@@ -327,3 +327,29 @@ test('pasted or uploaded JSON is parsed safely', () => {
   assert.match(failure(`${'['.repeat(200)}${']'.repeat(200)}`)[0].message, /nested/);
   assert.equal(parseSessionTemplateJson(JSON.stringify({ format, sessionName: '<b>Salon</b>' })).template.sessionName, '<b>Salon</b>');
 });
+
+test('secret scanning stays fast on hostile text near the size cap', () => {
+  for (const unit of ['a.', 'a', '-', '0', 'aA1', '-----BEGIN ', 'http://', '#&', 'Bearer ', 'sk-', 'x:', 'a://']) {
+    const text = unit.repeat(Math.floor(240000 / unit.length));
+    const started = performance.now();
+    validateSessionTemplate({ format, sessionInfo: text });
+    assert.ok(performance.now() - started < 1000, `${unit} took ${Math.round(performance.now() - started)} ms`);
+  }
+});
+
+test('ordinary links with hashes or k= stay valid; a fragment key does not', () => {
+  for (const url of [`https://etherscan.io/tx/0x${'ab'.repeat(32)}`, 'https://www.amazon.com/s?k=civic+tech']) {
+    assert.equal(validateSessionTemplate({ format, sessionContext: { links: [{ label: 'Link', url }] } }).ok, true, url);
+  }
+  assert.deepEqual(
+    errorsOf({ format, sessionInfo: 'Setup: https://contextengine.sh/new?sponsored=abc#k=secretbundlekey' }).map((error) => error.path),
+    ['sessionInfo'],
+  );
+});
+
+test('a template over the size cap cannot be exported, as it could not be imported', () => {
+  const result = sessionTemplateFromDraft({ sessionInfo: 'word '.repeat(SESSION_TEMPLATE_MAX_BYTES / 5) });
+  assert.equal(result.ok, false);
+  assert.deepEqual(result.errors.map((error) => error.path), ['']);
+  assert.match(result.errors[0].message, /larger than 256 KB/);
+});

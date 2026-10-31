@@ -14,10 +14,15 @@ export const SESSION_TEMPLATE_FORMAT = 'ce.session-template/v1';
 // Pasted, uploaded and unpacked template JSON stops at this size.
 export const SESSION_TEMPLATE_MAX_BYTES = 256 * 1024;
 
+const TOO_LARGE = `This template is larger than ${SESSION_TEMPLATE_MAX_BYTES / 1024} KB.`;
+
 const isRecord = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
 const hasOwn = (value, key) => Object.prototype.hasOwnProperty.call(value, key);
 const clone = (value) => JSON.parse(JSON.stringify(value));
 const failure = (path, message) => ({ ok: false, errors: [{ path, message }] });
+// UTF-8 is never shorter than UTF-16, so long text is refused before encoding.
+const utf8Length = (text) =>
+  text.length > SESSION_TEMPLATE_MAX_BYTES ? text.length : new TextEncoder().encode(text).byteLength;
 
 // Leaf types; an array holds the shape of its items; an object lists its fields.
 const TEXT = 'string';
@@ -192,18 +197,20 @@ const FIELD_RULES = {
 };
 
 // Secret-shaped text: provider keys, Cloudflare API tokens, private keys and
-// other 32-byte hex secrets, JSON Web Keys, PEM keys, bearer tokens and
-// credentials in links.
+// other 32-byte hex secrets (not hashes in a link's path), JSON Web Keys, PEM
+// keys, bearer tokens and credentials in links, including a setup link's #k=.
+// Every repeat is bounded or anchored by a literal, so scans stay linear.
 const SECRET_PATTERNS = [
   /\bsk-[\w-]{16,}/,
   /\bAIza[\w-]{30,}/,
   /\b(?:gsk|ghp|gho|ghu|ghs|ghr|github_pat|glpat|xox[abpr])[-_][\w-]{16,}/,
-  /\b(?:0x)?[0-9a-f]{64,}\b/i,
-  /-----BEGIN [A-Z ]*PRIVATE KEY-----/,
+  /(?<![/\w])(?:0x)?[0-9a-f]{64,}\b/i,
+  /-----BEGIN [A-Z ]{0,40}PRIVATE KEY-----/,
   /"kty"\s*:/,
   /\bBearer\s+[\w.~+/=-]{16,}/i,
-  /\b[a-z][a-z\d+.-]*:\/\/[^\s/?#@]*@/i,
-  /[?&#](?:access_token|api[_-]?key|key|k|token|secret|password|sig|signature|auth)=[^&#\s]/i,
+  /\b[a-z][a-z\d+.-]{0,31}:\/\/[^\s/?#@]*@/i,
+  /[?&#](?:access_token|api[_-]?key|key|token|secret|password|sig|signature|auth)=[^&#\s]/i,
+  /#(?:[^\s#]*&)?k=[^&#\s]/,
 ];
 const TOKEN_RUN = /(?<![\w-])[\w-]{40}(?![\w-])/g;
 const looksSecret = (text) =>
@@ -242,6 +249,8 @@ export const validateSessionTemplate = (input) => {
         message: `${path} looks like a key, token or password. Remove it: secrets are entered only where they are used.`,
       }),
     );
+  // The same cap as Import, so every exported template can be imported again.
+  if (utf8Length(JSON.stringify(template)) > SESSION_TEMPLATE_MAX_BYTES) errors.push({ path: '', message: TOO_LARGE });
   return errors.length ? { ok: false, errors } : { ok: true, template };
 };
 
@@ -278,9 +287,7 @@ const findUnsafeField = (root) => {
 
 export const parseSessionTemplateJson = (text) => {
   if (typeof text !== 'string') return failure('', 'A template must be JSON text.');
-  if (text.length > SESSION_TEMPLATE_MAX_BYTES || new TextEncoder().encode(text).byteLength > SESSION_TEMPLATE_MAX_BYTES) {
-    return failure('', `This template is larger than ${SESSION_TEMPLATE_MAX_BYTES / 1024} KB.`);
-  }
+  if (utf8Length(text) > SESSION_TEMPLATE_MAX_BYTES) return failure('', TOO_LARGE);
   let value;
   try {
     value = JSON.parse(text);
