@@ -1,7 +1,5 @@
-import { DEFAULT_AI_MODEL } from '../../../../shared/aiDefaults.mjs';
 import { inferAiProviderFromModel } from '../../../../shared/aiModelFamily.mjs';
 import { getChainById } from '../../variables/chains.js';
-import { getAiModelOptions } from '../Sessions/sessionWizardAiConfig';
 import { resolveSessionCapabilityProjection } from '../../utilities/session/sessionCapabilityProjection';
 import { toStr } from '../../utilities/shared/primitives.js';
 import { normalizeWorkerUrl as normalizeWorkerBaseUrl } from '../../utilities/worker/workerUrl.js';
@@ -100,14 +98,9 @@ export const resolveAdminAiTestModel = (aiValue: unknown): { provider: string; m
   );
   const providerModel = toStr(asAiRecord(asAiRecord(ai.providers)[provider]).model).trim();
   const fits = (model: string) => !!model && ['', provider].includes(inferAiProviderFromModel(model));
-  const fallback =
-    provider === 'anthropic'
-      ? getAiModelOptions('fast', 'anthropic')[0]
-      : provider === 'openrouter'
-        ? `openai/${DEFAULT_AI_MODEL}`
-        : DEFAULT_AI_MODEL;
-  const model =
-    (fits(fastModel) ? fastModel : '') || providerModel || (fits(legacyModel) ? legacyModel : '') || fallback;
+  // With no stored model the ping names none, so each Worker uses its own default;
+  // older Workers refuse this release's defaults.
+  const model = (fits(fastModel) ? fastModel : '') || providerModel || (fits(legacyModel) ? legacyModel : '');
   return { provider, model };
 };
 

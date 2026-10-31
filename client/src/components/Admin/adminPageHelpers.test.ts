@@ -11,7 +11,6 @@ import {
   resolveAdminCapabilities,
 } from './adminPageHelpers';
 import { inferAiProviderFromModel } from '../../../../shared/aiModelFamily.mjs';
-import { DEFAULT_AI_MODEL } from '../../../../shared/aiDefaults.mjs';
 import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';
 
 describe('adminPageHelpers', () => {
@@ -30,18 +29,16 @@ describe('adminPageHelpers', () => {
     expect(inferAiProviderFromModel('openai/gpt-4o-mini')).toBe('openrouter');
   });
 
-  it('pings the session’s everyday model, or the provider’s current default', () => {
+  it('pings the session’s everyday model, or names none so the Worker picks', () => {
     expect(resolveAdminAiTestModel({ models: { fast: { provider: 'anthropic', model: 'claude-opus-5-5' } } })).toEqual({
       provider: 'anthropic',
       model: 'claude-opus-5-5',
     });
     expect(resolveAdminAiTestModel({ models: { fast: { provider: 'anthropic' } } })).toEqual({
       provider: 'anthropic',
-      model: 'claude-sonnet-5-5',
+      model: '',
     });
-    expect(resolveAdminAiTestModel({ models: { fast: { provider: 'anthropic', model: 'gpt-5' } } }).model).toBe(
-      'claude-sonnet-5-5',
-    );
+    expect(resolveAdminAiTestModel({ models: { fast: { provider: 'anthropic', model: 'gpt-5' } } }).model).toBe('');
     expect(
       resolveAdminAiTestModel({ mode: 'anthropic', providers: { anthropic: { model: 'claude-haiku-5-5' } } }),
     ).toEqual({ provider: 'anthropic', model: 'claude-haiku-5-5' });
@@ -49,11 +46,8 @@ describe('adminPageHelpers', () => {
       provider: 'anthropic',
       model: 'claude-fable-5-1',
     });
-    expect(resolveAdminAiTestModel({ provider: 'openrouter' })).toEqual({
-      provider: 'openrouter',
-      model: `openai/${DEFAULT_AI_MODEL}`,
-    });
-    expect(resolveAdminAiTestModel(null)).toEqual({ provider: 'openai', model: DEFAULT_AI_MODEL });
+    expect(resolveAdminAiTestModel({ provider: 'openrouter' })).toEqual({ provider: 'openrouter', model: '' });
+    expect(resolveAdminAiTestModel(null)).toEqual({ provider: 'openai', model: '' });
   });
 
   it('counts sessions for registry chains and builds explorer links', () => {

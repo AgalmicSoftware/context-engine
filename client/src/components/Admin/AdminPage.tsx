@@ -1714,7 +1714,7 @@ const AdminPageRuntime = ({
       const payload = {
         action: 'ai',
         provider: providerMode,
-        model,
+        ...(model ? { model } : {}),
         messages: [{ role: 'user', content: 'ping' }],
         max_tokens: 8,
         temperature: 0,
