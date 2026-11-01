@@ -1,3 +1,4 @@
+import { useLayoutEffect, useRef } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCaretDown, faTimes } from '@fortawesome/free-solid-svg-icons';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
@@ -48,16 +49,30 @@ type SessionListeningTranscriptProps = {
   onClear: () => void;
 };
 
-// The open transcript: read-only text with a clear control in its corner.
+// Within about a line of the end still counts as reading the newest line.
+const FOLLOW_SLACK_PX = 24;
+
+// The open transcript: read-only text with a clear control in its corner. As chunks arrive it keeps
+// the newest line in view, unless the host has scrolled up to reread; scrolling back to the end resumes.
 export function SessionListeningTranscript({ transcript, clearDisabled, onClear }: SessionListeningTranscriptProps) {
+  const boxRef = useRef<HTMLTextAreaElement | null>(null);
+  const followRef = useRef(true);
+  useLayoutEffect(() => {
+    const box = boxRef.current;
+    if (box && followRef.current) box.scrollTop = box.scrollHeight;
+  }, [transcript]);
   return (
     <div className={styles.sessionListeningTranscriptDetails}>
       <div className={styles.sessionListeningTranscriptShell}>
         <textarea
+          ref={boxRef}
           className={styles.sessionListeningTranscript}
           value={transcript}
           readOnly
           placeholder="Transcript"
+          onScroll={({ currentTarget: box }) => {
+            followRef.current = box.scrollHeight - box.scrollTop - box.clientHeight <= FOLLOW_SLACK_PX;
+          }}
           data-testid={E2E_TESTIDS.SESSION_LISTENING_TRANSCRIPT}
         />
         <button
