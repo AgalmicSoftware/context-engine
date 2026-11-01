@@ -204,7 +204,7 @@ All notable changes to this project will be documented in this file.
 
 - Mark research summaries incomplete when they hold records an earlier Worker wrote without a participant or run, instead of showing an invented participant.
 
-- Prepare MCP 0.1.3 with the package fixes since 0.1.2; application and MCP versions remain independent.
+- Prepare MCP 0.2.0 with shared rating validation: fractional grids are supported, and new answers must follow the stored step (default 1). Existing answers remain unchanged. The minor version marks the changed accepted-input behavior; application and MCP versions remain independent.
 
 - Summarize research runs from bounded per-principal journal coverage, storing each frozen question list once. Summary exports read attempt metadata and one answer state per principal instead of every answer event.
 
