@@ -533,11 +533,10 @@ $user-page-background: var(--ce-surface-sunken);
   }
   li {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     margin-bottom: 10px;
   }
   li a {
-    flex-grow: 1;
     color: $clickable-color;
     text-decoration: none;
     &:hover {
@@ -546,8 +545,24 @@ $user-page-background: var(--ce-surface-sunken);
   }
 }
 
+// The label wraps, so the icon buttons beside it stay inside a narrow card.
+.uploadedQuestionLabel {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.uploadedQuestionId {
+  font-family: var(--ce-font-mono);
+  font-size: 0.8em;
+}
+
 .copyQuestionIdButton,
 .bookmarkQuestionButton {
+  flex-shrink: 0;
   background: none;
   border: none;
   color: color-mix(in srgb, var(--ce-text-inverse) 50%, transparent);

@@ -524,6 +524,8 @@ interface CreateQuestionsAndSurveysState {
   surveyAddedSuccessfully: boolean;
   questionsAddedSuccessfully: boolean;
   uploadedQuestions: CreateQuestionsAndSurveysUploadedQuestion[];
+  // Prompt text of the last upload by lower-case question ID, for its success list only.
+  uploadedQuestionPrompts: Record<string, string>;
   submissionError: string;
   copySurveyIdSuccess: boolean;
   copySurveyLinkSuccess: boolean;
@@ -710,6 +712,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
       surveyAddedSuccessfully: false,
       questionsAddedSuccessfully: false,
       uploadedQuestions: [],
+      uploadedQuestionPrompts: {},
       submissionError: '',
       copySurveyIdSuccess: false,
       copySurveyLinkSuccess: false,
@@ -1413,6 +1416,8 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
     delete stateToSave.formValidationError;
     delete stateToSave.surveyAddedSuccessfully;
     delete stateToSave.questionsAddedSuccessfully;
+    // Uploaded prompts, including locked ones, stay out of browser storage.
+    delete stateToSave.uploadedQuestionPrompts;
 
     delete stateToSave.draftSaveFailed;
     return JSON.stringify(stateToSave);
@@ -2576,10 +2581,19 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
           setPublicationState(buildCreateSurveySubmitResetPatch());
           return;
         }
+        const uploadedQuestionPrompts = Object.fromEntries(
+          uniqueQuestions.map((q) => [String(q.id || '').toLowerCase(), String(q.prompt || '').trim()]),
+        );
         setPublicationState(
-          submitProps.preformedQuestions
-            ? buildCreateSurveyQuestionsSubmitSuccessPatch({ uploadedQuestions: submittedQuestions })
-            : buildCreateSurveyQuestionsSubmitSuccessPatch({ resetDraft: true, uploadedQuestions: submittedQuestions }),
+          {
+            ...(submitProps.preformedQuestions
+              ? buildCreateSurveyQuestionsSubmitSuccessPatch({ uploadedQuestions: submittedQuestions })
+              : buildCreateSurveyQuestionsSubmitSuccessPatch({
+                  resetDraft: true,
+                  uploadedQuestions: submittedQuestions,
+                })),
+            uploadedQuestionPrompts,
+          },
           () => {
             this.startCacheWatch();
             if (submitProps.preformedQuestions && submitProps.appendPreformedQuestions) {
@@ -4028,6 +4042,8 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
                     const idL = String(questionId).toLowerCase();
                     const bookmarked = this.state.bookmarkedQuestionsSet.has(idL);
                     const sessionSlug = this.getActiveSessionSlug();
+                    const shortId = `${questionId.substring(0, 10)}...${questionId.substring(questionId.length - 8)}`;
+                    const prompt = this.state.uploadedQuestionPrompts?.[idL] || '';
                     return (
                       <li
                         key={`uploaded-${questionId}-${index}`}
@@ -4037,9 +4053,13 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
                           .trim()
                           .toLowerCase()}
                       >
-                        <a href={`${window.location.origin}${buildQuestionRoutePath(questionId, { sessionSlug })}`}>
-                          {questionId.substring(0, 10)}...{questionId.substring(questionId.length - 8)}
-                        </a>
+                        {/* The question text tells uploads apart; the ID stays beneath it. */}
+                        <span className={styles.uploadedQuestionLabel}>
+                          <a href={`${window.location.origin}${buildQuestionRoutePath(questionId, { sessionSlug })}`}>
+                            {prompt || shortId}
+                          </a>
+                          {prompt ? <span className={styles.uploadedQuestionId}>{shortId}</span> : null}
+                        </span>
                         {arweaveTxId && (
                           <a
                             href={normalizeArweaveUrl(arweaveTxId, { contextLabel: 'create_survey_question_link' })}

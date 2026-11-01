@@ -742,6 +742,25 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
     expect(markup).toContain(`href="https://ar-io.example.test/${txId}"`);
   });
 
+  it('names each uploaded question by its text, with its ID beneath', () => {
+    const named = '0xaaaaaaaa11111111222222223333333344444444555555556666666677777777';
+    const unnamed = '0xbbbbbbbb11111111222222223333333344444444555555556666666688888888';
+    const instance = makeInstance();
+    instance.state = {
+      ...instance.state,
+      showAutoTool: false,
+      questionsAddedSuccessfully: true,
+      uploadedQuestions: [{ questionId: named }, { questionId: unnamed }],
+      uploadedQuestionPrompts: { [named]: 'Who should check an AI summary?' },
+    };
+
+    const items = collectTreeNodes(instance.render(), (node) => nodeHasClassName(node, 'uploadedQuestionLabel')).map(
+      (node) => renderToStaticMarkup(node as Parameters<typeof renderToStaticMarkup>[0]).replace(/<[^>]+>/g, '|'),
+    );
+
+    expect(items).toEqual(['||Who should check an AI summary?||0xaaaaaaaa...77777777||', '||0xbbbbbbbb...88888888||']);
+  });
+
   it('renders submitted-survey Arweave links against ar.io when direct mode is enabled', () => {
     const txId = '8_2VRRP5Ka0b5F9yiq_nm2hJto8qnQazZ2EtfLJ0viE';
     (globalThis as any).CE_ARWEAVE_DIRECT_TO_AR_IO = true;
