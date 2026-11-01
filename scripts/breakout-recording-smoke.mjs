@@ -89,20 +89,35 @@ try {
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false);
     await page.getByRole('button', { name: 'Close', exact: true }).click();
     await page.getByRole('dialog').waitFor({ state: 'hidden' });
+    const recorder = page.getByRole('dialog', { name: /Group Conversation/ });
     for (const dismissal of ['Close', 'Escape', 'outside']) {
       await page.getByRole('button', { name: 'Reopen recording' }).click();
       await page.getByRole('checkbox', { name: 'Label speakers' }).check();
       await page.getByTestId('ce-session-listening-start').click();
       await page.getByRole('button', { name: 'Stop recording' }).waitFor();
       transcriptionGate = new Promise(resolve => { releaseTranscription = resolve; });
-      if (dismissal === 'Close') await page.getByRole('button', { name: 'Close', exact: true }).click();
-      else if (dismissal === 'Escape') await page.keyboard.press('Escape');
-      else await page.getByRole('dialog').click({ position: { x: 2, y: 2 } });
+      const dismiss = () => (dismissal === 'Escape' ? page.keyboard.press('Escape') : recorder.click({ position: { x: 2, y: 2 } }));
+      if (dismissal === 'Close') {
+        // Closing during capture asks first; Stop ends the recording and closes once its audio has uploaded.
+        await page.getByRole('button', { name: 'Close', exact: true }).click();
+        await page.getByTestId('ce-recording-stop-confirm').click();
+      } else {
+        // Escape and a tap outside leave capture running; once it has stopped, they close the same way. Escape
+        // pressed within about 100 ms of Record after a reopen asks "Stop recording?" instead, so wait first.
+        await page.waitForTimeout(500);
+        await dismiss();
+        await page.waitForTimeout(500);
+        assert.equal(await page.getByRole('button', { name: 'Stop recording' }).isVisible(), true, `${dismissal} leaves capture running`);
+        await page.getByRole('button', { name: 'Stop recording' }).click();
+        await page.getByTestId('ce-session-listening-start').waitFor();
+        await page.waitForTimeout(500);
+        await dismiss();
+      }
       await page.getByText('Finalizing recording…').waitFor().catch(async error => { console.error('dismissal', dismissal, await page.locator('body').innerText()); throw error; });
       await page.keyboard.press('Escape');
-      assert.equal(await page.getByRole('dialog').isVisible(), true);
+      assert.equal(await recorder.isVisible(), true);
       releaseTranscription();
-      await page.getByRole('dialog').waitFor({ state: 'hidden' });
+      await recorder.waitFor({ state: 'hidden' });
       const saved = await page.evaluate(() => window.__loadSavedRecording());
       assert.equal(saved.length, ['Close', 'Escape', 'outside'].indexOf(dismissal) + 2);
       assert(saved.every(segment => segment.status === 'complete' && segment.text === 'Synthetic room transcript.'));
