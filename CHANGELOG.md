@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Improve footer contrast, link directly to the CommonGround environments and Truth-Seeking AI grant program, and refresh the README feature slideshow and architecture artwork.
 - Let long question prompts use spare card space at phone and tablet widths, moving answer controls down before reducing text size. Extremely long prompts remain keyboard-scrollable.
 - Match the Minimal mobile Login button height to the visible C logo artwork, excluding the SVG's transparent padding.
 - Correct light-theme contrast in raw question results, expanded answers, sorting/export controls, bookmarks, sync indicators and Worker group notices, including Classic 95 counters, links and binary-answer labels. Keep the results title readable at narrow widths. Browser coverage now checks these surfaces in all three themes.

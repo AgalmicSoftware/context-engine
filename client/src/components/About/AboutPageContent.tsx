@@ -130,6 +130,7 @@ type PracticeEntry = {
   id: string;
   title: string;
   url: string;
+  links?: RecognitionLink[];
   description: string;
   icon: IconDefinition;
   image?: string;
@@ -143,6 +144,12 @@ export const PRACTICE_ENTRIES: PracticeEntry[] = [
     id: 'cosmos-fire',
     title: 'Cosmos × FIRE grants',
     url: 'https://blog.cosmos-institute.org/p/announcing-80-new-cosmos-grantees',
+    links: [
+      {
+        url: 'https://www.fire.org/news/fire-and-cosmos-institute-launch-1-million-grant-program-ai-advances-truth-seeking',
+        text: 'Truth-Seeking AI grant program',
+      },
+    ],
     description:
       'Context Engine was selected for a Cosmos × FIRE AI for Truth-Seeking grant in September 2026, for group deliberation research testing how faithfully AI agents represent the people they act for.',
     icon: faAward,

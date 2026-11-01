@@ -339,9 +339,13 @@ describe('AboutPage', () => {
       '/posts/agent-village-wrapped',
     );
     expect(related.getByRole('heading', { name: 'Ladders Made of Numbers' })).toBeVisible();
-    expect(related.getByRole('link', { name: 'CommonGround · Prime Intellect' })).toHaveAttribute(
+    expect(related.getByRole('link', { name: 'CommonGround Predict' })).toHaveAttribute(
       'href',
-      'https://app.primeintellect.ai/dashboard/environments',
+      'https://app.primeintellect.ai/dashboard/environments/charliethompson/commonground-predict',
+    );
+    expect(related.getByRole('link', { name: 'CommonGround Elicit' })).toHaveAttribute(
+      'href',
+      'https://app.primeintellect.ai/dashboard/environments/charliethompson/commonground-elicit',
     );
     const practice = within(screen.getByTestId('ce-about-used-by'));
     expect(practice.getByRole('link', { name: 'Cosmos × FIRE grants' })).toHaveAttribute(
@@ -349,6 +353,13 @@ describe('AboutPage', () => {
       'https://blog.cosmos-institute.org/p/announcing-80-new-cosmos-grantees',
     );
     expect(practice.getByText(/Context Engine was selected for a Cosmos × FIRE/)).toBeVisible();
+    const fireProgram = practice.getByRole('link', { name: 'Truth-Seeking AI grant program' });
+    expect(fireProgram).toHaveAttribute(
+      'href',
+      'https://www.fire.org/news/fire-and-cosmos-institute-launch-1-million-grant-program-ai-advances-truth-seeking',
+    );
+    expect(fireProgram).toHaveAttribute('target', '_blank');
+    expect(fireProgram).toHaveAttribute('rel', 'noopener noreferrer');
     expect(practice.getByRole('link', { name: 'Foresight Institute grant · 2026' })).toHaveAttribute(
       'href',
       'https://foresight.org/grants/ai-science-safety-nodes-rfp/',
@@ -370,7 +381,7 @@ describe('AboutPage', () => {
     expect(artwork).toHaveLength(6);
     artwork.forEach((img) => fireEvent.error(img));
     expect(practice.queryAllByRole('presentation', { hidden: true })).toHaveLength(0);
-    expect(practice.getAllByRole('link')).toHaveLength(5);
+    expect(practice.getAllByRole('link')).toHaveLength(6);
     expect(screen.queryByRole('heading', { name: /^Media$/ })).not.toBeInTheDocument();
   });
 

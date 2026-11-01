@@ -338,10 +338,10 @@ it.each<WorkerGeneration>(['current', 'refuses labels', 'text only'])(
     setPage({ online: true });
 
     await runUntil(at(13));
-    // Later writes succeed, so chunk 4's transcript is saved after all and its audio let go.
+    // Later writes save chunk 4's transcript; completed audio stays available for the combined export.
     expect(statuses(view).slice(0, 4)).toEqual(['complete', 'complete', 'complete', 'complete']);
     expect(view.result.current.errorMessage).toBe('');
-    expect(view.result.current.downloadableChunkIds).toEqual([view.result.current.segments[4].id]);
+    expect(view.result.current.downloadableChunkIds).toEqual(view.result.current.segments.map((segment) => segment.id));
 
     await runUntil(at(15, 30));
     expect(mockWorker.uploads.every((upload) => upload.outcome)).toBe(true);
@@ -382,7 +382,7 @@ it.each<WorkerGeneration>(['current', 'refuses labels', 'text only'])(
     expect(FakeMediaRecorder.made).toHaveLength(12);
     expect(statuses(view)).toEqual([...Array(8).fill('complete'), 'failed', 'complete', 'complete', 'complete']);
     const speech = (chunks: number[]) => chunks.map((chunk) => `Chunk ${chunk} speech.`).join(' ');
-    const gap = '[Recording gap: chunk 9 could not be transcribed.]';
+    const gap = '[Recording gap: audio could not be transcribed.]';
     const call = '[Microphone paused for 1 min.]';
     // The room's one voice is Person 1 in every chunk, before and after the reload.
     expect(recorder.transcript).toBe(
@@ -410,19 +410,21 @@ it.each<WorkerGeneration>(['current', 'refuses labels', 'text only'])(
     expect(recorder.segments.some((segment) => segment.speakersRenumbered)).toBe(false);
     // Two presses of Record, one before and one after the reload; nothing else opened the microphone.
     expect(getUserMedia).toHaveBeenCalledTimes(2);
-    // Only the rejected chunk keeps its audio, and it downloads whole.
-    expect(recorder.downloadableChunkIds).toEqual([rejected.id]);
+    // Successful and rejected chunks survive the reload and remain downloadable in full.
+    expect(recorder.downloadableChunkIds).toEqual(recorder.segments.map((segment) => segment.id));
     const downloads: Blob[] = [];
     const urls = { create: URL.createObjectURL, revoke: URL.revokeObjectURL };
     const click = jest.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
     Object.assign(URL, { createObjectURL: (blob: Blob) => `blob:${downloads.push(blob)}`, revokeObjectURL: () => {} });
     try {
+      act(() => recorder.downloadChunk(recorder.segments[0].id));
       act(() => recorder.downloadChunk(rejected.id));
     } finally {
       Object.assign(URL, { createObjectURL: urls.create, revokeObjectURL: urls.revoke });
       click.mockRestore();
     }
     expect(downloads.map((blob) => decodeAudio(blob.size))).toEqual([
+      { chunk: 1, fragments: FakeMediaRecorder.made[0].emitted },
       { chunk: 9, fragments: FakeMediaRecorder.made[8].emitted },
     ]);
 
@@ -447,13 +449,13 @@ it.each<WorkerGeneration>(['current', 'refuses labels', 'text only'])(
     expect(voices?.knownSpeakers?.map(({ name, sample }) => [name, sample.length])).toEqual(
       generation === 'current' ? [['Person 1', 'data:audio/wav;base64,'.length + ((44 + 160_000) / 3) * 4]] : undefined,
     );
-    // Device storage keeps every chunk in one recording, and audio only for the rejected one.
+    // Device storage keeps every chunk's audio in one recording for a complete local export.
     const stored = [...mockStore.records.values()].filter((record) => record.segment.index >= 0);
     expect(stored).toHaveLength(12);
     expect(new Set(stored.map((record) => record.scope)).size).toBe(1);
-    expect(stored.filter((record) => record.audio).map((record) => record.segment)).toEqual([
-      expect.objectContaining({ id: rejected.id, status: 'failed' }),
-    ]);
+    expect(stored.filter((record) => record.audio).map((record) => record.segment.id)).toEqual(
+      recorder.segments.map((segment) => segment.id),
+    );
     view.unmount();
   },
   60_000,

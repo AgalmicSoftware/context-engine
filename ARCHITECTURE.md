@@ -4,7 +4,7 @@
 
 ## Deployment Profiles
 
-![Context Engine deployment modes](docs/assets/readme-architecture-deployment-modes.jpg)
+![Context Engine architecture: fingerprint passkey web sign-in and agent access, Session Worker services, an Access / Network / Data / AI icon legend, and connected deployment modes](docs/assets/readme-architecture-session-worker-mcp.png)
 
 App hosting, public/private session access, and session infrastructure are
 separate choices. A publicly hosted web app can open either a private

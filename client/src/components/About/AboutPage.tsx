@@ -493,21 +493,30 @@ const AboutPage = () => {
                 <li className={styles.featureItem}>
                   <div className={styles.relatedCardHeading}>
                     <span className={styles.relatedPill}>eval</span>
-                    <h3 className={styles.featureLabel}>
-                      <a
-                        href="https://app.primeintellect.ai/dashboard/environments"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        CommonGround · Prime Intellect
-                      </a>
-                    </h3>
+                    <h3 className={styles.featureLabel}>CommonGround · Prime Intellect</h3>
                   </div>
                   <p className={styles.featureText}>
                     Context Engine exports deliberation data for CommonGround, an evaluation environment designed for
                     Prime Intellect’s tooling. Models predict held-out participant responses and receive deterministic
                     scores. This work connects a company’s stakeholder feedback to tests of how well its AI represents
                     those preferences.
+                  </p>
+                  <p className={styles.featureText}>
+                    <a
+                      href="https://app.primeintellect.ai/dashboard/environments/charliethompson/commonground-predict"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      CommonGround Predict
+                    </a>
+                    {' · '}
+                    <a
+                      href="https://app.primeintellect.ai/dashboard/environments/charliethompson/commonground-elicit"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      CommonGround Elicit
+                    </a>
                   </p>
                 </li>
                 <li className={styles.featureItem}>
@@ -588,6 +597,13 @@ const AboutPage = () => {
                         </h4>
                       </div>
                       <p className={styles.featureText}>{entry.description}</p>
+                      {entry.links?.map((link) => (
+                        <p className={styles.featureText} key={link.url}>
+                          <a href={link.url} target="_blank" rel="noopener noreferrer">
+                            {link.text}
+                          </a>
+                        </p>
+                      ))}
                     </li>
                   ))}
                 </ul>
