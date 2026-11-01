@@ -2,7 +2,6 @@ import { getEffectiveTranscriptionConfig } from '../../utilities/ai/aiSettings';
 import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
-  faCaretDown,
   faCircle,
   faMicrophone,
   faPause,
@@ -21,6 +20,7 @@ import SessionRecordingInput from './SessionRecordingInput';
 import SessionRecordingHelp from './SessionRecordingHelp';
 import { SessionRecordingNotices } from './SessionRecordingNotices';
 import { SessionNewDraftsCue } from './SessionNewDraftsCue';
+import { SessionListeningTranscript, SessionListeningTranscriptToggle } from './SessionListeningTranscript';
 import { useRollingTranscriptionRecorder } from '../../utilities/audio/useRollingTranscriptionRecorder';
 import { DEFAULT_ROLLING_TRANSCRIPTION_CHUNK_MS, transcriptSpeech } from '../../utilities/audio/rollingTranscription';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
@@ -833,27 +833,12 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
             </span>
           )}
           {hasTranscript && (
-            <button
-              type="button"
-              className={styles.sessionListeningTranscriptButton}
-              onClick={() => setIsTranscriptOpen((open) => !open)}
-              aria-expanded={isTranscriptOpen}
-              aria-busy={hasPendingTranscription}
-              data-testid={E2E_TESTIDS.SESSION_LISTENING_TRANSCRIPT_DETAILS}
-            >
-              <span>Transcript</span>
-              <span>{trimmedTranscript.length} chars</span>
-              <FontAwesomeIcon
-                icon={faCaretDown}
-                className={[
-                  styles.sessionListeningTranscriptCaret,
-                  isTranscriptOpen ? styles.sessionListeningTranscriptCaretExpanded : '',
-                ]
-                  .filter(Boolean)
-                  .join(' ')}
-                aria-hidden="true"
-              />
-            </button>
+            <SessionListeningTranscriptToggle
+              length={trimmedTranscript.length}
+              open={isTranscriptOpen}
+              pending={hasPendingTranscription}
+              onToggle={() => setIsTranscriptOpen((open) => !open)}
+            />
           )}
           {isGenerating && <span>{`Generating questions... ${generationElapsedSeconds}s`}</span>}
         </div>
@@ -920,32 +905,15 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
       />
 
       {hasTranscript && isTranscriptOpen && (
-        <div className={styles.sessionListeningTranscriptDetails}>
-          <div className={styles.sessionListeningTranscriptShell}>
-            <textarea
-              className={styles.sessionListeningTranscript}
-              value={recorder.transcript}
-              readOnly
-              placeholder="Transcript"
-              data-testid={E2E_TESTIDS.SESSION_LISTENING_TRANSCRIPT}
-            />
-            <button
-              type="button"
-              className={styles.sessionListeningClearTranscript}
-              onClick={() => (retainedAudioCount ? setConfirmClear(true) : handleClear())}
-              disabled={
-                isRecorderSessionActive ||
-                recorder.isBusy ||
-                recorder.segments.some((segment) => !['complete', 'failed'].includes(segment.status))
-              }
-              aria-label="Clear transcript"
-              title="Clear transcript"
-              data-testid={E2E_TESTIDS.SESSION_LISTENING_CLEAR}
-            >
-              <FontAwesomeIcon icon={faTimes} />
-            </button>
-          </div>
-        </div>
+        <SessionListeningTranscript
+          transcript={recorder.transcript}
+          clearDisabled={
+            isRecorderSessionActive ||
+            recorder.isBusy ||
+            recorder.segments.some((segment) => !['complete', 'failed'].includes(segment.status))
+          }
+          onClear={() => (retainedAudioCount ? setConfirmClear(true) : handleClear())}
+        />
       )}
 
       <CEConfirmDialog
