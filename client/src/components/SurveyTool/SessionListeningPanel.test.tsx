@@ -189,17 +189,36 @@ describe('SessionListeningPanel', () => {
         downloadableChunkIds: ['stuck'],
         retryChunk,
         downloadRecording,
-        errorMessage: 'Storage is full. Free storage, then Retry.',
+        errorMessage: 'Transcription is unavailable. Retry later.',
       }),
     );
     render(<SessionListeningPanel sessionSlug="workshop" />);
-    expect(screen.getByRole('alert')).toHaveTextContent('Storage is full');
+    expect(screen.getByRole('alert')).toHaveTextContent('Transcription is unavailable');
     fireEvent.click(screen.getByRole('button', { name: 'Retry transcription' }));
     expect(retryChunk).toHaveBeenCalledWith('stuck');
     expect(screen.queryByTestId('ce-recording-chunks')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Download audio' }));
     await waitFor(() => expect(downloadRecording).toHaveBeenCalledTimes(1));
     expect(screen.queryByTestId('ce-recording-chunks')).not.toBeInTheDocument();
+  });
+
+  it('offers the original audio of each part while device storage fails, even during capture', () => {
+    const downloadChunk = jest.fn();
+    (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+      buildRecorder({
+        isRecording: true,
+        status: 'recording',
+        segments: [{ id: 'live', index: 0, status: 'recording', text: '', startedAt: 1 }],
+        downloadableChunkIds: ['live'],
+        downloadChunk,
+        storageFailed: true,
+        errorMessage: "This recording can't be recovered after a reload.",
+      }),
+    );
+    render(<SessionListeningPanel sessionSlug="workshop" panelMode="recordGroup" />);
+    expect(screen.getByRole('list', { name: 'Original audio downloads' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Download chunk 1' }));
+    expect(downloadChunk).toHaveBeenCalledWith('live');
   });
 
   it('lets the recorder retry a chunk that is stuck uploading', () => {

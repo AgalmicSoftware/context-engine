@@ -902,6 +902,7 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
         onDownload={recorder.downloadChunk}
         onDownloadRecording={recorder.downloadRecording}
         capturing={isRecorderSessionActive}
+        storageFailed={recorder.storageFailed}
       />
 
       {hasTranscript && isTranscriptOpen && (

@@ -1021,6 +1021,7 @@ describe('useRollingTranscriptionRecorder', () => {
       expect(result.current.isRecording).toBe(true);
       expect(instances[0].stop).not.toHaveBeenCalled();
       expect(result.current.errorMessage).toContain("This recording can't be recovered after a reload");
+      expect(result.current.storageFailed).toBe(true);
       expect(result.current.downloadableChunkIds).toHaveLength(1);
       expect(transcribeAudio).not.toHaveBeenCalled();
       await act(async () => {

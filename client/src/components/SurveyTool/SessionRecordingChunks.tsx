@@ -20,6 +20,8 @@ type Props = {
   onDownload: (id: string) => void;
   onDownloadRecording: (onProgress: (percent: number) => void) => Promise<void>;
   capturing?: boolean;
+  // Device storage failed, so only this page may hold the audio: each part stays downloadable, even during capture.
+  storageFailed?: boolean;
 };
 
 export function SessionRecordingChunks({
@@ -29,6 +31,7 @@ export function SessionRecordingChunks({
   onDownload,
   onDownloadRecording,
   capturing = false,
+  storageFailed = false,
 }: Props) {
   const [downloadError, setDownloadError] = useState('');
   const [downloading, setDownloading] = useState(false);
@@ -88,7 +91,7 @@ export function SessionRecordingChunks({
         </small>
       )}
       {downloadError && <p role="alert">{downloadError}</p>}
-      {downloadError && (
+      {(downloadError || storageFailed) && downloadableChunkIds.length > 0 && (
         <ol className={styles.chunks} aria-label="Original audio downloads" data-testid="ce-recording-chunks">
           {segments
             .filter((segment) => downloadableChunkIds.includes(segment.id))
