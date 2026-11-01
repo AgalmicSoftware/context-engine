@@ -17,6 +17,7 @@ import styles from './SurveyTool.module.scss';
 import CreateQuestionsAndSurveys from './CreateQuestionsAndSurveys';
 import CEConfirmDialog from '../Shared/CEConfirmDialog';
 import { SessionRecordingChunks } from './SessionRecordingChunks';
+import { SessionRecordingNotices } from './SessionRecordingNotices';
 import { useRollingTranscriptionRecorder } from '../../utilities/audio/useRollingTranscriptionRecorder';
 import { DEFAULT_ROLLING_TRANSCRIPTION_CHUNK_MS, transcriptSpeech } from '../../utilities/audio/rollingTranscription';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
@@ -84,9 +85,6 @@ export const formatSessionRecordingElapsed = (secondsRaw: unknown) => {
   const rest = seconds % 60;
   return `${minutes}:${String(rest).padStart(2, '0')}`;
 };
-
-const RENUMBERED_HELP =
-  'No voice in these chunks matched an earlier one, often because the Session Worker predates voice samples. Person 1 there may be someone else. Updating the Worker keeps Person numbers the same across chunks.';
 
 const KEEP_AUDIO_HELP =
   'Closes without waiting for transcription. Audio still waiting for it stays on this device and resumes uploading when you reopen this recording.';
@@ -390,7 +388,6 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
   const speakerHelpId = `ce-record-speaker-help-${useId().replace(/:/g, '')}`;
   const labelsHelpId = `ce-speaker-labels-help-${useId().replace(/:/g, '')}`;
   const keepHelpId = `ce-keep-audio-help-${useId().replace(/:/g, '')}`;
-  const renumberedHelpId = `ce-renumbered-help-${useId().replace(/:/g, '')}`;
   const recordingContext = useMemo(
     () => ({
       ...(context && typeof context === 'object' ? context : {}),
@@ -462,9 +459,6 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
   }, [embeddedInModal, isRecorderSessionActive]);
 
   const spokenLength = useMemo(() => transcriptSpeech(trimmedTranscript).length, [trimmedTranscript]);
-  const renumberedChunks = recorder.segments
-    .filter((segment) => segment.speakersRenumbered)
-    .map((segment) => segment.index + 1);
   const canGenerate = !isClosing && spokenLength >= 50 && !isGenerating && !hasPendingTranscription;
   // Failed chunks and memory-only copies hold audio no saved transcript covers; Clear asks before deleting it.
   const retainedAudioCount = recorder.downloadableChunkIds?.length ?? 0;
@@ -766,86 +760,11 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
           </UncontrolledTooltip>
         </span>
       ) : null}
-      {panelMode === 'recordGroup' && speakerLabelsCheckTimedOut ? (
-        <div role="status">Speaker label check timed out. Recording is available with plain transcription.</div>
-      ) : null}
-      {recorder.labelsUnavailableReason ? (
-        <div role="status">{recorder.labelsUnavailableReason} Continuing with plain transcription.</div>
-      ) : null}
-      {renumberedChunks.length ? (
-        <span className={styles.sessionRecordingOption}>
-          <span role="status">
-            Person numbers restart in {renumberedChunks.length === 1 ? 'chunk' : 'chunks'} {renumberedChunks.join(', ')}
-            .
-          </span>
-          <button
-            type="button"
-            id={renumberedHelpId}
-            className={styles.sessionInterviewHeaderButton}
-            aria-label="About restarted Person numbers"
-            aria-describedby={`${renumberedHelpId}-about`}
-          >
-            <FontAwesomeIcon icon={faQuestionCircle} />
-          </button>
-          <span id={`${renumberedHelpId}-about`} hidden>
-            {RENUMBERED_HELP}
-          </span>
-          <UncontrolledTooltip target={renumberedHelpId} trigger="hover focus" autohide={false}>
-            {RENUMBERED_HELP}
-          </UncontrolledTooltip>
-        </span>
-      ) : null}
-      {recorder.hiddenPeriods?.length ? (
-        <div className={styles.sessionRecordingWakeNotice} role="status">
-          {recorder.hiddenPeriods.map((period, index) => (
-            <p key={`${period.startedAt}-${index}`}>
-              The page was hidden{' '}
-              {new Date(period.startedAt).toLocaleTimeString([], {
-                hour: '2-digit',
-                minute: '2-digit',
-                hourCycle: 'h23',
-              })}
-              –
-              {new Date(period.endedAt).toLocaleTimeString([], {
-                hour: '2-digit',
-                minute: '2-digit',
-                hourCycle: 'h23',
-              })}
-              ; recording may have paused.
-            </p>
-          ))}
-          <Button
-            size="sm"
-            className={styles.sessionInterviewHeaderButton}
-            onClick={recorder.dismissHiddenPeriods}
-            aria-label="Dismiss hidden-page notice"
-          >
-            Dismiss
-          </Button>
-        </div>
-      ) : null}
-      {isRecorderSessionActive && recorder.captureNotice ? (
-        <div className={styles.sessionRecordingWakeNotice} role="status">
-          {recorder.captureNotice}
-        </div>
-      ) : null}
-      {isRecorderSessionActive && recorder.microphonePaused ? (
-        <div className={styles.sessionRecordingWakeNotice} role="status">
-          Microphone paused by the device. Recording resumes when it returns.
-        </div>
-      ) : null}
-      {isRecorderSessionActive && recorder.backBlocked ? (
-        <div className={styles.sessionRecordingWakeNotice} role="status">
-          Still recording. Press Stop before leaving.
-        </div>
-      ) : null}
-      {isRecorderSessionActive && (recorder.pageHidden || !recorder.wakeLockHeld) ? (
-        <div className={styles.sessionRecordingWakeNotice} role="status">
-          {recorder.pageHidden
-            ? 'Recording page is hidden. Return to this page; your phone may pause the microphone in the background.'
-            : 'Screen lock is unavailable. Keep this page visible and the screen unlocked.'}
-        </div>
-      ) : null}
+      <SessionRecordingNotices
+        recorder={recorder}
+        capturing={isRecorderSessionActive}
+        labelCheckTimedOut={panelMode === 'recordGroup' && speakerLabelsCheckTimedOut}
+      />
       {isRecorderSessionActive ? (
         <div className={styles.sessionListeningActiveRecorder}>
           <div className={styles.sessionListeningWaveformShell}>
