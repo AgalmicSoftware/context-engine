@@ -9,11 +9,20 @@ assert(['localhost', '127.0.0.1'].includes(new URL(base).hostname), 'Use a local
 const output = process.env.OUTPUT_DIR || '/tmp/ce-recording-recovery';
 await fs.mkdir(output, { recursive: true });
 const browser = await chromium.launch({ headless: true });
+// The recorder shows no chunk rows unless an export or device storage fails, so chunk states come from the store.
 const snapshot = page => page.evaluate(async () => {
   const { listRecordingChunks } = await import('/src/utilities/audio/recordingChunkStore.ts');
   return (await listRecordingChunks(JSON.stringify(['https://worker.example', 'recovery', ''])))
+    .filter(record => record.segment.index >= 0).sort((a, b) => a.segment.index - b.segment.index)
     .map(record => ({ id: record.segment.id, status: record.segment.status, size: record.audio?.size, text: record.segment.text }));
 });
+// Polled from here: waitForFunction takes the promise an async predicate returns as true at once.
+const until = async (page, label, check) => {
+  for (const started = Date.now(); Date.now() - started < 30000; await new Promise(resolve => setTimeout(resolve, 200)))
+    if (check(await snapshot(page))) return;
+  assert.fail(`${label}: ${JSON.stringify(await snapshot(page))}`);
+};
+const chunkIs = (page, index, status) => until(page, `Chunk ${index + 1} ${status}`, chunks => chunks[index]?.status === status);
 try {
   for (const theme of ['civic', 'context-engine']) {
     const page = await browser.newPage({ viewport: { width: 375, height: 900 }, acceptDownloads: true });
@@ -66,28 +75,31 @@ try {
     await page.getByRole('button', { name: 'Stop recording' }).waitFor();
     assert.equal(await page.evaluate(() => window.__timeslice), 1000);
     await page.evaluate(() => window.__recorder.requestData());
-    await page.waitForFunction(async () => {
-      const { listRecordingChunks } = await import('/src/utilities/audio/recordingChunkStore.ts');
-      return (await listRecordingChunks(JSON.stringify(['https://worker.example', 'recovery', ''])))[0]?.audio?.size === 256;
-    });
+    await until(page, 'Partial capture saved', chunks => chunks[0]?.size === 256);
     assert.equal(attempts, 0, 'Partial capture is saved without uploading a dependent fragment');
     await page.evaluate(() => window.__signIn());
     assert.equal(await page.getByRole('button', { name: 'Stop recording' }).isVisible(), true, 'Sign-in leaves capture running');
     await page.reload();
-    await page.getByText('Transcribed', { exact: true }).waitFor({ timeout: 20000 });
+    await chunkIs(page, 0, 'complete');
     assert.equal(attempts, 3, 'Reloaded raw audio retries twice before succeeding');
     assert.deepEqual((await snapshot(page)).map(record => [record.status, record.size, record.text]), [['complete', undefined, 'Recovered room transcript.']]);
     assert.equal(await page.evaluate(() => window.__recorder), undefined, 'Recovery does not acquire the microphone');
 
     failure = 'always'; attempts = 0;
+    const gap = page.getByRole('status').filter({ hasText: "Some audio couldn't be transcribed." });
     await page.getByTestId('ce-session-listening-start').click();
     await page.getByRole('button', { name: 'Stop recording' }).click();
-    await page.getByText('Failed', { exact: true }).waitFor({ timeout: 30000 });
+    await chunkIs(page, 1, 'failed');
+    await gap.waitFor();
     assert.equal(attempts, 1);
     await page.getByRole('button', { name: 'Close and keep the audio' }).click();
     await page.getByRole('button', { name: 'Reopen recording' }).click();
-    await page.getByText('Failed', { exact: true }).waitFor();
+    await gap.waitFor();
+    assert.equal((await snapshot(page))[1].status, 'failed');
     assert.equal(attempts, 1, 'Reopening preserves a permanent failure until explicitly retried');
+    // The fake audio can't be decoded, so the MP3 export fails and offers the original file instead.
+    await page.getByRole('button', { name: 'Download audio' }).click();
+    await page.getByRole('alert').filter({ hasText: 'Some audio could not be decoded.' }).waitFor();
     const downloadPromise = page.waitForEvent('download');
     await page.getByRole('button', { name: 'Download chunk 2' }).click();
     const download = await downloadPromise;
@@ -100,9 +112,9 @@ try {
     await page.getByTestId('ce-recording-chunks').screenshot({ path: path.join(output, `${theme}-failed.png`) });
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false);
     failure = 'never';
-    await page.getByRole('button', { name: 'Retry chunk 2' }).click();
-    await page.waitForFunction(() => document.querySelectorAll('[data-testid="ce-recording-chunks"] [role="status"]')[1]?.textContent === 'Transcribed');
-    assert.equal((await snapshot(page))[1].size, undefined);
+    await page.getByRole('button', { name: 'Retry transcription' }).click();
+    await chunkIs(page, 1, 'complete');
+    assert.equal((await snapshot(page))[1].size, undefined, 'The transcript replaces the audio');
 
     await page.evaluate(() => {
       window.__originalIdbPut = IDBObjectStore.prototype.put;
@@ -114,21 +126,24 @@ try {
     await page.getByTestId('ce-session-listening-start').click();
     await page.getByRole('button', { name: 'Stop recording' }).waitFor();
     await page.evaluate(() => window.__recorder.requestData());
-    await page.getByRole('alert').filter({ hasText: "This recording can't be recovered after a reload" }).waitFor();
+    const unsaved = page.getByRole('alert').filter({ hasText: "This recording can't be recovered after a reload" });
+    await unsaved.waitFor();
     assert.equal(await page.getByRole('button', { name: 'Stop recording' }).isVisible(), true);
+    assert.equal(await page.getByRole('button', { name: 'Download chunk 3' }).isVisible(), true, 'Audio only memory holds stays downloadable during capture');
     await page.getByRole('button', { name: 'Stop recording' }).click();
-    await page.waitForFunction(() => document.querySelectorAll('[data-testid="ce-recording-chunks"] [role="status"]')[2]?.textContent === 'Transcribed');
-    assert.equal(await page.getByRole('button', { name: 'Download chunk 3' }).isVisible(), true);
+    // Once transcribed, the page keeps only the transcript, so the audio is no longer offered.
+    await page.getByRole('button', { name: 'Download chunk 3' }).waitFor({ state: 'detached', timeout: 30000 });
     await page.evaluate(() => { IDBObjectStore.prototype.put = window.__originalIdbPut; });
     await page.evaluate(() => window.dispatchEvent(new Event('online')));
-    await page.waitForFunction(() => document.querySelectorAll('[data-testid="ce-recording-chunks"] [role="status"]')[2]?.textContent === 'Transcribed');
+    await chunkIs(page, 2, 'complete');
+    await unsaved.waitFor({ state: 'detached' });
 
     await page.context().setOffline(true);
     await page.getByTestId('ce-session-listening-start').click();
     await page.getByRole('button', { name: 'Stop recording' }).click();
     await page.getByRole('alert').filter({ hasText: 'Offline' }).waitFor();
     await page.context().setOffline(false);
-    await page.waitForFunction(() => document.querySelectorAll('[data-testid="ce-recording-chunks"] [role="status"]')[3]?.textContent === 'Transcribed');
+    await chunkIs(page, 3, 'complete');
 
     await page.getByTestId('ce-session-listening-start').click();
     await page.getByRole('button', { name: 'Stop recording' }).waitFor();
@@ -146,7 +161,7 @@ try {
     await page.getByText(/The page was hidden .*recording may have paused/).waitFor();
     await page.getByRole('button', { name: 'Dismiss hidden-page notice' }).click();
     assert.equal(await page.getByText(/The page was hidden/).count(), 0);
-    await page.waitForFunction(() => document.querySelectorAll('[data-testid="ce-recording-chunks"] [role="status"]')[4]?.textContent === 'Transcribed');
+    await chunkIs(page, 4, 'complete');
     assert.deepEqual(errors, []);
     console.log(`PASS ${theme}: native IndexedDB partial recovery, ordered automatic retries, exact audio download, manual retry, raw deletion after transcript, quota/offline/microphone/visibility recovery`);
     await page.close();
