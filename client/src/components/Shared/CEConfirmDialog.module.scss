@@ -100,13 +100,13 @@
 }
 
 .dangerButton {
-  color: var(--ce-text-inverse);
+  color: var(--ce-status-error-contrast);
   border-color: var(--ce-status-error);
   background: var(--ce-status-error);
 
   &:hover,
   &:focus {
-    color: var(--ce-text-inverse);
+    color: var(--ce-status-error-contrast);
     border-color: var(--ce-status-error);
     background: var(--ce-status-error);
   }
