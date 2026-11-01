@@ -140,6 +140,37 @@ test('verify-public-release-pii fails emails, home paths, secrets, PEMs, and pri
   });
 });
 
+test('verify-public-release-pii rejects provider-shaped fixtures without credential field names', () => {
+  withFixture((rootDir) => {
+    const keys = ['sk', 'rk'].flatMap((kind) =>
+      ['live', 'test'].map((mode) => [kind, mode, 'fixture'.repeat(4)].join('_')),
+    );
+    writeFile(rootDir, 'tests/secret-shapes.test.js', keys.map((key) => `'${key}',`).join('\n'));
+
+    const result = runScanner(rootDir);
+
+    assert.equal(result.status, 1);
+    keys.forEach((key, index) => {
+      assert.ok(result.stderr.includes(`FAIL provider-api-key: tests/secret-shapes.test.js:${index + 1}:`));
+      assert.equal(result.stderr.includes(key), false, 'Diagnostics must redact the matched value');
+    });
+  });
+});
+
+test('verify-public-release-pii accepts generated synthetic fixtures and short provider labels', () => {
+  withFixture((rootDir) => {
+    writeFile(rootDir, 'tests/secret-shapes.test.js', [
+      "const fake = ['sk', 'live', 'fixture'.repeat(4)].join('_');",
+      "const labels = ['sk_live_demo', 'rk_test_demo'];",
+      '',
+    ].join('\n'));
+
+    const result = runScanner(rootDir);
+
+    assert.equal(result.status, 0, result.stderr);
+  });
+});
+
 test('verify-public-release-pii allows generated JavaScript frozen name collections', () => {
   withFixture((rootDir) => {
     const requiredSecretNames = `${'REQUIRED'}_${'SECRET'}_NAMES = Object.freeze([`;
