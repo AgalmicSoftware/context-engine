@@ -63,7 +63,7 @@ try {
       return route.continue();
     });
     await page.goto(`${base}/recording-probe`);
-    const speaker = page.getByRole('checkbox', { name: 'Record speaker audio' });
+    const speaker = page.getByRole('checkbox', { name: "Include voices from this device's speakers" });
     await speaker.waitFor();
     assert.equal(await speaker.isChecked(), false);
     await speaker.check();
