@@ -11,46 +11,61 @@ type SessionNewDraftsCueProps = {
   draftsRef: React.RefObject<HTMLElement | null>;
 };
 
+const draftCards = (drafts: HTMLElement | null) =>
+  drafts ? [...drafts.querySelectorAll<HTMLElement>(`[data-testid="${E2E_TESTIDS.CREATE_QUESTION}"]`)] : [];
+
 const firstNewDraft = (drafts: HTMLElement | null, unseen: number) => {
-  const cards = drafts?.querySelectorAll<HTMLElement>(`[data-testid="${E2E_TESTIDS.CREATE_QUESTION}"]`) || [];
+  const cards = draftCards(drafts);
   return cards.length >= unseen ? cards[cards.length - unseen] : drafts;
 };
 
 // Drafts arrive after each chunk, usually below the fold. This cue says how many are new until the first
-// of them scrolls into view, and its button scrolls there.
+// of them is well in view, and its button scrolls there. While it shows, the submit button is not pinned
+// (see .sessionNewDraftsCue), so uploading every draft means scrolling past the new ones first.
 export function SessionNewDraftsCue({ count, draftsRef }: SessionNewDraftsCueProps) {
   const seenRef = useRef(count);
+  const buttonRef = useRef<HTMLButtonElement | null>(null);
   const [unseen, setUnseen] = useState(0);
   useEffect(() => {
     seenRef.current = Math.min(seenRef.current, count);
     setUnseen(count - seenRef.current);
   }, [count]);
   const markSeen = useCallback(() => {
+    // The cue is about to go; keep keyboard focus inside the dialog.
+    if (buttonRef.current && document.activeElement === buttonRef.current) {
+      draftsRef.current?.focus({ preventScroll: true });
+    }
     seenRef.current = count;
     setUnseen(0);
-  }, [count]);
+  }, [count, draftsRef]);
 
   useEffect(() => {
-    if (!unseen || typeof IntersectionObserver === 'undefined') return undefined;
+    if (!unseen) return undefined;
     let observer: IntersectionObserver | undefined;
     // The draft list renders its new cards after this count changes.
     const frame = requestAnimationFrame(() => {
-      const target = firstNewDraft(draftsRef.current, unseen);
-      if (!target) return;
-      observer = new IntersectionObserver(([entry]) => {
-        if (entry?.isIntersecting) markSeen();
+      const cards = draftCards(draftsRef.current);
+      // An upload or a removal can leave fewer new cards than were counted.
+      if (cards.length < unseen) {
+        seenRef.current = count - cards.length;
+        setUnseen(cards.length);
+        return;
+      }
+      if (typeof IntersectionObserver === 'undefined') return;
+      // Seen once the card is above the bottom fifth, clear of the pinned submit button.
+      observer = new IntersectionObserver(([entry]) => entry?.isIntersecting && markSeen(), {
+        rootMargin: '0px 0px -20% 0px',
       });
-      observer.observe(target);
+      observer.observe(cards[cards.length - unseen]);
     });
     return () => {
       cancelAnimationFrame(frame);
       observer?.disconnect();
     };
-  }, [draftsRef, markSeen, unseen]);
+  }, [count, draftsRef, markSeen, unseen]);
 
   const showDrafts = () => {
     firstNewDraft(draftsRef.current, unseen)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    // The cue disappears, so focus moves to the drafts instead of the page.
     draftsRef.current?.focus({ preventScroll: true });
     markSeen();
   };
@@ -58,7 +73,7 @@ export function SessionNewDraftsCue({ count, draftsRef }: SessionNewDraftsCuePro
   return (
     <div className={styles.sessionNewDraftsCue} aria-live="polite">
       {unseen > 0 ? (
-        <button type="button" onClick={showDrafts}>
+        <button ref={buttonRef} type="button" onClick={showDrafts}>
           {unseen} new draft {unseen === 1 ? 'question' : 'questions'}
           <FontAwesomeIcon icon={faArrowDown} />
         </button>

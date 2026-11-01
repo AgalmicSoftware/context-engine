@@ -3119,8 +3119,26 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   bottom: 0;
   z-index: 2;
   min-height: 56px !important;
-  margin-top: 16px !important;
   font-size: 1.1rem !important;
+}
+
+// In the dialog it rests 10px above the body's edge, inside the body's 18px padding, on a strip of the
+// dialog's own colour (like the interview's review bar), so no draft shows around or beneath it.
+.sessionListeningPanelEmbedded .sessionListeningSubmit {
+  bottom: -8px;
+  box-shadow:
+    0 0 0 10px var(--ce-surface-sunken),
+    0 -12px 24px color-mix(in srgb, var(--ce-overlay-base) 16%, transparent) !important;
+}
+
+// Unseen drafts unpin it, so uploading every draft means scrolling past the new ones first.
+.sessionListeningPanel:has(.sessionNewDraftsCue button) .sessionListeningSubmit {
+  position: relative !important;
+}
+
+// Fields reached by Tab or the caret scroll clear of the pinned button.
+.sessionVoiceModeModal :global(.modal-body):has(.sessionListeningSubmit) {
+  scroll-padding-bottom: 96px;
 }
 
 // Floats at the top of the scrolling dialog. It takes no space: its height is zero and the negative

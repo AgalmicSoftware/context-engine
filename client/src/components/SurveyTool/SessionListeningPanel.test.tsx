@@ -53,7 +53,13 @@ jest.mock('./CreateQuestionsAndSurveys', () => {
         data-submit-class={props.submitClassName || ''}
         data-mount-id={String(mountId.current)}
         data-prompts={(props.preformedQuestions || []).map((question: any) => question.prompt).join('|')}
-      />
+      >
+        {(props.preformedQuestions || []).map((question: any) => (
+          <div key={question.prompt} data-testid="ce-create-question">
+            {question.prompt}
+          </div>
+        ))}
+      </div>
     );
   };
 });
@@ -549,7 +555,7 @@ describe('SessionListeningPanel', () => {
 
       fireEvent.click(await screen.findByRole('button', { name: '1 new draft question' }));
       const drafts = screen.getByRole('region', { name: 'Draft questions' });
-      expect(scrollIntoView.mock.contexts).toEqual([drafts]);
+      expect(scrollIntoView.mock.contexts).toEqual([screen.getByText('What evidence matters?')]);
       expect(drafts).toHaveFocus();
       expect(screen.queryByRole('button', { name: /new draft/ })).not.toBeInTheDocument();
 
@@ -561,7 +567,9 @@ describe('SessionListeningPanel', () => {
         }),
       );
       rerender(<SessionListeningPanel sessionSlug="demo" panelMode="recordGroup" embeddedInModal />);
-      expect(await screen.findByRole('button', { name: '2 new draft questions' })).toBeInTheDocument();
+      fireEvent.click(await screen.findByRole('button', { name: '2 new draft questions' }));
+      // The first of the new drafts, not the top of the list.
+      expect(scrollIntoView.mock.contexts[1]).toBe(screen.getByText('How should trust be measured?'));
     });
 
     it('goes away once the new drafts are on screen', async () => {
@@ -582,7 +590,7 @@ describe('SessionListeningPanel', () => {
 
       await screen.findByRole('button', { name: '1 new draft question' });
       await waitFor(() => expect(screen.queryByRole('button', { name: /new draft/ })).not.toBeInTheDocument());
-      expect(observed).toEqual([screen.getByRole('region', { name: 'Draft questions' })]);
+      expect(observed).toEqual([screen.getByText('What evidence matters?')]);
     });
   });
 
