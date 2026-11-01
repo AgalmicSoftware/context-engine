@@ -353,6 +353,10 @@ control states without component selectors in a theme file.
 | Geometry               | `--ce-radius-*`, `--ce-border-control-width`, `--ce-control-padding-*`        | theme-selectable shape and control density                                     |
 | Typography             | `--ce-font-*`, `--ce-font-button-weight`                                      | body, UI, mono, and control typography                                         |
 
+Labels on `--ce-status-success` fills, such as the recorder's Record and
+Generate questions buttons, use `--ce-status-success-contrast`: white where the
+fill is dark, near-black where it is bright, including color-blind mode.
+
 The legacy `--ce-color-*` aliases remain only for source compatibility and
 resolve through the active semantic contract. New code uses `--ce-*` semantic
 tokens directly.

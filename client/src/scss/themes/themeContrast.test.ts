@@ -112,6 +112,7 @@ describe('bundled app-theme contrast', () => {
       ['action-accent-text', 'action-accent-hover', 'canvas'],
       ['action-submit-text', 'action-submit', 'canvas'],
       ['action-submit-text', 'action-submit-hover', 'canvas'],
+      ['status-success-contrast', 'status-success', 'canvas'],
       ['control-text', 'control-face', 'canvas'],
       ['option-scroll-text', 'option-scroll-bg', 'canvas'],
       ['option-scroll-text', 'option-scroll-hover-bg', 'canvas'],
@@ -188,6 +189,7 @@ describe('bundled app-theme contrast', () => {
     ['success', 'warning', 'danger'].forEach((status) =>
       assertContrast(values, `status-${status}-text`, 'surface', 4.5),
     );
+    assertContrast(values, 'status-success-contrast', 'status-success', 4.5, 'surface');
     expect(values['binary-choice-agree-bg']).toBe('#56b4e9');
     expect(values['binary-choice-disagree-bg']).toBe('#e69f00');
     expect(values['chart-series-1']).toBe(values['data-series-1']);
