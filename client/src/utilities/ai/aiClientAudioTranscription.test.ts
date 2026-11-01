@@ -1,14 +1,18 @@
 import { audioBufferToWavParts, decodeAudioAtRate } from './aiClientAudioTranscription';
 
 const RATE = 16_000;
-// A decoded buffer whose channels hold `values`, repeated for `seconds`.
-const decoded = (seconds: number, ...values: number[]) =>
+// A decoded buffer whose channels hold `values`, repeated for `seconds`; a function value gives each sample's.
+const decoded = (seconds: number, ...values: Array<number | ((index: number) => number)>) =>
   ({
     numberOfChannels: values.length,
     length: seconds * RATE,
     sampleRate: RATE,
     duration: seconds,
-    getChannelData: (channel: number) => new Float32Array(seconds * RATE).fill(values[channel]),
+    getChannelData: (channel: number) => {
+      const value = values[channel];
+      const samples = new Float32Array(seconds * RATE);
+      return typeof value === 'number' ? samples.fill(value) : samples.map((_, index) => value(index));
+    },
   }) as unknown as AudioBuffer;
 const bytes = (blob: Blob) =>
   new Promise<ArrayBuffer>((resolve, reject) => {
@@ -68,13 +72,25 @@ describe('audioBufferToWavParts', () => {
   it('cuts decoded audio into 16-bit mono WAV parts of the given length, the last one shorter', async () => {
     const parts = audioBufferToWavParts(decoded(7 * 60, 0.5), 180);
     expect(await Promise.all(parts.map(readWav))).toEqual(
-      [180, 180, 60].map((seconds) => ({ rate: RATE, channels: 1, seconds, firstSample: 0x3fff })),
+      [180, 180, 62].map((seconds) => ({ rate: RATE, channels: 1, seconds, firstSample: 0x3fff })),
     );
     expect(parts.map((part) => part.type)).toEqual(['audio/wav', 'audio/wav', 'audio/wav']);
   });
 
+  it('starts each later part a second early, so a word cut at a boundary is whole in one part', async () => {
+    // Each sample holds the second it falls in.
+    const parts = audioBufferToWavParts(
+      decoded(400, (index) => Math.floor(index / RATE) / 1000),
+      180,
+    );
+    const firstSeconds = (await Promise.all(parts.map(readWav))).map(({ firstSample }) =>
+      Math.round((firstSample / 0x7fff) * 1000),
+    );
+    expect(firstSeconds).toEqual([0, 179, 358]);
+  });
+
   it('lets a last second or less ride with the part before it', async () => {
-    const parts = audioBufferToWavParts(decoded(360.5, 0.5), 180);
+    const parts = audioBufferToWavParts(decoded(359.5, 0.5), 180);
     expect((await Promise.all(parts.map(readWav))).map((part) => part.seconds)).toEqual([180, 180.5]);
     expect(audioBufferToWavParts(decoded(0.5, 0.5), 180)).toHaveLength(1);
   });

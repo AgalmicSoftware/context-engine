@@ -270,14 +270,16 @@ export const decodeAudioAtRate = async (inputBlob: AudioBlobLike, sampleRate: nu
 };
 
 /**
- * Cuts decoded audio into mono 16-bit WAV parts of `partSeconds`, mixing channels one part at a time. A last
- * second or less joins the part before it, as too short to transcribe alone.
+ * Cuts decoded audio into mono 16-bit WAV parts of `partSeconds`, mixing channels one part at a time. Each part
+ * after the first starts a second early, so a word cut at a boundary is whole in one of them (stitching drops
+ * the repeat), and a last second or less joins the part before it, as too short to transcribe alone.
  */
 export const audioBufferToWavParts = (audio: AudioBuffer, partSeconds: number): Blob[] => {
   const channels = Array.from({ length: audio.numberOfChannels }, (_, index) => audio.getChannelData(index));
   const partLength = Math.max(1, Math.round(partSeconds * audio.sampleRate));
+  const overlap = Math.min(audio.sampleRate, Math.floor(partLength / 2));
   const parts: Blob[] = [];
-  for (let start = 0, end = 0; start < audio.length; start = end) {
+  for (let start = 0, end = 0; end < audio.length; start = end - overlap) {
     end = audio.length - start - partLength <= audio.sampleRate ? audio.length : start + partLength;
     let mono = channels[0].subarray(start, end);
     if (channels.length > 1) {

@@ -215,7 +215,7 @@ describe('useRollingTranscriptionRecorder', () => {
       await jest.advanceTimersByTimeAsync(121_000);
       await flushPromises();
     });
-    expect(sent).toEqual([180, 180, 180, 60]);
+    expect(sent).toEqual([180, 180, 180, 62]);
     expect(result.current.transcript).toBe('Reply 1. Reply 3. Reply 4.');
     expect(result.current.downloadableChunkIds).toHaveLength(3);
     expect(FakeOfflineAudioContext.decoded).toBe(1);

@@ -66,8 +66,8 @@ jest.mock('./recordingChunkStore', () => ({
 }));
 
 const mockResponse = (status: number, body: unknown) => ({ ok: status < 300, status, json: async () => body });
-// An imported part is 16 kHz mono WAV whose samples hold its part number; it counts as chunk 100 + that number,
-// with a second of audio as a fragment.
+// An imported part is 16 kHz mono WAV whose samples hold its part number (read ten seconds in, past the second
+// it shares with the part before); it counts as chunk 100 + that number, with a second of audio as a fragment.
 const mockImportedPart = (file: Blob) =>
   new Promise<{ chunk: number; fragments: number }>((resolve, reject) => {
     const reader = new FileReader();
@@ -76,7 +76,7 @@ const mockImportedPart = (file: Blob) =>
       resolve({ chunk: 100 + Math.round((sample * 100) / 0x7fff), fragments: (file.size - 44) / 2 / 16_000 });
     };
     reader.onerror = () => reject(reader.error);
-    reader.readAsArrayBuffer(file.slice(44, 46));
+    reader.readAsArrayBuffer(file.slice(44 + 10 * 32_000, 46 + 10 * 32_000));
   });
 const mockWorker = {
   generation: 'current' as WorkerGeneration,
@@ -546,7 +546,7 @@ it('imports a ten-minute file as three-minute parts that each upload alone, thro
     [102, 180, 'ok'],
     [103, 180, undefined],
     [103, 180, 'ok'],
-    [104, 60, 'ok'],
+    [104, 63, 'ok'],
   ]);
   // The stalled part was abandoned after its own two minutes (the mock records it once it has read the part).
   expect(mockWorker.uploads[1].settledAt! - mockWorker.uploads[1].sentAt).toBeGreaterThan(115_000);
@@ -559,7 +559,7 @@ it('imports a ten-minute file as three-minute parts that each upload alone, thro
   const stored = [...mockStore.records.values()].filter((record) => record.segment.index >= 0);
   expect(stored.map((record) => [record.segment.status, record.audio?.size])).toEqual([
     ...Array(3).fill(['complete', 44 + 180 * 32_000]),
-    ['complete', 44 + 60 * 32_000],
+    ['complete', 44 + 63 * 32_000],
   ]);
   view.unmount();
 }, 60_000);
