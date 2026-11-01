@@ -988,6 +988,7 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
             preformedMode="questions"
             defaultTags={defaultTags as CreateQuestionsAndSurveysPanelProps['defaultTags']}
             documentURLs={[]}
+            submitClassName={styles.sessionListeningSubmit}
           />
         </div>
       )}

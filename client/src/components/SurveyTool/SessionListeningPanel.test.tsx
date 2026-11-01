@@ -50,6 +50,7 @@ jest.mock('./CreateQuestionsAndSurveys', () => {
         data-mode={props.preformedMode || ''}
         data-doc-urls={(props.documentURLs || []).join(',')}
         data-append={String(Boolean(props.appendPreformedQuestions))}
+        data-submit-class={props.submitClassName || ''}
         data-mount-id={String(mountId.current)}
         data-prompts={(props.preformedQuestions || []).map((question: any) => question.prompt).join('|')}
       />
@@ -427,6 +428,8 @@ describe('SessionListeningPanel', () => {
     });
     expect(await screen.findByTestId('mock-create-questions')).toHaveAttribute('data-count', '1');
     expect(screen.getByTestId('mock-create-questions')).toHaveAttribute('data-append', 'true');
+    // Below a long draft list, the submit button stays pinned to the bottom of the dialog.
+    expect(screen.getByTestId('mock-create-questions')).toHaveAttribute('data-submit-class', 'sessionListeningSubmit');
   });
 
   it('does not auto-request unchanged group transcripts more than once', async () => {

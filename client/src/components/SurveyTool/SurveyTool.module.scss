@@ -3112,6 +3112,17 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   cursor: not-allowed;
 }
 
+// The drafts end with the question-type chooser, so the submit button stays at the bottom of the
+// scrolling panel while any draft is in view.
+.sessionListeningSubmit {
+  position: sticky !important;
+  bottom: 0;
+  z-index: 2;
+  min-height: 56px !important;
+  margin-top: 16px !important;
+  font-size: 1.1rem !important;
+}
+
 // Floats at the top of the scrolling dialog. It takes no space: its height is zero and the negative
 // margin cancels the panel's 10px gap.
 .sessionNewDraftsCue {
@@ -3335,10 +3346,21 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 }
 
 .sessionListeningPanelEmbedded .sessionListeningCreateWrap {
+  // The dialog frames the drafts, so the authoring card adds no padding or border of its own.
   :global([class*='createSurveyContainer']) {
+    padding: 0 !important;
+    border: 0 !important;
     background: transparent !important;
     color: var(--ce-panel-text) !important;
     box-shadow: none !important;
+  }
+
+  @media (max-width: 640px) {
+    :global([class*='questionContainer']),
+    :global([class*='typeSelectorBlock']),
+    :global([class*='surveySubmissionConfirmation']) {
+      padding: 12px !important;
+    }
   }
 
   h3,
@@ -4791,6 +4813,13 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     width: min(100%, 560px);
     max-width: calc(100% - 24px);
     margin-bottom: 28px;
+  }
+
+  // Inside the dialog the panel fills its body; the inset above is for the page's floating panel.
+  .sessionListeningPanelEmbedded {
+    width: 100%;
+    max-width: 100%;
+    margin-bottom: 0;
   }
 }
 
