@@ -4173,64 +4173,68 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
           </div>
         )}
 
-        {/* JSON preview area */}
-        {showJson && (
-          <JsonPanel
-            as="pre"
-            onCopy={() => this.copyJsonPreview(jsonData)}
-            copied={this.state.copyJsonSuccess}
-            copyTitle="Copy JSON"
-          >
-            {JSON.stringify(jsonData, null, 2)}
-          </JsonPanel>
-        )}
-
-        {/* Shared toolbar */}
-        <JsonButtonRow align="end" className={styles.jsonPromptBar}>
-          <JsonToggleButton
-            label={showJson ? 'Hide JSON' : 'Show JSON'}
-            active={showJson}
-            onClick={this.toggleShowJson}
-          />
-          <JsonToggleButton
-            label={this.state.showAIPrompt ? 'Hide AI Prompt' : 'Show AI Prompt'}
-            active={this.state.showAIPrompt}
-            onClick={this.toggleAIPrompt}
-            icon={this.state.showAIPrompt ? faCaretUp : faCaretDown}
-          />
-        </JsonButtonRow>
-
-        {/* AI Prompt panel */}
-        {this.state.showAIPrompt && (
-          <div className={styles.aiPromptWrapper}>
-            <button
-              type="button"
-              className={buildCreateSurveyAiPromptCopyClassName(styles, this.state.aiPromptCopySuccess)}
-              onClick={this.copyAIPromptToClipboard}
-              title="Copy prompt"
+        {/* Developer views, folded away until someone asks for them. */}
+        <details className={styles.developerDetails}>
+          <summary>JSON and AI prompt</summary>
+          {/* JSON preview area */}
+          {showJson && (
+            <JsonPanel
+              as="pre"
+              onCopy={() => this.copyJsonPreview(jsonData)}
+              copied={this.state.copyJsonSuccess}
+              copyTitle="Copy JSON"
             >
-              <FontAwesomeIcon icon={this.state.aiPromptCopySuccess ? faCheck : faClipboard} />
-            </button>
+              {JSON.stringify(jsonData, null, 2)}
+            </JsonPanel>
+          )}
 
-            <div className={styles.aiPromptHeader}>
-              <strong>{`AI Prompt — ${this.state.aiPromptModelLabel}`}</strong>
-            </div>
+          {/* Shared toolbar */}
+          <JsonButtonRow align="end" className={styles.jsonPromptBar}>
+            <JsonToggleButton
+              label={showJson ? 'Hide JSON' : 'Show JSON'}
+              active={showJson}
+              onClick={this.toggleShowJson}
+            />
+            <JsonToggleButton
+              label={this.state.showAIPrompt ? 'Hide AI Prompt' : 'Show AI Prompt'}
+              active={this.state.showAIPrompt}
+              onClick={this.toggleAIPrompt}
+              icon={this.state.showAIPrompt ? faCaretUp : faCaretDown}
+            />
+          </JsonButtonRow>
 
-            <div className={styles.aiPromptMeta}>
-              Variables:&nbsp;
-              <span className={styles.aiVar}>&lt;SourceDocContent&gt;</span>,{' '}
-              <span className={styles.aiVar}>&lt;NumSeedStatements&gt;</span>,{' '}
-              <span className={styles.aiVar}>&lt;Types&gt;</span>,{' '}
-              <span className={styles.aiVar}>&lt;DefaultTags&gt;</span>
-            </div>
+          {/* AI Prompt panel */}
+          {this.state.showAIPrompt && (
+            <div className={styles.aiPromptWrapper}>
+              <button
+                type="button"
+                className={buildCreateSurveyAiPromptCopyClassName(styles, this.state.aiPromptCopySuccess)}
+                onClick={this.copyAIPromptToClipboard}
+                title="Copy prompt"
+              >
+                <FontAwesomeIcon icon={this.state.aiPromptCopySuccess ? faCheck : faClipboard} />
+              </button>
 
-            <div className={styles.jsonDisplayWrapper}>
-              <pre className={styles.jsonDisplay}>
-                {this.highlightPromptVariables(this.state.aiPromptText || '(Prompt not available)')}
-              </pre>
+              <div className={styles.aiPromptHeader}>
+                <strong>{`AI Prompt — ${this.state.aiPromptModelLabel}`}</strong>
+              </div>
+
+              <div className={styles.aiPromptMeta}>
+                Variables:&nbsp;
+                <span className={styles.aiVar}>&lt;SourceDocContent&gt;</span>,{' '}
+                <span className={styles.aiVar}>&lt;NumSeedStatements&gt;</span>,{' '}
+                <span className={styles.aiVar}>&lt;Types&gt;</span>,{' '}
+                <span className={styles.aiVar}>&lt;DefaultTags&gt;</span>
+              </div>
+
+              <div className={styles.jsonDisplayWrapper}>
+                <pre className={styles.jsonDisplay}>
+                  {this.highlightPromptVariables(this.state.aiPromptText || '(Prompt not available)')}
+                </pre>
+              </div>
             </div>
-          </div>
-        )}
+          )}
+        </details>
       </>
     );
 

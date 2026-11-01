@@ -25,8 +25,10 @@ spread across the panel and center when wrapping on phones. The toolbar stays
 pinned 10px below the viewport top while the question list scrolls, including
 pending Submit controls; Back and Session scroll away. JSON debug controls are hidden
 in this embedded Questions view; the underlying JSON UI remains available to other
-surfaces. Run `node scripts/session-selector-layout-smoke.mjs` against the local
-server to check short and long selections at mobile, compact, and desktop widths.
+surfaces. Question authoring folds its JSON and AI prompt views into a closed
+"JSON and AI prompt" disclosure. Run `node scripts/session-selector-layout-smoke.mjs`
+against the local server to check short and long selections at mobile, compact,
+and desktop widths.
 
 In a session's full question list, a confirmed empty survey list moves the live
 filtered count beside the Questions heading and removes the redundant selector

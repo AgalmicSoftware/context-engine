@@ -761,6 +761,19 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
     expect(items).toEqual(['||Who should check an AI summary?||0xaaaaaaaa...77777777||', '||0xbbbbbbbb...88888888||']);
   });
 
+  it('folds the JSON and AI prompt views into a closed disclosure', () => {
+    const instance = makeInstance();
+    instance.state = { ...instance.state, showAutoTool: false };
+
+    const detailsNodes = collectTreeNodes(instance.render(), (node) => asRenderTreeNode(node).type === 'details');
+    expect(detailsNodes).toHaveLength(1);
+    expect(asRenderTreeNode(detailsNodes[0]).props.open).toBeUndefined();
+    const markup = renderToStaticMarkup(detailsNodes[0] as Parameters<typeof renderToStaticMarkup>[0]);
+    expect(markup).toMatch(/^<details[^>]*><summary>JSON and AI prompt<\/summary>/);
+    expect(markup).toContain('Show JSON');
+    expect(markup).toContain('Show AI Prompt');
+  });
+
   it('renders submitted-survey Arweave links against ar.io when direct mode is enabled', () => {
     const txId = '8_2VRRP5Ka0b5F9yiq_nm2hJto8qnQazZ2EtfLJ0viE';
     (globalThis as any).CE_ARWEAVE_DIRECT_TO_AR_IO = true;

@@ -1072,6 +1072,21 @@ $user-page-background: var(--ce-surface-sunken);
   opacity: 0.7;
 }
 
+// JSON and the AI prompt serve authors who need them, so they stay folded until opened.
+.developerDetails {
+  margin-top: 16px;
+
+  > summary {
+    width: fit-content;
+    margin-left: auto;
+    padding: 8px 4px;
+    color: inherit;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+}
+
 .aiPromptWrapper {
   margin-top: 8px;
   position: relative;
