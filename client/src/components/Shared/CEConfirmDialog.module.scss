@@ -19,16 +19,38 @@
   font-weight: 700;
   line-height: 1.25;
 
-  :global(.close) {
-    color: var(--ce-text-inverse);
-    opacity: 0.86;
-    text-shadow: none;
+  // Global heading colour is unreadable on dark title bars; the title takes its bar's text colour.
+  :global(.modal-title) {
+    color: inherit;
+    font-size: 1rem;
+    font-weight: inherit;
+    line-height: inherit;
+  }
+}
 
-    &:hover,
-    &:focus {
-      color: var(--ce-text-inverse);
-      opacity: 1;
-    }
+.content .header {
+  padding: 16px;
+}
+
+// A compact × centred in the title bar, without the raised frame themes give other buttons.
+.content .header :global(.btn-close) {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 32px;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  margin: 0 0 0 auto;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  color: inherit;
+  opacity: 1;
+
+  &:hover {
+    background: color-mix(in srgb, currentColor 12%, transparent);
   }
 }
 
@@ -50,15 +72,17 @@
   font-weight: 700;
 }
 
+// Control colours keep the label readable on every theme's dialog surface, hovered or not.
 .cancelButton {
-  color: var(--ce-document-surface);
+  color: var(--ce-control-text);
+  background: var(--ce-control-face);
   border-color: color-mix(in srgb, var(--ce-control-text) 62%, transparent);
 
   &:hover,
   &:focus {
-    color: var(--ce-surface-sunken);
-    background: var(--ce-document-surface);
-    border-color: var(--ce-document-surface);
+    color: var(--ce-control-text);
+    background: color-mix(in srgb, var(--ce-control-text) 12%, var(--ce-control-face));
+    border-color: var(--ce-control-text);
   }
 }
 
@@ -95,25 +119,6 @@
     background: var(--ce-overlay-surface);
     color: var(--ce-overlay-text);
     border-color: var(--ce-document-border);
-  }
-
-  .content .header {
-    padding: 16px;
-  }
-
-  .content .header :global(.close),
-  .content .header :global(.btn-close) {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    flex: 0 0 32px;
-    width: 32px;
-    height: 32px;
-    padding: 0;
-    margin: 0 0 0 auto;
-    background: transparent;
-    color: var(--ce-control-text);
-    opacity: 1;
   }
 
   .footer {
