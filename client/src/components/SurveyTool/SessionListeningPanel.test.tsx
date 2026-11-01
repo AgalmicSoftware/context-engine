@@ -253,8 +253,14 @@ describe('SessionListeningPanel', () => {
   it('lets the recorder retry a chunk that is stuck uploading, but not one uploading normally', () => {
     const retryChunk = jest.fn();
     const upload = { id: 'stuck-upload', index: 0, status: 'transcribing', text: '', startedAt: 1 };
+    // The part has audio, so its original would be listed if anything showed the list during an upload.
     const recorder = (error?: string) =>
-      buildRecorder({ segments: [{ ...upload, error }], pendingSegmentCount: 1, retryChunk });
+      buildRecorder({
+        segments: [{ ...upload, error }],
+        downloadableChunkIds: ['stuck-upload'],
+        pendingSegmentCount: 1,
+        retryChunk,
+      });
     (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(recorder());
     const { rerender } = render(<SessionListeningPanel sessionSlug="workshop" />);
     expect(screen.queryByRole('button', { name: 'Retry transcription' })).not.toBeInTheDocument();
