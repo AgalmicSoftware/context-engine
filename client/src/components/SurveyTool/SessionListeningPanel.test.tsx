@@ -260,7 +260,7 @@ describe('SessionListeningPanel', () => {
       }),
     );
     render(<SessionListeningPanel sessionSlug="workshop" />);
-    expect(screen.queryByRole('list', { name: 'Audio downloads' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('list', { name: 'Original audio downloads' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Retry transcription' }));
     expect(retryChunk).toHaveBeenCalledWith('stuck-upload');
   });
