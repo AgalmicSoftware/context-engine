@@ -2966,10 +2966,21 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   }
 }
 
+// Capture warnings, such as a paused microphone or no screen lock: a bar and tint set them apart.
 .sessionRecordingWakeNotice {
   width: 100%;
+  padding: 10px 12px;
+  border-left: 4px solid var(--ce-status-warning-text);
+  border-radius: var(--ce-radius-6);
+  background: color-mix(in srgb, var(--ce-status-warning-text) 12%, transparent);
   color: inherit;
-  font-size: 0.82rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1.4;
+
+  p {
+    margin: 0 0 8px;
+  }
 }
 
 .sessionListeningMeta {
