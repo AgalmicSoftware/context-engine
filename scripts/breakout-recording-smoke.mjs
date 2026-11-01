@@ -84,7 +84,12 @@ try {
     await page.getByTestId('ce-session-listening-panel').screenshot({ path: path.join(output, `recording-${theme}-${width}.png`) });
     await page.getByRole('button', { name: 'Stop recording' }).click();
     await speaker.waitFor({ state: 'visible' });
-    await page.waitForFunction(async () => (await window.__loadSavedRecording())[0]?.speakerTurns?.[0]?.speaker === 'A');
+    // Polled from here: waitForFunction takes the promise an async predicate returns as true at once.
+    for (let tries = 0; (await page.evaluate(() => window.__loadSavedRecording()))[0]?.status !== 'complete'; tries += 1) {
+      assert(tries < 100, 'The first chunk is transcribed');
+      await page.waitForTimeout(100);
+    }
+    assert.deepEqual((await page.evaluate(() => window.__loadSavedRecording()))[0].speakerTurns.map(turn => turn.speaker), ['Person 1'], 'The model\'s speaker A is saved as Person 1');
     assert.equal(await page.evaluate(() => window.__wakeHeld), false);
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false);
     await page.getByRole('button', { name: 'Close', exact: true }).click();
