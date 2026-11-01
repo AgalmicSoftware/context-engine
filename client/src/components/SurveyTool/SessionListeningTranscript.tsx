@@ -57,9 +57,11 @@ const FOLLOW_SLACK_PX = 24;
 export function SessionListeningTranscript({ transcript, clearDisabled, onClear }: SessionListeningTranscriptProps) {
   const boxRef = useRef<HTMLTextAreaElement | null>(null);
   const followRef = useRef(true);
+  // Where a host who scrolled up is reading; restored in case replacing the text moved it.
+  const readingTopRef = useRef(0);
   useLayoutEffect(() => {
     const box = boxRef.current;
-    if (box && followRef.current) box.scrollTop = box.scrollHeight;
+    if (box) box.scrollTop = followRef.current ? box.scrollHeight : readingTopRef.current;
   }, [transcript]);
   return (
     <div className={styles.sessionListeningTranscriptDetails}>
@@ -71,6 +73,7 @@ export function SessionListeningTranscript({ transcript, clearDisabled, onClear 
           readOnly
           placeholder="Transcript"
           onScroll={({ currentTarget: box }) => {
+            readingTopRef.current = box.scrollTop;
             followRef.current = box.scrollHeight - box.scrollTop - box.clientHeight <= FOLLOW_SLACK_PX;
           }}
           data-testid={E2E_TESTIDS.SESSION_LISTENING_TRANSCRIPT}

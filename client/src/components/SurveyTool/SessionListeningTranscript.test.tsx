@@ -48,6 +48,29 @@ describe('SessionListeningTranscript', () => {
     expect(box.scrollTop).toBe(500);
   });
 
+  it('keeps the host where they were reading where new text moves the scroll position', () => {
+    const value = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!;
+    // Emulate an engine that scrolls a textarea back to its top when its value is replaced.
+    Object.defineProperty(HTMLTextAreaElement.prototype, 'value', {
+      configurable: true,
+      get: value.get,
+      set(this: HTMLTextAreaElement, next: string) {
+        value.set!.call(this, next);
+        this.scrollTop = 0;
+      },
+    });
+    try {
+      const { rerender } = render(transcriptBox(10));
+      const box = screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_TRANSCRIPT);
+      box.scrollTop = 40;
+      fireEvent.scroll(box);
+      rerender(transcriptBox(15));
+      expect(box.scrollTop).toBe(40);
+    } finally {
+      Object.defineProperty(HTMLTextAreaElement.prototype, 'value', value);
+    }
+  });
+
   it('clears through its corner control unless clearing is disabled', () => {
     const onClear = jest.fn();
     const { rerender } = render(<SessionListeningTranscript transcript="Notes" clearDisabled onClear={onClear} />);
