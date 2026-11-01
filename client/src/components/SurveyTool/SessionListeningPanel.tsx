@@ -517,10 +517,9 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
   }, [isGenerating]);
 
   useEffect(() => {
-    if (!hasTranscript) {
-      setIsTranscriptOpen(false);
-    }
-  }, [hasTranscript]);
+    // A group host follows the transcript as it fills, so it opens once text exists; they can still collapse it.
+    setIsTranscriptOpen(hasTranscript && panelMode === 'recordGroup');
+  }, [hasTranscript, panelMode]);
 
   const { finalizeRecording, keepAudio } = recorder;
   const handleClose = useCallback(async () => {

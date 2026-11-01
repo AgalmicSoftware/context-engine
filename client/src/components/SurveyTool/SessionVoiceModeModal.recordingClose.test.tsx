@@ -131,8 +131,8 @@ it('closing with Close saves the final speech and restores it on reopen', async 
   expect(transcribeAudio).toHaveBeenCalledTimes(1);
   expect(savedTranscript()).toBe(transcript);
   fireEvent.click(screen.getByText('Open the dialog again'));
-  fireEvent.click(await screen.findByTestId('ce-session-listening-transcript-details'));
-  expect(screen.getByTestId('ce-session-listening-transcript')).toHaveValue(transcript);
+  // A group recording shows its restored transcript open.
+  expect(await screen.findByTestId('ce-session-listening-transcript')).toHaveValue(transcript);
 });
 
 it.each(['Escape', 'outside click'])(

@@ -3075,6 +3075,11 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   color: var(--ce-document-text);
   padding: 10px 42px 10px 12px;
   line-height: 1.45;
+
+  // A phone wraps each turn over several lines; a taller box keeps more of the conversation in view.
+  @media (max-width: 640px) {
+    min-height: min(45vh, 320px);
+  }
 }
 
 .sessionListeningTranscript::placeholder {

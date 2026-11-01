@@ -543,7 +543,7 @@ describe('SessionListeningPanel', () => {
 
     render(<SessionListeningPanel sessionSlug="demo" panelMode="recordGroup" embeddedInModal />);
     await waitFor(() => expect(generateQuestionsFromListeningTranscript).toHaveBeenCalledTimes(1));
-    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_TRANSCRIPT_DETAILS));
+    // A group transcript is already open.
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_CLEAR));
 
     await act(async () => {
@@ -634,6 +634,28 @@ describe('SessionListeningPanel', () => {
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_TRANSCRIPT)).toHaveValue(transcript);
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_CLEAR));
     expect(clearDraft).toHaveBeenCalledTimes(1);
+  });
+
+  it('opens a group transcript once text exists and leaves it as the host sets it', () => {
+    const transcript = 'Person 1: The group discussed budget timing, operational risk, and follow-up evidence.';
+    (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(buildRecorder());
+    const { rerender } = render(<SessionListeningPanel sessionSlug="demo" panelMode="recordGroup" embeddedInModal />);
+    expect(screen.queryByTestId(E2E_TESTIDS.SESSION_LISTENING_TRANSCRIPT)).not.toBeInTheDocument();
+
+    (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(buildRecorder({ transcript }));
+    rerender(<SessionListeningPanel sessionSlug="demo" panelMode="recordGroup" embeddedInModal />);
+    const transcriptButton = screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_TRANSCRIPT_DETAILS);
+    expect(transcriptButton).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_TRANSCRIPT)).toHaveValue(transcript);
+
+    // A host who collapses it keeps it collapsed as later chunks arrive.
+    fireEvent.click(transcriptButton);
+    (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+      buildRecorder({ transcript: `${transcript}\nPerson 2: And who reviews it?` }),
+    );
+    rerender(<SessionListeningPanel sessionSlug="demo" panelMode="recordGroup" embeddedInModal />);
+    expect(transcriptButton).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByTestId(E2E_TESTIDS.SESSION_LISTENING_TRANSCRIPT)).not.toBeInTheDocument();
   });
 
   it('shows transcription progress and blocks question generation until pending audio is mapped', () => {
