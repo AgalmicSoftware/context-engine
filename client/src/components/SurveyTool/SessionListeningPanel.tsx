@@ -915,7 +915,7 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
             recorder.isBusy ||
             recorder.segments.some((segment) => !['complete', 'failed'].includes(segment.status))
           }
-          onClear={() => (retainedAudioCount ? setConfirmClear(true) : handleClear())}
+          onClear={() => setConfirmClear(true)}
         />
       )}
 
@@ -936,7 +936,11 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
       <CEConfirmDialog
         isOpen={confirmClear}
         title="Clear this recording?"
-        body="This deletes the transcript and the audio not yet transcribed. Download that audio first to keep it."
+        body={
+          retainedAudioCount
+            ? 'This deletes the transcript and the audio not yet transcribed. Download that audio first to keep it.'
+            : 'This deletes the transcript from this device.'
+        }
         confirmLabel="Clear recording"
         cancelLabel="Keep recording"
         danger

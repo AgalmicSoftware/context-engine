@@ -772,6 +772,7 @@ describe('SessionListeningPanel', () => {
     await waitFor(() => expect(generateQuestionsFromListeningTranscript).toHaveBeenCalledTimes(1));
     // A group transcript is already open.
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_CLEAR));
+    fireEvent.click(await screen.findByRole('button', { name: 'Clear recording' }));
 
     await act(async () => {
       resolveGenerationRef.current?.({
@@ -860,6 +861,10 @@ describe('SessionListeningPanel', () => {
     expect(transcriptButton).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_TRANSCRIPT)).toHaveValue(transcript);
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_CLEAR));
+    // With no audio left, Clear still asks, since the transcript is all that remains.
+    expect(clearDraft).not.toHaveBeenCalled();
+    expect(screen.getByText('This deletes the transcript from this device.')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Clear recording' }));
     expect(clearDraft).toHaveBeenCalledTimes(1);
   });
 

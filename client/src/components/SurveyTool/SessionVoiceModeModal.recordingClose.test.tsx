@@ -312,8 +312,12 @@ it.each(['a transcribed recording', 'a pasted transcript'])(
       expect(leaving()).toBe(true);
       // Cleared, nothing is left to lose.
       fireEvent.click(screen.getByRole('button', { name: 'Reopen recording' }));
-      // Transcribed, no audio is left to ask about.
+      // Transcribed, so no audio is left, but Clear still asks before deleting the transcript.
       fireEvent.click(await screen.findByRole('button', { name: 'Clear transcript' }));
+      expect(await screen.findByText('This deletes the transcript from this device.')).toBeInTheDocument();
+      expect(screen.getByTestId('ce-session-listening-transcript')).toHaveValue(transcript);
+      fireEvent.click(screen.getByTestId('ce-recording-clear-confirm'));
+      await waitFor(() => expect(screen.queryByText('Clear this recording?')).not.toBeInTheDocument());
       await waitFor(() => expect(screen.queryByTestId('ce-session-listening-transcript')).not.toBeInTheDocument());
       dismiss('Close');
       await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
