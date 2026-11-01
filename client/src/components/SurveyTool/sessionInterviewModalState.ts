@@ -110,6 +110,76 @@ export const describeResearchCoverage = (coverage: InterviewResearchCoverage | u
   ].filter(Boolean);
 };
 
+type InterviewStatusInput = {
+  recordingState: 'idle' | 'starting' | 'recording' | 'paused' | 'stopping';
+  mapping: boolean;
+  applying: boolean;
+  error: string;
+  // The interview's own last status, shown when nothing more pressing applies.
+  status: string;
+  hasQuestions: boolean;
+  hasDrafts: boolean;
+  readiness: 'checking' | 'ready' | 'unavailable' | 'unknown';
+  openingLoading: boolean;
+};
+
+/** The interview header's status and its tone, and the guidance behind its help button. */
+export const describeInterviewStatus = ({
+  recordingState,
+  mapping,
+  applying,
+  error,
+  status,
+  hasQuestions,
+  hasDrafts,
+  readiness,
+  openingLoading,
+}: InterviewStatusInput) => {
+  const isStarting = recordingState === 'starting';
+  const isRecording = recordingState === 'recording';
+  const isPaused = recordingState === 'paused';
+  const isStopping = recordingState === 'stopping';
+  const guidance = isPaused
+    ? 'Microphone and interviewer sound are paused. Resume to continue, or stop to prepare drafts.'
+    : isRecording
+      ? 'Microphone is on. Stop when you are ready to review your drafts.'
+      : isStarting
+        ? 'Connecting your microphone and voice session. Close this dialog to cancel.'
+        : hasDrafts
+          ? 'Review and edit your answers and privacy settings, then select Submit responses. You will be asked to sign in if needed.'
+          : 'Speak with an AI interviewer. Stopping prepares drafts for your review. You choose when to submit responses.';
+  const idle = recordingState === 'idle' && !mapping && !applying;
+  const statusLabel = error
+    ? 'Error'
+    : mapping
+      ? 'Preparing responses…'
+      : applying
+        ? 'Submitting'
+        : idle && !hasQuestions
+          ? 'No questions'
+          : idle && readiness === 'checking'
+            ? 'Checking setup'
+            : idle && readiness === 'unavailable'
+              ? 'Setup needed'
+              : idle && readiness === 'unknown'
+                ? 'Not checked'
+                : idle && openingLoading
+                  ? 'Preparing opening'
+                  : status;
+  const statusTone =
+    error || (idle && (!hasQuestions || readiness === 'unavailable'))
+      ? 'error'
+      : isStarting ||
+          isPaused ||
+          isStopping ||
+          mapping ||
+          applying ||
+          (idle && (readiness !== 'ready' || openingLoading))
+        ? 'pending'
+        : 'ready';
+  return { guidance, idle, statusLabel, statusTone };
+};
+
 export const shouldIgnorePromptCopyEvent = (target: EventTarget | null): boolean => {
   if (!(target instanceof HTMLElement)) return true;
   if (target.closest('button, a, input, textarea, select, [contenteditable="true"]')) return true;

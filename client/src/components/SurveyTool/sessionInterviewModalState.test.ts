@@ -1,5 +1,9 @@
 import type { InterviewPrefillPacket } from './sessionInterview';
-import { displayResponderContext, omitConcealedInterviewFacts } from './sessionInterviewModalState';
+import {
+  describeInterviewStatus,
+  displayResponderContext,
+  omitConcealedInterviewFacts,
+} from './sessionInterviewModalState';
 
 type ImportedFacts = NonNullable<InterviewPrefillPacket['responderContext']['facts']>;
 
@@ -83,5 +87,50 @@ describe('omitConcealedInterviewFacts', () => {
 
     expect(voiceContext(packet)).toBe('Backs the transit levy for night buses.');
     expect(voiceContext(packet, 'Backs the transit levying plan.')).toBe('Backs the transit levying plan.');
+  });
+});
+
+describe('describeInterviewStatus', () => {
+  const statusOf = (overrides: Partial<Parameters<typeof describeInterviewStatus>[0]> = {}) =>
+    describeInterviewStatus({
+      recordingState: 'idle',
+      mapping: false,
+      applying: false,
+      error: '',
+      status: 'Ready',
+      hasQuestions: true,
+      hasDrafts: false,
+      readiness: 'ready',
+      openingLoading: false,
+      ...overrides,
+    });
+
+  it('puts an error first, then preparing and submitting responses', () => {
+    expect(statusOf({ error: 'Offline', mapping: true })).toMatchObject({ statusLabel: 'Error', statusTone: 'error' });
+    expect(statusOf({ mapping: true, applying: true })).toMatchObject({
+      idle: false,
+      statusLabel: 'Preparing responses…',
+      statusTone: 'pending',
+    });
+    expect(statusOf({ applying: true })).toMatchObject({ statusLabel: 'Submitting', statusTone: 'pending' });
+  });
+
+  it('reports setup only while idle, and the interview status otherwise', () => {
+    expect(statusOf({ hasQuestions: false })).toMatchObject({ statusLabel: 'No questions', statusTone: 'error' });
+    expect(statusOf({ readiness: 'unavailable' })).toMatchObject({ statusLabel: 'Setup needed', statusTone: 'error' });
+    expect(statusOf({ openingLoading: true })).toMatchObject({
+      statusLabel: 'Preparing opening',
+      statusTone: 'pending',
+    });
+    expect(statusOf({ recordingState: 'recording', readiness: 'unavailable', status: 'Listening' })).toMatchObject({
+      idle: false,
+      statusLabel: 'Listening',
+      statusTone: 'ready',
+    });
+  });
+
+  it('guides a paused interview ahead of its drafts', () => {
+    expect(statusOf({ recordingState: 'paused', hasDrafts: true }).guidance).toMatch(/^Microphone and interviewer/);
+    expect(statusOf({ hasDrafts: true }).guidance).toMatch(/^Review and edit your answers/);
   });
 });

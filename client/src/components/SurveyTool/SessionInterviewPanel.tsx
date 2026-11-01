@@ -64,6 +64,7 @@ import type { ParticipantFidelitySummary } from '../../../../shared/agentFidelit
 import {
   buildResearchPacket,
   describeInterviewPlatform,
+  describeInterviewStatus,
   describeResearchCoverage,
   displayResponderContext,
   omitConcealedInterviewFacts,
@@ -1086,44 +1087,17 @@ export default function SessionInterviewPanel({
   const hasImportedResponderContext = Boolean(importedContext?.summary?.trim() || importedContext?.facts?.length);
   const canManuallyRefreshGroupRecommendations = hasRefreshableGroups && drafts.length > 0;
 
-  const guidance = isPaused
-    ? 'Microphone and interviewer sound are paused. Resume to continue, or stop to prepare drafts.'
-    : isRecording
-      ? 'Microphone is on. Stop when you are ready to review your drafts.'
-      : isStarting
-        ? 'Connecting your microphone and voice session. Close this dialog to cancel.'
-        : drafts.length
-          ? 'Review and edit your answers and privacy settings, then select Submit responses. You will be asked to sign in if needed.'
-          : 'Speak with an AI interviewer. Stopping prepares drafts for your review. You choose when to submit responses.';
-  const idle = !isInterviewBusy && !mapping && !applying;
-  const statusLabel = error
-    ? 'Error'
-    : mapping
-      ? 'Preparing responses…'
-      : applying
-        ? 'Submitting'
-        : idle && !questions.length
-          ? 'No questions'
-          : idle && readiness.state === 'checking'
-            ? 'Checking setup'
-            : idle && readiness.state === 'unavailable'
-              ? 'Setup needed'
-              : idle && readiness.state === 'unknown'
-                ? 'Not checked'
-                : idle && interviewOpening.loading
-                  ? 'Preparing opening'
-                  : status;
-  const statusTone =
-    error || (idle && (!questions.length || readiness.state === 'unavailable'))
-      ? 'error'
-      : isStarting ||
-          isPaused ||
-          isStopping ||
-          mapping ||
-          applying ||
-          (idle && (readiness.state !== 'ready' || interviewOpening.loading))
-        ? 'pending'
-        : 'ready';
+  const { guidance, idle, statusLabel, statusTone } = describeInterviewStatus({
+    recordingState,
+    mapping,
+    applying,
+    error,
+    status,
+    hasQuestions: questions.length > 0,
+    hasDrafts: drafts.length > 0,
+    readiness: readiness.state,
+    openingLoading: interviewOpening.loading,
+  });
   const hasUnsavedReview =
     isInterviewBusy ||
     mapping ||
