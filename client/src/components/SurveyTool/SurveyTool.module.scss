@@ -3156,28 +3156,29 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     box-shadow: 0 3px 10px color-mix(in srgb, var(--ce-overlay-base) 8%, transparent) !important;
   }
 
+  // Chips filled with a status text colour take the sunken surface colour, which contrasts with it in every theme.
   :global([class*='pill']) {
     background: var(--ce-status-info-text) !important;
     border-color: color-mix(in srgb, var(--ce-overlay-surface) 18%, transparent) !important;
-    color: var(--ce-document-text) !important;
+    color: var(--ce-surface-sunken) !important;
   }
 
   :global([class*='pillAgree']) {
     background: var(--ce-status-success-text) !important;
     border-color: color-mix(in srgb, var(--ce-status-success) 35%, transparent) !important;
-    color: var(--ce-overlay-surface) !important;
+    color: var(--ce-surface-sunken) !important;
   }
 
   :global([class*='pillDisagree']) {
     background: var(--ce-status-danger-text) !important;
     border-color: color-mix(in srgb, var(--ce-status-error) 32%, transparent) !important;
-    color: var(--ce-status-error) !important;
+    color: var(--ce-surface-sunken) !important;
   }
 
   :global([class*='pillUnsure']) {
     background: var(--ce-status-warning-text) !important;
     border-color: color-mix(in srgb, var(--ce-status-warning) 34%, transparent) !important;
-    color: var(--ce-overlay-surface) !important;
+    color: var(--ce-surface-sunken) !important;
   }
 
   :global([class*='freeformPreview']),
@@ -3350,19 +3351,19 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   :global([class*='pillAgree']) {
     background: color-mix(in srgb, var(--ce-status-success-text) 82%, transparent) !important;
     border-color: color-mix(in srgb, var(--ce-status-success) 46%, transparent) !important;
-    color: var(--ce-overlay-surface) !important;
+    color: var(--ce-surface-sunken) !important;
   }
 
   :global([class*='pillDisagree']) {
     background: color-mix(in srgb, var(--ce-status-danger-text) 82%, transparent) !important;
     border-color: color-mix(in srgb, var(--ce-status-error) 44%, transparent) !important;
-    color: var(--ce-status-error) !important;
+    color: var(--ce-surface-sunken) !important;
   }
 
   :global([class*='pillUnsure']) {
     background: color-mix(in srgb, var(--ce-status-warning-text) 90%, transparent) !important;
     border-color: color-mix(in srgb, var(--ce-status-warning) 46%, transparent) !important;
-    color: var(--ce-overlay-surface) !important;
+    color: var(--ce-surface-sunken) !important;
   }
 
   :global([class*='freeformPreview']),

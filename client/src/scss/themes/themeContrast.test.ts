@@ -136,6 +136,10 @@ describe('bundled app-theme contrast', () => {
       ['response-unsure-text', 'response-unsure-bg'],
       ['response-disagree-text', 'response-disagree-bg'],
     ].forEach(([foreground, background]) => assertContrast(values, foreground, background, 4.5, 'tooltip-bg'));
+    // Recorder question-type chips are filled with status text colours and labelled in the sunken surface colour.
+    ['info', 'success', 'warning', 'danger'].forEach((status) =>
+      assertContrast(values, 'surface-sunken', `status-${status}-text`, 4.5, 'surface-sunken'),
+    );
     assertContrast(values, 'data-viz-label', 'data-viz-surface', 4.5, 'surface');
     assertContrast(values, 'data-viz-point', 'data-viz-surface', 3, 'surface');
     assertContrast(values, 'data-viz-point-active', 'data-viz-surface', 3, 'surface');
@@ -187,9 +191,10 @@ describe('bundled app-theme contrast', () => {
         contrastRatio(parseColor(values[`response-${stance}-document-text`]), parseColor('#ffffff')),
       ).toBeGreaterThanOrEqual(4.5);
     });
-    ['success', 'warning', 'danger'].forEach((status) =>
-      assertContrast(values, `status-${status}-text`, 'surface', 4.5),
-    );
+    ['success', 'warning', 'danger'].forEach((status) => {
+      assertContrast(values, `status-${status}-text`, 'surface', 4.5);
+      assertContrast(values, 'surface-sunken', `status-${status}-text`, 4.5, 'surface-sunken');
+    });
     assertContrast(values, 'status-success-contrast', 'status-success', 4.5, 'surface');
     assertContrast(values, 'status-error-contrast', 'status-error', 4.5, 'surface');
     expect(values['binary-choice-agree-bg']).toBe('#56b4e9');
