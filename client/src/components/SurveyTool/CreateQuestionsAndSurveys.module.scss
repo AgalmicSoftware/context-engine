@@ -536,11 +536,13 @@ $user-page-background: var(--ce-surface-sunken);
     align-items: flex-start;
     margin-bottom: 10px;
   }
+  // The accent colour was 2.2:1 on the success tint in Classic 95; the card's own text colour reads in every theme.
   li a {
-    color: $clickable-color;
-    text-decoration: none;
+    color: inherit;
+    text-decoration: underline;
+    text-underline-offset: 2px;
     &:hover {
-      text-decoration: underline;
+      text-decoration-thickness: 2px;
     }
   }
 }

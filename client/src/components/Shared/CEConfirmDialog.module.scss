@@ -94,8 +94,8 @@
   &:hover,
   &:focus {
     color: var(--ce-action-accent-text);
-    border-color: var(--ce-status-success-text);
-    background: var(--ce-status-success-text);
+    border-color: var(--ce-action-accent-hover);
+    background: var(--ce-action-accent-hover);
   }
 }
 

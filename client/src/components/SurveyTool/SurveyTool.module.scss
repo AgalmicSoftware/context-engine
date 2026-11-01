@@ -3300,7 +3300,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   :global([class*='removeOptionButton']):hover {
     background: var(--ce-status-danger-text) !important;
     border-color: color-mix(in srgb, var(--ce-status-error) 35%, transparent) !important;
-    color: var(--ce-status-error) !important;
+    color: var(--ce-surface-sunken) !important;
   }
 
   :global([class*='addOptionButton']):hover,
@@ -3308,7 +3308,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   :global([class*='magicTagButton']):hover {
     background: var(--ce-status-success-text) !important;
     border-color: color-mix(in srgb, var(--ce-status-success) 35%, transparent) !important;
-    color: var(--ce-overlay-surface) !important;
+    color: var(--ce-surface-sunken) !important;
   }
 
   :global([class*='tagInputGroup']) {
@@ -3327,11 +3327,11 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   :global([class*='filterBubble']) {
     background: var(--ce-status-success-text) !important;
     border-color: color-mix(in srgb, var(--ce-status-success) 35%, transparent) !important;
-    color: var(--ce-overlay-surface) !important;
+    color: var(--ce-surface-sunken) !important;
   }
 
   :global([class*='removeIcon']) {
-    color: var(--ce-overlay-surface) !important;
+    color: var(--ce-surface-sunken) !important;
   }
 
   :global([class*='jsonDisplay']) {
