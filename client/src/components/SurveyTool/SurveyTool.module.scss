@@ -3537,7 +3537,8 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     background: transparent;
     color: var(--ce-panel-text);
     filter: none;
-    opacity: 0.5;
+    // At 0.5 the civic × was 2.9:1, under the 3:1 an icon-only control needs.
+    opacity: 0.75;
   }
 
   :global(.modal-header) :global(.btn-close):hover,
