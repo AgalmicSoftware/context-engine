@@ -1,5 +1,6 @@
-import React, { useCallback, useEffect, useLayoutEffect, useRef } from 'react';
+import React, { useCallback, useLayoutEffect, useRef } from 'react';
 import { Input, type InputProps } from 'reactstrap';
+import { subscribeThemeChanges } from '../../utilities/ui/themeRuntime';
 
 type AutoGrowTextareaProps = Omit<InputProps, 'type'> & {
   // For one-line values such as answer options: Enter and pasted line breaks add no new line.
@@ -42,18 +43,34 @@ export default function AutoGrowTextarea({
     if (areaRef.current) fitToContent(areaRef.current);
   }, [value]);
 
-  // A new width rewraps the text.
-  useEffect(() => {
+  // A new width, web fonts that finish loading and another theme each rewrap the text. Subscribing
+  // during layout, straight after the first fit, leaves no gap for a font load to finish unseen.
+  // Each refit waits a frame: resizing inside the observer's callback raises its loop error.
+  useLayoutEffect(() => {
     const area = areaRef.current;
-    if (!area || typeof ResizeObserver === 'undefined') return undefined;
+    if (!area) return undefined;
+    let frame = 0;
+    const refit = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => fitToContent(area));
+    };
     let width = area.clientWidth;
-    const observer = new ResizeObserver(() => {
+    const onResize = () => {
       if (area.clientWidth === width) return;
       width = area.clientWidth;
-      fitToContent(area);
-    });
-    observer.observe(area);
-    return () => observer.disconnect();
+      refit();
+    };
+    const observer = typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(onResize);
+    observer?.observe(area);
+    const fonts = document.fonts;
+    fonts?.addEventListener('loadingdone', refit);
+    const unsubscribeTheme = subscribeThemeChanges(refit);
+    return () => {
+      cancelAnimationFrame(frame);
+      observer?.disconnect();
+      fonts?.removeEventListener('loadingdone', refit);
+      unsubscribeTheme();
+    };
   }, []);
 
   return (
