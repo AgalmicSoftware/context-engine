@@ -17,6 +17,30 @@ import {
 
 // Unsaved records survive closing and reopening the panel in the same page.
 const memoryRecordings = new Map<string, Map<string, RecordingChunk>>();
+const memoryListeners = new Set<() => void>();
+const holdsSpeech = (record: RecordingChunk) => Boolean(record.audio || record.segment.text.trim());
+const holdsRecording = (records?: Map<string, RecordingChunk>) => [...(records?.values() || [])].some(holdsSpeech);
+const askBeforeLeaving = (event: BeforeUnloadEvent) => {
+  event.preventDefault();
+  // Some browsers show the prompt only when returnValue is set.
+  event.returnValue = '';
+};
+// What only this page holds outlives the recorder, so a reload or closing the tab asks first wherever the app
+// has gone since it closed, until the recording reopens (whose own prompt then applies), saves or clears.
+const holdInMemory = (scope: string, records: Map<string, RecordingChunk> | null) => {
+  if (records) memoryRecordings.set(scope, records);
+  else memoryRecordings.delete(scope);
+  if ([...memoryRecordings.values()].some(holdsRecording)) window.addEventListener('beforeunload', askBeforeLeaving);
+  else window.removeEventListener('beforeunload', askBeforeLeaving);
+  memoryListeners.forEach((listener) => listener());
+};
+/** Calls `listener` whenever what only this page holds changes; returns its unsubscribe. */
+export const subscribeUnsavedRecordings = (listener: () => void) => {
+  memoryListeners.add(listener);
+  return () => {
+    memoryListeners.delete(listener);
+  };
+};
 // Hidden periods are kept with the recording under one reserved record. It has no audio and is never
 // complete, so restoring skips it as a chunk (as 0.8.1 does), and Clear deletes it with the recording.
 // The page's own copy also covers a failed save.
@@ -28,9 +52,8 @@ type Speakers = { knownSpeakers: KnownSpeaker[]; speakerSamplesRefused: boolean 
 const memorySpeakers = new Map<string, Speakers>();
 // Cutting voice samples must never hold up later chunks for long.
 const SAMPLE_WAIT_MS = 10_000;
-/** Whether a closed recorder left audio that only this page holds for a recording. */
-export const hasUnsavedAudio = (scope: string): boolean =>
-  [...(memoryRecordings.get(scope)?.values() || [])].some((record) => record.audio);
+/** Whether a closed recorder left audio or text that only this page holds for a recording. */
+export const hasUnsavedRecording = (scope: string): boolean => holdsRecording(memoryRecordings.get(scope));
 
 /** How many chunks of a closed recording hold audio that reopening it will upload (Failed ones wait for Retry). */
 export async function countKeptChunks(scope: string): Promise<number> {
@@ -123,7 +146,7 @@ export class RecordingChunkQueue {
         this.records.set(entry.segment.id, entry);
         if (entry.labelsUnavailableReason) this.labelsUnavailableReason = entry.labelsUnavailableReason;
       }
-      memoryRecordings.delete(this.options.scope);
+      holdInMemory(this.options.scope, null);
       this.resaveKept(kept);
       this.restoreHiddenPeriods(storedPeriods);
       this.speakers = memorySpeakers.get(this.options.scope) ?? this.speakers;
@@ -137,7 +160,7 @@ export class RecordingChunkQueue {
           entry.segment = { ...entry.segment, status: 'queued' };
         this.records.set(entry.segment.id, entry);
       }
-      memoryRecordings.delete(this.options.scope);
+      holdInMemory(this.options.scope, null);
       this.resaveKept(kept);
       this.restoreHiddenPeriods([]);
       this.speakers = memorySpeakers.get(this.options.scope) ?? this.speakers;
@@ -190,10 +213,16 @@ export class RecordingChunkQueue {
     // Best effort, in order with chunk writes, so Clear deletes it after any pending save.
     this.writes = this.writes.then(() => putRecordingChunk(record).catch(() => {}));
   }
-  // Audio kept only in memory stays unsaved until a write succeeds: a failed write keeps the
-  // warning (and failedWrites), so a later close or unmount keeps the memory copy instead of dropping it.
+  // Audio or text kept only in memory stays unsaved (in failedWrites) until a write succeeds, so the warning and
+  // the prompt before leaving hold meanwhile, and a later close or unmount keeps the memory copy.
   private resaveKept(kept: RecordingChunk[]) {
-    for (const entry of kept) if (entry.audio && this.records.get(entry.segment.id) === entry) void this.save(entry);
+    for (const entry of kept)
+      if (holdsSpeech(entry) && this.records.get(entry.segment.id) === entry) {
+        const { id } = entry.segment;
+        this.failedWrites.add(id);
+        this.resaving.add(id);
+        void this.save(entry).finally(() => this.resaving.delete(id));
+      }
   }
   async prepare() {
     await this.ready;
@@ -234,7 +263,7 @@ export class RecordingChunkQueue {
       } catch (error) {
         this.failedWrites.add(record.segment.id);
         this.storageError = storageText(error);
-        if (this.disposed) memoryRecordings.set(this.options.scope, this.records);
+        if (this.disposed) holdInMemory(this.options.scope, this.records);
       }
       this.changed();
     });
@@ -445,6 +474,7 @@ export class RecordingChunkQueue {
       if (
         (!id || id === record.segment.id) &&
         this.failedWrites.has(record.segment.id) &&
+        !this.resaving.has(record.segment.id) &&
         record.segment.status === 'complete'
       )
         void this.save(record);
@@ -472,26 +502,23 @@ export class RecordingChunkQueue {
       );
     }
   }
-  /** Whether only this page holds some audio, so a reload or closing the tab would lose it. */
-  get unsavedAudio(): boolean {
-    return (
-      Boolean(this.storageError || this.failedWrites.size) && [...this.records.values()].some((record) => record.audio)
-    );
+  /** Whether only this page holds some of the recording (audio or text), so a reload would lose it. */
+  get unsaved(): boolean {
+    return Boolean(this.storageError || this.failedWrites.size) && holdsRecording(this.records);
   }
-  /** After pending saves: whether no chunk is waiting or uploading, and whether only this page holds some audio. */
+  /** After pending saves: whether no chunk is waiting or uploading, and whether only this page holds some of it. */
   async settled() {
     await this.ready;
     await this.writes;
     return {
       idle: this.segments.every((segment) => ['complete', 'failed'].includes(segment.status)),
-      unsaved: this.unsavedAudio,
+      unsaved: this.unsaved,
     };
   }
   async keepAudio() {
     await this.ready;
     await this.writes;
-    if (this.storageError) memoryRecordings.set(this.options.scope, this.records);
-    else memoryRecordings.delete(this.options.scope);
+    holdInMemory(this.options.scope, this.storageError ? this.records : null);
   }
   /** Every retained recording, including completed audio, requires explicit discard before deletion. */
   async clear(discardAudio = false) {
@@ -509,7 +536,7 @@ export class RecordingChunkQueue {
       if (!this.storageError) throw error;
     }
     this.records.clear();
-    memoryRecordings.delete(this.options.scope);
+    holdInMemory(this.options.scope, null);
     memoryHiddenPeriods.delete(this.options.scope);
     memorySpeakers.delete(this.options.scope);
     this.hiddenPeriods = [];
@@ -521,7 +548,7 @@ export class RecordingChunkQueue {
   dispose() {
     this.disposed = true;
     // Leaving without Close and keep (Back, a route change) must not drop audio that only memory holds.
-    if (this.storageError || this.failedWrites.size) memoryRecordings.set(this.options.scope, this.records);
+    if (this.storageError || this.failedWrites.size) holdInMemory(this.options.scope, this.records);
     if (this.retryTimer) clearTimeout(this.retryTimer);
     this.retryTimer = null;
     this.waiters.forEach((resolve) => resolve());

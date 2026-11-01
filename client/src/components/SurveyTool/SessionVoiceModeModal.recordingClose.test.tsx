@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import SessionVoiceModeModal from './SessionVoiceModeModal';
 import { transcribeAudio } from '../../utilities/ai/aiClient.js';
-import type { RecordingChunk } from '../../utilities/audio/recordingChunkStore';
+import { putRecordingChunk, type RecordingChunk } from '../../utilities/audio/recordingChunkStore';
 const mockRecords = new Map<string, RecordingChunk>();
 const savedSegments = () => [...mockRecords.values()].map((record) => record.segment);
 const savedTranscript = () =>
@@ -277,3 +277,52 @@ it('reminds the session page to reopen while kept audio waits to upload', async 
   await act(async () => {});
   expect(screen.queryByText(/waiting to upload/)).not.toBeInTheDocument();
 });
+
+it.each(['recorded audio', 'a pasted transcript'])(
+  'warns on the session page and before leaving while only this page holds %s',
+  async (kind) => {
+    const put = jest.mocked(putRecordingChunk).getMockImplementation()!;
+    jest.mocked(putRecordingChunk).mockRejectedValue(new DOMException('Full', 'QuotaExceededError'));
+    const leaving = () => !window.dispatchEvent(new Event('beforeunload', { cancelable: true }));
+    try {
+      render(<Harness />);
+      await waitFor(() => expect(screen.getByTestId('ce-session-listening-start')).toBeEnabled());
+      if (kind === 'recorded audio') {
+        fireEvent.click(screen.getByTestId('ce-session-listening-start'));
+        fireEvent.click(await screen.findByRole('button', { name: 'Stop recording' }));
+      } else {
+        fireEvent.click(screen.getByRole('button', { name: 'Add input' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Paste transcript' }));
+        fireEvent.change(screen.getByLabelText('Written transcript'), { target: { value: transcript } });
+        fireEvent.click(screen.getByRole('button', { name: 'Add transcript' }));
+      }
+      await waitFor(() => expect(screen.getByTestId('ce-session-listening-transcript')).toHaveValue(transcript));
+      dismiss('Close');
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+      // Transcribed or pasted, nothing waits to upload, yet a reload would lose it.
+      expect(await screen.findByText("This recording can't be recovered after a reload.")).toHaveAttribute(
+        'role',
+        'status',
+      );
+      expect(screen.getByRole('button', { name: 'About kept recording audio' })).toHaveAccessibleDescription(
+        /only this page holds it/,
+      );
+      expect(leaving()).toBe(true);
+      // Cleared, nothing is left to lose.
+      fireEvent.click(screen.getByRole('button', { name: 'Reopen recording' }));
+      fireEvent.click(await screen.findByRole('button', { name: 'Clear transcript' }));
+      if (kind === 'recorded audio') {
+        fireEvent.click(await screen.findByRole('button', { name: 'Clear recording' }));
+        await waitFor(() => expect(screen.queryByText('Clear this recording?')).not.toBeInTheDocument());
+      }
+      await waitFor(() => expect(screen.queryByTestId('ce-session-listening-transcript')).not.toBeInTheDocument());
+      dismiss('Close');
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+      await act(async () => {});
+      expect(screen.queryByText(/can't be recovered/)).not.toBeInTheDocument();
+      expect(leaving()).toBe(false);
+    } finally {
+      jest.mocked(putRecordingChunk).mockImplementation(put);
+    }
+  },
+);

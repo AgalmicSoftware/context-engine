@@ -600,7 +600,7 @@ export const useRollingTranscriptionRecorder = ({
   ).length;
   const backBlocked = useRecordingLeaveGuard(
     status === 'recording' || status === 'paused' || status === 'stopping',
-    pendingSegmentCount > 0 || chunks.unsavedAudio,
+    pendingSegmentCount > 0 || chunks.unsaved,
   );
 
   return {

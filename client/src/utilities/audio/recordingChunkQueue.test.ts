@@ -1,4 +1,4 @@
-import { countKeptChunks, RecordingChunkQueue } from './recordingChunkQueue';
+import { countKeptChunks, hasUnsavedRecording, RecordingChunkQueue } from './recordingChunkQueue';
 import {
   clearRecordingChunks,
   listRecordingChunks,
@@ -620,6 +620,43 @@ it('counts the kept chunks that reopening will upload, in storage or only in mem
   await queue.keepAudio();
   queue.dispose();
   await expect(countKeptChunks('kept-room')).resolves.toBe(1);
+});
+
+it('treats transcribed audio and pasted text that only this page holds as unsaved until a write succeeds', async () => {
+  jest.mocked(putRecordingChunk).mockRejectedValue(new DOMException('Full', 'QuotaExceededError'));
+  const first = create(undefined, 'unsaved-room');
+  await first.prepare();
+  await first.addTranscript('Pasted notes.');
+  // A pasted transcript alone would be lost by a reload.
+  expect(first.unsaved).toBe(true);
+  first.capture(first.begin(false), audio, true);
+  await first.finish();
+  expect(first.segments.map((segment) => segment.status)).toEqual(['complete', 'complete']);
+  await first.keepAudio();
+  first.dispose();
+  // Closed, with nothing waiting to upload: the recording is still only on this page.
+  expect(hasUnsavedRecording('unsaved-room')).toBe(true);
+  expect(hasUnsavedRecording('other-room')).toBe(false);
+  await expect(countKeptChunks('unsaved-room')).resolves.toBe(0);
+  // Reopened, the recording stays unsaved until a write succeeds, then saves the pasted text too.
+  let answer = () => {};
+  jest.mocked(putRecordingChunk).mockImplementation(async (record: RecordingChunk) => {
+    await new Promise<void>((resolve) => {
+      answer = resolve;
+    });
+    saved.set(record.segment.id, { ...record, segment: { ...record.segment } });
+  });
+  const second = create(undefined, 'unsaved-room');
+  await second.ready;
+  expect(hasUnsavedRecording('unsaved-room')).toBe(false);
+  expect(second.unsaved).toBe(true);
+  for (let write = 0; write < 2; write++) {
+    answer();
+    await tick();
+  }
+  expect([...saved.values()].map((record) => record.segment.text)).toEqual(['Pasted notes.', 'Speech.']);
+  expect(second.unsaved).toBe(false);
+  expect(second.storageError).toBe('');
 });
 
 describe('speaker labels across chunks', () => {

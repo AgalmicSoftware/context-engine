@@ -9,7 +9,7 @@ import SessionRecordingHelp from './SessionRecordingHelp';
 import SessionVoiceModeChooser from './SessionVoiceModeChooser';
 import SessionVoicePrefillCard from './SessionVoicePrefillCard';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
-import { useKeptRecordingChunks } from '../../utilities/audio/useRecordingChunkQueue';
+import { useKeptRecording } from '../../utilities/audio/useRecordingChunkQueue';
 import { sortInterviewQuestionPoolNewestFirst } from './sessionInterviewQuestionOrder';
 import { normalizeInterviewQuestions, type InterviewPrefillPacket } from './sessionInterview';
 import type { SessionVoiceModeModalProps } from './sessionVoiceModeTypes';
@@ -30,6 +30,9 @@ const KEPT_AUDIO_NOTICE_POSITION: React.CSSProperties = {
 
 const KEPT_AUDIO_HELP =
   'Close and keep the audio left it unsent. It stays on this device until it uploads; reopen the recording to finish.';
+const UNSAVED_NOTICE = "This recording can't be recovered after a reload.";
+const UNSAVED_HELP =
+  'Device storage failed, so only this page holds it. Reopen the recording to finish or download it before leaving.';
 
 export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps) {
   const { isOpen, mode, onSelectMode, onClose, questionPool = [], context } = props;
@@ -39,8 +42,9 @@ export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps)
   useEffect(() => {
     if (isOpen) setKeptDismissed(false);
   }, [isOpen]);
-  // While closed, audio a Group Conversation kept on this device still has to be uploaded.
-  const keptChunks = useKeptRecordingChunks(
+  // While closed, audio a Group Conversation kept on this device still has to be uploaded, and what only this
+  // page holds (device storage failed) is lost by a reload.
+  const kept = useKeptRecording(
     {
       sessionSlug: props.sessionSlug || '',
       sessionConfig: props.sessionConfig || null,
@@ -134,11 +138,11 @@ export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps)
           </>
         )}
       </Modal>
-      {keptChunks > 0 && !keptDismissed ? (
+      {(kept.waiting > 0 || kept.unsaved) && !keptDismissed ? (
         <div style={KEPT_AUDIO_NOTICE_POSITION}>
           <aside className={styles.sessionListeningPanel} aria-label="Kept recording audio">
             <span className={styles.sessionRecordingOption}>
-              <span role="status">Saved audio is waiting to upload.</span>
+              <span role="status">{kept.unsaved ? UNSAVED_NOTICE : 'Saved audio is waiting to upload.'}</span>
               <button
                 type="button"
                 id={keptHelpId}
@@ -149,10 +153,10 @@ export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps)
                 <FontAwesomeIcon icon={faQuestionCircle} />
               </button>
               <span id={`${keptHelpId}-about`} hidden>
-                {KEPT_AUDIO_HELP}
+                {kept.unsaved ? UNSAVED_HELP : KEPT_AUDIO_HELP}
               </span>
               <UncontrolledTooltip target={keptHelpId} trigger="hover focus" autohide={false}>
-                {KEPT_AUDIO_HELP}
+                {kept.unsaved ? UNSAVED_HELP : KEPT_AUDIO_HELP}
               </UncontrolledTooltip>
             </span>
             <span className={styles.sessionRecordingOption}>

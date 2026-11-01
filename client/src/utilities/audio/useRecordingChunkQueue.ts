@@ -1,7 +1,12 @@
 import { audioFileExtension } from './audioFileExtension';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { transcribeAudio, transcribeGroupAudio } from '../ai/aiClient.js';
-import { countKeptChunks, hasUnsavedAudio, RecordingChunkQueue } from './recordingChunkQueue';
+import {
+  countKeptChunks,
+  hasUnsavedRecording,
+  RecordingChunkQueue,
+  subscribeUnsavedRecordings,
+} from './recordingChunkQueue';
 import { recordingOwner, type RecordingOptions } from './recordingOwner';
 import {
   stitchRollingTranscriptSegments,
@@ -60,7 +65,7 @@ export function useRecordingChunkQueue(options: Options) {
   const [segments, setSegments] = useState<RollingTranscriptSegment[]>([]);
   const [downloadableChunkIds, setDownloadableChunkIds] = useState<string[]>([]);
   const [storageError, setStorageError] = useState('');
-  const [unsavedAudio, setUnsavedAudio] = useState(false);
+  const [unsaved, setUnsaved] = useState(false);
   const [labelsUnavailableReason, setLabelsUnavailableReason] = useState('');
   const [hiddenPeriods, setHiddenPeriods] = useState<Array<{ startedAt: number; endedAt: number }>>([]);
   const [offline, setOffline] = useState(typeof navigator !== 'undefined' && navigator.onLine === false);
@@ -73,11 +78,11 @@ export function useRecordingChunkQueue(options: Options) {
   const isForeign = (pin: string) => ownedByAnother(pin, normalizedAccount);
   // Record pins a recording so signing in or a late account restore neither stops capture nor splits it. A pin
   // made while signed in never reaches another account, which would see its transcript and upload with its own
-  // credentials: opening the recorder drops it, unless only this page holds some of its audio (kept below).
+  // credentials: opening the recorder drops it, unless only this page holds some of it (kept below).
   if (
     isForeign(pinned.current.scope) &&
     openScope.current !== pinned.current.scope &&
-    !hasUnsavedAudio(pinned.current.scope)
+    !hasUnsavedRecording(pinned.current.scope)
   ) {
     forgetPinnedScope(identity);
     pinned.current = { identity, scope: '' };
@@ -120,7 +125,7 @@ export function useRecordingChunkQueue(options: Options) {
             [...queue.records.values()].filter((record) => record.audio?.size).map((record) => record.segment.id),
           );
           setStorageError(queue.storageError);
-          setUnsavedAudio(queue.unsavedAudio);
+          setUnsaved(queue.unsaved);
           setLabelsUnavailableReason(queue.labelsUnavailableReason);
           setHiddenPeriods(
             queue.hiddenPeriods.flatMap(({ startedAt, endedAt }) => (endedAt == null ? [] : [{ startedAt, endedAt }])),
@@ -190,14 +195,14 @@ export function useRecordingChunkQueue(options: Options) {
     };
   }, [scope, options.sessionSlug]);
   // An open recording that now belongs to another account is released only once nothing would be lost: no
-  // capture, no chunk waiting or uploading (closing would drop a paid transcript), and no audio held only by
-  // this page. Until then it stays with its account, the recorder says so, and Record waits.
+  // capture, no chunk waiting or uploading (closing would drop a paid transcript), and no audio or text held
+  // only by this page. Until then it stays with its account, the recorder says so, and Record waits.
   useEffect(() => {
     const queue = queueRef.current;
     if (!foreignPin || options.capturing || !queue) return undefined;
     let current = true;
-    void queue.settled().then(({ idle, unsaved }) => {
-      if (current && idle && !unsaved) releasePin();
+    void queue.settled().then((settled) => {
+      if (current && settled.idle && !settled.unsaved) releasePin();
     });
     return () => {
       current = false;
@@ -305,7 +310,7 @@ export function useRecordingChunkQueue(options: Options) {
     segments,
     transcript: stitchRollingTranscriptSegments(segments),
     storageError,
-    unsavedAudio,
+    unsaved,
     offline,
     labelsUnavailableReason,
     ownerNotice: foreignPin && !options.capturing ? OWNER_NOTICE : '',
@@ -314,27 +319,30 @@ export function useRecordingChunkQueue(options: Options) {
 }
 
 /**
- * While the recorder is closed (`enabled`), how many chunks of the recording it would open still hold audio to
- * upload, so the session page can ask for it to be reopened.
+ * While the recorder is closed (`enabled`), what the recording it would open left on this device: how many
+ * chunks still hold audio to upload, and whether only this page holds some of it, so the session page can ask
+ * for it to be reopened.
  */
-export function useKeptRecordingChunks(options: RecordingOptions, enabled: boolean): number {
+export function useKeptRecording(options: RecordingOptions, enabled: boolean): { waiting: number; unsaved: boolean } {
   const { account, worker, identity } = recordingOwner(options);
   const pin = readPinnedScope(identity);
-  // As the recorder does on opening, another account's recording gives way unless only this page holds its audio.
+  // As the recorder does on opening, another account's recording gives way unless only this page holds some of it.
   const scope =
-    pin && (!ownedByAnother(pin, account) || hasUnsavedAudio(pin))
+    pin && (!ownedByAnother(pin, account) || hasUnsavedRecording(pin))
       ? pin
       : JSON.stringify([worker, options.sessionSlug, account]);
-  const [kept, setKept] = useState(0);
+  // Memory can change after the dialog closes, as when the recorder's last save fails while it unmounts.
+  const unsaved = useSyncExternalStore(subscribeUnsavedRecordings, () => hasUnsavedRecording(scope));
+  const [waiting, setWaiting] = useState(0);
   useEffect(() => {
     if (!enabled) return undefined;
     let current = true;
     void countKeptChunks(scope).then((count) => {
-      if (current) setKept(count);
+      if (current) setWaiting(count);
     });
     return () => {
       current = false;
     };
   }, [enabled, scope]);
-  return enabled ? kept : 0;
+  return enabled ? { waiting, unsaved } : { waiting: 0, unsaved: false };
 }

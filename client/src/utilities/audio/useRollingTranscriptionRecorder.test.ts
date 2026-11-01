@@ -735,26 +735,45 @@ describe('useRollingTranscriptionRecorder', () => {
       unmount();
     });
 
-    it('asks before leaving while some audio is held only in memory', async () => {
-      const put = jest.mocked(putRecordingChunk).getMockImplementation()!;
-      jest.mocked(putRecordingChunk).mockRejectedValue(new DOMException('Full', 'QuotaExceededError'));
-      const { result, unmount } = renderHook(() => useRollingTranscriptionRecorder({ sessionSlug: 'leave-memory' }));
-      try {
-        await act(async () => {
-          await result.current.startRecording();
-        });
-        await act(async () => {
-          await result.current.stopRecording();
-          await flushPromises();
-        });
-        expect(result.current.segments.map((segment) => segment.status)).toEqual(['complete']);
-        expect(result.current.downloadableChunkIds).toHaveLength(1);
-        expect(leaving()).toBe(true);
-      } finally {
-        unmount();
-        jest.mocked(putRecordingChunk).mockImplementation(put);
-      }
-    });
+    it.each(['audio', 'a pasted transcript'])(
+      'asks before leaving while %s is held only in memory, also once the recorder closes',
+      async (kind) => {
+        const put = jest.mocked(putRecordingChunk).getMockImplementation()!;
+        jest.mocked(putRecordingChunk).mockRejectedValue(new DOMException('Full', 'QuotaExceededError'));
+        const sessionSlug = `leave-memory-${kind.length}`;
+        let recorder = renderHook(() => useRollingTranscriptionRecorder({ sessionSlug }));
+        try {
+          if (kind === 'audio')
+            await act(async () => {
+              await recorder.result.current.startRecording();
+            });
+          await act(async () => {
+            if (kind === 'audio') await recorder.result.current.stopRecording();
+            else await recorder.result.current.addTranscript('Pasted notes.');
+            await flushPromises();
+          });
+          expect(recorder.result.current.segments.map((segment) => segment.status)).toEqual(['complete']);
+          expect(recorder.result.current.downloadableChunkIds).toHaveLength(kind === 'audio' ? 1 : 0);
+          expect(leaving()).toBe(true);
+          await act(() => recorder.result.current.keepAudio());
+          recorder.unmount();
+          expect(leaving()).toBe(true);
+          // Reopened and cleared, nothing is left to lose.
+          recorder = renderHook(() => useRollingTranscriptionRecorder({ sessionSlug }));
+          await act(flushPromises);
+          expect(recorder.result.current.transcript).toBe(kind === 'audio' ? 'transcript 1' : 'Pasted notes.');
+          await act(async () => {
+            recorder.result.current.clearDraft(true);
+            await flushPromises();
+          });
+          expect(leaving()).toBe(false);
+        } finally {
+          recorder.unmount();
+          jest.mocked(putRecordingChunk).mockImplementation(put);
+        }
+        expect(leaving()).toBe(false);
+      },
+    );
 
     it('keeps the page on Back while capturing, says why, and lets Back leave once capture stops', async () => {
       const { result, unmount } = renderHook(() => useRollingTranscriptionRecorder({ sessionSlug: 'leave-back' }));
