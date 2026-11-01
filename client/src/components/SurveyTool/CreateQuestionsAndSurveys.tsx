@@ -27,6 +27,7 @@ import InterviewSuggestedQuestionPrompt from './InterviewSuggestedQuestionPrompt
 import { arweaveClient as arweaveClient } from '../../utilities/arweave/arweaveClient';
 import CETooltip from '../Shared/CETooltip';
 import CEConfirmDialog from '../Shared/CEConfirmDialog';
+import AutoGrowTextarea from '../Shared/AutoGrowTextarea';
 import { normalizeArweaveUrl } from '../../utilities/arweave/arweaveUrls.js';
 import { canonicalizeSessionSlug as normalizeSessionSlug } from '../../utilities/session/sessionSlug.js';
 import contractScripts from '../../utilities/web3/chainGateway.js';
@@ -3682,12 +3683,10 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
                   actions={removeQuestionButton}
                 />
               ) : (
-                <Input
+                <AutoGrowTextarea
                   innerRef={(el: FocusablePromptElement | null) => {
                     this._promptRefs[question.uiKey] = el;
                   }}
-                  type="textarea"
-                  rows="2"
                   className={styles.questionPromptInput}
                   placeholder="Question prompt"
                   data-testid={E2E_TESTIDS.CREATE_QUESTION_PROMPT}
@@ -3702,7 +3701,8 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
                 <div className={styles.optionsContainer}>
                   {(question.options || []).map((option: string, oIndex: number) => (
                     <div key={`option-${question.uiKey || qIndex}-${oIndex}`} className={styles.optionItem}>
-                      <Input
+                      <AutoGrowTextarea
+                        singleLine
                         placeholder={`Option ${oIndex + 1}`}
                         value={option}
                         onChange={(e: CreateSurveyInputValueEvent) =>
