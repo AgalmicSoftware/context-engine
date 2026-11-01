@@ -727,7 +727,7 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
         <span className={styles.sessionRecordingOption}>
           <Button
             type="button"
-            className={styles.sessionInterviewHeaderButton}
+            className={styles.sessionRecordingButton}
             aria-describedby={`${keepHelpId}-about`}
             onClick={async () => {
               try {

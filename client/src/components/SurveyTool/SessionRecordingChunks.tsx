@@ -1,6 +1,7 @@
 import React from 'react';
 import type { RollingTranscriptSegment } from '../../utilities/audio/rollingTranscription';
 import styles from './SessionRecordingChunks.module.scss';
+import recorderStyles from './SurveyTool.module.scss';
 
 const STATUS_LABELS = {
   recording: 'Recording',
@@ -32,6 +33,7 @@ export function SessionRecordingChunks({ segments, downloadableChunkIds = [], on
               {segment.status === 'failed' || segment.status === 'retrying' || segment.status === 'transcribing' ? (
                 <button
                   type="button"
+                  className={recorderStyles.sessionRecordingButton}
                   onClick={() => onRetry(segment.id)}
                   aria-label={`Retry chunk ${segment.index + 1}`}
                 >
@@ -41,6 +43,7 @@ export function SessionRecordingChunks({ segments, downloadableChunkIds = [], on
               {downloadableChunkIds.includes(segment.id) ? (
                 <button
                   type="button"
+                  className={recorderStyles.sessionRecordingButton}
                   onClick={() => onDownload(segment.id)}
                   aria-label={`Download chunk ${segment.index + 1}`}
                 >

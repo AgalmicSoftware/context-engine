@@ -1049,13 +1049,19 @@ it('says when the recorder restarted the microphone because no audio arrived', (
   );
 });
 
-it('gives the hidden-page Dismiss the readable text-button style of the other recorder actions', () => {
+it('gives the recorder text actions one outlined button style', () => {
   (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
-    buildRecorder({ hiddenPeriods: [{ startedAt: 1_000, endedAt: 2_000 }], dismissHiddenPeriods: jest.fn() }),
+    buildRecorder({
+      hiddenPeriods: [{ startedAt: 1_000, endedAt: 2_000 }],
+      dismissHiddenPeriods: jest.fn(),
+      segments: [{ id: 'up', index: 0, status: 'transcribing', text: '', startedAt: 1 }],
+      pendingSegmentCount: 1,
+      downloadableChunkIds: ['up'],
+    }),
   );
-  render(<SessionListeningPanel sessionSlug="room" panelMode="recordGroup" />);
-  // The default secondary button is white on a light dialog.
-  expect(screen.getByRole('button', { name: 'Dismiss hidden-page notice' })).toHaveClass(
-    'sessionInterviewHeaderButton',
+  render(<SessionListeningPanel sessionSlug="room" panelMode="recordGroup" onClose={jest.fn()} />);
+  // The default secondary button is white on a light dialog, and Minimal drops button borders.
+  ['Dismiss hidden-page notice', 'Close and keep the audio', 'Retry chunk 1', 'Download chunk 1'].forEach((name) =>
+    expect(screen.getByRole('button', { name })).toHaveClass('sessionRecordingButton'),
   );
 });

@@ -84,7 +84,7 @@ export function SessionRecordingNotices({ recorder, capturing, labelCheckTimedOu
           ))}
           <Button
             size="sm"
-            className={styles.sessionInterviewHeaderButton}
+            className={styles.sessionRecordingButton}
             onClick={recorder.dismissHiddenPeriods}
             aria-label="Dismiss hidden-page notice"
           >

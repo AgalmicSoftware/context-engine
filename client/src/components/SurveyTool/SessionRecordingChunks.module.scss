@@ -39,18 +39,4 @@
   flex-wrap: wrap;
   gap: 8px;
   margin-left: auto;
-  button {
-    min-height: 36px;
-    padding: 4px 10px;
-    border: 1px solid var(--ce-panel-text);
-    border-radius: 6px;
-    color: var(--ce-panel-text);
-    background: var(--ce-surface);
-    cursor: pointer;
-    &:hover,
-    &:focus-visible {
-      outline: 2px solid var(--ce-panel-text);
-      outline-offset: 2px;
-    }
-  }
 }
