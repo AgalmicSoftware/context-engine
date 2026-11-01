@@ -6,6 +6,10 @@ All notable changes to this project will be documented in this file.
 
 0.9.0 also contains the 0.8.1 changes listed below, which were never released on their own.
 
+### Release verification
+
+- Reject raw provider-key shapes in release scans, including test fixtures, and generate synthetic secret-detection inputs at runtime.
+
 ### Client — available when the site deploys
 
 - Improve footer contrast, link directly to the CommonGround environments and Truth-Seeking AI grant program, and refresh the README feature slideshow and architecture artwork.
