@@ -74,6 +74,8 @@ export function useRecordingChunkQueue(options: Options) {
   const [labelsUnavailableReason, setLabelsUnavailableReason] = useState('');
   const [hiddenPeriods, setHiddenPeriods] = useState<Array<{ startedAt: number; endedAt: number }>>([]);
   const [offline, setOffline] = useState(typeof navigator !== 'undefined' && navigator.onLine === false);
+  const [importing, setImporting] = useState(false);
+  const importRef = useRef<Promise<unknown>>(Promise.resolve());
   const [openElsewhere, setOpenElsewhere] = useState(false);
   const { account: normalizedAccount, worker, identity } = recordingOwner(options);
   const pinned = useRef({ identity, scope: readPinnedScope(identity) });
@@ -234,18 +236,28 @@ export function useRecordingChunkQueue(options: Options) {
   }, []);
   // An import is decoded once, when added, into chunk-length parts that upload like recorded chunks, each with
   // its own deadline and retry: nothing later decodes or uploads the whole file, and one that can't be decoded,
-  // or is too long, adds nothing that a reload would retry.
+  // or is too long, adds nothing that a reload would retry. Decoding can take seconds on a phone, so closing
+  // waits for it rather than dropping the import, and Record waits rather than splitting the recording.
   const addAudio = useCallback(
     async (audio: Blob) => {
       const queue = queueRef.current;
-      const decoded = await decodeAudioAtRate(audio, TRANSCRIBE_WAV_TARGET_HZ);
-      if (!decoded?.length) throw new Error("This audio file couldn't be read. Try an MP3 or WAV file.");
-      if (decoded.duration > MAX_IMPORT_SECONDS)
-        throw new Error('Choose audio up to 30 minutes. Split longer recordings first.');
-      const parts = audioBufferToWavParts(decoded, latest.current.chunkMs / 1000);
-      await prepare();
-      if (!queue || queue !== queueRef.current) throw new Error('The recording changed. Add the audio again.');
-      queue.addParts(parts, latest.current.labelSpeakers);
+      const adding = (async () => {
+        const decoded = await decodeAudioAtRate(audio, TRANSCRIBE_WAV_TARGET_HZ);
+        if (!decoded?.length) throw new Error("This audio file couldn't be read. Try an MP3 or WAV file.");
+        if (decoded.duration > MAX_IMPORT_SECONDS)
+          throw new Error('Choose audio up to 30 minutes. Split longer recordings first.');
+        const parts = audioBufferToWavParts(decoded, latest.current.chunkMs / 1000);
+        await prepare();
+        if (!queue || queue !== queueRef.current) throw new Error('The recording changed. Add the audio again.');
+        queue.addParts(parts, latest.current.labelSpeakers);
+      })();
+      importRef.current = adding.catch(() => {});
+      setImporting(true);
+      try {
+        await adding;
+      } finally {
+        setImporting(false);
+      }
     },
     [prepare],
   );
@@ -259,9 +271,11 @@ export function useRecordingChunkQueue(options: Options) {
     [prepare],
   );
   const finishTranscription = useCallback(async () => {
+    await importRef.current;
     await queueRef.current?.finish();
   }, []);
   const keepAudio = useCallback(async () => {
+    await importRef.current;
     await queueRef.current?.keepAudio();
   }, []);
   const retryChunk = useCallback((id?: string) => queueRef.current?.retry(id), []);
@@ -324,6 +338,7 @@ export function useRecordingChunkQueue(options: Options) {
     transcript: stitchRollingTranscriptSegments(segments),
     storageError,
     unsaved,
+    importing,
     offline,
     labelsUnavailableReason,
     ownerNotice: foreignPin && !options.capturing ? OWNER_NOTICE : '',

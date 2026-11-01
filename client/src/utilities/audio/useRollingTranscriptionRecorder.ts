@@ -627,6 +627,8 @@ export const useRollingTranscriptionRecorder = ({
     backBlocked,
     // Device storage failed, so some of the recording may be held only by this page.
     storageFailed: Boolean(chunks.storageError) || chunks.unsaved,
+    // An imported file is still decoding.
+    importing: chunks.importing,
     // A capture stop leads; the storage and offline notices only say where the audio is kept.
     errorMessage: [
       errorMessage,

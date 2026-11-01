@@ -50,12 +50,15 @@ const flushPromises = async () => {
 // An imported file decodes to as many seconds of 16 kHz audio as its text names; other bytes don't decode.
 class FakeOfflineAudioContext {
   static decoded = 0;
+  // Decoding finishes once this settles.
+  static wait: Promise<void> = Promise.resolve();
   constructor(
     _channels: number,
     _length: number,
     readonly sampleRate: number,
   ) {}
   async decodeAudioData(bytes: ArrayBuffer) {
+    await FakeOfflineAudioContext.wait;
     FakeOfflineAudioContext.decoded += 1;
     const seconds = Number(new TextDecoder().decode(bytes));
     if (!seconds) throw new DOMException('Unable to decode audio data', 'EncodingError');
@@ -138,6 +141,7 @@ describe('useRollingTranscriptionRecorder', () => {
     originalMediaRecorder = (globalThis as any).MediaRecorder;
     originalMediaDevices = navigator.mediaDevices;
     FakeOfflineAudioContext.decoded = 0;
+    FakeOfflineAudioContext.wait = Promise.resolve();
     Object.defineProperty(window, 'OfflineAudioContext', { configurable: true, value: FakeOfflineAudioContext });
     mockTrack = { stop: jest.fn() };
     mockStream = {
@@ -234,6 +238,39 @@ describe('useRollingTranscriptionRecorder', () => {
     expect(result.current.segments).toEqual([]);
     expect(mockChunkRecords.size).toBe(0);
     expect(transcribeAudio).not.toHaveBeenCalled();
+    unmount();
+  });
+
+  it('finishes closing only once an import still decoding is added and transcribed', async () => {
+    let decode = () => {};
+    FakeOfflineAudioContext.wait = new Promise((resolve) => {
+      decode = resolve;
+    });
+    (transcribeAudio as jest.Mock).mockImplementation(async () => 'Imported speech.');
+    const { result, unmount } = renderHook(() => useRollingTranscriptionRecorder({ sessionSlug: 'import-closing' }));
+    let adding: Promise<void> = Promise.resolve();
+    await act(async () => {
+      adding = result.current.addAudio(new Blob(['60'], { type: 'audio/mpeg' }));
+      await flushPromises();
+    });
+    // Record waits too, so the import can't land in the middle of a recording.
+    expect(result.current.importing).toBe(true);
+    let closed = false;
+    let closing: Promise<void> = Promise.resolve();
+    await act(async () => {
+      closing = result.current.finalizeRecording({ waitForTranscription: true }).then(() => {
+        closed = true;
+      });
+      await flushPromises();
+    });
+    expect(closed).toBe(false);
+    await act(async () => {
+      decode();
+      await adding;
+      await closing;
+    });
+    expect(result.current.importing).toBe(false);
+    expect(result.current.transcript).toBe('Imported speech.');
     unmount();
   });
 

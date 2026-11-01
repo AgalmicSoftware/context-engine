@@ -335,6 +335,12 @@ describe('SessionListeningPanel', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Permission denied');
   });
 
+  it('holds Record while an imported file decodes, so the import stays in one place', () => {
+    (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(buildRecorder({ importing: true }));
+    render(<SessionListeningPanel sessionSlug="demo" />);
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_START)).toBeDisabled();
+  });
+
   it('starts recording only from the explicit Record control', () => {
     const startRecording = jest.fn();
     (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(

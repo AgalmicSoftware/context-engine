@@ -422,8 +422,10 @@ starts a second early, so a word cut at a boundary is whole in one of them;
 stitching drops the repeat. Each part uploads,
 retries and keeps its audio like a recorded chunk, as a 16 kHz WAV file, so a
 stalled upload sends only its part again and nothing decodes or uploads the whole
-file later. A file longer than 30 minutes, or one the browser can't decode, is
-refused with a message and adds nothing. Text import does not request the
+file later. Decoding can take some seconds on a phone; meanwhile Record waits,
+and closing the dialog waits for the import instead of dropping it. A file
+longer than 30 minutes, or one the browser can't decode, is refused with a
+message and adds nothing. Text import does not request the
 microphone or transcription. The input menu is unavailable during capture. Longer
 or larger audio files must be split first.
 

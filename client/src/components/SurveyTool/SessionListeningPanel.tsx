@@ -738,7 +738,8 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
               recorder.isBusy ||
               isPreparingRecording ||
               Boolean(recorder.ownerNotice) ||
-              recorder.openElsewhere
+              recorder.openElsewhere ||
+              recorder.importing
             }
             data-testid={E2E_TESTIDS.SESSION_LISTENING_START}
           >
