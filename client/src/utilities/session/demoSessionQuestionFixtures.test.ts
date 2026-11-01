@@ -194,16 +194,24 @@ describe('getTemporaryDemoSessionQuestionFixtures', () => {
     expect(classifySessionModeProfileSupport(config.sessionModeProfile).status).toBe('reachable');
   });
 
-  it.each(['rxc-test', 'rxc-ra-test', 'rxc-ra-test-2'])('discovers %s without seeding demo questions', (slug) => {
-    const config = (demoSessions as Record<string, any>)[slug];
-    expect(getTemporaryDemoSessionQuestionFixtures(slug, config)).toEqual([]);
-    expect(config).toMatchObject({
-      slug,
-      sessionId: expect.stringMatching(/^0x[0-9a-f]{32}$/),
-      corsWorkerUrl: expect.stringContaining(`https://ce-${slug}-`),
-      workerCanonicalCleanRoute: true,
-    });
-  });
+  it.each(['rxc-test', 'rxc-ra-test', 'rxc-ra-test-2', 'rxc-ra-test-3'])(
+    'discovers %s without seeding demo questions',
+    (slug) => {
+      const config = (demoSessions as Record<string, any>)[slug];
+      expect(getTemporaryDemoSessionQuestionFixtures(slug, config)).toEqual([]);
+      expect(config).toMatchObject({
+        slug,
+        sessionId: expect.stringMatching(/^0x[0-9a-f]{32}$/),
+        // Older deploys add a random suffix to the Worker name.
+        corsWorkerUrl: expect.stringMatching(
+          new RegExp(`^https://ce-${slug}(-[0-9a-f]{12})?\\.agalmic\\.workers\\.dev/$`),
+        ),
+        workerCanonicalCleanRoute: true,
+        // Bundled discovery trusts only a Worker-canonical entry.
+        sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+      });
+    },
+  );
 
   it('does not seed fallback questions for the fifth realtime demo route', () => {
     const config = (demoSessions as Record<string, any>)['demo-interview-5'];

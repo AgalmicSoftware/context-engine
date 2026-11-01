@@ -1,7 +1,7 @@
 import { getSessionEntryRedirect } from './sessionEntryRedirect';
 
 describe('EDDY session entry redirect', () => {
-  it.each(['rxc-test', 'rxc-ra-test', 'rxc-ra-test-2'])(
+  it.each(['rxc-test', 'rxc-ra-test', 'rxc-ra-test-2', 'rxc-ra-test-3'])(
     'expands %s without adding interview or group-join intent',
     (slug) => {
       const target = new URL(getSessionEntryRedirect(`/${slug}`)!, 'https://contextengine.sh');
