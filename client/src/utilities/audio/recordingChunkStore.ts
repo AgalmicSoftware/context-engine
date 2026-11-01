@@ -78,6 +78,11 @@ export async function putRecordingChunk(record: RecordingChunk): Promise<void> {
   await transact('readwrite', (store) => store.put(record));
 }
 
+/** Saves several records in one transaction, so a reload finds all of them or none. */
+export async function putRecordingChunks(records: RecordingChunk[]): Promise<void> {
+  await transact('readwrite', (store) => records.map((record) => store.put(record))[records.length - 1]);
+}
+
 export async function clearRecordingChunks(scope: string): Promise<void> {
   const database = await openStore();
   await new Promise<void>((resolve, reject) => {

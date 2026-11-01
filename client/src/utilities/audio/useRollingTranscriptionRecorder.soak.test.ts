@@ -52,6 +52,14 @@ jest.mock('./recordingChunkStore', () => ({
     }
     mockStore.records.set(`${record.scope}|${record.segment.id}`, mockClone(record));
   },
+  // One transaction: all of the records are saved, or none.
+  putRecordingChunks: async (records: RecordingChunk[]) => {
+    if (records.some((record) => mockStore.failNext?.(record))) {
+      mockStore.failNext = null;
+      throw new DOMException('The quota has been exceeded.', 'QuotaExceededError');
+    }
+    for (const record of records) mockStore.records.set(`${record.scope}|${record.segment.id}`, mockClone(record));
+  },
   clearRecordingChunks: async (scope: string) => {
     for (const [key, record] of mockStore.records) if (record.scope === scope) mockStore.records.delete(key);
   },

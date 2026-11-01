@@ -1,7 +1,12 @@
 import { act, renderHook } from '@testing-library/react';
 import { useRollingTranscriptionRecorder } from './useRollingTranscriptionRecorder';
 import { transcribeAudio, transcribeGroupAudio } from '../ai/aiClient.js';
-import { clearRecordingChunks, listRecordingChunks, putRecordingChunk } from './recordingChunkStore';
+import {
+  clearRecordingChunks,
+  listRecordingChunks,
+  putRecordingChunk,
+  putRecordingChunks,
+} from './recordingChunkStore';
 import { cutSpeakerSamples } from './speakerSamples';
 import { installFakeWebLocks } from './webLocks.testUtils';
 
@@ -28,6 +33,12 @@ jest.mock('./recordingChunkStore', () => ({
     async (record: { scope: string; segment: { id: string; status: string; text: string }; audio?: Blob }) => {
       // Keyed like the real store, by scope and segment id.
       mockChunkRecords.set(`${record.scope}|${record.segment.id}`, { ...record, segment: { ...record.segment } });
+    },
+  ),
+  putRecordingChunks: jest.fn(
+    async (records: Array<{ scope: string; segment: { id: string; status: string; text: string }; audio?: Blob }>) => {
+      for (const record of records)
+        mockChunkRecords.set(`${record.scope}|${record.segment.id}`, { ...record, segment: { ...record.segment } });
     },
   ),
   clearRecordingChunks: jest.fn(async () => mockChunkRecords.clear()),
@@ -195,6 +206,8 @@ describe('useRollingTranscriptionRecorder', () => {
       await flushPromises();
     });
     expect(FakeOfflineAudioContext.decoded).toBe(1);
+    // Saved in one write, so a reload finds the whole import or none of it.
+    expect(jest.mocked(putRecordingChunks).mock.calls.map(([records]) => records.length)).toEqual([3]);
     expect(result.current.segments.map((segment) => segment.status)).toEqual(['complete', 'transcribing', 'queued']);
     expect(sent).toEqual([180, 180]);
     // Only the stalled part goes again, under its own deadline; the whole file never goes.

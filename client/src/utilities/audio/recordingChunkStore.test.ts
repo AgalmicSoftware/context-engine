@@ -1,4 +1,4 @@
-import { hasKeptRecordingAudio, type RecordingChunk } from './recordingChunkStore';
+import { hasKeptRecordingAudio, putRecordingChunks, type RecordingChunk } from './recordingChunkStore';
 import { recordingOwner } from './recordingOwner';
 import type { RollingTranscriptSegment } from './rollingTranscription';
 
@@ -64,4 +64,30 @@ it.each([
 ])('finds kept audio for a session given %s', async (_case, records, kept) => {
   mockRecords = records;
   await expect(hasKeptRecordingAudio(session.identity)).resolves.toBe(kept);
+});
+
+it('saves several records in one transaction, so a reload finds all of them or none', async () => {
+  const transactions: RecordingChunk[][] = [];
+  const transaction = jest.spyOn(fakeDatabase, 'transaction').mockImplementation(() => {
+    const puts: RecordingChunk[] = [];
+    transactions.push(puts);
+    const pending: { oncomplete?: () => void; objectStore: () => unknown } = {
+      objectStore: () => ({
+        put: (record: RecordingChunk) => {
+          if (!puts.length) setTimeout(() => pending.oncomplete?.());
+          puts.push(record);
+          return {};
+        },
+      }),
+    };
+    return pending;
+  });
+  try {
+    const parts = ['queued', 'retrying', 'failed'] as const;
+    const records = parts.map((status) => chunk('rxc', '0xabc', status));
+    await putRecordingChunks(records);
+    expect(transactions).toEqual([records]);
+  } finally {
+    transaction.mockRestore();
+  }
 });

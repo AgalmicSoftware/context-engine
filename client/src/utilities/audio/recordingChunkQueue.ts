@@ -2,6 +2,7 @@ import {
   clearRecordingChunks,
   listRecordingChunks,
   putRecordingChunk,
+  putRecordingChunks,
   type HiddenPeriod,
   type RecordingChunk,
 } from './recordingChunkStore';
@@ -251,17 +252,30 @@ export class RecordingChunkQueue {
     this.changed();
     await this.save(record);
   }
-  private save(record: RecordingChunk): Promise<boolean> {
+  /** Adds an import's parts as finished chunks, saved in one write so that a reload finds all of them or none. */
+  addParts(parts: Blob[], labelSpeakers: boolean) {
+    const records = parts.map((audio) => {
+      const id = this.begin(labelSpeakers);
+      const begun = this.records.get(id)!;
+      const record: RecordingChunk = { ...begun, audio, segment: { ...begun.segment, status: 'queued' } };
+      this.records.set(id, record);
+      return record;
+    });
+    this.changed();
+    void this.save(records).then(() => this.pump());
+  }
+  private save(records: RecordingChunk | RecordingChunk[]): Promise<boolean> {
+    const batch = Array.isArray(records) ? records : [records];
     let saved = false;
     const operation = this.writes.then(async () => {
       try {
-        await putRecordingChunk(record);
+        await (batch.length > 1 ? putRecordingChunks(batch) : putRecordingChunk(batch[0]));
         saved = true;
-        this.failedWrites.delete(record.segment.id);
+        for (const { segment } of batch) this.failedWrites.delete(segment.id);
         if (!this.failedWrites.size) this.storageError = '';
         else this.resaveFailed();
       } catch (error) {
-        this.failedWrites.add(record.segment.id);
+        for (const { segment } of batch) this.failedWrites.add(segment.id);
         this.storageError = storageText(error);
         if (this.disposed) holdInMemory(this.options.scope, this.records);
       }

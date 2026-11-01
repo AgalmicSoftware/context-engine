@@ -245,7 +245,7 @@ export function useRecordingChunkQueue(options: Options) {
       const parts = audioBufferToWavParts(decoded, latest.current.chunkMs / 1000);
       await prepare();
       if (!queue || queue !== queueRef.current) throw new Error('The recording changed. Add the audio again.');
-      for (const part of parts) queue.capture(queue.begin(latest.current.labelSpeakers), part, true);
+      queue.addParts(parts, latest.current.labelSpeakers);
     },
     [prepare],
   );

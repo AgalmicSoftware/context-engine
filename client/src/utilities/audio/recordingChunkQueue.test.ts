@@ -3,6 +3,7 @@ import {
   clearRecordingChunks,
   listRecordingChunks,
   putRecordingChunk,
+  putRecordingChunks,
   type RecordingChunk,
 } from './recordingChunkStore';
 import type { KnownSpeaker, SpeakerTranscriptTurn } from './speakerTranscript';
@@ -11,6 +12,7 @@ jest.mock('./recordingChunkStore', () => ({
   clearRecordingChunks: jest.fn(),
   listRecordingChunks: jest.fn(),
   putRecordingChunk: jest.fn(),
+  putRecordingChunks: jest.fn(),
 }));
 const tick = async () => {
   for (let i = 0; i < 40; i++) await Promise.resolve();
@@ -48,6 +50,9 @@ beforeEach(() => {
       saved.set(record.segment.id, { ...record, segment: { ...record.segment } });
     },
   );
+  jest.mocked(putRecordingChunks).mockImplementation(async (records) => {
+    for (const record of records) saved.set(record.segment.id, { ...record, segment: { ...record.segment } });
+  });
   (clearRecordingChunks as jest.MockedFunction<typeof clearRecordingChunks>).mockImplementation(async () =>
     saved.clear(),
   );
@@ -831,6 +836,58 @@ describe('speaker labels across chunks', () => {
     expect(sentNames(transcribe)).toEqual([[], []]);
     expect(voices(queue)).toEqual([['Person 1'], ['Person 1']]);
   });
+});
+
+it("saves an import's parts in one write before sending any, so a reload finds all of them or none", async () => {
+  const transcribe = jest.fn<Transcribe>(async () => ({ text: 'Part.' }));
+  const queue = create(transcribe);
+  await queue.ready;
+  let finishWrite = () => {};
+  jest.mocked(putRecordingChunks).mockImplementationOnce(
+    (records) =>
+      new Promise((resolve) => {
+        finishWrite = () => {
+          records.forEach((record) => saved.set(record.segment.id, record));
+          resolve();
+        };
+      }),
+  );
+  const parts = ['first', 'second', 'third'].map((part) => new Blob([part], { type: 'audio/wav' }));
+  queue.addParts(parts, false);
+  await tick();
+  expect(queue.segments.map((segment) => segment.status)).toEqual(['queued', 'queued', 'queued']);
+  expect(saved.size).toBe(0);
+  expect(putRecordingChunk).not.toHaveBeenCalled();
+  expect(transcribe).not.toHaveBeenCalled();
+  finishWrite();
+  await queue.finish();
+  expect(putRecordingChunks).toHaveBeenCalledTimes(1);
+  expect(transcribe.mock.calls.map(([audio]) => audio)).toEqual(parts);
+  expect(queue.segments.map((segment) => segment.status)).toEqual(['complete', 'complete', 'complete']);
+});
+
+it('keeps an import whose one write is refused in memory, saving its parts once storage works', async () => {
+  jest.mocked(putRecordingChunks).mockRejectedValueOnce(new DOMException('Full', 'QuotaExceededError'));
+  let answer = (_value: { text: string }) => {};
+  const transcribe = jest.fn<Transcribe>(
+    () =>
+      new Promise((resolve) => {
+        answer = resolve;
+      }),
+  );
+  const queue = create(transcribe, 'import-refused-write');
+  await queue.ready;
+  queue.addParts([new Blob(['first']), new Blob(['second'])], false);
+  await tick();
+  expect(queue.unsaved).toBe(true);
+  expect(queue.storageError).toContain("can't be recovered after a reload");
+  expect(saved.size).toBe(0);
+  // Storage takes the first part's transcript, so the other part is saved again too.
+  answer({ text: 'First.' });
+  await tick();
+  expect([...saved.values()].map((record) => record.segment.status)).toEqual(['complete', 'queued']);
+  expect(queue.unsaved).toBe(false);
+  expect(queue.storageError).toBe('');
 });
 
 it('persists an imported transcript without sending it for transcription and restores it in order', async () => {

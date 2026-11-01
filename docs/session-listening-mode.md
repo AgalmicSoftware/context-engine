@@ -416,7 +416,8 @@ WAV, MP4, WebM, OGG; up to 30 minutes and 20 MB), upload a `.txt`/`.md` transcri
 characters), or paste a written transcript. Imported input is appended to the
 recording, saved on this device, and available to **Generate questions**. An audio
 file is decoded once on this device when added, at 16 kHz mono, and joins the
-recording as three-minute parts, the recorder's chunk length. Each part uploads,
+recording as three-minute parts, the recorder's chunk length, saved together in
+one write so a reload finds all of them or none. Each part uploads,
 retries and keeps its audio like a recorded chunk, as a 16 kHz WAV file, so a
 stalled upload sends only its part again and nothing decodes or uploads the whole
 file later. A file longer than 30 minutes, or one the browser can't decode, is
