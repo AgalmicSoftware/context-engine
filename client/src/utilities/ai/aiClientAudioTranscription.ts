@@ -50,6 +50,7 @@ type SplitAudioOptions = {
 
 type AudioRuntimeWindow = Window & {
   webkitAudioContext?: typeof AudioContext;
+  webkitOfflineAudioContext?: typeof OfflineAudioContext;
 };
 
 const getAudioContextConstructor = (): typeof AudioContext | null => {
@@ -244,6 +245,49 @@ export const splitAudioBlobToWavChunks = async (
   }
 
   return chunks;
+};
+
+/**
+ * Decodes audio once at `sampleRate`. An OfflineAudioContext at that rate resamples while decoding, so the result
+ * holds only that rate's samples. Resolves null when the browser can't decode it.
+ */
+export const decodeAudioAtRate = async (inputBlob: AudioBlobLike, sampleRate: number): Promise<AudioBuffer | null> => {
+  const runtimeWindow = typeof window === 'undefined' ? undefined : (window as AudioRuntimeWindow);
+  const OfflineContext = runtimeWindow?.OfflineAudioContext || runtimeWindow?.webkitOfflineAudioContext;
+  if (!OfflineContext) return null;
+  try {
+    const arrayBuf = await readBlobAsArrayBuffer(inputBlob);
+    // Decoding renders nothing, so the context is one frame long.
+    const ctx = new OfflineContext(1, 1, sampleRate);
+    return await new Promise<AudioBuffer>((resolve, reject) => {
+      const result = ctx.decodeAudioData(arrayBuf, resolve, reject);
+      if (result && typeof result.then === 'function') result.then(resolve).catch(reject);
+    });
+  } catch (error) {
+    audioLog.warn('Audio decode failed:', error);
+    return null;
+  }
+};
+
+/**
+ * Cuts decoded audio into mono 16-bit WAV parts of `partSeconds`, mixing channels one part at a time. A last
+ * second or less joins the part before it, as too short to transcribe alone.
+ */
+export const audioBufferToWavParts = (audio: AudioBuffer, partSeconds: number): Blob[] => {
+  const channels = Array.from({ length: audio.numberOfChannels }, (_, index) => audio.getChannelData(index));
+  const partLength = Math.max(1, Math.round(partSeconds * audio.sampleRate));
+  const parts: Blob[] = [];
+  for (let start = 0, end = 0; start < audio.length; start = end) {
+    end = audio.length - start - partLength <= audio.sampleRate ? audio.length : start + partLength;
+    let mono = channels[0].subarray(start, end);
+    if (channels.length > 1) {
+      mono = new Float32Array(end - start);
+      for (const channel of channels)
+        for (let index = start; index < end; index += 1) mono[index - start] += channel[index] / channels.length;
+    }
+    parts.push(buildMonoWavBlob(float32ToInt16(mono), audio.sampleRate));
+  }
+  return parts;
 };
 
 /**

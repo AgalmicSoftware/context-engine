@@ -50,12 +50,17 @@ export const useRollingTranscriptionRecorder = ({
 }: UseRollingTranscriptionRecorderOptions = {}) => {
   const [status, setStatus] = useState<RollingRecorderStatus>('idle');
   const [errorMessage, setErrorMessage] = useState('');
+  const chunkDurationMs =
+    Number.isFinite(Number(chunkMs)) && Number(chunkMs) > 0
+      ? Math.max(15_000, Math.floor(Number(chunkMs)))
+      : DEFAULT_ROLLING_TRANSCRIPTION_CHUNK_MS;
   const chunks = useRecordingChunkQueue({
     sessionSlug,
     sessionConfig,
     context,
     workerUrl,
     labelSpeakers,
+    chunkMs: chunkDurationMs,
     capturing: status !== 'idle' && status !== 'error',
   });
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -97,11 +102,6 @@ export const useRollingTranscriptionRecorder = ({
   const stopWaitersRef = useRef<Set<() => void>>(new Set());
   // Ends a recorder's chunk with the audio it has delivered, for when it never confirms Stop.
   const finishersRef = useRef(new WeakMap<MediaRecorder, () => void>());
-
-  const chunkDurationMs =
-    Number.isFinite(Number(chunkMs)) && Number(chunkMs) > 0
-      ? Math.max(15_000, Math.floor(Number(chunkMs)))
-      : DEFAULT_ROLLING_TRANSCRIPTION_CHUNK_MS;
 
   useEffect(() => {
     mountedRef.current = true;

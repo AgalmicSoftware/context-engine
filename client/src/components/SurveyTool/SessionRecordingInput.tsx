@@ -81,7 +81,7 @@ export default function SessionRecordingInput({ disabled, onAudio, onTranscript 
       {open && (
         <div id={id} className={styles.choices}>
           <button type="button" disabled={blocked} onClick={() => audioRef.current?.click()}>
-            Upload audio <small>MP3, M4A, WAV, MP4, WebM, OGG · up to 20 MB</small>
+            Upload audio <small>MP3, M4A, WAV, MP4, WebM, OGG · up to 30 min, 20 MB</small>
           </button>
           <button type="button" disabled={blocked} onClick={() => transcriptRef.current?.click()}>
             Upload transcript <small>Text or Markdown · up to 100,000 characters</small>

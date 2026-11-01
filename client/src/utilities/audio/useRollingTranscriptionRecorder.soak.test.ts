@@ -58,17 +58,34 @@ jest.mock('./recordingChunkStore', () => ({
 }));
 
 const mockResponse = (status: number, body: unknown) => ({ ok: status < 300, status, json: async () => body });
+// An imported part is 16 kHz mono WAV whose samples hold its part number; it counts as chunk 100 + that number,
+// with a second of audio as a fragment.
+const mockImportedPart = (file: Blob) =>
+  new Promise<{ chunk: number; fragments: number }>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const sample = new DataView(reader.result as ArrayBuffer).getInt16(0, true);
+      resolve({ chunk: 100 + Math.round((sample * 100) / 0x7fff), fragments: (file.size - 44) / 2 / 16_000 });
+    };
+    reader.onerror = () => reject(reader.error);
+    reader.readAsArrayBuffer(file.slice(44, 46));
+  });
 const mockWorker = {
   generation: 'current' as WorkerGeneration,
   uploads: [] as Upload[],
   // Replies to a chunk's first requests, in order; later requests succeed.
   plan: new Map<number, Array<'503' | 'hang' | 'corrupt'>>(),
-  transcribe(init: RequestInit) {
+  transcribe(init: RequestInit): Promise<unknown> {
+    const file = (init.body as FormData).get('file') as Blob;
+    if (file.type === 'audio/wav') return mockImportedPart(file).then((audio) => mockWorker.answer(init, audio));
+    return mockWorker.answer(init, decodeAudio(file.size));
+  },
+  answer(init: RequestInit, audio: { chunk: number; fragments: number }): Promise<unknown> {
     const form = init.body as FormData;
     const labels = form.get('labelSpeakers') === 'true';
     const knownSpeakers = form.getAll('known_speaker_names[]').map(String);
     const upload: Upload = {
-      ...decodeAudio((form.get('file') as Blob).size),
+      ...audio,
       labels,
       knownSpeakers,
       sentAt: Date.now(),
@@ -202,6 +219,7 @@ const descriptors = {
   onLine: Object.getOwnPropertyDescriptor(navigator, 'onLine'),
   visibilityState: Object.getOwnPropertyDescriptor(document, 'visibilityState'),
   AudioContext: Object.getOwnPropertyDescriptor(window, 'AudioContext'),
+  OfflineAudioContext: Object.getOwnPropertyDescriptor(window, 'OfflineAudioContext'),
   arrayBuffer: Object.getOwnPropertyDescriptor(Blob.prototype, 'arrayBuffer'),
 };
 const restore = (target: object, name: string, descriptor?: PropertyDescriptor) => {
@@ -220,6 +238,24 @@ class FakeAudioContext {
     };
   }
   async close() {}
+}
+// An imported file decodes to as many seconds of 16 kHz audio as its text names, each three-minute part's
+// samples holding its part number.
+class FakeOfflineAudioContext {
+  static decoded = 0;
+  async decodeAudioData(data: ArrayBuffer) {
+    FakeOfflineAudioContext.decoded += 1;
+    const length = Number(new TextDecoder().decode(data)) * 16_000;
+    const samples = new Float32Array(length);
+    for (let index = 0; index < length; index++) samples[index] = (Math.floor(index / (180 * 16_000)) + 1) / 100;
+    return {
+      numberOfChannels: 1,
+      length,
+      sampleRate: 16_000,
+      duration: length / 16_000,
+      getChannelData: () => samples,
+    };
+  }
 }
 function blobBytes(this: Blob) {
   return new Promise<ArrayBuffer>((resolve, reject) => {
@@ -262,6 +298,8 @@ beforeEach(() => {
     get: () => (page.visible ? 'visible' : 'hidden'),
   });
   Object.defineProperty(window, 'AudioContext', { configurable: true, value: FakeAudioContext });
+  FakeOfflineAudioContext.decoded = 0;
+  Object.defineProperty(window, 'OfflineAudioContext', { configurable: true, value: FakeOfflineAudioContext });
   Object.defineProperty(Blob.prototype, 'arrayBuffer', { configurable: true, value: blobBytes });
 });
 
@@ -274,6 +312,7 @@ afterEach(() => {
   restore(navigator, 'onLine', descriptors.onLine);
   restore(document, 'visibilityState', descriptors.visibilityState);
   restore(window, 'AudioContext', descriptors.AudioContext);
+  restore(window, 'OfflineAudioContext', descriptors.OfflineAudioContext);
   restore(Blob.prototype, 'arrayBuffer', descriptors.arrayBuffer);
 });
 
@@ -460,3 +499,59 @@ it.each<WorkerGeneration>(['current', 'refuses labels', 'text only'])(
   },
   60_000,
 );
+
+it('imports a ten-minute file as three-minute parts that each upload alone, through a stall and a reload', async () => {
+  mockWorker.generation = 'current';
+  // The second and third parts' first requests never answer.
+  mockWorker.plan.set(102, ['hang']);
+  mockWorker.plan.set(103, ['hang']);
+  const openPage = async () => {
+    const hook = loadPage();
+    const opened = renderHook(() =>
+      hook({ sessionSlug: 'breakout', workerUrl: WORKER, context: { account: ACCOUNT }, labelSpeakers: true }),
+    );
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(0);
+    });
+    return opened;
+  };
+  let view = await openPage();
+  const statuses = () => view.result.current.segments.map((segment) => segment.status);
+  const runUntil = async (done: () => boolean) => {
+    for (let second = 0; second < 600 && !done(); second++)
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(1000);
+      });
+  };
+  await act(async () => {
+    await view.result.current.addAudio(new Blob(['600'], { type: 'audio/mpeg' }));
+  });
+  expect(statuses()).toEqual(['transcribing', 'queued', 'queued', 'queued']);
+  // The second part stalls and goes again alone; reload while the third part's request hangs.
+  await runUntil(() => statuses()[2] === 'transcribing');
+  view.unmount();
+  view = await openPage();
+  await runUntil(() => statuses().every((status) => status === 'complete'));
+  expect(mockWorker.uploads.map(({ chunk, fragments, outcome }) => [chunk, fragments, outcome])).toEqual([
+    [101, 180, 'ok'],
+    [102, 180, 'aborted'],
+    [102, 180, 'ok'],
+    [103, 180, undefined],
+    [103, 180, 'ok'],
+    [104, 60, 'ok'],
+  ]);
+  // The stalled part was abandoned after its own two minutes (the mock records it once it has read the part).
+  expect(mockWorker.uploads[1].settledAt! - mockWorker.uploads[1].sentAt).toBeGreaterThan(115_000);
+  expect(mockWorker.uploads[1].settledAt! - mockWorker.uploads[1].sentAt).toBeLessThanOrEqual(120_000);
+  // Decoded once, when added: nothing decoded or sent the whole file again.
+  expect(FakeOfflineAudioContext.decoded).toBe(1);
+  expect(view.result.current.transcript).toBe(
+    ['Person 1: Chunk 101 speech.', 'Chunk 102 speech.', 'Chunk 103 speech.', 'Chunk 104 speech.'].join(' '),
+  );
+  const stored = [...mockStore.records.values()].filter((record) => record.segment.index >= 0);
+  expect(stored.map((record) => [record.segment.status, record.audio?.size])).toEqual([
+    ...Array(3).fill(['complete', 44 + 180 * 32_000]),
+    ['complete', 44 + 60 * 32_000],
+  ]);
+  view.unmount();
+}, 60_000);

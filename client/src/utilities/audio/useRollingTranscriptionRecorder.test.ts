@@ -36,6 +36,30 @@ jest.mock('./recordingChunkStore', () => ({
 const flushPromises = async () => {
   for (let index = 0; index < 40; index++) await Promise.resolve();
 };
+// An imported file decodes to as many seconds of 16 kHz audio as its text names; other bytes don't decode.
+class FakeOfflineAudioContext {
+  static decoded = 0;
+  constructor(
+    _channels: number,
+    _length: number,
+    readonly sampleRate: number,
+  ) {}
+  async decodeAudioData(bytes: ArrayBuffer) {
+    FakeOfflineAudioContext.decoded += 1;
+    const seconds = Number(new TextDecoder().decode(bytes));
+    if (!seconds) throw new DOMException('Unable to decode audio data', 'EncodingError');
+    const length = seconds * this.sampleRate;
+    return {
+      numberOfChannels: 1,
+      length,
+      sampleRate: this.sampleRate,
+      duration: seconds,
+      getChannelData: () => new Float32Array(length),
+    };
+  }
+}
+// Seconds of 16 kHz mono 16-bit audio in an imported part.
+const partSeconds = (part: Blob) => (part.size - 44) / 2 / 16_000;
 
 describe('useRollingTranscriptionRecorder', () => {
   let originalMediaRecorder: unknown;
@@ -102,6 +126,8 @@ describe('useRollingTranscriptionRecorder', () => {
 
     originalMediaRecorder = (globalThis as any).MediaRecorder;
     originalMediaDevices = navigator.mediaDevices;
+    FakeOfflineAudioContext.decoded = 0;
+    Object.defineProperty(window, 'OfflineAudioContext', { configurable: true, value: FakeOfflineAudioContext });
     mockTrack = { stop: jest.fn() };
     mockStream = {
       getTracks: () => [mockTrack],
@@ -120,6 +146,7 @@ describe('useRollingTranscriptionRecorder', () => {
   });
 
   afterEach(() => {
+    Reflect.deleteProperty(window, 'OfflineAudioContext');
     Object.defineProperty(globalThis, 'MediaRecorder', {
       configurable: true,
       value: originalMediaRecorder,
@@ -137,7 +164,7 @@ describe('useRollingTranscriptionRecorder', () => {
       Object.assign(new Error('Not enabled'), { status: 403 }),
     );
     const { result } = renderHook(() => useRollingTranscriptionRecorder({ sessionSlug: 'import-input' }));
-    const audio = new Blob(['MP3 bytes'], { type: 'audio/mpeg' });
+    const audio = new Blob(['60'], { type: 'audio/mpeg' });
     await act(async () => {
       await result.current.addTranscript('Written discussion.');
       await result.current.addAudio(audio);
@@ -153,6 +180,85 @@ describe('useRollingTranscriptionRecorder', () => {
     });
     expect(result.current.transcript).toBe('Written discussion. Uploaded discussion.');
     expect(result.current.downloadableChunkIds).toEqual([result.current.segments[1].id]);
+  });
+
+  it('imports a file as chunk-length parts that upload in order, each with its own deadline', async () => {
+    const sent: number[] = [];
+    jest.mocked(transcribeAudio).mockImplementation((part) => {
+      sent.push(partSeconds(part));
+      // The second request, the second part's first, never answers.
+      return sent.length === 2 ? new Promise<string>(() => {}) : Promise.resolve(`Reply ${sent.length}.`);
+    });
+    const { result, unmount } = renderHook(() => useRollingTranscriptionRecorder({ sessionSlug: 'import-parts' }));
+    await act(async () => {
+      await result.current.addAudio(new Blob(['420'], { type: 'audio/mpeg' }));
+      await flushPromises();
+    });
+    expect(FakeOfflineAudioContext.decoded).toBe(1);
+    expect(result.current.segments.map((segment) => segment.status)).toEqual(['complete', 'transcribing', 'queued']);
+    expect(sent).toEqual([180, 180]);
+    // Only the stalled part goes again, under its own deadline; the whole file never goes.
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(121_000);
+      await flushPromises();
+    });
+    expect(sent).toEqual([180, 180, 180, 60]);
+    expect(result.current.transcript).toBe('Reply 1. Reply 3. Reply 4.');
+    expect(result.current.downloadableChunkIds).toHaveLength(3);
+    expect(FakeOfflineAudioContext.decoded).toBe(1);
+    unmount();
+  });
+
+  it.each([
+    ['longer than 30 minutes', '1801', 'Choose audio up to 30 minutes. Split longer recordings first.'],
+    ['that does not decode', 'MP3 bytes', "This audio file couldn't be read. Try an MP3 or WAV file."],
+  ])('refuses an import %s and adds nothing to the recording', async (_kind, bytes, message) => {
+    const { result, unmount } = renderHook(() => useRollingTranscriptionRecorder({ sessionSlug: 'import-refused' }));
+    await act(async () => {
+      await expect(result.current.addAudio(new Blob([bytes], { type: 'audio/mpeg' }))).rejects.toThrow(message);
+      await flushPromises();
+    });
+    expect(result.current.segments).toEqual([]);
+    expect(mockChunkRecords.size).toBe(0);
+    expect(transcribeAudio).not.toHaveBeenCalled();
+    unmount();
+  });
+
+  it('never lets a rejected or refused import hold up later chunks or Clear, across a reload', async () => {
+    jest.mocked(transcribeAudio).mockImplementation(async (audio) => {
+      if (audio.type === 'audio/wav') throw Object.assign(new Error('Audio file might be corrupted.'), { status: 400 });
+      return 'Recorded speech.';
+    });
+    const sessionSlug = 'import-rejected';
+    let view = renderHook(() => useRollingTranscriptionRecorder({ sessionSlug }));
+    try {
+      await act(async () => {
+        await view.result.current.addAudio(new Blob(['60'], { type: 'audio/mpeg' }));
+        await expect(view.result.current.addAudio(new Blob(['1801'], { type: 'audio/mpeg' }))).rejects.toThrow();
+        await flushPromises();
+      });
+      await act(async () => {
+        await view.result.current.startRecording();
+      });
+      await act(async () => {
+        await view.result.current.stopRecording();
+        await flushPromises();
+      });
+      expect(view.result.current.segments.map((segment) => segment.status)).toEqual(['failed', 'complete']);
+      view.unmount();
+      view = renderHook(() => useRollingTranscriptionRecorder({ sessionSlug }));
+      await act(flushPromises);
+      expect(view.result.current.segments.map((segment) => segment.status)).toEqual(['failed', 'complete']);
+      expect(view.result.current.pendingSegmentCount).toBe(0);
+      await act(async () => {
+        view.result.current.clearDraft(true);
+        await flushPromises();
+      });
+      expect(view.result.current.segments).toEqual([]);
+      expect(mockChunkRecords.size).toBe(0);
+    } finally {
+      view.unmount();
+    }
   });
 
   it('a failed recorder start leaves no empty recording chunk and can be retried', async () => {

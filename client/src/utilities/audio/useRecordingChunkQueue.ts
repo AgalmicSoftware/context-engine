@@ -1,6 +1,7 @@
 import { audioFileExtension } from './audioFileExtension';
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { transcribeAudio, transcribeGroupAudio } from '../ai/aiClient.js';
+import { audioBufferToWavParts, decodeAudioAtRate, TRANSCRIBE_WAV_TARGET_HZ } from '../ai/aiClientAudioTranscription';
 import {
   countKeptChunks,
   hasUnsavedRecording,
@@ -51,9 +52,13 @@ const OPEN_ELSEWHERE_NOTICE = 'This recording is open in another tab.';
 const OPEN_ELSEWHERE_WAIT_MS = 1000;
 const OWNER_NOTICE =
   'This recording belongs to the account that made it. It closes when its uploads finish and its audio is saved, or when you clear it. Download any audio you need first.';
+// Longer imports are refused rather than decoded and uploaded whole.
+const MAX_IMPORT_SECONDS = 30 * 60;
 
 type Options = RecordingOptions & {
   labelSpeakers: boolean;
+  // The recorder's chunk length, which imported audio is cut to.
+  chunkMs: number;
   // Another account's recording stays open while capture continues.
   capturing?: boolean;
 };
@@ -227,12 +232,20 @@ export function useRecordingChunkQueue(options: Options) {
     const id = queue.begin(latest.current.labelSpeakers, gapBefore);
     return (audio: Blob, finished = false) => queue.capture(id, audio, finished);
   }, []);
+  // An import is decoded once, when added, into chunk-length parts that upload like recorded chunks, each with
+  // its own deadline and retry: nothing later decodes or uploads the whole file, and one that can't be decoded,
+  // or is too long, adds nothing that a reload would retry.
   const addAudio = useCallback(
     async (audio: Blob) => {
       const queue = queueRef.current;
+      const decoded = await decodeAudioAtRate(audio, TRANSCRIBE_WAV_TARGET_HZ);
+      if (!decoded?.length) throw new Error("This audio file couldn't be read. Try an MP3 or WAV file.");
+      if (decoded.duration > MAX_IMPORT_SECONDS)
+        throw new Error('Choose audio up to 30 minutes. Split longer recordings first.');
+      const parts = audioBufferToWavParts(decoded, latest.current.chunkMs / 1000);
       await prepare();
       if (!queue || queue !== queueRef.current) throw new Error('The recording changed. Add the audio again.');
-      queue.capture(queue.begin(latest.current.labelSpeakers), audio, true);
+      for (const part of parts) queue.capture(queue.begin(latest.current.labelSpeakers), part, true);
     },
     [prepare],
   );

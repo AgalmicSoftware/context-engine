@@ -410,12 +410,17 @@ override those settings itself.
 ## Group Conversation
 
 Use **Record** for the microphone, or **+** to upload audio (MP3, M4A,
-WAV, MP4, WebM, OGG; up to 20 MB), upload a `.txt`/`.md` transcript (up to 100,000
+WAV, MP4, WebM, OGG; up to 30 minutes and 20 MB), upload a `.txt`/`.md` transcript (up to 100,000
 characters), or paste a written transcript. Imported input is appended to the
-recording, saved on this device, and available to **Generate questions**. Audio
-uses the same retry/download queue as microphone recordings; failed transcription
-keeps its audio. Text import does not request the microphone or transcription.
-The input menu is unavailable during capture. Larger audio files must be split first.
+recording, saved on this device, and available to **Generate questions**. An audio
+file is decoded once on this device when added, at 16 kHz mono, and joins the
+recording as three-minute parts, the recorder's chunk length. Each part uploads,
+retries and keeps its audio like a recorded chunk, as a 16 kHz WAV file, so a
+stalled upload sends only its part again and nothing decodes or uploads the whole
+file later. A file longer than 30 minutes, or one the browser can't decode, is
+refused with a message and adds nothing. Text import does not request the
+microphone or transcription. The input menu is unavailable during capture. Longer
+or larger audio files must be split first.
 
 A signed-out question view backed by protected Cloudflare storage explains that
 participant sign-in is required. Anonymous AI/transcription access does not itself
