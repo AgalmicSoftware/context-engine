@@ -3112,6 +3112,46 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   cursor: not-allowed;
 }
 
+// Floats at the top of the scrolling dialog. It takes no space: its height is zero and the negative
+// margin cancels the panel's 10px gap.
+.sessionNewDraftsCue {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  display: flex;
+  justify-content: center;
+  height: 0;
+  margin-bottom: -10px;
+  overflow: visible;
+
+  button {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 40px;
+    margin-top: 8px;
+    padding: 8px 16px;
+    border: 0 !important;
+    border-radius: var(--ce-radius-pill) !important;
+    background: var(--ce-action-accent);
+    box-shadow: 0 6px 18px color-mix(in srgb, var(--ce-overlay-base) 32%, transparent) !important;
+    color: var(--ce-action-accent-text);
+    font-size: 0.95rem;
+    font-weight: 800;
+    line-height: 1.2;
+    cursor: pointer;
+
+    &:hover {
+      background: var(--ce-action-accent-hover);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--ce-focus-ring);
+      outline-offset: 2px;
+    }
+  }
+}
+
 .sessionListeningCreateWrap {
   border-top: 1px solid color-mix(in srgb, var(--ce-overlay-surface) 12%, transparent);
   padding-top: 12px;

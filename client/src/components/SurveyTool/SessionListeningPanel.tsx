@@ -18,6 +18,7 @@ import CreateQuestionsAndSurveys from './CreateQuestionsAndSurveys';
 import CEConfirmDialog from '../Shared/CEConfirmDialog';
 import { SessionRecordingChunks } from './SessionRecordingChunks';
 import { SessionRecordingNotices } from './SessionRecordingNotices';
+import { SessionNewDraftsCue } from './SessionNewDraftsCue';
 import { useRollingTranscriptionRecorder } from '../../utilities/audio/useRollingTranscriptionRecorder';
 import { DEFAULT_ROLLING_TRANSCRIPTION_CHUNK_MS, transcriptSpeech } from '../../utilities/audio/rollingTranscription';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
@@ -415,6 +416,7 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
   const [isClosing, setIsClosing] = useState(false);
   const closingRef = useRef(false);
   const panelRef = useRef<HTMLElement | null>(null);
+  const draftsRef = useRef<HTMLDivElement | null>(null);
   const [closeError, setCloseError] = useState('');
   const isMountedRef = useRef(true);
   const lastAutoRequestedTranscriptRef = useRef('');
@@ -633,6 +635,9 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
       aria-busy={isClosing}
       data-testid={E2E_TESTIDS.SESSION_LISTENING_PANEL}
     >
+      {panelMode === 'recordGroup' ? (
+        <SessionNewDraftsCue count={generatedQuestions.length} draftsRef={draftsRef} />
+      ) : null}
       {isClosing ? <div role="status">Finalizing recording…</div> : null}
       {showPanelHeader ? (
         <div className={styles.sessionListeningHeader}>
@@ -967,7 +972,14 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
       )}
 
       {generatedQuestions.length > 0 && (
-        <div className={styles.sessionListeningCreateWrap} data-testid={E2E_TESTIDS.SESSION_LISTENING_SUGGESTIONS}>
+        <div
+          ref={draftsRef}
+          tabIndex={-1}
+          role="region"
+          aria-label="Draft questions"
+          className={styles.sessionListeningCreateWrap}
+          data-testid={E2E_TESTIDS.SESSION_LISTENING_SUGGESTIONS}
+        >
           <CreateQuestionsAndSurveys
             {...(props as CreateQuestionsAndSurveysPanelProps)}
             appendPreformedQuestions

@@ -519,6 +519,70 @@ describe('SessionListeningPanel', () => {
     );
   });
 
+  describe('new-drafts cue', () => {
+    const firstTranscript =
+      'The group discussed budget timing, operational risk, ownership, rollout scope, and follow-up evidence.';
+    const firstSegment = { id: 's1', index: 0, status: 'complete', text: firstTranscript, completedAt: 2 };
+    const result = (...prompts: string[]) => ({
+      surveyTitle: 'Listening Follow-up',
+      statements: prompts.map((prompt, index) => ({ id: `q-${prompt.length}-${index}`, type: 'freeform', prompt })),
+      raw: { questions: [] },
+    });
+    afterEach(() => {
+      delete (Element.prototype as Partial<Element>).scrollIntoView;
+      delete (globalThis as Partial<typeof globalThis>).IntersectionObserver;
+    });
+
+    it('says how many drafts are new, scrolls to them, and then counts only later ones', async () => {
+      const scrollIntoView = jest.fn();
+      Element.prototype.scrollIntoView = scrollIntoView;
+      mockGenerateQuestionsFromListeningTranscript
+        .mockResolvedValueOnce(result('What evidence matters?'))
+        .mockResolvedValueOnce(result('How should trust be measured?', 'Who may trigger a review?'));
+      (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+        buildRecorder({ transcript: firstTranscript, segments: [firstSegment] }),
+      );
+      const { rerender } = render(<SessionListeningPanel sessionSlug="demo" panelMode="recordGroup" embeddedInModal />);
+
+      fireEvent.click(await screen.findByRole('button', { name: '1 new draft question' }));
+      const drafts = screen.getByRole('region', { name: 'Draft questions' });
+      expect(scrollIntoView.mock.contexts).toEqual([drafts]);
+      expect(drafts).toHaveFocus();
+      expect(screen.queryByRole('button', { name: /new draft/ })).not.toBeInTheDocument();
+
+      const secondTranscript = `${firstTranscript} Later they debated community trust and accountability thresholds.`;
+      (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+        buildRecorder({
+          transcript: secondTranscript,
+          segments: [firstSegment, { id: 's2', index: 1, status: 'complete', text: 'Later.', completedAt: 5 }],
+        }),
+      );
+      rerender(<SessionListeningPanel sessionSlug="demo" panelMode="recordGroup" embeddedInModal />);
+      expect(await screen.findByRole('button', { name: '2 new draft questions' })).toBeInTheDocument();
+    });
+
+    it('goes away once the new drafts are on screen', async () => {
+      const observed: Element[] = [];
+      (globalThis as Partial<typeof globalThis>).IntersectionObserver = class {
+        constructor(private readonly onChange: IntersectionObserverCallback) {}
+        observe(target: Element) {
+          observed.push(target);
+          this.onChange([{ isIntersecting: true, target } as IntersectionObserverEntry], this as never);
+        }
+        disconnect() {}
+      } as unknown as typeof IntersectionObserver;
+      mockGenerateQuestionsFromListeningTranscript.mockResolvedValueOnce(result('What evidence matters?'));
+      (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+        buildRecorder({ transcript: firstTranscript, segments: [firstSegment] }),
+      );
+      render(<SessionListeningPanel sessionSlug="demo" panelMode="recordGroup" embeddedInModal />);
+
+      await screen.findByRole('button', { name: '1 new draft question' });
+      await waitFor(() => expect(screen.queryByRole('button', { name: /new draft/ })).not.toBeInTheDocument());
+      expect(observed).toEqual([screen.getByRole('region', { name: 'Draft questions' })]);
+    });
+  });
+
   it('keeps cleared transcript state from being repopulated by a stale generation response', async () => {
     const clearDraft = jest.fn();
     const transcript =
