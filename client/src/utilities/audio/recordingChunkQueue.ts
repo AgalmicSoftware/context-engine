@@ -1,5 +1,6 @@
 import {
   clearRecordingChunks,
+  deleteRecordingChunk,
   listRecordingChunks,
   putRecordingChunk,
   putRecordingChunks,
@@ -47,7 +48,8 @@ export const subscribeUnsavedRecordings = (listener: () => void) => {
 // The page's own copy also covers a failed save.
 const HIDDEN_PERIODS_ID = 'hidden-periods';
 const memoryHiddenPeriods = new Map<string, HiddenPeriod[]>();
-// Voices heard so far, with their samples, are kept the same way.
+// Voices heard so far, with their samples, are kept the same way while the recording is open or has chunks to
+// transcribe, so later chunks keep their Person numbers.
 const SPEAKERS_ID = 'known-speakers';
 type Speakers = { knownSpeakers: KnownSpeaker[]; speakerSamplesRefused: boolean };
 const memorySpeakers = new Map<string, Speakers>();
@@ -87,13 +89,16 @@ type Options = {
 };
 const failureText = (error: unknown) => (error instanceof Error ? error.message : String(error));
 const storageText = (error: unknown) =>
-  `This recording can't be recovered after a reload. Its audio and transcript are kept in memory on this page; download unsaved audio before leaving. ${failureText(error)}`;
+  `This recording can't be recovered after a reload. This page holds it in memory: before leaving, copy the transcript and download any audio not yet transcribed. ${failureText(error)}`;
 // A request that never answers must not hold later chunks. After each such stall the next request waits two
 // minutes longer, so a slow upload still finishes; quick failures such as a 503 don't lengthen the wait.
 const UPLOAD_DEADLINE_MS = 120_000;
 const stalledText = 'The upload stopped responding. Retrying.';
 
-/** Raw audio and its completed transcript share one atomic IndexedDB record. */
+/**
+ * Each chunk is one IndexedDB record: its audio until it is transcribed, then its transcript, which replaces the
+ * audio in the same write.
+ */
 export class RecordingChunkQueue {
   records = new Map<string, RecordingChunk>();
   storageError = '';
@@ -128,8 +133,10 @@ export class RecordingChunkQueue {
       if (this.disposed) return;
       this.storageError = '';
       const kept = [...(memoryRecordings.get(this.options.scope)?.values() || [])];
+      // Transcribed audio that an earlier build kept goes now, as it does once a chunk is transcribed.
+      const stripped: RecordingChunk[] = [];
       let storedPeriods: HiddenPeriod[] = [];
-      for (const entry of [...saved, ...kept]) {
+      for (let entry of [...saved, ...kept]) {
         if (entry.segment.id === HIDDEN_PERIODS_ID) {
           storedPeriods = entry.hiddenPeriods || [];
           continue;
@@ -141,16 +148,20 @@ export class RecordingChunkQueue {
           };
           continue;
         }
-        if (entry.audio && !['failed', 'complete'].includes(entry.segment.status))
+        if (entry.audio && entry.segment.status === 'complete') {
+          entry = { ...entry, audio: undefined };
+          stripped.push(entry);
+        } else if (entry.audio && entry.segment.status !== 'failed')
           entry.segment = { ...entry.segment, status: 'queued', error: undefined };
         else if (!entry.audio && entry.segment.status !== 'complete') continue;
         this.records.set(entry.segment.id, entry);
         if (entry.labelsUnavailableReason) this.labelsUnavailableReason = entry.labelsUnavailableReason;
       }
       holdInMemory(this.options.scope, null);
-      this.resaveKept(kept);
+      this.resaveKept([...stripped, ...kept]);
       this.restoreHiddenPeriods(storedPeriods);
       this.speakers = memorySpeakers.get(this.options.scope) ?? this.speakers;
+      this.forgetSpeakersIfDone();
       this.changed();
       void this.retry();
     } catch (error) {
@@ -165,6 +176,7 @@ export class RecordingChunkQueue {
       this.resaveKept(kept);
       this.restoreHiddenPeriods([]);
       this.speakers = memorySpeakers.get(this.options.scope) ?? this.speakers;
+      this.forgetSpeakersIfDone();
       this.changed();
       void this.retry();
     }
@@ -214,11 +226,12 @@ export class RecordingChunkQueue {
     // Best effort, in order with chunk writes, so Clear deletes it after any pending save.
     this.writes = this.writes.then(() => putRecordingChunk(record).catch(() => {}));
   }
-  // Audio or text kept only in memory stays unsaved (in failedWrites) until a write succeeds, so the warning and
-  // the prompt before leaving hold meanwhile, and a later close or unmount keeps the memory copy.
+  // Audio or a transcript kept only in memory stays unsaved (in failedWrites) until a write succeeds, so the
+  // warning and the prompt before leaving hold meanwhile, and a later close or unmount keeps the memory copy. A
+  // silent chunk's empty transcript is saved too, or its stored audio would be sent again.
   private resaveKept(kept: RecordingChunk[]) {
     for (const entry of kept)
-      if (holdsSpeech(entry) && this.records.get(entry.segment.id) === entry) {
+      if ((entry.audio || entry.segment.status === 'complete') && this.records.get(entry.segment.id) === entry) {
         const { id } = entry.segment;
         this.failedWrites.add(id);
         this.resaving.add(id);
@@ -396,7 +409,6 @@ export class RecordingChunkQueue {
       if (this.disposed) return;
       const complete: RecordingChunk = {
         scope: record.scope,
-        audio: record.audio,
         labelSpeakers: record.labelSpeakers,
         labelsUnavailableReason: this.labelsUnavailableReason,
         segment: {
@@ -409,8 +421,9 @@ export class RecordingChunkQueue {
           completedAt: Date.now(),
         },
       };
-      // Keep the source with its paid transcript for a complete, local MP3 export. A failed
-      // durable write keeps both in memory; retrying storage must not transcribe it again.
+      // The transcript replaces the stored audio in one write, so the audio leaves the device only once its
+      // transcript is saved; if the write fails, the stored audio stays for a reload to transcribe again. This page
+      // keeps only the transcript either way, and saves it again once storage works.
       await this.save(complete);
       this.records.set(id, complete);
       this.attempts.delete(id);
@@ -564,10 +577,21 @@ export class RecordingChunkQueue {
     this.storageError = '';
     this.changed();
   }
+  // Voice samples only label later chunks. Once every chunk is transcribed and saved they go, when the recorder
+  // closes or, after a closed tab, when the recording next opens; a later Record more numbers its voices afresh.
+  private forgetSpeakersIfDone() {
+    if (!this.speakers.knownSpeakers.length || this.failedWrites.size) return;
+    if (this.segments.some((segment) => segment.status !== 'complete')) return;
+    this.speakers = { knownSpeakers: [], speakerSamplesRefused: false };
+    // Kept on this page too, so reopening before the delete lands doesn't bring them back.
+    memorySpeakers.set(this.options.scope, this.speakers);
+    this.writes = this.writes.then(() => deleteRecordingChunk(this.options.scope, SPEAKERS_ID).catch(() => {}));
+  }
   dispose() {
     this.disposed = true;
     // Leaving without Close and keep (Back, a route change) must not drop audio that only memory holds.
     if (this.storageError || this.failedWrites.size) holdInMemory(this.options.scope, this.records);
+    this.forgetSpeakersIfDone();
     if (this.retryTimer) clearTimeout(this.retryTimer);
     this.retryTimer = null;
     this.waiters.forEach((resolve) => resolve());

@@ -32,7 +32,7 @@ const KEPT_AUDIO_HELP =
   'Close and keep the audio left it unsent. It stays on this device until it uploads; reopen the recording to finish.';
 const UNSAVED_NOTICE = "This recording can't be recovered after a reload.";
 const UNSAVED_HELP =
-  'Device storage failed, so only this page holds it. Reopen the recording to finish or download it before leaving.';
+  'Device storage failed, so only this page holds it. Reopen the recording before leaving to finish it or copy its transcript.';
 
 export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps) {
   const { isOpen, mode, onSelectMode, onClose, questionPool = [], context } = props;

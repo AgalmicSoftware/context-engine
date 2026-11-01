@@ -42,6 +42,7 @@ jest.mock('./recordingChunkStore', () => ({
     },
   ),
   clearRecordingChunks: jest.fn(async () => mockChunkRecords.clear()),
+  deleteRecordingChunk: jest.fn(async (scope: string, id: string) => mockChunkRecords.delete(`${scope}|${id}`)),
 }));
 
 const flushPromises = async () => {
@@ -194,7 +195,8 @@ describe('useRollingTranscriptionRecorder', () => {
       await flushPromises();
     });
     expect(result.current.transcript).toBe('Written discussion. Uploaded discussion.');
-    expect(result.current.downloadableChunkIds).toEqual([result.current.segments[1].id]);
+    // Transcribed, its audio is gone.
+    expect(result.current.downloadableChunkIds).toEqual([]);
   });
 
   it('imports a file as chunk-length parts that upload in order, each with its own deadline', async () => {
@@ -221,7 +223,7 @@ describe('useRollingTranscriptionRecorder', () => {
     });
     expect(sent).toEqual([180, 180, 180, 62]);
     expect(result.current.transcript).toBe('Reply 1. Reply 3. Reply 4.');
-    expect(result.current.downloadableChunkIds).toHaveLength(3);
+    expect(result.current.downloadableChunkIds).toEqual([]);
     expect(FakeOfflineAudioContext.decoded).toBe(1);
     unmount();
   });
@@ -505,14 +507,14 @@ describe('useRollingTranscriptionRecorder', () => {
     });
     const [saved] = [...mockChunkRecords.values()];
     expect(saved).toMatchObject({ segment: { status: 'complete', text: 'Paid transcript.' } });
-    expect(saved.audio).toBeInstanceOf(Blob);
+    expect(saved.audio).toBeUndefined();
     expect(result.current.transcript).toBe('');
     expect(transcribeAudio).toHaveBeenCalledTimes(1);
     unmount();
   });
 
   it.each(['while open', 'after reopening'])(
-    'keeps audio only this page holds with its account after a sign-out, %s, and says so',
+    'keeps a recording only this page holds with its account after a sign-out, %s, and says so',
     async (when) => {
       const first = '0x1111111111111111111111111111111111111111';
       const put = jest.mocked(putRecordingChunk).getMockImplementation()!;
@@ -542,7 +544,7 @@ describe('useRollingTranscriptionRecorder', () => {
         }
         await act(flushPromises);
         expect(recorder.result.current.transcript).toBe('Unsaved speech.');
-        expect(recorder.result.current.downloadableChunkIds).toHaveLength(1);
+        expect(recorder.result.current.downloadableChunkIds).toEqual([]);
         expect(recorder.result.current.errorMessage).toContain('belongs to the account that made it');
         await act(async () => {
           await recorder.result.current.startRecording();
@@ -662,7 +664,7 @@ describe('useRollingTranscriptionRecorder', () => {
     }
   });
 
-  it('keeps raw audio until a failed upload retries and its transcript is saved', async () => {
+  it('keeps raw audio until a failed upload retries, then lets it go with the saved transcript', async () => {
     (transcribeAudio as jest.Mock)
       .mockImplementationOnce(async () => {
         throw new Error('Temporary upload failure');
@@ -685,7 +687,8 @@ describe('useRollingTranscriptionRecorder', () => {
     expect(transcribeAudio).toHaveBeenCalledTimes(2);
     expect(result.current.transcript).toBe('Recovered speech.');
     expect([...mockChunkRecords.values()][0]?.segment.text).toBe('Recovered speech.');
-    expect([...mockChunkRecords.values()][0]?.audio).toBeInstanceOf(Blob);
+    expect([...mockChunkRecords.values()][0]?.audio).toBeUndefined();
+    expect(result.current.downloadableChunkIds).toEqual([]);
     unmount();
   });
 
@@ -891,7 +894,7 @@ describe('useRollingTranscriptionRecorder', () => {
       unmount();
     });
 
-    it.each(['audio', 'a pasted transcript'])(
+    it.each(['a transcribed chunk', 'a pasted transcript'])(
       'asks before leaving while %s is held only in memory, also once the recorder closes',
       async (kind) => {
         const put = jest.mocked(putRecordingChunk).getMockImplementation()!;
@@ -899,17 +902,17 @@ describe('useRollingTranscriptionRecorder', () => {
         const sessionSlug = `leave-memory-${kind.length}`;
         let recorder = renderHook(() => useRollingTranscriptionRecorder({ sessionSlug }));
         try {
-          if (kind === 'audio')
+          if (kind === 'a transcribed chunk')
             await act(async () => {
               await recorder.result.current.startRecording();
             });
           await act(async () => {
-            if (kind === 'audio') await recorder.result.current.stopRecording();
+            if (kind === 'a transcribed chunk') await recorder.result.current.stopRecording();
             else await recorder.result.current.addTranscript('Pasted notes.');
             await flushPromises();
           });
           expect(recorder.result.current.segments.map((segment) => segment.status)).toEqual(['complete']);
-          expect(recorder.result.current.downloadableChunkIds).toHaveLength(kind === 'audio' ? 1 : 0);
+          expect(recorder.result.current.downloadableChunkIds).toEqual([]);
           expect(leaving()).toBe(true);
           await act(() => recorder.result.current.keepAudio());
           recorder.unmount();
@@ -917,7 +920,9 @@ describe('useRollingTranscriptionRecorder', () => {
           // Reopened and cleared, nothing is left to lose.
           recorder = renderHook(() => useRollingTranscriptionRecorder({ sessionSlug }));
           await act(flushPromises);
-          expect(recorder.result.current.transcript).toBe(kind === 'audio' ? 'transcript 1' : 'Pasted notes.');
+          expect(recorder.result.current.transcript).toBe(
+            kind === 'a transcribed chunk' ? 'transcript 1' : 'Pasted notes.',
+          );
           await act(async () => {
             recorder.result.current.clearDraft(true);
             await flushPromises();
@@ -1180,12 +1185,7 @@ describe('useRollingTranscriptionRecorder', () => {
       expect(result.current.storageFailed).toBe(true);
       expect(result.current.downloadableChunkIds).toHaveLength(1);
       expect(transcribeAudio).not.toHaveBeenCalled();
-      await act(async () => {
-        await result.current.stopRecording();
-        await flushPromises();
-      });
-      expect(result.current.transcript).toContain('transcript');
-      expect(transcribeAudio).toHaveBeenCalledTimes(1);
+      // Until it is transcribed, the audio only this page holds can be downloaded.
       const createUrl = jest.fn<typeof URL.createObjectURL>(() => 'blob:recording-fixture');
       const previous = URL.createObjectURL;
       URL.createObjectURL = createUrl;
@@ -1194,12 +1194,20 @@ describe('useRollingTranscriptionRecorder', () => {
         act(() => {
           result.current.downloadChunk(result.current.downloadableChunkIds[0]);
         });
-        expect(createUrl).toHaveBeenCalledWith(expect.objectContaining({ size: 512 }));
+        expect(createUrl).toHaveBeenCalledWith(expect.objectContaining({ size: 256 }));
         expect(click).toHaveBeenCalledTimes(1);
       } finally {
         URL.createObjectURL = previous;
         click.mockRestore();
       }
+      await act(async () => {
+        await result.current.stopRecording();
+        await flushPromises();
+      });
+      expect(result.current.transcript).toContain('transcript');
+      expect(transcribeAudio).toHaveBeenCalledTimes(1);
+      // Transcribed, the page keeps only the transcript.
+      expect(result.current.downloadableChunkIds).toEqual([]);
     } finally {
       unmount();
       jest.mocked(putRecordingChunk).mockImplementation(original);

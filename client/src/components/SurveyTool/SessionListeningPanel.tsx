@@ -471,7 +471,7 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
 
   const spokenLength = useMemo(() => transcriptSpeech(trimmedTranscript).length, [trimmedTranscript]);
   const canGenerate = !isClosing && spokenLength >= 50 && !isGenerating && !hasPendingTranscription;
-  // Keep completed audio for MP3 export too; Clear asks before deleting any retained source.
+  // Only audio not yet transcribed stays on the device; Clear asks before deleting it.
   const retainedAudioCount = recorder.downloadableChunkIds?.length ?? 0;
   const isStarting = !isRecorderSessionActive && recorder.isBusy;
   // A stopped recorder leads: an older close or generation error must not hide it.
@@ -936,7 +936,7 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
       <CEConfirmDialog
         isOpen={confirmClear}
         title="Clear this recording?"
-        body="This deletes the transcript and saved audio. Download the recording first if you want to keep it."
+        body="This deletes the transcript and the audio not yet transcribed. Download that audio first to keep it."
         confirmLabel="Clear recording"
         cancelLabel="Keep recording"
         danger

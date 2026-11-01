@@ -139,26 +139,29 @@ try {
       assert.equal(requests, 1);
       assert(!(await panel.innerText()).includes('workerAuthority'));
       await page.getByText(/This attempt was blocked/).waitFor();
-      fail = false;
-      await page.getByRole('button', { name: 'Retry transcription', exact: true }).click();
-      await page.waitForFunction(
-        () => document.querySelector('[data-testid="ce-session-listening-transcript"]')?.value === 'Recovered audio.',
-      );
+      // Both imports are refused at first, so their audio stays on the device until they are transcribed.
       await page
         .getByTestId(ids.SESSION_RECORDING_AUDIO_FILE)
         .setInputFiles({ name: 'second.wav', mimeType: 'audio/wav', buffer: secondAudio });
-      await page.waitForFunction(async () => {
-        const db = await new Promise((resolve) => {
-          const r = indexedDB.open('ce-recording-chunks');
-          r.onsuccess = () => resolve(r.result);
-        });
-        const records = await new Promise((resolve) => {
-          const r = db.transaction('chunks').objectStore('chunks').getAll();
-          r.onsuccess = () => resolve(r.result);
-        });
-        db.close();
-        return records.filter((r) => r.audio && r.segment.status === 'complete').length === 2;
-      });
+      const storedAudio = (status, withAudio) =>
+        page.waitForFunction(
+          async ([wanted, audio]) => {
+            const db = await new Promise((resolve) => {
+              const r = indexedDB.open('ce-recording-chunks');
+              r.onsuccess = () => resolve(r.result);
+            });
+            const records = await new Promise((resolve) => {
+              const r = db.transaction('chunks').objectStore('chunks').getAll();
+              r.onsuccess = () => resolve(r.result);
+            });
+            db.close();
+            const parts = records.filter((r) => r.segment.index >= 0 && r.segment.source !== 'text');
+            return parts.length === 2 && parts.every((r) => r.segment.status === wanted && Boolean(r.audio) === audio);
+          },
+          [status, withAudio],
+        );
+      await storedAudio('failed', true);
+      assert.equal(requests, 2);
       await page.getByTestId(ids.SESSION_RECORDING_TRANSCRIPT_FILE).setInputFiles({
         name: 'notes.txt',
         mimeType: 'text/plain',
@@ -170,25 +173,22 @@ try {
       await page.getByLabel('Written transcript').fill('Pasted text.');
       await page.getByRole('button', { name: 'Add transcript', exact: true }).click();
       await page.getByText('Transcript added.', { exact: true }).waitFor();
-      await page.waitForFunction(
-        () =>
-          document.querySelector('[data-testid="ce-session-listening-transcript"]')?.value ===
-          'Recovered audio. File text. Pasted text.',
-      );
-      assert.equal(requests, 3, 'Text import makes no transcription call');
+      const transcriptEnds = (text) =>
+        page.waitForFunction(
+          (end) => document.querySelector('[data-testid="ce-session-listening-transcript"]')?.value.endsWith(end),
+          text,
+        );
+      await transcriptEnds('File text. Pasted text.');
+      assert.equal(requests, 2, 'Text import makes no transcription call');
       assert.equal(await page.evaluate(() => window.__microphoneRequests), 0);
       await page.reload();
-      await page.waitForFunction(
-        () =>
-          document.querySelector('[data-testid="ce-session-listening-transcript"]')?.value ===
-          'Recovered audio. File text. Pasted text.',
-      );
-      assert.equal(requests, 3, 'Reload restores text without another upload');
+      await transcriptEnds('File text. Pasted text.');
+      assert.equal(requests, 2, 'Reload restores text and audio without another upload');
       assert.equal(await page.getByTestId('ce-recording-chunks').count(), 0);
       const downloaded = page.waitForEvent('download');
       await page.getByRole('button', { name: 'Download audio', exact: true }).click();
       const file = await downloaded;
-      assert.equal(file.suggestedFilename(), 'conversation.mp3');
+      assert.equal(file.suggestedFilename(), 'untranscribed-audio.mp3');
       const outputAudio = await fs.readFile(await file.path());
       const decoded = await page.evaluate(async (base64) => {
         const ctx = new AudioContext();
@@ -210,6 +210,17 @@ try {
       assert(decoded.duration > 1.2 && decoded.duration < 1.5, JSON.stringify(decoded));
       assert(Math.abs(decoded.first - 440) < 15 && Math.abs(decoded.second - 880) < 15, JSON.stringify(decoded));
       assert.equal(await page.getByTestId('ce-recording-chunks').count(), 0);
+      // Once transcribed, each part's audio leaves the device and nothing is offered for download.
+      fail = false;
+      await page.getByRole('button', { name: 'Retry transcription', exact: true }).click();
+      await page.waitForFunction(
+        () =>
+          document.querySelector('[data-testid="ce-session-listening-transcript"]')?.value ===
+          'Recovered audio. File text. Pasted text.',
+      );
+      await storedAudio('complete', false);
+      assert.equal(requests, 4);
+      assert.equal(await page.getByRole('button', { name: 'Download audio', exact: true }).count(), 0);
 
       assert.equal(await page.evaluate(() => window.__microphoneRequests), 0);
       assert.equal(await panel.evaluate((el) => el.scrollWidth <= el.clientWidth + 1), true, 'No horizontal overflow');
@@ -246,7 +257,7 @@ try {
       await page.getByTestId(ids.SESSION_LISTENING_GENERATE).waitFor();
       assert.deepEqual(errors, []);
       console.log(
-        `${theme} ${width}px: mixed-format combined MP3/reload, retry, text import, typed drafts/remove/submit, no paid calls passed`,
+        `${theme} ${width}px: mixed-format untranscribed MP3/reload, retry deletes audio, text import, typed drafts/remove/submit, no paid calls passed`,
       );
       await page.close();
     }

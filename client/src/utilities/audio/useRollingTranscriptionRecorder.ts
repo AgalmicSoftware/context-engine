@@ -218,7 +218,7 @@ export const useRollingTranscriptionRecorder = ({
         // recording; without this the dialog would keep showing Recording while nothing is captured.
         const stoppedItself = !shouldEndSession && mediaRecorderRef.current === recorder && recordingActiveRef.current;
         if (stoppedItself) {
-          setErrorMessage('Recording stopped. Press Record to continue. Saved audio remains available.');
+          setErrorMessage('Recording stopped. Press Record to continue. What was recorded so far is kept.');
           setStatus('error');
         } else if (!shouldEndSession) {
           if (mediaRecorderRef.current === recorder && !recordingActiveRef.current) {
@@ -288,7 +288,7 @@ export const useRollingTranscriptionRecorder = ({
           () => {
             if (streamRef.current !== stream || !recordingActiveRef.current) return;
             setErrorMessage(
-              'Microphone access ended. Restore microphone permission, then press Record to continue. Saved audio remains available.',
+              'Microphone access ended. Restore microphone permission, then press Record to continue. What was recorded so far is kept.',
             );
             setStatus('error');
             recordingActiveRef.current = false;
@@ -370,7 +370,7 @@ export const useRollingTranscriptionRecorder = ({
       stopTimer();
       stopTracks();
       setErrorMessage(
-        `Recording stopped: no audio arrived and the microphone couldn't restart. Press Record to continue. Saved audio remains available. ${describeError(error)}`,
+        `Recording stopped: no audio arrived and the microphone couldn't restart. Press Record to continue. What was recorded so far is kept. ${describeError(error)}`,
       );
       setStatus('error');
     } finally {

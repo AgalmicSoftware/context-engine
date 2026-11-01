@@ -1117,7 +1117,7 @@ it('clears a recording with a Failed chunk only after confirming that its audio 
   fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_TRANSCRIPT_DETAILS));
   fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_CLEAR));
   expect(clearDraft).not.toHaveBeenCalled();
-  expect(await screen.findByText(/Download the recording first/)).toBeInTheDocument();
+  expect(await screen.findByText(/the audio not yet transcribed/)).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Keep recording' }));
   expect(clearDraft).not.toHaveBeenCalled();
   fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_CLEAR));

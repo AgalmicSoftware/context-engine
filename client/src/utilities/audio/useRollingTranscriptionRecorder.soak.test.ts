@@ -31,6 +31,21 @@ const decodeAudio = (size: number) => {
   return { chunk: index + 1, fragments: size / FRAGMENT_SIZES[index] };
 };
 const page = { visible: true, online: true };
+// No audio is lost before it is transcribed, and none stays once it is: every stored chunk keeps its audio until
+// its transcript replaces it, and the page offers no transcribed chunk's audio.
+const expectAudioOnlyUntilTranscribed = (recorder: {
+  segments: Array<{ id: string; status: string }>;
+  downloadableChunkIds: string[];
+}) => {
+  for (const record of mockStore.records.values())
+    if (record.segment.index >= 0)
+      expect([record.segment.status, Boolean(record.audio?.size)]).toEqual([
+        record.segment.status,
+        record.segment.status !== 'complete',
+      ]);
+  const transcribed = recorder.segments.filter((segment) => segment.status === 'complete').map((segment) => segment.id);
+  expect(recorder.downloadableChunkIds.filter((id) => transcribed.includes(id))).toEqual([]);
+};
 
 const mockStore = {
   records: new Map<string, RecordingChunk>(),
@@ -62,6 +77,9 @@ jest.mock('./recordingChunkStore', () => ({
   },
   clearRecordingChunks: async (scope: string) => {
     for (const [key, record] of mockStore.records) if (record.scope === scope) mockStore.records.delete(key);
+  },
+  deleteRecordingChunk: async (scope: string, id: string) => {
+    mockStore.records.delete(`${scope}|${id}`);
   },
 }));
 
@@ -345,6 +363,7 @@ it.each<WorkerGeneration>(['current', 'refuses labels', 'text only'])(
           await jest.advanceTimersByTimeAsync(step);
         });
         elapsed += step;
+        expectAudioOnlyUntilTranscribed(view.result.current);
       }
     };
     const setPage = (change: Partial<typeof page>) =>
@@ -385,10 +404,10 @@ it.each<WorkerGeneration>(['current', 'refuses labels', 'text only'])(
     setPage({ online: true });
 
     await runUntil(at(13));
-    // Later writes save chunk 4's transcript; completed audio stays available for the combined export.
+    // Later writes save chunk 4's transcript, which replaces its audio; only the chunk being recorded has audio.
     expect(statuses(view).slice(0, 4)).toEqual(['complete', 'complete', 'complete', 'complete']);
     expect(view.result.current.errorMessage).toBe('');
-    expect(view.result.current.downloadableChunkIds).toEqual(view.result.current.segments.map((segment) => segment.id));
+    expect(view.result.current.downloadableChunkIds).toEqual([view.result.current.segments[4].id]);
 
     await runUntil(at(15, 30));
     expect(mockWorker.uploads.every((upload) => upload.outcome)).toBe(true);
@@ -457,8 +476,8 @@ it.each<WorkerGeneration>(['current', 'refuses labels', 'text only'])(
     expect(recorder.segments.some((segment) => segment.speakersRenumbered)).toBe(false);
     // Two presses of Record, one before and one after the reload; nothing else opened the microphone.
     expect(getUserMedia).toHaveBeenCalledTimes(2);
-    // Successful and rejected chunks survive the reload and remain downloadable in full.
-    expect(recorder.downloadableChunkIds).toEqual(recorder.segments.map((segment) => segment.id));
+    // Only the rejected chunk, never transcribed, keeps its audio, in full; a transcribed chunk has none to give.
+    expect(recorder.downloadableChunkIds).toEqual([rejected.id]);
     const downloads: Blob[] = [];
     const urls = { create: URL.createObjectURL, revoke: URL.revokeObjectURL };
     const click = jest.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
@@ -471,7 +490,6 @@ it.each<WorkerGeneration>(['current', 'refuses labels', 'text only'])(
       click.mockRestore();
     }
     expect(downloads.map((blob) => decodeAudio(blob.size))).toEqual([
-      { chunk: 1, fragments: FakeMediaRecorder.made[0].emitted },
       { chunk: 9, fragments: FakeMediaRecorder.made[8].emitted },
     ]);
 
@@ -496,14 +514,16 @@ it.each<WorkerGeneration>(['current', 'refuses labels', 'text only'])(
     expect(voices?.knownSpeakers?.map(({ name, sample }) => [name, sample.length])).toEqual(
       generation === 'current' ? [['Person 1', 'data:audio/wav;base64,'.length + ((44 + 160_000) / 3) * 4]] : undefined,
     );
-    // Device storage keeps every chunk's audio in one recording for a complete local export.
+    // Device storage holds every chunk of one recording; each transcript replaced its chunk's audio, so only the
+    // rejected chunk keeps audio.
     const stored = [...mockStore.records.values()].filter((record) => record.segment.index >= 0);
     expect(stored).toHaveLength(12);
     expect(new Set(stored.map((record) => record.scope)).size).toBe(1);
-    expect(stored.filter((record) => record.audio).map((record) => record.segment.id)).toEqual(
-      recorder.segments.map((segment) => segment.id),
-    );
+    expect(stored.filter((record) => record.audio).map((record) => record.segment.id)).toEqual([rejected.id]);
+    expectAudioOnlyUntilTranscribed(recorder);
     view.unmount();
+    // The rejected chunk still waits for Retry, so the voice samples stay for when it is transcribed.
+    expect([...mockStore.records.keys()].some((key) => key.endsWith('|known-speakers'))).toBe(generation === 'current');
   },
   60_000,
 );
@@ -526,15 +546,19 @@ it('imports a ten-minute file as three-minute parts that each upload alone, thro
   let view = await openPage();
   const statuses = () => view.result.current.segments.map((segment) => segment.status);
   const runUntil = async (done: () => boolean) => {
-    for (let second = 0; second < 600 && !done(); second++)
+    for (let second = 0; second < 600 && !done(); second++) {
       await act(async () => {
         await jest.advanceTimersByTimeAsync(1000);
       });
+      expectAudioOnlyUntilTranscribed(view.result.current);
+    }
   };
   await act(async () => {
     await view.result.current.addAudio(new Blob(['600'], { type: 'audio/mpeg' }));
   });
   expect(statuses()).toEqual(['transcribing', 'queued', 'queued', 'queued']);
+  // Every part is on the device before any is sent.
+  expect([...mockStore.records.values()].map((record) => Boolean(record.audio?.size))).toEqual(Array(4).fill(true));
   // The second part stalls and goes again alone; reload while the third part's request hangs.
   await runUntil(() => statuses()[2] === 'transcribing');
   view.unmount();
@@ -556,10 +580,9 @@ it('imports a ten-minute file as three-minute parts that each upload alone, thro
   expect(view.result.current.transcript).toBe(
     ['Person 1: Chunk 101 speech.', 'Chunk 102 speech.', 'Chunk 103 speech.', 'Chunk 104 speech.'].join(' '),
   );
+  // Each part's transcript replaced its audio, on the device and on the page.
   const stored = [...mockStore.records.values()].filter((record) => record.segment.index >= 0);
-  expect(stored.map((record) => [record.segment.status, record.audio?.size])).toEqual([
-    ...Array(3).fill(['complete', 44 + 180 * 32_000]),
-    ['complete', 44 + 63 * 32_000],
-  ]);
+  expect(stored.map((record) => [record.segment.status, record.audio])).toEqual(Array(4).fill(['complete', undefined]));
+  expect(view.result.current.downloadableChunkIds).toEqual([]);
   view.unmount();
 }, 60_000);

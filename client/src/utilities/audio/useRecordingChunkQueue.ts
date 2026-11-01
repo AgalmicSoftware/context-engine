@@ -302,7 +302,7 @@ export function useRecordingChunkQueue(options: Options) {
     const url = URL.createObjectURL(mp3);
     const anchor = document.createElement('a');
     anchor.href = url;
-    anchor.download = 'conversation.mp3';
+    anchor.download = 'untranscribed-audio.mp3';
     anchor.click();
     setTimeout(() => URL.revokeObjectURL(url), 60_000);
   }, []);

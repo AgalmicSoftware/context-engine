@@ -78,6 +78,11 @@ export async function putRecordingChunk(record: RecordingChunk): Promise<void> {
   await transact('readwrite', (store) => store.put(record));
 }
 
+/** Deletes one record of a recording, such as its voice samples. */
+export async function deleteRecordingChunk(scope: string, id: string): Promise<void> {
+  await transact('readwrite', (store) => store.delete([scope, id]));
+}
+
 /** Saves several records in one transaction, so a reload finds all of them or none. */
 export async function putRecordingChunks(records: RecordingChunk[]): Promise<void> {
   await transact('readwrite', (store) => records.map((record) => store.put(record))[records.length - 1]);

@@ -17,6 +17,7 @@ jest.mock('../../utilities/audio/recordingChunkStore', () => ({
     mockRecords.set(record.segment.id, { ...record, segment: { ...record.segment } });
   }),
   clearRecordingChunks: jest.fn(async () => mockRecords.clear()),
+  deleteRecordingChunk: jest.fn(async (_scope: string, id: string) => mockRecords.delete(id)),
 }));
 
 jest.mock('../../utilities/ai/aiSettings', () => ({
@@ -226,7 +227,8 @@ it('closes with pending audio and resumes it when the recording reopens', async 
   fireEvent.click(screen.getByText('Open the dialog again'));
   await waitFor(() => expect(screen.getByTestId('ce-session-listening-transcript')).toHaveValue(transcript));
   expect(savedTranscript()).toBe(transcript);
-  expect([...mockRecords.values()][0]?.audio).toBeInstanceOf(Blob);
+  // The saved transcript replaced the audio on the device.
+  expect([...mockRecords.values()][0]?.audio).toBeUndefined();
   expect(transcribeAudio).toHaveBeenCalledTimes(2);
 });
 
@@ -278,7 +280,7 @@ it('reminds the session page to reopen while kept audio waits to upload', async 
   expect(screen.queryByText(/waiting to upload/)).not.toBeInTheDocument();
 });
 
-it.each(['recorded audio', 'a pasted transcript'])(
+it.each(['a transcribed recording', 'a pasted transcript'])(
   'warns on the session page and before leaving while only this page holds %s',
   async (kind) => {
     const put = jest.mocked(putRecordingChunk).getMockImplementation()!;
@@ -287,7 +289,7 @@ it.each(['recorded audio', 'a pasted transcript'])(
     try {
       render(<Harness />);
       await waitFor(() => expect(screen.getByTestId('ce-session-listening-start')).toBeEnabled());
-      if (kind === 'recorded audio') {
+      if (kind === 'a transcribed recording') {
         fireEvent.click(screen.getByTestId('ce-session-listening-start'));
         fireEvent.click(await screen.findByRole('button', { name: 'Stop recording' }));
       } else {
@@ -310,11 +312,8 @@ it.each(['recorded audio', 'a pasted transcript'])(
       expect(leaving()).toBe(true);
       // Cleared, nothing is left to lose.
       fireEvent.click(screen.getByRole('button', { name: 'Reopen recording' }));
+      // Transcribed, no audio is left to ask about.
       fireEvent.click(await screen.findByRole('button', { name: 'Clear transcript' }));
-      if (kind === 'recorded audio') {
-        fireEvent.click(await screen.findByRole('button', { name: 'Clear recording' }));
-        await waitFor(() => expect(screen.queryByText('Clear this recording?')).not.toBeInTheDocument());
-      }
       await waitFor(() => expect(screen.queryByTestId('ce-session-listening-transcript')).not.toBeInTheDocument());
       dismiss('Close');
       await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
