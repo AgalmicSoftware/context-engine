@@ -250,16 +250,18 @@ describe('SessionListeningPanel', () => {
     expect(downloadChunk).toHaveBeenCalledWith('live');
   });
 
-  it('lets the recorder retry a chunk that is stuck uploading', () => {
+  it('lets the recorder retry a chunk that is stuck uploading, but not one uploading normally', () => {
     const retryChunk = jest.fn();
+    const upload = { id: 'stuck-upload', index: 0, status: 'transcribing', text: '', startedAt: 1 };
+    const recorder = (error?: string) =>
+      buildRecorder({ segments: [{ ...upload, error }], pendingSegmentCount: 1, retryChunk });
+    (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(recorder());
+    const { rerender } = render(<SessionListeningPanel sessionSlug="workshop" />);
+    expect(screen.queryByRole('button', { name: 'Retry transcription' })).not.toBeInTheDocument();
     (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
-      buildRecorder({
-        segments: [{ id: 'stuck-upload', index: 0, status: 'transcribing', text: '', startedAt: 1 }],
-        pendingSegmentCount: 1,
-        retryChunk,
-      }),
+      recorder('The upload stopped responding. Retrying.'),
     );
-    render(<SessionListeningPanel sessionSlug="workshop" />);
+    rerender(<SessionListeningPanel sessionSlug="workshop" />);
     expect(screen.queryByRole('list', { name: 'Original audio downloads' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Retry transcription' }));
     expect(retryChunk).toHaveBeenCalledWith('stuck-upload');
@@ -1290,7 +1292,10 @@ it('gives the recorder text actions one outlined button style', () => {
     buildRecorder({
       hiddenPeriods: [{ startedAt: 1_000, endedAt: 2_000 }],
       dismissHiddenPeriods: jest.fn(),
-      segments: [{ id: 'up', index: 0, status: 'transcribing', text: '', startedAt: 1 }],
+      // A stalled upload offers Retry.
+      segments: [
+        { id: 'up', index: 0, status: 'transcribing', text: '', startedAt: 1, error: 'The upload stopped responding.' },
+      ],
       pendingSegmentCount: 1,
       downloadableChunkIds: ['up'],
     }),

@@ -44,3 +44,21 @@ it('keeps every part downloadable while device storage fails, even during captur
   fireEvent.click(screen.getByRole('button', { name: 'Download chunk 2' }));
   expect(onDownload.mock.calls).toEqual([['done'], ['live']]);
 });
+
+it('offers Retry for an upload only once it has stalled', () => {
+  const onRetry = jest.fn();
+  const view = (error?: string) => (
+    <SessionRecordingChunks
+      segments={[{ id: 'upload', index: 0, text: '', status: 'transcribing', startedAt: 1, error }]}
+      onRetry={onRetry}
+      onDownload={jest.fn()}
+      onDownloadRecording={jest.fn()}
+    />
+  );
+  const { rerender } = render(view());
+  // Retrying a healthy upload would abort it and might pay for it twice.
+  expect(screen.queryByRole('button', { name: 'Retry transcription' })).not.toBeInTheDocument();
+  rerender(view('The upload stopped responding. Retrying.'));
+  fireEvent.click(screen.getByRole('button', { name: 'Retry transcription' }));
+  expect(onRetry).toHaveBeenCalledWith('upload');
+});

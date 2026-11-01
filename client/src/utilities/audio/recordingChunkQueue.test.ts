@@ -109,6 +109,33 @@ it('abandons an upload that never answers, retries it, then uploads later chunks
   expect(queue.segments.map((segment) => segment.status)).toEqual(['complete', 'complete']);
 });
 
+it('says an upload stalled while its next request runs, which offers Retry, until it is answered', async () => {
+  let answer = (_value: { text: string }) => {};
+  let requests = 0;
+  // The first request never answers.
+  const transcribe = jest.fn<Transcribe>(() =>
+    ++requests === 1
+      ? new Promise(() => {})
+      : new Promise((resolve) => {
+          answer = resolve;
+        }),
+  );
+  const queue = create(transcribe);
+  await queue.ready;
+  queue.capture(queue.begin(false), audio, true);
+  await tick();
+  expect(queue.segments[0]).toMatchObject({ status: 'transcribing', error: undefined });
+  await jest.advanceTimersByTimeAsync(121_000);
+  expect(transcribe).toHaveBeenCalledTimes(2);
+  expect(queue.segments[0]).toMatchObject({
+    status: 'transcribing',
+    error: expect.stringContaining('stopped responding'),
+  });
+  answer({ text: 'Answered.' });
+  await tick();
+  expect(queue.segments[0]).toMatchObject({ status: 'complete', text: 'Answered.', error: undefined });
+});
+
 it('waits two minutes for a hung upload after quick failures, and longer only after a stall', async () => {
   const signals: AbortSignal[] = [];
   const transcribe = jest.fn((_blob: Blob, _labels: boolean, signal: AbortSignal) => {

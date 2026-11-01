@@ -38,7 +38,12 @@ export function SessionRecordingChunks({
   const [downloaded, setDownloaded] = useState(false);
   const [percent, setPercent] = useState(0);
   if (!segments.length) return null;
-  const retryable = segments.filter((segment) => ['failed', 'retrying', 'transcribing'].includes(segment.status));
+  // Retrying a healthy upload would abort it and might pay for it twice, so an upload offers Retry only once it
+  // has stalled, when it keeps the stall's message.
+  const retryable = segments.filter(
+    (segment) =>
+      ['failed', 'retrying'].includes(segment.status) || (segment.status === 'transcribing' && Boolean(segment.error)),
+  );
   const errors = [...new Set(segments.map((segment) => segment.error).filter(Boolean))];
   return (
     <div className={styles.recovery}>

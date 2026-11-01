@@ -346,7 +346,12 @@ export class RecordingChunkQueue {
     const { id } = record.segment;
     const attempt = (this.attempts.get(id) || 0) + 1;
     this.attempts.set(id, attempt);
-    record.segment = { ...record.segment, status: 'transcribing', error: undefined };
+    // After a stall the next request may hang too, so it keeps saying so, which offers Retry while it runs.
+    record.segment = {
+      ...record.segment,
+      status: 'transcribing',
+      error: this.stalls.has(id) ? stalledText : undefined,
+    };
     this.changed();
     const controller = new AbortController();
     this.uploading = { id, controller };
