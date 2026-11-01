@@ -2729,23 +2729,25 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
 .sessionListeningRecordWrap {
   display: flex;
-  justify-content: center;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
   padding: 0 0 2px;
 }
 
 .sessionListeningRecordButton {
-  width: 132px;
-  height: 132px;
-  border-radius: var(--ce-radius-round) !important;
+  min-width: 132px;
+  min-height: 46px;
+  border-radius: 8px !important;
   border: 2px solid color-mix(in srgb, var(--ce-status-success) 50%, transparent) !important;
   background: var(--ce-status-success) !important;
   color: var(--ce-status-success-contrast) !important;
   display: inline-flex !important;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 14px !important;
+  padding: 10px 16px !important;
   box-shadow: 0 14px 28px color-mix(in srgb, var(--ce-overlay-surface) 25%, transparent);
   font-weight: 900 !important;
   line-height: 1.1;
@@ -2770,7 +2772,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 }
 
 .sessionListeningRecordIcon {
-  font-size: 2.2rem;
+  font-size: 1.2rem;
   line-height: 1;
 }
 
@@ -2914,6 +2916,16 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   background: var(--ce-status-success) !important;
   border-color: var(--ce-status-success) !important;
   color: var(--ce-status-success-contrast) !important;
+}
+
+.sessionListeningGenerate:disabled,
+.sessionListeningRecordButton:disabled {
+  opacity: 1 !important;
+  background: var(--ce-control-face) !important;
+  color: var(--ce-panel-text-muted) !important;
+  border: 1px dashed currentColor !important;
+  box-shadow: none;
+  cursor: default;
 }
 
 .sessionRecordingOptions {
@@ -3502,6 +3514,12 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   a {
     color: var(--ce-status-info-text) !important;
   }
+}
+
+.sessionRecordingHeading {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .sessionVoiceModeModal {
@@ -7758,12 +7776,12 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     }
   }
 
-  // Keep the shared card height across question types so navigation never moves
-  // with prompt length. Long prompts scroll within the original typography.
+  // The adaptive layout below allocates spare answer space to long prompts.
+  // Retain scrolling only when the full question cannot fit at readable size.
   .pileCardHeader {
     flex: 0 1 auto;
     min-height: 0;
-    max-height: 35%;
+    max-height: none;
     overflow-y: auto;
   }
 
@@ -7817,7 +7835,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   }
 }
 
-@media (max-width: 480px) {
+@media (max-width: 768px) {
   // Reserve only the space each answer needs; the prompt receives the rest of
   // the fixed-height card. Its text can fit without moving the navigation.
   .pileCardInner .pileCardBody,
@@ -7851,10 +7869,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     scrollbar-gutter: auto;
   }
 
-  .pileCardMainContent:has(.binaryQuestionContainer) {
-    flex-basis: 44px;
-  }
-
   .pileCardMainContent:has(.freeformQuestionContainer) {
     flex-basis: 104px;
   }
@@ -7865,23 +7879,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
   .pileCardInner.pileQuadraticCard .pileCardMainContent {
     flex-basis: 170px;
-  }
-
-  .pileCardInner #binaryChoice {
-    flex-wrap: nowrap;
-    gap: 6px;
-    width: 100%;
-    margin: 0;
-  }
-
-  .pileCardInner #binaryChoice .radioOptionText {
-    flex: 1 1 0;
-    min-width: 0;
-    min-height: 44px;
-    margin: 0;
-    padding: 6px 4px;
-    font-size: 1rem;
-    line-height: 1.25;
   }
 
   .pileCardBody[data-pile-answer-layout='roomy'] {
@@ -7897,11 +7894,13 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
       flex-wrap: wrap;
       gap: 0.5rem;
 
-      .radioOptionText {
-        flex: 0 0 auto;
-        padding: 0.5rem 1rem;
-        font-size: 1.5rem;
-        line-height: 1.5;
+      @media (max-width: 480px) {
+        .radioOptionText {
+          flex: 0 0 auto;
+          padding: 0.5rem 1rem;
+          font-size: 1.5rem;
+          line-height: 1.5;
+        }
       }
     }
   }
@@ -7923,56 +7922,79 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     }
   }
 
-  .pileCardInner .multichoiceQuestionContainer {
-    padding: 0 0 6px;
-  }
+  @media (max-width: 480px) {
+    .pileCardMainContent:has(.binaryQuestionContainer) {
+      flex-basis: 44px;
+    }
 
-  .pileCardInner .multichoiceQuestionContainer #multiChoice {
-    display: grid;
-    grid-auto-flow: column;
-    grid-template-rows: repeat(2, minmax(0, 1fr));
-    grid-auto-columns: 72%;
-    gap: 8px;
-    width: 100%;
-    max-width: 100%;
-    min-height: 0;
-    margin: 0;
-    padding: 2px;
-  }
-
-  .pileCardInner .multichoiceQuestionContainer #multiChoice .checkboxOptionText {
-    height: 100%;
-    min-height: 44px;
-    margin: 0;
-    padding: 4px 10px;
-    align-self: stretch;
-    overflow-y: auto;
-  }
-
-  @container ce-theme style(--ce-layout-profile: desktop-window) {
-    .pileCardInner .pileCardHeader {
-      padding: 8px;
+    .pileCardInner #binaryChoice {
+      flex-wrap: nowrap;
+      gap: 6px;
+      width: 100%;
+      margin: 0;
     }
 
     .pileCardInner #binaryChoice .radioOptionText {
-      padding-left: 19px;
-      font-size: 0.82rem;
+      flex: 1 1 0;
+      min-width: 0;
+      min-height: 44px;
+      margin: 0;
+      padding: 6px 4px;
+      font-size: 1rem;
+      line-height: 1.25;
     }
 
-    .pileCardInner #binaryChoice .radioOptionText::before {
-      left: 4px;
-      width: 11px;
-      height: 11px;
+    .pileCardInner .multichoiceQuestionContainer {
+      padding: 0 0 6px;
     }
 
-    .pileCardBody[data-pile-answer-layout='roomy'] #binaryChoice .radioOptionText {
-      padding: 7px 10px 7px 32px;
-      font-size: 0.82rem;
+    .pileCardInner .multichoiceQuestionContainer #multiChoice {
+      display: grid;
+      grid-auto-flow: column;
+      grid-template-rows: repeat(2, minmax(0, 1fr));
+      grid-auto-columns: 72%;
+      gap: 8px;
+      width: 100%;
+      max-width: 100%;
+      min-height: 0;
+      margin: 0;
+      padding: 2px;
+    }
 
-      &::before {
-        left: 9px;
-        width: 13px;
-        height: 13px;
+    .pileCardInner .multichoiceQuestionContainer #multiChoice .checkboxOptionText {
+      height: 100%;
+      min-height: 44px;
+      margin: 0;
+      padding: 4px 10px;
+      align-self: stretch;
+      overflow-y: auto;
+    }
+
+    @container ce-theme style(--ce-layout-profile: desktop-window) {
+      .pileCardInner .pileCardHeader {
+        padding: 8px;
+      }
+
+      .pileCardInner #binaryChoice .radioOptionText {
+        padding-left: 19px;
+        font-size: 0.82rem;
+      }
+
+      .pileCardInner #binaryChoice .radioOptionText::before {
+        left: 4px;
+        width: 11px;
+        height: 11px;
+      }
+
+      .pileCardBody[data-pile-answer-layout='roomy'] #binaryChoice .radioOptionText {
+        padding: 7px 10px 7px 32px;
+        font-size: 0.82rem;
+
+        &::before {
+          left: 9px;
+          width: 13px;
+          height: 13px;
+        }
       }
     }
   }

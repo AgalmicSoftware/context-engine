@@ -40,3 +40,18 @@
   gap: 8px;
   margin-left: auto;
 }
+.recovery {
+  color: var(--ce-panel-text);
+  a {
+    color: var(--ce-panel-text);
+    text-decoration: underline;
+    &:focus-visible {
+      outline: 2px solid var(--ce-focus-ring);
+      outline-offset: 2px;
+    }
+  }
+  p {
+    margin: 8px 0;
+    overflow-wrap: anywhere;
+  }
+}

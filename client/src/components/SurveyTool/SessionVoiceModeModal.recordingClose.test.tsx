@@ -147,7 +147,7 @@ it.each(['Escape', 'outside click'])(
     expect(mockStop).not.toHaveBeenCalled();
     expect(screen.getByRole('dialog')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Stop recording' }));
-    await screen.findByText('Transcribed');
+    await waitFor(() => expect(screen.getByTestId('ce-session-listening-transcript')).toHaveValue(transcript));
     dismiss(method);
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     expect(mockStop).toHaveBeenCalledTimes(1);
@@ -201,7 +201,7 @@ it('keeps failed audio in storage and automatically retries it before closing', 
   await screen.findByRole('button', { name: 'Stop recording' });
   dismiss('Close');
   await confirmStop();
-  expect(await screen.findByText('Retrying')).toBeInTheDocument();
+  expect(await screen.findByRole('button', { name: 'Retry transcription' })).toBeInTheDocument();
   expect(screen.getByRole('dialog')).toBeInTheDocument();
   expect([...mockRecords.values()][0]?.audio?.size).toBe(256);
   await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument(), { timeout: 3000 });
@@ -224,9 +224,9 @@ it('closes with pending audio and resumes it when the recording reopens', async 
   expect([...mockRecords.values()][0]?.audio?.size).toBe(256);
   jest.mocked(transcribeAudio).mockResolvedValue(transcript);
   fireEvent.click(screen.getByText('Open the dialog again'));
-  await screen.findByText('Transcribed');
+  await waitFor(() => expect(screen.getByTestId('ce-session-listening-transcript')).toHaveValue(transcript));
   expect(savedTranscript()).toBe(transcript);
-  expect([...mockRecords.values()][0]?.audio).toBeUndefined();
+  expect([...mockRecords.values()][0]?.audio).toBeInstanceOf(Blob);
   expect(transcribeAudio).toHaveBeenCalledTimes(2);
 });
 
@@ -256,7 +256,7 @@ it('reminds the session page to reopen while kept audio waits to upload', async 
   fireEvent.click(await screen.findByRole('button', { name: 'Stop recording' }));
   fireEvent.click(await screen.findByRole('button', { name: 'Close and keep the audio' }));
   await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
-  const notice = await screen.findByText('1 recording chunk is waiting to upload.');
+  const notice = await screen.findByText('Saved audio is waiting to upload.');
   expect(notice).toHaveAttribute('role', 'status');
   expect(screen.getByRole('button', { name: 'About kept recording audio' })).toHaveAccessibleDescription(
     /stays on this device/,
@@ -267,10 +267,10 @@ it('reminds the session page to reopen while kept audio waits to upload', async 
   fireEvent.click(screen.getByText('Open the dialog again'));
   fireEvent.click(await screen.findByRole('button', { name: 'Close and keep the audio' }));
   await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
-  expect(await screen.findByText('1 recording chunk is waiting to upload.')).toBeInTheDocument();
+  expect(await screen.findByText('Saved audio is waiting to upload.')).toBeInTheDocument();
   jest.mocked(transcribeAudio).mockResolvedValue(transcript);
   fireEvent.click(screen.getByRole('button', { name: 'Reopen recording' }));
-  await screen.findByText('Transcribed');
+  await waitFor(() => expect(screen.getByTestId('ce-session-listening-transcript')).toHaveValue(transcript));
   expect(screen.queryByText(/waiting to upload/)).not.toBeInTheDocument();
   dismiss('Close');
   await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());

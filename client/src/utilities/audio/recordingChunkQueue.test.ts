@@ -82,7 +82,7 @@ it('retries the first chunk with backoff before uploading later chunks', async (
   await tick();
   expect(calls).toEqual([audio, audio, audio, later]);
   expect(queue.segments.map((segment) => segment.status)).toEqual(['complete', 'complete']);
-  expect([...saved.values()].every((record) => !record.audio)).toBe(true);
+  expect([...saved.values()].every((record) => record.audio)).toBe(true);
 });
 
 it('abandons an upload that never answers, retries it, then uploads later chunks', async () => {
@@ -206,7 +206,7 @@ it('skips permanent failures while retaining their exact audio for retry and dow
   expect(queue.segments.map((segment) => segment.status)).toEqual(['complete', 'failed', 'complete']);
   expect(queue.records.get(failed)?.audio).toBe(badAudio);
   expect(saved.get(failed)?.audio).toBe(badAudio);
-  await expect(queue.clear()).rejects.toThrow('unsaved audio');
+  await expect(queue.clear()).rejects.toThrow('confirm deleting');
   transcribe.mockImplementation(async () => ({ text: 'Recovered.' }));
   queue.retry(failed);
   await queue.finish();
@@ -229,14 +229,14 @@ it('does not delete raw audio if persisting the completed transcript fails', asy
   expect(queue.records.get(id)?.audio).toBe(audio);
   expect(queue.storageError).toContain("This recording can't be recovered after a reload");
   expect(queue.segments[0]).toMatchObject({ status: 'complete', text: 'Speech.' });
-  await expect(queue.clear()).rejects.toThrow('unsaved audio');
+  await expect(queue.clear()).rejects.toThrow('confirm deleting');
   jest.mocked(putRecordingChunk).mockImplementation(async (record) => {
     saved.set(record.segment.id, record);
   });
   queue.retry(id);
   await tick();
   expect(saved.get(id)?.segment.text).toBe('Speech.');
-  expect(queue.records.get(id)?.audio).toBeUndefined();
+  expect(queue.records.get(id)?.audio).toBe(audio);
   expect(queue.storageError).toBe('');
 });
 
@@ -257,8 +257,8 @@ it('saves a refused transcript once a later write succeeds, so a reload neither 
   queue.capture(queue.begin(false), new Blob(['next'], { type: 'audio/webm' }));
   await tick();
   expect(saved.get(first)).toMatchObject({ segment: { status: 'complete', text: 'Speech.' } });
-  expect(saved.get(first)?.audio).toBeUndefined();
-  expect(queue.records.get(first)?.audio).toBeUndefined();
+  expect(saved.get(first)?.audio).toBe(audio);
+  expect(queue.records.get(first)?.audio).toBe(audio);
   expect(queue.storageError).toBe('');
   queue.dispose();
   const reopened = create(transcribe);
@@ -299,7 +299,7 @@ it('never lets a re-save of an uploading chunk overwrite the transcript saved af
   finishWrite();
   await tick();
   expect(saved.get(first)).toMatchObject({ segment: { status: 'complete', text: 'Speech.' } });
-  expect(saved.get(first)?.audio).toBeUndefined();
+  expect(saved.get(first)?.audio).toBe(audio);
   expect(queue.storageError).toBe('');
   queue.dispose();
   const reopened = create(transcribe);
@@ -390,7 +390,7 @@ it('resets speaker fallback when a completed recording is cleared', async () => 
   queue.capture(queue.begin(true), audio, true);
   await queue.finish();
   expect(queue.labelsUnavailableReason).toBe('Labels unavailable');
-  await queue.clear();
+  await queue.clear(true);
   queue.capture(queue.begin(true), audio, true);
   await queue.finish();
   expect(transcribe).toHaveBeenLastCalledWith(audio, true, expect.any(AbortSignal), []);
@@ -405,7 +405,7 @@ it('clears a recording made without IndexedDB once its memory-only audio is expl
   queue.capture(queue.begin(false), audio, true);
   await queue.finish();
   expect(queue.segments[0]).toMatchObject({ status: 'complete', text: 'Speech.' });
-  await expect(queue.clear()).rejects.toThrow('unsaved audio');
+  await expect(queue.clear()).rejects.toThrow('confirm deleting');
   expect(queue.records.size).toBe(1);
   await queue.clear(true);
   expect(queue.records.size).toBe(0);
@@ -421,7 +421,7 @@ it('clears a Failed chunk only once its audio is explicitly discarded', async ()
   queue.capture(id, audio, true);
   await queue.finish();
   expect(queue.segments[0].status).toBe('failed');
-  await expect(queue.clear()).rejects.toThrow('unsaved audio');
+  await expect(queue.clear()).rejects.toThrow('confirm deleting');
   expect(saved.get(id)?.audio).toBe(audio);
   await queue.clear(true);
   expect(queue.records.size).toBe(0);
@@ -605,7 +605,7 @@ it('counts the kept chunks that reopening will upload, in storage or only in mem
     ...(withAudio ? { audio } : {}),
     segment: { id, index: Number(id.slice(-1)), status, text: '', startedAt: 0 },
   });
-  saved.set('chunk-0', chunk('chunk-0', 'complete', false));
+  saved.set('chunk-0', chunk('chunk-0', 'complete', true));
   saved.set('chunk-1', chunk('chunk-1', 'queued'));
   // A Failed chunk waits for Retry, so reopening alone won't upload it.
   saved.set('chunk-2', chunk('chunk-2', 'failed'));
@@ -681,7 +681,7 @@ describe('speaker labels across chunks', () => {
     await reloaded.ready;
     await record(reloaded);
     expect(sentNames(reloadedTranscribe)).toEqual([['Person 1', 'Person 2', 'Person 3']]);
-    await reloaded.clear();
+    await reloaded.clear(true);
     expect(saved.has('known-speakers')).toBe(false);
     const cleared = replies([turn('A', 0, 3)]);
     const fresh = create(cleared, 'voices-1');
@@ -767,4 +767,21 @@ describe('speaker labels across chunks', () => {
     expect(sentNames(transcribe)).toEqual([[], []]);
     expect(voices(queue)).toEqual([['Person 1'], ['Person 1']]);
   });
+});
+
+it('persists an imported transcript without sending it for transcription and restores it in order', async () => {
+  const transcribe = jest.fn(async () => ({ text: 'Audio discussion.' }));
+  const queue = create(transcribe);
+  await queue.prepare();
+  await queue.addTranscript('Written discussion.');
+  expect(transcribe).not.toHaveBeenCalled();
+  expect(queue.segments[0]).toMatchObject({ source: 'text', status: 'complete', text: 'Written discussion.' });
+  const id = queue.begin(false);
+  queue.capture(id, audio, true);
+  await queue.finish();
+  queue.dispose();
+  const restored = create(transcribe);
+  await restored.ready;
+  expect(restored.segments.map((segment) => segment.text)).toEqual(['Written discussion.', 'Audio discussion.']);
+  expect(transcribe).toHaveBeenCalledTimes(1);
 });

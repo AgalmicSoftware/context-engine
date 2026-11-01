@@ -16,11 +16,21 @@ import {
   faMicrophone,
 } from '@fortawesome/free-solid-svg-icons';
 
+import {
+  usesCloudflareSessionStorage,
+  usesPublicReadCloudflareStorage,
+} from '../../utilities/storage/sessionStorageConfig';
+
 import PileHologramAssistant from './PileHologramAssistant';
 import PileQuestionActionMenu from './PileQuestionActionMenu';
 import styles from './SurveyTool.module.scss';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { SHOW_PILE_HOLOGRAM_TOGGLE } from './surveyToolRuntimeSupport.js';
+
+export const requiresQuestionStorageLogin = (config: unknown, signedIn: boolean): boolean =>
+  !signedIn &&
+  usesCloudflareSessionStorage(config, { resource: 'questions' }) &&
+  !usesPublicReadCloudflareStorage(config, { resource: 'questions' });
 
 const ACTIVE_GREEN = 'var(--ce-status-success)';
 
@@ -86,6 +96,7 @@ type PileEmptyStateProps = {
   hasTerminalScanError: boolean;
   scanErrorMessage: string;
   hasError: boolean;
+  requiresStorageLogin?: boolean;
   isStillLoading: boolean;
   loadingElapsedSec: number;
   hydrateDone: number;
@@ -117,6 +128,7 @@ export type PileInteractionSurfaceProps = {
   hasTerminalScanError: boolean;
   scanErrorMessage: string;
   hasError: boolean;
+  requiresStorageLogin?: boolean;
   isStillLoading: boolean;
   hydrateDone: number;
   hydrateDiscovered: number;
@@ -467,6 +479,7 @@ const renderPileEmptyState = ({
   hasTerminalScanError,
   scanErrorMessage,
   hasError,
+  requiresStorageLogin,
   isStillLoading,
   loadingElapsedSec,
   hydrateDone,
@@ -480,6 +493,17 @@ const renderPileEmptyState = ({
   showGatedEmptyState,
   gatedEmptyPanel,
 }: PileEmptyStateProps): React.ReactNode => {
+  if (requiresStorageLogin) {
+    return (
+      <div role="status">
+        <div>Sign in to view this session’s questions.</div>
+        <div style={PILE_SCAN_ERROR_DETAIL_STYLE}>
+          Question access is limited to eligible participants. Use Log in at the top of the page.
+        </div>
+      </div>
+    );
+  }
+
   if (hasTerminalScanError) {
     return <div>{scanErrorMessage}</div>;
   }
@@ -565,6 +589,7 @@ export const renderPileInteractionSurface = ({
   hasTerminalScanError,
   scanErrorMessage,
   hasError,
+  requiresStorageLogin,
   isStillLoading,
   hydrateDone,
   hydrateDiscovered,
@@ -661,6 +686,7 @@ export const renderPileInteractionSurface = ({
             hasTerminalScanError,
             scanErrorMessage,
             hasError,
+            requiresStorageLogin,
             isStillLoading,
             loadingElapsedSec,
             hydrateDone,

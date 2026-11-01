@@ -222,6 +222,24 @@ export function useRecordingChunkQueue(options: Options) {
     const id = queue.begin(latest.current.labelSpeakers, gapBefore);
     return (audio: Blob, finished = false) => queue.capture(id, audio, finished);
   }, []);
+  const addAudio = useCallback(
+    async (audio: Blob) => {
+      const queue = queueRef.current;
+      await prepare();
+      if (!queue || queue !== queueRef.current) throw new Error('The recording changed. Add the audio again.');
+      queue.capture(queue.begin(latest.current.labelSpeakers), audio, true);
+    },
+    [prepare],
+  );
+  const addTranscript = useCallback(
+    async (text: string) => {
+      const queue = queueRef.current;
+      await prepare();
+      if (!queue || queue !== queueRef.current) throw new Error('The recording changed. Add the transcript again.');
+      await queue.addTranscript(text);
+    },
+    [prepare],
+  );
   const finishTranscription = useCallback(async () => {
     await queueRef.current?.finish();
   }, []);
@@ -243,6 +261,19 @@ export function useRecordingChunkQueue(options: Options) {
     anchor.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }, []);
+  const downloadRecording = useCallback(async (onProgress: (percent: number) => void) => {
+    const audio = [...(queueRef.current?.records.values() || [])]
+      .sort((a, b) => a.segment.index - b.segment.index)
+      .flatMap((record) => (record.audio?.size ? [record.audio] : []));
+    const { combineRecordingAudio } = await import('./combinedRecordingAudio');
+    const mp3 = await combineRecordingAudio(audio, onProgress);
+    const url = URL.createObjectURL(mp3);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = 'conversation.mp3';
+    anchor.click();
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  }, []);
   const clearDraft = useCallback(
     async (discardAudio = false) => {
       try {
@@ -258,6 +289,8 @@ export function useRecordingChunkQueue(options: Options) {
     scope,
     prepare,
     beginChunk,
+    addAudio,
+    addTranscript,
     finishTranscription,
     keepAudio,
     retryChunk,
@@ -266,6 +299,7 @@ export function useRecordingChunkQueue(options: Options) {
     dismissHiddenPeriods,
     hiddenPeriods,
     downloadChunk,
+    downloadRecording,
     clearDraft,
     downloadableChunkIds,
     segments,

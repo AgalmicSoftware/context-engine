@@ -100,13 +100,13 @@ export default function SessionJoinPanel({
   return (
     <section className={styles.panel} data-testid="ce-session-join">
       <button type="button" className={styles.toggle} aria-expanded={open} onClick={() => setOpen(!open)}>
-        Join
+        Interview & share
       </button>
       {open ? (
         <div className={styles.content}>
           <div className={styles.heading}>
             Voice interview{' '}
-            <button type="button" id={helpId} className={styles.help} aria-label="About joining">
+            <button type="button" id={helpId} className={styles.help} aria-label="About interview and sharing links">
               <FontAwesomeIcon icon={faQuestionCircle} />
             </button>
           </div>

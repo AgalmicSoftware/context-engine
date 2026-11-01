@@ -126,7 +126,9 @@ export const checkLicenses = ({ rootDir = projectRoot, trees = productionTrees, 
         continue;
       }
       const license = override?.license ?? declared;
-      if (!isAllowedLicense(license)) failures.push(`${tree}: ${identity} has ${license || 'no license metadata'}; review its license before allowing it.`);
+      // Explicit version-scoped approvals retain the declared license; they never relabel a
+      // copyleft library as permissive or allow other versions/packages using that license.
+      if (!isAllowedLicense(license) && override?.allow !== true) failures.push(`${tree}: ${identity} has ${license || 'no license metadata'}; review its license before allowing it.`);
     }
   }
   for (const identity of Object.keys(reviewed)) {

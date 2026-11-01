@@ -146,6 +146,13 @@ describe('bundled app-theme contrast', () => {
     assertContrast(values, 'focus-ring', 'surface', 3, 'canvas');
   });
 
+  test.each(registry.themes.map(({ id }) => id))('%s keeps small binary answer labels readable', (themeId) => {
+    const values = themeValues(css, themeId);
+    for (const stance of ['agree', 'disagree']) {
+      assertContrast(values, `binary-choice-${stance}-text`, `binary-choice-${stance}-bg`, 4.5);
+    }
+  });
+
   test('Civic keeps forms, disabled actions, and session chrome readable', () => {
     const values = themeValues(css, 'civic');
     [

@@ -685,7 +685,7 @@
     }
 
     #navbarContainer {
-      --ce-navbar-control-size: 48px;
+      --ce-navbar-control-size: var(--ce-navbar-logo-size);
       --ce-navbar-control-scale: 1;
     }
   }

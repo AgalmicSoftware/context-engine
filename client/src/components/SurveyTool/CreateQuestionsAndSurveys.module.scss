@@ -1521,7 +1521,8 @@ $user-page-background: var(--ce-surface-sunken);
 
 .interviewQuestionPromptActions .removeQuestionButton:hover,
 .interviewQuestionPromptActions .removeQuestionButton:focus {
-  color: var(--ce-color-white);
+  color: var(--ce-panel-text);
+  background-color: color-mix(in srgb, var(--ce-status-error) 18%, var(--ce-color-surface)) !important;
 }
 
 .interviewQuestionSummary {

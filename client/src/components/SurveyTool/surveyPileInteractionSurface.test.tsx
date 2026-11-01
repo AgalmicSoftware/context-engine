@@ -11,6 +11,7 @@ import {
   buildPileHologramToggleClassName,
   buildPileSubmitButtonClassName,
   renderPileInteractionSurface,
+  requiresQuestionStorageLogin,
   resolvePileCardStatusClassName,
   resolvePileFilterButtonStyle,
   resolvePileFilterIconStyle,
@@ -503,4 +504,24 @@ it('announces a draft storage failure without hiding the submit error', () => {
   expect(screen.getByRole('status')).toHaveTextContent('Draft changes are only in memory.');
   expect(screen.getByRole('status')).toBe(status);
   expect(screen.getByRole('alert')).toHaveTextContent('The response was not submitted.');
+});
+
+it('explains protected question storage when signed out without replacing genuine public errors', () => {
+  const config = { storageProfile: { backend: 'cloudflare', payloadAccessControl: { gate: 'role_gate' } } };
+  expect(requiresQuestionStorageLogin(config, false)).toBe(true);
+  expect(requiresQuestionStorageLogin(config, true)).toBe(false);
+  expect(requiresQuestionStorageLogin({}, false)).toBe(false);
+  expect(
+    requiresQuestionStorageLogin(
+      { storageProfile: { backend: 'cloudflare', payloadAccessControl: { gate: 'none' } } },
+      false,
+    ),
+  ).toBe(false);
+  const { rerender } = render(
+    renderPileInteractionSurface({ ...buildBaseProps(), hasError: true, requiresStorageLogin: true }),
+  );
+  expect(screen.getByText('Sign in to view this session’s questions.')).toBeVisible();
+  expect(screen.queryByText(/Cache initialization error/)).not.toBeInTheDocument();
+  rerender(renderPileInteractionSurface({ ...buildBaseProps(), hasError: true, requiresStorageLogin: false }));
+  expect(screen.getByText(/Cache initialization error/)).toBeVisible();
 });

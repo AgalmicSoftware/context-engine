@@ -59,9 +59,10 @@ describe('SurveyResultsQuestionSummaryCard', () => {
     expect(renderDefaultSummary).not.toHaveBeenCalled();
 
     const bookmark = container.querySelector('svg[data-icon="bookmark"]') as SVGSVGElement;
-    expect(bookmark).toHaveAttribute('color', 'gold');
+    expect(bookmark).toHaveAttribute('color', 'currentColor');
     const bookmarkButton = screen.getByRole('button', { name: 'Remove bookmark' });
     expect(bookmarkButton).toHaveClass('questionBookmarkButton');
+    expect(bookmarkButton).toHaveAttribute('aria-pressed', 'true');
     expect(bookmarkButton).toHaveAttribute('data-ce-control-appearance', 'frameless');
     fireEvent.click(bookmarkButton);
     expect(onToggleBookmark).toHaveBeenCalledTimes(1);

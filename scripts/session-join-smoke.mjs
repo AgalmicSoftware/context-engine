@@ -42,7 +42,7 @@ async function main() {
           return route.continue();
         });
         await page.goto(`${base}/join-probe`);
-        await page.getByRole('button', { name: 'Join', exact: true }).click();
+        await page.getByRole('button', { name: 'Interview & share', exact: true }).click();
         await page.getByRole('button', { name: 'Copy AI prompt' }).waitFor();
         await page.waitForFunction(() => !document.querySelector('[aria-label="Copy AI prompt"]').disabled);
         const voice = `${base}/session/workshop?${workerPinned ? 'worker=https%3A%2F%2Fworker.example&' : ''}mode=voice`;

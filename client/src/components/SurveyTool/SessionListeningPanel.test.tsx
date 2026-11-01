@@ -51,6 +51,8 @@ jest.mock('./CreateQuestionsAndSurveys', () => {
         data-doc-urls={(props.documentURLs || []).join(',')}
         data-append={String(Boolean(props.appendPreformedQuestions))}
         data-submit-class={props.submitClassName || ''}
+        data-submit-label={props.questionSubmitLabel || ''}
+        data-review={String(Boolean(props.interviewQuestionReview))}
         data-mount-id={String(mountId.current)}
         data-prompts={(props.preformedQuestions || []).map((question: any) => question.prompt).join('|')}
       >
@@ -83,6 +85,9 @@ const buildRecorder = (overrides: Record<string, unknown> = {}) => ({
   finalizeRecording: jest.fn(),
   keepAudio: jest.fn(),
   clearDraft: jest.fn(),
+  addAudio: jest.fn(),
+  downloadRecording: jest.fn(async () => {}),
+  addTranscript: jest.fn(),
   ...overrides,
 });
 
@@ -98,26 +103,103 @@ describe('SessionListeningPanel', () => {
     jest.useRealTimers();
   });
 
-  it('shows per-chunk recovery actions and keeps device errors visible beside a transcript', () => {
-    const retryChunk = jest.fn(),
-      downloadChunk = jest.fn();
+  it('lets an imported transcript generate questions on demand without automatically starting AI', async () => {
+    const transcript =
+      'Written group discussion with enough detail to generate useful questions from the participants.';
+    (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+      buildRecorder({
+        transcript,
+        segments: [
+          {
+            id: 'text-1',
+            index: 0,
+            source: 'text',
+            status: 'complete',
+            text: transcript,
+            startedAt: 1,
+            completedAt: 2,
+          },
+        ],
+      }),
+    );
+    mockGenerateQuestionsFromListeningTranscript.mockResolvedValue({
+      surveyTitle: '',
+      statements: [],
+      raw: { questions: [] },
+    });
+    render(<SessionListeningPanel panelMode="recordGroup" />);
+    await waitFor(() => expect(screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_GENERATE)).toBeEnabled());
+    expect(mockGenerateQuestionsFromListeningTranscript).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_GENERATE));
+    await waitFor(() => expect(mockGenerateQuestionsFromListeningTranscript).toHaveBeenCalledTimes(1));
+  });
+
+  it('waits for Generate when text is imported after earlier audio', async () => {
+    (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+      buildRecorder({
+        transcript:
+          'Earlier speech. Imported discussion with enough detail about choices and evidence for useful questions.',
+        segments: [
+          { id: 'audio', index: 0, status: 'complete', text: 'Earlier speech.', startedAt: 1, completedAt: 2 },
+          {
+            id: 'text',
+            index: 1,
+            source: 'text',
+            status: 'complete',
+            text: 'Imported discussion.',
+            startedAt: 3,
+            completedAt: 4,
+          },
+        ],
+      }),
+    );
+    render(<SessionListeningPanel panelMode="recordGroup" />);
+    await waitFor(() => expect(screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_GENERATE)).toBeEnabled());
+    expect(mockGenerateQuestionsFromListeningTranscript).not.toHaveBeenCalled();
+  });
+
+  it('keeps an unfinished pasted transcript while microphone capture is active', async () => {
+    (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(buildRecorder());
+    const { rerender } = render(<SessionListeningPanel />);
+    fireEvent.click(screen.getByRole('button', { name: /Add input/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Paste transcript' }));
+    fireEvent.change(screen.getByLabelText('Written transcript'), { target: { value: 'Keep these written notes.' } });
+    (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+      buildRecorder({ isRecording: true, status: 'recording' }),
+    );
+    rerender(<SessionListeningPanel />);
+    expect(screen.getByLabelText('Written transcript')).toHaveValue('Keep these written notes.');
+    expect(screen.getByLabelText('Written transcript')).toBeDisabled();
+    (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(buildRecorder());
+    rerender(<SessionListeningPanel />);
+    expect(screen.getByLabelText('Written transcript')).toHaveValue('Keep these written notes.');
+    expect(screen.getByRole('button', { name: 'Add transcript' })).toBeEnabled();
+    await act(async () => {
+      await Promise.resolve();
+    });
+  });
+
+  it('hides audio parts and exports one recording while keeping recovery actions', async () => {
+    const retryChunk = jest.fn();
+    const downloadRecording = jest.fn(async () => {});
     (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
       buildRecorder({
         transcript: 'Already saved transcript.',
         segments: [{ id: 'stuck', index: 0, status: 'failed', text: '', startedAt: 1 }],
         downloadableChunkIds: ['stuck'],
         retryChunk,
-        downloadChunk,
+        downloadRecording,
         errorMessage: 'Storage is full. Free storage, then Retry.',
       }),
     );
     render(<SessionListeningPanel sessionSlug="workshop" />);
     expect(screen.getByRole('alert')).toHaveTextContent('Storage is full');
-    expect(screen.getByText('Failed')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Retry chunk 1' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Download chunk 1' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Retry transcription' }));
     expect(retryChunk).toHaveBeenCalledWith('stuck');
-    expect(downloadChunk).toHaveBeenCalledWith('stuck');
+    expect(screen.queryByTestId('ce-recording-chunks')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Download audio' }));
+    await waitFor(() => expect(downloadRecording).toHaveBeenCalledTimes(1));
+    expect(screen.queryByTestId('ce-recording-chunks')).not.toBeInTheDocument();
   });
 
   it('lets the recorder retry a chunk that is stuck uploading', () => {
@@ -130,8 +212,8 @@ describe('SessionListeningPanel', () => {
       }),
     );
     render(<SessionListeningPanel sessionSlug="workshop" />);
-    expect(screen.getByText('Uploading')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Retry chunk 1' }));
+    expect(screen.queryByRole('list', { name: 'Audio downloads' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Retry transcription' }));
     expect(retryChunk).toHaveBeenCalledWith('stuck-upload');
   });
 
@@ -328,7 +410,7 @@ describe('SessionListeningPanel', () => {
     render(<SessionListeningPanel sessionSlug="demo" />);
 
     expect(screen.getByRole('alert')).toHaveTextContent('could not be decoded');
-    expect(screen.getByText('Failed')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Retry transcription' })).toBeInTheDocument();
     expect(screen.queryByText(/1 failed/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/1 done/i)).not.toBeInTheDocument();
   });
@@ -356,7 +438,7 @@ describe('SessionListeningPanel', () => {
     render(<SessionListeningPanel sessionSlug="demo" />);
 
     expect(screen.getByRole('alert')).toHaveTextContent('could not be decoded');
-    expect(screen.getByText('Failed')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Retry transcription' })).toBeInTheDocument();
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_TRANSCRIPT_DETAILS)).toBeInTheDocument();
   });
 
@@ -436,6 +518,9 @@ describe('SessionListeningPanel', () => {
     expect(screen.getByTestId('mock-create-questions')).toHaveAttribute('data-append', 'true');
     // Below a long draft list, the submit button stays pinned to the bottom of the dialog.
     expect(screen.getByTestId('mock-create-questions')).toHaveAttribute('data-submit-class', 'sessionListeningSubmit');
+    expect(screen.getByTestId('mock-create-questions')).toHaveAttribute('data-submit-label', 'Submit questions');
+    expect(screen.getByTestId('mock-create-questions')).toHaveAttribute('data-review', 'true');
+    expect(screen.queryByTestId(E2E_TESTIDS.SESSION_LISTENING_GENERATE)).not.toBeInTheDocument();
   });
 
   it('does not auto-request unchanged group transcripts more than once', async () => {
@@ -532,9 +617,14 @@ describe('SessionListeningPanel', () => {
     const firstTranscript =
       'The group discussed budget timing, operational risk, ownership, rollout scope, and follow-up evidence.';
     const firstSegment = { id: 's1', index: 0, status: 'complete', text: firstTranscript, completedAt: 2 };
-    const result = (...prompts: string[]) => ({
+    const result = (...prompts: string[]): ListeningQuestionGenerationResult => ({
       surveyTitle: 'Listening Follow-up',
-      statements: prompts.map((prompt, index) => ({ id: `q-${prompt.length}-${index}`, type: 'freeform', prompt })),
+      statements: prompts.map((prompt, index) => ({
+        id: `q-${prompt.length}-${index}`,
+        type: 'freeform',
+        prompt,
+        tags: [],
+      })),
       raw: { questions: [] },
     });
     afterEach(() => {
@@ -792,13 +882,14 @@ describe('SessionListeningPanel', () => {
       await Promise.resolve();
     });
 
-    expect(screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_GENERATE)).toHaveTextContent('Generate questions');
+    expect(screen.queryByTestId(E2E_TESTIDS.SESSION_LISTENING_GENERATE)).not.toBeInTheDocument();
+    expect(screen.getByTestId('mock-create-questions')).toHaveAttribute('data-submit-label', 'Submit questions');
   });
 
   it('finalizes active recorder audio before closing the panel', async () => {
     const resolveFinalizeRef: { current: (() => void) | null } = { current: null };
     const finalizeRecording = jest.fn(
-      () =>
+      (_options?: { waitForTranscription: boolean }) =>
         new Promise<void>((resolve) => {
           resolveFinalizeRef.current = resolve;
         }),
@@ -939,7 +1030,7 @@ it('generates with a gap warning and offers closing while keeping pending audio'
     }),
   );
   render(<SessionListeningPanel sessionSlug="room" onClose={onClose} />);
-  expect(screen.getByText(/1 part of the recording couldn't be transcribed/)).toBeInTheDocument();
+  expect(screen.getByText(/Some audio couldn't be transcribed/)).toBeInTheDocument();
   expect(screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_GENERATE)).toBeEnabled();
   fireEvent.click(screen.getByRole('button', { name: 'Close and keep the audio' }));
   await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
@@ -964,7 +1055,7 @@ it('clears a recording with a Failed chunk only after confirming that its audio 
   fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_TRANSCRIPT_DETAILS));
   fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_CLEAR));
   expect(clearDraft).not.toHaveBeenCalled();
-  expect(await screen.findByText(/Download any chunk you need first/)).toBeInTheDocument();
+  expect(await screen.findByText(/Download the recording first/)).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Keep recording' }));
   expect(clearDraft).not.toHaveBeenCalled();
   fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_CLEAR));
@@ -1000,7 +1091,7 @@ it('does not count Person labels as speech toward generating questions', () => {
   expect(screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_TRANSCRIPT)).toHaveValue(transcript);
 });
 
-it('says which chunks number their speakers on their own, with the reason behind a question mark', async () => {
+it('explains speaker numbering without exposing audio parts, with the reason behind a question mark', async () => {
   const chunk = (index: number, speakersRenumbered?: boolean) => ({
     id: `chunk-${index}`,
     index,
@@ -1013,9 +1104,9 @@ it('says which chunks number their speakers on their own, with the reason behind
     buildRecorder({ transcript: 'Person 1: Speech.', segments: [chunk(0), chunk(1, true), chunk(2, true)] }),
   );
   render(<SessionListeningPanel sessionSlug="room" panelMode="recordGroup" />);
-  expect(await screen.findByText('Person numbers restart in chunks 2, 3.')).toBeInTheDocument();
+  expect(await screen.findByText('Some speaker numbers may change during the conversation.')).toBeInTheDocument();
   const help = screen.getByRole('button', { name: 'About restarted Person numbers' });
-  expect(help).toHaveAccessibleDescription(/Person 1 there may be someone else/);
+  expect(help).toHaveAccessibleDescription(/Person number may refer to someone different/);
 });
 
 it('offers Close and keep the audio only after capture stops, with its explanation behind a question mark', () => {
@@ -1158,7 +1249,7 @@ it('gives the recorder text actions one outlined button style', () => {
   );
   render(<SessionListeningPanel sessionSlug="room" panelMode="recordGroup" onClose={jest.fn()} />);
   // The default secondary button is white on a light dialog, and Minimal drops button borders.
-  ['Dismiss hidden-page notice', 'Close and keep the audio', 'Retry chunk 1', 'Download chunk 1'].forEach((name) =>
+  ['Dismiss hidden-page notice', 'Close and keep the audio', 'Retry transcription', 'Download audio'].forEach((name) =>
     expect(screen.getByRole('button', { name })).toHaveClass('sessionRecordingButton'),
   );
 });

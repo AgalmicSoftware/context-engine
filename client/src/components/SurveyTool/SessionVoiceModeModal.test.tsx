@@ -1988,10 +1988,14 @@ describe('SessionVoiceModeModal', () => {
     expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_COPY_AGENT_PROMPT)).not.toBeInTheDocument();
   });
 
-  it('opens Group Conversation directly as an embedded recorder', () => {
+  it('opens Group Conversation with its input guidance in a title tooltip', async () => {
     render(<SessionVoiceModeModal {...baseProps} mode="recordGroup" />);
     expect(screen.getByTestId('mock-group-listening')).toHaveAttribute('data-mode', 'recordGroup');
     expect(screen.getByTestId('mock-group-listening')).toHaveAttribute('data-embedded', 'true');
+    const help = screen.getByRole('button', { name: 'About Group Conversation' });
+    expect(help).toHaveAccessibleDescription('Record, upload audio, or add a transcript.');
+    fireEvent.focus(help);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Record, upload audio, or add a transcript.');
   });
 
   it('stops audio on close while retaining the transcript for continuing the interview', async () => {

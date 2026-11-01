@@ -2,13 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
-
 ## [0.9.0] - 2026-10-31
 
 0.9.0 also contains the 0.8.1 changes listed below, which were never released on their own.
 
 ### Client — available when the site deploys
+
+- Let long question prompts use spare card space at phone and tablet widths, moving answer controls down before reducing text size. Extremely long prompts remain keyboard-scrollable.
+- Match the Minimal mobile Login button height to the visible C logo artwork, excluding the SVG's transparent padding.
+- Correct light-theme contrast in raw question results, expanded answers, sorting/export controls, bookmarks, sync indicators and Worker group notices, including Classic 95 counters, links and binary-answer labels. Keep the results title readable at narrow widths. Browser coverage now checks these surfaces in all three themes.
+- Group Conversation offers a compact Record button and an icon-only **+** menu for audio uploads, transcript files, and pasted text. Imported audio keeps the recorder’s retry/download recovery. Internal audio parts stay hidden; downloads combine retained audio into one local MP3. Typed draft cards include a top-right remove button and **Submit questions**. Input guidance sits in the title tooltip.
+- Protected question storage shows a sign-in requirement instead of a generic cache error while signed out. Standard session pages omit the interview sharing panel; **Interview & share** remains on admin and publish screens.
 
 - Drop the retired Goerli test network from wallet connections and a collection metadata lookup that always failed.
 - Trust a cached Worker sign-in only when it records the Worker, session and account it was issued for; the older unscoped format, which nothing writes, is ignored.
@@ -69,6 +73,7 @@ All notable changes to this project will be documented in this file.
 
 ### Benchmark
 
+- Keep the standalone Raw Results heading readable and correctly wrapped at narrow widths, scope Risk Matrix heading colors to their own dialog, and give export buttons readable colors and descriptive accessible names.
 - `answer --resume` asks again when the endpoint, model settings, routing or answer schema change. Answers saved by earlier versions are asked again once.
 
 ## [0.8.1] - not released; included in 0.9.0

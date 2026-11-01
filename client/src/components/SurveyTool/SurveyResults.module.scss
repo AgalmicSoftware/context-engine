@@ -94,7 +94,8 @@
   display: flex;
   flex-direction: row;
   flex-wrap: wrap;
-  flex-grow: 1;
+  flex: 1 1 14rem;
+  min-width: 0;
   margin-right: 1rem;
   gap: 10px;
 }
@@ -119,6 +120,8 @@
   font-size: 2.5rem;
   font-weight: bold;
   margin: 0;
+  overflow-wrap: normal;
+  word-break: normal;
   color: var(--ce-overlay-text);
 }
 
@@ -748,13 +751,13 @@
   margin: 0;
   font-size: 1rem;
   font-weight: 700;
-  color: var(--ce-color-white);
+  color: var(--ce-overlay-text);
 }
 
 .lockedBannerSubtext {
   margin: 4px 0 0;
   font-size: 0.84rem;
-  color: color-mix(in srgb, var(--ce-control-text) 72%, transparent);
+  color: var(--ce-overlay-text-muted);
 }
 
 %decryptCtaOutline {
@@ -812,13 +815,13 @@
   padding: 0;
   border: 0;
   background: transparent;
-  color: color-mix(in srgb, var(--ce-control-text) 72%, transparent);
+  color: var(--ce-overlay-text-muted);
   font-size: 0.9rem;
   cursor: pointer;
 
   &:hover,
   &:focus {
-    color: var(--ce-color-white);
+    color: var(--ce-overlay-text);
   }
 }
 
@@ -827,12 +830,12 @@
   padding-top: 10px;
   border-top: 1px solid color-mix(in srgb, var(--ce-text-inverse) 12%, transparent);
   font-size: 0.85rem;
-  color: color-mix(in srgb, var(--ce-control-text) 68%, transparent);
+  color: var(--ce-overlay-text-muted);
 }
 
 .lockedBannerGateIntro {
   margin: 0 0 10px;
-  color: color-mix(in srgb, var(--ce-control-text) 80%, transparent);
+  color: var(--ce-overlay-text-muted);
   font-size: 0.82rem;
   font-weight: 600;
 }
@@ -864,7 +867,7 @@
 
 .lockedBannerGenericMessage {
   margin: 0;
-  color: color-mix(in srgb, var(--ce-control-text) 68%, transparent);
+  color: var(--ce-overlay-text-muted);
 }
 
 .responseItem {
@@ -920,7 +923,7 @@
 
 .singleResponseCard {
   margin-bottom: 10px !important;
-  background-color: var(--ce-status-info);
+  background-color: var(--ce-overlay-surface-alt);
   border-radius: var(--ce-radius-8) !important;
   padding: 5px !important;
 }
@@ -929,14 +932,14 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background-color: var(--ce-status-info);
-  color: var(--ce-color-white);
+  background-color: var(--ce-overlay-surface-alt);
+  color: var(--ce-overlay-text);
   padding: 15px 15px 15px 15px !important;
   font-size: 1.1rem;
   border-radius: var(--ce-radius-8) var(--ce-radius-8) var(--ce-radius-0) var(--ce-radius-0);
   cursor: pointer;
   &:hover {
-    background-color: var(--ce-status-info);
+    background-color: var(--ce-overlay-surface-alt);
   }
 }
 
@@ -947,7 +950,7 @@
 }
 
 .responderLink {
-  color: var(--ce-color-white);
+  color: var(--ce-overlay-text);
   text-decoration: none;
   &:hover {
     text-decoration: underline;
@@ -957,11 +960,11 @@
 .externalLink {
   display: inline-flex;
   margin-left: 0.5rem;
-  color: var(--ce-color-white);
+  color: var(--ce-overlay-text);
   font-size: 1.1rem;
   /* bigger icon */
   &:hover {
-    color: var(--ce-color-surface-light);
+    color: var(--ce-action-accent);
   }
 }
 
@@ -978,7 +981,8 @@
 }
 
 .responseCard {
-  background-color: var(--ce-color-surface-light);
+  background-color: var(--ce-overlay-surface-alt);
+  color: var(--ce-overlay-text);
   border-radius: var(--ce-radius-0) var(--ce-radius-0) var(--ce-radius-8) var(--ce-radius-8);
   padding: 1rem;
 }
@@ -1000,6 +1004,7 @@
 
 .questionSummaryHeader {
   cursor: pointer;
+  color: var(--ce-overlay-text);
   display: flex;
   flex-direction: row;
   justify-content: space-between;
@@ -1050,8 +1055,8 @@
 
 .surveyResultsResponseCard {
   margin: 0 !important;
-  background: color-mix(in srgb, var(--ce-status-info) 98%, transparent) !important;
-  border: 1px solid color-mix(in srgb, var(--ce-status-info) 34%, transparent) !important;
+  background: var(--ce-overlay-surface-alt) !important;
+  border: 1px solid color-mix(in srgb, var(--ce-overlay-text) 20%, transparent) !important;
   border-top: 0 !important;
   border-radius: var(--ce-radius-0) var(--ce-radius-0) var(--ce-radius-12) var(--ce-radius-12) !important;
   box-shadow: 0 8px 18px color-mix(in srgb, var(--ce-overlay-base) 16%, transparent) !important;
@@ -1068,12 +1073,12 @@
 }
 
 .surveyResultsResponseCardLinkButton {
-  color: color-mix(in srgb, var(--ce-control-text) 90%, transparent);
-  opacity: 0.82;
+  color: var(--ce-overlay-text);
+  opacity: 1;
 
   &:hover,
   &:focus {
-    color: var(--ce-color-white);
+    color: var(--ce-overlay-text);
     opacity: 1;
   }
 }
@@ -1089,7 +1094,7 @@
 }
 
 .surveyResultsAggregatorText {
-  color: var(--ce-color-white);
+  color: var(--ce-overlay-text);
   font-size: 1.08rem;
   font-weight: 700;
   line-height: 1.45;
@@ -1097,7 +1102,7 @@
 
 .surveyResultsAggregatorParagraph {
   margin-bottom: 0.85rem;
-  color: var(--ce-color-white) !important;
+  color: var(--ce-overlay-text) !important;
   font-size: 1.15em;
 
   &:last-child {
@@ -1111,7 +1116,7 @@
   border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
   border-radius: var(--ce-radius-12);
   padding: 18px 20px;
-  color: var(--ce-color-white);
+  color: var(--ce-overlay-text);
   font-weight: 600;
   margin-top: 12px;
   margin-bottom: 0;
@@ -1123,7 +1128,7 @@
   border-top: 1px solid color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
   padding-left: 0;
   font-size: 0.95em;
-  color: color-mix(in srgb, var(--ce-control-text) 72%, transparent);
+  color: var(--ce-overlay-text-muted);
   font-style: normal;
 }
 
@@ -1141,7 +1146,7 @@
 
 .surveyResultsMultichoiceOptionStats {
   flex: 0 0 auto;
-  color: color-mix(in srgb, var(--ce-control-text) 72%, transparent);
+  color: var(--ce-overlay-text-muted);
   font-size: 0.95em;
 }
 
@@ -1160,13 +1165,13 @@
 .questionTitle {
   font-size: 1.2rem;
   font-weight: bold;
-  color: var(--ce-color-white) !important;
+  color: var(--ce-overlay-text) !important;
   /* Used in some headers */
 }
 
 .clickableQuestionId {
-  color: var(--ce-status-info);
-  text-decoration: none;
+  color: var(--ce-overlay-text);
+  text-decoration: underline;
   font-weight: 600;
   &:hover {
     text-decoration: underline;
@@ -1205,7 +1210,7 @@ grey background, white text, bigger icons, etc.
 
   tbody tr td {
     background-color: var(--ce-overlay-surface);
-    color: var(--ce-color-white);
+    color: var(--ce-overlay-text);
     text-align: center;
     vertical-align: middle;
     padding: 10px;
@@ -1220,15 +1225,15 @@ grey background, white text, bigger icons, etc.
 
 /* Actions column button styling */
 .tableActionButton {
-  background-color: var(--ce-document-text-muted);
+  background-color: var(--ce-control-face) !important;
   border: none;
-  color: var(--ce-color-white);
+  color: var(--ce-control-text) !important;
   margin-right: 5px;
   font-size: 0.9rem;
   border-radius: var(--ce-radius-6);
   &:hover {
-    background-color: var(--ce-text-muted);
-    color: var(--ce-color-white);
+    background-color: var(--ce-control-face) !important;
+    color: var(--ce-control-text) !important;
   }
 }
 
@@ -1265,18 +1270,24 @@ grey background, white text, bigger icons, etc.
   border: 0;
   border-radius: var(--ce-radius-6);
   background: transparent !important;
-  color: var(--ce-color-white);
+  color: var(--ce-overlay-text);
   cursor: pointer;
 
   &:hover {
-    opacity: 0.8;
+    color: var(--ce-overlay-text);
+    box-shadow: inset 0 0 0 1px var(--ce-overlay-text);
   }
 
   &:focus-visible {
     background: transparent !important;
-    outline: 2px solid color-mix(in srgb, var(--ce-text-inverse) 42%, transparent);
+    outline: 2px solid var(--ce-overlay-text);
     outline-offset: 2px;
   }
+}
+
+.questionBookmarkButton[aria-pressed='true'] {
+  background: var(--ce-control-face) !important;
+  color: var(--ce-control-text);
 }
 
 .questionBookmarkIcon {
@@ -1285,7 +1296,7 @@ grey background, white text, bigger icons, etc.
 }
 
 .questionExpandIcon {
-  color: color-mix(in srgb, var(--ce-text-inverse) 86%, transparent);
+  color: var(--ce-overlay-text-muted);
   font-size: 1.15rem;
   line-height: 1;
   pointer-events: none;
@@ -1328,10 +1339,10 @@ grey background, white text, bigger icons, etc.
 }
 
 .exportDropdown {
-  background-color: var(--ce-color-white) !important;
+  background-color: var(--ce-control-face) !important;
   background-image: none !important;
   border: 1px solid var(--ce-document-border) !important;
-  color: var(--ce-color-surface) !important;
+  color: var(--ce-control-text) !important;
   font-weight: bold;
   margin-right: 10px;
   border-radius: var(--ce-radius-8);
@@ -1339,26 +1350,26 @@ grey background, white text, bigger icons, etc.
   padding: 6px 12px;
   &:hover,
   &:focus {
-    background-color: var(--ce-color-surface-light) !important;
+    background-color: var(--ce-control-face) !important;
     border-color: var(--ce-document-border) !important;
-    color: var(--ce-color-surface) !important;
+    color: var(--ce-control-text) !important;
   }
 }
 
 .downloadButton {
-  background-color: var(--ce-color-bg) !important;
+  background-color: var(--ce-action-primary) !important;
   background-image: none !important;
-  border: 1px solid var(--ce-color-bg) !important;
-  color: var(--ce-color-white) !important;
+  border: 1px solid var(--ce-action-primary) !important;
+  color: var(--ce-action-primary-text) !important;
   font-weight: bold;
   border-radius: var(--ce-radius-8);
   /* rounder corners */
   padding: 6px 12px;
   &:hover,
   &:focus {
-    background-color: var(--ce-color-surface) !important;
-    border-color: var(--ce-color-surface) !important;
-    color: var(--ce-color-white) !important;
+    background-color: var(--ce-action-primary-hover) !important;
+    border-color: var(--ce-action-primary-hover) !important;
+    color: var(--ce-action-primary-text) !important;
   }
 }
 
@@ -1725,10 +1736,10 @@ grey background, white text, bigger icons, etc.
 --------------------------------------- */
 .freeformAnswer {
   font-style: italic;
-  background-color: color-mix(in srgb, var(--ce-text-inverse) 15%, transparent);
+  background-color: color-mix(in srgb, var(--ce-overlay-text) 6%, var(--ce-overlay-surface));
   border-radius: var(--ce-radius-5);
   padding: 15px;
-  color: var(--ce-color-white);
+  color: var(--ce-overlay-text);
   font-weight: bold;
   margin-bottom: 5px;
   margin-top: 5px;
@@ -1738,17 +1749,17 @@ grey background, white text, bigger icons, etc.
   margin-top: 4px;
   padding-left: 12px;
   font-size: 0.9em;
-  color: color-mix(in srgb, var(--ce-control-text) 65%, transparent);
+  color: var(--ce-overlay-text-muted);
   font-style: italic;
 }
 
 .ratingAnswer {
   display: flex;
   align-items: center;
-  background-color: color-mix(in srgb, var(--ce-text-inverse) 15%, transparent);
+  background-color: color-mix(in srgb, var(--ce-overlay-text) 6%, var(--ce-overlay-surface));
   border-radius: var(--ce-radius-5);
   padding: 10px;
-  color: var(--ce-color-white);
+  color: var(--ce-overlay-text);
   font-weight: bold;
   .ratingBar {
     height: 10px;
@@ -1766,10 +1777,10 @@ grey background, white text, bigger icons, etc.
   display: flex;
   flex-wrap: wrap;
   gap: 5px;
-  background-color: color-mix(in srgb, var(--ce-text-inverse) 15%, transparent);
+  background-color: color-mix(in srgb, var(--ce-overlay-text) 6%, var(--ce-overlay-surface));
   border-radius: var(--ce-radius-5);
   padding: 10px;
-  color: var(--ce-color-white);
+  color: var(--ce-overlay-text);
   font-weight: bold;
   .choiceItem {
     background-color: var(--ce-color-accent);
@@ -1781,10 +1792,10 @@ grey background, white text, bigger icons, etc.
 }
 
 .binaryAnswer {
-  background-color: color-mix(in srgb, var(--ce-text-inverse) 15%, transparent);
+  background-color: color-mix(in srgb, var(--ce-overlay-text) 6%, var(--ce-overlay-surface));
   border-radius: var(--ce-radius-5);
   padding: 10px;
-  color: var(--ce-color-white);
+  color: var(--ce-overlay-text);
   font-weight: bold;
 }
 
@@ -1814,7 +1825,7 @@ grey background, white text, bigger icons, etc.
 }
 
 .surveyResultsOverride {
-  color: var(--ce-color-white) !important;
+  color: var(--ce-overlay-text) !important;
   font-size: 1.2em !important;
   margin-bottom: 5px;
 }
@@ -1991,11 +2002,11 @@ grey background, white text, bigger icons, etc.
   padding: 6px 12px;
   border: 1px solid var(--ce-document-border);
   border-radius: var(--ce-radius-6);
-  background-color: var(--ce-surface-subtle);
+  background-color: var(--ce-overlay-surface-alt);
   cursor: pointer;
   font-size: 0.9rem;
   font-family: inherit;
-  color: var(--ce-color-border);
+  color: var(--ce-overlay-text-muted);
   white-space: nowrap;
   overflow: scroll;
   .syncStatus__indicator_synced {
@@ -2014,6 +2025,7 @@ grey background, white text, bigger icons, etc.
   top: calc(100% + 5px);
   right: 0;
   background-color: var(--ce-document-surface);
+  color: var(--ce-document-text);
   border: 1px solid color-mix(in srgb, var(--ce-document-text) 12%, transparent);
   border-radius: var(--ce-radius-6);
   box-shadow: 0 12px 28px color-mix(in srgb, var(--ce-document-text) 14%, transparent);
@@ -2029,10 +2041,10 @@ grey background, white text, bigger icons, etc.
 
 .syncStatus__quickRefresh {
   cursor: pointer;
-  color: var(--ce-status-info);
+  color: var(--ce-action-accent);
   margin-left: 8px;
   font-size: 0.85rem;
-  opacity: 0.7;
+  opacity: 1;
   background: none;
   border: none;
   padding: 0;
@@ -2153,7 +2165,7 @@ grey background, white text, bigger icons, etc.
     // Keep header items on a single row, but allow wrapping if needed and add a gap.
     flex-wrap: wrap;
     gap: 10px;
-    padding-right: 7rem;
+    padding-right: 3.5rem;
   }
 
   .modalHeaderContent {
@@ -2297,7 +2309,7 @@ grey background, white text, bigger icons, etc.
   }
 
   p > strong {
-    color: var(--ce-action-accent) !important;
+    color: var(--ce-overlay-text) !important;
     font-weight: 700 !important;
     opacity: 1;
   }
@@ -2309,6 +2321,11 @@ grey background, white text, bigger icons, etc.
 
 .modalHeader > h5 {
   display: flex;
+  flex: 1 1 100%;
+  flex-wrap: wrap;
+  min-width: 0;
+  max-width: 100%;
+  gap: 12px;
   flex-direction: row;
   align-items: center;
 }
@@ -2316,13 +2333,13 @@ grey background, white text, bigger icons, etc.
 .responseCountIcon {
   font-weight: 600;
   font-size: 1em;
-  opacity: 0.75;
+  opacity: 1;
 }
 
 .responseCountNumber {
   font-weight: 600;
   font-size: 1em;
-  opacity: 0.75;
+  opacity: 1;
   margin-left: 5px;
 }
 

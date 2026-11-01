@@ -125,8 +125,11 @@ the standalone-only `overflow-wrap:anywhere` fallback, so narrow side-window
 views preserve word boundaries like the live DebateMap module.
 Its modal header and view-mode controls intentionally keep the base
 `SurveyResults.module.scss` rules without standalone padding/background,
-modal-title line-height, active-pill transform overrides, or extra min-width
-overrides, so the overlay reads like the live Question Results modal. Its close
+modal-title line-height, or active-pill transform overrides, so the overlay
+reads like the live Question Results modal. The title uses the
+shared flexible basis and zero minimum width, wraps between complete words,
+and reserves 3.5rem for the close control on narrow screens. Export buttons use
+paired primary-action background and text colors, including hover and focus. Its close
 button keeps the same modal-header absolute positioning, transparent reset,
 `#0f1222` color, zero margin, and full opacity as the live SurveyResults close
 control. The

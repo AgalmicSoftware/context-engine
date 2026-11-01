@@ -1,0 +1,70 @@
+.input {
+  display: contents;
+  color: var(--ce-panel-text);
+  button {
+    min-height: 44px;
+    border: 1px solid var(--ce-border-strong);
+    border-radius: 8px;
+    padding: 10px 14px;
+    background: var(--ce-control-face);
+    color: var(--ce-panel-text);
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+    &:focus-visible {
+      outline: 3px solid var(--ce-action-primary);
+      outline-offset: 2px;
+    }
+    &:disabled {
+      opacity: 1;
+      color: var(--ce-panel-text-muted);
+      border-style: dashed;
+      cursor: default;
+    }
+  }
+  p {
+    flex-basis: 100%;
+    margin: 8px 0 0;
+  }
+}
+.choices {
+  flex: 0 0 100%;
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+  button {
+    text-align: left;
+  }
+  small {
+    display: block;
+    font-weight: 400;
+  }
+}
+.input .addButton {
+  width: 46px;
+  height: 46px;
+  padding: 0;
+  font-size: 1.6rem;
+  line-height: 1;
+}
+.paste {
+  flex: 0 0 100%;
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+  textarea {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid var(--ce-border-strong);
+    background: var(--ce-control-face);
+    color: var(--ce-panel-text);
+    resize: vertical;
+  }
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}

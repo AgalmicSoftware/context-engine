@@ -183,7 +183,8 @@
 
 .agentSecondaryButton,
 .agentLogoutButton {
-  background: color-mix(in srgb, var(--ce-overlay-surface) 88%, transparent);
+  background: var(--ce-overlay-surface-alt);
+  color: var(--ce-overlay-text);
 }
 
 .agentTabButtonActive {
@@ -201,8 +202,8 @@
 .agentListPanel {
   border: 1px solid color-mix(in srgb, var(--ce-status-info) 28%, transparent);
   border-radius: var(--ce-radius-8);
-  background: color-mix(in srgb, var(--ce-document-text) 66%, transparent);
-  color: var(--ce-document-surface);
+  background: var(--ce-overlay-surface-alt);
+  color: var(--ce-overlay-text);
   padding: 16px;
 }
 
@@ -212,7 +213,7 @@
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 14px;
-  color: var(--ce-document-border);
+  color: var(--ce-overlay-text-muted);
   font-weight: 700;
 }
 
@@ -222,7 +223,7 @@
 
 .agentListEmpty,
 .agentListError {
-  color: var(--ce-document-border);
+  color: var(--ce-overlay-text-muted);
   font-size: 0.95rem;
 }
 
@@ -283,8 +284,8 @@
   padding: 12px 14px;
   border: 1px solid color-mix(in srgb, var(--ce-status-info) 28%, transparent);
   border-radius: var(--ce-radius-6);
-  background: color-mix(in srgb, var(--ce-document-text) 58%, transparent);
-  color: var(--ce-document-border);
+  background: var(--ce-overlay-surface-alt);
+  color: var(--ce-overlay-text-muted);
   font-size: 0.95rem;
 }
 

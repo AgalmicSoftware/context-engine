@@ -48,6 +48,15 @@ The add-on's vendored `ethers.umd.min.js` is ethers 5.7.2 under MIT; its notice
 is kept beside it in `ethers.LICENSE.md`. The add-on's MPL-2.0
 license applies to project-authored code.
 
+The browser's on-demand MP3 export links **@breezystack/lamejs 1.2.7** under
+LGPL-3.0 in a dedicated Web Worker. Project source remains MPL-2.0. Full GPL
+and LGPL texts, the exact upstream source archive and rebuild/replacement
+instructions ship at `client/public/licenses/lamejs/` (served at
+`/licenses/lamejs/README.txt`). The library is unmodified. Recipients may
+replace it and rebuild the client, including reverse engineering for debugging
+those modifications. The license gate records a version-specific approval;
+it does not allow LGPL libraries globally. See [Mozilla's LGPL linking note](https://www.mozilla.org/en-US/MPL/2.0/combining-mpl-and-gpl/#a-note-on-the-lgpl).
+
 The Classic 95 theme bundles Wine Tahoma regular and bold font files under
 `client/src/assets/fonts/classic-95/`. These are the Wine project's
 Tahoma-compatible fonts, copyright Larry Snyder and based on Bitstream Vera

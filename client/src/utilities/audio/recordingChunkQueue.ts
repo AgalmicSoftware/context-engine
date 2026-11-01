@@ -37,7 +37,7 @@ export async function countKeptChunks(scope: string): Promise<number> {
   const saved = await listRecordingChunks(scope).catch((): RecordingChunk[] => []);
   const kept = new Set<string>();
   for (const record of [...saved, ...(memoryRecordings.get(scope)?.values() || [])])
-    if (record.audio && record.segment.status !== 'failed') kept.add(record.segment.id);
+    if (record.audio && !['failed', 'complete'].includes(record.segment.status)) kept.add(record.segment.id);
   return kept.size;
 }
 
@@ -193,9 +193,7 @@ export class RecordingChunkQueue {
   // Audio kept only in memory stays unsaved until a write succeeds: a failed write keeps the
   // warning (and failedWrites), so a later close or unmount keeps the memory copy instead of dropping it.
   private resaveKept(kept: RecordingChunk[]) {
-    for (const entry of kept)
-      if (entry.audio && entry.segment.status !== 'complete' && this.records.get(entry.segment.id) === entry)
-        void this.save(entry);
+    for (const entry of kept) if (entry.audio && this.records.get(entry.segment.id) === entry) void this.save(entry);
   }
   async prepare() {
     await this.ready;
@@ -211,6 +209,18 @@ export class RecordingChunkQueue {
     });
     this.changed();
     return id;
+  }
+  async addTranscript(text: string) {
+    if (!text.trim()) return;
+    const id = this.begin(false);
+    const previous = this.records.get(id)!;
+    const record: RecordingChunk = {
+      ...previous,
+      segment: { ...previous.segment, source: 'text', status: 'complete', text: text.trim(), completedAt: Date.now() },
+    };
+    this.records.set(id, record);
+    this.changed();
+    await this.save(record);
   }
   private save(record: RecordingChunk): Promise<boolean> {
     let saved = false;
@@ -241,17 +251,9 @@ export class RecordingChunkQueue {
       if (!record) this.failedWrites.delete(id);
       if (!record || record.segment.status === 'transcribing' || this.resaving.has(id)) continue;
       this.resaving.add(id);
-      const saving = record.segment.status === 'complete' && record.audio ? this.commit(record) : this.save(record);
+      const saving = this.save(record);
       void saving.finally(() => this.resaving.delete(id));
     }
-  }
-  /** Saves a transcript whose audio only memory still holds, then lets that audio go. */
-  private commit(record: RecordingChunk) {
-    const complete = { ...record, audio: undefined };
-    return this.save(complete).then((persisted) => {
-      if (persisted && this.records.get(record.segment.id) === record) this.records.set(record.segment.id, complete);
-      this.changed();
-    });
   }
   capture(id: string, audio: Blob, finished = false): void {
     const previous = this.records.get(id);
@@ -346,6 +348,7 @@ export class RecordingChunkQueue {
       if (this.disposed) return;
       const complete: RecordingChunk = {
         scope: record.scope,
+        audio: record.audio,
         labelSpeakers: record.labelSpeakers,
         labelsUnavailableReason: this.labelsUnavailableReason,
         segment: {
@@ -358,10 +361,10 @@ export class RecordingChunkQueue {
           completedAt: Date.now(),
         },
       };
-      // Removing audio is part of the same transaction that commits its transcript.
-      const persisted = await this.save(complete);
-      // A failed durable commit must keep both the paid transcript and original audio in memory.
-      this.records.set(id, persisted ? complete : { ...complete, audio: record.audio });
+      // Keep the source with its paid transcript for a complete, local MP3 export. A failed
+      // durable write keeps both in memory; retrying storage must not transcribe it again.
+      await this.save(complete);
+      this.records.set(id, complete);
       this.attempts.delete(id);
       this.stalls.delete(id);
       this.changed();
@@ -439,8 +442,12 @@ export class RecordingChunkQueue {
     if (this.retryTimer) clearTimeout(this.retryTimer);
     this.retryTimer = null;
     for (const record of this.records.values()) {
-      if ((!id || id === record.segment.id) && record.audio && record.segment.status === 'complete')
-        void this.commit(record);
+      if (
+        (!id || id === record.segment.id) &&
+        this.failedWrites.has(record.segment.id) &&
+        record.segment.status === 'complete'
+      )
+        void this.save(record);
       if (
         (!id || id === record.segment.id) &&
         record.audio &&
@@ -486,15 +493,13 @@ export class RecordingChunkQueue {
     if (this.storageError) memoryRecordings.set(this.options.scope, this.records);
     else memoryRecordings.delete(this.options.scope);
   }
-  /** Deleting audio that has no saved transcript (a Failed chunk, or a memory-only copy) needs `discardAudio`. */
+  /** Every retained recording, including completed audio, requires explicit discard before deletion. */
   async clear(discardAudio = false) {
     if (this.segments.some((entry) => !['complete', 'failed'].includes(entry.status))) {
-      throw new Error('Transcribe pending audio before clearing the recording. Download any stuck chunks first.');
+      throw new Error('Transcribe pending audio before clearing the recording. Download the audio first.');
     }
     if (!discardAudio && [...this.records.values()].some((record) => record.audio)) {
-      throw new Error(
-        'Keep unsaved audio until its transcript is saved. Reconnect to retry storage or download it before leaving.',
-      );
+      throw new Error('Download the audio before clearing, or confirm deleting the recording.');
     }
     await this.writes;
     try {

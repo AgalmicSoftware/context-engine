@@ -3470,7 +3470,7 @@ const renderSnapshotJson = (report) => {
           <button type="button" class="exportToggleButton" aria-expanded="false" aria-controls="surveyResultsExportArea" data-ce-export-toggle>Export Data</button>
           <div class="exportAreaExpanded" id="surveyResultsExportArea" hidden>
             <div class="exportAreaHeader">
-              <label for="exportType" class="exportLabel">Export Data:</label>
+              <span class="exportLabel">Export Data:</span>
               <button type="button" class="exportCollapseButton" aria-label="Collapse export area" data-ce-export-toggle>${renderFontAwesomeIcon('caret-up', 'exportCollapseIcon')}</button>
             </div>
             <div id="exportOptions">
@@ -3601,6 +3601,9 @@ export const renderHtmlReport = (inputReport) => {
       --font-family-monospace:SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
       --ce-color-white:#fff;
       --ce-color-black:#000;
+      --ce-action-primary:#244a76;
+      --ce-action-primary-hover:#193957;
+      --ce-action-primary-text:#fff;
       --ce-color-text:#525f7f;
       --ce-color-text-muted:#6c757d;
       --ce-color-bg:#20204e;
@@ -3926,10 +3929,10 @@ export const renderHtmlReport = (inputReport) => {
     .resultsModal { max-width: 80%; width: 100%; background-color: var(--ce-color-white); overflow-y: auto; display: flex; flex-direction: column; border-radius: var(--ce-radius-12); }
     .modalBody { display: flex; flex-direction: column; color: var(--ce-color-black) !important; max-width: 95vw; }
     .modalHeader { display: flex; position: relative; flex-direction: row; flex-wrap: wrap; overflow-wrap: anywhere; justify-content: space-between; align-items: center; border-bottom: 1px solid #dee2e6; padding-right: 4.5rem; padding-bottom: 1rem; border-top-left-radius: 12px; border-top-right-radius: 12px; }
-    .modalHeaderContent { display: flex; flex-direction: row; flex-wrap: wrap; flex-grow: 1; margin-right: 1rem; gap: 10px; }
+    .modalHeaderContent { display: flex; flex-direction: row; flex-wrap: wrap; flex: 1 1 14rem; min-width: 0; margin-right: 1rem; gap: 10px; }
     .modalHeaderTitleBlock { display: flex; flex-direction: column; gap: 0.7rem; min-width: 0; }
     .modalHeaderControls { display: flex; align-items: center; justify-content: flex-end; gap: 10px; flex-wrap: wrap; margin-left: auto; }
-    .modalTitle { font-size: 2.5rem; font-weight: bold; margin: 0; color: var(--ce-color-black); }
+    .modalTitle { font-size: 2.5rem; font-weight: bold; margin: 0; overflow-wrap: normal; word-break: normal; color: var(--ce-color-black); }
     .demoResultsViewNav { display: flex; flex-wrap: wrap; gap: 0.55rem; }
     .demoResultsViewButton { display: inline-flex; align-items: center; justify-content: center; cursor: pointer; border: 1px solid rgba(15, 94, 199, 0.18); background: rgba(15, 94, 199, 0.08); color: #1a4e94; border-radius: var(--ce-radius-pill); padding: 0.45rem 0.85rem; font-size: 0.9rem; font-weight: 700; line-height: 1; transition: background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease, transform 0.18s ease; }
     .demoResultsViewButton:hover, .demoResultsViewButton:focus { background: rgba(15, 94, 199, 0.14); border-color: rgba(15, 94, 199, 0.28); color: #0e3d79; transform: translateY(-1px); outline: none; }
@@ -3960,8 +3963,8 @@ export const renderHtmlReport = (inputReport) => {
     .exportCollapseButton:hover, .exportCollapseButton:focus { color: #111827 !important; opacity: 1; outline: none; }
     .exportCollapseIcon { width: 1em; height: 1em; display: inline-block; overflow: visible; vertical-align: -0.125em; }
     #exportOptions { display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 10px; width: 100%; flex-wrap: wrap; }
-    .downloadButton { background-color: var(--ce-color-bg) !important; background-image: none !important; border: 1px solid var(--ce-color-bg) !important; color: var(--ce-color-white) !important; font-weight: bold; border-radius: var(--ce-radius-8); padding: 6px 12px; }
-    .downloadButton:hover, .downloadButton:focus { background-color: #11133b !important; border-color: #11133b !important; color: var(--ce-color-white) !important; outline: none; }
+    .downloadButton { background-color: var(--ce-action-primary) !important; background-image: none !important; border: 1px solid var(--ce-action-primary) !important; color: var(--ce-action-primary-text) !important; font-weight: bold; border-radius: var(--ce-radius-8); padding: 6px 12px; }
+    .downloadButton:hover, .downloadButton:focus { background-color: var(--ce-action-primary-hover) !important; border-color: var(--ce-action-primary-hover) !important; color: var(--ce-action-primary-text) !important; outline: none; }
     .aidb-raw-json-panels { display: grid; gap: 0.75rem; }
     .rawResultsJsonDetails { border: 1px solid #d9dee8; border-radius: var(--ce-radius-8); background: #fff; padding: 10px 12px; margin: 0; }
     .rawResultsJsonDetails > summary { cursor: pointer; color: #111827; font-weight: 800; }
@@ -4565,7 +4568,7 @@ export const renderHtmlReport = (inputReport) => {
     .riskMatrixModalBody { display: flex; flex-direction: column; gap: 16px; padding: 0 20px 20px; max-height: min(86vh, 820px); overflow-y: auto; }
     .riskMatrixModalHeader { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 20px 20px 0; margin-bottom: 18px; background: linear-gradient(90deg, rgba(77, 255, 164, 0.08), rgba(77, 255, 164, 0)); color: rgba(244, 247, 255, 0.96); border-bottom: 1px solid rgba(255, 255, 255, 0.08); }
     .modalTitleBlock { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
-    .modalTitle { margin: 0; color: rgba(244, 247, 255, 0.96); font-size: 1.4rem; line-height: 1.2; }
+    .riskMatrixCommentModal .modalTitle { margin: 0; color: rgba(244, 247, 255, 0.96); font-size: 1.4rem; line-height: 1.2; }
     .modalMeta { color: rgba(190, 199, 230, 0.82); font-size: 0.88rem; }
     .modalCloseButton { appearance: none; display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; width: 40px; height: 40px; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: var(--ce-radius-10); background: rgba(255, 255, 255, 0.06); color: rgba(244, 247, 255, 0.96); font-size: 1.5rem; line-height: 1; cursor: pointer; transition: background-color 0.18s ease, border-color 0.18s ease, transform 0.08s ease; }
     .modalCloseButton:hover, .modalCloseButton:focus-visible { outline: none; border-color: rgba(77, 255, 164, 0.38); background: rgba(77, 255, 164, 0.12); transform: translateY(-1px); }
@@ -4813,7 +4816,7 @@ export const renderHtmlReport = (inputReport) => {
     @media (max-width: 768px) {
       .resultsModal { max-width: 95vw; }
       .aidb-raw-results-dialog { margin: 0.5rem auto; }
-      .modalHeader { flex-wrap: wrap; gap: 10px; padding-right: 7rem; }
+      .modalHeader { flex-wrap: wrap; gap: 10px; padding-right: 3.5rem; }
       .modalHeaderContent { display: flex; flex-direction: row; flex-wrap: wrap; align-items: center; }
       .modalHeaderTitleBlock { width: 100%; }
       .modalTitle { font-size: 1.8rem; }

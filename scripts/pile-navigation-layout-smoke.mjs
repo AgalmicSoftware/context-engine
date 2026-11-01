@@ -21,6 +21,7 @@ const prompts = [
   'Should communities help decide?',
   "How well are your country's democratic institutions keeping up with AI?",
   'How well are institutions keeping up?',
+  'Social media feeds should rank posts by whether people who usually disagree both find them helpful, rather than by engagement.',
 ];
 const questions = Array.from({ length: 50 }, (_, index) => ({
   id: `0x${String(index + 1).padStart(64, '0')}`, type: quadratic && index === 0 ? 'quadratic' : ['binary', 'multichoice', 'rating', 'freeform', 'quadratic', 'binary', 'binary', 'binary', 'rating', 'rating'][index] || 'binary',
@@ -32,7 +33,7 @@ const questions = Array.from({ length: 50 }, (_, index) => ({
 const browser = await chromium.launch({ headless: true });
 try {
   for (const theme of (process.env.SMOKE_THEMES || 'civic,classic-95,context-engine').split(',')) {
-    for (const width of (process.env.SMOKE_WIDTHS || '320,335,390,596,640,705,768,773,937,1280').split(',').map(Number)) {
+    for (const width of (process.env.SMOKE_WIDTHS || '320,335,390,596,640,653,705,768,773,937,1280').split(',').map(Number)) {
       const page = await browser.newPage({ viewport: { width, height: 900 }, hasTouch: width <= 768, reducedMotion: 'reduce' });
       const resizeErrors = [];
       page.on('pageerror', error => { if (error.message.includes('ResizeObserver')) resizeErrors.push(error.message); });
@@ -196,10 +197,11 @@ try {
             headerHeight: header.clientHeight, contentHeight: content.clientHeight, contentBottom: content.getBoundingClientRect().bottom,
             footerTop: footer.getBoundingClientRect().top, inlineSize: title.style.fontSize, focusable: header.tabIndex === 0 };
         });
-        if (width <= 480) {
+        if (width <= 768) {
           assert(detail.font >= 16, `Prompt remains readable: ${JSON.stringify({theme, width, index, detail})}`);
           if (index === 7) assert(detail.overflow && detail.focusable, 'Extreme prompts retain keyboard-accessible scrolling');
           else assert(!detail.overflow, `Representative ${questions[index - 1].type} prompt fits: ${JSON.stringify({theme, width, index, detail})}`);
+          assert(detail.headerBottom <= detail.answerTop + 1 && detail.contentBottom <= detail.footerTop + 1, 'Question, answer and footer do not overlap');
           if (detail.answerMode === 'centered') {
             assert(Math.abs(detail.answerCenter - detail.cardCenter) < 1, 'Roomy rating control sits at the card center');
             assert(detail.answerTop >= detail.headerBottom + 11 && detail.contentBottom <= detail.footerTop - 11, 'Centered rating does not overlap the prompt or footer');
@@ -211,7 +213,7 @@ try {
           if (index === 10) assert.equal(detail.answerMode, 'centered', 'A short rating question uses the free space to center its control');
           if (theme === 'civic' && width === 390 && index === 6) assert.equal(detail.answerMode, 'roomy', 'The reported binary question has room for its larger buttons');
           if (theme === 'civic' && width === 390 && index === 9) assert.equal(detail.answerMode, 'centered', 'The reported rating question has room for a centered slider');
-          if (theme === 'civic' && width === 390 && (index === 6 || index === 9)) {
+          if (theme === 'civic' && ((width === 390 && (index === 6 || index === 9)) || (width === 653 && index === 11))) {
             const comments = page.getByTestId('ce-survey-additional-toggle');
             await comments.click();
             await page.getByTestId('ce-survey-additional-input').waitFor();
@@ -238,14 +240,14 @@ try {
         if (process.env.OUTPUT_DIR && (index <= 5 || index === 6 || index === 9)) await page.screenshot({ path: `${process.env.OUTPUT_DIR}/${theme}-${width}-type-${questions[index - 1].type}-${index}.png` });
       };
       await inspectPrompt(1);
-      for (let index = 2; index <= 10; index += 1) {
+      for (let index = 2; index <= 11; index += 1) {
         await next.click();
         const current = await inspect(index);
         assert.equal(current.card.bottom - current.card.top, firstLayout.card.bottom - firstLayout.card.top, 'Every question type retains the same card height');
         assert.equal(current.nav.top, firstLayout.nav.top, 'Navigation stays fixed across long/short prompts and question types');
         await inspectPrompt(index);
       }
-      for (let index = 9; index >= 1; index -= 1) await prev.click();
+      for (let index = 10; index >= 1; index -= 1) await prev.click();
       await inspect(1);
       if (!quadratic && width <= 768) {
         const answerLayout = await page.getByTestId('ce-pile-active-question').evaluate(active => {
@@ -290,7 +292,7 @@ try {
         assert(!answerLayout.bodyClips, 'Long prompt and answers fit inside the card');
         if (theme === 'civic') {
           const login = await page.getByTestId('ce-account-login-button').boundingBox();
-          assert(login.height >= 44 && login.height <= 50 && login.width <= 150, 'Mobile login stays compact and touch-sized');
+          assert.equal(login.height, 64, 'Mobile login matches the visible C artwork');
         }
         if (process.env.OUTPUT_DIR) await page.screenshot({ path: `${process.env.OUTPUT_DIR}/${theme}-${width}-long-prompt.png` });
       }

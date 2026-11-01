@@ -60,7 +60,7 @@ it('marks a permanently failed chunk as a gap between successful transcript part
     { id: 'last', index: 2, status: 'complete' as const, text: 'After.', startedAt: 3 },
   ];
   expect(stitchRollingTranscriptSegments(segments)).toBe(
-    'Before. [Recording gap: chunk 2 could not be transcribed.] After.',
+    'Before. [Recording gap: audio could not be transcribed.] After.',
   );
 });
 
@@ -110,7 +110,7 @@ it('shows each voice as Person turns, and chunks without turns as plain text', (
     [
       'Person 1: Should we fund it?',
       'Person 2: Yes, this year.',
-      'The budget is due in May. [Recording gap: chunk 3 could not be transcribed.]',
+      'The budget is due in May. [Recording gap: audio could not be transcribed.]',
       'Person 2: Agreed.',
       'Person 1: Then we vote.',
     ].join('\n'),

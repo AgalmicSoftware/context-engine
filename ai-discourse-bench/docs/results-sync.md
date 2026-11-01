@@ -54,6 +54,26 @@ draft scoping, without changing Results structure or presentation. Fresh report
 tests and browser checks at 1280px, 390px, and 320px confirmed the existing
 standalone rendering, including beeswarm and participant hover states.
 
+The 0.9.0 contrast review ports the responsive Raw Results title sizing and
+word wrapping from `SurveyResults.module.scss`, along with paired primary-action
+colors for its export buttons. Risk Matrix title colors are scoped to their
+own modal so they cannot override the light Results heading. Export controls
+retain their visible download names in the accessibility tree. The standalone
+modal already uses explicit dark
+text on light backgrounds for its table, disclosures and information notices;
+it does not render live question-response cards, bookmarks, synchronization
+controls, or group notices. The binary summary changes in
+`SingleQuestionResponse.module.scss` do not affect its distribution charts.
+
+The accompanying review covers `OnePageSession.module.scss`,
+`OnePageSession.tsx`, and `OnePageSessionStandardShell.tsx`: context-source
+management, per-question agent submission state, and the removal of the session
+Join panel do not alter the standalone Results shell. The benchmark has neither
+live session administration nor participant authentication. Its integrity,
+preview and model-participant notices remain intact. Browser checks include
+Raw Results title geometry and export-button default/hover/focus contrast at
+1280px, 653px, 390px and 320px, plus the existing beeswarm and participant states.
+
 ## Intended Migration
 
 When repository boundaries permit it, replace the copied renderer vocabulary

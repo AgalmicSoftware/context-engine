@@ -132,6 +132,29 @@ describe('useRollingTranscriptionRecorder', () => {
     jest.clearAllMocks();
   });
 
+  it('imports audio and text without microphone access and retains failed audio for retry', async () => {
+    (transcribeAudio as jest.MockedFunction<typeof transcribeAudio>).mockRejectedValueOnce(
+      Object.assign(new Error('Not enabled'), { status: 403 }),
+    );
+    const { result } = renderHook(() => useRollingTranscriptionRecorder({ sessionSlug: 'import-input' }));
+    const audio = new Blob(['MP3 bytes'], { type: 'audio/mpeg' });
+    await act(async () => {
+      await result.current.addTranscript('Written discussion.');
+      await result.current.addAudio(audio);
+      await flushPromises();
+    });
+    expect(navigator.mediaDevices.getUserMedia).not.toHaveBeenCalled();
+    expect(result.current.segments.map((segment) => segment.status)).toEqual(['complete', 'failed']);
+    expect(result.current.downloadableChunkIds).toEqual([result.current.segments[1].id]);
+    (transcribeAudio as jest.MockedFunction<typeof transcribeAudio>).mockResolvedValueOnce('Uploaded discussion.');
+    await act(async () => {
+      await result.current.retryChunk(result.current.segments[1].id);
+      await flushPromises();
+    });
+    expect(result.current.transcript).toBe('Written discussion. Uploaded discussion.');
+    expect(result.current.downloadableChunkIds).toEqual([result.current.segments[1].id]);
+  });
+
   it('a failed recorder start leaves no empty recording chunk and can be retried', async () => {
     const { result } = renderHook(() => useRollingTranscriptionRecorder({ sessionSlug: 'failed-start' }));
     MockMediaRecorder.failNextStart = true;
@@ -326,7 +349,7 @@ describe('useRollingTranscriptionRecorder', () => {
     });
     const [saved] = [...mockChunkRecords.values()];
     expect(saved).toMatchObject({ segment: { status: 'complete', text: 'Paid transcript.' } });
-    expect(saved.audio).toBeUndefined();
+    expect(saved.audio).toBeInstanceOf(Blob);
     expect(result.current.transcript).toBe('');
     expect(transcribeAudio).toHaveBeenCalledTimes(1);
     unmount();
@@ -506,7 +529,7 @@ describe('useRollingTranscriptionRecorder', () => {
     expect(transcribeAudio).toHaveBeenCalledTimes(2);
     expect(result.current.transcript).toBe('Recovered speech.');
     expect([...mockChunkRecords.values()][0]?.segment.text).toBe('Recovered speech.');
-    expect([...mockChunkRecords.values()][0]?.audio).toBeUndefined();
+    expect([...mockChunkRecords.values()][0]?.audio).toBeInstanceOf(Blob);
     unmount();
   });
 

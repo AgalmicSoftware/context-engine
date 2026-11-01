@@ -50,7 +50,7 @@ function civicRpcResponse(call, chainId) {
 
 // A fresh browser has no Stats data. Supply public reads at the Worker boundary
 // so contrast/navigation checks exercise populated UI without a deployed session.
-export async function installCivicThemeFixtures(context, baseUrl) {
+export async function installCivicThemeFixtures(context, baseUrl, { privateGroups = false } = {}) {
   const localOrigin = new URL(baseUrl).origin;
   assert(
     ['127.0.0.1', 'localhost', '[::1]'].includes(new URL(baseUrl).hostname),
@@ -61,6 +61,15 @@ export async function installCivicThemeFixtures(context, baseUrl) {
     corsWorkerUrl: 'https://civic-worker.example.test',
     sessionName: 'Civic smoke session',
   };
+  if (privateGroups) {
+    config.sessionModeProfile = structuredClone(config.sessionModeProfile);
+    config.sessionModeProfile.preset = 'custom';
+    config.sessionModeProfile.storage.payloadAccessControl = { gate: 'none', encryption: 'worker_envelope' };
+    config.sessionModeProfile.encryption = { mode: 'worker_envelope', keyProvider: 'worker_secret' };
+    config.sessionModeProfile.results.visibility = 'participant_aggregate';
+    config.storageProfile = structuredClone(config.storageProfile);
+    config.storageProfile.payloadAccessControl = { gate: 'none', encryption: 'worker_envelope' };
+  }
   const creator = '0x00000000000000000000000000000000000000a1';
   const question = {
     id: `0x${'1'.repeat(64)}`,

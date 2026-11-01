@@ -551,7 +551,7 @@ describe('SurveyResults module styles', () => {
       /\.aggregatorSummaryCard:not\(:has\(\.surveyResultsResponseCard\)\) \.questionSummaryHeader\s*{[\s\S]*?border-radius:\s*var\(--ce-radius-12\) !important;/,
     );
     expect(scss).toMatch(
-      /\.surveyResultsResponseCard\s*{[\s\S]*?background:\s*color-mix\(in srgb,\s*var\(--ce-status-info\) 98%,\s*transparent\) !important;[\s\S]*?border-top:\s*0 !important;[\s\S]*?border-radius:\s*var\(--ce-radius-0\) var\(--ce-radius-0\) var\(--ce-radius-12\) var\(--ce-radius-12\) !important;/,
+      /\.surveyResultsResponseCard\s*{[\s\S]*?background:\s*var\(--ce-overlay-surface-alt\) !important;[\s\S]*?border-top:\s*0 !important;[\s\S]*?border-radius:\s*var\(--ce-radius-0\) var\(--ce-radius-0\) var\(--ce-radius-12\) var\(--ce-radius-12\) !important;/,
     );
     expect(scss).toMatch(/\.surveyResultsResponseCardBody\s*{[\s\S]*?padding:\s*0 !important;/);
     expect(scss).toMatch(
@@ -581,7 +581,7 @@ describe('SurveyResults module styles', () => {
       /\.filterSummaryBox\s*{[\s\S]*?background:\s*color-mix\(in srgb,\s*var\(--ce-overlay-text\) 6%,\s*transparent\);[\s\S]*?color:\s*var\(--ce-overlay-text-muted\);/,
     );
     expect(scss).toMatch(
-      /\.filterSummaryBox\s*{[\s\S]*?p > strong\s*{[\s\S]*?color:\s*var\(--ce-action-accent\) !important;/,
+      /\.filterSummaryBox\s*{[\s\S]*?p > strong\s*{[\s\S]*?color:\s*var\(--ce-overlay-text\) !important;/,
     );
     expect(scss).toMatch(/\.demoResultsAtlasSurface,\s*\.demoResultsRiskMatrixSurface\s*{[\s\S]*?padding:\s*1rem;/);
     expect(scss).toMatch(

@@ -148,15 +148,20 @@ using the same title margins, collapse height, and submit-rail offsets as Contex
 Engine, with the shared five-second fade and hover/focus reveal. Loading labels
 use `--ce-loading-text`: black on the Minimal and Classic 95 light surfaces and
 near-white in Context Engine. On mobile, Minimal uses a compact navigation header
-with the visible logo artwork matched to the Login button's height while preserving
+with the blue Login button sharing the 64px visible-logo height while preserving
 the account controls. Across themes and responsive breakpoints, the visible logo
 artwork matches the Login button's height and keeps that size after signing in.
-Both account states retain 16px of header padding above and below the logo.
+Both account states retain balanced header padding above and below the logo:
+16px by default and 12px in the compact Minimal mobile header.
 The Account button retains its own sizing. Narrow Classic 95 headers let the
 Account control wrap below the logo when needed.
 The profile presents session
 sections as a single column of compact rows, and removes decorative depth from
-question cards and account controls. At widths up to 768px, question actions
+question cards and account controls. At widths up to 768px, long prompts use the
+space left after reserving the answer controls and footer; they can push answers
+down before reducing type to the root font size. Prompts that still cannot fit
+remain keyboard-scrollable. Card height and navigation stay fixed. At these
+widths, question actions
 start in the hamburger menu. The menu, pending Submit and clear controls, and
 previous/next arrows share one row. Submit shrinks within the available space;
 at phone widths up to 640px, the question counter forms a narrow column between
@@ -552,6 +557,17 @@ mode chooser/setup. Manual authoring checks cover all five question types, surve
 fields, and JSON/AI prompt panels. It checks rendered text contrast with ancestor opacity, translucent surfaces,
 gradient stops, and text-field fill colors included. It never deploys a session,
 submits responses, or starts recording.
+
+Raw question results use paired overlay surface/text tokens for question headings,
+expanded answers, bookmarks and sync status. Export and table actions use paired
+control/action tokens. Do not use fixed inverse text on a surface that changes
+with the theme. Worker group notices and membership lists use the same overlay
+pairs. Results headings can wrap between words without squeezing beside controls.
+Run `BASE_URL=http://127.0.0.1:3000 npm run ai:test-theme:results` to check raw results,
+expanded summaries, sorting tables, export controls, bookmark states and group
+sign-in notices in all three themes at 390, 653 and 1280px. The Civic suite also
+includes the raw-results checks. These tests use synthetic fixtures and do not
+submit data; `THEMES` and `WIDTHS` accept comma-separated values for focused runs.
 
 HTML Results exports project the selected sections before rendering or embedding
 any snapshot data. Excluded analysis is absent from both interactive and static

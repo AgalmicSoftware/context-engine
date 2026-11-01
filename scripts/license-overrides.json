@@ -25,5 +25,15 @@
       "reviewed": "2026-10-26",
       "note": "Owner-supplied evidence from npm view @metamask/eth-json-rpc-provider@1.0.1 license repository.url reports ISC. The installed package has neither license metadata nor a LICENSE file."
     }
+  },
+  "@breezystack/lamejs@1.2.7": {
+    "declaredLicense": "LGPL-3.0",
+    "license": "LGPL-3.0",
+    "allow": true,
+    "evidence": {
+      "source": "client/public/licenses/lamejs/README.txt",
+      "reviewed": "2026-11-01",
+      "note": "User approved linking this LGPL library into the MPL-2.0 browser application. Mozilla confirms this needs no application license change. Full GPL/LGPL texts, exact source archive and rebuild/replacement instructions ship with the client. This version-specific approval does not permit LGPL generally."
+    }
   }
 }

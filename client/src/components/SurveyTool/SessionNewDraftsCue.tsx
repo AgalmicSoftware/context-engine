@@ -5,7 +5,7 @@ import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import styles from './SurveyTool.module.scss';
 
 type SessionNewDraftsCueProps = {
-  // Drafts generated so far; the count only grows until the recording is cleared.
+  // Drafts still in review; removal and submission can lower the count.
   count: number;
   // The draft list, which appends new drafts at its end.
   draftsRef: React.RefObject<HTMLElement | null>;

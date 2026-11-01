@@ -57,7 +57,7 @@ import {
   renderPileQuestionIcons as renderPileQuestionIconsView,
   renderPileFooterSection as renderPileFooterSectionView,
 } from './surveyPileQuestionSections';
-import { renderPileInteractionSurface } from './surveyPileInteractionSurface';
+import { renderPileInteractionSurface, requiresQuestionStorageLogin } from './surveyPileInteractionSurface';
 import {
   buildPileBaselineCheckPlan,
   buildPileBaselineConsistencyPlan,
@@ -3389,6 +3389,10 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
             hasTerminalScanError,
             scanErrorMessage,
             hasError,
+            requiresStorageLogin: requiresQuestionStorageLogin(
+              engine.getEffectivePileSessionConfig(engine.props),
+              Boolean(engine.props.loginComplete && engine.props.account),
+            ),
             isStillLoading,
             hydrateDone,
             hydrateDiscovered,

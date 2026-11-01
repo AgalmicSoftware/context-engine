@@ -506,6 +506,7 @@ interface CreateQuestionsAndSurveysProps {
   miniaturized?: boolean;
   onUploadComplete?: (surveyHash: string | null) => void;
   onDraftEditedChange?: (edited: boolean) => void;
+  onDraftQuestionCountChange?: (count: number) => void;
   hideSurveyQuestionToggleUntilAuthoring?: boolean;
   [key: string]: unknown;
 }
@@ -807,6 +808,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
 
   componentDidMount() {
     this._isMounted = true;
+    this.props.onDraftQuestionCountChange?.(this.state.questions.length);
     window.addEventListener('beforeunload', this.handleDraftBeforeUnload);
     if (this.state.showAIPrompt) {
       this.refreshAIPromptModelLabel();
@@ -1120,6 +1122,9 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
   };
 
   componentDidUpdate(prevProps: CreateQuestionsAndSurveysProps, prevState: CreateQuestionsAndSurveysState) {
+    if (prevState.questions.length !== this.state.questions.length) {
+      this.props.onDraftQuestionCountChange?.(this.state.questions.length);
+    }
     this.props.onDraftEditedChange?.(createSurveyDraftContentKey(this.state) !== this._initialDraftContent);
     if (prevProps.account !== this.props.account) this.updateSurveyHash();
     const shouldAppendPreformedQuestions = this.props.interviewQuestionReview || this.props.appendPreformedQuestions;

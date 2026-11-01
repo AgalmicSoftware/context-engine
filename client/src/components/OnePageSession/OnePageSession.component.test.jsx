@@ -222,6 +222,36 @@ describe('OnePageSession view gating', () => {
   const getAutoMintStorageKey = (account, sbtAddress, chainId = 84532) =>
     `autoMint:${String(account || '').toLowerCase()}:${chainId}:${String(sbtAddress || '').toLowerCase()}`;
 
+  it.each(['registry', 'worker_canonical'])(
+    'shows the normal %s session without an interview sharing panel',
+    async (authorityMode) => {
+      const priorUrl = window.location.href;
+      window.history.replaceState({}, '', '/session/edge');
+      try {
+        const props = buildProps();
+        const profile =
+          authorityMode === 'worker_canonical'
+            ? cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE)
+            : props.sessionConfig.sessionModeProfile;
+        render(
+          <OnePageSession
+            {...props}
+            sessionConfig={{ ...props.sessionConfig, sessionModeProfile: profile, interviewModeEnabled: true }}
+          />,
+        );
+
+        expect(await screen.findByTestId('survey-page-pile')).toBeInTheDocument();
+        expect(screen.queryByTestId('ce-session-join')).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: /Interview & share|^Join$/ })).not.toBeInTheDocument();
+        fireEvent.click(screen.getByTestId('pile-view-all'));
+        expect(await screen.findByTestId('survey-page-full')).toBeInTheDocument();
+        expect(screen.queryByTestId('ce-session-join')).not.toBeInTheDocument();
+      } finally {
+        window.history.replaceState({}, '', priorUrl);
+      }
+    },
+  );
+
   it('renders only one SurveyPage instance when switching from pile to full view', async () => {
     render(<OnePageSession {...buildProps()} />);
 

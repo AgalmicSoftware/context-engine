@@ -60,12 +60,13 @@ const SurveyResultsQuestionSummaryCard = ({
               onToggleBookmark();
             }}
             aria-label={bookmarked ? 'Remove bookmark' : 'Bookmark question'}
+            aria-pressed={bookmarked}
             title={bookmarked ? 'Remove bookmark' : 'Bookmark question'}
           >
             <FontAwesomeIcon
               icon={faBookmark}
               className={styleMap.questionBookmarkIcon}
-              color={bookmarked ? 'gold' : 'white'}
+              color="currentColor"
               style={bookmarkIconStyle}
             />
           </button>

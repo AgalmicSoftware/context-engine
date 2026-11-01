@@ -71,7 +71,7 @@ export async function hasKeptRecordingAudio(identity: string): Promise<boolean> 
   const records = await transact<RecordingChunk[]>('readonly', (store) =>
     store.index('scope').getAll(IDBKeyRange.bound(prefix, `${prefix}￿`)),
   );
-  return records.some((record) => record.audio && record.segment.status !== 'failed');
+  return records.some((record) => record.audio && !['failed', 'complete'].includes(record.segment.status));
 }
 
 export async function putRecordingChunk(record: RecordingChunk): Promise<void> {

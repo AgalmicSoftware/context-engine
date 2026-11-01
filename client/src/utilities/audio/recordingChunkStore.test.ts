@@ -58,6 +58,7 @@ it.each([
   ['another account’s chunk', [chunk('rxc', '', 'retrying')], true],
   ['only a Failed chunk, which waits for Retry', [chunk('rxc', '0xabc', 'failed')], false],
   ['only transcribed chunks without audio', [chunk('rxc', '0xabc', 'complete', false)], false],
+  ['completed audio kept for download', [chunk('rxc', '0xabc', 'complete')], false],
   ['a chunk of a session whose slug starts the same', [chunk('rxc-2', '0xabc', 'queued')], false],
   ['nothing', [], false],
 ])('finds kept audio for a session given %s', async (_case, records, kept) => {

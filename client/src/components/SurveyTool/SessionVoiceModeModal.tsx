@@ -5,6 +5,7 @@ import { faQuestionCircle } from '@fortawesome/free-solid-svg-icons';
 import CEConfirmDialog from '../Shared/CEConfirmDialog';
 import SessionInterviewPanel from './SessionInterviewPanel';
 import SessionListeningPanel from './SessionListeningPanel';
+import SessionRecordingHelp from './SessionRecordingHelp';
 import SessionVoiceModeChooser from './SessionVoiceModeChooser';
 import SessionVoicePrefillCard from './SessionVoicePrefillCard';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
@@ -102,7 +103,10 @@ export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps)
         ) : (
           <>
             <ModalHeader id="ce-session-voice-mode-title" toggle={requestClose}>
-              {title}
+              <span className={styles.sessionRecordingHeading}>
+                {title}
+                {mode === 'recordGroup' ? <SessionRecordingHelp /> : null}
+              </span>
             </ModalHeader>
             <ModalBody>
               {!mode ? (
@@ -134,9 +138,7 @@ export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps)
         <div style={KEPT_AUDIO_NOTICE_POSITION}>
           <aside className={styles.sessionListeningPanel} aria-label="Kept recording audio">
             <span className={styles.sessionRecordingOption}>
-              <span role="status">
-                {keptChunks} recording {keptChunks === 1 ? 'chunk is' : 'chunks are'} waiting to upload.
-              </span>
+              <span role="status">Saved audio is waiting to upload.</span>
               <button
                 type="button"
                 id={keptHelpId}

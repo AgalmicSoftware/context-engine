@@ -14,6 +14,7 @@ export type RollingTranscriptSegment = {
   index: number;
   status: RollingTranscriptSegmentStatus;
   text: string;
+  source?: 'text';
   error?: string;
   startedAt: number;
   completedAt?: number;
@@ -28,7 +29,7 @@ const OVERLAP_WORDS = 80;
 export const mergeRollingTranscriptText = (previous: string, next: string): string =>
   mergeTranscriptOverlap(previous, next, OVERLAP_WORDS);
 
-const recordingGap = (index: number) => `[Recording gap: chunk ${index + 1} could not be transcribed.]`;
+const recordingGap = () => '[Recording gap: audio could not be transcribed.]';
 const duration = (milliseconds: number) => {
   const seconds = Math.max(1, Math.round(milliseconds / 1000));
   const minutes = Math.floor(seconds / 60);
@@ -40,6 +41,7 @@ const captureGap = ({ startedAt, endedAt, cause }: CaptureGap) =>
 export const transcriptSpeech = (transcript: string): string =>
   transcript
     .replace(/\[Recording gap: chunk \d+ could not be transcribed\.\]/g, '')
+    .replace(/\[Recording gap: audio could not be transcribed\.\]/g, '')
     .replace(/\[(?:Microphone paused|No audio) for [\w ]+\.\]/g, '')
     .replace(/^Person \d+: /gm, '')
     .trim();
@@ -48,7 +50,7 @@ export const transcriptSpeech = (transcript: string): string =>
 type TranscriptLine = { speaker: string; text: string };
 const chunkLines = (segment: RollingTranscriptSegment): TranscriptLine[] => {
   const gap = segment.gapBefore ? [{ speaker: '', text: captureGap(segment.gapBefore) }] : [];
-  if (segment.status === 'failed') return [...gap, { speaker: '', text: recordingGap(segment.index) }];
+  if (segment.status === 'failed') return [...gap, { speaker: '', text: recordingGap() }];
   const turns = (segment.speakerTurns || []).filter((turn) => turn.speaker && turn.text.trim());
   const lines = turns.length ? turns : [{ speaker: '', text: segment.text }];
   return [...gap, ...lines.map(({ speaker, text }) => ({ speaker, text: text.trim() })).filter((line) => line.text)];

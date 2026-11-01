@@ -23,7 +23,7 @@ beforeEach(() => {
 it('shares the voice link and the existing AI prompt without private query or fragment material', async () => {
   render(<SessionJoinPanel sessionUrl={sessionUrl} />);
   expect(verify).not.toHaveBeenCalled();
-  fireEvent.click(screen.getByText('Join'));
+  fireEvent.click(screen.getByRole('button', { name: 'Interview & share' }));
   await waitFor(() => expect(screen.getByRole('button', { name: 'Copy AI prompt' })).toBeEnabled());
   expect(screen.getByTestId('qr')).toHaveAttribute('data-value', `${cleanUrl}&mode=voice`);
   fireEvent.click(screen.getByRole('button', { name: 'Copy voice link' }));
@@ -48,7 +48,7 @@ it('shares the voice link and the existing AI prompt without private query or fr
 it('keeps the prompt unavailable when the catalog is incompatible and supports retry', async () => {
   verify.mockRejectedValueOnce(new Error('The session needs an updated catalog.'));
   render(<SessionJoinPanel sessionUrl={sessionUrl} />);
-  fireEvent.click(screen.getByText('Join'));
+  fireEvent.click(screen.getByRole('button', { name: 'Interview & share' }));
   expect(await screen.findByRole('alert')).toHaveTextContent('updated catalog');
   expect(screen.getByRole('button', { name: 'Copy AI prompt' })).toBeDisabled();
   fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
@@ -58,7 +58,7 @@ it('keeps the prompt unavailable when the catalog is incompatible and supports r
 it('offers selectable text if clipboard access fails', async () => {
   writeText.mockRejectedValueOnce(new Error('denied'));
   render(<SessionJoinPanel sessionUrl={sessionUrl} />);
-  fireEvent.click(screen.getByText('Join'));
+  fireEvent.click(screen.getByRole('button', { name: 'Interview & share' }));
   fireEvent.click(screen.getByRole('button', { name: 'Copy voice link' }));
   expect(await screen.findByRole('alert')).toHaveTextContent('Copy the text below');
   expect(screen.getByLabelText('Text to copy')).toHaveValue(`${cleanUrl}&mode=voice`);
@@ -75,7 +75,7 @@ it.each([
       sessionConfig={{ sessionModeProfile: { authority: { mode } } }}
     />,
   );
-  fireEvent.click(screen.getByText('Join'));
+  fireEvent.click(screen.getByRole('button', { name: 'Interview & share' }));
   await waitFor(() => expect(screen.getByRole('button', { name: 'Copy AI prompt' })).toBeEnabled());
   const voice = `${expected}${expected.includes('?') ? '&' : '?'}mode=voice`;
   expect(screen.getByRole('link', { name: 'Open voice interview' })).toHaveAttribute('href', voice);
@@ -102,7 +102,7 @@ it.each(['not a URL', 'https://wrong.example/path', 'https://fixture:[redacted-e
   async (workerUrl) => {
     jest.mocked(getCorsProxyUrlOrThrow).mockResolvedValue('https://worker.example');
     render(<SessionJoinPanel sessionUrl="https://site.example/session/workshop" workerUrl={workerUrl} />);
-    fireEvent.click(screen.getByText('Join'));
+    fireEvent.click(screen.getByRole('button', { name: 'Interview & share' }));
     await waitFor(() => expect(screen.getByRole('button', { name: 'Copy AI prompt' })).toBeEnabled());
     expect(getCorsProxyUrlOrThrow).toHaveBeenCalledTimes(1);
     expect(verify).toHaveBeenCalledWith({
@@ -124,7 +124,7 @@ it.each([
     sessionConfig: { sessionModeProfile: { authority: { mode } } },
   };
   const { rerender } = render(<SessionJoinPanel {...props} />);
-  fireEvent.click(screen.getByText('Join'));
+  fireEvent.click(screen.getByRole('button', { name: 'Interview & share' }));
   await waitFor(() => expect(screen.getByRole('button', { name: 'Copy AI prompt' })).toBeEnabled());
   // Participants only join; the recorder link is for whoever runs a room.
   expect(screen.queryByTestId('ce-join-group-recorder-link')).not.toBeInTheDocument();

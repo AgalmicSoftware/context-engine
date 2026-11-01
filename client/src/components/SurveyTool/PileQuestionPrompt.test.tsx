@@ -3,7 +3,7 @@ import PileQuestionPrompt from './PileQuestionPrompt';
 
 describe('PileQuestionPrompt', () => {
   let resize: () => void;
-  let mobile: boolean;
+  let viewportWidth: number;
   let availableHeight: number;
   let textLines: number;
   const disconnect = jest.fn();
@@ -12,16 +12,16 @@ describe('PileQuestionPrompt', () => {
   const originalMatchMedia = window.matchMedia;
 
   beforeEach(() => {
-    mobile = true;
+    viewportWidth = 390;
     availableHeight = 90;
     textLines = 4;
     document.documentElement.style.fontSize = '16px';
     Object.defineProperty(window, 'matchMedia', {
       configurable: true,
       writable: true,
-      value: () => ({
+      value: (query: string) => ({
         get matches() {
-          return mobile;
+          return viewportWidth <= Number(query.match(/max-width: (\d+)px/)?.[1]);
         },
         addEventListener: mediaListener,
         removeEventListener: jest.fn(),
@@ -64,7 +64,8 @@ describe('PileQuestionPrompt', () => {
     </PileQuestionPrompt>
   );
 
-  it('shrinks overflowing mobile text and restores the normal size when space returns', () => {
+  it.each([390, 653, 768])('fits overflowing text at %ipx and restores the normal size when space returns', (width) => {
+    viewportWidth = width;
     const { unmount } = render(prompt());
     const title = screen.getByRole('heading');
     expect(title).toHaveStyle({ fontSize: '22px' });
@@ -90,7 +91,7 @@ describe('PileQuestionPrompt', () => {
   it('leaves desktop typography unchanged and removes the mobile override on resize', () => {
     render(prompt());
     expect(screen.getByRole('heading')).toHaveStyle({ fontSize: '22px' });
-    mobile = false;
+    viewportWidth = 1280;
     act(() => resize());
     expect(screen.getByRole('heading').style.fontSize).toBe('');
   });

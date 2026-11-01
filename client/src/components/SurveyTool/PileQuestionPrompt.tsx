@@ -13,7 +13,7 @@ export default function PileQuestionPrompt({ children }: { children: ReactNode }
     const footer = body?.querySelector<HTMLElement>(`.${styles.pileCardFooter}`);
     const binaryChoices = content?.querySelector<HTMLElement>(`#${styles.binaryChoice}`);
     const rating = content?.querySelector<HTMLElement>(`.${styles.ratingQuestionContainer}`);
-    const mobile = window.matchMedia('(max-width: 480px)');
+    const mobile = window.matchMedia('(max-width: 768px)');
     let disposed = false;
 
     const fit = () => {
