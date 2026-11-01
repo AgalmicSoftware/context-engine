@@ -435,10 +435,11 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
   const draftCount = pendingDraftCount ?? generatedQuestions.length;
   const hasGeneratedDraft = draftCount > 0;
   const latestSuccessfulTranscriptAt = useMemo(() => {
+    // The latest to complete decides, not the order of parts: text pasted while a chunk transcribes leaves that
+    // chunk's questions automatic, and text added after the last chunk waits for an explicit Generate.
     const latestComplete = [...recorder.segments]
       .filter((segment) => segment.status === 'complete')
-      .sort((a, b) => b.index - a.index)[0];
-    // Pasting/importing text remains an explicit Generate action even after recorded audio.
+      .sort((a, b) => Number(b.completedAt || 0) - Number(a.completedAt || 0) || b.index - a.index)[0];
     if (latestComplete?.source === 'text') return 0;
     return recorder.segments.reduce((latest, segment) => {
       if (segment.source === 'text' || segment.status !== 'complete' || !String(segment.text || '').trim())

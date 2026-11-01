@@ -158,6 +158,35 @@ describe('SessionListeningPanel', () => {
     expect(mockGenerateQuestionsFromListeningTranscript).not.toHaveBeenCalled();
   });
 
+  it('drafts questions for a chunk transcribed after text pasted while it uploaded', async () => {
+    const transcript = 'Recorded speech about choices and evidence that should become useful questions. Pasted notes.';
+    (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+      buildRecorder({
+        transcript,
+        segments: [
+          { id: 'audio', index: 0, status: 'complete', text: 'Recorded speech.', startedAt: 1, completedAt: 9 },
+          {
+            id: 'text',
+            index: 1,
+            source: 'text',
+            status: 'complete',
+            text: 'Pasted notes.',
+            startedAt: 5,
+            completedAt: 5,
+          },
+        ],
+      }),
+    );
+    mockGenerateQuestionsFromListeningTranscript.mockResolvedValue({
+      surveyTitle: '',
+      statements: [],
+      raw: { questions: [] },
+    });
+    render(<SessionListeningPanel panelMode="recordGroup" />);
+    await waitFor(() => expect(mockGenerateQuestionsFromListeningTranscript).toHaveBeenCalledTimes(1));
+    expect(mockGenerateQuestionsFromListeningTranscript.mock.calls[0][0]).toBe(transcript);
+  });
+
   it('keeps an unfinished pasted transcript while microphone capture is active', async () => {
     (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(buildRecorder());
     const { rerender } = render(<SessionListeningPanel />);
