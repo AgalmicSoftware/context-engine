@@ -778,6 +778,7 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
     getSessionChainId: (slug: string) => this.getCacheSessionChainId(slug),
     getAccount: () => this.props.account,
     getProviderLike: () => this.props.provider,
+    buildDecryptContext: (slug: string) => this.buildQuestionDecryptContext(slug),
     getCurrentPath: () => this.props?.path || (typeof window !== 'undefined' ? window.location.pathname : '') || '',
     shouldSkipSessionScanForSlug: (slug: string, op: string, scopeCtx?: unknown) =>
       this.shouldSkipSessionScanForSlug(slug, op, toMainSiteScanScopeContext(scopeCtx)),
@@ -2664,6 +2665,7 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
       this._lastProcessedQuestionSlugFromPath = questionSlug;
       const slugsToRefresh = Array.from(new Set([activeSlug, questionSlug].filter(isMainSitePresent)));
       slugsToRefresh.forEach((slug: string) => {
+        void this.refreshEncryptedSurveyPayloadsForGroup(slug);
         if (!this.hasMaskedQuestionPayloadInCache(slug)) return;
         this.refreshEncryptedQuestionPayloadsForGroup(slug).catch((err: unknown) => {
           mainSiteLog.warn('refreshEncryptedQuestionPayloadsForGroup failed during mount:', {
@@ -2837,6 +2839,7 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
         const slugsToCheck = Array.from(new Set([activeSlug, questionSlug].filter(isMainSitePresent)));
 
         slugsToCheck.forEach((slug: string) => {
+          if (readinessSignalsChanged) void this.refreshEncryptedSurveyPayloadsForGroup(slug);
           const masked = this.hasMaskedQuestionPayloadInCache(slug);
           const shouldRetry =
             shouldRetryMaskedQuestionRefresh({
@@ -4068,6 +4071,9 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
 
   refreshEncryptedQuestionPayloadsForGroup: RefreshEncryptedQuestionPayloadsForGroupFn = (slug, opts) =>
     this._questionCacheController.refreshEncryptedQuestionPayloadsForGroup(slug, opts);
+
+  refreshEncryptedSurveyPayloadsForGroup = (slug: string, opts?: { force?: boolean }): Promise<void> =>
+    this._surveyCacheController.refreshEncryptedSurveyPayloadsForGroup(slug, opts);
 
   refreshQuestionMetadataForGroup: RefreshQuestionMetadataForGroupFn = async (slug, opts) => {
     const normalizedSlug = normalizeSessionSlug(slug || '');
