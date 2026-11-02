@@ -365,7 +365,8 @@ Each question is asked in the ways that expose wording and ordering effects:
 - agree/disagree statements also in their reversed wording, when the set has
   one (this benchmark's bank does; session questions don't);
 - ratings with labelled ends also with the scale flipped, mapped back to the
-  question's own scale;
+  question's own scale (unless the step skips the maximum, as 0 to 10 in steps
+  of 3 does, since flipped answers would then fall off the grid);
 - choice and allocation questions with a fresh option order on every repeat,
   recorded in each row, with allocations mapped back to the question's order.
 

@@ -100,6 +100,18 @@ test('each type is asked in the ways that expose wording and ordering effects', 
   assert.deepEqual(answerVariants(questions.qf), ['as-asked']);
 });
 
+test('a rating is flipped only when flipped answers stay on its grid', () => {
+  const labelled = (scale) => ({ type: 'rating', scale: { ...scale, minLabel: 'Not at all', maxLabel: 'Fully' } });
+  // 0 to 10 in steps of 3 stops at 9, so a flipped 0, 3, 6 or 9 would read as 10, 7, 4 or 1.
+  assert.deepEqual(answerVariants(labelled({ min: 0, max: 10, step: 3 })), ['scale']);
+  assert.deepEqual(answerVariants(labelled({ min: 1, max: 10, step: 2 })), ['scale']);
+  assert.deepEqual(answerVariants(labelled({ min: 0, max: 10, step: 2 })), ['scale', 'flipped']);
+  assert.deepEqual(answerVariants(labelled({ min: -0.5, max: 0.5, step: 0.1 })), ['scale', 'flipped']);
+  const question = labelled({ min: -0.5, max: 0.5, step: 0.1 });
+  const flipped = parseAnswerOutput({ rawText: '{"answer":0.2}', question, variant: 'flipped', order: [] });
+  assert.equal(flipped.answer, -0.2);
+});
+
 test('prompts show options in the order asked, and the scale the way round asked', () => {
   const questions = byId(readQuestionSet(resultsExport));
   const choice = buildAnswerPrompt({ question: questions.qs, variant: 'shuffled', order: [2, 0, 1] });
