@@ -1573,11 +1573,13 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
         return { response: responseJson(deps, { error: error?.message || 'Cloudflare worker envelope encryption failed.' }, 500, baseHeaders) };
       }
     }
-    const effectiveGroupIds = normalizeGroupIdList([
+    // Readers must be in one of the stored groups, so adding the session's
+    // groups to a payload's own would let every session member read it.
+    const ownGroupIds = normalizeGroupIdList([
       ...normalizeGroupIdList(payload.groupIds),
       ...normalizeGroupIdList(uploadPolicy.groupIds),
-      ...normalizeGroupIdList(payloadAccess.groupIds),
     ]);
+    const effectiveGroupIds = ownGroupIds.length ? ownGroupIds : normalizeGroupIdList(payloadAccess.groupIds);
     const metadata = {
       id,
       backend: STORAGE_BACKENDS.CLOUDFLARE,

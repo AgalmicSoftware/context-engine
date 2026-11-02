@@ -72125,11 +72125,11 @@ var init_storageRouteExecution = __esm({
             return { response: responseJson(deps, { error: error?.message || "Cloudflare worker envelope encryption failed." }, 500, baseHeaders) };
           }
         }
-        const effectiveGroupIds = normalizeGroupIdList([
+        const ownGroupIds = normalizeGroupIdList([
           ...normalizeGroupIdList(payload.groupIds),
-          ...normalizeGroupIdList(uploadPolicy.groupIds),
-          ...normalizeGroupIdList(payloadAccess.groupIds)
+          ...normalizeGroupIdList(uploadPolicy.groupIds)
         ]);
+        const effectiveGroupIds = ownGroupIds.length ? ownGroupIds : normalizeGroupIdList(payloadAccess.groupIds);
         const metadata2 = {
           id: id3,
           backend: STORAGE_BACKENDS.CLOUDFLARE,

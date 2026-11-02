@@ -3079,6 +3079,76 @@ test('storageRoute enforces worker group gates and group upload allowlists', asy
 	assert.equal(allowedSbtPolicyUpload.status, 200);
 });
 
+test('a payload group narrows a group-gated session instead of adding to it', async () => {
+	const kv = createMockKv();
+	const env = { CE_STORAGE_INDEX_KV: kv };
+	const adminPrincipal = { kind: 'evm_address', address: '0x0000000000000000000000000000000000000abc' };
+	const reviewerAddress = '0x0000000000000000000000000000000000000def';
+	const memberAddress = '0x0000000000000000000000000000000000000111';
+	for (const groupId of ['members', 'reviewers']) {
+		await createWorkerGroup({
+			env,
+			slug: 'session-a',
+			sessionId: WORKER_GROUP_SESSION_ID,
+			input: { groupId, label: groupId, joinMode: 'admin_add' },
+			actorPrincipal: adminPrincipal,
+		});
+	}
+	for (const [groupId, address] of [['members', reviewerAddress], ['reviewers', reviewerAddress], ['members', memberAddress]]) {
+		await addWorkerGroupMember({
+			env,
+			slug: 'session-a',
+			sessionId: WORKER_GROUP_SESSION_ID,
+			groupId,
+			principal: { kind: 'evm_address', address },
+			actorPrincipal: adminPrincipal,
+		});
+	}
+	const config = {
+		sessionId: WORKER_GROUP_SESSION_ID,
+		storageProfile: {
+			backend: 'cloudflare',
+			payloadAccessControl: { gate: 'group_gate', encryption: 'none', groupIds: ['members'] },
+		},
+	};
+	const call = (path, request, address, extraDeps = {}) => storageRoute({
+		path,
+		method: request.method,
+		request,
+		env,
+		config,
+		slug: 'session-a',
+		uploaderAddress: address,
+		authScopes: {},
+		baseHeaders: {},
+		deps: { json, isWorkerGroupMember: readWorkerGroupMembershipProjection, ...extraDeps },
+	});
+	const upload = async (body, randomBytes) => readJson(await call('/storage/upload', new Request('https://worker.example/storage/upload', {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ resource: 'docsContext', ...body }),
+	}), reviewerAddress, { randomBytes }));
+	const read = (id, address) => call('/storage/read', new Request(`https://worker.example/storage/read?id=${id}`), address);
+	const listIds = async (address) => (await readJson(await call(
+		'/storage/list',
+		new Request('https://worker.example/storage/list?resource=docsContext'),
+		address,
+	))).items.map((item) => item.storageRef.id);
+
+	const narrow = (await upload({ data: 'reviewers only', groupIds: ['reviewers'] }, fixedRandomBytes)).storageRef.id;
+	const whole = (await upload({ data: 'whole session' }, createSequenceRandomBytes(33))).storageRef.id;
+
+	assert.equal((await read(narrow, memberAddress)).status, 403);
+	assert.deepEqual(await listIds(memberAddress), [whole]);
+	const allowed = await read(narrow, reviewerAddress);
+	assert.equal(allowed.status, 200);
+	assert.equal(await allowed.text(), 'reviewers only');
+	assert.deepEqual((await listIds(reviewerAddress)).sort(), [narrow, whole].sort());
+	// A row without its own groups keeps the session's, so it still reads as published to everyone.
+	assert.deepEqual((await readStorageIndexMetadata(kv, 'session-a', 'docsContext', narrow)).groupIds, ['reviewers']);
+	assert.deepEqual((await readStorageIndexMetadata(kv, 'session-a', 'docsContext', whole)).groupIds, ['members']);
+});
+
 test('storageRoute scaffold rejects plaintext Cloudflare lit_encrypted uploads', async () => {
 	const r2 = createMockR2();
 	const env = { CE_STORAGE_R2: r2, CE_STORAGE_INDEX_KV: createMockKv() };
