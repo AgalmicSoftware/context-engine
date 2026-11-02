@@ -76,6 +76,25 @@ export const predictDeploymentAddresses = ({ walletAddress, nonce }) => ({
   sbtFactory: ethers.utils.getContractAddress({ from: walletAddress, nonce: nonce + 2 }),
 });
 
+// The predictions hold only if the three deployments took the next three
+// nonces; any other transaction from the deployer shifts every address.
+export const assertDeploymentLanded = async ({ provider, walletAddress, nonce, predicted }) => {
+  const roles = Object.entries(predicted);
+  const postNonce = await provider.getTransactionCount(walletAddress, 'pending');
+  if (postNonce !== nonce + roles.length) {
+    throw new Error(
+      `Deployer nonce is ${postNonce}, expected ${nonce + roles.length}, so the predicted addresses `
+      + 'are not the deployed ones. Read the addresses from the Forge output above.',
+    );
+  }
+  for (const [role, address] of roles) {
+    const code = await provider.getCode(address);
+    if (!code || code === '0x') {
+      throw new Error(`No contract code at the predicted ${role} address ${address}.`);
+    }
+  }
+};
+
 export const assertDeploymentChain = async ({ provider, expectedChainId }) => {
   const network = await provider.getNetwork();
   if (Number(network.chainId || 0) !== expectedChainId) {
@@ -141,10 +160,7 @@ export const deployEvmContracts = async ({
   const forgeInvocation = buildForgeDeploymentInvocation({ rpcUrl, privateKey });
   run(forgeInvocation.command, forgeInvocation.args, forgeInvocation.env);
 
-  const postNonce = await provider.getTransactionCount(wallet.address, 'pending');
-  if (postNonce < nonce + 3) {
-    throw new Error(`Deployment broadcast completed, but nonce advanced to ${postNonce} instead of at least ${nonce + 3}`);
-  }
+  await assertDeploymentLanded({ provider, walletAddress: wallet.address, nonce, predicted });
 
   console.log(JSON.stringify({
     step: 'complete',

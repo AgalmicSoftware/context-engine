@@ -4,7 +4,9 @@ import fs from 'node:fs';
 
 import {
   assertDeploymentChain,
+  assertDeploymentLanded,
   buildForgeDeploymentInvocation,
+  predictDeploymentAddresses,
   resolveDeploymentTarget,
 } from './deploy-evm.mjs';
 
@@ -46,6 +48,36 @@ test('assertDeploymentChain rejects an RPC endpoint on a different chain', async
     }),
     /Expected chain 421614, got 11155420/,
   );
+});
+
+test('assertDeploymentLanded refuses predictions that a nonce shift made wrong', async () => {
+  const walletAddress = `0x${'a1'.padStart(40, '0')}`;
+  const nonce = 5;
+  const predicted = predictDeploymentAddresses({ walletAddress, nonce });
+  const provider = ({ postNonce, emptyAt = '' }) => ({
+    async getTransactionCount() {
+      return postNonce;
+    },
+    async getCode(address) {
+      return address === emptyAt ? '0x' : '0x6080';
+    },
+  });
+  const check = (options) => assertDeploymentLanded({
+    provider: provider(options),
+    walletAddress,
+    nonce,
+    predicted,
+  });
+
+  // Another transaction from the deployer landed before Forge's three.
+  await assert.rejects(check({ postNonce: 9 }), /Deployer nonce is 9, expected 8/);
+  // Forge only simulated, so nothing was broadcast.
+  await assert.rejects(check({ postNonce: 5 }), /Deployer nonce is 5, expected 8/);
+  await assert.rejects(
+    check({ postNonce: 8, emptyAt: predicted.sessionRegistry }),
+    /No contract code at the predicted sessionRegistry address/,
+  );
+  await check({ postNonce: 8 });
 });
 
 test('deployment status output does not include the RPC URL', () => {
