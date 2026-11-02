@@ -60,6 +60,19 @@ All notable changes to this project will be documented in this file.
 - SBT pages show the chain's holder count, not 0, until a full count loads.
 - An already-saved interview answer reports "Responses already saved" while another answer has an unsent edit, and a tag removed while AI suggestions load stays removed.
 - A link padded with thousands of `=` no longer freezes the page, and a setup link opened over a draft with a problem lists what it changes.
+- If another account signs in while Group Conversation records, recording stops and its chunks wait on the device until the account that made them signs back in. A sign-out still uploads signed out.
+- The HTML report lists a question whose text the author encrypted as "Encrypted question", with its ID, type and answer count but no prompt, options or tags, even after you decrypt it. Its AI analysis leaves such questions and their answers out.
+- Results drops answers decrypted for one account when the account changes, including a decryption that finishes after the change.
+- Question text decrypted for one account is locked again when another account signs in and when the page loads, until it is decrypted for the current reader.
+- Session context files and links reset when the reader or the session's Worker changes, so the next reader never sees or sends the previous reader's admins-only items.
+- Profile SBT badges are kept per chain, so a badge burned on one chain no longer hides one earned at the same address on another.
+- Results analysis of on-chain sessions keeps answers to options whose text has repeated spaces.
+- Creating an SBT group stops before any transaction or draft save if the wallet account changes after Create.
+- Stats show cached counts within a few seconds while live group counts load or wait for a sign-in.
+- A changed multiple-choice draft is always saved; some option labels containing commas could make it look unchanged.
+- The Results report ignores ratings that are off the question's step grid.
+- Interview drafts snap ratings to the question's step.
+- Answer commitments in encrypted envelopes bind the exact answer: rating hashes keep the value on any scale, and Poseidon commitments include each value's length. Existing envelopes still decrypt; only new commitments change.
 
 ### Workers — requires redeployment
 
@@ -82,11 +95,36 @@ All notable changes to this project will be documented in this file.
 - A retried answer upload keeps its own storage ID, so a stalled first attempt that finishes late can't make the saved answer unreadable; the late attempt removes its own copy.
 - An agent's overlapping next-question requests are handled one at a time, so none repeats a question or loses history, and a repeated `requestId` returns the same question. A restore target that holds agent question state is no longer treated as empty.
 - Session context accepts Wikipedia, Notion and block-explorer links. The secret check also refuses Telegram bot tokens, RPC links carrying an Alchemy or Infura key, and Stripe and Hugging Face keys.
+- A payload's own groups narrow a group-gated session's audience instead of adding to it, so a session member outside them can't read or list the payload.
+- Session Wrapped loads catalogs of more than 200 questions instead of returning 503.
+- Context links drop hidden script, style and navigation text however the closing tag is written.
+- A context link or PDF reading started by an admin who has since been replaced is refused instead of published.
+- One request at a time reads a context PDF; another gets 409 "already being read", and readings and removals no longer undo each other.
+- Faucet payouts take turns with the session's wallet, in hosted and registry sessions and for agents, so concurrent requests no longer fail on the same nonce. A request that waits 30 seconds for its turn gets 503.
+- Results analysis drops ratings off the question's step grid, agent-created rating questions keep their end labels, and the interview catalog and brief include each rating's step.
 
 ### Benchmark
 
 - Keep the standalone Raw Results heading readable and correctly wrapped at narrow widths, scope Risk Matrix heading colors to their own dialog, and give export buttons readable colors and descriptive accessible names.
 - `answer --resume` asks again when the endpoint, model settings, routing or answer schema change. Answers saved by earlier versions are asked again once.
+- Typed answers and importance replies ignore drafts inside reasoning tags and refuse truncated reasoning.
+- Flipped rating prompts are used only when flipped answers stay on the scale's grid.
+- Mock ratings land on the scale's step grid.
+- `compare-answers` skips a question that the answer file and the export define differently, and says what differs.
+- `compare-answers` reports everyone apart from groups, so a group named `everyone` stays separate.
+
+### Agents and MCP
+
+- Agent fidelity takes the latest record by the time the Worker stored it, never by the participant's own clock, so a later withdrawal or edit counts.
+- Agent fidelity and MCP `get_results` reject ratings off the step grid and allocations over the voice-credit budget.
+
+### Local tooling
+
+- `deploy:evm` passes the RPC URL to `forge script`, which ignored `ETH_RPC_URL` and only simulated.
+- `deploy:evm` stops with an error instead of printing wrong addresses when another transaction from the deployer moves its nonce.
+- The public package no longer lists `ai:playwright-server`, whose script the public tree leaves out.
+- Corpus freshness with `--as-of` ignores entries dated after that day.
+- Rendering a film frame range that skips frame 0 still writes the video still.
 
 ## [0.8.1] - not released; included in 0.9.0
 
