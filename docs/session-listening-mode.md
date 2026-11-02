@@ -58,7 +58,7 @@ Session creators can change the model in `/new` under **Optional details**
 The Interview header shows a colored pill with its status always visible: Ready,
 Connecting, Listening, Paused, Ending, Preparing drafts, Review drafts, or Error.
 The pill itself carries the status color without a separate dot. The header
-shares the dialog background without a dividing line, and its close icon is half-opacity until hovered
+shares the dialog background without a dividing line, and its close icon is at 75% opacity until hovered
 or keyboard-focused.
 Green readiness requires a reachable Worker that confirms an OpenAI key, voice
 provider, and session access, plus browser microphone support and no known
@@ -588,6 +588,6 @@ Hidden-draft help includes a screen-reader description on its question-mark butt
 
 Voice interview context omits imported facts whose related questions in the interview all have concealed AI drafts, wherever their words appear in the editable background, including inside the summary. A fact with a visible related question stays whole, even when it contains a concealed fact's words.
 
-Generated group-conversation drafts show their question type and a top-right 44-pixel **X** control. Once drafts exist, **Submit questions** replaces the generation action. Removing the last draft restores **Generate questions**; submission remains the normal reviewed authoring flow. The **+** input menu shows upload/paste labels only after opening.
+Generated group-conversation drafts show their question type and a top-right 44-pixel **X** control. Once drafts exist, **Submit questions** replaces the generation action. While drafts generate, Submit is disabled and reads “Waiting for new drafts…”. Drafts generated during an upload join the list afterwards as new drafts; a successful upload always shows its success list and removes the drafts it sent, so none is sent twice. Removing the last draft restores **Generate questions**; submission remains the normal reviewed authoring flow. The **+** input menu shows upload/paste labels only after opening.
 
 Group Conversation keeps the Record/upload/transcript guidance in the question-mark tooltip beside its title, available on hover or keyboard focus.
