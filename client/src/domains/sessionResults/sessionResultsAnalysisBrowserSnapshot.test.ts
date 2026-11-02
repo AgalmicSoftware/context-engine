@@ -138,6 +138,30 @@ describe('sessionResultsAnalysisBrowserSnapshot', () => {
     });
   });
 
+  it('keeps inner option spacing so the Worker still matches the answers', async () => {
+    const result = buildResultsAnalysisBrowserSnapshotFromCacheNode({
+      sessionSlug: 'edge',
+      networkNode: {
+        questions: { q1: { id: 'q1', prompt: 'Pick', type: 'multichoice', options: ['Option  A', ' Option B ', ' '] } },
+        questionResponses: {
+          q1: {
+            first: JSON.stringify({ sessionSlug: 'edge', answer: ['Option  A'] }),
+            second: JSON.stringify({ sessionSlug: 'edge', answer: ['Option B'] }),
+          },
+        },
+      },
+    });
+    if (!result.ok) throw new Error(result.reason);
+    expect(result.snapshot.questions[0]).toEqual(expect.objectContaining({ options: ['Option  A', 'Option B'] }));
+    const source = await loadAdminSnapshotResultsAnalysisSource({
+      slug: 'edge',
+      config: { slug: 'edge' },
+      body: { source: { kind: 'admin-snapshot', snapshot: result.snapshot } },
+    });
+    if (!source.ok || !('counts' in source)) throw new Error('Worker did not accept the snapshot.');
+    expect(source.counts).toEqual(expect.objectContaining({ responseCount: 2, excludedCount: 0 }));
+  });
+
   it('reports unsupported when cache is not hydrated', () => {
     const result = buildResultsAnalysisBrowserSnapshotFromCacheNode({ networkNode: {}, sessionSlug: 'edge' });
     expect(result.ok).toBe(false);
