@@ -1,4 +1,5 @@
 import { summarizeQuadraticAllocations, validateQuadraticAllocation } from '../../shared/questions/quadraticAllocation.mjs';
+import { normalizeRatingAnswer } from '../../shared/questions/ratingScale.mjs';
 import { isSingleSelect, ratingScaleFor } from './records.mjs';
 import { normalizeSessionIdHex } from './workerClient.mjs';
 import { registryResponseMatchesSession } from './registryIdentity.mjs';
@@ -72,12 +73,8 @@ const validValue = (question, entry) => {
       const key = typeof scalar === 'boolean' || typeof scalar === 'number' ? String(scalar) : text(scalar).toLowerCase();
       return Object.hasOwn(BINARY_VOTES, key) ? BINARY_VOTES[key] : undefined;
     }
-    case 'rating': {
-      if (typeof value !== 'number' && !(typeof value === 'string' && value.trim())) return undefined;
-      const number = Number(value);
-      const scale = ratingScaleFor(question);
-      return Number.isFinite(number) && number >= scale.min && number <= scale.max ? number : undefined;
-    }
+    case 'rating':
+      return normalizeRatingAnswer(value, question) ?? undefined;
     case 'multichoice': {
       const options = (Array.isArray(question.options) ? question.options : []).map(text).filter(Boolean);
       const picks = (Array.isArray(value) ? value : [value]).map(text);

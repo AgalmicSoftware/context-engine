@@ -147,6 +147,9 @@ Similarity between a prediction and an answer runs from 0 to 1:
 - Importance and conviction are read with the app's stored-rating rule
   (`shared/questions/storedRating.mjs`): legacy 0–100 values are rescaled, and
   a missing importance falls back on conviction.
+- Ratings and allocations, both answers and drafts, are checked with the app's
+  answer rules (`shared/questions/answerValue.mjs`): a rating off its scale's
+  steps or an allocation over the credit budget counts as unreadable.
 
 ## Running it
 

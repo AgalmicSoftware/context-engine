@@ -3,8 +3,9 @@
 // answer. Pure functions with no I/O. The method is in docs/agent-fidelity.md.
 import { DEFAULT_AI_MODELS } from './aiDefaults.mjs';
 import { confidenceMeaningOf } from './interviewConfidence.mjs';
+import { normalizeAnswerValue } from './questions/answerValue.mjs';
 import { getVoiceCredits } from './questions/quadraticAllocation.mjs';
-import { normalizeRatingScale } from './questions/ratingScale.mjs';
+import { normalizeRatingScale, ratingStepFor } from './questions/ratingScale.mjs';
 import { readStoredRating } from './questions/storedRating.mjs';
 
 export const FIDELITY_METHOD_VERSION = 'ce-agent-fidelity-v1';
@@ -89,9 +90,9 @@ export const normalizeFidelityQuestion = (question) => {
   if (type === 'multichoice') normalized.singleSelect = isSingleSelect(question);
   if (type === 'rating') {
     const scale = normalizeRatingScale(question) || { min: 0, max: 10 };
-    normalized.scale = { min: Number(scale.min), max: Number(scale.max) };
+    normalized.scale = { min: Number(scale.min), max: Number(scale.max), step: ratingStepFor(question) };
   }
-  if (type === 'quadratic') normalized.budget = getVoiceCredits(question);
+  if (type === 'quadratic') normalized.voiceCredits = getVoiceCredits(question);
   return normalized;
 };
 
@@ -130,13 +131,11 @@ export const normalizeFidelityAnswer = (question, raw) => {
       if (!chosen.length || chosen.length !== picks.size) return null;
       return question.singleSelect && chosen.length !== 1 ? null : chosen;
     }
-    case 'rating': {
-      const number = numberOrNull(value);
-      return number !== null && number >= question.scale.min && number <= question.scale.max ? number : null;
-    }
+    // The canonical checks: ratings on the scale's grid, allocations within the budget.
+    case 'rating':
     case 'quadratic': {
-      const votes = (asArray(value) ?? []).map(numberOrNull);
-      return votes.length === question.options.length && votes.every(Number.isInteger) ? votes : null;
+      const checked = normalizeAnswerValue(question, question.type === 'quadratic' ? asArray(value) : value);
+      return checked.ok ? checked.value : null;
     }
     case 'freeform':
       return text(value) || null;
@@ -800,7 +799,7 @@ const topShare = (votes) => {
   const total = squaredLength(votes);
   return total ? Math.max(...votes.map((vote) => vote * vote)) / total : null;
 };
-const creditsUsed = (question, votes) => squaredLength(votes) / question.budget;
+const creditsUsed = (question, votes) => squaredLength(votes) / question.voiceCredits;
 // Per person: mean of `measure` over the AI's drafts minus the same over the
 // person's answers. Below zero means the drafts were weaker or more uniform.
 const pairedShift = (pairs, measure) => {

@@ -102,3 +102,13 @@ test('reads legacy and differently typed answers the way the web report does', (
   const mismatched = summarizeQuestion({ id: '0xq', type: 'binary' }, answers(['Agree'], { type: 'rating' }));
   assert.equal(mismatched.responses, 0);
 });
+
+// The fixture is also exercised by the browser, agent transport, fidelity report and benchmark.
+import { ratingConformance } from '../../shared/questions/ratingConformance.mjs';
+for (const { name, scale, input, expected } of ratingConformance) {
+  test(`results rating conformance: ${name}`, () => {
+    const answers = latestAnswersByQuestion([entry('1', '1', '0xA', '0xq', input)], SESSION).get('0xq');
+    const summary = summarizeQuestion({ id: '0xq', type: 'rating', prompt: 'P', scale }, answers);
+    assert.deepEqual(summary.histogram, expected === null ? {} : { [expected]: 1 });
+  });
+}

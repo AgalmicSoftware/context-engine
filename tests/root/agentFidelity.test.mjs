@@ -15,6 +15,7 @@ import {
   fidelityPairsFromReview,
   summarizeParticipantFidelity,
 } from '../../shared/agentFidelity.mjs';
+import { ratingConformance } from '../../shared/questions/ratingConformance.mjs';
 
 const questions = [
   { id: 'QB1', type: 'binary', prompt: 'One' },
@@ -50,6 +51,21 @@ test('answers are read from stored fields and unreadable ones are rejected', () 
   assert.equal(normalizeFidelityQuestion({ id: 'x', type: 'multichoice', options: ['Only'] }), null);
   for (const type of [undefined, 'text', 'Freeform']) assert.equal(normalizeFidelityQuestion({ id: 'x', type }).type, 'freeform');
   assert.equal(normalizeFidelityQuestion({ id: 'x', questionType: 'Binary' }).type, 'binary');
+});
+
+// The fixture is also exercised by the browser, agent transport, MCP server and benchmark.
+for (const { name, scale, input, expected } of ratingConformance) {
+  test(`fidelity rating conformance: ${name}`, () => {
+    assert.equal(normalizeFidelityAnswer(normalizeFidelityQuestion({ id: 'q-rating', type: 'rating', scale }), input), expected);
+  });
+}
+
+test('allocations over the voice-credit budget are not answers', () => {
+  const small = normalizeFidelityQuestion({ id: 'q4', type: 'quadratic', options: ['P', 'Q'], voiceCredits: 4 });
+  assert.deepEqual(normalizeFidelityAnswer(small, [2, 0]), [2, 0]);
+  assert.equal(normalizeFidelityAnswer(small, [2, 1]), null, '5 credits against a budget of 4');
+  assert.equal(normalizeFidelityAnswer(q.qq, [10, 0, 0]), null, '100 credits against a budget of 99');
+  assert.deepEqual(normalizeFidelityAnswer(q.qq, '["9","-3","0"]'), [9, -3, 0]);
 });
 
 test('similarity gives graded credit by question type', () => {
