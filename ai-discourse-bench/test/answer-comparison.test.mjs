@@ -161,6 +161,43 @@ test('each question checks its groups again with the people who answered it', ()
   assert.equal(comparisons('qs').odd.suppressed, undefined);
 });
 
+test('a question the answer file defines differently from the export is not compared', () => {
+  const exportWith = (changes) => ({
+    ...resultsExport,
+    filteredQuestions: questions.map((question) => ({ ...question, ...changes[question.id] })),
+  });
+  const compared = compareAnswers({
+    answersFile,
+    resultsExport: exportWith({
+      qr: { scale: { min: 0, max: 100, minLabel: 'Not at all', maxLabel: 'Very' } },
+      qq: { options: ['Policy', 'Interpretability', 'Evals'] },
+      qs: { options: ['PauseAI', 'e/acc', 'd/acc'] },
+    }),
+    bootstrapSamples: 0,
+  });
+  const result = (id) => compared.questions.find((question) => question.id === id);
+  assert.match(result('qr').notCompared, /differently .*\(scale\)/);
+  assert.equal(result('qr').comparisons, undefined);
+  assert.equal(result('qr').models['model-a'].answer, 6, 'replies are read as the models were asked');
+  assert.match(result('qq').notCompared, /\(options\)/, 'votes are read by position');
+  assert.equal(result('qs').notCompared, undefined, 'choices listed in another order read the same');
+  assert.equal(compared.closeness.everyone['model-a'].questions, 3);
+  assert.match(renderComparisonMarkdown(compared), /defines this question differently/);
+
+  const swapped = compareAnswers({
+    answersFile,
+    resultsExport: exportWith({ qr: { scale: { min: 0, max: 10, minLabel: 'Very', maxLabel: 'Not at all' } } }),
+    bootstrapSamples: 0,
+  });
+  assert.match(swapped.questions.find((question) => question.id === 'qr').notCompared, /\(labels\)/);
+  const retyped = compareAnswers({
+    answersFile: { ...answersFile, questions: questions.map((question) => (question.id === 'qb' ? { ...question, type: 'rating' } : question)) },
+    resultsExport,
+    bootstrapSamples: 0,
+  });
+  assert.match(retyped.questions.find((question) => question.id === 'qb').notCompared, /\(type\)/);
+});
+
 test('an answer file and a Results export from another session are refused', () => {
   assert.throws(() => compareAnswers({ answersFile: { runs: [] }, resultsExport }), /must come from the answer command/);
   const elsewhere = { ...answersFile, rows: answersFile.rows.map((row) => ({ ...row, questionId: `other-${row.questionId}` })) };

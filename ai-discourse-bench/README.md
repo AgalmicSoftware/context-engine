@@ -410,7 +410,10 @@ each question is checked again with the people who answered it, and a question
 with fewer is withheld for everyone. Each model counts as one respondent: its replies are
 summarized as its most common answer (an even split between agreeing and
 disagreeing counts as Unsure), the options it picked in at least half its
-replies, its median rating, or its mean allocation.
+replies, its median rating, or its mean allocation. A question the answer file
+defines differently from the export (another type, scale, end labels, options,
+selection rule or credit budget) is listed as not compared, naming what
+differs, since the models' answers would not read the same way as people's.
 
 | Type | One model against a group | Models against a group |
 | --- | --- | --- |
