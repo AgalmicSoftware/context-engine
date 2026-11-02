@@ -2032,10 +2032,11 @@ class UserPage extends Component<any, any> {
 
       sbtCaches.forEach(({ slug, data: cacheObj }: NamespaceCacheSourceEntry) => {
         const netEntries = getPrioritizedUserPageNetworkCacheNodes(cacheObj, networkID) as PrioritizedCacheNode[];
-        netEntries.forEach(({ value: netObj }) => {
+        netEntries.forEach(({ key: chain, value: netObj }) => {
           const sbtList = toAnalysisRecord(netObj.sbtList);
           Object.keys(sbtList).forEach((addrLowerKey: string) => {
             mergeUserPageSbtCacheEntryIntoAggregate({
+              chain,
               sbtAggregate,
               entry: sbtList[addrLowerKey],
               key: addrLowerKey,
@@ -2111,18 +2112,21 @@ class UserPage extends Component<any, any> {
           });
         });
 
-        (getPrioritizedUserPageChainNodes(userNode, networkID) as PrioritizedUserChainNode[]).forEach(({ node }) => {
-          const chainPayload = isPlainAnalysisObject(node.data) ? (node.data as UserCachePayload) : null;
-          if (!chainPayload) return;
-          (Array.isArray(chainPayload.sbts) ? chainPayload.sbts : []).forEach((item: unknown) => {
-            mergeUserPageUserCacheSbtIntoAggregate({
-              sbtAggregate,
-              item,
-              slug,
-              viewAddressKey,
+        (getPrioritizedUserPageChainNodes(userNode, networkID) as PrioritizedUserChainNode[]).forEach(
+          ({ chainKey, node }) => {
+            const chainPayload = isPlainAnalysisObject(node.data) ? (node.data as UserCachePayload) : null;
+            if (!chainPayload) return;
+            (Array.isArray(chainPayload.sbts) ? chainPayload.sbts : []).forEach((item: unknown) => {
+              mergeUserPageUserCacheSbtIntoAggregate({
+                chain: chainKey,
+                sbtAggregate,
+                item,
+                slug,
+                viewAddressKey,
+              });
             });
-          });
-        });
+          },
+        );
       });
 
       return {

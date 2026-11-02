@@ -381,7 +381,7 @@ describe('UserPage SBT ownership cache fallback', () => {
     instance._dgReadAll = jest.fn((name) => dataByNamespace[name] || []);
 
     const aggregate = instance._collectUnifiedCacheData({ networkID, viewAddressLower: viewLower });
-    const sbtEntry = aggregate.sbtAggregate['0x100'];
+    const sbtEntry = aggregate.sbtAggregate[`${networkID}:0x100`];
 
     expect(sbtEntry.burnedSet.has(viewLower)).toBe(true);
     expect(sbtEntry.mintedSet.has(viewLower)).toBe(false);
