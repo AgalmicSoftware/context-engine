@@ -105,7 +105,7 @@ describe('sessionResultsAnalysisBrowserSnapshot', () => {
     );
     expect(source.aiSnapshot.questions).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ id: 'rating', scale }),
+        expect.objectContaining({ id: 'rating', scale: { ...scale, step: 1 } }),
         expect.objectContaining({ id: 'quadratic', voiceCredits: 25 }),
       ]),
     );
