@@ -97,6 +97,7 @@ import {
   buildCreateSbtDeterministicSymbol,
   buildCreateSbtDistributionFieldPatch,
   buildCreateSbtDocumentUrlAdditionPatch,
+  assertCreateSbtAccountUnchanged,
   buildCreateSbtDocumentUrlRemovalPatch,
   buildCreateSbtEditResetPatch,
   buildEffectiveCreateSbtDocumentUrls,
@@ -2959,12 +2960,13 @@ class CreateSBTGroup extends Component<any, any> {
 
   handleDeferredSave = async ({
     groupPassword,
-  }: { groupPassword?: string } = {}): Promise<CreateSbtDeferredDraftPayload> => {
+    account = this.props.account,
+  }: { groupPassword?: string; account?: unknown } = {}): Promise<CreateSbtDeferredDraftPayload> => {
     if (typeof this.props.onSaveDraft !== 'function') {
       throw new Error('Session draft save is unavailable.');
     }
     await this.commitPendingDocumentUrl();
-    const draftPayload = await this.buildDeferredDraftPayload({ groupPassword });
+    const draftPayload = await this.buildDeferredDraftPayload({ groupPassword, account });
     await this.props.onSaveDraft(draftPayload);
     this.clearFormCache();
     await this.setStateAsync({
@@ -3327,7 +3329,8 @@ class CreateSBTGroup extends Component<any, any> {
 
   buildDeferredDraftPayload = async ({
     groupPassword = cryptoUtils.normalizeGroupPasswordInput(this.state.groupPassword),
-  }: { groupPassword?: string } = {}): Promise<CreateSbtDeferredDraftPayload> => {
+    account = this.props.account,
+  }: { groupPassword?: string; account?: unknown } = {}): Promise<CreateSbtDeferredDraftPayload> => {
     const authoringPayload = await this.buildSerializableAuthoringPayload();
     const arweaveKey = await this.getEffectiveArweaveUploadKey();
     let tokenURI = String(this.state.tokenURI || '').trim();
@@ -3353,6 +3356,7 @@ class CreateSBTGroup extends Component<any, any> {
         }
       }
     }
+    assertCreateSbtAccountUnchanged(account, this.props.account);
     const deployPlan = await this.resolvePredictableDeployPlan({ tokenURI, groupPassword });
     const metadataPreview = this.buildMetadataPreview();
     return {
@@ -3384,7 +3388,10 @@ class CreateSBTGroup extends Component<any, any> {
     };
   };
 
-  async mintSBT({ groupPassword: groupPasswordSnapshot }: { groupPassword?: string } = {}) {
+  async mintSBT({
+    groupPassword: groupPasswordSnapshot,
+    account = this.props.account,
+  }: { groupPassword?: string; account?: unknown } = {}) {
     if (!this.props.loginComplete) {
       // Nothing has been sent: end this create so the form unlocks and Create works again after login.
       this.setState({ startedMinting: false, currentStep: 0 });
@@ -3490,6 +3497,7 @@ class CreateSBTGroup extends Component<any, any> {
 
       this.setState(buildCreateSbtSymbolPatch({ sbtSymbol }));
 
+      assertCreateSbtAccountUnchanged(account, this.props.account);
       const receipt = await createSbtContractScripts.createSBT(
         this.props.provider,
         contractName,
@@ -3668,7 +3676,8 @@ class CreateSBTGroup extends Component<any, any> {
 
   handleMintClick = async (): Promise<void> => {
     // Must be connected
-    if (!this.props.account) {
+    const { account } = this.props;
+    if (!account) {
       this.props.toggleLoginModal(true);
       return;
     }
@@ -3740,11 +3749,11 @@ class CreateSBTGroup extends Component<any, any> {
 
     try {
       if (this.isDeferredDeployMode()) {
-        await this.handleDeferredSave({ groupPassword });
+        await this.handleDeferredSave({ groupPassword, account });
       } else {
         await this.uploadImageToArweave();
         await this.uploadTokenUriToArweave();
-        await this.mintSBT({ groupPassword });
+        await this.mintSBT({ groupPassword, account });
       }
     } catch (error) {
       if (this.state.error) return;

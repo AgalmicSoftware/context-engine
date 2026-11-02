@@ -376,6 +376,13 @@ export const buildCreateSbtCountdownTickPatch = ({ state = {} }: BuildCreateSbtC
 
 export const normalizeComparableAddress = (value: unknown): string => toStr(value).trim().toLowerCase();
 
+/** A create sends nothing once the connected account is no longer the one that clicked Create. */
+export const assertCreateSbtAccountUnchanged = (createAccount: unknown, liveAccount: unknown): void => {
+  if (normalizeComparableAddress(createAccount) !== normalizeComparableAddress(liveAccount)) {
+    throw new Error('The connected account changed, so nothing was sent. Click Create to try again.');
+  }
+};
+
 export const buildCreateSbtAccountDistributionSyncPatch = ({
   currentDistribution = {},
   nextAccount = '',
