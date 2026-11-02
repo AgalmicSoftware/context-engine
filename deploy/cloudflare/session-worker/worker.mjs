@@ -65270,7 +65270,14 @@ function normalizeOptions3(value = []) {
 function normalizeRatingScale2(value = {}) {
   const question = { scale: value };
   const scale = normalizeRatingScale(question);
-  return scale ? { min: scale.min, max: scale.max, step: ratingStepFor(question) } : null;
+  const label = (text4) => text4.replace(/\s+/g, " ").slice(0, 120);
+  return scale ? {
+    min: scale.min,
+    max: scale.max,
+    minLabel: label(scale.minLabel),
+    maxLabel: label(scale.maxLabel),
+    step: ratingStepFor(question)
+  } : null;
 }
 function normalizeReferenceUrl(value = "") {
   const text4 = safeString(value).slice(0, 2e3);
