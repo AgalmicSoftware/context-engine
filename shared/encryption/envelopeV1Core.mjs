@@ -307,13 +307,26 @@ export const bigIntToHex32 = (x) => {
 
 export const normalizePoseidonHashOutput = (out) => bigIntToHex32(BigInt(out) % BN254_P);
 
+// Each input becomes one field element: its byte length, then each 31-byte limb (always below the modulus)
+// folded in with the two-input hash. Reading a whole input as one number would drop leading zero bytes and
+// wrap past 31 bytes, so different answers could share a commitment.
+const POSEIDON_LIMB_BYTES = 31;
+const bytesToPoseidonField = async (bytes, hasher) => {
+  let acc = BigInt(bytes.length);
+  for (let start = 0; start < bytes.length; start += POSEIDON_LIMB_BYTES) {
+    acc = BigInt(await hasher([acc, toField(bytes.subarray(start, start + POSEIDON_LIMB_BYTES))])) % BN254_P;
+  }
+  return acc;
+};
+
 export const poseidonHashBytes = async (inputBytes, customHasher = null) => {
   requireBigInt();
   if (typeof customHasher !== 'function') {
     throw new Error('Poseidon hasher required but not available');
   }
   try {
-    const inputs = inputBytes.map((bytes) => toField(bytes));
+    const inputs = [];
+    for (const bytes of inputBytes) inputs.push(await bytesToPoseidonField(bytes, customHasher));
     const out = await customHasher(inputs);
     return normalizePoseidonHashOutput(out);
   } catch (_) {

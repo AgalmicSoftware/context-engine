@@ -2,8 +2,10 @@ import {
   computeContext as computeCcContext,
   computeResponseFieldContext,
   encodeValueBytes,
+  poseidonHashBytes,
 } from '@ce-shared/encryption/envelopeV1Core.mjs';
 import { cryptoUtils } from './cryptography';
+import { loadPoseidonHasher } from './poseidonHasher';
 
 const CONTEXT_INPUT = {
   chainId: 11155420,
@@ -39,5 +41,19 @@ describe('shared envelope v1 compatibility', () => {
       expect(encodeValueBytes('rating', left)).not.toEqual(encodeValueBytes('rating', right));
     });
     expect(() => encodeValueBytes('rating', 'not a number')).toThrow('Invalid rating');
+  });
+
+  it('keeps Poseidon inputs that differ by leading zero bytes or past 31 bytes distinct', async () => {
+    const hasher = await loadPoseidonHasher();
+    const text = (value: string) => new TextEncoder().encode(value);
+    const domain = text('rxc|commit|v1|chain:1|survey:0x00|qid:q');
+    const commit = (bytes: Uint8Array) => poseidonHashBytes([bytes, domain], hasher);
+    const fieldModulus = BigInt('21888242871839275222246405745257275088548364400416034343698204186575808495617');
+    const bytes32 = (value: bigint) =>
+      Uint8Array.from(value.toString(16).padStart(64, '0').match(/../g) || [], (byte) => parseInt(byte, 16));
+
+    expect(await commit(text('approve'))).not.toBe(await commit(text('\u0000approve')));
+    // As 32-byte numbers these two differ by exactly the field modulus.
+    expect(await commit(bytes32(1n))).not.toBe(await commit(bytes32(fieldModulus + 1n)));
   });
 });
