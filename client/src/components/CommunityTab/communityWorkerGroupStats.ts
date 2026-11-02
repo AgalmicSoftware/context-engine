@@ -54,6 +54,30 @@ type CommunityWorkerGroupRuntime = {
 };
 
 const WORKER_GROUP_COUNT_TTL_MS = 30000;
+export const WORKER_GROUP_COUNT_WAIT_MS = 2500;
+
+/**
+ * Live group counts are optional: a load can wait on a Worker sign-in that is
+ * never answered. Wait briefly so cached Stats can publish, and call
+ * `onSettledLate` once slower loads finish.
+ */
+export const awaitWorkerGroupCountsBriefly = async (
+  loads: Promise<unknown>,
+  onSettledLate: () => void,
+): Promise<void> => {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const late = new Promise<'late'>((resolve) => {
+    timer = setTimeout(() => resolve('late'), WORKER_GROUP_COUNT_WAIT_MS);
+  });
+  try {
+    if ((await Promise.race([loads, late])) === 'late') {
+      void loads.finally(onSettledLate).catch(() => undefined);
+    }
+  } finally {
+    clearTimeout(timer);
+  }
+};
+
 export const isDisplayableWorkerUserId = (value: unknown): boolean =>
   /^0x[0-9a-f]{40}$/i.test(String(value || '').trim());
 

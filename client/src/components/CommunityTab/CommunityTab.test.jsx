@@ -35,6 +35,7 @@ import {
   resolveWorkerCanonicalCacheIdentity,
   withWorkerCanonicalCacheIdentity,
 } from '../../utilities/survey/workerCanonicalCacheIdentity';
+import { WORKER_GROUP_COUNT_WAIT_MS } from './communityWorkerGroupStats';
 import BeeswarmPlot from '../Shared/BeeswarmPlot/BeeswarmPlot';
 import SBTsList from '../SBTs/SBTsList';
 import SBTFilter from '../SBTs/SBTFilter';
@@ -765,6 +766,45 @@ describe('CommunityTab helpers', () => {
     expect(instance.state.stats.find((stat) => stat.label === 'Groups').count).toBe(2);
     expect(instance.state.stats.find((stat) => stat.label === 'Users').count).toBe(3);
     expect(instance.state.uniqueUsers).toContain('0x0000000000000000000000000000000000000011');
+  });
+
+  it('publishes cached Stats while a Worker sign-in is still unanswered', async () => {
+    writeGlobalSessionSelection({ selectedSessionScope: 'active', primarySessionSlug: 'demo-sh' });
+    await writeWorkerStatsCaches();
+    let answerSignIn = () => {};
+    jest
+      .spyOn(workerAuth, 'getWorkerSessionToken')
+      .mockImplementation(() => new Promise((resolve) => (answerSignIn = () => resolve('worker-token'))));
+    jest.spyOn(workerGroupPorts, 'loadWorkerGroupOverview').mockResolvedValue({ groups: [], memberships: [] });
+    const instance = attachMutableSetState(
+      new CommunityTab({
+        activeSessionSlug: 'demo-sh',
+        sessionConfig: WORKER_SESSION_CONFIG,
+        account: '0x00000000000000000000000000000000000000aa',
+        isQuestionCacheReady: true,
+        isSurveyCacheReady: true,
+      }),
+    );
+    jest.spyOn(instance, '_shouldUseDemoBeeswarmData').mockReturnValue(false);
+    jest.spyOn(instance, 'checkIfInitialLoadDone').mockResolvedValue(true);
+    const queueRefresh = jest.spyOn(instance, '_queueCacheDrivenRefresh').mockImplementation(() => {});
+    jest.useFakeTimers();
+    try {
+      const refresh = instance._refreshCommunityStats({ force: true, markLoading: true });
+      await jest.advanceTimersByTimeAsync(WORKER_GROUP_COUNT_WAIT_MS);
+
+      expect(instance.state.stats.find((stat) => stat.label === 'Questions').count).toBe(1);
+      expect(instance.state.loadingSurveyData).toBe(false);
+      expect(instance._statsRefreshInFlight).toBe(false);
+      expect(queueRefresh).not.toHaveBeenCalled();
+
+      answerSignIn();
+      await jest.advanceTimersByTimeAsync(0);
+      expect(queueRefresh).toHaveBeenCalledWith({ force: true });
+      await refresh;
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('only authenticates the active Worker while counting the broader catalog', async () => {
