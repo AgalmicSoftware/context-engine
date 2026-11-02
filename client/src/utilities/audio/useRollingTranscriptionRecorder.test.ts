@@ -513,6 +513,39 @@ describe('useRollingTranscriptionRecorder', () => {
     unmount();
   });
 
+  it('stops when a second account signs in after a recording started signed out was handed over', async () => {
+    const first = '0x1111111111111111111111111111111111111111';
+    const second = '0x2222222222222222222222222222222222222222';
+    (transcribeAudio as jest.Mock).mockImplementation(async () => 'Speech.');
+    const uploadedAs = () =>
+      (transcribeAudio as jest.Mock).mock.calls.map(
+        (call) => (call[1] as { context: { account: string } }).context.account,
+      );
+    const { result, rerender, unmount } = renderHook(
+      ({ account }) =>
+        useRollingTranscriptionRecorder({ sessionSlug: 'handover-switch', context: { account }, chunkMs: 15000 }),
+      { initialProps: { account: '' } },
+    );
+    await act(async () => {
+      await result.current.startRecording();
+    });
+    rerender({ account: first });
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(15000);
+      await flushPromises();
+    });
+    expect(result.current.isRecording).toBe(true);
+    rerender({ account: second });
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(60_000);
+      await flushPromises();
+    });
+    expect(result.current.isRecording).toBe(false);
+    expect(uploadedAs()).toEqual([first]);
+    expect(result.current.segments.map((segment) => segment.status)).toEqual(['complete', 'retrying']);
+    unmount();
+  });
+
   it('stops when another account signs in mid-recording and uploads only as the account that made it', async () => {
     const first = '0x1111111111111111111111111111111111111111';
     const second = '0x2222222222222222222222222222222222222222';
