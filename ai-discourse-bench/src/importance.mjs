@@ -11,7 +11,7 @@ import {
   IMPORTANCE_PROMPT_TEMPLATE_VERSION,
 } from './config.mjs';
 import { callOpenAiCompatibleChat, getProviderConfig } from './adapters/openai-compatible.mjs';
-import { jsonObjectCandidates } from './normalize.mjs';
+import { extractFinalAnswerText, jsonObjectCandidates } from './normalize.mjs';
 import { detectHarnessCommit, hashJson, sha256 } from './provenance.mjs';
 
 const compareHash = (left, right) => left < right ? -1 : left > right ? 1 : 0;
@@ -116,7 +116,9 @@ export const parseImportanceAllocation = (rawText, {
   maxAllocations = DEFAULT_IMPORTANCE_MAX_ALLOCATIONS,
   maxVotesPerQuestion = maximumSafeImportanceVotes({ budget, maxAllocations }),
 } = {}) => {
-  const trimmed = String(rawText || '').trim();
+  // A reasoning region may hold a draft allocation; only the reply after it counts.
+  const { text: trimmed, truncated } = extractFinalAnswerText(rawText);
+  if (truncated) return { allocations: [], rationale: '', spentCredits: 0, parseError: 'truncated reasoning region' };
   if (!trimmed) return { allocations: [], rationale: '', spentCredits: 0, parseError: 'empty response' };
   const knownQuestionIds = questionIds instanceof Set ? questionIds : new Set(questionIds || []);
   const candidates = trimmed.startsWith('{') && trimmed.endsWith('}')

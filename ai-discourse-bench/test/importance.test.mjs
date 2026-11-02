@@ -86,6 +86,24 @@ test('quadratic importance parser skips unrelated JSON with braces inside string
   ]);
 });
 
+test('quadratic importance parser never reads a reasoning draft as the allocation', () => {
+  const options = {
+    questionIds: new Set(['q1', 'q2']),
+    budget: 10,
+    maxAllocations: 2,
+    maxVotesPerQuestion: 4,
+  };
+  const draft = '{"allocations":[{"questionId":"q1","votes":3}],"rationale":"draft"}';
+  const parsed = parseImportanceAllocation(
+    `<think>${draft}</think>{"allocations":[{"questionId":"q2","votes":1}],"rationale":"final"}`,
+    options,
+  );
+
+  assert.equal(parsed.parseError, '');
+  assert.deepEqual(parsed.allocations, [{ questionId: 'q2', votes: 1, cost: 1 }]);
+  assert.equal(parseImportanceAllocation(`<think>${draft}`, options).parseError, 'truncated reasoning region');
+});
+
 test('quadratic importance parser enforces known ids, integer votes, and squared budget cost', () => {
   const options = {
     questionIds: new Set(['q1', 'q2']),
