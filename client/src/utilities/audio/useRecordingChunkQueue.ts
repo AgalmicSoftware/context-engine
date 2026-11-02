@@ -48,7 +48,7 @@ const scopeAccount = (scope: string): string => {
 const ownedByAnother = (scope: string, account: string) =>
   Boolean(scopeAccount(scope)) && scopeAccount(scope) !== account;
 // Another account signed in, as opposed to a sign-out, which keeps uploading signed out.
-const switchedAccount = (scope: string, account: string) => Boolean(account) && ownedByAnother(scope, account);
+const switchedAccount = (owner: string, account: string) => Boolean(owner && account) && owner !== account;
 const SWITCHED_ACCOUNT_WAIT = 'Waiting for the account that made this recording.';
 const OPEN_ELSEWHERE_NOTICE = 'This recording is open in another tab.';
 // Reopening in the same tab gets the lock back at once; only a longer wait means another tab holds it.
@@ -99,6 +99,11 @@ export function useRecordingChunkQueue(options: Options) {
   }
   const foreignPin = isForeign(pinned.current.scope);
   const scope = pinned.current.scope || JSON.stringify([worker, options.sessionSlug, normalizedAccount]);
+  // A recording started signed out belongs to the first account that signs in during it.
+  const handover = useRef({ scope, account: '' });
+  if (handover.current.scope !== scope) handover.current = { scope, account: '' };
+  if (!scopeAccount(scope) && normalizedAccount && !handover.current.account)
+    handover.current.account = normalizedAccount;
   const releasePin = useCallback(() => {
     pinned.current = { identity, scope: '' };
     forgetPinnedScope(identity);
@@ -116,7 +121,8 @@ export function useRecordingChunkQueue(options: Options) {
         scope,
         transcribe: async (audio, labels, signal, knownSpeakers) => {
           // Retried until its own account is back, so the audio stays on this device meanwhile.
-          if (switchedAccount(scope, recordingOwner(latest.current).account)) throw new Error(SWITCHED_ACCOUNT_WAIT);
+          const owner = scopeAccount(scope) || handover.current.account;
+          if (switchedAccount(owner, recordingOwner(latest.current).account)) throw new Error(SWITCHED_ACCOUNT_WAIT);
           const request = { ...latest.current, signal };
           if (labels) {
             const result = await transcribeGroupAudio(audio, { ...request, knownSpeakers });
@@ -347,7 +353,7 @@ export function useRecordingChunkQueue(options: Options) {
     offline,
     labelsUnavailableReason,
     ownerNotice: foreignPin && !options.capturing ? OWNER_NOTICE : '',
-    accountSwitched: switchedAccount(pinned.current.scope, normalizedAccount),
+    accountSwitched: switchedAccount(scopeAccount(scope) || handover.current.account, normalizedAccount),
     openElsewhereNotice: openElsewhere ? OPEN_ELSEWHERE_NOTICE : '',
   };
 }
