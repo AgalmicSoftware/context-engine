@@ -245,10 +245,9 @@ export const loadCommunityWorkerGroupCount = async ({
   const requestRevision = Number(revisions.get(countCacheKey) || 0);
   const requestIsCurrent = () => Number(revisions.get(countCacheKey) || 0) === requestRevision;
   const existing = cache.get(countCacheKey);
-  if (existing?.promise) {
-    await existing.promise;
-    return;
-  }
+  // Still loading from an earlier Stats cycle, which refreshes Stats when it settles
+  // (awaitWorkerGroupCountsBriefly): later cycles show the current counts instead of waiting again.
+  if (existing?.promise) return;
   if (existing && Date.now() - existing.updatedAtMs < WORKER_GROUP_COUNT_TTL_MS) return;
 
   const { sessionConfig, slug } = scopeEntry;

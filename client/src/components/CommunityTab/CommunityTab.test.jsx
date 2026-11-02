@@ -807,6 +807,32 @@ describe('CommunityTab helpers', () => {
     }
   });
 
+  it('waits for a late Worker group count only once', async () => {
+    jest.spyOn(workerAuth, 'getWorkerSessionToken').mockImplementation(() => new Promise(() => {}));
+    const instance = new CommunityTab({
+      activeSessionSlug: 'demo-sh',
+      sessionConfig: WORKER_SESSION_CONFIG,
+      account: '0x00000000000000000000000000000000000000aa',
+    });
+    jest.spyOn(instance, '_queueCacheDrivenRefresh').mockImplementation(() => {});
+    jest.useFakeTimers();
+    try {
+      const first = instance._hydrateWorkerGroupCounts(instance._buildScopeEntriesFromSlugs(['demo-sh']));
+      await jest.advanceTimersByTimeAsync(WORKER_GROUP_COUNT_WAIT_MS);
+      await first;
+
+      let secondDone = false;
+      const second = instance
+        ._hydrateWorkerGroupCounts(instance._buildScopeEntriesFromSlugs(['demo-sh']))
+        .then(() => (secondDone = true));
+      await jest.advanceTimersByTimeAsync(0);
+      expect(secondDone).toBe(true);
+      await second;
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it('only authenticates the active Worker while counting the broader catalog', async () => {
     const token = jest.spyOn(workerAuth, 'getWorkerSessionToken').mockResolvedValue('worker-token');
     jest
