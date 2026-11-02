@@ -158,7 +158,10 @@ const AUTHOR_ENCRYPTED_FIELDS = [
   'encryptedTags',
 ];
 
-// The report leaves out questions whose author encrypted their text, even after this reader decrypted it.
+const ENCRYPTED_QUESTION_LABEL = 'Encrypted question';
+
+// Questions whose author encrypted their text: the report shows them redacted and its AI analysis never sees
+// them, even after this reader decrypted them.
 const listAuthorEncryptedQuestionIds = (networkQuestions: unknown): Set<string> => {
   const ids = new Set<string>();
   Object.entries(toRecord(networkQuestions)).forEach(([key, question]) => {
@@ -229,11 +232,25 @@ export const createSurveyResultsHtmlReportRuntime = ({
   const getHtmlReportQuestionsForExport = () => {
     const encrypted = listAuthorEncryptedQuestionIds(getNetworkQuestionsForCurrentContext());
     return buildSurveyResultsHtmlReportQuestionsForExport({
-      filteredQuestions: getFilteredQuestionsForExport().filter(
-        (question) => !encrypted.has(String(question.id || '').toLowerCase()),
+      filteredQuestions: getFilteredQuestionsForExport().map((question) =>
+        encrypted.has(String(question.id || '').toLowerCase())
+          ? {
+              id: question.id,
+              type: question.type,
+              voiceCredits: question.voiceCredits,
+              prompt: ENCRYPTED_QUESTION_LABEL,
+              options: [],
+              tags: [],
+            }
+          : question,
       ),
       responseCountsByQuestion: getHtmlReportResponseCountsByQuestion(),
     });
+  };
+
+  const getHtmlReportAnalysisQuestions = () => {
+    const encrypted = listAuthorEncryptedQuestionIds(getNetworkQuestionsForCurrentContext());
+    return getHtmlReportQuestionsForExport().filter((question) => !encrypted.has(question.id.toLowerCase()));
   };
 
   const isHtmlReportDemoSession = (): boolean => {
@@ -289,7 +306,7 @@ export const createSurveyResultsHtmlReportRuntime = ({
     const sessionName = String(props.sessionName || state.surveyTitle || sessionSlug || 'Session').trim();
     const encrypted = listAuthorEncryptedQuestionIds(getNetworkQuestionsForCurrentContext());
     const built = buildSessionResultsAnalysisAiPayload({
-      questions: getHtmlReportQuestionsForExport(),
+      questions: getHtmlReportAnalysisQuestions(),
       responses: buildSurveyResultsAnalysisResponsesForExport({
         aggregatorQuestionResponses: state.sbtFilteredAggregatorQuestionResponses,
         filteredResponses: state.sbtFilteredResponses,
@@ -327,7 +344,7 @@ export const createSurveyResultsHtmlReportRuntime = ({
         networkQuestions: getNetworkQuestionsForCurrentContext(),
         normalizeGateSbtEntries: (gate) => normalizeGateSbtEntries(toRecord(gate) as SurveyResultsGateRecord),
         participantCount: getHtmlReportParticipantCount(),
-        questions: getHtmlReportQuestionsForExport(),
+        questions: getHtmlReportAnalysisQuestions(),
       }),
       session: {
         name: sessionName,
