@@ -3079,10 +3079,12 @@ transport: { type: "webrtc", sdp } }`. Preserves the SDP offer verbatim,
     A request that times out waiting for its faucet-wallet turn (below) releases
     its capacity. Missing coordination fails closed. These rules do not apply to
     `POST /sponsored/redeem-faucet`.
-  - Every payout, in hosted and registry sessions and through Agent HTTP, takes
-    turns with the session's faucet wallet, so each reads its pending nonce,
-    signs and sends before the next starts. A request that waits 30 seconds for
-    its turn returns `503`; without coordination nothing is sent.
+  - Every payout, in hosted and registry sessions, through Agent HTTP and through
+    `POST /sponsored/redeem-faucet`, takes turns with its faucet wallet, so each
+    reads its pending nonce, signs and sends before the next starts. Sessions and
+    sponsored grants on the same Worker that share a key share the turn, and a
+    grant takes it before its one-time reservation. A request that waits 30
+    seconds for its turn returns `503`; without coordination nothing is sent.
   - The following generic and proof-backed gate rules apply to registry sessions.
   - Authenticated callers that already have `scopes.faucet=true` may continue using the generic payload
     `{ action: "request_test_eth", address|to, amountEth? }`.

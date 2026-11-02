@@ -122,7 +122,7 @@ export const createAgentServices = ({ env, agentEnv, deps }) => {
       const secrets = await deps.getSessionSecrets(env, ctx.slug);
       // The same wallet turn as participant payouts, so neither signs the other's nonce.
       const takeWalletTurn = deps.withCoordinatedFaucetWalletTurn || withCoordinatedFaucetWalletTurn;
-      const response = await takeWalletTurn({ env, slug: ctx.slug }, () => deps.faucet({ payload: { to: ctx.address },
+      const response = await takeWalletTurn({ env, secrets }, () => deps.faucet({ payload: { to: ctx.address },
         secrets, config: ctx.config, slug: ctx.slug, requesterAddress: ctx.address, tokenHasFaucetScope: true, baseHeaders: {} }));
       if (!response) return { ok: false, reason: 'faucet_busy', status: 503 };
       const body = await response.json();

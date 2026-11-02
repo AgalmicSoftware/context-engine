@@ -1,3 +1,4 @@
+import { computeAddress } from 'ethers';
 import { dispatchAgentSubmissionJournal, nextAgentSubmitProjectionAt, repairAgentSubmitProjections } from './agent/submissionJournal.mjs';
 import { dispatchAgentInviteJournal } from './agent/inviteJournal.mjs';
 import { executeAgentQuestionQueueAdvance } from './agent/agentQuestionQueue.mjs';
@@ -2687,12 +2688,13 @@ export class SessionWriteCoordinator {
     return jsonResponse(result);
   }
 
-  async executeFaucetWalletTurn(payload, release = false) {
+  async executeFaucetWalletTurn(payload, action) {
     const nowMs = Number(this.now()) || Date.now();
     const result = await this.state.storage.transaction(async (transaction) => {
       const turn = await transaction.get(FAUCET_WALLET_TURN_KEY);
-      if (release) {
-        if (turn && turn.token === toTrimmedString(payload?.token)) await transaction.delete(FAUCET_WALLET_TURN_KEY);
+      const held = Boolean(turn) && turn.token === toTrimmedString(payload?.token);
+      if (action === 'release') {
+        if (held) await transaction.delete(FAUCET_WALLET_TURN_KEY);
         return { ok: true };
       }
       if (turn?.expiresAtMs > nowMs) return { ok: true, acquired: false };
@@ -3122,8 +3124,8 @@ export class SessionWriteCoordinator {
     if (url.pathname === '/hosted-faucet/reserve' || url.pathname === '/hosted-faucet/finalize') {
       return this.executeHostedFaucetQuota(payload, url.pathname.endsWith('/finalize'));
     }
-    if (url.pathname === '/faucet-wallet/acquire' || url.pathname === '/faucet-wallet/release') {
-      return this.executeFaucetWalletTurn(payload, url.pathname.endsWith('/release'));
+    if (['/faucet-wallet/acquire', '/faucet-wallet/release'].includes(url.pathname)) {
+      return this.executeFaucetWalletTurn(payload, url.pathname.slice('/faucet-wallet/'.length));
     }
     if (url.pathname === '/auth-state/rate/check') {
       return this.executeAuthRateCheck(payload);
@@ -3410,23 +3412,30 @@ export const reserveCoordinatedHostedFaucet = (args = {}) => callHostedFaucetQuo
 }, false);
 export const finalizeCoordinatedHostedFaucet = (args = {}) => callHostedFaucetQuota(args, true);
 
-// One send at a time per session faucet wallet: each request reads the pending
-// nonce, signs and sends before the next reads it. Returns null without a turn.
-export const withCoordinatedFaucetWalletTurn = async ({ env, slug, now = Date.now,
+// One send at a time per faucet wallet on this Worker, whichever sessions or grants share its key: each
+// request reads the pending nonce, signs and sends before the next reads it. Returns null without a
+// turn. A missing or malformed key fails in the faucet before any nonce read, so it sends without a turn.
+export const withCoordinatedFaucetWalletTurn = async ({ env, secrets, now = Date.now,
   sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)) }, send) => {
-  const identity = `faucet-wallet:${resolveCoordinatorSessionSlugStorageKey(slug)}`;
-  const acquire = () => callAuthStateCoordinator({ env, identity, path: '/faucet-wallet/acquire', payload: {} });
+  let wallet = '';
+  try {
+    wallet = computeAddress(toTrimmedString(secrets?.faucetPrivateKey)).toLowerCase();
+  } catch {
+    return send();
+  }
+  const identity = `faucet-wallet:${wallet}`;
+  const call = (action, payload = {}) => callAuthStateCoordinator({ env, identity, path: `/faucet-wallet/${action}`, payload });
   const deadline = now() + FAUCET_WALLET_WAIT_MS;
-  let turn = await acquire();
+  let turn = await call('acquire');
   while (turn.ok === true && !turn.acquired && now() < deadline) {
     await sleep(FAUCET_WALLET_POLL_MS);
-    turn = await acquire();
+    turn = await call('acquire');
   }
   if (!turn.acquired) return null;
   try {
     return await send();
   } finally {
-    await callAuthStateCoordinator({ env, identity, path: '/faucet-wallet/release', payload: { token: turn.token } });
+    await call('release', { token: turn.token });
   }
 };
 

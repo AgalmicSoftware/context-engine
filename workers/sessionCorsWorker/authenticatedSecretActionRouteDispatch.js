@@ -129,11 +129,11 @@ export const dispatchAuthenticatedSecretActionRoute = async ({
         onSubmissionAttempt: () => { submissionAttempted = true; },
       } : {}),
     });
-    // Every payout takes turns with the session's faucet wallet, so two
-    // requests never sign the same nonce.
+    // Every payout takes turns with its faucet wallet, so two requests never
+    // sign the same nonce.
     const takeWalletTurn = deps?.withCoordinatedFaucetWalletTurn || withCoordinatedFaucetWalletTurn;
     try {
-      response = await takeWalletTurn({ env, slug }, send);
+      response = await takeWalletTurn({ env, secrets: secretContext.secrets }, send);
     } catch (error) {
       // A failure before submission, such as a malformed key, must not hold a slot.
       if (hosted && !submissionAttempted) {
