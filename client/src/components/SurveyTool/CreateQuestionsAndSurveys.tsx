@@ -699,6 +699,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
   _lastSavedUnfinishedSurveyJson: string | null = null;
   // Preformed drafts already added to the list (by id or prompt), so later batches append only new ones.
   _appendedPreformed = new Set((this.props.preformedQuestions || []).map((question) => question.id || question.prompt));
+  _publication: CreateSurveyPublicationContext | null = null;
   _initialDraftContent = '';
 
   constructor(props: CreateQuestionsAndSurveysProps) {
@@ -1132,12 +1133,14 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
     this.props.onDraftEditedChange?.(createSurveyDraftContentKey(this.state) !== this._initialDraftContent);
     if (prevProps.account !== this.props.account) this.updateSurveyHash();
     const shouldAppendPreformedQuestions = this.props.interviewQuestionReview || this.props.appendPreformedQuestions;
-    // Drafts that arrive while a submit publishes wait for it to settle, so the published draft stays as sent.
-    const submitSettled = prevState.isSubmitting && !this.state.isSubmitting;
+    // Drafts that arrive while a submit publishes wait until it settles (or no longer applies here), so the
+    // published draft stays as sent.
+    const holding =
+      this.state.isSubmitting && !!this._publication && this.isPublicationContextCurrent(this._publication);
     if (
       shouldAppendPreformedQuestions &&
-      !this.state.isSubmitting &&
-      (submitSettled || prevProps.preformedQuestions !== this.props.preformedQuestions)
+      !holding &&
+      (prevState.isSubmitting || prevProps.preformedQuestions !== this.props.preformedQuestions)
     ) {
       const added = (this.props.preformedQuestions || []).filter(
         (question) => !this._appendedPreformed.has(question.id || question.prompt),
@@ -2309,6 +2312,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
       account: String(submitProps.account || ''),
       chainId: isPureWorkerCanonicalAuthoring ? null : this.resolveSessionChainId(initialSessionConfig, submitProps),
     };
+    this._publication = publication;
     const submittedSurveyId = isWorkerCanonicalAuthoring ? this.computeSurveyHash() : submittedState.surveyHash;
     const setPublicationState: typeof this.setState = (update, callback) => {
       if (this.isPublicationContextCurrent(publication)) {
@@ -2591,13 +2595,18 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
           sourceQuestions: uniqueQuestions,
         });
         // A review list keeps its other drafts, so its upload stands (and its drafts leave) even if they changed.
-        if (!submitProps.preformedQuestions && !this.isPublicationDraftCurrent(publication)) {
+        const reviewList = submitProps.interviewQuestionReview || submitProps.appendPreformedQuestions;
+        if (!reviewList && !this.isPublicationDraftCurrent(publication)) {
           setPublicationState(buildCreateSurveySubmitResetPatch());
           return;
         }
         const uploadedQuestionPrompts = Object.fromEntries(
           uniqueQuestions.map((q) => [String(q.id || '').toLowerCase(), String(q.prompt || '').trim()]),
         );
+        // Uploaded drafts leave before the submit settles, so a batch held back meanwhile arrives as new drafts.
+        if (submitProps.preformedQuestions && submitProps.appendPreformedQuestions) {
+          if (this.isPublicationContextCurrent(publication)) this.removeUploadedQuestionDrafts(submittedQuestions);
+        }
         setPublicationState(
           {
             ...(submitProps.preformedQuestions
@@ -2610,9 +2619,6 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
           },
           () => {
             this.startCacheWatch();
-            if (submitProps.preformedQuestions && submitProps.appendPreformedQuestions) {
-              this.removeUploadedQuestionDrafts(submittedQuestions);
-            }
             if (submitProps.preformedQuestions && submitProps.miniaturized && submitProps.onUploadComplete) {
               submitProps.onUploadComplete(null);
             }

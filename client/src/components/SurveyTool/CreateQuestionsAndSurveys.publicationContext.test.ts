@@ -22,7 +22,7 @@ const deferred = <T>() => {
   return { promise, resolve };
 };
 const config = (slug: string, chainId = 1) => ({ slug, networkChainId: chainId, contracts: { surveys: { chainId } } });
-const setup = (standalone: boolean) => {
+const setup = (standalone: boolean, props: Record<string, unknown> = {}) => {
   const subject = makeInstance({
     loginComplete: true,
     provider: 'web3auth',
@@ -31,6 +31,7 @@ const setup = (standalone: boolean) => {
     sessionSlug: 'session-a',
     sessionConfig: config('session-a'),
     network: { id: 1 },
+    ...props,
   });
   subject.ensureResolvedSessionConfigForSubmit = jest.fn().mockResolvedValue(config('session-a'));
   subject.resolveGateOptions = jest.fn(() => ({ gateMap: {}, gateOptions: [], defaultGateId: '' }));
@@ -321,27 +322,90 @@ describe('drafts generated while publishing', () => {
   });
 
   const draft = (id: string) => ({ id, type: 'freeform', prompt: `Question ${id}?`, tags: [] });
+  const ids = (subject: { state: { questions: { id?: string }[] } }) => subject.state.questions.map((q) => q.id);
+  // A review list as the recorder mounts it, updating in React's order: an update, then componentDidUpdate,
+  // then its callback, with updates made inside either queued until then.
   const reviewSetup = () => {
-    const harness = setup(true);
-    const { subject } = harness;
-    subject.props = {
-      ...subject.props,
+    const onDraftQuestionCountChange = jest.fn();
+    const { subject, published, entered } = setup(true, {
       interviewQuestionReview: true,
       appendPreformedQuestions: true,
       preformedMode: 'questions',
       preformedQuestions: [draft('q1'), draft('q2')],
-    };
-    subject.state = { ...subject.state, questions: [draft('q1'), draft('q2')] };
-    // React's order: the update, then componentDidUpdate, then the callback.
-    const applyState = subject.setState;
-    subject.setState = jest.fn((update: unknown, cb?: () => void) => {
-      const prevState = subject.state;
-      applyState(update);
-      subject.componentDidUpdate(subject.props, prevState as typeof subject.state);
-      cb?.();
+      onDraftQuestionCountChange,
     });
-    return harness;
+    subject.state = { ...subject.state, questions: [draft('q1'), draft('q2')] };
+    const applyState = subject.setState;
+    const queue: [unknown, (() => void) | undefined][] = [];
+    let flushing = false;
+    subject.setState = jest.fn((update: unknown, cb?: () => void) => {
+      queue.push([update, cb]);
+      if (flushing) return;
+      flushing = true;
+      for (let next = queue.shift(); next; next = queue.shift()) {
+        const prevState = subject.state;
+        applyState(next[0]);
+        subject.componentDidUpdate(subject.props, prevState as typeof subject.state);
+        next[1]?.();
+      }
+      flushing = false;
+    });
+    // The next chunk's drafts arrive.
+    const lateBatch = () => {
+      const prevProps = subject.props;
+      subject.props = { ...prevProps, preformedQuestions: [draft('q1'), draft('q2'), draft('q3')] };
+      subject.componentDidUpdate(prevProps, subject.state as typeof subject.state);
+    };
+    return { subject, published, entered, lateBatch, onDraftQuestionCountChange };
   };
+
+  it('holds a batch that lands mid-submit, then shows the upload and adds the batch as new drafts', async () => {
+    const { subject, published, entered, lateBatch, onDraftQuestionCountChange } = reviewSetup();
+    const operation = subject.createSurvey();
+    await entered.promise;
+    lateBatch();
+    expect(ids(subject)).toEqual(['q1', 'q2']);
+    published.resolve({ receipt: { status: 1 }, uploadedQuestions: [{ questionId: 'q1' }, { questionId: 'q2' }] });
+    await operation;
+
+    expect(subject.state.questionsAddedSuccessfully).toBe(true);
+    expect(subject.state.uploadedQuestions).toEqual([{ questionId: 'q1' }, { questionId: 'q2' }]);
+    expect(ids(subject)).toEqual(['q3']);
+    // The count drops before the batch joins, so the new-drafts cue counts it as new.
+    expect(onDraftQuestionCountChange.mock.calls.slice(-2)).toEqual([[0], [1]]);
+    expect(contractScripts.addQuestions).toHaveBeenCalledTimes(1);
+    expect(contractScripts.addQuestions).toHaveBeenCalledWith(
+      'web3auth',
+      ['q1', 'q2'],
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+    );
+  });
+
+  it('adds a held batch after a failed submit', async () => {
+    const { subject, entered, lateBatch } = reviewSetup();
+    (contractScripts.addQuestions as jest.Mock).mockImplementation(async () => {
+      entered.resolve();
+      throw new Error('Worker unavailable');
+    });
+    const operation = subject.createSurvey();
+    lateBatch();
+    await operation;
+    expect(subject.state.questionsAddedSuccessfully).toBe(false);
+    expect(ids(subject)).toEqual(['q1', 'q2', 'q3']);
+  });
+
+  it('stops holding once the publication no longer applies here', async () => {
+    const { subject, published, entered, lateBatch } = reviewSetup();
+    const operation = subject.createSurvey();
+    await entered.promise;
+    subject.props = { ...subject.props, account: '0xbbb' };
+    lateBatch();
+    expect(ids(subject)).toEqual(['q1', 'q2', 'q3']);
+    published.resolve({ receipt: { status: 1 }, uploadedQuestions: [{ questionId: 'q1' }] });
+    await operation;
+  });
 
   it('keeps the success view and drops the uploaded drafts after an edit made while publishing', async () => {
     const { subject, published, entered } = reviewSetup();
@@ -353,29 +417,5 @@ describe('drafts generated while publishing', () => {
 
     expect(subject.state.questionsAddedSuccessfully).toBe(true);
     expect(subject.state.questions).toEqual([]);
-  });
-
-  it('shows the upload, drops its drafts and adds the late batch afterwards', async () => {
-    const { subject, published, entered } = reviewSetup();
-    const operation = subject.createSurvey();
-    await entered.promise;
-    // The next chunk's drafts arrive mid-submit.
-    const prevProps = subject.props;
-    subject.props = { ...prevProps, preformedQuestions: [draft('q1'), draft('q2'), draft('q3')] };
-    subject.componentDidUpdate(prevProps, subject.state as typeof subject.state);
-    published.resolve({ receipt: { status: 1 }, uploadedQuestions: [{ questionId: 'q1' }, { questionId: 'q2' }] });
-    await operation;
-
-    expect(subject.state.questionsAddedSuccessfully).toBe(true);
-    expect(subject.state.uploadedQuestions).toEqual([{ questionId: 'q1' }, { questionId: 'q2' }]);
-    expect(subject.state.questions.map((question) => question.id)).toEqual(['q3']);
-    expect(contractScripts.addQuestions).toHaveBeenCalledTimes(1);
-    expect(contractScripts.addQuestions).toHaveBeenCalledWith(
-      'web3auth',
-      ['q1', 'q2'],
-      expect.anything(),
-      expect.anything(),
-      expect.anything(),
-    );
   });
 });
