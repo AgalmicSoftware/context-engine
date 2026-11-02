@@ -66,6 +66,7 @@ import {
   type WorkerGroupsChangedDetail,
 } from '../../utilities/worker/workerGroupChangeEvents';
 import {
+  awaitWorkerGroupCountsBriefly,
   getCommunityWorkerGroupCountCacheKey,
   getCommunityWorkerGroupCountState,
   invalidateCommunityWorkerGroupCountCache,
@@ -587,7 +588,10 @@ export class CommunityTab extends Component<any, any> {
     });
 
   _hydrateWorkerGroupCounts = async (scopeEntries: ScopeCacheEntry[]) => {
-    await Promise.all(scopeEntries.map((scopeEntry) => this._loadWorkerGroupCount(scopeEntry)));
+    await awaitWorkerGroupCountsBriefly(
+      Promise.all(scopeEntries.map((scopeEntry) => this._loadWorkerGroupCount(scopeEntry))),
+      () => this._queueCacheDrivenRefresh({ force: true }),
+    );
     scopeEntries.forEach((scopeEntry) => {
       Object.assign(scopeEntry, this._getWorkerGroupCountState(scopeEntry.workerCanonicalIdentity));
     });
