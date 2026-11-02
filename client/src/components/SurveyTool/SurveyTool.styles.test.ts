@@ -129,9 +129,9 @@ describe('Group Conversation dialog colours', () => {
     );
   });
 
-  it('labels a held-off Submit in the disabled text colour', () => {
+  it('labels a held-off or submitting Submit in panel text, readable on its face and fill', () => {
     expect(ruleText(scss, '.sessionListeningCreateWrap')).toMatch(
-      /:disabled > :global\(\[class\*='buttonContent'\]\) \{\s*color: var\(--ce-action-submit-disabled-text\) !important;/,
+      /:disabled > :global\(\[class\*='buttonContent'\]\) \{\s*color: var\(--ce-panel-text\) !important;/,
     );
   });
 

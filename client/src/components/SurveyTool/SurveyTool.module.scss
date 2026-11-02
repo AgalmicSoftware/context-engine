@@ -3428,9 +3428,10 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
     color: var(--ce-text-inverse) !important;
   }
 
-  // Submit held off while new drafts generate keeps the disabled label colour (white was 1.1:1 there).
+  // A Submit held off while new drafts generate, or submitting over its progress bar, had a label of
+  // 1.1:1 in white on Minimal's disabled face and 3.9:1 in the disabled text colour on Context Engine's bar.
   :disabled > :global([class*='buttonContent']) {
-    color: var(--ce-action-submit-disabled-text) !important;
+    color: var(--ce-panel-text) !important;
   }
 }
 
