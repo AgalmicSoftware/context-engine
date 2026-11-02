@@ -637,6 +637,7 @@ describe('userPageCacheHelpers', () => {
     const sbtAggregate: Record<string, any> = {};
 
     mergeUserPageSbtCacheEntryIntoAggregate({
+      chain: '84532',
       sbtAggregate,
       entry: {
         sbtAddress: '0xBadge',
@@ -653,6 +654,7 @@ describe('userPageCacheHelpers', () => {
     });
 
     mergeUserPageUserCacheSbtIntoAggregate({
+      chain: '84532',
       sbtAggregate,
       item: {
         sbtAddress: '0xBadge',
@@ -662,7 +664,7 @@ describe('userPageCacheHelpers', () => {
       viewAddressKey,
     });
 
-    expect(sbtAggregate['0xbadge']).toEqual(
+    expect(sbtAggregate['84532:0xbadge']).toEqual(
       expect.objectContaining({
         blockNumber: 44,
         sbtAddress: '0xBadge',
@@ -674,14 +676,15 @@ describe('userPageCacheHelpers', () => {
         viewerCountsAuthoritative: true,
       }),
     );
-    expect(Array.from(sbtAggregate['0xbadge'].mintedSet).sort()).toEqual(['0xdef']);
-    expect(Array.from(sbtAggregate['0xbadge'].burnedSet)).toEqual([viewAddressKey]);
+    expect(Array.from(sbtAggregate['84532:0xbadge'].mintedSet).sort()).toEqual(['0xdef']);
+    expect(Array.from(sbtAggregate['84532:0xbadge'].burnedSet)).toEqual([viewAddressKey]);
   });
 
   it('uses userCache SBT rows as a fallback ownership signal when no aggregate signal exists', () => {
     const sbtAggregate: Record<string, any> = {};
 
     mergeUserPageUserCacheSbtIntoAggregate({
+      chain: '84532',
       sbtAggregate,
       item: {
         sbtAddress: '0xBadge',
@@ -691,9 +694,9 @@ describe('userPageCacheHelpers', () => {
       viewAddressKey: '0xabc',
     });
 
-    expect(Array.from(sbtAggregate['0xbadge'].mintedSet)).toEqual(['0xabc']);
-    expect(Array.from(sbtAggregate['0xbadge'].burnedSet)).toEqual([]);
-    expect(sbtAggregate['0xbadge']).toEqual(
+    expect(Array.from(sbtAggregate['84532:0xbadge'].mintedSet)).toEqual(['0xabc']);
+    expect(Array.from(sbtAggregate['84532:0xbadge'].burnedSet)).toEqual([]);
+    expect(sbtAggregate['84532:0xbadge']).toEqual(
       expect.objectContaining({
         sbtAddress: '0xBadge',
         sbtInfo: { name: 'Fallback badge' },
@@ -701,4 +704,59 @@ describe('userPageCacheHelpers', () => {
       }),
     );
   });
+  it.each(['11155420', '84532'])(
+    'keeps a badge earned on one chain when the same address is burned on another (active %s)',
+    (activeChain) => {
+      const viewer = '0xabc';
+      const badge = '0xbadge';
+      const cache = {
+        '11155420': {
+          sbtList: {
+            [badge]: {
+              sbtAddress: badge,
+              sbtInfo: { name: 'Earned' },
+              mintedCountByAddress: { [viewer]: 1 },
+              burnedCountByAddress: {},
+            },
+          },
+        },
+        '84532': {
+          sbtList: {
+            [badge]: {
+              sbtAddress: badge,
+              sbtInfo: { name: 'Burned' },
+              mintedCountByAddress: { [viewer]: 1 },
+              burnedCountByAddress: { [viewer]: 1 },
+            },
+          },
+        },
+      };
+      const sbtAggregate: Record<string, any> = {};
+      getPrioritizedUserPageNetworkCacheNodes(cache, activeChain).forEach(({ key, value }) => {
+        const sbtList = toAnalysisRecord(value.sbtList);
+        Object.keys(sbtList).forEach((address) =>
+          mergeUserPageSbtCacheEntryIntoAggregate({
+            chain: key,
+            sbtAggregate,
+            entry: sbtList[address],
+            key: address,
+            viewAddressKey: viewer,
+          }),
+        );
+      });
+      mergeUserPageUserCacheSbtIntoAggregate({
+        chain: '84532',
+        sbtAggregate,
+        item: { sbtAddress: badge },
+        viewAddressKey: viewer,
+      });
+
+      const { sbtList } = buildUserPageSbtSection({
+        aggregate: { sbtAggregate },
+        getSbtDisplayName: (info: any) => info?.name,
+        viewAddressLower: viewer,
+      });
+      expect(sbtList.map((item) => [item.sbtInfo.name, item.sbtInfo.sbtAddress])).toEqual([['Earned', badge]]);
+    },
+  );
 });

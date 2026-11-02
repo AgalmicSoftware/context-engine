@@ -94,6 +94,7 @@ export type UserPageUserCachePayload = UserPageUnknownRecord & {
   questionResponses?: unknown;
 };
 type MergeUserPageSbtCacheEntryIntoAggregateArgs = {
+  chain: unknown;
   entry?: unknown;
   key?: unknown;
   sbtAggregate: UserPageSbtAggregateMap;
@@ -101,6 +102,7 @@ type MergeUserPageSbtCacheEntryIntoAggregateArgs = {
   viewAddressKey?: unknown;
 };
 type MergeUserPageUserCacheSbtIntoAggregateArgs = {
+  chain: unknown;
   item?: unknown;
   sbtAggregate: UserPageSbtAggregateMap;
   slug?: unknown;
@@ -140,12 +142,15 @@ export const applyUserPageOwnershipSignal = (
   }
 };
 
+// The same contract address on two chains is two different SBTs.
+const userPageSbtAggregateKey = (chain: unknown, address: string): string => `${String(chain ?? '')}:${address}`;
+
 const buildDefaultUserPageSbtAggregateEntry = (
   entry: UserPageUnknownRecord,
-  key: string,
+  address: string,
   slug: unknown,
 ): UserPageSbtAggregateEntry => ({
-  sbtAddress: entry.sbtAddress || key,
+  sbtAddress: entry.sbtAddress || address,
   sbtInfo: null,
   mintedSet: new Set(),
   burnedSet: new Set(),
@@ -170,6 +175,7 @@ const applyUserPageSbtAggregateMetadata = (
 };
 
 export const mergeUserPageSbtCacheEntryIntoAggregate = ({
+  chain,
   entry: entryIn = {},
   key: keyIn = '',
   sbtAggregate,
@@ -177,10 +183,11 @@ export const mergeUserPageSbtCacheEntryIntoAggregate = ({
   viewAddressKey = '',
 }: MergeUserPageSbtCacheEntryIntoAggregateArgs): UserPageSbtAggregateEntry | null => {
   const entry = toAnalysisRecord(entryIn);
-  const key = String(keyIn || entry.sbtAddress || '').toLowerCase();
-  if (!key) return null;
+  const address = String(keyIn || entry.sbtAddress || '').toLowerCase();
+  if (!address) return null;
+  const key = userPageSbtAggregateKey(chain, address);
   const addressKey = String(viewAddressKey || '').toLowerCase();
-  const aggEntry = sbtAggregate[key] || buildDefaultUserPageSbtAggregateEntry(entry, key, slug);
+  const aggEntry = sbtAggregate[key] || buildDefaultUserPageSbtAggregateEntry(entry, address, slug);
 
   applyUserPageSbtAggregateMetadata(aggEntry, entry, slug);
   const hasExplicitCounts = hasMeaningfulUserPageOwnershipCounts(entry, addressKey);
@@ -209,16 +216,18 @@ export const mergeUserPageSbtCacheEntryIntoAggregate = ({
 };
 
 export const mergeUserPageUserCacheSbtIntoAggregate = ({
+  chain,
   item: itemIn = {},
   sbtAggregate,
   slug = '',
   viewAddressKey = '',
 }: MergeUserPageUserCacheSbtIntoAggregateArgs): UserPageSbtAggregateEntry | null => {
   const itemRecord = toAnalysisRecord(itemIn);
-  const key = String(itemRecord.sbtAddress || '').toLowerCase();
-  if (!key) return null;
+  const address = String(itemRecord.sbtAddress || '').toLowerCase();
+  if (!address) return null;
+  const key = userPageSbtAggregateKey(chain, address);
   const addressKey = String(viewAddressKey || '').toLowerCase();
-  const aggEntry = sbtAggregate[key] || buildDefaultUserPageSbtAggregateEntry(itemRecord, key, slug);
+  const aggEntry = sbtAggregate[key] || buildDefaultUserPageSbtAggregateEntry(itemRecord, address, slug);
 
   applyUserPageSbtAggregateMetadata(aggEntry, itemRecord, slug);
   const hasAggregateOwnershipSignal = aggEntry.mintedSet.has(addressKey) || aggEntry.burnedSet.has(addressKey);
