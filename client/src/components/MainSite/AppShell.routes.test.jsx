@@ -1033,6 +1033,19 @@ describe('AppShell route render smoke', () => {
     expect(getDecryptCacheGeneration()).toBe(start + 2);
   });
 
+  it('decrypts cached survey titles once the signed-in reader can decrypt', () => {
+    const subject = stubMainSiteMountSideEffects(createSubject({ path: '/' }));
+    subject.handleNetworkChange = jest.fn();
+    subject.refreshEncryptedSurveyPayloadsForGroup = jest.fn(async () => undefined);
+    subject.props = { ...subject.props, account: '0x00000000000000000000000000000000000000aa', loginComplete: true };
+    const prevState = subject.state;
+    subject.state = { ...subject.state, litHooks: { getKey: jest.fn() } };
+
+    subject.componentDidUpdate({ ...subject.props }, prevState);
+
+    expect(subject.refreshEncryptedSurveyPayloadsForGroup).toHaveBeenCalledWith('edge');
+  });
+
   it('locks decrypted question text on sign-in and sign-out, but not at startup', async () => {
     const subject = stubMainSiteMountSideEffects(createSubject({ path: '/' }));
     subject.handleNetworkChange = jest.fn();

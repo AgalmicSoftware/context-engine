@@ -1,37 +1,50 @@
 import { normalizeWorkerCanonicalCacheReader } from './workerCanonicalCacheReader';
 
 type UnknownRecord = Record<string, unknown>;
+type LockedField = readonly [flag: string, field: string, locked: () => unknown];
 
 // Chain cache nodes are shared by every account using this browser, so question
-// text decrypted there records the account it was decrypted for.
+// and survey text decrypted there records the account it was decrypted for.
 const DECRYPTED_FOR_FIELD = 'decryptedFor';
-const LOCKED_FIELDS = [
+const QUESTION_FIELDS: readonly LockedField[] = [
   ['promptDecrypted', 'prompt', () => '[encrypted]'],
   ['optionsDecrypted', 'options', () => []],
   ['tagsDecrypted', 'tags', () => []],
-] as const;
+];
+const SURVEY_FIELDS: readonly LockedField[] = [
+  ['titleDecrypted', 'title', () => '[encrypted]'],
+  ['documentURLsDecrypted', 'documentURLs', () => []],
+];
 
 const isRecord = (value: unknown): value is UnknownRecord =>
   !!value && typeof value === 'object' && !Array.isArray(value);
 
-const hasDecryptedText = (question: unknown): question is UnknownRecord =>
-  isRecord(question) && LOCKED_FIELDS.some(([flag]) => question[flag]);
+const hasDecryptedText = (fields: readonly LockedField[], payload: unknown): payload is UnknownRecord =>
+  isRecord(payload) && fields.some(([flag]) => payload[flag]);
 
-/** Records the reader a question's decrypted text belongs to; other questions are returned as they are. */
-export const stampDecryptedQuestion = <T extends object>(question: T, reader: unknown): T =>
-  hasDecryptedText(question)
-    ? { ...question, [DECRYPTED_FOR_FIELD]: normalizeWorkerCanonicalCacheReader(reader) }
-    : question;
+/** Records the reader decrypted text belongs to; payloads without decrypted text are returned as they are. */
+const stampFor =
+  (fields: readonly LockedField[]) =>
+  <T extends object>(payload: T, reader: unknown): T =>
+    hasDecryptedText(fields, payload)
+      ? { ...payload, [DECRYPTED_FOR_FIELD]: normalizeWorkerCanonicalCacheReader(reader) }
+      : payload;
 
-/** The question locked again when its text was decrypted for another reader; null when it can stay. */
-export const remaskQuestionForReader = (question: unknown, reader: string): UnknownRecord | null => {
-  if (!hasDecryptedText(question)) return null;
-  if (question[DECRYPTED_FOR_FIELD] === reader) return null;
-  const masked: UnknownRecord = { ...question };
-  LOCKED_FIELDS.forEach(([flag, field, locked]) => {
-    if (masked[flag]) masked[field] = locked();
-    delete masked[flag];
-  });
-  delete masked[DECRYPTED_FOR_FIELD];
-  return masked;
-};
+/** The payload locked again when its text was decrypted for another reader; null when it can stay. */
+const remaskFor =
+  (fields: readonly LockedField[]) =>
+  (payload: unknown, reader: string): UnknownRecord | null => {
+    if (!hasDecryptedText(fields, payload)) return null;
+    if (payload[DECRYPTED_FOR_FIELD] === reader) return null;
+    const masked: UnknownRecord = { ...payload };
+    fields.forEach(([flag, field, locked]) => {
+      if (masked[flag]) masked[field] = locked();
+      delete masked[flag];
+    });
+    delete masked[DECRYPTED_FOR_FIELD];
+    return masked;
+  };
+
+export const stampDecryptedQuestion = stampFor(QUESTION_FIELDS);
+export const remaskQuestionForReader = remaskFor(QUESTION_FIELDS);
+export const stampDecryptedSurvey = stampFor(SURVEY_FIELDS);

@@ -20,6 +20,7 @@ jest.mock('../web3/chainGateway.js', () => ({
     fetchAllSurveyResponses: jest.fn(),
     listenForSurveyEvents: jest.fn(),
     removeSurveyEventsListener: jest.fn(),
+    decryptSurveyPayloadInPlace: jest.fn(),
   },
 }));
 
@@ -1169,6 +1170,56 @@ describe('createSessionSurveyCacheController', () => {
         'Failed to persist surveys cache',
       );
       expect(host.getStateSnapshot()).toMatchObject({ surveyCacheInitializationError: true });
+    });
+  });
+
+  describe('encrypted survey titles and document links', () => {
+    const locked = {
+      title: '[encrypted]',
+      titleEncrypted: 'title-envelope',
+      documentURLs: [],
+      documentURLsEncrypted: 'links-envelope',
+      questionIDs: [],
+    };
+    const decryptForReader = async (survey) => {
+      Object.assign(survey, {
+        title: 'Private title',
+        titleDecrypted: true,
+        documentURLs: ['https://docs.example/private'],
+        documentURLsDecrypted: true,
+      });
+      return survey;
+    };
+    const settle = async () => {
+      for (let i = 0; i < 5; i += 1) await new Promise((resolve) => setTimeout(resolve, 0));
+    };
+
+    it('stores scanned surveys locked, then decrypts them for the current reader', async () => {
+      const host = createMockHost({
+        activeSlug: 'alpha',
+        buildDecryptContext: jest.fn(() => ({ account: '0xReader', providerLike: 'provider' })),
+      });
+      const controller = createSessionSurveyCacheController(host);
+      contractScripts.fetchUserSubmittedSurveyIDs.mockResolvedValue([{ surveyId: 'SURV1', creationBlock: 11 }]);
+      contractScripts.getSurveyDataById.mockImplementation(async (_provider, _id, _slug, opts) =>
+        opts?.skipDecrypt ? { ...locked } : decryptForReader({ ...locked }),
+      );
+      contractScripts.decryptSurveyPayloadInPlace.mockImplementation(decryptForReader);
+
+      await controller.initializeSurveyCacheForGroup('alpha');
+      await settle();
+
+      expect(contractScripts.getSurveyDataById).toHaveBeenCalledWith(
+        'none',
+        'surv1',
+        'alpha',
+        expect.objectContaining({ skipDecrypt: true }),
+      );
+      expect(host.getStored('surveysCache', 'alpha')['11155420'].surveys.surv1).toMatchObject({
+        title: 'Private title',
+        documentURLs: ['https://docs.example/private'],
+        decryptedFor: '0xreader',
+      });
     });
   });
 
