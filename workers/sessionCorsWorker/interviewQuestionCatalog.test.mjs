@@ -41,6 +41,12 @@ test('rating catalog questions retain exact scale metadata for interview prefill
         type: 'rating',
         scale: { min: 10, max: 1, minLabel: 'High', maxLabel: 'Low' },
       },
+      {
+        id: 'rating-q4',
+        prompt: 'Rate in fives',
+        type: 'rating',
+        scale: { min: 0, max: 100, step: 5 },
+      },
     ]),
     [
       {
@@ -48,21 +54,28 @@ test('rating catalog questions retain exact scale metadata for interview prefill
         prompt: 'Rate support',
         type: 'rating',
         options: [],
-        scale: { min: 1, max: 10, minLabel: 'Strongly oppose', maxLabel: 'Strongly support' },
+        scale: { min: 1, max: 10, minLabel: 'Strongly oppose', maxLabel: 'Strongly support', step: 1 },
       },
       {
         id: 'rating-q2',
         prompt: 'Rate confidence',
         type: 'rating',
         options: [],
-        scale: { min: 0, max: 10, minLabel: 'Not confident', maxLabel: 'Very confident' },
+        scale: { min: 0, max: 10, minLabel: 'Not confident', maxLabel: 'Very confident', step: 1 },
       },
       {
         id: 'rating-q3',
         prompt: 'Rate invalid',
         type: 'rating',
         options: [],
-        scale: { min: 0, max: 10, minLabel: '0', maxLabel: '10' },
+        scale: { min: 0, max: 10, minLabel: '0', maxLabel: '10', step: 1 },
+      },
+      {
+        id: 'rating-q4',
+        prompt: 'Rate in fives',
+        type: 'rating',
+        options: [],
+        scale: { min: 0, max: 100, minLabel: '0', maxLabel: '100', step: 5 },
       },
     ],
   );

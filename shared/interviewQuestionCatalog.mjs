@@ -1,4 +1,4 @@
-import { hasRatingScaleMetadata, normalizeRatingScale } from './questions/ratingScale.mjs';
+import { hasRatingScaleMetadata, normalizeRatingScale, ratingStepFor } from './questions/ratingScale.mjs';
 
 export { hasRatingScaleMetadata, normalizeRatingScale };
 
@@ -51,7 +51,7 @@ export const normalizeQuestion = (value = {}) => {
     ...(type === 'multichoice'
       ? { singleSelect: Boolean(question.singleSelect || question.oneSelectionOnly || question.singleChoice) }
       : {}),
-    ...(ratingScale ? { scale: ratingScale } : {}),
+    ...(ratingScale ? { scale: { ...ratingScale, step: ratingStepFor(question) } } : {}),
     ...(type === 'quadratic' ? { voiceCredits: Number(question.voiceCredits ?? 99) } : {}),
   };
 };
