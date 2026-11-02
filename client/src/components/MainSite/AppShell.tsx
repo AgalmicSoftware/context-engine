@@ -2772,7 +2772,10 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
     if (accountKey(prevProps.account) !== accountKey(this.props.account)) {
       clearDecryptCaches();
       clearSurveyDraftsForAccount(prevProps.account);
-      void purgeWorkerCanonicalCaches(prevProps.account).catch((e) => mainSiteLog.warn('MainSite: cleanup', e));
+      void purgeWorkerCanonicalCaches(prevProps.account)
+        // Survey titles relocked by the purge are decrypted again for the new reader.
+        .then(() => this.refreshEncryptedSurveyPayloadsForGroup(this.getActiveSessionSlug(), { force: true }))
+        .catch((e) => mainSiteLog.warn('MainSite: cleanup', e));
     }
 
     this.redirectLegacyDemoPath();

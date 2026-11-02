@@ -350,6 +350,7 @@ jest.mock('../Posts/PostsPage', () => {
 jest.mock('../../utilities/web3/chainGateway.js', () => {
   const contractScripts = {
     decryptQuestionPayloadInPlace: jest.fn(),
+    decryptSurveyPayloadInPlace: jest.fn(),
     getAllSbtAddressesCached: jest.fn(),
     getLatestBlockNumber: jest.fn(),
     getQuestionData: jest.fn(),
@@ -1044,6 +1045,55 @@ describe('AppShell route render smoke', () => {
     subject.componentDidUpdate({ ...subject.props }, prevState);
 
     expect(subject.refreshEncryptedSurveyPayloadsForGroup).toHaveBeenCalledWith('edge');
+  });
+
+  it('decrypts relocked survey titles again for an account that may read them', async () => {
+    const subject = stubMainSiteMountSideEffects(createSubject({ path: '/' }));
+    subject.handleNetworkChange = jest.fn();
+    subject.initializeWorkerCanonicalCachesForGroup = jest.fn(async () => true);
+    const ACCOUNT_X = '0x00000000000000000000000000000000000000aa';
+    const ACCOUNT_Y = '0x00000000000000000000000000000000000000bb';
+    const locked = { title: '[encrypted]', titleEncrypted: 'title-envelope' };
+    const caches = new Map([
+      [
+        'surveysCache|edge',
+        {
+          84532: {
+            surveys: { s: { ...locked, title: 'Private title', titleDecrypted: true, decryptedFor: ACCOUNT_Y } },
+          },
+        },
+      ],
+    ]);
+    const survey = () => caches.get('surveysCache|edge')[84532].surveys.s;
+    subject.DG.read = jest.fn((name, slug) => caches.get(`${name}|${slug}`) || null);
+    listNamespaceSlugsSync.mockImplementation((namespace) =>
+      [...caches.keys()].filter((key) => key.startsWith(`${namespace}|`)).map((key) => key.split('|')[1]),
+    );
+    peekCacheSync.mockImplementation((namespace, slug) => caches.get(`${namespace}|${slug}`) || null);
+    updateCacheAtomic.mockImplementation(async (namespace, slug, update) => {
+      const next = await update(caches.get(`${namespace}|${slug}`));
+      caches.set(`${namespace}|${slug}`, next);
+      return next;
+    });
+    contractScripts.decryptSurveyPayloadInPlace.mockImplementation(async (payload) => {
+      Object.assign(payload, { title: 'Private title', titleDecrypted: true });
+    });
+    const changeAccount = async (prevAccount, nextAccount) => {
+      // The store switches the cache reader when it dispatches the account.
+      setWorkerCanonicalCacheReader(nextAccount);
+      const prevProps = { ...subject.props, account: prevAccount };
+      subject.props = { ...subject.props, account: nextAccount, provider: 'wallet-provider', loginComplete: true };
+      subject.componentDidUpdate(prevProps, subject.state);
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      });
+    };
+
+    await changeAccount(ACCOUNT_Y, ACCOUNT_X);
+    expect(survey()).toMatchObject({ title: 'Private title', decryptedFor: ACCOUNT_X });
+
+    await changeAccount(ACCOUNT_X, '');
+    expect(survey()).toEqual(locked);
   });
 
   it('locks decrypted question text on sign-in and sign-out, but not at startup', async () => {

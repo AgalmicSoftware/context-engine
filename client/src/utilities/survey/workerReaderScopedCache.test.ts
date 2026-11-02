@@ -236,7 +236,7 @@ it("removes the previous reader's Worker nodes from persistent caches on an acco
   expect(updateCacheAtomic).toHaveBeenCalledTimes(2);
 });
 
-describe('question text decrypted into shared chain nodes', () => {
+describe('question and survey text decrypted into shared chain nodes', () => {
   const locked = {
     id: 'q',
     prompt: '[encrypted]',
@@ -252,9 +252,35 @@ describe('question text decrypted into shared chain nodes', () => {
     optionsDecrypted: true,
     ...(reader === undefined ? {} : { decryptedFor: reader }),
   });
+  const lockedSurvey = {
+    title: '[encrypted]',
+    titleEncrypted: 'envelope',
+    documentURLs: [],
+    documentURLsEncrypted: 'envelope',
+  };
+  const surveyDecryptedFor = (reader?: string) => ({
+    ...lockedSurvey,
+    title: 'Private title',
+    titleDecrypted: true,
+    documentURLs: ['https://docs.example/private'],
+    documentURLsDecrypted: true,
+    ...(reader === undefined ? {} : { decryptedFor: reader }),
+  });
   let cache: Map<string, unknown>;
   beforeEach(() => {
     cache = new Map<string, unknown>([
+      [
+        'surveysCache|a',
+        {
+          11155420: {
+            surveys: {
+              admin: surveyDecryptedFor('0xadmin'),
+              own: surveyDecryptedFor('0xnext'),
+              legacy: surveyDecryptedFor(),
+            },
+          },
+        },
+      ],
       [
         'questionsCache|a',
         {
@@ -291,6 +317,11 @@ describe('question text decrypted into shared chain nodes', () => {
     const root = cache.get('questionsCache|a') as Cache;
     expect(root[11155420].questions).toEqual({ admin: locked, own: decryptedFor('0xnext'), legacy: locked });
     expect(root.worker.questions.w).toEqual(decryptedFor('0xnext'));
+    expect((cache.get('surveysCache|a') as Cache)[11155420].surveys).toEqual({
+      admin: lockedSurvey,
+      own: surveyDecryptedFor('0xnext'),
+      legacy: lockedSurvey,
+    });
   });
 
   it('locks every decrypted text on sign-out', async () => {
@@ -298,6 +329,7 @@ describe('question text decrypted into shared chain nodes', () => {
     await purgeWorkerCanonicalCaches('0xnext');
 
     expect(JSON.stringify((cache.get('questionsCache|a') as Cache)[11155420])).not.toContain('Private');
+    expect(JSON.stringify(cache.get('surveysCache|a'))).not.toContain('Private');
   });
 });
 

@@ -1,6 +1,6 @@
 import { resolveWorkerCanonicalStorageTarget } from '../../domains/surveys/workerCanonicalAuthoringPort';
 import { initCacheManager, listNamespaceSlugsSync, peekCacheSync, updateCacheAtomic } from '../cache/cacheScripts';
-import { remaskQuestionForReader } from './decryptedQuestionReader';
+import { remaskQuestionForReader, remaskSurveyForReader } from './decryptedQuestionReader';
 import { getWorkerCanonicalCacheReader, normalizeWorkerCanonicalCacheReader } from './workerCanonicalCacheReader';
 
 type UnknownRecord = Record<string, unknown>;
@@ -178,21 +178,25 @@ const updateChangedCaches = (namespace: string, change: (cacheRoot: unknown) => 
     .filter((slug) => change(peekCacheSync(namespace, slug, { clone: false })))
     .map((slug) => updateCacheAtomic<UnknownRecord>(namespace, slug, (current) => change(current) || current || {}));
 
-// Locks question text in the chain nodes of a questionsCache root again when it
-// was decrypted for anyone but `reader`.
-const remaskChainQuestions = (cacheRoot: unknown, reader: string): UnknownRecord | null => {
+// Locks the `collection` entries in a cache root's chain nodes again when `remask`
+// finds them decrypted for another reader.
+const remaskChainNodes = (
+  cacheRoot: unknown,
+  collection: 'questions' | 'surveys',
+  remask: (entry: unknown) => UnknownRecord | null,
+): UnknownRecord | null => {
   if (!isRecord(cacheRoot)) return null;
   let next: UnknownRecord | null = null;
   for (const [scope, node] of Object.entries(cacheRoot)) {
-    if (scope === WORKER_CANONICAL_CACHE_SCOPE_KEY || !isRecord(node) || !isRecord(node.questions)) continue;
-    const questions: UnknownRecord = { ...node.questions };
+    if (scope === WORKER_CANONICAL_CACHE_SCOPE_KEY || !isRecord(node) || !isRecord(node[collection])) continue;
+    const entries: UnknownRecord = { ...(node[collection] as UnknownRecord) };
     let changed = false;
-    for (const qid of Object.keys(questions)) {
-      const masked = remaskQuestionForReader(questions[qid], reader);
-      if (masked) questions[qid] = masked;
+    for (const id of Object.keys(entries)) {
+      const masked = remask(entries[id]);
+      if (masked) entries[id] = masked;
       changed = changed || !!masked;
     }
-    if (changed) next = { ...(next || cacheRoot), [scope]: { ...node, questions } };
+    if (changed) next = { ...(next || cacheRoot), [scope]: { ...node, [collection]: entries } };
   }
   return next;
 };
@@ -200,8 +204,8 @@ const remaskChainQuestions = (cacheRoot: unknown, reader: string): UnknownRecord
 // Worker nodes hold what the previous account was authorized to read, including
 // Worker-decrypted answers, so an account change also removes them from storage.
 // Every account change, sign-in and sign-out included, also locks chain-node
-// question text not decrypted for the new reader. Startup does not: other tabs
-// of the same account share these nodes.
+// question text and survey titles and links not decrypted for the new reader.
+// Startup does not: other tabs of the same account share these nodes.
 export const purgeWorkerCanonicalCaches = async (previousReader: unknown): Promise<void> => {
   const reader = normalizeWorkerCanonicalCacheReader(previousReader);
   // The slug listing reads the in-memory mirror, which loads from storage once.
@@ -212,5 +216,12 @@ export const purgeWorkerCanonicalCaches = async (previousReader: unknown): Promi
     ),
   );
   const nextReader = getWorkerCanonicalCacheReader();
-  await Promise.all(updateChangedCaches('questionsCache', (cacheRoot) => remaskChainQuestions(cacheRoot, nextReader)));
+  await Promise.all([
+    ...updateChangedCaches('questionsCache', (cacheRoot) =>
+      remaskChainNodes(cacheRoot, 'questions', (question) => remaskQuestionForReader(question, nextReader)),
+    ),
+    ...updateChangedCaches('surveysCache', (cacheRoot) =>
+      remaskChainNodes(cacheRoot, 'surveys', (survey) => remaskSurveyForReader(survey, nextReader)),
+    ),
+  ]);
 };
