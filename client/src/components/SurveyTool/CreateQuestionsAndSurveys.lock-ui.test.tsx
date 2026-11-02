@@ -110,7 +110,7 @@ describe('CreateQuestionsAndSurveys lock UI', () => {
     );
     expect(resolveCreateSurveyProgressFillStyle(120)).toEqual({ width: '100%' });
     expect(resolveCreateSurveyProgressFillStyle(-20)).toEqual({ width: '0%' });
-    expect(resolveCreateSurveyQuestionBookmarkStyle(true)).toEqual({ color: 'var(--ce-status-warning)' });
+    expect(resolveCreateSurveyQuestionBookmarkStyle(true)).toEqual({ color: 'var(--ce-status-warning-text)' });
     expect(resolveCreateSurveyQuestionBookmarkStyle(false)).toEqual({ color: undefined });
     expect(resolveCreateSurveyBookmarkSurveyStyle(true)).toEqual({ color: 'var(--ce-status-warning-text)' });
     expect(resolveCreateSurveyBookmarkSurveyStyle(false)).toEqual({ color: undefined });

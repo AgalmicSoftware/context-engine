@@ -55,3 +55,74 @@ it('rejects selectors moved to a different reduced-motion rule', () => {
   expect(motionGuardPasses(text)).toBe(true);
   expect(motionGuardPasses(mutated)).toBe(false);
 });
+
+// The text of the first rule whose selector is exactly `selector`, nested rules included.
+const ruleText = (text: string, selector: string) => {
+  const start = text.indexOf(`${selector} {`);
+  if (start < 0) return '';
+  let depth = 0;
+  for (let end = text.indexOf('{', start); end < text.length; end += 1) {
+    if (text[end] === '{') depth += 1;
+    else if (text[end] === '}' && --depth === 0) return text.slice(start, end + 1);
+  }
+  return '';
+};
+
+// Group Conversation's colour pairs; their contrast in each theme is checked in scss/themes/themeContrast.test.ts.
+describe('Group Conversation dialog colours', () => {
+  const scss = readSurveyToolScss();
+  const drafts = ruleText(scss, '.sessionListeningPanelEmbedded .sessionListeningCreateWrap');
+
+  it('draws draft fields on the dialog colour with a muted-text edge and placeholder', () => {
+    const fields = drafts.slice(drafts.indexOf(':global(.form-control) {'));
+    expect(fields).toMatch(
+      /^[^}]*background: color-mix\(in srgb, var\(--ce-surface-sunken\) 68%, transparent\) !important;\s*border-color: var\(--ce-panel-text-muted\) !important;/,
+    );
+    expect(fields).toMatch(/^[^}]*&::placeholder \{\s*color: var\(--ce-panel-text-muted\) !important;/);
+    expect(drafts).toMatch(
+      /:global\(\[class\*='tagInputGroup'\]\) \{\s*border-color: var\(--ce-panel-text-muted\) !important;\s*&:focus-within \{\s*outline: 2px solid var\(--ce-focus-ring\);/,
+    );
+    expect(ruleText(scss, ".sessionListeningPanelEmbedded :global([class*='paste']) textarea")).toMatch(
+      /border: 1px solid var\(--ce-panel-text-muted\) !important;\s*color: var\(--ce-panel-text\) !important;/,
+    );
+    expect(drafts).not.toMatch(/var\(--ce-overlay-surface\) \d+%/);
+  });
+
+  it("gives a tinted tag chip's remove × the chip's text colour, and the help icon full opacity", () => {
+    expect(drafts).toMatch(
+      /:global\(\[class\*='removeIcon'\]\) \{\s*color: inherit !important;\s*&:hover \{\s*color: var\(--ce-status-danger-text\) !important;/,
+    );
+    expect(drafts).toMatch(/:global\(\[class\*='singleSelectLabel'\]\) svg \{\s*opacity: 1;/);
+  });
+
+  it('keeps the white transcript pill and clear button in document text', () => {
+    const pillHover = ruleText(
+      scss,
+      '.sessionListeningTranscriptButton:hover,\n.sessionListeningTranscriptButton:focus-visible',
+    );
+    expect(pillHover).toMatch(/border-color: var\(--ce-status-info\) !important;/);
+    expect(pillHover).not.toMatch(/[^-]color:/);
+    expect(ruleText(scss, '.sessionListeningClearTranscript')).toMatch(
+      /background: var\(--ce-text-inverse\);\s*color: var\(--ce-document-text\);/,
+    );
+    expect(ruleText(scss, '.sessionListeningClearTranscript:disabled')).toMatch(/opacity: 0\.6;/);
+  });
+
+  it('keeps recorder icons and focus rings clear of their surfaces', () => {
+    expect(ruleText(scss, '.sessionListeningPanel .sessionListeningTimerDot')).toMatch(
+      /color: color-mix\(in srgb, var\(--ce-status-error\) 60%, var\(--ce-text-inverse\)\);/,
+    );
+    expect(ruleText(scss, '.sessionListeningStopButton')).toMatch(
+      /color: color-mix\(in srgb, var\(--ce-status-error\) 65%, var\(--ce-compat-dark\)\);/,
+    );
+    expect(scss).toMatch(
+      /\.sessionListeningPanel\s+:is\(\.sessionListeningActiveRecorder, \.sessionListeningTranscriptDetails\)\s+:is\(button, textarea\):focus-visible,\s*\.sessionListeningPanel:not\(\.sessionListeningPanelEmbedded\) :is\(a, button, input, textarea\):focus-visible \{\s*outline-color: var\(--ce-document-text\);/,
+    );
+  });
+
+  it('keeps the Generate fill under the global .btn hover, focus and press resets', () => {
+    expect(ruleText(scss, 'button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled)')).toMatch(
+      /background: var\(--ce-status-success\) !important;/,
+    );
+  });
+});

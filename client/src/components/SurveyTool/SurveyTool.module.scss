@@ -2678,6 +2678,18 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   color: var(--ce-panel-text);
 }
 
+// The paste box on the dialog. The theme recipe for bare fields outranks its own rule, hence !important:
+// it drew Context Engine's body slate (2.9:1) inside a 1.3:1 edge.
+.sessionListeningPanelEmbedded :global([class*='paste']) textarea {
+  border: 1px solid var(--ce-panel-text-muted) !important;
+  color: var(--ce-panel-text) !important;
+
+  &::placeholder {
+    color: var(--ce-panel-text-muted);
+    opacity: 1;
+  }
+}
+
 .sessionListeningHeader,
 .sessionListeningActions {
   display: flex;
@@ -2843,6 +2855,11 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   font-size: 0.62rem;
 }
 
+// The recorder's timer chip is dark in every theme; towards its white label, Minimal's red is 3.4:1, not 1.6:1.
+.sessionListeningPanel .sessionListeningTimerDot {
+  color: color-mix(in srgb, var(--ce-status-error) 60%, var(--ce-text-inverse));
+}
+
 .sessionListeningTimerDotPaused {
   color: var(--ce-document-border);
   font-size: 0.62rem;
@@ -2897,7 +2914,17 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 }
 
 .sessionListeningStopButton {
-  color: var(--ce-status-error);
+  // Deepened towards the pause icon's dark ink: the error red alone was 1.7:1 on Classic 95's grey face.
+  color: color-mix(in srgb, var(--ce-status-error) 65%, var(--ce-compat-dark));
+}
+
+// The recorder box, the transcript box and the panel outside the dialog are light in every theme, where
+// Context Engine's green focus ring was 1.2:1; there it takes the document text colour.
+.sessionListeningPanel
+  :is(.sessionListeningActiveRecorder, .sessionListeningTranscriptDetails)
+  :is(button, textarea):focus-visible,
+.sessionListeningPanel:not(.sessionListeningPanelEmbedded) :is(a, button, input, textarea):focus-visible {
+  outline-color: var(--ce-document-text);
 }
 
 .sessionListeningSrOnly {
@@ -2916,6 +2943,12 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   background: var(--ce-status-success) !important;
   border-color: var(--ce-status-success) !important;
   color: var(--ce-status-success-contrast) !important;
+}
+
+// Global `.btn:hover`, `.btn-secondary:focus` and `.btn:active` rules clear button fills with !important,
+// which left this label on the surface behind it (white on white in Minimal). The element selector outranks them.
+button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
+  background: var(--ce-status-success) !important;
 }
 
 .sessionListeningGenerate:disabled,
@@ -3048,10 +3081,11 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   transform: rotate(180deg);
 }
 
+// The pill is white in every theme, so its label keeps the document text colour (Context Engine's info
+// blue was 3.4:1 on it) and the outline marks hover and focus.
 .sessionListeningTranscriptButton:hover,
 .sessionListeningTranscriptButton:focus-visible {
-  border-color: color-mix(in srgb, var(--ce-status-info) 34%, transparent);
-  color: var(--ce-status-info);
+  border-color: var(--ce-status-info) !important;
 }
 
 .sessionListeningError {
@@ -3106,8 +3140,9 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   height: 28px;
   border: 1px solid color-mix(in srgb, var(--ce-overlay-surface) 16%, transparent);
   border-radius: var(--ce-radius-6);
-  background: color-mix(in srgb, var(--ce-status-info-text) 96%, transparent);
-  color: var(--ce-status-info);
+  // The transcript box is white in every theme; info colours were 2.2:1 here, and navy on navy in Classic 95.
+  background: var(--ce-text-inverse);
+  color: var(--ce-document-text);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -3119,8 +3154,9 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   color: var(--ce-status-error);
 }
 
+// Dimmed while recording, but still 3:1 or more.
 .sessionListeningClearTranscript:disabled {
-  opacity: 0.45;
+  opacity: 0.6;
   cursor: not-allowed;
 }
 
@@ -3427,14 +3463,17 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   :global([class*='questionTypeSelect']),
   :global([class*='associatedSurveyInput']),
   :global([class*='tagInputField']),
-  :global([class*='tagsInput']) {
-    background: color-mix(in srgb, var(--ce-overlay-surface) 68%, transparent) !important;
-    border-color: color-mix(in srgb, var(--ce-panel-text) 22%, transparent) !important;
+  :global([class*='tagsInput']),
+  :global(.form-control) {
+    // The dialog's own colour, which its text is made for: Classic 95's overlay colour is navy, where black
+    // text was 2.8:1. Muted panel text keeps each field's edge at 3:1 or more on its card.
+    background: color-mix(in srgb, var(--ce-surface-sunken) 68%, transparent) !important;
+    border-color: var(--ce-panel-text-muted) !important;
     color: var(--ce-panel-text) !important;
     caret-color: var(--ce-panel-text) !important;
 
     &::placeholder {
-      color: color-mix(in srgb, var(--ce-panel-text) 62%, transparent) !important;
+      color: var(--ce-panel-text-muted) !important;
     }
   }
 
@@ -3464,6 +3503,16 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     opacity: 1 !important;
   }
 
+  // The tag field is drawn by its group, whose input has no border or outline of its own.
+  :global([class*='tagInputGroup']) {
+    border-color: var(--ce-panel-text-muted) !important;
+
+    &:focus-within {
+      outline: 2px solid var(--ce-focus-ring);
+      outline-offset: 2px;
+    }
+  }
+
   :global([class*='typeButton']):hover,
   :global([class*='jsonPromptBar']) button:hover,
   :global([class*='jsonPromptBar']) button:focus-visible,
@@ -3483,6 +3532,20 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     background: color-mix(in srgb, var(--ce-status-info-text) 18%, transparent) !important;
     border-color: color-mix(in srgb, var(--ce-status-info-text) 36%, transparent) !important;
     color: var(--ce-panel-text) !important;
+  }
+
+  // These chips are tinted, not filled, so the remove × takes the chip's text colour, not the dialog's.
+  :global([class*='removeIcon']) {
+    color: inherit !important;
+
+    &:hover {
+      color: var(--ce-status-danger-text) !important;
+    }
+  }
+
+  // At half opacity the help icon's accent was 2:1 in Classic 95.
+  :global([class*='singleSelectLabel']) svg {
+    opacity: 1;
   }
 
   :global([class*='pillAgree']) {
@@ -3506,7 +3569,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   :global([class*='freeformPreview']),
   :global([class*='ratingPreviewWrap']),
   :global([class*='jsonDisplay']) {
-    background: color-mix(in srgb, var(--ce-overlay-surface) 58%, transparent) !important;
+    background: color-mix(in srgb, var(--ce-surface-sunken) 58%, transparent) !important;
     border-color: color-mix(in srgb, var(--ce-panel-text) 18%, transparent) !important;
     color: var(--ce-panel-text) !important;
   }

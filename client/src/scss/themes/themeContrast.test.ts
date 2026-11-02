@@ -146,6 +146,36 @@ describe('bundled app-theme contrast', () => {
     assertContrast(values, 'focus-ring', 'surface', 3, 'canvas');
   });
 
+  // Group Conversation stacks translucent layers on the dialog's sunken surface (SurveyTool.module.scss):
+  // draft cards take 8% of the panel text, tag chips 18% of the info text, fields 68% of the dialog colour,
+  // and the recording timer is 82% of the compat dark over the waveform's light border colour.
+  test.each(registry.themes.map(({ id }) => id))('%s keeps Group Conversation drafts readable', (themeId) => {
+    const values = themeValues(css, themeId);
+    const color = (token: string) => parseColor(values[token]);
+    const tint = (token: string, share: number, under: Rgba) => {
+      const [red, green, blue, alpha] = color(token);
+      return composite([red, green, blue, alpha * share], under);
+    };
+    const blend = (token: string, share: number, other: string): Rgba => {
+      const [a, b] = [color(token), color(other)];
+      return [0, 1, 2].map((i) => a[i] * share + b[i] * (1 - share)).concat(1) as Rgba;
+    };
+    const ratio = (foreground: Rgba, background: Rgba) => contrastRatio(composite(foreground, background), background);
+    const card = tint('panel-text', 0.08, color('surface-sunken'));
+    const chip = tint('status-info-text', 0.18, card);
+    const field = tint('surface-sunken', 0.68, card);
+    const timer = tint('compat-dark', 0.82, color('border-light'));
+
+    expect(ratio(color('panel-text'), chip)).toBeGreaterThanOrEqual(4.5); // tag text and its remove ×
+    expect(ratio(color('status-danger-text'), chip)).toBeGreaterThanOrEqual(3); // the × while hovered
+    expect(ratio(color('panel-text'), field)).toBeGreaterThanOrEqual(4.5);
+    expect(ratio(color('panel-text-muted'), field)).toBeGreaterThanOrEqual(4.5); // placeholder
+    expect(contrastRatio(composite(color('panel-text-muted'), field), card)).toBeGreaterThanOrEqual(3); // field edge
+    expect(ratio(blend('status-error', 0.6, 'text-inverse'), timer)).toBeGreaterThanOrEqual(3); // recording dot
+    // The transcript pill and its clear button are white in every theme.
+    expect(ratio(color('document-text'), color('text-inverse'))).toBeGreaterThanOrEqual(4.5);
+  });
+
   test.each(registry.themes.map(({ id }) => id))('%s keeps small binary answer labels readable', (themeId) => {
     const values = themeValues(css, themeId);
     for (const stance of ['agree', 'disagree']) {
