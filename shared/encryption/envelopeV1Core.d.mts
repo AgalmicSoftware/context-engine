@@ -61,6 +61,10 @@ export function buildResponseFieldAAD(input: EnvelopeContextInput & { contextHex
 export function hashIdentifier(identifier: unknown): string;
 export function encodeValueBytes(kind: unknown, value: unknown, options?: { options?: unknown[] }): Uint8Array;
 export function toField(bytes: Uint8Array): bigint;
+export function poseidonHashBytes(
+  inputBytes: Uint8Array[],
+  customHasher?: ((inputs: bigint[]) => bigint | number | string | Promise<bigint | number | string>) | null,
+): Promise<string>;
 export function normalizePoseidonHashOutput(value: string | number | bigint): string;
 export function buildCommitDomainBytes(input: EnvelopeContextInput): Uint8Array;
 export function computeSaltedCommitments(

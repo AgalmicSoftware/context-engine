@@ -60,12 +60,10 @@ import {
   hashIdentifier,
   hexToBytes,
   importAesGcmKey,
-  normalizePoseidonHashOutput,
   parseEnvelope,
-  requireBigInt,
+  poseidonHashBytes,
   safeLower,
   stableStringify,
-  toField,
   utf8d,
   utf8e,
   validateEnvelopeBinding,
@@ -259,10 +257,6 @@ const toErrorMessage = (err: unknown, fallback = ''): string => {
   const message = String(err || '').trim();
   return message || fallback;
 };
-const isPromiseLike = <T>(value: unknown): value is PromiseLike<T> =>
-  !!value &&
-  (typeof value === 'object' || typeof value === 'function') &&
-  typeof (value as { then?: unknown }).then === 'function';
 const toOptionalString = (value: unknown): string | undefined =>
   value === undefined || value === null ? undefined : String(value);
 const toUint8Array = (value: unknown): Uint8Array => {
@@ -783,50 +777,6 @@ const getQuestionKindMeta = (qId: unknown, opts: { questionPool?: QuestionLike[]
 
 /* ------------------------ Commitments (Keccak, Poseidon) ----------------------- */
 
-/**
- * Poseidon support notes:
- * - If a real Poseidon is available (e.g., window.poseidon from circomlibjs), we use it.
- * - Otherwise the caller must provide a hasher, or Poseidon commitments are unavailable.
- */
-const poseidonHashBytes = (
-  parts: Uint8Array[],
-  customHasher: PoseidonHasher | null = null,
-): string | Promise<string> => {
-  requireBigInt();
-  const inputs = parts.map((b) => toField(b));
-
-  // 1. Dependency Injection (Highest Priority)
-  // Allows caller to provide a ZK-compatible implementation (e.g. poseidon-lite)
-  if (customHasher && typeof customHasher === 'function') {
-    try {
-      const out = customHasher(inputs);
-      if (isPromiseLike<PoseidonHashValue>(out)) {
-        return out.then((value) => normalizePoseidonHashOutput(value));
-      }
-      return normalizePoseidonHashOutput(out);
-    } catch (e) {
-      logCryptoFallback(e);
-      // Fall through if custom hasher fails
-    }
-  }
-
-  try {
-    const poseidon =
-      (typeof window !== 'undefined' && (window.poseidon || window.poseidon1 || window.Poseidon)) || null;
-    if (poseidon && typeof poseidon === 'function') {
-      const out = poseidon(inputs); // expected BigInt
-      if (isPromiseLike<PoseidonHashValue>(out)) {
-        return out.then((value) => normalizePoseidonHashOutput(value));
-      }
-      return normalizePoseidonHashOutput(out);
-    }
-  } catch (e) {
-    logCryptoFallback(e);
-    // fall through to required-hasher error
-  }
-  throw new Error('Poseidon hasher required but not available');
-};
-
 const resolvePoseidonHasher = (customHasher: PoseidonHasher | null = null): PoseidonHasher | null => {
   if (typeof customHasher === 'function') return customHasher;
   const browserHasher =
@@ -924,14 +874,7 @@ async function addTopLevelPoseidonIfRequired(
     const canonical = encodeValueBytes(kind, v, { options: Array.isArray(optionsForKind) ? optionsForKind : [] });
     const domain = buildCommitDomainBytes({ chainId, surveyId, qId });
 
-    // poseidonHashBytes may be sync or async in some builds — support both.
-    const out = poseidonHashBytes([canonical, domain], hasher);
-    if (isPromiseLike<string>(out)) {
-      const hex = await out;
-      if (typeof hex === 'string') field.poseidon = hex;
-    } else if (typeof out === 'string') {
-      field.poseidon = out;
-    }
+    field.poseidon = await poseidonHashBytes([canonical, domain], resolvePoseidonHasher(hasher));
   } catch (e) {
     logCryptoFallback(e);
     // Best-effort only; never throw from serialization path.
