@@ -10,6 +10,8 @@ import {
   reportableKeys,
   resultsResponseRows,
 } from '../../shared/agentFidelity.mjs';
+import { isSingleSelect, optionsOf, ratingScaleFor } from '../../shared/questions/answerValue.mjs';
+import { getVoiceCredits } from '../../shared/questions/quadraticAllocation.mjs';
 import { readQuestionSet } from './answer-set.mjs';
 import { bootstrapDifferenceInterval, newcombeDifferenceInterval } from './statistics.mjs';
 
@@ -217,6 +219,37 @@ export const compareDistributions = (question, models, group, { seed, bootstrapS
 // ---------------------------------------------------------------------------
 // Report
 
+// What decides how an answer reads: answers to two definitions of a question
+// mean the same only when these agree.
+const answerContract = (question) => {
+  switch (question.type) {
+    case 'rating': {
+      const { min, max, step, minLabel, maxLabel } = ratingScaleFor(question);
+      // An unlabelled end is labelled with its number, which the scale already compares.
+      const label = (value, end) => (lower(value) === String(end) ? null : lower(value));
+      return { type: question.type, scale: [min, max, step], labels: [label(minLabel, min), label(maxLabel, max)] };
+    }
+    case 'multichoice': {
+      const limit = Number(question.maxSelections);
+      return {
+        type: question.type,
+        options: optionsOf(question).map(lower).sort(),
+        selection: [isSingleSelect(question), Number.isInteger(limit) && limit > 0 ? limit : null],
+      };
+    }
+    case 'quadratic':
+      // Votes are read by position, so the options' order matters too.
+      return { type: question.type, options: optionsOf(question).map(lower), budget: getVoiceCredits(question) };
+    default:
+      return { type: question.type };
+  }
+};
+const contractDifferences = (a, b) => {
+  const [left, right] = [answerContract(a), answerContract(b)];
+  if (left.type !== right.type) return ['type'];
+  return Object.keys(left).filter((field) => key(left[field]) !== key(right[field]));
+};
+
 const readGroups = (input) => {
   const entries = Array.isArray(input)
     ? input.map((entry) => [entry?.address, entry?.groups ?? entry?.group])
@@ -233,7 +266,8 @@ const readGroups = (input) => {
  * `groups` (address to group ids) or else by the link they arrived through.
  * A group is withheld when it has fewer than `minPeople` people, or when
  * subtracting it from everyone, or from the other groups, would leave fewer;
- * each question is checked again with the people who answered it.
+ * each question is checked again with the people who answered it. A question
+ * the answer file defines differently from the export is not compared.
  */
 export const compareAnswers = ({
   answersFile,
@@ -248,18 +282,28 @@ export const compareAnswers = ({
   }
   // Read as the answer command reads them, so old polls are single choices.
   const exportQuestions = readQuestionSet({ questions: resultsExport?.filteredQuestions ?? [] }).questions;
+  const askedQuestions = readQuestionSet({ questions: answersFile.questions ?? [] }).questions;
   const exportIds = new Set(exportQuestions.map((question) => lower(question.id)));
   if (!(answersFile.rows || []).some((row) => exportIds.has(lower(row?.questionId)))) {
     throw new Error("None of the answers are to this Results export's questions.");
   }
-  const questions = [...exportQuestions, ...(answersFile.questions || [])]
+  // A question the models were asked differently from people is not compared,
+  // and its replies are read the way the models were asked it.
+  const askedById = new Map(askedQuestions.map((question) => [lower(question.id), question]));
+  const differencesById = new Map();
+  const definitions = exportQuestions.map((question) => {
+    const asked = askedById.get(lower(question.id));
+    const differences = asked ? contractDifferences(asked, question) : [];
+    if (!differences.length) return question;
+    differencesById.set(lower(question.id), differences);
+    return asked;
+  });
+  const questions = [...definitions, ...askedQuestions]
     .map(normalizeFidelityQuestion)
     .filter(Boolean)
     .filter((question, index, list) => list.findIndex((other) => other.id === question.id) === index);
   const questionMap = new Map(questions.map((question) => [question.id, question]));
-  const promptOf = new Map(
-    [...exportQuestions, ...(answersFile.questions || [])].map((question) => [lower(question?.id), text(question?.prompt)]),
-  );
+  const promptOf = new Map([...exportQuestions, ...askedQuestions].map((question) => [lower(question.id), text(question.prompt)]));
 
   const { answers } = collectSessionFidelityData({ questions: exportQuestions, payloads: resultsResponseRows(resultsExport) });
   const people = answers.filter((answer) => !answer.isAgent);
@@ -303,6 +347,13 @@ export const compareAnswers = ({
       modelIds.map((modelId) => [modelId, summarizeModelAnswers(question, repliesBy.get(`${modelId}|${question.id}`) || [])]),
     );
     const base = { id: question.id, type: question.type, prompt: promptOf.get(question.id) || '', models: modelSummaries };
+    const differences = differencesById.get(question.id);
+    if (differences) {
+      return {
+        ...base,
+        notCompared: `The answer file defines this question differently from the Results export (${differences.join(', ')}), so the models' answers don't read the same way as people's.`,
+      };
+    }
     if (question.type === 'freeform') {
       return { ...base, notCompared: 'Freeform answers need theme coding by a judge model against a human-checked codebook.' };
     }
