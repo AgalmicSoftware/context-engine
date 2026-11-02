@@ -2892,8 +2892,10 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   align-items: center;
   justify-content: center;
 
+  // Pressed, the face is halfway to white: the full border colour is Classic 95's dark grey, where the
+  // Stop icon was 2:1.
   &:active:not(:disabled) {
-    background: var(--ce-document-border);
+    background: color-mix(in srgb, var(--ce-document-border) 50%, var(--ce-text-inverse));
     box-shadow:
       inset 1px 1px 0 var(--ce-text-inverse),
       inset -1px -1px 0 var(--ce-text-muted);
@@ -3567,6 +3569,22 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   // At half opacity the help icon's accent was 2:1 in Classic 95.
   :global([class*='singleSelectLabel']) svg {
     opacity: 1;
+  }
+
+  // Submit progress sits on the dialog, which its labels mask the connecting line in; on the floating
+  // panel's light pill, Context Engine's success green was 1.9:1.
+  :global([class*='step']) {
+    color: var(--ce-panel-text-muted) !important;
+
+    span,
+    svg {
+      background: var(--ce-surface-sunken) !important;
+      box-shadow: 0 0 0 8px var(--ce-surface-sunken) !important;
+    }
+  }
+
+  :global([class*='stepCompleted']) {
+    color: var(--ce-status-success-text) !important;
   }
 
   :global([class*='pillAgree']) {

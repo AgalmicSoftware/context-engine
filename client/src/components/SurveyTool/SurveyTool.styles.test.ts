@@ -88,6 +88,15 @@ describe('Group Conversation dialog colours', () => {
     expect(drafts).not.toMatch(/var\(--ce-overlay-surface\) \d+%/);
   });
 
+  it('draws submit progress in the dialog colours', () => {
+    expect(drafts).toMatch(
+      /:global\(\[class\*='step'\]\) \{\s*color: var\(--ce-panel-text-muted\) !important;\s*span,\s*svg \{\s*background: var\(--ce-surface-sunken\) !important;/,
+    );
+    expect(drafts).toMatch(
+      /:global\(\[class\*='stepCompleted'\]\) \{\s*color: var\(--ce-status-success-text\) !important;/,
+    );
+  });
+
   it("gives a tinted tag chip's remove × the chip's text colour, and the help icon full opacity", () => {
     expect(drafts).toMatch(
       /:global\(\[class\*='removeIcon'\]\) \{\s*color: inherit !important;\s*&:hover \{\s*color: var\(--ce-status-danger-text\) !important;/,
@@ -123,6 +132,12 @@ describe('Group Conversation dialog colours', () => {
   it('labels a held-off Submit in the disabled text colour', () => {
     expect(ruleText(scss, '.sessionListeningCreateWrap')).toMatch(
       /:disabled > :global\(\[class\*='buttonContent'\]\) \{\s*color: var\(--ce-action-submit-disabled-text\) !important;/,
+    );
+  });
+
+  it('presses the audio buttons onto a face their icons stay readable on', () => {
+    expect(ruleText(scss, '.sessionListeningAudioButton')).toMatch(
+      /&:active:not\(:disabled\) \{\s*background: color-mix\(in srgb, var\(--ce-document-border\) 50%, var\(--ce-text-inverse\)\);/,
     );
   });
 

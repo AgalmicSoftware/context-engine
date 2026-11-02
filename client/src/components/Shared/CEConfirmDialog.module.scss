@@ -106,6 +106,11 @@
 // Global button rules repaint these on hover, focus and press with !important: `.btn:hover` clears the
 // fill (white on white for Minimal's Stop), `.btn-primary:focus` and `.btn-danger:focus` paint gradients,
 // and `.btn-primary:active` whitens the label. From the footer these outrank them.
+// The cancel button's fill is cleared too, which its label survives, but pressing gives it a dark label.
+.footer .cancelButton:is(:hover, :focus, :active):not(:disabled) {
+  color: var(--ce-control-text) !important;
+}
+
 .footer .confirmButton:is(:hover, :focus, :active):not(:disabled) {
   border-color: var(--ce-action-accent-hover) !important;
   background: var(--ce-action-accent-hover) !important;

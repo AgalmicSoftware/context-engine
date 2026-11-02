@@ -66,6 +66,14 @@ describe('CEConfirmDialog', () => {
     }
   });
 
+  it('keeps the cancel label in the control text colour when pressed', () => {
+    // Pressing `.btn-outline-secondary` paints a dark label while the global rule clears the fill.
+    const scss = fs.readFileSync(path.join(__dirname, 'CEConfirmDialog.module.scss'), 'utf8');
+    expect(scss).toContain(
+      '.footer .cancelButton:is(:hover, :focus, :active):not(:disabled) {\n  color: var(--ce-control-text) !important;\n}',
+    );
+  });
+
   it("rings the title-bar close button in the bar's text colour", () => {
     // The theme's focus ring can match a title bar (black on Classic 95's navy).
     const scss = fs.readFileSync(path.join(__dirname, 'CEConfirmDialog.module.scss'), 'utf8');
