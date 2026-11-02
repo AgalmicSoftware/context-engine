@@ -2605,11 +2605,12 @@ export const readContextSourceBytes = async ({ env, config, slug, metadata, maxB
 
 // Removes stored records: payload first, index row last, so a failure part
 // way leaves a row a retry removes rather than a payload nothing lists.
-export const removeCloudflareStorageRecords = async ({ env, slug, rows = [] } = {}) => {
+// `markWrite` lets the session coordinator count its own writes without calling itself.
+export const removeCloudflareStorageRecords = async ({ env, slug, rows = [], markWrite = () => markStorageBackupWrite(env, slug) } = {}) => {
   const r2 = getStorageR2Binding(env);
   const index = getStorageIndexBinding(env);
   if (!index || typeof index.delete !== 'function') throw new Error('Cloudflare storage index binding not configured.');
-  await markStorageBackupWrite(env, slug);
+  await markWrite();
   for (const metadata of rows) {
     const id = trim(metadata?.id);
     if (!isSafeCloudflareStorageRefId(id)) continue;
@@ -2617,7 +2618,7 @@ export const removeCloudflareStorageRecords = async ({ env, slug, rows = [] } = 
     await index.delete(buildPayloadKey({ slug, id }));
     await index.delete(buildIndexKey({ slug, resource: trim(metadata.resource) || 'docsContext', id }));
   }
-  await markStorageBackupWrite(env, slug);
+  await markWrite();
 };
 
 export const storageRoute = async ({ path, method, request, env, config, slug, uploaderAddress, authScopes, expectedAuthority, baseHeaders, deps } = {}) => {

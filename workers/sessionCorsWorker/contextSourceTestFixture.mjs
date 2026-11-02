@@ -1,9 +1,10 @@
 import { publishCloudflareOwnedStorageMetadata, storageRoute } from './storageRouteExecution.js';
 import { createOutboundUrlSafetyHelpersWithWorkerDeps } from './outboundUrlSafetyBinding.js';
+import { installSessionCoordinatorBinding } from '../../tests/helpers/sessionCorsWorkerTestUtils.mjs';
 
 // A Session Worker's storage for context-source tests: in-memory KV and R2, a
-// session with the default access, pages from a scripted network, and a
-// scripted AI provider. Nothing here reaches a real network or service.
+// session coordinator, a session with the default access, pages from a scripted
+// network, and a scripted AI provider. Nothing here reaches a real network or service.
 export const ADMIN = `0x${'1'.repeat(40)}`;
 export const PARTICIPANT = `0x${'2'.repeat(40)}`;
 const SCOPES = { storage: true };
@@ -56,7 +57,7 @@ export const pageResponse = (body, type = 'text/html; charset=utf-8') => new Res
 export const harness = ({ encryption = 'none', pages = {}, ai = { mode: 'anthropic', model: 'claude-sonnet-5-5' }, provider } = {}) => {
   const kv = createKv();
   const r2 = createR2();
-  const env = { CE_STORAGE_INDEX_KV: kv, CE_STORAGE_R2: r2, CE_STORAGE_ENVELOPE_KEK: 'synthetic-context-test-kek' };
+  const env = installSessionCoordinatorBinding({ CE_STORAGE_INDEX_KV: kv, CE_STORAGE_R2: r2, CE_STORAGE_ENVELOPE_KEK: 'synthetic-context-test-kek' });
   const state = {
     config: {
       slug: 'salon',

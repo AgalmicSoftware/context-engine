@@ -20,6 +20,7 @@ import {
 import { buildSafeSponsoredReceiptBody } from './sponsoredBootstrapGrantStore.js';
 import { runQueuedAutomaticResultsAnalysisJob, valueLooksEncrypted } from './resultsAnalysisGeneration.js';
 import { publishCloudflareOwnedStorageMetadata, scanLegacyStorageOwnerIds, setCloudflareStorageResourceHidden } from './storageRouteExecution.js';
+import { finishContextPdfReading, removeContextSource } from './contextSourceRoute.js';
 import {
   applySessionConfigMutation,
   resolveCanonicalWorkerSessionIdHex,
@@ -72,6 +73,9 @@ const AUTH_NONCE_ACTIVE_KEY = 'auth-nonce-active';
 const AUTH_NONCE_USED_KEY = 'auth-nonce-used';
 const AUTH_RATE_RECORD_KEY = 'auth-rate-record';
 const HOSTED_FAUCET_QUOTA_KEY = 'hosted-faucet-quota-v1';
+const CONTEXT_PDF_READING_PREFIX = 'context-pdf-reading:';
+// Longer than a PDF reading's AI deadline, so an abandoned reading frees its PDF.
+const CONTEXT_PDF_READING_LEASE_MS = 5 * 60 * 1000;
 const WORKER_GROUP_CAPACITY_META_KEY = 'worker-group-capacity-meta-v3';
 const WORKER_GROUP_CAPACITY_GROUP_PREFIX = 'worker-group-capacity-group-v3:';
 const WORKER_GROUP_CAPACITY_MEMBER_PREFIX = 'worker-group-capacity-member-v3:';
@@ -431,6 +435,7 @@ export class SessionWriteCoordinator {
     this.activeDirectAttemptId = '';
     this.sessionConfigTail = Promise.resolve();
     this.storageVisibilityTail = Promise.resolve();
+    this.contextSourceTail = Promise.resolve();
     this.workerGroupTail = Promise.resolve();
     this.resultsAnalysisTail = Promise.resolve();
     this.storageOwnerTail = Promise.resolve();
@@ -2294,6 +2299,46 @@ export class SessionWriteCoordinator {
     return run;
   }
 
+  // Context changes to a PDF's readings run one at a time per session, so a
+  // reading, a removal and the PDF's pointer to its reading never interleave.
+  async executeContextSourceOperation(operation, payload) {
+    const run = this.contextSourceTail.then(async () => {
+      try {
+        const slug = normalizeWorkerSessionSlug(payload?.slug);
+        const id = toTrimmedString(payload?.id);
+        const leaseKey = `${CONTEXT_PDF_READING_PREFIX}${id}`;
+        const markWrite = () => bumpStorageBackupRevision(this.state.storage);
+        if (operation === 'begin-read') {
+          const nowMs = Number(this.now()) || Date.now();
+          if ((await this.state.storage.get(leaseKey))?.expiresAtMs > nowMs) {
+            return jsonResponse({ error: 'This PDF is already being read.', reason: 'context_pdf_reading' }, 409);
+          }
+          const token = createAttemptId(this.crypto);
+          await this.state.storage.put(leaseKey, { token, expiresAtMs: nowMs + CONTEXT_PDF_READING_LEASE_MS });
+          return jsonResponse({ ok: true, token });
+        }
+        if (operation === 'end-read') {
+          if ((await this.state.storage.get(leaseKey))?.token === payload.token) await this.state.storage.delete(leaseKey);
+          if (!payload.readingId) return jsonResponse({ ok: true });
+          await assertNoActiveBackupImport(this);
+          const result = await finishContextPdfReading({ env: this.env, slug, pdfId: id, readingId: toTrimmedString(payload.readingId),
+            readAt: toTrimmedString(payload.readAt), markWrite });
+          return jsonResponse(result.body, result.status);
+        }
+        if (operation === 'remove') {
+          await assertNoActiveBackupImport(this);
+          const result = await removeContextSource({ env: this.env, slug, id, readingIds: payload.readingIds, markWrite });
+          return jsonResponse(result.body, result.status);
+        }
+        return jsonResponse({ error: 'Not found.' }, 404);
+      } catch (error) {
+        return jsonResponse({ error: error.message || 'Context update failed.' }, error.status || 503);
+      }
+    });
+    this.contextSourceTail = run.catch(() => undefined);
+    return run;
+  }
+
   async finalizeSessionConfigProjection(revision) {
     await this.state.storage.transaction(async (transaction) => {
       const current = await transaction.get(SESSION_CONFIG_AUTHORITY_KEY);
@@ -3011,6 +3056,9 @@ export class SessionWriteCoordinator {
     }
     if (url.pathname === '/session-config/storage/set-hidden') return this.executeStorageVisibilityMutation(payload);
     if (url.pathname === '/session-config/storage/publish') return this.executeStoragePublication(payload);
+    if (url.pathname.startsWith('/session-config/context-source/')) {
+      return this.executeContextSourceOperation(url.pathname.split('/').pop(), payload);
+    }
     if (['preflight', 'begin', 'check', 'checkpoint', 'release', 'discard'].some(operation => url.pathname === `/session-config/lit-authorization/provisioning/${operation}`)) {
       return this.serializeSessionConfigOperation(() => executeLitProvisioning(this, payload, url.pathname.split('/').at(-1)));
     }

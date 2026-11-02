@@ -21,6 +21,7 @@ import {
   removeCloudflareStorageRecords,
   resolveSessionAdminAddresses,
 } from './storageRouteExecution.js';
+import { executeCoordinatedContextSourceOperation } from './sessionConfigAuthority.js';
 
 const encoder = new TextEncoder();
 const trim = (value) => (typeof value === 'string' ? value.trim() : '');
@@ -124,23 +125,43 @@ const addLink = async ({ body, env, slug, deps, store, json, now }) => {
   });
 };
 
-// A PDF: the session's own AI reads it, and its text is stored beside the
-// PDF with the same privacy, replacing any earlier reading.
-const readPdf = async ({ body, env, config, slug, admin, deps, store, json, now }) => {
-  const pdf = await readContextSourceRow({ env, slug, id: body.id });
-  if (!pdf || contextRoleOf(pdf.tags) !== CONTEXT_ROLE || pdf.contentType !== CONTEXT_FILE_TYPES.pdf) {
-    return json({ error: 'That PDF is no longer in the session.' }, 404);
+// Context changes to a PDF's readings run in the session coordinator.
+const coordinate = (deps, args) => (deps?.executeCoordinatedContextSourceOperation || executeCoordinatedContextSourceOperation)(args);
+const readAtOf = (row) => contextTagValue(row.tags, TAGS.readAt);
+
+// Run by the session coordinator once a reading is stored. A PDF removed while
+// its AI read it takes the text too, and a reading newer than this one stays.
+export const finishContextPdfReading = async ({ env, slug, pdfId, readingId, readAt, markWrite }) => {
+  const reading = { id: readingId, resource: 'docsContext' };
+  const current = await readContextSourceRow({ env, slug, id: pdfId });
+  if (!current) {
+    await removeCloudflareStorageRecords({ env, slug, rows: [reading], markWrite });
+    return { status: 404, body: { error: 'That PDF was removed while the session’s AI read it.' } };
   }
-  if (config?.scopes?.ai === false) return json({ error: 'AI is turned off for this session.', reason: 'ai_disabled' }, 403);
-  if (Number(pdf.size) > LIMITS.pdfBytes) return json({ error: 'This PDF is too large for the session’s AI to read.' }, 413);
+  const earlier = (await readingsOf({ env, slug, row: current })).filter((row) => row.id !== readingId);
+  if (earlier.some((row) => readAtOf(row) > readAt || (readAtOf(row) === readAt && row.id > readingId))) {
+    await removeCloudflareStorageRecords({ env, slug, rows: [reading], markWrite });
+    return { status: 409, body: { error: 'A newer reading of this PDF finished first.', reason: 'context_pdf_reading_superseded' } };
+  }
+  if (earlier.length) await removeCloudflareStorageRecords({ env, slug, rows: earlier, markWrite });
+  // The PDF row names its reading, so removing the PDF finds it without a list.
+  await getStorageIndexBinding(env).put(
+    buildIndexKey({ slug, resource: 'docsContext', id: pdfId }),
+    JSON.stringify({ ...current, contextReadingId: readingId }),
+  );
+  return { status: 200, body: { ok: true } };
+};
+
+// The session's AI reads the PDF; its text is stored beside it with the same privacy.
+const readAndStorePdf = async ({ pdf, env, config, slug, admin, deps, store, json, now }) => {
   const bytes = await readContextSourceBytes({ env, config, slug, metadata: pdf, maxBytes: LIMITS.pdfBytes, principal: admin, deps });
-  if (!bytes) return json({ error: 'That PDF is no longer in the session.' }, 404);
+  if (!bytes) return { response: json({ error: 'That PDF is no longer in the session.' }, 404) };
   const name = contextTagValue(pdf.tags, TAGS.name) || 'document.pdf';
   const secrets = (await deps?.getSessionSecrets?.(env, slug)) || {};
   const read = await readPdfWithSessionAi({
     config, secrets, bytes, filename: name, deps: { fetch: deps?.fetch, readTimeoutMs: deps?.readTimeoutMs },
   });
-  if (!read.ok) return json({ error: read.error, reason: read.reason }, read.status);
+  if (!read.ok) return { response: json({ error: read.error, reason: read.reason }, read.status) };
   const readAt = now();
   const text = read.text.slice(0, LIMITS.readTextChars);
   const stored = await storeRecord(store, {
@@ -159,38 +180,51 @@ const readPdf = async ({ body, env, config, slug, admin, deps, store, json, now 
       { name: TAGS.readAt, value: readAt },
     ],
   });
-  if (stored.response) return stored.response;
-  const reading = { id: stored.id, resource: 'docsContext' };
-  // The PDF may have been removed while its AI read it; its text goes too.
-  const current = await readContextSourceRow({ env, slug, id: pdf.id });
-  if (!current) {
-    await removeCloudflareStorageRecords({ env, slug, rows: [reading] });
-    return json({ error: 'That PDF was removed while the session’s AI read it.' }, 404);
-  }
-  const earlier = (await readingsOf({ env, slug, row: current })).filter((row) => row.id !== stored.id);
-  if (earlier.length) await removeCloudflareStorageRecords({ env, slug, rows: earlier });
-  // The PDF row names its reading, so removing the PDF finds it without a list.
-  await getStorageIndexBinding(env).put(
-    buildIndexKey({ slug, resource: 'docsContext', id: pdf.id }),
-    JSON.stringify({ ...current, contextReadingId: stored.id }),
-  );
-  return json({
-    ok: true,
-    text: {
-      id: stored.id, derivedFrom: pdf.id, model: read.model, readAt,
-      chars: text.length, truncated: read.truncated || read.text.length > text.length,
-    },
-  });
+  if (stored.response) return stored;
+  return { id: stored.id, model: read.model, readAt, chars: text.length, truncated: read.truncated || read.text.length > text.length };
 };
 
-// Removes a source and the text the session's AI read from it, readings first
-// so a failure part way never leaves a reading without its PDF.
-const remove = async ({ body, env, slug, json }) => {
-  const row = await readContextSourceRow({ env, slug, id: body.id });
-  if (!row) return json({ error: 'That item is no longer in the session.' }, 404);
-  const rows = [...await readingsOf({ env, slug, row, shownIds: body.readingIds }), row];
-  await removeCloudflareStorageRecords({ env, slug, rows });
-  return json({ ok: true, removed: rows.map((entry) => entry.id) });
+// A PDF: one reading at a time, replacing any earlier reading. A second read
+// while one runs is refused rather than paying for the same read twice.
+const readPdf = async ({ body, env, config, slug, admin, deps, store, json, now }) => {
+  const pdf = await readContextSourceRow({ env, slug, id: body.id });
+  if (!pdf || contextRoleOf(pdf.tags) !== CONTEXT_ROLE || pdf.contentType !== CONTEXT_FILE_TYPES.pdf) {
+    return json({ error: 'That PDF is no longer in the session.' }, 404);
+  }
+  if (config?.scopes?.ai === false) return json({ error: 'AI is turned off for this session.', reason: 'ai_disabled' }, 403);
+  if (Number(pdf.size) > LIMITS.pdfBytes) return json({ error: 'This PDF is too large for the session’s AI to read.' }, 413);
+  const begun = await coordinate(deps, { env, slug, operation: 'begin-read', id: pdf.id });
+  if (!begun.ok) return json(begun.body, begun.status);
+  const end = (reading = {}) => coordinate(deps, { env, slug, operation: 'end-read', id: pdf.id, token: begun.body.token,
+    ...(reading.id ? { readingId: reading.id, readAt: reading.readAt } : {}) });
+  let reading;
+  try {
+    reading = await readAndStorePdf({ pdf, env, config, slug, admin, deps, store, json, now });
+  } catch (error) {
+    await end();
+    throw error;
+  }
+  const ended = await end(reading);
+  if (reading.response) return reading.response;
+  if (!ended.ok) return json(ended.body, ended.status);
+  const { id, model, readAt, chars, truncated } = reading;
+  return json({ ok: true, text: { id, derivedFrom: pdf.id, model, readAt, chars, truncated } });
+};
+
+// Run by the session coordinator: removes a source and the text the session's
+// AI read from it, readings first so a failure part way never leaves a reading
+// without its PDF.
+export const removeContextSource = async ({ env, slug, id, readingIds, markWrite }) => {
+  const row = await readContextSourceRow({ env, slug, id });
+  if (!row) return { status: 404, body: { error: 'That item is no longer in the session.' } };
+  const rows = [...await readingsOf({ env, slug, row, shownIds: readingIds }), row];
+  await removeCloudflareStorageRecords({ env, slug, rows, markWrite });
+  return { status: 200, body: { ok: true, removed: rows.map((entry) => entry.id) } };
+};
+
+const remove = async ({ body, env, slug, deps, json }) => {
+  const removed = await coordinate(deps, { env, slug, operation: 'remove', id: trim(body.id), readingIds: body.readingIds });
+  return json(removed.body, removed.status);
 };
 
 const ACTIONS = Object.freeze({ 'add-link': addLink, 'read-pdf': readPdf, remove });

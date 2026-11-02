@@ -60,3 +60,7 @@ export const executeCoordinatedStorageVisibilityMutation = (args) => (
 export const executeCoordinatedStoragePublication = (args) => (
   callSessionConfigCoordinator({ ...args, path: 'storage/publish' })
 );
+
+export const executeCoordinatedContextSourceOperation = ({ operation, ...args }) => (
+  callSessionConfigCoordinator({ ...args, path: `context-source/${operation}` })
+);
