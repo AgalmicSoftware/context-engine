@@ -7,6 +7,7 @@ import { createAgentServices } from './agent/services.mjs';
 import { faucet } from './faucetExecution.js';
 import { dispatchAuthenticatedSecretActionRoute } from './authenticatedSecretActionRouteDispatch.js';
 import { installSessionCoordinatorBinding } from '../../tests/helpers/sessionCorsWorkerTestUtils.mjs';
+import { SessionWriteCoordinator } from './sessionWriteCoordinator.js';
 import { resolveRpcUrlListForGate } from './gateRpcResolution.js';
 import { PRIVATE_SESSION_RPC_LABEL } from './rpcDiagnosticSafety.js';
 
@@ -172,6 +173,31 @@ test('two sessions sharing a faucet key take turns with its wallet nonce', async
   const results = await Promise.all([request('example', RECIPIENT), request('other-session', OTHER_RECIPIENT)]);
   assert.deepEqual(results.map(({ response }) => response.status), [200, 200]);
   assert.deepEqual([...accepted.keys()].sort(), [0, 1]);
+});
+
+test('a faucet wallet turn renewed while its send runs is not taken over', async () => {
+  let time = 1_000;
+  const values = new Map();
+  const storage = {
+    get: async (key) => values.get(key),
+    put: async (key, value) => values.set(key, structuredClone(value)),
+    delete: async (key) => values.delete(key),
+    transaction: (callback) => callback(storage),
+  };
+  const coordinator = new SessionWriteCoordinator({ storage }, {}, { now: () => time });
+  const call = async (action, payload = {}) => (await coordinator.fetch(new Request(
+    `https://session-coordinator.internal/faucet-wallet/${action}`,
+    { method: 'POST', body: JSON.stringify(payload) },
+  ))).json();
+
+  const first = await call('acquire');
+  assert.equal(first.acquired, true);
+  time += 50_000;
+  assert.equal((await call('renew', { token: first.token })).held, true);
+  time += 50_000;
+  assert.equal((await call('acquire')).acquired, false);
+  time += 11_000;
+  assert.equal((await call('acquire')).acquired, true);
 });
 
 test('agent faucet requests take the same wallet turn', async () => {

@@ -3083,8 +3083,9 @@ transport: { type: "webrtc", sdp } }`. Preserves the SDP offer verbatim,
     `POST /sponsored/redeem-faucet`, takes turns with its faucet wallet, so each
     reads its pending nonce, signs and sends before the next starts. Sessions and
     sponsored grants on the same Worker that share a key share the turn, and a
-    grant takes it before its one-time reservation. A request that waits 30
-    seconds for its turn returns `503`; without coordination nothing is sent.
+    grant takes it before its one-time reservation. A running payout renews its
+    turn, so a stalled RPC call can't let another payout in. A request that waits
+    30 seconds for its turn returns `503`; without coordination nothing is sent.
   - The following generic and proof-backed gate rules apply to registry sessions.
   - Authenticated callers that already have `scopes.faucet=true` may continue using the generic payload
     `{ action: "request_test_eth", address|to, amountEth? }`.
