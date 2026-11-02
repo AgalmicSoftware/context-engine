@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.9.0] - 2026-10-31
+## [0.9.0] - 2026-11-02
 
 0.9.0 also contains the 0.8.1 changes listed below, which were never released on their own.
 
