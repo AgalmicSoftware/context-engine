@@ -7,7 +7,25 @@ const sessionConfig = { sessionId: 'example-session-id', corsWorkerUrl: 'https:/
 
 type DecryptPort = Parameters<typeof createSurveyResultsLockedResponsesRuntime>[0]['ports']['decryptEnvelopeValue'];
 
-const buildRuntime = (decryptEnvelopeValue: DecryptPort, applyStatePatch = jest.fn()) => {
+const lockedRow = (responder: string, extra: Record<string, unknown> = {}) => ({
+  responder,
+  response: {
+    questionID: 'q1',
+    answer: {
+      value: '*',
+      encrypted: true,
+      encryptionAudience: 'self_admin',
+      encryptedPortion: '{"v":1,"recipients":[]}',
+    },
+    ...extra,
+  },
+});
+
+const buildRuntime = (
+  decryptEnvelopeValue: DecryptPort,
+  applyStatePatch = jest.fn(),
+  rows = [lockedRow('0x1111111111111111111111111111111111111111', { importanceEncrypted: '{"v":1,"recipients":[]}' })],
+) => {
   const props: SurveyResultsProps = {
     account: '0x2222222222222222222222222222222222222222',
     loginComplete: true,
@@ -17,23 +35,7 @@ const buildRuntime = (decryptEnvelopeValue: DecryptPort, applyStatePatch = jest.
   const state = {
     ...createInitialSurveyResultsState(props),
     viewMode: 'questions',
-    sbtFilteredAggregatorQuestionResponses: {
-      q1: [
-        {
-          responder: '0x1111111111111111111111111111111111111111',
-          response: {
-            questionID: 'q1',
-            answer: {
-              value: '*',
-              encrypted: true,
-              encryptionAudience: 'self_admin',
-              encryptedPortion: '{"v":1,"recipients":[]}',
-            },
-            importanceEncrypted: '{"v":1,"recipients":[]}',
-          },
-        },
-      ],
-    },
+    sbtFilteredAggregatorQuestionResponses: { q1: rows },
   };
   return createSurveyResultsLockedResponsesRuntime({
     instance: { _lockedResponsesModelMemo: {} },
@@ -98,5 +100,19 @@ describe('SurveyResults locked response decrypt', () => {
     expect(applyStatePatch.mock.calls.map(([patch]) => patch)).toEqual([
       { lockedResponsesDecrypting: true, alertMessage: '' },
     ]);
+  });
+  it('asks the new account to decrypt nothing once the account changes', async () => {
+    const decryptEnvelopeValue = jest.fn<ReturnType<DecryptPort>, Parameters<DecryptPort>>(async () => {
+      // AppShell clears the decrypt caches on every account change and sign-out.
+      clearDecryptCaches();
+      return 'previous reader plaintext';
+    });
+    const rows = ['0x1111111111111111111111111111111111111111', '0x3333333333333333333333333333333333333333'].map(
+      (responder) => lockedRow(responder),
+    );
+
+    await buildRuntime(decryptEnvelopeValue, jest.fn(), rows).handleDecryptLockedResponses();
+
+    expect(decryptEnvelopeValue).toHaveBeenCalledTimes(1);
   });
 });
