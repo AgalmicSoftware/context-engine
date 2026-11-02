@@ -95,36 +95,27 @@
   color: var(--ce-action-accent-text);
   border-color: var(--ce-action-accent);
   background: var(--ce-action-accent);
-
-  &:hover,
-  &:focus {
-    color: var(--ce-action-accent-text);
-    border-color: var(--ce-action-accent-hover);
-    background: var(--ce-action-accent-hover);
-  }
 }
 
 .dangerButton {
   color: var(--ce-status-error-contrast);
   border-color: var(--ce-status-error);
   background: var(--ce-status-error);
-
-  &:hover,
-  &:focus {
-    color: var(--ce-status-error-contrast);
-    border-color: var(--ce-status-error);
-    background: var(--ce-status-error);
-  }
 }
 
-// The app's global `.btn:hover` and `.btn:active` rules clear every button fill with !important, which
-// left these labels on the dialog surface (white on white for Minimal's Stop). The footer outranks them.
-.footer .confirmButton:is(:hover, :active):not(:disabled) {
-  background-color: var(--ce-action-accent-hover) !important;
+// Global button rules repaint these on hover, focus and press with !important: `.btn:hover` clears the
+// fill (white on white for Minimal's Stop), `.btn-primary:focus` and `.btn-danger:focus` paint gradients,
+// and `.btn-primary:active` whitens the label. From the footer these outrank them.
+.footer .confirmButton:is(:hover, :focus, :active):not(:disabled) {
+  border-color: var(--ce-action-accent-hover) !important;
+  background: var(--ce-action-accent-hover) !important;
+  color: var(--ce-action-accent-text) !important;
 }
 
-.footer .dangerButton:is(:hover, :active):not(:disabled) {
-  background-color: var(--ce-status-error) !important;
+.footer .dangerButton:is(:hover, :focus, :active):not(:disabled) {
+  border-color: var(--ce-status-error) !important;
+  background: var(--ce-status-error) !important;
+  color: var(--ce-status-error-contrast) !important;
 }
 
 @container ce-theme style(--ce-layout-profile: minimal-app) {

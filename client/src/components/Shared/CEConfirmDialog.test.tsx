@@ -48,17 +48,22 @@ describe('CEConfirmDialog', () => {
     expect(onConfirm).toHaveBeenCalledTimes(1);
   });
 
-  it('keeps the confirm fills under the global .btn hover and press reset', () => {
-    // contextEngine.scss clears every `.btn` fill on hover and press with `!important` (up to
-    // `.btn:active:hover`); a label drawn for its fill must keep it, so these rules need !important and more
-    // than three classes or pseudo-classes.
+  it('keeps each confirm label on its fill under the global .btn hover, focus and press rules', () => {
+    // contextEngine.scss repaints `.btn` on hover, focus and press with `!important` (up to
+    // `.btn:active:hover`, three classes or pseudo-classes) and whitens `.btn-primary`'s label when pressed;
+    // these rules need !important and four.
     const scss = fs.readFileSync(path.join(__dirname, 'CEConfirmDialog.module.scss'), 'utf8');
-    expect(scss).toMatch(
-      /\.footer \.confirmButton:is\(:hover, :active\):not\(:disabled\) \{\s*background-color: var\(--ce-action-accent-hover\) !important;/,
-    );
-    expect(scss).toMatch(
-      /\.footer \.dangerButton:is\(:hover, :active\):not\(:disabled\) \{\s*background-color: var\(--ce-status-error\) !important;/,
-    );
+    for (const [button, fill, label] of [
+      ['confirmButton', 'action-accent-hover', 'action-accent-text'],
+      ['dangerButton', 'status-error', 'status-error-contrast'],
+    ]) {
+      expect(scss).toContain(
+        `.footer .${button}:is(:hover, :focus, :active):not(:disabled) {\n` +
+          `  border-color: var(--ce-${fill}) !important;\n` +
+          `  background: var(--ce-${fill}) !important;\n` +
+          `  color: var(--ce-${label}) !important;\n}`,
+      );
+    }
   });
 
   it("rings the title-bar close button in the bar's text colour", () => {
