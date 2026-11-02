@@ -73,6 +73,11 @@ const AUTH_NONCE_ACTIVE_KEY = 'auth-nonce-active';
 const AUTH_NONCE_USED_KEY = 'auth-nonce-used';
 const AUTH_RATE_RECORD_KEY = 'auth-rate-record';
 const HOSTED_FAUCET_QUOTA_KEY = 'hosted-faucet-quota-v1';
+const FAUCET_WALLET_TURN_KEY = 'faucet-wallet-turn-v1';
+// Longer than one faucet send; a crashed request's turn then expires.
+const FAUCET_WALLET_TURN_MS = 60_000;
+const FAUCET_WALLET_WAIT_MS = 30_000;
+const FAUCET_WALLET_POLL_MS = 100;
 const CONTEXT_PDF_READING_PREFIX = 'context-pdf-reading:';
 // Longer than a PDF reading's AI deadline, so an abandoned reading frees its PDF.
 const CONTEXT_PDF_READING_LEASE_MS = 5 * 60 * 1000;
@@ -2682,6 +2687,22 @@ export class SessionWriteCoordinator {
     return jsonResponse(result);
   }
 
+  async executeFaucetWalletTurn(payload, release = false) {
+    const nowMs = Number(this.now()) || Date.now();
+    const result = await this.state.storage.transaction(async (transaction) => {
+      const turn = await transaction.get(FAUCET_WALLET_TURN_KEY);
+      if (release) {
+        if (turn && turn.token === toTrimmedString(payload?.token)) await transaction.delete(FAUCET_WALLET_TURN_KEY);
+        return { ok: true };
+      }
+      if (turn?.expiresAtMs > nowMs) return { ok: true, acquired: false };
+      const token = createAttemptId(this.crypto);
+      await transaction.put(FAUCET_WALLET_TURN_KEY, { token, expiresAtMs: nowMs + FAUCET_WALLET_TURN_MS });
+      return { ok: true, acquired: true, token };
+    });
+    return jsonResponse(result);
+  }
+
   async reserveSponsoredDeploy(requestDigest) {
     const nowMs = Number(this.now()) || Date.now();
     return this.state.storage.transaction(async (transaction) => {
@@ -3101,6 +3122,9 @@ export class SessionWriteCoordinator {
     if (url.pathname === '/hosted-faucet/reserve' || url.pathname === '/hosted-faucet/finalize') {
       return this.executeHostedFaucetQuota(payload, url.pathname.endsWith('/finalize'));
     }
+    if (url.pathname === '/faucet-wallet/acquire' || url.pathname === '/faucet-wallet/release') {
+      return this.executeFaucetWalletTurn(payload, url.pathname.endsWith('/release'));
+    }
     if (url.pathname === '/auth-state/rate/check') {
       return this.executeAuthRateCheck(payload);
     }
@@ -3385,6 +3409,26 @@ export const reserveCoordinatedHostedFaucet = (args = {}) => callHostedFaucetQuo
   ...args, requestId: crypto.randomUUID(),
 }, false);
 export const finalizeCoordinatedHostedFaucet = (args = {}) => callHostedFaucetQuota(args, true);
+
+// One send at a time per session faucet wallet: each request reads the pending
+// nonce, signs and sends before the next reads it. Returns null without a turn.
+export const withCoordinatedFaucetWalletTurn = async ({ env, slug, now = Date.now,
+  sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)) }, send) => {
+  const identity = `faucet-wallet:${resolveCoordinatorSessionSlugStorageKey(slug)}`;
+  const acquire = () => callAuthStateCoordinator({ env, identity, path: '/faucet-wallet/acquire', payload: {} });
+  const deadline = now() + FAUCET_WALLET_WAIT_MS;
+  let turn = await acquire();
+  while (turn.ok === true && !turn.acquired && now() < deadline) {
+    await sleep(FAUCET_WALLET_POLL_MS);
+    turn = await acquire();
+  }
+  if (!turn.acquired) return null;
+  try {
+    return await send();
+  } finally {
+    await callAuthStateCoordinator({ env, identity, path: '/faucet-wallet/release', payload: { token: turn.token } });
+  }
+};
 
 export const checkCoordinatedAuthRateLimit = async ({
   env,

@@ -1,5 +1,5 @@
 import { AI_MODEL_NOT_ALLOWED } from './aiRequestPolicy.js';
-import { reserveCoordinatedHostedFaucet, finalizeCoordinatedHostedFaucet } from './sessionWriteCoordinator.js';
+import { reserveCoordinatedHostedFaucet, finalizeCoordinatedHostedFaucet, withCoordinatedFaucetWalletTurn } from './sessionWriteCoordinator.js';
 import { DEFAULT_AI_MODEL, DEFAULT_ANTHROPIC_MODEL } from '../../shared/aiDefaults.mjs';
 import { isModelAllowed } from './aiRequestNormalization.js';
 import { executeSessionLitChipotleAction } from './chipotleClient.js';
@@ -117,19 +117,23 @@ export const dispatchAuthenticatedSecretActionRoute = async ({
     }
     let submissionAttempted = false;
     let response;
+    const send = () => deps?.faucet?.({
+      payload: body,
+      secrets: secretContext.secrets,
+      config,
+      baseHeaders: headers,
+      slug,
+      requesterAddress: address,
+      tokenHasFaucetScope: preflight.tokenHasScope,
+      ...(hosted ? {
+        onSubmissionAttempt: () => { submissionAttempted = true; },
+      } : {}),
+    });
+    // Hosted payouts take turns with the session's faucet wallet, so two
+    // recipients never sign the same nonce.
+    const takeWalletTurn = deps?.withCoordinatedFaucetWalletTurn || withCoordinatedFaucetWalletTurn;
     try {
-      response = await deps?.faucet?.({
-        payload: body,
-        secrets: secretContext.secrets,
-        config,
-        baseHeaders: headers,
-        slug,
-        requesterAddress: address,
-        tokenHasFaucetScope: preflight.tokenHasScope,
-        ...(hosted ? {
-          onSubmissionAttempt: () => { submissionAttempted = true; },
-        } : {}),
-      });
+      response = hosted ? await takeWalletTurn({ env, slug }, send) : await send();
     } catch (error) {
       // A failure before submission, such as a malformed key, must not hold a slot.
       if (hosted && !submissionAttempted) {
@@ -137,6 +141,7 @@ export const dispatchAuthenticatedSecretActionRoute = async ({
       }
       throw error;
     }
+    if (hosted && !response) response = deps?.json?.({ error: 'The faucet is busy; try again shortly.' }, 503, headers);
     if (hosted) {
       // HTTP errors do not prove a transfer was rejected. Only release a failed
       // request when no submission was attempted; ambiguous sends expire normally.

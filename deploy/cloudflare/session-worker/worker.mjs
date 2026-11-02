@@ -79049,9 +79049,10 @@ __export(sessionWriteCoordinator_exports, {
   readCoordinatedResultsAnalysisStatus: () => readCoordinatedResultsAnalysisStatus,
   reserveCoordinatedHostedFaucet: () => reserveCoordinatedHostedFaucet,
   reserveCoordinatedResultsAnalysis: () => reserveCoordinatedResultsAnalysis,
-  reserveCoordinatedSponsoredFaucet: () => reserveCoordinatedSponsoredFaucet
+  reserveCoordinatedSponsoredFaucet: () => reserveCoordinatedSponsoredFaucet,
+  withCoordinatedFaucetWalletTurn: () => withCoordinatedFaucetWalletTurn
 });
-var SPONSORED_DEPLOY_RECORD_KEY, STORAGE_LEGACY_SCAN_KEY_PREFIX, STORAGE_LEGACY_OWNER_KEY_PREFIX, LEGACY_SCAN_ROWS_PER_STEP, LEGACY_SCAN_STEPS_PER_UPLOAD, LEGACY_SCAN_PENDING_ERROR, LEGACY_SCAN_FAILED_ERROR, DIRECT_DEPLOY_RECORD_KEY, SPONSORED_FAUCET_RECORD_KEY, SESSION_CONFIG_AUTHORITY_KEY, AUTH_NONCE_ACTIVE_KEY, AUTH_NONCE_USED_KEY, AUTH_RATE_RECORD_KEY, HOSTED_FAUCET_QUOTA_KEY, CONTEXT_PDF_READING_PREFIX, CONTEXT_PDF_READING_LEASE_MS, WORKER_GROUP_CAPACITY_META_KEY, WORKER_GROUP_CAPACITY_GROUP_PREFIX, WORKER_GROUP_CAPACITY_MEMBER_PREFIX, RESULTS_ANALYSIS_RECORD_KEY, RESULTS_ANALYSIS_DRAFT_KEY, RESULTS_ANALYSIS_DRAFT_CHUNK_PREFIX, RESULTS_ANALYSIS_AUTO_JOB_KEY, RESULTS_ANALYSIS_UPLOAD_PREFIX, UPLOAD_RECEIPT_PREFIX, UPLOAD_RECEIPT_LEASE_MS, UPLOAD_RECEIPT_RETENTION_MS, uploadReceiptExpiresAt, MAX_UPLOAD_RECEIPTS, MAX_PRIOR_UPLOAD_TARGETS, MAX_RESULTS_ANALYSIS_REQUESTS, RESULTS_ANALYSIS_VALUE_CHUNK_CHARS, RESULTS_ANALYSIS_MAX_DRAFT_CHUNKS, RESULTS_ANALYSIS_AUTO_JOB_MAX_BYTES, RESULTS_ANALYSIS_RUNNING_LEASE_MS, RESULTS_ANALYSIS_MAX_THRESHOLD_RECHECKS, RESULTS_ANALYSIS_AUTO_RETRY_DELAYS_MS, RESULTS_ANALYSIS_RETRYABLE_STATUSES, RUNNING_LEASE_MS, MAX_AUTH_NONCE_LIFETIME_MS, AUTH_NONCE_MAC_KEY, MAX_AUTH_RATE_WINDOW_MS, WRAPPED_SESSION_KEY_FIELDS, toTrimmedString10, isObjectRecord, byteLength, normalizePositiveSafeInteger, normalizeBoundedFutureTimestamp, readActiveAuthNonces, putActiveAuthNonces, SIGNED_AUTH_NONCE_RE, bytesToHex3, hexToBytes2, equalText, signAuthNonce, isBase64url, normalizeWrappedSessionKeyRecord, normalizePublicSessionConfig, withAuthoritativeSessionKey, jsonResponse2, normalizeDeployResult, isTerminalDeployResult, buildDirectDeployTerminalReplay, createAttemptId, workerGroupCapacityGroupKey, workerGroupCapacityMemberKey, WORKER_GROUP_MUTATIONS, workerGroupBackupPendingKey, PENDING_WORKER_GROUP_OPERATIONS, PENDING_WORKER_GROUP_MEMBER_OPERATIONS, DEFINITELY_PREWRITE_WORKER_GROUP_CREATE_FAILURES, WORKER_GROUP_INPUT_FIELDS, WORKER_GROUP_INTENT_MAX_BYTES, pickWorkerGroupInput, sameWorkerGroupInput, withoutPendingMutation, normalizeWorkerGroupMutation, resolveInitializedWorkerGroupCapacity, SessionWriteCoordinator, WorkerGroupWriteCoordinator, executeCoordinatedSponsoredDeploy, resolveCoordinatorStub, coordinateResponseUploadReceipt, AUTH_STATE_UNAVAILABLE, callAuthStateCoordinator, issueCoordinatedAuthNonce, consumeCoordinatedAuthNonce, callHostedFaucetQuota, reserveCoordinatedHostedFaucet, finalizeCoordinatedHostedFaucet, checkCoordinatedAuthRateLimit, getOrCreateCoordinatedStorageEnvelopeSessionKey, executeCoordinatedSessionConfigMutation, reserveCoordinatedSponsoredFaucet, finalizeCoordinatedSponsoredFaucet, checkCoordinatedLegacyStorageOwner, readCoordinatedResultsAnalysisStatus, reserveCoordinatedResultsAnalysis, finalizeCoordinatedResultsAnalysis, enqueueCoordinatedResultsAnalysisAutoJob;
+var SPONSORED_DEPLOY_RECORD_KEY, STORAGE_LEGACY_SCAN_KEY_PREFIX, STORAGE_LEGACY_OWNER_KEY_PREFIX, LEGACY_SCAN_ROWS_PER_STEP, LEGACY_SCAN_STEPS_PER_UPLOAD, LEGACY_SCAN_PENDING_ERROR, LEGACY_SCAN_FAILED_ERROR, DIRECT_DEPLOY_RECORD_KEY, SPONSORED_FAUCET_RECORD_KEY, SESSION_CONFIG_AUTHORITY_KEY, AUTH_NONCE_ACTIVE_KEY, AUTH_NONCE_USED_KEY, AUTH_RATE_RECORD_KEY, HOSTED_FAUCET_QUOTA_KEY, FAUCET_WALLET_TURN_KEY, FAUCET_WALLET_TURN_MS, FAUCET_WALLET_WAIT_MS, FAUCET_WALLET_POLL_MS, CONTEXT_PDF_READING_PREFIX, CONTEXT_PDF_READING_LEASE_MS, WORKER_GROUP_CAPACITY_META_KEY, WORKER_GROUP_CAPACITY_GROUP_PREFIX, WORKER_GROUP_CAPACITY_MEMBER_PREFIX, RESULTS_ANALYSIS_RECORD_KEY, RESULTS_ANALYSIS_DRAFT_KEY, RESULTS_ANALYSIS_DRAFT_CHUNK_PREFIX, RESULTS_ANALYSIS_AUTO_JOB_KEY, RESULTS_ANALYSIS_UPLOAD_PREFIX, UPLOAD_RECEIPT_PREFIX, UPLOAD_RECEIPT_LEASE_MS, UPLOAD_RECEIPT_RETENTION_MS, uploadReceiptExpiresAt, MAX_UPLOAD_RECEIPTS, MAX_PRIOR_UPLOAD_TARGETS, MAX_RESULTS_ANALYSIS_REQUESTS, RESULTS_ANALYSIS_VALUE_CHUNK_CHARS, RESULTS_ANALYSIS_MAX_DRAFT_CHUNKS, RESULTS_ANALYSIS_AUTO_JOB_MAX_BYTES, RESULTS_ANALYSIS_RUNNING_LEASE_MS, RESULTS_ANALYSIS_MAX_THRESHOLD_RECHECKS, RESULTS_ANALYSIS_AUTO_RETRY_DELAYS_MS, RESULTS_ANALYSIS_RETRYABLE_STATUSES, RUNNING_LEASE_MS, MAX_AUTH_NONCE_LIFETIME_MS, AUTH_NONCE_MAC_KEY, MAX_AUTH_RATE_WINDOW_MS, WRAPPED_SESSION_KEY_FIELDS, toTrimmedString10, isObjectRecord, byteLength, normalizePositiveSafeInteger, normalizeBoundedFutureTimestamp, readActiveAuthNonces, putActiveAuthNonces, SIGNED_AUTH_NONCE_RE, bytesToHex3, hexToBytes2, equalText, signAuthNonce, isBase64url, normalizeWrappedSessionKeyRecord, normalizePublicSessionConfig, withAuthoritativeSessionKey, jsonResponse2, normalizeDeployResult, isTerminalDeployResult, buildDirectDeployTerminalReplay, createAttemptId, workerGroupCapacityGroupKey, workerGroupCapacityMemberKey, WORKER_GROUP_MUTATIONS, workerGroupBackupPendingKey, PENDING_WORKER_GROUP_OPERATIONS, PENDING_WORKER_GROUP_MEMBER_OPERATIONS, DEFINITELY_PREWRITE_WORKER_GROUP_CREATE_FAILURES, WORKER_GROUP_INPUT_FIELDS, WORKER_GROUP_INTENT_MAX_BYTES, pickWorkerGroupInput, sameWorkerGroupInput, withoutPendingMutation, normalizeWorkerGroupMutation, resolveInitializedWorkerGroupCapacity, SessionWriteCoordinator, WorkerGroupWriteCoordinator, executeCoordinatedSponsoredDeploy, resolveCoordinatorStub, coordinateResponseUploadReceipt, AUTH_STATE_UNAVAILABLE, callAuthStateCoordinator, issueCoordinatedAuthNonce, consumeCoordinatedAuthNonce, callHostedFaucetQuota, reserveCoordinatedHostedFaucet, finalizeCoordinatedHostedFaucet, withCoordinatedFaucetWalletTurn, checkCoordinatedAuthRateLimit, getOrCreateCoordinatedStorageEnvelopeSessionKey, executeCoordinatedSessionConfigMutation, reserveCoordinatedSponsoredFaucet, finalizeCoordinatedSponsoredFaucet, checkCoordinatedLegacyStorageOwner, readCoordinatedResultsAnalysisStatus, reserveCoordinatedResultsAnalysis, finalizeCoordinatedResultsAnalysis, enqueueCoordinatedResultsAnalysisAutoJob;
 var init_sessionWriteCoordinator = __esm({
   "workers/sessionCorsWorker/sessionWriteCoordinator.js"() {
     init_submissionJournal();
@@ -79094,6 +79095,10 @@ var init_sessionWriteCoordinator = __esm({
     AUTH_NONCE_USED_KEY = "auth-nonce-used";
     AUTH_RATE_RECORD_KEY = "auth-rate-record";
     HOSTED_FAUCET_QUOTA_KEY = "hosted-faucet-quota-v1";
+    FAUCET_WALLET_TURN_KEY = "faucet-wallet-turn-v1";
+    FAUCET_WALLET_TURN_MS = 6e4;
+    FAUCET_WALLET_WAIT_MS = 3e4;
+    FAUCET_WALLET_POLL_MS = 100;
     CONTEXT_PDF_READING_PREFIX = "context-pdf-reading:";
     CONTEXT_PDF_READING_LEASE_MS = 5 * 60 * 1e3;
     WORKER_GROUP_CAPACITY_META_KEY = "worker-group-capacity-meta-v3";
@@ -81403,6 +81408,21 @@ ${expiry}`);
         });
         return jsonResponse2(result);
       }
+      async executeFaucetWalletTurn(payload, release = false) {
+        const nowMs = Number(this.now()) || Date.now();
+        const result = await this.state.storage.transaction(async (transaction) => {
+          const turn = await transaction.get(FAUCET_WALLET_TURN_KEY);
+          if (release) {
+            if (turn && turn.token === toTrimmedString10(payload?.token)) await transaction.delete(FAUCET_WALLET_TURN_KEY);
+            return { ok: true };
+          }
+          if (turn?.expiresAtMs > nowMs) return { ok: true, acquired: false };
+          const token = createAttemptId(this.crypto);
+          await transaction.put(FAUCET_WALLET_TURN_KEY, { token, expiresAtMs: nowMs + FAUCET_WALLET_TURN_MS });
+          return { ok: true, acquired: true, token };
+        });
+        return jsonResponse2(result);
+      }
       async reserveSponsoredDeploy(requestDigest) {
         const nowMs = Number(this.now()) || Date.now();
         return this.state.storage.transaction(async (transaction) => {
@@ -81800,6 +81820,9 @@ ${expiry}`);
         if (url.pathname === "/hosted-faucet/reserve" || url.pathname === "/hosted-faucet/finalize") {
           return this.executeHostedFaucetQuota(payload, url.pathname.endsWith("/finalize"));
         }
+        if (url.pathname === "/faucet-wallet/acquire" || url.pathname === "/faucet-wallet/release") {
+          return this.executeFaucetWalletTurn(payload, url.pathname.endsWith("/release"));
+        }
         if (url.pathname === "/auth-state/rate/check") {
           return this.executeAuthRateCheck(payload);
         }
@@ -82062,6 +82085,27 @@ ${expiry}`);
       requestId: crypto.randomUUID()
     }, false);
     finalizeCoordinatedHostedFaucet = (args = {}) => callHostedFaucetQuota(args, true);
+    withCoordinatedFaucetWalletTurn = async ({
+      env,
+      slug,
+      now = Date.now,
+      sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+    }, send) => {
+      const identity = `faucet-wallet:${resolveCoordinatorSessionSlugStorageKey(slug)}`;
+      const acquire = () => callAuthStateCoordinator({ env, identity, path: "/faucet-wallet/acquire", payload: {} });
+      const deadline = now() + FAUCET_WALLET_WAIT_MS;
+      let turn = await acquire();
+      while (turn.ok === true && !turn.acquired && now() < deadline) {
+        await sleep(FAUCET_WALLET_POLL_MS);
+        turn = await acquire();
+      }
+      if (!turn.acquired) return null;
+      try {
+        return await send();
+      } finally {
+        await callAuthStateCoordinator({ env, identity, path: "/faucet-wallet/release", payload: { token: turn.token } });
+      }
+    };
     checkCoordinatedAuthRateLimit = async ({
       env,
       slug,
@@ -106537,27 +106581,30 @@ var dispatchAuthenticatedSecretActionRoute = async ({
     }
     let submissionAttempted = false;
     let response2;
+    const send = () => deps?.faucet?.({
+      payload: body,
+      secrets: secretContext2.secrets,
+      config,
+      baseHeaders: headers2,
+      slug,
+      requesterAddress: address2,
+      tokenHasFaucetScope: preflight2.tokenHasScope,
+      ...hosted ? {
+        onSubmissionAttempt: () => {
+          submissionAttempted = true;
+        }
+      } : {}
+    });
+    const takeWalletTurn = deps?.withCoordinatedFaucetWalletTurn || withCoordinatedFaucetWalletTurn;
     try {
-      response2 = await deps?.faucet?.({
-        payload: body,
-        secrets: secretContext2.secrets,
-        config,
-        baseHeaders: headers2,
-        slug,
-        requesterAddress: address2,
-        tokenHasFaucetScope: preflight2.tokenHasScope,
-        ...hosted ? {
-          onSubmissionAttempt: () => {
-            submissionAttempted = true;
-          }
-        } : {}
-      });
+      response2 = hosted ? await takeWalletTurn({ env, slug }, send) : await send();
     } catch (error) {
       if (hosted && !submissionAttempted) {
         await finalize({ env, slug, address: address2, requestId: reservation.requestId, sent: false });
       }
       throw error;
     }
+    if (hosted && !response2) response2 = deps?.json?.({ error: "The faucet is busy; try again shortly." }, 503, headers2);
     if (hosted) {
       if (!submissionAttempted || response2?.status === 200) {
         await finalize({ env, slug, address: address2, requestId: reservation.requestId, sent: response2?.status === 200 });
