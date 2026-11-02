@@ -741,7 +741,9 @@ Authenticated clients can use the worker as the session storage boundary:
   snapshot and fetch date (`replaces` refreshes an existing one, keeping its title and privacy);
   `{ action: "read-pdf", id }` sends a context PDF to the session's own Claude or OpenAI model and stores the
   returned text beside it with the same privacy; `{ action: "remove", id }` deletes a context source and that
-  text. Uploads with a context role on `/storage/upload` must come from an admin, be a PDF (20 MB) or text file
+  text. A PDF has one reading at a time: `read-pdf` returns `409` while another reading of it runs, and the
+  session coordinator applies finished readings and removals one at a time, so a removed PDF stays removed and
+  a reading never replaces a newer one. Uploads with a context role on `/storage/upload` must come from an admin, be a PDF (20 MB) or text file
   (1 MB), carry no access rule other than admins-only, and be readable by the Worker. The session
   coordinator publishes each context item only while its admin is still one, so a link, PDF reading or upload
   that finishes after that admin was replaced returns `409` and is not listed; a content-only settings edit

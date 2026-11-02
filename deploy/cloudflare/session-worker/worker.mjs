@@ -29976,7 +29976,7 @@ var init_sessionConfigSecretsStore = __esm({
 });
 
 // workers/sessionCorsWorker/sessionConfigAuthority.js
-var SESSION_CONFIG_COORDINATION_ERROR, SUPERSEDED_AUTHORITY_ERROR, assertExpectedSessionAuthority, callSessionConfigCoordinator, readCurrentSessionConfig, executeCoordinatedStorageVisibilityMutation, executeCoordinatedStoragePublication;
+var SESSION_CONFIG_COORDINATION_ERROR, SUPERSEDED_AUTHORITY_ERROR, assertExpectedSessionAuthority, callSessionConfigCoordinator, readCurrentSessionConfig, executeCoordinatedStorageVisibilityMutation, executeCoordinatedStoragePublication, executeCoordinatedContextSourceOperation;
 var init_sessionConfigAuthority = __esm({
   "workers/sessionCorsWorker/sessionConfigAuthority.js"() {
     init_deployHelperCore();
@@ -30018,6 +30018,7 @@ var init_sessionConfigAuthority = __esm({
     };
     executeCoordinatedStorageVisibilityMutation = (args) => callSessionConfigCoordinator({ ...args, path: "storage/set-hidden" });
     executeCoordinatedStoragePublication = (args) => callSessionConfigCoordinator({ ...args, path: "storage/publish" });
+    executeCoordinatedContextSourceOperation = ({ operation, ...args }) => callSessionConfigCoordinator({ ...args, path: `context-source/${operation}` });
   }
 });
 
@@ -68669,8 +68670,8 @@ var init_storageEnvelopeEncryption = __esm({
           })
         };
       }
-      const coordinate = deps.getOrCreateCoordinatedStorageEnvelopeSessionKey || getOrCreateCoordinatedStorageEnvelopeSessionKey;
-      const coordinated = await coordinate({
+      const coordinate2 = deps.getOrCreateCoordinatedStorageEnvelopeSessionKey || getOrCreateCoordinatedStorageEnvelopeSessionKey;
+      const coordinated = await coordinate2({
         env,
         slug,
         baseConfig: config,
@@ -70399,7 +70400,7 @@ var init_fetchExecution = __esm({
 });
 
 // workers/sessionCorsWorker/contextSourceRoute.js
-var encoder5, trim12, isObj15, clip, commonTags, isReadingOf, readingsOf, storeRecord, addLink, readPdf, remove, ACTIONS, contextSourceRoute;
+var encoder5, trim12, isObj15, clip, commonTags, isReadingOf, readingsOf, storeRecord, addLink, coordinate, readAtOf, finishContextPdfReading, readAndStorePdf, readPdf, removeContextSource, remove, ACTIONS, contextSourceRoute;
 var init_contextSourceRoute = __esm({
   "workers/sessionCorsWorker/contextSourceRoute.js"() {
     init_sessionContextSources();
@@ -70407,6 +70408,7 @@ var init_contextSourceRoute = __esm({
     init_contextDocumentRead();
     init_fetchExecution();
     init_storageRouteExecution();
+    init_sessionConfigAuthority();
     encoder5 = new TextEncoder();
     trim12 = (value) => typeof value === "string" ? value.trim() : "";
     isObj15 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
@@ -70503,15 +70505,30 @@ var init_contextSourceRoute = __esm({
         }
       });
     };
-    readPdf = async ({ body, env, config, slug, admin, deps, store, json: json6, now }) => {
-      const pdf = await readContextSourceRow({ env, slug, id: body.id });
-      if (!pdf || contextRoleOf(pdf.tags) !== CONTEXT_ROLE || pdf.contentType !== CONTEXT_FILE_TYPES.pdf) {
-        return json6({ error: "That PDF is no longer in the session." }, 404);
+    coordinate = (deps, args) => (deps?.executeCoordinatedContextSourceOperation || executeCoordinatedContextSourceOperation)(args);
+    readAtOf = (row) => contextTagValue(row.tags, CONTEXT_TAGS.readAt);
+    finishContextPdfReading = async ({ env, slug, pdfId, readingId, readAt, markWrite }) => {
+      const reading = { id: readingId, resource: "docsContext" };
+      const current = await readContextSourceRow({ env, slug, id: pdfId });
+      if (!current) {
+        await removeCloudflareStorageRecords({ env, slug, rows: [reading], markWrite });
+        return { status: 404, body: { error: "That PDF was removed while the session\u2019s AI read it." } };
       }
-      if (config?.scopes?.ai === false) return json6({ error: "AI is turned off for this session.", reason: "ai_disabled" }, 403);
-      if (Number(pdf.size) > CONTEXT_SOURCE_LIMITS.pdfBytes) return json6({ error: "This PDF is too large for the session\u2019s AI to read." }, 413);
+      const earlier = (await readingsOf({ env, slug, row: current })).filter((row) => row.id !== readingId);
+      if (earlier.some((row) => readAtOf(row) > readAt || readAtOf(row) === readAt && row.id > readingId)) {
+        await removeCloudflareStorageRecords({ env, slug, rows: [reading], markWrite });
+        return { status: 409, body: { error: "A newer reading of this PDF finished first.", reason: "context_pdf_reading_superseded" } };
+      }
+      if (earlier.length) await removeCloudflareStorageRecords({ env, slug, rows: earlier, markWrite });
+      await getStorageIndexBinding(env).put(
+        buildIndexKey({ slug, resource: "docsContext", id: pdfId }),
+        JSON.stringify({ ...current, contextReadingId: readingId })
+      );
+      return { status: 200, body: { ok: true } };
+    };
+    readAndStorePdf = async ({ pdf, env, config, slug, admin, deps, store, json: json6, now }) => {
       const bytes3 = await readContextSourceBytes({ env, config, slug, metadata: pdf, maxBytes: CONTEXT_SOURCE_LIMITS.pdfBytes, principal: admin, deps });
-      if (!bytes3) return json6({ error: "That PDF is no longer in the session." }, 404);
+      if (!bytes3) return { response: json6({ error: "That PDF is no longer in the session." }, 404) };
       const name = contextTagValue(pdf.tags, CONTEXT_TAGS.name) || "document.pdf";
       const secrets = await deps?.getSessionSecrets?.(env, slug) || {};
       const read = await readPdfWithSessionAi({
@@ -70521,7 +70538,7 @@ var init_contextSourceRoute = __esm({
         filename: name,
         deps: { fetch: deps?.fetch, readTimeoutMs: deps?.readTimeoutMs }
       });
-      if (!read.ok) return json6({ error: read.error, reason: read.reason }, read.status);
+      if (!read.ok) return { response: json6({ error: read.error, reason: read.reason }, read.status) };
       const readAt = now();
       const text4 = read.text.slice(0, CONTEXT_SOURCE_LIMITS.readTextChars);
       const stored = await storeRecord(store, {
@@ -70540,37 +70557,49 @@ var init_contextSourceRoute = __esm({
           { name: CONTEXT_TAGS.readAt, value: readAt }
         ]
       });
-      if (stored.response) return stored.response;
-      const reading = { id: stored.id, resource: "docsContext" };
-      const current = await readContextSourceRow({ env, slug, id: pdf.id });
-      if (!current) {
-        await removeCloudflareStorageRecords({ env, slug, rows: [reading] });
-        return json6({ error: "That PDF was removed while the session\u2019s AI read it." }, 404);
-      }
-      const earlier = (await readingsOf({ env, slug, row: current })).filter((row) => row.id !== stored.id);
-      if (earlier.length) await removeCloudflareStorageRecords({ env, slug, rows: earlier });
-      await getStorageIndexBinding(env).put(
-        buildIndexKey({ slug, resource: "docsContext", id: pdf.id }),
-        JSON.stringify({ ...current, contextReadingId: stored.id })
-      );
-      return json6({
-        ok: true,
-        text: {
-          id: stored.id,
-          derivedFrom: pdf.id,
-          model: read.model,
-          readAt,
-          chars: text4.length,
-          truncated: read.truncated || read.text.length > text4.length
-        }
-      });
+      if (stored.response) return stored;
+      return { id: stored.id, model: read.model, readAt, chars: text4.length, truncated: read.truncated || read.text.length > text4.length };
     };
-    remove = async ({ body, env, slug, json: json6 }) => {
-      const row = await readContextSourceRow({ env, slug, id: body.id });
-      if (!row) return json6({ error: "That item is no longer in the session." }, 404);
-      const rows = [...await readingsOf({ env, slug, row, shownIds: body.readingIds }), row];
-      await removeCloudflareStorageRecords({ env, slug, rows });
-      return json6({ ok: true, removed: rows.map((entry2) => entry2.id) });
+    readPdf = async ({ body, env, config, slug, admin, deps, store, json: json6, now }) => {
+      const pdf = await readContextSourceRow({ env, slug, id: body.id });
+      if (!pdf || contextRoleOf(pdf.tags) !== CONTEXT_ROLE || pdf.contentType !== CONTEXT_FILE_TYPES.pdf) {
+        return json6({ error: "That PDF is no longer in the session." }, 404);
+      }
+      if (config?.scopes?.ai === false) return json6({ error: "AI is turned off for this session.", reason: "ai_disabled" }, 403);
+      if (Number(pdf.size) > CONTEXT_SOURCE_LIMITS.pdfBytes) return json6({ error: "This PDF is too large for the session\u2019s AI to read." }, 413);
+      const begun = await coordinate(deps, { env, slug, operation: "begin-read", id: pdf.id });
+      if (!begun.ok) return json6(begun.body, begun.status);
+      const end = (reading2 = {}) => coordinate(deps, {
+        env,
+        slug,
+        operation: "end-read",
+        id: pdf.id,
+        token: begun.body.token,
+        ...reading2.id ? { readingId: reading2.id, readAt: reading2.readAt } : {}
+      });
+      let reading;
+      try {
+        reading = await readAndStorePdf({ pdf, env, config, slug, admin, deps, store, json: json6, now });
+      } catch (error) {
+        await end();
+        throw error;
+      }
+      const ended = await end(reading);
+      if (reading.response) return reading.response;
+      if (!ended.ok) return json6(ended.body, ended.status);
+      const { id: id2, model, readAt, chars, truncated } = reading;
+      return json6({ ok: true, text: { id: id2, derivedFrom: pdf.id, model, readAt, chars, truncated } });
+    };
+    removeContextSource = async ({ env, slug, id: id2, readingIds, markWrite }) => {
+      const row = await readContextSourceRow({ env, slug, id: id2 });
+      if (!row) return { status: 404, body: { error: "That item is no longer in the session." } };
+      const rows = [...await readingsOf({ env, slug, row, shownIds: readingIds }), row];
+      await removeCloudflareStorageRecords({ env, slug, rows, markWrite });
+      return { status: 200, body: { ok: true, removed: rows.map((entry2) => entry2.id) } };
+    };
+    remove = async ({ body, env, slug, deps, json: json6 }) => {
+      const removed = await coordinate(deps, { env, slug, operation: "remove", id: trim12(body.id), readingIds: body.readingIds });
+      return json6(removed.body, removed.status);
     };
     ACTIONS = Object.freeze({ "add-link": addLink, "read-pdf": readPdf, remove });
     contextSourceRoute = async ({
@@ -73142,11 +73171,11 @@ var init_storageRouteExecution = __esm({
       }
       return toUint8Array(bytes3);
     };
-    removeCloudflareStorageRecords = async ({ env, slug, rows = [] } = {}) => {
+    removeCloudflareStorageRecords = async ({ env, slug, rows = [], markWrite = () => markStorageBackupWrite(env, slug) } = {}) => {
       const r2 = getStorageR2Binding(env);
       const index = getStorageIndexBinding(env);
       if (!index || typeof index.delete !== "function") throw new Error("Cloudflare storage index binding not configured.");
-      await markStorageBackupWrite(env, slug);
+      await markWrite();
       for (const metadata of rows) {
         const id2 = trim13(metadata?.id);
         if (!isSafeCloudflareStorageRefId(id2)) continue;
@@ -73154,7 +73183,7 @@ var init_storageRouteExecution = __esm({
         await index.delete(buildPayloadKey({ slug, id: id2 }));
         await index.delete(buildIndexKey({ slug, resource: trim13(metadata.resource) || "docsContext", id: id2 }));
       }
-      await markStorageBackupWrite(env, slug);
+      await markWrite();
     };
     storageRoute = async ({ path, method, request, env, config, slug, uploaderAddress, authScopes, expectedAuthority, baseHeaders, deps } = {}) => {
       if (method === "POST" && ["/storage/response-field-key/wrap", "/storage/response-field-key/unwrap"].includes(path)) {
@@ -79022,7 +79051,7 @@ __export(sessionWriteCoordinator_exports, {
   reserveCoordinatedResultsAnalysis: () => reserveCoordinatedResultsAnalysis,
   reserveCoordinatedSponsoredFaucet: () => reserveCoordinatedSponsoredFaucet
 });
-var SPONSORED_DEPLOY_RECORD_KEY, STORAGE_LEGACY_SCAN_KEY_PREFIX, STORAGE_LEGACY_OWNER_KEY_PREFIX, LEGACY_SCAN_ROWS_PER_STEP, LEGACY_SCAN_STEPS_PER_UPLOAD, LEGACY_SCAN_PENDING_ERROR, LEGACY_SCAN_FAILED_ERROR, DIRECT_DEPLOY_RECORD_KEY, SPONSORED_FAUCET_RECORD_KEY, SESSION_CONFIG_AUTHORITY_KEY, AUTH_NONCE_ACTIVE_KEY, AUTH_NONCE_USED_KEY, AUTH_RATE_RECORD_KEY, HOSTED_FAUCET_QUOTA_KEY, WORKER_GROUP_CAPACITY_META_KEY, WORKER_GROUP_CAPACITY_GROUP_PREFIX, WORKER_GROUP_CAPACITY_MEMBER_PREFIX, RESULTS_ANALYSIS_RECORD_KEY, RESULTS_ANALYSIS_DRAFT_KEY, RESULTS_ANALYSIS_DRAFT_CHUNK_PREFIX, RESULTS_ANALYSIS_AUTO_JOB_KEY, RESULTS_ANALYSIS_UPLOAD_PREFIX, UPLOAD_RECEIPT_PREFIX, UPLOAD_RECEIPT_LEASE_MS, UPLOAD_RECEIPT_RETENTION_MS, uploadReceiptExpiresAt, MAX_UPLOAD_RECEIPTS, MAX_PRIOR_UPLOAD_TARGETS, MAX_RESULTS_ANALYSIS_REQUESTS, RESULTS_ANALYSIS_VALUE_CHUNK_CHARS, RESULTS_ANALYSIS_MAX_DRAFT_CHUNKS, RESULTS_ANALYSIS_AUTO_JOB_MAX_BYTES, RESULTS_ANALYSIS_RUNNING_LEASE_MS, RESULTS_ANALYSIS_MAX_THRESHOLD_RECHECKS, RESULTS_ANALYSIS_AUTO_RETRY_DELAYS_MS, RESULTS_ANALYSIS_RETRYABLE_STATUSES, RUNNING_LEASE_MS, MAX_AUTH_NONCE_LIFETIME_MS, AUTH_NONCE_MAC_KEY, MAX_AUTH_RATE_WINDOW_MS, WRAPPED_SESSION_KEY_FIELDS, toTrimmedString10, isObjectRecord, byteLength, normalizePositiveSafeInteger, normalizeBoundedFutureTimestamp, readActiveAuthNonces, putActiveAuthNonces, SIGNED_AUTH_NONCE_RE, bytesToHex3, hexToBytes2, equalText, signAuthNonce, isBase64url, normalizeWrappedSessionKeyRecord, normalizePublicSessionConfig, withAuthoritativeSessionKey, jsonResponse2, normalizeDeployResult, isTerminalDeployResult, buildDirectDeployTerminalReplay, createAttemptId, workerGroupCapacityGroupKey, workerGroupCapacityMemberKey, WORKER_GROUP_MUTATIONS, workerGroupBackupPendingKey, PENDING_WORKER_GROUP_OPERATIONS, PENDING_WORKER_GROUP_MEMBER_OPERATIONS, DEFINITELY_PREWRITE_WORKER_GROUP_CREATE_FAILURES, WORKER_GROUP_INPUT_FIELDS, WORKER_GROUP_INTENT_MAX_BYTES, pickWorkerGroupInput, sameWorkerGroupInput, withoutPendingMutation, normalizeWorkerGroupMutation, resolveInitializedWorkerGroupCapacity, SessionWriteCoordinator, WorkerGroupWriteCoordinator, executeCoordinatedSponsoredDeploy, resolveCoordinatorStub, coordinateResponseUploadReceipt, AUTH_STATE_UNAVAILABLE, callAuthStateCoordinator, issueCoordinatedAuthNonce, consumeCoordinatedAuthNonce, callHostedFaucetQuota, reserveCoordinatedHostedFaucet, finalizeCoordinatedHostedFaucet, checkCoordinatedAuthRateLimit, getOrCreateCoordinatedStorageEnvelopeSessionKey, executeCoordinatedSessionConfigMutation, reserveCoordinatedSponsoredFaucet, finalizeCoordinatedSponsoredFaucet, checkCoordinatedLegacyStorageOwner, readCoordinatedResultsAnalysisStatus, reserveCoordinatedResultsAnalysis, finalizeCoordinatedResultsAnalysis, enqueueCoordinatedResultsAnalysisAutoJob;
+var SPONSORED_DEPLOY_RECORD_KEY, STORAGE_LEGACY_SCAN_KEY_PREFIX, STORAGE_LEGACY_OWNER_KEY_PREFIX, LEGACY_SCAN_ROWS_PER_STEP, LEGACY_SCAN_STEPS_PER_UPLOAD, LEGACY_SCAN_PENDING_ERROR, LEGACY_SCAN_FAILED_ERROR, DIRECT_DEPLOY_RECORD_KEY, SPONSORED_FAUCET_RECORD_KEY, SESSION_CONFIG_AUTHORITY_KEY, AUTH_NONCE_ACTIVE_KEY, AUTH_NONCE_USED_KEY, AUTH_RATE_RECORD_KEY, HOSTED_FAUCET_QUOTA_KEY, CONTEXT_PDF_READING_PREFIX, CONTEXT_PDF_READING_LEASE_MS, WORKER_GROUP_CAPACITY_META_KEY, WORKER_GROUP_CAPACITY_GROUP_PREFIX, WORKER_GROUP_CAPACITY_MEMBER_PREFIX, RESULTS_ANALYSIS_RECORD_KEY, RESULTS_ANALYSIS_DRAFT_KEY, RESULTS_ANALYSIS_DRAFT_CHUNK_PREFIX, RESULTS_ANALYSIS_AUTO_JOB_KEY, RESULTS_ANALYSIS_UPLOAD_PREFIX, UPLOAD_RECEIPT_PREFIX, UPLOAD_RECEIPT_LEASE_MS, UPLOAD_RECEIPT_RETENTION_MS, uploadReceiptExpiresAt, MAX_UPLOAD_RECEIPTS, MAX_PRIOR_UPLOAD_TARGETS, MAX_RESULTS_ANALYSIS_REQUESTS, RESULTS_ANALYSIS_VALUE_CHUNK_CHARS, RESULTS_ANALYSIS_MAX_DRAFT_CHUNKS, RESULTS_ANALYSIS_AUTO_JOB_MAX_BYTES, RESULTS_ANALYSIS_RUNNING_LEASE_MS, RESULTS_ANALYSIS_MAX_THRESHOLD_RECHECKS, RESULTS_ANALYSIS_AUTO_RETRY_DELAYS_MS, RESULTS_ANALYSIS_RETRYABLE_STATUSES, RUNNING_LEASE_MS, MAX_AUTH_NONCE_LIFETIME_MS, AUTH_NONCE_MAC_KEY, MAX_AUTH_RATE_WINDOW_MS, WRAPPED_SESSION_KEY_FIELDS, toTrimmedString10, isObjectRecord, byteLength, normalizePositiveSafeInteger, normalizeBoundedFutureTimestamp, readActiveAuthNonces, putActiveAuthNonces, SIGNED_AUTH_NONCE_RE, bytesToHex3, hexToBytes2, equalText, signAuthNonce, isBase64url, normalizeWrappedSessionKeyRecord, normalizePublicSessionConfig, withAuthoritativeSessionKey, jsonResponse2, normalizeDeployResult, isTerminalDeployResult, buildDirectDeployTerminalReplay, createAttemptId, workerGroupCapacityGroupKey, workerGroupCapacityMemberKey, WORKER_GROUP_MUTATIONS, workerGroupBackupPendingKey, PENDING_WORKER_GROUP_OPERATIONS, PENDING_WORKER_GROUP_MEMBER_OPERATIONS, DEFINITELY_PREWRITE_WORKER_GROUP_CREATE_FAILURES, WORKER_GROUP_INPUT_FIELDS, WORKER_GROUP_INTENT_MAX_BYTES, pickWorkerGroupInput, sameWorkerGroupInput, withoutPendingMutation, normalizeWorkerGroupMutation, resolveInitializedWorkerGroupCapacity, SessionWriteCoordinator, WorkerGroupWriteCoordinator, executeCoordinatedSponsoredDeploy, resolveCoordinatorStub, coordinateResponseUploadReceipt, AUTH_STATE_UNAVAILABLE, callAuthStateCoordinator, issueCoordinatedAuthNonce, consumeCoordinatedAuthNonce, callHostedFaucetQuota, reserveCoordinatedHostedFaucet, finalizeCoordinatedHostedFaucet, checkCoordinatedAuthRateLimit, getOrCreateCoordinatedStorageEnvelopeSessionKey, executeCoordinatedSessionConfigMutation, reserveCoordinatedSponsoredFaucet, finalizeCoordinatedSponsoredFaucet, checkCoordinatedLegacyStorageOwner, readCoordinatedResultsAnalysisStatus, reserveCoordinatedResultsAnalysis, finalizeCoordinatedResultsAnalysis, enqueueCoordinatedResultsAnalysisAutoJob;
 var init_sessionWriteCoordinator = __esm({
   "workers/sessionCorsWorker/sessionWriteCoordinator.js"() {
     init_submissionJournal();
@@ -79042,6 +79071,7 @@ var init_sessionWriteCoordinator = __esm({
     init_sponsoredBootstrapGrantStore();
     init_resultsAnalysisGeneration();
     init_storageRouteExecution();
+    init_contextSourceRoute();
     init_sessionConfigMutation();
     init_sessionSecretsAuthority();
     init_sessionConfigNormalization();
@@ -79064,6 +79094,8 @@ var init_sessionWriteCoordinator = __esm({
     AUTH_NONCE_USED_KEY = "auth-nonce-used";
     AUTH_RATE_RECORD_KEY = "auth-rate-record";
     HOSTED_FAUCET_QUOTA_KEY = "hosted-faucet-quota-v1";
+    CONTEXT_PDF_READING_PREFIX = "context-pdf-reading:";
+    CONTEXT_PDF_READING_LEASE_MS = 5 * 60 * 1e3;
     WORKER_GROUP_CAPACITY_META_KEY = "worker-group-capacity-meta-v3";
     WORKER_GROUP_CAPACITY_GROUP_PREFIX = "worker-group-capacity-group-v3:";
     WORKER_GROUP_CAPACITY_MEMBER_PREFIX = "worker-group-capacity-member-v3:";
@@ -79343,6 +79375,7 @@ ${expiry}`);
         this.activeDirectAttemptId = "";
         this.sessionConfigTail = Promise.resolve();
         this.storageVisibilityTail = Promise.resolve();
+        this.contextSourceTail = Promise.resolve();
         this.workerGroupTail = Promise.resolve();
         this.resultsAnalysisTail = Promise.resolve();
         this.storageOwnerTail = Promise.resolve();
@@ -81021,6 +81054,51 @@ ${expiry}`);
         this.storageVisibilityTail = run.catch(() => void 0);
         return run;
       }
+      // Context changes to a PDF's readings run one at a time per session, so a
+      // reading, a removal and the PDF's pointer to its reading never interleave.
+      async executeContextSourceOperation(operation, payload) {
+        const run = this.contextSourceTail.then(async () => {
+          try {
+            const slug = normalizeWorkerSessionSlug(payload?.slug);
+            const id2 = toTrimmedString10(payload?.id);
+            const leaseKey = `${CONTEXT_PDF_READING_PREFIX}${id2}`;
+            const markWrite = () => bumpStorageBackupRevision(this.state.storage);
+            if (operation === "begin-read") {
+              const nowMs = Number(this.now()) || Date.now();
+              if ((await this.state.storage.get(leaseKey))?.expiresAtMs > nowMs) {
+                return jsonResponse2({ error: "This PDF is already being read.", reason: "context_pdf_reading" }, 409);
+              }
+              const token = createAttemptId(this.crypto);
+              await this.state.storage.put(leaseKey, { token, expiresAtMs: nowMs + CONTEXT_PDF_READING_LEASE_MS });
+              return jsonResponse2({ ok: true, token });
+            }
+            if (operation === "end-read") {
+              if ((await this.state.storage.get(leaseKey))?.token === payload.token) await this.state.storage.delete(leaseKey);
+              if (!payload.readingId) return jsonResponse2({ ok: true });
+              await assertNoActiveBackupImport(this);
+              const result = await finishContextPdfReading({
+                env: this.env,
+                slug,
+                pdfId: id2,
+                readingId: toTrimmedString10(payload.readingId),
+                readAt: toTrimmedString10(payload.readAt),
+                markWrite
+              });
+              return jsonResponse2(result.body, result.status);
+            }
+            if (operation === "remove") {
+              await assertNoActiveBackupImport(this);
+              const result = await removeContextSource({ env: this.env, slug, id: id2, readingIds: payload.readingIds, markWrite });
+              return jsonResponse2(result.body, result.status);
+            }
+            return jsonResponse2({ error: "Not found." }, 404);
+          } catch (error) {
+            return jsonResponse2({ error: error.message || "Context update failed." }, error.status || 503);
+          }
+        });
+        this.contextSourceTail = run.catch(() => void 0);
+        return run;
+      }
       async finalizeSessionConfigProjection(revision) {
         await this.state.storage.transaction(async (transaction) => {
           const current = await transaction.get(SESSION_CONFIG_AUTHORITY_KEY);
@@ -81677,6 +81755,9 @@ ${expiry}`);
         }
         if (url.pathname === "/session-config/storage/set-hidden") return this.executeStorageVisibilityMutation(payload);
         if (url.pathname === "/session-config/storage/publish") return this.executeStoragePublication(payload);
+        if (url.pathname.startsWith("/session-config/context-source/")) {
+          return this.executeContextSourceOperation(url.pathname.split("/").pop(), payload);
+        }
         if (["preflight", "begin", "check", "checkpoint", "release", "discard"].some((operation) => url.pathname === `/session-config/lit-authorization/provisioning/${operation}`)) {
           return this.serializeSessionConfigOperation(() => executeLitProvisioning(this, payload, url.pathname.split("/").at(-1)));
         }
@@ -88004,8 +88085,8 @@ var createRateLimitFaucetSupportWithWorkerDeps = ({
     if (!numeric || Number.isNaN(numeric) || numeric <= 0) return true;
     const routeKey = toTrimmedString2(route, deps).toLowerCase() || "default";
     const identity = toTrimmedString2(address2, deps).toLowerCase() || "anonymous";
-    const coordinate = deps?.checkCoordinatedAuthRateLimit || checkCoordinatedAuthRateLimit;
-    const result = await coordinate({
+    const coordinate2 = deps?.checkCoordinatedAuthRateLimit || checkCoordinatedAuthRateLimit;
+    const result = await coordinate2({
       env,
       slug,
       route: routeKey,
@@ -102990,8 +103071,8 @@ var executeDirectSessionConfigMutation = async ({
   mutation,
   deps
 } = {}) => {
-  const coordinate = deps?.executeCoordinatedSessionConfigMutation || executeCoordinatedSessionConfigMutation;
-  return coordinate({ env, slug, existingConfig, mutation, expectedAuthority });
+  const coordinate2 = deps?.executeCoordinatedSessionConfigMutation || executeCoordinatedSessionConfigMutation;
+  return coordinate2({ env, slug, existingConfig, mutation, expectedAuthority });
 };
 var dispatchAdminRequest = async ({
   request,
@@ -104165,8 +104246,8 @@ var buildNonce = (deps) => {
   return Array.from(bytes3, (byte) => byte.toString(16).padStart(2, "0")).join("");
 };
 var issueNonce = async (env, slug, address2, nonce, ttlSeconds, deps = {}) => {
-  const coordinate = deps?.issueCoordinatedAuthNonce || issueCoordinatedAuthNonce;
-  const result = await coordinate({
+  const coordinate2 = deps?.issueCoordinatedAuthNonce || issueCoordinatedAuthNonce;
+  const result = await coordinate2({
     env,
     slug,
     address: address2,
@@ -104187,8 +104268,8 @@ var issueNonce = async (env, slug, address2, nonce, ttlSeconds, deps = {}) => {
 };
 var consumeNonce = async (env, slug, address2, nonce, deps = {}) => {
   const usedNonceTtlSeconds = Number.isFinite(deps?.usedNonceTtlSeconds) ? deps.usedNonceTtlSeconds : DEFAULT_USED_NONCE_TTL_SECONDS;
-  const coordinate = deps?.consumeCoordinatedAuthNonce || consumeCoordinatedAuthNonce;
-  const result = await coordinate({
+  const coordinate2 = deps?.consumeCoordinatedAuthNonce || consumeCoordinatedAuthNonce;
+  const result = await coordinate2({
     env,
     slug,
     address: address2,
@@ -104237,10 +104318,10 @@ var checkNonceRateLimit = async ({
   const networkIdentity = normalizedIdentity || "unknown-network";
   const sessionSlug = String(slug || "").trim();
   const expirationTtl = Number.isFinite(Number(ttlSeconds)) && Number(ttlSeconds) > 0 ? Number(ttlSeconds) : DEFAULT_NONCE_RATE_LIMIT_TTL_SECONDS;
-  const coordinate = checkCoordinatedAuthRateLimit2 || checkCoordinatedAuthRateLimit;
+  const coordinate2 = checkCoordinatedAuthRateLimit2 || checkCoordinatedAuthRateLimit;
   const runLimitCheck = async ({ route, rateIdentity, numericLimit }) => {
     if (!Number.isFinite(numericLimit) || numericLimit <= 0) return { ok: true, allowed: true };
-    const result = await coordinate({
+    const result = await coordinate2({
       env,
       slug: sessionSlug,
       route,

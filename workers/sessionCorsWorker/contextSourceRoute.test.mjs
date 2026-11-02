@@ -273,6 +273,71 @@ test('a PDF removed while its AI reads it leaves no reading behind', async () =>
   assert.equal([...h.r2.store.keys()].length, 0);
 });
 
+test('a second read of a PDF already being read is refused, and the first keeps its reading', async () => {
+  let release;
+  const h = harness({
+    provider: () => (release
+      ? json({ content: [{ type: 'text', text: 'Second text.' }] })
+      : new Promise((resolve) => { release = () => resolve(json({ content: [{ type: 'text', text: 'First text.' }] })); })),
+  });
+  const pdf = await idOf(await h.uploadFile());
+  const first = h.context({ action: 'read-pdf', id: pdf });
+  while (!release) await new Promise((resolve) => setTimeout(resolve, 5));
+  const second = await h.context({ action: 'read-pdf', id: pdf });
+  assert.equal(second.status, 409);
+  assert.match((await second.json()).error, /already being read/);
+  release();
+  const reading = await idOf(await first);
+  assert.equal(h.providerCalls.length, 1);
+  assert.equal(await (await h.read(reading, ADMIN)).text(), 'First text.');
+  assert.equal(JSON.parse(await h.kv.get(`ce-storage:salon:docsContext:${pdf}`)).contextReadingId, reading);
+  // The finished read frees the PDF, and the next reading replaces this one.
+  const replacement = await idOf(await h.context({ action: 'read-pdf', id: pdf }));
+  assert.equal((await h.read(reading, ADMIN)).status, 404);
+  assert.equal((await h.read(replacement, ADMIN)).status, 200);
+});
+
+test('a PDF removed while its reading is stored stays removed with its bytes', async () => {
+  let release;
+  const h = harness({
+    provider: () => new Promise((resolve) => { release = () => resolve(json({ content: [{ type: 'text', text: 'Late text.' }] })); }),
+  });
+  const pdf = await idOf(await h.uploadFile());
+  const reading = h.context({ action: 'read-pdf', id: pdf });
+  while (!release) await new Promise((resolve) => setTimeout(resolve, 5));
+  // The removal arrives while the stored reading's cleanup lists the PDF's readings.
+  const list = h.kv.list;
+  let removing;
+  h.kv.list = async (options) => {
+    if (!removing) {
+      removing = h.context({ action: 'remove', id: pdf });
+      await Promise.race([removing, new Promise((resolve) => setTimeout(resolve, 20))]);
+    }
+    return list(options);
+  };
+  release();
+  assert.equal((await reading).status, 200);
+  assert.equal((await removing).status, 200);
+  h.kv.list = list;
+  assert.equal(await h.kv.get(`ce-storage:salon:docsContext:${pdf}`), null);
+  assert.deepEqual(await h.list(ADMIN), []);
+  assert.equal(h.r2.store.size, 0);
+});
+
+test('a reading never removes a newer reading of the same PDF', async () => {
+  const h = harness({ provider: async () => json({ content: [{ type: 'text', text: 'Deck text.' }] }) });
+  const pdf = await idOf(await h.uploadFile());
+  h.deps.now = () => Date.parse('2026-11-02T10:00:00.000Z');
+  const newer = await idOf(await h.context({ action: 'read-pdf', id: pdf }));
+  // A reading that started first but is stored after the newer one finished.
+  h.deps.now = () => Date.parse('2026-11-02T09:00:00.000Z');
+  const stale = await h.context({ action: 'read-pdf', id: pdf });
+  assert.equal(stale.status, 409);
+  assert.equal((await h.read(newer, ADMIN)).status, 200);
+  assert.equal(JSON.parse(await h.kv.get(`ce-storage:salon:docsContext:${pdf}`)).contextReadingId, newer);
+  assert.deepEqual((await h.list(ADMIN)).map((item) => item.storageRef.id).sort(), [newer, pdf].sort());
+});
+
 test('a reading keeps its PDF’s stored rule after the session’s access changes', async () => {
   const h = harness({ provider: async () => json({ content: [{ type: 'text', text: 'Deck text.' }] }) });
   const pdf = await idOf(await h.uploadFile());
