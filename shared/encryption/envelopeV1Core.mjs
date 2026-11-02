@@ -248,12 +248,11 @@ export const encodeBinary = (value) => {
   return new Uint8Array([v & 0xff]);
 };
 
+// JSON text keeps every finite rating distinct, whatever its scale and step.
 export const encodeRating = (value) => {
-  let n = Number(value);
-  if (!Number.isFinite(n)) n = 0;
-  if (n < 0) n = 0;
-  if (n > 10) n = 10;
-  return new Uint8Array([n & 0xff]);
+  const n = Number(value);
+  if (!Number.isFinite(n)) throw new Error('Invalid rating');
+  return utf8e(JSON.stringify(n));
 };
 
 export const encodeMultichoiceBitset = (valueArr, options) => {
