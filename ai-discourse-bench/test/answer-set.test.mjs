@@ -168,6 +168,30 @@ test('replies are mapped back to the question and checked like a person’s answ
   assert.match(parseAnswerOutput({ rawText: 'I think 7', question: questions.qr, variant: 'scale', order: [] }).parseError, /not valid JSON/);
 });
 
+test('a reasoning draft is never read as the final answer', () => {
+  const questions = byId(readQuestionSet(resultsExport));
+  const rating = (rawText) => parseAnswerOutput({ rawText, question: questions.qr, variant: 'scale', order: [] });
+  assert.equal(rating('<think>{"answer":0}</think>{"answer":10}').answer, 10);
+  assert.equal(rating('<analysis>{"answer":11}</analysis>\n{"answer":7}').answer, 7);
+  assert.equal(rating('{"answer":7}\n{"answer":"7"}').answer, 7, 'the same answer twice is one answer');
+  const choice = parseAnswerOutput({
+    rawText: '<think>{"answer":"d/acc"}</think>{"answer":"PauseAI"}',
+    question: questions.qs,
+    variant: 'shuffled',
+    order: [0, 1, 2],
+  });
+  assert.deepEqual(choice.answer, ['PauseAI']);
+  for (const [rawText, error] of [
+    ['<think>{"answer":3}', /truncated reasoning/],
+    ['{"answer":2}\n{"answer":9}', /conflicting/],
+    ['{"answer":7}\n{"answer":"8', /truncated JSON/],
+  ]) {
+    const reply = rating(rawText);
+    assert.equal(reply.answer, null, rawText);
+    assert.match(reply.parseError, error, rawText);
+  }
+});
+
 test('structured output asks for each type’s own answer shape', () => {
   const questions = byId(readQuestionSet(resultsExport));
   const answerSchema = (question, order = []) => answerJsonSchema({ question, order }).schema.properties.answer;
