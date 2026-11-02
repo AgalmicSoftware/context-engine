@@ -5,6 +5,7 @@ import {
   type SurveyResultsHtmlReportState,
 } from './surveyResultsHtmlReportRuntime';
 import type { SurveyResultsGateRecord, SurveyResultsResponseRecord } from './surveyResultsLockedFieldHelpers';
+import { renderSessionResultsHtmlReport } from '../../utilities/sessionResultsExport';
 
 const fixedNowIso = (): string => '2026-05-28T10:00:00.000Z';
 
@@ -84,6 +85,51 @@ const createRuntime = ({
 };
 
 describe('surveyResultsHtmlReportRuntime', () => {
+  it('leaves questions with author-encrypted text out of the report and its AI input', () => {
+    const gatedPrompt = 'Decrypted gated prompt';
+    const { runtime } = createRuntime({
+      networkQuestions: {
+        q1: { id: 'q1', prompt: 'Runtime question?', type: 'binary' },
+        q2: {
+          id: 'q2',
+          prompt: gatedPrompt,
+          promptDecrypted: true,
+          promptEncrypted: { ciphertext: 'fixture' },
+          tags: ['gated-tag'],
+          type: 'binary',
+        },
+      },
+      getFilteredQuestionsForExport: () => [
+        { id: 'q1', options: [], prompt: 'Runtime question?', tags: [], type: 'binary' },
+        { id: 'q2', options: [], prompt: gatedPrompt, tags: ['gated-tag'], type: 'binary' },
+      ],
+      state: {
+        sbtFilteredAggregatorQuestionResponses: {
+          q1: [
+            {
+              responder: '0x1111111111111111111111111111111111111111',
+              response: { answer: { value: 'Yes' }, questionID: 'q1' },
+            },
+          ],
+          q2: [
+            {
+              responder: '0x1111111111111111111111111111111111111111',
+              response: { answer: { value: 'Yes' }, questionID: 'q2' },
+            },
+          ],
+        },
+      },
+    });
+
+    const html = renderSessionResultsHtmlReport(runtime.buildSessionResultsHtmlReportSnapshot());
+    const aiInput = JSON.stringify(runtime.buildSessionResultsAnalysisPayloadForAi());
+
+    expect(html).toContain('Runtime question?');
+    expect(html).not.toContain(gatedPrompt);
+    expect(aiInput).not.toContain(gatedPrompt);
+    expect(aiInput).not.toContain('gated-tag');
+  });
+
   it('distinguishes an empty completed filter from the initial unhydrated state', () => {
     const { runtime, mutableState } = createRuntime({
       getFilteredQuestionsForExport: () => [],
