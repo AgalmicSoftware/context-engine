@@ -227,7 +227,10 @@ function normalizeOptions(value = []) {
 function normalizeRatingScale(value = {}) {
   const question = { scale: value };
   const scale = normalizeQuestionRatingScale(question);
-  return scale ? { min: scale.min, max: scale.max, step: ratingStepFor(question) } : null;
+  const label = (text) => text.replace(/\s+/g, ' ').slice(0, 120);
+  return scale ? {
+    min: scale.min, max: scale.max, minLabel: label(scale.minLabel), maxLabel: label(scale.maxLabel), step: ratingStepFor(question),
+  } : null;
 }
 
 function normalizeReferenceUrl(value = '') {
