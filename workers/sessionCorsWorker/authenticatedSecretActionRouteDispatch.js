@@ -129,11 +129,11 @@ export const dispatchAuthenticatedSecretActionRoute = async ({
         onSubmissionAttempt: () => { submissionAttempted = true; },
       } : {}),
     });
-    // Hosted payouts take turns with the session's faucet wallet, so two
-    // recipients never sign the same nonce.
+    // Every payout takes turns with the session's faucet wallet, so two
+    // requests never sign the same nonce.
     const takeWalletTurn = deps?.withCoordinatedFaucetWalletTurn || withCoordinatedFaucetWalletTurn;
     try {
-      response = hosted ? await takeWalletTurn({ env, slug }, send) : await send();
+      response = await takeWalletTurn({ env, slug }, send);
     } catch (error) {
       // A failure before submission, such as a malformed key, must not hold a slot.
       if (hosted && !submissionAttempted) {
@@ -141,7 +141,7 @@ export const dispatchAuthenticatedSecretActionRoute = async ({
       }
       throw error;
     }
-    if (hosted && !response) response = deps?.json?.({ error: 'The faucet is busy; try again shortly.' }, 503, headers);
+    if (!response) response = deps?.json?.({ error: 'The faucet is busy; try again shortly.' }, 503, headers);
     if (hosted) {
       // HTTP errors do not prove a transfer was rejected. Only release a failed
       // request when no submission was attempted; ambiguous sends expire normally.
