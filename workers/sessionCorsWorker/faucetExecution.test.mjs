@@ -104,9 +104,8 @@ test('hosted quotas release failures that occur before any transaction is submit
   assert.equal(signingAttempts, 5);
 });
 
-test('hosted payouts to two recipients take turns with the faucet wallet nonce', async () => {
-  const env = installSessionCoordinatorBinding({});
-  const otherRecipient = '0x00000000000000000000000000000000000000bb';
+// Signs one transaction per call; the simulated mempool accepts one per nonce, like a node would.
+const createSingleNonceMempool = () => {
   const signed = new Map();
   const accepted = new Map();
   const deps = createDeps({
@@ -117,7 +116,6 @@ test('hosted payouts to two recipients take turns with the faucet wallet nonce',
       signed.set(raw, { nonce: Number(nonce), to });
       return raw;
     } }),
-    // A mempool that accepts one transaction per nonce, like a node would.
     rpcRequest: async ({ method, params }) => {
       await new Promise((resolve) => setTimeout(resolve, 1));
       if (method === 'eth_getTransactionCount') return `0x${accepted.size.toString(16)}`;
@@ -128,20 +126,52 @@ test('hosted payouts to two recipients take turns with the faucet wallet nonce',
       return '0xtxhash';
     },
   });
-  const request = (address) => dispatchAuthenticatedSecretActionRoute({
-    path: '/', action: 'request_test_eth', body: { to: address }, address, slug: 'example', env,
-    config: { sessionModeProfile: { authority: { mode: 'worker_canonical' } } }, scopes: { faucet: true },
-    deps: {
-      json: deps.json,
-      evaluateAuthenticatedRoutePreflight: async () => ({ ok: true, tokenHasScope: true }),
-      resolveAuthenticatedRouteSecrets: async () => ({ ok: true, secrets: {} }),
-      faucet: (args) => runFaucet(deps, args),
-    },
+  return { deps, accepted };
+};
+const OTHER_RECIPIENT = '0x00000000000000000000000000000000000000bb';
+
+for (const [label, config] of [
+  ['hosted', { sessionModeProfile: { authority: { mode: 'worker_canonical' } } }],
+  ['registry', {}],
+]) {
+  test(`${label} payouts to two recipients take turns with the faucet wallet nonce`, async () => {
+    const env = installSessionCoordinatorBinding({});
+    const { deps, accepted } = createSingleNonceMempool();
+    const request = (address) => dispatchAuthenticatedSecretActionRoute({
+      path: '/', action: 'request_test_eth', body: { to: address }, address, slug: 'example', env,
+      config, scopes: { faucet: true },
+      deps: {
+        json: deps.json,
+        evaluateAuthenticatedRoutePreflight: async () => ({ ok: true, tokenHasScope: true }),
+        resolveAuthenticatedRouteSecrets: async () => ({ ok: true, secrets: {} }),
+        faucet: (args) => runFaucet(deps, args),
+      },
+    });
+    const results = await Promise.all([RECIPIENT, OTHER_RECIPIENT].map(request));
+    assert.deepEqual(results.map(({ response }) => response.status), [200, 200]);
+    assert.deepEqual([...accepted.keys()].sort(), [0, 1]);
+    assert.deepEqual([...accepted.values()].sort(), [RECIPIENT, OTHER_RECIPIENT]);
   });
-  const results = await Promise.all([RECIPIENT, otherRecipient].map(request));
-  assert.deepEqual(results.map(({ response }) => response.status), [200, 200]);
+}
+
+test('agent faucet requests take the same wallet turn', async () => {
+  const env = installSessionCoordinatorBinding({ TOKEN_HMAC_SECRET: 'local-test-only' });
+  const { deps, accepted } = createSingleNonceMempool();
+  const config = { sessionId: `0x${'ab'.repeat(16)}`, authzEpoch: 0,
+    sessionModeProfile: { surfaces: { agentHttp: true } }, agentHttp: { sponsoredFaucetAllowed: true } };
+  const request = (address) => {
+    const agentEnv = createAgentEnvironment({ env, config, revision: 1, slug: 'example', origin: 'https://worker.example' });
+    agentEnv.AGENT_CONTEXT.address = address;
+    return createAgentServices({ env, agentEnv, deps: {
+      readCurrentSessionConfig: async () => ({ config, revision: 1 }),
+      computeScopesForLogin: async () => ({ faucet: true }),
+      getSessionSecrets: async () => ({}),
+      faucet: (args) => runFaucet(deps, args),
+    } }).faucet();
+  };
+  const results = await Promise.all([RECIPIENT, OTHER_RECIPIENT].map(request));
+  assert.deepEqual(results.map(({ ok }) => ok), [true, true]);
   assert.deepEqual([...accepted.keys()].sort(), [0, 1]);
-  assert.deepEqual([...accepted.values()].sort(), [RECIPIENT, otherRecipient]);
 });
 
 const createNormalizedResult = (overrides = {}) => ({
@@ -811,7 +841,7 @@ for (const agentPath of [false, true]) {
       if (agentPath) {
         const config = { sessionId: `0x${'ab'.repeat(16)}`, authzEpoch: 0,
           sessionModeProfile: { surfaces: { agentHttp: true } }, agentHttp: { sponsoredFaucetAllowed: true } };
-        const env = { TOKEN_HMAC_SECRET: 'local-test-only' };
+        const env = installSessionCoordinatorBinding({ TOKEN_HMAC_SECRET: 'local-test-only' });
         const agentEnv = createAgentEnvironment({ env, config, revision: 1, slug: 'example', origin: 'https://worker.example' });
         agentEnv.AGENT_CONTEXT.address = RECIPIENT;
         const services = createAgentServices({ env, agentEnv, deps: {

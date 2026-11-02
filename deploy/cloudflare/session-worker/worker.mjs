@@ -91383,7 +91383,8 @@ var createAgentServices = ({ env, agentEnv, deps }) => {
       await current();
       if (!ctx.scopes?.faucet || ctx.config.agentHttp?.sponsoredFaucetAllowed !== true) return { ok: false, skipped: true, reason: "session_faucet_not_allowed" };
       const secrets = await deps.getSessionSecrets(env, ctx.slug);
-      const response2 = await deps.faucet({
+      const takeWalletTurn = deps.withCoordinatedFaucetWalletTurn || withCoordinatedFaucetWalletTurn;
+      const response2 = await takeWalletTurn({ env, slug: ctx.slug }, () => deps.faucet({
         payload: { to: ctx.address },
         secrets,
         config: ctx.config,
@@ -91391,7 +91392,8 @@ var createAgentServices = ({ env, agentEnv, deps }) => {
         requesterAddress: ctx.address,
         tokenHasFaucetScope: true,
         baseHeaders: {}
-      });
+      }));
+      if (!response2) return { ok: false, reason: "faucet_busy", status: 503 };
       const body = await response2.json();
       return response2.ok ? { ok: true, ...body } : {
         ok: false,
@@ -106597,14 +106599,14 @@ var dispatchAuthenticatedSecretActionRoute = async ({
     });
     const takeWalletTurn = deps?.withCoordinatedFaucetWalletTurn || withCoordinatedFaucetWalletTurn;
     try {
-      response2 = hosted ? await takeWalletTurn({ env, slug }, send) : await send();
+      response2 = await takeWalletTurn({ env, slug }, send);
     } catch (error) {
       if (hosted && !submissionAttempted) {
         await finalize({ env, slug, address: address2, requestId: reservation.requestId, sent: false });
       }
       throw error;
     }
-    if (hosted && !response2) response2 = deps?.json?.({ error: "The faucet is busy; try again shortly." }, 503, headers2);
+    if (!response2) response2 = deps?.json?.({ error: "The faucet is busy; try again shortly." }, 503, headers2);
     if (hosted) {
       if (!submissionAttempted || response2?.status === 200) {
         await finalize({ env, slug, address: address2, requestId: reservation.requestId, sent: response2?.status === 200 });

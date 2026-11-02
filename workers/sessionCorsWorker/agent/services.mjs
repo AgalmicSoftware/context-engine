@@ -3,7 +3,7 @@ import { resolveCanonicalWorkerSessionIdHex } from '../sessionConfigMutation.js'
 import { readAuthorizationEpoch } from '../authorizationScopeFreshness.js';
 import { buildAuthTokenJti, persistAuthTokenRecord, revokeAuthTokenRecord } from '../authTokenClaims.js';
 import { signToken } from '../tokenSigning.js';
-import { executeCoordinatedSessionConfigMutation } from '../sessionWriteCoordinator.js';
+import { executeCoordinatedSessionConfigMutation, withCoordinatedFaucetWalletTurn } from '../sessionWriteCoordinator.js';
 import { readCoordinatedWorkerGroupMemberships } from '../workerGroups.js';
 import { resolveSessionAiModel } from '../aiRequestPolicy.js';
 import { authorityError, agentHttpEnabled, validateCredentialAuthority, validateMemberSource } from './authority.mjs';
@@ -120,8 +120,11 @@ export const createAgentServices = ({ env, agentEnv, deps }) => {
       await current();
       if (!ctx.scopes?.faucet || ctx.config.agentHttp?.sponsoredFaucetAllowed !== true) return { ok: false, skipped: true, reason: 'session_faucet_not_allowed' };
       const secrets = await deps.getSessionSecrets(env, ctx.slug);
-      const response = await deps.faucet({ payload: { to: ctx.address }, secrets, config: ctx.config, slug: ctx.slug,
-        requesterAddress: ctx.address, tokenHasFaucetScope: true, baseHeaders: {} });
+      // The same wallet turn as participant payouts, so neither signs the other's nonce.
+      const takeWalletTurn = deps.withCoordinatedFaucetWalletTurn || withCoordinatedFaucetWalletTurn;
+      const response = await takeWalletTurn({ env, slug: ctx.slug }, () => deps.faucet({ payload: { to: ctx.address },
+        secrets, config: ctx.config, slug: ctx.slug, requesterAddress: ctx.address, tokenHasFaucetScope: true, baseHeaders: {} }));
+      if (!response) return { ok: false, reason: 'faucet_busy', status: 503 };
       const body = await response.json();
       return response.ok ? { ok: true, ...body } : { ok: false, reason: 'faucet_request_failed', status: response.status,
         ...(body.txHash ? { txHash: body.txHash } : {}) };

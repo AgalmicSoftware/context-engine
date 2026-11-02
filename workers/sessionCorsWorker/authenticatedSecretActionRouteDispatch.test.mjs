@@ -404,6 +404,7 @@ test('dispatchAuthenticatedSecretActionRoute preserves proof-backed faucet bypas
         return { ok: true, tokenHasScope: false };
       },
       resolveAuthenticatedRouteSecrets: async () => ({ ok: true, secrets }),
+      withCoordinatedFaucetWalletTurn: async (_, send) => send(),
       faucet: async (value) => {
         assert.deepEqual(value, {
           payload: {
@@ -456,6 +457,7 @@ test('dispatchAuthenticatedSecretActionRoute allows same-wallet faucet requests 
         return { ok: true, tokenHasScope: false };
       },
       resolveAuthenticatedRouteSecrets: async () => ({ ok: true, secrets }),
+      withCoordinatedFaucetWalletTurn: async (_, send) => send(),
       faucet: async (value) => {
         assert.equal(value.requesterAddress, '0xabc');
         assert.equal(value.tokenHasFaucetScope, false);
