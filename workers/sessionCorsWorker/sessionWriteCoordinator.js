@@ -2253,7 +2253,9 @@ export class SessionWriteCoordinator {
   async executeStoragePublication(payload) {
     return this.serializeSessionConfigOperation(async () => {
       try {
-        const authority = await this.assertSessionAuthority(payload);
+        // A context row may follow a long PDF read; a content edit meanwhile
+        // keeps the authorization epoch, and publishing rechecks the admin.
+        const authority = await this.assertSessionAuthority(payload, { requireRevision: payload?.metadata?.contextSource !== true });
         await this.repairPendingSessionConfigProjection();
         await publishCloudflareOwnedStorageMetadata({ env: this.env, slug: normalizeWorkerSessionSlug(payload.slug),
           config: authority?.config, actor: payload.expectedAuthority.actor,

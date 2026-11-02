@@ -1389,17 +1389,20 @@ const handleArweaveStorageUpload = async ({ request, env, config, slug, uploader
 
 // Called only inside the session config serialization boundary. The external
 // payload write stays outside it; permanent publication uses current authority.
+// Context is an admin's alone, so it publishes only while its uploader is one.
 export const publishCloudflareOwnedStorageMetadata = async ({ env, config, slug, actor, metadata, createOwner }) => {
   const uploader = normalizeAddress(actor);
   const resource = metadata?.resource;
-  if (!isOwnedStorageResource(resource) || !isStorageResourceId(metadata?.resourceId) ||
+  const isAdmin = resolveSessionAdminAddresses(config).has(uploader);
+  const context = metadata?.contextSource === true && resource === 'docsContext';
+  if (!(context ? isAdmin : isOwnedStorageResource(resource) && isStorageResourceId(metadata?.resourceId)) ||
     !isSafeCloudflareStorageRefId(metadata?.id) || !uploader || metadata.uploader !== uploader ||
-    metadata.uploadAuthority !== (resolveSessionAdminAddresses(config).has(uploader) ? 'admin' : 'author')) {
+    metadata.uploadAuthority !== (isAdmin ? 'admin' : 'author')) {
     throw Object.assign(new Error(SUPERSEDED_AUTHORITY_ERROR), { status: 409 });
   }
   const index = getStorageIndexBinding(env);
   if (typeof index?.get !== 'function' || typeof index?.put !== 'function') throw new Error('Cloudflare storage index binding not configured.');
-  const owner = await readStorageResourceOwner({ index, slug, resource, resourceId: metadata.resourceId });
+  const owner = context ? null : await readStorageResourceOwner({ index, slug, resource, resourceId: metadata.resourceId });
   if (owner && normalizeAddress(owner.uploader) !== uploader && metadata.uploadAuthority !== 'admin') {
     throw Object.assign(new Error('This id already belongs to another author.'), { status: 409 });
   }
@@ -1731,9 +1734,9 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
     await index.put(buildPayloadKey({ slug, id }), serializedKvPayload);
   }
 
-  if (owned) {
+  if (owned || metadata.contextSource) {
     const publish = deps?.executeCoordinatedStoragePublication || executeCoordinatedStoragePublication;
-    const result = await publish({ env, slug, expectedAuthority, metadata, createOwner: !owner && !!uploader });
+    const result = await publish({ env, slug, expectedAuthority, metadata, createOwner: owned && !owner && !!uploader });
     if (!result.ok) return responseJson(deps, { error: result.body?.error || 'Storage publication is unavailable; retry.' }, result.status || 503, baseHeaders);
   } else if (index && typeof index.put === 'function') {
     await index.put(buildIndexKey({ slug, resource, id }), serializedMetadata);
