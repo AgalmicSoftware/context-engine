@@ -791,8 +791,10 @@ function collectFreshness(rootDir = ROOT_DIR, asOf = new Date().toISOString().sl
   const corpuses = corpusFiles.map((file) => {
     const dated = file.entries.map(entryDate).filter(Boolean);
     const precise = dated.filter((date) => date.precision !== 'year');
-    const newest = precise.map((date) => date.iso).sort().at(-1) || null;
-    const within = (days) => precise.filter((date) => asOfMs - Date.parse(`${date.iso}T00:00:00Z`) <= days * dayMs).length;
+    // Entries dated after asOf did not exist yet on that day.
+    const known = precise.filter((date) => Date.parse(`${date.iso}T00:00:00Z`) <= asOfMs);
+    const newest = known.map((date) => date.iso).sort().at(-1) || null;
+    const within = (days) => known.filter((date) => asOfMs - Date.parse(`${date.iso}T00:00:00Z`) <= days * dayMs).length;
     const verified = file.entries.filter((entry) => entry?.verification_status === 'verified').length;
     const partiallyVerified = file.entries.filter((entry) => entry?.verification_status === 'partially_verified').length;
     const daysSinceNewest = newest ? Math.round((asOfMs - Date.parse(`${newest}T00:00:00Z`)) / dayMs) : null;
