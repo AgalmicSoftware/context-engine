@@ -554,7 +554,10 @@ Snapshots bind the exact persona label used in the prompt, mode and recorded pro
 template hash/version in a separate versioned experiment-context fingerprint.
 Comparisons refuse changed contexts or snapshots missing this fingerprint; rebuild
 those snapshots from reports with complete run manifests. Comparison output names
-the experiment context it compared.
+the experiment context it compared. Request settings such as temperature, token
+limits, routing and the system prompt are recorded in each run manifest but not
+in this fingerprint, so a comparison can span runs that differ in them; check the
+manifests before reading a shift as model drift.
 
 Comparisons report per-model stance shifts, direction changes, and pairwise
 similarity drift on common models and questions. Each model pair recomputes both
