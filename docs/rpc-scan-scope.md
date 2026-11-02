@@ -216,11 +216,13 @@ On successful completion:
 - `questionsLatestBlock` is advanced
 - `questionsDiscoveryCheckpointBlock` is cleared
 
-Known limit: scans never revisit blocks at or below the resume start. If a chain
+Known limit: scans never revisit blocks below the resume start. If a chain
 reorganization replaces a block a scan has already read, its question stays cached
 and the replacement is not found until the browser's question cache is cleared.
-This affects only the opt-in on-chain profile, whose contracts run on OP Sepolia,
-where such reorganizations are rare.
+The Session Worker's registry question index, which Agent HTTP and Wrapped read,
+has the same limit: it resumes after its last indexed block. This affects only the
+opt-in on-chain profile, whose contracts run on OP Sepolia, where such
+reorganizations are rare.
 
 ## RPC diagnostics
 
