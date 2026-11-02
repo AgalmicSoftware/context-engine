@@ -1,8 +1,10 @@
 import {
   buildDraftBaselineEntry,
+  buildStableDraftValueSignature,
   withoutStaleDraftFields,
   withoutUnrestorableUnlocks,
 } from './surveyDraftSavedBaseline';
+import { buildSurveyDraftSemanticSignature } from './surveyToolDraftState';
 
 describe('withoutStaleDraftFields', () => {
   it('drops only the draft fields whose saved value changed since the draft was written', () => {
@@ -126,5 +128,17 @@ describe('known empty saved answers', () => {
   ])('restores against a %s baseline with the same writer and reader rule', (_name, saved, current, expected) => {
     const stored = buildDraftBaselineEntry(saved, 'q1');
     expect(withoutStaleDraftFields(draft, stored, current, 'q1')).toEqual(expected);
+  });
+});
+
+describe('buildStableDraftValueSignature', () => {
+  it.each([
+    ['list items', ['A', 'B'], ['A,s:B']],
+    ['record values', { a: 'x', b: 'y' }, { a: 'x|b:s:y' }],
+    ['record keys', { a: 'x', b: 'y' }, { 'a:s:x|b': 'y' }],
+  ])('tells apart %s that contain separators', (_name, first, second) => {
+    expect(buildStableDraftValueSignature(first)).not.toBe(buildStableDraftValueSignature(second));
+    const draft = (value: unknown) => ({ meta: { networkId: 1 }, answers: { q1: { value } } });
+    expect(buildSurveyDraftSemanticSignature(draft(first))).not.toBe(buildSurveyDraftSemanticSignature(draft(second)));
   });
 });
