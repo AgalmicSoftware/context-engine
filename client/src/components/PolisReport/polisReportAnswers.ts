@@ -1,4 +1,5 @@
 import { validateQuadraticAllocation } from '../../../../shared/questions/quadraticAllocation.mjs';
+import { normalizeRatingAnswer } from '../../../../shared/questions/ratingScale.mjs';
 import { isResponseAllowedForSessionSlug } from '../../utilities/session/responseSessionScope';
 import { normalizeRatingScale } from '../../utilities/survey/ratingValue';
 
@@ -89,13 +90,8 @@ export function readReportAnswer(payload: ReportRecord, question: ReportRecord):
       return normalizePolisBinaryVote(value);
     case 'freeform':
       return scalarText(value) || null;
-    case 'rating': {
-      if ((typeof value !== 'number' && typeof value !== 'string') || value === '') return null;
-      if (typeof value === 'string' && !value.trim()) return null;
-      const { min, max } = normalizeRatingScale(question);
-      const number = Number(value);
-      return Number.isFinite(number) && number >= min && number <= max ? number : null;
-    }
+    case 'rating':
+      return normalizeRatingAnswer(value, question);
     case 'multichoice': {
       // Match the Worker's analysis validation: one malformed or unknown pick
       // excludes the whole answer, and selection limits apply.
