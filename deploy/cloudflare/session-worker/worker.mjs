@@ -75720,6 +75720,7 @@ var unwrap, scalarText, binaryAliases, formatValidAnalysisAnswer;
 var init_resultsAnalysisAnswerValidation = __esm({
   "workers/sessionCorsWorker/resultsAnalysisAnswerValidation.js"() {
     init_quadraticAllocation();
+    init_ratingScale();
     init_storedRating();
     unwrap = (value, depth = 0) => value && typeof value === "object" && !Array.isArray(value) && Object.hasOwn(value, "value") && depth < 5 ? unwrap(value.value, depth + 1) : value;
     scalarText = (value) => ["string", "number", "boolean"].includes(typeof value) ? String(value).trim() : "";
@@ -75735,10 +75736,8 @@ var init_resultsAnalysisAnswerValidation = __esm({
         case "binary":
           return binaryAliases.get(scalarText(value).toLowerCase()) ?? null;
         case "rating": {
-          if (!["number", "string"].includes(typeof value) || String(value).trim() === "") return null;
-          const number2 = Number(value);
-          const { min = 0, max = 10 } = question.scale || {};
-          return Number.isFinite(number2) && number2 >= min && number2 <= max ? String(number2) : null;
+          const rating = normalizeRatingAnswer(value, question);
+          return rating === null ? null : String(rating);
         }
         case "multichoice": {
           const values = Array.isArray(value) ? value : [value];
@@ -75764,7 +75763,7 @@ var init_resultsAnalysisAnswerValidation = __esm({
 });
 
 // workers/sessionCorsWorker/resultsAnalysisGeneration.js
-var readCoordinatedResultsAnalysisStatusDefault, reserveCoordinatedResultsAnalysisDefault, finalizeCoordinatedResultsAnalysisDefault, decoder7, AI_RESPONSE_CAP, AI_QUESTION_CAP, AI_LIMITS, ANALYSIS_ARTIFACT_VERSION, SOURCE_VERSION, RESULT_SECTION_ORDER, DEFAULT_RESULTS_ANALYSIS_PROVIDER_TIMEOUT_MS, RESULTS_CONTEXT_CHARS, isObj19, hasOwn6, trim15, lower6, getResultsAnalysisSettings, getCanonicalSessionId, publicDraft, applyCurrentArtifactPolicy, normalizeSessionIdHex2, parseJsonBytes, ENCRYPTED_ENVELOPE_KEYS, encryptedEnvelopeValueHasContent, isBlankFieldValue, isClearedFieldWithLockFlag, valueLooksEncrypted, valueFromAnswerLike, FIELD_MASKS, withoutFieldMask, rowLooksLocked, VALIDATED_QUESTION_TYPES, normalizeQuestionId3, normalizeQuestionPrompt, normalizeQuestionType5, RATING_SCALE_METADATA_KEYS2, safeNumber, hasMetadataValue2, recordHasRatingScaleMetadata2, pickRatingScaleRecord2, normalizeRatingLabel2, normalizeRatingScale3, normalizeSubmittedAt, enabledSectionsFromSettings, normalizeRequestedSections, resolveResultsAnalysisCapability, compareIdentity, participantDigest, normalizeQuestionRecord, selectRoundRobinResponses, isNewerResponseRow, normalizeSanitizedRows, readWorkerCanonicalResultsAnalysisSource, loadWorkerCanonicalResultsAnalysisSource, loadAdminSnapshotResultsAnalysisSource, sourceKindFromBody, resolveResultsAnalysisSource, normalizeProviderResponse, resolveAnalysisAiPayload, withTimeout, callResultsAnalysisProvider, normalizeGeneratedArtifact, buildSourceDescriptor, buildReservationKey, filterDraftForStatus, summarizeReservation, analysisEligibility, summarizeActiveState, summarizeFailureState, buildResultsAnalysisStatusBody, readResultsAnalysisAdminStatus, generateResultsAnalysisDraft, maybeTriggerAutomaticResultsAnalysis, runQueuedAutomaticResultsAnalysisJob, normalizedResultsProfile, resolveResultsVisibility, aggregateResultsEnabled, evaluateResultsAnalysisViewerEligibility, readPublishedResultsAnalysisArtifact;
+var readCoordinatedResultsAnalysisStatusDefault, reserveCoordinatedResultsAnalysisDefault, finalizeCoordinatedResultsAnalysisDefault, decoder7, AI_RESPONSE_CAP, AI_QUESTION_CAP, AI_LIMITS, ANALYSIS_ARTIFACT_VERSION, SOURCE_VERSION, RESULT_SECTION_ORDER, DEFAULT_RESULTS_ANALYSIS_PROVIDER_TIMEOUT_MS, RESULTS_CONTEXT_CHARS, isObj19, hasOwn6, trim15, lower6, getResultsAnalysisSettings, getCanonicalSessionId, publicDraft, applyCurrentArtifactPolicy, normalizeSessionIdHex2, parseJsonBytes, ENCRYPTED_ENVELOPE_KEYS, encryptedEnvelopeValueHasContent, isBlankFieldValue, isClearedFieldWithLockFlag, valueLooksEncrypted, valueFromAnswerLike, FIELD_MASKS, withoutFieldMask, rowLooksLocked, VALIDATED_QUESTION_TYPES, normalizeQuestionId3, normalizeQuestionPrompt, normalizeQuestionType5, normalizeAnalysisRatingScale, normalizeSubmittedAt, enabledSectionsFromSettings, normalizeRequestedSections, resolveResultsAnalysisCapability, compareIdentity, participantDigest, normalizeQuestionRecord, selectRoundRobinResponses, isNewerResponseRow, normalizeSanitizedRows, readWorkerCanonicalResultsAnalysisSource, loadWorkerCanonicalResultsAnalysisSource, loadAdminSnapshotResultsAnalysisSource, sourceKindFromBody, resolveResultsAnalysisSource, normalizeProviderResponse, resolveAnalysisAiPayload, withTimeout, callResultsAnalysisProvider, normalizeGeneratedArtifact, buildSourceDescriptor, buildReservationKey, filterDraftForStatus, summarizeReservation, analysisEligibility, summarizeActiveState, summarizeFailureState, buildResultsAnalysisStatusBody, readResultsAnalysisAdminStatus, generateResultsAnalysisDraft, maybeTriggerAutomaticResultsAnalysis, runQueuedAutomaticResultsAnalysisJob, normalizedResultsProfile, resolveResultsVisibility, aggregateResultsEnabled, evaluateResultsAnalysisViewerEligibility, readPublishedResultsAnalysisArtifact;
 var init_resultsAnalysisGeneration = __esm({
   "workers/sessionCorsWorker/resultsAnalysisGeneration.js"() {
     init_aiRequestPolicy();
@@ -75786,6 +75785,7 @@ var init_resultsAnalysisGeneration = __esm({
     init_storageAudience();
     init_contextSourceLoader();
     init_resultsAnalysisAnswerValidation();
+    init_ratingScale();
     init_storageScanBudget();
     readCoordinatedResultsAnalysisStatusDefault = async (args = {}) => (await Promise.resolve().then(() => (init_sessionWriteCoordinator(), sessionWriteCoordinator_exports))).readCoordinatedResultsAnalysisStatus(args);
     reserveCoordinatedResultsAnalysisDefault = async (args = {}) => (await Promise.resolve().then(() => (init_sessionWriteCoordinator(), sessionWriteCoordinator_exports))).reserveCoordinatedResultsAnalysis(args);
@@ -75894,47 +75894,10 @@ var init_resultsAnalysisGeneration = __esm({
     normalizeQuestionId3 = (value) => trim15(value).slice(0, 128);
     normalizeQuestionPrompt = (value) => trim15(value).replace(/\s+/g, " ").slice(0, 1200);
     normalizeQuestionType5 = (value) => trim15(value).slice(0, 64) || "text";
-    RATING_SCALE_METADATA_KEYS2 = [
-      "min",
-      "minimum",
-      "max",
-      "maximum",
-      "minLabel",
-      "lowLabel",
-      "maxLabel",
-      "highLabel"
-    ];
-    safeNumber = (value) => {
-      const numeric = Number(value);
-      return Number.isFinite(numeric) ? numeric : null;
-    };
-    hasMetadataValue2 = (value) => value !== void 0 && value !== null && trim15(value) !== "";
-    recordHasRatingScaleMetadata2 = (record4 = {}) => RATING_SCALE_METADATA_KEYS2.some((key) => hasMetadataValue2(record4[key]));
-    pickRatingScaleRecord2 = (question = {}) => {
-      const scale = isObj19(question.scale) ? question.scale : null;
-      if (scale && recordHasRatingScaleMetadata2(scale)) return scale;
-      const ratingScale = isObj19(question.ratingScale) ? question.ratingScale : null;
-      if (ratingScale && recordHasRatingScaleMetadata2(ratingScale)) return ratingScale;
-      return scale || ratingScale || question;
-    };
-    normalizeRatingLabel2 = (value, fallback) => {
-      const label = trim15(value);
-      return normalizeQuestionPrompt(label || String(fallback)).slice(0, 120);
-    };
-    normalizeRatingScale3 = (question = {}) => {
-      const scale = pickRatingScaleRecord2(question);
-      if (!recordHasRatingScaleMetadata2(scale) && !recordHasRatingScaleMetadata2(question)) return null;
-      const min = safeNumber(scale.min ?? scale.minimum ?? question.min ?? question.minimum);
-      const max = safeNumber(scale.max ?? scale.maximum ?? question.max ?? question.maximum);
-      const normalizedMin = min ?? 0;
-      const normalizedMax = max ?? 10;
-      if (normalizedMax <= normalizedMin) return { min: 0, max: 10, minLabel: "0", maxLabel: "10" };
-      return {
-        min: normalizedMin,
-        max: normalizedMax,
-        minLabel: normalizeRatingLabel2(scale.minLabel ?? scale.lowLabel ?? question.minLabel ?? question.lowLabel, normalizedMin),
-        maxLabel: normalizeRatingLabel2(scale.maxLabel ?? scale.highLabel ?? question.maxLabel ?? question.highLabel, normalizedMax)
-      };
+    normalizeAnalysisRatingScale = (question = {}) => {
+      const scale = normalizeRatingScale(question) || DEFAULT_RATING_SCALE2;
+      const clipLabel = (label) => normalizeQuestionPrompt(label).slice(0, 120);
+      return { ...scale, minLabel: clipLabel(scale.minLabel), maxLabel: clipLabel(scale.maxLabel), step: ratingStepFor(question) };
     };
     normalizeSubmittedAt = (value) => {
       const text4 = trim15(value);
@@ -76007,7 +75970,7 @@ var init_resultsAnalysisGeneration = __esm({
       const questionId4 = normalizeQuestionId3(question.questionId || question.questionID || question.id);
       if (!questionId4) return null;
       const type = normalizeQuestionType5(question.type || question.questionType);
-      const scale = type === "rating" ? normalizeRatingScale3(question) : null;
+      const scale = type === "rating" ? normalizeAnalysisRatingScale(question) : null;
       return {
         questionId: questionId4,
         id: questionId4,

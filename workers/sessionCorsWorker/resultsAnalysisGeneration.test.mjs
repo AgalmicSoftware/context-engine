@@ -746,7 +746,7 @@ test('AI input response cap samples round-robin across answered questions and pr
   assert.equal(Math.max(...countsByQuestion.values()), 10);
   assert.deepEqual(
     source.aiSnapshot.questions.find((question) => question.id === 'q003').scale,
-    { min: 1, max: 10, minLabel: 'Strongly oppose', maxLabel: 'Strongly support' },
+    { min: 1, max: 10, minLabel: 'Strongly oppose', maxLabel: 'Strongly support', step: 1 },
   );
   assert.equal(source.aiSnapshot.questions.find((question) => question.id === 'q042').voiceCredits, 25);
   assert.equal(source.snapshot.questions.find((question) => question.id === 'q042').voiceCredits, 25);

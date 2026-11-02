@@ -1,4 +1,5 @@
 import { formatQuadraticAllocation, validateQuadraticAllocation } from '../../shared/questions/quadraticAllocation.mjs';
+import { normalizeRatingAnswer } from '../../shared/questions/ratingScale.mjs';
 import { readStoredRating } from '../../shared/questions/storedRating.mjs';
 
 const unwrap = (value, depth = 0) => value && typeof value === 'object' && !Array.isArray(value) && Object.hasOwn(value, 'value') && depth < 5
@@ -19,10 +20,8 @@ export const formatValidAnalysisAnswer = (raw, question) => {
     case 'binary':
       return binaryAliases.get(scalarText(value).toLowerCase()) ?? null;
     case 'rating': {
-      if (!['number', 'string'].includes(typeof value) || String(value).trim() === '') return null;
-      const number = Number(value);
-      const { min = 0, max = 10 } = question.scale || {};
-      return Number.isFinite(number) && number >= min && number <= max ? String(number) : null;
+      const rating = normalizeRatingAnswer(value, question);
+      return rating === null ? null : String(rating);
     }
     case 'multichoice': {
       const values = Array.isArray(value) ? value : [value];

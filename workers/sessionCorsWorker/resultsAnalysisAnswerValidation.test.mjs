@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { buildIndexKey, buildPayloadKey } from './storageRouteExecution.js';
 import { generateResultsAnalysisDraft, loadWorkerCanonicalResultsAnalysisSource } from './resultsAnalysisGeneration.js';
 import { readStoredRating } from './resultsAnalysisAnswerValidation.js';
+import { ratingConformance } from '../../shared/questions/ratingConformance.mjs';
 
 const slug = 'validation-session';
 const sessionId = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
@@ -36,7 +37,7 @@ const invalid = [
   ['bad-budget', [0, 0]], ['quadratic', [500, 500]], ['quadratic', [1.5, 0]], ['quadratic', [0]], ['quadratic', ['0', '0']],
   ['binary', 'invented'], ['freeform', { unexpected: 'object' }],
 ];
-async function fixture(rows) {
+async function fixture(rows, questionList = questions) {
   const store = new Map();
   const kv = {
     async put(key, value) { store.set(key, value); },
@@ -48,7 +49,7 @@ async function fixture(rows) {
     await kv.put(buildIndexKey({ slug, resource, id }), JSON.stringify(info));
     await kv.put(buildPayloadKey({ slug, id }), JSON.stringify({ metadata: info, payloadBase64url: Buffer.from(JSON.stringify({ sessionSlug: slug, sessionId, ...payload })).toString('base64url') }));
   }
-  for (const question of questions) await put('questions', question.id, { ...question, prompt: `Question ${question.id}` });
+  for (const question of questionList) await put('questions', question.id, { ...question, prompt: `Question ${question.id}` });
   for (const [index, [questionId, answer, comment = 'Comments must not rescue an invalid answer']] of rows.entries()) {
     await put('responses', `r${index}`, { questionId, answer: { value: answer }, additionalComments: comment }, { responder: `0x${(index + 1).toString(16).padStart(40, '0')}` });
   }
@@ -76,6 +77,18 @@ test('canonical analysis excludes impossible answers before counts and the provi
   assert.equal(result.ok, true, JSON.stringify(result));
   assert.equal(providerSource.counts.responseCount, valid.length);
   assert.equal(providerSource.aiSnapshot.responses.some((row) => row.answer.includes('500')), false);
+});
+
+test('analysis reads ratings by the shared rating contract, including its step', async () => {
+  for (const { name, scale, input, expected } of ratingConformance) {
+    const env = await fixture([['scaled', input]], [{ id: 'scaled', type: 'rating', scale }]);
+    const source = await loadWorkerCanonicalResultsAnalysisSource({ env, slug, config });
+    assert.equal(source.ok, true, name);
+    // A missing or blank rating is an unrated answer kept for its comment, not an invalid one.
+    const unrated = input == null || Number.isNaN(input) || String(input).trim() === '';
+    assert.deepEqual(source.snapshot.responses.map((row) => row.answer), expected !== null ? [String(expected)] : unrated ? [''] : [], name);
+    assert.equal(source.aiSnapshot.questions[0].scale.step, scale.step ?? 1, name);
+  }
 });
 
 test('invalid-only canonical data cannot satisfy generation eligibility', async () => {

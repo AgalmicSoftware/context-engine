@@ -36,6 +36,7 @@ import { createOutboundUrlSafetyHelpersWithWorkerDeps } from './outboundUrlSafet
 import { metadataAccessMatchesPublishedAudience } from './storageAudience.js';
 import { buildParticipantContextPrompt } from './contextSourceLoader.js';
 import { formatValidAnalysisAnswer, readStoredRating } from './resultsAnalysisAnswerValidation.js';
+import { DEFAULT_RATING_SCALE, normalizeRatingScale, ratingStepFor } from '../../shared/questions/ratingScale.mjs';
 import { createResultsAnalysisScanBudget, isStorageReadLimitError, jsonByteLength } from './storageScanBudget.js';
 
 
@@ -179,50 +180,11 @@ const VALIDATED_QUESTION_TYPES = new Set(['binary', 'rating', 'multichoice', 'qu
 const normalizeQuestionId = (value) => trim(value).slice(0, 128);
 const normalizeQuestionPrompt = (value) => trim(value).replace(/\s+/g, ' ').slice(0, 1200);
 const normalizeQuestionType = (value) => trim(value).slice(0, 64) || 'text';
-const RATING_SCALE_METADATA_KEYS = [
-  'min',
-  'minimum',
-  'max',
-  'maximum',
-  'minLabel',
-  'lowLabel',
-  'maxLabel',
-  'highLabel',
-];
-
-const safeNumber = (value) => {
-  const numeric = Number(value);
-  return Number.isFinite(numeric) ? numeric : null;
-};
-
-const hasMetadataValue = (value) => value !== undefined && value !== null && trim(value) !== '';
-const recordHasRatingScaleMetadata = (record = {}) =>
-  RATING_SCALE_METADATA_KEYS.some((key) => hasMetadataValue(record[key]));
-const pickRatingScaleRecord = (question = {}) => {
-  const scale = isObj(question.scale) ? question.scale : null;
-  if (scale && recordHasRatingScaleMetadata(scale)) return scale;
-  const ratingScale = isObj(question.ratingScale) ? question.ratingScale : null;
-  if (ratingScale && recordHasRatingScaleMetadata(ratingScale)) return ratingScale;
-  return scale || ratingScale || question;
-};
-const normalizeRatingLabel = (value, fallback) => {
-  const label = trim(value);
-  return normalizeQuestionPrompt(label || String(fallback)).slice(0, 120);
-};
-const normalizeRatingScale = (question = {}) => {
-  const scale = pickRatingScaleRecord(question);
-  if (!recordHasRatingScaleMetadata(scale) && !recordHasRatingScaleMetadata(question)) return null;
-  const min = safeNumber(scale.min ?? scale.minimum ?? question.min ?? question.minimum);
-  const max = safeNumber(scale.max ?? scale.maximum ?? question.max ?? question.maximum);
-  const normalizedMin = min ?? 0;
-  const normalizedMax = max ?? 10;
-  if (normalizedMax <= normalizedMin) return { min: 0, max: 10, minLabel: '0', maxLabel: '10' };
-  return {
-    min: normalizedMin,
-    max: normalizedMax,
-    minLabel: normalizeRatingLabel(scale.minLabel ?? scale.lowLabel ?? question.minLabel ?? question.lowLabel, normalizedMin),
-    maxLabel: normalizeRatingLabel(scale.maxLabel ?? scale.highLabel ?? question.maxLabel ?? question.highLabel, normalizedMax),
-  };
+// The shared rating scale and step, with labels clipped for the prompt.
+const normalizeAnalysisRatingScale = (question = {}) => {
+  const scale = normalizeRatingScale(question) || DEFAULT_RATING_SCALE;
+  const clipLabel = (label) => normalizeQuestionPrompt(label).slice(0, 120);
+  return { ...scale, minLabel: clipLabel(scale.minLabel), maxLabel: clipLabel(scale.maxLabel), step: ratingStepFor(question) };
 };
 
 const normalizeSubmittedAt = (value) => {
@@ -307,7 +269,7 @@ const normalizeQuestionRecord = (question) => {
   const questionId = normalizeQuestionId(question.questionId || question.questionID || question.id);
   if (!questionId) return null;
   const type = normalizeQuestionType(question.type || question.questionType);
-  const scale = type === 'rating' ? normalizeRatingScale(question) : null;
+  const scale = type === 'rating' ? normalizeAnalysisRatingScale(question) : null;
   return {
     questionId,
     id: questionId,
