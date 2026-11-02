@@ -93,15 +93,19 @@ const hasLabelledEnds = (question) => {
   return text(minLabel) !== String(min) && text(maxLabel) !== String(max);
 };
 
+// A flipped reply v reads as min + max - v, which stays on the grid only when max is on it.
+const canFlip = (question) => hasLabelledEnds(question) && normalizeAnswerValue(question, ratingScaleFor(question).max).ok;
+
 /**
  * The ways each question is asked, to expose wording and ordering effects:
  * agree/disagree statements also in their reversed wording (when the set has
- * one), ratings with labelled ends also with the scale flipped, and choices and
- * allocations with a fresh option order on every repeat.
+ * one), ratings with labelled ends also with the scale flipped (when the grid
+ * reaches the maximum), and choices and allocations with a fresh option order
+ * on every repeat.
  */
 export const answerVariants = (question) => {
   if (question.type === 'binary') return question.reversedPrompt ? ['canonical', 'reversed'] : ['canonical'];
-  if (question.type === 'rating') return hasLabelledEnds(question) ? ['scale', 'flipped'] : ['scale'];
+  if (question.type === 'rating') return canFlip(question) ? ['scale', 'flipped'] : ['scale'];
   if (question.type === 'multichoice' || question.type === 'quadratic') return ['shuffled'];
   return ['as-asked'];
 };
