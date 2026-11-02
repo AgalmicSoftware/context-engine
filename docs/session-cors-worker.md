@@ -3071,8 +3071,11 @@ transport: { type: "webrtc", sdp } }`. Preserves the SDP offer verbatim,
     with an ambiguous send outcome retains its reservation for up to 24 hours.
     Hosted requests stop after a submission failure rather than risking another
     payout through a fallback RPC; failures before submission release capacity.
-    Missing coordination
-    fails closed. These rules do not apply to `POST /sponsored/redeem-faucet`.
+    Payouts take turns with the session's faucet wallet, so each reads its
+    pending nonce, signs and sends before the next starts; a request that waits
+    30 seconds for its turn returns `503` and releases its capacity. Missing
+    coordination fails closed. These rules do not apply to
+    `POST /sponsored/redeem-faucet`.
   - The following generic and proof-backed gate rules apply to registry sessions.
   - Authenticated callers that already have `scopes.faucet=true` may continue using the generic payload
     `{ action: "request_test_eth", address|to, amountEth? }`.

@@ -104,6 +104,46 @@ test('hosted quotas release failures that occur before any transaction is submit
   assert.equal(signingAttempts, 5);
 });
 
+test('hosted payouts to two recipients take turns with the faucet wallet nonce', async () => {
+  const env = installSessionCoordinatorBinding({});
+  const otherRecipient = '0x00000000000000000000000000000000000000bb';
+  const signed = new Map();
+  const accepted = new Map();
+  const deps = createDeps({
+    json: (body, status, headers) => new Response(JSON.stringify(body), { status, headers }),
+    normalizeFaucetRequest: ({ payload }) => createNormalizedResult({ normalized: { ...createNormalizedResult().normalized, to: payload.to } }),
+    Wallet: createWalletCtor({ signTransaction: async ({ nonce, to }) => {
+      const raw = `0x${(signed.size + 1).toString(16).padStart(4, '0')}`;
+      signed.set(raw, { nonce: Number(nonce), to });
+      return raw;
+    } }),
+    // A mempool that accepts one transaction per nonce, like a node would.
+    rpcRequest: async ({ method, params }) => {
+      await new Promise((resolve) => setTimeout(resolve, 1));
+      if (method === 'eth_getTransactionCount') return `0x${accepted.size.toString(16)}`;
+      if (method !== 'eth_sendRawTransaction') return createDeps().rpcRequest({ method });
+      const { nonce, to } = signed.get(params[0]);
+      if (accepted.has(nonce)) throw new Error('nonce too low');
+      accepted.set(nonce, to);
+      return '0xtxhash';
+    },
+  });
+  const request = (address) => dispatchAuthenticatedSecretActionRoute({
+    path: '/', action: 'request_test_eth', body: { to: address }, address, slug: 'example', env,
+    config: { sessionModeProfile: { authority: { mode: 'worker_canonical' } } }, scopes: { faucet: true },
+    deps: {
+      json: deps.json,
+      evaluateAuthenticatedRoutePreflight: async () => ({ ok: true, tokenHasScope: true }),
+      resolveAuthenticatedRouteSecrets: async () => ({ ok: true, secrets: {} }),
+      faucet: (args) => runFaucet(deps, args),
+    },
+  });
+  const results = await Promise.all([RECIPIENT, otherRecipient].map(request));
+  assert.deepEqual(results.map(({ response }) => response.status), [200, 200]);
+  assert.deepEqual([...accepted.keys()].sort(), [0, 1]);
+  assert.deepEqual([...accepted.values()].sort(), [RECIPIENT, otherRecipient]);
+});
+
 const createNormalizedResult = (overrides = {}) => ({
   ok: true,
   status: 200,

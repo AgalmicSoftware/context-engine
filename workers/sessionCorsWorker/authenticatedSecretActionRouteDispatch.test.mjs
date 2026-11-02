@@ -493,6 +493,7 @@ test('hosted faucet rejects another recipient and charges only successful payout
       checkRateLimit: async () => { throw new Error('Hosted payouts do not count refusal attempts'); },
       reserveCoordinatedHostedFaucet: async () => ({ ok: true, allowed: true, requestId: 'reservation' }),
       finalizeCoordinatedHostedFaucet: async (value) => { finalized.push(value); return { ok: true }; },
+      withCoordinatedFaucetWalletTurn: async (_, send) => send(),
       faucet: async () => { requests += 1; return new Response('{}', { status }); },
     },
   };
@@ -510,6 +511,13 @@ test('hosted faucet rejects another recipient and charges only successful payout
   } });
   assert.equal(capped.response.status, 429);
   assert.equal(requests, 2);
+  // No turn with the faucet wallet: nothing is sent and the slot is released.
+  const busy = await dispatchAuthenticatedSecretActionRoute({ ...args, body: { to: address }, deps: {
+    ...args.deps, withCoordinatedFaucetWalletTurn: async () => null,
+  } });
+  assert.equal(busy.response.status, 503);
+  assert.equal(requests, 2);
+  assert.equal(finalized[2].sent, false);
 });
 
 test('hosted faucet releases a slot only when it throws before submission', async () => {
@@ -525,6 +533,7 @@ test('hosted faucet releases a slot only when it throws before submission', asyn
       resolveAuthenticatedRouteSecrets: async () => ({ ok: true, secrets: {} }),
       reserveCoordinatedHostedFaucet: async () => ({ ok: true, allowed: true, requestId: 'reservation' }),
       finalizeCoordinatedHostedFaucet: async (value) => { finalized.push(value); return { ok: true }; },
+      withCoordinatedFaucetWalletTurn: async (_, send) => send(),
       faucet,
     },
   });
