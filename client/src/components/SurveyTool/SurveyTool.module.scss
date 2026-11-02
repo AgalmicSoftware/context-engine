@@ -3425,6 +3425,11 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   :global([class*='buttonContent']) {
     color: var(--ce-text-inverse) !important;
   }
+
+  // Submit held off while new drafts generate keeps the disabled label colour (white was 1.1:1 there).
+  :disabled > :global([class*='buttonContent']) {
+    color: var(--ce-action-submit-disabled-text) !important;
+  }
 }
 
 .sessionListeningPanelEmbedded .sessionListeningCreateWrap {

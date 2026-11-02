@@ -982,7 +982,8 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
             {...(props as CreateQuestionsAndSurveysPanelProps)}
             interviewQuestionReview
             appendPreformedQuestions
-            questionSubmitLabel="Submit questions"
+            questionSubmitLabel={isGenerating ? 'Waiting for new drafts…' : 'Submit questions'}
+            submitDisabled={isGenerating}
             onDraftQuestionCountChange={setPendingDraftCount}
             preformedQuestions={generatedQuestions as CreateQuestionsAndSurveysPanelProps['preformedQuestions']}
             preformedSurvey={{ title: generatedTitle }}

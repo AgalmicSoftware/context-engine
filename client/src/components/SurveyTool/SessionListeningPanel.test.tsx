@@ -52,6 +52,7 @@ jest.mock('./CreateQuestionsAndSurveys', () => {
         data-append={String(Boolean(props.appendPreformedQuestions))}
         data-submit-class={props.submitClassName || ''}
         data-submit-label={props.questionSubmitLabel || ''}
+        data-submit-disabled={String(Boolean(props.submitDisabled))}
         data-review={String(Boolean(props.interviewQuestionReview))}
         data-mount-id={String(mountId.current)}
         data-prompts={(props.preformedQuestions || []).map((question: any) => question.prompt).join('|')}
@@ -673,6 +674,50 @@ describe('SessionListeningPanel', () => {
       secondTranscript,
       expect.objectContaining({ existingQuestionPrompts: ['What evidence matters?'] }),
     );
+  });
+
+  it('holds Submit, with its reason, while the next drafts generate', async () => {
+    const firstTranscript =
+      'The group discussed budget timing, operational risk, ownership, rollout scope, and follow-up evidence.';
+    const firstSegment = { id: 's1', index: 0, status: 'complete', text: firstTranscript, completedAt: 2 };
+    const batch = (prompt: string): ListeningQuestionGenerationResult => ({
+      surveyTitle: 'Listening Follow-up',
+      statements: [{ id: `q-${prompt.length}`, type: 'freeform', prompt, tags: [] }],
+      raw: { questions: [] },
+    });
+    const finishSecond: { current: ((value: ListeningQuestionGenerationResult) => void) | null } = { current: null };
+    mockGenerateQuestionsFromListeningTranscript
+      .mockResolvedValueOnce(batch('What evidence matters?'))
+      .mockImplementationOnce(() => new Promise((resolve) => (finishSecond.current = resolve)));
+    (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+      buildRecorder({ transcript: firstTranscript, segments: [firstSegment] }),
+    );
+    const { rerender } = render(<SessionListeningPanel sessionSlug="demo" panelMode="recordGroup" embeddedInModal />);
+    const drafts = await screen.findByTestId('mock-create-questions');
+    expect(drafts).toHaveAttribute('data-submit-disabled', 'false');
+    expect(drafts).toHaveAttribute('data-submit-label', 'Submit questions');
+
+    (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+      buildRecorder({
+        transcript: `${firstTranscript} Later they debated community trust and accountability thresholds.`,
+        segments: [firstSegment, { id: 's2', index: 1, status: 'complete', text: 'Later.', completedAt: 5 }],
+      }),
+    );
+    rerender(<SessionListeningPanel sessionSlug="demo" panelMode="recordGroup" embeddedInModal />);
+    await waitFor(() =>
+      expect(screen.getByTestId('mock-create-questions')).toHaveAttribute('data-submit-disabled', 'true'),
+    );
+    expect(screen.getByTestId('mock-create-questions')).toHaveAttribute('data-submit-label', 'Waiting for new drafts…');
+
+    await act(async () => {
+      finishSecond.current?.(batch('Who may trigger a review?'));
+      await Promise.resolve();
+    });
+    await waitFor(() =>
+      expect(screen.getByTestId('mock-create-questions')).toHaveAttribute('data-submit-disabled', 'false'),
+    );
+    expect(screen.getByTestId('mock-create-questions')).toHaveAttribute('data-count', '2');
+    expect(screen.getByTestId('mock-create-questions')).toHaveAttribute('data-submit-label', 'Submit questions');
   });
 
   describe('new-drafts cue', () => {

@@ -502,6 +502,8 @@ interface CreateQuestionsAndSurveysProps {
   interviewQuestionReview?: boolean;
   appendPreformedQuestions?: boolean;
   questionSubmitLabel?: string;
+  // Holds Submit off, such as while the Group Conversation recorder is still generating drafts.
+  submitDisabled?: boolean;
   submitClassName?: string;
   miniaturized?: boolean;
   onUploadComplete?: (surveyHash: string | null) => void;
@@ -695,6 +697,8 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
   _promptRefs: Record<string, FocusablePromptElement | null> = {};
   _tagInputRefs: Record<string, FocusablePromptElement | null> = {};
   _lastSavedUnfinishedSurveyJson: string | null = null;
+  // Preformed drafts already added to the list (by id or prompt), so later batches append only new ones.
+  _appendedPreformed = new Set((this.props.preformedQuestions || []).map((question) => question.id || question.prompt));
   _initialDraftContent = '';
 
   constructor(props: CreateQuestionsAndSurveysProps) {
@@ -1128,13 +1132,17 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
     this.props.onDraftEditedChange?.(createSurveyDraftContentKey(this.state) !== this._initialDraftContent);
     if (prevProps.account !== this.props.account) this.updateSurveyHash();
     const shouldAppendPreformedQuestions = this.props.interviewQuestionReview || this.props.appendPreformedQuestions;
-    if (shouldAppendPreformedQuestions && prevProps.preformedQuestions !== this.props.preformedQuestions) {
-      const previousIds = new Set(
-        (prevProps.preformedQuestions || []).map((question) => question.id || question.prompt),
-      );
+    // Drafts that arrive while a submit publishes wait for it to settle, so the published draft stays as sent.
+    const submitSettled = prevState.isSubmitting && !this.state.isSubmitting;
+    if (
+      shouldAppendPreformedQuestions &&
+      !this.state.isSubmitting &&
+      (submitSettled || prevProps.preformedQuestions !== this.props.preformedQuestions)
+    ) {
       const added = (this.props.preformedQuestions || []).filter(
-        (question) => !previousIds.has(question.id || question.prompt),
+        (question) => !this._appendedPreformed.has(question.id || question.prompt),
       );
+      added.forEach((question) => this._appendedPreformed.add(question.id || question.prompt));
       if (added.length) {
         // Append new suggestions without resetting edited prompts/tags or restoring removed questions.
         // If the user uploads a batch and then records more, keep the success links while removing
@@ -2582,7 +2590,8 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
           uploadedQuestions: submittedQuestions,
           sourceQuestions: uniqueQuestions,
         });
-        if (!this.isPublicationDraftCurrent(publication)) {
+        // A review list keeps its other drafts, so its upload stands (and its drafts leave) even if they changed.
+        if (!submitProps.preformedQuestions && !this.isPublicationDraftCurrent(publication)) {
           setPublicationState(buildCreateSurveySubmitResetPatch());
           return;
         }
@@ -3963,7 +3972,9 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
                   ? false
                   : submissionError
                     ? false
-                    : (!isStandaloneQuestion && !title.trim()) || renderedQuestions.some((q) => q.isGeneratingTags))
+                    : (!isStandaloneQuestion && !title.trim()) ||
+                      renderedQuestions.some((q) => q.isGeneratingTags) ||
+                      Boolean(this.props.submitDisabled))
               }
               aria-busy={isSubmitting ? 'true' : 'false'}
               title={submissionError ? 'Click to copy error' : undefined}

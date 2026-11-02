@@ -305,3 +305,77 @@ describe('publication capture boundaries', () => {
     },
   );
 });
+
+// Group Conversation reviews drafts that each recorded chunk appends. A batch that lands while a submit is
+// publishing must not cost the host the success view or leave the uploaded drafts open to a second submit.
+describe('drafts generated while publishing', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    localStorage.clear();
+    sessionStorage.clear();
+    peekCacheSyncMock.mockReturnValue({});
+    writeCacheOptimisticMock.mockImplementation(async () => undefined);
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  const draft = (id: string) => ({ id, type: 'freeform', prompt: `Question ${id}?`, tags: [] });
+  const reviewSetup = () => {
+    const harness = setup(true);
+    const { subject } = harness;
+    subject.props = {
+      ...subject.props,
+      interviewQuestionReview: true,
+      appendPreformedQuestions: true,
+      preformedMode: 'questions',
+      preformedQuestions: [draft('q1'), draft('q2')],
+    };
+    subject.state = { ...subject.state, questions: [draft('q1'), draft('q2')] };
+    // React's order: the update, then componentDidUpdate, then the callback.
+    const applyState = subject.setState;
+    subject.setState = jest.fn((update: unknown, cb?: () => void) => {
+      const prevState = subject.state;
+      applyState(update);
+      subject.componentDidUpdate(subject.props, prevState as typeof subject.state);
+      cb?.();
+    });
+    return harness;
+  };
+
+  it('keeps the success view and drops the uploaded drafts after an edit made while publishing', async () => {
+    const { subject, published, entered } = reviewSetup();
+    const operation = subject.createSurvey();
+    await entered.promise;
+    subject.setState({ questions: [draft('q1'), { ...draft('q2'), prompt: 'Edited while uploading?' }] });
+    published.resolve({ receipt: { status: 1 }, uploadedQuestions: [{ questionId: 'q1' }, { questionId: 'q2' }] });
+    await operation;
+
+    expect(subject.state.questionsAddedSuccessfully).toBe(true);
+    expect(subject.state.questions).toEqual([]);
+  });
+
+  it('shows the upload, drops its drafts and adds the late batch afterwards', async () => {
+    const { subject, published, entered } = reviewSetup();
+    const operation = subject.createSurvey();
+    await entered.promise;
+    // The next chunk's drafts arrive mid-submit.
+    const prevProps = subject.props;
+    subject.props = { ...prevProps, preformedQuestions: [draft('q1'), draft('q2'), draft('q3')] };
+    subject.componentDidUpdate(prevProps, subject.state as typeof subject.state);
+    published.resolve({ receipt: { status: 1 }, uploadedQuestions: [{ questionId: 'q1' }, { questionId: 'q2' }] });
+    await operation;
+
+    expect(subject.state.questionsAddedSuccessfully).toBe(true);
+    expect(subject.state.uploadedQuestions).toEqual([{ questionId: 'q1' }, { questionId: 'q2' }]);
+    expect(subject.state.questions.map((question) => question.id)).toEqual(['q3']);
+    expect(contractScripts.addQuestions).toHaveBeenCalledTimes(1);
+    expect(contractScripts.addQuestions).toHaveBeenCalledWith(
+      'web3auth',
+      ['q1', 'q2'],
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+    );
+  });
+});

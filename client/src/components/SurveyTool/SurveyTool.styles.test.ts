@@ -120,6 +120,12 @@ describe('Group Conversation dialog colours', () => {
     );
   });
 
+  it('labels a held-off Submit in the disabled text colour', () => {
+    expect(ruleText(scss, '.sessionListeningCreateWrap')).toMatch(
+      /:disabled > :global\(\[class\*='buttonContent'\]\) \{\s*color: var\(--ce-action-submit-disabled-text\) !important;/,
+    );
+  });
+
   it('keeps the Generate fill under the global .btn hover, focus and press resets', () => {
     expect(ruleText(scss, 'button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled)')).toMatch(
       /background: var\(--ce-status-success\) !important;/,
