@@ -223,10 +223,11 @@ Semantics:
   persistence succeeds.
 - Decrypted question text in a chain node records `decryptedFor`, the account it
   was decrypted for; text saved without it counts as another account's. A sign-in,
-  sign-out or account switch locks text decrypted for anyone else again. Known
-  limits: text left by an account that closed the browser while signed in stays
-  readable to a signed-out visitor until someone signs in, and cached survey
-  titles and document links are not locked this way yet.
+  sign-out or account switch locks text decrypted for anyone else again. Survey
+  titles and document links follow the same rule: scans store them locked, and the
+  current reader's refresh decrypts and stamps the ones it may read. Known limit:
+  text left by an account that closed the browser while signed in stays readable
+  to a signed-out visitor until someone signs in.
 
 ## Important normalization rules
 

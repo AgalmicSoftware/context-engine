@@ -48,3 +48,4 @@ const remaskFor =
 export const stampDecryptedQuestion = stampFor(QUESTION_FIELDS);
 export const remaskQuestionForReader = remaskFor(QUESTION_FIELDS);
 export const stampDecryptedSurvey = stampFor(SURVEY_FIELDS);
+export const remaskSurveyForReader = remaskFor(SURVEY_FIELDS);
