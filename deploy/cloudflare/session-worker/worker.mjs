@@ -91903,11 +91903,7 @@ async function loadWrappedQuestionSource({
       questions: (readabilityOnly ? [...byId.values()] : enabledQuestionIds.map((id2) => byId.get(id2))).filter((question) => question && question.answerable !== false && !question.locked && !question.encrypted)
     };
   }
-  const canonical = await loadCanonicalQuestions({
-    env,
-    sessionSlug,
-    questionLimit: 200
-  });
+  const canonical = await loadCanonicalQuestions({ env, sessionSlug });
   if (canonical?.ok === false || canonical?.complete === false) {
     return {
       ok: false,

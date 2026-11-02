@@ -58,11 +58,7 @@ export async function loadWrappedQuestionSource({
     };
   }
 
-  const canonical = await loadCanonicalQuestions({
-    env,
-    sessionSlug,
-    questionLimit: 200,
-  });
+  const canonical = await loadCanonicalQuestions({ env, sessionSlug });
   if (canonical?.ok === false || canonical?.complete === false) {
     return {
       ok: false,
