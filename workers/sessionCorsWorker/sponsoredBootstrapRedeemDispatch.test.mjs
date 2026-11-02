@@ -66,6 +66,9 @@ const createDeployDeps = (overrides = {}) => {
       })
     );
   }
+  if (!deps.withCoordinatedFaucetWalletTurn) {
+    deps.withCoordinatedFaucetWalletTurn = async (_, send) => send();
+  }
   if (!deps.reserveCoordinatedSponsoredFaucet) {
     deps.reserveCoordinatedSponsoredFaucet = async ({ env, grantToken, requestDigest }) => {
       const records = env.__testFaucetCoordinator || new Map();
@@ -811,6 +814,54 @@ test('dispatchSponsoredBootstrapRedeem runs faucet grants through the faucet ser
     status: 200,
     headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
   });
+});
+
+test('dispatchSponsoredBootstrapRedeem keeps the grant when its faucet wallet is busy', async () => {
+  const faucetKey = `0x${'22'.repeat(32)}`;
+  const { env } = createKvEnv({
+    type: 'faucet-tx',
+    sourceSessionSlug: 'source-session',
+    sourceConfig: { allowOrigins: ['https://allowed.example.test'] },
+    faucetPrivateKey: faucetKey,
+  });
+  let faucetCalls = 0;
+  let walletBusy = true;
+  const turnSecrets = [];
+  const deps = createDeployDeps({
+    json: createJsonStub(),
+    getCorsContext: async () => ({
+      ok: true,
+      headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
+    }),
+    withCoordinatedFaucetWalletTurn: async ({ secrets }, send) => {
+      turnSecrets.push(secrets.faucetPrivateKey);
+      return walletBusy ? null : send();
+    },
+    faucet: async () => {
+      faucetCalls += 1;
+      return new Response(JSON.stringify({ txHash: '0xfaucet789' }), { status: 200 });
+    },
+  });
+  const redeem = () => dispatchSponsoredBootstrapRedeem({
+    request: createDeployRequest({
+      faucetGrantToken: 'faucet-grant-busy',
+      to: '0x1111111111111111111111111111111111111111',
+    }),
+    env,
+    baseHeaders: {},
+    action: 'faucet',
+    deps,
+  });
+
+  const busy = await redeem();
+  assert.equal(busy.status, 503);
+  assert.equal(faucetCalls, 0);
+  assert.equal(env.__testFaucetCoordinator?.has('faucet-grant-busy') || false, false);
+  walletBusy = false;
+  const sent = await redeem();
+  assert.equal(sent.status, 200);
+  assert.equal(faucetCalls, 1);
+  assert.deepEqual(turnSecrets, [faucetKey, faucetKey]);
 });
 
 test('dispatchSponsoredBootstrapRedeem replays a lost faucet success without sending a second transaction', async () => {

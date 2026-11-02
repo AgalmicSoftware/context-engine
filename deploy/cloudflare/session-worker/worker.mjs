@@ -79055,6 +79055,7 @@ __export(sessionWriteCoordinator_exports, {
 var SPONSORED_DEPLOY_RECORD_KEY, STORAGE_LEGACY_SCAN_KEY_PREFIX, STORAGE_LEGACY_OWNER_KEY_PREFIX, LEGACY_SCAN_ROWS_PER_STEP, LEGACY_SCAN_STEPS_PER_UPLOAD, LEGACY_SCAN_PENDING_ERROR, LEGACY_SCAN_FAILED_ERROR, DIRECT_DEPLOY_RECORD_KEY, SPONSORED_FAUCET_RECORD_KEY, SESSION_CONFIG_AUTHORITY_KEY, AUTH_NONCE_ACTIVE_KEY, AUTH_NONCE_USED_KEY, AUTH_RATE_RECORD_KEY, HOSTED_FAUCET_QUOTA_KEY, FAUCET_WALLET_TURN_KEY, FAUCET_WALLET_TURN_MS, FAUCET_WALLET_WAIT_MS, FAUCET_WALLET_POLL_MS, CONTEXT_PDF_READING_PREFIX, CONTEXT_PDF_READING_LEASE_MS, WORKER_GROUP_CAPACITY_META_KEY, WORKER_GROUP_CAPACITY_GROUP_PREFIX, WORKER_GROUP_CAPACITY_MEMBER_PREFIX, RESULTS_ANALYSIS_RECORD_KEY, RESULTS_ANALYSIS_DRAFT_KEY, RESULTS_ANALYSIS_DRAFT_CHUNK_PREFIX, RESULTS_ANALYSIS_AUTO_JOB_KEY, RESULTS_ANALYSIS_UPLOAD_PREFIX, UPLOAD_RECEIPT_PREFIX, UPLOAD_RECEIPT_LEASE_MS, UPLOAD_RECEIPT_RETENTION_MS, uploadReceiptExpiresAt, MAX_UPLOAD_RECEIPTS, MAX_PRIOR_UPLOAD_TARGETS, MAX_RESULTS_ANALYSIS_REQUESTS, RESULTS_ANALYSIS_VALUE_CHUNK_CHARS, RESULTS_ANALYSIS_MAX_DRAFT_CHUNKS, RESULTS_ANALYSIS_AUTO_JOB_MAX_BYTES, RESULTS_ANALYSIS_RUNNING_LEASE_MS, RESULTS_ANALYSIS_MAX_THRESHOLD_RECHECKS, RESULTS_ANALYSIS_AUTO_RETRY_DELAYS_MS, RESULTS_ANALYSIS_RETRYABLE_STATUSES, RUNNING_LEASE_MS, MAX_AUTH_NONCE_LIFETIME_MS, AUTH_NONCE_MAC_KEY, MAX_AUTH_RATE_WINDOW_MS, WRAPPED_SESSION_KEY_FIELDS, toTrimmedString10, isObjectRecord, byteLength, normalizePositiveSafeInteger, normalizeBoundedFutureTimestamp, readActiveAuthNonces, putActiveAuthNonces, SIGNED_AUTH_NONCE_RE, bytesToHex3, hexToBytes2, equalText, signAuthNonce, isBase64url, normalizeWrappedSessionKeyRecord, normalizePublicSessionConfig, withAuthoritativeSessionKey, jsonResponse2, normalizeDeployResult, isTerminalDeployResult, buildDirectDeployTerminalReplay, createAttemptId, workerGroupCapacityGroupKey, workerGroupCapacityMemberKey, WORKER_GROUP_MUTATIONS, workerGroupBackupPendingKey, PENDING_WORKER_GROUP_OPERATIONS, PENDING_WORKER_GROUP_MEMBER_OPERATIONS, DEFINITELY_PREWRITE_WORKER_GROUP_CREATE_FAILURES, WORKER_GROUP_INPUT_FIELDS, WORKER_GROUP_INTENT_MAX_BYTES, pickWorkerGroupInput, sameWorkerGroupInput, withoutPendingMutation, normalizeWorkerGroupMutation, resolveInitializedWorkerGroupCapacity, SessionWriteCoordinator, WorkerGroupWriteCoordinator, executeCoordinatedSponsoredDeploy, resolveCoordinatorStub, coordinateResponseUploadReceipt, AUTH_STATE_UNAVAILABLE, callAuthStateCoordinator, issueCoordinatedAuthNonce, consumeCoordinatedAuthNonce, callHostedFaucetQuota, reserveCoordinatedHostedFaucet, finalizeCoordinatedHostedFaucet, withCoordinatedFaucetWalletTurn, checkCoordinatedAuthRateLimit, getOrCreateCoordinatedStorageEnvelopeSessionKey, executeCoordinatedSessionConfigMutation, reserveCoordinatedSponsoredFaucet, finalizeCoordinatedSponsoredFaucet, checkCoordinatedLegacyStorageOwner, readCoordinatedResultsAnalysisStatus, reserveCoordinatedResultsAnalysis, finalizeCoordinatedResultsAnalysis, enqueueCoordinatedResultsAnalysisAutoJob;
 var init_sessionWriteCoordinator = __esm({
   "workers/sessionCorsWorker/sessionWriteCoordinator.js"() {
+    init_lib2();
     init_submissionJournal();
     init_inviteJournal();
     init_agentQuestionQueue();
@@ -81408,12 +81409,13 @@ ${expiry}`);
         });
         return jsonResponse2(result);
       }
-      async executeFaucetWalletTurn(payload, release = false) {
+      async executeFaucetWalletTurn(payload, action) {
         const nowMs = Number(this.now()) || Date.now();
         const result = await this.state.storage.transaction(async (transaction) => {
           const turn = await transaction.get(FAUCET_WALLET_TURN_KEY);
-          if (release) {
-            if (turn && turn.token === toTrimmedString10(payload?.token)) await transaction.delete(FAUCET_WALLET_TURN_KEY);
+          const held = Boolean(turn) && turn.token === toTrimmedString10(payload?.token);
+          if (action === "release") {
+            if (held) await transaction.delete(FAUCET_WALLET_TURN_KEY);
             return { ok: true };
           }
           if (turn?.expiresAtMs > nowMs) return { ok: true, acquired: false };
@@ -81820,8 +81822,8 @@ ${expiry}`);
         if (url.pathname === "/hosted-faucet/reserve" || url.pathname === "/hosted-faucet/finalize") {
           return this.executeHostedFaucetQuota(payload, url.pathname.endsWith("/finalize"));
         }
-        if (url.pathname === "/faucet-wallet/acquire" || url.pathname === "/faucet-wallet/release") {
-          return this.executeFaucetWalletTurn(payload, url.pathname.endsWith("/release"));
+        if (["/faucet-wallet/acquire", "/faucet-wallet/release"].includes(url.pathname)) {
+          return this.executeFaucetWalletTurn(payload, url.pathname.slice("/faucet-wallet/".length));
         }
         if (url.pathname === "/auth-state/rate/check") {
           return this.executeAuthRateCheck(payload);
@@ -82087,23 +82089,29 @@ ${expiry}`);
     finalizeCoordinatedHostedFaucet = (args = {}) => callHostedFaucetQuota(args, true);
     withCoordinatedFaucetWalletTurn = async ({
       env,
-      slug,
+      secrets,
       now = Date.now,
       sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
     }, send) => {
-      const identity = `faucet-wallet:${resolveCoordinatorSessionSlugStorageKey(slug)}`;
-      const acquire = () => callAuthStateCoordinator({ env, identity, path: "/faucet-wallet/acquire", payload: {} });
+      let wallet = "";
+      try {
+        wallet = computeAddress(toTrimmedString10(secrets?.faucetPrivateKey)).toLowerCase();
+      } catch {
+        return send();
+      }
+      const identity = `faucet-wallet:${wallet}`;
+      const call = (action, payload = {}) => callAuthStateCoordinator({ env, identity, path: `/faucet-wallet/${action}`, payload });
       const deadline = now() + FAUCET_WALLET_WAIT_MS;
-      let turn = await acquire();
+      let turn = await call("acquire");
       while (turn.ok === true && !turn.acquired && now() < deadline) {
         await sleep(FAUCET_WALLET_POLL_MS);
-        turn = await acquire();
+        turn = await call("acquire");
       }
       if (!turn.acquired) return null;
       try {
         return await send();
       } finally {
-        await callAuthStateCoordinator({ env, identity, path: "/faucet-wallet/release", payload: { token: turn.token } });
+        await call("release", { token: turn.token });
       }
     };
     checkCoordinatedAuthRateLimit = async ({
@@ -91384,7 +91392,7 @@ var createAgentServices = ({ env, agentEnv, deps }) => {
       if (!ctx.scopes?.faucet || ctx.config.agentHttp?.sponsoredFaucetAllowed !== true) return { ok: false, skipped: true, reason: "session_faucet_not_allowed" };
       const secrets = await deps.getSessionSecrets(env, ctx.slug);
       const takeWalletTurn = deps.withCoordinatedFaucetWalletTurn || withCoordinatedFaucetWalletTurn;
-      const response2 = await takeWalletTurn({ env, slug: ctx.slug }, () => deps.faucet({
+      const response2 = await takeWalletTurn({ env, secrets }, () => deps.faucet({
         payload: { to: ctx.address },
         secrets,
         config: ctx.config,
@@ -104800,11 +104808,48 @@ var dispatchSponsoredBootstrapRedeem = async ({
   });
   if (replayResponse) return replayResponse;
   const reserveCoordinatedSponsoredFaucet2 = deps?.reserveCoordinatedSponsoredFaucet || reserveCoordinatedSponsoredFaucet;
-  const faucetReservation = await reserveCoordinatedSponsoredFaucet2({
-    env,
-    grantToken,
-    requestDigest
+  const faucetSecrets = { faucetPrivateKey: toTrimmedString19(grantRecord?.faucetPrivateKey) };
+  const takeWalletTurn = deps?.withCoordinatedFaucetWalletTurn || withCoordinatedFaucetWalletTurn;
+  const outcome = await takeWalletTurn({ env, secrets: faucetSecrets }, async () => {
+    const reservation = await reserveCoordinatedSponsoredFaucet2({ env, grantToken, requestDigest });
+    if (reservation?.kind !== "execute") return { reservation };
+    try {
+      return {
+        reservation,
+        response: await deps?.faucet?.({
+          payload: {
+            action: "request_test_eth",
+            to: recipientAddress
+          },
+          secrets: faucetSecrets,
+          config: sourceConfig,
+          baseHeaders: headers2,
+          slug: toTrimmedString19(grantRecord?.sourceSessionSlug),
+          requesterAddress: recipientAddress,
+          tokenHasFaucetScope: true
+        })
+      };
+    } catch {
+      return {
+        reservation,
+        response: {
+          status: 502,
+          body: {
+            error: "Sponsored faucet redemption was interrupted; transfer status is unknown and it will not be repeated."
+          }
+        }
+      };
+    }
   });
+  if (!outcome) {
+    return buildGrantErrorResponse(
+      deps,
+      headers2,
+      503,
+      "The sponsored faucet wallet is busy; nothing was sent. Try again shortly."
+    );
+  }
+  const faucetReservation = outcome.reservation;
   if (faucetReservation?.kind === "terminal" && faucetReservation.receipt) {
     try {
       await writeSponsoredGrantReceipt({
@@ -104847,30 +104892,7 @@ var dispatchSponsoredBootstrapRedeem = async ({
       "Sponsored faucet coordination is unavailable; no transfer was attempted."
     );
   }
-  let faucetResponse;
-  try {
-    faucetResponse = await deps?.faucet?.({
-      payload: {
-        action: "request_test_eth",
-        to: recipientAddress
-      },
-      secrets: {
-        faucetPrivateKey: toTrimmedString19(grantRecord?.faucetPrivateKey)
-      },
-      config: sourceConfig,
-      baseHeaders: headers2,
-      slug: toTrimmedString19(grantRecord?.sourceSessionSlug),
-      requesterAddress: recipientAddress,
-      tokenHasFaucetScope: true
-    });
-  } catch (error) {
-    faucetResponse = {
-      status: 502,
-      body: {
-        error: "Sponsored faucet redemption was interrupted; transfer status is unknown and it will not be repeated."
-      }
-    };
-  }
+  const faucetResponse = outcome.response;
   const rawReceiptResponse = await readReceiptResponse(faucetResponse);
   const receiptResponse = {
     status: rawReceiptResponse.status,
@@ -106599,7 +106621,7 @@ var dispatchAuthenticatedSecretActionRoute = async ({
     });
     const takeWalletTurn = deps?.withCoordinatedFaucetWalletTurn || withCoordinatedFaucetWalletTurn;
     try {
-      response2 = await takeWalletTurn({ env, slug }, send);
+      response2 = await takeWalletTurn({ env, secrets: secretContext2.secrets }, send);
     } catch (error) {
       if (hosted && !submissionAttempted) {
         await finalize({ env, slug, address: address2, requestId: reservation.requestId, sent: false });

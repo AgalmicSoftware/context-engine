@@ -129,6 +129,8 @@ const createSingleNonceMempool = () => {
   return { deps, accepted };
 };
 const OTHER_RECIPIENT = '0x00000000000000000000000000000000000000bb';
+// The wallet turn is keyed on the address this key signs from.
+const FAUCET_KEY = `0x${'11'.repeat(32)}`;
 
 for (const [label, config] of [
   ['hosted', { sessionModeProfile: { authority: { mode: 'worker_canonical' } } }],
@@ -143,7 +145,7 @@ for (const [label, config] of [
       deps: {
         json: deps.json,
         evaluateAuthenticatedRoutePreflight: async () => ({ ok: true, tokenHasScope: true }),
-        resolveAuthenticatedRouteSecrets: async () => ({ ok: true, secrets: {} }),
+        resolveAuthenticatedRouteSecrets: async () => ({ ok: true, secrets: { faucetPrivateKey: FAUCET_KEY } }),
         faucet: (args) => runFaucet(deps, args),
       },
     });
@@ -153,6 +155,24 @@ for (const [label, config] of [
     assert.deepEqual([...accepted.values()].sort(), [RECIPIENT, OTHER_RECIPIENT]);
   });
 }
+
+test('two sessions sharing a faucet key take turns with its wallet nonce', async () => {
+  const env = installSessionCoordinatorBinding({});
+  const { deps, accepted } = createSingleNonceMempool();
+  const request = (slug, address) => dispatchAuthenticatedSecretActionRoute({
+    path: '/', action: 'request_test_eth', body: { to: address }, address, slug, env,
+    config: {}, scopes: { faucet: true },
+    deps: {
+      json: deps.json,
+      evaluateAuthenticatedRoutePreflight: async () => ({ ok: true, tokenHasScope: true }),
+      resolveAuthenticatedRouteSecrets: async () => ({ ok: true, secrets: { faucetPrivateKey: FAUCET_KEY } }),
+      faucet: (args) => runFaucet(deps, args),
+    },
+  });
+  const results = await Promise.all([request('example', RECIPIENT), request('other-session', OTHER_RECIPIENT)]);
+  assert.deepEqual(results.map(({ response }) => response.status), [200, 200]);
+  assert.deepEqual([...accepted.keys()].sort(), [0, 1]);
+});
 
 test('agent faucet requests take the same wallet turn', async () => {
   const env = installSessionCoordinatorBinding({ TOKEN_HMAC_SECRET: 'local-test-only' });
@@ -165,7 +185,7 @@ test('agent faucet requests take the same wallet turn', async () => {
     return createAgentServices({ env, agentEnv, deps: {
       readCurrentSessionConfig: async () => ({ config, revision: 1 }),
       computeScopesForLogin: async () => ({ faucet: true }),
-      getSessionSecrets: async () => ({}),
+      getSessionSecrets: async () => ({ faucetPrivateKey: FAUCET_KEY }),
       faucet: (args) => runFaucet(deps, args),
     } }).faucet();
   };
