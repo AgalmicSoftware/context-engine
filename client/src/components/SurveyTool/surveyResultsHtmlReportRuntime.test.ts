@@ -85,7 +85,7 @@ const createRuntime = ({
 };
 
 describe('surveyResultsHtmlReportRuntime', () => {
-  it('leaves questions with author-encrypted text out of the report and its AI input', () => {
+  it('shows author-encrypted questions as redacted rows and keeps them out of the AI input', () => {
     const gatedPrompt = 'Decrypted gated prompt';
     const { runtime } = createRuntime({
       networkQuestions: {
@@ -125,9 +125,13 @@ describe('surveyResultsHtmlReportRuntime', () => {
     const aiInput = JSON.stringify(runtime.buildSessionResultsAnalysisPayloadForAi());
 
     expect(html).toContain('Runtime question?');
+    expect(html).toContain('Encrypted question');
     expect(html).not.toContain(gatedPrompt);
+    expect(html).not.toContain('gated-tag');
     expect(aiInput).not.toContain(gatedPrompt);
     expect(aiInput).not.toContain('gated-tag');
+    expect(aiInput).not.toContain('Encrypted question');
+    expect(aiInput).not.toContain('"q2"');
   });
 
   it('distinguishes an empty completed filter from the initial unhydrated state', () => {
