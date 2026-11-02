@@ -140,7 +140,10 @@ Similarity between a prediction and an answer runs from 0 to 1:
   for.
 - For each person and question only the latest record counts. If someone later
   withdraws research consent or encrypts the answer, their earlier draft
-  comparison is not used.
+  comparison is not used. Latest means recorded last by the Worker
+  (`createdAt`) or on the chain (block, transaction and log index), or else
+  last in the input. A payload's own `timeStamp` comes from the participant's
+  browser, so it never decides.
 - Importance and conviction are read with the app's stored-rating rule
   (`shared/questions/storedRating.mjs`): legacy 0–100 values are rescaled, and
   a missing importance falls back on conviction.
@@ -158,12 +161,20 @@ This writes `agent-fidelity-report.json` and `agent-fidelity-report.md`.
 
 | Option | Use |
 | --- | --- |
-| `--questions <file> --responses <file>` | Instead of `--export`: a question list and raw stored payloads. |
+| `--questions <file> --responses <file>` | Instead of `--export`: a question list and response rows (below). |
 | `--wrapped <file>` | Add Session Wrapped export rows (the `wide` or `gold` view, as JSONL or JSON). |
 | `--groups <file>` | JSON mapping each address to its group ids. Without it, the `src` link a person arrived through is used. |
 | `--exclude <file>` | Addresses to leave out (for example test accounts), one per line. |
 | `--bootstrap`, `--seed`, `--min-participants` | Interval samples, random seed, smallest reported cell. |
 | `--include-agents` | Keep self-declared agent participants. |
+
+`--responses` takes a JSON array of rows as the Worker stores them:
+`{ "responder": "0x…", "createdAt": "2026-10-02T09:00:00Z", "response": … }`,
+where `response` is the stored payload (one answer entry, or
+`{ "responses": [ … ] }`), as an object or a JSON string. Rows read from the
+chain give `blockNumber`, `transactionIndex` and `logIndex` instead of
+`createdAt`. Bare payloads without a row are read too: their own `responder`
+then names the person, and for each question the later one in the file counts.
 
 ## What participants see
 

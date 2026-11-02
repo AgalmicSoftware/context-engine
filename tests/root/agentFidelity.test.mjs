@@ -426,8 +426,8 @@ test('results from fewer people than the minimum are withheld everywhere', () =>
 test('the latest record decides, so withdrawn consent and new encryption are honoured', () => {
   const address = '0xccc0000000000000000000000000000000000003';
   const versions = (later) => [
-    { responder: address, response: { timeStamp: '2026-10-01T00:00:00Z', responses: [entry('qb1', 'Agree', predicted('Agree', 0.9))] } },
-    { responder: address, response: { timeStamp: '2026-10-02T00:00:00Z', responses: [later] } },
+    { responder: address, createdAt: '2026-10-01T00:00:00Z', response: { responses: [entry('qb1', 'Agree', predicted('Agree', 0.9))] } },
+    { responder: address, createdAt: '2026-10-02T00:00:00Z', response: { responses: [later] } },
   ];
   const withdrawn = collectSessionFidelityData({ questions, payloads: versions(entry('qb1', 'Disagree', null)) });
   assert.equal(withdrawn.pairs.length, 0, 'no draft comparison once consent is withdrawn');
@@ -437,9 +437,31 @@ test('the latest record decides, so withdrawn consent and new encryption are hon
     payloads: versions({ questionID: 'qb1', answer: { value: '0xcipher', encrypted: true } }),
   });
   assert.deepEqual([encrypted.answers.length, encrypted.pairs.length], [0, 0], 'earlier plaintext is not used');
-  // Newest first in the input: the timestamps still decide.
+  // Newest first in the input: the Worker's times still decide.
   const reordered = collectSessionFidelityData({ questions, payloads: versions(entry('qb1', 'Disagree', null)).reverse() });
   assert.equal(reordered.answers[0].value, 'Disagree');
+});
+
+test("a participant's own clock never decides which record is latest", () => {
+  const address = '0xccc0000000000000000000000000000000000003';
+  // The browser writes a payload's timeStamp, so an old record can claim any time.
+  const shared = { timeStamp: '2099-01-01T00:00:00Z', responses: [entry('qb1', 'Agree', predicted('Agree', 0.9))] };
+  const withdrawn = { timeStamp: '2026-10-02T00:00:00Z', responses: [entry('qb1', 'Disagree', null)] };
+  const read = (payloads) => collectSessionFidelityData({ questions, payloads });
+  const stored = read([
+    { responder: address, createdAt: '2026-10-01T00:00:00Z', response: shared },
+    { responder: address, createdAt: '2026-10-02T00:00:00Z', response: withdrawn },
+  ]);
+  assert.deepEqual([stored.answers[0].value, stored.pairs.length], ['Disagree', 0]);
+  // On the chain, block, transaction and log index decide, whatever the input order.
+  const onChain = read([
+    { responder: address, blockNumber: 12, transactionIndex: 0, logIndex: 3, response: withdrawn },
+    { responder: address, blockNumber: 12, transactionIndex: 0, logIndex: 1, response: shared },
+  ]);
+  assert.equal(onChain.answers[0].value, 'Disagree');
+  // With nothing recorded, the later input decides.
+  const raw = read([{ ...shared, responder: address }, { ...withdrawn, responder: address }]);
+  assert.equal(raw.answers[0].value, 'Disagree');
 });
 
 test('questions-view export rows and legacy ratings are read like the app reads them', () => {
