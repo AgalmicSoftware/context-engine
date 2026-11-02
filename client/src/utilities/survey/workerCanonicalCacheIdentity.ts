@@ -197,14 +197,11 @@ const remaskChainQuestions = (cacheRoot: unknown, reader: string): UnknownRecord
   return next;
 };
 
-// Runs on every account change and once at startup, before the reader is known.
-export const remaskChainQuestionCaches = async (reader = getWorkerCanonicalCacheReader()): Promise<void> => {
-  await initCacheManager();
-  await Promise.all(updateChangedCaches('questionsCache', (cacheRoot) => remaskChainQuestions(cacheRoot, reader)));
-};
-
 // Worker nodes hold what the previous account was authorized to read, including
 // Worker-decrypted answers, so an account change also removes them from storage.
+// Every account change, sign-in and sign-out included, also locks chain-node
+// question text not decrypted for the new reader. Startup does not: other tabs
+// of the same account share these nodes.
 export const purgeWorkerCanonicalCaches = async (previousReader: unknown): Promise<void> => {
   const reader = normalizeWorkerCanonicalCacheReader(previousReader);
   // The slug listing reads the in-memory mirror, which loads from storage once.
@@ -214,5 +211,6 @@ export const purgeWorkerCanonicalCaches = async (previousReader: unknown): Promi
       updateChangedCaches(namespace, (cacheRoot) => stripWorkerCanonicalCacheNodes(namespace, cacheRoot, reader)),
     ),
   );
-  await remaskChainQuestionCaches();
+  const nextReader = getWorkerCanonicalCacheReader();
+  await Promise.all(updateChangedCaches('questionsCache', (cacheRoot) => remaskChainQuestions(cacheRoot, nextReader)));
 };

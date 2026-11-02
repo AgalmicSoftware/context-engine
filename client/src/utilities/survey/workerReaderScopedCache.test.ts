@@ -2,7 +2,6 @@ import { listNamespaceSlugsSync, peekCacheSync, updateCacheAtomic } from '../cac
 import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../session/sessionModeProfile';
 import {
   purgeWorkerCanonicalCaches,
-  remaskChainQuestionCaches,
   resolveWorkerCanonicalCacheIdentity,
   resolveWorkerCanonicalSessionKey,
   workerCanonicalCacheIdentityMatches,
@@ -282,18 +281,21 @@ describe('question text decrypted into shared chain nodes', () => {
     });
   });
 
-  it('locks text another reader decrypted again on an account change', async () => {
+  it.each([
+    ['an account change', '0xadmin'],
+    ['a sign-in', ''],
+  ])('keeps only the new reader text after %s', async (_change, previousReader) => {
     setWorkerCanonicalCacheReader('0xnext');
-    await purgeWorkerCanonicalCaches('0xadmin');
+    await purgeWorkerCanonicalCaches(previousReader);
 
     const root = cache.get('questionsCache|a') as Cache;
     expect(root[11155420].questions).toEqual({ admin: locked, own: decryptedFor('0xnext'), legacy: locked });
     expect(root.worker.questions.w).toEqual(decryptedFor('0xnext'));
   });
 
-  it('locks every decrypted text at startup, before the reader is known', async () => {
+  it('locks every decrypted text on sign-out', async () => {
     setWorkerCanonicalCacheReader('');
-    await remaskChainQuestionCaches();
+    await purgeWorkerCanonicalCaches('0xnext');
 
     expect(JSON.stringify((cache.get('questionsCache|a') as Cache)[11155420])).not.toContain('Private');
   });
