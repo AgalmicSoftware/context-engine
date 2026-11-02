@@ -151,6 +151,8 @@ describe('CommunityTab helpers', () => {
     localStorage.clear();
     globalThis.CE_SESSION_SCAN_SCOPE = 'active';
     globalThis.CE_SESSION_SCAN_SLUGS = [];
+    // Stats count the groups of every bundled Worker session; tests stub those reads instead of calling live Workers.
+    jest.spyOn(workerGroupPorts, 'loadPublicWorkerGroups').mockResolvedValue([]);
     const nativeCreateElement = document.createElement.bind(document);
     canvasCreateElementSpy = jest.spyOn(document, 'createElement').mockImplementation((tagName, options) => {
       if (tagName === 'canvas') {
