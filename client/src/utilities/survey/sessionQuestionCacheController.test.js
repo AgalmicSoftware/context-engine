@@ -112,6 +112,7 @@ const {
 } = require('../session/mainSiteProgressHelpers.js');
 const { isMaskedQuestionPayload, pickBetterQuestionPayload } = require('./questionRouting.js');
 const { resolveWorkerCanonicalCacheIdentity } = require('./workerCanonicalCacheIdentity.js');
+const { clearDecryptCaches } = require('../crypto/cryptography.js');
 
 const NETWORK_ID = '11155420';
 const SESSION_SLUG = 'alpha';
@@ -1740,7 +1741,7 @@ describe('createSessionQuestionCacheController', () => {
       expect(host.queueLocalRevisionUpdate).not.toHaveBeenCalled();
     });
 
-    it('writes improved masked payloads and queues a local revision update', async () => {
+    it('writes improved masked payloads for their reader and queues a local revision update', async () => {
       const host = createMockHost({
         initialStorage: {
           questionsCache: {
@@ -1783,6 +1784,7 @@ describe('createSessionQuestionCacheController', () => {
                 masked: false,
                 prompt: 'Decrypted prompt',
                 promptDecrypted: true,
+                decryptedFor: ACCOUNT.toLowerCase(),
               }),
             }),
           }),
@@ -1791,6 +1793,33 @@ describe('createSessionQuestionCacheController', () => {
       expect(host.queueLocalRevisionUpdate).toHaveBeenCalledWith({
         needsQuestionResponsesNonce: true,
       });
+    });
+
+    it('keeps text decrypted before an account change out of the cache', async () => {
+      const host = createMockHost({
+        initialStorage: {
+          questionsCache: {
+            [SESSION_SLUG]: createQuestionsCacheEnvelope({
+              q1: createMaskedQuestion('q1'),
+            }),
+          },
+        },
+      });
+      const controller = createSessionQuestionCacheController(host);
+
+      hasMaskedQuestionPayloadImproved.mockReturnValue(true);
+      contractScripts.decryptQuestionPayloadInPlace.mockImplementation(async (question) => {
+        question.masked = false;
+        question.prompt = 'Previous reader prompt';
+        question.promptDecrypted = true;
+        // AppShell clears the decrypt caches on every account change and sign-out.
+        clearDecryptCaches();
+      });
+
+      await controller.refreshEncryptedQuestionPayloadsForGroup(SESSION_SLUG, { force: true });
+
+      expect(contractScripts.decryptQuestionPayloadInPlace).toHaveBeenCalled();
+      expect(JSON.stringify(host.getStored('questionsCache', SESSION_SLUG))).not.toContain('Previous reader prompt');
     });
 
     it('preserves backoff entries created across multiple refresh batches', async () => {

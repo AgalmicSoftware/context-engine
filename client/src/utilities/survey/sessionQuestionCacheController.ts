@@ -12,6 +12,7 @@ import {
   readSessionScanMaxBlockRange,
   resolveValidatedSessionScanWindow,
 } from '../session/sessionScanScope.js';
+import { getDecryptCacheGeneration } from '../crypto/cryptography.js';
 import { getGlobalLitHooks } from '../crypto/litProtocol.js';
 import {
   buildQuestionDecryptContextForSession,
@@ -25,6 +26,7 @@ import {
   shouldFlushCoalescedRun,
 } from '../session/mainSiteProgressHelpers.js';
 import { MASKED_Q_DECRYPT_BACKOFF_MAX, MASKED_Q_DECRYPT_BACKOFF_TTL_MS } from '../cache/sessionCacheConstants.js';
+import { stampDecryptedQuestion } from './decryptedQuestionReader';
 import { isMaskedQuestionPayload, pickBetterQuestionPayload } from './questionRouting.js';
 import { isResponseRecencyAtLeast, toResponseRecencyPair, type ResponseRecencyPair } from './responseRecency';
 import {
@@ -2178,6 +2180,8 @@ export const createSessionQuestionCacheController = (
     const run = (async () => {
       const networkID = String(getSessionChainId(slug) || '');
       if (!networkID) return;
+      // Account changes move the decrypt generation (see AppShell).
+      const decryptGeneration = getDecryptCacheGeneration();
 
       const questionsCache = (dgRead('questionsCache', slug) || {}) as QuestionCache;
       const networkCache = (questionsCache?.[networkID] || null) as QuestionCacheNetworkNode | null;
@@ -2261,7 +2265,7 @@ export const createSessionQuestionCacheController = (
 
         // Success: clear backoff so future partial decrypts can run immediately.
         maskedQuestionDecryptBackoff.delete(key);
-        return { qid: id, next, improved: true };
+        return { qid: id, next: stampDecryptedQuestion(next, accountLower), improved: true };
       };
 
       let changed = 0;
@@ -2284,6 +2288,8 @@ export const createSessionQuestionCacheController = (
       if (changed) {
         const persisted = await host.updateQuestionsCacheAtomic(slug, (current) => {
           const next = (current && typeof current === 'object' ? current : {}) as QuestionCache;
+          // Text decrypted before an account change belongs to the previous reader.
+          if (decryptGeneration !== getDecryptCacheGeneration()) return next;
           mergeLegacyNumericNetworkKey(next, networkID);
           const targetNet = next[networkID] || createEmptyQuestionNetworkCacheNode(0);
           ensureQuestionArweaveCacheBranches(targetNet);
