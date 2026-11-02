@@ -52,6 +52,11 @@
   &:hover {
     background: color-mix(in srgb, currentColor 12%, transparent);
   }
+
+  // The bar's own text colour: the theme ring was black on Classic 95's navy bar (1.3:1).
+  &:focus-visible {
+    outline-color: currentColor;
+  }
 }
 
 .body {
@@ -110,6 +115,16 @@
     border-color: var(--ce-status-error);
     background: var(--ce-status-error);
   }
+}
+
+// The app's global `.btn:hover` and `.btn:active` rules clear every button fill with !important, which
+// left these labels on the dialog surface (white on white for Minimal's Stop). The footer outranks them.
+.footer .confirmButton:is(:hover, :active):not(:disabled) {
+  background-color: var(--ce-action-accent-hover) !important;
+}
+
+.footer .dangerButton:is(:hover, :active):not(:disabled) {
+  background-color: var(--ce-status-error) !important;
 }
 
 @container ce-theme style(--ce-layout-profile: minimal-app) {

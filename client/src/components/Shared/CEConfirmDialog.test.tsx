@@ -1,3 +1,5 @@
+import fs from 'fs';
+import path from 'path';
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import CEConfirmDialog from './CEConfirmDialog';
@@ -44,6 +46,27 @@ describe('CEConfirmDialog', () => {
 
     expect(onCancel).toHaveBeenCalledTimes(1);
     expect(onConfirm).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the confirm fills under the global .btn hover and press reset', () => {
+    // contextEngine.scss clears every `.btn` fill on hover and press with `!important` (up to
+    // `.btn:active:hover`); a label drawn for its fill must keep it, so these rules need !important and more
+    // than three classes or pseudo-classes.
+    const scss = fs.readFileSync(path.join(__dirname, 'CEConfirmDialog.module.scss'), 'utf8');
+    expect(scss).toMatch(
+      /\.footer \.confirmButton:is\(:hover, :active\):not\(:disabled\) \{\s*background-color: var\(--ce-action-accent-hover\) !important;/,
+    );
+    expect(scss).toMatch(
+      /\.footer \.dangerButton:is\(:hover, :active\):not\(:disabled\) \{\s*background-color: var\(--ce-status-error\) !important;/,
+    );
+  });
+
+  it("rings the title-bar close button in the bar's text colour", () => {
+    // The theme's focus ring can match a title bar (black on Classic 95's navy).
+    const scss = fs.readFileSync(path.join(__dirname, 'CEConfirmDialog.module.scss'), 'utf8');
+    expect(scss).toMatch(
+      /\.content \.header :global\(\.btn-close\) \{[^}]*&:hover \{[^}]*\}\s*[^}]*&:focus-visible \{\s*outline-color: currentColor;/,
+    );
   });
 
   it('stays out of the DOM while closed', () => {
