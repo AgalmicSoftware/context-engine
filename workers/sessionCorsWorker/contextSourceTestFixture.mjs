@@ -1,4 +1,4 @@
-import { storageRoute } from './storageRouteExecution.js';
+import { publishCloudflareOwnedStorageMetadata, storageRoute } from './storageRouteExecution.js';
 import { createOutboundUrlSafetyHelpersWithWorkerDeps } from './outboundUrlSafetyBinding.js';
 
 // A Session Worker's storage for context-source tests: in-memory KV and R2, a
@@ -87,6 +87,15 @@ export const harness = ({ encryption = 'none', pages = {}, ai = { mode: 'anthrop
       state.config = { ...baseConfig, storageEnvelope: { sessionKey: baseConfig.storageEnvelope?.sessionKey || candidateRecord } };
       return { config: state.config, created: true };
     },
+    // The session coordinator's publication step, checked against the current config.
+    executeCoordinatedStoragePublication: async ({ expectedAuthority, ...publication }) => {
+      try {
+        await publishCloudflareOwnedStorageMetadata({ ...publication, config: state.config, actor: expectedAuthority.actor });
+        return { ok: true, status: 200, body: { ok: true } };
+      } catch (error) {
+        return { ok: false, status: error.status || 503, body: { error: error.message } };
+      }
+    },
   };
   const call = (path, { method = 'GET', body, address = '' } = {}) => storageRoute({
     path: path.split('?')[0],
@@ -100,6 +109,7 @@ export const harness = ({ encryption = 'none', pages = {}, ai = { mode: 'anthrop
     slug: 'salon',
     uploaderAddress: address,
     authScopes: address ? SCOPES : {},
+    expectedAuthority: { actor: address },
     baseHeaders: {},
     deps,
   });

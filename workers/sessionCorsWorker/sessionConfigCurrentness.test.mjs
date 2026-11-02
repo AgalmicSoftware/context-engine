@@ -15,6 +15,7 @@ import { buildAdminActionBodyHash } from './adminTypedData.mjs';
 import { updateSessionSecretsAfterLitRepair, ensureSessionLitAuthorizationSigner, finalizeSessionLitAuthorization } from './sessionLitAuthorizationCoordinator.js';
 import { ethers } from 'ethers';
 import { readCurrentSessionConfig } from './sessionConfigAuthority.js';
+import { createOutboundUrlSafetyHelpersWithWorkerDeps } from './outboundUrlSafetyBinding.js';
 
 const ACTOR_A = `0x${'aa'.repeat(20)}`;
 const ACTOR_B = `0x${'bb'.repeat(20)}`;
@@ -142,6 +143,46 @@ test('publication rejects an admin upload revoked while external payload storage
     assert.deepEqual(listed.body.items, []);
     assert.equal(storageLayer === 'r2' ? blobs.size : [...rows.keys()].filter((key) => key.startsWith('ce-storage-payload:')).length, 1,
       'payload storage may leave one orphan, but it must not become a canonical/listed publication');
+  }
+});
+
+test('a context link started by a replaced admin is refused; a content edit meanwhile still publishes', async () => {
+  for (const [edit, status] of [['admin', 409], ['content', 200]]) {
+    const f = createFixture({ adminAddress: ACTOR_A, storageProfile: { backend: 'cloudflare', payloadAccessControl: { gate: 'none', encryption: 'none' } } });
+    const rows = new Map();
+    f.env.CE_STORAGE_INDEX_KV = {
+      get: async (key) => rows.get(key) ?? null,
+      put: async (key, value) => { rows.set(key, value); },
+      delete: async (key) => { rows.delete(key); },
+      list: async ({ prefix }) => ({ keys: [...rows.keys()].filter((key) => key.startsWith(prefix)).map((name) => ({ name })), list_complete: true }),
+    };
+    let reached;
+    let resume;
+    const fetching = new Promise((resolve) => { reached = resolve; });
+    const page = new Promise((resolve) => { resume = resolve; });
+    const { safeFetch, isBlockedOutboundUrl } = createOutboundUrlSafetyHelpersWithWorkerDeps({ deps: { fetch: async () => { reached(); return page; } } });
+    const respond = (body, status = 200, headers = {}) => Response.json(body, { status, headers });
+    const context = await f.context();
+    assert.equal(context.ok, true);
+    const request = new Request('https://worker.example/storage/context', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'add-link', url: 'https://example.com/notes' }) });
+    const adding = dispatchAuthenticatedRoute({ path: '/storage/context', method: 'POST', request, authenticatedContext: context,
+      deps: { dispatchAuthenticatedSecretPathRoute: (args) => dispatchAuthenticatedSecretPathRoute({ ...args, env: f.env, deps: {
+        evaluateAuthenticatedRoutePreflight: async () => ({ ok: true }),
+        storageRoute: (value) => storageRoute({ ...value, deps: { json: respond, safeFetch, isBlockedOutboundUrl } }),
+      } }) } });
+    await fetching;
+    try {
+      const changed = edit === 'admin' ? await f.rotate() : await executeCoordinatedSessionConfigMutation({ env: f.env, slug: 'fixture',
+        existingConfig: f.config, expectedAuthority: await f.authorized(), mutation: { kind: 'set-config', incomingConfig: { sessionName: 'Renamed' } } });
+      assert.equal(changed.status, 200, edit);
+    } finally {
+      resume(new Response('<p>Notes from the page, long enough to keep as its snapshot.</p>', { headers: { 'content-type': 'text/html' } }));
+    }
+    const result = await adding;
+    assert.equal(result.status, status, edit);
+    const published = [...rows.keys()].filter((key) => key.startsWith('ce-storage:') && key.includes(':docsContext:'));
+    assert.equal(published.length, status === 200 ? 1 : 0, edit);
   }
 });
 
