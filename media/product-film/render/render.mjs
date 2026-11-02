@@ -107,10 +107,13 @@ async function renderVideo(browser, base) {
     const png = await page.screenshot({ type: 'png', clip: { x: 0, y: 0, width: 1920, height: 1080 } });
     if (!ff.stdin.write(png)) await new Promise((r) => ff.stdin.once('drain', r));
     if (i % 60 === 0) process.stdout.write(`frame ${i}/${to} (${((Date.now() - started) / 1000).toFixed(0)}s)\n`);
-    if (i === 0) fs.writeFileSync(path.join(outDir, 'context-engine-film-frame0-1920x1080.png'), png);
   }
   ff.stdin.end();
   await done;
+  // The still is always frame 0, including when FRAMES skips it.
+  const frame0 = path.join(outDir, 'context-engine-film-frame0-1920x1080.png');
+  await page.evaluate((t) => window.film.capture(t), 0);
+  await page.screenshot({ path: frame0, type: 'png', clip: { x: 0, y: 0, width: 1920, height: 1080 } });
   await page.close();
 
   // Optimised 1280x720 preview for link unfurls.
@@ -125,7 +128,7 @@ async function renderVideo(browser, base) {
   ]);
   // 16:9 still from frame 0 for <video poster> and players.
   await run('ffmpeg', [
-    '-y', '-loglevel', 'error', '-i', path.join(outDir, 'context-engine-film-frame0-1920x1080.png'),
+    '-y', '-loglevel', 'error', '-i', frame0,
     '-vf', 'scale=1280:720:flags=lanczos', '-q:v', '3', path.join(outDir, 'context-engine-film-still-1280x720.jpg'),
   ]);
   console.log(`wrote ${master}\nwrote ${preview}`);
