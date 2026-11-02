@@ -1,3 +1,4 @@
+import { clearDecryptCaches } from '../../utilities/crypto/cryptography';
 import { createSurveyResultsLockedResponsesRuntime } from './surveyResultsLockedResponsesRuntime';
 import { createInitialSurveyResultsState } from './surveyResultsState';
 import type { SurveyResultsProps } from './SurveyResults';
@@ -6,7 +7,7 @@ const sessionConfig = { sessionId: 'example-session-id', corsWorkerUrl: 'https:/
 
 type DecryptPort = Parameters<typeof createSurveyResultsLockedResponsesRuntime>[0]['ports']['decryptEnvelopeValue'];
 
-const buildRuntime = (decryptEnvelopeValue: DecryptPort) => {
+const buildRuntime = (decryptEnvelopeValue: DecryptPort, applyStatePatch = jest.fn()) => {
   const props: SurveyResultsProps = {
     account: '0x2222222222222222222222222222222222222222',
     loginComplete: true,
@@ -37,7 +38,7 @@ const buildRuntime = (decryptEnvelopeValue: DecryptPort) => {
   return createSurveyResultsLockedResponsesRuntime({
     instance: { _lockedResponsesModelMemo: {} },
     ports: {
-      applyStatePatch: jest.fn(),
+      applyStatePatch,
       decryptEnvelopeValue,
       getEffectiveSessionContext: () => ({ sessionConfig, sessionSlug: 'example' }),
       getEffectiveSlug: () => 'example',
@@ -77,5 +78,25 @@ describe('SurveyResults locked response decrypt', () => {
     const [[, answerOptions], [, importanceOptions]] = decryptEnvelopeValue.mock.calls;
     expect(answerOptions).not.toHaveProperty('expectedQId');
     expect(importanceOptions).toEqual(expect.objectContaining({ expectedQId: 'importance:q1' }));
+  });
+  it('drops values decrypted for an account that changed while the decrypt was running', async () => {
+    let release: () => void = () => {};
+    const unlocked = new Promise<void>((resolve) => (release = resolve));
+    const decryptEnvelopeValue = jest.fn<ReturnType<DecryptPort>, Parameters<DecryptPort>>(async () => {
+      await unlocked;
+      return 'previous reader plaintext';
+    });
+    const applyStatePatch = jest.fn();
+    const run = buildRuntime(decryptEnvelopeValue, applyStatePatch).handleDecryptLockedResponses();
+    await Promise.resolve();
+    // AppShell clears the decrypt caches on every account change and sign-out.
+    clearDecryptCaches();
+    release();
+    await run;
+
+    expect(decryptEnvelopeValue).toHaveBeenCalled();
+    expect(applyStatePatch.mock.calls.map(([patch]) => patch)).toEqual([
+      { lockedResponsesDecrypting: true, alertMessage: '' },
+    ]);
   });
 });

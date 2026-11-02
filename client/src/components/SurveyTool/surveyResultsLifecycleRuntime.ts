@@ -425,6 +425,28 @@ export const runSurveyResultsComponentDidUpdate = ({
     ports.handleNonceTick();
   }
 
+  // Decrypted values belong to the account that unlocked them.
+  const accountKey = (account: unknown): string =>
+    String(account || '')
+      .trim()
+      .toLowerCase();
+  if (accountKey(prevProps.account) !== accountKey(props.account)) {
+    queueStatePatchValue({
+      hasPendingStatePatch,
+      key: 'decryptedResponseOverrides',
+      pendingStatePatch,
+      state,
+      value: {},
+    });
+    queueStatePatchValue({
+      hasPendingStatePatch,
+      key: 'lockedResponsesDecrypting',
+      pendingStatePatch,
+      state,
+      value: false,
+    });
+  }
+
   if (prevProps.isOpen !== props.isOpen) {
     if (props.isOpen) {
       ports.resetLocalStoragePollingBackoff('modal-open-state-change');
