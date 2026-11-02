@@ -513,6 +513,46 @@ describe('useRollingTranscriptionRecorder', () => {
     unmount();
   });
 
+  it('stops when another account signs in mid-recording and uploads only as the account that made it', async () => {
+    const first = '0x1111111111111111111111111111111111111111';
+    const second = '0x2222222222222222222222222222222222222222';
+    (transcribeAudio as jest.Mock).mockImplementation(async () => 'First account speech.');
+    const uploadedAs = () =>
+      (transcribeAudio as jest.Mock).mock.calls.map(
+        (call) => (call[1] as { context: { account: string } }).context.account,
+      );
+    const { result, rerender, unmount } = renderHook(
+      ({ account }) =>
+        useRollingTranscriptionRecorder({ sessionSlug: 'account-switch', context: { account }, chunkMs: 15000 }),
+      { initialProps: { account: first } },
+    );
+    await act(async () => {
+      await result.current.startRecording();
+    });
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(15000);
+      await flushPromises();
+    });
+    rerender({ account: second });
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(60_000);
+      await flushPromises();
+    });
+    expect(result.current.isRecording).toBe(false);
+    expect(mockTrack.stop).toHaveBeenCalled();
+    expect(uploadedAs()).toEqual([first]);
+    expect(result.current.segments.map((segment) => segment.status)).toEqual(['complete', 'retrying']);
+    expect([...mockChunkRecords.values()].filter((record) => record.audio)).toHaveLength(1);
+    rerender({ account: first });
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(60_000);
+      await flushPromises();
+    });
+    expect(uploadedAs()).toEqual([first, first]);
+    expect(result.current.segments.map((segment) => segment.status)).toEqual(['complete', 'complete']);
+    unmount();
+  });
+
   it.each(['while open', 'after reopening'])(
     'keeps a recording only this page holds with its account after a sign-out, %s, and says so',
     async (when) => {

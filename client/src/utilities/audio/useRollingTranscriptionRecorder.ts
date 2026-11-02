@@ -554,6 +554,10 @@ export const useRollingTranscriptionRecorder = ({
   );
 
   const stopRecording = useCallback(() => finalizeRecording({ waitForTranscription: false }), [finalizeRecording]);
+  // Another account signed in mid-recording: stop capture; the chunks wait for the account that made them.
+  useEffect(() => {
+    if (chunks.accountSwitched && (status === 'recording' || status === 'paused')) void stopRecording();
+  }, [chunks.accountSwitched, status, stopRecording]);
 
   const clearDraft = useCallback(
     (discardAudio = false) => {
