@@ -243,6 +243,21 @@ test('a run answers every question every way, and resumes without asking again',
   assert.equal(resumed.resumedRows, result.rows.length);
 });
 
+test('mock ratings land on each scale’s grid', async () => {
+  for (const scale of [
+    { min: 0, max: 10, step: 3 },
+    { min: 0, max: 100, step: 5 },
+    { min: 0, max: 0.3, step: 0.1 },
+    { min: -0.5, max: 0.5, step: 0.1, minLabel: 'Low', maxLabel: 'High' },
+    { min: 0, max: 10, step: 2, minLabel: 'Low', maxLabel: 'High' },
+  ]) {
+    const questionSet = readQuestionSet([{ id: 'qr', type: 'rating', prompt: 'Rate', scale }]);
+    const result = await runAnswerSet({ questionSet, modelRoster: roster, repeats: 10, maxAttempts: 1 });
+    assert.equal(result.unanswered, 0, JSON.stringify(scale));
+    assert.ok(new Set(result.rows.map((row) => row.answer)).size > 1, `${JSON.stringify(scale)} uses more than one point`);
+  }
+});
+
 // A loopback OpenAI-compatible server that records the temperature of each request.
 const startAnswerServer = async () => {
   const temperatures = [];

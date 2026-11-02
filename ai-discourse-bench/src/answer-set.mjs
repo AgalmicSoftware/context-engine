@@ -332,8 +332,10 @@ const mockAnswerValue = ({ question, order, hash }) => {
     case 'binary':
       return BINARY_ANSWERS[hash % BINARY_ANSWERS.length];
     case 'rating': {
-      const { min, max } = ratingScaleFor(question);
-      return min + (hash % (max - min + 1));
+      const { min, max, step } = ratingScaleFor(question);
+      const points = Math.floor((max - min) / step + 1e-9) + 1;
+      // Clamped so floating point noise can't step past the maximum.
+      return normalizeAnswerValue(question, Math.min(max, min + (hash % points) * step)).value;
     }
     case 'multichoice': {
       const first = shown[hash % shown.length];
