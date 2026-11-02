@@ -70175,7 +70175,7 @@ var init_fetchRequestNormalization = __esm({
 });
 
 // workers/sessionCorsWorker/fetchExecution.js
-var FETCH_CACHE_TTL_SECONDS, FETCH_USER_AGENT, MAX_RESPONSE_BYTES, FETCH_TIMEOUT_MS, TIMEOUT_ERROR, TEXT_MEDIA_TYPES, HTML_MEDIA_TYPES, discardBody, isTimeout, mediaTypeOf, decodeText, resolveJson2, resolveNormalizedTarget, fetchNormalizedTarget, readFetchBytes, stripHtml, fetchImage, fetchPublicText, fetchUrl, fetchContextSnapshotText;
+var FETCH_CACHE_TTL_SECONDS, FETCH_USER_AGENT, MAX_RESPONSE_BYTES, FETCH_TIMEOUT_MS, TIMEOUT_ERROR, TEXT_MEDIA_TYPES, HTML_MEDIA_TYPES, discardBody, isTimeout, mediaTypeOf, decodeText, resolveJson2, resolveNormalizedTarget, fetchNormalizedTarget, readFetchBytes, findClosingTagEnd, stripHtml, fetchImage, fetchPublicText, fetchUrl, fetchContextSnapshotText;
 var init_fetchExecution = __esm({
   "workers/sessionCorsWorker/fetchExecution.js"() {
     init_bodyByteLimit();
@@ -70269,6 +70269,16 @@ var init_fetchExecution = __esm({
         throw error;
       }
     };
+    findClosingTagEnd = (lower9, tag, from) => {
+      const prefix = `</${tag}`;
+      for (let at = lower9.indexOf(prefix, from); at >= 0; at = lower9.indexOf(prefix, at + prefix.length)) {
+        if (/[\t\n\f\r />]/.test(lower9[at + prefix.length] || "")) {
+          const close = lower9.indexOf(">", at + prefix.length);
+          return close < 0 ? -1 : close + 1;
+        }
+      }
+      return -1;
+    };
     stripHtml = (html) => {
       const source = String(html || "");
       const lower9 = source.replace(/[A-Z]/g, (letter) => letter.toLowerCase());
@@ -70285,10 +70295,9 @@ var init_fetchExecution = __esm({
         text4.push(source.slice(cursor, start));
         const hidden = /^<(script|style|head|nav|footer)\b/i.exec(source.slice(start, end + 1))?.[1].toLowerCase();
         if (hidden && !missingClosers.has(hidden)) {
-          const closingTag = `</${hidden}>`;
-          const closing = lower9.indexOf(closingTag, end + 1);
-          if (closing >= 0) {
-            cursor = closing + closingTag.length;
+          const closingEnd = findClosingTagEnd(lower9, hidden, end + 1);
+          if (closingEnd >= 0) {
+            cursor = closingEnd;
             continue;
           }
           missingClosers.add(hidden);

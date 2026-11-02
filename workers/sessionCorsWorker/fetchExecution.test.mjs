@@ -288,6 +288,10 @@ test('HTML extraction keeps ordinary page text and removes the same hidden eleme
     [`<STYLE>body { color: red; }</STYLE><NAV><a>Hidden</a></NAV>${visible}<FOOTER>Hidden</FOOTER>`, visible],
     [`İ <main> ${visible}\n <span>More &amp; text</span></main>`, `İ ${visible} More &amp; text`],
     [`<script>no closing tag<p>${visible}</p>`, `no closing tag ${visible}`],
+    // Closing tags a browser also accepts: whitespace or `/` before the `>`, any case.
+    [`a<script>hidden()</script >b<STYLE>x {}</STYLE\n>c<nav>Hidden</NAV/>d <p>${visible}</p>`, `abcd ${visible}`],
+    [`<script>a()</script ><p>${visible}</p><script>b()</script><p>tail</p>`, `${visible} tail`],
+    [`<script>x</scripts>still hidden</script>${visible}`, visible],
   ];
   for (const [html, expected] of fixtures) {
     const response = await extractHtml(html);
