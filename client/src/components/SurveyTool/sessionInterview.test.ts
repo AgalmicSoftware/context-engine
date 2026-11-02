@@ -622,7 +622,27 @@ describe('session interview protocol', () => {
     },
   );
 
-  it.each([0, '0', 4, ' 4.5 '])('preserves explicit numeric rating values: %p', (answer) => {
+  it('snaps imported rating drafts to the nearest step on the scale', () => {
+    const questions = normalizeInterviewQuestions([
+      { id: 'fives', prompt: 'How much?', type: 'rating', scale: { min: 0, max: 100, step: 5 } },
+      { id: 'fours', prompt: 'How much?', type: 'rating', scale: { min: 0, max: 10, step: 4 } },
+      { id: 'tenths', prompt: 'How much?', type: 'rating', scale: { min: 0, max: 0.3, step: 0.1 } },
+      { id: 'default', prompt: 'How much?', type: 'rating' },
+    ]);
+    const draft = (questionId: string, answer: unknown) =>
+      parseInterviewDraftResponses(
+        JSON.stringify({ responses: [{ questionId, answer, confidence: 0.8 }] }),
+        questions,
+      )[0]?.answer;
+    expect([52, 53, 101, -3].map((answer) => draft('fives', answer))).toEqual([50, 55, 100, 0]);
+    // The top of the scale is off the grid, so it snaps down to the last step.
+    expect(draft('fours', 10)).toBe(8);
+    // 3 × 0.1 is 0.30000000000000004 in floating point, past this maximum.
+    expect([0.14, 0.33].map((answer) => draft('tenths', answer))).toEqual([0.1, 0.3]);
+    expect(draft('default', ' 4.5 ')).toBe(5);
+  });
+
+  it.each([0, '0', 4])('preserves explicit numeric rating values: %p', (answer) => {
     const questions = normalizeInterviewQuestions([{ id: 'rating', prompt: 'How much?', type: 'rating' }]);
     const responses = [{ questionId: 'rating', answer, importance: null, conviction: '', confidence: 0.8 }];
     expect(parseInterviewDraftResponses(JSON.stringify({ responses }), questions)).toEqual([

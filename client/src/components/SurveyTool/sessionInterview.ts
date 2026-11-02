@@ -4,6 +4,7 @@ import {
   validateQuadraticQuestion,
 } from '../../../../shared/questions/quadraticAllocation.mjs';
 import { normalizePublicInterviewQuestions } from '../../../../shared/interviewQuestionCatalog.mjs';
+import { normalizeRatingAnswer } from '../../../../shared/questions/ratingScale.mjs';
 import { decodeLinkJson, encodeLinkJson, readLinkParam } from '../../../../shared/linkPayload.mjs';
 import { normalizeInterviewSettings } from '../../../../shared/interviewSettings.mjs';
 import { QUADRATIC_ANSWER_RULE, QUADRATIC_QUESTION_RULE, QUESTION_TAG_RULE } from '../../../../shared/promptRules.mjs';
@@ -228,8 +229,14 @@ const normalizeDraftCandidates = (
       } else if (question?.type === 'rating') {
         const numericAnswer = readNumericRating(answer);
         if (numericAnswer === undefined) return normalized;
-        const scale = normalizeRatingScale(question);
-        answer = Math.max(scale.min, Math.min(scale.max, numericAnswer));
+        const { min, max, step = 1 } = normalizeRatingScale(question);
+        // Clamped to the scale, then snapped to its nearest step at or below the maximum;
+        // the outer clamp stops floating point noise from stepping past it.
+        const steps = Math.min(
+          Math.floor((max - min) / step + 1e-9),
+          Math.max(0, Math.round((numericAnswer - min) / step)),
+        );
+        answer = normalizeRatingAnswer(Math.min(max, min + steps * step), question);
       }
       if (answer === undefined || answer === null) return normalized;
       const confidence = Number(response.confidence);
