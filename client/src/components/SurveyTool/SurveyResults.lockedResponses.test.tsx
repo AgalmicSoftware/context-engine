@@ -483,6 +483,31 @@ describe('SurveyResults locked responses banner', () => {
     expect(decryptSpy).toHaveBeenCalled();
   });
 
+  it('locks decrypted responses again when the account changes', async () => {
+    jest.spyOn(contractScriptsModule, 'getSessionConfigBySlug').mockReturnValue(null);
+    jest.spyOn(cryptoUtils, 'decryptEnvelopeValue').mockResolvedValue('Unlocked answer');
+    const view = mountSurveyResults({
+      viewMode: 'survey',
+      loginComplete: true,
+      account: '0xabc',
+      provider: 'mock-provider',
+    });
+    await switchToAggregateView();
+    injectSbtFilteredResponses({
+      q1: [buildLockedAggregatorRow('0xaaa0000000000000000000000000000000000001')],
+    });
+
+    fireEvent.click(await screen.findByTestId('ce-results-locked-toggle'));
+    fireEvent.click(await screen.findByTestId('ce-results-decrypt-btn'));
+    await waitFor(() => expect(screen.queryByTestId('ce-results-locked-toggle')).toBeNull());
+
+    view.rerenderSurveyResults({ account: '0xdef' });
+    expect(await screen.findByTestId('ce-results-locked-toggle')).toHaveAttribute(
+      'aria-label',
+      expect.stringMatching(/ 1 locked response$/),
+    );
+  });
+
   it('skips the locked banner model for self-encrypted responses without gate access rules', async () => {
     jest.spyOn(contractScriptsModule, 'getSessionConfigBySlug').mockReturnValue(null);
 

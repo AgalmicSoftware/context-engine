@@ -1,5 +1,6 @@
 import type React from 'react';
 
+import { getDecryptCacheGeneration } from '../../utilities/crypto/cryptography.js';
 import { buildResponseGatePolicy } from '../../utilities/crypto/litGatePolicy.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { getShortenedAddress } from 'utilities/ui/displayHelpers.js';
@@ -425,6 +426,8 @@ export const createSurveyResultsLockedResponsesRuntime = ({
     if (lockedRows.length === 0) return;
 
     ports.applyStatePatch(buildSurveyResultsLockedResponsesDecryptingPatch(true));
+    // The account changes (or signs out) whenever the decrypt generation moves.
+    const decryptGeneration = getDecryptCacheGeneration();
 
     let anyDecrypted = false;
     const nextOverrides: Record<string, SurveyResultsDecryptedResponseOverride> = {
@@ -494,6 +497,8 @@ export const createSurveyResultsLockedResponsesRuntime = ({
       }
     }
 
+    // Plaintext unlocked for the previous reader must not reach the next one.
+    if (decryptGeneration !== getDecryptCacheGeneration()) return;
     ports.applyStatePatch(
       buildSurveyResultsLockedResponsesDecryptCompletePatch({
         anyDecrypted,
