@@ -2541,6 +2541,11 @@ Never return secrets in responses.
   addresses, or unrecognized secret keys. The `/admin` Worker secrets cards use
   this manifest so blank write-only inputs are shown as unknown until verified
   instead of being mislabeled as empty.
+- Known limit: a secrets change, including removing a provider key, commits to
+  the session's Durable Object and overwrites the KV copy, but requests read the
+  KV copy, which Cloudflare can serve stale in other locations for up to about
+  60 seconds. A removed key stays usable until then; revoke a leaked key with
+  its provider.
 - Lit sponsorship now adds:
   - `litUsageApiKey` as a supported worker-secret field for scoped Chipotle execution
   - `litAccountApiKey` as a server-only session secret for per-session-account provisioning and later action management
