@@ -94,7 +94,9 @@ export const buildForgeDeploymentInvocation = ({
   env: {
     ...inheritedEnv,
     PRIVATE_KEY: privateKey,
-    ETH_RPC_URL: rpcUrl,
+    // `forge script` ignores ETH_RPC_URL (only `forge create` and cast read it)
+    // and would only simulate; this sets its eth_rpc_url config instead.
+    FOUNDRY_ETH_RPC_URL: rpcUrl,
   },
 });
 

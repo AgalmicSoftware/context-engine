@@ -78,6 +78,6 @@ test('Forge receives the RPC URL only through its inherited child environment', 
     PATH: '/fixture/bin',
     KEEP_ME: 'yes',
     PRIVATE_KEY: privateKey,
-    ETH_RPC_URL: rpcUrl,
+    FOUNDRY_ETH_RPC_URL: rpcUrl,
   });
 });
