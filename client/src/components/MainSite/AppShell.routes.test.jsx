@@ -7,7 +7,12 @@ import { STALE_CHUNK_RELOAD_STORAGE_KEY } from '../../bootRecovery.js';
 import { AppShell, appShellDispatchActions } from './AppShell';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import contractScripts from '../../utilities/web3/chainGateway.js';
-import { initCacheManager, updateCacheAtomic } from '../../utilities/cache/cacheScripts.js';
+import {
+  initCacheManager,
+  listNamespaceSlugsSync,
+  peekCacheSync,
+  updateCacheAtomic,
+} from '../../utilities/cache/cacheScripts.js';
 import {
   getDemoSessionConfigBySlug,
   getSessionConfigBySlug,
@@ -33,6 +38,7 @@ import {
   resolveWorkerCanonicalCacheIdentity,
   withWorkerCanonicalCacheIdentity,
 } from '../../utilities/survey/workerCanonicalCacheIdentity';
+import { setWorkerCanonicalCacheReader } from '../../utilities/survey/workerCanonicalCacheReader';
 
 const mockAdminPage = jest.fn(() => null);
 const mockNavbar = jest.fn(() => null);
@@ -413,6 +419,8 @@ jest.mock('../../utilities/arweave/arweaveUrls.js', () => ({
 jest.mock('../../utilities/cache/cacheScripts.js', () => ({
   __esModule: true,
   initCacheManager: jest.fn(() => Promise.resolve()),
+  listNamespaceSlugsSync: jest.fn(() => []),
+  peekCacheSync: jest.fn(() => null),
   subscribeCacheUpdates: jest.fn(() => jest.fn()),
   updateCacheAtomic: jest.fn(),
 }));
@@ -1023,6 +1031,71 @@ describe('AppShell route render smoke', () => {
 
     update(undefined, undefined);
     expect(getDecryptCacheGeneration()).toBe(start + 2);
+  });
+
+  it('locks decrypted question text on sign-in and sign-out, but not at startup', async () => {
+    const subject = stubMainSiteMountSideEffects(createSubject({ path: '/' }));
+    subject.handleNetworkChange = jest.fn();
+    subject.initializeWorkerCanonicalCachesForGroup = jest.fn(async () => true);
+    const ACCOUNT_X = '0x00000000000000000000000000000000000000aa';
+    const ACCOUNT_Y = '0x00000000000000000000000000000000000000bb';
+    const decrypted = (decryptedFor) => ({
+      id: 'q',
+      prompt: 'Private prompt',
+      promptEncrypted: 'envelope',
+      promptDecrypted: true,
+      ...(decryptedFor ? { decryptedFor } : {}),
+    });
+    const caches = new Map();
+    const seed = (questions) => caches.set('questionsCache|edge', { 84532: { questions } });
+    const prompts = () =>
+      Object.fromEntries(
+        Object.entries(caches.get('questionsCache|edge')[84532].questions).map(([id, question]) => [
+          id,
+          question.prompt,
+        ]),
+      );
+    listNamespaceSlugsSync.mockImplementation((namespace) =>
+      [...caches.keys()].filter((key) => key.startsWith(`${namespace}|`)).map((key) => key.split('|')[1]),
+    );
+    peekCacheSync.mockImplementation((namespace, slug) => caches.get(`${namespace}|${slug}`) || null);
+    updateCacheAtomic.mockImplementation(async (namespace, slug, update) => {
+      const next = await update(caches.get(`${namespace}|${slug}`));
+      caches.set(`${namespace}|${slug}`, next);
+      return next;
+    });
+    const settle = () =>
+      act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+    const changeAccount = async (prevAccount, nextAccount) => {
+      // The store switches the cache reader when it dispatches the account.
+      setWorkerCanonicalCacheReader(nextAccount);
+      const prevProps = { ...subject.props, account: prevAccount };
+      subject.props = { ...subject.props, account: nextAccount };
+      subject.componentDidUpdate(prevProps, subject.state);
+      await settle();
+    };
+
+    // A reload or another tab starts signed out while this account's other tabs stay open.
+    setWorkerCanonicalCacheReader('');
+    seed({ own: decrypted(ACCOUNT_X), unstamped: decrypted() });
+    await act(async () => {
+      await subject.componentDidMount();
+    });
+    await settle();
+    expect(prompts()).toEqual({ own: 'Private prompt', unstamped: 'Private prompt' });
+
+    await changeAccount('', ACCOUNT_X);
+    expect(prompts()).toEqual({ own: 'Private prompt', unstamped: '[encrypted]' });
+
+    await changeAccount(ACCOUNT_X, '');
+    expect(prompts()).toEqual({ own: '[encrypted]', unstamped: '[encrypted]' });
+
+    seed({ own: decrypted(ACCOUNT_X) });
+    await changeAccount('', ACCOUNT_Y);
+    expect(prompts()).toEqual({ own: '[encrypted]' });
+    subject.componentWillUnmount();
   });
 
   it('forwards the active session cache context to the home tools explorer', () => {
