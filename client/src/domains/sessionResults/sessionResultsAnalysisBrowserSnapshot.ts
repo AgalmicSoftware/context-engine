@@ -1,3 +1,4 @@
+import { optionsOf } from '../../../../shared/questions/answerValue.mjs';
 import { normalizeRatingScale } from '../../utilities/survey/ratingValue';
 import { isResponseAllowedForSessionSlug } from '../../utilities/session/responseSessionScope';
 
@@ -86,7 +87,10 @@ export const buildResultsAnalysisBrowserSnapshotFromCacheNode = ({
       id: toText(question.id || questionId),
       prompt: toText(question.prompt || question.text || question.title || question.question),
       type,
-      options: toArray(question.options).map(toText).filter(Boolean),
+      // Trimmed only, as the Worker does: answers must still match their option exactly.
+      options: optionsOf(question)
+        .map((option) => option.trim())
+        .filter(Boolean),
       tags: toArray(question.tags).map(toText).filter(Boolean),
       ...(type === 'rating' ? { scale: normalizeRatingScale(question) } : {}),
       ...(type === 'multichoice'
