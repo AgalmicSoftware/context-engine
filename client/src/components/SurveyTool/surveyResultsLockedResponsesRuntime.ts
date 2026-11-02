@@ -428,6 +428,7 @@ export const createSurveyResultsLockedResponsesRuntime = ({
     ports.applyStatePatch(buildSurveyResultsLockedResponsesDecryptingPatch(true));
     // The account changes (or signs out) whenever the decrypt generation moves.
     const decryptGeneration = getDecryptCacheGeneration();
+    const accountChanged = () => decryptGeneration !== getDecryptCacheGeneration();
 
     let anyDecrypted = false;
     const nextOverrides: Record<string, SurveyResultsDecryptedResponseOverride> = {
@@ -438,6 +439,8 @@ export const createSurveyResultsLockedResponsesRuntime = ({
     };
 
     for (const row of lockedRows) {
+      // Stop before the new account is asked to sign for work that is discarded.
+      if (accountChanged()) return;
       const response: SurveyResultsResponseRecord = row?.response || {};
       const override: SurveyResultsDecryptedResponseOverride = { ...(nextOverrides[row.key] || {}) };
 
@@ -498,7 +501,7 @@ export const createSurveyResultsLockedResponsesRuntime = ({
     }
 
     // Plaintext unlocked for the previous reader must not reach the next one.
-    if (decryptGeneration !== getDecryptCacheGeneration()) return;
+    if (accountChanged()) return;
     ports.applyStatePatch(
       buildSurveyResultsLockedResponsesDecryptCompletePatch({
         anyDecrypted,
