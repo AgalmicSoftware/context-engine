@@ -68,7 +68,7 @@ All notable changes to this project will be documented in this file.
 - Profile SBT badges are kept per chain, so a badge burned on one chain no longer hides one earned at the same address on another.
 - Results analysis of on-chain sessions keeps answers to options whose text has repeated spaces.
 - Creating an SBT group stops before the next upload, transaction or draft save if the wallet account changes after Create.
-- Stats show cached counts within a few seconds while live group counts load or wait for a sign-in.
+- Stats show cached counts within a few seconds while live group counts load or wait for a sign-in, and later updates don't wait for those counts again.
 - A changed multiple-choice draft is always saved; some option labels containing commas could make it look unchanged.
 - The Results report ignores ratings that are off the question's step grid.
 - Interview drafts snap ratings to the question's step.
