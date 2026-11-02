@@ -240,7 +240,7 @@ const commandCompareAnswers = async (args) => {
   await writeJsonFile(path.join(args.out, 'answer-comparison.json'), report);
   await writeTextFile(path.join(args.out, 'answer-comparison.md'), renderComparisonMarkdown(report));
   console.log(
-    `compared ${report.models.length} models with ${report.groups[0].people} people over ${report.questions.length} questions; wrote ${args.out}`,
+    `compared ${report.models.length} models with ${report.people} people over ${report.questions.length} questions; wrote ${args.out}`,
   );
 };
 

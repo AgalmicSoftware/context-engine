@@ -17,7 +17,6 @@ import { bootstrapDifferenceInterval, newcombeDifferenceInterval } from './stati
 
 export const ANSWER_COMPARISON_METHOD = 'aidb-answer-comparison-v1';
 const BINARY_ORDER = ['Disagree', 'Unsure', 'Agree'];
-const EVERYONE = 'everyone';
 
 const isRecord = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
 const text = (value) => (typeof value === 'string' ? value.trim() : '');
@@ -329,7 +328,6 @@ export const compareAnswers = ({
     groupsOf(participantId).forEach((group) => groupSizes.set(group, (groupSizes.get(group) ?? 0) + 1)),
   );
   const reported = reportableKeys(participants.map(groupsOf), minPeople);
-  const groupList = [{ id: EVERYONE, people: participants.length }, ...reported.map((id) => ({ id, people: groupSizes.get(id) }))];
 
   const modelIds = [...new Set((answersFile.rows || []).map((row) => row.modelId))].sort();
   const repliesBy = new Map();
@@ -366,50 +364,47 @@ export const compareAnswers = ({
         minPeople,
       ),
     );
-    const comparisons = Object.fromEntries(
-      groupList.map(({ id: groupId }) => {
-        const values = respondents
-          .filter((answer) => groupId === EVERYONE || groupsOf(answer.participantId).includes(groupId))
-          .map((answer) => answer.value);
-        if (values.length < minPeople || (groupId !== EVERYONE && !shown.has(groupId))) {
-          return [groupId, { people: values.length, suppressed: true }];
-        }
-        return [
-          groupId,
-          {
-            people: values.length,
-            byModel: Object.fromEntries(
-              answered.map((modelId) => [modelId, compareModelWithGroup(question, modelSummaries[modelId].answer, values)]),
-            ),
-            models: answered.length
-              ? compareDistributions(
-                  question,
-                  answered.map((modelId) => modelSummaries[modelId].answer),
-                  values,
-                  { seed: `${seed}:${question.id}:${groupId}`, bootstrapSamples },
-                )
-              : null,
-          },
-        ];
-      }),
-    );
+    // Everyone who answered (groupId null), or one group's members.
+    const compareWith = (groupId) => {
+      const values = respondents
+        .filter((answer) => groupId === null || groupsOf(answer.participantId).includes(groupId))
+        .map((answer) => answer.value);
+      if (values.length < minPeople || (groupId !== null && !shown.has(groupId))) {
+        return { people: values.length, suppressed: true };
+      }
+      return {
+        people: values.length,
+        byModel: Object.fromEntries(
+          answered.map((modelId) => [modelId, compareModelWithGroup(question, modelSummaries[modelId].answer, values)]),
+        ),
+        models: answered.length
+          ? compareDistributions(
+              question,
+              answered.map((modelId) => modelSummaries[modelId].answer),
+              values,
+              { seed: groupId === null ? `${seed}:${question.id}` : `${seed}:${question.id}:${groupId}`, bootstrapSamples },
+            )
+          : null,
+      };
+    };
+    // Kept apart from the groups, since a group can be named anything, `everyone` included.
+    const comparisons = {
+      overall: compareWith(null),
+      byGroup: Object.fromEntries(reported.map((groupId) => [groupId, compareWith(groupId)])),
+    };
     return { ...base, comparisons };
   });
 
-  // Headline: each model's mean similarity to each group, over the questions compared.
-  const closeness = Object.fromEntries(
-    groupList.map(({ id: groupId }) => [
-      groupId,
-      Object.fromEntries(
-        modelIds.map((modelId) => {
-          const values = results
-            .map((result) => result.comparisons?.[groupId]?.byModel?.[modelId]?.similarity)
-            .filter(Number.isFinite);
-          return [modelId, { similarity: round(mean(values)), questions: values.length }];
-        }),
-      ),
-    ]),
-  );
+  // Headline: each model's mean similarity to everyone and to each group, over the questions compared.
+  const closenessTo = (comparisonOf) =>
+    Object.fromEntries(
+      modelIds.map((modelId) => {
+        const values = results
+          .map((result) => (result.comparisons ? comparisonOf(result.comparisons) : null)?.byModel?.[modelId]?.similarity)
+          .filter(Number.isFinite);
+        return [modelId, { similarity: round(mean(values)), questions: values.length }];
+      }),
+    );
 
   return {
     kind: 'ai_discourse_bench_answer_comparison',
@@ -417,10 +412,16 @@ export const compareAnswers = ({
     setId: answersFile.setId || '',
     generatedAt: new Date().toISOString(),
     options: { minPeople, bootstrapSamples, seed },
-    groups: groupList,
+    people: participants.length,
+    groups: reported.map((id) => ({ id, people: groupSizes.get(id) })),
     groupsWithheld: groupSizes.size - reported.length,
     models: modelIds,
-    closeness,
+    closeness: {
+      overall: closenessTo((comparisons) => comparisons.overall),
+      byGroup: Object.fromEntries(
+        reported.map((groupId) => [groupId, closenessTo((comparisons) => comparisons.byGroup[groupId])]),
+      ),
+    },
     questions: results,
   };
 };
@@ -428,8 +429,12 @@ export const compareAnswers = ({
 const cell = (value) => (value === null || value === undefined ? '–' : String(value));
 const range = (interval) => (interval ? `${interval[0]} to ${interval[1]}` : '–');
 
-/** A readable summary: the closeness table per group, then each question's statistics. */
+/** A readable summary: the closeness table for everyone and each group, then each question's statistics. */
 export const renderComparisonMarkdown = (report) => {
+  const columns = [
+    { label: `Everyone (${report.people})`, closeness: report.closeness.overall },
+    ...report.groups.map((group) => ({ label: `Group ${group.id} (${group.people})`, closeness: report.closeness.byGroup[group.id] })),
+  ];
   const lines = [
     '# Models compared with people',
     '',
@@ -438,14 +443,14 @@ export const renderComparisonMarkdown = (report) => {
       (report.groupsWithheld ? ` (${report.groupsWithheld} withheld)` : '') +
       '. Each model counts once: its replies are summarized as its most common answer, the median rating or the mean allocation.',
     '',
-    '## How close each model is to each group',
+    '## How close each model is to everyone and to each group',
     '',
     'Mean similarity (0 to 1) of the model’s answer to each person’s, averaged over the questions compared.',
     '',
-    `| Model | ${report.groups.map((group) => `${group.id} (${group.people})`).join(' | ')} |`,
-    `| --- | ${report.groups.map(() => '---').join(' | ')} |`,
+    `| Model | ${columns.map((column) => column.label).join(' | ')} |`,
+    `| --- | ${columns.map(() => '---').join(' | ')} |`,
     ...report.models.map(
-      (modelId) => `| ${modelId} | ${report.groups.map((group) => cell(report.closeness[group.id]?.[modelId]?.similarity)).join(' | ')} |`,
+      (modelId) => `| ${modelId} | ${columns.map((column) => cell(column.closeness?.[modelId]?.similarity)).join(' | ')} |`,
     ),
     '',
     '## Questions',
@@ -456,12 +461,16 @@ export const renderComparisonMarkdown = (report) => {
       lines.push('', question.notCompared);
       continue;
     }
-    for (const [groupId, comparison] of Object.entries(question.comparisons)) {
+    const groups = [
+      ['Everyone', question.comparisons.overall],
+      ...Object.entries(question.comparisons.byGroup).map(([groupId, comparison]) => [`Group ${groupId}`, comparison]),
+    ];
+    for (const [label, comparison] of groups) {
       if (comparison.suppressed) {
-        lines.push('', `**${groupId}**: withheld (${comparison.people} people answered).`);
+        lines.push('', `**${label}**: withheld (${comparison.people} people answered).`);
         continue;
       }
-      lines.push('', `**${groupId}** (${comparison.people} people)`, '');
+      lines.push('', `**${label}** (${comparison.people} people)`, '');
       const statKeys = [...new Set(Object.values(comparison.byModel).flatMap((stats) => Object.keys(stats)))];
       lines.push(`| Model | ${statKeys.join(' | ')} |`, `| --- | ${statKeys.map(() => '---').join(' | ')} |`);
       for (const [modelId, stats] of Object.entries(comparison.byModel)) {
