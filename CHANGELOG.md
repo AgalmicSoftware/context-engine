@@ -60,14 +60,14 @@ All notable changes to this project will be documented in this file.
 - SBT pages show the chain's holder count, not 0, until a full count loads.
 - An already-saved interview answer reports "Responses already saved" while another answer has an unsent edit, and a tag removed while AI suggestions load stays removed.
 - A link padded with thousands of `=` no longer freezes the page, and a setup link opened over a draft with a problem lists what it changes.
-- If another account signs in while Group Conversation records, recording stops and its chunks wait on the device until the account that made them signs back in. A sign-out still uploads signed out.
-- The HTML report lists a question whose text the author encrypted as "Encrypted question", with its ID, type and answer count but no prompt, options or tags, even after you decrypt it. Its AI analysis leaves such questions and their answers out.
-- Results drops answers decrypted for one account when the account changes, including a decryption that finishes after the change.
-- Question text decrypted for one account is locked again when another account signs in and when the page loads, until it is decrypted for the current reader.
+- If another account signs in while Group Conversation records, recording stops and its chunks wait on the device until the account that made them signs back in. A recording started signed out belongs to the first account that signs in during it. A sign-out still uploads signed out.
+- The HTML report lists a question whose text the author encrypted as "Encrypted question", with its ID, type and answer count but no prompt, options or tags, even after you decrypt it. Its AI analysis, and the Generated AI views that other viewers open, leave such questions and their answers out.
+- Results drops answers decrypted for one account when the account changes, including a decryption that finishes after the change, and stops decrypting the remaining rows.
+- Question text decrypted for one account is locked again when another account signs in or the account signs out, until it is decrypted for the current reader. A Decrypt Prompt that finishes after an account change is neither shown nor saved.
 - Session context files and links reset when the reader or the session's Worker changes, so the next reader never sees or sends the previous reader's admins-only items.
 - Profile SBT badges are kept per chain, so a badge burned on one chain no longer hides one earned at the same address on another.
 - Results analysis of on-chain sessions keeps answers to options whose text has repeated spaces.
-- Creating an SBT group stops before any transaction or draft save if the wallet account changes after Create.
+- Creating an SBT group stops before the next upload, transaction or draft save if the wallet account changes after Create.
 - Stats show cached counts within a few seconds while live group counts load or wait for a sign-in.
 - A changed multiple-choice draft is always saved; some option labels containing commas could make it look unchanged.
 - The Results report ignores ratings that are off the question's step grid.
@@ -96,11 +96,11 @@ All notable changes to this project will be documented in this file.
 - An agent's overlapping next-question requests are handled one at a time, so none repeats a question or loses history, and a repeated `requestId` returns the same question. A restore target that holds agent question state is no longer treated as empty.
 - Session context accepts Wikipedia, Notion and block-explorer links. The secret check also refuses Telegram bot tokens, RPC links carrying an Alchemy or Infura key, and Stripe and Hugging Face keys.
 - A payload's own groups narrow a group-gated session's audience instead of adding to it, so a session member outside them can't read or list the payload.
-- Session Wrapped loads catalogs of more than 200 questions instead of returning 503.
+- Session Wrapped loads catalogs of more than 200 questions instead of returning 503. It still reads at most 1,000 stored question rows, and re-uploaded or hidden questions count toward that.
 - Context links drop hidden script, style and navigation text however the closing tag is written.
 - A context link or PDF reading started by an admin who has since been replaced is refused instead of published.
 - One request at a time reads a context PDF; another gets 409 "already being read", and readings and removals no longer undo each other.
-- Faucet payouts take turns with the session's wallet, in hosted and registry sessions and for agents, so concurrent requests no longer fail on the same nonce. A request that waits 30 seconds for its turn gets 503.
+- Faucet payouts take turns with their signing wallet, in hosted and registry sessions, for agents and for sponsored grants, so concurrent requests no longer fail on the same nonce, even when sessions share a key. A running payout keeps its turn; a request that waits 30 seconds gets 503 and leaves a sponsored grant unspent.
 - Results analysis drops ratings off the question's step grid, agent-created rating questions keep their end labels, and the interview catalog and brief include each rating's step.
 
 ### Benchmark
