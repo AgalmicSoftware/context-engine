@@ -36,7 +36,10 @@ import { surveyReadsPort } from '../../domains/surveys/surveyChainReadsPort.js';
 import { faucetFundingPort } from '../../domains/worker/faucetFundingPort.js';
 import { clearDecryptCaches, cryptoUtils } from '../../utilities/crypto/cryptography.js';
 import { clearSurveyDraftsForAccount } from '../SurveyTool/surveyToolDraftState.js';
-import { purgeWorkerCanonicalCaches } from '../../utilities/survey/workerCanonicalCacheIdentity';
+import {
+  purgeWorkerCanonicalCaches,
+  remaskChainQuestionCaches,
+} from '../../utilities/survey/workerCanonicalCacheIdentity';
 import { getGlobalLitHooks } from '../../utilities/crypto/litProtocol.js';
 import { ethers } from 'ethers';
 import {
@@ -2297,6 +2300,8 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
         this.setState(buildMainSiteCacheManagerReadyStatePatch());
       }
     }
+    // Question text decrypted in an earlier visit stays locked until this reader decrypts it.
+    void remaskChainQuestionCaches().catch((e) => mainSiteLog.warn('MainSite: cleanup', e));
 
     // Determine active group from URL and persist locally in state
     const postInitPathRaw = this.getCurrentPathname();

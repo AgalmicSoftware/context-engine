@@ -1,5 +1,6 @@
 import { resolveWorkerCanonicalStorageTarget } from '../../domains/surveys/workerCanonicalAuthoringPort';
 import { initCacheManager, listNamespaceSlugsSync, peekCacheSync, updateCacheAtomic } from '../cache/cacheScripts';
+import { remaskQuestionForReader } from './decryptedQuestionReader';
 import { getWorkerCanonicalCacheReader, normalizeWorkerCanonicalCacheReader } from './workerCanonicalCacheReader';
 
 type UnknownRecord = Record<string, unknown>;
@@ -171,6 +172,37 @@ const stripWorkerCanonicalCacheNodes = (
 
 const READER_SCOPED_CACHE_NAMESPACES = ['questionsCache', 'surveysCache', 'userCache'];
 
+// Applies `change` to every cached slug of `namespace` it alters.
+const updateChangedCaches = (namespace: string, change: (cacheRoot: unknown) => UnknownRecord | null) =>
+  listNamespaceSlugsSync(namespace)
+    .filter((slug) => change(peekCacheSync(namespace, slug, { clone: false })))
+    .map((slug) => updateCacheAtomic<UnknownRecord>(namespace, slug, (current) => change(current) || current || {}));
+
+// Locks question text in the chain nodes of a questionsCache root again when it
+// was decrypted for anyone but `reader`.
+const remaskChainQuestions = (cacheRoot: unknown, reader: string): UnknownRecord | null => {
+  if (!isRecord(cacheRoot)) return null;
+  let next: UnknownRecord | null = null;
+  for (const [scope, node] of Object.entries(cacheRoot)) {
+    if (scope === WORKER_CANONICAL_CACHE_SCOPE_KEY || !isRecord(node) || !isRecord(node.questions)) continue;
+    const questions: UnknownRecord = { ...node.questions };
+    let changed = false;
+    for (const qid of Object.keys(questions)) {
+      const masked = remaskQuestionForReader(questions[qid], reader);
+      if (masked) questions[qid] = masked;
+      changed = changed || !!masked;
+    }
+    if (changed) next = { ...(next || cacheRoot), [scope]: { ...node, questions } };
+  }
+  return next;
+};
+
+// Runs on every account change and once at startup, before the reader is known.
+export const remaskChainQuestionCaches = async (reader = getWorkerCanonicalCacheReader()): Promise<void> => {
+  await initCacheManager();
+  await Promise.all(updateChangedCaches('questionsCache', (cacheRoot) => remaskChainQuestions(cacheRoot, reader)));
+};
+
 // Worker nodes hold what the previous account was authorized to read, including
 // Worker-decrypted answers, so an account change also removes them from storage.
 export const purgeWorkerCanonicalCaches = async (previousReader: unknown): Promise<void> => {
@@ -179,17 +211,8 @@ export const purgeWorkerCanonicalCaches = async (previousReader: unknown): Promi
   await initCacheManager();
   await Promise.all(
     READER_SCOPED_CACHE_NAMESPACES.flatMap((namespace) =>
-      listNamespaceSlugsSync(namespace)
-        .filter((slug) =>
-          stripWorkerCanonicalCacheNodes(namespace, peekCacheSync(namespace, slug, { clone: false }), reader),
-        )
-        .map((slug) =>
-          updateCacheAtomic<UnknownRecord>(
-            namespace,
-            slug,
-            (current) => stripWorkerCanonicalCacheNodes(namespace, current, reader) || current || {},
-          ),
-        ),
+      updateChangedCaches(namespace, (cacheRoot) => stripWorkerCanonicalCacheNodes(namespace, cacheRoot, reader)),
     ),
   );
+  await remaskChainQuestionCaches();
 };

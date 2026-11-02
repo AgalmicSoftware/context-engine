@@ -2,6 +2,7 @@ import { listNamespaceSlugsSync, peekCacheSync, updateCacheAtomic } from '../cac
 import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../session/sessionModeProfile';
 import {
   purgeWorkerCanonicalCaches,
+  remaskChainQuestionCaches,
   resolveWorkerCanonicalCacheIdentity,
   resolveWorkerCanonicalSessionKey,
   workerCanonicalCacheIdentityMatches,
@@ -234,6 +235,68 @@ it("removes the previous reader's Worker nodes from persistent caches on an acco
   expect((cache.get('questionsCache|b') as Cache).worker).toBeDefined();
   expect(cache.get('userCache|a')).toEqual({ '0xadmin': { 11155420: chainNode }, '0xother': { 11155420: chainNode } });
   expect(updateCacheAtomic).toHaveBeenCalledTimes(2);
+});
+
+describe('question text decrypted into shared chain nodes', () => {
+  const locked = {
+    id: 'q',
+    prompt: '[encrypted]',
+    promptEncrypted: 'envelope',
+    options: [],
+    optionsEncrypted: 'envelope',
+  };
+  const decryptedFor = (reader?: string) => ({
+    ...locked,
+    prompt: 'Private prompt',
+    promptDecrypted: true,
+    options: ['Private option'],
+    optionsDecrypted: true,
+    ...(reader === undefined ? {} : { decryptedFor: reader }),
+  });
+  let cache: Map<string, unknown>;
+  beforeEach(() => {
+    cache = new Map<string, unknown>([
+      [
+        'questionsCache|a',
+        {
+          11155420: {
+            questions: { admin: decryptedFor('0xadmin'), own: decryptedFor('0xnext'), legacy: decryptedFor() },
+          },
+          worker: withWorkerCanonicalCacheIdentity(
+            { questions: { w: decryptedFor('0xnext') } },
+            resolveWorkerCanonicalCacheIdentity({ sessionConfig: config, sessionSlug: slug, reader: '0xnext' }),
+          ),
+        },
+      ],
+    ]);
+    jest
+      .mocked(listNamespaceSlugsSync)
+      .mockImplementation((namespace) =>
+        [...cache.keys()].filter((key) => key.startsWith(`${namespace}|`)).map((key) => key.split('|')[1]),
+      );
+    jest.mocked(peekCacheSync).mockImplementation((namespace, key) => cache.get(`${namespace}|${key}`) as any);
+    jest.mocked(updateCacheAtomic).mockImplementation(async (namespace, key, update) => {
+      const next = await update!(cache.get(`${namespace}|${key}`) as any);
+      cache.set(`${namespace}|${key}`, next);
+      return next;
+    });
+  });
+
+  it('locks text another reader decrypted again on an account change', async () => {
+    setWorkerCanonicalCacheReader('0xnext');
+    await purgeWorkerCanonicalCaches('0xadmin');
+
+    const root = cache.get('questionsCache|a') as Cache;
+    expect(root[11155420].questions).toEqual({ admin: locked, own: decryptedFor('0xnext'), legacy: locked });
+    expect(root.worker.questions.w).toEqual(decryptedFor('0xnext'));
+  });
+
+  it('locks every decrypted text at startup, before the reader is known', async () => {
+    setWorkerCanonicalCacheReader('');
+    await remaskChainQuestionCaches();
+
+    expect(JSON.stringify((cache.get('questionsCache|a') as Cache)[11155420])).not.toContain('Private');
+  });
 });
 
 it('keeps draft storage keys independent of the reader so saved drafts stay reachable', () => {
