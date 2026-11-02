@@ -2,6 +2,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { buildSessionContextPrompt } from '@ce-shared/sessionContextText.mjs';
+import { getUsableSessionWorkerUrl } from '../session/sessionWorkerAvailability';
+import { resolveWorkerCanonicalSessionIdHex } from '../session/sessionWorkerDiscovery';
 import { isConfiguredAdmin } from '../storage/storageClient';
 import { requiresLitForSessionStorage, usesCloudflareSessionStorage } from '../storage/sessionStorageConfig';
 import { listContextSources, loadContextSourcesForAi, type ContextSource } from './contextSources';
@@ -14,13 +16,27 @@ type Input = { sessionSlug: string; sessionConfig: unknown; account?: unknown; e
 
 export type SessionContextSourcesState = ReturnType<typeof useSessionContextSources>;
 
+const NO_SOURCES: ContextSource[] = [];
+
+/** Whose sources these are: another session, reader, role or Worker never sees them. */
+const contextSourcesIdentity = (input: Input, isAdmin: boolean): string =>
+  JSON.stringify([
+    input.sessionSlug,
+    String(input.account || '').toLowerCase(),
+    isAdmin,
+    getUsableSessionWorkerUrl({ slug: input.sessionSlug, sessionConfig: input.sessionConfig }),
+    resolveWorkerCanonicalSessionIdHex(input.sessionConfig),
+  ]);
+
 export function useSessionContextSources({ sessionSlug, sessionConfig, account = '', enabled = true }: Input) {
   const supported = supportsContextSources(sessionConfig);
   const isAdmin = isConfiguredAdmin(sessionConfig, { account });
+  const identity = contextSourcesIdentity({ sessionSlug, sessionConfig, account }, isAdmin);
   const configRef = useRef(sessionConfig);
   configRef.current = sessionConfig;
   const [revision, setRevision] = useState(0);
-  const [state, setState] = useState<{ sources: ContextSource[]; loading: boolean; error: string }>({
+  const [state, setState] = useState<{ identity: string; sources: ContextSource[]; loading: boolean; error: string }>({
+    identity: '',
     sources: [],
     loading: false,
     error: '',
@@ -28,16 +44,22 @@ export function useSessionContextSources({ sessionSlug, sessionConfig, account =
   const active = enabled && supported && !!sessionSlug;
   useEffect(() => {
     if (!active) {
-      setState({ sources: [], loading: false, error: '' });
+      setState({ identity, sources: [], loading: false, error: '' });
       return undefined;
     }
     let current = true;
-    setState((prev) => ({ ...prev, loading: true, error: '' }));
+    // Only a reload for the same identity keeps the current list while loading.
+    setState((prev) =>
+      prev.identity === identity
+        ? { ...prev, loading: true, error: '' }
+        : { identity, sources: [], loading: true, error: '' },
+    );
     listContextSources({ sessionSlug, sessionConfig: configRef.current, context: { account }, asAdmin: isAdmin })
-      .then((sources) => current && setState({ sources, loading: false, error: '' }))
+      .then((sources) => current && setState({ identity, sources, loading: false, error: '' }))
       .catch((error: unknown) => {
         if (current) {
           setState({
+            identity,
             sources: [],
             loading: false,
             error: error instanceof Error ? error.message : 'Context sources could not be read.',
@@ -47,9 +69,19 @@ export function useSessionContextSources({ sessionSlug, sessionConfig, account =
     return () => {
       current = false;
     };
-  }, [active, sessionSlug, account, isAdmin, revision]);
+  }, [active, identity, sessionSlug, account, isAdmin, revision]);
   const reload = useCallback(() => setRevision((value) => value + 1), []);
-  return { ...state, supported, isAdmin, reload };
+  // The render that changes identity runs before the effect clears the old list.
+  const { identity: loadedFor, ...loaded } = state;
+  const fresh = loadedFor === identity;
+  return {
+    sources: fresh ? loaded.sources : NO_SOURCES,
+    loading: fresh ? loaded.loading : active,
+    error: fresh ? loaded.error : '',
+    supported,
+    isAdmin,
+    reload,
+  };
 }
 
 /**
@@ -59,7 +91,8 @@ export function useSessionContextSources({ sessionSlug, sessionConfig, account =
  */
 export function useSessionContextPrompt({ totalChars, ...input }: Input & { totalChars: number }) {
   const { sources, loading, isAdmin } = useSessionContextSources(input);
-  const [text, setText] = useState('');
+  const identity = contextSourcesIdentity(input, isAdmin);
+  const [prompt, setPrompt] = useState({ identity: '', text: '' });
   const configRef = useRef(input.sessionConfig);
   configRef.current = input.sessionConfig;
   const notes = JSON.stringify((input.sessionConfig as { sessionContext?: unknown } | null)?.sessionContext ?? null);
@@ -73,11 +106,12 @@ export function useSessionContextPrompt({ totalChars, ...input }: Input & { tota
     };
     void loadContextSourcesForAi(sources, options).then((loaded) => {
       if (!current) return;
-      setText(buildSessionContextPrompt({ sessionContext: JSON.parse(notes), sources: loaded, totalChars }).text);
+      const text = buildSessionContextPrompt({ sessionContext: JSON.parse(notes), sources: loaded, totalChars }).text;
+      setPrompt({ identity, text });
     });
     return () => {
       current = false;
     };
-  }, [sources, notes, totalChars, input.sessionSlug, input.account, isAdmin]);
-  return { text, loading };
+  }, [sources, notes, totalChars, identity, input.sessionSlug, input.account, isAdmin]);
+  return { text: prompt.identity === identity ? prompt.text : '', loading };
 }
