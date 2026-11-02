@@ -162,6 +162,36 @@ describe('sessionResultsAnalysisBrowserSnapshot', () => {
     expect(source.counts).toEqual(expect.objectContaining({ responseCount: 2, excludedCount: 0 }));
   });
 
+  it('leaves questions with author-encrypted text and their answers out of the shared snapshot', () => {
+    const result = buildResultsAnalysisBrowserSnapshotFromCacheNode({
+      sessionSlug: 'edge',
+      networkNode: {
+        questions: {
+          q1: { id: 'q1', prompt: 'Open question?', type: 'text', sessionSlug: 'edge' },
+          q2: {
+            id: 'q2',
+            prompt: 'Decrypted gated prompt',
+            promptDecrypted: true,
+            promptEncrypted: { ciphertext: 'fixture' },
+            options: ['Gated option'],
+            type: 'multichoice',
+            sessionSlug: 'edge',
+          },
+        },
+        questionResponses: {
+          q1: { '0xaaa': { answer: { value: 'Visible answer' }, sessionSlug: 'edge' } },
+          q2: { '0xaaa': { answer: { value: ['Gated option'] }, sessionSlug: 'edge' } },
+        },
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    const serialized = JSON.stringify(result);
+    expect(serialized).toContain('Open question?');
+    expect(serialized).not.toContain('Decrypted gated prompt');
+    expect(serialized).not.toContain('Gated option');
+  });
+
   it('reports unsupported when cache is not hydrated', () => {
     const result = buildResultsAnalysisBrowserSnapshotFromCacheNode({ networkNode: {}, sessionSlug: 'edge' });
     expect(result.ok).toBe(false);

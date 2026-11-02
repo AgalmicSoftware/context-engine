@@ -1,4 +1,5 @@
 import { optionsOf } from '../../../../shared/questions/answerValue.mjs';
+import { hasAuthorEncryptedText } from '../../utilities/survey/authorEncryptedQuestion';
 import { normalizeRatingScale } from '../../utilities/survey/ratingValue';
 import { isResponseAllowedForSessionSlug } from '../../utilities/session/responseSessionScope';
 
@@ -82,6 +83,8 @@ export const buildResultsAnalysisBrowserSnapshotFromCacheNode = ({
   Object.entries(questionsById).forEach(([questionId, questionRaw]) => {
     const question = toRecord(questionRaw);
     if (!questionIsHydratedForSession(question, normalizedSlug)) return;
+    // The Worker stores this snapshot for every Results viewer, so encrypted questions and their answers stay out.
+    if (hasAuthorEncryptedText(question)) return;
     const type = toText(question.type || question.questionType);
     questions.push({
       id: toText(question.id || questionId),
