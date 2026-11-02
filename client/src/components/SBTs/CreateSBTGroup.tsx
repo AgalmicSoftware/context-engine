@@ -3342,8 +3342,10 @@ class CreateSBTGroup extends Component<any, any> {
       const hasImmediateUploadPath =
         hasConnectedCreator && (!!toStr(arweaveKey?.arweaveJwk).trim() || !!this.getResolvedArweaveUploadWorkerUrl());
       if (hasImmediateUploadPath) {
+        assertCreateSbtAccountUnchanged(account, this.props.account);
         try {
           await this.uploadImageToArweave();
+          assertCreateSbtAccountUnchanged(account, this.props.account);
           tokenURI = String(await this.uploadTokenUriToArweave()).trim();
           metadataUploadStatus = tokenURI ? 'ready' : 'pending-upload';
         } catch (error) {
@@ -3751,7 +3753,9 @@ class CreateSBTGroup extends Component<any, any> {
       if (this.isDeferredDeployMode()) {
         await this.handleDeferredSave({ groupPassword, account });
       } else {
+        assertCreateSbtAccountUnchanged(account, this.props.account);
         await this.uploadImageToArweave();
+        assertCreateSbtAccountUnchanged(account, this.props.account);
         await this.uploadTokenUriToArweave();
         await this.mintSBT({ groupPassword, account });
       }
