@@ -221,6 +221,12 @@ Semantics:
   monotonically advancing `questionsLatestBlock`; a partial or failed pass keeps
   its retryable frontier. Readiness and UI revisions are published only after
   persistence succeeds.
+- Decrypted question text in a chain node records `decryptedFor`, the account it
+  was decrypted for; text saved without it counts as another account's. A sign-in,
+  sign-out or account switch locks text decrypted for anyone else again. Known
+  limits: text left by an account that closed the browser while signed in stays
+  readable to a signed-out visitor until someone signs in, and cached survey
+  titles and document links are not locked this way yet.
 
 ## Important normalization rules
 
