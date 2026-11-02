@@ -126,3 +126,19 @@ describe('Group Conversation dialog colours', () => {
     );
   });
 });
+
+// Floating at zero height, the new-drafts cue covered the recorder and each draft's type chip and Edit
+// button on a phone; it now holds a lane of the dialog's colour, and scroll targets stop below it.
+it('gives the new-drafts cue its own lane and keeps scroll targets below it', () => {
+  const scss = readSurveyToolScss();
+  const cue = ruleText(scss, '.sessionNewDraftsCue');
+  // Sticky offsets start inside the body's 18px padding, which would show scrolled drafts above the lane.
+  expect(cue).toMatch(/position: sticky;\s*(\/\/[^\n]*\s*)*top: -18px;/);
+  expect(cue).not.toMatch(/[^-]height: 0;/);
+  expect(cue).toMatch(
+    /&:has\(> button\) \{\s*margin: 0 -18px -10px;\s*padding: 8px 18px;\s*background: var\(--ce-surface-sunken\);/,
+  );
+  expect(ruleText(scss, '.sessionVoiceModeModal :global(.modal-body):has(.sessionNewDraftsCue > button)')).toMatch(
+    /scroll-padding-top: 64px;/,
+  );
+});
