@@ -128,15 +128,22 @@ describe('Group Conversation dialog colours', () => {
 });
 
 // Floating at zero height, the new-drafts cue covered the recorder and each draft's type chip and Edit
-// button on a phone; it now holds a lane of the dialog's colour, and scroll targets stop below it.
-it('gives the new-drafts cue its own lane and keeps scroll targets below it', () => {
+// button on a phone. Once drafts exist it keeps a lane of its own, so showing or clearing it moves nothing;
+// while it shows, the lane sticks to the top of the dialog body and scroll targets stop below it.
+it('gives the new-drafts cue a lane of its own and keeps scroll targets below it', () => {
   const scss = readSurveyToolScss();
   const cue = ruleText(scss, '.sessionNewDraftsCue');
-  // Sticky offsets start inside the body's 18px padding, which would show scrolled drafts above the lane.
-  expect(cue).toMatch(/position: sticky;\s*(\/\/[^\n]*\s*)*top: -18px;/);
   expect(cue).not.toMatch(/[^-]height: 0;/);
   expect(cue).toMatch(
-    /&:has\(> button\) \{\s*margin: 0 -18px -10px;\s*padding: 8px 18px;\s*background: var\(--ce-surface-sunken\);/,
+    /\.sessionListeningPanelWithDraft > & \{\s*box-sizing: border-box;\s*min-height: 56px;\s*margin: 0 calc\(-1 \* var\(--ce-voice-body-pad\)\) -10px;\s*padding: 8px var\(--ce-voice-body-pad\);/,
+  );
+  // Sticky offsets start inside the body's padding, which would show scrolled drafts above the lane.
+  expect(cue).toMatch(
+    /&:has\(> button\) \{\s*position: sticky;\s*(\/\/[^\n]*\s*)*top: calc\(-1 \* var\(--ce-voice-body-pad\)\);\s*z-index: 3;\s*background: var\(--ce-surface-sunken\);/,
+  );
+  expect(scss).toMatch(/\.sessionVoiceModeModal \{\s*(\/\/[^\n]*\s*)*--ce-voice-body-pad: 18px;/);
+  expect(ruleText(scss, '.sessionVoiceModeModal')).toMatch(
+    /:global\(\.modal-body\) \{\s*min-height: 0;\s*padding: var\(--ce-voice-body-pad\);/,
   );
   expect(ruleText(scss, '.sessionVoiceModeModal :global(.modal-body):has(.sessionNewDraftsCue > button)')).toMatch(
     /scroll-padding-top: 64px;/,
