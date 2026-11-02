@@ -75,8 +75,9 @@ const AUTH_NONCE_USED_KEY = 'auth-nonce-used';
 const AUTH_RATE_RECORD_KEY = 'auth-rate-record';
 const HOSTED_FAUCET_QUOTA_KEY = 'hosted-faucet-quota-v1';
 const FAUCET_WALLET_TURN_KEY = 'faucet-wallet-turn-v1';
-// Longer than one faucet send; a crashed request's turn then expires.
+// A crashed request's turn expires after this; a live one renews it while it sends.
 const FAUCET_WALLET_TURN_MS = 60_000;
+const FAUCET_WALLET_RENEW_MS = 20_000;
 const FAUCET_WALLET_WAIT_MS = 30_000;
 const FAUCET_WALLET_POLL_MS = 100;
 const CONTEXT_PDF_READING_PREFIX = 'context-pdf-reading:';
@@ -2697,6 +2698,10 @@ export class SessionWriteCoordinator {
         if (held) await transaction.delete(FAUCET_WALLET_TURN_KEY);
         return { ok: true };
       }
+      if (action === 'renew') {
+        if (held) await transaction.put(FAUCET_WALLET_TURN_KEY, { token: turn.token, expiresAtMs: nowMs + FAUCET_WALLET_TURN_MS });
+        return { ok: true, held };
+      }
       if (turn?.expiresAtMs > nowMs) return { ok: true, acquired: false };
       const token = createAttemptId(this.crypto);
       await transaction.put(FAUCET_WALLET_TURN_KEY, { token, expiresAtMs: nowMs + FAUCET_WALLET_TURN_MS });
@@ -3124,7 +3129,7 @@ export class SessionWriteCoordinator {
     if (url.pathname === '/hosted-faucet/reserve' || url.pathname === '/hosted-faucet/finalize') {
       return this.executeHostedFaucetQuota(payload, url.pathname.endsWith('/finalize'));
     }
-    if (['/faucet-wallet/acquire', '/faucet-wallet/release'].includes(url.pathname)) {
+    if (['/faucet-wallet/acquire', '/faucet-wallet/renew', '/faucet-wallet/release'].includes(url.pathname)) {
       return this.executeFaucetWalletTurn(payload, url.pathname.slice('/faucet-wallet/'.length));
     }
     if (url.pathname === '/auth-state/rate/check') {
@@ -3413,10 +3418,11 @@ export const reserveCoordinatedHostedFaucet = (args = {}) => callHostedFaucetQuo
 export const finalizeCoordinatedHostedFaucet = (args = {}) => callHostedFaucetQuota(args, true);
 
 // One send at a time per faucet wallet on this Worker, whichever sessions or grants share its key: each
-// request reads the pending nonce, signs and sends before the next reads it. Returns null without a
-// turn. A missing or malformed key fails in the faucet before any nonce read, so it sends without a turn.
+// request reads the pending nonce, signs and sends before the next reads it. The turn is renewed while
+// the send runs, so a stalled RPC call can't let another request in. Returns null without a turn. A
+// missing or malformed key fails in the faucet before any nonce read, so it sends without a turn.
 export const withCoordinatedFaucetWalletTurn = async ({ env, secrets, now = Date.now,
-  sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)) }, send) => {
+  sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)), renewEveryMs = FAUCET_WALLET_RENEW_MS }, send) => {
   let wallet = '';
   try {
     wallet = computeAddress(toTrimmedString(secrets?.faucetPrivateKey)).toLowerCase();
@@ -3432,9 +3438,11 @@ export const withCoordinatedFaucetWalletTurn = async ({ env, secrets, now = Date
     turn = await call('acquire');
   }
   if (!turn.acquired) return null;
+  const renewal = setInterval(() => { void call('renew', { token: turn.token }); }, renewEveryMs);
   try {
     return await send();
   } finally {
+    clearInterval(renewal);
     await call('release', { token: turn.token });
   }
 };
