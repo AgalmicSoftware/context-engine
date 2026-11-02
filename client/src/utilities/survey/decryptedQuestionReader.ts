@@ -14,14 +14,18 @@ const LOCKED_FIELDS = [
 const isRecord = (value: unknown): value is UnknownRecord =>
   !!value && typeof value === 'object' && !Array.isArray(value);
 
-export const stampDecryptedQuestion = <T extends object>(question: T, reader: unknown): T => ({
-  ...question,
-  [DECRYPTED_FOR_FIELD]: normalizeWorkerCanonicalCacheReader(reader),
-});
+const hasDecryptedText = (question: unknown): question is UnknownRecord =>
+  isRecord(question) && LOCKED_FIELDS.some(([flag]) => question[flag]);
+
+/** Records the reader a question's decrypted text belongs to; other questions are returned as they are. */
+export const stampDecryptedQuestion = <T extends object>(question: T, reader: unknown): T =>
+  hasDecryptedText(question)
+    ? { ...question, [DECRYPTED_FOR_FIELD]: normalizeWorkerCanonicalCacheReader(reader) }
+    : question;
 
 /** The question locked again when its text was decrypted for another reader; null when it can stay. */
 export const remaskQuestionForReader = (question: unknown, reader: string): UnknownRecord | null => {
-  if (!isRecord(question) || !LOCKED_FIELDS.some(([flag]) => question[flag])) return null;
+  if (!hasDecryptedText(question)) return null;
   if (question[DECRYPTED_FOR_FIELD] === reader) return null;
   const masked: UnknownRecord = { ...question };
   LOCKED_FIELDS.forEach(([flag, field, locked]) => {

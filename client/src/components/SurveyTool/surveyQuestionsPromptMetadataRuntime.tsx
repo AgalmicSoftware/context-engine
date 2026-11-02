@@ -1,3 +1,5 @@
+import { getDecryptCacheGeneration } from '../../utilities/crypto/cryptography.js';
+import { stampDecryptedQuestion } from '../../utilities/survey/decryptedQuestionReader';
 import type { SurveyQuestionsLegacyRecord, SurveyQuestionsLegacyValue } from './surveyQuestionsTypes.js';
 
 export type SurveyQuestionsPromptMetadataRuntime = SurveyQuestionsLegacyRecord;
@@ -282,6 +284,9 @@ export const createSurveyQuestionsPromptMetadataRuntime = (
     ).toLowerCase();
     const candidateSlugs: SurveyQuestionsLegacyValue = getQuestionFetchCandidateSlugs(qid, bestSlug);
     let fetchedAny: SurveyQuestionsLegacyValue = false;
+    // Text decrypted before an account change is neither shown nor saved for the next reader.
+    const decryptGeneration = getDecryptCacheGeneration();
+    const decryptedForEarlierReader = () => decryptGeneration !== getDecryptCacheGeneration();
 
     for (const candidateSlug of candidateSlugs) {
       const decryptContext: SurveyQuestionsLegacyValue = buildQuestionDecryptContext(candidateSlug);
@@ -295,9 +300,13 @@ export const createSurveyQuestionsPromptMetadataRuntime = (
           candidateSlug,
           { decryptContext },
         );
+        if (decryptedForEarlierReader()) return { promptReady: false, bestQuestionData: null, bestSlug: '' };
         if (!fetched) continue;
         fetchedAny = true;
-        const normalized: SurveyQuestionsLegacyValue = { ...fetched, id: qid };
+        const normalized: SurveyQuestionsLegacyValue = stampDecryptedQuestion(
+          { ...fetched, id: qid },
+          decryptContext?.account,
+        );
         const picked: SurveyQuestionsLegacyValue =
           pickBetterQuestionPayload(bestQuestionData, normalized) || normalized;
         bestQuestionData = picked;
@@ -320,6 +329,7 @@ export const createSurveyQuestionsPromptMetadataRuntime = (
       }
     }
 
+    if (decryptedForEarlierReader()) return { promptReady: false, bestQuestionData: null, bestSlug: '' };
     if (bestQuestionData) {
       applyQuestionPayloadToRenderedPools(qid, bestQuestionData);
       if (bestSlug || bestSlug === '') {

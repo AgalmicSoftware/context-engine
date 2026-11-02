@@ -5,6 +5,8 @@ import '../../assets/css/contextEngine.scss';
 import styles from './SurveyTool.module.scss';
 import contractScripts, { getSessionSlugByName } from '../../utilities/web3/chainGateway.js';
 import { updateCacheAtomic } from '../../utilities/cache/cacheScripts.js';
+import { getDecryptCacheGeneration } from '../../utilities/crypto/cryptography.js';
+import { stampDecryptedQuestion } from '../../utilities/survey/decryptedQuestionReader';
 import {
   resolveEffectiveSlug,
   getActiveSessionSlugFromProps,
@@ -564,6 +566,9 @@ const SurveyTool = (props: SurveyToolProps) => {
         litOpts: litGetKey ? { getKey: litGetKey } : null,
       };
 
+      // Account changes move the decrypt generation; the next reader never gets this text.
+      const decryptGeneration = getDecryptCacheGeneration();
+      const decryptedForEarlierReader = () => decryptGeneration !== getDecryptCacheGeneration();
       let questionData = await cs.getQuestionData(resolvedProps.provider, qIdLower, fetchSlug, { decryptContext });
 
       const allowGeneralFallback = !currentSlug;
@@ -577,6 +582,7 @@ const SurveyTool = (props: SurveyToolProps) => {
         });
       }
 
+      if (decryptedForEarlierReader()) return;
       if (questionData) {
         questionData.id = qIdLower;
         if (!questionData.creator) questionData.creator = '';
@@ -587,7 +593,8 @@ const SurveyTool = (props: SurveyToolProps) => {
             current && typeof current === 'object' ? (current as SurveyToolRecord) : {},
             netIdStr,
           );
-          nextCache[netIdStr].questions[qIdLower] = questionData;
+          if (decryptedForEarlierReader()) return nextCache;
+          nextCache[netIdStr].questions[qIdLower] = stampDecryptedQuestion(questionData, decryptContext.account);
           return nextCache;
         });
         const persisted = !!persistedCache;

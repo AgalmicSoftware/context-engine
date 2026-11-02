@@ -1,3 +1,4 @@
+import { clearDecryptCaches } from '../../utilities/crypto/cryptography';
 import { createSurveyQuestionsPromptMetadataRuntime } from './surveyQuestionsPromptMetadataRuntime';
 import type { SurveyQuestionsLegacyRecord } from './surveyQuestionsTypes';
 
@@ -151,5 +152,42 @@ describe('surveyQuestionsPromptMetadataRuntime', () => {
 
     runtime.handleQuestionTagSelect(' Governance ');
     expect(context.setState).toHaveBeenCalledWith({ activeTagModal: 'Governance' });
+  });
+
+  describe('manual prompt decrypt', () => {
+    const decrypted = { id: 'q1', prompt: 'Private prompt', promptDecrypted: true };
+    const createDecryptContext = (getQuestionData: jest.Mock) =>
+      createContext({ readQuestionsCache: jest.fn(() => null), surveyQuestionReadsPort: { getQuestionData } });
+
+    it('saves and shows the decrypted prompt for the reader it was decrypted for', async () => {
+      const context = createDecryptContext(jest.fn(async () => decrypted));
+      const result =
+        await createSurveyQuestionsPromptMetadataRuntime(context).fetchQuestionPayloadWithDeterministicContext('q1');
+
+      expect(result.promptReady).toBe(true);
+      expect(context.writeQuestionsCache).toHaveBeenCalledWith(
+        'question-slug',
+        expect.objectContaining({
+          11155420: { questions: { q1: expect.objectContaining({ prompt: 'Private prompt', decryptedFor: '0xabc' }) } },
+        }),
+      );
+      expect(context.setState).toHaveBeenCalled();
+    });
+
+    it('neither shows nor saves a prompt decrypted before the account changed', async () => {
+      const context = createDecryptContext(
+        jest.fn(async () => {
+          // AppShell clears the decrypt caches on every account change and sign-out.
+          clearDecryptCaches();
+          return decrypted;
+        }),
+      );
+      const result =
+        await createSurveyQuestionsPromptMetadataRuntime(context).fetchQuestionPayloadWithDeterministicContext('q1');
+
+      expect(result).toEqual({ promptReady: false, bestQuestionData: null, bestSlug: '' });
+      expect(context.writeQuestionsCache).not.toHaveBeenCalled();
+      expect(context.setState).not.toHaveBeenCalled();
+    });
   });
 });
