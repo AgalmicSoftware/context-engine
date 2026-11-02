@@ -63,7 +63,7 @@ All notable changes to this project will be documented in this file.
 - If another account signs in while Group Conversation records, recording stops and its chunks wait on the device until the account that made them signs back in. A recording started signed out belongs to the first account that signs in during it. A sign-out still uploads signed out.
 - The HTML report lists a question whose text the author encrypted as "Encrypted question", with its ID, type and answer count but no prompt, options or tags, even after you decrypt it. Its AI analysis, and the Generated AI views that other viewers open, leave such questions and their answers out.
 - Results drops answers decrypted for one account when the account changes, including a decryption that finishes after the change, and stops decrypting the remaining rows.
-- Question text decrypted for one account is locked again when another account signs in or the account signs out, until it is decrypted for the current reader. A Decrypt Prompt that finishes after an account change is neither shown nor saved.
+- Question text, survey titles and survey document links decrypted for one account are locked again when another account signs in or the account signs out, until they are decrypted for the current reader. A Decrypt Prompt that finishes after an account change is neither shown nor saved.
 - Session context files and links reset when the reader or the session's Worker changes, so the next reader never sees or sends the previous reader's admins-only items.
 - Profile SBT badges are kept per chain, so a badge burned on one chain no longer hides one earned at the same address on another.
 - Results analysis of on-chain sessions keeps answers to options whose text has repeated spaces.
