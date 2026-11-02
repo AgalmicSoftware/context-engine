@@ -95,6 +95,19 @@ const readFetchBytes = async (response, maxBytes = MAX_RESPONSE_BYTES) => {
   }
 };
 
+// Browsers also end these elements at `</tag` followed by whitespace or `/`,
+// through the next `>`. Returns the index after that `>`, or -1.
+const findClosingTagEnd = (lower, tag, from) => {
+  const prefix = `</${tag}`;
+  for (let at = lower.indexOf(prefix, from); at >= 0; at = lower.indexOf(prefix, at + prefix.length)) {
+    if (/[\t\n\f\r />]/.test(lower[at + prefix.length] || '')) {
+      const close = lower.indexOf('>', at + prefix.length);
+      return close < 0 ? -1 : close + 1;
+    }
+  }
+  return -1;
+};
+
 const stripHtml = (html) => {
   const source = String(html || '');
   const lower = source.replace(/[A-Z]/g, (letter) => letter.toLowerCase());
@@ -111,10 +124,9 @@ const stripHtml = (html) => {
     text.push(source.slice(cursor, start));
     const hidden = /^<(script|style|head|nav|footer)\b/i.exec(source.slice(start, end + 1))?.[1].toLowerCase();
     if (hidden && !missingClosers.has(hidden)) {
-      const closingTag = `</${hidden}>`;
-      const closing = lower.indexOf(closingTag, end + 1);
-      if (closing >= 0) {
-        cursor = closing + closingTag.length;
+      const closingEnd = findClosingTagEnd(lower, hidden, end + 1);
+      if (closingEnd >= 0) {
+        cursor = closingEnd;
         continue;
       }
       // Repeated unclosed elements must not keep scanning the same suffix.
