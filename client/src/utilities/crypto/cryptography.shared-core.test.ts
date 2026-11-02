@@ -24,8 +24,20 @@ describe('shared envelope v1 compatibility', () => {
 
   it('uses the canonical shared value encoders in the browser test environment', () => {
     expect([...encodeValueBytes('binary', 'Agree')]).toEqual([2]);
-    expect([...encodeValueBytes('rating', 7)]).toEqual([7]);
+    expect(new TextDecoder().decode(encodeValueBytes('rating', 7))).toBe('7');
     expect([...encodeValueBytes('multichoice', ['beta'], { options: ['alpha', 'beta', 'gamma'] })]).toEqual([2]);
     expect(new TextDecoder().decode(encodeValueBytes('freeform', 'shared-vector'))).toBe('shared-vector');
+  });
+
+  it('keeps distinct ratings distinct in their commitment bytes', () => {
+    [
+      [20, 100],
+      [-5, 0],
+      [0.1, 0.9],
+      [5, 5.5],
+    ].forEach(([left, right]) => {
+      expect(encodeValueBytes('rating', left)).not.toEqual(encodeValueBytes('rating', right));
+    });
+    expect(() => encodeValueBytes('rating', 'not a number')).toThrow('Invalid rating');
   });
 });
