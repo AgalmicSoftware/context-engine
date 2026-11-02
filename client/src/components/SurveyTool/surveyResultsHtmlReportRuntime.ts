@@ -38,6 +38,7 @@ import { runSurveyResultsAnalysisArtifactReadController } from './surveyResultsA
 import { runSurveyResultsAnalysisArtifactWriteController } from './surveyResultsAnalysisArtifactWriteController';
 import type { SurveyResultsGateRecord, SurveyResultsResponseRecord } from './surveyResultsLockedFieldHelpers';
 import type { SurveyResultsQuestionExportRecord } from './surveyResultsExportRows';
+import { hasAuthorEncryptedText } from '../../utilities/survey/authorEncryptedQuestion';
 
 type SurveyResultsHtmlReportRecord = Record<string, unknown>;
 
@@ -149,15 +150,6 @@ const HTML_REPORT_SECTION_TO_ANALYSIS_SECTION: Partial<
 const toRecord = (value: unknown): SurveyResultsHtmlReportRecord =>
   value && typeof value === 'object' ? (value as SurveyResultsHtmlReportRecord) : {};
 
-const AUTHOR_ENCRYPTED_FIELDS = [
-  'promptEncrypted',
-  'encryptedPrompt',
-  'optionsEncrypted',
-  'encryptedOptions',
-  'tagsEncrypted',
-  'encryptedTags',
-];
-
 const ENCRYPTED_QUESTION_LABEL = 'Encrypted question';
 
 // Questions whose author encrypted their text: the report shows them redacted and its AI analysis never sees
@@ -165,10 +157,10 @@ const ENCRYPTED_QUESTION_LABEL = 'Encrypted question';
 const listAuthorEncryptedQuestionIds = (networkQuestions: unknown): Set<string> => {
   const ids = new Set<string>();
   Object.entries(toRecord(networkQuestions)).forEach(([key, question]) => {
-    const record = toRecord(question);
-    if (!AUTHOR_ENCRYPTED_FIELDS.some((field) => record[field])) return;
+    if (!hasAuthorEncryptedText(question)) return;
     ids.add(key.toLowerCase());
-    if (record.id) ids.add(String(record.id).toLowerCase());
+    const { id } = toRecord(question);
+    if (id) ids.add(String(id).toLowerCase());
   });
   return ids;
 };
