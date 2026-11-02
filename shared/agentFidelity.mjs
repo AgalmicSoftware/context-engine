@@ -16,7 +16,6 @@ export const FIDELITY_METHOD_VERSION = 'ce-agent-fidelity-v1';
 const CONDITIONS = ['shown', 'blind', 'separate'];
 const BINARY_ANSWERS = ['Agree', 'Unsure', 'Disagree'];
 const STRUCTURED_TYPES = new Set(['binary', 'multichoice', 'rating', 'quadratic']);
-const TIMESTAMP_KEYS = ['timestamp', 'timeStamp', 'created_at', 'createdAt', 'submittedAt'];
 const DEFAULTS = Object.freeze({
   bootstrapSamples: 1000,
   seed: 1,
@@ -268,18 +267,22 @@ const toMs = (value) => {
   const parsed = typeof value === 'string' ? Date.parse(value) : NaN;
   return Number.isFinite(parsed) ? parsed : null;
 };
-// First timestamp found on the records, or on their answer fields, in order.
-const readTimestamp = (...records) => {
-  for (const record of records) {
-    for (const source of [record, record?.answer]) {
-      if (!isRecord(source)) continue;
-      for (const key of TIMESTAMP_KEYS) {
-        const ms = toMs(source[key]);
-        if (ms !== null) return ms;
-      }
-    }
-  }
-  return null;
+// When the Worker or the chain recorded a row: the Worker's createdAt, or the
+// row's block, transaction and log index. A payload's own clock is set by the
+// participant's browser, so it never orders records.
+const recordedAt = (row) => {
+  if (!isRecord(row)) return null;
+  const createdAt = toMs(row.createdAt ?? row.created_at);
+  if (createdAt !== null) return [createdAt];
+  const block = numberOrNull(row.blockNumber);
+  return block === null ? null : [block, numberOrNull(row.transactionIndex) ?? 0, numberOrNull(row.logIndex) ?? 0];
+};
+// Below zero when `a` was recorded before `b`; NaN when either is missing or
+// one is a Worker time and the other a place on the chain.
+const compareRecorded = (a, b) => {
+  if (!a || !b || a.length !== b.length) return NaN;
+  const index = a.findIndex((value, i) => value !== b[i]);
+  return index < 0 ? 0 : a[index] - b[index];
 };
 
 // A stored payload is one response entry or { responses: [...] }. A Results
@@ -294,14 +297,14 @@ const entriesOf = (item, row = null) => {
   return entries.map((entry) => ({ entry, payload: parsed, row }));
 };
 
-// Keeps the latest record per participant and question; without timestamps,
-// later input wins.
+// Keeps the latest record per participant and question: the one recorded last,
+// or else the later input.
 const latestByKey = (records) => {
   const latest = new Map();
   for (const record of records) {
     const key = `${record.participantId}|${record.questionId}`;
     const previous = latest.get(key);
-    if (!previous || (record.at ?? -Infinity) >= (previous.at ?? -Infinity)) latest.set(key, record);
+    if (!previous || !(compareRecorded(record.recordedAt, previous.recordedAt) < 0)) latest.set(key, record);
   }
   return [...latest.values()];
 };
@@ -327,6 +330,8 @@ export const resultsResponseRows = (source) => {
  * prediction pairs (responses that kept their AI draft comparison). Only each
  * person's latest record for a question counts, so withdrawing research
  * consent or encrypting an answer later replaces what was shared before.
+ * Latest is the order the Worker or the chain recorded rows in, or else the
+ * input order; payload timestamps are never compared.
  */
 export const collectSessionFidelityData = ({ questions = [], payloads = [] } = {}) => {
   const questionMap = mapQuestions(questions);
@@ -346,19 +351,19 @@ export const collectSessionFidelityData = ({ questions = [], payloads = [] } = {
         skipped.noParticipant += 1;
         continue;
       }
-      records.push({ participantId, questionId: question.id, question, entry, payload, at: readTimestamp(entry, payload, row) });
+      records.push({ participantId, questionId: question.id, question, entry, payload, recordedAt: recordedAt(row) });
     }
   }
   const answers = [];
   const pairs = [];
-  for (const { participantId, questionId, question, entry, payload, at } of latestByKey(records)) {
+  for (const { participantId, questionId, question, entry, payload } of latestByKey(records)) {
     const final = normalizeFidelityAnswer(question, entry.answer);
     if (final === null) {
       skipped.unreadableAnswer += 1;
       continue;
     }
     const isAgent = entry.participant?.kind === 'agent' || payload.participant?.kind === 'agent';
-    answers.push({ participantId, questionId, value: final, at, isAgent, source: text(entry.recruitment?.source) });
+    answers.push({ participantId, questionId, value: final, isAgent, source: text(entry.recruitment?.source) });
     const provenance = isRecord(entry.interviewProvenance) ? entry.interviewProvenance : null;
     const original = provenance && (provenance.originalPrediction ?? provenance.predictionComparison?.original);
     if (!isRecord(original)) continue;
@@ -399,7 +404,6 @@ export const collectSessionFidelityData = ({ questions = [], payloads = [] } = {
       // Responses saved without importance fall back on conviction, as the app does.
       importance: readStoredRating(entry.importance) ?? readStoredRating(entry.conviction),
       conviction: readStoredRating(entry.conviction),
-      at,
       isAgent,
     });
   }
@@ -439,11 +443,11 @@ export const collectWrappedFidelityPairs = ({ questions = [], rows = [] } = {}) 
       predictedConviction: null,
       importance: null,
       conviction: null,
-      at: readTimestamp(row),
       isAgent: false,
+      recordedAt: recordedAt(row),
     });
   }
-  return latestByKey(pairs);
+  return latestByKey(pairs).map(({ recordedAt: _recordedAt, ...pair }) => pair);
 };
 
 // ---------------------------------------------------------------------------
