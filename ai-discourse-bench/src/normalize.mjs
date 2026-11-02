@@ -65,51 +65,64 @@ export const extractFinalAnswerText = (rawText) => {
   return { text, truncated };
 };
 
-export const parseModelAnswer = (rawText) => {
+/**
+ * Recovers a model reply's final answer, for every question type. Reasoning
+ * regions are removed, then each JSON object with an `answer` is read with
+ * `check`, which returns `{ ok: true, value }` or `{ ok: false, error }`.
+ * Returns `{ parseError }` for truncated reasoning or JSON, an empty reply or
+ * valid answers that disagree; `{ object, checked }` for the first valid answer,
+ * or else the first invalid one; otherwise `{ objects, text }`, the JSON objects
+ * found and the reply without its reasoning.
+ */
+export const recoverFinalAnswer = (rawText, check) => {
   const extracted = extractFinalAnswerText(rawText);
-  const trimmed = extracted.text;
-  const failure = (parseError) => ({ answer: null, confidence: null, rationale: '', parseError });
-  if (extracted.truncated) return failure('truncated reasoning region');
-  if (!trimmed) return failure('empty response');
-  const { candidates, truncated } = recoverJsonObjects(trimmed);
-  if (truncated) return failure('truncated JSON response');
-  let parsedObject = null;
-  const answers = [];
-  for (const candidate of [...new Set(candidates)]) {
+  if (extracted.truncated) return { parseError: 'truncated reasoning region' };
+  if (!extracted.text) return { parseError: 'empty response' };
+  const { candidates, truncated } = recoverJsonObjects(extracted.text);
+  if (truncated) return { parseError: 'truncated JSON response' };
+  const objects = [];
+  for (const candidate of new Set(candidates)) {
     try {
-      const parsed = JSON.parse(candidate);
-      if (!parsedObject) parsedObject = parsed;
-      const answer = normalizeAnswer(parsed?.answer);
-      if (!answer) continue;
-      answers.push({
-        answer,
-        confidence: normalizeConfidence(parsed.confidence),
-        rationale: typeof parsed.rationale === 'string' ? parsed.rationale.trim() : '',
-        parseError: '',
-      });
-    } catch (_) {
+      objects.push(JSON.parse(candidate));
+    } catch {
       // Continue to the next balanced JSON object.
     }
   }
-  if (new Set(answers.map((entry) => entry.answer)).size > 1) {
-    return failure('conflicting final answer objects');
+  const answers = objects
+    .filter((object) => Object.hasOwn(object, 'answer'))
+    .map((object) => ({ object, checked: check(object.answer) }));
+  const valid = answers.filter(({ checked }) => checked.ok);
+  if (new Set(valid.map(({ checked }) => JSON.stringify(checked.value))).size > 1) {
+    return { parseError: 'conflicting final answer objects' };
   }
-  if (answers.length) return answers[0];
-  if (parsedObject) {
+  return valid[0] ?? answers[0] ?? { objects, text: extracted.text };
+};
+
+const checkBinaryAnswer = (value) => {
+  const answer = normalizeAnswer(value);
+  return answer ? { ok: true, value: answer } : { ok: false, error: 'missing or invalid answer' };
+};
+
+export const parseModelAnswer = (rawText) => {
+  const recovered = recoverFinalAnswer(rawText, checkBinaryAnswer);
+  if (recovered.parseError) return { answer: null, confidence: null, rationale: '', parseError: recovered.parseError };
+  const object = recovered.object ?? recovered.objects[0];
+  if (object) {
+    const checked = recovered.checked ?? checkBinaryAnswer(undefined);
     return {
-      answer: null,
-      confidence: normalizeConfidence(parsedObject.confidence),
-      rationale: typeof parsedObject.rationale === 'string' ? parsedObject.rationale.trim() : '',
-      parseError: 'missing or invalid answer',
+      answer: checked.ok ? checked.value : null,
+      confidence: normalizeConfidence(object.confidence),
+      rationale: typeof object.rationale === 'string' ? object.rationale.trim() : '',
+      parseError: checked.ok ? '' : checked.error,
     };
   }
 
-  const fallback = trimmed.match(/^(?:(?:answer|response)\s*[:=-]\s*)?["']?(agree|unsure|neutral|uncertain|disagree)["']?[.!]?$/i);
+  const fallback = recovered.text.match(/^(?:(?:answer|response)\s*[:=-]\s*)?["']?(agree|unsure|neutral|uncertain|disagree)["']?[.!]?$/i);
   const matched = normalizeAnswer(fallback?.[1]);
   return {
     answer: matched,
     confidence: null,
-    rationale: trimmed,
+    rationale: recovered.text,
     parseError: matched ? '' : 'response was not valid JSON or a standalone answer token',
   };
 };

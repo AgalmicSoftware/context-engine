@@ -20,7 +20,7 @@ import {
 } from './config.mjs';
 import { callOpenAiCompatibleChat, getProviderConfig } from './adapters/openai-compatible.mjs';
 import { assertSafeUniqueIdentifiers, isSafeIdentifier } from './identifiers.mjs';
-import { jsonObjectCandidates, normalizeForCanonicalPolarity, parseModelAnswer } from './normalize.mjs';
+import { normalizeForCanonicalPolarity, parseModelAnswer, recoverFinalAnswer } from './normalize.mjs';
 import { hashJson, sha256 } from './provenance.mjs';
 
 const nowIso = () => new Date().toISOString();
@@ -286,31 +286,26 @@ export const parseAnswerOutput = ({ rawText, question, variant, order }) => {
       parseError: parsed.parseError,
     };
   }
-  const trimmed = String(rawText || '').trim();
-  if (!trimmed) return { answer: null, rawAnswer: null, confidence: null, rationale: '', parseError: 'empty response' };
-  const candidates = trimmed.startsWith('{') && trimmed.endsWith('}') ? [trimmed, ...jsonObjectCandidates(trimmed)] : jsonObjectCandidates(trimmed);
-  let firstError = 'response was not valid JSON';
-  for (const candidate of [...new Set(candidates)]) {
-    let parsed;
-    try {
-      parsed = JSON.parse(candidate);
-    } catch {
-      continue;
-    }
-    if (!isRecord(parsed) || !Object.prototype.hasOwnProperty.call(parsed, 'answer')) {
-      firstError = 'missing answer';
-      continue;
-    }
-    const checked = normalizeAnswerValue(question, toCanonical(question, variant, order, parsed.answer));
-    const reply = {
-      rawAnswer: parsed.answer,
-      confidence: readConfidence(parsed.confidence),
-      rationale: text(parsed.rationale),
+  const recovered = recoverFinalAnswer(rawText, (value) =>
+    normalizeAnswerValue(question, toCanonical(question, variant, order, value)),
+  );
+  if (recovered.object) {
+    const { object, checked } = recovered;
+    return {
+      answer: checked.ok ? checked.value : null,
+      rawAnswer: object.answer,
+      confidence: readConfidence(object.confidence),
+      rationale: text(object.rationale),
+      parseError: checked.ok ? '' : checked.error,
     };
-    if (checked.ok) return { ...reply, answer: checked.value, parseError: '' };
-    return { ...reply, answer: null, parseError: checked.error };
   }
-  return { answer: null, rawAnswer: null, confidence: null, rationale: trimmed, parseError: firstError };
+  return {
+    answer: null,
+    rawAnswer: null,
+    confidence: null,
+    rationale: recovered.text ?? '',
+    parseError: recovered.parseError || (recovered.objects.length ? 'missing answer' : 'response was not valid JSON'),
+  };
 };
 
 // ---------------------------------------------------------------------------
