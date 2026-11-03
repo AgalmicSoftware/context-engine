@@ -22,6 +22,7 @@ type SurveyQuestionRecord = {
   minLabel?: unknown;
   maxLabel?: unknown;
   voiceCredits?: unknown;
+  singleSelect?: unknown;
 };
 
 type SurveyAnswerRecord = {
