@@ -508,7 +508,10 @@ interface CreateQuestionsAndSurveysProps {
   miniaturized?: boolean;
   onUploadComplete?: (surveyHash: string | null) => void;
   onDraftEditedChange?: (edited: boolean) => void;
-  onDraftQuestionCountChange?: (count: number) => void;
+  // Each change to the draft list, edits included, which the Group Conversation recorder keeps with its recording.
+  onDraftQuestionsChange?: (questions: CreateQuestionsAndSurveysQuestion[]) => void;
+  // Whether a submit is in flight; reported after its uploaded drafts leave the list.
+  onSubmittingChange?: (submitting: boolean) => void;
   hideSurveyQuestionToggleUntilAuthoring?: boolean;
   [key: string]: unknown;
 }
@@ -813,7 +816,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
 
   componentDidMount() {
     this._isMounted = true;
-    this.props.onDraftQuestionCountChange?.(this.state.questions.length);
+    this.props.onDraftQuestionsChange?.(this.state.questions);
     window.addEventListener('beforeunload', this.handleDraftBeforeUnload);
     if (this.state.showAIPrompt) {
       this.refreshAIPromptModelLabel();
@@ -1127,9 +1130,8 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
   };
 
   componentDidUpdate(prevProps: CreateQuestionsAndSurveysProps, prevState: CreateQuestionsAndSurveysState) {
-    if (prevState.questions.length !== this.state.questions.length) {
-      this.props.onDraftQuestionCountChange?.(this.state.questions.length);
-    }
+    if (prevState.questions !== this.state.questions) this.props.onDraftQuestionsChange?.(this.state.questions);
+    if (prevState.isSubmitting !== this.state.isSubmitting) this.props.onSubmittingChange?.(this.state.isSubmitting);
     this.props.onDraftEditedChange?.(createSurveyDraftContentKey(this.state) !== this._initialDraftContent);
     if (prevProps.account !== this.props.account) this.updateSurveyHash();
     const shouldAppendPreformedQuestions = this.props.interviewQuestionReview || this.props.appendPreformedQuestions;
@@ -1440,6 +1442,12 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
   };
 
   handleDraftBeforeUnload = (event: BeforeUnloadEvent): void => {
+    // A list kept elsewhere would come back with its uploading drafts still in it.
+    if (this.state.isSubmitting && this.props.onDraftQuestionsChange) {
+      event.preventDefault();
+      event.returnValue = '';
+      return;
+    }
     if (!this.state.draftSaveFailed) return;
     if (this.serializeUnfinishedSurveyDraft() === this._lastSavedUnfinishedSurveyJson) return;
     event.preventDefault();

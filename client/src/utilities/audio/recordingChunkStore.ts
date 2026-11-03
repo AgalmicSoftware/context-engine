@@ -4,6 +4,13 @@ import type { KnownSpeaker } from './speakerTranscript';
 /** `endedAt` is unset while the page is still hidden. */
 export type HiddenPeriod = { startedAt: number; endedAt?: number };
 
+/** Draft questions as the host left them, every prompt drafted so far, and the transcript last drafted from. */
+export type QuestionDrafts = {
+  questions: Record<string, unknown>[];
+  prompts: string[];
+  draftedTranscript: string;
+};
+
 export type RecordingChunk = {
   scope: string;
   segment: RollingTranscriptSegment;
@@ -15,6 +22,8 @@ export type RecordingChunk = {
   // Set only on the recording's known-speakers record.
   knownSpeakers?: KnownSpeaker[];
   speakerSamplesRefused?: boolean;
+  // Set only on the recording's question-drafts record.
+  questionDrafts?: QuestionDrafts;
 };
 
 const DATABASE = 'ce-recording-chunks';

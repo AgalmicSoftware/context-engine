@@ -27,6 +27,7 @@ import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { SessionListeningWaveform } from './SessionListeningWaveform';
 export { SessionListeningWaveform } from './SessionListeningWaveform';
 import { generateQuestionsFromListeningTranscript, LISTENING_QUESTION_COUNT } from './sessionListeningQuestions';
+import type { QuestionDrafts } from '../../utilities/audio/recordingChunkStore';
 
 type SessionListeningPanelProps = Record<string, unknown> & {
   sessionSlug?: string;
@@ -56,16 +57,15 @@ const getGeneratedQuestionKey = (question: GeneratedQuestionDraft | null | undef
 const getGeneratedQuestionPrompt = (question: GeneratedQuestionDraft | null | undefined): string =>
   String(question?.prompt || '').trim();
 
+// Drafted prompts include drafts the host removed or submitted, so none of them comes back.
 const mergeGeneratedQuestionDrafts = (
   previous: GeneratedQuestionDraft[],
   incoming: GeneratedQuestionDraft[],
+  drafted: string[] = [],
 ): GeneratedQuestionDraft[] => {
   const seenKeys = new Set(previous.map(getGeneratedQuestionKey).filter(Boolean));
   const seenPrompts = new Set(
-    previous
-      .map(getGeneratedQuestionPrompt)
-      .map((prompt) => prompt.toLowerCase())
-      .filter(Boolean),
+    [...previous.map(getGeneratedQuestionPrompt), ...drafted].map((prompt) => prompt.toLowerCase()).filter(Boolean),
   );
   const additions = incoming.filter((question) => {
     const key = getGeneratedQuestionKey(question);
@@ -182,6 +182,69 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
   const lastAutoRequestedTranscriptRef = useRef('');
   const generationInFlightRef = useRef(false);
   const activeGenerationRequestRef = useRef(0);
+  // Kept with the recording (see recordingChunkQueue), so reopening shows the drafts as the host left them and
+  // drafts only newer transcript text.
+  const keptRef = useRef<QuestionDrafts>({ questions: [], prompts: [], draftedTranscript: '' });
+  const { questionDrafts: keptDrafts, saveQuestionDrafts } = recorder;
+  const keepDrafts = useCallback(
+    (change: Partial<QuestionDrafts>) => {
+      keptRef.current = { ...keptRef.current, ...change };
+      saveQuestionDrafts(keptRef.current);
+    },
+    [saveQuestionDrafts],
+  );
+  // A submit in flight, which closing waits for, so its uploaded drafts leave the kept ones first.
+  const submitRef = useRef<{ settled: Promise<void>; settle: () => void } | null>(null);
+  const handleSubmittingChange = useCallback((submitting: boolean) => {
+    if (submitting && !submitRef.current) {
+      let settle = () => {};
+      const settled = new Promise<void>((resolve) => (settle = resolve));
+      submitRef.current = { settled, settle };
+    } else if (!submitting) {
+      submitRef.current?.settle();
+      submitRef.current = null;
+    }
+  }, []);
+  // Clear deletes the kept drafts, and another recording (as after an account change) has its own; `drafted`
+  // is the transcript not to draft again.
+  const forgetDrafts = useCallback(
+    (drafted: string) => {
+      activeGenerationRequestRef.current += 1;
+      generationInFlightRef.current = false;
+      lastAutoRequestedTranscriptRef.current = drafted;
+      keptRef.current = { questions: [], prompts: [], draftedTranscript: '' };
+      handleSubmittingChange(false);
+      setIsGenerating(false);
+      setGeneratedQuestions([]);
+      setPendingDraftCount(null);
+      setGeneratedTitle('');
+      setGenerationError('');
+    },
+    [handleSubmittingChange],
+  );
+  const scopeRef = useRef(recorder.scope);
+  useEffect(() => {
+    if (scopeRef.current === recorder.scope) return;
+    scopeRef.current = recorder.scope;
+    forgetDrafts('');
+  }, [forgetDrafts, recorder.scope]);
+  // Remounts the new-drafts cue, which counts the kept drafts as seen.
+  const [keptDraftsShown, setKeptDraftsShown] = useState(0);
+  // Before the effect below that drafts new transcript text.
+  useEffect(() => {
+    if (!keptDrafts) return;
+    keptRef.current = keptDrafts;
+    lastAutoRequestedTranscriptRef.current = keptDrafts.draftedTranscript;
+    setGeneratedQuestions(keptDrafts.questions);
+    setKeptDraftsShown((shown) => shown + 1);
+  }, [keptDrafts]);
+  const handleDraftQuestionsChange = useCallback(
+    (questions: QuestionDrafts['questions']) => {
+      setPendingDraftCount(questions.length);
+      keepDrafts({ questions });
+    },
+    [keepDrafts],
+  );
 
   const failedCount = useMemo(
     () => recorder.segments.filter((segment) => segment.status === 'failed').length,
@@ -296,6 +359,7 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
     try {
       await finalizeRecording({ waitForTranscription: true });
       await keepAudio();
+      await submitRef.current?.settled;
       if (isMountedRef.current) onClose?.();
     } catch (error) {
       if (isMountedRef.current)
@@ -331,7 +395,9 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
       const requestId = activeGenerationRequestRef.current + 1;
       activeGenerationRequestRef.current = requestId;
       generationInFlightRef.current = true;
-      const existingPrompts = generatedQuestions.map(getGeneratedQuestionPrompt).filter(Boolean);
+      // Every prompt drafted so far, and the host's edits of them.
+      const { prompts: drafted, questions: shown } = keptRef.current;
+      const existingPrompts = [...new Set([...drafted, ...shown.map(getGeneratedQuestionPrompt)])].filter(Boolean);
       setIsGenerating(true);
       setGenerationError('');
       try {
@@ -350,8 +416,16 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
           existingQuestionPrompts: existingPrompts,
         });
         if (!isMountedRef.current || activeGenerationRequestRef.current !== requestId) return;
-        setGeneratedQuestions((previous) => mergeGeneratedQuestionDrafts(previous, result.statements));
+        const addDrafts = (previous: GeneratedQuestionDraft[]) =>
+          mergeGeneratedQuestionDrafts(previous, result.statements, drafted);
+        setGeneratedQuestions(addDrafts);
         setGeneratedTitle((previous) => previous || result.surveyTitle);
+        // Kept with the recording at once, so drafts held back while a submit publishes are never lost.
+        keepDrafts({
+          questions: addDrafts(keptRef.current.questions),
+          prompts: [...new Set([...drafted, ...result.statements.map(getGeneratedQuestionPrompt).filter(Boolean)])],
+          draftedTranscript: transcriptSnapshot,
+        });
       } catch (error) {
         if (!isMountedRef.current || activeGenerationRequestRef.current !== requestId) return;
         const message = error instanceof Error ? error.message : String(error || 'Failed to generate questions.');
@@ -363,7 +437,7 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
         }
       }
     },
-    [canGenerate, context, defaultTags, generatedQuestions, recorder.transcript, sessionConfig, sessionSlug, workerUrl],
+    [canGenerate, context, defaultTags, keepDrafts, recorder.transcript, sessionConfig, sessionSlug, workerUrl],
   );
 
   useEffect(() => {
@@ -374,14 +448,7 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
 
   const handleClear = (discardAudio = false) => {
     recorder.clearDraft(discardAudio);
-    activeGenerationRequestRef.current += 1;
-    generationInFlightRef.current = false;
-    lastAutoRequestedTranscriptRef.current = trimmedTranscript;
-    setIsGenerating(false);
-    setGeneratedQuestions([]);
-    setPendingDraftCount(null);
-    setGeneratedTitle('');
-    setGenerationError('');
+    forgetDrafts(trimmedTranscript);
   };
 
   const showPanelHeader = !embeddedInModal;
@@ -400,7 +467,9 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
       aria-busy={isClosing}
       data-testid={E2E_TESTIDS.SESSION_LISTENING_PANEL}
     >
-      {panelMode === 'recordGroup' ? <SessionNewDraftsCue count={draftCount} draftsRef={draftsRef} /> : null}
+      {panelMode === 'recordGroup' ? (
+        <SessionNewDraftsCue key={keptDraftsShown} count={draftCount} draftsRef={draftsRef} />
+      ) : null}
       {isClosing ? <div role="status">Finalizing recording…</div> : null}
       {showPanelHeader ? (
         <div className={styles.sessionListeningHeader}>
@@ -741,7 +810,8 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
             appendPreformedQuestions
             questionSubmitLabel={isGenerating ? 'Waiting for new drafts…' : 'Submit questions'}
             submitDisabled={isGenerating}
-            onDraftQuestionCountChange={setPendingDraftCount}
+            onDraftQuestionsChange={handleDraftQuestionsChange}
+            onSubmittingChange={handleSubmittingChange}
             preformedQuestions={generatedQuestions as CreateQuestionsAndSurveysPanelProps['preformedQuestions']}
             preformedSurvey={{ title: generatedTitle }}
             preformedMode="questions"

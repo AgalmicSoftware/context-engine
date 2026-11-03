@@ -612,6 +612,10 @@ export const useRollingTranscriptionRecorder = ({
     pageHidden,
     hiddenPeriods: chunks.hiddenPeriods,
     dismissHiddenPeriods: chunks.dismissHiddenPeriods,
+    // The recording open now; it changes with the session, or when another account's recording gives way.
+    scope: chunks.scope,
+    questionDrafts: chunks.questionDrafts,
+    saveQuestionDrafts: chunks.saveQuestionDrafts,
     downloadableChunkIds: chunks.downloadableChunkIds,
     ownerNotice: chunks.ownerNotice,
     openElsewhere: Boolean(chunks.openElsewhereNotice),

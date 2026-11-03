@@ -5,6 +5,7 @@ import {
   putRecordingChunk,
   putRecordingChunks,
   type HiddenPeriod,
+  type QuestionDrafts,
   type RecordingChunk,
 } from './recordingChunkStore';
 import type { CaptureGap, RollingTranscriptSegment } from './rollingTranscription';
@@ -53,6 +54,11 @@ const memoryHiddenPeriods = new Map<string, HiddenPeriod[]>();
 const SPEAKERS_ID = 'known-speakers';
 type Speakers = { knownSpeakers: KnownSpeaker[]; speakerSamplesRefused: boolean };
 const memorySpeakers = new Map<string, Speakers>();
+// So are the recording's draft questions, with the transcript they were drafted from, so reopening shows them as
+// the host left them and drafts only newer text. The page holds its own copy only until a save lands, so a save
+// that failed is covered while another tab's later save still wins.
+const QUESTION_DRAFTS_ID = 'question-drafts';
+const memoryQuestionDrafts = new Map<string, QuestionDrafts>();
 // Cutting voice samples must never hold up later chunks for long.
 const SAMPLE_WAIT_MS = 10_000;
 /** Whether a closed recorder left audio or text that only this page holds for a recording. */
@@ -105,8 +111,11 @@ export class RecordingChunkQueue {
   labelsUnavailableReason = '';
   hiddenPeriods: HiddenPeriod[] = [];
   speakers: Speakers = { knownSpeakers: [], speakerSamplesRefused: false };
+  // As restored when the recording opened; saving later drafts leaves it.
+  questionDrafts: QuestionDrafts | null = null;
   ready: Promise<void>;
   private disposed = false;
+  private draftsWriteQueued = false;
   private writes: Promise<void> = Promise.resolve();
   private running: Promise<void> | null = null;
   private uploading: { id: string; controller: AbortController } | null = null;
@@ -136,9 +145,14 @@ export class RecordingChunkQueue {
       // Transcribed audio that an earlier build kept goes now, as it does once a chunk is transcribed.
       const stripped: RecordingChunk[] = [];
       let storedPeriods: HiddenPeriod[] = [];
+      let storedDrafts: QuestionDrafts | null = null;
       for (let entry of [...saved, ...kept]) {
         if (entry.segment.id === HIDDEN_PERIODS_ID) {
           storedPeriods = entry.hiddenPeriods || [];
+          continue;
+        }
+        if (entry.segment.id === QUESTION_DRAFTS_ID) {
+          storedDrafts = entry.questionDrafts ?? null;
           continue;
         }
         if (entry.segment.id === SPEAKERS_ID) {
@@ -160,6 +174,7 @@ export class RecordingChunkQueue {
       holdInMemory(this.options.scope, null);
       this.resaveKept([...stripped, ...kept]);
       this.restoreHiddenPeriods(storedPeriods);
+      this.restoreQuestionDrafts(storedDrafts);
       this.speakers = memorySpeakers.get(this.options.scope) ?? this.speakers;
       this.forgetSpeakersIfDone();
       this.changed();
@@ -175,6 +190,7 @@ export class RecordingChunkQueue {
       holdInMemory(this.options.scope, null);
       this.resaveKept(kept);
       this.restoreHiddenPeriods([]);
+      this.restoreQuestionDrafts(null);
       this.speakers = memorySpeakers.get(this.options.scope) ?? this.speakers;
       this.forgetSpeakersIfDone();
       this.changed();
@@ -185,6 +201,28 @@ export class RecordingChunkQueue {
   private restoreHiddenPeriods(stored: HiddenPeriod[]) {
     this.hiddenPeriods = memoryHiddenPeriods.get(this.options.scope) ?? stored;
     this.pageShown(Date.now());
+  }
+  // A restore retried after a storage failure (see prepare) keeps any drafts the first one restored.
+  private restoreQuestionDrafts(stored: QuestionDrafts | null) {
+    this.questionDrafts ??= memoryQuestionDrafts.get(this.options.scope) ?? stored;
+  }
+  /** Keeps the drafts with the recording. Edits arrive with each keystroke, so one queued write saves the latest. */
+  saveQuestionDrafts(drafts: QuestionDrafts) {
+    memoryQuestionDrafts.set(this.options.scope, drafts);
+    if (this.draftsWriteQueued) return;
+    this.draftsWriteQueued = true;
+    this.writes = this.writes.then(async () => {
+      this.draftsWriteQueued = false;
+      const questionDrafts = memoryQuestionDrafts.get(this.options.scope);
+      if (!questionDrafts) return;
+      try {
+        await putRecordingChunk(this.reserved(QUESTION_DRAFTS_ID, { questionDrafts }));
+        if (memoryQuestionDrafts.get(this.options.scope) === questionDrafts)
+          memoryQuestionDrafts.delete(this.options.scope);
+      } catch {
+        // Kept on this page until a later save lands.
+      }
+    });
   }
   /** A period opens only during capture, and ends when the page returns, even if capture stopped meanwhile. */
   pageHidden(at: number) {
@@ -216,13 +254,16 @@ export class RecordingChunkQueue {
     memorySpeakers.set(this.options.scope, speakers);
     this.saveReserved(SPEAKERS_ID, speakers);
   }
-  private saveReserved(id: string, fields: Partial<RecordingChunk>) {
-    const record: RecordingChunk = {
+  private reserved(id: string, fields: Partial<RecordingChunk>): RecordingChunk {
+    return {
       scope: this.options.scope,
       labelSpeakers: false,
       ...fields,
       segment: { id, index: -1, status: 'recording', text: '', startedAt: 0 },
     };
+  }
+  private saveReserved(id: string, fields: Partial<RecordingChunk>) {
+    const record = this.reserved(id, fields);
     // Best effort, in order with chunk writes, so Clear deletes it after any pending save.
     this.writes = this.writes.then(() => putRecordingChunk(record).catch(() => {}));
   }
@@ -571,6 +612,8 @@ export class RecordingChunkQueue {
     holdInMemory(this.options.scope, null);
     memoryHiddenPeriods.delete(this.options.scope);
     memorySpeakers.delete(this.options.scope);
+    memoryQuestionDrafts.delete(this.options.scope);
+    this.questionDrafts = null;
     this.hiddenPeriods = [];
     this.speakers = { knownSpeakers: [], speakerSamplesRefused: false };
     this.labelsUnavailableReason = '';

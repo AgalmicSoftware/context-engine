@@ -814,6 +814,43 @@ describe('useRollingTranscriptionRecorder', () => {
     next.unmount();
   });
 
+  it('keeps draft questions with the recording, and gives another recording its own', async () => {
+    const drafts = {
+      questions: [{ id: 'q1', type: 'binary', prompt: 'Kept?' }],
+      prompts: ['Kept?'],
+      draftedTranscript: 'Speech.',
+    };
+    const renderRecorder = () =>
+      renderHook(({ slug }) => useRollingTranscriptionRecorder({ sessionSlug: slug }), {
+        initialProps: { slug: 'kept-drafts' },
+      });
+    const first = renderRecorder();
+    await act(async () => {
+      await flushPromises();
+    });
+    expect(first.result.current.questionDrafts).toBeNull();
+    act(() => first.result.current.saveQuestionDrafts(drafts));
+    await act(async () => {
+      await flushPromises();
+    });
+    first.unmount();
+
+    const reopened = renderRecorder();
+    await act(async () => {
+      await flushPromises();
+    });
+    expect(reopened.result.current.questionDrafts).toEqual(drafts);
+    const { scope } = reopened.result.current;
+    reopened.rerender({ slug: 'another-session' });
+    expect(reopened.result.current.scope).not.toBe(scope);
+    expect(reopened.result.current.questionDrafts).toBeNull();
+    await act(async () => {
+      await flushPromises();
+    });
+    expect(reopened.result.current.questionDrafts).toBeNull();
+    reopened.unmount();
+  });
+
   it('keeps the final audio when a route change unmounts the recorder mid-capture, and uploads it on reopen', async () => {
     (transcribeAudio as jest.Mock).mockImplementation(async () => 'Words before leaving.');
     const first = renderHook(() => useRollingTranscriptionRecorder({ sessionSlug: 'route-change' }));

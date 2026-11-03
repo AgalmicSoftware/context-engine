@@ -8,6 +8,7 @@ import {
   RecordingChunkQueue,
   subscribeUnsavedRecordings,
 } from './recordingChunkQueue';
+import type { QuestionDrafts } from './recordingChunkStore';
 import { recordingOwner, type RecordingOptions } from './recordingOwner';
 import {
   stitchRollingTranscriptSegments,
@@ -76,6 +77,7 @@ export function useRecordingChunkQueue(options: Options) {
   const [unsaved, setUnsaved] = useState(false);
   const [labelsUnavailableReason, setLabelsUnavailableReason] = useState('');
   const [hiddenPeriods, setHiddenPeriods] = useState<Array<{ startedAt: number; endedAt: number }>>([]);
+  const [questionDrafts, setQuestionDrafts] = useState<QuestionDrafts | null>(null);
   const [offline, setOffline] = useState(typeof navigator !== 'undefined' && navigator.onLine === false);
   const [importing, setImporting] = useState(false);
   const importRef = useRef<Promise<unknown>>(Promise.resolve());
@@ -115,6 +117,7 @@ export function useRecordingChunkQueue(options: Options) {
     openScope.current = scope;
     setSegments([]);
     setHiddenPeriods([]);
+    setQuestionDrafts(null);
     setOpenElsewhere(false);
     const open = () => {
       const queue = new RecordingChunkQueue({
@@ -148,6 +151,7 @@ export function useRecordingChunkQueue(options: Options) {
           setHiddenPeriods(
             queue.hiddenPeriods.flatMap(({ startedAt, endedAt }) => (endedAt == null ? [] : [{ startedAt, endedAt }])),
           );
+          setQuestionDrafts(queue.questionDrafts);
         },
       });
       queueRef.current = queue;
@@ -293,6 +297,7 @@ export function useRecordingChunkQueue(options: Options) {
   const pageHidden = useCallback((at: number) => queueRef.current?.pageHidden(at), []);
   const pageShown = useCallback((at: number) => queueRef.current?.pageShown(at), []);
   const dismissHiddenPeriods = useCallback(() => queueRef.current?.dismissHiddenPeriods(), []);
+  const saveQuestionDrafts = useCallback((drafts: QuestionDrafts) => queueRef.current?.saveQuestionDrafts(drafts), []);
   const downloadChunk = useCallback((id: string) => {
     const record = queueRef.current?.records.get(id);
     if (!record?.audio) return;
@@ -341,6 +346,9 @@ export function useRecordingChunkQueue(options: Options) {
     pageShown,
     dismissHiddenPeriods,
     hiddenPeriods,
+    // The draft questions kept with the recording when it opened (null until then, or when none were kept).
+    questionDrafts,
+    saveQuestionDrafts,
     downloadChunk,
     downloadRecording,
     clearDraft,
