@@ -43,6 +43,7 @@ export const normalizeQuestion = (value = {}) => {
           .map((entry) => trim(isObj(entry) ? entry.label || entry.value : entry))
           .filter(Boolean);
   const ratingScale = type === 'rating' ? normalizeRatingScale(question) : null;
+  const ratingStep = ratingStepFor(question);
   return {
     id,
     prompt,
@@ -51,7 +52,9 @@ export const normalizeQuestion = (value = {}) => {
     ...(type === 'multichoice'
       ? { singleSelect: Boolean(question.singleSelect || question.oneSelectionOnly || question.singleChoice) }
       : {}),
-    ...(ratingScale ? { scale: { ...ratingScale, step: ratingStepFor(question) } } : {}),
+    // A step of 1 is the default and stays out, so ordinary rating questions keep the hash every
+    // released Worker computes, and prefill works before a session's Worker is redeployed.
+    ...(ratingScale ? { scale: ratingStep === 1 ? ratingScale : { ...ratingScale, step: ratingStep } } : {}),
     ...(type === 'quadratic' ? { voiceCredits: Number(question.voiceCredits ?? 99) } : {}),
   };
 };

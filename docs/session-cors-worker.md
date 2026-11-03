@@ -2887,8 +2887,10 @@ Signed login/bootstrap requests:
     option labels for multi-select. Voice instructions, mapping, review controls,
     and submission preserve this setting. Unknown options and multiple distinct
     choices for a single-select question are rejected, never silently truncated.
-  - Rating questions expose `scale` with `min`, `max`, endpoint labels and
-    `step`, and the question hash covers the step. Imported rating drafts are
+  - Rating questions expose `scale` with `min`, `max` and endpoint labels, plus
+    `step` when it isn't 1. The question hash covers that step; a default step
+    stays out, so ordinary rating questions hash the same on every released
+    Worker and prefill works before a redeploy. Imported rating drafts are
     clamped to the scale and snapped to its nearest step.
   - `ce-interview-brief-v5` hashes include selection mode. Previously generated
     v1–v4 links remain readable using their original catalog hash format, while
