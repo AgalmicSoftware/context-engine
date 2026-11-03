@@ -233,9 +233,9 @@ test('dispatchInterviewBriefRequest applies anonymous IP daily budgets before lo
       expectedLimit: 4,
     },
     {
-      name: 'absent anonymous limit keeps legacy wallet fallback',
+      name: 'absent anonymous limit leaves anonymous routes unlimited',
       limits: { perWalletPerDay: 10 },
-      expectedLimit: 10,
+      expectedLimit: 0,
     },
   ];
 

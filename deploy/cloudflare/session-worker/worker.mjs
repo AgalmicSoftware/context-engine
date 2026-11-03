@@ -101767,11 +101767,7 @@ var isObj21 = (value) => !!value && typeof value === "object" && !Array.isArray(
 var isNonNegativeInteger = (value) => Number.isInteger(value) && value >= 0;
 var resolveAnonymousIpDailyLimit = (config = {}) => {
   const limits = isObj21(config?.limits) ? config.limits : {};
-  if (Object.prototype.hasOwnProperty.call(limits, "perAnonymousIpPerDay")) {
-    const explicitLimit = limits.perAnonymousIpPerDay;
-    if (isNonNegativeInteger(explicitLimit)) return explicitLimit;
-  }
-  return limits.perWalletPerDay || 0;
+  return isNonNegativeInteger(limits.perAnonymousIpPerDay) ? limits.perAnonymousIpPerDay : 0;
 };
 
 // workers/sessionCorsWorker/interviewStarter.js

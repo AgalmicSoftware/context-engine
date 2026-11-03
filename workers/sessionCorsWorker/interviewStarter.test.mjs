@@ -250,9 +250,9 @@ test('starter route resolves anonymous IP daily budgets before generation', asyn
       expectedLimit: 0,
     },
     {
-      name: 'malformed anonymous limit keeps legacy wallet fallback',
+      name: 'malformed anonymous limit leaves anonymous routes unlimited',
       limits: { perWalletPerDay: 12, perAnonymousIpPerDay: null },
-      expectedLimit: 12,
+      expectedLimit: 0,
     },
   ];
 
