@@ -904,6 +904,28 @@ describe('interview choice selection contract', () => {
       if (descriptor) Object.defineProperty(globalThis, 'crypto', descriptor);
     }
   });
+
+  it('hashes a default-step rating as released Workers do, so prefill works before a redeploy', async () => {
+    const { webcrypto, createHash } = await import('crypto');
+    const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'crypto');
+    Object.defineProperty(globalThis, 'crypto', { configurable: true, value: webcrypto });
+    try {
+      const scale = { min: 0, max: 10, minLabel: 'Low', maxLabel: 'High' };
+      const [plain, fives] = normalizeInterviewQuestions([
+        { id: 'plain', prompt: 'How much?', type: 'rating', scale: { ...scale, step: 1 } },
+        { id: 'fives', prompt: 'How much?', type: 'rating', scale: { ...scale, step: 5 } },
+      ]);
+      const released = [{ id: 'plain', prompt: 'How much?', type: 'rating', options: [], scale }];
+      expect(await hashInterviewQuestions([plain])).toBe(
+        createHash('sha256').update(JSON.stringify(released)).digest('hex'),
+      );
+      // A custom step is still carried, and it still changes the hash.
+      expect(fives.scale).toEqual({ ...scale, step: 5 });
+      expect(await hashInterviewQuestions([{ ...fives, id: 'plain' }])).not.toBe(await hashInterviewQuestions([plain]));
+    } finally {
+      if (descriptor) Object.defineProperty(globalThis, 'crypto', descriptor);
+    }
+  });
 });
 
 it('marks every input to interview mapping as data, not instructions', () => {

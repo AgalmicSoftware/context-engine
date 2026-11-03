@@ -101799,13 +101799,16 @@ var normalizeQuestion = (value = {}) => {
   const rawOptions = question.options || question.choices;
   const options = type === "binary" ? [...BINARY_RESPONSE_OPTIONS] : (Array.isArray(rawOptions) ? rawOptions : []).map((entry2) => trim16(isObj22(entry2) ? entry2.label || entry2.value : entry2)).filter(Boolean);
   const ratingScale = type === "rating" ? normalizeRatingScale(question) : null;
+  const ratingStep = ratingStepFor(question);
   return {
     id: id2,
     prompt,
     type,
     options,
     ...type === "multichoice" ? { singleSelect: Boolean(question.singleSelect || question.oneSelectionOnly || question.singleChoice) } : {},
-    ...ratingScale ? { scale: { ...ratingScale, step: ratingStepFor(question) } } : {},
+    // A step of 1 is the default and stays out, so ordinary rating questions keep the hash every
+    // released Worker computes, and prefill works before a session's Worker is redeployed.
+    ...ratingScale ? { scale: ratingStep === 1 ? ratingScale : { ...ratingScale, step: ratingStep } } : {},
     ...type === "quadratic" ? { voiceCredits: Number(question.voiceCredits ?? 99) } : {}
   };
 };
@@ -105179,7 +105182,7 @@ var buildInterviewBriefDocument = ({
   answerContract: {
     binary: ["Agree", "Unsure", "Disagree"],
     rating: { min: 0, max: 10, step: 1 },
-    ratingScaleOverrides: "Use a question.scale object when present: answer min plus a whole number of steps, at most max. Otherwise use the default rating contract.",
+    ratingScaleOverrides: "Use a question.scale object when present: answer min plus a whole number of steps (1 when no step is given), at most max. Otherwise use the default rating contract.",
     multichoice: "When singleSelect is true, use one exact question option. Otherwise use an array of one or more exact question options.",
     quadratic: "Signed integer array in option order; sum(vote\xB2) <= voiceCredits (99 default). Zero is neutral; unused credits are allowed."
   },
