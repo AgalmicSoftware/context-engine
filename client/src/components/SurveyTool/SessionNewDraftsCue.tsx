@@ -19,13 +19,16 @@ const firstNewDraft = (drafts: HTMLElement | null, unseen: number) => {
   return cards.length >= unseen ? cards[cards.length - unseen] : drafts;
 };
 
-// Drafts arrive after each chunk, usually below the fold. This cue says how many are new until the first
-// of them is well in view, and its button scrolls there. While it shows, the submit button is not pinned
-// (see .sessionNewDraftsCue), so uploading every draft means scrolling past the new ones first.
+// Drafts arrive after each chunk, usually below the fold. Once the first of them is found out of view, this
+// cue says how many are new until it is well in view, and its button scrolls there. Drafts that land in view
+// never show it, so its lane, which exists only while it shows, never moves the dialog for them. While it
+// shows, the submit button is not pinned (see .sessionNewDraftsCue), so uploading every draft means
+// scrolling past the new ones first.
 export function SessionNewDraftsCue({ count, draftsRef }: SessionNewDraftsCueProps) {
   const seenRef = useRef(count);
   const buttonRef = useRef<HTMLButtonElement | null>(null);
   const [unseen, setUnseen] = useState(0);
+  const [outOfView, setOutOfView] = useState(false);
   useEffect(() => {
     seenRef.current = Math.min(seenRef.current, count);
     setUnseen(count - seenRef.current);
@@ -40,7 +43,10 @@ export function SessionNewDraftsCue({ count, draftsRef }: SessionNewDraftsCuePro
   }, [count, draftsRef]);
 
   useEffect(() => {
-    if (!unseen) return undefined;
+    if (!unseen) {
+      setOutOfView(false);
+      return undefined;
+    }
     let observer: IntersectionObserver | undefined;
     // The draft list renders its new cards after this count changes.
     const frame = requestAnimationFrame(() => {
@@ -51,9 +57,12 @@ export function SessionNewDraftsCue({ count, draftsRef }: SessionNewDraftsCuePro
         setUnseen(cards.length);
         return;
       }
-      if (typeof IntersectionObserver === 'undefined') return;
+      if (typeof IntersectionObserver === 'undefined') {
+        setOutOfView(true);
+        return;
+      }
       // Seen once the card is above the bottom fifth, clear of the pinned submit button.
-      observer = new IntersectionObserver(([entry]) => entry?.isIntersecting && markSeen(), {
+      observer = new IntersectionObserver(([entry]) => (entry?.isIntersecting ? markSeen() : setOutOfView(true)), {
         rootMargin: '0px 0px -20% 0px',
       });
       observer.observe(cards[cards.length - unseen]);
@@ -72,7 +81,7 @@ export function SessionNewDraftsCue({ count, draftsRef }: SessionNewDraftsCuePro
 
   return (
     <div className={styles.sessionNewDraftsCue} aria-live="polite">
-      {unseen > 0 ? (
+      {unseen > 0 && outOfView ? (
         <button ref={buttonRef} type="button" onClick={showDrafts}>
           {unseen} new draft {unseen === 1 ? 'question' : 'questions'}
           <FontAwesomeIcon icon={faArrowDown} />

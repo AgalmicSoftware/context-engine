@@ -774,16 +774,43 @@ describe('SessionListeningPanel', () => {
       expect(scrollIntoView.mock.contexts[1]).toBe(screen.getByText('How should trust be measured?'));
     });
 
-    it('goes away once the new drafts are on screen', async () => {
-      const observed: Element[] = [];
+    // Its lane exists only while it shows, so it must not flash, and move the dialog, for drafts in view.
+    const observeDrafts = (inView: boolean[]) => {
+      const observers: Array<{ onChange: IntersectionObserverCallback; target?: Element }> = [];
       (globalThis as Partial<typeof globalThis>).IntersectionObserver = class {
-        constructor(private readonly onChange: IntersectionObserverCallback) {}
+        constructor(onChange: IntersectionObserverCallback) {
+          observers.push({ onChange });
+        }
         observe(target: Element) {
-          observed.push(target);
-          this.onChange([{ isIntersecting: true, target } as IntersectionObserverEntry], this as never);
+          const observer = observers[observers.length - 1];
+          observer.target = target;
+          observer.onChange(
+            [{ isIntersecting: inView.shift() ?? false, target } as IntersectionObserverEntry],
+            this as never,
+          );
         }
         disconnect() {}
       } as unknown as typeof IntersectionObserver;
+      return observers;
+    };
+
+    it('never shows for new drafts already on screen', async () => {
+      const observers = observeDrafts([true]);
+      mockGenerateQuestionsFromListeningTranscript.mockResolvedValueOnce(result('What evidence matters?'));
+      (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+        buildRecorder({ transcript: firstTranscript, segments: [firstSegment] }),
+      );
+      render(<SessionListeningPanel sessionSlug="demo" panelMode="recordGroup" embeddedInModal />);
+
+      await screen.findByText('What evidence matters?');
+      expect(screen.queryByRole('button', { name: /new draft/ })).not.toBeInTheDocument();
+      await nextFrame();
+      expect(observers.map((observer) => observer.target)).toEqual([screen.getByText('What evidence matters?')]);
+      expect(screen.queryByRole('button', { name: /new draft/ })).not.toBeInTheDocument();
+    });
+
+    it('shows once the first new draft is out of view, and goes once it is seen', async () => {
+      const observers = observeDrafts([false]);
       mockGenerateQuestionsFromListeningTranscript.mockResolvedValueOnce(result('What evidence matters?'));
       (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
         buildRecorder({ transcript: firstTranscript, segments: [firstSegment] }),
@@ -791,8 +818,9 @@ describe('SessionListeningPanel', () => {
       render(<SessionListeningPanel sessionSlug="demo" panelMode="recordGroup" embeddedInModal />);
 
       await screen.findByRole('button', { name: '1 new draft question' });
-      await waitFor(() => expect(screen.queryByRole('button', { name: /new draft/ })).not.toBeInTheDocument());
-      expect(observed).toEqual([screen.getByText('What evidence matters?')]);
+      const [{ onChange, target }] = observers;
+      act(() => onChange([{ isIntersecting: true, target } as IntersectionObserverEntry], {} as never));
+      expect(screen.queryByRole('button', { name: /new draft/ })).not.toBeInTheDocument();
     });
   });
 
