@@ -123,7 +123,7 @@ test('dispatchAnonymousRouteEntry preserves rate-limit failure after slug/config
     deps: {
       resolveRequestSlugWithoutToken: () => ({ ok: true, explicitSlugProvided: true, slug: 'session-a' }),
       getSessionConfig: async () => ({
-        limits: { perWalletPerDay: 2 },
+        limits: { perWalletPerDay: 9, perAnonymousIpPerDay: 2 },
       }),
       getCorsContext: async () => ({ ok: true, headers }),
       resolveAnonymousRateIdentity: () => 'anon:test',
@@ -201,18 +201,18 @@ test('dispatchAnonymousRouteEntry resolves anonymous IP daily budgets for each a
       expectedLimit: 7,
     },
     {
-      name: 'absent anonymous limit keeps legacy wallet fallback',
+      name: 'absent anonymous limit leaves the route unlimited',
       path: '/ai',
       anonymousRoute: 'ai',
       limits: { perWalletPerDay: 8 },
-      expectedLimit: 8,
+      expectedLimit: 0,
     },
     {
-      name: 'malformed anonymous limit keeps legacy wallet fallback',
+      name: 'malformed anonymous limit leaves the route unlimited',
       path: '/transcribe',
       anonymousRoute: 'transcribe',
       limits: { perWalletPerDay: 8, perAnonymousIpPerDay: '3' },
-      expectedLimit: 8,
+      expectedLimit: 0,
     },
   ];
 
