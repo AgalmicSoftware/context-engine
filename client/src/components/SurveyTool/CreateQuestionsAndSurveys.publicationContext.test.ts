@@ -326,13 +326,15 @@ describe('drafts generated while publishing', () => {
   // A review list as the recorder mounts it, updating in React's order: an update, then componentDidUpdate,
   // then its callback, with updates made inside either queued until then.
   const reviewSetup = () => {
-    const onDraftQuestionCountChange = jest.fn();
+    const onDraftQuestionsChange = jest.fn();
+    const onSubmittingChange = jest.fn();
     const { subject, published, entered } = setup(true, {
       interviewQuestionReview: true,
       appendPreformedQuestions: true,
       preformedMode: 'questions',
       preformedQuestions: [draft('q1'), draft('q2')],
-      onDraftQuestionCountChange,
+      onDraftQuestionsChange,
+      onSubmittingChange,
     });
     subject.state = { ...subject.state, questions: [draft('q1'), draft('q2')] };
     const applyState = subject.setState;
@@ -356,11 +358,14 @@ describe('drafts generated while publishing', () => {
       subject.props = { ...prevProps, preformedQuestions: [draft('q1'), draft('q2'), draft('q3')] };
       subject.componentDidUpdate(prevProps, subject.state as typeof subject.state);
     };
-    return { subject, published, entered, lateBatch, onDraftQuestionCountChange };
+    // The draft lists reported so far, as ids.
+    const reported = () =>
+      onDraftQuestionsChange.mock.calls.map(([questions]) => questions.map((q: { id: string }) => q.id));
+    return { subject, published, entered, lateBatch, reported, onDraftQuestionsChange, onSubmittingChange };
   };
 
   it('holds a batch that lands mid-submit, then shows the upload and adds the batch as new drafts', async () => {
-    const { subject, published, entered, lateBatch, onDraftQuestionCountChange } = reviewSetup();
+    const { subject, published, entered, lateBatch, reported } = reviewSetup();
     const operation = subject.createSurvey();
     await entered.promise;
     lateBatch();
@@ -371,8 +376,8 @@ describe('drafts generated while publishing', () => {
     expect(subject.state.questionsAddedSuccessfully).toBe(true);
     expect(subject.state.uploadedQuestions).toEqual([{ questionId: 'q1' }, { questionId: 'q2' }]);
     expect(ids(subject)).toEqual(['q3']);
-    // The count drops before the batch joins, so the new-drafts cue counts it as new.
-    expect(onDraftQuestionCountChange.mock.calls.slice(-2)).toEqual([[0], [1]]);
+    // The uploaded drafts leave before the batch joins, so the new-drafts cue counts it as new.
+    expect(reported().slice(-2)).toEqual([[], ['q3']]);
     expect(contractScripts.addQuestions).toHaveBeenCalledTimes(1);
     expect(contractScripts.addQuestions).toHaveBeenCalledWith(
       'web3auth',
@@ -381,6 +386,38 @@ describe('drafts generated while publishing', () => {
       expect.anything(),
       expect.anything(),
     );
+  });
+
+  // The recorder keeps the list with its recording, so a reopened dialog shows the drafts as the host left them.
+  it('reports each edit and removal of a draft', () => {
+    const { subject, reported } = reviewSetup();
+    subject.handleQuestionChange(1, 'prompt', 'Edited by the host?');
+    expect(subject.state.questions[1].prompt).toBe('Edited by the host?');
+    subject.removeQuestion(0);
+    expect(reported().slice(-2)).toEqual([['q1', subject.state.questions[0].id], [subject.state.questions[0].id]]);
+    expect(subject.state.questions).toEqual([expect.objectContaining({ prompt: 'Edited by the host?' })]);
+  });
+
+  // The recorder waits for it before closing, and leaving the page meanwhile would bring the drafts back.
+  it('reports a submit in flight, after its uploaded drafts leave, and asks before the page is left', async () => {
+    const { subject, published, entered, onDraftQuestionsChange, onSubmittingChange } = reviewSetup();
+    const operation = subject.createSurvey();
+    await entered.promise;
+    expect(onSubmittingChange.mock.calls).toEqual([[true]]);
+    const leaving = new Event('beforeunload', { cancelable: true }) as BeforeUnloadEvent;
+    subject.handleDraftBeforeUnload(leaving);
+    expect(leaving.defaultPrevented).toBe(true);
+    published.resolve({ receipt: { status: 1 }, uploadedQuestions: [{ questionId: 'q1' }, { questionId: 'q2' }] });
+    await operation;
+
+    expect(onSubmittingChange.mock.calls).toEqual([[true], [false]]);
+    const emptied = onDraftQuestionsChange.mock.calls.findIndex(([questions]) => questions.length === 0);
+    expect(onDraftQuestionsChange.mock.invocationCallOrder[emptied]).toBeLessThan(
+      onSubmittingChange.mock.invocationCallOrder[1],
+    );
+    const settled = new Event('beforeunload', { cancelable: true }) as BeforeUnloadEvent;
+    subject.handleDraftBeforeUnload(settled);
+    expect(settled.defaultPrevented).toBe(false);
   });
 
   it('adds a held batch after a failed submit', async () => {

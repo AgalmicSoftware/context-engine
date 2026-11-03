@@ -13,6 +13,7 @@ jest.mock('../../utilities/ai/aiSettings', () => ({
 }));
 
 let mockCreateQuestionsMountCount = 0;
+let mockCreateQuestionsProps: any = null;
 
 const mockReadThemeToken = readThemeToken as jest.MockedFunction<typeof readThemeToken>;
 const mockSubscribeThemeChanges = subscribeThemeChanges as jest.MockedFunction<typeof subscribeThemeChanges>;
@@ -37,6 +38,7 @@ jest.mock('../../utilities/ui/themeRuntime', () => ({
 jest.mock('./CreateQuestionsAndSurveys', () => {
   const React = require('react');
   return (props: any) => {
+    mockCreateQuestionsProps = props;
     const mountId = React.useRef(null as number | null);
     if (mountId.current === null) {
       mockCreateQuestionsMountCount += 1;
@@ -89,8 +91,11 @@ const buildRecorder = (overrides: Record<string, unknown> = {}) => ({
   addAudio: jest.fn(),
   downloadRecording: jest.fn(async () => {}),
   addTranscript: jest.fn(),
+  questionDrafts: null,
+  saveQuestionDrafts: jest.fn(),
   ...overrides,
 });
+const nextFrame = () => act(() => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())));
 
 describe('SessionListeningPanel', () => {
   beforeEach(() => {
@@ -788,6 +793,158 @@ describe('SessionListeningPanel', () => {
       await screen.findByRole('button', { name: '1 new draft question' });
       await waitFor(() => expect(screen.queryByRole('button', { name: /new draft/ })).not.toBeInTheDocument());
       expect(observed).toEqual([screen.getByText('What evidence matters?')]);
+    });
+  });
+
+  // Closing the dialog unmounts the panel, and a reload loses the page, so the drafts are kept with the recording.
+  describe('drafts kept with the recording', () => {
+    const transcript =
+      'The group discussed budget timing, operational risk, ownership, rollout scope, and follow-up evidence.';
+    const segment = { id: 's1', index: 0, status: 'complete', text: transcript, completedAt: 2 };
+    const kept = {
+      questions: [{ id: 'q1-edited', type: 'binary', prompt: 'Edited by the host?' }],
+      prompts: ['What evidence matters?', 'Removed by the host?'],
+      draftedTranscript: transcript,
+    };
+
+    it('reopens with the drafts as the host left them, without drafting the same transcript again', async () => {
+      (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+        buildRecorder({ transcript, segments: [segment], questionDrafts: kept }),
+      );
+      render(<SessionListeningPanel sessionSlug="demo" panelMode="recordGroup" embeddedInModal />);
+      expect(await screen.findByTestId('mock-create-questions')).toHaveAttribute('data-prompts', 'Edited by the host?');
+      await nextFrame();
+      expect(generateQuestionsFromListeningTranscript).not.toHaveBeenCalled();
+      // The host has seen them.
+      expect(screen.queryByRole('button', { name: /new draft/ })).not.toBeInTheDocument();
+    });
+
+    it('drafts only newer transcript text, and never a prompt it drafted before', async () => {
+      const saveQuestionDrafts = jest.fn();
+      const later = `${transcript} Later they debated community trust and accountability thresholds.`;
+      (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+        buildRecorder({
+          transcript: later,
+          segments: [segment, { id: 's2', index: 1, status: 'complete', text: 'Later.', completedAt: 5 }],
+          questionDrafts: kept,
+          saveQuestionDrafts,
+        }),
+      );
+      mockGenerateQuestionsFromListeningTranscript.mockResolvedValue({
+        surveyTitle: '',
+        statements: [
+          { id: 'q2', type: 'freeform', prompt: 'Removed by the host?', tags: [] },
+          { id: 'q3', type: 'freeform', prompt: 'Who may trigger a review?', tags: [] },
+        ],
+        raw: { questions: [] },
+      });
+      render(<SessionListeningPanel sessionSlug="demo" panelMode="recordGroup" embeddedInModal />);
+      await waitFor(() =>
+        expect(screen.getByTestId('mock-create-questions')).toHaveAttribute(
+          'data-prompts',
+          'Edited by the host?|Who may trigger a review?',
+        ),
+      );
+      expect(generateQuestionsFromListeningTranscript).toHaveBeenCalledTimes(1);
+      expect(generateQuestionsFromListeningTranscript).toHaveBeenCalledWith(
+        later,
+        expect.objectContaining({
+          existingQuestionPrompts: ['What evidence matters?', 'Removed by the host?', 'Edited by the host?'],
+        }),
+      );
+      // Saved with the recording at once, so a batch held back by a submit is never lost.
+      expect(saveQuestionDrafts).toHaveBeenLastCalledWith({
+        questions: [...kept.questions, expect.objectContaining({ prompt: 'Who may trigger a review?' })],
+        prompts: ['What evidence matters?', 'Removed by the host?', 'Who may trigger a review?'],
+        draftedTranscript: later,
+      });
+    });
+
+    it('starts another recording, as after an account change, with only its own drafts', async () => {
+      const saveQuestionDrafts = jest.fn();
+      (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+        buildRecorder({ scope: 'a', transcript, segments: [segment], questionDrafts: kept, saveQuestionDrafts }),
+      );
+      const { rerender } = render(<SessionListeningPanel sessionSlug="demo" panelMode="recordGroup" embeddedInModal />);
+      await screen.findByTestId('mock-create-questions');
+      const other = 'Another recording discussed school meals, transport passes, library hours and park lighting.';
+      mockGenerateQuestionsFromListeningTranscript.mockResolvedValue({
+        surveyTitle: '',
+        statements: [{ id: 'q9', type: 'freeform', prompt: 'Which service matters most?', tags: [] }],
+        raw: { questions: [] },
+      });
+      (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+        buildRecorder({
+          scope: 'b',
+          transcript: other,
+          segments: [{ ...segment, text: other }],
+          questionDrafts: null,
+          saveQuestionDrafts,
+        }),
+      );
+      rerender(<SessionListeningPanel sessionSlug="demo" panelMode="recordGroup" embeddedInModal />);
+      await waitFor(() =>
+        expect(screen.getByTestId('mock-create-questions')).toHaveAttribute(
+          'data-prompts',
+          'Which service matters most?',
+        ),
+      );
+      expect(generateQuestionsFromListeningTranscript).toHaveBeenCalledWith(
+        other,
+        expect.objectContaining({ existingQuestionPrompts: [] }),
+      );
+      expect(saveQuestionDrafts).toHaveBeenLastCalledWith({
+        questions: [expect.objectContaining({ prompt: 'Which service matters most?' })],
+        prompts: ['Which service matters most?'],
+        draftedTranscript: other,
+      });
+    });
+
+    // Closing mid-upload would bring the uploaded drafts back, and lose a batch held back meanwhile.
+    it('closes only once a submit in flight has settled', async () => {
+      const onClose = jest.fn();
+      const closeActionRef: { current: (() => Promise<void>) | null } = { current: null };
+      (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+        buildRecorder({
+          transcript,
+          segments: [segment],
+          questionDrafts: kept,
+          finalizeRecording: jest.fn(async () => {}),
+        }),
+      );
+      render(
+        <SessionListeningPanel
+          sessionSlug="demo"
+          panelMode="recordGroup"
+          embeddedInModal
+          onClose={onClose}
+          closeActionRef={closeActionRef}
+        />,
+      );
+      await screen.findByTestId('mock-create-questions');
+      act(() => mockCreateQuestionsProps.onSubmittingChange(true));
+      await act(async () => {
+        void closeActionRef.current?.();
+        await Promise.resolve();
+      });
+      expect(screen.getByRole('status')).toHaveTextContent('Finalizing recording…');
+      expect(onClose).not.toHaveBeenCalled();
+      act(() => mockCreateQuestionsProps.onSubmittingChange(false));
+      await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+    });
+
+    it("keeps the host's edits and removals", async () => {
+      const saveQuestionDrafts = jest.fn();
+      (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+        buildRecorder({ transcript, segments: [segment], questionDrafts: kept, saveQuestionDrafts }),
+      );
+      render(<SessionListeningPanel sessionSlug="demo" panelMode="recordGroup" embeddedInModal />);
+      await screen.findByTestId('mock-create-questions');
+      const edited = [{ id: 'q1-again', type: 'binary', prompt: 'Edited again?' }];
+      act(() => mockCreateQuestionsProps.onDraftQuestionsChange(edited));
+      expect(saveQuestionDrafts).toHaveBeenLastCalledWith({ ...kept, questions: edited });
+      act(() => mockCreateQuestionsProps.onDraftQuestionsChange([]));
+      expect(saveQuestionDrafts).toHaveBeenLastCalledWith({ ...kept, questions: [] });
     });
   });
 

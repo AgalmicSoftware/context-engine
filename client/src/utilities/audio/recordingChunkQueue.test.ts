@@ -1063,3 +1063,86 @@ it('persists an imported transcript without sending it for transcription and res
   expect(restored.segments.map((segment) => segment.text)).toEqual(['Written discussion.', 'Audio discussion.']);
   expect(transcribe).toHaveBeenCalledTimes(1);
 });
+
+const questionDrafts = (prompt: string) => ({
+  questions: [{ id: 'q1', type: 'binary', prompt }],
+  prompts: ['Drafted?', 'Removed by the host?'],
+  draftedTranscript: 'Speech.',
+});
+const draftWrites = () =>
+  jest.mocked(putRecordingChunk).mock.calls.filter(([record]) => record.segment.id === 'question-drafts');
+
+it('keeps question drafts with the recording, saving only the latest of quick edits, until Clear', async () => {
+  const queue = create(undefined, 'drafts-room');
+  await queue.ready;
+  expect(queue.questionDrafts).toBeNull();
+  queue.saveQuestionDrafts(questionDrafts('Drafted?'));
+  queue.saveQuestionDrafts(questionDrafts('Edited by the host?'));
+  await tick();
+  expect(draftWrites()).toHaveLength(1);
+  expect(saved.get('question-drafts')?.questionDrafts).toEqual(questionDrafts('Edited by the host?'));
+  queue.dispose();
+
+  const reopened = create(undefined, 'drafts-room');
+  await reopened.ready;
+  expect(reopened.questionDrafts).toEqual(questionDrafts('Edited by the host?'));
+  expect(reopened.segments).toEqual([]);
+  expect(hasUnsavedRecording('drafts-room')).toBe(false);
+  await reopened.clear(true);
+  expect(saved.has('question-drafts')).toBe(false);
+  expect(reopened.questionDrafts).toBeNull();
+  reopened.dispose();
+  const cleared = create(undefined, 'drafts-room');
+  await cleared.ready;
+  expect(cleared.questionDrafts).toBeNull();
+});
+
+it('restores question drafts that an earlier page saved', async () => {
+  saved.set('question-drafts', {
+    scope: 'reloaded-drafts',
+    labelSpeakers: false,
+    questionDrafts: questionDrafts('Saved before the reload?'),
+    segment: { id: 'question-drafts', index: -1, status: 'recording', text: '', startedAt: 0 },
+  });
+  const queue = create(undefined, 'reloaded-drafts');
+  await queue.ready;
+  expect(queue.questionDrafts).toEqual(questionDrafts('Saved before the reload?'));
+  expect(queue.segments).toEqual([]);
+  expect(await countKeptChunks('reloaded-drafts')).toBe(0);
+});
+
+it('restores question drafts when a failed first restore is retried', async () => {
+  saved.set('question-drafts', {
+    scope: 'retried-drafts',
+    labelSpeakers: false,
+    questionDrafts: questionDrafts('Saved before the reload?'),
+    segment: { id: 'question-drafts', index: -1, status: 'recording', text: '', startedAt: 0 },
+  });
+  jest.mocked(listRecordingChunks).mockRejectedValueOnce(new Error('Storage unavailable'));
+  const queue = create(undefined, 'retried-drafts');
+  await queue.ready;
+  expect(queue.questionDrafts).toBeNull();
+  await queue.prepare();
+  expect(queue.questionDrafts).toEqual(questionDrafts('Saved before the reload?'));
+});
+
+// The page's own copy only covers a save that failed or has not landed, so another tab's later save wins.
+it('reopens with drafts another tab saved later, unless this page could not save its own', async () => {
+  const first = create(undefined, 'shared-drafts');
+  await first.ready;
+  first.saveQuestionDrafts(questionDrafts('This tab?'));
+  await tick();
+  first.dispose();
+  saved.set('question-drafts', { ...saved.get('question-drafts')!, questionDrafts: questionDrafts('Other tab?') });
+  const reopened = create(undefined, 'shared-drafts');
+  await reopened.ready;
+  expect(reopened.questionDrafts).toEqual(questionDrafts('Other tab?'));
+
+  jest.mocked(putRecordingChunk).mockRejectedValueOnce(new DOMException('Quota exceeded', 'QuotaExceededError'));
+  reopened.saveQuestionDrafts(questionDrafts('Unsaved here?'));
+  await tick();
+  reopened.dispose();
+  const again = create(undefined, 'shared-drafts');
+  await again.ready;
+  expect(again.questionDrafts).toEqual(questionDrafts('Unsaved here?'));
+});
