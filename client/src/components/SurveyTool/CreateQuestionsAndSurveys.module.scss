@@ -1479,7 +1479,10 @@ $user-page-background: var(--ce-surface-sunken);
     overflow-wrap: anywhere;
   }
 
-  button {
+  // The card's own buttons, outranking none of their classes; the answer preview and the option editor keep their
+  // usual look.
+  > button,
+  :where(.interviewQuestionPromptActions) button {
     border: 0;
     background: transparent;
     color: var(--ce-panel-text);
@@ -1490,6 +1493,29 @@ $user-page-background: var(--ce-surface-sunken);
       outline: 2px solid var(--ce-focus-ring);
       outline-offset: 2px;
     }
+  }
+}
+
+// The answer as respondents see it, on the card rather than the answer page. A disabled fieldset, it takes no
+// focus or input, so nothing in it looks pressable, and nothing is dimmed as disabled. Its own stacking context
+// keeps the slider's raised handle beneath the pinned Submit bar and the new-drafts cue.
+.interviewQuestionPreview {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  isolation: isolate;
+
+  label {
+    cursor: default;
+  }
+
+  :global([class*='ratingLabelText']) {
+    color: inherit;
+  }
+
+  button[data-step]:disabled {
+    opacity: 1;
   }
 }
 
@@ -1546,11 +1572,6 @@ $user-page-background: var(--ce-surface-sunken);
   font-weight: 800;
   letter-spacing: 0.02em;
   text-transform: uppercase;
-}
-
-.interviewQuestionOptions {
-  color: color-mix(in srgb, var(--ce-panel-text) 76%, transparent);
-  overflow-wrap: anywhere;
 }
 
 .interviewQuestionPromptEditButton {

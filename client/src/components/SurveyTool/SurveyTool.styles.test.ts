@@ -88,9 +88,21 @@ describe('Group Conversation dialog colours', () => {
     expect(drafts).not.toMatch(/var\(--ce-overlay-surface\) \d+%/);
   });
 
+  // Answer previews on draft cards keep the answer input's own colours, as respondents see them.
+  it("leaves draft answer previews out of the dialog's label and progress-step colours", () => {
+    const general = ruleText(scss, '.sessionListeningCreateWrap');
+    for (const rules of [general, drafts]) {
+      expect(rules).toMatch(
+        /h3,\s*h4,\s*label:where\(:not\(\[class\*='interviewQuestionPreview'\] label\)\),\s*strong[,\s]/,
+      );
+      expect(rules).toContain(":global([class*='step']):where(:not([class*='interviewQuestionPreview'] *)) {");
+      expect(rules).not.toMatch(/^\s*label,$/m);
+    }
+  });
+
   it('draws submit progress in the dialog colours', () => {
     expect(drafts).toMatch(
-      /:global\(\[class\*='step'\]\) \{\s*color: var\(--ce-panel-text-muted\) !important;\s*span,\s*svg \{\s*background: var\(--ce-surface-sunken\) !important;/,
+      /:global\(\[class\*='step'\]\):where\(:not\(\[class\*='interviewQuestionPreview'\] \*\)\) \{\s*color: var\(--ce-panel-text-muted\) !important;\s*span,\s*svg \{\s*background: var\(--ce-surface-sunken\) !important;/,
     );
     expect(drafts).toMatch(
       /:global\(\[class\*='stepCompleted'\]\) \{\s*color: var\(--ce-status-success-text\) !important;/,

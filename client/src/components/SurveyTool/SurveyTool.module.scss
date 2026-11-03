@@ -3255,9 +3255,10 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
     box-shadow: 0 16px 32px color-mix(in srgb, var(--ce-overlay-base) 14%, transparent) !important;
   }
 
+  // Draft cards' answer previews keep the answer input's own colours.
   h3,
   h4,
-  label,
+  label:where(:not([class*='interviewQuestionPreview'] label)),
   strong {
     color: var(--ce-document-text) !important;
   }
@@ -3303,7 +3304,7 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
     box-shadow: 0 10px 22px color-mix(in srgb, var(--ce-overlay-base) 12%, transparent) !important;
   }
 
-  :global([class*='step']) {
+  :global([class*='step']):where(:not([class*='interviewQuestionPreview'] *)) {
     color: color-mix(in srgb, var(--ce-overlay-surface) 72%, transparent) !important;
 
     span,
@@ -3452,7 +3453,7 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
 
   h3,
   h4,
-  label,
+  label:where(:not([class*='interviewQuestionPreview'] label)),
   strong,
   :global([class*='toggleLabel']),
   :global([class*='inheritToggle']),
@@ -3571,7 +3572,7 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
 
   // Submit progress sits on the dialog, which its labels mask the connecting line in; on the floating
   // panel's light pill, Context Engine's success green was 1.9:1.
-  :global([class*='step']) {
+  :global([class*='step']):where(:not([class*='interviewQuestionPreview'] *)) {
     color: var(--ce-panel-text-muted) !important;
 
     span,

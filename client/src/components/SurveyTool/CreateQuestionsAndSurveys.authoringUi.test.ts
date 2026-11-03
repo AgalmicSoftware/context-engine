@@ -280,7 +280,9 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
     const markup = renderToStaticMarkup(tree);
 
     expect(markup).toContain('Multichoice');
-    expect(markup).toContain('Options: Pilot · Full launch');
+    // The card previews the answer, options included; their fields wait behind Edit.
+    expect(markup).toMatch(/aria-label="Answer preview"[\s\S]*Pilot[\s\S]*Full launch/);
+    expect(markup).not.toContain('Add Option');
     expect(treeHasText(tree, 'Survey')).toBe(false);
     expect(treeHasText(tree, 'from URL / Content')).toBe(false);
     expect(markup).toContain('interviewQuestionPromptEditButton');
@@ -290,6 +292,9 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
     expect(promptNodes).toHaveLength(1);
     expect(
       nodeHasClassName((promptNodes[0] as { props?: { actions?: unknown } })?.props?.actions, 'removeQuestionButton'),
+    ).toBe(true);
+    expect(
+      nodeHasClassName((promptNodes[0] as { props?: { editor?: unknown } })?.props?.editor, 'optionsContainer'),
     ).toBe(true);
     expect(markup).toContain('revealTagInputButton');
     expect(markup).toContain('aria-label="Add tag"');
