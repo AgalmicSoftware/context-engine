@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Context Engine — motion loops</title>
+  <link rel="stylesheet" href="motion.css" />
+</head>
+<body>
+  <svg id="stage" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Context Engine motion loop"></svg>
+  <div class="controls">
+    <button type="button" id="toggle">Play</button>
+    <input id="scrubber" type="range" min="0" step="0.001" value="0" aria-label="Scrub timeline" />
+    <span id="timecode"></span>
+    <nav aria-label="Films">
+      <a href="?film=readme">README</a>
+      <a href="?film=ai-discourse">AI Discourse</a>
+      <a href="?film=corporate">Companies</a>
+      <a href="?film=cities">Cities</a>
+      <a href="?film=conferences">Events</a>
+      <a href="?film=digital-groups">Groups</a>
+    </nav>
+  </div>
+  <script src="kit.js"></script>
+</body>
+</html>

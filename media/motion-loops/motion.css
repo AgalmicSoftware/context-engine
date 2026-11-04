@@ -1,0 +1,54 @@
+/*
+  Context Engine motion loops — styles.
+  Every animated property is set from JavaScript as a pure function of time;
+  nothing here uses CSS transitions or keyframe animations.
+*/
+
+@font-face { font-family: 'Poppins'; font-weight: 400; font-style: normal; font-display: block; src: url('../product-film/fonts/poppins-latin-400-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Poppins'; font-weight: 500; font-style: normal; font-display: block; src: url('../product-film/fonts/poppins-latin-500-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Poppins'; font-weight: 600; font-style: normal; font-display: block; src: url('../product-film/fonts/poppins-latin-600-normal.woff2') format('woff2'); }
+@font-face { font-family: 'Poppins'; font-weight: 700; font-style: normal; font-display: block; src: url('../product-film/fonts/poppins-latin-700-normal.woff2') format('woff2'); }
+
+* { box-sizing: border-box; }
+
+html, body { margin: 0; background: #ebe9e3; }
+
+/* The film's page: warm off-white with the same two faint glows, sized in
+   percentages so they scale with the stage. */
+#stage {
+  display: block;
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
+  aspect-ratio: 16 / 9;
+  background:
+    radial-gradient(57.3% 70.4% at 78% 50%, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0) 70%),
+    radial-gradient(46.9% 55.6% at 8% 100%, rgba(222, 225, 240, 0.7), rgba(222, 225, 240, 0) 70%),
+    #f7f6f2;
+  font-family: 'Poppins', sans-serif;
+  font-kerning: normal;
+  letter-spacing: -0.012em;
+  text-rendering: geometricPrecision;
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  max-width: 1280px;
+  margin: 12px auto;
+  padding: 0 16px;
+  color: #202b3a;
+  font: 14px/1 'Poppins', sans-serif;
+}
+.controls input { flex: 1; min-width: 120px; accent-color: #0b9aa8; }
+.controls button { min-width: 64px; padding: 8px 12px; font: inherit; cursor: pointer; }
+.controls span { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.controls nav { display: flex; flex-wrap: wrap; gap: 12px; width: 100%; }
+.controls a { color: #087f8b; }
+
+/* Capture mode: only the composition, filling the viewport at 1:1. */
+body.capture { overflow: hidden; }
+body.capture #stage { width: 100vw; height: 100vh; max-width: none; margin: 0; aspect-ratio: auto; }
+body.capture .controls { display: none; }
