@@ -3,7 +3,7 @@
 ![License: MPL-2.0](https://img.shields.io/badge/License-MPL--2.0-blue.svg)
 
 <p align="center">
-  <img src="docs/assets/readme-feature-rotation.gif" alt="Context Engine feature slideshow: individual Questions slides for agreement, freeform with voice input, rating, multiple choice, and quadratic allocation; Groups for private access and data, result filtering, and optional onchain SBT membership; and Results previews for Atlas, Breakdown, and Risk Matrix." />
+  <img src="docs/assets/readme-feature-rotation.gif" alt="Context Engine feature animation: a question card answered as agreement, freeform with voice input, rating, multiple choice, and quadratic allocation; Groups for private access and data, result filtering, and centralized or decentralized options; and Results previews for Opinion Map, Breakdown, and Analysis." />
   <br />
   <a href="docs/assets/readme-header-overview.png">View the complete still image</a>
 </p>
