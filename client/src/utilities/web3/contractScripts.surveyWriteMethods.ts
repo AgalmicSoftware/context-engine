@@ -28,6 +28,7 @@ type PayloadPointerUpload = {
 
 const toMetadataPayload = (value: MetadataPayload | null | undefined): MetadataPayload => value || {};
 const ID_PRECHECK_TIMEOUT_MS = 10_000;
+const SURVEY_COPY_RECHECK_LIMIT = 2;
 
 export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRuntimeDeps): ContractScriptsMethodMap => {
   const {
@@ -606,15 +607,25 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
       const canUseSessionStorage = isCloudflareStorageResource(cfg, STORAGE_RESOURCE_KEYS.RESPONSES);
       const workerCanonicalStorage =
         sessionProjection.profileValid && sessionProjection.isWorkerCanonical && canUseSessionStorage;
-      if (!workerCanonicalStorage && surveyResponse) {
+      // On-chain sessions save the whole survey as one copy, so an edit is merged
+      // into the stored copy. Worker sessions keep each answer as its own row.
+      const submittedSurveyResponse = surveyResponse as MetadataPayload;
+      const mergesStoredCopy = !workerCanonicalStorage && !!surveyResponse;
+      const readSurveyPointer = () =>
+        this.getResponseHash('none', userAddress, hashedSurveyId, cfg, { throwOnError: true, blockTag: 'latest' });
+      let mergedFromPointer: unknown = null;
+      const mergeStoredCopy = async (): Promise<void> => {
         try {
+          // The pointer first: a save landing between these reads is then seen as a change.
+          const pointer = await readSurveyPointer();
           const stored = await this.getSurveyResponse('none', userAddress, hashedSurveyId, cfg, {
             throwOnError: true,
             rawPayload: true,
             forceArweaveFetch: true,
             blockTag: 'latest',
           });
-          surveyResponse = mergeSurveyResponseSnapshot(stored, surveyResponse, questionResponses);
+          surveyResponse = mergeSurveyResponseSnapshot(stored, submittedSurveyResponse, questionResponses);
+          mergedFromPointer = pointer;
         } catch (cause: unknown) {
           throw Object.assign(
             new Error('Unable to read the complete stored survey response. Please retry submission.'),
@@ -624,7 +635,8 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
             },
           );
         }
-      }
+      };
+      if (mergesStoredCopy) await mergeStoredCopy();
       const workerSubmissionReceipt = (uploads: PayloadPointerUpload[]) => ({
         workerCanonicalSubmission: true,
         questionResponseRefs: uploads.map((upload, index) => ({
@@ -634,6 +646,7 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
         sessionSlug: workerResponseIdentity?.sessionSlug || resolveStorageSessionSlug(groupKeyOrCfg, cfg),
         storageRefs: [surveyResponseUpload?.storageRef, ...uploads.map((upload) => upload.storageRef)].filter(Boolean),
       });
+      let uploadSurveyResponse = async (): Promise<void> => {};
       if (ARWEAVE_ACTIVE || canUseSessionStorage) {
         const uploadContext = {
           account: userAddress,
@@ -658,10 +671,10 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
           );
           if (uploadProblem) throw new Error(uploadProblem);
         }
-        if (surveyResponse) {
-          const surveyResponsePayload = workerResponseIdentity
-            ? { ...surveyResponse, ...workerResponseIdentity }
-            : surveyResponse;
+        uploadSurveyResponse = async () => {
+          const surveyResponsePayload = (
+            workerResponseIdentity ? { ...surveyResponse, ...workerResponseIdentity } : surveyResponse
+          ) as MetadataPayload;
           validateNoLockedPlaintextInPayload(surveyResponsePayload, {
             family: 'survey_response_payload',
             path: 'survey response',
@@ -679,7 +692,8 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
           const surveyRevision = uploadRevisions.get(hashedSurveyId);
           if (surveyRevision) surveyRevision.settled = true;
           surveyResponseHashBytes = surveyResponseUpload?.pointerBytes || ethers.constants.HashZero;
-        }
+        };
+        if (surveyResponse) await uploadSurveyResponse();
         // Upload response objects sequentially to avoid Arweave anchor/signature races
         // that can appear when multiple uploads are posted in parallel for one wallet.
         questionResponseUploads = [];
@@ -718,6 +732,32 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
         }
       } else {
         return; // no-op when no configured payload storage path is available
+      }
+
+      // A save from another tab or device since the merge would lose its edit to this
+      // one, so build the copy again from what it saved. The contract can't check this,
+      // so two saves within the last few seconds before sending can still collide.
+      for (let attempt = 0; mergesStoredCopy; attempt += 1) {
+        let latestPointer: unknown;
+        try {
+          latestPointer = await readSurveyPointer();
+        } catch (cause: unknown) {
+          throw Object.assign(new Error('Unable to check the stored survey response. Please retry submission.'), {
+            cause,
+            retryable: true,
+          });
+        }
+        if (latestPointer === mergedFromPointer) break;
+        if (attempt >= SURVEY_COPY_RECHECK_LIMIT) {
+          throw Object.assign(
+            new Error('Your answers to this survey are changing elsewhere. Please retry submission.'),
+            {
+              retryable: true,
+            },
+          );
+        }
+        await mergeStoredCopy();
+        await uploadSurveyResponse();
       }
 
       const questionResponseHashesBytes = questionResponseUploads.map((upload) => upload.pointerBytes);
