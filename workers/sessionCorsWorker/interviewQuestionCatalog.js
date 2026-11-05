@@ -20,15 +20,13 @@ const catalog = (questions = [], incomplete = false) => ({ questions, incomplete
 const retryableReadStatus = status => !status || status === 408 || status === 429 || status >= 500;
 import { normalizePublicInterviewQuestions, hasRestrictedPrompt, hasRatingScaleMetadata, normalizeRatingScale, normalizeQuestion } from '../../shared/interviewQuestionCatalog.mjs';
 import { selectCanonicalStorageVersions } from './storageResourceOwnership.js';
+import { blockedQuestionIds } from './blockedQuestionIds.js';
 const trim = (value) => String(value == null ? '' : value).trim();
 const lower = (value) => trim(value).toLowerCase();
 const isObj = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
 const dedupeQuestions = (questions) => normalizePublicInterviewQuestions(questions, MAX_QUESTIONS);
 // The id normalizeQuestion will serve the payload under.
 const payloadQuestionId = (payload) => lower(payload?.id || payload?.questionId);
-// The session's hidden questions, which the browser and MCP leave out too.
-export const blockedInterviewQuestionIds = (config) =>
-  [...new Set((Array.isArray(config?.BLOCKED_QUESTION_IDS) ? config.BLOCKED_QUESTION_IDS : []).map(lower).filter(Boolean))].sort();
 
 const readJsonResponse = async (response) => {
   if (!response || Number(response.status || 0) < 200 || Number(response.status || 0) >= 300) return null;
@@ -83,7 +81,7 @@ const loadCloudflareQuestions = async ({ env, config, slug, storageRoute }) => {
   const { items } = listing;
   let incomplete = listing.incomplete;
   // Hidden ids arrive as markers without a storage reference.
-  const hiddenIds = new Set([...blockedInterviewQuestionIds(config), ...items
+  const hiddenIds = new Set([...blockedQuestionIds(config), ...items
     .filter((item) => item?.hidden === true || item?.metadata?.hidden === true)
     .map((item) => lower(item?.metadata?.resourceId))
     .filter(Boolean)]);
@@ -258,7 +256,7 @@ const loadOnChainQuestions = async ({ config, slug, fetchImpl }) => {
   const scanEnd = Math.min(end, start + MAX_SCAN_BLOCKS - 1);
   const questions = [];
   // A blocked id counts as seen, so it spends no pointer read.
-  const seen = new Set(blockedInterviewQuestionIds(config));
+  const seen = new Set(blockedQuestionIds(config));
   let incomplete = false;
   let pointerReads = 0;
   let candidates = 0;

@@ -65060,6 +65060,16 @@ var init_sessionQuestions = __esm({
   }
 });
 
+// workers/sessionCorsWorker/blockedQuestionIds.js
+var blockedQuestionIds;
+var init_blockedQuestionIds = __esm({
+  "workers/sessionCorsWorker/blockedQuestionIds.js"() {
+    blockedQuestionIds = (config) => [...new Set(
+      (Array.isArray(config?.BLOCKED_QUESTION_IDS) ? config.BLOCKED_QUESTION_IDS : []).map((id2) => String(id2 ?? "").trim().toLowerCase()).filter(Boolean)
+    )].sort();
+  }
+});
+
 // workers/sessionCorsWorker/agent/agentQuestionNumbers.mjs
 function normalizeQuestionId(value = "") {
   return safeString(value).slice(0, 256);
@@ -66159,11 +66169,17 @@ async function loadWorkerQuestionsForSession(env, sessionSlug, options = {}) {
   const result = await loadWorkerCloudflareQuestions({ env, session, ...options });
   return { ...result, questions: orderQuestionsForPresentation(result.questions || []) };
 }
+function withoutBlockedQuestions(env = {}, loaded = {}) {
+  const blocked = new Set(blockedQuestionIds(env.AGENT_CONTEXT?.config));
+  if (!blocked.size) return loaded;
+  const questions = (loaded.questions || []).filter((question) => !blocked.has(safeString(question.questionId || question.id).toLowerCase()));
+  return { ...loaded, questions, ...loaded.questionCount === void 0 ? {} : { questionCount: questions.length } };
+}
 async function loadQuestionsForSession(env = {}, sessionSlug = "", options = {}) {
   const hosted = await loadWorkerQuestionsForSession(env, sessionSlug, options);
   const result = hosted || await listCachedSessionQuestions({ env, sessionSlug, ...options });
   const summary = orderQuestionsForPresentationWithSummary(result.questions || []);
-  return withAgentProposedQuestions(env, sessionSlug, { ...result, questions: summary.questions }).then((value) => withSkippedMalformed(value, summary.skippedMalformed));
+  return withAgentProposedQuestions(env, sessionSlug, { ...result, questions: summary.questions }).then((value) => withoutBlockedQuestions(env, withSkippedMalformed(value, summary.skippedMalformed)));
 }
 var init_sessionQuestionLoading = __esm({
   "workers/sessionCorsWorker/agent/sessionQuestionLoading.mjs"() {
@@ -66172,6 +66188,7 @@ var init_sessionQuestionLoading = __esm({
     init_sessionQuestions();
     init_sessionPolicyLoader();
     init_runtimeCore();
+    init_blockedQuestionIds();
     init_hostedQuestionNormalization();
   }
 });
@@ -66851,6 +66868,7 @@ __export(agentSessionRuntime_exports, {
   sessionUsesWorkerBackedQuestions: () => sessionUsesWorkerBackedQuestions,
   shortQuestionId: () => shortQuestionId,
   summarizeQuestionResults: () => summarizeQuestionResults,
+  withoutBlockedQuestions: () => withoutBlockedQuestions,
   writeAgentSkillUpdateFlag: () => writeAgentSkillUpdateFlag,
   writeDraftLifecycleEvent: () => writeDraftLifecycleEvent
 });
@@ -75814,6 +75832,7 @@ var init_resultsAnalysisGeneration = __esm({
     init_sessionSlugResolution();
     init_storageRouteExecution();
     init_storageResourceOwnership();
+    init_blockedQuestionIds();
     init_aiRequestNormalization();
     init_aiProviderExecution();
     init_responseKvHelpers();
@@ -76045,10 +76064,11 @@ var init_resultsAnalysisGeneration = __esm({
     normalizeSanitizedRows = async ({ rows, questions, slug, config, strictLocked, requireKnownQuestion = false }) => {
       const expectedSlug = normalizeWorkerSessionSlug(slug || config?.slug);
       const expectedSessionId = normalizeSessionIdHex2(resolveCanonicalWorkerSessionIdHex(config));
+      const blocked = new Set(blockedQuestionIds(config));
       const questionMap = /* @__PURE__ */ new Map();
       (Array.isArray(questions) ? questions : []).forEach((question) => {
         const normalized = normalizeQuestionRecord(question);
-        if (normalized) questionMap.set(normalized.questionId, normalized);
+        if (normalized && !blocked.has(lower6(normalized.questionId))) questionMap.set(normalized.questionId, normalized);
       });
       const latestByQuestionParticipant = /* @__PURE__ */ new Map();
       let excludedCount = 0;
@@ -76066,7 +76086,7 @@ var init_resultsAnalysisGeneration = __esm({
           return { ok: false, status: 400, error: "Encrypted or locked response rows cannot be used for admin snapshot generation." };
         }
         const questionId4 = normalizeQuestionId3(row.questionId || row.questionID || row.id);
-        if (!questionId4 || requireKnownQuestion && !questionMap.has(questionId4)) {
+        if (!questionId4 || blocked.has(lower6(questionId4)) || requireKnownQuestion && !questionMap.has(questionId4)) {
           excludedCount += 1;
           continue;
         }
@@ -92039,7 +92059,9 @@ async function loadWrappedQuestionSource({
       ok: true,
       mode,
       source: "session_agent_proposals",
-      questions: (readabilityOnly ? [...byId.values()] : enabledQuestionIds.map((id2) => byId.get(id2))).filter((question) => question && question.answerable !== false && !question.locked && !question.encrypted)
+      questions: withoutBlockedQuestions(env, {
+        questions: (readabilityOnly ? [...byId.values()] : enabledQuestionIds.map((id2) => byId.get(id2))).filter((question) => question && question.answerable !== false && !question.locked && !question.encrypted)
+      }).questions
     };
   }
   const canonical = await loadCanonicalQuestions({ env, sessionSlug });
@@ -92053,7 +92075,7 @@ async function loadWrappedQuestionSource({
       questions: []
     };
   }
-  const questions = Array.isArray(canonical?.questions) ? canonical.questions : [];
+  const { questions } = withoutBlockedQuestions(env, { questions: Array.isArray(canonical?.questions) ? canonical.questions : [] });
   if (!questions.length && !readabilityOnly) {
     return {
       ok: false,
@@ -101787,6 +101809,7 @@ var resolveAnonymousIpDailyLimit = (config = {}) => {
 init_interviewSettings();
 init_aiRequestPolicy();
 init_responseKvHelpers();
+init_blockedQuestionIds();
 
 // shared/interviewQuestionCatalog.mjs
 init_ratingScale();
@@ -101837,6 +101860,7 @@ var normalizePublicInterviewQuestions = (input = [], limit = Infinity) => {
 
 // workers/sessionCorsWorker/interviewQuestionCatalog.js
 init_storageResourceOwnership();
+init_blockedQuestionIds();
 var QUESTIONS_ADDED_TOPIC02 = "0x3b584fb360a325f39352e75bd13458807d8e31735ef4dadaeff99fc3e59b517a";
 var GET_QUESTION_HASH_SELECTOR = "0x24b9f713";
 var ZERO_BYTES322 = `0x${"00".repeat(32)}`;
@@ -101856,7 +101880,6 @@ var lower8 = (value) => trim17(value).toLowerCase();
 var isObj23 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
 var dedupeQuestions = (questions) => normalizePublicInterviewQuestions(questions, MAX_QUESTIONS);
 var payloadQuestionId = (payload) => lower8(payload?.id || payload?.questionId);
-var blockedInterviewQuestionIds = (config) => [...new Set((Array.isArray(config?.BLOCKED_QUESTION_IDS) ? config.BLOCKED_QUESTION_IDS : []).map(lower8).filter(Boolean))].sort();
 var readJsonResponse = async (response2) => {
   if (!response2 || Number(response2.status || 0) < 200 || Number(response2.status || 0) >= 300) return null;
   try {
@@ -101910,7 +101933,7 @@ var loadCloudflareQuestions = async ({ env, config, slug, storageRoute: storageR
   const listing = await listQuestionRows(callStorage);
   const { items } = listing;
   let incomplete = listing.incomplete;
-  const hiddenIds = /* @__PURE__ */ new Set([...blockedInterviewQuestionIds(config), ...items.filter((item) => item?.hidden === true || item?.metadata?.hidden === true).map((item) => lower8(item?.metadata?.resourceId)).filter(Boolean)]);
+  const hiddenIds = /* @__PURE__ */ new Set([...blockedQuestionIds(config), ...items.filter((item) => item?.hidden === true || item?.metadata?.hidden === true).map((item) => lower8(item?.metadata?.resourceId)).filter(Boolean)]);
   const readPayload = async (storageRefId) => {
     try {
       const response2 = await callStorage("/storage/read", `id=${encodeURIComponent(storageRefId)}`);
@@ -102063,7 +102086,7 @@ var loadOnChainQuestions = async ({ config, slug, fetchImpl }) => {
   if (end < start) return catalog();
   const scanEnd = Math.min(end, start + MAX_SCAN_BLOCKS - 1);
   const questions = [];
-  const seen = new Set(blockedInterviewQuestionIds(config));
+  const seen = new Set(blockedQuestionIds(config));
   let incomplete = false;
   let pointerReads = 0;
   let candidates = 0;
@@ -102148,8 +102171,8 @@ var resolveInterviewStarter = async ({ env, slug, config, deps = {}, refresh = f
   const read = deps.getKvJson || getKvJson;
   const write = deps.putKvJson || putKvJson;
   const stored = await read(env, cacheKey2(slug));
-  const blockedQuestionIds = JSON.stringify(blockedInterviewQuestionIds(config));
-  const cached = (stored?.blockedQuestionIds || "[]") === blockedQuestionIds ? stored : null;
+  const blockedQuestionIds2 = JSON.stringify(blockedQuestionIds(config));
+  const cached = (stored?.blockedQuestionIds || "[]") === blockedQuestionIds2 ? stored : null;
   if (cached?.openingPrompt && !settings.autoRegenerate && !refresh) return withSteeringPrompt(cached);
   const { questions, incomplete } = await (deps.loadPublicInterviewQuestions || loadPublicInterviewQuestions)({
     env,
@@ -102225,7 +102248,7 @@ ${contextText}` : ""}`
       openingPrompt,
       source: "generated",
       questionCount: questions.length,
-      blockedQuestionIds,
+      blockedQuestionIds: blockedQuestionIds2,
       generatedAt: (/* @__PURE__ */ new Date()).toISOString()
     };
     await write(env, cacheKey2(slug), value);

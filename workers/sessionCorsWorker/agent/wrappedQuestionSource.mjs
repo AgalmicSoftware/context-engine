@@ -1,4 +1,4 @@
-import { loadWorkerQuestionsForSession } from './agentSessionRuntime.mjs';
+import { loadWorkerQuestionsForSession, withoutBlockedQuestions } from './agentSessionRuntime.mjs';
 import { safeString } from './runtimePrimitives.mjs';
 import { listCachedSessionQuestions } from './sessionQuestions.mjs';
 import { listAgentProposedQuestionsForSession } from './agentQuestionProposals.mjs';
@@ -54,7 +54,9 @@ export async function loadWrappedQuestionSource({
       ok: true,
       mode,
       source: 'session_agent_proposals',
-      questions: (readabilityOnly ? [...byId.values()] : enabledQuestionIds.map((id) => byId.get(id))).filter(question => question && question.answerable !== false && !question.locked && !question.encrypted),
+      questions: withoutBlockedQuestions(env, {
+        questions: (readabilityOnly ? [...byId.values()] : enabledQuestionIds.map((id) => byId.get(id))).filter(question => question && question.answerable !== false && !question.locked && !question.encrypted),
+      }).questions,
     };
   }
 
@@ -69,7 +71,7 @@ export async function loadWrappedQuestionSource({
       questions: [],
     };
   }
-  const questions = Array.isArray(canonical?.questions) ? canonical.questions : [];
+  const { questions } = withoutBlockedQuestions(env, { questions: Array.isArray(canonical?.questions) ? canonical.questions : [] });
   if (!questions.length && !readabilityOnly) {
     return {
       ok: false,

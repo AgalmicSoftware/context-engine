@@ -169,6 +169,24 @@ test('hosted proposals, reads, drafts and explicit submission stay inside the Se
   assert.equal([...f.records.keys()].filter(key => key.startsWith('ce-storage:fixture:responses:')).length, 1);
 });
 
+test('a question on the session hidden list leaves the Agent list, and no answer to it goes through', async () => {
+  const f = fixture(); f.withCoordinator(); f.env.CE_STORAGE_INDEX_KV = f.env.GROUP_KV;
+  f.config.storageProfile = { backend: 'cloudflare', payloadAccessControl: { gate: 'public', encryption: 'none' } };
+  const agent = await f.credential({ scopes: ['read_questions', 'draft_answers', 'pose_questions'] });
+  const created = await f.request('/api/agent/questions/create', { method: 'POST', token: agent.token,
+    body: { questions: [{ prompt: 'Should the fixture keep this one?', questionType: 'binary' }, { prompt: 'Should the fixture hide that one?', questionType: 'binary' }] } });
+  assert.equal(created.status, 200, await created.clone().text());
+  const list = async () => (await (await f.request('/api/agent/questions', { token: agent.token })).json()).questions.map(({ questionId }) => questionId);
+  const [kept, hidden] = (await created.json()).created.map(({ questionId }) => questionId);
+  assert.deepEqual((await list()).sort(), [kept, hidden].sort());
+  f.config.BLOCKED_QUESTION_IDS = [` ${hidden.toUpperCase()} `];
+  assert.deepEqual(await list(), [kept]);
+  const answered = await f.request('/api/agent/preferences', { method: 'POST', token: agent.token, body: { preferences: [{ questionId: hidden, value: 'Agree' }] } });
+  assert.equal(answered.status, 200, await answered.clone().text());
+  const body = await answered.json();
+  assert.equal((body.drafts || []).length, 0, JSON.stringify(body));
+});
+
 test('question pages are bounded, complete and bound to the current caller and question snapshot', async () => {
   const f = fixture(); f.withCoordinator(); f.env.CE_STORAGE_INDEX_KV = f.env.GROUP_KV;
   f.config.storageProfile = { backend: 'cloudflare', payloadAccessControl: { gate: 'public', encryption: 'none' } };
