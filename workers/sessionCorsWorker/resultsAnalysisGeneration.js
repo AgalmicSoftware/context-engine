@@ -1102,10 +1102,7 @@ export const runQueuedAutomaticResultsAnalysisJob = async ({ env, slug, job = {}
     env,
     slug: targetSlug,
     config,
-    // Rows queued before the queue kept access rules cannot vouch for their
-    // audience. The storage scan reads the real ones.
-    committedResponses: (Array.isArray(job.committedResponses) ? job.committedResponses : [])
-      .filter((entry) => hasOwn(entry?.metadata, 'accessConditions')),
+    committedResponses: Array.isArray(job.committedResponses) ? job.committedResponses : [],
     requestId: job.requestId,
     deps,
   });

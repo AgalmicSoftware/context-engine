@@ -415,29 +415,6 @@ test('the stored answer beats its shortened copy in the queue', async () => {
   assert.equal(source.snapshot.responses[0].answer.length, 2999);
 });
 
-test('a job queued before rows carried their access rule leaves those rows to the storage scan', async () => {
-  const kv = createKv();
-  await putPayload({ kv, resource: 'questions', id: 'qm1',
-    payload: { sessionSlug: 'session-a', sessionId, questionId: 'q1', prompt: 'Thoughts?', type: 'freeform' } });
-  const metadata = { id: 'queued-earlier', responder: `0x${'1'.repeat(40)}`, createdAt: '2026-09-17T00:00:00.000Z', ...publicAccess };
-  const result = await runQueuedAutomaticResultsAnalysisJob({
-    env: { CE_STORAGE_INDEX_KV: kv },
-    slug: 'session-a',
-    job: {
-      requestId: 'queued-earlier',
-      committedResponses: [{ metadata, payload: { sessionSlug: 'session-a', sessionId, questionId: 'q1', answer: 'Maybe admins only' } }],
-    },
-    deps: {
-      getSessionConfig: async () => publicConfig,
-      readCoordinatedResultsAnalysisStatus: async () => ({ ok: true, state: {} }),
-    },
-  });
-  assert.deepEqual(
-    [result.skipped, result.reason, result.newDistinctCount],
-    [true, 'threshold_not_met', 0],
-  );
-});
-
 test('a version the audience cannot read still decides which question and answer are current', async () => {
   const kv = createKv();
   const env = { CE_STORAGE_INDEX_KV: kv };
@@ -1463,7 +1440,7 @@ for (const [rpcUrl, redirect, expectedStatus] of [
   await putPayload({ kv, resource: 'questions', id: 'qmeta1',
     payload: { sessionSlug: 'session-a', sessionId, questionId: 'q1', prompt: 'Question?', type: 'text' } });
   const committedResponses = [1, 2, 3].map((index) => ({
-    metadata: { id: `r${index}`, responder: `0x${String(index).repeat(40)}`, createdAt: '2026-09-17T00:00:00.000Z', accessConditions: null },
+    metadata: { id: `r${index}`, responder: `0x${String(index).repeat(40)}`, createdAt: '2026-09-17T00:00:00.000Z' },
     payload: { sessionSlug: 'session-a', sessionId, questionId: 'q1', answer: `View ${index}` },
   }));
   const calls = [];
