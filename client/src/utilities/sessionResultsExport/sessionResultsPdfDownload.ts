@@ -4,6 +4,7 @@ import {
   resolveDefaultExport,
   resolveJsPdfConstructor,
 } from '../ui/browserPdfExport';
+import { FIXED_MEDIA_LIGHT } from '../ui/fixedMediaColors';
 
 export type SessionResultsPdfDownloadOptions = {
   documentRef?: Document;
@@ -64,7 +65,7 @@ export const downloadSessionResultsPdfReport = async ({
     const capture = async (element: HTMLElement) => {
       const height = element.getBoundingClientRect().height;
       const options = {
-        backgroundColor: '#ffffff',
+        backgroundColor: FIXED_MEDIA_LIGHT,
         scale: 2,
         scrollX: 0,
         scrollY: 0,
