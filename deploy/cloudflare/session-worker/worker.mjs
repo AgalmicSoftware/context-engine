@@ -71409,6 +71409,7 @@ var init_storageRouteExecution = __esm({
       const groupIds = normalizeGroupIdList(condition.groupIds || condition.groups || condition.groupId);
       if (!groupIds.length) return { ok: false, reason: "missing_worker_group", condition: { kind: "worker_group" } };
       let firstFailure = null;
+      let unavailable3 = null;
       for (const groupId of groupIds) {
         const result = await checkWorkerGroupMembership({
           env,
@@ -71419,7 +71420,10 @@ var init_storageRouteExecution = __esm({
           authScopes,
           deps
         });
-        if (result.outcome === "unavailable") return result;
+        if (result.outcome === "unavailable") {
+          unavailable3 || (unavailable3 = result);
+          continue;
+        }
         if (result?.ok) {
           return {
             ok: true,
@@ -71432,6 +71436,7 @@ var init_storageRouteExecution = __esm({
         }
         if (!firstFailure) firstFailure = result;
       }
+      if (unavailable3) return unavailable3;
       return {
         ok: false,
         reason: firstFailure?.reason || "worker_group_membership_denied",
@@ -71483,6 +71488,7 @@ var init_storageRouteExecution = __esm({
       const match = document.match === "all" ? "all" : "any";
       const matched = [];
       let firstFailure = null;
+      let unavailable3 = null;
       for (const condition of conditions) {
         const result = await evaluateAccessCondition({
           condition,
@@ -71493,7 +71499,10 @@ var init_storageRouteExecution = __esm({
           authScopes,
           deps
         });
-        if (result.outcome === "unavailable") return result;
+        if (result.outcome === "unavailable") {
+          unavailable3 || (unavailable3 = result);
+          continue;
+        }
         if (result.ok) {
           matched.push(result.matchedCondition || { kind: trim13(condition.kind).toLowerCase() });
           if (match === "any") {
@@ -71504,6 +71513,7 @@ var init_storageRouteExecution = __esm({
           if (match === "all") break;
         }
       }
+      if (unavailable3 && !(match === "all" && firstFailure)) return unavailable3;
       if (match === "all" && matched.length === conditions.length) {
         return { ok: true, conditionMatched: { source, match, conditions: matched } };
       }
@@ -71538,6 +71548,7 @@ var init_storageRouteExecution = __esm({
         };
       }
       let firstFailure = null;
+      let unavailable3 = null;
       for (const groupId of groupIds) {
         const result = await checkWorkerGroupMembership({
           env,
@@ -71548,14 +71559,10 @@ var init_storageRouteExecution = __esm({
           authScopes,
           deps
         });
-        if (result.outcome === "unavailable") return {
-          ok: false,
-          response: responseJson(deps, {
-            error: "Worker group membership is unavailable; retry.",
-            reason: result.reason,
-            retryable: true
-          }, 503, baseHeaders)
-        };
+        if (result.outcome === "unavailable") {
+          unavailable3 || (unavailable3 = result);
+          continue;
+        }
         if (result?.ok) {
           return {
             ok: true,
@@ -71569,6 +71576,14 @@ var init_storageRouteExecution = __esm({
         }
         if (!firstFailure) firstFailure = result;
       }
+      if (unavailable3) return {
+        ok: false,
+        response: responseJson(deps, {
+          error: "Worker group membership is unavailable; retry.",
+          reason: unavailable3.reason,
+          retryable: true
+        }, 503, baseHeaders)
+      };
       return {
         ok: false,
         response: responseJson(deps, {

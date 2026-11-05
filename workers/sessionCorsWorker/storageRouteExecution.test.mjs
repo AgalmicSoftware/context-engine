@@ -7,6 +7,7 @@ import {
 	setCloudflareStorageResourceHidden,
 	publishCloudflareOwnedStorageMetadata,
 	storageRoute as storageRouteBoundary,
+	authorizeCloudflareStorageResourceRead,
 } from './storageRouteExecution.js';
 import { dispatchAuthenticatedSecretPathRoute } from './authenticatedSecretPathRouteDispatch.js';
 import { getSessionSecrets } from './sessionConfigSecretsStore.js';
@@ -5200,3 +5201,55 @@ test('a real membership denial still omits its record', async () => {
   assert.deepEqual(body.items.map((item) => item.storageRef.id), ['cf_membership_1']);
   assert.equal(body.listComplete, true);
 });
+
+// Allowed decides ANY and denied decides ALL. Only with neither is an outage the answer.
+const policyAdmin = `0x${'a'.repeat(40)}`;
+const policyOutsider = `0x${'b'.repeat(40)}`;
+const groupRule = (...groupIds) => ({ kind: 'worker_group', groupIds });
+const adminRule = { kind: 'worker_role', role: 'admin' };
+const readWithPolicy = async (access, requesterAddress) => {
+  const result = await authorizeCloudflareStorageResourceRead({
+    env: {},
+    slug: 'policy',
+    resource: 'questions',
+    requesterAddress,
+    config: { slug: 'policy', adminAddress: policyAdmin, storageProfile: { backend: 'cloudflare', payloadAccessControl: access } },
+    deps: {
+      json,
+      isWorkerGroupMember: async ({ groupId, requesterAddress: principal }) => (
+        groupId === 'down' ? { ok: false, status: 503, reason: 'worker_group_membership_unavailable' }
+          : groupId === 'member' ? { ok: true, principal }
+            : { ok: false, status: 403, reason: 'worker_group_membership_denied' }
+      ),
+    },
+  });
+  return result.ok ? 200 : result.response.status;
+};
+const openAccess = { gate: 'none', encryption: 'none' };
+for (const [label, match, conditions, requester, expected] of [
+  ['ANY: an outage and a grant', 'any', [groupRule('down'), adminRule], policyAdmin, 200],
+  ['ANY: an outage and a denial', 'any', [groupRule('down'), adminRule], policyOutsider, 503],
+  ['ANY: only denials', 'any', [groupRule('other'), adminRule], policyOutsider, 403],
+  ['ALL: an outage and a denial', 'all', [groupRule('down'), adminRule], policyOutsider, 403],
+  ['ALL: an outage and a grant', 'all', [groupRule('down'), adminRule], policyAdmin, 503],
+  ['ALL: only grants', 'all', [groupRule('member'), adminRule], policyAdmin, 200],
+]) {
+  test(`an access policy reads the same in either order: ${label}`, async () => {
+    for (const ordered of [conditions, [...conditions].reverse()]) {
+      assert.equal(await readWithPolicy({ ...openAccess, accessConditions: { match, conditions: ordered } }, requester), expected);
+    }
+  });
+}
+for (const [label, groupIds, expected] of [
+  ['an outage and a membership', ['down', 'member'], 200],
+  ['an outage and a non-member', ['down', 'other'], 503],
+  ['only non-members', ['other', 'another'], 403],
+]) {
+  test(`one group rule and a group gate read the same in either order: ${label}`, async () => {
+    for (const ordered of [groupIds, [...groupIds].reverse()]) {
+      const rule = { match: 'any', conditions: [groupRule(...ordered)] };
+      assert.equal(await readWithPolicy({ ...openAccess, accessConditions: rule }, policyOutsider), expected);
+      assert.equal(await readWithPolicy({ gate: 'group_gate', encryption: 'none', groupIds: ordered }, policyOutsider), expected);
+    }
+  });
+}
