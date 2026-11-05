@@ -964,9 +964,8 @@ export const scoreAgentFidelity = ({ questions = [], pairs = [], answers = [], g
   const thirdsDiffer = !!(typicalityThirds[0].length && typicalityThirds[2].length);
   const terciles = ['most unusual', 'middle', 'most typical'].map((label, index) => {
     const slice = typicalityThirds[index];
-    if (!thirdsDiffer || slice.length < settings.minParticipants) {
-      return { tercile: label, participants: slice.length, suppressed: true };
-    }
+    if (!thirdsDiffer) return { tercile: label, participants: slice.length, suppressed: true, equallyTypical: true };
+    if (slice.length < settings.minParticipants) return { tercile: label, participants: slice.length, suppressed: true };
     return {
       tercile: label,
       participants: slice.length,

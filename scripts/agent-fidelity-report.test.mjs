@@ -85,6 +85,25 @@ test('questions-view exports and JSONL Session Wrapped exports are read', () => 
   }
 });
 
+test('a report says when everyone is equally typical, rather than too few', () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'agent-fidelity-'));
+  try {
+    const survey = exportFixture();
+    survey.filteredResponses = survey.filteredResponses.map((row) => ({
+      ...row,
+      response: row.response.replaceAll('"Disagree"', '"Agree"'),
+    }));
+    const input = path.join(dir, 'export.json');
+    writeFileSync(input, JSON.stringify(survey));
+    const run = runReport(dir, ['--export', input]);
+    assert.equal(run.status, 0, run.stderr);
+    const markdown = readFileSync(path.join(dir, 'agent-fidelity-report.md'), 'utf8');
+    assert.match(markdown, /\| middle \| 6 \| everyone is equally typical/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('an export without response rows is an error, not an empty report', () => {
   const dir = mkdtempSync(path.join(tmpdir(), 'agent-fidelity-'));
   try {
