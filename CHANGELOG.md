@@ -13,6 +13,7 @@ All notable changes to this project will be documented in this file.
 ### Client — available when the site deploys
 
 - Refresh the light-theme About page with colored use-case buttons, pressed selection states, teal actions, compact sections, and consistently sized Recognition logos.
+- Keep About actions on one line on narrow phones, enlarge resource touch targets, move section previews below their headings, and give the mobile video a clearly visible play icon.
 - Improve footer contrast, link directly to the CommonGround environments and Truth-Seeking AI grant program, and refresh the README feature slideshow and architecture artwork.
 - Let long question prompts use spare card space at phone and tablet widths, moving answer controls down before reducing text size. Extremely long prompts remain keyboard-scrollable.
 - Match the Minimal mobile Login button height to the visible C logo artwork, excluding the SVG's transparent padding.

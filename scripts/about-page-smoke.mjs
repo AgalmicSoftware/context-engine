@@ -2,6 +2,50 @@ import assert from 'node:assert/strict';
 import { pathToFileURL } from 'node:url';
 import { assertReadable } from './civic-theme-overlay-smoke.mjs';
 
+async function inspectMobileAbout(page) {
+  if (page.viewportSize().width > 640) return;
+  const hero = page.getByTestId('ce-about-hero');
+  const geometry = await hero.evaluate((element) => {
+    const actions = [...element.querySelectorAll('a')].filter((link) => ['Demo', 'New Session'].includes(link.textContent.trim()));
+    const textRows = (node) => {
+      const range = document.createRange();
+      range.selectNodeContents(node);
+      return new Set([...range.getClientRects()].filter((rect) => rect.width).map((rect) => Math.round(rect.top))).size;
+    };
+    return {
+      actionRows: actions.map(textRows),
+      actionHeights: actions.map((link) => link.getBoundingClientRect().height),
+      resources: [...element.querySelectorAll('[data-testid^="ce-about-link-"]')].map((link) => {
+        const rect = link.getBoundingClientRect();
+        return { width: rect.width, height: rect.height };
+      }),
+    };
+  });
+  assert.deepEqual(geometry.actionRows, [1, 1], 'Phone actions keep their labels on one line');
+  assert(geometry.actionHeights.every((height) => height >= 44), 'Phone actions have usable touch targets');
+  assert(geometry.resources.every(({ width, height }) => width >= 44 && height >= 44), 'Resource icons have 44px touch targets');
+  await assertReadable(page.getByTestId('ce-about-demo-video-play'));
+  for (const name of ['Related Work', 'Recognition']) {
+    const header = page.getByRole('button', { name, exact: true });
+    const fits = await header.evaluate((element) => {
+      const heading = element.querySelector('h2');
+      const summary = element.querySelector('[class*="relatedSummary_"], [class*="practiceSummary_"]');
+      const headingRect = heading.getBoundingClientRect();
+      const summaryRect = summary.getBoundingClientRect();
+      const rect = element.getBoundingClientRect();
+      return headingRect.height <= parseFloat(getComputedStyle(heading).lineHeight) + 1
+        && summaryRect.top >= headingRect.bottom
+        && summaryRect.left >= rect.left - 1 && summaryRect.right <= rect.right + 1;
+    });
+    assert(fits, `${name} preview sits below an unbroken heading and fits the phone`);
+  }
+  const tile = page.getByTestId('ce-about-use-cases').getByRole('button').first();
+  await tile.tap();
+  assert.equal(await tile.getAttribute('aria-pressed'), 'true', 'Touch opens the selected use case');
+  await tile.tap();
+  assert.equal(await tile.getAttribute('aria-pressed'), 'false', 'Touch closes the selected use case');
+}
+
 export async function inspectAboutControls(page) {
   const grid = page.getByTestId('ce-about-use-cases');
   const buttons = grid.getByRole('button');
@@ -59,13 +103,14 @@ export async function runSmoke() {
   const baseUrl = (process.env.BASE_URL || 'http://127.0.0.1:3000').replace(/\/$/, '');
   const browser = await chromium.launch({ headless: true });
   try {
-    for (const width of [1440, 768, 390, 320]) {
-      const context = await browser.newContext({ viewport: { width, height: 900 } });
+    for (const width of [1440, 768, 640, 430, 390, 360, 320]) {
+      const context = await browser.newContext({ viewport: { width, height: 900 }, isMobile: width <= 640, hasTouch: width <= 640 });
       await installCivicThemeFixtures(context, baseUrl);
       await context.addInitScript(() => localStorage.setItem('ce:theme', 'civic'));
       const page = await context.newPage();
       await page.goto(`${baseUrl}/about`, { waitUntil: 'domcontentloaded' });
       await inspectNavbarLogoAlignment(page);
+      await inspectMobileAbout(page);
       await inspectCivicAbout(page);
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false);
       console.log(`About smoke passed: ${width}px (contrast, selection, focus, logos, header, reduced motion)`);
