@@ -372,6 +372,10 @@ const normalizeSanitizedRows = async ({ rows, questions, slug, config, strictLoc
   const includedRows = [];
   const participantDigests = new Set();
   for (const { row, questionId, participantKey } of latestByQuestionParticipant.values()) {
+    if (row.__withheld === true) {
+      excludedCount += 1;
+      continue;
+    }
     if (rowLooksLocked(row)) {
       excludedCount += 1;
       lockedCount += 1;
@@ -506,6 +510,20 @@ const normalizeSanitizedRows = async ({ rows, questions, slug, config, strictLoc
   };
 };
 
+// Readable or not, every version of an answer reaches the choice of latest, so a
+// newer restricted answer withdraws an older public one and then stays out itself.
+const toResponseRow = (metadata, payload, config) => ({
+  ...payload,
+  __trustedParticipantId: metadata.responder,
+  __storageRefId: metadata.id,
+  __withheld: !metadataAccessMatchesPublishedAudience(metadata, config),
+  responder: metadata.responder,
+  createdAt: metadata.createdAt,
+  submittedAt: metadata.createdAt,
+  timestamp: metadata.createdAt,
+  encrypted: metadata.encrypted === true || metadata.payloadEncrypted === true || payload.encrypted === true || payload.payloadEncrypted === true,
+});
+
 const readWorkerCanonicalResultsAnalysisSource = async ({ env, slug, config, committedResponses = [], budget }) => {
   const index = getStorageIndexBinding(env);
   if (!index || typeof index.list !== 'function' || typeof index.get !== 'function') {
@@ -516,7 +534,20 @@ const readWorkerCanonicalResultsAnalysisSource = async ({ env, slug, config, com
   const candidates = [];
   for (const row of questionRows) {
     const metadata = row?.metadata;
-    if (!isObj(metadata) || metadata.hidden === true || metadata.encrypted === true || metadata.payloadEncrypted === true || !metadataAccessMatchesPublishedAudience(metadata, config)) continue;
+    if (!isObj(metadata) || metadata.hidden === true) continue;
+    const version = {
+      createdAtMs: Date.parse(trim(metadata.createdAt)) || 0,
+      storageRefId: trim(metadata.id),
+      uploader: trim(metadata.uploader),
+      uploadAuthority: metadata.uploadAuthority,
+    };
+    const trustedId = lower(metadata.resourceId);
+    // A version this audience cannot read can still be the current one, so it
+    // competes too, and an older public version is not promoted in its place.
+    if (metadata.encrypted === true || metadata.payloadEncrypted === true || !metadataAccessMatchesPublishedAudience(metadata, config)) {
+      if (trustedId) candidates.push({ ...version, resourceId: trustedId, withheld: true });
+      continue;
+    }
     const payload = parseJsonBytes(await readStoredCloudflarePayloadBytes({ env, index, slug, metadata, budget }));
     if (!isObj(payload)) continue;
     if (!compareIdentity({ slug, config, suppliedSlug: payload.sessionSlug, suppliedSessionId: payload.sessionId || payload.sessionIdHex })) continue;
@@ -524,23 +555,16 @@ const readWorkerCanonicalResultsAnalysisSource = async ({ env, slug, config, com
     // Legacy rows without it read the payload id in the same order, id first,
     // so a second id field in the payload cannot claim another question.
     const payloadId = trim(payload.id || payload.questionId || payload.questionID);
-    const trustedId = lower(metadata.resourceId);
     const normalized = normalizeQuestionRecord({
       ...payload,
       questionId: trustedId && lower(payloadId) !== trustedId ? trustedId : payloadId,
     });
     if (!normalized || hiddenQuestionIds.has(lower(normalized.questionId))) continue;
-    candidates.push({
-      resourceId: normalized.questionId,
-      createdAtMs: Date.parse(trim(metadata.createdAt)) || 0,
-      storageRefId: trim(metadata.id),
-      uploader: trim(metadata.uploader),
-      uploadAuthority: metadata.uploadAuthority,
-      question: normalized,
-    });
+    candidates.push({ ...version, resourceId: normalized.questionId, question: normalized });
   }
   // Only an upload-time admin stamp can replace the earliest ordinary version.
   const questions = selectCanonicalStorageVersions(candidates)
+    .filter((candidate) => !candidate.withheld)
     .map((candidate) => candidate.question);
 
   const rows = await listCloudflareMetadataRows({ index, slug, resource: 'responses', budget, strict: true });
@@ -556,43 +580,19 @@ const readWorkerCanonicalResultsAnalysisSource = async ({ env, slug, config, com
       excludedCount += 1;
       continue;
     }
-    if (!metadataAccessMatchesPublishedAudience(metadata, config)) {
-      excludedCount += 1;
-      continue;
-    }
-    if (metadata.encrypted === true || metadata.payloadEncrypted === true) {
-      excludedCount += 1;
-      lockedCount += 1;
-      continue;
-    }
-    responseRows.push({
-      ...payload,
-      __trustedParticipantId: metadata.responder,
-      __storageRefId: metadata.id,
-      responder: metadata.responder,
-      createdAt: metadata.createdAt,
-      submittedAt: metadata.createdAt,
-      timestamp: metadata.createdAt,
-      encrypted: payload.encrypted === true || payload.payloadEncrypted === true,
-    });
+    responseRows.push(toResponseRow(metadata, payload, config));
   }
   for (const row of rows) {
     const metadata = row?.metadata;
-    if (!isObj(metadata)) {
+    if (!isObj(metadata) || !trim(metadata.responder)) {
       excludedCount += 1;
       continue;
     }
-    if (!metadataAccessMatchesPublishedAudience(metadata, config)) {
-      excludedCount += 1;
-      continue;
-    }
-    if (!trim(metadata.responder)) {
-      excludedCount += 1;
-      continue;
-    }
+    // Encrypted bytes do not say which question they answer, so these rows
+    // cannot be matched to an older answer.
     if (metadata.encrypted === true || metadata.payloadEncrypted === true) {
       excludedCount += 1;
-      lockedCount += 1;
+      if (metadataAccessMatchesPublishedAudience(metadata, config)) lockedCount += 1;
       continue;
     }
     const bytes = await readStoredCloudflarePayloadBytes({ env, index, slug, metadata, budget });
@@ -601,16 +601,7 @@ const readWorkerCanonicalResultsAnalysisSource = async ({ env, slug, config, com
       excludedCount += 1;
       continue;
     }
-    responseRows.push({
-      ...payload,
-      __trustedParticipantId: metadata.responder,
-      __storageRefId: metadata.id,
-      responder: metadata.responder,
-      createdAt: metadata.createdAt,
-      submittedAt: metadata.createdAt,
-      timestamp: metadata.createdAt,
-      encrypted: metadata.encrypted === true || payload.encrypted === true || payload.payloadEncrypted === true,
-    });
+    responseRows.push(toResponseRow(metadata, payload, config));
   }
   const normalized = await normalizeSanitizedRows({ rows: responseRows, questions, slug, config, strictLocked: false, requireKnownQuestion: true });
   if (!normalized.ok) return normalized;
@@ -1084,7 +1075,10 @@ export const runQueuedAutomaticResultsAnalysisJob = async ({ env, slug, job = {}
     env,
     slug: targetSlug,
     config,
-    committedResponses: Array.isArray(job.committedResponses) ? job.committedResponses : [],
+    // Rows queued before the queue kept access rules cannot vouch for their
+    // audience. The storage scan reads the real ones.
+    committedResponses: (Array.isArray(job.committedResponses) ? job.committedResponses : [])
+      .filter((entry) => hasOwn(entry?.metadata, 'accessConditions')),
     requestId: job.requestId,
     deps,
   });

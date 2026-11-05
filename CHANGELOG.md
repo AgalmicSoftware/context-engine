@@ -120,6 +120,8 @@ All notable changes to this project will be documented in this file.
 - One request at a time reads a context PDF; another gets 409 "already being read", and readings and removals no longer undo each other.
 - Faucet payouts take turns with their signing wallet, in hosted and registry sessions, for agents and for sponsored grants, so concurrent requests no longer fail on the same nonce, even when sessions share a key. A running payout keeps its turn; a request that waits 30 seconds gets 503 and leaves a sponsored grant unspent.
 - Results analysis drops ratings off the question's step grid, agent-created rating questions keep their end labels, and the interview catalog and brief include each rating's step.
+- Results analysis respects each answer's own access rule. The automatic queue lost the rule, so an answer limited to admins could reach the AI and the published analysis. Sessions that ran automatic analysis with such answers should regenerate it.
+- Results analysis picks the current version of each question and answer before checking who may read it, so a newer restricted version no longer brings back the older public one.
 
 ### Benchmark
 

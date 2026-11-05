@@ -41,7 +41,7 @@ const normalizeAccessAudienceExtras = ({ value, metadata } = {}) => {
 // True when a stored row is readable by the session's whole published
 // audience: the session's own gate, encryption and conditions, nothing narrower.
 export const metadataAccessMatchesPublishedAudience = (metadata = {}, config = {}) => {
-  if (!isObj(metadata?.payloadAccessControl) && !trim(metadata?.payloadAccessMode)) return true;
+  if (!isObj(metadata?.payloadAccessControl) && !trim(metadata?.payloadAccessMode) && !metadata?.accessConditions) return true;
   const expectedValue = resolveConfiguredPayloadAccessValue(config);
   const actualValue = metadata.payloadAccessControl || metadata.payloadAccessMode;
   const expected = normalizePayloadAccessControl(expectedValue);

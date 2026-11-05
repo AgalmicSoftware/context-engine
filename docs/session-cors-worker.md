@@ -607,6 +607,11 @@ Admin test panel:
   arrays (including neutral zeros). A successful run immediately
   replaces the latest visible artifact for authorized viewers; Generate and
   Refresh remain admin-only actions.
+- Manual and automatic Worker-canonical runs read the same way. For each question
+  and each participant's answer, the Worker picks the current version first, then
+  leaves it out if it is encrypted or readable by fewer people than the session's
+  whole audience. An older public version never stands in for a newer restricted
+  one. Queued answers carry their own access rule for this check.
 - Automatic generated-results work is durable background work only for
   Worker-canonical Cloudflare storage. The Worker counts authoritative submitted
   distinct participants since the last successful run, defaults to threshold
