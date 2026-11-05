@@ -19,6 +19,7 @@ import {
   openHtmlReportModal,
   resetSurveyResultsExportControlsHarness,
   seedAnalysisEligibleSession,
+  seedQuestionsCache,
   seedSingleBinaryQuestion,
   waitForHydratedResponseCount,
 } from './SurveyResults.exportControlsHarness';
@@ -88,7 +89,15 @@ jest.mock('../MainContent/RiskMatrix', () => ({
   },
 }));
 
+const mockHiddenQuestionIds = jest.fn((_slug: string) => new Set<string>());
+jest.mock('./surveyToolScope', () => ({
+  ...(jest.requireActual('./surveyToolScope') as object),
+  getBlockedQuestionIdsSet: (slug: string) => mockHiddenQuestionIds(slug),
+}));
+
 beforeEach(() => {
+  mockHiddenQuestionIds.mockReset();
+  mockHiddenQuestionIds.mockReturnValue(new Set<string>());
   resetSurveyResultsExportControlsHarness();
   mockSbtFilter.mockClear();
   mockPolisReport.mockClear();
@@ -219,6 +228,44 @@ describe('SurveyResults HTML report export controls', () => {
     expect(html).toContain('<section id="argument-map"');
     expect(html).toContain('<section id="risk-matrix"');
     expect(html).toContain('<section id="atlas"');
+  });
+
+  it('leaves a hidden question and its answers out of the HTML report', async () => {
+    mockHiddenQuestionIds.mockReturnValue(new Set(['q2']));
+    const answer = (questionID: string, value: string) => ({
+      additional: { encrypted: false, value: '' },
+      answer: { encrypted: false, value },
+      questionID,
+      timeStamp: '2025-01-01T00:00:00.000Z',
+    });
+    seedQuestionsCache({
+      questionResponses: {
+        q1: { '0xabc': answer('q1', 'Visible text') },
+        q2: { '0xdef': answer('q2', 'Hidden text') },
+      },
+      questions: {
+        q1: { id: 'q1', prompt: 'Question One', type: 'freeform' },
+        q2: { id: 'q2', prompt: 'Question Two', type: 'freeform' },
+      },
+      slug: 'hidden-report',
+    });
+    mountSurveyResults({
+      account: WALLET_ACCOUNT,
+      loginComplete: true,
+      network: OP_NETWORK,
+      sessionName: 'Hidden Report Session',
+      sessionSlug: 'hidden-report',
+    });
+    await waitForHydratedResponseCount(1);
+
+    await openHtmlReportModal();
+    fireEvent.click(getDownloadReportButton());
+
+    await waitFor(() => expect(downloadSessionResultsHtmlReport).toHaveBeenCalledTimes(1));
+    const [html] = (downloadSessionResultsHtmlReport as jest.Mock).mock.calls[0];
+    expect(html).toContain('Question One');
+    expect(html).not.toContain('Question Two');
+    expect(html).not.toContain('Hidden text');
   });
 
   it('routes the enabled report download control to parent-owned report execution', async () => {

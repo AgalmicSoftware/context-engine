@@ -85,7 +85,15 @@ jest.mock('../MainContent/RiskMatrix', () => ({
   },
 }));
 
+const mockHiddenQuestionIds = jest.fn((_slug: string) => new Set<string>());
+jest.mock('./surveyToolScope', () => ({
+  ...(jest.requireActual('./surveyToolScope') as object),
+  getBlockedQuestionIdsSet: (slug: string) => mockHiddenQuestionIds(slug),
+}));
+
 beforeEach(() => {
+  mockHiddenQuestionIds.mockReset();
+  mockHiddenQuestionIds.mockReturnValue(new Set<string>());
   resetSurveyResultsExportControlsHarness();
   mockSbtFilter.mockClear();
   mockPolisReport.mockClear();
@@ -187,6 +195,106 @@ describe('SurveyResults data export controls', () => {
     expect(csv).not.toContain('Old note');
     expect(csv).not.toContain('old-hash');
     expect(lines).toHaveLength(3);
+  });
+
+  describe('hidden questions', () => {
+    const answer = (questionID: string, value: string) => ({
+      additional: { encrypted: false, value: '' },
+      answer: { encrypted: false, value },
+      questionID,
+      timeStamp: '2025-01-01T00:00:00.000Z',
+    });
+    const questions = {
+      q1: { id: 'q1', prompt: 'Question One', type: 'freeform' },
+      q2: { id: 'q2', prompt: 'Question Two', type: 'freeform' },
+    };
+    const seedSurvey = () =>
+      cacheStore.set(cacheStoreKey('surveysCache', 'demo'), {
+        '11155420': {
+          surveyResponses: {
+            [SURVEY_ID]: {
+              [RESPONDER_ONE]: { responses: [answer('q1', 'Visible text'), answer('q2', 'Hidden text one')] },
+              [RESPONDER_TWO]: { responses: [answer('q2', 'Hidden text two')] },
+            },
+          },
+          surveyResponsesLatestBlock: { [SURVEY_ID]: 1 },
+          surveys: { [SURVEY_ID]: { questionIDs: ['q1', 'q2'], title: 'Survey' } },
+          surveysLatestBlock: 1,
+        },
+      });
+    const downloadCsv = async () => {
+      openExportArea();
+      const capture = installBrowserDownloadCapture();
+      try {
+        clickExportDownload();
+        expect(capture.createObjectURLMock).toHaveBeenCalledTimes(1);
+        capture.restore();
+        return await readBlobText(capture.blobs[0]);
+      } finally {
+        capture.restore();
+      }
+    };
+    const mountSurvey = () =>
+      mountSurveyResults({
+        network: OP_NETWORK,
+        sessionName: 'Demo Session',
+        sessionSlug: 'demo',
+        surveyId: SURVEY_ID,
+        viewMode: 'survey',
+      });
+
+    it('leaves a question on the hidden list out of the survey CSV', async () => {
+      mockHiddenQuestionIds.mockReturnValue(new Set(['q2']));
+      seedSurvey();
+      seedQuestionsCache({ questions, slug: 'demo' });
+      mountSurvey();
+      await waitForHydratedResponseCount(1);
+
+      const csv = await downloadCsv();
+      expect(csv).toContain('Visible text');
+      expect(csv).not.toContain('Question Two');
+      expect(csv).not.toContain('Hidden text');
+      expect(csv).not.toContain(RESPONDER_TWO);
+    });
+
+    it('leaves a question hidden from the admin panel out of the survey CSV', async () => {
+      seedSurvey();
+      cacheStore.set(cacheStoreKey('questionsCache', 'demo'), {
+        '11155420': {
+          questionResponses: {},
+          questions: { q1: questions.q1 },
+          questionResponsesLatestBlock: 1,
+          questionsLatestBlock: 1,
+          workerQuestionMetadataTombstones: { q2: true },
+        },
+      });
+      mountSurvey();
+      await waitForHydratedResponseCount(1);
+
+      const csv = await downloadCsv();
+      expect(csv).toContain('Visible text');
+      expect(csv).not.toContain('Hidden text');
+      expect(csv).not.toContain(RESPONDER_TWO);
+    });
+
+    it('leaves a hidden question out of the question CSV', async () => {
+      mockHiddenQuestionIds.mockReturnValue(new Set(['q2']));
+      seedQuestionsCache({
+        questionResponses: {
+          q1: { [RESPONDER_ONE]: answer('q1', 'Visible text') },
+          q2: { [RESPONDER_TWO]: answer('q2', 'Hidden text') },
+        },
+        questions,
+        slug: 'demo',
+      });
+      mountSurveyResults({ network: OP_NETWORK, sessionSlug: 'demo' });
+      await waitForHydratedResponseCount(1);
+
+      const csv = await downloadCsv();
+      expect(csv).toContain('Visible text');
+      expect(csv).not.toContain('Question Two');
+      expect(csv).not.toContain('Hidden text');
+    });
   });
 
   it('exports aggregate response CSV from mixed object/string payloads using current question metadata', async () => {

@@ -88,7 +88,7 @@ export const SettingsQuestionListFields = ({
       onChange={onChange}
       listKey="BLOCKED_QUESTION_IDS"
       label="Hidden questions"
-      help="Question IDs participants don’t see, one per line."
+      help="Question IDs left out of the question list, Results and exports, one per line."
       readOnly={!!listsLockedReason}
     />
     <ListField

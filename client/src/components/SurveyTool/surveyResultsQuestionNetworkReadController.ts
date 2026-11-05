@@ -29,6 +29,7 @@ export type SurveyResultsScopedQuestionNetworkData = {
 
 export type SurveyResultsScopedQuestionNetworkEntry = {
   bucket?: SurveyResultsQuestionBucketRecord | null;
+  hiddenQuestionIds?: Set<string>;
   slug?: unknown;
 };
 
@@ -39,6 +40,7 @@ export type SurveyResultsScopedQuestionNetworkOptions = {
 
 export type SurveyResultsScopedQuestionNetworkMemo = {
   bucketRefs?: unknown[];
+  hiddenKey?: string;
   netIdStr?: string;
   requireAuthoritativeBinding?: boolean;
   result?: SurveyResultsScopedQuestionNetworkData;
@@ -47,11 +49,13 @@ export type SurveyResultsScopedQuestionNetworkMemo = {
 };
 
 export type SurveyResultsQuestionNetworkReadControllerPorts = {
+  readHiddenQuestionIds?: (slug: string) => Set<string>;
   readQuestionBucket?: (slug: string, netIdStr: string) => unknown;
 };
 
 export type SurveyResultsQuestionNetworkAsyncReadControllerPorts = {
   peekQuestionBucket?: (slug: string, netIdStr: string) => unknown;
+  readHiddenQuestionIds?: (slug: string) => Set<string>;
   readQuestionBucket?: (slug: string, netIdStr: string) => Promise<unknown> | unknown;
 };
 
@@ -207,7 +211,7 @@ export function mergeScopedQuestionNetworkData(
   let questionsLatestBlock = 0;
   let questionResponsesLatestBlock = 0;
 
-  networkEntries.forEach(({ slug = '', bucket = {} }) => {
+  networkEntries.forEach(({ slug = '', bucket = {}, hiddenQuestionIds }) => {
     const questionBucket = toQuestionBucket(bucket);
     const allowedQuestionIds: Set<string> = new Set();
     const questions =
@@ -216,7 +220,7 @@ export function mergeScopedQuestionNetworkData(
       const lowerQuestionId = String(questionId || '')
         .trim()
         .toLowerCase();
-      if (!lowerQuestionId) return;
+      if (!lowerQuestionId || hiddenQuestionIds?.has(lowerQuestionId)) return;
       const question = questions[questionId] || {};
       if (
         !shouldKeepScopedQuestion({
@@ -279,6 +283,7 @@ export const runSurveyResultsQuestionNetworkReadController = ({
   const authoritativeOnly = requireAuthoritativeBinding === true;
   const entries: SurveyResultsScopedQuestionNetworkEntry[] = slugs.map((slug) => ({
     slug,
+    hiddenQuestionIds: ports.readHiddenQuestionIds?.(slug),
     bucket: toQuestionBucket(
       typeof ports.readQuestionBucket === 'function'
         ? ports.readQuestionBucket(slug, normalizedNetIdStr)
@@ -286,12 +291,14 @@ export const runSurveyResultsQuestionNetworkReadController = ({
     ),
   }));
   const bucketRefs = entries.map((entry) => entry.bucket);
+  const hiddenKey = entries.map((entry) => [...(entry.hiddenQuestionIds || [])].sort().join(',')).join('|');
   const memo: SurveyResultsScopedQuestionNetworkMemo = previousMemo || {};
   const memoMatches =
     memo.viewMode === viewMode &&
     memo.netIdStr === normalizedNetIdStr &&
     memo.slugsKey === slugsKey &&
     memo.requireAuthoritativeBinding === authoritativeOnly &&
+    memo.hiddenKey === hiddenKey &&
     Array.isArray(memo.bucketRefs) &&
     memo.bucketRefs.length === bucketRefs.length &&
     memo.bucketRefs.every((bucket, index) => bucket === bucketRefs[index]);
@@ -313,6 +320,7 @@ export const runSurveyResultsQuestionNetworkReadController = ({
       netIdStr: normalizedNetIdStr,
       slugsKey,
       requireAuthoritativeBinding: authoritativeOnly,
+      hiddenKey,
       bucketRefs,
       result,
     },
@@ -348,6 +356,7 @@ export const runSurveyResultsQuestionNetworkAsyncReadController = async ({
       }
       return {
         slug,
+        hiddenQuestionIds: ports.readHiddenQuestionIds?.(slug),
         bucket: toQuestionBucket(bucket),
       };
     }),

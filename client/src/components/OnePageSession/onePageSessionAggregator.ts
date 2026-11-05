@@ -18,6 +18,7 @@ type AggregatorNetworkNode = {
   questionResponses?: Record<string, QuestionResponses>;
 };
 type AggregatorBuildOptions = {
+  hiddenQuestionIds?: Set<string>;
   parseMemo?: Map<string, unknown> | null;
   sessionSlug?: unknown;
 };
@@ -179,6 +180,7 @@ export function buildAggregatorFromLocalCache(
   let dirty = false;
 
   Object.keys(questionResponses).forEach((qId) => {
+    if (opts?.hiddenQuestionIds?.has(String(qId).trim().toLowerCase())) return;
     if (!hasVisibleQuestionMetadataForAggregator(questions, qId, sessionSlug)) return;
     const responderMap = asRecord(questionResponses[qId]);
     aggregatorMap[qId] = [];
