@@ -224,6 +224,11 @@ has the same limit: it resumes after its last indexed block. This affects only t
 opt-in on-chain profile, whose contracts run on OP Sepolia, where such
 reorganizations are rare.
 
+Answers have the same limit. If a reorganization removes an answer or an edit, the
+browser keeps it, because a refresh only lets a newer answer replace an older one.
+A forced full refresh rereads the blocks but merges the same way, so it keeps the
+removed answer too. Clearing the browser's cache reads the surviving answer.
+
 ## RPC diagnostics
 
 Enable before reload when you need demand-shaping or scope diagnostics:
