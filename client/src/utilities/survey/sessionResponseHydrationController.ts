@@ -507,6 +507,10 @@ export const createSessionResponseHydrationController = (
   let _responseInitPending: Record<string, ResponseInitOptions | undefined> = {};
   const completedWorkerRuns = new Set<string>();
   let _destroyed: boolean = false;
+  // The newest foreground load owns the visible readiness. An earlier load keeps
+  // filling its own cache, but marking the newer one ready would let the page act
+  // before that session's answers have arrived.
+  let _readinessOwner: string | null = null;
   let _continuationTimers: ReturnType<typeof setTimeout>[] = [];
 
   const setState = (updater: SetStateArg, cb?: () => void): void => {
@@ -605,6 +609,8 @@ export const createSessionResponseHydrationController = (
     const sessionConfig = getSessionCfg(slug);
     const workerRun = resolveWorkerResponseHydrationRun({ sessionConfig, sessionSlug: slug, reader: getAccount() });
     const initRunKey = workerRun?.key || slug;
+    if (!suppressUiState) _readinessOwner = initRunKey;
+    const ownsReadiness = (): boolean => !suppressUiState && isMounted() && _readinessOwner === initRunKey;
     const rerunOpts: ResponseInitOptions = {
       ...(opts && typeof opts === 'object' ? opts : {}),
       background: suppressUiState,
@@ -612,16 +618,14 @@ export const createSessionResponseHydrationController = (
       notifyOnCompletion,
     };
     const setResponseState = (nextState: SetStateArg, cb?: () => void): void => {
-      if (suppressUiState || !isMounted()) return;
-      setState(nextState, cb);
+      if (ownsReadiness()) setState(nextState, cb);
     };
     const notifyBackgroundCompletion = (): void => {
       if (!suppressUiState || !notifyOnCompletion) return;
       queueLocalRevisionUpdate({ needsQuestionResponsesNonce: true });
     };
     const maybeCheckAllCachesReady = (): void => {
-      if (suppressUiState) return;
-      checkAllCachesReady();
+      if (ownsReadiness()) checkAllCachesReady();
     };
     _responseInitInFlight = _responseInitInFlight || {};
     _responseInitPending = _responseInitPending || {};
@@ -640,7 +644,10 @@ export const createSessionResponseHydrationController = (
           delete _responseInitPending[initRunKey];
           const continuationTimer = setTimeout(() => {
             if (_destroyed || !isMounted()) return;
-            void fetchQuestionResponsesChunkedForGroup(slug, pendingOpts || rerunOpts).catch((error: unknown) => {
+            const queued = pendingOpts || rerunOpts;
+            // A rerun must not take readiness back from a newer load.
+            const nextOpts = _readinessOwner === initRunKey ? queued : { ...queued, background: true };
+            void fetchQuestionResponsesChunkedForGroup(slug, nextOpts).catch((error: unknown) => {
               mainSiteLog.warn(error);
             });
           }, 0);
@@ -1686,7 +1693,9 @@ export const createSessionResponseHydrationController = (
         responder: responderLower,
         questionCount: normalizedQids.length,
       });
-      setState({ isResponsesCacheReady: false });
+      // Refreshing another session's answers leaves the current load's readiness alone.
+      const ownsReadiness = (): boolean => _readinessOwner === null || _readinessOwner === slug;
+      if (ownsReadiness()) setState({ isResponsesCacheReady: false });
 
       const networkID = String(getSessionChainId(slug) || '');
       const { fromBlock: baseFrom } = await responseHydrationContractScripts.getRelevantBlockWindowForFilter(
@@ -1802,10 +1811,12 @@ export const createSessionResponseHydrationController = (
         }
       }
 
-      setState((prev) => ({
-        isQuestionCacheReady: updatedAny ? true : prev.isQuestionCacheReady,
-        isResponsesCacheReady: true,
-      }));
+      if (ownsReadiness()) {
+        setState((prev) => ({
+          isQuestionCacheReady: updatedAny ? true : prev.isQuestionCacheReady,
+          isResponsesCacheReady: true,
+        }));
+      }
       queueLocalRevisionUpdate({
         needsQuestionResponsesNonce: true,
         checkAllCachesReady: true,
