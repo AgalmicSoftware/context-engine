@@ -375,9 +375,11 @@ integer and the step is 1. Other grids state the step and origin explicitly.
 
 The command has the same retry, concurrency, checkpoint and `--resume`
 behavior as stance runs; `--seed` fixes the option orders. Resuming reuses an
-answer only when its `requestHash` matches: a changed prompt, model, endpoint,
-generation setting, routing or answer schema asks again. Answers saved before
-rows carried a `requestHash` are asked again once.
+answer only when its `requestHash` and `modelProvenance` match: a changed prompt,
+model, declared revision, endpoint, generation setting, routing or answer schema
+asks again. Answers saved before rows carried both are asked again once. As with
+stance runs, a model that reached two deployments stops the run: start a new
+artifact instead of resuming.
 
 Completed stance runs can be combined with `build-report --runs file1.json,file2.json`
 when the bank, prompt template, harness, mode, and persona identity agree.

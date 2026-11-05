@@ -308,6 +308,48 @@ test('a resumed run asks again when the endpoint or a model setting changed', as
   assert.deepEqual(first.temperatures, [0.2, 1.5], 'a changed temperature is asked again');
 });
 
+test('a resumed run asks again when a model’s declared revision changed', async () => {
+  const questionSet = readQuestionSet(resultsExport);
+  questionSet.questions = questionSet.questions.slice(0, 1);
+  const roster = (modelRevision) => ({
+    models: [{ id: 'm', provider: 'mock', model: 'mock-model', provenance: { modelRevision } }],
+  });
+  const first = await runAnswerSet({ questionSet, modelRoster: roster('revision-1'), repeats: 1 });
+  assert.equal(first.models[0].provenance.modelRevision, 'revision-1');
+  assert.equal(first.rows[0].modelProvenance.modelRevision, 'revision-1');
+  const same = await runAnswerSet({ questionSet, modelRoster: roster('revision-1'), repeats: 1, existingRows: first.rows });
+  assert.equal(same.resumedRows, first.rows.length);
+  const changed = await runAnswerSet({ questionSet, modelRoster: roster('revision-2'), repeats: 1, existingRows: first.rows });
+  assert.equal(changed.resumedRows, 0);
+  assert.equal(changed.rows[0].modelProvenance.modelRevision, 'revision-2');
+});
+
+test('a run that reached two deployments of one model is refused', async () => {
+  const questionSet = readQuestionSet(resultsExport);
+  questionSet.questions = questionSet.questions.filter(({ type }) => type === 'binary');
+  const modelRoster = { models: [{ id: 'm', provider: 'mock', model: 'mock-model' }] };
+  const fingerprints = ['fp-1', 'fp-2'];
+  const reply = (metadata) => ({ content: JSON.stringify({ answer: 'Agree' }), metadata });
+  await assert.rejects(
+    runAnswerSet({
+      questionSet, modelRoster, repeats: 2, concurrency: 1,
+      callModelImpl: async () => reply({ systemFingerprint: fingerprints.shift() }),
+    }),
+    /multiple deployment identities/,
+  );
+  // A request that failed outright reached no deployment, so it doesn't count as a second one.
+  const calls = [reply({ resolvedProvider: 'one-host' }), null];
+  const result = await runAnswerSet({
+    questionSet, modelRoster, repeats: 2, concurrency: 1, maxAttempts: 1,
+    callModelImpl: async () => {
+      const next = calls.shift();
+      if (!next) throw new Error('Synthetic outage');
+      return next;
+    },
+  });
+  assert.equal(result.unanswered, 1);
+});
+
 test('a reply that fails the checks is asked again, then kept as unanswered', async () => {
   const questionSet = readQuestionSet({ questions: [resultsExport.filteredQuestions[3]] });
   let calls = 0;

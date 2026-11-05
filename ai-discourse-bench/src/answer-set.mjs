@@ -19,6 +19,7 @@ import {
   DEFAULT_RETRY_BASE_DELAY_MS,
 } from './config.mjs';
 import { callOpenAiCompatibleChat, getProviderConfig } from './adapters/openai-compatible.mjs';
+import { assertConsistentDeployments } from './deployment-identity.mjs';
 import { assertSafeUniqueIdentifiers, isSafeIdentifier } from './identifiers.mjs';
 import { normalizeForCanonicalPolarity, parseModelAnswer, recoverFinalAnswer } from './normalize.mjs';
 import { hashJson, sha256 } from './provenance.mjs';
@@ -430,8 +431,8 @@ const buildTasks = ({ questionSet, modelRoster, repeats, seed }) => {
 /**
  * Asks every model every question, `repeats` times in each of its ways, and
  * returns one row per reply. Rows from an earlier run of the same request
- * (prompt, model, endpoint, settings and answer schema) are reused, so an
- * interrupted run can resume.
+ * (prompt, model, declared revision, endpoint, settings and answer schema) are
+ * reused, so an interrupted run can resume.
  */
 export const runAnswerSet = async ({
   questionSet,
@@ -469,7 +470,11 @@ export const runAnswerSet = async ({
   const pending = [];
   for (const task of tasks) {
     const prior = reusable.get(task.runId);
-    if (prior && prior.requestHash === requestHashFor(task)) {
+    if (
+      prior &&
+      prior.requestHash === requestHashFor(task) &&
+      hashJson(prior.modelProvenance || {}) === hashJson(task.modelEntry.provenance || {})
+    ) {
       rowsById.set(task.runId, prior);
     } else {
       pending.push(task);
@@ -523,6 +528,7 @@ export const runAnswerSet = async ({
       repeatIndex: task.repeatIndex,
       promptHash: sha256(prompt),
       requestHash: requestHashFor(task),
+      modelProvenance: task.modelEntry.provenance || {},
       answer: reply.answer,
       rawAnswer: reply.rawAnswer,
       confidence: reply.confidence,
@@ -549,6 +555,8 @@ export const runAnswerSet = async ({
 
   const order = new Map(tasks.map((task, index) => [task.runId, index]));
   const rows = [...rowsById.values()].sort((a, b) => order.get(a.runId) - order.get(b.runId));
+  // A request that failed outright reached no deployment, so only rows with a reply count.
+  assertConsistentDeployments(rows.filter((row) => Object.keys(row.responseMetadata || {}).length));
   return {
     schemaVersion: DEFAULT_OUTPUT_SCHEMA_VERSION,
     kind: 'ai_discourse_bench_answers',
@@ -559,7 +567,12 @@ export const runAnswerSet = async ({
     seed: effectiveSeed,
     questions: questionSet.questions,
     skippedQuestions: questionSet.skipped,
-    models: modelRoster.models.map(({ id, model, provider }) => ({ id, model, provider: providerOverride || provider })),
+    models: modelRoster.models.map(({ id, model, provider, provenance }) => ({
+      id,
+      model,
+      provider: providerOverride || provider,
+      provenance: provenance || {},
+    })),
     expectedRows: tasks.length,
     resumedRows,
     unanswered: rows.filter((row) => row.answer === null).length,
