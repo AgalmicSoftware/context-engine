@@ -147,6 +147,41 @@ test('on-chain question discovery fails closed on payloads from another session'
 });
 
 
+test('on-chain question discovery leaves out questions on the session blocklist', async () => {
+  const blocked = `0x${'11'.repeat(32)}`;
+  const allowed = `0x${'22'.repeat(32)}`;
+  const word = (value) => value.toString(16).padStart(64, '0');
+  const eventData = `0x${word(32n)}${word(2n)}${blocked.slice(2)}${allowed.slice(2)}`;
+  const pointerBytes = Buffer.alloc(32, 1);
+  const pointerReads = [];
+  const load = (BLOCKED_QUESTION_IDS) => loadPublicInterviewQuestions({
+    slug: 'demo',
+    config: {
+      BLOCKED_QUESTION_IDS,
+      contracts: { surveys: '0x1111111111111111111111111111111111111111' },
+      rpcUrl: 'https://rpc.example',
+      blockLimits: { start: 1, end: 1 },
+    },
+    fetch: async (url, init) => {
+      if (String(url) === 'https://rpc.example') {
+        const body = JSON.parse(String(init?.body || '{}'));
+        if (body.method === 'eth_call') pointerReads.push(`0x${body.params[0].data.slice(10)}`);
+        const result = body.method === 'eth_blockNumber'
+          ? '0x1'
+          : body.method === 'eth_getLogs'
+            ? [{ data: eventData }]
+            : `0x${pointerBytes.toString('hex')}`;
+        return new Response(JSON.stringify({ jsonrpc: '2.0', id: 1, result }));
+      }
+      return new Response(JSON.stringify({ sessionSlug: 'demo', prompt: 'A question' }));
+    },
+  });
+  assert.deepEqual((await load([])).questions.map(({ id }) => id), [blocked, allowed]);
+  pointerReads.length = 0;
+  assert.deepEqual((await load([blocked.toUpperCase().replace('0X', '0x')])).questions.map(({ id }) => id), [allowed]);
+  assert.deepEqual(pointerReads, [allowed]);
+});
+
 test('quadratic catalog questions retain ordered options and the configured or default credit budget', () => {
   const questions = helpers.dedupeQuestions([
     { id: 'q1', type: 'quadratic', prompt: 'Allocate support', options: ['Parks', 'Transit'], voiceCredits: 25 },
@@ -240,6 +275,16 @@ test('Cloudflare catalog keeps the first or admin version of each question and s
     assert.equal(rotated.find((entry) => entry.id === 'q2').prompt, 'Admin correction');
   }
 
+});
+
+test('Cloudflare catalog leaves out questions on the session blocklist before reading them', async () => {
+  const { put, load, reads } = createQuestionStore();
+  await put('aa-blocked', '2026-10-01T00:00:00.000Z', { uploader: author, resourceId: 'q1' }, question('q1', 'Blocked prompt'));
+  await put('bb-allowed', '2026-10-01T00:00:00.000Z', { uploader: author, resourceId: 'q2' }, question('q2', 'Allowed prompt'));
+  assert.deepEqual((await load()).map((entry) => entry.id).sort(), ['q1', 'q2']);
+  reads.length = 0;
+  assert.deepEqual((await load({ ...config, BLOCKED_QUESTION_IDS: [' Q1 '] })).map((entry) => entry.id), ['q2']);
+  assert.equal(reads.includes('aa-blocked'), false);
 });
 
 test('Cloudflare catalog chooses from every list page and reads only the chosen payload', async () => {

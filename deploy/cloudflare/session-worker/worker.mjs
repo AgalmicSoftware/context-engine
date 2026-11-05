@@ -101849,6 +101849,7 @@ var lower8 = (value) => trim17(value).toLowerCase();
 var isObj23 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
 var dedupeQuestions = (questions) => normalizePublicInterviewQuestions(questions, MAX_QUESTIONS);
 var payloadQuestionId = (payload) => lower8(payload?.id || payload?.questionId);
+var blockedInterviewQuestionIds = (config) => [...new Set((Array.isArray(config?.BLOCKED_QUESTION_IDS) ? config.BLOCKED_QUESTION_IDS : []).map(lower8).filter(Boolean))].sort();
 var readJsonResponse = async (response2) => {
   if (!response2 || Number(response2.status || 0) < 200 || Number(response2.status || 0) >= 300) return null;
   try {
@@ -101902,7 +101903,7 @@ var loadCloudflareQuestions = async ({ env, config, slug, storageRoute: storageR
   const listing = await listQuestionRows(callStorage);
   const { items } = listing;
   let incomplete = listing.incomplete;
-  const hiddenIds = new Set(items.filter((item) => item?.hidden === true || item?.metadata?.hidden === true).map((item) => lower8(item?.metadata?.resourceId)).filter(Boolean));
+  const hiddenIds = /* @__PURE__ */ new Set([...blockedInterviewQuestionIds(config), ...items.filter((item) => item?.hidden === true || item?.metadata?.hidden === true).map((item) => lower8(item?.metadata?.resourceId)).filter(Boolean)]);
   const readPayload = async (storageRefId) => {
     try {
       const response2 = await callStorage("/storage/read", `id=${encodeURIComponent(storageRefId)}`);
@@ -102055,7 +102056,7 @@ var loadOnChainQuestions = async ({ config, slug, fetchImpl }) => {
   if (end < start) return catalog();
   const scanEnd = Math.min(end, start + MAX_SCAN_BLOCKS - 1);
   const questions = [];
-  const seen = /* @__PURE__ */ new Set();
+  const seen = new Set(blockedInterviewQuestionIds(config));
   let incomplete = false;
   let pointerReads = 0;
   let candidates = 0;
@@ -102139,7 +102140,9 @@ var resolveInterviewStarter = async ({ env, slug, config, deps = {}, refresh = f
     return withSteeringPrompt({ openingPrompt: settings.openingPrompt, source: "owner" });
   const read = deps.getKvJson || getKvJson;
   const write = deps.putKvJson || putKvJson;
-  const cached = await read(env, cacheKey2(slug));
+  const stored = await read(env, cacheKey2(slug));
+  const blockedQuestionIds = JSON.stringify(blockedInterviewQuestionIds(config));
+  const cached = (stored?.blockedQuestionIds || "[]") === blockedQuestionIds ? stored : null;
   if (cached?.openingPrompt && !settings.autoRegenerate && !refresh) return withSteeringPrompt(cached);
   const { questions, incomplete } = await (deps.loadPublicInterviewQuestions || loadPublicInterviewQuestions)({
     env,
@@ -102215,6 +102218,7 @@ ${contextText}` : ""}`
       openingPrompt,
       source: "generated",
       questionCount: questions.length,
+      blockedQuestionIds,
       generatedAt: (/* @__PURE__ */ new Date()).toISOString()
     };
     await write(env, cacheKey2(slug), value);

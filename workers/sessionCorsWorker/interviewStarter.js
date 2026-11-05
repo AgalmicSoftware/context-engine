@@ -4,7 +4,7 @@ import { resolveAnonymousIpDailyLimit } from './anonymousRateLimitPolicy.js';
 import { normalizeInterviewSettings, hasInterviewQuestionGrowth } from '../../shared/interviewSettings.mjs';
 import { resolveSessionAiModel } from './aiRequestPolicy.js';
 import { getKvJson, putKvJson } from './responseKvHelpers.js';
-import { loadPublicInterviewQuestions } from './interviewQuestionCatalog.js';
+import { blockedInterviewQuestionIds, loadPublicInterviewQuestions } from './interviewQuestionCatalog.js';
 import { proxyOpenAI, proxyAnthropic, proxyOpenRouter, proxyCustomRPC } from './aiProviderExecution.js';
 import { buildSessionEndedResponse } from '../shared/sessionLifecycle.mjs';
 import { buildParticipantContextPrompt } from './contextSourceLoader.js';
@@ -24,7 +24,10 @@ export const resolveInterviewStarter = async ({ env, slug, config, deps = {}, re
     return withSteeringPrompt({ openingPrompt: settings.openingPrompt, source: 'owner' });
   const read = deps.getKvJson || getKvJson;
   const write = deps.putKvJson || putKvJson;
-  const cached = await read(env, cacheKey(slug));
+  const stored = await read(env, cacheKey(slug));
+  // An opening may quote a question hidden since it was written, so hiding one retires it.
+  const blockedQuestionIds = JSON.stringify(blockedInterviewQuestionIds(config));
+  const cached = (stored?.blockedQuestionIds || '[]') === blockedQuestionIds ? stored : null;
   if (cached?.openingPrompt && !settings.autoRegenerate && !refresh) return withSteeringPrompt(cached);
   const { questions, incomplete } = await (deps.loadPublicInterviewQuestions || loadPublicInterviewQuestions)({
     env,
@@ -97,6 +100,7 @@ export const resolveInterviewStarter = async ({ env, slug, config, deps = {}, re
       openingPrompt,
       source: 'generated',
       questionCount: questions.length,
+      blockedQuestionIds,
       generatedAt: new Date().toISOString(),
     };
     await write(env, cacheKey(slug), value);

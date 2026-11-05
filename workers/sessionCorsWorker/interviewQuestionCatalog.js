@@ -26,6 +26,9 @@ const isObj = (value) => !!value && typeof value === 'object' && !Array.isArray(
 const dedupeQuestions = (questions) => normalizePublicInterviewQuestions(questions, MAX_QUESTIONS);
 // The id normalizeQuestion will serve the payload under.
 const payloadQuestionId = (payload) => lower(payload?.id || payload?.questionId);
+// The session's hidden questions, which the browser and MCP leave out too.
+export const blockedInterviewQuestionIds = (config) =>
+  [...new Set((Array.isArray(config?.BLOCKED_QUESTION_IDS) ? config.BLOCKED_QUESTION_IDS : []).map(lower).filter(Boolean))].sort();
 
 const readJsonResponse = async (response) => {
   if (!response || Number(response.status || 0) < 200 || Number(response.status || 0) >= 300) return null;
@@ -80,10 +83,10 @@ const loadCloudflareQuestions = async ({ env, config, slug, storageRoute }) => {
   const { items } = listing;
   let incomplete = listing.incomplete;
   // Hidden ids arrive as markers without a storage reference.
-  const hiddenIds = new Set(items
+  const hiddenIds = new Set([...blockedInterviewQuestionIds(config), ...items
     .filter((item) => item?.hidden === true || item?.metadata?.hidden === true)
     .map((item) => lower(item?.metadata?.resourceId))
-    .filter(Boolean));
+    .filter(Boolean)]);
   // Deliberately sequential and bounded. Each read reuses the storage route's
   // per-item access checks, so this endpoint cannot widen question visibility.
   const readPayload = async (storageRefId) => {
@@ -254,7 +257,8 @@ const loadOnChainQuestions = async ({ config, slug, fetchImpl }) => {
   if (end < start) return catalog();
   const scanEnd = Math.min(end, start + MAX_SCAN_BLOCKS - 1);
   const questions = [];
-  const seen = new Set();
+  // A blocked id counts as seen, so it spends no pointer read.
+  const seen = new Set(blockedInterviewQuestionIds(config));
   let incomplete = false;
   let pointerReads = 0;
   let candidates = 0;
