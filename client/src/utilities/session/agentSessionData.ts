@@ -1,5 +1,6 @@
 import type { AgentClientLoginEnvelope } from './agentClientLogin';
 import { buildSessionAgentAuthHeaders } from './agentClientLogin';
+import { normalizeRatingScale, type RatingScale } from '../survey/ratingValue';
 
 type UnknownRecord = Record<string, unknown>;
 export type AgentPolisRow = { responder: string; questionId: string; response: string };
@@ -43,6 +44,8 @@ export type AgentQuestion = {
   questionText: string;
   options: string[];
   voiceCredits?: number;
+  scale?: RatingScale;
+  singleSelect?: boolean;
   tags: string[];
   answeredByUser: boolean;
   answerable: boolean;
@@ -61,6 +64,9 @@ export const normalizeAgentQuestion = (input: unknown): AgentQuestion => {
     prompt,
     questionText: prompt,
     ...(questionType === 'quadratic' ? { voiceCredits: Number(question.voiceCredits ?? 99) } : {}),
+    // The Worker checks answers against these, so the controls must offer the same choices.
+    ...(questionType === 'rating' ? { scale: normalizeRatingScale(question) } : {}),
+    ...(questionType === 'multichoice' && question.singleSelect === true ? { singleSelect: true } : {}),
     options: (Array.isArray(question.options) ? question.options : []).map(toStr).filter(Boolean),
     tags: (Array.isArray(question.tags) ? question.tags : []).map(toStr).filter(Boolean).slice(0, 8),
     answeredByUser: question.answeredByUser === true,

@@ -1,4 +1,4 @@
-import { fetchAgentQuestions } from './agentSessionData';
+import { fetchAgentQuestions, normalizeAgentQuestion } from './agentSessionData';
 import type { AgentClientLoginEnvelope } from './agentClientLogin';
 const envelope = {
   v: 3,
@@ -54,4 +54,32 @@ test('rejects a repeated cursor and foreign worker override before exposing part
     false,
   );
   expect(fetchImpl).not.toHaveBeenCalled();
+});
+
+describe('normalizeAgentQuestion', () => {
+  const base = { questionId: 'q1', prompt: 'A question?' };
+
+  it('keeps the scale a rating question is answered on', () => {
+    const scale = { min: -0.5, max: 0.5, step: 0.1, minLabel: 'Less', maxLabel: 'More' };
+    expect(normalizeAgentQuestion({ ...base, questionType: 'rating', scale }).scale).toEqual(scale);
+    // A released Worker may send no scale; such a question is the default 0 to 10.
+    expect(normalizeAgentQuestion({ ...base, questionType: 'rating' }).scale).toEqual({
+      min: 0,
+      max: 10,
+      step: 1,
+      minLabel: '0',
+      maxLabel: '10',
+    });
+    expect(normalizeAgentQuestion({ ...base, questionType: 'binary', scale })).not.toHaveProperty('scale');
+  });
+
+  it('keeps whether a choice question takes one option', () => {
+    const options = ['One', 'Two'];
+    expect(
+      normalizeAgentQuestion({ ...base, questionType: 'multichoice', options, singleSelect: true }).singleSelect,
+    ).toBe(true);
+    expect(normalizeAgentQuestion({ ...base, questionType: 'multichoice', options })).not.toHaveProperty(
+      'singleSelect',
+    );
+  });
 });

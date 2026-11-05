@@ -10,6 +10,8 @@ import CESlider from '../../Shared/CESlider';
 import { renderPileActiveQuestionCard } from '../../SurveyTool/surveyPileActiveQuestionCard';
 import surveyStyles from '../../SurveyTool/SurveyTool.module.scss';
 import styles from '../OnePageSession.module.scss';
+import { normalizeRatingAnswer } from '../../../../../shared/questions/ratingScale.mjs';
+import { normalizeRatingScale } from '../../../utilities/survey/ratingValue';
 import type { AgentQuestion } from '../../../utilities/session/agentSessionData';
 import type { AgentAnswerInput } from '../../../utilities/session/agentSessionBackend';
 
@@ -40,10 +42,16 @@ const questionContainerClassName = (question: AgentQuestion): string => {
   return surveyStyles.freeformQuestionContainer;
 };
 
+// The middle of the question's own scale, on its grid, so an untouched slider still sends an accepted answer.
+const middleRating = (question: AgentQuestion): number => {
+  const { min, max, step = 1 } = normalizeRatingScale(question);
+  return normalizeRatingAnswer(min + Math.round((max - min) / 2 / step) * step, question) ?? min;
+};
+
 const buildInitialAnswer = (question: AgentQuestion): AgentAnswerInput => {
   const type = normalizeQuestionType(question);
   if (type === 'quadratic') return { value: question.options.map(() => 0) };
-  if (type === 'rating') return { value: 5 };
+  if (type === 'rating') return { value: middleRating(question) };
   if (type === 'multichoice') return { values: [] };
   return { value: '' };
 };
@@ -127,25 +135,34 @@ const AgentQuestionPile = ({
         questionId={questionId}
         options={activeQuestion.options}
         selectedValues={selectedMultichoiceValues(answer)}
+        isSingleSelect={activeQuestion.singleSelect === true}
         disabled={isSubmitting}
         onChange={(values) => updateAnswer(questionId, { values })}
       />
     );
   } else if (type === 'rating') {
+    const scale = normalizeRatingScale(activeQuestion);
     const ratingValue = Number(answer.value);
+    const shownValue = Number.isFinite(ratingValue) ? ratingValue : middleRating(activeQuestion);
     questionComponent = (
-      <div className={surveyStyles.ratingContainer}>
-        <CESlider
-          min={0}
-          max={10}
-          step={1}
-          value={Number.isFinite(ratingValue) ? ratingValue : 5}
-          onChange={(value) => updateAnswer(questionId, { value })}
-          disabled={isSubmitting}
-          className={surveyStyles.ratingSlider}
-        />
-        <span className={surveyStyles.ratingValueDisplay}>{Number.isFinite(ratingValue) ? ratingValue : 5}</span>
-      </div>
+      <>
+        <div className={surveyStyles.ratingContainer}>
+          <CESlider
+            min={scale.min}
+            max={scale.max}
+            step={scale.step}
+            value={shownValue}
+            onChange={(value) => updateAnswer(questionId, { value })}
+            disabled={isSubmitting}
+            className={surveyStyles.ratingSlider}
+          />
+          <span className={surveyStyles.ratingValueDisplay}>{shownValue}</span>
+        </div>
+        <div className={styles.agentRatingEnds}>
+          <span>{scale.minLabel}</span>
+          <span>{scale.maxLabel}</span>
+        </div>
+      </>
     );
   } else {
     questionComponent = (
