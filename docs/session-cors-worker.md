@@ -23,7 +23,8 @@ session as empty. It leaves out the session's `BLOCKED_QUESTION_IDS`, as the
 browser and MCP do, before hashing or prompting. A saved interview opening is
 written again when that list changes. Agent question lists, answers, results and
 Wrapped statements, and both Results analysis sources, leave those questions out
-too. The raw `/storage/list` route still lists them.
+too. A published analysis keeps them until it is generated again. The raw
+`/storage/list` route still lists them.
 
 ## Agent HTTP client handoff
 

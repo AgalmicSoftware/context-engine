@@ -66075,9 +66075,10 @@ async function loadWorkerCloudflareQuestions({
   });
   const listedVersions = items.filter((item) => item?.hidden !== true).map(versionOf);
   const currentRefs = new Set(selectCanonicalStorageVersions(listedVersions).map((version2) => version2.storageRefId));
+  const blocked = new Set(blockedQuestionIds(env.AGENT_CONTEXT?.config));
   const currentItems = items.filter((item) => {
     const version2 = versionOf(item);
-    return item?.hidden !== true && (!version2.resourceId || currentRefs.has(version2.storageRefId));
+    return item?.hidden !== true && !blocked.has(version2.resourceId.toLowerCase()) && (!version2.resourceId || currentRefs.has(version2.storageRefId));
   });
   const selectedItems = selectWorkerCloudflareQuestionItems(currentItems, {
     questionLimit,
