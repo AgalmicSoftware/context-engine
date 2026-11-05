@@ -88,7 +88,7 @@ import SessionPublishAdvancedSettingsPanel from './SessionPublishAdvancedSetting
 import SessionPublishProgressPanel from './SessionPublishProgressPanel';
 import SessionPublishResultLinks from './SessionPublishResultLinks';
 import { SetupVoiceKeyNote } from './setup/SetupAiSection';
-import { describeContextProblem, readSetupQuestions } from './setup/SetupContentSections';
+import { describeContextProblem, readSetupQuestions, withoutPublishedQuestions } from './setup/SetupContentSections';
 import { SetupContextFiles, SetupContextPublisher, usePendingContextFiles } from './setup/SetupContextSources';
 import {
   SessionTemplateActions,
@@ -2814,7 +2814,13 @@ const SessionWizard = ({
             sessionSlug={toStr(draft.slug).trim()}
             account={toStr(account).trim()}
             provider={provider}
-            onPublished={() => updateDraftValue(['questions'], [])}
+            onPublished={(published) =>
+              setDraft((prev) => {
+                const next = { ...prev, questions: withoutPublishedQuestions(prev.questions, published) };
+                draftRef.current = next;
+                return next;
+              })
+            }
           />
         ) : null
       }

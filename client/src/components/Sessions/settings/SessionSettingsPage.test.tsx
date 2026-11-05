@@ -15,6 +15,10 @@ const mockUpdateMetadataOnChain = jest.fn();
 const mockUpsertRegistryCache = jest.fn();
 const mockReadWallet = jest.fn();
 
+const mockPublishQuestions = jest.fn();
+jest.mock('../../../domains/surveys/workerCanonicalAuthoringPort', () => ({
+  workerCanonicalAuthoringPort: { publishQuestions: (...args: unknown[]) => mockPublishQuestions(...args) },
+}));
 jest.mock('../../../utilities/session/sessionWorkerDiscovery', () => ({
   ...(jest.requireActual('../../../utilities/session/sessionWorkerDiscovery') as object),
   fetchWorkerCanonicalSessionBootstrap: (...args: unknown[]) => mockFetchBootstrap(...args),
@@ -244,6 +248,44 @@ describe('SessionSettingsPage', () => {
     expect(screen.getByTestId('ce-setup-summary-questions')).toHaveTextContent('1 question');
     expect(screen.getByTestId('ce-setup-questions-publish')).toHaveTextContent('Add 1 question to the session');
     expect(screen.getByTestId('ce-settings-content-changes')).toHaveTextContent('Name');
+  });
+
+  it('keeps a question edited while the questions upload', async () => {
+    renderPage();
+    await waitFor(() => expect(mockUpsertBootstrap).toHaveBeenCalled());
+    fireEvent.click(screen.getByTestId('ce-template-import'));
+    fireEvent.change(screen.getByTestId('ce-template-paste'), {
+      target: {
+        value: JSON.stringify({
+          format: 'ce.session-template/v1',
+          questions: [
+            { prompt: 'Adapting institutions deserves investment.', type: 'binary' },
+            { prompt: 'Cities should plant more trees.', type: 'binary' },
+          ],
+        }),
+      },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Check' }));
+    fireEvent.click(screen.getByTestId('ce-template-import-apply'));
+    fireEvent.click(screen.getByTestId(`${E2E_TESTIDS.SETUP_MORE_PREFIX}questions`));
+
+    let finishUpload: (value: unknown) => void = () => {};
+    mockPublishQuestions.mockReturnValue(
+      new Promise((resolve) => {
+        finishUpload = resolve;
+      }),
+    );
+    fireEvent.click(screen.getByTestId('ce-setup-questions-publish'));
+    await screen.findByText('Adding…');
+    fireEvent.change(screen.getByLabelText('Question 2'), { target: { value: 'Cities should plant shade trees.' } });
+    await act(async () => {
+      finishUpload({ uploadedQuestions: [{}, {}] });
+    });
+
+    expect(await screen.findByText('Added 2 questions.')).toBeInTheDocument();
+    expect(screen.getByLabelText('Question 1')).toHaveValue('Cities should plant shade trees.');
+    expect(screen.queryByLabelText('Question 2')).not.toBeInTheDocument();
+    expect(screen.getByTestId('ce-setup-questions-publish')).toHaveTextContent('Add 1 question to the session');
   });
 
   it('copies the group recorder link', async () => {

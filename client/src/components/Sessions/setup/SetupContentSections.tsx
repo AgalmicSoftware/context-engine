@@ -277,6 +277,24 @@ export const readSetupQuestions = (draft: SetupSectionProps['draft']): SetupQues
     return { ...question, prompt: text(question.prompt), type: text(question.type) || 'binary' } as SetupQuestion;
   });
 
+// Removes one draft per published question, by exact content, so an edit or an
+// addition made while the upload ran stays in the draft.
+export const withoutPublishedQuestions = (draftQuestions: unknown, published: SetupQuestion[]): unknown[] => {
+  const left = new Map<string, number>();
+  published.forEach((question) => {
+    const key = JSON.stringify(question);
+    left.set(key, (left.get(key) ?? 0) + 1);
+  });
+  const current = asList(draftQuestions);
+  const readable = readSetupQuestions({ questions: current });
+  return current.filter((_entry, index) => {
+    const key = JSON.stringify(readable[index]);
+    const count = left.get(key) ?? 0;
+    if (count) left.set(key, count - 1);
+    return !count;
+  });
+};
+
 const splitOptions = (value: string): string[] =>
   value
     .split('\n')

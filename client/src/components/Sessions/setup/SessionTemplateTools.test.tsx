@@ -10,6 +10,7 @@ import {
 import { decodeSessionTemplateLink, encodeSessionTemplateLink } from '@ce-shared/sessionTemplateLink.mjs';
 import { prose, salonSetupTemplateFields } from '../sessionWizardTemplate.testUtils';
 import { SessionTemplateActions, SessionTemplateLinkNotice, SetupQuestionsPublisher } from './SessionTemplateTools';
+import { readSetupQuestions, withoutPublishedQuestions } from './SetupContentSections';
 
 const mockPublishQuestions = jest.fn();
 jest.mock('../../../domains/surveys/workerCanonicalAuthoringPort', () => ({
@@ -220,6 +221,60 @@ describe('session template tools', () => {
     expect(errors).toHaveTextContent('questions.1.prompt is required.');
     expect(errors).toHaveTextContent('questions.2.options needs at least two options.');
     expect(mockPublishQuestions).not.toHaveBeenCalled();
+  });
+
+  it('removes only what was published, keeping edits made while it uploaded', async () => {
+    let finishUpload: (value: unknown) => void = () => {};
+    mockPublishQuestions.mockReturnValue(
+      new Promise((resolve) => {
+        finishUpload = resolve;
+      }),
+    );
+    const first = { prompt: 'First', type: 'binary' };
+    const second = { prompt: 'Second', type: 'binary' };
+    let setCurrent: (next: unknown[]) => void = () => {};
+    const Harness = () => {
+      const [draft, setDraft] = React.useState({ questions: [first, second] as unknown[] });
+      setCurrent = (questions) => setDraft((prev) => ({ ...prev, questions }));
+      return (
+        <>
+          <output data-testid="draft">{JSON.stringify(draft.questions)}</output>
+          <SetupQuestionsPublisher
+            questions={readSetupQuestions(draft)}
+            sessionConfig={{ slug: 'salon', sessionName: 'Salon' }}
+            sessionSlug="salon"
+            account="0xaa"
+            onPublished={(published) =>
+              setDraft((prev) => ({ ...prev, questions: withoutPublishedQuestions(prev.questions, published) }))
+            }
+          />
+        </>
+      );
+    };
+    render(<Harness />);
+    fireEvent.click(screen.getByTestId('ce-setup-questions-publish'));
+    await screen.findByText('Adding…');
+
+    // While the upload runs, the author edits one question and adds another.
+    const edited = { prompt: 'Second, edited', type: 'binary' };
+    const added = { prompt: 'Added later', type: 'rating' };
+    act(() => setCurrent([first, edited, added]));
+    await act(async () => {
+      finishUpload({ uploadedQuestions: [{}, {}] });
+    });
+
+    expect(await screen.findByTestId('ce-setup-questions-status')).toHaveTextContent('Added 2 questions.');
+    expect(JSON.parse(screen.getByTestId('draft').textContent || '')).toEqual([edited, added]);
+    expect(screen.getByTestId('ce-setup-questions-publish')).toHaveTextContent('Add 2 questions to the session');
+  });
+
+  it('removes one draft for each published copy of an identical question', () => {
+    const same = { prompt: 'Same', type: 'binary' };
+    expect(withoutPublishedQuestions([same, same, { prompt: 'Other', type: 'binary' }], [same])).toEqual([
+      same,
+      { prompt: 'Other', type: 'binary' },
+    ]);
+    expect(withoutPublishedQuestions(undefined, [same])).toEqual([]);
   });
 
   it('adds a template’s questions once the session exists', async () => {
