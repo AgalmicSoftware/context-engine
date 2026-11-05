@@ -323,11 +323,54 @@
       .hero {
         padding: 18px;
       }
+      .heroPrimaryButton {
+        font-family: var(--ce-font-button);
+        font-size: 1rem;
+        white-space: nowrap;
+      }
+      .titleRow {
+        flex-wrap: wrap;
+        justify-content: flex-start;
+        gap: 12px;
+      }
+      .mainTitle {
+        font-size: clamp(1.4rem, 6vw, 1.75rem);
+      }
+      .titleLinks {
+        gap: 8px;
+      }
+      .titleRepoLink {
+        --title-link-size: 44px;
+        height: 44px;
+      }
+      .mobileDemoVideoPlayButton {
+        color: var(--ce-text-inverse);
+      }
+      .mobileDemoVideoPlayIcon {
+        background: var(--about-accent);
+      }
       .collapsibleSection {
-        padding: 16px 14px;
+        padding: 12px 14px;
       }
       .sectionTitle {
         font-size: 1.1rem;
+      }
+      .toggleHeader {
+        min-height: 44px;
+      }
+      .toggleHeader.relatedToggle,
+      .toggleHeader.practiceToggle {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 8px;
+
+        .toggleHeaderAside {
+          display: contents;
+        }
+        .toggleIcon {
+          grid-column: 2;
+          grid-row: 1;
+        }
       }
       .useCaseGrid {
         gap: 10px;
@@ -354,19 +397,24 @@
         width: fit-content;
       }
       .relatedSummary {
+        grid-column: 1 / -1;
+        grid-row: 2;
         min-width: 0;
+        justify-content: flex-start;
         flex-wrap: wrap;
-        gap: 4px;
+        gap: 6px;
       }
       .relatedPill {
-        padding: 3px 6px;
-        font-size: 0.7rem;
+        padding: 4px 9px;
+        font-size: 0.8rem;
       }
       .practiceSummary {
-        gap: 3px;
+        grid-column: 1 / -1;
+        grid-row: 2;
+        gap: 6px;
         .practiceVisual {
-          width: 24px;
-          height: 24px;
+          width: 32px;
+          height: 32px;
         }
       }
     }
