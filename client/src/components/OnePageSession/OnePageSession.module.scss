@@ -819,6 +819,17 @@
   font-size: 0.88rem;
 }
 
+// Takes the card's text color, as the question above it does.
+.agentRatingEnds {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  margin-top: 6px;
+  font-size: 0.88rem;
+  overflow-wrap: anywhere;
+}
+
 .agentChipRow,
 .agentTopicCounts {
   display: flex;
