@@ -91,7 +91,7 @@ All notable changes to this project will be documented in this file.
 
 - Anonymous visitors have no daily per-IP request limit unless the session sets one. The per-wallet daily limit no longer doubles as one, so a room sharing one venue connection isn't cut off.
 - A transcription reply with no readable text returns 502, so the browser keeps the chunk's audio and retries. Earlier Workers report such a reply as silence.
-- Agent submissions count test-ETH funding against the per-wallet daily faucet limit they share with participants. Past the limit, the submission carries on without funding.
+- Agent submissions count test-ETH payouts against the per-wallet daily faucet limit they share with participants. Past the limit, the submission carries on without funding.
 - Voice interviews leave out the session's hidden questions, in the question list, its hash and the opening. Hiding a question has a saved opening written again.
 - Group transcription forwards up to four known-speaker samples (a name and a short WAV) to OpenAI, so voices keep their labels across chunks. Invalid samples are dropped without failing the chunk.
 - Claude requests work on current models. The Worker sends no `temperature`, which Opus 5.5 and Fable 5.1 refuse and Sonnet and Haiku 5.5 refuse at 0.7, so older Claude models also sample at their default. It reads the answer from the reply's text blocks after any thinking, and a request without a model uses `claude-opus-5-5` instead of a model retired in 2025.

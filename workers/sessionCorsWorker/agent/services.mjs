@@ -119,18 +119,18 @@ export const createAgentServices = ({ env, agentEnv, deps }) => {
     async faucet() {
       const { config } = await current();
       if (!ctx.scopes?.faucet || ctx.config.agentHttp?.sponsoredFaucetAllowed !== true) return { ok: false, skipped: true, reason: 'session_faucet_not_allowed' };
-      // The participant route's daily limit, counted together with it. A refusal doesn't stop the answer: the
-      // account may already hold enough to submit it.
-      if (!await deps.checkRateLimit({ env, slug: ctx.slug, address: ctx.address, route: 'faucet', limit: config.limits?.perWalletPerDay || 0 })) {
-        return { ok: false, reason: 'faucet_rate_limited', status: 429 };
-      }
       const secrets = await deps.getSessionSecrets(env, ctx.slug);
       // The same wallet turn as participant payouts, so neither signs the other's nonce.
       const takeWalletTurn = deps.withCoordinatedFaucetWalletTurn || withCoordinatedFaucetWalletTurn;
       const response = await takeWalletTurn({ env, secrets }, () => deps.faucet({ payload: { to: ctx.address },
-        secrets, config: ctx.config, slug: ctx.slug, requesterAddress: ctx.address, tokenHasFaucetScope: true, baseHeaders: {} }));
+        secrets, config: ctx.config, slug: ctx.slug, requesterAddress: ctx.address, tokenHasFaucetScope: true, baseHeaders: {},
+        // The participant route's daily limit, counted together with it. Submissions ask with every answer, so only
+        // a payout counts. A refusal doesn't stop the answer: the account may already hold enough to submit it.
+        beforePayout: () => deps.checkRateLimit({ env, slug: ctx.slug, address: ctx.address, route: 'faucet', limit: config.limits?.perWalletPerDay || 0 }),
+      }));
       if (!response) return { ok: false, reason: 'faucet_busy', status: 503 };
       const body = await response.json();
+      if (response.status === 429) return { ok: false, reason: 'faucet_rate_limited', status: 429 };
       return response.ok ? { ok: true, ...body } : { ok: false, reason: 'faucet_request_failed', status: response.status,
         ...(body.txHash ? { txHash: body.txHash } : {}) };
     },

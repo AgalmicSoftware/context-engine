@@ -90107,6 +90107,7 @@ var faucet = async ({
   requesterAddress = "",
   tokenHasFaucetScope = false,
   onSubmissionAttempt,
+  beforePayout,
   deps,
   constants,
   defaults
@@ -90242,6 +90243,7 @@ var faucet = async ({
   const thresholdWeiBig = toBigInt2(thresholdWei);
   let signedTx = "";
   let txHash = "";
+  let payoutAdmitted = false;
   for (const rpc2 of rpcUrls || []) {
     const masked = maskRpcUrl(rpc2);
     let chainId = 0;
@@ -90338,6 +90340,10 @@ var faucet = async ({
         gasPriceHex = await rpcRequest2({ rpcUrl: rpc2, method: "eth_gasPrice", params: [] });
       } catch (_) {
         gasPriceHex = DEFAULT_GAS_PRICE_HEX;
+      }
+      if (beforePayout && !payoutAdmitted) {
+        if (!await beforePayout()) return json6({ error: "Rate limit exceeded." }, 429, baseHeaders);
+        payoutAdmitted = true;
       }
       const txRequest = {
         to,
@@ -91403,9 +91409,6 @@ var createAgentServices = ({ env, agentEnv, deps }) => {
     async faucet() {
       const { config } = await current();
       if (!ctx.scopes?.faucet || ctx.config.agentHttp?.sponsoredFaucetAllowed !== true) return { ok: false, skipped: true, reason: "session_faucet_not_allowed" };
-      if (!await deps.checkRateLimit({ env, slug: ctx.slug, address: ctx.address, route: "faucet", limit: config.limits?.perWalletPerDay || 0 })) {
-        return { ok: false, reason: "faucet_rate_limited", status: 429 };
-      }
       const secrets = await deps.getSessionSecrets(env, ctx.slug);
       const takeWalletTurn = deps.withCoordinatedFaucetWalletTurn || withCoordinatedFaucetWalletTurn;
       const response2 = await takeWalletTurn({ env, secrets }, () => deps.faucet({
@@ -91415,10 +91418,14 @@ var createAgentServices = ({ env, agentEnv, deps }) => {
         slug: ctx.slug,
         requesterAddress: ctx.address,
         tokenHasFaucetScope: true,
-        baseHeaders: {}
+        baseHeaders: {},
+        // The participant route's daily limit, counted together with it. Submissions ask with every answer, so only
+        // a payout counts. A refusal doesn't stop the answer: the account may already hold enough to submit it.
+        beforePayout: () => deps.checkRateLimit({ env, slug: ctx.slug, address: ctx.address, route: "faucet", limit: config.limits?.perWalletPerDay || 0 })
       }));
       if (!response2) return { ok: false, reason: "faucet_busy", status: 503 };
       const body = await response2.json();
+      if (response2.status === 429) return { ok: false, reason: "faucet_rate_limited", status: 429 };
       return response2.ok ? { ok: true, ...body } : {
         ok: false,
         reason: "faucet_request_failed",
