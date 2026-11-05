@@ -439,7 +439,7 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
           links.find((link) => link.getAttribute('aria-label') === 'View Context Engine on GitHub'),
         ),
         newSession: readControl(findLink('New Session')),
-        whitepaper: readControl(findLink('Whitepaper')),
+        whitepaper: readControl(hero.querySelector('[data-testid="ce-about-link-whitepaper"]')),
       };
     });
 
@@ -1910,6 +1910,10 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
           };
         })
     : null;
+  if (routeCase.requiresTransparentRecognitionLogos) {
+    const recognitionToggle = page.getByRole('button', { name: 'Recognition', exact: true });
+    if ((await recognitionToggle.getAttribute('aria-expanded')) !== 'true') await recognitionToggle.click();
+  }
   const classicRecognitionLogoState = routeCase.requiresTransparentRecognitionLogos
     ? await page
         .getByTestId('ce-about-recognition-ethereum')
@@ -2365,8 +2369,8 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
     );
     assert.ok(classicAboutHeroControlState.demo.height >= 48, 'Classic 95 About primary actions should remain tappable');
     assert.ok(
-      classicAboutHeroControlState.whitepaper.height >= 34,
-      'Classic 95 About resource actions should remain tappable',
+      classicAboutHeroControlState.whitepaper.height >= 32,
+      'Classic 95 About resource icons should retain their responsive 32px minimum',
     );
     assert.equal(
       classicAboutHeroControlState.github.backgroundColor,
@@ -2374,8 +2378,8 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
       'Classic 95 About GitHub action should use the standard gray control face',
     );
     assert.ok(
-      classicAboutHeroControlState.github.width > classicAboutHeroControlState.github.height,
-      'Classic 95 About GitHub action should read as a rectangular push button',
+      classicAboutHeroControlState.github.width >= classicAboutHeroControlState.github.height,
+      'Classic 95 About resource controls should accommodate their icon at every viewport',
     );
     assert.notEqual(
       currentAboutHeroControlState.demo.borderRadius,
