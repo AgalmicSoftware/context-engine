@@ -13,6 +13,7 @@ import {
   SetupParticipationSection,
   SetupQuestionsSection,
   readSetupQuestions,
+  withoutPublishedQuestions,
 } from '../setup/SetupContentSections';
 import { SetupAccessSection, SetupHostingSection, SetupResultsSection } from '../setup/SetupPolicySections';
 import type { SetupSectionKey } from '../setup/SetupPrimitives';
@@ -464,7 +465,12 @@ const SessionSettingsPage = ({
                     sessionSlug={sessionSlug}
                     account={account}
                     provider={provider}
-                    onPublished={() => updateDraft(['questions'], [])}
+                    onPublished={(published) =>
+                      setDraft((prev) => ({
+                        ...prev,
+                        questions: withoutPublishedQuestions(prev.questions, published),
+                      }))
+                    }
                   />
                   <p className={styles.hint}>
                     Questions already in the session are edited on the <a href={sessionUrl}>session page</a>.

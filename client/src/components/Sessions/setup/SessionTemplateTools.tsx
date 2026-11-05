@@ -329,7 +329,8 @@ type SetupQuestionsPublisherProps = {
   sessionSlug: string;
   account: string;
   provider?: unknown;
-  onPublished: () => void;
+  /** Called with the questions the upload held, which edits made while it ran may differ from. */
+  onPublished: (published: SetupQuestion[]) => void;
 };
 
 // After creation, adds the questions a template brought.
@@ -358,7 +359,7 @@ export const SetupQuestionsPublisher = ({
     try {
       const count = await publishSetupQuestions({ questions, sessionConfig, sessionSlug, account, provider });
       setStatus(count === 1 ? 'Added 1 question.' : `Added ${count} questions.`);
-      onPublished();
+      onPublished(questions);
     } catch (error) {
       setStatus(error instanceof Error ? error.message : 'Adding the questions failed. Try again.');
     } finally {
