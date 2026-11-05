@@ -249,6 +249,96 @@ const pairsFor = (predict, extra = () => ({})) =>
     })),
   );
 
+// Sums taken in another order differ in the last bits, which is not a result.
+const rounded = (value) => JSON.parse(JSON.stringify(value), (_key, entry) => (
+  typeof entry === 'number' ? Math.round(entry * 1e9) / 1e9 : entry
+));
+const inBothOrders = (records, options = fast) => {
+  const score = (order) => rounded(scoreAgentFidelity({
+    questions,
+    pairs: order(records.pairs),
+    answers: order(records.answers),
+    options,
+  }).unusualViews.terciles);
+  const forward = score((list) => list);
+  assert.deepEqual(score((list) => [...list].reverse()), forward, 'record order must not change the groups');
+  return forward;
+};
+const recordsFrom = (views, predict = (_person, _questionId, actual) => actual) => {
+  const records = views.map((view, index) => ({ id: `0x${String(index).padStart(40, '0')}`, view, index }));
+  const shape = (person, questionId) => ({ participantId: person.id, questionId, at: 1 });
+  const actualOf = (person, questionId) => person.view[questionId] ?? 'Agree';
+  return {
+    answers: records.flatMap((person) => statements.map((questionId) => ({
+      ...shape(person, questionId), value: actualOf(person, questionId),
+    }))),
+    pairs: records.flatMap((person) => statements.map((questionId) => ({
+      ...shape(person, questionId),
+      condition: 'shown',
+      origin: 'external_prefill',
+      platform: 'claude',
+      modelId: 'test',
+      prediction: predict(person, questionId, actualOf(person, questionId)),
+      actual: actualOf(person, questionId),
+      confidence: 0.9,
+    }))),
+  };
+};
+
+test('everyone equally typical gets no unusual or typical group, in any record order', () => {
+  // All answer alike, and the agent is right for five of the fifteen.
+  const records = recordsFrom(
+    Array.from({ length: 15 }, () => ({})),
+    (person, _questionId, actual) => (person.index < 5 ? actual : 'Disagree'),
+  );
+  const groups = inBothOrders(records);
+  assert.ok(groups.every((group) => group.suppressed === true), JSON.stringify(groups));
+  assert.ok(groups.every((group) => !('agent' in group)));
+});
+
+test('a tie at a third stays in one group, in any record order', () => {
+  const groups = inBothOrders(recordsFrom([
+    ...Array.from({ length: 7 }, () => ({})),
+    ...Array.from({ length: 3 }, () => ({ qb1: 'Disagree' })),
+    ...Array.from({ length: 5 }, () => ({ qb2: 'Disagree' })),
+  ]), { ...fast, minParticipants: 5 });
+  assert.deepEqual(groups.map((group) => [group.tercile, group.participants]), [
+    ['most unusual', 3],
+    ['middle', 5],
+    ['most typical', 7],
+  ]);
+  assert.equal(groups[0].suppressed, true, 'three people are too few to report');
+  assert.equal(groups[1].suppressed, undefined);
+});
+
+test('two camps compare with no one in the middle, in any record order', () => {
+  const groups = inBothOrders(recordsFrom([
+    ...Array.from({ length: 6 }, () => ({})),
+    ...Array.from({ length: 4 }, () => Object.fromEntries(statements.map((questionId) => [questionId, 'Disagree']))),
+  ]));
+  assert.deepEqual(groups.map((group) => [group.tercile, group.participants]), [
+    ['most unusual', 4],
+    ['middle', 0],
+    ['most typical', 6],
+  ]);
+  assert.equal(groups[1].suppressed, true);
+  assert.equal(groups[0].suppressed, undefined);
+  assert.equal(groups[2].suppressed, undefined);
+});
+
+test('without ties the groups are the usual thirds', () => {
+  const ratings = [0, 1, 2, 3, 5, 8, 10];
+  const ids = ratings.map((_rating, index) => `0x${String(index).padStart(40, '0')}`);
+  const answers = ratings.map((value, index) => ({ participantId: ids[index], questionId: 'qr', value, at: 1 }));
+  const pairs = ratings.map((value, index) => ({
+    participantId: ids[index], questionId: 'qr', condition: 'shown', origin: 'external_prefill', platform: 'claude',
+    modelId: 'test', prediction: value, actual: value, confidence: 0.9, at: 1,
+  }));
+  const groups = inBothOrders({ answers, pairs }, { ...fast, minParticipants: 1 });
+  assert.deepEqual(groups.map((group) => group.participants), [2, 3, 2]);
+  assert.ok(groups.every((group) => group.suppressed === undefined));
+});
+
 test('an agent that knows each person beats the majority guess, most for unusual people', () => {
   const report = scoreAgentFidelity({ questions, pairs: pairsFor((person) => person.view), answers: answersFor(), options: fast });
   assert.equal(report.mirrorScore.overall.value, 1);
@@ -672,6 +762,12 @@ test('a participant summary lists the most confident misses first', () => {
   assert.equal(summary.hiddenPredictions, 1);
   assert.equal(summary.hiddenMatches, 0);
   assert.deepEqual(summary.confidentMisses.map((miss) => miss.questionId), ['qb3', 'qb2'], 'a near-miss rating is not a miss');
+  const tied = [1, 2, 3, 4].map((digit) => ({
+    questionId: `qb${digit}`, condition: 'shown', prediction: 'Agree', actual: 'Disagree', confidence: 0.8,
+  }));
+  const missesIn = (pairs) => summarizeParticipantFidelity({ questions, pairs }).confidentMisses.map((miss) => miss.questionId);
+  assert.deepEqual(missesIn(tied), ['qb1', 'qb2', 'qb3']);
+  assert.deepEqual(missesIn([...tied].reverse()), ['qb1', 'qb2', 'qb3'], 'equal confidence does not depend on record order');
   assert.equal(summarizeParticipantFidelity({ questions, pairs: [] }), null);
 });
 
