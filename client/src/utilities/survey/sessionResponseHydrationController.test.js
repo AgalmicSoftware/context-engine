@@ -661,6 +661,84 @@ describe('createSessionResponseHydrationController', () => {
       expect(controller.isInitInFlight(SESSION_SLUG)).toBe(false);
     });
 
+    it('an earlier session finishing late does not mark the newer load ready', async () => {
+      const host = createMockHost();
+      const controller = createSessionResponseHydrationController(host);
+      const [alphaWindow, betaWindow] = [createDeferred(), createDeferred()];
+      contractScripts.getRelevantBlockWindowForFilter
+        .mockReturnValueOnce(alphaWindow.promise)
+        .mockReturnValueOnce(betaWindow.promise);
+
+      const alpha = controller.fetchQuestionResponsesChunkedForGroup('alpha');
+      const beta = controller.fetchQuestionResponsesChunkedForGroup('beta');
+      alphaWindow.resolve({ fromBlock: 12, toBlock: 11 });
+      await alpha;
+
+      expect(host.getStateSnapshot().isResponsesCacheReady).toBe(false);
+      expect(host.checkAllCachesReady).not.toHaveBeenCalled();
+
+      betaWindow.resolve({ fromBlock: 12, toBlock: 11 });
+      await beta;
+
+      expect(host.getStateSnapshot().isResponsesCacheReady).toBe(true);
+      expect(host.checkAllCachesReady).toHaveBeenCalledTimes(1);
+    });
+
+    it('an earlier Worker load finishing late does not mark the newer load ready', async () => {
+      const [alphaLoad, betaLoad] = [createDeferred(), createDeferred()];
+      const loadWorkerResponses = jest.fn(
+        ({ sessionSlug }) => (sessionSlug === 'alpha' ? alphaLoad : betaLoad).promise,
+      );
+      const host = createMockHost({
+        chainId: null,
+        getSessionCfg: jest.fn((slug) => createWorkerCanonicalSessionConfig({ slug })),
+        scanScopeNoop: jest.fn(() => true),
+        loadWorkerResponses,
+      });
+      const controller = createSessionResponseHydrationController(host);
+
+      const alpha = controller.fetchQuestionResponsesChunkedForGroup('alpha');
+      const beta = controller.fetchQuestionResponsesChunkedForGroup('beta');
+      alphaLoad.resolve([]);
+      await alpha;
+
+      expect(host.getStateSnapshot().isResponsesCacheReady).toBe(false);
+
+      betaLoad.resolve([]);
+      await beta;
+
+      expect(host.getStateSnapshot().isResponsesCacheReady).toBe(true);
+    });
+
+    it('a queued rerun of the earlier session does not take readiness from the newer load', async () => {
+      // Earlier tests may leave a rerun timer that would use this test's mocks.
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      contractScripts.getRelevantBlockWindowForFilter.mockClear();
+      const host = createMockHost();
+      const controller = createSessionResponseHydrationController(host);
+      const [alphaWindow, betaWindow, rerunWindow] = [createDeferred(), createDeferred(), createDeferred()];
+      contractScripts.getRelevantBlockWindowForFilter
+        .mockReturnValueOnce(alphaWindow.promise)
+        .mockReturnValueOnce(betaWindow.promise)
+        .mockReturnValueOnce(rerunWindow.promise);
+
+      const alpha = controller.fetchQuestionResponsesChunkedForGroup('alpha');
+      void controller.fetchQuestionResponsesChunkedForGroup('alpha');
+      const beta = controller.fetchQuestionResponsesChunkedForGroup('beta');
+      alphaWindow.resolve({ fromBlock: 12, toBlock: 11 });
+      await alpha;
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(contractScripts.getRelevantBlockWindowForFilter).toHaveBeenCalledTimes(3);
+
+      betaWindow.resolve({ fromBlock: 12, toBlock: 11 });
+      await beta;
+      expect(host.getStateSnapshot().isResponsesCacheReady).toBe(true);
+
+      rerunWindow.resolve({ fromBlock: 12, toBlock: 11 });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(host.checkAllCachesReady).toHaveBeenCalledTimes(1);
+    });
+
     it('settles concurrent calls after the shared in-flight run completes', async () => {
       const host = createMockHost();
       const controller = createSessionResponseHydrationController(host);
@@ -1696,6 +1774,22 @@ describe('createSessionResponseHydrationController', () => {
   });
 
   describe('refreshQuestionResponses', () => {
+    it("a targeted refresh of another session leaves the current load's readiness alone", async () => {
+      const host = createMockHost();
+      const controller = createSessionResponseHydrationController(host);
+      const pendingWindow = createDeferred();
+      contractScripts.getRelevantBlockWindowForFilter.mockReturnValueOnce(pendingWindow.promise);
+      const current = controller.fetchQuestionResponsesChunkedForGroup('current');
+      contractScripts.getRelevantBlockWindowForFilter.mockResolvedValue({ fromBlock: 1, toBlock: 12 });
+
+      await controller.refreshQuestionResponses([QUESTION_ID_A], { slug: 'other', responder: RESPONDER_LOWER });
+      expect(host.getStateSnapshot().isResponsesCacheReady).toBe(false);
+
+      pendingWindow.resolve({ fromBlock: 12, toBlock: 11 });
+      await current;
+      expect(host.getStateSnapshot().isResponsesCacheReady).toBe(true);
+    });
+
     it.each([false, true])(
       'retries an incomplete chain scan on the next ordinary refresh (forceFull=%s)',
       async (forceFull) => {
