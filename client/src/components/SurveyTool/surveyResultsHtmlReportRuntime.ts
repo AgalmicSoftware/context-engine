@@ -4,7 +4,6 @@ import {
   buildSessionResultsAnalysisInputSignature,
   evaluateSessionResultsAnalysisEligibility,
   SESSION_RESULTS_ANALYSIS_SECTION_KEYS,
-  shortenSessionResultsAddress,
   type SessionResultsAnalysisSectionKey,
   type SessionResultsGeneratedAnalysisArtifact,
   type SessionResultsHtmlSnapshot,
@@ -273,7 +272,7 @@ export const createSurveyResultsHtmlReportRuntime = ({
     return {
       address: account,
       chainId: getHtmlReportChainId(),
-      displayAddress: shortenSessionResultsAddress(account),
+      displayAddress: account,
     };
   };
 

@@ -134,6 +134,14 @@ describe('surveyResultsHtmlReportRuntime', () => {
     expect(aiInput).not.toContain('"q2"');
   });
 
+  it('names the exporter by full address', () => {
+    const account = '0x1234567890123456789012345678901234567890';
+    const { runtime } = createRuntime({ props: { account, loginComplete: true } });
+    expect(runtime.getHtmlReportExporterMetadata()).toEqual(
+      expect.objectContaining({ address: account, displayAddress: account }),
+    );
+  });
+
   it('distinguishes an empty completed filter from the initial unhydrated state', () => {
     const { runtime, mutableState } = createRuntime({
       getFilteredQuestionsForExport: () => [],
@@ -185,7 +193,7 @@ describe('surveyResultsHtmlReportRuntime', () => {
     expect(runtime.getHtmlReportExporterMetadata()).toMatchObject({
       address: '0x9999999999999999999999999999999999999999',
       chainId: 11155420,
-      displayAddress: '0x9999...9999',
+      displayAddress: '0x9999999999999999999999999999999999999999',
     });
   });
 

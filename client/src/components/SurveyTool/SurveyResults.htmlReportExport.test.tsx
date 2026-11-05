@@ -286,7 +286,7 @@ describe('SurveyResults HTML report export controls', () => {
     expect(html).toContain('"participants": 1');
     expect(html).toContain('"privacyMode": "redacted"');
     expect(html).toContain('"address": "0x9999999999999999999999999999999999999999"');
-    expect(html).toContain('0x9999...9999');
+    expect(html).toContain('0x9999999999999999999999999999999999999999');
     expect(html).not.toContain('0xabc');
     expect(html).not.toContain('Raw answer');
     expect(html).not.toContain('Raw note');
@@ -312,7 +312,7 @@ describe('SurveyResults HTML report export controls', () => {
     const [html, filename] = (downloadSessionResultsHtmlReport as jest.Mock).mock.calls[0];
     expect(html).toContain('<!doctype html>');
     expect(html).toContain('Export this report?');
-    expect(html).toContain('Downloaded by 0x9999...9999');
+    expect(html).toContain('Downloaded by 0x9999999999999999999999999999999999999999');
     expect(html).toContain('"address": "0x9999999999999999999999999999999999999999"');
     expect(html).not.toContain('0xabc');
     expect(filename).toMatch(/^contextEngine_sessionReport_demo_\d{4}-\d{2}-\d{2}T\d{2}_\d{2}_\d{2}_\d{3}Z\.html$/);

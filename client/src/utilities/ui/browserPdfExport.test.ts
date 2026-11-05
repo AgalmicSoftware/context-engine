@@ -1,4 +1,5 @@
 import {
+  createPagedPdf,
   loadBrowserModuleWithRetry,
   resolveDefaultExport,
   resolveJsPdfConstructor,
@@ -26,31 +27,6 @@ describe('browser PDF export primitives', () => {
     expect(resolveJsPdfConstructor({ jsPDF: NamedJsPdf })).toBe(NamedJsPdf);
     expect(resolveJsPdfConstructor({ default: { jsPDF: NamespacedJsPdf } })).toBe(NamespacedJsPdf);
     expect(() => resolveJsPdfConstructor({ default: {} })).toThrow('jsPDF constructor is unavailable');
-  });
-
-  it('renders a canvas across A4 pages and saves the result', () => {
-    const addImage = jest.fn();
-    const addPage = jest.fn();
-    const save = jest.fn();
-    const JsPdf = jest.fn().mockImplementation(() => ({
-      addImage,
-      addPage,
-      internal: { pageSize: { getHeight: () => 842, getWidth: () => 595 } },
-      save,
-    }));
-    const canvas = {
-      height: 2000,
-      toDataURL: jest.fn(() => 'data:image/jpeg;base64,report'),
-      width: 500,
-    } as unknown as HTMLCanvasElement;
-
-    saveCanvasAsPagedPdf({ canvas, filename: 'report.pdf', JsPdf });
-
-    expect(canvas.toDataURL).toHaveBeenCalledWith('image/jpeg', 0.82);
-    expect(addImage).toHaveBeenCalledTimes(3);
-    expect(addPage).toHaveBeenCalledTimes(2);
-    expect(addImage.mock.calls.map((call) => call[3])).toEqual([0, -842, -1684]);
-    expect(save).toHaveBeenCalledWith('report.pdf');
   });
 
   it('rejects unusable captures before constructing a PDF', () => {
@@ -118,6 +94,89 @@ it('crops separate page images instead of drawing content into the page margins'
   expect(save).toHaveBeenCalledWith('mixed.pdf');
   getContext.mockRestore();
   toDataURL.mockRestore();
+});
+
+describe('paged PDF', () => {
+  const stubPdf = () => {
+    const doc = {
+      addImage: jest.fn(),
+      addPage: jest.fn(),
+      save: jest.fn(),
+      setFontSize: jest.fn(),
+      setProperties: jest.fn(),
+      setTextColor: jest.fn(),
+      text: jest.fn(),
+      internal: { pageSize: { getWidth: () => 540, getHeight: () => 1040 } },
+    };
+    return { doc, JsPdf: jest.fn().mockImplementation(() => doc) };
+  };
+  const captured = (height: number) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 500;
+    canvas.height = height;
+    return canvas;
+  };
+  let mocks: Array<{ mockRestore: () => void }>;
+  beforeEach(() => {
+    mocks = [
+      jest
+        .spyOn(HTMLCanvasElement.prototype, 'getContext')
+        .mockReturnValue({ fillRect: jest.fn(), drawImage: jest.fn() } as unknown as CanvasRenderingContext2D),
+      jest.spyOn(HTMLCanvasElement.prototype, 'toDataURL').mockReturnValue('data:image/jpeg;base64,page'),
+    ];
+  });
+  afterEach(() => mocks.forEach((mock) => mock.mockRestore()));
+
+  it('names the exporter in the file and on every page, inside the margin', () => {
+    const { doc, JsPdf } = stubPdf();
+    const exporter = '0x9999999999999999999999999999999999999999';
+    saveCanvasAsPagedPdf({ canvas: captured(2500), filename: 'report.pdf', JsPdf, exporter, title: 'Results' });
+    expect(doc.setProperties).toHaveBeenCalledWith(
+      expect.objectContaining({ author: exporter, subject: expect.stringContaining(exporter), title: 'Results' }),
+    );
+    // 2,500 pixels at a page of 1,000 is three pages, each stamped.
+    expect(doc.addPage).toHaveBeenCalledTimes(2);
+    expect(doc.text).toHaveBeenCalledTimes(3);
+    doc.text.mock.calls.forEach(([text, x, y]) => {
+      expect(text).toBe(`Downloaded by ${exporter}`);
+      expect(x).toBe(20);
+      expect(y).toBeGreaterThan(1040 - 20);
+    });
+    expect(doc.save).toHaveBeenCalledWith('report.pdf');
+  });
+
+  it('adds no stamp without an exporter', () => {
+    const { doc, JsPdf } = stubPdf();
+    saveCanvasAsPagedPdf({ canvas: captured(100), filename: 'report.pdf', JsPdf });
+    expect(doc.text).not.toHaveBeenCalled();
+    expect(doc.setProperties).not.toHaveBeenCalled();
+  });
+
+  it('adds captures one below another and moves one that no longer fits to a new page', () => {
+    const { doc, JsPdf } = stubPdf();
+    const pdf = createPagedPdf({ JsPdf, exporter: '0xabc' });
+    [400, 400, 400].forEach((height) => pdf.addCanvas(captured(height)));
+    expect(doc.addPage).toHaveBeenCalledTimes(1);
+    expect(doc.text).toHaveBeenCalledTimes(2);
+    // Each capture sits below the last with a small gap; the third starts page two at the top margin.
+    expect(doc.addImage.mock.calls.map((call) => [call[3], call[5]])).toEqual([
+      [20, 400],
+      [426, 400],
+      [20, 400],
+    ]);
+  });
+
+  it('splits only a capture taller than a page, and loses none of it', () => {
+    const { doc, JsPdf } = stubPdf();
+    const pdf = createPagedPdf({ JsPdf });
+    pdf.addCanvas(captured(100));
+    pdf.addCanvas(captured(2300));
+    pdf.addCanvas(captured(100));
+    // The tall one starts on its own page: 1,000 + 1,000 + 300, then the last fits below it.
+    expect(doc.addPage).toHaveBeenCalledTimes(3);
+    expect(doc.addImage.mock.calls.map((call) => call[5])).toEqual([100, 1000, 1000, 300, 100]);
+    expect(doc.addImage.mock.calls.map((call) => call[3])).toEqual([20, 20, 20, 20, 326]);
+  });
 });
 
 it('normalizes modern theme colors on the capture clone for html2canvas', () => {
