@@ -612,7 +612,8 @@ Admin test panel:
   and each participant's answer, the Worker picks the current version first, then
   leaves it out if it is encrypted or readable by fewer people than the session's
   whole audience. An older public version never stands in for a newer restricted
-  one. Queued answers carry their own access rule for this check.
+  one. Queued answers carry their own access rule for this check. Restricted answers
+  are read to learn their question, so they count toward the scan limit.
 - Automatic generated-results work is durable background work only for
   Worker-canonical Cloudflare storage. The Worker counts authoritative submitted
   distinct participants since the last successful run, defaults to threshold
