@@ -184,9 +184,10 @@ export const buildSurveyResultsHtmlReportAnswersForExport = ({
   const questions = toRecord(networkQuestions);
   const parsePort = typeof parseResponse === 'function' ? parseResponse : defaultParseResponse;
   const questionIdPort = typeof getResponseQuestionId === 'function' ? getResponseQuestionId : defaultQuestionId;
-  const addAnswer = (stored: unknown, responder: unknown, fallbackQuestionId = '', surveyId?: unknown): void => {
+  const addAnswer = (stored: unknown, responder: unknown, listedUnder = '', surveyId?: unknown): void => {
     if (!isRecord(stored)) return;
-    const questionId = questionIdPort(stored) || fallbackQuestionId;
+    // As in the Results view, the question an answer is listed under outranks what its author's payload names.
+    const questionId = listedUnder || questionIdPort(stored);
     if (!questionId) return;
     const question = toRecord(questions[questionId.toLowerCase()] || questions[questionId]);
     if (String(question.prompt || '').trim() === '[encrypted]') return;
