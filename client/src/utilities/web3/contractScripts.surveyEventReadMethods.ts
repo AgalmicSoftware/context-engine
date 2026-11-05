@@ -56,6 +56,9 @@ type LatestResponder = {
 type SurveyResponseLookup = Record<string, Record<string, unknown>>;
 type QuestionResponseLookup = Record<string, Record<string, unknown>>;
 
+// RPC nodes behind a load balancer can lag the head they report, so unchanged pairs read a little below it.
+const UNCHANGED_READ_MARGIN_BLOCKS = 16;
+
 export const createContractScriptsSurveyEventReadMethods = (
   deps: ContractScriptsRuntimeDeps,
 ): ContractScriptsMethodMap => {
@@ -88,25 +91,27 @@ export const createContractScriptsSurveyEventReadMethods = (
         _resolvedCfg: cfg,
         contractKey: 'surveys',
       });
-      if (end >= head) return null;
-      const gAddrs = getSessionAddresses(cfg);
-      const provider = getSurveysReadProviderForSession(groupKeyOrCfg, cfg, gAddrs.surveys?.chainId);
-      const contract = new ethers.Contract(gAddrs.surveys?.address, SURVEYS, provider);
-      const logs = await fetchLogsSmartWithProvider(
-        provider,
-        contract.filters.ResponsesSubmitted(opts.responder || null, null, null),
-        end + 1,
-        head,
-      );
-      // Current pointers are safe only for pairs with no edits after the configured end.
+      if (end > head) return null;
+      // Only pairs with no edits in end+1..head hold the same pointer up to head.
       const laterPairs = new Set<string>();
-      for (const log of logs) {
-        const { args } = SURVEYS_INTERFACE.parseLog(log);
-        for (const id of [...(args.questionIds || []), args.surveyId]) {
-          if (id && id !== ethers.constants.HashZero) laterPairs.add(responsePairKey(args.responder, id));
+      if (end < head) {
+        const gAddrs = getSessionAddresses(cfg);
+        const provider = getSurveysReadProviderForSession(groupKeyOrCfg, cfg, gAddrs.surveys?.chainId);
+        const contract = new ethers.Contract(gAddrs.surveys?.address, SURVEYS, provider);
+        const logs = await fetchLogsSmartWithProvider(
+          provider,
+          contract.filters.ResponsesSubmitted(opts.responder || null, null, null),
+          end + 1,
+          head,
+        );
+        for (const log of logs) {
+          const { args } = SURVEYS_INTERFACE.parseLog(log);
+          for (const id of [...(args.questionIds || []), args.surveyId]) {
+            if (id && id !== ethers.constants.HashZero) laterPairs.add(responsePairKey(args.responder, id));
+          }
         }
       }
-      return { blockTag: end, laterPairs };
+      return { blockTag: end, laterPairs, unchangedBlockTag: Math.max(end, head - UNCHANGED_READ_MARGIN_BLOCKS) };
     },
 
     async fetchAllQuestionIDs(
