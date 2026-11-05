@@ -472,6 +472,77 @@ describe('createSessionQuestionCacheController', () => {
       await beta;
       expect(host.getStateSnapshot().isQuestionCacheReady).toBe(true);
     });
+
+    it('an earlier session failing after the newer load finished cannot overwrite it', async () => {
+      const host = createMockHost();
+      const controller = createSessionQuestionCacheController(host);
+      const alphaScan = createDeferred();
+      contractScripts.getRelevantBlockWindowForFilter
+        .mockResolvedValueOnce({ fromBlock: 10, toBlock: 12 })
+        .mockResolvedValueOnce({ fromBlock: 4, toBlock: 3 });
+      contractScripts.getAllQuestionIDsChunkedWithCallback.mockReturnValueOnce(alphaScan.promise);
+
+      const alpha = controller.initializeQuestionCacheForGroup('alpha');
+      await controller.initializeQuestionCacheForGroup('beta');
+      expect(host.getStateSnapshot().isQuestionCacheReady).toBe(true);
+
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      alphaScan.reject(new Error('fixture: read failed'));
+      await alpha;
+
+      expect(host.getStateSnapshot()).toMatchObject({
+        isQuestionCacheReady: true,
+        questionCacheInitializationError: false,
+      });
+    });
+
+    it('a skipped session is ready at once while an earlier load still runs', async () => {
+      const host = createMockHost({
+        scanScopeNoop: jest.fn((slug, _operation, onSkipped) => {
+          if (slug !== 'beta') return false;
+          onSkipped();
+          return true;
+        }),
+      });
+      const controller = createSessionQuestionCacheController(host);
+      const alphaWindow = createDeferred();
+      contractScripts.getRelevantBlockWindowForFilter.mockReturnValueOnce(alphaWindow.promise);
+
+      const alpha = controller.initializeQuestionCacheForGroup('alpha');
+      await controller.initializeQuestionCacheForGroup('beta');
+      expect(host.getStateSnapshot().isQuestionCacheReady).toBe(true);
+
+      alphaWindow.resolve({ fromBlock: 4, toBlock: 3 });
+      await alpha;
+    });
+
+    it('a queued rerun of the earlier session does not take readiness from the newer load', async () => {
+      // Earlier tests may leave a rerun timer that would use this test's mocks.
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      contractScripts.getRelevantBlockWindowForFilter.mockClear();
+      const host = createMockHost();
+      const controller = createSessionQuestionCacheController(host);
+      const [alphaWindow, betaWindow, rerunWindow] = [createDeferred(), createDeferred(), createDeferred()];
+      contractScripts.getRelevantBlockWindowForFilter
+        .mockReturnValueOnce(alphaWindow.promise)
+        .mockReturnValueOnce(betaWindow.promise)
+        .mockReturnValueOnce(rerunWindow.promise);
+
+      const alpha = controller.initializeQuestionCacheForGroup('alpha');
+      void controller.initializeQuestionCacheForGroup('alpha');
+      const beta = controller.initializeQuestionCacheForGroup('beta');
+      alphaWindow.resolve({ fromBlock: 4, toBlock: 3 });
+      await alpha;
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(contractScripts.getRelevantBlockWindowForFilter).toHaveBeenCalledTimes(3);
+
+      betaWindow.resolve({ fromBlock: 4, toBlock: 3 });
+      await beta;
+      expect(host.getStateSnapshot().isQuestionCacheReady).toBe(true);
+
+      rerunWindow.resolve({ fromBlock: 4, toBlock: 3 });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
   });
 
   describe('destroy', () => {

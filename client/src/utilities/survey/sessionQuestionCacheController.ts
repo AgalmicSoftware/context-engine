@@ -538,6 +538,7 @@ export const createSessionQuestionCacheController = (
       skipDiscoveryScan,
       forceDiscoveryRescan,
     };
+    if (!suppressUiState) readiness.claim(initRunKey);
     const ownsReadiness = (): boolean => !suppressUiState && isMounted() && readiness.allows(initRunKey);
     const setQuestionState = (nextState: SetStateArg, cb?: () => void): void => {
       if (ownsReadiness()) setState(nextState, cb);
@@ -553,7 +554,6 @@ export const createSessionQuestionCacheController = (
     ) {
       return;
     }
-    if (!suppressUiState) readiness.claim(initRunKey);
     _questionInitInFlight = _questionInitInFlight || {};
     _questionInitPending = _questionInitPending || {};
     if (_questionInitInFlight[workerTarget.runKey]) {
@@ -2115,7 +2115,6 @@ export const createSessionQuestionCacheController = (
             : null,
         );
       }
-      readiness.release(initRunKey);
       if (hasPendingRerun) {
         const pendingOpts = _questionInitPending[initRunKey];
         delete _questionInitPending[initRunKey];

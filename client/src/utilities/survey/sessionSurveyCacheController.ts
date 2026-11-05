@@ -385,6 +385,7 @@ export const createSessionSurveyCacheController = (host: SessionSurveyCacheHost)
       };
       const workerTarget = resolveWorkerMetadataHydrationTarget(host, slug);
       const initRunKey = workerTarget.runKey;
+      if (!suppressUiState) readiness.claim(initRunKey);
       const ownsReadiness = (): boolean => !suppressUiState && isMounted() && readiness.allows(initRunKey);
       const setSurveyState = (nextState: SetStateArg, cb?: () => void): void => {
         if (ownsReadiness()) setState(nextState, cb);
@@ -397,7 +398,6 @@ export const createSessionSurveyCacheController = (host: SessionSurveyCacheHost)
       ) {
         return Promise.resolve();
       }
-      if (!suppressUiState) readiness.claim(initRunKey);
       _surveyInitInFlight = _surveyInitInFlight || {};
       _surveyInitPending = _surveyInitPending || {};
       if (_surveyInitInFlight[initRunKey]) {
@@ -1170,7 +1170,6 @@ export const createSessionSurveyCacheController = (host: SessionSurveyCacheHost)
       })();
 
       const finalizeRun = (): void => {
-        readiness.release(initRunKey);
         delete _surveyInitInFlight[initRunKey];
         if (_surveyInitPending[initRunKey]) {
           const pendingOpts = _surveyInitPending[initRunKey];

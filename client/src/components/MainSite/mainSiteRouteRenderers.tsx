@@ -863,15 +863,16 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
     const pageRefreshQuestionResponses =
       isQuestionsListRoute && questionRouteSession.sessionSlugPinned
         ? (questionIds?: string[] | null, opts: RefreshQuestionResponsesOptions = {}) => {
+            // The page's own session starts last, so its load holds readiness.
+            const generalSource = shouldRefreshBuiltInDemoQuestionSources
+              ? host.refreshQuestionResponses(questionIds, { ...(opts || {}), slug: '' })
+              : null;
             const primary = host.refreshQuestionResponses(questionIds, {
               ...(opts || {}),
               slug: effectivePageSlug ?? undefined,
             });
             if (!shouldRefreshBuiltInDemoQuestionSources) return primary;
-            return Promise.all([
-              Promise.resolve(primary),
-              Promise.resolve(host.refreshQuestionResponses(questionIds, { ...(opts || {}), slug: '' })),
-            ]).then(() => undefined);
+            return Promise.all([Promise.resolve(primary), Promise.resolve(generalSource)]).then(() => undefined);
           }
         : host.refreshQuestionResponses;
     const pageRefreshSbtData =

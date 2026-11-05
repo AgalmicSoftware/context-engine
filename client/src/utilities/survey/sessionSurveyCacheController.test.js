@@ -327,6 +327,75 @@ describe('createSessionSurveyCacheController', () => {
       expect(host.getStateSnapshot().isSurveyCacheReady).toBe(true);
     });
 
+    it('an earlier session failing after the newer load finished cannot overwrite it', async () => {
+      const host = createMockHost();
+      const controller = createSessionSurveyCacheController(host);
+      const alphaFetch = createDeferred();
+      contractScripts.getRelevantBlockWindowForFilter
+        .mockResolvedValueOnce({ fromBlock: 10, toBlock: 12 })
+        .mockResolvedValueOnce({ fromBlock: 2, toBlock: 1 });
+      contractScripts.fetchUserSubmittedSurveyIDs.mockReturnValueOnce(alphaFetch.promise);
+
+      const alpha = controller.initializeSurveyCacheForGroup('alpha');
+      await controller.initializeSurveyCacheForGroup('beta');
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      alphaFetch.reject(new Error('fixture: read failed'));
+      await alpha;
+
+      expect(host.getStateSnapshot()).toMatchObject({
+        isSurveyCacheReady: true,
+        surveyCacheInitializationError: false,
+      });
+    });
+
+    it('a skipped session is ready at once while an earlier load still runs', async () => {
+      const host = createMockHost({
+        scanScopeNoop: jest.fn((slug, _operation, onSkipped) => {
+          if (slug !== 'beta') return false;
+          onSkipped();
+          return true;
+        }),
+      });
+      const controller = createSessionSurveyCacheController(host);
+      const alphaWindow = createDeferred();
+      contractScripts.getRelevantBlockWindowForFilter.mockReturnValueOnce(alphaWindow.promise);
+
+      const alpha = controller.initializeSurveyCacheForGroup('alpha');
+      await controller.initializeSurveyCacheForGroup('beta');
+      expect(host.getStateSnapshot().isSurveyCacheReady).toBe(true);
+
+      alphaWindow.resolve({ fromBlock: 2, toBlock: 1 });
+      await alpha;
+    });
+
+    it('a queued rerun of the earlier session does not take readiness from the newer load', async () => {
+      // Earlier tests may leave a rerun timer that would use this test's mocks.
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      contractScripts.getRelevantBlockWindowForFilter.mockClear();
+      const host = createMockHost();
+      const controller = createSessionSurveyCacheController(host);
+      const [alphaWindow, betaWindow, rerunWindow] = [createDeferred(), createDeferred(), createDeferred()];
+      contractScripts.getRelevantBlockWindowForFilter
+        .mockReturnValueOnce(alphaWindow.promise)
+        .mockReturnValueOnce(betaWindow.promise)
+        .mockReturnValueOnce(rerunWindow.promise);
+
+      const alpha = controller.initializeSurveyCacheForGroup('alpha');
+      void controller.initializeSurveyCacheForGroup('alpha');
+      const beta = controller.initializeSurveyCacheForGroup('beta');
+      alphaWindow.resolve({ fromBlock: 2, toBlock: 1 });
+      await alpha;
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(contractScripts.getRelevantBlockWindowForFilter).toHaveBeenCalledTimes(3);
+
+      betaWindow.resolve({ fromBlock: 2, toBlock: 1 });
+      await beta;
+      expect(host.getStateSnapshot().isSurveyCacheReady).toBe(true);
+
+      rerunWindow.resolve({ fromBlock: 2, toBlock: 1 });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
     it('clears pending retry timers without throwing', async () => {
       jest.useFakeTimers();
       const clearTimeoutSpy = jest.spyOn(global, 'clearTimeout');
