@@ -95,9 +95,13 @@ export async function loadWorkerCloudflareQuestions({
   });
   const listedVersions = items.filter((item) => item?.hidden !== true).map(versionOf);
   const currentRefs = new Set(selectCanonicalStorageVersions(listedVersions).map((version) => version.storageRefId));
+  // Hidden questions are skipped before reading, so one whose object is lost cannot
+  // make the list read as incomplete. Rows with no resourceId are filtered after.
+  const blocked = new Set(blockedQuestionIds(env.AGENT_CONTEXT?.config));
   const currentItems = items.filter((item) => {
     const version = versionOf(item);
-    return item?.hidden !== true && (!version.resourceId || currentRefs.has(version.storageRefId));
+    return item?.hidden !== true && !blocked.has(version.resourceId.toLowerCase()) &&
+      (!version.resourceId || currentRefs.has(version.storageRefId));
   });
   const selectedItems = selectWorkerCloudflareQuestionItems(currentItems, {
     questionLimit,
