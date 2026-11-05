@@ -710,7 +710,7 @@ describe('createSessionResponseHydrationController', () => {
       expect(host.getStateSnapshot().isResponsesCacheReady).toBe(true);
     });
 
-    it('a newer load that fails does not leave the page waiting on it', async () => {
+    it('an earlier session finishing after the newer load failed does not mark it ready', async () => {
       const host = createMockHost();
       const controller = createSessionResponseHydrationController(host);
       const [alphaWindow, betaWindow] = [createDeferred(), createDeferred()];
@@ -725,7 +725,39 @@ describe('createSessionResponseHydrationController', () => {
       alphaWindow.resolve({ fromBlock: 12, toBlock: 11 });
       await alpha;
 
+      expect(host.getStateSnapshot().isResponsesCacheReady).toBe(false);
+      expect(host.checkAllCachesReady).not.toHaveBeenCalled();
+    });
+
+    it('an earlier Worker load ending partial after the newer one finished leaves it ready', async () => {
+      const alphaLoad = createDeferred();
+      const loadWorkerResponses = jest.fn(({ sessionSlug, onPartial }) => {
+        if (sessionSlug === 'beta') return Promise.resolve([]);
+        return alphaLoad.promise.then(() => {
+          onPartial();
+          return [];
+        });
+      });
+      const host = createMockHost({
+        chainId: null,
+        getSessionCfg: jest.fn((slug) => createWorkerCanonicalSessionConfig({ slug })),
+        scanScopeNoop: jest.fn(() => true),
+        loadWorkerResponses,
+      });
+      const controller = createSessionResponseHydrationController(host);
+
+      const alpha = controller.fetchQuestionResponsesChunkedForGroup('alpha');
+      await controller.fetchQuestionResponsesChunkedForGroup('beta');
       expect(host.getStateSnapshot().isResponsesCacheReady).toBe(true);
+
+      alphaLoad.resolve();
+      await alpha;
+
+      expect(host.getStateSnapshot().isResponsesCacheReady).toBe(true);
+      // Its answers are cached, so anything reading that session still hears about them.
+      expect(host.queueLocalRevisionUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({ needsQuestionResponsesNonce: true }),
+      );
     });
 
     it('a queued rerun of the earlier session does not take readiness from the newer load', async () => {

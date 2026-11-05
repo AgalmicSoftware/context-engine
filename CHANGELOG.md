@@ -86,7 +86,7 @@ All notable changes to this project will be documented in this file.
 - The Results report ignores ratings that are off the question's step grid.
 - Interview drafts snap ratings to the question's step.
 - Answer commitments in encrypted envelopes bind the exact answer: rating hashes keep the value on any scale, and Poseidon commitments include each value's length. Existing envelopes still decrypt; only new commitments change.
-- An earlier session's questions, surveys or answers finishing late no longer mark the session you switched to as loaded while its own are still on the way.
+- An earlier session's questions, surveys or answers finishing late no longer change whether the session you switched to counts as loaded, whether they succeed or fail.
 - Adding a template's questions to a session removes only what was uploaded. A question edited or added while the upload ran stays in the draft.
 - A rating with the same wording but a different scale, step or end labels is no longer reported as already published when another author owns its ID. The upload is refused instead, because the two still share an ID.
 

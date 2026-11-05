@@ -636,7 +636,11 @@ export const createSessionResponseHydrationController = (
       try {
         return await run;
       } finally {
-        readiness.release(initRunKey);
+        // A superseded load publishes no readiness, but its answers are cached for
+        // whatever reads that session, such as the demo page's second source.
+        if (!suppressUiState && !readiness.allows(initRunKey)) {
+          queueLocalRevisionUpdate({ needsQuestionResponsesNonce: true });
+        }
         delete _responseInitInFlight[initRunKey];
         if (_responseInitPending[initRunKey]) {
           const pendingOpts = _responseInitPending[initRunKey];
@@ -726,7 +730,6 @@ export const createSessionResponseHydrationController = (
         notifyBackgroundCompletion();
       })
     ) {
-      readiness.release(initRunKey);
       return;
     }
 
