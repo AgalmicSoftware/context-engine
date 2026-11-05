@@ -312,7 +312,7 @@ test('worker-canonical source breaks equal-time ties by storage id, not list ord
   for (const id of ['ref-b', 'ref-a']) await putPayload({ kv, resource: 'responses', id, ...answer(id) });
   const source = await loadWorkerCanonicalResultsAnalysisSource({ env, slug: 'session-a', config });
   assert.deepEqual(source.snapshot.responses.map((row) => row.answer), ['from ref-b']);
-  // Queued rows are read before index rows; the same rule applies across both.
+  // Queued rows are read after index rows; the same rule applies across both.
   const queued = await loadWorkerCanonicalResultsAnalysisSource({
     env, slug: 'session-a', config, committedResponses: [answer('ref-c')],
   });
@@ -392,6 +392,25 @@ test('the automatic queue keeps an answer to its own access rule', async () => {
   assert.deepEqual(source.snapshot.responses.map((row) => row.answer), ['Shared with everyone']);
   assert.deepEqual(source.aiSnapshot.responses.map((row) => row.answer), ['Shared with everyone']);
   assert.equal(source.counts.excludedCount, 1);
+});
+
+test('the stored answer beats its shortened copy in the queue', async () => {
+  const kv = createKv();
+  const env = { CE_STORAGE_INDEX_KV: kv };
+  await putPayload({ kv, resource: 'questions', id: 'qm1',
+    payload: { sessionSlug: 'session-a', sessionId, questionId: 'q1', prompt: 'Thoughts?', type: 'freeform' } });
+  const metadata = { responder: `0x${'1'.repeat(40)}`, createdAt: '2026-09-17T00:00:00.000Z', ...publicAccess };
+  const payload = { sessionSlug: 'session-a', sessionId, questionId: 'q1', answer: 'long '.repeat(600) };
+  await putPayload({ kv, resource: 'responses', id: 'r1', metadata, payload });
+  const coordinator = new SessionWriteCoordinator({ storage: {} }, env);
+  const { committedResponses } = coordinator.sanitizeResultsAnalysisAutoJob({
+    slug: 'session-a',
+    requestId: 'auto-upload:r1',
+    committedResponses: [{ metadata: { id: 'r1', ...metadata }, payload }],
+  });
+  assert.equal(committedResponses[0].payload.answer.length, 2000);
+  const source = await loadWorkerCanonicalResultsAnalysisSource({ env, slug: 'session-a', config: publicConfig, committedResponses });
+  assert.equal(source.snapshot.responses[0].answer.length, 2999);
 });
 
 test('a job queued before rows carried their access rule leaves those rows to the storage scan', async () => {

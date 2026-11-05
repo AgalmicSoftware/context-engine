@@ -125,6 +125,7 @@ All notable changes to this project will be documented in this file.
 - Results analysis drops ratings off the question's step grid, agent-created rating questions keep their end labels, and the interview catalog and brief include each rating's step.
 - Results analysis respects each answer's own access rule. The automatic queue lost the rule, so an answer limited to admins could reach the AI and the published analysis. Sessions that ran automatic analysis with such answers should regenerate it.
 - Results analysis picks the current version of each question and answer before checking who may read it, so a newer restricted version no longer brings back the older public one.
+- Automatic Results analysis uses the stored answer rather than its shortened copy in the queue, once the stored one is listed.
 - A bootstrap upload applies the signed-origin check login uses, so an admin's signature made for another site is refused before its nonce is spent. It now needs a browser `Origin` header from a trusted origin.
 - An access rule gives the same answer in any order. A member or admin who qualifies through one condition is let in while another condition's group check is down, instead of getting a 503, and a failed condition in an all-of rule refuses with 403.
 
