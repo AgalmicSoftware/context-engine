@@ -749,6 +749,7 @@ const evaluateWorkerGroupCondition = async ({
   const groupIds = normalizeGroupIdList(condition.groupIds || condition.groups || condition.groupId);
   if (!groupIds.length) return { ok: false, reason: 'missing_worker_group', condition: { kind: 'worker_group' } };
   let firstFailure = null;
+  let unavailable = null;
   for (const groupId of groupIds) {
     const result = await checkWorkerGroupMembership({
       env,
@@ -759,7 +760,11 @@ const evaluateWorkerGroupCondition = async ({
       authScopes,
       deps,
     });
-    if (result.outcome === 'unavailable') return result;
+    // Another group can still admit, so an outage decides only at the end.
+    if (result.outcome === 'unavailable') {
+      unavailable ||= result;
+      continue;
+    }
     if (result?.ok) {
       return {
         ok: true,
@@ -772,6 +777,7 @@ const evaluateWorkerGroupCondition = async ({
     }
     if (!firstFailure) firstFailure = result;
   }
+  if (unavailable) return unavailable;
   return {
     ok: false,
     reason: firstFailure?.reason || 'worker_group_membership_denied',
@@ -827,6 +833,7 @@ const evaluateAccessConditionDocument = async ({
   const match = document.match === 'all' ? 'all' : 'any';
   const matched = [];
   let firstFailure = null;
+  let unavailable = null;
   for (const condition of conditions) {
     const result = await evaluateAccessCondition({
       condition,
@@ -837,7 +844,12 @@ const evaluateAccessConditionDocument = async ({
       authScopes,
       deps,
     });
-    if (result.outcome === 'unavailable') return result;
+    // A later grant decides ANY and a later denial decides ALL, so an outage
+    // is the answer only when neither comes, whatever the order.
+    if (result.outcome === 'unavailable') {
+      unavailable ||= result;
+      continue;
+    }
     if (result.ok) {
       matched.push(result.matchedCondition || { kind: trim(condition.kind).toLowerCase() });
       if (match === 'any') {
@@ -848,6 +860,7 @@ const evaluateAccessConditionDocument = async ({
       if (match === 'all') break;
     }
   }
+  if (unavailable && !(match === 'all' && firstFailure)) return unavailable;
   if (match === 'all' && matched.length === conditions.length) {
     return { ok: true, conditionMatched: { source, match, conditions: matched } };
   }
@@ -884,6 +897,7 @@ const authorizeWorkerGroupAccess = async ({
     };
   }
   let firstFailure = null;
+  let unavailable = null;
   for (const groupId of groupIds) {
     const result = await checkWorkerGroupMembership({
       env,
@@ -894,10 +908,10 @@ const authorizeWorkerGroupAccess = async ({
       authScopes,
       deps,
     });
-    if (result.outcome === 'unavailable') return {
-      ok: false, response: responseJson(deps, { error: 'Worker group membership is unavailable; retry.',
-        reason: result.reason, retryable: true }, 503, baseHeaders),
-    };
+    if (result.outcome === 'unavailable') {
+      unavailable ||= result;
+      continue;
+    }
     if (result?.ok) {
       return {
         ok: true,
@@ -911,6 +925,10 @@ const authorizeWorkerGroupAccess = async ({
     }
     if (!firstFailure) firstFailure = result;
   }
+  if (unavailable) return {
+    ok: false, response: responseJson(deps, { error: 'Worker group membership is unavailable; retry.',
+      reason: unavailable.reason, retryable: true }, 503, baseHeaders),
+  };
   return {
     ok: false,
     response: responseJson(deps, {
