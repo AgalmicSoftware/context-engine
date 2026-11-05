@@ -115,6 +115,8 @@ export class RecordingChunkQueue {
   questionDrafts: QuestionDrafts | null = null;
   ready: Promise<void>;
   private disposed = false;
+  // Device storage answered at least once, so this recording may be saved there.
+  private storageAnswered = false;
   private draftsWriteQueued = false;
   private writes: Promise<void> = Promise.resolve();
   private running: Promise<void> | null = null;
@@ -139,6 +141,7 @@ export class RecordingChunkQueue {
   private async restore() {
     try {
       const saved = await listRecordingChunks(this.options.scope);
+      this.storageAnswered = true;
       if (this.disposed) return;
       this.storageError = '';
       const kept = [...(memoryRecordings.get(this.options.scope)?.values() || [])];
@@ -325,6 +328,7 @@ export class RecordingChunkQueue {
       try {
         await (batch.length > 1 ? putRecordingChunks(batch) : putRecordingChunk(batch[0]));
         saved = true;
+        this.storageAnswered = true;
         for (const { segment } of batch) this.failedWrites.delete(segment.id);
         if (!this.failedWrites.size) this.storageError = '';
         else this.resaveFailed();
@@ -605,8 +609,11 @@ export class RecordingChunkQueue {
     try {
       await clearRecordingChunks(this.options.scope);
     } catch (error) {
-      // Without working device storage there is nothing saved to delete; otherwise a reload would bring it back.
-      if (!this.storageError) throw error;
+      // Storage that never answered holds nothing to delete. A later failed save doesn't show that: earlier chunks
+      // may be saved, and a reload would bring them back, so the recording stays and Clear can be tried again.
+      if (this.storageAnswered || !this.storageError) {
+        throw new Error(`This recording couldn't be deleted from this device. Try again. ${failureText(error)}`);
+      }
     }
     this.records.clear();
     holdInMemory(this.options.scope, null);

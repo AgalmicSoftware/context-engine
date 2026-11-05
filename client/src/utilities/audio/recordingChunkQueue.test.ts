@@ -491,6 +491,29 @@ it('clears a recording made without IndexedDB once its memory-only audio is expl
   expect(queue.storageError).toBe('');
 });
 
+it('keeps a discard retryable when saved audio could not be deleted, even after a later save failed', async () => {
+  const queue = create(async () => {
+    throw Object.assign(new Error('Undecodable audio'), { status: 400 });
+  }, 'partly-saved');
+  await queue.ready;
+  const first = queue.begin(false);
+  queue.capture(first, audio, true);
+  await queue.finish();
+  expect(saved.get(first)?.audio).toBe(audio);
+  jest.mocked(putRecordingChunk).mockRejectedValue(new Error('Quota exceeded'));
+  queue.capture(queue.begin(false), audio, true);
+  await queue.finish();
+  expect(queue.storageError).toContain("can't be recovered");
+  jest.mocked(clearRecordingChunks).mockRejectedValueOnce(new Error('Delete refused'));
+  await expect(queue.clear(true)).rejects.toThrow("couldn't be deleted");
+  expect(queue.records.size).toBe(2);
+  expect(saved.size).toBe(1);
+  expect(queue.storageError).not.toBe('');
+  await queue.clear(true);
+  expect(queue.records.size).toBe(0);
+  expect(saved.size).toBe(0);
+});
+
 it('clears a Failed chunk only once its audio is explicitly discarded', async () => {
   const queue = create(async () => {
     throw Object.assign(new Error('Undecodable audio'), { status: 400 });
