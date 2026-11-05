@@ -1,5 +1,5 @@
 import { readCurrentSessionConfig } from './sessionConfigAuthority.js';
-import { parseSiweMessage, validateSiweResources } from './siweMessageValidation.js';
+import { parseSiweMessage, validateBrowserLoginOrigin, validateSiweResources } from './siweMessageValidation.js';
 import { getRouteBaseHeaders } from './routeBaseHeaders.js';
 
 export const dispatchBootstrapArweaveUpload = async ({
@@ -85,11 +85,19 @@ export const dispatchBootstrapArweaveUpload = async ({
     };
   }
 
-  const resourcesCheck = validateSiweResources({
-    siwe: parseSiweMessage(body?.message), request, config, targetSlug,
-  });
+  const siwe = parseSiweMessage(body?.message);
+  const resourcesCheck = validateSiweResources({ siwe, request, config, targetSlug });
   if (!resourcesCheck.ok) {
     return { handled: true, response: deps?.json?.({ error: resourcesCheck.error }, 403, corsContext.headers) };
+  }
+  // Login's signed-origin rule, over the origins the nonce route allows for an
+  // admin action. Checked first: refusing here leaves the nonce unused.
+  const originCheck = validateBrowserLoginOrigin(
+    { request, siwe, env, config, allowTrustedAdminOrigins: true },
+    { resolveTrustedAdminOrigins: deps?.resolveTrustedAdminOrigins },
+  );
+  if (!originCheck.ok) {
+    return { handled: true, response: deps?.json?.({ error: originCheck.error }, 403, corsContext.headers) };
   }
 
   const adminCheck = await deps?.verifyAdminSignature?.({

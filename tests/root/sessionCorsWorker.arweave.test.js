@@ -80,6 +80,7 @@ const createWorkerEnv = ({ sessionSlug, config, secrets, tokenSecret = 'test-sec
   });
 };
 
+const BOOTSTRAP_ORIGIN = 'https://contextengine.sh';
 const createUploadJsonRequest = ({ headers = {}, body }) => new Request('https://worker.example/arweave/upload', {
   method: 'POST',
   headers: {
@@ -191,10 +192,12 @@ describe('sessionCorsWorker arweave upload routes', () => {
       env,
       wallet,
       sessionSlug,
+      loginOrigin: BOOTSTRAP_ORIGIN,
     });
 
     const response = await sessionCorsWorker.fetch(
       createUploadJsonRequest({
+        headers: { Origin: BOOTSTRAP_ORIGIN },
         body: {
           ...authBody,
           data: { prompt: 'bootstrap' },
@@ -220,10 +223,12 @@ describe('sessionCorsWorker arweave upload routes', () => {
       env,
       wallet,
       sessionSlug,
+      loginOrigin: BOOTSTRAP_ORIGIN,
     });
 
     const response = await sessionCorsWorker.fetch(
       createFieldMapMultipartRequest({
+        headers: { Origin: BOOTSTRAP_ORIGIN },
         fields: {
           address: authBody.address,
           message: authBody.message,
