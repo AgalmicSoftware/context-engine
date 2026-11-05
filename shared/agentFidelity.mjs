@@ -589,6 +589,24 @@ const isChoice = (pair) => pair.question.type === 'binary' || pair.question.type
 
 // For each answer, its mean similarity to every other person's answer to the
 // same question.
+// Thirds of the people by typicality, cut only where typicality changes: equally
+// typical people share a label, so record order cannot decide who gets which.
+// Two levels leave the middle empty. With one level, everyone is in the middle.
+const typicalityGroups = (points) => {
+  // Sums taken in another order differ in the last bits.
+  const level = (point) => Math.round(point.typicality * 1e9);
+  const sorted = [...points].sort((a, b) => level(a) - level(b));
+  const changes = sorted.flatMap((point, index) => (
+    index > 0 && level(point) !== level(sorted[index - 1]) ? [index] : []
+  ));
+  if (!changes.length) return [[], sorted, []];
+  const nearestChange = (target) => changes.reduce((best, change) => (
+    Math.abs(change - target) <= Math.abs(best - target) ? change : best
+  ));
+  const cuts = [0, nearestChange(Math.round(sorted.length / 3)), nearestChange(Math.round((2 * sorted.length) / 3)), sorted.length];
+  return [0, 1, 2].map((index) => sorted.slice(cuts[index], cuts[index + 1]));
+};
+
 const typicalityByParticipant = (questionMap, answersByQuestion) => {
   const scores = new Map();
   for (const [questionId, list] of answersByQuestion) {
@@ -942,13 +960,13 @@ export const scoreAgentFidelity = ({ questions = [], pairs = [], answers = [], g
     const xy = points.map((point) => ({ x: point.typicality, y: point[key] }));
     return { value: spearman(xy), interval: bootstrapInterval(xy, spearman, settings) };
   };
-  const sortedPoints = [...points].sort((a, b) => a.typicality - b.typicality);
+  const typicalityThirds = typicalityGroups(points);
+  const thirdsDiffer = !!(typicalityThirds[0].length && typicalityThirds[2].length);
   const terciles = ['most unusual', 'middle', 'most typical'].map((label, index) => {
-    const slice = sortedPoints.slice(
-      Math.round((index * sortedPoints.length) / 3),
-      Math.round(((index + 1) * sortedPoints.length) / 3),
-    );
-    if (slice.length < settings.minParticipants) return { tercile: label, participants: slice.length, suppressed: true };
+    const slice = typicalityThirds[index];
+    if (!thirdsDiffer || slice.length < settings.minParticipants) {
+      return { tercile: label, participants: slice.length, suppressed: true };
+    }
     return {
       tercile: label,
       participants: slice.length,
@@ -1135,7 +1153,7 @@ export const summarizeParticipantFidelity = ({ questions = [], pairs = [] } = {}
     meanConfidence: mean(choices.map((pair) => pair.confidence).filter(finite)),
     confidentMisses: choices
       .filter((pair) => !pair.match && pair.confidence !== null)
-      .sort((a, b) => b.confidence - a.confidence)
+      .sort((a, b) => b.confidence - a.confidence || (a.questionId < b.questionId ? -1 : 1))
       .slice(0, 3)
       .map(({ questionId, prediction, actual, confidence }) => ({ questionId, prediction, actual, confidence })),
   };
