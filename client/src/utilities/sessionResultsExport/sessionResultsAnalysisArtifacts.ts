@@ -4,6 +4,7 @@ import {
   validateQuadraticAllocation,
 } from '../../../../shared/questions/quadraticAllocation.mjs';
 import { buildResultsAnalysisPrompt } from '../../../../shared/resultsAnalysisPrompt.mjs';
+import { normalizeRatingScale, type RatingScale } from '../survey/ratingValue';
 
 export const SESSION_RESULTS_ANALYSIS_ARTIFACT_KIND = 'ce_session_results_analysis_artifact';
 export const SESSION_RESULTS_ANALYSIS_ARTIFACT_VERSION = 1;
@@ -49,6 +50,7 @@ export type SessionResultsAnalysisQuestionInput = {
   id: string;
   options?: string[];
   prompt: string;
+  scale?: RatingScale;
   tags?: string[];
   type?: string;
   voiceCredits?: number;
@@ -302,6 +304,11 @@ export const buildSessionResultsAnalysisInputSignature = (payload: SessionResult
   );
 };
 
+const normalizeAnalysisRatingScale = (question: SessionResultsAnalysisQuestionInput): RatingScale => {
+  const scale = normalizeRatingScale(question);
+  return { ...scale, minLabel: truncateAiText(scale.minLabel, 120), maxLabel: truncateAiText(scale.maxLabel, 120) };
+};
+
 export const buildSessionResultsAnalysisAiPayload = ({
   questions = [],
   responses = [],
@@ -359,6 +366,8 @@ export const buildSessionResultsAnalysisAiPayload = ({
         : [],
       type: normalizeAiText(question?.type),
       ...(question?.type === 'quadratic' ? { voiceCredits: getVoiceCredits(question) } : {}),
+      // A rating's number means nothing without its ends, so the AI sees them as the Worker's analysis does.
+      ...(question?.type === 'rating' ? { scale: normalizeAnalysisRatingScale(question) } : {}),
     }))
     .filter((question) => question.id);
   const includedQuestionsById = new Map(normalizedQuestions.map((question) => [questionKey(question.id), question]));

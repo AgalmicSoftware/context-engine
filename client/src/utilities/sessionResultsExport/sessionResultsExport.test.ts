@@ -588,6 +588,53 @@ describe('sessionResultsExport utilities', () => {
   });
 });
 
+describe('rating scales in reports and AI input', () => {
+  const scale = { min: 0, max: 10, step: 2, minLabel: 'Never', maxLabel: 'Always' };
+  const reversed = { ...scale, minLabel: 'Always', maxLabel: 'Never' };
+  const question = (questionScale: typeof scale) => ({
+    id: 'q1',
+    prompt: 'How often?',
+    type: 'rating',
+    scale: questionScale,
+    options: [],
+    tags: [],
+    responseCount: 1,
+  });
+  const payload = (questionScale: typeof scale) =>
+    buildSessionResultsAnalysisAiPayload({
+      questions: [question(questionScale)],
+      responses: [{ questionId: 'q1', answer: '8', participantAddress: 'participant-1' }],
+    }).aiPayload;
+
+  it('tells the AI what a rating question’s ends mean', () => {
+    expect(payload(scale).questions[0].scale).toEqual(scale);
+    expect(buildSessionResultsAnalysisPrompt(payload(scale))).toContain('Always');
+    expect(buildSessionResultsAnalysisInputSignature(payload(reversed))).not.toBe(
+      buildSessionResultsAnalysisInputSignature(payload(scale)),
+    );
+    expect(payload(scale).questions[0]).toEqual(expect.objectContaining({ type: 'rating' }));
+    const binary = buildSessionResultsAnalysisAiPayload({
+      questions: [{ id: 'q2', prompt: 'Agree?', type: 'binary' }],
+    }).aiPayload.questions[0];
+    expect(binary).not.toHaveProperty('scale');
+  });
+
+  it('shows a rating question’s scale in the report and its data', () => {
+    const snapshot = buildRedactedSessionResultsSnapshot({ sections: { report: { questions: [question(scale)] } } });
+    expect(snapshot.sections.report.questions[0].scale).toEqual(scale);
+    const html = renderSessionResultsHtmlReport(snapshot);
+    expect(html).toContain('0 (Never) to 10 (Always), step 2');
+    const plain = buildRedactedSessionResultsSnapshot({
+      sections: {
+        report: {
+          questions: [{ ...question({ ...scale, step: 1, minLabel: '0', maxLabel: '10' }), id: 'q2', prompt: 'Plain' }],
+        },
+      },
+    });
+    expect(renderSessionResultsHtmlReport(plain)).toContain('0 to 10');
+  });
+});
+
 describe('analysis request question limits', () => {
   const serializedInput = (
     questions: NonNullable<Parameters<typeof buildSessionResultsAnalysisAiPayload>[0]>['questions'],
