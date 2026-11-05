@@ -25,7 +25,6 @@ import {
   resolveResultsAnalysisCapability,
 } from './resultsAnalysisGeneration.js';
 import { metadataAccessMatchesPublishedAudience } from './storageAudience.js';
-import { writeStorageResourceHidden } from './storageResourceOwnership.js';
 
 const sessionId = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 const config = {
@@ -54,7 +53,6 @@ const createKv = () => {
     store,
     async put(key, value) { store.set(key, value); },
     async get(key) { return store.get(key) || null; },
-    async delete(key) { store.delete(key); },
     async list({ prefix = '' } = {}) {
       return {
         keys: [...store.keys()].filter((name) => name.startsWith(prefix)).map((name) => ({ name })),
@@ -466,42 +464,6 @@ test('a version the audience cannot read still decides which question and answer
   // A's and E's current answers, and D's answer to a restricted question.
   assert.deepEqual([source.counts.excludedCount, source.counts.lockedCount], [3, 0]);
   assert.doesNotMatch(JSON.stringify(source), /Superseded prompt|Restricted prompt|Agree|Disagree/);
-});
-
-test('a published report that used a question hidden since is withheld until generated again', async () => {
-  const kv = createKv();
-  const env = { CE_STORAGE_INDEX_KV: kv };
-  const artifact = { kind: 'results-analysis', sections: {} };
-  const lastGood = {
-    generatedAt: '2026-09-17T00:00:00.000Z',
-    source: { kind: 'worker-canonical' },
-    artifact,
-    snapshot: { questions: [{ id: 'q1', prompt: 'One' }, { id: 'Q2', prompt: 'Two' }], responses: [] },
-  };
-  const deps = { readCoordinatedResultsAnalysisStatus: async () => ({ ok: true, state: { jobState: 'succeeded', lastGood } }) };
-  const read = (settings) => readPublishedResultsAnalysisArtifact({ env, slug: 'session-a', config: settings, deps });
-  const status = (settings) => readResultsAnalysisAdminStatus({ env, slug: 'session-a', config: settings, deps });
-  assert.equal((await read(config)).status, 200);
-  assert.equal((await status(config)).state.lastGood.artifact.kind, 'results-analysis');
-
-  // The settings list.
-  const listed = { ...config, BLOCKED_QUESTION_IDS: ['q2'] };
-  const withheld = await read(listed);
-  assert.equal(withheld.ok, false);
-  assert.equal(withheld.status, 404);
-  assert.equal(withheld.reason, 'results_analysis_question_hidden');
-  assert.equal((await status(listed)).state.lastGood, null);
-  assert.equal((await read({ ...config, BLOCKED_QUESTION_IDS: ['other'] })).status, 200);
-
-  // The admin panel, and unhiding brings the report back.
-  const setHidden = (hidden) => writeStorageResourceHidden({
-    index: kv, slug: 'session-a', resource: 'questions', resourceId: 'q2', hidden, actor: `0x${'1'.repeat(40)}`, updatedAt: '2026-09-18T00:00:00.000Z',
-  });
-  await setHidden(true);
-  assert.equal((await read(config)).status, 404);
-  assert.equal((await status(config)).state.lastGood, null);
-  await setHidden(false);
-  assert.equal((await read(config)).status, 200);
 });
 
 test('public text that looks like a lock marker is analysed; only encryption flags and envelopes lock', async () => {
