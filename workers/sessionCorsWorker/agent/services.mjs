@@ -117,8 +117,13 @@ export const createAgentServices = ({ env, agentEnv, deps }) => {
         uploaderAddress: ctx.address, authScopes: ctx.scopes, expectedAuthority: expectedAuthority(), baseHeaders: {} });
     },
     async faucet() {
-      await current();
+      const { config } = await current();
       if (!ctx.scopes?.faucet || ctx.config.agentHttp?.sponsoredFaucetAllowed !== true) return { ok: false, skipped: true, reason: 'session_faucet_not_allowed' };
+      // The participant route's daily limit, counted together with it. A refusal doesn't stop the answer: the
+      // account may already hold enough to submit it.
+      if (!await deps.checkRateLimit({ env, slug: ctx.slug, address: ctx.address, route: 'faucet', limit: config.limits?.perWalletPerDay || 0 })) {
+        return { ok: false, reason: 'faucet_rate_limited', status: 429 };
+      }
       const secrets = await deps.getSessionSecrets(env, ctx.slug);
       // The same wallet turn as participant payouts, so neither signs the other's nonce.
       const takeWalletTurn = deps.withCoordinatedFaucetWalletTurn || withCoordinatedFaucetWalletTurn;
