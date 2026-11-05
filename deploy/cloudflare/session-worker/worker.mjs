@@ -76786,9 +76786,7 @@ var init_resultsAnalysisGeneration = __esm({
         env,
         slug: targetSlug,
         config,
-        // Rows queued before the queue kept access rules cannot vouch for their
-        // audience. The storage scan reads the real ones.
-        committedResponses: (Array.isArray(job.committedResponses) ? job.committedResponses : []).filter((entry2) => hasOwn6(entry2?.metadata, "accessConditions")),
+        committedResponses: Array.isArray(job.committedResponses) ? job.committedResponses : [],
         requestId: job.requestId,
         deps
       });
