@@ -90,7 +90,11 @@ export type SurveyResultsHtmlReportExporterMetadata = {
 export type SurveyResultsHtmlReportRuntime = {
   buildHtmlReportDemoAnalysisArtifact: () => SessionResultsGeneratedAnalysisArtifact;
   buildSessionResultsAnalysisPayloadForAi: () => SurveyResultsHtmlReportAnalysisPayloadForAi;
-  buildSessionResultsHtmlReportSnapshot: (exportedAt?: unknown) => SessionResultsHtmlSnapshot;
+  // Answers are read only for a download: the modal renders on every state change and shows none of them.
+  buildSessionResultsHtmlReportSnapshot: (
+    exportedAt?: unknown,
+    options?: { withAnswers?: boolean },
+  ) => SessionResultsHtmlSnapshot;
   getHtmlReportAnalysisArtifact: () => SessionResultsGeneratedAnalysisArtifact | null;
   getHtmlReportAnalysisSectionsToGenerate: (
     sections?: Required<SessionResultsSectionSelection>,
@@ -369,14 +373,17 @@ export const createSurveyResultsHtmlReportRuntime = ({
     };
   };
 
-  const buildSessionResultsHtmlReportSnapshot = (exportedAt: unknown = nowIso()): SessionResultsHtmlSnapshot => {
+  const buildSessionResultsHtmlReportSnapshot = (
+    exportedAt: unknown = nowIso(),
+    { withAnswers = false }: { withAnswers?: boolean } = {},
+  ): SessionResultsHtmlSnapshot => {
     const state = getState();
     const props = getProps();
     const sessionSlug = getEffectiveSlug() || '';
     const sessionName = String(props.sessionName || state.surveyTitle || sessionSlug || 'Session').trim();
     return buildSurveyResultsHtmlReportSnapshot({
       analysisArtifact: getHtmlReportAnalysisArtifact(),
-      answers: getHtmlReportAnswersForExport(),
+      answers: withAnswers ? getHtmlReportAnswersForExport() : [],
       chainId: getHtmlReportChainId(),
       countsByQuestion: getHtmlReportResponseCountsByQuestion(),
       exportedAt,

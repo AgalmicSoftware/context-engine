@@ -125,7 +125,7 @@ describe('surveyResultsHtmlReportRuntime', () => {
 
     it('puts decrypted questions, answers and responders in the report, stamped with the exporter', () => {
       const { runtime } = gatedRuntime();
-      const snapshot = runtime.buildSessionResultsHtmlReportSnapshot();
+      const snapshot = runtime.buildSessionResultsHtmlReportSnapshot(undefined, { withAnswers: true });
       const html = renderSessionResultsHtmlReport(snapshot);
 
       expect(html).toContain('Runtime question?');
@@ -161,9 +161,19 @@ describe('surveyResultsHtmlReportRuntime', () => {
         },
       });
 
-      expect(runtime.buildSessionResultsHtmlReportSnapshot().sections.report.answers).toEqual([
-        { answer: 'Agree', comment: '', questionId: 'q1', responder: lockedResponder },
-      ]);
+      expect(
+        runtime.buildSessionResultsHtmlReportSnapshot(undefined, { withAnswers: true }).sections.report.answers,
+      ).toEqual([{ answer: 'Agree', comment: '', questionId: 'q1', responder: lockedResponder }]);
+    });
+
+    it('reads answers only for a download, as the modal renders on every state change', () => {
+      const applyDecryptedOverride = jest.fn((response) => response);
+      const { runtime } = createRuntime({ applyDecryptedOverride });
+      expect(runtime.buildSessionResultsHtmlReportSnapshot().sections.report.answers).toEqual([]);
+      expect(applyDecryptedOverride).not.toHaveBeenCalled();
+      expect(
+        runtime.buildSessionResultsHtmlReportSnapshot(undefined, { withAnswers: true }).sections.report.answers,
+      ).toHaveLength(1);
     });
 
     it('still keeps author-encrypted questions and their answers out of the AI input', () => {
