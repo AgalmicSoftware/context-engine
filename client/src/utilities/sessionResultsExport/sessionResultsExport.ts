@@ -397,7 +397,7 @@ const renderQuestionRows = (questions: SessionResultsReportQuestion[]): string =
     return '<p>No report questions were captured in this snapshot.</p>';
   }
   return `
-      <table>
+      <table class="ce-report-questions">
         <thead>
           <tr>
             <th scope="col">Question</th>
@@ -741,7 +741,13 @@ export const renderSessionResultsHtmlReport = (
     .ce-export-watermark { position: fixed; right: 14px; bottom: 10px; z-index: 50; max-width: calc(100vw - 28px); box-sizing: border-box; overflow-wrap: anywhere; border: 1px solid #cbd5e1; border-radius: 12px; background: rgba(255, 255, 255, 0.92); color: #334155; padding: 6px 10px; font-size: 0.78rem; font-weight: 800; box-shadow: 0 10px 24px rgba(15, 23, 42, 0.14); }
     .ce-integrity-warning { border: 2px solid #f97316; background: #fff7ed; color: #7c2d12; padding: 14px 18px; font-weight: 800; }
     .ce-report-integrity-failed header, .ce-report-integrity-failed main { filter: grayscale(1) blur(1px); opacity: 0.55; pointer-events: none; }
-    body.ce-report-pdf { background: #ffffff; }
+    /* A capture stops at its block's edge, so nothing may be wider than the block: long text wraps in fixed columns. */
+    body.ce-report-pdf { background: #ffffff; overflow-wrap: anywhere; }
+    body.ce-report-pdf table { table-layout: fixed; }
+    body.ce-report-pdf .ce-report-questions th:nth-child(1) { width: 37%; }
+    body.ce-report-pdf .ce-report-questions th:nth-child(2) { width: 12%; }
+    body.ce-report-pdf .ce-report-questions th:nth-child(3) { width: 11%; }
+    body.ce-report-pdf .ce-report-questions th:nth-child(4) { width: 15%; }
     body.ce-report-pdf header { padding: 18px 24px; }
     body.ce-report-pdf main { max-width: none; padding: 16px 24px 52px; }
     /* A little letter spacing makes html2canvas place each letter itself; otherwise large system-font titles run together. */

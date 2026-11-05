@@ -211,6 +211,10 @@ describe('sessionResultsExport utilities', () => {
         expect(block.querySelectorAll('tbody tr')).toHaveLength(index === 2 ? 13 : 16);
       });
       expect(page.querySelectorAll('details:not([open])')).toHaveLength(0);
+      // A capture stops at its block's edge, so nothing may be wider than the block: long text wraps in fixed columns.
+      expect(page.querySelector('style')?.textContent).toContain('body.ce-report-pdf table { table-layout: fixed; }');
+      expect(page.querySelector('style')?.textContent).toMatch(/body\.ce-report-pdf \{[^}]*overflow-wrap: anywhere/);
+      expect(page.querySelector('main table.ce-report-questions')).not.toBeNull();
       // Scripts and the JSON copy add nothing to a capture of the page.
       expect(page.querySelectorAll('script')).toHaveLength(0);
     });
@@ -703,33 +707,93 @@ describe('sessionResultsExport utilities', () => {
       expect(document.querySelector('iframe[title="Context Engine PDF export"]')).toBeNull();
     });
 
-    it('captures a block too tall for one image in windows, losing none of it', async () => {
+    // The report lays out in its own iframe, so its sizes are set there before the capture starts.
+    const withLayout = (rects: Record<string, { top?: number; height: number }>, html2canvas: unknown) => async () => {
+      const frame = document.querySelector<HTMLIFrameElement>('iframe[title="Context Engine PDF export"]');
+      const frameWindow = frame?.contentWindow as unknown as { Element: typeof Element };
+      frameWindow.Element.prototype.getBoundingClientRect = function rectOf(this: Element) {
+        const { top = 0, height = 100 } = rects[this.id] || {};
+        return { top, height, bottom: top + height } as DOMRect;
+      };
+      return { default: html2canvas };
+    };
+    const rowsHtml = `<!doctype html><html><body><main><section id="one"><table>
+      <tr id="r1"></tr><tr id="r2"></tr><tr id="r3"></tr></table></section></main></body></html>`;
+
+    it('captures a block too tall for one image in windows that end on a row, losing none of it', async () => {
       const { doc, loader } = stubPdf();
       const { html2canvas } = capturing({});
       await downloadSessionResultsPdfReport({
         exporterAddress,
         filename: 'report.pdf',
-        html,
-        html2canvasLoader: async () => {
-          // The report lays out in its own iframe, which this test gives a tall first block.
-          const frame = document.querySelector<HTMLIFrameElement>('iframe[title="Context Engine PDF export"]');
-          const frameWindow = frame?.contentWindow as unknown as { Element: typeof Element };
-          frameWindow.Element.prototype.getBoundingClientRect = function rectOf(this: Element) {
-            return { height: this.id === 'one' ? 25000 : 100 } as DOMRect;
-          };
-          return { default: html2canvas };
-        },
+        html: rowsHtml,
+        html2canvasLoader: withLayout(
+          {
+            one: { height: 8000 },
+            r1: { top: 0, height: 3400 },
+            r2: { top: 3400, height: 200 },
+            r3: { top: 3600, height: 4400 },
+          },
+          html2canvas,
+        ),
         jsPdfLoader: loader,
       });
-      const windows = html2canvas.mock.calls
-        .filter(([element]) => (element as HTMLElement).id === 'one')
-        .map(([, options]) => options);
-      expect(windows.map((options) => [options?.y, options?.height])).toEqual([
-        [0, 12000],
-        [12000, 12000],
-        [24000, 1000],
-      ]);
+      const windows = html2canvas.mock.calls.map(([, options]) => [options?.y, options?.height]);
+      // The second row would straddle 3,500, so the first window stops before it. No window is big enough
+      // to exceed the 16.7 million pixels a phone's canvas holds, even at the capture's double scale.
+      expect(windows[0]).toEqual([0, 3400]);
+      expect(windows.at(-1)?.[0]).toBeLessThan(8000);
+      expect(windows.reduce((sum, [, height]) => sum + Number(height), 0)).toBe(8000);
+      windows.forEach(([, height]) => expect(Number(height) * 2 * 2148).toBeLessThanOrEqual(16777216));
       expect(doc.save).toHaveBeenCalledWith('report.pdf');
+    });
+
+    it('keeps windows full when rows sit at fractional positions', async () => {
+      const { loader } = stubPdf();
+      const { html2canvas } = capturing({});
+      const count = 40;
+      const rowHeight = 277.6;
+      const rects: Record<string, { top?: number; height: number }> = { one: { height: count * rowHeight } };
+      const rows = Array.from({ length: count }, (_, index) => {
+        rects[`row-${index}`] = { top: index * rowHeight, height: rowHeight };
+        return `<tr id="row-${index}"></tr>`;
+      });
+      await downloadSessionResultsPdfReport({
+        filename: 'report.pdf',
+        html: `<!doctype html><html><body><main><section id="one"><table>${rows.join('')}</table></section></main></body></html>`,
+        html2canvasLoader: withLayout(rects, html2canvas),
+        jsPdfLoader: loader,
+      });
+      // Rows that seem to overlap by a rounding pixel would back each window up to a sliver.
+      const heights = html2canvas.mock.calls.map(([, options]) => Number(options?.height));
+      expect(heights).toHaveLength(4);
+      heights.slice(0, -1).forEach((height) => expect(height).toBeGreaterThan(3000));
+    });
+
+    it('breaks pages between rows when a block is taller than a page', async () => {
+      const { doc, loader } = stubPdf();
+      const html2canvas = jest.fn(async (element: HTMLElement) => {
+        const canvas = element.ownerDocument.createElement('canvas');
+        canvas.width = 500;
+        canvas.height = 2400;
+        return canvas;
+      });
+      await downloadSessionResultsPdfReport({
+        filename: 'report.pdf',
+        html: rowsHtml,
+        html2canvasLoader: withLayout(
+          {
+            one: { height: 1200 },
+            r1: { top: 0, height: 475 },
+            r2: { top: 475, height: 475 },
+            r3: { top: 950, height: 250 },
+          },
+          html2canvas,
+        ),
+        jsPdfLoader: loader,
+      });
+      // 1,000 pixels fit a page: each page ends where a row does, not at 1,000 and 2,000.
+      expect(doc.addImage.mock.calls.map((call) => call[5])).toEqual([950, 950, 500]);
     });
   });
 });
