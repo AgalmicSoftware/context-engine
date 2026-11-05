@@ -1,5 +1,6 @@
 import { ethers } from 'ethers';
 import { canonicalizeSessionSlug as normalizeSessionSlug } from '../session/sessionSlug.js';
+import { createCacheReadinessOwner } from './cacheReadinessOwner';
 import contractScripts from '../web3/chainGateway.js';
 import { cryptoUtils } from '../crypto/cryptography.js';
 import { createLogger } from 'utilities/logging.js';
@@ -507,10 +508,7 @@ export const createSessionResponseHydrationController = (
   let _responseInitPending: Record<string, ResponseInitOptions | undefined> = {};
   const completedWorkerRuns = new Set<string>();
   let _destroyed: boolean = false;
-  // The newest foreground load owns the visible readiness. An earlier load keeps
-  // filling its own cache, but marking the newer one ready would let the page act
-  // before that session's answers have arrived.
-  let _readinessOwner: string | null = null;
+  const readiness = createCacheReadinessOwner();
   let _continuationTimers: ReturnType<typeof setTimeout>[] = [];
 
   const setState = (updater: SetStateArg, cb?: () => void): void => {
@@ -609,8 +607,8 @@ export const createSessionResponseHydrationController = (
     const sessionConfig = getSessionCfg(slug);
     const workerRun = resolveWorkerResponseHydrationRun({ sessionConfig, sessionSlug: slug, reader: getAccount() });
     const initRunKey = workerRun?.key || slug;
-    if (!suppressUiState) _readinessOwner = initRunKey;
-    const ownsReadiness = (): boolean => !suppressUiState && isMounted() && _readinessOwner === initRunKey;
+    if (!suppressUiState) readiness.claim(initRunKey);
+    const ownsReadiness = (): boolean => !suppressUiState && isMounted() && readiness.allows(initRunKey);
     const rerunOpts: ResponseInitOptions = {
       ...(opts && typeof opts === 'object' ? opts : {}),
       background: suppressUiState,
@@ -638,6 +636,7 @@ export const createSessionResponseHydrationController = (
       try {
         return await run;
       } finally {
+        readiness.release(initRunKey);
         delete _responseInitInFlight[initRunKey];
         if (_responseInitPending[initRunKey]) {
           const pendingOpts = _responseInitPending[initRunKey];
@@ -646,7 +645,7 @@ export const createSessionResponseHydrationController = (
             if (_destroyed || !isMounted()) return;
             const queued = pendingOpts || rerunOpts;
             // A rerun must not take readiness back from a newer load.
-            const nextOpts = _readinessOwner === initRunKey ? queued : { ...queued, background: true };
+            const nextOpts = readiness.allows(initRunKey) ? queued : { ...queued, background: true };
             void fetchQuestionResponsesChunkedForGroup(slug, nextOpts).catch((error: unknown) => {
               mainSiteLog.warn(error);
             });
@@ -727,6 +726,7 @@ export const createSessionResponseHydrationController = (
         notifyBackgroundCompletion();
       })
     ) {
+      readiness.release(initRunKey);
       return;
     }
 
@@ -1694,7 +1694,7 @@ export const createSessionResponseHydrationController = (
         questionCount: normalizedQids.length,
       });
       // Refreshing another session's answers leaves the current load's readiness alone.
-      const ownsReadiness = (): boolean => _readinessOwner === null || _readinessOwner === slug;
+      const ownsReadiness = (): boolean => readiness.allows(slug);
       if (ownsReadiness()) setState({ isResponsesCacheReady: false });
 
       const networkID = String(getSessionChainId(slug) || '');

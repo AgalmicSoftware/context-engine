@@ -453,6 +453,27 @@ describe('createSessionQuestionCacheController', () => {
     });
   });
 
+  describe('readiness ownership', () => {
+    it('an earlier session finishing late does not mark the newer load ready', async () => {
+      const host = createMockHost();
+      const controller = createSessionQuestionCacheController(host);
+      const [alphaWindow, betaWindow] = [createDeferred(), createDeferred()];
+      contractScripts.getRelevantBlockWindowForFilter
+        .mockReturnValueOnce(alphaWindow.promise)
+        .mockReturnValueOnce(betaWindow.promise);
+
+      const alpha = controller.initializeQuestionCacheForGroup('alpha');
+      const beta = controller.initializeQuestionCacheForGroup('beta');
+      alphaWindow.resolve({ fromBlock: 4, toBlock: 3 });
+      await alpha;
+      expect(host.getStateSnapshot().isQuestionCacheReady).toBe(false);
+
+      betaWindow.resolve({ fromBlock: 4, toBlock: 3 });
+      await beta;
+      expect(host.getStateSnapshot().isQuestionCacheReady).toBe(true);
+    });
+  });
+
   describe('destroy', () => {
     it('clears timers and prevents queued continuation runs', async () => {
       jest.useFakeTimers();
