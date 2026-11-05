@@ -162,7 +162,14 @@ describe('report answers', () => {
   it('reads individual survey responses in that view', () => {
     expect(
       buildSurveyResultsHtmlReportAnswersForExport({
-        filteredResponses: [{ responder, response: { responses: [{ questionID: 'q1', answer: { value: 'Agree' } }] } }],
+        applyDecryptedOverride: (response, _responder, _questionId, surveyId) => {
+          // The Results view looks up what was decrypted under the row's own survey.
+          expect(surveyId).toBe('s1');
+          return response;
+        },
+        filteredResponses: [
+          { responder, surveyId: 's1', response: { responses: [{ questionID: 'q1', answer: { value: 'Agree' } }] } },
+        ],
         surveyViewMode: 'individuals',
         viewMode: 'survey',
       }),
