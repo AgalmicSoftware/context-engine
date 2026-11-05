@@ -1,0 +1,383 @@
+// Keep the light About treatment local: other themes own their control geometry.
+@container ce-theme style(--ce-layout-profile: minimal-app) {
+  // Outrank the generic theme button recipe without changing other controls.
+  :global(:root[data-ce-theme]) {
+    .aboutPageContainer {
+      --about-accent: var(--ce-data-series-2);
+      --about-edge: color-mix(in srgb, var(--about-accent) 32%, var(--ce-surface));
+      background: color-mix(in srgb, var(--about-accent) 3%, var(--ce-surface));
+    }
+
+    .pageShell {
+      gap: 20px;
+    }
+
+    .hero,
+    .useCaseDetail,
+    .collapsibleSection {
+      border-color: var(--about-edge);
+      border-radius: 12px;
+      background: var(--ce-surface);
+      box-shadow: 0 3px 12px color-mix(in srgb, var(--ce-panel-text) 4%, transparent);
+    }
+
+    .hero {
+      padding: 32px;
+    }
+
+    .titleRepoLink {
+      opacity: 1;
+      color: var(--ce-link);
+      border-color: var(--ce-border);
+      background: var(--ce-surface);
+      box-shadow: none;
+
+      &:hover,
+      &:focus-visible {
+        color: var(--ce-link);
+        border-color: var(--ce-link);
+        background: var(--ce-surface-sunken);
+        box-shadow: none;
+      }
+    }
+
+    .heroPrimaryButton {
+      min-height: 48px;
+      border-radius: 10px;
+      font-size: 1.05rem;
+      letter-spacing: 0;
+    }
+
+    .primaryButton {
+      color: var(--ce-text-inverse);
+      background: var(--about-accent);
+      border-color: var(--about-accent);
+      box-shadow: 0 4px 10px color-mix(in srgb, var(--about-accent) 22%, transparent);
+
+      &:hover,
+      &:focus {
+        color: var(--ce-text-inverse);
+        background: color-mix(in srgb, var(--about-accent) 90%, var(--ce-panel-text));
+        box-shadow: 0 5px 12px color-mix(in srgb, var(--about-accent) 26%, transparent);
+      }
+    }
+
+    .secondaryButton {
+      color: var(--about-accent);
+      background: var(--ce-surface);
+      border-color: var(--about-accent);
+      box-shadow: none;
+
+      &:hover,
+      &:focus-visible {
+        color: var(--about-accent);
+        background: color-mix(in srgb, var(--about-accent) 8%, var(--ce-surface));
+        border-color: var(--about-accent);
+        box-shadow: none;
+      }
+    }
+
+    .useCaseGrid {
+      gap: 14px;
+    }
+
+    .useCaseTileMint {
+      --usecase-tone: var(--ce-data-series-2);
+    }
+    .useCaseTileOrange {
+      --usecase-tone: color-mix(in srgb, var(--ce-status-error) 45%, var(--ce-status-warning));
+    }
+
+    .useCaseTile {
+      min-height: 104px;
+      padding: 16px 8px;
+      border: 1px solid color-mix(in srgb, var(--usecase-tone) 42%, var(--ce-surface));
+      border-radius: 16px;
+      background: linear-gradient(
+        145deg,
+        color-mix(in srgb, var(--usecase-tone) 16%, var(--ce-surface)),
+        color-mix(in srgb, var(--usecase-tone) 30%, var(--ce-surface))
+      );
+      box-shadow:
+        -3px -3px 8px var(--ce-surface),
+        3px 4px 8px color-mix(in srgb, var(--usecase-tone) 24%, transparent),
+        inset 0 1px 1px var(--ce-surface);
+
+      &:hover {
+        transform: translateY(-2px);
+        filter: none;
+        box-shadow:
+          -3px -3px 8px var(--ce-surface),
+          3px 6px 10px color-mix(in srgb, var(--usecase-tone) 30%, transparent),
+          inset 0 1px 1px var(--ce-surface);
+      }
+    }
+
+    .useCaseTileActive,
+    .useCaseTileActive:hover,
+    .useCaseTileActive:focus-visible {
+      transform: none;
+      border-color: var(--usecase-tone);
+      background: color-mix(in srgb, var(--usecase-tone) 23%, var(--ce-surface));
+      box-shadow:
+        inset 3px 3px 7px color-mix(in srgb, var(--usecase-tone) 38%, transparent),
+        inset -3px -3px 7px color-mix(in srgb, var(--ce-surface) 80%, transparent);
+    }
+
+    .useCaseTileContent {
+      flex-direction: column;
+      gap: 8px;
+    }
+    .useCaseLabel {
+      color: var(--ce-panel-text);
+      font-weight: 700;
+    }
+    .useCaseIcon {
+      color: color-mix(in srgb, var(--usecase-tone) 70%, var(--ce-panel-text));
+      font-size: 1.6rem;
+      filter: none;
+    }
+
+    .useCaseDetail {
+      padding: 22px 24px;
+    }
+    .useCaseDetailRow {
+      display: grid;
+      grid-template-columns: 220px minmax(0, 1fr);
+      align-items: start;
+      gap: 22px;
+      margin: 0;
+
+      + .useCaseDetailRow {
+        border-top: 1px solid var(--ce-border-light);
+        margin-top: 16px;
+        padding-top: 16px;
+      }
+    }
+
+    .useCaseDetailProblemTag,
+    .useCaseDetailSolutionTag {
+      min-width: 0;
+      border-radius: 6px;
+      padding: 10px 12px;
+      font-size: 0.85rem;
+      letter-spacing: 0;
+    }
+
+    .useCaseDetailProblemTag {
+      color: var(--ce-status-danger-text);
+      border-color: color-mix(in srgb, var(--ce-status-error) 30%, var(--ce-surface));
+      background: color-mix(in srgb, var(--ce-status-error) 9%, var(--ce-surface));
+    }
+
+    .useCaseDetailSolutionTag {
+      color: color-mix(in srgb, var(--about-accent) 75%, var(--ce-panel-text));
+      border-color: var(--about-edge);
+      background: color-mix(in srgb, var(--about-accent) 12%, var(--ce-surface));
+    }
+
+    .useCaseDetailRowText {
+      color: var(--ce-panel-text);
+      font-size: 1rem;
+      line-height: 1.55;
+    }
+    .collapsibleSection {
+      margin: 0;
+      padding: 18px 24px;
+    }
+    .sectionTitle {
+      color: var(--ce-panel-text);
+      font-size: 1.4rem;
+      line-height: 1.2;
+    }
+    .toggleIcon {
+      color: var(--ce-panel-text);
+      font-size: 1.2rem;
+    }
+    .relatedSummary {
+      max-width: none;
+      flex-wrap: nowrap;
+    }
+    .relatedPill {
+      background: var(--ce-surface-sunken);
+      font-size: 0.8rem;
+    }
+
+    .featureItem {
+      border-radius: 10px;
+      box-shadow: none;
+    }
+    .practiceGrid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .practiceCard {
+      padding: 16px;
+    }
+    .practiceCardHeading {
+      gap: 16px;
+    }
+    .practiceVisual,
+    .practicePartnerLogos,
+    .practiceWordmark {
+      width: 64px;
+      height: 64px;
+      box-sizing: border-box;
+      border: 1px solid var(--ce-border);
+      border-radius: 10px;
+      background: var(--ce-surface);
+
+      img {
+        object-fit: contain;
+        background: transparent;
+        padding: 6px;
+      }
+    }
+    .practicePartnerLogos {
+      padding: 5px;
+      img {
+        padding: 2px;
+      }
+    }
+    .practicePhoto img {
+      object-position: center;
+    }
+
+    .practiceSummary {
+      gap: 5px;
+      .practiceVisual {
+        width: 28px;
+        height: 28px;
+        border-radius: 6px;
+      }
+      img {
+        padding: 3px;
+      }
+      .practicePartnerLogos {
+        padding: 2px;
+        img {
+          padding: 1px;
+        }
+      }
+    }
+
+    .recognitionStrip {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+    }
+    .recognitionItem {
+      grid-template-columns: 48px minmax(0, 1fr);
+      padding: 0;
+      border: 0;
+      border-radius: 8px;
+      background: transparent;
+      box-shadow: none;
+      &:hover,
+      &:focus-visible {
+        background: var(--ce-surface-sunken);
+        box-shadow: none;
+        transform: none;
+      }
+    }
+    .recognitionLogo,
+    .recognitionLogoFallback {
+      width: 48px;
+      height: 48px;
+      box-sizing: border-box;
+      border: 1px solid var(--ce-border);
+      border-radius: 10px;
+      padding: 6px;
+      background: var(--ce-surface);
+      object-fit: contain;
+    }
+
+    .recognitionName {
+      white-space: normal;
+      overflow-wrap: anywhere;
+      font-size: 0.9rem;
+      line-height: 1.3;
+    }
+
+    // The original RadicalxChange artwork is white; retain it on a dark backing.
+    .recognitionLogoRxc,
+    .practiceSummary .recognitionLogoRxc {
+      background: var(--ce-panel-text-muted);
+    }
+
+    .useCaseTile:focus-visible,
+    .ctaButton:focus-visible,
+    .titleRepoLink:focus-visible,
+    .toggleHeader:focus-visible,
+    .recognitionItem:focus-visible {
+      outline: 3px solid var(--ce-focus-ring);
+      outline-offset: 4px;
+    }
+
+    @media (max-width: 899px) {
+      .practiceGrid {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
+
+    @media (max-width: 640px) {
+      .hero {
+        padding: 18px;
+      }
+      .collapsibleSection {
+        padding: 16px 14px;
+      }
+      .sectionTitle {
+        font-size: 1.1rem;
+      }
+      .useCaseGrid {
+        gap: 10px;
+      }
+      .useCaseTile {
+        min-height: 84px;
+        padding: 12px 8px;
+      }
+      .useCaseIcon {
+        font-size: 1.3rem;
+      }
+      .useCaseLabel {
+        font-size: 0.9rem;
+      }
+      .useCaseDetail {
+        padding: 18px;
+      }
+      .useCaseDetailRow {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 10px;
+      }
+      .useCaseDetailProblemTag,
+      .useCaseDetailSolutionTag {
+        width: fit-content;
+      }
+      .relatedSummary {
+        min-width: 0;
+        flex-wrap: wrap;
+        gap: 4px;
+      }
+      .relatedPill {
+        padding: 3px 6px;
+        font-size: 0.7rem;
+      }
+      .practiceSummary {
+        gap: 3px;
+        .practiceVisual {
+          width: 24px;
+          height: 24px;
+        }
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .useCaseTile {
+        transition: none;
+      }
+      .useCaseDetail {
+        animation: none;
+      }
+    }
+  }
+}

@@ -1,6 +1,7 @@
 // Run against local Vite with demo surfaces enabled. Synthetic registry/Worker
 // reads and checked-in demo data stay local; this smoke never submits.
 import assert from 'node:assert/strict';
+import { inspectAboutControls } from './about-page-smoke.mjs';
 import { inspectSessionSelectorLayout } from './session-selector-layout-smoke.mjs';
 import { assertReadable, auditPanelContrast, clickQuestionAction, inspectCivicOverlays } from './civic-theme-overlay-smoke.mjs';
 import { inspectCivicExplorerContent } from './civic-theme-explorer-smoke.mjs';
@@ -69,6 +70,7 @@ export async function inspectCivicAbout(page) {
     return element.getBoundingClientRect().top - container.getBoundingClientRect().top;
   });
   assert(topPadding >= 16, 'The About hero has space above it below the navbar');
+  await inspectAboutControls(page);
   await assertReadable(page.locator('body'));
   for (const name of ['Related Work', 'Recognition', 'Roadmap', 'Functionality']) {
     const section = page.getByRole('button', { name, exact: true });

@@ -563,7 +563,12 @@ const AboutPage = () => {
                     {RECOGNITION_GROUPS.map((group) => (
                       <span className={styles.practiceVisual} key={group.name}>
                         {group.logo ? (
-                          <img src={group.logo} alt="" loading="lazy" />
+                          <img
+                            src={group.logo}
+                            alt=""
+                            loading="lazy"
+                            className={group.logoClassName ? styles[group.logoClassName] : undefined}
+                          />
                         ) : (
                           getRecognitionFallback(group.name)
                         )}
@@ -581,7 +586,7 @@ const AboutPage = () => {
                 <h3 className={styles.recognitionSubheading} id="ce-about-used-by-heading">
                   Recognized &amp; Used By
                 </h3>
-                <ul className={styles.featureList}>
+                <ul className={`${styles.featureList} ${styles.practiceGrid}`}>
                   {PRACTICE_ENTRIES.map((entry) => (
                     <li className={`${styles.featureItem} ${styles.practiceCard}`} key={entry.id}>
                       <div className={styles.practiceCardHeading}>
