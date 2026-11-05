@@ -75589,7 +75589,7 @@ var init_storageAudience = __esm({
       };
     };
     metadataAccessMatchesPublishedAudience = (metadata = {}, config = {}) => {
-      if (!isObj18(metadata?.payloadAccessControl) && !trim14(metadata?.payloadAccessMode)) return true;
+      if (!isObj18(metadata?.payloadAccessControl) && !trim14(metadata?.payloadAccessMode) && !metadata?.accessConditions) return true;
       const expectedValue = resolveConfiguredPayloadAccessValue(config);
       const actualValue = metadata.payloadAccessControl || metadata.payloadAccessMode;
       const expected = normalizePayloadAccessControl2(expectedValue);
@@ -75817,7 +75817,7 @@ var init_resultsAnalysisAnswerValidation = __esm({
 });
 
 // workers/sessionCorsWorker/resultsAnalysisGeneration.js
-var readCoordinatedResultsAnalysisStatusDefault, reserveCoordinatedResultsAnalysisDefault, finalizeCoordinatedResultsAnalysisDefault, decoder7, AI_RESPONSE_CAP, AI_QUESTION_CAP, AI_LIMITS, ANALYSIS_ARTIFACT_VERSION, SOURCE_VERSION, RESULT_SECTION_ORDER, DEFAULT_RESULTS_ANALYSIS_PROVIDER_TIMEOUT_MS, RESULTS_CONTEXT_CHARS, isObj19, hasOwn6, trim15, lower6, getResultsAnalysisSettings, getCanonicalSessionId, publicDraft, applyCurrentArtifactPolicy, normalizeSessionIdHex2, parseJsonBytes, ENCRYPTED_ENVELOPE_KEYS, encryptedEnvelopeValueHasContent, isBlankFieldValue, isClearedFieldWithLockFlag, valueLooksEncrypted, valueFromAnswerLike, FIELD_MASKS, withoutFieldMask, rowLooksLocked, VALIDATED_QUESTION_TYPES, normalizeQuestionId3, normalizeQuestionPrompt, normalizeQuestionType5, normalizeAnalysisRatingScale, normalizeSubmittedAt, enabledSectionsFromSettings, normalizeRequestedSections, resolveResultsAnalysisCapability, compareIdentity, participantDigest, normalizeQuestionRecord, selectRoundRobinResponses, isNewerResponseRow, normalizeSanitizedRows, readWorkerCanonicalResultsAnalysisSource, loadWorkerCanonicalResultsAnalysisSource, loadAdminSnapshotResultsAnalysisSource, sourceKindFromBody, resolveResultsAnalysisSource, normalizeProviderResponse, resolveAnalysisAiPayload, withTimeout, callResultsAnalysisProvider, normalizeGeneratedArtifact, buildSourceDescriptor, buildReservationKey, filterDraftForStatus, summarizeReservation, analysisEligibility, summarizeActiveState, summarizeFailureState, buildResultsAnalysisStatusBody, readResultsAnalysisAdminStatus, generateResultsAnalysisDraft, maybeTriggerAutomaticResultsAnalysis, runQueuedAutomaticResultsAnalysisJob, normalizedResultsProfile, resolveResultsVisibility, aggregateResultsEnabled, evaluateResultsAnalysisViewerEligibility, readPublishedResultsAnalysisArtifact;
+var readCoordinatedResultsAnalysisStatusDefault, reserveCoordinatedResultsAnalysisDefault, finalizeCoordinatedResultsAnalysisDefault, decoder7, AI_RESPONSE_CAP, AI_QUESTION_CAP, AI_LIMITS, ANALYSIS_ARTIFACT_VERSION, SOURCE_VERSION, RESULT_SECTION_ORDER, DEFAULT_RESULTS_ANALYSIS_PROVIDER_TIMEOUT_MS, RESULTS_CONTEXT_CHARS, isObj19, hasOwn6, trim15, lower6, getResultsAnalysisSettings, getCanonicalSessionId, publicDraft, applyCurrentArtifactPolicy, normalizeSessionIdHex2, parseJsonBytes, ENCRYPTED_ENVELOPE_KEYS, encryptedEnvelopeValueHasContent, isBlankFieldValue, isClearedFieldWithLockFlag, valueLooksEncrypted, valueFromAnswerLike, FIELD_MASKS, withoutFieldMask, rowLooksLocked, VALIDATED_QUESTION_TYPES, normalizeQuestionId3, normalizeQuestionPrompt, normalizeQuestionType5, normalizeAnalysisRatingScale, normalizeSubmittedAt, enabledSectionsFromSettings, normalizeRequestedSections, resolveResultsAnalysisCapability, compareIdentity, participantDigest, normalizeQuestionRecord, selectRoundRobinResponses, isNewerResponseRow, normalizeSanitizedRows, toResponseRow, readWorkerCanonicalResultsAnalysisSource, loadWorkerCanonicalResultsAnalysisSource, loadAdminSnapshotResultsAnalysisSource, sourceKindFromBody, resolveResultsAnalysisSource, normalizeProviderResponse, resolveAnalysisAiPayload, withTimeout, callResultsAnalysisProvider, normalizeGeneratedArtifact, buildSourceDescriptor, buildReservationKey, filterDraftForStatus, summarizeReservation, analysisEligibility, summarizeActiveState, summarizeFailureState, buildResultsAnalysisStatusBody, readResultsAnalysisAdminStatus, generateResultsAnalysisDraft, maybeTriggerAutomaticResultsAnalysis, runQueuedAutomaticResultsAnalysisJob, normalizedResultsProfile, resolveResultsVisibility, aggregateResultsEnabled, evaluateResultsAnalysisViewerEligibility, readPublishedResultsAnalysisArtifact;
 var init_resultsAnalysisGeneration = __esm({
   "workers/sessionCorsWorker/resultsAnalysisGeneration.js"() {
     init_aiRequestPolicy();
@@ -76109,6 +76109,10 @@ var init_resultsAnalysisGeneration = __esm({
       const includedRows = [];
       const participantDigests = /* @__PURE__ */ new Set();
       for (const { row, questionId: questionId4, participantKey } of latestByQuestionParticipant.values()) {
+        if (row.__withheld === true) {
+          excludedCount += 1;
+          continue;
+        }
         if (rowLooksLocked(row)) {
           excludedCount += 1;
           lockedCount += 1;
@@ -76232,6 +76236,17 @@ var init_resultsAnalysisGeneration = __esm({
         participantDigests: sortedParticipantDigests
       };
     };
+    toResponseRow = (metadata, payload, config) => ({
+      ...payload,
+      __trustedParticipantId: metadata.responder,
+      __storageRefId: metadata.id,
+      __withheld: !metadataAccessMatchesPublishedAudience(metadata, config),
+      responder: metadata.responder,
+      createdAt: metadata.createdAt,
+      submittedAt: metadata.createdAt,
+      timestamp: metadata.createdAt,
+      encrypted: metadata.encrypted === true || metadata.payloadEncrypted === true || payload.encrypted === true || payload.payloadEncrypted === true
+    });
     readWorkerCanonicalResultsAnalysisSource = async ({ env, slug, config, committedResponses = [], budget }) => {
       const index = getStorageIndexBinding(env);
       if (!index || typeof index.list !== "function" || typeof index.get !== "function") {
@@ -76242,27 +76257,30 @@ var init_resultsAnalysisGeneration = __esm({
       const candidates = [];
       for (const row of questionRows) {
         const metadata = row?.metadata;
-        if (!isObj19(metadata) || metadata.hidden === true || metadata.encrypted === true || metadata.payloadEncrypted === true || !metadataAccessMatchesPublishedAudience(metadata, config)) continue;
+        if (!isObj19(metadata) || metadata.hidden === true) continue;
+        const version2 = {
+          createdAtMs: Date.parse(trim15(metadata.createdAt)) || 0,
+          storageRefId: trim15(metadata.id),
+          uploader: trim15(metadata.uploader),
+          uploadAuthority: metadata.uploadAuthority
+        };
+        const trustedId = lower6(metadata.resourceId);
+        if (metadata.encrypted === true || metadata.payloadEncrypted === true || !metadataAccessMatchesPublishedAudience(metadata, config)) {
+          if (trustedId) candidates.push({ ...version2, resourceId: trustedId, withheld: true });
+          continue;
+        }
         const payload = parseJsonBytes(await readStoredCloudflarePayloadBytes({ env, index, slug, metadata, budget }));
         if (!isObj19(payload)) continue;
         if (!compareIdentity({ slug, config, suppliedSlug: payload.sessionSlug, suppliedSessionId: payload.sessionId || payload.sessionIdHex })) continue;
         const payloadId = trim15(payload.id || payload.questionId || payload.questionID);
-        const trustedId = lower6(metadata.resourceId);
         const normalized2 = normalizeQuestionRecord({
           ...payload,
           questionId: trustedId && lower6(payloadId) !== trustedId ? trustedId : payloadId
         });
         if (!normalized2 || hiddenQuestionIds.has(lower6(normalized2.questionId))) continue;
-        candidates.push({
-          resourceId: normalized2.questionId,
-          createdAtMs: Date.parse(trim15(metadata.createdAt)) || 0,
-          storageRefId: trim15(metadata.id),
-          uploader: trim15(metadata.uploader),
-          uploadAuthority: metadata.uploadAuthority,
-          question: normalized2
-        });
+        candidates.push({ ...version2, resourceId: normalized2.questionId, question: normalized2 });
       }
-      const questions = selectCanonicalStorageVersions(candidates).map((candidate) => candidate.question);
+      const questions = selectCanonicalStorageVersions(candidates).filter((candidate) => !candidate.withheld).map((candidate) => candidate.question);
       const rows = await listCloudflareMetadataRows({ index, slug, resource: "responses", budget, strict: true });
       const responseRows = [];
       let excludedCount = 0;
@@ -76276,43 +76294,17 @@ var init_resultsAnalysisGeneration = __esm({
           excludedCount += 1;
           continue;
         }
-        if (!metadataAccessMatchesPublishedAudience(metadata, config)) {
-          excludedCount += 1;
-          continue;
-        }
-        if (metadata.encrypted === true || metadata.payloadEncrypted === true) {
-          excludedCount += 1;
-          lockedCount += 1;
-          continue;
-        }
-        responseRows.push({
-          ...payload,
-          __trustedParticipantId: metadata.responder,
-          __storageRefId: metadata.id,
-          responder: metadata.responder,
-          createdAt: metadata.createdAt,
-          submittedAt: metadata.createdAt,
-          timestamp: metadata.createdAt,
-          encrypted: payload.encrypted === true || payload.payloadEncrypted === true
-        });
+        responseRows.push(toResponseRow(metadata, payload, config));
       }
       for (const row of rows) {
         const metadata = row?.metadata;
-        if (!isObj19(metadata)) {
-          excludedCount += 1;
-          continue;
-        }
-        if (!metadataAccessMatchesPublishedAudience(metadata, config)) {
-          excludedCount += 1;
-          continue;
-        }
-        if (!trim15(metadata.responder)) {
+        if (!isObj19(metadata) || !trim15(metadata.responder)) {
           excludedCount += 1;
           continue;
         }
         if (metadata.encrypted === true || metadata.payloadEncrypted === true) {
           excludedCount += 1;
-          lockedCount += 1;
+          if (metadataAccessMatchesPublishedAudience(metadata, config)) lockedCount += 1;
           continue;
         }
         const bytes3 = await readStoredCloudflarePayloadBytes({ env, index, slug, metadata, budget });
@@ -76321,16 +76313,7 @@ var init_resultsAnalysisGeneration = __esm({
           excludedCount += 1;
           continue;
         }
-        responseRows.push({
-          ...payload,
-          __trustedParticipantId: metadata.responder,
-          __storageRefId: metadata.id,
-          responder: metadata.responder,
-          createdAt: metadata.createdAt,
-          submittedAt: metadata.createdAt,
-          timestamp: metadata.createdAt,
-          encrypted: metadata.encrypted === true || payload.encrypted === true || payload.payloadEncrypted === true
-        });
+        responseRows.push(toResponseRow(metadata, payload, config));
       }
       const normalized = await normalizeSanitizedRows({ rows: responseRows, questions, slug, config, strictLocked: false, requireKnownQuestion: true });
       if (!normalized.ok) return normalized;
@@ -76767,7 +76750,9 @@ var init_resultsAnalysisGeneration = __esm({
         env,
         slug: targetSlug,
         config,
-        committedResponses: Array.isArray(job.committedResponses) ? job.committedResponses : [],
+        // Rows queued before the queue kept access rules cannot vouch for their
+        // audience. The storage scan reads the real ones.
+        committedResponses: (Array.isArray(job.committedResponses) ? job.committedResponses : []).filter((entry2) => hasOwn6(entry2?.metadata, "accessConditions")),
         requestId: job.requestId,
         deps
       });
@@ -79712,7 +79697,9 @@ ${expiry}`);
               payloadEncrypted: metadata.payloadEncrypted === true,
               payloadAccessMode: toTrimmedString10(metadata.payloadAccessMode).slice(0, 80),
               payloadAccessControl: isObjectRecord(metadata.payloadAccessControl) ? metadata.payloadAccessControl : toTrimmedString10(metadata.payloadAccessControl).slice(0, 1e3),
-              groupIds: Array.isArray(metadata.groupIds) ? metadata.groupIds.map((entry3) => toTrimmedString10(entry3).slice(0, 160)).filter(Boolean).slice(0, 24) : []
+              groupIds: Array.isArray(metadata.groupIds) ? metadata.groupIds.map((entry3) => toTrimmedString10(entry3).slice(0, 160)).filter(Boolean).slice(0, 24) : [],
+              // Whole or not at all: a cut-down rule could read as a wider audience.
+              accessConditions: metadata.accessConditions ?? null
             },
             payload: sanitizedPayload
           };

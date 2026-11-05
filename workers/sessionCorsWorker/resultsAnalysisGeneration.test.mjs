@@ -24,6 +24,7 @@ import {
   resolveAnalysisAiPayload,
   resolveResultsAnalysisCapability,
 } from './resultsAnalysisGeneration.js';
+import { metadataAccessMatchesPublishedAudience } from './storageAudience.js';
 
 const sessionId = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 const config = {
@@ -358,6 +359,115 @@ test('worker-canonical source lets a newer locked, cleared or invalid answer wit
     [source.counts.responseCount, source.counts.participantCount, source.counts.lockedCount, source.counts.excludedCount],
     [1, 1, 1, 3],
   );
+});
+
+const adminsOnly = { accessConditions: { match: 'any', conditions: [{ kind: 'role', role: 'admin' }] } };
+const publicAccess = { payloadAccessControl: { gate: 'none', encryption: 'none' } };
+const publicConfig = { ...config, storageProfile: { backend: 'cloudflare', ...publicAccess } };
+
+test('a row with its own access rule never reads as open to everyone', () => {
+  assert.equal(metadataAccessMatchesPublishedAudience(adminsOnly, publicConfig), false);
+  assert.equal(metadataAccessMatchesPublishedAudience({}, publicConfig), true);
+});
+
+test('the automatic queue keeps an answer to its own access rule', async () => {
+  const kv = createKv();
+  const env = { CE_STORAGE_INDEX_KV: kv };
+  await putPayload({ kv, resource: 'questions', id: 'qm1',
+    payload: { sessionSlug: 'session-a', sessionId, questionId: 'q1', prompt: 'Thoughts?', type: 'freeform' } });
+  const coordinator = new SessionWriteCoordinator({ storage: {} }, env);
+  const queued = (id, responder, answer, access) => coordinator.sanitizeResultsAnalysisAutoJob({
+    slug: 'session-a',
+    requestId: `auto-upload:${id}`,
+    committedResponses: [{
+      metadata: { id, responder, createdAt: '2026-09-17T00:00:00.000Z', ...publicAccess, ...access },
+      payload: { sessionSlug: 'session-a', sessionId, questionId: 'q1', answer },
+    }],
+  }).committedResponses[0];
+  const committedResponses = [
+    queued('open', `0x${'1'.repeat(40)}`, 'Shared with everyone'),
+    queued('restricted', `0x${'2'.repeat(40)}`, 'Admins only', adminsOnly),
+  ];
+  const source = await loadWorkerCanonicalResultsAnalysisSource({ env, slug: 'session-a', config: publicConfig, committedResponses });
+  assert.deepEqual(source.snapshot.responses.map((row) => row.answer), ['Shared with everyone']);
+  assert.deepEqual(source.aiSnapshot.responses.map((row) => row.answer), ['Shared with everyone']);
+  assert.equal(source.counts.excludedCount, 1);
+});
+
+test('a job queued before rows carried their access rule leaves those rows to the storage scan', async () => {
+  const kv = createKv();
+  await putPayload({ kv, resource: 'questions', id: 'qm1',
+    payload: { sessionSlug: 'session-a', sessionId, questionId: 'q1', prompt: 'Thoughts?', type: 'freeform' } });
+  const metadata = { id: 'queued-earlier', responder: `0x${'1'.repeat(40)}`, createdAt: '2026-09-17T00:00:00.000Z', ...publicAccess };
+  const result = await runQueuedAutomaticResultsAnalysisJob({
+    env: { CE_STORAGE_INDEX_KV: kv },
+    slug: 'session-a',
+    job: {
+      requestId: 'queued-earlier',
+      committedResponses: [{ metadata, payload: { sessionSlug: 'session-a', sessionId, questionId: 'q1', answer: 'Maybe admins only' } }],
+    },
+    deps: {
+      getSessionConfig: async () => publicConfig,
+      readCoordinatedResultsAnalysisStatus: async () => ({ ok: true, state: {} }),
+    },
+  });
+  assert.deepEqual(
+    [result.skipped, result.reason, result.newDistinctCount],
+    [true, 'threshold_not_met', 0],
+  );
+});
+
+test('a version the audience cannot read still decides which question and answer are current', async () => {
+  const kv = createKv();
+  const env = { CE_STORAGE_INDEX_KV: kv };
+  const before = '2026-09-17T00:00:00.000Z';
+  const after = '2026-09-18T00:00:00.000Z';
+  const question = (questionId, prompt) => ({ sessionSlug: 'session-a', sessionId, questionId, prompt, type: 'freeform' });
+  const adminVersion = (id, createdAt, resourceId, prompt, access) => putPayload({
+    kv,
+    resource: 'questions',
+    id,
+    metadata: { createdAt, resourceId, uploadAuthority: 'admin', ...publicAccess, ...access },
+    payload: question(resourceId, prompt),
+  });
+  // An admin's correction narrows who may read the question.
+  await adminVersion('corrected-v1', before, 'corrected', 'Superseded prompt');
+  await adminVersion('corrected-v2', after, 'corrected', 'Restricted prompt', adminsOnly);
+  // An admin's correction opens a restricted question to everyone.
+  await adminVersion('opened-v1', before, 'opened', 'Earlier restricted prompt', adminsOnly);
+  await adminVersion('opened-v2', after, 'opened', 'Public prompt');
+  await adminVersion('open-v1', before, 'open', 'Open prompt');
+
+  const answer = (questionId, text) => ({ sessionSlug: 'session-a', sessionId, questionId, answer: text });
+  const putAnswer = (id, responder, createdAt, questionId, text, access) => putPayload({
+    kv, resource: 'responses', id, metadata: { responder, createdAt, ...publicAccess, ...access }, payload: answer(questionId, text),
+  });
+  const [A, B, C, D, E] = ['1', '2', '3', '4', '5'].map((digit) => `0x${digit.repeat(40)}`);
+  // A answers in public, then narrows who may read the new answer.
+  await putAnswer('a0', A, before, 'open', 'Agree');
+  await putAnswer('a1', A, after, 'open', 'Disagree', adminsOnly);
+  // B restricts an answer, then answers in public.
+  await putAnswer('b0', B, before, 'open', 'Earlier restricted');
+  await putAnswer('b1', B, after, 'open', 'Public from B');
+  // C answers once in public.
+  await putAnswer('c0', C, before, 'open', 'Public from C');
+  // D answers the question whose current version is restricted.
+  await putAnswer('d0', D, before, 'corrected', 'Answer to a restricted question');
+  // E answers in public; the newer restricted answer is still in the queue.
+  await putAnswer('e0', E, before, 'open', 'Agree');
+  const committedResponses = [{
+    metadata: { id: 'e1', responder: E, createdAt: after, ...publicAccess, ...adminsOnly },
+    payload: answer('open', 'Disagree'),
+  }];
+
+  const source = await loadWorkerCanonicalResultsAnalysisSource({ env, slug: 'session-a', config: publicConfig, committedResponses });
+  assert.equal(source.ok, true);
+  assert.deepEqual(source.snapshot.questions.map((row) => row.prompt).sort(), ['Open prompt', 'Public prompt']);
+  assert.deepEqual(source.snapshot.responses.map((row) => row.answer).sort(), ['Public from B', 'Public from C']);
+  assert.deepEqual(source.aiSnapshot.responses.map((row) => row.answer).sort(), ['Public from B', 'Public from C']);
+  // A's and E's current answers, and D's answer to a restricted question.
+  assert.deepEqual([source.counts.excludedCount, source.counts.lockedCount], [3, 0]);
+  assert.doesNotMatch(JSON.stringify(source), /Superseded prompt|Restricted prompt|Agree|Disagree/);
 });
 
 test('public text that looks like a lock marker is analysed; only encryption flags and envelopes lock', async () => {
@@ -1296,7 +1406,7 @@ for (const [rpcUrl, redirect, expectedStatus] of [
   await putPayload({ kv, resource: 'questions', id: 'qmeta1',
     payload: { sessionSlug: 'session-a', sessionId, questionId: 'q1', prompt: 'Question?', type: 'text' } });
   const committedResponses = [1, 2, 3].map((index) => ({
-    metadata: { id: `r${index}`, responder: `0x${String(index).repeat(40)}`, createdAt: '2026-09-17T00:00:00.000Z' },
+    metadata: { id: `r${index}`, responder: `0x${String(index).repeat(40)}`, createdAt: '2026-09-17T00:00:00.000Z', accessConditions: null },
     payload: { sessionSlug: 'session-a', sessionId, questionId: 'q1', answer: `View ${index}` },
   }));
   const calls = [];

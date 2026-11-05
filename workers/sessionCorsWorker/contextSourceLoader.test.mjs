@@ -91,7 +91,7 @@ test('results analysis gives the AI the participants’ context, outside the sou
   await h.env.CE_STORAGE_INDEX_KV.put(buildIndexKey({ slug: 'salon', resource: 'questions', id: 'qmeta1' }), JSON.stringify(metadata));
   await h.env.CE_STORAGE_INDEX_KV.put(buildPayloadKey({ slug: 'salon', id: 'qmeta1' }), JSON.stringify({ metadata, payloadBase64url: Buffer.from(JSON.stringify(question)).toString('base64url') }));
   const committedResponses = [1, 2, 3].map((index) => ({
-    metadata: { id: `r${index}`, responder: `0x${String(index).repeat(40)}`, createdAt: '2026-09-17T00:00:00.000Z' },
+    metadata: { id: `r${index}`, responder: `0x${String(index).repeat(40)}`, createdAt: '2026-09-17T00:00:00.000Z', accessConditions: null },
     payload: { sessionSlug: 'salon', sessionId, questionId: 'q1', answer: `View ${index}` },
   }));
   const config = {

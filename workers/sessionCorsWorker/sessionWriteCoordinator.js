@@ -774,6 +774,8 @@ export class SessionWriteCoordinator {
               groupIds: Array.isArray(metadata.groupIds)
                 ? metadata.groupIds.map((entry) => toTrimmedString(entry).slice(0, 160)).filter(Boolean).slice(0, 24)
                 : [],
+              // Whole or not at all: a cut-down rule could read as a wider audience.
+              accessConditions: metadata.accessConditions ?? null,
             },
             payload: sanitizedPayload,
           };
