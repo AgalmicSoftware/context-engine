@@ -19,6 +19,7 @@ import {
 } from './surveyResultsAnalysisDataModel';
 import {
   buildSurveyResultsHtmlReportParticipantCount,
+  buildSurveyResultsHtmlReportAnswersForExport,
   buildSurveyResultsHtmlReportQuestionsForExport,
   buildSurveyResultsHtmlReportResponseCountsByQuestion,
 } from './surveyResultsHtmlReportDataModel';
@@ -113,6 +114,12 @@ export type SurveyResultsHtmlReportRuntime = {
 };
 
 export type SurveyResultsHtmlReportRuntimeArgs = {
+  applyDecryptedOverride: (
+    response: SurveyResultsResponseRecord,
+    responder: unknown,
+    questionId: string,
+    surveyId?: unknown,
+  ) => unknown;
   getEffectiveSlug: () => string;
   getFilteredQuestionsForExport: () => SurveyResultsQuestionExportRecord[];
   getNetworkQuestionsForCurrentContext: () => unknown;
@@ -149,10 +156,8 @@ const HTML_REPORT_SECTION_TO_ANALYSIS_SECTION: Partial<
 const toRecord = (value: unknown): SurveyResultsHtmlReportRecord =>
   value && typeof value === 'object' ? (value as SurveyResultsHtmlReportRecord) : {};
 
-const ENCRYPTED_QUESTION_LABEL = 'Encrypted question';
-
-// Questions whose author encrypted their text: the report shows them redacted and its AI analysis never sees
-// them, even after this reader decrypted them.
+// Questions whose author encrypted their text: the report shows what this reader decrypted, but its AI analysis,
+// which goes to the session's AI provider, never sees them.
 const listAuthorEncryptedQuestionIds = (networkQuestions: unknown): Set<string> => {
   const ids = new Set<string>();
   Object.entries(toRecord(networkQuestions)).forEach(([key, question]) => {
@@ -165,6 +170,7 @@ const listAuthorEncryptedQuestionIds = (networkQuestions: unknown): Set<string> 
 };
 
 export const createSurveyResultsHtmlReportRuntime = ({
+  applyDecryptedOverride,
   getEffectiveSlug,
   getFilteredQuestionsForExport,
   getNetworkQuestionsForCurrentContext,
@@ -220,22 +226,24 @@ export const createSurveyResultsHtmlReportRuntime = ({
     });
   };
 
-  const getHtmlReportQuestionsForExport = () => {
-    const encrypted = listAuthorEncryptedQuestionIds(getNetworkQuestionsForCurrentContext());
-    return buildSurveyResultsHtmlReportQuestionsForExport({
-      filteredQuestions: getFilteredQuestionsForExport().map((question) =>
-        encrypted.has(String(question.id || '').toLowerCase())
-          ? {
-              id: question.id,
-              type: question.type,
-              voiceCredits: question.voiceCredits,
-              prompt: ENCRYPTED_QUESTION_LABEL,
-              options: [],
-              tags: [],
-            }
-          : question,
-      ),
+  const getHtmlReportQuestionsForExport = () =>
+    buildSurveyResultsHtmlReportQuestionsForExport({
+      filteredQuestions: getFilteredQuestionsForExport(),
       responseCountsByQuestion: getHtmlReportResponseCountsByQuestion(),
+    });
+
+  const getHtmlReportAnswersForExport = () => {
+    const state = getState();
+    return buildSurveyResultsHtmlReportAnswersForExport({
+      aggregatorQuestionResponses: state.sbtFilteredAggregatorQuestionResponses,
+      applyDecryptedOverride: (response, responder, questionId, surveyId) =>
+        applyDecryptedOverride(response as SurveyResultsResponseRecord, responder, questionId, surveyId),
+      filteredResponses: state.sbtFilteredResponses,
+      getResponseQuestionId: (response) => getResponseQuestionId(toRecord(response) as SurveyResultsResponseRecord),
+      networkQuestions: getNetworkQuestionsForCurrentContext(),
+      parseResponse,
+      surveyViewMode: state.surveyViewMode,
+      viewMode: state.viewMode,
     });
   };
 
@@ -368,6 +376,7 @@ export const createSurveyResultsHtmlReportRuntime = ({
     const sessionName = String(props.sessionName || state.surveyTitle || sessionSlug || 'Session').trim();
     return buildSurveyResultsHtmlReportSnapshot({
       analysisArtifact: getHtmlReportAnalysisArtifact(),
+      answers: getHtmlReportAnswersForExport(),
       chainId: getHtmlReportChainId(),
       countsByQuestion: getHtmlReportResponseCountsByQuestion(),
       exportedAt,

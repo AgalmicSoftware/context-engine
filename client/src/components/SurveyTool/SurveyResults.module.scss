@@ -498,18 +498,21 @@
   }
 }
 
-.htmlReportWarning {
-  background: var(--ce-status-warning-text) !important;
-  border-color: var(--ce-status-warning) !important;
-  color: var(--ce-overlay-surface) !important;
+// The modal's own text and background, which pass in every theme; the status color is the border.
+.htmlReportWarning,
+.htmlReportInfo {
+  background: var(--ce-text-inverse) !important;
+  color: var(--ce-document-border-strong) !important;
+  border-width: 2px !important;
   font-weight: 600;
 }
 
+.htmlReportWarning {
+  border-color: var(--ce-status-warning) !important;
+}
+
 .htmlReportInfo {
-  background: var(--ce-status-info-text) !important;
-  border-color: var(--ce-status-info-text) !important;
-  color: var(--ce-status-info) !important;
-  font-weight: 600;
+  border-color: var(--ce-status-info) !important;
 }
 
 .htmlReportModalFooter {

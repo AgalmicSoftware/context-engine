@@ -1,13 +1,15 @@
 import {
-  buildRedactedSessionResultsSnapshot,
+  SESSION_RESULTS_EXPORT_FORMAT_PDF,
+  type SessionResultsReportQuestion,
+  buildSessionResultsSnapshot,
   buildSessionResultsHtmlReportFilename,
   buildSessionResultsPdfReportFilename,
   downloadBrowserFile,
-  downloadSessionResultsPdfReport,
   escapeHtml,
   renderSessionResultsHtmlReport,
   serializeJsonForHtmlScript,
 } from './sessionResultsExport';
+import { downloadSessionResultsPdfReport } from './sessionResultsPdfDownload';
 import {
   buildSessionResultsAnalysisAiPayload,
   buildSessionResultsAnalysisInputSignature,
@@ -49,8 +51,8 @@ describe('sessionResultsExport utilities', () => {
     expect(serialized).not.toContain('</script><img');
   });
 
-  it('normalizes a redacted v1 snapshot and strips sensitive fields from sections and filters', () => {
-    const snapshot = buildRedactedSessionResultsSnapshot({
+  it('normalizes a v1 snapshot that keeps what the exporter can see and drops secrets and ciphertext', () => {
+    const snapshot = buildSessionResultsSnapshot({
       exportedAt: '2026-05-25T18:30:00.000Z',
       session: {
         slug: 'demo',
@@ -71,6 +73,7 @@ describe('sessionResultsExport utilities', () => {
       filters: {
         note: 'owner 0x1111111111111111111111111111111111111111',
         walletAddress: '0xabc',
+        apiKey: 'fixture-value',
         tag: 'governance',
       },
       sections: {
@@ -90,8 +93,16 @@ describe('sessionResultsExport utilities', () => {
               tags: ['export'],
               options: ['Yes', 'No'],
               responseCount: 2,
-              responder: '0xabc',
-              answer: { value: 'Yes' },
+              promptEncrypted: 'ciphertext',
+            } as SessionResultsReportQuestion,
+          ],
+          answers: [
+            {
+              questionId: 'q1',
+              responder: '0x1111111111111111111111111111111111111111',
+              answer: 'Yes',
+              comment: 'A note',
+              conviction: 4,
             },
           ],
         },
@@ -109,33 +120,110 @@ describe('sessionResultsExport utilities', () => {
 
     expect(snapshot.type).toBe('ce_session_results_html_snapshot');
     expect(snapshot.version).toBe(1);
-    expect(snapshot.privacyMode).toBe('redacted');
+    expect(snapshot.privacyMode).toBe('as-viewed');
     expect(snapshot.exportedBy).toEqual({
       address: '0x9999999999999999999999999999999999999999',
       chainId: 11155420,
       displayAddress: '0x9999999999999999999999999999999999999999',
     });
-    expect(snapshot.filters).toEqual({ note: 'owner [redacted-address]', tag: 'governance' });
+    expect(snapshot.filters).toEqual({
+      note: 'owner 0x1111111111111111111111111111111111111111',
+      walletAddress: '0xabc',
+      tag: 'governance',
+    });
     expect(snapshot.sections.report.available).toBe(true);
     expect(snapshot.sections.report.questions).toEqual([
       {
         id: 'q1',
-        prompt: 'Should CE export HTML for [redacted-address]?',
+        prompt: 'Should CE export HTML for 0x2222222222222222222222222222222222222222?',
         type: 'binary',
         tags: ['export'],
         options: ['Yes', 'No'],
         responseCount: 2,
       },
     ]);
-    expect(snapshot.sections.argumentMap.debates).toEqual([{ claim: 'Export helps audits for [redacted-address]' }]);
+    expect(snapshot.sections.report.answers).toEqual([
+      {
+        questionId: 'q1',
+        responder: '0x1111111111111111111111111111111111111111',
+        answer: 'Yes',
+        comment: 'A note',
+        conviction: 4,
+      },
+    ]);
+    expect(snapshot.sections.argumentMap.debates).toEqual([
+      { claim: 'Export helps audits for 0x3333333333333333333333333333333333333333', responderAddress: '0xdef' },
+    ]);
     expect(snapshot.sections.riskMatrix.available).toBe(false);
-    expect(snapshot.redactions).toEqual(
-      expect.arrayContaining(['encrypted_payloads', 'raw_responses', 'wallet_addresses']),
-    );
+    expect(snapshot.redactions).toEqual(['encrypted_payloads', 'secrets', 'telegram_identifiers']);
+  });
+
+  describe('answers in the report', () => {
+    const answers = Array.from({ length: 45 }, (_, index) => ({
+      questionId: 'q1',
+      responder: `0x${String(index).padStart(40, '0')}`,
+      answer: `Answer <${index}>`,
+      comment: index === 44 ? 'Note <b>' : '',
+    }));
+    const snapshot = buildSessionResultsSnapshot({
+      exportedBy: { address: '0x9999999999999999999999999999999999999999' },
+      sections: {
+        report: {
+          questions: [
+            { id: 'Q1', prompt: 'First question', type: 'freeform', options: [], tags: [], responseCount: 45 },
+          ],
+          answers: [...answers, { questionId: 'gone', responder: '0xabc', answer: 'Kept', comment: '' }],
+        },
+      },
+    });
+    const sections = { argumentMap: false, atlas: false, riskMatrix: false, snapshotJson: false };
+
+    it('lists them under each question, escaped, in the interactive and static reports', () => {
+      const html = renderSessionResultsHtmlReport(snapshot, { sections });
+      expect(html).toContain('<h3>Answers</h3>');
+      expect(html).toContain('First question <span class="ce-report-muted">(45)</span>');
+      expect(html).toContain('Answer &lt;44&gt;');
+      expect(html).toContain('Note &lt;b&gt;');
+      expect(html).toContain(answers[0].responder);
+      expect(html).toContain('gone <span class="ce-report-muted">(1)</span>');
+      expect(html.match(/<details/g)).toHaveLength(2);
+      expect(html).not.toContain('<details open');
+    });
+
+    it('leaves them out when the Report section is not selected', () => {
+      const html = renderSessionResultsHtmlReport(snapshot, { sections: { ...sections, report: false } });
+      expect(html).not.toContain('Answer &lt;44&gt;');
+      expect(html).not.toContain(answers[0].responder);
+    });
+
+    it('splits a PDF into blocks small enough to capture, with everything open', () => {
+      const html = renderSessionResultsHtmlReport(snapshot, {
+        format: SESSION_RESULTS_EXPORT_FORMAT_PDF,
+        sections,
+      });
+      const page = new DOMParser().parseFromString(html, 'text/html');
+      const blocks = Array.from(page.querySelectorAll('main > section'));
+      // The overview, the question table, 45 answers in blocks of 16, and the question it no longer lists.
+      expect(blocks).toHaveLength(6);
+      expect(blocks[2].querySelector('h3')?.textContent).toBe('First question');
+      expect(blocks[3].querySelector('h3')?.textContent).toBe('First question (continued)');
+      blocks.slice(2, 5).forEach((block, index) => {
+        expect(block.querySelectorAll('tbody tr')).toHaveLength(index === 2 ? 13 : 16);
+      });
+      expect(page.querySelectorAll('details:not([open])')).toHaveLength(0);
+      // Scripts and the JSON copy add nothing to a capture of the page.
+      expect(page.querySelectorAll('script')).toHaveLength(0);
+    });
+
+    it('still names the exporter in the header of a PDF', () => {
+      const html = renderSessionResultsHtmlReport(snapshot, { format: SESSION_RESULTS_EXPORT_FORMAT_PDF, sections });
+      const page = new DOMParser().parseFromString(html, 'text/html');
+      expect(page.querySelector('header')?.textContent).toContain('0x9999999999999999999999999999999999999999');
+    });
   });
 
   it('renders a self-contained HTML report with anchors, unavailable states, and safe embedded JSON', () => {
-    const snapshot = buildRedactedSessionResultsSnapshot({
+    const snapshot = buildSessionResultsSnapshot({
       exportedAt: '2026-05-25T18:30:00.000Z',
       session: {
         slug: 'demo',
@@ -193,7 +281,7 @@ describe('sessionResultsExport utilities', () => {
   });
 
   it('renders static selected-section HTML without viewer controls', () => {
-    const snapshot = buildRedactedSessionResultsSnapshot({
+    const snapshot = buildSessionResultsSnapshot({
       exportedAt: '2026-05-25T18:30:00.000Z',
       exportedBy: { address: '0x9999999999999999999999999999999999999999' },
       sections: {
@@ -224,7 +312,7 @@ describe('sessionResultsExport utilities', () => {
   it.each(['viewer', 'single-html'] as const)(
     'keeps excluded analysis out of all %s bytes and snapshot downloads',
     (format) => {
-      const snapshot = buildRedactedSessionResultsSnapshot({
+      const snapshot = buildSessionResultsSnapshot({
         exportedBy: { address: '0x9999999999999999999999999999999999999999' },
         sections: {
           report: {
@@ -254,7 +342,7 @@ describe('sessionResultsExport utilities', () => {
   );
 
   it('downloads precisely the selected snapshot when Snapshot JSON is checked', async () => {
-    const snapshot = buildRedactedSessionResultsSnapshot({
+    const snapshot = buildSessionResultsSnapshot({
       exportedBy: { address: '0x9999999999999999999999999999999999999999' },
       sections: {
         report: { summary: { marker: 'REPORT_MARKER' } },
@@ -298,7 +386,7 @@ describe('sessionResultsExport utilities', () => {
 
   it('keeps standalone HTML deterministic and fixed-light across session color scheme ids', () => {
     const build = (colorSchemeId: string) => {
-      const snapshot = buildRedactedSessionResultsSnapshot({
+      const snapshot = buildSessionResultsSnapshot({
         exportedAt: '2026-05-25T18:30:00.000Z',
         session: {
           slug: 'demo',
@@ -678,11 +766,11 @@ describe('rating scales in reports and AI input', () => {
   });
 
   it('shows a rating question’s scale in the report and its data', () => {
-    const snapshot = buildRedactedSessionResultsSnapshot({ sections: { report: { questions: [question(scale)] } } });
+    const snapshot = buildSessionResultsSnapshot({ sections: { report: { questions: [question(scale)] } } });
     expect(snapshot.sections.report.questions[0].scale).toEqual(scale);
     const html = renderSessionResultsHtmlReport(snapshot);
     expect(html).toContain('0 (Never) to 10 (Always), step 2');
-    const plain = buildRedactedSessionResultsSnapshot({
+    const plain = buildSessionResultsSnapshot({
       sections: {
         report: {
           questions: [{ ...question({ ...scale, step: 1, minLabel: '0', maxLabel: '10' }), id: 'q2', prompt: 'Plain' }],

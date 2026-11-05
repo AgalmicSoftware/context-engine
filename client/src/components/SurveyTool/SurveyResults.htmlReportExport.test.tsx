@@ -117,13 +117,13 @@ describe('SurveyResults HTML report export controls', () => {
     expect(await screen.findByTestId('ce-surveyresults-html-report-modal')).toBeInTheDocument();
   });
 
-  it('shows the HTML report confirmation modal in redacted mode and disables download without reportable data', async () => {
+  it('shows the HTML report confirmation modal, says what it holds, and disables download without reportable data', async () => {
     mountSurveyResults({ sessionSlug: 'demo' });
 
     await openHtmlReportModal();
 
-    expect(screen.getByText(/Privacy mode:/)).toBeInTheDocument();
-    expect(screen.getByText('Redacted')).toBeInTheDocument();
+    expect(screen.getByText(/Contents:/)).toBeInTheDocument();
+    expect(screen.getByText('What you can see here')).toBeInTheDocument();
     expect(screen.getByText('Exported viewer')).toBeInTheDocument();
     expect(screen.getByText('Single HTML file')).toBeInTheDocument();
     expect(screen.getByText('PDF report')).toBeInTheDocument();
@@ -255,9 +255,9 @@ describe('SurveyResults HTML report export controls', () => {
     expect(analysisCacheWrites()).toHaveLength(0);
   });
 
-  it('builds a redacted HTML report snapshot from hydrated SurveyResults state', async () => {
+  it('builds an HTML report with the answers and responders the Results view shows', async () => {
     seedSingleBinaryQuestion({
-      prompt: 'Should exports be redacted?',
+      prompt: 'Should exports be stamped?',
       response: {
         additional: { encrypted: false, value: 'Raw note' },
         answer: { encrypted: false, value: 'Raw answer' },
@@ -281,15 +281,14 @@ describe('SurveyResults HTML report export controls', () => {
     await waitFor(() => expect(downloadSessionResultsHtmlReport).toHaveBeenCalledTimes(1));
     const [html] = (downloadSessionResultsHtmlReport as jest.Mock).mock.calls[0];
 
-    expect(html).toContain('Should exports be redacted?');
+    expect(html).toContain('Should exports be stamped?');
     expect(html).toContain('"responseCount": 1');
     expect(html).toContain('"participants": 1');
-    expect(html).toContain('"privacyMode": "redacted"');
+    expect(html).toContain('"privacyMode": "as-viewed"');
     expect(html).toContain('"address": "0x9999999999999999999999999999999999999999"');
-    expect(html).toContain('0x9999999999999999999999999999999999999999');
-    expect(html).not.toContain('0xabc');
-    expect(html).not.toContain('Raw answer');
-    expect(html).not.toContain('Raw note');
+    expect(html).toContain('0xabc');
+    expect(html).toContain('Raw answer');
+    expect(html).toContain('Raw note');
   });
 
   it('downloads the confirmed HTML report through the browser helper', async () => {
@@ -314,7 +313,6 @@ describe('SurveyResults HTML report export controls', () => {
     expect(html).toContain('Export this report?');
     expect(html).toContain('Downloaded by 0x9999999999999999999999999999999999999999');
     expect(html).toContain('"address": "0x9999999999999999999999999999999999999999"');
-    expect(html).not.toContain('0xabc');
     expect(filename).toMatch(/^contextEngine_sessionReport_demo_\d{4}-\d{2}-\d{2}T\d{2}_\d{2}_\d{2}_\d{3}Z\.html$/);
 
     await waitFor(() => {
@@ -465,7 +463,7 @@ describe('SurveyResults HTML report export controls', () => {
     expect(html).toContain('<section id="snapshot-json"');
     expect(html).not.toContain('<a href="#report">Report</a>');
     expect(html).not.toContain('<section id="report"');
-    expect(html).toContain('"privacyMode": "redacted"');
+    expect(html).toContain('"privacyMode": "as-viewed"');
     expect(callAI).not.toHaveBeenCalled();
     expect(analysisCacheReads()).toHaveLength(0);
     expect(analysisCacheWrites()).toHaveLength(0);

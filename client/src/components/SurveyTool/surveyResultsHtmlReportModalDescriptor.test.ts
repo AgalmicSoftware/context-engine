@@ -1,6 +1,6 @@
 import { SURVEY_RESULTS_HTML_REPORT_DEFAULT_SELECTED_SECTIONS } from './surveyResultsHtmlReportSelection.js';
 import { buildSurveyResultsHtmlReportExportModalDescriptor } from './surveyResultsHtmlReportModalDescriptor.js';
-import { buildRedactedSessionResultsSnapshot } from '../../utilities/sessionResultsExport';
+import { buildSessionResultsSnapshot } from '../../utilities/sessionResultsExport';
 
 const buildHtmlReportSnapshot = ({
   argumentMapAvailable = false,
@@ -8,7 +8,7 @@ const buildHtmlReportSnapshot = ({
   reportAvailable = true,
   riskMatrixAvailable = false,
 } = {}) =>
-  buildRedactedSessionResultsSnapshot({
+  buildSessionResultsSnapshot({
     exportedAt: '2026-05-25T18:30:00.000Z',
     session: {
       chainId: 11155420,

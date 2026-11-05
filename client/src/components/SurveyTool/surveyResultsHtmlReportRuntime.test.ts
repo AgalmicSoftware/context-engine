@@ -14,11 +14,13 @@ const createRuntime = ({
   state = {},
   networkQuestions = {},
   getFilteredQuestionsForExport,
+  applyDecryptedOverride = (response) => response,
 }: {
   props?: SurveyResultsHtmlReportProps;
   state?: SurveyResultsHtmlReportState;
   networkQuestions?: unknown;
   getFilteredQuestionsForExport?: SurveyResultsHtmlReportRuntimeArgs['getFilteredQuestionsForExport'];
+  applyDecryptedOverride?: SurveyResultsHtmlReportRuntimeArgs['applyDecryptedOverride'];
 } = {}) => {
   const mutableState: SurveyResultsHtmlReportState = {
     filterState: {},
@@ -49,6 +51,7 @@ const createRuntime = ({
     ...state,
   };
   const runtime = createSurveyResultsHtmlReportRuntime({
+    applyDecryptedOverride,
     getEffectiveSlug: () => 'runtime-session',
     getFilteredQuestionsForExport:
       getFilteredQuestionsForExport ||
@@ -85,53 +88,94 @@ const createRuntime = ({
 };
 
 describe('surveyResultsHtmlReportRuntime', () => {
-  it('shows author-encrypted questions as redacted rows and keeps them out of the AI input', () => {
+  describe('what the exporter can see', () => {
     const gatedPrompt = 'Decrypted gated prompt';
-    const { runtime } = createRuntime({
-      networkQuestions: {
-        q1: { id: 'q1', prompt: 'Runtime question?', type: 'binary' },
-        q2: {
-          id: 'q2',
-          prompt: gatedPrompt,
-          promptDecrypted: true,
-          promptEncrypted: { ciphertext: 'fixture' },
-          tags: ['gated-tag'],
-          type: 'binary',
+    const responder = '0x1111111111111111111111111111111111111111';
+    const lockedResponder = '0x2222222222222222222222222222222222222222';
+    const gatedRuntime = () =>
+      createRuntime({
+        networkQuestions: {
+          q1: { id: 'q1', prompt: 'Runtime question?', type: 'binary' },
+          q2: {
+            id: 'q2',
+            prompt: gatedPrompt,
+            promptDecrypted: true,
+            promptEncrypted: { ciphertext: 'fixture' },
+            tags: ['gated-tag'],
+            type: 'binary',
+          },
         },
-      },
-      getFilteredQuestionsForExport: () => [
-        { id: 'q1', options: [], prompt: 'Runtime question?', tags: [], type: 'binary' },
-        { id: 'q2', options: [], prompt: gatedPrompt, tags: ['gated-tag'], type: 'binary' },
-      ],
-      state: {
-        sbtFilteredAggregatorQuestionResponses: {
-          q1: [
-            {
-              responder: '0x1111111111111111111111111111111111111111',
-              response: { answer: { value: 'Yes' }, questionID: 'q1' },
-            },
-          ],
-          q2: [
-            {
-              responder: '0x1111111111111111111111111111111111111111',
-              response: { answer: { value: 'Yes' }, questionID: 'q2' },
-            },
-          ],
+        getFilteredQuestionsForExport: () => [
+          { id: 'q1', options: [], prompt: 'Runtime question?', tags: [], type: 'binary' },
+          { id: 'q2', options: [], prompt: gatedPrompt, tags: ['gated-tag'], type: 'binary' },
+        ],
+        state: {
+          sbtFilteredAggregatorQuestionResponses: {
+            q1: [{ responder, response: { answer: { value: 'Agree' }, questionID: 'q1' } }],
+            q2: [
+              { responder, response: { answer: { value: 'Disagree' }, questionID: 'q2' } },
+              {
+                responder: lockedResponder,
+                response: { answer: { encrypted: true, value: '*' }, questionID: 'q2' },
+              },
+            ],
+          },
         },
-      },
+      });
+
+    it('puts decrypted questions, answers and responders in the report, stamped with the exporter', () => {
+      const { runtime } = gatedRuntime();
+      const snapshot = runtime.buildSessionResultsHtmlReportSnapshot();
+      const html = renderSessionResultsHtmlReport(snapshot);
+
+      expect(html).toContain('Runtime question?');
+      expect(html).toContain(gatedPrompt);
+      expect(html).toContain('gated-tag');
+      expect(html).not.toContain('Encrypted question');
+      expect(snapshot.sections.report.answers).toEqual([
+        { answer: 'Agree', comment: '', questionId: 'q1', responder },
+        { answer: 'Disagree', comment: '', questionId: 'q2', responder },
+      ]);
+      expect(html).toContain('Disagree');
+      expect(html).toContain(responder);
+      // An answer this reader can't see stays locked.
+      expect(html).not.toContain(lockedResponder);
     });
 
-    const html = renderSessionResultsHtmlReport(runtime.buildSessionResultsHtmlReportSnapshot());
-    const aiInput = JSON.stringify(runtime.buildSessionResultsAnalysisPayloadForAi());
+    it('adds an answer once this reader has decrypted it', () => {
+      const { runtime } = createRuntime({
+        networkQuestions: { q1: { id: 'q1', prompt: 'Runtime question?', type: 'binary' } },
+        state: {
+          sbtFilteredAggregatorQuestionResponses: {
+            q1: [
+              {
+                responder: lockedResponder,
+                response: { answer: { encrypted: true, value: '*' }, questionID: 'q1' },
+              },
+            ],
+          },
+        },
+        applyDecryptedOverride: (response, responderAddress, questionId) => {
+          expect([responderAddress, questionId]).toEqual([lockedResponder, 'q1']);
+          return { ...response, answer: { encrypted: true, value: 'Agree' } };
+        },
+      });
 
-    expect(html).toContain('Runtime question?');
-    expect(html).toContain('Encrypted question');
-    expect(html).not.toContain(gatedPrompt);
-    expect(html).not.toContain('gated-tag');
-    expect(aiInput).not.toContain(gatedPrompt);
-    expect(aiInput).not.toContain('gated-tag');
-    expect(aiInput).not.toContain('Encrypted question');
-    expect(aiInput).not.toContain('"q2"');
+      expect(runtime.buildSessionResultsHtmlReportSnapshot().sections.report.answers).toEqual([
+        { answer: 'Agree', comment: '', questionId: 'q1', responder: lockedResponder },
+      ]);
+    });
+
+    it('still keeps author-encrypted questions and their answers out of the AI input', () => {
+      const { runtime } = gatedRuntime();
+      const aiInput = JSON.stringify(runtime.buildSessionResultsAnalysisPayloadForAi());
+
+      expect(aiInput).not.toContain(gatedPrompt);
+      expect(aiInput).not.toContain('gated-tag');
+      expect(aiInput).not.toContain('Disagree');
+      expect(aiInput).not.toContain('"q2"');
+      expect(aiInput).toContain('Runtime question?');
+    });
   });
 
   it('names the exporter by full address', () => {

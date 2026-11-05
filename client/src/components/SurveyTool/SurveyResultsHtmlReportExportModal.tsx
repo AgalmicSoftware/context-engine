@@ -186,7 +186,7 @@ export const renderSurveyResultsHtmlReportExportModal = ({
           Export timestamp: <strong>{snapshot?.exportedAt}</strong>
         </p>
         <p>
-          Privacy mode: <strong>Redacted</strong>
+          Contents: <strong>What you can see here</strong>
         </p>
         <p>
           Downloaded by: <strong>{exporterLabel}</strong>
@@ -250,7 +250,7 @@ export const renderSurveyResultsHtmlReportExportModal = ({
           </Alert>
         )}
         <Alert color="warning" fade={false} className={styleMap.htmlReportWarning}>
-          Redacted exports omit raw response records, wallet addresses, encrypted payloads, and gated values by default.
+          Includes what you decrypted, answers and responder addresses. Your address is stamped on the file.
         </Alert>
         {!canDownload && (
           <Alert color="info" fade={false} className={styleMap.htmlReportInfo}>
