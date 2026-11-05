@@ -190,6 +190,28 @@ describe('report answers', () => {
     ).toEqual([]);
   });
 
+  it('files an answer under the question the Results view shows it under, whatever its payload names', () => {
+    const overridden: string[] = [];
+    expect(
+      buildSurveyResultsHtmlReportAnswersForExport({
+        aggregatorQuestionResponses: {
+          asked: [row('other', { answer: { value: 'Agree' } })],
+          masked: [row('public', { answer: { value: 'Disagree' } })],
+        },
+        applyDecryptedOverride: (response, _responder, questionId) => {
+          overridden.push(questionId);
+          return response;
+        },
+        networkQuestions: {
+          asked: { type: 'binary', prompt: 'Asked' },
+          masked: { type: 'binary', prompt: '[encrypted]' },
+          public: { type: 'binary', prompt: 'Public' },
+        },
+      }),
+    ).toEqual([{ questionId: 'asked', responder, answer: 'Agree', comment: '' }]);
+    expect(overridden).toEqual(['asked']);
+  });
+
   it('shows what this reader decrypted through the override port', () => {
     expect(
       buildSurveyResultsHtmlReportAnswersForExport({
