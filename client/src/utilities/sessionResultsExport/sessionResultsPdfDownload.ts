@@ -1,6 +1,7 @@
 import {
   createPagedPdf,
   loadBrowserModuleWithRetry,
+  planCanvasPdfPages,
   resolveDefaultExport,
   resolveJsPdfConstructor,
 } from '../ui/browserPdfExport';
@@ -15,8 +16,8 @@ export type SessionResultsPdfDownloadOptions = {
   jsPdfLoader?: () => Promise<unknown>;
 };
 
-// Below the 32,767 pixels a canvas can hold at twice this height, and well above a normal block.
-const PDF_CAPTURE_HEIGHT = 12000;
+// Captured at double scale this stays under the 16.7 million pixels a phone's canvas can hold.
+const PDF_CAPTURE_HEIGHT = 3500;
 
 export const downloadSessionResultsPdfReport = async ({
   documentRef = document,
@@ -63,22 +64,42 @@ export const downloadSessionResultsPdfReport = async ({
     const JsPdf = resolveJsPdfConstructor(jsPdfModule);
     const pdf = createPagedPdf({ JsPdf, exporter: exporterAddress, title: iframeDoc.title });
     const capture = async (element: HTMLElement) => {
-      const height = element.getBoundingClientRect().height;
+      const bounds = element.getBoundingClientRect();
       const options = {
         backgroundColor: FIXED_MEDIA_LIGHT,
         scale: 2,
         scrollX: 0,
         scrollY: 0,
         useCORS: true,
-        windowHeight: Math.max(iframeDoc.documentElement.scrollHeight, height),
+        windowHeight: Math.max(iframeDoc.documentElement.scrollHeight, bounds.height),
         windowWidth: iframeDoc.documentElement.scrollWidth,
       };
-      if (height <= PDF_CAPTURE_HEIGHT) {
-        pdf.addCanvas(await html2canvas(element, options));
-        return;
-      }
-      for (let y = 0; y < height; y += PDF_CAPTURE_HEIGHT) {
-        pdf.addCanvas(await html2canvas(element, { ...options, y, height: Math.min(PDF_CAPTURE_HEIGHT, height - y) }));
+      // Neither the end of a capture nor a page break cuts through a row that fits. Adjacent rows round alike, as an
+      // overlap of one pixel would make every earlier row look cut too.
+      const rows = Array.from(element.querySelectorAll('tr')).map((row) => {
+        const { top, bottom } = row.getBoundingClientRect();
+        return { top: Math.round(top - bounds.top), bottom: Math.round(bottom - bounds.top) };
+      });
+      const windows =
+        bounds.height > PDF_CAPTURE_HEIGHT
+          ? planCanvasPdfPages(Math.ceil(bounds.height), PDF_CAPTURE_HEIGHT, rows)
+          : [{ top: 0, bottom: bounds.height }];
+      for (const { top, bottom } of windows) {
+        const canvas = await html2canvas(
+          element,
+          windows.length > 1 ? { ...options, y: top, height: bottom - top } : options,
+        );
+        const toPixels = canvas.height / (bottom - top || 1);
+        const keepTogether = rows
+          .filter((row) => row.top >= top && row.bottom <= bottom)
+          .map((row) => ({
+            top: Math.round((row.top - top) * toPixels),
+            bottom: Math.round((row.bottom - top) * toPixels),
+          }));
+        pdf.addCanvas(canvas, keepTogether);
+        // Phones run out of canvas memory long before a report's end if these wait for garbage collection.
+        canvas.width = 0;
+        canvas.height = 0;
       }
     };
     // One canvas can't hold a long report, and html2canvas copies whatever the document holds on every capture, so
