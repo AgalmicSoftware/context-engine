@@ -1,5 +1,6 @@
 import { getVoiceCredits } from '../../../../shared/questions/quadraticAllocation.mjs';
 import type { SessionResultsReportQuestion } from '../../utilities/sessionResultsExport';
+import type { RatingScale } from '../../utilities/survey/ratingValue';
 
 type SurveyResultsRecord = Record<string, unknown>;
 
@@ -10,6 +11,7 @@ export type SurveyResultsHtmlReportQuestionRecord = {
   id?: unknown;
   options?: unknown;
   prompt?: unknown;
+  scale?: RatingScale;
   tags?: unknown;
   type?: unknown;
   voiceCredits?: unknown;
@@ -149,6 +151,7 @@ export const buildSurveyResultsHtmlReportQuestionsForExport = ({
       prompt: String(question.prompt || '').trim(),
       type: String(question.type || '').trim(),
       ...(question.type === 'quadratic' ? { voiceCredits: getVoiceCredits(question) } : {}),
+      ...(question.scale ? { scale: question.scale } : {}),
       tags: normalizeStringList(question.tags),
       options: normalizeStringList(question.options),
       responseCount: responseCountsByQuestion?.get(countKey) || 0,

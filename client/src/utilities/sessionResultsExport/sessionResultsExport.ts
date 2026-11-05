@@ -5,6 +5,7 @@ import {
   resolveJsPdfConstructor,
   saveCanvasAsPagedPdf,
 } from '../ui/browserPdfExport';
+import { normalizeRatingScale, type RatingScale } from '../survey/ratingValue';
 
 export const SESSION_RESULTS_HTML_SNAPSHOT_TYPE = 'ce_session_results_html_snapshot';
 export const SESSION_RESULTS_HTML_SNAPSHOT_VERSION = 1;
@@ -68,6 +69,7 @@ export type SessionResultsReportQuestion = {
   options: string[];
   prompt: string;
   responseCount: number;
+  scale?: RatingScale;
   voiceCredits?: number;
   tags: string[];
   type: string;
@@ -257,6 +259,7 @@ const normalizeReportQuestion = (value: unknown): SessionResultsReportQuestion =
     tags: toStringArray(record.tags),
     type: toSafeString(record.type).trim(),
     ...(record.type === 'quadratic' ? { voiceCredits: getVoiceCredits(record) } : {}),
+    ...(record.type === 'rating' ? { scale: normalizeRatingScale(record) } : {}),
   };
 };
 
@@ -400,6 +403,12 @@ const renderUnavailable = (label: string, reason?: string): string => `
       <p>${escapeHtml(reason || DEFAULT_UNAVAILABLE_REASON)}</p>
     </section>`;
 
+const formatRatingEnd = (value: number, label: string): string =>
+  label && label !== String(value) ? `${value} (${label})` : String(value);
+
+const formatRatingScale = ({ min, max, minLabel, maxLabel, step = 1 }: RatingScale): string =>
+  `${formatRatingEnd(min, minLabel)} to ${formatRatingEnd(max, maxLabel)}${step === 1 ? '' : `, step ${step}`}`;
+
 const renderQuestionRows = (questions: SessionResultsReportQuestion[]): string => {
   if (questions.length === 0) {
     return '<p>No report questions were captured in this snapshot.</p>';
@@ -429,7 +438,7 @@ const renderQuestionRows = (questions: SessionResultsReportQuestion[]): string =
               <td>${escapeHtml(question.type || 'unknown')}</td>
               <td>${escapeHtml(question.responseCount)}</td>
               <td>${escapeHtml(question.tags.join(', '))}</td>
-              <td>${escapeHtml(question.options.join(', '))}${question.type === 'quadratic' ? `<div class="ce-report-muted">${escapeHtml(getVoiceCredits(question))} voice credits</div>` : ''}</td>
+              <td>${escapeHtml(question.options.join(', '))}${question.type === 'quadratic' ? `<div class="ce-report-muted">${escapeHtml(getVoiceCredits(question))} voice credits</div>` : ''}${question.scale ? `<div class="ce-report-muted">${escapeHtml(formatRatingScale(question.scale))}</div>` : ''}</td>
             </tr>`,
             )
             .join('')}

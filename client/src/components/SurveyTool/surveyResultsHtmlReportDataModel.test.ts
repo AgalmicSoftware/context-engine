@@ -98,3 +98,15 @@ describe('surveyResultsHtmlReportDataModel', () => {
     ]);
   });
 });
+
+it('passes a rating question’s scale on to the report', () => {
+  const scale = { min: 0, max: 10, step: 2, minLabel: 'Never', maxLabel: 'Always' };
+  const [rating, binary] = buildSurveyResultsHtmlReportQuestionsForExport({
+    filteredQuestions: [
+      { id: 'q1', prompt: 'How often?', type: 'rating', scale },
+      { id: 'q2', prompt: 'Agree?', type: 'binary' },
+    ],
+  });
+  expect(rating.scale).toEqual(scale);
+  expect(binary).not.toHaveProperty('scale');
+});
