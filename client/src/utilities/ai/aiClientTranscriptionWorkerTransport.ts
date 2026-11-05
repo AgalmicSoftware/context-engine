@@ -83,7 +83,7 @@ const requestAudioTranscription = async (
   transport: TranscriptionWorkerTransport,
   { fileName = '', signal, onJsonParseError, knownSpeakers = [] }: TranscriptionUploadOptions = {},
   groupSpeakerLabels = false,
-): Promise<UnknownRecord> => {
+): Promise<UnknownRecord & { text: string }> => {
   const maybeBlob = typeof Blob !== 'undefined' && audioFileOrBlob instanceof Blob ? audioFileOrBlob : null;
   const sourceName = stringValue(asRecord(audioFileOrBlob).name);
   const sourceType = stringValue(asRecord(audioFileOrBlob).type);
@@ -140,14 +140,20 @@ const requestAudioTranscription = async (
     throw Object.assign(new Error(parseTranscriptionErrorMessage(data, resp.status)), { status: resp.status });
   }
 
-  return asRecord(data);
+  // A success without text is a lost reply (a dropped connection, say), not silence: saving it as a transcript
+  // would delete the chunk's audio. Released Workers always send text, so this leaves real silence alone.
+  const { text } = asRecord(data);
+  if (typeof text !== 'string') {
+    throw Object.assign(new Error('The transcription reply could not be read.'), { status: 502 });
+  }
+  return { ...asRecord(data), text };
 };
 
 export const uploadAudioForTranscription = async (
   audioFileOrBlob: unknown,
   transport: TranscriptionWorkerTransport,
   options: TranscriptionUploadOptions = {},
-): Promise<string> => stringValue((await requestAudioTranscription(audioFileOrBlob, transport, options)).text);
+): Promise<string> => (await requestAudioTranscription(audioFileOrBlob, transport, options)).text;
 
 export type DiarizedTranscription = {
   text: string;
@@ -169,7 +175,7 @@ export const uploadAudioForDiarizedTranscription = async (
     ...transport,
     transcriptionCfg: { ...config, provider: 'openai', model: GROUP_TRANSCRIPTION_MODEL },
   };
-  let data: UnknownRecord;
+  let data: UnknownRecord & { text: string };
   let speakerSamplesRefused = false;
   try {
     data = await requestAudioTranscription(audioFileOrBlob, labelled, options, true);
@@ -182,12 +188,14 @@ export const uploadAudioForDiarizedTranscription = async (
     speakerSamplesRefused = true;
   }
   if (!Array.isArray(data.segments)) {
-    const reason = 'This Worker returned text without speaker labels.';
-    if (typeof data.text === 'string') return { text: data.text, segments: [], labelsUnavailableReason: reason };
-    throw new SpeakerLabelsUnavailableError(reason);
+    return {
+      text: data.text,
+      segments: [],
+      labelsUnavailableReason: 'This Worker returned text without speaker labels.',
+    };
   }
   return {
-    text: stringValue(data.text),
+    text: data.text,
     segments: normalizeSpeakerTurns(data.segments),
     ...(speakerSamplesRefused ? { speakerSamplesRefused } : {}),
   };
