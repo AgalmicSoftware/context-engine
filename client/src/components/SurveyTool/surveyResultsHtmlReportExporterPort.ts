@@ -35,6 +35,7 @@ export const bindSurveyResultsHtmlReportExporterPort = ({
     const html = renderHtmlReport()(snapshot, downloadRequest.renderOptions);
     if (downloadRequest.kind === 'pdf') {
       await downloadPort().downloadPdfReport({
+        exporterAddress: snapshot.exportedBy?.address,
         filename: downloadRequest.filename,
         html,
       });

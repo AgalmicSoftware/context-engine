@@ -1213,6 +1213,7 @@ export default function PolisReport({
         keepTogether,
         filename: buildPolisReportPdfFilename(resolvedSessionName),
         JsPdf: jsPDF,
+        exporter: loginComplete && account ? String(account) : '',
       });
     } catch (e) {
       surveyLog.error('Polis report PDF export failed', e);

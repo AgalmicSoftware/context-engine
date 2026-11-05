@@ -113,7 +113,7 @@ describe('sessionResultsExport utilities', () => {
     expect(snapshot.exportedBy).toEqual({
       address: '0x9999999999999999999999999999999999999999',
       chainId: 11155420,
-      displayAddress: '0x9999...9999',
+      displayAddress: '0x9999999999999999999999999999999999999999',
     });
     expect(snapshot.filters).toEqual({ note: 'owner [redacted-address]', tag: 'governance' });
     expect(snapshot.sections.report.available).toBe(true);
@@ -181,7 +181,7 @@ describe('sessionResultsExport utilities', () => {
     expect(html).toContain('href="#report"');
     expect(html).toContain('id="ce-session-results-snapshot"');
     expect(html).toContain('Download Snapshot JSON');
-    expect(html).toContain('Downloaded by 0x9999...9999');
+    expect(html).toContain('Downloaded by 0x9999999999999999999999999999999999999999');
     expect(html).toContain('ce-report-integrity-warning');
     expect(html).toContain('Comparison Dimensions');
     expect(html).toContain('Builders Guild');
@@ -546,45 +546,103 @@ describe('sessionResultsExport utilities', () => {
     clickSpy.mockRestore();
   });
 
-  it('paginates PDF exports instead of shrinking long reports onto one page', async () => {
-    const canvas = {
-      height: 2000,
-      toDataURL: jest.fn(() => 'data:image/jpeg;base64,report'),
-      width: 500,
-    } as unknown as HTMLCanvasElement;
-    const html2canvas = jest.fn(async () => canvas);
-    const addImage = jest.fn();
-    const addPage = jest.fn();
-    const save = jest.fn();
-    const JsPdf = jest.fn().mockImplementation(() => ({
-      addImage,
-      addPage,
-      internal: {
-        pageSize: {
-          getHeight: () => 842,
-          getWidth: () => 595,
-        },
-      },
-      save,
-    }));
+  describe('PDF download', () => {
+    const exporterAddress = '0x9999999999999999999999999999999999999999';
+    const stubPdf = () => {
+      const doc = {
+        addImage: jest.fn(),
+        addPage: jest.fn(),
+        internal: { pageSize: { getHeight: () => 1040, getWidth: () => 540 } },
+        save: jest.fn(),
+        setFontSize: jest.fn(),
+        setProperties: jest.fn(),
+        setTextColor: jest.fn(),
+        text: jest.fn(),
+      };
+      return { doc, loader: async () => ({ jsPDF: jest.fn().mockImplementation(() => doc) }) };
+    };
+    let mocks: Array<{ mockRestore: () => void }>;
+    beforeEach(() => {
+      mocks = [
+        jest
+          .spyOn(HTMLCanvasElement.prototype, 'getContext')
+          .mockReturnValue({ fillRect: jest.fn(), drawImage: jest.fn() } as unknown as CanvasRenderingContext2D),
+        jest.spyOn(HTMLCanvasElement.prototype, 'toDataURL').mockReturnValue('data:image/jpeg;base64,page'),
+      ];
+    });
+    afterEach(() => mocks.forEach((mock) => mock.mockRestore()));
+    const capturing = (heights: Record<string, number>) => {
+      const seen: Array<{ tag: string; id: string; documentHolds: number }> = [];
+      const html2canvas = jest.fn(async (element: HTMLElement, _options?: Record<string, unknown>) => {
+        seen.push({
+          tag: element.tagName,
+          id: element.id,
+          documentHolds: element.ownerDocument.querySelectorAll('main > *').length,
+        });
+        const canvas = element.ownerDocument.createElement('canvas');
+        canvas.width = 500;
+        canvas.height = heights[element.id] ?? 100;
+        return canvas;
+      });
+      return { html2canvas, seen };
+    };
+    const html = `<!doctype html><html><head><title>Session report</title></head><body class="ce-report-pdf">
+      <header id="top">Header</header><main><section id="one">One</section><section id="two">Two</section></main></body></html>`;
 
-    await downloadSessionResultsPdfReport({
-      filename: 'report.pdf',
-      html: '<!doctype html><html><body><main>Long report</main></body></html>',
-      html2canvasLoader: async () => ({ default: html2canvas }),
-      jsPdfLoader: async () => ({ jsPDF: JsPdf }),
+    it('captures the header and each block alone, then names the exporter on every page', async () => {
+      const { doc, loader } = stubPdf();
+      const { html2canvas, seen } = capturing({ top: 100, one: 700, two: 700 });
+      await downloadSessionResultsPdfReport({
+        exporterAddress,
+        filename: 'report.pdf',
+        html,
+        html2canvasLoader: async () => ({ default: html2canvas }),
+        jsPdfLoader: loader,
+      });
+      // html2canvas copies whatever the document holds on every capture, so a block is alone when captured.
+      expect(seen).toEqual([
+        { tag: 'HEADER', id: 'top', documentHolds: 0 },
+        { tag: 'SECTION', id: 'one', documentHolds: 1 },
+        { tag: 'SECTION', id: 'two', documentHolds: 1 },
+      ]);
+      expect(doc.addPage).toHaveBeenCalledTimes(1);
+      expect(doc.text).toHaveBeenCalledTimes(2);
+      expect(doc.text.mock.calls[0][0]).toBe(`Downloaded by ${exporterAddress}`);
+      expect(doc.setProperties).toHaveBeenCalledWith(
+        expect.objectContaining({ author: exporterAddress, title: 'Session report' }),
+      );
+      expect(doc.save).toHaveBeenCalledWith('report.pdf');
+      expect(document.querySelector('iframe[title="Context Engine PDF export"]')).toBeNull();
     });
 
-    expect(html2canvas).toHaveBeenCalledTimes(1);
-    expect(canvas.toDataURL).toHaveBeenCalledWith('image/jpeg', 0.82);
-    expect(addImage).toHaveBeenCalledTimes(3);
-    expect(addPage).toHaveBeenCalledTimes(2);
-    expect(addImage.mock.calls.map((call) => call[3])).toEqual([0, -842, -1684]);
-    expect(addImage.mock.calls[0]).toEqual(
-      expect.arrayContaining(['data:image/jpeg;base64,report', 'JPEG', 0, 0, 595, 2380]),
-    );
-    expect(save).toHaveBeenCalledWith('report.pdf');
-    expect(document.querySelector('iframe[title="Context Engine PDF export"]')).toBeNull();
+    it('captures a block too tall for one image in windows, losing none of it', async () => {
+      const { doc, loader } = stubPdf();
+      const { html2canvas } = capturing({});
+      await downloadSessionResultsPdfReport({
+        exporterAddress,
+        filename: 'report.pdf',
+        html,
+        html2canvasLoader: async () => {
+          // The report lays out in its own iframe, which this test gives a tall first block.
+          const frame = document.querySelector<HTMLIFrameElement>('iframe[title="Context Engine PDF export"]');
+          const frameWindow = frame?.contentWindow as unknown as { Element: typeof Element };
+          frameWindow.Element.prototype.getBoundingClientRect = function rectOf(this: Element) {
+            return { height: this.id === 'one' ? 25000 : 100 } as DOMRect;
+          };
+          return { default: html2canvas };
+        },
+        jsPdfLoader: loader,
+      });
+      const windows = html2canvas.mock.calls
+        .filter(([element]) => (element as HTMLElement).id === 'one')
+        .map(([, options]) => options);
+      expect(windows.map((options) => [options?.y, options?.height])).toEqual([
+        [0, 12000],
+        [12000, 12000],
+        [24000, 1000],
+      ]);
+      expect(doc.save).toHaveBeenCalledWith('report.pdf');
+    });
   });
 });
 

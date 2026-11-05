@@ -1,9 +1,9 @@
 import { getVoiceCredits } from '../../../../shared/questions/quadraticAllocation.mjs';
 import {
+  createPagedPdf,
   loadBrowserModuleWithRetry,
   resolveDefaultExport,
   resolveJsPdfConstructor,
-  saveCanvasAsPagedPdf,
 } from '../ui/browserPdfExport';
 import { normalizeRatingScale, type RatingScale } from '../survey/ratingValue';
 
@@ -179,6 +179,7 @@ export type SessionResultsHtmlReportRenderOptions = {
 
 export type SessionResultsPdfDownloadOptions = {
   documentRef?: Document;
+  exporterAddress?: string;
   filename: string;
   html: string;
   html2canvasLoader?: () => Promise<unknown>;
@@ -200,13 +201,6 @@ const toFiniteNullableNumber = (value: unknown): number | null => {
 const toStringArray = (value: unknown): string[] =>
   Array.isArray(value) ? value.map((item) => toSafeString(item).trim()).filter(Boolean) : [];
 
-const shortenAddress = (value: unknown): string => {
-  const address = toSafeString(value).trim();
-  if (!address) return '';
-  if (address.length <= 12) return address;
-  return `${address.slice(0, 6)}...${address.slice(-4)}`;
-};
-
 const toPlainRecord = (value: unknown): Record<string, unknown> =>
   value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
 
@@ -226,7 +220,7 @@ const normalizeExporterMetadata = (
   return {
     address,
     chainId: toFiniteNullableNumber(value?.chainId),
-    displayAddress: toSafeString(value?.displayAddress).trim() || shortenAddress(address),
+    displayAddress: toSafeString(value?.displayAddress).trim() || address,
   };
 };
 
@@ -649,7 +643,7 @@ export const renderSessionResultsHtmlReport = (
     pre { overflow: auto; background: #101828; color: #f4f7fb; border-radius: 8px; padding: 14px; }
     details { border: 1px solid #d9dee8; border-radius: 8px; background: #ffffff; padding: 10px 12px; margin: 10px 0; }
     summary { cursor: pointer; font-weight: 700; }
-    .ce-report-meta { display: flex; flex-wrap: wrap; gap: 10px 18px; color: #4b5563; }
+    .ce-report-meta { display: flex; flex-wrap: wrap; gap: 10px 18px; color: #4b5563; overflow-wrap: anywhere; }
     .ce-report-section { background: #ffffff; border: 1px solid #d9dee8; border-radius: 8px; padding: 20px; margin: 18px 0; }
     .ce-report-section--unavailable { background: #fbfcfe; color: #5b6472; }
     .ce-report-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin: 18px 0; }
@@ -658,7 +652,7 @@ export const renderSessionResultsHtmlReport = (
     .ce-report-stats dd { margin: 4px 0 0; font-size: 1.35rem; font-weight: 800; }
     .ce-report-muted { color: #6b7280; font-size: 0.86rem; margin-top: 4px; overflow-wrap: anywhere; }
     .ce-report-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-top: 20px; }
-    .ce-export-watermark { position: fixed; right: 14px; bottom: 10px; z-index: 50; border: 1px solid #cbd5e1; border-radius: 999px; background: rgba(255, 255, 255, 0.92); color: #334155; padding: 6px 10px; font-size: 0.78rem; font-weight: 800; box-shadow: 0 10px 24px rgba(15, 23, 42, 0.14); }
+    .ce-export-watermark { position: fixed; right: 14px; bottom: 10px; z-index: 50; max-width: calc(100vw - 28px); box-sizing: border-box; overflow-wrap: anywhere; border: 1px solid #cbd5e1; border-radius: 12px; background: rgba(255, 255, 255, 0.92); color: #334155; padding: 6px 10px; font-size: 0.78rem; font-weight: 800; box-shadow: 0 10px 24px rgba(15, 23, 42, 0.14); }
     .ce-integrity-warning { border: 2px solid #f97316; background: #fff7ed; color: #7c2d12; padding: 14px 18px; font-weight: 800; }
     .ce-report-integrity-failed header, .ce-report-integrity-failed main { filter: grayscale(1) blur(1px); opacity: 0.55; pointer-events: none; }
     body.ce-report-pdf { background: #ffffff; }
@@ -840,8 +834,12 @@ export const downloadSessionResultsHtmlReport = (
   });
 };
 
+// Below the 32,767 pixels a canvas can hold at twice this height, and well above a normal block.
+const PDF_CAPTURE_HEIGHT = 12000;
+
 export const downloadSessionResultsPdfReport = async ({
   documentRef = document,
+  exporterAddress = '',
   filename,
   html,
   html2canvasLoader = () => import('html2canvas'),
@@ -882,18 +880,38 @@ export const downloadSessionResultsPdfReport = async ({
         html2canvasModule,
       );
     const JsPdf = resolveJsPdfConstructor(jsPdfModule);
-    const captureTarget = iframeDoc.body;
-    const canvas = await html2canvas(captureTarget, {
-      backgroundColor: '#ffffff',
-      scale: 2,
-      scrollX: 0,
-      scrollY: 0,
-      useCORS: true,
-      windowHeight: captureTarget.scrollHeight,
-      windowWidth: captureTarget.scrollWidth,
-    });
-
-    saveCanvasAsPagedPdf({ canvas, filename, JsPdf });
+    const pdf = createPagedPdf({ JsPdf, exporter: exporterAddress, title: iframeDoc.title });
+    const capture = async (element: HTMLElement) => {
+      const height = element.getBoundingClientRect().height;
+      const options = {
+        backgroundColor: '#ffffff',
+        scale: 2,
+        scrollX: 0,
+        scrollY: 0,
+        useCORS: true,
+        windowHeight: Math.max(iframeDoc.documentElement.scrollHeight, height),
+        windowWidth: iframeDoc.documentElement.scrollWidth,
+      };
+      if (height <= PDF_CAPTURE_HEIGHT) {
+        pdf.addCanvas(await html2canvas(element, options));
+        return;
+      }
+      for (let y = 0; y < height; y += PDF_CAPTURE_HEIGHT) {
+        pdf.addCanvas(await html2canvas(element, { ...options, y, height: Math.min(PDF_CAPTURE_HEIGHT, height - y) }));
+      }
+    };
+    // One canvas can't hold a long report, and html2canvas copies whatever the document holds on every capture, so
+    // each block is alone in the document while it is captured.
+    const main = iframeDoc.querySelector('main');
+    const blocks = Array.from(main?.children || []) as HTMLElement[];
+    main?.replaceChildren();
+    const header = iframeDoc.querySelector('header');
+    if (header) await capture(header);
+    for (const block of blocks) {
+      main?.replaceChildren(block);
+      await capture(block);
+    }
+    pdf.save(filename);
   } finally {
     if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
   }

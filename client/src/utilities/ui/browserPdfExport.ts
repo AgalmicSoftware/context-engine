@@ -10,6 +10,10 @@ export type JsPdfDocument = {
   addImage(...args: unknown[]): void;
   addPage(): void;
   save(filename: string): void;
+  setFontSize(size: number): unknown;
+  setProperties(properties: Record<string, string>): unknown;
+  setTextColor(red: number, green: number, blue: number): unknown;
+  text(text: string, x: number, y: number): unknown;
 };
 
 export type JsPdfConstructor = new (...args: unknown[]) => JsPdfDocument;
@@ -81,83 +85,124 @@ export function planCanvasPdfPages(height: number, pageHeight: number, ranges: P
   return pages;
 }
 
+type PdfCanvas = Pick<HTMLCanvasElement, 'height' | 'width'>;
+
+const assertUsableCanvas = (canvas: PdfCanvas) => {
+  if (!canvas.width || !canvas.height) {
+    throw new Error('PDF export capture did not produce a usable canvas.');
+  }
+};
+
+const PDF_MARGIN = 20;
+const PDF_BLOCK_GAP = 6;
+
+/**
+ * An A4 PDF built from captures, each placed below the last. A capture that doesn't fit the space left starts a new
+ * page. Who exported the file goes in its properties and, as real text, in the margin of every page.
+ */
+export const createPagedPdf = ({
+  JsPdf,
+  exporter = '',
+  title = '',
+  jpegQuality = 0.82,
+}: {
+  JsPdf: JsPdfConstructor;
+  exporter?: string;
+  title?: string;
+  jpegQuality?: number;
+}) => {
+  const pdf = new JsPdf({ compress: true, format: 'a4', orientation: 'p', unit: 'pt' });
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  const pageHeight = pdf.internal.pageSize.getHeight();
+  const imageWidth = pageWidth - PDF_MARGIN * 2;
+  const stampPage = () => {
+    if (!exporter) return;
+    pdf.setFontSize(8);
+    pdf.setTextColor(51, 65, 85);
+    pdf.text(`Downloaded by ${exporter}`, PDF_MARGIN, pageHeight - 8);
+  };
+  if (exporter) {
+    pdf.setProperties({
+      ...(title ? { title } : {}),
+      author: exporter,
+      subject: `Downloaded by ${exporter}`,
+      creator: 'Context Engine',
+    });
+  }
+  stampPage();
+  let y = PDF_MARGIN;
+  const newPage = () => {
+    pdf.addPage();
+    stampPage();
+    y = PDF_MARGIN;
+  };
+  return {
+    addCanvas(canvas: PdfCanvas, keepTogether: PdfKeepTogetherRange[] = []) {
+      assertUsableCanvas(canvas);
+      const scale = imageWidth / canvas.width;
+      if (y > PDF_MARGIN && y + canvas.height * scale > pageHeight - PDF_MARGIN) newPage();
+      const pageSpace = Math.floor((pageHeight - PDF_MARGIN * 2) / scale);
+      planCanvasPdfPages(canvas.height, pageSpace, keepTogether).forEach(({ top, bottom }, index) => {
+        if (index) newPage();
+        const pageCanvas = document.createElement('canvas');
+        pageCanvas.width = canvas.width;
+        pageCanvas.height = bottom - top;
+        const context = pageCanvas.getContext('2d');
+        if (!context) throw new Error('PDF page canvas is unavailable.');
+        context.fillStyle = FIXED_MEDIA_LIGHT;
+        context.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
+        context.drawImage(
+          canvas as HTMLCanvasElement,
+          0,
+          top,
+          canvas.width,
+          bottom - top,
+          0,
+          0,
+          canvas.width,
+          bottom - top,
+        );
+        pdf.addImage(
+          pageCanvas.toDataURL('image/jpeg', jpegQuality),
+          'JPEG',
+          PDF_MARGIN,
+          y,
+          imageWidth,
+          (bottom - top) * scale,
+          undefined,
+          'FAST',
+        );
+        y += (bottom - top) * scale;
+        // Release temporary page bitmaps promptly for large reports.
+        pageCanvas.width = 0;
+        pageCanvas.height = 0;
+      });
+      y += PDF_BLOCK_GAP;
+    },
+    save: (filename: string) => pdf.save(filename),
+  };
+};
+
 export const saveCanvasAsPagedPdf = ({
   canvas,
   filename,
   JsPdf,
-  jpegQuality = 0.82,
+  exporter,
+  title,
+  jpegQuality,
   keepTogether,
 }: {
-  canvas: Pick<HTMLCanvasElement, 'height' | 'toDataURL' | 'width'>;
+  canvas: PdfCanvas;
   filename: string;
   JsPdf: JsPdfConstructor;
+  exporter?: string;
+  title?: string;
   jpegQuality?: number;
   keepTogether?: PdfKeepTogetherRange[];
 }): void => {
-  if (!canvas.width || !canvas.height) {
-    throw new Error('PDF export capture did not produce a usable canvas.');
-  }
-
-  const pdf = new JsPdf({ compress: true, format: 'a4', orientation: 'p', unit: 'pt' });
-  const pageWidth = pdf.internal.pageSize.getWidth();
-  const pageHeight = pdf.internal.pageSize.getHeight();
-  if (keepTogether) {
-    const margin = 20;
-    const imageWidth = pageWidth - margin * 2;
-    const scale = imageWidth / canvas.width;
-    const pages = planCanvasPdfPages(canvas.height, Math.floor((pageHeight - margin * 2) / scale), keepTogether);
-    pages.forEach(({ top, bottom }, index) => {
-      const pageCanvas = document.createElement('canvas');
-      pageCanvas.width = canvas.width;
-      pageCanvas.height = bottom - top;
-      const context = pageCanvas.getContext('2d');
-      if (!context) throw new Error('PDF page canvas is unavailable.');
-      context.fillStyle = FIXED_MEDIA_LIGHT;
-      context.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
-      context.drawImage(
-        canvas as HTMLCanvasElement,
-        0,
-        top,
-        canvas.width,
-        bottom - top,
-        0,
-        0,
-        canvas.width,
-        bottom - top,
-      );
-      if (index) pdf.addPage();
-      pdf.addImage(
-        pageCanvas.toDataURL('image/jpeg', jpegQuality),
-        'JPEG',
-        margin,
-        margin,
-        imageWidth,
-        (bottom - top) * scale,
-        undefined,
-        'FAST',
-      );
-      // Release temporary page bitmaps promptly for large reports.
-      pageCanvas.width = 0;
-      pageCanvas.height = 0;
-    });
-    pdf.save(filename);
-    return;
-  }
-  const imgData = canvas.toDataURL('image/jpeg', jpegQuality);
-  const imgHeight = (canvas.height * pageWidth) / canvas.width;
-  let heightLeft = imgHeight;
-  let position = 0;
-
-  pdf.addImage(imgData, 'JPEG', 0, position, pageWidth, imgHeight, undefined, 'FAST');
-  heightLeft -= pageHeight;
-
-  while (heightLeft > 0) {
-    pdf.addPage();
-    position = heightLeft - imgHeight;
-    pdf.addImage(imgData, 'JPEG', 0, position, pageWidth, imgHeight, undefined, 'FAST');
-    heightLeft -= pageHeight;
-  }
-
+  assertUsableCanvas(canvas);
+  const pdf = createPagedPdf({ JsPdf, exporter, title, jpegQuality });
+  pdf.addCanvas(canvas, keepTogether);
   pdf.save(filename);
 };
 

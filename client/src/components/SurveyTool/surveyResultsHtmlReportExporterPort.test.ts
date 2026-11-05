@@ -103,7 +103,11 @@ describe('surveyResultsHtmlReportExporterPort', () => {
   });
 
   it('routes PDF requests through the DOM/PDF capture download backend', async () => {
-    const snapshot = buildSnapshot();
+    const exporterAddress = '0x9999999999999999999999999999999999999999';
+    const snapshot = {
+      ...buildSnapshot(),
+      exportedBy: { address: exporterAddress, chainId: 11155420, displayAddress: exporterAddress },
+    };
     const downloadRequest = buildDownloadRequest({
       filename: 'contextEngine_sessionReport_demo-session_2026-05-25T18_30_00_000Z.pdf',
       kind: 'pdf',
@@ -130,6 +134,7 @@ describe('surveyResultsHtmlReportExporterPort', () => {
 
     expect(renderHtmlReport).toHaveBeenCalledWith(snapshot, downloadRequest.renderOptions);
     expect(downloadPdfReport).toHaveBeenCalledWith({
+      exporterAddress,
       filename: downloadRequest.filename,
       html: '<html>PDF report</html>',
     });
