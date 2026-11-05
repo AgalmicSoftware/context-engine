@@ -75833,7 +75833,7 @@ var init_resultsAnalysisAnswerValidation = __esm({
 });
 
 // workers/sessionCorsWorker/resultsAnalysisGeneration.js
-var readCoordinatedResultsAnalysisStatusDefault, reserveCoordinatedResultsAnalysisDefault, finalizeCoordinatedResultsAnalysisDefault, decoder7, AI_RESPONSE_CAP, AI_QUESTION_CAP, AI_LIMITS, ANALYSIS_ARTIFACT_VERSION, SOURCE_VERSION, RESULT_SECTION_ORDER, DEFAULT_RESULTS_ANALYSIS_PROVIDER_TIMEOUT_MS, RESULTS_CONTEXT_CHARS, isObj19, hasOwn6, trim15, lower6, getResultsAnalysisSettings, getCanonicalSessionId, publicDraft, applyCurrentArtifactPolicy, normalizeSessionIdHex2, parseJsonBytes, ENCRYPTED_ENVELOPE_KEYS, encryptedEnvelopeValueHasContent, isBlankFieldValue, isClearedFieldWithLockFlag, valueLooksEncrypted, valueFromAnswerLike, FIELD_MASKS, withoutFieldMask, rowLooksLocked, VALIDATED_QUESTION_TYPES, normalizeQuestionId3, normalizeQuestionPrompt, normalizeQuestionType5, normalizeAnalysisRatingScale, normalizeSubmittedAt, enabledSectionsFromSettings, normalizeRequestedSections, resolveResultsAnalysisCapability, compareIdentity, participantDigest, normalizeQuestionRecord, selectRoundRobinResponses, isNewerResponseRow, normalizeSanitizedRows, toResponseRow, readWorkerCanonicalResultsAnalysisSource, loadWorkerCanonicalResultsAnalysisSource, loadAdminSnapshotResultsAnalysisSource, sourceKindFromBody, resolveResultsAnalysisSource, normalizeProviderResponse, resolveAnalysisAiPayload, withTimeout, callResultsAnalysisProvider, normalizeGeneratedArtifact, buildSourceDescriptor, buildReservationKey, filterDraftForStatus, summarizeReservation, analysisEligibility, summarizeActiveState, summarizeFailureState, buildResultsAnalysisStatusBody, readResultsAnalysisAdminStatus, generateResultsAnalysisDraft, maybeTriggerAutomaticResultsAnalysis, runQueuedAutomaticResultsAnalysisJob, normalizedResultsProfile, resolveResultsVisibility, aggregateResultsEnabled, evaluateResultsAnalysisViewerEligibility, readPublishedResultsAnalysisArtifact;
+var readCoordinatedResultsAnalysisStatusDefault, reserveCoordinatedResultsAnalysisDefault, finalizeCoordinatedResultsAnalysisDefault, decoder7, AI_RESPONSE_CAP, AI_QUESTION_CAP, AI_LIMITS, ANALYSIS_ARTIFACT_VERSION, SOURCE_VERSION, RESULT_SECTION_ORDER, DEFAULT_RESULTS_ANALYSIS_PROVIDER_TIMEOUT_MS, RESULTS_CONTEXT_CHARS, isObj19, hasOwn6, trim15, lower6, getResultsAnalysisSettings, getCanonicalSessionId, publicDraft, applyCurrentArtifactPolicy, normalizeSessionIdHex2, parseJsonBytes, ENCRYPTED_ENVELOPE_KEYS, encryptedEnvelopeValueHasContent, isBlankFieldValue, isClearedFieldWithLockFlag, valueLooksEncrypted, valueFromAnswerLike, FIELD_MASKS, withoutFieldMask, rowLooksLocked, VALIDATED_QUESTION_TYPES, normalizeQuestionId3, normalizeQuestionPrompt, normalizeQuestionType5, normalizeAnalysisRatingScale, normalizeSubmittedAt, enabledSectionsFromSettings, normalizeRequestedSections, resolveResultsAnalysisCapability, compareIdentity, participantDigest, normalizeQuestionRecord, selectRoundRobinResponses, isNewerResponseRow, normalizeSanitizedRows, toResponseRow, readWorkerCanonicalResultsAnalysisSource, loadWorkerCanonicalResultsAnalysisSource, loadAdminSnapshotResultsAnalysisSource, sourceKindFromBody, resolveResultsAnalysisSource, normalizeProviderResponse, resolveAnalysisAiPayload, withTimeout, callResultsAnalysisProvider, normalizeGeneratedArtifact, buildSourceDescriptor, buildReservationKey, filterDraftForStatus, summarizeReservation, analysisEligibility, summarizeActiveState, summarizeFailureState, buildResultsAnalysisStatusBody, draftUsesHiddenQuestion, readResultsAnalysisAdminStatus, generateResultsAnalysisDraft, maybeTriggerAutomaticResultsAnalysis, runQueuedAutomaticResultsAnalysisJob, normalizedResultsProfile, resolveResultsVisibility, aggregateResultsEnabled, evaluateResultsAnalysisViewerEligibility, readPublishedResultsAnalysisArtifact;
 var init_resultsAnalysisGeneration = __esm({
   "workers/sessionCorsWorker/resultsAnalysisGeneration.js"() {
     init_aiRequestPolicy();
@@ -76558,10 +76558,30 @@ var init_resultsAnalysisGeneration = __esm({
         }
       };
     };
+    draftUsesHiddenQuestion = async ({ env, slug, config, draft }) => {
+      const ids = (Array.isArray(draft?.snapshot?.questions) ? draft.snapshot.questions : []).map((question) => lower6(question?.id));
+      if (!ids.length) return false;
+      const blocked = new Set(blockedQuestionIds(config));
+      if (ids.some((id2) => blocked.has(id2))) return true;
+      const index = getStorageIndexBinding(env);
+      if (!index || typeof index.list !== "function") return false;
+      try {
+        const hidden = await listHiddenStorageResourceIds({ index, slug, resource: "questions" });
+        return ids.some((id2) => hidden.has(id2));
+      } catch {
+        return true;
+      }
+    };
     readResultsAnalysisAdminStatus = async ({ env, slug, config, includeDraft = true, deps } = {}) => {
       const readStatus = deps?.readCoordinatedResultsAnalysisStatus || readCoordinatedResultsAnalysisStatusDefault;
       const coordinatorState = await readStatus({ env, slug });
-      return buildResultsAnalysisStatusBody({ slug, config, coordinatorState, includeDraft });
+      const withheld = await draftUsesHiddenQuestion({ env, slug, config, draft: coordinatorState?.state?.lastGood });
+      return buildResultsAnalysisStatusBody({
+        slug,
+        config,
+        coordinatorState: withheld ? { ...coordinatorState, state: { ...coordinatorState.state, lastGood: null } } : coordinatorState,
+        includeDraft
+      });
     };
     generateResultsAnalysisDraft = async ({ env, slug, config, body = {}, headers: headers2, trigger = "manual", loadedSource, deps } = {}) => {
       const settings = getResultsAnalysisSettings(config);
@@ -76804,6 +76824,15 @@ var init_resultsAnalysisGeneration = __esm({
           status: 404,
           jobState: coordinatorState?.state?.jobState || "idle",
           error: "No generated results analysis artifact is available yet."
+        };
+      }
+      if (await draftUsesHiddenQuestion({ env, slug, config, draft: lastGood })) {
+        return {
+          ok: false,
+          status: 404,
+          reason: "results_analysis_question_hidden",
+          jobState: coordinatorState?.state?.jobState || "idle",
+          error: "This report used a question that has since been hidden. It needs to be generated again."
         };
       }
       return {

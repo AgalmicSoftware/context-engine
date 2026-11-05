@@ -23,8 +23,8 @@ session as empty. It leaves out the session's `BLOCKED_QUESTION_IDS`, as the
 browser and MCP do, before hashing or prompting. A saved interview opening is
 written again when that list changes. Agent question lists, answers, results and
 Wrapped statements, and both Results analysis sources, leave those questions out
-too. A published analysis keeps them until it is generated again. The raw
-`/storage/list` route still lists them.
+too. A published analysis that used one is withheld until it is generated again.
+The raw `/storage/list` route still lists them.
 
 ## Agent HTTP client handoff
 
@@ -2421,9 +2421,14 @@ token):
   `reason: "storage_resource_id_hidden"`), and that upload starts hidden.
   Lists also check the hide records, so a version stored while a hide was in
   progress is listed only as a marker too. Unhiding restores all versions.
-- Historical responses remain in Raw Results and CSV exports; hiding is not
-  deletion or redaction. An already-open cached view may need a reload before
-  it reflects the hide.
+- The browser leaves a hidden question and its answers out of the Results report,
+  Raw Results and every export, for everyone including admins. The session's
+  `BLOCKED_QUESTION_IDS` list works the same way. A published analysis that used a
+  hidden question is withheld (`404` with
+  `reason: "results_analysis_question_hidden"`, and no `lastGood` in admin status)
+  until it is generated again, and unhiding brings it back. Hiding is not deletion:
+  the stored answers stay in storage, in `/storage/list` and in backups. An
+  already-open cached view may need a reload before it reflects the hide.
 - The Worker marks every stored version of the id. Versions stored before this
   release have no `resourceId` in their index row, so the first hide reads
   those payloads once and records each row's id in the single write it makes

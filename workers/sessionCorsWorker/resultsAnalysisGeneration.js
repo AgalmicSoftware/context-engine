@@ -856,10 +856,35 @@ export const buildResultsAnalysisStatusBody = ({ slug, config, coordinatorState,
   };
 };
 
+// A report can quote a question anywhere in its text, so one that used a question
+// an admin has since hidden is withheld until it is generated again. Unhiding brings
+// it back. If the hide records can't be read, it stays withheld for that read.
+const draftUsesHiddenQuestion = async ({ env, slug, config, draft }) => {
+  const ids = (Array.isArray(draft?.snapshot?.questions) ? draft.snapshot.questions : [])
+    .map((question) => lower(question?.id));
+  if (!ids.length) return false;
+  const blocked = new Set(blockedQuestionIds(config));
+  if (ids.some((id) => blocked.has(id))) return true;
+  const index = getStorageIndexBinding(env);
+  if (!index || typeof index.list !== 'function') return false;
+  try {
+    const hidden = await listHiddenStorageResourceIds({ index, slug, resource: 'questions' });
+    return ids.some((id) => hidden.has(id));
+  } catch {
+    return true;
+  }
+};
+
 export const readResultsAnalysisAdminStatus = async ({ env, slug, config, includeDraft = true, deps } = {}) => {
   const readStatus = deps?.readCoordinatedResultsAnalysisStatus || readCoordinatedResultsAnalysisStatusDefault;
   const coordinatorState = await readStatus({ env, slug });
-  return buildResultsAnalysisStatusBody({ slug, config, coordinatorState, includeDraft });
+  const withheld = await draftUsesHiddenQuestion({ env, slug, config, draft: coordinatorState?.state?.lastGood });
+  return buildResultsAnalysisStatusBody({
+    slug,
+    config,
+    coordinatorState: withheld ? { ...coordinatorState, state: { ...coordinatorState.state, lastGood: null } } : coordinatorState,
+    includeDraft,
+  });
 };
 
 export const generateResultsAnalysisDraft = async ({ env, slug, config, body = {}, headers, trigger = 'manual', loadedSource, deps } = {}) => {
@@ -1124,6 +1149,15 @@ export const readPublishedResultsAnalysisArtifact = async ({ env, slug, config, 
       status: 404,
       jobState: coordinatorState?.state?.jobState || 'idle',
       error: 'No generated results analysis artifact is available yet.',
+    };
+  }
+  if (await draftUsesHiddenQuestion({ env, slug, config, draft: lastGood })) {
+    return {
+      ok: false,
+      status: 404,
+      reason: 'results_analysis_question_hidden',
+      jobState: coordinatorState?.state?.jobState || 'idle',
+      error: 'This report used a question that has since been hidden. It needs to be generated again.',
     };
   }
   return {
