@@ -180,6 +180,24 @@ test('regeneration accumulates additions from the last successful generation', a
   await resolveInterviewStarter(f.args);
   assert.equal(f.calls(), 2);
 });
+test('hiding a question writes the opening again, since the old one may quote it', async () => {
+  const f = fixture();
+  const initial = await resolveInterviewStarter(f.args);
+  assert.equal(f.calls(), 1);
+  f.args.config.BLOCKED_QUESTION_IDS = ['Q1'];
+  const rewritten = await resolveInterviewStarter(f.args);
+  assert.notEqual(rewritten.openingPrompt, initial.openingPrompt);
+  assert.equal(f.calls(), 2);
+  await resolveInterviewStarter(f.args);
+  f.args.config.BLOCKED_QUESTION_IDS = [' q1 '];
+  await resolveInterviewStarter(f.args);
+  assert.equal(f.calls(), 2);
+  // With no question left to ask about, the old opening is not served either.
+  f.args.config.BLOCKED_QUESTION_IDS = ['q1', 'q2'];
+  f.setCount(0);
+  assert.equal((await resolveInterviewStarter(f.args)).source, 'waiting-for-questions');
+  assert.equal(f.calls(), 2);
+});
 test('manual refresh works when enabled and rejects disabled refresh', async () => {
   const f = fixture();
   await resolveInterviewStarter(f.args);
