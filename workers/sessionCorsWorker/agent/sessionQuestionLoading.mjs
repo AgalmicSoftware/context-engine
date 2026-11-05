@@ -3,6 +3,7 @@ import { selectCanonicalStorageVersions } from '../../../shared/storage/canonica
 import { listCachedSessionQuestions, payloadConcurrency } from './sessionQuestions.mjs';
 import { loadSessionPolicy } from './sessionPolicyLoader.mjs';
 import { MAX_WORKER_QUESTION_LIST_PAGES } from './runtimeCore.mjs';
+import { blockedQuestionIds } from '../blockedQuestionIds.js';
 import { normalizePreloadedQuestionRecord, selectWorkerCloudflareQuestionItems, questionIsPayloadUnavailable, cloudflareQuestionItemHasInlinePayload, questionRecordMalformedReason, orderQuestionsForPresentationWithSummary, withSkippedMalformed, orderQuestionsForPresentation, withAgentProposedQuestions } from './hostedQuestionNormalization.mjs';
 
 export function sessionUsesWorkerBackedQuestions(session) {
@@ -200,10 +201,18 @@ export async function loadWorkerQuestionsForSession(env, sessionSlug, options = 
   return { ...result, questions: orderQuestionsForPresentation(result.questions || []) };
 }
 
+// A question on the session's hidden list is gone for every Agent reader, answers included.
+export function withoutBlockedQuestions(env = {}, loaded = {}) {
+  const blocked = new Set(blockedQuestionIds(env.AGENT_CONTEXT?.config));
+  if (!blocked.size) return loaded;
+  const questions = (loaded.questions || []).filter((question) => !blocked.has(safeString(question.questionId || question.id).toLowerCase()));
+  return { ...loaded, questions, ...(loaded.questionCount === undefined ? {} : { questionCount: questions.length }) };
+}
+
 export async function loadQuestionsForSession(env = {}, sessionSlug = '', options = {}) {
   const hosted = await loadWorkerQuestionsForSession(env, sessionSlug, options);
   const result = hosted || await listCachedSessionQuestions({ env, sessionSlug, ...options });
   const summary = orderQuestionsForPresentationWithSummary(result.questions || []);
   return withAgentProposedQuestions(env, sessionSlug, { ...result, questions: summary.questions })
-    .then(value => withSkippedMalformed(value, summary.skippedMalformed));
+    .then(value => withoutBlockedQuestions(env, withSkippedMalformed(value, summary.skippedMalformed)));
  }

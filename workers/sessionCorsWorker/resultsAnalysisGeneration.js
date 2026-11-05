@@ -21,6 +21,7 @@ import {
   readStoredCloudflarePayloadBytes,
 } from './storageRouteExecution.js';
 import { listHiddenStorageResourceIds, selectCanonicalStorageVersions } from './storageResourceOwnership.js';
+import { blockedQuestionIds } from './blockedQuestionIds.js';
 import {
   isModelAllowed,
   normalizeAiRequestPayload,
@@ -321,10 +322,11 @@ const isNewerResponseRow = (candidate, current) => (
 const normalizeSanitizedRows = async ({ rows, questions, slug, config, strictLocked, requireKnownQuestion = false }) => {
   const expectedSlug = normalizeWorkerSessionSlug(slug || config?.slug);
   const expectedSessionId = normalizeSessionIdHex(resolveCanonicalWorkerSessionIdHex(config));
+  const blocked = new Set(blockedQuestionIds(config));
   const questionMap = new Map();
   (Array.isArray(questions) ? questions : []).forEach((question) => {
     const normalized = normalizeQuestionRecord(question);
-    if (normalized) questionMap.set(normalized.questionId, normalized);
+    if (normalized && !blocked.has(lower(normalized.questionId))) questionMap.set(normalized.questionId, normalized);
   });
 
   // Each participant's latest row per question wins before any filter, so a
@@ -346,7 +348,7 @@ const normalizeSanitizedRows = async ({ rows, questions, slug, config, strictLoc
       return { ok: false, status: 400, error: 'Encrypted or locked response rows cannot be used for admin snapshot generation.' };
     }
     const questionId = normalizeQuestionId(row.questionId || row.questionID || row.id);
-    if (!questionId || (requireKnownQuestion && !questionMap.has(questionId))) {
+    if (!questionId || blocked.has(lower(questionId)) || (requireKnownQuestion && !questionMap.has(questionId))) {
       excludedCount += 1;
       continue;
     }

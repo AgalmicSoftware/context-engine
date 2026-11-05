@@ -62,3 +62,29 @@ test('Wrapped reads a hosted catalog past 200 questions in full', async () => {
   assert.equal(loaded.ok, true, loaded.reason);
   assert.equal(loaded.questions.length, 201);
 });
+
+test('Wrapped leaves out the session hidden list, from canonical questions and agent proposals alike', async () => {
+  const env = { AGENT_CONTEXT: { config: { BLOCKED_QUESTION_IDS: [' Q-1 '] } } };
+  const questions = [{ questionId: 'q-1', prompt: 'Hidden?' }, { questionId: 'q-2', prompt: 'Kept?' }];
+  const canonical = await loadWrappedQuestionSource({
+    env,
+    sessionSlug: 'fixture',
+    loadedConfig: { config: {} },
+    loadCanonicalQuestions: async () => ({ ok: true, questions }),
+  });
+  assert.deepEqual(canonical.questions.map(({ questionId }) => questionId), ['q-2']);
+  const proposals = await loadWrappedQuestionSource({
+    env,
+    sessionSlug: 'fixture',
+    loadedConfig: { config: { questionSourceMode: 'agent_only', enabledQuestionIds: ['q-1', 'q-2'] } },
+    loadProposalQuestions: async () => questions,
+  });
+  assert.deepEqual(proposals.questions.map(({ questionId }) => questionId), ['q-2']);
+  const allHidden = await loadWrappedQuestionSource({
+    env: { AGENT_CONTEXT: { config: { BLOCKED_QUESTION_IDS: ['q-1', 'q-2'] } } },
+    sessionSlug: 'fixture',
+    loadedConfig: { config: {} },
+    loadCanonicalQuestions: async () => ({ ok: true, questions }),
+  });
+  assert.equal(allHidden.reason, 'wrapped_canonical_questions_empty');
+});

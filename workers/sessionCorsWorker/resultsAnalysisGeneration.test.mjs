@@ -416,6 +416,47 @@ test('public text that looks like a lock marker is analysed; only encryption fla
   assert.deepEqual(admin.snapshot.responses.map((row) => row.answer).sort(), ['A plain answer', 'Locked']);
 });
 
+test('both analysis sources leave out the session hidden list, with its answers', async () => {
+  const hiddenConfig = { ...config, BLOCKED_QUESTION_IDS: [' HIDDEN-Q '] };
+  const kv = createKv();
+  const env = { CE_STORAGE_INDEX_KV: kv };
+  for (const questionId of ['kept-q', 'Hidden-Q']) {
+    await putPayload({
+      kv,
+      resource: 'questions',
+      id: `ref-${questionId}`,
+      metadata: { resourceId: questionId.toLowerCase(), createdAt: '2026-09-17T00:00:00.000Z' },
+      payload: { sessionSlug: 'session-a', sessionId, id: questionId, prompt: `Prompt for ${questionId}`, type: 'text' },
+    });
+    await putPayload({
+      kv,
+      resource: 'responses',
+      id: `answer-${questionId}`,
+      metadata: { responder: '0x1111111111111111111111111111111111111111', createdAt: '2026-09-19T00:00:00.000Z' },
+      payload: { sessionSlug: 'session-a', sessionId, questionId, answer: `Answer to ${questionId}` },
+    });
+  }
+  const canonical = await loadWorkerCanonicalResultsAnalysisSource({ env, slug: 'session-a', config: hiddenConfig });
+  assert.equal(canonical.ok, true, JSON.stringify(canonical));
+  assert.deepEqual(canonical.snapshot.questions.map((question) => question.id), ['kept-q']);
+  assert.deepEqual(canonical.snapshot.responses.map((row) => row.questionId), ['kept-q']);
+
+  // An admin snapshot's rows can name a question it doesn't list, which would otherwise be inferred from the row.
+  const admin = await loadAdminSnapshotResultsAnalysisSource({
+    slug: 'session-a',
+    config: hiddenConfig,
+    body: { source: { kind: 'admin-snapshot', snapshot: { sessionSlug: 'session-a', sessionId,
+      questions: [{ id: 'kept-q', prompt: 'Kept?', type: 'freeform' }, { id: 'Hidden-Q', prompt: 'Hidden?', type: 'freeform' }],
+      responses: [
+        { questionId: 'kept-q', participantId: 'p1', answer: 'Kept answer' },
+        { questionId: 'Hidden-Q', participantId: 'p1', answer: 'Hidden answer', prompt: 'Hidden?' },
+      ] } } },
+  });
+  assert.equal(admin.ok, true, JSON.stringify(admin));
+  assert.deepEqual(admin.snapshot.questions.map((question) => question.id), ['kept-q']);
+  assert.deepEqual(admin.snapshot.responses.map((row) => row.answer), ['Kept answer']);
+});
+
 test('worker-canonical source keeps the first or admin version of each question and skips hidden ids', async () => {
   const kv = createKv();
   const env = { CE_STORAGE_INDEX_KV: kv };
