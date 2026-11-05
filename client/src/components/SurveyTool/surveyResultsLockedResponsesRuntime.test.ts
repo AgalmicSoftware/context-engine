@@ -1,4 +1,5 @@
 import { clearDecryptCaches } from '../../utilities/crypto/cryptography';
+import { buildSurveyResultsHtmlReportAnswersForExport } from './surveyResultsHtmlReportDataModel';
 import { createSurveyResultsLockedResponsesRuntime } from './surveyResultsLockedResponsesRuntime';
 import { createInitialSurveyResultsState } from './surveyResultsState';
 import type { SurveyResultsProps } from './SurveyResults';
@@ -21,6 +22,8 @@ const lockedRow = (responder: string, extra: Record<string, unknown> = {}) => ({
   },
 });
 
+const runtimeState: { current: Record<string, unknown> } = { current: {} };
+
 const buildRuntime = (
   decryptEnvelopeValue: DecryptPort,
   applyStatePatch = jest.fn(),
@@ -37,6 +40,7 @@ const buildRuntime = (
     viewMode: 'questions',
     sbtFilteredAggregatorQuestionResponses: { q1: rows },
   };
+  runtimeState.current = state;
   return createSurveyResultsLockedResponsesRuntime({
     instance: { _lockedResponsesModelMemo: {} },
     ports: {
@@ -55,6 +59,26 @@ const buildRuntime = (
 };
 
 describe('SurveyResults locked response decrypt', () => {
+  it('gives a report the answer this reader decrypted, under the key the decrypt saved it', async () => {
+    const responder = '0x1111111111111111111111111111111111111111';
+    const row = lockedRow(responder);
+    const runtime = buildRuntime(
+      jest.fn<ReturnType<DecryptPort>, Parameters<DecryptPort>>().mockResolvedValue('Agree'),
+      jest.fn((patch) => Object.assign(runtimeState.current, patch)),
+      [row],
+    );
+    const report = () =>
+      buildSurveyResultsHtmlReportAnswersForExport({
+        aggregatorQuestionResponses: { q1: [row] },
+        applyDecryptedOverride: (response, who, questionId, surveyId) =>
+          runtime.applyDecryptedOverrideToRow(response, who, questionId, surveyId),
+      });
+
+    expect(report()).toEqual([]);
+    await runtime.handleDecryptLockedResponses();
+    expect(report()).toEqual([{ questionId: 'q1', responder, answer: 'Agree', comment: '' }]);
+  });
+
   it('passes the verified session context so Worker-held keys can unwrap', async () => {
     const decryptEnvelopeValue = jest.fn<ReturnType<DecryptPort>, Parameters<DecryptPort>>().mockResolvedValue('7');
     await buildRuntime(decryptEnvelopeValue).handleDecryptLockedResponses();

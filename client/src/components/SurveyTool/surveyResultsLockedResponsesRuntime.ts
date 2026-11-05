@@ -236,6 +236,23 @@ export const createSurveyResultsLockedResponsesRuntime = ({
     return changed ? (next as SurveyResultsResponseRecord) : response;
   };
 
+  // What the Results view shows for one stored answer, for callers that hold the row rather than its key.
+  const applyDecryptedOverrideToRow = (
+    response: SurveyResultsResponseRecord,
+    responder: unknown,
+    questionId: string,
+    surveyId?: unknown,
+  ): SurveyResultsResponseRecord | null =>
+    applyDecryptedOverrideToResponse({
+      response,
+      key: getLockedResponseKey({
+        responder,
+        questionId,
+        surveyId: surveyId || ports.getState().surveyId,
+        response,
+      }),
+    });
+
   const buildLockedGateDetails = (
     lockedRows: unknown = [],
     questionLookup: Record<string, SurveyResultsQuestionWithEncryption> = {},
@@ -517,6 +534,7 @@ export const createSurveyResultsLockedResponsesRuntime = ({
 
   return {
     applyDecryptedOverrideToResponse,
+    applyDecryptedOverrideToRow,
     getLockedResponseKey,
     getMemoizedLockedResponsesModel,
     getQuestionEncryptionGates,

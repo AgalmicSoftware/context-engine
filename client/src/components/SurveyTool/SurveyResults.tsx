@@ -1409,11 +1409,7 @@ const SurveyResults = (props: SurveyResultsProps): React.ReactElement => {
   };
 
   const htmlReportRuntime = createSurveyResultsHtmlReportRuntime({
-    applyDecryptedOverride: (response, responder, questionId, surveyId) =>
-      applyDecryptedOverrideToResponse({
-        response,
-        key: getLockedResponseKey({ responder, questionId, surveyId: surveyId || stateRef.current.surveyId, response }),
-      }),
+    applyDecryptedOverride: lockedResponsesRuntime.applyDecryptedOverrideToRow,
     getEffectiveSlug,
     getFilteredQuestionsForExport,
     getNetworkQuestionsForCurrentContext,
@@ -1652,7 +1648,7 @@ const SurveyResults = (props: SurveyResultsProps): React.ReactElement => {
 
   const downloadHtmlReport = async (): Promise<void> => {
     const exportedAt = stateRef.current.htmlReportExportedAt || new Date().toISOString();
-    const snapshot = buildSessionResultsHtmlReportSnapshot(exportedAt);
+    const snapshot = buildSessionResultsHtmlReportSnapshot(exportedAt, { withAnswers: true });
     const selectedSections = getHtmlReportSelectedSections();
     const format = stateRef.current.htmlReportExportFormat || SESSION_RESULTS_EXPORT_FORMAT_VIEWER;
     const downloadPlan = buildSurveyResultsHtmlReportDownloadExecutionPlan({
