@@ -1,4 +1,9 @@
 import { optionsOf } from '../../../../shared/questions/answerValue.mjs';
+import {
+  DEFAULT_RATING_SCALE,
+  normalizeRatingScale,
+  ratingStepFor,
+} from '../../../../shared/questions/ratingScale.mjs';
 import { peekCacheSync } from '../../utilities/cache/cacheScripts';
 import { questionIdMatchesContent } from '../../utilities/shared/questionUtils.mjs';
 import { canonicalizeSessionSlug } from '../../utilities/session/canonicalSessionContext';
@@ -614,10 +619,16 @@ export const loadWorkerCanonicalSurveys = (
 // multichoice options with commas, so equal ids can hide different questions.
 // Surrounding spaces in the prompt or options are ignored, as the hash ignores
 // them, and voice credits may be stored as text ("120"); everything else,
-// including case, must match.
+// including case, must match. The id leaves out a rating's scale, so the scale
+// is compared here: a different scale is a different question.
 const trimText = (value: unknown): unknown => (typeof value === 'string' ? value.trim() : value);
 const readVoiceCredits = (value: unknown): number =>
   value == null ? 99 : typeof value === 'number' || typeof value === 'string' ? Number(value) : NaN;
+const readRatingMeaning = (payload: UnknownRecord): unknown[] | null => {
+  if (payload.type !== 'rating') return null;
+  const { min, max, minLabel, maxLabel } = normalizeRatingScale(payload) || DEFAULT_RATING_SCALE;
+  return [min, max, ratingStepFor(payload), minLabel, maxLabel];
+};
 const readQuestionAuthoringInputs = (payload: UnknownRecord): string =>
   JSON.stringify([
     payload.type,
@@ -625,6 +636,7 @@ const readQuestionAuthoringInputs = (payload: UnknownRecord): string =>
     Array.isArray(payload.options) ? payload.options.map(trimText) : [],
     !!(payload.singleSelect || payload.oneSelectionOnly),
     readVoiceCredits(payload.voiceCredits),
+    readRatingMeaning(payload),
   ]);
 
 // Loads the session's questions once and returns a check for whether readers

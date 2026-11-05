@@ -981,6 +981,26 @@ describe('workerCanonicalMetadataHydrationPort', () => {
         expect(matches(question({ id: otherId, prompt: 'Another question' }))).toBe(false);
       });
 
+      it('does not call a rating on another scale already published', async () => {
+        const ratingId = String(generateQuestionId('rating', 'How safe?', [], false, 99)).toLowerCase();
+        const rating = (scale?: Record<string, unknown>) =>
+          question({ id: ratingId, type: 'rating', prompt: 'How safe?', ...(scale ? { scale } : {}) });
+        const fiveStars = { min: 1, max: 5, minLabel: 'Not', maxLabel: 'Very' };
+        const matches = await loadMatcher([listedItem('cf_rating', '2026-10-01T00:00:00.000Z', AUTHOR)], {
+          cf_rating: rating(fiveStars),
+        });
+        expect(matches(rating(fiveStars))).toBe(true);
+        expect(matches(rating({ ...fiveStars, min: 0, max: 100 }))).toBe(false);
+        expect(matches(rating({ ...fiveStars, step: 2 }))).toBe(false);
+        expect(matches(rating({ ...fiveStars, maxLabel: 'Extremely' }))).toBe(false);
+        // No scale means the default one, and a stored default matches it.
+        expect(matches(rating())).toBe(false);
+        const defaults = await loadMatcher([listedItem('cf_default', '2026-10-01T00:00:00.000Z', AUTHOR)], {
+          cf_default: rating({ min: 0, max: 10 }),
+        });
+        expect(defaults(rating())).toBe(true);
+      });
+
       it('does not match an id another author filled with different content', async () => {
         const squatted = await loadMatcher([listedItem('cf_squat', '2026-10-01T00:00:00.000Z', ATTACKER)], {
           cf_squat: question({ prompt: 'Spoofed text under a predicted id' }),
