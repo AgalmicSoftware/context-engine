@@ -103,8 +103,13 @@ export const transcribe = async ({
     return json?.({ error: String(message), details: data }, response.status, baseHeaders);
   }
 
+  // A success without text is a lost reply, not silence: the browser deletes a chunk's audio once it has a transcript.
+  if (typeof data?.text !== 'string') {
+    return json?.({ error: 'The transcription service sent an unreadable reply.' }, 502, baseHeaders);
+  }
+
   return json?.({
-    text: data?.text || '',
-    ...(groupSpeakerLabels ? { segments: normalizeSpeakerSegments(data?.segments) } : {}),
+    text: data.text,
+    ...(groupSpeakerLabels ? { segments: normalizeSpeakerSegments(data.segments) } : {}),
   }, 200, baseHeaders);
 };

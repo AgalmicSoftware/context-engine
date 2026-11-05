@@ -90917,9 +90917,12 @@ var transcribe = async ({
     const message = typeof data?.error === "string" ? data.error : data?.error?.message || data?.message || (response2.status === 401 ? "Unauthorized: invalid API key on server." : "Transcription failed.");
     return json6?.({ error: String(message), details: data }, response2.status, baseHeaders);
   }
+  if (typeof data?.text !== "string") {
+    return json6?.({ error: "The transcription service sent an unreadable reply." }, 502, baseHeaders);
+  }
   return json6?.({
-    text: data?.text || "",
-    ...groupSpeakerLabels ? { segments: normalizeSpeakerSegments(data?.segments) } : {}
+    text: data.text,
+    ...groupSpeakerLabels ? { segments: normalizeSpeakerSegments(data.segments) } : {}
   }, 200, baseHeaders);
 };
 

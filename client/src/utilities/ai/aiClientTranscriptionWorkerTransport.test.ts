@@ -81,7 +81,7 @@ describe('aiClientTranscriptionWorkerTransport', () => {
     expect((form.get('file') as File).name).toBe('meeting.wav');
   });
 
-  it('uses worker error messages without throwing on JSON parse failures', async () => {
+  it('reports a JSON parse failure to its callback and uses worker error messages', async () => {
     mockedFetchWorkerWithAuth.mockResolvedValueOnce({
       ok: true,
       json: async () => {
@@ -99,7 +99,7 @@ describe('aiClientTranscriptionWorkerTransport', () => {
         },
         { onJsonParseError },
       ),
-    ).resolves.toBe('');
+    ).rejects.toMatchObject({ status: 502 });
     expect(onJsonParseError).toHaveBeenCalledWith(expect.any(Error));
 
     mockedFetchWorkerWithAuth.mockResolvedValueOnce({
@@ -162,6 +162,31 @@ it('handles silent labeled clips, old Workers, and provider errors explicitly', 
   await expect(uploadAudioForDiarizedTranscription(new Blob(['audio']), transport)).rejects.toThrow(
     'Synthetic capacity error',
   );
+});
+
+it('fails a success reply without readable text, so the chunk keeps its audio and retries', async () => {
+  const { uploadAudioForDiarizedTranscription } = await import('./aiClientTranscriptionWorkerTransport');
+  const transport = { endpoint: 'https://worker.example/transcribe', baseUrl: 'https://worker.example' };
+  const replies = [
+    // The connection dropped part way through the body.
+    {
+      ok: true,
+      json: async () => {
+        throw new SyntaxError('Unexpected end of JSON input');
+      },
+    },
+    { ok: true, json: async () => ({}) },
+    { ok: true, json: async () => ({ text: { value: 'Spoken.' } }) },
+    { ok: true, json: async () => ({ text: { value: 'Spoken.' }, segments: [] }) },
+  ] as Response[];
+  for (const reply of replies) {
+    mockedFetchWorkerWithAuth.mockResolvedValueOnce(reply);
+    await expect(uploadAudioForTranscription(new Blob(['audio']), transport)).rejects.toMatchObject({ status: 502 });
+    mockedFetchWorkerWithAuth.mockResolvedValueOnce(reply);
+    await expect(uploadAudioForDiarizedTranscription(new Blob(['audio']), transport)).rejects.toMatchObject({
+      status: 502,
+    });
+  }
 });
 
 it('sends known speaker samples and keeps labels when they are refused', async () => {

@@ -388,3 +388,25 @@ test('group speaker labels use the bounded diarization model and normalize turns
   assert.equal(failed.status, 429);
   assert.equal(failed.body.error, 'Synthetic provider error');
 });
+
+test('transcribe reports a success reply it cannot read as a failure, not as silence', async () => {
+  const run = (reply) => {
+    const upstreamFormData = new FormData();
+    upstreamFormData.append('file', new File(['audio'], 'clip.mp3', { type: 'audio/mpeg' }));
+    return transcribe({
+      request: { headers: new Headers() },
+      secrets: { openaiKey: crypto.randomUUID() },
+      transcribeRequest: { ok: true, payload: { provider: 'openai', requestApiKey: '', requestRpcUrl: '', upstreamFormData } },
+      deps: { json: createJsonStub(), safeFetch: async () => new Response(reply, { status: 200 }) },
+    });
+  };
+  for (const reply of ['not json', '{"text"', '{}', '{"transcript":"Elsewhere."}', '{"text":null}', '{"text":{"value":"Spoken."}}']) {
+    const result = await run(reply);
+    assert.equal(result.status, 502, reply);
+    assert.equal(typeof result.body.error, 'string', reply);
+    assert.equal(Object.hasOwn(result.body, 'text'), false, reply);
+  }
+  // Real silence and real speech are unchanged.
+  assert.deepEqual((await run('{"text":""}')).body, { text: '' });
+  assert.deepEqual((await run('{"text":"Spoken."}')).body, { text: 'Spoken.' });
+});
