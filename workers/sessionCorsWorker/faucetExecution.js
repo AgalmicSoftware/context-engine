@@ -51,6 +51,7 @@ export const faucet = async ({
   requesterAddress = '',
   tokenHasFaucetScope = false,
   onSubmissionAttempt,
+  beforePayout,
   deps,
   constants,
   defaults,
@@ -199,6 +200,7 @@ export const faucet = async ({
   const thresholdWeiBig = toBigInt(thresholdWei);
   let signedTx = '';
   let txHash = '';
+  let payoutAdmitted = false;
 
   for (const rpc of rpcUrls || []) {
     const masked = maskRpcUrl(rpc);
@@ -304,6 +306,12 @@ export const faucet = async ({
         gasPriceHex = await rpcRequest({ rpcUrl: rpc, method: 'eth_gasPrice', params: [] });
       } catch (_) {
         gasPriceHex = DEFAULT_GAS_PRICE_HEX;
+      }
+
+      // Asked once, and only when a payout is due: a refusal on balance costs the caller nothing.
+      if (beforePayout && !payoutAdmitted) {
+        if (!await beforePayout()) return json({ error: 'Rate limit exceeded.' }, 429, baseHeaders);
+        payoutAdmitted = true;
       }
 
       const txRequest = {

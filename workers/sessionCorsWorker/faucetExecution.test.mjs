@@ -221,30 +221,6 @@ test('agent faucet requests take the same wallet turn', async () => {
   assert.deepEqual([...accepted.keys()].sort(), [0, 1]);
 });
 
-test('agent faucet requests count against the same daily limit as participant requests', async () => {
-  const env = installSessionCoordinatorBinding({ TOKEN_HMAC_SECRET: 'local-test-only' });
-  const config = { sessionId: `0x${'ab'.repeat(16)}`, authzEpoch: 0, limits: { perWalletPerDay: 2 },
-    sessionModeProfile: { surfaces: { agentHttp: true } }, agentHttp: { sponsoredFaucetAllowed: true } };
-  const agentEnv = createAgentEnvironment({ env, config, revision: 1, slug: 'example', origin: 'https://worker.example' });
-  agentEnv.AGENT_CONTEXT.address = RECIPIENT;
-  const checks = [];
-  let spent = 0;
-  const faucet = async () => { spent += 1; return Response.json({ txHash: '0xabc' }); };
-  const services = createAgentServices({ env, agentEnv, deps: {
-    readCurrentSessionConfig: async () => ({ config, revision: 1 }),
-    computeScopesForLogin: async () => ({ faucet: true }),
-    getSessionSecrets: async () => ({}),
-    checkRateLimit: async (args) => { checks.push(args); return checks.length <= 1; },
-    faucet,
-  } });
-  assert.equal((await services.faucet()).ok, true);
-  assert.deepEqual(await services.faucet(), { ok: false, reason: 'faucet_rate_limited', status: 429 });
-  assert.equal(spent, 1);
-  assert.deepEqual(checks.map(({ route, limit, address, slug }) => ({ route, limit, address, slug })), Array(2).fill({
-    route: 'faucet', limit: 2, address: RECIPIENT, slug: 'example',
-  }));
-});
-
 const createNormalizedResult = (overrides = {}) => ({
   ok: true,
   status: 200,
@@ -937,6 +913,46 @@ for (const agentPath of [false, true]) {
     });
   }
 }
+
+test('agent funding counts against the participant daily limit only when a payout is due', async () => {
+  const env = installSessionCoordinatorBinding({ TOKEN_HMAC_SECRET: 'local-test-only' });
+  const config = { sessionId: `0x${'ab'.repeat(16)}`, authzEpoch: 0, limits: { perWalletPerDay: 2 },
+    sessionModeProfile: { surfaces: { agentHttp: true } }, agentHttp: { sponsoredFaucetAllowed: true } };
+  const agentEnv = createAgentEnvironment({ env, config, revision: 1, slug: 'example', origin: 'https://worker.example' });
+  agentEnv.AGENT_CONTEXT.address = RECIPIENT;
+  let balance = '0x0';
+  const signed = [];
+  const execution = createDeps({
+    json: (body, status, headers) => new Response(JSON.stringify(body), { status, headers }),
+    Wallet: createWalletCtor({ signTransaction: async (tx) => { signed.push(tx); return '0x1234'; } }),
+    rpcRequest: async ({ method }) => (method === 'eth_getBalance' ? balance : createDeps().rpcRequest({ method })),
+  });
+  const checks = [];
+  let allowed = true;
+  const services = createAgentServices({ env, agentEnv, deps: {
+    readCurrentSessionConfig: async () => ({ config, revision: 1 }),
+    computeScopesForLogin: async () => ({ faucet: true }),
+    getSessionSecrets: async () => ({}),
+    checkRateLimit: async (args) => { checks.push(args); return allowed; },
+    faucet: (args) => runFaucet(execution, args),
+  } });
+
+  // A funded wallet asks with every answer, and that spends nothing from the limit.
+  balance = '0x1000000';
+  assert.equal((await services.faucet()).status, 403);
+  assert.equal(checks.length, 0);
+
+  balance = '0x0';
+  assert.equal((await services.faucet()).ok, true);
+  assert.equal(signed.length, 1);
+  assert.deepEqual(checks.map(({ route, limit, address, slug }) => ({ route, limit, address, slug })), [
+    { route: 'faucet', limit: 2, address: RECIPIENT, slug: 'example' },
+  ]);
+
+  allowed = false;
+  assert.deepEqual(await services.faucet(), { ok: false, reason: 'faucet_rate_limited', status: 429 });
+  assert.equal(signed.length, 1);
+});
 
 test('a pre-broadcast balance read failure still falls back before signing', async () => {
   const signed = [];
