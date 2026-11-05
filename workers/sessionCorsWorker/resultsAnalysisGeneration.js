@@ -571,17 +571,6 @@ const readWorkerCanonicalResultsAnalysisSource = async ({ env, slug, config, com
   const responseRows = [];
   let excludedCount = 0;
   let lockedCount = 0;
-  for (const committed of Array.isArray(committedResponses) ? committedResponses : []) {
-    budget.rows();
-    budget.payload(jsonByteLength(committed));
-    const metadata = committed?.metadata;
-    const payload = committed?.payload;
-    if (!isObj(metadata) || !isObj(payload) || !trim(metadata.responder)) {
-      excludedCount += 1;
-      continue;
-    }
-    responseRows.push(toResponseRow(metadata, payload, config));
-  }
   for (const row of rows) {
     const metadata = row?.metadata;
     if (!isObj(metadata) || !trim(metadata.responder)) {
@@ -598,6 +587,19 @@ const readWorkerCanonicalResultsAnalysisSource = async ({ env, slug, config, com
     const bytes = await readStoredCloudflarePayloadBytes({ env, index, slug, metadata, budget });
     const payload = parseJsonBytes(bytes);
     if (!isObj(payload)) {
+      excludedCount += 1;
+      continue;
+    }
+    responseRows.push(toResponseRow(metadata, payload, config));
+  }
+  // After the stored rows: the queue holds a shortened copy, and on an exact tie
+  // the first row stays. A queued row matters only until the listing shows it.
+  for (const committed of Array.isArray(committedResponses) ? committedResponses : []) {
+    budget.rows();
+    budget.payload(jsonByteLength(committed));
+    const metadata = committed?.metadata;
+    const payload = committed?.payload;
+    if (!isObj(metadata) || !isObj(payload) || !trim(metadata.responder)) {
       excludedCount += 1;
       continue;
     }

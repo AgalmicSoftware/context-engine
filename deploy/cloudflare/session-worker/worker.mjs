@@ -76300,17 +76300,6 @@ var init_resultsAnalysisGeneration = __esm({
       const responseRows = [];
       let excludedCount = 0;
       let lockedCount = 0;
-      for (const committed of Array.isArray(committedResponses) ? committedResponses : []) {
-        budget.rows();
-        budget.payload(jsonByteLength(committed));
-        const metadata = committed?.metadata;
-        const payload = committed?.payload;
-        if (!isObj19(metadata) || !isObj19(payload) || !trim15(metadata.responder)) {
-          excludedCount += 1;
-          continue;
-        }
-        responseRows.push(toResponseRow(metadata, payload, config));
-      }
       for (const row of rows) {
         const metadata = row?.metadata;
         if (!isObj19(metadata) || !trim15(metadata.responder)) {
@@ -76325,6 +76314,17 @@ var init_resultsAnalysisGeneration = __esm({
         const bytes3 = await readStoredCloudflarePayloadBytes({ env, index, slug, metadata, budget });
         const payload = parseJsonBytes(bytes3);
         if (!isObj19(payload)) {
+          excludedCount += 1;
+          continue;
+        }
+        responseRows.push(toResponseRow(metadata, payload, config));
+      }
+      for (const committed of Array.isArray(committedResponses) ? committedResponses : []) {
+        budget.rows();
+        budget.payload(jsonByteLength(committed));
+        const metadata = committed?.metadata;
+        const payload = committed?.payload;
+        if (!isObj19(metadata) || !isObj19(payload) || !trim15(metadata.responder)) {
           excludedCount += 1;
           continue;
         }
