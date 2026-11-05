@@ -32,11 +32,22 @@ import { computePolisCommentStats, computePolisConversationMath } from '../../ut
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import * as sessionScanScope from '../../utilities/session/sessionScanScope.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
+import { saveCanvasAsPagedPdf } from '../../utilities/ui/browserPdfExport';
 import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../../utilities/session/sessionModeProfile';
 import {
   resolveWorkerCanonicalCacheIdentity,
   withWorkerCanonicalCacheIdentity,
 } from '../../utilities/survey/workerCanonicalCacheIdentity';
+
+jest.mock('html2canvas', () => ({
+  __esModule: true,
+  default: jest.fn(async () => ({ width: 100, height: 100 })),
+}));
+jest.mock('jspdf', () => ({ __esModule: true, jsPDF: function JsPdfStub() {} }));
+jest.mock('../../utilities/ui/browserPdfExport', () => ({
+  ...jest.requireActual('../../utilities/ui/browserPdfExport'),
+  saveCanvasAsPagedPdf: jest.fn(),
+}));
 
 jest.mock('../../utilities/worker/workerAuth.js', () => ({
   ...jest.requireActual('../../utilities/worker/workerAuth.js'),
@@ -146,6 +157,24 @@ const openSettingsRow = () => {
   const btn = screen.queryByLabelText('Show report settings');
   if (btn) fireEvent.click(btn);
 };
+
+describe('PolisReport PDF export', () => {
+  const account = '0x9999999999999999999999999999999999999999';
+  const downloadPdf = async (props) => {
+    saveCanvasAsPagedPdf.mockClear();
+    const view = render(<PolisReport {...baseReportProps} slug="demo" {...props} />);
+    openSettingsRow();
+    fireEvent.click(screen.getByRole('button', { name: /Download as PDF/ }));
+    await waitFor(() => expect(saveCanvasAsPagedPdf).toHaveBeenCalledTimes(1));
+    view.unmount();
+    return saveCanvasAsPagedPdf.mock.calls[0][0];
+  };
+
+  it('stamps the file with the signed-in exporter, and with no one otherwise', async () => {
+    expect((await downloadPdf({ account, loginComplete: true })).exporter).toBe(account);
+    expect((await downloadPdf({ account, loginComplete: false })).exporter).toBe('');
+  });
+});
 
 describe('PolisReport session description', () => {
   const introduction = 'Short questions about institutions and AI.';
