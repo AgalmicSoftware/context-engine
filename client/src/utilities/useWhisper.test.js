@@ -459,6 +459,57 @@ describe('useWhisper', () => {
     expect(onComplete).toHaveBeenCalledWith('yes yes yes');
   });
 
+  it('reports an unreadable transcription reply instead of an empty transcript', async () => {
+    fetchWorkerWithAuth.mockResolvedValueOnce({
+      ok: true,
+      json: async () => {
+        throw new SyntaxError('Unexpected end of JSON input');
+      },
+    });
+    const onComplete = jest.fn();
+    const onError = jest.fn();
+
+    act(() => {
+      root.render(
+        <WhisperHarness
+          ref={ref}
+          options={{
+            silenceDetection: false,
+            onTranscriptionComplete: onComplete,
+            onError,
+          }}
+        />,
+      );
+    });
+
+    await act(async () => {
+      await ref.current.startRecording();
+    });
+
+    if (!ref.current.audioContextRef.current) {
+      ref.current.audioContextRef.current = new MockAudioContext();
+    }
+    ref.current.audioContextRef.current.state = 'closed';
+    setNow(2000);
+
+    await act(async () => {
+      await ref.current.stopRecording();
+    });
+
+    await act(async () => {
+      await flushPromises();
+      await flushPromises();
+      await flushPromises();
+      await flushPromises();
+    });
+
+    expect(onError).toHaveBeenCalledWith(
+      expect.objectContaining({ message: expect.stringContaining('could not be read') }),
+    );
+    expect(onComplete).not.toHaveBeenCalled();
+    expect(ref.current.errorMessage).toContain('could not be read');
+  });
+
   it('hands the final transcript to the parent once, outside render', async () => {
     const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
     const onComplete = jest.fn();

@@ -563,7 +563,9 @@ export const useWhisper = ({
           throw new Error(String(message || 'Transcription failed.'));
         }
 
-        return data && typeof data.text === 'string' ? data.text : '';
+        // A success without text is a lost reply, not silence.
+        if (!data || typeof data.text !== 'string') throw new Error('The transcription reply could not be read.');
+        return data.text;
       } catch (err) {
         if (getErrorName(err) === 'AbortError') return null;
         const msg = getErrorMessage(err, 'Transcription error');
