@@ -2278,7 +2278,10 @@ login, and signed admin request bodies must carry that config's canonical
    bootstrap uploads check these signed resources before consuming the nonce,
    and reject a message without them with `403`, so a signature made for
    another Worker or session cannot be replayed here. Browser tabs that still
-   run a client from before this binding existed must reload.
+   run a client from before this binding existed must reload. Both also require
+   a trusted `Origin` header equal to the message's `URI`, so a signature made
+   for another site is refused too. Bearer-token uploads, as MCP and CE-CC make,
+   are not bootstrap uploads and are unaffected.
 3. `POST /auth/login` body:
    `{ address, message, signature, sessionSlug, sessionId }` for
    `worker_canonical`; registry compatibility may omit `sessionId`.

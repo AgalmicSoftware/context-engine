@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { dispatchBootstrapArweaveUpload as boundary } from './bootstrapArweaveUploadDispatch.js';
 
 const dispatchBootstrapArweaveUpload = (args) => boundary({
+  env: { ADMIN_TRUSTED_ORIGINS: 'https://allowed.example https://app.example' },
   ...args, deps: { ...args.deps, readCurrentSessionConfig: args.deps?.readCurrentSessionConfig || (async ({ slug }) => ({
     config: await args.deps?.getSessionConfig?.(slug), revision: 1,
   })) },
@@ -403,7 +404,7 @@ for (const [label, resources, accepted, mode] of [
       'Nonce: nonce0001', 'Issued At: 2026-10-01T00:00:00.000Z',
       ...(resources === null ? [] : ['Resources:', ...resources.map((r) => `- ${r}`)])].join('\n');
     const result = await dispatchBootstrapArweaveUpload({
-      request: new Request('https://worker.example/arweave/upload'), hasAuthorization: false,
+      request: new Request('https://worker.example/arweave/upload', { headers: { Origin: 'https://app.example' } }), hasAuthorization: false,
       deps: {
         corsHeaders: () => ({}),
         readArweaveBootstrapUploadPayload: async () => ({ ok: true, body: { message }, hasProvidedArweaveJwk: false }),
@@ -419,5 +420,45 @@ for (const [label, resources, accepted, mode] of [
     assert.equal(result.response.status, accepted ? 200 : 403);
     assert.equal(verified, accepted);
     assert.equal(uploaded, accepted);
+  });
+}
+
+// Login's rule, with the admin origins the nonce route allows for an admin action.
+for (const [label, uri, origin, env, error] of [
+  ['a trusted page signing for itself', 'https://app.example', 'https://app.example', { ADMIN_TRUSTED_ORIGINS: 'https://app.example' }, null],
+  ['the default hosted site', 'https://contextengine.sh', 'https://contextengine.sh', {}, null],
+  ['a session\'s configured origin', 'https://session.example', 'https://session.example', {}, null],
+  ['an admin origin when login origins differ', 'https://app.example', 'https://app.example',
+    { ADMIN_TRUSTED_ORIGINS: 'https://app.example', LOGIN_TRUSTED_ORIGINS: 'https://other.example' }, null],
+  ['a signature for another origin replayed from a trusted one', 'https://unrelated.example', 'https://app.example',
+    { ADMIN_TRUSTED_ORIGINS: 'https://app.example' }, 'SIWE uri origin does not match request Origin.'],
+  ['another origin claiming itself', 'https://unrelated.example', 'https://unrelated.example',
+    { ADMIN_TRUSTED_ORIGINS: 'https://app.example' }, 'Untrusted worker login origin.'],
+  ['no Origin header', 'https://app.example', null, { ADMIN_TRUSTED_ORIGINS: 'https://app.example' }, 'Missing Origin for worker login.'],
+]) {
+  test(`bootstrap upload checks the signed origin before a nonce is used: ${label}`, async () => {
+    let verified = false;
+    const message = signedBootstrapMessage('sample')
+      .replace('allowed.example wants', `${new URL(uri).host} wants`)
+      .replace('URI: https://allowed.example', `URI: ${uri}`);
+    const result = await dispatchBootstrapArweaveUpload({
+      request: new Request(UPLOAD_URL, origin ? { headers: { Origin: origin } } : undefined),
+      env,
+      hasAuthorization: false,
+      deps: {
+        corsHeaders: () => ({}),
+        readArweaveBootstrapUploadPayload: async () => ({ ok: true, body: { message }, hasProvidedArweaveJwk: false }),
+        resolveWorkerBodySlugContext: () => ({ ok: true, targetSlug: 'sample' }),
+        getSessionConfig: async () => ({ allowOrigins: ['https://session.example'] }),
+        getCorsContext: async () => ({ ok: true, headers: {} }),
+        verifyAdminSignature: async () => { verified = true; return { ok: true }; },
+        getSessionSecrets: async () => ({}),
+        arweaveUpload: async () => ({ status: 200 }),
+        json: (body, status) => ({ body, status }),
+      },
+    });
+    assert.equal(result.response.status, error ? 403 : 200);
+    assert.equal(result.response.body?.error, error ?? undefined);
+    assert.equal(verified, !error);
   });
 }

@@ -140,12 +140,13 @@ export const validateTrustedLoginRequestOrigin = ({
   };
 };
 
-export const validateBrowserLoginOrigin = ({ request, siwe, env, config } = {}, deps) => {
+export const validateBrowserLoginOrigin = ({ request, siwe, env, config, allowTrustedAdminOrigins = false } = {}, deps) => {
   const requestOriginCheck = validateTrustedLoginRequestOrigin(
     {
   request,
   env,
   config,
+  allowTrustedAdminOrigins,
     },
     deps,
   );

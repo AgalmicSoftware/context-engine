@@ -87484,12 +87484,13 @@ var validateTrustedLoginRequestOrigin = ({
     origin: requestOrigin
   };
 };
-var validateBrowserLoginOrigin = ({ request, siwe, env, config } = {}, deps) => {
+var validateBrowserLoginOrigin = ({ request, siwe, env, config, allowTrustedAdminOrigins = false } = {}, deps) => {
   const requestOriginCheck = validateTrustedLoginRequestOrigin(
     {
       request,
       env,
-      config
+      config,
+      allowTrustedAdminOrigins
     },
     deps
   );
@@ -104546,14 +104547,17 @@ var dispatchBootstrapArweaveUpload = async ({
       response: corsContext?.response
     };
   }
-  const resourcesCheck = validateSiweResources({
-    siwe: parseSiweMessage(body?.message),
-    request,
-    config,
-    targetSlug
-  });
+  const siwe = parseSiweMessage(body?.message);
+  const resourcesCheck = validateSiweResources({ siwe, request, config, targetSlug });
   if (!resourcesCheck.ok) {
     return { handled: true, response: deps?.json?.({ error: resourcesCheck.error }, 403, corsContext.headers) };
+  }
+  const originCheck = validateBrowserLoginOrigin(
+    { request, siwe, env, config, allowTrustedAdminOrigins: true },
+    { resolveTrustedAdminOrigins: deps?.resolveTrustedAdminOrigins }
+  );
+  if (!originCheck.ok) {
+    return { handled: true, response: deps?.json?.({ error: originCheck.error }, 403, corsContext.headers) };
   }
   const adminCheck = await deps?.verifyAdminSignature?.({
     baseHeaders: corsContext.headers,
