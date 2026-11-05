@@ -19,7 +19,9 @@ completion counts. Attempts remain traffic records and do not inflate coverage.
 Interview question discovery keeps failed pointer and payload reads marked
 incomplete. If no readable question remains, the public interview brief returns
 503 with a Retry-After header, allowing clients to retry instead of treating the
-session as empty.
+session as empty. It leaves out the session's `BLOCKED_QUESTION_IDS`, as the
+browser and MCP do, before hashing or prompting. A saved interview opening is
+written again when that list changes.
 
 ## Agent HTTP client handoff
 
@@ -2995,6 +2997,9 @@ transport: { type: "webrtc", sdp } }`. Preserves the SDP offer verbatim,
   - Upstream transcribe execution now also routes through `workers/sessionCorsWorker/transcribeExecution.js`,
     preserving provider selection, blocked custom-target rejection, request-vs-worker key precedence,
     upstream 401/general error mapping, and final `{ text }` response normalization.
+  - A provider success whose body is not JSON, or has no string `text`, returns `502`. Only a real
+    `{ "text": "" }` means silence, because the browser deletes a chunk's audio once it has a transcript.
+    Workers before 0.9.0 report such a reply as `{ "text": "" }`.
   - Worker-local transcribe dependencies are assembled by
     `workers/sessionCorsWorker/workerExecutionServiceBinding.js`, preserving the
     `safeFetch` / blocked-url / default-URL bundle before the execution helper runs.
