@@ -67,7 +67,14 @@ All notable changes to this project will be documented in this file.
 - An already-saved interview answer reports "Responses already saved" while another answer has an unsent edit, and a tag removed while AI suggestions load stays removed.
 - A link padded with thousands of `=` no longer freezes the page, and a setup link opened over a draft with a problem lists what it changes.
 - If another account signs in while Group Conversation records, recording stops and its chunks wait on the device until the account that made them signs back in. A recording started signed out belongs to the first account that signs in during it. A sign-out still uploads signed out.
-- The HTML report lists a question whose text the author encrypted as "Encrypted question", with its ID, type and answer count but no prompt, options or tags, even after you decrypt it. Its AI analysis, and the Generated AI views that other viewers open, leave such questions and their answers out.
+- HTML and PDF reports hold what the exporter can see in Results: question text they decrypted, answers, comments, conviction and responder addresses. Answers still locked for them stay out. AI analysis, and the Generated AI views that other viewers open, still leave out questions whose text the author encrypted, and their answers.
+- Reports carry the exporter's full address in the file's data and on the page. A PDF also has it in its properties and as text on every page, and the Polis report PDF is stamped the same way.
+- A long report's PDF is captured a block at a time, so it no longer outgrows what one image can hold. Its closed items are open. A very long report takes a while and makes a large file: 3,000 answers took about 20 seconds and 50 MB.
+- Reports show each rating's scale, and the browser's AI analysis receives it, so a saved analysis of a session with ratings is generated again once.
+- A transcription reply that can't be read, such as one cut off by a dropped connection, no longer counts as silence, which deleted that chunk's audio. The chunk keeps its audio and retries.
+- Clear reports a failed delete and can be tried again, even after an earlier save failed, instead of saying the recording is gone while chunks stay on the device.
+- An ended on-chain session reads each answer at a block, never at the latest state, so an edit made during the read can't appear as an answer from before the end.
+- The Agent page asks each rating on its own scale and step, with its end labels, and a single-choice question holds one option.
 - Results drops answers decrypted for one account when the account changes, including a decryption that finishes after the change, and stops decrypting the remaining rows.
 - Question text, survey titles and survey document links decrypted for one account are locked again when another account signs in or the account signs out, until they are decrypted for the current reader. A Decrypt Prompt that finishes after an account change is neither shown nor saved.
 - Session context files and links reset when the reader or the session's Worker changes, so the next reader never sees or sends the previous reader's admins-only items.
@@ -83,6 +90,9 @@ All notable changes to this project will be documented in this file.
 ### Workers — requires redeployment
 
 - Anonymous visitors have no daily per-IP request limit unless the session sets one. The per-wallet daily limit no longer doubles as one, so a room sharing one venue connection isn't cut off.
+- A transcription reply with no readable text returns 502, so the browser keeps the chunk's audio and retries. Earlier Workers report such a reply as silence.
+- Agent submissions count test-ETH funding against the per-wallet daily faucet limit they share with participants. Past the limit, the submission carries on without funding.
+- Voice interviews leave out the session's hidden questions, in the question list, its hash and the opening. Hiding a question has a saved opening written again.
 - Group transcription forwards up to four known-speaker samples (a name and a short WAV) to OpenAI, so voices keep their labels across chunks. Invalid samples are dropped without failing the chunk.
 - Claude requests work on current models. The Worker sends no `temperature`, which Opus 5.5 and Fable 5.1 refuse and Sonnet and Haiku 5.5 refuse at 0.7, so older Claude models also sample at their default. It reads the answer from the reply's text blocks after any thinking, and a request without a model uses `claude-opus-5-5` instead of a model retired in 2025.
 - Only admins add context items. For a link, the Worker fetches the page itself: https on a public host only, every redirect re-checked, up to 2 MB and 10 seconds. A PDF can be read by the session's own Claude or OpenAI key. Admins-only items never reach participants through reads, lists or the AI.
@@ -113,7 +123,7 @@ All notable changes to this project will be documented in this file.
 ### Benchmark
 
 - Keep the standalone Raw Results heading readable and correctly wrapped at narrow widths, scope Risk Matrix heading colors to their own dialog, and give export buttons readable colors and descriptive accessible names.
-- `answer --resume` asks again when the endpoint, model settings, routing or answer schema change. Answers saved by earlier versions are asked again once.
+- `answer --resume` asks again when the endpoint, model settings, declared model revision, routing or answer schema change. Answers saved by earlier versions are asked again once. Answer files record each model's revision, and a run that reaches two deployments of one model stops with an error.
 - Typed answers and importance replies ignore drafts inside reasoning tags and refuse truncated reasoning.
 - Flipped rating prompts are used only when flipped answers stay on the scale's grid.
 - Mock ratings land on the scale's step grid.

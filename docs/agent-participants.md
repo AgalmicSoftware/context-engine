@@ -93,7 +93,9 @@ pending or the balance check fails, and explain balance-threshold refusals. Each
 faucet request signs at most one payment. After a broadcast attempt, RPC fallback
 resends the identical transaction; an uncertain outcome returns its transaction
 hash for checking before another request is made. This applies to hosted, registry
-and agent faucet calls.
+and agent faucet calls. Funding for an Agent's managed registry submission counts
+against the per-wallet daily limit it shares with participant requests; past the
+limit the submission carries on without funding and reports `faucet_rate_limited`.
 
 ## Question queue
 
