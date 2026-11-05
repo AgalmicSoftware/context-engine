@@ -91401,8 +91401,11 @@ var createAgentServices = ({ env, agentEnv, deps }) => {
       });
     },
     async faucet() {
-      await current();
+      const { config } = await current();
       if (!ctx.scopes?.faucet || ctx.config.agentHttp?.sponsoredFaucetAllowed !== true) return { ok: false, skipped: true, reason: "session_faucet_not_allowed" };
+      if (!await deps.checkRateLimit({ env, slug: ctx.slug, address: ctx.address, route: "faucet", limit: config.limits?.perWalletPerDay || 0 })) {
+        return { ok: false, reason: "faucet_rate_limited", status: 429 };
+      }
       const secrets = await deps.getSessionSecrets(env, ctx.slug);
       const takeWalletTurn = deps.withCoordinatedFaucetWalletTurn || withCoordinatedFaucetWalletTurn;
       const response2 = await takeWalletTurn({ env, secrets }, () => deps.faucet({

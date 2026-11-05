@@ -211,6 +211,7 @@ test('agent faucet requests take the same wallet turn', async () => {
     return createAgentServices({ env, agentEnv, deps: {
       readCurrentSessionConfig: async () => ({ config, revision: 1 }),
       computeScopesForLogin: async () => ({ faucet: true }),
+      checkRateLimit: async () => true,
       getSessionSecrets: async () => ({ faucetPrivateKey: FAUCET_KEY }),
       faucet: (args) => runFaucet(deps, args),
     } }).faucet();
@@ -218,6 +219,30 @@ test('agent faucet requests take the same wallet turn', async () => {
   const results = await Promise.all([RECIPIENT, OTHER_RECIPIENT].map(request));
   assert.deepEqual(results.map(({ ok }) => ok), [true, true]);
   assert.deepEqual([...accepted.keys()].sort(), [0, 1]);
+});
+
+test('agent faucet requests count against the same daily limit as participant requests', async () => {
+  const env = installSessionCoordinatorBinding({ TOKEN_HMAC_SECRET: 'local-test-only' });
+  const config = { sessionId: `0x${'ab'.repeat(16)}`, authzEpoch: 0, limits: { perWalletPerDay: 2 },
+    sessionModeProfile: { surfaces: { agentHttp: true } }, agentHttp: { sponsoredFaucetAllowed: true } };
+  const agentEnv = createAgentEnvironment({ env, config, revision: 1, slug: 'example', origin: 'https://worker.example' });
+  agentEnv.AGENT_CONTEXT.address = RECIPIENT;
+  const checks = [];
+  let spent = 0;
+  const faucet = async () => { spent += 1; return Response.json({ txHash: '0xabc' }); };
+  const services = createAgentServices({ env, agentEnv, deps: {
+    readCurrentSessionConfig: async () => ({ config, revision: 1 }),
+    computeScopesForLogin: async () => ({ faucet: true }),
+    getSessionSecrets: async () => ({}),
+    checkRateLimit: async (args) => { checks.push(args); return checks.length <= 1; },
+    faucet,
+  } });
+  assert.equal((await services.faucet()).ok, true);
+  assert.deepEqual(await services.faucet(), { ok: false, reason: 'faucet_rate_limited', status: 429 });
+  assert.equal(spent, 1);
+  assert.deepEqual(checks.map(({ route, limit, address, slug }) => ({ route, limit, address, slug })), Array(2).fill({
+    route: 'faucet', limit: 2, address: RECIPIENT, slug: 'example',
+  }));
 });
 
 const createNormalizedResult = (overrides = {}) => ({
@@ -893,6 +918,7 @@ for (const agentPath of [false, true]) {
         const services = createAgentServices({ env, agentEnv, deps: {
           readCurrentSessionConfig: async () => ({ config, revision: 1 }),
           computeScopesForLogin: async () => ({ faucet: true }),
+          checkRateLimit: async () => true,
           getSessionSecrets: async () => ({}),
           faucet: args => runFaucet(deps, args),
         } });
