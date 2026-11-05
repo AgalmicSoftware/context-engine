@@ -77,6 +77,10 @@ export const createContractScriptsSurveyEventReadMethods = (
     rpcLog,
     utils,
   } = deps;
+  // A node missing that block's state may answer on a later scan; a bad payload never will.
+  const isRetryableResponseRead = (error: unknown): boolean =>
+    (error as { code?: unknown } | null)?.code === 'RESPONSE_HISTORY_UNAVAILABLE' ||
+    isRetryableSurveyResponseReadError(error);
 
   return {
     async getBoundedResponseReadWindow(
@@ -297,7 +301,7 @@ export const createContractScriptsSurveyEventReadMethods = (
                 throwOnError: true,
               });
             } catch (e: unknown) {
-              const retryable = readOptions.blockTag !== undefined || isRetryableSurveyResponseReadError(e);
+              const retryable = isRetryableResponseRead(e);
               failedResponses.push({
                 responder,
                 id: qId,
@@ -563,7 +567,7 @@ export const createContractScriptsSurveyEventReadMethods = (
               throwOnError: true,
             });
           } catch (error: unknown) {
-            const retryable = readOptions.blockTag !== undefined || isRetryableSurveyResponseReadError(error);
+            const retryable = isRetryableResponseRead(error);
             failedResponses.push({
               responder,
               id: sId,

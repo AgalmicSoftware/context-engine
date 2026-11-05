@@ -303,7 +303,9 @@ describe('contractScripts survey event reads', () => {
       jest
         .spyOn(contractScripts, kind === 'survey' ? 'getSurveyResponse' : 'getResponse')
         .mockImplementation(async (_p, _r, _id, _cfg, options) => {
-          if (options.blockTag === 20) throw new Error('missing trie node');
+          if (options.blockTag === 20) {
+            throw makeResponseReadError('missing trie node', { code: 'RESPONSE_HISTORY_UNAVAILABLE' });
+          }
           return { answer: 'Disagree' };
         });
       const partial = jest.fn();
@@ -320,6 +322,33 @@ describe('contractScripts survey event reads', () => {
       });
       if (kind === 'survey') expect(result.responses).toEqual([]);
       else expect(partial).toHaveBeenCalledWith({}, 14);
+    },
+  );
+
+  it.each(['survey', 'question'])(
+    'lets a bad %s payload in an ended session go instead of rescanning for it on every load',
+    async (kind) => {
+      const responder = '0x00000000000000000000000000000000000000aa';
+      const cfg = { ...GROUP_CFG, blockLimits: { start: 1, end: 20 } };
+      contractScripts.getRelevantBlockWindowForFilter.mockResolvedValue({ fromBlock: 1, toBlock: 20 });
+      jest.spyOn(contractScripts, 'getLatestBlockNumber').mockResolvedValue(100);
+      mockFetchLogsSmartWithProvider.mockImplementation(async (_p, _f, from) =>
+        from > 20 ? [] : [makeResponsesSubmittedLog(responder, 15)],
+      );
+      jest
+        .spyOn(contractScripts, kind === 'survey' ? 'getSurveyResponse' : 'getResponse')
+        .mockImplementation(async () => {
+          throw makeResponseReadError('Invalid response JSON for tx bad-payload', {
+            arweaveFailure: { retryable: false, state: 'terminal_invalid', kind: 'invalid' },
+          });
+        });
+      const partial = jest.fn();
+      const result =
+        kind === 'survey'
+          ? await contractScripts.fetchAllSurveyResponses('none', SURVEY_ID, 1, 'latest', cfg)
+          : await contractScripts.getQuestionResponsesChunkedWithCallback('none', 1, 'latest', null, partial, cfg);
+      expect(result).toMatchObject({ hadPartialFailure: false, lowestFailedBlock: null });
+      if (kind === 'question') expect(partial).toHaveBeenCalledWith({}, 20);
     },
   );
 
