@@ -87,7 +87,10 @@ Similarity between a prediction and an answer runs from 0 to 1:
 - **Unusual views:** each person's typicality is the mean similarity of their
   answers to every other person's answers on the same questions. The report
   splits people into thirds by typicality and gives the AI's score, the
-  baseline's and the lift for each, plus rank correlations with intervals. An
+  baseline's and the lift for each, plus rank correlations with intervals.
+  Equally typical people stay together, whatever order their records came in, so
+  groups can be uneven: two camps leave the middle empty, and when everyone ties
+  there are no groups to compare. An
   AI that only knows the stereotype loses accuracy on unusual people as fast as
   the baseline does; one that knows the person keeps its lift.
 - **Synthesis checks:** the AI's drafts minus people's own answers, per person

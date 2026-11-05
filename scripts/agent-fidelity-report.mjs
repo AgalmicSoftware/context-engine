@@ -146,7 +146,7 @@ export const renderFidelityMarkdown = (report) => {
           ['', 'People', 'Typicality', 'AI', 'Most common answer', 'Lift'],
           unusualViews.terciles.map((tercile) =>
             tercile.suppressed
-              ? [tercile.tercile, count(tercile.participants), fewer, '', '', '']
+              ? [tercile.tercile, count(tercile.participants), tercile.equallyTypical ? 'everyone is equally typical' : fewer, '', '', '']
               : [
                   tercile.tercile,
                   count(tercile.participants),
