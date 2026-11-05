@@ -466,7 +466,7 @@ test('a version the audience cannot read still decides which question and answer
   await putAnswer('a0', A, before, 'open', 'Agree');
   await putAnswer('a1', A, after, 'open', 'Disagree', adminsOnly);
   // B restricts an answer, then answers in public.
-  await putAnswer('b0', B, before, 'open', 'Earlier restricted');
+  await putAnswer('b0', B, before, 'open', 'Earlier restricted', adminsOnly);
   await putAnswer('b1', B, after, 'open', 'Public from B');
   // C answers once in public.
   await putAnswer('c0', C, before, 'open', 'Public from C');
