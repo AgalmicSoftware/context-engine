@@ -4,7 +4,7 @@ import { buildSurveyResultsFilteredQuestionsForExport } from './surveyResultsExp
 import { buildSurveyResultsQuestionsCsvExport } from './surveyResultsExportPlans';
 import { buildSurveyResultsHtmlReportQuestionsForExport } from './surveyResultsHtmlReportDataModel';
 import {
-  buildRedactedSessionResultsSnapshot,
+  buildSessionResultsSnapshot,
   renderSessionResultsHtmlReport,
 } from '../../utilities/sessionResultsExport/sessionResultsExport';
 import {
@@ -28,7 +28,7 @@ it('preserves a custom quadratic budget through filtered CSV and report snapshot
   expect(filtered[0]).toMatchObject({ voiceCredits: 25 });
   expect(buildSurveyResultsQuestionsCsvExport(filtered)).toContain('"[""Parks"",""Transit""]","25"');
   const reportQuestions = buildSurveyResultsHtmlReportQuestionsForExport({ filteredQuestions: filtered });
-  const snapshot = buildRedactedSessionResultsSnapshot({ sections: { report: { questions: reportQuestions } } });
+  const snapshot = buildSessionResultsSnapshot({ sections: { report: { questions: reportQuestions } } });
   expect(snapshot.sections.report.questions[0]).toMatchObject({ voiceCredits: 25 });
   expect(renderSessionResultsHtmlReport(snapshot, { format: 'single-html' })).toContain('25 voice credits');
 });

@@ -16,7 +16,7 @@ const buildSnapshot = (): SessionResultsHtmlSnapshot => ({
   },
   exportedAt: '2026-05-25T18:30:00.000Z',
   filters: {},
-  privacyMode: 'redacted',
+  privacyMode: 'as-viewed',
   redactions: [],
   sections: {
     argumentMap: { available: false, debates: [] },
@@ -27,6 +27,7 @@ const buildSnapshot = (): SessionResultsHtmlSnapshot => ({
       groups: [],
       questions: [],
       representativeQuestions: [],
+      answers: [],
       summary: {},
     },
     riskMatrix: {

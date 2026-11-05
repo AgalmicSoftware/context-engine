@@ -1409,6 +1409,11 @@ const SurveyResults = (props: SurveyResultsProps): React.ReactElement => {
   };
 
   const htmlReportRuntime = createSurveyResultsHtmlReportRuntime({
+    applyDecryptedOverride: (response, responder, questionId, surveyId) =>
+      applyDecryptedOverrideToResponse({
+        response,
+        key: getLockedResponseKey({ responder, questionId, surveyId: surveyId || stateRef.current.surveyId, response }),
+      }),
     getEffectiveSlug,
     getFilteredQuestionsForExport,
     getNetworkQuestionsForCurrentContext,
