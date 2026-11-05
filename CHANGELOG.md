@@ -71,7 +71,7 @@ All notable changes to this project will be documented in this file.
 - Reports carry the exporter's full address in the file's data and on the page. A PDF also has it in its properties and as text on every page, and the Polis report PDF is stamped the same way.
 - A long report's PDF is captured a block at a time, so it no longer outgrows what one image can hold. Its closed items are open. A very long report takes a while and makes a large file: 3,000 answers took about 20 seconds and 50 MB.
 - Reports show each rating's scale, and the browser's AI analysis receives it, so a saved analysis of a session with ratings is generated again once.
-- A transcription reply that can't be read, such as one cut off by a dropped connection, no longer counts as silence, which deleted that chunk's audio. The chunk keeps its audio and retries.
+- A transcription reply that can't be read, such as one cut off by a dropped connection, no longer counts as silence, which deleted that chunk's audio. The chunk keeps its audio and retries, and dictation shows an error instead of an empty transcript.
 - Clear reports a failed delete and can be tried again, even after an earlier save failed, instead of saying the recording is gone while chunks stay on the device.
 - An ended on-chain session reads each answer at a block, never at the latest state, so an edit made during the read can't appear as an answer from before the end.
 - The Agent page asks each rating on its own scale and step, with its end labels, and a single-choice question holds one option.
