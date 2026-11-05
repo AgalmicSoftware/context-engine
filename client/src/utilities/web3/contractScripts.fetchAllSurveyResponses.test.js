@@ -223,47 +223,71 @@ describe('contractScripts survey event reads', () => {
     ]);
   });
 
-  it.each(['survey', 'question'])('reads only later-edited %s answers at the configured end', async (kind) => {
-    const edited = '0x00000000000000000000000000000000000000aa';
-    const unchanged = '0x00000000000000000000000000000000000000bb';
+  it.each(['survey', 'question'])(
+    'reads later-edited %s answers at the end, unchanged ones at a proven block',
+    async (kind) => {
+      const edited = '0x00000000000000000000000000000000000000aa';
+      const unchanged = '0x00000000000000000000000000000000000000bb';
+      const cfg = { ...GROUP_CFG, blockLimits: { start: 1, end: 20 } };
+      contractScripts.getRelevantBlockWindowForFilter.mockResolvedValue({ fromBlock: 1, toBlock: 20 });
+      const head = jest.spyOn(contractScripts, 'getLatestBlockNumber').mockResolvedValue(100);
+      mockFetchLogsSmartWithProvider.mockImplementation(async (_provider, _filter, from) =>
+        from > 20
+          ? [makeResponsesSubmittedLog(edited, 25)]
+          : [makeResponsesSubmittedLog(edited, 15), makeResponsesSubmittedLog(unchanged, 16)],
+      );
+      const read = jest
+        .spyOn(contractScripts, kind === 'survey' ? 'getSurveyResponse' : 'getResponse')
+        .mockImplementation(async (_p, responder, _id, _cfg, options) => ({
+          answer: responder === edited && options.blockTag !== 20 ? 'Disagree' : 'Agree',
+        }));
+      const scan = async (config) => {
+        if (kind === 'survey')
+          return (await contractScripts.fetchAllSurveyResponses('none', SURVEY_ID, 1, 'latest', config)).responses;
+        const partial = jest.fn();
+        await contractScripts.getQuestionResponsesChunkedWithCallback('none', 1, 'latest', null, partial, config);
+        return partial.mock.calls[0][0][QUESTION_ID];
+      };
+      const rows = await scan(cfg);
+      expect(rows).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ responder: edited, blockNumber: 15, response: { answer: 'Agree' } }),
+          expect.objectContaining({ responder: unchanged, response: { answer: 'Agree' } }),
+        ]),
+      );
+      expect(read.mock.calls.find((call) => call[1] === edited)[4].blockTag).toBe(20);
+      // Never latest, which could return an edit made after the scan: a few blocks below the scanned head.
+      expect(read.mock.calls.find((call) => call[1] === unchanged)[4].blockTag).toBe(84);
+      expect(mockFetchLogsSmartWithProvider).toHaveBeenCalledTimes(2);
+      read.mockClear();
+      mockFetchLogsSmartWithProvider.mockClear();
+      head.mockClear();
+      contractScripts.getRelevantBlockWindowForFilter.mockResolvedValue({ fromBlock: 1, toBlock: 30 });
+      mockFetchLogsSmartWithProvider.mockResolvedValue([makeResponsesSubmittedLog(edited, 25)]);
+      expect((await scan(GROUP_CFG))[0]).toMatchObject({ blockNumber: 25, response: { answer: 'Disagree' } });
+      expect(mockFetchLogsSmartWithProvider).toHaveBeenCalledTimes(1);
+      expect(head).not.toHaveBeenCalled();
+    },
+  );
+
+  it('bounds reads when the chain has just reached the end block, and stays open before it', async () => {
     const cfg = { ...GROUP_CFG, blockLimits: { start: 1, end: 20 } };
-    contractScripts.getRelevantBlockWindowForFilter.mockResolvedValue({ fromBlock: 1, toBlock: 20 });
-    const head = jest.spyOn(contractScripts, 'getLatestBlockNumber').mockResolvedValue(30);
-    mockFetchLogsSmartWithProvider.mockImplementation(async (_provider, _filter, from) =>
-      from > 20
-        ? [makeResponsesSubmittedLog(edited, 25)]
-        : [makeResponsesSubmittedLog(edited, 15), makeResponsesSubmittedLog(unchanged, 16)],
-    );
-    const read = jest
-      .spyOn(contractScripts, kind === 'survey' ? 'getSurveyResponse' : 'getResponse')
-      .mockImplementation(async (_p, responder, _id, _cfg, options) => ({
-        answer: responder === edited && options.blockTag !== 20 ? 'Disagree' : 'Agree',
-      }));
-    const scan = async (config) => {
-      if (kind === 'survey')
-        return (await contractScripts.fetchAllSurveyResponses('none', SURVEY_ID, 1, 'latest', config)).responses;
-      const partial = jest.fn();
-      await contractScripts.getQuestionResponsesChunkedWithCallback('none', 1, 'latest', null, partial, config);
-      return partial.mock.calls[0][0][QUESTION_ID];
-    };
-    const rows = await scan(cfg);
-    expect(rows).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ responder: edited, blockNumber: 15, response: { answer: 'Agree' } }),
-        expect.objectContaining({ responder: unchanged, response: { answer: 'Agree' } }),
-      ]),
-    );
-    expect(read.mock.calls.find((call) => call[1] === edited)[4].blockTag).toBe(20);
-    expect(read.mock.calls.find((call) => call[1] === unchanged)[4].blockTag).toBeUndefined();
-    expect(mockFetchLogsSmartWithProvider).toHaveBeenCalledTimes(2);
-    read.mockClear();
+    const head = jest.spyOn(contractScripts, 'getLatestBlockNumber').mockResolvedValue(20);
     mockFetchLogsSmartWithProvider.mockClear();
-    head.mockClear();
-    contractScripts.getRelevantBlockWindowForFilter.mockResolvedValue({ fromBlock: 1, toBlock: 30 });
-    mockFetchLogsSmartWithProvider.mockResolvedValue([makeResponsesSubmittedLog(edited, 25)]);
-    expect((await scan(GROUP_CFG))[0]).toMatchObject({ blockNumber: 25, response: { answer: 'Disagree' } });
-    expect(mockFetchLogsSmartWithProvider).toHaveBeenCalledTimes(1);
-    expect(head).not.toHaveBeenCalled();
+    await expect(contractScripts.getBoundedResponseReadWindow(cfg, { _resolvedCfg: cfg })).resolves.toEqual({
+      blockTag: 20,
+      laterPairs: new Set(),
+      unchangedBlockTag: 20,
+    });
+    expect(mockFetchLogsSmartWithProvider).not.toHaveBeenCalled();
+    head.mockResolvedValue(19);
+    await expect(contractScripts.getBoundedResponseReadWindow(cfg, { _resolvedCfg: cfg })).resolves.toBeNull();
+    // Close to the end the proven block never falls below it.
+    head.mockResolvedValue(25);
+    mockFetchLogsSmartWithProvider.mockResolvedValue([]);
+    await expect(contractScripts.getBoundedResponseReadWindow(cfg, { _resolvedCfg: cfg })).resolves.toMatchObject({
+      unchangedBlockTag: 20,
+    });
   });
 
   it.each(['survey', 'question'])(
