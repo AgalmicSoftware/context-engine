@@ -65,6 +65,7 @@ const createPorts = ({
       if (afterApply) afterApply();
     },
     getEffectiveSlug: () => effectiveSlug,
+    getHiddenQuestionIds: () => new Set<string>(),
     getNetworkQuestionsForCurrentContext: () => ({
       q1: { id: 'q1', type: 'text' },
       q2: { id: 'q2', type: 'text' },

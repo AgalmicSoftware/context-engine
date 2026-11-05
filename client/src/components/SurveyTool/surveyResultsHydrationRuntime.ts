@@ -93,6 +93,7 @@ export type SurveyResultsHydrationPorts = {
   applyStatePatch: (patch: unknown, afterApply?: () => void) => void;
   getCacheScope?: () => string;
   getEffectiveSlug: () => string;
+  getHiddenQuestionIds: () => Set<string>;
   getNetworkQuestionsForCurrentContext: () => Record<string, SurveyResultsRecord>;
   getProps: () => SurveyResultsProps;
   getScopedQuestionNetworkData: (viewMode?: unknown) => Promise<SurveyResultsScopedQuestionNetworkData>;
@@ -150,9 +151,13 @@ export const fetchSurveyResultsSurveyModeResponses = async ({
   const srMap = surveyNetCache.surveyResponses?.[currentSurveyID] || {};
   const allResponders = Object.keys(srMap);
   const networkQuestions = ports.getNetworkQuestionsForCurrentContext();
-  const questionIDsInSurvey: string[] = Array.isArray(surveyNetCache?.surveys?.[currentSurveyID]?.questionIDs)
-    ? (surveyNetCache.surveys[currentSurveyID].questionIDs as string[])
-    : [];
+  // An answer row carries its own prompt, so a hidden question's rows go here, not just its metadata.
+  const hiddenQuestionIds = ports.getHiddenQuestionIds();
+  const questionIDsInSurvey: string[] = (
+    Array.isArray(surveyNetCache?.surveys?.[currentSurveyID]?.questionIDs)
+      ? (surveyNetCache.surveys[currentSurveyID].questionIDs as string[])
+      : []
+  ).filter((qid) => !hiddenQuestionIds.has(String(qid || '').toLowerCase()));
   const questionIdsSignature = questionIDsInSurvey.map((qid) => String(qid || '').toLowerCase()).join('|');
   const surveyResponsesLatestBlock = readSurveyResultsLatestBlock(
     surveyNetCache?.surveyResponsesLatestBlock,
@@ -172,6 +177,7 @@ export const fetchSurveyResultsSurveyModeResponses = async ({
     surveyDefinitionLatestBlock,
     allResponders.length,
     questionIdsSignature,
+    [...hiddenQuestionIds].sort().join(','),
   ].join('::');
   const respondersSignature = buildSurveyRespondersSignature(srMap);
   const sourceSignature = [coarseSourceSignature, respondersSignature].join('::');
@@ -190,9 +196,16 @@ export const fetchSurveyResultsSurveyModeResponses = async ({
   const rawResponses: SurveyResultsResponseListEntry[] = [];
   allResponders.forEach((responder) => {
     const responderLower = String(responder || '').toLowerCase();
-    const rawResp = normalizeSurveyResponsePayloadByQuestionId(
+    const parsedResp = normalizeSurveyResponsePayloadByQuestionId(
       ports.parseResponse(srMap[responder]),
     ) as SurveyResultsSurveyResponsePayload | null;
+    const rawResp =
+      parsedResp && Array.isArray(parsedResp.responses)
+        ? {
+            ...parsedResp,
+            responses: parsedResp.responses.filter((ans) => !hiddenQuestionIds.has(getSurveyResponseQuestionId(ans))),
+          }
+        : parsedResp;
     if (!hasAnyCountableSurveyAnswer(rawResp, networkQuestions)) return;
     rawResponses.push({
       responder: responderLower,

@@ -131,6 +131,7 @@ import {
   type SurveyResultsScopedQuestionNetworkData,
   type SurveyResultsScopedQuestionNetworkMemo,
 } from './surveyResultsQuestionNetworkReadController';
+import { getBlockedQuestionIdsSet } from './surveyToolScope';
 import {
   applySurveyResultsBuiltInDemoQuestionMetadataFallbackToBucket,
   isSurveyResultsDemoQuestionResultsContext,
@@ -714,6 +715,23 @@ const SurveyResults = (props: SurveyResultsProps): React.ReactElement => {
     return (node || fallback) as SurveyResultsRecord;
   }
 
+  // Questions an admin hid: the session's hidden list, and those the admin panel
+  // marked, which reach the browser as tombstones in the question cache.
+  function getHiddenQuestionIds(): Set<string> {
+    const slug = getEffectiveSlug();
+    const node = readResultsScopedCacheNode(
+      surveyResultsCachePort.peekCacheSync('questionsCache', slug, { clone: false }) || {},
+      slug,
+      getEffectiveCacheScope(),
+      {},
+    );
+    const tombstones = (node.workerQuestionMetadataTombstones || {}) as SurveyResultsRecord;
+    return new Set([
+      ...getBlockedQuestionIdsSet(slug),
+      ...Object.keys(tombstones).filter((id) => tombstones[id] === true),
+    ]);
+  }
+
   function filterResultsCacheRoot(cache: unknown, slug: string, cacheScope: string): unknown {
     if (cacheScope !== WORKER_CANONICAL_CACHE_SCOPE_KEY) return cache;
     const node = readResultsScopedCacheNode(cache, slug, cacheScope, {});
@@ -815,6 +833,7 @@ const SurveyResults = (props: SurveyResultsProps): React.ReactElement => {
       requireAuthoritativeBinding,
       viewMode,
       ports: {
+        readHiddenQuestionIds: getBlockedQuestionIdsSet,
         readQuestionBucket: (slug, networkId) =>
           applyBuiltInDemoQuestionMetadataFallbackToBucket(
             readResultsScopedCacheNode(
@@ -851,6 +870,7 @@ const SurveyResults = (props: SurveyResultsProps): React.ReactElement => {
       questionReadSlugs,
       requireAuthoritativeBinding,
       ports: {
+        readHiddenQuestionIds: getBlockedQuestionIdsSet,
         peekQuestionBucket: (slug, networkId) => {
           const bucket = readResultsScopedCacheNode(
             surveyResultsCachePort.peekCacheSync('questionsCache', slug, { clone: false }) || {},
@@ -1303,6 +1323,7 @@ const SurveyResults = (props: SurveyResultsProps): React.ReactElement => {
         applyStatePatch: (patch, afterApply) => setState(asSurveyResultsStatePatch(patch), afterApply),
         getCacheScope: getEffectiveCacheScope,
         getEffectiveSlug,
+        getHiddenQuestionIds,
         getNetworkQuestionsForCurrentContext,
         getProps: () => propsRef.current,
         getScopedQuestionNetworkData,
@@ -1335,6 +1356,7 @@ const SurveyResults = (props: SurveyResultsProps): React.ReactElement => {
         applyStatePatch: (patch, afterApply) => setState(asSurveyResultsStatePatch(patch), afterApply),
         getCacheScope: getEffectiveCacheScope,
         getEffectiveSlug,
+        getHiddenQuestionIds,
         getNetworkQuestionsForCurrentContext,
         getProps: () => propsRef.current,
         getScopedQuestionNetworkData,
