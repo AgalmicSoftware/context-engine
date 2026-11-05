@@ -308,6 +308,25 @@ describe('createSessionSurveyCacheController', () => {
   });
 
   describe('destroy', () => {
+    it('an earlier session finishing late does not mark the newer load ready', async () => {
+      const host = createMockHost();
+      const controller = createSessionSurveyCacheController(host);
+      const [alphaWindow, betaWindow] = [createDeferred(), createDeferred()];
+      contractScripts.getRelevantBlockWindowForFilter
+        .mockReturnValueOnce(alphaWindow.promise)
+        .mockReturnValueOnce(betaWindow.promise);
+
+      const alpha = controller.initializeSurveyCacheForGroup('alpha');
+      const beta = controller.initializeSurveyCacheForGroup('beta');
+      alphaWindow.resolve({ fromBlock: 2, toBlock: 1 });
+      await alpha;
+      expect(host.getStateSnapshot().isSurveyCacheReady).toBeUndefined();
+
+      betaWindow.resolve({ fromBlock: 2, toBlock: 1 });
+      await beta;
+      expect(host.getStateSnapshot().isSurveyCacheReady).toBe(true);
+    });
+
     it('clears pending retry timers without throwing', async () => {
       jest.useFakeTimers();
       const clearTimeoutSpy = jest.spyOn(global, 'clearTimeout');

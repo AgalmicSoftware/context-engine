@@ -710,6 +710,24 @@ describe('createSessionResponseHydrationController', () => {
       expect(host.getStateSnapshot().isResponsesCacheReady).toBe(true);
     });
 
+    it('a newer load that fails does not leave the page waiting on it', async () => {
+      const host = createMockHost();
+      const controller = createSessionResponseHydrationController(host);
+      const [alphaWindow, betaWindow] = [createDeferred(), createDeferred()];
+      contractScripts.getRelevantBlockWindowForFilter
+        .mockReturnValueOnce(alphaWindow.promise)
+        .mockReturnValueOnce(betaWindow.promise);
+
+      const alpha = controller.fetchQuestionResponsesChunkedForGroup('alpha');
+      const beta = controller.fetchQuestionResponsesChunkedForGroup('beta');
+      betaWindow.reject(new Error('fixture: read failed'));
+      await expect(beta).rejects.toThrow('fixture: read failed');
+      alphaWindow.resolve({ fromBlock: 12, toBlock: 11 });
+      await alpha;
+
+      expect(host.getStateSnapshot().isResponsesCacheReady).toBe(true);
+    });
+
     it('a queued rerun of the earlier session does not take readiness from the newer load', async () => {
       // Earlier tests may leave a rerun timer that would use this test's mocks.
       await new Promise((resolve) => setTimeout(resolve, 0));

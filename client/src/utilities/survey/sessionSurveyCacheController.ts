@@ -1,4 +1,5 @@
 import { canonicalizeSessionSlug as normalizeSessionSlug } from '../session/sessionSlug.js';
+import { createCacheReadinessOwner } from './cacheReadinessOwner';
 import contractScripts from '../web3/chainGateway.js';
 import { createLogger } from 'utilities/logging.js';
 import { normalizeArweaveFailureMeta, shouldStopPendingMetadataRetry } from '../arweave/arweaveRetryHelpers.js';
@@ -189,6 +190,7 @@ const surveyContractScripts = contractScripts as unknown as SurveyContractScript
 class SurveyCachePersistenceError extends Error {}
 
 export const createSessionSurveyCacheController = (host: SessionSurveyCacheHost): SessionSurveyCacheController => {
+  const readiness = createCacheReadinessOwner();
   let _surveyInitInFlight: Record<string, Promise<void> | undefined> = {};
   let _surveyInitPending: Record<string, SurveyInitOptions | undefined> = {};
   let _pendingSurveyMetadataRetryTimers: Record<string, ReturnType<typeof setTimeout> | undefined> = {};
@@ -381,12 +383,12 @@ export const createSessionSurveyCacheController = (host: SessionSurveyCacheHost)
         ...((opts && typeof opts === 'object' ? opts : {}) as SurveyInitOptions),
         background: suppressUiState,
       };
-      const setSurveyState = (nextState: SetStateArg, cb?: () => void): void => {
-        if (suppressUiState || !isMounted()) return;
-        setState(nextState, cb);
-      };
       const workerTarget = resolveWorkerMetadataHydrationTarget(host, slug);
       const initRunKey = workerTarget.runKey;
+      const ownsReadiness = (): boolean => !suppressUiState && isMounted() && readiness.allows(initRunKey);
+      const setSurveyState = (nextState: SetStateArg, cb?: () => void): void => {
+        if (ownsReadiness()) setState(nextState, cb);
+      };
       if (
         !workerTarget.isWorkerCanonical &&
         scanScopeNoop(slug, 'initializeSurveyCacheForGroup', () => {
@@ -395,6 +397,7 @@ export const createSessionSurveyCacheController = (host: SessionSurveyCacheHost)
       ) {
         return Promise.resolve();
       }
+      if (!suppressUiState) readiness.claim(initRunKey);
       _surveyInitInFlight = _surveyInitInFlight || {};
       _surveyInitPending = _surveyInitPending || {};
       if (_surveyInitInFlight[initRunKey]) {
@@ -417,7 +420,7 @@ export const createSessionSurveyCacheController = (host: SessionSurveyCacheHost)
             onSuccess: (count) => {
               setSurveyState({ isSurveyCacheReady: true });
               if (count > 0) queueLocalRevisionUpdate({ needsQuestionResponsesNonce: true });
-              if (!suppressUiState) checkAllCachesReady();
+              if (ownsReadiness()) checkAllCachesReady();
             },
             onError: (error) => {
               mainSiteLog.error('Error hydrating Worker survey metadata:', error);
@@ -1167,13 +1170,17 @@ export const createSessionSurveyCacheController = (host: SessionSurveyCacheHost)
       })();
 
       const finalizeRun = (): void => {
+        readiness.release(initRunKey);
         delete _surveyInitInFlight[initRunKey];
         if (_surveyInitPending[initRunKey]) {
           const pendingOpts = _surveyInitPending[initRunKey];
           delete _surveyInitPending[initRunKey];
           setTimeout(() => {
             if (!isMounted()) return;
-            void initializeSurveyCacheForGroup(slug, pendingOpts || rerunOpts).catch((error: unknown) => {
+            const queued = pendingOpts || rerunOpts;
+            // A rerun must not take readiness back from a newer load.
+            const nextOpts = readiness.allows(initRunKey) ? queued : { ...queued, background: true };
+            void initializeSurveyCacheForGroup(slug, nextOpts).catch((error: unknown) => {
               mainSiteLog.warn('Deferred survey cache rerun failed', { slug, error });
             });
           }, 0);

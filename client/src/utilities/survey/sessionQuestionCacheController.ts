@@ -1,4 +1,5 @@
 import { canonicalizeSessionSlug as normalizeSessionSlug } from '../session/sessionSlug.js';
+import { createCacheReadinessOwner } from './cacheReadinessOwner';
 import contractScripts from '../web3/chainGateway.js';
 import { createLogger } from 'utilities/logging.js';
 import {
@@ -368,6 +369,7 @@ class QuestionCachePersistenceError extends Error {}
 export const createSessionQuestionCacheController = (
   host: SessionQuestionCacheHost,
 ): SessionQuestionCacheController => {
+  const readiness = createCacheReadinessOwner();
   let _questionInitInFlight: Record<string, Promise<void> | undefined> = {};
   let _questionInitPending: Record<string, QuestionInitOptions | undefined> = {};
   let _destroyed: boolean = false;
@@ -536,13 +538,12 @@ export const createSessionQuestionCacheController = (
       skipDiscoveryScan,
       forceDiscoveryRescan,
     };
+    const ownsReadiness = (): boolean => !suppressUiState && isMounted() && readiness.allows(initRunKey);
     const setQuestionState = (nextState: SetStateArg, cb?: () => void): void => {
-      if (suppressUiState || !isMounted()) return;
-      setState(nextState, cb);
+      if (ownsReadiness()) setState(nextState, cb);
     };
     const maybeCheckAllCachesReady = (): void => {
-      if (suppressUiState) return;
-      checkAllCachesReady();
+      if (ownsReadiness()) checkAllCachesReady();
     };
     if (
       !workerTarget.isWorkerCanonical &&
@@ -552,6 +553,7 @@ export const createSessionQuestionCacheController = (
     ) {
       return;
     }
+    if (!suppressUiState) readiness.claim(initRunKey);
     _questionInitInFlight = _questionInitInFlight || {};
     _questionInitPending = _questionInitPending || {};
     if (_questionInitInFlight[workerTarget.runKey]) {
@@ -2113,6 +2115,7 @@ export const createSessionQuestionCacheController = (
             : null,
         );
       }
+      readiness.release(initRunKey);
       if (hasPendingRerun) {
         const pendingOpts = _questionInitPending[initRunKey];
         delete _questionInitPending[initRunKey];
@@ -2120,7 +2123,12 @@ export const createSessionQuestionCacheController = (
           if (_destroyed) return;
           try {
             if (!isMounted()) return;
-            initializeQuestionCacheForGroup(slug, pendingOpts || rerunOpts);
+            const queued = pendingOpts || rerunOpts;
+            // A rerun must not take readiness back from a newer load.
+            initializeQuestionCacheForGroup(
+              slug,
+              readiness.allows(initRunKey) ? queued : { ...queued, background: true },
+            );
           } catch (e: unknown) {
             mainSiteLog.warn('MainSite: fallback', e);
           }
