@@ -27,7 +27,6 @@
     "client/src/components/MainSite",
     "client/src/components/Navbar",
     "client/src/components/Onboarding",
-    "client/src/components/OnePageSession/telegram",
     "client/src/components/PolisReport",
     "client/src/components/RightSidebar",
     "client/src/components/Sessions",

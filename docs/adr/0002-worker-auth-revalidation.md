@@ -94,8 +94,8 @@ request through live route-specific revalidation, so authorization freshness no
 longer depends on the four-hour token lifetime. A token can also be invalidated
 directly by deleting its `authToken:{slug}:{sub}:{jti}` KV record.
 
-ADR-0004 records the earlier risk acceptance and its 2026-07-21 supersession by
-the Durable Object authority.
+[ADR-0004](0004-worker-auth-consistency-risk-acceptance.md) records the earlier
+risk acceptance and its 2026-07-21 supersession by the Durable Object authority.
 
 ## Tests
 

@@ -8,7 +8,6 @@ client/coverage/
 node_modules/
 
 client/src/contractsABI/**/*.json
-client/src/artifacts/
 client/src/assets/**/*.min.*
 client/src/assets/vendor/
 

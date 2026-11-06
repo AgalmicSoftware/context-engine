@@ -173,7 +173,6 @@ test('public agent docs define fresh single-Worker storage and deployment', () =
   assert.match(agentReadme, /Hosted & Fast uses canonical Cloudflare payload storage/);
   assert.match(agentReadme, /Trustless & Slower/);
   assert.match(agentReadme, /SessionWriteCoordinator/);
-  assert.match(agentReadme, /Existing Bridge-backed sessions keep their old deployments/);
   assert.match(agentReadme, /ce-agent:/);
 });
 
@@ -237,7 +236,7 @@ test('active agent docs preserve HTTP access and distinguish historical review e
   assert.doesNotMatch(architecture, /telegramAgentData\.ts|telegramSessionBackend\.ts/);
   assert.match(workerDoc, /HTTP-off overrides stale legacy flags/);
   assert.match(workerDoc, /historical `telegram`|Historical explicit\s+`telegram`/);
-  assert.match(read('workers/sessionCorsWorker/agent/README.md'), /retired/);
+  assert.doesNotMatch(read('workers/sessionCorsWorker/agent/README.md'), /\bBridge\b/);
   assert.doesNotMatch(workerDoc, /Telegram-first|Telegram remains independently optional/);
   if (contract) {
     assert.match(contract, /Session Worker now owns the canonical authenticated/);

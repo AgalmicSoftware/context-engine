@@ -2,8 +2,9 @@
 
 ## Status
 
-Superseded on 2026-07-21. The accepted KV consistency risk is closed by the
-mandatory `CE_SESSION_COORDINATOR` Durable Object authority described below.
+Superseded on 2026-07-21 by the `CE_SESSION_COORDINATOR` Durable Object
+authority described below. [ADR-0002](0002-worker-auth-revalidation.md) records
+the token and revalidation decisions that remain in force.
 
 ## Context
 
