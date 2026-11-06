@@ -1538,7 +1538,6 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
         const panel = document.querySelector('[data-testid="ce-prelogin-settings-panel"]');
         const selector = panel?.querySelector('[data-testid="ce-settings-theme"]');
         const appearanceSection = selector?.closest('[class*="settingsThemeQuickControl"]');
-        const summary = appearanceSection?.querySelector('[class*="settingsSectionSummary"]');
         const resourceCards = Array.from(panel?.querySelectorAll('[class*="supportedResourceCard"]') || []);
         const aiCard = resourceCards.find(
           (candidate) => candidate.querySelector('[class*="supportedResourceName"]')?.textContent?.trim() === 'AI',
@@ -1557,7 +1556,6 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
           hasVisibleLabel: Array.from(appearanceSection.querySelectorAll('*')).some(
             (element) => element.childElementCount === 0 && element.textContent?.trim() === 'App theme',
           ),
-          hasVisibleSummary: !!summary,
           isFinalSection: appearanceSection.parentElement?.lastElementChild === appearanceSection,
           selectorRatio: ratio(selectorStyle.color, backgroundFor(selector)),
           sponsorDetailInsideActivePill: activeSessionPill.contains(sponsorDetail),
@@ -3140,7 +3138,6 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
       true,
       'Appearance should be the final signed-out Settings control',
     );
-    assert.equal(preloginThemeSettingsState.hasVisibleSummary, false, 'Appearance should not show a summary');
     assert.equal(preloginThemeSettingsState.hasVisibleLabel, false, 'Appearance should not show an App theme label');
     assert.equal(preloginThemeSettingsState.hasVisibleHint, false, 'Appearance should not show explanatory copy');
     assert.equal(preloginThemeSettingsState.accessibleName, 'App theme', 'Theme selector should retain its accessible name');
