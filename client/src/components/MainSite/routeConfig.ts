@@ -23,7 +23,6 @@ export const KNOWN_ROUTE_PREFIXES = new Set([
   'su',
   'u',
   'new',
-  'demo',
   'benchmarks',
   'about',
   'posts',
