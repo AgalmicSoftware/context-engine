@@ -228,7 +228,7 @@ describe('OnePageSession auto-mint queue', () => {
     const nativeBalanceSpy = jest
       .spyOn(contractScripts, 'getNativeBalance')
       .mockResolvedValue(ethers.utils.parseEther('0.1'));
-    const ok = await subject.waitForSufficientBalance('mock', account, ethers.utils.parseEther('0.00002'), 50, 1);
+    const ok = await subject.waitForSufficientBalance(account, ethers.utils.parseEther('0.00002'), 50, 1);
 
     expect(ok).toBe(true);
     expect(nativeBalanceSpy).toHaveBeenCalledWith(account, expect.any(String));
@@ -460,7 +460,6 @@ describe('OnePageSession auto-mint queue', () => {
     const queueRun = subject.runAutoMintQueue();
     await waitFor(() =>
       expect(subject.waitForSufficientBalance).toHaveBeenCalledWith(
-        'wagmi',
         accountA.toLowerCase(),
         expect.anything(),
         expect.any(Number),

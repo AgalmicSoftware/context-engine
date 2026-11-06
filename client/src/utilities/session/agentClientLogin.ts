@@ -87,7 +87,7 @@ const storageKey = (target: unknown | AgentClientLoginIdentityTarget): string =>
     storageSlugPart(identity.sessionSlug),
     encodeURIComponent(identity.sessionId || 'no-session-id'),
     encodeURIComponent(identity.workerUrl || 'no-worker-origin'),
-    encodeURIComponent(identity.agentWorkerUrl || 'no-bridge-origin'),
+    encodeURIComponent(identity.agentWorkerUrl || 'no-agent-origin'),
   ].join(':');
 };
 
@@ -196,7 +196,7 @@ const normalizeExchangeEnvelope = ({
   }
   const agentCredential = toRecord(body.agentCredential);
   const workerCredential = toRecord(body.workerCredential);
-  if (!toStr(agentCredential.token)) throw new Error('agent_client_login_missing_bridge_credential');
+  if (!toStr(agentCredential.token)) throw new Error('agent_client_login_missing_agent_credential');
   if (!toStr(workerCredential.token)) throw new Error('agent_client_login_missing_worker_credential');
   const normalizedSlug = normalizeSessionSlug(body.sessionSlug || sessionSlug);
   if (normalizedSlug !== normalizeSessionSlug(sessionSlug)) {
@@ -359,16 +359,16 @@ export const exchangeAgentClientLogin = async ({
     if (generation !== getClientAuthGeneration())
       throw new DOMException('Agent login cancelled by logout.', 'AbortError');
   };
-  const bridge = normalizeWorkerUrl(agentWorkerUrl);
-  if (!bridge) throw new Error('agent_client_login_worker_missing');
-  if (expectedWorkerUrlRaw && normalizeWorkerUrl(toStr(expectedWorkerUrlRaw)) !== bridge)
+  const agentOrigin = normalizeWorkerUrl(agentWorkerUrl);
+  if (!agentOrigin) throw new Error('agent_client_login_worker_missing');
+  if (expectedWorkerUrlRaw && normalizeWorkerUrl(toStr(expectedWorkerUrlRaw)) !== agentOrigin)
     throw new Error('agent_client_login_origin_mismatch');
   const slug = normalizeSessionSlug(sessionSlug);
   if (!slug) throw new Error('agent_client_login_session_required');
   const validation = extractAgentClientToken(tokenOrLink);
   if (!validation.ok) throw new Error(`agent_client_login_${validation.reason}`);
 
-  const capabilityResponse = await fetchImpl(`${bridge}/capabilities?slug=${encodeURIComponent(slug)}`, {
+  const capabilityResponse = await fetchImpl(`${agentOrigin}/capabilities?slug=${encodeURIComponent(slug)}`, {
     cache: 'no-store',
   });
   const capability = toRecord(await capabilityResponse.json().catch(() => ({})));
@@ -378,11 +378,11 @@ export const exchangeAgentClientLogin = async ({
     !Array.isArray(capability.features) ||
     !capability.features.includes('agent_http_v1') ||
     toRecord(capability.agentHttp).ready !== true ||
-    toRecord(capability.agentSessionWrapped).origin !== bridge
+    toRecord(capability.agentSessionWrapped).origin !== agentOrigin
   ) {
     throw new Error('agent_client_login_worker_not_ready');
   }
-  const response = await fetchImpl(`${bridge}/api/agent/client-login/exchange`, {
+  const response = await fetchImpl(`${agentOrigin}/api/agent/client-login/exchange`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
@@ -400,7 +400,7 @@ export const exchangeAgentClientLogin = async ({
     body,
     sessionSlug: slug,
     sourceToken: validation.token,
-    agentWorkerUrl: bridge,
+    agentWorkerUrl: agentOrigin,
   });
   const expectedSessionId = normalizeWorkerCanonicalSessionIdHex(expectedSessionIdRaw);
   const expectedWorkerUrl = normalizeWorkerUrl(toStr(expectedWorkerUrlRaw));
@@ -415,7 +415,7 @@ export const exchangeAgentClientLogin = async ({
       sessionSlug: slug,
       sessionId: expectedSessionId,
       workerUrl: expectedWorkerUrl,
-      agentWorkerUrl: bridge,
+      agentWorkerUrl: agentOrigin,
     })
   ) {
     throw new Error('agent_client_login_session_identity_mismatch');

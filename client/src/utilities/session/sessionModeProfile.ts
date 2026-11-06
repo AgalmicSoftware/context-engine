@@ -131,25 +131,6 @@ const SESSION_MODE_UNAVAILABLE_ISSUE_CODES = new Set<string>([
 const SESSION_MODE_EVM_ADDRESS_PATTERN = /^0x[0-9a-fA-F]{40}$/;
 
 const trim = (value: unknown): string => String(value ?? '').trim();
-const lower = (value: unknown): string => trim(value).toLowerCase();
-
-const normalizeModeValue = (value: unknown): string => lower(value);
-
-// Compatibility-only fields from profiles written before direct agent HTTP access.
-export const hasLegacyHostedAgentFlags = (metadata: unknown): boolean => {
-  const config = isRecord(metadata) ? metadata : {};
-  const agentConfig = isRecord(config.telegram) ? config.telegram : {};
-  return (
-    config.sessionBackendKind === 'agent' ||
-    config.sessionBackendKind === 'telegram' ||
-    config.telegramOnly === true ||
-    config.telegram_only === true ||
-    normalizeModeValue(config.sessionMode) === 'telegram_only' ||
-    normalizeModeValue(config.telegramMode) === 'telegram_only' ||
-    agentConfig.only === true ||
-    normalizeModeValue(agentConfig.mode) === 'telegram_only'
-  );
-};
 
 export const isSessionModeProfileAgentHttpEnabled = (metadata: unknown): boolean => {
   const config = isRecord(metadata) ? metadata : {};
@@ -891,8 +872,6 @@ export const compileSessionModeProfile = (profile: SessionModeProfile): Compiled
     payloadAccessControl,
     payloadAccessMode,
     authorityMode: profile.authority.mode,
-    telegramBridgeEnabled: false,
-    miniAppEnabled: false,
     agentHttpEnabled: profile.surfaces.agentHttp === true,
     resultsExposure: normalizeExposure(profile.results.exposure),
     exportScope: profile.export.scope,
@@ -913,14 +892,6 @@ export const profileFromLegacyConfig = (sessionConfig: unknown): SessionModeProf
       ? config.sessionStorageProfile
       : {};
   const normalizedBackend = normalizeStorageBackend(storageProfile.backend || config.storageBackend || config.storage);
-  if (hasLegacyHostedAgentFlags(config)) {
-    const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
-    profile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
-    profile.surfaces.agentHttp = (config.agentHttpEnabled ?? config.agentHttp) !== false;
-    profile.surfaces.web = true;
-    return profile;
-  }
-
   const profile = cloneSessionModePreset(
     normalizedBackend === STORAGE_BACKENDS.CLOUDFLARE
       ? SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE

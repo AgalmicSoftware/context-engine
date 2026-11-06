@@ -43,7 +43,7 @@ const baseProps = {
     expiresAt: '2099-01-01T00:00:00.000Z',
     address: '0xabc',
     workerCredential: { kind: 'worker', token: 'worker-jwt' },
-    agentCredential: { kind: 'bridge', token: 'bridge-token' },
+    agentCredential: { kind: 'agent', token: 'agent-token' },
     capabilities: { submitAnswers: true },
   },
   agentPolisDataset: null,

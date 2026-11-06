@@ -1450,7 +1450,6 @@ class OnePageSession extends Component<any, any> {
 
   // Await sufficient balance for gas if possible; otherwise skip (non-blocking UX)
   async waitForSufficientBalance(
-    providerIn: any,
     address: any,
     minimumBalanceWei: any,
     timeoutMs: any = 45000,
@@ -1832,7 +1831,6 @@ class OnePageSession extends Component<any, any> {
 
         // Gate before ANY gas-spending tx
         const hasFundsFirst = await this.waitForSufficientBalance(
-          autoMintProvider,
           userAddr,
           MIN_BALANCE_WEI,
           WAIT_TIMEOUT_MS,

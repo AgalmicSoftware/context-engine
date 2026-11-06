@@ -22,7 +22,7 @@ const envelope: AgentClientLoginEnvelope = {
   expiresAt: '2027-07-05T00:00:00.000Z',
   address: '0x00000000000000000000000000000000000000aa',
   capabilities: { readGroups: true },
-  agentCredential: { kind: 'session_agent_browser_token', token: 'bridge-browser-token' },
+  agentCredential: { kind: 'session_agent_browser_token', token: 'agent-browser-token' },
   workerCredential: { kind: 'session_worker_jwt', token: 'worker-jwt-token' },
   workerUrl: 'https://session-worker.example',
 };
@@ -920,7 +920,7 @@ describe('WorkerGroupMembershipPanel', () => {
       const url = String(input);
       const parsedUrl = new URL(url);
       expect(new Headers(init?.headers).get('Authorization')).toBe('Bearer worker-jwt-token');
-      expect(JSON.stringify(init)).not.toContain('bridge-browser-token');
+      expect(JSON.stringify(init)).not.toContain('agent-browser-token');
       if (parsedUrl.pathname.endsWith('/groups/join')) {
         joined = true;
         expect(JSON.parse(String(init?.body))).toEqual({ groupId: 'open-reviewers', sessionId: SESSION_ID });

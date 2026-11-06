@@ -288,19 +288,6 @@ describe('OnePageSession view gating', () => {
     expect(screen.getByTestId('survey-page-pile')).toBeInTheDocument();
   });
 
-  it('preserves the agent sign-in shell for profile-less legacy sessions', async () => {
-    const sessionConfig = { ...buildProps().sessionConfig, telegramOnly: true };
-    delete sessionConfig.sessionModeProfile;
-    render(<OnePageSession {...buildProps()} sessionConfig={sessionConfig} />);
-
-    expect(await screen.findByTestId(E2E_TESTIDS.SESSION_AGENT_SIGN_IN_NOTICE)).toHaveTextContent(
-      /Agent-enabled session/i,
-    );
-    expect(screen.getByTestId('ce-session-agent-login-open')).toBeInTheDocument();
-    expect(screen.queryByTestId('survey-page-pile')).not.toBeInTheDocument();
-    expect(mockSurveyPage).not.toHaveBeenCalled();
-  });
-
   it.each([
     ['signed out', false, ''],
     ['wallet', true, 'wagmi'],
@@ -313,7 +300,7 @@ describe('OnePageSession view gating', () => {
         {...buildProps()}
         loginComplete={loginComplete}
         provider={provider}
-        sessionConfig={{ ...buildProps().sessionConfig, sessionModeProfile: profile, telegramOnly: true }}
+        sessionConfig={{ ...buildProps().sessionConfig, sessionModeProfile: profile }}
       />,
     );
 
@@ -401,8 +388,8 @@ describe('OnePageSession view gating', () => {
             JSON.stringify({
               ok: true,
               sessionSlug: 'edge',
-              telegramOnly: true,
-              telegramBridgeEnabled: true,
+              authorityMode: 'worker_canonical',
+              agentHttpEnabled: true,
               clientSubmitReady: true,
             }),
             { status: 200, headers: { 'content-type': 'application/json' } },
@@ -492,20 +479,19 @@ describe('OnePageSession view gating', () => {
     expect(screen.queryByTestId('ce-session-agent-questions')).not.toBeInTheDocument();
   });
 
-  it('keeps /session/demo in the normal shell when stale telegram session-meta belongs to another slug', () => {
+  it('keeps /session/demo in the normal shell when stale session-meta belongs to another slug', () => {
     const subject = createSubject({
       slug: 'demo',
       sessionConfig: {
         ...buildProps().sessionConfig,
         slug: 'demo',
-        sessionMode: 'standard',
       },
     });
     subject.state.agentSessionMeta = {
       ok: true,
       sessionSlug: 'edge',
-      telegramOnly: true,
-      telegramBridgeEnabled: true,
+      authorityMode: 'worker_canonical',
+      agentHttpEnabled: true,
       clientSubmitReady: true,
     };
 
@@ -513,11 +499,12 @@ describe('OnePageSession view gating', () => {
   });
 
   it('clears prior Agent state before a route-state early return on slug change', () => {
+    const agentProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    agentProfile.surfaces.agentHttp = true;
     const alphaConfig = {
       ...buildProps().sessionConfig,
       slug: 'alpha',
-      telegramOnly: true,
-      sessionMode: 'telegram_only',
+      sessionModeProfile: agentProfile,
     };
     const subject = createSubject({
       slug: 'alpha',
@@ -537,8 +524,7 @@ describe('OnePageSession view gating', () => {
       sessionConfig: {
         ...alphaConfig,
         slug: 'beta',
-        telegramOnly: false,
-        sessionMode: 'standard',
+        sessionModeProfile: { ...agentProfile, surfaces: { ...agentProfile.surfaces, agentHttp: false } },
       },
       routeQuestionsOpen: true,
     };
