@@ -3734,8 +3734,8 @@ export const renderHtmlReport = (inputReport) => {
     .ce-session-results-section > .sectionHeaderRow > .sectionHeader { display: flex; flex-direction: row; align-items: flex-start; flex-wrap: wrap; gap: 10px; cursor: pointer; font-size: 2rem; margin: 0; font-weight: bold; color: rgba(255, 255, 255, 0.75); flex: 0 1 auto; min-width: 0; line-height: 1.1; }
     .ce-session-results-section > .sectionHeaderRow > .sectionHeader .sectionHeaderText { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 6px; min-width: 0; }
     .sectionExpanded .sectionHeaderText { align-self: center; }
-    .sectionHeaderTitle { display: block; max-width: 100%; line-height: 1; color: rgba(255, 255, 255, 0.5); }
-    .sectionHeaderSubtitle { display: block; max-width: 100%; font-size: 0.63em; line-height: 1.12; font-weight: 600; color: rgba(255, 255, 255, 0.25); }
+    .sectionHeaderTitle { display: block; max-width: 100%; line-height: 1; color: #f4f7ff; }
+    .sectionHeaderSubtitle { display: block; max-width: 100%; font-size: 0.63em; line-height: 1.12; font-weight: 600; color: rgba(244, 247, 255, 0.65); }
     .tooltip { position: relative; display: inline-block; cursor: pointer; font-size: 1.4em; z-index: 1000; opacity: 1; }
     .tooltip > svg { color: rgba(255, 255, 255, 0.75); opacity: 0.1; transition: opacity 0.25s ease; }
     .tooltip:hover > svg,
@@ -4810,7 +4810,7 @@ export const renderHtmlReport = (inputReport) => {
     @media only screen and (min-width: 601px) and (max-width: 767px) {
       .ce-session-results-section > .sectionHeaderRow > .sectionHeader { align-items: center; font-size: 1.6em; padding-left: 10px; }
       .ce-session-results-section > .sectionHeaderRow > .sectionHeader .sectionHeaderText { flex-direction: row; align-items: center; flex-wrap: wrap; gap: 6px 12px; }
-      .ce-session-results-section > .sectionHeaderRow > .sectionHeader .sectionHeaderSubtitle { font-size: 1.2em; font-weight: inherit; line-height: 1; color: rgba(255, 255, 255, 0.15); }
+      .ce-session-results-section > .sectionHeaderRow > .sectionHeader .sectionHeaderSubtitle { font-size: 1.2em; font-weight: inherit; line-height: 1; color: rgba(244, 247, 255, 0.65); }
       .ce-session-results-section > .sectionHeaderRow { gap: 12px; }
     }
     @media (max-width: 768px) {
@@ -4857,7 +4857,7 @@ export const renderHtmlReport = (inputReport) => {
       .ce-session-results-section { padding-left: 0; padding-right: 0; border: none; }
       .ce-session-results-section > .sectionHeaderRow > .sectionHeader { align-items: center; font-size: 1.6em; padding-left: 10px; }
       .ce-session-results-section > .sectionHeaderRow > .sectionHeader .sectionHeaderText { flex-direction: row; align-items: center; flex-wrap: wrap; gap: 6px 12px; }
-      .ce-session-results-section > .sectionHeaderRow > .sectionHeader .sectionHeaderSubtitle { font-size: 1em; font-weight: inherit; line-height: 1; color: rgba(255, 255, 255, 0.15); }
+      .ce-session-results-section > .sectionHeaderRow > .sectionHeader .sectionHeaderSubtitle { font-size: 1em; font-weight: inherit; line-height: 1; color: rgba(244, 247, 255, 0.65); }
       .ce-session-results-section > .sectionHeaderRow { gap: 12px; }
       .sectionHeaderActionsScroller { width: 100%; justify-content: flex-start; padding-left: 10px; }
       .sectionHeaderActions { justify-content: flex-start; }
