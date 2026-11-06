@@ -92,9 +92,9 @@ not shipped packages.
 
 | Mode | Availability | Trust model | Best fit |
 | --- | --- | --- | --- |
-| `worker_envelope` | Implemented default for Hosted & Fast | Session operator and Cloudflare worker runtime | Cloudflare-backed private sessions |
+| `worker_envelope` | Implemented opt-in for Hosted & Fast | Session operator and Cloudflare worker runtime | Cloudflare-backed private sessions |
 | `lit` | Implemented opt-in | Session Worker operator, holders of the session's Lit API key, and Lit's Chipotle service checking SBT ownership on the selected EVM chain | SBT-gated data in Arweave-backed sessions |
-| `none` | Implemented; decentralized preset default | Storage visibility and session policy | Intentionally public data |
+| `none` | Implemented; default for new sessions and the decentralized preset | Storage visibility and session policy | Intentionally public data |
 | Organizational KMS/key release | Planned | Customer IAM and key-service policy | Company-operated environments |
 | TEE or permissioned threshold compute | Planned research | Attested operator or permissioned threshold trust | Advanced private query and compute |
 

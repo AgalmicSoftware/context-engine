@@ -9,10 +9,16 @@ import {
   type SessionModeResultsVisibility,
 } from '../../../utilities/session/sessionModeProfile';
 
-// The quick path's profile: Worker-canonical, passkey-first, optional
-// surfaces off. Every option on the page edits a copy of it.
-export const defaultSessionSetupProfile = (): SessionModeProfile =>
-  cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+// The quick path's profile: Worker-canonical, passkey-first, optional surfaces off,
+// and public results, which need unencrypted answers. Every option on the page edits
+// a copy of it.
+export const defaultSessionSetupProfile = (): SessionModeProfile => {
+  const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+  profile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
+  profile.encryption = { mode: 'none' };
+  setResultsVisibility(profile, PUBLIC_RESULTS);
+  return profile;
+};
 
 export const PUBLIC_RESULTS: SessionModeResultsVisibility = 'public_full_if_storage_public';
 export const DEFAULT_REGISTRY_CHAIN_ID = 11155420;
@@ -34,8 +40,10 @@ const payloadEncryptionFor = (profile: SessionModeProfile): PayloadAccess['encry
       ? 'lit'
       : 'none';
 
+// The access policy of a session whose results aren't public.
 export const defaultCloudflarePayloadAccess = (profile?: SessionModeProfile): PayloadAccess => {
-  const access = clone(defaultSessionSetupProfile().storage.payloadAccessControl as PayloadAccess);
+  const preset = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+  const access = preset.storage.payloadAccessControl as PayloadAccess;
   return profile ? { ...access, encryption: payloadEncryptionFor(profile) } : access;
 };
 
@@ -125,6 +133,7 @@ export const setHosting = (profile: SessionModeProfile, authority: string, regis
   }
   profile.authority.mode = 'worker_canonical';
   profile.storage = { backend: 'cloudflare', payloadAccessControl: defaultCloudflarePayloadAccess(profile) };
+  setResultsVisibility(profile, profile.results.visibility);
   profile.identity = { default: 'passkey', enabled: ['passkey'] };
   profile.authorization = { mechanisms: ['worker_roles'] };
 };

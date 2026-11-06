@@ -5,6 +5,7 @@ import {
   sessionModeAllowsAnonymousWorkerGroupDiscovery,
   validateSessionModeProfile,
 } from './sessionModeProfile';
+import { defaultSessionSetupProfile } from '../../components/Sessions/setup/sessionSetupProfile';
 import {
   validateDeploymentModeValues,
   validateWorkerConfigModeValues,
@@ -24,6 +25,10 @@ const expectValidatorParity = (profile, expectedValid) => {
 };
 
 describe('session mode profile client/Worker validator parity', () => {
+  it('accepts the profile a new session starts from', () => {
+    expectValidatorParity(defaultSessionSetupProfile(), true);
+  });
+
   it('accepts both exact named presets', () => {
     for (const preset of [
       SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE,

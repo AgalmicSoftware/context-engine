@@ -1,10 +1,11 @@
 import {
-  SESSION_MODE_PRESET_IDS,
-  cloneSessionModePreset,
   compileSessionModeProfile,
+  sessionModeAllowsAnonymousWorkerGroupDiscovery,
   validateSessionModeProfile,
 } from '../../../utilities/session/sessionModeProfile';
+import { sessionAnswersRequireLogin } from '../../../utilities/session/sessionCapabilityProjection';
 import {
+  defaultCloudflarePayloadAccess,
   defaultSessionSetupProfile,
   editSessionSetupProfile,
   setEncryptionMode,
@@ -18,10 +19,33 @@ const issueCodes = (profile: unknown) => validateSessionModeProfile(profile).iss
 describe('session setup profile edits', () => {
   it('starts from the quick path: Worker-hosted, passkeys, optional surfaces off', () => {
     const profile = defaultSessionSetupProfile();
-    expect(profile).toEqual(cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE));
     expect(profile.authority.mode).toBe('worker_canonical');
     expect(profile.identity).toEqual({ default: 'passkey', enabled: ['passkey'] });
     expect(Object.entries(profile.surfaces).filter(([, on]) => on)).toEqual([['web', true]]);
+  });
+
+  it('starts with public results, which needs unencrypted answers on public-read storage', () => {
+    const profile = defaultSessionSetupProfile();
+    expect(profile.results.visibility).toBe('public_full_if_storage_public');
+    expect(profile.encryption).toEqual({ mode: 'none' });
+    expect(profile.storage.payloadAccessControl).toEqual({ gate: 'none', encryption: 'none' });
+    expect(issueCodes(profile)).toEqual([]);
+    expect(sessionModeAllowsAnonymousWorkerGroupDiscovery(profile)).toBe(true);
+    expect(sessionAnswersRequireLogin(profile)).toBe(false);
+  });
+
+  it('asks visitors to log in only once the creator chooses non-public results', () => {
+    const { profile } = editSessionSetupProfile(defaultSessionSetupProfile(), (draft) =>
+      setResultsVisibility(draft, 'participant_aggregate'),
+    );
+    expect(sessionAnswersRequireLogin(profile)).toBe(true);
+    expect(profile.storage.payloadAccessControl?.gate).toBe('role_gate');
+    expect(issueCodes(profile)).toEqual([]);
+  });
+
+  it('keeps the private access policy for sessions that leave public results', () => {
+    expect(defaultCloudflarePayloadAccess().gate).toBe('role_gate');
+    expect(defaultCloudflarePayloadAccess().accessConditions?.conditions.length).toBeGreaterThan(0);
   });
 
   it('edits a copy, marks it custom and keeps the web surface on', () => {
@@ -63,6 +87,8 @@ describe('session setup profile edits', () => {
     expect(back.evm.registryChainId).toBeNull();
     expect(back.storage.backend).toBe('cloudflare');
     expect(issueCodes(back)).toEqual([]);
+    expect(back.results.visibility).toBe('public_full_if_storage_public');
+    expect(back.storage.payloadAccessControl).toEqual({ gate: 'none', encryption: 'none' });
   });
 
   it('moves public results off encrypted storage and back to the default access policy', () => {
