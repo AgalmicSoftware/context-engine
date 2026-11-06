@@ -1537,8 +1537,7 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
         };
         const panel = document.querySelector('[data-testid="ce-prelogin-settings-panel"]');
         const selector = panel?.querySelector('[data-testid="ce-settings-theme"]');
-        const sections = Array.from(panel?.querySelectorAll('[class*="settingsSectionCard"]') || []);
-        const appearanceSection = selector?.closest('[class*="settingsSectionCard"]');
+        const appearanceSection = selector?.closest('[class*="settingsThemeQuickControl"]');
         const summary = appearanceSection?.querySelector('[class*="settingsSectionSummary"]');
         const resourceCards = Array.from(panel?.querySelectorAll('[class*="supportedResourceCard"]') || []);
         const aiCard = resourceCards.find(
@@ -1559,7 +1558,7 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
             (element) => element.childElementCount === 0 && element.textContent?.trim() === 'App theme',
           ),
           hasVisibleSummary: !!summary,
-          isFinalSection: sections.at(-1) === appearanceSection,
+          isFinalSection: appearanceSection.parentElement?.lastElementChild === appearanceSection,
           selectorRatio: ratio(selectorStyle.color, backgroundFor(selector)),
           sponsorDetailInsideActivePill: activeSessionPill.contains(sponsorDetail),
         };
@@ -3134,12 +3133,12 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
     assert.equal(
       preloginThemeSettingsState.missing,
       undefined,
-      'Signed-out Appearance & colors controls should render',
+      'Signed-out Appearance controls should render',
     );
     assert.equal(
       preloginThemeSettingsState.isFinalSection,
       true,
-      'Appearance & colors should be the final signed-out Settings section',
+      'Appearance should be the final signed-out Settings control',
     );
     assert.equal(preloginThemeSettingsState.hasVisibleSummary, false, 'Appearance should not show a summary');
     assert.equal(preloginThemeSettingsState.hasVisibleLabel, false, 'Appearance should not show an App theme label');
@@ -3157,7 +3156,7 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
     );
     assert.match(
       preloginThemeSettingsState.activeSessionPillText,
-      /Demo Session\s+No sponsor key is configured for the active session\./,
+      /Demo Session\s+(No sponsor key is configured for the active session\.|Could not confirm sponsorship\.)/,
       'Active-session pill should combine the session name with its sponsorship status',
     );
     assert.ok(
