@@ -47,9 +47,6 @@ export const AGENT_CREDENTIAL_DEFAULT_SCOPES = Object.freeze([
   AGENT_CREDENTIAL_SCOPES.POSE_QUESTIONS,
 ]);
 
-// Compatibility exports for the Telegram adapter. New transport-neutral code
-// should use the AGENT_CREDENTIAL names above.
-
 function normalizeSessionId(value = '') {
   const normalized = safeString(value).toLowerCase().replace(/^0x/, '').replace(/-/g, '');
   return /^[0-9a-f]{32}$/.test(normalized) && !/^0+$/.test(normalized) ? `0x${normalized}` : '';

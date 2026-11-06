@@ -133,7 +133,7 @@ test('resolveAuthenticatedRequest passes token and header slug data through with
         received = value;
         return { ok: true, slug: 'resolved-slug', tokenSlug: '', explicitSlugProvided: true };
       },
-      validateAuthTokenRecord: async () => ({ ok: true, legacy: false }),
+      validateAuthTokenRecord: async () => ({ ok: true }),
       json: createJsonStub(),
       MISSING_SLUG_ERROR: 'Missing sessionSlug.',
     },
@@ -255,7 +255,7 @@ test('resolveAuthenticatedRequest preserves success payload and resolved slug sh
       }),
       validateAuthTokenRecord: async () => {
         validateCalled = true;
-        return { ok: true, legacy: false };
+        return { ok: true };
       },
       json: createJsonStub(),
       MISSING_SLUG_ERROR: 'Missing sessionSlug.',
@@ -349,7 +349,7 @@ test('resolveAuthenticatedRequest requires live KV marker for jti tokens', async
       }),
       validateAuthTokenRecord: async (value) => {
         calls.push(value);
-        return { ok: true, legacy: false };
+        return { ok: true };
       },
       json: createJsonStub(),
       MISSING_SLUG_ERROR: 'Missing sessionSlug.',

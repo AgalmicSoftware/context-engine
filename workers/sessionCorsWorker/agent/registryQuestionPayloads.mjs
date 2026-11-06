@@ -133,8 +133,6 @@ export function normalizePayloadSessionSlug(payload = {}) {
   return '';
 }
 
-export function allowUnscopedQuestionPayloads() { return false; }
-
 export function skippedQuestionPayload(reason = 'session_mismatch') {
   return {
     [QUESTION_PAYLOAD_SKIP]: true,
@@ -192,7 +190,6 @@ export function normalizeQuestionPayload(payload = {}, {
   pointerId = '',
   pointerBackend = STORAGE_BACKENDS.ARWEAVE,
   sessionSlug = '',
-  fallbackSessionSlug = '',
 } = {}) {
   const root = normalizeQuestionPayloadRoot(payload);
   if (!root || typeof root !== 'object' || Array.isArray(root)) return null;
@@ -234,7 +231,7 @@ export function normalizeQuestionPayload(payload = {}, {
         }
       : {}),
     source: 'live_session_question',
-    sessionSlug: normalizePayloadSessionSlug(root) || normalizePayloadSessionSlug(payload) || lower(fallbackSessionSlug),
+    sessionSlug: normalizePayloadSessionSlug(root) || normalizePayloadSessionSlug(payload),
     ...(pointerBackend === STORAGE_BACKENDS.ARWEAVE ? { arweaveTxId: pointerId } : {}),
     storageRef: storageRefForPointer(pointerId, 'questions', pointerBackend),
   };
@@ -312,10 +309,7 @@ export async function fetchQuestionPayload({
   if (payloadSessionSlug && requestedSessionSlug && payloadSessionSlug !== requestedSessionSlug) {
     return skippedQuestionPayload('session_mismatch');
   }
-  const shouldStampUnscopedPayload = !payloadSessionSlug &&
-    requestedSessionSlug &&
-    allowUnscopedQuestionPayloads(env);
-  if (!payloadSessionSlug && requestedSessionSlug && !shouldStampUnscopedPayload) {
+  if (!payloadSessionSlug && requestedSessionSlug) {
     return skippedQuestionPayload('session_slug_missing');
   }
   return (
@@ -324,7 +318,6 @@ export async function fetchQuestionPayload({
     pointerId,
     pointerBackend,
     sessionSlug,
-    fallbackSessionSlug: shouldStampUnscopedPayload ? requestedSessionSlug : '',
     }) || lockedQuestionPlaceholder({ questionId: id, pointerId, pointerBackend, sessionSlug })
   );
 }

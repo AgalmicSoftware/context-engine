@@ -7,7 +7,6 @@ export const AGENT_EVENT_TYPES = Object.freeze({
 });
 
 export const LEGACY_TRANSPORT_LANES = Object.freeze({
-  GROUP_LOBBY: 'telegram_group_lobby',
   PRIVATE_ACCOUNT: 'telegram_private_account',
   MINI_APP: 'telegram_mini_app',
 });

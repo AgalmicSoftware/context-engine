@@ -12,11 +12,6 @@ export function extractAgentToken(value = '') {
 export function suppliedAgentToken(request) {
   return extractAgentToken(request.headers.get('authorization') || request.headers.get('x-ce-agent-token') || request.headers.get('x-context-engine-agent-token'));
 }
-export async function authenticateAgentHandoff(_request, env = {}) {
-  return env.AGENT_CONTEXT?.auth || { ok: false, status: 401, reason: 'agent_credential_required' };
-}
-
-
 export function delegationScopeForRequest(pathname = '', method = 'GET') {
   const methodName = safeString(method).toUpperCase();
   if (pathname === '/api/agent/questions') {
@@ -128,7 +123,7 @@ export async function resolveHandoffContext({ env, auth = env.AGENT_CONTEXT.auth
   if (!principal?.principalId) return { ok: false, status: 401, reason: 'agent_principal_required' };
   const principalId = principal.principalId;
   return { ok: true, policy, session, principal, principalId, storageSubjectId: principalId,
-    adapterMetadata: {}, storageContext: normalizeAgentRequestContext({ telegramUserId: principalId, username: principal.label }),
-    groupBinding: null, privateBinding: null, permission: { ok: true, mode: 'session_policy' },
+    storageContext: normalizeAgentRequestContext({ telegramUserId: principalId, username: principal.label }),
+    permission: { ok: true, mode: 'session_policy' },
     delegation: auth.delegation || null, authMode: auth.authMode, scopes: env.AGENT_CONTEXT.scopes };
 }
