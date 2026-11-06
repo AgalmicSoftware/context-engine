@@ -1,7 +1,7 @@
 # Session Worker Agent HTTP
 
-New sessions serve `/api/agent/*`, ordinary participant routes and optional
-Session Wrapped from one Session Worker origin. The implementation lives in
+A session's Worker serves `/api/agent/*`, ordinary participant routes and
+optional Session Wrapped from one origin. The implementation lives in
 `workers/sessionCorsWorker/agent/`; the existing Worker owns session identity,
 configuration, membership, storage, gates, rate limits and admin authority.
 
@@ -22,8 +22,8 @@ No extra KV namespace, coordinator class or migration is needed for agents.
 Managed accounts derive from this fresh secret, the canonical session ID and
 an opaque principal. Never reuse an old Bridge root or deployment identity.
 Signing supports configured OP Sepolia and best-effort Base Sepolia testnet
-sessions only. Root, client, MCP and CE-CC remain on ethers v5; this Worker uses
-its isolated ethers v6 package.
+sessions only. Root, client, MCP and CE-CC use ethers v5; this Worker uses its
+isolated ethers v6 package.
 
 ## Credentials and authority
 
@@ -153,6 +153,6 @@ code or delete existing resources.
 
 Use [Agent access](skills/ce-agent-access/SKILL.md) or
 [Session Wrapped](skills/ce-session-wrapped/SKILL.md). The route inventory is
-[`routes.mjs`](routes.mjs). Agent tests run with `npm run test:worker:agent`;
-the former `test:worker:agent-bridge` command invokes the same maintained tests.
+[`routes.mjs`](routes.mjs). Agent tests run with `npm run test:worker:agent`
+(`test:worker:agent-bridge` is an alias).
 See [the coverage map](testing.md) and the [Worker guide](../../../docs/session-cors-worker.md).

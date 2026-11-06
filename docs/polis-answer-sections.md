@@ -79,8 +79,9 @@ report-only examples live in `polis_report_answer_examples.json`. They do not
 alter published question IDs, Worker data, or the original binary opinion clusters.
 Custom report datasets and live-response mode do not receive these examples.
 
-Blank, malformed, still-encrypted, and out-of-session answers are excluded. A
-zero rating and an explicit all-zero quadratic allocation remain valid answers.
+Blank, malformed, still-encrypted, and out-of-session answers are excluded, as
+are questions an admin has hidden. A zero rating and an explicit all-zero
+quadratic allocation remain valid answers.
 Repeated rows for the same respondent count once within the new sections.
 Multiple-choice percentages use respondents as the denominator, so a question
 allowing several choices can exceed 100% across its options. Quadratic bars show
@@ -101,8 +102,9 @@ possible. Export measures the desktop capture layout even when initiated from a
 mobile screen, normalizes modern theme colors for the canvas renderer, and
 restores the previous interactive expansion state when finished.
 
-Regression coverage lives beside `PolisReport` and `browserPdfExport`. The
-credential-free browser smoke is covered by the repository E2E command notes.
+Regression coverage lives beside `PolisReport` and `browserPdfExport`. With a
+client dev server running, `BASE_URL=http://127.0.0.1:3000 node scripts/polis-answer-sections-smoke.mjs`
+runs the credential-free browser smoke.
 
 Filtered Raw Results JSON exports retain each question’s normalized rating scale,
 selection limits, quadratic budget, ordering, and public benchmark/source IDs.

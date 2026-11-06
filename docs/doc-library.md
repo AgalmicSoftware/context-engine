@@ -1,8 +1,9 @@
 # Doc Library (Sessions + SBT Groups)
 
-This feature adds a shared Doc Library backed by Arweave transactions indexed via tags. Documents can be:
-- plaintext (`arweave` storage), or
-- encrypted Arweave envelope payloads (`lit-arweave` storage), where decrypt access is either private to the uploader's self-recipient wallet signature or gated by SBT ownership conditions.
+The Doc Library is a shared store of files and links. Documents can be:
+- plaintext Arweave transactions indexed via tags (`arweave` storage),
+- encrypted Arweave envelope payloads (`lit-arweave` storage), where decrypt access is either private to the uploader's self-recipient wallet signature or gated by SBT ownership conditions, or
+- records kept by the session's Worker (`cloudflare` storage), the default for a session that runs on a Session Worker.
 
 Docs can be associated with:
 - a **Session** (discoverability by `sessionIdHex`), and/or
@@ -13,7 +14,7 @@ Docs can be associated with:
 - Session docs page: `/session/:token/docs`
   - `:token` may be a session slug or a UUID-like session id token.
   - When `:token` is a session id, the app keeps the URL stable (no rewrite to slug) on this subroute.
-- Tool Explorer `Data` panel:
+- Tool Explorer `Context` tool, with `Add` and `View` modes:
   - `Add` keeps the existing question-generation ingest flow.
   - Queued URL, file, and photo sources can be saved directly to the active session with `Add to <session>`; this does not generate questions. `Generate Questions` remains a separate action.
   - When one or more files/images are uploaded in `Add`, a title field appears at the top of the ingest surface and is reused as the doc title / filename when possible.
@@ -82,7 +83,7 @@ Storage records normalize to:
 
 Cloudflare `storageRef` values must stay opaque: do not expose account IDs, bucket names, raw R2 object keys, worker tokens, long-lived signed URLs, or secrets.
 
-Note: GraphQL here refers to Arweave’s public indexing API. The client now prefers `https://permagate.io/graphql`, then falls back to `https://g8way.io/graphql`, and only then to `https://arweave.net/graphql`, so a single flaky gateway does not blank the Arweave/Lit-Arweave Doc Library.
+Note: GraphQL here refers to Arweave’s public indexing API. The client tries the session's configured `docLibrary.arweave.graphqlUrl` first, then `https://permagate.io/graphql`, `https://g8way.io/graphql` and `https://arweave.net/graphql` in that order, so a single flaky gateway does not blank the Arweave/Lit-Arweave Doc Library.
 
 ## Tag Schema (Arweave Index)
 
@@ -136,7 +137,7 @@ For the main Doc Library panel, encryption is based on SBT conditions:
   - users can still encrypt by selecting **Custom SBT(s)** manually.
 - There is no fallback to any “general” docUploads gate when `docUploads` is missing/unavailable.
 
-For Tool Explorer `Data -> Add` saved extra sources:
+For Tool Explorer `Context -> Add` saved extra sources:
 - saves are always encrypted
 - the audience can be `only me` or the session `docUploads` gate
 - `only me` wraps the content encryption key with the existing `self-eip712-v1` recipient, so private saves can upload and reopen with the connected wallet without Lit/Chipotle hooks
