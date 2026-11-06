@@ -114,7 +114,7 @@ The inventory check keeps root tests classified as one of:
 
 The Node runner recursively discovers `*.test.{js,cjs,mjs}` files under
 `scripts` and `workers/shared`, and runs the `tests/root` Node tests listed in
-`scripts/testInventoryConfig.js`. `test:node:tracked` keeps only tracked files
+`scripts/node-test-inventory-config.js`. `test:node:tracked` keeps only tracked files
 that the public strip contract retains. Inventory verification fails for any
 `tests/root` test that is not classified there.
 
