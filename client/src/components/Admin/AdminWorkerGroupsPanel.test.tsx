@@ -62,7 +62,6 @@ describe('AdminWorkerGroupsPanel', () => {
     });
     render(
       <AdminWorkerGroupsPanel
-        account={ADDRESS}
         canAdminWorker={true}
         createOnly
         sessionId={SESSION_ID}
