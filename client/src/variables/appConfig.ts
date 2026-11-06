@@ -44,7 +44,6 @@ export const CE_ENABLE_WALLETCONNECT_FALLBACK = readPublicBoolEnv('REACT_APP_CE_
 // CE_RPC_VERBOSE_ERRORS (expanded error tree logging), CE_RPC_LOG_PROVIDER_SUCCESS (log which RPC URL served),
 // DISABLE_SBT_INSTANCE_LISTENERS (skip per-SBT polling), MAX_SBT_INSTANCE_LISTENERS (cap count),
 // SBT_INSTANCE_LISTENER_GROUPS (allowlist by slug), ENABLE_SBT_HISTORY_SCAN (mint/burn history scans).
-// TODO: extend this pattern for other log categories so we can toggle logs globally or by area.
 export const ENABLE_RPC_DEBUG_LOGGING = readPublicBoolEnv('REACT_APP_ENABLE_RPC_DEBUG_LOGGING', false);
 export const ENABLE_RPC_DEBUG_STATS = readPublicBoolEnv('REACT_APP_ENABLE_RPC_DEBUG_STATS', false);
 export const ENABLE_RPC_DEBUG_TRACE = readPublicBoolEnv('REACT_APP_ENABLE_RPC_DEBUG_TRACE', false);

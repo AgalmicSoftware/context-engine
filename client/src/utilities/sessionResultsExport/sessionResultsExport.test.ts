@@ -155,7 +155,7 @@ describe('sessionResultsExport utilities', () => {
       { claim: 'Export helps audits for 0x3333333333333333333333333333333333333333', responderAddress: '0xdef' },
     ]);
     expect(snapshot.sections.riskMatrix.available).toBe(false);
-    expect(snapshot.redactions).toEqual(['encrypted_payloads', 'secrets', 'telegram_identifiers']);
+    expect(snapshot.redactions).toEqual(['contact_handles', 'encrypted_payloads', 'secrets']);
   });
 
   describe('answers in the report', () => {

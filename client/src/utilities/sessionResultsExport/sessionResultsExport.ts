@@ -10,7 +10,7 @@ export const SESSION_RESULTS_EXPORT_FORMAT_SINGLE_HTML = 'single-html';
 export const SESSION_RESULTS_EXPORT_FORMAT_PDF = 'pdf-report';
 
 const DEFAULT_UNAVAILABLE_REASON = 'No hydrated data was available for this section when the export was created.';
-const DEFAULT_REDACTIONS = ['encrypted_payloads', 'secrets', 'telegram_identifiers'] as const;
+const DEFAULT_REDACTIONS = ['encrypted_payloads', 'secrets', 'contact_handles'] as const;
 
 // A report keeps what its exporter can see. Only unreadable ciphertext, secrets and contact handles stay out.
 const OMITTED_KEY_PATTERNS = [

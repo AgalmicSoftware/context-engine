@@ -637,7 +637,6 @@ const resolveRegistryAddress = (chainId: unknown) => {
 
 const resolveBootstrapRpcUrl = (chainId: unknown) => {
   // Bootstrap reads should use public/default RPCs (no PATH) so sessions load without wallet config.
-  // TODO: Move default registry/contract lookups to <chainId>.contracts.contextengine.eth once live.
   return getDefaultHttpRpc(chainId, { allowPath: false });
 };
 
