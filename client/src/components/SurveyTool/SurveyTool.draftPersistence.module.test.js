@@ -843,7 +843,6 @@ describe('SurveyTool draft persistence', () => {
     const recalculateEditStats = jest.fn();
 
     const result = executeSurveySingleQuestionPrefill({
-      state: stateRef.current,
       questionId: 'q1',
       userAnswer: {
         questionID: 'q1',
@@ -891,7 +890,6 @@ describe('SurveyTool draft persistence', () => {
     const recalculateEditStats = jest.fn();
 
     const result = executeSurveyResponsePrefill({
-      state: stateRef.current,
       surveyIndex: 1,
       userAnswers: {
         responses: [

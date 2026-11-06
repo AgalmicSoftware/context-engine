@@ -45,10 +45,9 @@ const findElementsInTree = (node, predicate, acc = []) => {
 };
 
 describe('SBTFilter render guards', () => {
-  it('accepts a scoped layout class without replacing the default filter class', () => {
+  it('accepts a scoped layout class', () => {
     const tree = new SBTFilter({ items: [], mode: 'addresses', className: 'users-toolbar-filter' }).render();
-    expect(tree.props.className).toContain('sbtFilter');
-    expect(tree.props.className).toContain('users-toolbar-filter');
+    expect(tree.props.className).toBe('users-toolbar-filter');
   });
 
   beforeEach(() => {

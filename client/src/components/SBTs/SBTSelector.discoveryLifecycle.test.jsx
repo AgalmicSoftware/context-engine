@@ -771,7 +771,7 @@ describe('SBTSelector discovery lifecycle', () => {
       { address: '0x3', name: 'Three' },
     ];
     expect(instance.getNoOptionsMessage()).toBeNull();
-    const loadingNode = instance.getLoadingMessage();
+    const loadingNode = instance.renderLoadingStatus({ includeTestId: true });
     const loadingTextNode = findElement(
       loadingNode,
       (node) => node?.props?.['data-testid'] === E2E_TESTIDS.SBT_SELECTOR_LOADING,

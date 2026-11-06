@@ -510,35 +510,6 @@ describe('contractScripts user profile metadata wrappers', () => {
     expect(countSpy).toHaveBeenCalledTimes(1);
   });
 
-  it('uses net holdings for getSBTsByUserAddress before falling back to per-SBT history scans', async () => {
-    const user = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
-    const heldAddress = '0x6666666666666666666666666666666666666666';
-    const missedAddress = '0x7777777777777777777777777777777777777777777';
-    const groupCfg = makeProfileGroupCfg('edge-user-sbts-holdings', 1000);
-    jest.spyOn(contractScripts, 'getRelevantBlockWindowForFilter').mockResolvedValue({
-      fromBlock: 1000,
-      toBlock: 2000,
-    });
-    jest.spyOn(contractScripts, 'getSbtsCreated').mockResolvedValue([
-      { sbtAddress: missedAddress, name: 'Missed' },
-      { sbtAddress: heldAddress, name: 'Held' },
-    ]);
-    jest.spyOn(contractScripts, 'getUserSbtNetHoldings').mockResolvedValue({
-      addresses: [heldAddress],
-    });
-    const userHasSpy = jest.spyOn(contractScripts, 'userHasSBT').mockResolvedValue(true);
-    const mintedSpy = jest.spyOn(contractScripts, 'getAddressesWhoMintedSBT').mockResolvedValue([user]);
-    const burnedSpy = jest.spyOn(contractScripts, 'getAddressesWhoBurnedSBT').mockResolvedValue([]);
-
-    await expect(contractScripts.getSBTsByUserAddress('none', user, 1000, groupCfg)).resolves.toEqual([
-      { sbtAddress: heldAddress, name: 'Held' },
-    ]);
-
-    expect(userHasSpy).not.toHaveBeenCalled();
-    expect(mintedSpy).not.toHaveBeenCalled();
-    expect(burnedSpy).not.toHaveBeenCalled();
-  });
-
   it('partitions getUserSBTsMinimal memo entries by session in ignoreScope profile scans', async () => {
     const user = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
     const groupA = makeProfileGroupCfg('edge-a', 1000);

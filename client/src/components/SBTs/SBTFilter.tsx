@@ -1213,7 +1213,7 @@ class SBTFilter extends React.Component<SbtFilterProps, SbtFilterState> {
     }
 
     return (
-      <div className={[styles.sbtFilter, this.props.className].filter(Boolean).join(' ')}>
+      <div className={this.props.className}>
         {/* If not autoExpand, show a settings/cog button to toggle filter options */}
         {panelDisplayState.shouldRenderFilterToggleButton && (
           <Button

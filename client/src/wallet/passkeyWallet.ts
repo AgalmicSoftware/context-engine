@@ -227,7 +227,6 @@ export class PasskeyEoaWalletClient {
   private readonly readProviderFactory: (chainId: number) => unknown;
   private readonly now: () => number;
   private sessionClient: SoftSessionClient;
-  private activeRecord: PasskeyWalletRecord | null = null;
   private activeAddress: HexString | null = null;
   private unlockExpiresAt = 0;
   private activeChain: ChainLike = defaultChain();
@@ -490,7 +489,6 @@ export class PasskeyEoaWalletClient {
     if (this.config.walletKeyMode === 'passkey-derived' && !isPasskeyDerivedWalletRecord(record)) return null;
     if (this.config.walletKeyMode === 'encrypted-private-key' && !isEncryptedWalletRecord(record)) return null;
     if (options.requireSigner === false) {
-      this.activeRecord = record;
       this.activeAddress = record.evmAddress;
       this.unlockExpiresAt = 0;
       return record.evmAddress;
@@ -610,7 +608,6 @@ export class PasskeyEoaWalletClient {
   private async endWallet(deleteRecord: boolean): Promise<void> {
     this.operationGeneration += 1;
     this.transitionInProgress = false;
-    this.activeRecord = null;
     this.activeAddress = null;
     await this.mutateWallet(async () => {
       await this.lock();
@@ -680,7 +677,6 @@ export class PasskeyEoaWalletClient {
         await session.lock();
         throw error;
       }
-      this.activeRecord = record;
       this.activeAddress = record.evmAddress;
       this.unlockExpiresAt = expiresAt;
       this.sessionChainId = chainId;

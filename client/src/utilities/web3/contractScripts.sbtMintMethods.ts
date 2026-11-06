@@ -602,27 +602,6 @@ export const createContractScriptsSbtMintMethods = (deps: ContractScriptsRuntime
       return false;
     },
 
-    userCanBurnSBTs: async function (providerName: any, SBTAddress: any, userAddress: any, groupKeyOrCfg: any = null) {
-      const provider = getLocalAwareReadProviderForGroup(groupKeyOrCfg, SBT_READ_PROVIDER_OPTIONS);
-      const CustomSBT = new ethers.Contract(SBTAddress, CUSTOM_SBT_ABI, provider as any);
-
-      const admin = await callWithRetry(() => CustomSBT.admin(), 'CustomSBT.admin (userCanBurnSBTs)');
-      const burnAuth = await callWithRetry(
-        () => CustomSBT.collectionBurnAuth(),
-        'CustomSBT.collectionBurnAuth (userCanBurnSBTs)',
-      );
-      const burnAuthNum = ethers.BigNumber.isBigNumber(burnAuth) ? burnAuth.toNumber() : Number(burnAuth);
-      const hasSBT = await this.userHasSBT('none', SBTAddress, userAddress, 0, 'latest', groupKeyOrCfg);
-      const isAdmin =
-        normalizeAddress(admin) !== ethers.constants.AddressZero &&
-        normalizeAddress(admin) === normalizeAddress(userAddress);
-
-      if (burnAuthNum === 0) return isAdmin;
-      if (burnAuthNum === 1) return hasSBT;
-      if (burnAuthNum === 2) return isAdmin || hasSBT;
-      return false;
-    },
-
     async getCachedSbtMintBurnCountsByAddress(
       providerName: any,
       SBTAddress: any,

@@ -31,7 +31,7 @@ export const createSurveyQuestionsEditDiffRuntime = (
     valuesEqual,
   } = context;
 
-  const areResponsesConsistent = (latest: SurveyQuestionsLegacyValue, surveyIndex: SurveyQuestionsLegacyValue) => {
+  const areResponsesConsistent = (latest: SurveyQuestionsLegacyValue) => {
     return areSurveyResponsesConsistent({
       latest,
       editBaseline: stateRef.current.editBaseline,

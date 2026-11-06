@@ -434,13 +434,13 @@ const attachPileViewRuntimeEngine = (engine: PileViewModeEngine): PileViewModeEn
     buildQuestionOptionsDigest: bindPileEngineMethod(engine, buildQuestionOptionsDigest),
     getPileLoadingScanDisplay: bindPileEngineMethod(engine, getPileLoadingScanDisplay),
     getQuestionObjectSignature: bindPileEngineMethod(engine, getQuestionObjectSignature),
-    mixQuestionListHash: bindPileEngineMethod(engine, mixQuestionListHash),
+    mixQuestionListHash,
     buildQuestionListSignature: bindPileEngineMethod(engine, buildQuestionListSignature),
     getPileVisibleQuestionIds: bindPileEngineMethod(engine, getPileVisibleQuestionIds),
     buildPileVisibleResponseSignature: bindPileEngineMethod(engine, buildPileVisibleResponseSignature),
     syncCurrentPileQuestionsSignature: bindPileEngineMethod(engine, syncCurrentPileQuestionsSignature),
     areQuestionListsEquivalent: bindPileEngineMethod(engine, areQuestionListsEquivalent),
-    isRecentRateLimit: bindPileEngineMethod(engine, isRecentRateLimit),
+    isRecentRateLimit,
     getEffectivePileSessionConfig: bindPileEngineMethod(engine, getEffectivePileSessionConfig),
     hasRestrictedSessionQuestionGate: bindPileEngineMethod(engine, hasRestrictedSessionQuestionGate),
     maybeRecoverUnhydratedGatedPile: bindPileEngineMethod(engine, maybeRecoverUnhydratedGatedPile),
@@ -456,12 +456,12 @@ const attachPileViewRuntimeEngine = (engine: PileViewModeEngine): PileViewModeEn
     handleNext: bindPileEngineMethod(engine, handleNext),
     handlePrev: bindPileEngineMethod(engine, handlePrev),
     toggleCreate: bindPileEngineMethod(engine, toggleCreate),
-    syncListeningModeQuery: bindPileEngineMethod(engine, syncListeningModeQuery),
-    shouldUseMobileListeningScroll: bindPileEngineMethod(engine, shouldUseMobileListeningScroll),
+    syncListeningModeQuery,
+    shouldUseMobileListeningScroll,
     scrollListeningPanelIntoViewIfNeeded: bindPileEngineMethod(engine, scrollListeningPanelIntoViewIfNeeded),
     toggleListeningPanel: bindPileEngineMethod(engine, toggleListeningPanel),
     closeListeningPanel: bindPileEngineMethod(engine, closeListeningPanel),
-    syncSessionVoiceModeQuery: bindPileEngineMethod(engine, syncSessionVoiceModeQuery),
+    syncSessionVoiceModeQuery,
     toggleSessionVoiceModeModal: bindPileEngineMethod(engine, toggleSessionVoiceModeModal),
     selectSessionVoiceMode: bindPileEngineMethod(engine, selectSessionVoiceMode),
     closeSessionVoiceModeModal: bindPileEngineMethod(engine, closeSessionVoiceModeModal),
@@ -723,7 +723,7 @@ const getQuestionObjectSignature = (engine: PileViewModeEngine, question: any) =
   return sig;
 };
 
-const mixQuestionListHash = (engine: PileViewModeEngine, seed: any, text: any) => {
+const mixQuestionListHash = (seed: any, text: any) => {
   let h = Number(seed) >>> 0;
   const str = String(text || '');
   for (let i = 0; i < str.length; i += 1) {
@@ -799,7 +799,7 @@ const areQuestionListsEquivalent = (engine: PileViewModeEngine, left: any = [], 
     right,
   });
 
-const isRecentRateLimit = (engine: PileViewModeEngine) => {
+const isRecentRateLimit = () => {
   try {
     const info = typeof window !== 'undefined' ? window.__LAST_RPC_RATE_LIMIT_ERROR__ : null;
     if (!info || !info.ts) return false;
@@ -1486,7 +1486,7 @@ const toggleCreate = (engine: PileViewModeEngine) => {
   );
 };
 
-const syncListeningModeQuery = (engine: PileViewModeEngine, enabled: any) => {
+const syncListeningModeQuery = (enabled: any) => {
   if (typeof window === 'undefined' || !window.history?.replaceState) return;
   try {
     const nextSearch = buildListeningModeSearch(window.location.search || '', enabled);
@@ -1497,7 +1497,7 @@ const syncListeningModeQuery = (engine: PileViewModeEngine, enabled: any) => {
   }
 };
 
-const syncSessionVoiceModeQuery = (engine: PileViewModeEngine, mode: SessionVoiceMode | null) => {
+const syncSessionVoiceModeQuery = (mode: SessionVoiceMode | null) => {
   if (typeof window === 'undefined' || !window.history?.replaceState) return;
   try {
     const nextSearch = buildSessionVoiceModeSearch(window.location.search || '', mode);
@@ -1717,7 +1717,7 @@ export const recordInterviewProvenance = (
   });
 };
 
-const shouldUseMobileListeningScroll = (engine: PileViewModeEngine) => {
+const shouldUseMobileListeningScroll = () => {
   if (typeof window === 'undefined') return false;
   try {
     if (typeof window.matchMedia === 'function') {

@@ -572,14 +572,10 @@ export const createSurveyQuestionsDataRuntime = (context: SurveyQuestionsLegacyR
 
         // Consistency check logic
         if (stateRef.current.submissionComplete) {
-          const surveyIndex: SurveyQuestionsLegacyValue =
-            propsRef.current.isStandalone || propsRef.current.singleQuestionMode
-              ? 0
-              : propsRef.current.surveyIndex || 0;
           surveyLog.log('Comparing incoming chain data vs optimistic baseline');
 
           // Only switch off optimistic mode if chain data matches our submitted baseline
-          if (userAnswers && areResponsesConsistent(userAnswers, surveyIndex)) {
+          if (userAnswers && areResponsesConsistent(userAnswers)) {
             surveyLog.log('Result: New. Chain data consistent with submission. Exiting optimistic mode.');
             const hasEncrypted: SurveyQuestionsLegacyValue = userAnswers.responses?.some(
               (r: SurveyQuestionsLegacyValue) => !!r?.answer?.encryptedPortion || !!r?.additional?.encryptedPortion,
@@ -634,7 +630,6 @@ export const createSurveyQuestionsDataRuntime = (context: SurveyQuestionsLegacyR
     const questionId: SurveyQuestionsLegacyValue = normalizeQuestionIdKey(propsRef.current.questionID);
 
     executeSurveySingleQuestionPrefill({
-      state: stateRef.current,
       questionId,
       userAnswer,
       buildSliceFromUserAnswers: buildSliceFromUserAnswers,

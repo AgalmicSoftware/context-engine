@@ -50,9 +50,7 @@ const SurveyQuestionsSubmitFooter = ({
     submittedIndicatorActive = false,
     uploadStatusText = 'Uploading...',
   } = displayState;
-  const submitFooterClassName =
-    [styles.footer, isSingleQuestionView ? styles.singleQuestionSubmitFooter : ''].filter(Boolean).join(' ') ||
-    undefined;
+  const submitFooterClassName = (isSingleQuestionView ? styles.singleQuestionSubmitFooter : '') || undefined;
   const singleQuestionSubmittedIndicatorActive = !isSingleQuestionView && submittedIndicatorActive;
   const submitButtonClassName =
     [

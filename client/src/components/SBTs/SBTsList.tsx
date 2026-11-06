@@ -2735,7 +2735,7 @@ const OnChainSBTsList = ({
       createSessionCapabilities.isWorkerCanonical) ||
     claimsWorkerCanonicalAuthority(createSessionConfig);
 
-  const rootClassName = viewMode === 'modal' ? styles.modalViewContainer : styles.standardViewContainer;
+  const rootClassName = viewMode === 'modal' ? styles.modalViewContainer : undefined;
 
   // Miniaturized mode
   if (miniaturized) {

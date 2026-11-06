@@ -118,7 +118,6 @@ describe('SurveyTool response hydration', () => {
     const recalculateEditStats = jest.fn();
 
     const result = executeSurveyResponsePrefill({
-      state: stateRef.current,
       surveyIndex: 0,
       userAnswers,
       buildSliceFromUserAnswers: () => ({

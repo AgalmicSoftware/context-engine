@@ -295,7 +295,6 @@ export const createSurveyQuestionsResponseStateRuntime = ({
       : setState;
 
     executeSurveyResponsePrefill({
-      state: stateRef.current,
       surveyIndex,
       userAnswers,
       buildSliceFromUserAnswers: buildSliceFromUserAnswers,

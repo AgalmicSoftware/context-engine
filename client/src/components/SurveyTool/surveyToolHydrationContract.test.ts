@@ -118,7 +118,6 @@ describe('surveyToolHydration shared contracts', () => {
     });
 
     const result = executeSurveyResponsePrefill({
-      state: stateRef.current,
       surveyIndex: 0,
       userAnswers: {
         responses: [
@@ -174,7 +173,6 @@ describe('surveyToolHydration shared contracts', () => {
     });
 
     const result = executeSurveySingleQuestionPrefill({
-      state: stateRef.current,
       questionId: 'q1',
       userAnswer: {
         questionID: 'q1',

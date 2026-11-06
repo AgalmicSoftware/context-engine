@@ -90,7 +90,7 @@ describe('adminAgentSessionWrapped', () => {
     );
   });
 
-  it('rejects an incompatible authority instead of inventing Bridge chain verification', () => {
+  it('rejects an incompatible authority instead of inventing agent chain verification', () => {
     const availability = resolveAdminAgentSessionWrappedAvailability({
       canAdminWorker: true,
       sessionConfig: registrySession({ sessionModeProfile: { authority: { mode: 'local_only' } } }),

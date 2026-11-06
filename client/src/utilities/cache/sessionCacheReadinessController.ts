@@ -335,7 +335,7 @@ export const createSessionCacheReadinessController = (
     return host.syncCacheHasLoadedFlagFromPersistent(slug, { force: shouldForceSync });
   };
 
-  const runDeferredFullSbtScan = (slug: string, pathname: string): void => {
+  const runDeferredFullSbtScan = (pathname: string): void => {
     void (async () => {
       try {
         if (typeof host.shouldAutoRunFullSbtScan === 'function' && !host.shouldAutoRunFullSbtScan({ pathname })) {
@@ -380,7 +380,7 @@ export const createSessionCacheReadinessController = (
       !(typeof host.readFlag === 'function' && host.readFlag('sbt:fullScanInProgress', slug));
 
     if (shouldKickOff) {
-      runDeferredFullSbtScan(slug, pathname);
+      runDeferredFullSbtScan(pathname);
     }
   };
 

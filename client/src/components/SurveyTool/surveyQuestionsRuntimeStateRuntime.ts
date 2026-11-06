@@ -17,7 +17,6 @@ export const createSurveyQuestionsRuntimeStateRuntime = (
     buildCanDecryptOtherResponsesState,
     buildQuestionIdScopeSignature,
     checkSponsoredAccess,
-    engine,
     evaluateCanDecryptPreCheck,
     getPendingStatsSnapshotFromState,
     getSessionSlugHintFromProps,
