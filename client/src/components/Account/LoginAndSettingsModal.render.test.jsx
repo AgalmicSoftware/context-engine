@@ -1,6 +1,7 @@
 jest.mock('wagmi/actions', () => ({ disconnect: jest.fn(async () => {}) }));
 import React, { act } from 'react';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { Modal } from 'reactstrap';
 import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';
 import { resolveSessionCapabilityProjection } from '../../utilities/session/sessionCapabilityProjection';
 import { clearAgentClientLoginEnvelope } from '../../utilities/session/agentClientLogin';
@@ -561,6 +562,45 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     await waitFor(() => {
       expect(screen.getAllByRole('button', { name: 'Close' })).toHaveLength(1);
     });
+  });
+
+  it('leaves a dialog still open beneath it able to scroll when it closes', async () => {
+    const toggleLoginModal = jest.fn();
+    const props = buildProps({ toggleLoginModal });
+    const view = render(
+      <>
+        <Modal isOpen>Raw Results underneath</Modal>
+        <LoginAndSettingsModal {...props} />
+      </>,
+    );
+    await screen.findByText('Raw Results underneath');
+    expect(document.body).toHaveClass('modal-open');
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Close' }));
+    expect(toggleLoginModal).toHaveBeenCalledWith(false);
+    expect(document.body).toHaveClass('modal-open');
+
+    view.rerender(
+      <>
+        <Modal isOpen>Raw Results underneath</Modal>
+        <LoginAndSettingsModal {...props} loginModalToggled={false} />
+      </>,
+    );
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Close' })).not.toBeInTheDocument());
+    expect(document.body).toHaveClass('modal-open');
+
+    view.unmount();
+    expect(document.body).not.toHaveClass('modal-open');
+  });
+
+  it('releases the page when it was the only dialog open', async () => {
+    const props = buildProps();
+    const view = render(<LoginAndSettingsModal {...props} />);
+    await screen.findByRole('button', { name: 'Close' });
+    expect(document.body).toHaveClass('modal-open');
+
+    view.rerender(<LoginAndSettingsModal {...props} loginModalToggled={false} />);
+    await waitFor(() => expect(document.body).not.toHaveClass('modal-open'));
   });
 
   it('shows the shared session dropdown above Config and keeps network details out of the collapsed row in plain mode', () => {

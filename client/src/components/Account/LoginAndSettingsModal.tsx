@@ -2462,13 +2462,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     );
   }
 
-  openLoginModal = () => {
-    document.body.classList.add('modal-open');
-    this.props.toggleLoginModal(true);
-  };
-
   closeLoginModal = () => {
-    document.body.classList.remove('modal-open');
     this.props.toggleLoginModal(false);
     if (this.state.firstModalAfterLogin === true) {
       this.setState({ firstModalAfterLogin: false });
