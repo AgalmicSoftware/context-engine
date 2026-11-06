@@ -261,11 +261,6 @@ const INPUT_CASES = [
     input: { slug: 'alpha' },
   },
   {
-    label: "input { _isWeb3Context: true, groupKeyOrCfg: 'alpha' }",
-    key: 'object-web3-context-alpha',
-    input: { _isWeb3Context: true, groupKeyOrCfg: 'alpha' },
-  },
-  {
     label: "input { sessionSlug: 'alpha', legacy naming fields }",
     key: 'object-sessionSlug-alpha-with-legacy-fields',
     input: {
@@ -279,13 +274,6 @@ const INPUT_CASES = [
 ];
 
 const CALLER_NULL_SAFETY = [
-  {
-    caller: 'getWeb3Context',
-    file: 'contractScripts.impl.ts#getWeb3Context',
-    safe: true,
-    reason:
-      'extractChainId(cfg) and getSessionAddresses(cfg) are null-tolerant, so the context is created with fallback/default-chain resolution.',
-  },
   {
     caller: 'maybeDecryptSurveyPayload',
     file: 'contractScripts.impl.ts#maybeDecryptSurveyPayload',
@@ -369,7 +357,6 @@ const MODULE_PRIVATE_NULL_SAFE_CALLERS = new Set([
 ]);
 
 const CALLER_EXPORT_RESOLVERS = {
-  getWeb3Context: ({ contractScriptsImplModule }) => contractScriptsImplModule.getWeb3Context,
   predictSBTAddress: ({ contractScriptsImplModule }) => contractScriptsImplModule.default?.predictSBTAddress,
   addSurveyWithQuestions: ({ contractScriptsImplModule }) => contractScriptsImplModule.default?.addSurveyWithQuestions,
   addQuestions: ({ contractScriptsImplModule }) => contractScriptsImplModule.default?.addQuestions,
@@ -442,24 +429,6 @@ describe('resolveSession parity characterization', () => {
                 }
 
                 expect(exportedResult).toEqual(demoDefaultSessionConfig);
-                return;
-              }
-
-              if (key === 'object-web3-context-alpha') {
-                if (registryState === 'populated') {
-                  // DIVERGENCE: LOCAL unwraps memoized web3-context wrappers before resolving the slug.
-                  expect(localResult).toEqual(RAW_ALPHA_REGISTRY_SESSION);
-                  expect(localResult?.orgName).toBe('LegacyOrg');
-                  expect(localResult?.sessionName).toBe('  Alpha Session  ');
-
-                  // DIVERGENCE: EXPORTED resolveSession treats the wrapper as a plain object.
-                  expect(exportedResult).toEqual({ _isWeb3Context: true, groupKeyOrCfg: 'alpha' });
-                  return;
-                }
-
-                expect(localResult).toEqual(unresolvedSession('alpha'));
-                // DIVERGENCE: EXPORTED still preserves the wrapper object when no local unwrap occurs.
-                expect(exportedResult).toEqual({ _isWeb3Context: true, groupKeyOrCfg: 'alpha' });
                 return;
               }
 
@@ -560,13 +529,6 @@ describe('resolveSession parity characterization', () => {
       });
 
       expect(CALLER_NULL_SAFETY).toEqual([
-        {
-          caller: 'getWeb3Context',
-          file: 'contractScripts.impl.ts#getWeb3Context',
-          safe: true,
-          reason:
-            'extractChainId(cfg) and getSessionAddresses(cfg) are null-tolerant, so the context is created with fallback/default-chain resolution.',
-        },
         {
           caller: 'maybeDecryptSurveyPayload',
           file: 'contractScripts.impl.ts#maybeDecryptSurveyPayload',

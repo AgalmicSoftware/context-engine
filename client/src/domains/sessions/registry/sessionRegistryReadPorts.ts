@@ -11,12 +11,6 @@ export type SessionRegistryCacheTarget = {
   removeEventListener: (type: string, listener: EventListenerOrEventListenerObject) => void;
 };
 
-export type SessionRegistryStore = {
-  getAllSessionEntries: () => SessionRegistryRawEntry[];
-  getSessionConfig: (slug: string) => SessionRegistryRecord | null | undefined;
-  getSessionConfigById: (sessionId: string | number) => SessionRegistryRecord | null | undefined;
-};
-
 export type SessionRegistryReadsPort = {
   loadSessionRegistryCache: (input?: SessionRegistryRecord) => Promise<unknown>;
   loadGroupRegistryCache: (input?: SessionRegistryRecord) => Promise<unknown>;

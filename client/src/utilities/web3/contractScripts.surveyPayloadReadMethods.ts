@@ -1,19 +1,6 @@
 import { historicalResponseReadError, responseReadWindowOptions } from './responseReadWindow.js';
 import type { ContractScriptsMethodMap, ContractScriptsRuntimeDeps } from './contractScripts.runtimeDeps.js';
 
-type SbtReadProviderRef = string | Record<string, unknown>;
-type SbtReadGroupKeyOrConfig = string | Record<string, unknown> | null | undefined;
-type SbtReadOptions = { allowInjectedReadFallback?: boolean; [key: string]: unknown };
-type SbtMintBurnCountsByAddressResult = {
-  mintedCountByAddress: Record<string, number>;
-  burnedCountByAddress: Record<string, number>;
-  mintedEventCount?: number;
-  burnedEventCount?: number;
-  scannedToBlock?: number | null;
-  ok?: boolean;
-  [key: string]: unknown;
-};
-
 export const createContractScriptsSurveyPayloadReadMethods = (
   deps: ContractScriptsRuntimeDeps,
 ): ContractScriptsMethodMap => {

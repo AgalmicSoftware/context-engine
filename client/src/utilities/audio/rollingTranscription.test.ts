@@ -1,7 +1,6 @@
 import {
   buildListeningModeSearch,
   isListeningModeQueryEnabled,
-  mergeRollingTranscriptText,
   stitchRollingTranscriptSegments,
   transcriptSpeech,
 } from './rollingTranscription';
@@ -42,7 +41,6 @@ describe('rollingTranscription helpers', () => {
     expect(stitchRollingTranscriptSegments(segments)).toBe(
       'We talked about budget timing and risk thresholds that the group should review before voting.',
     );
-    expect(mergeRollingTranscriptText('alpha beta gamma', 'beta gamma delta')).toBe('alpha beta gamma delta');
   });
 
   it('round-trips listening mode query state without dropping other params', () => {

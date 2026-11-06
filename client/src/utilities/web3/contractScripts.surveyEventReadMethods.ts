@@ -1,18 +1,6 @@
 import { responsePairKey, responseReadWindowOptions, type ResponseReadWindow } from './responseReadWindow.js';
 import type { ContractScriptsMethodMap, ContractScriptsRuntimeDeps } from './contractScripts.runtimeDeps.js';
 
-type SbtReadProviderRef = string | Record<string, unknown>;
-type SbtReadGroupKeyOrConfig = string | Record<string, unknown> | null | undefined;
-type SbtReadOptions = { allowInjectedReadFallback?: boolean; [key: string]: unknown };
-type SbtMintBurnCountsByAddressResult = {
-  mintedCountByAddress: Record<string, number>;
-  burnedCountByAddress: Record<string, number>;
-  mintedEventCount?: number;
-  burnedEventCount?: number;
-  scannedToBlock?: number | null;
-  ok?: boolean;
-  [key: string]: unknown;
-};
 type ProviderName = string;
 type AddressInput = string;
 type Bytes32Input = string | number | null | undefined;
@@ -53,8 +41,6 @@ type LatestResponder = {
   transactionIndex: number;
   logIndex: number;
 };
-type SurveyResponseLookup = Record<string, Record<string, unknown>>;
-type QuestionResponseLookup = Record<string, Record<string, unknown>>;
 
 // RPC nodes behind a load balancer can lag the head they report, so unchanged pairs read a little below it.
 const UNCHANGED_READ_MARGIN_BLOCKS = 16;

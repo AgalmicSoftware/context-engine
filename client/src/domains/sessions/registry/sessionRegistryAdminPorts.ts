@@ -1,11 +1,9 @@
 import * as defaultSessionRegistry from '../../../utilities/web3/sessionRegistry.js';
 import {
   sessionRegistryReadsPort,
-  type SessionRegistryCacheTarget,
   type SessionRegistryEntry,
   type SessionRegistryReadsPort,
   type SessionRegistryRecord,
-  type SessionRegistryStore,
 } from './sessionRegistryReadPorts.js';
 import { buildSessionWizardRegistrySessionFields } from './sessionRegistryWriteNormalization.js';
 
@@ -22,9 +20,6 @@ export type AdminSessionRegistryWriteResult = AdminSessionRegistryRecord & {
     }
   >;
 };
-
-export type AdminSessionRegistryCacheTarget = SessionRegistryCacheTarget;
-export type AdminSessionRegistryStore = SessionRegistryStore;
 
 export type AdminRegistrySessionFieldsInput = {
   onChainFields?: AdminSessionRegistryRecord;

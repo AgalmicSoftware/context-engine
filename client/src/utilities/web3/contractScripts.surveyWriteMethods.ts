@@ -4,18 +4,6 @@ import { resolveWorkerCanonicalSessionIdHex } from '../session/sessionWorkerDisc
 import { readStoredAnswersUploadProblem } from '../survey/answerSizeBudget';
 import { mergeSurveyResponseSnapshot } from '../survey/surveyResponseSnapshot';
 
-type SbtReadProviderRef = string | Record<string, unknown>;
-type SbtReadGroupKeyOrConfig = string | Record<string, unknown> | null | undefined;
-type SbtReadOptions = { allowInjectedReadFallback?: boolean; [key: string]: unknown };
-type SbtMintBurnCountsByAddressResult = {
-  mintedCountByAddress: Record<string, number>;
-  burnedCountByAddress: Record<string, number>;
-  mintedEventCount?: number;
-  burnedEventCount?: number;
-  scannedToBlock?: number | null;
-  ok?: boolean;
-  [key: string]: unknown;
-};
 type ProviderName = string;
 type GroupKeyOrConfig = string | Record<string, unknown> | null | undefined;
 type Bytes32Input = string | number | null | undefined;

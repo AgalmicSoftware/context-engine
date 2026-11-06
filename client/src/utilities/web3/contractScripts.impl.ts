@@ -1,4 +1,3 @@
-// Mechanical Phase 4 extension migration: keep legacy runtime behavior identical and tighten types separately.
 /**
  * @module contractScriptsImpl
  * @description Web3 contract interaction layer — the primary bridge between React components and on-chain state.
@@ -29,19 +28,6 @@ import { createLogger, shouldLog } from '../logging.js';
 import { notify } from '../ui/notify.js';
 
 // Default RPCs derive from chains.js; PATH defaults live in rpcDefaults.js (Pocket/POKT gateway).
-
-type SbtReadProviderRef = string | Record<string, unknown>;
-type SbtReadGroupKeyOrConfig = string | Record<string, unknown> | null | undefined;
-type SbtReadOptions = { allowInjectedReadFallback?: boolean; [key: string]: unknown };
-type SbtMintBurnCountsByAddressResult = {
-  mintedCountByAddress: Record<string, number>;
-  burnedCountByAddress: Record<string, number>;
-  mintedEventCount?: number;
-  burnedEventCount?: number;
-  scannedToBlock?: number | null;
-  ok?: boolean;
-  [key: string]: unknown;
-};
 
 import SURVEYS from '../../contractsABI/SURVEYS_ABI.json';
 import SBT_FACTORY_ABI from '../../contractsABI/SBT_FACTORY_ABI.json';
@@ -80,7 +66,6 @@ import {
   memoizedResolveSession,
   setTimedMemoValue,
 } from '../cache/contractScriptsCache.js';
-import { resolveWeb3ContextCacheEntry } from '../cache/web3ContextCache.js';
 import { isCallExceptionError, logArweaveMetadataFetchFailure } from '../arweave/arweaveMetadataFailureLog.js';
 import {
   buildHashUnavailableMetadataError,
@@ -350,28 +335,6 @@ const isRetryableSurveyResponseReadError = (error: any) => {
     message.includes('temporarily unavailable')
   );
 };
-
-export function getWeb3Context(groupKeyOrCfg: any) {
-  if (groupKeyOrCfg && typeof groupKeyOrCfg === 'object' && groupKeyOrCfg._isWeb3Context === true) {
-    return groupKeyOrCfg;
-  }
-
-  return resolveWeb3ContextCacheEntry(groupKeyOrCfg, () => {
-    const cfg = memoizedResolveSession(groupKeyOrCfg === undefined ? '' : groupKeyOrCfg);
-    const chainId = extractChainId(cfg);
-    const readProvider = getLocalAwareReadProviderForGroup(groupKeyOrCfg);
-    const addresses = getSessionAddresses(cfg);
-    const ctx: any = {
-      _isWeb3Context: true,
-      cfg,
-      chainId,
-      readProvider,
-      addresses,
-      groupKeyOrCfg,
-    };
-    return ctx;
-  });
-}
 
 const SBT_READ_PROVIDER_OPTIONS = Object.freeze({ contractKey: 'sbtFactory' });
 const SURVEYS_READ_PROVIDER_OPTIONS = Object.freeze({

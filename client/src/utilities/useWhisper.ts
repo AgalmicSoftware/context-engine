@@ -224,10 +224,6 @@ export const useWhisper = ({
     };
   }, []);
 
-  const log = useCallback((msg: string, ...args: WhisperLegacyValue[]) => {
-    whisperLog.log(`[useWhisper] ${msg}`, ...args);
-  }, []);
-
   const clearSilenceTimer = useCallback(() => {
     if (silenceTimerRef.current !== null) {
       clearTimeout(silenceTimerRef.current);

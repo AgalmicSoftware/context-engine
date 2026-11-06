@@ -1,7 +1,6 @@
 import { ethers } from 'ethers';
 import { clearCacheNamespace } from '../cache/cacheScripts.js';
 import contractScripts from './chainGateway.js';
-import { getWeb3Context } from './contractScripts.impl.js';
 import { arweaveClient } from '../arweave/arweaveClient.js';
 
 describe('contractScripts.getSbtMetadata tokenURI parsing', () => {
@@ -606,7 +605,7 @@ describe('contractScripts.getSbtMetadata tokenURI parsing', () => {
       text: async () => '',
     });
 
-    const ctx = getWeb3Context({
+    const ctx = {
       slug: 'edge',
       networkChainId: 84532,
       blockLimits: {
@@ -619,7 +618,7 @@ describe('contractScripts.getSbtMetadata tokenURI parsing', () => {
           chainId: 84532,
         },
       },
-    });
+    };
 
     const meta = await contractScripts.getSbtMetadata('none', sbtAddress, ctx);
 
