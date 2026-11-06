@@ -17,8 +17,10 @@ Related docs:
 Context, Questions, Participation, Results visibility, Access and identity,
 Hosting and storage, and AI each show a one-line summary and open from their
 caret. A new draft starts on the default profile: a Session Worker on
-Cloudflare with Worker encryption. Labels stay short; a "?" beside a label opens
-its explanation, which screen readers also get through `aria-describedby`.
+Cloudflare with public results, so anyone can read them and answers are stored
+unencrypted. Choosing encryption or other results visibility keeps them private.
+Labels stay short; a "?" beside a label opens its explanation, which screen
+readers also get through `aria-describedby`.
 
 The quick path needs only a name, a Cloudflare API token and the OpenAI key.
 **Create** lists whatever is still missing and stays disabled until it is
@@ -399,8 +401,9 @@ switches between the two hosting models, and every other option adjusts that
 profile in place:
 
 - **Session Worker** compiles to a Cloudflare-backed, worker-canonical session
-  shape with Cloudflare-internal worker encryption (`worker_envelope`) enabled
-  by default. Create asks for a name, a Cloudflare API token (or a verified
+  shape with public results and no encryption by default; Cloudflare-internal
+  worker encryption (`worker_envelope`) is an option in setup that also makes
+  results private. Create asks for a name, a Cloudflare API token (or a verified
   dashboard-deployed Worker) and the OpenAI key. It does not ask for Arweave,
   Lit, RPC, funding, faucet, or gas inputs.
 - **On-chain registry** compiles to the Arweave + Ethereum smart-contract
@@ -556,12 +559,12 @@ What gets stored where:
   available only with Cloudflare storage. The operator and Cloudflare runtime
   can decrypt; it is not decentralized, not end-to-end, and not private from
   the session operator or Cloudflare runtime.
-- Public stored-results visibility requires unencrypted storage. The current
-  wizard offers it only for Arweave + no encryption; switching backend or
-  encryption coerces an incompatible selection back to participant aggregate.
-  Validated legacy Cloudflare public-result profiles remain readable only when
-  their payload gate is `none` and neither profile policy branch carries access
-  conditions.
+- Public stored-results visibility requires unencrypted storage. New sessions
+  start with it; choosing encryption moves an incompatible selection to
+  participant aggregate. On Cloudflare, public results also need a payload gate
+  of `none` with no access conditions in either profile policy branch, and
+  signed-out visitors can then read them without any anonymous scope. On any
+  other visibility, a signed-out visitor who opens Results is asked to log in.
 - When `/new` deploys a custom worker for Cloudflare storage, the deploy helper receives the normalized storage profile before Worker upload so it can bind the storage index KV and any requested R2 bucket. If `worker_envelope` is selected, the helper also generates the worker secret used as the deployment KEK; the generated value is not written to session metadata.
 - Worker-envelope key provider is fixed to `worker_secret` in this release. In a nonpublic Worker-canonical session, the normal participant storage scope permits submitting and reloading their own responses. Reading another participant's individual response additionally requires a current session admin or an authenticated delegated storage grant; ordinary `storage: true` is not that grant. Existing item access conditions still apply. Aggregate-only visibility does not permit downloading everyone's raw answers to calculate a summary in the browser; combined summaries require an authorized server-generated aggregate. An explicit override can combine Session role (`worker_role`), SBT holders (`sbt_onchain`), or Authorized agents (`agent_grant_scope`) rules with any/all matching; the wizard writes those conditions to `storageProfile.payloadAccessControl.accessConditions` for the worker.
 - `SessionRegistry` does not store long-form content directly. Decentralized

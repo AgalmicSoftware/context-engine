@@ -958,10 +958,11 @@ readers, but cannot replace or broaden that gate. Resource names are restricted
 to `docsContext`, `questions`, `surveys`, `responses`, `generatedArtifacts`,
 `media`, and `images`; list rows must match the exact resource namespace.
 
-- Current pure Worker profiles use `gate: "role_gate"` with
-  `encryption: "worker_envelope"` by default, or `encryption: "none"` when the
-  creator explicitly disables encryption. They remain passkey/Worker-owned and
-  require `evm.registryChainId: null`.
+- A new session from `/new` starts with public results: `gate: "none"` and
+  `encryption: "none"`. The `fast_cheap_cloudflare` preset, and a session that
+  chooses other results visibility, use `gate: "role_gate"`, with
+  `encryption: "worker_envelope"` or `encryption: "none"`. Pure Worker profiles
+  remain passkey/Worker-owned and require `evm.registryChainId: null`.
 - A current Worker/SBT hybrid expresses SBT authorization as an explicit
   `sbt_onchain` access condition and labels it **Advanced on-chain access**.
   `gate: "sbt_gate"` and the `worker_sbt_gate` alias remain runtime
