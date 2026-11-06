@@ -172,11 +172,6 @@ const withStateWriter = async (stateDir, write) => {
   }
 };
 
-export const writeAgentState = (stateDir, state) =>
-  withStateWriter(stateDir, () =>
-    writeOwnerOnlyJson(path.join(stateDir, STATE_FILE), state),
-  );
-
 /** Applies a synchronous mutation while holding the state writer lock. */
 export const updateAgentState = (stateDir, mutate) =>
   withStateWriter(stateDir, async () => {

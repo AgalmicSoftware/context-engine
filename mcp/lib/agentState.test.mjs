@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { loadOrCreateWallet, readAgentState, writeAgentState, updateAgentState } from './agentState.mjs';
+import { loadOrCreateWallet, readAgentState, updateAgentState } from './agentState.mjs';
 import { readConfig } from './config.mjs';
 
 const tempDir = () => fs.mkdtemp(path.join(os.tmpdir(), 'ce-mcp-state-'));
@@ -163,7 +163,7 @@ test('round-trips state and starts empty', async () => {
   const dir = await tempDir();
   assert.deepEqual(await readAgentState(dir), { version: 1, address: '', profile: {}, sessions: {}, current: '' });
   const state = { version: 1, address: '0xabc', profile: { displayName: 'bot' }, sessions: { k: { slug: 's' } }, current: 'k' };
-  await writeAgentState(dir, state);
+  await updateAgentState(dir, (current) => Object.assign(current, state));
   assert.deepEqual(await readAgentState(dir), state);
 });
 
@@ -195,7 +195,7 @@ test('refuses a new key when saved state outlived its key', async () => {
 
 test('refuses a new key beside unbound state that remembers sessions', async () => {
   const dir = await tempDir();
-  await writeAgentState(dir, { version: 1, profile: {}, sessions: { k: { slug: 's' } }, current: 'k' });
+  await fs.writeFile(path.join(dir, 'state.json'), JSON.stringify({ version: 1, profile: {}, sessions: { k: { slug: 's' } }, current: 'k' }));
   await assert.rejects(loadOrCreateWallet(dir), /is missing, but state.json belongs to an earlier agent/);
 });
 
@@ -210,7 +210,7 @@ test('refuses state that belongs to another key', async () => {
 test('binds state saved before addresses were recorded to the existing key', async () => {
   const dir = await tempDir();
   const { wallet } = await loadOrCreateWallet(dir);
-  await writeAgentState(dir, { version: 1, profile: {}, sessions: { k: { slug: 's' } }, current: 'k' });
+  await fs.writeFile(path.join(dir, 'state.json'), JSON.stringify({ version: 1, profile: {}, sessions: { k: { slug: 's' } }, current: 'k' }));
   await loadOrCreateWallet(dir);
   const state = await readAgentState(dir);
   assert.equal(state.address, wallet.address);
