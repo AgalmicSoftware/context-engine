@@ -1089,16 +1089,16 @@ describe('PolisReport cache read options', () => {
       expect(screen.queryByText('Log in to see your answers.')).not.toBeInTheDocument();
     });
 
-    it('keeps showing the report when one can be rendered', () => {
+    it('keeps showing a report it can render, even after a failed load', async () => {
       render(
         <PolisReport
           {...failedLoad}
-          isResponsesCacheReady
-          cacheInitializationError={false}
+          questionResponses={seededQuestionResponses}
           sessionConfig={session('participant_aggregate')}
         />,
       );
 
+      expect(await screen.findByText('Summary and Statistics')).toBeInTheDocument();
       expect(screen.queryByText('Log in to see your answers.')).not.toBeInTheDocument();
     });
   });
