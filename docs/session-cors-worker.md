@@ -1063,6 +1063,7 @@ The answer/comment lock follows the session's encryption capability. An explicit
 Worker-canonical Cloudflare session explicitly opts into
 `responseFieldEncryption: { "mode": "optional" }`. This opt-in leaves whole-payload
 storage and Results visibility unchanged. Previously encrypted answers keep their usable lock, decrypt path and Only me editing even when new encryption is disabled.
+That lock means the answer's own fields were encrypted for an audience. `worker_envelope` storage is different: the Worker decrypts those answers for anyone allowed to read, so switching a session to `public_full_if_storage_public` makes its earlier answers and their responder addresses publicly readable too.
 Legacy sessions without a mode profile retain their existing self/Lit behavior.
 
 - **Only me** uses the submitter's signature-derived wrapping key. Neither session
