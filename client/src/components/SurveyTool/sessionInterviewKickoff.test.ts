@@ -5,14 +5,16 @@ import {
 } from '../../../../workers/sessionCorsWorker/interviewBriefDispatch';
 import {
   buildExternalInterviewKickoff,
-  decodeInterviewPrefillPacket,
-  encodeInterviewPrefillPacket,
   hashInterviewQuestions,
   normalizeInterviewQuestions,
   readImportedInterviewDraftResponses,
   type InterviewPrefillPacket,
+  decodeInterviewPrefill,
 } from './sessionInterview';
 import { resolveInterviewPrefillQuestions } from './sessionInterviewCatalogValidation';
+import { encodeLinkJson } from '../../../../shared/linkPayload.mjs';
+
+const decodeInterviewPrefillPacket = (encoded: unknown) => decodeInterviewPrefill(encoded).packet;
 
 const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'crypto');
 beforeAll(() => {
@@ -83,7 +85,7 @@ it.each(['ce-interview-brief-v4', 'ce-interview-brief-v5', 'ce-interview-brief-v
         { questionId: 'q3', answer: 75, confidence: 0.8 },
       ],
     };
-    const decoded = decodeInterviewPrefillPacket(encodeInterviewPrefillPacket(packet));
+    const decoded = decodeInterviewPrefillPacket(encodeLinkJson(packet));
     expect(decoded).toEqual(packet);
     const matched = await resolveInterviewPrefillQuestions({
       packet: decoded!,
@@ -133,7 +135,7 @@ it.each([1, 2, 3, 4, 5, 6])(
       responderContext: {},
       responses: [{ questionId: 'q1', answer: 'A', confidence: 0.7 }],
     };
-    expect(decodeInterviewPrefillPacket(encodeInterviewPrefillPacket(packet))).toEqual(packet);
+    expect(decodeInterviewPrefillPacket(encodeLinkJson(packet))).toEqual(packet);
     expect(
       await resolveInterviewPrefillQuestions({
         packet,

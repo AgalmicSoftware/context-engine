@@ -2490,7 +2490,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
             });
 
             if (questionEncryption && questionEncryption.recipients.length) {
-              const { gates, recipients } = questionEncryption;
+              const { recipients } = questionEncryption;
 
               const promptResult = await encryptValueWithRecipients({
                 value: q.prompt,

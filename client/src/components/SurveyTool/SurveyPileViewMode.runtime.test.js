@@ -3,7 +3,6 @@ import { responseValuesEqual } from './responseValueEquality';
 import React from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 
-import PileHologramAssistant from './PileHologramAssistant';
 import SurveyQuestionsFullQuestionSliderSection from './SurveyQuestionsFullQuestionSliderSection';
 import {
   buildPileRuntimeInitialState,
@@ -30,7 +29,8 @@ import {
 import { buildSurveyQuestionPoolLoadState } from './surveyQuestionsTypes.js';
 import { buildListeningModeSearch, isListeningModeQueryEnabled } from '../../utilities/audio/rollingTranscription';
 import * as recordingChunkStore from '../../utilities/audio/recordingChunkStore';
-import { encodeInterviewPrefillPacket, resolveSessionVoiceMode } from './sessionInterview';
+import { resolveSessionVoiceMode } from './sessionInterview';
+import { encodeLinkJson } from '../../../../shared/linkPayload.mjs';
 import { readSessionRecruitmentSource } from './sessionRecruitmentSource';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../../utilities/session/sessionModeProfile';
@@ -140,8 +140,6 @@ const baseRail = (overrides = {}) =>
 const buildSurfaceProps = (overrides = {}) => {
   const rail = overrides.rail || baseRail();
   return {
-    showHologramAssistant: false,
-    toggleHologramAssistant: jest.fn(),
     showMiniBackgroundSpinner: false,
     priorResponsesHydrating: false,
     showLongLoading: false,
@@ -785,7 +783,7 @@ describe('SurveyPileViewMode runtime surface', () => {
   });
 
   it('imports a valid prefill hash when the mounted session URL changes', async () => {
-    const encoded = encodeInterviewPrefillPacket({
+    const encoded = encodeLinkJson({
       version: 1,
       sessionSlug: 'demo',
       questionSetHash: 'b'.repeat(64),
@@ -816,7 +814,7 @@ describe('SurveyPileViewMode runtime surface', () => {
   });
 
   it('can import the same valid prefill again after the URL hash is cleared', async () => {
-    const encoded = encodeInterviewPrefillPacket({
+    const encoded = encodeLinkJson({
       version: 1,
       sessionSlug: 'demo',
       questionSetHash: 'd'.repeat(64),
@@ -865,7 +863,7 @@ describe('SurveyPileViewMode runtime surface', () => {
     await waitFor(() => expect(window.location.hash).toBe(''));
     expect(screen.getByTestId('mock-voice-mode-modal')).toHaveAttribute('data-prefill-model', '');
 
-    const encoded = encodeInterviewPrefillPacket({
+    const encoded = encodeLinkJson({
       version: 1,
       sessionSlug: 'demo',
       questionSetHash: 'c'.repeat(64),
@@ -935,7 +933,7 @@ describe('SurveyPileViewMode runtime surface', () => {
   });
 
   it('keeps an imported prefill through initialization and clears it only after mount', async () => {
-    const encoded = encodeInterviewPrefillPacket({
+    const encoded = encodeLinkJson({
       version: 1,
       sessionSlug: 'demo',
       questionSetHash: 'a'.repeat(64),
@@ -1564,51 +1562,6 @@ describe('SurveyPileViewMode runtime surface', () => {
     expect(successBadge.props.role).toBe('status');
     expect(successBadge.props['aria-label']).toBe('Submitted');
     expect(successIcon).not.toBeNull();
-  });
-
-  it('renders the pile hologram as a full-card takeover and hides pile controls while active', () => {
-    const closedTree = renderPileInteractionSurface(
-      buildSurfaceProps({
-        renderActiveQuestion: jest.fn(() => null),
-        showHologramAssistant: false,
-      }),
-    );
-    const closedToggleButton = findElement(
-      closedTree,
-      (node) => isElementNode(node) && node.props['data-testid'] === E2E_TESTIDS.SURVEY_PILE_HOLOGRAM_TOGGLE,
-    );
-    const closedHologram = findElement(
-      closedTree,
-      (node) => isElementNode(node) && node.type === PileHologramAssistant,
-    );
-    const closedControls = findNodeByClassName(closedTree, 'pileControls');
-    const closedActions = findNodeByClassName(closedControls?.props?.children, 'pileActions');
-    const closedFooter = findNodeByClassName(closedControls?.props?.children, 'pileFooter');
-    const closedNav = findNodeByClassName(closedControls?.props?.children, 'pileNav');
-
-    expect(closedToggleButton).toBeNull();
-    expect(closedControls).not.toBeNull();
-    expect(closedActions).not.toBeNull();
-    expect(closedFooter).not.toBeNull();
-    expect(closedNav).not.toBeNull();
-    expect(closedHologram).toBeNull();
-
-    const openTree = renderPileInteractionSurface(
-      buildSurfaceProps({
-        renderActiveQuestion: jest.fn(() => null),
-        showHologramAssistant: true,
-      }),
-    );
-    const openToggleButton = findElement(
-      openTree,
-      (node) => isElementNode(node) && node.props['data-testid'] === E2E_TESTIDS.SURVEY_PILE_HOLOGRAM_TOGGLE,
-    );
-    const openHologram = findElement(openTree, (node) => isElementNode(node) && node.type === PileHologramAssistant);
-
-    expect(openToggleButton).toBeNull();
-    expect(findNodeByClassName(openTree, 'pileControls')).toBeNull();
-    expect(findNodeByClassName(openTree, 'pileFooter')).toBeNull();
-    expect(openHologram).not.toBeNull();
   });
 
   it('does not call getPendingEditStats during PileViewMode.render', () => {

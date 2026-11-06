@@ -24,7 +24,7 @@ import type { GeneratedSurveyStatement } from './SurveyGenerator/surveyGenerator
 import { useInterviewOpening } from './useInterviewOpening';
 import { useSessionContextPrompt } from '../../utilities/docLibrary/useSessionContextSources';
 import { SESSION_CONTEXT_LIMIT } from './sessionInterviewRealtimeInstructions';
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button, Input, Label, ModalBody } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCheck } from '@fortawesome/free-solid-svg-icons';

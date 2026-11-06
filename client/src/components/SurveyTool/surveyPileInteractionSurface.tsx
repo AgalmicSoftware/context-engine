@@ -12,7 +12,6 @@ import {
   faMinus,
   faCaretDown,
   faBars,
-  faRobot,
   faMicrophone,
 } from '@fortawesome/free-solid-svg-icons';
 
@@ -21,11 +20,9 @@ import {
   usesPublicReadCloudflareStorage,
 } from '../../utilities/storage/sessionStorageConfig';
 
-import PileHologramAssistant from './PileHologramAssistant';
 import PileQuestionActionMenu from './PileQuestionActionMenu';
 import styles from './SurveyTool.module.scss';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
-import { SHOW_PILE_HOLOGRAM_TOGGLE } from './surveyToolRuntimeSupport.js';
 
 export const requiresQuestionStorageLogin = (config: unknown, signedIn: boolean): boolean =>
   !signedIn &&
@@ -60,7 +57,6 @@ type PileActionControlsProps = {
   toggleFilterModal: VoidHandler;
   showCreate: boolean;
   toggleCreate: VoidHandler;
-  showListeningPanel?: boolean;
   toggleListeningPanel?: VoidHandler;
   showVoiceModeControl?: boolean;
   voiceModeActive?: boolean;
@@ -116,8 +112,6 @@ export type PileInteractionSurfaceProps = {
   draftPersistenceError?: string;
   // Shown when the session's saved answers failed to load, so earlier answers may be missing.
   savedAnswersNotice?: { retrying: boolean; onRetry: VoidHandler } | null;
-  showHologramAssistant: boolean;
-  toggleHologramAssistant: VoidHandler;
   showMiniBackgroundSpinner: boolean;
   priorResponsesHydrating: boolean;
   showLongLoading: boolean;
@@ -143,7 +137,6 @@ export type PileInteractionSurfaceProps = {
   toggleFilterModal: VoidHandler;
   showCreate: boolean;
   toggleCreate: VoidHandler;
-  showListeningPanel?: boolean;
   toggleListeningPanel?: VoidHandler;
   showVoiceModeControl?: boolean;
   voiceModeActive?: boolean;
@@ -236,9 +229,6 @@ export const resolvePileLoadingProgressFillStyle = ({
   }%`,
 });
 
-export const buildPileHologramToggleClassName = (styleMap: Record<string, string>, showHologramAssistant: unknown) =>
-  `${styleMap.pileHologramToggle}${showHologramAssistant ? ` ${styleMap.pileHologramToggleActive}` : ''}`;
-
 export const resolvePileMiniLoaderStyle = (priorResponsesHydrating: unknown): React.CSSProperties => ({
   opacity: priorResponsesHydrating ? 0.5 : 1,
 });
@@ -282,7 +272,6 @@ const renderPileActionControls = ({
   toggleFilterModal,
   showCreate,
   toggleCreate,
-  showListeningPanel = false,
   toggleListeningPanel = () => {},
   showVoiceModeControl = true,
   voiceModeActive = false,
@@ -577,8 +566,6 @@ export const renderPileInteractionSurface = ({
   submissionError,
   draftPersistenceError,
   savedAnswersNotice,
-  showHologramAssistant,
-  toggleHologramAssistant,
   showMiniBackgroundSpinner,
   priorResponsesHydrating,
   showLongLoading,
@@ -604,7 +591,6 @@ export const renderPileInteractionSurface = ({
   toggleFilterModal,
   showCreate,
   toggleCreate,
-  showListeningPanel,
   toggleListeningPanel,
   showVoiceModeControl,
   voiceModeActive,
@@ -630,21 +616,7 @@ export const renderPileInteractionSurface = ({
   handleNext,
 }: PileInteractionSurfaceProps): React.ReactElement => (
   <div className={styles.pileInteractionUnit}>
-    {SHOW_PILE_HOLOGRAM_TOGGLE && (
-      <button
-        type="button"
-        className={buildPileHologramToggleClassName(styles, showHologramAssistant)}
-        onClick={toggleHologramAssistant}
-        aria-label={showHologramAssistant ? 'Hide holographic guide' : 'Show holographic guide'}
-        aria-pressed={showHologramAssistant}
-        title={showHologramAssistant ? 'Hide holographic guide' : 'Show holographic guide'}
-        data-testid={E2E_TESTIDS.SURVEY_PILE_HOLOGRAM_TOGGLE}
-      >
-        <FontAwesomeIcon icon={faRobot} />
-      </button>
-    )}
-
-    {showMiniBackgroundSpinner && !showHologramAssistant && (
+    {showMiniBackgroundSpinner && (
       <div className={styles.miniSpinnerWrapper}>
         <FontAwesomeIcon
           icon={faSpinner}
@@ -662,7 +634,7 @@ export const renderPileInteractionSurface = ({
       </div>
     )}
 
-    {savedAnswersNotice && !showHologramAssistant && (
+    {savedAnswersNotice && (
       <p className={styles.pileSubmitError} role="status">
         Your saved answers did not load, so answers you saved earlier may be missing.{' '}
         <Button
@@ -678,9 +650,7 @@ export const renderPileInteractionSurface = ({
     )}
 
     <div className={styles.pileCardContainer}>
-      {showHologramAssistant ? (
-        <PileHologramAssistant />
-      ) : pileQuestions.length === 0 ? (
+      {pileQuestions.length === 0 ? (
         <div className={styles.pileEmptyState}>
           {renderPileEmptyState({
             hasTerminalScanError,
@@ -710,46 +680,43 @@ export const renderPileInteractionSurface = ({
       )}
     </div>
 
-    {!showHologramAssistant && (
-      <div className={styles.pileControls}>
-        {renderPileActionControls({
-          isFilterActive,
-          toggleFilterModal,
-          showCreate,
-          toggleCreate,
-          showListeningPanel,
-          toggleListeningPanel,
-          showVoiceModeControl,
-          voiceModeActive,
-          toggleVoiceModeModal,
-          onViewAllClick,
-          handleViewAllFromPile,
-        })}
-        {renderPileFooterControls({
-          pileTopRailVisible,
-          showSuccessBadgeLink,
-          pileSubmitResponderHref,
-          showSuccessBadgeStatus,
-          showSubmitButton,
-          handlePileSubmitClick,
-          hasPendingPileChanges,
-          pendingAnswerCount,
-          shouldHidePileSubmitButton,
-          isSubmitting,
-          activePromptMasked,
-          finalSubmitText,
-          showClearPendingButton,
-          handleRevertPendingChanges,
-        })}
-        {renderPileNavControls({
-          pileQuestions,
-          activePileIndex,
-          navCounterVisible,
-          handlePrev,
-          handleNext,
-        })}
-      </div>
-    )}
+    <div className={styles.pileControls}>
+      {renderPileActionControls({
+        isFilterActive,
+        toggleFilterModal,
+        showCreate,
+        toggleCreate,
+        toggleListeningPanel,
+        showVoiceModeControl,
+        voiceModeActive,
+        toggleVoiceModeModal,
+        onViewAllClick,
+        handleViewAllFromPile,
+      })}
+      {renderPileFooterControls({
+        pileTopRailVisible,
+        showSuccessBadgeLink,
+        pileSubmitResponderHref,
+        showSuccessBadgeStatus,
+        showSubmitButton,
+        handlePileSubmitClick,
+        hasPendingPileChanges,
+        pendingAnswerCount,
+        shouldHidePileSubmitButton,
+        isSubmitting,
+        activePromptMasked,
+        finalSubmitText,
+        showClearPendingButton,
+        handleRevertPendingChanges,
+      })}
+      {renderPileNavControls({
+        pileQuestions,
+        activePileIndex,
+        navCounterVisible,
+        handlePrev,
+        handleNext,
+      })}
+    </div>
     <p className={styles.draftPersistenceStatus} role="status" aria-atomic="true">
       {draftPersistenceError || ''}
     </p>

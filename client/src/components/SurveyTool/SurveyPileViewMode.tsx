@@ -302,7 +302,6 @@ export const buildPileRuntimeInitialState = (engine: SurveyQuestionsRuntimeEngin
     showLongLoading: false,
     hasHiddenGatedQuestions: false,
     loadingElapsedSec: 0,
-    showHologramAssistant: false,
     showListeningPanel:
       typeof window !== 'undefined' ? isListeningModeQueryEnabled(window.location.search || '') : false,
     // A prefill link opens the interview, where a broken one says why and offers a paste instead.
@@ -469,7 +468,6 @@ const attachPileViewRuntimeEngine = (engine: PileViewModeEngine): PileViewModeEn
     importInterviewPrefillJson: bindPileEngineMethod(engine, importInterviewPrefillJson),
     viewResultsFromSessionVoiceModeModal: bindPileEngineMethod(engine, viewResultsFromSessionVoiceModeModal),
     recordInterviewProvenance: bindPileEngineMethod(engine, recordInterviewProvenance),
-    toggleHologramAssistant: bindPileEngineMethod(engine, toggleHologramAssistant),
     toggleConviction: bindPileEngineMethod(engine, toggleConviction),
     openConvictionSlider: bindPileEngineMethod(engine, openConvictionSlider),
     checkCacheAgainstBaseline: bindPileEngineMethod(engine, checkCacheAgainstBaseline),
@@ -1757,12 +1755,6 @@ const closeListeningPanel = (engine: PileViewModeEngine) => {
   engine.setState({ showListeningPanel: false }, () => {
     engine.syncListeningModeQuery(false);
   });
-};
-
-const toggleHologramAssistant = (engine: PileViewModeEngine) => {
-  return engine.setState((prev: any) => ({
-    showHologramAssistant: !prev.showHologramAssistant,
-  }));
 };
 
 const toggleConviction = (engine: PileViewModeEngine, questionId: any) => {
@@ -3198,7 +3190,6 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
     filterModalOpen,
     showLongLoading,
     navCounterVisible,
-    showHologramAssistant,
     showListeningPanel,
     showVoiceModeModal,
     sessionVoiceMode,
@@ -3273,11 +3264,9 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
     hasSessionQuestionGate,
   });
   const {
-    activeQuestion,
     activePromptMasked,
     hydrateDiscovered,
     hydrateDone,
-    hasPendingMetadataRetries,
     isHydrating,
     hasTerminalScanError,
     scanErrorMessage,
@@ -3351,8 +3340,6 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
       </>
     );
 
-  const showListeningAside = showListeningPanel && !showHologramAssistant;
-
   return (
     <div
       className={styles.pileViewContainer}
@@ -3371,14 +3358,12 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
         engine._pileAnswerArrowKeyDown = false;
       }}
     >
-      <div className={showListeningAside ? styles.pileListeningLayout : undefined}>
+      <div className={showListeningPanel ? styles.pileListeningLayout : undefined}>
         <div className={styles.pileWrapper}>
           {renderPileInteractionSurface({
             submissionError: String(engine.state.submissionError || ''),
             draftPersistenceError: String(engine.state.draftPersistenceError || ''),
             savedAnswersNotice: buildSavedAnswersNotice(engine, pileQuestions.length > 0),
-            showHologramAssistant,
-            toggleHologramAssistant: engine.toggleHologramAssistant,
             showMiniBackgroundSpinner,
             priorResponsesHydrating,
             showLongLoading,
@@ -3407,7 +3392,6 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
             toggleFilterModal: engine.toggleFilterModal,
             showCreate,
             toggleCreate: engine.toggleCreate,
-            showListeningPanel,
             toggleListeningPanel: engine.toggleListeningPanel,
             showVoiceModeControl: isInterviewFeatureEnabled(engine.props?.sessionConfig),
             voiceModeActive:
@@ -3453,7 +3437,7 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
             handleNext: engine.handleNext,
           })}
         </div>
-        {showListeningAside && (
+        {showListeningPanel && (
           <div className={styles.sessionListeningPanelAnchor} ref={engine.listeningPanelRef}>
             <React.Suspense fallback={<LazyFallback label="Loading Listening Panel..." minHeight="160px" />}>
               <LazySessionListeningPanel
@@ -3597,7 +3581,7 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
         />
       ) : null}
 
-      {!showHologramAssistant && showCreate && (
+      {showCreate && (
         <div className={styles.pileFullControls} ref={engine.createSectionRef}>
           <React.Suspense fallback={<LazyFallback label="Loading Question Authoring..." minHeight="160px" />}>
             <LazyPileCreateQuestionsAndSurveys {...engine.props} hideSurveyQuestionToggleUntilAuthoring={true} />

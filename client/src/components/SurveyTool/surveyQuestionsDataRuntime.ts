@@ -7,7 +7,6 @@ export type SurveyQuestionsDataRuntime = SurveyQuestionsLegacyRecord;
 
 export const createSurveyQuestionsDataRuntime = (context: SurveyQuestionsLegacyRecord): SurveyQuestionsDataRuntime => {
   const {
-    _applyResponseHydrationListToSlice,
     areQuestionPayloadsEquivalent,
     buildClearedSurveyQuestionPoolState,
     publishSurveyQuestionPoolIfCurrent,
@@ -68,11 +67,9 @@ export const createSurveyQuestionsDataRuntime = (context: SurveyQuestionsLegacyR
     scheduleSingleQuestionBootstrapRetry,
     setResponseHydrationState,
     setState,
-    state,
     stateRef,
     surveyLog,
     surveyQuestionReadsPort,
-    t,
     updateCacheAtomic,
     updateSingleQuestionDebug,
     updateSubmittedSinceLastEdit,

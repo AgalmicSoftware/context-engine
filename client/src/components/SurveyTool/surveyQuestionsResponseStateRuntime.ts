@@ -19,7 +19,6 @@ import {
 import { executeSurveyFormStateReset, executeSurveyPendingRevert } from './surveyToolResponseResetController';
 import { resolveSurveyBaselineSourceSlice } from './surveyToolResponseSourceController';
 import {
-  DEBUG_PREFILL,
   areEnvelopesEquivalent,
   buildDraftAnswersByQuestionId,
   buildDraftAwareCacheHydrationState,
@@ -334,14 +333,7 @@ export const createSurveyQuestionsResponseStateRuntime = ({
       setLocalCacheMemo: (nextMemo: SurveyQuestionsLegacyValue) => {
         inst._localCacheSliceMemo = nextMemo;
       },
-      onError: (error: SurveyQuestionsLegacyValue) => {
-        DEBUG_PREFILL && surveyLog.error('[Survey][buildSlice] Error:', error);
-      },
     });
-    if (slice) {
-      DEBUG_PREFILL &&
-        surveyLog.log('[Survey][buildSlice] Building for rendered IDs:', getCurrentRenderedQuestionIds());
-    }
     return slice;
   };
 
@@ -395,12 +387,6 @@ export const createSurveyQuestionsResponseStateRuntime = ({
       },
       callback: finalCallback,
       bumpNoop: () => bumpSurveyPerfCounter('noopSkipCount'),
-      onNoChange: () => {
-        DEBUG_PREFILL && surveyLog.log('[Survey][rehydrateLocal] No changes to apply.');
-      },
-      onError: (error: SurveyQuestionsLegacyValue) => {
-        DEBUG_PREFILL && surveyLog.error('[Survey][rehydrateLocal] Error:', error);
-      },
       isStaleRun,
     });
     // The cache read covered these questions; once saved answers are known they count as loaded.

@@ -1,6 +1,9 @@
 import { QUADRATIC_ANSWER_RULE } from '../../../../shared/promptRules.mjs';
 import { callAI } from '../../utilities/ai/aiClient.js';
 import { generateQuestionId } from '../../utilities/shared/questionUtils.mjs';
+import { encodeLinkJson } from '../../../../shared/linkPayload.mjs';
+
+const decodeInterviewPrefillPacket = (encoded: unknown) => decodeInterviewPrefill(encoded).packet;
 jest.mock('../../utilities/ai/aiClient.js', () => ({ callAI: jest.fn() }));
 import {
   buildExternalInterviewKickoff,
@@ -10,8 +13,6 @@ import {
   canonicalizeInterviewQuestions,
   hashInterviewQuestions,
   clearInterviewPrefillHash,
-  decodeInterviewPrefillPacket,
-  encodeInterviewPrefillPacket,
   hasInterviewPrefillHash,
   INTERVIEW_PROMPT_VERSION,
   isInterviewFeatureEnabled,
@@ -25,6 +26,7 @@ import {
   resolveRealtimeInterviewSource,
   resolveSessionVoiceMode,
   type InterviewPrefillPacket,
+  decodeInterviewPrefill,
 } from './sessionInterview';
 
 const packet: InterviewPrefillPacket = {
@@ -60,7 +62,7 @@ describe('session interview protocol', () => {
       ...packet,
       responses: [{ questionId: 'q1', answer: 'Agree', importance: 60, conviction: 80, confidence: 0.8 }],
     };
-    const decoded = decodeInterviewPrefillPacket(encodeInterviewPrefillPacket(incoming));
+    const decoded = decodeInterviewPrefillPacket(encodeLinkJson(incoming));
     expect(decoded?.responses?.[0]).toMatchObject({ importance: 60, conviction: 80 });
     const questions = normalizeInterviewQuestions([{ id: 'q1', prompt: 'Fixture question', type: 'binary' }]);
     expect(readImportedInterviewDraftResponses(decoded, questions)?.[0]).toMatchObject({
@@ -168,7 +170,7 @@ describe('session interview protocol', () => {
   });
 
   it('round-trips unicode prefill packets, validates source metadata, and supports URL cleanup', () => {
-    const encoded = encodeInterviewPrefillPacket(packet);
+    const encoded = encodeLinkJson(packet);
     expect(decodeInterviewPrefillPacket(encoded)).toEqual({
       ...packet,
       responderContext: {
@@ -189,7 +191,7 @@ describe('session interview protocol', () => {
     expect(decodeInterviewPrefillPacket('not-valid')).toBeNull();
     expect(
       decodeInterviewPrefillPacket(
-        encodeInterviewPrefillPacket({
+        encodeLinkJson({
           ...packet,
           questionSetHash: '',
         }),
@@ -197,7 +199,7 @@ describe('session interview protocol', () => {
     ).toBeNull();
     expect(
       decodeInterviewPrefillPacket(
-        encodeInterviewPrefillPacket({
+        encodeLinkJson({
           ...packet,
           promptVersion: INTERVIEW_PROMPT_VERSION,
         }),
@@ -206,7 +208,7 @@ describe('session interview protocol', () => {
   });
 
   it('reads prefill links the way setup links are read: tolerant of wrapping, strict about damage', () => {
-    const encoded = encodeInterviewPrefillPacket(packet);
+    const encoded = encodeLinkJson(packet);
     const expected = decodeInterviewPrefillPacket(encoded);
     expect(expected).not.toBeNull();
     // Chat apps wrap long links, and some encoders pad.
@@ -228,7 +230,7 @@ describe('session interview protocol', () => {
   });
 
   it('names the field a prefill packet lacks, and counts the drafts it leaves out', () => {
-    const encode = (value: Record<string, unknown>) => `#prefill=${encodeInterviewPrefillPacket(value as never)}`;
+    const encode = (value: Record<string, unknown>) => `#prefill=${encodeLinkJson(value as never)}`;
     expect(readInterviewPrefillFromHash(encode({ ...packet, version: 2 })).error).toMatch(/version must be 1/);
     expect(readInterviewPrefillFromHash(encode({ ...packet, sessionSlug: ' ' })).error).toMatch(/no sessionSlug/);
     expect(readInterviewPrefillFromHash(encode({ ...packet, source: { platform: 'claude' } })).error).toMatch(
@@ -258,7 +260,7 @@ describe('session interview protocol', () => {
 
   it('reads a pasted JSON packet when the link breaks', () => {
     const pasted = parseInterviewPrefillJson(`\n${JSON.stringify(packet, null, 2)}\n`);
-    expect(pasted.packet).toEqual(decodeInterviewPrefillPacket(encodeInterviewPrefillPacket(packet)));
+    expect(pasted.packet).toEqual(decodeInterviewPrefillPacket(encodeLinkJson(packet)));
     expect(parseInterviewPrefillJson('{"version":1').error).toMatch(/not valid JSON/);
     expect(parseInterviewPrefillJson(JSON.stringify({ ...packet, questionSetHash: '' })).error).toMatch(
       /questionSetHash/,
@@ -896,9 +898,7 @@ describe('interview choice selection contract', () => {
       expect(await hashInterviewQuestions(multi, 'ce-interview-brief-v5')).toBe(await hashInterviewQuestions(multi));
       expect(await hashInterviewQuestions(single, 'ce-interview-brief-v5')).not.toBe(legacyHash);
       expect(
-        decodeInterviewPrefillPacket(
-          encodeInterviewPrefillPacket({ ...packet, promptVersion: 'ce-interview-brief-v4' }),
-        ),
+        decodeInterviewPrefillPacket(encodeLinkJson({ ...packet, promptVersion: 'ce-interview-brief-v4' })),
       ).not.toBeNull();
     } finally {
       if (descriptor) Object.defineProperty(globalThis, 'crypto', descriptor);

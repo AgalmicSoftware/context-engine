@@ -193,7 +193,6 @@ export const renderSurveyResultsRenderSurface = ({
   toggleSurveyBookmark,
 }: SurveyResultsRenderSurfaceArgs): React.ReactElement => {
   const {
-    responses,
     sbtFilteredResponses,
     exportType,
     alertMessage,
@@ -203,7 +202,6 @@ export const renderSurveyResultsRenderSurface = ({
     filteredResponsesCount,
     surveyViewMode,
     exportAreaOpen,
-    aggregatorQuestionResponses,
     sbtFilteredAggregatorQuestionResponses,
     surveyTitle,
     surveyDocumentURLs,

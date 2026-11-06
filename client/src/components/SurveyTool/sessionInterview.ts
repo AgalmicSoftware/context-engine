@@ -5,7 +5,7 @@ import {
 } from '../../../../shared/questions/quadraticAllocation.mjs';
 import { normalizePublicInterviewQuestions } from '../../../../shared/interviewQuestionCatalog.mjs';
 import { normalizeRatingAnswer } from '../../../../shared/questions/ratingScale.mjs';
-import { decodeLinkJson, encodeLinkJson, readLinkParam } from '../../../../shared/linkPayload.mjs';
+import { decodeLinkJson, readLinkParam } from '../../../../shared/linkPayload.mjs';
 import { normalizeInterviewSettings } from '../../../../shared/interviewSettings.mjs';
 import { QUADRATIC_ANSWER_RULE, QUADRATIC_QUESTION_RULE, QUESTION_TAG_RULE } from '../../../../shared/promptRules.mjs';
 import {
@@ -325,8 +325,6 @@ export const hashInterviewQuestions = async (
   return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
 };
 
-export const encodeInterviewPrefillPacket = (packet: InterviewPrefillPacket): string => encodeLinkJson(packet);
-
 // The first required field a packet lacks, named so the person can ask their AI to fix it.
 const describePrefillPacketProblem = (value: unknown): string => {
   const packet = asRecord(value);
@@ -434,9 +432,6 @@ export const parseInterviewPrefillJson = (text: unknown): InterviewPrefillRead =
     return { packet: null, error: 'This is not valid JSON. Copy all of the packet your AI gave you.', notice: '' };
   }
 };
-
-export const decodeInterviewPrefillPacket = (encoded: unknown): InterviewPrefillPacket | null =>
-  decodeInterviewPrefill(encoded).packet;
 
 export const readInterviewPrefillFromHash = (hash: unknown): InterviewPrefillRead =>
   decodeInterviewPrefill(readLinkParam(hash, INTERVIEW_PREFILL_FRAGMENT_KEY));

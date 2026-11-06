@@ -177,7 +177,6 @@ const membershipGroupIds = (overview: WorkerGroupOverview, sessionSlug: string):
 const buildRecommendationViews = (
   overview: WorkerGroupOverview,
   recommendations: SessionInterviewGroupRecommendation[],
-  sessionSlug: string,
 ): RecommendationView[] => {
   const eligible = new Map(
     normalizeInterviewGroupCandidates({
@@ -313,8 +312,8 @@ export function SessionInterviewRecommendedGroups({
   }, [loadCatalog, normalizedAccount, targetKey]);
 
   const recommendationViews = useMemo(
-    () => buildRecommendationViews(activeViewState.overview, normalizedRecommendations, sessionSlug),
-    [activeViewState.overview, normalizedRecommendations, sessionSlug],
+    () => buildRecommendationViews(activeViewState.overview, normalizedRecommendations),
+    [activeViewState.overview, normalizedRecommendations],
   );
 
   const joinRecommendedGroup = useCallback(
@@ -373,7 +372,7 @@ export function SessionInterviewRecommendedGroups({
           }
           return;
         }
-        const allowed = buildRecommendationViews(overview, normalizedRecommendations, sessionSlug).some(
+        const allowed = buildRecommendationViews(overview, normalizedRecommendations).some(
           (view) => view.group.groupId === groupId,
         );
         if (!allowed) throw new Error('This group is no longer available to join.');
