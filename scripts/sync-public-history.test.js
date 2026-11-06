@@ -1095,6 +1095,31 @@ test('sync-public-history replays across the Agent Bridge retirement commit', ()
   });
 });
 
+test('sync-public-history keeps the retired paths out after a later side-line commit', () => {
+  withSourceRepo(({ sourceDir }) => {
+    writeFile(sourceDir, path.join('workers', 'agentBridgeWorker', 'worker.js'), 'public agent bridge worker v2\n');
+    const branchPoint = commitAt(sourceDir, 'Update the worker before retirement', 1);
+    const mainBranch = git(sourceDir, ['symbolic-ref', '--short', 'HEAD']).trim();
+    retireAgentBridge(sourceDir, 2);
+    git(sourceDir, ['checkout', '-q', '-b', 'side-line', branchPoint]);
+    writeFile(sourceDir, 'side.txt', 'late side line\n');
+    commitAt(sourceDir, 'Late side-line commit', 3);
+    git(sourceDir, ['checkout', '-q', mainBranch]);
+    git(sourceDir, ['merge', '-q', '--no-ff', '--no-edit', 'side-line']);
+
+    const result = runSyncScript(sourceDir, ['--allow-diverged-source', 'release-candidate']);
+    assert.equal(result.status, 0, syncFailureMessage(result));
+
+    const paths = trackedPathsAt(sourceDir, 'release-candidate');
+    assert.match(paths, /^side\.txt$/m);
+    assert.doesNotMatch(paths, /^workers\/agentBridgeWorker\//m);
+    assert.doesNotMatch(paths, /^scripts\/run-agent-bridge-worker-tests\.js$/m);
+    const { scripts } = JSON.parse(git(sourceDir, ['show', 'release-candidate:package.json']));
+    assert.equal(Object.hasOwn(scripts, 'test:worker:agent-bridge'), false);
+    assert.equal(scripts['test:worker:agent'], 'node scripts/run-session-agent-tests.js');
+  });
+});
+
 test('sync-public-history dry run counts a retirement that only deletes Agent Bridge paths', () => {
   withSourceRepo(({ sourceDir }) => {
     removeFromSource(sourceDir, AGENT_BRIDGE_SUBTREE, AGENT_BRIDGE_RUNNER);
