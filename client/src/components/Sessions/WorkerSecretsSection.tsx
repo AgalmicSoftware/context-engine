@@ -159,7 +159,7 @@ const WorkerSecretsSection = ({
             {renderTooltip({
               id: 'gw-limit-per-anonymous-ip',
               content:
-                'Daily budget for anonymous users sharing the same public IP address across public reads and enabled AI, transcription, and realtime routes. Use 0 to disable this Worker daily cap; provider limits and access policy still apply. Leave blank only when importing an older config that should inherit the wallet limit.',
+                'Daily budget for anonymous users sharing the same public IP address across public reads and enabled AI, transcription, and realtime routes. Use 0 or leave blank for no Worker daily cap; provider limits and access policy still apply.',
               placement: 'right',
               testId: 'ce-wizard-worker-tooltip-gw-limit-per-anonymous-ip',
               ariaLabel: 'Anonymous IP request limit info',
@@ -171,7 +171,7 @@ const WorkerSecretsSection = ({
             min="0"
             step="1"
             value={workerLimitPerAnonymousIp}
-            placeholder="Inherit authenticated wallet limit"
+            placeholder="No daily cap"
             onChange={(e) => setWorkerLimitPerAnonymousIp(e.target.value)}
           />
           <div className={styles.helperText}>

@@ -105,7 +105,7 @@ export const verifyNativeSessionWorker = async ({
   }
   if (modeRequirements.requiresLit) {
     throw new Error(
-      'Advanced Lit hybrid setup still requires the legacy/manual bootstrap flow; the native dashboard handoff supports Worker-native encryption and on-chain SBT checks without Lit.',
+      'Lit encryption needs the API token deploy; the dashboard handoff supports Worker encryption and on-chain SBT checks without Lit.',
     );
   }
   if (runtime.loginComplete !== true) {
