@@ -1,5 +1,6 @@
 import React from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { createWorkerAuthRemoteError } from '../../utilities/worker/workerAuthRemoteError';
 import AdminWorkerGroupsPanel from './AdminWorkerGroupsPanel';
 
 const ADDRESS = '0x00000000000000000000000000000000000000aa';
@@ -25,6 +26,25 @@ describe('AdminWorkerGroupsPanel', () => {
 
     expect(screen.getByRole('button', { name: 'Remove facilitators' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Remove reviewers' })).toBeInTheDocument();
+  });
+
+  it('says when signing is rate limited instead of showing an internal code', async () => {
+    const postSignedRequest = jest.fn(async () => {
+      throw createWorkerAuthRemoteError({ kind: 'admin_nonce', payload: {}, status: 429 });
+    });
+    render(
+      <AdminWorkerGroupsPanel
+        canAdminWorker={true}
+        sessionId={SESSION_ID}
+        sessionSlug="alpha"
+        workerUrl="https://session-worker.example"
+        postSignedRequest={postSignedRequest}
+      />,
+    );
+    fireEvent.change(screen.getByTestId('ce-admin-worker-group-create-label'), { target: { value: 'Salon' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create Group' }));
+    expect(await screen.findByText('Too many sign-in attempts. Wait a minute and try again.')).toBeInTheDocument();
+    expect(screen.queryByText('worker_group_admin_request_failed')).not.toBeInTheDocument();
   });
 
   it('manages the supported group and membership operations through signed worker requests', async () => {
