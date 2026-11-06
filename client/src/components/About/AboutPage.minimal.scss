@@ -1,7 +1,7 @@
 // Keep the light About treatment local: other themes own their control geometry.
 @container ce-theme style(--ce-layout-profile: minimal-app) {
   // Outrank the generic theme button recipe without changing other controls.
-  :global(:root[data-ce-theme]) {
+  :global(:root:root) {
     .aboutPageContainer {
       --about-accent: var(--ce-data-series-2);
       --about-edge: color-mix(in srgb, var(--about-accent) 32%, var(--ce-surface));
