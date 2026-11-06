@@ -165,16 +165,13 @@ describe('workerCanonicalRouteResolution', () => {
     expect(resolveStandardSessionRoute).not.toHaveBeenCalled();
   });
 
-  it.each(['rxc-ra-test-3', 'rxc-ra-test-5'] as const)(
-    'bundles %s with the public Results it runs, so a fresh browser starts from the right profile',
-    (slug) => {
-      const profile = demoSessions[slug].sessionModeProfile;
-      expect(profile.results.visibility).toBe('public_full_if_storage_public');
-      expect(profile.encryption).toEqual({ mode: 'none' });
-      expect(profile.storage.payloadAccessControl).toEqual({ gate: 'none', encryption: 'none' });
-      expect(listSessionModeConflicts(profile)).toEqual([]);
-    },
-  );
+  it('bundles rxc-ra-test-5 with the public Results it runs, so a fresh browser starts from the right profile', () => {
+    const profile = demoSessions['rxc-ra-test-5'].sessionModeProfile;
+    expect(profile.results.visibility).toBe('public_full_if_storage_public');
+    expect(profile.encryption).toEqual({ mode: 'none' });
+    expect(profile.storage.payloadAccessControl).toEqual({ gate: 'none', encryption: 'none' });
+    expect(listSessionModeConflicts(profile)).toEqual([]);
+  });
 
   it.each([
     ['rxc-test', 'https://ce-rxc-test-96862a1dc78f.agalmic.workers.dev'],
