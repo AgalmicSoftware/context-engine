@@ -1,16 +1,19 @@
 # Passkey EOA Wallet
 
-Context Engine's embedded wallet is a passkey-unlocked EOA. It keeps the
-existing account UX while removing hosted wallet infrastructure from the normal
-login, signing, and transaction path.
+Context Engine's embedded wallet is a passkey-unlocked EOA. No hosted wallet
+service is involved in login, signing, or transactions.
 
 ```text
-User clicks Continue / Sign in
+User clicks Create / Login
 -> browser passkey prompt
 -> wallet is unlocked in memory
 -> app signs messages, typed data, and normal EVM transactions
 -> routine actions may reuse a soft worker-held session until TTL
 ```
+
+In Hosted & Fast sessions the account signs login and admin requests that the
+Worker verifies; no transaction or gas is involved. Trustless & Slower sessions
+send wallet transactions.
 
 This wallet is intentionally not a smart account. It does not provide gas
 sponsorship, batching, relayers, paymasters, ERC-4337, EIP-7702, onchain
@@ -20,7 +23,7 @@ passkey verification, or hard onchain session-key permissions.
 
 - `client/src/wallet/config.ts`: RP ID, origin, mode, TTL, and capability config.
 - `client/src/wallet/passkey/`: WebAuthn registration/authentication helpers and PRF handling.
-- `client/src/wallet/keystore/`: deterministic EOA derivation, optional AES-GCM encrypt/decrypt, IndexedDB metadata storage, migration types.
+- `client/src/wallet/keystore/`: deterministic EOA derivation, optional AES-GCM encrypt/decrypt, IndexedDB metadata storage.
 - `client/src/wallet/passkeyWallet.ts`: client API and EIP-1193 provider facade.
 - `client/src/wallet/session/`: soft-session policy, worker, and worker client.
 - `client/src/components/Account/LoginAndSettingsModal.tsx`: create, sign-in, restore, logout, and account sync.
@@ -73,7 +76,8 @@ deployment tooling. See `client/.env.example`.
 
 Rules enforced by `validatePasskeyWalletConfig()`:
 
-- RP ID is required outside loopback local development.
+- An RP ID is required. When `NEXT_PUBLIC_RP_ID` is unset, it defaults to the
+  page's hostname (`localhost` on loopback hosts).
 - Third-party wallet domains are rejected.
 - Preview-host RP IDs are rejected unless `NEXT_PUBLIC_ALLOW_PREVIEW_RP_ID=true`.
 - App and account origins must be the RP ID itself or a subdomain of it.
@@ -125,7 +129,7 @@ available at unlock time.
 
 ## Create Flow
 
-1. User clicks Create account or Continue.
+1. User clicks Create.
 2. The app creates a WebAuthn credential under the configured RP ID, offering
    both ES256 and RS256 for platform-authenticator compatibility.
 3. When registration returns WebAuthn PRF output, the app uses it directly.
@@ -135,8 +139,8 @@ available at unlock time.
 4. The app derives the EOA private key with HKDF-SHA256 over PRF output,
    configured RP ID, configured derivation namespace, and versioned derivation
    labels.
-5. The app records non-secret metadata such as credential ID and EVM address
-   when browser storage is available.
+5. The app saves non-secret metadata, such as credential ID and EVM address, to
+   IndexedDB. If that write fails, creation fails.
 6. The app initializes the worker-held soft session.
 
 In `encrypted-private-key` compatibility mode, Create refuses before opening a
@@ -156,6 +160,7 @@ Passkey-derived metadata shape:
 type PasskeyDerivedWalletRecord = {
   id: string;
   userId?: string;
+  disconnected?: boolean;
   rpId: string;
   credentialId: string;
   evmAddress: `0x${string}`;
@@ -173,10 +178,11 @@ Encrypted-private-key compatibility record shape:
 type EncryptedWalletRecord = {
   id: string;
   userId?: string;
+  disconnected?: boolean;
   rpId: string;
   credentialId: string;
   evmAddress: `0x${string}`;
-  keyMode: 'encrypted-private-key';
+  keyMode?: 'encrypted-private-key';
   encryptedPrivateKey: string;
   encryptionVersion: 'passkey-prf-aes-gcm-v1';
   salt: string;
@@ -196,9 +202,9 @@ These values must never be sent to a server or persisted in logs:
 
 ## Unlock Flow
 
-1. User clicks Continue or Sign in, or a signing action needs to re-unlock an
-   expired soft session.
-2. Explicit Sign in uses discoverable authentication for the configured RP ID,
+1. User clicks Login, or a signing action needs to re-unlock an expired soft
+   session.
+2. Explicit Login uses discoverable authentication for the configured RP ID,
    so the browser/OS picker can list every available passkey and the selected
    passkey-derived wallet becomes active. Background re-unlocks for an active
    wallet still supply the saved credential ID in WebAuthn `allowCredentials`,
@@ -229,7 +235,8 @@ unlock fail closed.
 Allowed fallback behavior:
 
 - ask the user to use a PRF-capable passkey/browser
-- use an already-supported external wallet path
+- use an external wallet path, if the build enables one
+  (`REACT_APP_CE_ENABLE_METAMASK_CONNECTOR`)
 - add a clearly labeled password-encryption mode in a separate reviewed change
 
 Forbidden fallback behavior:
@@ -244,7 +251,7 @@ Forbidden fallback behavior:
 
 ```ts
 createWallet(): Promise<`0x${string}`>
-unlockWallet(): Promise<`0x${string}`>
+unlockWallet(options?: { selectCredential?: boolean; expectedAddress?: string | null }): Promise<`0x${string}`>
 restoreSession(options?: { requireSigner?: boolean }): Promise<`0x${string}` | null>
 getAddress(): `0x${string}` | null
 signMessage(message: unknown): Promise<`0x${string}`>
@@ -323,9 +330,10 @@ This Vite app can unlock `passkey-derived` wallets without an encrypted wallet
 record. IndexedDB metadata improves silent account display after reload, but it
 is not required to derive the EOA after a passkey prompt.
 
-Deployments that use `encrypted-private-key` mode or add server-side account
-storage should use the following endpoint contract and must verify WebAuthn
-challenges server-side:
+This repository implements none of the endpoints below, and
+`encrypted-private-key` mode keeps its record in IndexedDB only. A deployment
+that adds server-side account storage should use this contract and must verify
+WebAuthn challenges server-side:
 
 ```text
 POST /api/passkey/register/options

@@ -21,7 +21,8 @@ NEXT_PUBLIC_SESSION_MODE=soft
 NEXT_PUBLIC_WALLET_UNLOCK_TTL_SECONDS=900
 ```
 
-4. For Vite/older CE deployment tooling, use the alias names if needed:
+4. The Vite build reads both prefixes. Tooling that passes only `REACT_APP_*`
+   variables can use the alias names instead:
 
 ```bash
 REACT_APP_NEXT_PUBLIC_RP_ID=example.com
@@ -37,8 +38,8 @@ REACT_APP_NEXT_PUBLIC_WALLET_DERIVATION_NAMESPACE=context-engine
    these by default.
 6. Verify the app can create and unlock a wallet on the final domain before
    inviting users.
-7. Keep external wallet fallback enabled only if the fork intentionally supports
-   it.
+7. MetaMask login is off by default (`REACT_APP_CE_ENABLE_METAMASK_CONNECTOR=false`,
+   set at build time). Turn it on only if the fork intentionally supports it.
 
 ## Namespace Rules
 
