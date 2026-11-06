@@ -36,6 +36,14 @@ const globalFillRules = (variant: string) =>
 const stateSelector = (button: string) => `button.${button}:is(:hover, :focus, :active):not(:disabled)`;
 
 describe('passkey buttons under the global .btn rules', () => {
+  // `.btn`'s 40px side padding kept the pair from fitting: about 10px past the dialog on each side at 375px.
+  it('lets the pair share a phone-width dialog', () => {
+    const body = accountCss.match(/@media \(max-width: 480px\) \{\s*\.passkeyButton \{([^}]*)\}/)?.[1];
+    expect(body).toMatch(/flex: 1 1 0;/);
+    expect(body).toMatch(/min-width: 0;/);
+    expect(body).toMatch(/padding-inline: 12px;/);
+  });
+
   // contextEngine.scss clears `.btn` fills on hover and press and paints `.btn-primary:focus`, all with !important.
   // That left these light labels on the dialog behind them: white on white in Minimal, 1.82:1 in Classic 95.
   it.each([

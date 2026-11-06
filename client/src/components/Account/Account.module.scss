@@ -3825,6 +3825,12 @@ h1 {
   box-shadow:
     -3px 3px 6px color-mix(in srgb, var(--ce-overlay-base) 62%, transparent),
     3px -3px 8px color-mix(in srgb, var(--ce-status-info) 22%, transparent);
+  // `.btn`'s 40px side padding pushes the pair past a phone-width dialog's edges.
+  @media (max-width: 480px) {
+    flex: 1 1 0;
+    min-width: 0;
+    padding-inline: 12px;
+  }
   &:hover {
     transform: translateY(-2px);
     box-shadow:
