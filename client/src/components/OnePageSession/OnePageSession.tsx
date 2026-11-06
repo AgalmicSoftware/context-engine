@@ -517,7 +517,8 @@ class OnePageSession extends Component<any, any> {
       props.isResponsesCacheReady ? 1 : 0,
       Number(props.questionResponsesNonce || 0),
       state.demoFixturesLoaded ? 1 : 0,
-      [...getBlockedQuestionIdsSet(questionCacheSlug)].sort().join(','),
+      // Reads the stored config, so a page with Results closed, as when recording, skips it.
+      state.showResults ? [...getBlockedQuestionIdsSet(questionCacheSlug)].sort().join(',') : '',
     ].join('|');
   }
 
