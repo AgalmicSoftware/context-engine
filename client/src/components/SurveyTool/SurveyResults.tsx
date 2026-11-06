@@ -1462,7 +1462,6 @@ const SurveyResults = (props: SurveyResultsProps): React.ReactElement => {
     getHtmlReportAnalysisArtifact,
     getHtmlReportAnalysisSectionsToGenerate,
     getHtmlReportChainId,
-    getHtmlReportExporterMetadata,
     getHtmlReportSelectedSections,
     getSessionResultsAnalysisCacheKey,
     getSessionResultsAnalysisCacheSlug,

@@ -621,7 +621,6 @@ type LocalCacheHydrationApplyArgs = {
   cachedConviction?: unknown;
   allowMaskedAnswerDraftEmpty?: boolean;
   allowMaskedAdditionalDraftEmpty?: boolean;
-  debugLabel?: string;
 };
 
 type BuildLocalCacheRehydrationStateArgs = {
@@ -642,7 +641,6 @@ type BuildLocalCacheRehydrationStateArgs = {
       })
     | null;
   applyLocalCacheHydrationEntryToSlice?: ((args: LocalCacheHydrationApplyArgs) => boolean) | null;
-  debugLabel?: string;
 };
 
 export const loadDraftAnswersByQuestionIdSafely = ({
@@ -2856,7 +2854,6 @@ export const buildLocalCacheRehydrationState = ({
   cloneBaseline = null,
   buildDraftAwareCacheHydrationState: buildDraftAwareState = null,
   applyLocalCacheHydrationEntryToSlice = null,
-  debugLabel = '',
 }: BuildLocalCacheRehydrationStateArgs = {}) => {
   const normalizedBaseSlice = baseSlice && typeof baseSlice === 'object' ? baseSlice : buildEmptyResponseSlice();
   const nextSlice: ResponseSlice = {
@@ -2954,7 +2951,6 @@ export const buildLocalCacheRehydrationState = ({
         cachedConviction: edited('conviction') ? undefined : cachedConviction,
         allowMaskedAnswerDraftEmpty: canReplaceMaskedAnswerWithDraftEmpty,
         allowMaskedAdditionalDraftEmpty: canReplaceMaskedAdditionalWithDraftEmpty,
-        debugLabel,
       })
     ) {
       changed = true;

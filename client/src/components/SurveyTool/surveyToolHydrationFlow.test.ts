@@ -405,7 +405,6 @@ describe('surveyToolHydrationFlow', () => {
         cloneBaseline,
         buildDraftAwareCacheHydrationState: buildDraftAwareState,
         applyLocalCacheHydrationEntryToSlice,
-        debugLabel: '[test][rehydrateLocal]',
       }),
     ).toEqual({
       nextSlice: {

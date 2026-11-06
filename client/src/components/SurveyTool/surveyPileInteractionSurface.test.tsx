@@ -1,14 +1,12 @@
 import React from 'react';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 
-import PileHologramAssistant from './PileHologramAssistant';
 import {
   PILE_LOADING_ICON_WRAP_STYLE,
   PILE_SCAN_ERROR_DETAIL_STYLE,
   buildPileCardClassName,
   buildPileFilterButtonClassName,
   buildPileFooterClassName,
-  buildPileHologramToggleClassName,
   buildPileSubmitButtonClassName,
   renderPileInteractionSurface,
   requiresQuestionStorageLogin,
@@ -114,8 +112,6 @@ const getElementChildren = (node: TestTreeNode): TestElementNode[] => {
 };
 
 const buildBaseProps = (): PileInteractionSurfaceProps => ({
-  showHologramAssistant: false,
-  toggleHologramAssistant: jest.fn(),
   showMiniBackgroundSpinner: false,
   priorResponsesHydrating: false,
   showLongLoading: false,
@@ -212,9 +208,6 @@ describe('surveyPileInteractionSurface', () => {
         scanPercent: 72,
       }),
     ).toEqual({ width: '72%' });
-    expect(buildPileHologramToggleClassName(styles, true)).toBe(
-      `${styles.pileHologramToggle} ${styles.pileHologramToggleActive}`,
-    );
     expect(resolvePileMiniLoaderStyle(true)).toEqual({ opacity: 0.5 });
     expect(resolvePileMiniLoaderStyle(false)).toEqual({ opacity: 1 });
   });
@@ -471,22 +464,6 @@ describe('surveyPileInteractionSurface', () => {
     expect(nodeHasClassName(actionsNode, 'pileActionsMenuEligible')).toBe(true);
     expect(findNodeByClassName(tree, 'pileActionMenuToggle')).not.toBeNull();
     expect(findNodeByClassName(tree, 'pileActionButtonGroup')).not.toBeNull();
-  });
-
-  it('renders the hologram takeover instead of the pile controls when active', () => {
-    const renderActiveQuestion = jest.fn(() => <div data-testid="active-question" />);
-    const tree = renderPileInteractionSurface({
-      ...buildBaseProps(),
-      showHologramAssistant: true,
-      showMiniBackgroundSpinner: true,
-      pileQuestions: [{ id: 'q1', prompt: 'Q1' }],
-      renderActiveQuestion,
-    });
-
-    expect(findElement(tree, (node) => isElementNode(node) && node.type === PileHologramAssistant)).not.toBeNull();
-    expect(findNodeByClassName(tree, 'pileControls')).toBeNull();
-    expect(findNodeByClassName(tree, 'miniSpinnerWrapper')).toBeNull();
-    expect(renderActiveQuestion).not.toHaveBeenCalled();
   });
 });
 

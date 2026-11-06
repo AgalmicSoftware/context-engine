@@ -339,11 +339,6 @@ function QueuedPhotoPreview({ file, photoName, sourceId }: QueuedPhotoPreviewPro
   );
 }
 
-// Dev-only logger
-const debug = (...args: unknown[]) => {
-  if (process.env.NODE_ENV !== 'production') cacheLog.log(...args);
-};
-
 const LazyCorpusViewer = React.lazy(() => import('../../DemoViews/CorpusViewer'));
 // CreateQuestionsAndSurveys embeds this generator, so load it lazily instead of
 // importing it back; it is only needed once questions have been generated.
@@ -421,7 +416,7 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
   const [documentURLs, setDocumentURLs] = useState<string[]>([]);
 
   // AUDIO summary-first flow state
-  const [summaryMd, setSummaryMd] = useState('');
+  const [, setSummaryMd] = useState('');
 
   const [showSessionSelector, setShowSessionSelector] = useState(false);
   const [localSessionOverrideSlug, setLocalSessionOverrideSlug] = useState<string | null>(null);
@@ -1385,7 +1380,7 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
               sessionConfig: resolvedSessionConfig,
               context: { account, providerLike: provider as ResourceKeyProviderLike, chainId: network?.id },
             });
-            const { txId, url } = await uploadMarkdownSummaryToArweave(md, {
+            const { url } = await uploadMarkdownSummaryToArweave(md, {
               sessionSlug: resolvedSessionSlug || '',
               sessionConfig: resolvedSessionConfig,
               arweaveJwk: arweaveKey?.arweaveJwk || '',

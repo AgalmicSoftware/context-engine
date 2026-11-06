@@ -30,7 +30,6 @@ export const createSurveyQuestionsRuntimeStateRuntime = (
     setState,
     stateRef,
     surveyLog,
-    t,
   } = context;
   const {
     clearAutoDecryptSweepScheduling,

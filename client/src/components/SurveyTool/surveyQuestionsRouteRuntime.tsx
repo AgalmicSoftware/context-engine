@@ -135,14 +135,11 @@ export const createSurveyQuestionsRouteRuntime = (
       visibleQuestionPool: maskedQuestionVisibility.visibleQuestionPool,
     });
     const {
-      surveyIndex,
       currentSurveyResponseState,
       questionPoolReady,
-      fullQuestionPool,
       visibleQuestionPool,
       hiddenMaskedQuestionIds,
       gatedEmptyStateReady,
-      hasHiddenMaskedQuestions,
     } = renderReadiness;
     const fullLoadingProgress: SurveyQuestionsFullLoadingProgressState = buildSurveyQuestionsFullLoadingProgressState({
       questionScanProgress: propsRef.current.questionScanProgress,

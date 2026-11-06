@@ -37,7 +37,6 @@ export const createSurveyQuestionsRuntimeMethods = (
 ): SurveyQuestionsRuntimeMethods => {
   const {
     GATE_SBT_HYDRATION_RETRY_MS,
-    QuestionsDashboard,
     applyQuestionDecryptCompletionStatusHelper,
     applyQuestionDecryptFailureStatusHelper,
     applySurveyDecryptStaleStatusHelper,
@@ -106,11 +105,9 @@ export const createSurveyQuestionsRuntimeMethods = (
     setState,
     shouldRetryMaskedQuestionRefresh,
     startQuestionDecryptAttemptStatusHelper,
-    state,
     stateRef,
     surveyLog,
     surveyResponseSubmitPort,
-    t,
     updateSubmittedSinceLastEdit,
     utils,
     verifyEncryptionIntegrity,

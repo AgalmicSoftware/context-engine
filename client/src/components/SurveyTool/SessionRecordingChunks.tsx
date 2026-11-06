@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import type { RollingTranscriptSegment } from '../../utilities/audio/rollingTranscription';
 import { buildPublicUrlPath } from '../../utilities/ui/publicUrl';
 import styles from './SessionRecordingChunks.module.scss';

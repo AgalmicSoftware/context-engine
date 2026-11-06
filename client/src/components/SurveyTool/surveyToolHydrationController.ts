@@ -627,7 +627,6 @@ export const executeSurveyLocalCacheRehydrate = async ({
       cloneBaseline,
       buildDraftAwareCacheHydrationState,
       applyLocalCacheHydrationEntryToSlice,
-      debugLabel: '[Survey][rehydrateLocal]',
     };
     const rehydrationUpdatePlan = buildRehydrationUpdatePlan({
       ...planArgs,

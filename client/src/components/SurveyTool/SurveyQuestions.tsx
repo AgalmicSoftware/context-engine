@@ -208,7 +208,6 @@ import {
 } from '../../utilities/sbt/sbtDisplayNames.js';
 import {
   EMPTY_QUESTION_POOL,
-  DEBUG_PREFILL,
   GATE_SBT_HYDRATION_RETRY_MS,
   QUESTION_TAG_DROPDOWN_ROW_STYLE,
   appendExplicitSessionHintToPath,
@@ -844,7 +843,6 @@ const SurveyQuestionsInner = (
     cachedConviction = undefined,
     allowMaskedAnswerDraftEmpty = false,
     allowMaskedAdditionalDraftEmpty = false,
-    debugLabel = '',
   }: SurveyQuestionsLocalCacheHydrationEntryArgs = {}) => {
     if (!targetSlice || !questionId) return false;
     const targetAnswers = targetSlice.answers as Record<string, SurveyQuestionsResponseFieldState>;
@@ -880,12 +878,6 @@ const SurveyQuestionsInner = (
         ...cachedAnswer,
       };
       changed = true;
-      if (debugLabel) {
-        DEBUG_PREFILL &&
-          surveyLog.log(`${debugLabel} Hydrated answer for qid=${questionId}`, {
-            fromCache: cachedAnswer,
-          });
-      }
     }
 
     if (
@@ -900,12 +892,6 @@ const SurveyQuestionsInner = (
         ...cachedAdditional,
       };
       changed = true;
-      if (debugLabel) {
-        DEBUG_PREFILL &&
-          surveyLog.log(`${debugLabel} Hydrated additional for qid=${questionId}`, {
-            fromCache: cachedAdditional,
-          });
-      }
     }
 
     if (
@@ -915,12 +901,6 @@ const SurveyQuestionsInner = (
     ) {
       targetImportance[questionId] = Number(cachedImportance);
       changed = true;
-      if (debugLabel) {
-        DEBUG_PREFILL &&
-          surveyLog.log(`${debugLabel} Hydrated importance for qid=${questionId}`, {
-            fromCache: cachedImportance,
-          });
-      }
     }
 
     if (
@@ -930,12 +910,6 @@ const SurveyQuestionsInner = (
     ) {
       targetConviction[questionId] = Number(cachedConviction);
       changed = true;
-      if (debugLabel) {
-        DEBUG_PREFILL &&
-          surveyLog.log(`${debugLabel} Hydrated conviction for qid=${questionId}`, {
-            fromCache: cachedConviction,
-          });
-      }
     }
 
     return changed;
@@ -1627,7 +1601,6 @@ const SurveyQuestionsInner = (
     scheduleGateSbtHydrationRetry,
     isResponseJsonPreviewVisible,
     scheduleJsonPreviewUpdate,
-    resolveResponseGateConfigBySlug,
     resolveEffectiveResponseGateConfig,
     resolveSessionChainId,
     buildResponseGateConfigSignature,
@@ -1780,10 +1753,6 @@ const SurveyQuestionsInner = (
     renderAnswerLockControl,
     renderQuestion,
     buildResponseGatePolicyCacheKey,
-    getQuestionRouteSessionSlug,
-    getExplicitResponseGateSessionSlug,
-    isResponseGateQuestionFlow,
-    resolveResponseGateSessionSlug,
     getResponseGatePolicy,
     getQuestionLookupMap,
     getQuestionById,
@@ -1791,7 +1760,6 @@ const SurveyQuestionsInner = (
     getQuestionEncryptionGates,
     normalizeFieldAudienceMode,
     getQuestionGateOptions,
-    buildFallbackResponseGateOptions,
     getResponseGateOptions,
     getResponseGateOptionById,
     resolveFieldEncryptionGateId,

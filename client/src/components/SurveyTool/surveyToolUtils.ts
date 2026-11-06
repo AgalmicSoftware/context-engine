@@ -213,12 +213,10 @@ export {
 } from './surveyToolScope.js';
 export {
   bumpSurveyPerfCounter,
-  DEBUG_PREFILL,
   EMPTY_QUESTION_POOL,
   GATE_SBT_HYDRATION_RETRY_MS,
   isSurveyPerfCountersEnabled,
   QUESTION_TAG_DROPDOWN_ROW_STYLE,
   scheduleMicrotask,
-  SHOW_PILE_HOLOGRAM_TOGGLE,
   surveyLog,
 } from './surveyToolRuntimeSupport.js';
