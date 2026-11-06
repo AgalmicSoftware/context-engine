@@ -536,50 +536,56 @@
   color: var(--ce-document-text) !important;
 
   &:hover,
-  &:focus {
-    background: var(--ce-status-info-text) !important;
+  &:focus,
+  &:active,
+  &:active:hover {
+    background: color-mix(in srgb, var(--ce-document-text) 10%, var(--ce-text-inverse)) !important;
     border-color: var(--ce-document-text-muted) !important;
-    color: var(--ce-overlay-base) !important;
+    color: var(--ce-document-text) !important;
   }
 }
 
 .htmlReportDownloadButton {
-  background: var(--ce-status-info) !important;
-  border: 1px solid var(--ce-status-info) !important;
-  color: var(--ce-text-inverse) !important;
+  background: var(--ce-action-primary) !important;
+  border: 1px solid var(--ce-action-primary) !important;
+  color: var(--ce-action-primary-text) !important;
 
   &:hover,
-  &:focus {
-    background: var(--ce-status-info) !important;
-    border-color: var(--ce-status-info) !important;
-    color: var(--ce-text-inverse) !important;
+  &:focus,
+  &:active,
+  &:active:hover {
+    background: var(--ce-action-primary-hover) !important;
+    border-color: var(--ce-action-primary-hover) !important;
+    color: var(--ce-action-primary-text) !important;
   }
 
   &:disabled {
-    background: var(--ce-status-info-text) !important;
-    border-color: var(--ce-status-info-text) !important;
-    color: var(--ce-document-text-muted) !important;
+    background: var(--ce-control-disabled-bg) !important;
+    border-color: var(--ce-control-disabled-bg) !important;
+    color: var(--ce-control-disabled-text) !important;
     opacity: 1 !important;
   }
 }
 
 .htmlReportGenerateButton {
   background: var(--ce-text-inverse) !important;
-  border: 1px solid var(--ce-status-info) !important;
-  color: var(--ce-status-info) !important;
+  border: 1px solid var(--ce-document-text-muted) !important;
+  color: var(--ce-document-text) !important;
   margin-top: 0.65rem;
 
   &:hover,
-  &:focus {
-    background: var(--ce-status-info-text) !important;
-    border-color: var(--ce-status-info) !important;
-    color: var(--ce-status-info) !important;
+  &:focus,
+  &:active,
+  &:active:hover {
+    background: color-mix(in srgb, var(--ce-document-text) 10%, var(--ce-text-inverse)) !important;
+    border-color: var(--ce-document-text-muted) !important;
+    color: var(--ce-document-text) !important;
   }
 
   &:disabled {
-    background: var(--ce-status-info-text) !important;
-    border-color: var(--ce-document-border) !important;
-    color: var(--ce-document-text-muted) !important;
+    background: var(--ce-control-disabled-bg) !important;
+    border-color: var(--ce-control-disabled-bg) !important;
+    color: var(--ce-control-disabled-text) !important;
     opacity: 1 !important;
   }
 }
