@@ -583,7 +583,7 @@ describe('SurveyResults module styles', () => {
       /\.surveyResultsAggregatorPanel\s*{[\s\S]*?background:\s*transparent !important;[\s\S]*?border:\s*0;[\s\S]*?border-radius:\s*var\(--ce-radius-0\);/,
     );
     expect(scss).toMatch(
-      /\.lockedBanner\s*{[\s\S]*?background:\s*color-mix\(in srgb,\s*var\(--ce-overlay-surface\) 96%,\s*transparent\);[\s\S]*?border-left:\s*4px solid color-mix\(in srgb,\s*var\(--ce-action-accent\) 70%,\s*transparent\);[\s\S]*?color:\s*var\(--ce-color-panel-text\);/,
+      /\.lockedBanner\s*{[\s\S]*?background:\s*color-mix\(in srgb,\s*var\(--ce-overlay-surface\) 96%,\s*transparent\);[\s\S]*?border-left:\s*4px solid color-mix\(in srgb,\s*var\(--ce-action-accent\) 70%,\s*transparent\);[\s\S]*?color:\s*var\(--ce-overlay-text\);/,
     );
     expect(scss).toMatch(/\.lockedBannerCaret\s*{[\s\S]*?margin:\s*8px 0 0 auto;[\s\S]*?padding:\s*0;/);
     expect(scss).toMatch(
