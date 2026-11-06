@@ -102,7 +102,7 @@ $placeholder-color: var(--ce-panel-text-muted);
   .createGroupTitle {
     font-size: clamp(1.8rem, 3.2vw, 2.35rem);
     font-weight: 700;
-    color: $clickable-color !important;
+    color: var(--ce-control-text) !important;
     margin: 0;
     font-family: var(--ce-font-mono);
     letter-spacing: 0.03em;

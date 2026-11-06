@@ -470,7 +470,14 @@ const AdminWorkerGroupsPanel = ({
           <div className={styles.panelTitle}>{title}</div>
           <div className={styles.panelSubtitle}>{description}</div>
         </div>
-        <Button size="sm" color="secondary" outline disabled={busy} onClick={() => void loadGroups()}>
+        <Button
+          className={styles.subtleActionButton}
+          size="sm"
+          color="secondary"
+          outline
+          disabled={busy}
+          onClick={() => void loadGroups()}
+        >
           Refresh
         </Button>
       </div>
@@ -512,6 +519,7 @@ const AdminWorkerGroupsPanel = ({
             {group.adminAddress ? <span>Group admin: {group.adminAddress}</span> : null}
             <div>
               <Button
+                className={styles.subtleActionButton}
                 size="sm"
                 color="secondary"
                 outline
@@ -521,6 +529,7 @@ const AdminWorkerGroupsPanel = ({
                 Edit
               </Button>{' '}
               <Button
+                className={styles.subtleActionButton}
                 size="sm"
                 color="secondary"
                 outline
@@ -530,6 +539,7 @@ const AdminWorkerGroupsPanel = ({
                 Members
               </Button>{' '}
               <Button
+                className={styles.dangerActionButton}
                 size="sm"
                 color="danger"
                 outline
@@ -712,6 +722,7 @@ const AdminWorkerGroupsPanel = ({
                 <span>{address || member.principalKey}</span>
                 {address ? (
                   <Button
+                    className={styles.dangerActionButton}
                     size="sm"
                     color="danger"
                     outline
@@ -726,6 +737,7 @@ const AdminWorkerGroupsPanel = ({
           })}
           {memberNextCursor ? (
             <Button
+              className={styles.subtleActionButton}
               size="sm"
               color="secondary"
               outline
