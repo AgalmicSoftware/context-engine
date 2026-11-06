@@ -12,6 +12,11 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- The `/docs` page and Tool Explorer descriptions match current behavior: new sessions start public, storage depends on the session, and Lit protects only the fields you lock. `/docs` shows the current deployment diagram.
+- The setup page's Results summary shows the saved analysis choice instead of always saying manual.
+- The About page's Agent Mirror Test and Agent Village links open the published post.
+- Worker setup help no longer calls the API token deploy legacy, says a blank anonymous IP budget means no cap, and says a disabled embedded helper refuses sponsored deploys.
+- Removed unreachable setup branches, the hidden hologram assistant, unused styles, and Bridge-era session flags, with no visible change.
 - Refresh the light-theme About page with colored use-case buttons, pressed selection states, teal actions, compact sections, and consistently sized Recognition logos.
 - Keep About actions on one line on narrow phones, enlarge resource touch targets, move section previews below their headings, and give the mobile video a clearly visible play icon.
 - Improve footer contrast, link directly to the CommonGround environments and Truth-Seeking AI grant program, and refresh the README feature slideshow and architecture artwork.
@@ -114,6 +119,9 @@ All notable changes to this project will be documented in this file.
 
 ### Workers — requires redeployment
 
+- Removed the retired Agent Bridge source. Agent HTTP stays in the Session Worker; admin metrics report `sessionsWithAgentActivity`, and agent on-chain answers record source `session-agent`.
+- `telegramResponseExportAllowedAddresses` no longer grants export access. Nothing writes this key, and no live session's public config carries it.
+- Removed unread Telegram fields and unused Worker exports. Stored record fields and KV prefixes are unchanged.
 - Anonymous visitors have no daily per-IP request limit unless the session sets one. The per-wallet daily limit no longer doubles as one, so a room sharing one venue connection isn't cut off.
 - A transcription reply with no readable text returns 502, so the browser keeps the chunk's audio and retries. Earlier Workers report such a reply as silence.
 - Agent submissions count test-ETH payouts against the per-wallet daily faucet limit they share with participants. Past the limit, the submission carries on without funding.
@@ -169,6 +177,8 @@ All notable changes to this project will be documented in this file.
 
 ### Local tooling
 
+- `npm run test:worker:agent` is the agent test command; `test:worker:agent-bridge` is gone. Public history replay keeps the audited cutover for old commits and accepts only a complete retirement of the Bridge subtree.
+- Corrected documentation across the README, guides, spec, private runbooks and companion docs, and deleted finished audit notes. Three scripts now use kebab-case names.
 - `deploy:evm` passes the RPC URL to `forge script`, which ignored `ETH_RPC_URL` and only simulated.
 - `deploy:evm` stops with an error instead of printing wrong addresses when another transaction from the deployer moves its nonce.
 - The public package no longer lists `ai:playwright-server`, whose script the public tree leaves out.
