@@ -139,9 +139,6 @@ const createRefs = () => ({
   workerSecretsEnabledRef: {
     current: false,
   },
-  persistWorkerSecretsRef: {
-    current: true,
-  },
 });
 
 const buildSponsoredBundle = () => ({
@@ -188,9 +185,6 @@ const renderAppliedBundleLifecycle = async () => {
   const updateWorkerSecretState = jest.fn((nextState = {}) => {
     if (Object.prototype.hasOwnProperty.call(nextState, 'workerSecretsEnabled')) {
       refs.workerSecretsEnabledRef.current = !!nextState.workerSecretsEnabled;
-    }
-    if (Object.prototype.hasOwnProperty.call(nextState, 'persistWorkerSecrets')) {
-      refs.persistWorkerSecretsRef.current = !!nextState.persistWorkerSecrets;
     }
   });
 

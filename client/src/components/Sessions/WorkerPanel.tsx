@@ -1,23 +1,13 @@
 /** @file WorkerPanel.tsx */
 import React from 'react';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faExternalLinkAlt } from '@fortawesome/free-solid-svg-icons';
 import styles from './SessionWizard.module.scss';
-import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import WorkerConnectionSection from './WorkerConnectionSection';
 import WorkerDeploySection, { type WorkerDeploySectionProps } from './WorkerDeploySection';
 import WorkerSecretsSection from './WorkerSecretsSection';
-import { normalizeWorkerUrl as normalizeWorkerAuthUrl } from '../../utilities/worker/workerAuth.js';
 import { toStr } from '../../utilities/shared/primitives.js';
-import { PUBLIC_GITHUB_BRANCH, PUBLIC_REPO_URL } from '../../variables/publicRepoMetadata.js';
-import type { SessionWizardDeployStatusDisplayState } from './sessionWizardDeployErrors';
 import type { SessionWizardVerifiedWorkerConnection } from './sessionWizardNativeWorkerVerification';
 import type { SessionWizardTooltipRenderOptions } from './SessionWizardInfoTooltip';
 import type { SessionWizardRenderField } from './sessionWizardFieldDescriptors';
-
-const SESSION_CORS_WORKER_SOURCE_URL = `${PUBLIC_REPO_URL}/tree/${PUBLIC_GITHUB_BRANCH}/workers/sessionCorsWorker`;
-const DEPLOY_HELPER_SOURCE_URL = `${PUBLIC_REPO_URL}/tree/${PUBLIC_GITHUB_BRANCH}/workers/deploy-helper`;
-const SESSION_CORS_WORKER_DOCS_URL = `${PUBLIC_REPO_URL}/blob/${PUBLIC_GITHUB_BRANCH}/docs/session-cors-worker.md`;
 
 type DraftState = {
   corsWorkerUrl?: string;
@@ -34,8 +24,6 @@ type DeployForm = {
 export type WorkerPanelProps = {
   allowNativeWorkerVerification?: boolean;
   agentHttpEnabled?: boolean;
-  isNormalMode: boolean;
-  t?: (key: string) => string;
   renderSessionWizardInfoTooltip?: (props: {
     id?: string;
     content?: React.ReactNode;
@@ -43,17 +31,8 @@ export type WorkerPanelProps = {
     testId?: string;
     ariaLabel?: string;
   }) => React.ReactNode;
-  /** The page shows the Cloudflare token and starts deployment itself. */
-  pageOwnsDeployToken?: boolean;
-  showSharedWorkerChoice: boolean;
   workerMode: string;
-  onWorkerModeChange: (mode: string) => void;
-  setWorkerUrlAutoFilled: (value: boolean) => void;
-  updateDraftValue: (path: string[], value: string) => void;
-  getDefaultWorkerUrl: () => string;
   draft?: DraftState;
-  deployWorkerUrl?: string;
-  deployComplete: boolean;
   deployVerifiedInUi?: boolean;
   showUserPaidUsage?: boolean;
   workerSecretsEnabled: boolean;
@@ -74,8 +53,6 @@ export type WorkerPanelProps = {
   shouldShowDeployHelperUrlInput: boolean;
   deployHelperUrl: string;
   setDeployHelperUrl: (value: string) => void;
-  bundleMode: string;
-  setBundleMode: (mode: string) => void;
   normalModeBundleUrl: string;
   normalModeBundleHelpText: string;
   showNormalModeManualBundleControls: boolean;
@@ -89,16 +66,10 @@ export type WorkerPanelProps = {
   bundleFile?: File | null;
   normalModeManualBundleHelpText: string;
   localWorkerBundleFallbackFilePath: string;
-  advancedBundleFileInputRef?: React.Ref<HTMLInputElement>;
-  showSponsoredDeployAccessNotice: boolean;
   account?: string;
-  toggleLoginModal?: WorkerDeploySectionProps['toggleLoginModal'];
   resolvedActiveSessionSlug?: string;
-  setDeployForm: React.Dispatch<React.SetStateAction<DeployForm>>;
   operatorRecoveryKey?: WorkerDeploySectionProps['operatorRecoveryKey'];
   setOperatorRecoveryKey?: WorkerDeploySectionProps['setOperatorRecoveryKey'];
-  handleDeployWorker: () => void;
-  deployStatusDisplayState: SessionWizardDeployStatusDisplayState;
   showWorkerUrlField: boolean;
   displayedWorkerUrl: string;
   renderField: SessionWizardRenderField;
@@ -113,19 +84,9 @@ export type WorkerPanelProps = {
 const WorkerPanel = ({
   allowNativeWorkerVerification = false,
   agentHttpEnabled = false,
-  isNormalMode,
-  t,
   renderSessionWizardInfoTooltip,
-  pageOwnsDeployToken = false,
-  showSharedWorkerChoice,
   workerMode,
-  onWorkerModeChange,
-  setWorkerUrlAutoFilled,
-  updateDraftValue,
-  getDefaultWorkerUrl,
   draft = {},
-  deployWorkerUrl,
-  deployComplete,
   deployVerifiedInUi,
   showUserPaidUsage = false,
   workerSecretsEnabled,
@@ -146,8 +107,6 @@ const WorkerPanel = ({
   shouldShowDeployHelperUrlInput,
   deployHelperUrl,
   setDeployHelperUrl,
-  bundleMode,
-  setBundleMode,
   normalModeBundleUrl,
   normalModeBundleHelpText,
   showNormalModeManualBundleControls,
@@ -161,16 +120,10 @@ const WorkerPanel = ({
   bundleFile,
   normalModeManualBundleHelpText,
   localWorkerBundleFallbackFilePath,
-  advancedBundleFileInputRef,
-  showSponsoredDeployAccessNotice,
   account,
-  toggleLoginModal,
   resolvedActiveSessionSlug,
-  setDeployForm,
   operatorRecoveryKey,
   setOperatorRecoveryKey,
-  handleDeployWorker,
-  deployStatusDisplayState,
   showWorkerUrlField,
   displayedWorkerUrl,
   renderField,
@@ -181,89 +134,22 @@ const WorkerPanel = ({
   nativeTemplateSetupIdentity,
   onNativeTemplateSetupGenerated,
 }: WorkerPanelProps) => {
-  const translate = typeof t === 'function' ? t : (key: string) => key;
   const renderInfoTooltip =
     typeof renderSessionWizardInfoTooltip === 'function' ? renderSessionWizardInfoTooltip : () => null;
   const renderResource = typeof renderResourceCard === 'function' ? renderResourceCard : () => null;
-
-  const handleDefaultWorkerModeClick = () => {
-    onWorkerModeChange('default');
-    setWorkerUrlAutoFilled(false);
-    updateDraftValue(['corsWorkerUrl'], getDefaultWorkerUrl());
-  };
-
-  const handleCustomWorkerModeClick = () => {
-    onWorkerModeChange('custom');
-    setWorkerUrlAutoFilled(false);
-    const normalizedConfigured = normalizeWorkerAuthUrl(toStr(draft.corsWorkerUrl).trim());
-    const normalizedDefault = normalizeWorkerAuthUrl(getDefaultWorkerUrl());
-    const normalizedDeployed = normalizeWorkerAuthUrl(toStr(deployWorkerUrl).trim());
-    if (!deployComplete) {
-      if (normalizedConfigured) updateDraftValue(['corsWorkerUrl'], '');
-      return;
-    }
-    if ((!normalizedConfigured || normalizedConfigured === normalizedDefault) && normalizedDeployed) {
-      updateDraftValue(['corsWorkerUrl'], normalizedDeployed);
-    }
-  };
 
   return (
     <section id="session-wizard-section-worker">
       <div className={styles.panelBody}>
         {sessionModeProfileWorkerControl}
         <div className={styles.workerModeRow}>
-          {!showSharedWorkerChoice ? (
-            <div className={styles.workerModeCopy}>
-              <div className={styles.workerModeTitle}>Bring your own worker</div>
-              <div className={styles.workerModeSummary}>Deploy your own worker or paste a worker URL you control.</div>
-            </div>
-          ) : (
-            !isNormalMode && (
-              <div className={styles.workerModeCopy}>
-                <div className={styles.workerModeTitle}>How should this session run?</div>
-                <div className={styles.workerModeSummary}>
-                  {workerMode === 'default' ? 'Shared hosted worker' : 'Custom worker deployment'}
-                </div>
-              </div>
-            )
-          )}
-          {showSharedWorkerChoice && (
-            <>
-              <div className={styles.workerModePills} data-testid={E2E_TESTIDS.WIZARD_WORKER_MODE_TOGGLE}>
-                <button
-                  type="button"
-                  className={`${styles.workerModePill} ${workerMode === 'default' ? styles.workerModePillActive : ''}`}
-                  data-testid={E2E_TESTIDS.WIZARD_WORKER_MODE_BUTTON}
-                  data-ce-worker-mode="default"
-                  onClick={handleDefaultWorkerModeClick}
-                >
-                  Using Default Worker
-                </button>
-                <button
-                  type="button"
-                  className={`${styles.workerModePill} ${workerMode !== 'default' ? styles.workerModePillActive : ''}`}
-                  data-testid={E2E_TESTIDS.WIZARD_WORKER_MODE_BUTTON}
-                  data-ce-worker-mode="custom"
-                  onClick={handleCustomWorkerModeClick}
-                >
-                  Use My Own
-                </button>
-              </div>
-              {renderInfoTooltip({
-                id: 'gw-worker-mode-tip',
-                content:
-                  'Toggle between the shared hosted worker and deploying your own. Using your own requires a free Cloudflare account (or Vercel Edge, AWS Lambda@Edge, Fly.io, Render, Deno Deploy). Deploy as a module worker with Node.js + npm deps.',
-                placement: 'right',
-                testId: 'ce-wizard-worker-tooltip-gw-worker-mode-tip',
-                ariaLabel: 'Worker mode info',
-              })}
-            </>
-          )}
+          <div className={styles.workerModeCopy}>
+            <div className={styles.workerModeTitle}>Bring your own worker</div>
+            <div className={styles.workerModeSummary}>Deploy your own worker or paste a worker URL you control.</div>
+          </div>
         </div>
         <WorkerSecretsSection
           showUserPaidUsage={showUserPaidUsage}
-          isNormalMode={isNormalMode}
-          translate={translate}
           renderInfoTooltip={renderInfoTooltip}
           workerSecretsEnabled={workerSecretsEnabled}
           setWorkerSecretsEnabled={setWorkerSecretsEnabled}
@@ -279,11 +165,8 @@ const WorkerPanel = ({
           defaultAllowedOrigins={defaultAllowedOrigins}
         />
         <WorkerDeploySection
-          pageOwnsDeployToken={pageOwnsDeployToken}
           agentHttpEnabled={agentHttpEnabled}
           allowNativeWorkerVerification={allowNativeWorkerVerification}
-          isNormalMode={isNormalMode}
-          renderInfoTooltip={renderInfoTooltip}
           workerMode={workerMode}
           shouldUseSponsoredAutoDeployFlow={shouldUseSponsoredAutoDeployFlow}
           deployForm={deployForm}
@@ -291,8 +174,6 @@ const WorkerPanel = ({
           shouldShowDeployHelperUrlInput={shouldShowDeployHelperUrlInput}
           deployHelperUrl={deployHelperUrl}
           setDeployHelperUrl={setDeployHelperUrl}
-          bundleMode={bundleMode}
-          setBundleMode={setBundleMode}
           normalModeBundleUrl={normalModeBundleUrl}
           normalModeBundleHelpText={normalModeBundleHelpText}
           showNormalModeManualBundleControls={showNormalModeManualBundleControls}
@@ -306,16 +187,10 @@ const WorkerPanel = ({
           bundleFile={bundleFile}
           normalModeManualBundleHelpText={normalModeManualBundleHelpText}
           localWorkerBundleFallbackFilePath={localWorkerBundleFallbackFilePath}
-          advancedBundleFileInputRef={advancedBundleFileInputRef}
-          showSponsoredDeployAccessNotice={showSponsoredDeployAccessNotice}
           account={account}
-          toggleLoginModal={toggleLoginModal}
           cloudflareTokenSlug={toStr(draft.slug || resolvedActiveSessionSlug).trim()}
-          setDeployForm={setDeployForm}
           operatorRecoveryKey={operatorRecoveryKey}
           setOperatorRecoveryKey={setOperatorRecoveryKey}
-          handleDeployWorker={handleDeployWorker}
-          deployStatusDisplayState={deployStatusDisplayState}
           deployVerifiedInUi={deployVerifiedInUi}
           displayedWorkerUrl={displayedWorkerUrl}
           onNativeWorkerVerified={onNativeWorkerVerified}
@@ -330,53 +205,7 @@ const WorkerPanel = ({
           renderField={renderField}
           workerUrlAutoFilled={workerUrlAutoFilled}
           renderInfoTooltip={renderInfoTooltip}
-          showSharedWorkerChoice={showSharedWorkerChoice}
-          onResetToDefault={() => {
-            setWorkerUrlAutoFilled(false);
-            updateDraftValue(['corsWorkerUrl'], getDefaultWorkerUrl());
-          }}
         />
-
-        {!isNormalMode && (
-          <div className={styles.workerIntro}>
-            <div className={styles.workerIntroTitle}>Worker Deployment</div>
-            <p className={styles.workerIntroCopy}>
-              Sessions use a Cloudflare Worker for CORS proxy, AI, and faucet services.
-            </p>
-            <p className={styles.workerIntroCopy}>
-              The default hosted worker is used automatically unless a custom worker URL is configured.
-            </p>
-            <div className={styles.workerLinks}>
-              <a
-                href={SESSION_CORS_WORKER_SOURCE_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={styles.workerDocLink}
-              >
-                Worker source
-                <FontAwesomeIcon icon={faExternalLinkAlt} />
-              </a>
-              <a
-                href={DEPLOY_HELPER_SOURCE_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={styles.workerDocLink}
-              >
-                Deploy helper
-                <FontAwesomeIcon icon={faExternalLinkAlt} />
-              </a>
-              <a
-                href={SESSION_CORS_WORKER_DOCS_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={styles.workerDocLink}
-              >
-                Worker docs
-                <FontAwesomeIcon icon={faExternalLinkAlt} />
-              </a>
-            </div>
-          </div>
-        )}
       </div>
     </section>
   );

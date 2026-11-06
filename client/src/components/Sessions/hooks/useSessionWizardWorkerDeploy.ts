@@ -112,7 +112,6 @@ const useSessionWizardWorkerDeploy = ({
   getCurrentWorkerSecrets = () => ({}),
   applyWorkerSecretsUpdate = () => undefined,
   getMissingWorkerSecretsForDeploy = () => [],
-  resolveWorkerBaseUrl = () => '',
   resolveWorkerFaucetConfig = () => ({}),
   parseAllowOriginsInput = () => [],
   signTypedAdminAction = async () => ({}),
@@ -120,7 +119,6 @@ const useSessionWizardWorkerDeploy = ({
   updateDraftValue = () => undefined,
   updateDeploymentState = () => undefined,
   clearSelectedBundleFile = () => undefined,
-  clearCachedWorkerSecretsAfterDeploy = () => undefined,
   verifyPublicWorkerDeployment = verifySessionWizardWorkerPublicDeployment,
 }: UseSessionWizardWorkerDeployOptions = {}) => {
   const { runtimeRef, resolvedWalletAccountRef, sponsoredBundleAppliedBundleRef } = refs;
@@ -269,9 +267,6 @@ const useSessionWizardWorkerDeploy = ({
             getMissingWorkerSecretsForDeploy,
           }).ready;
         effectiveBundleMode = resolveSessionWizardDeployBundleMode({
-          wizardMode: runtime.wizardMode,
-          bundleMode: runtime.bundleMode,
-          bundleUrl: currentDeployForm.bundleUrl,
           sponsoredAutoDeployReady: forceSponsoredAutoDeploy || sponsoredAutoDeployReady,
           forceSponsoredAutoDeploy,
           forceManualBundleFile: runtime.forceManualBundleFile,
@@ -288,15 +283,9 @@ const useSessionWizardWorkerDeploy = ({
           !!sponsoredDeployGrantToken &&
           !!sponsoredBootstrapWorkerUrl;
         if (!usesSponsoredDeploy && effectiveBundleMode === 'upload' && !runtime.bundleFile) {
-          throw new Error(
-            effectiveBundleMode === 'upload' && runtime.wizardMode === 'normal'
-              ? 'Upload a worker bundle file before deploy.'
-              : 'Upload a worker bundle file or switch to bundle URL.',
-          );
+          throw new Error('Upload a worker bundle file before deploy.');
         }
         const requestedBundleUrl = resolveSessionWizardBundleUrlForMode({
-          wizardMode: runtime.wizardMode,
-          bundleUrl: currentDeployForm.bundleUrl,
           normalModeBundleUrlOverride: runtime.normalModeBundleUrlOverride,
         });
         const { bundleText, bundleUrl, bundleManifestUrl, bundleSha256 } = usesSponsoredDeploy
@@ -938,7 +927,6 @@ const useSessionWizardWorkerDeploy = ({
         // Manual bundle uploads are one-off retries; clear the cached file so
         // later URL-mode deploys and sponsored publish flows don't reuse stale bytes.
         clearSelectedBundleFile();
-        clearCachedWorkerSecretsAfterDeploy();
         return {
           ok: true,
           workerUrl: resolvedDeployWorkerUrl,
@@ -957,7 +945,6 @@ const useSessionWizardWorkerDeploy = ({
           !usesSponsoredDeploy &&
           shouldForceSessionWizardNormalModeManualBundleRetry({
             err,
-            wizardMode: runtime.wizardMode,
             effectiveBundleMode,
             hasBundleFile: !!runtime.bundleFile,
           })
@@ -979,7 +966,6 @@ const useSessionWizardWorkerDeploy = ({
       operatorRecoveryKey,
       setOperatorRecoveryKey,
       presentRecoveryKey,
-      clearCachedWorkerSecretsAfterDeploy,
       clearSelectedBundleFile,
       applyWorkerSecretsUpdate,
       getCurrentWorkerSecrets,

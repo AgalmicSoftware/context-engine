@@ -40,7 +40,6 @@ describe('useSessionWizardWorkerState', () => {
 
     expect(result.current.workerMode).toBe('default');
     expect(result.current.workerSecretsEnabled).toBe(true);
-    expect(result.current.persistWorkerSecrets).toBe(false);
     // Secret persistence is unsupported, so no setter is offered.
     expect(result.current).not.toHaveProperty('setPersistWorkerSecrets');
     expect(result.current.deployHelperUrl).toBe('https://deploy-helper.example');
@@ -50,7 +49,6 @@ describe('useSessionWizardWorkerState', () => {
       adminAddress: undefined,
       bundleUrl: 'https://bundle.example/session-worker.js',
     });
-    expect(result.current.bundleMode).toBe('url');
     expect(result.current.deployStatus).toBe('');
     expect(result.current.deployInFlight).toBe(false);
     expect(result.current.deployComplete).toBe(false);
@@ -65,7 +63,6 @@ describe('useSessionWizardWorkerState', () => {
     const { result } = renderWorkerState({
       cachedWizard: {
         workerSecretsEnabled: false,
-        persistWorkerSecrets: false,
         deployComplete: true,
         deployWorkerUrl: 'worker.example/path///',
         workerRequirementProof: {
@@ -99,7 +96,6 @@ describe('useSessionWizardWorkerState', () => {
     });
 
     expect(result.current.workerSecretsEnabled).toBe(false);
-    expect(result.current.persistWorkerSecrets).toBe(false);
     expect(result.current.deployComplete).toBe(false);
     expect(result.current.deployWorkerUrl).toBe('https://worker.example/path');
     expect(result.current.workerRequirementProof).toBeNull();
@@ -145,13 +141,11 @@ describe('useSessionWizardWorkerState', () => {
     expect(result.current.nativeTemplateSetupIdentity).toBe(marker);
   });
 
-  it('uses upload bundle mode when no hosted worker bundle default exists', () => {
+  it('leaves the bundle URL blank when no hosted worker bundle default exists', () => {
     const { result } = renderWorkerState({
       workerBundleUrlDefault: '',
     });
 
-    expect(result.current.bundleMode).toBe('upload');
-    expect(result.current.persistWorkerSecrets).toBe(false);
     expect(result.current.deployForm.bundleUrl).toBe('');
   });
 

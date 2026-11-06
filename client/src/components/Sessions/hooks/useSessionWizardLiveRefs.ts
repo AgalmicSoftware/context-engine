@@ -21,8 +21,6 @@ export interface UseSessionWizardLiveRefsOptions<
   provisionedSponsoredContextRef: MutableRefObject<TProvisionedSponsoredContext>;
   workerSecretsEnabled: boolean;
   workerSecretsEnabledRef: MutableRefObject<boolean>;
-  persistWorkerSecrets: boolean;
-  persistWorkerSecretsRef: MutableRefObject<boolean>;
   workerSecrets: TWorkerSecrets;
   workerSecretsRef: MutableRefObject<TWorkerSecrets>;
 }
@@ -47,8 +45,6 @@ const useSessionWizardLiveRefs = <
   provisionedSponsoredContextRef,
   workerSecretsEnabled,
   workerSecretsEnabledRef,
-  persistWorkerSecrets,
-  persistWorkerSecretsRef,
   workerSecrets,
   workerSecretsRef,
 }: UseSessionWizardLiveRefsOptions<TDraft, TDeployForm, TProvisionedSponsoredContext, TWorkerSecrets>) => {
@@ -82,10 +78,6 @@ const useSessionWizardLiveRefs = <
   useEffect(() => {
     workerSecretsEnabledRef.current = workerSecretsEnabled;
   }, [workerSecretsEnabled, workerSecretsEnabledRef]);
-
-  useEffect(() => {
-    persistWorkerSecretsRef.current = persistWorkerSecrets;
-  }, [persistWorkerSecrets, persistWorkerSecretsRef]);
 
   useEffect(() => {
     workerSecretsRef.current = workerSecrets;

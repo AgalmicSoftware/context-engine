@@ -135,17 +135,13 @@ const createControllerHarness = (overrides: Record<string, unknown> = {}) => {
         typeof draftFactoryOverride === 'function'
           ? draftFactoryOverride()
           : baseDraft((draftOverride as Record<string, unknown> | undefined) || {}),
-      wizardMode: 'advanced',
       deployComplete: false,
       deployWorkerUrl: '',
-      workerMode: 'custom',
       workerSecrets,
       workerSecretsEnabled: true,
       workerAllowOrigins: 'https://app.example.test, https://admin.example.test',
       provisionedSponsoredContext: null,
-      effectivePersistWorkerSecrets: false,
       registryChainId: 11155420,
-      allowNormalModeSharedHostedWorker: true,
       getCurrentWorkerSecrets: jest.fn(() => workerSecrets),
       getCurrentEnabledWorkerSecrets: jest.fn(() => workerSecrets),
       applyWorkerSecretsUpdate:
@@ -405,10 +401,8 @@ describe('useSessionWizardWorkerSecretsController', () => {
         provider: 'injected-provider',
         network: { id: 11155420 },
         draft: baseDraft(),
-        wizardMode: 'advanced',
         deployComplete: false,
         deployWorkerUrl: '',
-        workerMode: 'custom',
         workerSecrets: baseWorkerSecrets(),
         workerSecretsEnabled: true,
         workerAllowOrigins: '',
@@ -420,9 +414,7 @@ describe('useSessionWizardWorkerSecretsController', () => {
             [SPONSORED_FIELD_KEYS.lit]: '1',
           },
         },
-        effectivePersistWorkerSecrets: false,
         registryChainId: 11155420,
-        allowNormalModeSharedHostedWorker: true,
         getCurrentWorkerSecrets: jest.fn(() => baseWorkerSecrets()),
         getCurrentEnabledWorkerSecrets: jest.fn(() => baseWorkerSecrets()),
         applyWorkerSecretsUpdate: jest.fn(),
@@ -457,7 +449,7 @@ describe('useSessionWizardWorkerSecretsController', () => {
     expect(updateDraftValue).toHaveBeenCalledWith(['faucet', 'encryptedPrivateKey'], '');
   });
 
-  it('clears cached Arweave JWKs only when local secret persistence is disabled', () => {
+  it('clears cached Arweave JWKs from worker secrets', () => {
     const { result, applyWorkerSecretsUpdate } = createControllerHarness();
 
     act(() => {
@@ -471,15 +463,6 @@ describe('useSessionWizardWorkerSecretsController', () => {
         openaiKey: 'cached-openai',
       },
     );
-
-    const persisted = createControllerHarness({
-      effectivePersistWorkerSecrets: true,
-    });
-    act(() => {
-      persisted.result.current.clearCachedArweaveJwkAfterUpload();
-    });
-
-    expect(persisted.applyWorkerSecretsUpdate).not.toHaveBeenCalled();
   });
 
   it('signs admin actions with normalized worker URL, slug, and account context', async () => {

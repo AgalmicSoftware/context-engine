@@ -3,23 +3,12 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import WorkerPanel, { WorkerPanelProps } from './WorkerPanel';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 
-const t = (key: string) => key;
-
 const renderWorkerPanel = (props: Partial<WorkerPanelProps> = {}) =>
   render(
     <WorkerPanel
-      isNormalMode
-      t={t}
       renderSessionWizardInfoTooltip={() => null}
-      showSharedWorkerChoice
       workerMode="default"
-      onWorkerModeChange={() => {}}
-      setWorkerUrlAutoFilled={() => {}}
-      updateDraftValue={() => {}}
-      getDefaultWorkerUrl={() => 'https://default-worker.example'}
       draft={{ corsWorkerUrl: '', slug: 'demo-session' }}
-      deployWorkerUrl=""
-      deployComplete={false}
       workerSecretsEnabled
       setWorkerSecretsEnabled={() => {}}
       clearWorkerSecretFields={() => {}}
@@ -38,8 +27,6 @@ const renderWorkerPanel = (props: Partial<WorkerPanelProps> = {}) =>
       shouldShowDeployHelperUrlInput={false}
       deployHelperUrl=""
       setDeployHelperUrl={() => {}}
-      bundleMode="upload"
-      setBundleMode={() => {}}
       normalModeBundleUrl=""
       normalModeBundleHelpText=""
       showNormalModeManualBundleControls={false}
@@ -53,17 +40,8 @@ const renderWorkerPanel = (props: Partial<WorkerPanelProps> = {}) =>
       bundleFile={null}
       normalModeManualBundleHelpText=""
       localWorkerBundleFallbackFilePath="/dist/sessionCorsWorker.bundle.js"
-      advancedBundleFileInputRef={{ current: null }}
-      showSponsoredDeployAccessNotice={false}
       account=""
       resolvedActiveSessionSlug="demo-session"
-      setDeployForm={() => {}}
-      handleDeployWorker={() => {}}
-      deployStatusDisplayState={{
-        deployButtonDisabled: false,
-        deployStatusText: '',
-        isError: false,
-      }}
       showWorkerUrlField={false}
       displayedWorkerUrl=""
       renderField={() => null}
@@ -79,12 +57,6 @@ describe('WorkerPanel', () => {
     // Hosting's More shows it inline: no panel header to collapse.
     expect(document.getElementById('session-wizard-section-worker')).toBeInTheDocument();
     expect(screen.queryByTestId('ce-wizard-worker-panel-toggle')).not.toBeInTheDocument();
-  });
-
-  it('preserves the worker mode toggle test id', () => {
-    renderWorkerPanel();
-
-    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_MODE_TOGGLE)).toBeInTheDocument();
   });
 
   it('labels independent authenticated wallet and anonymous IP request limits', () => {
@@ -108,24 +80,10 @@ describe('WorkerPanel', () => {
   });
 
   it('omits the planned shared hosted worker sentence from the custom-worker summary', () => {
-    renderWorkerPanel({ showSharedWorkerChoice: false });
+    renderWorkerPanel();
 
     expect(screen.getByText('Deploy your own worker or paste a worker URL you control.')).toBeInTheDocument();
     expect(screen.queryByText(/Shared hosted worker support is planned separately/i)).not.toBeInTheDocument();
-  });
-
-  it('renders worker mode pills and fires the mode-change handler', () => {
-    const onWorkerModeChange = jest.fn();
-    const setWorkerUrlAutoFilled = jest.fn();
-    renderWorkerPanel({ onWorkerModeChange, setWorkerUrlAutoFilled });
-
-    expect(screen.getByText('Using Default Worker')).toBeInTheDocument();
-    expect(screen.getByText('Use My Own')).toBeInTheDocument();
-
-    fireEvent.click(screen.getByText('Use My Own'));
-
-    expect(onWorkerModeChange).toHaveBeenCalledWith('custom');
-    expect(setWorkerUrlAutoFilled).toHaveBeenCalledWith(false);
   });
 
   it('passes the template setup marker through to native Worker verification', async () => {
@@ -140,7 +98,6 @@ describe('WorkerPanel', () => {
     });
     renderWorkerPanel({
       allowNativeWorkerVerification: true,
-      isNormalMode: false,
       workerMode: 'custom',
       account: adminAddress,
       draft: { corsWorkerUrl: '', slug: 'demo-sh' },

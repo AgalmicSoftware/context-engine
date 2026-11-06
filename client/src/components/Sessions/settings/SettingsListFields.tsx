@@ -1,4 +1,3 @@
-import React from 'react';
 import { Input } from 'reactstrap';
 
 import { SetupCheck, SetupField, setupHelpId } from '../setup/SetupPrimitives';

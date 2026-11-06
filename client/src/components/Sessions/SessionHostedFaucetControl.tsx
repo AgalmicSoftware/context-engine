@@ -1,4 +1,3 @@
-import React from 'react';
 import { Input, Label } from 'reactstrap';
 import type { UnknownRecord } from '../../utilities/session/sessionTypes';
 import { describeHostedFaucetSetup, faucetAddressFromKey, setHostedFaucetEnabled } from './sessionWizardHostedFaucet';

@@ -1,5 +1,5 @@
 /** @file SetupWithAi.tsx: "Set up with your AI" on /new. */
-import React, { useContext, useState } from 'react';
+import { useContext, useState } from 'react';
 import { ReactReduxContext } from 'react-redux';
 
 import SessionWizardInfoTooltip from '../SessionWizardInfoTooltip';

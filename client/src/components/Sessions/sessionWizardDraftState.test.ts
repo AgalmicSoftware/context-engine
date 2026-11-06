@@ -212,7 +212,6 @@ describe('sessionWizardDraftState', () => {
           deployComplete: false,
         },
         defaultTemplate,
-        normalModeSharedHostedWorkerEnabled: false,
         sourceEmbeddedDeployHelperDefault: true,
       }),
     ).toEqual(
@@ -233,7 +232,6 @@ describe('sessionWizardDraftState', () => {
           deployComplete: true,
         },
         defaultTemplate,
-        normalModeSharedHostedWorkerEnabled: false,
         sourceEmbeddedDeployHelperDefault: true,
       }),
     ).toEqual(
@@ -561,7 +559,6 @@ describe('sessionWizardDraftState', () => {
           memberVisibility: 'session',
         },
       ],
-      effectivePersistWorkerSecrets: false,
       workerLimitPerWallet: '7',
       workerLimitPerAnonymousIp: '0',
       workerSecrets: {
@@ -657,7 +654,6 @@ describe('sessionWizardDraftState', () => {
     };
 
     const payload = buildSessionWizardCacheWritePayload({
-      effectivePersistWorkerSecrets: true,
       workerSecrets,
     });
 

@@ -34,7 +34,6 @@ describe('sessionWizardFieldDescriptors', () => {
         key: 'slug',
         path: [],
         currentPath: ['slug'],
-        wizardMode: 'normal',
       }),
     ).toBe(true);
 
@@ -43,7 +42,6 @@ describe('sessionWizardFieldDescriptors', () => {
         key: 'apiKey',
         path: ['ai', 'providers', 'openai'],
         currentPath: ['ai', 'providers', 'openai', 'apiKey'],
-        wizardMode: 'advanced',
       }),
     ).toBe(true);
 
@@ -52,7 +50,6 @@ describe('sessionWizardFieldDescriptors', () => {
         key: 'chainId',
         path: ['contracts', 'surveys'],
         currentPath: ['contracts', 'surveys', 'chainId'],
-        wizardMode: 'advanced',
       }),
     ).toBe(true);
 
@@ -61,7 +58,6 @@ describe('sessionWizardFieldDescriptors', () => {
         key: 'sessionName',
         path: [],
         currentPath: ['sessionName'],
-        wizardMode: 'advanced',
       }),
     ).toBe(false);
 
@@ -70,7 +66,6 @@ describe('sessionWizardFieldDescriptors', () => {
         key: 'provider',
         path: ['interviewMode'],
         currentPath: ['interviewMode', 'provider'],
-        wizardMode: 'normal',
       }),
     ).toBe(true);
   });
@@ -83,7 +78,6 @@ describe('sessionWizardFieldDescriptors', () => {
           key,
           path: [],
           currentPath: [key],
-          wizardMode: 'normal',
           modeFieldPolicy: pureWorkerPolicy,
         }),
       ).toBe(true);
@@ -94,7 +88,6 @@ describe('sessionWizardFieldDescriptors', () => {
         key: 'sessionEndsAt',
         path: [],
         currentPath: ['sessionEndsAt'],
-        wizardMode: 'normal',
         modeFieldPolicy: pureWorkerPolicy,
       }),
     ).toBe(false);
@@ -104,7 +97,6 @@ describe('sessionWizardFieldDescriptors', () => {
         key: 'corsWorkerUrl',
         path: [],
         currentPath: ['corsWorkerUrl'],
-        wizardMode: 'normal',
         modeFieldPolicy: pureWorkerPolicy,
       }),
     ).toBe(false);
@@ -119,7 +111,6 @@ describe('sessionWizardFieldDescriptors', () => {
           key,
           path: [...path],
           currentPath: [...path, key],
-          wizardMode: 'advanced',
         }),
       ).toBe(true);
     }
@@ -134,9 +125,7 @@ describe('sessionWizardFieldDescriptors', () => {
       showAgentSessionWrapped: true,
     };
     const rawLabels = Object.keys(buildSessionWizardDefaultTemplate())
-      .filter(
-        (key) => !shouldHideSessionWizardField({ key, wizardMode: 'advanced', modeFieldPolicy: everyOptionPolicy }),
-      )
+      .filter((key) => !shouldHideSessionWizardField({ key, modeFieldPolicy: everyOptionPolicy }))
       .filter((key) => getSessionWizardFieldLabel(key, key) === key);
 
     expect(rawLabels).toEqual([]);

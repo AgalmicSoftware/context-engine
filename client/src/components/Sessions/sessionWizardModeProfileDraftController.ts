@@ -37,17 +37,6 @@ type DraftWithSelectedModeProfile<Draft extends SessionWizardModeDraft> = DraftW
 const isRecord = (value: unknown): value is UnknownRecord =>
   !!value && typeof value === 'object' && !Array.isArray(value);
 
-// The storage profile field renders only for drafts without a session mode
-// profile, so a change never has a mode profile to keep in step.
-export const applyStorageProfileChangeToModeDraft = <Draft extends SessionWizardModeDraft>(
-  prev: Draft,
-  nextProfile: unknown,
-): Draft => {
-  const next = deepClone(prev) as Draft;
-  next.storageProfile = normalizeSessionStorageProfileConfig(nextProfile);
-  return next;
-};
-
 export const applySessionModeProfileSelectionToDraft = <Draft extends SessionWizardModeDraft>(
   prev: Draft,
   profile: SessionModeProfile,

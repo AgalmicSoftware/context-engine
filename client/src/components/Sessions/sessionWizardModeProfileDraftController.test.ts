@@ -3,32 +3,9 @@ import {
   cloneSessionModePreset,
   compileSessionModeProfile,
 } from '../../utilities/session/sessionModeProfile';
-import {
-  applySessionModeProfileSelectionToDraft,
-  applyStorageProfileChangeToModeDraft,
-} from './sessionWizardModeProfileDraftController';
+import { applySessionModeProfileSelectionToDraft } from './sessionWizardModeProfileDraftController';
 
 describe('sessionWizardModeProfileDraftController', () => {
-  it('changes only the storage profile', () => {
-    const sessionModeProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED);
-    const prev = {
-      sessionModeProfile,
-      storageProfile: { backend: 'arweave' },
-    };
-
-    const next = applyStorageProfileChangeToModeDraft(prev, {
-      backend: 'cloudflare',
-      payloadAccessControl: { mode: 'lit_encrypted' },
-    });
-
-    expect(next.storageProfile).toMatchObject({
-      backend: 'cloudflare',
-      payloadAccessControl: { mode: 'lit_encrypted' },
-    });
-    expect(next.sessionModeProfile).toEqual(sessionModeProfile);
-    expect(prev.storageProfile).toEqual({ backend: 'arweave' });
-  });
-
   it('stores selected mode profiles and clears legacy telegram flags', () => {
     const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
     const compiled = compileSessionModeProfile(profile);

@@ -30,9 +30,7 @@ export type SessionWizardWorkerDeployRuntime = {
   toggleLoginModal?: ((nextOpen?: boolean) => unknown) | null;
   registryAddress?: string;
   registryChainId?: ChainIdLike;
-  wizardMode?: string;
   workerMode?: string;
-  bundleMode?: string;
   bundleFile?: File | null;
   forceManualBundleFile?: boolean;
   normalModeBundleUrlOverride?: string;
@@ -76,7 +74,6 @@ export type UseSessionWizardWorkerDeployOptions = {
   getCurrentWorkerSecrets?: () => WorkerSecretsLike;
   applyWorkerSecretsUpdate?: (nextValueOrUpdater: unknown) => unknown;
   getMissingWorkerSecretsForDeploy?: (secretsSnapshot?: WorkerSecretsLike) => string[];
-  resolveWorkerBaseUrl?: () => string;
   resolveWorkerRpcUrl?: () => string;
   resolveWorkerRpcUrlMap?: () => Record<string, string[]>;
   resolveWorkerFaucetConfig?: () => AnyRecord;
@@ -92,6 +89,5 @@ export type UseSessionWizardWorkerDeployOptions = {
   updateDraftValue?: (path: string[], value: unknown) => void;
   updateDeploymentState?: (nextState?: SessionWizardWorkerDeployStateUpdate) => void;
   clearSelectedBundleFile?: () => void;
-  clearCachedWorkerSecretsAfterDeploy?: () => void;
   verifyPublicWorkerDeployment?: typeof verifySessionWizardWorkerPublicDeployment;
 };

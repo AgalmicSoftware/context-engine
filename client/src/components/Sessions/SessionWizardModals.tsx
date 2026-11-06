@@ -1,5 +1,4 @@
 import type { ContractViewerContract } from '../DocsPage/ContractViewer';
-import SessionHeaderPreviewModal from './SessionHeaderPreviewModal';
 import SessionWizardContractViewerModal from './SessionWizardContractViewerModal';
 import SessionWizardCreateSbtModal from './SessionWizardCreateSbtModal';
 
@@ -44,9 +43,6 @@ export type SessionWizardModalsProps = {
   selectedWizardContract: ContractViewerContract | null;
   closeContractViewerModal: () => void;
   selectedWizardContractHref: string;
-  sessionHeaderPreviewModalOpen: boolean;
-  onCloseSessionHeaderPreviewModal: () => void;
-  sessionHeaderPreviewSrc: string;
   t: (value: string) => string;
 };
 
@@ -70,9 +66,6 @@ const SessionWizardModals = ({
   selectedWizardContract,
   closeContractViewerModal,
   selectedWizardContractHref,
-  sessionHeaderPreviewModalOpen,
-  onCloseSessionHeaderPreviewModal,
-  sessionHeaderPreviewSrc,
   t,
 }: SessionWizardModalsProps) => (
   <>
@@ -100,12 +93,6 @@ const SessionWizardModals = ({
       selectedWizardContract={selectedWizardContract}
       closeContractViewerModal={closeContractViewerModal}
       selectedWizardContractHref={selectedWizardContractHref}
-    />
-
-    <SessionHeaderPreviewModal
-      isOpen={sessionHeaderPreviewModalOpen}
-      onClose={onCloseSessionHeaderPreviewModal}
-      previewSrc={sessionHeaderPreviewSrc}
     />
   </>
 );

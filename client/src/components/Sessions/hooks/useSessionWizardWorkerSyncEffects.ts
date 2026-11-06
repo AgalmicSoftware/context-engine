@@ -2,7 +2,6 @@ import { type Dispatch, type MutableRefObject, type SetStateAction, useEffect, u
 import { normalizeBaseUrl } from '../../../utilities/urlUtils.js';
 import { normalizeWorkerUrl as normalizeWorkerAuthUrl } from '../../../utilities/worker/workerAuth.js';
 import { toStr } from '../../../utilities/shared/primitives.js';
-import { NORMAL_MODE_SHARED_HOSTED_WORKER_ENABLED } from '../sessionWizardConfig';
 import { getSessionWizardDefaultWorkerUrl } from '../sessionWizardWorkerDefaults';
 
 type DeployFormLike = {
@@ -24,7 +23,6 @@ export interface UseSessionWizardWorkerSyncEffectsOptions<TDeployForm extends De
   deployComplete: boolean;
   deployWorkerUrl?: unknown;
   setDeployComplete: Dispatch<SetStateAction<boolean>>;
-  wizardMode: string;
   workerMode: string;
   setWorkerMode: Dispatch<SetStateAction<string>>;
   setWorkerUrlAutoFilled: Dispatch<SetStateAction<boolean>>;
@@ -42,7 +40,6 @@ const useSessionWizardWorkerSyncEffects = <TDeployForm extends DeployFormLike>({
   deployComplete,
   deployWorkerUrl,
   setDeployComplete,
-  wizardMode,
   workerMode,
   setWorkerMode,
   setWorkerUrlAutoFilled,
@@ -83,7 +80,6 @@ const useSessionWizardWorkerSyncEffects = <TDeployForm extends DeployFormLike>({
   }, [draftCorsWorkerUrl, deployComplete, deployWorkerUrl, setDeployComplete]);
 
   useEffect(() => {
-    if (wizardMode !== 'normal' || NORMAL_MODE_SHARED_HOSTED_WORKER_ENABLED) return;
     const fallbackUrl = normalizeWorkerAuthUrl(getSessionWizardDefaultWorkerUrl());
     const configuredUrl = normalizeWorkerAuthUrl(toStr(draftCorsWorkerUrl).trim());
     if (workerMode === 'default') {
@@ -93,15 +89,7 @@ const useSessionWizardWorkerSyncEffects = <TDeployForm extends DeployFormLike>({
       setWorkerUrlAutoFilled(false);
       updateDraftValueRef.current?.(['corsWorkerUrl'], '');
     }
-  }, [
-    wizardMode,
-    workerMode,
-    draftCorsWorkerUrl,
-    deployComplete,
-    setWorkerMode,
-    setWorkerUrlAutoFilled,
-    updateDraftValueRef,
-  ]);
+  }, [workerMode, draftCorsWorkerUrl, deployComplete, setWorkerMode, setWorkerUrlAutoFilled, updateDraftValueRef]);
 };
 
 export default useSessionWizardWorkerSyncEffects;

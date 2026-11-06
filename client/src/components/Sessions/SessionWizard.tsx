@@ -187,7 +187,6 @@ import {
   resolveSessionWizardSelectorSourceConfig,
   setValueAtPath,
 } from './sessionWizardGateUtils';
-import { resolveSponsoredBundleAdvancedFieldNotices } from './sessionWizardSponsoredBundleSupport';
 import { __test__resetSessionWizardSponsoredBundleCacheKey } from './sessionWizardSponsoredBundleCache';
 import {
   getSessionWizardWorkerResourceKeys,
@@ -206,7 +205,6 @@ import {
   MANUAL_BUNDLE_URL_OVERRIDE_HELP,
   NORMAL_MODE_MANUAL_BUNDLE_RETRY_MESSAGE,
   NORMAL_MODE_MISSING_HOSTED_BUNDLE_MESSAGE,
-  NORMAL_MODE_SHARED_HOSTED_WORKER_ENABLED,
   SESSION_WIZARD_DEFAULT_TEMPLATE,
 } from './sessionWizardConfig';
 import { getSessionSlugValidationError, isReservedSessionSlug } from './sessionWizardSlugValidation';
@@ -402,7 +400,6 @@ const SessionWizard = ({
     const draftFromCache = buildSessionWizardInitialDraftFromCache({
       cachedWizard,
       defaultTemplate: DEFAULT_TEMPLATE,
-      normalModeSharedHostedWorkerEnabled: NORMAL_MODE_SHARED_HOSTED_WORKER_ENABLED,
       sourceEmbeddedDeployHelperDefault: cachedDraftHasEmbeddedDeployHelperEnabled
         ? null
         : sourceEmbeddedDeployHelperDefault,
@@ -422,7 +419,7 @@ const SessionWizard = ({
   const [draft, setDraft] = useState<DraftState>(() => initialDraft as DraftState);
   const draftRef = useRef<DraftState>(initialDraft as DraftState);
   const [sessionId, setSessionId] = useState(() => cachedInitialState.initialSessionIdValue);
-  const [sessionIdStatus, setSessionIdStatus] = useState('');
+  const [, setSessionIdStatus] = useState('');
   const [privateSlugMode, setPrivateSlugMode] = useState(() => !!cachedWizard?.privateSlugMode);
   const privateSlugModeRef = useRef(privateSlugMode);
   privateSlugModeRef.current = privateSlugMode;
@@ -438,7 +435,6 @@ const SessionWizard = ({
   const {
     metadataUrl,
     setMetadataUrl,
-    metadataTxId,
     setMetadataTxId,
     manualMetadataUrl,
     setManualMetadataUrl,
@@ -450,7 +446,6 @@ const SessionWizard = ({
     setManualMaxFeePerGasGwei,
     manualMaxPriorityFeePerGasGwei,
     setManualMaxPriorityFeePerGasGwei,
-    publishAdvancedOpen,
   } = useSessionWizardPublishAdvancedState({ cachedWizard });
   const [registerTxs, setRegisterTxs] = useState<SessionWizardRegisterTxEntry[]>([]);
   const [pendingOnChainFields, setPendingOnChainFields] = useState<UnknownRecord>({});
@@ -478,7 +473,6 @@ const SessionWizard = ({
   const publishRequestInFlightRef = useRef(false);
   const [publishStepElapsedMs, setPublishStepElapsedMs] = useState(0);
   // One page, no advanced mode: the runtime keeps its normal-mode behaviour.
-  const wizardMode = 'normal';
   const [registryChainId, setRegistryChainId] = useState<number>(() =>
     resolveSessionWizardInitialRegistryChainId({
       draftChainId: draft.networkChainId,
@@ -611,13 +605,10 @@ const SessionWizard = ({
     setWorkerMode,
     workerSecretsEnabled: savedWorkerSecretsEnabled,
     setWorkerSecretsEnabled,
-    persistWorkerSecrets,
     deployHelperUrl,
     setDeployHelperUrl,
     deployForm,
     setDeployForm,
-    bundleMode,
-    setBundleMode,
     bundleFile,
     setBundleFile,
     forceManualBundleFile,
@@ -682,7 +673,6 @@ const SessionWizard = ({
 
   const deployFormRef = useRef<DeployFormState>(deployForm);
   const resolvedWalletAccountRef = useRef(toStr(account).trim());
-  const advancedBundleFileInputRef = useRef<HTMLInputElement | null>(null);
   const normalModeRetryBundleFileInputRef = useRef<HTMLInputElement | null>(null);
   const deployCompleteRef = useRef(deployComplete);
   const deployWorkerUrlRef = useRef(normalizeBaseUrl(toStr(cachedWizard?.deployWorkerUrl).trim()));
@@ -693,7 +683,6 @@ const SessionWizard = ({
   );
   // Holds the saved choice: sponsored-bundle restore puts it back as it was.
   const workerSecretsEnabledRef = useRef(savedWorkerSecretsEnabled);
-  const persistWorkerSecretsRef = useRef(persistWorkerSecrets);
   const workerSecretsRef = useRef<WorkerSecretsLike>(
     sanitizeSessionWizardWorkerSecretsForLitMode(cachedWizard?.workerSecrets),
   );
@@ -733,7 +722,6 @@ const SessionWizard = ({
   };
   const {
     sponsoredBundleStatus,
-    sponsoredBundleRetryNonce,
     setSponsoredBundleRetryNonce,
     sponsoredBundleAppliedBundleRef,
     sponsoredBundleKeyInput,
@@ -756,9 +744,7 @@ const SessionWizard = ({
       deployWorkerUrlRef,
       provisionedSponsoredContextRef,
       workerSecretsEnabledRef,
-      persistWorkerSecretsRef,
       workerSecretsRef,
-      advancedBundleFileInputRef,
       normalModeRetryBundleFileInputRef,
     },
     setWorkerSecrets,
@@ -810,8 +796,6 @@ const SessionWizard = ({
     sessionHeaderFile,
     setSessionHeaderFile,
     sessionHeaderPreviewSrc,
-    sessionHeaderPreviewModalOpen,
-    setSessionHeaderPreviewModalOpen,
     sessionHeaderUploadStatus,
     sessionHeaderUploadStatusTone,
     setSessionHeaderStatus,
@@ -866,7 +850,6 @@ const SessionWizard = ({
       ? sessionModeRequirements.visibleWorkerResourceKeys.includes(key)
       : !cloudflareWorkerSbtGateMode || key !== 'lit',
   );
-  const effectivePersistWorkerSecrets = false;
 
   const registryAddress = useMemo(() => {
     return resolveSessionWizardRegistryAddress(registryChainId, draft?.contracts);
@@ -897,7 +880,6 @@ const SessionWizard = ({
     deployComplete,
     deployWorkerUrl,
     setDeployComplete,
-    wizardMode,
     workerMode,
     setWorkerMode,
     setWorkerUrlAutoFilled,
@@ -945,7 +927,6 @@ const SessionWizard = ({
       manualMaxFeePerGasGwei,
       manualMaxPriorityFeePerGasGwei,
       workerSecretsEnabled: savedWorkerSecretsEnabled,
-      effectivePersistWorkerSecrets,
       workerSecrets,
       workerAllowOrigins,
       workerLimitPerWallet,
@@ -976,7 +957,6 @@ const SessionWizard = ({
     manualMaxFeePerGasGwei,
     manualMaxPriorityFeePerGasGwei,
     savedWorkerSecretsEnabled,
-    effectivePersistWorkerSecrets,
     workerSecrets,
     workerAllowOrigins,
     workerLimitPerWallet,
@@ -1368,8 +1348,6 @@ const SessionWizard = ({
     provisionedSponsoredContextRef,
     workerSecretsEnabled: savedWorkerSecretsEnabled,
     workerSecretsEnabledRef,
-    persistWorkerSecrets,
-    persistWorkerSecretsRef,
     workerSecrets,
     workerSecretsRef,
   });
@@ -1511,7 +1489,6 @@ const SessionWizard = ({
   };
 
   const {
-    clearPendingSbtDrafts,
     handleGateAddSbt,
     handleGateRemoveSbt,
     handleRemoveDefaultFeaturedSbt,
@@ -2147,7 +2124,6 @@ const SessionWizard = ({
     buildSessionWizardPublishArweaveUploadOptions,
     buildSponsoredFlagFields,
     clearCachedArweaveJwkAfterUpload,
-    clearCachedWorkerSecretsAfterDeploy,
     clearWorkerSecretFields,
     effectiveDefaultWorkerRpcUrl,
     getMissingWorkerSecretsForDeploy,
@@ -2157,7 +2133,6 @@ const SessionWizard = ({
     resolveWorkerFaucetConfig,
     resolveWorkerRpcUrl,
     resolveWorkerRpcUrlMap,
-    resolvedWorkerBaseUrlForDelegation,
     signBootstrapAdminAction,
     signTypedAdminAction,
   } = useSessionWizardWorkerSecretsController({
@@ -2165,17 +2140,13 @@ const SessionWizard = ({
     provider,
     network,
     draft,
-    wizardMode,
     deployComplete,
     deployWorkerUrl,
-    workerMode,
     workerSecrets,
     workerSecretsEnabled,
     workerAllowOrigins,
     provisionedSponsoredContext,
-    effectivePersistWorkerSecrets,
     registryChainId,
-    allowNormalModeSharedHostedWorker: NORMAL_MODE_SHARED_HOSTED_WORKER_ENABLED,
     getCurrentWorkerSecrets,
     getCurrentEnabledWorkerSecrets,
     applyWorkerSecretsUpdate,
@@ -2258,9 +2229,7 @@ const SessionWizard = ({
     toggleLoginModal,
     registryAddress,
     registryChainId,
-    wizardMode,
     workerMode,
-    bundleMode,
     bundleFile,
     forceManualBundleFile,
     normalModeBundleUrlOverride,
@@ -2307,11 +2276,9 @@ const SessionWizard = ({
     updateDraftValue,
     updateDeploymentState: updateSponsoredBundleDeploymentState,
     clearSelectedBundleFile,
-    clearCachedWorkerSecretsAfterDeploy,
   });
 
   const sessionWizardPublishRuntimeController = createSessionWizardPublishRuntimeController({
-    runtimeRef: workerDeployRuntimeRef,
     dispatch: dispatchSessionPublish,
     getErrorMessage: getSessionWizardErrorMessage,
     deployWorker: () => handleDeployWorker({ forceSponsoredAutoDeploy: true }),
@@ -2383,7 +2350,6 @@ const SessionWizard = ({
     compactSessionHeaderMode,
     defaultGateId,
     draft,
-    draftRef,
     encryptedFieldGates,
     encryptionGates,
     ensureLightSbtUniverse,
@@ -2420,13 +2386,11 @@ const SessionWizard = ({
     setBlockLimitUnit,
     setCompactSessionHeaderMode,
     setDefaultGateId,
-    setDraft,
     setEncryptedFieldGates,
     setMetadataObjectCollapsed,
     setOpenLockKey,
     setSessionHeaderFile,
     setSessionHeaderMode,
-    setSessionHeaderPreviewModalOpen,
     setSessionHeaderStatus,
     setShowPromptPreview,
     setWorkerUrlAutoFilled,
@@ -2437,28 +2401,24 @@ const SessionWizard = ({
     updateArrayValue,
     updateDraftValue,
     workerSecretsEnabled,
-    wizardMode,
   });
   const registerChainId = Number(registryChainId || draft.networkChainId || 0) || null;
   const registerExplorerBaseUrl = getExplorerBaseUrl(registerChainId);
-  const isNormalMode = true;
   const hasConfiguredDeployHelperUrl = !!workerAuthPublishAdapter.normalizeWorkerUrl(
     toStr(CLOUDFLARE_DEPLOY_HELPER_URL).trim(),
   );
-  const shouldShowDeployHelperUrlInput = !isNormalMode || !hasConfiguredDeployHelperUrl;
+  const shouldShowDeployHelperUrlInput = !hasConfiguredDeployHelperUrl;
 
   const resolvedWorkerBaseUrl = resolveWorkerBaseUrl();
   const configuredWorkerUrl = normalizeWorkerUrl(toStr(draft.corsWorkerUrl).trim());
   const defaultWorkerUrl = normalizeWorkerUrl(getSessionWizardDefaultWorkerUrl());
   const deployedWorkerUrl = normalizeWorkerUrl(toStr(deployWorkerUrl).trim());
-  const normalModeRequiresCustomWorker = isNormalMode && !NORMAL_MODE_SHARED_HOSTED_WORKER_ENABLED;
   const { deployVerifiedInUi: deployIdentityVerifiedInUi, effectiveConfiguredWorkerUrl } =
     resolveSessionWizardWorkerVerificationUiState({
       configuredWorkerUrl,
       deployWorkerUrl: deployedWorkerUrl,
       defaultWorkerUrl,
       deployComplete,
-      normalModeRequiresCustomWorker,
     });
   const currentWorkerSecrets = getCurrentWorkerSecrets();
   const deployRequirementsVerified = workerRequirementProof
@@ -2466,17 +2426,13 @@ const SessionWizard = ({
     : !sessionModeRequirements.usesWorkerRuntime;
   // Derive current publish authority from the selected worker, profile, provider, and secrets.
   const deployVerifiedInUi = deployIdentityVerifiedInUi && deployRequirementsVerified;
-  const customWorkerSelected = normalModeRequiresCustomWorker || workerMode !== 'default';
   const hideNormalModeDefaultWorkerUrl =
-    normalModeRequiresCustomWorker &&
-    !deployVerifiedInUi &&
-    isSessionWizardDefaultWorkerPlaceholderUrl(configuredWorkerUrl, defaultWorkerUrl);
+    !deployVerifiedInUi && isSessionWizardDefaultWorkerPlaceholderUrl(configuredWorkerUrl, defaultWorkerUrl);
   const visibleConfiguredWorkerUrl = hideNormalModeDefaultWorkerUrl ? '' : effectiveConfiguredWorkerUrl;
   const displayedWorkerUrl = hideNormalModeDefaultWorkerUrl
     ? ''
     : toStr(draft.corsWorkerUrl).trim() || visibleConfiguredWorkerUrl;
-  const showSharedWorkerChoice = !normalModeRequiresCustomWorker;
-  const showWorkerUrlField = customWorkerSelected && (deployVerifiedInUi || sessionModeRequirements.usesWorkerRuntime);
+  const showWorkerUrlField = deployVerifiedInUi || sessionModeRequirements.usesWorkerRuntime;
   const allowNativeWorkerVerification =
     sessionModeRequirements.selected &&
     sessionModeRequirements.usesWorkerRuntime &&
@@ -2498,20 +2454,13 @@ const SessionWizard = ({
     getMissingWorkerSecretsForDeploy,
   });
   const normalModeBundleUrl = toStr(CLOUDFLARE_WORKER_BUNDLE_URL).trim();
-  const { showSponsoredFaucetNotice, showSponsoredDeployAccessNotice } = resolveSponsoredBundleAdvancedFieldNotices({
-    sponsoredBundle: sponsoredBundleAppliedBundleRef.current,
-    workerSecrets,
-    deployForm,
-  });
   const { renderResourceCard } = useSessionWizardWorkerResourceRenderer({
     defaultGateId,
     effectiveDefaultWorkerRpcUrl,
     gateOptions,
-    isNormalMode,
     openResourceGateKey,
     resourceGateMap,
     resourceGateOptions,
-    showSponsoredFaucetNotice,
     workerSecrets,
     workerSecretsEnabled,
     applyWorkerSecretsUpdate,
@@ -2527,7 +2476,6 @@ const SessionWizard = ({
     shouldUseSponsoredAutoDeployFlow,
     showNormalModeManualBundleControls,
   } = resolveSessionWizardSponsoredPublishSurfaceState({
-    isNormalMode,
     workerMode,
     sponsoredAutoDeployState,
     forceManualBundleFile,
@@ -2554,9 +2502,6 @@ const SessionWizard = ({
     deployComplete,
     hasPendingDrafts: hasUndeployedPendingSbtDrafts,
     hasPendingWorkerGroupDrafts: pendingWorkerGroupDrafts.length > 0,
-    isNormalMode,
-    publishAdvancedOpen,
-    publishCompleted: workerCanonicalSettlement.publishCompleted,
     publishStepElapsedMs,
     sbtsLabel: t('sbts'),
     sessionModeProfile: draft.sessionModeProfile as SessionModeProfile,
@@ -2621,7 +2566,6 @@ const SessionWizard = ({
       selectorSourceSessionConfig?.slug,
     ],
   );
-  const wizardContractViewerContracts = wizardContractViewerPlan.contracts;
   const selectedWizardContract = wizardContractViewerPlan.selectedContract;
   const selectedWizardContractHref = wizardContractViewerPlan.selectedContractHref;
   // Templates: export, import and share links carry only portable fields.
@@ -2849,7 +2793,6 @@ const SessionWizard = ({
         />
       }
       encryptionPanelProps={{
-        isNormalMode,
         t,
         renderSessionWizardInfoTooltip,
         launchCreateSbtModal,
@@ -2914,19 +2857,9 @@ const SessionWizard = ({
       workerPanelProps={{
         allowNativeWorkerVerification,
         agentHttpEnabled: sessionModeRequirements.usesAgentSessionWrapped,
-        isNormalMode,
-        t,
         renderSessionWizardInfoTooltip,
-        pageOwnsDeployToken: true,
-        showSharedWorkerChoice,
         workerMode,
-        onWorkerModeChange: setWorkerMode,
-        setWorkerUrlAutoFilled,
-        updateDraftValue,
-        getDefaultWorkerUrl: getSessionWizardDefaultWorkerUrl,
         draft,
-        deployWorkerUrl,
-        deployComplete,
         deployVerifiedInUi,
         showUserPaidUsage: userPaidUsageAvailable,
         workerSecretsEnabled,
@@ -2953,8 +2886,6 @@ const SessionWizard = ({
         shouldShowDeployHelperUrlInput,
         deployHelperUrl,
         setDeployHelperUrl,
-        bundleMode,
-        setBundleMode,
         normalModeBundleUrl,
         normalModeBundleHelpText,
         showNormalModeManualBundleControls,
@@ -2968,16 +2899,10 @@ const SessionWizard = ({
         bundleFile,
         normalModeManualBundleHelpText,
         localWorkerBundleFallbackFilePath: LOCAL_WORKER_BUNDLE_FALLBACK_FILE_PATH,
-        advancedBundleFileInputRef,
-        showSponsoredDeployAccessNotice,
         account,
-        toggleLoginModal,
         resolvedActiveSessionSlug,
-        setDeployForm,
         operatorRecoveryKey,
         setOperatorRecoveryKey,
-        handleDeployWorker,
-        deployStatusDisplayState,
         showWorkerUrlField,
         displayedWorkerUrl,
         renderField,
@@ -3080,9 +3005,6 @@ const SessionWizard = ({
         selectedWizardContract,
         closeContractViewerModal,
         selectedWizardContractHref,
-        sessionHeaderPreviewModalOpen,
-        onCloseSessionHeaderPreviewModal: () => setSessionHeaderPreviewModalOpen(false),
-        sessionHeaderPreviewSrc,
         t,
       }}
     />

@@ -42,7 +42,6 @@ const t = (key: string) => key;
 const renderEncryptionPanel = (props: Partial<EncryptionPanelProps> = {}) =>
   render(
     <EncryptionPanel
-      isNormalMode
       t={t}
       renderSessionWizardInfoTooltip={() => null}
       launchCreateSbtModal={() => {}}

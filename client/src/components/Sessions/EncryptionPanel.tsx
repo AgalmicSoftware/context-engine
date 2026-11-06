@@ -32,7 +32,6 @@ type SessionConfig = {
 };
 
 export type EncryptionPanelProps = {
-  isNormalMode: boolean;
   t?: (key: string) => string;
   renderSessionWizardInfoTooltip?: (props: {
     id?: string;
@@ -70,7 +69,6 @@ export type EncryptionPanelProps = {
 };
 
 const EncryptionPanel = ({
-  isNormalMode,
   t,
   renderSessionWizardInfoTooltip,
   launchCreateSbtModal,
@@ -117,9 +115,7 @@ const EncryptionPanel = ({
               ? showOnChainGateControls
                 ? 'Session Access · Advanced hybrid'
                 : 'Session Access'
-              : isNormalMode
-                ? 'Privacy & Access'
-                : `${translate('sbts')} allowed to decrypt locked fields`}
+              : 'Privacy & Access'}
             {renderInfoTooltip({
               id: 'gw-encryption-visibility',
               content:

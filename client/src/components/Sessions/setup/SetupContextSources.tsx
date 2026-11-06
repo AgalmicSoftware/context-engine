@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Input } from 'reactstrap';
 
 import { CONTEXT_FILE_TYPES, resolveContextFileType } from '@ce-shared/sessionContextSources.mjs';

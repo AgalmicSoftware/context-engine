@@ -6,13 +6,7 @@ import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 const renderWorkerSecretsSection = (props = {}) =>
   render(
     <WorkerSecretsSection
-      isNormalMode={false}
       showUserPaidUsage
-      translate={(key) => {
-        if (key === 'gatesLower') return 'gates';
-        if (key === 'gateLower') return 'gate';
-        return key;
-      }}
       renderInfoTooltip={({ testId }) => <button type="button" data-testid={testId} />}
       workerSecretsEnabled
       setWorkerSecretsEnabled={() => {}}
@@ -39,10 +33,6 @@ describe('WorkerSecretsSection', () => {
     });
 
     expect(screen.getByText('Worker secrets')).toBeInTheDocument();
-    expect(screen.getByText('Resource gates (on-chain)')).toBeInTheDocument();
-    expect(
-      screen.getByText("Secrets stay in this tab's memory only — re-enter them if you refresh the page."),
-    ).toBeInTheDocument();
     expect(screen.getByText('card ai')).toBeInTheDocument();
     expect(screen.getByText('card rpc')).toBeInTheDocument();
 

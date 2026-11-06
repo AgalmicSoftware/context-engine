@@ -351,12 +351,10 @@ export const applySessionTemplateToDraft = (
 export const buildSessionWizardInitialDraftFromCache = ({
   cachedWizard = null,
   defaultTemplate = buildSessionWizardDefaultTemplate(),
-  normalModeSharedHostedWorkerEnabled = true,
   sourceEmbeddedDeployHelperDefault = null,
 }: {
   cachedWizard?: AnyRecord | null;
   defaultTemplate?: AnyRecord;
-  normalModeSharedHostedWorkerEnabled?: unknown;
   sourceEmbeddedDeployHelperDefault?: unknown;
 } = {}): AnyRecord => {
   const cachedDraft =
@@ -382,7 +380,7 @@ export const buildSessionWizardInitialDraftFromCache = ({
       normalized.storageProfile = normalizeSessionStorageProfileConfig(compiled.storageProfile);
     }
   }
-  if (normalModeSharedHostedWorkerEnabled === false && !cachedWizard?.deployComplete) {
+  if (!cachedWizard?.deployComplete) {
     normalized.corsWorkerUrl = '';
   }
   return normalized;

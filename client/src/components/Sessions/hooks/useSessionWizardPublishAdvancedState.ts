@@ -31,7 +31,6 @@ const useSessionWizardPublishAdvancedState = ({ cachedWizard }: UseSessionWizard
   const [manualMaxPriorityFeePerGasGwei, setManualMaxPriorityFeePerGasGwei] = useState(() =>
     toStr(cachedWizard?.manualMaxPriorityFeePerGasGwei || '').trim(),
   );
-  const [publishAdvancedOpen, setPublishAdvancedOpen] = useState(false);
 
   return {
     metadataUrl,
@@ -48,8 +47,6 @@ const useSessionWizardPublishAdvancedState = ({ cachedWizard }: UseSessionWizard
     setManualMaxFeePerGasGwei,
     manualMaxPriorityFeePerGasGwei,
     setManualMaxPriorityFeePerGasGwei,
-    publishAdvancedOpen,
-    setPublishAdvancedOpen,
   };
 };
 

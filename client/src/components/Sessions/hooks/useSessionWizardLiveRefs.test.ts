@@ -10,7 +10,6 @@ const buildRefs = () => ({
   deployWorkerUrlRef: { current: '' } as MutableRefObject<string>,
   provisionedSponsoredContextRef: { current: { sessionSlug: '' } } as MutableRefObject<{ sessionSlug: string }>,
   workerSecretsEnabledRef: { current: false } as MutableRefObject<boolean>,
-  persistWorkerSecretsRef: { current: false } as MutableRefObject<boolean>,
   workerSecretsRef: { current: { customRpcUrl: '' } } as MutableRefObject<{ customRpcUrl: string }>,
 });
 
@@ -34,8 +33,6 @@ describe('useSessionWizardLiveRefs', () => {
         provisionedSponsoredContextRef: refs.provisionedSponsoredContextRef,
         workerSecretsEnabled: true,
         workerSecretsEnabledRef: refs.workerSecretsEnabledRef,
-        persistWorkerSecrets: true,
-        persistWorkerSecretsRef: refs.persistWorkerSecretsRef,
         workerSecrets: { customRpcUrl: 'https://rpc.example.test' },
         workerSecretsRef: refs.workerSecretsRef,
       }),
@@ -48,7 +45,6 @@ describe('useSessionWizardLiveRefs', () => {
     expect(refs.deployWorkerUrlRef.current).toBe('https://worker.example.test');
     expect(refs.provisionedSponsoredContextRef.current).toEqual({ sessionSlug: 'sponsored-session' });
     expect(refs.workerSecretsEnabledRef.current).toBe(true);
-    expect(refs.persistWorkerSecretsRef.current).toBe(true);
     expect(refs.workerSecretsRef.current).toEqual({ customRpcUrl: 'https://rpc.example.test' });
   });
 
@@ -72,8 +68,6 @@ describe('useSessionWizardLiveRefs', () => {
           provisionedSponsoredContextRef: refs.provisionedSponsoredContextRef,
           workerSecretsEnabled: false,
           workerSecretsEnabledRef: refs.workerSecretsEnabledRef,
-          persistWorkerSecrets: false,
-          persistWorkerSecretsRef: refs.persistWorkerSecretsRef,
           workerSecrets: { customRpcUrl: '' },
           workerSecretsRef: refs.workerSecretsRef,
         }),

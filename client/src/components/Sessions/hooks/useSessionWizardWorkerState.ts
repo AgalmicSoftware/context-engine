@@ -19,7 +19,6 @@ type DeployFormState = NonNullable<WorkerPanelProps['deployForm']> & {
 type CachedWorkerState =
   | {
       workerSecretsEnabled?: unknown;
-      persistWorkerSecrets?: unknown;
       deployComplete?: unknown;
       deployWorkerUrl?: unknown;
       deployForm?: unknown;
@@ -86,8 +85,6 @@ const useSessionWizardWorkerState = <TProvisionedSponsoredContext>({
   const [workerSecretsEnabled, setWorkerSecretsEnabled] = useState(() =>
     typeof cachedWizard?.workerSecretsEnabled === 'boolean' ? cachedWizard.workerSecretsEnabled : true,
   );
-  // Secret persistence is intentionally unsupported in every build.
-  const persistWorkerSecrets = false;
   const [deployHelperUrl, setDeployHelperUrl] = useState(() => toStr(deployHelperUrlDefault));
   const [deployForm, setDeployForm] = useState<DeployFormState>({
     // Cloudflare deployment tokens are request-only. Ignore legacy cache values.
@@ -96,7 +93,6 @@ const useSessionWizardWorkerState = <TProvisionedSponsoredContext>({
     adminAddress: toStr(cachedDeployForm.adminAddress || '').trim() || undefined,
     bundleUrl: toStr(cachedDeployForm.bundleUrl || normalizedWorkerBundleUrlDefault),
   });
-  const [bundleMode, setBundleMode] = useState(() => (normalizedWorkerBundleUrlDefault ? 'url' : 'upload'));
   const [bundleFile, setBundleFile] = useState<File | null>(null);
   const [forceManualBundleFile, setForceManualBundleFile] = useState(false);
   const [normalModeBundleUrlOverride, setNormalModeBundleUrlOverride] = useState('');
@@ -158,13 +154,10 @@ const useSessionWizardWorkerState = <TProvisionedSponsoredContext>({
     setWorkerMode,
     workerSecretsEnabled,
     setWorkerSecretsEnabled,
-    persistWorkerSecrets,
     deployHelperUrl,
     setDeployHelperUrl,
     deployForm,
     setDeployForm,
-    bundleMode,
-    setBundleMode,
     bundleFile,
     setBundleFile,
     forceManualBundleFile,

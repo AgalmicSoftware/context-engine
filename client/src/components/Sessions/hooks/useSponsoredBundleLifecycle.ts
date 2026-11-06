@@ -39,7 +39,6 @@ type SponsoredBundleBaselineState = {
   corsWorkerUrl?: string;
   provisionedSponsoredContext?: AnyRecord;
   workerSecretsEnabled?: boolean;
-  persistWorkerSecrets?: boolean;
 };
 
 type SponsoredBundleRefs = {
@@ -49,7 +48,6 @@ type SponsoredBundleRefs = {
   deployWorkerUrlRef?: MutableRefObject<string>;
   provisionedSponsoredContextRef?: MutableRefObject<AnyRecord | null>;
   workerSecretsEnabledRef?: MutableRefObject<boolean>;
-  persistWorkerSecretsRef?: MutableRefObject<boolean>;
 };
 
 type SponsoredBundleDeploymentStateUpdate = {
@@ -62,7 +60,6 @@ type SponsoredBundleDeploymentStateUpdate = {
 
 type SponsoredBundleWorkerSecretStateUpdate = {
   workerSecretsEnabled?: boolean;
-  persistWorkerSecrets?: boolean;
 };
 
 export type SponsoredBundleStatusState = {
@@ -111,7 +108,6 @@ const useSponsoredBundleLifecycle = ({
     deployWorkerUrlRef,
     provisionedSponsoredContextRef,
     workerSecretsEnabledRef,
-    persistWorkerSecretsRef,
   } = refs;
   const [sponsoredBundleStatus, setSponsoredBundleStatus] = useState<SponsoredBundleStatusState | null>(null);
   const [sponsoredBundleRetryNonce, setSponsoredBundleRetryNonce] = useState(0);
@@ -236,7 +232,6 @@ const useSponsoredBundleLifecycle = ({
       currentCorsWorkerUrl = '',
       currentProvisionedSponsoredContext = buildEmptyProvisionedSponsoredContext(),
       currentWorkerSecretsEnabled = true,
-      currentPersistWorkerSecrets = false,
       baseline = {},
       appliedBundle = {},
     }: {
@@ -247,7 +242,6 @@ const useSponsoredBundleLifecycle = ({
       currentCorsWorkerUrl?: string;
       currentProvisionedSponsoredContext?: AnyRecord;
       currentWorkerSecretsEnabled?: boolean;
-      currentPersistWorkerSecrets?: boolean;
       baseline?: SponsoredBundleBaselineState | AnyRecord;
       appliedBundle?: SponsoredBundleLike | AnyRecord;
     } = {}) => {
@@ -262,8 +256,6 @@ const useSponsoredBundleLifecycle = ({
         workerSecrets: nextSecrets,
         workerSecretsEnabled:
           currentWorkerSecretsEnabled === true ? !!resolvedBaseline.workerSecretsEnabled : currentWorkerSecretsEnabled,
-        persistWorkerSecrets:
-          currentPersistWorkerSecrets === false ? !!resolvedBaseline.persistWorkerSecrets : currentPersistWorkerSecrets,
         deployForm: currentDeployForm,
         deployComplete: currentDeployComplete === false ? !!resolvedBaseline.deployComplete : currentDeployComplete,
         deployWorkerUrl: toStr(currentDeployWorkerUrl).trim()
@@ -328,7 +320,6 @@ const useSponsoredBundleLifecycle = ({
       currentProvisionedSponsoredContext:
         provisionedSponsoredContextRef?.current || buildEmptyProvisionedSponsoredContext(),
       currentWorkerSecretsEnabled: workerSecretsEnabledRef?.current !== false,
-      currentPersistWorkerSecrets: !!persistWorkerSecretsRef?.current,
       baseline,
       appliedBundle,
     });
@@ -342,7 +333,6 @@ const useSponsoredBundleLifecycle = ({
     updateDraftCorsWorkerUrl(toStr(restored.corsWorkerUrl || '').trim());
     updateWorkerSecretState({
       workerSecretsEnabled: restored.workerSecretsEnabled,
-      persistWorkerSecrets: restored.persistWorkerSecrets,
     });
     clearSponsoredBundleTracking();
   }, [
@@ -353,7 +343,6 @@ const useSponsoredBundleLifecycle = ({
     deployWorkerUrlRef,
     draftRef,
     getCurrentWorkerSecrets,
-    persistWorkerSecretsRef,
     provisionedSponsoredContextRef,
     resolveSponsoredBundleRestoreState,
     updateDeploymentState,
@@ -373,7 +362,6 @@ const useSponsoredBundleLifecycle = ({
         corsWorkerUrl: toStr(draftRef?.current?.corsWorkerUrl || '').trim(),
         provisionedSponsoredContext: provisionedSponsoredContextRef?.current || buildEmptyProvisionedSponsoredContext(),
         workerSecretsEnabled: workerSecretsEnabledRef?.current !== false,
-        persistWorkerSecrets: !!persistWorkerSecretsRef?.current,
       };
       if (
         sponsoredBundleBaselineRef.current &&
@@ -389,7 +377,6 @@ const useSponsoredBundleLifecycle = ({
           currentCorsWorkerUrl: baselineSource.corsWorkerUrl,
           currentProvisionedSponsoredContext: baselineSource.provisionedSponsoredContext,
           currentWorkerSecretsEnabled: baselineSource.workerSecretsEnabled,
-          currentPersistWorkerSecrets: baselineSource.persistWorkerSecrets,
           baseline: sponsoredBundleBaselineRef.current,
           appliedBundle: sponsoredBundleAppliedBundleRef.current,
         });
@@ -404,11 +391,9 @@ const useSponsoredBundleLifecycle = ({
           baselineSource.provisionedSponsoredContext,
         ),
         workerSecretsEnabled: baselineSource.workerSecretsEnabled,
-        persistWorkerSecrets: baselineSource.persistWorkerSecrets,
       };
       sponsoredBundleAppliedBundleRef.current = normalizedBundle;
       updateWorkerSecretState({
-        persistWorkerSecrets: false,
         workerSecretsEnabled: true,
       });
       applyWorkerSecretsUpdate(mergeSponsoredBundleWorkerSecrets(baselineSource.workerSecrets, normalizedBundle));
@@ -433,7 +418,6 @@ const useSponsoredBundleLifecycle = ({
       deployWorkerUrlRef,
       draftRef,
       getCurrentWorkerSecrets,
-      persistWorkerSecretsRef,
       provisionedSponsoredContextRef,
       resolveSponsoredBundleRestoreState,
       syncSponsoredBootstrapFundingContext,

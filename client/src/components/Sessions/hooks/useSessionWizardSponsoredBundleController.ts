@@ -38,9 +38,7 @@ type SponsoredBundleControllerRefs<TDeployForm, TProvisionedSponsoredContext> = 
   deployWorkerUrlRef: MutableRefObject<string>;
   provisionedSponsoredContextRef: MutableRefObject<TProvisionedSponsoredContext | null>;
   workerSecretsEnabledRef: MutableRefObject<boolean>;
-  persistWorkerSecretsRef: MutableRefObject<boolean>;
   workerSecretsRef: MutableRefObject<WorkerSecretsLike>;
-  advancedBundleFileInputRef: RefObject<HTMLInputElement>;
   normalModeRetryBundleFileInputRef: RefObject<HTMLInputElement>;
 };
 
@@ -106,9 +104,7 @@ const useSessionWizardSponsoredBundleController = <
     deployWorkerUrlRef,
     provisionedSponsoredContextRef,
     workerSecretsEnabledRef,
-    persistWorkerSecretsRef,
     workerSecretsRef,
-    advancedBundleFileInputRef,
     normalModeRetryBundleFileInputRef,
   } = refs;
 
@@ -251,7 +247,6 @@ const useSessionWizardSponsoredBundleController = <
       deployWorkerUrlRef,
       provisionedSponsoredContextRef: provisionedSponsoredContextRef as MutableRefObject<AnyRecord | null>,
       workerSecretsEnabledRef,
-      persistWorkerSecretsRef,
     },
     getCurrentWorkerSecrets,
     applyWorkerSecretsUpdate,
@@ -262,12 +257,11 @@ const useSessionWizardSponsoredBundleController = <
 
   const clearSelectedBundleFile = useCallback(() => {
     setBundleFile(null);
-    [advancedBundleFileInputRef.current, normalModeRetryBundleFileInputRef.current].forEach((input) => {
-      if (input && typeof input.value === 'string') {
-        input.value = '';
-      }
-    });
-  }, [advancedBundleFileInputRef, normalModeRetryBundleFileInputRef, setBundleFile]);
+    const input = normalModeRetryBundleFileInputRef.current;
+    if (input && typeof input.value === 'string') {
+      input.value = '';
+    }
+  }, [normalModeRetryBundleFileInputRef, setBundleFile]);
 
   return {
     ...sponsoredBundleLifecycle,
