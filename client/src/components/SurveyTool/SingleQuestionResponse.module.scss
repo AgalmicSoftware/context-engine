@@ -128,10 +128,12 @@
   align-items: flex-start;
 }
 
+// The accent is 1.00:1 on Classic 95's teal, so the button takes the surface's own text colour in every theme. The
+// card this sits in resets `color`, so a surface that isn't a panel, such as the Results dialog, names its colour here.
 %decryptCtaOutline {
   background: transparent !important;
-  border: 1px solid var(--ce-color-accent) !important;
-  color: var(--ce-color-accent) !important;
+  border: 1px solid currentColor !important;
+  color: var(--decrypt-cta-text, var(--ce-panel-text)) !important;
   box-shadow: none;
   transition:
     background-color 0.18s ease,
@@ -139,21 +141,19 @@
     color 0.18s ease,
     box-shadow 0.18s ease;
 
+  // A thicker outline, not a tint: tinting towards the label is what takes it below 4.5:1 on teal.
   &:hover:not(:disabled),
   &:focus:not(:disabled) {
-    background: color-mix(in srgb, var(--ce-action-accent) 15%, transparent) !important;
-    border-color: var(--ce-color-accent) !important;
-    color: var(--ce-color-accent) !important;
-    box-shadow: 0 8px 18px color-mix(in srgb, var(--ce-action-accent) 22%, transparent);
+    box-shadow: inset 0 0 0 1px currentColor;
   }
 
   &:focus {
-    outline: 2px solid color-mix(in srgb, var(--ce-action-accent) 28%, transparent);
+    outline: 2px solid currentColor;
     outline-offset: 2px;
   }
 
   &:disabled {
-    opacity: 0.55;
+    opacity: 0.7;
     cursor: not-allowed;
     box-shadow: none;
   }

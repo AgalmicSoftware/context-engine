@@ -405,6 +405,67 @@ describe('bundled app-theme contrast', () => {
     expect(ratios.filter(([, value]) => value < 4.5)).toEqual([]);
   });
 
+  // The accent is 1.00:1 on Classic 95's teal. These sit on several surfaces, so they take each surface's text colour.
+  test.each([
+    [
+      'components/SurveyTool/SingleQuestionResponse.module.scss',
+      ['.decryptCta', '.maskedPromptActionButton'],
+      'var(--decrypt-cta-text, var(--ce-panel-text))',
+    ],
+    [
+      'components/SurveyTool/SurveyTool.module.scss',
+      ['.gatedPromptNoticeActionButton', '.maskedPromptActionButton', '.decryptQuestionButton', '#decryptEditButton'],
+      'inherit',
+    ],
+  ] as const)('%s keeps Decrypt on the surface text colour', (file, buttons, color) => {
+    const moduleCss = compileModule(file);
+    buttons.forEach((button) => {
+      const rest = moduleRule(moduleCss, button);
+      expect([button, rest.color, rest.border]).toEqual([button, color, '1px solid currentColor']);
+      const hovered = moduleRule(moduleCss, `${button}:hover:not(:disabled)`);
+      expect([button, hovered.color, hovered['border-color'], hovered.background]).toEqual([
+        button,
+        undefined,
+        undefined,
+        undefined,
+      ]);
+      expect([button, moduleRule(moduleCss, `${button}:focus`).outline]).toEqual([button, '2px solid currentColor']);
+    });
+  });
+
+  const surveyToolCss = compileModule('components/SurveyTool/SurveyTool.module.scss');
+  test.each(registry.themes.map(({ id }) => id))('%s keeps the surfaces Decrypt inherits from readable', (themeId) => {
+    const values = themeValues(css, themeId);
+    const paint = painter(values);
+    const onSurface = composite(parseColor(values.surface), parseColor(values.canvas));
+    const ratio = (color: string, background: string, under: Rgba) => {
+      const fill = composite(paint(background), under);
+      return Number(contrastRatio(composite(paint(color), fill), fill).toFixed(2));
+    };
+    const notice = moduleRule(surveyToolCss, '.gatedPromptNotice');
+    const responseNotice = moduleRule(surveyToolCss, '.userResponseNotice');
+    const chip = moduleRule(surveyToolCss, '.decryptChip');
+    const dialog = composite(parseColor(values['overlay-surface']), parseColor(values['overlay-base']));
+    const onDark = moduleRule(surveyToolCss, '.lockedQuestionsBannerOnDark .lockedQuestionsDecryptButton');
+    expect(
+      [
+        ['locked notice', ratio(notice.color, notice.background, onSurface)],
+        ['response notice', ratio(responseNotice.color, responseNotice['background-color'], onSurface)],
+        ['chip', ratio(chip.color, 'var(--ce-card-bg)', onSurface)],
+        ['locked banner', ratio(onDark.color, 'transparent', dialog)],
+      ].filter(([, value]) => Number(value) < 4.5),
+    ).toEqual([]);
+    expect(chip.opacity).toBeUndefined();
+
+    // Results' dialog names the colour the card's Decrypt takes; panel text is black on Classic 95's teal there.
+    const resultsCard = moduleRule(resultsCss, '.surveyResultsResponseCard');
+    const onCard = composite(paint(resultsCard.background), dialog);
+    expect(resultsCard['--decrypt-cta-text']).toBe('var(--ce-overlay-text)');
+    expect(contrastRatio(composite(paint(resultsCard['--decrypt-cta-text']), onCard), onCard)).toBeGreaterThanOrEqual(
+      4.5,
+    );
+  });
+
   test.each(registry.themes.map(({ id }) => id))('%s keeps small binary answer labels readable', (themeId) => {
     const values = themeValues(css, themeId);
     for (const stance of ['agree', 'disagree']) {
