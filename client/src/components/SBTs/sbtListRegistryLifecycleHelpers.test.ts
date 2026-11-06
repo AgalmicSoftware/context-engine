@@ -5,7 +5,6 @@ describe('sbtListRegistryLifecycleHelpers', () => {
     expect(
       resolveSbtListRegistryRetryPlan({
         attempt: 0,
-        shouldExpectRegistryUniverse: true,
         snapshot: {
           registryEntryCount: 0,
           registryHydrated: false,
@@ -21,7 +20,6 @@ describe('sbtListRegistryLifecycleHelpers', () => {
     expect(
       resolveSbtListRegistryRetryPlan({
         attempt: 3,
-        shouldExpectRegistryUniverse: true,
         snapshot: {
           registryEntryCount: 0,
           registryHydrated: false,
@@ -37,7 +35,6 @@ describe('sbtListRegistryLifecycleHelpers', () => {
     expect(
       resolveSbtListRegistryRetryPlan({
         attempt: 4,
-        shouldExpectRegistryUniverse: true,
         snapshot: {
           registryEntryCount: 0,
           registryHydrated: false,
@@ -55,7 +52,6 @@ describe('sbtListRegistryLifecycleHelpers', () => {
     expect(
       resolveSbtListRegistryRetryPlan({
         attempt: 1,
-        shouldExpectRegistryUniverse: true,
         snapshot: {
           registryEntryCount: 2,
           registryHydrated: false,
@@ -71,26 +67,9 @@ describe('sbtListRegistryLifecycleHelpers', () => {
     expect(
       resolveSbtListRegistryRetryPlan({
         attempt: 1,
-        shouldExpectRegistryUniverse: true,
         snapshot: {
           registryEntryCount: 0,
           registryHydrated: true,
-        },
-      }),
-    ).toEqual({
-      delayMs: null,
-      nextAttempt: 1,
-      pending: false,
-      shouldSchedule: false,
-    });
-
-    expect(
-      resolveSbtListRegistryRetryPlan({
-        attempt: 1,
-        shouldExpectRegistryUniverse: false,
-        snapshot: {
-          registryEntryCount: 0,
-          registryHydrated: false,
         },
       }),
     ).toEqual({
@@ -107,7 +86,6 @@ describe('sbtListRegistryLifecycleHelpers', () => {
         attempt: 2,
         delayStepMs: 3000,
         maxDelayMs: 5000,
-        shouldExpectRegistryUniverse: true,
         snapshot: {
           registryEntryCount: 0,
           registryHydrated: false,

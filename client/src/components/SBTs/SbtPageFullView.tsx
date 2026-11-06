@@ -235,7 +235,6 @@ export const renderSbtPageFullView = ({
 }: RenderSbtPageFullViewArgs): React.ReactElement => {
   const {
     bookmarked,
-    burnedAddresses,
     burningStatus,
     copiedAddress,
     copiedError,

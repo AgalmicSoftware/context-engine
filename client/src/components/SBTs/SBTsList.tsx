@@ -209,8 +209,6 @@ const OnChainSBTsList = ({
     }),
   );
 
-  const shouldExpectRegistryUniverse = true;
-
   const readSessionUniverseSnapshot = useCallback((): SbtSessionUniverseSnapshot => {
     const allEntries = getAllSessionEntries();
     const showDemoSessions = readSbtListShowDemoSessions();
@@ -228,13 +226,12 @@ const OnChainSBTsList = ({
       demoSessionMap: DEMO_SESSION_MAP,
     });
     const fallbackEntryCount = Array.isArray(fallbackEntries) ? fallbackEntries.length : 0;
-    const entriesForUniverse = shouldExpectRegistryUniverse
-      ? registryEntryCount > 0
+    const entriesForUniverse =
+      registryEntryCount > 0
         ? mergeSessionUniverseEntriesBySlug([registryEntries, customDemoEntries], {
             demoSessionMap: DEMO_SESSION_MAP,
           })
-        : visibleFallbackEntries
-      : visibleFallbackEntries;
+        : visibleFallbackEntries;
     const slugs = getVisibleSessionSlugsFromEntries(entriesForUniverse);
     const cache = sessionRegistryStore.readCache();
     const registryHydrated = !!(
@@ -243,7 +240,7 @@ const OnChainSBTsList = ({
       (typeof cache.__hadLoadErrors === 'boolean' || Object.keys(cache.sessions || {}).length > 0)
     );
     return { slugs, registryEntryCount, fallbackEntryCount, registryHydrated };
-  }, [shouldExpectRegistryUniverse]);
+  }, []);
 
   const syncSessionUniverseFromCache = useCallback(() => {
     const next = readSessionUniverseSnapshot();
@@ -264,10 +261,8 @@ const OnChainSBTsList = ({
   const [hasNoSessionUniverseItems, setHasNoSessionUniverseItems] = useState<boolean>(false);
   const availableSessionSlugs = availableSessionUniverse.slugs;
   const registryEntryCount = Number(availableSessionUniverse.registryEntryCount || 0);
-  const fallbackEntryCount = Number(availableSessionUniverse.fallbackEntryCount || 0);
   const registryHydrated = !!availableSessionUniverse.registryHydrated;
-  const sessionUniverseRegistryPending =
-    allSessionsMode && shouldExpectRegistryUniverse && registryEntryCount <= 0 && !registryHydrated;
+  const sessionUniverseRegistryPending = allSessionsMode && registryEntryCount <= 0 && !registryHydrated;
 
   const isListModeScopeEnabled = useMemo(() => {
     void globalSessionSelectionRevision;
@@ -278,10 +273,6 @@ const OnChainSBTsList = ({
     void globalSessionSelectionRevision;
     return isListModeScopeEnabled ? dedupeNormalizedSbtListSlugs(readSessionScanSlugs()) : [];
   }, [globalSessionSelectionRevision, isListModeScopeEnabled]);
-  const listModeConfiguredSessionSlugSet = useMemo(
-    () => new Set(listModeConfiguredSessionSlugs),
-    [listModeConfiguredSessionSlugs],
-  );
 
   const registrySessionUniverseSlugs = useMemo<string[]>(() => {
     const snapshot = availableSessionUniverse;
@@ -498,7 +489,6 @@ const OnChainSBTsList = ({
       const retryPlan = resolveSbtListRegistryRetryPlan({
         attempt,
         maxAttempts,
-        shouldExpectRegistryUniverse,
         snapshot: next,
       });
       if (!retryPlan.shouldSchedule || retryPlan.delayMs == null) return;
@@ -510,7 +500,7 @@ const OnChainSBTsList = ({
       cancelled = true;
       if (retryTimerId) clearTimeout(retryTimerId);
     };
-  }, [allSessionsMode, sessionUniverseRegistryPending, shouldExpectRegistryUniverse, syncSessionUniverseFromCache]);
+  }, [allSessionsMode, sessionUniverseRegistryPending, syncSessionUniverseFromCache]);
 
   useEffect(() => {
     if (!allSessionsMode) return;

@@ -216,14 +216,6 @@ interface LoginAndSettingsModalState {
   walletBalanceWei: ethers.BigNumber | null;
 }
 
-type SponsoredSessionEntry = Record<string, unknown> & {
-  slug: string;
-  label: string;
-  sponsoredKeys: Record<string, unknown>;
-  isActive?: boolean;
-  inRpcScope?: boolean;
-};
-
 type AiSettingsLike = Record<string, unknown> & {
   mode?: unknown;
   models?: Record<string, unknown>;
@@ -2166,7 +2158,6 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
         ? card.sessions.filter((entry: any) => !entry?.isActive)
         : [];
     const extrasExpanded = !!this.state.expandedSponsorResources?.[card.key];
-    const extraCount = extraSessions.length;
 
     return (
       <LoginSettingsSupportedResourceCard
@@ -2212,7 +2203,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
 
   getSettingsDisplay = () => {
     const overview = this.getSettingsOverviewContext();
-    const { activeSession, cryptoTerminology, needsNetworkSwitch, sponsorSessions, targetNetwork } = overview;
+    const { activeSession, cryptoTerminology, needsNetworkSwitch, sponsorSessions } = overview;
 
     const aiLocal = this.state.aiSettings || getLocalAiSettings() || {};
     const sessionSlug = this.getActiveSessionSlug();

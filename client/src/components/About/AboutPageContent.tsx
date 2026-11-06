@@ -41,11 +41,6 @@ export type RecognitionGroup = {
   image?: string;
 };
 
-export type RecognitionIndividual = {
-  name: string;
-  url?: string;
-};
-
 type RoadmapSection = {
   category: string;
   items: {
@@ -226,8 +221,6 @@ export const PracticeVisual = ({ entry }: { entry: PracticeEntry }) => {
   );
 };
 
-export const RECOGNIZED_INDIVIDUALS: RecognitionIndividual[] = [];
-
 export const ROADMAP_SECTIONS: RoadmapSection[] = [
   {
     category: 'Current Foundations',
@@ -401,15 +394,6 @@ export const USE_CASES = [
       'Codify group preferences over time, train representative AI models, and keep community data attributable, licensable, and revocable.',
   },
 ];
-
-export const getConfiguredRecognitionIndividuals = (individuals: unknown[] = []): RecognitionIndividual[] =>
-  individuals.filter(
-    (person): person is RecognitionIndividual =>
-      !!person &&
-      typeof person === 'object' &&
-      typeof (person as { name?: unknown }).name === 'string' &&
-      (person as { name: string }).name.trim().length > 0,
-  );
 
 export const getAboutDemoSessionPath = (selection = readStoredGlobalSessionSelection()) => {
   const scopeMode = String(selection?.selectedSessionScope || '')

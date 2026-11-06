@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import { useMemo } from 'react';
 import styles from './DemoAnalysisWorkspace.module.scss';
 
 const RESPONSE_ORDER = ['Agree', 'Unsure', 'Disagree'] as const;

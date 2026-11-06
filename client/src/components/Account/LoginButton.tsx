@@ -2,7 +2,6 @@
 import { Component } from 'react';
 import { connect } from 'react-redux';
 import type { RootState } from '../../reducers/index.js';
-import { createLogger } from '../../utilities/logging';
 
 // Reactstrap components
 import { Button } from 'reactstrap';
@@ -13,8 +12,6 @@ import styles from './Account.module.scss';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faSpinner } from '@fortawesome/free-solid-svg-icons';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
-
-const log = createLogger('account');
 
 type LoginButtonOwnProps = {
   launchAccountModal: () => void;

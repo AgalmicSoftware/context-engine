@@ -13,19 +13,17 @@ import {
 import { buildPublicRoute } from '../MainSite/urlUtils.js';
 import {
   getAboutDemoSessionPath,
-  getConfiguredRecognitionIndividuals,
   getRecognitionFallback,
   getRecognitionSlug,
   PracticeVisual,
   PRACTICE_ENTRIES,
   RECOGNITION_GROUPS,
-  RECOGNIZED_INDIVIDUALS,
   ROADMAP_SECTIONS,
   USE_CASES,
   type RecognitionGroup,
 } from './AboutPageContent';
 
-export { getAboutDemoSessionPath, getConfiguredRecognitionIndividuals } from './AboutPageContent';
+export { getAboutDemoSessionPath } from './AboutPageContent';
 
 const ABOUT_DEMO_VIDEO_MEDIA_URL = buildPublicRoute('/about-demo.mp4');
 
@@ -46,8 +44,6 @@ const AboutPage = () => {
   const useCaseDetailRef = useRef<HTMLElement | null>(null);
   const mobileDemoVideoRef = useRef<HTMLVideoElement | null>(null);
   const activeUseCaseConfig = USE_CASES.find(({ slug }) => slug === activeUseCase) || null;
-  const configuredRecognitionIndividuals = getConfiguredRecognitionIndividuals(RECOGNIZED_INDIVIDUALS);
-  const hasRecognizedIndividuals = configuredRecognitionIndividuals.length > 0;
 
   useEffect(() => {
     const updateUsesJump = () => {
@@ -651,22 +647,6 @@ const AboutPage = () => {
                       );
                     })}
                   </div>
-
-                  {hasRecognizedIndividuals && (
-                    <div className={styles.recognitionIndividuals} data-testid="ce-about-recognition-individuals">
-                      {configuredRecognitionIndividuals.map((person) => (
-                        <span key={person.name} className={styles.recognitionIndividual}>
-                          {person.url ? (
-                            <a href={person.url} target="_blank" rel="noopener noreferrer">
-                              {person.name}
-                            </a>
-                          ) : (
-                            person.name
-                          )}
-                        </span>
-                      ))}
-                    </div>
-                  )}
                 </div>
               </section>
             </div>

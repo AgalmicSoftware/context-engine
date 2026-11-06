@@ -3465,15 +3465,8 @@ class UserPage extends Component<any, any> {
     // Unique tooltip targets (wrapping spans) for disabled buttons.
     // Sanitize route-derived values to avoid invalid selector chars (e.g. "/")
     // in reactstrap tooltip `target` selectors.
-    const {
-      analyzeBtnWrapId,
-      compareBtnWrapId,
-      questionSpinnerId,
-      questionsCreatedSpinnerId,
-      sbtSpinnerId,
-      surveySpinnerId,
-      surveysCreatedSpinnerId,
-    } = buildUserPageTooltipTargetIds(propViewAddress);
+    const { questionSpinnerId, questionsCreatedSpinnerId, sbtSpinnerId, surveySpinnerId, surveysCreatedSpinnerId } =
+      buildUserPageTooltipTargetIds(propViewAddress);
     const deepScanTooltipLines = this.buildDeepScanProgressTooltip();
     const deepScanProgressRows = this.buildDeepScanProgressRows();
     const { deepScanTooltipContent, deepScanTooltipTitle } = buildUserPageDeepScanTooltipDisplayState({

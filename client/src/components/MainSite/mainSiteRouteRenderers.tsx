@@ -1319,7 +1319,7 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
     );
   },
 
-  getMainView: (relevantMatch: RegExpMatchArray | null | undefined) => {
+  getMainView: () => {
     // Variable initialization
     let surveyIDFromPath: string | null = null;
     let parsedFilterStateFromUrl: Record<string, unknown> = {};

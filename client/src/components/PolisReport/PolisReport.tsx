@@ -181,7 +181,6 @@ export default function PolisReport({
   sbtFilterString, // (Optional) String describing SBT filters applied by parent
   filterState, // (Optional) Object with detailed filter state from parent
   sessionName = null, // Optional session name
-  sessionHeader = null, // --> NEW: Optional header image path
   sessionInfo = null, // Optional session info (string or object)
   onePageDemo = false, // whether we are embedded in demo page
   demoDataFirstLoad = false,
@@ -607,7 +606,7 @@ export default function PolisReport({
 
   // ====== NEW: AI Cluster Analysis State ======
   const analysisStartTimesRef = useRef<NumberMap>({}); // { [clusterIndex]: startMs }
-  const [analysisTicker, setAnalysisTicker] = useState<number>(0); // triggers re-render for timers
+  const [, setAnalysisTicker] = useState<number>(0); // triggers re-render for timers
   const [analysisLoadingKey, setAnalysisLoadingKey] = useState<string | null>(null); // string | null (current analysis key)
   const [analysisCacheByKey, setAnalysisCacheByKey] = useState<PolisAnalysisCacheByKey>({}); // { [key]: { [clusterIndex]: {short,long} } }
   const [analysisErrorsByKey, setAnalysisErrorsByKey] = useState<PolisAnalysisErrorsByKey>({}); // { [key]: { [clusterIndex]: string } }
@@ -1341,7 +1340,6 @@ export default function PolisReport({
       return <p style={{ fontStyle: 'italic', marginLeft: '10px' }}>(No participants found.)</p>;
     }
 
-    const hasDisplayNames = demoDisplayNames && Object.keys(demoDisplayNames).length > 0;
     const unique = getRenderableParticipantList(allResponders, demoDisplayNames);
 
     if (unique.length === 0) {
@@ -2587,18 +2585,6 @@ export default function PolisReport({
       >
         {/* --- ORGANIZATION BRANDING SECTION --- */}
         <div className={styles.brandingHeader}>
-          {/* {sessionHeader && (
-            <img
-              src={sessionHeader}
-              alt={`${resolvedSessionName || 'Session'} Header`}
-              className={styles.orgHeaderImage} // Use CSS class for styling
-            />
-          )}
-          {resolvedSessionName && (
-            <h3 className={styles.orgReportTitle}>
-              {resolvedSessionName} - Context Engine Report
-            </h3>
-          )} */}
           {!!resolvedSessionInfo && !!sessionInfoText && <p className={styles.sessionInfo}>{sessionInfoText}</p>}
         </div>
         {/* --- END ORGANIZATION BRANDING SECTION --- */}

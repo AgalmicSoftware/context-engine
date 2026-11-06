@@ -30,16 +30,6 @@ type LegacyIssueLink = {
   label?: string;
 };
 
-type DebateIssueRef =
-  | string
-  | {
-      atlasNodeId?: string;
-      nodeId?: string;
-      id?: string;
-      label?: string;
-      name?: string;
-    };
-
 export type CorpusEntry = {
   id?: string;
   author?: string;

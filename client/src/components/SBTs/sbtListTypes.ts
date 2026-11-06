@@ -9,9 +9,7 @@ import type {
   SbtListRealtimeProgressBySlug,
   SbtListRealtimeProgressRecord,
   SbtListScopedEntryOptions,
-  SbtListSessionChipStateBySlug,
   SbtListSessionLoadingStatus,
-  SbtListSessionLoadingStatusBySlug,
   SbtListSessionLoadingStatusOptions,
   SbtListSessionProgressSnapshot,
   SbtListSessionUniverseSnapshot,
@@ -97,8 +95,6 @@ export type SbtSessionDisplayConfig = UnknownRecord & {
 export type SbtSessionProgressSnapshot = SbtListSessionProgressSnapshot;
 export type SbtSessionLoadingOptions = SbtListSessionLoadingStatusOptions;
 export type SbtSessionLoadingStatus = SbtListSessionLoadingStatus;
-export type SbtSessionLoadingStatusBySlug = SbtListSessionLoadingStatusBySlug;
-export type SbtSessionChipStateBySlug = SbtListSessionChipStateBySlug;
 
 export type SbtListInitDeps = {
   listSlug: string;

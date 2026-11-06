@@ -1,4 +1,3 @@
-import React from 'react';
 import CheckboxMultiSelect from '../../Shared/CheckboxMultiSelect';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faMagic, faTimes } from '@fortawesome/free-solid-svg-icons';

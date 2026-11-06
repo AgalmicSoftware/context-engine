@@ -18,7 +18,7 @@ import type { MainSiteProps, MainSiteState } from './MainSiteTypes';
 
 // Styles
 import 'assets/css/contextEngine.scss';
-import stylesRaw from './AppShell.module.scss';
+import './AppShell.module.scss';
 
 // Smart contract events / interactions
 import {
@@ -113,14 +113,13 @@ import { WagmiHooksHOC as WagmiHooksHOCRaw } from '../HooksHOC/withWagmiBridge';
 
 // Components
 import NavbarRaw from '../Navbar/Navbar';
-import MainAreaTabsRaw from '../MainContent/MainAreaTabs';
-import RightSideRaw from '../RightSidebar/RightSide';
+// Route renderers use these two; importing them here keeps their stylesheets in the same bundle order.
+import '../MainContent/MainAreaTabs';
+import '../RightSidebar/RightSide';
 import OnboardingOverlayRaw from '../Onboarding/OnboardingOverlay';
 import { FIRST_VISIT_STORAGE_KEY } from '../Onboarding/onboardingConfig.js';
 import FooterRaw from '../Footer/Footer';
-import LazyFallbackRaw from '../Shared/LazyFallback';
 import DevE2eNavRaw from '../E2E/DevE2eNav';
-import RouteErrorBoundaryRaw from '../ErrorBoundary/RouteErrorBoundary';
 
 import { createLogger } from 'utilities/logging.js';
 import {
@@ -169,10 +168,6 @@ import {
   SESSION_FALLBACK_REDIRECT_STORAGE_KEY_PREFIX,
 } from '../../utilities/cache/sessionCacheConstants.js';
 import { buildMainSiteCacheManagerReadyStatePatch } from '../../utilities/session/mainSiteUtils.js';
-import {
-  NotFoundRoute as NotFoundRouteRaw,
-  SessionLoadingSkeleton as SessionLoadingSkeletonRaw,
-} from './routeStatusViews';
 import { isStaticNonCacheRoute } from './routeConfig.js';
 import { createMainSiteRouteRenderers } from './mainSiteRouteRenderers.js';
 import { createMainSiteSessionScanPolicy } from './mainSiteSessionScanPolicyBinding.js';
@@ -246,21 +241,13 @@ export {
 
 const mainSiteLog = createLogger('mainSite');
 
-const PROFILE_SCAN_REPORT_EVENT = 'ce:profile-scan-report';
 type MainSiteRouteComponent = React.ComponentType<Record<string, unknown>>;
-const styles = stylesRaw as Record<string, string>;
 const WagmiHooksHOC = WagmiHooksHOCRaw;
 const asMainSiteRouteComponent = (component: unknown): MainSiteRouteComponent => component as MainSiteRouteComponent;
 const Navbar = asMainSiteRouteComponent(NavbarRaw);
-const MainAreaTabs = asMainSiteRouteComponent(MainAreaTabsRaw);
-const RightSide = asMainSiteRouteComponent(RightSideRaw);
 const OnboardingOverlay = asMainSiteRouteComponent(OnboardingOverlayRaw);
 const Footer = asMainSiteRouteComponent(FooterRaw);
-const LazyFallback = asMainSiteRouteComponent(LazyFallbackRaw);
 const DevE2eNav = asMainSiteRouteComponent(DevE2eNavRaw);
-const RouteErrorBoundary = asMainSiteRouteComponent(RouteErrorBoundaryRaw);
-const NotFoundRoute = asMainSiteRouteComponent(NotFoundRouteRaw);
-const SessionLoadingSkeleton = asMainSiteRouteComponent(SessionLoadingSkeletonRaw);
 
 type RefreshSurveyResponsesByIDFn = (surveyID: string) => Promise<void>;
 type RefreshQuestionResponsesFn = (
@@ -330,48 +317,6 @@ type MainSiteProfileScanError = Error & {
   code?: string;
   slug?: string;
 };
-type MainSiteProfileScanSbt = Record<string, unknown> & {
-  sbtAddress?: string;
-  sbtInfo?: Record<string, unknown>;
-};
-type MainSiteProfileActivityEntry = Record<string, unknown> & {
-  id?: string;
-  surveyId?: string;
-  surveyID?: string;
-  questionId?: string;
-  questionID?: string;
-  responder?: string;
-  response?: unknown;
-  data?: MainSiteMutableMetadata;
-  blockNumber?: number | string;
-  transactionIndex?: number | string;
-  txIndex?: number | string;
-  logIndex?: number | string;
-  timestamp?: number | string;
-};
-type MainSiteProfileActivityPayload = {
-  createdSurveys: MainSiteProfileActivityEntry[];
-  createdQuestions: MainSiteProfileActivityEntry[];
-  surveyResponses: MainSiteProfileActivityEntry[];
-  questionResponses: MainSiteProfileActivityEntry[];
-};
-type MainSiteProfileUserData = MainSiteProfileActivityPayload & {
-  sbts: MainSiteProfileScanSbt[];
-};
-type MainSiteProfileUserChainEntry = Record<string, unknown> & {
-  lastBlockScanned?: number;
-  lastScanTimestamp?: number;
-  scanIncomplete?: boolean;
-  surveyActivityLastBlockScanned?: number;
-  surveyActivityScanIncomplete?: boolean;
-  questionActivityLastBlockScanned?: number;
-  questionActivityScanIncomplete?: boolean;
-  sbtLastBlockScanned?: number;
-  sbtScanIncomplete?: boolean;
-  sbtBackfillComplete?: boolean;
-  data?: MainSiteProfileUserData;
-};
-type MainSiteProfileUserCache = Record<string, Record<string, MainSiteProfileUserChainEntry>>;
 type MainSiteProfileScanReport = {
   targetAddress: string;
   usedAllSessions: boolean;
@@ -418,26 +363,6 @@ type MainSiteProfileScanReport = {
   sampleSurveyResponseIds: string[];
   sampleQuestionResponseIds: string[];
 };
-type MainSiteProfileActivityWindow = {
-  fromBlock: number;
-  shouldForceBackfill: boolean;
-};
-type MainSiteProfileTimeoutOutcome<T = unknown> = {
-  timedOut: boolean;
-  value?: T;
-  error?: unknown;
-};
-type MainSiteProfileBackfillTimeoutOptions = Record<string, unknown> & {
-  floorTimeoutMs?: number;
-  spanStepBlocks?: number;
-  timeoutCapMs?: number;
-};
-type MainSiteProfileResponseRecency = {
-  bn: number;
-  txi: number;
-  li: number;
-  ts: number;
-};
 type MainSiteRuntimeFlags = {
   CE_SURVEY_DEEPLINK_RPC_TIMEOUT_MS?: unknown;
   ENABLE_RPC_DEBUG_LOGGING?: unknown;
@@ -463,18 +388,6 @@ type MainSiteSurveyNetworkCache = Record<string, unknown> & {
   surveyResponsesLatestBlock: MainSiteSurveyResponseBlockCache;
   pendingSurveyMetadata?: Record<string, unknown>;
 };
-type MainSiteSbtProfileCacheEntry = Record<string, unknown> & {
-  blockNumber?: number;
-  mintedAddresses?: string[];
-  sbtAddress?: string;
-  sbtInfo?: Record<string, unknown>;
-  slug?: string;
-};
-type MainSiteSbtNetworkCache = Record<string, unknown> & {
-  lastBlock?: number;
-  sbtList: Record<string, MainSiteSbtProfileCacheEntry | undefined>;
-};
-type MainSiteSbtMetadataCache = Record<string, MainSiteSbtNetworkCache | undefined>;
 type MainSiteQuestionNetworkCache = Record<string, unknown> & {
   questionsLatestBlock?: number;
   questionResponsesLatestBlock?: number;
@@ -567,19 +480,6 @@ const updateMainSiteCacheAtomic = async <TValue,>(
   }
 };
 
-const hasMainSiteRegistryIdentity = (sessionConfig: MainSiteSessionConfigLike | null | undefined): boolean => {
-  if (!isMainSiteRecord(sessionConfig)) return false;
-  const registry = isMainSiteRecord(sessionConfig.__registry) ? sessionConfig.__registry : {};
-  return !!(
-    sessionConfig.sessionId ||
-    sessionConfig.sessionIdHex ||
-    sessionConfig.metadataURI ||
-    registry.sessionId ||
-    registry.sessionIdHex ||
-    registry.metadataURI
-  );
-};
-
 const isMainSitePresent = <T,>(value: T | null | undefined): value is T => value !== null && value !== undefined;
 
 const readMainSiteErrorMessage = (error: unknown): unknown => (error instanceof Error ? error.message : error);
@@ -593,9 +493,6 @@ const toMainSiteScanScopeContext = (ctx: unknown): MainSiteScanScopeContext | nu
     activeSlugFromRoute: ctx.activeSlugFromRoute === true,
   };
 };
-
-const getMainSiteRuntimeGlobal = (): typeof globalThis & MainSiteRuntimeFlags =>
-  globalThis as typeof globalThis & MainSiteRuntimeFlags;
 
 const getMainSiteRuntimeWindow = (): (Window & MainSiteRuntimeFlags) | null =>
   typeof window === 'undefined' ? null : (window as Window & MainSiteRuntimeFlags);
@@ -2268,7 +2165,7 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
       (didRedirectInitialLoadToAbout && typeof window !== 'undefined'
         ? window.location.pathname
         : this.getCurrentPathname()) || '';
-    const mountFallbackTarget = this.applySessionFallbackRedirect({ pathIn: mountPathRaw });
+    this.applySessionFallbackRedirect({ pathIn: mountPathRaw });
     this.syncSessionFallbackRedirectConsumption({ pathIn: mountPathRaw });
     const currentPath = this.getEffectiveRoutePath(mountPathRaw);
     const mountSearch = (typeof window !== 'undefined' ? window.location.search : '') || '';
@@ -4091,7 +3988,7 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
     this._responseHydrationController.refreshQuestionResponses(questionIds, opts);
 
   render() {
-    const mainViewDisplay = this.getMainView(null);
+    const mainViewDisplay = this.getMainView();
     const activeRouteSessionConfig = this.getDisplaySessionCfg(this.getSessionSlugFromProps());
     const effectivePath = this.getEffectiveRoutePath(this.getCurrentPathname());
     const hasActiveSessionRoute =

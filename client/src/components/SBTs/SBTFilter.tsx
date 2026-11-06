@@ -336,7 +336,7 @@ class SBTFilter extends React.Component<SbtFilterProps, SbtFilterState> {
       this._activeApplyFilterRunId = effectiveRunId;
     }
     try {
-      const { items, mode, provider, network, isQuestionCacheReady, isSBTCacheReady } = this.props;
+      const { items, mode, isQuestionCacheReady, isSBTCacheReady } = this.props;
       const slug = this.props.sessionSlug || '';
 
       // Correct readiness gating per mode:

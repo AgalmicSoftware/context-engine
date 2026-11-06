@@ -3407,7 +3407,6 @@ class CreateSBTGroup extends Component<any, any> {
       sbtName,
       sbtDistribution,
       passwordList,
-      numInviteLinks,
       tokenURI,
       groupPassword: rawGroupPassword,
       create2Salt,
@@ -3600,18 +3599,6 @@ class CreateSBTGroup extends Component<any, any> {
     const sbtInviteBackupDate = new Date().toISOString().slice(0, 10);
     this.setState(buildCreateSbtInviteLinksBackupPatch({ sbtInviteLinks, sbtInviteBackupDate }));
   }
-
-  massSendSBTs = async (): Promise<void> => {
-    const { csvAddresses } = this.state;
-    const addresses = String(csvAddresses || '')
-      .split(',')
-      .map((address) => address.trim());
-    try {
-      // placeholder
-    } catch (e) {
-      sbtLog.warn('CreateSBTGroup: fallback', e);
-    }
-  };
 
   updateNumInviteLinks = (): void => {
     if (
@@ -3950,31 +3937,25 @@ class CreateSBTGroup extends Component<any, any> {
       sbtImageUrl,
       useImageUrl,
       sbtDistribution,
-      imageUploaded,
       tokenURI,
-      tokenUriUploaded,
       sbtMinted,
       sbtAddress,
-      csvAddresses,
       tokenInfoCollapsed,
       mintOptionsCollapsed,
       distributionOptionsCollapsed,
       currentStep,
       mintingFailed,
       sbtInviteLinks,
-      numInviteLinks,
       network,
       copiedLinkIndex,
       copyIdSuccess,
       copyLinkSuccess,
       exportFormat,
-      sbtSymbol,
       passwordList,
       tags,
       currentTagInput,
       documentIDHashes,
       documentUrl,
-      showTagsInput,
       imageLoadError,
       imageChooserStatusText,
       imageChooserStatusTone,

@@ -15,7 +15,6 @@ import {
   faSearch,
   faUsers,
 } from '@fortawesome/free-solid-svg-icons';
-import { createLogger } from '../../utilities/logging';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { hasCachedCreateSbtForm } from '../../utilities/sbt/sbtCreateFormCache.js';
 import { sbtsListPath } from '../../utilities/ui/terminology.js';
@@ -44,8 +43,6 @@ const SurveyTool = React.lazy(() => import('../SurveyTool/SurveyTool'));
 const SBTsPage = React.lazy(() => import('../SBTs/SBTsPage'));
 const DebateMap = React.lazy(() => import('../DebateMap/DebateMap'));
 const AudioSurveyGenerator = React.lazy(() => import('../SurveyTool/SurveyGenerator/SurveyGenerator'));
-
-const log = createLogger('ui');
 
 type ToolComponent = React.ComponentType<any> | React.LazyExoticComponent<React.ComponentType<any>>;
 
