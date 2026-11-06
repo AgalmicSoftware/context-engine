@@ -70,8 +70,15 @@ describe('AdminWorkerGroupsPanel', () => {
         postSignedRequest={postSignedRequest}
       />,
     );
-    expect(screen.getByTestId('ce-admin-worker-group-create-mode')).toHaveValue('open');
-    expect(screen.getByTestId('ce-admin-worker-group-create-visibility')).toHaveValue('session');
+    const mode = screen.getByTestId('ce-admin-worker-group-create-mode');
+    const visibility = screen.getByTestId('ce-admin-worker-group-create-visibility');
+    expect(mode).toHaveValue('open');
+    expect(visibility).toHaveValue('session');
+    // A roster that admins fill by hand doesn't stay visible to the session, and an open group doesn't stay hidden.
+    fireEvent.change(mode, { target: { value: 'admin_add' } });
+    expect(visibility).toHaveValue('admin_only');
+    fireEvent.change(mode, { target: { value: 'open' } });
+    expect(visibility).toHaveValue('session');
     fireEvent.change(screen.getByTestId('ce-admin-worker-group-create-label'), { target: { value: 'Salon' } });
     fireEvent.click(screen.getByRole('button', { name: 'Create Group' }));
     await waitFor(() =>

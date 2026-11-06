@@ -91,11 +91,17 @@ const buildGroupInput = (draft: WorkerGroupDraft, label: string) => ({
   memberVisibility: draft.memberVisibility,
 });
 
-const withJoinMode = (draft: WorkerGroupDraft, joinMode: WorkerGroupJoinMode): WorkerGroupDraft => ({
-  ...draft,
-  joinMode,
-  memberVisibility: joinMode === 'open' && draft.memberVisibility === 'admin_only' ? 'session' : draft.memberVisibility,
-});
+// A group admins fill by hand keeps its roster with them, so choosing it never leaves the list open to the session.
+const withJoinMode = (draft: WorkerGroupDraft, joinMode: WorkerGroupJoinMode): WorkerGroupDraft => {
+  const { memberVisibility } = draft;
+  if (joinMode === 'open' && memberVisibility === 'admin_only') {
+    return { ...draft, joinMode, memberVisibility: 'session' };
+  }
+  if (joinMode === 'admin_add' && memberVisibility === 'session') {
+    return { ...draft, joinMode, memberVisibility: 'admin_only' };
+  }
+  return { ...draft, joinMode };
+};
 
 const memberAddress = (member: WorkerGroupMember): string => {
   const principal = member.principal;
