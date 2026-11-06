@@ -13,15 +13,9 @@ import {
 } from '../../utilities/session/groupCreationPolicy';
 
 type SessionWizardModeDraft = UnknownRecord & {
-  sessionMode?: unknown;
   sessionModeProfile?: unknown;
   storageProfile?: unknown;
   groupCreationPolicy?: unknown;
-  telegram?: UnknownRecord;
-  telegramBridgeEnabled?: unknown;
-  telegramMode?: unknown;
-  telegramOnly?: unknown;
-  telegram_only?: unknown;
 };
 
 type DraftWithGroupCreationPolicy<Draft extends SessionWizardModeDraft> = Draft & {
@@ -33,9 +27,6 @@ type DraftWithSelectedModeProfile<Draft extends SessionWizardModeDraft> = DraftW
   storageProfile: UnknownRecord;
   networkChainId?: number;
 };
-
-const isRecord = (value: unknown): value is UnknownRecord =>
-  !!value && typeof value === 'object' && !Array.isArray(value);
 
 export const applySessionModeProfileSelectionToDraft = <Draft extends SessionWizardModeDraft>(
   prev: Draft,
@@ -51,16 +42,6 @@ export const applySessionModeProfileSelectionToDraft = <Draft extends SessionWiz
     next.groupCreationPolicy,
     DEFAULT_NEW_SESSION_GROUP_CREATION_POLICY,
   );
-  delete next.telegramOnly;
-  delete next.telegram_only;
-  delete next.telegramMode;
-  delete next.sessionMode;
-  delete next.telegramBridgeEnabled;
   if (profile.surfaces?.agentHttp !== true) delete next.agentSessionWrapped;
-  if (isRecord(next.telegram)) {
-    delete next.telegram.only;
-    delete next.telegram.mode;
-    if (!Object.keys(next.telegram).length) delete next.telegram;
-  }
   return normalizeHostedFaucetSelection(next, prev);
 };

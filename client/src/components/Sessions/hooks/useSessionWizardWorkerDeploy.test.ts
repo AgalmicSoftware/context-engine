@@ -643,7 +643,7 @@ describe('useSessionWizardWorkerDeploy', () => {
       const capability = {
         version: 1,
         enabled: true,
-        origin: sameOrigin ? 'https://deployed.example.test' : 'https://retired-bridge.example.test',
+        origin: sameOrigin ? 'https://deployed.example.test' : 'https://retired-agent.example.test',
         protocolVersion: 'agent-session-wrapped-v1',
         revision: 'wrapped-0123456789abcdef',
         verifiedAt: '2026-07-20T18:00:00.000Z',

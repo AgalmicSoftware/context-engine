@@ -13,7 +13,6 @@ type DeployFormState = NonNullable<WorkerPanelProps['deployForm']> & {
   apiToken?: string;
   workerName?: string;
   adminAddress?: string;
-  bundleUrl?: string;
 };
 
 type CachedWorkerState =
@@ -36,7 +35,6 @@ type CachedWorkerState =
 export interface UseSessionWizardWorkerStateOptions<TProvisionedSponsoredContext> {
   cachedWizard?: CachedWorkerState;
   deployHelperUrlDefault?: unknown;
-  workerBundleUrlDefault?: unknown;
   defaultAllowedOrigins: string;
   buildProvisionedSponsoredContextState: (value: unknown) => TProvisionedSponsoredContext;
 }
@@ -75,12 +73,10 @@ const resolveCachedLimitValue = ({
 const useSessionWizardWorkerState = <TProvisionedSponsoredContext>({
   cachedWizard,
   deployHelperUrlDefault = '',
-  workerBundleUrlDefault = '',
   defaultAllowedOrigins,
   buildProvisionedSponsoredContextState,
 }: UseSessionWizardWorkerStateOptions<TProvisionedSponsoredContext>) => {
   const cachedDeployForm = resolveCachedDeployForm(cachedWizard);
-  const normalizedWorkerBundleUrlDefault = toStr(workerBundleUrlDefault);
   const [workerMode, setWorkerMode] = useState('default');
   const [workerSecretsEnabled, setWorkerSecretsEnabled] = useState(() =>
     typeof cachedWizard?.workerSecretsEnabled === 'boolean' ? cachedWizard.workerSecretsEnabled : true,
@@ -91,7 +87,6 @@ const useSessionWizardWorkerState = <TProvisionedSponsoredContext>({
     apiToken: '',
     workerName: toStr(cachedDeployForm.workerName || '').trim(),
     adminAddress: toStr(cachedDeployForm.adminAddress || '').trim() || undefined,
-    bundleUrl: toStr(cachedDeployForm.bundleUrl || normalizedWorkerBundleUrlDefault),
   });
   const [bundleFile, setBundleFile] = useState<File | null>(null);
   const [forceManualBundleFile, setForceManualBundleFile] = useState(false);

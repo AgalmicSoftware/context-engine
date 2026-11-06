@@ -7,7 +7,7 @@ const buildWorkerDeploySectionProps = (props: Partial<WorkerDeploySectionProps> 
   allowNativeWorkerVerification: true,
   workerMode: 'custom',
   shouldUseSponsoredAutoDeployFlow: false,
-  deployForm: { workerName: 'demo-worker', bundleUrl: '', apiToken: '', adminAddress: '' },
+  deployForm: { workerName: 'demo-worker', apiToken: '', adminAddress: '' },
   deployHelperToggle: <div>helper toggle</div>,
   shouldShowDeployHelperUrlInput: true,
   deployHelperUrl: '',

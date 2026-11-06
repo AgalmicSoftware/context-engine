@@ -7,7 +7,6 @@ export type DeployFormLike = AnyRecord & {
   apiToken?: string;
   workerName?: string;
   adminAddress?: string;
-  bundleUrl?: string;
 };
 
 export type DraftLike = AnyRecord & {

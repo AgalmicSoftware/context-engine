@@ -419,7 +419,6 @@ const SessionWizard = ({
   const [draft, setDraft] = useState<DraftState>(() => initialDraft as DraftState);
   const draftRef = useRef<DraftState>(initialDraft as DraftState);
   const [sessionId, setSessionId] = useState(() => cachedInitialState.initialSessionIdValue);
-  const [, setSessionIdStatus] = useState('');
   const [privateSlugMode, setPrivateSlugMode] = useState(() => !!cachedWizard?.privateSlugMode);
   const privateSlugModeRef = useRef(privateSlugMode);
   privateSlugModeRef.current = privateSlugMode;
@@ -541,7 +540,6 @@ const SessionWizard = ({
   });
   const sessionIdRotationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const adminUrlStatusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const sessionIdStatusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const jsonCopiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const compactSessionHeaderInputRef = useRef<HTMLInputElement | null>(null);
   const embeddedDeployHelperHydrationKeyRef = useRef('');
@@ -596,7 +594,6 @@ const SessionWizard = ({
     isMountedRef,
     sessionIdRotationTimerRef,
     adminUrlStatusTimerRef,
-    sessionIdStatusTimerRef,
     jsonCopiedTimerRef,
   });
   const DEFAULT_ALLOWED_ORIGINS = buildSessionWizardDefaultAllowedOrigins().join('\n');
@@ -642,7 +639,6 @@ const SessionWizard = ({
   } = useSessionWizardWorkerState<ProvisionedSponsoredContextState>({
     cachedWizard,
     deployHelperUrlDefault: CLOUDFLARE_DEPLOY_HELPER_URL,
-    workerBundleUrlDefault: CLOUDFLARE_WORKER_BUNDLE_URL,
     defaultAllowedOrigins: DEFAULT_ALLOWED_ORIGINS,
     buildProvisionedSponsoredContextState,
   });
@@ -1849,7 +1845,6 @@ const SessionWizard = ({
         wizardCacheSnapshotRef.current = null;
       const nextSessionId = generateSessionId();
       setSessionId(nextSessionId);
-      setSessionIdStatus(registerSuccessSettlement.nextSessionIdStatus);
       try {
         const refreshed = await sessionRegistryPublishAdapter.fetchSessionFromRegistry({
           ...registerSuccessSettlement.registryRefreshArgs,
@@ -2311,7 +2306,6 @@ const SessionWizard = ({
       clearSessionWizardCache,
       writeSessionWizardWorkerSettlement,
       setSessionId,
-      setSessionIdStatus,
     },
   });
 

@@ -23,7 +23,6 @@ const renderWorkerState = (overrides = {}) =>
     useSessionWizardWorkerState<ProvisionedSponsoredContext>({
       cachedWizard: null,
       deployHelperUrlDefault: 'https://deploy-helper.example',
-      workerBundleUrlDefault: 'https://bundle.example/session-worker.js',
       defaultAllowedOrigins: 'http://localhost:3010\nhttp://127.0.0.1:3010',
       buildProvisionedSponsoredContextState,
       ...overrides,
@@ -47,7 +46,6 @@ describe('useSessionWizardWorkerState', () => {
       apiToken: '',
       workerName: '',
       adminAddress: undefined,
-      bundleUrl: 'https://bundle.example/session-worker.js',
     });
     expect(result.current.deployStatus).toBe('');
     expect(result.current.deployInFlight).toBe(false);
@@ -103,7 +101,6 @@ describe('useSessionWizardWorkerState', () => {
       apiToken: '',
       workerName: 'worker',
       adminAddress: '0xAdmin',
-      bundleUrl: 'https://cached.example/worker.js',
     });
     expect(result.current.deployForm.accountId).toBeUndefined();
     expect(result.current.provisionedSponsoredContext).toEqual({
@@ -139,14 +136,6 @@ describe('useSessionWizardWorkerState', () => {
 
     expect(cachedWizard.nativeTemplateSetupIdentity).toBe(marker);
     expect(result.current.nativeTemplateSetupIdentity).toBe(marker);
-  });
-
-  it('leaves the bundle URL blank when no hosted worker bundle default exists', () => {
-    const { result } = renderWorkerState({
-      workerBundleUrlDefault: '',
-    });
-
-    expect(result.current.deployForm.bundleUrl).toBe('');
   });
 
   it('hydrates imported limit fields but keeps older drafts without anonymous limits inherited', () => {

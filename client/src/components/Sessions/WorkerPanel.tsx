@@ -16,7 +16,6 @@ type DraftState = {
 
 type DeployForm = {
   workerName?: string;
-  bundleUrl?: string;
   apiToken?: string;
   adminAddress?: string;
 };

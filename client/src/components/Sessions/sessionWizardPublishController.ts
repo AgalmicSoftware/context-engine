@@ -253,7 +253,6 @@ export type SessionWizardRegisterSuccessSettlementDescriptor = {
   sessionUrl: string;
   adminUrl: string;
   adminUrlStatus: string;
-  nextSessionIdStatus: string;
   registryRefreshArgs: {
     chainId: number;
     slug: string;
@@ -267,7 +266,6 @@ export type SessionWizardWorkerPublishSuccessSettlementDescriptor = {
   sessionUrl: string;
   adminUrl: string;
   adminUrlStatus: string;
-  nextSessionIdStatus: string;
 };
 
 export type SessionWizardRegisterFailureSettlementInput = {
@@ -752,7 +750,6 @@ export const resolveSessionWizardRegisterSuccessSettlementDescriptor = ({
       origin,
     }),
     adminUrlStatus: '',
-    nextSessionIdStatus: 'Generated a new session ID for your next session.',
     registryRefreshArgs: {
       chainId: refreshChainId,
       slug: normalizedRegistrySlug,
@@ -784,7 +781,6 @@ export const resolveSessionWizardWorkerPublishSuccessSettlementDescriptor = ({
       origin,
     }),
     adminUrlStatus: '',
-    nextSessionIdStatus: 'Generated a new session ID for your next session.',
   };
 };
 

@@ -6,7 +6,6 @@ export interface UseSessionWizardCleanupEffectOptions {
   isMountedRef: MutableRefObject<boolean>;
   sessionIdRotationTimerRef: TimerRef;
   adminUrlStatusTimerRef: TimerRef;
-  sessionIdStatusTimerRef: TimerRef;
   jsonCopiedTimerRef: TimerRef;
 }
 
@@ -21,7 +20,6 @@ const useSessionWizardCleanupEffect = ({
   isMountedRef,
   sessionIdRotationTimerRef,
   adminUrlStatusTimerRef,
-  sessionIdStatusTimerRef,
   jsonCopiedTimerRef,
 }: UseSessionWizardCleanupEffectOptions) => {
   useEffect(() => {
@@ -29,10 +27,9 @@ const useSessionWizardCleanupEffect = ({
       isMountedRef.current = false;
       clearTimerRef(sessionIdRotationTimerRef);
       clearTimerRef(adminUrlStatusTimerRef);
-      clearTimerRef(sessionIdStatusTimerRef);
       clearTimerRef(jsonCopiedTimerRef);
     };
-  }, [isMountedRef, sessionIdRotationTimerRef, adminUrlStatusTimerRef, sessionIdStatusTimerRef, jsonCopiedTimerRef]);
+  }, [isMountedRef, sessionIdRotationTimerRef, adminUrlStatusTimerRef, jsonCopiedTimerRef]);
 };
 
 export default useSessionWizardCleanupEffect;

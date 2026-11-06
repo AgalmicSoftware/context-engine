@@ -50,7 +50,6 @@ type PublishRuntimeCallbacks = {
   }) => unknown;
   writeSessionWizardWorkerSettlement: (input: SessionWizardWorkerSettlementInput) => unknown;
   setSessionId: (value: string) => unknown;
-  setSessionIdStatus: (value: string) => unknown;
 };
 
 const requireSuccessfulDurableStorageOperation = (result: unknown, message: string): void => {
@@ -404,7 +403,6 @@ export const createSessionWizardPublishRuntimeController = ({
       'Could not durably clear the published session draft',
     );
     callbacks.setSessionId(generateSessionId());
-    callbacks.setSessionIdStatus(workerSettlement.nextSessionIdStatus);
   };
 
   return { runPreparation, settleRegistration };
