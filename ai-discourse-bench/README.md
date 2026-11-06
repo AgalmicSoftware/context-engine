@@ -608,11 +608,8 @@ live-client synchronization details.
 
 ## Question Bank Prompt
 
-The coding-model handoff prompt lives at:
-
-```text
-prompts/question-bank-generator.md
-```
+The coding-model handoff prompt lives at `prompts/question-bank-generator.md`;
+`node ./bin/ai-discourse-bench.mjs print-prompt` prints it.
 
 It asks a repository-aware model to derive and rank exactly 500 source-resolved
 candidate questions from the OSS AI discourse corpus. The prompt reserves
@@ -620,15 +617,10 @@ substantial coverage for norms governing human use of AI agents, requires
 canonical and reversed wording, and produces provenance, coverage, rejection,
 and human-review artifacts without treating generation as validation.
 
-The second-pass analysis overlay prompt lives at:
-
-```text
-prompts/analysis-overlay-generator.md
-```
-
-It asks an analysis model to return compact JSON for risk-matrix popups,
-generated Debate Map topics, modal-ready issue areas, topic edges, compasses,
-and report-level analysis.
+The second-pass analysis overlay prompt lives at
+`prompts/analysis-overlay-generator.md`. It asks an analysis model to return
+compact JSON for risk-matrix popups, generated Debate Map topics, modal-ready
+issue areas, topic edges, compasses, and report-level analysis.
 
 ## Keeping Results Styling In Sync
 
@@ -654,76 +646,69 @@ model/question cell's full Agree / Unsure / Disagree distribution. Question,
 cohort, and opinion-group summaries average those normalized distributions with
 one weight per contributing model. Model summaries give each answered question
 one weight. Repeats and failed attempts cannot increase a model's weight; cells
-with no valid answers contribute to missing/invalid coverage instead. The
+with no valid answers count toward missing/invalid coverage instead. The
 standalone report uses the same aggregation function for initial views and
 interactive cohort filters.
 
 `observedDistribution.probabilities` contains the three observed shares;
 `observedDistribution.counts` contains fractional model (or question) equivalents,
 whose sum is `validUnits`. `totalUnits` includes cells without a valid answer.
-`runSummary` retains actual valid, invalid, and attempted run counts separately.
-Thus a model that answers Agree and Disagree equally has zero observed Unsure,
-while a model that always answers Unsure has an observed Unsure share of one,
-even though both have mean stance zero. The observed-share histogram is separate
-from each model's explicitly labeled -1 to +1 mean-stance axis. Nearby markers
-use separate vertical lanes without moving their means. Marker tooltips and
-keyboard focus expose observed shares; majority-Unsure observations are labeled
-"Mostly Unsure", and all-Unsure observations remain "Unsure". A central mean
-without majority uncertainty is labeled "Mixed (mean stance)". Displayed model
-equivalents are rounded to at most four decimal places; stored values and raw
-trial counts are unchanged. Within-polarity repeat consistency and wording
-sensitivity calculations are unchanged.
+`runSummary` keeps actual valid, invalid, and attempted run counts separately.
+A model that answers Agree and Disagree equally has zero observed Unsure, while a
+model that always answers Unsure has an observed Unsure share of one, even though
+both have mean stance zero. The observed-share histogram is separate from each
+model's labeled -1 to +1 mean-stance axis. Nearby markers use separate vertical
+lanes without moving their means. Marker tooltips and keyboard focus expose
+observed shares; majority-Unsure observations are labeled "Mostly Unsure", and
+all-Unsure observations remain "Unsure". A central mean without majority
+uncertainty is labeled "Mixed (mean stance)". Displayed model equivalents are
+rounded to at most four decimal places; stored values and raw trial counts are
+unchanged.
 
-This is a semantic revision within report schema v2 and native dataset v1,
-identified by `responseDistributionVersion: 1`; it is not wholly additive.
-Existing report/analysis aggregate `counts` and report `responseEntropy` retain their discretized mean
-stance semantics for compatibility; `countsUnit: 'discretized-mean-stances'` and
-`meanStance` make that interpretation explicit. Aggregate `uncertaintyRate` now
-means the equal-weight observed Unsure share among valid cells, as declared by
-`polisReport.uncertaintyRateSemantics`. Use the version/semantics fields when
-comparing new summaries with older saved reports. Rebuild reports from their run
-artifacts for full reproducibility. A schema-v2 preview with complete saved
-model/question and polarity counts can instead receive this narrow correction:
+Aggregate `counts` and report `responseEntropy` keep their discretized mean-stance
+semantics, declared by `countsUnit: 'discretized-mean-stances'` and `meanStance`.
+Aggregate `uncertaintyRate` is the equal-weight observed Unsure share among valid
+cells, declared by `polisReport.uncertaintyRateSemantics`. Check these fields when
+comparing a report with one saved before `responseDistributionVersion: 1`, and
+rebuild reports from their run artifacts for full reproducibility. A schema-v2
+preview with complete saved model/question and polarity counts can instead receive
+a narrow correction:
 
 ```bash
 node scripts/correct-saved-report-distributions.mjs old-report.json corrected-report.json
 node bin/ai-discourse-bench.mjs render-report --report corrected-report.json --out corrected-report.html
 ```
 
-The correction verifies legacy means against both the count-derived mean and
-its original calculation from rounded cell means. It retains the stored mean
-and interval; it does not widen the tolerance for arbitrary inconsistent values.
+The correction verifies saved means against both the count-derived mean and its
+original calculation from rounded cell means. It keeps the stored mean and
+interval, original cells, run summaries, source hashes, model metadata, and
+preview status, and does not widen the tolerance for inconsistent values. It
+records the source report digest and method in `summaryCorrection` and displays a
+notice that the original runs were not rerun or revalidated. Incomplete counts,
+changed means, analysis overlays, and release receipts need separate
+regeneration; the correction does not fabricate individual responses or rebind
+old analysis. No stored report is rewritten implicitly.
 
-The correction preserves original cells, run summaries, intervals, source hashes,
-model metadata, and preview status. It records the source report digest and the
-correction method in `summaryCorrection` and displays a notice that the original
-runs were not rerun or revalidated. Incomplete counts, changed means, analysis
-overlays, and release receipts require separate regeneration; the correction
-does not fabricate individual responses or rebind old analysis. No stored report
-is rewritten implicitly. The compatibility CE export still discretizes a mean into one answer;
-its `answerSemantics` flag and `averagedFrom.observedDistribution` distinguish that
+A report without `responseDistributionVersion` renders distributions derived from
+its retained model/question histograms, including interactive cohort and tag
+views, and shows a notice. An omitted question in a model row means no attempts;
+a missing row or a cell with incomplete counts makes that distribution
+unavailable. Mean-stance buckets are never presented as observed Unsure.
+
+The compatibility CE export still discretizes a mean into one answer; its
+`answerSemantics` flag and `averagedFrom.observedDistribution` distinguish that
 lossy answer from observed uncertainty. The analysis input includes observed
 shares, valid model counts, raw run counts, and the separate mean stance.
 
-When rendering an older report, visible distributions are derived from its
-retained model/question histograms, including interactive cohort and tag views.
-An omitted question in an existing model row denotes no attempts; a missing row
-or a present cell with incomplete counts makes that distribution unavailable.
-The legacy notice explains this read-only view. Original aggregates and cell
-evidence remain in Raw Results; legacy mean-stance buckets are never presented
-as observed Unsure.
-
 Native, compatibility, analysis-input, and longitudinal exports carry
-`summaryCorrection`. The analysis fingerprint includes that provenance whenever
-it is present. Uncorrected reports retain the historical fingerprint algorithm;
-older fingerprints for corrected reports must not be accepted or rebound.
-Regenerate the analysis input and its overlay against the corrected report.
-Rendering a corrected report also rejects an attached overlay with an obsolete
-fingerprint. The HTML analysis-input download stays bound to the original saved
-report, even when display normalization withholds legacy opinion groups. Attach
-its overlay to that original JSON; the normalized embedded Snapshot JSON is a
-derived display artifact and can have a different fingerprint.
-Release-content hashing already includes the correction record and is unchanged.
+`summaryCorrection`. The analysis fingerprint includes it whenever present, so
+regenerate the analysis input and its overlay against a corrected report;
+rendering a corrected report rejects an overlay with an obsolete fingerprint. The
+HTML analysis-input download stays bound to the original saved report even when
+display normalization withholds legacy opinion groups: attach its overlay to that
+original JSON, since the normalized embedded Snapshot JSON is a derived display
+artifact with a possibly different fingerprint. Release-content hashing already
+includes the correction record.
 
 Participant embedding and automatic or manual opinion groups require at least
 two eligible participants and measured similarity for every eligible pair.
