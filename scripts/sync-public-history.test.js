@@ -443,6 +443,62 @@ test('sync-public-history accepts a target base from the fetched public target h
   });
 });
 
+test('sync-public-history extends a pushed candidate that already carries the release version', () => {
+  withSourceRepo(({ sourceDir }) => {
+    const first = runSyncScript(sourceDir, ['--push', '--release-version', '0.2.0', 'release-staging-next']);
+    assert.equal(first.status, 0, syncFailureMessage(first));
+    const replayedThrough = git(sourceDir, ['rev-parse', 'dev']).trim();
+    const pushed = git(sourceDir, ['rev-parse', 'release-staging-next']).trim();
+
+    writeFile(sourceDir, 'later.txt', 'later public change\n');
+    commitAll(sourceDir, 'fix: add a later public change', {
+      authorDate: '2025-01-06T00:00:00Z',
+      committerDate: '2025-01-06T00:00:00Z',
+    });
+
+    const second = runSyncScript(sourceDir, [
+      '--force-with-lease',
+      '--source-base',
+      replayedThrough,
+      '--target-base',
+      pushed,
+      '--keep-release-version',
+      'release-staging-next',
+    ]);
+
+    assert.equal(second.status, 0, syncFailureMessage(second));
+    assert.equal(git(sourceDir, ['log', '-1', '--format=%s', 'release-staging-next']).trim(), 'fix: add a later public change');
+    assert.equal(git(sourceDir, ['rev-parse', 'release-staging-next^']).trim(), pushed);
+    assert.equal(JSON.parse(git(sourceDir, ['show', 'release-staging-next:package.json'])).version, '0.2.0');
+  });
+});
+
+test('sync-public-history replays onto a remote that a stale local target does not contain', () => {
+  withSourceRepo(({ sourceDir }) => {
+    git(sourceDir, ['branch', 'release-candidate', 'main']);
+    git(sourceDir, ['checkout', '--quiet', '-b', 'rewritten', 'main']);
+    writeFile(sourceDir, 'rewritten.txt', 'rewritten public candidate\n');
+    commitAll(sourceDir, 'Rewritten public candidate', {
+      authorDate: '2025-01-02T00:00:00Z',
+      committerDate: '2025-01-02T00:00:00Z',
+    });
+    const rewritten = git(sourceDir, ['rev-parse', 'HEAD']).trim();
+    git(sourceDir, ['push', '--quiet', 'origin', 'HEAD:release-candidate']);
+    git(sourceDir, ['checkout', '--quiet', 'dev']);
+    git(sourceDir, ['branch', '--quiet', '-D', 'rewritten']);
+    const staleTree = git(sourceDir, ['rev-parse', 'main^{tree}']).trim();
+    const stale = git(sourceDir, ['commit-tree', staleTree, '-p', 'main', '-m', 'Stale local candidate'], {
+      env: { ...process.env, GIT_AUTHOR_DATE: '2025-01-03T00:00:00Z', GIT_COMMITTER_DATE: '2025-01-03T00:00:00Z' },
+    }).trim();
+    git(sourceDir, ['branch', '--quiet', '-f', 'release-candidate', stale]);
+
+    const result = runSyncScript(sourceDir, ['--force-with-lease', '--target-base', rewritten, 'release-candidate']);
+
+    assert.equal(result.status, 0, syncFailureMessage(result));
+    assert.equal(git(sourceDir, ['merge-base', '--is-ancestor', rewritten, 'release-candidate']), '');
+  });
+});
+
 test('sync-public-history can replay patch-new commits from a source branch diverged from main', () => {
   withSourceRepo(({ sourceDir }) => {
     git(sourceDir, ['checkout', '--quiet', 'main']);

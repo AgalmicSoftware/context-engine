@@ -36,6 +36,8 @@ Options:
                instead of the automatic next patch
   --acknowledge-patch
                Keep a patch bump after reviewing a major/minor suggestion
+  --keep-release-version
+               Extend a pushed candidate without changing its public version
   --force-with-lease
                Replace an existing local target branch safely
   -h, --help   Show this help text
@@ -127,6 +129,7 @@ RELEASE_CHANGED_PATHS_FILE=""
 RELEASE_SUBJECTS_FILE=""
 RELEASE_PLAN_FILE=""
 RELEASE_VERSIONING_ENABLED=0
+KEEP_RELEASE_VERSION=0
 
 cleanup() {
   if [ "${SYNC_PUBLIC_HISTORY_KEEP_TMP:-0}" = "1" ]; then
@@ -925,6 +928,9 @@ while [ $# -gt 0 ]; do
       fi
       EXPLICIT_RELEASE_VERSION="$1"
       ;;
+    --keep-release-version)
+      KEEP_RELEASE_VERSION=1
+      ;;
     --acknowledge-patch)
       ACKNOWLEDGE_PATCH=1
       ;;
@@ -950,7 +956,9 @@ done
 
 case "$TARGET_BRANCH" in
   release-staging*)
-    RELEASE_VERSIONING_ENABLED=1
+    if [ "$KEEP_RELEASE_VERSION" -ne 1 ]; then
+      RELEASE_VERSIONING_ENABLED=1
+    fi
     ;;
 esac
 
@@ -1105,8 +1113,9 @@ if git -C "$TEMP_CLONE" ls-remote --exit-code --heads origin "$TARGET_BRANCH" >/
   else
     log_info "Remote branch origin/$TARGET_BRANCH already exists and will be refreshed automatically with --force-with-lease."
   fi
+  # Forced: the clone's copy came from a local branch, which a rewritten remote may not extend.
   git -C "$TEMP_CLONE" fetch --quiet origin \
-    "refs/heads/$TARGET_BRANCH:refs/remotes/origin/$TARGET_BRANCH"
+    "+refs/heads/$TARGET_BRANCH:refs/remotes/origin/$TARGET_BRANCH"
 fi
 
 TARGET_BASE_IS_PUBLIC=0
