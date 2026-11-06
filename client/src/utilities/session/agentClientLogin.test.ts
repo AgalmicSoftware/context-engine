@@ -66,9 +66,7 @@ test('purges historic envelopes without restoring or migrating credentials', () 
 });
 test('refuses mismatched origins before sending any credential', async () => {
   const fetchImpl = mockFetch();
-  await expect(exchange(fetchImpl, { agentWorkerUrl: 'https://old-bridge.example' })).rejects.toThrow(
-    'origin_mismatch',
-  );
+  await expect(exchange(fetchImpl, { agentWorkerUrl: 'https://old-agent.example' })).rejects.toThrow('origin_mismatch');
   expect(fetchImpl).not.toHaveBeenCalled();
 });
 test('does not exchange with an unready Worker or an advertised foreign origin', async () => {

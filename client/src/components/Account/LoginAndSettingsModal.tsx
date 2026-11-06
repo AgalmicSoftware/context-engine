@@ -2602,7 +2602,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       !this.props.loginComplete && !this.props.loginInProgress ? this.getPreLoginSettingsDisplay() : null;
 
     return (
-      <div id={styles.loginModal}>
+      <div>
         <Modal
           isOpen={this.props.loginModalToggled}
           modalClassName="modal-login"

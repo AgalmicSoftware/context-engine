@@ -557,11 +557,7 @@ export const createSessionProfileScanController = (host: SessionProfileScanHost)
     const lit = getGlobalLitHooks();
     const targetAddress = String(opts.targetAddress || '').toLowerCase();
     const attemptErrors: Array<Record<string, unknown>> = [];
-    const runWithTimeout = async <T>(
-      promiseFactory: () => Promise<T> | T,
-      chainId: number,
-      bootstrapRpc: boolean,
-    ): Promise<T> => {
+    const runWithTimeout = async <T>(promiseFactory: () => Promise<T> | T, chainId: number): Promise<T> => {
       let timeoutId: ReturnType<typeof setTimeout> | null = null;
       try {
         return await Promise.race([
@@ -595,7 +591,6 @@ export const createSessionProfileScanController = (host: SessionProfileScanHost)
                 bootstrapRpc,
               }) as Promise<unknown>,
             registryChainId,
-            bootstrapRpc,
           );
           const resolvedConfig = asProfileScanSessionConfig(config);
           if (!resolvedConfig) continue;

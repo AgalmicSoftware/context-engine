@@ -112,8 +112,6 @@ export type CompiledSessionModeProfile = {
   };
   payloadAccessMode: string;
   authorityMode: SessionModeAuthorityMode;
-  telegramBridgeEnabled: boolean;
-  miniAppEnabled: boolean;
   agentHttpEnabled: boolean;
   resultsExposure: {
     aggregateResultsEnabled: boolean;

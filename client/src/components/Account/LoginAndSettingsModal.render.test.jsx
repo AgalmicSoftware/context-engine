@@ -1879,7 +1879,7 @@ describe('LoginAndSettingsModal agent token login', () => {
               workerUrl: 'https://session-worker.example',
               agentCredential: {
                 kind: 'session_agent_browser_token',
-                token: 'bridge-browser-token',
+                token: 'agent-browser-token',
                 expiresAt: '2027-07-05T00:00:00.000Z',
               },
               workerCredential: {
@@ -1902,20 +1902,17 @@ describe('LoginAndSettingsModal agent token login', () => {
     delete global.__CE_AGENT_CLIENT_LOGIN_ENVELOPES__;
   });
 
-  it.each(['hosted HTTP'])('supports %s agent-token login and clears raw tokens after exchange', async (kind) => {
+  it('supports hosted HTTP agent-token login and clears raw tokens after exchange', async () => {
     const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
     profile.surfaces.agentHttp = true;
     const props = buildProps({
       activeSessionSlug: 'alpha',
-      sessionConfig:
-        kind === 'legacy'
-          ? { slug: 'alpha', telegramOnly: true, sessionMode: 'telegram_only' }
-          : {
-              slug: 'alpha',
-              sessionId: '0x00112233445566778899aabbccddeeff',
-              corsWorkerUrl: 'https://session-worker.example',
-              sessionModeProfile: profile,
-            },
+      sessionConfig: {
+        slug: 'alpha',
+        sessionId: '0x00112233445566778899aabbccddeeff',
+        corsWorkerUrl: 'https://session-worker.example',
+        sessionModeProfile: profile,
+      },
     });
     render(<LoginAndSettingsModal {...props} />);
 
@@ -1942,7 +1939,7 @@ describe('LoginAndSettingsModal agent token login', () => {
     expect(window.location.href).not.toContain(RAW_AGENT_TOKEN);
     expect(JSON.stringify(window.localStorage)).not.toContain(RAW_AGENT_TOKEN);
     expect(Object.values(window.sessionStorage).join('\n')).not.toContain(RAW_AGENT_TOKEN);
-    expect(Object.values(window.sessionStorage).join('\n')).not.toContain('bridge-browser-token');
+    expect(Object.values(window.sessionStorage).join('\n')).not.toContain('agent-browser-token');
     expect(Object.values(window.sessionStorage).join('\n')).not.toContain('jwt-session-token');
     expect(JSON.stringify(props.changeAccount.mock.calls)).not.toContain(RAW_AGENT_TOKEN);
     expect(JSON.stringify(props.updateLoginInfo.mock.calls)).not.toContain(RAW_AGENT_TOKEN);
@@ -1954,7 +1951,7 @@ describe('LoginAndSettingsModal agent token login', () => {
       <LoginAndSettingsModal
         {...buildProps({
           activeSessionSlug: 'alpha',
-          sessionConfig: { slug: 'alpha', sessionModeProfile: profile, telegramOnly: true },
+          sessionConfig: { slug: 'alpha', sessionModeProfile: profile },
         })}
       />,
     );

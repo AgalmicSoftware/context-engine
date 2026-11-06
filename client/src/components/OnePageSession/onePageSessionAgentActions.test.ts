@@ -12,9 +12,9 @@ const buildEnvelope = (sessionSlug: string): AgentClientLoginEnvelope => ({
   sessionId: '0x11111111111111111111111111111111',
   sessionSlug,
   address: '0x0000000000000000000000000000000000000001',
-  agentCredential: { kind: 'session_agent_browser_token', token: `bridge-${sessionSlug}` },
+  agentCredential: { kind: 'session_agent_browser_token', token: `agent-${sessionSlug}` },
   workerCredential: { kind: 'session_worker_jwt', token: `worker-${sessionSlug}` },
-  agentWorkerUrl: 'https://bridge.example',
+  agentWorkerUrl: 'https://agent.example',
   workerUrl: 'https://worker.example',
   capabilities: { submitAnswers: true },
   expiresAt: '2030-01-01T00:00:00.000Z',
@@ -66,11 +66,10 @@ const createHarness = () => {
     },
     resolveCurrentSessionConfig: () => ({
       slug,
-      sessionMode: agentMode ? 'telegram_only' : 'standard',
-      agentWorkerUrl: 'https://bridge.example',
+      agentWorkerUrl: 'https://agent.example',
     }),
     resolveCurrentSessionSlug: () => slug,
-    resolveSessionAgentWorkerUrl: () => 'https://bridge.example',
+    resolveSessionAgentWorkerUrl: () => 'https://agent.example',
     setState,
   });
 
