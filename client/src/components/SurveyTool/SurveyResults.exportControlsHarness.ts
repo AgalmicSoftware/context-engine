@@ -5,6 +5,12 @@ import type { SurveyResultsProps } from './SurveyResults';
 import * as cacheScriptsModule from '../../utilities/cache/cacheScripts.js';
 import * as contractScriptsModule from '../../utilities/web3/chainGateway.js';
 import { renderSurveyResults } from './surveyResultsTestHarness';
+import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../../utilities/session/sessionModeProfile';
+import { upsertWorkerCanonicalSessionBootstrap } from '../../utilities/session/sessionWorkerConfigCache';
+import {
+  resolveWorkerCanonicalCacheIdentity,
+  withWorkerCanonicalCacheIdentity,
+} from '../../utilities/survey/workerCanonicalCacheIdentity';
 import { callAI } from '../../utilities/ai/aiClient.js';
 import {
   downloadSessionResultsHtmlReport,
@@ -160,6 +166,43 @@ export const seedQuestionsCache = ({
       questionsLatestBlock: 1,
     },
   });
+};
+
+// A Worker-hosted session stored as a real one is, so its hidden list reaches
+// Results the way it does in the app, not through a mock.
+export const seedWorkerSession = ({ hidden = [], slug = 'pilot' }: { hidden?: string[]; slug?: string } = {}) => {
+  const sessionId = `0x${'1'.repeat(32)}`;
+  const workerOrigin = 'https://results-worker.example.test';
+  const sessionConfig = {
+    slug,
+    sessionId,
+    corsWorkerUrl: workerOrigin,
+    BLOCKED_QUESTION_IDS: hidden,
+    sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+    storageProfile: {
+      backend: 'cloudflare',
+      resources: { questions: 'active', surveys: 'active' },
+      payloadAccessControl: { gate: 'role_gate', encryption: 'worker_envelope', mode: 'authorized_read' },
+    },
+  };
+  upsertWorkerCanonicalSessionBootstrap({
+    slug,
+    sessionIdHex: sessionId,
+    workerOrigin,
+    configRevision: 'r1',
+    config: sessionConfig,
+  });
+  const identity = resolveWorkerCanonicalCacheIdentity({ sessionConfig, sessionSlug: slug });
+  return {
+    inWorkerCache: (node: Record<string, unknown>) => ({ worker: withWorkerCanonicalCacheIdentity(node, identity) }),
+    mountProps: {
+      activeSessionSlug: slug,
+      network: { id: null, chainId: null },
+      networkChainId: null,
+      sessionConfig,
+      sessionSlug: slug,
+    } as unknown as SurveyResultsProps,
+  };
 };
 
 export const seedSingleBinaryQuestion = ({

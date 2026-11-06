@@ -15,6 +15,7 @@ import {
 import { getAllSessionSlugs, getSessionConfigBySlug } from '../../utilities/web3/chainGateway.js';
 import { readSessionScanScope, readSessionScanSlugs } from '../../utilities/session/sessionScanScope.js';
 import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../../utilities/session/sessionModeProfile.js';
+import { upsertWorkerCanonicalSessionBootstrap } from '../../utilities/session/sessionWorkerConfigCache';
 
 jest.mock('../../utilities/web3/chainGateway.js', () => ({
   getAllSessionSlugs: jest.fn(() => []),
@@ -74,6 +75,50 @@ describe('surveyToolScope', () => {
         };
       }
       return null;
+    });
+  });
+
+  describe('hidden and highlighted lists', () => {
+    const storeWorkerSession = (slug: string, lists: Record<string, unknown>) =>
+      upsertWorkerCanonicalSessionBootstrap({
+        slug,
+        sessionIdHex: `0x${'1'.repeat(32)}`,
+        workerOrigin: 'https://session-lists.example.test',
+        configRevision: 'r1',
+        config: {
+          slug,
+          sessionId: `0x${'1'.repeat(32)}`,
+          corsWorkerUrl: 'https://session-lists.example.test',
+          sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+          ...lists,
+        },
+      });
+    const workerLists = { BLOCKED_QUESTION_IDS: [' Q2 '], HIGHLIGHTED_QUESTION_IDS: ['Q1'] };
+
+    beforeEach(() => window.localStorage.clear());
+
+    it('reads them from a Worker session, which has no registry entry', () => {
+      mockedGetSessionConfigBySlug.mockReturnValue(null);
+      expect(storeWorkerSession('pilot', workerLists).status).toBe('cached');
+      expect([...getBlockedQuestionIdsSet('pilot')]).toEqual(['q2']);
+      expect([...getHighlightedQuestionIdsSet('pilot')]).toEqual(['q1']);
+    });
+
+    it('prefers a Worker session to a bundled copy that lacks them', () => {
+      mockedGetSessionConfigBySlug.mockReturnValue({ slug: 'pilot', sessionName: 'Bundled copy' });
+      storeWorkerSession('pilot', workerLists);
+      expect([...getBlockedQuestionIdsSet('pilot')]).toEqual(['q2']);
+    });
+
+    it('still reads an on-chain session from the registry', () => {
+      mockedGetSessionConfigBySlug.mockReturnValue({ slug: 'chain', BLOCKED_QUESTION_IDS: ['q9'] });
+      storeWorkerSession('pilot', workerLists);
+      expect([...getBlockedQuestionIdsSet('chain')]).toEqual(['q9']);
+    });
+
+    it('is empty for an unknown session', () => {
+      mockedGetSessionConfigBySlug.mockReturnValue(null);
+      expect(getBlockedQuestionIdsSet('unknown').size).toBe(0);
     });
   });
 

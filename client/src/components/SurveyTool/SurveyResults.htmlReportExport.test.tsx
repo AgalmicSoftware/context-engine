@@ -12,6 +12,8 @@ import {
   analysisCachePeeks,
   analysisCacheReads,
   analysisCacheWrites,
+  cacheStore,
+  cacheStoreKey,
   getDownloadReportButton,
   getSectionRows,
   mountSurveyResults,
@@ -19,8 +21,8 @@ import {
   openHtmlReportModal,
   resetSurveyResultsExportControlsHarness,
   seedAnalysisEligibleSession,
-  seedQuestionsCache,
   seedSingleBinaryQuestion,
+  seedWorkerSession,
   waitForHydratedResponseCount,
 } from './SurveyResults.exportControlsHarness';
 
@@ -89,15 +91,7 @@ jest.mock('../MainContent/RiskMatrix', () => ({
   },
 }));
 
-const mockHiddenQuestionIds = jest.fn((_slug: string) => new Set<string>());
-jest.mock('./surveyToolScope', () => ({
-  ...(jest.requireActual('./surveyToolScope') as object),
-  getBlockedQuestionIdsSet: (slug: string) => mockHiddenQuestionIds(slug),
-}));
-
 beforeEach(() => {
-  mockHiddenQuestionIds.mockReset();
-  mockHiddenQuestionIds.mockReturnValue(new Set<string>());
   resetSurveyResultsExportControlsHarness();
   mockSbtFilter.mockClear();
   mockPolisReport.mockClear();
@@ -231,30 +225,33 @@ describe('SurveyResults HTML report export controls', () => {
   });
 
   it('leaves a hidden question and its answers out of the HTML report', async () => {
-    mockHiddenQuestionIds.mockReturnValue(new Set(['q2']));
+    const session = seedWorkerSession({ hidden: ['q2'], slug: 'hidden-report' });
     const answer = (questionID: string, value: string) => ({
       additional: { encrypted: false, value: '' },
       answer: { encrypted: false, value },
       questionID,
       timeStamp: '2025-01-01T00:00:00.000Z',
     });
-    seedQuestionsCache({
-      questionResponses: {
-        q1: { '0xabc': answer('q1', 'Visible text') },
-        q2: { '0xdef': answer('q2', 'Hidden text') },
-      },
-      questions: {
-        q1: { id: 'q1', prompt: 'Question One', type: 'freeform' },
-        q2: { id: 'q2', prompt: 'Question Two', type: 'freeform' },
-      },
-      slug: 'hidden-report',
-    });
+    cacheStore.set(
+      cacheStoreKey('questionsCache', 'hidden-report'),
+      session.inWorkerCache({
+        questionResponses: {
+          q1: { '0xabc': answer('q1', 'Visible text') },
+          q2: { '0xdef': answer('q2', 'Hidden text') },
+        },
+        questionResponsesLatestBlock: 0,
+        questions: {
+          q1: { id: 'q1', prompt: 'Question One', type: 'freeform' },
+          q2: { id: 'q2', prompt: 'Question Two', type: 'freeform' },
+        },
+        questionsLatestBlock: 0,
+      }),
+    );
     mountSurveyResults({
+      ...session.mountProps,
       account: WALLET_ACCOUNT,
       loginComplete: true,
-      network: OP_NETWORK,
-      sessionName: 'Hidden Report Session',
-      sessionSlug: 'hidden-report',
+      sessionName: 'Hidden Report',
     });
     await waitForHydratedResponseCount(1);
 

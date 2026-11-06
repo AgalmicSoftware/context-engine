@@ -2,6 +2,7 @@ import {
   getAllSessionSlugs,
   getSessionConfigBySlug as getStrictSessionConfigBySlug,
 } from '../../utilities/web3/chainGateway.js';
+import { getWorkerCanonicalSessionBootstrapBySlug } from '../../utilities/session/sessionWorkerConfigCache';
 import {
   parseQuestionSessionIdFromSearch,
   parseQuestionSessionSlugFromSearch,
@@ -421,10 +422,12 @@ export const buildQuestionFilterStorageKeyPrefix = (props: SurveyToolScopeProps 
   return `dg:filters:${storageSlug}`;
 };
 
+// A Worker-hosted session's lists are in its own config. It has no registry entry,
+// and a bundled copy of it would not have them.
 const resolveQuestionConfigContext = (sessionSlug = '') =>
   resolveSurveyToolQuestionConfigContext({
     sessionSlug,
-    resolveBySlug: getStrictSessionConfigBySlug,
+    resolveBySlug: (slug) => getWorkerCanonicalSessionBootstrapBySlug(slug) || getStrictSessionConfigBySlug(slug),
   });
 
 export const resolveLockAudienceSessionNameContext = (sessionSlug = '') =>
