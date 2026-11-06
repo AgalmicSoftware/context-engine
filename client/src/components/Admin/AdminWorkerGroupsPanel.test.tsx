@@ -140,8 +140,13 @@ describe('AdminWorkerGroupsPanel', () => {
       />,
     );
 
+    // The theme's plain outline-secondary label is its button fill: 1.1:1 in Minimal, and 1:1 in Classic 95.
+    expect(screen.getByRole('button', { name: 'Refresh' })).toHaveClass('subtleActionButton');
     fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
     expect(await screen.findByText('Reviewers')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Edit Reviewers' })).toHaveClass('subtleActionButton');
+    expect(screen.getByRole('button', { name: 'Manage Reviewers members' })).toHaveClass('subtleActionButton');
+    expect(screen.getByRole('button', { name: 'Delete Reviewers' })).toHaveClass('dangerActionButton');
     expect(postSignedRequest).toHaveBeenCalledWith(
       expect.objectContaining({
         action: 'groups/list',

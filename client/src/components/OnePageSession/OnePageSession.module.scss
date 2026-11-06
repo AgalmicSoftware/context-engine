@@ -1172,7 +1172,7 @@
   display: block;
   max-width: 100%;
   line-height: 1;
-  color: color-mix(in srgb, var(--ce-text-inverse) 50%, transparent);
+  color: var(--ce-panel-text);
 }
 
 .sectionHeaderSubtitle {
@@ -1181,7 +1181,7 @@
   font-size: 0.63em;
   line-height: 1.12;
   font-weight: 600;
-  color: color-mix(in srgb, var(--ce-text-inverse) 25%, transparent);
+  color: var(--ce-panel-text-muted);
 }
 
 .sectionHeaderTooltip {
@@ -1813,7 +1813,7 @@
     font-size: 1em;
     font-weight: inherit;
     line-height: 1;
-    color: color-mix(in srgb, var(--ce-text-inverse) 15%, transparent);
+    color: var(--ce-panel-text-muted);
   }
 
   .sectionHeaderRow {
@@ -1910,7 +1910,7 @@
     font-size: 1em;
     font-weight: inherit;
     line-height: 1;
-    color: color-mix(in srgb, var(--ce-text-inverse) 15%, transparent);
+    color: var(--ce-panel-text-muted);
   }
 
   .sectionHeaderRow {
@@ -2311,7 +2311,6 @@
 
   .sectionsGrid .sectionHeaderTitle {
     font-size: 1.35rem;
-    opacity: 0.5;
   }
 
   .sectionsGrid .sectionHeaderTooltip {
@@ -2321,7 +2320,6 @@
   .sectionsGrid .sectionHeaderSubtitle {
     font-size: 1rem;
     font-weight: 400;
-    opacity: 0.5;
   }
 
   .sectionsGrid .sectionToggleIcon {
@@ -2438,7 +2436,6 @@
 
     .sectionsGrid .sectionHeaderSubtitle {
       font-size: 1rem;
-      opacity: 0.5;
     }
   }
 }

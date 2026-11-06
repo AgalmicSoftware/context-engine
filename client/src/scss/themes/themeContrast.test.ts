@@ -398,6 +398,106 @@ describe('bundled app-theme contrast', () => {
     expect(ratios.filter(([, value]) => value < 4.5)).toEqual([]);
   });
 
+  test.each(registry.themes.map(({ id }) => id))('%s keeps the Groups panel readable', (themeId) => {
+    const values = themeValues(css, themeId);
+    const paint = painter(values);
+    const card = composite(
+      parseColor(values['card-bg']),
+      composite(parseColor(values.surface), parseColor(values.canvas)),
+    );
+    const rule = (selector: string) => moduleRule(adminCss, selector);
+    const fillOf = (selector: string) => composite(paint(rule(selector).background), card);
+    const ratio = (color: string, fill: Rgba) => Number(contrastRatio(composite(paint(color), fill), fill).toFixed(2));
+    expect(rule('.panelTitle').opacity).toBeUndefined();
+    const groupCard = fillOf('.statusItem');
+    const ratios = [
+      ['.panelTitle', ratio(rule('.panelTitle').color, card)],
+      ['.panelSubtitle', ratio(rule('.panelSubtitle').color, card)],
+      ['.statusNote', ratio(rule('.statusNote').color, fillOf('.statusNote'))],
+      ['.statusItem text', ratio('var(--ce-panel-text)', groupCard)],
+      ['subtle button on a group', ratio(rule('.subtleActionButton:global(.btn)').color, groupCard)],
+    ] as const;
+    expect(ratios.filter(([, value]) => value < 4.5)).toEqual([]);
+  });
+
+  test.each(registry.themes.map(({ id }) => id))('%s keeps the group form readable', (themeId) => {
+    const values = themeValues(css, themeId);
+    const paint = painter(values);
+    const formCss = compileModule('components/Shared/WorkerGroupCreateForm.module.scss');
+    const card = composite(
+      parseColor(values['card-bg']),
+      composite(parseColor(values.surface), parseColor(values.canvas)),
+    );
+    const selectors = [
+      '.sessionContextName',
+      '.sessionContextSlug',
+      '.sectionHeading',
+      '.field label',
+      '.metadataCard > label',
+      '.imageLabel',
+      '.accessLabel',
+      '.formHelp',
+      '.status',
+    ];
+    expect(selectors.filter((selector) => moduleRule(formCss, selector).color !== 'var(--ce-control-text)')).toEqual(
+      [],
+    );
+    // The theme paints every select and input with text meant for documents, so these rules must outrank it.
+    expect(formCss).toMatch(/\.accessSelect[^{]*\{[^}]*[^-]color: var\(--ce-control-text\) !important/);
+    const sessionContext = composite(paint(moduleRule(formCss, '.sessionContext').background), card);
+    expect(contrastRatio(paint('var(--ce-control-text)'), sessionContext)).toBeGreaterThanOrEqual(4.5);
+    expect(
+      moduleRule(compileModule('components/SBTs/CreateSBTGroup.module.scss'), '.createGroupExpanded .createGroupTitle')
+        .color,
+    ).toBe('var(--ce-control-text)');
+  });
+
+  // Hover and press clear a danger outline's fill, so its label can't rely on that fill.
+  test.each(registry.themes.map(({ id }) => id))('%s keeps the Groups panel danger button readable', (themeId) => {
+    const values = themeValues(css, themeId);
+    const paint = painter(values);
+    const card = composite(
+      parseColor(values['card-bg']),
+      composite(parseColor(values.surface), parseColor(values.canvas)),
+    );
+    const groupCard = composite(paint(moduleRule(adminCss, '.statusItem').background), card);
+    expect(moduleRule(adminCss, '.statusItem').color).toBe('var(--ce-panel-text)');
+    const selectors = [
+      ':global(.btn)',
+      ':global(.btn:hover:not(:disabled))',
+      ':global(.btn:active:not(:disabled))',
+    ].map((state) => `.dangerActionButton${state}`);
+    expect(selectors.filter((selector) => !importantFill(adminCss, selector))).toEqual([]);
+    selectors.forEach((selector) => {
+      const rule = moduleRule(adminCss, selector);
+      expect([selector, rule.background]).toEqual([selector, 'transparent']);
+      expect(contrastRatio(paint(rule.color), groupCard)).toBeGreaterThanOrEqual(4.5);
+    });
+  });
+
+  test.each(registry.themes.map(({ id }) => id))('%s keeps the session section headers readable', (themeId) => {
+    const values = themeValues(css, themeId);
+    const paint = painter(values);
+    const onePageCss = compileModule('components/OnePageSession/OnePageSession.module.scss');
+    const surface = composite(
+      parseColor(values['card-bg']),
+      composite(parseColor(values.surface), parseColor(values.canvas)),
+    );
+    ['.sectionsGrid .sectionHeaderTitle', '.sectionsGrid .sectionHeaderSubtitle'].forEach((selector) =>
+      expect([selector, moduleRule(onePageCss, selector).opacity]).toEqual([selector, undefined]),
+    );
+    // Every rule for these selectors, since the layouts each set their own colour and only one applies at a time.
+    const ratios = ['.sectionHeaderTitle', '.sectionHeaderSubtitle', '.sectionHeader .sectionHeaderSubtitle'].flatMap(
+      (selector) =>
+        [...onePageCss.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+          .filter(([, selectors]) => selectors.split(/,(?![^(]*\))/).some((candidate) => candidate.trim() === selector))
+          .flatMap(([, , body]) => [...body.matchAll(/(?:^|[;\s])color:\s*([^;]+);/g)].map(([, color]) => color.trim()))
+          .map((color) => [selector, color, contrastRatio(composite(paint(color), surface), surface)] as const),
+    );
+    expect(ratios.length).toBeGreaterThanOrEqual(5);
+    expect(ratios.filter(([, , value]) => value < 4.5)).toEqual([]);
+  });
+
   // Minimal clears every button's border, so a button with no fill of its own reads as a plain word.
   test.each(registry.themes.map(({ id }) => id))('%s gives the settings buttons a readable fill', (themeId) => {
     const values = themeValues(css, themeId);
