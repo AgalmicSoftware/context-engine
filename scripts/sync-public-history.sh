@@ -82,6 +82,7 @@ AGENT_BRIDGE_PUBLIC_CUTOVER_REQUIRED_PATHS=(
   "scripts/run-agent-bridge-worker-tests.js"
 )
 AGENT_BRIDGE_PUBLIC_CUTOVER_COMMIT=""
+AGENT_BRIDGE_PUBLIC_RETIREMENT_COMMIT=""
 
 PRIVATE_REPLAY_MESSAGE_TOKENS=(
   "contextEngine-cc"
@@ -155,11 +156,21 @@ is_agent_bridge_public_history_path() {
   esac
 }
 
+agent_bridge_is_retired_for_source_commit() {
+  local commit_sha="$1"
+
+  [ -n "$AGENT_BRIDGE_PUBLIC_RETIREMENT_COMMIT" ] &&
+    git -C "$REPO_ROOT" merge-base --is-ancestor "$AGENT_BRIDGE_PUBLIC_RETIREMENT_COMMIT" "$commit_sha"
+}
+
+# True only inside the published window: from the audited cutover commit up to,
+# but not including, the commit that deleted the cutover marker.
 agent_bridge_is_public_for_source_commit() {
   local commit_sha="$1"
 
   [ -n "$AGENT_BRIDGE_PUBLIC_CUTOVER_COMMIT" ] &&
-    git -C "$REPO_ROOT" merge-base --is-ancestor "$AGENT_BRIDGE_PUBLIC_CUTOVER_COMMIT" "$commit_sha"
+    git -C "$REPO_ROOT" merge-base --is-ancestor "$AGENT_BRIDGE_PUBLIC_CUTOVER_COMMIT" "$commit_sha" &&
+    ! agent_bridge_is_retired_for_source_commit "$commit_sha"
 }
 
 path_matches_strip_pattern() {
@@ -183,7 +194,10 @@ path_matches_strip_pattern() {
   done
 
   if [ -n "$commit_sha" ] && is_agent_bridge_public_history_path "$relative_path"; then
-    if ! agent_bridge_is_public_for_source_commit "$commit_sha"; then
+    # The retirement commit's own deletions change public files, so dry runs and
+    # release evidence must count them. Later touches of these paths stay stripped.
+    if [ "$commit_sha" != "$AGENT_BRIDGE_PUBLIC_RETIREMENT_COMMIT" ] &&
+      ! agent_bridge_is_public_for_source_commit "$commit_sha"; then
       return 0
     fi
   fi
@@ -349,7 +363,8 @@ apply_agent_bridge_public_history_policy() {
 
     # Always clear the replay checkout first. At the cutover commit this turns
     # the reviewed source tree into one complete public snapshot instead of
-    # exposing the formerly private file-by-file development history.
+    # exposing the formerly private file-by-file development history. At and
+    # after retirement, nothing is restored and the paths stay out of public.
     for path in "${AGENT_BRIDGE_PUBLIC_HISTORY_PATHS[@]}"; do
       git rm -rf --ignore-unmatch -- "$path" >/dev/null 2>&1 || true
       rm -rf -- "$path"
@@ -1006,7 +1021,34 @@ if git -C "$REPO_ROOT" cat-file -e "${SOURCE_BRANCH}:${AGENT_BRIDGE_PUBLIC_CUTOV
   if [ -z "$AGENT_BRIDGE_PUBLIC_CUTOVER_COMMIT" ]; then
     fail "Agent Bridge public cutover marker exists, but its introducing commit could not be resolved." 2
   fi
+elif [ -n "$AGENT_BRIDGE_PUBLIC_CUTOVER_COMMIT" ]; then
+  AGENT_BRIDGE_PUBLIC_RETIREMENT_COMMIT=$(
+    git -C "$REPO_ROOT" log \
+      --diff-filter=D \
+      --format='%H' \
+      "$SOURCE_BRANCH" \
+      -- "$AGENT_BRIDGE_PUBLIC_CUTOVER_MARKER" |
+      sed -n '1p'
+  )
 
+  if [ -z "$AGENT_BRIDGE_PUBLIC_RETIREMENT_COMMIT" ] ||
+    ! git -C "$REPO_ROOT" merge-base --is-ancestor \
+      "$AGENT_BRIDGE_PUBLIC_CUTOVER_COMMIT" "$AGENT_BRIDGE_PUBLIC_RETIREMENT_COMMIT"; then
+    fail "Agent Bridge public cutover marker was removed, but its removing commit could not be resolved." 2
+  fi
+
+  for retired_path in "${AGENT_BRIDGE_PUBLIC_HISTORY_PATHS[@]}"; do
+    if git -C "$REPO_ROOT" cat-file -e "${SOURCE_BRANCH}:${retired_path}" 2>/dev/null; then
+      fail "Agent Bridge public cutover marker was removed, but $retired_path is still on $SOURCE_BRANCH. Remove the whole subtree and runner, or restore the marker." 2
+    fi
+  done
+
+  log_info "Agent Bridge public history retired at: $AGENT_BRIDGE_PUBLIC_RETIREMENT_COMMIT"
+else
+  log_info "Agent Bridge public history remains stripped; no cutover marker is present."
+fi
+
+if [ -n "$AGENT_BRIDGE_PUBLIC_CUTOVER_COMMIT" ]; then
   cutover_header=$(
     git -C "$REPO_ROOT" show \
       "${AGENT_BRIDGE_PUBLIC_CUTOVER_COMMIT}:${AGENT_BRIDGE_PUBLIC_CUTOVER_MARKER}" |
@@ -1024,10 +1066,6 @@ if git -C "$REPO_ROOT" cat-file -e "${SOURCE_BRANCH}:${AGENT_BRIDGE_PUBLIC_CUTOV
   done
 
   log_info "Agent Bridge public history cutover: $AGENT_BRIDGE_PUBLIC_CUTOVER_COMMIT"
-elif [ -n "$AGENT_BRIDGE_PUBLIC_CUTOVER_COMMIT" ]; then
-  fail "Agent Bridge public cutover marker was removed from the source branch." 2
-else
-  log_info "Agent Bridge public history remains stripped; no cutover marker is present."
 fi
 
 git -C "$REPO_ROOT" fetch --quiet origin main

@@ -178,7 +178,7 @@ test('verify-public-release-pii allows generated JavaScript frozen name collecti
     writeFile(rootDir, 'deploy/cloudflare/session-worker/worker.mjs', [
       requiredSecretNames,
       '  "DEMO_SIGNER_ROOT_SECRET",',
-      '  "AGENT_BRIDGE_AGENT_API_TOKEN"',
+      '  "AGENT_MANAGED_ROOT_SECRET"',
       ']);',
       `AGENT_${'CREDENTIAL'}_KINDS = Object.freeze({`,
       '  member: "member",',

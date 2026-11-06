@@ -11,7 +11,6 @@ button.
 | `deploy-helper/` | Deploys a Session Worker through the Cloudflare API when `/new` is given a Cloudflare API token. It is a separate Worker, not another Session Worker copy. |
 | `sessionCorsWorker/agent/` | Agent HTTP, scoped credentials, optional registry submission queue, and Session Wrapped within the Session Worker. |
 | `shared/` | Implementation shared by two or more Worker services. |
-| `agentBridgeWorker/` | Retired; no source remains. Agent HTTP runs inside the Session Worker. |
 
 Related outputs live outside this source tree:
 

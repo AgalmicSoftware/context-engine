@@ -193,7 +193,7 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectFile('scripts/release-version.test.mjs');
   expectFile('workers/sessionCorsWorker/package.json');
   expectFile('workers/sessionCorsWorker/agent/requestBoundary.mjs');
-  expectFile('scripts/run-agent-bridge-worker-tests.js');
+  expectFile('scripts/run-session-agent-tests.js');
   expectFile(publishWorkflowPath);
   expectFile(promoteWorkflowPath);
   expectFile('workers/deploy-helper/wrangler.example.toml');
@@ -474,9 +474,6 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   }
   if (trackedDistFiles.includes('dist/deployHelper.bundle.js')) {
     failures.push('dist/deployHelper.bundle.js must not be tracked by git');
-  }
-  if (trackedDistFiles.includes('dist/agentBridgeWorker.bundle.js')) {
-    failures.push('dist/agentBridgeWorker.bundle.js must not be tracked by git');
   }
 
   return failures;

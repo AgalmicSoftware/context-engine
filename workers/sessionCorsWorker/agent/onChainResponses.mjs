@@ -362,7 +362,7 @@ export function buildAgentResponsePayload({
       hash: comments ? ethers.id(comments) : '',
       encryptedPortion: '',
     },
-    source: 'telegram-agent-bridge',
+    source: 'session-agent',
     responder: safeString(accountAddress),
     encryptionRequested: false,
   };

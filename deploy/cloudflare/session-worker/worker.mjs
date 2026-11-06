@@ -33279,7 +33279,7 @@ function redactSecrets(value, path = []) {
     SECRET_FIELD_RE.test(key) && !(SAFE_AUTHORITY_METADATA_KEYS.has(lower2(key)) && entry2 === false) ? "[redacted]" : redactSecrets(entry2, [...path, key])
   ]));
 }
-function assertNoSecretShape(value, message = "Agent bridge records must not serialize secrets.") {
+function assertNoSecretShape(value, message = "Agent records must not serialize secrets.") {
   if (hasSecretShape(value)) {
     throw new Error(message);
   }
@@ -61414,7 +61414,7 @@ var require_lib2 = __commonJS({
 
 // workers/sessionCorsWorker/agent/opaqueActions.mjs
 function stableHash(seed = "") {
-  const digest2 = ethers_exports.sha256(ethers_exports.toUtf8Bytes(String(seed || "agent-bridge-action")));
+  const digest2 = ethers_exports.sha256(ethers_exports.toUtf8Bytes(String(seed || "agent-action")));
   return BigInt(digest2).toString(36).padStart(50, "0");
 }
 function buildSubmitIdempotencyKey({ transport, principal, sessionSlug, questionId: questionId4, answer }) {
@@ -62216,7 +62216,7 @@ function buildAgentResponsePayload({
       hash: comments ? ethers_exports.id(comments) : "",
       encryptedPortion: ""
     },
-    source: "telegram-agent-bridge",
+    source: "session-agent",
     responder: safeString(accountAddress),
     encryptionRequested: false
   };
@@ -104771,9 +104771,6 @@ var dispatchSponsoredBootstrapRedeem = async ({
       bundleUrl: _discardedBundleUrl,
       bundleSha256: _discardedBundleSha256,
       bundleManifestUrl: _discardedBundleManifestUrl,
-      agentBridgeBundleUrl: _discardedAgentBridgeBundleUrl,
-      agentBridgeBundleManifestUrl: _discardedAgentBridgeBundleManifestUrl,
-      agentBridgeBundleSha256: _discardedAgentBridgeBundleSha256,
       ...accountIndependentDeployPayload
     } = deployPayload;
     const deploymentRequestId = await buildSponsoredDeploymentRequestId(grantToken);

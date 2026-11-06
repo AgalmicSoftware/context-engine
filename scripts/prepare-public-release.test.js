@@ -212,21 +212,9 @@ test('prepare-public-release strips private surfaces without publishing an inven
     writeFile(sourceDir, path.join('contextEngine-cc', 'public', 'js', 'sessionSlugs.mjs'), 'export default [];\n');
     writeFile(sourceDir, path.join('tests', 'root', 'private-runtime.private.test.mjs'), 'private companion service worker test\n');
     writeFile(sourceDir, path.join('docs', 'agent-native-contract.md'), 'private agent contract\n');
-    writeFile(sourceDir, path.join('docs', 'agent-native-bridge.md'), 'private agent bridge\n');
+    writeFile(sourceDir, path.join('docs', 'agent-native-bridge.md'), 'private agent notes\n');
     writeFile(sourceDir, path.join('client', 'public', 'skill.md'), 'private agent skill\n');
-    writeFile(sourceDir, path.join('workers', 'agentBridgeWorker', 'worker.js'), 'public agent bridge worker\n');
-    writeFile(sourceDir, path.join('workers', 'agentBridgeWorker', 'README.md'), 'agent bridge docs\n');
-    writeFile(
-      sourceDir,
-      path.join('workers', 'agentBridgeWorker', 'PUBLIC_RELEASE_CUTOVER'),
-      [
-        'context-engine-agent-bridge-public-cutover-v1',
-        'audited=2025-01-04',
-        'scope=workers/agentBridgeWorker,scripts/run-agent-bridge-worker-tests.js',
-        '',
-      ].join('\n'),
-    );
-    writeFile(sourceDir, path.join('scripts', 'run-agent-bridge-worker-tests.js'), 'agent bridge test runner\n');
+    writeFile(sourceDir, path.join('scripts', 'run-session-agent-tests.js'), 'session agent test runner\n');
     writeFile(sourceDir, path.join('scripts', 'run-contextengine-cc-tests.js'), 'private companion test runner\n');
     writeFile(sourceDir, path.join('scripts', 'run-contextengine-cc-tests.test.js'), 'private companion runner test\n');
     writeFile(sourceDir, path.join('scripts', 'e2e-env-example.test.js'), 'private E2E env fixture test\n');
@@ -247,7 +235,7 @@ test('prepare-public-release strips private surfaces without publishing an inven
             test: 'node scripts/run-node-tests.js',
             'test:cc': 'node scripts/run-contextengine-cc-tests.js',
             'test:ci': 'npm run test && npm run test:cc',
-            'test:worker:agent-bridge': 'node scripts/run-agent-bridge-worker-tests.js',
+            'test:worker:agent': 'node scripts/run-session-agent-tests.js',
             'ai:test-cf-envelope:worker': 'npm run -s ai:node -- scripts/e2e/cloudflare-worker-envelope.js',
             'ai:test-cf-envelope:all': 'npm run -s ai:test-cf-envelope:worker',
             'ai:test-session:demo-smoke': 'npm run -s ai:node -- scripts/test-session-demo.ui.js',
@@ -331,7 +319,7 @@ test('prepare-public-release strips private surfaces without publishing an inven
     assert.deepEqual(JSON.parse(fs.readFileSync(path.join(outputDir, 'package.json'), 'utf8')).scripts, {
       test: 'node scripts/run-node-tests.js',
       'test:ci': 'npm run test',
-      'test:worker:agent-bridge': 'node scripts/run-agent-bridge-worker-tests.js',
+      'test:worker:agent': 'node scripts/run-session-agent-tests.js',
       tests: 'npm run test',
     });
     assert.equal(fs.existsSync(path.join(outputDir, '.DS_Store')), false);
@@ -388,13 +376,7 @@ test('prepare-public-release strips private surfaces without publishing an inven
     assert.equal(fs.existsSync(path.join(outputDir, 'docs', 'agent-native-contract.md')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'docs', 'agent-native-bridge.md')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'client', 'public', 'skill.md')), false);
-    assert.equal(fs.existsSync(path.join(outputDir, 'workers', 'agentBridgeWorker')), true);
-    assert.equal(fs.existsSync(path.join(outputDir, 'workers', 'agentBridgeWorker', 'worker.js')), true);
-    assert.equal(
-      fs.existsSync(path.join(outputDir, 'workers', 'agentBridgeWorker', 'PUBLIC_RELEASE_CUTOVER')),
-      true,
-    );
-    assert.equal(fs.existsSync(path.join(outputDir, 'scripts', 'run-agent-bridge-worker-tests.js')), true);
+    assert.equal(fs.existsSync(path.join(outputDir, 'scripts', 'run-session-agent-tests.js')), true);
     assert.equal(fs.existsSync(path.join(outputDir, 'scripts', 'run-contextengine-cc-tests.js')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'scripts', 'run-contextengine-cc-tests.test.js')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'scripts', 'e2e-env-example.test.js')), false);

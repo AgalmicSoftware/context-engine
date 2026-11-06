@@ -7,8 +7,8 @@ import { assertNoSecretShape } from './redaction.mjs';
 const ACTION_ID_RE = /^ceab_[a-z0-9]{10,50}$/;
 
 function stableHash(seed = '') {
-  const digest = ethers.sha256(ethers.toUtf8Bytes(String(seed || 'agent-bridge-action')));
-  // Base36 preserves all 256 bits while keeping prefixed Telegram payloads under 64 bytes.
+  const digest = ethers.sha256(ethers.toUtf8Bytes(String(seed || 'agent-action')));
+  // Base36 preserves all 256 bits in a compact, fixed-width identifier.
   return BigInt(digest).toString(36).padStart(50, '0');
 }
 

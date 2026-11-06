@@ -153,6 +153,5 @@ code or delete existing resources.
 
 Use [Agent access](skills/ce-agent-access/SKILL.md) or
 [Session Wrapped](skills/ce-session-wrapped/SKILL.md). The route inventory is
-[`routes.mjs`](routes.mjs). Agent tests run with `npm run test:worker:agent`
-(`test:worker:agent-bridge` is an alias).
+[`routes.mjs`](routes.mjs). Agent tests run with `npm run test:worker:agent`.
 See [the coverage map](testing.md) and the [Worker guide](../../../docs/session-cors-worker.md).

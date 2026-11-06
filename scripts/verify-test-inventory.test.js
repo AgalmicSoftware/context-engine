@@ -64,7 +64,7 @@ function writeInventoryFixture(rootDir, overrides = {}) {
         ROOT_JEST_TEST_FILES.map((relativePath) => `'<rootDir>/${path.join('..', relativePath)}'`).join(' ')
       }`,
       'test:worker:session-cors': 'npm --prefix workers/sessionCorsWorker test',
-      'test:worker:agent-bridge': 'node scripts/run-agent-bridge-worker-tests.js',
+      'test:worker:agent': 'node scripts/run-session-agent-tests.js',
       'test:e2e': 'npm run -s test:e2e:smoke',
       'test:e2e:quick': 'npm run -s test:e2e:smoke',
       'test:e2e:smoke': 'npm run -s ai:test-nav:smoke',
@@ -111,7 +111,7 @@ function writeInventoryFixture(rootDir, overrides = {}) {
       workers: {
         commands: [
           { label: 'worker', command: 'npm', args: ['run', 'test:worker:session-cors'] },
-          { label: 'agent', command: 'npm', args: ['run', 'test:worker:agent-bridge'] },
+          { label: 'agent', command: 'npm', args: ['run', 'test:worker:agent'] },
         ],
       },
       'wiring-and-release': {
@@ -194,13 +194,13 @@ test('verifyTestInventory owns canonical test runner and CI-gate reachability', 
   withTempRepo((rootDir) => {
     writeInventoryFixture(rootDir);
     const pkg = JSON.parse(fs.readFileSync(path.join(rootDir, 'package.json'), 'utf8'));
-    delete pkg.scripts['test:worker:agent-bridge'];
+    delete pkg.scripts['test:worker:agent'];
     writeJson(rootDir, 'package.json', pkg);
 
     const manifest = JSON.parse(fs.readFileSync(path.join(rootDir, 'scripts/ci-gates.json'), 'utf8'));
     manifest.profiles.ci = manifest.profiles.ci.filter((gateName) => gateName !== 'client');
     manifest.gates.workers.commands = manifest.gates.workers.commands
-      .filter((entry) => entry.args.join(' ') !== 'run test:worker:agent-bridge');
+      .filter((entry) => entry.args.join(' ') !== 'run test:worker:agent');
     writeJson(rootDir, 'scripts/ci-gates.json', manifest);
     writeFile(rootDir, '.github/workflows/ci.yml', fs.readFileSync(
       path.join(rootDir, '.github/workflows/ci.yml'),
@@ -208,9 +208,9 @@ test('verifyTestInventory owns canonical test runner and CI-gate reachability', 
     ).replace('run: npm run ci:gates:check-hosted', 'run: true'));
 
     assert.deepEqual(verifyTestInventory(rootDir), [
-      'package.json missing scripts.test:worker:agent-bridge',
+      'package.json missing scripts.test:worker:agent',
       'scripts/ci-gates.json profile "ci" must include "client"',
-      'scripts/ci-gates.json gate "workers" must run test:worker:agent-bridge',
+      'scripts/ci-gates.json gate "workers" must run test:worker:agent',
       '.github/workflows/ci.yml must include the manifest-backed aggregate checker',
     ]);
   });

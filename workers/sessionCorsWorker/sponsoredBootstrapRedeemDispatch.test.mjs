@@ -197,16 +197,12 @@ test('dispatchSponsoredBootstrapRedeem uses the embedded deploy-helper path and 
 });
 
 test('dispatchSponsoredBootstrapRedeem deploys only the sponsor-configured release, never redeemer bundles', async () => {
-  const bridgeRelease = {
-    AGENT_BRIDGE_BUNDLE_URL: 'https://releases.example.test/r1/agentBridgeWorker.bundle.js',
-    AGENT_BRIDGE_BUNDLE_MANIFEST_URL: 'https://releases.example.test/r1/worker-release-manifest.json',
-  };
   const { env } = createKvEnv({
     type: 'deploy-worker',
     sourceSessionSlug: 'source-session',
     sourceConfig: { allowOrigins: ['https://allowed.example.test'] },
     cloudflareApiToken: 'cf-sponsored-token',
-  }, { DEPLOY_HELPER_ENABLED: '1', ...bridgeRelease });
+  }, { DEPLOY_HELPER_ENABLED: '1' });
   const deployBodies = [];
   const result = await dispatchSponsoredBootstrapRedeem({
     request: createDeployRequest({
@@ -220,9 +216,6 @@ test('dispatchSponsoredBootstrapRedeem deploys only the sponsor-configured relea
         bundleUrl: 'https://attacker.example.test/worker.js',
         bundleSha256: 'a'.repeat(64),
         bundleManifestUrl: 'https://attacker.example.test/worker-release-manifest.json',
-        agentBridgeBundleUrl: 'https://attacker.example.test/bridge.js',
-        agentBridgeBundleManifestUrl: 'https://attacker.example.test/worker-release-manifest.json',
-        agentBridgeBundleSha256: 'b'.repeat(64),
       },
     }),
     env,
@@ -240,13 +233,11 @@ test('dispatchSponsoredBootstrapRedeem deploys only the sponsor-configured relea
   assert.equal(deployBodies.length, 1);
   const deployed = deployBodies[0];
   assert.equal(JSON.stringify(deployed).includes('attacker'), false);
-  for (const field of ['deploymentKind', 'bundleText', 'bundleSha256', 'agentBridgeBundleSha256']) {
+  for (const field of ['deploymentKind', 'bundleText', 'bundleSha256']) {
     assert.equal(Object.hasOwn(deployed, field), false, field);
   }
   assert.equal(deployed.bundleUrl, SPONSOR_RELEASE_ENV.WORKER_BUNDLE_URL);
   assert.equal(deployed.bundleManifestUrl, SPONSOR_RELEASE_ENV.WORKER_BUNDLE_MANIFEST_URL);
-  assert.equal(deployed.agentBridgeBundleUrl, undefined);
-  assert.equal(deployed.agentBridgeBundleManifestUrl, undefined);
 });
 
 test('dispatchSponsoredBootstrapRedeem refuses deploys before using the grant when no release is configured', async () => {

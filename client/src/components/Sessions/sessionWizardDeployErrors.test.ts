@@ -205,11 +205,10 @@ describe('sessionWizardDeployErrors', () => {
     expect(
       describeSessionWizardSponsoredDeployFailure({
         status: 400,
-        error:
-          'Sponsored Agents HTTP deploys need AGENT_BRIDGE_BUNDLE_URL and AGENT_BRIDGE_BUNDLE_MANIFEST_URL on the sponsoring Worker.',
+        error: 'Sponsored deploys need WORKER_BUNDLE_URL and WORKER_BUNDLE_MANIFEST_URL on the sponsoring Worker.',
       }),
     ).toBe(
-      'Sponsored Agents HTTP deploys need AGENT_BRIDGE_BUNDLE_URL and AGENT_BRIDGE_BUNDLE_MANIFEST_URL on the sponsoring Worker. Your deploy grant was not used. It will work once the sponsor sets these on their Worker.',
+      'Sponsored deploys need WORKER_BUNDLE_URL and WORKER_BUNDLE_MANIFEST_URL on the sponsoring Worker. Your deploy grant was not used. It will work once the sponsor sets these on their Worker.',
     );
     expect(
       describeSessionWizardSponsoredDeployFailure({
