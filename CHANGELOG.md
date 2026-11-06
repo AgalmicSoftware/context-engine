@@ -20,7 +20,7 @@ All notable changes to this project will be documented in this file.
 - Correct light-theme contrast in raw question results, expanded answers, sorting/export controls, bookmarks, sync indicators and Worker group notices, including Classic 95 counters, links and binary-answer labels. Keep the results title readable at narrow widths. Browser coverage now checks these surfaces in all three themes.
 - The login dialog's Create and Login buttons keep their fill when hovered, focused or pressed, so their labels stay readable in every theme; in Minimal, Create's label vanished on hover.
 - The locked-answers controls in Raw Results are readable in every theme, hovered, focused or pressed: Decrypt, Log in, the required-group links, the toggle that opens them, and their focus rings.
-- Primary buttons keep a readable fill in every theme, hovered, focused or pressed, including See Questions, the Agent token Login and the Worker group and document buttons. They use the theme's action colours instead of a purple that reached only 3.54:1 with their white label.
+- Primary buttons keep a readable fill in every theme, hovered, focused or pressed, including See Questions, the Agent token Login and the Worker group and document buttons. They use the theme's action colours instead of a purple that reached only 3.70:1 with their white label.
 - The HTML report's Cancel, Download and Generate buttons and the Admin and Sponsor action buttons are readable in every state and theme.
 - Decrypt on answers and questions takes the surface's own text colour, so it no longer disappears on Classic 95's teal. The locked-question notice is readable in Minimal.
 - Create and Login fit the login dialog at phone width.

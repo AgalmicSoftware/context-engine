@@ -4172,6 +4172,10 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
     color: var(--ce-action-accent-text) !important;
     border-color: var(--ce-action-accent-hover);
   }
+
+  &:disabled:hover {
+    background: var(--ce-action-accent) !important;
+  }
 }
 
 .sessionInterviewPanel :global(.btn-outline-secondary) {

@@ -559,10 +559,12 @@
     color: var(--ce-action-primary-text) !important;
   }
 
-  &:disabled {
-    background: var(--ce-control-disabled-bg) !important;
-    border-color: var(--ce-control-disabled-bg) !important;
-    color: var(--ce-control-disabled-text) !important;
+  // This dialog is a light document in every theme, so the app's disabled colours, translucent on dark themes, vanish.
+  &:disabled,
+  &:disabled:hover {
+    background: var(--ce-document-surface) !important;
+    border-color: var(--ce-document-text-muted) !important;
+    color: var(--ce-document-text-muted) !important;
     opacity: 1 !important;
   }
 }
@@ -582,10 +584,11 @@
     color: var(--ce-document-text) !important;
   }
 
-  &:disabled {
-    background: var(--ce-control-disabled-bg) !important;
-    border-color: var(--ce-control-disabled-bg) !important;
-    color: var(--ce-control-disabled-text) !important;
+  &:disabled,
+  &:disabled:hover {
+    background: var(--ce-document-surface) !important;
+    border-color: var(--ce-document-text-muted) !important;
+    color: var(--ce-document-text-muted) !important;
     opacity: 1 !important;
   }
 }

@@ -4559,7 +4559,7 @@ textarea.form-control {
 
 // Those resets also cleared .btn-primary's fill, leaving its light label on whatever is behind the button: blank on
 // Minimal's white. It keeps a fill on the action colours the contrast test holds to 4.5:1. Same specificity, later in
-// the file, so a module's own rule for its button still wins.
+// the file, so a module's own rule for its button still wins; `:where` keeps the disabled rule at that specificity too.
 .btn-primary:hover,
 .btn-primary:active,
 .btn-primary:active:hover {
@@ -4567,8 +4567,7 @@ textarea.form-control {
   color: var(--ce-action-primary-text);
 }
 
-.btn-primary:disabled:hover,
-.btn-primary.disabled:hover {
+.btn-primary:where(:disabled, .disabled):hover {
   background-color: var(--ce-action-primary) !important;
 }
 

@@ -296,7 +296,7 @@ describe('bundled app-theme contrast', () => {
   });
 
   // Every primary button without its own rule takes these. `.btn:hover` and `.btn:active` clear fills with !important,
-  // so the primary rules must come after them; the purple fill they replace was only 3.54:1 with a white label.
+  // so the primary rules must come after them; the purple fill they replace was only 3.70:1 with a white label.
   test('primary buttons keep their fill on the action colours', () => {
     const rules = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map(([, selectors, body]) => ({
       selectors: selectors.split(/,(?![^(]*\))/).map((selector) => selector.trim()),
@@ -316,10 +316,18 @@ describe('bundled app-theme contrast', () => {
         clears,
       );
     });
-    // Disabled buttons don't react to the pointer, and their label must stay on a fill.
+    // Disabled buttons don't react to the pointer, and their label must stay on a fill. `:where` adds no specificity,
+    // so a module's own disabled rule still wins.
     expect(
-      lastRule('.btn-primary:disabled:hover', /background-color: var\(--ce-action-primary\) !important/),
-    ).toBeGreaterThan(lastRule('.btn-primary:hover', /!important/));
+      moduleRule(
+        compileModule('components/SurveyTool/SurveyTool.module.scss'),
+        '.sessionInterviewPanel :global(.btn-primary):disabled:hover',
+      ).background,
+    ).toBe('var(--ce-action-accent)');
+    const disabledHover = '.btn-primary:where(:disabled, .disabled):hover';
+    expect(lastRule(disabledHover, /background-color: var\(--ce-action-primary\) !important/)).toBeGreaterThan(
+      lastRule('.btn-primary:hover', /!important/),
+    );
     expect(
       rules
         .filter(({ selectors }) => selectors.some((selector) => selector.startsWith('.btn-primary')))
@@ -393,9 +401,15 @@ describe('bundled app-theme contrast', () => {
   test.each(registry.themes.map(({ id }) => id))('%s keeps the HTML report buttons readable', (themeId) => {
     const values = themeValues(css, themeId);
     const paint = painter(values);
-    const selectors = ['.htmlReportCancelButton', '.htmlReportDownloadButton', '.htmlReportGenerateButton'].flatMap(
-      stateSelectors,
-    );
+    const selectors = [
+      ...['.htmlReportCancelButton', '.htmlReportDownloadButton', '.htmlReportGenerateButton'].flatMap(stateSelectors),
+      // Download stays disabled while signed out. These dialogs are light in every theme, so dark-theme disabled
+      // colours vanish, and hovering must not bring back the primary fill under a muted label.
+      ...['.htmlReportDownloadButton', '.htmlReportGenerateButton'].flatMap((button) => [
+        `${button}:disabled`,
+        `${button}:disabled:hover`,
+      ]),
+    ];
     expect(selectors.filter((selector) => !importantFill(resultsCss, selector))).toEqual([]);
     const ratios = selectors.map((selector) => {
       const rule = resultsRule(selector);
