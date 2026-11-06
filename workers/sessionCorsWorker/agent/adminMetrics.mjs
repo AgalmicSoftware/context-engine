@@ -83,7 +83,7 @@ export function emptyAdminMetricTotals() {
     agentDraftedAnswers: 0,
     draftEditMetrics: 0,
     groupProposals: 0,
-    sessionsWithBridgeActivity: 0,
+    sessionsWithAgentActivity: 0,
     registrySessionCount: 0,
     distinctRespondents: 0,
   };
@@ -128,12 +128,12 @@ export function publicSessionMetric(metric = {}) {
     agentDraftedAnswers: Number(metric.agentDraftedAnswers || 0),
     draftEditMetrics: Number(metric.draftEditMetrics || 0),
     groupProposals: Number(metric.groupProposals || 0),
-    sessionsWithBridgeActivity: 0,
+    sessionsWithAgentActivity: 0,
     registrySessionCount: Number(metric.registrySessionCount || 0),
     distinctRespondents:
       metric._respondents instanceof Set ? metric._respondents.size : Number(metric.distinctRespondents || 0),
   };
-  out.sessionsWithBridgeActivity = [
+  out.sessionsWithAgentActivity = [
     out.agentsOnboarded,
     out.questionsCreated,
     out.questionsAnswered,

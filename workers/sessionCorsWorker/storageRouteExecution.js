@@ -603,7 +603,6 @@ const listDelimitedAddresses = (value) => {
 const resolveEnvelopeExportAddressSet = (config = {}) => {
   const addresses = new Set(resolveRoleAddressSet({ config, role: 'admin' }));
   listDelimitedAddresses(config.responseExportAllowedAddresses).forEach((address) => addresses.add(address));
-  listDelimitedAddresses(config.telegramResponseExportAllowedAddresses).forEach((address) => addresses.add(address));
   listDelimitedAddresses(config.export?.allowedAddresses).forEach((address) => addresses.add(address));
   listDelimitedAddresses(config.export?.adminAddresses).forEach((address) => addresses.add(address));
   return addresses;
