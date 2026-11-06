@@ -31,15 +31,15 @@ and restored before first paint. Session color schemes are a separate
 ## Session Wrapped Capability Record
 
 Agent Session Wrapped discovery is session-scoped public config, not a
-browser environment secret. A successfully verified dedicated deployment may
-publish exactly this versioned record in the canonical session config:
+browser environment secret. A Session Worker whose agent capabilities verify
+may publish exactly this versioned record in the canonical session config:
 
 ```json
 {
   "agentSessionWrapped": {
     "version": 1,
     "enabled": true,
-    "origin": "https://<dedicated-bridge>.<workers-subdomain>.workers.dev",
+    "origin": "https://<session-worker>.<workers-subdomain>.workers.dev",
     "protocolVersion": "agent-session-wrapped-v1",
     "revision": "wrapped-<safe-revision>",
     "verifiedAt": "<ISO-8601 timestamp>"
@@ -48,12 +48,15 @@ publish exactly this versioned record in the canonical session config:
 ```
 
 The client accepts an HTTPS origin with no credentials, path, query, or
-fragment and safe bounded protocol/revision identifiers. The record contains
-no Cloudflare token, worker secret, member credential, agent credential, or
-provider key. `sessionModeProfile.surfaces.agentHttp` is the only enablement
-bit; it must mirror `agentSessionWrapped.enabled`. `surfaces.telegram` and `surfaces.miniApp` are retired compatibility fields; new client writes keep both false. Deploy and redeploy code preserves the last
-verified record until the replacement Worker has passed activation, health,
-protocol, pinned-authority, and durable-config checks.
+fragment and safe bounded protocol/revision identifiers. The origin is the
+Session Worker's own. The record contains no Cloudflare token, worker secret,
+member credential, agent credential, or provider key.
+`sessionModeProfile.surfaces.agentHttp` is the only enablement bit; it must
+mirror `agentSessionWrapped.enabled`. `surfaces.telegram` and
+`surfaces.miniApp` are retired compatibility fields; new client writes keep both
+false. Deploy and redeploy code preserves the last verified record until the
+replacement Worker has passed activation, health, protocol, pinned-authority,
+and durable-config checks.
 
 Agent-token web login and the agent session shell require hosted
 (`worker_canonical`) authority with `surfaces.agentHttp: true`. An explicit
@@ -65,7 +68,7 @@ explicit profile.
 ## How to Configure
 
 1. Copy the example file: `cp client/.env.example client/.env`
-2. Edit `client/.env` - uncomment and change only the values you need to override. For general local browsing/authoring flows and production builds an empty `.env` file is valid; native Cloudflare deployment uses the pinned Worker release described below. The deploy-helper URL is a legacy/self-host override.
+2. Edit `client/.env` - uncomment and change only the values you need to override. For general local browsing/authoring flows and production builds an empty `.env` file is valid; native Cloudflare deployment uses the pinned Worker release described below. The deploy-helper URL defaults to the project's helper; set it only to use your own.
 3. Restart the dev server: `cd client && npm run dev` (client env values are bundled when the dev server or production build starts)
 4. For production (Vercel, Netlify, Cloudflare Pages, etc.): set `REACT_APP_*` vars in your hosting platform's environment settings. Do not commit `client/.env` to git.
 
@@ -105,20 +108,21 @@ For a custom-domain self-host, the values to check first are:
 - `REACT_APP_CE_CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT` selects the Worker
   release. The Netlify build sets it to its own `COMMIT_REF`; builds without it
   use the release pinned in `client/src/variables/workerReleasePin.json`. The
-  native Cloudflare deploy card replays that public commit, and the Session and
-  Agent Bridge bundles and their manifest download from its immutable
-  `worker-bundles-<sha>` release, so all of these move together. It must be the exact
-  40-character public commit of a published, verified release that contains
+  native Cloudflare deploy card replays that public commit, and the Session
+  Worker bundle and its manifest download from its immutable
+  `worker-bundles-<sha>` release, so all of these move together. It must be the
+  exact 40-character public commit of a published, verified release that contains
   the reviewed `deploy/cloudflare/session-worker/` package. Branch names, tags,
   abbreviated hashes, and non-GitHub sources fail closed: the native card and
   default bundle downloads are disabled rather than falling back to `latest`.
-- `REACT_APP_CE_DEPLOY_HELPER_URL` when `/new` should use your own
-  deploy-helper for the explicit legacy fallback.
-- `REACT_APP_CE_WORKER_BUNDLE_URL` and `REACT_APP_CE_AGENT_BRIDGE_WORKER_BUNDLE_URL`
-  only when deploy flows should fetch Worker bundles from non-default URLs.
+- `REACT_APP_CE_DEPLOY_HELPER_URL` when `/new` should deploy through your own
+  deploy-helper, the Worker that receives the Cloudflare API token, instead of
+  the project's.
+- `REACT_APP_CE_WORKER_BUNDLE_URL` only when deploy flows should fetch the
+  Worker bundle from a non-default URL.
 - `REACT_APP_CE_WORKER_RELEASE_MANIFEST_URL` alongside any Worker bundle URL
   override. The manifest must come from the same immutable release and provides
-  the expected SHA-256 for both Session and Wrapped deploys. Explicit URLs
+  the expected SHA-256 for the Session Worker bundle. Explicit URLs
   bypass the release selection, so verify their release yourself.
 - `REACT_APP_DEFAULT_CHAIN_ID`, session scan variables, and registry/session
   defaults only when your deployment intentionally targets a different chain,
@@ -162,12 +166,12 @@ Node: 20
 
 `COMMIT_REF` is supplied by Netlify for Git-backed builds. The client then
 pairs everything with the exact public commit it was built from: the native
-Cloudflare Deploy Button replays that commit, and the Session and Agent Bridge
-bundles and their manifest come from its immutable `worker-bundles-<sha>`
-release, never from GitHub's moving `latest` release. CI publishes that release
-after the required checks and `Publish Worker Bundles` complete; there is no
-fixed publication delay. Until then, deploy-helper and
-wrapped deploys fail closed; the native button works at once. After `Publish
+Cloudflare Deploy Button replays that commit, and the Session Worker bundle and
+its manifest come from its immutable `worker-bundles-<sha>` release, never from
+GitHub's moving `latest` release. CI publishes that release after the required
+checks and `Publish Worker Bundles` complete; there is no fixed publication
+delay. Until then, deploy-helper deploys fail closed; the native button works
+at once. After `Publish
 Worker Bundles` finishes, check the release with
 `CE_RELEASE_COMMIT=<sha> npm run verify:release-assets` from the repository
 root. Manual and local builds without `COMMIT_REF` use the release pinned in
@@ -270,11 +274,12 @@ goes with it. Keep unhashed files out of an `assets/` folder in
 deploy, `curl -sI https://<site>/assets/missing.js` should return 404 without
 `immutable` in `cache-control`.
 
-The same `_headers` file enforces a baseline Content Security Policy
-(`frame-ancestors`, `object-src`, `base-uri`, and `form-action`). It also sends
-a stricter policy that allows scripts only from this origin as
-`Content-Security-Policy-Report-Only`. That policy has no report endpoint, so
-its violations appear only in the browser console.
+The same `_headers` file enforces a Content Security Policy: `script-src 'self'`
+(plus one SHA-256 hash for the sandboxed benchmark report script),
+`worker-src 'self' blob:`, `frame-ancestors`, `object-src`, `base-uri`, and
+`form-action`. A broader policy is sent as `Content-Security-Policy-Report-Only`.
+That policy has no report endpoint, so its violations appear only in the browser
+console. See [`security-model.md`](security-model.md#csp-and-third-party-script-note).
 
 This cannot replace already-running JavaScript in an open tab. It makes the
 browser re-check the app shell on the next navigation, reload, or new visit.
@@ -315,10 +320,10 @@ writes (about 240), so set up caching there separately.
 
 - `client/.env` is optional. If it is missing, the app still uses the checked-in
   defaults from `publicDeploymentConfig.ts` and `appConfig.ts`.
-- Shared worker fallback now defaults to `https://demo-worker-030226.agalmic.workers.dev` unless `REACT_APP_CE_SHARED_WORKER_URL` overrides it.
-- The deploy-helper now defaults to `https://ce-deploy-helper.agalmic.workers.dev/`.
-- Only `REACT_APP_*` keys are exposed to the browser in the Vite client
-  compatibility env.
+- Shared worker fallback defaults to `https://demo-worker-030226.agalmic.workers.dev` unless `REACT_APP_CE_SHARED_WORKER_URL` overrides it.
+- The deploy-helper defaults to the project's `https://ce-deploy-helper.agalmic.workers.dev/` unless `REACT_APP_CE_DEPLOY_HELPER_URL` overrides it.
+- Only `REACT_APP_*` and `NEXT_PUBLIC_*` keys are exposed to the browser in the
+  Vite client compatibility env.
 - `publicDeploymentConfig.ts` is the single owner of deployment endpoint
   fallbacks; `appConfig.ts` re-exports those values for the existing client API.
 - Browser/runtime overrides still exist for some flags (`globalThis`,
@@ -327,11 +332,10 @@ writes (about 240), so set up caching there separately.
 ## Lit / Chipotle config boundary
 
 - Do **not** add Lit API keys to `client/.env` or any `REACT_APP_*` variable.
-- Chipotle auth is now intended to stay server-side:
-  - preferred deployment/sponsor worker env fallback: `LIT_USAGE_API_KEY`
-  - legacy-compatible deployment/sponsor worker env fallback: `LIT_ACCOUNT_API_KEY`
-  - per-session worker-secret overrides: `litAccountApiKey` (internal field behind the visible "Lit API key" input), `litUsageApiKey`
-- Session-scoped non-secret Chipotle identifiers are no longer treated like browser env vars:
+- Chipotle auth stays server-side:
+  - deployment/sponsor worker env: `LIT_USAGE_API_KEY` runs the Action (falling back to `LIT_ACCOUNT_API_KEY`); `LIT_ACCOUNT_API_KEY` provisions authorities (falling back to `LIT_USAGE_API_KEY`)
+  - per-session worker-secret overrides: `litAccountApiKey` (the field behind the visible "Lit API key" input), `litUsageApiKey`
+- Session-scoped non-secret Chipotle identifiers are Worker config, not browser env vars:
   - `litApiBase`
   - `litGroupId`
   - `litPkpId`
@@ -346,9 +350,10 @@ writes (about 240), so set up caching there separately.
 - If a sponsored bundle intentionally carries `litAccountApiKey`, treat that as an explicit Lit authority transfer rather than an ordinary config convenience. The durable OSS-friendly version of that pattern is one disposable Lit key per bundle, not one long-lived deployment key copied into many bundles.
 - Chipotle v2 metadata may store the non-secret policy fields and policy fingerprint needed to bind a wrapped CEK to an audience, but it must not store secret-bearing RPC URLs. Decrypt/check RPC selection is derived from worker-approved config, secrets, or defaults.
 - New Lit authorities require a Worker-generated per-session signing secret in encrypted KV. Public runtime descriptors never transfer that secret. Old authorities require an explicit fresh PKP/group/usage-key cutover; see [Lit authorization and cutover](lit-worker-authorization.md). Old ciphertext is not automatically migrated.
-- Current public prod/dev Chipotle environments both report Base mainnet, so environment isolation should come from separate Chipotle accounts, usage keys, groups, and PKPs rather than from shipping different public chain IDs alone.
-- The default CE automation path is now one new Lit account per session. Groups are reserved for internal trust boundaries or future action families inside that session account rather than as the primary cross-session isolation primitive.
-- There is no longer a client-side Lit payer-wallet feature gate in `/new`; the manual `/new` Lit card asks only for one Lit API key. E2E/deploy env should prefer `LIT_USAGE_API_KEY`; `litAccountApiKey` remains the internal worker-secret field backing that visible input for backward compatibility.
+- The manual `/new` Lit card asks only for one Lit API key, stored as the `litAccountApiKey` worker secret.
+- `litActionCid` can be omitted during session setup.
+  - If the wizard only has the visible Lit API key (`litAccountApiKey` internally), the worker can auto-bootstrap the default group, PKP, usage key, and CE action for that session, using the default Chipotle API base unless worker config/env overrides it.
+  - If the wizard already has `litGroupId` and `litPkpId`, the worker can still auto-provision the default CE Lit action into an existing account and write the returned CID back into worker config after deploy.
 
 ## RPC Defaults
 
@@ -377,13 +382,13 @@ writes (about 240), so set up caching there separately.
   locally generated cooldown errors do not extend it. Active-session SBT cache
   warming also fetches only the selected registry slug instead of enumerating
   every session.
-- Optional paid testnet read RPCs are env/runtime-only and are no longer
-  committed in source.
+- Optional paid testnet read RPCs are env/runtime-only and are not committed
+  in source.
   - `REACT_APP_CE_BASE_SEPOLIA_PAID_RPC_URL_HTTP`
   - `REACT_APP_CE_BASE_SEPOLIA_PAID_RPC_URL_WSS`
   - `REACT_APP_CE_OP_SEPOLIA_PAID_RPC_URL_HTTP`
   - `REACT_APP_CE_OP_SEPOLIA_PAID_RPC_URL_WSS`
-- The existing paid-RPC diagnostics toggles still apply:
+- The paid-RPC diagnostics toggles:
   `REACT_APP_CE_USE_INFURA_RPC=true` and
   `REACT_APP_CE_RPC_PROVIDER_MODE=infura_only` only inject a paid RPC for chains
   that have one of the paid URL overrides above (or the matching runtime globals)
@@ -444,7 +449,7 @@ Context's View AI prompt uses those same model defaults. Explicit browser-local
 AI overrides still take precedence. Provider secrets stay on the Worker and are
 not returned by these configuration or presence reads.
 
-## Current Migration Toggle
+## Other Toggles
 
 - `REACT_APP_TERMINOLOGY_MODE=plain`
   - Controls whether user-facing membership copy defaults to plain-language
@@ -526,7 +531,3 @@ not returned by these configuration or presence reads.
 
 - `REACT_APP_CE_USER_PROFILE_SCAN_ALL_SESSIONS_QUESTIONS=false`
   - Allows off-list question activity discovery in `UserPage` / compare deep scans when enabled.
-
-- `litActionCid` can be omitted during session setup.
-  - If the wizard only has the visible Lit API key (`litAccountApiKey` internally), the worker can now auto-bootstrap the default group, PKP, usage key, and CE action for that session, using the default Chipotle API base unless worker config/env overrides it.
-  - If the wizard already has `litGroupId` and `litPkpId`, the worker can still auto-provision the default CE Lit action into an existing account and write the returned CID back into worker config after deploy.

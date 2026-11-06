@@ -95,12 +95,12 @@ Limited SBT invite links are one-time bearer credentials until redemption.
 Anyone who obtains an unredeemed link can use its authorization; the link does
 not identify or authenticate an intended human recipient.
 
-The current `claimWithInvite` authorization signs the SBT contract address and
-a sequential nonce. It does not include the recipient address, so the wallet
-that submits a valid unconsumed invite becomes the recipient. This differs from
-password minting: `startClaim` records a commitment derived from the password
-and `msg.sender`, and `claimWithPassword` verifies that caller-bound commitment
-before minting.
+The current `claimWithInvite` authorization signs the chain ID, the SBT contract
+address, and a one-use slot number. It does not include the recipient address,
+so the wallet that submits a valid unconsumed invite becomes the recipient. This
+differs from password minting: `startClaim` records a commitment derived from
+the password and `msg.sender`, and `claimWithPassword` verifies that
+caller-bound commitment before minting.
 
 The currently configured OP Stack networks use sequencer-private transaction
 pools, which reduces exposure to public-mempool copying. It does not remove the

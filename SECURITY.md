@@ -54,5 +54,5 @@ We are happy to credit responsible reporters after a fix is available unless you
 - All secrets use environment variables or worker KV — never committed to code
 - Repository security reviews have been run in Codex using GPT-5.4 and Claude Opus 4.6 against the Trail of Bits methodology skill/runbook; those findings informed remediation work but do not replace a formal external audit
 - A formal third-party security audit remains a project goal for a future release
-- Lit encryption is SBT-gated key release, not end-to-end encryption: a Lit Action releases each content key after an SBT check, but the key passes through the session Worker, and anyone holding the session's Lit API key can request it too
+- Lit encryption is SBT-gated key release, not end-to-end encryption: a Lit Action releases each content key after an SBT check, but the key passes through the session Worker, so the Worker operator and Lit account administrators can obtain it too. A Lit usage API key alone cannot request keys, because the Action requires a Worker-signed authorization
 - CORS policies enforced at the worker level

@@ -1,35 +1,28 @@
 # Sponsored Resource Keys
 
-This doc covers how AI, Arweave, RPC, faucet, and Lit payer keys are stored and routed.
+This doc covers how AI, Arweave, RPC, faucet, and Lit keys are stored and routed.
 
 ## Where keys live
 
-Group-level secrets now live in worker secrets (not in Arweave metadata):
+Keys live in worker secrets, not in session metadata:
 
-- AI provider keys (Anthropic/OpenAI/OpenRouter) → worker secrets.
-- Arweave wallet JWK → worker secret.
-- Faucet private key → worker secret.
-- Lit payer private key (+ derived payer address/status) → worker secret / admin worker status route.
+- AI provider keys (OpenAI, Anthropic, OpenRouter) → `openaiKey`, `anthropicKey`, `openrouterKey`.
+- Arweave wallet JWK → `arweaveJwk`.
+- Faucet private key → `faucetPrivateKey`.
+- Lit account and usage API keys → `litAccountApiKey`, `litUsageApiKey`. The
+  Worker generates its own Lit signing key (`litAuthorizationPrivateKey`); admins
+  cannot set or read it.
 - Custom RPC URL, including any provider credential embedded in its path →
-  worker session secret (`customRpcUrl`). A separate bare RPC key is not
-  injected into JSON-RPC requests.
+  `customRpcUrl`.
 
-Legacy metadata fields (`ai.providers.*.apiKey`, `rpc.providers.path.apiKey`,
-`arweave.jwk`, `faucet.privateKey`) are still tolerated on read for older
-sessions, but `/session/new` no longer writes them.
-
-Legacy/dormant metadata-backed `litCredentials` reads are now fenced off; Lit payer
-material should only live in worker secrets, sponsored bundles, or transient runtime state.
+`/session/new` strips these keys from the metadata it uploads, and the client
+ignores AI and Arweave keys found in older metadata.
 
 ## Local overrides
 
-The settings panel exposes per-group local overrides stored only in
-localStorage:
-
-- AI API keys
-- Arweave JWK
-- RPC API key (reserved)
-- Faucet private key + faucet config (optional)
+Settings can override the AI key, RPC API key (reserved), and Arweave JWK. These
+overrides are held in memory only and are cleared on reload. The AI model and
+provider choices persist in `localStorage`, without the plaintext key.
 
 ## Resolution order
 

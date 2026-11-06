@@ -25,10 +25,11 @@ are intentionally public, limited, disposable, and safe to lose.
 
 When creating fixture links through `/sponsor`, use a separate low-budget
 resource profile. Prefer provider-side spend caps or prepaid keys for AI,
-short expirations, small faucet balances, disposable Arweave/Lit payer wallets,
-and credentials that can be revoked without affecting normal sessions. Never
-publish a sponsored handoff backed by unrestricted production API keys. Never put
-the decryption key in the fixture, a URL fragment, or another URL field.
+short expirations, small faucet balances, a disposable Arweave wallet,
+disposable Lit keys, and credentials that can be revoked without affecting
+normal sessions. Never publish a sponsored handoff backed by unrestricted
+production API keys. Never put the decryption key in the fixture, a URL
+fragment, or another URL field.
 
 ## Fixture Shape
 
