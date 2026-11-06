@@ -80,8 +80,8 @@ describe('WorkerDeploySection', () => {
       /^[a-f0-9]{64}$/,
     );
     expect(screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_DEPLOY)).toHaveAttribute('href', nativeDeployUrl);
-    expect(screen.getByText('Legacy deploy-helper fallback')).toBeInTheDocument();
-    expect(screen.getByText('Legacy deploy-helper fallback').closest('details')).not.toHaveAttribute('open');
+    expect(screen.getByText('Deploy helper (API token)')).toBeInTheDocument();
+    expect(screen.getByText('Deploy helper (API token)').closest('details')).not.toHaveAttribute('open');
   });
 
   it('does not open native deployment until the admin address is available', () => {

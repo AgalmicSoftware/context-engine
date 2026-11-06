@@ -582,8 +582,8 @@ const WorkerDeploySection = ({
         </div>
       )}
       {(!shouldUseSponsoredAutoDeployFlow || !isNormalMode) && (
-        <details className={styles.legacyWorkerDeployDetails} open={!nativeDeployUrl}>
-          <summary>{nativeDeployUrl ? 'Legacy deploy-helper fallback' : 'Worker deployment'}</summary>
+        <details className={styles.workerDeployDetails} open={!nativeDeployUrl}>
+          <summary>{nativeDeployUrl ? 'Deploy helper (API token)' : 'Worker deployment'}</summary>
           <div className={styles.workerDeployPanel}>
             <div className={styles.workerDeployHeader}>
               {deployForm.workerName ? (
