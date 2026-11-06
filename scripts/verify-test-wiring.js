@@ -136,14 +136,14 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectFile('scripts/capture-client-coverage-baseline.mjs');
   expectFile('scripts/check-client-coverage-floors.mjs');
   expectFile('scripts/check-client-coverage-floors.test.mjs');
-  expectFile('scripts/clientCoverageUniverse.js');
-  expectFile('scripts/clientCoverageUniverse.test.js');
+  expectFile('scripts/client-coverage-universe.js');
+  expectFile('scripts/client-coverage-universe.test.js');
   expectFile('scripts/client-coverage-exclusions.json');
   expectFile('scripts/client-coverage-full-baseline.json');
   expectFile('scripts/check-client-test-types.mjs');
   expectFile('scripts/check-client-test-types.test.mjs');
-  expectFile('scripts/clientTestTypeUniverse.js');
-  expectFile('scripts/clientTestTypeUniverse.test.js');
+  expectFile('scripts/client-test-type-universe.js');
+  expectFile('scripts/client-test-type-universe.test.js');
   expectFile('scripts/client-test-type-contract.json');
   expectFile('scripts/client-test-type-diagnostics-baseline.json');
   expectFile('scripts/client-bundle-budget.json');
@@ -170,7 +170,7 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectFile('scripts/verify-abi-sync.test.mjs');
   expectFile('scripts/lib/audit-verdict.sh');
   expectFile('scripts/audit-verdict.test.js');
-  expectFile('scripts/testInventoryConfig.js');
+  expectFile('scripts/node-test-inventory-config.js');
   expectFile('scripts/verify-test-inventory.js');
   expectFile('scripts/verify-test-inventory.test.js');
   expectFile('scripts/vite-navigation-smoke.js');

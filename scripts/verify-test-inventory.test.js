@@ -11,7 +11,7 @@ const {
   ROOT_LOCAL_CHAIN_TEST_FILES,
   ROOT_NODE_TEST_FILES,
   ROOT_OPTIONAL_NODE_TEST_FILES,
-} = require('./testInventoryConfig');
+} = require('./node-test-inventory-config');
 const { verifyTestInventory } = require('./verify-test-inventory');
 
 const PRIVATE_STRIPPED_TEST_FIXTURE = 'tests/root/private-runtime.private.test.mjs';

@@ -4,7 +4,6 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const ROOT_DIR = path.resolve(__dirname, '..');
-const CORPUS_DIR = path.join(ROOT_DIR, 'ai-discourse-corpus', 'corpuses');
 const CLIENT_CORPUS_SAMPLE_PATH = path.join(ROOT_DIR, 'client', 'src', 'variables', 'demo', 'corpus_sample.json');
 
 const CLIENT_SAMPLE_CORPUS_KEYS = Object.freeze({

@@ -11,7 +11,7 @@ const require = createRequire(import.meta.url);
 const {
   CLIENT_TEST_TYPE_CONTRACT,
   listTrackedClientTestTypeFiles,
-} = require('./clientTestTypeUniverse');
+} = require('./client-test-type-universe');
 
 const DIAGNOSTIC_RE = /^(.+?)\((\d+),(\d+)\): error (TS\d+): (.+)$/;
 
@@ -167,8 +167,3 @@ if (isDirect) {
     process.exit(1);
   }
 }
-
-export const __test__clientTestTypes = {
-  diagnosticGains,
-  inventoryHash,
-};
