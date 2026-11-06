@@ -77,8 +77,3 @@ export const fetchExpectedWorkerBundleDigest = async ({
     return { ok: false, error: `Failed to read Worker release manifest: ${toStr(error?.message || error)}` };
   }
 };
-
-export const __test__workerReleaseManifest = {
-  ARTIFACT_SET,
-  RELEASE_MANIFEST_FILE,
-};

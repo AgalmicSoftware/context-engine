@@ -1,7 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  DEFAULT_INTERVIEW_REALTIME_MODEL,
   proxyOpenAiRealtimeCall,
   readRealtimeCallRequestPayload,
 } from './realtimeCallExecution.js';
@@ -51,7 +50,6 @@ test('proxyOpenAiRealtimeCall keeps the API key server-side and pins current rea
   const body = JSON.parse(outbound.init.body);
   assert.deepEqual(body.transport, { type: 'webrtc', sdp: 'v=0\r\no=test\r\n' });
   const session = body.session;
-  assert.equal(DEFAULT_INTERVIEW_REALTIME_MODEL, 'gpt-live-1');
   assert.deepEqual(session, { model: 'gpt-live-1', instructions: 'Ask one question.', store: false, delegation: { type: 'client' } });
   assert.equal(response.headers.get('x-interview-protocol'), 'live');
   assert.match(response.headers.get('access-control-expose-headers'), /x-interview-protocol/);

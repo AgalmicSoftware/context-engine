@@ -1,8 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  ensureAgentQuestionNumbers,
-  findQuestionByStableNumber,
+  assignAgentQuestionNumber,
   agentQuestionNumberKvKey,
 } from './agentQuestionNumbers.mjs';
 
@@ -30,19 +29,9 @@ test('stable question numbers persist a durable map for bytes32 ids', async () =
   const secondId = `0x${'34'.repeat(32)}`;
   const key = agentQuestionNumberKvKey(sessionSlug);
 
-  const first = await ensureAgentQuestionNumbers({
-    env,
-    sessionSlug,
-    questions: [
-      { questionId: firstId, prompt: 'First question?' },
-      { questionId: secondId, prompt: 'Second question?' },
-    ],
-    createdAt: 'not-a-date',
-  });
-
-  assert.equal(first.ok, true);
-  assert.equal(first.questions[0].stableQuestionNumber, 1);
-  assert.equal(first.questions[1].stableQuestionNumber, 2);
+  const assign = (questionId, createdAt) => assignAgentQuestionNumber({ env, sessionSlug, questionId, createdAt });
+  assert.equal((await assign(firstId, 'not-a-date')).number, 1);
+  assert.equal((await assign(secondId, 'not-a-date')).number, 2);
   assert.equal(kv.options.get(key), null);
 
   const stored = JSON.parse(await kv.get(key));
@@ -52,25 +41,7 @@ test('stable question numbers persist a durable map for bytes32 ids', async () =
   assert.equal(stored.questionIdToNumber[secondId], 2);
   assert.equal(stored.nextNumber, 3);
 
-  const reordered = await ensureAgentQuestionNumbers({
-    env,
-    sessionSlug,
-    questions: [
-      { questionId: secondId, prompt: 'Second question?' },
-      { questionId: firstId, prompt: 'First question?' },
-      { questionId: 'q-new', prompt: 'New question?' },
-    ],
-    createdAt: '2026-05-08T12:01:00.000Z',
-  });
-  assert.equal(reordered.questions[0].stableQuestionNumber, 2);
-  assert.equal(reordered.questions[1].stableQuestionNumber, 1);
-  assert.equal(reordered.questions[2].stableQuestionNumber, 3);
-
-  const selected = await findQuestionByStableNumber({
-    env,
-    sessionSlug,
-    selector: 'question 2',
-    questions: reordered.questions,
-  });
-  assert.equal(selected.questionId, secondId);
+  assert.equal((await assign(secondId, '2026-05-08T12:01:00.000Z')).number, 2);
+  assert.equal((await assign(firstId, '2026-05-08T12:01:00.000Z')).number, 1);
+  assert.equal((await assign('q-new', '2026-05-08T12:01:00.000Z')).number, 3);
 });

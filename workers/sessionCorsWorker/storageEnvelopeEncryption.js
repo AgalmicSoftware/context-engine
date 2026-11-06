@@ -2,7 +2,6 @@ import { getOrCreateCoordinatedStorageEnvelopeSessionKey } from './sessionWriteC
 import { toStr } from './stringCoercion.js';
 
 const textEncoder = new TextEncoder();
-const textDecoder = new TextDecoder();
 
 export const STORAGE_ENVELOPE_KEK_SECRET_NAME = 'CE_STORAGE_ENVELOPE_KEK';
 export const STORAGE_ENVELOPE_PREVIOUS_KEK_SECRET_NAME = 'CE_STORAGE_ENVELOPE_PREVIOUS_KEK';

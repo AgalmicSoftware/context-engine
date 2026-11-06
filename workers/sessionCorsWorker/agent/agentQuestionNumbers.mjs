@@ -12,10 +12,6 @@ function normalizeQuestionId(value = '') {
   return safeString(value).slice(0, 256);
 }
 
-function questionId(question = {}) {
-  return normalizeQuestionId(question?.questionId || question?.id);
-}
-
 export function agentQuestionNumberKvKey(sessionSlug = '') {
   const slug = sanitizeSessionSlug(sessionSlug);
   return slug ? `${AGENT_QUESTION_NUMBER_KV_PREFIX}${slug}` : '';
@@ -82,34 +78,6 @@ async function persistQuestionNumberMap(env = {}, map = {}, createdAt = null) {
   return { ok: true, key, record };
 }
 
-export async function ensureAgentQuestionNumbers({
-  env = {},
-  sessionSlug = '',
-  questions = [],
-  createdAt = null,
-} = {}) {
-  const slug = sanitizeSessionSlug(sessionSlug);
-  if (!slug) return { ok: false, reason: 'session_slug_missing', questions: Array.isArray(questions) ? questions : [] };
-  const map = await loadQuestionNumberMap(env, slug);
-  let changed = false;
-  for (const question of Array.isArray(questions) ? questions : []) {
-    const qid = questionId(question);
-    if (!qid || map.questionIdToNumber[qid]) continue;
-    const number = map.nextNumber;
-    map.numberToQuestionId[String(number)] = qid;
-    map.questionIdToNumber[qid] = number;
-    map.nextNumber = number + 1;
-    changed = true;
-  }
-  if (changed) await persistQuestionNumberMap(env, map, createdAt);
-  const numberedQuestions = (Array.isArray(questions) ? questions : []).map((question) => {
-    const qid = questionId(question);
-    const stableQuestionNumber = qid ? map.questionIdToNumber[qid] : null;
-    return stableQuestionNumber ? { ...question, stableQuestionNumber } : question;
-  });
-  return { ok: true, map, questions: numberedQuestions };
-}
-
 export async function assignAgentQuestionNumber({
   env = {},
   sessionSlug = '',
@@ -129,27 +97,4 @@ export async function assignAgentQuestionNumber({
     await persistQuestionNumberMap(env, map, createdAt);
   }
   return { ok: true, number, map };
-}
-
-export function parseStableQuestionNumberSelector(selector = '') {
-  const text = safeString(selector).toLowerCase();
-  const match = text.match(/^(?:question|q|#)?\s*(\d+)$/i);
-  if (!match) return null;
-  const number = Number(match[1]);
-  return Number.isInteger(number) && number > 0 ? number : null;
-}
-
-export async function findQuestionByStableNumber({
-  env = {},
-  sessionSlug = '',
-  selector = '',
-  questions = [],
-  createdAt = null,
-} = {}) {
-  const number = parseStableQuestionNumberSelector(selector);
-  if (!number) return null;
-  const ensured = await ensureAgentQuestionNumbers({ env, sessionSlug, questions, createdAt });
-  const qid = ensured.map?.numberToQuestionId?.[String(number)];
-  if (!qid) return null;
-  return (ensured.questions || questions).find((question) => questionId(question) === qid) || null;
 }

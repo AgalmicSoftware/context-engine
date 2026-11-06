@@ -748,15 +748,6 @@ export const callResultsAnalysisProvider = async ({ env, slug, config, prompt, h
   return normalizeProviderResponse(response, Number(deps?.now?.() ?? Date.now()));
 };
 
-export const validateGeneratedAnalysisOutput = ({ value, source, sections, generatedAt, model = '' } = {}) => {
-  try {
-    normalizeGeneratedArtifact({ value, source, sections, generatedAt, model });
-    return { ok: true };
-  } catch (error) {
-    return { ok: false, error: error?.message || 'AI results analysis output failed validation.' };
-  }
-};
-
 export const normalizeGeneratedArtifact = ({ value, source, sections, generatedAt, model = '' }) => {
   const validationSource = {
     aiSnapshot: source?.aiSnapshot,

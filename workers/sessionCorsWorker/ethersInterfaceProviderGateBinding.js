@@ -1,16 +1,6 @@
 import { attestRpcEndpointChain } from './rpcChainAttestation.js';
 import { buildSafeRpcFailure, createRpcDiagnosticMasker } from './rpcDiagnosticSafety.js';
 
-const toStr = (value, deps) => (
-  typeof deps?.toStr === 'function'
-    ? deps.toStr(value)
-    : typeof value === 'string'
-      ? value
-      : value == null
-        ? ''
-        : String(value)
-);
-
 const getInterfaceCtor = (deps) => (
   typeof deps?.getEthersInterfaceCtor === 'function'
     ? deps.getEthersInterfaceCtor()

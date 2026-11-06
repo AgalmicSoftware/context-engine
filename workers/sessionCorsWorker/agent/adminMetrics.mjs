@@ -49,19 +49,6 @@ export async function listHandoffKvRecordsByPrefix(env = {}, prefix = '', { limi
   return records;
 }
 
-export function dedupeSubmitRecordsByRequestId(records = []) {
-  const byId = new Map();
-  (Array.isArray(records) ? records : []).forEach((record) => {
-    const requestId = safeString(record?.requestId || record?.idempotencyKey || record?.key);
-    if (!requestId) return;
-    const existing = byId.get(requestId);
-    if (!existing || safeString(existing.createdAt).localeCompare(safeString(record.createdAt)) <= 0) {
-      byId.set(requestId, record);
-    }
-  });
-  return Array.from(byId.values());
-}
-
 export function sessionFromSessionFirstKey(key = '', prefix = '') {
   const rest = safeString(key).startsWith(prefix) ? safeString(key).slice(prefix.length) : '';
   return sanitizeSessionSlug(rest.split(':')[0]);

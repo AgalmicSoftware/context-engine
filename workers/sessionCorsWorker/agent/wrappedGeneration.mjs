@@ -1,5 +1,5 @@
 import { runBoundedPoster } from './posterBudget.mjs';
-import { safeString, sanitizeSessionSlug } from './runtimePrimitives.mjs';
+import { sanitizeSessionSlug } from './runtimePrimitives.mjs';
 import { assertNoSecretShape } from './redaction.mjs';
 import { SESSION_LAB_LOGO_REFERENCE_BASE64, SESSION_LAB_LOGO_REFERENCE_FILENAME } from './sessionLabLogoReference.mjs';
 import { DEFAULT_WRAPPED_IMAGE_MODEL, DEFAULT_WRAPPED_IMAGE_SIZE, WRAPPED_STORY_FRAME_SECONDS, DEFAULT_OPENAI_IMAGE_EDIT_URL, base64ToUint8Array, normalizeAgentOnlyRunId, runIdFromBody } from './wrappedCore.mjs';
