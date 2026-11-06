@@ -107,8 +107,7 @@ recipients fail closed unless they use the policy-bound v2 format:
 
 - `ciphertext`: the Chipotle-wrapped content key, whose plaintext is JSON `{ v: 2, cekHex, policyFingerprint, policy }`
 - `dataToEncryptHash`: a policy-bound sentinel, not a Lit SDK hash
-- `chipotle`: `{ version: 2, litActionCid, litPkpId, sbtAddresses, gateMode, chainId, policyFingerprint, policy }`
-- `policy`: canonical SBT gate policy `{ chainId, gateMode, sbtAddresses, litActionCid, litPkpId }`
+- `chipotle`: `{ version: 2, litActionCid, litPkpId, sbtAddresses, gateMode, chainId, policyFingerprint, policy }`, where `policy` is the canonical SBT gate policy `{ version: "chipotle-sbt-v2", chainId, gateMode, sbtAddresses, litActionCid, litPkpId }`
 - no stored RPC URL: the Worker picks the check/decrypt RPC from its approved list, and the Action verifies `provider.getNetwork().chainId`
 
 This keeps the user data format close to CE's existing envelope model and swaps

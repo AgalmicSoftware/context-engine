@@ -34,9 +34,9 @@ flowchart LR
   Trustless -.->|Lit encryption selected| Lit["Lit Protocol"]
 ```
 
-Hosted & Fast needs a Cloudflare account, one AI-provider key, and either a
-Cloudflare API token, sent once through the deploy helper and never saved, or
-the token-free dashboard handoff. The passkey-derived EOA signs canonical Worker
+Hosted & Fast needs a Cloudflare account, an AI-provider key (OpenAI by
+default), and either a Cloudflare API token, sent once through the deploy helper
+and never saved, or the token-free dashboard handoff. The passkey-derived EOA signs canonical Worker
 config without an EVM transaction, so public EVM, registry, RPC, gas, Arweave,
 and Lit are not default dependencies. Trustless & Slower adds public EVM
 contracts, Arweave, wallet transactions, and gas, and still needs a Session

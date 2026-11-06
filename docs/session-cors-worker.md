@@ -58,7 +58,8 @@ Existing Bridge deployments are not migrated.
 - The project hosts a worker for the `demo-sh` session with embedded deploy-helper capability disabled.
 - New sessions created via `/new` are bring-your-own-worker: each session's full
   `sessionCorsWorker` runs in the creator's own free Cloudflare Workers account.
-  Both deploy paths need that account.
+  Both deploy paths need that account. A sponsored session runs in the sponsor's
+  account instead, which makes the sponsor its Worker operator.
 - [API token (default)](#default-wizard-flow-api-token-and-deploy-helper):
   **Create** deploys through the deploy helper.
 - [Dashboard handoff](#dashboard-wizard-flow-no-api-token): the token-free path
@@ -204,9 +205,10 @@ constraints in mind before creating or pasting one:
 - The browser sends the token only for the current deployment attempt to the
   deploy helper. The default helper is the project's, at
   `https://ce-deploy-helper.agalmic.workers.dev/`. It uses the token to call
-  Cloudflare, and its operator can see the token. The token is not saved to the
-  session draft or browser storage, and it is not installed in the deployed
-  Session Worker.
+  Cloudflare. Its operator can see the token, the session secrets sent with it
+  (such as AI keys), and the Worker secrets it generates. The token is not saved
+  to the session draft or browser storage, and it is not installed in the
+  deployed Session Worker.
 - Set the earliest expiration Cloudflare permits that still covers setup and an
   immediate retry. Revoke the token as soon as deployment succeeds or you
   abandon the attempt from
@@ -271,8 +273,9 @@ deleted speculatively.
 - The deploy-helper (`workers/deploy-helper/worker.js`) is a separate trusted
   Cloudflare Worker. It is not the `sessionCorsWorker` itself; it proxies
   Cloudflare API calls, creates the target worker + KV namespace, and seeds the
-  initial session config/secrets. Its operator can see the Cloudflare token it
-  receives, so prefer self-hosting it on infrastructure you control.
+  initial session config/secrets. Its operator can see the Cloudflare token and
+  session secrets it receives and the Worker secrets it generates, so prefer
+  self-hosting it on infrastructure you control.
 - Self-hosted deploy-helper deployments should bundle from `workers/deploy-helper/worker.js` with Wrangler. The canonical source is the GitHub tree under `workers/deploy-helper/`.
 - The checked-in deploy-helper source imports shared modules from `workers/shared/`. If you deploy outside Wrangler, bundle it first; do not paste raw `workers/deploy-helper/worker.js` into the Cloudflare dashboard as a standalone script.
 - `workers/deploy-helper/README.md` is the quick public reference for bindings, env vars, trust boundaries, and endpoint behavior.
@@ -380,7 +383,7 @@ settings is a separate operator action.
   - `meta.label`, `meta.createdAt`, `meta.createdBy`, optional `meta.expiresAt`
   - `meta.sourceSessionSlug`, `meta.sourceWorkerUrl` (bootstrap funding/deploy provenance)
 - Lit keys in a bundle:
-  - `litAccountApiKey` is the per-bundle authority field, backed by one disposable Lit account per bundle. `/new` uses it during redemption to create a fresh group / PKP / usage key for the new session.
+  - `litAccountApiKey` is the per-bundle authority field. Redeeming a bundle hands over that account's full authority, so sponsors should paste the key of a disposable account, one per bundle. `/new` uses it during redemption to create a fresh group / PKP / usage key for the new session.
   - Scoped runtime bundles use `litUsageApiKey` plus `litApiBase` / `litGroupId` / `litPkpId` / `litActionCid`.
 - The manual `/new` Lit card exposes only `litAccountApiKey` / `LIT_ACCOUNT_API_KEY`; scoped runtime identifiers stay worker-side and are derived during bootstrap or supplied through admin/sponsored-bundle paths.
 - The raw Cloudflare API token entered on `/sponsor` is not written into the encrypted bundle payload. `/sponsor` exchanges it for a `deployGrantToken`, and the sponsoring worker keeps the raw token only inside the server-side sponsored grant record until redeem/expiry. The per-grant coordinator stores only the request digest, attempt state, and a credential-redacted safe result. A successful deploy replaces the credential-bearing KV grant record with a secret-free terminal receipt so a lost browser response can be replayed without deploying again.
@@ -3046,7 +3049,8 @@ Scripts: Edit` and `Workers KV Storage: Edit`; the Durable Object module
   in `client/.env` so `/new` uses it instead.
 
 Warning: passing a Cloudflare API token to a deploy-helper requires trust, because
-its operator can see the token. On the direct `/new` route, the token is
+its operator can see the token, the session secrets sent with it, and the Worker
+secrets it generates. On the direct `/new` route, the token is
 request-only input and must not be returned, logged, placed in metadata/config, or
 stored by the helper or session worker. A sponsored deploy grant is the exception:
 the sponsoring Worker keeps the sponsor's token until redeem or expiry.

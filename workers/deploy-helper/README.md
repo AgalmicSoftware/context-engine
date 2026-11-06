@@ -4,9 +4,9 @@
 
 It is a trusted helper:
 
-- browsers send a Cloudflare API token to this worker
-- the helper creates the target worker, KV namespace, and initial session config/secrets
-- the helper operator can therefore see and misuse that Cloudflare token
+- browsers send a Cloudflare API token and the session's secrets, such as AI keys, to this worker
+- the helper creates the target worker, KV namespace, and initial session config/secrets, and generates the Worker's runtime secrets
+- the helper operator can therefore see and misuse that token and those secrets
 
 Unless `REACT_APP_CE_DEPLOY_HELPER_URL` points elsewhere, `/new` uses the project's helper. Prefer self-hosting one on infrastructure you control.
 

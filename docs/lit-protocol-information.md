@@ -24,7 +24,7 @@ Primary docs:
   - worker secrets store the Lit API key material when a per-session account or per-session override is needed
   - the worker can fall back to a deployment-level server env key for sponsored/shared-account setups
 - Current worker/runtime split:
-  - worker env fallback: `LIT_USAGE_API_KEY` runs the Action (falling back to `LIT_ACCOUNT_API_KEY`); `LIT_ACCOUNT_API_KEY` provisions authorities (falling back to `LIT_USAGE_API_KEY`); `LIT_API_BASE` overrides the API base
+  - worker env fallback: `LIT_USAGE_API_KEY` runs the Action (falling back to `LIT_ACCOUNT_API_KEY`); `LIT_ACCOUNT_API_KEY` provisions authorities (`lit-chipotle-provision` alone falls back to `LIT_USAGE_API_KEY`; without an account key, `lit-chipotle-bootstrap-session` creates a new Lit account); `LIT_API_BASE` overrides the API base
   - per-session worker secrets: `litAccountApiKey`, `litUsageApiKey`, and the Worker-generated `litAuthorizationPrivateKey`
   - per-session Worker-private config: `litCredentials = { litApiBase, litGroupId, litPkpId, litActionCid, litAuthorizationVersion, litAuthorizationSigner }`; the public `/session-config` response strips this entire descriptor
 - Runtime security contract:

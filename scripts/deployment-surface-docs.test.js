@@ -48,7 +48,7 @@ test('canonical docs name both Hosted deployment paths', () => {
   const overview = read('docs/architecture-overview.md');
   const spec = read('spec.md');
 
-  assert.match(readme, /Cloudflare account, one AI-provider key, and either a Cloudflare API token or the token-free dashboard setup/);
+  assert.match(readme, /Cloudflare account, an AI-provider key \(OpenAI by default\), and either a Cloudflare API token or the token-free dashboard setup/);
   assert.doesNotMatch(readme, /default Cloudflare profile needs only a Cloudflare deploy token/i);
   assert.match(architecture, /Deploy helper[\s\S]{0,80}request-only Cloudflare API token/);
   assert.match(architecture, /Native Deploy to Cloudflare[\s\S]{0,80}token-free dashboard handoff/);
