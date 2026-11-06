@@ -76,7 +76,7 @@ export const QUICKSTART_STEPS: readonly QuickstartStep[] = Object.freeze(
     {
       id: 'understand-storage',
       title: 'Know where the data lives',
-      body: 'A session profile chooses Cloudflare or Arweave storage. Decentralized sessions use durable Arweave payloads and on-chain anchors; encrypted fields remain ciphertext until an authorized viewer decrypts them.',
+      body: 'New sessions use Cloudflare storage in the account that deployed their Worker. On-chain sessions use public, permanent Arweave payloads and on-chain anchors; anyone can read them unless a field is encrypted, and encrypted fields stay ciphertext until an authorized viewer decrypts them.',
     },
   ].map(freezeQuickstartStep),
 );
@@ -109,7 +109,8 @@ export const GUIDE_TOPICS: readonly GuideTopic[] = Object.freeze(
         'Session metadata, question or survey prompts and tags, responses, and documents can be stored as encrypted payloads.',
       points: [
         `Lit access conditions commonly grant decryption to wallets that hold the selected ${t('sbt')} gate.`,
-        'Worker-envelope sessions decrypt only after the Worker applies the configured access policy; decentralized Lit payloads remain client-side ciphertext until their conditions pass.',
+        'Worker-envelope sessions decrypt only after the Worker applies the configured access policy, so the Worker operator and Cloudflare runtime stay trusted.',
+        'Lit protects only the fields you lock. They remain ciphertext until their conditions pass, the Worker operator and Lit account administrators stay trusted, and which wallet answered which question stays public.',
       ],
     },
     {
@@ -126,7 +127,7 @@ export const GUIDE_TOPICS: readonly GuideTopic[] = Object.freeze(
       id: 'document-library',
       title: 'Session document library',
       summary:
-        'Open `/session/<slug>/docs` to browse a session library. Depending on the profile, records are backed by Arweave or by private Worker-managed storage references.',
+        'Open `/session/<slug>/docs` to browse a session library. Depending on the profile, records are backed by Arweave or by Worker-managed Cloudflare storage.',
       points: [
         'Arweave libraries can store plaintext or Lit-encrypted files and link records.',
         'The `docUploads` gate can supply the default encrypted audience; private “only me” saves use the connected wallet.',
@@ -140,7 +141,7 @@ export const GUIDE_TOPICS: readonly GuideTopic[] = Object.freeze(
       points: [
         'Interview mode turns a realtime conversation or a reviewed ChatGPT/Claude handoff into local response drafts with visible confidence; it never submits automatically.',
         'Generated questions remain drafts for review rather than being published automatically.',
-        'The prompt templates used by these features are published in the Prompts section below.',
+        'Prompt templates for question generation, summaries, and analysis are published in the Prompts section below.',
       ],
     },
     {
@@ -152,7 +153,7 @@ export const GUIDE_TOPICS: readonly GuideTopic[] = Object.freeze(
         'Use `?mode=voice` to open the voice chooser, `?mode=interview` for one-person conversational response drafting, or `?mode=groupRecording` to turn a recorded discussion into draft questions.',
         'Admins copy the `?mode=groupRecording` link, one per breakout room, with “Copy group recorder link” under Join or on the settings page; it keeps any Worker pin, and other `mode` values are ignored and removed.',
         'The optional ChatGPT/Claude memory handoff, offered in the voice chooser, keeps instructions in the pasted user request, fetches only an inert question catalog, shows the exact packet before encoding, and includes explained per-answer confidence; no relevant signal produces a clean interview link. A cut-off or damaged link says why and accepts the pasted JSON packet instead.',
-        'The legacy `?mode=listening` link remains supported for the pile-adjacent group recorder, and recording starts only after you press Record.',
+        '`?mode=listening` opens the pile-adjacent group recorder, and recording starts only after you press Record.',
         'Back keeps a running recording on the page, and reloading or closing the tab asks first while audio is still being recorded or uploaded.',
       ],
     },
@@ -162,8 +163,8 @@ export const GUIDE_TOPICS: readonly GuideTopic[] = Object.freeze(
       summary:
         'Demo sessions provide curated examples. Worker-canonical sessions use a session Worker as their operational authority, while registry-canonical sessions anchor identity and SBT gate authority on-chain.',
       points: [
-        'Legacy demo configuration remains a compatibility source while registry and Worker session reads are resolved.',
-        'A pure Worker session does not gain contracts, gas, or on-chain authority from stale legacy fields.',
+        'Demo configuration is the fallback while registry and Worker session reads resolve.',
+        'A pure Worker session has no contracts, gas, or on-chain authority.',
       ],
     },
   ].map(freezeGuideTopic),
@@ -187,13 +188,13 @@ export const FAQ_ITEMS: readonly FaqItem[] = Object.freeze(
       id: 'data-location',
       question: 'Where is my data stored?',
       answer:
-        'The session profile decides. It may use Worker-managed Cloudflare storage or durable Arweave payloads, with registry-canonical sessions keeping minimal identity, pointers, and gate authority on-chain.',
+        'The session profile decides. New sessions use Cloudflare storage in the account that deployed their Worker. On-chain sessions use public, permanent Arweave payloads and keep minimal identity, pointers, and gate authority on-chain.',
     },
     {
       id: 'private-answers',
       question: 'Can my answers be private?',
       answer:
-        'Yes, when the session enables response encryption. Answers and additional comments have independent locks, can be encrypted for you or for a gated audience, and only an authorized viewer can decrypt the protected fields. Comments follow the answer lock only when you explicitly choose that option.',
+        'It depends on the session, and new sessions start with public results. When a session enables response encryption, answers and additional comments have independent locks, can be encrypted for you or for a gated audience, and only an authorized viewer can decrypt the protected fields. Comments follow the answer lock only when you explicitly choose that option. In on-chain sessions, which wallet answered which question stays public.',
     },
     {
       id: 'active-chain',
@@ -210,7 +211,7 @@ export const FAQ_ITEMS: readonly FaqItem[] = Object.freeze(
       id: 'results-visibility',
       question: 'Who can see the results?',
       answer:
-        'The session’s result-visibility and access policy decides. Results may be public aggregates or limited to participants, session members, or administrators, and protected fields still require decryption access.',
+        'The session’s result-visibility and access policy decides. New sessions start public, so anyone can see the results. A session can instead show each person only their own answers, with session admins and authorized agents able to read session-wide responses. Protected fields still require decryption access.',
     },
   ].map(freezeFaqItem),
 );

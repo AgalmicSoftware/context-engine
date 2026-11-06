@@ -36,10 +36,12 @@ flowchart LR
 
 Hosted & Fast needs a Cloudflare account, an AI-provider key (OpenAI by
 default), and either a Cloudflare API token, sent once through the deploy helper
-and never saved, or the token-free dashboard handoff. The passkey-derived EOA signs canonical Worker
-config without an EVM transaction, so public EVM, registry, RPC, gas, Arweave,
-and Lit are not default dependencies. Trustless & Slower adds public EVM
-contracts, Arweave, wallet transactions, and gas, and still needs a Session
+and never saved, or the token-free dashboard handoff. The helper's operator can
+see that token, the session secrets sent with it, and the Worker secrets it
+generates. The passkey-derived EOA signs canonical Worker config without an EVM
+transaction, so public EVM, registry, RPC, gas, Arweave, and Lit are not default
+dependencies. Trustless & Slower adds public EVM contracts, Arweave, wallet
+transactions, gas, and a 0.0001 ETH creation fee, and still needs a Session
 Worker. Lit credentials are required only when Lit encryption is selected.
 
 Participants use session identity and authorization. They never need the
@@ -98,17 +100,18 @@ Trustless & Slower:
 ```text
 Wizard UI  ──▸  Configure profile-enabled session Worker services
            ──▸  Upload metadata JSON to Arweave (optionally Lit-encrypted)
-           ──▸  SessionRegistry.createSession(slug, sessionId, chainId, metadataURI)
+           ──▸  SessionRegistry.createSession(slug, sessionId, chainId, metadataURI, encryptedMetadataURI), paying the creation fee
            ──▸  SessionRegistry.setSessionFields(slug, [corsWorkerUrl, sponsored_*])
            ──▸  SessionRegistry.setResourceGates(slug, gates[])
 ```
 
-Sponsored bootstrap deploys target the sponsoring `sessionCorsWorker` first:
+Sponsored bootstrap deploys run on the sponsoring `sessionCorsWorker`. They do
+not fall back to the standalone deploy helper; a Worker with embedded deploy
+disabled refuses the grant.
 
 ```
 Browser  ──▸  source sessionCorsWorker /sponsored/redeem-deploy
          ──▸  embedded deploy-helper core inside source worker
-         ──▸  fallback standalone deploy-helper only if embedded deploy is disabled or retryable failure occurs
 ```
 
 ### 2. Survey Response
@@ -124,8 +127,10 @@ to Surveys.submitResponses(...). Worker-canonical sessions send no transaction.
 
 ### 3. SBT Mint (chain-backed profiles)
 ```
-User claims ──▸  CustomSBT.mint() / .claimWithPassword() / .claimWithSignature()
-            ──▸  Token metadata stored on Arweave (via SBTFactory or direct)
+User claims ──▸  CustomSBT.claim() / .startClaim() + .claimWithPassword() /
+                 .mintWithGroupSignature() / .claimWithInvite()
+
+Collection metadata is stored on Arweave; SBTFactory sets its tokenURI on creation.
 ```
 
 ### 4. Gate Check (Worker Login)
@@ -158,10 +163,9 @@ Lit opt-in:
   Arweave or Cloudflare stores the resulting ciphertext according to the profile
 ```
 
-New Lit authorities use the Worker-signed protocol above. Legacy unsigned
-Actions and their existing ciphertext are not retroactively protected; fresh
-authority setup and content preservation follow
-[Worker authorization for Lit key release](docs/lit-worker-authorization.md).
+Lit encrypts only the fields you lock; who answered which question stays public.
+See [Worker authorization for Lit key release](docs/lit-worker-authorization.md)
+for the protocol and setup.
 
 ## Corpus Data
 
@@ -174,7 +178,7 @@ authority setup and content preservation follow
 
 | Area | Files |
 |------|-------|
-| Entry / routing | `components/MainSite/AppShell.tsx` |
+| Entry / routing | `components/MainSite/AppShell.tsx`, `routeTable.ts` |
 | Home tab shell | `components/MainContent/MainAreaTabs.tsx`, `ToolExplorer.tsx`, `OnboardingWalkthrough.tsx` |
 | Account / login settings | `components/Account/LoginAndSettingsModal.tsx`, `LoginButton.tsx` |
 | Session wizard | `components/Sessions/SessionWizard.tsx` |
@@ -185,12 +189,12 @@ authority setup and content preservation follow
 | About page | `components/About/AboutPage.tsx` |
 | Survey tool | `components/SurveyTool/SurveyTool.tsx`, `CreateQuestionsAndSurveys.tsx`, `SurveyResults.tsx` |
 | Shared UI | `components/Shared/AudioInput/AudioInput.tsx`, `components/Shared/Json/JsonControls.tsx`, `components/Shared/Json/JsonDisplay.tsx` |
-| SBT management | `components/SBTs/SBTsList.tsx`, `SBTPage.tsx`, `CreateSBTGroup.tsx` |
+| SBT management | `components/SBTs/SBTsPage.tsx`, `SBTsList.tsx`, `SBTPage.tsx`, `CreateSBTGroup.tsx` |
 | Gate components | `components/Gates/` |
 | **Utilities** | |
 | Web3 / contracts | `utilities/web3/chainGateway.ts`, `contractScripts.impl.ts`, `contractHelpers.ts`, `chainEventStreams.ts`, `profileChainReads.ts`, `sessionRegistry.ts` |
 | Wallet | `client/src/wallet/` passkey EOA wallet config, encrypted keystore, EIP-1193 provider, and soft-session worker |
-| Crypto / Lit | `shared/encryption/envelopeV1Core.mjs` owns the browser/CE-CC envelope-v1 primitives; `utilities/crypto/cryptography.ts`, `litProtocol.ts`, and `encryptedFields.ts` own browser providers, Lit integration, and response orchestration |
+| Crypto / Lit | `shared/encryption/envelopeV1Core.mjs` owns the shared envelope-v1 primitives; `utilities/crypto/cryptography.ts`, `litProtocol.ts`, and `encryptedFields.ts` own browser providers, Lit integration, and response orchestration |
 | Arweave | `utilities/arweave/arweaveClient.js`, `arweaveUrls.ts` |
 | Session helpers | `utilities/session/sessionSlug.ts` owns identity/transport/storage slug conversions; `sessionNaming.ts`, `sessionMetadata.ts`, `resourceKeys.ts`, `sessionModeProfile.ts`, `groupCreationPolicy.ts`, `sessionBackendKind.ts`, `agentClientLogin.ts`, `agentSessionData.ts`, and `agentSessionBackend.ts` own higher-level session behavior |
 | Worker auth | `utilities/worker/workerAuth.ts`, `corsProxy.ts` |
@@ -213,17 +217,14 @@ authority setup and content preservation follow
 
 `Surveys.sol` reserves distinct IDs for surveys and questions, including questions
 in a survey's initial batch. This prevents the shared `userResponses[user][id]`
-mapping from aliasing a survey response and a question response. The guards apply
-only to future deployments built from this source; existing deployed contracts
-and configured addresses are unchanged. The response mapping and public ABI are
-unchanged.
+mapping from aliasing a survey response and a question response.
 
 ### Workers (`workers/`)
 
 | Worker | Purpose |
 |--------|---------|
 | `sessionCorsWorker/worker.js` | Canonical config/auth/storage for Hosted & Fast, plus profile-enabled AI, Arweave, fetch, transcription, and faucet routes |
-| `deploy-helper/worker.js` | Worker deployment for the `/new` API-token path and sponsored fallback, including optional Agent HTTP setup |
+| `deploy-helper/worker.js` | Worker deployment for the `/new` API-token path, including optional Agent HTTP setup |
 | `sessionCorsWorker/agent/` | Scoped Agent HTTP, credential exchange, optional registry queue and Session Wrapped under canonical Session Worker authority |
 
 ### Verification
@@ -244,9 +245,13 @@ manifest is `client/src/variables/contracts.json`, exposed through
 
 OP Sepolia is the current default and the only chain configured in the canonical
 manifest. Its immutable Surveys and SBTFactory deployments predate the current
-source hardening. The restrictions above become live only after a testnet
-redeploy and corresponding manifest/transaction updates; no mainnet migration
-is in scope.
+source hardening. The contract restrictions described in this document become
+live only after a testnet redeploy and a manifest update.
+
+The current OP Sepolia `SBTFactory` default above was deployed in tx
+`0x57b91018ed6b93f64c83d5a44bfb9d0be1920f96929ecc045aa3946ba7cc917e`.
+
+### SBT Claim Authorization
 
 Group-claim signatures use EIP-191 over `keccak256(abi.encode(domain, chainId,
 collection, claimant))`. Invite signatures replace the claimant with a positive
@@ -261,8 +266,7 @@ pre-signed code per slot. Each code contains only chain ID, collection address,
 slot and signature (`c`, `a`, `n`, `s` in base64url JSON). Recipients cannot use
 a reusable password to generate fresh slots. Claim links still identify the
 group, with the code entered separately. `sbtAuthorization.ts` supplies the
-same signing implementation to the browser and the local contract smoke test;
-there is no legacy signature fallback or alternate contract generation.
+same signing implementation to the browser and the local contract smoke test.
 
 The client derives a group-password signer with PBKDF2-SHA256 (600,000
 iterations) over the NFKC-normalized password, salted by
@@ -279,15 +283,9 @@ issuer actions; holder burns still follow `OwnerOnly`/`Both`, and `Neither`
 remains unburnable. Ordinary deployments preserve an explicit zero admin.
 Configured CREATE2 deployment requires an initial nonzero admin matching the
 sender to prevent capture; that admin may retire to zero after initialization.
-These source changes require a separately deployed factory before use; checked-in
-network addresses do not acquire new bytecode through an ABI update.
 
 CustomSBT instances are deployed per-group via SBTFactory. Configured
-deterministic SBT creation is admin-submitted; sponsored or relayed configured
-creation requires a separate authorization design.
-
-The current OP Sepolia `SBTFactory` default above was deployed in tx
-`0x57b91018ed6b93f64c83d5a44bfb9d0be1920f96929ecc045aa3946ba7cc917e`.
+deterministic SBT creation is admin-submitted.
 
 ### Historical Base Sepolia Record
 
@@ -309,17 +307,12 @@ contracts, add the canonical set to `contracts.json`, expose the chain through
 
 ### Address Discovery
 
-Contract address discovery is currently file-based rather than on-chain.
+Contract address discovery is file-based, with no on-chain or dynamic step.
 `client/src/variables/chains.ts` imports the base deployment map from `contracts.json`.
 `SESSION_REGISTRY_ADDRESSES` maps each configured chain ID to its `SessionRegistry` address.
 `SESSION_CONTRACTS_BY_CHAIN` provides the per-chain contract configuration used by the SPA.
-That bundle includes addresses such as `SessionRegistry`, `Surveys`, and `SBTFactory`.
 For local development, `local-contracts.json` can override the checked-in defaults.
 Those local overrides are merged into both exported maps before the client reads them.
-This is the current source of truth for contract lookup in the client.
-There is no dynamic production discovery step today.
-The planned future path is ENS-based discovery via `<chainId>.contracts.contextengine.eth`.
-That ENS lookup is not implemented yet.
 
 ## Auth Model
 

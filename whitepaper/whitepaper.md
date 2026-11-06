@@ -40,7 +40,7 @@ Context Engine extends the pioneering approach of Pol.is in the following ways:
 
 - More question types (binary, freeform, single- and multi-select, rating, quadratic allocation) + priority / conviction ratings
 - Optional privacy of responses / votes / results / shared group context
-- AI-native inputs / outputs for better UX: Generate questions / responses from URLs, speech-to-text input, AI analysis of results
+- AI-native inputs / outputs for better UX: Generate questions from URLs, draft responses through a voice interview or a ChatGPT / Claude handoff, speech-to-text input, AI analysis of results
 - Cloudflare storage in the default Hosted & Fast profile, with permanent Arweave storage available in the opt-in Trustless & Slower profile
 - Passkey sign-in for session identity, with Ethereum accounts and soulbound tokens available to chain-backed sessions
 - No-Code deployment of new sessions: compatible with other tools / easy .json export
@@ -56,7 +56,7 @@ Context Engine is a web application, a set of smart contracts (EVM), and support
 - **Access control** supports Worker roles and Cloudflare Groups in Hosted & Fast sessions, and soulbound-token gates in chain-backed sessions. Encryption and sponsored resources depend on the selected configuration.
 - **Storage**: Hosted & Fast sessions use Cloudflare storage; Trustless & Slower sessions opt into Arweave and EVM contracts. Storage and encryption choices determine the persistence and access model.
 - **AI** is already used for question generation, transcription, cluster summaries, result analysis, and comparison of user positions across wallets.
-- **Demonstration datasets** are shipped in the repo as well, including one built around simulated historical figures. The current public demo can be seen at [/demo-1](https://contextengine.sh/session/demo-1)
+- **Demonstration datasets** are shipped in the repo as well, including one built around simulated historical figures. The current public demo can be seen at [/demo-sh](https://contextengine.sh/session/demo-sh)
 
 The static web client can be self-hosted, and creators can deploy their own per-session Cloudflare Worker today. The Company-Operated edition, with adapters for internal identity, key management, storage, AI, networking, and observability, is planned and not yet generally available; it can be entirely off-chain. Hosting the existing client and deploying a Worker does not provide that planned local-only stack. See the [deployment-mode table](../README.md#deployment-modes) and [architecture](../ARCHITECTURE.md), including its [source-versus-deployed contract caveat](../ARCHITECTURE.md#contract-addresses).
 
