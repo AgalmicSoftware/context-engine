@@ -54,9 +54,10 @@ flowchart TD
   ProtectedPromotion --> Hosted
 ```
 
-Agent HTTP uses the Session Worker’s canonical authority and gated storage services. When session policy and live testnet contract configuration
-explicitly enable managed-account broadcast, it may submit directly to the
-Surveys contract; the EVM contracts remain canonical for that chain-backed
+Agent HTTP runs inside the Session Worker and uses its canonical authority and
+gated storage services. When session policy and live testnet contract
+configuration explicitly enable managed-account broadcast, it may submit directly
+to the Surveys contract; the EVM contracts remain canonical for that chain-backed
 write.
 
 Static app hosting, public/private session access, and the session
@@ -100,7 +101,6 @@ Web3, Arweave, worker, or storage utilities directly. Existing IndexedDB and
 localStorage caches remain authoritative persistence. wagmi 0.9 installs its
 React Query persistence plugin on the shared client, so every application key
 starts with `{ scope: 'ce-app', persist: false }` to opt out of `wagmi.cache`.
-Old string-first application entries no longer match and age out naturally.
 
 Keys use the `queryKeys` factory, which the app foundation also exposes for
 bootstrap consumers. After the frozen application scope object, a
@@ -123,10 +123,7 @@ Freshness is mapped per read family from current behavior, never invented:
 | Cache-revision or event driven | Use `staleTime: Infinity`; the existing event and successful write paths explicitly invalidate the affected key. |
 | User-triggered refresh | Keep the refresh control and invalidate or refetch the exact key. |
 
-TanStack Query v5 renames `cacheTime` to `gcTime`; dependency migration is a
-separate change and must not alter these semantics.
-
-The first functional exemplar is TagPage's session-registry snapshot. It reads
+TagPage's session-registry snapshot is the worked example. It reads
 through the session-registry domain port, uses synchronous `initialData` to
 preserve the previous first render, and keeps `staleTime: Infinity`. The
 app query provider owns one app-lifetime subscription that maps the existing
@@ -145,15 +142,6 @@ The event-driven invalidation recipe is:
 3. Invalidate the narrow domain/entity key family on that event; read hooks do
    not register duplicate listeners.
 4. Keep write completion responsible only for emitting the existing signal.
-
-Each migration slice must:
-
-1. Characterize loading, data shape, context changes, freshness, and fetch count.
-2. Add a hook over an existing domain read port using the shared key factory.
-3. Convert one named functional surface without changing routes, test IDs, copy,
-   payloads, storage keys, or write behavior.
-4. Wire existing events and successful writes to exact-key invalidation.
-5. Prove duplicate in-flight reads are collapsed and fetch counts do not rise.
 
 ## Enforcement System
 
@@ -177,8 +165,7 @@ The tracked checks work together:
   hygiene.
 - `scripts/ci-gates.json` defines the serial local CI profile, the split hosted
   gate set, and the standalone release profile. `test:ci` and GitHub Actions
-  consume the same named gates; `verify:release` runs its narrower release
-  profile without being nested in local CI.
+  consume the same named gates; `verify:release` runs its own release profile.
 
 ## Worker Topology
 
@@ -190,10 +177,13 @@ The worker surface is documented in `docs/session-cors-worker.md`.
 - In the default Hosted & Fast profile, a creator-owned per-session instance is
   the canonical config, auth, and payload-storage authority. Its passkey-derived
   admin EOA signs config without submitting an EVM transaction.
-- `workers/deploy-helper/` serves the `/new` API-token path, sponsored fallback,
-  and self-hosted deployments, including optional Agent HTTP setup. It calls
-  Cloudflare APIs to create the target Worker and bindings. The token-free `/new`
-  path instead opens the tracked native Cloudflare dashboard template.
+- `workers/deploy-helper/` serves the `/new` API-token path and self-hosted
+  deployments, including optional Agent HTTP setup. It calls Cloudflare APIs to
+  create the target Worker and bindings, so its operator can see the token, the
+  session secrets sent with it, and the Worker secrets it generates. The
+  token-free `/new` path instead opens the tracked native Cloudflare dashboard
+  template. Sponsored deploys run in the sponsoring Session Worker's embedded
+  deploy core and do not fall back to this helper.
 - `workers/sessionCorsWorker/agent/` is an optional part of the Session Worker,
   enabled by session policy. It owns the scoped `/api/agent/*` contract, submission
   queue, and Session Wrapped, while the Session Worker keeps session membership,
@@ -222,8 +212,8 @@ Storage authority follows the selected profile:
   is an explicit advanced option.
 - Trustless & Slower keeps Arweave as its durable metadata and payload store,
   with public EVM contracts anchoring the selected registry and gate state.
-- Company-Operated targets organization-selected storage adapters and does not
-  require Arweave or EVM storage.
+- Company-Operated will target organization-selected storage adapters and will
+  not require Arweave or EVM storage.
 
 The session worker exposes the profile-aware canonical storage routes:
 
@@ -272,8 +262,10 @@ published source package.
 
 The entry failure screen automatically performs one cache-busted reload only for recognized stale JavaScript chunk errors. Its cache cleanup removes Cache API entries while preserving local/session storage, including drafts, settings, and reload-loop sentinels. Generic startup failures offer a plain manual reload and leave browser storage and caches untouched. Successful entry/route commits clear only their own recovery markers.
 
-User profiles match only `/u/<valid-address>` or the legacy `/<valid-address>` route, with an optional trailing slash. The shared path helper validates the address for both routing and rendering; unrelated paths, query values, fragments, and extra path segments cannot select a profile. Query parameters such as `tab` keep their existing meaning.
+## User profile routes
+
+User profiles match only `/u/<valid-address>` or `/<valid-address>`, with an optional trailing slash. The shared path helper validates the address for both routing and rendering; unrelated paths, query values, fragments, and extra path segments cannot select a profile.
 
 ## Browser contract writes
 
-Raw contract writes retain wallet/passkey approval and EVM execution as their authority. The shared writer verifies deployed code and the expected chain, includes that chain in the wallet transaction, and requires a successful receipt for the destination contract. Session-aware callers supply their configured chain; address-only SBT calls pin the connected chain for the operation. Creation, mint/burn, survey/response, and registry creation/metadata operations also require their expected event from the target contract. Calldata, signatures, storage keys, and registry payloads remain unchanged.
+Raw contract writes retain wallet/passkey approval and EVM execution as their authority. The shared writer verifies deployed code and the expected chain, includes that chain in the wallet transaction, and requires a successful receipt for the destination contract. Session-aware callers supply their configured chain; address-only SBT calls pin the connected chain for the operation. Creation, mint/burn, survey/response, and registry creation/metadata operations also require their expected event from the target contract.

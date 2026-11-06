@@ -95,7 +95,7 @@ export const ToolExplorer = (props: ToolExplorerProps) => {
       subtext: 'Create and explore questions.',
       icon: faQuestionCircle,
       explainText:
-        'Survey and question platform allowing detailed responses, advanced question formats, preference weighing, and group filtering. Responses can be encrypted for privacy and retroactive evaluation by ZK systems (opt-in). Audio input processed by OpenAI – not stored by this app. Responses stored permanently on Arweave',
+        'Survey and question platform with detailed responses, advanced question formats, preference weighing, and group filtering. Responses can be encrypted for privacy (opt-in). Audio input goes to the session’s AI provider for transcription. Storage depends on the session: Cloudflare by default, or public and permanent on Arweave.',
       image: worldVoteImage,
       headerImage: artHeader,
       content: SurveyTool,
@@ -107,7 +107,7 @@ export const ToolExplorer = (props: ToolExplorerProps) => {
       subtext: 'Organize and manage groups.',
       icon: faUsers,
       explainText:
-        'Soulbound tokens (non-transferrable NFTs) enable digital groups to organize and coordinate by representing membership, roles, and permissions on-chain. SBTs can create private spaces for collective action, decision-making, and training custom AI models together, unlocking new possibilities for decentralized governance.',
+        'Groups organize people by membership, roles, and permissions. Worker-hosted sessions use Worker Groups; chain-backed sessions can use Soulbound tokens (non-transferable NFTs). Groups can create private spaces for collective action and decision-making.',
       image: modelDirectoryImage,
       content: SBTsPage,
       disabled: false,
