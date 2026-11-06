@@ -86,7 +86,6 @@ export const buildSafeSponsoredReceiptBody = (incoming = {}, sensitiveValues = [
     'accountId',
     'sessionSlug',
     'sessionWorkerOrigin',
-    'telegramConfigured',
     'resolvedSlug',
     'kvNamespaceId',
     'deploymentId',
@@ -198,26 +197,6 @@ const buildSponsoredGrantContinuationRecord = ({
     state,
     requestDigest: toTrimmedString(requestDigest),
   };
-};
-
-export const writeSponsoredGrantRedemptionReservation = async ({
-  env,
-  token,
-  grantRecord,
-  requestDigest,
-  nowMs = Date.now(),
-} = {}) => {
-  const expiresAt = toTrimmedString(grantRecord?.expiresAt);
-  const ttlSeconds = expiresAt
-    ? computeSponsoredGrantExpirationTtl(expiresAt, nowMs)
-    : null;
-  const reservation = buildSponsoredGrantContinuationRecord({
-    grantRecord,
-    requestDigest,
-    state: 'redeeming',
-  });
-  await writeSponsoredGrantRecord(env, token, reservation, ttlSeconds);
-  return reservation;
 };
 
 export const writeSponsoredGrantReceipt = async ({

@@ -16,7 +16,8 @@ import { createWorkerExecutionServicesWithWorkerDeps } from './workerExecutionSe
 import { resolveRpcUrlListForGate } from './gateRpcResolution.js';
 import { createEthersInterfaceProviderGateHelpersWithWorkerDeps } from './ethersInterfaceProviderGateBinding.js';
 import { PRIVATE_SESSION_RPC_LABEL } from './rpcDiagnosticSafety.js';
-import { addWorkerGroupMember, createWorkerGroup, deleteWorkerGroup, readWorkerGroupMembershipProjection } from './workerGroups.js';
+import { addWorkerGroupMember, createWorkerGroup, deleteWorkerGroup } from './workerGroups.js';
+import { readWorkerGroupMembershipProjection } from './workerGroupProjectionFixture.mjs';
 import { SessionWriteCoordinator, enqueueCoordinatedResultsAnalysisAutoJob } from './sessionWriteCoordinator.js';
 import { resolveWorkerCanonicalLoginScopes } from './workerCanonicalAuthority.js';
 import { validateWorkerConfigModeValues } from '../shared/workerConfigModeValidation.mjs';

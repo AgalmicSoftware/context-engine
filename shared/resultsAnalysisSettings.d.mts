@@ -3,8 +3,6 @@ export type ResultsAnalysisViewKey = "circles" | "breakdown" | "riskMatrix";
 export type ResultsAnalysisAutoAfterUnit = "distinctParticipants";
 export type ResultsAnalysisInputScope = "submitted";
 export type ResultsAnalysisPublication = "latest_success_visible";
-export type ResultsAnalysisSectionKey =
-  "breakdown" | "riskMatrix" | "argumentMap" | "atlas";
 
 export type ResultsAnalysisSettings = {
   version: 1;
@@ -20,7 +18,6 @@ export type ResultsAnalysisSettings = {
 
 export const RESULTS_ANALYSIS_GENERATION_MODES: readonly ResultsAnalysisGenerationMode[];
 export const RESULTS_ANALYSIS_VIEW_KEYS: readonly ResultsAnalysisViewKey[];
-export const RESULTS_ANALYSIS_AUTO_AFTER_UNITS: readonly ResultsAnalysisAutoAfterUnit[];
 export const RESULTS_ANALYSIS_INPUT_SCOPES: readonly ResultsAnalysisInputScope[];
 export const RESULTS_ANALYSIS_PUBLICATIONS: readonly ResultsAnalysisPublication[];
 export const RESULTS_ANALYSIS_THRESHOLD_MIN: number;
@@ -35,6 +32,3 @@ export function normalizeResultsAnalysisSettings(
   value?: unknown,
 ): ResultsAnalysisSettings;
 export function validResultsAnalysisSettings(value?: unknown): boolean;
-export function resolveResultsAnalysisSectionKeys(
-  settings?: unknown,
-): ResultsAnalysisSectionKey[];

@@ -15,15 +15,17 @@ import {
 	listWorkerGroupMemberships as listWorkerGroupMembershipsBoundary,
 	normalizeWorkerGroupId,
 	normalizeWorkerGroupPrincipal,
-	readWorkerGroupMembershipProjection as readWorkerGroupMembershipProjectionBoundary,
 	removeWorkerGroupMember as removeWorkerGroupMemberBoundary,
 	resolveWorkerGroupBootstrap,
 	resolveWorkerGroupsKv,
 	resolveWorkerGroupPrincipal,
-	snapshotWorkerGroupCapacity as snapshotWorkerGroupCapacityBoundary,
 	updateWorkerGroup as updateWorkerGroupBoundary,
 	workerGroupsRoute as workerGroupsRouteBoundary,
 } from './workerGroups.js';
+import {
+	readWorkerGroupMembershipProjection as readWorkerGroupMembershipProjectionBoundary,
+	snapshotWorkerGroupCapacity as snapshotWorkerGroupCapacityBoundary,
+} from './workerGroupProjectionFixture.mjs';
 import { SessionWriteCoordinator } from './sessionWriteCoordinator.js';
 
 const json = (body, status = 200, headers = {}) => ({ body, status, headers });

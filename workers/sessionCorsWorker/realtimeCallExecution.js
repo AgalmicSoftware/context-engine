@@ -1,8 +1,7 @@
-import { DEFAULT_REALTIME_INTERVIEW_MODEL, resolveRealtimeInterviewModel } from '../../shared/realtimeInterviewConfig.mjs';
+import { resolveRealtimeInterviewModel } from '../../shared/realtimeInterviewConfig.mjs';
 
 const OPENAI_LIVE_SESSIONS_URL = 'https://api.openai.com/v1/live/sessions';
 const OPENAI_REALTIME_CALLS_URL = 'https://api.openai.com/v1/realtime/calls';
-export const DEFAULT_INTERVIEW_REALTIME_MODEL = DEFAULT_REALTIME_INTERVIEW_MODEL;
 
 const trim = (value) => String(value == null ? '' : value).trim();
 const isObj = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
@@ -130,5 +129,3 @@ export const proxyOpenAiRealtimeCall = async ({
   headers.set('access-control-expose-headers', [headers.get('access-control-expose-headers'), 'x-interview-protocol'].filter(Boolean).join(', '));
   return new Response(answerSdp, { status: 200, headers });
 };
-
-export const __test__realtimeCallExecution = { buildRealtimeMultipartBody, resolveRealtimeConfig };

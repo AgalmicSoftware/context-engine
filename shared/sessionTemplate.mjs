@@ -66,7 +66,6 @@ const PROFILE = {
   },
   export: { scope: TEXT },
 };
-const MODEL = { provider: TEXT, model: TEXT };
 const GROUP_CREATION_POLICIES = ['participants', 'admin_only'];
 // A question's portable fields, as the question editor publishes them. Its ID
 // is derived from these when it is added to a session.

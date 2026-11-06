@@ -29,7 +29,7 @@ import {
 import { repairPendingSessionSecretsProjection } from './sessionSecretsAuthority.js';
 import { normalizeWorkerConfigRecord } from './sessionConfigNormalization.js';
 import {
-  getSessionConfig, getLegacySessionConfigForAuthority, putSessionConfig,
+  getLegacySessionConfigForAuthority, putSessionConfig,
   SESSION_CONFIG_MIGRATION_REQUIRED_REASON, legacySessionConfigMigrationError,
 } from './sessionConfigSecretsStore.js';
 import {

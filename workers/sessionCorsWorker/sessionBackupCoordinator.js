@@ -4,7 +4,7 @@ import { readBackupGroupSnapshot } from './sessionBackupGroupSnapshot.js';
 import { STORAGE_BACKUP_REVISION_KEY } from './storageBackupRevision.js';
 import { resolveWorkerGroupsKv, workerGroupBackupPrefixes } from './workerGroups.js';
 import { resolveCanonicalWorkerSessionIdHex } from './sessionConfigMutation.js';
-import { normalizeWorkerSessionSlug, resolveCoordinatorSessionSlugStorageKey } from './sessionSlugResolution.js';
+import { resolveCoordinatorSessionSlugStorageKey } from './sessionSlugResolution.js';
 import { isEncryptedSessionSecretsEnvelope } from '../shared/sessionSecretsEnvelope.mjs';
 import { backupImportJournalKey, journalBackupImportWrite, cleanupBackupImportJournal, clearBackupImportMetadata } from './sessionBackupLifecycle.js';
 

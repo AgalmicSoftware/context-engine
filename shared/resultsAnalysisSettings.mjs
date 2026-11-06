@@ -17,7 +17,6 @@ export const RESULTS_ANALYSIS_VIEW_KEYS = Object.freeze([
 export const RESULTS_ANALYSIS_AUTO_UNITS = Object.freeze([
   "distinctParticipants",
 ]);
-export const RESULTS_ANALYSIS_AUTO_AFTER_UNITS = RESULTS_ANALYSIS_AUTO_UNITS;
 export const RESULTS_ANALYSIS_INPUT_SCOPES = Object.freeze(["submitted"]);
 export const RESULTS_ANALYSIS_PUBLICATIONS = Object.freeze(["latest_success_visible"]);
 export const RESULTS_ANALYSIS_THRESHOLD_MIN = 1;
@@ -230,12 +229,3 @@ export const validateResultsAnalysisSettings = (raw = {}) => {
 
 export const validResultsAnalysisSettings = (raw = {}) =>
   validateResultsAnalysisSettings(raw).ok === true;
-
-export const resolveResultsAnalysisSectionKeys = (settings = {}) => {
-  const normalized = normalizeResultsAnalysisSettings(settings);
-  const sections = [];
-  if (normalized.views.breakdown) sections.push("breakdown");
-  if (normalized.views.riskMatrix) sections.push("riskMatrix");
-  if (normalized.views.circles) sections.push("argumentMap", "atlas");
-  return [...new Set(sections)];
-};

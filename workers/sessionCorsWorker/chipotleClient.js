@@ -435,20 +435,6 @@ const listGroupActions = async ({ runtime, fetchImpl } = {}) => {
   return listActions({ runtime, fetchImpl, groupId: runtime.litGroupId });
 };
 
-const listGroups = async ({ runtime, fetchImpl } = {}) => {
-  const response = await fetchChipotleJson({
-    apiBase: runtime.litApiBase,
-    apiKey: runtime.litManagementApiKey,
-    allowLocalApiBase: runtimeAllowsLocalApiBase(runtime),
-    path: buildPagedPath('/list_groups', {
-      page_number: DEFAULT_PAGE_NUMBER,
-      page_size: DEFAULT_PAGE_SIZE,
-    }),
-    fetchImpl,
-  });
-  return Array.isArray(response) ? response : [];
-};
-
 const listWallets = async ({ runtime, fetchImpl } = {}) => {
   const response = await fetchChipotleJson({
     apiBase: runtime.litApiBase,
