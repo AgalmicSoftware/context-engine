@@ -614,6 +614,23 @@ export const loadGeneratedResultsArtifactForHost = async (
       await pollGeneratedResultsArtifactForHost({ host, mergedPorts, requestSeq, runtime, sessionConfig });
       return;
     }
+    if (toStatusCode(artifactBody) === 404) {
+      // No report yet, which is not an expired poll: an admin must still be able to sign in and generate one.
+      const previous = toRecord(host.state.generatedResultsStatusBody);
+      applyGeneratedResultsStatusBody(
+        host,
+        {
+          ...previous,
+          ok: true,
+          viewerAuthorized: true,
+          pollExpired: false,
+          settings: previous.settings || toRecord(sessionConfig).resultsAnalysis,
+          state: { ...toRecord(previous.state), active: null, jobState: 'idle' },
+        },
+        toRecord(previous.state).lastGood,
+      );
+      return;
+    }
     markGeneratedResultsPollExpired({
       host,
       previousStatusBody: host.state.generatedResultsStatusBody,
