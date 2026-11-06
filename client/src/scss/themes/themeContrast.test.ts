@@ -433,6 +433,15 @@ describe('bundled app-theme contrast', () => {
     });
   });
 
+  // Inside the voice dialog the notice's group name meets `.sessionVoiceModeModal strong`, and has to outrank it.
+  test('the group notice keeps its own colour for the group name', () => {
+    const noticeCss = compileModule('components/OnePageSession/WorkerGroupAutoJoinNotice.module.scss');
+    expect(moduleRule(noticeCss, '.notice .message strong').color).toBe('inherit');
+    expect(
+      moduleRule(compileModule('components/SurveyTool/SurveyTool.module.scss'), '.sessionVoiceModeModal strong').color,
+    ).toBe('var(--ce-panel-text)');
+  });
+
   const surveyToolCss = compileModule('components/SurveyTool/SurveyTool.module.scss');
   test.each(registry.themes.map(({ id }) => id))('%s keeps the surfaces Decrypt inherits from readable', (themeId) => {
     const values = themeValues(css, themeId);

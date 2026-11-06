@@ -30,6 +30,11 @@
   overflow-wrap: anywhere;
 }
 
+// The voice dialog colours every `strong` for its own surface: black on this navy in Classic 95.
+.notice .message strong {
+  color: inherit;
+}
+
 .actions {
   display: flex;
   flex-shrink: 0;
