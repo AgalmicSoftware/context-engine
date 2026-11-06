@@ -151,7 +151,6 @@ const AudioInput = ({
   }, []);
   const recordingRequestedRef = useRef<object | null>(null);
   const [originalText, setOriginalText] = useState('');
-  const [, setRewrittenText] = useState('');
   const [aiRewriteActive, setAiRewriteActive] = useState(false);
   const [waitingForAI, setWaitingForAI] = useState(false);
   const [waitingSeconds, setWaitingSeconds] = useState(0);
@@ -168,7 +167,6 @@ const AudioInput = ({
     setWaitingForAI(false);
     setWaitingSeconds(0);
     setOriginalText('');
-    setRewrittenText('');
     setAiRewriteActive(false);
   }, []);
 
@@ -761,7 +759,6 @@ const AudioInput = ({
     const isCurrent = () => !abortedRef.current && rewriteAttemptRef.current === attempt;
     try {
       setOriginalText(currentRewriteText);
-      setRewrittenText('');
       setAiRewriteActive(false);
       setWaitingForAI(true);
       setWaitingSeconds(0);
@@ -778,7 +775,6 @@ const AudioInput = ({
       waitingForAIRef.current = false;
       setWaitingForAI(false);
       setWaitingSeconds(0);
-      setRewrittenText(cleaned);
       setAiRewriteActive(true);
       updateUserText(cleaned);
       callParentUpdate(cleaned);
@@ -789,7 +785,6 @@ const AudioInput = ({
       waitingForAIRef.current = false;
       setWaitingForAI(false);
       setWaitingSeconds(0);
-      setRewrittenText('');
       setAiRewriteActive(false);
       updateUserText(currentRewriteText);
       callParentUpdate(currentRewriteText);
@@ -799,7 +794,6 @@ const AudioInput = ({
   const handleRevertText = () => {
     if (disabled || abortedRef.current || pendingRewriteRef.current || !aiRewriteActive) return;
     setAiRewriteActive(false);
-    setRewrittenText('');
     updateUserText(originalText);
     callParentUpdate(originalText);
   };

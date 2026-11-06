@@ -3904,7 +3904,6 @@ class CreateSBTGroup extends Component<any, any> {
   renderShareableBlock = (
     title: string,
     tooltipText: string,
-    description: string | null,
     url: string,
     qrId: string,
     fileSuffix: string,
@@ -4596,7 +4595,6 @@ class CreateSBTGroup extends Component<any, any> {
                 {this.renderShareableBlock(
                   'URL Where Anyone Can Join',
                   'Anyone with this link can open the session page and trigger the open-mint flow immediately.',
-                  null,
                   openMintAutoJoinUrl,
                   'qr-code-auto-join',
                   'autojoin',
@@ -4615,7 +4613,6 @@ class CreateSBTGroup extends Component<any, any> {
                   sbtDistribution.isLimited
                     ? 'This link identifies the group only. Send one exported invite code separately; it permits one claim.'
                     : 'This link identifies the group only. Send the group password separately; the recipient enters it in the claim form.',
-                  null,
                   autoJoinUrl,
                   'qr-code-one-click',
                   'oneclick',

@@ -314,7 +314,6 @@ describe('surveyToolHydrationController', () => {
 
     expect(
       executeSurveyResponsePrefill({
-        state: {},
         surveyIndex: 2,
         userAnswers: {
           responses: [{ questionID: 'q1' }],
@@ -374,7 +373,6 @@ describe('surveyToolHydrationController', () => {
 
     expect(
       executeSurveySingleQuestionPrefill({
-        state: {},
         questionId: 'q1',
         userAnswer: { questionID: 'q1' },
         buildSliceFromUserAnswers: jest.fn(),

@@ -600,52 +600,6 @@ export const createContractScriptsSurveyPayloadReadMethods = (
       }
     },
 
-    getQuestionSurvey: async function (providerName: any, questionId: any, groupKeyOrCfg: any = null) {
-      const cfg = resolveSession(groupKeyOrCfg || '');
-      const gAddrs = getSessionAddresses(cfg);
-      const addr = gAddrs.surveys?.address;
-      const chId = gAddrs.surveys?.chainId || cfg?.networkChainId || undefined;
-
-      if (!addr || !utils.isAddress(addr)) {
-        return null;
-      }
-
-      const provider = getSurveysReadProviderForSession(groupKeyOrCfg, cfg, chId);
-      if (!provider) {
-        return null;
-      }
-      const SurveyContract = new ethers.Contract(addr, SURVEYS, provider as any);
-
-      // 🔐 Normalize
-      const ensureHash = (v: any) => {
-        try {
-          if (cryptoUtils && typeof cryptoUtils.hashIdentifier === 'function') return cryptoUtils.hashIdentifier(v);
-        } catch {}
-        try {
-          if (utils.isHexString(v, 32)) return String(v).toLowerCase();
-        } catch {}
-        const s = v === null || v === undefined ? '' : String(v);
-        return s.trim() === '' ? ethers.constants.HashZero : utils.id(s);
-      };
-      const qId = ensureHash(questionId);
-
-      try {
-        rpcLog('RPC Call:', {
-          function: 'getQuestionSurvey',
-          method: 'SurveyContract.getQuestionSurvey',
-          params: { questionId: qId },
-        });
-        const surveyIdResult = await callWithRetry(
-          () => SurveyContract.getQuestionSurvey(qId),
-          'SurveyContract.getQuestionSurvey',
-        );
-        return surveyIdResult;
-      } catch (error: any) {
-        contractsLog.error("Error getting question's associated survey:", error);
-        return null;
-      }
-    },
-
     // === CHANGED: +groupKeyOrCfg (optional). Threads group to getQuestionHash.
     async getQuestionData(providerName: any, questionId: any, groupKeyOrCfg: any, opts: any = {}) {
       const qId = String(questionId || '').toLowerCase();

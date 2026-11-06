@@ -13,7 +13,6 @@ type HarnessProps = {
   onChangeSpy?: (option: TestOption) => void;
   placeholder?: string;
   isLoading?: boolean;
-  loadingMessage?: () => React.ReactNode;
   noOptionsMessage?: () => React.ReactNode;
   formatOptionLabel?: (option: TestOption) => React.ReactNode;
   formatValueLabel?: (option: TestOption) => React.ReactNode;
@@ -36,7 +35,6 @@ const Harness = ({
   onChangeSpy,
   placeholder = 'Pick one',
   isLoading = false,
-  loadingMessage,
   noOptionsMessage,
   formatOptionLabel,
   formatValueLabel,
@@ -60,7 +58,6 @@ const Harness = ({
       }}
       placeholder={placeholder}
       isLoading={isLoading}
-      loadingMessage={loadingMessage}
       noOptionsMessage={noOptionsMessage}
       formatOptionLabel={formatOptionLabel}
       formatValueLabel={formatValueLabel}
@@ -222,14 +219,7 @@ describe('AsyncSearchSelect', () => {
 
   it('keeps already-available options visible and selectable while loading stays in the control', async () => {
     const spy = jest.fn();
-    render(
-      <Harness
-        isLoading
-        onChangeSpy={spy}
-        loadingMessage={() => 'Searching...'}
-        noOptionsMessage={() => 'Nothing here'}
-      />,
-    );
+    render(<Harness isLoading onChangeSpy={spy} noOptionsMessage={() => 'Nothing here'} />);
 
     openMenu();
     expect(screen.queryByTestId('ce-async-select-loading')).not.toBeInTheDocument();

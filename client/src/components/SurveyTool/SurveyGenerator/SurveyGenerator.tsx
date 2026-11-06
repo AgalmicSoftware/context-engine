@@ -416,7 +416,6 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
   const [documentURLs, setDocumentURLs] = useState<string[]>([]);
 
   // AUDIO summary-first flow state
-  const [, setSummaryMd] = useState('');
 
   const [showSessionSelector, setShowSessionSelector] = useState(false);
   const [localSessionOverrideSlug, setLocalSessionOverrideSlug] = useState<string | null>(null);
@@ -701,7 +700,6 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
       const newVal = !prev;
       if (!newVal) {
         setAudioFile(null);
-        setSummaryMd('');
       }
       return newVal;
     });
@@ -1245,7 +1243,6 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
     const { effectiveSources } = buildEffectiveAdditionalSources();
     const shouldClearAdditionalUrlInput = Boolean(additionalUrlInput && additionalUrlInput.trim());
     let sourceTypeOverride = '';
-    let generatedSummary = '';
 
     try {
       setLoading(true);
@@ -1367,7 +1364,6 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
           ...aiRequestOptions,
         });
         if (abortedRef.current) return;
-        generatedSummary = (md || '').trim();
 
         sourceForQuestions = md;
 
@@ -1414,7 +1410,6 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
       // 5. Spawn Survey Tool
       // This updates state.documentURLs, which CreateQuestionsAndSurveys picks up
       if (processAndSetQuestions(aiData, finalDocUrls)) {
-        setSummaryMd(generatedSummary);
         if (shouldClearAdditionalUrlInput) setAdditionalUrlInput('');
       }
     } catch (err: unknown) {
@@ -1602,7 +1597,6 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
     if (!hasTranscriptModeInput && transcriptMode) {
       setTranscriptMode(false);
       setAudioFile(null);
-      setSummaryMd('');
     }
   }, [hasTranscriptModeInput, transcriptMode]);
 
