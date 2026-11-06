@@ -5,6 +5,7 @@ import {
 } from '../../domains/sessionResults/sessionResultsAnalysisController';
 import { SESSION_GENERATED_RESULTS_VIEW_KEYS } from '../../domains/sessionResults/sessionResultsGeneratedViewTypes';
 import { buildResultsAnalysisBrowserSnapshotFromCacheNode } from '../../domains/sessionResults/sessionResultsAnalysisBrowserSnapshot';
+import { getBlockedQuestionIdsSet } from '../SurveyTool/surveyToolScope';
 import {
   readSessionResultsAnalysisArtifact,
   readSessionResultsAnalysisStatus,
@@ -158,6 +159,7 @@ export const resolveGeneratedResultsRuntime = (
     const cacheScope = resolveOnePageSessionAggregatorCacheScope({ ...host.props, sessionConfig });
     const questionsCache = toRecord(mergedPorts.readQuestionsCache(questionSourceSlug));
     snapshotResult = buildResultsAnalysisBrowserSnapshotFromCacheNode({
+      hiddenQuestionIds: getBlockedQuestionIdsSet(questionSourceSlug),
       networkNode: questionsCache[cacheScope],
       sessionSlug: normalizedSlug,
     });

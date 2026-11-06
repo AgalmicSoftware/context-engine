@@ -1,9 +1,11 @@
 import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';
+import { upsertWorkerCanonicalSessionBootstrap } from '../../utilities/session/sessionWorkerConfigCache';
 import {
   generateResultsForHost,
   authorizeGeneratedResultsForHost,
   buildGeneratedResultsIdentityKey,
   loadGeneratedResultsArtifactForHost,
+  resolveGeneratedResultsRuntime,
 } from './onePageSessionGeneratedResultsRuntime';
 import { resolveGeneratedResultsControllerState } from '../../domains/sessionResults/sessionResultsAnalysisController';
 
@@ -586,6 +588,61 @@ describe('onePageSessionGeneratedResultsRuntime', () => {
     expect(host.state.generatedResultsAnalysis?.artifact).not.toBeNull();
     expect((host.state.generatedResultsStatusBody as UnknownRecord | undefined)?.pollExpired).toBe(false);
   });
+  it('leaves a hidden question out of the snapshot an admin sends for analysis', () => {
+    window.localStorage.clear();
+    const hiddenSlug = 'hidden-source';
+    upsertWorkerCanonicalSessionBootstrap({
+      slug: hiddenSlug,
+      sessionIdHex: `0x${'2'.repeat(32)}`,
+      workerOrigin: 'https://snapshot-worker.example.test',
+      configRevision: 'r1',
+      config: {
+        slug: hiddenSlug,
+        sessionId: `0x${'2'.repeat(32)}`,
+        corsWorkerUrl: 'https://snapshot-worker.example.test',
+        BLOCKED_QUESTION_IDS: ['q2'],
+        sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+      },
+    });
+    const answer = (value: string) => ({ answer: { value, encrypted: false }, sessionSlug: hiddenSlug });
+    const sessionConfig = {
+      slug: hiddenSlug,
+      corsWorkerUrl: 'https://snapshot-worker.example.test',
+      networkChainId: 11155420,
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED),
+    };
+    const host = {
+      ...buildHost(),
+      props: {
+        account: '0xabc',
+        loginComplete: true,
+        sessionSlug: hiddenSlug,
+        slug: hiddenSlug,
+        network: { id: 11155420 },
+        networkChainId: 11155420,
+        provider: {},
+      },
+    } as GeneratedHost;
+    const runtime = resolveGeneratedResultsRuntime(host, {
+      ports: {
+        readQuestionsCache: () => ({
+          '11155420': {
+            questions: {
+              q1: { id: 'q1', prompt: 'Shown', type: 'text', sessionSlug: hiddenSlug },
+              q2: { id: 'q2', prompt: 'Hidden', type: 'text', sessionSlug: hiddenSlug },
+            },
+            questionResponses: { q1: { '0xaaa': answer('Visible') }, q2: { '0xaaa': answer('Secret') } },
+          },
+        }),
+      },
+      sessionConfig,
+      sessionSlug: hiddenSlug,
+    });
+    window.localStorage.clear();
+    expect(JSON.stringify(runtime.snapshotResult)).toContain('Visible');
+    expect(JSON.stringify(runtime.snapshotResult)).not.toContain('Secret');
+  });
+
   it('keeps the previous artifact visible while a same-session viewer reload is queued', async () => {
     const host = buildHost(buildStatusBody({ viewerAuthorized: true }));
     const readArtifact = jest.fn(async () => ({

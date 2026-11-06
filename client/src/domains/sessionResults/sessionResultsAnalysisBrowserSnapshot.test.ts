@@ -4,6 +4,25 @@ import { buildResultsAnalysisBrowserSnapshotFromCacheNode } from './sessionResul
 import { loadAdminSnapshotResultsAnalysisSource } from '../../../../workers/sessionCorsWorker/resultsAnalysisGeneration';
 
 describe('sessionResultsAnalysisBrowserSnapshot', () => {
+  it('leaves hidden questions and their answers out of what the AI receives', () => {
+    const answer = (value: string) => ({ answer: { value, encrypted: false }, sessionSlug: 'edge' });
+    const result = buildResultsAnalysisBrowserSnapshotFromCacheNode({
+      hiddenQuestionIds: new Set(['q2']),
+      sessionSlug: 'edge',
+      networkNode: {
+        questions: {
+          q1: { id: 'q1', prompt: 'Shown', type: 'text', sessionSlug: 'edge' },
+          Q2: { id: 'Q2', prompt: 'Hidden', type: 'text', sessionSlug: 'edge' },
+        },
+        questionResponses: { q1: { '0xaaa': answer('Visible') }, Q2: { '0xaaa': answer('Secret') } },
+      },
+    });
+    expect(result.ok).toBe(true);
+    expect(JSON.stringify(result)).toContain('Visible');
+    expect(JSON.stringify(result)).not.toContain('Hidden');
+    expect(JSON.stringify(result)).not.toContain('Secret');
+  });
+
   it('builds sanitized same-session snapshots and skips locked/demo rows', () => {
     const result = buildResultsAnalysisBrowserSnapshotFromCacheNode({
       sessionSlug: 'edge',

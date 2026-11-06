@@ -18,6 +18,7 @@ import * as sessionScanScope from '../../utilities/session/sessionScanScope.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { t } from '../../utilities/ui/terminology.js';
 import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../../utilities/session/sessionModeProfile';
+import { upsertWorkerCanonicalSessionBootstrap } from '../../utilities/session/sessionWorkerConfigCache';
 import {
   resolveWorkerCanonicalCacheIdentity,
   withWorkerCanonicalCacheIdentity,
@@ -315,6 +316,30 @@ describe('OnePageSession results routing', () => {
     });
     return subject;
   };
+
+  it('rebuilds the report when the session hidden list changes', () => {
+    const storeSession = (hidden) =>
+      upsertWorkerCanonicalSessionBootstrap({
+        slug: 'edge',
+        sessionIdHex: `0x${'1'.repeat(32)}`,
+        workerOrigin: 'https://report-worker.example.test',
+        configRevision: 'r1',
+        config: {
+          slug: 'edge',
+          sessionId: `0x${'1'.repeat(32)}`,
+          corsWorkerUrl: 'https://report-worker.example.test',
+          BLOCKED_QUESTION_IDS: hidden,
+          sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+        },
+      });
+    window.localStorage.clear();
+    const subject = createSubject({ slug: 'edge' });
+    storeSession([]);
+    const before = subject.buildAggregatorInputSignature(subject.props, subject.state);
+    storeSession(['q2']);
+    expect(subject.buildAggregatorInputSignature(subject.props, subject.state)).not.toBe(before);
+    window.localStorage.clear();
+  });
 
   it('opens and scrolls to the inline report after an interview without opening raw results', () => {
     const subject = createSubject();

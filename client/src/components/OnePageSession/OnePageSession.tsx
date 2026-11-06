@@ -82,6 +82,7 @@ import {
   resetGeneratedResultsAnalysis,
   resolveGeneratedResultsRuntime,
 } from './onePageSessionGeneratedResultsRuntime';
+import { getBlockedQuestionIdsSet } from '../SurveyTool/surveyToolScope';
 import {
   buildOnePageSessionCanonicalBaseUrl,
   buildOnePageSessionRawResultsRoute,
@@ -516,6 +517,7 @@ class OnePageSession extends Component<any, any> {
       props.isResponsesCacheReady ? 1 : 0,
       Number(props.questionResponsesNonce || 0),
       state.demoFixturesLoaded ? 1 : 0,
+      [...getBlockedQuestionIdsSet(questionCacheSlug)].sort().join(','),
     ].join('|');
   }
 
