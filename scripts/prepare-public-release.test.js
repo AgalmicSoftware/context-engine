@@ -215,6 +215,8 @@ test('prepare-public-release strips private surfaces without publishing an inven
     writeFile(sourceDir, path.join('docs', 'agent-native-bridge.md'), 'private agent notes\n');
     writeFile(sourceDir, path.join('client', 'public', 'skill.md'), 'private agent skill\n');
     writeFile(sourceDir, path.join('scripts', 'run-session-agent-tests.js'), 'session agent test runner\n');
+    writeFile(sourceDir, path.join('workers', 'deploy-helper', '.dev.vars'), 'LOCAL_WORKER_VALUE=fixture\n');
+    writeFile(sourceDir, path.join('workers', 'retiredWorker', 'dev.vars'), 'LOCAL_WORKER_VALUE=fixture\n');
     writeFile(sourceDir, path.join('scripts', 'run-contextengine-cc-tests.js'), 'private companion test runner\n');
     writeFile(sourceDir, path.join('scripts', 'run-contextengine-cc-tests.test.js'), 'private companion runner test\n');
     writeFile(sourceDir, path.join('scripts', 'e2e-env-example.test.js'), 'private E2E env fixture test\n');
@@ -363,6 +365,8 @@ test('prepare-public-release strips private surfaces without publishing an inven
       require('node:crypto').createHash('sha256').update(publicBenchmarkCorpus).digest('hex'),
     );
     assert.equal(fs.existsSync(path.join(outputDir, '.tmp-review')), false);
+    assert.equal(fs.existsSync(path.join(outputDir, 'workers', 'deploy-helper', '.dev.vars')), false);
+    assert.equal(fs.existsSync(path.join(outputDir, 'workers', 'retiredWorker', 'dev.vars')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'Demo Integration Package')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'outreach-and-applications')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'Claude outputs')), false);

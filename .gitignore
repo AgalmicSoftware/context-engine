@@ -159,6 +159,20 @@ contextEngine-cc/.cache/
 contextEngine-cc/cache/
 contextEngine-cc/tmp/
 
+# Local Worker secrets and state, in any Worker directory
+**/.dev.vars
+**/.dev.vars.*
+!**/.dev.vars.example
+**/dev.vars
+workers/**/wrangler.toml
+workers/**/.wrangler/
+workers/**/.data/
+workers/**/.state/
+workers/**/*.log
+workers/**/*.key
+workers/**/*.pem
+workers/**/*.jwt
+
 # E2E test layer (stripped from public release)
 scripts/.tmp-*/
 scripts/test-*.js

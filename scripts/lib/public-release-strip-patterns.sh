@@ -57,6 +57,8 @@ video-clickthrough-local
 .env.e2e
 .env.e2e.example
 .keys
+workers/*/.dev.vars
+workers/*/dev.vars
 .e2e-secrets
 .e2e-cache
 .npm-cache
@@ -127,6 +129,8 @@ CLAUDE.md
 .env.e2e
 .env.e2e.example
 .keys
+workers/*/.dev.vars
+workers/*/dev.vars
 .e2e-secrets
 .e2e-cache
 .npm-cache
