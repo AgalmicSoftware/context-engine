@@ -31,50 +31,26 @@ regenerate this block rather than maintaining parallel numbers.
 | Warning threshold | 95% of each byte cap | Warning only; more than 100% fails |
 <!-- END GENERATED CLIENT BUNDLE POLICY -->
 
-## Snapshot: 2026-07-21
+## How the Checker Works
 
-Command:
-
-```bash
-npm --prefix client run build
-```
-
-Key chunks:
-
-| Chunk | Minified | Gzip | Notes |
-| --- | ---: | ---: | --- |
-| `index-0c54e6dc.js` | 5.92 kB | 2.57 kB | HTML bootstrap entry |
-| `index-b21485c9.js` | 673.72 kB | 190.05 kB | Direct dynamic application entry; governed by the entry gzip cap |
-| `AppShell-9007e00d.js` | 624.28 kB | 169.08 kB | Lazy route shell; fixed temporary exception at 625,000 bytes |
-| `SurveyQuestions-1cab4d79.js` | 496.74 kB | 125.27 kB | Route chunk; 95% warning band |
-| `DebateMap-c3346e21.js` | 492.88 kB | 152.13 kB | Route chunk; 95% warning band |
-| `vendor-wallet-core-5e1bf322.js` | 80.59 kB | 25.74 kB | Representative vendor chunk |
-| `vendor-crypto-zk-poseidon-high-c5739e16.js` | 438.91 kB | 314.50 kB | Vendor chunk |
-
-The checker reads `client/build/vite-bundle-manifest.json`, measures built bytes
-directly, and follows the HTML entry's direct dynamic import so hashed filename
-changes cannot reclassify the application entry. It warns at 95% and fails over
-the checked-in cap. The baseline monotonicity gate independently rejects cap,
-exception, entry, vendor-prefix, or duplicate-allowlist growth.
+`npm --prefix client run build` writes `client/build/vite-bundle-manifest.json`.
+The checker reads it, measures built bytes directly, and follows the HTML
+entry's direct dynamic import so hashed filename changes cannot reclassify the
+application entry. It warns at 95% of a cap and fails over the checked-in cap.
+The baseline monotonicity gate independently rejects cap, exception, entry,
+vendor-prefix, or duplicate-allowlist growth.
 
 ## Static Image Deduplication
 
-The former build plugin copied 23 source images (18,710,631 bytes) into
-`build/images` even though Vite already emitted the 21 runtime-owned images as
-hashed assets. Those 21 byte-identical pairs totaled 16,618,799 bytes. No local
-raw `/images/` consumer exists in source, styles, generated HTML/CSS/JS, or
-tracked tests, so the compatibility copy and its unused optimizer script were
-removed. README-only images remain tracked at their source paths for GitHub and
-are not emitted into the production build.
-
-The current build has no `build/images` directory and zero unapproved
-hashed/compatibility image pairs. `npm run client:bundle-budget:check` hashes
-built images and fails if a future compatibility path silently duplicates an
-emitted asset.
+Vite emits each runtime-owned image once, as a hashed file under `assets/`.
+`npm run client:bundle-budget:check` hashes the built images and fails when a
+file outside `assets/` is byte-identical to an emitted asset; the allowlist is
+empty. README-only images stay at their tracked source paths for GitHub and are
+not emitted into the production build.
 
 ## Runtime Smoke
 
-Command:
+Command, against a running app (see [testing.md](testing.md#e2e-workflows)):
 
 ```bash
 SMOKE_ROUTES=/session/pe4,/about,/docs,/contracts npm run -s test:e2e:smoke
@@ -87,24 +63,21 @@ smoke can still expose environment-sensitive session or admin dependencies.
 
 ## Temporary AppShell Exception
 
-`AppShell` is now lazy-loaded but remains above the non-vendor chunk cap because
+`AppShell` is lazy-loaded but remains above the non-vendor chunk cap because
 the shell/controller layer imports chain, cache, session, and profile runtime
-modules synchronously. A previous broad app-level `manualChunks` split of
-executable runtime modules produced browser initialization-order failures. Keep
-runtime and controller reductions behind real lazy boundaries; narrowly
+modules synchronously. A broad app-level `manualChunks` split of executable
+runtime modules produced browser initialization-order failures, so do not repeat
+it. Keep runtime and controller reductions behind real lazy boundaries; narrowly
 isolating immutable, side-effect-free fixture data is acceptable only when the
 built import graph, bundle gate, and route smoke prove the split safe.
 
-The August 2026 dead-code cleanup produced a 518,829-byte minified AppShell
-chunk on the current development tree, so the temporary exception was tightened
-from 625,000 to 525,000 bytes. The dated snapshot above remains the historical
-evidence for the former cap; the machine-readable budget is the current
-authority.
+The exception is capped at 525,000 bytes minified. `scripts/client-bundle-budget.json`
+is the authority for that number.
 
 This is an accepted temporary exception for the current release line. The
 follow-up work is a dedicated AppShell chunk diet: map the current chunk
 ownership, move safe route/modal/runtime boundaries one at a time, keep route
-behavior tests green, and only then tighten the budget snapshot.
+behavior tests green, and only then tighten the budget.
 
 Run the enforced build contract from the repository root:
 

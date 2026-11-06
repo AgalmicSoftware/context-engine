@@ -8,6 +8,8 @@ Context Engine testing spans the root repo, the React client, and the E2E workfl
   `^20.19.0` or `>=22.12.0` with npm `^10.0.0`
 - Install client dependencies with plain `npm install`; strict peer resolution
   is the normal install contract
+- The root gate also needs `npm --prefix workers/sessionCorsWorker install` and
+  `npm --prefix mcp install`
 - Contract and local-chain test flows require Foundry (`forge` / `anvil`)
 
 ## Common Commands
@@ -20,14 +22,14 @@ npm test
 ```
 
 This runs the canonical root gate (`npm run test:ci`): wiring and ratchets,
-release-surface checks and builds, contract/ABI parity, client coverage,
-public-safe root Jest, both public Worker suites, Context Engine CC, the tracked
-root Node universe, and the managed-cache guard. The coverage-enabled full
-client universe and tracked Node universe each run exactly once. The wiring
-lane also verifies that every tracked typed client test/support source is in
-the monotonic test-typecheck universe. Build-owning gates immediately run the
-manifest-backed bundle budget against the bytes they just produced, without a
-second build.
+AI Discourse Bench tests, release-surface checks and builds, contract/ABI
+parity, client coverage, public-safe root Jest, both public Worker suites,
+Context Engine CC, MCP tests, the tracked root Node universe, and the
+managed-cache guard. The coverage-enabled full client universe and tracked Node
+universe each run exactly once. The wiring lane also verifies that every
+tracked typed client test/support source is in the monotonic test-typecheck
+universe. Build-owning gates immediately run the manifest-backed bundle budget
+against the bytes they just produced, without a second build.
 
 `scripts/ci-gates.json` is the explicit command manifest. Local CI consumes
 its serial `ci` profile; GitHub Actions consumes the same named gates as split
@@ -37,9 +39,9 @@ extra, failed, canceled, or skipped lanes. Event-specific baseline-growth
 authorization remains a protected workflow step beside the manifest-backed
 gate.
 
-`npm run verify:release` is the standalone `release` profile. It retains the
-non-coverage full client and tracked-Node release rehearsal but is no longer
-nested inside `test:ci`.
+`npm run verify:release` runs the standalone `release` profile, which includes
+lint, typechecks, the non-coverage full client suite, tracked Node tests, MCP
+tests, release-surface checks, and builds. `test:ci` does not run it.
 
 The manifest uses `test:node:tracked` for reproducible CI. The broader
 `test:node` alias remains available to operators with ignored private E2E
@@ -110,10 +112,11 @@ The inventory check keeps root tests classified as one of:
 - local-chain tests maintained in the full development checkout
 - package-local tests run by their package's documented command
 
-The Node runner recursively discovers tracked `*.test.{js,cjs,mjs}` files
-under `tests/root`, `scripts`, and `workers/shared`, then applies the public
-strip contract and explicit Jest/local-chain classifications. A nested eligible
-test that is not reachable from a canonical runner fails inventory verification.
+The Node runner recursively discovers `*.test.{js,cjs,mjs}` files under
+`scripts` and `workers/shared`, and runs the `tests/root` Node tests listed in
+`scripts/testInventoryConfig.js`. `test:node:tracked` keeps only tracked files
+that the public strip contract retains. Inventory verification fails for any
+`tests/root` test that is not classified there.
 
 Do not add live credentials, private deployment names, or identifying fixtures
 to root `package.json` scripts.
@@ -150,6 +153,12 @@ the root:
 nvm use 20
 npm run test:e2e
 ```
+
+The smoke drives Chromium against a running app. Install the browser once with
+`npx playwright install chromium`, then start `npm --prefix client run dev`
+(the default `BASE_URL` is `http://127.0.0.1:3000`) or build and serve with
+`npm --prefix client run preview` and set `BASE_URL=http://127.0.0.1:4173`.
+`SMOKE_ROUTES` selects the routes.
 
 Wallet behavior and local contract setup are documented in
 [docs/passkey-wallet.md](passkey-wallet.md) and

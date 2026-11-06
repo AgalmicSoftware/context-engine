@@ -9,7 +9,7 @@ For scan-scope, profile deep-scan, and RPC guardrail flags, see
 ## What PATH means in this repo
 
 - PATH is Pocket Network's gateway product.
-- The built-in public endpoint family currently lives under `api.pocket.network`.
+- The built-in public endpoint family lives under `api.pocket.network`.
 - Context Engine uses PATH in two different places:
   - client read-provider ordering (`client/src/variables/chains.ts`, `client/src/utilities/web3/contractScripts.impl.ts`)
   - worker/session RPC overrides (`workers/sessionCorsWorker/worker.js`, Session Wizard/Admin worker config payloads)
@@ -32,10 +32,10 @@ OP Sepolia client read-provider order is:
 
 1. PATH (`https://op-sepolia-testnet.api.pocket.network`) when PATH preference is enabled
 2. `https://sepolia.optimism.io`
-3. `https://optimism-sepolia.publicnode.com`
-4. `https://optimism-sepolia-rpc.publicnode.com`
-5. `https://optimism-sepolia.gateway.tenderly.co`
-6. `https://optimism-sepolia.drpc.org`
+
+The browser keeps this list short on purpose: other anonymous OP Sepolia gateways
+returned persistent 400, 403, and 429 responses in the app. The Worker faucet
+uses a longer list, `faucetFallbackRpcUrlsByChainId` in `shared/rpcDefaults.cjs`.
 
 Base Sepolia client read-provider order is:
 
@@ -75,11 +75,11 @@ Treat "PATH-first" as the normal read-provider rule, not a universal rule for ev
 
 ## Session metadata / legacy overrides
 
-`/session/new` no longer writes RPC config into Arweave metadata.
+The session wizard (`/session/new`) does not write RPC config into Arweave metadata.
 
-Current authoritative locations are:
+RPC settings live in:
 
-- worker KV config (`session:{slug}:config`) for operational worker RPCs
+- the Worker's session config (`session:{slug}:config`) for operational worker RPCs
 - client chain definitions for default read-provider ordering
 - legacy metadata/manual session config only when you explicitly preserve or inject old RPC fields
 
@@ -129,7 +129,7 @@ Behavior:
   PATH is preferred.
 - Public `rpc.path.*` / `rpc.providers.path.*` overrides remain session-level read overrides only when `rpc.provider` is
   unset, `default`, `path`, or `pocket`.
-- Browser-visible top-level session RPC fields (`rpcUrlsByChainId`, `rpcEndpoint`, `rpcUrl`) now feed the
+- Browser-visible top-level session RPC fields (`rpcUrlsByChainId`, `rpcEndpoint`, `rpcUrl`) feed the
   same participant-facing read-provider path, not just Admin diagnostics; use `rpcUrlsByChainId` (top-level
   or nested under `rpc.*`) for cross-chain contract reads because direct `rpcEndpoint`/`rpcUrl` only apply
   on the session default chain.
@@ -141,7 +141,7 @@ Behavior:
 - The app still falls back to the chain's public/default RPC list after any preferred PATH URLs.
 - Empty PATH override strings are ignored. On OP Sepolia and Base Sepolia, that falls back to the built-in
   chain PATH default and then the normal chain fallback list.
-- SBT/profile read paths now use the same session-aware provider selection as latest-block reads, so
+- SBT/profile read paths use the same session-aware provider selection as latest-block reads, so
   session-level PATH overrides also apply to SBT discovery, profile SBT universe scans, and holder/count
   helper reads like `mintedTokens()` / `groupPasswordHash()`.
 
@@ -154,15 +154,15 @@ Important current behavior on OP Sepolia (`11155420`) and Base Sepolia (`84532`)
 - Session Wizard deploy payloads intentionally prefer non-PATH fallback/public RPCs first when building
   `rpcUrlsByChainId` for worker config.
 - Browser-visible worker/session RPC values mirrored onto top-level `rpcUrlsByChainId`, `rpcEndpoint`, or `rpcUrl`
-  can now be consumed by the main client read-provider path only when the on-chain `rpc` gate is open or the current wallet already has a cached grant.
-- AdminPage worker-config payloads currently default `rpcUrl` to `getDefaultHttpRpc(chainId)`, which is
+  are consumed by the main client read-provider path only when the on-chain `rpc` gate is open or the current wallet already has a cached grant.
+- AdminPage worker-config payloads default `rpcUrl` to `getDefaultHttpRpc(chainId)`, which is
   PATH-first when PATH preference is enabled.
 - AdminPage Resources -> Faucet balance is a browser read-only lookup that follows the public session
   chain values; it does not use worker secrets or wallet RPC calls.
 - Authenticated faucet execution for a worker-canonical session uses its same-network
   `customRpcUrl` session secret first, then legacy `faucet.rpcUrl`, mapped/session RPC values, and
   public fallbacks. The Worker verifies `eth_chainId` before protected reads and masks private
-  endpoint details in diagnostics. Decentralized sessions retain the legacy public-config ordering.
+  endpoint details in diagnostics. Sessions that are not Worker-canonical (Trustless & Slower) keep the legacy public-config ordering.
 - Worker faucet fallback order is not identical to the client read-provider order.
 
 In other words: do not assume the worker's default RPC order exactly matches the app's read-provider order.
@@ -199,7 +199,7 @@ Useful signals:
 
 - `RPC provider ok`
 - `PATH RPC ok`
-- `RPC provider error`
+- `PATH RPC failed; falling back`
 
 ## Self-hosted PATH notes
 

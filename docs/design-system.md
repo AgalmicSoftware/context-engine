@@ -12,7 +12,7 @@ global compatibility styles, and browser-rendered visualizations.
   `client/src/scss/themes/registry.json`.
 - Shared theme-aware control recipes live in `client/src/scss/themes/_recipes.scss`.
 - `client/src/assets/css/contextEngine.scss` emits the theme package and keeps
-  legacy `--ce-color-*` aliases during migration.
+  legacy `--ce-color-*` aliases.
 - `client/src/scss/_variables.scss` remains for structural/build-time Sass
   values. Do not add theme-dependent component values there.
 
@@ -82,8 +82,8 @@ The Settings selector is enabled by default. Set
 hides user theme selection. The preference remains restricted to the bundled
 registry and cannot load CSS, URLs, or arbitrary token maps.
 
-**Color-blind mode** is available in Settings → Theme, independently of the
-theme selector. It persists locally as `ce:color-vision`, restores before paint,
+**Color-blind mode** is available in Settings → Appearance, independently of
+the theme selector. It persists locally as `ce:color-vision`, restores before paint,
 and synchronizes across tabs. The shared palette uses blue for support/agree,
 orange for oppose/disagree, and gray for unsure. Quadratic allocation bars use
 brighter fill tokens independently of text colors, and Agree/Disagree buttons
@@ -129,7 +129,7 @@ on their narrower semantic tokens rather than adding structural queries.
 
 Minimal is the default white theme. Its stable configuration and storage ID remains
 `civic`, preserving existing saved selections. Select
-**Minimal** in Settings → App theme, or use `REACT_APP_CE_DEFAULT_THEME=civic`
+**Minimal** in Settings → Appearance, or use `REACT_APP_CE_DEFAULT_THEME=civic`
 for a deployment default. It uses dark slate text, blue actions, subtle borders,
 modest corner radii, sans-serif typography with system fallbacks, and flat surfaces.
 Login and Submit share the brighter blue submit palette, including hover states.
@@ -167,7 +167,6 @@ previous/next arrows share one row. Submit shrinks within the available space;
 at phone widths up to 640px, the question counter forms a narrow column between
 the arrows. The home Explorer offers Stats, Tools, and
 Welcome; Tools remains the default, including for a retained Latest-tab selection.
-Session title tooltips share the Results description cleanup for retired RxC instructions.
 Explorer tabs use blue selected/hover text
 and dark inactive icons on the light header. On narrow Minimal phones, the
 selected label is 20px and the tab icons are 22px, with 44px minimum touch targets.
@@ -293,13 +292,13 @@ mobile and checks its visible control/text pairs at 4.5:1.
 When the bundled-theme selector is enabled, signed-in Settings exposes it
 directly beneath the equal 2×2 Config, Session, Explainers, and Demo Mode quick
 controls. At phone widths up to 480px, these controls stack into full-width rows
-so the Session dropdown remains readable. Signed-out Settings keeps it in the final `Appearance & colors`
-section. This selector changes the complete app theme; it is separate from a
-session's curated color scheme and does not accept arbitrary color values. Its
-default option reads `<theme label> (default)` for a valid embedded
-choice, or `Default` when that choice cannot be named. Native dropdown options
-use paired document text and surface colors for readability. The theme bar
-uses the same border opacity as adjacent quick controls without dimming its
+so the Session dropdown remains readable. Signed-out Settings keeps it at the
+end of the panel, below Config. This selector changes the complete app theme; it
+is separate from a session's curated color scheme and does not accept arbitrary
+color values. Its default option reads `<theme label> (default)` for a valid
+embedded choice, or `Default` when that choice cannot be named. Native dropdown
+options use paired document text and surface colors for readability. The theme
+bar uses the same border opacity as adjacent quick controls without dimming its
 text. Opening Config scrolls its start into view only when clipped by the
 screen or account dialog. Selected reasoning buttons retain the paired accent
 text color even when session defaults disable editing.
@@ -387,19 +386,19 @@ Escape, the backdrop, or its close button dismiss it and restore trigger focus.
 
 ## Typography
 
-| Token                     | `context-engine`                | `classic-95`                           |
-| ------------------------- | ------------------------------- | -------------------------------------- |
-| `--ce-font-body`          | Poppins fallback stack          | bundled Wine Tahoma + system fallbacks |
-| `--ce-font-ui`            | Open Sans fallback stack        | bundled Wine Tahoma + system fallbacks |
-| `--ce-font-mono`          | system monospace fallback stack | Courier New fallback stack             |
-| `--ce-font-button-weight` | `600`                           | `400`                                  |
+| Token                     | `context-engine`                | `classic-95`                           | `civic` (Minimal)               |
+| ------------------------- | ------------------------------- | -------------------------------------- | ------------------------------- |
+| `--ce-font-body`          | Poppins fallback stack          | bundled Wine Tahoma + system fallbacks | Open Sans + system fallbacks    |
+| `--ce-font-ui`            | Open Sans fallback stack        | bundled Wine Tahoma + system fallbacks | Open Sans + system fallbacks    |
+| `--ce-font-mono`          | system monospace fallback stack | Courier New fallback stack             | system monospace fallback stack |
+| `--ce-font-button-weight` | `600`                           | `400`                                  | `600`                           |
 
 Guideline:
 
 - Use `var(--ce-font-body)` or `var(--ce-font-mono)` directly in component rules.
-- Sass font values in `_variables.scss` seed the default theme only. Component
-  rules use runtime variables so changing `data-ce-theme` repaints without a
-  reload.
+- Sass font values in `_variables.scss` seed the `context-engine` theme only.
+  Component rules use runtime variables so changing `data-ce-theme` repaints
+  without a reload.
 
 ## Spacing And Radius
 
@@ -426,8 +425,8 @@ Radius tokens:
 
 Guideline: component rules use runtime radius tokens. In `classic-95`, every
 non-round radius slot resolves to square geometry; `context-engine` retains its
-rounded scale. Sass radius values seed the default map and are not a component
-theme API.
+rounded scale. Sass radius values seed the `context-engine` map and are not a
+component theme API.
 
 ## Button Patterns
 

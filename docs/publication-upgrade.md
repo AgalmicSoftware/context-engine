@@ -8,11 +8,13 @@ migration, or republication runs automatically during an upgrade or read.
 ## Rollout order and mixed versions
 
 The client reads public `GET /capabilities?slug=<slug>` lazily and caches it for
-five minutes per Worker origin and session. Admin settings show the reported
-API version and bundle hash, with an upgrade recommendation for missing
-features. A 404, invalid response or network error is treated as a legacy
-Worker. Normal submission continues unless a valid response explicitly lists
-`submit` as unavailable; that refusal preserves unsaved drafts.
+five minutes per Worker origin and session (30 seconds while `submit` is
+unavailable). Admin settings show the reported API version and bundle hash, with
+an upgrade recommendation for missing features. A 404 or a non-JSON response is
+treated as a legacy Worker. Any other failure, such as a network error, timeout,
+non-OK status or invalid body, shows the capabilities as temporarily unavailable
+and is not cached. Normal submission continues unless a valid response
+explicitly lists `submit` as unavailable; that refusal preserves unsaved drafts.
 
 Admin re-uploads of existing question or survey IDs require
 `upload_authority_stamps`. With an older Worker the client permits a new
@@ -48,12 +50,12 @@ previous minor Worker. Within that window, support is feature-specific:
 | Current | Previous minor, no capabilities endpoint | Existing stored records, normal creation and submission; no admin corrections, backup/import or recovery-key UI without the corresponding feature |
 | Current | Older than previous minor | Best effort reads only; upgrade before relying on writes |
 
-Release numbers alone do not prove support: the 0.6.14 fallback bundle also
-predates authority stamps and capabilities. A current client can safely read
-its records, but cannot change historical correction intent. An old Worker's
-own results/interview implementation may still apply its old selection rule;
-the coordinated upgrade procedure above remains necessary for agreement across
-all deployed readers.
+Release numbers alone do not prove support; read the features a Worker
+advertises. A current client can safely read an older Worker's records, but
+cannot change historical correction intent. An old Worker's own
+results/interview implementation may still apply its old selection rule; the
+coordinated upgrade procedure above remains necessary for agreement across all
+deployed readers.
 
 `tests/fixtures/worker-compat/previous-minor.json` pins synthetic stored-format
 compatibility: unstamped admin corrections, legacy rows without resource IDs,
@@ -144,7 +146,7 @@ later correction may therefore stop winning after upgrade. Reading a record
 does not migrate it, and later admin promotion/removal never changes a completed
 upload's authority stamp.
 
-Publication now rechecks the admitted revision and authorization epoch after
+Publication rechecks the admitted revision and authorization epoch after
 external payload storage. A stale completion returns `409` before its index or
 initial owner record is written. Its bytes may remain orphaned; they are absent
 from listing and canonical version selection. A KV-only orphan remains readable
@@ -156,13 +158,14 @@ coordinator receipts when supported; see the storage retry contract in
 
 ## Hosted faucet compatibility
 
-The hosted wizard now requests `workerAuthority.participantScopes: ["faucet_self"]`
+The hosted wizard requests `workerAuthority.participantScopes: ["faucet_self"]`
 (alongside the session's other grants). Current Workers issue the existing
 `faucet` route scope only through their self-recipient and daily-limit handling.
 Older Workers ignore `faucet_self`; older deploy helpers reject it during config
 validation. Upgrade both before enabling the option. Do not translate the grant
 back to `faucet` for an older Worker, whose route lacks the participant limits.
 
-Local builds using the 0.6.14 release pin remain subject to both this limitation
-and the missing publication stamp described above. Update the fallback pin only
-after a compatible Worker release is published and its manifest is verified.
+Builds without a Netlify `COMMIT_REF` deploy the Worker release pinned in
+`client/src/variables/workerReleasePin.json`. Update that pin only after a
+compatible Worker release is published and its manifest is verified
+(`npm run release:worker-pin`).
