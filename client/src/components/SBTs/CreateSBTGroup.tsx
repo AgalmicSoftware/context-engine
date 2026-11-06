@@ -273,7 +273,7 @@ const buildDeferredDraftCreate2Salt = () =>
   });
 const LOCKED_FIELD_MASK = '[encrypted]';
 const CREATED_GROUP_PASSWORD_COPY_KEY = 'created_group_password';
-const DEFERRED_MODAL_SURFACE_BG = 'var(--ce-overlay-surface)';
+const DEFERRED_MODAL_SURFACE_BG = 'var(--ce-surface-raised)';
 const DISTRIBUTION_OPTION_CONFIGS = Object.freeze([
   {
     value: 'hasPasswords',

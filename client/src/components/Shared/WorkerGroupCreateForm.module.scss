@@ -128,7 +128,8 @@
 .accessInput,
 .inlineInputRow input {
   border: 1px solid var(--ce-input-border-strong) !important;
-  background: var(--ce-input-bg) !important;
+  // Over an opaque surface, since a translucent input fill would otherwise add up with every layer under it.
+  background: linear-gradient(var(--ce-input-bg), var(--ce-input-bg)), var(--ce-surface) !important;
   color: var(--ce-control-text) !important;
   -webkit-text-fill-color: var(--ce-control-text);
 }
@@ -143,9 +144,11 @@
 }
 
 .field input::placeholder,
-.field textarea::placeholder {
-  color: var(--ce-panel-text-muted) !important;
-  -webkit-text-fill-color: var(--ce-panel-text-muted);
+.field textarea::placeholder,
+.accessInput::placeholder,
+.inlineInputRow input::placeholder {
+  color: color-mix(in srgb, var(--ce-control-text) 78%, transparent) !important;
+  -webkit-text-fill-color: color-mix(in srgb, var(--ce-control-text) 78%, transparent);
 }
 
 .imageColumn {
@@ -193,7 +196,7 @@
   border: 1px solid color-mix(in srgb, var(--ce-action-accent) 35%, transparent);
   border-radius: var(--ce-radius-8);
   background: color-mix(in srgb, var(--ce-action-accent) 10%, transparent);
-  color: var(--ce-action-accent);
+  color: var(--ce-control-text);
   cursor: pointer;
 }
 
@@ -330,7 +333,7 @@
   border: 1px solid color-mix(in srgb, var(--ce-action-accent) 55%, transparent);
   border-radius: var(--ce-radius-pill);
   background: color-mix(in srgb, var(--ce-action-accent) 12%, transparent);
-  color: var(--ce-action-accent);
+  color: var(--ce-control-text);
   cursor: pointer;
   font-family: var(--ce-font-mono);
   font-weight: 700;

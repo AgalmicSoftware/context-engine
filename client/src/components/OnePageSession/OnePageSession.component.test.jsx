@@ -1669,18 +1669,16 @@ describe('OnePageSession view gating', () => {
     expect(sectionHeaderBlock).toContain('font-size: 2rem;');
     expect(sectionHeaderBlock).toContain('font-weight: bold;');
     expect(sectionHeaderBlock).toContain('color: color-mix(in srgb, var(--ce-text-inverse) 75%, transparent);');
-    expect(sectionHeaderTitleBlock).toContain('color: color-mix(in srgb, var(--ce-text-inverse) 50%, transparent);');
+    expect(sectionHeaderTitleBlock).toContain('color: var(--ce-panel-text);');
     expect(sectionHeaderSubtitleBlock).toContain('font-size: 0.63em;');
     expect(sectionHeaderSubtitleBlock).toContain('font-weight: 600;');
-    expect(sectionHeaderSubtitleBlock).toContain('color: color-mix(in srgb, var(--ce-text-inverse) 25%, transparent);');
+    expect(sectionHeaderSubtitleBlock).toContain('color: var(--ce-panel-text-muted);');
     expect(scss).toMatch(
       /@container ce-theme style\(--ce-layout-profile: desktop-window\)\s*{[\s\S]*?\.sectionsGrid \.sectionHeader\s*{[\s\S]*?font-family:\s*var\(--ce-font-ui\);[\s\S]*?font-size:\s*1rem;/,
     );
+    expect(classicThemeBlock).toMatch(/\.sectionsGrid \.sectionHeaderTitle\s*{\s*font-size:\s*1\.35rem;\s*}/);
     expect(classicThemeBlock).toMatch(
-      /\.sectionsGrid \.sectionHeaderTitle\s*{[^}]*font-size:\s*1\.35rem;[^}]*opacity:\s*0\.5;/,
-    );
-    expect(classicThemeBlock).toMatch(
-      /\.sectionsGrid \.sectionHeaderSubtitle\s*{[^}]*font-size:\s*1rem;[^}]*opacity:\s*0\.5;/,
+      /\.sectionsGrid \.sectionHeaderSubtitle\s*{\s*font-size:\s*1rem;\s*font-weight:\s*400;\s*}/,
     );
     expect(classicThemeBlock).toMatch(/\.sectionsGrid \.sectionToggleIcon\s*{[^}]*opacity:\s*0\.5;/);
   });
@@ -1842,7 +1840,7 @@ describe('OnePageSession view gating', () => {
     expect(phoneBlock).toContain('.sectionHeader .sectionHeaderSubtitle {');
     expect(phoneBlock).toContain('font-size: 1em;');
     expect(phoneBlock).toContain('font-weight: inherit;');
-    expect(phoneBlock).toContain('color: color-mix(in srgb, var(--ce-text-inverse) 15%, transparent);');
+    expect(phoneBlock).toContain('color: var(--ce-panel-text-muted);');
     expect(phoneBlock).toContain('.sectionHeader {');
     expect(phoneBlock).toContain('align-items: center;');
     expect(phoneBlock).toContain('.documentsSectionHeader {');
@@ -1868,7 +1866,7 @@ describe('OnePageSession view gating', () => {
     expect(smallTabletBlock).toContain('.sectionHeader .sectionHeaderSubtitle {');
     expect(smallTabletBlock).toContain('font-size: 1em;');
     expect(smallTabletBlock).toContain('font-weight: inherit;');
-    expect(smallTabletBlock).toContain('color: color-mix(in srgb, var(--ce-text-inverse) 15%, transparent);');
+    expect(smallTabletBlock).toContain('color: var(--ce-panel-text-muted);');
     expect(smallTabletBlock).not.toContain('.documentsSectionHeaderText');
     expect(smallTabletBlock).not.toContain('.documentsSectionHeaderTitleRow');
     expect(smallTabletBlock).not.toContain('.documentsSectionHeaderMain');
@@ -1888,7 +1886,7 @@ describe('OnePageSession view gating', () => {
     expect(classicSmallTabletBlock).toContain('gap: 3px;');
     expect(classicSmallTabletBlock).toContain('.sectionsGrid .sectionHeaderSubtitle {');
     expect(classicSmallTabletBlock).toContain('font-size: 1rem;');
-    expect(classicSmallTabletBlock).toContain('opacity: 0.5;');
+    expect(classicSmallTabletBlock).not.toContain('opacity');
     expect(tabletBlock).toContain('.pileHeaderRow {');
     expect(tabletBlock).toContain('flex-wrap: nowrap;');
     expect(tabletBlock).toContain('.pileHeaderTitleWrap {');

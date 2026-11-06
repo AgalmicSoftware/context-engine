@@ -3179,7 +3179,7 @@ $muted-text: var(--ce-panel-text-muted);
   padding: 13px;
   border: 1px solid color-mix(in srgb, var(--ce-control-text) 24%, transparent);
   border-radius: var(--ce-radius-8);
-  background: color-mix(in srgb, var(--ce-session-chrome) 58%, transparent);
+  background: var(--ce-surface-raised);
 }
 
 .pendingWorkerGroupCardHeader {
