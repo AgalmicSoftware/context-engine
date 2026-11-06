@@ -379,21 +379,27 @@ const SessionSettingsPage = ({
         <div className={styles.page}>
           {header}
           <p className={styles.hint} data-testid="ce-settings-admin-only">
-            {onChain
-              ? signedIn
-                ? `Only this session’s registry admin${registryAdmin} can change its settings.`
-                : `Connect the session’s registry admin wallet${registryAdmin} to change its settings.`
-              : signedIn
-                ? 'Only this session’s admins can change its settings.'
-                : 'Sign in as a session admin to change its settings.'}
+            {signedIn ? (
+              `${
+                onChain
+                  ? `Only this session’s registry admin${registryAdmin} can change its settings.`
+                  : 'Only this session’s admins can change its settings.'
+              } You’re signed in as ${account}.`
+            ) : (
+              <>
+                <button
+                  type="button"
+                  className={`${styles.button} ${styles.primaryButton} ${styles.inlineButton}`}
+                  onClick={() => toggleLoginModal?.(true)}
+                >
+                  Sign in
+                </button>{' '}
+                {onChain
+                  ? `with the session’s registry admin wallet${registryAdmin} to change its settings.`
+                  : 'as a session admin to change its settings.'}
+              </>
+            )}
           </p>
-          {!signedIn ? (
-            <div className={styles.buttonRow}>
-              <button type="button" className={styles.button} onClick={() => toggleLoginModal?.(true)}>
-                Sign in
-              </button>
-            </div>
-          ) : null}
         </div>
       </div>
     );

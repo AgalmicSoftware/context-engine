@@ -62,6 +62,7 @@ jest.mock('../setup/ContextSourcesPanel', () => {
 });
 
 const ADMIN = '0x00000000000000000000000000000000000000aa';
+const OTHER_ACCOUNT = '0x00000000000000000000000000000000000000cc';
 const WORKER = 'https://edit-salon.example.workers.dev';
 const SESSION_ID = `0x${'1f'.repeat(16)}`;
 
@@ -157,9 +158,20 @@ describe('SessionSettingsPage', () => {
   it('is admin-only', async () => {
     const toggleLoginModal = jest.fn();
     renderPage({ account: '', loginComplete: false, toggleLoginModal });
-    expect(await screen.findByTestId('ce-settings-admin-only')).toHaveTextContent('Sign in as a session admin');
-    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
+    const adminOnly = await screen.findByTestId('ce-settings-admin-only');
+    expect(adminOnly).toHaveTextContent('Sign in as a session admin to change its settings.');
+    // The button starts the sentence, so it can't read as a separate word below it.
+    const signIn = within(adminOnly).getByRole('button', { name: 'Sign in' });
+    expect(signIn).toHaveClass('primaryButton');
+    fireEvent.click(signIn);
     expect(toggleLoginModal).toHaveBeenCalledWith(true);
+    cleanup();
+    renderPage({ account: OTHER_ACCOUNT });
+    // A passkey makes its own address, so the page says which account it is looking at.
+    expect(await screen.findByTestId('ce-settings-admin-only')).toHaveTextContent(
+      `Only this session’s admins can change its settings. You’re signed in as ${OTHER_ACCOUNT}.`,
+    );
+    expect(screen.queryByRole('button', { name: 'Sign in' })).not.toBeInTheDocument();
     expect(isSessionAdmin(workerConfig({ adminAddresses: ['0xBB'] }), '0xbb')).toBe(true);
     expect(isSessionAdmin(workerConfig(), '0x00000000000000000000000000000000000000cc')).toBe(false);
   });
@@ -480,11 +492,14 @@ describe('SessionSettingsPage', () => {
     it('names the wallet it needs', () => {
       renderPage({ sessionConfig: registryConfig(), account: '0x00000000000000000000000000000000000000cc' });
       expect(screen.getByTestId('ce-settings-admin-only')).toHaveTextContent(`registry admin, ${ADMIN},`);
+      expect(screen.getByTestId('ce-settings-admin-only')).toHaveTextContent(
+        'You’re signed in as 0x00000000000000000000000000000000000000cc.',
+      );
       cleanup();
       renderPage({ sessionConfig: registryConfig(), account: '', loginComplete: false });
-      expect(screen.getByTestId('ce-settings-admin-only')).toHaveTextContent(
-        `Connect the session’s registry admin wallet, ${ADMIN},`,
-      );
+      const adminOnly = screen.getByTestId('ce-settings-admin-only');
+      expect(adminOnly).toHaveTextContent(`Sign in with the session’s registry admin wallet, ${ADMIN},`);
+      expect(within(adminOnly).getByRole('button', { name: 'Sign in' })).toBeInTheDocument();
     });
 
     it('refuses to save synthesized contract addresses until the admin confirms them', () => {

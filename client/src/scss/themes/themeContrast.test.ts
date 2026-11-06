@@ -398,6 +398,21 @@ describe('bundled app-theme contrast', () => {
     expect(ratios.filter(([, value]) => value < 4.5)).toEqual([]);
   });
 
+  // Minimal clears every button's border, so a button with no fill of its own reads as a plain word.
+  test.each(registry.themes.map(({ id }) => id))('%s gives the settings buttons a readable fill', (themeId) => {
+    const values = themeValues(css, themeId);
+    const paint = painter(values);
+    const setupCss = compileModule('components/Sessions/setup/SessionSetup.module.scss');
+    const surface = composite(parseColor(values.surface), parseColor(values.canvas));
+    const ratios = ['.button', '.moreButton', '.primaryButton'].map((selector) => {
+      const rule = moduleRule(setupCss, selector);
+      expect([selector, rule.background]).not.toEqual([selector, 'transparent']);
+      const fill = composite(paint(rule.background), surface);
+      return [selector, Number(contrastRatio(composite(paint(rule.color), fill), fill).toFixed(2))] as const;
+    });
+    expect(ratios.filter(([, value]) => value < 4.5)).toEqual([]);
+  });
+
   test.each(registry.themes.map(({ id }) => id))('%s keeps the HTML report buttons readable', (themeId) => {
     const values = themeValues(css, themeId);
     const paint = painter(values);
