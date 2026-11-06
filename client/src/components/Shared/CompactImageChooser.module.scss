@@ -63,20 +63,23 @@
 .urlInput {
   width: 100%;
   min-width: 0;
-  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 14%, transparent);
+  // The theme's input colours outrank a plain rule, as in WorkerGroupCreateForm.
+  border: 1px solid var(--ce-input-border-strong) !important;
   border-radius: var(--ce-radius-10);
-  background: color-mix(in srgb, var(--ce-overlay-base) 74%, transparent);
-  color: var(--ce-color-white);
+  background: linear-gradient(var(--ce-input-bg), var(--ce-input-bg)), var(--ce-surface) !important;
+  color: var(--ce-control-text) !important;
+  -webkit-text-fill-color: var(--ce-control-text);
   padding: 10px 12px;
   font-size: 0.95rem;
 
   &::placeholder {
-    color: color-mix(in srgb, var(--ce-control-text) 42%, transparent);
+    color: color-mix(in srgb, var(--ce-control-text) 78%, transparent) !important;
+    -webkit-text-fill-color: color-mix(in srgb, var(--ce-control-text) 78%, transparent);
   }
 
   &:focus {
     outline: none;
-    border-color: color-mix(in srgb, var(--ce-action-accent) 42%, transparent);
+    border-color: var(--ce-action-accent) !important;
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--ce-action-accent) 12%, transparent);
   }
 

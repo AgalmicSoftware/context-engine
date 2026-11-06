@@ -52,7 +52,7 @@ describe('CreateSBTGroup render and image authoring', () => {
 
     const panel = document.querySelector(`.${styles.createGroupExpanded}`);
     expect(panel).toBeInTheDocument();
-    expect(panel).toHaveStyle('--ce-create-group-surface-bg: var(--ce-overlay-surface)');
+    expect(panel).toHaveStyle('--ce-create-group-surface-bg: var(--ce-surface-raised)');
     expect(screen.getByRole('heading', { name: 'Add to Session' })).toBeInTheDocument();
   });
 

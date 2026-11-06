@@ -410,11 +410,46 @@ describe('bundled app-theme contrast', () => {
     const ratio = (color: string, fill: Rgba) => Number(contrastRatio(composite(paint(color), fill), fill).toFixed(2));
     expect(rule('.panelTitle').opacity).toBeUndefined();
     const groupCard = fillOf('.statusItem');
+    // The theme outranks a plain colour on these, and the panel also sits outside .adminPage.
+    [
+      '.subtleActionButton:global(.btn)',
+      '.subtleActionButton:global(.btn:hover:not(:disabled))',
+      '.dangerActionButton:global(.btn)',
+      '.dangerActionButton:global(.btn:focus:not(:disabled))',
+    ].forEach((selector) =>
+      expect(
+        [...adminCss.matchAll(/([^{}]+)\{([^{}]*)\}/g)].some(
+          ([, selectors, body]) =>
+            selectors.split(/,(?![^(]*\))/).some((candidate) => candidate.trim() === selector) &&
+            /border-color: [^;]+ !important/.test(body),
+        ),
+      ).toBe(true),
+    );
+    expect(adminCss).toMatch(
+      /\.panel :global\(\.form-control\)[^{]*\{[^}]*[^-]color: var\(--ce-control-text\) !important/,
+    );
+    expect(rule('.panel').color).toBe('var(--ce-panel-text)');
+    expect(rule('.heroSessionDetailLabel').opacity).toBeUndefined();
+    expect(rule('.hero').background).toBe('var(--ce-card-bg)');
+    expect(rule('.inlineResourceCard').background).toBe('var(--ce-card-bg)');
+    // Translucent fields add up with the layers under them, so each sits over an opaque surface.
+    expect(rule('.panel :global(.form-control)').background).toContain('var(--ce-surface)');
+    expect(rule('.panel :global(.form-select)')['background-color']).toBe('var(--ce-surface)');
+    expect(rule('.statusItemClickable:hover').background).toBeUndefined();
     const ratios = [
       ['.panelTitle', ratio(rule('.panelTitle').color, card)],
       ['.panelSubtitle', ratio(rule('.panelSubtitle').color, card)],
       ['.statusNote', ratio(rule('.statusNote').color, fillOf('.statusNote'))],
       ['.statusItem text', ratio('var(--ce-panel-text)', groupCard)],
+      ['.statusItem label', ratio(rule('.statusItem span:first-child').color, groupCard)],
+      ['.statusItem link', ratio(rule('.statusItem a').color, groupCard)],
+      ['.metadataItem label', ratio(rule('.metadataItem span:first-child').color, fillOf('.metadataItem'))],
+      ['.panel label', ratio(rule('.panel :global(label)').color, card)],
+      ['admin heading', ratio(rule('.heroTitleBlock h1').color, card)],
+      ['connection badge', ratio(rule('.connectionBadgeActive').color, fillOf('.connectionBadgeActive'))],
+      ['result box', ratio('var(--ce-panel-text)', fillOf('.resultBox'))],
+      ['secret option', ratio('var(--ce-panel-text)', fillOf('.secretOptionCard'))],
+      ['.adminPage label', ratio(rule('.adminPage :global(label)').color, card)],
       ['subtle button on a group', ratio(rule('.subtleActionButton:global(.btn)').color, groupCard)],
     ] as const;
     expect(ratios.filter(([, value]) => value < 4.5)).toEqual([]);
@@ -444,6 +479,24 @@ describe('bundled app-theme contrast', () => {
     );
     // The theme paints every select and input with text meant for documents, so these rules must outrank it.
     expect(formCss).toMatch(/\.accessSelect[^{]*\{[^}]*[^-]color: var\(--ce-control-text\) !important/);
+    // Placeholders set the fill too, or the input's own fill would make them look typed.
+    ['.field input::placeholder', '.accessInput::placeholder', '.inlineInputRow input::placeholder'].forEach(
+      (selector) =>
+        expect([selector, moduleRule(formCss, selector)['-webkit-text-fill-color']]).toEqual([
+          selector,
+          'color-mix(in srgb, var(--ce-control-text) 78%, transparent)',
+        ]),
+    );
+    expect(moduleRule(formCss, '.accessSelect').background).toContain('var(--ce-surface)');
+    const wizardCard = moduleRule(
+      compileModule('components/Sessions/SessionWizard.module.scss'),
+      '.pendingWorkerGroupCard',
+    ).background;
+    expect(contrastRatio(paint('var(--ce-control-text)'), composite(paint(wizardCard), card))).toBeGreaterThanOrEqual(
+      4.5,
+    );
+    const chooserCss = compileModule('components/Shared/CompactImageChooser.module.scss');
+    expect(chooserCss).toMatch(/\.urlInput \{[^}]*[^-]color: var\(--ce-control-text\) !important/);
     const sessionContext = composite(paint(moduleRule(formCss, '.sessionContext').background), card);
     expect(contrastRatio(paint('var(--ce-control-text)'), sessionContext)).toBeGreaterThanOrEqual(4.5);
     expect(
@@ -465,6 +518,7 @@ describe('bundled app-theme contrast', () => {
     const selectors = [
       ':global(.btn)',
       ':global(.btn:hover:not(:disabled))',
+      ':global(.btn:focus:not(:disabled))',
       ':global(.btn:active:not(:disabled))',
     ].map((state) => `.dangerActionButton${state}`);
     expect(selectors.filter((selector) => !importantFill(adminCss, selector))).toEqual([]);
