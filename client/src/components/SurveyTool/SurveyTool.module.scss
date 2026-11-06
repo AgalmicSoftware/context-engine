@@ -131,60 +131,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   line-height: 1;
 }
 
-/* Styling for Survey Questions (general card/layout) */
-.surveyQuestions {
-  width: 100%;
-
-  .binaryChoice {
-    display: flex;
-    justify-content: space-between;
-    button {
-      width: 48%;
-    }
-  }
-
-  .slider {
-    margin-top: 20px;
-    max-width: 200px;
-  }
-
-  .multiChoice {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-    .option {
-      flex: 1;
-      margin: 5px;
-      padding: 10px;
-      border: 1px solid var(--ce-color-surface-alt);
-      border-radius: var(--ce-radius-4);
-      background: var(--ce-color-surface);
-      cursor: pointer;
-      transition: background-color 0.3s ease;
-      &:hover {
-        background: var(--ce-color-surface-alt);
-      }
-    }
-  }
-
-  .footer {
-    display: flex;
-    flex-direction: row;
-    justify-content: center;
-    align-items: center;
-    button {
-      color: var(--ce-color-white);
-      background: var(--ce-color-surface);
-      border-color: var(--ce-color-white);
-      text-transform: uppercase;
-      font-weight: 600;
-      &:hover {
-        background: transparent;
-      }
-    }
-  }
-}
-
 #responsePreview {
   color: var(--ce-color-white) !important;
   display: flex;
@@ -208,12 +154,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   margin-top: 10px;
   border-radius: var(--ce-radius-5);
   overflow-x: auto;
-}
-
-#ratingInput {
-  padding: 20px;
-  margin-right: 20px;
-  max-width: 200px;
 }
 
 .ratingLabelText {
@@ -966,13 +906,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   gap: 10px;
 }
 
-.lockedQuestionsGenericMessage {
-  margin: 0;
-  font-size: 0.92rem;
-  line-height: 1.5;
-  color: color-mix(in srgb, var(--ce-overlay-surface) 82%, transparent);
-}
-
 .lockedGateDetailCard {
   border: 1px solid color-mix(in srgb, var(--ce-status-info) 20%, transparent);
   border-radius: var(--ce-radius-10);
@@ -1101,10 +1034,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
 .lockedQuestionsBannerOnDark .lockedQuestionsDetails {
   border-top-color: color-mix(in srgb, var(--ce-overlay-text) 12%, transparent);
-}
-
-.lockedQuestionsBannerOnDark .lockedQuestionsGenericMessage {
-  color: var(--ce-overlay-text-muted);
 }
 
 .lockedQuestionsBannerOnDark .lockedGateDetailCard {
@@ -1854,18 +1783,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   transition: width 0.25s ease;
 }
 
-/* Response display styles (used in SurveyQuestions when viewing answers) */
-.freeformAnswer {
-  font-style: italic;
-  background-color: color-mix(in srgb, var(--ce-text-inverse) 15%, transparent);
-  border-radius: var(--ce-radius-5);
-  padding: 15px;
-  color: var(--ce-color-white);
-  font-weight: bold;
-  margin-bottom: 5px;
-  margin-top: 5px;
-}
-
 /* Styles for the existing user response notice */
 .userResponseNotice {
   display: inline-flex;
@@ -1936,7 +1853,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 /* Buttons within userResponseNotice */
 #startFreshButton,
 #decryptEditButton,
-#editButton,
 #answerSurveyButton,
 #exitEditingButton {
   margin-right: 10px;
@@ -1971,16 +1887,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   @extend %decryptCtaOutline;
   text-transform: uppercase;
   letter-spacing: 0.02em;
-}
-
-#editButton {
-  background-color: var(--ce-status-warning);
-  border-color: var(--ce-status-warning);
-  color: var(--ce-color-dark);
-  &:hover {
-    background-color: var(--ce-status-warning);
-    border-color: var(--ce-status-warning);
-  }
 }
 
 #answerSurveyButton {
@@ -3781,39 +3687,6 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
 .sessionInterviewPanel button {
   border: 0 !important;
   box-shadow: none !important;
-}
-
-.sessionInterviewMetadata {
-  padding: 12px;
-  border-radius: var(--ce-radius-8);
-  background: var(--ce-surface-sunken);
-  color: var(--ce-panel-text);
-  font-size: 0.875rem;
-  overflow-wrap: anywhere;
-
-  summary {
-    cursor: pointer;
-    font-weight: 700;
-
-    &:focus-visible {
-      outline: 2px solid var(--ce-focus-ring);
-      outline-offset: 4px;
-    }
-  }
-
-  dl,
-  p,
-  ul {
-    margin: 12px 0 0;
-  }
-
-  dd {
-    margin: 0 0 8px;
-  }
-
-  ul {
-    padding-left: 20px;
-  }
 }
 
 .sessionInterviewPanel :global(.btn-primary) {
@@ -6250,24 +6123,6 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   }
 }
 
-.aiPromptToggleBtn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  border: 1px solid var(--ce-status-info-text);
-  background: var(--ce-color-white);
-  color: var(--ce-color-surface);
-  border-radius: var(--ce-radius-6);
-  padding: 6px 10px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: transform 0.06s ease;
-  &:hover {
-    box-shadow: 0 2px 6px color-mix(in srgb, var(--ce-overlay-base) 12%, transparent);
-    transform: translateY(-1px);
-  }
-}
-
 /* Subtle, reusable icon glow (used for lock/comment) */
 
 /* Glowing green lock icon consistent with other buttons */
@@ -6391,7 +6246,6 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   .multiChoice .option,
   #startFreshButton,
   #decryptEditButton,
-  #editButton,
   #answerSurveyButton,
   #exitEditingButton,
   .iconButton,

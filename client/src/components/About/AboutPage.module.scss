@@ -217,8 +217,7 @@ $modal-cta-text: var(--ce-action-submit-text);
   gap: 12px;
 }
 
-.ctaButton,
-.tertiaryLink {
+.ctaButton {
   text-decoration: none;
   transition:
     transform 0.18s ease,
@@ -283,27 +282,6 @@ $modal-cta-text: var(--ce-action-submit-text);
   letter-spacing: 0.04em;
 }
 
-.tertiaryLink {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 36px;
-  padding: 0 14px;
-  border-radius: var(--ce-radius-pill);
-  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 12%, transparent);
-  background: color-mix(in srgb, var(--ce-text-inverse) 5%, transparent);
-  color: color-mix(in srgb, var(--ce-control-text) 90%, transparent);
-  font-size: 0.82rem;
-
-  &:hover,
-  &:focus {
-    color: $text-color;
-    border-color: color-mix(in srgb, var(--ce-action-accent) 34%, transparent);
-    background: color-mix(in srgb, var(--ce-action-accent) 8%, transparent);
-    transform: translateY(-1px);
-  }
-}
-
 .toggleHeader {
   display: flex;
   justify-content: space-between;
@@ -333,31 +311,6 @@ $modal-cta-text: var(--ce-action-submit-text);
   color: color-mix(in srgb, var(--ce-control-text) 72%, transparent);
   margin-left: 10px;
   flex-shrink: 0;
-}
-
-.recognitionSummary {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
-  min-width: 0;
-  overflow: hidden;
-}
-
-.recognitionSummaryLogo {
-  width: 30px;
-  height: 30px;
-  border-radius: var(--ce-radius-10);
-  flex-shrink: 0;
-  object-fit: contain;
-  padding: 3px;
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--ce-overlay-surface) 96%, transparent),
-    color-mix(in srgb, var(--ce-overlay-base) 92%, transparent)
-  );
-  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
-  box-shadow: 0 6px 14px color-mix(in srgb, var(--ce-overlay-base) 24%, transparent);
 }
 
 .collapsibleContent {
@@ -1369,12 +1322,6 @@ button.recognitionModalCloseButton {
     padding: 0 28px;
     font-size: 1.08rem;
   }
-
-  .tertiaryLink {
-    min-height: 46px;
-    padding: 0 18px;
-    font-size: 1.05rem;
-  }
 }
 
 @media (max-width: 640px) {
@@ -1417,26 +1364,6 @@ button.recognitionModalCloseButton {
   .toggleHeader > .toggleIcon,
   .toggleHeaderAside .toggleIcon {
     margin-left: auto;
-  }
-
-  .recognitionSummary {
-    display: flex;
-    flex: 0 1 auto;
-    justify-content: flex-start;
-    gap: 0;
-    margin-top: 0;
-    overflow: hidden;
-  }
-
-  .recognitionSummaryLogo {
-    width: 28px;
-    height: 28px;
-    border-radius: var(--ce-radius-8);
-    padding: 2px;
-  }
-
-  .recognitionSummaryLogo + .recognitionSummaryLogo {
-    margin-left: -6px;
   }
 
   .heroVideo {
@@ -1493,11 +1420,6 @@ button.recognitionModalCloseButton {
     padding: 0 10px;
     min-height: 52px;
     font-size: 1.08rem;
-  }
-
-  .tertiaryLink {
-    flex: 1 1 calc(50% - 8px);
-    min-width: 0;
   }
 
   .featureItem {
@@ -1643,7 +1565,6 @@ button.recognitionModalCloseButton {
   }
 
   .heroPrimaryButton,
-  .tertiaryLink,
   .titleRepoLink {
     border: 2px solid;
     border-color: var(--ce-border-raised);
@@ -1671,14 +1592,6 @@ button.recognitionModalCloseButton {
     color: var(--ce-titlebar-text);
   }
 
-  .tertiaryLink {
-    min-width: 108px;
-    min-height: 34px;
-    padding: 0 14px;
-    font-size: 0.88rem;
-    font-weight: 400;
-  }
-
   .titleRepoLink {
     --title-link-size: 64px;
     height: 44px;
@@ -1688,8 +1601,6 @@ button.recognitionModalCloseButton {
 
   .heroPrimaryButton:hover,
   .heroPrimaryButton:focus-visible,
-  .tertiaryLink:hover,
-  .tertiaryLink:focus-visible,
   .titleRepoLink:hover,
   .titleRepoLink:focus-visible {
     border-color: var(--ce-border-raised);
@@ -1709,7 +1620,6 @@ button.recognitionModalCloseButton {
   }
 
   .heroPrimaryButton:active,
-  .tertiaryLink:active,
   .titleRepoLink:active {
     border-color: var(--ce-border-inset);
     box-shadow: var(--ce-shadow-pressed);
@@ -1726,10 +1636,6 @@ button.recognitionModalCloseButton {
       min-width: 0;
       width: 100%;
       padding: 0 10px;
-    }
-
-    .tertiaryLink {
-      flex: 1 1 108px;
     }
   }
 }

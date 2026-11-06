@@ -21,10 +21,6 @@ $warning: var(--ce-status-warning-text);
     .content {
       display: none;
     }
-
-    .header {
-      margin-bottom: 0;
-    }
   }
 }
 
@@ -47,20 +43,6 @@ $warning: var(--ce-status-warning-text);
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
-}
-
-.header {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  flex-wrap: wrap;
-  gap: 16px;
-  margin-bottom: 20px;
-  padding: 18px 20px;
-  background: $panel-bg;
-  border: 1px solid $panel-border;
-  border-radius: var(--ce-radius-14);
-  box-shadow: $panel-shadow;
 }
 
 .userInfo {
@@ -182,14 +164,6 @@ $warning: var(--ce-status-warning-text);
   font-size: 1.05rem;
   font-weight: 600;
   line-height: 1.75;
-}
-
-.document {
-  background: $raised-card-bg;
-  border: 1px solid $raised-card-border;
-  border-radius: var(--ce-radius-10);
-  padding: 12px 14px;
-  color: $soft-text;
 }
 
 .modalContent :global(.modal-content) {
@@ -598,10 +572,6 @@ $warning: var(--ce-status-warning-text);
   .stanceEndpoint {
     min-width: 60px;
     font-size: 0.65rem;
-  }
-
-  .header {
-    padding: 16px;
   }
 
   .userInfo {

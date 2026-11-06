@@ -652,7 +652,6 @@ describe('bundled app-theme contrast', () => {
       `${banner} .lockedQuestionsDecryptButton:hover:not(:disabled)`,
       `${banner} .lockedQuestionsDecryptButton:focus:not(:disabled)`,
       `${banner} .lockedQuestionsDecryptButton:disabled`,
-      `${banner} .lockedQuestionsGenericMessage`,
       `${banner} .lockedSbtCard`,
       `${banner} .lockedSbtCard:hover`,
       `${banner} .lockedSbtMeta`,

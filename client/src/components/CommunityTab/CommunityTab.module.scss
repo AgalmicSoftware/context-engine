@@ -24,16 +24,6 @@
     min-height: 0;
   }
 
-  .leaderboardSection {
-    flex: 1;
-    min-width: 0;
-    padding: 18px;
-    border-right: 1px solid var(--ce-color-border-light);
-    display: flex;
-    flex-direction: column;
-    background: transparent;
-  }
-
   .scopeLabel {
     margin: 0 0 10px;
     color: var(--ce-panel-text);
@@ -41,13 +31,6 @@
     font-size: 0.85rem;
     line-height: 1.4;
     overflow-wrap: anywhere;
-  }
-
-  .sessionContent {
-    flex: 1;
-    display: flex;
-    min-height: 0;
-    min-width: 0;
   }
 
   .statsHeader {
@@ -172,11 +155,6 @@
       outline: 2px solid var(--ce-focus-ring);
       outline-offset: 2px;
     }
-  }
-
-  .leaderboard {
-    display: flex;
-    flex-direction: column;
   }
 
   .leaderboardItem {
@@ -377,19 +355,6 @@
     flex-direction: column;
     height: auto;
 
-    .sessionContent {
-      flex-direction: column;
-      width: 100%;
-    }
-
-    .leaderboardSection {
-      order: 2;
-      width: 100%;
-      border-right: none;
-      border-top: 1px solid var(--ce-color-border-light);
-      border-bottom: none;
-    }
-
     .statsSection {
       order: 1;
       height: auto;
@@ -418,15 +383,6 @@
     border-color: var(--ce-border-inset);
     background: var(--ce-surface-raised);
     color: var(--ce-panel-text);
-  }
-
-  .communityTab .leaderboardSection {
-    flex: 0 0 28%;
-    min-width: 230px;
-    padding: 0;
-    border: 0;
-    border-right: 2px solid var(--ce-edge-shadow);
-    background: var(--ce-surface-raised);
   }
 
   .communityTab .sessionSelectorToggle {
@@ -485,12 +441,6 @@
     width: 38px;
     height: 38px;
     border: 1px solid var(--ce-border-strong);
-  }
-
-  .communityTab .sessionContent {
-    flex: 1 1 auto;
-    min-width: 0;
-    background: var(--ce-surface-raised);
   }
 
   .communityTab .statsSection {
@@ -571,12 +521,6 @@
     .communityTab {
       height: auto;
       overflow: visible;
-    }
-
-    .communityTab .leaderboardSection {
-      min-width: 0;
-      border-right: 0;
-      border-top: 2px solid var(--ce-edge-shadow);
     }
 
     .communityTab .statsGrid {

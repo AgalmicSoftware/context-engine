@@ -296,13 +296,6 @@
  Filter / Search UI
 --------------------------------------- */
 
-.filterInput {
-  flex-grow: 1;
-  margin-right: 0.5rem;
-  color: var(--ce-color-black) !important;
-  font-weight: 600;
-}
-
 .htmlReportModal {
   :global(.modal-content) {
     background: var(--ce-text-inverse) !important;
@@ -744,24 +737,6 @@
   font-size: 0.85rem;
 }
 
-.lockedBannerCaret {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  margin: 8px 0 0 auto;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--ce-overlay-text-muted);
-  font-size: 0.9rem;
-  cursor: pointer;
-
-  &:hover,
-  &:focus {
-    color: var(--ce-overlay-text);
-  }
-}
-
 .lockedBannerDetails {
   margin-top: 10px;
   padding-top: 10px;
@@ -1078,13 +1053,6 @@
   margin-top: 1rem;
 }
 
-.bookmarkIcon {
-  margin-left: 10px;
-  cursor: pointer;
-  font-size: 1rem;
-  /* bigger bookmark icon */
-}
-
 /* Additional styling for question titles displayed */
 .questionTitle {
   font-size: 1.2rem;
@@ -1279,47 +1247,9 @@ grey background, white text, bigger icons, etc.
   }
 }
 
-/* Additional styling for custom dropdown items (used in some exports) */
-.dropdownItem {
-  color: var(--ce-color-black) !important;
-  text-transform: uppercase;
-  font-size: 1.5em !important;
-  font-weight: 600 !important;
-  &.questionsItem {
-    background-color: var(--ce-status-danger-text) !important;
-    /* pastel pink */
-    font-style: italic;
-    &:hover {
-      background-color: var(--ce-status-danger-text) !important;
-      /* darker pastel pink */
-    }
-  }
-
-  &.surveyItem {
-    background-color: var(--ce-data-series-6) !important;
-    /* pastel yellow */
-    &:hover {
-      background-color: var(--ce-data-series-6) !important;
-      /* darker pastel yellow */
-    }
-  }
-}
-
 /* --------------------------------------
  Show / Hide Results Buttons
 --------------------------------------- */
-#filterButton {
-  background: transparent;
-  font-weight: 600;
-  padding: 10px;
-  font-size: 1.5em;
-  color: var(--ce-color-white);
-  text-transform: uppercase;
-  border: var(--ce-color-white) 1px solid;
-  border-radius: var(--ce-radius-10);
-  opacity: 0.9;
-  margin-right: 10px;
-}
 
 /* --------------------------------------
  Sizing & layout for the encryption / uploading text
@@ -1378,88 +1308,13 @@ grey background, white text, bigger icons, etc.
  Toggling JSON or additional data
 --------------------------------------- */
 
-.jsonDisplay {
-  margin-top: 20px;
-  background-color: var(--ce-status-info);
-  padding: 15px;
-  border-radius: var(--ce-radius-5);
-  border: 1px solid var(--ce-document-border);
-  white-space: pre-wrap;
-  word-break: break-all;
-  font-size: 0.9em;
-}
-
 /* --------------------------------------
  Existing user response notice
 --------------------------------------- */
-.userResponseNotice {
-  margin-bottom: 20px;
-  background-color: var(--ce-color-light);
-  border-radius: var(--ce-radius-8);
-  border: 1px solid var(--ce-document-border);
-  padding: 20px;
-  margin-left: 15px;
-  margin-right: 15px;
-  font-size: 1.25em;
-  p {
-    font-size: 1.5em;
-    color: var(--ce-document-text-muted);
-    margin-bottom: 10px;
-    font-weight: 600;
-    margin-top: 10px;
-  }
-}
-
-#decryptEditButton,
-#editButton {
-  margin-right: 10px;
-  font-size: 1em;
-  font-weight: 600;
-  padding: 8px 15px;
-  border-radius: var(--ce-radius-5);
-  transition:
-    background-color 0.3s ease,
-    border-color 0.3s ease,
-    color 0.3s ease;
-}
-
-#editButton {
-  background-color: var(--ce-status-warning);
-  border-color: var(--ce-status-warning);
-  color: var(--ce-color-dark);
-  &:hover {
-    background-color: var(--ce-status-warning);
-    border-color: var(--ce-status-warning);
-  }
-}
-
-#decryptEditButton {
-  @extend %decryptCtaOutline;
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
-}
 
 /* --------------------------------------
  Misc. binary / rating / freeform styling
 --------------------------------------- */
-.freeformAnswer {
-  font-style: italic;
-  background-color: color-mix(in srgb, var(--ce-overlay-text) 6%, var(--ce-overlay-surface));
-  border-radius: var(--ce-radius-5);
-  padding: 15px;
-  color: var(--ce-overlay-text);
-  font-weight: bold;
-  margin-bottom: 5px;
-  margin-top: 5px;
-}
-
-.additionalComment {
-  margin-top: 4px;
-  padding-left: 12px;
-  font-size: 0.9em;
-  color: var(--ce-overlay-text-muted);
-  font-style: italic;
-}
 
 /* --------------------------------------
  (Optional) Mini-Create-Survey references
@@ -1988,11 +1843,4 @@ button.exportToggleButton:is(:hover, :focus, :active):not(:disabled) {
   font-size: 1em;
   opacity: 1;
   margin-left: 5px;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  #decryptEditButton,
-  #editButton {
-    transition-duration: 0.01ms !important;
-  }
 }

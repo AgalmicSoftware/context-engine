@@ -255,13 +255,6 @@
   margin-top: 10px;
   margin-bottom: 10px;
 }
-.ratingLabelText {
-  margin-left: 10px;
-  font-weight: 600;
-  color: var(--ce-color-white);
-  font-size: 1.2em;
-  margin-right: 10px;
-}
 .ratingSlider {
   width: 200px;
 }
@@ -688,7 +681,6 @@
 @container ce-theme style(--ce-layout-profile: minimal-app) {
   .questionTitle,
   .miniPromptAbbrev:not(.maskedPromptActionButton),
-  .ratingLabelText,
   .ratingValueLabel,
   .importanceText,
   .aggregatorText,
