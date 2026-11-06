@@ -1728,6 +1728,11 @@ managed account address. Historical explicit
 principal IDs and storage keys; obsolete implicit transport scope hints no
 longer select a principal. Malformed principals fail closed.
 
+Don't use an open group as an access rule, because anyone who can sign in can
+join it. A `group_allowlist`, group gate or `worker_group` condition needs an
+`admin_add` group. Choosing **Admin adds members** in the app's forms also moves
+the member list back to admins.
+
 Upload policy `group_allowlist` may be supplied on Cloudflare storage uploads with `groupId`/`groupIds`; the uploader must be a member before payload bytes are persisted. Existing SBT upload behavior is unchanged.
 
 ## Required bindings
