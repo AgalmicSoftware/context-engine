@@ -643,11 +643,19 @@ $card-shadow: var(--ce-card-shadow);
   padding: 0.6rem 0.95rem;
   border: 1px solid transparent;
   border-radius: var(--ce-radius-12);
-  background: linear-gradient(180deg, var(--ce-status-success-text) 0%, var(--ce-status-success) 100%);
-  color: var(--ce-overlay-base);
   font-weight: 700;
   letter-spacing: 0.01em;
   box-shadow: 0 10px 18px color-mix(in srgb, var(--ce-overlay-base) 24%, transparent);
+}
+
+// Global `.btn:hover`, `.btn:active` and `.btn-primary:focus` repaint fills with !important, so these keep theirs the
+// same way. Every label here stays on the pair the contrast test holds to 4.5:1.
+.actionButton:global(.btn),
+.actionButton:global(.btn:hover:not(:disabled)),
+.actionButton:global(.btn:focus:not(:disabled)),
+.actionButton:global(.btn:active:not(:disabled)) {
+  background: linear-gradient(180deg, var(--ce-status-success-text) 0%, var(--ce-status-success) 100%) !important;
+  color: var(--ce-status-success-contrast) !important;
 }
 
 .actionButton:global(.btn:hover:not(:disabled)),
@@ -663,34 +671,34 @@ $card-shadow: var(--ce-card-shadow);
 }
 
 .actionButton:global(.btn-outline-secondary) {
-  background: color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
-  border-color: color-mix(in srgb, var(--ce-text-inverse) 16%, transparent);
-  color: $admin-text;
+  background: color-mix(in srgb, var(--ce-text-inverse) 8%, transparent) !important;
+  border-color: var(--ce-card-border);
+  color: $admin-text !important;
   box-shadow: none;
 }
 
 .actionButton:global(.btn-outline-secondary:hover:not(:disabled)),
-.actionButton:global(.btn-outline-secondary:focus-visible) {
-  border-color: color-mix(in srgb, var(--ce-action-accent) 32%, transparent);
-  background: color-mix(in srgb, var(--ce-action-accent) 10%, transparent);
-  color: $admin-accent;
+.actionButton:global(.btn-outline-secondary:focus:not(:disabled)),
+.actionButton:global(.btn-outline-secondary:active:not(:disabled)) {
+  border-color: $admin-text;
+  background: color-mix(in srgb, var(--ce-panel-text) 8%, transparent) !important;
+  color: $admin-text !important;
 }
 
 .subtleActionButton:global(.btn),
 .subtleActionButton:global(.btn-outline-secondary) {
-  background: transparent;
-  border-color: color-mix(in srgb, var(--ce-text-inverse) 14%, transparent);
-  color: color-mix(in srgb, var(--ce-control-text) 82%, transparent);
-  opacity: 0.5;
+  background: transparent !important;
+  border-color: var(--ce-card-border);
+  color: $admin-muted !important;
   box-shadow: none;
 }
 
 .subtleActionButton:global(.btn:hover:not(:disabled)),
-.subtleActionButton:global(.btn:focus-visible) {
-  background: transparent;
-  border-color: color-mix(in srgb, var(--ce-text-inverse) 22%, transparent);
-  color: $admin-text;
-  opacity: 0.85;
+.subtleActionButton:global(.btn:focus:not(:disabled)),
+.subtleActionButton:global(.btn:active:not(:disabled)) {
+  background: transparent !important;
+  border-color: $admin-text;
+  color: $admin-text !important;
   box-shadow: none;
 }
 
@@ -1112,19 +1120,20 @@ $card-shadow: var(--ce-card-shadow);
   }
 
   .actionButton:global(.btn) {
-    background: var(--ce-action-primary);
-    color: var(--ce-action-primary-text);
+    background: var(--ce-action-primary) !important;
+    color: var(--ce-action-primary-text) !important;
   }
 
   .actionButton:global(.btn:hover:not(:disabled)),
-  .actionButton:global(.btn:focus-visible) {
-    background: var(--ce-action-primary-hover);
-    color: var(--ce-action-primary-text);
+  .actionButton:global(.btn:focus:not(:disabled)),
+  .actionButton:global(.btn:active:not(:disabled)) {
+    background: var(--ce-action-primary-hover) !important;
+    color: var(--ce-action-primary-text) !important;
   }
 
   .actionButton:global(.btn:disabled) {
-    background: var(--ce-control-disabled-bg);
-    color: var(--ce-control-disabled-text);
+    background: var(--ce-control-disabled-bg) !important;
+    color: var(--ce-control-disabled-text) !important;
     opacity: 1;
   }
 }

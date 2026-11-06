@@ -181,7 +181,7 @@ describe('bundled app-theme contrast', () => {
     sass.compile(path.resolve(scssDir, file), { loadPaths: [scssDir], style: 'expanded' }).css;
   const moduleRule = (moduleCss: string, selector: string) => {
     const found: Record<string, string> = {};
-    for (const [, selectors, body] of moduleCss.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    for (const [, selectors, body] of moduleCss.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
       if (!selectors.split(/,(?![^(]*\))/).some((candidate) => candidate.trim() === selector)) continue;
       for (const [, name, value] of body.matchAll(/([a-z-]+):\s*([^;]+);/g)) {
         found[name] = value.replace(/\s*!important$/, '').trim();
@@ -197,6 +197,13 @@ describe('bundled app-theme contrast', () => {
       const tokenColor = (token: string) => parseColor(values[aliases[token] ?? token]);
       const token = value.match(/^var\(--ce-([a-z0-9-]+)\)$/)?.[1];
       if (token) return tokenColor(token);
+      const onToken = value.match(/^color-mix\(in srgb, var\(--ce-([a-z0-9-]+)\) (\d+)%, var\(--ce-([a-z0-9-]+)\)\)$/);
+      if (onToken) {
+        const [top, base] = [tokenColor(onToken[1]), tokenColor(onToken[3])];
+        return [0, 1, 2]
+          .map((i) => (top[i] * Number(onToken[2])) / 100 + (base[i] * (100 - Number(onToken[2]))) / 100)
+          .concat(1) as Rgba;
+      }
       const mix = value.match(/^color-mix\(in srgb, var\(--ce-([a-z0-9-]+)\) (\d+)%, transparent\)$/);
       if (!mix) throw new Error(`Unsupported paint in a component contrast contract: ${value}`);
       const [red, green, blue, alpha] = tokenColor(mix[1]);
@@ -286,6 +293,116 @@ describe('bundled app-theme contrast', () => {
     expect(
       contrastRatio(paint(resultsRule('.lockedSummaryToggle:focus-visible')['outline-color']), onTitleBar),
     ).toBeGreaterThanOrEqual(3);
+  });
+
+  // Every primary button without its own rule takes these. `.btn:hover` and `.btn:active` clear fills with !important,
+  // so the primary rules must come after them; the purple fill they replace was only 3.54:1 with a white label.
+  test('primary buttons keep their fill on the action colours', () => {
+    const rules = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map(([, selectors, body]) => ({
+      selectors: selectors.split(/,(?![^(]*\))/).map((selector) => selector.trim()),
+      body,
+    }));
+    const lastRule = (selector: string, bodyPattern: RegExp) =>
+      rules.findLastIndex((rule) => rule.selectors.includes(selector) && bodyPattern.test(rule.body));
+
+    [
+      ['.btn-primary:hover', '.btn:hover'],
+      ['.btn-primary:active', '.btn:active'],
+      ['.btn-primary:active:hover', '.btn:active:hover'],
+    ].forEach(([primary, reset]) => {
+      const clears = lastRule(reset, /background-color: unset !important/);
+      expect(clears).toBeGreaterThan(-1);
+      expect(lastRule(primary, /background-color: var\(--ce-action-primary-hover\) !important/)).toBeGreaterThan(
+        clears,
+      );
+    });
+    // Disabled buttons don't react to the pointer, and their label must stay on a fill.
+    expect(
+      lastRule('.btn-primary:disabled:hover', /background-color: var\(--ce-action-primary\) !important/),
+    ).toBeGreaterThan(lastRule('.btn-primary:hover', /!important/));
+    expect(
+      rules
+        .filter(({ selectors }) => selectors.some((selector) => selector.startsWith('.btn-primary')))
+        .filter(({ body }) => body.includes('--ce-compat-purple'))
+        .flatMap(({ selectors }) => selectors),
+    ).toEqual([]);
+  });
+
+  // Every pairing below paints over the global `.btn` rules, so each fill has to be !important in every state.
+  const stateSelectors = (button: string) =>
+    ['', ':hover', ':focus', ':active', ':active:hover'].map((state) => `${button}${state}`);
+  const importantFill = (moduleCss: string, selector: string) =>
+    [...moduleCss.matchAll(/([^{}]+)\{([^{}]*)\}/g)].some(
+      ([, selectors, body]) =>
+        selectors.split(/,(?![^(]*\))/).some((candidate) => candidate.trim() === selector) &&
+        /background: [^;]+ !important/.test(body) &&
+        /[^-]color: [^;]+ !important/.test(body),
+    );
+
+  const adminCss = compileModule('components/Admin/AdminPage.module.scss');
+  test.each(registry.themes.map(({ id }) => id))('%s keeps admin action buttons readable', (themeId) => {
+    const values = themeValues(css, themeId);
+    const paint = painter(values);
+    const card = composite(
+      parseColor(values['card-bg']),
+      composite(parseColor(values.surface), parseColor(values.canvas)),
+    );
+    const filled = [
+      '.actionButton:global(.btn)',
+      '.actionButton:global(.btn:hover:not(:disabled))',
+      '.actionButton:global(.btn:focus:not(:disabled))',
+      '.actionButton:global(.btn:active:not(:disabled))',
+    ];
+    const outline = [
+      '.actionButton:global(.btn-outline-secondary)',
+      '.actionButton:global(.btn-outline-secondary:hover:not(:disabled))',
+      '.actionButton:global(.btn-outline-secondary:focus:not(:disabled))',
+      '.actionButton:global(.btn-outline-secondary:active:not(:disabled))',
+      '.subtleActionButton:global(.btn)',
+      '.subtleActionButton:global(.btn:hover:not(:disabled))',
+      '.subtleActionButton:global(.btn:focus:not(:disabled))',
+      '.subtleActionButton:global(.btn:active:not(:disabled))',
+    ];
+    const diagnostics = [
+      '.diagnosticsCard .actionButton:global(.btn)',
+      '.diagnosticsCard .actionButton:global(.btn:hover:not(:disabled))',
+      '.diagnosticsCard .actionButton:global(.btn:focus:not(:disabled))',
+      '.diagnosticsCard .actionButton:global(.btn:active:not(:disabled))',
+    ];
+    expect([...filled, ...outline, ...diagnostics].filter((selector) => !importantFill(adminCss, selector))).toEqual(
+      [],
+    );
+
+    const ratio = (color: string, fill: Rgba) => Number(contrastRatio(composite(paint(color), fill), fill).toFixed(2));
+    const ratios = [
+      ...filled.flatMap((selector) => {
+        const rule = moduleRule(adminCss, selector);
+        // The gradient's two stops: the label has to clear both.
+        const stops = rule.background.match(/var\(--ce-[a-z0-9-]+\)/g) ?? [];
+        expect(stops).toHaveLength(2);
+        return stops.map((stop) => [selector, ratio(rule.color, composite(paint(stop), card))] as const);
+      }),
+      ...outline.map((selector) => {
+        const rule = moduleRule(adminCss, selector);
+        return [selector, ratio(rule.color, composite(paint(rule.background), card))] as const;
+      }),
+    ];
+    expect(ratios.filter(([, value]) => value < 4.5)).toEqual([]);
+  });
+
+  test.each(registry.themes.map(({ id }) => id))('%s keeps the HTML report buttons readable', (themeId) => {
+    const values = themeValues(css, themeId);
+    const paint = painter(values);
+    const selectors = ['.htmlReportCancelButton', '.htmlReportDownloadButton', '.htmlReportGenerateButton'].flatMap(
+      stateSelectors,
+    );
+    expect(selectors.filter((selector) => !importantFill(resultsCss, selector))).toEqual([]);
+    const ratios = selectors.map((selector) => {
+      const rule = resultsRule(selector);
+      const fill = paint(rule.background);
+      return [selector, Number(contrastRatio(composite(paint(rule.color), fill), fill).toFixed(2))] as const;
+    });
+    expect(ratios.filter(([, value]) => value < 4.5)).toEqual([]);
   });
 
   test.each(registry.themes.map(({ id }) => id))('%s keeps small binary answer labels readable', (themeId) => {
