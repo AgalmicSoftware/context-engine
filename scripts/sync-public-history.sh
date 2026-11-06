@@ -83,6 +83,7 @@ AGENT_BRIDGE_PUBLIC_CUTOVER_REQUIRED_PATHS=(
 )
 AGENT_BRIDGE_PUBLIC_CUTOVER_COMMIT=""
 AGENT_BRIDGE_PUBLIC_RETIREMENT_COMMIT=""
+AGENT_BRIDGE_RETIREMENT_REPLAYED=""
 
 PRIVATE_REPLAY_MESSAGE_TOKENS=(
   "contextEngine-cc"
@@ -163,12 +164,33 @@ agent_bridge_is_retired_for_source_commit() {
     git -C "$REPO_ROOT" merge-base --is-ancestor "$AGENT_BRIDGE_PUBLIC_RETIREMENT_COMMIT" "$commit_sha"
 }
 
+# Replay lists commits by date, so a side-line commit can follow the retirement
+# commit without descending from it. Once retirement is behind the replay,
+# nothing may restore the retired paths or their package wiring.
+begin_agent_bridge_replay_pass() {
+  local commit_sha
+
+  AGENT_BRIDGE_RETIREMENT_REPLAYED=""
+  [ -n "$AGENT_BRIDGE_PUBLIC_RETIREMENT_COMMIT" ] || return 0
+  for commit_sha in "${COMMITS[@]}"; do
+    [ "$commit_sha" != "$AGENT_BRIDGE_PUBLIC_RETIREMENT_COMMIT" ] || return 0
+  done
+  AGENT_BRIDGE_RETIREMENT_REPLAYED=1
+}
+
+note_agent_bridge_replay_position() {
+  if [ "$1" = "$AGENT_BRIDGE_PUBLIC_RETIREMENT_COMMIT" ]; then
+    AGENT_BRIDGE_RETIREMENT_REPLAYED=1
+  fi
+}
+
 # True only inside the published window: from the audited cutover commit up to,
 # but not including, the commit that deleted the cutover marker.
 agent_bridge_is_public_for_source_commit() {
   local commit_sha="$1"
 
-  [ -n "$AGENT_BRIDGE_PUBLIC_CUTOVER_COMMIT" ] &&
+  [ -z "$AGENT_BRIDGE_RETIREMENT_REPLAYED" ] &&
+    [ -n "$AGENT_BRIDGE_PUBLIC_CUTOVER_COMMIT" ] &&
     git -C "$REPO_ROOT" merge-base --is-ancestor "$AGENT_BRIDGE_PUBLIC_CUTOVER_COMMIT" "$commit_sha" &&
     ! agent_bridge_is_retired_for_source_commit "$commit_sha"
 }
@@ -813,7 +835,9 @@ collect_source_release_evidence() {
   : > "$RELEASE_CHANGED_PATHS_FILE"
   : > "$RELEASE_SUBJECTS_FILE"
 
+  begin_agent_bridge_replay_pass
   for commit_sha in "${COMMITS[@]}"; do
+    note_agent_bridge_replay_position "$commit_sha"
     git -C "$REPO_ROOT" log -1 --format='%s' "$commit_sha" >> "$RELEASE_SUBJECTS_FILE"
     while IFS= read -r changed_path; do
       [ -n "$changed_path" ] || continue
@@ -1180,7 +1204,9 @@ git -C "$TEMP_CLONE" checkout --quiet -B "$TARGET_BRANCH" "$TARGET_BASE_SHA"
 log_info "Prepared temp branch $TARGET_BRANCH from $TARGET_BASE."
 
 if [ "$DRY_RUN" -eq 1 ]; then
+  begin_agent_bridge_replay_pass
   for commit_sha in "${COMMITS[@]}"; do
+    note_agent_bridge_replay_position "$commit_sha"
     subject=$(git -C "$REPO_ROOT" log -1 --format='%s' "$commit_sha")
     if commit_is_empty_after_strip "$commit_sha"; then
       SKIPPED_COUNT=$((SKIPPED_COUNT + 1))
@@ -1213,7 +1239,9 @@ if [ "$DRY_RUN" -eq 1 ]; then
   exit 0
 fi
 
+begin_agent_bridge_replay_pass
 for commit_sha in "${COMMITS[@]}"; do
+  note_agent_bridge_replay_position "$commit_sha"
   subject=$(git -C "$REPO_ROOT" log -1 --format='%s' "$commit_sha")
   author_date=$(git -C "$REPO_ROOT" log -1 --format='%aI' "$commit_sha")
   committer_date=$(git -C "$REPO_ROOT" log -1 --format='%cI' "$commit_sha")
