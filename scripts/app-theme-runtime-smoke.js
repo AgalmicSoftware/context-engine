@@ -229,6 +229,91 @@ const auditVisibleTextContrast = (rootSelector) => {
   return { failures };
 };
 
+// The label against the pixels really under it, so gradient and translucent fills count.
+const readLabelContrast = async (page, label) => {
+  const box = await label.boundingBox();
+  await label.evaluate((element) => {
+    element.style.visibility = 'hidden';
+  });
+  const screenshot = await page.screenshot({ clip: box });
+  await label.evaluate((element) => {
+    element.style.visibility = '';
+  });
+  return label.evaluate(async (element, base64) => {
+    const image = new Image();
+    image.src = `data:image/png;base64,${base64}`;
+    await image.decode();
+    const canvas = document.createElement('canvas');
+    canvas.width = image.width;
+    canvas.height = image.height;
+    const context = canvas.getContext('2d');
+    context.drawImage(image, 0, 0);
+    const { data } = context.getImageData(0, 0, canvas.width, canvas.height);
+    const luminance = (channels) => {
+      const [red, green, blue] = channels.map((channel) => {
+        const value = channel / 255;
+        return value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+      });
+      return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
+    };
+    const text = luminance(window.getComputedStyle(element).color.match(/[\d.]+/g).slice(0, 3).map(Number));
+    let worst = Infinity;
+    for (let index = 0; index < data.length; index += 4) {
+      const fill = luminance([data[index], data[index + 1], data[index + 2]]);
+      worst = Math.min(worst, (Math.max(text, fill) + 0.05) / (Math.min(text, fill) + 0.05));
+    }
+    return worst;
+  }, screenshot.toString('base64'));
+};
+
+// Global `.btn` rules repaint fills with !important on hover, focus and press, which only a real browser shows.
+// These buttons animate colour, so each reading waits for the theme or state to settle.
+const assertPasskeyButtonsReadable = async (page, viewportName) => {
+  const setTheme = (id) =>
+    page.evaluate((themeId) => {
+      document.documentElement.dataset.ceTheme = themeId;
+      window.dispatchEvent(new CustomEvent('ce:theme-change', { detail: { id: themeId, source: 'user' } }));
+    }, id);
+  const rest = async () => {
+    await page.evaluate(() => document.activeElement?.blur());
+    await page.mouse.move(0, 0);
+  };
+  const initialTheme = await page.evaluate(() => document.documentElement.dataset.ceTheme);
+  for (const { id: themeId } of themeRegistry.themes) {
+    await setTheme(themeId);
+    for (const testId of ['ce-passkey-wallet-create', 'ce-passkey-wallet-sign-in']) {
+      const button = page.getByTestId(testId);
+      const states = {
+        resting: rest,
+        hovered: () => button.hover(),
+        focused: async () => {
+          await rest();
+          await button.focus();
+        },
+        pressed: async () => {
+          await button.hover();
+          await page.mouse.down();
+        },
+      };
+      for (const [state, enter] of Object.entries(states)) {
+        await enter();
+        await page.waitForTimeout(450);
+        const ratio = await readLabelContrast(page, button.locator('span'));
+        // Releasing off the button clicks nothing.
+        await page.locator('.modal-login .card-header').hover();
+        await page.mouse.up();
+        assert.ok(
+          ratio >= 4.5,
+          `${viewportName} ${themeId} ${testId} ${state} label contrast should be at least 4.5:1; received ${ratio.toFixed(2)}:1`,
+        );
+      }
+    }
+  }
+  await setTheme(initialTheme);
+  await rest();
+  await page.waitForTimeout(450);
+};
+
 async function inspectRoute(page, baseUrl, routeCase, viewportName) {
   const response = await page.goto(`${baseUrl}${routeCase.path}`, {
     waitUntil: 'domcontentloaded',
@@ -805,6 +890,7 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
     await page.getByRole('button', { name: 'LOG IN', exact: true }).click();
     await page.locator('.modal-login.show').waitFor({ state: 'visible' });
     await page.getByText('Account uses a passkey:', { exact: true }).waitFor({ state: 'visible' });
+    await assertPasskeyButtonsReadable(page, viewportName);
   }
 
   if (routeCase.requiresPreloginControlLayout) {

@@ -3896,6 +3896,25 @@ h1 {
   }
 }
 
+// Global `.btn:hover`, `.btn:active` and `.btn-primary:focus` rules repaint button fills with !important, which left
+// these light labels on the dialog behind them (white on white for Minimal's Create). The element selector outranks
+// them. Pressing also repaints the labels, dark for `.btn-outline-secondary`.
+button.passkeyButtonPrimary:is(:hover, :focus, :active):not(:disabled) {
+  background-color: var(--ce-status-info) !important;
+  background-image: linear-gradient(150deg, var(--ce-status-info), var(--ce-overlay-surface)) !important;
+  color: var(--ce-document-surface) !important;
+}
+
+button.passkeyButtonOutline:is(:hover, :focus, :active):not(:disabled) {
+  background-color: color-mix(in srgb, var(--ce-overlay-surface) 72%, transparent) !important;
+  background-image: linear-gradient(
+    150deg,
+    color-mix(in srgb, var(--ce-status-info) 70%, transparent),
+    color-mix(in srgb, var(--ce-overlay-surface) 55%, transparent)
+  ) !important;
+  color: var(--ce-document-surface) !important;
+}
+
 .passkeyWalletStatus {
   max-width: min(520px, 100%);
   margin: 14px auto 0;
@@ -4273,5 +4292,17 @@ h1 {
       background: var(--ce-surface-subtle);
       color: var(--ce-control-text);
     }
+  }
+
+  button.passkeyButtonPrimary:is(:hover, :focus, :active):not(:disabled) {
+    background-color: var(--ce-action-primary-hover) !important;
+    background-image: none !important;
+    color: var(--ce-action-primary-text) !important;
+  }
+
+  button.passkeyButtonOutline:is(:hover, :focus, :active):not(:disabled) {
+    background-color: var(--ce-surface-subtle) !important;
+    background-image: none !important;
+    color: var(--ce-control-text) !important;
   }
 }

@@ -176,6 +176,63 @@ describe('bundled app-theme contrast', () => {
     expect(ratio(color('document-text'), color('text-inverse'))).toBeGreaterThanOrEqual(4.5);
   });
 
+  // Contracts on component stylesheets read the compiled rules, so a token meant for another surface fails them.
+  const compileModule = (file: string) =>
+    sass.compile(path.resolve(scssDir, file), { loadPaths: [scssDir], style: 'expanded' }).css;
+  const moduleRule = (moduleCss: string, selector: string) => {
+    const found: Record<string, string> = {};
+    for (const [, selectors, body] of moduleCss.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+      if (!selectors.split(/,(?![^(]*\))/).some((candidate) => candidate.trim() === selector)) continue;
+      for (const [, name, value] of body.matchAll(/([a-z-]+):\s*([^;]+);/g)) {
+        found[name] = value.replace(/\s*!important$/, '').trim();
+      }
+    }
+    return found;
+  };
+  const painter =
+    (values: Record<string, string>) =>
+    (value: string): Rgba => {
+      if (value === 'transparent') return [0, 0, 0, 0];
+      const aliases: Record<string, string> = { 'color-accent': 'action-accent', 'color-panel-text': 'panel-text' };
+      const tokenColor = (token: string) => parseColor(values[aliases[token] ?? token]);
+      const token = value.match(/^var\(--ce-([a-z0-9-]+)\)$/)?.[1];
+      if (token) return tokenColor(token);
+      const mix = value.match(/^color-mix\(in srgb, var\(--ce-([a-z0-9-]+)\) (\d+)%, transparent\)$/);
+      if (!mix) throw new Error(`Unsupported paint in a component contrast contract: ${value}`);
+      const [red, green, blue, alpha] = tokenColor(mix[1]);
+      return [red, green, blue, (alpha * Number(mix[2])) / 100];
+    };
+
+  // Hovered, focused or pressed, the login dialog's passkey buttons paint their own fill and label, and
+  // Account.styles.test.ts checks that those rules win. The label sits mid-button, so a gradient counts at its midpoint.
+  const accountCss = compileModule('components/Account/Account.module.scss');
+  const minimalStart = accountCss.indexOf('style(--ce-layout-profile: minimal-app)');
+
+  test.each(registry.themes.map(({ id, layoutProfile }) => [id, layoutProfile]))(
+    '%s keeps the passkey labels readable on their active fills',
+    (themeId, layoutProfile) => {
+      const values = themeValues(css, themeId);
+      const paint = painter(values);
+      const themedCss =
+        layoutProfile === 'minimal-app' ? accountCss.slice(minimalStart) : accountCss.slice(0, minimalStart);
+      const dialog = composite(parseColor(values.surface), parseColor(values.canvas));
+      const midpoint = (gradient: string): Rgba => {
+        const stops = gradient.match(/color-mix\(in srgb, var\([^)]+\) \d+%, transparent\)|var\(--ce-[a-z0-9-]+\)/g);
+        const [a, b] = (stops ?? []).map(paint);
+        const alpha = (a[3] + b[3]) / 2;
+        return [0, 1, 2].map((i) => (a[i] * a[3] + b[i] * b[3]) / (2 * alpha)).concat(alpha) as Rgba;
+      };
+      const ratios = ['passkeyButtonPrimary', 'passkeyButtonOutline'].map((button) => {
+        const rule = moduleRule(themedCss, `button.${button}:is(:hover, :focus, :active):not(:disabled)`);
+        const backing = composite(paint(rule['background-color']), dialog);
+        const image = rule['background-image'];
+        const fill = image === 'none' ? backing : composite(midpoint(image), backing);
+        return [button, Number(contrastRatio(composite(paint(rule.color), fill), fill).toFixed(2))] as const;
+      });
+      expect(ratios.filter(([, value]) => value < 4.5)).toEqual([]);
+    },
+  );
+
   test.each(registry.themes.map(({ id }) => id))('%s keeps small binary answer labels readable', (themeId) => {
     const values = themeValues(css, themeId);
     for (const stance of ['agree', 'disagree']) {
