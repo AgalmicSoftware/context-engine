@@ -317,7 +317,7 @@ describe('OnePageSession results routing', () => {
     return subject;
   };
 
-  it('rebuilds the report when the session hidden list changes', () => {
+  it('rebuilds a reopened report when the session hidden list changed', () => {
     const storeSession = (hidden) =>
       upsertWorkerCanonicalSessionBootstrap({
         slug: 'edge',
@@ -332,13 +332,38 @@ describe('OnePageSession results routing', () => {
           sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
         },
       });
+    jest.useFakeTimers();
     window.localStorage.clear();
     const subject = createSubject({ slug: 'edge' });
+    subject.state = { ...subject.state, showResults: true };
+    subject.buildAggregator = jest.fn();
+    const scheduleBuild = () => {
+      subject.scheduleBuildAggregator(0);
+      jest.runOnlyPendingTimers();
+    };
+
     storeSession([]);
-    const before = subject.buildAggregatorInputSignature(subject.props, subject.state);
+    scheduleBuild();
+    expect(subject.buildAggregator).toHaveBeenCalledTimes(1);
+    scheduleBuild();
+    expect(subject.buildAggregator).toHaveBeenCalledTimes(1);
+
     storeSession(['q2']);
-    expect(subject.buildAggregatorInputSignature(subject.props, subject.state)).not.toBe(before);
+    scheduleBuild();
+    expect(subject.buildAggregator).toHaveBeenCalledTimes(2);
+
     window.localStorage.clear();
+    jest.useRealTimers();
+  });
+
+  it('reads no session config for the report check while Results is closed', () => {
+    const subject = createSubject({ slug: 'edge' });
+    const getItem = jest.spyOn(Storage.prototype, 'getItem');
+
+    subject.buildAggregatorInputSignature(subject.props, subject.state);
+
+    expect(getItem).not.toHaveBeenCalledWith('ce:sessionWorkerConfigCache:v1');
+    getItem.mockRestore();
   });
 
   it('opens and scrolls to the inline report after an interview without opening raw results', () => {
