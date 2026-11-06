@@ -469,6 +469,41 @@ describe('bundled app-theme contrast', () => {
     const responseNotice = moduleRule(surveyToolCss, '.userResponseNotice');
     const chip = moduleRule(surveyToolCss, '.decryptChip');
     const dialog = composite(parseColor(values['overlay-surface']), parseColor(values['overlay-base']));
+    // The banner's colours are all set against its own fill, in every state.
+    const banner = '.lockedQuestionsBannerOnDark';
+    const bannerRule = moduleRule(surveyToolCss, banner);
+    const onBanner = composite(paint(bannerRule.background), parseColor(values['overlay-base']));
+    const bannerText = [
+      banner,
+      `${banner} .lockedQuestionsSubtext`,
+      `${banner} .lockedSbtInlineLink`,
+      `${banner} .lockedSbtInlineLink:hover`,
+      `${banner} .lockedSbtInlineLink:focus`,
+      `${banner} .lockedQuestionsDecryptButton`,
+      `${banner} .lockedQuestionsDecryptButton:hover:not(:disabled)`,
+      `${banner} .lockedQuestionsDecryptButton:focus:not(:disabled)`,
+      `${banner} .lockedQuestionsDecryptButton:disabled`,
+      `${banner} .lockedQuestionsGenericMessage`,
+      `${banner} .lockedSbtCard`,
+      `${banner} .lockedSbtCard:hover`,
+      `${banner} .lockedSbtMeta`,
+      `${banner} .lockedQuestionsCaretButton:hover:not(:disabled)`,
+    ];
+    expect(
+      bannerText
+        .map(
+          (selector) =>
+            [
+              selector,
+              Number(
+                contrastRatio(composite(paint(moduleRule(surveyToolCss, selector).color), onBanner), onBanner).toFixed(
+                  2,
+                ),
+              ),
+            ] as const,
+        )
+        .filter(([, value]) => value < 4.5),
+    ).toEqual([]);
     const onDark = moduleRule(surveyToolCss, '.lockedQuestionsBannerOnDark .lockedQuestionsDecryptButton');
     expect(
       [
@@ -479,6 +514,9 @@ describe('bundled app-theme contrast', () => {
       ].filter(([, value]) => Number(value) < 4.5),
     ).toEqual([]);
     expect(chip.opacity).toBeUndefined();
+    expect(moduleRule(surveyToolCss, '.gatedEmptyCopy').color).toBe('inherit');
+    const tooltipIcon = moduleRule(surveyToolCss, '.gatedPromptTooltipIcon');
+    expect([tooltipIcon.color, tooltipIcon.opacity]).toEqual(['inherit', '1']);
 
     // Results' dialog names the colour the card's Decrypt takes; panel text is black on Classic 95's teal there.
     const resultsCard = moduleRule(resultsCss, '.surveyResultsResponseCard');

@@ -22,7 +22,7 @@ All notable changes to this project will be documented in this file.
 - The locked-answers controls in Raw Results are readable in every theme, hovered, focused or pressed: Decrypt, Log in, the required-group links, the toggle that opens them, and their focus rings.
 - Primary buttons keep a readable fill in every theme, hovered, focused or pressed, including See Questions, the Agent token Login and the Worker group and document buttons. They use the theme's action colours instead of a purple that reached only 3.70:1 with their white label.
 - The HTML report's Cancel, Download and Generate buttons and the Admin and Sponsor action buttons are readable in every state and theme.
-- Decrypt on answers and questions takes the surface's own text colour, so it no longer disappears on Classic 95's teal. The locked-question notice is readable in Minimal.
+- Decrypt on answers and questions takes the surface's own text colour, so it no longer disappears on Classic 95's teal. The locked-question notice and the locked-questions banner are readable in every theme.
 - Create and Login fit the login dialog at phone width.
 - A link with both `mode` and `joinGroup` shows the group notice inside the voice dialog, where it can be read and cancelled before signing in.
 - Creating a group says when sign-ins are rate limited instead of showing an internal code.
