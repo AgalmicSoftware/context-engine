@@ -169,7 +169,7 @@ export const PRACTICE_ENTRIES: PracticeEntry[] = [
   {
     id: 'agent-village',
     title: 'Agent Village 2026',
-    url: '/posts/agent-village-wrapped',
+    url: '/posts/agent-village-wrapped-2026',
     description:
       'Context Engine powered Agent Village Wrapped at Edge Esmeralda 2026, comparing personal agents’ predicted answers with their users’ actual responses. The project write-up reports what the experiment revealed about agent representation.',
     icon: faRobot,
