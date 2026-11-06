@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "kind": "ai_discourse_bench_context_engine_results_sync",
-  "sourceCommit": "f6a20fcd87fffb889b11fdd157a39d8e46e92fca",
+  "sourceCommit": "b0621a709995c527059c497459826af13cffa115",
   "files": {
     "client/src/components/OnePageSession/OnePageSessionStandardShell.tsx": "c58330a944446ce51e0c229c7d08aa06634c289668cc8850a1eba2e14aa5526c",
     "client/src/components/OnePageSession/OnePageSession.tsx": "9ae4c85ea41cf55f3906bee3e2be7d402811a1257a946774d4a2caab99189e54",
@@ -23,8 +23,8 @@
     "client/src/components/SurveyTool/QuestionTagDropdown.tsx": "6dc2ad981c4f103efba150f299a591c87388d0c19af87b56f3985989937d7d41",
     "client/src/components/SurveyTool/QuestionTagDropdown.module.scss": "b2807732ca2cfaebe71742243c98073add599d8a08257a0ead0ea370022ae123",
     "client/src/components/SurveyTool/SingleQuestionResponse.tsx": "441668ac48cf9d042892d1e908de58f758a706cedfc110c82e5ca673b01b7424",
-    "client/src/components/SurveyTool/SingleQuestionResponse.module.scss": "44549f22514df0b07c22486f5fc4162b0243f4b3e4cb0ea588214f59b92017bf",
-    "client/src/components/SurveyTool/SurveyResults.module.scss": "80d84d771afe35ad3adc10c63b94f6723609d2936369600755df970ab4456b52",
+    "client/src/components/SurveyTool/SingleQuestionResponse.module.scss": "6d3b8c726aa25b4edd86dff7b3e1295d51a50e46dd9ee57ea1844e69f9a6c89c",
+    "client/src/components/SurveyTool/SurveyResults.module.scss": "2e0d27a354e6ce065225e1293223932af0b3465ee24308cafec6e743daf2d9de",
     "client/src/utilities/demo/demoAnalysisAdapter.ts": "c33000cb47513e03fc7e79357955651798dd222136093554b56f2ed0a9431df1",
     "client/src/utilities/demo/demoAnalysisMath.ts": "77ba04a211394fd05a044c1f1f25ad4fa40e66b5f424c5f3470ae4ef96712663"
   }
