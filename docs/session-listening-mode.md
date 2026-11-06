@@ -15,17 +15,14 @@ The session links are:
 
 The direct links open the selected modal panel; `?mode=voice` opens the
 launcher, as does clicking the microphone without a mode query. The launcher's
-two choices sit side by side with centered icons and titles; a question mark
-beside each icon shows what the choice does. Below them, a bordered **Let your
-AI draft your answers** card holds the ChatGPT or Claude prefill prompt (see
-below), with its own question mark beside the heading. Screen readers get each
-description with its choice. The header close button dismisses the launcher
-without a separate footer. Picking a choice replaces `?mode=voice` with its own
-mode.
-The older
-`?mode=listening` link remains supported and opens the original pile-adjacent
-group recorder. Any other `mode` value, such as an old `recordGroup` link,
-opens nothing and is removed from the address.
+two choices sit side by side, each with a question mark that shows what it
+does. Below them, a bordered **Let your AI draft your answers** card holds the
+ChatGPT or Claude prefill prompt (see below). Picking a choice replaces
+`?mode=voice` with its own mode.
+`?mode=listening` still opens the pile-adjacent group recorder. Any other
+`mode` value, such as `recordGroup`, opens nothing and is removed from the
+address. `joinGroup=<id>` is a separate query parameter that can sit beside
+`mode`; it asks to join an open Worker group.
 
 `interviewModeEnabled` is a per-session public config value. It defaults to
 `true`; setting it to `false` hides the microphone entry point and makes the
@@ -36,37 +33,30 @@ public interview-brief endpoint return `404`.
 Interview mode sends an SDP offer and interviewer instructions to the
 session's own Cloudflare Worker. The Worker creates a GPT-Live session through
 `POST https://api.openai.com/v1/live/sessions` using its own `openaiKey`; the
-browser never receives that key. New sessions and the Interview demo default
-to `gpt-live-1`. The JSON request carries `session: { model, instructions,
+browser never receives that key. The default model is `gpt-live-1`. The JSON
+request carries `session: { model, instructions,
 store: false, delegation: { type: "client" } }` and `transport: { type: "webrtc",
 sdp }`. Audio is negotiated through WebRTC; Realtime session type, output
 modalities, VAD, and transcription-model fields are not sent to Live.
 
-The per-session `interviewMode.realtimeModel` setting also accepts the supported
-legacy aliases `gpt-realtime-2.1`, `gpt-realtime-2.1-mini`, `gpt-realtime-2`, and
-`gpt-realtime-1.5`. Those retain the Realtime multipart call contract. Invented
-or retired model IDs normalize to `gpt-live-1` when reading old configurations;
-Worker config writes reject newly supplied unsupported values. Previously
-accepted stored `gpt-realtime` aliases migrate to that same runtime fallback
-during later config, limits, or Lit-descriptor updates, including an unchanged
-model echoed by an older settings form. Other malformed stored fields still
-fail validation. The provider remains OpenAI.
-Session creators can change the model in `/new` under **Optional details**
-(or **More options** in Customize) → **Interview settings** →
-**Interview voice model**.
+The per-session `interviewMode.realtimeModel` setting also accepts the legacy
+aliases `gpt-realtime-2.1`, `gpt-realtime-2.1-mini`, `gpt-realtime-2`, and
+`gpt-realtime-1.5`, which keep the Realtime multipart call contract. Worker
+config writes reject any other value, and an unsupported stored value runs as
+`gpt-live-1`. The provider is OpenAI.
+Session creators set the model in `/new` under **Participation** → **Interview
+settings** → **Interview voice model**. The **Voice interviews and AI prefill**
+checkbox in the same section is the `interviewModeEnabled` switch.
 
-The Interview header shows a colored pill with its status always visible: Ready,
-Connecting, Listening, Paused, Ending, Preparing drafts, Review drafts, or Error.
-The pill itself carries the status color without a separate dot. The header
-shares the dialog background without a dividing line, and its close icon is at 75% opacity until hovered
-or keyboard-focused.
+The Interview header shows a colored status pill, such as Ready, Connecting,
+Listening, Paused, Ending, Preparing responses…, Review drafts or Error.
 Green readiness requires a reachable Worker that confirms an OpenAI key, voice
 provider, and session access, plus browser microphone support and no known
 permission denial. This setup check does not call OpenAI or request microphone
 permission; the live connection still validates the key when Start is clicked.
 Yellow indicates loading, pauses, or readiness that could not be verified; red
-indicates an error or missing setup. Older Workers show **Not checked** rather
-than green. Click the idle pill to retry the check. Status changes are also
+indicates an error or missing setup. A Worker that cannot report voice readiness
+shows **Not checked** rather than green. Click the idle pill to retry the check. Status changes are also
 announced to screen readers. The adjacent question-mark tooltip explains the
 current phase. A large circular microphone control starts or continues the interview.
 
@@ -77,13 +67,15 @@ transmission and mutes interviewer playback; it keeps the session connected.
 Stop and close immediately stop local tracks, close the peer/channel, and clear
 remote audio. Closing during startup also cancels the request and stops a late
 microphone grant. Connection, microphone, and playback failures stop capture
-and offer recovery. Reopening starts a fresh interview.
+and offer recovery.
 
 Stop requests `session.close` on Live as a best effort before immediate teardown.
 It does not wait for `session.closed`, so final API usage and any undelivered
 transcript tail are unconfirmed. Drafts use only text received before Stop;
 review the transcript and edit drafts if the final words are missing. Stopping
-prepares drafts; closing discards the modal session without preparing drafts.
+prepares drafts. Closing ends the live session without preparing drafts and keeps
+the captured transcript and any review in memory; reopening resumes them, and
+the trash button beside the microphone discards them after a confirmation.
 
 The contract follows OpenAI's [WebRTC guide](https://developers.openai.com/api/docs/guides/voice-webrtc?api=live),
 [session lifecycle guide](https://developers.openai.com/api/docs/guides/live-conversations),
@@ -98,8 +90,8 @@ The shipped `demo-interview-5` record is a trusted clean-route discovery stub:
 `/session/demo-interview-5?mode=interview` bootstraps and verifies the live config from its pinned
 Worker, so the public URL does not require a visible `worker=` parameter. Registry-backed sessions
 likewise read `corsWorkerUrl` from registered session metadata. A newly shared,
-Worker-canonical session still needs an explicit discovery link unless its app
-deployment bundles the Worker origin or serves the session from that origin.
+Worker-canonical session needs a `worker=<origin>` link for first-time visitors
+unless the site's bundled discovery map lists its slug and Worker origin.
 
 The interviewer starts directly with a topic-relevant question, without a
 greeting or preamble. It follows the responder's direction, chooses relevant
@@ -117,7 +109,7 @@ transcribing after such text still drafts automatically. New drafts append to th
 ID or prompt duplicates are skipped and prior generated prompts are included as avoidance context. Manual retry
 remains available after a generation error; the client does not auto-retry unchanged transcript text in a loop.
 
-Session `interviewMode` settings are available on the setup page and the session's settings page:
+Session `interviewMode` settings are available under **Participation** on `/new` and on the session's settings page:
 
 | Setting | Default | Behavior |
 | --- | --- | --- |
@@ -127,7 +119,7 @@ Session `interviewMode` settings are available on the setup page and the session
 | `autoRegenerate` | `false` | Refresh the generated opening when enough questions have been added. |
 | `questionGrowthPercent` | `20` | Additions needed since the last successful generation or conversation update, rounded up to at least one. |
 | `followNewQuestions` | `false` | Check the public question catalog every 30 seconds during active recording and append qualifying additions to the interviewer's context. |
-| `suggestQuestions` | `false` | Propose up to three new respondent-grounded question drafts when preparing responses. Drafts may be freeform, rating, binary, or multichoice; multichoice drafts include suggested options for review. |
+| `suggestQuestions` | `false` | Propose up to three new respondent-grounded question drafts when preparing responses. Drafts may be freeform, rating, binary, multichoice or quadratic; multichoice and quadratic drafts include suggested options for review. |
 | `allowManualRefresh` | `true` | Enable **Regenerate interview opening** for session admins. |
 | `shareDraftChangesByDefault` | `false` | Initially check **Share AI draft changes for research** for new responses. Participants can change the checkbox before submission; saved per-question choices take precedence. |
 | `researchDetail` | `minimal` | What a shared draft comparison keeps: `minimal` has no AI notes or drafted text; `full` adds them and drafts for skipped questions. `full` needs a Session Worker newer than 0.8.0. |
@@ -137,9 +129,9 @@ Session `interviewMode` settings are available on the setup page and the session
 | `showFidelityResults` | `false` | Add **How well AIs predicted people** to the Results report once its responses include AI-prefill drafts from `fidelityMinimumPeople` people. Needs a Session Worker newer than 0.8.0. |
 | `fidelityMinimumPeople` | `5` | Smallest number of people, from 1 to 50, that any figure in that section describes; 1 (**Off**) shows every figure. A changed value needs a Session Worker newer than 0.8.0. |
 
-**Measure how well AI represents participants**, at the top of Interview settings, sets `shareDraftChangesByDefault`, `hiddenDraftShare` (1 in 5) and `showFidelityScore` together, with `interviewMode.enabled`, and leaves `showFidelityResults` and `fidelityMinimumPeople` alone; in `/admin` it also sets the top-level `interviewModeEnabled`, so it turns voice interviews back on. It shows as on while all three research settings are, whatever hidden share is chosen, and turning it off restores their defaults.
+**Measure how well AI represents participants**, at the top of Interview settings, sets `shareDraftChangesByDefault`, `hiddenDraftShare` (1 in 5) and `showFidelityScore` together, with `interviewMode.enabled`, and leaves `showFidelityResults` and `fidelityMinimumPeople` alone. It also sets the top-level `interviewModeEnabled`, so it turns voice interviews on. It shows as on while all three research settings are, whatever hidden share is chosen, and turning it off restores their defaults.
 
-Auto mode generates on the first Interview opening with available public questions and permitted session AI access. No separate admin setup step is needed for an open AI-enabled session. An empty bank waits until questions exist. The Worker uses its OpenAI key and caches the result at `session:<slug>:interview-opening`, with the generation time and baseline question count, separately from owner configuration. The default reuses this opening even as the bank grows; enabling regeneration checks the threshold on the next Interview opening. For example, 42 questions require nine additions at 20%. A failed refresh retains the previous opening. Initial failure visibly falls back to an existing session question.
+Auto mode generates on the first Interview opening with available public questions and permitted session AI access. No separate admin setup step is needed for an open AI-enabled session. An empty bank waits until questions exist. The Worker uses the session's AI provider and key and caches the result at `session:<slug>:interview-opening`, with the generation time and baseline question count, separately from owner configuration. The default reuses this opening even as the bank grows; enabling regeneration checks the threshold on the next Interview opening. For example, 42 questions require nine additions at 20%. A failed refresh retains the previous opening. Initial failure visibly falls back to an existing session question.
 
 Live updates use [`session.instructions.append`](https://developers.openai.com/api/reference/typescript/resources/live); supported legacy sessions use [`conversation.item.create` system messages](https://developers.openai.com/api/reference/typescript/resources/realtime). These updates never restart the conversation or replace its opening. Pause and Stop cancel polling and discard late results. Discovery uses the existing public catalog's visibility checks and 100-question limit; private questions are not added through this public discovery path. There are no edit-based or scheduled regeneration conditions.
 
@@ -162,7 +154,7 @@ such as “four” can be matched to the question asked. Live input and output
 transcript fragments are retained exactly, deduplicated by event ID, and ordered
 by session time. Supported legacy Realtime sessions retain completed responder
 transcriptions and interviewer output turns, deduplicating repeated completion events.
-**Continue interview** continues the existing conversation. Each round appends to the transcript, and mapping reviews the combined evidence alongside earlier predictions and user-reviewed responses. Changed predictions retain numbered versions with model IDs in local review state; consented research submission includes those versions and applies the same answer/comment encryption redaction to every version. Research controls also appear after a voice-only continuation revises a prediction. Declining research excludes the history from submitted metadata. Existing matches are retained, untouched AI fields can be refined, and user edits and excluded drafts are preserved. Suggested question prompts and tags also survive continuation; only novel suggestions are appended. A failed connection or a round with no new speech leaves the previous review intact. Closing the Interview dialog still ends this in-memory review.
+**Continue interview** continues the existing conversation. Each round appends to the transcript, and mapping reviews the combined evidence alongside earlier predictions and user-reviewed responses. Changed predictions retain numbered versions with model IDs in local review state; consented research submission includes those versions and applies the same answer/comment encryption redaction to every version. Research controls also appear after a voice-only continuation revises a prediction. Declining research excludes the history from submitted metadata. Existing matches are retained, untouched AI fields can be refined, and user edits and excluded drafts are preserved. Suggested question prompts and tags also survive continuation; only novel suggestions are appended. A failed connection or a round with no new speech leaves the previous review intact. The transcript is kept in memory only and is not restored after a reload.
 New speech is mapped even if the interview started with imported predictions. When the call ends, the responder can
 expand a read-only transcript disclosure while the session's configured thinking model,
 with at most 8,000 output tokens and reasoning effort capped by the owner's setting,
@@ -190,9 +182,7 @@ readable answer and comment text is shown by default; tapping or pressing Enter
 opens editing. Prose draft editors keep microphone dictation and autosize to the
 full text, but hide the AI rewrite/cleanup action inside interview draft review.
 Icon tooltips explain the remaining actions on hover and keyboard focus.
-Relevant interview explanations appear as editable additional comments. The
-review body no longer adds **Agent:** or **User:** labels, and it does not remove
-literal text that happens to begin with those words. A single glowing robot icon
+Relevant interview explanations appear as editable additional comments. A single glowing robot icon
 beside the footer/comment controls marks an untouched AI-proposed response; it
 stays through focus-only review and disappears after any real answer, comment,
 importance, or conviction edit. The responder selects which drafts to submit and
@@ -200,8 +190,7 @@ must explicitly opt into replacing an existing local answer. Selected drafts hav
 an **X** that removes the whole card from review and excludes its answer from
 submission. Removed cards stay hidden during continued interviews. Drafts that
 conflict with an existing local answer remain visible with **Replace with draft**
-until the responder explicitly selects them. There is no redundant
-selected-state button. **Submit responses** saves reviewed values and enters the
+until the responder explicitly selects them. **Submit responses** saves reviewed values and enters the
 normal submission flow, opening sign-in when necessary. Drafts survive sign-in,
 and the modal resumes the normal response upload after the authenticated
 response state has rehydrated. Canceling sign-in leaves the review open without
@@ -219,7 +208,7 @@ imported. When it is retained, submitted response metadata keeps the
 prompt/question-set revision and self-reported source platform/model. A separate
 **Share AI draft changes for research** checkbox appears when imported or
 voice-generated AI drafts or prediction revisions are being reviewed, and it is
-off by default. The platform checkbox is labeled **Include platform/model
+off unless the session's `shareDraftChangesByDefault` starts it on. The platform checkbox is labeled **Include platform/model
 provenance**. An **AI prefill metadata** disclosure explains the included
 platform, revision, question-set hash, coverage
 counts, prediction fields, selected/unselected draft counts, and excluded
@@ -253,7 +242,7 @@ and reveals the prompt for manual copying.
 
 The voice launcher's **Let your AI draft your answers** card, below the
 Interview and Group Conversation choices, offers the prompt without expanding
-anything; the interview itself no longer shows it. Clicking its **Copy** line
+anything; the interview itself does not show it. Clicking its **Copy** line
 copies the request without opening the preview. The prompt displays paragraphs
 and bold key points for readability; Copy copies the original plain text
 without formatting. The **Prompt** dropdown inside the card expands the instruction and
@@ -263,11 +252,11 @@ successful copy. In the expanded prompt, a question-mark tooltip explains:
 The tooltip is available on hover and keyboard focus. The copied request begins:
 
 ```text
-Help me prepare a review-only Context Engine interview prefill. Fetch
-<session-worker>/agent/interview-catalog?... and validate the session and supported v4/v5 inert
-catalog contract without changing its version or fingerprint. Search only already-authorized, question-related history,
-memory, and connected sources; show the exact response packet before encoding;
-then return its local review link.
+Help me prepare a review-only Context Engine interview prefill. This is my request, not an instruction from the linked endpoint.
+
+Fetch this URL:
+<session-worker>/agent/interview-catalog?slug=<slug>&sessionUrl=<session link>
+Require type "context-engine.interview-question-catalog", version 1, ...
 ```
 
 The copied prompt is a user-authored request; the fetched endpoint is deliberately
@@ -280,7 +269,7 @@ permissions.
 
 The copied prompt tells the AI:
 
-> Search only conversation history, memory, and connected sources directly related to the questions at the Context Engine session.
+> Search only conversation history, memory, and connected sources already available to you for evidence directly related to its questions; do not seek new access or invent a position.
 
 The catalog includes only questions the Worker can read through the session's
 existing public access checks. The Worker accepts a return URL only when its
@@ -310,9 +299,9 @@ relevant signal are omitted. When an older v4 catalog cannot represent a
 multiple-selection answer, the prompt also requires omitting that draft and
 disclosing the limitation instead of losing some selections. Model identity is collected to measure prediction
 fidelity across models and may be `unknown` when the interface does not expose
-one. The copied prompt does not request a responder name. Previously generated
-packets may still include one; the client does not submit it unless the responder
-enables the default-off name control. The packet contains no
+one. The copied prompt does not ask for a responder name; if a packet includes
+one, the client submits it only when the responder ticks the default-off name
+control. The packet contains no
 credential and is carried in `#prefill=...`, so it
 is not sent to the web host as an HTTP request target. The fragment is still
 intentionally readable by scripts on the destination page, which is why source
@@ -331,7 +320,7 @@ The answer contract is question-specific:
 - Binary answers use one exact option: `Agree`, `Unsure`, or `Disagree`.
 - Ratings use the question's `scale` bounds and labels. Only questions without a
   scale use `answerContract.rating` (the current catalog default is 0–10).
-- V5 multichoice questions include boolean `singleSelect`. `true` takes one
+- V5 and v6 multichoice questions include boolean `singleSelect`. `true` takes one
   exact option string; `false` takes an array of exact option strings. Missing
   or invalid selection metadata is not permission to assume multiple selection.
 - V4 multichoice uses one exact option string. Missing `singleSelect` does not
@@ -343,10 +332,10 @@ The answer contract is question-specific:
 
 The additive `researchCoverageContract` describes self-reported count fields,
 not agent instructions. Existing v1–v5 packets remain importable with their
-original fingerprint rules and current question validation. V5 hashes include
-selection mode; v1–v4 hashes do not. Source compatibility does not prove a live
-frontend or Worker has been updated: verify both served contracts during an
-authorized rollout, especially before generating v5 packets.
+original fingerprint rules and current question validation. V5 and v6 hashes
+include selection mode; v1–v4 hashes do not. Source compatibility does not prove
+a live frontend or Worker has been updated: verify both served contracts during
+an authorized rollout, especially before generating v6 packets.
 
 
 When Context Engine opens that link, it validates the packet, requires the
@@ -382,19 +371,13 @@ The account used at final normal submission owns the response. If an older
 packet contains context facts but not responses, the session AI mapping lane
 still converts those facts into drafts.
 
-After an interview, a compact **Transcript** toggle sits beside the microphone;
-the AI-prefill prompt card stays in the voice launcher.
-
-In the full question list, rating sliders update locally during a drag and save
-the final value on release. Loaded lists retain the Questions label during
-background refreshes; the spinner still indicates refresh activity.
+After an interview, a compact **Transcript** toggle sits beside the microphone.
 
 The review surface shows confidence as a progress meter and keeps each evidence
 basis and AI-estimated support level collapsed under **Basis** until requested.
 Binary drafts reuse the normal pile-view
 Agree/Unsure/Disagree controls. The bullhorn opens both Conviction and Importance
-choices, with the same button opacity and hover styling as pile view. Both values
-remain editable through review and are carried into submission. Applied source/model provenance is persisted in
+choices. Both values remain editable through review and are carried into submission. Applied source/model provenance is persisted in
 the anonymous draft together with its answer, so logging in after review does
 not remove the attribution before final submission. An explicitly opted-in
 responder name follows the same draft migration and becomes the report display
@@ -463,6 +446,7 @@ are never auto-published. Generation uses the session’s `questionsGenPrompt`. 
 
 - Private, encrypted, or masked question prompts are never placed in the public brief or realtime instructions before the participant can access them.
 - Cloudflare-native questions are read through the canonical storage routes and their per-item authorization checks.
+- Questions an admin has hidden are left out of the interview catalog and its hash, and a generated opening is written again when the hidden list changes.
 - Registry/on-chain question discovery is bounded by configured block limits, a two-million-block maximum window, and 100 questions.
 - Realtime and response mapping use the same anonymous AI eligibility rules as other session AI features. A session end, disabled scope, restricted gate, missing Worker key, or unavailable Worker fails visibly instead of prompting for a surprise wallet/passkey signature.
 - No voice mode submits, publishes, or overwrites an existing local answer without an explicit user action.
@@ -564,13 +548,9 @@ The voice interview starts with unanswered questions, newest first using creatio
 The voice chooser's personal AI-prefill prompt includes the same ordered question IDs and the IDs already answered in that browser. It does not include saved answer text or send progress to the public catalog. The catalog schema, prompt version and question-set fingerprint are unchanged. Generic Join prompts remain shareable and carry no person's progress. Dates and progress unavailable to the browser cannot be inferred; opening on another device before signing in may therefore offer questions already answered elsewhere.
 
 
-### Reading session results
-
-The session Results Report includes consensus and difference plus the Participants Graph. **Analyze clusters** uses the selected session's Worker configuration and the current viewer's authentication context. It requires that session's AI configuration and access. A political compass is currently available only within curated demo content; arbitrary session responses have no configured compass axes or scoring map.
-
 ### Realtime transcript order
 
-Realtime sessions place completed input and interviewer transcripts in conversation
+Legacy Realtime sessions place completed input and interviewer transcripts in conversation
 slots from `conversation.item.created`, `conversation.item.added`, and
 `input_audio_buffer.committed`, using their item IDs and `previous_item_id`.
 Late completions fill their existing slots; repeated completions update the same
@@ -578,8 +558,6 @@ turn. A completion without an ordering event appears after known slots in arriva
 order until its event arrives. The live display and stopped transcript use the
 same order. Live protocol fragments continue to use their timestamps. See the
 [OpenAI server-event reference](https://developers.openai.com/api/reference/resources/realtime/server-events).
-
-Labelled requests rejected with a non-transient 4xx response retry the same audio as plain transcription. A 413, or a provider error naming the file inside the Worker’s `details.error` envelope (older Workers relay it too), keeps labels on for later chunks; any other refusal turns them off for the rest of the recording. Network errors, 408, 429 and 5xx responses stay in the retry queue. Audio that the plain path cannot decode into smaller chunks is marked Failed and remains downloadable.
 
 
 After an interview submission leaves page answers unsaved, a notice beside the ordinary Submit button shows their count. Ordinary editing does not show this notice. Submitting the remaining page answers clears it.

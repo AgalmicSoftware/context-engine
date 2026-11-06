@@ -110,9 +110,9 @@ and submitted-answer history restore numeric allocations without converting them
 to text; edit provenance tracks which option votes changed. Question-only previews show those options
 and the budget without introducing answer controls inside the navigation card.
 
-Credential-free respondent smoke coverage is part of the repository E2E command
-notes. Live storage, wallet, and gated-decryption suites require the
-operator-local harness described there.
+The credential-free respondent smoke is at the end of this page. Live storage,
+wallet, and gated-decryption suites need an operator-local harness outside the
+public release.
 
 ### Respondent controls
 
@@ -155,7 +155,7 @@ and keeps the pending allocation available for retry.
 The main React client, including its agent pile, uses these steppers. The
 companion browser retains its own slider UI. Both Cloudflare and smart-contract storage modes use the same ordered numeric arrays, definition validation,
 per-question budget, encryption encoding, and signed vote analysis. No Solidity interface change
-is required: question metadata and response payloads carry the new type through existing storage.
+is required: question metadata and response payloads carry the type through existing storage.
 
 The overflow scroll arrow sits below the options viewport in a yellow button, keeping it visible while the options scroll.
 

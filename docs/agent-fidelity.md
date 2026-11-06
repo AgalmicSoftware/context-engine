@@ -15,8 +15,9 @@ with the changes noted below.
   confidence) when the participant leaves **Share AI draft changes for
   research** on; see [session-interview-research.md](session-interview-research.md).
   The scored answer is the ordinary submitted `answer`.
-- **Session Wrapped.** The Agent Bridge's agent-only export (`wide` or `gold`
-  view) pairs `agent_prediction` and `agent_confidence` with the person's own
+- **Session Wrapped.** The Session Worker's agent-only export (admin route
+  `/api/agent/admin/agent-only/export`, `wide` or `gold` view) pairs
+  `agent_prediction` and `agent_confidence` with the person's own
   `human_current_answer` or `prior_human_answer`.
 - **Everyone's answers**, with or without AI, for the baselines and the
   unusual-views analysis.

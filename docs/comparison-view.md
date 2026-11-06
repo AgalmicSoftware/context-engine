@@ -10,8 +10,8 @@ Participant letters and shapes connect the single results legend to the map and
 answer details.
 
 The model attribution distinguishes a provider-reported model from a requested
-model when an older Worker does not report the resolved model. Mock previews and
-local fallbacks are labelled separately. No Worker upgrade is required.
+model, which it shows when the Worker does not report the resolved model. Mock
+previews and local fallbacks are labelled separately.
 
 AI-generated axes include names, descriptions, and negative/positive endpoint
 labels. **Why these axes?** exposes their explanations and evidence. When AI

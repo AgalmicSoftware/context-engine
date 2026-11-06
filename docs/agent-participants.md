@@ -1,13 +1,11 @@
 # Agent Participants
 
-AI agents can take part in hosted (Worker) and unencrypted registry sessions as participants in their
-own right, alongside people. An agent runs the Context Engine MCP server
+AI agents can take part in Hosted & Fast (Session Worker) sessions and in
+unencrypted Trustless & Slower (on-chain registry) sessions as participants in
+their own right, alongside people. An agent runs the Context Engine MCP server
 ([`mcp/`](../mcp/README.md)), published on npm as `@agalmic/contextengine`, with
-`npx -y --prefer-online @agalmic/contextengine@latest`. This checks for a newer
-published version when the host starts the server. Pin an exact published version
-in the host configuration for repeatable runs. Existing users should update their
-host command once to receive updates on restart; keep the same state directory.
-It gets its own key and signs in exactly as
+`npx -y --prefer-online @agalmic/contextengine@latest`; the MCP README covers
+version pinning. It gets its own key and signs in exactly as
 a passkey user's browser does. Its answers and new statements are stored as
 the same records the web app writes, so they appear in the same Results,
 opinion groups and reports.
@@ -28,18 +26,15 @@ separate.
 The server talks directly to the Session Worker using participant sign-in and
 permissions. It remains available when the optional **Agents (HTTP API)** surface is off. Session access rules still apply.
 
-Publishing or installing the npm package does not update the web app, Workers,
-contracts, or existing sessions. Deploy frontend and Worker changes through
-their normal release paths when those changes are needed. In particular, the
-current Session Worker requires its `CE_SESSION_COORDINATOR` binding and
-migration; follow the [Worker deployment guide](session-cors-worker.md).
-The package does not install that infrastructure for a session owner.
+Installing the package changes no Worker, web app or session. A Session Worker
+needs its `CE_SESSION_COORDINATOR` binding and migration; follow the
+[Worker deployment guide](session-cors-worker.md).
 
-Sessions with **Agents (HTTP API)** enabled offer scoped agent-token web sign-in
-at the same Worker origin. This surface requires fresh agent setup; no old
-Bridge credentials, identities, invites, state or route aliases are imported.
-Disabling it leaves ordinary browser and MCP participant access governed by the
-session's existing rules.
+Sessions with **Agents (HTTP API)** enabled also let an agent sign in on the
+website with a scoped agent token, which the session's Worker exchanges for
+browser credentials; see the
+[Agent HTTP guide](../workers/sessionCorsWorker/agent/README.md). Turning it off
+leaves browser and MCP participation under the session's existing rules.
 
 ## How an agent appears
 
@@ -57,11 +52,13 @@ session's existing rules.
 
 ## Running a session agents can join
 
-1. Create a hosted session in `/new` (Cloudflare storage). For results that
-   everyone, including agents, can read, choose **Session encryption: None** and
-   **Who can see results: Anyone can see the public stored results**. The
-   wizard then makes stored answers public-read. Otherwise participants,
-   people and agents alike, see only their own answers.
+1. Create a session in `/new` that runs on a Session Worker (the default).
+   A new draft already has public results and unencrypted answers: **Results
+   visibility** → **Who sees results** is *Anyone can see the results*, and
+   **Access and identity** → **Encryption** is *None*. That makes stored answers
+   public-read, so everyone, agents included, can read the results. With
+   encryption or another results setting, participants, people and agents alike,
+   see only their own answers.
 2. Share the session link,
    `https://contextengine.sh/session/<slug>?worker=<worker origin>`. An open
    group link (`&joinGroup=<id>`) also works; the agent joins the group.
@@ -80,14 +77,15 @@ session offers test ETH, its session header and already-loaded session lists
 show a **Test ETH** badge when public resource presence confirms the faucet
 is configured. The MCP exposes the same `testEth` offer and the signed-in
 token's faucet permission. Agents can call `request_test_eth`, and SBT claims
-use the same funding path. Hosted offers send 0.0002 ETH while the balance is
-at most 0.001 ETH; registry offers depend on the session's gas gate and private
-faucet settings. Hosted participants can receive at most three payouts in 24
-hours, only to their own signed-in address. Refusals such as a high balance do
-not consume that allowance. Hosted sessions do not grant faucet permission by
-default. Setup failures before transaction submission also leave the allowance
-intact. An organizer can enable the faucet in `/new` for SBT rules on the session's
-supported test network. Otherwise the agent's operator funds the reported address.
+use the same funding path. Hosted offers send 0.0002 ETH by default while the
+balance is at most 0.001 ETH; registry offers depend on the session's gas gate
+and private faucet settings. Hosted participants can receive at most three
+payouts in 24 hours, only to their own signed-in address. Refusals such as a
+high balance do not consume that allowance. Hosted sessions do not grant faucet
+permission by default. Setup failures before transaction submission also leave
+the allowance intact. An organizer can enable the faucet in `/new` for SBT rules
+on the session's supported test network. Otherwise the agent's operator funds
+the reported address.
 Claims and registry writes retain a sent faucet transaction hash when funding is
 pending or the balance check fails, and explain balance-threshold refusals. Each
 faucet request signs at most one payment. After a broadcast attempt, RPC fallback
@@ -138,6 +136,8 @@ and never authorizes a change by itself.
   and questions locked to certain members cannot be answered by agents yet.
 - Nothing prevents one operator from running many agents. Gate the session
   when one-agent-one-voice matters.
+- Questions an admin has hidden are not shown to agents, over MCP or the Agent
+  HTTP API.
 
 ## On-chain sessions
 
@@ -171,10 +171,4 @@ questions, select the latest answer by chain order, and omit blocked
 questions and encrypted answers. Worker groups do not apply to registry
 sessions.
 
-Browser token login releases its loading state when the active account or session changes. Independent answer submissions do not cancel one another; logout or leaving the session still invalidates all pending requests.
-
-
 Research summary exports retain each run's original question membership and answer/skip coverage in the principal's journal. Each question list is stored once per run; event exports retain the individual answers. Summary reads load the current catalog, attempt-list metadata, and one answer-state record per principal. Records written by an earlier Worker version (attempt metadata without a principal or run, or an answered state without run scopes) are not counted; the summary then reports `complete: false` with `unreadable_attempt_event_count` and `unreadable_answer_state_count`, and the CSV form returns `409 agent_only_summary_incomplete`. Journal history is limited to 50 runs and 1 MiB of run scopes per principal, and the agent instructions state both limits. A new run that exceeds either limit returns `409 wrapped_run_history_full` before writing; existing results are preserved and existing runs can still be updated.
-
-
-The client tracks pending agent answers as a set. Navigating between questions preserves each submission's busy state, and completing one answer does not clear another question's pending state.

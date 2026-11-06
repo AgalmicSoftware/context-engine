@@ -12,7 +12,7 @@ When a session URL includes a valid `src` query parameter, the browser keeps the
 
 Encrypted answer or comment fields are redacted before this metadata is written, and the full interview transcript or imported conversation history is not attached. Saved AI draft changes appear in exportable data only after a selected draft is submitted and the relevant research controls allow the metadata; in-memory review state that is closed or discarded without submission is not a stored research record.
 
-For a visual overview, see the [interview research diagrams](assets/interview-research/README.md). Click either diagram there to open the full-size PNG.
+For a visual overview, see the [interview research diagrams](assets/interview-research/README.md). Click either diagram there to open the full-size image.
 
 ## Consent Controls
 
@@ -24,12 +24,7 @@ described below in one step; see
 Interview review exposes two independent choices under the initially collapsed
 **AI submission info** dropdown. It also contains the metadata disclosure and,
 when available, the optional responder-name checkbox. Expanding it does not
-change consent. Its muted green toggle shares one bordered, lighter-blue footer
-with **Submit responses**; the options open above that compact footer. The
-**Review proposed responses** heading uses bold weight to separate drafts clearly.
-Freeform answers and comments use a tinted, bordered surface in both reading
-and editing modes. Inactive conviction, comment, and encryption icons share the
-same neutral color and opacity; active controls remain more prominent.
+change consent.
 
 | Control | Initial default | Submitted effect |
 | --- | --- | --- |
@@ -88,7 +83,6 @@ hidden.
   question-mark tooltip explaining why. Your answer controls remain available
   below it. The AI answer, comment, ratings and notes are absent from the
   rendered markup and accessible text; the grey area contains only placeholders.
-  The placeholder and its help text stay readable in light and dark themes.
 - **Reveal.** Agree/disagree and single-choice questions show "Your AI guessed:
   Agree · 70% sure" right after the answer. Ratings, multi-select and
   quadratic questions show it once the person edits another card or submits,
@@ -173,18 +167,18 @@ The reverse can also happen: `changedFields` can list a field while `userEditedF
 The nested `predictionComparison` object repeats the top-level comparison snapshot in a versioned shape for downstream consumers. Treat it as the same observation represented in a second schema shape, not as a second independent measurement.
 
 For external imports, `promptVersion` records the catalog version used to make
-that packet, not the current frontend version. New requests negotiate v4 or v5;
-older v1–v5 imports keep their original fingerprints. V5 binds selection mode to
-the question hash; v4 does not and its generation contract allows only one
-choice string. A missing v4 draft may reflect an unrepresentable multiple-choice
-answer, not lack of evidence. Ratings follow each question's scale; importance
-and conviction are separate 0–100 fields in AI requests and imported packets.
-The client converts them once into 0–10 review and stored response values, and
-converts local predictions back to 0–100 when continuing an AI interview.
-Existing stored responses are not migrated. Instead, readers map a stored
-rating above 10 and at most 100 onto 0–10 by dividing it by 10, then clamp the
-result to 0–10 (`readStoredRating` in `shared/questions/storedRating.mjs`, used
-by the client, the Worker results analysis and the agent fidelity report). A
+that packet, not the current frontend version. New requests accept v4, v5 or v6
+catalogs; older v1–v5 imports keep their original fingerprints. V5 and v6 bind
+selection mode to the question hash; v4 does not and its generation contract
+allows only one choice string. A missing v4 draft may reflect an
+unrepresentable multiple-choice answer, not lack of evidence. Ratings follow
+each question's scale; importance and conviction are separate 0–100 fields in AI
+requests and imported packets. The client converts them once into 0–10 review
+and stored response values, and converts local predictions back to 0–100 when
+continuing an AI interview. Readers map a stored rating above 10 and at most 100
+onto 0–10 by dividing it by 10, then clamp the result to 0–10
+(`readStoredRating` in `shared/questions/storedRating.mjs`, used by the client,
+the Worker results analysis and the agent fidelity report). A
 legacy rating of 10 or less cannot be told apart from a 0–10
 rating, so it reads as given. See [the interview contract](session-listening-mode.md).
 
@@ -224,7 +218,11 @@ In browser CSV exports, `options` cells contain JSON arrays, and array-valued `a
       "answer": { "value": "I worry that evaluations can miss deployment risks." },
       "additional": { "value": "The strongest evidence was about monitoring after launch." },
       "interviewProvenance": {
-        "version": 1,
+        "version": 2,
+        "researchTier": "full",
+        "draftOrigin": "external_prefill",
+        "predictionCondition": "shown",
+        "confidenceMeaning": "keep",
         "source": {
           "platform": "chatgpt",
           "modelId": "gpt-example",
@@ -301,21 +299,21 @@ In browser CSV exports, `options` cells contain JSON arrays, and array-valued `a
             "original": {
               "answer": { "redacted": true, "reason": "encrypted_field" },
               "additionalComments": { "redacted": true, "reason": "encrypted_field" },
-              "importance": null,
-              "conviction": null,
+              "importance": { "redacted": true, "reason": "encrypted_field" },
+              "conviction": { "redacted": true, "reason": "encrypted_field" },
               "confidence": 0.52,
               "evidence": ""
             },
             "reviewed": {
               "answer": { "redacted": true, "reason": "encrypted_field" },
               "additionalComments": { "redacted": true, "reason": "encrypted_field" },
-              "importance": null,
-              "conviction": null
+              "importance": { "redacted": true, "reason": "encrypted_field" },
+              "conviction": { "redacted": true, "reason": "encrypted_field" }
             },
             "submitted": null,
             "changedFields": [],
             "userEditedFields": [],
-            "redactedFields": ["answer", "additionalComments"]
+            "redactedFields": ["answer", "additionalComments", "importance", "conviction"]
           }
         ],
         "appliedAt": 1789776000000
@@ -357,8 +355,7 @@ Session interview research is narrower and persists with ordinary submitted resp
 
 An interview submission sends only the selected questions that actually changed.
 The same set limits preflight checks, encryption, uploaded rows and draft cleanup;
-unselected manual drafts remain pending. The page Submit control shows how many
-answers remain unsubmitted and clears the notice when they are saved. The ordinary Submit button still sends
+unselected manual drafts remain pending. The ordinary Submit button still sends
 every changed answer.
 
 The semantics are also different. Edge2026 distinguishes explicit confirm, edit, stale confirm, skips, agent reruns, and prior human answers with semantic fingerprints. Interview research distinguishes selected versus unselected drafts, final submitted values, fields whose final values changed, and instrumented fields the reviewer touched. It does not record keystrokes, edit timing, time-to-review, cursor history, or a semantic agreement score. A no-change submitted value is documented as unchanged, not as scientific agreement with the AI. When a touched marker is captured for a field that is later restored to the original, that field remains in `userEditedFields` but drops out of `changedFields`.
@@ -396,7 +393,7 @@ Cluster-summary caches include the filtered participant roster in assignment ord
 
 Report refreshes preserve expanded clusters while those cluster identifiers remain present. A two-participant report uses its existing PCA coordinates for the graph because UMAP cannot fit that cohort size.
 
-Before displaying or copying an external-interview kickoff, the browser checks that the session’s public catalog uses a supported v4 or v5 contract. Incompatible catalogs show an update message; unavailable catalogs show a retry message. This check does not change v1–v4 packet import validation or relabel catalog hashes.
+Before displaying or copying an external-interview kickoff, the browser checks that the session’s public catalog uses a supported v4, v5 or v6 contract. Incompatible catalogs show an update message; unavailable catalogs show a retry message. This check does not change packet import validation or relabel catalog hashes.
 
 
 Saved-answer checks are scoped to the signed-in participant and the current

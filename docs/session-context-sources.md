@@ -57,8 +57,8 @@ Sources (`shared/sessionContextSources.mjs`):
 Only session admins add, refresh or remove sources; the Worker refuses anyone
 else.
 
-- **Setup (`/new`):** the Context section takes paragraphs and links as before,
-  plus files. Files stay in the browser until **Create**; then **Add context to
+- **Setup (`/new`):** the Context section takes paragraphs, links and files.
+  Files stay in the browser until **Create**; then **Add context to
   the session** uploads them, has the session's AI read the PDFs marked
   **Analyze with the session's AI**, and, unless unticked, reads each link's
   page for the AI. After a reload only the file names remain, to attach again.
@@ -90,7 +90,7 @@ passwords in the link, no IP addresses, localhost or private names (such as
 `.local` or `.internal`), and every redirect is checked the same way, up to
 five. It reads HTML (as text), JSON, plain text and Markdown, stops after
 10 seconds or 2 MB, and records the fetch date. **Refresh** reads the page again
-and replaces the snapshot, keeping its title and privacy. The same checks now
+and replaces the snapshot, keeping its title and privacy. The same checks
 apply to `fetch_url` and `fetch_image`, which question generation and image
 links use, so an `http://`, IP-address or local link is refused there too.
 

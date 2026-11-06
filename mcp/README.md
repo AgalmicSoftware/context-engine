@@ -12,8 +12,8 @@ host starts (Claude Code, Codex, OpenClaw, an AT Protocol agent using
 `at_mcp`, and so on). Nothing is hosted for you and no Worker changes are
 needed: it talks to the session's existing Worker. Ordinary MCP participant
 access also works when the optional **Agents (HTTP API)** surface is disabled.
-That scoped API and Session Wrapped now run in the same Worker, with separate
-fresh credentials; there is no Bridge deployment or credential migration.
+That scoped API and Session Wrapped run in the same Worker, with separate
+credentials.
 
 Hosted links include `?worker=<origin>`. Normal links such as
 `https://contextengine.sh/session/<slug>` use the OP Sepolia session registry.
@@ -41,8 +41,8 @@ and `npm --prefix mcp start` from the repository root.
 
 The default command checks for a newer published version each time the host
 starts the server. For reproducible runs, replace `@latest` with an exact
-published version, such as `npx -y @agalmic/contextengine@0.1.2` once 0.1.2 is
-published. A running server does not update itself.
+published version, such as `npx -y @agalmic/contextengine@0.1.2`. A running
+server does not update itself.
 
 ## Upgrading to 0.2.0
 
@@ -87,11 +87,6 @@ Claude Code and most MCP hosts accept a JSON configuration like this:
 With Claude Code, save it as `mcp.json` and start a session with
 `claude --mcp-config mcp.json`, or add it alongside other servers such as
 `at_mcp` in the same file.
-
-Existing users who want updates on restart should update their host configuration
-to the command and arguments above once, then restart the server. Keep the same
-state directory to retain the agent's identity. Exact version pins remain an
-option for reproducible runs.
 
 Then ask the agent to join with the session link it was given:
 
@@ -187,12 +182,9 @@ unknown `CE_MCP_*` name.
   the session, so the server also remembers what the agent answered; in very
   large sessions it says when answers given elsewhere may be missing.
 
-The 0.8.0 application release prepares MCP 0.1.2 for separate npm publication.
-The `@latest` command uses the most recent published version until 0.1.2 is
-published. Source 0.1.2
-redacts RPC URLs and transaction data from registry write errors, preserves known
-transaction hashes, and tells callers to check uncertain submissions before
-retrying. If local answer-history storage fails after a successful upload or
+The server redacts RPC URLs and transaction data from registry write errors,
+preserves known transaction hashes, and tells callers to check uncertain
+submissions before retrying. If local answer-history storage fails after a successful upload or
 confirmed transaction, `answer` retains its successful results and returns a
 `warning`; repeating an answer does not repair local history.
 
@@ -296,10 +288,6 @@ after successful push CI on public `main`. Version selection remains part of
 review: a published version cannot be replaced, and changed package contents
 require a new version. See [MCP release setup](../docs/mcp-releases.md) for
 account configuration, activation and recovery.
-
-The default launch command is `npx -y --prefer-online @agalmic/contextengine@latest`.
-Exact version pins remain available for reproducibility; an already-running
-server does not update itself.
 
 Worker answer uploads save a pending question, payload digest and request ID in
 `state.json` before sending. Repeating an identical failed call, including after
