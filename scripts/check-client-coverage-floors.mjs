@@ -6,7 +6,7 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 
 const require = createRequire(import.meta.url);
-const { listTrackedClientCoverageFiles, normalizeRepoPath } = require('./clientCoverageUniverse');
+const { listTrackedClientCoverageFiles, normalizeRepoPath } = require('./client-coverage-universe');
 
 const METRICS = ['statements', 'branches', 'functions', 'lines'];
 const EPSILON = 0.000001;
@@ -158,7 +158,3 @@ if (isDirectRun) {
     process.exit(1);
   }
 }
-
-export const __test__clientCoverageFloors = {
-  DEFAULT_PATHS,
-};

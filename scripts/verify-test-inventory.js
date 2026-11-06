@@ -9,7 +9,7 @@ const {
   ROOT_NODE_TEST_FILES,
   ROOT_PRIVATE_STRIPPED_TEST_FILE_RE,
   ROOT_TEST_FILES,
-} = require('./testInventoryConfig');
+} = require('./node-test-inventory-config');
 
 const ROOT_TEST_FILE_RE = /\.test\.(?:c?js|mjs)$/;
 const WORKER_TEST_FILE_RE = /\.test\.mjs$/;

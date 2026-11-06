@@ -8,7 +8,7 @@ const {
   ROOT_NODE_TEST_FILES,
   ROOT_OPTIONAL_NODE_TEST_FILES,
   ROOT_PRIVATE_STRIPPED_TEST_FILE_RE,
-} = require('./testInventoryConfig');
+} = require('./node-test-inventory-config');
 const {
   createStripMatcher,
   loadStripPatterns,

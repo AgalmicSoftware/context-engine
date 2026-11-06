@@ -7,7 +7,7 @@ const {
   CLIENT_COVERAGE_EXCLUSION_RULES,
   JEST_COLLECT_COVERAGE_FROM,
   classifyClientCoveragePath,
-} = require('./clientCoverageUniverse');
+} = require('./client-coverage-universe');
 
 test('coverage universe includes executable production owners', () => {
   for (const file of [

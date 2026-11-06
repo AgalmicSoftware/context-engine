@@ -11,7 +11,7 @@ const {
   CLIENT_TEST_TYPE_CONTRACT,
   classifyClientTestTypePath,
   listTrackedClientTestTypeFiles,
-} = require('./clientTestTypeUniverse');
+} = require('./client-test-type-universe');
 const trackedContract = require('./client-test-type-contract.json');
 
 test('typed-test classifier includes tests, setup, and named helpers without exclusions', () => {
