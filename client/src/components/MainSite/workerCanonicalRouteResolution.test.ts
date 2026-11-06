@@ -7,6 +7,8 @@ import { sessionRegistryReadsPort } from '../../domains/sessions/registry/sessio
 import type { WorkerCanonicalRouteController } from './workerCanonicalRouteController';
 import { upsertWorkerCanonicalSessionBootstrap } from '../../utilities/session/sessionWorkerConfigCache';
 import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../../utilities/session/sessionModeProfile';
+import { listSessionModeConflicts } from '../../utilities/session/sessionModeRuleMessages';
+import demoSessions from '../../variables/demo/demo_sessions.json';
 
 const controller: WorkerCanonicalRouteController = {
   getActiveVerifiedConfig: () => null,
@@ -161,6 +163,14 @@ describe('workerCanonicalRouteResolution', () => {
       sessionRoute: { sessionSlug: 'eddy26', sessionConfig: null },
     });
     expect(resolveStandardSessionRoute).not.toHaveBeenCalled();
+  });
+
+  it('bundles rxc-ra-test-3 with the public Results it runs, so a fresh browser starts from the right profile', () => {
+    const profile = demoSessions['rxc-ra-test-3'].sessionModeProfile;
+    expect(profile.results.visibility).toBe('public_full_if_storage_public');
+    expect(profile.encryption).toEqual({ mode: 'none' });
+    expect(profile.storage.payloadAccessControl).toEqual({ gate: 'none', encryption: 'none' });
+    expect(listSessionModeConflicts(profile)).toEqual([]);
   });
 
   it.each([

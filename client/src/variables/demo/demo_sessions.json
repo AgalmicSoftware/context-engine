@@ -575,7 +575,7 @@
         "backend": "cloudflare",
         "payloadAccessControl": {
           "gate": "none",
-          "encryption": "worker_envelope"
+          "encryption": "none"
         }
       },
       "identity": {
@@ -590,8 +590,7 @@
         ]
       },
       "encryption": {
-        "mode": "worker_envelope",
-        "keyProvider": "worker_secret"
+        "mode": "none"
       },
       "surfaces": {
         "web": true,
@@ -602,7 +601,7 @@
         "ceCc": false
       },
       "results": {
-        "visibility": "participant_aggregate",
+        "visibility": "public_full_if_storage_public",
         "exposure": {
           "aggregateResultsEnabled": true,
           "anonymizedGroupsEnabled": false,
