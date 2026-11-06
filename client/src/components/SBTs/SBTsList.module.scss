@@ -188,15 +188,6 @@ $filter-pill-active-border: color-mix(in srgb, var(--ce-action-accent) 60%, tran
   font-size: 0.75rem;
 }
 
-@keyframes sessionChipIndeterminateSlide {
-  0% {
-    transform: translateX(-120%);
-  }
-  100% {
-    transform: translateX(320%);
-  }
-}
-
 .sessionUniverseCollapsedSummary {
   display: flex;
   flex-direction: column;
@@ -1407,14 +1398,6 @@ $filter-pill-active-border: color-mix(in srgb, var(--ce-action-accent) 60%, tran
     box-shadow: 0 0 0 1px color-mix(in srgb, var(--ce-status-success) 20%, transparent);
   }
 
-  #loadingIcon {
-    font-size: 2em;
-    margin: 20px auto;
-    display: block;
-    color: var(--ce-color-black);
-    /* or adapt for your theme */
-  }
-
   @media (max-width: 600px) {
     .sessionUniversePanel {
       padding: 10px 12px;
@@ -1440,9 +1423,6 @@ $filter-pill-active-border: color-mix(in srgb, var(--ce-action-accent) 60%, tran
 }
 
 /* --- VIEW MODE SPECIFIC OVERRIDES --- */
-.standardViewContainer {
-  /* For full-page /sbts view.  No changes needed here. */
-}
 
 .modalViewContainer {
   /* The enclosing modal owns the surface; inverse text disappears on light themes. */

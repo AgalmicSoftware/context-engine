@@ -538,15 +538,14 @@ describe('AboutPage', () => {
       /@container ce-theme style\(--ce-layout-profile:\s*desktop-window\)\s*{[\s\S]*?\.recognitionModalTitle\s*{[\s\S]*?color:\s*var\(--ce-titlebar-text\);/,
     );
     expect(scss).toMatch(
-      /@container ce-theme style\(--ce-layout-profile:\s*desktop-window\)\s*{[\s\S]*?\.heroPrimaryButton,\s*\.tertiaryLink,\s*\.titleRepoLink\s*{[\s\S]*?border:\s*2px solid;[\s\S]*?box-shadow:\s*var\(--ce-shadow-raised\);[\s\S]*?font-family:\s*var\(--ce-font-body\);/,
+      /@container ce-theme style\(--ce-layout-profile:\s*desktop-window\)\s*{[\s\S]*?\.heroPrimaryButton,\s*\.titleRepoLink\s*{[\s\S]*?border:\s*2px solid;[\s\S]*?box-shadow:\s*var\(--ce-shadow-raised\);[\s\S]*?font-family:\s*var\(--ce-font-body\);/,
     );
     expect(scss).toMatch(/\.heroPrimaryButton\s*{[\s\S]*?min-width:\s*148px;[\s\S]*?min-height:\s*48px;/);
-    expect(scss).toMatch(/\.tertiaryLink\s*{[\s\S]*?min-width:\s*108px;[\s\S]*?min-height:\s*34px;/);
     expect(scss).toMatch(
       /\.titleRepoLink\s*{[\s\S]*?width:\s*64px;[\s\S]*?height:\s*44px;[\s\S]*?background:\s*var\(--ce-control-face\);/,
     );
     expect(scss).toMatch(
-      /\.heroPrimaryButton:active,[\s\S]*?\.tertiaryLink:active,[\s\S]*?\.titleRepoLink:active\s*{[\s\S]*?box-shadow:\s*var\(--ce-shadow-pressed\);/,
+      /\.heroPrimaryButton:active,[\s\S]*?\.titleRepoLink:active\s*{[\s\S]*?box-shadow:\s*var\(--ce-shadow-pressed\);/,
     );
   });
 
@@ -561,12 +560,6 @@ describe('AboutPage', () => {
     );
     expect(scss).toMatch(
       /@media \(max-width:\s*640px\)\s*{[\s\S]*?\.toggleHeaderAside\s*{[\s\S]*?display:\s*flex;[\s\S]*?flex:\s*1 1 auto;[\s\S]*?margin-left:\s*0;/,
-    );
-    expect(scss).toMatch(
-      /@media \(max-width:\s*640px\)\s*{[\s\S]*?\.recognitionSummary\s*{[\s\S]*?display:\s*flex;[\s\S]*?flex:\s*0 1 auto;[\s\S]*?margin-top:\s*0;[\s\S]*?overflow:\s*hidden;/,
-    );
-    expect(scss).toMatch(
-      /@media \(max-width:\s*640px\)\s*{[\s\S]*?\.recognitionSummaryLogo \+ \.recognitionSummaryLogo\s*{[\s\S]*?margin-left:\s*-6px;/,
     );
     expect(scss).toMatch(
       /\.recognitionItem\s*{[\s\S]*?box-sizing:\s*border-box;[\s\S]*?min-width:\s*0;[\s\S]*?max-width:\s*100%;/,

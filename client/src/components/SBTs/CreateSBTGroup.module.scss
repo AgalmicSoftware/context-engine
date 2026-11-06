@@ -14,24 +14,6 @@ $input-bg: var(--ce-input-bg);
 $input-border: var(--ce-input-border-strong);
 $placeholder-color: var(--ce-panel-text-muted);
 
-#createGroupButton {
-  background: transparent;
-  font-weight: 600;
-  padding: 15px;
-  font-size: 1.5em;
-  color: var(--ce-color-white);
-  text-transform: uppercase;
-  border: var(--ce-color-white) 1px solid;
-  border-radius: var(--ce-radius-10);
-  opacity: 0.5;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  .tooltip {
-    margin-left: 5px;
-  }
-}
-
 .createGroupExpanded {
   justify-self: center !important;
   background: var(--ce-create-group-surface-bg, #{$card-bg});

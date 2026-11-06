@@ -322,8 +322,7 @@ $user-page-background: var(--ce-surface-sunken);
   }
 }
 
-.createSurveyButton,
-#submitNewSurveyButton {
+.createSurveyButton {
   @include finalSubmitCta.final-submit-cta-shell(
     $padding: 16px 24px,
     $min-height: 72px,
@@ -1352,7 +1351,6 @@ $user-page-background: var(--ce-surface-sunken);
 @media (prefers-reduced-motion: reduce) {
   .removeQuestionButton,
   .createSurveyButton,
-  #submitNewSurveyButton,
   .buttonProgressFill,
   .addDocUrlButton,
   .tagInputGroup,
