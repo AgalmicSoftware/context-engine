@@ -643,6 +643,31 @@ describe('onePageSessionGeneratedResultsRuntime', () => {
     expect(JSON.stringify(runtime.snapshotResult)).not.toContain('Secret');
   });
 
+  it('treats a 404 with no job as no report yet, so an admin can still sign in and generate', async () => {
+    const host = buildHost({ ok: false });
+    const readArtifact = jest.fn(async () => ({ ok: false, status: 404, jobState: 'idle', error: 'No report yet.' }));
+
+    await loadGeneratedResultsArtifactForHost(host, {
+      ports: { pollAttempts: 0, pollIntervalMs: 0, readQuestionsCache: () => ({}), readArtifact },
+    });
+
+    expect(host.state.generatedResultsAnalysis?.status).toBe('ready');
+    expect(host.state.generatedResultsAnalysis?.canCheckStatus).toBe(false);
+    expect(host.state.generatedResultsAnalysis?.artifact).toBeNull();
+  });
+
+  it('keeps an admin able to generate when a refresh finds no report', async () => {
+    const host = buildHost(buildStatusBody({ adminAuthorized: true, state: { jobState: 'idle', lastGood: null } }));
+    const readArtifact = jest.fn(async () => ({ ok: false, status: 404, jobState: 'idle', error: 'No report yet.' }));
+
+    await loadGeneratedResultsArtifactForHost(host, {
+      ports: { pollAttempts: 0, pollIntervalMs: 0, readQuestionsCache: () => ({}), readArtifact },
+    });
+
+    expect(host.state.generatedResultsAnalysis?.adminAuthorized).toBe(true);
+    expect(host.state.generatedResultsAnalysis?.canGenerate).toBe(true);
+  });
+
   it('keeps the previous artifact visible while a same-session viewer reload is queued', async () => {
     const host = buildHost(buildStatusBody({ viewerAuthorized: true }));
     const readArtifact = jest.fn(async () => ({

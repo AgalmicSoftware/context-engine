@@ -1005,6 +1005,54 @@ describe('OnePageSession results routing', () => {
     expect(screen.queryByTestId('ai-policy-atlas')).not.toBeInTheDocument();
   });
 
+  it('lets an admin check AI views when the public report route finds no report', async () => {
+    const originalFetch = global.fetch;
+    const fetchMock = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 404,
+      json: async () => ({
+        ok: false,
+        jobState: 'idle',
+        error: 'No generated results analysis artifact is available yet.',
+      }),
+    });
+    global.fetch = fetchMock;
+    try {
+      render(
+        <OnePageSession
+          {...buildProps()}
+          account="0xabc"
+          loginComplete={true}
+          sessionConfig={{
+            ...buildProps().sessionConfig,
+            adminAddress: '0xAbC',
+            corsWorkerUrl: 'https://worker.example',
+            resultsAnalysis: {
+              version: 1,
+              generationMode: 'manual',
+              views: { circles: true, breakdown: true, riskMatrix: true },
+              autoAfter: { threshold: 10, unit: 'distinctParticipants' },
+              inputScope: 'submitted',
+              publication: 'latest_success_visible',
+            },
+          }}
+        />,
+      );
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
+      await waitFor(() =>
+        expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/results-analysis/artifact'))).toBe(true),
+      );
+      // Let the 404 land: the button is enabled before it does.
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      });
+      expect(screen.getByTestId('ce-session-generated-results-check')).toBeEnabled();
+      expect(screen.getByTestId('ce-session-generated-results-check')).toHaveTextContent('Check AI Views');
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
+
   it('offers only the explicit generated AI status check for a plausible admin hint', async () => {
     render(
       <OnePageSession
