@@ -88,6 +88,7 @@ All notable changes to this project will be documented in this file.
 - Answer commitments in encrypted envelopes bind the exact answer: rating hashes keep the value on any scale, and Poseidon commitments include each value's length. Existing envelopes still decrypt; only new commitments change.
 - An earlier session's questions, surveys or answers finishing late no longer change whether the session you switched to counts as loaded, whether they succeed or fail.
 - A question an admin hid, from the admin panel or the settings list, and its answers leave the Results report, Raw Results and every export, including for admins.
+- The hidden and highlighted question lists in session settings apply in the browser for Worker-hosted sessions. They only took effect there for on-chain sessions before.
 - An on-chain survey edit checks the stored copy again just before sending, so an edit saved from another tab or device moments earlier isn't overwritten.
 - Adding a template's questions to a session removes only what was uploaded. A question edited or added while the upload ran stays in the draft.
 - A rating with the same wording but a different scale, step or end labels is no longer reported as already published when another author owns its ID. The upload is refused instead, because the two still share an ID.

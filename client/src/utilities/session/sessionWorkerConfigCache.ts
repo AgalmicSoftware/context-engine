@@ -861,6 +861,21 @@ export const getWorkerCanonicalSessionBootstrap = ({
   return cloneValue(matchingRecords[0].canonicalConfig) as SessionConfigLike;
 };
 
+// The config of a Worker-hosted session known only by its slug. A browser keeps one
+// such record per slug, because a second Worker for a slug must replace the first.
+export const getWorkerCanonicalSessionBootstrapBySlug = (slug?: unknown): SessionConfigLike | null => {
+  const normalizedSlug = canonicalizeSessionSlug(slug);
+  const record = Object.values(readSessionWorkerConfigCache().bySession).find((rawRecord) => {
+    const candidate = rawRecord as WorkerCanonicalBootstrapRecord;
+    return (
+      candidate.authorityMode === 'worker_canonical' &&
+      canonicalizeSessionSlug(candidate.slug) === normalizedSlug &&
+      isObj(candidate.canonicalConfig)
+    );
+  }) as WorkerCanonicalBootstrapRecord | undefined;
+  return (record?.canonicalConfig as SessionConfigLike | undefined) ?? null;
+};
+
 export const markWorkerCanonicalSessionBootstrapVerified = ({
   slug,
   sessionIdHex,

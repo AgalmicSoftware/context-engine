@@ -1,10 +1,6 @@
 import { buildOnePageSessionAggregatorCacheResult } from './onePageSessionAggregatorCacheRuntime';
-
-const mockHiddenQuestionIds = jest.fn((_slug: string) => new Set<string>());
-jest.mock('../SurveyTool/surveyToolScope', () => ({
-  ...(jest.requireActual('../SurveyTool/surveyToolScope') as object),
-  getBlockedQuestionIdsSet: (slug: string) => mockHiddenQuestionIds(slug),
-}));
+import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../../utilities/session/sessionModeProfile';
+import { upsertWorkerCanonicalSessionBootstrap } from '../../utilities/session/sessionWorkerConfigCache';
 
 const answer = (questionID: string) => ({ questionID, type: 'binary', answer: { value: 'Agree', encrypted: false } });
 const node = {
@@ -14,6 +10,20 @@ const node = {
   },
   questionResponses: { q1: { '0xa': answer('q1') }, q2: { '0xa': answer('q2') } },
 };
+const storeSession = (hidden: string[]) =>
+  upsertWorkerCanonicalSessionBootstrap({
+    slug: 'pilot',
+    sessionIdHex: `0x${'1'.repeat(32)}`,
+    workerOrigin: 'https://report-worker.example.test',
+    configRevision: 'r1',
+    config: {
+      slug: 'pilot',
+      sessionId: `0x${'1'.repeat(32)}`,
+      corsWorkerUrl: 'https://report-worker.example.test',
+      BLOCKED_QUESTION_IDS: hidden,
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+    },
+  });
 const build = () =>
   buildOnePageSessionAggregatorCacheResult({
     cacheScope: '11155420',
@@ -27,16 +37,17 @@ const build = () =>
   });
 
 describe('buildOnePageSessionAggregatorCacheResult', () => {
+  beforeEach(() => window.localStorage.clear());
+
   it('leaves a question on the hidden list, and its answers, out of the report', () => {
-    mockHiddenQuestionIds.mockReturnValue(new Set());
+    expect(storeSession([]).status).toBe('cached');
     const shown = build();
     expect(Object.keys(shown.map).sort()).toEqual(['q1', 'q2']);
 
-    mockHiddenQuestionIds.mockReturnValue(new Set(['q2']));
+    storeSession(['q2']);
     const hidden = build();
     expect(Object.keys(hidden.map)).toEqual(['q1']);
-    expect(mockHiddenQuestionIds).toHaveBeenCalledWith('pilot');
-    // The report rebuilds when the list changes, though the cache did not.
+    // A report built before the list changed is not reused.
     expect(hidden.sourceSignature).not.toBe(shown.sourceSignature);
   });
 });
