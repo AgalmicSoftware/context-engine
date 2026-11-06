@@ -66,9 +66,11 @@ const chainLabel = (chainId: number | null | undefined) =>
 
 export const summarizeResults = (draft: SetupSectionProps['draft']): string => {
   const profile = profileOf(draft);
-  const analysis = text(asRecord(draft.resultsAnalysis).mode) || 'manual';
+  const analysis = text(asRecord(draft.resultsAnalysis).generationMode) || 'manual';
   const visibility = profile ? VISIBILITY_LABELS[profile.results.visibility] || profile.results.visibility : '';
-  return [visibility, `analysis ${analysis === 'auto' ? 'automatic' : analysis}`].filter(Boolean).join(' · ');
+  return [visibility, `analysis ${analysis === 'both' ? 'manual and automatic' : analysis}`]
+    .filter(Boolean)
+    .join(' · ');
 };
 
 const MinGroupSizeInput = ({
