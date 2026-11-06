@@ -23,6 +23,7 @@ All notable changes to this project will be documented in this file.
 - Primary buttons keep a readable fill in every theme, hovered, focused or pressed, including See Questions, the Agent token Login and the Worker group and document buttons. They use the theme's action colours instead of a purple that reached only 3.54:1 with their white label.
 - The HTML report's Cancel, Download and Generate buttons and the Admin and Sponsor action buttons are readable in every state and theme.
 - Decrypt on answers and questions takes the surface's own text colour, so it no longer disappears on Classic 95's teal. The locked-question notice is readable in Minimal.
+- Create and Login fit the login dialog at phone width.
 - Group Conversation offers a compact Record button and an icon-only **+** menu for audio uploads, transcript files, and pasted text. Imported audio keeps the recorder’s retry/download recovery. Internal audio parts stay hidden; downloads combine the audio not yet transcribed into one local MP3. Typed draft cards include a top-right remove button and **Submit questions**. Input guidance sits in the title tooltip.
 - Protected question storage shows a sign-in requirement instead of a generic cache error while signed out. Standard session pages omit the interview sharing panel; **Interview & share** remains on admin and publish screens.
 
