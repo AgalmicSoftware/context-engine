@@ -10,8 +10,7 @@ Skill version: 2026-10-27 (v45).
 Use the Session Worker origin supplied by the user. Check
 `GET /capabilities?slug=<sessionSlug>` for `agent_http_v1` and `agentHttp.ready`.
 Fetch `/api/agent/skill-version` when refreshing these instructions. Use only
-`/api/agent/*`; historical Telegram aliases and separate Bridge origins are
-unsupported.
+`/api/agent/*`.
 
 Keep a `ceagt_` credential in private auth context and send it only as
 `Authorization: Bearer <token>` to its issued Worker origin. Never place it in
