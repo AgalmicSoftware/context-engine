@@ -25,6 +25,7 @@ All notable changes to this project will be documented in this file.
 - Decrypt on answers and questions takes the surface's own text colour, so it no longer disappears on Classic 95's teal. The locked-question notice is readable in Minimal.
 - Create and Login fit the login dialog at phone width.
 - A link with both `mode` and `joinGroup` shows the group notice inside the voice dialog, where it can be read and cancelled before signing in.
+- Creating a group says when sign-ins are rate limited instead of showing an internal code.
 - Group Conversation offers a compact Record button and an icon-only **+** menu for audio uploads, transcript files, and pasted text. Imported audio keeps the recorder’s retry/download recovery. Internal audio parts stay hidden; downloads combine the audio not yet transcribed into one local MP3. Typed draft cards include a top-right remove button and **Submit questions**. Input guidance sits in the title tooltip.
 - Protected question storage shows a sign-in requirement instead of a generic cache error while signed out. Standard session pages omit the interview sharing panel; **Interview & share** remains on admin and publish screens.
 

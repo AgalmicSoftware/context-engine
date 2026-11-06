@@ -21,6 +21,7 @@ import {
 import { uploadWorkerGroupImage } from '../../domains/worker/workerGroupImageUpload';
 import { canonicalizeSessionSlug } from '../../utilities/session/canonicalSessionContext.js';
 import { normalizeWorkerCanonicalSessionIdHex } from '../../utilities/session/sessionWorkerDiscovery.js';
+import { getWorkerAuthRemoteErrorMessage } from '../../utilities/worker/workerAuthRemoteError';
 import { normalizeWorkerUrl } from '../../utilities/worker/workerUrl.js';
 import WorkerGroupCreateForm from '../Shared/WorkerGroupCreateForm';
 import WorkerGroupImage from '../Shared/WorkerGroupImage';
@@ -149,6 +150,9 @@ const AdminWorkerGroupsPanel = ({
           workerUrl: normalizedWorkerUrl,
         });
       } catch (error) {
+        // Signing can fail before the Worker's group route runs, as when sign-ins are rate limited.
+        const signingFailure = getWorkerAuthRemoteErrorMessage(error);
+        if (signingFailure) throw new Error(signingFailure);
         throw sanitizeWorkerGroupRequestError(error, 'worker_group_admin_request_failed');
       }
     },
