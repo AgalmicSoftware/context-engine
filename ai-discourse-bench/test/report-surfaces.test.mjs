@@ -2580,3 +2580,11 @@ test('Breakdown exposes question selection independently of trait comparisons', 
   assert.match(html, /<option value="q2">Question q2<\/option>/);
   assert.match(html, /breakdownQuestionSelect.addEventListener\('change'/);
 });
+
+test('Section headers keep the live readable title and subtitle colours', async () => {
+  const source = await fs.readFile(new URL('../src/render-html.mjs', import.meta.url), 'utf8');
+  const colours = (selector) =>
+    [...source.matchAll(new RegExp(`${selector} \\{[^}]*?[^-]color: ([^;]+);`, 'g'))].map(([, colour]) => colour);
+  assert.deepEqual(colours('\\.sectionHeaderTitle'), ['#f4f7ff']);
+  assert.deepEqual(new Set(colours('\\.sectionHeaderSubtitle')), new Set(['rgba(244, 247, 255, 0.65)']));
+});
