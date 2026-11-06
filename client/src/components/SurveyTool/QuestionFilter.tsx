@@ -136,6 +136,7 @@ import {
   normalizeResponseStatusFilterState,
   normalizeSbtFilterLocalState,
 } from './questionFilterHelpers.js';
+import { getBlockedQuestionIdsSet } from './surveyToolScope';
 import {
   areQuestionListsEquivalentById,
   buildAiCandidateSignature,
@@ -1474,7 +1475,8 @@ class QuestionFilter extends React.Component<any, any> {
     if (!net || !net.questions) return sourceQuestions;
     const cachedQuestions = net.questions;
 
-    const allCacheQIDs = Object.keys(cachedQuestions);
+    const hiddenQuestionIds = getBlockedQuestionIdsSet(slug);
+    const allCacheQIDs = Object.keys(cachedQuestions).filter((id) => !hiddenQuestionIds.has(id.toLowerCase()));
     const existingIDs = new Set<string>(sourceQuestionList.map((q) => String(q.id || '').toLowerCase()));
     const merged = [...sourceQuestionList];
 

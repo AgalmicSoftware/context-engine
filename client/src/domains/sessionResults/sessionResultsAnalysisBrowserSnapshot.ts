@@ -64,9 +64,11 @@ const questionIsHydratedForSession = (question: RecordLike, sessionSlug: string)
 };
 
 export const buildResultsAnalysisBrowserSnapshotFromCacheNode = ({
+  hiddenQuestionIds,
   networkNode,
   sessionSlug = '',
 }: {
+  hiddenQuestionIds?: Set<string>;
   networkNode?: unknown;
   sessionSlug?: unknown;
 } = {}): ResultsAnalysisBrowserSnapshotResult => {
@@ -83,6 +85,7 @@ export const buildResultsAnalysisBrowserSnapshotFromCacheNode = ({
   Object.entries(questionsById).forEach(([questionId, questionRaw]) => {
     const question = toRecord(questionRaw);
     if (!questionIsHydratedForSession(question, normalizedSlug)) return;
+    if (hiddenQuestionIds?.has(questionId.toLowerCase())) return;
     // The Worker stores this snapshot for every Results viewer, so encrypted questions and their answers stay out.
     if (hasAuthorEncryptedText(question)) return;
     const type = toText(question.type || question.questionType);
