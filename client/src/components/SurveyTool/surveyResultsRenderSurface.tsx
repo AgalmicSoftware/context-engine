@@ -80,6 +80,7 @@ export type SurveyResultsRenderSurfaceDisplayStyles = {
 
 export type SurveyResultsRenderSurfaceArgs = {
   workerGroupFilterNotice?: React.ReactNode;
+  loginPromptNode?: React.ReactNode;
   applyDecryptedOverrideToResponse: SurveyResultsDisplayPanelsArgs['applyDecryptedOverrideToResponse'];
   closeModal: () => void;
   displayStyles: SurveyResultsRenderSurfaceDisplayStyles;
@@ -141,6 +142,7 @@ export type SurveyResultsRenderSurfaceArgs = {
 
 export const renderSurveyResultsRenderSurface = ({
   workerGroupFilterNotice,
+  loginPromptNode,
   applyDecryptedOverrideToResponse,
   closeModal,
   displayStyles,
@@ -344,6 +346,7 @@ export const renderSurveyResultsRenderSurface = ({
     getFallbackQuestion,
     getLockedResponseKey,
     getResponseCardProps,
+    loginPromptNode,
     lockedResponsesBannerNode: SurveyResultsLockedResponsesBanner({
       decrypting: !!state.lockedResponsesDecrypting,
       isOpen: !!state.lockedResponseDetailsOpen,

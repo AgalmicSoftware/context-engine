@@ -160,6 +160,7 @@ export interface RatingMatrixBuildResult {
 
 export interface PolisReportProps {
   [key: string]: unknown;
+  onRequestLogin?: () => void;
   questionResponses?: PolisQuestionResponses | UnknownRecord | null;
   network?: UnknownRecord | null;
   disclaimersActive?: boolean;

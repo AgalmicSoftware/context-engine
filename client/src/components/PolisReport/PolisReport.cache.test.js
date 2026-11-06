@@ -1030,6 +1030,79 @@ describe('PolisReport cache read options', () => {
     await waitFor(() => expect(onRetryLoad).toHaveBeenCalledTimes(1));
   });
 
+  describe('a failed load when only signed-in people can read answers', () => {
+    const session = (visibility) => ({
+      sessionModeProfile: { authority: { mode: 'worker_canonical' }, results: { visibility } },
+    });
+    const failedLoad = {
+      ...baseReportProps,
+      slug: 'edge',
+      isResponsesCacheReady: false,
+      cacheInitializationError: true,
+      onRetryLoad: () => {},
+    };
+
+    it('asks a signed-out visitor to log in, because a retry cannot help', () => {
+      const onRequestLogin = jest.fn();
+      render(
+        <PolisReport
+          {...failedLoad}
+          sessionConfig={session('participant_aggregate')}
+          onRequestLogin={onRequestLogin}
+        />,
+      );
+
+      expect(screen.getByText('Log in to see your answers.')).toBeInTheDocument();
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('Loading report')).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'Log in' }));
+      expect(onRequestLogin).toHaveBeenCalledTimes(1);
+    });
+
+    it('still asks a wallet that has not finished logging in', () => {
+      render(
+        <PolisReport
+          {...failedLoad}
+          account="0xabc"
+          loginComplete={false}
+          sessionConfig={session('participant_aggregate')}
+        />,
+      );
+
+      expect(screen.getByText('Log in to see your answers.')).toBeInTheDocument();
+    });
+
+    it('keeps the retry for someone logged in, whose load really failed', () => {
+      render(
+        <PolisReport {...failedLoad} account="0xabc" loginComplete sessionConfig={session('participant_aggregate')} />,
+      );
+
+      expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+      expect(screen.queryByText('Log in to see your answers.')).not.toBeInTheDocument();
+    });
+
+    it('keeps the retry on a session with public Results', () => {
+      render(<PolisReport {...failedLoad} sessionConfig={session('public_full_if_storage_public')} />);
+
+      expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+      expect(screen.queryByText('Log in to see your answers.')).not.toBeInTheDocument();
+    });
+
+    it('keeps showing the report when one can be rendered', () => {
+      render(
+        <PolisReport
+          {...failedLoad}
+          isResponsesCacheReady
+          cacheInitializationError={false}
+          sessionConfig={session('participant_aggregate')}
+        />,
+      );
+
+      expect(screen.queryByText('Log in to see your answers.')).not.toBeInTheDocument();
+    });
+  });
+
   it('shows block-count loading progress under the Polis spinner when scoped question scan progress is available', () => {
     render(
       <PolisReport
