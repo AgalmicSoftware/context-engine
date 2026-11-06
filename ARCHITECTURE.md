@@ -8,23 +8,23 @@
 
 App hosting, public/private session access, and session infrastructure are
 separate choices. A publicly hosted web app can open either a private
-worker-canonical session or a public decentralized session. The `/new` chooser
-opens with no preset automatically selected; Hosted & Fast is the implemented
-default/recommended path once chosen.
+worker-canonical session or a public decentralized session. `/new` is one page
+that starts on Hosted & Fast; `Runs on` under Hosting and storage switches to
+Trustless & Slower.
 
 ### Implemented Profiles
 
 ```mermaid
 flowchart LR
-  Creator["Session creator"] --> Choice{"/new profile choice"}
-  Choice --> Hosted["Centralized (Cloudflare)<br/>implemented default path"]
-  Choice --> Trustless["Decentralized (Arweave + EVM)<br/>implemented opt-in"]
+  Creator["Session creator"] --> Choice{"/new: Runs on"}
+  Choice --> Hosted["Session Worker: Hosted & Fast<br/>where /new starts"]
+  Choice --> Trustless["On-chain registry: Trustless & Slower<br/>implemented opt-in"]
 
-  Hosted --> NativeDeploy["Native Deploy to Cloudflare<br/>dashboard handoff; no API token"]
-  NativeDeploy --> Worker["Creator-owned per-session Worker<br/>worker_canonical authority"]
-  Hosted -.-> LegacyHelper["Legacy deploy-helper<br/>request-only Cloudflare token"]
-  LegacyHelper -.-> Worker
-  Worker --> Cloudflare["Worker KV / Cloudflare payload storage<br/>worker_envelope by default"]
+  Hosted --> DeployHelper["Deploy helper<br/>request-only Cloudflare API token"]
+  Hosted --> NativeDeploy["Native Deploy to Cloudflare<br/>token-free dashboard handoff"]
+  DeployHelper --> Worker["Creator-owned per-session Worker<br/>worker_canonical authority"]
+  NativeDeploy --> Worker
+  Worker --> Cloudflare["Worker KV / Cloudflare payload storage<br/>public results by default; worker_envelope optional"]
   Worker --> AI["Selected AI provider"]
   Passkey["Passkey-derived EOA<br/>signing/admin identity"] --> Worker
 
@@ -34,14 +34,13 @@ flowchart LR
   Trustless -.->|Lit encryption selected| Lit["Lit Protocol"]
 ```
 
-Hosted & Fast needs a creator Cloudflare account/dashboard login and one
-AI-provider key. Its native handoff does not ask for a Cloudflare API token; a
-request-only token belongs only to the explicit legacy
-deploy-helper fallback. The passkey-derived EOA signs canonical Worker config
-without an EVM transaction, so public EVM, registry, RPC, gas, Arweave, and Lit
-are not default dependencies. Trustless & Slower preserves the public EVM,
-Arweave, wallet, and gas path as an opt-in profile. Lit credentials are required
-only when Lit encryption is selected.
+Hosted & Fast needs a Cloudflare account, one AI-provider key, and either a
+Cloudflare API token, sent once through the deploy helper and never saved, or
+the token-free dashboard handoff. The passkey-derived EOA signs canonical Worker
+config without an EVM transaction, so public EVM, registry, RPC, gas, Arweave,
+and Lit are not default dependencies. Trustless & Slower adds public EVM
+contracts, Arweave, wallet transactions, and gas, and still needs a Session
+Worker. Lit credentials are required only when Lit encryption is selected.
 
 Participants use session identity and authorization. They never need the
 creator's Cloudflare token, AI key, Arweave key, or other deployer API keys.
@@ -73,7 +72,7 @@ architecture.
 | **Client** | React SPA: survey authoring, response collection, SBT management, encryption gates, admin, session wizard | Shared across implemented profiles | `client/src/` |
 | **Session Worker** | Auth, canonical config, AI proxy, transcription, storage routes, controlled URL/image fetch, and profile-enabled chain/Arweave helpers | Canonical authority for Hosted & Fast; service boundary for decentralized/custom profiles | `workers/sessionCorsWorker/` |
 | **Session Agent HTTP** | Scoped Agent HTTP, submission queue, Session Wrapped, and atomically coordinated one-time invite exchange | Integrated domain modules using canonical Session Worker authority | `workers/sessionCorsWorker/agent/` |
-| **Cloudflare storage** | Worker KV config, secrets, encrypted payload envelopes/indexes, and optional advanced R2 blobs | Hosted & Fast default | Worker bindings (external) |
+| **Cloudflare storage** | Worker KV config, secrets, payloads and indexes (Worker-encrypted when selected), and optional advanced R2 blobs | Hosted & Fast default | Worker bindings (external) |
 | **Contracts** | Session registry, surveys, SBTs, gates, and factory on supported EVM chains | Trustless & Slower and explicit chain-backed custom profiles | `contracts/` |
 | **Arweave** | Immutable metadata, survey/question payloads, SBT tokenURI, and document-library files | Trustless & Slower and explicit Arweave-backed custom profiles | External |
 | **Lit Protocol (Chipotle)** | Wraps and releases content keys behind SBT gates; the browser encrypts content locally and the session Worker calls a registered Lit Action | Optional when Lit encryption is selected | Lit Chipotle API via the Session Worker |
@@ -86,8 +85,8 @@ architecture.
 Hosted & Fast:
 
 ```text
-Wizard UI  ──▸  Open the immutable native Deploy to Cloudflare template
-           ──▸  Creator installs the per-session Worker, KV, Durable Object, and runtime secrets in the Cloudflare dashboard
+Wizard UI  ──▸  Sign in with a passkey to confirm Create
+           ──▸  Deploy the per-session Worker, KV, Durable Object, and runtime secrets: through the deploy helper with a request-only Cloudflare API token, or from the immutable native Deploy to Cloudflare template in the dashboard
            ──▸  Persist and read back admin-signed canonical Worker config
            ──▸  Return reload-safe session/admin URLs with the public Worker URL
 
@@ -104,7 +103,7 @@ Wizard UI  ──▸  Configure profile-enabled session Worker services
            ──▸  SessionRegistry.setResourceGates(slug, gates[])
 ```
 
-Sponsored bootstrap deploys now target the sponsoring `sessionCorsWorker` first:
+Sponsored bootstrap deploys target the sponsoring `sessionCorsWorker` first:
 
 ```
 Browser  ──▸  source sessionCorsWorker /sponsored/redeem-deploy
@@ -116,12 +115,11 @@ Browser  ──▸  source sessionCorsWorker /sponsored/redeem-deploy
 
 ```text
 User submits  ──▸  Store the payload through the profile-selected backend
-               ├─ Hosted & Fast: Cloudflare storage, worker-envelope by default
+               ├─ Hosted & Fast: Cloudflare storage, worker-envelope when selected
                └─ Trustless & Slower: Arweave, with Lit only when selected
 
-Chain-backed survey flows may additionally anchor selected response hashes
-through Surveys.submitResponses(...). That contract write is profile/surface
-specific rather than a universal storage dependency.
+Chain-backed sessions then anchor the response hashes with a wallet transaction
+to Surveys.submitResponses(...). Worker-canonical sessions send no transaction.
 ```
 
 ### 3. SBT Mint (chain-backed profiles)
@@ -145,9 +143,9 @@ SBT balances before issuing scoped access.
 ### 5. Encryption / Gated Decrypt
 
 ```text
-Hosted & Fast default:
+Worker encryption (optional in Hosted & Fast):
   Worker encrypts payloads at rest with worker-envelope keys
-  Worker roles/conditions gate future key release
+  Worker roles/conditions gate each key release
 
 Lit opt-in:
   Client encrypts content locally with a fresh content key
@@ -225,7 +223,7 @@ unchanged.
 | Worker | Purpose |
 |--------|---------|
 | `sessionCorsWorker/worker.js` | Canonical config/auth/storage for Hosted & Fast, plus profile-enabled AI, Arweave, fetch, transcription, and faucet routes |
-| `deploy-helper/worker.js` | Explicit legacy/sponsored Worker-deployment fallback including optional Agent HTTP setup; not the native `/new` default |
+| `deploy-helper/worker.js` | Worker deployment for the `/new` API-token path and sponsored fallback, including optional Agent HTTP setup |
 | `sessionCorsWorker/agent/` | Scoped Agent HTTP, credential exchange, optional registry queue and Session Wrapped under canonical Session Worker authority |
 
 ### Verification
@@ -373,7 +371,7 @@ Hosted & Fast (implemented default)
 Per-session Worker
   session:{slug}:config       canonical identity/content and policy
   session:{slug}:secrets      AI and profile-enabled runtime secrets
-  Cloudflare storage routes   encrypted payload envelopes and indexes in KV
+  Cloudflare storage routes   payloads (Worker-encrypted when selected) and indexes in KV
                               optional existing R2 for advanced blob storage
   passkey-derived EOA         signing/admin identity; no required chain tx
 

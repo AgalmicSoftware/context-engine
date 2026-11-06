@@ -4,21 +4,6 @@ Start here when reviewing the repo for runtime boundaries, deployment surfaces,
 and verification gates. This document links the source-of-truth docs instead of
 duplicating their full detail.
 
-Interactive disclosure headers, removable question-filter chips, sync refresh,
-user statistics, and the Debate Map suggestion close control use native buttons.
-Disclosures expose their expanded state and report sections retain their heading
-semantics. The Debate Map remains available at `/atlas` and in demo session
-results; its keyboard interactions are verified independently.
-
-Standalone `/debate`, `/beta`, `/contributors`, `/matrix`, and `/demos` pages
-are removed and use the normal unknown-route view. Simulated profiles at
-`/su/...`, demo sessions and their `/session/demo/...` views remain available.
-Full question views preserve the session shell’s pinned canonical slug through
-question loading, filtering, and response editing. Worker-backed sessions use
-the Worker cache scope without requiring an EVM network, including when a
-route such as `/session/demo/questions` is an alias for the canonical session.
-The home Tools surface and embedded session views retain the shared risk matrix.
-
 ## Client Boundary Model
 
 The client follows the boundary accepted in
@@ -42,13 +27,13 @@ flowchart TD
   Domains --> Utilities["Low-level utilities<br/>client/src/utilities/**"]
   Browser --> Wizard["/new and /session/new<br/>SessionWizard"]
   Wizard --> ProfileChoice{"Session infrastructure profile"}
-  ProfileChoice --> Hosted["Hosted & Fast<br/>implemented default path"]
+  ProfileChoice --> Hosted["Hosted & Fast<br/>where /new starts"]
   ProfileChoice --> Trustless["Trustless & Slower<br/>implemented opt-in"]
   ProfileChoice -.-> Company["Company-Operated<br/>planned"]
-  Hosted --> NativeTemplate["native Deploy to Cloudflare template<br/>dashboard handoff; no API token"]
-  NativeTemplate --> HostedWorker["per-session sessionCorsWorker<br/>canonical config, auth, AI, storage"]
-  Hosted -.-> DeployHelper["legacy/sponsored deploy-helper fallback<br/>workers/deploy-helper"]
-  DeployHelper -.-> HostedWorker
+  Hosted --> DeployHelper["deploy helper with a request-only API token<br/>workers/deploy-helper"]
+  DeployHelper --> HostedWorker["per-session sessionCorsWorker<br/>canonical config, auth, AI, storage"]
+  Hosted --> NativeTemplate["native Deploy to Cloudflare template<br/>token-free dashboard handoff"]
+  NativeTemplate --> HostedWorker
   HostedWorker --> CloudflareStorage["Cloudflare KV payload/index storage<br/>optional existing R2"]
   AgentClient["Agent/tool client or agent token browser login"] --> SessionAgent["Session Worker agent modules<br/>scoped HTTP and Session Wrapped"]
   SessionAgent --> HostedWorker
@@ -75,10 +60,9 @@ Surveys contract; the EVM contracts remain canonical for that chain-backed
 write.
 
 Static app hosting, public/private session access, and the session
-infrastructure profile are independent choices. The `/new` screen does not
-automatically preselect a hosting option; `Centralized (Cloudflare)` is the implemented
-default/recommended path once chosen, and
-`Decentralized (Arweave + EVM)` is the implemented opt-in path. The
+infrastructure profile are independent choices. `/new` is one page that starts
+on Hosted & Fast, shown as `Session Worker` under `Runs on`; `On-chain registry`
+selects the opt-in Trustless & Slower path. The
 Company-Operated branch is a planned adapter architecture, not a shipped
 corporate package. It can target entirely off-chain infrastructure; a private
 EVM would be only a possible future adapter, never a requirement.
@@ -151,8 +135,7 @@ session-registry cache-update event to the
 marked stale so they refetch on the next mount, without adding a duplicate
 subscription for each mounted consumer.
 Successful cache loads and upserts already emit that event. Fetch/upsert
-orchestration remains outside the read hook. Its characterized mount reads
-decreased from three to two.
+orchestration remains outside the read hook.
 
 The event-driven invalidation recipe is:
 
@@ -204,18 +187,17 @@ The worker surface is documented in `docs/session-cors-worker.md`.
 - `workers/sessionCorsWorker/` is the session worker. It handles AI proxying,
   transcription, Arweave uploads, storage routes, fetch helpers, auth, gates,
   faucet support, and sponsored/deploy-helper paths.
-- In the default `Centralized (Cloudflare)` profile, a creator-owned
-  per-session instance is the canonical config, auth, and payload-storage
-  authority. Its passkey-derived admin EOA signs config without submitting an
-  EVM transaction.
-- `workers/deploy-helper/` is the explicit legacy/sponsored and self-hosted
-  fallback, including optional Agent HTTP setup. It calls Cloudflare APIs to create
-  the target Worker and bindings; the default `/new` path instead opens the
-  tracked native Cloudflare dashboard template without requesting an API token.
-- `workers/sessionCorsWorker/agent/` is an optional, separately deployed sidecar. It
-  owns the scoped `/api/agent/*` contract, submission queue, and Session Wrapped,
-  while delegating session membership, gates, and canonical storage to
-  the configured Session Worker when those authorities are required.
+- In the default Hosted & Fast profile, a creator-owned per-session instance is
+  the canonical config, auth, and payload-storage authority. Its passkey-derived
+  admin EOA signs config without submitting an EVM transaction.
+- `workers/deploy-helper/` serves the `/new` API-token path, sponsored fallback,
+  and self-hosted deployments, including optional Agent HTTP setup. It calls
+  Cloudflare APIs to create the target Worker and bindings. The token-free `/new`
+  path instead opens the tracked native Cloudflare dashboard template.
+- `workers/sessionCorsWorker/agent/` is an optional part of the Session Worker,
+  enabled by session policy. It owns the scoped `/api/agent/*` contract, submission
+  queue, and Session Wrapped, while the Session Worker keeps session membership,
+  gates, and canonical storage.
 - `workers/shared/` contains modules reused by worker packages; it is not an
   independently deployed Worker.
 - `scripts/worker-bundle.mjs` generates ignored local/manual bundles in
@@ -235,9 +217,9 @@ Auth decisions:
 Storage authority follows the selected profile:
 
 - Hosted & Fast uses the session worker's Cloudflare bindings for canonical
-  config, encrypted payload envelopes, and indexes. KV-only payload storage is
-  the default-compatible path; binding an existing R2 bucket is an explicit
-  advanced option.
+  config, payloads (Worker-encrypted when selected), and indexes. KV-only
+  payload storage is the default-compatible path; binding an existing R2 bucket
+  is an explicit advanced option.
 - Trustless & Slower keeps Arweave as its durable metadata and payload store,
   with public EVM contracts anchoring the selected registry and gate state.
 - Company-Operated targets organization-selected storage adapters and does not
