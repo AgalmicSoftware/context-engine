@@ -233,6 +233,61 @@ describe('bundled app-theme contrast', () => {
     },
   );
 
+  // The results dialog's locked-answers controls. On Classic 95's navy the accent gave Decrypt 3.35:1 and document
+  // text gave the toggle 1.31:1.
+  const resultsCss = compileModule('components/SurveyTool/SurveyResults.module.scss');
+  const resultsRule = (selector: string) => moduleRule(resultsCss, selector);
+
+  test.each(registry.themes.map(({ id }) => id))('%s keeps the locked-answers controls readable', (themeId) => {
+    const values = themeValues(css, themeId);
+    const paint = painter(values);
+    const dialog = composite(parseColor(values['overlay-surface']), parseColor(values['overlay-base']));
+    const onBanner = composite(paint(resultsRule('.lockedBanner').background), dialog);
+    const onTitleBar = composite(parseColor(values['titlebar-bg']), parseColor(values['overlay-base']));
+    const ratio = (selector: string, under: Rgba) => {
+      const { background, color } = resultsRule(selector);
+      // A state without its own colour takes a global one, such as `a:hover`.
+      if (!color) return [selector, 0] as const;
+      const fill = composite(paint(background), under);
+      return [selector, Number(contrastRatio(composite(paint(color), fill), fill).toFixed(2))] as const;
+    };
+
+    const ratios = [
+      ratio('.lockedBanner', dialog),
+      ...[
+        '.lockedBannerDecryptButton',
+        '.lockedBannerDecryptButton:hover:not(:disabled)',
+        '.lockedBannerDecryptButton:focus:not(:disabled)',
+        '.lockedBannerGateLink',
+        '.lockedBannerGateLink:hover',
+        '.lockedBannerGateLink:focus',
+        '.exportToggleButton',
+        // Log in sits on the banner, and only this selector outranks the global `.btn:active:hover`.
+        'button.exportToggleButton:is(:hover, :focus, :active):not(:disabled)',
+      ].map((selector) => ratio(selector, onBanner)),
+      ...[
+        '.lockedSummaryToggle',
+        '.lockedSummaryToggle:hover',
+        '.lockedSummaryToggle:focus',
+        '.lockedSummaryToggleOpen',
+      ].map((selector) => ratio(selector, onTitleBar)),
+    ];
+    expect(ratios.filter(([, value]) => value < 4.5)).toEqual([]);
+
+    // Decrypting dims the whole button, and its label stays readable at that opacity.
+    const [red, green, blue, alpha] = paint(resultsRule('.lockedBannerDecryptButton').color);
+    const dimmed = alpha * Number(resultsRule('.lockedBannerDecryptButton:disabled').opacity);
+    expect(contrastRatio(composite([red, green, blue, dimmed], onBanner), onBanner)).toBeGreaterThanOrEqual(4.5);
+
+    // The theme's own focus ring is black on Classic 95's navy.
+    expect(
+      contrastRatio(paint(resultsRule('.lockedBanner :is(a, button):focus-visible')['outline-color']), onBanner),
+    ).toBeGreaterThanOrEqual(3);
+    expect(
+      contrastRatio(paint(resultsRule('.lockedSummaryToggle:focus-visible')['outline-color']), onTitleBar),
+    ).toBeGreaterThanOrEqual(3);
+  });
+
   test.each(registry.themes.map(({ id }) => id))('%s keeps small binary answer labels readable', (themeId) => {
     const values = themeValues(css, themeId);
     for (const stance of ['agree', 'disagree']) {

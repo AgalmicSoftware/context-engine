@@ -19,6 +19,7 @@ All notable changes to this project will be documented in this file.
 - Match the Minimal mobile Login button height to the visible C logo artwork, excluding the SVG's transparent padding.
 - Correct light-theme contrast in raw question results, expanded answers, sorting/export controls, bookmarks, sync indicators and Worker group notices, including Classic 95 counters, links and binary-answer labels. Keep the results title readable at narrow widths. Browser coverage now checks these surfaces in all three themes.
 - The login dialog's Create and Login buttons keep their fill when hovered, focused or pressed, so their labels stay readable in every theme; in Minimal, Create's label vanished on hover.
+- The locked-answers controls in Raw Results are readable in every theme, hovered, focused or pressed: Decrypt, Log in, the required-group links, the toggle that opens them, and their focus rings.
 - Group Conversation offers a compact Record button and an icon-only **+** menu for audio uploads, transcript files, and pasted text. Imported audio keeps the recorder’s retry/download recovery. Internal audio parts stay hidden; downloads combine the audio not yet transcribed into one local MP3. Typed draft cards include a top-right remove button and **Submit questions**. Input guidance sits in the title tooltip.
 - Protected question storage shows a sign-in requirement instead of a generic cache error while signed out. Standard session pages omit the interview sharing panel; **Interview & share** remains on admin and publish screens.
 
