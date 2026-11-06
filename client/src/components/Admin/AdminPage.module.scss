@@ -123,13 +123,6 @@ $card-shadow: var(--ce-card-shadow);
   gap: 16px;
 }
 
-.heroKicker {
-  font-size: 0.72rem;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: $admin-muted;
-}
-
 .heroTopRow {
   display: flex;
   align-items: flex-start;
@@ -657,16 +650,6 @@ $card-shadow: var(--ce-card-shadow);
   flex-wrap: wrap;
 }
 
-.workerUrlRow {
-  display: flex;
-  align-items: stretch;
-  gap: 8px;
-}
-
-.workerUrlRow :global(.form-control) {
-  flex: 1 1 auto;
-}
-
 .actionButton:global(.btn) {
   align-self: flex-start;
   min-height: 40px;
@@ -833,7 +816,6 @@ $card-shadow: var(--ce-card-shadow);
 }
 
 .metadataItem,
-.resourceCard,
 .statusItem {
   border-radius: var(--ce-radius-14);
   border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
@@ -986,13 +968,6 @@ $card-shadow: var(--ce-card-shadow);
 .statusItemClickable:focus-visible {
   border-color: color-mix(in srgb, var(--ce-action-accent) 34%, transparent);
   transform: translateY(-1px);
-}
-
-.checklist {
-  margin: 0;
-  padding-left: 20px;
-  line-height: 1.6;
-  font-size: 0.92rem;
 }
 
 .gateLabelRow {
@@ -1234,14 +1209,6 @@ $card-shadow: var(--ce-card-shadow);
   gap: 6px;
 }
 
-.gateRow,
-.linkRow,
-.fileActions,
-.previewImage,
-.sessionWorkerRow {
-  /* legacy admin page hooks retained for compatibility */
-}
-
 @media (max-width: 1100px) {
   .hero {
     grid-template-columns: 1fr;
@@ -1254,7 +1221,6 @@ $card-shadow: var(--ce-card-shadow);
   .metadataPanel,
   .gatePanel,
   .secretsPanel,
-  .resourcesPanel,
   .testsPanel {
     grid-column: auto;
   }
@@ -1289,10 +1255,6 @@ $card-shadow: var(--ce-card-shadow);
 
   .heroTitleBlock h1 {
     font-size: 1.8rem;
-  }
-
-  .workerUrlRow {
-    flex-wrap: wrap;
   }
 
   .heroCardInputShell {

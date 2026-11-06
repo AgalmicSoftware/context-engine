@@ -30,8 +30,7 @@ $user-page-background: var(--ce-surface-sunken);
   }
 }
 
-.surveyTitleInput,
-#newSurveyTitleInput {
+.surveyTitleInput {
   font-size: 2em;
   font-weight: 600;
   background-color: transparent;
@@ -147,8 +146,7 @@ $user-page-background: var(--ce-surface-sunken);
   }
 }
 
-.questionPromptInput,
-#newQuestionInput {
+.questionPromptInput {
   font-size: 1.25em;
   margin-bottom: 10px;
   background: $input-bg;
@@ -576,12 +574,6 @@ $user-page-background: var(--ce-surface-sunken);
   }
 }
 
-#miniCreateSurveyLabel {
-  font-weight: 600;
-  font-size: 1.5em;
-  color: var(--ce-color-white) !important;
-}
-
 .errorButton {
   background-color: var(--ce-status-danger) !important;
   border-color: var(--ce-status-danger) !important;
@@ -639,13 +631,6 @@ $user-page-background: var(--ce-surface-sunken);
   color: var(--ce-status-danger-text);
   font-size: 0.88rem;
   font-weight: 600;
-}
-
-#copySurveyIdButton {
-  margin-left: 10px;
-  background-color: transparent;
-  border: none;
-  cursor: pointer;
 }
 
 .miniaturized {
@@ -1646,9 +1631,7 @@ $user-page-background: var(--ce-surface-sunken);
     }
 
     .surveyTitleInput::placeholder,
-    #newSurveyTitleInput::placeholder,
     .questionPromptInput::placeholder,
-    #newQuestionInput::placeholder,
     .docUrlInput::placeholder,
     .optionInput::placeholder,
     .tagInputField::placeholder {
@@ -1677,8 +1660,7 @@ $user-page-background: var(--ce-surface-sunken);
     }
 
     .actionBtn,
-    .actionLink,
-    #miniCreateSurveyLabel {
+    .actionLink {
       color: var(--ce-control-text) !important;
     }
 

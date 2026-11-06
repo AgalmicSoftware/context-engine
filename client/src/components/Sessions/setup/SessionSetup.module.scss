@@ -151,19 +151,6 @@
   }
 }
 
-.choiceRow {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 16px;
-
-  label {
-    margin: 0;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-  }
-}
-
 .inlineRow {
   display: flex;
   flex-wrap: wrap;

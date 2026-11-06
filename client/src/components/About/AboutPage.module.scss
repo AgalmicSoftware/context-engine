@@ -1,7 +1,6 @@
 $page-bg: var(--ce-surface-sunken);
 $page-bg-deep: var(--ce-overlay-base);
 $text-color: var(--ce-panel-text);
-$muted-text: var(--ce-panel-text-muted);
 $accent: var(--ce-action-accent);
 $accent-text: var(--ce-action-accent-text);
 $card-bg: var(--ce-card-bg);
@@ -54,8 +53,6 @@ $modal-cta-text: var(--ce-action-submit-text);
 }
 
 .hero,
-.cardSection,
-.mediaCard,
 .useCaseDetail {
   border: 1px solid $card-border;
   border-radius: var(--ce-radius-20);
@@ -88,15 +85,6 @@ $modal-cta-text: var(--ce-action-submit-text);
   display: grid;
   gap: 10px;
   justify-items: stretch;
-}
-
-.eyebrow,
-.mediaLabel {
-  margin: 0;
-  color: $muted-text;
-  font-size: 0.76rem;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
 }
 
 .srOnly {
@@ -223,7 +211,6 @@ $modal-cta-text: var(--ce-action-submit-text);
 }
 
 .heroActions,
-.heroLinks,
 .recognitionStrip {
   display: flex;
   flex-wrap: wrap;
@@ -231,9 +218,7 @@ $modal-cta-text: var(--ce-action-submit-text);
 }
 
 .ctaButton,
-.tertiaryLink,
-.inlineLink,
-.recognitionLink {
+.tertiaryLink {
   text-decoration: none;
   transition:
     transform 0.18s ease,
@@ -563,53 +548,6 @@ $modal-cta-text: var(--ce-action-submit-text);
   line-height: 1.65;
 }
 
-.cardSection {
-  padding: 22px 24px;
-  display: grid;
-  gap: 18px;
-}
-
-.cardSectionHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.inlineLink {
-  color: $accent;
-  font-size: 0.86rem;
-
-  &:hover,
-  &:focus {
-    color: $text-color;
-  }
-}
-
-.bulletList {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-
-  li {
-    position: relative;
-    padding-left: 1.5rem;
-    margin-bottom: 0.8rem;
-    font-family: var(--ce-font-body);
-    font-size: 1.05rem;
-    line-height: 1.6;
-
-    &::before {
-      content: '—';
-      position: absolute;
-      left: 0;
-      color: var(--ce-action-accent);
-      font-weight: 700;
-    }
-  }
-}
-
 .featureList {
   list-style: none;
   padding: 0;
@@ -890,11 +828,6 @@ $modal-cta-text: var(--ce-action-submit-text);
   line-height: 1.5;
 }
 
-.roadmapStatus {
-  font-weight: 700;
-  margin-right: 0.3em;
-}
-
 .roadmapChecklistItemComplete {
   color: var(--ce-panel-text);
 }
@@ -931,18 +864,6 @@ $modal-cta-text: var(--ce-action-submit-text);
   &::before {
     content: '';
   }
-}
-
-.mediaGrid {
-  display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.95fr);
-  gap: 14px;
-}
-
-.mediaCard {
-  padding: 18px;
-  display: grid;
-  gap: 14px;
 }
 
 .demoVideo,
@@ -1025,27 +946,6 @@ $modal-cta-text: var(--ce-action-submit-text);
   font-size: 0.86rem;
   line-height: 1.4;
   text-align: center;
-}
-
-.mobileDemoVideoFallbackLink {
-  min-height: 44px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 16px;
-  border-radius: var(--ce-radius-pill);
-  border: 1px solid color-mix(in srgb, var(--ce-action-accent) 36%, transparent);
-  background: color-mix(in srgb, var(--ce-action-accent) 96%, transparent);
-  color: var(--ce-overlay-base);
-  font-weight: 800;
-  text-decoration: none;
-
-  &:hover,
-  &:focus-visible {
-    color: var(--ce-overlay-base);
-    background: var(--ce-status-success);
-    outline: none;
-  }
 }
 
 .recognitionStrip {
@@ -1369,49 +1269,6 @@ button.recognitionModalCloseButton {
   }
 }
 
-.recognitionLinks {
-  display: inline-flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-  color: $muted-text;
-  font-size: 0.82rem;
-}
-
-.recognitionLink {
-  color: $muted-text;
-
-  &:hover,
-  &:focus {
-    color: $accent;
-  }
-}
-
-.recognitionDot {
-  color: color-mix(in srgb, var(--ce-control-text) 34%, transparent);
-}
-
-.recognitionIndividuals {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  justify-content: center;
-}
-
-.recognitionIndividual {
-  color: color-mix(in srgb, var(--ce-control-text) 86%, transparent);
-}
-
-.recognitionIndividual a {
-  color: inherit;
-  text-decoration: none;
-
-  &:hover,
-  &:focus {
-    color: $accent;
-  }
-}
-
 @keyframes detail-enter {
   from {
     opacity: 0;
@@ -1460,12 +1317,6 @@ button.recognitionModalCloseButton {
   }
 }
 
-@media (max-width: 900px) {
-  .mediaGrid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
 @media (max-width: 1023px) {
   .hero {
     grid-template-columns: 1fr;
@@ -1509,8 +1360,7 @@ button.recognitionModalCloseButton {
     line-height: 1.35;
   }
 
-  .heroActions,
-  .heroLinks {
+  .heroActions {
     gap: 16px;
   }
 
@@ -1537,8 +1387,6 @@ button.recognitionModalCloseButton {
   }
 
   .hero,
-  .cardSection,
-  .mediaCard,
   .useCaseDetail {
     border-radius: var(--ce-radius-18);
   }
@@ -1635,10 +1483,6 @@ button.recognitionModalCloseButton {
     align-items: stretch;
   }
 
-  .heroLinks {
-    gap: 8px;
-  }
-
   .ctaButton {
     width: 100%;
   }
@@ -1692,10 +1536,6 @@ button.recognitionModalCloseButton {
     font-size: 0.92rem;
   }
 
-  .mediaGrid {
-    grid-template-columns: 1fr;
-  }
-
   .recognitionCard {
     padding: 0;
   }
@@ -1733,10 +1573,6 @@ button.recognitionModalCloseButton {
 
   .recognitionModalBody {
     padding: 1.1rem 1rem 1.2rem;
-  }
-
-  .mobileDemoVideoFallbackLink {
-    width: 100%;
   }
 }
 
@@ -1797,19 +1633,13 @@ button.recognitionModalCloseButton {
 
   .mainTitle,
   .tagline,
-  .heroActions,
-  .heroLinks {
+  .heroActions {
     font-family: var(--ce-font-body);
   }
 
   .heroActions {
     align-items: stretch;
     gap: 10px;
-  }
-
-  .heroLinks {
-    align-items: stretch;
-    gap: 8px;
   }
 
   .heroPrimaryButton,

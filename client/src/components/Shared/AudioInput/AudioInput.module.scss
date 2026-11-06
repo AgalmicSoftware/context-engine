@@ -245,16 +245,6 @@
   font-size: 0.95rem;
 }
 
-/* (Old separate waveform box styles left intact but unused) */
-.waveformCanvas {
-  display: block;
-  width: 100%;
-  height: 50px;
-  background-color: var(--ce-border-light);
-  border: 1px solid var(--ce-border-light);
-  image-rendering: pixelated;
-}
-
 /* Spinner overlay centered inside the textarea during processing */
 .spinnerOverlay {
   position: absolute;
@@ -286,18 +276,6 @@
 
 /* === Appended: glow + small icon sizing for AudioInput === */
 /* === Appended: glow + small icon sizing for AudioInput === */
-@keyframes iconPulseGlow {
-  0% {
-    filter: drop-shadow(0 0 0px transparent);
-  }
-  50% {
-    filter: drop-shadow(0 0 8px color-mix(in srgb, var(--ce-action-accent) 85%, transparent))
-      drop-shadow(0 0 14px color-mix(in srgb, var(--ce-action-accent) 55%, transparent));
-  }
-  100% {
-    filter: drop-shadow(0 0 0px transparent);
-  }
-}
 
 .iconGlow {
   color: var(--ce-color-accent) !important;

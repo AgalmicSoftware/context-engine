@@ -211,7 +211,7 @@ describe('renderSbtPageFullView', () => {
     const stylesheet = fs.readFileSync(path.join(__dirname, 'SBTPage.module.scss'), 'utf8');
 
     expect(stylesheet).toMatch(
-      /@container ce-theme style\(--ce-layout-profile:\s*minimal-app\)\s*{[\s\S]*?\.loadingTitle,[\s\S]*?color:\s*var\(--ce-document-text\);/,
+      /@container ce-theme style\(--ce-layout-profile:\s*minimal-app\)\s*{[\s\S]*?\.loadingTitle\s*[,{][\s\S]*?color:\s*var\(--ce-document-text\);/,
     );
   });
 

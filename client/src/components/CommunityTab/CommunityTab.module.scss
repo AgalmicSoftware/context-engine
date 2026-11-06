@@ -18,16 +18,6 @@
   height: auto;
   gap: 1px;
 
-  .sectionTitle {
-    margin: 0 0 14px;
-    font-size: 0.92rem;
-    text-align: left;
-    font-family: var(--ce-font-mono);
-    text-transform: uppercase;
-    letter-spacing: 0.14em;
-    color: var(--ce-panel-text);
-  }
-
   .content {
     flex-grow: 1;
     overflow: auto;
@@ -44,19 +34,6 @@
     background: transparent;
   }
 
-  .leaderboardTopBar {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 12px;
-    margin-bottom: 10px;
-  }
-
-  .leaderboardTitle {
-    display: none;
-    margin: 0;
-  }
-
   .scopeLabel {
     margin: 0 0 10px;
     color: var(--ce-panel-text);
@@ -64,28 +41,6 @@
     font-size: 0.85rem;
     line-height: 1.4;
     overflow-wrap: anywhere;
-  }
-
-  .sessionSection {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    min-height: 0;
-    border: var(--ce-data-viz-border);
-    border-radius: var(--ce-radius-12);
-    background: var(--ce-data-viz-surface);
-  }
-
-  .sessionSection > .scopeLabel {
-    margin: 0;
-    padding: 16px 18px 0;
-  }
-
-  .sessionScope {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 8px;
   }
 
   .sessionContent {
@@ -143,14 +98,6 @@
 
   .beeswarmSection {
     background: var(--ce-data-viz-surface);
-  }
-
-  .leaderboardHeader {
-    display: flex;
-    justify-content: space-between;
-    padding: 0 10px;
-    font-weight: bold;
-    color: var(--ce-panel-text);
   }
 
   .leaderboardControlsWrap {
@@ -266,10 +213,6 @@
     color: var(--ce-status-warning-text);
     margin-left: 5px;
     font-size: 0.8em;
-  }
-
-  .karma {
-    font-weight: bold;
   }
 
   .showMoreButton {
@@ -439,10 +382,6 @@
       width: 100%;
     }
 
-    .sessionSection {
-      order: 2;
-    }
-
     .leaderboardSection {
       order: 2;
       width: 100%;
@@ -488,24 +427,6 @@
     border: 0;
     border-right: 2px solid var(--ce-edge-shadow);
     background: var(--ce-surface-raised);
-  }
-
-  .communityTab .leaderboardTopBar {
-    align-items: center;
-    min-height: 44px;
-    margin: 0;
-    padding: 6px 10px;
-    border-bottom: 1px solid var(--ce-edge-shadow);
-    background: var(--ce-surface-alt);
-  }
-
-  .communityTab .leaderboardTitle {
-    display: block;
-    color: var(--ce-panel-text);
-    font-family: var(--ce-font-ui);
-    font-size: 0.98rem;
-    font-weight: 700;
-    line-height: 1.2;
   }
 
   .communityTab .sessionSelectorToggle {
@@ -742,30 +663,6 @@
       &:hover {
         text-decoration: underline;
       }
-    }
-
-    .questionCount {
-      background: var(--ce-color-light);
-      padding: 6px 12px;
-      border-radius: var(--ce-radius-16);
-      color: var(--ce-document-text-muted);
-      font-size: 14px;
-      margin-left: 16px;
-    }
-  }
-}
-
-.questionContent {
-  text-align: center;
-  padding: 40px;
-  font-size: 18px;
-  color: var(--ce-document-text);
-  a {
-    color: var(--ce-status-info);
-    text-decoration: none;
-    font-weight: 600;
-    &:hover {
-      text-decoration: underline;
     }
   }
 }
@@ -1031,16 +928,6 @@
   &::-webkit-scrollbar-track {
     background: var(--ce-surface-subtle);
   }
-}
-
-#seeQuestionsText {
-  font-size: 1.5em;
-  font-weight: 600;
-}
-
-#seeQuestionsLinkText {
-  font-size: 1em;
-  font-weight: 600;
 }
 
 @container ce-theme style(--ce-layout-profile: minimal-app) {

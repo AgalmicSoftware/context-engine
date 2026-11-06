@@ -8,11 +8,6 @@
     background: transparent;
   }
 
-  #mainAreaTabs {
-    background: transparent;
-    margin-top: 0px;
-  }
-
   .mainTabsCardHeader {
     padding: 15px 5px 15px 5px;
   }
@@ -26,11 +21,6 @@
   .mainTabsCard {
     min-height: 100%;
     background: transparent;
-  }
-
-  #mainAreaTabs {
-    background: transparent;
-    margin-top: 0px;
   }
 
   .mainTabsCardHeader {
@@ -48,10 +38,6 @@
     background: transparent;
     border-radius: var(--ce-radius-7);
     background: transparent;
-  }
-
-  #mainAreaTabs {
-    margin-top: 17.5px;
   }
 
   .mainTabsCardHeader {
@@ -75,16 +61,6 @@
     box-shadow:
       -6px 6px 12px var(--ce-shadow-neumorphic-dark),
       6px -6px 12px var(--ce-shadow-neumorphic-light);
-  }
-
-  #mainAreaTabs {
-    flex: 1 1 100%;
-    width: 100%;
-    max-width: 100%;
-    height: 100%;
-    min-height: 100%;
-    margin-top: 5px;
-    margin-right: 0;
   }
 
   .mainAreaTabsAlt {
@@ -117,13 +93,6 @@
       6px -6px 12px var(--ce-shadow-neumorphic-light);
   }
 
-  #mainAreaTabs {
-    width: 75%;
-    min-height: 100%;
-    margin-top: 7.5px;
-    margin-right: 2%;
-  }
-
   .mainAreaTabsAlt {
     flex: 0 0 75%;
     width: 75%;
@@ -145,13 +114,6 @@
 .mainTabsCard {
   min-height: 100%;
   margin-top: 0px;
-}
-
-.navTabIcon {
-}
-
-#trelloEmbed {
-  display: flex;
 }
 
 /* --- OnboardingWalkthrough --- */
@@ -195,14 +157,6 @@
     height: unset !important;
   }
 
-  #takeSurveyPrompt {
-    margin-bottom: 0px;
-    text-transform: uppercase;
-    font-size: 0.85em;
-    font-weight: 600;
-    color: var(--ce-color-white);
-  }
-
   .takeSurveyIcon {
     display: inline-flex;
     margin-left: 5px;
@@ -227,14 +181,6 @@
     flex-wrap: wrap;
     justify-content: center;
     align-items: center;
-  }
-
-  #feedbackPromptText {
-    display: inline-flex;
-  }
-
-  #feedbackPromptDetailText {
-    display: inline-flex;
   }
 }
 
@@ -275,14 +221,6 @@
     height: unset !important;
   }
 
-  #takeSurveyPrompt {
-    margin-bottom: 0px;
-    text-transform: uppercase;
-    font-size: 0.85em;
-    font-weight: 600;
-    color: var(--ce-color-white);
-  }
-
   .takeSurveyIcon {
     display: inline-flex;
     margin-left: 5px;
@@ -307,14 +245,6 @@
     flex-wrap: wrap;
     justify-content: center;
     align-items: center;
-  }
-
-  #feedbackPromptText {
-    display: inline-flex;
-  }
-
-  #feedbackPromptDetailText {
-    display: inline-flex;
   }
 }
 
@@ -353,14 +283,6 @@
     height: unset !important;
   }
 
-  #takeSurveyPrompt {
-    margin-bottom: 0px;
-    text-transform: uppercase;
-    font-size: 0.85em;
-    font-weight: 600;
-    color: var(--ce-color-white);
-  }
-
   .takeSurveyIcon {
     display: inline-flex;
     margin-left: 5px;
@@ -386,14 +308,6 @@
     flex-wrap: wrap;
     justify-content: center;
     align-items: center;
-  }
-
-  #feedbackPromptText {
-    display: inline-flex;
-  }
-
-  #feedbackPromptDetailText {
-    display: inline-flex;
   }
 }
 
@@ -445,14 +359,6 @@
     height: unset !important;
   }
 
-  #takeSurveyPrompt {
-    margin-bottom: 0px;
-    text-transform: uppercase;
-    font-size: 0.85em;
-    font-weight: 600;
-    color: var(--ce-color-white);
-  }
-
   .takeSurveyIcon {
     display: inline-flex;
     margin-left: 5px;
@@ -477,14 +383,6 @@
     flex-wrap: wrap;
     justify-content: center;
     align-items: center;
-  }
-
-  #feedbackPromptText {
-    display: inline-flex;
-  }
-
-  #feedbackPromptDetailText {
-    display: inline-flex;
   }
 }
 
@@ -562,14 +460,6 @@
     height: unset !important;
   }
 
-  #takeSurveyPrompt {
-    margin-bottom: 0px;
-    text-transform: uppercase;
-    font-size: 0.85em;
-    font-weight: 600;
-    color: var(--ce-color-white);
-  }
-
   .takeSurveyIcon {
     display: inline-flex;
     margin-left: 5px;
@@ -594,14 +484,6 @@
     flex-direction: row;
     justify-content: center;
     align-items: center;
-  }
-
-  #feedbackPromptText {
-    display: inline-flex;
-  }
-
-  #feedbackPromptDetailText {
-    display: inline-flex;
   }
 }
 
@@ -664,17 +546,11 @@
   background: color-mix(in srgb, var(--ce-status-info) 16%, transparent);
 }
 
-#typeformEmbed {
-  height: 0;
-  width: 0;
-}
-
 /* Classic 95 turns the home card into a compact desktop window. The inactive
  * tabs remain usable as title-bar controls, while the active tab becomes the
  * window title. */
 @container ce-theme style(--ce-layout-profile: desktop-window) {
-  .mainAreaTabsAlt,
-  #mainAreaTabs {
+  .mainAreaTabsAlt {
     flex: 0 1 1080px;
     width: min(1080px, calc(100% - 32px));
     max-width: 1080px;
@@ -877,8 +753,7 @@
 
 @media (max-width: 768px) {
   @container ce-theme style(--ce-welcome-slide-mode: fixed-window) {
-    .mainAreaTabsAlt,
-    #mainAreaTabs {
+    .mainAreaTabsAlt {
       flex-basis: auto;
     }
   }
@@ -905,8 +780,7 @@
 
 @media (max-width: 640px) {
   @container ce-theme style(--ce-layout-profile: desktop-window) {
-    .mainAreaTabsAlt,
-    #mainAreaTabs {
+    .mainAreaTabsAlt {
       width: calc(100% - 12px);
       margin: 10px auto 14px;
     }

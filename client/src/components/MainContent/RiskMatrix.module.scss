@@ -62,15 +62,6 @@ $card-shadow: var(--ce-card-shadow);
   padding: 16px;
 }
 
-.sectionHeader {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  flex-wrap: wrap;
-  margin-bottom: 14px;
-}
-
 .gridScroll {
   overflow-x: auto;
   padding-bottom: 6px;
@@ -769,11 +760,6 @@ button.cell {
   }
 }
 
-.modalSectionHeader {
-  margin-bottom: 12px;
-}
-
-.modalSectionCopy,
 .emptyState {
   margin: 8px 0 0;
 }
@@ -1066,12 +1052,6 @@ button.cell {
   }
 }
 
-.modalDivider {
-  height: 1px;
-  margin: 2px 0;
-  background: color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
-}
-
 .modalComposer {
   display: flex;
   flex-direction: column;
@@ -1250,10 +1230,6 @@ button.cell {
 
   .atlasScenarioValence {
     align-self: flex-start;
-  }
-
-  .sectionHeader {
-    margin-bottom: 12px;
   }
 
   .gridContainer,
