@@ -1714,7 +1714,10 @@ Native Group membership is separate from the existing on-chain SBT results
 filters. Auto-joining records the cohort membership, but does not itself filter
 the question set, response statistics, or generated analysis by that cohort.
 
-`memberVisibility` defaults to `admin_only`. `members` lets members see the
+A group created through the API without these fields is `admin_add` and
+`admin_only`. The app's forms start on `open` and `session`, so anyone who can
+see the session can join: everyone on a public session, participants on a
+private one. `members` lets members see the
 group metadata and member identities, while `session` lets any authenticated
 session principal see both. Self-membership visibility is always allowed, but
 does not grant an `admin_only` identity list. Anonymous discovery never returns

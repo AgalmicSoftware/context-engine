@@ -47,6 +47,46 @@ describe('AdminWorkerGroupsPanel', () => {
     expect(screen.queryByText('worker_group_admin_request_failed')).not.toBeInTheDocument();
   });
 
+  it('starts a new group open to anyone who can see the session', async () => {
+    const postSignedRequest = jest.fn().mockResolvedValue({
+      ok: true,
+      data: {
+        group: {
+          groupId: 'salon',
+          sessionSlug: 'alpha',
+          label: 'Salon',
+          joinMode: 'open',
+          memberVisibility: 'session',
+        },
+      },
+    });
+    render(
+      <AdminWorkerGroupsPanel
+        account={ADDRESS}
+        canAdminWorker={true}
+        createOnly
+        sessionId={SESSION_ID}
+        sessionSlug="alpha"
+        workerUrl="https://session-worker.example"
+        postSignedRequest={postSignedRequest}
+      />,
+    );
+    expect(screen.getByTestId('ce-admin-worker-group-create-mode')).toHaveValue('open');
+    expect(screen.getByTestId('ce-admin-worker-group-create-visibility')).toHaveValue('session');
+    fireEvent.change(screen.getByTestId('ce-admin-worker-group-create-label'), { target: { value: 'Salon' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create Group' }));
+    await waitFor(() =>
+      expect(postSignedRequest).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'groups/create',
+          body: expect.objectContaining({
+            group: expect.objectContaining({ label: 'Salon', joinMode: 'open', memberVisibility: 'session' }),
+          }),
+        }),
+      ),
+    );
+  });
+
   it('manages the supported group and membership operations through signed worker requests', async () => {
     const buildGroup = (group: Record<string, unknown> = {}) => {
       const built: Record<string, unknown> = {

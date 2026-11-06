@@ -66,8 +66,9 @@ const emptyDraft = (adminAddress = '', tags: string[] = []): WorkerGroupDraft =>
   memberLimit: '',
   joinEndsAt: '',
   adminAddress,
-  joinMode: 'admin_add',
-  memberVisibility: 'admin_only',
+  // Open to anyone who can see the session: everyone on a public session, participants on a private one.
+  joinMode: 'open',
+  memberVisibility: 'session',
 });
 
 const toLocalDateTimeInput = (value: unknown): string => {
