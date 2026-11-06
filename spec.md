@@ -1,7 +1,7 @@
 # Context Engine Specification
 
 Status: Living specification (update alongside feature work)
-Last reviewed: 2026-08-23
+Last reviewed: 2026-11-06
 Canonical deep-dive docs: `docs/` (see `docs/README.md`)
 
 ## Purpose
@@ -65,8 +65,8 @@ Primary storage and authority split:
   compatibility mode and soft worker-held sessions.
 - Doc Library: A per-session and per-group document store whose provider follows
   the session profile: Cloudflare storage with profile-selected Worker access
-  and encryption (Worker-envelope in the Hosted & Fast preset), or Arweave with
-  optional Lit encryption for Arweave-backed sessions.
+  and optional Worker-envelope encryption, or Arweave with optional Lit
+  encryption for Arweave-backed sessions.
 - Sponsored resource: A service that uses secrets (AI keys, Arweave wallet, faucet key) and therefore routes through the Worker.
 - Sponsored grant: A pre-authorized access token for worker resources (deploy, faucet) redeemable without full auth.
 - Worker token: A short-lived session token minted after login; it encodes
@@ -86,7 +86,7 @@ Primary storage and authority split:
 The client uses React Router to route all paths to `MainSite`, which then renders page modules based on `window.location.pathname`.
 
 Core routes:
-- `/`: Home (tabs: Latest, Community, Tools, Welcome).
+- `/`: Home (tabs: Stats, Tools, Welcome).
 - `/session/new` (alias: `/new`; sponsored links can land here as `/new?sponsored=<txId>#k=<secret>`): Session Wizard. Hosted & Fast publishes canonical Worker config without EVM/Arweave; Trustless & Slower uploads metadata and registers on-chain.
 - `/session/:token`: Session landing page (accepts a slug or a UUID-like session id token; resolves and renders a one-page session view).
 - `/session/:token/questions`, `/session/:token/questions/results`: Session-scoped question list/results rendered inside the session shell.
@@ -127,15 +127,9 @@ Core routes:
 ### 0) Home Tabs and Primary Navigation
 
 The home route (`/`) is tab-based and functions as the app's main "portal":
-- Latest: home landing surface for the current match/feed view.
-- Community: universe/group discovery, aggregate stats, and leaderboard-style views sourced from caches and on-chain fetches.
+- Stats: universe/group discovery, aggregate stats, and leaderboard-style views sourced from caches and on-chain fetches.
 - Tools: a plugin-style launcher for the core Context Engine modules (surveys/questions, SBT groups, AI data tool, debate map, risk matrix).
 - Welcome: onboarding slides and entry points into the Tools tab.
-
-Legacy note:
-- `Votes` is no longer a current top-level home tab.
-- `Community` is still a current home tab, and Polis-style reports are still current embedded results surfaces.
-- Atlas / debate-map UI, simulated profiles, and demo-session views remain available.
 
 ### 1) Sessions (Spaces)
 
@@ -152,6 +146,9 @@ What users can do:
   stylesheets, or CSS.
 
 What the system does:
+- Starts a new draft on Hosted & Fast with public results and unencrypted
+  answers. Choosing encryption or another results visibility keeps them private;
+  `Runs on` under Hosting and storage switches to Trustless & Slower.
 - In Hosted & Fast, stores canonical signed session config, secrets,
   Worker-native group/gate state, and Cloudflare payload indexes in the
   per-session Worker; publication does not perform an EVM transaction or
@@ -224,6 +221,7 @@ Question types (current core set):
 - Rating scales.
 - Multiple choice (single-select and multi-select).
 - Freeform text.
+- Quadratic allocation.
 
 Privacy and integrity:
 - Response fields can be optionally encrypted (for self or for a gated audience), with hashes retained for verification.
@@ -387,9 +385,9 @@ What the system does:
   unavailable, Arweave session docs default to plaintext rather than falling
   back to a “general” gate.
 - For Worker-canonical Cloudflare storage, encryption and access conditions
-  follow `storageProfile`; the Hosted & Fast preset uses Worker-envelope
-  encryption with Worker role/scope conditions and does not infer plaintext
-  from the absence of a SessionRegistry `docUploads` gate.
+  follow `storageProfile`; Worker-envelope encryption uses Worker role/scope
+  conditions, and the Worker does not infer plaintext from the absence of a
+  SessionRegistry `docUploads` gate.
 - For Lit-Arweave uploads, allows either the session `docUploads` gate or a
   custom SBT audience, with a "Copy from session gate" shortcut.
 - Enforces provider-appropriate association integrity and anti-spam at upload
@@ -407,9 +405,6 @@ This repo still includes an older Atlas / debate-map demo surface alongside the 
 That remaining surface is mainly `/atlas`, `/tag/...`, and embedded debate-map UI inside demo session results.
 The home Tools surface and embedded session views also retain the shared risk matrix.
 Removed standalone pages use the normal unknown-route behavior.
-
-Intent for these features:
-- Either retire them cleanly (if no longer needed), or explicitly scope and bring them back under test.
 
 ## System Architecture (How It Works)
 
@@ -440,12 +435,12 @@ Primary runtime worker:
   Cloudflare storage for Worker-canonical profiles, plus profile-enabled AI,
   transcription, fetch, chain, Arweave, and faucet services.
 
-Optional legacy/sponsored helper:
-- `workers/deploy-helper/`: Trusted endpoint for the explicit legacy Session
-  Wizard fallback, sponsored deployment, and same-Worker agent setup; the
-  default Hosted & Fast path uses the native Cloudflare dashboard handoff.
+Deploy helper:
+- `workers/deploy-helper/`: Trusted endpoint for the Session Wizard's API-token
+  path, sponsored deployment, and same-Worker agent setup; the token-free path
+  uses the native Cloudflare dashboard handoff.
 
-Optional agent sidecar:
+Optional agent modules:
 - `workers/sessionCorsWorker/agent/`: Scoped Agent HTTP API, submission queue, and
   Session Wrapped. It delegates canonical session authority rather than
   duplicating it.
@@ -516,9 +511,9 @@ Agent HTTP API families (selected):
 
 ### Storage and Data
 
-- Cloudflare Worker storage: canonical signed config, secrets, payload envelopes,
-  authorization metadata/index rows, and optional advanced R2 blobs for Hosted &
-  Fast.
+- Cloudflare Worker storage: canonical signed config, secrets, payloads
+  (Worker-encrypted when selected), authorization metadata/index rows, and
+  optional advanced R2 blobs for Hosted & Fast.
 - Arweave: durable JSON payloads for chain-backed session metadata, survey and
   question payloads, SBT tokenURI metadata, and explicitly Arweave-backed
   resources.
@@ -562,7 +557,6 @@ Published workflow verification:
 
 See also:
 - `docs/local-chain.md`
-- `README.md` for the AI wallet test workflow
 
 ## Appendix: Canonical Docs Index
 

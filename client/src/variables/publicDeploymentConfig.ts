@@ -1,8 +1,8 @@
 // NOTE: The demo session uses a project-hosted worker hard-coded by default as https://demo-worker-030226.agalmic.workers.dev.
 // All other OSS sessions are bring-your-own-worker.
 // DEFAULT_SHARED_WORKER_URL still remains env-overridable; the hard-coded value is only the default.
-// Native Cloudflare deployment is the default `/new` path. The deploy-helper
-// endpoint remains available only for the explicitly labeled legacy fallback.
+// `/new` deploys through the deploy helper with a Cloudflare API token; native
+// Cloudflare deployment is its token-free alternative.
 // All public deployment URLs below remain env-overridable via REACT_APP_CE_* variables.
 
 import { readPublicBoolEnv, readPublicEnv } from './publicEnv.js';

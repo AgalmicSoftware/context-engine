@@ -24,11 +24,11 @@ Hosting the website is a separate decision: use [contextengine.sh](https://conte
 
 | Mode | Availability | Infrastructure and setup |
 | --- | --- | --- |
-| **Hosted & Fast** | Available; default/recommended path after selection in `/new` | Public or private sessions use a per-session Cloudflare Worker and Cloudflare storage. Native setup uses a Cloudflare account/dashboard login and one AI-provider key; it does not ask for a Cloudflare API token. No EVM network or transaction, RPC endpoint, gas, Arweave, or Lit is required by default. |
-| **Trustless & Slower** | Available; opt-in | Public or private sessions use Arweave plus an EVM registry and contracts. Setup requires an Arweave wallet/JWK, an EVM RPC URL and gas, and one AI-provider key; add Lit credentials only when Lit encryption is selected. |
-| **Company-Operated** | Planned; not yet generally available | Existing hardware, private clouds, or internal networks connect through adapters for company identity and key management, storage, AI gateways, and observability. Public EVM and Arweave are not architectural requirements, so this mode can be entirely off-chain. |
+| **Hosted & Fast** | Available; where `/new` starts | A per-session Cloudflare Worker and Cloudflare storage. Results start public with unencrypted answers; choosing encryption or another results visibility keeps them private. Setup needs a Cloudflare account, one AI-provider key, and either a Cloudflare API token or the token-free dashboard setup. No EVM network or transaction, RPC endpoint, gas, Arweave, or Lit is required by default. |
+| **Trustless & Slower** | Available; opt-in under `Runs on` | Arweave plus an EVM registry and contracts. Data is publicly readable unless Lit encryption is selected. Setup requires a Session Worker, an Arweave wallet/JWK, an EVM RPC URL, a wallet with gas, and one AI-provider key; add Lit credentials only when Lit encryption is selected. |
+| **Company-Operated** | Planned; not yet generally available | Existing hardware, private clouds, or internal networks will connect through adapters for company identity and key management, storage, AI gateways, and observability. Public EVM and Arweave will not be required, so this mode will be able to run entirely off-chain. |
 
-[contextengine.sh](https://contextengine.sh) is the hosted public web interface, and the static client can also be self-hosted. The former `.xyz` address redirects to this canonical site. App hosting, public/private session access, and the session infrastructure profile are separate choices. Participants never need deployer API keys.
+The former `.xyz` address redirects to [contextengine.sh](https://contextengine.sh). Participants never need deployer API keys.
 
 ## Quick Start
 
@@ -64,7 +64,7 @@ For testing, run modes, and deeper setup:
 - Optional encryption of responses and results
 - Optional decentralized and permanent response storage in the public Arweave-backed profile
 - Statistical / AI analysis and visualization of results
-- Export results as `.json`, `.csv`, `.pdf`
+- Export results as `.json`, `.csv`, `.html`, `.pdf`
 
 ### Groups
 - Cloudflare Groups for membership, invitations, and response filtering in Worker-backed sessions
@@ -101,11 +101,11 @@ For testing, run modes, and deeper setup:
 
 - Users log in with a simple passkey / biometric flow (native PIN, fingerprint, or Face ID on phones)
 - Login supplies a signing account for session identity; EVM-backed profiles can also use it as a chain account
-- Hosted & Fast does not submit an EVM transaction, and its users do not need Ethereum, a wallet balance, or gas
+- By default, Hosted & Fast does not submit an EVM transaction, and its users do not need Ethereum, a wallet balance, or gas
 
 ### Deployer UX: Sponsored Bundles
 
-- Setup requirements follow the selected profile: the default Cloudflare profile needs a Cloudflare account/dashboard login and one AI-provider key; a Cloudflare API token is used only by the explicit legacy deploy-helper fallback
+- Setup requirements follow the selected profile: the default Cloudflare profile needs a Cloudflare account, one AI-provider key, and either a Cloudflare API token or the token-free dashboard setup
 - Sponsored bundles and advanced configuration can supply Arweave, EVM/RPC, Lit, or other credentials only when the selected decentralized or encrypted profile needs them; planned company-operated adapters will connect internal services instead
 
 ## AI Discourse Corpus
@@ -114,7 +114,7 @@ The top-level [`ai-discourse-corpus/`](ai-discourse-corpus/) directory contains 
 
 ## AI Opinions Benchmark
 
-The top-level [`ai-discourse-bench/`](ai-discourse-bench/) package turns source-grounded question banks into repeated, polarity-reversed model runs and static Context Engine results reports. The client serves its bundled report index at [`/benchmarks`](http://localhost:3000/benchmarks), where each model is treated as one participant and the report exposes agreement, disagreement, repeat stability, opinion groups, and model-trait comparisons.
+The top-level [`ai-discourse-bench/`](ai-discourse-bench/) package turns source-grounded question banks into repeated, polarity-reversed model runs and static Context Engine results reports. The client serves its bundled report index at `/benchmarks`, where each model is treated as one participant and the report exposes agreement, disagreement, repeat stability, opinion groups, and model-trait comparisons.
 
 Bundled reports declare their publication status. Development previews are useful for inspecting the method and interface, but a released result additionally requires a reviewed question bank, the configured repeats for both original and reversed wording, and complete valid model coverage. See the [benchmark README](ai-discourse-bench/README.md) and [methodology](ai-discourse-bench/docs/methodology.md) for local-model, OpenRouter, question-bank, and release-gate details.
 

@@ -14,7 +14,7 @@ Frontend development and local client work only.
 
 - Use the React client without chain, worker, or Arweave dependencies.
 - Client workflows support Node.js `^20.19.0` or `>=22.12.0` with npm
-  `^10.0.0`; Node 16/npm 9 are no longer supported.
+  `^10.0.0`.
 - Install client dependencies with plain `npm install`; strict peer resolution
   is the normal install contract.
 
@@ -68,26 +68,22 @@ live gas for every repeated validation.
 These developer modes do not select a production session-infrastructure
 profile. That choice happens separately in `/new`.
 
-The older `hosted/onchain` label grouped several production choices together.
-It is retained as a documentation alias only: use Hosted & Fast for the
-worker-canonical Cloudflare path, or Trustless & Slower for the public
-EVM-and-Arweave path described below.
-
 ## Session Infrastructure Profiles
 
-The `/new` chooser initially selects nothing. **Hosted & Fast** is the default
-and recommended path once chosen; **Trustless & Slower** is an implemented
-opt-in; **Company-Operated** is planned.
+`/new` is one page and starts on **Hosted & Fast**. `Runs on` under Hosting and
+storage switches to **Trustless & Slower**. **Company-Operated** is planned.
 
 ### Hosted & Fast — implemented default
 
-This is labeled `Centralized (Cloudflare)` in the wizard.
+`Runs on` shows this as `Session Worker`.
 
 - A creator deploys a per-session Cloudflare Worker with Cloudflare-backed
-  canonical config and payload storage.
-- `worker_canonical` authority and `worker_envelope` encryption are the defaults.
-- Creator-facing setup needs a Cloudflare login and one AI-provider key. The
-  native deploy flow does not ask the creator to copy a Cloudflare API token.
+  canonical config and payload storage, under `worker_canonical` authority.
+- New sessions start with public results and unencrypted answers. Choosing
+  `worker_envelope` encryption or another results visibility keeps them private.
+- Setup needs a Cloudflare account, one AI-provider key, and either a Cloudflare
+  API token, sent once through the deploy helper and never saved, or the
+  token-free dashboard handoff.
 - The passkey-derived EOA supplies signing and admin identity, but publishing
   this profile does not submit an EVM transaction or require gas.
 - EVM contracts, registry/RPC access, Arweave, and Lit are not dependencies of
@@ -97,17 +93,15 @@ This is labeled `Centralized (Cloudflare)` in the wizard.
 
 ### Trustless & Slower — implemented opt-in
 
-This is labeled `Decentralized (Arweave + EVM)` in the wizard.
+`Runs on` shows this as `On-chain registry`.
 
 - Public EVM registry/contracts provide session and gate authority.
-- Arweave stores metadata and payloads.
-- Creation requires the relevant wallet transaction, gas, RPC access, and
-  Arweave wallet/JWK.
+- Arweave stores metadata and payloads, which are public and permanent. Anyone
+  can read them unless Lit encryption is selected.
+- Creation requires a compatible Session Worker, an Arweave wallet/JWK, RPC
+  access, and a wallet that sends the registry transactions and pays gas.
 - Lit credentials are required only when the creator explicitly selects Lit
   encryption; the stock preset does not enable it.
-
-The decentralized path remains supported. It is an optional profile, not a
-universal dependency of hosted operation.
 
 ### Company-Operated — planned
 
