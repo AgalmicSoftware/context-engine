@@ -4,24 +4,20 @@ Run `npm run test:worker:agent` and `npm run test:worker:session-cors` from the
 repository root. Tests execute the canonical Session Worker entry point, in-process
 services and coordinator, plus retained pure-domain fixtures.
 
-The table identifies retained scenarios, not assertion-for-assertion parity with
-the former Bridge suites. Paths without
-a prefix below are relative to `workers/sessionCorsWorker/`.
+Paths without a prefix below are relative to `workers/sessionCorsWorker/`.
 
-| Former Bridge suites | Maintained coverage |
-| --- | --- |
-| `agentHttp`, `agentHttpSurface`, `worker`, `agentTransportRemoval`, `agentQuestionCreateScope` | `agentRequestBoundary.test.mjs`, `agentRoutes.test.mjs`: route/method rejection before effects, CORS, signed admin, scoped credentials, disabled surface, typed hosted participation |
-| `agentClientLogin.worker`, `sessionWorkerAuthority`, `sessionPolicyIdentity` | `agentRequestBoundary.test.mjs`: same-origin exchange, identity/audience/source expiry/revocation, participant access; client `agentClientLogin.test.ts` |
-| `agentInviteRedemptionCoordinator` | `agentRequestBoundary.test.mjs`: concurrent single winner, independent journals, lost finalization and missing coordinator |
-| `agentSessionRuntime`, `agentApprovedAnswers`, `agentRatingRecovery`, `ratingScaleSubmit`, `sessionQuestions` | `agentRequestBoundary.test.mjs`, `agentReviewRegression.test.mjs`, `agentQueue.test.mjs`: current question schema, saved approval, canonical hosted writes, current read gates, incomplete pagination |
-| `agentGroups`, `agentOnlyMode`, `agentQuestionProposals` | `agentRoutes.test.mjs`, `agentRequestBoundary.test.mjs`: scoped auxiliary groups, visibility, proposals/votes and explicit approval |
-| `agentSubmitQueue`, `submitQueueRecovery` | `agentQueue.test.mjs`: duplicate delivery, retries, publication loss, ambiguous effects, persistence-only recovery, authorization changes |
-| `managedSigner`, `onChainResponses` | `agentSigning.test.mjs`, `agentReviewRegression.test.mjs`: deterministic fresh identities, ethers v6 transaction signing, final authorization, RPC failures and redaction |
-| `sessionPolicy`, `sessionPolicyLoader`, `registrySessions` | `agentRequestBoundary.test.mjs`, `agentRoutes.test.mjs`, `agentReviewRegression.test.mjs`: canonical-only policy, bounded registry source pages, current per-payload authorization |
-| `wrappedQuestionSource`, `skillVersionLinks` | `agentRoutes.test.mjs`, `agentReviewRegression.test.mjs`: scoped current links and statements, historical answer wording and current visibility filtering, predictions and exports |
-| `agentSessionWrappedDeployment`, `deployHelperApply`, `deployHelperPlan` | `tests/root/deployHelper.worker.test.js`, `sponsoredBootstrapRedeemDispatch.test.mjs`: one application Worker, fresh secret, retry preservation, obsolete bundle pins ignored |
-| `runtimePrimitives` | `agentAi.test.mjs`, `agentStorage.test.mjs`, retained domain tests: bounded fetch/body deadlines, response limits, scoped namespace/cursors |
-| `agentAnswerSchema`, `agentOnlyConcurrentVotes`, `agentQuestionNumbers`, `agentSettings`, `agentTopicMap`, `draftProvenance`, `kvReadHelpers`, `opaqueActions`, `quadraticAllocation`, `questionScaleCache`, `questionTypeAliases`, `ratingScaleParity`, `ratingScaleSteps`, `resultImage` | Named test files under `agent/` retain the applicable domain behavior |
+- `agentRequestBoundary.test.mjs`, `agentRoutes.test.mjs`: route/method rejection before effects, CORS, signed admin, scoped credentials, disabled surface, typed hosted participation
+- `agentRequestBoundary.test.mjs`: same-origin exchange, identity/audience/source expiry/revocation, participant access; client `agentClientLogin.test.ts`
+- `agentRequestBoundary.test.mjs`: concurrent single winner, independent journals, lost finalization and missing coordinator
+- `agentRequestBoundary.test.mjs`, `agentReviewRegression.test.mjs`, `agentQueue.test.mjs`: current question schema, saved approval, canonical hosted writes, current read gates, incomplete pagination
+- `agentRoutes.test.mjs`, `agentRequestBoundary.test.mjs`: scoped auxiliary groups, visibility, proposals/votes and explicit approval
+- `agentQueue.test.mjs`: duplicate delivery, retries, publication loss, ambiguous effects, persistence-only recovery, authorization changes
+- `agentSigning.test.mjs`, `agentReviewRegression.test.mjs`: deterministic fresh identities, ethers v6 transaction signing, final authorization, RPC failures and redaction
+- `agentRequestBoundary.test.mjs`, `agentRoutes.test.mjs`, `agentReviewRegression.test.mjs`: canonical-only policy, bounded registry source pages, current per-payload authorization
+- `agentRoutes.test.mjs`, `agentReviewRegression.test.mjs`: scoped current links and statements, historical answer wording and current visibility filtering, predictions and exports
+- `tests/root/deployHelper.worker.test.js`, `sponsoredBootstrapRedeemDispatch.test.mjs`: one application Worker, fresh secret, retry preservation, obsolete bundle pins ignored
+- `agentAi.test.mjs`, `agentStorage.test.mjs`, retained domain tests: bounded fetch/body deadlines, response limits, scoped namespace/cursors
+- Named test files under `agent/` retain the applicable domain behavior
 
 `agentAuthorizationRegression.test.mjs`, `agentAuthorityRecheck.test.mjs` and
 `agentMembershipRegression.test.mjs` exercise scope denial, service login,

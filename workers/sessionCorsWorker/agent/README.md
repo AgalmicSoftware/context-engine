@@ -20,7 +20,7 @@ access; the wizard checks readiness after saving the canonical configuration.
 No extra KV namespace, coordinator class or migration is needed for agents.
 
 Managed accounts derive from this fresh secret, the canonical session ID and
-an opaque principal. Never reuse an old Bridge root or deployment identity.
+an opaque principal. Never reuse a root secret or identity from another deployment.
 Signing supports configured OP Sepolia and best-effort Base Sepolia testnet
 sessions only. Root, client, MCP and CE-CC use ethers v5; this Worker uses its
 isolated ethers v6 package.
@@ -144,10 +144,7 @@ normal backup coverage. Restore rejects targets containing agent or invite
 state. Reissue credentials and create new invites after restore; archives
 cannot recover managed signing keys.
 
-There is no Bridge URL fallback, forwarding, migration, identity transfer or
-invite transfer. Existing Bridge-backed sessions keep their old deployments
-until separately retired by their owner. Updating this source does not deploy
-code or delete existing resources.
+Updating this source does not deploy code or delete existing resources.
 
 ## Runtime instructions and verification
 

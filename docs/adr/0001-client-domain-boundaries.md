@@ -72,6 +72,8 @@ late-binding behavior.
 - `client/src/domains/sbts/`: SBT metadata reads, mint execution, group mint
   authorization, admin ops, ownership reads, and event-stream ports backed by
   `contractScripts`.
+- `client/src/domains/sessionResults/`: session Results analysis controller,
+  browser snapshot, and Worker client.
 - `client/src/domains/sessions/`: session config, session media URL helpers,
   balance readers, sponsored access, publish reducer/ports/adapters, and session
   registry read/write ports.

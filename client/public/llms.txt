@@ -43,4 +43,4 @@ Do not infer that every session is on-chain. Use the session's selected profile 
 - SBT-gated access control and encrypted fields
 - Passkey-oriented participant and administrator identity
 - Cloudflare Worker, Arweave, EVM, and optional Lit deployment profiles
-- Deterministic browser automation through a stable TestID API and opt-in agent bridge
+- Deterministic browser automation through a stable TestID API and opt-in agent mode
