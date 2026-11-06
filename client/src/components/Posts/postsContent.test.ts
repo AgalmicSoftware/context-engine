@@ -14,6 +14,17 @@ afterEach(() => {
 });
 
 describe('postsContent', () => {
+  it('links the About page only to published post slugs', () => {
+    const posts = normalizePostsManifest(JSON.parse(readFileSync('../posts/manifest.json', 'utf8')));
+    const about = ['src/components/About/AboutPage.tsx', 'src/components/About/AboutPageContent.tsx']
+      .map((file) => readFileSync(file, 'utf8'))
+      .join('\n');
+    const linked = [...about.matchAll(/["']\/posts\/([a-z0-9-]+)["']/g)].map((match) => match[1]);
+
+    expect(linked.length).toBeGreaterThan(0);
+    expect(linked.filter((slug) => !posts.some((post) => post.slug === slug))).toEqual([]);
+  });
+
   it('publishes only listed posts and keeps placeholder Markdown out of the public posts root', () => {
     const manifest = JSON.parse(readFileSync('../posts/manifest.json', 'utf8'));
     const posts = normalizePostsManifest(manifest);

@@ -482,7 +482,7 @@ const AboutPage = () => {
                   <div className={styles.relatedCardHeading}>
                     <span className={styles.relatedPill}>eval</span>
                     <h3 className={styles.featureLabel}>
-                      <Link to="/posts/agent-village-wrapped">The Agent Mirror Test</Link>
+                      <Link to="/posts/agent-village-wrapped-2026">The Agent Mirror Test</Link>
                     </h3>
                   </div>
                   <p className={styles.featureText}>

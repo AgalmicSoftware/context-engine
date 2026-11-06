@@ -336,7 +336,7 @@ describe('AboutPage', () => {
     expect(related.getByRole('link', { name: 'AI Opinions Benchmark' })).toHaveAttribute('href', '/benchmarks');
     expect(related.getByRole('link', { name: 'The Agent Mirror Test' })).toHaveAttribute(
       'href',
-      '/posts/agent-village-wrapped',
+      '/posts/agent-village-wrapped-2026',
     );
     expect(related.getByRole('heading', { name: 'Ladders Made of Numbers' })).toBeVisible();
     expect(related.getByRole('link', { name: 'CommonGround Predict' })).toHaveAttribute(
@@ -367,7 +367,7 @@ describe('AboutPage', () => {
     expect(practice.getByText(/Context Engine received a grant through Foresight Institute/)).toBeVisible();
     expect(practice.getByRole('link', { name: 'Agent Village 2026' })).toHaveAttribute(
       'href',
-      '/posts/agent-village-wrapped',
+      '/posts/agent-village-wrapped-2026',
     );
     expect(practice.getByRole('link', { name: 'EDDY 2026 demo' })).toHaveAttribute(
       'href',
