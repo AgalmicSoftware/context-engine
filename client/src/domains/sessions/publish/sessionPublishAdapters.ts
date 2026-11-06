@@ -1,6 +1,5 @@
 import { arweaveClient as defaultArweaveClient } from '../../../utilities/arweave/arweaveClient.js';
 import * as defaultPublishUploadAuth from '../../../utilities/arweave/publishUploadAuth.js';
-import * as defaultSponsoredBundles from '../../../utilities/arweave/sponsoredBundles.js';
 import * as defaultSessionRegistry from '../../../utilities/web3/sessionRegistry.js';
 import * as defaultSbtFactoryReceipt from '../../../utilities/web3/sbtFactoryReceipt.js';
 import * as defaultWorkerAuth from '../../../utilities/worker/workerAuth.js';
@@ -106,12 +105,6 @@ export const arweavePublishAdapter = {
 export const workerAuthPublishAdapter = bindWorkerAuthPublishAdapter({
   workerAuth: () => defaultWorkerAuth,
 });
-
-export const sponsoredBundlePublishAdapter = {
-  normalizeSparseSponsoredBundlePayload: (input: unknown) =>
-    defaultSponsoredBundles.normalizeSparseSponsoredBundlePayload(input),
-  hasSponsoredBundleFields: (input: PublishRecord) => defaultSponsoredBundles.hasSponsoredBundleFields(input),
-};
 
 export const sbtFactoryReceiptPublishAdapter = {
   resolveSbtAddressFromFactoryReceipt: ({ receipt }: { receipt: unknown }) =>

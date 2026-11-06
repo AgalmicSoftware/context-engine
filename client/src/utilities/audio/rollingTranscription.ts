@@ -1,4 +1,4 @@
-import { joinTranscriptText, mergeTranscriptOverlap, transcriptOverlapTail } from './transcriptOverlap';
+import { joinTranscriptText, transcriptOverlapTail } from './transcriptOverlap';
 import type { SpeakerTranscriptTurn } from './speakerTranscript';
 export const DEFAULT_ROLLING_TRANSCRIPTION_CHUNK_MS = 3 * 60 * 1000;
 export const LISTENING_MODE_QUERY_VALUE = 'listening';
@@ -26,8 +26,6 @@ export type RollingTranscriptSegment = {
 
 // A chunk boundary repeats at most a second of speech, so only its last 80 words are compared.
 const OVERLAP_WORDS = 80;
-export const mergeRollingTranscriptText = (previous: string, next: string): string =>
-  mergeTranscriptOverlap(previous, next, OVERLAP_WORDS);
 
 const recordingGap = () => '[Recording gap: audio could not be transcribed.]';
 const duration = (milliseconds: number) => {

@@ -140,5 +140,3 @@ export const createBundleReportPlugin = ({ rootDir = process.cwd() } = {}) => ({
     });
   },
 });
-
-export const measureBundleSourceBytes = byteLength;

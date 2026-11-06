@@ -732,10 +732,9 @@ export const wrapEthersJsonRpcSend = <T extends WrappedProvider | null | undefin
 
     const wantsDedupe = DEDUPE_METHODS.has(method);
     const wantsTtl = TTL_METHODS.has(method);
-    const debugOnly = false;
 
     // Fast path: if this method is not a target for dedupe/TTL caching, do nothing.
-    if (!wantsDedupe && !wantsTtl && !debugOnly) {
+    if (!wantsDedupe && !wantsTtl) {
       return await runWithRpcRateLimitGate(rateLimitKey, sendMeta, () => originalSend(method, params));
     }
 

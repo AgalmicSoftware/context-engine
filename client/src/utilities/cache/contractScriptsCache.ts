@@ -23,7 +23,6 @@ type PruneTimestampedOptions = {
   maxEntries?: number;
 };
 type SessionConfigRecord = UnknownRecord & {
-  _isWeb3Context?: boolean;
   activeSessionSlug?: unknown;
   blockLimits?: UnknownRecord;
   cfg?: unknown;
@@ -286,19 +285,14 @@ const resolveSession = (groupKeyOrCfg: unknown): SessionConfigRecord | null => {
 };
 
 export const memoizedResolveSession = (groupKeyOrCfg: unknown) => {
-  const groupRecord = asSessionConfigRecord(groupKeyOrCfg);
-  const resolvedInput =
-    groupRecord && groupRecord._isWeb3Context === true
-      ? (groupRecord.groupKeyOrCfg ?? groupRecord.cfg ?? groupRecord)
-      : groupKeyOrCfg;
   const key =
-    resolvedInput === undefined
+    groupKeyOrCfg === undefined
       ? ''
-      : typeof resolvedInput === 'string'
-        ? resolvedInput
-        : JSON.stringify(resolvedInput);
+      : typeof groupKeyOrCfg === 'string'
+        ? groupKeyOrCfg
+        : JSON.stringify(groupKeyOrCfg);
   if (_resolveSessionCache.has(key)) return _resolveSessionCache.get(key);
-  const result = resolveSession(resolvedInput === undefined ? '' : resolvedInput);
+  const result = resolveSession(groupKeyOrCfg === undefined ? '' : groupKeyOrCfg);
   _resolveSessionCache.set(key, result);
   if (!_resolveSessionCacheTimer) {
     _resolveSessionCacheTimer = setTimeout(() => {

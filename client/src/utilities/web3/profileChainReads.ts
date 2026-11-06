@@ -364,7 +364,6 @@ export function createProfileChainReadMethods(deps: ContractProfileDeps): Contra
     normalizeSessionSlug,
     normalizeSbtSessionLinkFields,
     normalizeSessionNameFields,
-    latestBlockCache,
   } = deps;
 
   const methods: ContractProfileMethods = {

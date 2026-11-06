@@ -7,9 +7,6 @@ import {
 } from './sbtPasswordRecoveryStore.js';
 
 export { SBT_ENCRYPTED_PASSWORD_RECOVERY_STORAGE_KEY };
-const SBT_ENCRYPTED_PASSWORD_RECOVERY_VERSION = 2;
-const SBT_ENCRYPTED_PASSWORD_RECOVERY_KIND = 'sbt-password-recovery';
-const SBT_ENCRYPTED_PASSWORD_RECOVERY_KEY_REF = 'tab-memory-v1';
 
 type StorageLike = {
   getItem?: (key: string) => string | null;

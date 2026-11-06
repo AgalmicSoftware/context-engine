@@ -62,7 +62,6 @@ export const createContractScriptsSbtMintMethods = (deps: ContractScriptsRuntime
     resolveTxGasOverrides,
     rpcLog,
     sendContractWriteViaProvider,
-    utils,
   } = deps;
 
   return {
@@ -207,11 +206,6 @@ export const createContractScriptsSbtMintMethods = (deps: ContractScriptsRuntime
       groupKeyOrCfg: any = null,
     ) {
       try {
-        const cfg = memoizedResolveSession(groupKeyOrCfg === undefined ? '' : groupKeyOrCfg);
-        const chId =
-          Number(cfg?.networkChainId || cfg?.contracts?.sbtFactory?.chainId || cfg?.contracts?.surveys?.chainId || 0) ||
-          undefined;
-
         const provider = getLocalAwareReadProviderForGroup(groupKeyOrCfg, SBT_READ_PROVIDER_OPTIONS);
 
         let ok = false;

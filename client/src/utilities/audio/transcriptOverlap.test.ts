@@ -1,9 +1,9 @@
 import { mergeTranscriptText } from '../ai/aiClientAudioTranscription';
-import { mergeRollingTranscriptText } from './rollingTranscription';
+import { mergeTranscriptOverlap } from './transcriptOverlap';
 
 for (const [name, merge] of [
   ['uploaded audio', mergeTranscriptText],
-  ['rolling audio', mergeRollingTranscriptText],
+  ['rolling audio', (previous: string, next: string) => mergeTranscriptOverlap(previous, next, 80)],
 ] as const) {
   describe(name, () => {
     it.each([
