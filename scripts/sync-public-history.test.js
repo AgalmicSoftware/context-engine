@@ -473,6 +473,48 @@ test('sync-public-history extends a pushed candidate that already carries the re
   });
 });
 
+test('sync-public-history stops a kept version once that candidate has reached public main', () => {
+  withSourceRepo(({ sourceDir, remoteDir }) => {
+    const first = runSyncScript(sourceDir, ['--push', '--release-version', '0.2.0', 'release-staging-next']);
+    assert.equal(first.status, 0, syncFailureMessage(first));
+    const replayedThrough = git(sourceDir, ['rev-parse', 'dev']).trim();
+    const pushed = git(sourceDir, ['rev-parse', 'release-staging-next']).trim();
+    git(remoteDir, ['update-ref', 'refs/heads/main', pushed]);
+
+    writeFile(sourceDir, 'later.txt', 'later public change\n');
+    commitAll(sourceDir, 'fix: add a later public change', {
+      authorDate: '2025-01-06T00:00:00Z',
+      committerDate: '2025-01-06T00:00:00Z',
+    });
+
+    const second = runSyncScript(sourceDir, [
+      '--force-with-lease',
+      '--source-base',
+      replayedThrough,
+      '--target-base',
+      pushed,
+      '--keep-release-version',
+      'release-staging-next',
+    ]);
+
+    assert.equal(second.status, 2, syncFailureMessage(second));
+    assert.match(second.stderr, /kept version does not pass/);
+    assert.equal(git(sourceDir, ['rev-parse', 'release-staging-next']).trim(), pushed);
+  });
+});
+
+test('sync-public-history refuses a kept version it cannot honour', () => {
+  withSourceRepo(({ sourceDir }) => {
+    const withVersion = runSyncScript(sourceDir, ['--keep-release-version', '--release-version', '0.5.0', 'release-staging-next']);
+    assert.equal(withVersion.status, 1);
+    assert.match(withVersion.stderr, /cannot be combined/);
+
+    const unpushed = runSyncScript(sourceDir, ['--keep-release-version', 'release-staging-next']);
+    assert.equal(unpushed.status, 1);
+    assert.match(unpushed.stderr, /extends a pushed candidate/);
+  });
+});
+
 test('sync-public-history replays onto a remote that a stale local target does not contain', () => {
   withSourceRepo(({ sourceDir }) => {
     git(sourceDir, ['branch', 'release-candidate', 'main']);

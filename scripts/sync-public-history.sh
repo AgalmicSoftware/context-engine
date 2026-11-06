@@ -954,6 +954,10 @@ while [ $# -gt 0 ]; do
   shift
 done
 
+if [ "$KEEP_RELEASE_VERSION" -eq 1 ] && { [ -n "$EXPLICIT_RELEASE_VERSION" ] || [ "$ACKNOWLEDGE_PATCH" -eq 1 ]; }; then
+  fail "--keep-release-version cannot be combined with --release-version or --acknowledge-patch." 1
+fi
+
 case "$TARGET_BRANCH" in
   release-staging*)
     if [ "$KEEP_RELEASE_VERSION" -ne 1 ]; then
@@ -1118,6 +1122,10 @@ if git -C "$TEMP_CLONE" ls-remote --exit-code --heads origin "$TARGET_BRANCH" >/
     "+refs/heads/$TARGET_BRANCH:refs/remotes/origin/$TARGET_BRANCH"
 fi
 
+if [ "$KEEP_RELEASE_VERSION" -eq 1 ] && [ "$REMOTE_BRANCH_EXISTS" -ne 1 ]; then
+  fail "--keep-release-version extends a pushed candidate, but origin/$TARGET_BRANCH does not exist." 1
+fi
+
 TARGET_BASE_IS_PUBLIC=0
 if git -C "$TEMP_CLONE" merge-base --is-ancestor "$TARGET_BASE_SHA" origin/main >/dev/null 2>&1; then
   TARGET_BASE_IS_PUBLIC=1
@@ -1233,6 +1241,17 @@ if [ "$RELEASE_VERSIONING_ENABLED" -eq 1 ]; then
   collect_replayed_release_evidence
   plan_release_candidate_version 0
   stamp_release_candidate_version
+fi
+
+# A kept version skips the plan above, so check here what the pre-push hook would refuse.
+if [ "$KEEP_RELEASE_VERSION" -eq 1 ]; then
+  if ! node "$REPO_ROOT/scripts/release-version.mjs" verify-ref \
+    --repo-root "$TEMP_CLONE" \
+    --candidate-ref HEAD \
+    --minimum-ref "$TARGET_BASE_SHA" \
+    --baseline-ref origin/main >&2; then
+    fail "The kept version does not pass release version verification." 2
+  fi
 fi
 
 if strip_findings=$(verify_strip_patterns_absent); then
