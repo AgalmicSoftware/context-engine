@@ -298,6 +298,15 @@ describe('on-chain survey copy re-check', () => {
     expect(built.sendContractWriteViaProvider).toHaveBeenCalledTimes(1);
   });
 
+  it('sends a first submission, when there is no stored copy before or after', async () => {
+    const built = buildSubmit({ pointers: [null, null] as unknown as string[], stored: [null] });
+    await built.submit();
+
+    expect(built.getResponseHash).toHaveBeenCalledTimes(2);
+    expect(built.surveyUploads()).toHaveLength(1);
+    expect(built.sendContractWriteViaProvider).toHaveBeenCalledTimes(1);
+  });
+
   it('merges again when another tab or device saved in between, keeping its edit', async () => {
     const built = buildSubmit({
       pointers: ['pointer-1', 'pointer-2', 'pointer-2', 'pointer-2'],
