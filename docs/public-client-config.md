@@ -333,7 +333,7 @@ writes (about 240), so set up caching there separately.
 
 - Do **not** add Lit API keys to `client/.env` or any `REACT_APP_*` variable.
 - Chipotle auth stays server-side:
-  - deployment/sponsor worker env: `LIT_USAGE_API_KEY` runs the Action (falling back to `LIT_ACCOUNT_API_KEY`); `LIT_ACCOUNT_API_KEY` provisions authorities (falling back to `LIT_USAGE_API_KEY`)
+  - deployment/sponsor worker env: `LIT_USAGE_API_KEY` runs the Action (falling back to `LIT_ACCOUNT_API_KEY`); `LIT_ACCOUNT_API_KEY` provisions authorities (`lit-chipotle-provision` alone falls back to `LIT_USAGE_API_KEY`; without an account key, `lit-chipotle-bootstrap-session` creates a new Lit account)
   - per-session worker-secret overrides: `litAccountApiKey` (the field behind the visible "Lit API key" input), `litUsageApiKey`
 - Session-scoped non-secret Chipotle identifiers are Worker config, not browser env vars:
   - `litApiBase`

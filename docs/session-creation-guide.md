@@ -30,7 +30,7 @@ config and reads it back. **Deploy the Worker now** runs the deploy step early
 if you want to check the Worker first. The token and keys are request-only:
 they are never stored in the browser, the address bar, templates or the
 session config. The default deploy helper is the project's, and its operator can
-see the token; see
+see the token, the keys sent with it, and the Worker secrets it generates; see
 [API token setup and handling](session-cors-worker.md#api-token-setup-and-handling).
 The token-free path, a guided Cloudflare dashboard handoff, is under Hosting and
 storage → More; once its Worker is verified, Create needs no token. Lit profiles
@@ -521,8 +521,8 @@ What gets stored where:
   receive payloads encrypted before upload, and Cloudflare, which is mutable and
   not permanent.
 - **Encryption** in Access and identity offers
-  `none` (payload bytes are stored as provided), `lit` (data is encrypted
-  before upload and a Lit Action releases its key after an on-chain SBT check;
+  `none` (payload bytes are stored as provided), `lit` (locked fields are encrypted
+  before upload and a Lit Action releases their key after an on-chain SBT check;
   the key passes through the session worker, so the Worker operator and Lit
   account administrators remain trusted; scoped usage keys alone cannot
   authorize decryption, and it is not end-to-end), and
@@ -843,7 +843,7 @@ After success, the wizard generates:
 This is the path `/new` shows first. **Create** sends the request-only Cloudflare
 API token to the deploy helper, which creates the Worker, discovers its URL, and
 seeds config automatically. The default helper is the project's, and its operator
-can see the token. See
+can see the token, the keys sent with it, and the Worker secrets it generates. See
 [API token setup and handling](session-cors-worker.md#api-token-setup-and-handling).
 
 ### Cloudflare dashboard handoff (no API token)

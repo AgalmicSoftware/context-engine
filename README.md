@@ -24,8 +24,8 @@ Hosting the website is a separate decision: use [contextengine.sh](https://conte
 
 | Mode | Availability | Infrastructure and setup |
 | --- | --- | --- |
-| **Hosted & Fast** | Available; where `/new` starts | A per-session Cloudflare Worker and Cloudflare storage. Results start public with unencrypted answers; choosing encryption or another results visibility keeps them private. Setup needs a Cloudflare account, one AI-provider key, and either a Cloudflare API token or the token-free dashboard setup. No EVM network or transaction, RPC endpoint, gas, Arweave, or Lit is required by default. |
-| **Trustless & Slower** | Available; opt-in under `Runs on` | Arweave plus an EVM registry and contracts. Data is publicly readable unless Lit encryption is selected. Setup requires a Session Worker, an Arweave wallet/JWK, an EVM RPC URL, a wallet with gas, and one AI-provider key; add Lit credentials only when Lit encryption is selected. |
+| **Hosted & Fast** | Available; where `/new` starts | A per-session Cloudflare Worker and Cloudflare storage. Results start public with unencrypted answers; choosing encryption or another results visibility keeps them private. Setup needs a Cloudflare account, an AI-provider key (OpenAI by default), and either a Cloudflare API token or the token-free dashboard setup. No EVM network or transaction, RPC endpoint, gas, Arweave, or Lit is required by default. |
+| **Trustless & Slower** | Available; opt-in under `Runs on` | Arweave plus an EVM registry and contracts. Data is publicly readable unless locked with Lit encryption. Setup requires a Session Worker, an Arweave wallet/JWK, an EVM RPC URL, a wallet with gas and the 0.0001 ETH creation fee, and an AI-provider key (OpenAI by default); add Lit credentials only when Lit encryption is selected. |
 | **Company-Operated** | Planned; not yet generally available | Existing hardware, private clouds, or internal networks will connect through adapters for company identity and key management, storage, AI gateways, and observability. Public EVM and Arweave will not be required, so this mode will be able to run entirely off-chain. |
 
 The former `.xyz` address redirects to [contextengine.sh](https://contextengine.sh). Participants never need deployer API keys.
@@ -105,7 +105,7 @@ For testing, run modes, and deeper setup:
 
 ### Deployer UX: Sponsored Bundles
 
-- Setup requirements follow the selected profile: the default Cloudflare profile needs a Cloudflare account, one AI-provider key, and either a Cloudflare API token or the token-free dashboard setup
+- Setup requirements follow the selected profile: the default Cloudflare profile needs a Cloudflare account, an AI-provider key (OpenAI by default), and either a Cloudflare API token or the token-free dashboard setup
 - Sponsored bundles and advanced configuration can supply Arweave, EVM/RPC, Lit, or other credentials only when the selected decentralized or encrypted profile needs them; planned company-operated adapters will connect internal services instead
 
 ## AI Discourse Corpus

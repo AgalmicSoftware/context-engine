@@ -13,8 +13,8 @@ path.
 
 | Profile | Availability | Canonical authority and storage | Creator setup | Chain requirement |
 | --- | --- | --- | --- | --- |
-| Hosted & Fast | Implemented; default path | Creator-owned per-session Cloudflare Worker, Worker KV/Cloudflare payload storage, and `worker_canonical` authority; results start public with unencrypted answers, and `worker_envelope` encryption is optional | Cloudflare account; one AI-provider key; a Cloudflare API token or the token-free dashboard handoff | None by default; the passkey-derived EOA signs worker config without submitting a transaction |
-| Trustless & Slower | Implemented; opt-in | Public EVM registry/contracts and Arweave | Compatible Session Worker, wallet transaction, gas, RPC access, Arweave JWK, and one AI-provider key | Required; Lit credentials are required only when Lit encryption is selected |
+| Hosted & Fast | Implemented; default path | Creator-owned per-session Cloudflare Worker, Worker KV/Cloudflare payload storage, and `worker_canonical` authority; results start public with unencrypted answers, and `worker_envelope` encryption is optional | Cloudflare account; an AI-provider key (OpenAI by default); a Cloudflare API token or the token-free dashboard handoff | None by default; the passkey-derived EOA signs worker config without submitting a transaction |
+| Trustless & Slower | Implemented; opt-in | Public EVM registry/contracts and Arweave | Compatible Session Worker, wallet transaction, gas, the 0.0001 ETH creation fee, RPC access, Arweave JWK, and an AI-provider key (OpenAI by default) | Required; Lit credentials are required only when Lit encryption is selected |
 | Company-Operated | Planned; not generally available | Intended organizational IAM, key-release/KMS, storage, AI gateway, networking, and observability adapters | To be defined by the operator's environment | Not required by the architecture; an entirely off-chain deployment is a target, while a private EVM could only be an optional future adapter |
 
 Creators need deployment credentials only while provisioning infrastructure.
