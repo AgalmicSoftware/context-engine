@@ -92,6 +92,7 @@ All notable changes to this project will be documented in this file.
 - A question an admin hid, from the admin panel or the settings list, and its answers leave the Results report, its filters, Raw Results, the AI's input and every export, including for admins.
 - The hidden and highlighted question lists in session settings apply in the browser for Worker-hosted sessions. They only took effect there for on-chain sessions before.
 - An admin on a session with public Results can sign in and generate AI views when no report exists yet. The check button stayed disabled.
+- A signed-out visitor to a session whose Results aren't public is asked to log in, in the report and in Raw Results. The report offered a Retry that couldn't work, and Raw Results read as if nobody had answered.
 - An on-chain survey edit checks the stored copy again just before sending, so an edit saved from another tab or device moments earlier isn't overwritten.
 - Adding a template's questions to a session removes only what was uploaded. A question edited or added while the upload ran stays in the draft.
 - A rating with the same wording but a different scale, step or end labels is no longer reported as already published when another author owns its ID. The upload is refused instead, because the two still share an ID.

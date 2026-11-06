@@ -1,5 +1,31 @@
 import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from './sessionModeProfile';
-import { resolveSessionCapabilityProjection } from './sessionCapabilityProjection';
+import { resolveSessionCapabilityProjection, sessionAnswersRequireLogin } from './sessionCapabilityProjection';
+
+describe('sessionAnswersRequireLogin', () => {
+  const session = (mode: string, visibility?: string) => ({
+    sessionModeProfile: { authority: { mode }, results: { visibility } },
+  });
+
+  it.each([
+    ['private to each person', session('worker_canonical', 'participant_aggregate'), true],
+    ['admin only', session('worker_canonical', 'private_admin'), true],
+    ['public Results', session('worker_canonical', 'public_full_if_storage_public'), false],
+    ['no stated visibility', session('worker_canonical'), false],
+    ['a public anchor', session('worker_with_public_anchor', 'participant_aggregate'), false],
+    ['on-chain authority', session('evm_registry_canonical', 'participant_aggregate'), false],
+    ['no profile', { slug: 'edge' }, false],
+    ['no session', null, false],
+  ])('%s', (_label, value, expected) => {
+    expect(sessionAnswersRequireLogin(value)).toBe(expected);
+  });
+
+  it('reads a bare profile as well as a session config', () => {
+    const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+
+    expect(sessionAnswersRequireLogin(profile)).toBe(true);
+    expect(sessionAnswersRequireLogin({ sessionModeProfile: profile })).toBe(true);
+  });
+});
 
 describe('sessionCapabilityProjection', () => {
   it('keeps the minimal worker-canonical profile chainless and worker-native', () => {

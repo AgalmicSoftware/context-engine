@@ -132,6 +132,9 @@ import {
   type SurveyResultsScopedQuestionNetworkMemo,
 } from './surveyResultsQuestionNetworkReadController';
 import { getBlockedQuestionIdsSet } from './surveyToolScope';
+import { toggleLoginModal } from '../../actions/sessionStateActions';
+import { sessionAnswersRequireLogin } from '../../utilities/session/sessionCapabilityProjection';
+import { SurveyResultsLoginPrompt } from './SurveyResultsLockedResponsesPanel';
 import {
   applySurveyResultsBuiltInDemoQuestionMetadataFallbackToBucket,
   isSurveyResultsDemoQuestionResultsContext,
@@ -340,6 +343,7 @@ export type SurveyResultsProps = SurveyResultsRecord & {
   sessionState?: unknown;
   setFilterLoading?: (loading: unknown) => void;
   surveyId?: string;
+  toggleLoginModal?: (isOpen: boolean) => unknown;
   viewMode?: string;
 };
 export type SurveyResultsState = SurveyResultsRecord & {
@@ -2362,6 +2366,11 @@ const SurveyResults = (props: SurveyResultsProps): React.ReactElement => {
   }, []);
 
   return renderSurveyResultsRenderSurface({
+    loginPromptNode:
+      !(props.loginComplete && props.account) &&
+      sessionAnswersRequireLogin(getEffectiveSessionContext().sessionConfig) ? (
+        <SurveyResultsLoginPrompt onLogin={() => props.toggleLoginModal?.(true)} />
+      ) : null,
     workerGroupFilterNotice:
       groupResolution.cohort.active && groupResolution.cohort.message ? (
         <div role={groupResolution.cohort.status === 'error' ? 'alert' : 'status'}>
@@ -2452,4 +2461,4 @@ const mapStateToProps = (state: SurveyResultsRecord = {}) => {
     loginComplete: !!sessionState.loginComplete,
   };
 };
-export default connect(mapStateToProps)(SurveyResults);
+export default connect(mapStateToProps, { toggleLoginModal })(SurveyResults);

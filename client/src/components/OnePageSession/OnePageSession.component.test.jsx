@@ -922,6 +922,21 @@ describe('OnePageSession view gating', () => {
     expect(refreshQuestionResponses).toHaveBeenCalledWith(null, { slug: 'edge' });
   });
 
+  it('lets the embedded report open the login dialog', async () => {
+    const toggleLoginModal = jest.fn();
+    render(<OnePageSession {...buildProps()} toggleLoginModal={toggleLoginModal} />);
+
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
+    await waitFor(() => {
+      expect(screen.getByTestId('polis-report')).toBeInTheDocument();
+    });
+    toggleLoginModal.mockClear();
+
+    const reportProps = mockPolisReport.mock.calls.map((args) => args[0]).at(-1);
+    reportProps.onRequestLogin();
+    expect(toggleLoginModal).toHaveBeenCalledWith(true);
+  });
+
   it('passes the built-in demo display slug to the embedded report', async () => {
     render(
       <OnePageSession

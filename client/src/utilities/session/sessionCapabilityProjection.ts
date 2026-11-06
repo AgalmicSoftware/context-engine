@@ -59,6 +59,14 @@ export const claimsWorkerCanonicalAuthority = (value: unknown): boolean => {
   return candidate.present && asRecord(asRecord(candidate.value).authority).mode === 'worker_canonical';
 };
 
+// Mirrors the Worker's private response rule: unless Results are public, only a
+// signed-in person can read answers, so a signed-out visitor's load can't succeed.
+export const sessionAnswersRequireLogin = (value: unknown): boolean => {
+  if (!claimsWorkerCanonicalAuthority(value)) return false;
+  const { visibility } = asRecord(asRecord(getProfileCandidate(value).value).results);
+  return !!visibility && visibility !== 'public_full_if_storage_public';
+};
+
 const hasOnChainCondition = (document: unknown): boolean =>
   Array.isArray(asRecord(document).conditions) &&
   (asRecord(document).conditions as SessionModeAccessConditionDocument['conditions']).some(

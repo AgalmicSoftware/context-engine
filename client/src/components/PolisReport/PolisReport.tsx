@@ -76,6 +76,7 @@ import type {
   StringMap,
   UnknownRecord,
 } from './polisReportRuntime';
+import { sessionAnswersRequireLogin } from '../../utilities/session/sessionCapabilityProjection';
 import {
   DEFAULT_EXPLORATORY_CLUSTER_COUNT,
   OPINION_GROUPS_TOOLTIP_TEXT,
@@ -197,6 +198,7 @@ export default function PolisReport({
   sessionConfig = null,
   cacheInitializationError = false,
   onRetryLoad,
+  onRequestLogin,
 }: PolisReportProps) {
   const [ratingMatrix, setRatingMatrix] = useState<RatingMatrix | null>(null);
   const [retryingLoad, setRetryingLoad] = useState(false);
@@ -2423,6 +2425,8 @@ export default function PolisReport({
   const isLoading = isRefreshing && !hasRenderableReport;
   // A failed session load never settles on its own; say so and offer a retry instead of spinning.
   const loadFailed = isLoading && !!cacheInitializationError && typeof onRetryLoad === 'function';
+  // Retrying can't help someone the Worker refuses until they log in, so ask for that instead.
+  const loginRequired = loadFailed && !(loginComplete && account) && sessionAnswersRequireLogin(sessionConfig);
   const retryLoad = async () => {
     if (retryingLoad || typeof onRetryLoad !== 'function') return;
     setRetryingLoad(true);
@@ -2620,7 +2624,16 @@ export default function PolisReport({
           </div>
         )}
 
-        {loadFailed ? (
+        {loginRequired ? (
+          <p className={styles.noData} role="status">
+            Log in to see your answers.{' '}
+            {onRequestLogin && (
+              <button type="button" className={styles.downloadButton} onClick={onRequestLogin}>
+                Log in
+              </button>
+            )}
+          </p>
+        ) : loadFailed ? (
           <p className={styles.noData} role="alert">
             Responses could not be loaded, so the report can&apos;t be shown yet.{' '}
             <button type="button" className={styles.downloadButton} onClick={retryLoad} disabled={retryingLoad}>

@@ -853,6 +853,7 @@ export default function OnePageSessionStandardShell({
                           ? () => refreshQuestionResponses(null, { slug: embeddedQuestionSessionSlug })
                           : undefined
                       }
+                      onRequestLogin={typeof toggleLoginModal === 'function' ? () => toggleLoginModal(true) : undefined}
                       questionScanProgress={questionScanProgress}
                       questionResponsesNonce={questionResponsesNonce}
                       sessionSlug={displaySessionSlug}

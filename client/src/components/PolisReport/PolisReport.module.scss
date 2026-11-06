@@ -67,6 +67,33 @@
   color: var(--ce-text-muted);
 }
 
+.noData button {
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid var(--report-control-blue);
+  border-radius: 10px;
+  background: var(--report-control-blue);
+  color: var(--report-control-white);
+  font-style: normal;
+  font-weight: 600;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--report-control-blue-hover);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--report-control-blue);
+    outline-offset: 2px;
+  }
+
+  &:disabled {
+    background: var(--report-control-blue-tint);
+    color: var(--report-control-blue-hover);
+    cursor: progress;
+  }
+}
+
 .loadingState {
   width: 100%;
   min-height: 200px;

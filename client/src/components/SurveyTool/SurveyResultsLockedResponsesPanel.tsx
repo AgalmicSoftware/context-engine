@@ -49,6 +49,18 @@ export const SurveyResultsLockedResponsesToggle = ({
   );
 };
 
+// Answers this visitor can't read until they log in: not a failure, and not a real count of zero.
+export const SurveyResultsLoginPrompt = ({ onLogin }: { onLogin?: () => void }): React.ReactElement => (
+  <div className={styles.lockedBanner} role="status">
+    <div className={styles.lockedBannerTop}>
+      <p className={styles.lockedBannerSubtext}>Log in to see your answers.</p>
+      <Button type="button" className={styles.exportToggleButton} onClick={onLogin}>
+        Log in
+      </Button>
+    </div>
+  </div>
+);
+
 export const SurveyResultsLockedResponsesBanner = ({
   decrypting = false,
   isOpen = false,
