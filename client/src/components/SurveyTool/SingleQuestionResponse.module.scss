@@ -250,20 +250,6 @@
   margin-top: 5px;
 }
 
-/* multi-choice styling */
-.multiChoice {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-left: 10px;
-}
-
-.checkboxOptionText {
-  font-size: 1em;
-  font-weight: 600;
-  color: var(--ce-color-border-light);
-}
-
 /* rating slider */
 .importanceSlider {
   margin-top: 10px;
@@ -278,65 +264,6 @@
 }
 .ratingSlider {
   width: 200px;
-}
-
-/* binary styling */
-.binaryChoice {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  margin-top: 1rem;
-  .radioOptionText {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin: 0 0.5rem;
-    font-size: 1rem;
-    color: var(--ce-border-light);
-    cursor: pointer;
-    padding: 0.5rem 1rem;
-    border-radius: var(--ce-radius-4);
-    transition: font-weight 0.3s ease;
-    &.selected {
-      font-weight: 900;
-      font-style: italic;
-    }
-
-    input[type='radio'] {
-      display: none;
-    }
-
-    &:hover {
-      background-color: var(--ce-color-border);
-    }
-
-    &.agree {
-      background-color: var(--ce-binary-choice-agree-bg);
-      color: var(--ce-binary-choice-agree-text);
-      &:before {
-        font-weight: 900;
-        margin-right: 0.5rem;
-      }
-    }
-
-    &.unsure {
-      background-color: var(--ce-binary-choice-unsure-bg);
-      color: var(--ce-color-black);
-    }
-
-    &.disagree {
-      background-color: var(--ce-binary-choice-disagree-bg);
-      color: var(--ce-binary-choice-disagree-text);
-      &:before {
-        font-weight: 900;
-        margin-right: 0.5rem;
-      }
-    }
-
-    .optionIcon {
-      margin-right: 0.5rem;
-    }
-  }
 }
 
 /* importance text style */
@@ -403,16 +330,6 @@
   &:hover {
     color: var(--ce-status-warning-text);
   }
-}
-
-.miniAnswer {
-  background-color: color-mix(in srgb, var(--ce-text-inverse) 15%, transparent);
-  padding: 8px;
-  border-radius: var(--ce-radius-4);
-  color: var(--ce-color-white);
-  font-weight: 600;
-  margin-top: 5px;
-  margin-bottom: 5px;
 }
 
 /* NEW - Read-only Answer Styles */
@@ -537,22 +454,6 @@
     font-size: 0.9em;
     font-weight: 600;
   }
-}
-
-/*
-     Additional detail row for the expanded mini mode
-  */
-.miniExpandedTopRow {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 10px;
-}
-
-.miniIdLabel {
-  font-size: 0.9em;
-  color: var(--ce-color-border-light);
-  font-weight: 600;
 }
 
 .externalLink {
@@ -778,67 +679,18 @@
   }
 }
 
-.affordanceStack {
-  margin-top: 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.affordanceBlock {
-  border: 1px dashed color-mix(in srgb, var(--ce-text-inverse) 12%, transparent);
-  border-radius: var(--ce-radius-8);
-  padding: 8px;
-}
-
 .answerPillsRow {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
 }
 
-/* Visually disabled look, but allows the parent to receive the click */
-.disabledVisual {
-  opacity: 0.6;
-  filter: grayscale(10%);
-  pointer-events: none;
-}
-
-/* For inputs we want to look disabled while letting click-through happen on container */
-.disabledInput {
-  pointer-events: none;
-  opacity: 0.6;
-}
-
-/* Small header row for prompt + open icon */
-.questionHeaderRow {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.openLinkButton {
-  background: none;
-  border: 0;
-  color: inherit;
-  cursor: pointer;
-  padding: 4px;
-  line-height: 1;
-  &:focus {
-    outline: 2px solid color-mix(in srgb, var(--ce-compat-indigo) 70%, transparent);
-    outline-offset: 2px;
-  }
-}
-
 @container ce-theme style(--ce-layout-profile: minimal-app) {
   .questionTitle,
   .miniPromptAbbrev:not(.maskedPromptActionButton),
-  .checkboxOptionText,
   .ratingLabelText,
   .ratingValueLabel,
   .importanceText,
-  .miniIdLabel,
   .aggregatorText,
   .multiChoiceOption,
   .optionStats {
@@ -861,7 +713,6 @@
 
   .freeformAnswer,
   .additionalCommentsContent,
-  .miniAnswer,
   .encryptedResponseText,
   .readOnlyRating,
   .readOnlyMultichoice .choiceItem {

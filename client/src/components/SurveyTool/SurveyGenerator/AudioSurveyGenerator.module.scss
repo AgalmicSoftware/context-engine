@@ -20,12 +20,6 @@ $input-border: var(--ce-input-border);
   font-family: var(--ce-font-mono);
   display: flex;
   flex-direction: column;
-  .header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 10px;
-  }
 
   .sessionSelectorTriggerRow {
     display: flex;
@@ -70,13 +64,6 @@ $input-border: var(--ce-input-border);
     display: inline-flex;
     align-items: center;
     justify-content: center;
-  }
-
-  .docLibraryLink {
-    color: color-mix(in srgb, var(--ce-text-inverse) 88%, transparent);
-    text-decoration: none;
-    border-bottom: 1px solid color-mix(in srgb, var(--ce-text-inverse) 22%, transparent);
-    padding-bottom: 2px;
   }
 
   .viewModeShell {
@@ -723,29 +710,6 @@ $input-border: var(--ce-input-border);
     color: var(--ce-status-danger-text);
   }
 
-  .compactBtn {
-    white-space: nowrap;
-    padding: 6px 12px;
-    height: 38px;
-    /* Match standard input height */
-    font-size: 0.9rem;
-    background: var(--ce-authoring-control-bg) !important;
-    border: 1px solid var(--ce-authoring-control-border) !important;
-    color: var(--ce-authoring-control-text) !important;
-    &:hover {
-      background: var(--ce-authoring-control-bg) !important;
-      border-color: var(--ce-action-accent) !important;
-    }
-    &:active,
-    &:focus,
-    &:focus-visible {
-      background: var(--ce-authoring-control-bg) !important;
-      border-color: var(--ce-focus-ring) !important;
-      color: var(--ce-authoring-control-text) !important;
-      box-shadow: 0 0 0 2px color-mix(in srgb, var(--ce-focus-ring) 25%, transparent);
-    }
-  }
-
   .countControlRow {
     display: flex;
     align-items: center;
@@ -946,10 +910,6 @@ $input-border: var(--ce-input-border);
   @media (max-width: 600px) {
     .databaseTool {
       padding: 10px;
-      .header {
-        flex-direction: column;
-        align-items: flex-start;
-      }
       form {
         gap: 10px;
       }
@@ -967,7 +927,6 @@ $input-border: var(--ce-input-border);
       align-items: stretch;
     }
 
-    .compactBtn,
     .transcriptToggleBtn,
     .docSaveAudienceButton,
     .libraryButton,
@@ -1094,32 +1053,6 @@ $input-border: var(--ce-input-border);
     font-size: 1.1em;
     margin: 0;
     border: none;
-  }
-
-  .markdownSummary {
-    max-width: 90ch;
-    margin: 0 auto;
-    background: var(--ce-status-info-text);
-    color: var(--ce-document-text);
-    border: 1px solid var(--ce-status-info-text);
-    padding: 12px;
-    border-radius: var(--ce-radius-6);
-    max-height: 360px;
-    overflow: auto;
-    line-height: 1.35;
-    font-size: 1.1rem;
-    white-space: pre-wrap;
-  }
-
-  .ingressButton {
-    background: var(--ce-color-black);
-    border: 1px solid var(--ce-color-border);
-    color: var(--ce-color-white);
-    border-radius: var(--ce-radius-4);
-    cursor: pointer;
-    &:hover {
-      background: var(--ce-document-text);
-    }
   }
 
   /* --- Visual Question Type Selector --- */

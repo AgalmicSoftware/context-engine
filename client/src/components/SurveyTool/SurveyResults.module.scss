@@ -207,17 +207,6 @@
   );
 }
 
-.closeButton {
-  background: none;
-  border: none;
-  font-size: 1.5rem;
-  cursor: pointer;
-  color: var(--ce-color-text-muted);
-  &:hover {
-    color: var(--ce-color-dark);
-  }
-}
-
 .modalSubtitle {
   font-size: 0.9rem;
   color: var(--ce-overlay-text-muted) !important;
@@ -306,40 +295,12 @@
 /* --------------------------------------
  Filter / Search UI
 --------------------------------------- */
-.filterContainer {
-  display: flex;
-  align-items: center;
-  margin-bottom: 1.5rem;
-}
 
 .filterInput {
   flex-grow: 1;
   margin-right: 0.5rem;
   color: var(--ce-color-black) !important;
   font-weight: 600;
-}
-
-.searchIcon {
-  font-size: 1.25rem;
-  color: var(--ce-color-text-muted);
-}
-
-.filterModalOption {
-  color: var(--ce-color-black) !important;
-  font-size: 1.5em;
-  font-weight: 600;
-}
-
-.cumulativeCheckLabel {
-  color: var(--ce-color-black) !important;
-  font-size: 1.5em;
-}
-
-.filterModalCheckbox {
-  color: var(--ce-color-black) !important;
-  font-size: 1.5em;
-  visibility: initial !important;
-  opacity: 1 !important;
 }
 
 .htmlReportModal {
@@ -591,43 +552,6 @@
     color: var(--ce-document-text-muted) !important;
     opacity: 1 !important;
   }
-}
-
-.filterSection {
-  margin-bottom: 1rem;
-}
-
-.filterOptions {
-  padding: 1rem;
-  background: var(--ce-color-surface-light);
-  border-radius: var(--ce-radius-4);
-  margin-top: 1rem;
-}
-
-.sbtOptions {
-  margin-top: 1rem;
-  padding: 1rem;
-  background: var(--ce-color-white);
-  border-radius: var(--ce-radius-4);
-}
-
-/* Boundary box for top filter & export actions */
-.topActionsContainer {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 1rem;
-  padding: 15px;
-  border: 2px solid var(--ce-document-border);
-  border-radius: var(--ce-radius-12);
-  background-color: var(--ce-document-surface);
-}
-
-.sbtFilterContainer {
-  display: flex;
-  flex-direction: column;
-  min-width: 300px;
-  margin-right: 20px;
 }
 
 .filterBoxLabel {
@@ -890,10 +814,6 @@
   color: var(--ce-overlay-text-muted);
 }
 
-.responseItem {
-  margin-bottom: 1rem;
-}
-
 @media (max-width: 767px) {
   .modalHeaderControls {
     width: 100%;
@@ -994,23 +914,11 @@
   /* bigger lock icon */
 }
 
-.caretIcon {
-  font-size: 1.5rem;
-  /* bigger caret */
-  transition: transform 0.2s ease;
-}
-
 .responseCard {
   background-color: var(--ce-overlay-surface-alt);
   color: var(--ce-overlay-text);
   border-radius: var(--ce-radius-0) var(--ce-radius-0) var(--ce-radius-8) var(--ce-radius-8);
   padding: 1rem;
-}
-
-/* For toggling question expansions in aggregator mode */
-.questionSummaryCard {
-  background-color: var(--ce-control-disabled-bg) !important;
-  margin-bottom: 5px !important;
 }
 
 /* For the Polis Report container */
@@ -1045,11 +953,6 @@
 
 #surveyResultsCollapse {
   box-shadow: none !important;
-}
-
-.darkCardBody {
-  padding: 1rem;
-  background-color: var(--ce-control-disabled-bg) !important;
 }
 
 /* Aggregator improvements */
@@ -1323,27 +1226,9 @@ grey background, white text, bigger icons, etc.
   pointer-events: none;
 }
 
-/* NEW: Smaller, half-opacity refresh icon for "Refresh" actions */
-.refreshIcon {
-  font-size: 1rem;
-  opacity: 0.5;
-  margin-left: 10px;
-  cursor: pointer;
-  transition: opacity 0.2s ease;
-}
-
-.refreshIcon:hover {
-  opacity: 0.7;
-}
-
 /* --------------------------------------
  Export / Download / CSV section
 --------------------------------------- */
-.exportContainer {
-  display: flex;
-  flex-direction: column;
-  margin-top: 0;
-}
 
 .exportLabel {
   font-size: 1rem;
@@ -1423,8 +1308,7 @@ grey background, white text, bigger icons, etc.
 /* --------------------------------------
  Show / Hide Results Buttons
 --------------------------------------- */
-#filterButton,
-#showResultsButton {
+#filterButton {
   background: transparent;
   font-weight: 600;
   padding: 10px;
@@ -1437,28 +1321,9 @@ grey background, white text, bigger icons, etc.
   margin-right: 10px;
 }
 
-#showResultsButton {
-  opacity: 0.5;
-}
-
-/* If you have top-level container for results (optional) */
-.topButtonsContainer {
-  display: flex;
-  justify-content: center;
-  gap: 10px;
-  margin-bottom: 20px;
-}
-
 /* --------------------------------------
  Sizing & layout for the encryption / uploading text
 --------------------------------------- */
-#uploadingEncryptingText {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  justify-content: center;
-  color: var(--ce-color-white);
-}
 
 /* --------------------------------------
  Reused button styles
@@ -1500,138 +1365,18 @@ grey background, white text, bigger icons, etc.
 /* --------------------------------------
  Survey submission progress bars
 --------------------------------------- */
-.progressBarContainer {
-  margin-top: 20px;
-  background-color: var(--ce-color-light);
-  border-radius: var(--ce-radius-8);
-  overflow: hidden;
-}
-
-.progressBar {
-  height: 10px;
-  background-color: var(--ce-status-success);
-  transition: width 0.5s ease;
-}
 
 /* --------------------------------------
  Survey submission confirmation
 --------------------------------------- */
-.surveySubmissionConfirmation {
-  margin-top: 30px;
-  padding: 20px;
-  background-color: var(--ce-color-success-soft);
-  border-radius: var(--ce-radius-8);
-  border: 1px solid var(--ce-color-success-soft-hover);
-  h3 {
-    color: var(--ce-overlay-surface);
-    margin-bottom: 15px;
-  }
-
-  p {
-    font-size: 1.1em;
-    color: var(--ce-status-success);
-  }
-}
-
-.surveyActions {
-  display: flex;
-  flex-direction: row;
-  justify-content: space-between;
-  margin-top: 20px;
-}
-
-.copySurveyLinkButton,
-.viewSurveyLink {
-  flex: 1;
-  padding: 10px;
-  text-align: center;
-  border-radius: var(--ce-radius-5);
-  font-weight: 600;
-  transition: background-color 0.3s ease;
-}
-
-.copySurveyLinkButton {
-  background-color: var(--ce-status-success);
-  color: var(--ce-color-white);
-  border: none;
-  margin-right: 10px;
-  &:hover {
-    background-color: var(--ce-status-success);
-  }
-}
-
-.viewSurveyLink {
-  background-color: var(--ce-status-info);
-  color: var(--ce-color-white);
-  text-decoration: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  &:hover {
-    background-color: var(--ce-data-series-8);
-    color: var(--ce-color-white);
-    text-decoration: none;
-  }
-}
 
 /* --------------------------------------
  Handling multiple responses
 --------------------------------------- */
-.multipleResponsesContainer {
-  margin-top: 30px;
-  padding: 20px;
-  background-color: var(--ce-color-light);
-  border-radius: var(--ce-radius-8);
-  h4 {
-    margin-bottom: 15px;
-    color: var(--ce-document-text-muted);
-  }
-}
-
-.responseNavigation {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 15px;
-  button {
-    background-color: var(--ce-color-text-muted);
-    color: var(--ce-color-white);
-    border: none;
-    padding: 5px 10px;
-    border-radius: var(--ce-radius-4);
-    transition: background-color 0.3s ease;
-    &:hover:not(:disabled) {
-      background-color: var(--ce-document-text-muted);
-    }
-
-    &:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-  }
-
-  span {
-    font-size: 1.1em;
-    font-weight: 600;
-  }
-}
 
 /* --------------------------------------
  Toggling JSON or additional data
 --------------------------------------- */
-.toggleJsonButton {
-  margin-top: 20px;
-  background-color: var(--ce-color-text-muted);
-  color: var(--ce-color-white);
-  border: none;
-  padding: 10px 15px;
-  border-radius: var(--ce-radius-5);
-  font-weight: 600;
-  transition: background-color 0.3s ease;
-  &:hover {
-    background-color: var(--ce-document-text-muted);
-  }
-}
 
 .jsonDisplay {
   margin-top: 20px;
@@ -1642,33 +1387,6 @@ grey background, white text, bigger icons, etc.
   white-space: pre-wrap;
   word-break: break-all;
   font-size: 0.9em;
-}
-
-.jsonContainer {
-  position: relative;
-}
-
-.copyJsonButton {
-  position: absolute !important;
-  top: 10px !important;
-  right: 10px !important;
-  background: transparent !important;
-  border: none !important;
-  cursor: pointer !important;
-  transition: none !important;
-  &:hover,
-  &:active,
-  &:focus {
-    background-color: transparent !important;
-    outline: none !important;
-    box-shadow: none !important;
-    color: inherit !important;
-    transform: none !important;
-  }
-}
-
-.copyJsonButton:hover {
-  color: var(--ce-status-success-text);
 }
 
 /* --------------------------------------
@@ -1692,19 +1410,8 @@ grey background, white text, bigger icons, etc.
   }
 }
 
-.viewAddressHeading {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-top: 10px;
-  margin-bottom: 10px;
-  font-weight: 600;
-}
-
-#startFreshButton,
 #decryptEditButton,
-#editButton,
-#viewAnswersButton {
+#editButton {
   margin-right: 10px;
   font-size: 1em;
   font-weight: 600;
@@ -1714,16 +1421,6 @@ grey background, white text, bigger icons, etc.
     background-color 0.3s ease,
     border-color 0.3s ease,
     color 0.3s ease;
-}
-
-#startFreshButton {
-  // background-color: var(--ce-status-success);
-  // border-color: var(--ce-status-success);
-  color: color-mix(in srgb, var(--ce-document-text-muted) 52.3%, transparent);
-  &:hover {
-    background-color: var(--ce-status-success);
-    border-color: var(--ce-status-success);
-  }
 }
 
 #editButton {
@@ -1740,16 +1437,6 @@ grey background, white text, bigger icons, etc.
   @extend %decryptCtaOutline;
   text-transform: uppercase;
   letter-spacing: 0.02em;
-}
-
-#viewAnswersButton {
-  background-color: var(--ce-status-info);
-  border-color: var(--ce-status-info);
-  color: var(--ce-color-white);
-  &:hover {
-    background-color: var(--ce-data-series-8);
-    border-color: var(--ce-data-series-8);
-  }
 }
 
 /* --------------------------------------
@@ -1774,76 +1461,9 @@ grey background, white text, bigger icons, etc.
   font-style: italic;
 }
 
-.ratingAnswer {
-  display: flex;
-  align-items: center;
-  background-color: color-mix(in srgb, var(--ce-overlay-text) 6%, var(--ce-overlay-surface));
-  border-radius: var(--ce-radius-5);
-  padding: 10px;
-  color: var(--ce-overlay-text);
-  font-weight: bold;
-  .ratingBar {
-    height: 10px;
-    background-color: var(--ce-color-accent);
-    border-radius: var(--ce-radius-5);
-    margin-right: 10px;
-  }
-
-  span {
-    font-size: 1em;
-  }
-}
-
-.multichoiceAnswer {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
-  background-color: color-mix(in srgb, var(--ce-overlay-text) 6%, var(--ce-overlay-surface));
-  border-radius: var(--ce-radius-5);
-  padding: 10px;
-  color: var(--ce-overlay-text);
-  font-weight: bold;
-  .choiceItem {
-    background-color: var(--ce-color-accent);
-    color: var(--ce-color-bg);
-    padding: 5px 10px;
-    border-radius: var(--ce-radius-15);
-    font-size: 0.9em;
-  }
-}
-
-.binaryAnswer {
-  background-color: color-mix(in srgb, var(--ce-overlay-text) 6%, var(--ce-overlay-surface));
-  border-radius: var(--ce-radius-5);
-  padding: 10px;
-  color: var(--ce-overlay-text);
-  font-weight: bold;
-}
-
-/* For aggregator binary results */
-.binaryOptionResults {
-  display: flex;
-  flex-direction: column;
-}
-
-.binaryOptionResponse {
-  margin-left: 5px;
-  font-weight: 600;
-  font-size: 1.25em;
-}
-
 /* --------------------------------------
  (Optional) Mini-Create-Survey references
 --------------------------------------- */
-#miniCreateSurveyLabel {
-  font-weight: 600;
-  font-size: 1.5em;
-  color: var(--ce-color-black) !important;
-}
-
-.tagsInput {
-  color: var(--ce-color-black) !important;
-}
 
 .modalBody,
 .surveyResultsOverride,
@@ -2371,10 +1991,8 @@ button.exportToggleButton:is(:hover, :focus, :active):not(:disabled) {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  #startFreshButton,
   #decryptEditButton,
-  #editButton,
-  #viewAnswersButton {
+  #editButton {
     transition-duration: 0.01ms !important;
   }
 }

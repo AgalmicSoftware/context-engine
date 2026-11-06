@@ -35,17 +35,6 @@ $glass-shadow: 0 8px 32px 0 color-mix(in srgb, var(--ce-compat-dark) 37%, transp
     transform: scale(1);
   }
 }
-@keyframes pulse-glow {
-  0% {
-    box-shadow: 0 0 0 0 color-mix(in srgb, var(--ce-status-info) 40%, transparent);
-  }
-  70% {
-    box-shadow: 0 0 0 10px transparent;
-  }
-  100% {
-    box-shadow: 0 0 0 0 transparent;
-  }
-}
 
 .debateMapWrapper {
   display: block;
@@ -177,8 +166,7 @@ $glass-shadow: 0 8px 32px 0 color-mix(in srgb, var(--ce-compat-dark) 37%, transp
       margin-left: auto;
     }
 
-    .viewModeSwitch,
-    .atlasLayoutSwitch {
+    .viewModeSwitch {
       display: flex;
       align-items: center;
       background: color-mix(in srgb, var(--ce-compat-dark) 30%, transparent);
@@ -2705,91 +2693,6 @@ $glass-shadow: 0 8px 32px 0 color-mix(in srgb, var(--ce-compat-dark) 37%, transp
         flex-direction: column;
       }
     }
-
-    .commentsSection {
-      .comment {
-        display: flex;
-        gap: 15px;
-        margin-bottom: 20px;
-        background: color-mix(in srgb, var(--ce-text-inverse) 2%, transparent);
-        padding: 15px;
-        border-radius: var(--ce-radius-8);
-        .avatar {
-          width: 40px;
-          height: 40px;
-          border-radius: var(--ce-radius-round);
-          background: var(--ce-color-border);
-          flex-shrink: 0;
-          border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 20%, transparent);
-          object-fit: cover;
-        }
-        .commentContent {
-          .commentUser {
-            color: $primary-glow;
-            font-size: 0.9rem;
-            font-weight: bold;
-            display: block;
-            margin-bottom: 4px;
-          }
-          .commentText {
-            color: var(--ce-document-border);
-            font-size: 0.95rem;
-            line-height: 1.5;
-          }
-        }
-      }
-    }
-
-    .addCommentSection {
-      margin-top: 30px;
-      border-top: 1px solid color-mix(in srgb, var(--ce-text-inverse) 10%, transparent);
-      padding-top: 20px;
-      .toggleCommentBtn {
-        background: transparent;
-        color: $text-muted;
-        border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 20%, transparent);
-        padding: 8px 16px;
-        border-radius: var(--ce-radius-6);
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        &:hover {
-          color: var(--ce-color-white);
-          border-color: var(--ce-color-white);
-        }
-      }
-      .commentInputContainer {
-        margin-top: 15px;
-        textarea {
-          width: 100%;
-          background: var(--ce-color-black);
-          border: 1px solid var(--ce-color-border);
-          color: var(--ce-color-white);
-          padding: 15px;
-          border-radius: var(--ce-radius-8);
-          min-height: 100px;
-          font-family: inherit;
-          margin-bottom: 10px;
-          &:focus {
-            outline: none;
-            border-color: $primary-glow;
-          }
-        }
-        .submitBtn {
-          background: $primary-glow;
-          color: var(--ce-color-black);
-          border: none;
-          padding: 10px 20px;
-          border-radius: var(--ce-radius-6);
-          font-weight: bold;
-          cursor: pointer;
-          &:hover {
-            opacity: 0.9;
-          }
-        }
-      }
-    }
   }
 }
 
@@ -2853,10 +2756,6 @@ $glass-shadow: 0 8px 32px 0 color-mix(in srgb, var(--ce-compat-dark) 37%, transp
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
   }
-
-  .debateMap .voteInputGroup {
-    animation: none !important;
-  }
 }
 
 @container ce-theme style(--ce-layout-profile: minimal-app) {
@@ -2906,8 +2805,7 @@ $glass-shadow: 0 8px 32px 0 color-mix(in srgb, var(--ce-compat-dark) 37%, transp
       background: var(--ce-document-surface);
     }
 
-    .controls .viewModeSwitch,
-    .controls .atlasLayoutSwitch {
+    .controls .viewModeSwitch {
       background: var(--ce-control-face);
 
       button,
@@ -2924,9 +2822,7 @@ $glass-shadow: 0 8px 32px 0 color-mix(in srgb, var(--ce-compat-dark) 37%, transp
 
     .atlasViewContainer {
       .hotDebatesBtn,
-      .hotDebatesBtn:hover,
-      .backBtn,
-      .backBtn:hover {
+      .hotDebatesBtn:hover {
         background: var(--ce-control-face);
         color: var(--ce-control-text);
         box-shadow: none;

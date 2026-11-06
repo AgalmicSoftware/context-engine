@@ -90,263 +90,6 @@ $muted-text: var(--ce-panel-text-muted);
   }
 }
 
-.headerTitleBlock {
-  display: grid;
-  flex: 0 0 auto;
-  gap: 6px;
-  min-width: 0;
-  max-width: 100%;
-}
-
-.headerTitleBlockWithBack {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex: 1 1 100%;
-  flex-wrap: wrap;
-  width: 100%;
-
-  h1 {
-    flex: 0 1 auto;
-    min-width: 0;
-  }
-}
-
-.headerTitleInlineControl {
-  display: inline-flex;
-  align-items: center;
-  flex: 0 0 auto;
-  margin-left: auto;
-  min-width: 0;
-}
-
-.headerResumeControl {
-  display: inline-flex;
-  align-items: center;
-  flex: 0 0 auto;
-  min-width: 0;
-}
-
-.headerBackButton {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
-  width: fit-content;
-  min-height: 34px;
-  padding: 6px 10px;
-  border: 0;
-  border-radius: var(--ce-radius-pill);
-  background: var(--ce-session-setup-accent);
-  color: var(--ce-action-accent-text);
-  cursor: pointer;
-  font-size: 0.86rem;
-  font-weight: 700;
-  line-height: 1;
-
-  &:hover,
-  &:focus-visible {
-    background: color-mix(in srgb, var(--ce-session-setup-accent) 88%, var(--ce-color-white));
-    color: var(--ce-action-accent-text);
-  }
-
-  &:focus-visible {
-    outline: 2px solid color-mix(in srgb, var(--ce-session-setup-accent) 72%, transparent);
-    outline-offset: 3px;
-  }
-}
-
-.headerActions {
-  display: flex;
-  flex: 0 1 auto;
-  align-items: flex-start;
-  gap: 12px;
-  flex-wrap: wrap;
-  min-width: 0;
-  max-width: 100%;
-  margin-left: auto;
-}
-
-.headerControlStack {
-  display: grid;
-  justify-items: end;
-  gap: 7px;
-  min-width: 0;
-  max-width: 100%;
-}
-
-.headerProfileSelectionStep {
-  align-items: stretch;
-
-  .headerTitleBlock {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-basis: 100%;
-    flex-wrap: wrap;
-    gap: 12px;
-    min-width: 0;
-    text-align: center;
-
-    h1 {
-      font-size: clamp(28px, 4vw, 32px);
-    }
-  }
-
-  .headerActions {
-    flex: 1 1 100%;
-    width: 100%;
-    margin-left: 0;
-  }
-
-  .headerControlStack {
-    width: 100%;
-    justify-items: stretch;
-  }
-}
-
-.headerSecondaryActions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.headerChainSelector {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  opacity: 0.5;
-  transition: opacity 0.2s ease;
-  &:hover {
-    opacity: 0.85;
-  }
-}
-
-.headerChainLabel {
-  font-size: 14px;
-  white-space: nowrap;
-  color: color-mix(in srgb, var(--ce-control-text) 65%, transparent);
-}
-
-.headerChainInput {
-  width: auto;
-  min-width: 200px;
-}
-
-.normalModeRail {
-  display: grid;
-  grid-template-columns: repeat(var(--session-wizard-card-count, 4), minmax(0, 1fr));
-  gap: 12px;
-  margin-bottom: 18px;
-}
-
-.normalModeCard {
-  position: relative;
-  display: flex;
-  align-items: flex-end;
-  text-align: left;
-  border-radius: var(--ce-radius-14);
-  border: 1px solid $card-border;
-  background: var(--ce-surface-alt);
-  color: $user-page-text-color;
-  padding: 16px;
-  min-height: 116px;
-  overflow: hidden;
-  box-shadow:
-    -3px 3px 6px var(--ce-surface-sunken),
-    3px -3px 6px color-mix(in srgb, var(--ce-text-inverse) 4%, transparent);
-  cursor: pointer;
-  transition:
-    border-color 0.2s ease,
-    background 0.2s ease,
-    transform 0.12s ease;
-
-  &:hover {
-    border-color: color-mix(in srgb, var(--ce-text-inverse) 24%, transparent);
-    background: var(--ce-status-info);
-    transform: translateY(-1px);
-  }
-}
-
-.normalModeCardNumber {
-  position: absolute;
-  right: 12px;
-  top: 8px;
-  font-size: 3.5rem;
-  line-height: 1;
-  font-weight: 800;
-  color: color-mix(in srgb, var(--ce-control-text) 60%, transparent);
-  pointer-events: none;
-}
-
-.normalModeCardContent {
-  position: relative;
-  z-index: 1;
-  display: grid;
-  gap: 6px;
-  max-width: 88%;
-}
-
-.normalModeCardTitle {
-  font-size: 0.95rem;
-  font-weight: 700;
-  letter-spacing: 0.01em;
-  text-transform: none;
-  overflow-wrap: normal;
-  word-break: normal;
-}
-
-.normalModeCardSummary {
-  font-size: 0.82rem;
-  line-height: 1.4;
-  color: color-mix(in srgb, var(--ce-control-text) 72%, transparent);
-}
-
-.normalModeCardReady {
-  border-color: color-mix(in srgb, var(--ce-text-inverse) 18%, transparent);
-}
-
-.normalModeCardPending {
-  border-color: color-mix(in srgb, var(--ce-text-inverse) 12%, transparent);
-}
-
-.normalModeCardNeutral {
-  border-color: color-mix(in srgb, var(--ce-text-inverse) 14%, transparent);
-}
-
-.normalModeCardActive {
-  border-color: color-mix(in srgb, var(--ce-action-accent) 40%, transparent);
-  background: color-mix(in srgb, var(--ce-action-accent) 8%, transparent);
-  box-shadow: 0 6px 22px color-mix(in srgb, var(--ce-compat-dark) 25%, transparent);
-
-  .normalModeCardNumber {
-    color: color-mix(in srgb, var(--ce-control-text) 72%, transparent);
-  }
-}
-
-.normalModeCardCompact {
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  text-align: center;
-
-  .normalModeCardNumber {
-    position: static;
-    inset: auto;
-  }
-}
-
-// Inactive steps keep their names visible so the whole path is readable.
-.normalModeCardCompactTitle {
-  font-size: 0.8rem;
-  font-weight: 600;
-  line-height: 1.15;
-  overflow-wrap: break-word;
-}
-
 .panel {
   background: $card-bg;
   border: 1px solid $card-border;
@@ -382,28 +125,6 @@ $muted-text: var(--ce-panel-text-muted);
     margin-bottom: 0;
     width: auto;
     flex: 1;
-  }
-}
-
-.sessionIdBadge {
-  opacity: 0.2;
-  font-size: 15px;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-family: var(--ce-font-mono);
-  color: color-mix(in srgb, var(--ce-control-text) 65%, transparent);
-  transition: opacity 0.2s ease;
-  &:hover {
-    opacity: 0.6;
-  }
-  .iconButton {
-    width: 24px;
-    height: 24px;
-    font-size: 13px;
-  }
-  .tooltip {
-    font-size: 12px;
   }
 }
 
@@ -481,22 +202,6 @@ $muted-text: var(--ce-panel-text-muted);
   margin-bottom: 12px;
 }
 
-.sessionIdentityRow {
-  display: grid;
-  grid-template-columns: minmax(0, 1.55fr) minmax(320px, 0.95fr);
-  gap: 14px;
-  align-items: start;
-}
-
-.sessionIdentityPrimary,
-.sessionIdentitySecondary {
-  min-width: 0;
-}
-
-.sessionIdentityRow .fieldGroup {
-  margin-bottom: 0;
-}
-
 .compactSessionHeaderStandalone {
   display: grid;
   gap: 12px;
@@ -518,115 +223,6 @@ $muted-text: var(--ce-panel-text-muted);
 .compactSessionHeaderIcon {
   font-size: 1rem;
   color: color-mix(in srgb, var(--ce-control-text) 82%, transparent);
-}
-
-.sessionHeaderPreviewSurface {
-  position: relative;
-  width: 100%;
-  aspect-ratio: 16 / 9;
-  min-height: 208px;
-  border-radius: var(--ce-radius-14);
-  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 14%, transparent);
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--ce-overlay-surface) 94%, transparent),
-      color-mix(in srgb, var(--ce-overlay-base) 92%, transparent)
-    ),
-    color-mix(in srgb, var(--ce-text-inverse) 3%, transparent);
-  overflow: hidden;
-  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--ce-text-inverse) 5%, transparent);
-}
-
-.sessionHeaderPreviewSurfaceFilled {
-  display: block;
-  width: 100%;
-  height: 100%;
-  padding: 0;
-  cursor: pointer;
-  transition:
-    transform 0.16s ease,
-    border-color 0.16s ease,
-    box-shadow 0.16s ease;
-
-  img {
-    display: block;
-    width: 100%;
-    height: 100%;
-    min-height: inherit;
-    object-fit: cover;
-  }
-
-  &:hover {
-    border-color: color-mix(in srgb, var(--ce-action-accent) 40%, transparent);
-    box-shadow:
-      0 16px 32px color-mix(in srgb, var(--ce-compat-dark) 28%, transparent),
-      inset 0 1px 0 color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
-    transform: translateY(-1px);
-  }
-
-  &:focus-visible {
-    outline: 2px solid color-mix(in srgb, var(--ce-action-accent) 90%, transparent);
-    outline-offset: 2px;
-  }
-}
-
-.sessionHeaderPreviewOverlay {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--ce-overlay-base) 10%, transparent),
-    color-mix(in srgb, var(--ce-overlay-base) 62%, transparent)
-  );
-  color: var(--ce-color-white);
-  font-size: 0.85rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  opacity: 0;
-  transition: opacity 0.16s ease;
-}
-
-.sessionHeaderPreviewSurfaceFilled:hover .sessionHeaderPreviewOverlay,
-.sessionHeaderPreviewSurfaceFilled:focus-visible .sessionHeaderPreviewOverlay {
-  opacity: 1;
-}
-
-.sessionHeaderPreviewClearButton {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  z-index: 2;
-  width: 34px;
-  height: 34px;
-  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 24%, transparent);
-  border-radius: var(--ce-radius-pill);
-  background: color-mix(in srgb, var(--ce-overlay-base) 72%, transparent);
-  color: var(--ce-color-white);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition:
-    background 0.16s ease,
-    border-color 0.16s ease,
-    transform 0.16s ease;
-
-  &:hover {
-    background: color-mix(in srgb, var(--ce-overlay-surface-alt) 92%, transparent);
-    border-color: color-mix(in srgb, var(--ce-action-accent) 42%, transparent);
-    transform: translateY(-1px);
-  }
-
-  &:focus-visible {
-    outline: 2px solid color-mix(in srgb, var(--ce-action-accent) 90%, transparent);
-    outline-offset: 2px;
-  }
 }
 
 .fieldHeader {
@@ -1050,46 +646,6 @@ $muted-text: var(--ce-panel-text-muted);
   }
 }
 
-.subSectionTitle {
-  font-size: 12px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: $muted-text;
-}
-
-.moreOptionsSection {
-  display: grid;
-  gap: 10px;
-}
-
-.moreOptionsToggle {
-  align-self: flex-start;
-  border-radius: var(--ce-radius-8);
-  border: 1px solid color-mix(in srgb, var(--ce-action-accent) 30%, transparent);
-  background: color-mix(in srgb, var(--ce-action-accent) 8%, transparent);
-  color: $user-page-text-color;
-  padding: 6px 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition:
-    border-color 0.2s ease,
-    background 0.2s ease;
-
-  &:hover {
-    border-color: color-mix(in srgb, var(--ce-action-accent) 55%, transparent);
-    background: color-mix(in srgb, var(--ce-action-accent) 16%, transparent);
-  }
-}
-
-.moreOptionsBody {
-  display: grid;
-  gap: 12px;
-  padding: 10px 12px;
-  border: 1px solid $card-border;
-  border-radius: var(--ce-radius-12);
-  background: color-mix(in srgb, var(--ce-compat-dark) 18%, transparent);
-}
-
 .contractsGrid {
   display: grid;
   gap: 12px;
@@ -1188,10 +744,6 @@ $muted-text: var(--ce-panel-text-muted);
 }
 
 @media (max-width: 720px) {
-  .headerTitleBlock {
-    min-width: 0;
-  }
-
   .header h1 {
     font-size: clamp(20px, 3.5vw, 24px);
     white-space: normal;
@@ -1203,90 +755,6 @@ $muted-text: var(--ce-panel-text-muted);
 
   .header:not(.headerProfileSelectionStep) h1 {
     font-size: clamp(18px, 3.05vw, 24px);
-  }
-
-  .header:not(.headerProfileSelectionStep) .headerTitleBlock {
-    flex: 1 1 100%;
-    width: 100%;
-  }
-
-  .header:not(.headerProfileSelectionStep) .headerTitleBlockWithBack {
-    flex-wrap: nowrap;
-    gap: 9px;
-  }
-
-  .header:not(.headerProfileSelectionStep) .headerBackButton {
-    padding-inline: 8px;
-  }
-
-  .headerActions {
-    width: 100%;
-    justify-content: stretch;
-    margin-left: 0;
-  }
-
-  .headerControlStack {
-    width: 100%;
-    justify-items: stretch;
-  }
-
-  .headerSecondaryActions {
-    justify-content: flex-end;
-  }
-
-  .normalModeRail {
-    grid-template-columns: repeat(var(--session-wizard-card-count, 4), minmax(0, 1fr));
-    gap: 6px;
-    margin-bottom: 12px;
-  }
-
-  .sessionIdentityRow {
-    grid-template-columns: 1fr;
-  }
-
-  @media (max-width: 480px) {
-    .header:not(.headerProfileSelectionStep) .headerTitleBlockWithBack {
-      flex-wrap: wrap;
-    }
-
-    .header:not(.headerProfileSelectionStep) .headerTitleInlineControl {
-      margin-left: 0;
-    }
-  }
-
-  .normalModeCard {
-    min-width: 0;
-    min-height: 78px;
-    padding: 24px 6px 9px;
-    border-radius: var(--ce-radius-10);
-  }
-
-  .normalModeCardCompact {
-    padding: 9px 6px;
-  }
-
-  .normalModeCardNumber {
-    top: 5px;
-    right: 7px;
-    font-size: 1.65rem;
-  }
-
-  .normalModeCardContent {
-    gap: 0;
-    max-width: 100%;
-  }
-
-  .normalModeCardTitle {
-    font-size: 0.78rem;
-    line-height: 1.12;
-  }
-
-  .normalModeCardCompactTitle {
-    font-size: 0.7rem;
-  }
-
-  .normalModeCardSummary {
-    display: none;
   }
 
   .panelHeaderRow {
@@ -1346,19 +814,6 @@ $muted-text: var(--ce-panel-text-muted);
 
   .encryptionGateList {
     grid-template-columns: 1fr;
-  }
-
-  .workerModePills {
-    width: 100%;
-  }
-
-  .workerModePill {
-    flex: 1 1 100%;
-    text-align: center;
-  }
-
-  .modeSegmentedOption {
-    flex-basis: 100%;
   }
 }
 
@@ -1421,28 +876,6 @@ $muted-text: var(--ce-panel-text-muted);
   white-space: pre-wrap;
   font-size: 12px;
   color: color-mix(in srgb, var(--ce-control-text) 85%, transparent);
-}
-
-.sessionHeaderPreviewModalContent {
-  background: transparent !important;
-  border: none !important;
-  box-shadow: none !important;
-}
-
-.sessionHeaderPreviewModalBody {
-  padding: 0 !important;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  cursor: pointer;
-
-  img {
-    display: block;
-    max-width: 100%;
-    max-height: 90vh;
-    border-radius: var(--ce-radius-10);
-    box-shadow: 0 18px 40px color-mix(in srgb, var(--ce-compat-dark) 45%, transparent);
-  }
 }
 
 .corsFieldRow {
@@ -1531,81 +964,6 @@ $muted-text: var(--ce-panel-text-muted);
 .workerModeSummary {
   font-size: 12px;
   color: $muted-text;
-}
-
-.workerModePills {
-  display: inline-flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.workerModePill {
-  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 14%, transparent);
-  background: color-mix(in srgb, var(--ce-text-inverse) 4%, transparent);
-  color: $user-page-text-color;
-  border-radius: var(--ce-radius-pill);
-  padding: 8px 12px;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition:
-    border-color 0.2s ease,
-    background 0.2s ease;
-
-  &:hover {
-    border-color: color-mix(in srgb, var(--ce-text-inverse) 28%, transparent);
-    background: color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
-  }
-}
-
-.workerModePillActive {
-  border-color: color-mix(in srgb, var(--ce-action-accent) 62%, transparent) !important;
-  background: color-mix(in srgb, var(--ce-action-accent) 16%, transparent) !important;
-  color: var(--ce-text-inverse) !important;
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ce-action-accent) 12%, transparent);
-}
-
-.workerModePill:disabled {
-  border-color: color-mix(in srgb, var(--ce-control-text) 24%, transparent) !important;
-  background: color-mix(in srgb, var(--ce-control-text) 5.5%, transparent) !important;
-  color: color-mix(in srgb, var(--ce-control-text) 72%, transparent) !important;
-  cursor: not-allowed;
-  opacity: 1 !important;
-}
-
-.workerRadio {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 13px;
-  margin: 0;
-  line-height: 1.2;
-}
-
-.workerRadio input {
-  margin: 0 8px 0 0 !important;
-  position: static;
-}
-
-.inlineToggleRow {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 16px;
-  padding: 2px 0 4px;
-}
-
-.modeSegmentedOption {
-  display: flex;
-  flex: 1 1 180px;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-
-  .workerModePill {
-    flex: 1 1 auto;
-    min-width: 0;
-  }
 }
 
 .iconButton {
@@ -1709,28 +1067,6 @@ $muted-text: var(--ce-panel-text-muted);
   }
 }
 
-.groupWizard .adminLoginControl {
-  cursor: pointer;
-  color: $clickable-color;
-  font-weight: 800;
-  text-align: left;
-  -webkit-text-fill-color: $clickable-color;
-
-  &:hover,
-  &:focus-visible {
-    border-color: $clickable-color;
-    background: color-mix(in srgb, var(--ce-action-accent) 10%, $input-bg);
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--ce-action-accent) 20%, transparent);
-    outline: none;
-  }
-}
-
-.workerDeployActions {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
 .workerSecretsPanel {
   margin-top: 16px;
   padding: 12px;
@@ -1744,14 +1080,6 @@ $muted-text: var(--ce-panel-text-muted);
 .resourceSection {
   display: grid;
   gap: 12px;
-}
-
-.resourceHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
 }
 
 .resourceFields {
@@ -1866,258 +1194,9 @@ $muted-text: var(--ce-panel-text-muted);
   gap: 12px;
 }
 
-.workerIntro {
-  margin-top: 12px;
-  padding: 12px;
-  border: 1px solid $card-border;
-  border-radius: var(--ce-radius-10);
-  background: color-mix(in srgb, var(--ce-text-inverse) 3%, transparent);
-  display: grid;
-  gap: 10px;
-}
-
-.workerIntroTitle {
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: $muted-text;
-}
-
-.workerIntroCopy {
-  margin: 0;
-  font-size: 13px;
-  line-height: 1.5;
-  color: color-mix(in srgb, var(--ce-control-text) 88%, transparent);
-}
-
-.workerLinks {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  align-items: center;
-}
-
-.workerDocLink {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  border: 1px solid $card-border;
-  border-radius: var(--ce-radius-pill);
-  background: color-mix(in srgb, var(--ce-text-inverse) 4%, transparent);
-  color: $user-page-text-color;
-  font-size: 12px;
-  font-family: var(--ce-font-mono);
-  text-decoration: none;
-  transition:
-    border-color 0.2s ease,
-    background 0.2s ease,
-    color 0.2s ease;
-}
-
-.workerDocLink:hover,
-.workerDocLink:focus,
-.workerDocLink:focus-visible {
-  border-color: color-mix(in srgb, var(--ce-text-inverse) 35%, transparent);
-  background: color-mix(in srgb, var(--ce-text-inverse) 10%, transparent);
-  color: $clickable-color;
-  outline: none;
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--ce-action-accent) 18%, transparent);
-}
-
 .copyStatus {
   font-size: 12px;
   color: $muted-text;
-}
-
-.copyStatusError {
-  color: var(--ce-status-danger-text);
-}
-
-.publishRow {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  align-items: center;
-}
-
-.publishHero {
-  display: grid;
-  gap: 18px;
-  padding: 0;
-  border: 0;
-  border-radius: var(--ce-radius-0);
-  background: transparent;
-  box-shadow: none;
-}
-
-.publishSummaryGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
-  gap: 12px;
-  margin: 0;
-}
-
-.publishSummaryCard {
-  display: grid;
-  align-content: start;
-  gap: 6px;
-  min-width: 0;
-  padding: 16px;
-  border-radius: var(--ce-radius-12);
-  border: 1px solid $card-border;
-  background: var(--ce-control-face);
-}
-
-.publishSummaryLabel {
-  margin: 0;
-  font-size: 12px;
-  font-weight: 700;
-  line-height: 1.5;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: $muted-text;
-}
-
-.publishSummaryValue {
-  min-width: 0;
-  margin: 0;
-  font-size: 0.98rem;
-  line-height: 1.5;
-  overflow-wrap: anywhere;
-  color: var(--ce-control-text);
-}
-
-.publishActionCluster {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 16px;
-  flex-wrap: wrap;
-}
-
-.publishPrimaryButton {
-  min-width: min(440px, 100%);
-  min-height: 78px;
-  padding: 16px 28px;
-  font-size: 1.25rem;
-  font-weight: 800;
-  border-radius: var(--ce-radius-12);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 14px;
-  background-color: var(--ce-action-submit) !important;
-  background-image: none !important;
-  color: var(--ce-color-white) !important;
-  border: 1px solid var(--ce-action-submit) !important;
-  box-shadow: 0 4px 6px color-mix(in srgb, var(--ce-compat-dark) 12%, transparent);
-  transition:
-    transform 0.2s ease,
-    opacity 0.2s ease,
-    background-color 0.2s ease,
-    border-color 0.2s ease,
-    box-shadow 0.2s ease;
-
-  &:hover {
-    background-color: var(--ce-color-indigo) !important;
-    color: var(--ce-color-white) !important;
-    border-color: var(--ce-color-indigo) !important;
-    transform: translateY(-2px);
-    box-shadow: 0 6px 12px color-mix(in srgb, var(--ce-compat-dark) 16%, transparent);
-  }
-
-  &:active,
-  &:focus,
-  &:active:focus {
-    background-color: var(--ce-color-indigo) !important;
-    color: var(--ce-color-white) !important;
-    border-color: var(--ce-color-indigo) !important;
-    box-shadow: 0 4px 6px color-mix(in srgb, var(--ce-compat-dark) 12%, transparent) !important;
-  }
-
-  &:disabled {
-    background-color: var(--ce-control-disabled-bg) !important;
-    color: var(--ce-control-text) !important;
-    border-color: $card-border !important;
-    opacity: 1;
-    box-shadow: none;
-    transform: none;
-  }
-}
-
-.publishSettingsButton {
-  width: auto;
-  height: auto;
-  padding: 6px;
-  border-radius: var(--ce-radius-0);
-  border: 0;
-  background: transparent;
-  color: color-mix(in srgb, var(--ce-control-text) 84%, transparent);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  box-shadow: none;
-  transition:
-    color 0.2s ease,
-    transform 0.12s ease;
-
-  svg {
-    font-size: 0.82rem;
-  }
-
-  &:hover {
-    color: var(--ce-color-white);
-    transform: translateY(-1px);
-  }
-
-  &:focus,
-  &:focus-visible,
-  &:active,
-  &:active:focus {
-    background: transparent;
-    color: var(--ce-color-white);
-    border: 0;
-    box-shadow: none;
-    outline: none;
-  }
-}
-
-.publishSettingsButtonActive {
-  color: color-mix(in srgb, var(--ce-action-accent) 95%, transparent);
-}
-
-@media (max-width: 720px) {
-  .publishSummaryGrid {
-    grid-template-columns: 1fr;
-    gap: 10px;
-  }
-
-  .publishSummaryCard {
-    grid-template-columns: minmax(0, 100px) minmax(0, 1fr);
-    align-items: baseline;
-    gap: 12px;
-    padding: 14px;
-  }
-
-  .publishActionCluster {
-    gap: 10px;
-  }
-
-  .publishPrimaryButton {
-    width: 100%;
-    min-width: 0;
-    min-height: 60px;
-    padding: 14px 18px;
-    font-size: 1.1rem;
-    gap: 10px;
-  }
-
-  .publishSettingsButton {
-    min-width: 44px;
-    min-height: 44px;
-  }
 }
 
 .actionButton {
@@ -2195,78 +1274,6 @@ $muted-text: var(--ce-panel-text-muted);
   margin-top: 12px;
   font-size: 13px;
   color: $muted-text;
-}
-
-.newSessionBanner {
-  margin-bottom: 18px;
-  padding: 14px 16px;
-  border: 1px solid color-mix(in srgb, var(--ce-action-accent) 24%, transparent);
-  border-radius: var(--ce-radius-14);
-  background: var(--ce-card-bg);
-  color: var(--ce-panel-text);
-  box-shadow: $card-shadow;
-}
-
-.newSessionBannerHeader {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.newSessionBannerTitle {
-  margin: 0;
-  font-size: 1rem;
-  line-height: 1.35;
-  color: var(--ce-panel-text);
-}
-
-.newSessionBannerDismissButton {
-  width: 30px;
-  height: 30px;
-  flex-shrink: 0;
-  border-radius: var(--ce-radius-pill);
-
-  &:focus-visible {
-    outline: none;
-    border-color: color-mix(in srgb, var(--ce-action-accent) 42%, transparent);
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--ce-action-accent) 18%, transparent);
-  }
-}
-
-.newSessionBannerBody {
-  display: grid;
-  gap: 10px;
-  margin-top: 10px;
-}
-
-.newSessionBannerList {
-  margin: 0;
-  padding-left: 1.2rem;
-  display: grid;
-  gap: 6px;
-
-  li {
-    line-height: 1.5;
-    color: var(--ce-panel-text);
-  }
-}
-
-.newSessionBannerCopy {
-  margin: 0;
-  line-height: 1.55;
-  color: var(--ce-panel-text-muted);
-}
-
-.newSessionBannerLink {
-  color: var(--ce-link);
-  text-decoration: underline;
-  text-underline-offset: 2px;
-
-  &:hover,
-  &:focus-visible {
-    color: var(--ce-action-accent-hover);
-  }
 }
 
 .sponsoredBundleStatus {
@@ -2360,10 +1367,6 @@ $muted-text: var(--ce-panel-text-muted);
     border-left-color: var(--ce-color-tooltip-bg);
     border-right-color: var(--ce-color-tooltip-bg);
   }
-}
-
-.encryptionPanel {
-  background: color-mix(in srgb, var(--ce-text-inverse) 4%, transparent);
 }
 
 .encryptionGateList {
@@ -2513,10 +1516,6 @@ $muted-text: var(--ce-panel-text-muted);
   }
 }
 
-.iconButtonActive {
-  color: $clickable-color;
-}
-
 .publishProgressCard {
   margin-top: 22px;
   padding: 14px 16px 16px;
@@ -2661,359 +1660,6 @@ $muted-text: var(--ce-panel-text-muted);
   }
 }
 
-.modeProfilePanel {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 7px;
-  min-width: 0;
-  max-width: 100%;
-}
-
-.modeProfileEntryPanel {
-  display: grid;
-  width: min(100%, 720px);
-  margin: 0 auto;
-  gap: 18px;
-}
-
-.modeProfileArchitectureLink {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--ce-session-setup-text);
-  font-size: 0.9rem;
-  line-height: 1;
-  transition:
-    color 0.18s ease,
-    transform 0.18s ease;
-
-  &:hover,
-  &:focus-visible {
-    color: var(--ce-session-setup-text);
-    transform: translateY(-1px);
-  }
-
-  &:focus-visible {
-    outline: 2px solid var(--ce-action-accent);
-    outline-offset: 3px;
-    border-radius: var(--ce-radius-round);
-  }
-}
-
-.modePresetCards {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 18px;
-}
-
-.modePresetCard {
-  appearance: none;
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  min-height: 0;
-  padding: 24px 26px;
-  border: 1px solid var(--ce-session-setup-border);
-  border-radius: var(--ce-radius-18);
-  background: var(--ce-session-setup-surface);
-  box-shadow: var(--ce-session-setup-shadow);
-  color: var(--ce-session-setup-text);
-  cursor: pointer;
-  font-family: var(--ce-font-ui);
-  text-align: left;
-  transition:
-    background 0.18s ease,
-    border-color 0.18s ease,
-    box-shadow 0.18s ease,
-    transform 0.18s ease;
-}
-
-.modeProfileEntryPanel .modePresetCards .modePresetCard {
-  border: 1px solid var(--ce-session-setup-border);
-  border-radius: var(--ce-radius-18);
-  background: var(--ce-session-setup-surface);
-  box-shadow: var(--ce-session-setup-shadow);
-  color: var(--ce-session-setup-text);
-  font-family: var(--ce-font-ui);
-}
-
-.modeProfileEntryPanel .modePresetCards .modePresetCard:hover,
-.modeProfileEntryPanel .modePresetCards .modePresetCard:focus-visible {
-  border-color: color-mix(in srgb, var(--ce-session-setup-accent) 74%, transparent);
-  border-radius: var(--ce-radius-18);
-  background: var(--ce-session-setup-surface-hover);
-  box-shadow: var(--ce-session-setup-shadow);
-}
-
-.modeProfileEntryPanel .modePresetCards .modePresetCard:active {
-  border-radius: var(--ce-radius-18);
-  box-shadow: var(--ce-session-setup-shadow);
-  font-family: var(--ce-font-ui);
-}
-
-.modeProfileEntryPanel .modePresetCards .modePresetCardSelected {
-  border-color: var(--ce-session-setup-accent);
-  background: var(--ce-session-setup-surface-selected);
-}
-
-.modePresetCard::after {
-  position: absolute;
-  top: 24px;
-  right: 26px;
-  width: 20px;
-  height: 20px;
-  border: 2px solid color-mix(in srgb, var(--ce-status-info-text) 72%, transparent);
-  border-radius: var(--ce-radius-round);
-  background: color-mix(in srgb, var(--ce-overlay-base) 34%, transparent);
-  box-shadow: inset 0 0 0 4px var(--ce-session-setup-surface);
-  content: '';
-}
-
-.modePresetCard:hover,
-.modePresetCard:focus-visible {
-  border-color: color-mix(in srgb, var(--ce-session-setup-accent) 74%, transparent);
-  background: var(--ce-session-setup-surface-hover);
-  box-shadow: var(--ce-session-setup-shadow);
-  transform: translateY(-1px);
-}
-
-.modePresetCard:focus-visible {
-  outline: 2px solid var(--ce-session-setup-accent);
-  outline-offset: 3px;
-}
-
-.modePresetCardSelected {
-  border-color: var(--ce-session-setup-accent);
-  background: var(--ce-session-setup-surface-selected);
-}
-
-.modePresetCardSelected::after {
-  border-color: var(--ce-session-setup-accent);
-  background: var(--ce-session-setup-accent);
-}
-
-.modePresetCardHeader {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-  padding-right: 34px;
-}
-
-.modePresetCardHeadingText {
-  display: flex;
-  align-items: baseline;
-  flex-wrap: wrap;
-  gap: 6px 12px;
-  min-width: 0;
-}
-
-.modePresetCardTitle,
-.modePresetCardProvider,
-.modePresetCardDescription,
-.modePresetCardRequirementsLabel {
-  display: block;
-}
-
-.modePresetCardTitle {
-  color: var(--ce-session-setup-text);
-  font-size: clamp(1.6rem, 4vw, 1.95rem);
-  font-weight: 680;
-  line-height: 1.1;
-}
-
-.modePresetCardProvider {
-  margin-top: 0;
-  color: var(--ce-session-setup-muted);
-  font-size: clamp(1rem, 2.2vw, 1.15rem);
-  font-weight: 500;
-  letter-spacing: normal;
-  text-transform: none;
-}
-
-.modePresetCardDescription {
-  margin-top: 22px;
-  color: var(--ce-session-setup-muted);
-  font-size: clamp(0.98rem, 2.1vw, 1.06rem);
-  font-weight: 420;
-  line-height: 1.48;
-}
-
-.modePresetCardRequirements {
-  display: grid;
-  gap: 10px;
-  margin-top: 26px;
-  padding-top: 20px;
-  border-top: 1px solid color-mix(in srgb, var(--ce-session-setup-border) 62%, transparent);
-}
-
-.modePresetCardRequirementsLabel {
-  color: var(--ce-session-setup-muted);
-  font-size: 0.72rem;
-  font-weight: 600;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
-.modePresetCardRequirementPills {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.modePresetCardRequirementPill {
-  display: inline-flex;
-  align-items: center;
-  width: fit-content;
-  min-height: 30px;
-  padding: 5px 8px;
-  border: 1px solid color-mix(in srgb, var(--ce-session-setup-accent) 68%, transparent);
-  border-radius: var(--ce-radius-pill);
-  background: color-mix(in srgb, var(--ce-session-setup-accent) 10%, transparent);
-  color: color-mix(in srgb, var(--ce-session-setup-accent) 78%, var(--ce-session-setup-text));
-  font-size: 0.72rem;
-  font-weight: 600;
-  line-height: 1.25;
-}
-
-.modePresetToggle {
-  display: flex;
-  flex: 1 1 auto;
-  align-items: center;
-  gap: 4px;
-  box-sizing: border-box;
-  min-width: 0;
-  max-width: 100%;
-  overflow-x: auto;
-  overscroll-behavior-inline: contain;
-  padding: 3px;
-  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 12%, transparent);
-  border-radius: var(--ce-radius-pill);
-  background: color-mix(in srgb, var(--ce-text-inverse) 4%, transparent);
-}
-
-.modePresetButton {
-  appearance: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  min-height: 34px;
-  padding: 5px 10px;
-  border: 0;
-  border-radius: var(--ce-radius-pill);
-  background: transparent;
-  color: color-mix(in srgb, var(--ce-control-text) 78%, transparent);
-  cursor: pointer;
-  font-size: 0.72rem;
-  font-weight: 750;
-  white-space: nowrap;
-  transition:
-    background 0.18s ease,
-    border-color 0.18s ease,
-    color 0.18s ease;
-}
-
-.modePresetButton:hover,
-.modePresetButton:focus-visible {
-  background: color-mix(in srgb, var(--ce-action-accent) 10%, transparent);
-  color: var(--ce-text-inverse);
-}
-
-.modePresetButton:focus-visible {
-  outline: 2px solid var(--ce-action-accent);
-  outline-offset: 2px;
-}
-
-.modePresetButtonSelected {
-  background: color-mix(in srgb, var(--ce-action-accent) 14%, transparent);
-  color: var(--ce-text-inverse);
-}
-
-.modePresetButtonDisabled,
-.modePresetButtonDisabled:hover {
-  background: transparent;
-  color: color-mix(in srgb, var(--ce-control-text) 46%, transparent);
-  cursor: not-allowed;
-}
-
-.modePresetSoon {
-  display: inline-flex;
-  align-items: center;
-  border-radius: var(--ce-radius-pill);
-  font-size: 0.58rem;
-  font-weight: 800;
-  line-height: 1;
-  padding: 3px 5px;
-  text-transform: uppercase;
-}
-
-.modePresetSoon {
-  border: 1px solid color-mix(in srgb, var(--ce-control-text) 18%, transparent);
-  color: color-mix(in srgb, var(--ce-control-text) 52%, transparent);
-}
-
-.modeProfilePanel .moreOptionsToggle {
-  flex: 0 0 auto;
-  align-self: center;
-  min-height: 42px;
-  padding: 5px 9px;
-  border-radius: var(--ce-radius-pill);
-  font-size: 0.7rem;
-}
-
-.modeProfilePanel .moreOptionsToggleActive {
-  border-color: color-mix(in srgb, var(--ce-action-accent) 62%, transparent);
-  background: color-mix(in srgb, var(--ce-action-accent) 18%, transparent);
-  color: var(--ce-text-inverse);
-}
-
-.modeSavedProfileResumeButton {
-  appearance: none;
-  min-height: 48px;
-  padding: 10px 18px;
-  border: 1px solid var(--ce-session-setup-accent);
-  border-radius: var(--ce-radius-pill);
-  background: var(--ce-session-setup-accent);
-  color: var(--ce-action-accent-text);
-  cursor: pointer;
-  font-size: 0.9rem;
-  font-weight: 800;
-  line-height: 1.4;
-  box-shadow: 0 10px 22px color-mix(in srgb, var(--ce-session-setup-accent) 25%, transparent);
-  transition:
-    background 0.16s ease,
-    border-color 0.16s ease,
-    box-shadow 0.16s ease,
-    transform 0.12s ease;
-}
-
-.modeSavedProfileResumeButton:hover,
-.modeSavedProfileResumeButton:focus {
-  border-color: color-mix(in srgb, var(--ce-session-setup-accent) 88%, var(--ce-color-white));
-  background: color-mix(in srgb, var(--ce-session-setup-accent) 88%, var(--ce-color-white));
-  color: var(--ce-action-accent-text);
-}
-
-.modeSavedProfileResumeButton:hover {
-  transform: translateY(-1px);
-}
-
-.modeSavedProfileResumeButton:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--ce-session-setup-accent) 72%, transparent);
-  outline-offset: 3px;
-}
-
-.modeCheckboxRow {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
-  gap: 10px;
-  width: 100%;
-}
-
 .modeSection {
   display: grid;
   gap: 16px;
@@ -3022,68 +1668,6 @@ $muted-text: var(--ce-panel-text-muted);
   border: 1px solid color-mix(in srgb, var(--ce-status-success-text) 24%, transparent);
   border-radius: var(--ce-radius-lg);
   background: color-mix(in srgb, var(--ce-action-accent) 4.5%, transparent);
-}
-
-.modeSectionEmpty {
-  margin-bottom: 18px;
-  padding: 14px 16px;
-  border: 1px solid color-mix(in srgb, var(--ce-status-warning) 32%, transparent);
-  border-radius: var(--ce-radius-10);
-  color: var(--ce-status-warning-text);
-  background: color-mix(in srgb, var(--ce-status-warning) 6%, transparent);
-}
-
-.modeSectionHeading {
-  display: grid;
-  gap: 4px;
-
-  h3,
-  p {
-    margin: 0;
-  }
-
-  h3 {
-    color: var(--ce-text-inverse);
-    font-size: 1rem;
-  }
-
-  p {
-    color: color-mix(in srgb, var(--ce-control-text) 72%, transparent);
-    font-size: 0.82rem;
-  }
-}
-
-.modeAdvancedRow {
-  display: grid;
-  grid-template-columns: minmax(130px, 0.38fr) minmax(0, 1fr);
-  gap: 14px;
-  align-items: start;
-}
-
-.modeAdvancedLabel {
-  font-weight: 700;
-  color: color-mix(in srgb, var(--ce-control-text) 84%, transparent);
-  padding-top: 7px;
-}
-
-.modeAdvancedControl {
-  display: grid;
-  gap: 8px;
-}
-
-.modeAdvancedNested,
-.modeRuleBuilder {
-  display: grid;
-  gap: 12px;
-}
-
-.modeSummaryList {
-  display: grid;
-  gap: 5px;
-  margin: 0;
-  padding-left: 1.15rem;
-  color: color-mix(in srgb, var(--ce-control-text) 76%, transparent);
-  font-size: 0.82rem;
 }
 
 .pendingWorkerGroups {
@@ -3248,120 +1832,6 @@ $muted-text: var(--ce-panel-text-muted);
   }
 }
 
-.modeFieldLabel {
-  display: grid;
-  gap: 6px;
-  margin: 0;
-  color: color-mix(in srgb, var(--ce-control-text) 84%, transparent);
-  font-weight: 700;
-}
-
-.modeRuleCard {
-  display: grid;
-  gap: 10px;
-  padding: 12px;
-  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 14%, transparent);
-  border-radius: var(--ce-radius-10);
-  background: color-mix(in srgb, var(--ce-overlay-base) 42%, transparent);
-}
-
-.modeRuleHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.modeRuleRemove {
-  appearance: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border: 0;
-  border-radius: var(--ce-radius-round);
-  background: transparent;
-  box-shadow: none;
-  color: var(--ce-status-danger-text);
-  cursor: pointer;
-
-  &:hover,
-  &:focus-visible {
-    background: color-mix(in srgb, var(--ce-status-error) 14%, transparent);
-  }
-}
-
-.modeRuleCard .modeRuleHeader button.modeRuleRemove {
-  border: 0;
-  background: transparent;
-  box-shadow: none;
-}
-
-.modeSbtRuleFields {
-  display: grid;
-  grid-template-columns: minmax(140px, 0.65fr) minmax(200px, 1.35fr) minmax(220px, 1fr);
-  gap: 10px;
-}
-
-.modeCheckboxWithTooltip {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-
-.modeCheckboxWithTooltip .modeCheckboxLabel {
-  flex: 0 1 auto;
-}
-
-.modeCheckboxWithTooltip [role='button'] {
-  flex: 0 0 auto;
-}
-
-.modeChannelOption .modeCheckboxLabel {
-  flex: 1;
-}
-
-.modeChannelOption .tooltipTrigger {
-  min-width: 44px;
-  min-height: 44px;
-}
-
-.modeChannelOption .tooltip {
-  margin: 0;
-  opacity: 1;
-  color: $muted-text;
-}
-
-.modeCheckboxLabel {
-  box-sizing: border-box;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-  min-height: 48px;
-  margin: 0;
-  padding: 10px 12px;
-  border: 1px solid color-mix(in srgb, var(--ce-control-text) 18%, transparent);
-  border-radius: var(--ce-radius-10);
-  background: color-mix(in srgb, var(--ce-overlay-base) 26%, transparent);
-  color: color-mix(in srgb, var(--ce-control-text) 90%, transparent);
-  line-height: 1.3;
-
-  > input[type='checkbox'] {
-    position: static;
-    flex: 0 0 auto;
-    margin: 0 !important;
-    opacity: 1;
-  }
-}
-
-.modeCheckboxText {
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-
 .interviewModePanel {
   display: grid;
   gap: 12px;
@@ -3457,39 +1927,7 @@ $muted-text: var(--ce-panel-text-muted);
   }
 }
 
-.modeNumberLabel {
-  display: inline-grid;
-  grid-template-columns: auto 92px;
-  align-items: center;
-  gap: 8px;
-  margin: 0;
-}
-
-.modeValidationList {
-  display: grid;
-  gap: 4px;
-  color: var(--ce-status-warning-text);
-  font-size: 0.88rem;
-}
-
 @media (max-width: 760px) {
-  .newSessionBanner {
-    padding: 13px 14px;
-  }
-
-  .newSessionBannerHeader {
-    gap: 10px;
-  }
-
-  .newSessionBannerBody {
-    gap: 8px;
-  }
-
-  .newSessionBannerList {
-    padding-left: 1.1rem;
-    gap: 5px;
-  }
-
   .publishProgressHeader {
     align-items: flex-start;
     flex-direction: column;
@@ -3523,60 +1961,13 @@ $muted-text: var(--ce-panel-text-muted);
     }
   }
 
-  .modeAdvancedRow {
-    grid-template-columns: 1fr;
-  }
-
-  .modeProfilePanel {
-    box-sizing: border-box;
-    flex-wrap: nowrap;
-    width: 100%;
-    justify-content: flex-start;
-  }
-
-  .modeProfileEntryPanel {
-    gap: 16px;
-  }
-
-  .modePresetCards {
-    grid-template-columns: 1fr;
-  }
-
-  .modePresetCard {
-    padding: 20px;
-  }
-
-  .modePresetCard::after {
-    top: 20px;
-    right: 20px;
-  }
-
-  @media (max-width: 400px) {
-    .modePresetCardRequirementPill {
-      padding-inline: 5px;
-    }
-  }
-
-  .modePresetToggle {
-    width: auto;
-  }
-
-  .modePresetButton {
-    flex: 1 0 auto;
-  }
-
   .modeSection {
     padding: 14px;
-  }
-
-  .modeSbtRuleFields {
-    grid-template-columns: 1fr;
   }
 }
 
 @container ce-theme style(--ce-layout-profile: minimal-app) {
   .header h1,
-  .modeSectionHeading h3,
   .contractLabel {
     color: var(--ce-panel-text);
   }
@@ -3609,50 +2000,11 @@ $muted-text: var(--ce-panel-text-muted);
     }
   }
 
-  .normalModeCard,
-  .normalModeCard:hover {
-    background: var(--ce-control-face);
-    color: var(--ce-control-text);
-    box-shadow: none;
-  }
-
-  .normalModeCardActive,
-  .normalModeCardActive:hover {
-    background: color-mix(in srgb, var(--ce-action-submit) 12%, var(--ce-surface));
-  }
-
-  .normalModeCardNumber,
-  .normalModeCardActive .normalModeCardNumber,
-  .normalModeCardSummary,
   .step,
   .stepCompleted {
     color: var(--ce-document-text-muted);
   }
 
-  .sessionIdBadge,
-  .sessionIdBadge:hover,
-  .headerChainSelector,
-  .headerChainSelector:hover {
-    color: var(--ce-document-text-muted);
-    opacity: 1;
-  }
-
-  .modeProfilePanel .moreOptionsToggleActive,
-  .publishSettingsButton:hover,
-  .publishSettingsButton:focus,
-  .publishSettingsButton:active {
-    color: var(--ce-control-text);
-  }
-
-  .workerModePillActive {
-    background: var(--ce-selection-bg) !important;
-    color: var(--ce-selection-text) !important;
-    box-shadow: none;
-  }
-
-  .modePresetButtonSelected,
-  .modePresetButton:hover,
-  .modePresetButton:focus-visible,
   .createSbtButton,
   .createSbtButton:hover,
   .createSbtButton:focus,
@@ -3661,7 +2013,6 @@ $muted-text: var(--ce-panel-text-muted);
     color: var(--ce-selection-text);
   }
 
-  .moreOptionsBody,
   .interviewModePanel,
   .interviewModePanelBody,
   .promptPreview,
@@ -3670,8 +2021,7 @@ $muted-text: var(--ce-panel-text-muted);
     background: var(--ce-document-surface);
   }
 
-  .interviewModePanelBody p,
-  .modeSectionHeading p {
+  .interviewModePanelBody p {
     color: var(--ce-document-text-muted);
   }
 }

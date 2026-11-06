@@ -324,37 +324,9 @@
   }
 }
 
-.breadcrumbBtn {
-  display: inline-block;
-  background-color: var(--ce-color-surface-light);
-  border: 1px solid var(--ce-document-border);
-  border-radius: var(--ce-radius-5);
-  padding: 5px 10px;
-  font-size: 16px;
-  cursor: pointer;
-  font-size: 1.85em;
-  text-transform: uppercase;
-  font-weight: 600;
-  /* margin-bottom: 20px; */
-  margin-top: 20px;
-  margin-bottom: 20px;
-}
-
-.breadcrumbBtn:hover {
-  background-color: var(--ce-color-light);
-}
-
 .disabled {
   opacity: 0.5;
   pointer-events: none;
-}
-
-.inputBar {
-  font-size: 18px;
-}
-
-#searchIcon {
-  font-size: 16px;
 }
 
 @media (min-width: 466px) and (max-width: 768px) {
@@ -582,39 +554,6 @@
   color: var(--ce-status-warning);
 }
 
-.secureAddressDisplay {
-  display: flex;
-  flex-direction: column;
-  flex-wrap: wrap; // background: color-mix(in srgb, var(--ce-status-success) 38%, transparent);
-  background: color-mix(in srgb, var(--ce-status-success) 50.2%, transparent); // border-style: solid;
-  // border-width: 2px;
-  // border-color: var(--ce-status-success-text);
-  border-radius: var(--ce-radius-7);
-  margin-right: 15px;
-  margin-left: 15px;
-  padding: 20px;
-  color: var(--ce-color-white);
-  font-size: 1.65em;
-  margin-bottom: 15px;
-  margin-top: 15px;
-  font-weight: 600; // background: linear-gradient(90deg, var(--ce-status-info), var(--ce-status-info), var(--ce-status-info), var(--ce-status-info), var(--ce-status-info), var(--ce-status-info), var(--ce-data-series-2), var(--ce-data-series-2));
-  // border-radius: var(--ce-radius-0);
-  border: 1px var(--ce-color-bg) solid;
-  border-radius: var(--ce-radius-5);
-  box-shadow:
-    5px 5px 12px var(--ce-overlay-base),
-    -5px -5px 12px var(--ce-status-info);
-}
-
-.secureAddress {
-  // padding-top: 0.5em;
-  display: flex;
-  flex-direction: row;
-  align-self: center;
-  opacity: 0.85;
-  font-weight: 600;
-}
-
 .explainerTooltipIcon {
   display: inline-flex;
   align-items: center;
@@ -650,90 +589,8 @@
   line-height: 1.5;
 }
 
-#aboutText {
-  font-size: 1.25em;
-  opacity: 0.75;
-}
-
-#aboutCaret {
-  display: inline;
-  font-size: 2em;
-  margin-right: 20px;
-}
-
 ///
 ///
-///
-
-#plusImage {
-  background-size: contain;
-  opacity: 0.4;
-}
-
-//
-
-#bannerImageContainer {
-  margin-left: 20px;
-  margin-right: 20px;
-}
-
-#bannerImage {
-  display: flex;
-  flex-direction: row;
-  justify-content: center;
-  align-items: center;
-  margin-top: 10px;
-  margin-bottom: 10px;
-  opacity: 0.55; // background: linear-gradient(90deg, var(--ce-data-series-1), var(--ce-data-series-2), var(--ce-data-series-3), var(--ce-data-series-4), var(--ce-data-series-5), var(--ce-data-series-6), var(--ce-data-series-7), var(--ce-data-series-8));
-  // background-blend-mode: initial;
-  // mix-blend-mode: difference;
-  // border: 5px transparent solid;
-  border-radius: var(--ce-radius-15); // mix-blend-mode: saturation;
-  // padding-top: 20px;
-  // padding-bottom: 20px;
-  // padding-left: 20px;
-  // padding-right: 20px;
-}
-
-#bannerImage1 {
-  display: flex;
-  flex-direction: row;
-  justify-content: center;
-  align-items: center;
-  margin-top: 10px;
-  margin-bottom: 10px;
-  opacity: 0.55;
-  background: linear-gradient(
-    90deg,
-    var(--ce-status-info),
-    var(--ce-data-series-2),
-    var(--ce-data-series-3),
-    var(--ce-status-error),
-    var(--ce-status-warning),
-    var(--ce-data-series-6),
-    var(--ce-status-success),
-    var(--ce-data-series-8)
-  );
-  background-blend-mode: initial;
-  mix-blend-mode: difference;
-  border: 1px var(--ce-color-white) solid;
-  border-radius: var(--ce-radius-5);
-}
-
-#butterflyImage {
-  height: 100px; // width: 100%;
-  justify-content: center;
-  align-items: center;
-  margin-bottom: 20px; // mix-blend-mode: plus-lighter;
-}
-
-#mirrorsImage {
-  height: 150px; // width: 100%;
-  justify-content: center;
-  align-items: center;
-  margin-bottom: 10px;
-  mix-blend-mode: plus-lighter;
-}
 
 .classicToolIcon {
   display: none;
@@ -993,17 +850,5 @@
 
   .title {
     color: var(--ce-document-text);
-  }
-
-  .secureAddressDisplay {
-    background: var(--ce-response-agree-bg);
-    color: var(--ce-response-agree-text);
-    border-color: var(--ce-response-agree-border);
-    box-shadow: none;
-  }
-
-  .secureAddress,
-  #aboutText {
-    opacity: 1;
   }
 }

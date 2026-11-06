@@ -289,14 +289,6 @@
   font-size: 0.95rem;
 }
 
-.workerGroupImage {
-  width: min(100%, 240px);
-  aspect-ratio: 16 / 9;
-  object-fit: cover;
-  border-radius: var(--ce-radius-6);
-  border: 1px solid color-mix(in srgb, var(--ce-status-info) 28%, transparent);
-}
-
 .workerGroupsListPanel {
   width: 100%;
   min-width: 0;
@@ -490,7 +482,6 @@
 
 .workerGroupCardPrimaryButton,
 .workerGroupCardLeaveButton,
-.workerGroupCardMemberStatus,
 .workerGroupCardInactiveStatus {
   display: inline-flex;
   align-items: center;
@@ -563,12 +554,6 @@
     box-shadow: none;
     transform: none;
   }
-}
-
-.workerGroupCardMemberStatus {
-  border: 1px solid color-mix(in srgb, var(--ce-action-accent) 42%, transparent);
-  background: color-mix(in srgb, var(--ce-action-accent) 12%, transparent);
-  color: var(--ce-status-success-text);
 }
 
 .workerGroupCardInactiveStatus {
@@ -718,7 +703,6 @@
 
   .workerGroupCardPrimaryButton,
   .workerGroupCardLeaveButton,
-  .workerGroupCardMemberStatus,
   .workerGroupCardInactiveStatus {
     width: auto;
     min-width: 88px;
@@ -1036,57 +1020,6 @@
   }
 }
 
-/* Make the Foresight logo bigger */
-.brandLogo {
-  max-width: 350px;
-  margin-bottom: 0px; // for Edge Logo
-  -webkit-filter: invert(100%);
-  /* Safari/Chrome */
-  filter: invert(100%);
-}
-
-/* Flex item for the text portion */
-.brandText {
-  flex: 1 1 auto;
-  /* allow it to expand */
-  font-size: 1.3rem;
-  line-height: 1.5;
-}
-
-/* Flex item for the header image portion */
-.brandImage {
-  flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.headerImage {
-  max-width: 300px;
-  margin-top: 12px;
-  margin-bottom: 0px;
-  mix-blend-mode: luminosity;
-}
-
-.eventBlurb {
-  font-size: 1.25rem;
-  line-height: 1.2;
-  padding: 15px;
-  border-radius: var(--ce-radius-6);
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  justify-content: space-between;
-}
-
-#blurbText {
-  line-height: 1.6;
-  padding: 20px;
-  font-weight: 500;
-  font-size: 1em;
-  margin: 20px;
-}
-
 /* Each collapsible section wrapper (Questions, Groups, Results) */
 .sectionContainer {
   box-sizing: border-box;
@@ -1192,12 +1125,6 @@
   margin-left: 6px;
   align-self: center;
   flex: 0 0 auto;
-}
-
-.sectionHeaderMeta {
-  align-items: center;
-  display: inline-flex;
-  gap: 10px;
 }
 
 .documentsSectionHeader {
@@ -1650,99 +1577,8 @@
   }
 }
 
-/* (Optional) older placeholder classes if needed */
-.surveySection {
-  background: transparent;
-  padding: 15px;
-  margin-bottom: 20px;
-  border-radius: var(--ce-radius-6);
-}
-.groupsSection {
-  background: transparent;
-  border: 1px solid var(--ce-border-light);
-  padding: 15px;
-  border-radius: var(--ce-radius-6);
-}
-.miniSbtArea {
-  margin-top: 10px;
-  background: color-mix(in srgb, var(--ce-data-series-2) 5%, transparent);
-  border: 1px solid var(--ce-data-series-2);
-  padding: 10px;
-  border-radius: var(--ce-radius-4);
-}
-
-/* Torus modal classes if still needed */
-.torusModalBackdrop {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: color-mix(in srgb, var(--ce-compat-dark) 35%, transparent);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 9999;
-}
-.torusModal {
-  background: var(--ce-color-white);
-  border-radius: var(--ce-radius-8);
-  padding: 20px;
-  width: 320px;
-  box-shadow: 0 2px 8px color-mix(in srgb, var(--ce-compat-dark) 20%, transparent);
-  text-align: center;
-  color: var(--ce-document-text);
-}
-
 /* --------------------------------------------
      NEW: Additional classes for "About" collapsible  --------------------------------------------- */
-.aboutContainer {
-  display: flex;
-  flex-direction: column;
-  flex-wrap: wrap;
-  background: color-mix(in srgb, var(--ce-status-success) 50.2%, transparent);
-  border-radius: var(--ce-radius-7);
-  margin-right: 15px;
-  margin-left: 15px;
-  padding: 20px;
-  color: var(--ce-color-white);
-  font-size: 1.65em;
-  margin-bottom: 15px;
-  margin-top: 15px;
-  font-weight: 600;
-  border: 1px var(--ce-color-bg) solid;
-  border-radius: var(--ce-radius-5);
-  box-shadow:
-    5px 5px 12px var(--ce-overlay-base),
-    -5px -5px 12px var(--ce-status-info);
-}
-
-.aboutHeader {
-  display: flex;
-  flex-direction: row-reverse;
-  align-self: center;
-  opacity: 0.75;
-  font-weight: 600;
-  color: var(--ce-color-white);
-  align-items: center;
-  text-transform: uppercase;
-  font-size: 1.2em;
-}
-
-.aboutContent {
-  font-size: 0.85em;
-  font-weight: 700;
-  color: var(--ce-color-white);
-}
-
-#aboutText {
-  font-weight: 600;
-}
-
-#aboutArrowIcon {
-  font-size: 2em;
-  margin-right: 20px;
-}
 
 /* -------------------------------------------
      Responsive adjustments for smartphones
@@ -1767,27 +1603,6 @@
   .titleContainer {
     color: var(--ce-session-chrome-contrast);
     font-size: 0.9rem;
-  }
-
-  .brandLogo {
-    max-width: 250px;
-    margin-bottom: 0px; // below if for Edge Logo
-    -webkit-filter: invert(100%);
-    /* Safari/Chrome */
-    filter: invert(100%);
-    opacity: 0.25;
-  }
-
-  .eventBlurb {
-    flex-direction: column-reverse;
-    align-items: center;
-    padding-top: 0px;
-  }
-
-  #blurbText {
-    margin: 20px 0;
-    font-size: 0.95rem;
-    padding: 0;
   }
 
   .sectionContainer {
@@ -1881,13 +1696,6 @@
 
   .miniSectionContent {
     padding: 10px;
-  }
-
-  .headerImage {
-    max-width: 250px;
-    margin-top: 8px;
-    margin-bottom: 8px;
-    mix-blend-mode: luminosity;
   }
 }
 
@@ -2001,33 +1809,6 @@
     align-items: center;
     grid-gap: 15px;
     gap: 0px;
-  }
-
-  .brandLogo {
-    max-width: 280px;
-    margin-bottom: 0px; // for Edge Logo
-    -webkit-filter: invert(100%);
-    /* Safari/Chrome */
-    filter: invert(100%);
-  }
-
-  .eventBlurb {
-    padding: 10px;
-    font-size: 1.1rem;
-    flex-direction: column;
-  }
-
-  #blurbText {
-    margin: 0px;
-    font-size: 1.2rem;
-    padding: 10px;
-  }
-
-  .headerImage {
-    max-width: 200px;
-    margin-top: 10px;
-    margin-bottom: 10px;
-    mix-blend-mode: luminosity;
   }
 
   .sectionHeader {
@@ -2169,19 +1950,6 @@
   background-color: var(--ce-status-warning-text);
   border-color: var(--ce-status-warning-text);
   color: var(--ce-overlay-surface);
-}
-
-#viewAllQuestionsButton {
-  display: inline-block;
-  font-size: 0.9rem;
-  font-weight: 600;
-  padding: 8px 14px;
-  border-radius: var(--ce-radius-4);
-  background-color: transparent;
-  color: var(--ce-text-muted);
-  border: 0px solid var(--ce-color-black);
-  cursor: pointer;
-  opacity: 0.75;
 }
 
 /* ===================================================== */

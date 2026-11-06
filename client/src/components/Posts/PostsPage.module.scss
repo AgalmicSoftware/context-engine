@@ -47,14 +47,6 @@ $viz-panel-border: var(--ce-card-border);
   padding: 0;
 }
 
-.eyebrow {
-  margin: 0 0 8px;
-  color: $muted;
-  font-size: 0.78rem;
-  letter-spacing: 0;
-  text-transform: uppercase;
-}
-
 .mainTitle,
 .postTitle {
   margin: 0;
@@ -1920,13 +1912,6 @@ h3.postHeading {
 .binaryTooltipSplitSegment {
   min-width: 0;
   height: 100%;
-}
-
-.binaryBeeswarmHint {
-  margin: 0;
-  color: color-mix(in srgb, var(--ce-control-text) 50%, transparent);
-  font-size: 0.74rem;
-  line-height: 1.32;
 }
 
 .vizToolbar {

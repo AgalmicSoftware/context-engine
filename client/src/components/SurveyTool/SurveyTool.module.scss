@@ -60,11 +60,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   position: relative;
 }
 
-.surveySelector {
-  // width: 100%;
-  margin-bottom: 20px;
-}
-
 #dropdownToggle {
   display: flex;
   flex-direction: row;
@@ -84,10 +79,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 #dropdownToggleCaret {
   font-size: 1.25em;
   flex-shrink: 0;
-}
-
-#dropdownMenu {
-  // width: 50%;
 }
 
 .questionSelectorSummary {
@@ -143,14 +134,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 /* Styling for Survey Questions (general card/layout) */
 .surveyQuestions {
   width: 100%;
-  .questionCard {
-    margin-bottom: 20px;
-    background: var(--ce-color-surface);
-    border-radius: var(--ce-radius-8);
-    box-shadow:
-      -7px 7px 14px var(--ce-surface-sunken),
-      7px -7px 14px var(--ce-color-surface-alt);
-  }
 
   .binaryChoice {
     display: flex;
@@ -163,10 +146,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   .slider {
     margin-top: 20px;
     max-width: 200px;
-  }
-
-  .spectrum {
-    // ... styles for spectrum ...
   }
 
   .multiChoice {
@@ -206,10 +185,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   }
 }
 
-#surveySlider {
-  max-width: 150px;
-}
-
 #responsePreview {
   color: var(--ce-color-white) !important;
   display: flex;
@@ -239,10 +214,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   padding: 20px;
   margin-right: 20px;
   max-width: 200px;
-}
-
-#textInput {
-  min-height: 100px;
 }
 
 .ratingLabelText {
@@ -567,16 +538,8 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   }
 }
 
-#encryptAdditionalThoughts {
-  border: 0px transparent solid;
-}
-
 // Media queries for responsiveness on encrypt text
 @media (min-width: 0px) and (max-width: 319px) {
-  #inputGroupTextBox {
-    font-size: 1em;
-  }
-
   #encryptIcon {
     font-size: 0.75em;
     margin-right: 5px;
@@ -591,13 +554,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 }
 
 @media (min-width: 320px) and (max-width: 465px) {
-  #inputGroupTextBox {
-    font-size: 1em !important;
-    margin-left: 2px !important;
-    margin-right: 2px !important;
-    padding: 0 !important;
-  }
-
   #encryptIcon {
     font-size: 1.5em !important;
     margin-right: 0 !important;
@@ -619,13 +575,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 }
 
 @media (min-width: 466px) and (max-width: 768px) {
-  #inputGroupTextBox {
-    font-size: 1em !important;
-    margin-left: 3px !important;
-    margin-right: 3px !important;
-    padding: 0 !important;
-  }
-
   #encryptIcon {
     font-size: 1.5em !important;
     margin-right: 0 !important;
@@ -633,13 +582,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 }
 
 @media (min-width: 769px) and (max-width: 1366px) {
-  #inputGroupTextBox {
-    font-size: 1.25em !important;
-    margin-left: 7.5px !important;
-    margin-right: 7.5px !important;
-    padding-left: 5px !important;
-  }
-
   #encryptIcon {
     font-size: 1.5em !important;
     margin-right: 10px !important;
@@ -651,12 +593,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 }
 
 @media (min-width: 1367px) {
-  #inputGroupTextBox {
-    font-size: 1.5em !important;
-    margin-left: 10px !important;
-    margin-right: 10px !important;
-  }
-
   #encryptIcon {
     font-size: 2em !important;
     margin-right: 15px !important;
@@ -709,44 +645,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   flex-direction: column;
   gap: 12px;
   padding: 18px;
-}
-
-.singleQuestionSubmitLayout {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(180px, 20%);
-  align-items: stretch;
-  gap: 24px;
-  width: 100%;
-}
-
-.singleQuestionSubmitLayoutNoRail {
-  grid-template-columns: minmax(0, 1fr) 0;
-  gap: 0;
-}
-
-.singleQuestionSubmitMain {
-  min-width: 0;
-  display: flex;
-
-  .fullQuestionCard {
-    width: 100%;
-    margin-bottom: 0;
-  }
-}
-
-.singleQuestionSubmitRail {
-  display: flex;
-  align-items: stretch;
-  width: 100%;
-  min-height: 100%;
-}
-
-.singleQuestionSubmitRailHidden {
-  width: 0;
-  min-height: 0;
-  opacity: 0;
-  overflow: hidden;
-  pointer-events: none;
 }
 
 .singleQuestionPage {
@@ -1433,25 +1331,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   color: var(--ce-panel-text) !important;
 }
 
-.additionalCommentsSection {
-  display: flex;
-  flex-direction: column;
-  margin-top: 10px;
-  margin-bottom: 10px;
-}
-
-.additionalCommentsLabel {
-  margin-top: 10px;
-  font-size: 1.05em;
-  font-weight: 600;
-}
-
-.additionalCommentsContent {
-  opacity: 0.8;
-  font-weight: 600;
-  font-size: 1.15em;
-}
-
 .questionTitle {
   font-weight: 600;
   font-size: 1.5em;
@@ -1473,46 +1352,11 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   opacity: 1;
 }
 
-// Encrypt button parts
-#encryptOptionButton {
-  display: flex;
-  flex-direction: row-reverse;
-  justify-content: space-evenly;
-  align-items: center;
-  background-color: color-mix(in srgb, var(--ce-status-info) 50%, transparent);
-  border-top-right-radius: var(--ce-radius-5);
-  border-bottom-right-radius: var(--ce-radius-5);
-  border-bottom-left-radius: var(--ce-radius-0);
-  border-top-left-radius: var(--ce-radius-0);
-  cursor: crosshair;
-}
-
 #encryptIcon {
   font-size: 1.5em !important;
   margin-right: 15px;
   color: var(--ce-color-white);
   opacity: 0.25;
-}
-
-#inputGroupTextBox {
-  border: 1px solid transparent;
-  border-radius: var(--ce-radius-0);
-  font-size: 1.5em;
-  font-weight: 600;
-  text-transform: uppercase;
-  opacity: 0.5;
-  display: flex;
-  flex-direction: row;
-  justify-content: space-between;
-  margin-left: 10px;
-  margin-right: 10px;
-}
-
-#encryptCheckbox {
-  margin-top: 5px;
-  margin-bottom: 5px;
-  scale: 1.5;
-  margin-right: 10px;
 }
 
 #surveyButtonText {
@@ -1597,24 +1441,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 }
 
 /* Component media queries */
-@media (min-width: 0px) and (max-width: 319px) {
-  #encryptOptionButton {
-    flex-direction: column !important;
-  }
-}
-
-@media (min-width: 320px) and (max-width: 465px) {
-  #encryptOptionButton {
-    flex-direction: column !important;
-    min-width: 105px;
-  }
-}
-
-@media (min-width: 466px) and (max-width: 768px) {
-  #encryptOptionButton {
-    flex-direction: column !important;
-  }
-}
 
 /* Filter/Results Buttons (part of SurveySelector) */
 #filterButton {
@@ -2040,87 +1866,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   margin-top: 5px;
 }
 
-.ratingAnswer {
-  display: flex;
-  align-items: center;
-  background-color: color-mix(in srgb, var(--ce-text-inverse) 15%, transparent);
-  border-radius: var(--ce-radius-5);
-  padding: 10px;
-  color: var(--ce-color-white);
-  font-weight: bold;
-  .ratingBar {
-    height: 10px;
-    background-color: var(--ce-color-accent);
-    border-radius: var(--ce-radius-5);
-    margin-right: 10px;
-  }
-
-  span {
-    font-size: 1em;
-  }
-}
-
-.multichoiceAnswer {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
-  background-color: color-mix(in srgb, var(--ce-text-inverse) 15%, transparent);
-  border-radius: var(--ce-radius-5);
-  padding: 10px;
-  color: var(--ce-color-white);
-  font-weight: bold;
-  .choiceItem {
-    background-color: var(--ce-color-accent);
-    color: var(--ce-color-bg);
-    padding: 5px 10px;
-    border-radius: var(--ce-radius-15);
-    font-size: 0.9em;
-  }
-}
-
-.binaryAnswer {
-  background-color: color-mix(in srgb, var(--ce-text-inverse) 15%, transparent);
-  border-radius: var(--ce-radius-5);
-  padding: 10px;
-  color: var(--ce-color-white);
-  font-weight: bold;
-}
-
-/* JSON Preview Copy Button (General Utility) */
-.jsonContainer {
-  position: relative;
-}
-
-.copyJsonButton {
-  position: absolute !important;
-  top: 10px !important;
-  right: 10px !important;
-  background: transparent !important;
-  border: none !important;
-  cursor: pointer !important;
-  transition: none !important;
-  // Ensure link inside the button also inherits the style
-  a.copyJsonButton {
-    color: var(--ce-color-black) !important;
-    font-size: 1.5em !important;
-    text-decoration: none !important; // Ensures no underline on links
-  }
-
-  // Ensures all pseudo-elements have no hover or focus effects
-  &:hover,
-  &:active,
-  &:focus {
-    background-color: transparent !important;
-    outline: none !important;
-    box-shadow: none !important;
-    color: inherit !important; // No color change on focus or hover    transform: none !important;
-  }
-}
-
-.copyJsonButton:hover {
-  color: var(--ce-status-success-text);
-}
-
 /* Styles for the existing user response notice */
 .userResponseNotice {
   display: inline-flex;
@@ -2192,9 +1937,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 #startFreshButton,
 #decryptEditButton,
 #editButton,
-#viewAnswersButton,
 #answerSurveyButton,
-#updateResponseButton,
 #exitEditingButton {
   margin-right: 10px;
   font-size: 1em;
@@ -2240,7 +1983,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   }
 }
 
-#viewAnswersButton,
 #answerSurveyButton {
   /* Combined as they serve similar toggle purpose */
   background-color: var(--ce-status-info);
@@ -2281,16 +2023,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   }
 }
 
-#updateResponseButton {
-  background-color: var(--ce-status-info);
-  border-color: var(--ce-status-info);
-  color: var(--ce-color-white);
-  &:hover {
-    background-color: var(--ce-status-info);
-    border-color: var(--ce-status-info);
-  }
-}
-
 #exitEditingButton {
   background-color: color-mix(in srgb, var(--ce-text-inverse) 72%, transparent);
   border-color: color-mix(in srgb, var(--ce-status-info) 55%, transparent);
@@ -2322,39 +2054,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   flex-direction: row;
   justify-content: space-evenly;
   align-items: center;
-}
-
-#copySurveyIdIcon {
-  font-size: 1.5em;
-  margin-left: 10px;
-  margin-right: 10px;
-}
-
-/* Survey ID Preview */
-.surveyIdContainer {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-top: 10px;
-  font-weight: 600;
-  color: var(--ce-text-muted);
-  opacity: 0.75;
-}
-
-.surveyIdText {
-  font-size: 1.25em;
-  margin-left: 5px;
-  margin-right: 5px;
-}
-
-.copySurveyIdButton {
-  /* Class used in SurveySelector */
-  font-size: 1.25em;
-  background: none;
-  border: none;
-  padding: 0;
-  cursor: pointer;
-  margin-right: 5px;
 }
 
 /* Mobile-specific dropdown styles */
@@ -2520,18 +2219,9 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   backdrop-filter: blur(10px);
 
   .convictionToggleLine,
-  .lockAudienceMeta,
   .lockAudienceGateDetailItem {
     opacity: 0.8;
   }
-}
-
-.lockAudienceMeta {
-  margin-top: 2px;
-  font-size: 0.78rem;
-  font-weight: 600;
-  color: var(--ce-color-white);
-  opacity: 0.7;
 }
 
 .lockAudienceGateRow {
@@ -4093,36 +3783,6 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   box-shadow: none !important;
 }
 
-.sessionInterviewQuestionEditor {
-  min-width: 0;
-  font-family: var(--ce-font-body);
-
-  #binaryChoice {
-    justify-content: flex-start;
-    margin: 4px 0;
-  }
-}
-
-.sessionInterviewResearchHelp {
-  align-self: flex-start;
-  padding: 2px 4px;
-  border: 0;
-  background: transparent !important;
-  color: var(--ce-panel-text);
-  box-shadow: none !important;
-
-  &:focus-visible {
-    outline: 2px solid var(--ce-focus-ring);
-    outline-offset: 2px;
-  }
-}
-
-.sessionInterviewResearchConsent {
-  display: flex;
-  align-items: flex-start;
-  gap: 4px;
-}
-
 .sessionInterviewMetadata {
   padding: 12px;
   border-radius: var(--ce-radius-8);
@@ -4585,13 +4245,6 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   }
 }
 
-.sessionInterviewFieldOrigin {
-  margin: 8px 0;
-  color: var(--ce-panel-text);
-  font-size: 0.875rem;
-  line-height: 1.4;
-}
-
 .sessionInterviewDraft {
   position: relative;
   display: grid;
@@ -4603,175 +4256,9 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   color: var(--ce-panel-text);
 }
 
-.sessionInterviewDraftRemoved {
-  border-style: dashed;
-  background: color-mix(in srgb, var(--ce-card-bg) 74%, var(--ce-surface-sunken));
-}
-
-.sessionInterviewDraftRemove {
-  appearance: none;
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  width: 30px;
-  height: 30px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  border: 0;
-  border-radius: var(--ce-radius-6);
-  background: transparent;
-  color: var(--ce-panel-text-muted);
-  cursor: pointer;
-
-  &:hover:not(:disabled),
-  &:focus-visible {
-    background: color-mix(in srgb, var(--ce-status-error) 14%, transparent);
-    color: var(--ce-status-error);
-    outline: 2px solid var(--ce-focus-ring);
-    outline-offset: 1px;
-  }
-
-  &:disabled {
-    cursor: default;
-    opacity: 0.28;
-  }
-}
-
-.sessionInterviewQuestion {
-  font-weight: 800;
-  line-height: 1.35;
-}
-
-.sessionInterviewAnswerInput {
-  min-height: 92px;
-  resize: vertical;
-  background: var(--ce-input-bg) !important;
-  color: var(--ce-panel-text) !important;
-  caret-color: var(--ce-panel-text);
-  font-family: var(--ce-font-body);
-  font-size: 1rem;
-  font-weight: 600;
-  line-height: 1.5;
-  opacity: 1;
-}
-
-.sessionInterviewConfidence {
-  display: grid;
-  gap: 6px;
-  width: min(100%, 440px);
-  color: var(--ce-panel-text);
-  font-size: 0.82rem;
-}
-
-.sessionInterviewConfidenceMeta {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-
-  strong {
-    color: var(--ce-panel-text);
-  }
-
-  span {
-    color: var(--ce-panel-text-muted);
-  }
-}
-
-.sessionInterviewConfidenceTrack {
-  width: 100%;
-  height: 9px;
-  overflow: hidden;
-  border: 1px solid var(--ce-card-border);
-  border-radius: var(--ce-radius-round);
-  background: var(--ce-surface-sunken);
-
-  span {
-    display: block;
-    height: 100%;
-    border-radius: inherit;
-    background: linear-gradient(90deg, var(--ce-status-warning), var(--ce-status-success));
-  }
-}
-
-.sessionInterviewEvidenceDisclosure {
-  display: grid;
-  gap: 6px;
-}
-
-.sessionInterviewEvidenceToggle {
-  appearance: none;
-  width: fit-content;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 3px 2px;
-  border: 0;
-  border-radius: var(--ce-radius-4);
-  background: transparent;
-  color: var(--ce-panel-text);
-  font: inherit;
-  font-size: 0.86rem;
-  font-weight: 800;
-  cursor: pointer;
-
-  &:hover,
-  &:focus-visible {
-    color: var(--ce-panel-text);
-    outline: 2px solid var(--ce-focus-ring);
-    outline-offset: 2px;
-  }
-}
-
-.sessionInterviewEvidenceCaret {
-  transform: rotate(-90deg);
-  transition: transform 150ms ease;
-}
-
-.sessionInterviewEvidenceCaretExpanded {
-  transform: rotate(0);
-}
-
-.sessionInterviewEvidence {
-  padding: 8px 10px;
-  border-left: 3px solid var(--ce-card-border);
-  font-size: 0.9rem;
-  color: var(--ce-panel-text-muted);
-  line-height: 1.45;
-}
-
 .sessionInterviewDraftActions {
   display: flex;
   justify-content: flex-end;
-}
-
-.sessionInterviewDraftApply {
-  appearance: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  min-height: 34px;
-  padding: 6px 10px;
-  border: 1px solid var(--ce-card-border);
-  border-radius: var(--ce-radius-6);
-  background: var(--ce-surface-sunken);
-  color: var(--ce-panel-text);
-  font: inherit;
-  font-size: 0.82rem;
-  font-weight: 800;
-  cursor: pointer;
-
-  &:hover,
-  &:focus-visible {
-    border-color: var(--ce-action-accent);
-    color: var(--ce-action-accent);
-    outline: 2px solid var(--ce-focus-ring);
-    outline-offset: 1px;
-  }
 }
 
 .sessionInterviewPanel .sessionInterviewSubmitButton {
@@ -5249,310 +4736,6 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   font-size: 1.25rem;
 }
 
-.pileHologramToggle {
-  position: absolute;
-  top: 6px;
-  right: 16px;
-  width: 42px;
-  height: 42px;
-  border: 1px solid color-mix(in srgb, var(--ce-data-series-8) 34%, transparent);
-  border-radius: var(--ce-radius-pill);
-  background:
-    radial-gradient(
-      circle at 30% 28%,
-      color-mix(in srgb, var(--ce-text-inverse) 20%, transparent),
-      color-mix(in srgb, var(--ce-text-inverse) 3%, transparent) 54%
-    ),
-    color-mix(in srgb, var(--ce-overlay-surface) 74%, transparent);
-  color: var(--ce-data-series-8);
-  opacity: 0.5;
-  box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--ce-status-info) 8%, transparent),
-    0 16px 32px color-mix(in srgb, var(--ce-overlay-base) 34%, transparent);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1rem;
-  z-index: 8;
-  cursor: pointer;
-  backdrop-filter: blur(10px);
-  transition:
-    opacity 0.2s ease,
-    transform 0.2s ease,
-    color 0.2s ease,
-    border-color 0.2s ease,
-    box-shadow 0.2s ease;
-
-  &:hover,
-  &:focus-visible {
-    opacity: 1;
-    color: var(--ce-data-series-8);
-    transform: translateY(-1px) scale(1.05);
-    border-color: color-mix(in srgb, var(--ce-data-series-8) 66%, transparent);
-    box-shadow:
-      0 0 0 1px color-mix(in srgb, var(--ce-data-series-8) 18%, transparent),
-      0 0 28px color-mix(in srgb, var(--ce-data-series-8) 22%, transparent),
-      0 16px 32px color-mix(in srgb, var(--ce-overlay-base) 42%, transparent);
-    outline: none;
-  }
-}
-
-.pileHologramToggleActive {
-  opacity: 1;
-  color: var(--ce-data-series-8);
-  border-color: color-mix(in srgb, var(--ce-data-series-8) 66%, transparent);
-  box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--ce-data-series-8) 18%, transparent),
-    0 0 28px color-mix(in srgb, var(--ce-data-series-8) 22%, transparent),
-    0 16px 32px color-mix(in srgb, var(--ce-overlay-base) 42%, transparent);
-}
-
-.pileHologramPanel {
-  position: relative;
-  width: 100%;
-  height: 400px;
-  margin-top: 30px;
-  padding: 0;
-  border-radius: var(--ce-radius-20);
-  overflow: hidden;
-  isolation: isolate;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  background:
-    radial-gradient(circle at 50% 32%, color-mix(in srgb, var(--ce-data-series-8) 14%, transparent), transparent 22%),
-    radial-gradient(circle at 50% 66%, color-mix(in srgb, var(--ce-status-info) 18%, transparent), transparent 44%),
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--ce-overlay-surface) 99%, transparent) 0%,
-      color-mix(in srgb, var(--ce-overlay-base) 98%, transparent) 100%
-    );
-  border: 1px solid color-mix(in srgb, var(--ce-data-series-8) 20%, transparent);
-  box-shadow:
-    0 18px 46px color-mix(in srgb, var(--ce-overlay-base) 46%, transparent),
-    inset 0 0 28px color-mix(in srgb, var(--ce-data-series-8) 8%, transparent);
-}
-
-.pileHologramBackdrop,
-.pileHologramScanlines {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-}
-
-.pileHologramBackdrop {
-  background:
-    radial-gradient(circle at 50% 34%, color-mix(in srgb, var(--ce-data-series-8) 20%, transparent), transparent 24%),
-    radial-gradient(circle at 50% 78%, color-mix(in srgb, var(--ce-status-info) 16%, transparent), transparent 34%),
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--ce-data-series-8) 2%, transparent) 0%,
-      color-mix(in srgb, var(--ce-data-series-8) 6%, transparent) 100%
-    );
-}
-
-.pileHologramScanlines {
-  background: repeating-linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--ce-text-inverse) 12%, transparent) 0,
-    color-mix(in srgb, var(--ce-text-inverse) 12%, transparent) 1px,
-    transparent 1px,
-    transparent 6px
-  );
-  opacity: 0.08;
-}
-
-.pileHologramStage {
-  position: relative;
-  z-index: 1;
-  flex: 1 1 auto;
-  min-height: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding-top: 18px;
-}
-
-.pileHologramAura {
-  position: absolute;
-  inset: 50% auto auto 50%;
-  transform: translate(-50%, -50%);
-  border-radius: var(--ce-radius-round);
-  pointer-events: none;
-  width: 396px;
-  height: 396px;
-  background: radial-gradient(
-    circle,
-    color-mix(in srgb, var(--ce-data-series-8) 18%, transparent) 0%,
-    color-mix(in srgb, var(--ce-data-series-8) 8%, transparent) 40%,
-    color-mix(in srgb, var(--ce-status-info) 2%, transparent) 64%,
-    transparent 78%
-  );
-  filter: blur(16px);
-  animation: pileHologramPulse 4.2s ease-in-out infinite;
-}
-
-.pileHologramSvg {
-  position: relative;
-  z-index: 1;
-  display: block;
-  width: min(100%, 432px);
-  height: auto;
-  filter: drop-shadow(0 0 10px color-mix(in srgb, var(--ce-data-series-8) 20%, transparent))
-    drop-shadow(0 0 26px color-mix(in srgb, var(--ce-status-info) 18%, transparent));
-}
-
-.pileHologramFloat {
-  transform-origin: 210px 178px;
-  animation: pileHologramFloat 4.8s ease-in-out infinite;
-}
-
-.pileHologramBustFill {
-  stroke: color-mix(in srgb, var(--ce-data-series-8) 24%, transparent);
-  stroke-width: 1.05;
-  opacity: 0.82;
-}
-
-.pileHologramDepthShell,
-.pileHologramFaceCore,
-.pileHologramFaceGlow,
-.pileHologramDepthOutline {
-  pointer-events: none;
-}
-
-.pileHologramDepthShell {
-  opacity: 0.88;
-}
-
-.pileHologramFaceCore {
-  opacity: 0.95;
-}
-
-.pileHologramFaceGlow {
-  opacity: 0.92;
-}
-
-.pileHologramHeadOutline,
-.pileHologramDepthOutline,
-.pileHologramMeshLine,
-.pileHologramFeatureLine,
-.pileHologramFeatureSoftLine,
-.pileHologramNeckLine,
-.pileHologramContourLine,
-.pileHologramBrowLine,
-.pileHologramSmileLine {
-  fill: none;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.pileHologramHeadOutline {
-  stroke: color-mix(in srgb, var(--ce-data-series-8) 92%, transparent);
-  stroke-width: 1.4;
-}
-
-.pileHologramDepthOutline {
-  stroke: color-mix(in srgb, var(--ce-data-series-8) 34%, transparent);
-  stroke-width: 1.1;
-}
-
-.pileHologramMeshGroup {
-  opacity: 0.98;
-}
-
-.pileHologramMeshLine {
-  stroke: color-mix(in srgb, var(--ce-data-series-8) 80%, transparent);
-  stroke-width: 0.78;
-}
-
-.pileHologramFeatureLine {
-  stroke: color-mix(in srgb, var(--ce-data-series-8) 94%, transparent);
-  stroke-width: 1.18;
-}
-
-.pileHologramContourLine {
-  stroke: color-mix(in srgb, var(--ce-data-series-8) 58%, transparent);
-  stroke-width: 0.96;
-}
-
-.pileHologramFeatureSoftLine,
-.pileHologramNeckLine {
-  stroke: color-mix(in srgb, var(--ce-data-series-8) 72%, transparent);
-  stroke-width: 1.02;
-}
-
-.pileHologramBrowLine {
-  stroke: color-mix(in srgb, var(--ce-data-series-8) 70%, transparent);
-  stroke-width: 0.98;
-}
-
-.pileHologramSmileLine {
-  stroke: color-mix(in srgb, var(--ce-data-series-8) 90%, transparent);
-  stroke-width: 1.02;
-}
-
-.pileHologramIrisGlow {
-  fill: color-mix(in srgb, var(--ce-data-series-8) 22%, transparent);
-  filter: drop-shadow(0 0 5px color-mix(in srgb, var(--ce-data-series-8) 28%, transparent));
-}
-
-.pileHologramEyes {
-  transform-origin: 210px 170px;
-  animation: pileHologramBlink 7s infinite;
-}
-
-.pileHologramPupil {
-  fill: color-mix(in srgb, var(--ce-data-series-8) 90%, transparent);
-}
-
-.pileHologramEyeHighlight {
-  fill: color-mix(in srgb, var(--ce-text-inverse) 82%, transparent);
-}
-
-.pileHologramPulseDots {
-  animation: pileHologramPulse 3.2s ease-in-out infinite;
-}
-
-.pileHologramPulseDot {
-  fill: color-mix(in srgb, var(--ce-data-series-8) 88%, transparent);
-  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--ce-data-series-8) 68%, transparent));
-}
-
-@keyframes pileHologramFloat {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-
-  50% {
-    transform: translateY(-5px);
-  }
-}
-
-@keyframes pileHologramPulse {
-  0%,
-  100% {
-    opacity: 0.46;
-  }
-
-  50% {
-    opacity: 0.96;
-  }
-}
-
-@keyframes pileHologramBlink {
-  0%,
-  46%,
-  50%,
-  100% {
-    transform: scaleY(1);
-  }
-
-  48% {
-    transform: scaleY(0.2);
-  }
-}
-
 /* --- Footer (Submit / Clear) --- */
 .pileFooter {
   display: flex;
@@ -5576,8 +4759,7 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   pointer-events: none;
 }
 
-.pileFooter .pileIconButton,
-.pileFooter .pileSubmitLink {
+.pileFooter .pileIconButton {
   position: absolute;
   top: 50%;
   left: calc(100% + 12px);
@@ -5589,10 +4771,6 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
     top: 0;
   }
 
-  .pileHologramToggle {
-    top: 36px;
-  }
-
   .pileFooter {
     top: -50px;
     right: 32px;
@@ -5601,8 +4779,7 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
     transform: none;
   }
 
-  .pileFooter .pileIconButton,
-  .pileFooter .pileSubmitLink {
+  .pileFooter .pileIconButton {
     left: calc(100% + 8px);
   }
 }
@@ -5651,16 +4828,6 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
     min-height: 64px;
     padding: 16px 18px;
     font-size: 1.15rem;
-  }
-
-  .singleQuestionSubmitLayout {
-    grid-template-columns: 1fr;
-    gap: 18px;
-  }
-
-  .singleQuestionSubmitRail {
-    width: 100%;
-    min-height: 0;
   }
 
   #surveyFooter.singleQuestionSubmitFooter {
@@ -5733,28 +4900,6 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
     margin-top: 10px;
   }
 
-  .pileHologramPanel {
-    height: 380px;
-    margin-top: 10px;
-  }
-
-  .pileHologramToggle {
-    top: 4px;
-    right: 8px;
-    width: 38px;
-    height: 38px;
-    font-size: 0.92rem;
-  }
-
-  .pileHologramAura {
-    width: 302px;
-    height: 302px;
-  }
-
-  .pileHologramSvg {
-    width: min(100%, 320px);
-  }
-
   .pileEmptyState {
     min-height: 380px;
     margin-top: 10px;
@@ -5774,8 +4919,7 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
     gap: 14px;
   }
 
-  .pileFooter .pileIconButton,
-  .pileFooter .pileSubmitLink {
+  .pileFooter .pileIconButton {
     position: static;
     top: auto;
     left: auto;
@@ -5945,10 +5089,6 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
     top: -30px;
   }
 
-  .pileHologramToggle {
-    top: 14px;
-  }
-
   .pileFooter {
     gap: 4px;
     margin-right: 0;
@@ -6005,10 +5145,6 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
     opacity: 0.14;
   }
 
-  .pileHologramToggle {
-    opacity: 0.5;
-  }
-
   .actionButtonActive {
     opacity: 0.75;
     color: var(--ce-color-accent) !important;
@@ -6017,15 +5153,6 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
 
   .pileNavArrow:hover:not(:disabled) {
     filter: none;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .pileHologramAura,
-  .pileHologramFloat,
-  .pileHologramEyes,
-  .pileHologramPulseDots {
-    animation: none !important;
   }
 }
 
@@ -6301,19 +5428,12 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
 
   .fullQuestionFooter .importanceText,
   .fullQuestionFooter .convictionToggleLine,
-  .fullQuestionFooter .convictionToggleButton,
-  .fullQuestionFooter .convictionToggleDivider,
   .fullQuestionFooter .convictionToggleValue,
   .pileCardFooter .importanceText,
   .pileCardFooter .convictionToggleLine,
-  .pileCardFooter .convictionToggleButton,
-  .pileCardFooter .convictionToggleDivider,
   .pileCardFooter .convictionToggleValue,
   .lockAudiencePopover .convictionToggleLine,
-  .lockAudiencePopover .convictionToggleButton,
-  .lockAudiencePopover .convictionToggleDivider,
   .lockAudiencePopover .convictionToggleValue,
-  .lockAudiencePopover .lockAudienceMeta,
   .lockAudiencePopover .lockAudienceGateDetailItem,
   .lockAudiencePopover .lockAudienceCaretButton {
     color: var(--ce-control-text) !important;
@@ -6333,18 +5453,12 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   .fullQuestionFooter .convictionToggleLine:hover,
   .fullQuestionFooter .convictionToggleLine:focus-visible,
   .fullQuestionFooter .convictionToggleButtonActive,
-  .fullQuestionFooter .convictionToggleButton:hover,
-  .fullQuestionFooter .convictionToggleButton:focus-visible,
   .pileCardFooter .convictionToggleLine:hover,
   .pileCardFooter .convictionToggleLine:focus-visible,
   .pileCardFooter .convictionToggleButtonActive,
-  .pileCardFooter .convictionToggleButton:hover,
-  .pileCardFooter .convictionToggleButton:focus-visible,
   .lockAudiencePopover .convictionToggleLine:hover,
   .lockAudiencePopover .convictionToggleLine:focus-visible,
-  .lockAudiencePopover .convictionToggleButtonActive,
-  .lockAudiencePopover .convictionToggleButton:hover,
-  .lockAudiencePopover .convictionToggleButton:focus-visible {
+  .lockAudiencePopover .convictionToggleButtonActive {
     color: var(--ce-control-text) !important;
     opacity: 1;
     text-shadow: none;
@@ -6383,7 +5497,6 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
     backdrop-filter: none;
   }
 
-  .lockAudiencePopover .lockAudienceMeta,
   .lockAudiencePopover .lockAudienceGateDetailItem {
     opacity: 1;
   }
@@ -6996,13 +6109,6 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   width: 0;
 }
 
-.pileSubmitLink {
-  display: inline-flex;
-  align-items: center;
-  font-size: 1.5rem;
-  color: var(--ce-status-success);
-}
-
 .ratingContainer {
   display: flex;
   align-items: center;
@@ -7163,19 +6269,6 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
 }
 
 /* Subtle, reusable icon glow (used for lock/comment) */
-@keyframes iconPulseGlow {
-  0% {
-    opacity: 0.72;
-  }
-
-  50% {
-    opacity: 1;
-  }
-
-  100% {
-    opacity: 0.72;
-  }
-}
 
 /* Glowing green lock icon consistent with other buttons */
 .iconGlow {
@@ -7211,32 +6304,10 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   letter-spacing: 0.02em;
 }
 
-/* Unobtrusive loading chip for prefill/decrypt */
-.loadingPreviousAnswersChip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
-  border-radius: var(--ce-radius-pill);
-  font-size: 12px;
-  line-height: 1;
-  color: var(--ce-color-white);
-  background: color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
-  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 16%, transparent);
-  white-space: nowrap;
-  user-select: none;
-}
-
 .convictionValueRow {
   display: inline-flex;
   align-items: center;
   gap: 12px;
-}
-
-.convictionTogglePill {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
 }
 
 .convictionToggleStack {
@@ -7286,25 +6357,9 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   }
 }
 
-.convictionToggleButton {
-  background: transparent;
-  border: none;
-  color: var(--ce-panel-text);
-  padding: 0;
-  margin: 0;
-  cursor: pointer;
-  opacity: 0.58;
-}
-
 .convictionToggleButtonActive {
   opacity: 1;
   text-shadow: 0 0 8px color-mix(in srgb, var(--ce-text-inverse) 35%, transparent);
-}
-
-.convictionToggleDivider {
-  color: var(--ce-panel-text);
-  opacity: 0.5;
-  font-weight: 600;
 }
 
 .convictionToggleValue {
@@ -7319,72 +6374,11 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   color: color-mix(in srgb, var(--ce-text-inverse) 80%, transparent);
 }
 
-.scanningIndicator {
-  color: var(--ce-color-white);
-  opacity: 0.5;
-  font-size: 0.85rem;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-left: 15px;
-  margin-right: 15px;
-  white-space: nowrap;
-  animation: none;
-  font-weight: 700;
-  /* Mobile adjustment */
-  @media (max-width: 600px) {
-    font-size: 0.75rem;
-    margin-left: 8px;
-    margin-right: 8px;
-    span {
-      display: none;
-      /* Hide text on very small screens, keep spinner */
-    }
-
-    span::after {
-      content: 'Scanning...';
-      /* Shorter text for mobile */
-      display: inline;
-    }
-  }
-}
-
-.selectorScanProgressWrap {
-  width: 100%;
-  padding: 4px 0 2px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-
-  to {
-    opacity: 1;
-  }
-}
-
-@keyframes headerPulseBlue {
-  0% {
-    box-shadow: 0 0 0 color-mix(in srgb, var(--ce-status-info) 30%, transparent);
-  }
-  50% {
-    box-shadow: 0 0 14px color-mix(in srgb, var(--ce-status-info) 55%, transparent);
-  }
-  100% {
-    box-shadow: 0 0 0 color-mix(in srgb, var(--ce-status-info) 30%, transparent);
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   .pileSubmitSuccessBadge,
   .pileFooter .pileSubmitButton.submitGlow::before,
   .headerSubmitButton.submitGlow::before,
-  .submitGlow,
-  .scanningIndicator {
+  .submitGlow {
     -webkit-animation: none !important;
     -moz-animation: none !important;
     animation: none !important;
@@ -7398,9 +6392,7 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   #startFreshButton,
   #decryptEditButton,
   #editButton,
-  #viewAnswersButton,
   #answerSurveyButton,
-  #updateResponseButton,
   #exitEditingButton,
   .iconButton,
   .pileIconButton,
@@ -7562,8 +6554,6 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
 
   .pileCardFooter .importanceText,
   .pileCardFooter .convictionToggleLine,
-  .pileCardFooter .convictionToggleButton,
-  .pileCardFooter .convictionToggleDivider,
   .pileCardFooter .convictionToggleValue {
     color: var(--ce-panel-text-muted);
     opacity: 1;
@@ -7681,7 +6671,6 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   }
 
   .lockAudiencePopover .convictionToggleLine,
-  .lockAudiencePopover .convictionToggleButton,
   .lockAudiencePopover .convictionToggleValue,
   .lockAudiencePopover .lockAudienceCaretButton,
   .lockAudiencePopover .lockAudienceGateDetailItem {
@@ -7690,7 +6679,6 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
     text-shadow: none;
   }
 
-  .lockAudiencePopover .lockAudienceMeta,
   .lockAudiencePopover .lockAudienceGateDetailSbts {
     color: var(--ce-overlay-text-muted);
     opacity: 1;
@@ -7714,8 +6702,6 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   .pileCardFooter .importanceSlider,
   .fullQuestionFooter .importanceText,
   .fullQuestionFooter .convictionToggleLine,
-  .fullQuestionFooter .convictionToggleButton,
-  .fullQuestionFooter .convictionToggleDivider,
   .fullQuestionFooter .convictionToggleValue {
     color: var(--ce-panel-text);
     opacity: 1;
