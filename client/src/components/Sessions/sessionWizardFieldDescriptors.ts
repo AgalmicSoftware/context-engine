@@ -5,8 +5,6 @@ import {
   type SessionWizardModeFieldPolicy,
 } from './sessionWizardModeFieldPolicy';
 
-type DraftLike = Record<string, unknown>;
-
 export type SessionWizardRenderFieldOptions = {
   forceShow?: boolean;
 };
@@ -23,7 +21,6 @@ type SessionWizardFieldVisibilityOptions = {
   key: string;
   path?: string[];
   currentPath?: string[];
-  wizardMode?: string;
   modeFieldPolicy?: SessionWizardModeFieldPolicy;
 };
 
@@ -171,7 +168,6 @@ export const shouldHideSessionWizardField = ({
   key,
   path = [],
   currentPath = [...path, key],
-  wizardMode = 'advanced',
   modeFieldPolicy,
 }: SessionWizardFieldVisibilityOptions): boolean => {
   if (currentPath.length === 1 && isSessionWizardModeHiddenTopLevelField(currentPath[0], modeFieldPolicy)) {
@@ -207,9 +203,7 @@ export const shouldHideSessionWizardField = ({
     return true;
   }
 
-  const isNormalMode = wizardMode !== 'advanced';
-
-  if (isNormalMode && path.length === 0 && NORMAL_MODE_HIDDEN_TOP_LEVEL_FIELDS.has(key)) {
+  if (path.length === 0 && NORMAL_MODE_HIDDEN_TOP_LEVEL_FIELDS.has(key)) {
     return true;
   }
 

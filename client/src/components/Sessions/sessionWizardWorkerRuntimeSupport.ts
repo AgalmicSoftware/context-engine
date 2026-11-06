@@ -16,13 +16,11 @@ import type { AnyRecord } from '../shellTypes';
 
 type WorkerBaseUrlParams = {
   draft?: AnyRecord | null;
-  wizardMode?: string;
   deployComplete?: boolean;
   deployWorkerUrl?: string;
   workerMode?: string;
   registryChainId?: unknown;
   networkId?: unknown;
-  allowNormalModeSharedHostedWorker?: boolean;
 };
 type ResolveSessionWizardWorkerUrlSourceStateArgs = {
   defaultWorkerUrl?: unknown;
@@ -40,26 +38,20 @@ export type SessionWizardWorkerUrlSourceState = {
 
 export const resolveSessionWizardWorkerBaseUrlFromDraft = ({
   draft,
-  wizardMode = 'normal',
   deployComplete = false,
   deployWorkerUrl = '',
-  workerMode = 'custom',
-  allowNormalModeSharedHostedWorker = false,
 }: WorkerBaseUrlParams = {}): string => {
   const fallbackWorkerUrl = getSessionWizardDefaultWorkerUrl();
   const configuredWorkerUrl = toStr(draft?.corsWorkerUrl).trim();
   const effectiveConfiguredWorkerUrl =
-    wizardMode === 'normal' &&
-    !allowNormalModeSharedHostedWorker &&
-    !deployComplete &&
-    isSessionWizardDefaultWorkerPlaceholderUrl(configuredWorkerUrl, fallbackWorkerUrl)
+    !deployComplete && isSessionWizardDefaultWorkerPlaceholderUrl(configuredWorkerUrl, fallbackWorkerUrl)
       ? ''
       : configuredWorkerUrl;
   return resolveSessionWizardWorkerBaseUrl({
     configuredWorkerUrl: effectiveConfiguredWorkerUrl,
     deployWorkerUrl: deployComplete ? deployWorkerUrl : '',
     fallbackWorkerUrl,
-    workerMode: wizardMode === 'normal' && !allowNormalModeSharedHostedWorker ? 'custom' : workerMode,
+    workerMode: 'custom',
   });
 };
 

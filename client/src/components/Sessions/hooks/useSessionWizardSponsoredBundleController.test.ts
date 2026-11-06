@@ -58,14 +58,12 @@ const createControllerHarness = (overrides: Record<string, unknown> = {}) => {
       },
     },
     workerSecretsEnabledRef: { current: true },
-    persistWorkerSecretsRef: { current: false },
     workerSecretsRef: {
       current: {
         openaiKey: 'old-openai',
         arweaveJwk: 'old-jwk',
       } as WorkerSecretsLike,
     },
-    advancedBundleFileInputRef: createInputRef('advanced.bundle.js'),
     normalModeRetryBundleFileInputRef: createInputRef('retry.bundle.js'),
   };
   const setters = {
@@ -253,7 +251,6 @@ describe('useSessionWizardSponsoredBundleController', () => {
     });
 
     expect(setters.setBundleFile).toHaveBeenCalledWith(null);
-    expect(refs.advancedBundleFileInputRef.current.value).toBe('');
     expect(refs.normalModeRetryBundleFileInputRef.current.value).toBe('');
   });
 });

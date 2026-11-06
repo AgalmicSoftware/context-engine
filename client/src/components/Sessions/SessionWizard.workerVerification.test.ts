@@ -8,7 +8,6 @@ describe('SessionWizard worker verification UI state', () => {
         deployWorkerUrl: 'https://deployed.example.test',
         defaultWorkerUrl: 'https://shared.example.test',
         deployComplete: true,
-        normalModeRequiresCustomWorker: true,
       }),
     ).toEqual({
       deployVerifiedInUi: true,
@@ -23,7 +22,6 @@ describe('SessionWizard worker verification UI state', () => {
         deployWorkerUrl: 'https://deployed.example.test',
         defaultWorkerUrl: 'https://shared.example.test',
         deployComplete: false,
-        normalModeRequiresCustomWorker: true,
       }),
     ).toEqual({
       deployVerifiedInUi: false,
@@ -38,7 +36,6 @@ describe('SessionWizard worker verification UI state', () => {
         deployWorkerUrl: 'https://deployed.example.test',
         defaultWorkerUrl: 'https://shared.example.test',
         deployComplete: false,
-        normalModeRequiresCustomWorker: true,
       }),
     ).toEqual({
       deployVerifiedInUi: false,

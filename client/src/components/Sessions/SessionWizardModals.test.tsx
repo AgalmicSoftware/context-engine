@@ -99,9 +99,6 @@ const buildProps = (overrides: Partial<SessionWizardModalsProps> = {}): SessionW
   selectedWizardContract: null,
   closeContractViewerModal: jest.fn(),
   selectedWizardContractHref: '/docs?contract=surveys',
-  sessionHeaderPreviewModalOpen: false,
-  onCloseSessionHeaderPreviewModal: jest.fn(),
-  sessionHeaderPreviewSrc: '',
   t: (value) => value,
   ...overrides,
 });
@@ -151,25 +148,5 @@ describe('SessionWizardModals', () => {
       'aria-label',
       'Open Surveys in Docs',
     );
-  });
-
-  it('renders and closes the session header preview modal body', () => {
-    const onCloseSessionHeaderPreviewModal = jest.fn();
-    render(
-      <SessionWizardModals
-        {...buildProps({
-          sessionHeaderPreviewModalOpen: true,
-          sessionHeaderPreviewSrc: 'https://example.test/header.png',
-          onCloseSessionHeaderPreviewModal,
-        })}
-      />,
-    );
-
-    const preview = screen.getByAltText('Expanded session header preview');
-    expect(preview).toHaveAttribute('src', 'https://example.test/header.png');
-
-    fireEvent.click(preview.closest('.modal-body') || preview);
-
-    expect(onCloseSessionHeaderPreviewModal).toHaveBeenCalledTimes(1);
   });
 });

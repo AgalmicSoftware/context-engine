@@ -3,7 +3,7 @@ import { upsertCachedSessionWorkerConfig } from '../../utilities/session/session
 import { normalizeWorkerUrl as normalizeWorkerAuthUrl } from '../../utilities/worker/workerAuth.js';
 import { toStr } from '../../utilities/shared/primitives.js';
 import { shouldCacheSessionWorkerConfigAfterDeploy } from './sessionWizardWorkerState';
-import type { AnyRecord, WorkerSecretsLike } from '../shellTypes';
+import type { AnyRecord } from '../shellTypes';
 
 type SponsoredBundleLike = AnyRecord & {
   meta?: AnyRecord;
@@ -36,28 +36,6 @@ export const buildSponsoredBundleAppliedStatusMessage = (sponsoredBundle: Sponso
   return appliedLabels.length
     ? `Sponsored resources applied: ${appliedLabels.join(', ')}.`
     : 'Sponsored resources applied.';
-};
-
-export const resolveSponsoredBundleAdvancedFieldNotices = ({
-  sponsoredBundle = {},
-  workerSecrets = {},
-  deployForm = {},
-}: {
-  sponsoredBundle?: SponsoredBundleInput;
-  workerSecrets?: WorkerSecretsLike | AnyRecord;
-  deployForm?: AnyRecord;
-} = {}) => {
-  const normalizedBundle = normalizeSparseSponsoredBundlePayload(sponsoredBundle) as SponsoredBundleLike;
-  const sponsoredFaucetPrivateKey = toStr(normalizedBundle?.faucetPrivateKey || '').trim();
-  const sponsoredFaucetGrantToken = toStr(normalizedBundle?.faucetGrantToken || '').trim();
-  const currentFaucetPrivateKey = toStr(workerSecrets?.faucetPrivateKey || '').trim();
-  return {
-    showSponsoredFaucetNotice:
-      !!(sponsoredFaucetPrivateKey || sponsoredFaucetGrantToken) &&
-      (sponsoredFaucetPrivateKey ? currentFaucetPrivateKey === sponsoredFaucetPrivateKey : !currentFaucetPrivateKey),
-    showSponsoredDeployAccessNotice:
-      !!toStr(normalizedBundle?.deployGrantToken || '').trim() && !toStr(deployForm?.apiToken || '').trim(),
-  };
 };
 
 export const cacheSessionWorkerConfigAfterDeploy = ({

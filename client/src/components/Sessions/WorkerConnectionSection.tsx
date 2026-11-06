@@ -1,6 +1,5 @@
 /** @file WorkerConnectionSection.tsx */
 import React from 'react';
-import { Button } from 'reactstrap';
 import styles from './SessionWizard.module.scss';
 import type { SessionWizardTooltipRenderOptions } from './SessionWizardInfoTooltip';
 import type { SessionWizardRenderField } from './sessionWizardFieldDescriptors';
@@ -19,8 +18,6 @@ export type WorkerConnectionSectionProps = {
   renderField: SessionWizardRenderField;
   workerUrlAutoFilled: boolean;
   renderInfoTooltip?: RenderInfoTooltip;
-  showSharedWorkerChoice: boolean;
-  onResetToDefault: () => void;
 };
 
 const WorkerConnectionSection = ({
@@ -29,8 +26,6 @@ const WorkerConnectionSection = ({
   renderField,
   workerUrlAutoFilled,
   renderInfoTooltip,
-  showSharedWorkerChoice,
-  onResetToDefault,
 }: WorkerConnectionSectionProps) => {
   const renderTooltip = typeof renderInfoTooltip === 'function' ? renderInfoTooltip : () => null;
 
@@ -55,11 +50,6 @@ const WorkerConnectionSection = ({
           </div>
         )}
       </div>
-      {showSharedWorkerChoice && (
-        <Button type="button" className={styles.secondaryButton} onClick={onResetToDefault}>
-          Reset to default
-        </Button>
-      )}
     </div>
   );
 };

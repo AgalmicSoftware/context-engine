@@ -27,15 +27,11 @@ jest.mock('./EncryptionPanel', () => (props: any) => (
 jest.mock('./WorkerPanel', () => (props: any) => (
   <section
     data-testid="shell-worker"
-    data-page-owns-token={String(!!props.pageOwnsDeployToken)}
     data-worker-url={props.displayedWorkerUrl || ''}
     data-native-template-setup={props.nativeTemplateSetupIdentity || ''}
   >
     <button type="button" onClick={() => props.onNativeTemplateSetupGenerated?.('generated-identity')}>
       generate template setup
-    </button>
-    <button type="button" onClick={props.handleDeployWorker}>
-      deploy worker
     </button>
   </section>
 ));
@@ -47,9 +43,6 @@ jest.mock('./SessionWizardModals', () => (props: any) => (
     </button>
     <button type="button" onClick={props.closeContractViewerModal}>
       close contract
-    </button>
-    <button type="button" onClick={props.onCloseSessionHeaderPreviewModal}>
-      close preview
     </button>
   </div>
 ));
@@ -82,10 +75,8 @@ const baseProps = (overrides: Partial<SessionWizardShellProps> = {}): SessionWiz
   hostingStatus: 'Worker deploys on Create',
   workerPanelProps: {
     displayedWorkerUrl: 'https://worker.example.test',
-    handleDeployWorker: jest.fn(),
     nativeTemplateSetupIdentity: 'demo-session\n0xabc',
     onNativeTemplateSetupGenerated: jest.fn(),
-    pageOwnsDeployToken: true,
   } as unknown as SessionWizardShellProps['workerPanelProps'],
   aiKeys: <div data-testid="shell-ai-keys">OpenAI key</div>,
   sponsoredStatusProps: {
@@ -105,7 +96,6 @@ const baseProps = (overrides: Partial<SessionWizardShellProps> = {}): SessionWiz
     createSbtModalSessionSlug: 'demo-session',
     closeCreateSbtModal: jest.fn(),
     closeContractViewerModal: jest.fn(),
-    onCloseSessionHeaderPreviewModal: jest.fn(),
   } as unknown as SessionWizardShellProps['modalsProps'],
   ...overrides,
 });
@@ -209,7 +199,6 @@ describe('SessionWizardShell', () => {
     fireEvent.click(screen.getByTestId('ce-setup-more-hosting'));
     const worker = within(screen.getByTestId('ce-setup-section-hosting')).getByTestId('shell-worker');
     expect(worker).toBeInTheDocument();
-    expect(worker).toHaveAttribute('data-page-owns-token', 'true');
     expect(worker).toHaveAttribute('data-worker-url', 'https://worker.example.test');
 
     fireEvent.click(screen.getByTestId('ce-setup-more-access'));
@@ -332,20 +321,18 @@ describe('SessionWizardShell', () => {
 
     fireEvent.click(screen.getByText('retry sponsored bundle'));
     fireEvent.click(screen.getByText('create sbt'));
-    fireEvent.click(screen.getByText('deploy worker'));
+    fireEvent.click(screen.getByText('generate template setup'));
     fireEvent.click(screen.getByText('close create sbt'));
     fireEvent.click(screen.getByText('close contract'));
-    fireEvent.click(screen.getByText('close preview'));
 
     expect(props.sponsoredStatusProps.onRetry).toHaveBeenCalledTimes(1);
     expect(props.encryptionPanelProps.launchCreateSbtModal).toHaveBeenCalledWith({
       targetType: 'gate',
       gateId: 'gate-1',
     });
-    expect(props.workerPanelProps.handleDeployWorker).toHaveBeenCalledTimes(1);
+    expect(props.workerPanelProps.onNativeTemplateSetupGenerated).toHaveBeenCalledWith('generated-identity');
     expect(props.modalsProps.closeCreateSbtModal).toHaveBeenCalledTimes(1);
     expect(props.modalsProps.closeContractViewerModal).toHaveBeenCalledTimes(1);
-    expect(props.modalsProps.onCloseSessionHeaderPreviewModal).toHaveBeenCalledTimes(1);
   });
 
   // Every rule code shows its plain message beside the option that

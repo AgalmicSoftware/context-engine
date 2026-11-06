@@ -1,5 +1,4 @@
 import {
-  resolveSessionWizardPublishActionDisplayState,
   resolveSessionWizardPublishRequestDescriptor,
   resolveSessionWizardPublishMetadataIdentityState,
   resolveSessionWizardPublishMetadataDisplayState,
@@ -358,15 +357,6 @@ describe('resolveSessionWizardPublishReadiness', () => {
         showMetadataUri: false,
       }),
     );
-    expect(plan.publishActionDisplayState).toEqual({
-      canPublishNow: false,
-      displayMode: 'advanced',
-      publishAdvancedOpen: false,
-      publishBusy: false,
-      publishButtonDisabled: true,
-      publishButtonLabel: 'Publish',
-      settingsButtonActive: false,
-    });
   });
 
   it('builds a pure publish UI plan for default-worker metadata upload readiness', () => {
@@ -377,9 +367,7 @@ describe('resolveSessionWizardPublishReadiness', () => {
       effectiveMetadataTxId: txId,
       hasPendingDrafts: true,
       hasPendingWorkerGroupDrafts: false,
-      isNormalMode: true,
       metadataUrl: `ar://${txId}`,
-      publishAdvancedOpen: true,
       publishBusy: true,
       publishStep: 2,
       publishStepElapsedMs: 1300,
@@ -432,15 +420,6 @@ describe('resolveSessionWizardPublishReadiness', () => {
       showArweaveTx: true,
       showManualMetadataUri: false,
       showMetadataUri: true,
-    });
-    expect(plan.publishActionDisplayState).toEqual({
-      canPublishNow: true,
-      displayMode: 'normal',
-      publishAdvancedOpen: true,
-      publishBusy: true,
-      publishButtonDisabled: true,
-      publishButtonLabel: 'Deploy Session',
-      settingsButtonActive: true,
     });
     expect(plan.publishProgressDisplayState.publishProgressPercent).toBeGreaterThan(25);
     expect(plan.publishProgressDisplayState.publishProgressPercent).toBeLessThan(50);
@@ -516,7 +495,6 @@ describe('resolveSessionWizardPublishReadiness', () => {
       }),
     );
     expect(Object.keys(plan)).toEqual([
-      'publishActionDisplayState',
       'publishReadiness',
       'publishExecutionPlan',
       'publishMetadataDisplayState',
@@ -638,56 +616,6 @@ describe('resolveSessionWizardPublishReadiness', () => {
         metadataUri: `ar://${txId}`,
         showArweaveTx: true,
         showMetadataUri: true,
-      }),
-    );
-  });
-
-  it('describes publish action controls without execution callbacks', () => {
-    expect(
-      resolveSessionWizardPublishActionDisplayState({
-        canPublishNow: true,
-        isNormalMode: true,
-        publishAdvancedOpen: true,
-        publishBusy: false,
-      }),
-    ).toEqual({
-      canPublishNow: true,
-      displayMode: 'normal',
-      publishAdvancedOpen: true,
-      publishBusy: false,
-      publishButtonDisabled: false,
-      publishButtonLabel: 'Deploy Session',
-      settingsButtonActive: true,
-    });
-
-    expect(
-      resolveSessionWizardPublishActionDisplayState({
-        canPublishNow: false,
-        isNormalMode: false,
-        publishAdvancedOpen: false,
-        publishBusy: true,
-      }),
-    ).toEqual({
-      canPublishNow: false,
-      displayMode: 'advanced',
-      publishAdvancedOpen: false,
-      publishBusy: true,
-      publishButtonDisabled: true,
-      publishButtonLabel: 'Publish',
-      settingsButtonActive: false,
-    });
-
-    expect(
-      resolveSessionWizardPublishActionDisplayState({
-        canPublishNow: true,
-        isNormalMode: true,
-        publishCompleted: true,
-      }),
-    ).toEqual(
-      expect.objectContaining({
-        publishBusy: false,
-        publishButtonDisabled: true,
-        publishButtonLabel: 'Session Created',
       }),
     );
   });

@@ -1,6 +1,6 @@
 import { isWorkerAuthorizedLitConfig } from '../../../../shared/litChipotleAction.mjs';
 import { toStr } from '../../utilities/shared/primitives.js';
-import { DEFAULT_CHIPOTLE_ACTION, DEFAULT_CHIPOTLE_ACTION_NAME } from '../../utilities/crypto/litChipotleCatalog.js';
+import { DEFAULT_CHIPOTLE_ACTION } from '../../utilities/crypto/litChipotleCatalog.js';
 import type { AnyRecord, WorkerSecretSyncResult, WorkerSecretsLike } from '../shellTypes';
 
 type AsyncShellResult = AnyRecord | null | undefined;
@@ -41,7 +41,6 @@ const isTransientLitSyncError = (err: unknown): boolean => {
   return TRANSIENT_LIT_SYNC_ERROR_PATTERNS.some((pattern) => message.includes(pattern));
 };
 
-export const SESSION_WIZARD_CHIPOTLE_ACTION_NAME = DEFAULT_CHIPOTLE_ACTION_NAME;
 export const SESSION_WIZARD_CHIPOTLE_DEFAULT_ACTION = DEFAULT_CHIPOTLE_ACTION;
 
 export const buildSessionWizardLitBootstrapRequest = (

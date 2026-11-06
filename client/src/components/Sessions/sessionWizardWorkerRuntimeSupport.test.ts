@@ -11,13 +11,11 @@ import {
 import { getSessionWizardDefaultWorkerUrl } from './sessionWizardWorkerDefaults';
 
 describe('sessionWizardWorkerRuntimeSupport', () => {
-  it('keeps normal mode on bring-your-own-worker when only the placeholder url is present', () => {
+  it('stays on bring-your-own-worker when only the placeholder url is present', () => {
     expect(
       resolveSessionWizardWorkerBaseUrlFromDraft({
         draft: { corsWorkerUrl: getSessionWizardDefaultWorkerUrl() },
-        wizardMode: 'normal',
         deployComplete: false,
-        workerMode: 'default',
       }),
     ).toBe('');
   });

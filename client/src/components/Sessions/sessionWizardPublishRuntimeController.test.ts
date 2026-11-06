@@ -101,7 +101,6 @@ const createControllerHarness = () => {
     };
   });
   const controller = createSessionWizardPublishRuntimeController({
-    runtimeRef,
     dispatch,
     getErrorMessage: (error) => (error instanceof Error ? error.message : String(error)),
     deployWorker: jest.fn(async () => ({ ok: true, deployComplete: true, workerUrl: WORKER_ORIGIN })),

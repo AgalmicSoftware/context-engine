@@ -85,23 +85,18 @@ export const resolveSessionWizardWorkerVerificationUiState = ({
   deployWorkerUrl = '',
   defaultWorkerUrl = '',
   deployComplete = false,
-  normalModeRequiresCustomWorker = false,
 }: {
   configuredWorkerUrl?: unknown;
   deployWorkerUrl?: unknown;
   defaultWorkerUrl?: unknown;
   deployComplete?: boolean;
-  normalModeRequiresCustomWorker?: boolean;
 } = {}) => {
   const configured = normalizeWorkerAuthUrl(toStr(configuredWorkerUrl).trim());
   const deployed = normalizeWorkerAuthUrl(toStr(deployWorkerUrl).trim());
   const fallback = normalizeWorkerAuthUrl(toStr(defaultWorkerUrl).trim());
   const deployVerifiedInUi = !!deployComplete;
   const effectiveConfiguredWorkerUrl =
-    deployVerifiedInUi &&
-    !!normalModeRequiresCustomWorker &&
-    !!deployed &&
-    (!configured || (configured && fallback && configured === fallback))
+    deployVerifiedInUi && !!deployed && (!configured || (configured && fallback && configured === fallback))
       ? deployed
       : configured;
   return {

@@ -9,7 +9,6 @@ import {
 } from '../../domains/sessions/publish/sessionPublishDispatch.js';
 import type { SessionPublishEffect } from '../../domains/sessions/publish/sessionPublishReducer.js';
 import type { AnyRecord } from '../shellTypes';
-import type { SessionWizardWorkerDeployRuntime } from './hooks/useSessionWizardWorkerDeploy';
 import {
   resolveSessionWizardRegisterStepRequest,
   resolveSessionWizardWorkerPublishSuccessSettlementDescriptor,
@@ -32,10 +31,6 @@ import {
 } from './sessionWizardWorkerPublishEvidence';
 import { canonicalizeSessionWizardJson, fingerprintSessionWizardJson } from './sessionWizardCanonicalJson';
 import { buildSessionWizardWorkerLimits, validateSessionWizardWorkerLimits } from './sessionWizardWorkerRuntimeSupport';
-
-type RuntimeRef = {
-  current: SessionWizardWorkerDeployRuntime | null;
-};
 
 type PublishExecutionPlan = SessionWizardPublishExecutionPlanLike & {
   shouldRegisterSession?: boolean;
@@ -74,7 +69,6 @@ const fingerprintCanonicalValue = (value: unknown): string =>
   fingerprintSessionWizardJson('context-engine:worker-publish-config:v1', value);
 
 type PublishRuntimeControllerOptions = {
-  runtimeRef: RuntimeRef;
   dispatch: SessionPublishDispatch;
   getErrorMessage: SessionPublishErrorMessageReader;
   deployWorker: SessionWizardPublishControllerPorts['deployWorker'];
@@ -140,7 +134,6 @@ const createEffectRunner =
     });
 
 export const createSessionWizardPublishRuntimeController = ({
-  runtimeRef,
   dispatch,
   getErrorMessage,
   deployWorker,

@@ -2,7 +2,6 @@ import {
   buildSessionWizardLitBootstrapRequest,
   buildSessionWizardLitProvisionRequest,
   SESSION_WIZARD_CHIPOTLE_DEFAULT_ACTION,
-  SESSION_WIZARD_CHIPOTLE_ACTION_NAME,
   syncWorkerLitSessionBootstrapAfterDeploy,
   syncWorkerLitActionProvisionAfterDeploy,
   withLitBootstrapSyncStatus,
@@ -24,7 +23,7 @@ describe('sessionWizardChipotleLitSupport', () => {
       expect.objectContaining({
         litApiBase: 'https://api.chipotle.litprotocol.com',
         sessionName: 'Session A',
-        actionName: SESSION_WIZARD_CHIPOTLE_ACTION_NAME,
+        actionName: SESSION_WIZARD_CHIPOTLE_DEFAULT_ACTION.name,
       }),
     );
     expect(result?.actionCode).toBe(SESSION_WIZARD_CHIPOTLE_DEFAULT_ACTION.code);
@@ -44,7 +43,7 @@ describe('sessionWizardChipotleLitSupport', () => {
       expect.objectContaining({
         litAccountApiKey: 'account-secret',
         sessionName: 'Session A',
-        actionName: SESSION_WIZARD_CHIPOTLE_ACTION_NAME,
+        actionName: SESSION_WIZARD_CHIPOTLE_DEFAULT_ACTION.name,
       }),
     );
     expect(result?.litApiBase).toBeUndefined();
@@ -72,7 +71,7 @@ describe('sessionWizardChipotleLitSupport', () => {
       expect.objectContaining({
         litAccountApiKey: 'account-secret',
         sessionName: 'Session A',
-        actionName: SESSION_WIZARD_CHIPOTLE_ACTION_NAME,
+        actionName: SESSION_WIZARD_CHIPOTLE_DEFAULT_ACTION.name,
       }),
     );
     expect(result?.litApiBase).toBeUndefined();
@@ -110,7 +109,7 @@ describe('sessionWizardChipotleLitSupport', () => {
         litApiBase: 'https://api.chipotle.litprotocol.com',
         litGroupId: 'ce-session-content-prod',
         litPkpId: '0xpkp123',
-        actionName: SESSION_WIZARD_CHIPOTLE_ACTION_NAME,
+        actionName: SESSION_WIZARD_CHIPOTLE_DEFAULT_ACTION.name,
       }),
     );
     expect(String(result?.actionCode || '')).toContain('async function main(params)');

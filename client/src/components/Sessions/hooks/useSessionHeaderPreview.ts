@@ -39,7 +39,6 @@ const useSessionHeaderPreview = ({
   const [sessionHeaderPreviewUrl, setSessionHeaderPreviewUrl] = useState('');
   const sessionHeaderPreviewUrlRef = useRef(sessionHeaderPreviewUrl);
   sessionHeaderPreviewUrlRef.current = sessionHeaderPreviewUrl;
-  const [sessionHeaderPreviewModalOpen, setSessionHeaderPreviewModalOpen] = useState(false);
   const [sessionHeaderUploadStatus, setSessionHeaderUploadStatus] = useState('');
   const [sessionHeaderUploadStatusTone, setSessionHeaderUploadStatusTone] =
     useState<SessionHeaderUploadStatusTone>('default');
@@ -68,7 +67,6 @@ const useSessionHeaderPreview = ({
     if (allowFileUpload) return;
     setSessionHeaderMode('url');
     setSessionHeaderFile(null);
-    setSessionHeaderPreviewModalOpen(false);
     setSessionHeaderStatus('');
   }, [allowFileUpload, setSessionHeaderStatus]);
 
@@ -101,11 +99,6 @@ const useSessionHeaderPreview = ({
     });
   }, [allowFileUpload, draftSessionHeader, sessionHeaderMode, sessionHeaderPreviewUrl]);
 
-  useEffect(() => {
-    if (sessionHeaderPreviewSrc) return;
-    setSessionHeaderPreviewModalOpen(false);
-  }, [sessionHeaderPreviewSrc]);
-
   const handlePasteSessionHeaderFromClipboard = useCallback(async () => {
     const clipboardResult = await readClipboard({
       fileNamePrefix: 'clipboard-session-header',
@@ -136,7 +129,6 @@ const useSessionHeaderPreview = ({
   }, [allowFileUpload, chooseSessionHeaderFile, readClipboard, setSessionHeaderStatus, updateDraftSessionHeader]);
 
   const handleClearSessionHeaderPreview = useCallback(() => {
-    setSessionHeaderPreviewModalOpen(false);
     setSessionHeaderMode('url');
     setCompactSessionHeaderMode('idle');
     setSessionHeaderFile(null);
@@ -152,8 +144,6 @@ const useSessionHeaderPreview = ({
     sessionHeaderFile: allowFileUpload ? sessionHeaderFile : null,
     setSessionHeaderFile: chooseSessionHeaderFile,
     sessionHeaderPreviewSrc,
-    sessionHeaderPreviewModalOpen: allowFileUpload ? sessionHeaderPreviewModalOpen : false,
-    setSessionHeaderPreviewModalOpen,
     sessionHeaderUploadStatus,
     sessionHeaderUploadStatusTone,
     setSessionHeaderStatus,
