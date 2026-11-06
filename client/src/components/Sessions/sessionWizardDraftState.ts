@@ -30,7 +30,6 @@ import { normalizeSessionAppearance } from '../../utilities/ui/sessionColorSchem
 import {
   classifySessionModeProfileSupport,
   compileSessionModeProfile,
-  hasLegacyHostedAgentFlags,
   normalizeSessionModeProfileForWrite,
   mergeSessionModeProfileStorageAccess,
   profileFromLegacyConfig,
@@ -119,19 +118,6 @@ export const normalizeSessionWizardDraftShape = (draftIn: AnyRecord = {}): AnyRe
   const chainId = Number(draft.networkChainId || DEFAULT_CHAIN_ID || 0) || DEFAULT_CHAIN_ID;
   draft.sessionName = toStr(draft.sessionName || '').trim();
   draft.sessionInfo = toStr(draft.sessionInfo || '').trim();
-  delete draft.telegram_only;
-  delete draft.telegramOnly;
-  delete draft.telegramMode;
-  delete draft.sessionMode;
-  delete draft.telegramBridgeEnabled;
-  if (draft.telegram && typeof draft.telegram === 'object') {
-    delete draft.telegram.only;
-    delete draft.telegram.mode;
-    if (!Object.keys(draft.telegram).length) delete draft.telegram;
-  }
-  if (!draft.sessionModeProfile && hasLegacyHostedAgentFlags(draftIn)) {
-    draft.sessionModeProfile = profileFromLegacyConfig(draftIn);
-  }
   if (draft.sessionModeProfile && typeof draft.sessionModeProfile === 'object') {
     draft.sessionModeProfile = normalizeSessionModeProfileForWrite(draft.sessionModeProfile);
   }
@@ -254,12 +240,6 @@ export const buildSessionWizardDefaultTemplate = (): AnyRecord => {
   draft.sessionEndsAt = '';
   draft.appearance = { colorSchemeId: 'context-engine' };
   delete draft.sessionModeProfile;
-  delete draft.telegramOnly;
-  delete draft.telegram_only;
-  delete draft.telegramMode;
-  delete draft.sessionMode;
-  delete draft.telegramBridgeEnabled;
-  delete draft.telegram;
   delete draft.sessionHeaderImg;
   delete draft.sessionInfoEncrypted;
   draft.corsWorkerUrl = '';
@@ -531,7 +511,6 @@ export const buildSessionWizardCacheWritePayload = ({
   const durableDeployForm = {
     workerName: toStr(deployFormRecord.workerName || '').trim(),
     adminAddress: toStr(deployFormRecord.adminAddress || '').trim() || undefined,
-    bundleUrl: toStr(deployFormRecord.bundleUrl || '').trim(),
   };
 
   return {

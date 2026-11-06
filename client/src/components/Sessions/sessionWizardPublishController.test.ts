@@ -1106,7 +1106,6 @@ describe('resolveSessionWizardRegisterSuccessSettlementDescriptor', () => {
       sessionUrl: 'https://context.example/session/writers-room',
       adminUrl: 'https://context.example/admin?sessionId=00000000-0000-0000-0000-000000000001&chainId=84532',
       adminUrlStatus: '',
-      nextSessionIdStatus: 'Generated a new session ID for your next session.',
       registryRefreshArgs: {
         chainId: 84532,
         slug: 'writers-room',
@@ -1119,7 +1118,6 @@ describe('resolveSessionWizardRegisterSuccessSettlementDescriptor', () => {
       'sessionUrl',
       'adminUrl',
       'adminUrlStatus',
-      'nextSessionIdStatus',
       'registryRefreshArgs',
     ]);
     expect(Object.keys(descriptor.registryRefreshArgs)).toEqual(['chainId', 'slug', 'providerLike', 'account']);
@@ -1163,7 +1161,6 @@ describe('resolveSessionWizardWorkerPublishSuccessSettlementDescriptor', () => {
       adminUrl:
         'https://context.example/admin?sessionId=00000000-0000-0000-0000-000000000001&sessionSlug=worker-session&worker=https%3A%2F%2Fworker.example',
       adminUrlStatus: '',
-      nextSessionIdStatus: 'Generated a new session ID for your next session.',
     });
   });
 });

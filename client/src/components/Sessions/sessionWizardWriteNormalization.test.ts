@@ -84,7 +84,7 @@ describe('sessionWizardWriteNormalization', () => {
       },
       agentSessionWrapped: {
         enabled: true,
-        bridgeUrl: 'https://wrapped.example.test',
+        agentUrl: 'https://wrapped.example.test',
       },
     };
     const buildMetadataPayload = buildSessionWizardMetadataPayloadBuilder({
@@ -173,7 +173,7 @@ describe('sessionWizardWriteNormalization', () => {
     sessionModeProfile.surfaces.agentHttp = true;
     const agentSessionWrapped = {
       enabled: true,
-      bridgeUrl: 'https://wrapped.example.test',
+      agentUrl: 'https://wrapped.example.test',
     };
 
     expect(
@@ -296,10 +296,6 @@ describe('sessionWizardWriteNormalization', () => {
       slug: 'profile-session',
       sessionName: 'Profile Session',
       sessionModeProfile: profile,
-      telegramOnly: true,
-      sessionMode: 'telegram_only',
-      telegramBridgeEnabled: true,
-      telegram: { only: true, mode: 'telegram_only' },
     });
 
     expect(metadata.sessionModeProfile).toEqual({
@@ -312,10 +308,6 @@ describe('sessionWizardWriteNormalization', () => {
         payloadAccessControl: expect.objectContaining({ mode: 'worker_sbt_gate' }),
       }),
     );
-    expect(metadata.telegramOnly).toBeUndefined();
-    expect(metadata.sessionMode).toBeUndefined();
-    expect(metadata.telegramBridgeEnabled).toBeUndefined();
-    expect(metadata.telegram).toBeUndefined();
   });
 
   test('sanitizeSessionWizardMetadataPayload preserves public interview model configuration', () => {
@@ -382,39 +374,6 @@ describe('sessionWizardWriteNormalization', () => {
       expect(payload.sessionModeProfile.surfaces).toMatchObject({ telegram: false, miniApp: false, agentHttp });
     }
     expect(profile.surfaces).toMatchObject({ telegram: true, miniApp: true, agentHttp });
-  });
-
-  test.each([
-    { telegramOnly: true },
-    { telegram_only: true },
-    { sessionMode: 'telegram_only' },
-    { telegramMode: 'telegram_only' },
-    { telegram: { only: true } },
-    { telegram: { mode: 'telegram_only' } },
-  ])('upgrades legacy agent access %j without dual-write fields', (legacyFlags) => {
-    const metadata = sanitizeSessionWizardMetadataPayload({
-      slug: 'legacy-telegram',
-      sessionName: 'Legacy Agent',
-      ...legacyFlags,
-      storageProfile: { backend: 'cloudflare' },
-    });
-
-    expect(metadata.sessionModeProfile).toEqual(
-      expect.objectContaining({
-        preset: 'custom',
-        authority: { mode: 'worker_canonical' },
-        surfaces: expect.objectContaining({ telegram: false, miniApp: false, agentHttp: true, web: true }),
-      }),
-    );
-    expect(metadata.storageProfile).toEqual(
-      expect.objectContaining({
-        backend: 'cloudflare',
-        payloadAccessControl: expect.objectContaining({ mode: 'worker_sbt_gate' }),
-      }),
-    );
-    expect(metadata.telegramOnly).toBeUndefined();
-    expect(metadata.sessionMode).toBeUndefined();
-    expect(metadata.telegramBridgeEnabled).toBeUndefined();
   });
 
   test('buildSessionWizardRegistrySessionFields keeps compatibility mirrors and sponsored flags only', () => {
@@ -1120,59 +1079,6 @@ describe('sessionWizardWriteNormalization', () => {
     expect(workerPayload.storageProfile.telegramOwned).toBe(false);
     expect(workerPayload.storageProfile.payloadAccessControl.mode).toBe('worker_sbt_gate');
     expect(workerPayload.litCredentials).toEqual({});
-  });
-
-  test('legacy adapter mode is published as profile-only session metadata', () => {
-    const metadata = sanitizeSessionWizardMetadataPayload(
-      {
-        slug: 'telegram-native',
-        sessionName: 'Agent Native',
-        telegramOnly: true,
-        storageProfile: { backend: 'cloudflare', payloadAccessControl: { mode: 'public_read' } },
-      },
-      {
-        fieldOrder: ['slug', 'sessionName', 'telegramOnly', 'storageProfile'],
-      },
-    );
-
-    expect(metadata.sessionModeProfile).toEqual(
-      expect.objectContaining({
-        preset: 'custom',
-        authority: { mode: 'worker_canonical' },
-        surfaces: expect.objectContaining({ telegram: false, miniApp: false, agentHttp: true, web: true }),
-      }),
-    );
-    expect(metadata.telegramOnly).toBeUndefined();
-    expect(metadata.sessionMode).toBeUndefined();
-    expect(metadata.telegramBridgeEnabled).toBeUndefined();
-    expect(metadata.telegram).toBeUndefined();
-
-    const workerPayload = buildSessionWizardWorkerConfigPayload({
-      slug: 'telegram-native',
-      draft: {
-        networkChainId: DEFAULT_CONFIG_CHAIN_ID,
-        telegramOnly: true,
-        storageProfile: { backend: 'cloudflare', payloadAccessControl: { mode: 'public_read' } },
-      },
-      deployPayload: {},
-    });
-
-    expect(workerPayload.sessionModeProfile).toEqual(
-      expect.objectContaining({
-        preset: 'custom',
-        authority: { mode: 'worker_canonical' },
-        surfaces: expect.objectContaining({ telegram: false, miniApp: false, agentHttp: true, web: true }),
-      }),
-    );
-    expect(workerPayload.storageProfile).toEqual(
-      expect.objectContaining({
-        backend: 'cloudflare',
-        payloadAccessControl: expect.objectContaining({ mode: 'public_read' }),
-      }),
-    );
-    expect(workerPayload.telegramOnly).toBeUndefined();
-    expect(workerPayload.sessionMode).toBeUndefined();
-    expect(workerPayload.telegramBridgeEnabled).toBeUndefined();
   });
 });
 

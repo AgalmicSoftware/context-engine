@@ -200,7 +200,8 @@ describe('SessionWizard worker panel rendering', () => {
 
     try {
       renderLoggedInSessionWizard();
-      await waitFor(() => expect(readCachedBundleUrl()).toBe(customBundleUrl));
+      // Autosave stops carrying the stale URL, and deploy never read it.
+      await waitFor(() => expect(readCachedBundleUrl()).toBeUndefined());
 
       fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME), {
         target: { value: 'Normal Mode Bundle Reset' },

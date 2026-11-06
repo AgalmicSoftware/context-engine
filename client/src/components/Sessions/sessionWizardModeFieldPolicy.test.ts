@@ -129,7 +129,7 @@ describe('sessionWizardModeFieldPolicy', () => {
     const payload = {
       agentSessionWrapped: {
         enabled: true,
-        bridgeUrl: 'https://wrapped.example.test',
+        agentUrl: 'https://wrapped.example.test',
       },
     };
 
@@ -141,7 +141,7 @@ describe('sessionWizardModeFieldPolicy', () => {
     ).toEqual({
       agentSessionWrapped: {
         enabled: true,
-        bridgeUrl: 'https://wrapped.example.test',
+        agentUrl: 'https://wrapped.example.test',
       },
     });
   });

@@ -41,10 +41,8 @@ import {
 import {
   classifySessionModeProfileSupport,
   compileSessionModeProfile,
-  hasLegacyHostedAgentFlags,
   normalizeSessionModeProfileForWrite,
   mergeSessionModeProfileStorageAccess,
-  profileFromLegacyConfig,
   type SessionModeProfile,
 } from '../../utilities/session/sessionModeProfile';
 import { resolveSessionWizardModeRequirements } from './sessionWizardModeRequirements';
@@ -189,21 +187,8 @@ export const sanitizeSessionWizardMetadataPayload = (
   next = normalizeSessionNaming(next) as AnyRecord;
   next.sessionName = trimString(next.sessionName);
   next.sessionInfo = trimString(next.sessionInfo);
-  if (!next.sessionModeProfile && hasLegacyHostedAgentFlags(next)) {
-    next.sessionModeProfile = profileFromLegacyConfig(next);
-  }
   if (isObj(next.sessionModeProfile)) {
     next.sessionModeProfile = normalizeSessionModeProfileForWrite(next.sessionModeProfile as SessionModeProfile);
-  }
-  delete next.telegram_only;
-  delete next.telegramOnly;
-  delete next.telegramMode;
-  delete next.telegramBridgeEnabled;
-  delete next.sessionMode;
-  if (isObj(next.telegram)) {
-    delete next.telegram.only;
-    delete next.telegram.mode;
-    if (!Object.keys(next.telegram).length) delete next.telegram;
   }
   if (!next.sessionName) delete next.sessionName;
   if (!next.sessionInfo) delete next.sessionInfo;
@@ -335,9 +320,7 @@ export const resolveSessionWizardWorkerStorageProfilePayload = ({
   }
   const sessionModeProfile = isObj(resolvedDraft.sessionModeProfile)
     ? (resolvedDraft.sessionModeProfile as SessionModeProfile)
-    : hasLegacyHostedAgentFlags(resolvedDraft)
-      ? profileFromLegacyConfig(resolvedDraft)
-      : null;
+    : null;
   const effectiveSessionModeProfile = sessionModeProfile
     ? mergeSessionModeProfileStorageAccess(normalizeSessionModeProfileForWrite(sessionModeProfile), rawStorageProfile)
     : null;

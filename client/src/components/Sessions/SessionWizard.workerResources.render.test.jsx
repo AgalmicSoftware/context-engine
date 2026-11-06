@@ -502,7 +502,6 @@ describe('SessionWizard worker resource rendering', () => {
     expect(screen.getByText('LIT')).toBeInTheDocument();
     expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_ACCOUNT_API_KEY)).toBeInTheDocument();
     expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_API_BASE)).not.toBeInTheDocument();
-    expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_PAYER_PRIVATE_KEY)).not.toBeInTheDocument();
     expect(screen.getByTestId('ce-wizard-resource-tooltip-lit')).toBeInTheDocument();
 
     await waitFor(() => {

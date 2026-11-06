@@ -44,7 +44,6 @@ const createControllerHarness = () => {
       return { ok: true, bytes: 1, key: 'settlement', status: 'ok' };
     }),
     setSessionId: jest.fn((value: string) => events.push(`session-id:${value}`)),
-    setSessionIdStatus: jest.fn((value: string) => events.push(`session-id-status:${value}`)),
   };
   const handleRegisterGroup = jest.fn(async () => {
     events.push('register');
@@ -478,7 +477,7 @@ describe('sessionWizardPublishRuntimeController', () => {
     });
 
     expect(harness.handleRegisterGroup).not.toHaveBeenCalled();
-    expect(harness.events).toHaveLength(8);
+    expect(harness.events).toHaveLength(7);
     expect(harness.events[0]).toContain('session-url:');
     expect(harness.events[0]).toContain('worker=');
     expect(harness.events[1]).toContain('admin-url:');
@@ -488,7 +487,6 @@ describe('sessionWizardPublishRuntimeController', () => {
       'write-settlement',
       'clear-cache',
       'session-id:next-session-id',
-      'session-id-status:Generated a new session ID for your next session.',
     ]);
     const workerSettlement = {
       workerUrl: WORKER_ORIGIN,

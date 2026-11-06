@@ -10,7 +10,6 @@ import type { SessionWizardVerifiedWorkerConnection } from './sessionWizardNativ
 
 type DeployForm = {
   workerName?: string;
-  bundleUrl?: string;
   apiToken?: string;
   adminAddress?: string;
 };
