@@ -13,7 +13,7 @@ their verified source notices; newly distributed source uses MPL-2.0.
 | Material | License | Notes |
 | --- | --- | --- |
 | Root tools, `client/`, `mcp/`, `ai-discourse-bench/`, `shared/` and add-ons | MPL-2.0 | The root license applies to project code. |
-| `workers/` | MPL-2.0 | Includes the Session Worker, Agent Bridge, deploy helper and shared Worker modules. |
+| `workers/` | MPL-2.0 | Includes the Session Worker, deploy helper and shared Worker modules. |
 | `deploy/cloudflare/session-worker/` | MPL-2.0 for project code | The standalone package includes the project license and bundled dependency notices in `THIRD_PARTY_NOTICES.md`. |
 | `contracts/` and `foundry/` | MPL-2.0 | Source files carry matching SPDX identifiers. |
 | Repository documentation | MPL-2.0 | Except material with a specific third-party or corpus notice. |
@@ -38,7 +38,7 @@ Third-party dependencies retain their own licenses. Package metadata, lockfiles,
 The Session Worker deploy package generates `THIRD_PARTY_NOTICES.md` from its
 esbuild input packages, preserving each package's version, license and full
 license text. Template verification checks these notices against the bundle.
-The released Session Worker, deploy-helper and Agent Bridge JavaScript bundles
+The released Session Worker and deploy-helper JavaScript bundles
 also carry their own generated notices in a trailing comment, so installations
 and copies retain them. Inputs with no local license file must have a full
 license grant in their README, or be an ethers v5 subpackage whose exact version
@@ -85,8 +85,8 @@ Current third-party images:
 ## Dependency license check
 
 After installing root, client, MCP and Session Worker dependencies, run
-`npm run -s license:check`. This builds the client, MCP, Session Worker, Agent Bridge
-and deploy helper to capture their exact inputs. Released Worker bundles must
+`npm run -s license:check`. This builds the client, MCP, Session Worker and
+deploy helper to capture their exact inputs. Released Worker bundles must
 end with their complete generated notices. The check reads installed production packages plus
 packages in the esbuild metafiles and Vite's private module inventory, including
 bundled development dependencies, attributed to the tree that installed them.

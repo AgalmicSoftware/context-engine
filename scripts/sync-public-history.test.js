@@ -991,6 +991,203 @@ test('sync-public-history rejects a runner secret added and deleted after the Ag
   });
 });
 
+const AGENT_BRIDGE_MARKER = path.join('workers', 'agentBridgeWorker', 'PUBLIC_RELEASE_CUTOVER');
+const AGENT_BRIDGE_SUBTREE = path.join('workers', 'agentBridgeWorker');
+const AGENT_BRIDGE_RUNNER = path.join('scripts', 'run-agent-bridge-worker-tests.js');
+const SESSION_AGENT_RUNNER = path.join('scripts', 'run-session-agent-tests.js');
+
+function removeFromSource(sourceDir, ...relativePaths) {
+  for (const relativePath of relativePaths) {
+    fs.rmSync(path.join(sourceDir, relativePath), { recursive: true });
+  }
+}
+
+function commitAt(sourceDir, message, day) {
+  const date = `2025-02-${String(day).padStart(2, '0')}T00:00:00Z`;
+  commitAll(sourceDir, message, { authorDate: date, committerDate: date });
+  return git(sourceDir, ['rev-parse', 'HEAD']).trim();
+}
+
+function retireAgentBridge(sourceDir, day) {
+  removeFromSource(sourceDir, AGENT_BRIDGE_SUBTREE, AGENT_BRIDGE_RUNNER);
+  writeFile(sourceDir, SESSION_AGENT_RUNNER, "console.log('session agent tests');\n");
+  const pkg = JSON.parse(fs.readFileSync(path.join(sourceDir, 'package.json'), 'utf8'));
+  delete pkg.scripts['test:worker:agent-bridge'];
+  pkg.scripts['test:worker:agent'] = 'node scripts/run-session-agent-tests.js';
+  writeFile(sourceDir, 'package.json', `${JSON.stringify(pkg, null, 2)}\n`);
+  return commitAt(sourceDir, 'Retire the separate agent worker', day);
+}
+
+function trackedPathsAt(sourceDir, rev) {
+  return git(sourceDir, ['ls-tree', '-r', '--name-only', rev]);
+}
+
+test('sync-public-history replays across the Agent Bridge retirement commit', () => {
+  withSourceRepo(({ sourceDir }) => {
+    writeFile(sourceDir, path.join('workers', 'agentBridgeWorker', 'worker.js'), 'public agent bridge worker v2\n');
+    const lastBridgeCommit = commitAt(sourceDir, 'Update the worker before retirement', 1);
+    const retirementCommit = retireAgentBridge(sourceDir, 2);
+    writeFile(sourceDir, 'public.txt', 'public one\npublic two\npublic three\n');
+    commitAt(sourceDir, 'Public commit after retirement', 3);
+    writeFile(sourceDir, path.join('workers', 'agentBridgeWorker', 'stray.txt'), 'must stay stripped\n');
+    writeFile(sourceDir, AGENT_BRIDGE_RUNNER, 'must stay stripped\n');
+    commitAt(sourceDir, 'Add a stray retired file', 4);
+    removeFromSource(sourceDir, AGENT_BRIDGE_SUBTREE, AGENT_BRIDGE_RUNNER);
+    commitAt(sourceDir, 'Remove the stray retired file', 5);
+
+    const dryRun = runSyncScript(sourceDir, ['--dry-run', 'release-candidate']);
+    assert.equal(dryRun.status, 0, syncFailureMessage(dryRun));
+    assert.equal(parseSummaryValue(dryRun.stdout, 'Would replay'), '5');
+    assert.equal(parseSummaryValue(dryRun.stdout, 'Would skip'), '4');
+
+    const result = runSyncScript(sourceDir, ['release-candidate']);
+    assert.equal(result.status, 0, syncFailureMessage(result));
+    assert.match(result.stderr, new RegExp(`Agent Bridge public history retired at: ${retirementCommit}`));
+
+    const replayedByMessage = new Map(
+      git(sourceDir, ['log', '--format=%H %s', 'origin/main..release-candidate'])
+        .trim()
+        .split('\n')
+        .map((line) => [line.slice(41), line.slice(0, 40)]),
+    );
+    assert.equal(replayedByMessage.size, 5);
+    assert.match(
+      git(sourceDir, ['log', '-1', '--format=%B', replayedByMessage.get('Retire the separate agent worker')]),
+      new RegExp(`CE-Private-Source: ${retirementCommit}`),
+    );
+
+    // The audited window still publishes the subtree, runner, marker and command.
+    const lastBridgeReplay = replayedByMessage.get('Update the worker before retirement');
+    assert.match(
+      git(sourceDir, ['log', '-1', '--format=%B', lastBridgeReplay]),
+      new RegExp(`CE-Private-Source: ${lastBridgeCommit}`),
+    );
+    assert.equal(
+      git(sourceDir, ['show', `${lastBridgeReplay}:workers/agentBridgeWorker/worker.js`]),
+      'public agent bridge worker v2\n',
+    );
+    const lastBridgePaths = trackedPathsAt(sourceDir, lastBridgeReplay);
+    assert.match(lastBridgePaths, /^workers\/agentBridgeWorker\/PUBLIC_RELEASE_CUTOVER$/m);
+    assert.match(lastBridgePaths, /^scripts\/run-agent-bridge-worker-tests\.js$/m);
+    assert.equal(
+      JSON.parse(git(sourceDir, ['show', `${lastBridgeReplay}:package.json`])).scripts['test:worker:agent-bridge'],
+      'node scripts/run-agent-bridge-worker-tests.js',
+    );
+
+    // From the retirement commit on, only the renamed runner remains.
+    for (const subject of ['Retire the separate agent worker', 'Public commit after retirement']) {
+      const replayed = replayedByMessage.get(subject);
+      const paths = trackedPathsAt(sourceDir, replayed);
+      assert.doesNotMatch(paths, /^workers\/agentBridgeWorker\//m, subject);
+      assert.doesNotMatch(paths, /^scripts\/run-agent-bridge-worker-tests\.js$/m, subject);
+      assert.match(paths, /^scripts\/run-session-agent-tests\.js$/m, subject);
+      const { scripts } = JSON.parse(git(sourceDir, ['show', `${replayed}:package.json`]));
+      assert.equal(scripts['test:worker:agent'], 'node scripts/run-session-agent-tests.js', subject);
+      assert.equal(Object.hasOwn(scripts, 'test:worker:agent-bridge'), false, subject);
+    }
+
+    assert.equal(replayedByMessage.has('Add a stray retired file'), false);
+    assert.equal(replayedByMessage.has('Remove the stray retired file'), false);
+    assert.equal(
+      git(sourceDir, ['show', 'release-candidate:public.txt']),
+      'public one\npublic two\npublic three\n',
+    );
+  });
+});
+
+test('sync-public-history dry run counts a retirement that only deletes Agent Bridge paths', () => {
+  withSourceRepo(({ sourceDir }) => {
+    removeFromSource(sourceDir, AGENT_BRIDGE_SUBTREE, AGENT_BRIDGE_RUNNER);
+    const retirementCommit = commitAt(sourceDir, 'Remove the retired agent worker', 1);
+
+    const result = runSyncScript(sourceDir, ['--dry-run', 'release-candidate']);
+
+    assert.equal(result.status, 0, syncFailureMessage(result));
+    assert.match(result.stderr, new RegExp(`DRY RUN replay ${retirementCommit}`));
+    assert.equal(parseSummaryValue(result.stdout, 'Would replay'), '3');
+  });
+});
+
+for (const [label, removedPaths, leftoverPattern] of [
+  ['only the marker', [AGENT_BRIDGE_MARKER], /workers\/agentBridgeWorker is still on dev/],
+  ['the marker and subtree', [AGENT_BRIDGE_SUBTREE], /scripts\/run-agent-bridge-worker-tests\.js is still on dev/],
+  ['the marker and runner', [AGENT_BRIDGE_MARKER, AGENT_BRIDGE_RUNNER], /workers\/agentBridgeWorker is still on dev/],
+]) {
+  test(`sync-public-history rejects a partial Agent Bridge removal of ${label}`, () => {
+    withSourceRepo(({ sourceDir }) => {
+      removeFromSource(sourceDir, ...removedPaths);
+      commitAt(sourceDir, 'Partly remove the agent worker', 1);
+
+      const result = runSyncScript(sourceDir, ['release-candidate']);
+
+      assert.equal(result.status, 2, syncFailureMessage(result));
+      assert.match(result.stderr, leftoverPattern);
+      assert.match(result.stderr, /Remove the whole subtree and runner, or restore the marker/);
+      assert.equal(git(sourceDir, ['branch', '--list', 'release-candidate']).trim(), '');
+    });
+  });
+}
+
+test('sync-public-history still requires the runner while the Agent Bridge marker remains', () => {
+  withSourceRepo(({ sourceDir }) => {
+    removeFromSource(sourceDir, AGENT_BRIDGE_RUNNER);
+    commitAt(sourceDir, 'Remove the runner but keep the marker', 1);
+
+    const result = runSyncScript(sourceDir, ['release-candidate']);
+
+    assert.equal(result.status, 2, syncFailureMessage(result));
+    assert.match(result.stderr, /Agent Bridge public test runner is missing after the cutover/);
+  });
+});
+
+test('sync-public-history scans commits before the Agent Bridge retirement even when it deletes the secret', () => {
+  withSourceRepo(({ sourceDir }) => {
+    const unsafeToken = ['live', 'credential', 'material', 'must', 'not', 'ship'].join('-');
+    writeFile(sourceDir, AGENT_BRIDGE_RUNNER, `const agent_api_token = '${unsafeToken}';\n`);
+    commitAt(sourceDir, 'Add a credential before retirement', 1);
+    retireAgentBridge(sourceDir, 2);
+
+    const result = runSyncScript(sourceDir, ['release-candidate']);
+
+    assert.equal(result.status, 2, syncFailureMessage(result));
+    assert.match(result.stderr, /Scanning Agent Bridge public replay commit for PII\/secrets/);
+    assert.match(result.stderr, /public release PII scan failed/);
+    assert.equal(git(sourceDir, ['branch', '--list', 'release-candidate']).trim(), '');
+  });
+});
+
+test('sync-public-history requires Agent Bridge package wiring on commits before retirement', () => {
+  withSourceRepo(({ sourceDir }) => {
+    const pkg = JSON.parse(fs.readFileSync(path.join(sourceDir, 'package.json'), 'utf8'));
+    delete pkg.scripts['test:worker:agent-bridge'];
+    writeFile(sourceDir, 'package.json', `${JSON.stringify(pkg, null, 2)}\n`);
+    commitAt(sourceDir, 'Remove the package command before retirement', 1);
+    removeFromSource(sourceDir, AGENT_BRIDGE_SUBTREE, AGENT_BRIDGE_RUNNER);
+    commitAt(sourceDir, 'Retire the separate agent worker', 2);
+
+    const result = runSyncScript(sourceDir, ['release-candidate']);
+
+    assert.notEqual(result.status, 0, syncFailureMessage(result));
+    assert.match(result.stderr, /Agent Bridge public cutover source is missing test:worker:agent-bridge/);
+    assert.equal(git(sourceDir, ['branch', '--list', 'release-candidate']).trim(), '');
+  });
+});
+
+test('sync-public-history still audits the cutover commit after Agent Bridge retirement', () => {
+  withSourceRepo(({ sourceDir }) => {
+    removeFromSource(sourceDir, AGENT_BRIDGE_MARKER);
+    commitAt(sourceDir, 'Drop the audited marker', 1);
+    writeFile(sourceDir, AGENT_BRIDGE_MARKER, 'unreviewed-cutover-header\n');
+    commitAt(sourceDir, 'Add an unreviewed marker', 2);
+    retireAgentBridge(sourceDir, 3);
+
+    const result = runSyncScript(sourceDir, ['release-candidate']);
+
+    assert.equal(result.status, 2, syncFailureMessage(result));
+    assert.match(result.stderr, /Agent Bridge public cutover marker has an unsupported header/);
+  });
+});
+
 test('sync-public-history rejects a public secret added and deleted outside Agent Bridge', () => {
   withSourceRepo(({ sourceDir }) => {
     const unsafeToken = ['live', 'credential', 'material', 'must', 'not', 'ship'].join('-');

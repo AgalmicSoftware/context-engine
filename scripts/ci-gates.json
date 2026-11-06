@@ -267,11 +267,11 @@
           ]
         },
         {
-          "label": "Run Agent Bridge Worker tests",
+          "label": "Run session agent tests",
           "command": "npm",
           "args": [
             "run",
-            "test:worker:agent-bridge"
+            "test:worker:agent"
           ]
         }
       ]

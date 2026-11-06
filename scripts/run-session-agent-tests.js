@@ -1,9 +1,9 @@
-// Retained command name for CI callers; behavior now lives in the Session Worker.
+// Runs the Session Worker's agent behavior tests.
 'use strict';
 const { spawnSync } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
-function runAgentBridgeWorkerTests(rootDir = path.resolve(__dirname, '..')) {
+function runSessionAgentTests(rootDir = path.resolve(__dirname, '..')) {
   const dir = path.join(rootDir, 'workers/sessionCorsWorker');
   const files = fs.readdirSync(dir).filter(name => /^agent.*\.test\.mjs$/.test(name))
     .map(name => path.join(dir, name));
@@ -14,5 +14,5 @@ function runAgentBridgeWorkerTests(rootDir = path.resolve(__dirname, '..')) {
   if (result.error) throw result.error;
   return typeof result.status === 'number' ? result.status : 1;
 }
-if (require.main === module) process.exit(runAgentBridgeWorkerTests());
-module.exports = { runAgentBridgeWorkerTests };
+if (require.main === module) process.exit(runSessionAgentTests());
+module.exports = { runSessionAgentTests };

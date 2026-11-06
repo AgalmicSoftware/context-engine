@@ -75,7 +75,7 @@ const makeWorkerModeDeployFields = (options = {}) => {
   return {
     sessionModeProfile,
     storageProfile: makeWorkerStorageProfile(sessionModeProfile),
-    // The wizard always sends its session ID; a hosted Agent Bridge pins it.
+    // The wizard always sends its session ID; Agent HTTP sessions pin it.
     ...(options.agentHttp === true ? { sessionId: `0x${'4b'.repeat(16)}` } : {}),
   };
 };
@@ -1593,7 +1593,6 @@ describe('deploy-helper worker', () => {
         sessionSlug: 'wrapped-alpha',
         sessionId: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
         agentSessionWrappedDeploymentIdentity: 'session:11155420:0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:wrapped-alpha',
-        agentBridgeBundleUrl: 'https://bundles.example.test/agentBridgeWorker.bundle.js',
         adminAddress: '0x00000000000000000000000000000000000000aa',
         sessionModeProfile: makeWorkerSessionModeProfile({ agentHttp: true }),
         bundleUrl: 'https://bundles.example.test/sessionCorsWorker.bundle.js',
@@ -1611,6 +1610,7 @@ describe('deploy-helper worker', () => {
         protocolVersion: 'agent-session-wrapped-v1',
         origin: new URL(payload.workerUrl).origin,
       }));
+      expect(fetchMock.getNamespaceCreateCount()).toBe(1);
       expect(fetchMock.getScriptUploadCount()).toBe(1);
       expect(fetchMock.workerSecretBodies.some(entry => JSON.stringify(entry).includes('AGENT_MANAGED_ROOT_SECRET'))).toBe(true);
       const sessionConfigEntry = [...fetchMock.kvValues.entries()].find(([key]) => key.endsWith('/session:wrapped-alpha:config'));
@@ -4919,25 +4919,20 @@ describe('deploy-helper worker', () => {
     const RELEASE_VAR_NAMES = [
       'WORKER_BUNDLE_URL',
       'WORKER_BUNDLE_MANIFEST_URL',
-      'AGENT_BRIDGE_BUNDLE_URL',
-      'AGENT_BRIDGE_BUNDLE_MANIFEST_URL',
     ];
     const SPONSOR_APP_ORIGIN = 'https://app.example.test';
     const sha256OfText = (text) => createHash('sha256').update(text, 'utf8').digest('hex');
 
     // One commit-addressed release, shaped like the GitHub release assets under
-    // worker-bundles-<commit>/: two bundles plus the manifest that pins them.
+    // worker-bundles-<commit>/: the session bundle plus the manifest that pins it.
     const makeWorkerRelease = (commitChar) => {
       const base = `https://releases.example.test/worker-bundles-${commitChar.repeat(40)}/`;
       const release = {
         workerBundleUrl: `${base}sessionCorsWorker.bundle.js`,
-        agentBridgeBundleUrl: `${base}agentBridgeWorker.bundle.js`,
         manifestUrl: `${base}worker-release-manifest.json`,
         sessionBundle: `export default { fetch() { return new Response('session ${commitChar}'); } };`,
-        agentBridgeBundle: `export default { fetch() { return new Response('bridge ${commitChar}'); } };`,
       };
       release.sessionSha256 = sha256OfText(release.sessionBundle);
-      release.agentBridgeSha256 = sha256OfText(release.agentBridgeBundle);
       release.manifest = {
         schemaVersion: 1,
         artifactSet: 'context-engine-worker-bundles',
@@ -4956,12 +4951,6 @@ describe('deploy-helper worker', () => {
             bytes: release.sessionBundle.length,
             sha256: release.sessionSha256,
           },
-          {
-            kind: 'agent-bridge-worker',
-            file: 'agentBridgeWorker.bundle.js',
-            bytes: release.agentBridgeBundle.length,
-            sha256: release.agentBridgeSha256,
-          },
         ],
       };
       return release;
@@ -4978,7 +4967,6 @@ describe('deploy-helper worker', () => {
           const text = {
             [release.manifestUrl]: JSON.stringify(release.manifest),
             [release.workerBundleUrl]: release.sessionBundle,
-            [release.agentBridgeBundleUrl]: release.agentBridgeBundle,
           }[href];
           if (text === null) return new Response('Not found.', { status: 404 });
           if (text !== undefined) return new Response(text, { status: 200 });
@@ -5098,8 +5086,6 @@ describe('deploy-helper worker', () => {
         ...makeWorkerModeDeployFields({ agentHttp: true }),
         bundleUrl: release.workerBundleUrl,
         bundleManifestUrl: release.manifestUrl,
-        agentBridgeBundleUrl: release.agentBridgeBundleUrl,
-        agentBridgeBundleManifestUrl: release.manifestUrl,
       }, makeCoordinatorEnv({ DEPLOY_HELPER_KV: makeKvBinding() }));
 
       expect(sponsor.status).toBe(200);
@@ -5124,8 +5110,6 @@ describe('deploy-helper worker', () => {
         bundleText: 'export default { fetch() { return new Response("redeemer code"); } };',
         bundleUrl: 'https://redeemer.example.test/sessionCorsWorker.bundle.js',
         bundleManifestUrl: 'https://redeemer.example.test/worker-release-manifest.json',
-        agentBridgeBundleUrl: 'https://redeemer.example.test/agentBridgeWorker.bundle.js',
-        agentBridgeBundleManifestUrl: 'https://redeemer.example.test/worker-release-manifest.json',
       });
 
       expect(redeemed.status).toBe(200);
@@ -5187,7 +5171,7 @@ describe('deploy-helper worker', () => {
       expect(sponsorEnv.GROUP_KV.store.get(`sponsoredGrant:${grantToken}`)).toBe(grantRecord);
     });
 
-    it('records no release for a bundle URL without a manifest or a bridge the session does not use', async () => {
+    it('records no release for a bundle URL without a manifest', async () => {
       const release = makeWorkerRelease('3');
       const fetchMock = makeReleaseFetch(release);
       global.fetch = fetchMock;
@@ -5203,7 +5187,6 @@ describe('deploy-helper worker', () => {
       const vars = workerVars(fetchMock, deployed.payload.workerName);
       expect(vars.CE_BUNDLE_SHA256).toBe(release.sessionSha256);
       expect(recordedRelease(vars)).toEqual({});
-      expect(fetchMock.releaseReads).not.toContain(release.agentBridgeBundleUrl);
     });
 
     it('records the release the request names over the helper defaults, and the defaults otherwise', async () => {
@@ -5243,24 +5226,7 @@ describe('deploy-helper worker', () => {
       });
     });
 
-    it.each([null, 'untrusted retired bytes'])('ignores obsolete Bridge bundle input (%s) and creates one Worker', async (bytes) => {
-      const release = makeWorkerRelease('6');
-      release.agentBridgeBundle = bytes;
-      const fetchMock = makeReleaseFetch(release);
-      global.fetch = fetchMock;
-      const deployed = await deploySessionWorker({
-        workerName: 'agent-only-worker', sessionSlug: 'agent-only-session',
-        ...makeWorkerModeDeployFields({ agentHttp: true }),
-        bundleUrl: release.workerBundleUrl, bundleManifestUrl: release.manifestUrl,
-        agentBridgeBundleUrl: release.agentBridgeBundleUrl, agentBridgeBundleManifestUrl: release.manifestUrl,
-      });
-      expect(deployed.status).toBe(200);
-      expect(fetchMock.cloudflare.getNamespaceCreateCount()).toBe(1);
-      expect(fetchMock.cloudflare.getScriptUploadCount()).toBe(1);
-      expect(fetchMock.releaseReads).not.toContain(release.agentBridgeBundleUrl);
-    });
-
-    it('resumes an uploaded agent Worker after lost terminal persistence without a Bridge dependency', async () => {
+    it('resumes an uploaded agent Worker after lost terminal persistence', async () => {
       const release = makeWorkerRelease('7');
       const fetchMock = makeReleaseFetch(release);
       global.fetch = fetchMock;
@@ -5276,15 +5242,13 @@ describe('deploy-helper worker', () => {
       };
       const env = makeCoordinatorEnv({ DEPLOY_HELPER_KV: journalKv });
       const body = {
-        deploymentRequestId: 'bridge-resume-request-0001',
-        workerName: 'bridge-resume-worker',
-        sessionSlug: 'bridge-resume-session',
-        agentSessionWrappedDeploymentIdentity: 'session:worker:bridge-resume-session',
+        deploymentRequestId: 'agent-terminal-request-0001',
+        workerName: 'agent-terminal-worker',
+        sessionSlug: 'agent-terminal-session',
+        agentSessionWrappedDeploymentIdentity: 'session:worker:agent-terminal-session',
         ...makeWorkerModeDeployFields({ agentHttp: true }),
         bundleUrl: release.workerBundleUrl,
         bundleManifestUrl: release.manifestUrl,
-        agentBridgeBundleUrl: release.agentBridgeBundleUrl,
-        agentBridgeBundleManifestUrl: release.manifestUrl,
       };
 
       const first = await deploySessionWorker(body, env);
@@ -5293,32 +5257,27 @@ describe('deploy-helper worker', () => {
       expect(fetchMock.cloudflare.getScriptUploadCount()).toBe(1);
 
       const secretWrites = fetchMock.mock.calls.filter(([url, init]) => String(url).endsWith('/secrets') && init?.method === 'PUT').length;
-      release.agentBridgeBundle = null;
       const retry = await deploySessionWorker(body, env);
       expect(retry.status).toBe(200);
       expect(fetchMock.cloudflare.getScriptUploadCount()).toBe(1);
       expect(fetchMock.mock.calls.filter(([url, init]) => String(url).endsWith('/secrets') && init?.method === 'PUT')).toHaveLength(secretWrites);
-      expect(fetchMock.releaseReads).not.toContain(release.agentBridgeBundleUrl);
     });
 
-    it('resumes staged resources for agent setup without fetching retired bundle inputs', async () => {
+    it('resumes staged resources for agent setup', async () => {
       const release = makeWorkerRelease('8');
       const fetchMock = makeReleaseFetch(release);
       global.fetch = fetchMock;
       const env = makeCoordinatorEnv({ DEPLOY_HELPER_KV: makeKvBinding() });
       const body = { deploymentRequestId: 'agent-resume-request-0001', workerName: 'agent-resume-worker',
         sessionSlug: 'agent-resume-session', ...makeWorkerModeDeployFields({ agentHttp: true }),
-        bundleUrl: release.workerBundleUrl, bundleManifestUrl: release.manifestUrl,
-        agentBridgeBundleUrl: release.agentBridgeBundleUrl };
+        bundleUrl: release.workerBundleUrl, bundleManifestUrl: release.manifestUrl };
       fetchMock.cloudflare.scriptUploadResponses.push(cfFailure(500, 'Upload response lost.'));
       const first = await deploySessionWorker(body, env);
       expect(first.status).toBe(502);
       expect(first.payload.deploymentRequestPending).toBe(true);
-      release.agentBridgeBundle = null;
       const recovered = await deploySessionWorker(body, env);
       expect(recovered.status).toBe(200);
       expect(recovered.payload.kvNamespaceId).toBe(first.payload.orphanResources.kvNamespaceId);
-      expect(fetchMock.releaseReads).not.toContain(release.agentBridgeBundleUrl);
       expect(recordedRelease(workerVars(fetchMock, recovered.payload.workerName))).toEqual({
         WORKER_BUNDLE_URL: release.workerBundleUrl, WORKER_BUNDLE_MANIFEST_URL: release.manifestUrl,
       });
@@ -5547,32 +5506,6 @@ describe('deploy-helper worker', () => {
       });
     });
 
-    it('does not persist retired Bridge URL inputs even when malformed', async () => {
-      const release = makeWorkerRelease('9');
-      const fetchMock = makeReleaseFetch(release);
-      global.fetch = fetchMock;
-
-      const deployed = await deploySessionWorker({
-        workerName: 'fragment-bridge-worker',
-        sessionSlug: 'fragment-bridge-session',
-        agentSessionWrappedDeploymentIdentity: 'session:worker:fragment-bridge-session',
-        ...makeWorkerModeDeployFields({ agentHttp: true }),
-        bundleUrl: release.workerBundleUrl,
-        bundleManifestUrl: release.manifestUrl,
-        agentBridgeBundleUrl: `${release.agentBridgeBundleUrl}#latest`,
-        agentBridgeBundleManifestUrl: release.manifestUrl,
-      });
-
-      expect(deployed.status).toBe(200);
-      expect(fetchMock.releaseReads).not.toContain(`${release.agentBridgeBundleUrl}#latest`);
-      const sessionWorkerName = [...fetchMock.cloudflare.workerBindings.keys()]
-        .find((name) => name.startsWith('fragment-bridge-worker-'));
-      expect(recordedRelease(workerVars(fetchMock, sessionWorkerName))).toEqual({
-        WORKER_BUNDLE_URL: release.workerBundleUrl,
-        WORKER_BUNDLE_MANIFEST_URL: release.manifestUrl,
-      });
-    });
-
     it('carries the recorded release through the migration retry upload', async () => {
       const release = makeWorkerRelease('a');
       const fetchMock = makeReleaseFetch(release);
@@ -5652,8 +5585,6 @@ describe('deploy-helper worker', () => {
         ...makeWorkerModeDeployFields({ agentHttp: true }),
         bundleUrl: release.workerBundleUrl,
         bundleSha256: release.sessionSha256,
-        agentBridgeBundleUrl: release.agentBridgeBundleUrl,
-        agentBridgeBundleSha256: release.agentBridgeSha256,
       });
 
       expect(deployed.status).toBe(200);

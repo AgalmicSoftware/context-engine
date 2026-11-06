@@ -99,10 +99,10 @@ test('buildWorkerBundles removes trailing horizontal whitespace from generated o
   ]]);
 });
 
-test('the retired Bridge is not a deployable bundle target', async () => {
+test('the Session Worker and deploy helper are the only bundle targets', async () => {
   const { resolveWorkerBundleTargets } = await loadModule();
   assert.deepEqual(resolveWorkerBundleTargets().map(target => target.key), ['sessionCorsWorker', 'deployHelper']);
-  assert.throws(() => resolveWorkerBundleTargets({ targetKeys: ['agentBridgeWorker'] }), /Unknown worker bundle target/);
+  assert.throws(() => resolveWorkerBundleTargets({ targetKeys: ['unknownWorker'] }), /Unknown worker bundle target/);
 });
 
 test('every released bundle carries complete deterministic notices inside a safe trailing comment', async (t) => {

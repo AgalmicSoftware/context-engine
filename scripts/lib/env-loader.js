@@ -130,7 +130,7 @@ if (!global[LOADER_FLAG]) {
     console.log(`[e2e-env] no env file loaded (checked: ${listed})`);
   }
 
-  const sessionWorkerEnv = sanitizeSessionWorkerEnv(process.env);
+  sanitizeSessionWorkerEnv(process.env);
 
   // Non-fatal prereq warnings (do not edit `.env.e2e.local` automatically).
   const warn = (msg) => {
@@ -144,10 +144,6 @@ if (!global[LOADER_FLAG]) {
 
   if (!has('RPC_URL')) {
     warn('RPC_URL is not set. Public RPCs are often rate-limited; set RPC_URL in `.env.e2e.local`/`.env.e2e` for more reliable on-chain runs.');
-  }
-
-  if (sessionWorkerEnv.ignored.some((entry) => entry.key === 'WORKER_URL')) {
-    warn('WORKER_URL appears to point at the agent bridge worker, so normal session-worker E2E is ignoring it. Set SESSION_WORKER_URL for sessionCorsWorker, or E2E_ALLOW_WORKER_URL_AGENT_BRIDGE=1 to force legacy WORKER_URL usage.');
   }
 
   if (!has('SESSION_WORKER_URL') && !has('WORKER_URL')) {

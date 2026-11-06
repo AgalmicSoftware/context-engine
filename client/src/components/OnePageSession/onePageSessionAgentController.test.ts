@@ -111,13 +111,10 @@ describe('onePageSessionAgentController', () => {
     });
   });
 
-  it('uses only the canonical Worker URL and ignores retired Bridge settings', () => {
-    expect(
-      resolveSessionAgentWorkerUrl({
-        corsWorkerUrl: 'https://session.example///',
-        agentBridgeUrl: 'https://old.example',
-      }),
-    ).toBe('https://session.example');
+  it('uses only the canonical Worker URL', () => {
+    expect(resolveSessionAgentWorkerUrl({ corsWorkerUrl: 'https://session.example///' })).toBe(
+      'https://session.example',
+    );
     expect(resolveSessionAgentWorkerUrl({ telegram: { workerUrl: 'https://old.example' } })).toBe('');
     expect(resolveSessionAgentWorkerUrl({})).toBe('');
   });

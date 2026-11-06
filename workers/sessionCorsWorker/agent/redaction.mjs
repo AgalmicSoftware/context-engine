@@ -67,7 +67,7 @@ export function redactSecrets(value, path = []) {
   ]));
 }
 
-export function assertNoSecretShape(value, message = 'Agent bridge records must not serialize secrets.') {
+export function assertNoSecretShape(value, message = 'Agent records must not serialize secrets.') {
   if (hasSecretShape(value)) {
     throw new Error(message);
   }

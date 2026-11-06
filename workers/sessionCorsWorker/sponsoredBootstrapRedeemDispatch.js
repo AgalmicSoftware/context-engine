@@ -242,9 +242,6 @@ export const dispatchSponsoredBootstrapRedeem = async ({
       bundleUrl: _discardedBundleUrl,
       bundleSha256: _discardedBundleSha256,
       bundleManifestUrl: _discardedBundleManifestUrl,
-      agentBridgeBundleUrl: _discardedAgentBridgeBundleUrl,
-      agentBridgeBundleManifestUrl: _discardedAgentBridgeBundleManifestUrl,
-      agentBridgeBundleSha256: _discardedAgentBridgeBundleSha256,
       ...accountIndependentDeployPayload
     } = deployPayload;
     // Regression guard: the one-shot grant, not a page-lifetime hook ref,

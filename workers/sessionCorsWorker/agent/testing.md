@@ -1,8 +1,7 @@
 # Agent runtime regression coverage
 
-Run `npm run test:worker:agent` (the historical `test:worker:agent-bridge`
-command is an alias) and `npm run test:worker:session-cors` from the repository
-root. Tests execute the canonical Session Worker entry point, in-process
+Run `npm run test:worker:agent` and `npm run test:worker:session-cors` from the
+repository root. Tests execute the canonical Session Worker entry point, in-process
 services and coordinator, plus retained pure-domain fixtures.
 
 The table identifies retained scenarios, not assertion-for-assertion parity with
@@ -59,9 +58,7 @@ restore (including an occupied agent target through signed HTTP); `workerCapabil
 native setup/admin tests and `scripts/agent-token-client-login-smoke.js` for
 verified one-origin setup, memory-only login, questions and explicit submission.
 
-Retired behavior is deliberately not preserved: Bridge deployment/probing,
+Retired behavior is deliberately not preserved: separate agent Worker deployment and probing,
 root/environment-global credentials or policy, compatibility route aliases,
 Telegram/Mini App adapters, scheduled transport work, weekly Wrapped windows,
 window snapshots/opening actions, and legacy state import.
-The historical `workers/agentBridgeWorker/PUBLIC_RELEASE_CUTOVER` marker remains
-only for public-history export safeguards; it is not a deployment target.
