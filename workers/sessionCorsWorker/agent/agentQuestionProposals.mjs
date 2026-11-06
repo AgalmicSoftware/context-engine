@@ -115,7 +115,6 @@ export function sessionContextFromPolicySession(session = {}) {
     : {};
   return [
     session.sessionContext,
-    session.telegramSessionContext,
     session.context,
     session.description,
     session.purpose,
@@ -160,7 +159,6 @@ function sessionSourceTags(session = {}) {
   return [
     session.questionTags,
     session.defaultQuestionTags,
-    session.telegramQuestionTags,
     session.defaultTags,
     session.tags,
     metadata.questionTags,

@@ -81,7 +81,7 @@ export const validateAuthTokenRecord = async ({
 
   const marker = await kv.get(key);
   if (!marker) return { ok: false, error: 'Invalid token.' };
-  return { ok: true, legacy: false };
+  return { ok: true };
 };
 
 export const revokeAuthTokenRecord = async ({

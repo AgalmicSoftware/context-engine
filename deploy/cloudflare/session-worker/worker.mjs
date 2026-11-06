@@ -27424,7 +27424,6 @@ var init_deployHelperCore = __esm({
         "workerUrl",
         "sessionSlug",
         "sessionWorkerOrigin",
-        "telegramConfigured",
         "resolvedSlug",
         "kvNamespaceId",
         "deploymentId",
@@ -32961,7 +32960,7 @@ var init_authTokenClaims = __esm({
       }
       const marker = await kv.get(key);
       if (!marker) return { ok: false, error: "Invalid token." };
-      return { ok: true, legacy: false };
+      return { ok: true };
     };
     revokeAuthTokenRecord = async ({
       env,
@@ -33155,7 +33154,6 @@ var init_constants2 = __esm({
       ACCOUNT_RECOVERED: "account_recovered"
     });
     LEGACY_TRANSPORT_LANES = Object.freeze({
-      GROUP_LOBBY: "telegram_group_lobby",
       PRIVATE_ACCOUNT: "telegram_private_account",
       MINI_APP: "telegram_mini_app"
     });
@@ -63854,7 +63852,7 @@ var init_registryQuestionCore = __esm({
     DEFAULT_PAYLOAD_FETCH_TIMEOUT_MS = 2500;
     QUESTION_CACHE_PREFIX = "telegram:questions:v7:";
     questionMemoryCache = /* @__PURE__ */ new Map();
-    QUESTION_PAYLOAD_SKIP = "__telegramQuestionPayloadSkip";
+    QUESTION_PAYLOAD_SKIP = "__questionPayloadSkip";
     STORAGE_BACKENDS2 = Object.freeze({
       ARWEAVE: "arweave",
       CLOUDFLARE: "cloudflare"
@@ -64192,9 +64190,6 @@ function normalizePayloadSessionSlug(payload = {}) {
   }
   return "";
 }
-function allowUnscopedQuestionPayloads() {
-  return false;
-}
 function skippedQuestionPayload(reason = "session_mismatch") {
   return {
     [QUESTION_PAYLOAD_SKIP]: true,
@@ -64238,8 +64233,7 @@ function normalizeQuestionPayload(payload = {}, {
   questionId: questionId4 = "",
   pointerId = "",
   pointerBackend = STORAGE_BACKENDS2.ARWEAVE,
-  sessionSlug = "",
-  fallbackSessionSlug = ""
+  sessionSlug = ""
 } = {}) {
   const root = normalizeQuestionPayloadRoot(payload);
   if (!root || typeof root !== "object" || Array.isArray(root)) return null;
@@ -64277,7 +64271,7 @@ function normalizeQuestionPayload(payload = {}, {
       }
     } : {},
     source: "live_session_question",
-    sessionSlug: normalizePayloadSessionSlug(root) || normalizePayloadSessionSlug(payload) || lower2(fallbackSessionSlug),
+    sessionSlug: normalizePayloadSessionSlug(root) || normalizePayloadSessionSlug(payload),
     ...pointerBackend === STORAGE_BACKENDS2.ARWEAVE ? { arweaveTxId: pointerId } : {},
     storageRef: storageRefForPointer(pointerId, "questions", pointerBackend)
   };
@@ -64351,16 +64345,14 @@ async function fetchQuestionPayload({
   if (payloadSessionSlug2 && requestedSessionSlug && payloadSessionSlug2 !== requestedSessionSlug) {
     return skippedQuestionPayload("session_mismatch");
   }
-  const shouldStampUnscopedPayload = !payloadSessionSlug2 && requestedSessionSlug && allowUnscopedQuestionPayloads(env);
-  if (!payloadSessionSlug2 && requestedSessionSlug && !shouldStampUnscopedPayload) {
+  if (!payloadSessionSlug2 && requestedSessionSlug) {
     return skippedQuestionPayload("session_slug_missing");
   }
   return normalizeQuestionPayload(payload, {
     questionId: id2,
     pointerId,
     pointerBackend,
-    sessionSlug,
-    fallbackSessionSlug: shouldStampUnscopedPayload ? requestedSessionSlug : ""
+    sessionSlug
   }) || lockedQuestionPlaceholder({ questionId: id2, pointerId, pointerBackend, sessionSlug });
 }
 var init_registryQuestionPayloads = __esm({
@@ -65191,7 +65183,6 @@ function sessionContextFromPolicySession(session = {}) {
   const metadata = session?.metadata && typeof session.metadata === "object" && !Array.isArray(session.metadata) ? session.metadata : {};
   return [
     session.sessionContext,
-    session.telegramSessionContext,
     session.context,
     session.description,
     session.purpose,
@@ -65227,7 +65218,6 @@ function sessionSourceTags(session = {}) {
   return [
     session.questionTags,
     session.defaultQuestionTags,
-    session.telegramQuestionTags,
     session.defaultTags,
     session.tags,
     metadata.questionTags,
@@ -68492,13 +68482,12 @@ var init_payloadAccessControl = __esm({
 });
 
 // workers/sessionCorsWorker/storageEnvelopeEncryption.js
-var textEncoder3, textDecoder2, STORAGE_ENVELOPE_KEK_SECRET_NAME2, STORAGE_ENVELOPE_PREVIOUS_KEK_SECRET_NAME, ENVELOPE_VERSION, AES_GCM2, AES_256_GCM, trim8, isObj11, cloneJson, safeSlugPart, bytesToBase64url2, base64urlToBytes2, toUint8Array, getCryptoImpl2, randomBytes5, nowIso3, importAesKey, deriveDeploymentKeyBytes, readDeploymentSecret, importDeploymentKek, aesEncrypt, aesDecrypt, wrapBytesWithKey, unwrapBytesWithKey, wrapResponseFieldKey, unwrapResponseFieldKey, readSessionKeyRecord, isCoordinatorWrappedSessionKeyRecord, unwrapSessionKeyBytes, ensureStorageEnvelopeSessionKey, encryptPayloadWithStorageEnvelope, decryptPayloadWithStorageEnvelope, resolveAuditKv, auditSuffix, writeStorageEnvelopeKeyReleaseAudit, writeStorageVisibilityAudit;
+var textEncoder3, STORAGE_ENVELOPE_KEK_SECRET_NAME2, STORAGE_ENVELOPE_PREVIOUS_KEK_SECRET_NAME, ENVELOPE_VERSION, AES_GCM2, AES_256_GCM, trim8, isObj11, cloneJson, safeSlugPart, bytesToBase64url2, base64urlToBytes2, toUint8Array, getCryptoImpl2, randomBytes5, nowIso3, importAesKey, deriveDeploymentKeyBytes, readDeploymentSecret, importDeploymentKek, aesEncrypt, aesDecrypt, wrapBytesWithKey, unwrapBytesWithKey, wrapResponseFieldKey, unwrapResponseFieldKey, readSessionKeyRecord, isCoordinatorWrappedSessionKeyRecord, unwrapSessionKeyBytes, ensureStorageEnvelopeSessionKey, encryptPayloadWithStorageEnvelope, decryptPayloadWithStorageEnvelope, resolveAuditKv, auditSuffix, writeStorageEnvelopeKeyReleaseAudit, writeStorageVisibilityAudit;
 var init_storageEnvelopeEncryption = __esm({
   "workers/sessionCorsWorker/storageEnvelopeEncryption.js"() {
     init_sessionWriteCoordinator();
     init_stringCoercion();
     textEncoder3 = new TextEncoder();
-    textDecoder2 = new TextDecoder();
     STORAGE_ENVELOPE_KEK_SECRET_NAME2 = "CE_STORAGE_ENVELOPE_KEK";
     STORAGE_ENVELOPE_PREVIOUS_KEK_SECRET_NAME = "CE_STORAGE_ENVELOPE_PREVIOUS_KEK";
     ENVELOPE_VERSION = 1;
@@ -74724,7 +74713,6 @@ var init_sponsoredBootstrapGrantStore = __esm({
         "accountId",
         "sessionSlug",
         "sessionWorkerOrigin",
-        "telegramConfigured",
         "resolvedSlug",
         "kvNamespaceId",
         "deploymentId",
@@ -86302,7 +86290,6 @@ var resolveRegistryRpcUrls = ({
 } = {}) => {
   const normalizeRpcUrlList2 = typeof deps?.normalizeRpcUrlList === "function" ? deps.normalizeRpcUrlList : normalizeRpcUrlList;
   const mergeRpcUrlLists2 = typeof deps?.mergeRpcUrlLists === "function" ? deps.mergeRpcUrlLists : mergeRpcUrlLists;
-  const toChainId2 = typeof deps?.toChainId === "function" ? deps.toChainId : toChainId;
   const registryChainId = resolveRegistryChainId(config);
   const map = config?.rpcUrlsByChainId;
   const mapped = registryChainId && map && typeof map === "object" ? normalizeRpcUrlList2(map[registryChainId] || map[String(registryChainId)]) : [];
@@ -94884,7 +94871,6 @@ init_wrappedCore();
 
 // workers/sessionCorsWorker/agent/httpInput.mjs
 init_runtimePrimitives();
-init_constants2();
 function safeAnswerString2(value) {
   if (value === void 0 || value === null) return "";
   return String(value).trim();
@@ -94918,25 +94904,11 @@ function titleAnswer(value = "") {
   if (normalized === "unsure" || normalized === "unknown" || normalized === "maybe") return "Unsure";
   return safeString(value);
 }
-function normalizeAgentRequestContext(input = {}) {
-  const telegram = input.telegram && typeof input.telegram === "object" && !Array.isArray(input.telegram) ? input.telegram : {};
-  const telegramUserId = safeString(input.telegramUserId || input.userId || telegram.telegramUserId || telegram.userId);
-  const username = safeString(input.username || telegram.username);
-  const groupChatId = safeString(input.groupChatId || input.chatId || telegram.groupChatId || telegram.chatId);
-  const chatId = groupChatId || telegramUserId;
-  const isPrivate = !groupChatId;
+function normalizeAgentRequestContext({ telegramUserId, username } = {}) {
+  const principalId = safeString(telegramUserId);
   return {
-    type: "telegram_mock_update",
-    updateId: safeString(input.updateId) || `agent-${Date.now()}`,
-    kind: "agent_handoff",
-    lane: isPrivate ? LEGACY_TRANSPORT_LANES.PRIVATE_ACCOUNT : LEGACY_TRANSPORT_LANES.GROUP_LOBBY,
-    user: { telegramUserId, username },
-    chat: {
-      chatId,
-      chatType: groupChatId ? "supergroup" : "private",
-      type: groupChatId ? "supergroup" : "private",
-      isPrivate
-    }
+    user: { telegramUserId: principalId, username: safeString(username) },
+    chat: { chatId: principalId }
   };
 }
 async function readRequestJson(request) {
@@ -95123,10 +95095,7 @@ async function resolveHandoffContext({ env, auth = env.AGENT_CONTEXT.auth, input
     principal,
     principalId,
     storageSubjectId: principalId,
-    adapterMetadata: {},
     storageContext: normalizeAgentRequestContext({ telegramUserId: principalId, username: principal.label }),
-    groupBinding: null,
-    privateBinding: null,
     permission: { ok: true, mode: "session_policy" },
     delegation: auth.delegation || null,
     authMode: auth.authMode,
@@ -101587,7 +101556,6 @@ async function handleWrappedMemberExchangeRequest({ env }) {
 }
 
 // workers/sessionCorsWorker/agent/dispatch.mjs
-var AGENT_HTTP_ROUTES = new Set(Object.keys(AGENT_ROUTES));
 var handlers = {
   "/api/agent/credentials/service": handleServiceCredentialBootstrapRequest,
   "/api/agent/invite/onboard": handleInviteOnboardRequest,

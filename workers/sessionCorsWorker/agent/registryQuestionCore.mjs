@@ -24,7 +24,7 @@ export const QUESTION_CACHE_PREFIX = 'telegram:questions:v7:';
 
 export const questionMemoryCache = new Map();
 
-export const QUESTION_PAYLOAD_SKIP = '__telegramQuestionPayloadSkip';
+export const QUESTION_PAYLOAD_SKIP = '__questionPayloadSkip';
 
 export const STORAGE_BACKENDS = Object.freeze({
   ARWEAVE: 'arweave',

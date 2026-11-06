@@ -1,4 +1,4 @@
-// Canonical rating-scale contract shared by browser, Session Worker and bridge consumers.
+// Canonical rating-scale contract shared by browser, Session Worker and agent consumers.
 const trim = (value) => String(value == null ? '' : value).trim();
 const isObj = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
 

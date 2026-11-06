@@ -1,5 +1,4 @@
 import { safeString, lower } from './runtimePrimitives.mjs';
-import { LEGACY_TRANSPORT_LANES } from './constants.mjs';
 
 
 export function safeAnswerString(value) {
@@ -38,26 +37,12 @@ export function titleAnswer(value = '') {
   return safeString(value);
 }
 
-export function normalizeAgentRequestContext(input = {}) {
-  const telegram =
-    input.telegram && typeof input.telegram === 'object' && !Array.isArray(input.telegram) ? input.telegram : {};
-  const telegramUserId = safeString(input.telegramUserId || input.userId || telegram.telegramUserId || telegram.userId);
-  const username = safeString(input.username || telegram.username);
-  const groupChatId = safeString(input.groupChatId || input.chatId || telegram.groupChatId || telegram.chatId);
-  const chatId = groupChatId || telegramUserId;
-  const isPrivate = !groupChatId;
+// Stored agent records name the principal `telegramUserId` and `chatId`.
+export function normalizeAgentRequestContext({ telegramUserId, username } = {}) {
+  const principalId = safeString(telegramUserId);
   return {
-    type: 'telegram_mock_update',
-    updateId: safeString(input.updateId) || `agent-${Date.now()}`,
-    kind: 'agent_handoff',
-    lane: isPrivate ? LEGACY_TRANSPORT_LANES.PRIVATE_ACCOUNT : LEGACY_TRANSPORT_LANES.GROUP_LOBBY,
-    user: { telegramUserId, username },
-    chat: {
-      chatId,
-      chatType: groupChatId ? 'supergroup' : 'private',
-      type: groupChatId ? 'supergroup' : 'private',
-      isPrivate,
-    },
+    user: { telegramUserId: principalId, username: safeString(username) },
+    chat: { chatId: principalId },
   };
 }
 

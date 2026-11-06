@@ -560,7 +560,6 @@ const buildSafeDeployJournalResult = (result = {}, credentials = []) => {
     'workerUrl',
     'sessionSlug',
     'sessionWorkerOrigin',
-    'telegramConfigured',
     'resolvedSlug',
     'kvNamespaceId',
     'deploymentId',
