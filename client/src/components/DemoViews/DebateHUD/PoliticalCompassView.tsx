@@ -631,19 +631,7 @@ const PoliticalCompass = ({ compass, compact = true }: PoliticalCompassProps) =>
           {renderSideLabel(compass.xAxis.right, padX + cW + 12, 'start')}
 
           {pointLayouts.map(
-            ({
-              point,
-              px,
-              py,
-              pointComment,
-              isSelected,
-              isActive,
-              showInlineLabel,
-              size,
-              activeSize,
-              avatarInfo,
-              avatarRadius,
-            }) => {
+            ({ point, px, py, pointComment, isSelected, isActive, showInlineLabel, size, activeSize }) => {
               return (
                 <g
                   key={point.name}

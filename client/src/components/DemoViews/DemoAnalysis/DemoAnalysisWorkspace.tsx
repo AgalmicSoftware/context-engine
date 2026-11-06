@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import demoAnalysisData from '../../../variables/demo/demo_analysis_data.json';
 import historicalFigureDemographics from '../../../variables/demo/historical_figure_demographics.js';
 import buildDemoAnalysisData from '../../../utilities/demo/demoAnalysisAdapter.js';

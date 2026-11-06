@@ -4,9 +4,6 @@ export const FIRST_VISIT_STORAGE_KEY = 'firstVisit';
 export const ONBOARDING_COMPLETE_STORAGE_KEY = 'ce_onboarding_complete';
 export const COLD_LOAD_ONBOARDING_OVERRIDE_STORAGE_KEY = 'ce:forceColdLoadWelcomeSlides';
 
-// Keep welcome slides active only for direct session entry points; tests/dev can still force the overlay on.
-export const COLD_LOAD_ONBOARDING_ENABLED = true;
-
 type OnboardingStorage = {
   getItem: (key: string) => string | null;
   setItem: (key: string, value: string) => void;
@@ -36,7 +33,8 @@ export const shouldAutoOpenColdLoadOnboarding = (
 ): boolean => {
   const forcedValue = parseStorageBoolean(storage?.getItem?.(COLD_LOAD_ONBOARDING_OVERRIDE_STORAGE_KEY));
   if (forcedValue != null) return forcedValue;
-  return COLD_LOAD_ONBOARDING_ENABLED && isSessionColdLoadOnboardingRoute(pathname);
+  // Welcome slides open only on direct session entry points; tests/dev can still force the overlay on.
+  return isSessionColdLoadOnboardingRoute(pathname);
 };
 
 export const readColdLoadOnboardingState = (storage: OnboardingStorage, pathname: unknown = '') => {

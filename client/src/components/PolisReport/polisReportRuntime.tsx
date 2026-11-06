@@ -167,7 +167,6 @@ export interface PolisReportProps {
   sbtFilterString?: string;
   filterState?: PolisFilterState | null;
   sessionName?: unknown;
-  sessionHeader?: unknown;
   sessionInfo?: unknown;
   onePageDemo?: boolean;
   demoMode?: boolean;

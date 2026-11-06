@@ -4,11 +4,6 @@ import modalPicture2 from '../../assets/img/jump_transparent.png';
 import modalPicture3 from '../../assets/img/seedsman_slim.jpg';
 import modalPicture4 from '../../assets/img/frontliner.png';
 import modalPicture5 from '../../assets/img/explainer_final.png';
-import {
-  COLD_LOAD_ONBOARDING_OVERRIDE_STORAGE_KEY,
-  FIRST_VISIT_STORAGE_KEY,
-  ONBOARDING_COMPLETE_STORAGE_KEY,
-} from '../Onboarding/onboardingConfig.js';
 
 export type WelcomeSlideMediaButtonVariant = 'standard' | 'centered';
 export type WelcomeSlideImageVariant = 'intro' | 'toolkit' | 'goals' | 'audience' | 'motivation' | 'collaborators';
@@ -28,14 +23,6 @@ export type WelcomeSlide = {
     text: string;
   }>;
 };
-
-// Dev/QA bookmarklet: paste into the browser address bar on localhost to reopen these slides.
-export const FORCE_COLD_LOAD_WELCOME_SLIDES_BOOKMARKLET = [
-  `javascript:localStorage.setItem('${COLD_LOAD_ONBOARDING_OVERRIDE_STORAGE_KEY}','true')`,
-  `localStorage.removeItem('${ONBOARDING_COMPLETE_STORAGE_KEY}')`,
-  `localStorage.removeItem('${FIRST_VISIT_STORAGE_KEY}')`,
-  "location.href='/'",
-].join(';');
 
 export const WELCOME_SLIDES: WelcomeSlide[] = [
   {

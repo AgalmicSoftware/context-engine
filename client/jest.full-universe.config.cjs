@@ -1,5 +1,5 @@
 const baseConfig = require('./jest.config.cjs');
-const { JEST_COLLECT_COVERAGE_FROM } = require('../scripts/clientCoverageUniverse');
+const { JEST_COLLECT_COVERAGE_FROM } = require('../scripts/client-coverage-universe');
 
 module.exports = {
   ...baseConfig,

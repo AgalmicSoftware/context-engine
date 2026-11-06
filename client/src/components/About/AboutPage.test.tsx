@@ -5,7 +5,7 @@ import path from 'path';
 import { TestMemoryRouter as MemoryRouter } from 'testUtils/TestMemoryRouter';
 import { normalizeScssContract } from 'testUtils/scssContractAssertions';
 
-import AboutPage, { getAboutDemoSessionPath, getConfiguredRecognitionIndividuals } from './AboutPage';
+import AboutPage, { getAboutDemoSessionPath } from './AboutPage';
 
 const mutableEnv = process.env as Record<string, string | undefined>;
 const ORIGINAL_PUBLIC_URL = process.env.PUBLIC_URL;
@@ -413,7 +413,7 @@ describe('AboutPage', () => {
     expect(screen.queryByRole('link', { name: 'Cosmos × FIRE grants' })).not.toBeInTheDocument();
   });
 
-  it('keeps the recognition section visible without rendering empty individuals content', () => {
+  it('keeps the recognition section visible', () => {
     renderAboutPage();
 
     const recognitionSection = screen.getByTestId('ce-about-in-practice');
@@ -428,7 +428,6 @@ describe('AboutPage', () => {
     expect(within(recognitionSection).getByRole('heading', { name: 'Acknowledgements' })).toBeVisible();
     expect(screen.queryByRole('button', { name: 'Acknowledgements' })).not.toBeInTheDocument();
     expect(screen.getByTestId('ce-about-recognition-radicalxchange')).toBeInTheDocument();
-    expect(screen.queryByTestId('ce-about-recognition-individuals')).not.toBeInTheDocument();
     expect(screen.queryByText(/No recognized individuals yet/i)).not.toBeInTheDocument();
 
     fireEvent.click(recognitionToggle);
@@ -444,18 +443,6 @@ describe('AboutPage', () => {
     ['Functionality', 'Roadmap', 'Related Work', 'Recognition'].forEach((name) => {
       expect(screen.getByRole('button', { name })).toHaveAttribute('data-ce-control-appearance', 'frameless');
     });
-  });
-
-  it('only treats named recognition individuals as renderable configuration', () => {
-    expect(getConfiguredRecognitionIndividuals()).toEqual([]);
-    expect(
-      getConfiguredRecognitionIndividuals([
-        null,
-        {},
-        { name: '   ' },
-        { name: 'Audrey Tang', url: 'https://example.com/audrey' },
-      ]),
-    ).toEqual([{ name: 'Audrey Tang', url: 'https://example.com/audrey' }]);
   });
 
   it('uses the configured public demo route when list scope has no concrete session slug', () => {

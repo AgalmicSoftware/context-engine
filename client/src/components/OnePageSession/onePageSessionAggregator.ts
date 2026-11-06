@@ -1,7 +1,5 @@
-import { createLogger } from 'utilities/logging.js';
 import { isResponseAllowedForSessionSlug } from '../../utilities/session/responseSessionScope.js';
 
-const demoLog = createLogger('demo');
 const AGGREGATOR_PARSE_MEMO_MAX = 3000;
 
 type UnknownRecord = Record<string, unknown>;

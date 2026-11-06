@@ -1873,7 +1873,7 @@ class SBTSelector extends React.Component<SbtSelectorProps, SbtSelectorState> {
     optionsInput: unknown = this.props.additionalSBTOptions,
   ): SbtSelectorAdditionalOption[] => normalizeAdditionalSbtOptions(optionsInput);
 
-  formatOptionLabel = ({ label, image, value }: SbtSelectorLabelOption): React.ReactElement => {
+  formatOptionLabel = ({ label, image }: SbtSelectorLabelOption): React.ReactElement => {
     const imageState = resolveSbtSelectorLabelImageState({ image });
     return (
       <div className={styles.optionLabel}>

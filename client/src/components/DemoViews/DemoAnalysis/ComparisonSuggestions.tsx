@@ -1,4 +1,3 @@
-import React from 'react';
 import { getSegmentDisplayName } from '../../../utilities/demo/demoAnalysisMath.js';
 import styles from './DemoAnalysisWorkspace.module.scss';
 

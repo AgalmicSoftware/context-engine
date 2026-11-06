@@ -2435,9 +2435,8 @@ const AdminPageRuntime = ({
               </div>
               {!walletReady && <div className={styles.statusNote}>Connect a wallet to decrypt these fields.</div>}
               <div className={styles.grid}>
-                {Object.entries(encryptedFields).map(([key, envelope]: any) => {
+                {Object.entries(encryptedFields).map(([key]: any) => {
                   const resolved = decryptedFields[key] || {};
-                  const status = resolved.status || 'locked';
                   const decrypted = toStr(resolved.value);
                   const decryptedPreview = decrypted ? formatPreviewValue(decrypted) : null;
                   return (

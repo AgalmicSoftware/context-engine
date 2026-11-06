@@ -151,7 +151,6 @@ export const resolveMainSiteSurveyRouteCapabilityState = ({
 
 export const renderMainSiteSurveyResolutionStatus = ({
   host,
-  sessionSlug,
   surveyId,
   surveyMissing,
   allowRegistryScan,

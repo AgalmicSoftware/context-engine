@@ -31,7 +31,7 @@ import {
 import { usesDemoSessionFixtures } from '../../utilities/demo/demoFixtureSessionSlugs';
 import { serializeFilterState, deserializeFilterState } from '../../utilities/survey/filterStateUtils.js';
 import { createLogger } from 'utilities/logging.js';
-import { listNamespaceEntriesSync, peekCacheSync, writeCache } from '../../utilities/cache/cacheScripts.js';
+import { peekCacheSync, writeCache } from '../../utilities/cache/cacheScripts.js';
 import { measureSync } from '../../utilities/ui/uiPerfStats.js';
 import { readPublicUrlBasePath } from '../../utilities/ui/publicUrl.js';
 import { getSbtDisplayName } from '../../utilities/sbt/sbtDisplayNames.js';

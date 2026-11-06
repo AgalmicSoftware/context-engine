@@ -23,12 +23,7 @@ import defaultSbtImage from '../../assets/img/ce_circuit_logo.png';
 import { cryptoUtils } from 'utilities/crypto/cryptography.js';
 import { getGlobalLitHooks, litStorage } from 'utilities/crypto/litProtocol.js';
 import { createLogger } from 'utilities/logging.js';
-import {
-  listNamespaceEntriesSync,
-  peekCacheSync,
-  readCache,
-  updateCacheAtomic,
-} from '../../utilities/cache/cacheScripts.js';
+import { listNamespaceEntriesSync, readCache, updateCacheAtomic } from '../../utilities/cache/cacheScripts.js';
 import { applyBookmarkChange } from '../../utilities/cache/bookmarkChanges';
 import { measureSync } from '../../utilities/ui/uiPerfStats.js';
 import { buildPublicRoute, readPublicUrlBasePath } from '../../utilities/ui/publicUrl.js';
@@ -4038,7 +4033,6 @@ class SBTPage extends Component<any, any> {
       showActions,
       showMoreDetails,
       showAdminSection,
-      showDocsSection,
       loadingMintersBurners,
       mintingStatus,
       burningStatus,

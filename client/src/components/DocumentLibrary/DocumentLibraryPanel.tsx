@@ -179,15 +179,6 @@ const readSessionStorageBlobForDocs = readSessionStorageBlob as (opts: {
   workerUrl?: string;
 }) => Promise<Response>;
 
-const DEFAULT_DOC_UPLOADS_GATE: DocUploadsGateState = {
-  gate: null,
-  lookupStatus: '',
-  sbtAddresses: [],
-  chainId: null,
-  mode: 'any',
-  hasRecipients: false,
-};
-
 const buildSbtAccessControlConditionsUntyped = buildSbtAccessControlConditions as (args: {
   sbtAddresses: string[];
   chainId: number | null;

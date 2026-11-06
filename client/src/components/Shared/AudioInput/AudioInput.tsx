@@ -151,7 +151,7 @@ const AudioInput = ({
   }, []);
   const recordingRequestedRef = useRef<object | null>(null);
   const [originalText, setOriginalText] = useState('');
-  const [rewrittenText, setRewrittenText] = useState('');
+  const [, setRewrittenText] = useState('');
   const [aiRewriteActive, setAiRewriteActive] = useState(false);
   const [waitingForAI, setWaitingForAI] = useState(false);
   const [waitingSeconds, setWaitingSeconds] = useState(0);
@@ -278,7 +278,6 @@ const AudioInput = ({
     isPaused,
     isProcessing,
     isStreaming,
-    transcript,
     errorMessage,
     startRecording,
     stopRecording,

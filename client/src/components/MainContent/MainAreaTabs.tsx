@@ -3,7 +3,6 @@
 import React, { Component, Suspense } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCompass, faGlobe, faTools } from '@fortawesome/free-solid-svg-icons';
-import { createLogger } from '../../utilities/logging';
 
 import styles from './MainContent.module.scss';
 
@@ -11,8 +10,6 @@ import { TabContent, TabPane, Card, CardHeader, CardBody, Nav, NavItem, NavLink 
 
 import LazyFallback from '../Shared/LazyFallback';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
-
-const log = createLogger('ui');
 
 // Lazy tabs: load on first activation.
 const ToolExplorer = React.lazy(() => import('./ToolExplorer'));
