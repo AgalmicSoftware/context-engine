@@ -14,6 +14,12 @@
   font-family: var(--ce-font-body);
 }
 
+.noticeInDialog {
+  flex: 0 0 auto;
+  width: calc(100% - 24px);
+  margin: 12px auto 0;
+}
+
 .message {
   min-width: 0;
   margin: 0;

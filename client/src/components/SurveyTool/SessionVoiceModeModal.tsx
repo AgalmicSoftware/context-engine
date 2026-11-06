@@ -9,6 +9,7 @@ import SessionRecordingHelp from './SessionRecordingHelp';
 import SessionVoiceModeChooser from './SessionVoiceModeChooser';
 import SessionVoicePrefillCard from './SessionVoicePrefillCard';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
+import { VOICE_DIALOG_NOTICE_SLOT_ID } from '../../utilities/ui/voiceDialogNoticeSlot';
 import { useKeptRecording } from '../../utilities/audio/useRecordingChunkQueue';
 import { sortInterviewQuestionPoolNewestFirst } from './sessionInterviewQuestionOrder';
 import { normalizeInterviewQuestions, type InterviewPrefillPacket } from './sessionInterview';
@@ -94,6 +95,7 @@ export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps)
         contentClassName={styles.sessionVoiceModeModal}
         data-testid={E2E_TESTIDS.SESSION_VOICE_MODE_MODAL}
       >
+        {isOpen ? <div id={VOICE_DIALOG_NOTICE_SLOT_ID} /> : null}
         {mode === 'interview' ? (
           <SessionInterviewPanel
             key={`${interviewVersion}:${prefillIdentity}`}

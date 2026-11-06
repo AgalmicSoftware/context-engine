@@ -1654,7 +1654,11 @@ Worker-canonical web sessions also support auto-joining an open, session-visible
 Group through `/session/<slug>?joinGroup=<groupId>`. **Copy auto-join link** on
 the expanded Group detail page builds this session link from the actual Group
 ID and includes the validated public `worker` origin so fresh browsers can
-discover the session. Ordinary Group and back-to-list links preserve this public
+discover the session. The link can also carry `mode=interview` or
+`mode=groupRecording`, such as `/session/<slug>?mode=groupRecording&joinGroup=<groupId>`.
+While that voice dialog is open the notice shows inside it, and a join that
+finishes during a recording leaves the recording running.
+Ordinary Group and back-to-list links preserve this public
 Worker origin too, so expanded pages can verify the session in a fresh tab.
 Older Group links without `worker` recover an unambiguous, previously cached
 Worker origin for that exact session and verify its identity again before
