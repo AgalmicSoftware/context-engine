@@ -71266,7 +71266,6 @@ var init_storageRouteExecution = __esm({
     resolveEnvelopeExportAddressSet = (config = {}) => {
       const addresses = new Set(resolveRoleAddressSet2({ config, role: "admin" }));
       listDelimitedAddresses(config.responseExportAllowedAddresses).forEach((address2) => addresses.add(address2));
-      listDelimitedAddresses(config.telegramResponseExportAllowedAddresses).forEach((address2) => addresses.add(address2));
       listDelimitedAddresses(config.export?.allowedAddresses).forEach((address2) => addresses.add(address2));
       listDelimitedAddresses(config.export?.adminAddresses).forEach((address2) => addresses.add(address2));
       return addresses;
@@ -95402,7 +95401,7 @@ function emptyAdminMetricTotals() {
     agentDraftedAnswers: 0,
     draftEditMetrics: 0,
     groupProposals: 0,
-    sessionsWithBridgeActivity: 0,
+    sessionsWithAgentActivity: 0,
     registrySessionCount: 0,
     distinctRespondents: 0
   };
@@ -95443,11 +95442,11 @@ function publicSessionMetric(metric = {}) {
     agentDraftedAnswers: Number(metric.agentDraftedAnswers || 0),
     draftEditMetrics: Number(metric.draftEditMetrics || 0),
     groupProposals: Number(metric.groupProposals || 0),
-    sessionsWithBridgeActivity: 0,
+    sessionsWithAgentActivity: 0,
     registrySessionCount: Number(metric.registrySessionCount || 0),
     distinctRespondents: metric._respondents instanceof Set ? metric._respondents.size : Number(metric.distinctRespondents || 0)
   };
-  out.sessionsWithBridgeActivity = [
+  out.sessionsWithAgentActivity = [
     out.agentsOnboarded,
     out.questionsCreated,
     out.questionsAnswered,
@@ -96864,7 +96863,7 @@ async function buildAdminMetricsSnapshot({
   const registrySessionCount = Array.isArray(registry?.sessions) ? registry.sessions.length : 0;
   totals.distinctUsersOnboarded = onboardedUsers.size;
   totals.distinctRespondents = respondents.size;
-  totals.sessionsWithBridgeActivity = activitySessions.size;
+  totals.sessionsWithAgentActivity = activitySessions.size;
   totals.registrySessionCount = registrySessionCount;
   for (const metric of perSession.values()) {
     metric.registrySessionCount = registrySessionCount;
@@ -96921,7 +96920,7 @@ async function handleAdminMetricsRequest({ env = {}, context = {}, input = {} } 
     definitions: {
       agentsOnboarded: "Delegation-token mints observed by the worker; this is not a count of external skill installs.",
       registrySessionCount: "The current canonical session; the worker does not discover other sessions.",
-      sessionsWithBridgeActivity: "Distinct session slugs with bridge KV activity such as token mints, drafts, proposed questions, group proposals, or submitted answers.",
+      sessionsWithAgentActivity: "Distinct session slugs with agent KV activity such as token mints, drafts, proposed questions, group proposals, or submitted answers.",
       draftEditMetrics: "Opt-in draft-edit metric records that compare an initial agent draft with the saved or submitted answer without storing raw answer text.",
       answerDraftsEdited: "Live drafts whose content changed at least once after the first save (point-in-time KV scan, decays with draft TTL).",
       agentDraftedAnswers: "Live drafts whose first revision was written through the agent handoff preferences endpoint.",

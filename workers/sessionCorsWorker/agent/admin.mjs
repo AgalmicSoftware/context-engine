@@ -296,7 +296,7 @@ export async function buildAdminMetricsSnapshot({
   const registrySessionCount = Array.isArray(registry?.sessions) ? registry.sessions.length : 0;
   totals.distinctUsersOnboarded = onboardedUsers.size;
   totals.distinctRespondents = respondents.size;
-  totals.sessionsWithBridgeActivity = activitySessions.size;
+  totals.sessionsWithAgentActivity = activitySessions.size;
   totals.registrySessionCount = registrySessionCount;
   for (const metric of perSession.values()) {
     metric.registrySessionCount = registrySessionCount;
@@ -359,8 +359,8 @@ export async function handleAdminMetricsRequest({ env = {}, context = {}, input 
       agentsOnboarded: 'Delegation-token mints observed by the worker; this is not a count of external skill installs.',
       registrySessionCount:
         'The current canonical session; the worker does not discover other sessions.',
-      sessionsWithBridgeActivity:
-        'Distinct session slugs with bridge KV activity such as token mints, drafts, proposed questions, group proposals, or submitted answers.',
+      sessionsWithAgentActivity:
+        'Distinct session slugs with agent KV activity such as token mints, drafts, proposed questions, group proposals, or submitted answers.',
       draftEditMetrics:
         'Opt-in draft-edit metric records that compare an initial agent draft with the saved or submitted answer without storing raw answer text.',
       answerDraftsEdited:
