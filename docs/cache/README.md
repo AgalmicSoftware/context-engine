@@ -105,8 +105,6 @@ Cache docs in this folder refer to `<slug>` as the canonical session slug used b
 - `demo_sessions.json`
 - route/session state
 
-Older references to `demoGroups.json` are historical and no longer canonical.
-
 ## Namespace docs
 
 - [`surveys-and-questions-cache-structure.md`](surveys-and-questions-cache-structure.md)
@@ -121,11 +119,11 @@ fields. Equal timestamps use the case-sensitive storage reference as a stable
 fallback, not proof of chronology. Payload-supplied blockchain fields do not
 participate in Worker ordering; on-chain response ordering is unchanged.
 
-The response-cache version clears legacy Worker response rows, response metadata,
-and seen-reference sets once before rehydration. Question/discovery data and
-other chain scopes remain intact. Failed reads remain retryable, and subsequent
-runs reuse immutable references. Rolling back to older client code can restore
-the former ordering behavior; reload/rebuild affected caches after rollback.
+A change to the Worker response-cache version (`workerResponseCacheVersion`)
+clears Worker response rows, response metadata, and seen-reference sets once
+before rehydration. Question and discovery data and other chain scopes stay.
+Failed reads remain retryable, and later runs reuse immutable references. After
+rolling back to older client code, reload to rebuild the affected caches.
 
 Older submission receipts without per-question storage metadata use precise local
 time for the immediate cache write; clock skew can affect that legacy fallback.

@@ -6,6 +6,12 @@ Source patterns:
 
 Use `UserPage` as the default for new page-level UI, with shared token values for cross-surface consistency.
 
+Scope: the colors and fonts below are the values of the Context Engine (dark)
+theme. The default theme is Minimal, and the `--ce-color-*` names are aliases
+that resolve through the active theme. Component styles read `--ce-*` tokens, not
+hex values; `npm run theme:literals:check` rejects new hard-coded colors. See
+[design-system.md](design-system.md).
+
 ## 1. Color System
 
 ### Core surfaces
@@ -26,21 +32,10 @@ Use `UserPage` as the default for new page-level UI, with shared token values fo
 | --- | --- | --- |
 | `--ce-color-white` / `$user-page-text-color` | `#ffffff` | primary text |
 | `rgba(244, 247, 255, 0.65)` | `rgba(244, 247, 255, 0.65)` | muted metadata |
-| `#ffffff24` | `rgba(255, 255, 255, 0.14)` | empty / inactive text |
 | `$clickable-color` / `--ce-color-accent` | `#4dffa4` | hover, links, active emphasis |
-| `--ce-color-info` | `#1d8cf8` | winner glow, info state |
+| `--ce-color-info` | `#1d8cf8` | info state |
 | `--ce-color-indigo` / `$light-blue` | `#5e72e4` | avatars, indigo labels |
 | `--ce-color-yellow` | `#ffd600` | vote counts, high-attention accents |
-| raw cyan | `#69c9d0` | address / handle highlight treatment |
-| raw magenta | `#ee1d52` | shadow pair for cyan highlight text |
-
-### Shadow colors
-
-| Pair | Value | Use |
-| --- | --- | --- |
-| MemeMatch dark / light | `#131532` / `#2b2f70` | duel cards and hard neumorphic gameplay tiles |
-| UserPage dark / light | `#121433` / `#1c1e4f` | softer dashboard-style neumorphic reference pair |
-| Upcoming feature dark / light | `#10122a` / `#2e3278` | gradient proposal and up-next cards |
 
 ### Recommended usage
 
@@ -51,8 +46,8 @@ Use `UserPage` as the default for new page-level UI, with shared token values fo
 }
 
 .overlayCard {
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: var(--ce-card-bg); /* rgba(255, 255, 255, 0.06) */
+  border: 1px solid var(--ce-card-border); /* rgba(255, 255, 255, 0.14) */
 }
 ```
 
@@ -62,44 +57,16 @@ Use `UserPage` as the default for new page-level UI, with shared token values fo
 
 | Pattern | Shadow |
 | --- | --- |
-| MemeMatch card | `7px 7px 14px #131532, -7px -7px 14px #2b2f70` |
-| MemeMatch asymmetric left | `7px 7px 14px #131532, -7px -7px 14px #2b2f70` |
-| MemeMatch asymmetric right | `-7px 7px 14px #131532, 7px -7px 14px #2b2f70` |
-| Pending duel card variant | dark edge `#171a3d` + light edge `var(--ce-color-surface-alt)` |
-| UpcomingMatches feature card | `6px 6px 12px #10122a, -6px -6px 12px #2e3278` |
-| UserPage neumorphic reference pair | `#121433 / #1c1e4f` |
-| UserPage standard card | `0 6px 22px rgba(0, 0, 0, 0.25)` |
-| Winner / active glow | `0px 0px 30px 5px var(--ce-color-info) !important` |
+| UserPage standard card | `0 6px 22px rgba(0, 0, 0, 0.25)` (`--ce-card-shadow`) |
+| Neumorphic edges | `--ce-shadow-neumorphic-dark` and `--ce-shadow-neumorphic-light` |
 
-### Snippets
-
-```scss
-.duelCardLeft {
-  border-radius: var(--ce-radius-8);
-  background: var(--ce-color-surface);
-  box-shadow:
-    7px 7px 14px #131532,
-    -7px -7px 14px #2b2f70;
-}
-
-.duelCardRight {
-  border-radius: var(--ce-radius-8);
-  background: var(--ce-color-surface);
-  box-shadow:
-    -7px 7px 14px #131532,
-    7px -7px 14px #2b2f70;
-}
-
-.winner {
-  box-shadow: 0px 0px 30px 5px var(--ce-color-info) !important;
-}
-```
+### Snippet
 
 ```scss
 .pageCard {
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.25);
+  background: var(--ce-card-bg);
+  border: 1px solid var(--ce-card-border);
+  box-shadow: var(--ce-card-shadow);
 }
 ```
 
@@ -118,28 +85,6 @@ Use `UserPage` as the default for new page-level UI, with shared token values fo
 - `700`: card titles, badge labels, icons paired with text
 - `800`: compact summary headings only
 
-### Responsive size cues
-
-| Breakpoint | Typical sizes from these modules |
-| --- | --- |
-| `0-319` | stats `0.85em`, card headers `1em` |
-| `320-465` | stats `0.9em`, card headers `1em` |
-| `466-768` | stats `1em`, feature headers `1.25em` |
-| `769-1366` | stats `1.1em`, feature headers `1.45em` |
-| `1367+` | stats up to `1.5em`, feature headers `1.65em` |
-
-```scss
-.statsRow {
-  font-family: var(--ce-font-mono);
-  font-size: 1em;
-}
-
-.promptText {
-  font-weight: 600;
-  font-size: 1.35em;
-}
-```
-
 ## 4. Spacing & Breakpoints
 
 ### Breakpoint system
@@ -155,25 +100,7 @@ Use `UserPage` as the default for new page-level UI, with shared token values fo
 ### Spacing rules
 
 - Outer page padding: `20px` by default, `10px` on mobile (`UserPage`).
-- Card body padding: `10px` on mobile, `15px` on tablet and up (`UpcomingMatches`).
 - Section/list padding: `10px` on small screens, `20-25px` once space opens up.
-- Tiny match layouts use `0-5px` gutters first, then scale content instead of adding large padding.
-
-### Scale transforms
-
-| Pattern | `0-319` | `320-465` | `466-768` | `769-1366` | `1367+` |
-| --- | --- | --- | --- | --- | --- |
-| duel cards | `0.8` | `0.85` | `0.85` | `0.85` | `0.85` |
-| featured proposal / up-next cards | `0.8` | `0.9` | `0.95` | `0.95` | `0.95` |
-
-```scss
-@media (min-width: 466px) and (max-width: 768px) {
-  .featureCard {
-    padding: 15px;
-    transform: scale(0.95);
-  }
-}
-```
 
 ## 5. Card Patterns
 
@@ -181,73 +108,32 @@ Use `UserPage` as the default for new page-level UI, with shared token values fo
 
 ```scss
 .pageCard {
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: var(--ce-card-bg);
+  border: 1px solid var(--ce-card-border);
   border-radius: var(--ce-radius-12);
-  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.25);
+  box-shadow: var(--ce-card-shadow);
   padding: 20px;
 }
 ```
 
-### B. Standard gameplay card (`MemeMatch` / `UpcomingMatches`)
-
-```scss
-.gameCard {
-  background: var(--ce-color-surface);
-  border-radius: var(--ce-radius-8);
-}
-```
-
-### C. Duel / versus card
-
-```scss
-.duelCardLeft {
-  background: var(--ce-color-surface);
-  border-radius: var(--ce-radius-8);
-  transform: scale(0.85);
-  box-shadow:
-    7px 7px 14px #131532,
-    -7px -7px 14px #2b2f70;
-}
-
-.duelCardRight {
-  background: var(--ce-color-surface);
-  border-radius: var(--ce-radius-8);
-  transform: scale(0.85);
-  box-shadow:
-    -7px 7px 14px #131532,
-    7px -7px 14px #2b2f70;
-}
-```
-
-### D. Active / winner state
-
-```scss
-.activeCard {
-  box-shadow: 0px 0px 30px 5px var(--ce-color-info) !important;
-}
-```
-
-### E. Inputs
+### B. Inputs
 
 ```scss
 .input {
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: var(--ce-input-bg);
+  border: 1px solid var(--ce-input-border);
   border-radius: var(--ce-radius-6);
-  color: var(--ce-color-white);
+  color: var(--ce-panel-text);
 }
 ```
 
-Prefer:
-- `var(--ce-radius-7)` or `var(--ce-radius-8)` for game cards and match tiles
-- `var(--ce-radius-10)` to `var(--ce-radius-14)` for page sections, compare panels, and modal-like blocks
+Prefer `var(--ce-radius-10)` to `var(--ce-radius-14)` for page sections, compare panels, and modal-like blocks.
 
 ## 6. Layout Patterns
 
 ### Flexbox first
 
-Use flex for headers, duel rows, action bars, and card footers. `flex-wrap: wrap` is common and should be added early.
+Use flex for headers, action bars, and card footers. `flex-wrap: wrap` is common and should be added early.
 
 ```scss
 .headerRow {
@@ -256,12 +142,6 @@ Use flex for headers, duel rows, action bars, and card footers. `flex-wrap: wrap
   align-items: center;
   flex-wrap: wrap;
   gap: 12px;
-}
-
-.duelRow {
-  display: flex;
-  flex-direction: row;
-  justify-content: space-between;
 }
 ```
 
@@ -287,7 +167,7 @@ Use grid when two columns need equal visual weight, then collapse to one column 
 
 ### Shared behavior
 
-- Hover/focus on links and icons on dark panels: switch to `#4dffa4`.
+- Hover/focus on links and icons on dark panels: switch to `var(--ce-action-accent)` (`#4dffa4` in the Context Engine theme).
   On document cards, including Docs Quickstart, use `--ce-document-text` for
   readable links in every state; emphasize hover with a thicker underline and
   keyboard focus with a matching outline.
@@ -295,8 +175,8 @@ Use grid when two columns need equal visual weight, then collapse to one column 
   to remove theme borders and shadows. Use color for pointer hover feedback and
   retain a visible keyboard focus indicator.
 - Hover on buttons/cards: slight lift with `translateY(-1px)` or `translateY(-2px)`
-- Final submit/create CTAs use the shared `#2a63ca` surface, indigo hover, uppercase body-font labels, and the same lift-on-hover motion.
-- Focus: visible outline, usually `2px solid rgba(99, 102, 241, 0.45)`
+- Final submit/create CTAs use the shared `var(--ce-action-submit)` surface (`#2a63ca`), indigo hover, uppercase body-font labels, and the same lift-on-hover motion.
+- Focus: visible outline, usually `2px solid var(--ce-focus-ring)`
 - Disabled: `opacity: 0.7` and `cursor: not-allowed`
 
 ```scss
@@ -307,7 +187,7 @@ Use grid when two columns need equal visual weight, then collapse to one column 
 
   &:hover,
   &:focus {
-    color: #4dffa4;
+    color: var(--ce-action-accent);
     transform: scale(1.05);
     outline: none;
   }
@@ -325,7 +205,7 @@ Use grid when two columns need equal visual weight, then collapse to one column 
   }
 
   &:focus {
-    outline: 2px solid rgba(99, 102, 241, 0.45);
+    outline: 2px solid var(--ce-focus-ring);
     outline-offset: 2px;
   }
 }
@@ -333,32 +213,9 @@ Use grid when two columns need equal visual weight, then collapse to one column 
 
 ## 8. Gradient Backgrounds
 
-### Featured match / proposal gradient
-
-Use this only for featured cards, not for every panel.
-
-```scss
-.featuredCard {
-  background: linear-gradient(145deg, #1c1f49, #212457);
-  box-shadow:
-    6px 6px 12px #10122a,
-    -6px -6px 12px #2e3278;
-}
-```
-
-### CTA gradient already in use
-
-```scss
-.ctaButton {
-  background: linear-gradient(180deg, #00d0a9 0%, #00b48e 100%);
-  color: #0b1736;
-}
-```
-
-Current state:
-- Flat/shared surfaces already use tokens such as `--ce-color-surface` and `--ce-color-surface-alt`.
-- There is no shared `--ce-gradient-*` token yet, so copy exact gradients when matching existing featured-card UI.
-- Final submit/create CTAs are a separate shared pattern: `var(--ce-font-body)`, uppercase inner content, blue `#2a63ca` surface, indigo hover, and a subtle lift-on-hover treatment.
+- Flat/shared surfaces use tokens such as `--ce-color-surface` and `--ce-color-surface-alt`.
+- There is no shared `--ce-gradient-*` token.
+- Final submit/create CTAs are a separate shared pattern: `var(--ce-font-body)`, uppercase inner content, blue `--ce-action-submit` (`#2a63ca`) surface, indigo hover, and a subtle lift-on-hover treatment.
 
 ## 9. Existing CSS Custom Properties Used By These Files
 
@@ -404,19 +261,19 @@ Current state:
 
 ## Quick Default Recipe
 
-If a new component is not explicitly game-like, start here:
+For a new card or panel, start here:
 
 ```scss
 .newComponent {
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: var(--ce-card-bg);
+  border: 1px solid var(--ce-card-border);
   border-radius: var(--ce-radius-12);
-  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.25);
-  color: var(--ce-color-white);
+  box-shadow: var(--ce-card-shadow);
+  color: var(--ce-panel-text);
 }
 
 .newComponent a,
 .newComponent button:hover {
-  color: #4dffa4;
+  color: var(--ce-action-accent);
 }
 ```

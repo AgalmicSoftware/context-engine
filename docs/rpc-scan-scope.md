@@ -8,7 +8,7 @@ For PATH/Pocket endpoint defaults and provider ordering, see
 
 ## Session scan scope
 
-The app now treats session selection as a two-layer model:
+The app treats session selection as a two-layer model:
 
 - `primary/default session`: the inherited single-session context used by tools and views that operate on one session at a time.
 - `selected-session scope + list`: the multi-session scan/discovery scope used by cross-session reads (`all`, `active`, `general`, `list`).
@@ -58,23 +58,23 @@ Slug list input (`CE_SESSION_SCAN_SLUGS`) precedence:
 Slug normalization:
 
 - Non-alias session slugs are preserved exactly as entered.
-- Only reserved aliases are canonicalized automatically:
-  - `general` -> `""`
-  - `debate` -> `rxc`
+- Only the reserved alias `general` is canonicalized automatically
+  (`general` -> `""`).
 - Optional demo alias resolution can still rewrite list entries when
   `CE_SESSION_SCAN_RESOLVE_DEMO_SESSION_ALIASES` is enabled.
 
-Current repo default in this checkout:
+Repo defaults (`client/src/variables/appConfig.ts`):
 
-- `scope = "list"`
-- `slugs = []`
+- `scope = "all"`
+- `slugs = ["demo-sh"]`
 
-Set `REACT_APP_CE_SESSION_SCAN_SLUGS` in your env file when you want a non-empty
-default list for this checkout.
+Override them with `REACT_APP_CE_SESSION_SCAN_SCOPE` and
+`REACT_APP_CE_SESSION_SCAN_SLUGS` in your env file.
 
 ## Demo-session alias resolution
 
 Optional list-mode alias resolution is controlled by `CE_SESSION_SCAN_RESOLVE_DEMO_SESSION_ALIASES`.
+The default is off while `REACT_APP_USE_ONCHAIN_SESSION_REGISTRY` is true (its default).
 
 When enabled, `list` values can resolve through `client/src/variables/demo/demo_sessions.json` by:
 
@@ -88,20 +88,15 @@ Runtime override:
 
 ## Settings UI
 
-The Account modal now exposes the canonical session model under `AI Settings` -> `Session`:
+Settings -> Config -> `Session` holds the scan-scope controls:
 
-- `Primary session`
-- `Selected-session scope`
-- multi-select session chips used for `list` scope and stored global defaults
+- `Selected-session scope`, with the modes `All sessions`, `Primary session`,
+  `General only`, and `Session list`
+- `Selected sessions`: multi-select session chips used by `Session list`
+- `Save session settings` and `Reset to general`
 
-The RPC summary remains visible under `AI Settings` -> `Session subscriptions (RPC)`.
-
-Scope modes exposed in the modal:
-
-- `All sessions`
-- `Primary session`
-- `General only`
-- `Session list`
+The primary session comes from the Session dropdown at the top of Settings.
+Saving scan-scope settings does not change it.
 
 ## Block-window behavior
 
@@ -130,13 +125,13 @@ This means:
 
 These flags apply only to per-user deep scans such as `/u/:address` and compare-address scans.
 
-Runtime precedence:
+Runtime precedence, for each resource:
 
-1. `globalThis.CE_USER_PROFILE_SCAN_ALL_SESSIONS_SBTS`
-2. `globalThis.CE_USER_PROFILE_SCAN_ALL_SESSIONS_SURVEYS`
-3. `globalThis.CE_USER_PROFILE_SCAN_ALL_SESSIONS_QUESTIONS`
-4. `globalThis.CE_USER_PROFILE_SCAN_ALL_SESSIONS` as the legacy fallback
-5. defaults from `appConfig.ts`
+1. its own `globalThis` flag: `CE_USER_PROFILE_SCAN_ALL_SESSIONS_SBTS`,
+   `CE_USER_PROFILE_SCAN_ALL_SESSIONS_SURVEYS`, or
+   `CE_USER_PROFILE_SCAN_ALL_SESSIONS_QUESTIONS`
+2. `globalThis.CE_USER_PROFILE_SCAN_ALL_SESSIONS`, the legacy flag
+3. the default from `appConfig.ts`
 
 ## Important list-scope nuance
 
@@ -278,7 +273,7 @@ Policy:
 Policies:
 
 - `auto`: current behavior
-- `sbts`: autorun full scans only on `/sbts` and `/sbt/:address`
+- `sbts`: autorun full scans only on the SBT and group pages (`/sbts`, `/groups`, `/sbt/…`, `/group/…`)
 - `manual`: never autorun full scans
 
 ### One-shot RPC testing mode

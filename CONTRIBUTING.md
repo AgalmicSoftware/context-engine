@@ -20,8 +20,8 @@ The local React dev server runs with:
 
 `cd client && npm run dev`
 
-Repo-level scripts, CI, and the client package target Node `^20.19.0` or `>=22.12.0` with npm `^10.0.0`; Node 16/npm 9 are no longer supported for client work. Client installs are expected to pass with npm's normal strict peer resolution.
-Install Foundry as well if you plan to run the root test gate (`npm test`), since it includes Solidity suites via `forge test`. Setup instructions live in [docs/local-chain.md](docs/local-chain.md).
+Repo-level scripts, CI, and the client package target Node `^20.19.0` or `>=22.12.0` with npm `^10.0.0`. Client installs are expected to pass with npm's normal strict peer resolution.
+To run the root test gate (`npm test`), also install the Session Worker and MCP dependencies (`npm --prefix workers/sessionCorsWorker install` and `npm --prefix mcp install`) and Foundry, since the gate includes Solidity suites via `forge test`. Foundry setup instructions live in [docs/local-chain.md](docs/local-chain.md).
 
 If you need public client environment overrides, use [`client/.env.example`](client/.env.example).
 OP Sepolia is the active/default OSS chain. Base Sepolia is a best-effort
