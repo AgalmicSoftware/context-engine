@@ -1088,7 +1088,7 @@ const clearClaimHashFromAddress = () => {
 };
 
 // A camera that reads someone's looping code opens the session with that code in the link's fragment.
-const consumeTranscriptClaimHashIfPresent = (engine: PileViewModeEngine) => {
+export const consumeTranscriptClaimHashIfPresent = (engine: PileViewModeEngine) => {
   if (typeof window === 'undefined' || !isInterviewFeatureEnabled(engine.props?.sessionConfig)) return;
   if (!hasClaimHash(window.location.hash || '')) return;
   const frame = readClaimFrame(window.location.hash || '');
@@ -1097,7 +1097,7 @@ const consumeTranscriptClaimHashIfPresent = (engine: PileViewModeEngine) => {
 };
 
 // Their part of the conversation goes to the interview, and they join the group the recorder's link was for.
-const receiveTranscriptClaim = (engine: PileViewModeEngine, claim: TranscriptClaim) => {
+export const receiveTranscriptClaim = (engine: PileViewModeEngine, claim: TranscriptClaim) => {
   engine.setState({
     showVoiceModeModal: true,
     sessionVoiceMode: 'interview',
@@ -1182,7 +1182,9 @@ const runPileComponentDidMount = (engine: PileViewModeEngine) => {
       surveyLog.warn('PileViewMode: could not clear imported interview packet from URL', e);
     }
   }
-  if (typeof window !== 'undefined' && hasClaimHash(window.location.hash || '')) clearClaimHashFromAddress();
+  // Only once it's held: a session whose settings load later still reads it, when they arrive.
+  if (typeof window !== 'undefined' && engine.state.interviewClaimFrame && hasClaimHash(window.location.hash || ''))
+    clearClaimHashFromAddress();
   engine.syncCurrentPileQuestionsSignature(engine.state.pileQuestions);
   engine.loadAndSortQuestions();
   engine.maybeRecoverUnhydratedGatedPile();
