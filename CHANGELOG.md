@@ -134,7 +134,7 @@ All notable changes to this project will be documented in this file.
 - Removed the retired Agent Bridge source. Agent HTTP stays in the Session Worker; admin metrics report `sessionsWithAgentActivity`, and agent on-chain answers record source `session-agent`.
 - `telegramResponseExportAllowedAddresses` no longer grants export access. Nothing writes this key, and no live session's public config carries it.
 - Removed unread Telegram fields and unused Worker exports. Stored record fields and KV prefixes are unchanged.
-- Reading another participant's individual response now takes a session admin, and Worker Groups take their principal only from the signed-in address. The grant claims that also opened these were never issued, so nobody loses access.
+- Worker routes no longer read grant claims from login tokens. Nothing issued them, so nobody loses access: in a Hosted session whose results aren't public, reading another participant's individual response still takes a session admin, and Worker Groups still use the signed-in address.
 - Anonymous visitors have no daily per-IP request limit unless the session sets one. The per-wallet daily limit no longer doubles as one, so a room sharing one venue connection isn't cut off.
 - A transcription reply with no readable text returns 502, so the browser keeps the chunk's audio and retries. Earlier Workers report such a reply as silence.
 - Agent submissions count test-ETH payouts against the per-wallet daily faucet limit they share with participants. Past the limit, the submission carries on without funding.
@@ -184,7 +184,7 @@ All notable changes to this project will be documented in this file.
 
 ### Agents and MCP
 
-- Agent HTTP names no longer say Telegram. In question sources and reasons, `telegram_only_*` is now `hosted_*`, and a question with no id gets a `hosted-` one. In submit results, `telegram_submit_queue_*` is now `agent_submit_queue_*`. An agent that matches the old strings must switch to the new ones.
+- Two groups of Agent HTTP names no longer say Telegram. In question sources and reasons, `telegram_only_*` is now `hosted_*`, and a question with no id gets a `hosted-` one. In submit results, `telegram_submit_queue_*` is now `agent_submit_queue_*`. An agent that matches the old strings must switch to the new ones.
 - Agent fidelity takes the latest record by the time the Worker stored it, never by the participant's own clock, so a later withdrawal or edit counts.
 - Agent fidelity and MCP `get_results` reject ratings off the step grid and allocations over the voice-credit budget.
 - Agent fidelity keeps equally typical people in one group, so reordering records can't change the most-unusual and most-typical results. When everyone is equally typical, it reports no groups. Confident misses with equal confidence list in question order.
