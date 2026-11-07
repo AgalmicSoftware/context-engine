@@ -220,6 +220,12 @@
   margin: 0;
 }
 
+// For a banner outside .page, which would otherwise set this colour.
+.bannerMessage {
+  color: var(--ce-panel-text);
+  overflow-wrap: anywhere;
+}
+
 .diffList {
   margin: 0;
   padding-left: 18px;
@@ -269,10 +275,17 @@
   }
 }
 
-// A link that looks like .button; it outranks .page a.
+// A link that looks like .button; it outranks .page a and the global a:hover.
 a.button {
   display: inline-block;
   text-decoration: none;
+
+  &:hover,
+  &:focus,
+  &:active {
+    color: var(--ce-panel-text);
+    text-decoration: none;
+  }
 }
 
 // Applied with .button.

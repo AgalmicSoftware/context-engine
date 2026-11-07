@@ -18,6 +18,7 @@ import {
 } from '../../utilities/session/sessionWorkerConfigCache.js';
 import { normalizeSessionSlug } from '../../utilities/session/sessionNaming';
 import { buildPublicRoute } from '../../utilities/ui/publicUrl.js';
+import setupStyles from './setup/SessionSetup.module.scss';
 
 type WorkerCanonicalSessionBootstrapBoundaryProps = {
   sessionSlug: string;
@@ -244,21 +245,31 @@ const WorkerCanonicalSessionBootstrapBoundary = ({
     );
     return (
       <>
-        <div role="alert" aria-live="assertive" data-testid="ce-worker-canonical-bootstrap-error">
-          <h3>{viewState.title}</h3>
-          <div>{viewState.message}</div>
-          <div>
+        <div
+          className={setupStyles.banner}
+          role="alert"
+          aria-live="assertive"
+          data-testid="ce-worker-canonical-bootstrap-error"
+        >
+          <h3 className={setupStyles.bannerTitle}>{viewState.title}</h3>
+          <div className={setupStyles.bannerMessage}>{viewState.message}</div>
+          <div className={setupStyles.buttonRow}>
             {viewState.canRetry && (
               <button
                 type="button"
+                className={setupStyles.button}
                 aria-label="Retry worker session"
                 onClick={() => setRetryNonce((value) => value + 1)}
               >
                 Retry
               </button>
             )}
-            <a href={adminHref}>Open Admin</a>
-            <a href={buildPublicRoute('/new')}>Return to session selection</a>
+            <a className={setupStyles.button} href={adminHref}>
+              Open Admin
+            </a>
+            <a className={setupStyles.button} href={buildPublicRoute('/new')}>
+              Return to session selection
+            </a>
           </div>
         </div>
         {viewState.errorKind === 'missing_config' &&

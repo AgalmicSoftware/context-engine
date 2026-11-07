@@ -431,11 +431,19 @@ describe('WorkerCanonicalSessionBootstrapBoundary', () => {
       />,
     );
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Worker identity mismatch');
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('Worker identity mismatch');
+    // A readable card outside the setup page, which would otherwise set these colours.
+    expect(alert).toHaveClass('banner');
+    expect(screen.getByRole('heading', { name: 'Worker identity mismatch' })).toHaveClass('bannerTitle');
     expect(screen.getByRole('link', { name: 'Open Admin' })).toHaveAttribute(
       'href',
       `/admin?sessionSlug=worker-session&worker=${encodeURIComponent(WORKER_ORIGIN)}`,
     );
+    // Styled as a row of buttons, not bare links run together.
+    expect(screen.getByRole('link', { name: 'Open Admin' })).toHaveClass('button');
+    expect(screen.getByRole('link', { name: 'Return to session selection' })).toHaveClass('button');
+    expect(screen.getByRole('link', { name: 'Open Admin' }).parentElement).toHaveClass('buttonRow');
     expect(confirmRepin).toHaveBeenCalledTimes(1);
     expect(mockUpsertBootstrap).toHaveBeenCalledTimes(1);
     expect(mockMarkBootstrapVerified).not.toHaveBeenCalled();
@@ -591,7 +599,7 @@ describe('WorkerCanonicalSessionBootstrapBoundary', () => {
       />,
     );
 
-    expect(await screen.findByRole('button', { name: 'Retry worker session' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Retry worker session' })).toHaveClass('button');
     expect(mockFetchBootstrap).toHaveBeenCalledTimes(3);
   });
 

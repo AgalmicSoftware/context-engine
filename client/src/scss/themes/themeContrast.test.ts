@@ -567,6 +567,20 @@ describe('bundled app-theme contrast', () => {
     expect(ratios.filter(([, value]) => value < 4.5)).toEqual([]);
   });
 
+  // A link with no state colour of its own takes the global `a:hover`, which fails on the button's fill.
+  test.each(registry.themes.map(({ id }) => id))('%s keeps a link styled as a button readable', (themeId) => {
+    const values = themeValues(css, themeId);
+    const paint = painter(values);
+    const setupCss = compileModule('components/Sessions/setup/SessionSetup.module.scss');
+    const surface = composite(parseColor(values.surface), parseColor(values.canvas));
+    const fill = composite(paint(moduleRule(setupCss, '.button').background), surface);
+    const ratios = ['a.button:hover', 'a.button:focus', 'a.button:active'].map((selector) => {
+      const { color } = moduleRule(setupCss, selector);
+      return [selector, color ? Number(contrastRatio(composite(paint(color), fill), fill).toFixed(2)) : 0] as const;
+    });
+    expect(ratios.filter(([, value]) => value < 4.5)).toEqual([]);
+  });
+
   // A heading with no colour of its own takes the global one, which vanishes on dark themes.
   test.each(registry.themes.map(({ id }) => id))('%s keeps the setup banner title readable', (themeId) => {
     const values = themeValues(css, themeId);
@@ -576,6 +590,8 @@ describe('bundled app-theme contrast', () => {
     const banner = composite(paint(moduleRule(setupCss, '.banner').background), surface);
     const title = composite(paint(moduleRule(setupCss, '.bannerTitle').color), banner);
     expect(contrastRatio(title, banner)).toBeGreaterThanOrEqual(4.5);
+    const message = composite(paint(moduleRule(setupCss, '.bannerMessage').color), banner);
+    expect(contrastRatio(message, banner)).toBeGreaterThanOrEqual(4.5);
   });
 
   test.each(registry.themes.map(({ id }) => id))('%s keeps the HTML report buttons readable', (themeId) => {
