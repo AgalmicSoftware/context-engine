@@ -41,6 +41,8 @@ type SessionListeningPanelProps = Record<string, unknown> & {
   onClose?: () => void;
   panelMode?: 'recordGroup' | 'listening';
   embeddedInModal?: boolean;
+  // The dialog header's spot for the + that adds audio or a transcript.
+  headerActionsSlot?: HTMLElement | null;
   closeActionRef?: React.MutableRefObject<(() => Promise<void>) | null>;
   // Lets the dialog ignore backdrop taps and Escape while the microphone is capturing.
   onCaptureChange?: (capturing: boolean) => void;
@@ -106,6 +108,7 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
     onClose,
     panelMode = 'listening',
     embeddedInModal = false,
+    headerActionsSlot = null,
     closeActionRef,
     onCaptureChange,
   } = props;
@@ -603,6 +606,7 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
             await recorder.addTranscript(text);
             setIsTranscriptOpen(true);
           }}
+          triggerSlot={headerActionsSlot}
         />
       </div>
 

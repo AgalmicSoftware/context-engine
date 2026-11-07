@@ -76,6 +76,8 @@ export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps)
   const groupCloseRef = useRef<(() => Promise<void>) | null>(null);
   // A tap outside or Escape must not end a recording; the header close button still stops and saves it.
   const [groupCapturing, setGroupCapturing] = useState(false);
+  // The header spot Group Conversation puts its + in, once the header has rendered.
+  const [headerActions, setHeaderActions] = useState<HTMLSpanElement | null>(null);
   // A code opened in a tab that's recording waits for Stop, so it can't end the recording.
   const scanning = (scanRequested || !!props.claimFrame) && !groupCapturing;
   const stopScanning = () => {
@@ -126,25 +128,31 @@ export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps)
                   {title}
                   {mode === 'recordGroup' ? <SessionRecordingHelp /> : null}
                 </span>
-                {props.onClaim ? (
-                  <>
-                    <button
-                      type="button"
-                      id="ce-session-claim-scan"
-                      className={styles.sessionInterviewHeaderButton}
-                      data-ce-control-appearance="frameless"
-                      aria-label="Scan code"
-                      disabled={groupCapturing}
-                      data-testid={E2E_TESTIDS.SESSION_CLAIM_SCAN}
-                      onClick={() => setScanRequested(true)}
-                    >
-                      <FontAwesomeIcon icon={faQrcode} />
-                    </button>
-                    <UncontrolledTooltip target="ce-session-claim-scan" trigger="hover focus">
-                      Scan code
-                    </UncontrolledTooltip>
-                  </>
-                ) : null}
+                <span className={styles.sessionVoiceModeActions}>
+                  {/* Group Conversation's + for audio and transcripts goes here. */}
+                  {mode === 'recordGroup' ? (
+                    <span ref={setHeaderActions} className={styles.sessionVoiceModeSlot} />
+                  ) : null}
+                  {props.onClaim ? (
+                    <>
+                      <button
+                        type="button"
+                        id="ce-session-claim-scan"
+                        className={styles.sessionInterviewHeaderButton}
+                        data-ce-control-appearance="frameless"
+                        aria-label="Scan code"
+                        disabled={groupCapturing}
+                        data-testid={E2E_TESTIDS.SESSION_CLAIM_SCAN}
+                        onClick={() => setScanRequested(true)}
+                      >
+                        <FontAwesomeIcon icon={faQrcode} />
+                      </button>
+                      <UncontrolledTooltip target="ce-session-claim-scan" trigger="hover focus">
+                        Scan code
+                      </UncontrolledTooltip>
+                    </>
+                  ) : null}
+                </span>
               </span>
             </ModalHeader>
             <ModalBody>
@@ -167,6 +175,7 @@ export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps)
                   onClose={onClose}
                   closeActionRef={groupCloseRef}
                   onCaptureChange={setGroupCapturing}
+                  headerActionsSlot={headerActions}
                 />
               )}
             </ModalBody>

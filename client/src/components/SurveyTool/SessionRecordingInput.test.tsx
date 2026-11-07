@@ -16,6 +16,26 @@ it('adds MP3 files with a usable MIME type and permits choosing the same file ag
   await waitFor(() => expect(onAudio).toHaveBeenCalledTimes(2));
 });
 
+it('can put its + elsewhere, as in a dialog’s header, keeping its choices and Escape where they were', () => {
+  const header = document.createElement('div');
+  document.body.append(header);
+  try {
+    const { container } = render(
+      <SessionRecordingInput disabled={false} onAudio={jest.fn()} onTranscript={jest.fn()} triggerSlot={header} />,
+    );
+    const add = screen.getByRole('button', { name: 'Add input' });
+    expect(header).toContainElement(add);
+    expect(container).not.toContainElement(add);
+    fireEvent.click(add);
+    expect(container).toContainElement(screen.getByRole('button', { name: /Upload audio/ }));
+    fireEvent.keyDown(add, { key: 'Escape' });
+    expect(screen.queryByRole('button', { name: /Upload audio/ })).toBeNull();
+    expect(add).toHaveAttribute('aria-expanded', 'false');
+  } finally {
+    header.remove();
+  }
+});
+
 it('rejects unsupported, empty and oversized audio before enqueueing', async () => {
   const onAudio = jest.fn();
   render(<SessionRecordingInput disabled={false} onAudio={onAudio} onTranscript={jest.fn()} />);

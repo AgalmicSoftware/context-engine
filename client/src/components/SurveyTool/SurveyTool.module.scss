@@ -3308,6 +3308,18 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   white-space: nowrap;
 }
 
+// The title row's icon buttons, together at its far end.
+.sessionVoiceModeActions {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+}
+
+.sessionVoiceModeSlot {
+  display: contents;
+}
+
 // Handing a person their part of a recording. The people's colours are for white, as in the transcript.
 .sessionClaimShare {
   display: flex;

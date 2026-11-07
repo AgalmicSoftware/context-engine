@@ -48,6 +48,35 @@
   font-size: 1.6rem;
   line-height: 1;
 }
+// In a dialog's header, the + looks like the header's other icon buttons.
+.headerAddButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 8px;
+  border: 0 !important;
+  border-radius: var(--ce-radius-6);
+  background: transparent !important;
+  box-shadow: none !important;
+  color: inherit !important;
+  font-size: 1.6rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  &:hover:not(:disabled) {
+    background: color-mix(in srgb, currentColor 12%, transparent) !important;
+  }
+  &:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 2px;
+  }
+  &:disabled {
+    opacity: 0.45;
+    cursor: default;
+  }
+}
 .paste {
   flex: 0 0 100%;
   min-width: 0;

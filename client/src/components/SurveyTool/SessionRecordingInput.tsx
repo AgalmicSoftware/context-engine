@@ -1,4 +1,5 @@
 import { useId, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import styles from './SessionRecordingInput.module.scss';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 
@@ -17,10 +18,12 @@ type Props = {
   disabled: boolean;
   onAudio: (audio: Blob) => Promise<void>;
   onTranscript: (text: string) => Promise<void>;
+  // Where the + goes instead, as in a dialog's header beside its other icons. Its choices stay here.
+  triggerSlot?: Element | null;
 };
 
 /** Additional input joins the same saved recording without opening the microphone. */
-export default function SessionRecordingInput({ disabled, onAudio, onTranscript }: Props) {
+export default function SessionRecordingInput({ disabled, onAudio, onTranscript, triggerSlot = null }: Props) {
   const [open, setOpen] = useState(false);
   const [pasting, setPasting] = useState(false);
   const [text, setText] = useState('');
@@ -53,9 +56,27 @@ export default function SessionRecordingInput({ disabled, onAudio, onTranscript 
     setText('');
     setPasting(false);
   };
+  const trigger = (
+    <button
+      ref={toggleRef}
+      type="button"
+      aria-label="Add input"
+      title="Add audio or a transcript"
+      className={triggerSlot ? styles.headerAddButton : styles.addButton}
+      data-ce-control-appearance={triggerSlot ? 'frameless' : undefined}
+      disabled={blocked}
+      aria-expanded={open}
+      aria-controls={id}
+      data-testid={E2E_TESTIDS.SESSION_RECORDING_ADD_INPUT}
+      onClick={() => setOpen(!open)}
+    >
+      <span aria-hidden="true">+</span>
+    </button>
+  );
   return (
     <div
       className={styles.input}
+      // Escape from the + reaches this through the portal too.
       onKeyDown={(event) => {
         if (event.key === 'Escape' && (open || pasting)) {
           event.stopPropagation();
@@ -65,19 +86,7 @@ export default function SessionRecordingInput({ disabled, onAudio, onTranscript 
         }
       }}
     >
-      <button
-        ref={toggleRef}
-        type="button"
-        aria-label="Add input"
-        className={styles.addButton}
-        disabled={blocked}
-        aria-expanded={open}
-        aria-controls={id}
-        data-testid={E2E_TESTIDS.SESSION_RECORDING_ADD_INPUT}
-        onClick={() => setOpen(!open)}
-      >
-        <span aria-hidden="true">+</span>
-      </button>
+      {triggerSlot ? createPortal(trigger, triggerSlot) : trigger}
       {open && (
         <div id={id} className={styles.choices}>
           <button type="button" disabled={blocked} onClick={() => audioRef.current?.click()}>

@@ -293,7 +293,10 @@ it.each(['a transcribed recording', 'a pasted transcript'])(
         fireEvent.click(screen.getByTestId('ce-session-listening-start'));
         fireEvent.click(await screen.findByRole('button', { name: 'Stop recording' }));
       } else {
+        // The + sits in the dialog's header; what it opens stays in the dialog's body.
+        expect(screen.getByRole('button', { name: 'Add input' }).closest('.modal-header')).not.toBeNull();
         fireEvent.click(screen.getByRole('button', { name: 'Add input' }));
+        expect(screen.getByRole('button', { name: 'Paste transcript' }).closest('.modal-body')).not.toBeNull();
         fireEvent.click(screen.getByRole('button', { name: 'Paste transcript' }));
         fireEvent.change(screen.getByLabelText('Written transcript'), { target: { value: transcript } });
         fireEvent.click(screen.getByRole('button', { name: 'Add transcript' }));

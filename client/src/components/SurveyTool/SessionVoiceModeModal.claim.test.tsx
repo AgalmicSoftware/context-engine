@@ -18,12 +18,15 @@ jest.mock('./useInterviewOpening', () => ({
 }));
 jest.mock('./SessionListeningPanel', () => {
   const { useEffect } = jest.requireActual<typeof import('react')>('react');
+  const { createPortal } = jest.requireActual<typeof import('react-dom')>('react-dom');
   const MockListeningPanel = ({
     closeActionRef,
     onCaptureChange,
+    headerActionsSlot,
   }: {
     closeActionRef: { current: unknown };
     onCaptureChange: (capturing: boolean) => void;
+    headerActionsSlot?: HTMLElement | null;
   }) => {
     useEffect(() => {
       closeActionRef.current = mockGroupClose;
@@ -36,6 +39,7 @@ jest.mock('./SessionListeningPanel', () => {
         <button type="button" onClick={() => onCaptureChange(false)}>
           Stop capturing
         </button>
+        {headerActionsSlot ? createPortal(<button type="button">Add input</button>, headerActionsSlot) : null}
       </>
     );
   };
@@ -130,6 +134,14 @@ describe('scanning a part of a conversation', () => {
     expect(await screen.findByTestId('mock-scanner')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Cancel scan' }));
     await waitFor(() => expect(screen.queryByTestId('mock-scanner')).toBeNull());
+  });
+
+  it('gives Group Conversation a spot in the header beside Scan code for its +', async () => {
+    render(<SessionVoiceModeModal {...baseProps} mode="recordGroup" />);
+    const add = await screen.findByRole('button', { name: 'Add input' });
+    const scan = screen.getByTestId(E2E_TESTIDS.SESSION_CLAIM_SCAN);
+    expect(add.closest('.modal-header')).not.toBeNull();
+    expect(add.parentElement?.parentElement).toBe(scan.parentElement);
   });
 
   it('holds scanning back while the dialog is capturing a recording', () => {
