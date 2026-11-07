@@ -18,15 +18,15 @@ const payload = {
   sessionSlug: 'eddy26',
 };
 
-test('bridge HTTP schema uses the stored 1..10 scale like the shared catalog', () => {
+test('Agent HTTP schema uses the stored 1..10 scale like the shared catalog', () => {
   const shared = sharedCatalogScale(payload);
-  const bridgeQuestion = __test__sessionQuestions.normalizeQuestionPayload(payload, {
+  const agentQuestion = __test__sessionQuestions.normalizeQuestionPayload(payload, {
     questionId: id,
     pointerId: 'x'.repeat(43),
     sessionSlug: 'eddy26',
   });
-  const schema = buildAgentQuestionAnswerSchema(bridgeQuestion).answerSchema;
-  const cardScale = normalizeAgentRatingScale(bridgeQuestion);
+  const schema = buildAgentQuestionAnswerSchema(agentQuestion).answerSchema;
+  const cardScale = normalizeAgentRatingScale(agentQuestion);
   const directScale = normalizeAgentRatingScale(payload);
   assert.deepEqual({ min: schema.min, max: schema.max }, { min: shared.min, max: shared.max });
   assert.deepEqual(cardScale, { min: 1, max: 10, step: 1 });

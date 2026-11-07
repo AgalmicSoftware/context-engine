@@ -78,7 +78,7 @@ test('an override for an absent installed version fails even when all shipped li
   assert.match(result.failures[0], /synthetic-removed@1.0.0.*no longer installed/);
 });
 
-test('the default release gate checks root-installed Bridge and deploy-helper dependencies and bundle notices', async (t) => {
+test('the default release gate checks root-installed Session Worker and deploy-helper dependencies and bundle notices', async (t) => {
   const rootDir = await mkdtemp(path.join(os.tmpdir(), 'ce-release-license-fixture-'));
   t.after(() => rm(rootDir, { recursive: true, force: true }));
   for (const tree of ['.', 'client', 'mcp', 'workers/sessionCorsWorker']) {
