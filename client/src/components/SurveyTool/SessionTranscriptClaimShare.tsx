@@ -5,6 +5,9 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faQuestionCircle } from '@fortawesome/free-solid-svg-icons';
 import { readLinkedWorkerGroupId } from '../../domains/worker/workerGroupAutoJoin';
 import { useRecordingWakeLock } from '../../utilities/audio/useRecordingWakeLock';
+import { claimsWorkerCanonicalAuthority } from '../../utilities/session/sessionCapabilityProjection';
+import { getUsableSessionWorkerUrl } from '../../utilities/session/sessionWorkerAvailability';
+import { normalizeShareableWorkerOrigin } from '../Sessions/sessionWizardUrlSupport';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { speakerColor } from './SessionListeningTranscript';
 import {
@@ -24,9 +27,14 @@ const ABOUT =
 const ABOUT_CODE =
   'The code changes as it goes. Keep the camera on it until the phone has every piece; any it misses come round again.';
 
-// The address a code opens: this session, on this Worker if the page was opened with one.
-const claimBaseUrl = () => {
-  const worker = new URLSearchParams(window.location.search).get('worker');
+// The address a code opens: this session, pinned to its Worker as its own links are, so a fresh phone can find it.
+// Sessions that open from a clean link need no pin, which leaves more room in each code.
+const claimBaseUrl = (sessionSlug: string, sessionConfig: unknown) => {
+  const config = (sessionConfig || {}) as Record<string, unknown>;
+  const pinned = claimsWorkerCanonicalAuthority(config) && config.workerCanonicalCleanRoute !== true;
+  const worker =
+    new URLSearchParams(window.location.search).get('worker') ||
+    (pinned ? normalizeShareableWorkerOrigin(getUsableSessionWorkerUrl({ slug: sessionSlug, sessionConfig })) : '');
   return `${window.location.origin}${window.location.pathname}${worker ? `?worker=${encodeURIComponent(worker)}` : ''}`;
 };
 
@@ -34,11 +42,13 @@ function ClaimCodeDialog({
   transcript,
   person,
   sessionSlug,
+  sessionConfig,
   onClose,
 }: {
   transcript: string;
   person: string;
   sessionSlug: string;
+  sessionConfig: unknown;
   onClose: () => void;
 }) {
   const helpId = `ce-claim-code-help-${useId().replace(/:/g, '')}`;
@@ -59,7 +69,7 @@ function ClaimCodeDialog({
         joinGroup: readLinkedWorkerGroupId(sessionSlug),
       });
       const id = createClaimShareId();
-      const base = claimBaseUrl();
+      const base = claimBaseUrl(sessionSlug, sessionConfig);
       if (current) setShare({ codes: buildClaimCodes(packed, base, id), link: buildClaimLink(packed, base, id) });
     })().catch((failure: unknown) => {
       if (current) setError(failure instanceof Error ? failure.message : 'This part could not be prepared.');
@@ -144,10 +154,10 @@ function ClaimCodeDialog({
   );
 }
 
-type Props = { transcript: string; sessionSlug: string };
+type Props = { transcript: string; sessionSlug: string; sessionConfig?: unknown };
 
 /** Under a labelled transcript: one button per speaker, each showing the code that hands them their part. */
-export default function SessionTranscriptClaimShare({ transcript, sessionSlug }: Props) {
+export default function SessionTranscriptClaimShare({ transcript, sessionSlug, sessionConfig = null }: Props) {
   const helpId = `ce-claim-help-${useId().replace(/:/g, '')}`;
   const people = useMemo(() => claimablePeople(transcript), [transcript]);
   const [person, setPerson] = useState('');
@@ -190,6 +200,7 @@ export default function SessionTranscriptClaimShare({ transcript, sessionSlug }:
           transcript={transcript}
           person={person}
           sessionSlug={sessionSlug}
+          sessionConfig={sessionConfig}
           onClose={() => setPerson('')}
         />
       ) : null}

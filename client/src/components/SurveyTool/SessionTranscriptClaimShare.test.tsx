@@ -27,7 +27,28 @@ const TRANSCRIPT = `Person 1: Should we fund the garden? It would need a small g
 
 describe('giving each person their part', () => {
   beforeEach(() => {
+    useRecordingWakeLock.mockClear();
     window.history.replaceState({}, '', '/session/salon?joinGroup=salon-group&worker=https%3A%2F%2Fw.example');
+  });
+
+  it('pins a code to the session’s Worker as its own links do, unless it opens from a clean link', async () => {
+    window.history.replaceState({}, '', '/session/salon');
+    const config = {
+      slug: 'salon',
+      corsWorkerUrl: 'https://worker.example',
+      sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+    };
+    const open = async (sessionConfig: Record<string, unknown>) => {
+      const view = render(
+        <SessionTranscriptClaimShare transcript={TRANSCRIPT} sessionSlug="salon" sessionConfig={sessionConfig} />,
+      );
+      fireEvent.click(screen.getByRole('button', { name: 'Person 2' }));
+      const value = (await screen.findByTestId('code')).getAttribute('data-value');
+      view.unmount();
+      return value;
+    };
+    expect(await open(config)).toContain('/session/salon?worker=https%3A%2F%2Fworker.example#claim=');
+    expect(await open({ ...config, workerCanonicalCleanRoute: true })).toContain('/session/salon#claim=');
   });
 
   it('offers a button per speaker with enough to claim, and nothing for an unlabelled transcript', () => {

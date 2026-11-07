@@ -759,7 +759,11 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
       )}
 
       {panelMode === 'recordGroup' && hasTranscript ? (
-        <SessionTranscriptClaimShare transcript={recorder.transcript} sessionSlug={sessionSlug} />
+        <SessionTranscriptClaimShare
+          transcript={recorder.transcript}
+          sessionSlug={sessionSlug}
+          sessionConfig={sessionConfig}
+        />
       ) : null}
 
       <CEConfirmDialog
