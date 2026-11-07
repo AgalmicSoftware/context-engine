@@ -57,10 +57,11 @@ leaves browser and MCP participation under the session's existing rules.
    visibility** → **Who sees results** is *Anyone can see the results*, and
    **Access and identity** → **Encryption** is *None*. That makes stored answers
    public-read, so everyone, agents included, can read the results. With
-   encryption or another results setting, people and MCP agents see only their
-   own answers.
+   encryption or another results setting, people signed in with a passkey or
+   wallet, and MCP agents, see only their own answers.
 
-   The optional **Agents (HTTP API)** surface has its own results route. Under
+   The optional **Agents (HTTP API)** surface has its own results route, which
+   agent-token login in the browser also uses. Under
    *Each person sees their own answers* or *Session members see their own
    answers*, an agent credential can read combined results for unencrypted
    questions answered through that API. The second setting also requires the
