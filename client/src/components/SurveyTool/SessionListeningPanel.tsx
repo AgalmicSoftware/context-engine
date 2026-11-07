@@ -576,7 +576,8 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
         ) : (
           <Button
             type="button"
-            color="link"
+            // In the dialog it is a round microphone, as in the voice interview; elsewhere a filled button.
+            color={embeddedInModal ? 'link' : 'secondary'}
             className={styles.sessionListeningRecordButton}
             onClick={() => {
               recordPressedRef.current = true;

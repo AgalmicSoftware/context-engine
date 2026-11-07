@@ -2335,75 +2335,122 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 .sessionListeningRecordWrap {
   display: flex;
   align-items: flex-start;
-  justify-content: center;
   gap: 12px;
   flex-wrap: wrap;
   padding: 0 0 2px;
 }
 
-// Record looks like the voice interview's microphone: a circle with its label beneath.
 .sessionListeningRecordButton {
+  min-width: 132px;
+  min-height: 46px;
+  border-radius: 8px !important;
+  border: 2px solid color-mix(in srgb, var(--ce-status-success) 50%, transparent) !important;
+  background: var(--ce-status-success) !important;
+  color: var(--ce-status-success-contrast) !important;
   display: inline-flex !important;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  gap: 12px;
-  min-width: 112px;
-  padding: 10px 4px !important;
-  border: 0 !important;
-  background: transparent !important;
-  box-shadow: none !important;
-  color: var(--ce-panel-text) !important;
-  font-family: var(--ce-font-body);
-  font-size: 0.9rem;
-  font-weight: 700 !important;
-  line-height: 1.4;
-  text-decoration: none !important;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 16px !important;
+  box-shadow: 0 14px 28px color-mix(in srgb, var(--ce-overlay-surface) 25%, transparent);
+  font-weight: 900 !important;
+  line-height: 1.1;
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    background-color 0.18s ease;
 
   &:hover:not(:disabled),
-  &:focus:not(:disabled),
-  &:active:not(:disabled) {
-    background: transparent !important;
-    color: var(--ce-panel-text) !important;
-
-    .sessionListeningRecordIcon {
-      background: color-mix(in srgb, var(--ce-status-info-text) 14%, var(--ce-card-bg));
-      border-color: var(--ce-status-info-text);
-    }
-  }
-
-  &:focus-visible {
-    outline: 2px solid var(--ce-status-info-text);
-    outline-offset: 2px;
+  &:focus:not(:disabled) {
+    background: var(--ce-status-success) !important;
+    border-color: color-mix(in srgb, var(--ce-status-success) 72%, transparent) !important;
+    color: var(--ce-status-success-contrast) !important;
+    transform: translateY(-1px);
+    box-shadow: 0 18px 34px color-mix(in srgb, var(--ce-overlay-surface) 32%, transparent);
   }
 
   &:disabled {
-    opacity: 1 !important;
-    color: var(--ce-panel-text-muted) !important;
-    cursor: default;
-
-    .sessionListeningRecordIcon {
-      border-style: dashed;
-      color: var(--ce-control-text);
-    }
+    opacity: 0.68;
+    cursor: wait;
   }
 }
 
 .sessionListeningRecordIcon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 104px;
-  height: 104px;
-  border: 2px solid var(--ce-panel-text-muted);
-  border-radius: 50%;
-  color: var(--ce-status-info-text);
-  font-size: 3.5rem;
+  font-size: 1.2rem;
   line-height: 1;
 }
 
 .sessionListeningRecordText {
+  font-size: 0.95rem;
   max-width: 100%;
   text-align: center;
+}
+
+// In the dialog, Record is centred and looks like the voice interview's microphone: a circle with its label
+// beneath. Outside it, on the light panel, the filled button above stays readable.
+.sessionListeningPanelEmbedded {
+  .sessionListeningRecordWrap {
+    justify-content: center;
+  }
+
+  .sessionListeningRecordButton {
+    flex-direction: column;
+    gap: 12px;
+    min-width: 112px;
+    min-height: 0;
+    padding: 10px 4px !important;
+    border: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    color: var(--ce-panel-text) !important;
+    font-family: var(--ce-font-body);
+    font-weight: 700 !important;
+    line-height: 1.4;
+    text-decoration: none !important;
+
+    &:hover:not(:disabled),
+    &:focus:not(:disabled),
+    &:active:not(:disabled) {
+      background: transparent !important;
+      box-shadow: none !important;
+      color: var(--ce-panel-text) !important;
+      transform: none;
+
+      .sessionListeningRecordIcon {
+        background: color-mix(in srgb, var(--ce-status-info-text) 14%, var(--ce-card-bg));
+        border-color: var(--ce-status-info-text);
+      }
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--ce-status-info-text);
+      outline-offset: 2px;
+    }
+
+    &:disabled {
+      border: 0 !important;
+      background: transparent !important;
+      color: var(--ce-panel-text-muted) !important;
+
+      .sessionListeningRecordIcon {
+        border-style: dashed;
+        color: var(--ce-control-text);
+      }
+    }
+  }
+
+  .sessionListeningRecordIcon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 104px;
+    height: 104px;
+    border: 2px solid var(--ce-panel-text-muted);
+    border-radius: 50%;
+    color: var(--ce-status-info-text);
+    font-size: 3.5rem;
+  }
 }
 
 .sessionListeningActiveRecorder {
@@ -2565,7 +2612,8 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   background: var(--ce-status-success) !important;
 }
 
-.sessionListeningGenerate:disabled {
+.sessionListeningGenerate:disabled,
+.sessionListeningRecordButton:disabled {
   opacity: 1 !important;
   background: var(--ce-control-face) !important;
   color: var(--ce-panel-text-muted) !important;
