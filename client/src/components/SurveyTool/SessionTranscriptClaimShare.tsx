@@ -6,6 +6,7 @@ import { faQuestionCircle } from '@fortawesome/free-solid-svg-icons';
 import { readLinkedWorkerGroupId } from '../../domains/worker/workerGroupAutoJoin';
 import { useRecordingWakeLock } from '../../utilities/audio/useRecordingWakeLock';
 import { claimsWorkerCanonicalAuthority } from '../../utilities/session/sessionCapabilityProjection';
+import { getDemoSessionConfigByKey } from '../../utilities/session/sessionDemoCompat';
 import { getUsableSessionWorkerUrl } from '../../utilities/session/sessionWorkerAvailability';
 import { normalizeShareableWorkerOrigin } from '../Sessions/sessionWizardUrlSupport';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
@@ -28,10 +29,10 @@ const ABOUT_CODE =
   'The code changes as it goes. Keep the camera on it until the phone has every piece; any it misses come round again.';
 
 // The address a code opens: this session, pinned to its Worker as its own links are, so a fresh phone can find it.
-// Sessions that open from a clean link need no pin, which leaves more room in each code.
+// Sessions the site ships with open from a clean link and need no pin, which leaves more room in each code.
 const claimBaseUrl = (sessionSlug: string, sessionConfig: unknown) => {
-  const config = (sessionConfig || {}) as Record<string, unknown>;
-  const pinned = claimsWorkerCanonicalAuthority(config) && config.workerCanonicalCleanRoute !== true;
+  const shipped = getDemoSessionConfigByKey(sessionSlug) as { workerCanonicalCleanRoute?: unknown } | null | undefined;
+  const pinned = claimsWorkerCanonicalAuthority(sessionConfig) && shipped?.workerCanonicalCleanRoute !== true;
   const worker =
     new URLSearchParams(window.location.search).get('worker') ||
     (pinned ? normalizeShareableWorkerOrigin(getUsableSessionWorkerUrl({ slug: sessionSlug, sessionConfig })) : '');
