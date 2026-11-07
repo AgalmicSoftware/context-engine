@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Button } from 'reactstrap';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import {
+  claimCodeDestination,
   createClaimCollector,
   readClaimFrame,
   unpackClaim,
@@ -92,13 +93,13 @@ export default function SessionTranscriptClaimScanner({ sessionSlug, firstFrame 
           const code = readQrCode(data, output, output, { inversionAttempts: 'dontInvert' });
           if (code?.data) {
             const frame = readClaimFrame(code.data);
-            if (!frame) setProblem('That code isn’t someone’s part of a conversation.');
-            else if (new URL(code.data).pathname !== window.location.pathname) setOtherSession(code.data);
-            else {
+            const destination = frame ? claimCodeDestination(code.data, window.location) : '';
+            if (frame && destination === 'here') {
               setProblem('');
               setOtherSession('');
               await receive(frame);
-            }
+            } else if (destination === 'other') setOtherSession(code.data);
+            else setProblem('That code isn’t someone’s part of a conversation.');
           }
         }
         if (!stopped) timer = setTimeout(() => void tick(), SCAN_GAP_MS);

@@ -141,6 +141,20 @@ export const readClaimFrame = (value: unknown): ClaimFrame | null => {
   return index < total ? { id: match[1], index, total, data: match[4] } : null;
 };
 
+/** Where a scanned code's link leads: this page, or another page of this site. Anyone can print a code, so anything else is neither. */
+export const claimCodeDestination = (
+  code: string,
+  here: Pick<Location, 'origin' | 'pathname'>,
+): 'here' | 'other' | '' => {
+  try {
+    const { origin, pathname } = new URL(code);
+    if (origin !== here.origin) return '';
+    return pathname === here.pathname ? 'here' : 'other';
+  } catch {
+    return '';
+  }
+};
+
 export const hasClaimHash = (hash: unknown): boolean => {
   const raw = String(hash ?? '').replace(/^#/, '');
   return !!raw && new URLSearchParams(raw).has(CLAIM_FRAGMENT_KEY);

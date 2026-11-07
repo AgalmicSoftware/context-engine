@@ -110,6 +110,23 @@ describe('scanning someone’s code', () => {
     expect(onClaim).not.toHaveBeenCalled();
   });
 
+  it('never offers a link from a code that leaves this site', async () => {
+    startCamera();
+    for (const code of [
+      'javascript:alert(1)//#claim=ab12.0.1.data',
+      'https://elsewhere.example/session/salon#claim=ab12.0.1.data',
+      '#claim=ab12.0.1.data',
+    ]) {
+      showCodes([code]);
+      const view = render(
+        <SessionTranscriptClaimScanner sessionSlug="salon" onClaim={jest.fn()} onCancel={jest.fn()} />,
+      );
+      expect(await screen.findByText('That code isn’t someone’s part of a conversation.')).toBeInTheDocument();
+      expect(screen.queryByRole('link')).toBeNull();
+      view.unmount();
+    }
+  });
+
   it('refuses a whole part from another session', async () => {
     startCamera();
     const frame = readClaimFrame(buildClaimLink(await packClaim({ ...claim, sessionSlug: 'other' }), BASE, 'ab12'));
