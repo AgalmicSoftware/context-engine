@@ -1,3 +1,4 @@
+import { useState, type ComponentProps } from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import SessionTranscriptClaimShare from './SessionTranscriptClaimShare';
 import { createClaimCollector, readClaimFrame, unpackClaim } from './sessionTranscriptClaim';
@@ -25,6 +26,12 @@ const { useRecordingWakeLock } = jest.requireMock<{ useRecordingWakeLock: jest.M
 const long = `I think the garden brings neighbours together. ${Array.from({ length: 200 }, (_, index) => (index * 104729).toString(36)).join(' ')}`;
 const TRANSCRIPT = `Person 1: Should we fund the garden? It would need a small grant.\nPerson 2: ${long}\nPerson 3: Yes.`;
 
+// The share row as the recorder panel holds it: whose code is showing lives with the panel.
+function Share(props: Omit<ComponentProps<typeof SessionTranscriptClaimShare>, 'person' | 'onPersonChange'>) {
+  const [person, setPerson] = useState('');
+  return <SessionTranscriptClaimShare {...props} person={person} onPersonChange={setPerson} />;
+}
+
 describe('giving each person their part', () => {
   beforeEach(() => {
     useRecordingWakeLock.mockClear();
@@ -39,9 +46,7 @@ describe('giving each person their part', () => {
       sessionModeProfile: { authority: { mode: 'worker_canonical' } },
     };
     const open = async (sessionSlug: string) => {
-      const view = render(
-        <SessionTranscriptClaimShare transcript={TRANSCRIPT} sessionSlug={sessionSlug} sessionConfig={config} />,
-      );
+      const view = render(<Share transcript={TRANSCRIPT} sessionSlug={sessionSlug} sessionConfig={config} />);
       fireEvent.click(screen.getByRole('button', { name: 'Person 2' }));
       const value = (await screen.findByTestId('code')).getAttribute('data-value');
       view.unmount();
@@ -52,19 +57,18 @@ describe('giving each person their part', () => {
     expect(await open('rxc-ra-test-5')).toContain('/session/salon#claim=');
   });
 
-  it('offers a button per speaker with enough to claim, and nothing for an unlabelled transcript', () => {
-    const { rerender } = render(<SessionTranscriptClaimShare transcript={TRANSCRIPT} sessionSlug="salon" />);
+  it('offers a button to every speaker, however little they said, and nothing for an unlabelled transcript', () => {
+    const { rerender } = render(<Share transcript={TRANSCRIPT} sessionSlug="salon" />);
     expect(screen.getByRole('button', { name: 'Person 1' })).toHaveStyle({ color: 'var(--ce-speaker-1)' });
     expect(screen.getByRole('button', { name: 'Person 2' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Person 3' })).toBeNull();
-    rerender(
-      <SessionTranscriptClaimShare transcript="Plain notes with no labels at all, however long." sessionSlug="salon" />,
-    );
+    // "Yes." is a part too.
+    expect(screen.getByRole('button', { name: 'Person 3' })).toBeInTheDocument();
+    rerender(<Share transcript="Plain notes with no labels at all, however long." sessionSlug="salon" />);
     expect(screen.queryByTestId(E2E_TESTIDS.SESSION_CLAIM_SHARE)).toBeNull();
   });
 
   it('loops codes that rebuild the person’s part, keeps the screen on, and offers the same part as a link', async () => {
-    render(<SessionTranscriptClaimShare transcript={TRANSCRIPT} sessionSlug="salon" />);
+    render(<Share transcript={TRANSCRIPT} sessionSlug="salon" />);
     expect(useRecordingWakeLock).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: 'Person 2' }));
     const first = await screen.findByTestId('code');

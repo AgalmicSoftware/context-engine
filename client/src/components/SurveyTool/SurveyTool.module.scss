@@ -2729,6 +2729,26 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   overflow-wrap: anywhere;
 }
 
+// A speaker's label, opening their code: it reads as the label it replaces, underlined under the pointer.
+.sessionTranscriptSpeaker {
+  display: inline;
+  margin: 0;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0;
+  background: none !important;
+  box-shadow: none !important;
+  font: inherit;
+  line-height: inherit;
+  vertical-align: baseline;
+  cursor: pointer;
+
+  &:hover strong,
+  &:focus-visible strong {
+    text-decoration: underline;
+  }
+}
+
 .sessionListeningClearTranscript {
   position: absolute;
   top: 8px;

@@ -22,8 +22,6 @@ const CLAIM_QR_BYTES = 287;
 export const CLAIM_CODE_MS = 800;
 
 const TURN = /^(Person \d+): (.*)$/;
-// A stray word isn't a part anyone needs to claim.
-const MIN_CLAIM_CHARS = 30;
 // What someone was answering; enough to read "I agree" against, without carrying everyone's words.
 const CONTEXT_CHARS = 240;
 // About five hours of one person talking. Longer parts keep their latest words.
@@ -43,15 +41,15 @@ export type TranscriptClaim = {
 
 export type ClaimFrame = { id: string; index: number; total: number; data: string };
 
-/** The speakers worth a code, by number. */
+/** Everyone the transcript has saying something, by number: a short part is still someone's part. */
 export const claimablePeople = (transcript: string): string[] => {
   const spoken = new Map<string, number>();
   for (const line of transcript.split('\n')) {
     const turn = TURN.exec(line);
-    if (turn) spoken.set(turn[1], (spoken.get(turn[1]) || 0) + turn[2].length);
+    if (turn) spoken.set(turn[1], (spoken.get(turn[1]) || 0) + turn[2].trim().length);
   }
   return [...spoken]
-    .filter(([, chars]) => chars >= MIN_CLAIM_CHARS)
+    .filter(([, chars]) => chars > 0)
     .map(([person]) => person)
     .sort((left, right) => Number(left.slice(7)) - Number(right.slice(7)));
 };

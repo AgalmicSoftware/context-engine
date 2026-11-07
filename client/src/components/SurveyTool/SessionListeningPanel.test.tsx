@@ -1024,6 +1024,9 @@ describe('SessionListeningPanel', () => {
       (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(buildRecorder({ transcript: labelled }));
       const { unmount } = render(<SessionListeningPanel sessionSlug="demo" panelMode="recordGroup" embeddedInModal />);
       expect(screen.getByRole('button', { name: 'Person 2' })).toBeInTheDocument();
+      // A label in the transcript, open from the start in a group recording, gives the same person their code.
+      fireEvent.click(screen.getByRole('button', { name: 'Person 2:' }));
+      expect(await screen.findByRole('dialog')).toHaveTextContent('Person 2');
       unmount();
       render(<SessionListeningPanel sessionSlug="demo" />);
       expect(screen.queryByTestId(E2E_TESTIDS.SESSION_CLAIM_SHARE)).toBeNull();

@@ -67,6 +67,30 @@ describe('SessionListeningTranscript', () => {
     expect(screen.getByText('[Recording gap: audio could not be transcribed.]').querySelector('strong')).toBeNull();
   });
 
+  it('lets a speaker’s label open their code only when there are codes to give', () => {
+    const transcript = 'Person 1: First.\nPerson 2: Second.\n[Recording gap: audio could not be transcribed.]';
+    const onSelectSpeaker = jest.fn();
+    const { rerender } = render(
+      <SessionListeningTranscript transcript={transcript} clearDisabled={false} onClear={jest.fn()} />,
+    );
+    expect(screen.queryByRole('button', { name: 'Person 2:' })).toBeNull();
+    rerender(
+      <SessionListeningTranscript
+        transcript={transcript}
+        clearDisabled={false}
+        onClear={jest.fn()}
+        onSelectSpeaker={onSelectSpeaker}
+      />,
+    );
+    const label = screen.getByRole('button', { name: 'Person 2:' });
+    // Still the bold, coloured label; the person buttons under it are the keyboard's way in.
+    expect(label.querySelector('strong')).toHaveStyle({ color: 'var(--ce-speaker-2)' });
+    expect(label).toHaveAttribute('tabindex', '-1');
+    fireEvent.click(label);
+    expect(onSelectSpeaker).toHaveBeenCalledWith('Person 2');
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_TRANSCRIPT)).toHaveTextContent('Person 2: Second.');
+  });
+
   it('keeps the box reachable by keyboard, since it scrolls', () => {
     render(transcriptBox(2));
     expect(screen.getByRole('region', { name: 'Transcript' })).toHaveAttribute('tabindex', '0');

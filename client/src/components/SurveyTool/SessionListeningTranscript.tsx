@@ -47,6 +47,8 @@ type SessionListeningTranscriptProps = {
   // Clearing waits while audio is being captured or transcribed.
   clearDisabled: boolean;
   onClear: () => void;
+  // Given, each speaker's label opens that person's code, as their button under the transcript does.
+  onSelectSpeaker?: (person: string) => void;
 };
 
 // Within about a line of the end still counts as reading the newest line.
@@ -62,7 +64,12 @@ export const speakerColor = (number: number) =>
 // The open transcript: read-only text with a clear control in its corner, each speaker's label bold and in
 // that person's colour. As chunks arrive it keeps the newest line in view, unless the host has scrolled up to
 // reread; scrolling back to the end resumes.
-export function SessionListeningTranscript({ transcript, clearDisabled, onClear }: SessionListeningTranscriptProps) {
+export function SessionListeningTranscript({
+  transcript,
+  clearDisabled,
+  onClear,
+  onSelectSpeaker,
+}: SessionListeningTranscriptProps) {
   const boxRef = useRef<HTMLDivElement | null>(null);
   const followRef = useRef(true);
   // Where a host who scrolled up is reading; restored in case replacing the text moved it.
@@ -89,11 +96,27 @@ export function SessionListeningTranscript({ transcript, clearDisabled, onClear 
         >
           {transcript.split('\n').map((line, index) => {
             const turn = SPEAKER_LINE.exec(line);
+            const label = turn ? <strong style={{ color: speakerColor(Number(turn[2])) }}>{turn[1]}</strong> : null;
             return (
               <p key={index}>
                 {turn ? (
                   <>
-                    <strong style={{ color: speakerColor(Number(turn[2])) }}>{turn[1]}</strong> {turn[3]}
+                    {onSelectSpeaker ? (
+                      <button
+                        type="button"
+                        className={styles.sessionTranscriptSpeaker}
+                        data-ce-control-appearance="frameless"
+                        // Out of the tab order: the person buttons under the transcript reach the same codes.
+                        tabIndex={-1}
+                        title={`Show Person ${turn[2]}’s code`}
+                        onClick={() => onSelectSpeaker(`Person ${turn[2]}`)}
+                      >
+                        {label}
+                      </button>
+                    ) : (
+                      label
+                    )}{' '}
+                    {turn[3]}
                   </>
                 ) : (
                   line

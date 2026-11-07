@@ -155,13 +155,25 @@ function ClaimCodeDialog({
   );
 }
 
-type Props = { transcript: string; sessionSlug: string; sessionConfig?: unknown };
+type Props = {
+  transcript: string;
+  sessionSlug: string;
+  sessionConfig?: unknown;
+  // Whose code is showing, '' for none. The transcript's labels choose it too.
+  person: string;
+  onPersonChange: (person: string) => void;
+};
 
 /** Under a labelled transcript: one button per speaker, each showing the code that hands them their part. */
-export default function SessionTranscriptClaimShare({ transcript, sessionSlug, sessionConfig = null }: Props) {
+export default function SessionTranscriptClaimShare({
+  transcript,
+  sessionSlug,
+  sessionConfig = null,
+  person,
+  onPersonChange,
+}: Props) {
   const helpId = `ce-claim-help-${useId().replace(/:/g, '')}`;
   const people = useMemo(() => claimablePeople(transcript), [transcript]);
-  const [person, setPerson] = useState('');
   if (!people.length) return null;
   return (
     <div className={styles.sessionClaimShare} data-testid={E2E_TESTIDS.SESSION_CLAIM_SHARE}>
@@ -190,7 +202,7 @@ export default function SessionTranscriptClaimShare({ transcript, sessionSlug, s
             type="button"
             className={styles.sessionClaimPersonButton}
             style={{ color: speakerColor(Number(name.replace(/\D/g, ''))) }}
-            onClick={() => setPerson(name)}
+            onClick={() => onPersonChange(name)}
           >
             {name}
           </button>
@@ -202,7 +214,7 @@ export default function SessionTranscriptClaimShare({ transcript, sessionSlug, s
           person={person}
           sessionSlug={sessionSlug}
           sessionConfig={sessionConfig}
-          onClose={() => setPerson('')}
+          onClose={() => onPersonChange('')}
         />
       ) : null}
     </div>

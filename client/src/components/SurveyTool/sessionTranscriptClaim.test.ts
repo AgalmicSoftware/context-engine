@@ -25,13 +25,12 @@ const TRANSCRIPT = [
 ].join('\n');
 
 describe('a speaker’s part', () => {
-  it('offers a code to each person who said enough, by number', () => {
-    expect(claimablePeople(TRANSCRIPT)).toEqual(['Person 1', 'Person 2']);
-    expect(
-      claimablePeople(
-        'Person 10: Enough words here to count as a part.\nPerson 2: So too, a whole part of it all, it seems.',
-      ),
-    ).toEqual(['Person 2', 'Person 10']);
+  it('offers a code to each person who said anything, by number', () => {
+    expect(claimablePeople(TRANSCRIPT)).toEqual(['Person 1', 'Person 2', 'Person 3']);
+    expect(claimablePeople('Person 10: Words.\nPerson 2: So too.\nPerson 4: \nPerson 5:  ')).toEqual([
+      'Person 2',
+      'Person 10',
+    ]);
     expect(claimablePeople('No labels in this one, however long it goes on.')).toEqual([]);
   });
 

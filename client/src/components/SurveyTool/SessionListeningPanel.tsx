@@ -182,6 +182,8 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
   const [generatedTitle, setGeneratedTitle] = useState('');
   const [generationElapsedSeconds, setGenerationElapsedSeconds] = useState(0);
   const [isTranscriptOpen, setIsTranscriptOpen] = useState(false);
+  // The speaker whose code is showing, chosen by their button or their label in the transcript.
+  const [claimPerson, setClaimPerson] = useState('');
   const [confirmClear, setConfirmClear] = useState(false);
   const [confirmStop, setConfirmStop] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
@@ -755,6 +757,7 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
             recorder.segments.some((segment) => !['complete', 'failed'].includes(segment.status))
           }
           onClear={() => setConfirmClear(true)}
+          onSelectSpeaker={panelMode === 'recordGroup' ? setClaimPerson : undefined}
         />
       )}
 
@@ -763,6 +766,8 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
           transcript={recorder.transcript}
           sessionSlug={sessionSlug}
           sessionConfig={sessionConfig}
+          person={claimPerson}
+          onPersonChange={setClaimPerson}
         />
       ) : null}
 
