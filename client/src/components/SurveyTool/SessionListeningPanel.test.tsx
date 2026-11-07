@@ -35,6 +35,13 @@ jest.mock('../../utilities/ui/themeRuntime', () => ({
   subscribeThemeChanges: jest.fn(() => jest.fn()),
 }));
 
+let mockTranscriptContext: Record<string, unknown> = {};
+jest.mock('./useTranscriptContextUpload', () => ({ useTranscriptContextUpload: () => mockTranscriptContext }));
+jest.mock('./SessionTranscriptContextOption', () => ({
+  __esModule: true,
+  default: () => <span data-testid="mock-transcript-option" />,
+}));
+
 jest.mock('./CreateQuestionsAndSurveys', () => {
   const React = require('react');
   return (props: any) => {
@@ -59,6 +66,7 @@ jest.mock('./CreateQuestionsAndSurveys', () => {
         data-mount-id={String(mountId.current)}
         data-prompts={(props.preformedQuestions || []).map((question: any) => question.prompt).join('|')}
       >
+        {props.submitAccessory}
         {(props.preformedQuestions || []).map((question: any) => (
           <div key={question.prompt} data-testid="ce-create-question">
             {question.prompt}
@@ -98,6 +106,15 @@ const buildRecorder = (overrides: Record<string, unknown> = {}) => ({
 const nextFrame = () => act(() => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())));
 
 describe('SessionListeningPanel', () => {
+  beforeEach(() => {
+    mockTranscriptContext = {
+      available: false,
+      status: '',
+      failed: false,
+      upload: jest.fn(),
+      settled: jest.fn(async () => undefined),
+    };
+  });
   beforeEach(() => {
     jest.clearAllMocks();
     mockCreateQuestionsMountCount = 0;
@@ -926,6 +943,90 @@ describe('SessionListeningPanel', () => {
         prompts: ['Which service matters most?'],
         draftedTranscript: other,
       });
+    });
+
+    it('offers the transcript box only where it can be used, and uploads the latest text after a submit', async () => {
+      const upload = jest.fn(async () => undefined);
+      (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+        buildRecorder({ transcript, segments: [segment], questionDrafts: kept }),
+      );
+      const { rerender } = render(<SessionListeningPanel sessionSlug="demo" panelMode="recordGroup" embeddedInModal />);
+      await screen.findByTestId('mock-create-questions');
+      expect(screen.queryByTestId('mock-transcript-option')).toBeNull();
+
+      mockTranscriptContext = { ...mockTranscriptContext, available: true, upload };
+      (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+        buildRecorder({ transcript: `${transcript} More.`, segments: [segment], questionDrafts: kept }),
+      );
+      rerender(<SessionListeningPanel sessionSlug="demo" panelMode="recordGroup" embeddedInModal />);
+      expect(screen.getByTestId('mock-transcript-option')).toBeInTheDocument();
+      expect(upload).not.toHaveBeenCalled();
+      act(() => mockCreateQuestionsProps.onQuestionsSubmitted());
+      expect(upload).toHaveBeenCalledWith(`${transcript} More.`);
+    });
+
+    it('says when the transcript failed to upload and tries again', async () => {
+      const upload = jest.fn(async () => undefined);
+      mockTranscriptContext = {
+        ...mockTranscriptContext,
+        available: true,
+        upload,
+        failed: true,
+        status: 'The transcript wasn’t added to context: no.',
+      };
+      (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+        buildRecorder({ transcript, segments: [segment], questionDrafts: kept }),
+      );
+      render(<SessionListeningPanel sessionSlug="demo" panelMode="recordGroup" embeddedInModal />);
+      expect(await screen.findByText('The transcript wasn’t added to context: no.')).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+      expect(upload).toHaveBeenCalledWith(transcript);
+    });
+
+    it('waits for a transcript upload under way before closing', async () => {
+      let finish = () => {};
+      const settled = jest.fn(() => new Promise<void>((resolve) => (finish = resolve)));
+      mockTranscriptContext = { ...mockTranscriptContext, settled };
+      const onClose = jest.fn();
+      const closeActionRef: { current: (() => Promise<void>) | null } = { current: null };
+      (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+        buildRecorder({
+          transcript,
+          segments: [segment],
+          questionDrafts: kept,
+          finalizeRecording: jest.fn(async () => {}),
+        }),
+      );
+      render(
+        <SessionListeningPanel
+          sessionSlug="demo"
+          panelMode="recordGroup"
+          embeddedInModal
+          onClose={onClose}
+          closeActionRef={closeActionRef}
+        />,
+      );
+      await screen.findByTestId('mock-create-questions');
+      await act(async () => {
+        void closeActionRef.current?.();
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      await waitFor(() => expect(settled).toHaveBeenCalled());
+      expect(onClose).not.toHaveBeenCalled();
+      await act(async () => finish());
+      await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+    });
+
+    it('gives each speaker a button only in a group recording', async () => {
+      const labelled =
+        'Person 1: Enough words here for a whole part of the talk.\nPerson 2: And quite a lot more from another person.';
+      (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(buildRecorder({ transcript: labelled }));
+      const { unmount } = render(<SessionListeningPanel sessionSlug="demo" panelMode="recordGroup" embeddedInModal />);
+      expect(screen.getByRole('button', { name: 'Person 2' })).toBeInTheDocument();
+      unmount();
+      render(<SessionListeningPanel sessionSlug="demo" />);
+      expect(screen.queryByTestId(E2E_TESTIDS.SESSION_CLAIM_SHARE)).toBeNull();
     });
 
     // Closing mid-upload would bring the uploaded drafts back, and lose a batch held back meanwhile.

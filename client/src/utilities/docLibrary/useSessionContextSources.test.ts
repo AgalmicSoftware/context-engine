@@ -64,7 +64,7 @@ describe('useSessionContextSources', () => {
 
     rerender({
       sessionSlug: 'salon',
-      sessionConfig: { ...config(), contextAdditionPolicy: 'admin_only' },
+      sessionConfig: { ...config(), contextAdditionPolicy: 'admin_only' } as ReturnType<typeof config>,
       account: READER,
     });
     expect(result.current.participantsCanAdd).toBe(false);

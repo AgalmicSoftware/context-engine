@@ -328,6 +328,7 @@ describe('drafts generated while publishing', () => {
   const reviewSetup = () => {
     const onDraftQuestionsChange = jest.fn();
     const onSubmittingChange = jest.fn();
+    const onQuestionsSubmitted = jest.fn();
     const { subject, published, entered } = setup(true, {
       interviewQuestionReview: true,
       appendPreformedQuestions: true,
@@ -335,6 +336,7 @@ describe('drafts generated while publishing', () => {
       preformedQuestions: [draft('q1'), draft('q2')],
       onDraftQuestionsChange,
       onSubmittingChange,
+      onQuestionsSubmitted,
     });
     subject.state = { ...subject.state, questions: [draft('q1'), draft('q2')] };
     const applyState = subject.setState;
@@ -361,7 +363,16 @@ describe('drafts generated while publishing', () => {
     // The draft lists reported so far, as ids.
     const reported = () =>
       onDraftQuestionsChange.mock.calls.map(([questions]) => questions.map((q: { id: string }) => q.id));
-    return { subject, published, entered, lateBatch, reported, onDraftQuestionsChange, onSubmittingChange };
+    return {
+      subject,
+      published,
+      entered,
+      lateBatch,
+      reported,
+      onDraftQuestionsChange,
+      onSubmittingChange,
+      onQuestionsSubmitted,
+    };
   };
 
   it('holds a batch that lands mid-submit, then shows the upload and adds the batch as new drafts', async () => {
@@ -386,6 +397,16 @@ describe('drafts generated while publishing', () => {
       expect.anything(),
       expect.anything(),
     );
+  });
+
+  it('says the questions uploaded only once they have', async () => {
+    const { subject, published, entered, onQuestionsSubmitted } = reviewSetup();
+    const operation = subject.createSurvey();
+    await entered.promise;
+    expect(onQuestionsSubmitted).not.toHaveBeenCalled();
+    published.resolve({ receipt: { status: 1 }, uploadedQuestions: [{ questionId: 'q1' }, { questionId: 'q2' }] });
+    await operation;
+    expect(onQuestionsSubmitted).toHaveBeenCalledTimes(1);
   });
 
   // The recorder keeps the list with its recording, so a reopened dialog shows the drafts as the host left them.

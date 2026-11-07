@@ -17,7 +17,9 @@ jest.mock('./sessionTranscriptClaim', () => ({
   ...jest.requireActual<object>('./sessionTranscriptClaim'),
   CLAIM_CODE_MS: 5,
 }));
-const { useRecordingWakeLock } = jest.requireMock('../../utilities/audio/useRecordingWakeLock');
+const { useRecordingWakeLock } = jest.requireMock<{ useRecordingWakeLock: jest.Mock }>(
+  '../../utilities/audio/useRecordingWakeLock',
+);
 
 // Varied, so it doesn't compress to a single code.
 const long = `I think the garden brings neighbours together. ${Array.from({ length: 200 }, (_, index) => (index * 104729).toString(36)).join(' ')}`;

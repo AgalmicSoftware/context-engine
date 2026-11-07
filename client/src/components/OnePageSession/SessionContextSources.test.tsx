@@ -54,8 +54,12 @@ const renderList = (list: SessionContextSourcesState, account = ME) =>
   );
 
 describe('the Context section for participants', () => {
-  beforeEach(() => jest.spyOn(window, 'confirm').mockReturnValue(true));
-  afterEach(() => jest.restoreAllMocks());
+  beforeEach(() => {
+    jest.spyOn(window, 'confirm').mockReturnValue(true);
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it('shows who added each file and its group, and removes only their own', async () => {
     const list = state({

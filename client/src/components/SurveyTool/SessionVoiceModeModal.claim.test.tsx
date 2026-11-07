@@ -18,24 +18,25 @@ jest.mock('./useInterviewOpening', () => ({
 }));
 jest.mock('./SessionListeningPanel', () => {
   const { useEffect } = jest.requireActual<typeof import('react')>('react');
+  const MockListeningPanel = ({
+    closeActionRef,
+    onCaptureChange,
+  }: {
+    closeActionRef: { current: unknown };
+    onCaptureChange: (capturing: boolean) => void;
+  }) => {
+    useEffect(() => {
+      closeActionRef.current = mockGroupClose;
+    }, [closeActionRef]);
+    return (
+      <button type="button" onClick={() => onCaptureChange(true)}>
+        Start capturing
+      </button>
+    );
+  };
   return {
     __esModule: true,
-    default: ({
-      closeActionRef,
-      onCaptureChange,
-    }: {
-      closeActionRef: { current: unknown };
-      onCaptureChange: (capturing: boolean) => void;
-    }) => {
-      useEffect(() => {
-        closeActionRef.current = mockGroupClose;
-      }, []);
-      return (
-        <button type="button" onClick={() => onCaptureChange(true)}>
-          Start capturing
-        </button>
-      );
-    },
+    default: MockListeningPanel,
     SessionListeningWaveform: () => null,
     formatSessionRecordingElapsed: (seconds: number) => `0:${seconds}`,
   };

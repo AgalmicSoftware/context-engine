@@ -1,3 +1,4 @@
+import { createElement } from 'react';
 import {
   E2E_TESTIDS,
   REGISTRY_CACHE_KEY,
@@ -764,6 +765,25 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
     );
 
     expect(items).toEqual(['||Who should check an AI summary?||0xaaaaaaaa...77777777||', '||0xbbbbbbbb...88888888||']);
+  });
+
+  it('puts what a page offers beside the submit button on one line, and leaves the button alone otherwise', () => {
+    const question = { id: 'q1', type: 'freeform', prompt: 'Why?', tags: [] };
+    const reviewList = { interviewQuestionReview: true, preformedQuestions: [question], preformedMode: 'questions' };
+    const plain = makeInstance({ ...reviewList, submitClassName: 'button' });
+    plain.setState({ questions: [question] });
+    expect(collectTreeNodes(plain.render(), (node) => nodeHasClassName(node, 'submitLine'))).toHaveLength(0);
+
+    const instance = makeInstance({
+      ...reviewList,
+      submitRowClassName: 'submitLine',
+      submitAccessory: createElement('input', { 'aria-label': 'Beside the button' }),
+    });
+    instance.setState({ questions: [question] });
+    const markup = renderToStaticMarkup(
+      collectTreeNodes(instance.render(), (node) => nodeHasClassName(node, 'submitLine'))[0] as never,
+    );
+    expect(markup).toMatch(/aria-label="Beside the button"[\s\S]*Create Questions/);
   });
 
   it('folds the JSON and AI prompt views into a closed disclosure', () => {

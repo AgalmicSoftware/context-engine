@@ -15,7 +15,7 @@ const claim = {
 
 const startCamera = () => {
   const stopTrack = jest.fn();
-  const getUserMedia = jest.fn(async () => ({ getTracks: () => [{ stop: stopTrack }] }));
+  const getUserMedia = jest.fn(async (_constraints?: unknown) => ({ getTracks: () => [{ stop: stopTrack }] }));
   Object.defineProperty(navigator, 'mediaDevices', { configurable: true, value: { getUserMedia } });
   Object.defineProperty(HTMLMediaElement.prototype, 'play', {
     configurable: true,
@@ -46,7 +46,9 @@ describe('scanning someone’s code', () => {
     window.history.replaceState({}, '', '/session/salon');
     mockReadQrCode.mockReset();
   });
-  afterEach(() => jest.restoreAllMocks());
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it('collects the codes it sees, then hands over the part and turns the camera off', async () => {
     const { getUserMedia, stopTrack } = startCamera();
