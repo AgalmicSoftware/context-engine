@@ -2763,8 +2763,63 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   position: sticky !important;
   bottom: 0;
   z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  background: var(--ce-surface-sunken);
+}
+
+.sessionListeningSubmitButton {
+  // On a phone its label wraps, so it stays on the line with the transcript box.
+  flex: 1 1 110px;
+  width: auto !important;
+  min-width: 0;
   min-height: 56px !important;
+  margin: 0 !important;
   font-size: 1.1rem !important;
+  white-space: normal !important;
+
+  @media (max-width: 480px) {
+    flex-basis: 96px;
+    padding: 8px !important;
+    font-size: 0.95rem !important;
+  }
+}
+
+// On the same line as Submit questions; once ticked, who can read it takes a line of its own above them.
+.sessionTranscriptContext {
+  display: contents;
+}
+
+.sessionTranscriptContextLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 700;
+  line-height: 1.2;
+  cursor: pointer;
+
+  input {
+    flex: none;
+    width: 28px;
+    height: 28px;
+    accent-color: var(--ce-action-accent);
+  }
+
+  span {
+    max-width: 8.5em;
+  }
+}
+
+.sessionTranscriptContextAccess {
+  order: -1;
+  flex: 1 1 100%;
+  // The same white and text as the transcript it describes, whatever the dialog's own colours.
+  background-color: var(--ce-text-inverse) !important;
+  color: var(--ce-document-text) !important;
 }
 
 // In the dialog it rests 10px above the body's edge, inside the body's 18px padding, on a strip of the
@@ -3218,6 +3273,113 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   gap: 6px;
 }
 
+// The dialog's title row: its heading, then the scan button at the far end, beside the close button.
+.sessionVoiceModeTitle {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+}
+
+.sessionVoiceModeTitle > :global(.btn) {
+  flex: none;
+  white-space: nowrap;
+}
+
+// Handing a person their part of a recording. The people's colours are for white, as in the transcript.
+.sessionClaimShare {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.sessionClaimPeople {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.sessionClaimPersonButton {
+  min-height: 44px;
+  padding: 6px 12px;
+  border: 2px solid currentColor !important;
+  border-radius: var(--ce-radius-8);
+  background: var(--ce-text-inverse);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.sessionClaimHeading {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sessionClaimPerson {
+  padding: 2px 10px;
+  border-radius: var(--ce-radius-6);
+  background: var(--ce-text-inverse);
+  font-weight: 700;
+}
+
+.sessionClaimCode {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+// White and as large as the dialog allows: the camera needs the contrast and the detail, whatever the theme.
+.sessionClaimCodeBox {
+  width: min(100%, 68vh, 640px);
+  background: #fff;
+  line-height: 0;
+
+  svg {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+}
+
+.sessionClaimProgress {
+  margin: 0;
+}
+
+.sessionClaimActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+.sessionClaimScanner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+
+  p {
+    margin: 0;
+    text-align: center;
+  }
+}
+
+.sessionClaimVideo {
+  width: min(100%, 60vh);
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: var(--ce-radius-8);
+  background: var(--ce-overlay-base);
+}
+
+.sessionClaimMeter {
+  width: min(100%, 60vh);
+}
+
 .sessionVoiceModeModal {
   // The body's padding, which the new-drafts cue's lane spans.
   --ce-voice-body-pad: 18px;
@@ -3242,6 +3404,8 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   }
 
   :global(.modal-title) {
+    // Its row runs the width of the header, so a button can sit in the far corner.
+    flex: 1;
     color: var(--ce-panel-text) !important;
     font-size: clamp(1.35rem, 2.4vw, 1.6rem);
     font-weight: 800;

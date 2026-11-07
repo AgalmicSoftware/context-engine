@@ -505,6 +505,11 @@ interface CreateQuestionsAndSurveysProps {
   // Holds Submit off, such as while the Group Conversation recorder is still generating drafts.
   submitDisabled?: boolean;
   submitClassName?: string;
+  /** Shown on the submit button's own line, which then takes `submitRowClassName`. */
+  submitAccessory?: React.ReactNode;
+  submitRowClassName?: string;
+  /** The questions uploaded, as opposed to a submit that failed or was abandoned. */
+  onQuestionsSubmitted?: () => void;
   miniaturized?: boolean;
   onUploadComplete?: (surveyHash: string | null) => void;
   onDraftEditedChange?: (edited: boolean) => void;
@@ -2627,6 +2632,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
           },
           () => {
             this.startCacheWatch();
+            submitProps.onQuestionsSubmitted?.();
             if (submitProps.preformedQuestions && submitProps.miniaturized && submitProps.onUploadComplete) {
               submitProps.onUploadComplete(null);
             }
@@ -3272,6 +3278,17 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
   };
 
   // Visual type selector
+  // The submit button alone, or on one line with what the page puts beside it.
+  wrapSubmitRow = (button: React.ReactElement) =>
+    this.props.submitRowClassName ? (
+      <div className={this.props.submitRowClassName}>
+        {this.props.submitAccessory}
+        {button}
+      </div>
+    ) : (
+      button
+    );
+
   renderTypeSelector: () => React.ReactNode = () => {
     return (
       <div className={styles.typeSelectorBlock}>
@@ -3967,69 +3984,71 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
         {/* Submit Button: only render if at least one question exists */}
         {questions.length > 0 && (
           <>
-            <Button
-              className={[
-                buildCreateSurveySubmitButtonClassName(styles, isSubmitting, submissionError),
-                this.props.submitClassName,
-              ]
-                .filter(Boolean)
-                .join(' ')}
-              data-testid={E2E_TESTIDS.CREATE_SUBMIT}
-              onClick={
-                !isPureWorkerCanonicalAuthoring &&
-                this.state.needsNetworkSwitch &&
-                this.props.provider === 'wagmi' &&
-                this.props.loginComplete
-                  ? this.switchToCorrectNetwork
-                  : this.handleSubmitButtonClick
-              }
-              disabled={
-                isSubmitting ||
-                (!isPureWorkerCanonicalAuthoring &&
-                this.state.needsNetworkSwitch &&
-                this.props.provider === 'wagmi' &&
-                this.props.loginComplete
-                  ? false
-                  : submissionError
-                    ? false
-                    : (!isStandaloneQuestion && !title.trim()) ||
-                      renderedQuestions.some((q) => q.isGeneratingTags) ||
-                      Boolean(this.props.submitDisabled))
-              }
-              aria-busy={isSubmitting ? 'true' : 'false'}
-              title={submissionError ? 'Click to copy error' : undefined}
-            >
-              {isSubmitting && (
-                <span
-                  className={styles.buttonProgressFill}
-                  style={resolveCreateSurveyProgressFillStyle(progress)}
-                  aria-hidden="true"
-                />
-              )}
-              <span className={styles.buttonContent}>
-                {isSubmitting ? (
-                  <>
-                    <FontAwesomeIcon icon={faSpinner} spin style={CREATE_SURVEY_SUBMIT_ICON_STYLE} />
-                    Submitting...
-                  </>
-                ) : submissionError ? (
-                  <>
-                    <FontAwesomeIcon icon={faExclamationCircle} style={CREATE_SURVEY_SUBMIT_ICON_STYLE} />
-                    {submissionError}
-                    <span className={styles.copyHint}>&nbsp;— click to copy</span>
-                  </>
-                ) : !isPureWorkerCanonicalAuthoring &&
+            {this.wrapSubmitRow(
+              <Button
+                className={[
+                  buildCreateSurveySubmitButtonClassName(styles, isSubmitting, submissionError),
+                  this.props.submitClassName,
+                ]
+                  .filter(Boolean)
+                  .join(' ')}
+                data-testid={E2E_TESTIDS.CREATE_SUBMIT}
+                onClick={
+                  !isPureWorkerCanonicalAuthoring &&
                   this.state.needsNetworkSwitch &&
                   this.props.provider === 'wagmi' &&
-                  this.props.loginComplete ? (
-                  'Switch to correct network → Submit'
-                ) : isStandaloneQuestion ? (
-                  this.props.questionSubmitLabel || 'Create Questions'
-                ) : (
-                  'Create Survey'
+                  this.props.loginComplete
+                    ? this.switchToCorrectNetwork
+                    : this.handleSubmitButtonClick
+                }
+                disabled={
+                  isSubmitting ||
+                  (!isPureWorkerCanonicalAuthoring &&
+                  this.state.needsNetworkSwitch &&
+                  this.props.provider === 'wagmi' &&
+                  this.props.loginComplete
+                    ? false
+                    : submissionError
+                      ? false
+                      : (!isStandaloneQuestion && !title.trim()) ||
+                        renderedQuestions.some((q) => q.isGeneratingTags) ||
+                        Boolean(this.props.submitDisabled))
+                }
+                aria-busy={isSubmitting ? 'true' : 'false'}
+                title={submissionError ? 'Click to copy error' : undefined}
+              >
+                {isSubmitting && (
+                  <span
+                    className={styles.buttonProgressFill}
+                    style={resolveCreateSurveyProgressFillStyle(progress)}
+                    aria-hidden="true"
+                  />
                 )}
-              </span>
-            </Button>
+                <span className={styles.buttonContent}>
+                  {isSubmitting ? (
+                    <>
+                      <FontAwesomeIcon icon={faSpinner} spin style={CREATE_SURVEY_SUBMIT_ICON_STYLE} />
+                      Submitting...
+                    </>
+                  ) : submissionError ? (
+                    <>
+                      <FontAwesomeIcon icon={faExclamationCircle} style={CREATE_SURVEY_SUBMIT_ICON_STYLE} />
+                      {submissionError}
+                      <span className={styles.copyHint}>&nbsp;— click to copy</span>
+                    </>
+                  ) : !isPureWorkerCanonicalAuthoring &&
+                    this.state.needsNetworkSwitch &&
+                    this.props.provider === 'wagmi' &&
+                    this.props.loginComplete ? (
+                    'Switch to correct network → Submit'
+                  ) : isStandaloneQuestion ? (
+                    this.props.questionSubmitLabel || 'Create Questions'
+                  ) : (
+                    'Create Survey'
+                  )}
+                </span>
+              </Button>,
+            )}
 
             {/* Progress Indicator: Only visible during/after submission steps */}
             {(isSubmitting || this.state.showSubmitSteps) && (

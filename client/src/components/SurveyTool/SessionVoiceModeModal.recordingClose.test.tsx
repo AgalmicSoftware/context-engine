@@ -133,7 +133,7 @@ it('closing with Close saves the final speech and restores it on reopen', async 
   expect(savedTranscript()).toBe(transcript);
   fireEvent.click(screen.getByText('Open the dialog again'));
   // A group recording shows its restored transcript open.
-  expect(await screen.findByTestId('ce-session-listening-transcript')).toHaveValue(transcript);
+  expect(await screen.findByTestId('ce-session-listening-transcript')).toHaveTextContent(transcript);
 });
 
 it.each(['Escape', 'outside click'])(
@@ -148,7 +148,7 @@ it.each(['Escape', 'outside click'])(
     expect(mockStop).not.toHaveBeenCalled();
     expect(screen.getByRole('dialog')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Stop recording' }));
-    await waitFor(() => expect(screen.getByTestId('ce-session-listening-transcript')).toHaveValue(transcript));
+    await waitFor(() => expect(screen.getByTestId('ce-session-listening-transcript')).toHaveTextContent(transcript));
     dismiss(method);
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     expect(mockStop).toHaveBeenCalledTimes(1);
@@ -225,7 +225,7 @@ it('closes with pending audio and resumes it when the recording reopens', async 
   expect([...mockRecords.values()][0]?.audio?.size).toBe(256);
   jest.mocked(transcribeAudio).mockResolvedValue(transcript);
   fireEvent.click(screen.getByText('Open the dialog again'));
-  await waitFor(() => expect(screen.getByTestId('ce-session-listening-transcript')).toHaveValue(transcript));
+  await waitFor(() => expect(screen.getByTestId('ce-session-listening-transcript')).toHaveTextContent(transcript));
   expect(savedTranscript()).toBe(transcript);
   // The saved transcript replaced the audio on the device.
   expect([...mockRecords.values()][0]?.audio).toBeUndefined();
@@ -272,7 +272,7 @@ it('reminds the session page to reopen while kept audio waits to upload', async 
   expect(await screen.findByText('Saved audio is waiting to upload.')).toBeInTheDocument();
   jest.mocked(transcribeAudio).mockResolvedValue(transcript);
   fireEvent.click(screen.getByRole('button', { name: 'Reopen recording' }));
-  await waitFor(() => expect(screen.getByTestId('ce-session-listening-transcript')).toHaveValue(transcript));
+  await waitFor(() => expect(screen.getByTestId('ce-session-listening-transcript')).toHaveTextContent(transcript));
   expect(screen.queryByText(/waiting to upload/)).not.toBeInTheDocument();
   dismiss('Close');
   await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
@@ -298,7 +298,7 @@ it.each(['a transcribed recording', 'a pasted transcript'])(
         fireEvent.change(screen.getByLabelText('Written transcript'), { target: { value: transcript } });
         fireEvent.click(screen.getByRole('button', { name: 'Add transcript' }));
       }
-      await waitFor(() => expect(screen.getByTestId('ce-session-listening-transcript')).toHaveValue(transcript));
+      await waitFor(() => expect(screen.getByTestId('ce-session-listening-transcript')).toHaveTextContent(transcript));
       dismiss('Close');
       await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
       // Transcribed or pasted, nothing waits to upload, yet a reload would lose it.
@@ -315,7 +315,7 @@ it.each(['a transcribed recording', 'a pasted transcript'])(
       // Transcribed, so no audio is left, but Clear still asks before deleting the transcript.
       fireEvent.click(await screen.findByRole('button', { name: 'Clear transcript' }));
       expect(await screen.findByText('This deletes the transcript from this device.')).toBeInTheDocument();
-      expect(screen.getByTestId('ce-session-listening-transcript')).toHaveValue(transcript);
+      expect(screen.getByTestId('ce-session-listening-transcript')).toHaveTextContent(transcript);
       fireEvent.click(screen.getByTestId('ce-recording-clear-confirm'));
       await waitFor(() => expect(screen.queryByText('Clear this recording?')).not.toBeInTheDocument());
       await waitFor(() => expect(screen.queryByTestId('ce-session-listening-transcript')).not.toBeInTheDocument());

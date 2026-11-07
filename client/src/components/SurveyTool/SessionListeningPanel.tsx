@@ -21,6 +21,8 @@ import SessionRecordingHelp from './SessionRecordingHelp';
 import { SessionRecordingNotices } from './SessionRecordingNotices';
 import { SessionNewDraftsCue } from './SessionNewDraftsCue';
 import { SessionListeningTranscript, SessionListeningTranscriptToggle } from './SessionListeningTranscript';
+import SessionTranscriptContextOption from './SessionTranscriptContextOption';
+import { useTranscriptContextUpload } from './useTranscriptContextUpload';
 import { useRollingTranscriptionRecorder } from '../../utilities/audio/useRollingTranscriptionRecorder';
 import { DEFAULT_ROLLING_TRANSCRIPTION_CHUNK_MS, transcriptSpeech } from '../../utilities/audio/rollingTranscription';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
@@ -164,6 +166,14 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
     labelSpeakers: panelMode === 'recordGroup' && speakerLabelsSupported === true && labelSpeakers,
     recordSpeakerAudio: panelMode === 'recordGroup' && recordSpeakerAudio,
   });
+  const transcriptContext = useTranscriptContextUpload({
+    sessionSlug,
+    sessionConfig,
+    context: recordingContext,
+    enabled: panelMode === 'recordGroup',
+  });
+  const latestTranscriptRef = useRef(recorder.transcript);
+  latestTranscriptRef.current = recorder.transcript;
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationError, setGenerationError] = useState('');
   const [generatedQuestions, setGeneratedQuestions] = useState<GeneratedQuestionDraft[]>([]);
@@ -351,6 +361,7 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
   }, [hasTranscript, panelMode]);
 
   const { finalizeRecording, keepAudio } = recorder;
+  const settleTranscriptContext = transcriptContext.settled;
   const handleClose = useCallback(async () => {
     if (closingRef.current) return;
     closingRef.current = true;
@@ -360,6 +371,7 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
       await finalizeRecording({ waitForTranscription: true });
       await keepAudio();
       await submitRef.current?.settled;
+      await settleTranscriptContext();
       if (isMountedRef.current) onClose?.();
     } catch (error) {
       if (isMountedRef.current)
@@ -368,7 +380,7 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
       closingRef.current = false;
       if (isMountedRef.current) setIsClosing(false);
     }
-  }, [onClose, finalizeRecording, keepAudio]);
+  }, [onClose, finalizeRecording, keepAudio, settleTranscriptContext]);
 
   // Closing during capture would end the recording, so it asks first.
   const capturingAudio = recorder.isRecording || recorder.isPaused;
@@ -795,6 +807,21 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
         </div>
       )}
 
+      {transcriptContext.status ? (
+        <span className={styles.sessionRecordingOption} role="status">
+          <span>{transcriptContext.status}</span>
+          {transcriptContext.failed ? (
+            <Button
+              type="button"
+              className={styles.sessionRecordingButton}
+              onClick={() => void transcriptContext.upload(latestTranscriptRef.current)}
+            >
+              Try again
+            </Button>
+          ) : null}
+        </span>
+      ) : null}
+
       {generatedQuestions.length > 0 && (
         <div
           ref={draftsRef}
@@ -817,7 +844,12 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
             preformedMode="questions"
             defaultTags={defaultTags as CreateQuestionsAndSurveysPanelProps['defaultTags']}
             documentURLs={[]}
-            submitClassName={styles.sessionListeningSubmit}
+            submitClassName={styles.sessionListeningSubmitButton}
+            submitRowClassName={styles.sessionListeningSubmit}
+            submitAccessory={
+              transcriptContext.available ? <SessionTranscriptContextOption upload={transcriptContext} /> : null
+            }
+            onQuestionsSubmitted={() => void transcriptContext.upload(latestTranscriptRef.current)}
           />
         </div>
       )}

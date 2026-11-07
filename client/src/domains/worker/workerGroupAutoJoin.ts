@@ -73,7 +73,16 @@ export const canAutoJoinWorkerGroup = (group: WorkerGroup): boolean =>
   group.memberVisibility === 'session' &&
   (!group.joinEndsAt || Date.parse(group.joinEndsAt) > Date.now());
 
+// The group this page's link joined, which leaves the address once joined.
+let joinedThroughLink: { sessionSlug: string; groupId: string } | null = null;
+
+/** The group this page's link is for, still in the address or already joined. '' without one. */
+export const readLinkedWorkerGroupId = (sessionSlug: string): string =>
+  readWorkerGroupAutoJoinId(window.location.search) ||
+  (joinedThroughLink?.sessionSlug === sessionSlug ? joinedThroughLink.groupId : '');
+
 export const finishWorkerGroupAutoJoin = (sessionSlug: string, groupId: string, sessionId?: string) => {
+  joinedThroughLink = { sessionSlug, groupId };
   // Only consume the intent we handled; preserve other query parameters and
   // a newer link if navigation happened while a request was in flight.
   const url = new URL(window.location.href);

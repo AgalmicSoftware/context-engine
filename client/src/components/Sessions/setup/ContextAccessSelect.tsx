@@ -33,6 +33,10 @@ type Props = {
 const ContextAccessSelect = ({ id, value, groups, allowAdminsOnly, onChange, ...rest }: Props) => (
   <Input id={id} type="select" value={value} onChange={(event) => onChange(event.target.value)} {...rest}>
     <option value={SESSION_WIDE_ACCESS}>Anyone who can see the session</option>
+    {/* A group chosen before the list loads, or that it doesn't name, must still show as what's chosen. */}
+    {value.startsWith(GROUP_PREFIX) && !groups.some(({ groupId }) => contextGroupChoice(groupId) === value) ? (
+      <option value={value}>This group</option>
+    ) : null}
     {groups.map(({ groupId, label }) => (
       <option key={groupId} value={contextGroupChoice(groupId)}>
         {label}
