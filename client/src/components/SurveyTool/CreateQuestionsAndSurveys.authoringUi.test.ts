@@ -768,8 +768,12 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
   });
 
   it('puts what a page offers beside the submit button on one line, and leaves the button alone otherwise', () => {
-    const question = { id: 'q1', type: 'freeform', prompt: 'Why?', tags: [] };
-    const reviewList = { interviewQuestionReview: true, preformedQuestions: [question], preformedMode: 'questions' };
+    const question = { id: 'q1', type: 'freeform', prompt: 'Why?', tags: [] as string[] };
+    const reviewList = {
+      interviewQuestionReview: true,
+      preformedQuestions: [question],
+      preformedMode: 'questions' as const,
+    };
     const plain = makeInstance({ ...reviewList, submitClassName: 'button' });
     plain.setState({ questions: [question] });
     expect(collectTreeNodes(plain.render(), (node) => nodeHasClassName(node, 'submitLine'))).toHaveLength(0);

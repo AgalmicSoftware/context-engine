@@ -946,7 +946,7 @@ describe('SessionListeningPanel', () => {
     });
 
     it('offers the transcript box only where it can be used, and uploads the latest text after a submit', async () => {
-      const upload = jest.fn(async () => undefined);
+      const upload = jest.fn(async (_transcript: string) => undefined);
       (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
         buildRecorder({ transcript, segments: [segment], questionDrafts: kept }),
       );
@@ -966,7 +966,7 @@ describe('SessionListeningPanel', () => {
     });
 
     it('says when the transcript failed to upload and tries again', async () => {
-      const upload = jest.fn(async () => undefined);
+      const upload = jest.fn(async (_transcript: string) => undefined);
       mockTranscriptContext = {
         ...mockTranscriptContext,
         available: true,
