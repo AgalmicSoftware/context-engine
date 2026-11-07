@@ -70,6 +70,18 @@ function Harness() {
     </>
   );
 }
+it('moves focus from the header + to its choices in the body, and back on Escape', async () => {
+  render(<Harness />);
+  await waitFor(() => expect(screen.getByTestId('ce-session-listening-start')).toBeEnabled());
+  const add = screen.getByRole('button', { name: 'Add input' });
+  fireEvent.click(add);
+  const choice = screen.getByRole('button', { name: /Upload audio/ });
+  expect(choice).toHaveFocus();
+  fireEvent.keyDown(choice, { key: 'Escape', keyCode: 27 });
+  expect(screen.queryByRole('button', { name: /Upload audio/ })).toBeNull();
+  expect(add).toHaveFocus();
+});
+
 function dismiss(method: string) {
   const dialog = screen.getByRole('dialog');
   if (method === 'Close') fireEvent.click(screen.getByRole('button', { name: 'Close' }));

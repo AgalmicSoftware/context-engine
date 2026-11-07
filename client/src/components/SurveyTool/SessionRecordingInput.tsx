@@ -1,4 +1,4 @@
-import { useId, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import styles from './SessionRecordingInput.module.scss';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
@@ -33,7 +33,17 @@ export default function SessionRecordingInput({ disabled, onAudio, onTranscript,
   const audioRef = useRef<HTMLInputElement>(null);
   const transcriptRef = useRef<HTMLInputElement>(null);
   const toggleRef = useRef<HTMLButtonElement>(null);
+  const choicesRef = useRef<HTMLDivElement>(null);
+  // An Escape this handled: its keyup must not reach the dialog, which closes on keyup.
+  const escapeHandledRef = useRef(false);
   const id = useId();
+  // The choices can open far from the +, which may be in the dialog's header: take focus to them, in view.
+  useEffect(() => {
+    if (!open) return;
+    const first = choicesRef.current?.querySelector('button');
+    first?.focus();
+    first?.scrollIntoView?.({ block: 'nearest' });
+  }, [open]);
   const blocked = disabled || busy;
   const run = async (action: () => Promise<void>, success: string) => {
     setBusy(true);
@@ -80,15 +90,22 @@ export default function SessionRecordingInput({ disabled, onAudio, onTranscript,
       onKeyDown={(event) => {
         if (event.key === 'Escape' && (open || pasting)) {
           event.stopPropagation();
+          escapeHandledRef.current = true;
           setOpen(false);
           setPasting(false);
           toggleRef.current?.focus();
         }
       }}
+      onKeyUp={(event) => {
+        if (event.key === 'Escape' && escapeHandledRef.current) {
+          escapeHandledRef.current = false;
+          event.stopPropagation();
+        }
+      }}
     >
       {triggerSlot ? createPortal(trigger, triggerSlot) : trigger}
       {open && (
-        <div id={id} className={styles.choices}>
+        <div id={id} ref={choicesRef} className={styles.choices}>
           <button type="button" disabled={blocked} onClick={() => audioRef.current?.click()}>
             Upload audio <small>MP3, M4A, WAV, MP4, WebM, OGG · up to 30 min, 20 MB</small>
           </button>

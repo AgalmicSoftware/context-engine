@@ -36,6 +36,31 @@ it('can put its + elsewhere, as in a dialog’s header, keeping its choices and 
   }
 });
 
+it('takes focus to its first choice, back to the + on Escape or Cancel, and keeps that Escape from the dialog', () => {
+  const dialogKeyUp = jest.fn();
+  render(
+    <div onKeyUp={dialogKeyUp}>
+      <SessionRecordingInput disabled={false} onAudio={jest.fn()} onTranscript={jest.fn()} />
+    </div>,
+  );
+  const add = screen.getByRole('button', { name: 'Add input' });
+  fireEvent.click(add);
+  expect(screen.getByRole('button', { name: /Upload audio/ })).toHaveFocus();
+  fireEvent.keyDown(document.activeElement as Element, { key: 'Escape' });
+  expect(add).toHaveFocus();
+  // The dialog closes on keyup; this one belonged to the choices.
+  fireEvent.keyUp(add, { key: 'Escape' });
+  expect(dialogKeyUp).not.toHaveBeenCalled();
+  // With nothing open, the next Escape is the dialog's.
+  fireEvent.keyDown(add, { key: 'Escape' });
+  fireEvent.keyUp(add, { key: 'Escape' });
+  expect(dialogKeyUp).toHaveBeenCalledTimes(1);
+  fireEvent.click(add);
+  fireEvent.click(screen.getByRole('button', { name: 'Paste transcript' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+  expect(add).toHaveFocus();
+});
+
 it('rejects unsupported, empty and oversized audio before enqueueing', async () => {
   const onAudio = jest.fn();
   render(<SessionRecordingInput disabled={false} onAudio={onAudio} onTranscript={jest.fn()} />);
