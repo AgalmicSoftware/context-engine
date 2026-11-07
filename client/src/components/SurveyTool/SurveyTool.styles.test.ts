@@ -137,7 +137,7 @@ describe('Group Conversation dialog colours', () => {
       /color: color-mix\(in srgb, var\(--ce-status-error\) 65%, var\(--ce-compat-dark\)\);/,
     );
     expect(scss).toMatch(
-      /\.sessionListeningPanel\s+:is\(\.sessionListeningActiveRecorder, \.sessionListeningTranscriptDetails\)\s+:is\(button, textarea\):focus-visible,\s*\.sessionListeningPanel:not\(\.sessionListeningPanelEmbedded\) :is\(a, button, input, textarea\):focus-visible \{\s*outline-color: var\(--ce-document-text\);/,
+      /\.sessionListeningPanel\s+:is\(\.sessionListeningActiveRecorder, \.sessionListeningTranscriptDetails\)\s+:is\(button, \[tabindex\]\):focus-visible,\s*\.sessionListeningPanel:not\(\.sessionListeningPanelEmbedded\) :is\(a, button, input, textarea\):focus-visible \{\s*outline-color: var\(--ce-document-text\);/,
     );
   });
 
