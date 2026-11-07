@@ -10,6 +10,9 @@ import {
 import { cutSpeakerSamples } from './speakerSamples';
 import { installFakeWebLocks } from './webLocks.testUtils';
 
+// The longest scenario replays a 45-minute recording, close to Jest's 5s default.
+jest.setTimeout(20_000);
+
 jest.mock('../ai/aiClient.js', () => ({
   transcribeAudio: jest.fn(),
   transcribeGroupAudio: jest.fn(),

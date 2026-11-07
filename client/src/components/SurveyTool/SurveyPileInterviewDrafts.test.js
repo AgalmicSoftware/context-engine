@@ -12,6 +12,9 @@ import * as savedAnswersLoader from './sessionInterviewSavedAnswers';
 import { createPileViewRuntimeStrategy } from './SurveyPileViewMode';
 import { renderSurveyPileViewMode } from './surveyQuestionsTestHarness';
 
+// Each scenario drives the real pile and modal with real timers, close to Jest's 5s default.
+jest.setTimeout(20_000);
+
 jest.mock('./CreateQuestionsAndSurveys', () => ({ __esModule: true, default: () => null }));
 jest.mock('./SessionListeningPanel', () => ({
   __esModule: true,
