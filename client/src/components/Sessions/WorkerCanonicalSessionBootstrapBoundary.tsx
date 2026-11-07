@@ -246,13 +246,13 @@ const WorkerCanonicalSessionBootstrapBoundary = ({
     return (
       <>
         <div
-          className={setupStyles.banner}
+          className={`${setupStyles.banner} ${setupStyles.pageBanner}`}
           role="alert"
           aria-live="assertive"
           data-testid="ce-worker-canonical-bootstrap-error"
         >
           <h3 className={setupStyles.bannerTitle}>{viewState.title}</h3>
-          <div className={setupStyles.bannerMessage}>{viewState.message}</div>
+          <div>{viewState.message}</div>
           <div className={setupStyles.buttonRow}>
             {viewState.canRetry && (
               <button
@@ -264,10 +264,10 @@ const WorkerCanonicalSessionBootstrapBoundary = ({
                 Retry
               </button>
             )}
-            <a className={setupStyles.button} href={adminHref}>
+            <a className={setupStyles.button} data-ce-control-appearance="raised" href={adminHref}>
               Open Admin
             </a>
-            <a className={setupStyles.button} href={buildPublicRoute('/new')}>
+            <a className={setupStyles.button} data-ce-control-appearance="raised" href={buildPublicRoute('/new')}>
               Return to session selection
             </a>
           </div>

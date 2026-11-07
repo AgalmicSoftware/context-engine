@@ -30,6 +30,7 @@ describe('Set up with your AI', () => {
       ['Claude', 'https://claude.ai'],
     ]) {
       const link = screen.getByRole('link', { name: `Open in ${name}` });
+      expect(link).toHaveAttribute('data-ce-control-appearance', 'raised');
       const url = new URL(link.getAttribute('href') || '');
       expect(url.origin).toBe(origin);
       expect(url.searchParams.get('q')).toBe(prompt);

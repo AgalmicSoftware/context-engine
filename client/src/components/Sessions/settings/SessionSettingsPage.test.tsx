@@ -305,6 +305,10 @@ describe('SessionSettingsPage', () => {
     Object.assign(navigator, { clipboard: { writeText } });
     renderPage();
     fireEvent.click(await screen.findByTestId('ce-settings-group-recorder-link'));
+    expect(screen.getByRole('link', { name: 'Open the session' })).toHaveAttribute(
+      'data-ce-control-appearance',
+      'raised',
+    );
     await waitFor(() => expect(writeText).toHaveBeenCalled());
     const link = new URL(String((writeText.mock.calls[0] as unknown[])[0]));
     expect(link.pathname).toBe('/session/edit-salon');

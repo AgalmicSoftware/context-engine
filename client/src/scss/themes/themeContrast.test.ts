@@ -590,7 +590,7 @@ describe('bundled app-theme contrast', () => {
     const banner = composite(paint(moduleRule(setupCss, '.banner').background), surface);
     const title = composite(paint(moduleRule(setupCss, '.bannerTitle').color), banner);
     expect(contrastRatio(title, banner)).toBeGreaterThanOrEqual(4.5);
-    const message = composite(paint(moduleRule(setupCss, '.bannerMessage').color), banner);
+    const message = composite(paint(moduleRule(setupCss, '.pageBanner').color), banner);
     expect(contrastRatio(message, banner)).toBeGreaterThanOrEqual(4.5);
   });
 

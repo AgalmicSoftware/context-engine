@@ -421,7 +421,7 @@ const SessionSettingsPage = ({
       <div className={styles.page}>
         {header}
         <div className={styles.buttonRow}>
-          <a className={styles.button} href={sessionUrl}>
+          <a className={styles.button} data-ce-control-appearance="raised" href={sessionUrl}>
             Open the session
           </a>
           <button

@@ -12,8 +12,8 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
-- A session's error page shows its title and message on a readable card, with Retry, Open Admin and Return to session selection as a row of matching buttons.
-- A link styled as a button keeps its readable colour on hover in every theme.
+- A session's error pages show their title and message on a readable card, with their actions as a row of matching buttons.
+- A link styled as a button matches the theme's buttons and keeps its readable colour on hover.
 - In a Group Conversation's transcript, each speaker's label is bold and has its own colour.
 - Group Conversation can hand each speaker their part: the recorder taps a person, and that person scans a looping code with their own phone, signed in or not, to open the interview with their answers drafted from what they said. Nothing is uploaded. It's slow enough to work over a shared screen on a video call, and **Copy link instead** covers a phone whose camera can't be used. **Scan code** in the dialog's header starts the same scan.
 - When someone claims their part, the answers and files they already have in the session are reconsidered against it: a changed answer shows for review, and answers that still fit stay as they are.

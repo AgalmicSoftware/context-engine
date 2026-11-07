@@ -220,9 +220,10 @@
   margin: 0;
 }
 
-// For a banner outside .page, which would otherwise set this colour.
-.bannerMessage {
+// A banner on a page of its own, outside .page, which would otherwise set this colour.
+.pageBanner {
   color: var(--ce-panel-text);
+  margin-bottom: 12px;
   overflow-wrap: anywhere;
 }
 
@@ -275,7 +276,8 @@
   }
 }
 
-// A link that looks like .button; it outranks .page a and the global a:hover.
+// A link that looks like .button; it outranks .page a and the global a:hover. With
+// data-ce-control-appearance="raised" it also takes the theme's button chrome, as a <button> does.
 a.button {
   display: inline-block;
   text-decoration: none;

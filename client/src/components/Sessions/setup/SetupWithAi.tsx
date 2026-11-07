@@ -66,6 +66,7 @@ export const SetupWithAi = ({ setupUrl }: Props) => {
           <a
             key={app.name}
             className={styles.button}
+            data-ce-control-appearance="raised"
             href={app.url(prompt)}
             target="_blank"
             rel="noopener noreferrer"

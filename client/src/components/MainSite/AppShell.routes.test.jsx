@@ -1,7 +1,7 @@
 import { buildQuestionBookmarkHref } from '../Bookmarks/BookmarksPage';
 import React from 'react';
 import fs from 'fs';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, useLocation, useNavigationType } from 'react-router-dom';
 import { STALE_CHUNK_RELOAD_STORAGE_KEY } from '../../bootRecovery.js';
 import { AppShell, appShellDispatchActions } from './AppShell';
@@ -3254,7 +3254,12 @@ describe('AppShell route render smoke', () => {
       sessionConfig: null,
     });
     render(subject.render());
-    expect(await screen.findByTestId('ce-worker-canonical-discovery-error')).toBeInTheDocument();
+    const alert = await screen.findByTestId('ce-worker-canonical-discovery-error');
+    expect(alert).toHaveClass('banner', 'pageBanner');
+    expect(within(alert).getByRole('heading')).toHaveClass('bannerTitle');
+    const back = within(alert).getByRole('link', { name: 'Return to session selection' });
+    expect(back).toHaveClass('button');
+    expect(back).toHaveAttribute('data-ce-control-appearance', 'raised');
     expect(mockSBTsPage).not.toHaveBeenCalled();
   });
 
