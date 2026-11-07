@@ -122,10 +122,11 @@ export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps)
           />
         ) : (
           <>
-            <ModalHeader id="ce-session-voice-mode-title" toggle={requestClose}>
+            <ModalHeader toggle={requestClose}>
               <span className={styles.sessionVoiceModeTitle}>
                 <span className={styles.sessionRecordingHeading}>
-                  {title}
+                  {/* The dialog takes its name from the title alone, not the icons beside it. */}
+                  <span id="ce-session-voice-mode-title">{title}</span>
                   {mode === 'recordGroup' ? <SessionRecordingHelp /> : null}
                 </span>
                 <span className={styles.sessionVoiceModeActions}>

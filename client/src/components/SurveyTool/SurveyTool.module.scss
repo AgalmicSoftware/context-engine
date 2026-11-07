@@ -3317,9 +3317,11 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
 .sessionVoiceModeTitle {
   display: flex;
   flex: 1;
+  // A phone too narrow for the title and its icons puts the icons on a line of their own, not under the close.
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: 4px 8px;
   width: 100%;
 }
 
@@ -3334,6 +3336,7 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   flex: none;
   align-items: center;
   gap: 4px;
+  margin-inline-start: auto;
 }
 
 .sessionVoiceModeSlot {

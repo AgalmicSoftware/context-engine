@@ -142,6 +142,8 @@ describe('scanning a part of a conversation', () => {
     const scan = screen.getByTestId(E2E_TESTIDS.SESSION_CLAIM_SCAN);
     expect(add.closest('.modal-header')).not.toBeNull();
     expect(add.parentElement?.parentElement).toBe(scan.parentElement);
+    // The dialog is named by its title, not the icons beside it.
+    expect(screen.getByRole('dialog')).toHaveAccessibleName('Group Conversation');
   });
 
   it('holds scanning back while the dialog is capturing a recording', () => {
