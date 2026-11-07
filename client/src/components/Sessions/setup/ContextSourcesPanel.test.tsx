@@ -64,6 +64,7 @@ const list = (overrides: Partial<SessionContextSourcesState> = {}): SessionConte
   supported: true,
   isAdmin: true,
   participantsCanAdd: false,
+  groupFilesHidden: false,
   reload: jest.fn(),
   ...overrides,
 });

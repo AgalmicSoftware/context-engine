@@ -3335,7 +3335,7 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
 // White and as large as the dialog allows: the camera needs the contrast and the detail, whatever the theme.
 .sessionClaimCodeBox {
   width: min(100%, 68vh, 640px);
-  background: #fff;
+  background: var(--ce-text-inverse);
   line-height: 0;
 
   svg {
