@@ -23,9 +23,8 @@ Use it for new files, refactors, and cleanup PRs.
 - `posts/` holds public Markdown posts and the `/posts` route manifest.
 - `ai-discourse-corpus/` and `whitepaper/` hold the curated discourse corpus and
   the whitepaper.
-- `media/` holds editable sources and render tooling for public media such as
-  the product film. Files the site serves are copied into `client/public/media/`;
-  local render output stays in each project's ignored `dist/`.
+- `client/public/media/` holds the media files the site serves, such as the
+  product film.
 - `tests/` holds source-of-truth root Node/Jest test harnesses that are not practical to colocate elsewhere; shared helpers live under `tests/helpers/`.
 - `broadcast/`, `cache/`, `dist/`, `out/`, `release-public/`, and `tmp/` are
   generated or runtime output locations and are not canonical homes for new

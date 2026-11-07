@@ -103,7 +103,7 @@ whitepaper/IdeasMap.md
 client/src/utilities/worker/sessionCorsWorker.*.proxy.test.js
 client/src/utilities/web3/contractScripts.*.proxy.test.js
 ai-discourse-corpus/corpuses/_*.js
-media/motion-loops
+media
 EOF
   ce_public_release_private_doc_patterns
 }
@@ -112,7 +112,7 @@ ce_public_release_strip_assert_absent_patterns() {
   cat <<'EOF'
 TODO
 contextEngine-cc
-media/motion-loops
+media
 Claude outputs
 outreach-and-applications
 grant-applications

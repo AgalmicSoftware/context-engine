@@ -88,7 +88,7 @@ describe('link-preview metadata for the product film', () => {
     expect(metaContent(indexHtml, 'name', 'twitter:card')).toBe('summary_large_image');
     expect(metaContent(indexHtml, 'name', 'twitter:image')).toBe(image.url);
     expect(metaContent(indexHtml, 'name', 'twitter:image:alt')).toBe(image.alt);
-    // No X Player Card: it needs an approved iframe player page (see media/product-film/README.md).
+    // No X Player Card: it needs an approved iframe player page.
     expect(metaTags(indexHtml, 'name', 'twitter:player')).toHaveLength(0);
     // Open Graph structured properties must follow the og:video they describe.
     const order = ['og:video', 'og:video:secure_url', 'og:video:type', 'og:video:width', 'og:video:height'].map((p) =>

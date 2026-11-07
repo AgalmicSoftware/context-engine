@@ -25,8 +25,7 @@ and AI tools, plus the fastest post-deploy crawl steps.
     platforms can offer inline playback) served from `client/public/media/product-film/v1/`.
     `client/index.html` carries the same tags in raw HTML, `syncPublicPageHead()`
     keeps the runtime head identical, and production builds write `about.html`
-    and `about/index.html` with the `/about` canonical URL. See
-    [`media/product-film/README.md`](../media/product-film/README.md).
+    and `about/index.html` with the `/about` canonical URL.
 - `client/public/robots.txt`
   - Allows crawling and points bots to the sitemap.
 - `client/public/sitemap.xml`

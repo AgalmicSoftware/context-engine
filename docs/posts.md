@@ -83,8 +83,7 @@ WebP, rather than full-resolution working files.
 
 Non-post routes (the homepage, `/about` and app routes) use the site-wide
 preview defined in `client/src/variables/publicSocialPreview.json`: a 1200×630
-poster plus the product film as `og:video` (see
-[`media/product-film/README.md`](../media/product-film/README.md)). Individual
+poster plus the product film as `og:video`. Individual
 posts replace that default with their manifest header image and do not
 advertise the film.
 
