@@ -1062,10 +1062,10 @@ export function findRepresentativeQuestions(
     }
 
     const sufficient = state.sufficient.filter((item) => item.questionIndex !== bestAgree?.questionIndex);
-    finalizedByGroup[groupId] = agreesBeforeDisagrees([
-      ...(bestAgree ? [bestAgree] : []),
-      ...repnessSort(sufficient),
-    ]).slice(0, 5);
+    // The top five first, as pol.is does: ordering first would let mild agrees push out strong disagrees.
+    finalizedByGroup[groupId] = agreesBeforeDisagrees(
+      [...(bestAgree ? [bestAgree] : []), ...repnessSort(sufficient)].slice(0, 5),
+    );
   });
 
   return finalizedByGroup;

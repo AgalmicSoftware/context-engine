@@ -29,7 +29,7 @@ Context Engine; the local implementation uses its own vote convention
 | PCA | Two-dimensional, deterministic seeded power iteration with finite empty, all-missing, and rank-one fallbacks. |
 | Conversation membership | The cold-snapshot threshold is `min(7, statement count)`, with the most active participants filling a floor of 15 when available. |
 | Opinion groups | Two-tier base/group K-means, participant-weighted group centers, and silhouette selection over the pol.is K range. |
-| Representative comments | The pol.is-style proportion tests, 90% threshold, best-agree fallback, and five-comment cap. |
+| Representative comments | The pol.is-style proportion tests, 90% threshold, best-agree fallback, and five-comment cap, applied before agrees are moved ahead of disagrees. |
 
 The local cold path intentionally retains several hardenings that are better
 suited to a browser snapshot: seed-42 reproducibility, true Euclidean distance,

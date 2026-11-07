@@ -205,6 +205,36 @@ describe('computePolisConversationMath', () => {
 });
 
 describe('findRepresentativeQuestions', () => {
+  // Two groups of `size`: a question's row, from how many in each agree (everyone else disagrees).
+  const row = (size, agreeInFirst, agreeInSecond) => [
+    ...Array.from({ length: size }, (_, member) => (member < agreeInFirst ? 1 : -1)),
+    ...Array.from({ length: size }, (_, member) => (member < agreeInSecond ? 1 : -1)),
+  ];
+  const twoGroups = (size) => Array.from({ length: size * 2 }, (_, participant) => (participant < size ? 0 : 1));
+
+  it('takes the top five before moving agrees ahead of disagrees', () => {
+    const mildAgrees = Array.from({ length: 6 }, () => row(20, 14, 8));
+    const strongDisagrees = Array.from({ length: 6 }, () => row(20, 0, 20));
+
+    const group = findRepresentativeQuestions([...mildAgrees, ...strongDisagrees], twoGroups(20))[0];
+
+    expect(group.map((question) => question.repfulFor)).toEqual([
+      'agree',
+      'disagree',
+      'disagree',
+      'disagree',
+      'disagree',
+    ]);
+    expect(group[0]).toMatchObject({ bestAgree: true });
+  });
+
+  it('applies the 90% one-tailed significance threshold', () => {
+    // Question 0 is the best agree. For fifteen people, ten agreeing tests at 1.5 and nine at 1.0, against 1.2816.
+    const group = findRepresentativeQuestions([row(15, 15, 0), row(15, 10, 0), row(15, 9, 0)], twoGroups(15))[0];
+
+    expect(group.map((question) => question.questionIndex)).toEqual([0, 1]);
+  });
+
   it('returns agree and disagree representative metadata instead of raw average deltas only', () => {
     const ratingMatrix = [
       [1, 1, 1, -1, -1, -1],
