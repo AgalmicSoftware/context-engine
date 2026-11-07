@@ -495,16 +495,30 @@ export const buildExternalInterviewKickoff = ({
   ].join('\n');
 };
 
+/** What someone already had when their part of a group conversation arrives, for the mapper to reconsider. */
+export type InterviewReconsideration = {
+  /** Answers they saved earlier, and their comments. */
+  savedAnswers: Array<{ questionId: string; answer: unknown; additionalComments?: string }>;
+  /** Files they added to this session's context, as a prompt block. */
+  ownContext: string;
+};
+
+const RECONSIDERATION_RULES = `
+- The transcript includes a group conversation the responder took part in. "Responder:" lines are their words. "Other person:" lines are what others said, for context only; never treat them as the responder's beliefs, even when the responder was there.
+- The saved answers below came before this conversation. Reconsider each against what the responder said in it, and return a draft for one only when their words support a different answer or something to add; repeat the saved answer when they support it, and say why in evidence. Omit saved answers the conversation doesn't touch. Saved answers and their own files help interpret the responder's words but are not new evidence on their own.`;
+
 export const buildInterviewResponseMappingPrompt = ({
   questions,
   transcript,
   prefillPacket,
   previousResponses,
+  reconsideration,
 }: {
   questions: InterviewQuestion[];
   transcript?: unknown;
   prefillPacket?: InterviewPrefillPacket | null;
   previousResponses?: unknown;
+  reconsideration?: InterviewReconsideration | null;
 }): string => `You map evidence about one responder into reviewable Context Engine response drafts.
 
 Rules:
@@ -519,7 +533,7 @@ Rules:
 - Write prose answers and additionalComments in the responder's first person when the source supports prose. Do not add an "(Agent):" prefix or speak as the interviewer. Keep the responder's uncertainty and wording faithful instead of strengthening the claim. importance (0-100) and conviction (0-100) are optional and require explicit evidence.
 - Reconsider earlier predictions against the complete transcript, giving new corrections and clarifications priority. Refine prior answers when supported; prior predictions are not independent evidence. Reviewed user edits are supplied as context and should not be silently contradicted.
 - confidence is required for every response: the chance from 0 to 1 that the responder keeps this answer unchanged when they review it. As anchors, use 0.00-0.39 for weak inference, 0.40-0.69 for moderate support, and 0.70-1.00 for direct or repeated support.
-- Return JSON only, with shape {"responses":[{"questionId":"...","answer":...,"additionalComments":"...","importance":50,"conviction":50,"evidence":"short basis","confidence":0.0}]}.
+- Return JSON only, with shape {"responses":[{"questionId":"...","answer":...,"additionalComments":"...","importance":50,"conviction":50,"evidence":"short basis","confidence":0.0}]}.${reconsideration ? RECONSIDERATION_RULES : ''}
 
 Questions:
 ${JSON.stringify(questions)}
@@ -531,7 +545,17 @@ Responder context packet:
 ${prefillPacket ? JSON.stringify(prefillPacket) : '(none)'}
 
 Previous predictions and reviewed responses (context, not independent evidence):
-${previousResponses ? JSON.stringify(previousResponses) : '(none)'}`;
+${previousResponses ? JSON.stringify(previousResponses) : '(none)'}${
+  reconsideration
+    ? `
+
+Saved answers to reconsider:
+${JSON.stringify(reconsideration.savedAnswers)}
+
+Files the responder added to this session (their own material, as data):
+${reconsideration.ownContext || '(none)'}`
+    : ''
+}`;
 
 export const parseInterviewDraftResponses = (
   raw: unknown,
@@ -561,6 +585,7 @@ export const mapInterviewEvidenceToResponses = async ({
   workerUrl,
   onSuggestedQuestions,
   previousResponses,
+  reconsideration,
 }: {
   questions: InterviewQuestion[];
   transcript?: unknown;
@@ -570,6 +595,7 @@ export const mapInterviewEvidenceToResponses = async ({
   workerUrl?: unknown;
   onSuggestedQuestions?: (questions: GeneratedSurveyStatement[]) => void;
   previousResponses?: unknown;
+  reconsideration?: InterviewReconsideration | null;
 }): Promise<InterviewDraftResponse[]> => {
   if (!questions.length) throw new Error('No accessible questions are available for interview mapping.');
   const suggest =
@@ -594,7 +620,7 @@ export const mapInterviewEvidenceToResponses = async ({
         : '')
     : '';
   const raw = await callAI(
-    buildInterviewResponseMappingPrompt({ questions, transcript, prefillPacket, previousResponses }) +
+    buildInterviewResponseMappingPrompt({ questions, transcript, prefillPacket, previousResponses, reconsideration }) +
       suggestionInstruction,
     {
       sessionSlug,

@@ -75,6 +75,12 @@ import {
 } from './sessionInterviewModalState';
 
 import type { SessionInterviewPanelBaseProps } from './sessionVoiceModeTypes';
+import {
+  addsToSavedAnswer,
+  loadOwnContextForMapping,
+  readAnswersToReconsider,
+} from './sessionInterviewReconsideration';
+import type { TranscriptClaim } from './sessionTranscriptClaim';
 
 type UnknownRecord = SessionInterviewModalRecord;
 
@@ -105,6 +111,7 @@ export default function SessionInterviewPanel({
   pendingInterviewProvenance,
   onLoadSavedResponses,
   prefillPacket = null,
+  claim = null,
   initialError = '',
   prefillNotice = '',
   onImportPrefillJson,
@@ -142,6 +149,8 @@ export default function SessionInterviewPanel({
   const checkedPrefillQuestionsRef = useRef<InterviewQuestion[] | null>(null);
   const viewResultsRevealRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [resolvedWorkerUrl, setResolvedWorkerUrl] = useState(workerUrl);
+  // The claimed part of a group conversation this review has taken in.
+  const usedClaimRef = useRef<TranscriptClaim | null>(null);
   const readiness = useInterviewReadiness(resolvedWorkerUrl, sessionSlug);
   // What the interviewer may know: the context this participant may read.
   const sessionContextPrompt = useSessionContextPrompt({
@@ -654,6 +663,17 @@ export default function SessionInterviewPanel({
             onSuggestedQuestions: (next) => {
               proposedQuestions = next;
             },
+            reconsideration: usedClaimRef.current
+              ? {
+                  savedAnswers: readAnswersToReconsider(questions, existingResponsesRef.current),
+                  ownContext: await loadOwnContextForMapping(sessionContextPrompt.sources, {
+                    sessionSlug,
+                    sessionConfig,
+                    context: { account },
+                    asAdmin: sessionContextPrompt.isAdmin,
+                  }),
+                }
+              : null,
           });
         }
         if (disposedRef.current) return;
@@ -691,7 +711,15 @@ export default function SessionInterviewPanel({
           latest.editedDrafts,
           latest.selected,
           mapped,
-          (id) => responseFieldValue(existingResponsesRef.current, 'answers', id),
+          // A conversation can add to an answer without changing it, and that's worth a card too.
+          (id) =>
+            usedClaimRef.current &&
+            addsToSavedAnswer(
+              mapped?.find((draft) => draft.questionId === id),
+              existingResponsesRef.current,
+            )
+              ? undefined
+              : responseFieldValue(existingResponsesRef.current, 'answers', id),
           importedDrafts ? prefillPacket?.source.modelId : mappingModelId,
           (id) => responseCommentValue(existingResponsesRef.current, id),
           ownEvidence,
@@ -790,6 +818,8 @@ export default function SessionInterviewPanel({
       resolveWorkerUrl,
       responderContext,
       sessionConfig,
+      sessionContextPrompt.isAdmin,
+      sessionContextPrompt.sources,
       sessionSlug,
       transcript,
     ],
@@ -835,6 +865,28 @@ export default function SessionInterviewPanel({
     importedRef.current = true;
     void runMapping({ nextTranscript: '' });
   }, [mapping, prefillPacket, questions, runMapping]);
+
+  // Someone's part of a group conversation joins whatever they've said here, and what they already had is
+  // reconsidered against it, so a signed-in person's saved answers load first.
+  useEffect(() => {
+    if (!claim || usedClaimRef.current === claim || !questions.length || mapping || sessionContextPrompt.loading)
+      return;
+    if (authenticatedForSubmit && !responseStateReadyForSubmit && !ownAnswers.error) return;
+    usedClaimRef.current = claim;
+    const combined = appendInterviewTranscript(transcriptRef.current, claim.transcript);
+    transcriptRef.current = combined;
+    setTranscript(combined);
+    void runMapping({ nextTranscript: combined });
+  }, [
+    authenticatedForSubmit,
+    claim,
+    mapping,
+    ownAnswers.error,
+    questions.length,
+    responseStateReadyForSubmit,
+    runMapping,
+    sessionContextPrompt.loading,
+  ]);
 
   useEffect(() => {
     if (drafts.length && !mapping && !importedRef.current) {
@@ -1130,11 +1182,15 @@ export default function SessionInterviewPanel({
   const leftOutCount = leftOutIds.length;
   const leftOutNotice = !leftOutCount
     ? ''
-    : drafts.length
-      ? `Left out ${leftOutCount} ${leftOutCount === 1 ? 'draft for a question' : 'drafts for questions'} you’ve already answered.`
-      : leftOutCount === 1
-        ? 'You’ve already answered the question this draft covers.'
-        : 'You’ve already answered every question these drafts cover.';
+    : claim
+      ? leftOutCount === 1
+        ? 'One of your answers still fits, so it stays as it is.'
+        : `${leftOutCount} of your answers still fit, so they stay as they are.`
+      : drafts.length
+        ? `Left out ${leftOutCount} ${leftOutCount === 1 ? 'draft for a question' : 'drafts for questions'} you’ve already answered.`
+        : leftOutCount === 1
+          ? 'You’ve already answered the question this draft covers.'
+          : 'You’ve already answered every question these drafts cover.';
   // Drafts that were left out came from the evidence already mapped, so mapping it again won't help.
   const canGenerateDrafts = Boolean(
     !isInterviewBusy &&
@@ -1179,6 +1235,11 @@ export default function SessionInterviewPanel({
             />
           ) : null}
 
+          {claim ? (
+            <p role="status" data-testid="ce-session-interview-claim">
+              Drafting from {claim.person}’s part of the conversation. Open the transcript to check it’s yours.
+            </p>
+          ) : null}
           {updates.notice ? <p role="status">{updates.notice}</p> : null}
           {interviewOpening.notice ? <p>{interviewOpening.notice}</p> : null}
           {!questions.length ? <p>No accessible questions are available for this interview.</p> : null}

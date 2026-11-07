@@ -6,6 +6,9 @@ export type LinkPayloadOptions = { maxLength?: number };
 export function readLinkParam(hash: unknown, key: string): string | null;
 
 export function encodeBase64Url(bytes: Uint8Array): string;
+export function deflateLinkBytes(bytes: Uint8Array): Promise<Uint8Array>;
+/** The bytes, or null past maxBytes. Damaged data rejects. */
+export function inflateLinkBytes(bytes: Uint8Array, maxBytes: number): Promise<Uint8Array | null>;
 /** Base64url of the JSON's UTF-8 bytes, without padding. */
 export function encodeLinkJson(value: unknown): string;
 

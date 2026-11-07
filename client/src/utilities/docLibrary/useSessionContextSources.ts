@@ -133,5 +133,5 @@ export function useSessionContextPrompt({ totalChars, ...input }: Input & { tota
       current = false;
     };
   }, [sources, notes, totalChars, identity, input.sessionSlug, input.account, isAdmin]);
-  return { text: prompt.identity === identity ? prompt.text : '', loading };
+  return { text: prompt.identity === identity ? prompt.text : '', loading, sources, isAdmin };
 }

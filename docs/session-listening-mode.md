@@ -442,6 +442,61 @@ there until they scroll back to the end. Generated questions are drafts
 rendered through the existing `CreateQuestionsAndSurveys` review surface and
 are never auto-published. Generation uses the session’s `questionsGenPrompt`. A participant with question-authoring permission can review the generated questions and press Submit. Each chunk's audio stays on the device only until its transcript is saved, which replaces it in the same write. Recorder audio, and the voice samples cut from it, leave the device only for the session Worker's `/transcribe` relay, which forwards them to the transcription provider and stores nothing.
 
+Each speaker's label is bold and has its own colour in the transcript
+(`--ce-speaker-1` to `-8`, at least 4.5:1 on the transcript's white in every theme).
+
+### Adding the transcript to context
+
+The **Add transcript to context** box sits on the **Submit questions** line and is off
+by default. Ticked, it asks who can read the transcript: anyone who can see the session,
+or one group, starting at the group the page's link joined. Submitting uploads the
+transcript as a text file through the same path as any
+[context file](session-context-sources.md), after the questions, so the person has
+signed in by then. A later submit with more transcript replaces that file. A failure
+says so beside **Try again**, and closing waits for an upload under way. The box only
+shows when the Worker takes participants' files (`participant_context_v1`) and the
+session allows them, or for an admin.
+
+### Handing each person their part
+
+Under a labelled transcript, **Give each person their part** has one button per speaker
+who said at least 30 characters. A button shows that person's code, for them to scan with
+their own phone, signed in or not. Nothing is uploaded and the recorder needn't be signed
+in: holding the code is the permission, on the assumption that the room trusts each other.
+
+The part is that person's lines as `Responder:` and the line before each as
+`Other person:` (its last 240 characters), so a reply such as "I agree" can be read. It is
+packed with the session slug and the group the recorder's link joined as deflated JSON in
+base64url (`sessionTranscriptClaim.ts`), then split across QR codes:
+
+- Each code is a link: `/session/<slug>#claim=<share id>.<index>.<total>.<data>`. So an
+  ordinary camera opens the session, whose page then opens its own scanner and collects
+  the rest. **Scan code** in the Group Conversation and voice-mode dialog headers starts
+  the same scanner. It stays disabled while that dialog is capturing.
+- Every code is QR version 12 at level M (65×65 modules, 287 bytes) so nothing jumps as
+  they change, and one shows for 800 ms. That is slow enough for a shared screen to settle
+  between codes and well under the three changes a second that count as flashing. About
+  10 KB of text takes about 20 seconds a loop. A phone that misses a code gets it next time
+  round, and a code from another share starts the collection over, so two people's parts never mix.
+- The scanner reads with `jsQR`, loaded only when scanning, because iOS has no
+  `BarcodeDetector`. It asks for the rear camera at 1080p and alternates the view's middle
+  at full detail with the whole view scaled down. The video stays on the device.
+- **Copy link instead** gives the same part as one link in the URL fragment, which
+  browsers don't send to a server, for when a camera can't be used.
+
+The part opens the interview review like a prefill link, and the person joins the group
+the recorder's link was for. Their lines join whatever they've said in this review, and
+mapping treats `Responder:` lines as their words and `Other person:` lines as context only.
+
+What they already had is reconsidered against it. A signed-in person's saved answers load
+first (or drafting goes ahead without them if they can't be read). The mapper gets those
+answers and their comments, the drafts already in review and any responder context as
+usual, and the files they added to the session themselves. A draft that gives a different
+answer shows for review, saying which answer it changes. One that repeats the saved answer
+adds nothing and is counted in a note, unless it adds a new comment. A locked answer stands.
+Someone signed out gets drafts from their part alone; if they sign in to submit, the usual
+check of drafts against saved answers applies.
+
 ## Access and failure behavior
 
 - Private, encrypted, or masked question prompts are never placed in the public brief or realtime instructions before the participant can access them.

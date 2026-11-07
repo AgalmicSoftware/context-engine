@@ -21,6 +21,7 @@ import SessionRecordingHelp from './SessionRecordingHelp';
 import { SessionRecordingNotices } from './SessionRecordingNotices';
 import { SessionNewDraftsCue } from './SessionNewDraftsCue';
 import { SessionListeningTranscript, SessionListeningTranscriptToggle } from './SessionListeningTranscript';
+import SessionTranscriptClaimShare from './SessionTranscriptClaimShare';
 import SessionTranscriptContextOption from './SessionTranscriptContextOption';
 import { useTranscriptContextUpload } from './useTranscriptContextUpload';
 import { useRollingTranscriptionRecorder } from '../../utilities/audio/useRollingTranscriptionRecorder';
@@ -756,6 +757,10 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
           onClear={() => setConfirmClear(true)}
         />
       )}
+
+      {panelMode === 'recordGroup' && hasTranscript ? (
+        <SessionTranscriptClaimShare transcript={recorder.transcript} sessionSlug={sessionSlug} />
+      ) : null}
 
       <CEConfirmDialog
         isOpen={confirmStop}

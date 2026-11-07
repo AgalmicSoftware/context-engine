@@ -18,6 +18,44 @@ export const encodeBase64Url = (bytes) => {
   return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 };
 
+// A browser unpacks each written chunk whole before the size check can run,
+// so input goes in slices: at most about 1 MB of output per slice.
+const SLICE_BYTES = 1024;
+
+// Streams bytes through a (de)compression stream; null once past maxBytes.
+const transform = async (bytes, stream, maxBytes) => {
+  const writer = stream.writable.getWriter();
+  const written = (async () => {
+    for (let start = 0; start < bytes.length; start += SLICE_BYTES) {
+      await writer.write(bytes.subarray(start, start + SLICE_BYTES));
+    }
+    await writer.close();
+  })();
+  written.catch(() => {}); // a failure surfaces through the reader
+  const reader = stream.readable.getReader();
+  const chunks = [];
+  let size = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > maxBytes) {
+      await reader.cancel().catch(() => {});
+      return null;
+    }
+    chunks.push(value);
+  }
+  await written;
+  const output = new Uint8Array(size);
+  chunks.reduce((offset, chunk) => (output.set(chunk, offset), offset + chunk.byteLength), 0);
+  return output;
+};
+
+export const deflateLinkBytes = (bytes) => transform(bytes, new CompressionStream('deflate-raw'), Infinity);
+
+/** The bytes, or null past maxBytes. Damaged data rejects. */
+export const inflateLinkBytes = (bytes, maxBytes) => transform(bytes, new DecompressionStream('deflate-raw'), maxBytes);
+
 /** Base64url of the JSON's UTF-8 bytes, without padding. */
 export const encodeLinkJson = (value) => encodeBase64Url(new TextEncoder().encode(JSON.stringify(value)));
 

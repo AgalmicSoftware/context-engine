@@ -6,6 +6,7 @@ import type { InterviewConsentOverrides } from './sessionInterviewConsent';
 import type { InterviewSavedAnswerLoader } from './useInterviewSavedAnswers';
 import type { InterviewDraftResponse, InterviewPrefillPacket, SessionVoiceMode } from './sessionInterview';
 import type { SessionInterviewModalRecord } from './sessionInterviewModalState';
+import type { ClaimFrame, TranscriptClaim } from './sessionTranscriptClaim';
 
 type InterviewDraftApplicationProps = InterviewQuestionControls & {
   questionCreatorProps?: React.ComponentProps<typeof SessionInterviewSuggestions>['creatorProps'];
@@ -38,6 +39,8 @@ export type SessionInterviewPanelBaseProps = InterviewDraftApplicationProps & {
   pendingInterviewProvenance?: SessionInterviewModalRecord;
   onLoadSavedResponses?: InterviewSavedAnswerLoader;
   prefillPacket?: InterviewPrefillPacket | null;
+  /** Someone's part of a group recording, read from a code, to draft their answers from. */
+  claim?: TranscriptClaim | null;
   initialError?: string;
   /** Drafts the prefill left out before review, said when its review opens. */
   prefillNotice?: string;
@@ -60,4 +63,8 @@ export type SessionVoiceModeModalProps = SessionInterviewPanelBaseProps & {
   mode: SessionVoiceMode | null;
   onSelectMode: (mode: SessionVoiceMode) => void;
   questionPool?: unknown[];
+  /** The code a camera opened this page with, so scanning carries on from it. */
+  claimFrame?: ClaimFrame | null;
+  onClaimFrameDone?: () => void;
+  onClaim?: (claim: TranscriptClaim) => void;
 };

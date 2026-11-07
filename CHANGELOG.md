@@ -13,6 +13,8 @@ All notable changes to this project will be documented in this file.
 ### Client — available when the site deploys
 
 - In a Group Conversation's transcript, each speaker's label is bold and has its own colour.
+- Group Conversation can hand each speaker their part: the recorder taps a person, and that person scans a looping code with their own phone, signed in or not, to open the interview with their answers drafted from what they said. Nothing is uploaded. It's slow enough to work over a shared screen on a video call, and **Copy link instead** covers a phone whose camera can't be used. **Scan code** in the dialog's header starts the same scan.
+- When someone claims their part, the answers and files they already have in the session are reconsidered against it: a changed answer shows for review, and answers that still fit stay as they are.
 - Group Conversation's **Add transcript to context** box, on the **Submit questions** line, uploads the transcript as a context file for the group or the session, off by default.
 - The question selector no longer shows "(cache error)" when a signed-out visitor's request for other people's answers is refused on a private session.
 - Results group sizes, vote bars, overall figures, representative statements and AI group summaries now count only people who answered enough to be in the analysis, as pol.is does, in every view. People with few answers still appear on the map in their nearest group. Representative statements keep a group's five strongest before showing agreements first, and uneven or very small sets of responses no longer break the Results maps.

@@ -134,6 +134,13 @@ import {
   type InterviewPrefillPacket,
   type SessionVoiceMode,
 } from './sessionInterview';
+import {
+  clearClaimHash,
+  hasClaimHash,
+  readClaimFrame,
+  type ClaimFrame,
+  type TranscriptClaim,
+} from './sessionTranscriptClaim';
 import { resolveInterviewDraftOrigin } from './sessionInterviewResearch';
 import { normalizeInterviewSettings } from '../../../../shared/interviewSettings.mjs';
 import { confidenceMeaningOf } from '../../../../shared/interviewConfidence.mjs';
@@ -251,6 +258,8 @@ export const buildPileRuntimeInitialState = (engine: SurveyQuestionsRuntimeEngin
     interviewEnabled && typeof window !== 'undefined' ? resolveSessionVoiceMode(window.location.search || '') : null;
   const opensVoiceChooser =
     interviewEnabled && typeof window !== 'undefined' && opensSessionVoiceChooser(window.location.search || '');
+  const initialClaimFrame =
+    interviewEnabled && typeof window !== 'undefined' ? readClaimFrame(window.location.hash || '') : null;
   let initialPrefillPacket: InterviewPrefillPacket | null = null;
   let initialInterviewPrefillError = '';
   let initialInterviewPrefillNotice = '';
@@ -309,8 +318,11 @@ export const buildPileRuntimeInitialState = (engine: SurveyQuestionsRuntimeEngin
       initialVoiceMode ||
       initialPrefillPacket ||
       initialInterviewPrefillError ||
+      initialClaimFrame ||
       opensVoiceChooser
     ),
+    interviewClaimFrame: initialClaimFrame,
+    interviewClaim: null,
     sessionVoiceMode: initialPrefillPacket || initialInterviewPrefillError ? 'interview' : initialVoiceMode,
     interviewPrefillPacket: initialPrefillPacket,
     interviewPrefillError: initialInterviewPrefillError,
@@ -1067,6 +1079,38 @@ const scheduleLoadAndSortQuestions = (engine: PileViewModeEngine, delayMs: any =
   );
 };
 
+const clearClaimHashFromAddress = () => {
+  try {
+    window.history.replaceState(window.history.state, '', clearClaimHash(window.location));
+  } catch (e) {
+    surveyLog.warn('PileViewMode: could not clear a transcript code from URL', e);
+  }
+};
+
+// A camera that reads someone's looping code opens the session with that code in the link's fragment.
+const consumeTranscriptClaimHashIfPresent = (engine: PileViewModeEngine) => {
+  if (typeof window === 'undefined' || !isInterviewFeatureEnabled(engine.props?.sessionConfig)) return;
+  if (!hasClaimHash(window.location.hash || '')) return;
+  const frame = readClaimFrame(window.location.hash || '');
+  clearClaimHashFromAddress();
+  if (frame) engine.setState({ showVoiceModeModal: true, interviewClaimFrame: frame });
+};
+
+// Their part of the conversation goes to the interview, and they join the group the recorder's link was for.
+const receiveTranscriptClaim = (engine: PileViewModeEngine, claim: TranscriptClaim) => {
+  engine.setState({
+    showVoiceModeModal: true,
+    sessionVoiceMode: 'interview',
+    interviewClaim: claim,
+    interviewClaimFrame: null,
+  });
+  if (!claim.joinGroup) return;
+  const url = new URL(window.location.href);
+  url.searchParams.set('joinGroup', claim.joinGroup);
+  window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
+  window.dispatchEvent(new PopStateEvent('popstate'));
+};
+
 const consumeInterviewPrefillHashIfPresent = (engine: PileViewModeEngine) => {
   if (typeof window === 'undefined' || !isInterviewFeatureEnabled(engine.props?.sessionConfig)) return false;
   const hash = window.location.hash || '';
@@ -1138,6 +1182,7 @@ const runPileComponentDidMount = (engine: PileViewModeEngine) => {
       surveyLog.warn('PileViewMode: could not clear imported interview packet from URL', e);
     }
   }
+  if (typeof window !== 'undefined' && hasClaimHash(window.location.hash || '')) clearClaimHashFromAddress();
   engine.syncCurrentPileQuestionsSignature(engine.state.pileQuestions);
   engine.loadAndSortQuestions();
   engine.maybeRecoverUnhydratedGatedPile();
@@ -1156,6 +1201,7 @@ const runPileComponentDidMount = (engine: PileViewModeEngine) => {
 
 const runPileComponentDidUpdate = (engine: PileViewModeEngine, prevProps: any, prevState: any) => {
   consumeInterviewPrefillHashIfPresent(engine);
+  consumeTranscriptClaimHashIfPresent(engine);
   if (engine.props.isResponsesCacheReady) engine._savedAnswersSeenReady = true;
   const diffInputsChanged = engine.didEditDiffInputsChange(prevProps, prevState);
   if (diffInputsChanged) {
@@ -3494,6 +3540,10 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
                   engine.state.surveysResponseState?.[0]?.interviewProvenance,
                 )}
                 prefillPacket={(interviewPrefillPacket as InterviewPrefillPacket | null) || null}
+                claim={(engine.state.interviewClaim as TranscriptClaim | null) || null}
+                claimFrame={(engine.state.interviewClaimFrame as ClaimFrame | null) || null}
+                onClaimFrameDone={() => engine.setState({ interviewClaimFrame: null })}
+                onClaim={(claim: TranscriptClaim) => receiveTranscriptClaim(engine, claim)}
                 initialError={String(interviewPrefillError || '')}
                 prefillNotice={String(interviewPrefillNotice || '')}
                 onImportPrefillJson={engine.importInterviewPrefillJson}

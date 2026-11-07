@@ -55,6 +55,9 @@ const FOLLOW_SLACK_PX = 24;
 // Enough colours that a room's speakers stay apart; a ninth voice shares the first's.
 const SPEAKER_COLORS = 8;
 const SPEAKER_LINE = /^(Person (\d+):) (.*)$/;
+/** A speaker's label colour, for text on the transcript's white in every theme. */
+export const speakerColor = (number: number) =>
+  `var(--ce-speaker-${((number - 1 + SPEAKER_COLORS) % SPEAKER_COLORS) + 1})`;
 
 // The open transcript: read-only text with a clear control in its corner, each speaker's label bold and in
 // that person's colour. As chunks arrive it keeps the newest line in view, unless the host has scrolled up to
@@ -90,14 +93,7 @@ export function SessionListeningTranscript({ transcript, clearDisabled, onClear 
               <p key={index}>
                 {turn ? (
                   <>
-                    <strong
-                      style={{
-                        color: `var(--ce-speaker-${((Number(turn[2]) - 1 + SPEAKER_COLORS) % SPEAKER_COLORS) + 1})`,
-                      }}
-                    >
-                      {turn[1]}
-                    </strong>{' '}
-                    {turn[3]}
+                    <strong style={{ color: speakerColor(Number(turn[2])) }}>{turn[1]}</strong> {turn[3]}
                   </>
                 ) : (
                   line

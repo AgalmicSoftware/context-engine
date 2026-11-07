@@ -1,11 +1,12 @@
 import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Button, Modal, ModalBody, ModalHeader, UncontrolledTooltip } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faQuestionCircle } from '@fortawesome/free-solid-svg-icons';
+import { faQrcode, faQuestionCircle } from '@fortawesome/free-solid-svg-icons';
 import CEConfirmDialog from '../Shared/CEConfirmDialog';
 import SessionInterviewPanel from './SessionInterviewPanel';
 import SessionListeningPanel from './SessionListeningPanel';
 import SessionRecordingHelp from './SessionRecordingHelp';
+import SessionTranscriptClaimScanner from './SessionTranscriptClaimScanner';
 import SessionVoiceModeChooser from './SessionVoiceModeChooser';
 import SessionVoicePrefillCard from './SessionVoicePrefillCard';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
@@ -13,6 +14,7 @@ import { VOICE_DIALOG_NOTICE_SLOT_ID } from '../../utilities/ui/voiceDialogNotic
 import { useKeptRecording } from '../../utilities/audio/useRecordingChunkQueue';
 import { sortInterviewQuestionPoolNewestFirst } from './sessionInterviewQuestionOrder';
 import { normalizeInterviewQuestions, type InterviewPrefillPacket } from './sessionInterview';
+import type { TranscriptClaim } from './sessionTranscriptClaim';
 import type { SessionVoiceModeModalProps } from './sessionVoiceModeTypes';
 import styles from './SurveyTool.module.scss';
 
@@ -61,6 +63,14 @@ export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps)
   const [interviewVersion, setInterviewVersion] = useState(0);
   const [discardedPrefill, setDiscardedPrefill] = useState<InterviewPrefillPacket | null>(null);
   const prefillPacket = props.prefillPacket === discardedPrefill ? null : props.prefillPacket;
+  const [discardedClaim, setDiscardedClaim] = useState<TranscriptClaim | null>(null);
+  const claim = props.claim === discardedClaim ? null : props.claim;
+  const [scanRequested, setScanRequested] = useState(false);
+  const scanning = scanRequested || !!props.claimFrame;
+  const stopScanning = () => {
+    setScanRequested(false);
+    props.onClaimFrameDone?.();
+  };
   // Closing retains this review, but importing different evidence starts a new
   // review. Equivalent packet objects must not erase the participant's edits.
   const prefillIdentity = useMemo(() => JSON.stringify(prefillPacket || null), [prefillPacket]);
@@ -101,6 +111,7 @@ export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps)
             key={`${interviewVersion}:${prefillIdentity}`}
             {...props}
             prefillPacket={prefillPacket}
+            claim={claim}
             onClose={requestClose}
             questions={questions}
             onReviewStateChange={setHasUnsavedReview}
@@ -109,9 +120,22 @@ export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps)
         ) : (
           <>
             <ModalHeader id="ce-session-voice-mode-title" toggle={requestClose}>
-              <span className={styles.sessionRecordingHeading}>
-                {title}
-                {mode === 'recordGroup' ? <SessionRecordingHelp /> : null}
+              <span className={styles.sessionVoiceModeTitle}>
+                <span className={styles.sessionRecordingHeading}>
+                  {title}
+                  {mode === 'recordGroup' ? <SessionRecordingHelp /> : null}
+                </span>
+                {props.onClaim ? (
+                  <Button
+                    type="button"
+                    className={styles.sessionRecordingButton}
+                    disabled={groupCapturing}
+                    data-testid={E2E_TESTIDS.SESSION_CLAIM_SCAN}
+                    onClick={() => setScanRequested(true)}
+                  >
+                    <FontAwesomeIcon icon={faQrcode} /> Scan code
+                  </Button>
+                ) : null}
               </span>
             </ModalHeader>
             <ModalBody>
@@ -140,6 +164,23 @@ export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps)
           </>
         )}
       </Modal>
+      {isOpen && scanning ? (
+        <Modal isOpen toggle={stopScanning} centered contentClassName={styles.sessionVoiceModeModal}>
+          <ModalHeader toggle={stopScanning}>Scan your code</ModalHeader>
+          <ModalBody>
+            <SessionTranscriptClaimScanner
+              sessionSlug={props.sessionSlug || ''}
+              firstFrame={props.claimFrame}
+              onCancel={stopScanning}
+              onClaim={(scanned) => {
+                stopScanning();
+                // A recording left in this dialog finishes as closing it would, before the interview takes over.
+                void Promise.resolve(groupCloseRef.current?.()).finally(() => props.onClaim?.(scanned));
+              }}
+            />
+          </ModalBody>
+        </Modal>
+      ) : null}
       {(kept.waiting > 0 || kept.unsaved) && !keptDismissed ? (
         <div style={KEPT_AUDIO_NOTICE_POSITION}>
           <aside className={styles.sessionListeningPanel} aria-label="Kept recording audio">
@@ -192,6 +233,7 @@ export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps)
           setConfirmDiscard(false);
           setHasUnsavedReview(false);
           setDiscardedPrefill(props.prefillPacket || null);
+          setDiscardedClaim(props.claim || null);
           setInterviewVersion((version) => version + 1);
           onClose();
         }}
