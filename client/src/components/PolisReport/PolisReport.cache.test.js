@@ -29,6 +29,7 @@ import { buildUmapParticipantData, rememberClusterAnalysis } from './polisReport
 import { CHART_SERIES_COLORS } from '../../utilities/ui/chartColors';
 import { doUMAP } from '../../utilities/survey/consensusMath';
 import { computePolisCommentStats, computePolisConversationMath } from '../../utilities/survey/consensusReportMath.js';
+import { analyzeClusterOpinions } from '../../utilities/ai/aiClient.js';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import * as sessionScanScope from '../../utilities/session/sessionScanScope.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
@@ -58,6 +59,12 @@ jest.mock('../../utilities/cache/cacheScripts.js', () => ({
   peekCacheSync: jest.fn(() => ({})),
 }));
 
+// The real client, so the sponsored analysis tests below reach the Worker; one test replaces its answers.
+jest.mock('../../utilities/ai/aiClient.js', () => {
+  const actual = jest.requireActual('../../utilities/ai/aiClient.js');
+  return { ...actual, analyzeClusterOpinions: jest.fn(actual.analyzeClusterOpinions) };
+});
+
 jest.mock('../../utilities/survey/consensusMath', () => ({
   clusterUMAPPointsKmeans: jest.fn((points = []) => new Array(points.length).fill(0)),
   doUMAP: jest.fn((data = []) => data.map((_, index) => [index, index])),
@@ -75,6 +82,7 @@ jest.mock('../../utilities/survey/consensusReportMath.js', () => ({
     statementCoords: [],
     commentStats: [],
     clusterAssignments: [],
+    analyticalClusterAssignments: [],
     clusterCount: 0,
     repQuestions: {},
   })),
@@ -294,6 +302,7 @@ describe('PolisReport cache read options', () => {
       statementCoords: [],
       commentStats: [],
       clusterAssignments: [],
+      analyticalClusterAssignments: [],
       clusterCount: 0,
       repQuestions: {},
     });
@@ -631,6 +640,13 @@ describe('PolisReport cache read options', () => {
       [1, 1, -1],
       [-1, 1, -1],
       [1, 1, -1],
+    ]);
+  });
+
+  it('gives every participant a UMAP row when a question has fewer responses', () => {
+    expect(buildUmapParticipantData([[1], [1, -1]])).toEqual([
+      [1, 1],
+      [1, -1],
     ]);
   });
 
@@ -1577,6 +1593,65 @@ describe('PolisReport demo data defaults', () => {
     ['Binary', 'Freeform', 'Ratings', 'Multiple choice', 'Quadratic allocation'].forEach((name) => {
       expect(screen.getByRole('button', { name })).toHaveAttribute('aria-expanded', 'true');
     });
+  });
+
+  it('uses analytical memberships for AI group sizes and representative vote bars', async () => {
+    const responseRow = (responder, value) => ({
+      responder,
+      questionId: 'q1',
+      response: JSON.stringify({ type: 'binary', prompt: 'Prompt', answer: { value } }),
+    });
+    const questionResponses = {
+      q1: [
+        responseRow('p0', 'Agree'),
+        responseRow('p1', 'Disagree'),
+        responseRow('p2', 'Disagree'),
+        responseRow('p3', 'Disagree'),
+      ],
+    };
+    // Later tests rely on the mock they find, so this one puts it back.
+    const previousMath = computePolisConversationMath.getMockImplementation();
+    const analysis = { short: 'Summary', long: 'Long summary', name: 'Group' };
+    analyzeClusterOpinions.mockResolvedValueOnce(analysis).mockResolvedValueOnce(analysis);
+    computePolisConversationMath.mockReturnValue({
+      stats: { nParticipants: 4, nComments: 1, totalVotes: 4, votesPerVoterAvg: 1 },
+      participantCoords: [
+        { x: 0, y: 0, index: 0 },
+        { x: 0.1, y: 0, index: 1 },
+        { x: 1, y: 0, index: 2 },
+        { x: 1.1, y: 0, index: 3 },
+      ],
+      statementCoords: [{ x: 0, y: 0, index: 0 }],
+      commentStats: [],
+      clusterAssignments: [0, 0, 1, 1],
+      analyticalClusterAssignments: [0, -1, 1, 1],
+      clusterCount: 2,
+      repQuestions: {
+        0: [{ label: '#1', questionIndex: 0, prompt: 'Prompt', difference: 0.5, repfulFor: 'agree' }],
+        1: [{ label: '#1', questionIndex: 0, prompt: 'Prompt', difference: 0.5, repfulFor: 'disagree' }],
+      },
+    });
+
+    render(<PolisReport {...baseReportProps} slug="edge" questionResponses={questionResponses} />);
+
+    fireEvent.change(screen.getByDisplayValue('UMAP'), { target: { value: 'POLIS' } });
+    await screen.findByDisplayValue(REPORT_DEFAULT_EMBEDDING_LABEL);
+    fireEvent.click(await screen.findByTestId(E2E_TESTIDS.POLIS_ANALYZE_CLUSTERS));
+
+    await waitFor(() => expect(analyzeClusterOpinions).toHaveBeenCalled());
+    expect(analyzeClusterOpinions.mock.calls[0][0]).toEqual(
+      expect.objectContaining({
+        clusterIndex: 0,
+        clusterSize: 1,
+        topStatements: [
+          expect.objectContaining({
+            cluster: expect.objectContaining({ agree: 1, disagree: 0, responded: 1 }),
+          }),
+        ],
+      }),
+    );
+    expect(analyzeClusterOpinions.mock.calls[0][1]).toEqual(expect.objectContaining({ sizes: { 0: 1, 1: 2 } }));
+    computePolisConversationMath.mockImplementation(previousMath);
   });
 
   it('defaults built-in /session/demo to UMAP with 3 groups and still exposes precomputed Polis analysis after switching modes', async () => {

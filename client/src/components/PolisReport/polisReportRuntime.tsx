@@ -956,7 +956,7 @@ export function buildRatingMatrixFromRealData(
  * would pull participants who skipped the same questions together.
  */
 export function buildUmapParticipantData(ratingMatrix: RatingMatrix): number[][] {
-  const nParticipants = ratingMatrix[0]?.length || 0;
+  const nParticipants = ratingMatrix.reduce((widest, votes) => Math.max(widest, votes.length), 0);
   const means = ratingMatrix.map((votes) => {
     const answered = votes.filter((vote): vote is ConcretePolisVote => vote !== null && vote !== undefined);
     return answered.length ? answered.reduce<number>((sum, vote) => sum + vote, 0) / answered.length : 0;

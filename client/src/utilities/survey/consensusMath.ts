@@ -91,7 +91,7 @@ export function clusterUMAPPointsKmeans(umapPoints: Point2D[], k = 3, seed: numb
 export function computeQuestionDivisiveness(ratingMatrix: RatingMatrix) {
   const rows = Array.isArray(ratingMatrix) ? ratingMatrix : [];
   const nComments = rows.length;
-  const nParticipants = nComments > 0 && Array.isArray(rows[0]) ? rows[0].length : 0;
+  const nParticipants = rows.reduce((maxWidth, row) => Math.max(maxWidth, Array.isArray(row) ? row.length : 0), 0);
   const results: Array<{
     commentIndex: number;
     agrees: number;

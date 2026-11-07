@@ -129,7 +129,7 @@ const isDisagreeVote = (value: unknown): value is -1 => value === -1;
 
 function matrixShape(matrix: PolisReportRatingMatrix = []): [number, number] {
   const rows = Array.isArray(matrix) ? matrix.length : 0;
-  const cols = rows > 0 && Array.isArray(matrix[0]) ? matrix[0].length : 0;
+  const cols = rows ? matrix.reduce((maxWidth, row) => Math.max(maxWidth, Array.isArray(row) ? row.length : 0), 0) : 0;
   return [rows, cols];
 }
 
@@ -888,13 +888,13 @@ function buildMemberIndicesByGroup(assignments: number[] = []): {
   groupIds: number[];
   byGroup: Record<number, number[]>;
 } {
-  const groupIds = Array.from(new Set(assignments.filter((clusterId) => Number.isInteger(clusterId)))).sort(
-    (left, right) => left - right,
-  );
+  const groupIds = Array.from(
+    new Set(assignments.filter((clusterId) => Number.isInteger(clusterId) && clusterId >= 0)),
+  ).sort((left, right) => left - right);
 
   const byGroup: Record<number, number[]> = Object.fromEntries(groupIds.map((groupId) => [groupId, []]));
   assignments.forEach((groupId, participantIndex) => {
-    if (!Number.isInteger(groupId) || !byGroup[groupId]) return;
+    if (!Number.isInteger(groupId) || groupId < 0 || !byGroup[groupId]) return;
     byGroup[groupId].push(participantIndex);
   });
   return { groupIds, byGroup };
@@ -1082,6 +1082,7 @@ export function computePolisConversationMath(
   statementCoords: PolisPoint[];
   commentStats: ReturnType<typeof computePolisCommentStats>;
   clusterAssignments: number[];
+  analyticalClusterAssignments: number[];
   clusterCount: number;
   repQuestions: Record<number, RepresentativeComment[]>;
   baseClusters: Cluster[];
@@ -1100,8 +1101,18 @@ export function computePolisConversationMath(
     baseClusters,
     clusteredBase.groupClusters,
   );
-  const repQuestions = findRepresentativeQuestions(ratingMatrix, clusterAssignments, questionPromptsMap, allQuestions);
-
+  const inConversationParticipantSet = new Set(inConversationParticipantIndices);
+  // Regression guard: display assignments include every participant, but analytical
+  // repness and group tallies must exclude low-participation nearest-group outliers.
+  const analyticalClusterAssignments = clusterAssignments.map((clusterId, participantIndex) =>
+    inConversationParticipantSet.has(participantIndex) ? clusterId : -1,
+  );
+  const repQuestions = findRepresentativeQuestions(
+    ratingMatrix,
+    analyticalClusterAssignments,
+    questionPromptsMap,
+    allQuestions,
+  );
   return {
     stats,
     participantCoords: pcaBundle.participantCoords,
@@ -1111,6 +1122,7 @@ export function computePolisConversationMath(
       pcaBundle,
     }),
     clusterAssignments,
+    analyticalClusterAssignments,
     clusterCount: clusteredBase.clusterCount || (clusterAssignments.length ? 1 : 0),
     repQuestions,
     baseClusters,

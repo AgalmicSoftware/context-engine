@@ -102,7 +102,9 @@ function buildClusters(
   const centerById = new Map(groupClusters.map((cluster) => [cluster.id, cluster.center]));
   const memberIndicesById = new Map<number, number[]>();
   clusterAssignments.forEach((clusterId, participantIndex) => {
-    if (!Number.isInteger(clusterId)) return;
+    // Negative assignments mark display-only participants and must never become
+    // an analytical cluster or contribute to the export's k-anonymity proof.
+    if (!Number.isInteger(clusterId) || clusterId < 0) return;
     const members = memberIndicesById.get(clusterId) || [];
     members.push(participantIndex);
     memberIndicesById.set(clusterId, members);
@@ -184,7 +186,16 @@ export function buildCommonGroundSnapshotFromDemoDataset(
     throw new Error('CommonGround export requires computePolisConversationMath cluster assignments.');
   }
 
-  const clusters = buildClusters(mathResult.clusterAssignments, mathResult.groupClusters || [], participants);
+  const analyticalAssignments = mathResult.analyticalClusterAssignments;
+  // CommonGround requires clusters to partition every emitted participant.
+  // Never substitute display-only nearest-group labels to satisfy that privacy contract.
+  if (
+    analyticalAssignments.length !== participants.length ||
+    analyticalAssignments.some((clusterId) => !Number.isInteger(clusterId) || clusterId < 0)
+  ) {
+    return null;
+  }
+  const clusters = buildClusters(analyticalAssignments, mathResult.groupClusters || [], participants);
   if (!passesKAnonymity(clusters, kAnonymity)) return null;
 
   return {

@@ -22,6 +22,55 @@ describe('computePolisStats', () => {
       votesPerVoterAvg: 4 / 3,
     });
   });
+
+  it('uses the widest row so ragged matrices keep every participant', () => {
+    const ratingMatrix = [[], [1, -1]];
+
+    expect(computePolisStats(ratingMatrix)).toEqual({
+      nComments: 2,
+      nParticipants: 2,
+      totalVotes: 2,
+      voters: 2,
+      votesPerVoterAvg: 1,
+    });
+    expect(computePolisPcaBundle(ratingMatrix).participantMatrix).toEqual([
+      [null, 1],
+      [null, -1],
+    ]);
+    expect(computePolisCommentStats(ratingMatrix)).toEqual([
+      expect.objectContaining({ commentIndex: 0, agrees: 0, disagrees: 0, unsure: 0, total: 0 }),
+      expect.objectContaining({ commentIndex: 1, agrees: 1, disagrees: 1, unsure: 0, total: 2 }),
+    ]);
+  });
+
+  it('preserves rectangular finite invariants across bounded deterministic ragged matrices', () => {
+    const voteValues = [-1, 0, 1, null];
+
+    for (let seed = 0; seed < 32; seed += 1) {
+      const nComments = 1 + (seed % 5);
+      const ratingMatrix = Array.from({ length: nComments }, (_, commentIndex) =>
+        Array.from(
+          { length: (seed * 3 + commentIndex * 5) % 7 },
+          (_, participantIndex) => voteValues[(seed + commentIndex + participantIndex) % voteValues.length],
+        ),
+      );
+      const expectedParticipants = ratingMatrix.reduce((max, row) => Math.max(max, row.length), 0);
+      const expectedVotes = ratingMatrix.flat().filter((vote) => vote === -1 || vote === 0 || vote === 1).length;
+      const stats = computePolisStats(ratingMatrix);
+      const bundle = computePolisPcaBundle(ratingMatrix, { randomSeed: seed });
+
+      expect(stats.nParticipants).toBe(expectedParticipants);
+      expect(stats.totalVotes).toBe(expectedVotes);
+      expect(bundle.participantMatrix).toHaveLength(expectedParticipants);
+      bundle.participantMatrix.forEach((participantVotes, participantIndex) => {
+        expect(participantVotes).toHaveLength(nComments);
+        participantVotes.forEach((vote, commentIndex) => {
+          expect(vote).toBe(ratingMatrix[commentIndex][participantIndex] ?? null);
+        });
+      });
+      expect(bundle.participantCoords.flatMap(({ x, y }) => [x, y]).every(Number.isFinite)).toBe(true);
+    }
+  });
 });
 
 describe('computePolisCommentStats', () => {
@@ -104,9 +153,6 @@ describe('computePolisConversationMath', () => {
     expect(result.clusterAssignments[3]).toBe(result.clusterAssignments[4]);
     expect(result.clusterAssignments[0]).not.toBe(result.clusterAssignments[3]);
     expect(Number.isInteger(result.clusterAssignments[5])).toBe(true);
-    expect(result.groupVotes).toBeUndefined();
-    expect(result.groupAwareConsensus).toBeUndefined();
-    expect(result.consensus).toBeUndefined();
   });
 
   it('builds base clusters by participant index, not participantCoords array position', () => {
@@ -129,6 +175,32 @@ describe('computePolisConversationMath', () => {
       { id: 1, center: [10, 20], members: [4] },
       { id: 2, center: [-3, 5], members: [2] },
     ]);
+  });
+
+  it('keeps low-participation display assignments out of representative-question inference', () => {
+    // Twelve people split into two groups across six questions; the thirteenth answers only the first.
+    const matrix = [
+      [1, 1, 1, 1, 1, 1, -1, -1, -1, -1, -1, -1, 1],
+      [1, 1, 1, 1, 1, 1, -1, -1, -1, -1, -1, -1, null],
+      [1, 1, 1, 1, 1, 1, -1, -1, -1, -1, -1, -1, null],
+      [-1, -1, -1, -1, -1, -1, 1, 1, 1, 1, 1, 1, null],
+      [-1, -1, -1, -1, -1, -1, 1, 1, 1, 1, 1, 1, null],
+      [-1, -1, -1, -1, -1, -1, 1, 1, 1, 1, 1, 1, null],
+    ];
+    const options = { randomSeed: 42, inConversationFloor: 12, inConversationThresholdCap: 2 };
+
+    const result = computePolisConversationMath(matrix, {}, [], options);
+
+    expect(result.inConversationParticipantIndices).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
+    expect(result.clusterAssignments[12]).toBe(result.clusterAssignments[0]);
+    expect(result.analyticalClusterAssignments[12]).toBe(-1);
+    expect(result.analyticalClusterAssignments.slice(0, 12)).toEqual(result.clusterAssignments.slice(0, 12));
+    const group = result.repQuestions[result.clusterAssignments[0]];
+    expect(group.find((question) => question.questionIndex === 0)).toMatchObject({ nSuccess: 6, nTrials: 6 });
+
+    const changedVote = matrix.map((row) => [...row]);
+    changedVote[0][12] = -1;
+    expect(computePolisConversationMath(changedVote, {}, [], options).repQuestions).toEqual(result.repQuestions);
   });
 });
 

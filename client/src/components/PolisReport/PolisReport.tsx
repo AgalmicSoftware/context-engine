@@ -450,6 +450,7 @@ export default function PolisReport({
     statementCoords: PolisPoint[];
     commentStats?: PolisCommentStat[];
     clusterAssignments: number[];
+    analyticalClusterAssignments: number[];
     clusterCount: number;
     repQuestions: PolisRepQuestionsMap;
   } | null>(null);
@@ -471,6 +472,7 @@ export default function PolisReport({
           statementCoords: PolisPoint[];
           commentStats?: PolisCommentStat[];
           clusterAssignments: number[];
+          analyticalClusterAssignments: number[];
           clusterCount: number;
           repQuestions: PolisRepQuestionsMap;
         },
@@ -559,6 +561,22 @@ export default function PolisReport({
     precomputedDemoClusterState,
     shouldUsePrecomputedDemoClusters,
   ]);
+  const activeAnalyticalClusterAssignments = useMemo(() => {
+    if (isExploratoryMode || shouldUsePrecomputedDemoClusters) {
+      return activeClusterAssignments;
+    }
+    const analytical = polisMathResult?.analyticalClusterAssignments;
+    return Array.isArray(analytical) && analytical.length ? analytical : activeClusterAssignments;
+  }, [activeClusterAssignments, isExploratoryMode, polisMathResult, shouldUsePrecomputedDemoClusters]);
+  const activeAnalyticalClusterIds = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          activeAnalyticalClusterAssignments.filter((clusterId) => Number.isInteger(clusterId) && clusterId >= 0),
+        ),
+      ).sort((left, right) => left - right),
+    [activeAnalyticalClusterAssignments],
+  );
   const activeRepQuestions = useMemo(() => {
     const source = isExploratoryMode ? exploratoryRepQuestions : repQuestions;
     if (source && typeof source === 'object' && Object.keys(source).length) return source;
@@ -620,7 +638,7 @@ export default function PolisReport({
   const analysisDataKey = useMemo(
     () =>
       buildClusterAnalysisDataKey({
-        activeClusterAssignments,
+        activeClusterAssignments: activeAnalyticalClusterAssignments,
         activeClusterCount,
         activeRepQuestions,
         embeddingChoice,
@@ -630,7 +648,7 @@ export default function PolisReport({
         allResponders,
       }),
     [
-      activeClusterAssignments,
+      activeAnalyticalClusterAssignments,
       activeClusterCount,
       activeRepQuestions,
       embeddingChoice,
@@ -972,15 +990,15 @@ export default function PolisReport({
   useEffect(() => {
     if (!isUmapView || umapMatrixRef.current === ratingMatrix) return;
     umapMatrixRef.current = ratingMatrix;
-    const nParticipants = ratingMatrix?.[0]?.length || 0;
-    if (!ratingMatrix || nParticipants < 3) {
+    const participantData = ratingMatrix ? buildUmapParticipantData(ratingMatrix) : [];
+    if (participantData.length < 3) {
       setUmapParticipantCoords([]);
       return;
     }
 
     try {
-      const nNeighbors = Math.max(2, Math.min(15, nParticipants - 1));
-      const embedding = doUMAPTyped(buildUmapParticipantData(ratingMatrix), nNeighbors, DETERMINISTIC_SEED);
+      const nNeighbors = Math.max(2, Math.min(15, participantData.length - 1));
+      const embedding = doUMAPTyped(participantData, nNeighbors, DETERMINISTIC_SEED);
       setUmapParticipantCoords(
         embedding.map((point, index) => ({
           x: point[0],
@@ -1456,7 +1474,7 @@ export default function PolisReport({
   };
 
   const buildClusterPayload = (clusterIndex: number, uniqueClusters: number[]): UnknownRecord => {
-    const clusterSize = activeClusterAssignments.filter((c) => c === clusterIndex).length;
+    const clusterSize = activeAnalyticalClusterAssignments.filter((c) => c === clusterIndex).length;
     const totalClusters = uniqueClusters.length;
     const matrix = ratingMatrix || [];
 
@@ -1465,7 +1483,7 @@ export default function PolisReport({
       const qIdx = rq.questionIndex;
       const promptKey = allQuestions[qIdx];
       const prompt = (questionPrompts[promptKey] || rq.prompt || '').trim();
-      const clusterVotes = getVotesForQuestionInCluster(qIdx, clusterIndex, matrix, activeClusterAssignments);
+      const clusterVotes = getVotesForQuestionInCluster(qIdx, clusterIndex, matrix, activeAnalyticalClusterAssignments);
       const overallVotes = matrix[qIdx] || [];
       return {
         label: rq.label,
@@ -1486,10 +1504,10 @@ export default function PolisReport({
    ***************************************************************/
   const handleAnalyzeClustersClick = async () => {
     try {
-      if (!activeClusterAssignments || activeClusterAssignments.length === 0) return;
+      if (!activeAnalyticalClusterAssignments.length) return;
 
       const key = currentAnalysisKey;
-      const uniqueClusters = Array.from(new Set(activeClusterAssignments)).sort((a, b) => a - b);
+      const uniqueClusters = activeAnalyticalClusterIds;
       if (uniqueClusters.length === 0) return;
 
       const cacheForKey = analysisCacheByKey[key] || {};
@@ -1514,7 +1532,7 @@ export default function PolisReport({
       // Optional all-clusters context (sizes only) for the template
       const clusterSizes: NumberMap = {};
       uniqueClusters.forEach((c) => {
-        clusterSizes[c] = activeClusterAssignments.filter((x) => x === c).length;
+        clusterSizes[c] = activeAnalyticalClusterAssignments.filter((x) => x === c).length;
       });
       const baseAllClustersData = { clusterCount: uniqueClusters.length, sizes: clusterSizes };
 
@@ -1605,7 +1623,7 @@ export default function PolisReport({
       );
     }
     const arr = activeRepQuestions[clusterIndex].slice(0, 3);
-    const uniqueClusters = Array.from(new Set(activeClusterAssignments)).sort((a, b) => a - b);
+    const uniqueClusters = activeAnalyticalClusterIds;
     const colorScale = d3Report.scaleOrdinal(POLIS_CLUSTER_COLORS);
 
     return (
@@ -1617,7 +1635,7 @@ export default function PolisReport({
             qIndex,
             clusterIndex,
             ratingMatrix,
-            activeClusterAssignments,
+            activeAnalyticalClusterAssignments,
           );
 
           const stance = rq.repfulFor === 'disagree' ? 'disagree' : 'agree';
@@ -1664,7 +1682,7 @@ export default function PolisReport({
                       qIndex,
                       cl,
                       ratingMatrix,
-                      activeClusterAssignments,
+                      activeAnalyticalClusterAssignments,
                     );
                     const clusterColor = colorScale(cl);
                     return (
@@ -1725,8 +1743,8 @@ export default function PolisReport({
    * renderClusterLegend (augmented with AI summaries + timers)
    ***************************************************************/
   function renderClusterLegend() {
-    if (!activeClusterAssignments || !activeClusterAssignments.length) return null;
-    const uniqueClusters = Array.from(new Set(activeClusterAssignments)).sort((a, b) => a - b);
+    if (!activeAnalyticalClusterIds.length) return null;
+    const uniqueClusters = activeAnalyticalClusterIds;
     const colorScale = d3Report.scaleOrdinal(POLIS_CLUSTER_COLORS);
 
     const cacheForKey = analysisCacheByKey[currentAnalysisKey] || {};

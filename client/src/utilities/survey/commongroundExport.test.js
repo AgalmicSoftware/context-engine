@@ -146,4 +146,25 @@ describe('CommonGround deliberation snapshot export', () => {
       }),
     ).toBeNull();
   });
+
+  it('fails closed when analytical groups do not partition every emitted participant', () => {
+    const fullVotes = Object.fromEntries(Array.from({ length: 7 }, (_, index) => [index, 1]));
+    const dataset = {
+      comments: Array.from({ length: 7 }, (_, index) => ({
+        type: 'binary',
+        commentBody: `Statement ${index + 1}`,
+      })),
+      participantsVotes: Array.from({ length: 16 }, (_, participantIndex) => ({
+        votes: participantIndex === 15 ? { 0: 1 } : fullVotes,
+      })),
+    };
+
+    expect(
+      buildCommonGroundSnapshotFromDemoDataset(dataset, {
+        sessionId: 'in-conversation-k-test',
+        seed: 42,
+        kAnonymity: 15,
+      }),
+    ).toBeNull();
+  });
 });
