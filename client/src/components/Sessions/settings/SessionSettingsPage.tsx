@@ -5,7 +5,7 @@ import wizardStyles from '../SessionWizard.module.scss';
 import styles from '../setup/SessionSetup.module.scss';
 import ContextSourcesPanel from '../setup/ContextSourcesPanel';
 import { normalizeSessionContext } from '@ce-shared/sessionContext.mjs';
-import type { ContextSource } from '../../../utilities/docLibrary/contextSources';
+import { templateContextFiles, type ContextSource } from '../../../utilities/docLibrary/contextSources';
 import { SessionTemplateActions, SetupQuestionsPublisher } from '../setup/SessionTemplateTools';
 import { sessionTemplateFromDraft } from '@ce-shared/sessionTemplate.mjs';
 import {
@@ -345,9 +345,7 @@ const SessionSettingsPage = ({
           buildTemplate={() =>
             sessionTemplateFromDraft({
               ...draft,
-              contextFiles: contextSources
-                .filter((source) => source.kind === 'file')
-                .map((source) => ({ name: source.title, adminsOnly: source.adminsOnly })),
+              contextFiles: templateContextFiles(contextSources),
             })
           }
           onImport={importTemplate}

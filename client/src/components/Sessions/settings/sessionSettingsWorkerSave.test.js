@@ -268,6 +268,24 @@ describe('saving the edit page through the Session Worker', () => {
     expect(buildSessionSettingsSave(before, draft).patch).not.toHaveProperty('sessionModeProfile');
   });
 
+  it('leaves who can add context alone when a template is imported, and saves a change without signing anyone out', () => {
+    const stored = { ...publishedSession(), contextAdditionPolicy: 'admin_only' };
+    const before = projectPublicWorkerSessionConfig(stored);
+    const { draft } = applyTemplateToSessionSettingsDraft(buildSessionSettingsDraft(before), {
+      format: SESSION_TEMPLATE_FORMAT,
+    });
+    expect(draft.contextAdditionPolicy).toBe('admin_only');
+    expect(buildSessionSettingsSave(before, draft).patch).not.toHaveProperty('contextAdditionPolicy');
+
+    const { save, result } = editAndSave(publishedSession(), (next) => {
+      next.contextAdditionPolicy = 'admin_only';
+    });
+    expect(save.patch).toEqual({ contextAdditionPolicy: 'admin_only' });
+    expect(save.classification.signsParticipantsOut).toBe(false);
+    expect(result).toMatchObject({ ok: true });
+    expect(result.config.contextAdditionPolicy).toBe('admin_only');
+  });
+
   it('saves highlighted and hidden lists, one ID per line, without signing anyone out', () => {
     const stored = publishedSession();
     const questionId = `0x${'ab'.repeat(32)}`;

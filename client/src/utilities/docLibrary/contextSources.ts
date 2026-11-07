@@ -209,6 +209,12 @@ export const contextAdderLabel = (
     : `${addedBy.slice(0, 6)}…${addedBy.slice(-4)}`;
 };
 
+/** A session's files as a template lists them. Groups don't travel between sessions, so a locked file stays narrow. */
+export const templateContextFiles = (sources: ContextSource[]): Array<{ name: string; adminsOnly: boolean }> =>
+  sources
+    .filter((source) => source.kind === 'file')
+    .map((source) => ({ name: source.title, adminsOnly: source.adminsOnly || !!source.lockedGroupId }));
+
 const postContextAction = async (body: UnknownRecord, options: ContextSourceOptions): Promise<UnknownRecord> => {
   const baseUrl = await workerBaseUrl(options);
   const response = await fetchWorkerWithAuth(

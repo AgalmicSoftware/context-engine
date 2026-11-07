@@ -7,6 +7,7 @@ import {
   readContextPdf,
   readContextSourceText,
   removeContextSource,
+  templateContextFiles,
   uploadContextFile,
   type ContextSource,
 } from './contextSources';
@@ -172,6 +173,23 @@ describe('context sources on the client', () => {
     jest.mocked(hasCachedWorkerSessionToken).mockResolvedValueOnce(true);
     await listContextSources(options);
     expect(listPage).toHaveBeenLastCalledWith(expect.objectContaining({ preferAnonymous: false }));
+  });
+
+  it('keeps a group’s file narrow in a template, since groups don’t travel between sessions', () => {
+    const source = (overrides: Partial<ContextSource>) =>
+      ({ kind: 'file', title: 'x', adminsOnly: false, lockedGroupId: '', ...overrides }) as ContextSource;
+    expect(
+      templateContextFiles([
+        source({ title: 'open.txt' }),
+        source({ title: 'admins.txt', adminsOnly: true }),
+        source({ title: 'group.txt', lockedGroupId: 'salon' }),
+        source({ title: 'page', kind: 'link' }),
+      ]),
+    ).toEqual([
+      { name: 'open.txt', adminsOnly: false },
+      { name: 'admins.txt', adminsOnly: true },
+      { name: 'group.txt', adminsOnly: true },
+    ]);
   });
 
   it('reads the group a source is locked to, and says who added it', async () => {

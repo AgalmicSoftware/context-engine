@@ -343,7 +343,6 @@ const TEMPLATE_FIELDS = [
   'defaultTags',
   'defaultGroupTags',
   'groupCreationPolicy',
-  'contextAdditionPolicy',
   'interviewModeEnabled',
   'interviewMode',
   'resultsAnalysis',
