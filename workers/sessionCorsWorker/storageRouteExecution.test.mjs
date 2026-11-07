@@ -4129,6 +4129,11 @@ test('storageRoute worker_envelope evaluates any/all and supported condition kin
 	const anyResponse = await read({ authScopes: { storage: true } });
 	assert.equal(anyResponse.status, 200);
 	assert.equal(await anyResponse.text(), 'classified payload');
+	// Only an issued scope satisfies the rule; login tokens carry no grant lists.
+	for (const claims of [{ delegationScopes: ['storage'] }, { agentGrant: ['storage'] }, { agent_grant: ['storage'] }]) {
+		const claimed = await read({ authScopes: claims });
+		assert.equal(claimed.status, 403, JSON.stringify(claims));
+	}
 
 	await setConditions({
 		match: 'all',
