@@ -69,6 +69,12 @@ try {
       });
       let fail = true,
         requests = 0;
+      // A part can be saved as failed a moment before its upload goes out, so wait briefly for the count.
+      const expectRequests = async (count) => {
+        for (const deadline = Date.now() + 5000; requests < count && Date.now() < deadline; )
+          await new Promise((resolve) => setTimeout(resolve, 50));
+        assert.equal(requests, count);
+      };
       await page.route('**/*', async (route) => {
         const url = new URL(route.request().url());
         if (url.origin === 'https://worker.example') {
@@ -123,6 +129,9 @@ try {
       await assertReadable(page.getByRole('tooltip'));
       await page.getByRole('checkbox', { name: 'Label speakers', exact: true }).uncheck();
       assert.equal((await page.getByTestId(ids.SESSION_RECORDING_ADD_INPUT).innerText()).trim(), '+');
+      // The + sits in the dialog's header, whose text this audits; its choices open in the panel.
+      assert(await page.getByTestId(ids.SESSION_RECORDING_ADD_INPUT).evaluate((el) => !!el.closest('.modal-header')));
+      await assertReadable(page.locator('.modal-header').first());
       await page.getByTestId(ids.SESSION_RECORDING_ADD_INPUT).click();
       await page.getByRole('button', { name: /Upload audio/ }).waitFor();
       await assertReadable(panel);
@@ -161,7 +170,7 @@ try {
           [status, withAudio],
         );
       await storedAudio('failed', true);
-      assert.equal(requests, 2);
+      await expectRequests(2);
       await page.getByTestId(ids.SESSION_RECORDING_TRANSCRIPT_FILE).setInputFiles({
         name: 'notes.txt',
         mimeType: 'text/plain',
