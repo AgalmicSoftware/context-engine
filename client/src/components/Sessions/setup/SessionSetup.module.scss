@@ -214,6 +214,8 @@
 }
 
 .bannerTitle {
+  // A global heading colour would otherwise make it unreadable on dark themes.
+  color: var(--ce-panel-text);
   font-weight: 600;
   margin: 0;
 }

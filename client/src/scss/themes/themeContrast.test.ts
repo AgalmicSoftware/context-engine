@@ -567,6 +567,17 @@ describe('bundled app-theme contrast', () => {
     expect(ratios.filter(([, value]) => value < 4.5)).toEqual([]);
   });
 
+  // A heading with no colour of its own takes the global one, which vanishes on dark themes.
+  test.each(registry.themes.map(({ id }) => id))('%s keeps the setup banner title readable', (themeId) => {
+    const values = themeValues(css, themeId);
+    const paint = painter(values);
+    const setupCss = compileModule('components/Sessions/setup/SessionSetup.module.scss');
+    const surface = composite(parseColor(values.surface), parseColor(values.canvas));
+    const banner = composite(paint(moduleRule(setupCss, '.banner').background), surface);
+    const title = composite(paint(moduleRule(setupCss, '.bannerTitle').color), banner);
+    expect(contrastRatio(title, banner)).toBeGreaterThanOrEqual(4.5);
+  });
+
   test.each(registry.themes.map(({ id }) => id))('%s keeps the HTML report buttons readable', (themeId) => {
     const values = themeValues(css, themeId);
     const paint = painter(values);
