@@ -12,6 +12,11 @@ const NEW_FILE_LINE_LIMIT = 1500;
 const LARGE_FILE_LINE_LIMIT = 1000;
 const MIN_GROWTH_ALLOWANCE = 100;
 const GROWTH_ALLOWANCE_RATIO = 0.1;
+// A file split out of an older one counts as new until the base has it. These passed the
+// new-file limit later and are pinned at their size then: they may shrink, never grow.
+const PINNED_NEW_FILE_LINE_LIMITS = new Map([
+  ['client/src/components/SurveyTool/SessionInterviewPanel.tsx', 1543],
+]);
 
 const PRODUCTION_FILE_RE = /\.(?:js|jsx|ts|tsx)$/;
 const TEST_OR_DECLARATION_FILE_RE = /(?:\.d|\.test|\.spec|\.testUtils|TestUtils)\.(?:js|jsx|ts|tsx)$/;
@@ -82,7 +87,7 @@ const readBaseLineCount = (baseCommit, relativePath, rootDir = ROOT_DIR) => {
   }
 };
 
-const evaluateLargeFilePolicy = (records) => {
+const evaluateLargeFilePolicy = (records, pins = PINNED_NEW_FILE_LINE_LIMITS) => {
   const failures = [];
 
   for (const { relativePath, currentLineCount, baseLineCount } of records) {
@@ -92,7 +97,12 @@ const evaluateLargeFilePolicy = (records) => {
     }
 
     if (baseLineCount == null) {
-      if (currentLineCount > NEW_FILE_LINE_LIMIT) {
+      const pin = pins.get(relativePath);
+      if (pin != null) {
+        if (currentLineCount > pin) {
+          failures.push(`${relativePath} has ${currentLineCount} lines; it is pinned at ${pin}.`);
+        }
+      } else if (currentLineCount > NEW_FILE_LINE_LIMIT) {
         failures.push(
           `${relativePath} is a new ${currentLineCount}-line file; new files may not exceed ${NEW_FILE_LINE_LIMIT} lines.`,
         );
@@ -139,6 +149,24 @@ test('large-file policy accepts bounded growth and shrinking files', () => {
       { relativePath: 'shrinking.ts', baseLineCount: 3000, currentLineCount: 1200 },
     ]),
     [],
+  );
+});
+
+test('a pinned new file may reach its pin but not pass it', () => {
+  const pins = new Map([['pinned.ts', 1600]]);
+  assert.deepEqual(
+    evaluateLargeFilePolicy(
+      [
+        { relativePath: 'pinned.ts', baseLineCount: null, currentLineCount: 1600 },
+        { relativePath: 'new.ts', baseLineCount: null, currentLineCount: 1600 },
+      ],
+      pins,
+    ),
+    ['new.ts is a new 1600-line file; new files may not exceed 1500 lines.'],
+  );
+  assert.deepEqual(
+    evaluateLargeFilePolicy([{ relativePath: 'pinned.ts', baseLineCount: null, currentLineCount: 1601 }], pins),
+    ['pinned.ts has 1601 lines; it is pinned at 1600.'],
   );
 });
 
