@@ -7,6 +7,8 @@ import { getUsableSessionWorkerUrl } from '../session/sessionWorkerAvailability'
 import { resolveWorkerCanonicalSessionIdHex } from '../session/sessionWorkerDiscovery';
 import { isConfiguredAdmin } from '../storage/storageClient';
 import { requiresLitForSessionStorage, usesCloudflareSessionStorage } from '../storage/sessionStorageConfig';
+import { hasCachedWorkerSessionToken, subscribeWorkerSessionToken } from '../worker/workerAuth.js';
+import { subscribeWorkerGroupsChanged } from '../worker/workerGroupChangeEvents';
 import {
   listContextSources,
   loadContextSourcesForAi,
@@ -77,6 +79,32 @@ export function useSessionContextSources({ sessionSlug, sessionConfig, account =
     };
   }, [active, identity, sessionSlug, account, isAdmin, revision]);
   const reload = useCallback(() => setRevision((value) => value + 1), []);
+  // A token or a new membership can open files the last list couldn't show.
+  useEffect(() => {
+    if (!active || isAdmin) return undefined;
+    const stopHearingToken = subscribeWorkerSessionToken(reload);
+    const stopHearingGroups = subscribeWorkerGroupsChanged(reload);
+    return () => {
+      stopHearingToken();
+      stopHearingGroups();
+    };
+  }, [active, isAdmin, reload]);
+  // Someone signed in whose browser holds no token, as after a reload, can't yet be shown their groups' files;
+  // listing never asks them to sign, so the page offers it.
+  const [groupFilesHidden, setGroupFilesHidden] = useState(false);
+  useEffect(() => {
+    if (!active || isAdmin || !account) {
+      setGroupFilesHidden(false);
+      return undefined;
+    }
+    let current = true;
+    void hasCachedWorkerSessionToken({ sessionSlug, sessionConfig: configRef.current, context: { account } }).then(
+      (holdsToken) => current && setGroupFilesHidden(!holdsToken),
+    );
+    return () => {
+      current = false;
+    };
+  }, [active, isAdmin, account, sessionSlug, revision]);
   // Only someone signed in can add, so only they make this check.
   const [workerAccepts, setWorkerAccepts] = useState(false);
   const mayAdd = active && !!account && participantsMayAddContext(sessionConfig);
@@ -100,6 +128,7 @@ export function useSessionContextSources({ sessionSlug, sessionConfig, account =
     supported,
     isAdmin,
     participantsCanAdd: mayAdd && workerAccepts,
+    groupFilesHidden,
     reload,
   };
 }

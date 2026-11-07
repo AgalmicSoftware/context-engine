@@ -1,11 +1,13 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
+import { UncontrolledTooltip } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faExternalLinkAlt, faFileAlt } from '@fortawesome/free-solid-svg-icons';
+import { faExternalLinkAlt, faFileAlt, faQuestionCircle } from '@fortawesome/free-solid-svg-icons';
 
 import ContextSourcesPanel from '../Sessions/setup/ContextSourcesPanel';
 import SessionContextAddFile from './SessionContextAddFile';
 import setupStyles from '../Sessions/setup/SessionSetup.module.scss';
 import { contextAdderLabel, removeContextSource } from '../../utilities/docLibrary/contextSources';
+import { getWorkerSessionToken } from '../../utilities/worker/workerAuth.js';
 import { buildSessionDocLibraryViewerUrl } from '../../utilities/docLibrary/docUploadContracts';
 import { useContextGroups } from '../../utilities/docLibrary/useContextGroups';
 import type { SessionContextSourcesState } from '../../utilities/docLibrary/useSessionContextSources';
@@ -21,14 +23,21 @@ type Props = {
   pageLinks: Array<{ label: string; url: string }>;
 };
 
+const MY_GROUPS_HELP = 'Signs you in to this session, so it can show files locked to your groups, and your own.';
+
 // The Context section's files and links: the ones this reader may open, who
 // added each, and for admins the controls that add, refresh and remove them.
 // Others may add files and remove their own, unless the session limits that.
 const SessionContextSources = ({ sessionSlug, sessionConfig, account, list, pageLinks }: Props) => {
   const isAdmin = list.isAdmin && list.supported;
   const canAddFile = !isAdmin && list.participantsCanAdd;
-  const groups = useContextGroups({ sessionSlug, sessionConfig, enabled: canAddFile || list.sources.length > 0 });
+  const groups = useContextGroups({
+    sessionSlug,
+    sessionConfig,
+    enabled: canAddFile || list.groupFilesHidden || list.sources.length > 0,
+  });
   const [removeError, setRemoveError] = useState('');
+  const myGroupsHelpId = `ce-context-my-groups-help-${useId().replace(/:/g, '')}`;
   const shown = list.sources.filter(
     (source) => !(source.kind === 'link' && pageLinks.some((link) => link.url === source.url)),
   );
@@ -89,8 +98,43 @@ const SessionContextSources = ({ sessionSlug, sessionConfig, account, list, page
               );
             })}
           </div>
-          {removeError ? <p role="alert">{removeError}</p> : null}
         </section>
+      ) : null}
+      {removeError ? <p role="alert">{removeError}</p> : null}
+      {list.groupFilesHidden && groups.length > 0 ? (
+        <div className={`${setupStyles.page} ${styles.sessionContextManage}`}>
+          <div className={setupStyles.buttonRow}>
+            <button
+              type="button"
+              className={setupStyles.button}
+              onClick={() => {
+                setRemoveError('');
+                // The token's arrival lists again.
+                void getWorkerSessionToken({ sessionSlug, sessionConfig, context: { account } }).catch(
+                  (failure: unknown) =>
+                    setRemoveError(failure instanceof Error ? failure.message : 'That did not work. Try again.'),
+                );
+              }}
+            >
+              Show my groups’ files
+            </button>
+            <button
+              type="button"
+              id={myGroupsHelpId}
+              className={styles.sessionContextHelp}
+              aria-label="About showing your groups’ files"
+              aria-describedby={`${myGroupsHelpId}-about`}
+            >
+              <FontAwesomeIcon icon={faQuestionCircle} />
+            </button>
+            <span id={`${myGroupsHelpId}-about`} hidden>
+              {MY_GROUPS_HELP}
+            </span>
+            <UncontrolledTooltip target={myGroupsHelpId} trigger="hover focus" autohide={false}>
+              {MY_GROUPS_HELP}
+            </UncontrolledTooltip>
+          </div>
+        </div>
       ) : null}
       {canAddFile ? (
         <details

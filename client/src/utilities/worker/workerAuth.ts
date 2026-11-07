@@ -710,6 +710,14 @@ const readCachedWorkerSessionToken = ({
   return cached?.ok && cached.token ? cached.token : '';
 };
 
+const WORKER_SESSION_TOKEN_EVENT = 'ce:worker-session-token';
+
+/** Hears each new Worker token, as what someone may read can widen once the Worker knows who they are. */
+export const subscribeWorkerSessionToken = (listener: () => void): (() => void) => {
+  window.addEventListener(WORKER_SESSION_TOKEN_EVENT, listener);
+  return () => window.removeEventListener(WORKER_SESSION_TOKEN_EVENT, listener);
+};
+
 /** Whether this browser already holds a Worker token for the signed-in person, so using it asks them for nothing. */
 export const hasCachedWorkerSessionToken = async (options: WorkerSessionTokenOptions = {}): Promise<boolean> => {
   const account = normalizeAddress((options.context as { account?: unknown } | undefined)?.account);
@@ -889,6 +897,7 @@ export const getWorkerSessionToken = async ({
         address,
       }),
     );
+    if (typeof window !== 'undefined') window.dispatchEvent(new Event(WORKER_SESSION_TOKEN_EVENT));
     // An access change during sign-in may postdate the scopes this token holds.
     if (requestAccessEpoch === workerAccessEpoch && Date.now() - workerAccessChangedAtMs >= ACCESS_CHANGE_SETTLE_MS) {
       tokensIssuedForCurrentAccess.add(loginData.token);

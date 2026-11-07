@@ -69,7 +69,10 @@ AI key; the Worker refuses anyone else.
   **Analyze with the session's AI**, and, unless unticked, reads each link's
   page for the AI. After a reload only the file names remain, to attach again.
 - **The session page's Context section** gives someone signed in **Add a file**,
-  with who can read it, and **Remove** beside their own files.
+  with who can read it, and **Remove** beside their own files. Listing never asks
+  anyone to sign, so someone whose browser holds no Worker token yet, as after a
+  reload, gets **Show my groups' files**. The list refreshes when a token or a new
+  group membership arrives.
 - **A Group Conversation's** **Add transcript to context** box, beside **Submit
   questions**, uploads the transcript as a text file when the questions submit.
 - **Settings (`/session/<slug>/settings`)** and **the session page's Context
@@ -94,7 +97,8 @@ read it, and admins, who may have to remove it. The Worker enforces both on
 `/storage/read` and on each row of `/storage/list`, so anyone else never receives
 the item or learns that it exists. Someone can lock a file to a group they are
 not in, and then can't read it themselves. A PDF's reading keeps the PDF's
-privacy. No other access rule is accepted for a context item. The Worker's own AI
+privacy. No other access rule is accepted for a context item. Groups don't travel
+between sessions, so a template lists a locked file as admins only. The Worker's own AI
 features act for participants, so they use neither admins-only nor group-locked
 items; an AI that runs in someone's browser uses what that person may read.
 

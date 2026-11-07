@@ -10,6 +10,22 @@ jest.mock('../storage/sessionStorageConfig', () => ({
   usesCloudflareSessionStorage: () => true,
   requiresLitForSessionStorage: () => false,
 }));
+let mockTokenHeld = false;
+let mockHearToken: () => void = () => undefined;
+let mockHearGroups: () => void = () => undefined;
+jest.mock('../worker/workerAuth.js', () => ({
+  hasCachedWorkerSessionToken: async () => mockTokenHeld,
+  subscribeWorkerSessionToken: (listener: () => void) => {
+    mockHearToken = listener;
+    return () => undefined;
+  },
+}));
+jest.mock('../worker/workerGroupChangeEvents', () => ({
+  subscribeWorkerGroupsChanged: (listener: () => void) => {
+    mockHearGroups = listener;
+    return () => undefined;
+  },
+}));
 jest.mock('./contextSources', () => ({
   workerAcceptsParticipantContext: jest.fn(async () => true),
   listContextSources: jest.fn(
@@ -77,6 +93,37 @@ describe('useSessionContextSources', () => {
     await resolveLatest([]);
     await act(async () => undefined);
     expect(older.result.current.participantsCanAdd).toBe(false);
+  });
+
+  it('lists again when a token or a new membership arrives, as they can open a group’s files', async () => {
+    mockTokenHeld = false;
+    const { result } = mount(READER);
+    await resolveLatest([source('public')]);
+    await waitFor(() => expect(result.current.groupFilesHidden).toBe(true));
+    const before = mockRequests.length;
+
+    mockTokenHeld = true;
+    act(() => mockHearToken());
+    expect(mockRequests.length).toBe(before + 1);
+    await resolveLatest([source('public'), source('locked')]);
+    expect(result.current.sources.map(({ id }) => id)).toEqual(['public', 'locked']);
+    await waitFor(() => expect(result.current.groupFilesHidden).toBe(false));
+
+    act(() => mockHearGroups());
+    expect(mockRequests.length).toBe(before + 2);
+    await resolveLatest([]);
+  });
+
+  it('asks nothing of admins or signed-out readers about groups’ files', async () => {
+    mockTokenHeld = false;
+    const admin = mount(ADMIN);
+    await resolveLatest([]);
+    await act(async () => undefined);
+    expect(admin.result.current.groupFilesHidden).toBe(false);
+    const signedOut = mount('');
+    await resolveLatest([]);
+    await act(async () => undefined);
+    expect(signedOut.result.current.groupFilesHidden).toBe(false);
   });
 
   it('shows a new reader no sources until their own list loads', async () => {

@@ -3,10 +3,12 @@ import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import SessionContextSources from './SessionContextSources';
 import { removeContextSource, uploadContextFile, type ContextSource } from '../../utilities/docLibrary/contextSources';
 import type { SessionContextSourcesState } from '../../utilities/docLibrary/useSessionContextSources';
+import { getWorkerSessionToken } from '../../utilities/worker/workerAuth.js';
 
 jest.mock('../../utilities/docLibrary/useContextGroups', () => ({
   useContextGroups: () => [{ groupId: 'salon', label: 'Salon' }],
 }));
+jest.mock('../../utilities/worker/workerAuth.js', () => ({ getWorkerSessionToken: jest.fn(async () => 'token') }));
 jest.mock('../../utilities/docLibrary/contextSources', () => ({
   ...jest.requireActual<typeof import('../../utilities/docLibrary/contextSources')>(
     '../../utilities/docLibrary/contextSources',
@@ -39,6 +41,7 @@ const state = (overrides: Partial<SessionContextSourcesState> = {}): SessionCont
   supported: true,
   isAdmin: false,
   participantsCanAdd: true,
+  groupFilesHidden: false,
   reload: jest.fn(),
   ...overrides,
 });
@@ -98,6 +101,17 @@ describe('the Context section for participants', () => {
     );
     expect(list.reload).toHaveBeenCalled();
     expect(screen.getByRole('status')).toHaveTextContent('File added.');
+  });
+
+  it('lets someone ask for their groups’ files, which signs them in, only when it would help', async () => {
+    const { unmount } = renderList(state());
+    expect(screen.queryByRole('button', { name: 'Show my groups’ files' })).toBeNull();
+    unmount();
+    renderList(state({ groupFilesHidden: true }));
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Show my groups’ files' })));
+    expect(getWorkerSessionToken).toHaveBeenCalledWith(
+      expect.objectContaining({ sessionSlug: 'salon', context: { account: ME } }),
+    );
   });
 
   it('offers no form where the session limits adding to admins', () => {

@@ -426,6 +426,13 @@
   font-size: 0.75rem;
 }
 
+.sessionContextHelp {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: help;
+}
+
 .sessionContextRemove {
   border: 1px solid currentColor;
   border-radius: var(--ce-radius-6);

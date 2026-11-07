@@ -8,6 +8,7 @@ import {
   getWorkerAuthHeaders,
   getWorkerSessionToken,
   hasCachedWorkerSessionToken,
+  subscribeWorkerSessionToken,
   normalizeWorkerUrl,
   noteWorkerAccessChanged,
 } from './workerAuth.js';
@@ -548,10 +549,17 @@ describe('workerAuth canonical session resolution', () => {
       .mockResolvedValueOnce(jsonResp(200, { token: 'token-1', exp: Math.floor(Date.now() / 1000) + 3600 }));
     const options = { sessionConfig: { slug: 'debate' }, context: authContext, workerUrl: 'https://worker.example' };
 
+    const heard = jest.fn();
+    const stopHearing = subscribeWorkerSessionToken(heard);
     expect(await hasCachedWorkerSessionToken(options)).toBe(false);
     expect(global.fetch).not.toHaveBeenCalled();
     await getWorkerSessionToken(options);
+    expect(heard).toHaveBeenCalledTimes(1);
     expect(await hasCachedWorkerSessionToken(options)).toBe(true);
+    // A token already held is no news.
+    await getWorkerSessionToken(options);
+    stopHearing();
+    expect(heard).toHaveBeenCalledTimes(1);
     expect(await hasCachedWorkerSessionToken({ ...options, context: {} })).toBe(false);
   });
 
