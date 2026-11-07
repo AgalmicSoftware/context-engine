@@ -438,10 +438,12 @@ backend, payload gate, encryption mode, and effective access-condition document
 must agree with the validated profile. Deploy, signed config mutation, and
 public Worker readback all fail closed on missing, ambiguous, or divergent
 profile/storage policy.
-Switching storage also replaces the mode-specific identity and authorization
-lineage: Cloudflare uses passkey plus Worker roles, while Arweave uses wallet
-plus on-chain SBT authorization. A stale wallet, Worker role, or legacy
-top-level chain ID cannot survive that switch as a hidden capability.
+Switching **Runs on** also replaces storage, identity and authorization: Session
+Worker uses Cloudflare with passkey plus Worker roles, while On-chain registry
+uses Arweave with wallet plus on-chain SBT authorization. A stale wallet, Worker
+role, or legacy top-level chain ID cannot survive that switch as a hidden
+capability. The **Storage** selector changes only storage, including its payload
+access gate; identity and authorization stay as set.
 The wizard validates that profile at the publish boundary and rechecks the live
 draft after asynchronous identity and duplicate-session preflight. A profile
 edit made while preflight is running therefore still stops before upload,
@@ -450,10 +452,7 @@ Mode values are exact enums at every write boundary:
 explicit blanks, friendly aliases, unknown values, and reserved key providers
 are rejected rather than normalized to a less-protective default. Legacy aliases
 remain readable only for stored compatibility.
-Legacy `telegramOnly` fields are read only as a migration fallback when no
-explicit profile exists; they migrate to hosted HTTP access. An explicit
-`surfaces.agentHttp: false` remains authoritative even if stale legacy flags
-remain. Enabling Agent HTTP adds token login alongside ordinary wallet/passkey
+Enabling Agent HTTP adds token login alongside ordinary wallet/passkey
 web participation; it does not replace the web session page. New client writes
 keep the reserved `surfaces.telegram` and
 `surfaces.miniApp` booleans false.
@@ -786,7 +785,8 @@ gates. An unlocked workerless registry session must attach a compatible Worker;
 a permanently locked one cannot. Wrapped member credentials are capped by
 24 hours and source-JWT expiry, with source revocation and membership checked
 on every request. Predictions use HTTPS/KV and remain separate from ordinary
-responses. No Bridge resources, identities or invites are transferred.
+responses. No resources, identities or invites from the retired Agent Bridge
+are transferred.
 
 What gets stored where:
 
@@ -1327,7 +1327,8 @@ Why this matters:
 Check both CORS and SIWE assumptions:
 
 - `allowOrigins` must be non-empty and include the exact browser origin you are using; `*` and wildcard hosts are unsupported, while an empty list means open CORS at runtime and is rejected by native `/new` verification
-- the SIWE message domain must match the request URI host
+- the SIWE message's `domain` must match the host in its own `uri`, that `uri` must
+  have the browser's origin, and its resources must name this Worker and session
 - the active passkey-derived EOA or connected wallet must match the configured
   session admin for signed admin actions
 - Worker-canonical discovery must resolve one validated HTTPS Worker origin,
@@ -1337,7 +1338,7 @@ Check both CORS and SIWE assumptions:
 Typical symptoms:
 
 - `Failed to fetch` or `Load failed` from worker auth endpoints usually means the origin is missing from `allowOrigins`
-- `SIWE domain does not match URI host.` means the login signature was created for a different host than the one receiving the request. Signed admin actions report audience errors instead, such as `Admin audience does not match request origin.`
+- `SIWE domain does not match URI host.` means the signed message's `domain` differs from the host of its own `uri`. `SIWE uri origin does not match request Origin.` means its `uri` isn't the page's origin, and `Signed login resources do not match this Worker and session.` means it was signed for another Worker or session. Signed admin actions report audience errors instead, such as `Admin audience does not match request origin.`
 
 ### Default AI models
 

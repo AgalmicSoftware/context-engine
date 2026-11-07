@@ -60,10 +60,9 @@ and durable-config checks.
 
 Agent-token web login and the agent session shell require hosted
 (`worker_canonical`) authority with `surfaces.agentHttp: true`. An explicit
-profile with HTTP access off stays off even if legacy Telegram flags or cached
-session metadata remain. Configurations without a profile can migrate their
-legacy Telegram mode into hosted HTTP access; this fallback never overrides an
-explicit profile.
+profile with HTTP access off stays off even if cached session metadata remains.
+A config without a profile counts as hosted only when the Worker's session
+metadata reports `worker_canonical` authority with Agent HTTP on.
 
 ## How to Configure
 
@@ -353,7 +352,7 @@ writes (about 240), so set up caching there separately.
 - The manual `/new` Lit card asks only for one Lit API key, stored as the `litAccountApiKey` worker secret.
 - `litActionCid` can be omitted during session setup.
   - If the wizard only has the visible Lit API key (`litAccountApiKey` internally), the worker can auto-bootstrap the default group, PKP, usage key, and CE action for that session, using the default Chipotle API base unless worker config/env overrides it.
-  - If the wizard already has `litGroupId` and `litPkpId`, the worker can still auto-provision the default CE Lit action into an existing account and write the returned CID back into worker config after deploy.
+  - If the wizard already has `litGroupId` and `litPkpId` from a Worker-authorized authority (current `litAuthorizationVersion` and this session's signer), the worker can still auto-provision the default CE Lit action into an existing account and write the returned CID back into worker config after deploy. Any other existing authority is refused until the fresh cutover above.
 
 ## RPC Defaults
 

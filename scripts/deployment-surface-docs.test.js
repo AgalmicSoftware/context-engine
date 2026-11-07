@@ -234,7 +234,7 @@ test('active agent docs preserve HTTP access and distinguish historical review e
   assert.match(architecture, /OnePageSessionAgentShell\.tsx/);
   assert.match(architecture, /agentSessionBackend\.ts/);
   assert.doesNotMatch(architecture, /telegramAgentData\.ts|telegramSessionBackend\.ts/);
-  assert.match(workerDoc, /HTTP-off overrides stale legacy flags/);
+  assert.doesNotMatch(workerDoc, /stale legacy flags/);
   assert.match(workerDoc, /historical `telegram`|Historical explicit\s+`telegram`/);
   assert.doesNotMatch(read('workers/sessionCorsWorker/agent/README.md'), /\bBridge\b/);
   assert.doesNotMatch(workerDoc, /Telegram-first|Telegram remains independently optional/);

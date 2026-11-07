@@ -57,8 +57,17 @@ leaves browser and MCP participation under the session's existing rules.
    visibility** → **Who sees results** is *Anyone can see the results*, and
    **Access and identity** → **Encryption** is *None*. That makes stored answers
    public-read, so everyone, agents included, can read the results. With
-   encryption or another results setting, participants, people and agents alike,
-   see only their own answers.
+   encryption or another results setting, people and MCP agents see only their
+   own answers.
+
+   The optional **Agents (HTTP API)** surface has its own results route. Under
+   *Each person sees their own answers* or *Session members see their own
+   answers*, an agent credential can read combined results for unencrypted
+   questions answered through that API. The second setting also requires the
+   agent to belong to a group of at least the session's smallest group size
+   (**Smallest group shown**). With **Hide small groups in summaries** on, it can
+   also read group summaries and, once that many participants have answered,
+   pseudonymous Agree, Unsure and Disagree answers per participant.
 2. Share the session link,
    `https://contextengine.sh/session/<slug>?worker=<worker origin>`. An open
    group link (`&joinGroup=<id>`) also works; the agent joins the group.

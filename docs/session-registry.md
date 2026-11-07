@@ -2,15 +2,17 @@
 
 This document defines the hybrid session model: an on-chain registry holds
 identity and gates, and Arweave holds session metadata. The
-`demo_sessions.json` fallback applies only when on-chain registry mode is
-disabled (see Current Default and Remaining Cleanup).
+`demo_sessions.json` fallback supplies session authority only when on-chain
+registry mode is disabled (see Current Default and Remaining Cleanup). In registry
+mode, bundled entries still supply display config and, for clean-route sessions
+the registry has no entry for, the Worker origin.
 
 ## Goals
 
 - Keep Ethereum‑sensitive fields on-chain (permissions, gates, chain IDs).
 - Store long‑form content + UI defaults on Arweave (optionally Lit‑encrypted).
-- Fall back to `demo_sessions.json` only when on-chain registry mode is
-  explicitly disabled.
+- Fall back to `demo_sessions.json` for session authority only when on-chain
+  registry mode is explicitly disabled.
 - Hybrid (a+b): keep only the essential, permissioned fields on-chain and push
   the rest to Arweave.
 
@@ -241,8 +243,8 @@ envelope; the client decrypts it for users who satisfy the gate you select.
 - In Smart Contracts, `Session Registry` is an editable address field that defaults from `getSessionRegistryAddress(chainId)` (`client/src/variables/chains.ts`) and overrides the registry address for deploy and register actions. Saved metadata `contracts` keeps only `surveys`, `sbtFactory`, and `sessionRegistry`.
 - New SBTs can be created inline through a modal. A new SBT draft shows a predicted deterministic address, can be used in the wizard before deployment, and is deployed during Publish before the session registration transaction is sent.
 - Worker URLs that end in an endpoint path (for example `.../auth/nonce` or `.../arweave/upload`) are normalized back to the worker base URL before auth and upload calls, and auth network failures show a CORS/allowOrigins hint instead of a raw `Failed to fetch`.
-- The wizard auto-fills `corsWorkerUrl` after a successful deploy-helper call, then retries the signed `/admin/set-secrets` sync against the resolved worker URL for post-deploy verification and backfill. If the sync hits `Admin authorization failed`, it runs a signed `/admin/set-config` once and retries.
-- The "deploy-helper already wrote secrets" note is shown only when deploy-helper reports `writesSessionSecrets: true` in its `/deploy` response.
+- The wizard auto-fills `corsWorkerUrl` after a successful deploy-helper call, then retries the signed `/admin/set-secrets` sync against the resolved worker URL for post-deploy verification and backfill.
+- The "deploy-helper already wrote secrets" note is shown only when deploy-helper reports `writesSessionSecrets: true` in its `/deploy` response or, if that flag is absent, a `sessionSecretsKey` starting with `session:`.
 - Deploy-helper payloads map an empty slug to `general` for worker deployment.
 - New registry writes validate the canonical slug before wallet signing. The client trims and lowercases the slug, maps empty or default input to `general`, and rejects non-canonical characters or reserved internal slugs.
 - Advanced worker settings expose a deploy-time `embedded deploy-helper` toggle (default from `REACT_APP_CE_DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED`, fallback `true`). It maps to the worker's `DEPLOY_HELPER_ENABLED` binding at deploy time and is mirrored into worker config for frontend hydration; changing Worker KV config later does not change the runtime binding.
@@ -250,7 +252,7 @@ envelope; the client decrypts it for users who satisfy the gate you select.
 - Worker `/ai` provider selection resolves from an explicit `provider` first, then infers it from `model` (`gpt-*`/`o*` => OpenAI, `claude*` => Anthropic, names containing `/` => OpenRouter), and otherwise defaults to OpenAI.
 - An empty slug is the default "general" session. The wizard keeps metadata `slug` as `""` and maps it to `general` for on-chain registry calls.
 - Private slug mode sets the slug to the session ID; it does not Lit-encrypt the slug.
-- Arweave uploads resolve the worker auth `sessionSlug` from explicit request fields or `groupConfig.slug`, so question and survey uploads cannot mix slugs. Legacy `groupSlug` is migration-only compatibility; new non-SBT callers use `sessionSlug`.
+- Arweave uploads resolve the worker auth `sessionSlug` from explicit request fields or `sessionConfig.slug`, so question and survey uploads cannot mix slugs. Legacy `groupSlug` is migration-only compatibility; new non-SBT callers use `sessionSlug`.
 - Arweave upload responses with `id`/`txId`/`arweaveTxId`/`url`/`arweaveUrl` variants (including `*.arweave.net` gateway URLs) are normalized to a canonical tx id before they reach callers.
 
 ### Encrypted Fields
@@ -335,8 +337,8 @@ When `USE_ONCHAIN_SESSION_REGISTRY` is enabled:
   normal runtime path.
 - `SESSION_REGISTRY_ADDRESSES` contains the checked-in per-chain registry
   defaults, with local overrides merged for local development.
-- The `demo_sessions.json` fallback remains compatibility behavior only when an
-  operator explicitly disables on-chain registry mode. Removing that fallback
+- The `demo_sessions.json` authority fallback remains compatibility behavior
+  only when an operator explicitly disables on-chain registry mode. Removing that fallback
   is a future compatibility decision, not a pending production switch.
 
 ## Deployment Verification Checklist

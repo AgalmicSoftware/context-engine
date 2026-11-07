@@ -44,14 +44,14 @@ Worker. Enable `sessionModeProfile.surfaces.agentHttp` and configure a fresh
 Browser exchange returns a distinct agent credential and participant JWT for
 this one origin. Both live only in page memory. Their lifetime is capped by the
 source credential, and source revocation/rotation also invalidates the JWT.
-The client purges historical envelopes and does not follow Bridge URLs. Invites
-use the existing session coordinator's per-invite journal. Operator actions use
-signed Session Worker admin requests. Ordinary browser/MCP access remains
-available when Agent HTTP is disabled. Explicit HTTP-off overrides stale legacy flags.
+The client purges historical envelopes and does not follow retired Agent Bridge
+URLs. Invites use the existing session coordinator's per-invite journal. Operator
+actions use signed Session Worker admin requests. Ordinary browser/MCP access
+remains available when Agent HTTP is disabled.
 
 See [Agent HTTP setup, authority and routes](../workers/sessionCorsWorker/agent/README.md)
 for current scopes, canonical storage, optional queues, AI funding and backups.
-Existing Bridge deployments are not migrated.
+Existing deployments of the retired Agent Bridge are not migrated.
 
 ## OSS worker model
 
@@ -255,8 +255,7 @@ The flow:
    refresh a registry cache.
 6. Post-deploy secret verification retries `/auth/nonce` +
    `/admin/set-secrets` with backoff.
-   - If `/admin/set-secrets` returns `Admin authorization failed` (common when session config has not propagated/seeded yet), the wizard runs signed `/admin/set-config` once and retries secrets sync in the same deploy flow.
-   - The deploy helper returns `writesSessionConfig` / `writesSessionSecrets` flags; the wizard shows the non-fatal "helper already wrote secrets" note only when those flags confirm session-key writes.
+   - The deploy helper returns `writesSessionConfig` / `writesSessionSecrets` flags; the wizard shows the non-fatal "helper already wrote secrets" note only when `writesSessionSecrets` is true or, if that flag is absent, when `sessionSecretsKey` starts with `session:`.
    - Chain-backed profiles continue to persist their normalized `blockLimits`
      (`start`, optional `end`); worker-canonical does not require a chain scan
      window.
@@ -2289,14 +2288,14 @@ The Worker checks these in order:
 
 - Header and token: `401 Missing Authorization header.`, token verification errors, `400 Missing sessionSlug.`, then `403 Token does not match requested session slug.`. `X-Session-Slug` wins over legacy `X-Group-Slug`. Every token also needs the live `authToken:{slug}:{sub}:{jti}` KV marker.
 - Route context: `404 Session config not found.` and fail-closed CORS rejection. Malformed or stale token authorization epochs return `401`. Config/token pairs with no epoch count as epoch zero until the first effective config update.
-- Scope and rate limit: per-scope `403 Token missing ... scope.` and `429 Rate limit exceeded.`. `request_test_eth` may continue without the token's faucet scope when an SBT proof payload is present or the request funds the authenticated wallet. Every protected route re-evaluates the current default gate and its own resource gate; signed and current scope must both allow ordinary access, and policy-read failures return `403` before side effects.
+- Scope and rate limit: per-scope `403 Token missing ... scope.` and `429 Rate limit exceeded.`. Outside `worker_canonical` sessions, `request_test_eth` may continue without the token's faucet scope when an SBT proof payload is present or the request funds the authenticated wallet. Every protected route re-evaluates the current default gate and its own resource gate; signed and current scope must both allow ordinary access, and policy-read failures return `403` before side effects.
 - Secrets: `401 Session secrets not configured.` before authenticated `ai`, `transcribe`, `arweave/upload`, and `request_test_eth` run.
 - Dispatch: secret path routes (`POST /transcribe`, `POST /arweave/upload`) run before JSON parsing. After `Expected application/json.` / `Invalid JSON.` checks, non-secret actions (`fetch_url`, `fetch_image`) run before secret actions (`/ai`, `request_test_eth`). AI dispatches to `anthropic`, `openai`, `openrouter` or `custom`; others get `400`. Anything else gets `404 Not found.`.
 
 Anonymous exception (AI/transcribe/realtime interview only):
 
 - `POST /ai` and `POST /transcribe` may run without `Authorization` only when one of these holds:
-  - request includes a non-empty `apiKey`,
+  - outside a `worker_canonical` session, the request includes a non-empty `apiKey`,
   - on-chain gate authority is available and both `default` + `ai` gates are explicitly open, or
   - in a `worker_canonical` session with no login gate, `workerAuthority.anonymousScopes` includes the route's scope.
 - `POST /realtime/call` does not accept a browser-supplied provider key. It may
@@ -2314,7 +2313,7 @@ Anonymous exception (AI/transcribe/realtime interview only):
   The daily anonymous budget is `limits.perAnonymousIpPerDay` when that field is a positive integer; otherwise anonymous routes have no daily IP budget. This applies to anonymous AI/transcribe/realtime, public storage read/list, public group discovery, and interview starter/catalog routes. A value of `0` disables the anonymous daily IP bucket without changing authenticated per-wallet rate limits or nonce protections.
   - The rate identity: native Cloudflare runtime uses `CF-Connecting-IP`; otherwise the worker only uses a valid
     `X-Anonymous-Client-Id` as a best-effort sharding key and falls back to `anon:unknown`.
-  - Anonymous requests must name a slug with `X-Session-Slug` or legacy `X-Group-Slug`; a missing slug fails closed.
+  - On a Worker with no `DEFAULT_SESSION_SLUG` or legacy `DEFAULT_GROUP_SLUG`, anonymous requests must name a slug with `X-Session-Slug` or legacy `X-Group-Slug`; a missing slug fails closed.
   - `/transcribe` multipart and realtime SDP parse failures return before anonymous gate evaluation, and a
     request `apiKey` does not touch worker secrets.
 

@@ -12,8 +12,9 @@ User clicks Create / Login
 ```
 
 In Hosted & Fast sessions the account signs login and admin requests that the
-Worker verifies; no transaction or gas is involved. Trustless & Slower sessions
-send wallet transactions.
+Worker verifies; no transaction or gas is involved, unless a rule requires an
+on-chain SBT. Claiming one is a wallet transaction, and the session can offer
+test ETH for its gas. Trustless & Slower sessions send wallet transactions.
 
 This wallet is intentionally not a smart account. It does not provide gas
 sponsorship, batching, relayers, paymasters, ERC-4337, EIP-7702, onchain
