@@ -608,15 +608,7 @@ const resolveEnvelopeExportAddressSet = (config = {}) => {
 };
 
 const isEnvelopeExportAuthorized = ({ config, requesterAddress, authScopes }) => {
-  const scopes = isObj(authScopes) ? authScopes : {};
-  if (
-    scopes.admin === true ||
-    scopes.responseExport === true ||
-    scopes.response_export === true ||
-    scopes.encryptedEnvelopeExport === true
-  ) {
-    return true;
-  }
+  if (isObj(authScopes) && authScopes.admin === true) return true;
   const address = normalizeAddress(requesterAddress);
   if (!address) return false;
   return resolveEnvelopeExportAddressSet(config).has(address);

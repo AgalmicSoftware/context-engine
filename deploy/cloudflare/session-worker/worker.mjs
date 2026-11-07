@@ -71307,10 +71307,7 @@ var init_storageRouteExecution = __esm({
       return addresses;
     };
     isEnvelopeExportAuthorized = ({ config, requesterAddress, authScopes }) => {
-      const scopes = isObj16(authScopes) ? authScopes : {};
-      if (scopes.admin === true || scopes.responseExport === true || scopes.response_export === true || scopes.encryptedEnvelopeExport === true) {
-        return true;
-      }
+      if (isObj16(authScopes) && authScopes.admin === true) return true;
       const address2 = normalizeAddress(requesterAddress);
       if (!address2) return false;
       return resolveEnvelopeExportAddressSet(config).has(address2);

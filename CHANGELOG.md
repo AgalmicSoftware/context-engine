@@ -134,7 +134,7 @@ All notable changes to this project will be documented in this file.
 - Removed the retired Agent Bridge source. Agent HTTP stays in the Session Worker; admin metrics report `sessionsWithAgentActivity`, and agent on-chain answers record source `session-agent`.
 - `telegramResponseExportAllowedAddresses` no longer grants export access. Nothing writes this key, and no live session's public config carries it.
 - Removed unread Telegram fields and unused Worker exports. Stored record fields and KV prefixes are unchanged.
-- Worker routes no longer read grant claims from login tokens. Nothing issued them, so nobody loses access: in a Hosted session whose results aren't public, reading another participant's individual response still takes a session admin, and Worker Groups still use the signed-in address.
+- Worker routes no longer read grant or export claims from login tokens. Nothing issued them, so nobody loses access: in a Hosted session whose results aren't public, reading another participant's individual response still takes a session admin, encrypted-envelope export still takes a session admin or an address the session config lists for export, and Worker Groups still use the signed-in address.
 - Anonymous visitors have no daily per-IP request limit unless the session sets one. The per-wallet daily limit no longer doubles as one, so a room sharing one venue connection isn't cut off.
 - A transcription reply with no readable text returns 502, so the browser keeps the chunk's audio and retries. Earlier Workers report such a reply as silence.
 - Agent submissions count test-ETH payouts against the per-wallet daily faucet limit they share with participants. Past the limit, the submission carries on without funding.

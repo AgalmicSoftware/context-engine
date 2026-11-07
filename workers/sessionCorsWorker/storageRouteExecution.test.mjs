@@ -4399,6 +4399,34 @@ test('storageRoute /storage/export-envelopes omits session key material', async 
 	assert.equal(postBody.payloads.length, 1);
 });
 
+test('storageRoute /storage/export-envelopes takes an admin or a listed address, not a token claim', async () => {
+	const env = {
+		CE_STORAGE_INDEX_KV: createMockKv(),
+		CE_STORAGE_ENVELOPE_KEK: 'test deployment envelope kek',
+	};
+	const config = createEnvelopeConfig();
+	const outsider = '0x0000000000000000000000000000000000000bad';
+	const exportAs = (authScopes, sessionConfig = config) => storageRoute({
+		path: '/storage/export-envelopes',
+		method: 'GET',
+		request: new Request('https://worker.example/storage/export-envelopes?resource=docsContext'),
+		env,
+		config: sessionConfig,
+		slug: 'session-a',
+		uploaderAddress: outsider,
+		authScopes,
+		baseHeaders: {},
+		deps: { json },
+	});
+	// Login tokens carry only issued scopes, and none of these is issued.
+	for (const claim of ['responseExport', 'response_export', 'encryptedEnvelopeExport']) {
+		assert.equal((await exportAs({ storage: true, [claim]: true })).status, 403, claim);
+	}
+	assert.equal((await exportAs({ admin: true })).status, 200);
+	const listed = { ...config, export: { allowedAddresses: [outsider] } };
+	assert.equal((await exportAs({ storage: true }, listed)).status, 200);
+});
+
 test('exportCloudflareEncryptedPayloadEnvelopes counts encrypted rows when payload bytes are missing', async () => {
 	const kv = createMockKv();
 	const env = {
