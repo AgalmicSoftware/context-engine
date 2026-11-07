@@ -45,7 +45,7 @@ export const resolveInterviewDraftOrigin = (
     : 'voice_interview';
 };
 
-const resolveFieldProtection = (
+export const resolveFieldProtection = (
   questionId: string,
   fields: { answers?: unknown; additionalComments?: unknown } = {},
   draft: RecordValue = {},

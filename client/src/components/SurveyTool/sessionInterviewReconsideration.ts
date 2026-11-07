@@ -5,6 +5,7 @@ import {
   type ContextSourceOptions,
 } from '../../utilities/docLibrary/contextSources';
 import type { InterviewDraftResponse, InterviewQuestion, InterviewReconsideration } from './sessionInterview';
+import { resolveFieldProtection } from './sessionInterviewResearch';
 import {
   hasDraftValue,
   responseCommentValue,
@@ -14,15 +15,19 @@ import {
 
 const OWN_CONTEXT_CHARS = 12_000;
 
-/** The person's saved answers. A locked ("*") answer can't be read, so it stands and isn't offered. */
+/**
+ * The person's saved answers. A locked answer stands and isn't offered, whether it still shows as "*" or they
+ * unlocked it on this page: what they encrypted doesn't go to the session's AI, as research sharing redacts it too.
+ */
 export const readAnswersToReconsider = (
   questions: InterviewQuestion[],
   slice: SessionInterviewModalRecord | null | undefined,
 ): InterviewReconsideration['savedAnswers'] =>
   questions.flatMap(({ id }) => {
     const answer = responseFieldValue(slice, 'answers', id);
-    if (!hasDraftValue(answer) || answer === '*') return [];
-    const additionalComments = responseCommentValue(slice, id);
+    const { encryptedAnswer, encryptedComments } = resolveFieldProtection(id, slice || {});
+    if (!hasDraftValue(answer) || answer === '*' || encryptedAnswer) return [];
+    const additionalComments = encryptedComments ? '' : responseCommentValue(slice, id);
     return [{ questionId: id, answer, ...(additionalComments ? { additionalComments } : {}) }];
   });
 

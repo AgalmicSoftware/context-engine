@@ -26,6 +26,21 @@ describe('what a claim reconsiders', () => {
     expect(readAnswersToReconsider([question('q1')], null)).toEqual([]);
   });
 
+  it('keeps answers someone encrypted out of the AI’s prompt, even once they’ve unlocked them here', () => {
+    const slice = {
+      answers: { q1: { value: 'Secret', encrypted: true }, q2: { value: 'Open' }, q3: { value: 'Open' } },
+      additionalComments: {
+        q1: { value: 'Secret reason' },
+        q2: { value: 'Secret comment', encrypted: true },
+        q3: { value: 'Open comment' },
+      },
+    };
+    expect(readAnswersToReconsider([question('q1'), question('q2'), question('q3')], slice)).toEqual([
+      { questionId: 'q2', answer: 'Open' },
+      { questionId: 'q3', answer: 'Open', additionalComments: 'Open comment' },
+    ]);
+  });
+
   it('notices a comment that adds to a saved answer, but not a repeat or a locked answer', () => {
     const slice = {
       answers: { q1: { value: 'Yes' }, q2: { value: '*' } },
