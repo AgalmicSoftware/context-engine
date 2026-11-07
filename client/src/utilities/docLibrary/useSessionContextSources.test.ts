@@ -95,6 +95,20 @@ describe('useSessionContextSources', () => {
     expect(older.result.current.participantsCanAdd).toBe(false);
   });
 
+  it('skips the Worker check where adding isn’t on offer, as for the AI’s context', async () => {
+    jest.mocked(workerAcceptsParticipantContext).mockClear();
+    renderHook(() =>
+      useSessionContextSources({ sessionSlug: 'salon', sessionConfig: config(), account: READER, offersAdding: false }),
+    );
+    await resolveLatest([]);
+    expect(workerAcceptsParticipantContext).not.toHaveBeenCalled();
+    renderHook(() =>
+      useSessionContextPrompt({ sessionSlug: 'salon', sessionConfig: config(), account: READER, totalChars: 100 }),
+    );
+    await resolveLatest([]);
+    expect(workerAcceptsParticipantContext).not.toHaveBeenCalled();
+  });
+
   it('lists again when a token or a new membership arrives, as they can open a group’s files', async () => {
     mockTokenHeld = false;
     const { result } = mount(READER);

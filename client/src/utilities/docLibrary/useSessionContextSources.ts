@@ -21,6 +21,7 @@ export const supportsContextSources = (sessionConfig: unknown): boolean =>
   usesCloudflareSessionStorage(sessionConfig) && !requiresLitForSessionStorage(sessionConfig);
 
 type Input = { sessionSlug: string; sessionConfig: unknown; account?: unknown; enabled?: boolean };
+type ListInput = Input & { offersAdding?: boolean };
 
 export type SessionContextSourcesState = ReturnType<typeof useSessionContextSources>;
 
@@ -36,7 +37,13 @@ const contextSourcesIdentity = (input: Input, isAdmin: boolean): string =>
     resolveWorkerCanonicalSessionIdHex(input.sessionConfig),
   ]);
 
-export function useSessionContextSources({ sessionSlug, sessionConfig, account = '', enabled = true }: Input) {
+export function useSessionContextSources({
+  sessionSlug,
+  sessionConfig,
+  account = '',
+  enabled = true,
+  offersAdding = true,
+}: ListInput) {
   const supported = supportsContextSources(sessionConfig);
   const isAdmin = isConfiguredAdmin(sessionConfig, { account });
   const identity = contextSourcesIdentity({ sessionSlug, sessionConfig, account }, isAdmin);
@@ -105,9 +112,9 @@ export function useSessionContextSources({ sessionSlug, sessionConfig, account =
       current = false;
     };
   }, [active, isAdmin, account, sessionSlug, revision]);
-  // Only someone signed in can add, so only they make this check.
+  // Only someone signed in can add, so only they make this check, and only where adding is on offer.
   const [workerAccepts, setWorkerAccepts] = useState(false);
-  const mayAdd = active && !!account && participantsMayAddContext(sessionConfig);
+  const mayAdd = active && offersAdding && !!account && participantsMayAddContext(sessionConfig);
   useEffect(() => {
     if (!mayAdd) return undefined;
     let current = true;
@@ -139,7 +146,7 @@ export function useSessionContextSources({ sessionSlug, sessionConfig, account =
  * when there is nothing.
  */
 export function useSessionContextPrompt({ totalChars, ...input }: Input & { totalChars: number }) {
-  const { sources, loading, isAdmin } = useSessionContextSources(input);
+  const { sources, loading, isAdmin } = useSessionContextSources({ ...input, offersAdding: false });
   const identity = contextSourcesIdentity(input, isAdmin);
   const [prompt, setPrompt] = useState({ identity: '', text: '' });
   const configRef = useRef(input.sessionConfig);
