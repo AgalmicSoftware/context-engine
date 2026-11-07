@@ -92,8 +92,9 @@ import {
   buildRatingMatrixFromDemo,
   buildRatingMatrixFromRealData,
   buildUmapParticipantData,
-  clusterUMAPPointsKmeansTyped,
+  clusterExploratoryPoints,
   d3Report,
+  type ExploratoryGroups,
   doUMAPTyped,
   formatBlockchainNetworkLabel,
   formatSuperscriptNumber,
@@ -144,6 +145,7 @@ const formatSummaryStat = (all: number | string, binary: number | string) =>
 
 const surveyLog = createLogger('surveys');
 export const POLIS_CLUSTER_COLORS = CHART_SERIES_COLORS;
+const NO_EXPLORATORY_GROUPS: ExploratoryGroups = { assignments: [], analytical: [] };
 export const getPolisDemoDatasetForSlug = (...args: Parameters<typeof getPolisDemoDatasetForSlugRuntime>) =>
   getPolisDemoDatasetForSlugRuntime(...args);
 
@@ -311,7 +313,8 @@ export default function PolisReport({
     () => defaultEmbeddingChoice as EmbeddingChoice,
   );
   const [manualClusterCount, setManualClusterCount] = useState<string>(() => defaultManualClusterCount);
-  const [exploratoryClusterAssignments, setExploratoryClusterAssignments] = useState<number[]>([]);
+  const [exploratoryGroups, setExploratoryGroups] = useState<ExploratoryGroups>(NO_EXPLORATORY_GROUPS);
+  const exploratoryClusterAssignments = exploratoryGroups.assignments;
   const [exploratoryRepQuestions, setExploratoryRepQuestions] = useState<PolisRepQuestionsMap>({});
 
   // Representative questions
@@ -451,6 +454,7 @@ export default function PolisReport({
     commentStats?: PolisCommentStat[];
     clusterAssignments: number[];
     analyticalClusterAssignments: number[];
+    inConversationParticipantIndices?: number[];
     clusterCount: number;
     repQuestions: PolisRepQuestionsMap;
   } | null>(null);
@@ -473,6 +477,7 @@ export default function PolisReport({
           commentStats?: PolisCommentStat[];
           clusterAssignments: number[];
           analyticalClusterAssignments: number[];
+          inConversationParticipantIndices?: number[];
           clusterCount: number;
           repQuestions: PolisRepQuestionsMap;
         },
@@ -520,11 +525,11 @@ export default function PolisReport({
     manualClusterCountValue === null
   );
   const isExploratoryMode = embeddingChoice !== 'POLIS' || manualClusterCountValue !== null;
+  const inConversationParticipantIndices = polisMathResult?.inConversationParticipantIndices;
   const isUmapView = embeddingChoice === 'UMAP';
-  // UMAP needs two neighbours, fewer than the number of participants, so a pair
-  // keeps the PCA layout.
-  const activeParticipantCoords =
-    isUmapView && (ratingMatrix?.[0]?.length || 0) !== 2 ? umapParticipantCoords : participantCoords;
+  // UMAP needs two neighbours, fewer than the number of participants, so small reports keep the PCA layout.
+  const participantCount = (ratingMatrix || []).reduce((widest, votes) => Math.max(widest, votes.length), 0);
+  const activeParticipantCoords = isUmapView && participantCount >= 3 ? umapParticipantCoords : participantCoords;
   const activeStatementCoords = embeddingChoice === 'SVD' ? statementCoords : [];
   const activeClusterCount = useMemo(() => {
     if (manualClusterCountValue !== null) return manualClusterCountValue;
@@ -562,12 +567,16 @@ export default function PolisReport({
     shouldUsePrecomputedDemoClusters,
   ]);
   const activeAnalyticalClusterAssignments = useMemo(() => {
-    if (isExploratoryMode || shouldUsePrecomputedDemoClusters) {
-      return activeClusterAssignments;
-    }
-    const analytical = polisMathResult?.analyticalClusterAssignments;
+    if (!isExploratoryMode && shouldUsePrecomputedDemoClusters) return activeClusterAssignments;
+    const analytical = isExploratoryMode ? exploratoryGroups.analytical : polisMathResult?.analyticalClusterAssignments;
     return Array.isArray(analytical) && analytical.length ? analytical : activeClusterAssignments;
-  }, [activeClusterAssignments, isExploratoryMode, polisMathResult, shouldUsePrecomputedDemoClusters]);
+  }, [
+    activeClusterAssignments,
+    exploratoryGroups,
+    isExploratoryMode,
+    polisMathResult,
+    shouldUsePrecomputedDemoClusters,
+  ]);
   const activeAnalyticalClusterIds = useMemo(
     () =>
       Array.from(
@@ -956,7 +965,7 @@ export default function PolisReport({
       setClusterCount(0);
       setClusterAssignments([]);
       setRepQuestions({});
-      setExploratoryClusterAssignments([]);
+      setExploratoryGroups(NO_EXPLORATORY_GROUPS);
       setExploratoryRepQuestions({});
       setClusterCollapseState({});
       return;
@@ -1015,19 +1024,19 @@ export default function PolisReport({
 
   useEffect(() => {
     if (!ratingMatrix || !ratingMatrix.length) {
-      setExploratoryClusterAssignments([]);
+      setExploratoryGroups(NO_EXPLORATORY_GROUPS);
       setExploratoryRepQuestions({});
       return;
     }
     if (!isExploratoryMode) {
-      setExploratoryClusterAssignments([]);
+      setExploratoryGroups(NO_EXPLORATORY_GROUPS);
       setExploratoryRepQuestions({});
       return;
     }
 
     const pointsToUse = activeParticipantCoords;
     if (!pointsToUse || !pointsToUse.length) {
-      setExploratoryClusterAssignments([]);
+      setExploratoryGroups(NO_EXPLORATORY_GROUPS);
       setExploratoryRepQuestions({});
       return;
     }
@@ -1037,33 +1046,24 @@ export default function PolisReport({
       manualClusterCountValue,
     });
     if (nextClusterCount < 1) {
-      setExploratoryClusterAssignments([]);
+      setExploratoryGroups(NO_EXPLORATORY_GROUPS);
       setExploratoryRepQuestions({});
       return;
     }
-    if (pointsToUse.length < nextClusterCount) {
-      const fallbackAssignments = new Array(pointsToUse.length).fill(0);
-      setExploratoryClusterAssignments(fallbackAssignments);
-      setExploratoryRepQuestions(
-        findRepresentativeQuestions(
-          ratingMatrix,
-          fallbackAssignments,
-          questionPrompts,
-          allQuestions,
-        ) as PolisRepQuestionsMap,
-      );
-      return;
-    }
-
     try {
-      const assigned = clusterUMAPPointsKmeansTyped(pointsToUse, nextClusterCount, DETERMINISTIC_SEED);
+      const groups = clusterExploratoryPoints(
+        pointsToUse,
+        inConversationParticipantIndices,
+        nextClusterCount,
+        DETERMINISTIC_SEED,
+      );
       const nextRepQuestions = findRepresentativeQuestions(
         ratingMatrix,
-        assigned,
+        groups.analytical,
         questionPrompts,
         allQuestions,
       ) as PolisRepQuestionsMap;
-      setExploratoryClusterAssignments(assigned);
+      setExploratoryGroups(groups);
       setExploratoryRepQuestions(nextRepQuestions);
       setClusterCollapseState((prev) => {
         const next = { ...prev };
@@ -1076,7 +1076,7 @@ export default function PolisReport({
       });
     } catch (e: unknown) {
       setErrorMessage(`Exploratory clustering error: ${getErrorMessage(e)}`);
-      setExploratoryClusterAssignments([]);
+      setExploratoryGroups(NO_EXPLORATORY_GROUPS);
       setExploratoryRepQuestions({});
     }
   }, [
@@ -1084,6 +1084,7 @@ export default function PolisReport({
     activeClusterCount,
     activeParticipantCoords,
     allQuestions,
+    inConversationParticipantIndices,
     isExploratoryMode,
     manualClusterCountValue,
     questionPrompts,
@@ -1448,6 +1449,12 @@ export default function PolisReport({
     return votes;
   }
 
+  // Everyone in the analysis: who the groups, and their differences, are measured against.
+  const getAnalysedVotesForQuestion = (questionIndex: number): PolisVote[] =>
+    (ratingMatrix?.[questionIndex] || []).filter(
+      (_, participant) => (activeAnalyticalClusterAssignments[participant] ?? -1) >= 0,
+    );
+
   /***************************************************************
    * Helpers for AI payload construction
    ***************************************************************/
@@ -1484,7 +1491,7 @@ export default function PolisReport({
       const promptKey = allQuestions[qIdx];
       const prompt = (questionPrompts[promptKey] || rq.prompt || '').trim();
       const clusterVotes = getVotesForQuestionInCluster(qIdx, clusterIndex, matrix, activeAnalyticalClusterAssignments);
-      const overallVotes = matrix[qIdx] || [];
+      const overallVotes = getAnalysedVotesForQuestion(qIdx);
       return {
         label: rq.label,
         questionIndex: qIdx,
@@ -1640,7 +1647,7 @@ export default function PolisReport({
 
           const stance = rq.repfulFor === 'disagree' ? 'disagree' : 'agree';
           const clusterCounts = countVotes(clusterVotes);
-          const overallCounts = countVotes(ratingMatrix?.[qIndex] || []);
+          const overallCounts = countVotes(getAnalysedVotesForQuestion(qIndex));
           const comparison =
             clusterCounts.responded && overallCounts.responded
               ? `${Math.round((clusterCounts[stance] / clusterCounts.responded) * 100)}% ${stance} in this cluster · ${Math.round((overallCounts[stance] / overallCounts.responded) * 100)}% overall`
@@ -1659,7 +1666,7 @@ export default function PolisReport({
               <strong>{rq.label}</strong>: {questionPrompt} <br />
               <small
                 style={{ color: 'var(--ce-document-text-muted)' }}
-                title="Percentages use responses to this question, including Unsure. Overall includes this cluster and respects the report filters."
+                title="Percentages use responses to this question, including Unsure. Overall counts everyone in the analysis, including this cluster, and respects the report filters."
               >
                 {comparison}
               </small>

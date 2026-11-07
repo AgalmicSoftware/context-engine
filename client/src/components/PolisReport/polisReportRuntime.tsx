@@ -238,6 +238,58 @@ export const doUMAPTyped: DoUMAPFn = (data, nNeighbors, randomSeed) =>
   Reflect.apply(doUMAP, null, [data, nNeighbors, randomSeed]) as [number, number][];
 export const clusterUMAPPointsKmeansTyped: ClusterPointsFn = (points, clusterCount, randomSeed) =>
   Reflect.apply(clusterUMAPPointsKmeans, null, [points, clusterCount, randomSeed]) as number[];
+
+export interface ExploratoryGroups {
+  /** Each participant's group on the map, by participant index. */
+  assignments: number[];
+  /** The same, with -1 for anyone outside the analysis, for every count and comparison. */
+  analytical: number[];
+}
+
+/**
+ * Exploratory groups, formed the way automatic ones are: people in the analysis define the groups, and everyone
+ * else is shown in the nearest one without counting towards it. Without a member list, everyone counts.
+ */
+export function clusterExploratoryPoints(
+  points: PolisPoint[],
+  memberIndices: number[] | null | undefined,
+  clusterCount: number,
+  randomSeed: number,
+): ExploratoryGroups {
+  const members = memberIndices?.length ? new Set(memberIndices) : null;
+  const listedPoints = members ? points.filter((point) => members.has(point.index)) : points;
+  const groupPoints = listedPoints.length ? listedPoints : points;
+  const groups =
+    groupPoints.length < clusterCount
+      ? new Array<number>(groupPoints.length).fill(0)
+      : clusterUMAPPointsKmeansTyped(groupPoints, clusterCount, randomSeed);
+
+  const groupByPoint = new Map(groupPoints.map((point, position) => [point, groups[position]]));
+  const totals = new Map<number, { x: number; y: number; count: number }>();
+  groupPoints.forEach((point, position) => {
+    const total = totals.get(groups[position]) ?? { x: 0, y: 0, count: 0 };
+    totals.set(groups[position], { x: total.x + point.x, y: total.y + point.y, count: total.count + 1 });
+  });
+  const centers = Array.from(totals, ([group, { x, y, count }]) => ({ group, x: x / count, y: y / count }));
+  const nearestGroup = (point: PolisPoint) =>
+    centers.reduce(
+      (nearest, center) => {
+        const distance = (point.x - center.x) ** 2 + (point.y - center.y) ** 2;
+        return distance < nearest.distance ? { group: center.group, distance } : nearest;
+      },
+      { group: 0, distance: Infinity },
+    ).group;
+
+  const assignments: number[] = [];
+  const analytical: number[] = [];
+  points.forEach((point) => {
+    const group = groupByPoint.get(point);
+    assignments[point.index] = group ?? nearestGroup(point);
+    analytical[point.index] = group ?? -1;
+  });
+  return { assignments, analytical };
+}
+
 export const analyzeClusterOpinionsTyped: AnalyzeClusterOpinionsFn = (payload, allClustersData, options) =>
   Reflect.apply(analyzeClusterOpinions, null, [payload, allClustersData, options]) as Promise<
     Partial<PolisClusterAnalysisResult>
@@ -1210,7 +1262,7 @@ export function getUTCDataTimestamp() {
 }
 
 export const REPORT_DEFAULT_EMBEDDING_LABEL = 'Polis Auto';
-export const PARTICIPANTS_GRAPH_TOOLTIP_TEXT = `This diagram opens in UMAP with 3 clusters. Switch to SVD/PCA for the PCA view, or ${REPORT_DEFAULT_EMBEDDING_LABEL} for the report's Polis-inspired automatic clustering.`;
+export const PARTICIPANTS_GRAPH_TOOLTIP_TEXT = `This diagram opens in UMAP with 3 clusters. Switch to SVD/PCA for the PCA view, or ${REPORT_DEFAULT_EMBEDDING_LABEL} for the report's Polis-inspired automatic clustering. People with too few answers appear in their nearest cluster but aren't counted in its results.`;
 export const REPORT_DEFAULT_EMBEDDING_TOOLTIP_TEXT =
   "Polis Auto uses Context Engine's Polis-inspired automatic clustering. It keeps the report's PCA-based participant layout and auto-selects opinion clusters from that layout. UMAP and SVD/PCA are exploratory views where you can override K manually. This is Polis-inspired analysis inside Context Engine, not an official Polis/Pol.is integration or endorsement.";
 export const OPINION_GROUPS_TOOLTIP_TEXT =

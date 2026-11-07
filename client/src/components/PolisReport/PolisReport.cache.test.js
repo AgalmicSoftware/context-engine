@@ -25,10 +25,14 @@ import PolisReport, {
   shouldAutoEnablePolisDemoData,
 } from './PolisReport';
 import { buildReportResponseStats } from './polisReportAnswers';
-import { buildUmapParticipantData, rememberClusterAnalysis } from './polisReportRuntime';
+import { buildUmapParticipantData, clusterExploratoryPoints, rememberClusterAnalysis } from './polisReportRuntime';
 import { CHART_SERIES_COLORS } from '../../utilities/ui/chartColors';
-import { doUMAP } from '../../utilities/survey/consensusMath';
-import { computePolisCommentStats, computePolisConversationMath } from '../../utilities/survey/consensusReportMath.js';
+import { clusterUMAPPointsKmeans, doUMAP } from '../../utilities/survey/consensusMath';
+import {
+  computePolisCommentStats,
+  computePolisConversationMath,
+  findRepresentativeQuestions,
+} from '../../utilities/survey/consensusReportMath.js';
 import { analyzeClusterOpinions } from '../../utilities/ai/aiClient.js';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import * as sessionScanScope from '../../utilities/session/sessionScanScope.js';
@@ -306,6 +310,22 @@ describe('PolisReport cache read options', () => {
       clusterCount: 0,
       repQuestions: {},
     });
+  });
+
+  it('plots one participant without calling UMAP', () => {
+    const point = { x: 0, y: 0, index: 0 };
+    computePolisConversationMath.mockReturnValue({
+      stats: { nParticipants: 1, nComments: 1, totalVotes: 1 },
+      participantCoords: [point],
+      statementCoords: [],
+      commentStats: [],
+      clusterAssignments: [0],
+      clusterCount: 1,
+      repQuestions: { 0: [] },
+    });
+    render(<PolisReport {...baseReportProps} slug="one-voter" questionResponses={seededQuestionResponses} />);
+    expect(doUMAP).not.toHaveBeenCalled();
+    expect(screen.queryByText('(Not enough participant data to plot.)')).not.toBeInTheDocument();
   });
 
   it('plots two participants without calling UMAP with an impossible neighbor count', () => {
@@ -643,6 +663,32 @@ describe('PolisReport cache read options', () => {
     ]);
   });
 
+  it('forms exploratory groups from the analysis and shows everyone else in the nearest one', () => {
+    const previousClustering = clusterUMAPPointsKmeans.getMockImplementation();
+    clusterUMAPPointsKmeans.mockImplementation((points = []) => points.map((point) => (point.x < 5 ? 0 : 1)));
+    // Out of participant order, as the math's coordinates can be.
+    const points = [
+      { x: 10, y: 0, index: 3 },
+      { x: 0, y: 0, index: 0 },
+      { x: 9, y: 0, index: 1 },
+      { x: 1, y: 0, index: 2 },
+    ];
+
+    expect(clusterExploratoryPoints(points, [0, 3], 2, 7)).toEqual({
+      assignments: [0, 1, 0, 1],
+      analytical: [0, -1, -1, 1],
+    });
+    expect(clusterUMAPPointsKmeans.mock.lastCall).toEqual([[points[0], points[1]], 2, 7]);
+    // Without a member list, everyone counts.
+    expect(clusterExploratoryPoints(points, undefined, 2, 7).analytical).toEqual([0, 1, 0, 1]);
+    // Too few members for the groups asked for: one group, not an error.
+    expect(clusterExploratoryPoints(points, [0], 2, 7)).toEqual({
+      assignments: [0, 0, 0, 0],
+      analytical: [0, -1, -1, -1],
+    });
+    clusterUMAPPointsKmeans.mockImplementation(previousClustering);
+  });
+
   it('gives every participant a UMAP row when a question has fewer responses', () => {
     expect(buildUmapParticipantData([[1], [1, -1]])).toEqual([
       [1, 1],
@@ -754,7 +800,7 @@ describe('PolisReport cache read options', () => {
   it('keeps participant graph tooltip copy aligned with the Polis graph modes', () => {
     expect(REPORT_DEFAULT_EMBEDDING_LABEL).toBe('Polis Auto');
     expect(PARTICIPANTS_GRAPH_TOOLTIP_TEXT).toBe(
-      "This diagram opens in UMAP with 3 clusters. Switch to SVD/PCA for the PCA view, or Polis Auto for the report's Polis-inspired automatic clustering.",
+      "This diagram opens in UMAP with 3 clusters. Switch to SVD/PCA for the PCA view, or Polis Auto for the report's Polis-inspired automatic clustering. People with too few answers appear in their nearest cluster but aren't counted in its results.",
     );
     expect(REPORT_DEFAULT_EMBEDDING_TOOLTIP_TEXT).toBe(
       "Polis Auto uses Context Engine's Polis-inspired automatic clustering. It keeps the report's PCA-based participant layout and auto-selects opinion clusters from that layout. UMAP and SVD/PCA are exploratory views where you can override K manually. This is Polis-inspired analysis inside Context Engine, not an official Polis/Pol.is integration or endorsement.",
@@ -1595,7 +1641,8 @@ describe('PolisReport demo data defaults', () => {
     });
   });
 
-  it('uses analytical memberships for AI group sizes and representative vote bars', async () => {
+  describe('people outside the analysis', () => {
+    // Four people answered; the second answered too little to be in the analysis, but is shown in group 0.
     const responseRow = (responder, value) => ({
       responder,
       questionId: 'q1',
@@ -1609,49 +1656,113 @@ describe('PolisReport demo data defaults', () => {
         responseRow('p3', 'Disagree'),
       ],
     };
-    // Later tests rely on the mock they find, so this one puts it back.
-    const previousMath = computePolisConversationMath.getMockImplementation();
     const analysis = { short: 'Summary', long: 'Long summary', name: 'Group' };
-    analyzeClusterOpinions.mockResolvedValueOnce(analysis).mockResolvedValueOnce(analysis);
-    computePolisConversationMath.mockReturnValue({
-      stats: { nParticipants: 4, nComments: 1, totalVotes: 4, votesPerVoterAvg: 1 },
-      participantCoords: [
-        { x: 0, y: 0, index: 0 },
-        { x: 0.1, y: 0, index: 1 },
-        { x: 1, y: 0, index: 2 },
-        { x: 1.1, y: 0, index: 3 },
-      ],
-      statementCoords: [{ x: 0, y: 0, index: 0 }],
-      commentStats: [],
-      clusterAssignments: [0, 0, 1, 1],
-      analyticalClusterAssignments: [0, -1, 1, 1],
-      clusterCount: 2,
-      repQuestions: {
-        0: [{ label: '#1', questionIndex: 0, prompt: 'Prompt', difference: 0.5, repfulFor: 'agree' }],
-        1: [{ label: '#1', questionIndex: 0, prompt: 'Prompt', difference: 0.5, repfulFor: 'disagree' }],
-      },
+    // Later tests rely on the mocks they find, so these are put back.
+    let previousMath;
+    let previousClustering;
+
+    beforeEach(() => {
+      previousMath = computePolisConversationMath.getMockImplementation();
+      previousClustering = clusterUMAPPointsKmeans.getMockImplementation();
+      analyzeClusterOpinions.mockReset();
+      analyzeClusterOpinions.mockResolvedValue(analysis);
+      computePolisConversationMath.mockReturnValue({
+        stats: { nParticipants: 4, nComments: 1, totalVotes: 4, votesPerVoterAvg: 1 },
+        participantCoords: [
+          { x: 0, y: 0, index: 0 },
+          { x: 0.1, y: 0, index: 1 },
+          { x: 1, y: 0, index: 2 },
+          { x: 1.1, y: 0, index: 3 },
+        ],
+        statementCoords: [{ x: 0, y: 0, index: 0 }],
+        commentStats: [],
+        clusterAssignments: [0, 0, 1, 1],
+        analyticalClusterAssignments: [0, -1, 1, 1],
+        inConversationParticipantIndices: [0, 2, 3],
+        clusterCount: 2,
+        repQuestions: {
+          0: [{ label: '#1', questionIndex: 0, prompt: 'Prompt', difference: 0.5, repfulFor: 'agree' }],
+          1: [{ label: '#1', questionIndex: 0, prompt: 'Prompt', difference: 0.5, repfulFor: 'disagree' }],
+        },
+      });
+      findRepresentativeQuestions.mockImplementation((_matrix, assignments) =>
+        Object.fromEntries(
+          [...new Set(assignments.filter((group) => group >= 0))].map((group) => [
+            group,
+            [
+              {
+                label: '#1',
+                questionIndex: 0,
+                prompt: 'Prompt',
+                difference: 0.5,
+                repfulFor: group ? 'disagree' : 'agree',
+              },
+            ],
+          ]),
+        ),
+      );
+      // The first person is one group, everyone else the other.
+      clusterUMAPPointsKmeans.mockImplementation((points = []) => points.map((_, position) => (position ? 1 : 0)));
     });
 
-    render(<PolisReport {...baseReportProps} slug="edge" questionResponses={questionResponses} />);
+    afterEach(() => {
+      computePolisConversationMath.mockImplementation(previousMath);
+      clusterUMAPPointsKmeans.mockImplementation(previousClustering);
+      findRepresentativeQuestions.mockImplementation(() => ({}));
+      analyzeClusterOpinions.mockReset();
+      analyzeClusterOpinions.mockImplementation(
+        jest.requireActual('../../utilities/ai/aiClient.js').analyzeClusterOpinions,
+      );
+    });
 
-    fireEvent.change(screen.getByDisplayValue('UMAP'), { target: { value: 'POLIS' } });
-    await screen.findByDisplayValue(REPORT_DEFAULT_EMBEDDING_LABEL);
-    fireEvent.click(await screen.findByTestId(E2E_TESTIDS.POLIS_ANALYZE_CLUSTERS));
+    const expectAnalysedCounts = async () => {
+      fireEvent.click(await screen.findByLabelText('Expand Clusters'));
+      expect(await screen.findByText('100% agree in this cluster · 33% overall')).toBeInTheDocument();
+      expect(screen.getByText('100% disagree in this cluster · 67% overall')).toBeInTheDocument();
+      // Each section's bar, then the other cluster's beside it: nobody's vote is counted for the second person.
+      expect(screen.getAllByRole('img', { name: 'Agree 1, unsure 0, disagree 0' })).toHaveLength(2);
+      expect(screen.getAllByRole('img', { name: 'Agree 0, unsure 0, disagree 2' })).toHaveLength(2);
 
-    await waitFor(() => expect(analyzeClusterOpinions).toHaveBeenCalled());
-    expect(analyzeClusterOpinions.mock.calls[0][0]).toEqual(
-      expect.objectContaining({
-        clusterIndex: 0,
-        clusterSize: 1,
-        topStatements: [
-          expect.objectContaining({
-            cluster: expect.objectContaining({ agree: 1, disagree: 0, responded: 1 }),
-          }),
-        ],
-      }),
-    );
-    expect(analyzeClusterOpinions.mock.calls[0][1]).toEqual(expect.objectContaining({ sizes: { 0: 1, 1: 2 } }));
-    computePolisConversationMath.mockImplementation(previousMath);
+      fireEvent.click(await screen.findByTestId(E2E_TESTIDS.POLIS_ANALYZE_CLUSTERS));
+      await waitFor(() => expect(analyzeClusterOpinions).toHaveBeenCalled());
+      expect(analyzeClusterOpinions.mock.calls[0][0]).toEqual(
+        expect.objectContaining({
+          clusterIndex: 0,
+          clusterSize: 1,
+          topStatements: [
+            expect.objectContaining({
+              cluster: expect.objectContaining({ agree: 1, disagree: 0, responded: 1 }),
+              overall: expect.objectContaining({ agree: 1, disagree: 2, responded: 3 }),
+            }),
+          ],
+        }),
+      );
+      expect(analyzeClusterOpinions.mock.calls[0][1]).toEqual(expect.objectContaining({ sizes: { 0: 1, 1: 2 } }));
+    };
+
+    it('leaves them out of counts in the default UMAP view', async () => {
+      render(<PolisReport {...baseReportProps} slug="edge" questionResponses={questionResponses} />);
+
+      await waitFor(() => expect(clusterUMAPPointsKmeans).toHaveBeenCalled());
+      expect(clusterUMAPPointsKmeans.mock.lastCall[0].map((point) => point.index)).toEqual([0, 2, 3]);
+      await expectAnalysedCounts();
+    });
+
+    it('leaves them out of counts after the group count is set by hand', async () => {
+      render(<PolisReport {...baseReportProps} slug="edge" questionResponses={questionResponses} />);
+
+      fireEvent.change(screen.getByDisplayValue('UMAP'), { target: { value: 'SVD' } });
+      await screen.findByDisplayValue('SVD/PCA');
+      await expectAnalysedCounts();
+    });
+
+    it('leaves them out of counts in Polis Auto', async () => {
+      render(<PolisReport {...baseReportProps} slug="edge" questionResponses={questionResponses} />);
+
+      fireEvent.change(screen.getByDisplayValue('UMAP'), { target: { value: 'POLIS' } });
+      await screen.findByDisplayValue(REPORT_DEFAULT_EMBEDDING_LABEL);
+      await expectAnalysedCounts();
+    });
   });
 
   it('defaults built-in /session/demo to UMAP with 3 groups and still exposes precomputed Polis analysis after switching modes', async () => {

@@ -204,6 +204,33 @@ describe('computePolisConversationMath', () => {
   });
 });
 
+describe('in-conversation membership defaults', () => {
+  // One row per question, from how many questions each person answered.
+  const answersByPerson = (nQuestions, answeredCounts) =>
+    Array.from({ length: nQuestions }, (_, question) =>
+      answeredCounts.map((answered) => (question < answered ? 1 : null)),
+    );
+  const inConversation = (nQuestions, answeredCounts) =>
+    computePolisConversationMath(answersByPerson(nQuestions, answeredCounts), {}, [], { randomSeed: 42 })
+      .inConversationParticipantIndices;
+
+  it('admits people at seven answers once fifteen qualify', () => {
+    const counts = [...new Array(16).fill(7), 6];
+    expect(inConversation(20, counts)).toEqual(Array.from({ length: 16 }, (_, person) => person));
+  });
+
+  it('fills to fifteen with the most active people', () => {
+    expect(inConversation(20, [...new Array(10).fill(7), 6, 5, 4, 3, 2, 1])).toEqual(
+      Array.from({ length: 15 }, (_, person) => person),
+    );
+  });
+
+  it('asks for no more answers than there are questions', () => {
+    const counts = [...new Array(15).fill(3), 2];
+    expect(inConversation(3, counts)).toEqual(Array.from({ length: 15 }, (_, person) => person));
+  });
+});
+
 describe('findRepresentativeQuestions', () => {
   // Two groups of `size`: a question's row, from how many in each agree (everyone else disagrees).
   const row = (size, agreeInFirst, agreeInSecond) => [

@@ -39,11 +39,12 @@ guards, and a zero-padded second component for rank-one data.
 ## Analytical membership versus display assignment
 
 Only participants admitted to the in-conversation set define analytical group
-membership. Low-participation participants may still receive a nearest-group
-display color so every plotted point is legible, but those extrapolated labels
-do not affect:
+membership, in every view. The exploratory UMAP and SVD/PCA views cluster those
+participants and place everyone else by the nearest group center. Low-participation
+participants may still receive a nearest-group display color so every plotted point
+is legible, but those extrapolated labels do not affect:
 
-- group sizes or group vote tallies;
+- group sizes, group vote tallies, or the overall figures groups are compared with;
 - comparative proportions, z-tests, or representative-comment selection; or
 - CommonGround cluster membership and K-anonymity checks.
 
@@ -65,8 +66,8 @@ neighbor bound.
 ## Deliberate scope boundaries
 
 The browser library analyzes one current, already-visible rating matrix. It
-does not reproduce the pol.is worker's prior-tick PCA vectors, persistent group
-lineage, four-tick K smoothing, moderation routing, subgroups, comment
+does not reproduce the pol.is worker's prior-tick PCA vectors, once-in-always-in
+membership, persistent group lineage, four-tick K smoothing, moderation routing, subgroups, comment
 priorities, or participant archetype reports. Those features depend on durable
 worker state or product schemas that the snapshot API does not receive.
 
