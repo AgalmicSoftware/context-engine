@@ -162,6 +162,23 @@ describe('mainSiteWorkerCanonicalCacheRuntime', () => {
     expect(host.startSbtEventListenerForGroup).not.toHaveBeenCalled();
   });
 
+  it('carries on to surveys when others’ answers are refused, leaving response readiness alone', async () => {
+    const { host, calls } = makeHost();
+    jest.mocked(host.fetchQuestionResponsesChunkedForGroup).mockRejectedValueOnce(new Error('Access denied'));
+    await expect(
+      initializeMainSiteWorkerCanonicalCaches({
+        host,
+        sessionConfig: makeWorkerConfig(),
+        sessionSlug: 'worker-session',
+      }),
+    ).resolves.toBe(true);
+    expect(calls).toEqual(['questions', 'sbt-ready', 'surveys', 'surveys-ready']);
+    expect(host.setReadinessStateIfChanged).not.toHaveBeenCalledWith(
+      expect.objectContaining({ isResponsesCacheReady: true }),
+      expect.anything(),
+    );
+  });
+
   it('does not run cache work for invalid or non-Worker profiles', async () => {
     const { host, calls } = makeHost();
 
