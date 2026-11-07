@@ -110,7 +110,6 @@ export function applyDelegationToInput(auth = {}, input = {}, pathname = '', met
   const principal = record?.principal || auth.principal;
   if (!principal?.principalId) return { ok: false, status: 401, reason: 'agent_principal_required' };
   return { ok: true, input: { ...input, principalId: principal.principalId, principalAdapter: principal.adapter,
-    telegramUserId: '', userId: '', groupChatId: '', chatId: '', telegram: {}, adapterMetadata: {},
     username: principal.label || '', accountAddress: record?.accountAddress || auth.address,
     sessionSlug: record?.sessionSlug || auth.slug } };
 }

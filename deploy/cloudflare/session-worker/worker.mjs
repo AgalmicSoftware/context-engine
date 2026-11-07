@@ -94972,10 +94972,7 @@ function inputFromRequest(request, body = {}) {
   return {
     ...body,
     sessionSlug: safeString(body.sessionSlug || url.searchParams.get("sessionSlug")),
-    telegramUserId: safeString(body.telegramUserId || url.searchParams.get("telegramUserId")),
     createdAt: safeString(body.createdAt || url.searchParams.get("createdAt")),
-    chatId: safeString(body.chatId || url.searchParams.get("chatId")),
-    groupChatId: safeString(body.groupChatId || url.searchParams.get("groupChatId")),
     username: safeString(body.username || url.searchParams.get("username")),
     tags: body.tags || url.searchParams.get("tags") || url.searchParams.get("tag"),
     interests: body.interests || url.searchParams.get("interests"),
@@ -95122,12 +95119,6 @@ function applyDelegationToInput(auth = {}, input = {}, pathname = "", method = "
     ...input,
     principalId: principal.principalId,
     principalAdapter: principal.adapter,
-    telegramUserId: "",
-    userId: "",
-    groupChatId: "",
-    chatId: "",
-    telegram: {},
-    adapterMetadata: {},
     username: principal.label || "",
     accountAddress: record4?.accountAddress || auth.address,
     sessionSlug: record4?.sessionSlug || auth.slug

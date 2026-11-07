@@ -56,10 +56,7 @@ export function inputFromRequest(request, body = {}) {
   return {
     ...body,
     sessionSlug: safeString(body.sessionSlug || url.searchParams.get('sessionSlug')),
-    telegramUserId: safeString(body.telegramUserId || url.searchParams.get('telegramUserId')),
     createdAt: safeString(body.createdAt || url.searchParams.get('createdAt')),
-    chatId: safeString(body.chatId || url.searchParams.get('chatId')),
-    groupChatId: safeString(body.groupChatId || url.searchParams.get('groupChatId')),
     username: safeString(body.username || url.searchParams.get('username')),
     tags: body.tags || url.searchParams.get('tags') || url.searchParams.get('tag'),
     interests: body.interests || url.searchParams.get('interests'),

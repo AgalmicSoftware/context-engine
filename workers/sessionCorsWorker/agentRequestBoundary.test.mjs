@@ -169,6 +169,24 @@ test('hosted proposals, reads, drafts and explicit submission stay inside the Se
   assert.equal([...f.records.keys()].filter(key => key.startsWith('ce-storage:fixture:responses:')).length, 1);
 });
 
+test('retired Telegram fields in a request cannot change whose draft is saved', async () => {
+  const f = fixture(); f.withCoordinator(); f.env.CE_STORAGE_INDEX_KV = f.env.GROUP_KV;
+  f.config.storageProfile = { backend: 'cloudflare', payloadAccessControl: { gate: 'public', encryption: 'none' } };
+  const agent = await f.credential({ scopes: ['read_questions', 'draft_answers', 'pose_questions'] });
+  const created = await f.request('/api/agent/questions/create', { method: 'POST', token: agent.token,
+    body: { questions: [{ prompt: 'Should the fixture keep a shared garden?', questionType: 'binary' }] } });
+  assert.equal(created.status, 200, await created.clone().text());
+  const [{ questionId }] = (await created.json()).created;
+  const draft = await f.request('/api/agent/preferences?telegramUserId=foreign&chatId=foreign&groupChatId=foreign', { method: 'POST', token: agent.token, body: {
+    telegramUserId: 'foreign', userId: 'foreign', chatId: 'foreign', groupChatId: 'foreign', telegram: { id: 'foreign' }, adapterMetadata: { id: 'foreign' },
+    preferences: [{ questionId, value: 'Agree' }] } });
+  assert.equal(draft.status, 200, await draft.clone().text());
+  assert.equal((await draft.json()).drafts.length, 1);
+  const draftKeys = [...f.records.keys()].filter(key => key.includes(questionId) && key.includes('fixture-agent'));
+  assert.ok(draftKeys.length > 0, 'the draft belongs to the credential principal');
+  assert.equal([...f.records].flat().join('\n').includes('foreign'), false);
+});
+
 test('a question on the session hidden list leaves the Agent list, and no answer to it goes through', async () => {
   const f = fixture(); f.withCoordinator(); f.env.CE_STORAGE_INDEX_KV = f.env.GROUP_KV;
   f.config.storageProfile = { backend: 'cloudflare', payloadAccessControl: { gate: 'public', encryption: 'none' } };
