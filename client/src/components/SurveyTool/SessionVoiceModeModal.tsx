@@ -127,15 +127,23 @@ export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps)
                   {mode === 'recordGroup' ? <SessionRecordingHelp /> : null}
                 </span>
                 {props.onClaim ? (
-                  <Button
-                    type="button"
-                    className={styles.sessionRecordingButton}
-                    disabled={groupCapturing}
-                    data-testid={E2E_TESTIDS.SESSION_CLAIM_SCAN}
-                    onClick={() => setScanRequested(true)}
-                  >
-                    <FontAwesomeIcon icon={faQrcode} /> Scan code
-                  </Button>
+                  <>
+                    <button
+                      type="button"
+                      id="ce-session-claim-scan"
+                      className={styles.sessionInterviewHeaderButton}
+                      data-ce-control-appearance="frameless"
+                      aria-label="Scan code"
+                      disabled={groupCapturing}
+                      data-testid={E2E_TESTIDS.SESSION_CLAIM_SCAN}
+                      onClick={() => setScanRequested(true)}
+                    >
+                      <FontAwesomeIcon icon={faQrcode} />
+                    </button>
+                    <UncontrolledTooltip target="ce-session-claim-scan" trigger="hover focus">
+                      Scan code
+                    </UncontrolledTooltip>
+                  </>
                 ) : null}
               </span>
             </ModalHeader>

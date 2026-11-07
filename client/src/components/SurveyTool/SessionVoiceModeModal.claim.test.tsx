@@ -123,6 +123,9 @@ describe('scanning a part of a conversation', () => {
     render(<SessionVoiceModeModal {...baseProps} mode={mode} />);
     const scan = screen.getByTestId(E2E_TESTIDS.SESSION_CLAIM_SCAN);
     expect(scan.closest('.modal-header')).not.toBeNull();
+    // An icon alone, named for screen readers.
+    expect(scan).toHaveAccessibleName('Scan code');
+    expect(scan).toHaveTextContent(/^$/);
     fireEvent.click(scan);
     expect(await screen.findByTestId('mock-scanner')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Cancel scan' }));

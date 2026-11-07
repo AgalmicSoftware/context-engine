@@ -472,8 +472,8 @@ base64url (`sessionTranscriptClaim.ts`), then split across QR codes:
 
 - Each code is a link: `/session/<slug>#claim=<share id>.<index>.<total>.<data>`. So an
   ordinary camera opens the session, whose page then opens its own scanner and collects
-  the rest. **Scan code** in the Group Conversation and voice-mode dialog headers starts
-  the same scanner. It stays disabled while that dialog is capturing, and a code's link
+  the rest. The QR-code icon (**Scan code**) in the Group Conversation and voice-mode
+  dialog headers starts the same scanner. It stays disabled while that dialog is capturing, and a code's link
   opened in a tab that's recording waits for Stop.
 - Every code is QR version 12 at level M (65×65 modules, 287 bytes) so nothing jumps as
   they change, and one shows for 800 ms. That is slow enough for a shared screen to settle
