@@ -249,8 +249,10 @@ export const contextSourceRoute = async ({
   const name = trim(body.action);
   if (!Object.hasOwn(ACTIONS, name)) return json({ error: 'Unknown context action.' }, 400);
   if (!isAdmin) {
+    // A row that can't be read proves nothing, so it removes nothing.
     const row = await readContextSourceRow({ env, slug, id: body.id });
-    if (row && trim(row.uploader).toLowerCase() !== admin) return refused();
+    if (!row) return json({ error: 'That item is no longer in the session.' }, 404);
+    if (trim(row.uploader).toLowerCase() !== admin) return refused();
   }
   const action = ACTIONS[name];
   const now = () => new Date(deps?.now?.() || Date.now()).toISOString();

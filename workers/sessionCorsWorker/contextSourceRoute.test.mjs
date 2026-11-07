@@ -132,6 +132,22 @@ test('whoever added a file may remove it; anyone else’s needs an admin', async
   assert.equal((await h.context({ action: 'remove', id: another }, PARTICIPANT)).status, 200);
 });
 
+test('a row that can’t be read removes nothing for someone who isn’t an admin', async () => {
+  const h = harness();
+  const text = { name: 'notes.txt', type: 'text/plain', bytes: new TextEncoder().encode('notes') };
+  const theirs = await idOf(await h.uploadFile({ ...text, address: ADMIN }));
+  // One read fails; the next would succeed, and find the file to remove.
+  const { get } = h.kv;
+  let failures = 1;
+  h.kv.get = async (key) => {
+    if (failures-- > 0) throw new Error('KV read failed');
+    return get(key);
+  };
+  const refused = await h.context({ action: 'remove', id: theirs }, PARTICIPANT);
+  assert.equal(refused.status, 404);
+  assert.deepEqual((await h.list(ADMIN)).map((item) => item.storageRef.id), [theirs]);
+});
+
 test('a file publishes only if its uploader may still add it when the upload finishes', async () => {
   const h = harness();
   const publish = h.deps.executeCoordinatedStoragePublication;

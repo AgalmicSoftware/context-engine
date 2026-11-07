@@ -70665,7 +70665,8 @@ var init_contextSourceRoute = __esm({
       if (!Object.hasOwn(ACTIONS, name)) return json6({ error: "Unknown context action." }, 400);
       if (!isAdmin) {
         const row = await readContextSourceRow({ env, slug, id: body.id });
-        if (row && trim12(row.uploader).toLowerCase() !== admin) return refused();
+        if (!row) return json6({ error: "That item is no longer in the session." }, 404);
+        if (trim12(row.uploader).toLowerCase() !== admin) return refused();
       }
       const action = ACTIONS[name];
       const now = () => new Date(deps?.now?.() || Date.now()).toISOString();
