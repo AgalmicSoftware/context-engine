@@ -452,7 +452,8 @@ by default. Ticked, it asks who can read the transcript: anyone who can see the 
 or one group, starting at the group the page's link joined. Submitting uploads the
 transcript as a text file through the same path as any
 [context file](session-context-sources.md), after the questions, so the person has
-signed in by then. A later submit with more transcript replaces that file. A failure
+signed in by then. A later submit with more of the same conversation, or a new choice
+of who can read it, replaces that file; another conversation keeps its own. A failure
 says so beside **Try again**, and closing waits for an upload under way. The box only
 shows when the Worker takes participants' files (`participant_context_v1`) and the
 session allows them, or for an admin.
@@ -472,7 +473,8 @@ base64url (`sessionTranscriptClaim.ts`), then split across QR codes:
 - Each code is a link: `/session/<slug>#claim=<share id>.<index>.<total>.<data>`. So an
   ordinary camera opens the session, whose page then opens its own scanner and collects
   the rest. **Scan code** in the Group Conversation and voice-mode dialog headers starts
-  the same scanner. It stays disabled while that dialog is capturing.
+  the same scanner. It stays disabled while that dialog is capturing, and a code's link
+  opened in a tab that's recording waits for Stop.
 - Every code is QR version 12 at level M (65×65 modules, 287 bytes) so nothing jumps as
   they change, and one shows for 800 ms. That is slow enough for a shared screen to settle
   between codes and well under the three changes a second that count as flashing. About
@@ -493,7 +495,8 @@ first (or drafting goes ahead without them if they can't be read). The mapper ge
 answers and their comments, the drafts already in review and any responder context as
 usual, and the files they added to the session themselves. A draft that gives a different
 answer shows for review, saying which answer it changes. One that repeats the saved answer
-adds nothing and is counted in a note, unless it adds a new comment. A locked answer stands.
+adds nothing and is counted in a note, unless it adds a new comment. A locked answer stands
+and goes to no AI, even after it's been unlocked on the page.
 Someone signed out gets drafts from their part alone; if they sign in to submit, the usual
 check of drafts against saved answers applies.
 

@@ -111,6 +111,29 @@ describe('adding a transcript to context', () => {
     );
   });
 
+  it('keeps the file of an earlier conversation when another one is uploaded', async () => {
+    const { result } = await mount();
+    act(() => result.current.setChosen(true));
+    await act(() => result.current.upload('Person 1: First conversation.'));
+    jest.mocked(uploadContextFile).mockResolvedValueOnce('stored-2');
+    await act(() => result.current.upload('Person 1: A different one.'));
+    expect(uploadContextFile).toHaveBeenCalledTimes(2);
+    expect(removeContextSource).not.toHaveBeenCalled();
+  });
+
+  it('moves the same text to a new audience, and says if the wider copy stays', async () => {
+    const { result } = await mount();
+    act(() => result.current.setChosen(true));
+    await act(() => result.current.upload('Person 1: Words.'));
+    act(() => result.current.setChoice('group:salon'));
+    jest.mocked(uploadContextFile).mockResolvedValueOnce('stored-2');
+    jest.mocked(removeContextSource).mockRejectedValueOnce(new Error('no'));
+    await act(() => result.current.upload('Person 1: Words.'));
+    expect(jest.mocked(uploadContextFile).mock.calls[1][0].groupId).toBe('salon');
+    expect(removeContextSource).toHaveBeenCalledWith(expect.objectContaining({ id: 'stored-1' }), expect.anything());
+    expect(result.current.status).toBe('Transcript added to context, but its earlier copy is still there.');
+  });
+
   it('says when it failed and can try again, and closing waits for an upload under way', async () => {
     const { result } = await mount();
     act(() => result.current.setChosen(true));

@@ -22,7 +22,7 @@ type Input = { sessionSlug: string; sessionConfig: unknown; context: unknown; en
 
 /**
  * The Group Conversation's "Add transcript to context" choice. The file goes up after the questions submit, as
- * that is when someone has signed in. A later submit with more transcript replaces it rather than adding another.
+ * that is when someone has signed in.
  */
 export function useTranscriptContextUpload({ sessionSlug, sessionConfig, context, enabled }: Input) {
   const [available, setAvailable] = useState(false);
@@ -36,7 +36,7 @@ export function useTranscriptContextUpload({ sessionSlug, sessionConfig, context
     enabled && supportsContextSources(sessionConfig) && (isAdmin || participantsMayAddContext(sessionConfig));
   const latest = useRef({ sessionSlug, sessionConfig, context });
   latest.current = { sessionSlug, sessionConfig, context };
-  const uploaded = useRef({ text: '', id: '' });
+  const uploaded = useRef({ text: '', id: '', choice: '' });
   const pending = useRef<Promise<void>>(Promise.resolve());
   const groups = useContextGroups({ sessionSlug, sessionConfig, enabled: available });
 
@@ -60,7 +60,8 @@ export function useTranscriptContextUpload({ sessionSlug, sessionConfig, context
   const upload = useCallback(
     (transcript: string) => {
       const text = transcript.trim();
-      if (!chosen || !text || text === uploaded.current.text) return pending.current;
+      const earlier = uploaded.current;
+      if (!chosen || !text || (text === earlier.text && choice === earlier.choice)) return pending.current;
       setFailed(false);
       setStatus('Adding the transcript to context…');
       pending.current = pending.current.then(async () => {
@@ -72,11 +73,20 @@ export function useTranscriptContextUpload({ sessionSlug, sessionConfig, context
             },
             latest.current,
           );
-          const previous = uploaded.current.id;
-          uploaded.current = { text, id };
-          if (previous)
-            await removeContextSource({ id: previous, reading: null }, latest.current).catch(() => undefined);
-          setStatus('Transcript added to context.');
+          uploaded.current = { text, id, choice };
+          // More of this conversation, or a new audience for it, replaces its file. Another conversation keeps its own.
+          const replaces = !!earlier.id && text.startsWith(earlier.text);
+          let replaced = true;
+          if (replaces) {
+            await removeContextSource({ id: earlier.id, reading: null }, latest.current).catch(() => {
+              replaced = false;
+            });
+          }
+          setStatus(
+            replaced
+              ? 'Transcript added to context.'
+              : 'Transcript added to context, but its earlier copy is still there.',
+          );
         } catch (error) {
           setFailed(true);
           setStatus(`The transcript wasn’t added to context: ${error instanceof Error ? error.message : 'try again'}`);
