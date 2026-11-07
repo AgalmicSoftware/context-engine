@@ -215,7 +215,7 @@ export async function refreshSessionQuestionIndex({
     ok,
     reason,
     sessionSlug: slug,
-    source: 'telegram_worker_question_index',
+    source: 'worker_question_index',
     cacheLayer: 'fresh',
     cachedAtMs: Date.now(),
     chainId: normalizeChainId(session.chainId),

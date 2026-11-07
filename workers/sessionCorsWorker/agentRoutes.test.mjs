@@ -68,6 +68,16 @@ test('question selection, queue planning, voting and auxiliary groups retain the
   assert.equal((await f.request('/api/agent/question-queue/plan', { method: 'POST', token, body: {} })).status, 403);
 });
 
+test('group membership saved for an agent reports the agent principal as its source', async () => {
+  const { f, agent } = await hosted(); const token = agent.token;
+  const groups = async () => (await jsonOk(await f.request('/api/agent/groups', { token }))).groups;
+  assert.equal((await groups()).membershipSource, null);
+  const saved = await jsonOk(await f.request('/api/agent/onboarding', { method: 'POST', token,
+    body: { answers: { demographic_link_opt_in: true }, groupSelections: { age_bucket: '25_34' } } }));
+  assert.equal(saved.groups.membershipSource, 'agent_principal');
+  assert.equal((await groups()).membershipSource, 'agent_principal');
+});
+
 test('overlapping next-question calls serve different questions, and a repeated requestId replays', async () => {
   const { f, agent, coordinator } = await hosted(); const token = agent.token;
   // A slow queue read lets both requests read before either one writes.

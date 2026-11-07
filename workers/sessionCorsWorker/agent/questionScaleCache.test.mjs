@@ -40,6 +40,12 @@ const baseEnv = () => ({
   } },
 });
 
+test('a fresh question index names the Worker as its source', async () => {
+  NEW.__test__sessionQuestions.clearCaches();
+  const fresh = await NEW.listCachedSessionQuestions({ env: baseEnv(), sessionSlug: 'demo', fetchImpl });
+  assert.equal(fresh.source, 'worker_question_index');
+});
+
 test('refresh ignores legacy v5 records missing the stored rating scale', async () => {
   const fresh = await NEW.listCachedSessionQuestions({ env: baseEnv(), sessionSlug: 'demo', fetchImpl });
   assert.deepEqual(normalizeAgentRatingScale(fresh.questions[0]), { min: 1, max: 10, step: 1 });

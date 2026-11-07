@@ -64773,7 +64773,7 @@ async function refreshSessionQuestionIndex({
     ok,
     reason,
     sessionSlug: slug,
-    source: "telegram_worker_question_index",
+    source: "worker_question_index",
     cacheLayer: "fresh",
     cachedAtMs: Date.now(),
     chainId: normalizeChainId2(session.chainId),
@@ -97445,9 +97445,9 @@ async function loadAgentLightweightGroups({
     policyGroups,
     custom.categories
   );
-  const telegramMembership = await readMembership(env, { sessionSlug, telegramUserId });
-  const bucketMembership = telegramMembership ? null : await readAgentBucketMembership(env, { sessionSlug, accountAddress });
-  const membership = telegramMembership || bucketMembership;
+  const principalMembership = await readMembership(env, { sessionSlug, telegramUserId });
+  const bucketMembership = principalMembership ? null : await readAgentBucketMembership(env, { sessionSlug, accountAddress });
+  const membership = principalMembership || bucketMembership;
   const selections = normalizeAgentGroupSelections(membership?.selections || {}, categories);
   const details = normalizeAgentGroupDetails(membership?.details || {}, categories, selections);
   const proposals = await loadGroupProposals(env, { sessionSlug, telegramUserId });
@@ -97458,7 +97458,7 @@ async function loadAgentLightweightGroups({
     selections,
     details,
     proposals,
-    membershipSource: telegramMembership ? "telegram_user" : bucketMembership ? "managed_wallet" : null,
+    membershipSource: principalMembership ? "agent_principal" : bucketMembership ? "managed_wallet" : null,
     updatedAt: safeString(membership?.updatedAt) || null
   };
 }
@@ -97510,7 +97510,7 @@ async function saveAgentLightweightGroupMembership({
       ...groups,
       selections: normalizedSelections,
       details: normalizedDetails,
-      membershipSource: key ? "telegram_user" : "managed_wallet",
+      membershipSource: key ? "agent_principal" : "managed_wallet",
       updatedAt: record4.updatedAt
     }
   };

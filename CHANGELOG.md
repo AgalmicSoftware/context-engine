@@ -184,7 +184,7 @@ All notable changes to this project will be documented in this file.
 
 ### Agents and MCP
 
-- Two groups of Agent HTTP names no longer say Telegram. In question sources and reasons, `telegram_only_*` is now `hosted_*`, and a question with no id gets a `hosted-` one. In submit results, `telegram_submit_queue_*` is now `agent_submit_queue_*`. An agent that matches the old strings must switch to the new ones.
+- Several Agent HTTP names no longer say Telegram. In question sources and reasons, `telegram_only_*` is now `hosted_*`, `telegram_worker_question_index` is now `worker_question_index`, and a question with no id gets a `hosted-` one. In submit results, `telegram_submit_queue_*` is now `agent_submit_queue_*`. In group data, a `membershipSource` of `telegram_user` is now `agent_principal`. An agent that matches the old strings must switch to the new ones.
 - Agent fidelity takes the latest record by the time the Worker stored it, never by the participant's own clock, so a later withdrawal or edit counts.
 - Agent fidelity and MCP `get_results` reject ratings off the step grid and allocations over the voice-credit budget.
 - Agent fidelity keeps equally typical people in one group, so reordering records can't change the most-unusual and most-typical results. When everyone is equally typical, it reports no groups. Confident misses with equal confidence list in question order.
