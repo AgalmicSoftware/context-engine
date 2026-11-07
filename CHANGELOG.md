@@ -54,7 +54,7 @@ All notable changes to this project will be documented in this file.
 - Group Conversation shows who spoke as `Person 1:`, `Person 2:` lines. A five-second sample of each new voice goes with later chunks, so up to four voices keep their number across three-minute chunks; a fifth voice, or one heard only briefly, is numbered within its chunk. With a Session Worker before 0.9.0, numbers restart in each chunk and the recorder says so.
 - The voice dialog's close button asks before it stops a recording.
 - The recorder notes when the device takes the microphone, as a call can, and marks the gap in the transcript. Capture that stops without telling the page gets a fresh microphone stream.
-- The hidden-page notice appears only when audio stopped while the page was hidden, so switching tabs on a computer, which keeps recording, raises none.
+- On a computer, which keeps recording in a background tab, switching tabs no longer raises the hidden-page notice while audio keeps arriving. A gap in the audio, a muted microphone or a phone still gets it.
 - Only one tab at a time opens a recording; another tab says so and takes over once the first closes it.
 - The session page says when audio kept by Close and keep the audio is still waiting to upload, after a reload too, and offers Reopen recording.
 - Group Conversation is readable in every theme, hovered or focused too: recorder status, transcript details and errors, the Record, Stop, Generate questions and Reopen recording buttons, destructive confirmations, dark dialog titles and close buttons, question-type chips, draft fields, tag remove buttons, icons, focus rings and the recording timer. Civic, the default, uses system monospace fonts, and its "Transcribing…" is no longer white on white.

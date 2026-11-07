@@ -710,6 +710,7 @@ describe('useRollingTranscriptionRecorder', () => {
 
   describe('a hidden spell during capture', () => {
     const visibility = Object.getOwnPropertyDescriptor(document, 'visibilityState');
+    const matchMedia = window.matchMedia;
     const show = (state: string) => {
       Object.defineProperty(document, 'visibilityState', { configurable: true, value: state });
       document.dispatchEvent(new Event('visibilitychange'));
@@ -718,9 +719,18 @@ describe('useRollingTranscriptionRecorder', () => {
     afterEach(() => {
       if (visibility) Object.defineProperty(document, 'visibilityState', visibility);
       else Reflect.deleteProperty(document, 'visibilityState');
+      window.matchMedia = matchMedia;
     });
+    // `audioAt`: the seconds into the spell at which the live recorder hands over audio, as each second's slice.
     // Hidden periods outlive a page in memory by session, so each case takes its own.
-    const hideFor = async (sessionSlug: string, { heard = false, muted = false }) => {
+    const hideFor = async (
+      sessionSlug: string,
+      { seconds = 6, audioAt = [] as number[], mutedAt = -1, computer = true },
+    ) => {
+      window.matchMedia = ((query: string) => ({
+        matches: computer && query === '(pointer: fine)',
+        media: query,
+      })) as unknown as typeof window.matchMedia;
       Object.assign(mockTrack, {
         addEventListener: (name: string, callback: () => void) => {
           listeners[name] = callback;
@@ -732,35 +742,37 @@ describe('useRollingTranscriptionRecorder', () => {
       });
       const hiddenAt = Date.now();
       act(() => show('hidden'));
-      await act(async () => {
-        if (muted) listeners.mute();
-        await jest.advanceTimersByTimeAsync(5000);
-        if (muted) listeners.unmute();
-        // A slice of audio delivered while hidden, as a computer records in a background tab.
-        if (heard) instances[instances.length - 1].requestData();
-        await flushPromises();
-      });
+      for (let second = 1; second <= seconds; second += 1) {
+        await act(async () => {
+          await jest.advanceTimersByTimeAsync(1000);
+          if (second === mutedAt) listeners.mute();
+          if (second === mutedAt + 1) listeners.unmute();
+          if (audioAt.includes(second)) instances[instances.length - 1].requestData();
+          await flushPromises();
+        });
+      }
       await act(async () => {
         show('visible');
         await flushPromises();
       });
       return { hook, period: { startedAt: hiddenAt, endedAt: Date.now() } };
     };
+    const everySecond = [1, 2, 3, 4, 5, 6];
 
-    it('needs no notice when audio kept arriving', async () => {
-      const { hook } = await hideFor('hidden-heard', { heard: true });
+    it('needs no notice on a computer whose audio kept arriving until the return', async () => {
+      const { hook } = await hideFor('hidden-heard', { audioAt: everySecond });
       expect(hook.result.current.hiddenPeriods).toEqual([]);
       hook.unmount();
     });
 
-    it('keeps its notice when only the audio asked for at hiding arrived', async () => {
-      const { hook, period } = await hideFor('hidden-silent', {});
-      expect(hook.result.current.hiddenPeriods).toEqual([period]);
-      hook.unmount();
-    });
-
-    it('keeps its notice when the device paused the microphone, even with audio after', async () => {
-      const { hook, period } = await hideFor('hidden-muted', { heard: true, muted: true });
+    it.each([
+      ['only the audio asked for at hiding arrived', 'hidden-silent', {}],
+      ['audio stopped before the return', 'hidden-early', { audioAt: [1, 2] }],
+      ['audio stopped for a while in between', 'hidden-gap', { audioAt: [1, 2, 6] }],
+      ['the device paused the microphone, even briefly', 'hidden-muted', { audioAt: everySecond, mutedAt: 2 }],
+      ['it was a phone, which can be fed silence', 'hidden-phone', { audioAt: everySecond, computer: false }],
+    ])('keeps its notice when %s', async (_case, sessionSlug, options) => {
+      const { hook, period } = await hideFor(sessionSlug, options);
       expect(hook.result.current.hiddenPeriods).toEqual([period]);
       hook.unmount();
     });
