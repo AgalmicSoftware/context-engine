@@ -204,6 +204,7 @@ test('prepare-public-release strips private surfaces without publishing an inven
       'legacy private application state\n',
     );
     writeFile(sourceDir, path.join('TODO', 'secret.md'), 'private planning\n');
+    writeFile(sourceDir, path.join('media', 'motion-loops', 'kit.js'), 'private film source\n');
     writeFile(sourceDir, path.join('TODO', `${'PR'}${'D'}s`, '123_private-roadmap.md'), 'private roadmap\n');
     writeFile(sourceDir, path.join('contextEngine-cc', 'secret.txt'), 'private companion surface\n');
     writeFile(sourceDir, path.join('contextEngine-cc', 'TODO', `${'PR'}${'D'}s`, '155_private-cecc.md'), 'private companion plan\n');
@@ -372,6 +373,7 @@ test('prepare-public-release strips private surfaces without publishing an inven
     assert.equal(fs.existsSync(path.join(outputDir, 'Claude outputs')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'grant-applications')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'TODO')), false);
+    assert.equal(fs.existsSync(path.join(outputDir, 'media', 'motion-loops')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'TODO', `${'PR'}${'D'}s`)), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'contextEngine-cc')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'contextEngine-cc', 'server.mjs')), false);
