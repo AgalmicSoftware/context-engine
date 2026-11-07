@@ -231,6 +231,11 @@ try {
   await page.getByTestId('ce-wizard-session-name').fill('Setup smoke session');
   await page.getByTestId('ce-wizard-session-info').fill('Synthetic publication and participant fixture.');
   await page.getByTestId('ce-wizard-secret-openai-key').fill('synthetic-ai-key-not-a-credential');
+  // New sessions start public and unencrypted; this run proves the encrypted path.
+  await page.getByTestId('ce-setup-more-access').click();
+  const encryption = page.getByTestId('ce-setup-encryption');
+  assert.equal(await encryption.inputValue(), 'none', 'A new session starts unencrypted');
+  await encryption.selectOption('worker_envelope');
   await page.getByTestId('ce-setup-more-hosting').click();
   await page.getByRole('checkbox', { name: 'Agents (HTTP API)', exact: true }).check();
   await page
