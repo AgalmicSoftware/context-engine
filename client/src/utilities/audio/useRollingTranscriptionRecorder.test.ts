@@ -708,6 +708,64 @@ describe('useRollingTranscriptionRecorder', () => {
     }
   });
 
+  describe('a hidden spell during capture', () => {
+    const visibility = Object.getOwnPropertyDescriptor(document, 'visibilityState');
+    const show = (state: string) => {
+      Object.defineProperty(document, 'visibilityState', { configurable: true, value: state });
+      document.dispatchEvent(new Event('visibilitychange'));
+    };
+    const listeners: Record<string, () => void> = {};
+    afterEach(() => {
+      if (visibility) Object.defineProperty(document, 'visibilityState', visibility);
+      else Reflect.deleteProperty(document, 'visibilityState');
+    });
+    // Hidden periods outlive a page in memory by session, so each case takes its own.
+    const hideFor = async (sessionSlug: string, { heard = false, muted = false }) => {
+      Object.assign(mockTrack, {
+        addEventListener: (name: string, callback: () => void) => {
+          listeners[name] = callback;
+        },
+      });
+      const hook = renderHook(() => useRollingTranscriptionRecorder({ sessionSlug, chunkMs: 60_000 }));
+      await act(async () => {
+        await hook.result.current.startRecording();
+      });
+      const hiddenAt = Date.now();
+      act(() => show('hidden'));
+      await act(async () => {
+        if (muted) listeners.mute();
+        await jest.advanceTimersByTimeAsync(5000);
+        if (muted) listeners.unmute();
+        // A slice of audio delivered while hidden, as a computer records in a background tab.
+        if (heard) instances[instances.length - 1].requestData();
+        await flushPromises();
+      });
+      await act(async () => {
+        show('visible');
+        await flushPromises();
+      });
+      return { hook, period: { startedAt: hiddenAt, endedAt: Date.now() } };
+    };
+
+    it('needs no notice when audio kept arriving', async () => {
+      const { hook } = await hideFor('hidden-heard', { heard: true });
+      expect(hook.result.current.hiddenPeriods).toEqual([]);
+      hook.unmount();
+    });
+
+    it('keeps its notice when only the audio asked for at hiding arrived', async () => {
+      const { hook, period } = await hideFor('hidden-silent', {});
+      expect(hook.result.current.hiddenPeriods).toEqual([period]);
+      hook.unmount();
+    });
+
+    it('keeps its notice when the device paused the microphone, even with audio after', async () => {
+      const { hook, period } = await hideFor('hidden-muted', { heard: true, muted: true });
+      expect(hook.result.current.hiddenPeriods).toEqual([period]);
+      hook.unmount();
+    });
+  });
+
   it('saves the audio so far as soon as the page is hidden, so a discarded tab loses at most a second', async () => {
     const visibility = Object.getOwnPropertyDescriptor(document, 'visibilityState');
     const savedAudio = () =>

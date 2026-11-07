@@ -37,6 +37,8 @@ const STOP_WAIT_MS = 2000;
 // microphone is restarted only after a chunk length and 30 seconds without any.
 const STALL_CHECK_MS = 5000;
 const STALL_GRACE_MS = 30_000;
+// The audio asked for when the page hides, and the second in flight then, arrive within this.
+const HIDDEN_FLUSH_MS = 2000;
 const CAPTURE_RESTARTED_NOTICE = 'No audio arrived for a while, so the microphone was restarted.';
 
 export const useRollingTranscriptionRecorder = ({
@@ -64,24 +66,6 @@ export const useRollingTranscriptionRecorder = ({
     capturing: status !== 'idle' && status !== 'error',
   });
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const { pageHidden: savePageHidden } = chunks;
-  const onPageHidden = useCallback(
-    (at: number) => {
-      savePageHidden(at);
-      // Hand over the part second not yet delivered, so it is saved too.
-      try {
-        mediaRecorderRef.current?.requestData();
-      } catch (_) {
-        // An inactive recorder has nothing more to give.
-      }
-    },
-    [savePageHidden],
-  );
-  const { wakeLockHeld, pageHidden } = useRecordingWakeLock(
-    status === 'recording' || status === 'paused',
-    onPageHidden,
-    chunks.pageShown,
-  );
   const { segments, transcript, labelsUnavailableReason, beginChunk, prepare, finishTranscription, retryChunk } =
     chunks;
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -102,6 +86,36 @@ export const useRollingTranscriptionRecorder = ({
   const stopWaitersRef = useRef<Set<() => void>>(new Set());
   // Ends a recorder's chunk with the audio it has delivered, for when it never confirms Stop.
   const finishersRef = useRef(new WeakMap<MediaRecorder, () => void>());
+  // While the page is hidden: whether audio kept arriving, and whether the device paused the microphone.
+  const hiddenCaptureRef = useRef<{ since: number; heard: boolean; paused: boolean } | null>(null);
+  const { pageHidden: savePageHidden, pageShown: savePageShown } = chunks;
+  const onPageHidden = useCallback(
+    (at: number) => {
+      hiddenCaptureRef.current = { since: at, heard: false, paused: false };
+      savePageHidden(at);
+      // Hand over the part second not yet delivered, so it is saved too.
+      try {
+        mediaRecorderRef.current?.requestData();
+      } catch (_) {
+        // An inactive recorder has nothing more to give.
+      }
+    },
+    [savePageHidden],
+  );
+  // A computer goes on recording in a background tab, so a hidden spell needs a notice only when audio stopped.
+  const onPageShown = useCallback(
+    (at: number) => {
+      const hidden = hiddenCaptureRef.current;
+      hiddenCaptureRef.current = null;
+      savePageShown(at, !!hidden?.heard && !hidden.paused && mutedAtRef.current == null && recordingActiveRef.current);
+    },
+    [savePageShown],
+  );
+  const { wakeLockHeld, pageHidden } = useRecordingWakeLock(
+    status === 'recording' || status === 'paused',
+    onPageHidden,
+    onPageShown,
+  );
 
   useEffect(() => {
     mountedRef.current = true;
@@ -193,6 +207,8 @@ export const useRollingTranscriptionRecorder = ({
       recorder.ondataavailable = (event: BlobEvent) => {
         if (event.data && event.data.size > 0) {
           lastAudioAtRef.current = Date.now();
+          const hidden = hiddenCaptureRef.current;
+          if (hidden && mutedAtRef.current == null && Date.now() - hidden.since > HIDDEN_FLUSH_MS) hidden.heard = true;
           // Timeslice fragments share a container header; persist the cumulative chunk.
           fragments.push(event.data);
           snapshot();
@@ -300,12 +316,14 @@ export const useRollingTranscriptionRecorder = ({
         );
         track.addEventListener?.('mute', () => {
           if (streamRef.current !== stream || !recordingActiveRef.current) return;
+          if (hiddenCaptureRef.current) hiddenCaptureRef.current.paused = true;
           mutedAtRef.current ??= Date.now();
           setMicrophonePaused(true);
         });
         track.addEventListener?.('unmute', () => {
           const startedAt = mutedAtRef.current;
           if (streamRef.current !== stream || startedAt == null) return;
+          if (hiddenCaptureRef.current) hiddenCaptureRef.current.paused = true;
           mutedAtRef.current = null;
           setMicrophonePaused(false);
           // Nothing was captured meanwhile: speech carries on in a new chunk, and the transcript notes the gap.

@@ -295,7 +295,7 @@ export function useRecordingChunkQueue(options: Options) {
   }, []);
   const retryChunk = useCallback((id?: string) => queueRef.current?.retry(id), []);
   const pageHidden = useCallback((at: number) => queueRef.current?.pageHidden(at), []);
-  const pageShown = useCallback((at: number) => queueRef.current?.pageShown(at), []);
+  const pageShown = useCallback((at: number, carriedOn?: boolean) => queueRef.current?.pageShown(at, carriedOn), []);
   const dismissHiddenPeriods = useCallback(() => queueRef.current?.dismissHiddenPeriods(), []);
   const saveQuestionDrafts = useCallback((drafts: QuestionDrafts) => queueRef.current?.saveQuestionDrafts(drafts), []);
   const downloadChunk = useCallback((id: string) => {

@@ -239,9 +239,14 @@ export class RecordingChunkQueue {
     if (!this.hiddenPeriods.some((period) => period.endedAt == null))
       this.saveHiddenPeriods([...this.hiddenPeriods, { startedAt: at }]);
   }
-  pageShown(at: number) {
-    if (this.hiddenPeriods.some((period) => period.endedAt == null))
-      this.saveHiddenPeriods(this.hiddenPeriods.map((period) => ({ ...period, endedAt: period.endedAt ?? at })));
+  /** `carriedOn`: audio kept arriving while the page was hidden, so the period needs no notice. */
+  pageShown(at: number, carriedOn = false) {
+    if (!this.hiddenPeriods.some((period) => period.endedAt == null)) return;
+    this.saveHiddenPeriods(
+      carriedOn
+        ? this.hiddenPeriods.filter((period) => period.endedAt != null)
+        : this.hiddenPeriods.map((period) => ({ ...period, endedAt: period.endedAt ?? at })),
+    );
   }
   dismissHiddenPeriods() {
     this.saveHiddenPeriods([]);

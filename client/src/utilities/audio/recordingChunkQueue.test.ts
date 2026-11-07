@@ -553,6 +553,16 @@ it('restores hidden periods saved by an earlier page and ends one still open at 
   expect(saved.get('hidden-periods')?.hiddenPeriods).toEqual([]);
 });
 
+it('drops an open hidden period whose audio carried on, and keeps earlier ones', async () => {
+  const queue = create(undefined, 'carried-on-room');
+  await queue.ready;
+  queue.pageHidden(1000);
+  queue.pageShown(2000);
+  queue.pageHidden(3000);
+  queue.pageShown(4000, true);
+  expect(queue.hiddenPeriods).toEqual([{ startedAt: 1000, endedAt: 2000 }]);
+});
+
 it('reopens kept pending audio even when IndexedDB is unavailable', async () => {
   jest.mocked(listRecordingChunks).mockRejectedValue(new Error('No storage'));
   jest.mocked(putRecordingChunk).mockRejectedValue(new Error('No storage'));
