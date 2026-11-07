@@ -892,7 +892,6 @@ export const normalizeDeployStorageProfile = (incoming) => {
     version: 'session-storage-profile-v1',
     backend,
     sessionOwned: true,
-    telegramOwned: false,
     resources: {
       ...DEFAULT_STORAGE_RESOURCES,
       docsContext,

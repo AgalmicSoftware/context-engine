@@ -27713,7 +27713,6 @@ var init_deployHelperCore = __esm({
         version: "session-storage-profile-v1",
         backend,
         sessionOwned: true,
-        telegramOwned: false,
         resources: {
           ...DEFAULT_STORAGE_RESOURCES,
           docsContext,

@@ -792,7 +792,6 @@ describe('useSessionWizardWorkerDeploy', () => {
       expect.objectContaining({
         backend: 'cloudflare',
         sessionOwned: true,
-        telegramOwned: false,
         payloadAccessControl: expect.objectContaining({
           gate: 'sbt_gate',
           encryption: 'worker_envelope',

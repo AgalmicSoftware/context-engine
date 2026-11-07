@@ -852,7 +852,6 @@ export const compileSessionModeProfile = (profile: SessionModeProfile): Compiled
     version: 'session-storage-profile-v1',
     backend: storageBackend,
     sessionOwned: true,
-    telegramOwned: false,
     resources: resourceStagesForBackend(profile.storage.backend, profile.storage.resources),
   };
 

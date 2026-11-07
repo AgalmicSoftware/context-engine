@@ -50,7 +50,6 @@ const sessionConfig = ({ slug = SLUG, sessionId = SESSION_ID, visibility } = {})
     version: 'session-storage-profile-v1',
     backend: 'cloudflare',
     sessionOwned: true,
-    telegramOwned: false,
     resources: { docsContext: 'active', questions: 'active', surveys: 'active', responses: 'active' },
     payloadAccessControl: {
       gate: 'none',

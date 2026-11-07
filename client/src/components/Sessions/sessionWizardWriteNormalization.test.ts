@@ -1052,7 +1052,6 @@ describe('sessionWizardWriteNormalization', () => {
 
     expect(metadata.storageProfile.backend).toBe('cloudflare');
     expect(metadata.storageProfile.sessionOwned).toBe(true);
-    expect(metadata.storageProfile.telegramOwned).toBe(false);
     expect(metadata.storageProfile.resources.docsContext).toBe('active');
     expect(metadata.storageProfile.resources.questions).toBe('active');
     expect(metadata.storageProfile.resources.surveys).toBe('active');
@@ -1076,7 +1075,6 @@ describe('sessionWizardWriteNormalization', () => {
 
     expect(workerPayload.storageProfile.backend).toBe('cloudflare');
     expect(workerPayload.storageProfile.sessionOwned).toBe(true);
-    expect(workerPayload.storageProfile.telegramOwned).toBe(false);
     expect(workerPayload.storageProfile.payloadAccessControl.mode).toBe('worker_sbt_gate');
     expect(workerPayload.litCredentials).toEqual({});
   });

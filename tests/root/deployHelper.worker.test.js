@@ -1855,7 +1855,6 @@ describe('deploy-helper worker', () => {
       expect(configWrite.storageProfile).toEqual(expect.objectContaining({
         backend: 'cloudflare',
         sessionOwned: true,
-        telegramOwned: false,
         payloadAccessControl: expect.objectContaining({ mode: 'public_read' }),
       }));
       expect(configWrite.storageProfile.resources.questions).toBe('active');
