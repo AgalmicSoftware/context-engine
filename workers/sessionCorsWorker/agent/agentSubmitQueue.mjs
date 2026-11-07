@@ -249,7 +249,7 @@ export async function enqueueAgentSubmitRecord({
   record = {},
 } = {}) {
   if (!agentSubmitQueueEnabled(env)) {
-    return { ok: false, skipped: true, reason: 'telegram_submit_queue_disabled' };
+    return { ok: false, skipped: true, reason: 'agent_submit_queue_disabled' };
   }
   const body = {
     type: AGENT_SUBMIT_QUEUE_MESSAGE_TYPE,
@@ -613,7 +613,7 @@ export async function processAgentSubmitQueueBatch(batch = {}, env = {}) {
       message.retry?.({ delaySeconds: SUBMIT_QUEUE_RETRY_DELAY_SECONDS });
       results.push({
         ok: false,
-        reason: 'telegram_submit_queue_processing_failed',
+        reason: 'agent_submit_queue_processing_failed',
         error: safeString(error?.message || error),
         retryable: true,
         reconciliationRequired: true,

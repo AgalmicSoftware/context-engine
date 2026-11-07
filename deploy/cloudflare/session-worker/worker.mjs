@@ -65760,14 +65760,14 @@ function questionPayloadRoot(payload = {}) {
 function normalizePreloadedQuestionRecord(entry2 = {}, {
   index = 0,
   fallbackSessionSlug = "",
-  source = "telegram_only_preloaded_questions"
+  source = "hosted_preloaded_questions"
 } = {}) {
   const root = questionPayloadRoot(entry2);
   if (!root) return null;
   const sessionSlug = sanitizeSessionSlug(root.sessionSlug || root.session || entry2.sessionSlug || entry2.session || fallbackSessionSlug);
   const storageRef = root.storageRef && typeof root.storageRef === "object" && !Array.isArray(root.storageRef) ? root.storageRef : entry2.storageRef && typeof entry2.storageRef === "object" && !Array.isArray(entry2.storageRef) ? entry2.storageRef : null;
   const id2 = safeString(
-    root.questionId || root.id || entry2.questionId || entry2.id || storageRef?.id || `telegram-only-${sessionSlug || "session"}-${index + 1}`
+    root.questionId || root.id || entry2.questionId || entry2.id || storageRef?.id || `hosted-${sessionSlug || "session"}-${index + 1}`
   );
   if (!id2) return null;
   const visibility = lower2(root.visibility || root.accessMode || entry2.visibility || "public") || "public";
@@ -65792,7 +65792,7 @@ function normalizePreloadedQuestionRecord(entry2 = {}, {
   };
   if (payloadUnavailable) {
     normalized.payloadUnavailable = true;
-    normalized.payloadUnavailableReason = "telegram_only_question_payload_missing_prompt";
+    normalized.payloadUnavailableReason = "hosted_question_payload_missing_prompt";
   }
   return normalized;
 }
@@ -66013,7 +66013,7 @@ async function loadWorkerCloudflareQuestions({
   } catch (error) {
     return {
       ok: false,
-      reason: "telegram_only_cloudflare_questions_list_failed",
+      reason: "hosted_cloudflare_questions_list_failed",
       authReason: "session_worker_auth_failed",
       error: safeString(error?.message || error),
       questions: []
@@ -66022,7 +66022,7 @@ async function loadWorkerCloudflareQuestions({
   if (!auth?.ok) {
     return {
       ok: false,
-      reason: "telegram_only_cloudflare_questions_list_failed",
+      reason: "hosted_cloudflare_questions_list_failed",
       authReason: safeString(auth?.reason),
       questions: []
     };
@@ -66042,7 +66042,7 @@ async function loadWorkerCloudflareQuestions({
     if (!listed.ok) {
       return {
         ok: false,
-        reason: "telegram_only_cloudflare_questions_list_failed",
+        reason: "hosted_cloudflare_questions_list_failed",
         error: listed.error,
         status: listed.status || 0,
         questions: []
@@ -66054,7 +66054,7 @@ async function loadWorkerCloudflareQuestions({
     if (!listComplete && (!cursor || seenCursors.has(cursor))) {
       return {
         ok: false,
-        reason: "telegram_only_cloudflare_questions_list_failed",
+        reason: "hosted_cloudflare_questions_list_failed",
         error: "Worker question list cursor is missing or repeated.",
         questions: []
       };
@@ -66094,7 +66094,7 @@ async function loadWorkerCloudflareQuestions({
         {
           index,
           fallbackSessionSlug: sessionSlug,
-          source: "telegram_only_cloudflare_questions"
+          source: "hosted_cloudflare_questions"
         }
       );
       if (normalized2 && !questionIsPayloadUnavailable(normalized2) && !questionRecordMalformedReason(normalized2)) {
@@ -66118,7 +66118,7 @@ async function loadWorkerCloudflareQuestions({
       {
         index,
         fallbackSessionSlug: sessionSlug,
-        source: "telegram_only_cloudflare_questions"
+        source: "hosted_cloudflare_questions"
       }
     );
     return normalized ? { question: normalized, version: versionOf(item) } : null;
@@ -66147,8 +66147,8 @@ async function loadWorkerCloudflareQuestions({
   });
   return {
     ok: readErrors.length === 0 || questions.length > 0,
-    reason: readErrors.length && questions.length === 0 ? "telegram_only_cloudflare_questions_read_failed" : questions.length ? "telegram_only_cloudflare_questions_loaded" : "telegram_only_cloudflare_questions_empty",
-    source: "telegram_only_cloudflare_storage",
+    reason: readErrors.length && questions.length === 0 ? "hosted_cloudflare_questions_read_failed" : questions.length ? "hosted_cloudflare_questions_loaded" : "hosted_cloudflare_questions_empty",
+    source: "hosted_cloudflare_storage",
     questions,
     questionCount: questions.length,
     complete: listComplete && selectedItems.length >= currentItems.length && readErrors.length === 0,
@@ -66547,7 +66547,7 @@ async function executeAgentSubmitRequest({
     if (existing.status === "submit_queued" && existing.onChain?.reconciliationRequired !== true) {
       const retry = await enqueueAgentSubmitRecord({ env, record: existing }).catch(() => ({
         ok: false,
-        reason: "telegram_submit_queue_failed"
+        reason: "agent_submit_queue_failed"
       }));
       if (!retry.ok) return { ...retry, requestId, idempotencyKey, retryable: true };
       queued = true;
@@ -66637,7 +66637,7 @@ async function executeAgentSubmitRequest({
     });
     const queued = await queueAgentSubmitRecord({ env, kvKey, record: record5 }).catch((error) => ({
       ok: false,
-      reason: "telegram_submit_queue_failed",
+      reason: "agent_submit_queue_failed",
       retryable: true,
       error: safeString(error?.message || error)
     }));
@@ -67087,7 +67087,7 @@ async function enqueueAgentSubmitRecord({
   record: record4 = {}
 } = {}) {
   if (!agentSubmitQueueEnabled(env)) {
-    return { ok: false, skipped: true, reason: "telegram_submit_queue_disabled" };
+    return { ok: false, skipped: true, reason: "agent_submit_queue_disabled" };
   }
   const body = {
     type: AGENT_SUBMIT_QUEUE_MESSAGE_TYPE,
@@ -67464,7 +67464,7 @@ async function processAgentSubmitQueueBatch(batch = {}, env = {}) {
       message.retry?.({ delaySeconds: SUBMIT_QUEUE_RETRY_DELAY_SECONDS });
       results.push({
         ok: false,
-        reason: "telegram_submit_queue_processing_failed",
+        reason: "agent_submit_queue_processing_failed",
         error: safeString(error?.message || error),
         retryable: true,
         reconciliationRequired: true

@@ -19,7 +19,7 @@ test('a question page without listComplete fails closed instead of reading as th
   });
 
   assert.equal(loaded.ok, false);
-  assert.equal(loaded.reason, 'telegram_only_cloudflare_questions_list_failed');
+  assert.equal(loaded.reason, 'hosted_cloudflare_questions_list_failed');
   assert.equal(loaded.error, 'Worker question list cursor is missing or repeated.');
   assert.deepEqual(loaded.questions, []);
 });
@@ -92,6 +92,9 @@ test('a hidden question is never read, so a lost object cannot make the list inc
   };
   const loaded = await loadWorkerCloudflareQuestions({ env, session: { sessionSlug: 'fixture' } });
   assert.equal(loaded.complete, true);
+  assert.equal(loaded.source, 'hosted_cloudflare_storage');
+  assert.equal(loaded.reason, 'hosted_cloudflare_questions_loaded');
+  assert.equal(loaded.questions[0].source, 'hosted_cloudflare_questions');
   assert.deepEqual(reads, ['ref-q-2']);
   assert.deepEqual(loaded.questions.map((question) => question.questionId), ['q-2']);
 });

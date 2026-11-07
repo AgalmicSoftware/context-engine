@@ -8,7 +8,7 @@ import { ethers } from 'ethers';
 import { fixture, sessionId, origin } from './agentTestFixture.mjs';
 import { issueAgentCredential, revokeAgentCredentialHash } from './agent/agentCredentials.mjs';
 import { deriveManagedDemoAccount } from './agent/managedAccounts.mjs';
-import { buildQueuedSubmitRecord, queueAgentSubmitRecord, AGENT_SUBMIT_QUEUE_MESSAGE_TYPE } from './agent/agentSubmitQueue.mjs';
+import { buildQueuedSubmitRecord, enqueueAgentSubmitRecord, processAgentSubmitQueueBatch, queueAgentSubmitRecord, AGENT_SUBMIT_QUEUE_MESSAGE_TYPE } from './agent/agentSubmitQueue.mjs';
 const questionId = '0x' + '2'.repeat(64);
 const pointer = Buffer.alloc(32, 3).toString('base64url');
 
@@ -87,12 +87,18 @@ test('publication failure retains the same generation and stale deliveries canno
   const key = `ce-agent:${sessionId}:telegram:submit-request:${body.record.requestId}`;
   const saved = q.f.records.get(key);
   q.f.agentEnv.AGENT_RESPONSE_QUEUE = { send: async () => { throw new Error('Fixture uncertain publication'); } };
-  const { enqueueAgentSubmitRecord } = await import('./agent/agentSubmitQueue.mjs');
   await assert.rejects(enqueueAgentSubmitRecord({ env: q.f.agentEnv, record: body.record }));
   assert.equal(q.f.records.get(key), saved);
   const stale = await q.deliver({ ...body, record: { ...body.record, queueGeneration: 'older-generation' } });
   assert.equal(stale.result.results[0].reason, 'stale_submit_delivery'); assert.equal(q.f.records.get(key), saved);
   assert.deepEqual(q.counts(), { uploads: 0, broadcasts: 0 });
+});
+test('queue results carry the agent submit queue reason names', async () => {
+  assert.equal((await enqueueAgentSubmitRecord({ env: {}, record: {} })).reason, 'agent_submit_queue_disabled');
+  let retries = 0;
+  const failing = await processAgentSubmitQueueBatch({ messages: [{ body: { type: AGENT_SUBMIT_QUEUE_MESSAGE_TYPE, record: { requestId: 'fixture' } }, retry: () => retries++ }] }, null);
+  assert.equal(failing.results[0].reason, 'agent_submit_queue_processing_failed');
+  assert.equal(retries, 1);
 });
 test('definite upload failures retry with backoff, then terminate at the fourth attempt', async () => {
   const q = await queuedFixture({ uploadFailure: true }); const body = await q.enqueue();

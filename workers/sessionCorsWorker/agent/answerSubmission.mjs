@@ -94,7 +94,7 @@ async function executeAgentSubmitRequest({
       // the saved generation without rewriting KV: a consumer may already have
       // recorded an intent or outcome, which its replay checks must preserve.
       const retry = await enqueueAgentSubmitRecord({ env, record: existing }).catch(() => ({
-        ok: false, reason: 'telegram_submit_queue_failed',
+        ok: false, reason: 'agent_submit_queue_failed',
       }));
       if (!retry.ok) return { ...retry, requestId, idempotencyKey, retryable: true };
       queued = true;
@@ -185,7 +185,7 @@ async function executeAgentSubmitRequest({
     // generation (or saves it, if that write failed), so callers may retry it.
     const queued = await queueAgentSubmitRecord({ env, kvKey, record }).catch((error) => ({
       ok: false,
-      reason: 'telegram_submit_queue_failed',
+      reason: 'agent_submit_queue_failed',
       retryable: true,
       error: safeString(error?.message || error),
     }));
