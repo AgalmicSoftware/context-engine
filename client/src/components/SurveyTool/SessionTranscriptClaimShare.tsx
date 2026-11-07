@@ -24,7 +24,7 @@ import {
 import styles from './SurveyTool.module.scss';
 
 const ABOUT =
-  'Each person scans their own code with their phone. It opens this session with their answers drafted from what they said, for them to check. Their part goes straight from this screen to their phone, without being uploaded. On a video call, share your screen.';
+  'Each person scans their own code with their phone. It opens this session with their answers drafted from what they said, for them to check. Their part goes straight from this screen to their phone, where the session’s AI drafts their answers from it. Nothing is saved until they submit. On a video call, share your screen.';
 const ABOUT_CODE =
   'The code changes as it goes. Keep the camera on it until the phone has every piece; any it misses come round again.';
 

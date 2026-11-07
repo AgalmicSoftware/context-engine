@@ -461,9 +461,12 @@ session allows them, or for an admin.
 ### Handing each person their part
 
 Under a labelled transcript, **Give each person their part** has one button per speaker
-who said at least 30 characters. A button shows that person's code, for them to scan with
-their own phone, signed in or not. Nothing is uploaded and the recorder needn't be signed
-in: holding the code is the permission, on the assumption that the room trusts each other.
+who said anything; in a group recording, a speaker's label in the transcript opens the same
+code. A button shows that person's code, for them to scan with their own phone, signed in
+or not. The part isn't stored on the way, and the recorder needn't be signed in: holding the
+code is the permission, on the assumption that the room trusts each other. On the phone,
+the session's AI drafts the answers from the part, as it does from a voice interview, and
+nothing is saved until the person submits.
 
 The part is that person's lines as `Responder:` and the line before each as
 `Other person:` (its last 240 characters), so a reply such as "I agree" can be read. It is
