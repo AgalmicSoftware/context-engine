@@ -23,14 +23,13 @@ export const readWorkerGroupMembershipProjection = async ({
 	groupId,
 	principal,
 	requesterAddress,
-	authScopes,
 	deps = {},
 } = {}) => {
 	const store = resolveWorkerGroupStore(env);
 	if (!store) return { ok: false, reason: 'worker_group_store_not_configured' };
 	const normalized = principal
 		? normalizeWorkerGroupPrincipal(principal, deps)
-		: resolveWorkerGroupPrincipal({ requesterAddress, authScopes, deps });
+		: resolveWorkerGroupPrincipal({ requesterAddress, deps });
 	if (!normalized.ok) return { ok: false, reason: normalized.reason || 'missing_principal' };
 	const group = await readGroupRecord({ store, slug, sessionId, groupId });
 	if (!group || group.deletedAt) return { ok: false, reason: 'worker_group_not_found' };

@@ -158,7 +158,6 @@ export const dispatchAuthenticatedSecretPathRoute = async ({
         slug,
         requesterAddress: address,
         expectedAuthority,
-        authScopes: scopes,
         baseHeaders: headers,
         deps: {
           json: deps?.json,

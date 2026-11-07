@@ -918,7 +918,6 @@ test('legacy group identity isolation never imports old membership projections',
 		env,
 		slug: 'session-a',
 		requesterAddress: member.address,
-		authScopes: {},
 		baseHeaders: {},
 		deps: { json },
 	});
@@ -1343,15 +1342,6 @@ test('worker groups reject deferred join modes and malformed principals fail clo
 		ok: false,
 		reason: 'missing_principal',
 	});
-	assert.deepEqual(
-		resolveWorkerGroupPrincipal({
-			authScopes: { agentGrant: { grantId: 'grant:test-1' } },
-		}).principal,
-		{
-			kind: 'agent',
-			grantId: 'grant:test-1',
-		},
-	);
 });
 
 test('worker group EVM principal normalization uses getAddress while matching lower-case keys', async () => {
@@ -1367,13 +1357,18 @@ test('worker group EVM principal normalization uses getAddress while matching lo
 	assert.equal(normalized.key, 'evm_address:0x0000000000000000000000000000000000000def');
 });
 
-test('obsolete transport hints cannot replace the authenticated EVM group principal', () => {
+test('token claims cannot replace the authenticated EVM group principal', () => {
 	for (const authScopes of [
 		{ telegramPrincipal: 'historical-subject' },
 		{ integrationPrincipal: { telegram: 'historical-subject' } },
 		{ integrationPrincipal: { principalId: 'historical-subject' } },
 		{ telegramUserId: 'historical-user' },
 		{ integrationPrincipal: { telegram_user_id: 'historical-user' } },
+		{ principal: { kind: 'agent', grantId: 'grant:test-1' } },
+		{ grantId: 'grant:test-1' },
+		{ agentGrant: { grantId: 'grant:test-1' } },
+		{ agent_grant: { grantId: 'grant:test-1' } },
+		{ delegation: { grantId: 'grant:test-1' } },
 	]) {
 		assert.deepEqual(resolveWorkerGroupPrincipal({ requesterAddress: actor.address, authScopes }).principal,
 			{ kind: 'evm_address', address: actor.address });
@@ -1388,7 +1383,7 @@ test('explicit historical transport principals still read their original members
 		input: { label: 'Historical group', joinMode: 'admin_add' }, deps: { randomUUID: () => 'historical-group' } });
 	assert.equal(group.ok, true);
 	assert.equal((await addWorkerGroupMember({ env, slug: 'session-a', groupId: 'historical-group', principal, actorPrincipal: actor })).ok, true);
-	const explicit = resolveWorkerGroupPrincipal({ authScopes: { principal } });
+	const explicit = normalizeWorkerGroupPrincipal(principal);
 	assert.equal(explicit.key, 'telegram:Historical-Subject');
 	const membership = await readWorkerGroupMembershipProjection({ env, slug: 'session-a', groupId: 'historical-group', principal: explicit.principal });
 	assert.equal(membership.ok, true);
@@ -1415,7 +1410,6 @@ test('Worker Group routes reject missing or mismatched session ids before coordi
 		env,
 		slug: 'session-a',
 		requesterAddress: member.address,
-		authScopes: {},
 		baseHeaders: {},
 		deps: {
 			json,
@@ -1497,7 +1491,6 @@ test('member routes respect visibility and open join mode', async () => {
 		env,
 		slug: 'session-a',
 		requesterAddress: member.address,
-		authScopes: {},
 		baseHeaders: {},
 		deps: { json },
 	});
@@ -1520,7 +1513,6 @@ test('member routes respect visibility and open join mode', async () => {
 		env,
 		slug: 'session-a',
 		requesterAddress: member.address,
-		authScopes: {},
 		baseHeaders: {},
 		deps: { json, now: () => Date.parse('2026-02-03T04:05:06.000Z') },
 	});
@@ -1556,7 +1548,6 @@ test('member routes respect visibility and open join mode', async () => {
 		env,
 		slug: 'session-a',
 		requesterAddress: member.address,
-		authScopes: {},
 		baseHeaders: {},
 		deps: { json, now: () => Date.parse('2026-02-03T04:06:06.000Z') },
 	});
@@ -1617,7 +1608,6 @@ test('session-visible leave returns the retained group and authoritative count',
 		env,
 		slug: 'session-a',
 		requesterAddress: member.address,
-		authScopes: {},
 		baseHeaders: {},
 		deps: { json },
 	});
@@ -1634,7 +1624,6 @@ test('session-visible leave returns the retained group and authoritative count',
 		env,
 		slug: 'session-a',
 		requesterAddress: member.address,
-		authScopes: {},
 		baseHeaders: {},
 		deps: { json },
 	});
@@ -1748,7 +1737,6 @@ test('participant member-list route binds the authenticated principal and exact 
 		env: {},
 		slug: 'session-a',
 		requesterAddress: member.address,
-		authScopes: {},
 		baseHeaders: {},
 		deps: {
 			json,
@@ -1832,7 +1820,6 @@ test('participant group creation requires the explicit policy and forces an open
 		env: {},
 		slug: 'session-a',
 		requesterAddress: member.address,
-		authScopes: { groups: true },
 		baseHeaders: {},
 		deps,
 	});
@@ -1848,7 +1835,6 @@ test('participant group creation requires the explicit policy and forces an open
 			env: {},
 			slug: 'session-a',
 			requesterAddress: member.address,
-			authScopes: { groups: true },
 			baseHeaders: {},
 			deps,
 		});
@@ -1865,7 +1851,6 @@ test('participant group creation requires the explicit policy and forces an open
 		env: {},
 		slug: 'session-a',
 		requesterAddress: member.address,
-		authScopes: { groups: true },
 		baseHeaders: {},
 		deps,
 	});
@@ -1935,7 +1920,6 @@ test('same slug with a replacement session id cannot expose prior groups or memb
 		env,
 		slug: 'session-a',
 		requesterAddress: member.address,
-		authScopes: {},
 		baseHeaders: {},
 		deps: { json },
 	});
@@ -2095,7 +2079,6 @@ test('group list projection failures return 503 instead of a false empty state',
 		env,
 		slug: 'session-a',
 		requesterAddress: member.address,
-		authScopes: {},
 		baseHeaders: {},
 		deps: { json },
 	});
@@ -2134,7 +2117,6 @@ test('group lists reject a stale-empty KV projection when Durable Objects report
 		env,
 		slug: 'session-a',
 		requesterAddress: member.address,
-		authScopes: {},
 		baseHeaders: {},
 		deps: { json },
 	});
@@ -2203,7 +2185,6 @@ test('member list routes propagate coordinator failures after readiness succeeds
 			env,
 			slug: 'session-a',
 			requesterAddress: member.address,
-			authScopes: {},
 			baseHeaders: {},
 			deps: { json },
 		});
@@ -2272,7 +2253,6 @@ test('participant and admin group lists use authoritative activity and visibilit
 		env,
 		slug: 'session-a',
 		requesterAddress: member.address,
-		authScopes: {},
 		baseHeaders: {},
 		deps: { json },
 	});

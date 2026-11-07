@@ -106,7 +106,6 @@ test('worker-canonical login evaluates configured worker-group gates and fails c
     sessionId: SESSION_ID,
     groupId: 'participants',
     requesterAddress: PARTICIPANT,
-    authScopes: {},
   }]);
 });
 

@@ -77,7 +77,6 @@ const evaluateLoginCondition = async ({ condition, address, config, env, slug, d
       sessionId: resolveCanonicalWorkerSessionIdHex(config),
       groupId,
       requesterAddress: address,
-      authScopes: {},
     });
     return result?.ok === true;
   }

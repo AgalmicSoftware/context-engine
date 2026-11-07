@@ -326,13 +326,7 @@ export const normalizeWorkerGroupPrincipal = (input, deps = {}) => {
 	return { ok: false, reason: 'unsupported_principal_kind' };
 };
 
-export const resolveWorkerGroupPrincipal = ({ requesterAddress, authScopes, principal, deps = {} } = {}) => {
-	if (principal) return normalizeWorkerGroupPrincipal(principal, deps);
-	const scopes = isObj(authScopes) ? authScopes : {};
-	const explicit = scopes.principal || scopes.workerPrincipal || scopes.subjectPrincipal || scopes.delegationPrincipal;
-	if (explicit) return normalizeWorkerGroupPrincipal(explicit, deps);
-	const grantId = trim(scopes.grantId || scopes.agentGrant?.grantId || scopes.agent_grant?.grantId || scopes.delegation?.grantId);
-	if (grantId) return normalizeWorkerGroupPrincipal({ kind: 'agent', grantId }, deps);
+export const resolveWorkerGroupPrincipal = ({ requesterAddress, deps = {} } = {}) => {
 	// Retained HTTP clients authenticate with SIWE. Historical transport kinds
 	// remain readable only through an explicit principal and keep their old keys.
 	if (requesterAddress) return normalizeWorkerGroupPrincipal({ kind: 'evm_address', address: requesterAddress }, deps);
@@ -1593,10 +1587,10 @@ export const readCoordinatedWorkerGroupMemberships = async ({ env, slug, session
 		payload: { principal },
 	});
 
-export const isWorkerGroupMember = async ({ env, slug, sessionId, groupId, principal, requesterAddress, authScopes, deps = {} } = {}) => {
+export const isWorkerGroupMember = async ({ env, slug, sessionId, groupId, principal, requesterAddress, deps = {} } = {}) => {
 	const normalized = principal
 		? normalizeWorkerGroupPrincipal(principal, deps)
-		: resolveWorkerGroupPrincipal({ requesterAddress, authScopes, deps });
+		: resolveWorkerGroupPrincipal({ requesterAddress, deps });
 	const normalizedGroupId = normalizeWorkerGroupId(groupId);
 	if (!normalized.ok) {
 		return { ok: false, status: 400, reason: normalized.reason || 'missing_principal' };
@@ -1961,7 +1955,6 @@ export const workerGroupsRoute = async ({
 	slug,
 	requesterAddress,
 	expectedAuthority,
-	authScopes,
 	baseHeaders,
 	deps,
 } = {}) => {
@@ -1993,7 +1986,7 @@ export const workerGroupsRoute = async ({
 			baseHeaders,
 		);
 	}
-	const actor = resolveWorkerGroupPrincipal({ requesterAddress, authScopes, deps });
+	const actor = resolveWorkerGroupPrincipal({ requesterAddress, deps });
 	if (!actor.ok) {
 		return jsonResponse(deps, { error: 'Missing worker group principal.', reason: actor.reason }, 401, baseHeaders);
 	}

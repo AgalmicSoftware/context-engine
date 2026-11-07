@@ -25,10 +25,7 @@ import {
   writeStorageEnvelopeKeyReleaseAudit,
   writeStorageVisibilityAudit,
 } from './storageEnvelopeEncryption.js';
-import {
-  isWorkerGroupMember,
-  resolveWorkerGroupPrincipal,
-} from './workerGroups.js';
+import { isWorkerGroupMember } from './workerGroups.js';
 import {
   MAX_STORAGE_METADATA_BYTES,
   STORAGE_METADATA_TAG_LIMITS,
@@ -640,13 +637,7 @@ const evaluateAgentGrantScopeCondition = ({ condition, authScopes }) => {
   const scope = trim(condition.scope || condition.value);
   if (!scope) return { ok: false, reason: 'missing_agent_grant_scope' };
   const scopes = isObj(authScopes) ? authScopes : {};
-  const scopeLists = [
-    scopes.agent_grant,
-    scopes.agentGrant,
-    scopes.delegationScopes,
-  ].filter(Array.isArray);
-  const ok = scopes[scope] === true || scopeLists.some((items) => items.map(trim).includes(scope));
-  return ok
+  return scopes[scope] === true
     ? { ok: true, matchedCondition: { kind: 'agent_grant_scope', scope } }
     : { ok: false, reason: 'agent_grant_scope_denied', condition: { kind: 'agent_grant_scope', scope } };
 };
@@ -718,14 +709,13 @@ const checkWorkerGroupMembership = async ({
   config,
   groupId,
   requesterAddress,
-  authScopes,
   deps,
 }) => {
   const cache = deps?.[STORAGE_GROUP_MEMBERSHIP_CACHE];
   if (cache?.has(groupId)) return cache.get(groupId);
   const check = typeof deps?.isWorkerGroupMember === 'function' ? deps.isWorkerGroupMember : isWorkerGroupMember;
   const pending = Promise.resolve().then(() => check({
-    env, slug, sessionId: resolveCanonicalWorkerSessionIdHex(config), groupId, requesterAddress, authScopes, deps,
+    env, slug, sessionId: resolveCanonicalWorkerSessionIdHex(config), groupId, requesterAddress, deps,
   })).then((result) => {
     const denied = result?.ok === false &&
       ([400, 401, 403, 404].includes(Number(result.status)) ||
@@ -744,7 +734,6 @@ const evaluateWorkerGroupCondition = async ({
   slug,
   config,
   requesterAddress,
-  authScopes,
   deps,
 }) => {
   const groupIds = normalizeGroupIdList(condition.groupIds || condition.groups || condition.groupId);
@@ -758,7 +747,6 @@ const evaluateWorkerGroupCondition = async ({
       config,
       groupId,
       requesterAddress,
-      authScopes,
       deps,
     });
     // Another group can still admit, so an outage decides only at the end.
@@ -798,7 +786,6 @@ const evaluateAccessCondition = async ({ condition, env, slug, config, requester
       slug,
       config,
       requesterAddress,
-      authScopes,
       deps,
     });
   }
@@ -887,7 +874,6 @@ const authorizeWorkerGroupAccess = async ({
   config,
   groupIds,
   requesterAddress,
-  authScopes,
   baseHeaders,
   deps,
 }) => {
@@ -906,7 +892,6 @@ const authorizeWorkerGroupAccess = async ({
       config,
       groupId,
       requesterAddress,
-      authScopes,
       deps,
     });
     if (result.outcome === 'unavailable') {
@@ -994,12 +979,6 @@ const canReadPrivateResponse = ({ config, resource, metadata, requesterAddress, 
   const scopes = isObj(authScopes) ? authScopes : {};
   const address = normalizeAddress(requesterAddress);
   if (address && resolveRoleAddressSet({ config, role: 'admin' }).has(address)) return true;
-  const delegatedScopes = [scopes.agent_grant, scopes.agentGrant, scopes.delegationScopes].filter(Array.isArray);
-  const agent = resolveWorkerGroupPrincipal({ requesterAddress, authScopes: scopes });
-  if (
-    delegatedScopes.some((items) => items.map(trim).includes('storage')) ||
-    (scopes.storage === true && agent.ok && agent.principal.kind === 'agent')
-  ) return true;
 
   // A participant's route scope permits submission, not reading everyone else's
   // answers. List preflight permits scanning; each row still requires its owner.
@@ -1027,7 +1006,7 @@ const authorizeCloudflareStorageAccess = async ({
     return {
       ok: false,
       response: responseJson(deps, {
-        error: 'Access denied: individual response access requires its author, a session admin, or a delegated storage grant.',
+        error: 'Access denied: individual response access requires its author or a session admin.',
         reason: 'private_response_owner_required',
       }, 403, baseHeaders),
     };
@@ -1101,7 +1080,6 @@ const authorizeCloudflareStorageGate = async ({
       config,
       groupIds: resolveGroupGateIds({ metadata, access }),
       requesterAddress,
-      authScopes,
       baseHeaders,
       deps,
     });
@@ -1240,7 +1218,7 @@ export const authorizeCloudflareStorageResourceRead = async ({
   deps: createStorageRouteGateDeps({ config, env, slug, deps }),
 });
 
-const enforceCloudflareUploadPolicy = async ({ env, config, slug, payload, requesterAddress, authScopes, baseHeaders, deps }) => {
+const enforceCloudflareUploadPolicy = async ({ env, config, slug, payload, requesterAddress, baseHeaders, deps }) => {
   const policy = payload?.uploadPolicy;
   if (!policy?.mode) return { ok: true };
   if (policy.mode === 'group_allowlist') {
@@ -1251,7 +1229,6 @@ const enforceCloudflareUploadPolicy = async ({ env, config, slug, payload, reque
       config,
       groupIds,
       requesterAddress,
-      authScopes,
       baseHeaders,
       deps,
     });
@@ -1468,7 +1445,6 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
     slug,
     payload,
     requesterAddress: uploaderAddress,
-    authScopes,
     baseHeaders,
     deps,
   });

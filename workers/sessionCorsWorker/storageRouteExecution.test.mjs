@@ -654,12 +654,19 @@ test('private response reads separate participant submission scope from non-owne
 			const adminScopes = await scopesFor(admin);
 			assert.equal((await read(firstId, admin, adminScopes)).status, 200);
 			assert.equal((await (await list(admin, adminScopes)).json()).items.length, 2);
-			const delegated = { storage: true, delegationScopes: ['storage'] };
-			assert.equal((await read(firstId, second, delegated)).status, 200);
-			assert.equal((await (await list(second, delegated)).json()).items.length, 2);
-			assert.equal((await read(firstId, second, { storage: true, delegationScopes: ['ai'] })).status, 403);
-			assert.equal((await read(firstId, second, { storage: true, principal: { kind: 'agent', grantId: 'synthetic-grant' } })).status, 200);
-			assert.equal((await read(firstId, second, { storage: true, principal: { kind: 'agent', grantId: '' } })).status, 403);
+			// Login tokens carry no grant claims, and these would not open other people's answers.
+			for (const claims of [
+				{ delegationScopes: ['storage'] },
+				{ agentGrant: ['storage'] },
+				{ agent_grant: ['storage'] },
+				{ principal: { kind: 'agent', grantId: 'synthetic-grant' } },
+				{ grantId: 'synthetic-grant' },
+				{ delegation: { grantId: 'synthetic-grant' } },
+			]) {
+				const claimed = { storage: true, ...claims };
+				assert.equal((await read(firstId, second, claimed)).status, 403, JSON.stringify(claims));
+				assert.deepEqual((await (await list(second, claimed)).json()).items.map((item) => item.storageRef.id), [secondId]);
+			}
 			// Old rows without a server-recorded owner fail closed for participants.
 			const missingOwner = await readStorageIndexMetadata(kv, 'session-a', 'responses', firstId);
 			delete missingOwner.responder;
@@ -667,8 +674,9 @@ test('private response reads separate participant submission scope from non-owne
 			assert.equal((await read(firstId, first, firstScopes)).status, 403);
 			assert.equal((await read(firstId, admin, adminScopes)).status, 200);
 			// Per-item restrictions still apply to an owner who otherwise qualifies.
-			const adminOnlyId = await upload(admin, adminScopes, { accessConditions: { match: 'all', conditions: [{ kind: 'worker_role', role: 'admin' }] } });
-			assert.equal((await read(adminOnlyId, second, delegated)).status, 403);
+			const adminOnlyId = await upload(second, secondScopes, { accessConditions: { match: 'all', conditions: [{ kind: 'worker_role', role: 'admin' }] } });
+			assert.equal((await read(adminOnlyId, second, secondScopes)).status, 403);
+			assert.equal((await read(adminOnlyId, admin, adminScopes)).status, 200);
 			// Public EDDY-style policy still permits anonymous raw reads and lists.
 			const publicAccess = { gate: 'none', encryption: 'none' };
 			config = { ...config, storageProfile: { backend: 'cloudflare', payloadAccessControl: publicAccess }, sessionModeProfile: {

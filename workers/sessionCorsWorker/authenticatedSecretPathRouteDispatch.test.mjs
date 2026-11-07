@@ -553,7 +553,6 @@ test('dispatchAuthenticatedSecretPathRoute routes authenticated worker group req
       workerGroupsRoute: async (value) => {
         assert.equal(value.path, '/groups/my-memberships');
         assert.equal(value.requesterAddress, '0x0000000000000000000000000000000000000def');
-        assert.deepEqual(value.authScopes, { arweave: false, groups: true });
         return downstreamResponse;
       },
       resolveAuthenticatedRouteSecrets: async () => {

@@ -755,11 +755,11 @@ Authenticated clients can use the worker as the session storage boundary:
     responder metadata. The payload's own `responder` field is not authoritative.
     In Worker-canonical sessions whose results visibility is not
     `public_full_if_storage_public`, individual response reads also require
-    that recorded author, a current session admin, or an authenticated
-    delegated storage grant. A participant's ordinary `storage` route scope
-    permits submission and own-response reload, not other participants' raw
-    answers. Lists apply the same restriction to each row, and older rows
-    lacking trusted author metadata remain unavailable to ordinary participants.
+    that recorded author or a current session admin. A participant's ordinary
+    `storage` route scope permits submission and own-response reload, not other
+    participants' raw answers. Lists apply the same restriction to each row, and
+    older rows lacking trusted author metadata remain unavailable to ordinary
+    participants.
     Existing per-item access conditions still apply to every permitted reader.
     This is a read-time protection for existing and new rows; it does not
     rewrite stored data or revoke plaintext already downloaded. Aggregate-only

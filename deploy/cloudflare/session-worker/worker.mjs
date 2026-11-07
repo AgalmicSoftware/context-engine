@@ -31047,13 +31047,7 @@ var init_workerGroups = __esm({
       }
       return { ok: false, reason: "unsupported_principal_kind" };
     };
-    resolveWorkerGroupPrincipal = ({ requesterAddress, authScopes, principal, deps = {} } = {}) => {
-      if (principal) return normalizeWorkerGroupPrincipal(principal, deps);
-      const scopes = isObj7(authScopes) ? authScopes : {};
-      const explicit = scopes.principal || scopes.workerPrincipal || scopes.subjectPrincipal || scopes.delegationPrincipal;
-      if (explicit) return normalizeWorkerGroupPrincipal(explicit, deps);
-      const grantId = trim2(scopes.grantId || scopes.agentGrant?.grantId || scopes.agent_grant?.grantId || scopes.delegation?.grantId);
-      if (grantId) return normalizeWorkerGroupPrincipal({ kind: "agent", grantId }, deps);
+    resolveWorkerGroupPrincipal = ({ requesterAddress, deps = {} } = {}) => {
       if (requesterAddress) return normalizeWorkerGroupPrincipal({ kind: "evm_address", address: requesterAddress }, deps);
       return { ok: false, reason: "missing_principal" };
     };
@@ -32157,8 +32151,8 @@ var init_workerGroups = __esm({
       path: "/worker-groups/memberships",
       payload: { principal }
     });
-    isWorkerGroupMember = async ({ env, slug, sessionId, groupId, principal, requesterAddress, authScopes, deps = {} } = {}) => {
-      const normalized = principal ? normalizeWorkerGroupPrincipal(principal, deps) : resolveWorkerGroupPrincipal({ requesterAddress, authScopes, deps });
+    isWorkerGroupMember = async ({ env, slug, sessionId, groupId, principal, requesterAddress, deps = {} } = {}) => {
+      const normalized = principal ? normalizeWorkerGroupPrincipal(principal, deps) : resolveWorkerGroupPrincipal({ requesterAddress, deps });
       const normalizedGroupId = normalizeWorkerGroupId(groupId);
       if (!normalized.ok) {
         return { ok: false, status: 400, reason: normalized.reason || "missing_principal" };
@@ -32521,7 +32515,6 @@ var init_workerGroups = __esm({
       slug,
       requesterAddress,
       expectedAuthority,
-      authScopes,
       baseHeaders,
       deps
     } = {}) => {
@@ -32553,7 +32546,7 @@ var init_workerGroups = __esm({
           baseHeaders
         );
       }
-      const actor = resolveWorkerGroupPrincipal({ requesterAddress, authScopes, deps });
+      const actor = resolveWorkerGroupPrincipal({ requesterAddress, deps });
       if (!actor.ok) {
         return jsonResponse(deps, { error: "Missing worker group principal.", reason: actor.reason }, 401, baseHeaders);
       }
@@ -71337,13 +71330,7 @@ var init_storageRouteExecution = __esm({
       const scope = trim13(condition.scope || condition.value);
       if (!scope) return { ok: false, reason: "missing_agent_grant_scope" };
       const scopes = isObj16(authScopes) ? authScopes : {};
-      const scopeLists = [
-        scopes.agent_grant,
-        scopes.agentGrant,
-        scopes.delegationScopes
-      ].filter(Array.isArray);
-      const ok = scopes[scope] === true || scopeLists.some((items) => items.map(trim13).includes(scope));
-      return ok ? { ok: true, matchedCondition: { kind: "agent_grant_scope", scope } } : { ok: false, reason: "agent_grant_scope_denied", condition: { kind: "agent_grant_scope", scope } };
+      return scopes[scope] === true ? { ok: true, matchedCondition: { kind: "agent_grant_scope", scope } } : { ok: false, reason: "agent_grant_scope_denied", condition: { kind: "agent_grant_scope", scope } };
     };
     evaluateSbtOnchainCondition = async ({ condition, config, requesterAddress, deps }) => {
       const address2 = normalizeAddress(requesterAddress);
@@ -71409,7 +71396,6 @@ var init_storageRouteExecution = __esm({
       config,
       groupId,
       requesterAddress,
-      authScopes,
       deps
     }) => {
       const cache = deps?.[STORAGE_GROUP_MEMBERSHIP_CACHE];
@@ -71421,7 +71407,6 @@ var init_storageRouteExecution = __esm({
         sessionId: resolveCanonicalWorkerSessionIdHex(config),
         groupId,
         requesterAddress,
-        authScopes,
         deps
       })).then((result) => {
         const denied = result?.ok === false && ([400, 401, 403, 404].includes(Number(result.status)) || ["worker_group_membership_denied", "worker_group_not_found", "missing_principal", "invalid_worker_group_id"].includes(result.reason)) && !/unavailable|not_configured|ambiguous/.test(result.reason || "");
@@ -71436,7 +71421,6 @@ var init_storageRouteExecution = __esm({
       slug,
       config,
       requesterAddress,
-      authScopes,
       deps
     }) => {
       const groupIds = normalizeGroupIdList(condition.groupIds || condition.groups || condition.groupId);
@@ -71450,7 +71434,6 @@ var init_storageRouteExecution = __esm({
           config,
           groupId,
           requesterAddress,
-          authScopes,
           deps
         });
         if (result.outcome === "unavailable") {
@@ -71488,7 +71471,6 @@ var init_storageRouteExecution = __esm({
           slug,
           config,
           requesterAddress,
-          authScopes,
           deps
         });
       }
@@ -71570,7 +71552,6 @@ var init_storageRouteExecution = __esm({
       config,
       groupIds,
       requesterAddress,
-      authScopes,
       baseHeaders,
       deps
     }) => {
@@ -71589,7 +71570,6 @@ var init_storageRouteExecution = __esm({
           config,
           groupId,
           requesterAddress,
-          authScopes,
           deps
         });
         if (result.outcome === "unavailable") {
@@ -71668,9 +71648,6 @@ var init_storageRouteExecution = __esm({
       const scopes = isObj16(authScopes) ? authScopes : {};
       const address2 = normalizeAddress(requesterAddress);
       if (address2 && resolveRoleAddressSet2({ config, role: "admin" }).has(address2)) return true;
-      const delegatedScopes = [scopes.agent_grant, scopes.agentGrant, scopes.delegationScopes].filter(Array.isArray);
-      const agent = resolveWorkerGroupPrincipal({ requesterAddress, authScopes: scopes });
-      if (delegatedScopes.some((items) => items.map(trim13).includes("storage")) || scopes.storage === true && agent.ok && agent.principal.kind === "agent") return true;
       if (!address2 || scopes.storage !== true && scopes.arweave !== true) return false;
       if (operation === "list") return true;
       return !!trim13(metadata?.responder) && normalizeAddress(metadata.responder) === address2;
@@ -71694,7 +71671,7 @@ var init_storageRouteExecution = __esm({
         return {
           ok: false,
           response: responseJson(deps, {
-            error: "Access denied: individual response access requires its author, a session admin, or a delegated storage grant.",
+            error: "Access denied: individual response access requires its author or a session admin.",
             reason: "private_response_owner_required"
           }, 403, baseHeaders)
         };
@@ -71765,7 +71742,6 @@ var init_storageRouteExecution = __esm({
           config,
           groupIds: resolveGroupGateIds({ metadata, access }),
           requesterAddress,
-          authScopes,
           baseHeaders,
           deps
         });
@@ -71899,7 +71875,7 @@ var init_storageRouteExecution = __esm({
       baseHeaders,
       deps: createStorageRouteGateDeps({ config, env, slug, deps })
     });
-    enforceCloudflareUploadPolicy = async ({ env, config, slug, payload, requesterAddress, authScopes, baseHeaders, deps }) => {
+    enforceCloudflareUploadPolicy = async ({ env, config, slug, payload, requesterAddress, baseHeaders, deps }) => {
       const policy = payload?.uploadPolicy;
       if (!policy?.mode) return { ok: true };
       if (policy.mode === "group_allowlist") {
@@ -71910,7 +71886,6 @@ var init_storageRouteExecution = __esm({
           config,
           groupIds,
           requesterAddress,
-          authScopes,
           baseHeaders,
           deps
         });
@@ -72119,7 +72094,6 @@ var init_storageRouteExecution = __esm({
         slug,
         payload,
         requesterAddress: uploaderAddress,
-        authScopes,
         baseHeaders,
         deps
       });
@@ -86821,8 +86795,7 @@ var evaluateLoginCondition = async ({ condition, address: address2, config, env,
       slug,
       sessionId: resolveCanonicalWorkerSessionIdHex(config),
       groupId,
-      requesterAddress: address2,
-      authScopes: {}
+      requesterAddress: address2
     });
     return result?.ok === true;
   }
@@ -106483,7 +106456,6 @@ var dispatchAuthenticatedSecretPathRoute = async ({
         slug,
         requesterAddress: address2,
         expectedAuthority,
-        authScopes: scopes,
         baseHeaders: headers2,
         deps: {
           json: deps?.json,
