@@ -67,6 +67,34 @@ const parseTranscriptionErrorMessage = (data: unknown, status: unknown): string 
   );
 };
 
+// A labelled 3-minute chunk takes over a minute to answer, and some networks close a connection after 60 quiet
+// seconds. A small request on the same connection (HTTP/2 or HTTP/3) keeps it in use while the transcription waits.
+const CONNECTION_KEEP_ALIVE_MS = 20_000;
+
+const keepConnectionInUse = (baseUrl: string, signal?: AbortSignal): (() => void) => {
+  let request: AbortController | undefined;
+  const stop = () => {
+    clearInterval(timer);
+    request?.abort();
+    signal?.removeEventListener('abort', stop);
+  };
+  const timer = setInterval(() => {
+    // One at a time, so a stuck request can't hold the browser's connections. no-store keeps it from its cache.
+    request?.abort();
+    request = new AbortController();
+    fetch(`${baseUrl}/capabilities`, { cache: 'no-store', signal: request.signal }).then(
+      // Workers before 0.8.0 count this missing route as a failed login, and have no slow labelled transcription.
+      ({ status }) => {
+        if (status === 401 || status === 404) stop();
+      },
+      // Only the traffic matters.
+      () => undefined,
+    );
+  }, CONNECTION_KEEP_ALIVE_MS);
+  signal?.addEventListener('abort', stop);
+  return stop;
+};
+
 /** `chunkOnly` refusals (this audio's size or content) leave labels on for the rest of the recording. */
 export class SpeakerLabelsUnavailableError extends Error {
   name = 'SpeakerLabelsUnavailableError';
@@ -103,6 +131,7 @@ const requestAudioTranscription = async (
     for (const { sample } of knownSpeakers) form.append('known_speaker_references[]', sample);
   }
 
+  const stopKeepingConnection = keepConnectionInUse(transport.baseUrl, signal);
   const resp = await fetchWorkerWithAuth(
     transport.endpoint,
     { method: 'POST', body: form, ...(signal ? { signal } : {}) },
@@ -117,7 +146,7 @@ const requestAudioTranscription = async (
       fallbackOnGateUnavailable: true,
       allowDemoFallback: defaultStrictAllowDemoFallback(),
     },
-  );
+  ).finally(stopKeepingConnection);
   let data: unknown = {};
   try {
     data = await resp.json();

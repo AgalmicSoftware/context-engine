@@ -303,8 +303,11 @@ const getUserMedia = jest.fn(async () => {
 });
 
 let uninstallLocks = () => {};
+const originalFetch = global.fetch;
 beforeEach(() => {
   uninstallLocks = installFakeWebLocks();
+  // Slow uploads send keep-alive requests, which must not reach the network.
+  global.fetch = jest.fn(async () => ({ status: 200 })) as unknown as typeof fetch;
   jest.useFakeTimers();
   jest.setSystemTime(START);
   window.sessionStorage.clear();
@@ -331,6 +334,7 @@ beforeEach(() => {
 
 afterEach(() => {
   uninstallLocks();
+  global.fetch = originalFetch;
   jest.clearAllTimers();
   jest.useRealTimers();
   restore(globalThis, 'MediaRecorder', descriptors.MediaRecorder);

@@ -84,6 +84,31 @@ describe('transcription through worker authentication', () => {
     expect(mockSignMessage).not.toHaveBeenCalled();
   });
 
+  // A different credentials mode or request mode would put them on separate connections.
+  it('sends the keep-alive request the same way as the upload it protects', async () => {
+    jest.useFakeTimers();
+    try {
+      let answer;
+      global.fetch = jest.fn((url) =>
+        String(url).endsWith('/capabilities')
+          ? Promise.resolve(jsonResponse(200, {}))
+          : new Promise((resolve) => {
+              answer = resolve;
+            }),
+      );
+      const result = upload();
+      await jest.advanceTimersByTimeAsync(20_000);
+      const [[postUrl, post], [pingUrl, ping]] = global.fetch.mock.calls;
+      expect([postUrl, pingUrl]).toEqual([`${WORKER_URL}/transcribe`, `${WORKER_URL}/capabilities`]);
+      expect(ping.credentials).toBe(post.credentials);
+      expect(ping.mode).toBe(post.mode);
+      answer(jsonResponse(200, { text: 'public transcript' }));
+      await expect(result).resolves.toBe('public transcript');
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it('authenticates a signed-in holder after anonymous denial and reuses the session token', async () => {
     global.fetch = jest.fn(async (url, options) => {
       if (url.endsWith('/auth/nonce')) return jsonResponse(200, { nonce: 'fixture-nonce' });

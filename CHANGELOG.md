@@ -12,6 +12,7 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Recording is less likely to stall on networks that close a connection after a minute of silence: while a chunk waits for its transcript, the page sends a small request every 20 seconds to keep the connection in use.
 - The `/docs` page and Tool Explorer descriptions match current behavior: new sessions start public, storage depends on the session, and Lit protects only the fields you lock. `/docs` shows the current deployment diagram.
 - The setup page's Results summary shows the saved analysis choice instead of always saying manual.
 - The "Set up with your AI" heading on `/new` is readable on the Context Engine theme.
