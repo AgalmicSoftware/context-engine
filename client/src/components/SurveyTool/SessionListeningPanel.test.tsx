@@ -1032,6 +1032,24 @@ describe('SessionListeningPanel', () => {
       expect(screen.queryByTestId(E2E_TESTIDS.SESSION_CLAIM_SHARE)).toBeNull();
     });
 
+    it('forgets a chosen code once the transcript is gone, so it can’t reopen unasked', async () => {
+      const labelled =
+        'Person 1: Enough words here for a whole part of the talk.\nPerson 2: And quite a lot more from another person.';
+      // A fresh element each time, so the recorder's new state reaches the panel.
+      const panel = () => <SessionListeningPanel sessionSlug="demo" panelMode="recordGroup" embeddedInModal />;
+      (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(buildRecorder({ transcript: labelled }));
+      const { rerender } = render(panel());
+      fireEvent.click(screen.getByRole('button', { name: 'Person 2' }));
+      expect(await screen.findByRole('dialog')).toHaveTextContent('Person 2');
+      (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(buildRecorder({ transcript: '' }));
+      rerender(panel());
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+      (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(buildRecorder({ transcript: labelled }));
+      rerender(panel());
+      expect(await screen.findByRole('button', { name: 'Person 2' })).toBeInTheDocument();
+      expect(screen.queryByRole('dialog')).toBeNull();
+    });
+
     // Closing mid-upload would bring the uploaded drafts back, and lose a batch held back meanwhile.
     it('closes only once a submit in flight has settled', async () => {
       const onClose = jest.fn();

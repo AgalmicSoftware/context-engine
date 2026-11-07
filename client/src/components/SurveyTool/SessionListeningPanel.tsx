@@ -268,6 +268,10 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
   );
   const trimmedTranscript = recorder.transcript.trim();
   const hasTranscript = trimmedTranscript.length > 0;
+  // A code chosen for a transcript that has since gone (cleared, another account) mustn't come back with the next.
+  useEffect(() => {
+    if (!hasTranscript) setClaimPerson('');
+  }, [hasTranscript]);
   const draftCount = pendingDraftCount ?? generatedQuestions.length;
   const hasGeneratedDraft = draftCount > 0;
   const latestSuccessfulTranscriptAt = useMemo(() => {

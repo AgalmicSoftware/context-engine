@@ -208,8 +208,10 @@ export default function SessionTranscriptClaimShare({
           </button>
         ))}
       </span>
-      {person ? (
+      {/* Only a speaker with a button: a blank label has no part. A new person gets codes of their own. */}
+      {people.includes(person) ? (
         <ClaimCodeDialog
+          key={person}
           transcript={transcript}
           person={person}
           sessionSlug={sessionSlug}

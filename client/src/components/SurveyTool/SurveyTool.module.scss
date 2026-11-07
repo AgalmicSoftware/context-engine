@@ -2732,6 +2732,8 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
 // A speaker's label, opening their code: it reads as the label it replaces, underlined under the pointer.
 .sessionTranscriptSpeaker {
   display: inline;
+  // A copied selection of the transcript keeps who said each line.
+  user-select: text;
   margin: 0;
   padding: 0 !important;
   border: 0 !important;
@@ -3734,13 +3736,19 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   color: var(--ce-panel-text) !important;
   font-size: 1rem;
 
-  &:hover {
+  &:hover:not(:disabled) {
     background: color-mix(in srgb, currentColor 12%, transparent) !important;
   }
 
   &:focus-visible {
     outline: 2px solid currentColor;
     outline-offset: 2px;
+  }
+
+  // As Scan code is while a recording captures: dimmed, so it doesn't look ready.
+  &:disabled {
+    opacity: 0.5;
+    cursor: default;
   }
 }
 

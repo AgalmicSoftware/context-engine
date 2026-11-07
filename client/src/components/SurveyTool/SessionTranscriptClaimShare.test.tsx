@@ -67,6 +67,23 @@ describe('giving each person their part', () => {
     expect(screen.queryByTestId(E2E_TESTIDS.SESSION_CLAIM_SHARE)).toBeNull();
   });
 
+  it('opens a code only for a speaker with a button, and builds new codes for another person', async () => {
+    const at = (person: string) => (
+      <SessionTranscriptClaimShare
+        transcript={TRANSCRIPT}
+        sessionSlug="salon"
+        person={person}
+        onPersonChange={jest.fn()}
+      />
+    );
+    const { rerender } = render(at('Person 9'));
+    expect(screen.queryByTestId('code')).toBeNull();
+    rerender(at('Person 1'));
+    const first = (await screen.findByTestId('code')).getAttribute('data-value');
+    rerender(at('Person 2'));
+    await waitFor(() => expect(screen.getByTestId('code').getAttribute('data-value')).not.toBe(first));
+  });
+
   it('loops codes that rebuild the person’s part, keeps the screen on, and offers the same part as a link', async () => {
     render(<Share transcript={TRANSCRIPT} sessionSlug="salon" />);
     expect(useRecordingWakeLock).not.toHaveBeenCalled();
