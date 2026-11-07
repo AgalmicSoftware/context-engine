@@ -6,15 +6,18 @@ import {
   CONTEXT_SOURCE_LIMITS,
   resolveContextFileType,
 } from '@ce-shared/sessionContextSources.mjs';
+import ContextAccessSelect, { SESSION_WIDE_ACCESS, contextAccessOf } from './ContextAccessSelect';
 import {
   addContextLink,
   checkContextFile,
+  contextAdderLabel,
   readContextPdf,
   removeContextSource,
   uploadContextFile,
   workerSupportsContextSources,
   type ContextSource,
 } from '../../../utilities/docLibrary/contextSources';
+import { useContextGroups, type ContextGroup } from '../../../utilities/docLibrary/useContextGroups';
 import {
   useSessionContextSources,
   type SessionContextSourcesState,
@@ -24,6 +27,8 @@ import styles from './SessionSetup.module.scss';
 
 export const CONTEXT_PRIVACY_HELP =
   'Only session admins can open it, and the session’s AI uses it only when it works for an admin. Everyone else never receives it.';
+const FILE_ACCESS_HELP =
+  'A locked file is for that group’s members and the session’s admins; an admins-only file is for admins. The session’s AI uses a file only when it works for someone who may read it.';
 export const CONTEXT_ANALYZE_HELP =
   'Sends the PDF to the session’s own AI provider with the session’s key. The text it returns is saved with the PDF. Unticked, the PDF is kept but gives the AI no text.';
 const LINK_HELP =
@@ -36,10 +41,18 @@ const formatDate = (value: string): string => {
 
 export const isContextPdf = (source: Pick<ContextSource, 'mime'>) => source.mime === CONTEXT_FILE_TYPES.pdf;
 
-/** One line about a source: who may read it, and what the AI has of it. */
-export const describeContextSource = (source: ContextSource): string =>
+/** One line about a source: who may read it, who added it, and what the AI has of it. */
+export const describeContextSource = (
+  source: ContextSource,
+  { groups = [], adder = '' }: { groups?: ContextGroup[]; adder?: string } = {},
+): string =>
   [
-    source.adminsOnly ? 'Admins only' : 'Everyone in the session',
+    source.adminsOnly
+      ? 'Admins only'
+      : source.lockedGroupId
+        ? groups.find(({ groupId }) => groupId === source.lockedGroupId)?.label || 'One group'
+        : 'Everyone in the session',
+    ...(adder ? [`Added by ${adder}`] : []),
     source.kind === 'link'
       ? `Read ${formatDate(source.fetchedAt)}`.trim()
       : isContextPdf(source)
@@ -73,7 +86,8 @@ const ContextSourcesPanel = ({ sessionSlug, sessionConfig, account, pageLinks = 
   const [linkTitle, setLinkTitle] = useState('');
   const [linkPrivate, setLinkPrivate] = useState(false);
   const [file, setFile] = useState<File | null>(null);
-  const [filePrivate, setFilePrivate] = useState(false);
+  const [fileAccess, setFileAccess] = useState(SESSION_WIDE_ACCESS);
+  const groups = useContextGroups({ sessionSlug, sessionConfig });
   const [analyze, setAnalyze] = useState(true);
   const [fileKey, setFileKey] = useState(0);
   const options = { sessionSlug, sessionConfig, context: { account }, asAdmin: true };
@@ -137,7 +151,12 @@ const ContextSourcesPanel = ({ sessionSlug, sessionConfig, account, pageLinks = 
                 {source.kind === 'link' && source.url ? (
                   <span className={styles.readOnlyValue}>{source.url}</span>
                 ) : null}
-                <span className={styles.hint}>{describeContextSource(source)}</span>
+                <span className={styles.hint}>
+                  {describeContextSource(source, {
+                    groups,
+                    adder: contextAdderLabel(source, sessionConfig, account),
+                  })}
+                </span>
               </div>
               <div className={styles.buttonRow}>
                 {source.kind === 'link' ? (
@@ -271,13 +290,16 @@ const ContextSourcesPanel = ({ sessionSlug, sessionConfig, account, pageLinks = 
         />
       </SetupField>
       {fileProblem ? <p className={styles.errorText}>{fileProblem}</p> : null}
-      <SetupCheck
-        id="ce-context-file-private"
-        label="Admins only"
-        help={CONTEXT_PRIVACY_HELP}
-        checked={filePrivate}
-        onChange={setFilePrivate}
-      />
+      <SetupField id="ce-context-file-access" label="Who can read the file" help={FILE_ACCESS_HELP}>
+        <ContextAccessSelect
+          id="ce-context-file-access"
+          value={fileAccess}
+          groups={groups}
+          allowAdminsOnly
+          data-testid="ce-context-file-access"
+          onChange={setFileAccess}
+        />
+      </SetupField>
       {fileIsPdf ? (
         <SetupCheck
           id="ce-context-file-analyze"
@@ -297,7 +319,7 @@ const ContextSourcesPanel = ({ sessionSlug, sessionConfig, account, pageLinks = 
           onClick={() =>
             void run('Adding the file…', async () => {
               if (!file) return '';
-              const id = await uploadContextFile({ file, adminsOnly: filePrivate }, options);
+              const id = await uploadContextFile({ file, ...contextAccessOf(fileAccess) }, options);
               setFile(null);
               setFileKey((key) => key + 1);
               if (!(analyze && fileIsPdf)) return 'File added.';

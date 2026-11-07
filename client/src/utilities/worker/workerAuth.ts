@@ -710,6 +710,19 @@ const readCachedWorkerSessionToken = ({
   return cached?.ok && cached.token ? cached.token : '';
 };
 
+/** Whether this browser already holds a Worker token for the signed-in person, so using it asks them for nothing. */
+export const hasCachedWorkerSessionToken = async (options: WorkerSessionTokenOptions = {}): Promise<boolean> => {
+  const account = normalizeAddress((options.context as { account?: unknown } | undefined)?.account);
+  if (!account) return false;
+  try {
+    return !!readCachedWorkerSessionToken(
+      await resolveWorkerTokenRequestContext({ ...options, resolvedAddress: account, resolveWorkerUrl: true }),
+    );
+  } catch {
+    return false;
+  }
+};
+
 export const getWorkerSessionToken = async ({
   sessionSlug,
   sessionConfig,

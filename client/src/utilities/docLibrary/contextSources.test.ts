@@ -1,6 +1,7 @@
 import {
   addContextLink,
   checkContextFile,
+  contextAdderLabel,
   listContextSources,
   loadContextSourcesForAi,
   readContextPdf,
@@ -14,14 +15,19 @@ import {
   readSessionStorageBlob,
   uploadDataToSessionStorage,
 } from '../storage/storageClient';
-import { fetchWorkerWithAuth } from '../worker/workerAuth.js';
+import { fetchWorkerWithAuth, hasCachedWorkerSessionToken } from '../worker/workerAuth.js';
 
 jest.mock('../storage/storageClient', () => ({
+  isConfiguredAdmin: (config: { adminAddress?: string }, { account }: { account: string }) =>
+    config.adminAddress === account,
   listSessionStorageRefsPage: jest.fn(),
   readSessionStorageBlob: jest.fn(),
   uploadDataToSessionStorage: jest.fn(),
 }));
-jest.mock('../worker/workerAuth.js', () => ({ fetchWorkerWithAuth: jest.fn() }));
+jest.mock('../worker/workerAuth.js', () => ({
+  hasCachedWorkerSessionToken: jest.fn(async () => false),
+  fetchWorkerWithAuth: jest.fn(),
+}));
 jest.mock('../worker/corsProxy', () => ({ getCorsProxyUrlOrThrow: jest.fn(async () => 'https://worker.example/') }));
 
 const listPage = listSessionStorageRefsPage as jest.MockedFunction<typeof listSessionStorageRefsPage>;
@@ -141,12 +147,46 @@ describe('context sources on the client', () => {
     );
     await uploadContextFile({ file: new File(['x'], 'deck.pdf', { type: 'application/pdf' }) }, options);
     expect(upload.mock.calls[1][2]).not.toHaveProperty('accessConditions');
+    await uploadContextFile({ file: new File(['x'], 'notes.txt', { type: 'text/plain' }), groupId: 'Salon' }, options);
+    expect(upload.mock.calls[2][2]).toMatchObject({
+      accessConditions: {
+        match: 'any',
+        conditions: [
+          { kind: 'worker_role', role: 'admin' },
+          { kind: 'worker_group', groupIds: ['salon'] },
+        ],
+      },
+    });
     expect(checkContextFile({ name: 'slides.pptx', type: 'application/vnd.ms-powerpoint' })).toMatch(/PDF, Markdown/);
     expect(checkContextFile({ name: 'big.pdf', type: 'application/pdf', size: 21 * 1024 * 1024 })).toMatch(/20 MB/);
     await expect(
       uploadContextFile({ file: new File(['x'], 'photo.png', { type: 'image/png' }) }, options),
     ).rejects.toThrow(/PDF, Markdown/);
-    expect(upload).toHaveBeenCalledTimes(2);
+    expect(upload).toHaveBeenCalledTimes(3);
+  });
+
+  it('lists as the person only when their browser already holds a session token, so it never asks them to sign', async () => {
+    listPage.mockResolvedValue({ items: [], cursor: null, listComplete: true });
+    await listContextSources(options);
+    expect(listPage).toHaveBeenLastCalledWith(expect.objectContaining({ preferAnonymous: true }));
+    jest.mocked(hasCachedWorkerSessionToken).mockResolvedValueOnce(true);
+    await listContextSources(options);
+    expect(listPage).toHaveBeenLastCalledWith(expect.objectContaining({ preferAnonymous: false }));
+  });
+
+  it('reads the group a source is locked to, and says who added it', async () => {
+    const locked = item('group-1', [tag('CE-DocRole', 'context'), tag('CE-DocKind', 'file')], {
+      lockedGroupId: 'salon',
+      addedBy: '0xAbCd00000000000000000000000000000000Ef01',
+    });
+    listPage.mockResolvedValueOnce({ items: [locked], cursor: null, listComplete: true });
+    const [source] = await listContextSources(options);
+    expect(source).toMatchObject({ lockedGroupId: 'salon', addedBy: '0xabcd00000000000000000000000000000000ef01' });
+    const config = { adminAddress: '0x1111111111111111111111111111111111111111' };
+    expect(contextAdderLabel(source, config, '0xABCD00000000000000000000000000000000EF01')).toBe('you');
+    expect(contextAdderLabel(source, config, '')).toBe('0xabcd…ef01');
+    expect(contextAdderLabel({ addedBy: config.adminAddress }, config, '')).toBe('an admin');
+    expect(contextAdderLabel({ addedBy: '' }, config, '')).toBe('');
   });
 
   it('asks the Worker to read links and PDFs and to remove items, with the person’s sign-in', async () => {

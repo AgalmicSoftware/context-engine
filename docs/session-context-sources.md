@@ -6,15 +6,16 @@ coalition's site, a deck. It has two parts.
 - **Notes and page links** live in the session config as `sessionContext`
   (`{ title, paragraphs, links }`). They show on the session page to everyone
   who can open it, MCP returns them, and templates carry them.
-- **Sources** are files and links the admins add for the AI. They are
-  doc-library records (resource `docsContext`) tagged with a context role, so
-  there is no second storage model. Each source is for everyone with access to
-  the session, or for admins only.
+- **Sources** are files and links added for the AI. They are doc-library
+  records (resource `docsContext`) tagged with a context role, so there is no
+  second storage model. Each source is for everyone with access to the session,
+  for one group, or for admins only.
 
 Sources need a session whose storage is on its Session Worker (Cloudflare), not
 Arweave and not Lit-encrypted, because the Worker must be able to read them.
 Session Workers advertise them as the `context_sources_v1` capability; the page
-asks admins to update an older Worker.
+asks admins to update an older Worker. Workers that also let participants add
+files advertise `participant_context_v1`.
 
 ## Limits
 
@@ -54,16 +55,25 @@ Sources (`shared/sessionContextSources.mjs`):
 
 ## Adding and removing
 
-Only session admins add, refresh or remove sources; the Worker refuses anyone
-else.
+Anyone signed in to the session may add a file, unless an admin sets **Who can
+add files** to **Admins only** in Settings (`contextAdditionPolicy`, which is
+`participants` when unset). The Worker checks that again when each file
+publishes. Each source shows who added it. Whoever added a file may remove it,
+and admins may remove any source. Only admins add or refresh links and have the
+AI read a PDF, because those make the Worker fetch a page or spend the session's
+AI key; the Worker refuses anyone else.
 
 - **Setup (`/new`):** the Context section takes paragraphs, links and files.
   Files stay in the browser until **Create**; then **Add context to
   the session** uploads them, has the session's AI read the PDFs marked
   **Analyze with the session's AI**, and, unless unticked, reads each link's
   page for the AI. After a reload only the file names remain, to attach again.
+- **The session page's Context section** gives someone signed in **Add a file**,
+  with who can read it, and **Remove** beside their own files.
+- **A Group Conversation's** **Add transcript to context** box, beside **Submit
+  questions**, uploads the transcript as a text file when the questions submit.
 - **Settings (`/session/<slug>/settings`)** and **the session page's Context
-  section** (admins only) list the sources with their privacy and what the AI
+  section** (for admins) list the sources with their privacy and what the AI
   has of each. **Add a link**, **Add a file**, **Refresh** (a link),
   **Read with AI** (a PDF) and **Remove** apply at once; they are not part of
   **Save**. Removing a PDF also removes the AI's reading of it.
@@ -77,11 +87,16 @@ so every link snapshot is one the Worker fetched.
 
 The default is anyone with access to the session: the item takes the session's
 own storage access. **Admins only** adds the `worker_role` condition
-`{ match: 'all', conditions: [{ kind: 'worker_role', role: 'admin' }] }`. The
-Worker enforces it on `/storage/read` and on each row of `/storage/list`, so a
-participant never receives an admins-only item or learns that it exists. A
-PDF's reading keeps the PDF's privacy. No other access rule is accepted for a
-context item.
+`{ match: 'all', conditions: [{ kind: 'worker_role', role: 'admin' }] }`. Locking
+a file to a group adds `{ match: 'any', conditions: [{ kind: 'worker_role', role:
+'admin' }, { kind: 'worker_group', groupIds: ['<group>'] }] }`, so its members
+read it, and admins, who may have to remove it. The Worker enforces both on
+`/storage/read` and on each row of `/storage/list`, so anyone else never receives
+the item or learns that it exists. Someone can lock a file to a group they are
+not in, and then can't read it themselves. A PDF's reading keeps the PDF's
+privacy. No other access rule is accepted for a context item. The Worker's own AI
+features act for participants, so they use neither admins-only nor group-locked
+items; an AI that runs in someone's browser uses what that person may read.
 
 ## Links
 

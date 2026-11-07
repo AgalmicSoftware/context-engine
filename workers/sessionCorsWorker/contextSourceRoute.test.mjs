@@ -2,15 +2,32 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { buildPdfReadRequest, PDF_READ_PROMPT } from './contextDocumentRead.js';
+import { groupLockedAccess } from '../../shared/sessionContextSources.mjs';
 import { ADMIN, PARTICIPANT, PDF_BYTES, harness, idOf, json, pageResponse } from './contextSourceTestFixture.mjs';
 
 const tagOf = (item, name) => item.metadata.tags.find((tag) => tag.name === name)?.value;
 
-test('only session admins add context, and only as readable PDF or text files', async () => {
+test('signed-in people add context files unless the session limits it, and only as readable PDF or text', async () => {
   const h = harness();
+  assert.ok([401, 403].includes((await h.uploadFile({ address: '' })).status), 'a signed-out upload is refused');
+  const id = await idOf(await h.uploadFile({ address: PARTICIPANT, name: 'notes.txt', type: 'text/plain', bytes: new TextEncoder().encode('notes') }));
+  const [added] = await h.list(PARTICIPANT);
+  assert.deepEqual([added.storageRef.id, added.metadata.addedBy, added.metadata.uploadAuthority], [id, PARTICIPANT, undefined]);
+  const storedByParticipant = JSON.parse(h.kv.store.get([...h.kv.store.keys()].find((key) => key.endsWith(`:docsContext:${id}`))));
+  assert.deepEqual([storedByParticipant.contextSource, storedByParticipant.uploadAuthority, storedByParticipant.uploader], [true, 'author', PARTICIPANT]);
+  // Links and AI readings stay with the admins: both make the Worker do work on someone's behalf.
+  assert.equal((await h.context({ action: 'add-link', url: 'https://example.org/' }, PARTICIPANT)).status, 403);
+  assert.equal((await h.context({ action: 'read-pdf', id }, PARTICIPANT)).status, 403);
+
+  h.state.config.contextAdditionPolicy = 'admin_only';
   const refused = await h.uploadFile({ address: PARTICIPANT });
   assert.equal(refused.status, 403);
   assert.equal((await refused.json()).reason, 'context_admin_required');
+  assert.equal((await h.uploadFile({ address: ADMIN })).status, 200, 'admins still add');
+});
+
+test('context is a readable PDF or text file, and links and AI text come only from the context route', async () => {
+  const h = harness();
   // A participant's ordinary document upload is unaffected.
   const form = new FormData();
   form.append('file', new Blob(['notes'], { type: 'text/plain' }), 'notes.txt');
@@ -23,6 +40,8 @@ test('only session admins add context, and only as readable PDF or text files', 
     [{ name: 'notes.txt', type: 'text/plain', bytes: new Uint8Array(1024 * 1024 + 1) }, 413, 'context_too_large'],
     [{ extra: { payloadEncrypted: 'true' } }, 400, 'context_encryption_unsupported'],
     [{ extra: { groupId: 'facilitators' } }, 400, 'context_policy_unsupported'],
+    [{ extra: { accessConditions: JSON.stringify({ match: 'all', conditions: [{ kind: 'worker_role', role: 'admin' }, { kind: 'worker_group', groupIds: ['salon'] }] }) } }, 400, 'context_policy_unsupported'],
+    [{ extra: { accessConditions: JSON.stringify({ match: 'any', conditions: [{ kind: 'worker_group', groupIds: ['salon'] }] }) } }, 400, 'context_policy_unsupported'],
     [{ extra: { accessConditions: JSON.stringify({ match: 'any', conditions: [{ kind: 'worker_role', role: 'reviewer' }] }) } }, 400, 'context_policy_unsupported'],
     // Links and AI-read text are written by the context route alone.
     [{ role: 'context-text', name: 'deck.txt', type: 'text/plain', bytes: new TextEncoder().encode('forged reading') }, 400, 'context_route_required'],
@@ -65,6 +84,64 @@ test('an admins-only item is refused to participants on read and list; admins re
     const plain = await (await h.call('/storage/list?resource=docsContext', { address: PARTICIPANT })).json();
     assert.deepEqual(plain.items.map((item) => item.storageRef.id), [everyone]);
   }
+});
+
+test('a file locked to a group reaches its members and admins, and no one else', async () => {
+  const MEMBER = `0x${'3'.repeat(40)}`;
+  for (const encryption of ['none', 'worker_envelope']) {
+    const h = harness({ encryption });
+    h.deps.isWorkerGroupMember = async ({ groupId, requesterAddress }) =>
+      groupId === 'salon' && String(requesterAddress).toLowerCase() === MEMBER
+        ? { ok: true, principal: { kind: 'address', address: MEMBER } }
+        : { ok: false, status: 403, reason: 'worker_group_membership_denied' };
+    const id = await idOf(await h.uploadFile({
+      address: MEMBER,
+      name: 'transcript.txt',
+      type: 'text/plain',
+      bytes: new TextEncoder().encode('Group words'),
+      extra: { accessConditions: JSON.stringify(groupLockedAccess('Salon')) },
+    }));
+    const [item] = await h.list(MEMBER);
+    assert.deepEqual([item.storageRef.id, item.metadata.lockedGroupId, item.metadata.adminsOnly, item.metadata.addedBy], [id, 'salon', false, MEMBER]);
+    assert.equal(await (await h.read(id, MEMBER)).text(), 'Group words');
+    assert.deepEqual(await h.list(PARTICIPANT), [], 'someone outside the group never learns it exists');
+    assert.equal((await h.read(id, PARTICIPANT)).status, 403);
+    assert.equal((await h.read(id, '')).ok, false, 'nor does a signed-out reader');
+    assert.equal((await h.list(ADMIN))[0].storageRef.id, id, 'admins see it, so they can remove it');
+    assert.equal(await (await h.read(id, ADMIN)).text(), 'Group words');
+  }
+});
+
+test('whoever added a file may remove it; anyone else’s needs an admin', async () => {
+  const OTHER = `0x${'4'.repeat(40)}`;
+  const h = harness();
+  const text = { name: 'notes.txt', type: 'text/plain', bytes: new TextEncoder().encode('notes') };
+  const mine = await idOf(await h.uploadFile({ ...text, address: PARTICIPANT }));
+  const theirs = await idOf(await h.uploadFile({ ...text, address: OTHER }));
+  const refused = await h.context({ action: 'remove', id: theirs }, PARTICIPANT);
+  assert.equal(refused.status, 403);
+  assert.equal((await refused.json()).reason, 'context_admin_required');
+  assert.equal((await h.context({ action: 'remove', id: mine }, PARTICIPANT)).status, 200);
+  assert.equal((await h.context({ action: 'remove', id: theirs }, '')).status, 403, 'signed out');
+  assert.deepEqual((await h.list(ADMIN)).map((item) => item.storageRef.id), [theirs]);
+  assert.equal((await h.context({ action: 'remove', id: theirs }, ADMIN)).status, 200);
+  assert.deepEqual(await h.list(ADMIN), []);
+  // The setting stops additions, not cleaning up your own.
+  const another = await idOf(await h.uploadFile({ ...text, address: PARTICIPANT }));
+  h.state.config.contextAdditionPolicy = 'admin_only';
+  assert.equal((await h.context({ action: 'remove', id: another }, PARTICIPANT)).status, 200);
+});
+
+test('a file publishes only if its uploader may still add it when the upload finishes', async () => {
+  const h = harness();
+  const publish = h.deps.executeCoordinatedStoragePublication;
+  h.deps.executeCoordinatedStoragePublication = (publication) => {
+    h.state.config.contextAdditionPolicy = 'admin_only';
+    return publish(publication);
+  };
+  const late = await h.uploadFile({ address: PARTICIPANT, name: 'notes.txt', type: 'text/plain', bytes: new TextEncoder().encode('notes') });
+  assert.equal(late.status, 409);
+  assert.deepEqual(await h.list(ADMIN), []);
 });
 
 test('a link is fetched by the Worker under the strict policy and stored with its snapshot', async () => {

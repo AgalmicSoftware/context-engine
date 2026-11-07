@@ -734,17 +734,18 @@ Matrix scroll/detail behavior, and Circles hover/drill interactions.
 
 Authenticated clients can use the worker as the session storage boundary:
 
-- `POST /storage/context`: session admins only. `{ action: "add-link", url, title?, adminsOnly?, replaces? }`
+- `POST /storage/context`: session admins, except that whoever added a file may `remove` it. `{ action: "add-link", url, title?, adminsOnly?, replaces? }`
   fetches the page under the public-artifact link policy and stores it as a context link record with its text
   snapshot and fetch date (`replaces` refreshes an existing one, keeping its title and privacy);
   `{ action: "read-pdf", id }` sends a context PDF to the session's own Claude or OpenAI model and stores the
   returned text beside it with the same privacy; `{ action: "remove", id }` deletes a context source and that
   text. A PDF has one reading at a time: `read-pdf` returns `409` while another reading of it runs, and the
   session coordinator applies finished readings and removals one at a time, so a removed PDF stays removed and
-  a reading never replaces a newer one. Uploads with a context role on `/storage/upload` must come from an admin, be a PDF (20 MB) or text file
-  (1 MB), carry no access rule other than admins-only, and be readable by the Worker. The session
-  coordinator publishes each context item only while its admin is still one, so a link, PDF reading or upload
-  that finishes after that admin was replaced returns `409` and is not listed; a content-only settings edit
+  a reading never replaces a newer one. Uploads with a context role on `/storage/upload` must come from someone
+  signed in (an admin, or anyone while `contextAdditionPolicy` isn't `admin_only`), be a PDF (20 MB) or text file
+  (1 MB), carry no access rule other than admins-only or one group, and be readable by the Worker. The session
+  coordinator publishes each context item only while its uploader may still add it, so a link, PDF reading or upload
+  that finishes after that admin was replaced, or after participants were limited, returns `409` and is not listed; a content-only settings edit
   meanwhile does not stop it. See [Session context](session-context-sources.md).
 - `POST /storage/upload`: accepts JSON or multipart payloads for CE payload resources (`docsContext`, `questions`, `surveys`, `responses`, `generatedArtifacts`, and `media`). `arweave` and `lit-arweave` delegate to the existing Arweave upload behavior and return both `arweaveTxId` and `storageRef`. `cloudflare` writes blobs to R2 and authorization metadata/index rows to KV when R2 is available. An R2 deployment must provide an index binding with both `get` and `put`; otherwise upload returns `501` before any R2 write. For small JSON/demo deployments where R2 is not enabled, the worker can store opaque payload envelopes in KV-only Cloudflare storage. Both modes return an opaque 32-byte base64url Cloudflare `storageRef.id` that existing Surveys `bytes32` pointer fields can carry without changing the ABI.
   - Worker-canonical participant submissions preserve the verified session

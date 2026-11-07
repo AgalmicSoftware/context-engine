@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Input } from 'reactstrap';
 
 import wizardStyles from '../SessionWizard.module.scss';
 import styles from '../setup/SessionSetup.module.scss';
@@ -16,7 +17,7 @@ import {
   withoutPublishedQuestions,
 } from '../setup/SetupContentSections';
 import { SetupAccessSection, SetupHostingSection, SetupResultsSection } from '../setup/SetupPolicySections';
-import type { SetupSectionKey } from '../setup/SetupPrimitives';
+import { SetupField, type SetupSectionKey } from '../setup/SetupPrimitives';
 import { editSessionSetupProfile } from '../setup/sessionSetupProfile';
 import type { SetupDraft } from '../setup/setupSectionTypes';
 import {
@@ -446,13 +447,31 @@ const SessionSettingsPage = ({
         <SetupContextSection
           {...section('context')}
           sources={
-            <ContextSourcesPanel
-              sessionSlug={sessionSlug}
-              sessionConfig={saved}
-              account={account}
-              pageLinks={normalizeSessionContext(saved?.sessionContext).links}
-              onSourcesChange={setContextSources}
-            />
+            <>
+              <SetupField
+                id="ce-setting-context-addition"
+                label="Who can add files"
+                help="Each file shows who added it, and admins can remove any of them. Only admins add links."
+              >
+                <Input
+                  id="ce-setting-context-addition"
+                  type="select"
+                  value={draft.contextAdditionPolicy === 'admin_only' ? 'admin_only' : 'participants'}
+                  data-testid="ce-setting-context-addition"
+                  onChange={(event) => updateDraft(['contextAdditionPolicy'], event.target.value)}
+                >
+                  <option value="participants">Anyone in the session</option>
+                  <option value="admin_only">Admins only</option>
+                </Input>
+              </SetupField>
+              <ContextSourcesPanel
+                sessionSlug={sessionSlug}
+                sessionConfig={saved}
+                account={account}
+                pageLinks={normalizeSessionContext(saved?.sessionContext).links}
+                onSourcesChange={setContextSources}
+              />
+            </>
           }
         />
         <SetupQuestionsSection

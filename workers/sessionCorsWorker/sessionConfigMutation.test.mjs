@@ -272,6 +272,25 @@ test('set-config persists only exact group creation policies', () => {
   }
 });
 
+test('set-config accepts only the two context addition policies', () => {
+  for (const contextAdditionPolicy of ['admin_only', 'participants']) {
+    const result = applySessionConfigMutation({
+      existingConfig: baseConfig,
+      mutation: { kind: 'set-config', incomingConfig: { contextAdditionPolicy } },
+      slug: 'session-a',
+    });
+    assert.equal(result.ok, true);
+    assert.equal(result.config.contextAdditionPolicy, contextAdditionPolicy);
+  }
+  for (const contextAdditionPolicy of ['everyone', 'Participants', true]) {
+    assert.deepEqual(applySessionConfigMutation({
+      existingConfig: baseConfig,
+      mutation: { kind: 'set-config', incomingConfig: { contextAdditionPolicy } },
+      slug: 'session-a',
+    }), { ok: false, status: 400, error: 'Invalid context addition policy.' });
+  }
+});
+
 test('set-config validates profile patches against the complete canonical storage record', () => {
   const existingConfig = {
     ...cloneJson(profileBearingConfig),

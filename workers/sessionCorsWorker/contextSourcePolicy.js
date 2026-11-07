@@ -5,28 +5,33 @@ import {
   contextRoleOf,
   contextTagValue,
   isAdminsOnlyAccess,
+  lockedGroupOf,
+  participantsMayAddContext,
   resolveContextFileType,
 } from '../../shared/sessionContextSources.mjs';
 
 const fail = (status, error, reason) => ({ ok: false, status, error, reason });
-const POLICY_ERROR = 'Context is for everyone in the session or for admins only; it takes no other access rule.';
+const POLICY_ERROR = 'Context is for everyone in the session, one group or admins only; it takes no other access rule.';
 const MIB = 1024 * 1024;
 
-// Checks a doc-library upload that carries a context role. Only admins add
-// context; the Worker must be able to read it; and links and AI-read text are
-// written only by the context route (contextOrigin 'worker', set server-side),
-// so a link's snapshot is always one the Worker fetched.
-export const checkContextSourceUpload = ({ payload = {}, isAdmin = false, litEncrypted = false } = {}) => {
+// Checks a doc-library upload that carries a context role. Signed-in people add
+// files unless the session limits context to admins; the Worker must be able to
+// read them; and links and AI-read text are written only by the context route
+// (contextOrigin 'worker', set server-side), so a link's snapshot is always one
+// the Worker fetched.
+export const checkContextSourceUpload = ({ payload = {}, config, uploader = '', isAdmin = false, litEncrypted = false } = {}) => {
   const role = contextRoleOf(payload.tags);
   if (!role) return { ok: true, role: '' };
-  if (!isAdmin) return fail(403, 'Only session admins can add context.', 'context_admin_required');
+  if (!isAdmin && !participantsMayAddContext(config)) return fail(403, 'Only session admins can add context.', 'context_admin_required');
+  if (!isAdmin && !uploader) return fail(401, 'Sign in to add context.', 'context_sign_in_required');
   if (payload.payloadEncrypted === true || litEncrypted) {
     return fail(400, 'Context must be readable by the Session Worker, so it cannot be Lit-encrypted.', 'context_encryption_unsupported');
   }
   if (payload.uploadPolicy || payload.groupIds?.length) return fail(400, POLICY_ERROR, 'context_policy_unsupported');
   // The context route copies a PDF's stored rule onto its reading; uploads
-  // choose between the session's access and admins only.
-  if (payload.accessConditions && payload.contextOrigin !== 'worker' && !isAdminsOnlyAccess(payload.accessConditions)) {
+  // choose between the session's access, one group and admins only.
+  if (payload.accessConditions && payload.contextOrigin !== 'worker' &&
+    !isAdminsOnlyAccess(payload.accessConditions) && !lockedGroupOf(payload.accessConditions)) {
     return fail(400, POLICY_ERROR, 'context_policy_unsupported');
   }
   const kind = contextTagValue(payload.tags, CONTEXT_TAGS.kind);
@@ -45,9 +50,14 @@ export const checkContextSourceUpload = ({ payload = {}, isAdmin = false, litEnc
   return { ok: true, role };
 };
 
-// What a list shows of a context source beyond its tags: the privacy level.
+// What a list shows of a context source beyond its tags: the privacy level and who added it.
 export const contextSourceListFields = (metadata = {}) => (
   metadata?.contextSource === true
-    ? { contextSource: true, adminsOnly: isAdminsOnlyAccess(metadata.accessConditions) }
+    ? {
+      contextSource: true,
+      adminsOnly: isAdminsOnlyAccess(metadata.accessConditions),
+      lockedGroupId: lockedGroupOf(metadata.accessConditions),
+      addedBy: metadata.uploader || '',
+    }
     : {}
 );

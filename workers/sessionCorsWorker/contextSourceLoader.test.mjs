@@ -5,6 +5,7 @@ import { buildParticipantContextPrompt, loadParticipantContextSources } from './
 import { resolveInterviewStarter } from './interviewStarter.js';
 import { runQueuedAutomaticResultsAnalysisJob } from './resultsAnalysisGeneration.js';
 import { buildIndexKey, buildPayloadKey } from './storageRouteExecution.js';
+import { groupLockedAccess } from '../../shared/sessionContextSources.mjs';
 import { harness, idOf, json, pageResponse } from './contextSourceTestFixture.mjs';
 
 const encode = (text) => new TextEncoder().encode(text);
@@ -21,6 +22,12 @@ const seeded = async (options = {}) => {
   h.state.config.sessionContext = sessionContext;
   await idOf(await h.uploadFile({ name: 'agenda.md', type: 'text/markdown', bytes: encode('# Agenda for everyone') }));
   await idOf(await h.uploadFile({ name: 'board.txt', type: 'text/plain', bytes: encode('SECRET admins-only plan'), adminsOnly: true }));
+  await idOf(await h.uploadFile({
+    name: 'group.txt',
+    type: 'text/plain',
+    bytes: encode('SECRET notes for one group'),
+    extra: { accessConditions: JSON.stringify(groupLockedAccess('salon')) },
+  }));
   await idOf(await h.context({ action: 'add-link', url: 'https://example.org/essay' }));
   const deck = await idOf(await h.uploadFile({ name: 'deck.pdf' }));
   await idOf(await h.context({ action: 'read-pdf', id: deck }));

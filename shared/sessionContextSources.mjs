@@ -1,8 +1,8 @@
-// Context sources: files and links a session's admins add for its AI. They are
+// Context sources: files and links added to a session for its AI. They are
 // doc-library records (resource docsContext) whose CE-DocRole tag says which:
-// 'context' for a file or link an admin added, 'context-text' for the text the
+// 'context' for a file or link someone added, 'context-text' for the text the
 // session's AI read from one of those PDFs. Each is for everyone with access
-// to the session, or for admins only through the worker_role condition.
+// to the session, for one group, or for admins only.
 export const CONTEXT_ROLE = 'context';
 export const CONTEXT_TEXT_ROLE = 'context-text';
 
@@ -51,6 +51,18 @@ export const ADMINS_ONLY_ACCESS = Object.freeze({
 const text = (value) => (typeof value === 'string' ? value.trim() : '');
 const isRecord = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
 
+/** Everyone the session admits may add files, unless an admin limits it to admins. */
+export const participantsMayAddContext = (config) => config?.contextAdditionPolicy !== 'admin_only';
+
+/** The rule for an item locked to one group: its members may read it, and admins, who may have to remove it. */
+export const groupLockedAccess = (groupId) => ({
+  match: 'any',
+  conditions: [
+    { kind: 'worker_role', role: 'admin' },
+    { kind: 'worker_group', groupIds: [text(groupId).toLowerCase()] },
+  ],
+});
+
 /** A tag's value from a storage tag list ({ name, value }[]), or ''. */
 export const contextTagValue = (tags, name) =>
   text((Array.isArray(tags) ? tags : []).find((tag) => isRecord(tag) && text(tag.name) === name)?.value);
@@ -72,6 +84,19 @@ export const isAdminsOnlyAccess = (accessConditions) => {
     text(conditions[0].role || 'admin').toLowerCase() === 'admin' &&
     Object.keys(conditions[0]).every((key) => key === 'kind' || key === 'role')
   );
+};
+
+/** The group an item is locked to, or '' for any other rule, so the privacy levels stay unambiguous. */
+export const lockedGroupOf = (accessConditions) => {
+  if (!isRecord(accessConditions) || text(accessConditions.match).toLowerCase() !== 'any') return '';
+  const conditions = Array.isArray(accessConditions.conditions) ? accessConditions.conditions : [];
+  const kindOf = (condition) => (isRecord(condition) ? text(condition.kind).toLowerCase() : '');
+  const role = conditions.find((condition) => kindOf(condition) === 'worker_role');
+  const group = conditions.find((condition) => kindOf(condition) === 'worker_group');
+  const groupIds = Array.isArray(group?.groupIds) ? group.groupIds : [];
+  return conditions.length === 2 && role && text(role.role).toLowerCase() === 'admin' && groupIds.length === 1
+    ? text(groupIds[0]).toLowerCase()
+    : '';
 };
 
 /** A file's content type from its type or name, when context sources accept it; else ''. */

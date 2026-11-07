@@ -12,6 +12,8 @@ import {
 } from '../../../utilities/docLibrary/contextSources';
 import type { SessionContextSourcesState } from '../../../utilities/docLibrary/useSessionContextSources';
 
+let mockGroups: Array<{ groupId: string; label: string }> = [];
+jest.mock('../../../utilities/docLibrary/useContextGroups', () => ({ useContextGroups: () => mockGroups }));
 jest.mock('../../../utilities/docLibrary/contextSources', () => ({
   ...jest.requireActual<typeof import('../../../utilities/docLibrary/contextSources')>(
     '../../../utilities/docLibrary/contextSources',
@@ -32,6 +34,8 @@ const source = (overrides: Partial<ContextSource>): ContextSource => ({
   size: 1,
   createdAt: '2026-10-31T10:00:00.000Z',
   adminsOnly: false,
+  lockedGroupId: '',
+  addedBy: '',
   fetchedAt: '',
   reading: null,
   ...overrides,
@@ -59,6 +63,7 @@ const list = (overrides: Partial<SessionContextSourcesState> = {}): SessionConte
   error: '',
   supported: true,
   isAdmin: true,
+  participantsCanAdd: false,
   reload: jest.fn(),
   ...overrides,
 });
@@ -120,6 +125,25 @@ describe('context sources panel', () => {
     expect(removeContextSource).toHaveBeenCalledWith(deck, options);
   });
 
+  it('says who may read a file and who added it, and uploads with the chosen access', async () => {
+    mockGroups = [{ groupId: 'salon', label: 'Salon' }];
+    expect(describeContextSource(source({ lockedGroupId: 'salon' }), { groups: mockGroups, adder: 'an admin' })).toBe(
+      'Salon · Added by an admin · Text file',
+    );
+    expect(describeContextSource(source({ lockedGroupId: 'gone' }))).toBe('One group · Text file');
+    renderPanel(list({ sources: [] }));
+    const input = await screen.findByTestId('ce-context-file');
+    const notes = new File(['notes'], 'notes.txt', { type: 'text/plain' });
+    fireEvent.change(input, { target: { files: [notes] } });
+    fireEvent.change(screen.getByTestId('ce-context-file-access'), { target: { value: 'group:salon' } });
+    await act(async () => fireEvent.click(screen.getByTestId('ce-context-add-file')));
+    expect(uploadContextFile).toHaveBeenLastCalledWith({ file: notes, groupId: 'salon' }, options);
+    fireEvent.change(screen.getByTestId('ce-context-file'), { target: { files: [notes] } });
+    fireEvent.change(screen.getByTestId('ce-context-file-access'), { target: { value: 'admins' } });
+    await act(async () => fireEvent.click(screen.getByTestId('ce-context-add-file')));
+    expect(uploadContextFile).toHaveBeenLastCalledWith({ file: notes, adminsOnly: true }, options);
+  });
+
   it('uploads a file and has the session’s AI read a PDF only when Analyze is ticked', async () => {
     renderPanel(list({ sources: [] }));
     const input = await screen.findByTestId('ce-context-file');
@@ -127,7 +151,7 @@ describe('context sources panel', () => {
     fireEvent.change(input, { target: { files: [pdf] } });
     expect(screen.getByTestId('ce-context-file-analyze')).toBeChecked();
     await act(async () => fireEvent.click(screen.getByTestId('ce-context-add-file')));
-    expect(uploadContextFile).toHaveBeenCalledWith({ file: pdf, adminsOnly: false }, options);
+    expect(uploadContextFile).toHaveBeenCalledWith({ file: pdf }, options);
     expect(readContextPdf).toHaveBeenCalledWith('new-pdf', options);
     expect(screen.getByTestId('ce-context-sources-status')).toHaveTextContent(
       'File added and read by the session’s AI.',

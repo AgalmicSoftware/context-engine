@@ -1,6 +1,6 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 
-import type { ContextSource, ContextSourceOptions } from './contextSources';
+import { workerAcceptsParticipantContext, type ContextSource, type ContextSourceOptions } from './contextSources';
 import { useSessionContextPrompt, useSessionContextSources } from './useSessionContextSources';
 
 const mockRequests: Array<{ options: ContextSourceOptions; resolve: (sources: ContextSource[]) => void }> = [];
@@ -11,6 +11,7 @@ jest.mock('../storage/sessionStorageConfig', () => ({
   requiresLitForSessionStorage: () => false,
 }));
 jest.mock('./contextSources', () => ({
+  workerAcceptsParticipantContext: jest.fn(async () => true),
   listContextSources: jest.fn(
     (options: ContextSourceOptions) => new Promise((resolve) => mockRequests.push({ options, resolve })),
   ),
@@ -35,6 +36,8 @@ const source = (id: string, adminsOnly = false): ContextSource => ({
   size: 1,
   createdAt: '',
   adminsOnly,
+  lockedGroupId: '',
+  addedBy: '',
   fetchedAt: '',
   reading: null,
 });
@@ -53,6 +56,28 @@ describe('useSessionContextSources', () => {
     renderHook((props: HookProps) => useSessionContextSources(props), {
       initialProps: { sessionSlug: 'salon', sessionConfig: config(), account },
     });
+
+  it('lets signed-in people add files unless the session limits it or their Worker can’t', async () => {
+    const { result, rerender } = mount(READER);
+    await resolveLatest([]);
+    await waitFor(() => expect(result.current.participantsCanAdd).toBe(true));
+
+    rerender({
+      sessionSlug: 'salon',
+      sessionConfig: { ...config(), contextAdditionPolicy: 'admin_only' },
+      account: READER,
+    });
+    expect(result.current.participantsCanAdd).toBe(false);
+
+    rerender({ sessionSlug: 'salon', sessionConfig: config(), account: '' });
+    expect(result.current.participantsCanAdd).toBe(false);
+
+    jest.mocked(workerAcceptsParticipantContext).mockResolvedValueOnce(false);
+    const older = mount(READER);
+    await resolveLatest([]);
+    await act(async () => undefined);
+    expect(older.result.current.participantsCanAdd).toBe(false);
+  });
 
   it('shows a new reader no sources until their own list loads', async () => {
     const { result, rerender } = mount(ADMIN);

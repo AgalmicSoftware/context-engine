@@ -123,6 +123,7 @@ All notable changes to this project will be documented in this file.
 
 ### Workers — requires redeployment
 
+- Anyone signed in to a session can add files to its context, each showing who added it. They can lock a file to any group or leave it for anyone who can see the session, and remove their own. Admins can remove any file, and can limit adding to admins in Settings. The Worker's own AI features leave group-locked files out.
 - Removed the retired Agent Bridge source. Agent HTTP stays in the Session Worker; admin metrics report `sessionsWithAgentActivity`, and agent on-chain answers record source `session-agent`.
 - `telegramResponseExportAllowedAddresses` no longer grants export access. Nothing writes this key, and no live session's public config carries it.
 - Removed unread Telegram fields and unused Worker exports. Stored record fields and KV prefixes are unchanged.

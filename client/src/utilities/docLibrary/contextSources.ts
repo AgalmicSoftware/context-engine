@@ -1,6 +1,7 @@
-/** @file contextSources.ts: a session's context sources, as its admins add them and its AI reads them. */
+/** @file contextSources.ts: a session's context sources, as people add them and its AI reads them. */
 import {
   ADMINS_ONLY_ACCESS,
+  groupLockedAccess,
   CONTEXT_FILE_TYPES,
   CONTEXT_ROLE,
   CONTEXT_TAGS,
@@ -12,10 +13,11 @@ import {
 } from '@ce-shared/sessionContextSources.mjs';
 import type { SessionContextPromptSource } from '@ce-shared/sessionContextText.mjs';
 import { getCorsProxyUrlOrThrow } from '../worker/corsProxy';
-import { fetchWorkerWithAuth } from '../worker/workerAuth.js';
+import { fetchWorkerWithAuth, hasCachedWorkerSessionToken } from '../worker/workerAuth.js';
 import { readWorkerCapabilities } from '../worker/workerCapabilities';
 import { defaultStrictAllowDemoFallback } from '../worker/workerSessionResolution.js';
 import {
+  isConfiguredAdmin,
   listSessionStorageRefsPage,
   readSessionStorageBlob,
   uploadDataToSessionStorage,
@@ -34,6 +36,10 @@ export type ContextSource = {
   size: number;
   createdAt: string;
   adminsOnly: boolean;
+  /** The group it is locked to, or ''. */
+  lockedGroupId: string;
+  /** The address that added it. */
+  addedBy: string;
   /** When the Worker last read a link's page. */
   fetchedAt: string;
   /** A PDF's text as the session's AI read it. */
@@ -64,15 +70,22 @@ const workerBaseUrl = async (options: ContextSourceOptions): Promise<string> =>
     .trim()
     .replace(/\/+$/, '');
 
-/** True when this session's Worker stores context sources (Session Workers from 0.9.0). */
-export const workerSupportsContextSources = async (options: ContextSourceOptions): Promise<boolean> => {
+const workerHasFeature = async (options: ContextSourceOptions, feature: string): Promise<boolean> => {
   try {
     const capabilities = await readWorkerCapabilities(await workerBaseUrl(options), options.sessionSlug);
-    return capabilities.features.includes('context_sources_v1');
+    return capabilities.features.includes(feature);
   } catch {
     return false;
   }
 };
+
+/** True when this session's Worker stores context sources (Session Workers from 0.9.0). */
+export const workerSupportsContextSources = (options: ContextSourceOptions): Promise<boolean> =>
+  workerHasFeature(options, 'context_sources_v1');
+
+/** True when this session's Worker lets participants add files and lock them to a group. */
+export const workerAcceptsParticipantContext = (options: ContextSourceOptions): Promise<boolean> =>
+  workerHasFeature(options, 'participant_context_v1');
 
 const toSource = (item: unknown): (ContextSource & { role: string; derivedFrom: string }) | null => {
   const record = asRecord(item);
@@ -94,6 +107,8 @@ const toSource = (item: unknown): (ContextSource & { role: string; derivedFrom: 
     size: Number(metadata.size) || 0,
     createdAt: toStr(metadata.createdAt),
     adminsOnly: metadata.adminsOnly === true,
+    lockedGroupId: toStr(metadata.lockedGroupId),
+    addedBy: toStr(metadata.addedBy).toLowerCase(),
     fetchedAt: contextTagValue(tags, CONTEXT_TAGS.fetchedAt),
     reading:
       role === CONTEXT_TEXT_ROLE
@@ -106,13 +121,15 @@ const toSource = (item: unknown): (ContextSource & { role: string; derivedFrom: 
 export const listContextSources = async (options: ContextSourceOptions): Promise<ContextSource[]> => {
   const rows: NonNullable<ReturnType<typeof toSource>>[] = [];
   let cursor: string | null = null;
+  // Someone already signed in to this session sees their groups' items too; listing never asks them to sign.
+  const asThemselves = options.asAdmin || (await hasCachedWorkerSessionToken(workerOptions(options)));
   for (let page = 0; page < MAX_LIST_PAGES; page += 1) {
     const result = await listSessionStorageRefsPage({
       ...workerOptions(options),
       resource: 'docsContext',
       role: 'context',
       cursor,
-      preferAnonymous: !options.asAdmin,
+      preferAnonymous: !asThemselves,
     });
     result.items.forEach((item) => {
       const source = toSource(item);
@@ -135,7 +152,7 @@ const readText = async (id: string, options: ContextSourceOptions): Promise<stri
   const response = await readSessionStorageBlob({
     ...workerOptions(options),
     storageRef: { backend: 'cloudflare', id },
-    preferAnonymous: !options.asAdmin,
+    preferAnonymous: !(options.asAdmin || (await hasCachedWorkerSessionToken(workerOptions(options)))),
   });
   return response.text();
 };
@@ -177,6 +194,19 @@ export const loadContextSourcesForAi = async (
     }),
   );
   return loaded.filter((source): source is NonNullable<typeof source> => !!source);
+};
+
+/** Who added a source, for its list: "you", "an admin" or a short address. '' when unrecorded. */
+export const contextAdderLabel = (
+  { addedBy }: Pick<ContextSource, 'addedBy'>,
+  sessionConfig: unknown,
+  account: unknown,
+): string => {
+  if (!addedBy) return '';
+  if (addedBy === toStr(account).trim().toLowerCase()) return 'you';
+  return isConfiguredAdmin(sessionConfig, { account: addedBy })
+    ? 'an admin'
+    : `${addedBy.slice(0, 6)}…${addedBy.slice(-4)}`;
 };
 
 const postContextAction = async (body: UnknownRecord, options: ContextSourceOptions): Promise<UnknownRecord> => {
@@ -236,9 +266,12 @@ export const checkContextFile = (file: { name?: string; type?: string; size?: nu
     : '';
 };
 
-/** Uploads a file as a context source (admins only) and returns its storage id. */
+/** Who may read a file: anyone with access to the session, admins alone, or one group (and admins). */
+export type ContextFileAccess = { adminsOnly?: boolean; groupId?: string };
+
+/** Uploads a file as a context source and returns its storage id. */
 export const uploadContextFile = async (
-  { file, adminsOnly = false }: { file: File; adminsOnly?: boolean },
+  { file, adminsOnly = false, groupId = '' }: { file: File } & ContextFileAccess,
   options: ContextSourceOptions,
 ): Promise<string> => {
   const problem = checkContextFile(file);
@@ -256,7 +289,11 @@ export const uploadContextFile = async (
       { name: CONTEXT_TAGS.name, value: file.name.slice(0, 180) },
       { name: CONTEXT_TAGS.mime, value: contentType },
     ],
-    ...(adminsOnly ? { accessConditions: ADMINS_ONLY_ACCESS } : {}),
+    ...(adminsOnly
+      ? { accessConditions: ADMINS_ONLY_ACCESS }
+      : groupId
+        ? { accessConditions: groupLockedAccess(groupId) }
+        : {}),
   });
   return toStr(result.id);
 };

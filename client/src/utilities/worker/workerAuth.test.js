@@ -7,6 +7,7 @@ import {
   fetchWorkerWithAuth,
   getWorkerAuthHeaders,
   getWorkerSessionToken,
+  hasCachedWorkerSessionToken,
   normalizeWorkerUrl,
   noteWorkerAccessChanged,
 } from './workerAuth.js';
@@ -538,6 +539,20 @@ describe('workerAuth canonical session resolution', () => {
 
     expect(JSON.parse(global.fetch.mock.calls[0][1].body)).not.toHaveProperty('sessionId');
     expect(JSON.parse(global.fetch.mock.calls[1][1].body)).not.toHaveProperty('sessionId');
+  });
+
+  it('says whether a Worker token is already held, without asking anyone to sign', async () => {
+    global.fetch = jest
+      .fn()
+      .mockResolvedValueOnce(jsonResp(200, { nonce: 'nonce-1' }))
+      .mockResolvedValueOnce(jsonResp(200, { token: 'token-1', exp: Math.floor(Date.now() / 1000) + 3600 }));
+    const options = { sessionConfig: { slug: 'debate' }, context: authContext, workerUrl: 'https://worker.example' };
+
+    expect(await hasCachedWorkerSessionToken(options)).toBe(false);
+    expect(global.fetch).not.toHaveBeenCalled();
+    await getWorkerSessionToken(options);
+    expect(await hasCachedWorkerSessionToken(options)).toBe(true);
+    expect(await hasCachedWorkerSessionToken({ ...options, context: {} })).toBe(false);
   });
 
   it('does not inject demo general config into worker lookup for implicit default session in on-chain mode', async () => {

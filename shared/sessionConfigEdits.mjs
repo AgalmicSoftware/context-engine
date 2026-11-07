@@ -39,6 +39,7 @@ export const WORKER_CANONICAL_SET_CONFIG_KEYS = Object.freeze([
   'roles',
   'authorization',
   'groupCreationPolicy',
+  'contextAdditionPolicy',
   'storageProfile',
   'storageEnvelope',
   'ai',
@@ -67,6 +68,8 @@ export const validCuratedIdList = value =>
 
 const CONTENT_FIELDS = new Set([
   'sessionName', 'sessionInfo', 'sessionContext', 'questionsGenPrompt', 'appearance', 'sessionHeaderImg',
+  // Checked again when each file publishes, so changing it signs no one out.
+  'contextAdditionPolicy',
   ...CURATED_ID_LIST_KEYS,
 ]);
 const INTERVIEW_CONTENT_FIELDS = new Set(['openingPrompt', 'steeringPrompt']);

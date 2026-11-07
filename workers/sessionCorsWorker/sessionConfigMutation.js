@@ -47,6 +47,10 @@ const validGroupCreationPolicy = (config) =>
   !hasOwn(config, 'groupCreationPolicy') ||
   config?.groupCreationPolicy === 'admin_only' ||
   config?.groupCreationPolicy === 'participants';
+const validContextAdditionPolicy = (config) =>
+  !hasOwn(config, 'contextAdditionPolicy') ||
+  config?.contextAdditionPolicy === 'admin_only' ||
+  config?.contextAdditionPolicy === 'participants';
 const validAllowOrigins = (config) =>
   !hasOwn(config, 'allowOrigins') ||
   !Array.isArray(config?.allowOrigins) ||
@@ -300,6 +304,9 @@ export const applySessionConfigMutation = ({ existingConfig, mutation, slug } = 
     if (!validGroupCreationPolicy(incomingConfig)) {
       return { ok: false, status: 400, error: 'Invalid group creation policy.' };
     }
+    if (!validContextAdditionPolicy(incomingConfig)) {
+      return { ok: false, status: 400, error: 'Invalid context addition policy.' };
+    }
     if (!validAppearanceConfig(incomingConfig)) {
       return { ok: false, status: 400, error: 'Invalid session appearance config.' };
     }
@@ -388,6 +395,9 @@ export const applySessionConfigMutation = ({ existingConfig, mutation, slug } = 
   }
   if (!validGroupCreationPolicy(mergedConfig)) {
     return { ok: false, status: 400, error: 'Invalid group creation policy.' };
+  }
+  if (!validContextAdditionPolicy(mergedConfig)) {
+    return { ok: false, status: 400, error: 'Invalid context addition policy.' };
   }
   if (!validAppearanceConfig(mergedConfig)) {
     return { ok: false, status: 400, error: 'Invalid session appearance config.' };

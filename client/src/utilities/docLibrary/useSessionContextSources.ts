@@ -1,12 +1,18 @@
 /** @file useSessionContextSources.ts: the context sources a reader may see, and their text for the AI. */
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { participantsMayAddContext } from '@ce-shared/sessionContextSources.mjs';
 import { buildSessionContextPrompt } from '@ce-shared/sessionContextText.mjs';
 import { getUsableSessionWorkerUrl } from '../session/sessionWorkerAvailability';
 import { resolveWorkerCanonicalSessionIdHex } from '../session/sessionWorkerDiscovery';
 import { isConfiguredAdmin } from '../storage/storageClient';
 import { requiresLitForSessionStorage, usesCloudflareSessionStorage } from '../storage/sessionStorageConfig';
-import { listContextSources, loadContextSourcesForAi, type ContextSource } from './contextSources';
+import {
+  listContextSources,
+  loadContextSourcesForAi,
+  workerAcceptsParticipantContext,
+  type ContextSource,
+} from './contextSources';
 
 /** Context sources need Worker storage the Worker can read: not Arweave, not Lit-encrypted. */
 export const supportsContextSources = (sessionConfig: unknown): boolean =>
@@ -71,6 +77,19 @@ export function useSessionContextSources({ sessionSlug, sessionConfig, account =
     };
   }, [active, identity, sessionSlug, account, isAdmin, revision]);
   const reload = useCallback(() => setRevision((value) => value + 1), []);
+  // Only someone signed in can add, so only they make this check.
+  const [workerAccepts, setWorkerAccepts] = useState(false);
+  const mayAdd = active && !!account && participantsMayAddContext(sessionConfig);
+  useEffect(() => {
+    if (!mayAdd) return undefined;
+    let current = true;
+    void workerAcceptsParticipantContext({ sessionSlug, sessionConfig: configRef.current, context: { account } }).then(
+      (accepts) => current && setWorkerAccepts(accepts),
+    );
+    return () => {
+      current = false;
+    };
+  }, [mayAdd, sessionSlug, account]);
   // The render that changes identity runs before the effect clears the old list.
   const { identity: loadedFor, ...loaded } = state;
   const fresh = loadedFor === identity;
@@ -80,6 +99,7 @@ export function useSessionContextSources({ sessionSlug, sessionConfig, account =
     error: fresh ? loaded.error : '',
     supported,
     isAdmin,
+    participantsCanAdd: mayAdd && workerAccepts,
     reload,
   };
 }

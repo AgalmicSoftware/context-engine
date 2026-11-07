@@ -24,6 +24,11 @@ test('additive invite changes preserve all previous invite records without ambig
   assert.equal(revokes(withInvites([{ ...invite, enabled: false }]), withInvites([invite])), true);
 });
 
+test('limiting who adds context signs no one out: each file is checked as it publishes', () => {
+  assert.equal(revokes({}, { contextAdditionPolicy: 'admin_only' }), false);
+  assert.equal(revokes({ contextAdditionPolicy: 'admin_only' }, { contextAdditionPolicy: 'participants' }), false);
+});
+
 test('only prompt text is content within interview settings', () => {
   const before = { interviewMode: { enabled: true, openingPrompt: 'Earlier', steeringPrompt: 'Earlier' } };
   assert.equal(revokes(before, { interviewMode: { ...before.interviewMode, openingPrompt: 'Updated', steeringPrompt: '' } }), false);

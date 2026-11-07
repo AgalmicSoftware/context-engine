@@ -1,3 +1,4 @@
+import { participantsMayAddContext } from '../../shared/sessionContextSources.mjs';
 import { markStorageBackupWrite } from './storageBackupRevision.js';
 import {
   STORAGE_BACKENDS,
@@ -1406,13 +1407,13 @@ const handleArweaveStorageUpload = async ({ request, env, config, slug, uploader
 
 // Called only inside the session config serialization boundary. The external
 // payload write stays outside it; permanent publication uses current authority.
-// Context is an admin's alone, so it publishes only while its uploader is one.
+// Context publishes only while its uploader may still add it.
 export const publishCloudflareOwnedStorageMetadata = async ({ env, config, slug, actor, metadata, createOwner }) => {
   const uploader = normalizeAddress(actor);
   const resource = metadata?.resource;
   const isAdmin = resolveSessionAdminAddresses(config).has(uploader);
   const context = metadata?.contextSource === true && resource === 'docsContext';
-  if (!(context ? isAdmin : isOwnedStorageResource(resource) && isStorageResourceId(metadata?.resourceId)) ||
+  if (!(context ? isAdmin || participantsMayAddContext(config) : isOwnedStorageResource(resource) && isStorageResourceId(metadata?.resourceId)) ||
     !isSafeCloudflareStorageRefId(metadata?.id) || !uploader || metadata.uploader !== uploader ||
     metadata.uploadAuthority !== (isAdmin ? 'admin' : 'author')) {
     throw Object.assign(new Error(SUPERSEDED_AUTHORITY_ERROR), { status: 409 });
@@ -1479,10 +1480,13 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
   const uploader = normalizeAddress(uploaderAddress);
   const owned = isOwnedStorageResource(resource);
   const uploaderIsAdmin = owned && resolveSessionAdminAddresses(config).has(uploader);
+  const contextUploaderIsAdmin = resolveSessionAdminAddresses(config).has(uploader);
   const contextCheck = resource === 'docsContext'
     ? checkContextSourceUpload({
       payload,
-      isAdmin: resolveSessionAdminAddresses(config).has(uploader),
+      config,
+      uploader,
+      isAdmin: contextUploaderIsAdmin,
       litEncrypted: payloadAccess.encryption === PAYLOAD_ENCRYPTION_MODES.LIT,
     })
     : { ok: true, role: '' };
@@ -1618,10 +1622,10 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
       // Authorship and precedence are server-authored; payload fields cannot grant
       // admin correction authority, and later role changes cannot withdraw it.
       ...(owned ? { resourceId, uploadAuthority: uploaderIsAdmin ? 'admin' : 'author', ...(uploader ? { uploader } : {}), ...(hidden ? { hidden: true } : {}) } : {}),
-      // Server-authored: only an admin's upload with a context role is context.
+      // Server-authored: only an upload the policy passed with a context role is context.
       ...(contextCheck.role ? {
         contextSource: true,
-        uploadAuthority: 'admin',
+        uploadAuthority: contextUploaderIsAdmin ? 'admin' : 'author',
         uploader,
         ...(payload.contextOrigin === 'worker' ? { contextOrigin: 'worker' } : {}),
       } : {}),
@@ -2581,8 +2585,8 @@ export const exportCloudflareEncryptedPayloadEnvelopes = async ({
   };
 };
 
-// Context sources: doc-library rows an admin's upload with a context role
-// created (contextSource is server-authored at upload).
+// Context sources: doc-library rows an upload with a context role created
+// (contextSource is server-authored at upload).
 export const listContextSourceRows = async ({ env, slug, budget } = {}) => {
   const index = getStorageIndexBinding(env);
   if (!index || typeof index.list !== 'function' || typeof index.get !== 'function') return [];

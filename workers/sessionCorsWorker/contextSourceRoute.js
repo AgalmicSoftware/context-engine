@@ -229,8 +229,9 @@ const remove = async ({ body, env, slug, deps, json }) => {
 
 const ACTIONS = Object.freeze({ 'add-link': addLink, 'read-pdf': readPdf, remove });
 
-// POST /storage/context { action, ... }: admin-only changes to context
-// sources. Files are added through /storage/upload with a context role.
+// POST /storage/context { action, ... }: admins change context sources, and
+// whoever added a file may remove it. Files are added through /storage/upload
+// with a context role.
 export const contextSourceRoute = async ({
   request, env, config, slug, uploaderAddress, baseHeaders, deps, store,
 } = {}) => {
@@ -238,14 +239,19 @@ export const contextSourceRoute = async ({
     ? deps.json(body, status, baseHeaders)
     : new Response(JSON.stringify(body), { status, headers: baseHeaders }));
   const admin = trim(uploaderAddress).toLowerCase();
-  if (!admin || !resolveSessionAdminAddresses(config).has(admin)) {
-    return json({ error: 'Only session admins can change context.', reason: 'context_admin_required' }, 403);
-  }
+  const refused = () => json({ error: 'Only session admins can change context.', reason: 'context_admin_required' }, 403);
+  if (!admin) return refused();
+  const isAdmin = resolveSessionAdminAddresses(config).has(admin);
   let body = null;
   try { body = await request.json(); } catch { body = null; }
+  if (!isAdmin && (!isObj(body) || trim(body.action) !== 'remove')) return refused();
   if (!isObj(body)) return json({ error: 'Invalid JSON.' }, 400);
   const name = trim(body.action);
   if (!Object.hasOwn(ACTIONS, name)) return json({ error: 'Unknown context action.' }, 400);
+  if (!isAdmin) {
+    const row = await readContextSourceRow({ env, slug, id: body.id });
+    if (row && trim(row.uploader).toLowerCase() !== admin) return refused();
+  }
   const action = ACTIONS[name];
   const now = () => new Date(deps?.now?.() || Date.now()).toISOString();
   return action({ body, env, config, slug, admin, deps, store, json, now });

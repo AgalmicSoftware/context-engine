@@ -401,7 +401,7 @@ export default function OnePageSessionStandardShell({
     sessionConfig: resolvedSessionConfig,
     account: typeof account === 'string' ? account : '',
   });
-  const canEditContext = contextSources.isAdmin && contextSources.supported;
+  const canEditContext = (contextSources.isAdmin && contextSources.supported) || contextSources.participantsCanAdd;
   const showContextSection =
     isDemoSlug || !!sessionContext || showContextAtlas || contextSources.sources.length > 0 || canEditContext;
   const sectionsGridClassName = [styles.sectionsGrid, !showContextSection ? styles.sectionsGridTwoUp : '']

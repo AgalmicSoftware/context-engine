@@ -25867,6 +25867,7 @@ var init_workerSessionPublicConfig = __esm({
       "resultsExposure",
       "workerAuthority",
       "groupCreationPolicy",
+      "contextAdditionPolicy",
       "linkedWorkerGroups",
       "storageProfile",
       "ai",
@@ -25917,6 +25918,7 @@ var init_workerSessionConfig = __esm({
       "responseFieldEncryption",
       "workerAuthority",
       "groupCreationPolicy",
+      "contextAdditionPolicy",
       "linkedWorkerGroups",
       "storageProfile",
       "ai",
@@ -30081,6 +30083,7 @@ var init_sessionConfigEdits = __esm({
       "roles",
       "authorization",
       "groupCreationPolicy",
+      "contextAdditionPolicy",
       "storageProfile",
       "storageEnvelope",
       "ai",
@@ -30111,6 +30114,8 @@ var init_sessionConfigEdits = __esm({
       "questionsGenPrompt",
       "appearance",
       "sessionHeaderImg",
+      // Checked again when each file publishes, so changing it signs no one out.
+      "contextAdditionPolicy",
       ...CURATED_ID_LIST_KEYS
     ]);
     INTERVIEW_CONTENT_FIELDS = /* @__PURE__ */ new Set(["openingPrompt", "steeringPrompt"]);
@@ -30401,7 +30406,7 @@ var init_sessionContext = __esm({
 });
 
 // workers/sessionCorsWorker/sessionConfigMutation.js
-var WORKER_CANONICAL_PUBLICATION_REVISION_KEY, WORKER_GROUPS_BOOTSTRAP_KEY, REGISTRY_CANONICAL_AUTHORITY_MODES, WORKER_CANONICAL_SET_CONFIG_KEY_SET, toTrimmedString6, hasOwn4, validGroupCreationPolicy, validAllowOrigins, validAppearanceConfig, validResultsAnalysisSettingsConfig, validPileAutoAdvanceConfig, validInterviewModeConfig, getWorkerAuthorityMode, workerCanonicalUsesOnChainSbt, workerCanonicalUsesChain, validateWorkerCanonicalIncomingFields, normalizeCanonicalSessionId, resolveCanonicalSessionIdentity, resolveSessionConfigSessionIdHex, resolveCanonicalWorkerSessionIdHex, normalizeConfigRevision, normalizeWorkerUrlIdentity, changesInitializedWorkerCanonicalIdentity, changesInitializedRegistryCanonicalIdentity, resolveWorkerCanonicalPublicationWrite, applySessionConfigMutation;
+var WORKER_CANONICAL_PUBLICATION_REVISION_KEY, WORKER_GROUPS_BOOTSTRAP_KEY, REGISTRY_CANONICAL_AUTHORITY_MODES, WORKER_CANONICAL_SET_CONFIG_KEY_SET, toTrimmedString6, hasOwn4, validGroupCreationPolicy, validContextAdditionPolicy, validAllowOrigins, validAppearanceConfig, validResultsAnalysisSettingsConfig, validPileAutoAdvanceConfig, validInterviewModeConfig, getWorkerAuthorityMode, workerCanonicalUsesOnChainSbt, workerCanonicalUsesChain, validateWorkerCanonicalIncomingFields, normalizeCanonicalSessionId, resolveCanonicalSessionIdentity, resolveSessionConfigSessionIdHex, resolveCanonicalWorkerSessionIdHex, normalizeConfigRevision, normalizeWorkerUrlIdentity, changesInitializedWorkerCanonicalIdentity, changesInitializedRegistryCanonicalIdentity, resolveWorkerCanonicalPublicationWrite, applySessionConfigMutation;
 var init_sessionConfigMutation = __esm({
   "workers/sessionCorsWorker/sessionConfigMutation.js"() {
     init_sessionConfigEdits();
@@ -30424,6 +30429,7 @@ var init_sessionConfigMutation = __esm({
     toTrimmedString6 = (value) => typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
     hasOwn4 = (value, key) => Object.prototype.hasOwnProperty.call(value || {}, key);
     validGroupCreationPolicy = (config) => !hasOwn4(config, "groupCreationPolicy") || config?.groupCreationPolicy === "admin_only" || config?.groupCreationPolicy === "participants";
+    validContextAdditionPolicy = (config) => !hasOwn4(config, "contextAdditionPolicy") || config?.contextAdditionPolicy === "admin_only" || config?.contextAdditionPolicy === "participants";
     validAllowOrigins = (config) => !hasOwn4(config, "allowOrigins") || !Array.isArray(config?.allowOrigins) || config.allowOrigins.every((origin) => typeof origin !== "string" || !origin.includes("*"));
     validAppearanceConfig = (config) => !hasOwn4(config, "appearance") || normalizeWorkerSessionAppearance(config.appearance) !== null;
     validResultsAnalysisSettingsConfig = (config) => {
@@ -30625,6 +30631,9 @@ var init_sessionConfigMutation = __esm({
         if (!validGroupCreationPolicy(incomingConfig)) {
           return { ok: false, status: 400, error: "Invalid group creation policy." };
         }
+        if (!validContextAdditionPolicy(incomingConfig)) {
+          return { ok: false, status: 400, error: "Invalid context addition policy." };
+        }
         if (!validAppearanceConfig(incomingConfig)) {
           return { ok: false, status: 400, error: "Invalid session appearance config." };
         }
@@ -30696,6 +30705,9 @@ var init_sessionConfigMutation = __esm({
       }
       if (!validGroupCreationPolicy(mergedConfig)) {
         return { ok: false, status: 400, error: "Invalid group creation policy." };
+      }
+      if (!validContextAdditionPolicy(mergedConfig)) {
+        return { ok: false, status: 400, error: "Invalid context addition policy." };
       }
       if (!validAppearanceConfig(mergedConfig)) {
         return { ok: false, status: 400, error: "Invalid session appearance config." };
@@ -68355,6 +68367,81 @@ var init_wrappedJournal = __esm({
   }
 });
 
+// shared/sessionContextSources.mjs
+var CONTEXT_ROLE, CONTEXT_TEXT_ROLE, CONTEXT_TAGS, CONTEXT_SOURCE_LIMITS, CONTEXT_FILE_TYPES, CONTEXT_FILE_MIMES, ADMINS_ONLY_ACCESS, text2, isRecord4, participantsMayAddContext, contextTagValue, contextRoleOf, isAdminsOnlyAccess, lockedGroupOf, resolveContextFileType, contextFileByteLimit;
+var init_sessionContextSources = __esm({
+  "shared/sessionContextSources.mjs"() {
+    CONTEXT_ROLE = "context";
+    CONTEXT_TEXT_ROLE = "context-text";
+    CONTEXT_TAGS = Object.freeze({
+      role: "CE-DocRole",
+      kind: "CE-DocKind",
+      name: "CE-DocName",
+      mime: "CE-DocMime",
+      url: "CE-ContextUrl",
+      fetchedAt: "CE-ContextFetchedAt",
+      derivedFrom: "CE-DocDerivedFromTx",
+      readBy: "CE-ReadBy",
+      readModel: "CE-ReadModel",
+      readAt: "CE-ReadAt"
+    });
+    CONTEXT_SOURCE_LIMITS = Object.freeze({
+      pdfBytes: 20 * 1024 * 1024,
+      textFileBytes: 1024 * 1024,
+      // A linked page as fetched, before its text is taken out.
+      pageBytes: 2 * 1024 * 1024,
+      snapshotChars: 1e5,
+      // Text the session's AI returns for a PDF.
+      readTextChars: 1e5,
+      titleChars: 120,
+      // A link is also a storage tag, and tag values stop at 1,024 characters.
+      urlChars: 1e3
+    });
+    CONTEXT_FILE_TYPES = Object.freeze({
+      pdf: "application/pdf",
+      md: "text/markdown",
+      markdown: "text/markdown",
+      txt: "text/plain",
+      csv: "text/csv",
+      json: "application/json"
+    });
+    CONTEXT_FILE_MIMES = new Set(Object.values(CONTEXT_FILE_TYPES));
+    ADMINS_ONLY_ACCESS = Object.freeze({
+      match: "all",
+      conditions: Object.freeze([Object.freeze({ kind: "worker_role", role: "admin" })])
+    });
+    text2 = (value) => typeof value === "string" ? value.trim() : "";
+    isRecord4 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+    participantsMayAddContext = (config) => config?.contextAdditionPolicy !== "admin_only";
+    contextTagValue = (tags, name) => text2((Array.isArray(tags) ? tags : []).find((tag) => isRecord4(tag) && text2(tag.name) === name)?.value);
+    contextRoleOf = (tags) => {
+      const role = contextTagValue(tags, CONTEXT_TAGS.role).toLowerCase();
+      return role === CONTEXT_ROLE || role === CONTEXT_TEXT_ROLE ? role : "";
+    };
+    isAdminsOnlyAccess = (accessConditions) => {
+      if (!isRecord4(accessConditions) || text2(accessConditions.match).toLowerCase() !== "all") return false;
+      const conditions = Array.isArray(accessConditions.conditions) ? accessConditions.conditions : [];
+      return conditions.length === 1 && isRecord4(conditions[0]) && text2(conditions[0].kind).toLowerCase() === "worker_role" && text2(conditions[0].role || "admin").toLowerCase() === "admin" && Object.keys(conditions[0]).every((key) => key === "kind" || key === "role");
+    };
+    lockedGroupOf = (accessConditions) => {
+      if (!isRecord4(accessConditions) || text2(accessConditions.match).toLowerCase() !== "any") return "";
+      const conditions = Array.isArray(accessConditions.conditions) ? accessConditions.conditions : [];
+      const kindOf = (condition) => isRecord4(condition) ? text2(condition.kind).toLowerCase() : "";
+      const role = conditions.find((condition) => kindOf(condition) === "worker_role");
+      const group = conditions.find((condition) => kindOf(condition) === "worker_group");
+      const groupIds = Array.isArray(group?.groupIds) ? group.groupIds : [];
+      return conditions.length === 2 && role && text2(role.role).toLowerCase() === "admin" && groupIds.length === 1 ? text2(groupIds[0]).toLowerCase() : "";
+    };
+    resolveContextFileType = ({ name = "", type = "" } = {}) => {
+      const declared = text2(type).split(";")[0].toLowerCase();
+      if (CONTEXT_FILE_MIMES.has(declared)) return declared;
+      const extension = /\.([a-z0-9]+)$/i.exec(text2(name))?.[1]?.toLowerCase() || "";
+      return Object.hasOwn(CONTEXT_FILE_TYPES, extension) ? CONTEXT_FILE_TYPES[extension] : "";
+    };
+    contextFileByteLimit = (contentType) => contentType === CONTEXT_FILE_TYPES.pdf ? CONTEXT_SOURCE_LIMITS.pdfBytes : CONTEXT_SOURCE_LIMITS.textFileBytes;
+  }
+});
+
 // workers/sessionCorsWorker/storageBackupRevision.js
 var STORAGE_BACKUP_REVISION_KEY, WORKER_GROUP_BACKUP_PENDING_PREFIX, bumpStorageBackupRevision, markStorageBackupWrite;
 var init_storageBackupRevision = __esm({
@@ -69265,88 +69352,24 @@ var init_responseFieldKeyRoute = __esm({
   }
 });
 
-// shared/sessionContextSources.mjs
-var CONTEXT_ROLE, CONTEXT_TEXT_ROLE, CONTEXT_TAGS, CONTEXT_SOURCE_LIMITS, CONTEXT_FILE_TYPES, CONTEXT_FILE_MIMES, ADMINS_ONLY_ACCESS, text2, isRecord4, contextTagValue, contextRoleOf, isAdminsOnlyAccess, resolveContextFileType, contextFileByteLimit;
-var init_sessionContextSources = __esm({
-  "shared/sessionContextSources.mjs"() {
-    CONTEXT_ROLE = "context";
-    CONTEXT_TEXT_ROLE = "context-text";
-    CONTEXT_TAGS = Object.freeze({
-      role: "CE-DocRole",
-      kind: "CE-DocKind",
-      name: "CE-DocName",
-      mime: "CE-DocMime",
-      url: "CE-ContextUrl",
-      fetchedAt: "CE-ContextFetchedAt",
-      derivedFrom: "CE-DocDerivedFromTx",
-      readBy: "CE-ReadBy",
-      readModel: "CE-ReadModel",
-      readAt: "CE-ReadAt"
-    });
-    CONTEXT_SOURCE_LIMITS = Object.freeze({
-      pdfBytes: 20 * 1024 * 1024,
-      textFileBytes: 1024 * 1024,
-      // A linked page as fetched, before its text is taken out.
-      pageBytes: 2 * 1024 * 1024,
-      snapshotChars: 1e5,
-      // Text the session's AI returns for a PDF.
-      readTextChars: 1e5,
-      titleChars: 120,
-      // A link is also a storage tag, and tag values stop at 1,024 characters.
-      urlChars: 1e3
-    });
-    CONTEXT_FILE_TYPES = Object.freeze({
-      pdf: "application/pdf",
-      md: "text/markdown",
-      markdown: "text/markdown",
-      txt: "text/plain",
-      csv: "text/csv",
-      json: "application/json"
-    });
-    CONTEXT_FILE_MIMES = new Set(Object.values(CONTEXT_FILE_TYPES));
-    ADMINS_ONLY_ACCESS = Object.freeze({
-      match: "all",
-      conditions: Object.freeze([Object.freeze({ kind: "worker_role", role: "admin" })])
-    });
-    text2 = (value) => typeof value === "string" ? value.trim() : "";
-    isRecord4 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
-    contextTagValue = (tags, name) => text2((Array.isArray(tags) ? tags : []).find((tag) => isRecord4(tag) && text2(tag.name) === name)?.value);
-    contextRoleOf = (tags) => {
-      const role = contextTagValue(tags, CONTEXT_TAGS.role).toLowerCase();
-      return role === CONTEXT_ROLE || role === CONTEXT_TEXT_ROLE ? role : "";
-    };
-    isAdminsOnlyAccess = (accessConditions) => {
-      if (!isRecord4(accessConditions) || text2(accessConditions.match).toLowerCase() !== "all") return false;
-      const conditions = Array.isArray(accessConditions.conditions) ? accessConditions.conditions : [];
-      return conditions.length === 1 && isRecord4(conditions[0]) && text2(conditions[0].kind).toLowerCase() === "worker_role" && text2(conditions[0].role || "admin").toLowerCase() === "admin" && Object.keys(conditions[0]).every((key) => key === "kind" || key === "role");
-    };
-    resolveContextFileType = ({ name = "", type = "" } = {}) => {
-      const declared = text2(type).split(";")[0].toLowerCase();
-      if (CONTEXT_FILE_MIMES.has(declared)) return declared;
-      const extension = /\.([a-z0-9]+)$/i.exec(text2(name))?.[1]?.toLowerCase() || "";
-      return Object.hasOwn(CONTEXT_FILE_TYPES, extension) ? CONTEXT_FILE_TYPES[extension] : "";
-    };
-    contextFileByteLimit = (contentType) => contentType === CONTEXT_FILE_TYPES.pdf ? CONTEXT_SOURCE_LIMITS.pdfBytes : CONTEXT_SOURCE_LIMITS.textFileBytes;
-  }
-});
-
 // workers/sessionCorsWorker/contextSourcePolicy.js
 var fail3, POLICY_ERROR, MIB, checkContextSourceUpload, contextSourceListFields;
 var init_contextSourcePolicy = __esm({
   "workers/sessionCorsWorker/contextSourcePolicy.js"() {
     init_sessionContextSources();
     fail3 = (status, error, reason) => ({ ok: false, status, error, reason });
-    POLICY_ERROR = "Context is for everyone in the session or for admins only; it takes no other access rule.";
+    POLICY_ERROR = "Context is for everyone in the session, one group or admins only; it takes no other access rule.";
     MIB = 1024 * 1024;
-    checkContextSourceUpload = ({ payload = {}, isAdmin = false, litEncrypted = false } = {}) => {
+    checkContextSourceUpload = ({ payload = {}, config, uploader = "", isAdmin = false, litEncrypted = false } = {}) => {
       const role = contextRoleOf(payload.tags);
       if (!role) return { ok: true, role: "" };
-      if (!isAdmin) return fail3(403, "Only session admins can add context.", "context_admin_required");
+      if (!isAdmin && !participantsMayAddContext(config)) return fail3(403, "Only session admins can add context.", "context_admin_required");
+      if (!isAdmin && !uploader) return fail3(401, "Sign in to add context.", "context_sign_in_required");
       if (payload.payloadEncrypted === true || litEncrypted) {
         return fail3(400, "Context must be readable by the Session Worker, so it cannot be Lit-encrypted.", "context_encryption_unsupported");
       }
       if (payload.uploadPolicy || payload.groupIds?.length) return fail3(400, POLICY_ERROR, "context_policy_unsupported");
-      if (payload.accessConditions && payload.contextOrigin !== "worker" && !isAdminsOnlyAccess(payload.accessConditions)) {
+      if (payload.accessConditions && payload.contextOrigin !== "worker" && !isAdminsOnlyAccess(payload.accessConditions) && !lockedGroupOf(payload.accessConditions)) {
         return fail3(400, POLICY_ERROR, "context_policy_unsupported");
       }
       const kind = contextTagValue(payload.tags, CONTEXT_TAGS.kind);
@@ -69362,7 +69385,12 @@ var init_contextSourcePolicy = __esm({
       }
       return { ok: true, role };
     };
-    contextSourceListFields = (metadata = {}) => metadata?.contextSource === true ? { contextSource: true, adminsOnly: isAdminsOnlyAccess(metadata.accessConditions) } : {};
+    contextSourceListFields = (metadata = {}) => metadata?.contextSource === true ? {
+      contextSource: true,
+      adminsOnly: isAdminsOnlyAccess(metadata.accessConditions),
+      lockedGroupId: lockedGroupOf(metadata.accessConditions),
+      addedBy: metadata.uploader || ""
+    } : {};
   }
 });
 
@@ -70622,18 +70650,23 @@ var init_contextSourceRoute = __esm({
     } = {}) => {
       const json6 = (body2, status = 200) => deps?.json ? deps.json(body2, status, baseHeaders) : new Response(JSON.stringify(body2), { status, headers: baseHeaders });
       const admin = trim12(uploaderAddress).toLowerCase();
-      if (!admin || !resolveSessionAdminAddresses(config).has(admin)) {
-        return json6({ error: "Only session admins can change context.", reason: "context_admin_required" }, 403);
-      }
+      const refused = () => json6({ error: "Only session admins can change context.", reason: "context_admin_required" }, 403);
+      if (!admin) return refused();
+      const isAdmin = resolveSessionAdminAddresses(config).has(admin);
       let body = null;
       try {
         body = await request.json();
       } catch {
         body = null;
       }
+      if (!isAdmin && (!isObj15(body) || trim12(body.action) !== "remove")) return refused();
       if (!isObj15(body)) return json6({ error: "Invalid JSON." }, 400);
       const name = trim12(body.action);
       if (!Object.hasOwn(ACTIONS, name)) return json6({ error: "Unknown context action." }, 400);
+      if (!isAdmin) {
+        const row = await readContextSourceRow({ env, slug, id: body.id });
+        if (row && trim12(row.uploader).toLowerCase() !== admin) return refused();
+      }
       const action = ACTIONS[name];
       const now = () => new Date(deps?.now?.() || Date.now()).toISOString();
       return action({ body, env, config, slug, admin, deps, store, json: json6, now });
@@ -70776,6 +70809,7 @@ var init_storageScanBudget = __esm({
 var encoder7, decoder5, RESOLVE_STORAGE_GATE_RUNTIME_CONFIG, STORAGE_GROUP_MEMBERSHIP_CACHE, STORAGE_RPC_CHAIN_ATTESTATION_CACHE, trim13, isObj16, isJsonContentType, MEDIA_TYPE_RE, INLINE_MEDIA_TYPE_RE, resolveStorageReadContentType, getStorageR2Binding, getStorageIndexBinding, DEFAULT_STORAGE_LIST_PAGE_SIZE, MAX_STORAGE_LIST_PAGE_SIZE, DEFAULT_RESOURCE_GATES, isStorageResource, buildCloudflareStorageId, buildObjectKey, buildIndexKey, buildIndexPrefix, buildSessionIndexPrefix, buildPayloadKey, safeGroupId, normalizeGroupIdList, readKvPayloadEnvelope, normalizeTagsForMetadata, normalizeAccessConditionDocument, invalidUploadPolicy, readUploadGroupIds, readUploadAccessConditions, normalizeUploadPolicy, readUploadPolicyFields, readJsonPayload, readMultipartPayload, readStorageUploadRequestPayload, readConfiguredStorageBackendCandidate, resolveConfiguredStorageBackend, resolvePayloadAccessControl, resolveStorageResourceGateKey, normalizeGateMode2, normalizeDirectGate, readStorageGate, normalizeAddress, listRoleAddresses, resolveRoleAddressSet2, resolveSessionAdminAddresses, listDelimitedAddresses, resolveEnvelopeExportAddressSet, isEnvelopeExportAuthorized, evaluateWorkerRoleCondition, evaluateAgentGrantScopeCondition, evaluateSbtOnchainCondition, checkWorkerGroupMembership, evaluateWorkerGroupCondition, evaluateAccessCondition, resolvePayloadAccessConditions, evaluateAccessConditionDocument, resolveGroupGateIds, authorizeWorkerGroupAccess, resolveBareRoleGateCondition, authorizeWorkerRoleAccess, hasPrivateResponsePolicy, canReadPrivateResponse, authorizeCloudflareStorageAccess, authorizeCloudflareStorageGate, authorizeCloudflareStorageResourceRead, enforceCloudflareUploadPolicy, responseJson, attachStorageGateRuntimeRpc, resolveStorageGateRuntimeConfig, createStorageRouteGateDeps, parseArweaveUploadResponse, handleArweaveStorageUpload, publishCloudflareOwnedStorageMetadata, handleCloudflareUpload, readRequestId, normalizeStorageListLimit, readStorageListOptions, handleCloudflareRead, handleCloudflareList, listCloudflareMetadataRows, readStoredCloudflarePayloadBytes, readStoredPayloadJson, readIndexRowResourceId, readLegacyRowResourceId, scanLegacyStorageOwnerIds, LEGACY_OWNER, resolveLegacyStorageOwner, VISIBILITY_SCAN_PAGE_ROWS, readVisibilityMetadataPages, setCloudflareStorageResourceHidden, resolveEnvelopeExportKeyProvider, resolveEnvelopeExportManifestKeyProvider, exportCloudflareEncryptedPayloadEnvelopes, listContextSourceRows, readContextSourceRow, readContextSourceBytes, removeCloudflareStorageRecords, storageRoute;
 var init_storageRouteExecution = __esm({
   "workers/sessionCorsWorker/storageRouteExecution.js"() {
+    init_sessionContextSources();
     init_storageBackupRevision();
     init_storageRefNormalization();
     init_payloadAccessControl();
@@ -72018,7 +72052,7 @@ var init_storageRouteExecution = __esm({
       const resource = metadata?.resource;
       const isAdmin = resolveSessionAdminAddresses(config).has(uploader);
       const context = metadata?.contextSource === true && resource === "docsContext";
-      if (!(context ? isAdmin : isOwnedStorageResource(resource) && isStorageResourceId(metadata?.resourceId)) || !isSafeCloudflareStorageRefId(metadata?.id) || !uploader || metadata.uploader !== uploader || metadata.uploadAuthority !== (isAdmin ? "admin" : "author")) {
+      if (!(context ? isAdmin || participantsMayAddContext(config) : isOwnedStorageResource(resource) && isStorageResourceId(metadata?.resourceId)) || !isSafeCloudflareStorageRefId(metadata?.id) || !uploader || metadata.uploader !== uploader || metadata.uploadAuthority !== (isAdmin ? "admin" : "author")) {
         throw Object.assign(new Error(SUPERSEDED_AUTHORITY_ERROR), { status: 409 });
       }
       const index = getStorageIndexBinding(env);
@@ -72088,9 +72122,12 @@ var init_storageRouteExecution = __esm({
       const uploader = normalizeAddress(uploaderAddress);
       const owned = isOwnedStorageResource(resource);
       const uploaderIsAdmin = owned && resolveSessionAdminAddresses(config).has(uploader);
+      const contextUploaderIsAdmin = resolveSessionAdminAddresses(config).has(uploader);
       const contextCheck = resource === "docsContext" ? checkContextSourceUpload({
         payload,
-        isAdmin: resolveSessionAdminAddresses(config).has(uploader),
+        config,
+        uploader,
+        isAdmin: contextUploaderIsAdmin,
         litEncrypted: payloadAccess.encryption === PAYLOAD_ENCRYPTION_MODES3.LIT
       }) : { ok: true, role: "" };
       if (!contextCheck.ok) {
@@ -72215,10 +72252,10 @@ var init_storageRouteExecution = __esm({
           // Authorship and precedence are server-authored; payload fields cannot grant
           // admin correction authority, and later role changes cannot withdraw it.
           ...owned ? { resourceId, uploadAuthority: uploaderIsAdmin ? "admin" : "author", ...uploader ? { uploader } : {}, ...hidden ? { hidden: true } : {} } : {},
-          // Server-authored: only an admin's upload with a context role is context.
+          // Server-authored: only an upload the policy passed with a context role is context.
           ...contextCheck.role ? {
             contextSource: true,
-            uploadAuthority: "admin",
+            uploadAuthority: contextUploaderIsAdmin ? "admin" : "author",
             uploader,
             ...payload.contextOrigin === "worker" ? { contextOrigin: "worker" } : {}
           } : {},
@@ -102366,6 +102403,7 @@ var FEATURES = Object.freeze([
   "agent_http_v1",
   "context_sources_v1",
   "envelope_export_identity_v1",
+  "participant_context_v1",
   "recovery_key_export",
   "response_upload_receipts",
   "results_analysis_retry_v1",

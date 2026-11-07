@@ -414,6 +414,29 @@
   margin-top: 0;
 }
 
+.sessionContextItem {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.sessionContextAdder {
+  color: var(--ce-session-chrome-contrast);
+  font-size: 0.75rem;
+}
+
+.sessionContextRemove {
+  border: 1px solid currentColor;
+  border-radius: var(--ce-radius-6);
+  padding: 0 0.45rem;
+  background: transparent;
+  color: var(--ce-session-chrome-contrast);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
 .sessionContextBadge {
   border: 1px solid currentColor;
   border-radius: var(--ce-radius-pill, 999px);
