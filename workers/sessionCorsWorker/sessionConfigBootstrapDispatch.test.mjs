@@ -665,6 +665,8 @@ test('field-key capability requires the deployed KEK and audit binding, not a pe
   for (const [env, version] of [
     [{}, 0], [{ CE_STORAGE_ENVELOPE_KEK: 'test-key' }, 0],
     [{ CE_STORAGE_ENVELOPE_KEK: 'test-key', CE_STORAGE_INDEX_KV: { put: async () => {} } }, 1],
+    [{ CE_STORAGE_ENVELOPE_KEK: 'test-key', GROUP_KV: { put: async () => {} } }, 0],
+    [{ CE_STORAGE_ENVELOPE_KEK: 'test-key', GROUP_KV: { put: async () => {} }, CE_STORAGE_IN_GROUP_KV: '1' }, 1],
   ]) {
     const response = await dispatchSessionConfigBootstrapRequest({
       request: new Request('https://worker.example/session-config?slug=session-a'), env,

@@ -1378,6 +1378,150 @@ test('storageRoute accepts deploy-helper KV alias bindings for Cloudflare payloa
 	assert.deepEqual(JSON.parse(await readResponse.text()), { id: 'q-fixture', type: 'binary', prompt: 'Aliased KV storage works', ok: true });
 });
 
+test('storageRoute keeps Cloudflare payloads in GROUP_KV when the Worker opts in', async () => {
+	const kv = createMockKv();
+	const env = { GROUP_KV: kv, CE_STORAGE_IN_GROUP_KV: '1' };
+	const question = { id: 'q-fixture', type: 'binary', prompt: 'GROUP_KV storage works', ok: true };
+	const uploadResponse = await storageRoute({
+		path: '/storage/upload',
+		method: 'POST',
+		request: new Request('https://worker.example/storage/upload', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ data: question, contentType: 'application/json', resource: 'questions' }),
+		}),
+		env,
+		config: CLOUDFLARE_WORKER_GATE_CONFIG,
+		slug: 'session-a',
+		uploaderAddress: '0xabc',
+		baseHeaders: {},
+		deps: { json, randomBytes: fixedRandomBytes },
+	});
+
+	assert.equal(uploadResponse.status, 200);
+	const { storageRef } = await readJson(uploadResponse);
+	assert.equal(kv.store.has(`ce-storage-payload:session-a:${storageRef.id}`), true);
+
+	const readResponse = await storageRoute({
+		path: '/storage/read',
+		method: 'GET',
+		request: new Request(`https://worker.example/storage/read?id=${storageRef.id}`),
+		env,
+		config: CLOUDFLARE_WORKER_GATE_CONFIG,
+		slug: 'session-a',
+		uploaderAddress: '0xabc',
+		baseHeaders: {},
+		deps: { json },
+	});
+
+	assert.equal(readResponse.status, 200);
+	assert.deepEqual(JSON.parse(await readResponse.text()), question);
+});
+
+const uploadToCloudflareStorage = (env) => storageRoute({
+	path: '/storage/upload',
+	method: 'POST',
+	request: new Request('https://worker.example/storage/upload', {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ data: 'a stored payload', resource: 'docsContext' }),
+	}),
+	env,
+	config: CLOUDFLARE_WORKER_GATE_CONFIG,
+	slug: 'session-a',
+	uploaderAddress: '0xabc',
+	baseHeaders: {},
+	deps: { json, randomBytes: fixedRandomBytes },
+});
+
+test('storageRoute leaves GROUP_KV alone unless the Worker opts in', async () => {
+	for (const optIn of [{}, { CE_STORAGE_IN_GROUP_KV: '0' }]) {
+		const kv = createMockKv();
+		const response = await uploadToCloudflareStorage({ GROUP_KV: kv, ...optIn });
+
+		assert.equal(response.status, 501);
+		assert.equal(kv.store.size, 0);
+	}
+});
+
+test('a bound storage index keeps payloads out of GROUP_KV even when the Worker opts in', async () => {
+	const groupKv = createMockKv();
+	const index = createMockKv();
+	const response = await uploadToCloudflareStorage({ GROUP_KV: groupKv, CE_STORAGE_INDEX_KV: index, CE_STORAGE_IN_GROUP_KV: '1' });
+
+	assert.equal(response.status, 200);
+	assert.equal(groupKv.store.size, 0);
+	assert.equal([...index.store.keys()].some((key) => key.startsWith('ce-storage-payload:session-a:')), true);
+});
+
+test('storage routes refuse sessions that do not use Cloudflare storage, even when the Worker opts in', async () => {
+	for (const config of [{}, { storageProfile: { backend: 'arweave' } }]) {
+		const kv = createMockKv();
+		const env = { GROUP_KV: kv, CE_STORAGE_IN_GROUP_KV: '1' };
+		for (const [path, method, body] of [
+			['/storage/upload', 'POST', { data: 'not this session', backend: 'cloudflare', resource: 'docsContext' }],
+			['/storage/read', 'GET'],
+			['/storage/list', 'GET'],
+			['/storage/context', 'POST', {}],
+			['/storage/export-envelopes', 'GET'],
+		]) {
+			const response = await storageRoute({
+				path,
+				method,
+				request: new Request(`https://worker.example${path}`, {
+					method,
+					...(body ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {}),
+				}),
+				env,
+				config,
+				slug: 'session-a',
+				uploaderAddress: '0xabc',
+				baseHeaders: {},
+				deps: { json, randomBytes: fixedRandomBytes },
+			});
+			assert.equal(response.status, 400, path);
+			assert.match((await readJson(response)).error, /only available for Cloudflare storage/, path);
+		}
+		assert.equal(kv.store.size, 0);
+	}
+});
+
+test('hiding needs a session configured for Cloudflare storage', async () => {
+	const hide = (config, kv) => setCloudflareStorageResourceHidden({
+		env: { GROUP_KV: kv, CE_STORAGE_IN_GROUP_KV: '1' },
+		config,
+		slug: 'session-a',
+		body: { resource: 'questions', id: `0x${'1'.repeat(64)}`, hidden: true },
+		actor: '0xabc',
+	});
+	for (const config of [{}, { storageProfile: { backend: 'arweave' } }, { storageProfile: { backend: 'lit-arweave' } }]) {
+		const kv = createMockKv();
+		const refused = await hide(config, kv);
+		assert.equal(refused.status, 400);
+		assert.match(refused.error, /only available for Cloudflare storage/);
+		assert.equal(kv.store.size, 0);
+	}
+	for (const config of [CLOUDFLARE_WORKER_GATE_CONFIG, { docLibrary: { provider: 'cloudflare' } }]) {
+		assert.equal((await hide(config, createMockKv())).status, 200);
+	}
+});
+
+test('envelope audits land in GROUP_KV only when the Worker opts in', async () => {
+	const kv = createMockKv();
+	const audit = (env) => writeStorageEnvelopeKeyReleaseAudit({
+		env,
+		slug: 'session-a',
+		payloadId: 'payload-group-kv',
+		principal: '0x00000000000000000000000000000000000000aa',
+		conditionMatched: 'public',
+	});
+
+	await assert.rejects(audit({ GROUP_KV: kv }), /Storage envelope audit store is not configured/);
+	assert.equal(kv.store.size, 0);
+	assert.equal((await audit({ GROUP_KV: kv, CE_STORAGE_IN_GROUP_KV: '1' })).ok, true);
+	assert.equal([...kv.store.keys()].some((key) => key.startsWith('ce-storage-audit:session-a:')), true);
+});
+
 test('storageRoute uses Web Crypto getRandomValues for Cloudflare storage refs when randomBytes is absent', async () => {
 	const kv = createMockKv();
 	const env = { CE_STORAGE_INDEX_KV: kv };

@@ -32,8 +32,9 @@
     "DEFAULT_SESSION_SLUG": "replace-with-session-slug",
     "BOOTSTRAP_ADMIN_ADDRESS": "replace-with-context-engine-admin-address",
     "CE_WORKER_GROUPS_BOOTSTRAP": "fresh-template-v2",
+    "CE_STORAGE_IN_GROUP_KV": "1",
     "DEPLOY_HELPER_ENABLED": "0",
     "WORKER_DEBUG_LOGS": "0",
-    "CE_BUNDLE_SHA256": "25dd4bf33db351c806199e8ff9e1e201c0dc8f13df13dbebabf9ac647a5d7653"
+    "CE_BUNDLE_SHA256": "7f35fa96ebc67868f132797bc9ba56c34de29bbd8f5c8445e7080f7b3a119cd5"
   }
 }

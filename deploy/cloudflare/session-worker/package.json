@@ -9,6 +9,9 @@
       "GROUP_KV": {
         "description": "A new KV namespace owned by your Cloudflare account. It stores this session's canonical config, encrypted secret envelope, questions, responses, groups, and indexes."
       },
+      "CE_STORAGE_IN_GROUP_KV": {
+        "description": "Keep this set to 1. It stores this session's questions and answers in GROUP_KV."
+      },
       "DEFAULT_SESSION_SLUG": {
         "description": "The exact Context Engine session slug, for example `my-session`. It must match the slug used in Context Engine."
       },

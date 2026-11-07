@@ -21,6 +21,7 @@ const ACTOR_A = `0x${'aa'.repeat(20)}`;
 const ACTOR_B = `0x${'bb'.repeat(20)}`;
 const KEY = `0x${'11'.repeat(32)}`;
 const json = (body, status, headers) => ({ body, status, headers });
+const CLOUDFLARE_STORAGE_CONFIG = { slug: 'fixture', adminAddress: ACTOR_A, storageProfile: { backend: 'cloudflare', payloadAccessControl: { gate: 'none', encryption: 'none' } } };
 const createFixture = (config = { slug: 'fixture', adminAddress: ACTOR_A }) => {
   const kv = new Map(config ? [['session:fixture:config', JSON.stringify(config)]] : []);
   const durable = new Map();
@@ -217,7 +218,7 @@ test('publication with current authority records server stamps and rejects missi
 });
 
 test('current config reads finish while an existing visibility scan is waiting on storage', async () => {
-  const f = createFixture();
+  const f = createFixture(CLOUDFLARE_STORAGE_CONFIG);
   const expectedAuthority = await f.authorized();
   let reached;
   let resume;
@@ -285,7 +286,7 @@ const visibilityIndex = (count = 121) => {
 };
 
 test('visibility pages recheck authority after scan reads and stop writes after a completed rotation', async () => {
-  const f = createFixture();
+  const f = createFixture(CLOUDFLARE_STORAGE_CONFIG);
   const v = visibilityIndex();
   f.env.CE_STORAGE_INDEX_KV = v.index;
   const expectedAuthority = await f.authorized();
@@ -318,7 +319,7 @@ test('visibility pages recheck authority after scan reads and stop writes after 
 });
 
 test('concurrent same-id hide and unhide complete in order across bounded pages', async () => {
-  const f = createFixture();
+  const f = createFixture(CLOUDFLARE_STORAGE_CONFIG);
   const v = visibilityIndex();
   f.env.CE_STORAGE_INDEX_KV = v.index;
   const expectedAuthority = await f.authorized();
@@ -333,7 +334,7 @@ test('concurrent same-id hide and unhide complete in order across bounded pages'
 });
 
 test('visibility write failure within a page is an explicit failure and can be completed on retry', async () => {
-  const f = createFixture();
+  const f = createFixture(CLOUDFLARE_STORAGE_CONFIG);
   const v = visibilityIndex();
   f.env.CE_STORAGE_INDEX_KV = v.index;
   const expectedAuthority = await f.authorized();

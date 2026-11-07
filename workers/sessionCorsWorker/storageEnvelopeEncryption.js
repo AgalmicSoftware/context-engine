@@ -1,4 +1,5 @@
 import { getOrCreateCoordinatedStorageEnvelopeSessionKey } from './sessionWriteCoordinator.js';
+import { getStorageAuditBinding } from './storageKvBindings.js';
 import { toStr } from './stringCoercion.js';
 
 const textEncoder = new TextEncoder();
@@ -336,8 +337,6 @@ export const decryptPayloadWithStorageEnvelope = async ({
   });
 };
 
-const resolveAuditKv = (env = {}) => env.CE_STORAGE_AUDIT_KV || env.CE_STORAGE_INDEX_KV || env.STORAGE_INDEX_KV || env.STORAGE_KV || null;
-
 const auditSuffix = (deps = {}) => {
   if (typeof deps.randomUUID === 'function') return trim(deps.randomUUID());
   try {
@@ -365,7 +364,7 @@ export const writeStorageEnvelopeKeyReleaseAudit = async ({
     conditionMatched: isObj(conditionMatched) ? cloneJson(conditionMatched) : conditionMatched || 'gate_fallback',
     timestamp,
   };
-  const kv = resolveAuditKv(env);
+  const kv = getStorageAuditBinding(env);
   if (!kv || typeof kv.put !== 'function') {
     throw new Error('Storage envelope audit store is not configured.');
   }
@@ -396,7 +395,7 @@ export const writeStorageVisibilityAudit = async ({
     principal: trim(principal).toLowerCase(),
     timestamp,
   };
-  const kv = resolveAuditKv(env);
+  const kv = getStorageAuditBinding(env);
   if (!kv || typeof kv.put !== 'function') {
     throw new Error('Storage audit store is not configured.');
   }

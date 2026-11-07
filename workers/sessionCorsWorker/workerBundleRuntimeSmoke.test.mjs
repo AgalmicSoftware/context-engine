@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 import { Wallet } from 'ethers';
@@ -220,27 +221,28 @@ Resources:
 	return payload.token;
 };
 
+const buildCentralizedConfig = (adminAddress) => ({
+	slug: SESSION_SLUG,
+	sessionId: SESSION_ID,
+	configRevision: 'bundle-runtime-v1',
+	sessionName: 'Bundle runtime fixture',
+	adminAddress,
+	allowOrigins: [ORIGIN],
+	sessionModeProfile: centralizedProfile,
+	storageProfile: centralizedStorageProfile,
+	workerAuthority: {
+		version: 1,
+		participantScopes: ['storage'],
+		anonymousScopes: [],
+	},
+});
+
 test('generated Worker bundle runs the centralized preset auth and encrypted storage path', async () => {
 	const admin = Wallet.createRandom();
 	const participant = Wallet.createRandom();
 	const storageKv = createMemoryKv();
-	const config = {
-		slug: SESSION_SLUG,
-		sessionId: SESSION_ID,
-		configRevision: 'bundle-runtime-v1',
-		sessionName: 'Bundle runtime fixture',
-		adminAddress: admin.address,
-		allowOrigins: [ORIGIN],
-		sessionModeProfile: centralizedProfile,
-		storageProfile: centralizedStorageProfile,
-		workerAuthority: {
-			version: 1,
-			participantScopes: ['storage'],
-			anonymousScopes: [],
-		},
-	};
 	const groupKv = createMemoryKv({
-		[`session:${SESSION_SLUG}:config`]: JSON.stringify(config),
+		[`session:${SESSION_SLUG}:config`]: JSON.stringify(buildCentralizedConfig(admin.address)),
 	});
 	const env = installCoordinatorBinding({
 		GROUP_KV: groupKv,
@@ -340,4 +342,50 @@ test('generated Worker bundle runs the centralized preset auth and encrypted sto
 	assert.match(persistedStorage, /payloadBase64url/);
 	assert.match(persistedStorage, /AES-256-GCM/);
 	assert.doesNotMatch(persistedStorage, new RegExp(marker));
+});
+
+test('the deploy package stores encrypted answers with only the bindings it declares', async () => {
+	const { kv_namespaces: kvNamespaces, vars } = JSON.parse(
+		readFileSync(new URL('../../deploy/cloudflare/session-worker/wrangler.jsonc', import.meta.url), 'utf8'),
+	);
+	const admin = Wallet.createRandom();
+	const participant = Wallet.createRandom();
+	const env = installCoordinatorBinding({
+		...vars,
+		...Object.fromEntries(kvNamespaces.map(({ binding }) => [binding, createMemoryKv()])),
+		DEFAULT_SESSION_SLUG: SESSION_SLUG,
+		BOOTSTRAP_ADMIN_ADDRESS: admin.address,
+		TOKEN_HMAC_SECRET: 'bundle-runtime-token-hmac-fixture-v1',
+		CE_STORAGE_ENVELOPE_KEK: 'bundle-runtime-envelope-kek-fixture-v1',
+	});
+	await env.GROUP_KV.put(`session:${SESSION_SLUG}:config`, JSON.stringify(buildCentralizedConfig(admin.address)));
+
+	const capabilities = await (await fetchWorker(makeRequest(`/capabilities?slug=${SESSION_SLUG}`), env)).json();
+	assert.equal(capabilities.session.readiness.storage, 'ok');
+	assert.deepEqual(capabilities.session.unavailable, []);
+
+	const token = await login({ env, wallet: participant });
+	const answer = { questionID: 'template-binding-question', answer: 'template binding marker' };
+	const uploadResponse = await fetchWorker(
+		makeRequest('/storage/upload', {
+			method: 'POST',
+			token,
+			body: { data: answer, contentType: 'application/json', resource: 'responses' },
+		}),
+		env,
+	);
+	const uploaded = await uploadResponse.json();
+	assert.equal(uploadResponse.status, 200, JSON.stringify(uploaded));
+
+	const readResponse = await fetchWorker(
+		makeRequest(`/storage/read?id=${encodeURIComponent(uploaded.storageRef.id)}&resource=responses`, { token }),
+		env,
+	);
+	assert.equal(readResponse.status, 200, await readResponse.clone().text());
+	assert.deepEqual(await readResponse.json(), answer);
+
+	const persistedKeys = [...env.GROUP_KV.dump().keys()];
+	assert.ok(persistedKeys.some((key) => key.startsWith('ce-storage-payload:')));
+	assert.ok(persistedKeys.some((key) => key.startsWith('ce-storage-audit:')));
+	assert.doesNotMatch(JSON.stringify([...env.GROUP_KV.dump()]), /template binding marker/);
 });

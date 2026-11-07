@@ -66,6 +66,7 @@ import {
 import { checkCoordinatedLegacyStorageOwner, coordinateResponseUploadReceipt } from './sessionWriteCoordinator.js';
 import { executeCoordinatedStoragePublication, SUPERSEDED_AUTHORITY_ERROR } from './sessionConfigAuthority.js';
 import { sessionSlugStorageKey } from './sessionSlugResolution.js';
+import { getStorageIndexBinding } from './storageKvBindings.js';
 import { responseFieldKeyRoute } from './responseFieldKeyRoute.js';
 import { checkContextSourceUpload, contextSourceListFields } from './contextSourcePolicy.js';
 import { contextSourceRoute } from './contextSourceRoute.js';
@@ -104,7 +105,7 @@ const resolveStorageReadContentType = (storedContentType) => {
 };
 
 export const getStorageR2Binding = (env = {}) => env.CE_STORAGE_R2 || env.STORAGE_R2 || env.R2_BUCKET || null;
-export const getStorageIndexBinding = (env = {}) => env.CE_STORAGE_INDEX_KV || env.STORAGE_INDEX_KV || env.STORAGE_KV || null;
+export { getStorageIndexBinding };
 const DEFAULT_STORAGE_LIST_PAGE_SIZE = 100;
 const MAX_STORAGE_LIST_PAGE_SIZE = 100;
 const DEFAULT_RESOURCE_GATES = Object.freeze({
@@ -2339,6 +2340,9 @@ export const setCloudflareStorageResourceHidden = async ({ env, config, slug, bo
   }
   if (!isStorageResourceId(resourceId)) return { ok: false, status: 400, error: `Invalid ${resource} id.` };
   if (typeof body?.hidden !== 'boolean') return { ok: false, status: 400, error: 'hidden must be true or false.' };
+  if (resolveConfiguredStorageBackend({ config }) !== STORAGE_BACKENDS.CLOUDFLARE) {
+    return { ok: false, status: 400, error: 'Hiding is only available for Cloudflare storage.' };
+  }
   const index = getStorageIndexBinding(env);
   if (!index || ['get', 'put', 'list', 'delete'].some((method) => typeof index[method] !== 'function')) {
     return { ok: false, status: 501, error: 'Cloudflare storage index binding not configured.' };
@@ -2674,6 +2678,10 @@ export const storageRoute = async ({ path, method, request, env, config, slug, u
     });
     if (isArweaveStorageBackend(backend)) {
       return handleArweaveStorageUpload({ request, env, config, slug, uploaderAddress, backend, payload, baseHeaders, deps });
+    }
+    // A request can't move a session onto Cloudflare storage: reads below refuse it.
+    if (resolveConfiguredStorageBackend({ config }) !== STORAGE_BACKENDS.CLOUDFLARE) {
+      return responseJson(deps, { error: 'Storage route upload is only available for Cloudflare storage.' }, 400, baseHeaders);
     }
     const routeDeps = createStorageRouteGateDeps({ config, env, slug, deps });
     return handleCloudflareUpload({

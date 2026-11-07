@@ -37,9 +37,10 @@ const kv = () => {
     }),
   };
 };
+// This run takes the dashboard path, so bind only the KV namespace its template declares.
 const env = installSessionCoordinatorBinding({
   GROUP_KV: kv(),
-  CE_STORAGE_INDEX_KV: kv(),
+  CE_STORAGE_IN_GROUP_KV: '1',
   BOOTSTRAP_ADMIN_ADDRESS: admin.address,
   LOGIN_TRUSTED_ORIGINS: baseUrl,
   ADMIN_TRUSTED_ORIGINS: baseUrl,
@@ -308,10 +309,12 @@ try {
     assert.equal(response.status, 200, await response.clone().text());
     return response.json();
   };
-  const beforeStatements = new Map(env.GROUP_KV.values);
+  // Reading an encrypted question records its key release, which isn't a statement.
+  const statementRows = () => new Map([...env.GROUP_KV.values].filter(([key]) => !key.startsWith('ce-storage-audit:')));
+  const beforeStatements = statementRows();
   const wrapped = await wrappedRequest('/api/agent/agent-only/statements');
   assert.equal(Object.hasOwn(wrapped, 'window_id'), false);
-  assert.deepEqual(env.GROUP_KV.values, beforeStatements, 'Wrapped reads must not write shared statements');
+  assert.deepEqual(statementRows(), beforeStatements, 'Wrapped reads must not write shared statements');
   const statement = wrapped.statements.find(row => row.statement_id === question.id);
   assert.equal(statement.text, question.record.prompt);
   const answersBeforeWrapped = await adminClient.listAll('responses', { mine: true });
@@ -404,7 +407,7 @@ try {
   });
   assert.equal(anonymous.status, 403, 'Anonymous access to the private response is denied');
   assert.equal(
-    [...env.CE_STORAGE_INDEX_KV.values.values()].some((value) => String(value).includes(question.record.prompt)),
+    [...env.GROUP_KV.values].some(([key, value]) => key.startsWith('ce-storage') && String(value).includes(question.record.prompt)),
     false,
     'The stored encrypted payloads do not contain the question plaintext',
   );
@@ -608,7 +611,7 @@ try {
   await page.getByRole('alert').filter({ hasText: 'Restore requires an empty target session' }).waitFor();
   const sourceAdminPage = page;
   const restoreEnv = installSessionCoordinatorBinding({
-    GROUP_KV: kv(), CE_STORAGE_INDEX_KV: kv(), DEFAULT_SESSION_SLUG: slug,
+    GROUP_KV: kv(), CE_STORAGE_IN_GROUP_KV: '1', DEFAULT_SESSION_SLUG: slug,
     BOOTSTRAP_ADMIN_ADDRESS: admin.address, LOGIN_TRUSTED_ORIGINS: baseUrl, ADMIN_TRUSTED_ORIGINS: baseUrl,
     TOKEN_HMAC_SECRET: 'synthetic-fresh-restore-token-key', CE_STORAGE_ENVELOPE_KEK: env.CE_STORAGE_ENVELOPE_KEK,
   });
@@ -622,8 +625,8 @@ try {
   await page.getByLabel('Adopt the backup session ID on a fresh deployment').check();
   await page.getByTestId('ce-admin-backup-restore').click();
   await page.getByRole('status').filter({ hasText: 'Restore complete.' }).waitFor({ timeout: 120000 });
-  assert.deepEqual([...restoreEnv.CE_STORAGE_INDEX_KV.values].filter(([key]) => key.startsWith(`ce-storage:${slug}:`)).sort(),
-    [...env.CE_STORAGE_INDEX_KV.values].filter(([key]) => key.startsWith(`ce-storage:${slug}:`)).sort(), 'Fresh restore preserves every metadata record');
+  assert.deepEqual([...restoreEnv.GROUP_KV.values].filter(([key]) => key.startsWith(`ce-storage:${slug}:`)).sort(),
+    [...env.GROUP_KV.values].filter(([key]) => key.startsWith(`ce-storage:${slug}:`)).sort(), 'Fresh restore preserves every metadata record');
   assert.equal([...restoreEnv.GROUP_KV.values.keys()].some(key => key.startsWith(`ce-agent:${adminClient.sessionId}:`)), false);
   const restoredAgentCaps = await (await worker.fetch(new Request(`${workerOrigin}/capabilities?slug=${slug}`), restoreEnv)).json();
   assert.equal(restoredAgentCaps.agentHttp.ready, false, 'Restored session needs fresh agent resources and credentials');

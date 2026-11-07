@@ -950,6 +950,8 @@ Minimal setup:
    [vars]
    DEFAULT_SESSION_SLUG = ""
    BOOTSTRAP_ADMIN_ADDRESS = "<public-admin-address-from-wizard>"
+   CE_WORKER_GROUPS_BOOTSTRAP = "fresh-template-v2"
+   CE_STORAGE_IN_GROUP_KV = "1"
    DEPLOY_HELPER_ENABLED = "false"
    ```
 
@@ -969,7 +971,11 @@ Minimal setup:
 
 Operational notes:
 
-- `GROUP_KV` is required
+- `GROUP_KV` is required. `CE_STORAGE_IN_GROUP_KV=1` keeps Cloudflare payloads in
+  it; without that, bind `CE_STORAGE_INDEX_KV`
+- Keep `CE_WORKER_GROUPS_BOOTSTRAP=fresh-template-v2` only when `GROUP_KV` is a
+  new namespace, and remove it before attaching existing Group data. Without it
+  or a deploy-helper proof, Group writes return 503
 - `CE_SESSION_COORDINATOR` and the `ce-session-write-coordinator-v1` SQLite
   migration are required; signed config writes fail closed without them
 - `TOKEN_HMAC_SECRET` and `CE_STORAGE_ENVELOPE_KEK` are separate required
@@ -1006,7 +1012,7 @@ Dashboard checklist:
 2. Paste or upload the bundled worker source
 3. Enable `nodejs_compat` and `global_fetch_strictly_public` compatibility flags
 4. Add the `GROUP_KV` binding and the `CE_SESSION_COORDINATOR` Durable Object binding with its `ce-session-write-coordinator-v1` SQLite migration
-5. Add `BOOTSTRAP_ADMIN_ADDRESS` and the secrets `TOKEN_HMAC_SECRET` and `CE_STORAGE_ENVELOPE_KEK`
+5. Add `BOOTSTRAP_ADMIN_ADDRESS`, `CE_STORAGE_IN_GROUP_KV=1`, `CE_WORKER_GROUPS_BOOTSTRAP=fresh-template-v2` for a new namespace, and the secrets `TOKEN_HMAC_SECRET` and `CE_STORAGE_ENVELOPE_KEK`
 6. Deploy the worker
 7. Copy the worker base URL into the wizard or `/admin`
 
