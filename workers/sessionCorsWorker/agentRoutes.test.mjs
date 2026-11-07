@@ -4,6 +4,7 @@ import { fixture, wallet, origin, sessionId } from './agentTestFixture.mjs';
 import { signToken } from './tokenSigning.js';
 import { persistAuthTokenRecord } from './authTokenClaims.js';
 import { buildAdminActionBodyHash, buildAdminActionTypedData } from './adminTypedData.mjs';
+import { loadAgentLightweightGroups, saveAgentLightweightGroupMembership } from './agent/agentGroups.mjs';
 
 async function jsonOk(response, status = 200) {
   assert.equal(response.status, status, await response.clone().text());
@@ -76,6 +77,15 @@ test('group membership saved for an agent reports the agent principal as its sou
     body: { answers: { demographic_link_opt_in: true }, groupSelections: { age_bucket: '25_34' } } }));
   assert.equal(saved.groups.membershipSource, 'agent_principal');
   assert.equal((await groups()).membershipSource, 'agent_principal');
+});
+
+test('group membership kept only under an account reports the managed wallet as its source', async () => {
+  const account = { env: { AGENT_ACTION_KV: fixture().env.GROUP_KV }, session: { sessionSlug: 'fixture' }, accountAddress: wallet.address };
+  const saved = await saveAgentLightweightGroupMembership({ ...account, selections: { age_bucket: '25_34' } });
+  assert.equal(saved.groups.membershipSource, 'managed_wallet');
+  const loaded = await loadAgentLightweightGroups(account);
+  assert.equal(loaded.membershipSource, 'managed_wallet');
+  assert.deepEqual(loaded.selections, saved.groups.selections);
 });
 
 test('overlapping next-question calls serve different questions, and a repeated requestId replays', async () => {

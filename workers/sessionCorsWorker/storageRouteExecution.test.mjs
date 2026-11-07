@@ -4423,8 +4423,13 @@ test('storageRoute /storage/export-envelopes takes an admin or a listed address,
 		assert.equal((await exportAs({ storage: true, [claim]: true })).status, 403, claim);
 	}
 	assert.equal((await exportAs({ admin: true })).status, 200);
-	const listed = { ...config, export: { allowedAddresses: [outsider] } };
-	assert.equal((await exportAs({ storage: true }, listed)).status, 200);
+	for (const list of [
+		{ responseExportAllowedAddresses: outsider },
+		{ export: { allowedAddresses: [outsider] } },
+		{ export: { adminAddresses: [outsider] } },
+	]) {
+		assert.equal((await exportAs({ storage: true }, { ...config, ...list })).status, 200, JSON.stringify(list));
+	}
 });
 
 test('exportCloudflareEncryptedPayloadEnvelopes counts encrypted rows when payload bytes are missing', async () => {
