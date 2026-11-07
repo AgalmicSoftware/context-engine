@@ -140,6 +140,17 @@ describe('scanning someone’s code', () => {
     expect(onClaim).not.toHaveBeenCalled();
   });
 
+  it('releases a camera that opened but wouldn’t play', async () => {
+    const { stopTrack } = startCamera();
+    Object.defineProperty(HTMLMediaElement.prototype, 'play', {
+      configurable: true,
+      value: jest.fn(async () => Promise.reject(new Error('no'))),
+    });
+    render(<SessionTranscriptClaimScanner sessionSlug="salon" onClaim={jest.fn()} onCancel={jest.fn()} />);
+    expect(await screen.findByRole('alert')).toHaveTextContent('The camera could not start');
+    expect(stopTrack).toHaveBeenCalled();
+  });
+
   it('says what to do when the camera is refused, and stops it when cancelled', async () => {
     const { getUserMedia, stopTrack } = startCamera();
     getUserMedia.mockRejectedValueOnce(Object.assign(new Error('denied'), { name: 'NotAllowedError' }));

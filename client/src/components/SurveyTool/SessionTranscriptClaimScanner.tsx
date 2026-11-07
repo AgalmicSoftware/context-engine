@@ -112,6 +112,8 @@ export default function SessionTranscriptClaimScanner({ sessionSlug, firstFrame 
       await scan();
     })().catch((failure: unknown) => {
       if (stopped) return;
+      // A camera that opened but wouldn't play isn't left on behind the message.
+      stop();
       const name = failure instanceof Error ? failure.name : '';
       setProblem(
         name === 'NotAllowedError'
