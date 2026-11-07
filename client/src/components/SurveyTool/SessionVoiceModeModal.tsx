@@ -66,11 +66,6 @@ export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps)
   const [discardedClaim, setDiscardedClaim] = useState<TranscriptClaim | null>(null);
   const claim = props.claim === discardedClaim ? null : props.claim;
   const [scanRequested, setScanRequested] = useState(false);
-  const scanning = scanRequested || !!props.claimFrame;
-  const stopScanning = () => {
-    setScanRequested(false);
-    props.onClaimFrameDone?.();
-  };
   // Closing retains this review, but importing different evidence starts a new
   // review. Equivalent packet objects must not erase the participant's edits.
   const prefillIdentity = useMemo(() => JSON.stringify(prefillPacket || null), [prefillPacket]);
@@ -81,6 +76,12 @@ export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps)
   const groupCloseRef = useRef<(() => Promise<void>) | null>(null);
   // A tap outside or Escape must not end a recording; the header close button still stops and saves it.
   const [groupCapturing, setGroupCapturing] = useState(false);
+  // A code opened in a tab that's recording waits for Stop, so it can't end the recording.
+  const scanning = (scanRequested || !!props.claimFrame) && !groupCapturing;
+  const stopScanning = () => {
+    setScanRequested(false);
+    props.onClaimFrameDone?.();
+  };
   const requestClose = () => {
     if (mode === 'recordGroup' && groupCloseRef.current) void groupCloseRef.current();
     else onClose();

@@ -2,6 +2,7 @@ import {
   readOnePageSessionReportIntent,
   resolveOnePageSessionAggregatorCacheScope,
   resolveOnePageSessionRouteUiState,
+  removeOnePageSessionInterviewIntent,
 } from './onePageSessionRouteRuntime';
 import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../../utilities/session/sessionModeProfile';
 
@@ -140,5 +141,15 @@ describe('onePageSessionRouteRuntime', () => {
       showQuestions: true,
       autoOpenResults: true,
     });
+  });
+});
+
+describe('the address a section toggle restores', () => {
+  it('holds no prefill or transcript code, so neither reopens or sits in the address', () => {
+    expect(removeOnePageSessionInterviewIntent('/session/a?mode=interview&x=1#claim=ab12.0.1.data&other=1')).toBe(
+      '/session/a?x=1#other=1',
+    );
+    expect(removeOnePageSessionInterviewIntent('/session/a#prefill=abc')).toBe('/session/a');
+    expect(removeOnePageSessionInterviewIntent('/session/a?x=1#other=1')).toBe('/session/a?x=1#other=1');
   });
 });

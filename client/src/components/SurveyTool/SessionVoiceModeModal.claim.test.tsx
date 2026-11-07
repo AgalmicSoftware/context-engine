@@ -29,9 +29,14 @@ jest.mock('./SessionListeningPanel', () => {
       closeActionRef.current = mockGroupClose;
     }, [closeActionRef]);
     return (
-      <button type="button" onClick={() => onCaptureChange(true)}>
-        Start capturing
-      </button>
+      <>
+        <button type="button" onClick={() => onCaptureChange(true)}>
+          Start capturing
+        </button>
+        <button type="button" onClick={() => onCaptureChange(false)}>
+          Stop capturing
+        </button>
+      </>
     );
   };
   return {
@@ -129,6 +134,17 @@ describe('scanning a part of a conversation', () => {
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_CLAIM_SCAN)).toBeEnabled();
     fireEvent.click(screen.getByRole('button', { name: 'Start capturing' }));
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_CLAIM_SCAN)).toBeDisabled();
+  });
+
+  it('holds a code opened in a tab that’s recording until the recording stops', async () => {
+    const frame = { id: 'ab12', index: 0, total: 3, data: 'x' };
+    const { rerender } = render(<SessionVoiceModeModal {...baseProps} mode="recordGroup" />);
+    fireEvent.click(screen.getByRole('button', { name: 'Start capturing' }));
+    rerender(<SessionVoiceModeModal {...baseProps} mode="recordGroup" claimFrame={frame} />);
+    expect(screen.queryByTestId('mock-scanner')).toBeNull();
+    expect(mockGroupClose).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Stop capturing' }));
+    expect(await screen.findByTestId('mock-scanner')).toBeInTheDocument();
   });
 
   it('carries on from the code that opened the page, and finishes a recording before the part arrives', async () => {

@@ -1556,7 +1556,7 @@ const syncSessionVoiceModeQuery = (mode: SessionVoiceMode | null) => {
   }
 };
 
-const toggleSessionVoiceModeModal = (engine: PileViewModeEngine) => {
+export const toggleSessionVoiceModeModal = (engine: PileViewModeEngine) => {
   if (!isInterviewFeatureEnabled(engine.props?.sessionConfig)) return;
   if (engine.state.showListeningPanel) {
     engine.closeListeningPanel();
@@ -1571,7 +1571,9 @@ const toggleSessionVoiceModeModal = (engine: PileViewModeEngine) => {
   engine.setState({
     showVoiceModeModal: true,
     sessionVoiceMode: resumeInterview ? 'interview' : null,
-    ...(resumeInterview ? {} : { interviewPrefillPacket: null, interviewPrefillError: '', interviewPrefillNotice: '' }),
+    ...(resumeInterview
+      ? {}
+      : { interviewPrefillPacket: null, interviewPrefillError: '', interviewPrefillNotice: '', interviewClaim: null }),
   });
 };
 

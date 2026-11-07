@@ -1,4 +1,8 @@
-import { consumeTranscriptClaimHashIfPresent, receiveTranscriptClaim } from './SurveyPileViewMode';
+import {
+  consumeTranscriptClaimHashIfPresent,
+  receiveTranscriptClaim,
+  toggleSessionVoiceModeModal,
+} from './SurveyPileViewMode';
 
 const makeEngine = (sessionConfig = {}) => ({ props: { sessionConfig }, state: {}, setState: jest.fn() });
 
@@ -53,6 +57,20 @@ describe('a claimed part', () => {
     });
     expect(window.location.search).toBe('?joinGroup=salon-group');
     expect(popstate).toHaveBeenCalled();
+  });
+
+  it('isn’t taken in again when the dialog is opened afresh, but stays while a review is in progress', () => {
+    const open = (interviewProgressContext) => {
+      const engine = {
+        ...makeEngine(),
+        state: { interviewProgressContext, interviewClaim: claim },
+        buildSessionInterviewSubmitContextToken: () => 'context',
+      };
+      toggleSessionVoiceModeModal(engine);
+      return engine.setState.mock.calls[0][0];
+    };
+    expect(open('')).toMatchObject({ sessionVoiceMode: null, interviewClaim: null });
+    expect(open('context')).toEqual({ showVoiceModeModal: true, sessionVoiceMode: 'interview' });
   });
 
   it('leaves the address alone without a group', () => {
