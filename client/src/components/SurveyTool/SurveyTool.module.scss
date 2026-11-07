@@ -2517,7 +2517,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 // Context Engine's green focus ring was 1.2:1; there it takes the document text colour.
 .sessionListeningPanel
   :is(.sessionListeningActiveRecorder, .sessionListeningTranscriptDetails)
-  :is(button, textarea):focus-visible,
+  :is(button, [tabindex]):focus-visible,
 .sessionListeningPanel:not(.sessionListeningPanelEmbedded) :is(a, button, input, textarea):focus-visible {
   outline-color: var(--ce-document-text);
 }
@@ -2723,8 +2723,10 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   }
 }
 
-.sessionListeningTranscript::placeholder {
-  color: var(--ce-document-text-muted);
+.sessionListeningTranscript p {
+  margin: 0 0 6px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .sessionListeningClearTranscript {

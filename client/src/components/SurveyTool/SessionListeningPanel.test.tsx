@@ -1089,7 +1089,7 @@ describe('SessionListeningPanel', () => {
 
     fireEvent.click(transcriptButton);
     expect(transcriptButton).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_TRANSCRIPT)).toHaveValue(transcript);
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_TRANSCRIPT)).toHaveTextContent(transcript);
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_CLEAR));
     // With no audio left, Clear still asks, since the transcript is all that remains.
     expect(clearDraft).not.toHaveBeenCalled();
@@ -1108,7 +1108,7 @@ describe('SessionListeningPanel', () => {
     rerender(<SessionListeningPanel sessionSlug="demo" panelMode="recordGroup" embeddedInModal />);
     const transcriptButton = screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_TRANSCRIPT_DETAILS);
     expect(transcriptButton).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_TRANSCRIPT)).toHaveValue(transcript);
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_TRANSCRIPT)).toHaveTextContent(transcript);
 
     // A host who collapses it keeps it collapsed as later chunks arrive.
     fireEvent.click(transcriptButton);
@@ -1385,7 +1385,7 @@ it('does not count Person labels as speech toward generating questions', () => {
   render(<SessionListeningPanel sessionSlug="room" />);
   expect(screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_GENERATE)).toBeDisabled();
   fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_TRANSCRIPT_DETAILS));
-  expect(screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_TRANSCRIPT)).toHaveValue(transcript);
+  expect(screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_TRANSCRIPT)).toHaveTextContent(transcript.replace(/\n/g, ''));
 });
 
 it('explains speaker numbering without exposing audio parts, with the reason behind a question mark', async () => {

@@ -554,7 +554,7 @@ try {
       lost: interruption ? `${lost.toFixed(3)} s (${interruption.kind})` : '0', uploads: uploads.map((upload) => upload.outcome).join(', '), sha256: sha(audio).slice(0, 12) });
   }
   console.table(rows);
-  const transcript = await page.getByTestId('ce-session-listening-transcript').inputValue();
+  const transcript = await page.getByTestId('ce-session-listening-transcript').textContent();
   let cursor = -1;
   for (const recorder of made) {
     const text = chunkText(recorder.serial);
@@ -573,7 +573,7 @@ try {
   assertRetention(await settledStore(page), { recorderClosed: true });
   await page.getByRole('button', { name: 'Open recorder' }).click();
   await recorderReady(page);
-  assert.equal(await page.getByTestId('ce-session-listening-transcript').inputValue(), transcript, 'Reopening restores the transcript');
+  assert.equal(await page.getByTestId('ce-session-listening-transcript').textContent(), transcript, 'Reopening restores the transcript');
   // Clear asks first, even with only a transcript left.
   await page.getByTestId('ce-session-listening-clear').click();
   await page.getByTestId('ce-recording-clear-confirm').click();

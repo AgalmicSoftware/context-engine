@@ -12,6 +12,7 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- In a Group Conversation's transcript, each speaker's label is bold and has its own colour.
 - Results group sizes, vote bars, overall figures, representative statements and AI group summaries now count only people who answered enough to be in the analysis, as pol.is does, in every view. People with few answers still appear on the map in their nearest group. Representative statements keep a group's five strongest before showing agreements first, and uneven or very small sets of responses no longer break the Results maps.
 - Recording is less likely to stall on networks that close a connection after a minute of silence: while a chunk waits for its transcript, the page sends a small request every 20 seconds to keep the connection in use.
 - The `/docs` page and Tool Explorer descriptions match current behavior: new sessions start public, storage depends on the session, and Lit protects only the fields you lock. `/docs` shows the current deployment diagram.

@@ -52,10 +52,15 @@ type SessionListeningTranscriptProps = {
 // Within about a line of the end still counts as reading the newest line.
 const FOLLOW_SLACK_PX = 24;
 
-// The open transcript: read-only text with a clear control in its corner. As chunks arrive it keeps
-// the newest line in view, unless the host has scrolled up to reread; scrolling back to the end resumes.
+// Enough colours that a room's speakers stay apart; a ninth voice shares the first's.
+const SPEAKER_COLORS = 8;
+const SPEAKER_LINE = /^(Person (\d+):) (.*)$/;
+
+// The open transcript: read-only text with a clear control in its corner, each speaker's label bold and in
+// that person's colour. As chunks arrive it keeps the newest line in view, unless the host has scrolled up to
+// reread; scrolling back to the end resumes.
 export function SessionListeningTranscript({ transcript, clearDisabled, onClear }: SessionListeningTranscriptProps) {
-  const boxRef = useRef<HTMLTextAreaElement | null>(null);
+  const boxRef = useRef<HTMLDivElement | null>(null);
   const followRef = useRef(true);
   // Where a host who scrolled up is reading; restored in case replacing the text moved it.
   const readingTopRef = useRef(0);
@@ -66,18 +71,41 @@ export function SessionListeningTranscript({ transcript, clearDisabled, onClear 
   return (
     <div className={styles.sessionListeningTranscriptDetails}>
       <div className={styles.sessionListeningTranscriptShell}>
-        <textarea
+        <div
           ref={boxRef}
           className={styles.sessionListeningTranscript}
-          value={transcript}
-          readOnly
-          placeholder="Transcript"
+          // It scrolls, so the keyboard has to be able to reach it.
+          tabIndex={0}
+          role="region"
+          aria-label="Transcript"
           onScroll={({ currentTarget: box }) => {
             readingTopRef.current = box.scrollTop;
             followRef.current = box.scrollHeight - box.scrollTop - box.clientHeight <= FOLLOW_SLACK_PX;
           }}
           data-testid={E2E_TESTIDS.SESSION_LISTENING_TRANSCRIPT}
-        />
+        >
+          {transcript.split('\n').map((line, index) => {
+            const turn = SPEAKER_LINE.exec(line);
+            return (
+              <p key={index}>
+                {turn ? (
+                  <>
+                    <strong
+                      style={{
+                        color: `var(--ce-speaker-${((Number(turn[2]) - 1 + SPEAKER_COLORS) % SPEAKER_COLORS) + 1})`,
+                      }}
+                    >
+                      {turn[1]}
+                    </strong>{' '}
+                    {turn[3]}
+                  </>
+                ) : (
+                  line
+                )}
+              </p>
+            );
+          })}
+        </div>
         <button
           type="button"
           className={styles.sessionListeningClearTranscript}

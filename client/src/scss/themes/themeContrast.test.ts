@@ -768,4 +768,12 @@ describe('bundled app-theme contrast', () => {
     expect(values['binary-choice-disagree-bg']).toBe('#e69f00');
     expect(values['chart-series-1']).toBe(values['data-series-1']);
   });
+  test('speaker labels stay legible on the transcript in every theme and vision mode', () => {
+    const colors = [...css.matchAll(/--ce-speaker-\d+:\s*([^;]+);/g)].map((match) => match[1].trim());
+    expect(colors).toHaveLength(16);
+    registry.themes.forEach(({ id }) => {
+      const transcript = parseColor(themeValues(css, id)['text-inverse']);
+      colors.forEach((color) => expect(contrastRatio(parseColor(color), transcript)).toBeGreaterThanOrEqual(4.5));
+    });
+  });
 });

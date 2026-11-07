@@ -175,7 +175,7 @@ try {
       await page.getByText('Transcript added.', { exact: true }).waitFor();
       const transcriptEnds = (text) =>
         page.waitForFunction(
-          (end) => document.querySelector('[data-testid="ce-session-listening-transcript"]')?.value.endsWith(end),
+          (end) => document.querySelector('[data-testid="ce-session-listening-transcript"]')?.textContent.endsWith(end),
           text,
         );
       await transcriptEnds('File text. Pasted text.');
@@ -215,7 +215,7 @@ try {
       await page.getByRole('button', { name: 'Retry transcription', exact: true }).click();
       await page.waitForFunction(
         () =>
-          document.querySelector('[data-testid="ce-session-listening-transcript"]')?.value ===
+          document.querySelector('[data-testid="ce-session-listening-transcript"]')?.textContent ===
           'Recovered audio. File text. Pasted text.',
       );
       await storedAudio('complete', false);

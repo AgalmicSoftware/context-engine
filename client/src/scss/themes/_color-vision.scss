@@ -10,6 +10,11 @@
     @for $index from 1 through list.length($series) {
       --ce-chart-series-#{$index}: #{list.nth($series, $index)};
     }
+    // Speaker labels in a recording's transcript, which is white in every theme.
+    $speakers: (#0b5cad, #b4241b, #0a7a4b, #7d3cb0, #9a5200, #0f7480, #ad1667, #4f5f12);
+    @for $index from 1 through list.length($speakers) {
+      --ce-speaker-#{$index}: #{list.nth($speakers, $index)};
+    }
   }
 
   :root[data-ce-color-vision='color-blind'] {
@@ -56,6 +61,10 @@
       @if $index <= 8 {
         --ce-data-series-#{$index}: #{list.nth($series, $index)};
       }
+    }
+    $speakers: (#004b70, #7a4500, #8a1c5f, #00695c, #6b5b00, #1f6f94, #b3283a, #333333);
+    @for $index from 1 through list.length($speakers) {
+      --ce-speaker-#{$index}: #{list.nth($speakers, $index)};
     }
   }
 
