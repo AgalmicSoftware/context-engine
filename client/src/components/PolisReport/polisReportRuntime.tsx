@@ -198,7 +198,6 @@ export type D3LinearScale = {
 };
 
 export type D3ReportApi = {
-  scaleOrdinal(range: readonly string[]): (value: string | number) => string;
   schemeCategory10: readonly string[];
   polygonHull(points: [number, number][]): [number, number][] | null;
   min(values: number[]): number | undefined;
@@ -225,8 +224,6 @@ const getD3StringArray = (key: string): readonly string[] => {
 };
 
 export const d3Report: D3ReportApi = {
-  scaleOrdinal: (range) =>
-    Reflect.apply(getD3Function('scaleOrdinal'), d3, [range]) as (value: string | number) => string,
   schemeCategory10: getD3StringArray('schemeCategory10'),
   polygonHull: (points) => Reflect.apply(getD3Function('polygonHull'), d3, [points]) as [number, number][] | null,
   min: (values) => Reflect.apply(getD3Function('min'), d3, [values]) as number | undefined,

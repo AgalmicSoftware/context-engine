@@ -145,6 +145,9 @@ const formatSummaryStat = (all: number | string, binary: number | string) =>
 
 const surveyLog = createLogger('surveys');
 export const POLIS_CLUSTER_COLORS = CHART_SERIES_COLORS;
+// By group number, so a group keeps its colour on the map, in the legend and in comparisons.
+const polisClusterColor = (clusterId: number): string =>
+  POLIS_CLUSTER_COLORS[Math.abs(clusterId) % POLIS_CLUSTER_COLORS.length];
 const NO_EXPLORATORY_GROUPS: ExploratoryGroups = { assignments: [], analytical: [] };
 export const getPolisDemoDatasetForSlug = (...args: Parameters<typeof getPolisDemoDatasetForSlugRuntime>) =>
   getPolisDemoDatasetForSlugRuntime(...args);
@@ -1631,7 +1634,6 @@ export default function PolisReport({
     }
     const arr = activeRepQuestions[clusterIndex].slice(0, 3);
     const uniqueClusters = activeAnalyticalClusterIds;
-    const colorScale = d3Report.scaleOrdinal(POLIS_CLUSTER_COLORS);
 
     return (
       <div style={{ marginTop: '6px' }}>
@@ -1691,7 +1693,7 @@ export default function PolisReport({
                       ratingMatrix,
                       activeAnalyticalClusterAssignments,
                     );
-                    const clusterColor = colorScale(cl);
+                    const clusterColor = polisClusterColor(cl);
                     return (
                       <div
                         key={cl}
@@ -1752,7 +1754,6 @@ export default function PolisReport({
   function renderClusterLegend() {
     if (!activeAnalyticalClusterIds.length) return null;
     const uniqueClusters = activeAnalyticalClusterIds;
-    const colorScale = d3Report.scaleOrdinal(POLIS_CLUSTER_COLORS);
 
     const cacheForKey = analysisCacheByKey[currentAnalysisKey] || {};
     const errorsForKey = analysisErrorsByKey[currentAnalysisKey] || {};
@@ -1817,7 +1818,7 @@ export default function PolisReport({
           }}
         >
           {uniqueClusters.map((c) => {
-            const cColor = colorScale(c);
+            const cColor = polisClusterColor(c);
             const clusterIsOpen = clusterCollapseState[c];
             const handleToggleCluster = () => {
               setClusterCollapseState((prev) => ({
@@ -1951,7 +1952,6 @@ export default function PolisReport({
         .range([h / 2 - pad, -(h / 2 - pad)]);
 
       const hulls = buildClusterHulls(pointsToUse, activeClusterAssignments);
-      const colorScale = d3Report.scaleOrdinal(POLIS_CLUSTER_COLORS);
 
       const centerX = w / 2;
       const centerY = h / 2;
@@ -2012,7 +2012,7 @@ export default function PolisReport({
               {showGroupOutline &&
                 hulls.map((hullObj, i) => {
                   if (!hullObj.path) return null;
-                  const cColor = colorScale(hullObj.cluster); // BUGFIX: reuse existing colorScale; do not re-instantiate
+                  const cColor = polisClusterColor(hullObj.cluster);
                   const lineGenerator = d3Report.line();
                   const pathStr = lineGenerator(hullObj.path.map((pt) => [xScale(pt[0]), yScale(pt[1])])) + 'Z';
                   return (
@@ -2031,7 +2031,7 @@ export default function PolisReport({
               {showParticipants &&
                 pointsToUse.map((d, i) => {
                   const c = activeClusterAssignments[d.index] ?? 0;
-                  const col = colorScale(c);
+                  const col = polisClusterColor(c);
                   const px = xScale(d.x);
                   const py = yScale(d.y);
                   const addr = allResponders?.[d.index];

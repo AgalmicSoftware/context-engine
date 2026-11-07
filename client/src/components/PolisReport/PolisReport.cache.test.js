@@ -1740,6 +1740,34 @@ describe('PolisReport demo data defaults', () => {
       expect(analyzeClusterOpinions.mock.calls[0][1]).toEqual(expect.objectContaining({ sizes: { 0: 1, 1: 2 } }));
     };
 
+    it('keeps each group the same colour on the map and in comparisons', async () => {
+      // Group 0 is too small for an outline, so group 1 is the first one drawn.
+      computePolisConversationMath.mockReturnValue({
+        ...computePolisConversationMath(),
+        clusterAssignments: [0, 1, 1, 1],
+        analyticalClusterAssignments: [0, 1, 1, 1],
+        inConversationParticipantIndices: [0, 1, 2, 3],
+      });
+      const { container } = render(
+        <PolisReport {...baseReportProps} slug="edge" questionResponses={questionResponses} />,
+      );
+
+      fireEvent.change(screen.getByDisplayValue('UMAP'), { target: { value: 'POLIS' } });
+      await screen.findByDisplayValue(REPORT_DEFAULT_EMBEDDING_LABEL);
+      fireEvent.click(await screen.findByLabelText('Expand Clusters'));
+
+      const dots = [...container.querySelectorAll('circle[r="5"]')].map((dot) => dot.getAttribute('fill'));
+      expect(dots).toEqual([
+        POLIS_CLUSTER_COLORS[0],
+        POLIS_CLUSTER_COLORS[1],
+        POLIS_CLUSTER_COLORS[1],
+        POLIS_CLUSTER_COLORS[1],
+      ]);
+      // Cluster 1 is the first name in Cluster 0's comparison, which once gave it the first colour.
+      const comparison = (await screen.findAllByText('Cluster 1')).find((label) => label.style.color);
+      expect(comparison.getAttribute('style')).toContain(POLIS_CLUSTER_COLORS[1]);
+    });
+
     it('leaves them out of counts in the default UMAP view', async () => {
       render(<PolisReport {...baseReportProps} slug="edge" questionResponses={questionResponses} />);
 
