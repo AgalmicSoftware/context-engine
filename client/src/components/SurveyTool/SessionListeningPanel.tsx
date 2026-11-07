@@ -576,6 +576,7 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
         ) : (
           <Button
             type="button"
+            color="link"
             className={styles.sessionListeningRecordButton}
             onClick={() => {
               recordPressedRef.current = true;
@@ -591,7 +592,7 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
             }
             data-testid={E2E_TESTIDS.SESSION_LISTENING_START}
           >
-            <span className={styles.sessionListeningRecordIcon}>
+            <span className={styles.sessionListeningRecordIcon} aria-hidden="true">
               <FontAwesomeIcon icon={recordButtonIcon} spin={isRecordButtonSpinning} />
             </span>
             <span className={styles.sessionListeningRecordText}>{recordButtonLabel}</span>
