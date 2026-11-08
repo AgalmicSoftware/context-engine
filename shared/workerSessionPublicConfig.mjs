@@ -28,6 +28,7 @@ export const PUBLIC_WORKER_CONFIG_FIELDS = Object.freeze([
   'featured_SBTs_LIST',
   'adminAddress',
   'adminAddresses',
+  'resultsAdminAddresses',
   'corsWorkerUrl',
   'allowOrigins',
   'sessionModeProfile',
@@ -59,3 +60,7 @@ export const PUBLIC_WORKER_AI_FIELDS = Object.freeze(['models', 'reasoningEffort
 // set-config merges `ai` one level deep, so an editor that sees only the
 // public parts of `ai` can save them without dropping the rest.
 export const SET_CONFIG_MERGES_AI_FIELD = 'setConfigMergesAi';
+
+// Set the same way: this Worker builds debate atlases and accepts
+// resultsAdminAddresses, which older Workers refuse.
+export const DEBATE_ATLAS_FIELD = 'debateAtlas';

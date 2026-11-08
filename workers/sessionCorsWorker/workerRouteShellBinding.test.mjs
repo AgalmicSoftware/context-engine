@@ -860,3 +860,35 @@ test('artifact requests reject stale token epochs and require current storage sc
   assert.equal((await shell.fetch(request(false), {})).status, 200);
   assert.equal(artifactReads, 2);
 });
+
+test('atlas reads pass the artifact checks and reach the atlas reader with the signed-in address', async () => {
+  const sessionId = '0x' + '1'.repeat(32);
+  const reader = '0x' + '2'.repeat(40);
+  const reads = [];
+  const config = { sessionId, authzEpoch: 2, sessionModeProfile: { authority: { mode: 'worker_canonical' } } };
+  const shell = createWorkerRouteShellWithWorkerDeps({
+    constants: createBaseConstants(),
+    deps: {
+      toStr: (value) => String(value ?? ''), corsHeaders: () => ({}),
+      json: (body, status = 200, headers = {}) => new Response(JSON.stringify(body), { status, headers }),
+      resolveRequestSlugWithoutToken: () => ({ ok: true, slug: 'session-a', explicitSlugProvided: true }),
+      getSessionConfig: async () => config,
+      readCurrentSessionConfig: async () => ({ revision: 1, config }),
+      getCorsContext: async () => ({ ok: true, headers: {} }),
+      requireAuth: async () => ({ ok: true, slug: 'session-a', payload: { sub: reader, sessionId, authzEpoch: 2, scopes: { storage: true } } }),
+      computeScopesForLogin: async () => ({ storage: true }), checkRateLimit: async () => true,
+      dispatchResultsAnalysisArtifactRequest: async () => assert.fail('atlas reads must not reach the artifact reader'),
+      dispatchDebateAtlasReadRequest: async ({ slug, address, request }) => {
+        reads.push({ slug, address, id: new URL(request.url).searchParams.get('id') });
+        return new Response('{}');
+      },
+    },
+  });
+  const request = (headers = {}) => new Request('https://worker.example/debate-atlas?sessionSlug=session-a&id=atlas_k1_00000001', { headers });
+  assert.equal((await shell.fetch(request({ authorization: 'Bearer synthetic' }), {})).status, 200);
+  assert.equal((await shell.fetch(request(), {})).status, 200);
+  assert.deepEqual(reads, [
+    { slug: 'session-a', address: reader, id: 'atlas_k1_00000001' },
+    { slug: 'session-a', address: '', id: 'atlas_k1_00000001' },
+  ]);
+});

@@ -70,6 +70,10 @@ export const resolveTopLevelRouteSelection = ({
     return { kind: 'results-analysis-artifact' };
   }
 
+  if (path === '/debate-atlas' && method === 'GET') {
+    return { kind: 'debate-atlas' };
+  }
+
   if (path.startsWith('/admin/') && method === 'POST') {
     return {
       kind: 'admin',

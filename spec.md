@@ -542,6 +542,9 @@ Worker API (selected endpoints):
 - `POST /admin/results-analysis/generate`, `GET /admin/results-analysis/status`,
   and `GET /results-analysis/artifact`: Generate admin Results analysis, read its
   status, and let authorized viewers read the latest successful artifact.
+- `POST /admin/debate-atlas/build` and `GET /debate-atlas`: Build a debate atlas
+  from the stored responses (admins, co-admins and `resultsAdminAddresses`), and
+  read the newest build or one by `id` under the same viewer rule.
 - `POST /`: Authenticated action-style requests using an `action` field: `request_test_eth` (testnet faucet), `fetch_url`, `fetch_image`.
 
 Agent HTTP API families (selected):

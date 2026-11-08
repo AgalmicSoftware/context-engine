@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   CURATED_ID_LIST_KEYS,
   MAX_CURATED_IDS,
+  MAX_RESULTS_ADMINS,
   WORKER_CANONICAL_SET_CONFIG_KEYS,
   classifySessionConfigEdits as classify,
   sessionConfigRequiresReauthorization as revokes,
@@ -120,6 +121,22 @@ test('highlighted and hidden ID lists save as checked lists and sign no one out'
     }
   }
   assert.equal(setConfig({ BLOCKED_QUESTION_IDS: Array(MAX_CURATED_IDS).fill('q') }).ok, true);
+});
+
+test('results admins save as a checked address list and sign no one out', () => {
+  const first = `0x${'ab'.repeat(20)}`;
+  const second = `0x${'CD'.repeat(20)}`;
+  const saved = setConfig({ resultsAdminAddresses: [first, second] });
+  assert.equal(saved.ok, true);
+  assert.deepEqual(saved.config.resultsAdminAddresses, [first, second]);
+  assert.deepEqual(classify({}, { resultsAdminAddresses: [first] }), { content: ['resultsAdminAddresses'], authority: [], signsParticipantsOut: false });
+  assert.equal(revokes({ resultsAdminAddresses: [first] }, { resultsAdminAddresses: [] }), false);
+  const error = `resultsAdminAddresses must list at most ${MAX_RESULTS_ADMINS} different addresses.`;
+  const tooMany = Array.from({ length: MAX_RESULTS_ADMINS + 1 }, (_, index) => `0x${String(index).padStart(40, '0')}`);
+  for (const invalid of [first, ['0x1234'], [7], [first, `0x${first.slice(2).toUpperCase()}`], tooMany]) {
+    assert.deepEqual(setConfig({ resultsAdminAddresses: invalid }), { ok: false, status: 400, error }, JSON.stringify(invalid).slice(0, 40));
+  }
+  assert.equal(setConfig({ resultsAdminAddresses: tooMany.slice(1) }).ok, true);
 });
 
 test('lists each edited path as content or as a sign-out', () => {

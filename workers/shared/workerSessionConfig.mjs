@@ -1,5 +1,6 @@
 import { projectPublicAgentConfig } from '../../shared/sessionAgentConfig.mjs';
 import {
+  DEBATE_ATLAS_FIELD,
   PUBLIC_WORKER_AI_FIELDS,
   PUBLIC_WORKER_CONFIG_FIELDS,
   SET_CONFIG_MERGES_AI_FIELD,
@@ -311,6 +312,7 @@ export const projectPublicWorkerSessionConfig = (config) => {
   if (projected.agentHttp) projected.agentHttp = projectPublicAgentConfig(projected.agentHttp);
   // This code's set-config merges `ai` (mergeSetConfigAi); older Workers lack the field.
   projected[SET_CONFIG_MERGES_AI_FIELD] = true;
+  projected[DEBATE_ATLAS_FIELD] = true;
   return projected;
 };
 

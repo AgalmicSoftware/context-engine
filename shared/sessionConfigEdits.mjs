@@ -28,6 +28,7 @@ export const WORKER_CANONICAL_SET_CONFIG_KEYS = Object.freeze([
   'BLOCKED_SURVEY_IDS',
   'adminAddress',
   'adminAddresses',
+  'resultsAdminAddresses',
   'corsWorkerUrl',
   'allowOrigins',
   'sessionModeProfile',
@@ -66,10 +67,21 @@ export const validCuratedIdList = value =>
   Array.isArray(value) && value.length <= MAX_CURATED_IDS &&
   value.every(id => typeof id === 'string' && CURATED_ID.test(id));
 
+// Results admins build debate atlases, and nothing else an admin does.
+export const MAX_RESULTS_ADMINS = 20;
+const ADDRESS = /^0x[0-9a-fA-F]{40}$/;
+export const validResultsAdminAddresses = value =>
+  Array.isArray(value) && value.length <= MAX_RESULTS_ADMINS &&
+  value.every(address => typeof address === 'string' && ADDRESS.test(address)) &&
+  new Set(value.map(address => address.toLowerCase())).size === value.length;
+
 const CONTENT_FIELDS = new Set([
   'sessionName', 'sessionInfo', 'sessionContext', 'questionsGenPrompt', 'appearance', 'sessionHeaderImg',
   // Checked again when each file publishes, so changing it signs no one out.
   'contextAdditionPolicy',
+  // Checked on each atlas build and read and never held in a sign-in, so
+  // changing it signs no one out either.
+  'resultsAdminAddresses',
   ...CURATED_ID_LIST_KEYS,
 ]);
 const INTERVIEW_CONTENT_FIELDS = new Set(['openingPrompt', 'steeringPrompt']);

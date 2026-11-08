@@ -53,6 +53,7 @@ import {
 } from '../shared/workerSessionConfig.mjs';
 import { executeCoordinatedSessionConfigMutation } from './sessionWriteCoordinator.js';
 import { generateResultsAnalysisDraft } from './resultsAnalysisGeneration.js';
+import { buildDebateAtlas, canBuildDebateAtlas, DEBATE_ATLAS_BUILD_ACTION } from './debateAtlasBuild.js';
 
 const toTrimmedString = (value) => (
   typeof value === 'string'
@@ -174,7 +175,10 @@ export const dispatchAdminRequest = async ({
       validateSiweAddressMatchesRequest: deps?.validateSiweAddressMatchesRequest,
       consumeNonce: deps?.consumeNonce,
       validateBootstrapAdmin: deps?.validateBootstrapAdmin,
-      validateAdmin: deps?.validateAdmin,
+      // Co-admins and results admins may build atlases and do nothing else here.
+      validateAdmin: action === DEBATE_ATLAS_BUILD_ACTION
+        ? (args) => canBuildDebateAtlas({ ...args, validateAdmin: deps?.validateAdmin })
+        : deps?.validateAdmin,
       MISSING_SLUG_ERROR: deps?.MISSING_SLUG_ERROR,
     },
   });
@@ -234,6 +238,20 @@ export const dispatchAdminRequest = async ({
     } catch (error) {
       return deps?.json?.({ error: error?.message || 'Results analysis generation failed.' }, 500, privateHeaders);
     }
+  }
+
+  if (action === DEBATE_ATLAS_BUILD_ACTION) {
+    const privateHeaders = withPrivateNoStoreHeaders(headers);
+    const result = await (deps?.buildDebateAtlas || buildDebateAtlas)({
+      env,
+      slug: targetSlug,
+      config: existingConfig,
+      body,
+      headers: privateHeaders,
+      builderAddress: authorityResult.address,
+      deps,
+    });
+    return deps?.json?.(result, result?.status || (result?.ok ? 200 : 500), privateHeaders);
   }
 
   if (action === 'storage/set-hidden') {

@@ -1,10 +1,12 @@
 import {
   CURATED_ID_LIST_KEYS,
   MAX_CURATED_IDS,
+  MAX_RESULTS_ADMINS,
   WORKER_CANONICAL_SET_CONFIG_KEYS,
   mergeSetConfigAi,
   sessionConfigRequiresReauthorization,
   validCuratedIdList,
+  validResultsAdminAddresses,
 } from '../../shared/sessionConfigEdits.mjs';
 import { validSessionAgentConfig } from '../../shared/sessionAgentConfig.mjs';
 import { DEFAULT_INTERVIEW_SETTINGS, validInterviewSettings } from '../../shared/interviewSettings.mjs';
@@ -327,6 +329,13 @@ export const applySessionConfigMutation = ({ existingConfig, mutation, slug } = 
         ok: false,
         status: 400,
         error: `${invalidIdList} must be a list of at most ${MAX_CURATED_IDS} IDs.`,
+      };
+    }
+    if (hasOwn(incomingConfig, 'resultsAdminAddresses') && !validResultsAdminAddresses(incomingConfig.resultsAdminAddresses)) {
+      return {
+        ok: false,
+        status: 400,
+        error: `resultsAdminAddresses must list at most ${MAX_RESULTS_ADMINS} different addresses.`,
       };
     }
     // Only a sent context is checked, so a stored one from before these limits

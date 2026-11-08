@@ -1,4 +1,5 @@
 import {
+  DEBATE_ATLAS_FIELD,
   PUBLIC_WORKER_AI_FIELDS,
   PUBLIC_WORKER_CONFIG_FIELDS,
   SET_CONFIG_MERGES_AI_FIELD,
@@ -65,13 +66,14 @@ const isRetryableConfigReadStatus = (status: number): boolean =>
 const WORKER_CANONICAL_PUBLICATION_REVISION_KEY = 'workerCanonicalPublicationRevision';
 // The Worker sets these public fields itself: the authorization epoch and the
 // publication marker on writes, and response field encryption and the
-// merges-ai field on every read. They are not config the wizard writes, so the
-// readback check skips them.
+// merges-ai and debate-atlas fields on every read. They are not config the
+// wizard writes, so the readback check skips them.
 const WORKER_MANAGED_PUBLIC_CONFIG_FIELDS = Object.freeze([
   'authzEpoch',
   WORKER_CANONICAL_PUBLICATION_REVISION_KEY,
   'responseFieldEncryption',
   SET_CONFIG_MERGES_AI_FIELD,
+  DEBATE_ATLAS_FIELD,
 ]);
 // Only a finalizing write claims a revision. Before that, a stored revision
 // (such as one the deploy helper staged) is not part of the checked config.

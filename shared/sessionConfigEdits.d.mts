@@ -7,6 +7,10 @@ export const CURATED_ID_LIST_KEYS: readonly string[];
 export const MAX_CURATED_IDS: number;
 /** True for a list of at most MAX_CURATED_IDS IDs, each 1-128 letters, digits or `._:-`. */
 export function validCuratedIdList(value: unknown): value is string[];
+/** The most results admins one session lists. */
+export const MAX_RESULTS_ADMINS: number;
+/** True for at most MAX_RESULTS_ADMINS distinct addresses; results admins build debate atlases and nothing else. */
+export function validResultsAdminAddresses(value: unknown): value is string[];
 
 export type SessionConfigEditClassification = {
   /** Edited paths that keep participants signed in, such as `sessionName`. */

@@ -333,6 +333,7 @@ const normalizeSanitizedRows = async ({ rows, questions, slug, config, strictLoc
   // newer locked, cleared or invalid answer withdraws an older public one.
   // Superseded rows are not counted as excluded or locked.
   const latestByQuestionParticipant = new Map();
+  const participantSources = new Map();
   let excludedCount = 0;
   let lockedCount = 0;
   for (const row of Array.isArray(rows) ? rows : []) {
@@ -364,6 +365,7 @@ const normalizeSanitizedRows = async ({ rows, questions, slug, config, strictLoc
       rowTime: Date.parse(row.submittedAt || row.createdAt || row.timestamp || '') || 0,
       storageRefId: trim(row.__storageRefId),
     };
+    participantSources.set(candidate.participantKey, participantSource);
     const dedupeKey = `${questionId}:${candidate.participantKey}`;
     const existing = latestByQuestionParticipant.get(dedupeKey);
     if (!existing || isNewerResponseRow(candidate, existing)) latestByQuestionParticipant.set(dedupeKey, candidate);
@@ -427,6 +429,11 @@ const normalizeSanitizedRows = async ({ rows, questions, slug, config, strictLoc
   const sortedParticipantDigests = [...participantDigests].sort();
   const participantLabels = new Map(sortedParticipantDigests.map((digest, index) => [digest, `participant_${String(index + 1).padStart(3, '0')}`]));
   const participants = sortedParticipantDigests.map((digest) => ({ syntheticId: participantLabels.get(digest) }));
+  // Never in a prompt or a draft (a Map serializes as {}): only a debate atlas
+  // build reads it, to show each participant it places by address.
+  const participantAddresses = new Map(sortedParticipantDigests
+    .map((digest) => [participantLabels.get(digest), lower(participantSources.get(digest))])
+    .filter(([, source]) => /^0x[0-9a-f]{40}$/.test(source)));
   const responseRows = includedRows
     .sort((a, b) => a.questionId.localeCompare(b.questionId) || (participantLabels.get(a.participantKey) || '').localeCompare(participantLabels.get(b.participantKey) || ''));
   const sanitizedResponses = responseRows.map((row, index) => ({
@@ -507,6 +514,7 @@ const normalizeSanitizedRows = async ({ rows, questions, slug, config, strictLoc
     },
     participants,
     participantDigests: sortedParticipantDigests,
+    participantAddresses,
   };
 };
 
@@ -795,7 +803,7 @@ const summarizeReservation = (reservation, requestId = '') => {
   };
 };
 
-const analysisEligibility = (source) => {
+export const analysisEligibility = (source) => {
   const counts = source?.counts || {};
   const reasons = [];
   if (Number(counts.aiInputParticipantCount || 0) < 2) reasons.push('Needs at least 2 participants in the AI input window.');

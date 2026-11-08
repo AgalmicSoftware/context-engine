@@ -109,7 +109,7 @@ test('deployment retains optional response encryption and exact linked group ref
   assert.deepEqual(selectDeployWorkerSessionConfigFields(fields), fields);
 });
 
-test('public config shows the AI models and effort, hides the rest of ai, and says set-config merges ai', () => {
+test('public config shows the AI models and effort, hides the rest of ai, and says set-config merges ai and atlases build', () => {
   const projected = projectPublicWorkerSessionConfig({
     slug: 'session-a',
     ai: {
@@ -121,6 +121,7 @@ test('public config shows the AI models and effort, hides the rest of ai, and sa
       mode: 'openai',
     },
     setConfigMergesAi: false,
+    debateAtlas: false,
   });
 
   assert.deepEqual(projected, {
@@ -132,5 +133,6 @@ test('public config shows the AI models and effort, hides the rest of ai, and sa
     },
     // Set by this code on every read, never taken from storage.
     setConfigMergesAi: true,
+    debateAtlas: true,
   });
 });
