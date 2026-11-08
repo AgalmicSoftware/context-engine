@@ -1386,6 +1386,57 @@ describe('DebateMap', () => {
     expect(mockNavigate).toHaveBeenCalledWith('/tag/AI%20Safety?session=edge');
   });
 
+  describe('a session page atlas', () => {
+    const sessionTree = [
+      {
+        id: 'b1',
+        name: 'Organizing',
+        compass: {
+          xAxis: { label: 'Pace', left: 'Slow', right: 'Fast' },
+          yAxis: { label: 'Scope', top: 'Local', bottom: 'Global' },
+          points: [{ name: 'Go slow', x: 0.2, y: 0.8, type: 'debater' }],
+        },
+        children: [
+          {
+            id: 't1',
+            name: 'Pilots',
+            compass: {
+              xAxis: { label: 'Risk', left: 'Careful', right: 'Bold' },
+              yAxis: { label: 'Who', top: 'Locals', bottom: 'Experts' },
+              points: [],
+            },
+          },
+        ],
+      },
+    ];
+    const renderSessionAtlas = (props: Record<string, unknown> = {}) =>
+      render(
+        <MemoryRouter>
+          <DebateMapComponent readOnly hideDemoModeToggle embedded treeData={sessionTree} {...props} />
+        </MemoryRouter>,
+      );
+
+    it('closes a node without leaving the session page', async () => {
+      mockNavigate.mockClear();
+      renderSessionAtlas({ requestedModalNodeId: 'b1' });
+      expect(await screen.findByRole('heading', { name: 'Organizing' })).toBeInTheDocument();
+      fireEvent.click(screen.getByTitle('Close'));
+      await waitFor(() => expect(screen.queryByRole('heading', { name: 'Organizing' })).not.toBeInTheDocument());
+      expect(mockNavigate).not.toHaveBeenCalled();
+    });
+
+    it("copies the session's own link for a node", async () => {
+      const writeText = jest.fn(async (_text: string) => undefined);
+      Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+      renderSessionAtlas({
+        requestedModalNodeId: 't1',
+        buildNodeLink: (nodeId: string) => `/atlas/${nodeId}?session=salon`,
+      });
+      fireEvent.click(await screen.findByTitle('Copy Deep Link URL'));
+      await waitFor(() => expect(writeText).toHaveBeenCalledWith('http://localhost/atlas/t1?session=salon'));
+    });
+  });
+
   it('opens a requested atlas node modal and notifies the parent when it closes', async () => {
     mockNavigate.mockClear();
     const onModalClose = jest.fn();

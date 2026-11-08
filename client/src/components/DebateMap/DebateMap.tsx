@@ -2241,6 +2241,7 @@ const DebateMap = ({
   onModalClose = null,
   atlasLayoutMode = ATLAS_LAYOUT_MODES.PACKED,
   treeData = null,
+  buildNodeLink = null,
 }: DebateMapProps) => {
   const explicitTreeData = Array.isArray(treeData) ? treeData : null;
   const externalDemoEnabled =
@@ -2366,8 +2367,10 @@ const DebateMap = ({
       onModalClose();
       return;
     }
+    // Inside a session page, closing a node keeps the reader on that page.
+    if (embedded) return;
     navigate(modalReturnTo || buildPublicRoute('/atlas'), { replace: true });
-  }, [modalReturnTo, navigate, onModalClose]);
+  }, [embedded, modalReturnTo, navigate, onModalClose]);
 
   const handleBookmark = useCallback((id: string) => {
     setBookmarkedNodes((prev) => {
@@ -2381,8 +2384,13 @@ const DebateMap = ({
   const copyToClipboard = useCallback(() => {
     const modalContentId = String(modalContent?.id || '').trim();
     if (modalContent && modalContentId) {
-      const deepLink = new URL(buildPublicRoute(`/atlas/${modalContentId}`), window.location.origin);
-      if (demoMode) {
+      const deepLink = new URL(
+        typeof buildNodeLink === 'function'
+          ? buildNodeLink(modalContentId)
+          : buildPublicRoute(`/atlas/${modalContentId}`),
+        window.location.origin,
+      );
+      if (demoMode && typeof buildNodeLink !== 'function') {
         deepLink.searchParams.set('demo', '1');
       }
       navigator.clipboard
@@ -2397,7 +2405,7 @@ const DebateMap = ({
           notify.warn('Copy failed');
         });
     }
-  }, [demoMode, modalContent]);
+  }, [buildNodeLink, demoMode, modalContent]);
 
   // --- NEW: Handle Tag Clicks to route ---
   const handleTagClick = useCallback(

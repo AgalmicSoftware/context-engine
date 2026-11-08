@@ -1,4 +1,6 @@
 import { generateBlockieDataUrl } from '../../utilities/ui/blockieAvatars.js';
+import { buildPublicRoute } from '../../utilities/ui/publicUrl.js';
+import { parseSessionWorkerDiscoveryOrigin } from '../../utilities/session/sessionWorkerDiscovery';
 import type { DebateNode, HistoricalCompassPoint } from '../DebateMap/debateMapTypes';
 import type {
   DebateAtlasBuild,
@@ -121,3 +123,26 @@ export const buildDebateAtlasTree = (build: DebateAtlasBuild, { sessionSlug = ''
       }),
     };
   });
+
+// A node's id starts with its build's: "<build id>:<branch or topic id>".
+export const debateAtlasBuildIdOf = (nodeId: string): string => String(nodeId || '').split(':')[0];
+
+// What a node's copy button shares. /atlas sends it to the session's page, and
+// the Worker in it lets a fresh browser find the session.
+export const buildSessionAtlasLink = ({
+  nodeId,
+  sessionSlug,
+  workerUrl = '',
+}: {
+  nodeId: string;
+  sessionSlug: string;
+  workerUrl?: string;
+}): string => {
+  const params = new URLSearchParams({ session: sessionSlug });
+  try {
+    if (workerUrl) params.set('worker', parseSessionWorkerDiscoveryOrigin(workerUrl));
+  } catch {
+    // Without the Worker the link still opens a session the site already knows.
+  }
+  return `${buildPublicRoute(`/atlas/${encodeURIComponent(nodeId)}`)}?${params}`;
+};

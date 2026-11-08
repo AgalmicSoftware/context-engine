@@ -1384,6 +1384,35 @@ describe('OnePageSession results routing', () => {
       else expect(button).toBeDisabled();
       expect(status).toHaveTextContent(statusText);
     });
+
+    it('opens the atlas at the node an /atlas link asked for, and keeps the session URL', async () => {
+      window.history.replaceState({}, '', '/session/edge?worker=https%3A%2F%2Fw.example&atlas=atlas_k1_00000001%3Ab1');
+      mockDebateAtlasState = atlasState();
+      const sessionRef = React.createRef();
+      const props = buildProps();
+      render(
+        <MemoryRouter initialEntries={['/session/edge']}>
+          <OnePageSession
+            {...props}
+            ref={sessionRef}
+            slug="edge"
+            sessionConfig={{ ...props.sessionConfig, slug: 'edge' }}
+          />
+        </MemoryRouter>,
+      );
+      expect(window.location.search).toBe('?worker=https%3A%2F%2Fw.example');
+      await screen.findByTestId('ce-session-debate-atlas');
+      expect(sessionRef.current.state).toMatchObject({
+        showResults: true,
+        resultsViewMode: 'debateAtlas',
+        requestedAtlasNodeId: 'atlas_k1_00000001:b1',
+      });
+      const { requestedModalNodeId, onModalClose } = mockDebateMap.mock.calls.at(-1)[0];
+      expect(requestedModalNodeId).toBe('atlas_k1_00000001:b1');
+      act(() => onModalClose());
+      expect(sessionRef.current.state.requestedAtlasNodeId).toBeNull();
+      window.history.replaceState({}, '', '/');
+    });
   });
 
   describe('context files and links', () => {

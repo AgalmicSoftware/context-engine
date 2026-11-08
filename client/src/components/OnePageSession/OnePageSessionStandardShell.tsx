@@ -94,6 +94,8 @@ type OnePageSessionStandardShellProps = {
   effectiveSlug: string;
   embeddedAtlasNodeId: unknown;
   embeddedAtlasReturnState: unknown;
+  requestedAtlasNodeId?: string | null;
+  onRequestedAtlasNodeClose?: () => void;
   embeddedGroupsSessionConfig: unknown;
   embeddedGroupsSessionSlug: string;
   embeddedQuestionSessionSlug: string;
@@ -258,6 +260,8 @@ export default function OnePageSessionStandardShell({
   effectiveSlug,
   embeddedAtlasNodeId,
   embeddedAtlasReturnState,
+  requestedAtlasNodeId = null,
+  onRequestedAtlasNodeClose,
   embeddedGroupsSessionConfig,
   embeddedGroupsSessionSlug,
   embeddedQuestionSessionSlug,
@@ -885,6 +889,9 @@ export default function OnePageSessionStandardShell({
                       builds={atlas.builds}
                       onSelectBuild={atlas.selectBuild}
                       sessionSlug={displaySessionSlug}
+                      workerUrl={atlas.workerUrl}
+                      requestedNodeId={requestedAtlasNodeId}
+                      onRequestedNodeClose={onRequestedAtlasNodeClose}
                     />
                   </Suspense>
                 )}

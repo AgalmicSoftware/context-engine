@@ -250,6 +250,8 @@ class OnePageSession extends Component<any, any> {
       autoOpenResults: routeUiState.autoOpenResults,
       embeddedAtlasNodeId: null,
       embeddedAtlasReturnState: null,
+      // A node of this session's built atlas that a link asked to open.
+      requestedAtlasNodeId: null,
       riskMatrixRestoreState: null,
       aggregatorData: {},
       disclaimersActive: true,
@@ -407,6 +409,7 @@ class OnePageSession extends Component<any, any> {
   }
 
   componentDidMount() {
+    this.openRequestedAtlas();
     const routeUiState = resolveOnePageSessionRouteUiState(this.props);
     this.recordOriginalURL(routeUiState.showQuestions ? buildOnePageSessionCanonicalBaseUrl(this.props) : null);
     captureSessionRecruitmentSource(resolveEffectiveSlug(this.props));
@@ -2078,6 +2081,34 @@ class OnePageSession extends Component<any, any> {
     }));
   }
 
+  // An atlas link (/atlas?session=…) lands here: Results open on the atlas, at
+  // its node when one is named, and the address bar keeps the session's own URL.
+  openRequestedAtlas() {
+    try {
+      const url = new URL(window.location.href);
+      const requested = url.searchParams.get('atlas');
+      if (requested === null) return;
+      url.searchParams.delete('atlas');
+      window.history.replaceState(window.history.state, '', url.toString());
+      this._pendingReportScroll = true;
+      this._pendingReportScrollIntent = '';
+      this.setState(
+        {
+          showResults: true,
+          resultsViewMode: 'debateAtlas',
+          requestedAtlasNodeId: requested && requested !== '1' ? requested : null,
+        },
+        this.scrollPendingReportIntoView,
+      );
+    } catch (e) {
+      demoLog.warn('OnePageSession: fallback', e);
+    }
+  }
+
+  handleRequestedAtlasNodeClose = () => {
+    if (this.state.requestedAtlasNodeId) this.setState({ requestedAtlasNodeId: null });
+  };
+
   handleEmbeddedAtlasModalClose() {
     this.setState((prevState: Readonly<OnePageSession['state']>) => {
       const returnState = prevState.embeddedAtlasReturnState;
@@ -2478,6 +2509,8 @@ class OnePageSession extends Component<any, any> {
         effectiveSlug={effectiveSlug}
         embeddedAtlasNodeId={this.state.embeddedAtlasNodeId}
         embeddedAtlasReturnState={this.state.embeddedAtlasReturnState}
+        requestedAtlasNodeId={this.state.requestedAtlasNodeId}
+        onRequestedAtlasNodeClose={this.handleRequestedAtlasNodeClose}
         embeddedGroupsSessionConfig={embeddedGroupsSessionConfig}
         embeddedGroupsSessionSlug={embeddedGroupsSessionSlug}
         embeddedQuestionSessionSlug={embeddedQuestionSessionSlug}

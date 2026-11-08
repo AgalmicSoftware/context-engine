@@ -50,3 +50,38 @@ it('lets viewers open an earlier build', () => {
   fireEvent.change(picker, { target: { value: 'atlas_k1_00000001' } });
   expect(onSelectBuild).toHaveBeenCalledWith('atlas_k1_00000001');
 });
+
+it('opens the node a link asked for, first showing the build it belongs to', () => {
+  const onSelectBuild = jest.fn();
+  const onRequestedNodeClose = jest.fn();
+  const view = (shownBuild: DebateAtlasBuild) => (
+    <SessionDebateAtlasView
+      build={shownBuild}
+      builds={[build, older]}
+      onSelectBuild={onSelectBuild}
+      sessionSlug="salon"
+      workerUrl="https://ce-salon.workers.dev"
+      requestedNodeId="atlas_k1_00000001:b1t2"
+      onRequestedNodeClose={onRequestedNodeClose}
+    />
+  );
+  const { rerender } = render(view(build));
+  expect(onSelectBuild).toHaveBeenCalledWith('atlas_k1_00000001');
+  expect(mockDebateMap).toHaveBeenLastCalledWith(expect.objectContaining({ requestedModalNodeId: null }));
+
+  rerender(view({ ...older, branches: [] }));
+  expect(onSelectBuild).toHaveBeenCalledTimes(1);
+  const [props] = mockDebateMap.mock.calls[mockDebateMap.mock.calls.length - 1];
+  expect(props).toMatchObject({ requestedModalNodeId: 'atlas_k1_00000001:b1t2', onModalClose: onRequestedNodeClose });
+  // A node's copy button shares the session's atlas link.
+  expect(props.buildNodeLink('atlas_k1_00000001:b1')).toBe(
+    '/atlas/atlas_k1_00000001%3Ab1?session=salon&worker=https%3A%2F%2Fce-salon.workers.dev',
+  );
+
+  // Picking another build afterwards is the reader's choice, and leaves the node shut.
+  rerender(view(build));
+  expect(onSelectBuild).toHaveBeenCalledTimes(1);
+  fireEvent.change(screen.getByRole('combobox', { name: 'Build' }), { target: { value: 'atlas_k1_00000001' } });
+  expect(onRequestedNodeClose).toHaveBeenCalledTimes(1);
+  expect(onSelectBuild).toHaveBeenLastCalledWith('atlas_k1_00000001');
+});

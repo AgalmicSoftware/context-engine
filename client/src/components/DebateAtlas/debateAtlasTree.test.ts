@@ -1,4 +1,9 @@
-import { buildDebateAtlasTree, describeDebateAtlasBuild } from './debateAtlasTree';
+import {
+  buildDebateAtlasTree,
+  buildSessionAtlasLink,
+  debateAtlasBuildIdOf,
+  describeDebateAtlasBuild,
+} from './debateAtlasTree';
 import type { DebateAtlasBuild } from '../../domains/debateAtlas/debateAtlasTypes';
 
 const address = `0x${'ab'.repeat(20)}`;
@@ -86,4 +91,22 @@ it('stamps a build with its time and counts', () => {
   expect(stamp).toMatch(/2026/);
   expect(stamp).toMatch(/ · 12 responses · 1 participant$/);
   expect(describeDebateAtlasBuild({ id: 'x', builtAt: 'not a date' })).toBe('');
+});
+
+it('links a node to its session, with the Worker a fresh browser needs, and knows its build', () => {
+  const nodeId = 'atlas_k1_00000001:b1t1';
+  expect(debateAtlasBuildIdOf(nodeId)).toBe('atlas_k1_00000001');
+  const link = new URL(
+    buildSessionAtlasLink({ nodeId, sessionSlug: 'salon', workerUrl: 'https://ce-salon.workers.dev' }),
+    'https://site.example',
+  );
+  expect(link.pathname).toBe('/atlas/atlas_k1_00000001%3Ab1t1');
+  expect(Object.fromEntries(link.searchParams)).toEqual({ session: 'salon', worker: 'https://ce-salon.workers.dev' });
+  // A Worker address that is not a plain origin is left out rather than shared.
+  expect(
+    new URL(
+      buildSessionAtlasLink({ nodeId, sessionSlug: 'salon', workerUrl: 'not a url' }),
+      'https://site.example',
+    ).searchParams.has('worker'),
+  ).toBe(false);
 });

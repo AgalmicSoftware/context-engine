@@ -240,6 +240,28 @@ it("shows someone else's running build when a press is refused for it, and check
   expect(read).toHaveBeenCalledTimes(1);
 });
 
+it('checks back on the build the reader picked, not the newest', async () => {
+  jest.useFakeTimers();
+  const running = { ...shown('atlas_k2_00000002'), active: { startedAtMs: 5 } };
+  read.mockResolvedValue(running);
+  const { result } = renderAtlas();
+  await act(async () => {
+    await Promise.resolve();
+  });
+  act(() => result.current.selectBuild('atlas_k1_00000001'));
+  await act(async () => {
+    await Promise.resolve();
+  });
+  expect(read).toHaveBeenLastCalledWith(expect.objectContaining({ id: 'atlas_k1_00000001' }));
+  read.mockClear();
+  await act(async () => {
+    jest.advanceTimersByTime(DEBATE_ATLAS_ACTIVE_POLL_MS);
+    await Promise.resolve();
+  });
+  expect(read).toHaveBeenCalledTimes(1);
+  expect(read).toHaveBeenLastCalledWith(expect.objectContaining({ id: 'atlas_k1_00000001' }));
+});
+
 it("keeps checking back while someone else's build is still running", async () => {
   jest.useFakeTimers();
   const running = { ok: true, status: 200, builds: [], build: null, active: { startedAtMs: 5 } };
@@ -269,4 +291,12 @@ it("keeps checking back while someone else's build is still running", async () =
     await Promise.resolve();
   });
   expect(read).toHaveBeenCalledTimes(4);
+});
+
+it('names the Worker that keeps its atlases, and none where it builds none', async () => {
+  const { result } = renderAtlas();
+  await waitFor(() => expect(result.current.build?.id).toBe('atlas_k2_00000002'));
+  expect(result.current.workerUrl).toBe('https://worker.example');
+  const unsupported = renderAtlas({ sessionConfig: { ...baseConfig, debateAtlas: undefined } });
+  expect(unsupported.result.current.workerUrl).toBe('');
 });

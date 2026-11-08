@@ -51,7 +51,7 @@ import {
   resolveMainSiteSessionRouteSourceSlug,
 } from './routeSessionResolution.js';
 import { getWorkerCanonicalRouteController } from './workerCanonicalRouteController.js';
-import { getSessionEntryRedirect } from './sessionEntryRedirect';
+import { getSessionAtlasRedirect, getSessionEntryRedirect } from './sessionEntryRedirect';
 import { isRxcSessionEntryPath } from '../../utilities/session/rxcSessionSlugs';
 import {
   resolveExplicitWorkerSessionConfig,
@@ -204,7 +204,9 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
   },
 
   _renderAtlasRoute: (ctx: RouteRenderCtx) => {
-    const { fullPath, defaultSlug, defaultSessionNetwork, routeDemoMode } = ctx;
+    const { fullPath, defaultSlug, defaultSessionNetwork, routeDemoMode, pathWithoutQuery, searchStr } = ctx;
+    const sessionAtlas = getSessionAtlasRedirect(pathWithoutQuery, searchStr);
+    if (sessionAtlas) return <Navigate replace to={sessionAtlas} />;
     return (
       <InitialRouteBoundary fallback={<LazyFallback label="Loading Atlas..." />} resetKey={fullPath}>
         <div data-testid={E2E_TESTIDS.PAGE_ATLAS_ROOT}>

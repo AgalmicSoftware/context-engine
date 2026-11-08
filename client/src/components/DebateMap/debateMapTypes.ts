@@ -259,6 +259,8 @@ export interface DebateMapProps {
   onModalClose?: (() => void) | null;
   atlasLayoutMode?: AtlasLayoutMode;
   treeData?: DebateNode[] | null;
+  /** The link a node's copy button shares, when it is not the demo atlas's /atlas/<id>. */
+  buildNodeLink?: ((nodeId: string) => string) | null;
 }
 
 export interface AtlasChromeProps {

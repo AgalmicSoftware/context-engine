@@ -21,6 +21,8 @@ export type SessionDebateAtlas = {
   loading: boolean;
   /** When a build someone started is still running. */
   activeSinceMs: number | null;
+  /** The Worker that keeps this session's atlases. */
+  workerUrl: string;
   error: string;
   buildAtlas: () => Promise<boolean>;
   selectBuild: (id: string) => void;
@@ -93,12 +95,15 @@ export const useSessionDebateAtlas = ({
   const [shownFor, setShownFor] = useState(identity);
   const [data, setData] = useState<AtlasData>(EMPTY);
   const [building, setBuilding] = useState(false);
+  // The build the reader picked; '' follows the newest.
+  const [selectedId, setSelectedId] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   if (shownFor !== identity) {
     setShownFor(identity);
     setData(EMPTY);
     setBuilding(false);
+    setSelectedId('');
     setLoading(false);
     setError('');
   }
@@ -119,7 +124,10 @@ export const useSessionDebateAtlas = ({
       setLoading(false);
       if (!result.ok) {
         // A build that is no longer kept: show the newest instead.
-        if (id && result.status === 404) return load('');
+        if (id && result.status === 404) {
+          setSelectedId('');
+          return load('');
+        }
         // Refused: this reader may not see atlases here, so none stay on screen.
         if (result.status === 401 || result.status === 403) {
           setData(EMPTY);
@@ -148,9 +156,10 @@ export const useSessionDebateAtlas = ({
 
   useEffect(() => {
     if (!enabled || !data.activeSinceMs || building) return undefined;
-    const timer = globalThis.setTimeout(() => void load(), DEBATE_ATLAS_ACTIVE_POLL_MS);
+    // Checking back keeps the build the reader is looking at.
+    const timer = globalThis.setTimeout(() => void load(selectedId), DEBATE_ATLAS_ACTIVE_POLL_MS);
     return () => globalThis.clearTimeout(timer);
-  }, [data.activeSinceMs, data.activeReads, building, enabled, load]);
+  }, [data.activeSinceMs, data.activeReads, building, enabled, load, selectedId]);
 
   const buildAtlas = useCallback(async () => {
     if (!supported || building) return false;
@@ -185,6 +194,7 @@ export const useSessionDebateAtlas = ({
       return false;
     }
     const { branches, ...summary } = result.build;
+    setSelectedId('');
     // A read that started before this build must not replace it.
     requestSeq.current += 1;
     setData((previous) => ({
@@ -199,7 +209,13 @@ export const useSessionDebateAtlas = ({
     return true;
   }, [account, building, chainId, config, identity, provider, sessionId, sessionSlug, supported, workerUrl]);
 
-  const selectBuild = useCallback((id: string) => void load(id), [load]);
+  const selectBuild = useCallback(
+    (id: string) => {
+      setSelectedId(id);
+      void load(id);
+    },
+    [load],
+  );
 
   return {
     supported,
@@ -209,6 +225,7 @@ export const useSessionDebateAtlas = ({
     building,
     loading,
     activeSinceMs: data.activeSinceMs,
+    workerUrl: supported ? String(workerUrl || '') : '',
     error,
     buildAtlas,
     selectBuild,
