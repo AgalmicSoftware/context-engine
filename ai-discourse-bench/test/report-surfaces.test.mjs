@@ -1990,6 +1990,9 @@ test('report renders models as participants in a OnePageSession-style results sh
   assert.doesNotMatch(html, /\.debateMap \.viewModeSwitch button svg \{[^}]*height: 1em/);
   assert.doesNotMatch(html, /\.debateMap \.viewModeSwitch button svg \{[^}]*vertical-align: -0\.125em/);
   assert.match(html, /\.debateMap \.legendDot\.subcategory \{ background: #2dd4bf; color: #2dd4bf; \}/);
+  // A compass's placement count and Hide toggle read at 4.5:1 or more on the dark panel, as in live Results.
+  assert.match(html, /\.debateMap \.collapseCount \{ font-size: 0\.8rem; color: rgba\(255, 255, 255, 0\.7\); margin-left: 6px; \}/);
+  assert.match(html, /\.debateMap \.collapseToggle \{ margin-left: auto; font-size: 0\.75rem; color: rgba\(255, 255, 255, 0\.7\); text-transform: uppercase; letter-spacing: 0\.05em; \}/);
   assert.match(html, /\.debateMap \.legendDot\.topic \{ background: #4ade80; color: #4ade80; \}/);
   assert.match(html, /\.debateMap \.legendDot\.instance \{ background: #fde047; color: #fde047; \}/);
   assert.doesNotMatch(html, />Demo Mode</);

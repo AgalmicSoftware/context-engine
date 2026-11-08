@@ -4298,8 +4298,8 @@ export const renderHtmlReport = (inputReport) => {
     .debateMap .collapseHeader { display: flex; align-items: center; cursor: pointer; padding: 8px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.08); margin-bottom: 8px; user-select: none; }
     .debateMap .collapseHeader > svg { color: rgba(255, 255, 255, 0.5); width: 14px; margin-right: 6px; }
     .debateMap .collapseHeader > span:first-of-type { font-size: 1.1rem; font-weight: 600; color: rgba(255, 255, 255, 0.75); }
-    .debateMap .collapseCount { font-size: 0.8rem; color: rgba(255, 255, 255, 0.4); margin-left: 6px; }
-    .debateMap .collapseToggle { margin-left: auto; font-size: 0.75rem; color: rgba(255, 255, 255, 0.35); text-transform: uppercase; letter-spacing: 0.05em; }
+    .debateMap .collapseCount { font-size: 0.8rem; color: rgba(255, 255, 255, 0.7); margin-left: 6px; }
+    .debateMap .collapseToggle { margin-left: auto; font-size: 0.75rem; color: rgba(255, 255, 255, 0.7); text-transform: uppercase; letter-spacing: 0.05em; }
     .debateMap .collapseContent { padding: 4px 0; }
     .debateMap .compassSection .compassContainer { width: 100%; padding: 4px 0 8px; }
     .aidb-analysis-compasses { display: grid; gap: 10px; margin-top: 16px; }
