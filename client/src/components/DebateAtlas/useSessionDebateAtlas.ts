@@ -28,6 +28,19 @@ export type SessionDebateAtlas = {
 
 // While someone else's build runs, the open Results check back this often.
 export const DEBATE_ATLAS_ACTIVE_POLL_MS = 20_000;
+// The Worker keeps this many builds; the list never offers one it dropped.
+export const DEBATE_ATLAS_KEPT_BUILDS = 8;
+
+type AtlasData = {
+  builds: DebateAtlasBuildSummary[];
+  build: DebateAtlasBuild | null;
+  serverCanBuild: boolean;
+  activeSinceMs: number | null;
+  // Bumped by each read that finds a build running, so the check-back re-arms.
+  activeReads: number;
+};
+
+const EMPTY: AtlasData = { builds: [], build: null, serverCanBuild: false, activeSinceMs: null, activeReads: 0 };
 
 const toRecord = (value: unknown): UnknownRecord =>
   value && typeof value === 'object' && !Array.isArray(value) ? (value as UnknownRecord) : {};
@@ -74,17 +87,30 @@ export const useSessionDebateAtlas = ({
   );
   const sessionId = resolveWorkerCanonicalSessionIdHex(config);
   const supported = config[DEBATE_ATLAS_FIELD] === true && !!workerUrl;
-  const [builds, setBuilds] = useState<DebateAtlasBuildSummary[]>([]);
-  const [build, setBuild] = useState<DebateAtlasBuild | null>(null);
-  const [serverCanBuild, setServerCanBuild] = useState(false);
+  // Whose atlases these are. A new session, Worker or account starts empty, so
+  // nothing read for one reader or session is shown for another.
+  const identity = supported ? [workerUrl, sessionSlug, sessionId, lower(account)].join('|') : '';
+  const [shownFor, setShownFor] = useState(identity);
+  const [data, setData] = useState<AtlasData>(EMPTY);
   const [building, setBuilding] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [activeSinceMs, setActiveSinceMs] = useState<number | null>(null);
   const [error, setError] = useState('');
+  if (shownFor !== identity) {
+    setShownFor(identity);
+    setData(EMPTY);
+    setBuilding(false);
+    setLoading(false);
+    setError('');
+  }
+  const identityRef = useRef(identity);
   const requestSeq = useRef(0);
+  useEffect(() => {
+    identityRef.current = identity;
+    requestSeq.current += 1;
+  }, [identity]);
 
   const load = useCallback(
-    async (id = '') => {
+    async (id = ''): Promise<void> => {
       if (!supported) return;
       const seq = (requestSeq.current += 1);
       setLoading(true);
@@ -92,15 +118,26 @@ export const useSessionDebateAtlas = ({
       if (seq !== requestSeq.current) return;
       setLoading(false);
       if (!result.ok) {
-        // A session whose Results viewers may not see atlases simply has none to show.
-        if (result.status !== 403) setError(result.error || 'Atlases are unavailable.');
+        // A build that is no longer kept: show the newest instead.
+        if (id && result.status === 404) return load('');
+        // Refused: this reader may not see atlases here, so none stay on screen.
+        if (result.status === 401 || result.status === 403) {
+          setData(EMPTY);
+          setError('');
+          return;
+        }
+        setError(result.error || 'Atlases are unavailable.');
         return;
       }
       setError('');
-      setBuilds(result.builds || []);
-      setBuild(result.build || null);
-      setServerCanBuild(result.canBuild === true);
-      setActiveSinceMs(result.active?.startedAtMs || null);
+      const activeSinceMs = result.active?.startedAtMs || null;
+      setData((previous) => ({
+        builds: result.builds || [],
+        build: result.build || null,
+        serverCanBuild: result.canBuild === true,
+        activeSinceMs,
+        activeReads: previous.activeReads + (activeSinceMs ? 1 : 0),
+      }));
     },
     [account, sessionId, sessionSlug, supported, workerUrl],
   );
@@ -110,13 +147,14 @@ export const useSessionDebateAtlas = ({
   }, [enabled, load]);
 
   useEffect(() => {
-    if (!enabled || !activeSinceMs || building) return undefined;
+    if (!enabled || !data.activeSinceMs || building) return undefined;
     const timer = globalThis.setTimeout(() => void load(), DEBATE_ATLAS_ACTIVE_POLL_MS);
     return () => globalThis.clearTimeout(timer);
-  }, [activeSinceMs, building, enabled, load]);
+  }, [data.activeSinceMs, data.activeReads, building, enabled, load]);
 
   const buildAtlas = useCallback(async () => {
     if (!supported || building) return false;
+    const startedFor = identity;
     setBuilding(true);
     setError('');
     const signingChainId = Number(config.networkChainId || chainId || 1) || 1;
@@ -136,32 +174,41 @@ export const useSessionDebateAtlas = ({
           context: { account, chainId: signingChainId, providerLike: provider },
         }),
     });
+    // The reader or session changed while it built: its atlas belongs to the old one.
+    if (identityRef.current !== startedFor) return false;
     setBuilding(false);
     if (!result.ok || !result.build) {
       setError(result.error || 'The atlas build failed.');
       // Someone else's build is running: show it, and check back for its atlas.
-      if (result.active?.startedAtMs) setActiveSinceMs(result.active.startedAtMs);
+      const startedAtMs = result.active?.startedAtMs;
+      if (startedAtMs) setData((previous) => ({ ...previous, activeSinceMs: startedAtMs }));
       return false;
     }
     const { branches, ...summary } = result.build;
     // A read that started before this build must not replace it.
     requestSeq.current += 1;
-    setBuild(result.build);
-    setBuilds((previous) => [summary, ...previous.filter((entry) => entry.id !== summary.id)]);
-    setActiveSinceMs(null);
+    setData((previous) => ({
+      ...previous,
+      build: result.build || null,
+      builds: [summary, ...previous.builds.filter((entry) => entry.id !== summary.id)].slice(
+        0,
+        DEBATE_ATLAS_KEPT_BUILDS,
+      ),
+      activeSinceMs: null,
+    }));
     return true;
-  }, [account, building, chainId, config, provider, sessionId, sessionSlug, supported, workerUrl]);
+  }, [account, building, chainId, config, identity, provider, sessionId, sessionSlug, supported, workerUrl]);
 
   const selectBuild = useCallback((id: string) => void load(id), [load]);
 
   return {
     supported,
-    builds,
-    build,
-    canBuild: supported && (serverCanBuild || mayOfferBuild(config, account)),
+    builds: data.builds,
+    build: data.build,
+    canBuild: supported && (data.serverCanBuild || mayOfferBuild(config, account)),
     building,
     loading,
-    activeSinceMs,
+    activeSinceMs: data.activeSinceMs,
     error,
     buildAtlas,
     selectBuild,
