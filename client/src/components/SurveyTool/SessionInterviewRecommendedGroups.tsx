@@ -13,8 +13,10 @@ import {
 import { AUTO_JOIN_CLAIM_ATTRIBUTE } from '../../utilities/ui/voiceDialogNoticeSlot';
 import { clearWorkerGroupAutoJoinCancellation } from '../../domains/worker/workerGroupAutoJoinPreference';
 import type { WorkerGroupAutoJoinIntent } from '../../domains/worker/workerGroupAutoJoinIntent';
+import WorkerGroupImage from '../Shared/WorkerGroupImage';
 import {
   getWorkerSessionToken,
+  isSafeHttpsUrl,
   joinWorkerGroup,
   loadPublicWorkerGroups,
   loadWorkerGroupOverview,
@@ -77,6 +79,7 @@ type GroupChoice = {
   groupId: string;
   label: string;
   description?: string;
+  imageUrl?: string;
   reason: string;
   fromLink: boolean;
   startsTicked: boolean;
@@ -279,6 +282,7 @@ export function SessionInterviewRecommendedGroups({
               groupId: invite.groupId,
               label: linked?.label || invite.groupId,
               ...(linked?.description ? { description: linked.description } : {}),
+              ...(linked?.imageUrl ? { imageUrl: linked.imageUrl } : {}),
               reason: 'From your link.',
               fromLink: true,
               startsTicked: true,
@@ -295,6 +299,7 @@ export function SessionInterviewRecommendedGroups({
             groupId: group.groupId,
             label: group.label,
             ...(group.description ? { description: group.description } : {}),
+            ...(group.imageUrl ? { imageUrl: group.imageUrl } : {}),
             reason: recommendation.reason || 'Suggested from your answers.',
             fromLink: false,
             startsTicked: isStrongGroupMatch(recommendation) && (!listedAtJoin || listedAtJoin.includes(group.groupId)),
@@ -398,6 +403,10 @@ export function SessionInterviewRecommendedGroups({
 
   const loadFailed = catalog.targetKey === targetKey && catalog.status === 'error';
   const loading = availability === 'loading';
+  // A private session's images need a Worker sign-in; use a saved one, and never ask for one here.
+  const imageToken = authenticated
+    ? readCachedInterviewWorkerToken({ sessionConfig, sessionSlug, workerUrl, account: normalizedAccount })
+    : '';
   if (!choices.length && !loading && outcome.status === 'idle' && !onRefresh && !loadFailed) return null;
   return (
     <SessionInterviewReviewSection
@@ -419,6 +428,21 @@ export function SessionInterviewRecommendedGroups({
               onChange={(event) => toggle(choice, event.target.checked)}
               data-testid={`ce-session-interview-group-choice-${choice.groupId}`}
             />
+            {/* Its name is beside it, so the image needs no text of its own. */}
+            {choice.imageUrl && isSafeHttpsUrl(choice.imageUrl) ? (
+              <WorkerGroupImage
+                src={choice.imageUrl}
+                alt=""
+                allowSignIn={false}
+                className={styles.sessionInterviewGroupChoiceImage}
+                fetchImpl={fetchImpl}
+                sessionConfig={sessionConfig}
+                sessionSlug={sessionSlug}
+                testId={`ce-session-interview-group-image-${choice.groupId}`}
+                workerToken={imageToken}
+                workerUrl={workerUrl}
+              />
+            ) : null}
             <span>
               <strong>{choice.label}</strong>
               {choice.description ? <small>{choice.description}</small> : null}

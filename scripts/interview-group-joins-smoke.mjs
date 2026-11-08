@@ -1,41 +1,75 @@
-import assert from "node:assert/strict";
-import fs from "node:fs/promises";
-import path from "node:path";
-import { chromium } from "playwright";
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import zlib from 'node:zlib';
+import { chromium } from 'playwright';
 
 // Interview review's Groups section against a fake Worker: a join link's group and strong matches
 // ticked, a weak match not, Submit and join, each join's outcome, and the switch in Settings.
 // Checks readable text in every theme, at phone and desktop widths, hovered, focused and pressed.
-const base = process.env.BASE_URL || "http://127.0.0.1:3000";
-assert(
-  ["localhost", "127.0.0.1"].includes(new URL(base).hostname),
-  "Use a local Vite server",
-);
-const output = process.env.OUTPUT_DIR || "";
+const base = process.env.BASE_URL || 'http://127.0.0.1:3000';
+assert(['localhost', '127.0.0.1'].includes(new URL(base).hostname), 'Use a local Vite server');
+const output = process.env.OUTPUT_DIR || '';
 if (output) await fs.mkdir(output, { recursive: true });
 
-const worker = "https://worker.example.test";
-const sessionSlug = "fixture";
-const sessionId = `0x${"1".repeat(32)}`;
-const account = "0x0000000000000000000000000000000000000001";
+const worker = 'https://worker.example.test';
+const images = 'https://images.example.test';
+const sessionSlug = 'fixture';
+const sessionId = `0x${'1'.repeat(32)}`;
+const account = '0x0000000000000000000000000000000000000001';
+// A small solid-colour PNG for each group's image.
+const crcTable = Array.from({ length: 256 }, (_, n) => {
+  let c = n;
+  for (let k = 0; k < 8; k += 1) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+  return c >>> 0;
+});
+const crc32 = (bytes) => {
+  let c = 0xffffffff;
+  for (const byte of bytes) c = crcTable[(c ^ byte) & 0xff] ^ (c >>> 8);
+  return (c ^ 0xffffffff) >>> 0;
+};
+const pngChunk = (type, data) => {
+  const body = Buffer.concat([Buffer.from(type), data]);
+  const out = Buffer.alloc(data.length + 12);
+  out.writeUInt32BE(data.length, 0);
+  body.copy(out, 4);
+  out.writeUInt32BE(crc32(body), data.length + 8);
+  return out;
+};
+const solidPng = ([r, g, b], size = 48) => {
+  const header = Buffer.alloc(13);
+  header.writeUInt32BE(size, 0);
+  header.writeUInt32BE(size, 4);
+  header[8] = 8; // bits per channel
+  header[9] = 2; // RGB
+  const row = Buffer.from([0, ...Array.from({ length: size }, () => [r, g, b]).flat()]);
+  const pixels = Buffer.concat(Array.from({ length: size }, () => row));
+  return Buffer.concat([
+    Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
+    pngChunk('IHDR', header),
+    pngChunk('IDAT', zlib.deflateSync(pixels)),
+    pngChunk('IEND', Buffer.alloc(0)),
+  ]);
+};
+
 const groups = [
-  ["salon", "Reverse Alignment Salon", "Everyone taking part in the salon."],
-  ["dacc", "d/acc", "Defensive, decentralised acceleration."],
-  ["uk", "UK residents", "People who live in the United Kingdom."],
-  ["builders", "Builders", "People who build AI tools."],
-].map(([groupId, label, description]) => ({
+  ['salon', 'Reverse Alignment Salon', 'Everyone taking part in the salon.', [42, 157, 143]],
+  ['dacc', 'd/acc', 'Defensive, decentralised acceleration.', [231, 111, 81]],
+  ['uk', 'UK residents', 'People who live in the United Kingdom.', [38, 70, 83]],
+  ['builders', 'Builders', 'People who build AI tools.', [233, 196, 106]],
+].map(([groupId, label, description, colour]) => ({
   groupId,
   sessionSlug,
   label,
   description,
-  joinMode: "open",
-  memberVisibility: "session",
+  imageUrl: `${images}/${groupId}.png`,
+  colour,
+  joinMode: 'open',
+  memberVisibility: 'session',
 }));
+const workerGroups = groups.map(({ colour: _colour, ...group }) => group);
 
-const probe = (
-  theme,
-  state,
-) => `<!doctype html><html data-ce-theme="${theme}" data-ce-theme-source="user"><head>
+const probe = (theme, state) => `<!doctype html><html data-ce-theme="${theme}" data-ce-theme-source="user"><head>
 <meta name="viewport" content="width=device-width,initial-scale=1"></head>
 <body style="padding:16px;margin:0;background:var(--ce-canvas);color:var(--ce-text)"><main id="probe"></main>
 <script type="module">
@@ -113,9 +147,7 @@ const probe = (
 // Each element's own text against what is painted behind it, half-transparent layers included.
 const readContrast = (root) => {
   const parse = (value) => {
-    const [r = 0, g = 0, b = 0, a = 1] = (value.match(/[\d.]+/g) || []).map(
-      Number,
-    );
+    const [r = 0, g = 0, b = 0, a = 1] = (value.match(/[\d.]+/g) || []).map(Number);
     return { r, g, b, a };
   };
   const over = (top, bottom) => ({
@@ -141,33 +173,21 @@ const readContrast = (root) => {
   const luminance = ({ r, g, b }) =>
     [r, g, b]
       .map((value) => value / 255)
-      .map((value) =>
-        value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4,
-      )
-      .reduce(
-        (sum, value, index) => sum + value * [0.2126, 0.7152, 0.0722][index],
-        0,
-      );
+      .map((value) => (value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4))
+      .reduce((sum, value, index) => sum + value * [0.2126, 0.7152, 0.0722][index], 0);
   const readings = [];
-  for (const element of [root, ...root.querySelectorAll("*")]) {
+  for (const element of [root, ...root.querySelectorAll('*')]) {
     const text = [...element.childNodes]
       .filter((node) => node.nodeType === Node.TEXT_NODE)
       .map((node) => node.textContent.trim())
-      .join(" ")
+      .join(' ')
       .trim();
-    if (
-      !text ||
-      element.closest("[hidden]") ||
-      !element.getClientRects().length
-    )
-      continue;
+    if (!text || element.closest('[hidden]') || !element.getClientRects().length) continue;
     const style = getComputedStyle(element);
-    if (style.visibility === "hidden" || Number(style.opacity) === 0) continue;
+    if (style.visibility === 'hidden' || Number(style.opacity) === 0) continue;
     const background = behind(element);
     const foreground = over(parse(style.color), background);
-    const [light, dark] = [luminance(foreground), luminance(background)].sort(
-      (a, b) => b - a,
-    );
+    const [light, dark] = [luminance(foreground), luminance(background)].sort((a, b) => b - a);
     readings.push({
       text: text.slice(0, 48),
       ratio: Math.round(((light + 0.05) / (dark + 0.05)) * 100) / 100,
@@ -197,9 +217,7 @@ const expectReadableInStates = async (page, target, region, label) => {
   lowest.push(await expectReadable(region, `${label} pressed`));
   await page.mouse.move(0, 0);
   await page.mouse.up();
-  await page
-    .locator("body")
-    .evaluate((body) => document.activeElement?.blur?.() ?? body);
+  await page.locator('body').evaluate((body) => document.activeElement?.blur?.() ?? body);
   return Math.min(...lowest);
 };
 
@@ -207,17 +225,15 @@ const expectReadableInStates = async (page, target, region, label) => {
 const expectSubmitLabel = (page, label) =>
   page.waitForFunction(
     (expected) =>
-      document
-        .querySelector('[data-testid="ce-session-interview-apply"]')
-        ?.textContent.trim()
-        .toLowerCase() === expected,
+      document.querySelector('[data-testid="ce-session-interview-apply"]')?.textContent.trim().toLowerCase() ===
+      expected,
     label,
   );
 
 const browser = await chromium.launch({ headless: true });
 const joined = [];
 try {
-  for (const theme of ["civic", "context-engine", "classic-95"]) {
+  for (const theme of ['civic', 'context-engine', 'classic-95']) {
     for (const width of [375, 1280]) {
       const run = async (state) => {
         const page = await browser.newPage({
@@ -225,41 +241,37 @@ try {
         });
         page.setDefaultTimeout(20000);
         const failures = [];
-        page.on("pageerror", (error) => failures.push(error.message));
-        await page.route("**/*", async (route) => {
+        page.on('pageerror', (error) => failures.push(error.message));
+        await page.route('**/*', async (route) => {
           const request = route.request();
           const url = new URL(request.url());
           if (url.origin === new URL(base).origin) {
-            if (url.pathname === "/group-joins-probe")
+            if (url.pathname === '/group-joins-probe')
               return route.fulfill({
-                contentType: "text/html",
+                contentType: 'text/html',
                 body: probe(theme, state),
               });
             return route.continue();
+          }
+          if (url.origin === images) {
+            const group = groups.find(({ groupId }) => url.pathname === `/${groupId}.png`);
+            return group ? route.fulfill({ contentType: 'image/png', body: solidPng(group.colour) }) : route.abort();
           }
           if (url.origin !== worker) return route.abort();
           const reply = (body, status = 200) =>
             route.fulfill({
               status,
-              contentType: "application/json",
+              contentType: 'application/json',
               body: JSON.stringify(body),
             });
           const identity = { sessionId, sessionSlug };
-          if (url.pathname === "/groups/list")
-            return reply({ ok: true, ...identity, groups });
-          if (url.pathname === "/groups/my-memberships")
-            return reply({ ok: true, ...identity, memberships: [] });
-          if (url.pathname === "/groups/join") {
-            const { groupId } = JSON.parse(request.postData() || "{}");
-            if (groupId === "uk")
-              return reply(
-                { ok: false, reason: "worker_group_member_cap_exceeded" },
-                409,
-              );
+          if (url.pathname === '/groups/list') return reply({ ok: true, ...identity, groups: workerGroups });
+          if (url.pathname === '/groups/my-memberships') return reply({ ok: true, ...identity, memberships: [] });
+          if (url.pathname === '/groups/join') {
+            const { groupId } = JSON.parse(request.postData() || '{}');
+            if (groupId === 'uk') return reply({ ok: false, reason: 'worker_group_member_cap_exceeded' }, 409);
             joined.push(groupId);
-            const group = groups.find(
-              (candidate) => candidate.groupId === groupId,
-            );
+            const group = workerGroups.find((candidate) => candidate.groupId === groupId);
             return reply({
               ok: true,
               ...identity,
@@ -268,7 +280,7 @@ try {
               memberCount: 1,
             });
           }
-          return reply({ error: "Not found." }, 404);
+          return reply({ error: 'Not found.' }, 404);
         });
         await page.goto(`${base}/group-joins-probe`);
         return { page, failures };
@@ -276,104 +288,78 @@ try {
 
       // Signed out, with a join link: the review before submitting.
       {
-        const { page, failures } = await run("out");
-        const section = page.getByTestId(
-          "ce-session-interview-group-recommendations",
-        );
+        const { page, failures } = await run('out');
+        const section = page.getByTestId('ce-session-interview-group-recommendations');
         await section.waitFor().catch(async (error) => {
-          console.error(await page.locator("body").innerText(), failures);
+          console.error(await page.locator('body').innerText(), failures);
           throw error;
         });
-        await page.getByRole("heading", { name: "Groups (4)" }).waitFor();
+        await page.getByRole('heading', { name: 'Groups (4)' }).waitFor();
         await page.waitForFunction(() =>
-          [...document.querySelectorAll(".modal")].some(
-            (element) => Number(getComputedStyle(element).opacity) === 1,
-          ),
+          [...document.querySelectorAll('.modal')].some((element) => Number(getComputedStyle(element).opacity) === 1),
         );
-        const box = (name) => section.getByRole("checkbox", { name });
+        const box = (name) => section.getByRole('checkbox', { name });
         const names = await section
-          .locator("label strong")
-          .evaluateAll((elements) =>
-            elements.map((element) => element.textContent),
-          );
-        assert.deepEqual(names, [
-          "Reverse Alignment Salon",
-          "d/acc",
-          "UK residents",
-          "Builders",
-        ]);
+          .locator('label strong')
+          .evaluateAll((elements) => elements.map((element) => element.textContent));
+        assert.deepEqual(names, ['Reverse Alignment Salon', 'd/acc', 'UK residents', 'Builders']);
         assert.equal(await box(/Reverse Alignment Salon/).isChecked(), true);
         assert.equal(await box(/d\/acc/).isChecked(), true);
         assert.equal(await box(/UK residents/).isChecked(), true);
         assert.equal(await box(/Builders/).isChecked(), false);
-        await section.getByText("From your link.").waitFor();
-        await section.getByText("Your AI: Lives in the UK").waitFor();
-        const submit = page.getByTestId("ce-session-interview-apply");
-        await expectSubmitLabel(page, "submit and join");
-        // The link's own notice stands aside while its group is listed here.
-        assert.equal(
-          await page.getByTestId("ce-session-worker-group-auto-join").count(),
-          0,
+        await section.getByText('From your link.').waitFor();
+        // Each group's image shows beside its name, loaded, with no text of its own.
+        await page.waitForFunction(
+          () =>
+            [...document.querySelectorAll('[data-testid^="ce-session-interview-group-image-"]')].filter(
+              (image) => image.complete && image.naturalWidth > 0,
+            ).length === 4,
         );
-        const rows = section.locator("label");
+        assert.deepEqual(
+          await section
+            .locator('label img')
+            .evaluateAll((elements) => elements.map((element) => element.getAttribute('alt'))),
+          ['', '', '', ''],
+        );
+        await section.getByText('Your AI: Lives in the UK').waitFor();
+        const submit = page.getByTestId('ce-session-interview-apply');
+        await expectSubmitLabel(page, 'submit and join');
+        // The link's own notice stands aside while its group is listed here.
+        assert.equal(await page.getByTestId('ce-session-worker-group-auto-join').count(), 0);
+        const rows = section.locator('label');
         let lowest = Infinity;
         for (let index = 0; index < (await rows.count()); index += 1) {
           const row = rows.nth(index);
           lowest = Math.min(
             lowest,
-            await expectReadableInStates(
-              page,
-              row.getByRole("checkbox"),
-              row,
-              `${theme} ${width} row ${index}`,
-            ),
+            await expectReadableInStates(page, row.getByRole('checkbox'), row, `${theme} ${width} row ${index}`),
           );
         }
-        lowest = Math.min(
-          lowest,
-          await expectReadableInStates(
-            page,
-            submit,
-            submit,
-            `${theme} ${width} submit`,
-          ),
-        );
-        const header = section
-          .locator("xpath=ancestor::details[1]")
-          .locator("summary");
-        lowest = Math.min(
-          lowest,
-          await expectReadable(header, `${theme} ${width} heading`),
-        );
-        assert.equal(
-          await page.evaluate(
-            () => document.documentElement.scrollWidth > innerWidth + 1,
-          ),
-          false,
-        );
+        lowest = Math.min(lowest, await expectReadableInStates(page, submit, submit, `${theme} ${width} submit`));
+        const header = section.locator('xpath=ancestor::details[1]').locator('summary');
+        lowest = Math.min(lowest, await expectReadable(header, `${theme} ${width} heading`));
+        assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false);
         await box(/Builders/).check();
         await box(/Builders/).uncheck();
         await box(/Reverse Alignment Salon/).uncheck();
         await box(/d\/acc/).uncheck();
         await box(/UK residents/).uncheck();
-        await expectSubmitLabel(page, "submit responses");
+        await expectSubmitLabel(page, 'submit responses');
         await box(/Reverse Alignment Salon/).check();
         await box(/d\/acc/).check();
         await box(/UK residents/).check();
-        await expectSubmitLabel(page, "submit and join");
+        await expectSubmitLabel(page, 'submit and join');
         if (output) {
           await page.evaluate(() => document.activeElement?.blur());
           await page.mouse.move(0, 0);
-          await section
-            .locator("xpath=ancestor::details[1]")
-            .scrollIntoViewIfNeeded();
+          await section.locator('xpath=ancestor::details[1]').scrollIntoViewIfNeeded();
           await page.screenshot({
             path: path.join(output, `before-${theme}-${width}.png`),
-            animations: "disabled",
+            animations: 'disabled',
           });
-          await section.locator("xpath=ancestor::details[1]").screenshot({
+          await section.locator('xpath=ancestor::details[1]').screenshot({
             path: path.join(output, `groups-${theme}-${width}.png`),
-            animations: "disabled",
+            animations: 'disabled',
           });
         }
         assert.deepEqual(failures, []);
@@ -385,98 +371,56 @@ try {
 
       // Signed in: Submit and join, and what each join did.
       {
-        const { page, failures } = await run("in");
-        const section = page.getByTestId(
-          "ce-session-interview-group-recommendations",
-        );
-        await page.getByRole("heading", { name: "Groups (4)" }).waitFor();
+        const { page, failures } = await run('in');
+        const section = page.getByTestId('ce-session-interview-group-recommendations');
+        await page.getByRole('heading', { name: 'Groups (4)' }).waitFor();
         const before = joined.length;
-        await page.getByTestId("ce-session-interview-apply").click();
-        await section
-          .getByText("Joined Reverse Alignment Salon and d/acc.")
-          .waitFor();
-        assert.deepEqual(joined.slice(before), ["salon", "dacc"]);
-        const alert = section.getByRole("alert");
-        assert.equal(
-          await alert.innerText(),
-          "Couldn’t join UK residents: it is full.",
-        );
-        const retry = section.getByRole("button", {
-          name: "Join ticked groups",
+        await page.getByTestId('ce-session-interview-apply').click();
+        await section.getByText('Joined Reverse Alignment Salon and d/acc.').waitFor();
+        assert.deepEqual(joined.slice(before), ['salon', 'dacc']);
+        const alert = section.getByRole('alert');
+        assert.equal(await alert.innerText(), 'Couldn’t join UK residents: it is full.');
+        const retry = section.getByRole('button', {
+          name: 'Join ticked groups',
         });
         let lowest = await expectReadable(section, `${theme} ${width} outcome`);
-        lowest = Math.min(
-          lowest,
-          await expectReadableInStates(
-            page,
-            retry,
-            retry,
-            `${theme} ${width} join ticked`,
-          ),
-        );
-        assert.equal(
-          await page.evaluate(
-            () => document.documentElement.scrollWidth > innerWidth + 1,
-          ),
-          false,
-        );
+        lowest = Math.min(lowest, await expectReadableInStates(page, retry, retry, `${theme} ${width} join ticked`));
+        assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false);
         if (output) {
           await page.evaluate(() => document.activeElement?.blur());
           await page.mouse.move(0, 0);
           await retry.scrollIntoViewIfNeeded();
           await page.screenshot({
             path: path.join(output, `after-${theme}-${width}.png`),
-            animations: "disabled",
+            animations: 'disabled',
           });
         }
         assert.deepEqual(failures, []);
-        console.log(
-          `PASS Groups after submit ${theme} ${width}: joined two, one full, lowest contrast ${lowest}`,
-        );
+        console.log(`PASS Groups after submit ${theme} ${width}: joined two, one full, lowest contrast ${lowest}`);
         await page.close();
       }
 
       // The switch in Interview settings, with its help.
       {
-        const { page, failures } = await run("settings");
-        const toggle = page.getByLabel("Join strong group matches on submit");
+        const { page, failures } = await run('settings');
+        const toggle = page.getByLabel('Join strong group matches on submit');
         await toggle.waitFor();
-        const row = toggle.locator("xpath=ancestor::div[1]");
-        let lowest = await expectReadableInStates(
-          page,
-          toggle,
-          row,
-          `${theme} ${width} setting`,
-        );
+        const row = toggle.locator('xpath=ancestor::div[1]');
+        let lowest = await expectReadableInStates(page, toggle, row, `${theme} ${width} setting`);
         await toggle.check();
         assert.equal(await toggle.isChecked(), true);
-        await page
-          .getByRole("button", { name: "About joining strong group matches" })
-          .hover();
-        const tooltip = page.getByRole("tooltip");
+        await page.getByRole('button', { name: 'About joining strong group matches' }).hover();
+        const tooltip = page.getByRole('tooltip');
         await tooltip.waitFor();
         if (output)
           await page.screenshot({
             path: path.join(output, `setting-${theme}-${width}.png`),
           });
-        assert.match(
-          await tooltip.innerText(),
-          /strongly fit a participant’s answers start ticked/,
-        );
-        lowest = Math.min(
-          lowest,
-          await expectReadable(tooltip, `${theme} ${width} setting help`),
-        );
-        assert.equal(
-          await page.evaluate(
-            () => document.documentElement.scrollWidth > innerWidth + 1,
-          ),
-          false,
-        );
+        assert.match(await tooltip.innerText(), /Strong matches start ticked under their drafts.*Off, no groups are matched/);
+        lowest = Math.min(lowest, await expectReadable(tooltip, `${theme} ${width} setting help`));
+        assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false);
         assert.deepEqual(failures, []);
-        console.log(
-          `PASS Setting ${theme} ${width}: switch, help, lowest contrast ${lowest}`,
-        );
+        console.log(`PASS Setting ${theme} ${width}: switch, help, lowest contrast ${lowest}`);
         await page.close();
       }
     }

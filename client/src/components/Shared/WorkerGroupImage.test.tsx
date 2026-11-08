@@ -1,6 +1,10 @@
 import React from 'react';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import WorkerGroupImage from './WorkerGroupImage';
+import { fetchWorkerWithAuth } from '../../utilities/worker/workerAuth';
+
+// Signing in for an image would prompt someone; tests watch that it doesn't happen.
+jest.mock('../../utilities/worker/workerAuth', () => ({ fetchWorkerWithAuth: jest.fn() }));
 
 const originalCreateObjectURL = URL.createObjectURL;
 const originalRevokeObjectURL = URL.revokeObjectURL;
@@ -51,6 +55,42 @@ describe('WorkerGroupImage', () => {
 
     expect(screen.getByTestId('group-image')).toHaveAttribute('src', src);
     expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('never asks someone to sign in for a private image when told not to; a saved token still loads it', async () => {
+    const createObjectURL = jest.fn().mockReturnValue('blob:private-group-image');
+    Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: createObjectURL });
+    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: jest.fn() });
+    const fetchImpl = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      blob: jest.fn().mockResolvedValue(new Blob(['image'], { type: 'image/png' })),
+    });
+    const src = 'https://private-worker.example/storage/read?id=cf_group_image';
+    const image = (workerToken: string) => (
+      <WorkerGroupImage
+        allowSignIn={false}
+        src={src}
+        sessionConfig={privateConfig}
+        sessionSlug="private-session"
+        workerToken={workerToken}
+        workerUrl="https://private-worker.example"
+        fetchImpl={fetchImpl}
+        testId="group-image"
+      />
+    );
+    const view = render(image(''));
+    await act(async () => {});
+    expect(screen.queryByTestId('group-image')).toBeNull();
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(fetchWorkerWithAuth).not.toHaveBeenCalled();
+    view.rerender(image('participant-token'));
+    expect(await screen.findByTestId('group-image')).toHaveAttribute('src', 'blob:private-group-image');
+    expect(fetchImpl).toHaveBeenCalledWith(
+      src,
+      expect.objectContaining({ headers: expect.objectContaining({ Authorization: 'Bearer participant-token' }) }),
+    );
+    view.unmount();
   });
 
   it('loads private session storage artwork with the existing Worker credential', async () => {

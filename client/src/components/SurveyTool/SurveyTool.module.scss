@@ -4502,6 +4502,15 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
     overflow-wrap: anywhere;
   }
 
+  .sessionInterviewGroupChoiceImage {
+    flex-shrink: 0;
+    width: 44px;
+    height: 44px;
+    border: 1px solid var(--ce-card-border);
+    border-radius: var(--ce-radius-6);
+    object-fit: cover;
+  }
+
   small {
     color: inherit;
     font-size: 0.82rem;

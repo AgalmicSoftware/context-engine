@@ -20,6 +20,9 @@ import {
 } from '../../utilities/worker/workerAuthTokenCache';
 
 jest.mock('../../domains/worker/workerGroupPorts', () => ({
+  isSafeHttpsUrl: jest.requireActual<typeof import('../../domains/worker/workerGroupPorts')>(
+    '../../domains/worker/workerGroupPorts',
+  ).isSafeHttpsUrl,
   getWorkerSessionToken: jest.fn(),
   joinWorkerGroup: jest.fn(),
   loadPublicWorkerGroups: jest.fn(),
@@ -439,6 +442,33 @@ describe('SessionInterviewRecommendedGroups', () => {
     view.rerender(element({ account: other, loginComplete: true, joinRequest: 1 }));
     await waitFor(() => expect(screen.queryByText('Joined AI Optimists.')).toBeNull());
     expect(await screen.findByRole('checkbox', { name: /AI Optimists/ })).toBeInTheDocument();
+  });
+
+  it('shows each group’s image beside its name, only from a safe address', async () => {
+    jest
+      .mocked(loadPublicWorkerGroups)
+      .mockResolvedValue([
+        group({ imageUrl: 'https://images.example/optimists.png' }),
+        group({ groupId: 'plain', label: 'Plain' }),
+        group({ groupId: 'unsafe', label: 'Unsafe', imageUrl: 'http://images.example/unsafe.png' }),
+      ]);
+    render(
+      element({
+        recommendations: [
+          recommendation(),
+          recommendation({ groupId: 'plain' }),
+          recommendation({ groupId: 'unsafe' }),
+        ],
+      }),
+    );
+    const image = await screen.findByTestId('ce-session-interview-group-image-ai-optimists');
+    expect(image).toHaveAttribute('src', 'https://images.example/optimists.png');
+    // Decorative: the name beside it already labels the tick box.
+    expect(image).toHaveAttribute('alt', '');
+    expect(box(/AI Optimists/).closest('label')).toContainElement(image);
+    expect(screen.queryByTestId('ce-session-interview-group-image-plain')).toBeNull();
+    expect(screen.queryByTestId('ce-session-interview-group-image-unsafe')).toBeNull();
+    expect(box(/^AI Optimists/)).toBeInTheDocument();
   });
 
   it('shows nothing with no groups to list and nothing pending', () => {
