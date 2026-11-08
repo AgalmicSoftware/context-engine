@@ -1212,10 +1212,12 @@
   min-height: 50px;
   min-width: 138px;
   padding: 10px 20px;
+  // Opaque and darker than the info colour, so the white label reads at 4.5:1
+  // on any panel; translucent, it was 3.77:1 on Context Engine.
   background: linear-gradient(
     180deg,
-    color-mix(in srgb, var(--ce-status-info) 72%, transparent) 0%,
-    color-mix(in srgb, var(--ce-status-info) 90%, transparent) 100%
+    color-mix(in srgb, var(--ce-status-info) 75%, var(--ce-compat-dark)) 0%,
+    color-mix(in srgb, var(--ce-status-info) 68%, var(--ce-compat-dark)) 100%
   );
   color: color-mix(in srgb, var(--ce-text-inverse) 98%, transparent);
   font-size: 0.98rem;
@@ -1240,8 +1242,8 @@
   &:focus-visible {
     background: linear-gradient(
       180deg,
-      color-mix(in srgb, var(--ce-status-info) 82%, transparent) 0%,
-      color-mix(in srgb, var(--ce-status-info) 94%, transparent) 100%
+      color-mix(in srgb, var(--ce-status-info) 70%, var(--ce-compat-dark)) 0%,
+      color-mix(in srgb, var(--ce-status-info) 62%, var(--ce-compat-dark)) 100%
     );
     border-color: color-mix(in srgb, var(--ce-text-inverse) 36%, transparent);
     color: var(--ce-color-white);
@@ -2048,6 +2050,17 @@
     min-height: calc(100vh - 196px);
     padding: 0 clamp(12px, 3vw, 42px) 48px;
     color: var(--ce-panel-text);
+  }
+
+  // The selected Results view: the shared tint left its white label at 1.6:1
+  // on the grey window, so it takes the primary button's colours, as Minimal does.
+  .sectionHeaderViewModeButtonActive,
+  .sectionHeaderViewModeButtonActive:hover,
+  .sectionHeaderViewModeButtonActive:focus-visible {
+    background: var(--ce-action-primary);
+    border-color: var(--ce-action-primary);
+    color: var(--ce-action-primary-text);
+    text-shadow: none;
   }
 
   .brandingSection {
