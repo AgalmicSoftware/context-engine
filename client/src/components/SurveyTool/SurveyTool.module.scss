@@ -3448,7 +3448,7 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   position: relative;
   z-index: 2;
   cursor: grabbing;
-  box-shadow: 0 6px 16px rgb(0 0 0 / 25%);
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--ce-compat-dark) 25%, transparent);
 }
 
 // Where a dragged person would land: an outline, so the label keeps its contrast.
