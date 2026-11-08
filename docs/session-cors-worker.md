@@ -1669,7 +1669,7 @@ requires sign-in; closing the interview or opening results does not relaunch it.
 The invitation notice displays the public Group name before sign-in using the
 exact session-bound discovery endpoint; it falls back to the Group ID when
 public discovery is unavailable. The compact notice reads “Group name: Will be
-joined upon sign-in” with Cancel auto-join; sign-in uses the existing page login
+joined upon sign-in” with **Cancel**; sign-in uses the existing page login
 control. Visitors
 who follow the auto-join link sign in first; the client then calls the existing
 `/groups/join` endpoint automatically. The app remembers one pending invitation

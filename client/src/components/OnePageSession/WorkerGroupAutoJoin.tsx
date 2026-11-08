@@ -208,8 +208,8 @@ function AutoJoinIntent({
         </button>
       ) : null}
       {!done && progress.phase !== 'joining' ? (
-        <button type="button" className={styles.secondaryButton} onClick={cancel}>
-          Cancel auto-join
+        <button type="button" className={styles.secondaryButton} onClick={cancel} aria-label="Cancel auto-join">
+          Cancel
         </button>
       ) : null}
     </WorkerGroupAutoJoinNotice>
@@ -330,8 +330,9 @@ export default function WorkerGroupAutoJoin(props: Props) {
           finishWorkerGroupAutoJoin(intent.sessionSlug, intent.groupId);
           setIntent(null);
         }}
+        aria-label="Cancel auto-join"
       >
-        Cancel auto-join
+        Cancel
       </button>
     </WorkerGroupAutoJoinNotice>
   );
