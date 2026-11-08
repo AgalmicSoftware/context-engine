@@ -111,6 +111,29 @@ ${[
 ${topic ? 'Topic' : 'Branch'} input:
 ${JSON.stringify({ questions, responses, placeParticipants })}`;
 
+// What a build would send now, with the session's data left as placeholders,
+// so a builder sees the model and the prompts before and while one runs.
+export const describeNextDebateAtlasBuild = (config) => {
+  const unquote = (prompt) => prompt.replace(/"(<[A-Za-z ,]+>)"/g, '$1');
+  return {
+    model: trim(resolveAnalysisAiPayload({ config, prompt: '' }).model),
+    prompts: {
+      plan: unquote(buildDebateAtlasPlanPrompt({
+        sessionName: config?.sessionName,
+        questions: '<Questions>',
+        contextText: '<Background, when the hosts gave some>',
+      })),
+      map: unquote(buildDebateAtlasTopicPrompt({
+        branch: '<Branch>',
+        topic: '<Topic, left out for a whole branch>',
+        questions: '<Questions>',
+        responses: '<Responses>',
+        placeParticipants: '<Participants>',
+      })),
+    },
+  };
+};
+
 const planQuestion = (question, responseCount) => ({
   id: question.id,
   prompt: text(question.prompt, 400),
@@ -406,5 +429,9 @@ export const dispatchDebateAtlasReadRequest = async ({ request, env, config, slu
   if (!result.ok) {
     return deps.json({ ok: false, error: result.body?.error || 'Atlases are unavailable; retry.' }, result.status || 503, responseHeaders);
   }
-  return deps.json({ ...result.body, canBuild: builder }, 200, responseHeaders);
+  return deps.json({
+    ...result.body,
+    canBuild: builder,
+    ...(builder ? { nextBuild: describeNextDebateAtlasBuild(config) } : {}),
+  }, 200, responseHeaders);
 };

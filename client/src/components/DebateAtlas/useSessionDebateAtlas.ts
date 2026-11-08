@@ -3,7 +3,11 @@ import { DEBATE_ATLAS_FIELD } from '@ce-shared/workerSessionPublicConfig.mjs';
 
 import { adminWorkerPorts } from '../../domains/worker/adminWorkerPorts';
 import { readDebateAtlas, requestDebateAtlasBuild } from '../../domains/debateAtlas/debateAtlasWorkerClient';
-import type { DebateAtlasBuild, DebateAtlasBuildSummary } from '../../domains/debateAtlas/debateAtlasTypes';
+import type {
+  DebateAtlasBuild,
+  DebateAtlasBuildSummary,
+  DebateAtlasNextBuild,
+} from '../../domains/debateAtlas/debateAtlasTypes';
 import { isConfiguredAdmin } from '../../utilities/storage/storageClient';
 import { getUsableSessionWorkerUrl } from '../../utilities/session/sessionWorkerAvailability';
 import { resolveWorkerCanonicalSessionIdHex } from '../../utilities/session/sessionWorkerDiscovery';
@@ -21,6 +25,10 @@ export type SessionDebateAtlas = {
   loading: boolean;
   /** When a build someone started is still running. */
   activeSinceMs: number | null;
+  /** When the running build, this reader's or someone else's, started. */
+  buildStartedAtMs: number | null;
+  /** The model and prompts a build would use, for those who may build. */
+  nextBuild: DebateAtlasNextBuild | null;
   /** The Worker that keeps this session's atlases. */
   workerUrl: string;
   error: string;
@@ -40,9 +48,17 @@ type AtlasData = {
   activeSinceMs: number | null;
   // Bumped by each read that finds a build running, so the check-back re-arms.
   activeReads: number;
+  nextBuild: DebateAtlasNextBuild | null;
 };
 
-const EMPTY: AtlasData = { builds: [], build: null, serverCanBuild: false, activeSinceMs: null, activeReads: 0 };
+const EMPTY: AtlasData = {
+  builds: [],
+  build: null,
+  serverCanBuild: false,
+  activeSinceMs: null,
+  activeReads: 0,
+  nextBuild: null,
+};
 
 const toRecord = (value: unknown): UnknownRecord =>
   value && typeof value === 'object' && !Array.isArray(value) ? (value as UnknownRecord) : {};
@@ -95,6 +111,7 @@ export const useSessionDebateAtlas = ({
   const [shownFor, setShownFor] = useState(identity);
   const [data, setData] = useState<AtlasData>(EMPTY);
   const [building, setBuilding] = useState(false);
+  const [pressedAtMs, setPressedAtMs] = useState<number | null>(null);
   // The build the reader picked; '' follows the newest.
   const [selectedId, setSelectedId] = useState('');
   const [loading, setLoading] = useState(false);
@@ -103,6 +120,7 @@ export const useSessionDebateAtlas = ({
     setShownFor(identity);
     setData(EMPTY);
     setBuilding(false);
+    setPressedAtMs(null);
     setSelectedId('');
     setLoading(false);
     setError('');
@@ -145,6 +163,7 @@ export const useSessionDebateAtlas = ({
         serverCanBuild: result.canBuild === true,
         activeSinceMs,
         activeReads: previous.activeReads + (activeSinceMs ? 1 : 0),
+        nextBuild: result.nextBuild || null,
       }));
     },
     [account, sessionId, sessionSlug, supported, workerUrl],
@@ -165,6 +184,7 @@ export const useSessionDebateAtlas = ({
     if (!supported || building) return false;
     const startedFor = identity;
     setBuilding(true);
+    setPressedAtMs(Date.now());
     setError('');
     const signingChainId = Number(config.networkChainId || chainId || 1) || 1;
     const authorityMode = toRecord(toRecord(config.sessionModeProfile).authority).mode;
@@ -186,6 +206,7 @@ export const useSessionDebateAtlas = ({
     // The reader or session changed while it built: its atlas belongs to the old one.
     if (identityRef.current !== startedFor) return false;
     setBuilding(false);
+    setPressedAtMs(null);
     if (!result.ok || !result.build) {
       setError(result.error || 'The atlas build failed.');
       // Someone else's build is running: show it, and check back for its atlas.
@@ -225,6 +246,8 @@ export const useSessionDebateAtlas = ({
     building,
     loading,
     activeSinceMs: data.activeSinceMs,
+    buildStartedAtMs: building ? pressedAtMs : data.activeSinceMs,
+    nextBuild: data.nextBuild,
     workerUrl: supported ? String(workerUrl || '') : '',
     error,
     buildAtlas,

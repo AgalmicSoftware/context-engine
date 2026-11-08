@@ -64,12 +64,18 @@ it('posts a signed build of the stored responses and returns the new atlas', asy
 
 it.each([
   [
+    { ok: false, error: 'Already building.', reason: 'debate_atlas_build_running', active: { startedAtMs: 4 } },
+    409,
+    { active: { startedAtMs: 4 } },
+  ],
+  // An older Worker that does not say when its build started: timed from the refusal.
+  [
     { ok: false, error: 'Already building.', reason: 'debate_atlas_build_running' },
     409,
     { active: { startedAtMs: 9 } },
   ],
   [{ ok: false, error: 'Needs at least 2 participants.' }, 422, {}],
-])('passes on the status of a refused build, and whether another build runs', async (body, status, extra) => {
+])('passes on the status of a refused build, and when another build started', async (body, status, extra) => {
   const result = await requestDebateAtlasBuild({
     chainId: 1,
     fetchImpl: respond(body, status) as unknown as typeof fetch,

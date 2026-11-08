@@ -5,6 +5,7 @@ import {
   DEBATE_ATLAS_BUILD_ACTION,
   DEBATE_ATLAS_LIMITS,
   buildDebateAtlas,
+  describeNextDebateAtlasBuild,
   dispatchDebateAtlasReadRequest,
   normalizeDebateAtlasPlan,
   normalizeDebateAtlasTopic,
@@ -408,6 +409,20 @@ test('everyone who sees full Results reads atlases; elsewhere only those who may
   assert.equal(signedInViewer.status, 200);
   assert.deepEqual(signedInViewer.adminChecks, []);
   assert.equal(resultsAdmin.adminChecks.length, 0);
+
+  // Only those who may build are told the model and prompts a build would use.
+  assert.equal(viewer.body.nextBuild, undefined);
+  assert.equal(signedInViewer.body.nextBuild, undefined);
+  assert.deepEqual(resultsAdmin.body.nextBuild, describeNextDebateAtlasBuild(privateResults));
+});
+
+test('the next build is described with the session model and placeholder prompts', () => {
+  const next = describeNextDebateAtlasBuild({ sessionName: 'Salon', ai: { models: { thinking: 'deep-model' } } });
+  assert.equal(next.model, 'deep-model');
+  assert.ok(next.prompts.plan.startsWith('You are planning') && next.prompts.plan.includes('"Salon"'));
+  assert.match(next.prompts.plan, /\n<Questions>\n/);
+  assert.match(next.prompts.map, /\{"questions":<Questions>,"responses":<Responses>,"placeParticipants":<Participants>\}$/);
+  assert.ok(!/"</.test(next.prompts.plan + next.prompts.map));
 });
 
 const dispatchAs = async ({ action, signer, config }) => {

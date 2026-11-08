@@ -300,3 +300,32 @@ it('names the Worker that keeps its atlases, and none where it builds none', asy
   const unsupported = renderAtlas({ sessionConfig: { ...baseConfig, debateAtlas: undefined } });
   expect(unsupported.result.current.workerUrl).toBe('');
 });
+
+it('times a press from when it started and gives the model and prompts the Worker sent builders', async () => {
+  const nextBuild = { model: 'deep-model', prompts: { plan: 'Plan <Questions>', map: 'Map <Responses>' } };
+  read.mockResolvedValue({ ...shown('atlas_k2_00000002'), canBuild: true, nextBuild });
+  let finish: (value: DebateAtlasBuildResult) => void = () => {};
+  requestBuild.mockReturnValue(new Promise((resolve) => (finish = resolve)));
+  const { result } = renderAtlas({ account: address(1) });
+  await waitFor(() => expect(result.current.nextBuild).toEqual(nextBuild));
+  expect(result.current.buildStartedAtMs).toBeNull();
+
+  const before = Date.now();
+  let pending: Promise<boolean> = Promise.resolve(true);
+  act(() => {
+    pending = result.current.buildAtlas();
+  });
+  expect(result.current.buildStartedAtMs).toBeGreaterThanOrEqual(before);
+  await act(async () => {
+    finish({ ok: true, status: 200, build: build('atlas_kz_0000000f') });
+    await pending;
+  });
+  expect(result.current.buildStartedAtMs).toBeNull();
+});
+
+it("times someone else's running build from its start", async () => {
+  read.mockResolvedValue({ ...shown('atlas_k2_00000002'), active: { startedAtMs: 1234 } });
+  const { result } = renderAtlas({ account: address(1) });
+  await waitFor(() => expect(result.current.activeSinceMs).toBe(1234));
+  expect(result.current.buildStartedAtMs).toBe(1234);
+});

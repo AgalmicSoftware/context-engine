@@ -132,9 +132,12 @@ export const postSignedAdminWorkerRequest = async ({
         responseError,
       }),
     );
+    const activeStartedAtMs = Number(data?.active?.startedAtMs);
     Object.assign(lastError, {
       status: response.status,
       reason: typeof data?.reason === 'string' ? data.reason : '',
+      // A refusal because the same work is already running says when it started.
+      ...(activeStartedAtMs > 0 ? { active: { startedAtMs: activeStartedAtMs } } : {}),
     });
     throw lastError;
   }

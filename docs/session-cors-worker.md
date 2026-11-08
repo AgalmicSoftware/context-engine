@@ -602,8 +602,11 @@ Admin test panel:
   time, builder, model and response counts.
   `GET /debate-atlas?sessionSlug=<slug>&id=` returns the build list and the
   newest build (or the one named by `id`) to viewers under the artifact rule
-  above, and to signed-in builders on any session, with `canBuild`. The public
-  config sets `debateAtlas: true` so the site knows the Worker builds atlases.
+  above, and to signed-in builders on any session, with `canBuild`. Builders
+  also get `nextBuild`: the model a build would call and its two prompt
+  templates, with the session's data as placeholders, which the site shows
+  while a build runs. The public config sets `debateAtlas: true` so the site
+  knows the Worker builds atlases.
 - Manual generation uses signed admin action
   `POST /admin/results-analysis/generate` with action
   `results-analysis/generate`. Worker-canonical Cloudflare sessions can request

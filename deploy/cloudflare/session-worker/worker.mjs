@@ -103285,6 +103285,26 @@ ${[
 
 ${topic ? "Topic" : "Branch"} input:
 ${JSON.stringify({ questions, responses, placeParticipants })}`;
+var describeNextDebateAtlasBuild = (config) => {
+  const unquote = (prompt) => prompt.replace(/"(<[A-Za-z ,]+>)"/g, "$1");
+  return {
+    model: trim20(resolveAnalysisAiPayload({ config, prompt: "" }).model),
+    prompts: {
+      plan: unquote(buildDebateAtlasPlanPrompt({
+        sessionName: config?.sessionName,
+        questions: "<Questions>",
+        contextText: "<Background, when the hosts gave some>"
+      })),
+      map: unquote(buildDebateAtlasTopicPrompt({
+        branch: "<Branch>",
+        topic: "<Topic, left out for a whole branch>",
+        questions: "<Questions>",
+        responses: "<Responses>",
+        placeParticipants: "<Participants>"
+      }))
+    }
+  };
+};
 var planQuestion = (question, responseCount) => ({
   id: question.id,
   prompt: text4(question.prompt, 400),
@@ -103551,7 +103571,11 @@ var dispatchDebateAtlasReadRequest = async ({ request, env, config, slug, addres
   if (!result.ok) {
     return deps.json({ ok: false, error: result.body?.error || "Atlases are unavailable; retry." }, result.status || 503, responseHeaders);
   }
-  return deps.json({ ...result.body, canBuild: builder }, 200, responseHeaders);
+  return deps.json({
+    ...result.body,
+    canBuild: builder,
+    ...builder ? { nextBuild: describeNextDebateAtlasBuild(config) } : {}
+  }, 200, responseHeaders);
 };
 
 // workers/sessionCorsWorker/adminRequestDispatch.js

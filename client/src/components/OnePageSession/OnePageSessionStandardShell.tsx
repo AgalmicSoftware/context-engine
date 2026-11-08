@@ -3,6 +3,7 @@ import CETooltip from '../Shared/CETooltip';
 import SessionTestEthBadge from '../Shared/SessionTestEthBadge';
 import { hasReverseAlignmentContext } from './reverseAlignmentTopics';
 import { useSessionDebateAtlas } from '../DebateAtlas/useSessionDebateAtlas';
+import DebateAtlasBuildStatus from '../DebateAtlas/DebateAtlasBuildStatus';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faArrowLeft,
@@ -874,13 +875,13 @@ export default function OnePageSessionStandardShell({
                 </div>
               ) : null}
               {atlas.canBuild && (atlasBusy || atlas.error) ? (
-                <div
+                <DebateAtlasBuildStatus
                   className={styles.generatedResultsStatus}
-                  role="status"
-                  data-testid="ce-session-debate-atlas-status"
-                >
-                  {atlasBusy ? 'Building the atlas. This takes a minute or two.' : atlas.error}
-                </div>
+                  busy={atlasBusy}
+                  error={atlas.error}
+                  nextBuild={atlas.nextBuild}
+                  startedAtMs={atlas.buildStartedAtMs}
+                />
               ) : null}
               <div>
                 {!showDemoAtlas && effectiveResultsViewMode === 'debateAtlas' && atlas.build && (

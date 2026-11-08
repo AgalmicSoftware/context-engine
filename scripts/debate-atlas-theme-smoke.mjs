@@ -1,6 +1,7 @@
 // Local fixtures only: the Session Worker's replies come from here, so nothing
 // reaches a real Worker and no atlas is built. Checks a built atlas, its Build
-// button, and a category's and a topic's compass in each theme and width.
+// button, a running build's status and prompts, and a category's and a topic's
+// compass in each theme and width.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -53,6 +54,12 @@ const build = {
     { ...topic('b2t3', 'Repairs', 0.02), id: 'b2', label: 'Housing', summary: 'Rents and repairs.', topics: [topic('b2t3', 'Repairs', 0.02)] },
   ],
 };
+const nextBuild = {
+  model: 'fixture-model',
+  prompts: { plan: 'You are planning a debate atlas.\nQuestions:\n<Questions>', map: 'You are mapping one topic.\n<Responses>' },
+};
+// Set to show someone else's build running, without pressing Build.
+const fixtureState = { active: null };
 const older = { ...build, id: 'atlas_mh0_0a1b2c3e', builtAt: '2026-11-08T13:00:00.000Z', counts: { responses: 30, participants: 8 } };
 const summary = ({ branches, ...rest }) => rest;
 const step = async (name, run) => {
@@ -81,8 +88,9 @@ async function installAtlasFixtures(context, base) {
     return route.fulfill({
       json: {
         ok: true,
-        active: null,
+        active: fixtureState.active,
         canBuild: true,
+        nextBuild,
         builds: [summary(build), summary(older)],
         build: id === older.id ? older : build,
       },
@@ -178,6 +186,35 @@ export async function inspectDebateAtlas(page, { screenshotDir = '', tag = '' } 
   if (screenshotDir) await categoryPanel.screenshot({ path: `${screenshotDir}/debate-atlas-category-${tag}.png` });
 }
 
+// A running build shows its time, model and, on request, its prompts.
+export async function inspectBuildStatus(page, { screenshotDir = '', tag = '' } = {}) {
+  await page.getByTestId('ce-session-results-toggle').click();
+  const status = page.getByTestId('ce-session-debate-atlas-status');
+  await step('build status', async () => {
+    await status.getByText(/Building the atlas · \d+s/).waitFor({ timeout: 60000 });
+    await status.getByText('AI model: fixture-model').waitFor();
+    await assertReadable(status);
+  });
+  const toggle = status.getByRole('button', { name: /Show AI prompt/ });
+  await toggle.hover();
+  await step('prompt toggle hovered', () => assertReadable(status));
+  await page.mouse.move(0, 0);
+  await toggle.focus();
+  await step('prompt toggle focused', () => assertReadable(status));
+  const box = await toggle.boundingBox();
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await step('prompt toggle pressed', () => assertReadable(status));
+  await page.mouse.up();
+  await step('prompts shown', async () => {
+    await status.getByRole('region', { name: 'Planning prompt' }).waitFor();
+    await assertReadable(status);
+  });
+  const overflow = await page.evaluate(() => document.scrollingElement.scrollWidth - window.innerWidth);
+  assert(overflow <= 1, `The page scrolls sideways by ${overflow}px with the prompts open`);
+  if (screenshotDir) await status.screenshot({ path: `${screenshotDir}/debate-atlas-status-${tag}.png` });
+}
+
 export async function runDebateAtlasThemeSmoke() {
   const { chromium } = await import('playwright');
   const base = (process.env.BASE_URL || 'http://127.0.0.1:3000').replace(/\/$/, '');
@@ -201,7 +238,11 @@ export async function runDebateAtlasThemeSmoke() {
         try {
           await page.goto(`${base}/session/demo-sh`, { waitUntil: 'domcontentloaded' });
           await page.waitForFunction((value) => document.documentElement.dataset.ceTheme === value, theme);
+          fixtureState.active = null;
           await inspectDebateAtlas(page, { screenshotDir, tag: `${theme}-${width}` });
+          fixtureState.active = { startedAtMs: Date.now() - 42_000 };
+          await page.reload({ waitUntil: 'domcontentloaded' });
+          await inspectBuildStatus(page, { screenshotDir, tag: `${theme}-${width}` });
           console.log(`PASS debate atlas contrast ${theme} ${width}px`);
         } catch (error) {
           if (screenshotDir) await page.screenshot({ path: `${screenshotDir}/failed-${theme}-${width}.png` }).catch(() => {});

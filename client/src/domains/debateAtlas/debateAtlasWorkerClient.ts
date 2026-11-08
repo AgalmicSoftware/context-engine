@@ -1,7 +1,7 @@
 import { postSignedAdminWorkerRequest } from '../../utilities/worker/signedAdminWorkerRequest';
 import { normalizeWorkerUrl } from '../../utilities/worker/workerUrl';
 import { getCachedWorkerAuthHeaders } from '../sessionResults/sessionResultsAnalysisWorkerClient';
-import type { DebateAtlasBuild, DebateAtlasBuildSummary } from './debateAtlasTypes';
+import type { DebateAtlasBuild, DebateAtlasBuildSummary, DebateAtlasNextBuild } from './debateAtlasTypes';
 
 export const DEBATE_ATLAS_BUILD_ACTION = 'debate-atlas/build';
 
@@ -13,6 +13,8 @@ export type DebateAtlasReadResult = {
   build?: DebateAtlasBuild | null;
   builds?: DebateAtlasBuildSummary[];
   canBuild?: boolean;
+  /** Sent to those who may build. */
+  nextBuild?: DebateAtlasNextBuild | null;
 };
 
 export type DebateAtlasBuildResult = {
@@ -102,13 +104,15 @@ export const requestDebateAtlasBuild = async ({
       return { ok: false, status, error: readError(data, 'The atlas build failed.') };
     return { ok: true, status, build: data.build as DebateAtlasBuild };
   } catch (error) {
-    // The signed request throws on a refusal, keeping its status and reason.
-    const { status, reason } = toRecord(error);
+    // The signed request throws on a refusal, keeping its status, reason and,
+    // when a build is already running, when that build started.
+    const { status, reason, active } = toRecord(error);
+    const startedAtMs = Number(toRecord(active).startedAtMs) || now();
     return {
       ok: false,
       status: Number(status) || 0,
       error: error instanceof Error ? error.message : 'The atlas build failed.',
-      ...(reason === 'debate_atlas_build_running' ? { active: { startedAtMs: now() } } : {}),
+      ...(reason === 'debate_atlas_build_running' ? { active: { startedAtMs } } : {}),
     };
   }
 };

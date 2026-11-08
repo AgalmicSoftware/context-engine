@@ -33,3 +33,5 @@ export type DebateAtlasBuildSummary = {
   missingTopics?: string[];
 };
 export type DebateAtlasBuild = DebateAtlasBuildSummary & { branches: DebateAtlasBranch[] };
+// What a build would send now: the model, and the prompts with the session's data as placeholders.
+export type DebateAtlasNextBuild = { model?: string; prompts?: { plan?: string; map?: string } };

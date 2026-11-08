@@ -1366,8 +1366,8 @@ describe('OnePageSession results routing', () => {
 
     it.each([
       [{ canBuild: false }, null, null],
-      [{ canBuild: true, building: true }, 'Building atlas…', 'Building the atlas. This takes a minute or two.'],
-      [{ canBuild: true, activeSinceMs: 1 }, 'Building atlas…', 'Building the atlas. This takes a minute or two.'],
+      [{ canBuild: true, building: true }, 'Building atlas…', /^\s*Building the atlas · \d+s$/],
+      [{ canBuild: true, activeSinceMs: 1 }, 'Building atlas…', /^\s*Building the atlas · \d+s$/],
       [{ canBuild: true, error: 'Needs at least 2 participants.' }, 'Build atlas', 'Needs at least 2 participants.'],
     ])('with %j shows button %s and status %s', (state, buttonText, statusText) => {
       mockDebateAtlasState = atlasState(state);
@@ -1383,6 +1383,21 @@ describe('OnePageSession results routing', () => {
       if (buttonText === 'Build atlas') expect(button).toBeEnabled();
       else expect(button).toBeDisabled();
       expect(status).toHaveTextContent(statusText);
+    });
+
+    it('times a running build from its start and offers the model and prompts the Worker gave', () => {
+      mockDebateAtlasState = atlasState({
+        canBuild: true,
+        building: true,
+        buildStartedAtMs: Date.now() - 65_000,
+        nextBuild: { model: 'deep-model', prompts: { plan: 'Plan <Questions>', map: 'Map <Responses>' } },
+      });
+      renderSession('edge');
+      const status = screen.getByTestId('ce-session-debate-atlas-status');
+      expect(within(status).getByRole('status')).toHaveTextContent(/Building the atlas · 6[5-7]s/);
+      expect(status).toHaveTextContent('AI model: deep-model');
+      fireEvent.click(within(status).getByRole('button', { name: /Show AI prompt/ }));
+      expect(within(status).getByRole('region', { name: 'Planning prompt' })).toHaveTextContent('Plan <Questions>');
     });
 
     it('opens the atlas at the node an /atlas link asked for, and keeps the session URL', async () => {

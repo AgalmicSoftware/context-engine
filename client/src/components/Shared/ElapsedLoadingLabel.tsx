@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react';
 
 // Keep elapsed seconds visual: live regions should announce the task, not every tick.
-export default function ElapsedLoadingLabel({ label }: { label: string }) {
-  const [seconds, setSeconds] = useState(0);
+// Counts from `since` when the task started before this label appeared.
+export default function ElapsedLoadingLabel({ label, since = null }: { label: string; since?: number | null }) {
+  const [mountedAt] = useState(() => Date.now());
+  const [now, setNow] = useState(mountedAt);
   useEffect(() => {
-    const startedAt = Date.now();
-    const timer = setInterval(() => setSeconds(Math.floor((Date.now() - startedAt) / 1000)), 1000);
+    const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
   }, []);
+  const seconds = Math.max(0, Math.floor((now - (since ?? mountedAt)) / 1000));
   return (
     <span>
       {label}
