@@ -90,6 +90,7 @@ const topicReply = {
 };
 
 const isPlanPrompt = (prompt) => prompt.startsWith('You are planning');
+const isBranchPrompt = (prompt) => prompt.startsWith('You are mapping one branch');
 
 const runBuild = async ({ source = createSource(), provider, store = createStore(), config = {}, body = {}, now } = {}) => {
   const prompts = [];
@@ -114,7 +115,7 @@ const runBuild = async ({ source = createSource(), provider, store = createStore
   return { result, prompts, store };
 };
 
-test('builds an atlas from one planning call and one call per topic, sending each response once and no address', async () => {
+test('builds an atlas from a planning call, a call per topic and one per branch, each response reaching its topic and branch and no address', async () => {
   const source = createSource();
   const { result, prompts, store } = await runBuild({
     source,
@@ -124,11 +125,17 @@ test('builds an atlas from one planning call and one call per topic, sending eac
   assert.equal(result.ok, true, result.error);
   assert.deepEqual(store.calls, ['reserve', 'finalize']);
   assert.equal(prompts.filter(isPlanPrompt).length, 1);
-  const topicPrompts = prompts.filter((prompt) => !isPlanPrompt(prompt));
+  const topicPrompts = prompts.filter((prompt) => !isPlanPrompt(prompt) && !isBranchPrompt(prompt));
+  const branchPrompts = prompts.filter(isBranchPrompt);
   assert.equal(topicPrompts.length, 4);
+  assert.equal(branchPrompts.length, 2);
+  // Branches start after every topic, so a build short of time loses a branch compass first.
+  assert.ok(prompts.slice(prompts.findIndex(isBranchPrompt)).every(isBranchPrompt));
   for (const response of source.aiSnapshot.responses) {
     assert.equal(topicPrompts.filter((prompt) => prompt.includes(response.answer)).length, 1, response.answer);
+    assert.equal(branchPrompts.filter((prompt) => prompt.includes(response.answer)).length, 1, response.answer);
   }
+  assert.ok(branchPrompts.every((prompt) => !prompt.includes('Topic:') && prompt.includes("this branch's main disagreements")));
   assert.ok(prompts.every((prompt) => ![...PARTICIPANT_ADDRESSES.values(), RESULTS_ADMIN].some((value) => prompt.toLowerCase().includes(value))));
   assert.ok(prompts.every((prompt) => prompt.includes('not instructions')));
 
@@ -145,8 +152,50 @@ test('builds an atlas from one planning call and one call per topic, sending eac
     { address: PARTICIPANT_ADDRESSES.get('participant_001'), x: 0.2, y: 0.9, reason: 'Wants care.' },
     { address: PARTICIPANT_ADDRESSES.get('participant_003'), x: 1, y: 0, reason: 'Clamped.' },
   ]);
+  // Each branch has its own compass, summary and placements, from all its topics' answers.
+  const [branch] = build.branches;
+  assert.equal(branch.summary, 'They split.');
+  assert.deepEqual(branch.compass, topic.compass);
+  assert.deepEqual(branch.positions, topic.positions);
+  assert.equal(branch.participants.length, 2);
   const stored = await store.callAtlasStore({}, 'atlas-session', 'read', {});
   assert.deepEqual(stored.body.build, build);
+});
+
+test('a branch of one topic shares its compass and keeps the plan summary, with no call of its own', async () => {
+  const plan = {
+    title: 'Atlas',
+    branches: [
+      { label: 'Solo', summary: 'One topic.', topics: [{ label: 'Only', questionIds: ['q1', 'q2'] }] },
+      { label: 'Pair', summary: 'Two topics.', topics: [{ label: 'A', questionIds: ['q3'] }, { label: 'B', questionIds: ['q4'] }] },
+    ],
+  };
+  const { result, prompts } = await runBuild({
+    provider: async (prompt) => ({ ok: true, value: isPlanPrompt(prompt) ? plan : topicReply }),
+  });
+  assert.equal(result.ok, true, result.error);
+  assert.equal(prompts.filter(isBranchPrompt).length, 1);
+  const [solo, pair] = result.build.branches;
+  assert.equal(solo.summary, 'One topic.');
+  assert.deepEqual(solo.compass, solo.topics[0].compass);
+  assert.deepEqual(solo.participants, solo.topics[0].participants);
+  assert.equal(pair.summary, 'They split.');
+  assert.ok(pair.compass);
+});
+
+test('a branch whose own call fails keeps its topics and plan summary, and no topic is missing', async () => {
+  const { result } = await runBuild({
+    provider: async (prompt) => {
+      if (isPlanPrompt(prompt)) return { ok: true, value: planFor(['q1', 'q2', 'q3', 'q4']) };
+      return isBranchPrompt(prompt) ? { ok: false, status: 502, error: 'upstream' } : { ok: true, value: topicReply };
+    },
+  });
+  assert.equal(result.ok, true, result.error);
+  assert.deepEqual(result.build.missingTopics, []);
+  const [branch] = result.build.branches;
+  assert.equal(branch.summary, 'A branch.');
+  assert.equal(branch.compass, undefined);
+  assert.equal(branch.topics.length, 2);
 });
 
 test(`runs at most ${DEBATE_ATLAS_LIMITS.concurrency} topic calls at once`, async () => {
@@ -165,7 +214,8 @@ test(`runs at most ${DEBATE_ATLAS_LIMITS.concurrency} topic calls at once`, asyn
     },
   });
   assert.equal(result.ok, true, result.error);
-  assert.equal(prompts.length, 13);
+  // The plan, 12 topics and the 2 branches.
+  assert.equal(prompts.length, 15);
   assert.equal(peak, DEBATE_ATLAS_LIMITS.concurrency);
 });
 

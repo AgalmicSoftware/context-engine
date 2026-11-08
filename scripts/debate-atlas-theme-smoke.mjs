@@ -1,6 +1,6 @@
 // Local fixtures only: the Session Worker's replies come from here, so nothing
 // reaches a real Worker and no atlas is built. Checks a built atlas, its Build
-// button and a topic's compass in each theme and width.
+// button, and a category's and a topic's compass in each theme and width.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -45,8 +45,12 @@ const build = {
   counts: { responses: 64, participants: 12, questions: 9, aiResponses: 48, aiQuestions: 9 },
   missingTopics: ['Libraries'],
   branches: [
-    { id: 'b1', label: 'Transport', summary: 'Buses and bikes.', topics: [topic('b1t1', 'Bus lanes', 0), topic('b1t2', 'Bike parking', 0.05)] },
-    { id: 'b2', label: 'Housing', summary: 'Rents and repairs.', topics: [topic('b2t3', 'Repairs', 0.02)] },
+    {
+      ...topic('b1', 'Transport', 0.03),
+      summary: 'Buses and bikes.',
+      topics: [topic('b1t1', 'Bus lanes', 0), topic('b1t2', 'Bike parking', 0.05)],
+    },
+    { ...topic('b2t3', 'Repairs', 0.02), id: 'b2', label: 'Housing', summary: 'Rents and repairs.', topics: [topic('b2t3', 'Repairs', 0.02)] },
   ],
 };
 const older = { ...build, id: 'atlas_mh0_0a1b2c3e', builtAt: '2026-11-08T13:00:00.000Z', counts: { responses: 30, participants: 8 } };
@@ -75,7 +79,13 @@ async function installAtlasFixtures(context, base) {
   await context.route(`${config.corsWorkerUrl}/debate-atlas*`, (route) => {
     const id = new URL(route.request().url()).searchParams.get('id');
     return route.fulfill({
-      json: { ok: true, active: null, canBuild: true, builds: [summary(build), summary(older)], build: id === older.id ? older : build },
+      json: {
+        ok: true,
+        active: null,
+        canBuild: true,
+        builds: [summary(build), summary(older)],
+        build: id === older.id ? older : build,
+      },
     });
   });
 }
@@ -157,6 +167,15 @@ export async function inspectDebateAtlas(page, { screenshotDir = '', tag = '' } 
   await page.locator('[data-testid^="ce-political-compass-point-0x"]').first().click({ force: true });
   await step('selected participant', () => assertReadable(panel));
   if (screenshotDir) await panel.screenshot({ path: `${screenshotDir}/debate-atlas-compass-${tag}.png` });
+
+  // The category behind it has a compass of its own, with the same legend.
+  await panel.getByTitle('Close').click();
+  await page.getByLabel('Open Transport').click();
+  const categoryPanel = page.locator('[class*="modalContent"]').last();
+  await step('open category', () => categoryPanel.getByText('Category', { exact: true }).waitFor({ timeout: 15000 }));
+  await step('category compass', () => categoryPanel.getByText('Participant', { exact: true }).waitFor({ timeout: 15000 }));
+  await step('category panel', () => assertReadable(categoryPanel));
+  if (screenshotDir) await categoryPanel.screenshot({ path: `${screenshotDir}/debate-atlas-category-${tag}.png` });
 }
 
 export async function runDebateAtlasThemeSmoke() {
@@ -185,6 +204,7 @@ export async function runDebateAtlasThemeSmoke() {
           await inspectDebateAtlas(page, { screenshotDir, tag: `${theme}-${width}` });
           console.log(`PASS debate atlas contrast ${theme} ${width}px`);
         } catch (error) {
+          if (screenshotDir) await page.screenshot({ path: `${screenshotDir}/failed-${theme}-${width}.png` }).catch(() => {});
           throw new Error(`${theme} ${width}px: ${error.message}`);
         } finally {
           await context.close();

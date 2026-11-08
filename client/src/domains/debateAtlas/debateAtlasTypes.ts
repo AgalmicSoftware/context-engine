@@ -1,11 +1,9 @@
 // A build as the Session Worker stores it (workers/sessionCorsWorker/debateAtlasBuild.js).
 export type DebateAtlasPosition = { label: string; summary?: string; participantCount: number; x?: number; y?: number };
 export type DebateAtlasPlacedParticipant = { address?: string; label?: string; x: number; y: number; reason?: string };
-export type DebateAtlasTopic = {
-  id: string;
-  label: string;
+// A topic's map, and a branch's across all its topics.
+export type DebateAtlasMapping = {
   summary?: string;
-  questions?: Array<{ id: string; prompt: string; type?: string }>;
   compass?: {
     x: { label: string; left: string; right: string };
     y: { label: string; top: string; bottom: string };
@@ -13,7 +11,12 @@ export type DebateAtlasTopic = {
   positions?: DebateAtlasPosition[];
   participants?: DebateAtlasPlacedParticipant[];
 };
-export type DebateAtlasBranch = { id: string; label: string; summary?: string; topics: DebateAtlasTopic[] };
+export type DebateAtlasTopic = DebateAtlasMapping & {
+  id: string;
+  label: string;
+  questions?: Array<{ id: string; prompt: string; type?: string }>;
+};
+export type DebateAtlasBranch = DebateAtlasMapping & { id: string; label: string; topics: DebateAtlasTopic[] };
 export type DebateAtlasBuildSummary = {
   id: string;
   builtAt: string;

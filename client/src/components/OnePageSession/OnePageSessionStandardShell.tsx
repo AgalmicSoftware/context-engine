@@ -822,8 +822,9 @@ export default function OnePageSessionStandardShell({
                         <FontAwesomeIcon icon={faQuestionCircle} aria-hidden="true" />
                       </button>
                       <CETooltip target={buildAtlasHelpId} placement="bottom" trigger="hover focus" autohide={false}>
-                        Builds a debate atlas from the responses right now, with a political compass for each topic.
-                        Takes a minute or two. Everyone who sees Results sees it, and earlier builds stay to compare.
+                        Builds a debate atlas from the responses right now, with a political compass for each category
+                        and topic. Takes a few minutes. Everyone who sees Results sees it, and earlier builds stay to
+                        compare.
                       </CETooltip>
                     </>
                   )}

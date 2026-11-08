@@ -589,18 +589,21 @@ Admin test panel:
   Session Settings without signing anyone out); those lists grant no other admin
   action. It reads only the responses the Worker stores, through the same
   sanitizer as the Results views. One planning call groups the answered
-  questions into at most 5 branches and 12 topics, then one call per topic, at
-  most 6 at once and within 3 minutes, writes its summary, its positions and a
-  two-axis compass placing the positions and up to 40 participants. Each
-  response reaches one topic call. The AI sees synthetic participant IDs only;
+  questions into at most 5 branches and 12 topics, then one call per topic and
+  one per branch of several topics, at most 6 at once and within 4 minutes,
+  writes its summary, its positions and a two-axis compass placing the
+  positions and up to 40 participants. A branch of one topic shares that
+  topic's compass. Branch calls start after every topic call, so a build short
+  of time loses a branch's compass before a topic. Each response reaches its
+  topic's call and its branch's. The AI sees synthetic participant IDs only;
   the Worker maps them back to addresses afterwards and drops any citation of a
-  participant who did not answer that topic. The coordinator lets one build run
-  at a time per session and keeps the newest 8, each stamped with its time,
-  builder, model and response counts. `GET /debate-atlas?sessionSlug=<slug>&id=`
-  returns the build list and the newest build (or the one named by `id`) to
-  viewers under the artifact rule above, and to signed-in builders on any
-  session, with `canBuild`. The public config sets `debateAtlas: true` so the
-  site knows the Worker builds atlases.
+  participant who did not answer that topic or branch. The coordinator lets one
+  build run at a time per session and keeps the newest 8, each stamped with its
+  time, builder, model and response counts.
+  `GET /debate-atlas?sessionSlug=<slug>&id=` returns the build list and the
+  newest build (or the one named by `id`) to viewers under the artifact rule
+  above, and to signed-in builders on any session, with `canBuild`. The public
+  config sets `debateAtlas: true` so the site knows the Worker builds atlases.
 - Manual generation uses signed admin action
   `POST /admin/results-analysis/generate` with action
   `results-analysis/generate`. Worker-canonical Cloudflare sessions can request

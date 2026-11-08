@@ -5,8 +5,8 @@ import type { DebateNode, HistoricalCompassPoint } from '../DebateMap/debateMapT
 import type {
   DebateAtlasBuild,
   DebateAtlasBuildSummary,
+  DebateAtlasMapping,
   DebateAtlasPosition,
-  DebateAtlasTopic,
 } from '../../domains/debateAtlas/debateAtlasTypes';
 
 // Markers take the document's text colour, which every theme keeps readable on
@@ -43,10 +43,17 @@ const uniqueName = (taken: Set<string>, name: string): string => {
   return candidate;
 };
 
-const compassPoints = (topic: DebateAtlasTopic, sessionSlug: string): HistoricalCompassPoint[] => {
+// Positions are drawn as labelled dots and participants as their avatars, or a
+// ring without one; the legend names only the kinds a compass shows.
+const compassLegend = (points: HistoricalCompassPoint[]) => [
+  ...(points.some((point) => point.type === 'debater') ? [{ label: 'Position', shape: 'circle' }] : []),
+  ...(points.some((point) => point.type === 'participant') ? [{ label: 'Participant', shape: 'ring' }] : []),
+];
+
+const compassPoints = (mapping: DebateAtlasMapping, sessionSlug: string): HistoricalCompassPoint[] => {
   // The compass keys points by name, so a repeated label gets a number.
   const taken = new Set<string>();
-  const positions = (topic.positions || [])
+  const positions = (mapping.positions || [])
     .filter((position) => Number.isFinite(position.x) && Number.isFinite(position.y))
     .map((position) => ({
       name: uniqueName(taken, position.label),
@@ -58,7 +65,7 @@ const compassPoints = (topic: DebateAtlasTopic, sessionSlug: string): Historical
         .filter(Boolean)
         .join(' '),
     }));
-  const participants = (topic.participants || []).map((participant) => {
+  const participants = (mapping.participants || []).map((participant) => {
     const address = String(participant.address || '');
     return {
       name: uniqueName(taken, address ? shortenAddress(address) : participant.label || 'Participant'),
@@ -88,8 +95,27 @@ const describePosition = (position: DebateAtlasPosition): string =>
     .filter(Boolean)
     .join(' ');
 
+// A branch or topic's summary, positions and compass.
+const mappedNode = (id: string, mapping: DebateAtlasMapping, sessionSlug: string) => {
+  const points = mapping.compass ? compassPoints(mapping, sessionSlug) : [];
+  return {
+    comments: summaryComments(id, mapping.summary, ...(mapping.positions || []).map(describePosition)),
+    ...(mapping.compass
+      ? {
+          compass: {
+            xAxis: { ...mapping.compass.x },
+            yAxis: { ...mapping.compass.y },
+            points,
+            legend: compassLegend(points),
+          },
+        }
+      : {}),
+  };
+};
+
 // Branches, then topics. A topic is a leaf, as in the demo atlas, so one click
-// opens it: its summary and positions, its questions and its compass.
+// opens it: its summary and positions, its questions and its compass. A branch
+// maps all its topics' questions on a compass of its own.
 export const buildDebateAtlasTree = (build: DebateAtlasBuild, { sessionSlug = '' } = {}): DebateNode[] =>
   (build.branches || []).map((branch) => {
     const branchId = `${build.id}:${branch.id}`;
@@ -97,28 +123,19 @@ export const buildDebateAtlasTree = (build: DebateAtlasBuild, { sessionSlug = ''
       id: branchId,
       name: branch.label,
       depth: 0,
-      comments: summaryComments(branchId, branch.summary),
+      ...mappedNode(branchId, branch, sessionSlug),
       children: (branch.topics || []).map((topic) => {
         const topicId = `${build.id}:${topic.id}`;
         return {
           id: topicId,
           name: topic.label,
           depth: 1,
-          comments: summaryComments(topicId, topic.summary, ...(topic.positions || []).map(describePosition)),
+          ...mappedNode(topicId, topic, sessionSlug),
           questions: (topic.questions || []).map((question) => ({
             id: question.id,
             question: question.prompt,
             questionType: question.type,
           })),
-          ...(topic.compass
-            ? {
-                compass: {
-                  xAxis: { ...topic.compass.x },
-                  yAxis: { ...topic.compass.y },
-                  points: compassPoints(topic, sessionSlug),
-                },
-              }
-            : {}),
         };
       }),
     };

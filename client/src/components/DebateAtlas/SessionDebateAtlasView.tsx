@@ -25,7 +25,7 @@ type Props = {
 };
 
 // A built atlas replaces the demo atlas and the RxC topic circles: read-only
-// circles whose topics each open a compass of positions and participants.
+// circles whose categories and topics each open a compass of positions and participants.
 export default function SessionDebateAtlasView({
   build,
   builds,
@@ -72,8 +72,8 @@ export default function SessionDebateAtlasView({
               <FontAwesomeIcon icon={faQuestionCircle} />
             </button>
             <CETooltip target={helpId} placement="bottom" trigger="hover focus" autohide={false}>
-              The session&apos;s AI built this from the responses at that moment. Open a topic to see its compass: the
-              positions found and where each participant sits.
+              The session&apos;s AI built this from the responses at that moment. Open a category or topic to see its
+              compass: the positions found and where each participant sits.
               {sampled ? ` The AI read ${build.counts?.aiResponses} of the ${build.counts?.responses} responses.` : ''}
             </CETooltip>
           </div>

@@ -20,6 +20,9 @@ const build: DebateAtlasBuild = {
       id: 'b1',
       label: 'Trust',
       summary: 'About trust.',
+      compass,
+      positions: [{ label: 'Prove it', participantCount: 1, x: 0.9, y: 0.1 }],
+      participants: [{ address, x: 0.8, y: 0.2, reason: 'Wants proof.' }],
       topics: [
         {
           id: 'b1t1',
@@ -46,7 +49,10 @@ const build: DebateAtlasBuild = {
 it('nests topics under branches as leaves that open in one click, under ids unique to the build', () => {
   const [branch] = buildDebateAtlasTree(build, { sessionSlug: 'salon' });
   expect(branch).toMatchObject({ id: 'atlas_k1_00000001:b1', name: 'Trust', depth: 0 });
-  expect(branch.comments).toEqual([{ id: 'atlas_k1_00000001:b1:summary:0', comment: 'About trust.' }]);
+  expect(branch.comments).toEqual([
+    { id: 'atlas_k1_00000001:b1:summary:0', comment: 'About trust.' },
+    { id: 'atlas_k1_00000001:b1:summary:1', comment: 'Prove it: Held by 1 participant.' },
+  ]);
   const [identity, privacy] = branch.children || [];
   expect(identity).toMatchObject({ id: 'atlas_k1_00000001:b1t1', name: 'Identity', depth: 1 });
   expect(identity.children).toBeUndefined();
@@ -91,6 +97,36 @@ it('stamps a build with its time and counts', () => {
   expect(stamp).toMatch(/2026/);
   expect(stamp).toMatch(/ · 12 responses · 1 participant$/);
   expect(describeDebateAtlasBuild({ id: 'x', builtAt: 'not a date' })).toBe('');
+});
+
+it('gives a category its own compass, and each compass a legend of the kinds of point it shows', () => {
+  const [branch] = buildDebateAtlasTree(build, { sessionSlug: 'salon' });
+  expect(branch.compass?.xAxis).toEqual(compass.x);
+  expect(branch.compass?.points?.map((point) => [point.name, point.type])).toEqual([
+    ['Prove it', 'debater'],
+    ['0xabab…abab', 'participant'],
+  ]);
+  const legend = [
+    { label: 'Position', shape: 'circle' },
+    { label: 'Participant', shape: 'ring' },
+  ];
+  expect(branch.compass?.legend).toEqual(legend);
+  expect(branch.children?.[0].compass?.legend).toEqual(legend);
+
+  // A compass on which no one is placed names only its positions.
+  const [positionsOnly] = buildDebateAtlasTree({
+    ...build,
+    branches: [
+      {
+        id: 'b2',
+        label: 'Care',
+        compass,
+        positions: [{ label: 'Wait', participantCount: 2, x: 0.1, y: 0.1 }],
+        topics: [],
+      },
+    ],
+  });
+  expect(positionsOnly.compass?.legend).toEqual([{ label: 'Position', shape: 'circle' }]);
 });
 
 it('links a node to its session, with the Worker a fresh browser needs, and knows its build', () => {

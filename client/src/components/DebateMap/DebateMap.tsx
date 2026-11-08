@@ -1881,6 +1881,9 @@ const Modal = ({ isOpen, onClose, content, onVote, readOnly = false, copied, onC
                     <StandalonePoliticalCompass compass={compassData as any} />
                   </React.Suspense>
                 </div>
+                {!compassData.points?.length && (
+                  <p className={styles.compassEmpty}>No one is placed on this compass yet.</p>
+                )}
               </div>
             )}
           </div>

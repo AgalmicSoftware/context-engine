@@ -19,6 +19,8 @@ type CompassPoint = {
   avatarUrl?: string;
 };
 
+type LegendEntry = { label: string; shape: 'circle' | 'diamond' | 'square' | 'ring' };
+
 type Compass = {
   xAxis: {
     label?: string;
@@ -30,6 +32,31 @@ type Compass = {
     bottom: string;
   };
   points: CompassPoint[];
+  // What the markers stand for; the demo's figures when not given, none when empty.
+  legend?: LegendEntry[];
+};
+
+const DEMO_LEGEND: LegendEntry[] = [
+  { label: 'Debater', shape: 'circle' },
+  { label: 'Tweeter', shape: 'diamond' },
+  { label: 'Insider / Historical', shape: 'square' },
+];
+
+const LegendMarker = ({ shape }: { shape: LegendEntry['shape'] }) => {
+  const marker = { fill: 'var(--ce-text-muted)', stroke: 'var(--ce-document-canvas)', strokeWidth: 1 };
+  return (
+    <svg width="12" height="12" aria-hidden="true">
+      {shape === 'diamond' ? (
+        <polygon points="6,1 11,6 6,11 1,6" {...marker} />
+      ) : shape === 'square' ? (
+        <rect x="1" y="1" width="10" height="10" rx="1.5" {...marker} />
+      ) : shape === 'ring' ? (
+        <circle cx="6" cy="6" r="4.5" fill="none" stroke="var(--ce-text-muted)" strokeWidth="2" />
+      ) : (
+        <circle cx="6" cy="6" r="5" {...marker} />
+      )}
+    </svg>
+  );
 };
 
 type VoterProfile = {
@@ -297,6 +324,12 @@ const PoliticalCompass = ({ compass, compact = true }: PoliticalCompassProps) =>
   );
 
   const getShape = (point: CompassPoint, px: number, py: number, size: number) => {
+    if (point.type === 'participant') {
+      // Under an avatar, or alone when there is none: the ring the legend shows.
+      return (
+        <circle cx={px} cy={py} r={size} fill="var(--ce-document-canvas)" stroke={point.color} strokeWidth={2.5} />
+      );
+    }
     if (point.type === 'tweeter') {
       const d = size * 0.9;
       return <polygon points={`${px},${py - d} ${px + d},${py} ${px},${py + d} ${px - d},${py}`} />;
@@ -773,45 +806,11 @@ const PoliticalCompass = ({ compass, compact = true }: PoliticalCompassProps) =>
           marginBottom: 8,
         }}
       >
-        <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-          <svg width="12" height="12">
-            <circle
-              cx="6"
-              cy="6"
-              r="5"
-              fill="var(--ce-text-muted)"
-              stroke="var(--ce-document-canvas)"
-              strokeWidth="1"
-            />
-          </svg>{' '}
-          Debater
-        </span>
-        <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-          <svg width="12" height="12">
-            <polygon
-              points="6,1 11,6 6,11 1,6"
-              fill="var(--ce-text-muted)"
-              stroke="var(--ce-document-canvas)"
-              strokeWidth="1"
-            />
-          </svg>{' '}
-          Tweeter
-        </span>
-        <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-          <svg width="12" height="12">
-            <rect
-              x="1"
-              y="1"
-              width="10"
-              height="10"
-              rx="1.5"
-              fill="var(--ce-text-muted)"
-              stroke="var(--ce-document-canvas)"
-              strokeWidth="1"
-            />
-          </svg>{' '}
-          Insider / Historical
-        </span>
+        {(compass.legend ?? DEMO_LEGEND).map((entry) => (
+          <span key={entry.label} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <LegendMarker shape={entry.shape} /> {entry.label}
+          </span>
+        ))}
       </div>
     </>
   );

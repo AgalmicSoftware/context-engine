@@ -2698,6 +2698,13 @@ $glass-shadow: 0 8px 32px 0 color-mix(in srgb, var(--ce-compat-dark) 37%, transp
         width: 100%;
         padding: 4px 0 8px;
       }
+
+      .compassEmpty {
+        margin: 0 0 8px;
+        color: $text-main;
+        font-size: 0.9rem;
+        text-align: center;
+      }
     }
 
     @media (max-width: 640px) {
@@ -2947,6 +2954,7 @@ $glass-shadow: 0 8px 32px 0 color-mix(in srgb, var(--ce-compat-dark) 37%, transp
     .collapseHeader > svg,
     .argumentClaim,
     .generatedSummarySection p,
+    .compassSection .compassEmpty,
     .historicalCaseTitle,
     .historicalCaseSummary,
     .historicalCaseDetailBlock p,

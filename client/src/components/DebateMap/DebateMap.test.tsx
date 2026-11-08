@@ -1441,6 +1441,16 @@ describe('DebateMap', () => {
       fireEvent.click(getDebateViewModeButton('tree'));
       expect(screen.getByText('Select a category above to view the Tree Chart')).toBeInTheDocument();
     });
+
+    it('gives a category its compass and says when no one is placed on one', async () => {
+      const { unmount } = renderSessionAtlas({ requestedModalNodeId: 'b1' });
+      expect(await screen.findByTestId('atlas-compass')).toHaveTextContent('Pace');
+      expect(screen.queryByText('No one is placed on this compass yet.')).not.toBeInTheDocument();
+      unmount();
+      renderSessionAtlas({ requestedModalNodeId: 't1' });
+      expect(await screen.findByTestId('atlas-compass')).toHaveTextContent('Risk');
+      expect(screen.getByText('No one is placed on this compass yet.')).toBeInTheDocument();
+    });
   });
 
   it('opens a requested atlas node modal and notifies the parent when it closes', async () => {

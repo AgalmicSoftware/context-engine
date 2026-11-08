@@ -206,4 +206,44 @@ describe('PoliticalCompass tooltip hover behavior', () => {
       expect.stringContaining('/u/participant-seven?session=salon'),
     );
   });
+
+  it("names the markers a compass gives, or the demo's figures when it gives none", () => {
+    const { unmount } = render(<StandalonePoliticalCompass compass={createCompass()} compact={false} />);
+    for (const label of ['Debater', 'Tweeter', 'Insider / Historical']) expect(screen.getByText(label)).toBeVisible();
+    unmount();
+
+    const compass = {
+      ...createCompass(),
+      legend: [
+        { label: 'Position', shape: 'circle' as const },
+        { label: 'Participant', shape: 'ring' as const },
+      ],
+    };
+    const { unmount: unmountNamed } = render(<StandalonePoliticalCompass compass={compass} compact={false} />);
+    expect(screen.getByText('Position')).toBeVisible();
+    expect(screen.getByText('Participant')).toBeVisible();
+    expect(screen.queryByText('Tweeter')).not.toBeInTheDocument();
+    expect(screen.queryByText('Insider / Historical')).not.toBeInTheDocument();
+    unmountNamed();
+
+    // An empty legend names nothing, rather than the demo's figures.
+    render(<StandalonePoliticalCompass compass={{ ...createCompass(), legend: [] }} compact={false} />);
+    expect(screen.queryByText('Debater')).not.toBeInTheDocument();
+  });
+
+  it('draws a participant without an avatar as a ring, apart from the filled position dots', () => {
+    const compass = createCompass();
+    compass.points.push({
+      name: 'Participant 4',
+      x: 0.4,
+      y: 0.4,
+      color: 'var(--ce-document-text)',
+      type: 'participant',
+      comment: 'AI reading: Mixed.',
+    });
+    const { container } = render(<StandalonePoliticalCompass compass={compass} compact={false} />);
+    const ring = container.querySelector('[data-testid="ce-political-compass-point-participant-4"] g circle');
+    expect(ring).toHaveAttribute('fill', 'var(--ce-document-canvas)');
+    expect(ring).toHaveAttribute('stroke', 'var(--ce-document-text)');
+  });
 });

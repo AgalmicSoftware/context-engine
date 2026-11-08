@@ -13,9 +13,10 @@ import { QUADRATIC_READING_RULE } from '../../shared/promptRules.mjs';
 
 // One admin press builds a debate atlas from the responses stored at that
 // moment: a planning call groups the questions into branches and topics, then
-// one call per topic, at most CONCURRENCY at once, maps its positions and a
-// political compass. Each response reaches one topic call, so a build reads
-// about what one AI Views run does.
+// one call per topic, and one per branch of several topics, at most
+// CONCURRENCY at once, maps positions and a political compass. Each response
+// reaches its topic's call and its branch's, so a build reads about twice what
+// one AI Views run does.
 export const DEBATE_ATLAS_BUILD_ACTION = 'debate-atlas/build';
 export const DEBATE_ATLAS_LIMITS = Object.freeze({
   branches: 5,
@@ -23,7 +24,7 @@ export const DEBATE_ATLAS_LIMITS = Object.freeze({
   positions: 6,
   placedParticipants: 40,
   concurrency: 6,
-  buildMs: 3 * 60 * 1000,
+  buildMs: 4 * 60 * 1000,
   callMs: 2 * 60 * 1000,
   // A topic call is not started with less time than this left.
   minCallMs: 20 * 1000,
@@ -87,8 +88,9 @@ ${JSON.stringify(questions)}${contextText ? `
 The session's hosts gave this background. Use it only to understand the subject; group and name only what the questions ask.
 ${contextText}` : ''}`;
 
-export const buildDebateAtlasTopicPrompt = ({ branch = '', topic = '', questions = [], responses = [], placeParticipants = [] } = {}) => `You are mapping one topic of a Context Engine debate atlas from survey responses.
-Branch: ${JSON.stringify(text(branch, 120))}. Topic: ${JSON.stringify(text(topic, 120))}.
+// Maps one topic, or with no topic one branch across all its topics' questions.
+export const buildDebateAtlasTopicPrompt = ({ branch = '', topic = '', questions = [], responses = [], placeParticipants = [] } = {}) => `You are mapping ${topic ? 'one topic' : 'one branch, across all its topics,'} of a Context Engine debate atlas from survey responses.
+Branch: ${JSON.stringify(text(branch, 120))}.${topic ? ` Topic: ${JSON.stringify(text(topic, 120))}.` : ''}
 Return one JSON object with no Markdown fences and no tool calls, in this shape:
 {
   "summary": "two neutral sentences on where participants agree and where they split",
@@ -100,13 +102,13 @@ Return one JSON object with no Markdown fences and no tool calls, in this shape:
 Rules:
 ${[
   ...SHARED_RULES,
-  "Choose the compass's two axes from this topic's main disagreements, independent of each other, and write each end as a short plain position.",
+  `Choose the compass's two axes from this ${topic ? 'topic' : 'branch'}'s main disagreements, independent of each other, and write each end as a short plain position.`,
   'x runs from 0 at the left end to 1 at the right end; y runs from 0 at the bottom end to 1 at the top end. Place every point by what its responses say about the ends you wrote, and do not pile points on the centre when the evidence leans.',
   `List 2 to ${DEBATE_ATLAS_LIMITS.positions} distinct positions found in the responses, keeping a minority view even when one participant holds it. Each position cites every participant who holds it, and only participants who answered these questions.`,
   'Place each participant in placeParticipants exactly once, from their own answers only; the reason paraphrases those answers.',
 ].map((rule) => `- ${rule}`).join('\n')}
 
-Topic input:
+${topic ? 'Topic' : 'Branch'} input:
 ${JSON.stringify({ questions, responses, placeParticipants })}`;
 
 const planQuestion = (question, responseCount) => ({
@@ -278,9 +280,12 @@ export const buildDebateAtlas = async ({ env, slug, config, body = {}, headers, 
     if (!plan.branches.length) return await finish(failure(502, 'The AI did not group the questions into topics; try again.'));
 
     const questionsById = new Map(questions.map((question) => [question.id, question]));
-    const topics = plan.branches.flatMap((branch) => branch.topics.map((topic) => ({ branch, topic })));
-    const mapped = await runWithConcurrency(topics, DEBATE_ATLAS_LIMITS.concurrency, async ({ branch, topic }) => {
-      const topicResponses = topic.questionIds.flatMap((id) => responsesByQuestion.get(id));
+    const topics = plan.branches.flatMap((branch) => branch.topics.map((topic) => ({ branch, topic, questionIds: topic.questionIds })));
+    // Branches go last, so a build short of time drops a branch's compass before a topic.
+    const branchJobs = plan.branches.filter((branch) => branch.topics.length > 1)
+      .map((branch) => ({ branch, topic: null, questionIds: branch.topics.flatMap((topic) => topic.questionIds) }));
+    const mapped = await runWithConcurrency([...topics, ...branchJobs], DEBATE_ATLAS_LIMITS.concurrency, async ({ branch, topic, questionIds }) => {
+      const topicResponses = questionIds.flatMap((id) => responsesByQuestion.get(id));
       const answeredBy = new Map();
       topicResponses.forEach((response) => answeredBy.set(response.participantId, (answeredBy.get(response.participantId) || 0) + 1));
       // The most active participants first, so the cap drops the lightest evidence.
@@ -290,8 +295,8 @@ export const buildDebateAtlas = async ({ env, slug, config, body = {}, headers, 
         .map(([id]) => id);
       const result = await callAi(buildDebateAtlasTopicPrompt({
         branch: branch.label,
-        topic: topic.label,
-        questions: topic.questionIds.map((id) => {
+        topic: topic?.label || '',
+        questions: questionIds.map((id) => {
           const { id: questionId, prompt, type, options, scale, voiceCredits } = questionsById.get(id);
           return { id: questionId, prompt, type, ...(options?.length ? { options } : {}), ...(scale ? { scale } : {}), ...(voiceCredits ? { voiceCredits } : {}) };
         }),
@@ -305,9 +310,9 @@ export const buildDebateAtlas = async ({ env, slug, config, body = {}, headers, 
 
     let topicIndex = 0;
     const missingTopics = [];
-    const branches = plan.branches.map((branch) => ({
-      ...branch,
-      topics: branch.topics.map((topic) => {
+    const branchMaps = new Map(branchJobs.map(({ branch }, index) => [branch.id, mapped[topics.length + index]]));
+    const branches = plan.branches.map((branch) => {
+      const mappedTopics = branch.topics.map((topic) => {
         const result = mapped[topicIndex];
         topicIndex += 1;
         if (!result) {
@@ -320,8 +325,18 @@ export const buildDebateAtlas = async ({ env, slug, config, body = {}, headers, 
           ...result,
           questions: topic.questionIds.map((id) => ({ id, prompt: text(questionsById.get(id).prompt, 400), type: questionsById.get(id).type })),
         };
-      }).filter(Boolean),
-    })).filter((branch) => branch.topics.length);
+      }).filter(Boolean);
+      // A branch of one topic shares that topic's compass and keeps the plan's summary.
+      const own = branch.topics.length > 1;
+      const map = own ? branchMaps.get(branch.id) : mappedTopics[0];
+      return {
+        id: branch.id,
+        label: branch.label,
+        summary: (own && map?.summary) || branch.summary,
+        ...(map ? { compass: map.compass, positions: map.positions, participants: map.participants } : {}),
+        topics: mappedTopics,
+      };
+    }).filter((branch) => branch.topics.length);
     if (!branches.length) return await finish(failure(502, 'No topic of the atlas could be mapped; try again.'));
 
     const builtAtMs = now();

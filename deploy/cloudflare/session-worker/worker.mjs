@@ -103220,7 +103220,7 @@ var DEBATE_ATLAS_LIMITS = Object.freeze({
   positions: 6,
   placedParticipants: 40,
   concurrency: 6,
-  buildMs: 3 * 60 * 1e3,
+  buildMs: 4 * 60 * 1e3,
   callMs: 2 * 60 * 1e3,
   // A topic call is not started with less time than this left.
   minCallMs: 20 * 1e3,
@@ -103264,8 +103264,8 @@ ${JSON.stringify(questions)}${contextText ? `
 
 The session's hosts gave this background. Use it only to understand the subject; group and name only what the questions ask.
 ${contextText}` : ""}`;
-var buildDebateAtlasTopicPrompt = ({ branch = "", topic = "", questions = [], responses = [], placeParticipants = [] } = {}) => `You are mapping one topic of a Context Engine debate atlas from survey responses.
-Branch: ${JSON.stringify(text4(branch, 120))}. Topic: ${JSON.stringify(text4(topic, 120))}.
+var buildDebateAtlasTopicPrompt = ({ branch = "", topic = "", questions = [], responses = [], placeParticipants = [] } = {}) => `You are mapping ${topic ? "one topic" : "one branch, across all its topics,"} of a Context Engine debate atlas from survey responses.
+Branch: ${JSON.stringify(text4(branch, 120))}.${topic ? ` Topic: ${JSON.stringify(text4(topic, 120))}.` : ""}
 Return one JSON object with no Markdown fences and no tool calls, in this shape:
 {
   "summary": "two neutral sentences on where participants agree and where they split",
@@ -103277,13 +103277,13 @@ Return one JSON object with no Markdown fences and no tool calls, in this shape:
 Rules:
 ${[
   ...SHARED_RULES,
-  "Choose the compass's two axes from this topic's main disagreements, independent of each other, and write each end as a short plain position.",
+  `Choose the compass's two axes from this ${topic ? "topic" : "branch"}'s main disagreements, independent of each other, and write each end as a short plain position.`,
   "x runs from 0 at the left end to 1 at the right end; y runs from 0 at the bottom end to 1 at the top end. Place every point by what its responses say about the ends you wrote, and do not pile points on the centre when the evidence leans.",
   `List 2 to ${DEBATE_ATLAS_LIMITS.positions} distinct positions found in the responses, keeping a minority view even when one participant holds it. Each position cites every participant who holds it, and only participants who answered these questions.`,
   "Place each participant in placeParticipants exactly once, from their own answers only; the reason paraphrases those answers."
 ].map((rule) => `- ${rule}`).join("\n")}
 
-Topic input:
+${topic ? "Topic" : "Branch"} input:
 ${JSON.stringify({ questions, responses, placeParticipants })}`;
 var planQuestion = (question, responseCount) => ({
   id: question.id,
@@ -103442,16 +103442,17 @@ var buildDebateAtlas = async ({ env, slug, config, body = {}, headers: headers2,
     const plan = normalizeDebateAtlasPlan({ value: planResult.value, answeredQuestionIds });
     if (!plan.branches.length) return await finish(failure(502, "The AI did not group the questions into topics; try again."));
     const questionsById = new Map(questions.map((question) => [question.id, question]));
-    const topics = plan.branches.flatMap((branch) => branch.topics.map((topic) => ({ branch, topic })));
-    const mapped = await runWithConcurrency(topics, DEBATE_ATLAS_LIMITS.concurrency, async ({ branch, topic }) => {
-      const topicResponses = topic.questionIds.flatMap((id2) => responsesByQuestion.get(id2));
+    const topics = plan.branches.flatMap((branch) => branch.topics.map((topic) => ({ branch, topic, questionIds: topic.questionIds })));
+    const branchJobs = plan.branches.filter((branch) => branch.topics.length > 1).map((branch) => ({ branch, topic: null, questionIds: branch.topics.flatMap((topic) => topic.questionIds) }));
+    const mapped = await runWithConcurrency([...topics, ...branchJobs], DEBATE_ATLAS_LIMITS.concurrency, async ({ branch, topic, questionIds }) => {
+      const topicResponses = questionIds.flatMap((id2) => responsesByQuestion.get(id2));
       const answeredBy = /* @__PURE__ */ new Map();
       topicResponses.forEach((response2) => answeredBy.set(response2.participantId, (answeredBy.get(response2.participantId) || 0) + 1));
       const placeParticipants = [...answeredBy.entries()].sort((a, b2) => b2[1] - a[1] || a[0].localeCompare(b2[0])).slice(0, DEBATE_ATLAS_LIMITS.placedParticipants).map(([id2]) => id2);
       const result = await callAi(buildDebateAtlasTopicPrompt({
         branch: branch.label,
-        topic: topic.label,
-        questions: topic.questionIds.map((id2) => {
+        topic: topic?.label || "",
+        questions: questionIds.map((id2) => {
           const { id: questionId4, prompt, type, options, scale, voiceCredits } = questionsById.get(id2);
           return { id: questionId4, prompt, type, ...options?.length ? { options } : {}, ...scale ? { scale } : {}, ...voiceCredits ? { voiceCredits } : {} };
         }),
@@ -103462,9 +103463,9 @@ var buildDebateAtlas = async ({ env, slug, config, body = {}, headers: headers2,
     });
     let topicIndex = 0;
     const missingTopics = [];
-    const branches = plan.branches.map((branch) => ({
-      ...branch,
-      topics: branch.topics.map((topic) => {
+    const branchMaps = new Map(branchJobs.map(({ branch }, index) => [branch.id, mapped[topics.length + index]]));
+    const branches = plan.branches.map((branch) => {
+      const mappedTopics = branch.topics.map((topic) => {
         const result = mapped[topicIndex];
         topicIndex += 1;
         if (!result) {
@@ -103477,8 +103478,17 @@ var buildDebateAtlas = async ({ env, slug, config, body = {}, headers: headers2,
           ...result,
           questions: topic.questionIds.map((id2) => ({ id: id2, prompt: text4(questionsById.get(id2).prompt, 400), type: questionsById.get(id2).type }))
         };
-      }).filter(Boolean)
-    })).filter((branch) => branch.topics.length);
+      }).filter(Boolean);
+      const own = branch.topics.length > 1;
+      const map = own ? branchMaps.get(branch.id) : mappedTopics[0];
+      return {
+        id: branch.id,
+        label: branch.label,
+        summary: own && map?.summary || branch.summary,
+        ...map ? { compass: map.compass, positions: map.positions, participants: map.participants } : {},
+        topics: mappedTopics
+      };
+    }).filter((branch) => branch.topics.length);
     if (!branches.length) return await finish(failure(502, "No topic of the atlas could be mapped; try again."));
     const builtAtMs = now();
     return await finish({
