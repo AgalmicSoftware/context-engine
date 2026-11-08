@@ -639,13 +639,13 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
                   }
                 }}
               />{' '}
-              Include voices from this device&apos;s speakers
+              Recording voices coming from this device
             </label>
             <button
               type="button"
               id={speakerHelpId}
               className={styles.sessionInterviewHeaderButton}
-              aria-label="About including voices from this device's speakers"
+              aria-label="About recording voices coming from this device"
             >
               <FontAwesomeIcon icon={faQuestionCircle} />
             </button>

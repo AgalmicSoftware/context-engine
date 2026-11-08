@@ -1365,7 +1365,7 @@ it('remembers the optional speaker-audio setting and locks it while recording', 
   window.localStorage.removeItem('ce:record-speaker-audio:v1');
   (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(buildRecorder());
   const { rerender, unmount } = render(<SessionListeningPanel sessionSlug="workshop" panelMode="recordGroup" />);
-  const toggle = screen.getByRole('checkbox', { name: "Include voices from this device's speakers" });
+  const toggle = screen.getByRole('checkbox', { name: 'Recording voices coming from this device' });
   expect(toggle).not.toBeChecked();
   fireEvent.click(toggle);
   expect(useRollingTranscriptionRecorder).toHaveBeenLastCalledWith(
@@ -1376,14 +1376,14 @@ it('remembers the optional speaker-audio setting and locks it while recording', 
     buildRecorder({ isRecording: true, status: 'recording', wakeLockHeld: false }),
   );
   rerender(<SessionListeningPanel sessionSlug="workshop" panelMode="recordGroup" />);
-  expect(screen.getByRole('checkbox', { name: "Include voices from this device's speakers" })).toBeDisabled();
+  expect(screen.getByRole('checkbox', { name: 'Recording voices coming from this device' })).toBeDisabled();
   expect(
     screen.getByText('Screen lock is unavailable. Keep this page visible and the screen unlocked.'),
   ).toBeInTheDocument();
   unmount();
   (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(buildRecorder());
   render(<SessionListeningPanel sessionSlug="workshop" panelMode="recordGroup" />);
-  expect(screen.getByRole('checkbox', { name: "Include voices from this device's speakers" })).toBeChecked();
+  expect(screen.getByRole('checkbox', { name: 'Recording voices coming from this device' })).toBeChecked();
   window.localStorage.removeItem('ce:record-speaker-audio:v1');
 });
 
