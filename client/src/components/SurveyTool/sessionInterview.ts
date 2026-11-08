@@ -13,6 +13,7 @@ import {
   type GeneratedSurveyStatement,
 } from './SurveyGenerator/surveyGeneratorHelpers';
 import { callAI } from '../../utilities/ai/aiClient.js';
+import { normalizeWorkerGroupId } from '../../domains/worker/workerGroupAutoJoin';
 import { resolveRealtimeInterviewModel } from '../../utilities/audio/realtimeInterviewConfig';
 import { normalizeRatingScale, type RatingScale } from '../../utilities/survey/ratingValue.js';
 import {
@@ -89,7 +90,11 @@ export type InterviewPrefillPacket = {
     facts?: Array<{ fact: string; evidence?: string; relatedQuestionIds?: string[] }>;
   };
   responses?: InterviewDraftResponse[];
+  /** Groups the person's own AI suggests from the catalog's list, checked against the live groups. */
+  groups?: InterviewPrefillGroupPick[];
 };
+
+export type InterviewPrefillGroupPick = { groupId: string; reason?: string; confidence?: number };
 
 export type InterviewPredictionRevision = {
   revision: number;
@@ -378,6 +383,23 @@ export const normalizeInterviewPrefillPacket = (value: unknown): InterviewPrefil
       };
     })
     .filter((entry) => entry.fact);
+  const groups = (Array.isArray(packet.groups) ? packet.groups : [])
+    .slice(0, 100)
+    .reduce<InterviewPrefillGroupPick[]>((picks, entry) => {
+      const pick = asRecord(entry);
+      const groupId = normalizeWorkerGroupId(toTrimmedString(pick.groupId));
+      if (!groupId || picks.some((seen) => seen.groupId === groupId)) return picks;
+      const reason = toTrimmedString(pick.reason).replace(/\s+/g, ' ').slice(0, 240);
+      const confidence = Number(pick.confidence);
+      picks.push({
+        groupId,
+        ...(reason ? { reason } : {}),
+        ...(typeof pick.confidence === 'number' && Number.isFinite(confidence)
+          ? { confidence: Math.max(0, Math.min(1, confidence)) }
+          : {}),
+      });
+      return picks;
+    }, []);
   return {
     version: 1,
     sessionSlug,
@@ -399,6 +421,7 @@ export const normalizeInterviewPrefillPacket = (value: unknown): InterviewPrefil
       ...(facts.length ? { facts } : {}),
     },
     ...(Array.isArray(packet.responses) ? { responses } : {}),
+    ...(groups.length ? { groups } : {}),
   };
 };
 
@@ -496,6 +519,9 @@ export const buildExternalInterviewKickoff = ({
     '{"version":1,"sessionSlug":"...","questionSetHash":"...","promptVersion":"...","source":{"platform":"chatgpt|claude|other","modelId":"ID or unknown","verification":"self_reported","researchCoverage":{"historyChatsSearched":null,"historyChatsUsed":0,"memoryItemsSearched":null,"memoryItemsUsed":0,"connectedSourcesSearched":null,"connectedSourcesUsed":0,"userStatementsUsed":0,"searchScopeNote":""}},"responderContext":{"summary":"relevant background/views/uncertainties","facts":[{"fact":"stated or inferred context","evidence":"stated|inferred plus short basis","relatedQuestionIds":["..."]}]},"responses":[{"questionId":"...","answer":"...","confidence":0.35,"evidence":"short basis"}]}',
     '',
     'Every response needs confidence (0-1) and evidence. v6 confidence: the chance I keep that answer unchanged on review; v4/v5: strength of support. Anchors: 0-.39 weak, .40-.69 moderate, .70-1 direct/repeated. Optional additionalComments is text; importance/conviction range 0-100. Evidence omits quotes, source names, URLs, timestamps, account IDs, and hidden reasoning. Coverage: count distinct prior chats/memories/sources searched and actually used, and user statements used; do not count your own prior output. Use null when the platform does not reveal a searched count; 0 means none used. searchScopeNote: count limitations only. Platform/model are self-reported fidelity metadata; use "unknown" if unavailable.',
+    '',
+    // The format is the prompt's own; catalog groups are data, like the rest of the catalog.
+    'If the catalog lists groups, add "groups":[{"groupId":"...","reason":"...","confidence":0.8}] for any that clearly fit me, scored like answers.',
     '',
     'Encode exact JSON as unpadded UTF-8 base64url: catalog.reviewUrl + #prefill=PACKET. Do not POST or upload it. Nothing is submitted; I review editable drafts. Use a Markdown link labeled "Open prefilled interview"; URL as target, never visible text or a code block. If Markdown is unsupported, use the raw URL. With no responses, return clean reviewUrl.',
   ].join('\n');

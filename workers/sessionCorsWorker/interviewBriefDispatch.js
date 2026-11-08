@@ -1,6 +1,8 @@
 import { readCurrentSessionConfig } from './sessionConfigAuthority.js';
 import { resolveAnonymousIpDailyLimit } from './anonymousRateLimitPolicy.js';
 import { loadPublicInterviewQuestions as loadPublicInterviewQuestionsBoundary } from './interviewQuestionCatalog.js';
+import { listSelfJoinableWorkerGroupsForVisitor as listSelfJoinableWorkerGroupsForVisitorBoundary } from './workerGroups.js';
+import { normalizeInterviewSettings } from '../../shared/interviewSettings.mjs';
 
 // v6 asks for confidence as the chance the person keeps the answer; hashes follow v5.
 export const INTERVIEW_PROMPT_VERSION = 'ce-interview-brief-v6';
@@ -86,12 +88,21 @@ const buildReviewUrl = ({ sessionUrl, servedWorkerOrigin } = {}) => {
   return url.toString();
 };
 
+// Groups an AI may suggest, as data; the clipboard prompt, not the catalog, says how to suggest them.
+const catalogGroup = (group) => ({
+  groupId: group.groupId,
+  label: group.label,
+  ...(group.description ? { description: group.description } : {}),
+  ...(Array.isArray(group.tags) && group.tags.length ? { tags: group.tags } : {}),
+});
+
 export const buildInterviewBriefDocument = ({
   slug,
   sessionUrl,
   servedWorkerOrigin,
   questions,
   questionSetHash,
+  groups,
 } = {}) => ({
   type: 'context-engine.interview-question-catalog',
   version: 1,
@@ -120,6 +131,7 @@ export const buildInterviewBriefDocument = ({
     verification: 'self_reported',
   },
   questions,
+  ...(groups?.length ? { groups: groups.map(catalogGroup) } : {}),
 });
 
 export const dispatchInterviewBriefRequest = async ({
@@ -193,6 +205,17 @@ export const dispatchInterviewBriefRequest = async ({
     return deps?.json?.({ error: 'A session-approved HTTPS (or localhost) sessionUrl is required.' }, 400, headers);
   }
   const questionSetHash = await (deps?.sha256 || sha256)(JSON.stringify(canonicalizeQuestions(questions)));
+  // With joining matching groups on, the person's own AI may suggest groups too, from those
+  // this visitor could see: all of them on a public session, or what a join link allows.
+  const groups = normalizeInterviewSettings(config.interviewMode).joinMatchingGroups
+    ? await (deps?.listSelfJoinableWorkerGroupsForVisitor || listSelfJoinableWorkerGroupsForVisitorBoundary)({
+        env,
+        config,
+        slug,
+        inviteGroupId: new URL(sessionUrl).searchParams.get('joinGroup'),
+        deps: { now: deps?.now },
+      })
+    : [];
   return deps?.json?.(
     buildInterviewBriefDocument({
       slug,
@@ -200,6 +223,7 @@ export const dispatchInterviewBriefRequest = async ({
       servedWorkerOrigin: safeServedWorkerOrigin(request.url),
       questions,
       questionSetHash,
+      groups,
     }),
     200,
     headers,

@@ -7,6 +7,7 @@ const NEWER_INTERVIEW_DEFAULTS: Record<string, unknown> = {
   hiddenDraftShare: 0,
   showFidelityScore: false,
   suggestGroups: false,
+  joinMatchingGroups: false,
   showFidelityResults: false,
   fidelityMinimumPeople: 5,
 };

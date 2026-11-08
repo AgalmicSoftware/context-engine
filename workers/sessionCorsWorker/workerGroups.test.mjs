@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+	listSelfJoinableWorkerGroupsForVisitor,
 	addWorkerGroupMember as addWorkerGroupMemberBoundary,
 	createWorkerGroup as createWorkerGroupBoundary,
 	deleteWorkerGroup as deleteWorkerGroupBoundary,
@@ -249,6 +250,152 @@ test('public Worker Group discovery follows the public ungated mode independentl
 	assert.equal(mismatched.status, 409);
 	assert.equal(mismatched.body.reason, 'worker_group_session_identity_mismatch');
 	assert.equal(listCalls, 2);
+});
+
+test('a join link shows a private session only what members of its group see', async () => {
+	const env = installCoordinatorBinding({ CE_WORKER_GROUPS_KV: createMockKv() });
+	const create = (groupId, input) =>
+		executeCoordinatedWorkerGroupMutation({
+			env,
+			slug: 'session-a',
+			operation: 'create',
+			input: { groupId, label: `Label ${groupId}`, ...input },
+			actorPrincipal: actor,
+		});
+	await create('salon', { joinMode: 'open', memberVisibility: 'session' });
+	await create('staff', { joinMode: 'admin_add', memberVisibility: 'session' });
+	await create('closing', {
+		joinMode: 'open',
+		memberVisibility: 'session',
+		joinEndsAt: new Date(Date.now() + 60_000).toISOString(),
+	});
+	await create('circle', { joinMode: 'open', memberVisibility: 'members' });
+	await create('admins', { joinMode: 'open', memberVisibility: 'admin_only' });
+	// Listed after the closing group's deadline.
+	const now = () => Date.now() + 120_000;
+	const list = (query) =>
+		dispatchPublicWorkerGroupListRequest({
+			request: new Request(`https://worker.example/groups/list?sessionId=${sessionId}${query}`),
+			config: privateWorkerGroupConfig(),
+			env,
+			slug: 'session-a',
+			baseHeaders: {},
+			deps: { json, now },
+		});
+
+	const joined = await workerGroupsRoute({
+		path: '/groups/join',
+		method: 'POST',
+		request: new Request('https://worker.example/groups/join', {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ groupId: 'salon' }),
+		}),
+		env,
+		slug: 'session-a',
+		requesterAddress: member.address,
+		baseHeaders: {},
+		deps: { json },
+	});
+	assert.equal(joined.status, 200);
+	const memberView = await workerGroupsRoute({
+		path: '/groups/list',
+		method: 'GET',
+		request: new Request('https://worker.example/groups/list'),
+		env,
+		slug: 'session-a',
+		requesterAddress: member.address,
+		baseHeaders: {},
+		deps: { json },
+	});
+	const ids = (response) => response.body.groups.map((group) => group.groupId).sort();
+
+	for (const query of ['&joinGroup=salon', '&joinGroup=%20SALON%20']) {
+		const invited = await list(query);
+		assert.equal(invited.status, 200);
+		assert.deepEqual(ids(invited), ['closing', 'salon', 'staff']);
+		assert.deepEqual(ids(invited), ids(memberView));
+		assert.equal(invited.body.sessionId, sessionId);
+		// Never counts, and never who runs a group, which for a participant's group is a participant.
+		assert.ok(invited.body.groups.every((group) => !('memberCount' in group) && !('adminAddress' in group)));
+	}
+	assert.ok(memberView.body.groups.some((group) => group.adminAddress === actor.address.toLowerCase() || group.adminAddress === actor.address));
+	// Only a link to a group someone could join on their own, still open, counts.
+	for (const query of [
+		'',
+		'&joinGroup=staff',
+		'&joinGroup=closing',
+		'&joinGroup=circle',
+		'&joinGroup=admins',
+		'&joinGroup=missing',
+		'&joinGroup=salon&joinGroup=staff',
+		'&joinGroup=sal%2Fon',
+	]) {
+		const denied = await list(query);
+		assert.equal(denied.status, 403, query);
+		assert.equal(denied.body.reason, 'worker_group_discovery_not_public');
+		assert.equal('groups' in denied.body, false);
+	}
+	const mismatched = await dispatchPublicWorkerGroupListRequest({
+		request: new Request(`https://worker.example/groups/list?sessionId=${replacementSessionId}&joinGroup=salon`),
+		config: privateWorkerGroupConfig(),
+		env,
+		slug: 'session-a',
+		baseHeaders: {},
+		deps: { json, now },
+	});
+	assert.equal(mismatched.status, 409);
+	// A public session lists the same groups with or without a link.
+	const publicList = await dispatchPublicWorkerGroupListRequest({
+		request: new Request(`https://worker.example/groups/list?sessionId=${sessionId}&joinGroup=missing`),
+		config: publicWorkerGroupConfig(),
+		env,
+		slug: 'session-a',
+		baseHeaders: {},
+		deps: { json, now },
+	});
+	assert.equal(publicList.status, 200);
+	assert.deepEqual(ids(publicList), ['closing', 'salon', 'staff']);
+});
+
+test('only groups someone could join on their own count, for a link or for an AI to suggest', async () => {
+	const nowMs = Date.parse('2026-02-03T04:05:06.000Z');
+	const listed = [
+		{ groupId: 'salon', label: 'Salon', joinMode: 'open', memberVisibility: 'session' },
+		{ groupId: 'staff', label: 'Staff', joinMode: 'admin_add', memberVisibility: 'session' },
+		{ groupId: 'circle', label: 'Circle', joinMode: 'open', memberVisibility: 'members' },
+		{ groupId: 'closed', label: 'Closed', joinMode: 'open', memberVisibility: 'session', joinEndsAt: '2026-02-01T00:00:00.000Z' },
+		{ groupId: 'open-later', label: 'Open later', joinMode: 'open', memberVisibility: 'session', joinEndsAt: '2026-03-01T00:00:00.000Z' },
+	];
+	// Even a list that held more than members see could not widen what counts.
+	const deps = {
+		now: () => nowMs,
+		checkCoordinatedWorkerGroupReady: async () => ({ ok: true, meta: { groupCount: listed.length } }),
+		listWorkerGroups: async () => ({ ok: true, store: 'kv', groups: listed }),
+	};
+	const joinable = await listSelfJoinableWorkerGroupsForVisitor({ env: {}, config: publicWorkerGroupConfig(), slug: 'session-a', deps });
+	assert.deepEqual(joinable.map((group) => group.groupId), ['salon', 'open-later']);
+	for (const inviteGroupId of ['circle', 'staff', 'closed']) {
+		assert.deepEqual(
+			await listSelfJoinableWorkerGroupsForVisitor({ env: {}, config: privateWorkerGroupConfig(), slug: 'session-a', inviteGroupId, deps }),
+			[],
+			inviteGroupId,
+		);
+	}
+	assert.equal(
+		(await listSelfJoinableWorkerGroupsForVisitor({ env: {}, config: privateWorkerGroupConfig(), slug: 'session-a', inviteGroupId: 'salon', deps })).length,
+		2,
+	);
+	// A failing list shows nothing rather than an error.
+	assert.deepEqual(
+		await listSelfJoinableWorkerGroupsForVisitor({
+			env: {},
+			config: publicWorkerGroupConfig(),
+			slug: 'session-a',
+			deps: { ...deps, listWorkerGroups: async () => { throw new Error('down'); } },
+		}),
+		[],
+	);
 });
 
 const createMockKv = () => {

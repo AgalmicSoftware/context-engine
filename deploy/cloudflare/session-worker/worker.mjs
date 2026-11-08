@@ -30188,6 +30188,7 @@ var init_interviewSettings = __esm({
       hiddenDraftShare: 0,
       showFidelityScore: false,
       suggestGroups: false,
+      joinMatchingGroups: false,
       showFidelityResults: false,
       fidelityMinimumPeople: 5
     });
@@ -30214,6 +30215,8 @@ var init_interviewSettings = __esm({
         showFidelityScore: source.showFidelityScore === true,
         // After an interview or AI prefill, suggest the session's open groups that fit the answers.
         suggestGroups: source.suggestGroups === true,
+        // Also tick the strong matches, so submitting joins them; the person can untick any first.
+        joinMatchingGroups: source.joinMatchingGroups === true,
         // Add "How well AIs predicted people" to Results, scoring everyone's AI-prefill drafts together.
         showFidelityResults: source.showFidelityResults === true,
         // That section hides figures from fewer people than this; 1 shows all.
@@ -30242,6 +30245,7 @@ var init_interviewSettings = __esm({
         "shareDraftChangesByDefault",
         "showFidelityScore",
         "suggestGroups",
+        "joinMatchingGroups",
         "showFidelityResults"
       ].every(
         (key) => value[key] === void 0 || typeof value[key] === "boolean"
@@ -30841,7 +30845,7 @@ var init_sessionConfigMutation = __esm({
 });
 
 // workers/sessionCorsWorker/workerGroups.js
-var trim2, isObj7, WORKER_GROUP_JOIN_MODES, WORKER_GROUP_MEMBER_VISIBILITY, DEFAULT_WORKER_GROUP_MAX_GROUPS_PER_SESSION, DEFAULT_WORKER_GROUP_MAX_MEMBERS_PER_GROUP, MAX_WORKER_GROUP_IMAGE_URL_LENGTH, MAX_WORKER_GROUP_DOCUMENT_URLS, MAX_WORKER_GROUP_TAGS, MAX_WORKER_GROUP_TAG_LENGTH, MAX_WORKER_GROUP_MEMBER_LIMIT, MAX_WORKER_GROUP_ID_LENGTH, MAX_WORKER_GROUP_SESSION_SLUG_LENGTH, DEFAULT_WORKER_GROUP_MEMBER_PAGE_SIZE, MAX_WORKER_GROUP_MEMBER_PAGE_SIZE, WORKER_GROUPS_FRESH_BOOTSTRAP_SENTINEL, IMPLEMENTED_JOIN_MODES, normalizeWorkerGroupId, isAddressShapedWorkerGroupId, encodedPrincipalKeyPart, canonicalSessionIdKeyPart, canonicalWorkerGroupSessionSlug, nowIso, parsePositiveInt, resolveWorkerGroupMemberPageRequest, WORKER_GROUP_MEMBER_CURSOR_PREFIX, decodeWorkerGroupMemberCursor, encodeWorkerGroupMemberCursor, resolveWorkerGroupCaps, resolveWorkerGroupsKv, resolveWorkerGroupStore, workerGroupIdentityKeyPrefix, workerGroupBackupPrefixes, workerGroupRecordMatchesIdentity, groupKey, groupPrefix, groupIndexKey, groupIndexPrefix, memberKey, memberIndexKey, memberPrefix, principalPrefix, legacyGroupKey, legacyGroupPrefix, legacyGroupIndexKey, legacyGroupIndexPrefix, jsonResponse, normalizeJoinMode, normalizeMemberVisibility, normalizeImageUrl, normalizeGroupTags, normalizeGroupDocumentUrls, normalizeGroupMemberLimit, normalizeGroupJoinEndsAt, normalizeEvmAddress, normalizePrincipalId, principalKeyFor, normalizeWorkerGroupPrincipal, resolveWorkerGroupPrincipal, createWorkerGroupId, normalizeGroupPatch, kvGetJsonStrict, kvGetLegacyJson, resolveWorkerGroupBootstrap, kvListKeys, kvListKeyPage, readGroupRecord, writeGroupRecord, listGroupRecords, scanWorkerGroupRecordsForIdentity, writeMembershipRecord, canonicalizeMembershipRecord, readMembershipRecord, listMembershipRecords, listMembershipRecordPage, redactGroupForMember, normalizeWorkerGroupMembershipFailure, createWorkerGroup, updateWorkerGroup, deleteWorkerGroup, addWorkerGroupMember, removeWorkerGroupMember, listWorkerGroups, listWorkerGroupMembers, redactWorkerGroupMemberForViewer, listWorkerGroupMembersForPrincipal, listWorkerGroupMemberships, executeWorkerGroupMutation, workerGroupCoordinationUnavailable, callWorkerGroupCoordinator, coordinateWorkerGroupBackup, checkCoordinatedWorkerGroupReady, reconcileCoordinatedWorkerGroupCapacity, readCoordinatedWorkerGroupCatalog, readCoordinatedWorkerGroupMemberships, isWorkerGroupMember, forwardWorkerGroupMutation, executeCoordinatedWorkerGroupMutation, parseRouteBody, routeError, resolveWorkerGroupSessionIdentity, participantGroupCreationAllowed, dispatchPublicWorkerGroupListRequest, dispatchAdminWorkerGroupRequest, workerGroupsRoute;
+var trim2, isObj7, WORKER_GROUP_JOIN_MODES, WORKER_GROUP_MEMBER_VISIBILITY, DEFAULT_WORKER_GROUP_MAX_GROUPS_PER_SESSION, DEFAULT_WORKER_GROUP_MAX_MEMBERS_PER_GROUP, MAX_WORKER_GROUP_IMAGE_URL_LENGTH, MAX_WORKER_GROUP_DOCUMENT_URLS, MAX_WORKER_GROUP_TAGS, MAX_WORKER_GROUP_TAG_LENGTH, MAX_WORKER_GROUP_MEMBER_LIMIT, MAX_WORKER_GROUP_ID_LENGTH, MAX_WORKER_GROUP_SESSION_SLUG_LENGTH, DEFAULT_WORKER_GROUP_MEMBER_PAGE_SIZE, MAX_WORKER_GROUP_MEMBER_PAGE_SIZE, WORKER_GROUPS_FRESH_BOOTSTRAP_SENTINEL, IMPLEMENTED_JOIN_MODES, normalizeWorkerGroupId, isAddressShapedWorkerGroupId, encodedPrincipalKeyPart, canonicalSessionIdKeyPart, canonicalWorkerGroupSessionSlug, nowIso, parsePositiveInt, resolveWorkerGroupMemberPageRequest, WORKER_GROUP_MEMBER_CURSOR_PREFIX, decodeWorkerGroupMemberCursor, encodeWorkerGroupMemberCursor, resolveWorkerGroupCaps, resolveWorkerGroupsKv, resolveWorkerGroupStore, workerGroupIdentityKeyPrefix, workerGroupBackupPrefixes, workerGroupRecordMatchesIdentity, groupKey, groupPrefix, groupIndexKey, groupIndexPrefix, memberKey, memberIndexKey, memberPrefix, principalPrefix, legacyGroupKey, legacyGroupPrefix, legacyGroupIndexKey, legacyGroupIndexPrefix, jsonResponse, normalizeJoinMode, normalizeMemberVisibility, normalizeImageUrl, normalizeGroupTags, normalizeGroupDocumentUrls, normalizeGroupMemberLimit, normalizeGroupJoinEndsAt, normalizeEvmAddress, normalizePrincipalId, principalKeyFor, normalizeWorkerGroupPrincipal, resolveWorkerGroupPrincipal, createWorkerGroupId, normalizeGroupPatch, kvGetJsonStrict, kvGetLegacyJson, resolveWorkerGroupBootstrap, kvListKeys, kvListKeyPage, readGroupRecord, writeGroupRecord, listGroupRecords, scanWorkerGroupRecordsForIdentity, writeMembershipRecord, canonicalizeMembershipRecord, readMembershipRecord, listMembershipRecords, listMembershipRecordPage, redactGroupForMember, normalizeWorkerGroupMembershipFailure, createWorkerGroup, updateWorkerGroup, deleteWorkerGroup, addWorkerGroupMember, removeWorkerGroupMember, listWorkerGroups, listWorkerGroupMembers, redactWorkerGroupMemberForViewer, listWorkerGroupMembersForPrincipal, listWorkerGroupMemberships, executeWorkerGroupMutation, workerGroupCoordinationUnavailable, callWorkerGroupCoordinator, coordinateWorkerGroupBackup, checkCoordinatedWorkerGroupReady, reconcileCoordinatedWorkerGroupCapacity, readCoordinatedWorkerGroupCatalog, readCoordinatedWorkerGroupMemberships, isWorkerGroupMember, forwardWorkerGroupMutation, executeCoordinatedWorkerGroupMutation, parseRouteBody, routeError, resolveWorkerGroupSessionIdentity, participantGroupCreationAllowed, isSelfJoinableWorkerGroup, listWorkerGroupsForVisitor, listSelfJoinableWorkerGroupsForVisitor, dispatchPublicWorkerGroupListRequest, dispatchAdminWorkerGroupRequest, workerGroupsRoute;
 var init_workerGroups = __esm({
   "workers/sessionCorsWorker/workerGroups.js"() {
     init_sessionConfigAuthority();
@@ -32295,43 +32299,22 @@ var init_workerGroups = __esm({
       return { ok: true, sessionSlug, sessionId };
     };
     participantGroupCreationAllowed = (config) => config?.groupCreationPolicy === "participants";
-    dispatchPublicWorkerGroupListRequest = async ({ request, config, env, slug, baseHeaders, deps = {} } = {}) => {
+    isSelfJoinableWorkerGroup = (group, nowMs) => {
+      const joinEndsAt = Date.parse(trim2(group?.joinEndsAt));
+      return group?.joinMode === WORKER_GROUP_JOIN_MODES.OPEN && group?.memberVisibility === WORKER_GROUP_MEMBER_VISIBILITY.SESSION && !(Number.isFinite(joinEndsAt) && joinEndsAt <= nowMs);
+    };
+    listWorkerGroupsForVisitor = async ({ env, config, slug, inviteGroupId, deps = {} } = {}) => {
       const sessionIdentity = resolveWorkerGroupSessionIdentity({ config, slug });
-      if (!sessionIdentity.ok) return routeError(deps, sessionIdentity, baseHeaders);
-      if (!workerConfigAllowsAnonymousGroupDiscovery(config)) {
-        return routeError(
-          deps,
-          {
-            status: 403,
-            reason: "worker_group_discovery_not_public"
-          },
-          baseHeaders
-        );
-      }
-      let requestedSessionId = "";
-      try {
-        requestedSessionId = resolveCanonicalWorkerSessionIdHex({
-          sessionId: new URL(request?.url || "").searchParams.get("sessionId")
-        });
-      } catch {
-        requestedSessionId = "";
-      }
-      if (requestedSessionId !== sessionIdentity.sessionId) {
-        return routeError(
-          deps,
-          {
-            status: 409,
-            reason: "worker_group_session_identity_mismatch"
-          },
-          baseHeaders
-        );
-      }
+      if (!sessionIdentity.ok) return sessionIdentity;
+      const publicDiscovery = workerConfigAllowsAnonymousGroupDiscovery(config);
+      const invite = publicDiscovery ? "" : normalizeWorkerGroupId(inviteGroupId);
+      if (!publicDiscovery && !invite) return { ok: false, status: 403, reason: "worker_group_discovery_not_public" };
       const ready = await (deps?.checkCoordinatedWorkerGroupReady || checkCoordinatedWorkerGroupReady)({
         env,
         slug,
         sessionId: sessionIdentity.sessionId
       });
-      if (!ready.ok) return routeError(deps, ready, baseHeaders);
+      if (!ready.ok) return ready;
       let result;
       try {
         result = await (deps?.listWorkerGroups || listWorkerGroups)({
@@ -32349,6 +32332,57 @@ var init_workerGroups = __esm({
           reason: "worker_group_projection_unavailable"
         };
       }
+      if (!result.ok) return result;
+      const nowMs = Number(deps.now?.() || Date.now());
+      if (!invite) return { ok: true, sessionIdentity, store: result.store, groups: result.groups };
+      if (!result.groups.some((group) => group.groupId === invite && isSelfJoinableWorkerGroup(group, nowMs))) {
+        return { ok: false, status: 403, reason: "worker_group_discovery_not_public" };
+      }
+      const groups = result.groups.map(({ adminAddress: _adminAddress, ...group }) => group);
+      return { ok: true, sessionIdentity, store: result.store, groups };
+    };
+    listSelfJoinableWorkerGroupsForVisitor = async (args = {}) => {
+      try {
+        const result = await listWorkerGroupsForVisitor(args);
+        const nowMs = Number(args.deps?.now?.() || Date.now());
+        return result.ok ? result.groups.filter((group) => isSelfJoinableWorkerGroup(group, nowMs)) : [];
+      } catch {
+        return [];
+      }
+    };
+    dispatchPublicWorkerGroupListRequest = async ({ request, config, env, slug, baseHeaders, deps = {} } = {}) => {
+      const sessionIdentity = resolveWorkerGroupSessionIdentity({ config, slug });
+      if (!sessionIdentity.ok) return routeError(deps, sessionIdentity, baseHeaders);
+      let params = new URLSearchParams();
+      try {
+        params = new URL(request?.url || "").searchParams;
+      } catch {
+        params = new URLSearchParams();
+      }
+      const inviteGroupIds = params.getAll("joinGroup");
+      const inviteGroupId = inviteGroupIds.length === 1 ? normalizeWorkerGroupId(inviteGroupIds[0]) : "";
+      if (!inviteGroupId && !workerConfigAllowsAnonymousGroupDiscovery(config)) {
+        return routeError(
+          deps,
+          {
+            status: 403,
+            reason: "worker_group_discovery_not_public"
+          },
+          baseHeaders
+        );
+      }
+      const requestedSessionId = resolveCanonicalWorkerSessionIdHex({ sessionId: params.get("sessionId") });
+      if (requestedSessionId !== sessionIdentity.sessionId) {
+        return routeError(
+          deps,
+          {
+            status: 409,
+            reason: "worker_group_session_identity_mismatch"
+          },
+          baseHeaders
+        );
+      }
+      const result = await listWorkerGroupsForVisitor({ env, config, slug, inviteGroupId, deps });
       if (!result.ok) return routeError(deps, result, baseHeaders);
       return jsonResponse(deps, { ok: true, ...sessionIdentity, store: result.store, groups: result.groups }, 200, baseHeaders);
     };
@@ -105657,6 +105691,8 @@ var dispatchSessionAgentInstructionsRequest = async ({
 
 // workers/sessionCorsWorker/interviewBriefDispatch.js
 init_sessionConfigAuthority();
+init_workerGroups();
+init_interviewSettings();
 var INTERVIEW_PROMPT_VERSION = "ce-interview-brief-v6";
 var trim21 = (value) => String(value == null ? "" : value).trim();
 var isObj26 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
@@ -105728,12 +105764,19 @@ var buildReviewUrl = ({ sessionUrl, servedWorkerOrigin } = {}) => {
   url.searchParams.set("mode", "interview");
   return url.toString();
 };
+var catalogGroup = (group) => ({
+  groupId: group.groupId,
+  label: group.label,
+  ...group.description ? { description: group.description } : {},
+  ...Array.isArray(group.tags) && group.tags.length ? { tags: group.tags } : {}
+});
 var buildInterviewBriefDocument = ({
   slug,
   sessionUrl,
   servedWorkerOrigin,
   questions,
-  questionSetHash
+  questionSetHash,
+  groups
 } = {}) => ({
   type: "context-engine.interview-question-catalog",
   version: 1,
@@ -105761,7 +105804,8 @@ var buildInterviewBriefDocument = ({
     unknownSearchedCount: null,
     verification: "self_reported"
   },
-  questions
+  questions,
+  ...groups?.length ? { groups: groups.map(catalogGroup) } : {}
 });
 var dispatchInterviewBriefRequest = async ({
   request,
@@ -105833,13 +105877,21 @@ var dispatchInterviewBriefRequest = async ({
     return deps?.json?.({ error: "A session-approved HTTPS (or localhost) sessionUrl is required." }, 400, headers2);
   }
   const questionSetHash = await (deps?.sha256 || sha2563)(JSON.stringify(canonicalizeQuestions(questions)));
+  const groups = normalizeInterviewSettings(config.interviewMode).joinMatchingGroups ? await (deps?.listSelfJoinableWorkerGroupsForVisitor || listSelfJoinableWorkerGroupsForVisitor)({
+    env,
+    config,
+    slug,
+    inviteGroupId: new URL(sessionUrl).searchParams.get("joinGroup"),
+    deps: { now: deps?.now }
+  }) : [];
   return deps?.json?.(
     buildInterviewBriefDocument({
       slug,
       sessionUrl,
       servedWorkerOrigin: safeServedWorkerOrigin(request.url),
       questions,
-      questionSetHash
+      questionSetHash,
+      groups
     }),
     200,
     headers2

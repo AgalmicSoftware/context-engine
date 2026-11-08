@@ -26,6 +26,9 @@ const FIDELITY_DEFAULTS = {
 const FIDELITY_ABOUT =
   'Turns on voice interviews, which AI prefill uses, research sharing by default and hidden drafts for 1 in 5 of each person’s AI-prefill drafts, and shows people how well their AI predicted them. Turning it off sets the research settings back to their defaults; each can still be changed below.';
 
+const JOIN_GROUPS_ABOUT =
+  'After an AI prefill or voice interview, groups that strongly fit a participant’s answers start ticked under their drafts, and Submit joins the ticked groups. They can untick any first. Their own AI can suggest groups from the session’s list too.';
+
 // The smallest group "How well AIs predicted people" reports on; 1 shows every figure.
 const FIDELITY_MINIMUMS = [1, 3, 5, 10];
 const fidelityMinimumLabel = (people: number) => (people === 1 ? 'Off: show every result' : `${people} people`);
@@ -51,6 +54,7 @@ export default function InterviewSettingsFields({ value, onChange, disabled = fa
   // Tooltip targets are CSS selectors, which can't contain React's colons.
   const fidelityId = `${id.replace(/:/g, '')}-fidelity`;
   const minimumId = `${fidelityId}-minimum`;
+  const joinGroupsId = `${fidelityId}-join-groups`;
   return (
     <fieldset disabled={disabled} style={{ minWidth: 0 }}>
       <legend>Interview settings</legend>
@@ -182,29 +186,54 @@ export default function InterviewSettingsFields({ value, onChange, disabled = fa
           'followNewQuestions',
           'suggestQuestions',
           'suggestGroups',
+          'joinMatchingGroups',
           'allowManualRefresh',
           'showFidelityScore',
         ] as const
-      ).map((key) => (
-        <Label key={key} style={{ display: 'block', marginTop: 12 }}>
-          <input
-            type="checkbox"
-            checked={settings[key]}
-            onChange={(e) => change(key, e.target.checked)}
-            disabled={key === 'autoRegenerate' && settings.openingMode === 'owner'}
-          />{' '}
-          {
+      ).map((key) =>
+        key === 'joinMatchingGroups' ? (
+          <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12 }}>
+            <Label style={{ marginBottom: 0 }}>
+              <input
+                type="checkbox"
+                checked={settings.joinMatchingGroups}
+                aria-describedby={`${joinGroupsId}-about`}
+                onChange={(e) => change(key, e.target.checked)}
+              />{' '}
+              Join strong group matches on submit
+            </Label>
+            <SessionWizardInfoTooltip
+              enabled={tooltipsEnabled}
+              id={`${joinGroupsId}-help`}
+              content={JOIN_GROUPS_ABOUT}
+              placement="top"
+              ariaLabel="About joining strong group matches"
+            />
+            <span id={`${joinGroupsId}-about`} hidden>
+              {JOIN_GROUPS_ABOUT}
+            </span>
+          </div>
+        ) : (
+          <Label key={key} style={{ display: 'block', marginTop: 12 }}>
+            <input
+              type="checkbox"
+              checked={settings[key]}
+              onChange={(e) => change(key, e.target.checked)}
+              disabled={key === 'autoRegenerate' && settings.openingMode === 'owner'}
+            />{' '}
             {
-              autoRegenerate: 'Regenerate opening when the question bank grows',
-              followNewQuestions: 'Check for new session questions during interviews',
-              suggestQuestions: 'Suggest new question drafts from interview evidence',
-              suggestGroups: 'Suggest open groups that fit participants’ answers',
-              allowManualRefresh: 'Allow admins to regenerate the opening',
-              showFidelityScore: 'Show participants how well their AI predicted them',
-            }[key]
-          }
-        </Label>
-      ))}
+              {
+                autoRegenerate: 'Regenerate opening when the question bank grows',
+                followNewQuestions: 'Check for new session questions during interviews',
+                suggestQuestions: 'Suggest new question drafts from interview evidence',
+                suggestGroups: 'Suggest open groups that fit participants’ answers',
+                allowManualRefresh: 'Allow admins to regenerate the opening',
+                showFidelityScore: 'Show participants how well their AI predicted them',
+              }[key]
+            }
+          </Label>
+        ),
+      )}
       <Label style={{ display: 'block', marginTop: 12 }}>
         <input
           type="checkbox"

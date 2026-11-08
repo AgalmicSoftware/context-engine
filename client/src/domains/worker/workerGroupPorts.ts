@@ -457,18 +457,22 @@ export const loadPublicWorkerGroups = async ({
   workerUrl,
   sessionId,
   sessionSlug,
+  joinGroup = '',
   fetchImpl = fetch,
 }: {
   workerUrl: unknown;
   sessionId: unknown;
   sessionSlug: unknown;
+  /** A join link's group: on a private session it shows what that group's members see. */
+  joinGroup?: string;
   fetchImpl?: typeof fetch;
 }): Promise<WorkerGroup[]> => {
   const base = normalizeWorkerUrl(workerUrl);
   const expectedSessionSlug = normalizeExpectedSessionSlug(sessionSlug);
   const expectedSessionId = normalizeExpectedSessionId(sessionId);
   if (!base) throw new WorkerGroupRequestError('worker_group_worker_url_missing');
-  const response = await fetchImpl(`${base}/groups/list?sessionId=${encodeURIComponent(expectedSessionId)}`, {
+  const invite = joinGroup ? `&joinGroup=${encodeURIComponent(joinGroup)}` : '';
+  const response = await fetchImpl(`${base}/groups/list?sessionId=${encodeURIComponent(expectedSessionId)}${invite}`, {
     method: 'GET',
     cache: 'no-store',
     headers: {

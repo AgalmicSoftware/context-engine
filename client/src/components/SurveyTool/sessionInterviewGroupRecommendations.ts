@@ -3,6 +3,8 @@ import { canonicalizeSessionSlug } from '../../utilities/session/canonicalSessio
 import { resolveSessionCapabilityProjection } from '../../utilities/session/sessionCapabilityProjection.js';
 import { resolveWorkerCanonicalSessionIdHex } from '../../utilities/session/sessionWorkerDiscovery.js';
 import { getUsableSessionWorkerUrl } from '../../utilities/session/sessionWorkerAvailability';
+import { buildTokenCacheKey, readScopedTokenCache } from '../../utilities/worker/workerAuthTokenCache';
+import { normalizeWorkerUrl } from '../../utilities/worker/workerUrl.js';
 import { sessionModeAllowsAnonymousWorkerGroupDiscovery } from '../../utilities/session/sessionModeProfile';
 import {
   loadPublicWorkerGroups,
@@ -10,7 +12,12 @@ import {
   type WorkerGroup,
   type WorkerGroupMembership,
 } from '../../domains/worker/workerGroupPorts';
-import type { InterviewDraftResponse, InterviewPrefillPacket, InterviewQuestion } from './sessionInterview';
+import type {
+  InterviewDraftResponse,
+  InterviewPrefillGroupPick,
+  InterviewPrefillPacket,
+  InterviewQuestion,
+} from './sessionInterview';
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -32,7 +39,14 @@ export type InterviewGroupRecommendation = {
   groupId: string;
   reason: string;
   evidence: string;
+  /** 0-1: how surely the group fits. Strong matches start ticked when the session joins them. */
+  confidence?: number;
 };
+
+// The kickoff's anchor for direct or repeated support.
+const STRONG_GROUP_MATCH_CONFIDENCE = 0.7;
+export const isStrongGroupMatch = (recommendation: Pick<InterviewGroupRecommendation, 'confidence'>): boolean =>
+  (recommendation.confidence ?? 0) >= STRONG_GROUP_MATCH_CONFIDENCE;
 
 export type InterviewGroupRecommendationUnavailableReason =
   'empty_eligible_catalog' | 'ai_authentication_required' | 'ai_recommendation_failed';
@@ -85,6 +99,8 @@ export type LoadInterviewWorkerGroupCandidatesArgs = {
   sessionSlug?: unknown;
   workerUrl?: unknown;
   workerToken?: unknown;
+  /** A pending join link's group, which lets a signed-out person see what its members see. */
+  inviteGroupId?: string;
   fetchImpl?: typeof fetch;
   nowMs?: number;
 };
@@ -99,11 +115,41 @@ export type RecommendInterviewGroupsArgs = {
   workerUrl?: unknown;
 };
 
+export type SessionInterviewGroupRecommendationRequest = {
+  requestId: number;
+  transcript: string;
+  prefillPacket: InterviewPrefillPacket | null;
+  draftResponses: InterviewDraftResponse[];
+};
+
+/** Suggestions count only answers the person keeps; a hidden draft's guess stays out until it is shown. */
+export const buildGroupRecommendationRequest = ({
+  transcript,
+  prefillPacket,
+  drafts,
+  selected,
+  edited,
+  hidden,
+}: {
+  transcript: string;
+  prefillPacket: InterviewPrefillPacket | null;
+  drafts: InterviewDraftResponse[];
+  selected: Record<string, boolean>;
+  edited: Record<string, Partial<InterviewDraftResponse>>;
+  hidden: (questionId: string) => boolean;
+}): SessionInterviewGroupRecommendationRequest => ({
+  requestId: Date.now(),
+  transcript,
+  prefillPacket,
+  draftResponses: drafts
+    .filter(({ questionId }) => selected[questionId] && !hidden(questionId))
+    .map((draft) => ({ ...draft, ...(edited[draft.questionId] || {}) })),
+});
+
 const MAX_PROMPT_TRANSCRIPT_CHARS = 6000;
 const MAX_PROMPT_CONTEXT_CHARS = 1600;
 const MAX_PROMPT_DRAFTS = 12;
 const MAX_PROMPT_GROUPS = 100;
-const MAX_RECOMMENDATIONS = 4;
 // callAI has no timeout of its own; a stalled call must not hold back the exact-name matches.
 export const INTERVIEW_GROUP_AI_TIMEOUT_MS = 30_000;
 
@@ -213,6 +259,33 @@ export const resolveInterviewWorkerGroupTarget = ({
   };
 };
 
+/** A signed-in person's saved Worker token for this session, read without asking them to sign anything. */
+export const readCachedInterviewWorkerToken = ({
+  sessionConfig,
+  sessionSlug,
+  workerUrl,
+  account,
+}: {
+  sessionConfig: unknown;
+  sessionSlug?: unknown;
+  workerUrl?: unknown;
+  account?: unknown;
+}): string => {
+  const address = lower(account);
+  const config = asRecord(sessionConfig);
+  const slug = canonicalizeSessionSlug(sessionSlug || config.slug);
+  const sessionId = resolveWorkerCanonicalSessionIdHex(config);
+  const url = normalizeWorkerUrl(workerUrl);
+  if (!/^0x[0-9a-f]{40}$/.test(address) || !slug || !sessionId || !url) return '';
+  const cached = readScopedTokenCache(buildTokenCacheKey({ workerUrl: url, slug, sessionId, address }), {
+    workerUrl: url,
+    sessionSlug: slug,
+    sessionId,
+    address,
+  });
+  return cached?.ok && cached.token ? cached.token : '';
+};
+
 export const normalizeInterviewGroupCandidates = ({
   groups,
   memberships = [],
@@ -260,6 +333,7 @@ export const loadInterviewWorkerGroupCandidates = async ({
   sessionSlug,
   workerUrl,
   workerToken,
+  inviteGroupId = '',
   fetchImpl,
   nowMs,
 }: LoadInterviewWorkerGroupCandidatesArgs): Promise<InterviewGroupCandidateLoadResult> => {
@@ -289,13 +363,14 @@ export const loadInterviewWorkerGroupCandidates = async ({
         }),
       };
     }
-    if (!target.anonymousDiscoveryAllowed) {
+    if (!target.anonymousDiscoveryAllowed && !inviteGroupId) {
       return { status: 'unsupported', candidates: [], reason: 'worker_group_authentication_required' };
     }
     const groups = await loadPublicWorkerGroups({
       workerUrl: target.workerUrl,
       sessionId: target.sessionId,
       sessionSlug: target.sessionSlug,
+      joinGroup: target.anonymousDiscoveryAllowed ? '' : inviteGroupId,
       fetchImpl,
     });
     return {
@@ -439,9 +514,10 @@ Rules:
 - Recommend a group only when the respondent clearly matches the group's actual description or criteria. Do not infer residence, nationality, job role, support, or identity from a weak topical mention.
 - Honor corrections, uncertainty, and negation. If the evidence is ambiguous, return no recommendation for that group.
 - Do not assign identity to the respondent. Frame matches as optional suggestions.
-- Return JSON only with shape {"groups":[{"groupId":"known-id","reason":"short optional-match reason","evidence":"short exact respondent quote copied from supplied evidence"}]}.
+- Return JSON only with shape {"groups":[{"groupId":"known-id","reason":"short optional-match reason","evidence":"short exact respondent quote copied from supplied evidence","confidence":0.8}]}.
 - The evidence field must be a short verbatim quote from the supplied respondent evidence, not a paraphrase.
-- groupId must be one of the eligible group IDs in the catalog. Return at most ${MAX_RECOMMENDATIONS} groups.
+- confidence (0-1) is how surely the respondent fits the group: 0-0.39 weak, 0.40-0.69 moderate, 0.70-1 direct or repeated evidence.
+- groupId must be one of the eligible group IDs in the catalog. Return every group that fits.
 
 Eligible group catalog:
 ${JSON.stringify(catalog)}
@@ -480,7 +556,6 @@ export const parseInterviewGroupRecommendations = (
   const candidateById = new Map(candidates.map((candidate) => [candidate.groupId, candidate]));
   const seen = new Set<string>();
   return rows.reduce<InterviewGroupRecommendation[]>((items, row) => {
-    if (items.length >= MAX_RECOMMENDATIONS) return items;
     const record = asRecord(row);
     const groupId = toText(record.groupId || record.id);
     if (!groupId || seen.has(groupId) || !candidateById.has(groupId)) return items;
@@ -494,7 +569,15 @@ export const parseInterviewGroupRecommendations = (
       return items;
     }
     seen.add(groupId);
-    items.push({ groupId, reason, evidence });
+    const confidence = Number(record.confidence);
+    items.push({
+      groupId,
+      reason,
+      evidence,
+      ...(typeof record.confidence === 'number' && Number.isFinite(confidence)
+        ? { confidence: Math.max(0, Math.min(1, confidence)) }
+        : {}),
+    });
     return items;
   }, []);
 };
@@ -539,9 +622,29 @@ export const matchInterviewGroupsByAnswer = ({
     const choice = toText(Array.isArray(draft.answer) && draft.answer.length === 1 ? draft.answer[0] : draft.answer);
     const group = choice ? groups.get(nameKey(choice)) : undefined;
     if (!group || matches.some((match) => match.groupId === group.groupId)) continue;
-    matches.push({ groupId: group.groupId, reason: `You chose “${choice}”.`, evidence: '' });
+    // A kept answer naming the group is as strong as a match gets.
+    matches.push({ groupId: group.groupId, reason: `You chose “${choice}”.`, evidence: '', confidence: 1 });
   }
   return matches;
+};
+
+/** The groups the person's own AI suggested in its prefill, among those they could join. */
+export const matchInterviewGroupsFromPrefill = ({
+  candidates,
+  picks = [],
+}: {
+  candidates: InterviewGroupCandidate[];
+  picks?: InterviewPrefillGroupPick[];
+}): InterviewGroupRecommendation[] => {
+  const eligible = new Set(candidates.map((group) => group.groupId));
+  return picks
+    .filter((pick) => eligible.has(pick.groupId))
+    .map((pick) => ({
+      groupId: pick.groupId,
+      reason: pick.reason ? `Your AI: ${pick.reason}` : 'Your AI suggested this group.',
+      evidence: '',
+      ...(pick.confidence === undefined ? {} : { confidence: pick.confidence }),
+    }));
 };
 
 export const recommendInterviewGroups = async ({
@@ -600,10 +703,7 @@ export const recommendInterviewGroups = async ({
   };
   try {
     await Promise.race([timeout, collect()]);
-    return {
-      status: 'ready',
-      recommendations: recommendations.slice(0, MAX_RECOMMENDATIONS),
-    };
+    return { status: 'ready', recommendations };
   } catch (error) {
     return { status: 'unavailable', recommendations: [], reason: classifyRecommendationError(error) };
   } finally {

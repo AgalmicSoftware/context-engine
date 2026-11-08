@@ -4454,6 +4454,61 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   justify-content: flex-end;
 }
 
+.sessionInterviewGroupChoices {
+  display: grid;
+  gap: 8px;
+
+  > p {
+    margin: 0;
+    color: var(--ce-panel-text);
+  }
+
+  > button {
+    justify-self: start;
+  }
+}
+
+// A group the person can tick, to join it when they submit.
+.sessionInterviewGroupChoice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--ce-card-border);
+  border-radius: var(--ce-radius-8);
+  background: var(--ce-card-bg);
+  color: var(--ce-panel-text);
+  cursor: pointer;
+
+  &:focus-within {
+    outline: 2px solid var(--ce-focus-ring);
+    outline-offset: 2px;
+  }
+
+  input {
+    position: static;
+    flex-shrink: 0;
+    width: 18px;
+    height: 18px;
+    margin: 2px 0 0 !important;
+    cursor: pointer;
+  }
+
+  > span {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  small {
+    color: inherit;
+    font-size: 0.82rem;
+    line-height: 1.35;
+  }
+}
+
 .sessionInterviewPanel .sessionInterviewSubmitButton {
   @include finalSubmitCta.final-submit-cta-shell(
     $padding: 12px 24px,

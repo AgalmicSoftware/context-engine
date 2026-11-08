@@ -5,6 +5,8 @@ import { getWorkerSessionToken } from '../../utilities/worker/workerAuth';
 import WorkerGroupAutoJoin from './WorkerGroupAutoJoin';
 import { AUTO_JOIN_STORAGE_KEY, readPendingAutoJoin } from '../../domains/worker/workerGroupAutoJoinIntent';
 import { fetchWorkerCanonicalSessionBootstrap } from '../../utilities/session/sessionWorkerDiscovery';
+import { AUTO_JOIN_CLAIM_ATTRIBUTE, VOICE_DIALOG_NOTICE_SLOT_ID } from '../../utilities/ui/voiceDialogNoticeSlot';
+import { rememberWorkerGroupAutoJoinCancellation } from '../../domains/worker/workerGroupAutoJoinPreference';
 jest.mock('../../utilities/session/sessionWorkerDiscovery', () => ({
   ...jest.requireActual<Record<string, unknown>>('../../utilities/session/sessionWorkerDiscovery'),
   fetchWorkerCanonicalSessionBootstrap: jest.fn(),
@@ -94,6 +96,8 @@ describe('WorkerGroupAutoJoin', () => {
     expect(getToken).not.toHaveBeenCalled();
     expect(joins()).toHaveLength(0);
     expect(new Headers(fetchMock.mock.calls[0][1]?.headers).has('Authorization')).toBe(false);
+    // The link shows a private session's group names to someone signed out.
+    expect(new URL(String(fetchMock.mock.calls[0][0])).searchParams.get('joinGroup')).toBe(group.groupId);
     expect(screen.queryByRole('button', { name: /sign in/i })).not.toBeInTheDocument();
     expect(screen.queryByText('Group invitation')).not.toBeInTheDocument();
     expect(screen.getAllByRole('button')).toHaveLength(1);
@@ -128,6 +132,51 @@ describe('WorkerGroupAutoJoin', () => {
     await flush();
     expect(screen.queryByTestId('ce-session-worker-group-auto-join')).not.toBeInTheDocument();
     expect(joins()).toHaveLength(1);
+  });
+
+  it('lets the open interview’s Groups section hold a waiting link, but shows the join itself', async () => {
+    const slot = document.createElement('div');
+    slot.id = VOICE_DIALOG_NOTICE_SLOT_ID;
+    const claim = document.createElement('span');
+    claim.setAttribute(AUTO_JOIN_CLAIM_ATTRIBUTE, group.groupId);
+    document.body.append(slot, claim);
+    try {
+      const { rerender } = render(<WorkerGroupAutoJoin {...props} account="" loginComplete={false} />);
+      await flush();
+      expect(screen.queryByTestId('ce-session-worker-group-auto-join')).not.toBeInTheDocument();
+      rerender(<WorkerGroupAutoJoin {...props} />);
+      await flush();
+      expect(slot).toContainElement(screen.getByText('Joined Participants 2026.'));
+      expect(joins()).toHaveLength(1);
+    } finally {
+      slot.remove();
+      claim.remove();
+    }
+  });
+
+  it('stops the sign-in join when the link’s group is unticked while it reads the groups', async () => {
+    let releaseMemberships = () => {};
+    const original = fetchMock.getMockImplementation()!;
+    fetchMock.mockImplementation(async (input, init) => {
+      if (String(input).includes('/groups/my-memberships'))
+        await new Promise<void>((resolve) => {
+          releaseMemberships = resolve;
+        });
+      return original(input, init);
+    });
+    render(<WorkerGroupAutoJoin {...props} />);
+    await flush();
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/groups/my-memberships'))).toBe(true);
+    rememberWorkerGroupAutoJoinCancellation({
+      workerUrl: 'https://worker.example',
+      sessionSlug: 'alpha',
+      sessionId,
+      groupId: group.groupId,
+    });
+    releaseMemberships();
+    await flush();
+    expect(joins()).toHaveLength(0);
+    expect(screen.getByText('Auto-join cancelled. Join whenever you choose.')).toBeInTheDocument();
   });
 
   it('preserves source, mode, worker bootstrap, and prefill context after joining', async () => {

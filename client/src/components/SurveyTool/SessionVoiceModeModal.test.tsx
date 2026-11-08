@@ -14,10 +14,24 @@ import { startSessionRealtimeInterview } from '../../utilities/audio/realtimeInt
 import { getCorsProxyUrlOrThrow } from '../../utilities/worker/corsProxy.js';
 import { useSessionInterviewGroupRecommendations } from './useSessionInterviewGroupRecommendations';
 
+const mockGroupArea = jest.fn();
+const mockGroupAreaMounts = jest.fn();
 jest.mock('./SessionInterviewRecommendedGroups', () => ({
   __esModule: true,
-  default: (props: { recommendations?: unknown[] }) =>
-    props.recommendations?.length ? <div data-testid="mock-group-recommendations" /> : null,
+  default: (props: { recommendations?: unknown[]; onRefresh?: () => void }) => {
+    mockGroupArea(props);
+    jest.requireActual<typeof import('react')>('react').useEffect(() => mockGroupAreaMounts(), []);
+    return (
+      <>
+        {props.recommendations?.length ? <div data-testid="mock-group-recommendations" /> : null}
+        {props.onRefresh ? (
+          <button type="button" onClick={props.onRefresh}>
+            Refresh group suggestions
+          </button>
+        ) : null}
+      </>
+    );
+  },
 }));
 
 jest.mock('./useSessionInterviewGroupRecommendations', () => ({
@@ -1905,8 +1919,153 @@ describe('SessionVoiceModeModal', () => {
     expect(lastRequest()).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Refresh group suggestions' }));
     expect(lastRequest()?.draftResponses.map(({ questionId }) => questionId)).toEqual(['q1']);
-    // The refresh button goes once clicked, so focus moves to the review heading.
-    expect(screen.getByText('Review proposed responses').closest('summary')).toHaveFocus();
+  });
+
+  it.each([
+    [{ suggestGroups: true }, false],
+    [{ joinMatchingGroups: true }, true],
+  ])('with %j, suggests groups and ticks strong matches only when joining them', async (interviewMode, joins) => {
+    mockedUseSessionInterviewGroupRecommendations.mockReturnValue({ availability: 'loading', recommendations: [] });
+    render(
+      <SessionVoiceModeModal
+        {...baseProps}
+        mode="interview"
+        sessionConfig={{ interviewMode }}
+        prefillPacket={{
+          version: 1,
+          sessionSlug: 'demo',
+          source: { platform: 'claude', modelId: 'claude-test', verification: 'self_reported' },
+          responderContext: {},
+          responses: [{ questionId: 'q1', answer: 'Drafted by the AI', confidence: 0.7 }],
+        }}
+      />,
+    );
+    await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+    // The person's own AI's group picks count only when the session joins matching groups.
+    expect(mockedUseSessionInterviewGroupRecommendations.mock.calls.at(-1)?.[0]).toEqual(
+      expect.objectContaining({ active: true, usePrefillPicks: joins }),
+    );
+    expect(mockGroupArea.mock.calls.at(-1)?.[0]).toEqual(
+      expect.objectContaining({ preselect: joins, availability: 'loading', joinRequest: 0, hidden: false }),
+    );
+  });
+
+  it.each([true, false])(
+    'suggests groups with the person’s saved sign-in only once signed in (%s)',
+    async (loginComplete) => {
+      render(
+        <SessionVoiceModeModal
+          {...baseProps}
+          mode="interview"
+          loginComplete={loginComplete}
+          sessionConfig={{ interviewMode: { suggestGroups: true } }}
+          prefillPacket={{
+            version: 1,
+            sessionSlug: 'demo',
+            source: { platform: 'claude', modelId: 'claude-test', verification: 'self_reported' },
+            responderContext: {},
+            responses: [{ questionId: 'q1', answer: 'Drafted by the AI', confidence: 0.7 }],
+          }}
+        />,
+      );
+      await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+      expect(mockedUseSessionInterviewGroupRecommendations.mock.calls.at(-1)?.[0]).toEqual(
+        expect.objectContaining({ account: loginComplete ? baseProps.account : '' }),
+      );
+    },
+  );
+
+  it('keeps the Groups section, and its ticks, through another interview round', async () => {
+    mockedUseSessionInterviewGroupRecommendations.mockReturnValue({ availability: 'available', recommendations: [] });
+    mockedMapInterviewEvidenceToResponses.mockResolvedValue([{ questionId: 'q1', answer: 'Spoken answer' }]);
+    render(
+      <SessionVoiceModeModal
+        {...baseProps}
+        mode="interview"
+        sessionConfig={{ interviewMode: { joinMatchingGroups: true } }}
+        prefillPacket={{
+          version: 1,
+          sessionSlug: 'demo',
+          source: { platform: 'claude', modelId: 'claude-test', verification: 'self_reported' },
+          responderContext: {},
+          responses: [{ questionId: 'q1', answer: 'Drafted by the AI', confidence: 0.7 }],
+        }}
+      />,
+    );
+    await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+    const area = () => mockGroupArea.mock.calls.at(-1)?.[0];
+    expect(area()).toEqual(expect.objectContaining({ hidden: false }));
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START));
+    await screen.findByLabelText('Pause interview');
+    expect(area()).toEqual(expect.objectContaining({ hidden: true }));
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STOP));
+    await waitFor(() => expect(mockedMapInterviewEvidenceToResponses).toHaveBeenCalled());
+    await waitFor(() => expect(area()).toEqual(expect.objectContaining({ hidden: false })));
+    // Hidden, never unmounted, so what the person ticked survives the round.
+    expect(mockGroupAreaMounts).toHaveBeenCalledTimes(1);
+  });
+
+  it('says Submit and join while a group is ticked, and joins the ticked groups once submitted', async () => {
+    mockedUseSessionInterviewGroupRecommendations.mockReturnValue({ availability: 'available', recommendations: [] });
+    const onSubmitResponses = jest.fn().mockResolvedValue({ status: 'submitted' });
+    render(
+      <SessionVoiceModeModal
+        {...baseProps}
+        mode="interview"
+        isResponsesCacheReady
+        onSubmitResponses={onSubmitResponses}
+        sessionConfig={{ interviewMode: { joinMatchingGroups: true } }}
+        prefillPacket={{
+          version: 1,
+          sessionSlug: 'demo',
+          responderContext: { summary: 'My own context' },
+          source: { platform: 'other', modelId: 'direct-user-context', verification: 'self_reported' },
+          responses: [{ questionId: 'q1', answer: 'A reviewed answer', confidence: 0.8 }],
+        }}
+      />,
+    );
+    await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+    const area = () => mockGroupArea.mock.calls.at(-1)?.[0];
+    const submit = () => screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY);
+    expect(submit()).toHaveTextContent('Submit responses');
+    act(() => area().onTickedChange(true));
+    expect(submit()).toHaveTextContent('Submit and join');
+    act(() => area().onTickedChange(false));
+    expect(submit()).toHaveTextContent('Submit responses');
+    act(() => area().onTickedChange(true));
+    expect(area().joinRequest).toBe(0);
+
+    fireEvent.click(submit());
+    await waitFor(() => expect(onSubmitResponses).toHaveBeenCalledTimes(1));
+    // Groups join only after the answers are saved.
+    await waitFor(() => expect(area().joinRequest).toBeGreaterThan(0));
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveTextContent('Responses submitted');
+  });
+
+  it('asks the Groups area to join nothing when a submit fails', async () => {
+    mockedUseSessionInterviewGroupRecommendations.mockReturnValue({ availability: 'available', recommendations: [] });
+    const onSubmitResponses = jest.fn().mockResolvedValue({ status: 'failed', message: 'Storage unavailable' });
+    render(
+      <SessionVoiceModeModal
+        {...baseProps}
+        mode="interview"
+        isResponsesCacheReady
+        onSubmitResponses={onSubmitResponses}
+        sessionConfig={{ interviewMode: { joinMatchingGroups: true } }}
+        prefillPacket={{
+          version: 1,
+          sessionSlug: 'demo',
+          responderContext: { summary: 'My own context' },
+          source: { platform: 'other', modelId: 'direct-user-context', verification: 'self_reported' },
+          responses: [{ questionId: 'q1', answer: 'A reviewed answer', confidence: 0.8 }],
+        }}
+      />,
+    );
+    await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+    act(() => mockGroupArea.mock.calls.at(-1)?.[0].onTickedChange(true));
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
+    expect(await screen.findByText('Storage unavailable')).toBeInTheDocument();
+    expect(mockGroupArea.mock.calls.at(-1)?.[0].joinRequest).toBe(0);
   });
 
   it('offers the two large requested voice-mode choices, with the AI-prefill option below them', async () => {

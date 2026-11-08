@@ -1427,11 +1427,12 @@ identifiers and access modes, generates participant-created IDs, and forces
 those groups to open self-join with session visibility. The configured worker
 admin retains the signed create, edit, delete, and membership controls under
 either policy. Group discovery is independent: an unsigned `GET /groups/list`
-is accepted only when the validated session mode declares public stored results
-over unencrypted, ungated Cloudflare storage. It returns only `session`-visible
-group metadata, never memberships, member identities, member counts, or groups
-restricted to admins/members. Private, gated, and encrypted modes keep discovery
-authenticated. This flow never opens the
+is accepted when the validated session mode declares public stored results
+over unencrypted, ungated Cloudflare storage, or when it carries a join link's
+`joinGroup` for a group someone could join on their own. It returns only
+`session`-visible group metadata, never memberships, member identities, member
+counts, or groups restricted to admins/members. Private, gated, and encrypted
+modes otherwise keep discovery authenticated. This flow never opens the
 legacy SBT deployment form and does not request a contract address, chain, RPC,
 gas, or burn policy. A
 Worker/SBT or Worker/Lit hybrid keeps **Native Worker Groups** as its participant
@@ -1615,9 +1616,13 @@ Implemented routes:
   request; the response returns `nextCursor`, and Admin exposes an explicitly
   signed **Load more** action rather than exceeding the Worker KV operation
   budget.
-- `GET /groups/list`: anonymous discovery is allowed only when the validated
+- `GET /groups/list`: anonymous discovery is allowed when the validated
   Worker-canonical profile declares `public_full_if_storage_public` over
   unencrypted Cloudflare storage with `gate: "none"` and no access conditions.
+  On any other session it is allowed only with one `joinGroup=<groupId>` naming
+  an open, session-visible group whose joining hasn't closed, as a join link
+  does; the response is then what that group's members see, less each group's
+  `adminAddress`. Other requests get 403 `worker_group_discovery_not_public`.
   It returns only redacted, session-visible group metadata. The request must
   include the exact session slug header and canonical session ID. With a Worker
   credential, `GET` remains the authenticated member route and additionally
@@ -1695,9 +1700,10 @@ entry `/session/eddy26` is an explicit exception: the bare URL redirects to the
 pinned Worker with `joinGroup=eddy-2026&mode=interview`. Existing query parameters,
 hashes (including AI prefill), and subroutes bypass that redirect. Joining still
 requires sign-in; closing the interview or opening results does not relaunch it.
-The invitation notice displays the public Group name before sign-in using the
-exact session-bound discovery endpoint; it falls back to the Group ID when
-public discovery is unavailable. The compact notice reads “Group name: Will be
+The invitation notice displays the Group name before sign-in using the
+exact session-bound discovery endpoint with the link's Group, which on a private
+session lists what that Group's members see; it falls back to the Group ID when
+that lookup fails, as on an older Worker. The compact notice reads “Group name: Will be
 joined upon sign-in” with **Cancel**; sign-in uses the existing page login
 control. Visitors
 who follow the auto-join link sign in first; the client then calls the existing
@@ -1717,8 +1723,12 @@ pending authentication; failures retain the invitation for explicit retry.
 Cancel is remembered in this browser for the account, Worker/session, and Group,
 with no expiry. Following the same link again (including the bare EDDY entry)
 shows an explicit **Join** action instead of joining automatically; the interview
-redirect still works. An explicit Join in the notice, Group page, or interview
-recommendations clears that preference. Cancellation never leaves an existing
+redirect still works. An explicit Join in the notice or on the Group page, or
+ticking the Group in Interview review's **Groups** section, clears that
+preference. While the interview dialog is open on that section, it lists a
+link's Group still waiting for sign-in, ticked, and the notice stands aside;
+unticking cancels as the notice's **Cancel** does, even while sign-in is reading
+the groups. Joining at sign-in and its outcome show in the notice as usual. Cancellation never leaves an existing
 membership. Before sign-in the cancellation is stored for the signed-out visitor;
 when that invitation’s visitor signs in, it is assigned to that account.
 A changed canonical session identity does not inherit another session's choice.
@@ -2765,7 +2775,12 @@ Signed login/bootstrap requests:
     `interviewMode.enabled=false`.
   - Returns only an inert JSON question catalog: `type`, `version`,
     `sessionSlug`, `reviewUrl`, `questionSetHash`, `prefillPromptVersion`,
-    `answerContract`, `researchCoverageContract`, and `questions`. Binary options,
+    `answerContract`, `researchCoverageContract`, and `questions`, plus `groups`
+    when `interviewMode.joinMatchingGroups` is on and the visitor may see groups:
+    on a public session, or with a join link's `joinGroup` in `sessionUrl`.
+    `groups` lists only those the visitor could join on their own, as `groupId`,
+    `label`, `description` and `tags`; the clipboard prompt says how to suggest
+    them. Binary options,
     the default 0–10 rating range, per-question scale overrides, and additive
     self-reported research-coverage count fields are explicit. It deliberately contains no agent instructions; the
     client-side clipboard prompt carries the user's request.

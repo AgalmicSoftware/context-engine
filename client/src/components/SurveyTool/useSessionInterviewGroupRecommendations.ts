@@ -3,16 +3,15 @@ import type { InterviewDraftResponse, InterviewPrefillPacket, InterviewQuestion 
 import {
   loadInterviewWorkerGroupCandidates,
   matchInterviewGroupsByAnswer,
+  matchInterviewGroupsFromPrefill,
+  readCachedInterviewWorkerToken,
   recommendInterviewGroups,
   type InterviewGroupRecommendation,
+  type SessionInterviewGroupRecommendationRequest,
 } from './sessionInterviewGroupRecommendations';
+import { readInterviewInviteGroupId } from './sessionInterviewGroupInvite';
 
-export type SessionInterviewGroupRecommendationRequest = {
-  requestId: number;
-  transcript: string;
-  prefillPacket: InterviewPrefillPacket | null;
-  draftResponses: InterviewDraftResponse[];
-};
+export type { SessionInterviewGroupRecommendationRequest };
 
 type UseSessionInterviewGroupRecommendationsArgs = {
   active: boolean;
@@ -21,6 +20,10 @@ type UseSessionInterviewGroupRecommendationsArgs = {
   sessionConfig: unknown;
   sessionSlug?: string;
   workerUrl?: string;
+  /** Whether the groups the person's own AI suggested in its prefill count. */
+  usePrefillPicks?: boolean;
+  /** The signed-in account, whose saved Worker sign-in lists the groups it may see. */
+  account?: string;
 };
 
 export type SessionInterviewGroupRecommendationState = {
@@ -58,6 +61,8 @@ export function useSessionInterviewGroupRecommendations({
   sessionConfig,
   sessionSlug = '',
   workerUrl = '',
+  usePrefillPicks = false,
+  account = '',
 }: UseSessionInterviewGroupRecommendationsArgs): SessionInterviewGroupRecommendationState {
   const availabilityScopeKey = useMemo(
     () => (active ? [sessionSlug, workerUrl].map((value) => String(value || '')).join('\n') : ''),
@@ -77,8 +82,8 @@ export function useSessionInterviewGroupRecommendations({
   const requestRef = useRef(0);
   // The page can pass new sessionConfig and question objects on every render, so the effect
   // reads the latest ones here; otherwise each re-render would restart the lookup and its AI call.
-  const inputsRef = useRef({ questions, sessionConfig });
-  inputsRef.current = { questions, sessionConfig };
+  const inputsRef = useRef({ questions, sessionConfig, usePrefillPicks, account });
+  inputsRef.current = { questions, sessionConfig, usePrefillPicks, account };
 
   useEffect(() => {
     if (!active || !request || !requestKey) return undefined;
@@ -93,8 +98,15 @@ export function useSessionInterviewGroupRecommendations({
         scopeKey: availabilityScopeKey,
         recommendations: [],
       });
-      const { questions, sessionConfig } = inputsRef.current;
-      const catalog = await loadInterviewWorkerGroupCandidates({ sessionConfig, sessionSlug, workerUrl });
+      const { questions, sessionConfig, usePrefillPicks, account } = inputsRef.current;
+      // A saved sign-in lists what that person may see; a join link, what its group's members see.
+      const catalog = await loadInterviewWorkerGroupCandidates({
+        sessionConfig,
+        sessionSlug,
+        workerUrl,
+        workerToken: readCachedInterviewWorkerToken({ sessionConfig, sessionSlug, workerUrl, account }),
+        inviteGroupId: readInterviewInviteGroupId(sessionSlug, workerUrl),
+      });
       if (canceled || requestRef.current !== requestId) return;
       if (catalog.status !== 'ready' || !catalog.candidates.length) {
         setRecommendationState({
@@ -106,13 +118,27 @@ export function useSessionInterviewGroupRecommendations({
         });
         return;
       }
-      // Groups named like a chosen option come first, without an AI call; the AI covers the rest.
+      // Groups named like a chosen option come first, then those the person's own AI suggested,
+      // without an AI call; the session's AI covers the rest.
       const exact = matchInterviewGroupsByAnswer({
         candidates: catalog.candidates,
         draftResponses: request.draftResponses,
         questions,
       });
-      const others = catalog.candidates.filter((group) => !exact.some((match) => match.groupId === group.groupId));
+      const unmatched = (matches: InterviewGroupRecommendation[]) =>
+        catalog.candidates.filter((group) => !matches.some((match) => match.groupId === group.groupId));
+      const picked = usePrefillPicks
+        ? matchInterviewGroupsFromPrefill({ candidates: unmatched(exact), picks: request.prefillPacket?.groups })
+        : [];
+      const others = unmatched([...exact, ...picked]);
+      // These need no AI call, so they show at once; the session's AI can take up to 30 seconds.
+      if (others.length && (exact.length || picked.length))
+        setRecommendationState({
+          availability: 'loading',
+          key: requestKey,
+          scopeKey: availabilityScopeKey,
+          recommendations: [...exact, ...picked],
+        });
       const result = others.length
         ? await recommendInterviewGroups({
             candidates: others,
@@ -129,7 +155,7 @@ export function useSessionInterviewGroupRecommendations({
         availability: 'available',
         key: requestKey,
         scopeKey: availabilityScopeKey,
-        recommendations: [...exact, ...(result?.status === 'ready' ? result.recommendations : [])],
+        recommendations: [...exact, ...picked, ...(result?.status === 'ready' ? result.recommendations : [])],
       });
     };
 

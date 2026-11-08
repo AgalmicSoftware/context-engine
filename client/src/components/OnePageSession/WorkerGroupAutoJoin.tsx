@@ -72,7 +72,7 @@ function AutoJoinIntent({
     void import('../../domains/worker/workerGroupPorts')
       .then(async ({ loadPublicWorkerGroups }) => {
         if (!active) return;
-        const groups = await loadPublicWorkerGroups({ workerUrl, sessionId, sessionSlug });
+        const groups = await loadPublicWorkerGroups({ workerUrl, sessionId, sessionSlug, joinGroup: groupId });
         const group = groups.find((candidate) => candidate.groupId === groupId);
         if (active && group) setGroupLabel(group.label);
       })
@@ -85,17 +85,20 @@ function AutoJoinIntent({
     };
   }, [ready, workerUrl, sessionId, sessionSlug, groupId]);
 
+  // A cancellation holds for this browser: signing in, switching accounts or
+  // following the invitation again must not turn it into a join.
+  const consumeCancellation = useCallback(() => {
+    if (!isWorkerGroupAutoJoinCancelled({ workerUrl, sessionSlug, sessionId, groupId })) return false;
+    finishedRef.current = true;
+    onConsumed();
+    clearPendingAutoJoin(intent);
+    finishWorkerGroupAutoJoin(sessionSlug, groupId);
+    setProgress({ phase: 'cancelled', message: 'Auto-join cancelled. Join whenever you choose.' });
+    return true;
+  }, [groupId, intent, onConsumed, sessionId, sessionSlug, workerUrl]);
+
   useEffect(() => {
-    // A cancellation holds for this browser: signing in, switching accounts or
-    // following the invitation again must not turn it into a join.
-    if (!finishedRef.current && isWorkerGroupAutoJoinCancelled({ workerUrl, sessionSlug, sessionId, groupId })) {
-      finishedRef.current = true;
-      onConsumed();
-      clearPendingAutoJoin(intent);
-      finishWorkerGroupAutoJoin(sessionSlug, groupId);
-      setProgress({ phase: 'cancelled', message: 'Auto-join cancelled. Join whenever you choose.' });
-      return undefined;
-    }
+    if (!finishedRef.current && consumeCancellation()) return undefined;
     if (!ready || finishedRef.current) return undefined;
     let active = true;
     const stop = () => {
@@ -140,6 +143,8 @@ function AutoJoinIntent({
         if (!group) throw new Error('This group is unavailable in this session.');
         setGroupLabel(group.label);
         if (!canAutoJoinWorkerGroup(group)) throw new Error('This group is not open for joining.');
+        // The interview's Groups section can untick the link's group while sign-in is under way.
+        if (consumeCancellation()) return;
         setProgress({ phase: 'joining', message: `Joining ${group.label}…` });
         await joinWorkerGroup({ ...request, groupId });
         complete(`Joined ${group.label}.`);
@@ -150,7 +155,20 @@ function AutoJoinIntent({
     // Account, session, provider changes and unmount invalidate pending auth,
     // and reads before they can submit a join for the previous viewer.
     return stop;
-  }, [account, ready, props.provider, sessionId, sessionSlug, workerUrl, chainId, groupId, retry, intent, onConsumed]);
+  }, [
+    account,
+    ready,
+    props.provider,
+    sessionId,
+    sessionSlug,
+    workerUrl,
+    chainId,
+    groupId,
+    retry,
+    intent,
+    onConsumed,
+    consumeCancellation,
+  ]);
 
   useEffect(() => {
     if (progress.phase !== 'done' || !progress.message) return;
@@ -183,6 +201,8 @@ function AutoJoinIntent({
   if (done && completedAccountRef.current && completedAccountRef.current !== account) return null;
   return (
     <WorkerGroupAutoJoinNotice
+      // Only a join waiting for sign-in moves into the interview's Groups section; joining and its outcome show here.
+      groupId={!ready && !done ? groupId : undefined}
       groupLabel={!ready && !done ? groupLabel : undefined}
       message={!ready && !done ? 'Will be joined upon sign-in' : progress.message}
       isError={progress.phase === 'error'}
@@ -307,6 +327,7 @@ export default function WorkerGroupAutoJoin(props: Props) {
     );
   return (
     <WorkerGroupAutoJoinNotice
+      groupId={intent.groupId}
       groupLabel={intent.groupId}
       message={error || 'Preparing your group invitation…'}
       isError={!!error}

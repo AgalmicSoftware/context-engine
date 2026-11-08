@@ -1675,43 +1675,33 @@ const resolveWorkerGroupSessionIdentity = ({ config, slug } = {}) => {
 
 const participantGroupCreationAllowed = (config) => config?.groupCreationPolicy === 'participants';
 
-export const dispatchPublicWorkerGroupListRequest = async ({ request, config, env, slug, baseHeaders, deps = {} } = {}) => {
+// Whether someone could join this group on their own right now, as a join link does.
+const isSelfJoinableWorkerGroup = (group, nowMs) => {
+	const joinEndsAt = Date.parse(trim(group?.joinEndsAt));
+	return (
+		group?.joinMode === WORKER_GROUP_JOIN_MODES.OPEN &&
+		group?.memberVisibility === WORKER_GROUP_MEMBER_VISIBILITY.SESSION &&
+		!(Number.isFinite(joinEndsAt) && joinEndsAt <= nowMs)
+	);
+};
+
+/**
+ * The groups a signed-out visitor may see. A private session shows them only to someone holding a
+ * join link to a group they could join on their own, and then only what that group's members see:
+ * groups visible to the whole session. Groups shown to their members or admins stay hidden.
+ */
+export const listWorkerGroupsForVisitor = async ({ env, config, slug, inviteGroupId, deps = {} } = {}) => {
 	const sessionIdentity = resolveWorkerGroupSessionIdentity({ config, slug });
-	if (!sessionIdentity.ok) return routeError(deps, sessionIdentity, baseHeaders);
-	if (!workerConfigAllowsAnonymousGroupDiscovery(config)) {
-		return routeError(
-			deps,
-			{
-				status: 403,
-				reason: 'worker_group_discovery_not_public',
-			},
-			baseHeaders,
-		);
-	}
-	let requestedSessionId = '';
-	try {
-		requestedSessionId = resolveCanonicalWorkerSessionIdHex({
-			sessionId: new URL(request?.url || '').searchParams.get('sessionId'),
-		});
-	} catch {
-		requestedSessionId = '';
-	}
-	if (requestedSessionId !== sessionIdentity.sessionId) {
-		return routeError(
-			deps,
-			{
-				status: 409,
-				reason: 'worker_group_session_identity_mismatch',
-			},
-			baseHeaders,
-		);
-	}
+	if (!sessionIdentity.ok) return sessionIdentity;
+	const publicDiscovery = workerConfigAllowsAnonymousGroupDiscovery(config);
+	const invite = publicDiscovery ? '' : normalizeWorkerGroupId(inviteGroupId);
+	if (!publicDiscovery && !invite) return { ok: false, status: 403, reason: 'worker_group_discovery_not_public' };
 	const ready = await (deps?.checkCoordinatedWorkerGroupReady || checkCoordinatedWorkerGroupReady)({
 		env,
 		slug,
 		sessionId: sessionIdentity.sessionId,
 	});
-	if (!ready.ok) return routeError(deps, ready, baseHeaders);
+	if (!ready.ok) return ready;
 	let result;
 	try {
 		result = await (deps?.listWorkerGroups || listWorkerGroups)({
@@ -1729,6 +1719,61 @@ export const dispatchPublicWorkerGroupListRequest = async ({ request, config, en
 			reason: 'worker_group_projection_unavailable',
 		};
 	}
+	if (!result.ok) return result;
+	const nowMs = Number(deps.now?.() || Date.now());
+	if (!invite) return { ok: true, sessionIdentity, store: result.store, groups: result.groups };
+	if (!result.groups.some((group) => group.groupId === invite && isSelfJoinableWorkerGroup(group, nowMs))) {
+		return { ok: false, status: 403, reason: 'worker_group_discovery_not_public' };
+	}
+	// A link shows group names, not who runs each group: a participant's group names its creator.
+	const groups = result.groups.map(({ adminAddress: _adminAddress, ...group }) => group);
+	return { ok: true, sessionIdentity, store: result.store, groups };
+};
+
+/** The groups a visitor could join on their own, for an AI to match them to. Empty when none may be shown. */
+export const listSelfJoinableWorkerGroupsForVisitor = async (args = {}) => {
+	try {
+		const result = await listWorkerGroupsForVisitor(args);
+		const nowMs = Number(args.deps?.now?.() || Date.now());
+		return result.ok ? result.groups.filter((group) => isSelfJoinableWorkerGroup(group, nowMs)) : [];
+	} catch {
+		return [];
+	}
+};
+
+export const dispatchPublicWorkerGroupListRequest = async ({ request, config, env, slug, baseHeaders, deps = {} } = {}) => {
+	const sessionIdentity = resolveWorkerGroupSessionIdentity({ config, slug });
+	if (!sessionIdentity.ok) return routeError(deps, sessionIdentity, baseHeaders);
+	let params = new URLSearchParams();
+	try {
+		params = new URL(request?.url || '').searchParams;
+	} catch {
+		params = new URLSearchParams();
+	}
+	const inviteGroupIds = params.getAll('joinGroup');
+	const inviteGroupId = inviteGroupIds.length === 1 ? normalizeWorkerGroupId(inviteGroupIds[0]) : '';
+	if (!inviteGroupId && !workerConfigAllowsAnonymousGroupDiscovery(config)) {
+		return routeError(
+			deps,
+			{
+				status: 403,
+				reason: 'worker_group_discovery_not_public',
+			},
+			baseHeaders,
+		);
+	}
+	const requestedSessionId = resolveCanonicalWorkerSessionIdHex({ sessionId: params.get('sessionId') });
+	if (requestedSessionId !== sessionIdentity.sessionId) {
+		return routeError(
+			deps,
+			{
+				status: 409,
+				reason: 'worker_group_session_identity_mismatch',
+			},
+			baseHeaders,
+		);
+	}
+	const result = await listWorkerGroupsForVisitor({ env, config, slug, inviteGroupId, deps });
 	if (!result.ok) return routeError(deps, result, baseHeaders);
 	return jsonResponse(deps, { ok: true, ...sessionIdentity, store: result.store, groups: result.groups }, 200, baseHeaders);
 };

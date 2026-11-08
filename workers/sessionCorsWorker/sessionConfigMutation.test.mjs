@@ -903,6 +903,7 @@ test('set-config preserves owner opening and optional interview features', () =>
     hiddenDraftShare: 0.2,
     showFidelityScore: true,
     suggestGroups: true,
+    joinMatchingGroups: true,
   };
   const result = applySessionConfigMutation({
     existingConfig: cloneJson(profileBearingConfig),

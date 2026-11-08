@@ -3,10 +3,13 @@ import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities
 import { loadPublicWorkerGroups, loadWorkerGroupOverview } from '../../domains/worker/workerGroupPorts';
 import {
   INTERVIEW_GROUP_AI_TIMEOUT_MS,
+  buildGroupRecommendationRequest,
   buildInterviewGroupRecommendationEvidenceText,
   buildInterviewGroupRecommendationPrompt,
+  isStrongGroupMatch,
   loadInterviewWorkerGroupCandidates,
   matchInterviewGroupsByAnswer,
+  matchInterviewGroupsFromPrefill,
   normalizeInterviewGroupCandidates,
   parseInterviewGroupRecommendations,
   recommendInterviewGroups,
@@ -136,7 +139,7 @@ describe('session interview group recommendations', () => {
         draftResponses: [{ questionId, answer }],
       });
     // Exact, then case and spacing differences.
-    expect(match('d/acc')).toEqual([{ groupId: 'dacc', reason: 'You chose “d/acc”.', evidence: '' }]);
+    expect(match('d/acc')).toEqual([{ groupId: 'dacc', reason: 'You chose “d/acc”.', evidence: '', confidence: 1 }]);
     expect(match('  D/ACC ')).toEqual([expect.objectContaining({ groupId: 'dacc', reason: 'You chose “D/ACC”.' })]);
     expect(match(['d/acc'])).toEqual([expect.objectContaining({ groupId: 'dacc' })]);
     expect(
@@ -225,6 +228,97 @@ describe('session interview group recommendations', () => {
     );
   });
 
+  it('lists a private session through a join link only, for a signed-out person', async () => {
+    const privateConfig = () => {
+      const config = workerConfig();
+      config.sessionModeProfile = {
+        ...publicWorkerProfile,
+        results: { ...publicWorkerProfile.results, visibility: 'session_member_aggregate' },
+      };
+      return config;
+    };
+    expect(resolveInterviewWorkerGroupTarget({ sessionConfig: privateConfig(), sessionSlug: 'demo4' })).toEqual(
+      expect.objectContaining({ supported: true, anonymousDiscoveryAllowed: false }),
+    );
+    await expect(
+      loadInterviewWorkerGroupCandidates({ sessionConfig: privateConfig(), sessionSlug: 'demo4' }),
+    ).resolves.toEqual({
+      status: 'unsupported',
+      candidates: [],
+      reason: 'worker_group_authentication_required',
+    });
+    expect(loadPublicWorkerGroups).not.toHaveBeenCalled();
+
+    jest.mocked(loadPublicWorkerGroups).mockResolvedValue([baseGroup]);
+    const invited = await loadInterviewWorkerGroupCandidates({
+      sessionConfig: privateConfig(),
+      sessionSlug: 'demo4',
+      inviteGroupId: 'salon',
+    });
+    expect(loadPublicWorkerGroups).toHaveBeenLastCalledWith(expect.objectContaining({ joinGroup: 'salon' }));
+    expect(invited).toEqual(
+      expect.objectContaining({
+        status: 'ready',
+        candidates: [expect.objectContaining({ groupId: 'france-builders' })],
+      }),
+    );
+    // A public session needs no link, so it never sends one.
+    await loadInterviewWorkerGroupCandidates({
+      sessionConfig: workerConfig(),
+      sessionSlug: 'demo4',
+      inviteGroupId: 'salon',
+    });
+    expect(loadPublicWorkerGroups).toHaveBeenLastCalledWith(expect.objectContaining({ joinGroup: '' }));
+  });
+
+  it('takes the groups the person’s own AI suggested, among those they could join', () => {
+    const other = { ...eligibleCandidate, groupId: 'dacc', label: 'd/acc' };
+    expect(
+      matchInterviewGroupsFromPrefill({
+        candidates: [eligibleCandidate, other],
+        picks: [
+          { groupId: 'unknown', reason: 'Not a group here', confidence: 0.9 },
+          { groupId: 'dacc', reason: 'Writes about d/acc', confidence: 0.9 },
+          { groupId: 'france-builders' },
+        ],
+      }),
+    ).toEqual([
+      { groupId: 'dacc', reason: 'Your AI: Writes about d/acc', evidence: '', confidence: 0.9 },
+      { groupId: 'france-builders', reason: 'Your AI suggested this group.', evidence: '' },
+    ]);
+    expect(matchInterviewGroupsFromPrefill({ candidates: [eligibleCandidate] })).toEqual([]);
+  });
+
+  it('counts a match as strong from 0.7, and a match with no confidence as weak', () => {
+    expect(isStrongGroupMatch({ confidence: 0.7 })).toBe(true);
+    expect(isStrongGroupMatch({ confidence: 1 })).toBe(true);
+    expect(isStrongGroupMatch({ confidence: 0.69 })).toBe(false);
+    expect(isStrongGroupMatch({})).toBe(false);
+  });
+
+  it('builds a suggestion request from kept, shown answers with the person’s edits', () => {
+    const request = buildGroupRecommendationRequest({
+      transcript: 'Responder: hello',
+      prefillPacket: null,
+      drafts: [
+        { questionId: 'kept', answer: 'AI answer' },
+        { questionId: 'dropped', answer: 'Dropped' },
+        { questionId: 'hidden', answer: 'Hidden guess' },
+      ],
+      selected: { kept: true, hidden: true },
+      edited: { kept: { answer: 'My answer', userEditedFields: ['answer'] } },
+      hidden: (questionId) => questionId === 'hidden',
+    });
+    expect(request).toEqual(
+      expect.objectContaining({
+        transcript: 'Responder: hello',
+        prefillPacket: null,
+        draftResponses: [{ questionId: 'kept', answer: 'My answer', userEditedFields: ['answer'] }],
+      }),
+    );
+    expect(request.requestId).toEqual(expect.any(Number));
+  });
+
   it('builds a grounded model prompt from bounded respondent evidence and treats group text as untrusted data', () => {
     const prompt = buildInterviewGroupRecommendationPrompt({
       candidates: [eligibleCandidate],
@@ -256,6 +350,42 @@ describe('session interview group recommendations', () => {
     expect(prompt).toContain('short exact respondent quote copied from supplied evidence');
     expect(prompt).toContain('France builders');
     expect(prompt).not.toContain('memberCount');
+    expect(prompt).toContain('"confidence":0.8');
+    expect(prompt).toContain('0.70-1 direct or repeated evidence');
+    expect(prompt).toContain('Return every group that fits.');
+    expect(prompt).not.toMatch(/at most \d+ groups/);
+  });
+
+  it('keeps every fitting group and each one’s confidence, clamped to 0-1', () => {
+    const candidates = Array.from({ length: 6 }, (_, index) => ({ ...eligibleCandidate, groupId: `group-${index}` }));
+    const quote = 'I live in Lyon and work on French AI governance pilots.';
+    const parsed = parseInterviewGroupRecommendations(
+      JSON.stringify({
+        groups: candidates.map(({ groupId }, index) => ({
+          groupId,
+          reason: `Fits ${groupId}`,
+          evidence: quote,
+          ...[
+            { confidence: 0.9 },
+            { confidence: 1.4 },
+            { confidence: -2 },
+            { confidence: '0.9' },
+            {},
+            { confidence: 0.4 },
+          ][index],
+        })),
+      }),
+      candidates,
+      { evidenceSourceText: `Responder: ${quote}` },
+    );
+    expect(parsed.map(({ groupId, confidence }) => [groupId, confidence])).toEqual([
+      ['group-0', 0.9],
+      ['group-1', 1],
+      ['group-2', 0],
+      ['group-3', undefined],
+      ['group-4', undefined],
+      ['group-5', 0.4],
+    ]);
   });
 
   it('parses only known eligible group IDs with respondent-attributable evidence', () => {
@@ -327,6 +457,28 @@ describe('session interview group recommendations', () => {
 
     expect(prompt).toContain('country-france');
     expect(prompt).toContain('France residents');
+  });
+
+  it('returns every group the AI matches, with no cap', async () => {
+    const candidates = Array.from({ length: 6 }, (_, index) => ({ ...eligibleCandidate, groupId: `group-${index}` }));
+    jest.mocked(callAI).mockResolvedValue(
+      JSON.stringify({
+        groups: candidates.map(({ groupId }) => ({
+          groupId,
+          reason: `Fits ${groupId}`,
+          evidence: 'I live in Lyon.',
+          confidence: 0.8,
+        })),
+      }),
+    );
+    const result = await recommendInterviewGroups({
+      candidates,
+      transcript: 'Responder: I live in Lyon.',
+      sessionSlug: 'demo4',
+      sessionConfig: workerConfig(),
+      workerUrl: 'https://worker.example',
+    });
+    expect(result.recommendations.map(({ groupId }) => groupId)).toEqual(candidates.map(({ groupId }) => groupId));
   });
 
   it('recommends eligible groups beyond the first bounded prompt chunk', async () => {

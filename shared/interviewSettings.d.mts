@@ -12,6 +12,7 @@ export type InterviewSettings = {
   hiddenDraftShare: number;
   showFidelityScore: boolean;
   suggestGroups: boolean;
+  joinMatchingGroups: boolean;
   showFidelityResults: boolean;
   fidelityMinimumPeople: number;
 };

@@ -936,6 +936,21 @@ describe('sessionWizardWriteNormalization', () => {
     expect(payload.interviewMode.suggestGroups).toBe(suggestGroups || undefined);
   });
 
+  test.each([true, false])('publishes joining strong group matches only when on (%s)', (joinMatchingGroups) => {
+    const payload = buildSessionWizardWorkerConfigPayload({
+      slug: 'group-joins',
+      draft: {
+        sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+        interviewMode: { joinMatchingGroups },
+      },
+      account: '0x00000000000000000000000000000000000000aa',
+      sessionId: '123e4567-e89b-12d3-a456-426614174000',
+      workerUrl: 'https://worker.example',
+    });
+    // Off is the default, left out so older Session Workers still accept the save.
+    expect(payload.interviewMode.joinMatchingGroups).toBe(joinMatchingGroups || undefined);
+  });
+
   test.each([true, false])('publishes the fidelity section of Results only when on (%s)', (showFidelityResults) => {
     const payload = buildSessionWizardWorkerConfigPayload({
       slug: 'fidelity-results',

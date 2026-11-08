@@ -100,6 +100,24 @@ it('turns on group suggestions, off by default', () => {
   expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ suggestGroups: true }));
 });
 
+it('turns on joining strong group matches, off by default, with its explanation behind its help', () => {
+  const onChange = jest.fn();
+  const label = 'Join strong group matches on submit';
+  const { rerender } = render(<InterviewSettingsFields value={{ suggestGroups: true }} onChange={onChange} />);
+  const box = screen.getByLabelText(label);
+  expect(box).not.toBeChecked();
+  expect(box).toHaveAccessibleDescription(/groups that strongly fit a participant’s answers start ticked/);
+  const helpButton = screen.getByRole('button', { name: 'About joining strong group matches' });
+  fireEvent.click(helpButton);
+  expect(onChange).not.toHaveBeenCalled();
+  fireEvent.click(box);
+  expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ joinMatchingGroups: true, suggestGroups: true }));
+  rerender(<InterviewSettingsFields value={onChange.mock.calls.at(-1)?.[0]} onChange={onChange} />);
+  expect(screen.getByLabelText(label)).toBeChecked();
+  fireEvent.click(screen.getByLabelText(label));
+  expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ joinMatchingGroups: false }));
+});
+
 it('turns on the private fidelity score, off by default', () => {
   const onChange = jest.fn();
   render(<InterviewSettingsFields value={{}} onChange={onChange} />);

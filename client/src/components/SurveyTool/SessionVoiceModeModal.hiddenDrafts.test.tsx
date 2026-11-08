@@ -7,7 +7,16 @@ import { startSessionRealtimeInterview } from '../../utilities/audio/realtimeInt
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { useSessionInterviewGroupRecommendations } from './useSessionInterviewGroupRecommendations';
 
-jest.mock('./SessionInterviewRecommendedGroups', () => ({ __esModule: true, default: () => null }));
+jest.mock('./SessionInterviewRecommendedGroups', () => ({
+  __esModule: true,
+  // The refresh control lives in the Groups section.
+  default: ({ onRefresh }: { onRefresh?: () => void }) =>
+    onRefresh ? (
+      <button type="button" onClick={onRefresh}>
+        Refresh group suggestions
+      </button>
+    ) : null,
+}));
 jest.mock('./useSessionInterviewGroupRecommendations', () => ({
   useSessionInterviewGroupRecommendations: jest.fn(() => ({ availability: 'idle', recommendations: [] })),
 }));

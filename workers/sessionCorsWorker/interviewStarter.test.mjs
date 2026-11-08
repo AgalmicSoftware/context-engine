@@ -93,6 +93,9 @@ test('defaults are stable and settings reject invalid values', () => {
   assert.equal(normalizeInterviewSettings({ showFidelityScore: true }).showFidelityScore, true);
   assert.equal(normalizeInterviewSettings().suggestGroups, false);
   assert.equal(normalizeInterviewSettings({ suggestGroups: true }).suggestGroups, true);
+  assert.equal(normalizeInterviewSettings().joinMatchingGroups, false);
+  assert.equal(normalizeInterviewSettings({ joinMatchingGroups: true }).joinMatchingGroups, true);
+  assert.equal(normalizeInterviewSettings({ joinMatchingGroups: 'true' }).joinMatchingGroups, false);
   assert.equal(normalizeInterviewSettings().showFidelityResults, false);
   assert.equal(normalizeInterviewSettings({ showFidelityResults: true }).showFidelityResults, true);
   assert.equal(normalizeInterviewSettings({ showFidelityResults: 'true' }).showFidelityResults, false);
@@ -130,6 +133,8 @@ test('defaults are stable and settings reject invalid values', () => {
     { hiddenDraftShare: '0.2' },
     { showFidelityScore: 'true' },
     { suggestGroups: 'true' },
+    { joinMatchingGroups: 'true' },
+    { joinMatchingGroups: 1 },
     { showFidelityResults: 'true' },
     { showFidelityResults: 1 },
     { fidelityMinimumPeople: 0 },

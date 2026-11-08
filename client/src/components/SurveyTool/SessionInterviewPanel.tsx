@@ -20,6 +20,7 @@ import {
   useSessionInterviewGroupRecommendations,
   type SessionInterviewGroupRecommendationRequest,
 } from './useSessionInterviewGroupRecommendations';
+import { buildGroupRecommendationRequest } from './sessionInterviewGroupRecommendations';
 import type { GeneratedSurveyStatement } from './SurveyGenerator/surveyGeneratorHelpers';
 import { useInterviewOpening } from './useInterviewOpening';
 import { useSessionContextPrompt } from '../../utilities/docLibrary/useSessionContextSources';
@@ -243,10 +244,13 @@ export default function SessionInterviewPanel({
   );
   const panelRef = useRef<HTMLDivElement | null>(null);
   const showFidelityScore = normalizeInterviewSettings(sessionConfig?.interviewMode).showFidelityScore;
-  // Off by default: the session's open groups that fit the person's answers, never joined for them.
-  const suggestGroups = normalizeInterviewSettings(sessionConfig?.interviewMode).suggestGroups;
+  // Groups that fit the answers, joined if ticked at submit; joinMatchingGroups also ticks strong ones.
+  const { suggestGroups: suggestOnly, joinMatchingGroups } = normalizeInterviewSettings(sessionConfig?.interviewMode);
+  const suggestGroups = suggestOnly || joinMatchingGroups;
   const [showViewResults, setShowViewResults] = useState(false);
   const [hasRefreshableGroups, setHasRefreshableGroups] = useState(false);
+  const [groupJoinRequest, setGroupJoinRequest] = useState(0);
+  const [groupsTicked, setGroupsTicked] = useState(false);
   useEffect(() => {
     if (workerUrl) setResolvedWorkerUrl(workerUrl);
   }, [workerUrl]);
@@ -483,6 +487,8 @@ export default function SessionInterviewPanel({
     sessionConfig,
     sessionSlug,
     workerUrl: resolvedWorkerUrl,
+    usePrefillPicks: joinMatchingGroups,
+    account: authenticatedForSubmit ? String(account) : '',
   });
   const generatedGroupRecommendations = generatedGroupRecommendationState.recommendations;
 
@@ -752,22 +758,18 @@ export default function SessionInterviewPanel({
           );
         }
         setMappedTranscript(nextTranscript);
-        if (review.drafts.length) {
-          setGroupRecommendationRequest({
-            requestId: Date.now(),
-            transcript: nextTranscript,
-            prefillPacket: contextPacket,
-            // Only answers the person keeps count; a hidden draft's guess stays out until it is shown.
-            draftResponses: review.drafts
-              .filter(
-                ({ questionId }) =>
-                  review.selected[questionId] && !newlyHidden.includes(questionId) && !isDraftConcealed(questionId),
-              )
-              .map((draft) => ({ ...draft, ...(review.edited[draft.questionId] || {}) })),
-          });
-        } else {
-          setGroupRecommendationRequest(null);
-        }
+        setGroupRecommendationRequest(
+          review.drafts.length
+            ? buildGroupRecommendationRequest({
+                transcript: nextTranscript,
+                prefillPacket: contextPacket,
+                drafts: review.drafts,
+                selected: review.selected,
+                edited: review.edited,
+                hidden: (questionId) => newlyHidden.includes(questionId) || isDraftConcealed(questionId),
+              })
+            : null,
+        );
         setMappingNotice(
           [
             ...importNotices,
@@ -818,20 +820,22 @@ export default function SessionInterviewPanel({
 
   const refreshGroupRecommendations = useCallback(() => {
     if (!drafts.length || isInterviewBusy || mapping) return;
-    setGroupRecommendationRequest({
-      requestId: Date.now(),
-      transcript,
-      prefillPacket: prefillPacket
-        ? scopeInterviewPrefillToQuestions(
-            prefillPacket,
-            validatedPrefillQuestionsRef.current || questions,
-            responderContext,
-          )
-        : null,
-      draftResponses: drafts
-        .filter(({ questionId }) => selected[questionId] && !isDraftConcealed(questionId))
-        .map((draft) => ({ ...draft, ...(editedDrafts[draft.questionId] || {}) })),
-    });
+    setGroupRecommendationRequest(
+      buildGroupRecommendationRequest({
+        transcript,
+        prefillPacket: prefillPacket
+          ? scopeInterviewPrefillToQuestions(
+              prefillPacket,
+              validatedPrefillQuestionsRef.current || questions,
+              responderContext,
+            )
+          : null,
+        drafts,
+        selected,
+        edited: editedDrafts,
+        hidden: isDraftConcealed,
+      }),
+    );
   }, [
     drafts,
     editedDrafts,
@@ -1021,6 +1025,7 @@ export default function SessionInterviewPanel({
           if (review.selected[draft.questionId]) submittedDraftIdsRef.current.add(draft.questionId);
         setFidelityScore(score ? { summary: score, height: visibleBodyHeight(panelRef.current) } : null);
         setSubmitSucceeded(true);
+        setGroupJoinRequest(Date.now());
         setShowViewResults(false);
         if (viewResultsRevealRef.current) clearTimeout(viewResultsRevealRef.current);
         viewResultsRevealRef.current = setTimeout(() => {
@@ -1385,41 +1390,33 @@ export default function SessionInterviewPanel({
               })}
             </SessionInterviewReviewSection>
           ) : null}
+          {suggestGroups && drafts.length ? (
+            <SessionInterviewRecommendedGroups
+              hidden={isInterviewBusy || mapping}
+              recommendations={generatedGroupRecommendations}
+              preselect={joinMatchingGroups}
+              availability={generatedGroupRecommendationState.availability}
+              joinRequest={groupJoinRequest}
+              onTickedChange={setGroupsTicked}
+              onRefresh={
+                canManuallyRefreshGroupRecommendations && !groupRecommendationRequest
+                  ? refreshGroupRecommendations
+                  : undefined
+              }
+              account={account}
+              provider={provider}
+              network={network}
+              loginComplete={loginComplete}
+              sessionConfig={sessionConfig}
+              sessionSlug={sessionSlug}
+              workerUrl={resolvedWorkerUrl}
+            />
+          ) : null}
           {suggestedQuestions.length > 0 ? (
             <SessionInterviewSuggestions
               questions={suggestedQuestions}
               creatorProps={questionCreatorProps || {}}
               hidden={isInterviewBusy || mapping || shouldHideSuggestedQuestionSection(suggestedQuestionAuthoringState)}
-            />
-          ) : null}
-          {suggestGroups &&
-          !isInterviewBusy &&
-          !mapping &&
-          canManuallyRefreshGroupRecommendations &&
-          !groupRecommendationRequest ? (
-            <Button
-              outline
-              onClick={() => {
-                refreshGroupRecommendations();
-                // The button goes away once clicked; keep keyboard focus on a control that stays.
-                (reviewRef.current || statusRef.current)?.focus({ preventScroll: true });
-              }}
-            >
-              Refresh group suggestions
-            </Button>
-          ) : null}
-          {suggestGroups && !isInterviewBusy && !mapping ? (
-            <SessionInterviewRecommendedGroups
-              recommendations={generatedGroupRecommendations}
-              account={account}
-              provider={provider}
-              network={network}
-              loginComplete={loginComplete}
-              loginModalToggled={loginModalToggled}
-              toggleLoginModal={toggleLoginModal}
-              sessionConfig={sessionConfig}
-              sessionSlug={sessionSlug}
-              workerUrl={resolvedWorkerUrl}
             />
           ) : null}
           {researchCoverage ? (
@@ -1519,6 +1516,8 @@ export default function SessionInterviewPanel({
                   'Preparing submission…'
                 ) : pendingSubmitAfterLogin && !authenticatedForSubmit ? (
                   'Submit after login'
+                ) : groupsTicked ? (
+                  'Submit and join'
                 ) : (
                   'Submit responses'
                 )}

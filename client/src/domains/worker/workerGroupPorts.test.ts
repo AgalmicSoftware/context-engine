@@ -78,6 +78,17 @@ describe('worker group ports', () => {
       },
     });
     expect(JSON.stringify(fetchImpl.mock.calls)).not.toContain('Authorization');
+
+    await loadPublicWorkerGroups({
+      workerUrl: WORKER_URL,
+      sessionId: SESSION_ID,
+      sessionSlug: SESSION_SLUG,
+      joinGroup: 'salon 2026',
+      fetchImpl,
+    }).catch(() => undefined);
+    expect((fetchImpl.mock.calls.at(-1) as unknown[] | undefined)?.[0]).toBe(
+      `${WORKER_URL}/groups/list?sessionId=${encodeURIComponent(SESSION_ID)}&joinGroup=salon%202026`,
+    );
   });
 
   it('loads visible groups and self-memberships directly with the session-worker credential', async () => {

@@ -225,6 +225,58 @@ test('dispatchInterviewBriefRequest preserves only safe source and auto-join sta
   assert.equal('instructions' in body, false);
 });
 
+test('the catalog lists groups to join only when the session joins matching groups', async () => {
+  const listed = [];
+  const run = (interviewMode, groups) => dispatchInterviewBriefRequest({
+    request: new Request('https://worker.example/agent/interview-brief?slug=demo&sessionUrl=https%3A%2F%2Fapp.example%2Fsession%2Fdemo%3FjoinGroup%3DSalon'),
+    env: { marker: 'env' },
+    deps: {
+      resolveRequestSlugWithoutToken: () => ({ ok: true, explicitSlugProvided: true, slug: 'demo' }),
+      getSessionConfig: async () => ({ allowOrigins: ['https://app.example'], interviewMode }),
+      getCorsContext: async () => ({ ok: true, headers: {} }),
+      loadPublicInterviewQuestions: async () => ({ questions: [{ id: 'q1', type: 'freeform', prompt: 'Question?', options: [] }], incomplete: false }),
+      listSelfJoinableWorkerGroupsForVisitor: async (args) => {
+        listed.push(args);
+        return groups;
+      },
+      sha256: async () => 'question-hash',
+      json,
+    },
+  }).then((response) => response.json());
+  const groups = [
+    {
+      groupId: 'salon',
+      sessionSlug: 'demo',
+      label: 'Salon',
+      description: 'People at the salon',
+      tags: ['in person'],
+      joinMode: 'open',
+      memberVisibility: 'session',
+      adminAddress: '0x0000000000000000000000000000000000000abc',
+    },
+    { groupId: 'dacc', label: 'd/acc', tags: [], joinMode: 'open', memberVisibility: 'session' },
+  ];
+
+  const on = await run({ joinMatchingGroups: true }, groups);
+  // Only what an AI needs to match someone; never who runs a group.
+  assert.deepEqual(on.groups, [
+    { groupId: 'salon', label: 'Salon', description: 'People at the salon', tags: ['in person'] },
+    { groupId: 'dacc', label: 'd/acc' },
+  ]);
+  // The catalog carries no instructions; the clipboard prompt says how to suggest groups.
+  assert.equal('groupContract' in on, false);
+  assert.equal(on.questionSetHash, 'question-hash');
+  assert.equal(listed.length, 1);
+  assert.equal(listed[0].slug, 'demo');
+  assert.equal(listed[0].inviteGroupId, 'salon');
+  assert.equal(listed[0].env.marker, 'env');
+
+  for (const body of [await run({ joinMatchingGroups: true }, []), await run({ suggestGroups: true }, groups), await run(undefined, groups)]) {
+    assert.equal('groups' in body, false);
+  }
+  assert.equal(listed.length, 2);
+});
+
 test('dispatchInterviewBriefRequest applies anonymous IP daily budgets before loading questions', async () => {
   const cases = [
     {

@@ -12,6 +12,7 @@ export const DEFAULT_INTERVIEW_SETTINGS = Object.freeze({
   hiddenDraftShare: 0,
   showFidelityScore: false,
   suggestGroups: false,
+  joinMatchingGroups: false,
   showFidelityResults: false,
   fidelityMinimumPeople: 5,
 });
@@ -50,6 +51,8 @@ export const normalizeInterviewSettings = (value = {}) => {
     showFidelityScore: source.showFidelityScore === true,
     // After an interview or AI prefill, suggest the session's open groups that fit the answers.
     suggestGroups: source.suggestGroups === true,
+    // Also tick the strong matches, so submitting joins them; the person can untick any first.
+    joinMatchingGroups: source.joinMatchingGroups === true,
     // Add "How well AIs predicted people" to Results, scoring everyone's AI-prefill drafts together.
     showFidelityResults: source.showFidelityResults === true,
     // That section hides figures from fewer people than this; 1 shows all.
@@ -101,6 +104,7 @@ export const validInterviewSettings = (value = {}) => {
     'shareDraftChangesByDefault',
     'showFidelityScore',
     'suggestGroups',
+    'joinMatchingGroups',
     'showFidelityResults',
   ].every(
     (key) => value[key] === undefined || typeof value[key] === 'boolean',
