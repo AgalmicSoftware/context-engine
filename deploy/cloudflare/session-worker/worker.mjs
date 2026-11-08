@@ -76901,15 +76901,19 @@ var init_debateAtlasStore = __esm({
       }
       if (operation === "finalize") {
         const build = isObj20(payload.build) ? payload.build : null;
-        if (build && !DEBATE_ATLAS_ID.test(trim16(build.id))) return json4({ ok: false, error: "Invalid atlas build." }, 400);
-        const chunks = build ? chunkBuild(build) : [];
-        if (chunks.length > MAX_CHUNKS) return json4({ ok: false, error: "This atlas is too large to keep." }, 413);
+        const invalid3 = !!build && !DEBATE_ATLAS_ID.test(trim16(build.id));
+        const chunks = build && !invalid3 ? chunkBuild(build) : [];
+        const refusal = invalid3 ? json4({ ok: false, error: "Invalid atlas build." }, 400) : chunks.length > MAX_CHUNKS ? json4({ ok: false, error: "This atlas is too large to keep." }, 413) : null;
         return storage.transaction(async (transaction) => {
           const index = await readIndex(transaction);
           if (!trim16(payload.attemptId) || index.active?.attemptId !== trim16(payload.attemptId)) {
             return json4({ ok: false, error: "This atlas build is no longer current." }, 409);
           }
           index.active = null;
+          if (refusal) {
+            await transaction.put(INDEX_KEY, index);
+            return refusal;
+          }
           if (build) {
             for (let chunk2 = 0; chunk2 < chunks.length; chunk2 += 1) await transaction.put(chunkKey(build.id, chunk2), chunks[chunk2]);
             const { branches, ...summary } = build;
@@ -103382,7 +103386,10 @@ var buildDebateAtlas = async ({ env, slug, config, body = {}, headers: headers2,
   const store = deps.callAtlasStore || callAtlasStore;
   const reserved = await store(env, slug, "reserve", { builder: lower9(builderAddress) });
   if (!reserved.ok) {
-    return failure(reserved.status || 503, reserved.body?.error || "Atlas builds are unavailable; retry.", reserved.body?.active ? { active: reserved.body.active } : {});
+    return failure(reserved.status || 503, reserved.body?.error || "Atlas builds are unavailable; retry.", {
+      ...reserved.body?.reason ? { reason: reserved.body.reason } : {},
+      ...reserved.body?.active ? { active: reserved.body.active } : {}
+    });
   }
   const attemptId = reserved.body.attemptId;
   const now = () => Number(deps.now?.() ?? Date.now());
@@ -103504,19 +103511,25 @@ var withPrivateNoStoreHeaders = (headers2 = {}) => {
   next.set("Cache-Control", "private, no-store");
   return next;
 };
+var readViewerRefusal = async ({ env, config, slug, address: address2, scopes, headers: headers2, deps }) => {
+  const visibility = (deps.evaluateResultsAnalysisViewerEligibility || evaluateResultsAnalysisViewerEligibility)({ config });
+  if (!visibility?.ok) {
+    return deps.json({ ok: false, error: visibility?.error || "Atlases are not visible on this session.", reason: visibility?.reason }, visibility?.status || 403, headers2);
+  }
+  const authorize = deps.authorizeCloudflareStorageResourceRead || authorizeCloudflareStorageResourceRead;
+  for (const resource of ["generatedArtifacts", "questions", "responses"]) {
+    const access = await authorize({ env, config, slug, resource, requesterAddress: address2, authScopes: scopes, baseHeaders: headers2, deps });
+    if (!access?.ok) return access?.response || deps.json({ ok: false, error: "Access denied." }, 403, headers2);
+  }
+  return null;
+};
 var dispatchDebateAtlasReadRequest = async ({ request, env, config, slug, address: address2, scopes, headers: headers2, deps = {} } = {}) => {
   const responseHeaders = withPrivateNoStoreHeaders(headers2);
-  const builder = !!address2 && await canBuildDebateAtlas({ env, slug, config, address: address2, validateAdmin: deps.validateAdmin });
+  let builder = isListedDebateAtlasBuilder(config, address2);
   if (!builder) {
-    const visibility = (deps.evaluateResultsAnalysisViewerEligibility || evaluateResultsAnalysisViewerEligibility)({ config });
-    if (!visibility?.ok) {
-      return deps.json({ ok: false, error: visibility?.error || "Atlases are not visible on this session.", reason: visibility?.reason }, visibility?.status || 403, responseHeaders);
-    }
-    const authorize = deps.authorizeCloudflareStorageResourceRead || authorizeCloudflareStorageResourceRead;
-    for (const resource of ["generatedArtifacts", "questions", "responses"]) {
-      const access = await authorize({ env, config, slug, resource, requesterAddress: address2, authScopes: scopes, baseHeaders: responseHeaders, deps });
-      if (!access?.ok) return access?.response || deps.json({ ok: false, error: "Access denied." }, 403, responseHeaders);
-    }
+    const refusal = await readViewerRefusal({ env, config, slug, address: address2, scopes, headers: responseHeaders, deps });
+    builder = !!refusal && !!address2 && await canBuildDebateAtlas({ env, slug, config, address: address2, validateAdmin: deps.validateAdmin });
+    if (refusal && !builder) return refusal;
   }
   let id2 = "";
   try {

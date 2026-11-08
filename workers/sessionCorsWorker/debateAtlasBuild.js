@@ -219,7 +219,11 @@ export const buildDebateAtlas = async ({ env, slug, config, body = {}, headers, 
   const store = deps.callAtlasStore || callAtlasStore;
   const reserved = await store(env, slug, 'reserve', { builder: lower(builderAddress) });
   if (!reserved.ok) {
-    return failure(reserved.status || 503, reserved.body?.error || 'Atlas builds are unavailable; retry.', reserved.body?.active ? { active: reserved.body.active } : {});
+    // The reason lets the site show the build that is running and check back for it.
+    return failure(reserved.status || 503, reserved.body?.error || 'Atlas builds are unavailable; retry.', {
+      ...(reserved.body?.reason ? { reason: reserved.body.reason } : {}),
+      ...(reserved.body?.active ? { active: reserved.body.active } : {}),
+    });
   }
   const attemptId = reserved.body.attemptId;
   const now = () => Number(deps.now?.() ?? Date.now());
@@ -353,21 +357,29 @@ const withPrivateNoStoreHeaders = (headers = {}) => {
   return next;
 };
 
+const readViewerRefusal = async ({ env, config, slug, address, scopes, headers, deps }) => {
+  const visibility = (deps.evaluateResultsAnalysisViewerEligibility || evaluateResultsAnalysisViewerEligibility)({ config });
+  if (!visibility?.ok) {
+    return deps.json({ ok: false, error: visibility?.error || 'Atlases are not visible on this session.', reason: visibility?.reason }, visibility?.status || 403, headers);
+  }
+  const authorize = deps.authorizeCloudflareStorageResourceRead || authorizeCloudflareStorageResourceRead;
+  for (const resource of ['generatedArtifacts', 'questions', 'responses']) {
+    const access = await authorize({ env, config, slug, resource, requesterAddress: address, authScopes: scopes, baseHeaders: headers, deps });
+    if (!access?.ok) return access?.response || deps.json({ ok: false, error: 'Access denied.' }, 403, headers);
+  }
+  return null;
+};
+
 // Viewers see atlases under the rule AI Views follow; anyone who may build one
-// sees them on any session, signed in.
+// sees them on any session, signed in. The admin-hat check reads the chain, so
+// it runs only for a signed-in reader the viewer rule refuses.
 export const dispatchDebateAtlasReadRequest = async ({ request, env, config, slug, address, scopes, headers, deps = {} } = {}) => {
   const responseHeaders = withPrivateNoStoreHeaders(headers);
-  const builder = !!address && await canBuildDebateAtlas({ env, slug, config, address, validateAdmin: deps.validateAdmin });
+  let builder = isListedDebateAtlasBuilder(config, address);
   if (!builder) {
-    const visibility = (deps.evaluateResultsAnalysisViewerEligibility || evaluateResultsAnalysisViewerEligibility)({ config });
-    if (!visibility?.ok) {
-      return deps.json({ ok: false, error: visibility?.error || 'Atlases are not visible on this session.', reason: visibility?.reason }, visibility?.status || 403, responseHeaders);
-    }
-    const authorize = deps.authorizeCloudflareStorageResourceRead || authorizeCloudflareStorageResourceRead;
-    for (const resource of ['generatedArtifacts', 'questions', 'responses']) {
-      const access = await authorize({ env, config, slug, resource, requesterAddress: address, authScopes: scopes, baseHeaders: responseHeaders, deps });
-      if (!access?.ok) return access?.response || deps.json({ ok: false, error: 'Access denied.' }, 403, responseHeaders);
-    }
+    const refusal = await readViewerRefusal({ env, config, slug, address, scopes, headers: responseHeaders, deps });
+    builder = !!refusal && !!address && await canBuildDebateAtlas({ env, slug, config, address, validateAdmin: deps.validateAdmin });
+    if (refusal && !builder) return refusal;
   }
   let id = '';
   try {

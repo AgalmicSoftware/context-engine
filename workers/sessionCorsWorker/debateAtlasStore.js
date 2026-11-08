@@ -69,15 +69,24 @@ export const dispatchDebateAtlasStore = async (coordinator, operation, payload =
   }
   if (operation === 'finalize') {
     const build = isObj(payload.build) ? payload.build : null;
-    if (build && !DEBATE_ATLAS_ID.test(trim(build.id))) return json({ ok: false, error: 'Invalid atlas build.' }, 400);
-    const chunks = build ? chunkBuild(build) : [];
-    if (chunks.length > MAX_CHUNKS) return json({ ok: false, error: 'This atlas is too large to keep.' }, 413);
+    const invalid = !!build && !DEBATE_ATLAS_ID.test(trim(build.id));
+    const chunks = build && !invalid ? chunkBuild(build) : [];
+    const refusal = invalid
+      ? json({ ok: false, error: 'Invalid atlas build.' }, 400)
+      : chunks.length > MAX_CHUNKS
+        ? json({ ok: false, error: 'This atlas is too large to keep.' }, 413)
+        : null;
     return storage.transaction(async (transaction) => {
       const index = await readIndex(transaction);
       if (!trim(payload.attemptId) || index.active?.attemptId !== trim(payload.attemptId)) {
         return json({ ok: false, error: 'This atlas build is no longer current.' }, 409);
       }
       index.active = null;
+      // A build that cannot be kept still ends its attempt, so the next press need not wait out the lease.
+      if (refusal) {
+        await transaction.put(INDEX_KEY, index);
+        return refusal;
+      }
       if (build) {
         for (let chunk = 0; chunk < chunks.length; chunk += 1) await transaction.put(chunkKey(build.id, chunk), chunks[chunk]);
         const { branches, ...summary } = build;

@@ -23,7 +23,8 @@ const PARTICIPANT_ADDRESSES = new Map(PARTICIPANTS.map((id, index) => [id, addre
 const createStore = () => {
   const values = new Map();
   const storage = {
-    get: async (key) => values.get(key),
+    // Durable Object storage hands back copies, so an edit is kept only by a put.
+    get: async (key) => structuredClone(values.get(key)),
     put: async (key, value) => { values.set(key, structuredClone(value)); },
     delete: async (key) => values.delete(key),
     transaction: async (run) => run(storage),
@@ -216,7 +217,11 @@ test('refuses before any AI call when a build runs, AI is off, the input is thin
   const busy = createStore();
   await busy.callAtlasStore({}, 'atlas-session', 'reserve', {});
   const provider = async () => assert.fail('no AI call expected');
-  assert.equal((await runBuild({ provider, store: busy })).result.status, 409);
+  const refused = (await runBuild({ provider, store: busy })).result;
+  assert.equal(refused.status, 409);
+  // The site shows the running build from these and checks back for it.
+  assert.equal(refused.reason, 'debate_atlas_build_running');
+  assert.deepEqual(refused.active, { startedAtMs: 1_000 });
   assert.equal((await runBuild({ provider, config: { scopes: { ai: false } } })).result.status, 403);
   assert.equal((await runBuild({ provider, body: { source: { kind: 'admin-snapshot', snapshot: {} } } })).result.status, 400);
 
@@ -291,6 +296,7 @@ test('runWithConcurrency keeps order', async () => {
 const json = (body, status = 200, headers = {}) => new Response(JSON.stringify(body), { status, headers });
 const readAtlas = async ({ config, address: requester = '', validateAdmin = async () => false, id = '' } = {}) => {
   const storeCalls = [];
+  const adminChecks = [];
   const response = await dispatchDebateAtlasReadRequest({
     request: new Request(`https://worker.example/debate-atlas?sessionSlug=atlas-session${id ? `&id=${id}` : ''}`),
     env: {},
@@ -301,7 +307,10 @@ const readAtlas = async ({ config, address: requester = '', validateAdmin = asyn
     headers: {},
     deps: {
       json,
-      validateAdmin,
+      validateAdmin: async (args) => {
+        adminChecks.push(args.address);
+        return validateAdmin(args);
+      },
       authorizeCloudflareStorageResourceRead: async () => ({ ok: true }),
       callAtlasStore: async (_env, _slug, operation, payload) => {
         storeCalls.push([operation, payload]);
@@ -309,7 +318,7 @@ const readAtlas = async ({ config, address: requester = '', validateAdmin = asyn
       },
     },
   });
-  return { status: response.status, body: await response.json(), storeCalls, cache: response.headers.get('cache-control') };
+  return { status: response.status, body: await response.json(), storeCalls, adminChecks, cache: response.headers.get('cache-control') };
 };
 
 const publicResults = {
@@ -337,6 +346,18 @@ test('everyone who sees full Results reads atlases; elsewhere only those who may
 
   const hatWearer = await readAtlas({ config: privateResults, address: address(8), validateAdmin: async ({ address: who }) => who === address(8) });
   assert.equal(hatWearer.body.canBuild, true);
+  assert.deepEqual(hatWearer.adminChecks, [address(8)]);
+
+  // A listed builder is told so on a public session too, without an admin-hat chain read.
+  const listedOnPublic = await readAtlas({ config: { ...publicResults, resultsAdminAddresses: [RESULTS_ADMIN] }, address: RESULTS_ADMIN });
+  assert.equal(listedOnPublic.body.canBuild, true);
+  assert.deepEqual(listedOnPublic.adminChecks, []);
+
+  // Where viewers may read, a signed-in reader costs no admin-hat chain read.
+  const signedInViewer = await readAtlas({ config: publicResults, address: address(8), validateAdmin: async () => true });
+  assert.equal(signedInViewer.status, 200);
+  assert.deepEqual(signedInViewer.adminChecks, []);
+  assert.equal(resultsAdmin.adminChecks.length, 0);
 });
 
 const dispatchAs = async ({ action, signer, config }) => {

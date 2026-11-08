@@ -7,7 +7,8 @@ const createCoordinator = () => {
   const values = new Map();
   const storage = {
     values,
-    get: async (key) => values.get(key),
+    // Durable Object storage hands back copies, so an edit is kept only by a put.
+    get: async (key) => structuredClone(values.get(key)),
     put: async (key, value) => { values.set(key, structuredClone(value)); },
     delete: async (key) => values.delete(key),
     transaction: async (run) => run(storage),
@@ -103,9 +104,17 @@ test(`keeps the newest ${MAX_DEBATE_ATLAS_BUILDS} builds and deletes the chunks 
   assert.equal((await call(coordinator, 'read', { id: builds[0].id })).status, 404);
 });
 
-test('rejects malformed ids before touching storage', async () => {
+test('refuses a malformed or oversized build, keeps nothing, and frees the next press', async () => {
   const coordinator = createCoordinator();
   assert.equal((await call(coordinator, 'read', { id: '../config' })).status, 400);
-  const reserved = await call(coordinator, 'reserve', {});
-  assert.equal((await call(coordinator, 'finalize', { attemptId: reserved.body.attemptId, build: { id: 'debate-atlas-v1' } })).status, 400);
+  for (const [build, status] of [
+    [{ id: 'debate-atlas-v1' }, 400],
+    [buildRecord({ branches: [{ id: 'b1', label: 'x'.repeat(64 * 24_000), summary: '', topics: [] }] }), 413],
+  ]) {
+    const reserved = await call(coordinator, 'reserve', {});
+    assert.equal(reserved.status, 200);
+    assert.equal((await call(coordinator, 'finalize', { attemptId: reserved.body.attemptId, build })).status, status);
+  }
+  assert.equal((await call(coordinator, 'reserve', {})).status, 200);
+  assert.deepEqual((await call(coordinator, 'read', {})).body.builds, []);
 });
