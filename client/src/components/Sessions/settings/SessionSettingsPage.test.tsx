@@ -381,6 +381,59 @@ describe('SessionSettingsPage', () => {
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_SETTINGS_SAVE)).toBeDisabled();
   });
 
+  it('offers the results admin list only on a Worker that builds atlases', async () => {
+    renderPage();
+    await waitFor(() => expect(mockUpsertBootstrap).toHaveBeenCalled());
+    fireEvent.click(screen.getByTestId('ce-setup-more-results'));
+    expect(screen.queryByTestId('ce-setting-results-admins')).not.toBeInTheDocument();
+  });
+
+  it('adds and removes results admins and saves them without a sign-out', async () => {
+    const existing = `0x${'cd'.repeat(20)}`;
+    const added = `0x${'AB'.repeat(20)}`;
+    mockFetchBootstrap.mockResolvedValue(
+      bootstrapOf(
+        workerConfig({ debateAtlas: true, resultsAdminAddresses: [existing.toUpperCase().replace('0X', '0x')] }),
+      ),
+    );
+    renderPage();
+    await waitFor(() => expect(mockUpsertBootstrap).toHaveBeenCalled());
+    fireEvent.click(screen.getByTestId('ce-setup-more-results'));
+    const list = screen.getByTestId('ce-setting-results-admins-list');
+    expect(within(list).getByText(existing)).toBeInTheDocument();
+    // A stored list in other letter case is not an edit.
+    expect(screen.queryByTestId('ce-settings-content-changes')).not.toBeInTheDocument();
+
+    const input = screen.getByTestId('ce-setting-results-admins');
+    fireEvent.change(input, { target: { value: '0x1234' } });
+    fireEvent.click(screen.getByTestId('ce-setting-results-admins-add'));
+    expect(screen.getByRole('alert')).toHaveTextContent('Enter an address');
+    fireEvent.change(input, { target: { value: existing } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(screen.getByRole('alert')).toHaveTextContent('already a results admin');
+
+    fireEvent.change(input, { target: { value: ` ${added} ` } });
+    fireEvent.click(screen.getByTestId('ce-setting-results-admins-add'));
+    expect(input).toHaveValue('');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: `Remove ${existing}` }));
+    expect(screen.getByTestId('ce-settings-content-changes')).toHaveTextContent('Results admins');
+    expect(screen.queryByTestId('ce-settings-authority-changes')).not.toBeInTheDocument();
+    const save = screen.getByTestId(E2E_TESTIDS.SESSION_SETTINGS_SAVE);
+    expect(save).toHaveTextContent(/^Save$/);
+
+    await act(async () => {
+      fireEvent.click(save);
+    });
+    await waitFor(() => expect(screen.getByTestId('ce-settings-status')).toHaveTextContent('Settings saved.'));
+    const write = posted.find((entry) => String(entry.url).endsWith('/admin/set-config'));
+    expect(write?.body).toEqual({
+      sessionSlug: 'edit-salon',
+      config: { resultsAdminAddresses: [added.toLowerCase()] },
+      signature: '0xsigned',
+    });
+  });
+
   it('keeps typed edits when the Worker’s copy arrives after them', async () => {
     let resolveBootstrap: (value: unknown) => void = () => {};
     mockFetchBootstrap.mockReturnValue(new Promise((resolve) => (resolveBootstrap = resolve)));

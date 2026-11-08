@@ -5,13 +5,19 @@ import { normalizeSessionContext } from '@ce-shared/sessionContext.mjs';
 import {
   CURATED_ID_LIST_KEYS,
   MAX_CURATED_IDS,
+  MAX_RESULTS_ADMINS,
   WORKER_CANONICAL_SET_CONFIG_KEYS,
   classifySessionConfigEdits,
   mergeSetConfigAi,
   validCuratedIdList,
+  validResultsAdminAddresses,
   type SessionConfigEditClassification,
 } from '@ce-shared/sessionConfigEdits.mjs';
-import { PUBLIC_WORKER_AI_FIELDS, SET_CONFIG_MERGES_AI_FIELD } from '@ce-shared/workerSessionPublicConfig.mjs';
+import {
+  DEBATE_ATLAS_FIELD,
+  PUBLIC_WORKER_AI_FIELDS,
+  SET_CONFIG_MERGES_AI_FIELD,
+} from '@ce-shared/workerSessionPublicConfig.mjs';
 import { compileSessionModeProfile, type SessionModeProfile } from '../../../utilities/session/sessionModeProfile';
 import { listSessionModeConflicts } from '../../../utilities/session/sessionModeRuleMessages';
 import { normalizeSessionAppearance } from '../../../utilities/ui/sessionColorSchemes';
@@ -40,6 +46,12 @@ const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value ?? null));
 
 /** True when the session's Worker merges `ai` on save, so the page may edit it. */
 export const workerMergesAi = (config: unknown): boolean => asRecord(config)[SET_CONFIG_MERGES_AI_FIELD] === true;
+
+/** True when the session's Worker builds debate atlases, so it takes a results admin list; older ones refuse it. */
+export const workerTakesResultsAdmins = (config: unknown): boolean => asRecord(config)[DEBATE_ATLAS_FIELD] === true;
+
+const storedResultsAdmins = (value: unknown): string[] =>
+  Array.isArray(value) ? value.map((address) => text(address).trim().toLowerCase()).filter(Boolean) : [];
 
 // Lists are edited as text, one item per line (commas work too).
 const SBT_LIST_KEYS = ['defaultFeaturedSBTs', 'featured_SBTs_LIST', 'ignored_SBTs_LIST'] as const;
@@ -106,6 +118,7 @@ export const buildSessionSettingsDraft = (config: unknown): SetupDraft => {
     defaultSbtTags: text(source.defaultSbtTags),
     autoFeatureSBTsBySessionSlug: resolveSessionWizardAutoFeatureBySessionSlug(source) !== false,
     lists: Object.fromEntries(LIST_KEYS.map((key) => [key, formatSettingsList(source[key])])),
+    resultsAdminAddresses: storedResultsAdmins(source.resultsAdminAddresses),
     ...buildSessionSettingsChainDraft(source),
   };
 };
@@ -225,6 +238,13 @@ const editedValues = (before: Config, draft: SetupDraft, { nowMs, onChain }: Edi
       values[key] = idList(before, draft, key);
     });
   }
+  if (!onChain && workerTakesResultsAdmins(before)) {
+    const resultsAdmins = storedResultsAdmins(draft.resultsAdminAddresses);
+    if (!validResultsAdminAddresses(resultsAdmins)) {
+      throw new Error(`Results admins: up to ${MAX_RESULTS_ADMINS} different addresses (0x and 40 hex digits).`);
+    }
+    values.resultsAdminAddresses = resultsAdmins;
+  }
   // Pile navigation has a deployment default; only a changed choice is stored.
   if (draft.pileAutoAdvanceEnabled !== resolvePileAutoAdvanceEnabled(before)) {
     values.pileAutoAdvanceEnabled = draft.pileAutoAdvanceEnabled === true;
@@ -270,6 +290,7 @@ const unchanged = (key: string, before: unknown, after: unknown) => {
   if (key === 'sessionContext') return same(storedContext(before), after);
   if (key === 'resultsAnalysis') return same(normalizeResultsAnalysisSettings(before), after);
   if (key === 'appearance') return same(normalizeSessionAppearance(before), after);
+  if (key === 'resultsAdminAddresses') return same(storedResultsAdmins(before), after);
   // Voice interviews are on unless turned off.
   if (key === 'interviewModeEnabled') return (before !== false) === after;
   return same(before, after) || (isBlank(before) && isBlank(after));
@@ -392,6 +413,7 @@ const LABELS: Record<string, string> = {
   groupCreationPolicy: 'Who can create groups',
   contextAdditionPolicy: 'Who can add files to context',
   resultsAnalysis: 'Results analysis',
+  resultsAdminAddresses: 'Results admins',
   ai: 'AI models and effort',
   sessionModeProfile: 'Access, results and hosting',
   storageProfile: 'Storage access',

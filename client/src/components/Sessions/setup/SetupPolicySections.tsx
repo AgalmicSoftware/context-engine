@@ -109,7 +109,15 @@ const MinGroupSizeInput = ({
   );
 };
 
-export const SetupResultsSection = ({ draft, onChange, open, onToggle, conflicts, editProfile }: PolicyProps) => {
+export const SetupResultsSection = ({
+  draft,
+  onChange,
+  open,
+  onToggle,
+  conflicts,
+  editProfile,
+  admins = null,
+}: PolicyProps & { admins?: React.ReactNode }) => {
   const profile = profileOf(draft);
   const sectionConflicts = conflicts.filter((conflict) => conflict.section === 'results');
   const visibilityConflicts = conflictsAt(sectionConflicts, ['results.visibility']);
@@ -181,6 +189,7 @@ export const SetupResultsSection = ({ draft, onChange, open, onToggle, conflicts
         backgroundAutoSupported={supportsBackgroundResultsAnalysis(draft)}
         unsupportedReason={getBackgroundResultsAnalysisUnsupportedReason(draft)}
       />
+      {admins}
     </SetupSection>
   );
 };

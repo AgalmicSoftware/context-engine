@@ -46,6 +46,7 @@ import {
   rebaseSessionSettingsDraft,
   usesSbtDefaults,
   workerMergesAi,
+  workerTakesResultsAdmins,
   type SessionSettingsSave,
 } from './sessionSettingsEdits';
 import { contractsNeedChecking, describeChain, readRegistryFacts } from './sessionSettingsChain';
@@ -61,6 +62,7 @@ import {
 import { SettingsAiSection } from './SettingsAiSection';
 import { SettingsChainFacts, SettingsChainFields } from './SettingsChainFields';
 import { SettingsQuestionListFields, SettingsSbtFields } from './SettingsListFields';
+import SettingsResultsAdminsField from './SettingsResultsAdminsField';
 
 type SessionSettingsPageProps = {
   account?: string;
@@ -515,6 +517,14 @@ const SessionSettingsPage = ({
           {...section('results')}
           editProfile={editProfile}
           registryChainId={facts.registryChainId || null}
+          admins={
+            !onChain && workerTakesResultsAdmins(saved) ? (
+              <SettingsResultsAdminsField
+                value={Array.isArray(draft.resultsAdminAddresses) ? (draft.resultsAdminAddresses as string[]) : []}
+                onChange={(next) => updateDraft(['resultsAdminAddresses'], next)}
+              />
+            ) : null
+          }
         />
         <SetupAccessSection
           {...section('access')}
