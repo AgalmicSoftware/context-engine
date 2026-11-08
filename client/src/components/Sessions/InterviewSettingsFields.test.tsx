@@ -91,27 +91,26 @@ it('edits the share of hidden AI drafts, defaulting to off', () => {
   expect(screen.getByLabelText(label)).toHaveDisplayValue('30%');
 });
 
-it('turns on group suggestions, off by default', () => {
+it('no longer offers the retired group suggestions box, and keeps a stored value as it is', () => {
   const onChange = jest.fn();
-  render(<InterviewSettingsFields value={{}} onChange={onChange} />);
-  const box = screen.getByLabelText('Suggest open groups that fit participants’ answers');
-  expect(box).not.toBeChecked();
-  fireEvent.click(box);
-  expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ suggestGroups: true }));
+  render(<InterviewSettingsFields value={{ suggestGroups: true }} onChange={onChange} />);
+  expect(screen.queryByLabelText('Suggest open groups that fit participants’ answers')).not.toBeInTheDocument();
+  fireEvent.click(screen.getByLabelText('Show participants how well their AI predicted them'));
+  expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ suggestGroups: true, showFidelityScore: true }));
 });
 
 it('turns on joining strong group matches, off by default, with its explanation behind its help', () => {
   const onChange = jest.fn();
   const label = 'Join strong group matches on submit';
-  const { rerender } = render(<InterviewSettingsFields value={{ suggestGroups: true }} onChange={onChange} />);
+  const { rerender } = render(<InterviewSettingsFields value={{}} onChange={onChange} />);
   const box = screen.getByLabelText(label);
   expect(box).not.toBeChecked();
-  expect(box).toHaveAccessibleDescription(/groups that strongly fit a participant’s answers start ticked/);
+  expect(box).toHaveAccessibleDescription(/Strong matches start ticked under their drafts.*Off, no groups are matched/);
   const helpButton = screen.getByRole('button', { name: 'About joining strong group matches' });
   fireEvent.click(helpButton);
   expect(onChange).not.toHaveBeenCalled();
   fireEvent.click(box);
-  expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ joinMatchingGroups: true, suggestGroups: true }));
+  expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ joinMatchingGroups: true }));
   rerender(<InterviewSettingsFields value={onChange.mock.calls.at(-1)?.[0]} onChange={onChange} />);
   expect(screen.getByLabelText(label)).toBeChecked();
   fireEvent.click(screen.getByLabelText(label));

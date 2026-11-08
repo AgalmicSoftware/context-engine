@@ -140,12 +140,11 @@ Interview settings for the call:
   default; when enabled, their default addition threshold is 20%. Question
   suggestions are optional and off by default. Admin refresh is on by default.
 
-- **Suggest open groups that fit participants’ answers**
-  (`interviewMode.suggestGroups`, off by default) lists the session's open
-  groups that fit after an interview or AI prefill, unticked; submitting joins
-  any a participant ticks. **Join strong group matches on submit**
-  (`interviewMode.joinMatchingGroups`, off by default) lists them too, with
-  strong matches ticked, and lets the participant's own AI suggest groups.
+- **Join strong group matches on submit** (`interviewMode.joinMatchingGroups`,
+  off by default) matches participants to the session's open groups after an
+  interview or AI prefill: strong matches start ticked and join when they
+  submit, and their own AI can suggest groups too. Off, no groups are matched.
+  The older `interviewMode.suggestGroups` is no longer read.
 
 Interview settings for research:
 

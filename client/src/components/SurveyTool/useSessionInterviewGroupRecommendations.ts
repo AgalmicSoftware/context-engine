@@ -20,8 +20,6 @@ type UseSessionInterviewGroupRecommendationsArgs = {
   sessionConfig: unknown;
   sessionSlug?: string;
   workerUrl?: string;
-  /** Whether the groups the person's own AI suggested in its prefill count. */
-  usePrefillPicks?: boolean;
   /** The signed-in account, whose saved Worker sign-in lists the groups it may see. */
   account?: string;
 };
@@ -61,7 +59,6 @@ export function useSessionInterviewGroupRecommendations({
   sessionConfig,
   sessionSlug = '',
   workerUrl = '',
-  usePrefillPicks = false,
   account = '',
 }: UseSessionInterviewGroupRecommendationsArgs): SessionInterviewGroupRecommendationState {
   const availabilityScopeKey = useMemo(
@@ -82,8 +79,8 @@ export function useSessionInterviewGroupRecommendations({
   const requestRef = useRef(0);
   // The page can pass new sessionConfig and question objects on every render, so the effect
   // reads the latest ones here; otherwise each re-render would restart the lookup and its AI call.
-  const inputsRef = useRef({ questions, sessionConfig, usePrefillPicks, account });
-  inputsRef.current = { questions, sessionConfig, usePrefillPicks, account };
+  const inputsRef = useRef({ questions, sessionConfig, account });
+  inputsRef.current = { questions, sessionConfig, account };
 
   useEffect(() => {
     if (!active || !request || !requestKey) return undefined;
@@ -98,7 +95,7 @@ export function useSessionInterviewGroupRecommendations({
         scopeKey: availabilityScopeKey,
         recommendations: [],
       });
-      const { questions, sessionConfig, usePrefillPicks, account } = inputsRef.current;
+      const { questions, sessionConfig, account } = inputsRef.current;
       // A saved sign-in lists what that person may see; a join link, what its group's members see.
       const catalog = await loadInterviewWorkerGroupCandidates({
         sessionConfig,
@@ -127,9 +124,10 @@ export function useSessionInterviewGroupRecommendations({
       });
       const unmatched = (matches: InterviewGroupRecommendation[]) =>
         catalog.candidates.filter((group) => !matches.some((match) => match.groupId === group.groupId));
-      const picked = usePrefillPicks
-        ? matchInterviewGroupsFromPrefill({ candidates: unmatched(exact), picks: request.prefillPacket?.groups })
-        : [];
+      const picked = matchInterviewGroupsFromPrefill({
+        candidates: unmatched(exact),
+        picks: request.prefillPacket?.groups,
+      });
       const others = unmatched([...exact, ...picked]);
       // These need no AI call, so they show at once; the session's AI can take up to 30 seconds.
       if (others.length && (exact.length || picked.length))

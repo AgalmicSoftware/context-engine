@@ -27,7 +27,7 @@ const FIDELITY_ABOUT =
   'Turns on voice interviews, which AI prefill uses, research sharing by default and hidden drafts for 1 in 5 of each person’s AI-prefill drafts, and shows people how well their AI predicted them. Turning it off sets the research settings back to their defaults; each can still be changed below.';
 
 const JOIN_GROUPS_ABOUT =
-  'After an AI prefill or voice interview, groups that strongly fit a participant’s answers start ticked under their drafts, and Submit joins the ticked groups. They can untick any first. Their own AI can suggest groups from the session’s list too.';
+  'After an AI prefill or voice interview, the AI matches participants to the session’s open groups. Strong matches start ticked under their drafts and join when they submit; they can untick any first. Their own AI can suggest groups too. Off, no groups are matched.';
 
 // The smallest group "How well AIs predicted people" reports on; 1 shows every figure.
 const FIDELITY_MINIMUMS = [1, 3, 5, 10];
@@ -185,7 +185,6 @@ export default function InterviewSettingsFields({ value, onChange, disabled = fa
           'autoRegenerate',
           'followNewQuestions',
           'suggestQuestions',
-          'suggestGroups',
           'joinMatchingGroups',
           'allowManualRefresh',
           'showFidelityScore',
@@ -226,7 +225,6 @@ export default function InterviewSettingsFields({ value, onChange, disabled = fa
                 autoRegenerate: 'Regenerate opening when the question bank grows',
                 followNewQuestions: 'Check for new session questions during interviews',
                 suggestQuestions: 'Suggest new question drafts from interview evidence',
-                suggestGroups: 'Suggest open groups that fit participants’ answers',
                 allowManualRefresh: 'Allow admins to regenerate the opening',
                 showFidelityScore: 'Show participants how well their AI predicted them',
               }[key]

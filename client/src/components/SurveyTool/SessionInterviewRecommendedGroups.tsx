@@ -47,8 +47,6 @@ export type SessionInterviewGroupRecommendation = {
 
 export type SessionInterviewRecommendedGroupsProps = {
   recommendations?: SessionInterviewGroupRecommendation[];
-  /** The session joins groups that fit: strong matches start ticked. */
-  preselect?: boolean;
   /** Where the suggestions stand; 'idle' after an edit clears them, which keeps what was listed. */
   availability?: SessionInterviewGroupRecommendationState['availability'];
   /** Out of sight during another interview round, keeping its ticks. */
@@ -164,7 +162,6 @@ const joinableGroupIds = (overview: WorkerGroupOverview): Set<string> =>
  */
 export function SessionInterviewRecommendedGroups({
   recommendations = [],
-  preselect = false,
   availability = 'available',
   hidden = false,
   joinRequest = 0,
@@ -303,15 +300,12 @@ export function SessionInterviewRecommendedGroups({
             reason: recommendation.reason || 'Suggested from your answers.',
             evidence: recommendation.evidence || '',
             fromLink: false,
-            startsTicked:
-              preselect &&
-              isStrongGroupMatch(recommendation) &&
-              (!listedAtJoin || listedAtJoin.includes(group.groupId)),
+            startsTicked: isStrongGroupMatch(recommendation) && (!listedAtJoin || listedAtJoin.includes(group.groupId)),
           },
         ];
       }),
     ];
-  }, [invite, joinedIds, listedAtJoin, normalizedRecommendations, overview, preselect, sessionSlug]);
+  }, [invite, joinedIds, listedAtJoin, normalizedRecommendations, overview, sessionSlug]);
 
   const tickedIds = choices.filter((choice) => ticks[choice.groupId] ?? choice.startsTicked).map((c) => c.groupId);
   const latestRef = useRef({ tickedIds, choices });

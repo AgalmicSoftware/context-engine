@@ -51,7 +51,7 @@ const probe = (
     const { default: wizardStyles } = await import('/src/components/Sessions/SessionWizard.module.scss');
     const { default: setupStyles } = await import('/src/components/Sessions/setup/SessionSetup.module.scss');
     const Settings = () => {
-      const [draft, setDraft] = React.useState({ interviewModeEnabled: true, interviewMode: { suggestGroups: true } });
+      const [draft, setDraft] = React.useState({ interviewModeEnabled: true, interviewMode: {} });
       const onChange = (keys, value) => setDraft((current) => ({ ...current, [keys[0]]: value }));
       return React.createElement('div', { className: wizardStyles.groupWizard },
         React.createElement('div', { className: setupStyles.page },

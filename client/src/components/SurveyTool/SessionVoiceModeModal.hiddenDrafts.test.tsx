@@ -271,7 +271,7 @@ it('keeps hidden guesses out of group suggestions until they are shown', async (
   jest
     .mocked(useSessionInterviewGroupRecommendations)
     .mockReturnValue({ availability: 'available', recommendations: [] });
-  renderReview({ hiddenDraftShare: share, shareDraftChangesByDefault: true, suggestGroups: true });
+  renderReview({ hiddenDraftShare: share, shareDraftChangesByDefault: true, joinMatchingGroups: true });
   await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
   const sent = () =>
     (jest.mocked(useSessionInterviewGroupRecommendations).mock.calls.at(-1)?.[0].request?.draftResponses || []).map(

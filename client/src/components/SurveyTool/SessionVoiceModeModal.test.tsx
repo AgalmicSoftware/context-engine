@@ -1827,7 +1827,7 @@ describe('SessionVoiceModeModal', () => {
       <SessionVoiceModeModal
         {...baseProps}
         mode="interview"
-        sessionConfig={{ interviewMode: { suggestGroups: true } }}
+        sessionConfig={{ interviewMode: { joinMatchingGroups: true } }}
       />,
     );
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START));
@@ -1860,7 +1860,7 @@ describe('SessionVoiceModeModal', () => {
       <SessionVoiceModeModal
         {...baseProps}
         mode="interview"
-        sessionConfig={{ interviewMode: { suggestGroups: true } }}
+        sessionConfig={{ interviewMode: { joinMatchingGroups: true } }}
         prefillPacket={{
           version: 1,
           sessionSlug: 'demo',
@@ -1893,7 +1893,7 @@ describe('SessionVoiceModeModal', () => {
           { id: 'q2', prompt: 'Which camp?', type: 'freeform' },
           { id: 'q3', prompt: 'Where do you live?', type: 'freeform' },
         ]}
-        sessionConfig={{ interviewMode: { suggestGroups: true } }}
+        sessionConfig={{ interviewMode: { joinMatchingGroups: true } }}
         existingResponseSlice={{ answers: { q3: { value: 'My saved answer' } } }}
         prefillPacket={{
           version: 1,
@@ -1922,9 +1922,10 @@ describe('SessionVoiceModeModal', () => {
   });
 
   it.each([
-    [{ suggestGroups: true }, false],
     [{ joinMatchingGroups: true }, true],
-  ])('with %j, suggests groups and ticks strong matches only when joining them', async (interviewMode, joins) => {
+    [{ suggestGroups: true }, false],
+    [{}, false],
+  ])('with %j, matches groups only when the session joins matching groups', async (interviewMode, joins) => {
     mockedUseSessionInterviewGroupRecommendations.mockReturnValue({ availability: 'loading', recommendations: [] });
     render(
       <SessionVoiceModeModal
@@ -1941,13 +1942,16 @@ describe('SessionVoiceModeModal', () => {
       />,
     );
     await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
-    // The person's own AI's group picks count only when the session joins matching groups.
+    // The retired suggestGroups setting matches nothing on its own.
     expect(mockedUseSessionInterviewGroupRecommendations.mock.calls.at(-1)?.[0]).toEqual(
-      expect.objectContaining({ active: true, usePrefillPicks: joins }),
+      expect.objectContaining({ active: joins }),
     );
-    expect(mockGroupArea.mock.calls.at(-1)?.[0]).toEqual(
-      expect.objectContaining({ preselect: joins, availability: 'loading', joinRequest: 0, hidden: false }),
-    );
+    if (joins)
+      expect(mockGroupArea.mock.calls.at(-1)?.[0]).toEqual(
+        expect.objectContaining({ availability: 'loading', joinRequest: 0, hidden: false }),
+      );
+    else expect(mockGroupArea).not.toHaveBeenCalled();
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY)).toHaveTextContent('Submit responses');
   });
 
   it.each([true, false])(
@@ -1958,7 +1962,7 @@ describe('SessionVoiceModeModal', () => {
           {...baseProps}
           mode="interview"
           loginComplete={loginComplete}
-          sessionConfig={{ interviewMode: { suggestGroups: true } }}
+          sessionConfig={{ interviewMode: { joinMatchingGroups: true } }}
           prefillPacket={{
             version: 1,
             sessionSlug: 'demo',
@@ -2850,8 +2854,8 @@ describe('SessionVoiceModeModal', () => {
   });
 
   it.each([true, false])(
-    'offers group refresh after edits only while suggestions are on (%s)',
-    async (suggestGroups) => {
+    'offers group refresh after edits only while group matching is on (%s)',
+    async (joinMatchingGroups) => {
       mockedUseSessionInterviewGroupRecommendations.mockReturnValue({
         availability: 'available',
         recommendations: [],
@@ -2861,7 +2865,7 @@ describe('SessionVoiceModeModal', () => {
         <SessionVoiceModeModal
           {...baseProps}
           mode="interview"
-          sessionConfig={{ interviewMode: { suggestGroups } }}
+          sessionConfig={{ interviewMode: { joinMatchingGroups } }}
           prefillPacket={{
             version: 1,
             sessionSlug: 'demo',
@@ -2878,7 +2882,7 @@ describe('SessionVoiceModeModal', () => {
       await editReadableDraftText('Draft answer for What matters?', 'Edited answer');
       // An edit clears the suggestions until the person asks for fresh ones.
       expect(screen.queryAllByRole('button', { name: 'Refresh group suggestions' })).toHaveLength(
-        suggestGroups ? 1 : 0,
+        joinMatchingGroups ? 1 : 0,
       );
     },
   );

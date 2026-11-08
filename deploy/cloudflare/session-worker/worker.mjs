@@ -30213,9 +30213,10 @@ var init_interviewSettings = __esm({
         hiddenDraftShare: Number.isFinite(source.hiddenDraftShare) ? Math.max(0, Math.min(MAX_HIDDEN_DRAFT_SHARE, source.hiddenDraftShare)) : 0,
         // After submitting, show the person how well their AI predicted them (private, in the browser).
         showFidelityScore: source.showFidelityScore === true,
-        // After an interview or AI prefill, suggest the session's open groups that fit the answers.
+        // No longer read: group matching follows joinMatchingGroups. Still accepted, so configs that carry it save.
         suggestGroups: source.suggestGroups === true,
-        // Also tick the strong matches, so submitting joins them; the person can untick any first.
+        // After an interview or AI prefill, match the person to open groups; strong matches start
+        // ticked and join when they submit. Off, nothing is matched.
         joinMatchingGroups: source.joinMatchingGroups === true,
         // Add "How well AIs predicted people" to Results, scoring everyone's AI-prefill drafts together.
         showFidelityResults: source.showFidelityResults === true,

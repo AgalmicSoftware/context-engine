@@ -122,12 +122,11 @@ describe('useSessionInterviewGroupRecommendations', () => {
   };
   const choseNewGroup = { groupId: 'new-group', reason: 'You chose “new group”.', evidence: '', confidence: 1 };
 
-  it.each([true, false])('counts the person’s own AI’s group picks only when told to (%s)', async (usePrefillPicks) => {
+  it('counts the groups the person’s own AI picked, after name matches and before the session’s AI', async () => {
     jest.mocked(recommendInterviewGroups).mockResolvedValue(readyResult([]));
     // One props object, as the panel passes a request that changes only when its drafts do.
     const props: HookProps = {
       ...pickedNewGroup,
-      usePrefillPicks,
       request: {
         ...pickedNewGroup.request!,
         prefillPacket: {
@@ -145,9 +144,9 @@ describe('useSessionInterviewGroupRecommendations', () => {
     const { result } = renderHook(() => useSessionInterviewGroupRecommendations(props));
     await waitFor(() => expect(result.current.availability).toBe('available'));
     const picked = { groupId: 'old-group', reason: 'Your AI: Works on AI policy', evidence: '', confidence: 0.9 };
-    expect(result.current.recommendations).toEqual(usePrefillPicks ? [choseNewGroup, picked] : [choseNewGroup]);
+    expect(result.current.recommendations).toEqual([choseNewGroup, picked]);
     // The session's AI is asked only about groups nothing else matched; here, none are left.
-    expect(recommendInterviewGroups).toHaveBeenCalledTimes(usePrefillPicks ? 0 : 1);
+    expect(recommendInterviewGroups).not.toHaveBeenCalled();
   });
 
   it('shows the matches that need no AI call while the session’s AI is still at work', async () => {

@@ -73,7 +73,6 @@ type Props = Partial<React.ComponentProps<typeof SessionInterviewRecommendedGrou
 const element = (props: Props = {}) => (
   <SessionInterviewRecommendedGroups
     recommendations={[recommendation()]}
-    preselect
     account=""
     loginComplete={false}
     sessionConfig={{ slug: 'demo', sessionId }}
@@ -83,6 +82,8 @@ const element = (props: Props = {}) => (
   />
 );
 const signedIn = { account, loginComplete: true };
+// A weak match starts unticked.
+const weak = [recommendation({ confidence: 0.5 })];
 
 const box = (name: RegExp | string) => screen.getByRole<HTMLInputElement>('checkbox', { name });
 const pendingLink = (groupId = 'salon', sessionSlug = 'demo') =>
@@ -116,41 +117,37 @@ describe('SessionInterviewRecommendedGroups', () => {
     jest.mocked(joinWorkerGroup).mockResolvedValue({ group: group(), memberCount: 1 });
   });
 
-  it.each([true, false])(
-    'ticks strong matches only when the session joins them (%s), and lists only joinable groups',
-    async (preselect) => {
-      jest
-        .mocked(loadPublicWorkerGroups)
-        .mockResolvedValue([
-          group(),
-          group({ groupId: 'maybe', label: 'Maybe' }),
-          group({ groupId: 'restricted', label: 'Restricted', joinMode: 'admin_add' }),
-          group({ groupId: 'expired', label: 'Expired', joinEndsAt: '2020-01-01T00:00:00.000Z' }),
-          group({ groupId: 'unrecommended', label: 'Unrecommended' }),
-        ]);
-      render(
-        element({
-          preselect,
-          recommendations: [
-            recommendation(),
-            recommendation({ groupId: 'maybe', confidence: 0.69 }),
-            recommendation({ groupId: 'restricted' }),
-            recommendation({ groupId: 'expired' }),
-          ],
-        }),
-      );
+  it('ticks strong matches, leaves weaker ones unticked, and lists only joinable groups', async () => {
+    jest
+      .mocked(loadPublicWorkerGroups)
+      .mockResolvedValue([
+        group(),
+        group({ groupId: 'maybe', label: 'Maybe' }),
+        group({ groupId: 'restricted', label: 'Restricted', joinMode: 'admin_add' }),
+        group({ groupId: 'expired', label: 'Expired', joinEndsAt: '2020-01-01T00:00:00.000Z' }),
+        group({ groupId: 'unrecommended', label: 'Unrecommended' }),
+      ]);
+    render(
+      element({
+        recommendations: [
+          recommendation(),
+          recommendation({ groupId: 'maybe', confidence: 0.69 }),
+          recommendation({ groupId: 'restricted' }),
+          recommendation({ groupId: 'expired' }),
+        ],
+      }),
+    );
 
-      expect(await screen.findByRole('heading', { name: 'Groups (2)' })).toBeInTheDocument();
-      expect(box(/AI Optimists/).checked).toBe(preselect);
-      expect(box(/Maybe/).checked).toBe(false);
-      expect(
-        within(box(/AI Optimists/).closest('label')!).getByText('Evidence: I support open AI development.'),
-      ).toBeInTheDocument();
-      for (const hidden of ['Restricted', 'Expired', 'Unrecommended']) expect(screen.queryByText(hidden)).toBeNull();
-      expect(getWorkerSessionToken).not.toHaveBeenCalled();
-      expect(joinWorkerGroup).not.toHaveBeenCalled();
-    },
-  );
+    expect(await screen.findByRole('heading', { name: 'Groups (2)' })).toBeInTheDocument();
+    expect(box(/AI Optimists/)).toBeChecked();
+    expect(box(/Maybe/)).not.toBeChecked();
+    expect(
+      within(box(/AI Optimists/).closest('label')!).getByText('Evidence: I support open AI development.'),
+    ).toBeInTheDocument();
+    for (const hidden of ['Restricted', 'Expired', 'Unrecommended']) expect(screen.queryByText(hidden)).toBeNull();
+    expect(getWorkerSessionToken).not.toHaveBeenCalled();
+    expect(joinWorkerGroup).not.toHaveBeenCalled();
+  });
 
   it('keeps suggestion order, so a group named like a chosen answer stays first, and shows every match', async () => {
     const many = Array.from({ length: 6 }, (_, index) => group({ groupId: `g${index}`, label: `Group ${index}` }));
@@ -171,7 +168,7 @@ describe('SessionInterviewRecommendedGroups', () => {
 
   it('tells the page whether any group is ticked, and that none is once it goes', async () => {
     const onTickedChange = jest.fn();
-    const view = render(element({ preselect: false, onTickedChange }));
+    const view = render(element({ recommendations: weak, onTickedChange }));
     fireEvent.click(await screen.findByRole('checkbox', { name: /AI Optimists/ }));
     expect(onTickedChange).toHaveBeenLastCalledWith(true);
     fireEvent.click(box(/AI Optimists/));
@@ -185,7 +182,7 @@ describe('SessionInterviewRecommendedGroups', () => {
     pendingLink();
     jest.mocked(loadPublicWorkerGroups).mockResolvedValue([group(), group({ groupId: 'salon', label: 'Salon' })]);
     const onTickedChange = jest.fn();
-    const { container } = render(element({ preselect: false, onTickedChange }));
+    const { container } = render(element({ recommendations: weak, onTickedChange }));
 
     expect(await screen.findByRole('heading', { name: 'Groups (2)' })).toBeInTheDocument();
     // A signed-out person sees the groups through their link.
@@ -316,9 +313,9 @@ describe('SessionInterviewRecommendedGroups', () => {
     const groups = [group(), group({ groupId: 'salon', label: 'Salon' })];
     jest.mocked(loadPublicWorkerGroups).mockResolvedValue(groups);
     jest.mocked(loadWorkerGroupOverview).mockResolvedValue(overview(groups));
-    const view = render(element({ preselect: false }));
+    const view = render(element({ recommendations: weak }));
     await screen.findByRole('heading', { name: 'Groups (2)' });
-    view.rerender(element({ ...signedIn, preselect: false, joinRequest: 1 }));
+    view.rerender(element({ ...signedIn, recommendations: weak, joinRequest: 1 }));
     expect(await screen.findByText('Joined Salon.')).toBeInTheDocument();
     expect(jest.mocked(joinWorkerGroup).mock.calls.map(([args]) => args.groupId)).toEqual(['salon']);
     expect(readPendingAutoJoin()).toBeNull();

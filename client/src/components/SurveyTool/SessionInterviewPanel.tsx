@@ -244,9 +244,8 @@ export default function SessionInterviewPanel({
   );
   const panelRef = useRef<HTMLDivElement | null>(null);
   const showFidelityScore = normalizeInterviewSettings(sessionConfig?.interviewMode).showFidelityScore;
-  // Groups that fit the answers, joined if ticked at submit; joinMatchingGroups also ticks strong ones.
-  const { suggestGroups: suggestOnly, joinMatchingGroups } = normalizeInterviewSettings(sessionConfig?.interviewMode);
-  const suggestGroups = suggestOnly || joinMatchingGroups;
+  // Off by default. On, the AI matches the person to groups; strong matches are ticked and join on submit.
+  const { joinMatchingGroups } = normalizeInterviewSettings(sessionConfig?.interviewMode);
   const [showViewResults, setShowViewResults] = useState(false);
   const [hasRefreshableGroups, setHasRefreshableGroups] = useState(false);
   const [groupJoinRequest, setGroupJoinRequest] = useState(0);
@@ -481,13 +480,12 @@ export default function SessionInterviewPanel({
     sessionSlug,
   });
   const generatedGroupRecommendationState = useSessionInterviewGroupRecommendations({
-    active: suggestGroups && !isInterviewBusy && !mapping,
+    active: joinMatchingGroups && !isInterviewBusy && !mapping,
     request: groupRecommendationRequest,
     questions,
     sessionConfig,
     sessionSlug,
     workerUrl: resolvedWorkerUrl,
-    usePrefillPicks: joinMatchingGroups,
     account: authenticatedForSubmit ? String(account) : '',
   });
   const generatedGroupRecommendations = generatedGroupRecommendationState.recommendations;
@@ -1390,11 +1388,10 @@ export default function SessionInterviewPanel({
               })}
             </SessionInterviewReviewSection>
           ) : null}
-          {suggestGroups && drafts.length ? (
+          {joinMatchingGroups && drafts.length ? (
             <SessionInterviewRecommendedGroups
               hidden={isInterviewBusy || mapping}
               recommendations={generatedGroupRecommendations}
-              preselect={joinMatchingGroups}
               availability={generatedGroupRecommendationState.availability}
               joinRequest={groupJoinRequest}
               onTickedChange={setGroupsTicked}
