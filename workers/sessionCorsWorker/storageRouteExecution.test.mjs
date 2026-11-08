@@ -4354,7 +4354,7 @@ test('storageRoute /storage/export-envelopes omits session key material', async 
 	});
 	assert.equal(deniedResponse.status, 403);
 	assert.deepEqual(await readJson(deniedResponse), {
-		error: 'Encrypted-envelope export requires session export admin authorization.',
+		error: 'Encrypted-envelope export requires a session admin.',
 	});
 
 	const response = await storageRoute({
@@ -4399,7 +4399,7 @@ test('storageRoute /storage/export-envelopes omits session key material', async 
 	assert.equal(postBody.payloads.length, 1);
 });
 
-test('storageRoute /storage/export-envelopes takes an admin or a listed address, not a token claim', async () => {
+test('storageRoute /storage/export-envelopes takes a session admin, not a token claim or an export list', async () => {
 	const env = {
 		CE_STORAGE_INDEX_KV: createMockKv(),
 		CE_STORAGE_ENVELOPE_KEK: 'test deployment envelope kek',
@@ -4422,14 +4422,16 @@ test('storageRoute /storage/export-envelopes takes an admin or a listed address,
 	for (const claim of ['responseExport', 'response_export', 'encryptedEnvelopeExport']) {
 		assert.equal((await exportAs({ storage: true, [claim]: true })).status, 403, claim);
 	}
-	assert.equal((await exportAs({ admin: true })).status, 200);
+	// Nothing in Context Engine writes these session config lists.
 	for (const list of [
 		{ responseExportAllowedAddresses: outsider },
 		{ export: { allowedAddresses: [outsider] } },
 		{ export: { adminAddresses: [outsider] } },
 	]) {
-		assert.equal((await exportAs({ storage: true }, { ...config, ...list })).status, 200, JSON.stringify(list));
+		assert.equal((await exportAs({ storage: true }, { ...config, ...list })).status, 403, JSON.stringify(list));
 	}
+	assert.equal((await exportAs({ admin: true })).status, 200);
+	assert.equal((await exportAs({ storage: true }, { ...config, adminAddresses: [outsider] })).status, 200);
 });
 
 test('exportCloudflareEncryptedPayloadEnvelopes counts encrypted rows when payload bytes are missing', async () => {

@@ -52,6 +52,7 @@ test('question selection, queue planning, voting and auxiliary groups retain the
   for (const path of ['/api/agent/tags', '/api/agent/questions/next', '/api/agent/onboarding', '/api/agent/groups', '/api/agent/actions', '/api/agent/admin/status']) {
     await jsonOk(await f.request(path, { token }));
   }
+  assert.deepEqual((await jsonOk(await f.request('/api/agent/admin/status', { token }))).capabilities, { canManageSponsoredQuestions: true });
   await jsonOk(await f.request('/api/agent/onboarding', { method: 'POST', token, body: { topicPreferences: ['garden'] } }));
   await jsonOk(await f.request('/api/agent/groups/propose', { method: 'POST', token,
     body: { category: { categoryId: 'role', label: 'Role', options: [{ optionId: 'reader', label: 'Reader' }] }, optionIds: ['reader'] } }));
@@ -67,6 +68,7 @@ test('question selection, queue planning, voting and auxiliary groups retain the
     body: { decisions: [{ questionId: questions[0].questionId, vote: 'up' }], approvalText: 'Approve this vote' } }));
   f.config.adminAddress = '0x2222222222222222222222222222222222222222';
   assert.equal((await f.request('/api/agent/question-queue/plan', { method: 'POST', token, body: {} })).status, 403);
+  assert.equal((await f.request('/api/agent/admin/metrics', { token })).status, 403);
 });
 
 test('group membership saved for an agent reports the agent principal as its source', async () => {

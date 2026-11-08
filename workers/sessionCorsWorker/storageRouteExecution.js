@@ -592,26 +592,11 @@ const resolveRoleAddressSet = ({ config = {}, role }) => {
 
 export const resolveSessionAdminAddresses = (config = {}) => resolveRoleAddressSet({ config, role: 'admin' });
 
-const listDelimitedAddresses = (value) => {
-  if (typeof value === 'string') {
-    return value.split(/[\s,;]+/).map(normalizeAddress).filter(Boolean);
-  }
-  return listRoleAddresses(value);
-};
-
-const resolveEnvelopeExportAddressSet = (config = {}) => {
-  const addresses = new Set(resolveRoleAddressSet({ config, role: 'admin' }));
-  listDelimitedAddresses(config.responseExportAllowedAddresses).forEach((address) => addresses.add(address));
-  listDelimitedAddresses(config.export?.allowedAddresses).forEach((address) => addresses.add(address));
-  listDelimitedAddresses(config.export?.adminAddresses).forEach((address) => addresses.add(address));
-  return addresses;
-};
-
 const isEnvelopeExportAuthorized = ({ config, requesterAddress, authScopes }) => {
   if (isObj(authScopes) && authScopes.admin === true) return true;
   const address = normalizeAddress(requesterAddress);
   if (!address) return false;
-  return resolveEnvelopeExportAddressSet(config).has(address);
+  return resolveSessionAdminAddresses(config).has(address);
 };
 
 const evaluateWorkerRoleCondition = ({ condition, config, requesterAddress }) => {
@@ -2681,7 +2666,7 @@ export const storageRoute = async ({ path, method, request, env, config, slug, u
   }
   if (path === '/storage/export-envelopes' && (method === 'GET' || method === 'POST')) {
     if (!isEnvelopeExportAuthorized({ config, requesterAddress: uploaderAddress, authScopes })) {
-      return responseJson(deps, { error: 'Encrypted-envelope export requires session export admin authorization.' }, 403, baseHeaders);
+      return responseJson(deps, { error: 'Encrypted-envelope export requires a session admin.' }, 403, baseHeaders);
     }
     const url = new URL(request.url);
     let resource = trim(url.searchParams.get('resource'));

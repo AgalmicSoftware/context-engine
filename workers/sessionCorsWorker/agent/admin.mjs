@@ -6,7 +6,6 @@ import { archiveAgentProposedQuestion, deleteAgentProposedQuestion } from './age
 import { assertNoSecretShape } from './redaction.mjs';
 import { DRAFT_EDIT_METRIC_KV_PREFIX } from './agentDraftEditMetrics.mjs';
 import { listCurrentAgentSession } from './registrySessions.mjs';
-import { canManageResponseExportAllowlist } from './agentResponseAccess.mjs';
 import { AGENT_CREDENTIAL_KV_PREFIX } from './agentCredentials.mjs';
 import { buildAgentOnlyMetrics, exportAgentOnlyData, loadAgentOnlyModeConfig, saveAgentOnlyModeConfig } from './agentOnlyMode.mjs';
 import { SUBMIT_REQUEST_KV_PREFIX, SUBMIT_REQUEST_SESSION_KV_PREFIX, SUBMIT_REQUEST_USER_KV_PREFIX, SUBMIT_REQUEST_TTL_SECONDS, SUBMITTED_RESULT_STATUSES, submitRequestSessionKvPrefix } from './agentSubmitQueue.mjs';
@@ -310,13 +309,8 @@ export async function buildAdminMetricsSnapshot({
   };
 }
 
-export async function handleAdminMetricsRequest({ env = {}, context = {}, input = {} } = {}) {
-  const manager = await canManageResponseExportAllowlist({
-    env,
-    normalized: context.storageContext,
-    session: context.session,
-    createdAt: input.createdAt || null,
-  });
+export async function handleAdminMetricsRequest({ env = {}, context = {} } = {}) {
+  const manager = await env.AGENT_SERVICES.admin();
   if (!manager.ok) {
     return json(
       {

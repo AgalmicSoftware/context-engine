@@ -70808,7 +70808,7 @@ var init_storageScanBudget = __esm({
 });
 
 // workers/sessionCorsWorker/storageRouteExecution.js
-var encoder7, decoder5, RESOLVE_STORAGE_GATE_RUNTIME_CONFIG, STORAGE_GROUP_MEMBERSHIP_CACHE, STORAGE_RPC_CHAIN_ATTESTATION_CACHE, trim13, isObj16, isJsonContentType, MEDIA_TYPE_RE, INLINE_MEDIA_TYPE_RE, resolveStorageReadContentType, getStorageR2Binding, DEFAULT_STORAGE_LIST_PAGE_SIZE, MAX_STORAGE_LIST_PAGE_SIZE, DEFAULT_RESOURCE_GATES, isStorageResource, buildCloudflareStorageId, buildObjectKey, buildIndexKey, buildIndexPrefix, buildSessionIndexPrefix, buildPayloadKey, safeGroupId, normalizeGroupIdList, readKvPayloadEnvelope, normalizeTagsForMetadata, normalizeAccessConditionDocument, invalidUploadPolicy, readUploadGroupIds, readUploadAccessConditions, normalizeUploadPolicy, readUploadPolicyFields, readJsonPayload, readMultipartPayload, readStorageUploadRequestPayload, readConfiguredStorageBackendCandidate, resolveConfiguredStorageBackend, resolvePayloadAccessControl, resolveStorageResourceGateKey, normalizeGateMode2, normalizeDirectGate, readStorageGate, normalizeAddress, listRoleAddresses, resolveRoleAddressSet2, resolveSessionAdminAddresses, listDelimitedAddresses, resolveEnvelopeExportAddressSet, isEnvelopeExportAuthorized, evaluateWorkerRoleCondition, evaluateAgentGrantScopeCondition, evaluateSbtOnchainCondition, checkWorkerGroupMembership, evaluateWorkerGroupCondition, evaluateAccessCondition, resolvePayloadAccessConditions, evaluateAccessConditionDocument, resolveGroupGateIds, authorizeWorkerGroupAccess, resolveBareRoleGateCondition, authorizeWorkerRoleAccess, hasPrivateResponsePolicy, canReadPrivateResponse, authorizeCloudflareStorageAccess, authorizeCloudflareStorageGate, authorizeCloudflareStorageResourceRead, enforceCloudflareUploadPolicy, responseJson, attachStorageGateRuntimeRpc, resolveStorageGateRuntimeConfig, createStorageRouteGateDeps, parseArweaveUploadResponse, handleArweaveStorageUpload, publishCloudflareOwnedStorageMetadata, handleCloudflareUpload, readRequestId, normalizeStorageListLimit, readStorageListOptions, handleCloudflareRead, handleCloudflareList, listCloudflareMetadataRows, readStoredCloudflarePayloadBytes, readStoredPayloadJson, readIndexRowResourceId, readLegacyRowResourceId, scanLegacyStorageOwnerIds, LEGACY_OWNER, resolveLegacyStorageOwner, VISIBILITY_SCAN_PAGE_ROWS, readVisibilityMetadataPages, setCloudflareStorageResourceHidden, resolveEnvelopeExportKeyProvider, resolveEnvelopeExportManifestKeyProvider, exportCloudflareEncryptedPayloadEnvelopes, listContextSourceRows, readContextSourceRow, readContextSourceBytes, removeCloudflareStorageRecords, storageRoute;
+var encoder7, decoder5, RESOLVE_STORAGE_GATE_RUNTIME_CONFIG, STORAGE_GROUP_MEMBERSHIP_CACHE, STORAGE_RPC_CHAIN_ATTESTATION_CACHE, trim13, isObj16, isJsonContentType, MEDIA_TYPE_RE, INLINE_MEDIA_TYPE_RE, resolveStorageReadContentType, getStorageR2Binding, DEFAULT_STORAGE_LIST_PAGE_SIZE, MAX_STORAGE_LIST_PAGE_SIZE, DEFAULT_RESOURCE_GATES, isStorageResource, buildCloudflareStorageId, buildObjectKey, buildIndexKey, buildIndexPrefix, buildSessionIndexPrefix, buildPayloadKey, safeGroupId, normalizeGroupIdList, readKvPayloadEnvelope, normalizeTagsForMetadata, normalizeAccessConditionDocument, invalidUploadPolicy, readUploadGroupIds, readUploadAccessConditions, normalizeUploadPolicy, readUploadPolicyFields, readJsonPayload, readMultipartPayload, readStorageUploadRequestPayload, readConfiguredStorageBackendCandidate, resolveConfiguredStorageBackend, resolvePayloadAccessControl, resolveStorageResourceGateKey, normalizeGateMode2, normalizeDirectGate, readStorageGate, normalizeAddress, listRoleAddresses, resolveRoleAddressSet2, resolveSessionAdminAddresses, isEnvelopeExportAuthorized, evaluateWorkerRoleCondition, evaluateAgentGrantScopeCondition, evaluateSbtOnchainCondition, checkWorkerGroupMembership, evaluateWorkerGroupCondition, evaluateAccessCondition, resolvePayloadAccessConditions, evaluateAccessConditionDocument, resolveGroupGateIds, authorizeWorkerGroupAccess, resolveBareRoleGateCondition, authorizeWorkerRoleAccess, hasPrivateResponsePolicy, canReadPrivateResponse, authorizeCloudflareStorageAccess, authorizeCloudflareStorageGate, authorizeCloudflareStorageResourceRead, enforceCloudflareUploadPolicy, responseJson, attachStorageGateRuntimeRpc, resolveStorageGateRuntimeConfig, createStorageRouteGateDeps, parseArweaveUploadResponse, handleArweaveStorageUpload, publishCloudflareOwnedStorageMetadata, handleCloudflareUpload, readRequestId, normalizeStorageListLimit, readStorageListOptions, handleCloudflareRead, handleCloudflareList, listCloudflareMetadataRows, readStoredCloudflarePayloadBytes, readStoredPayloadJson, readIndexRowResourceId, readLegacyRowResourceId, scanLegacyStorageOwnerIds, LEGACY_OWNER, resolveLegacyStorageOwner, VISIBILITY_SCAN_PAGE_ROWS, readVisibilityMetadataPages, setCloudflareStorageResourceHidden, resolveEnvelopeExportKeyProvider, resolveEnvelopeExportManifestKeyProvider, exportCloudflareEncryptedPayloadEnvelopes, listContextSourceRows, readContextSourceRow, readContextSourceBytes, removeCloudflareStorageRecords, storageRoute;
 var init_storageRouteExecution = __esm({
   "workers/sessionCorsWorker/storageRouteExecution.js"() {
     init_sessionContextSources();
@@ -71293,24 +71293,11 @@ var init_storageRouteExecution = __esm({
       return addresses;
     };
     resolveSessionAdminAddresses = (config = {}) => resolveRoleAddressSet2({ config, role: "admin" });
-    listDelimitedAddresses = (value) => {
-      if (typeof value === "string") {
-        return value.split(/[\s,;]+/).map(normalizeAddress).filter(Boolean);
-      }
-      return listRoleAddresses(value);
-    };
-    resolveEnvelopeExportAddressSet = (config = {}) => {
-      const addresses = new Set(resolveRoleAddressSet2({ config, role: "admin" }));
-      listDelimitedAddresses(config.responseExportAllowedAddresses).forEach((address2) => addresses.add(address2));
-      listDelimitedAddresses(config.export?.allowedAddresses).forEach((address2) => addresses.add(address2));
-      listDelimitedAddresses(config.export?.adminAddresses).forEach((address2) => addresses.add(address2));
-      return addresses;
-    };
     isEnvelopeExportAuthorized = ({ config, requesterAddress, authScopes }) => {
       if (isObj16(authScopes) && authScopes.admin === true) return true;
       const address2 = normalizeAddress(requesterAddress);
       if (!address2) return false;
-      return resolveEnvelopeExportAddressSet(config).has(address2);
+      return resolveSessionAdminAddresses(config).has(address2);
     };
     evaluateWorkerRoleCondition = ({ condition, config, requesterAddress }) => {
       const role = trim13(condition.role || condition.name || "admin").toLowerCase();
@@ -73328,7 +73315,7 @@ var init_storageRouteExecution = __esm({
       }
       if (path === "/storage/export-envelopes" && (method === "GET" || method === "POST")) {
         if (!isEnvelopeExportAuthorized({ config, requesterAddress: uploaderAddress, authScopes })) {
-          return responseJson(deps, { error: "Encrypted-envelope export requires session export admin authorization." }, 403, baseHeaders);
+          return responseJson(deps, { error: "Encrypted-envelope export requires a session admin." }, 403, baseHeaders);
         }
         const url = new URL(request.url);
         let resource = trim13(url.searchParams.get("resource"));
@@ -96070,7 +96057,7 @@ async function loadAgentAdminStatus({ env, context }) {
     accountAddress: manager.accountAddress,
     admin: manager.ok,
     reason: manager.ok ? "admin_allowed" : "session_admin_required",
-    capabilities: { canManageSponsoredQuestions: manager.ok, canManageResponseExportAllowlist: manager.ok }
+    capabilities: { canManageSponsoredQuestions: manager.ok }
   };
 }
 async function requireQuestionQueueAdmin({ env, context, allowDelegatedAdmin = false }) {
@@ -96613,13 +96600,6 @@ init_agentQuestionProposals();
 init_redaction();
 init_agentDraftEditMetrics();
 init_registrySessions();
-
-// workers/sessionCorsWorker/agent/agentResponseAccess.mjs
-async function canManageResponseExportAllowlist({ env }) {
-  return env.AGENT_SERVICES.admin();
-}
-
-// workers/sessionCorsWorker/agent/admin.mjs
 init_agentCredentials();
 init_agentSubmitQueue();
 async function handleAdminStatusRequest({ env = {}, context = {}, input = {} } = {}) {
@@ -96886,13 +96866,8 @@ async function buildAdminMetricsSnapshot({
     perSession: [...perSession.values()].map(publicSessionMetric).sort((left, right) => left.sessionSlug.localeCompare(right.sessionSlug))
   };
 }
-async function handleAdminMetricsRequest({ env = {}, context = {}, input = {} } = {}) {
-  const manager = await canManageResponseExportAllowlist({
-    env,
-    normalized: context.storageContext,
-    session: context.session,
-    createdAt: input.createdAt || null
-  });
+async function handleAdminMetricsRequest({ env = {}, context = {} } = {}) {
+  const manager = await env.AGENT_SERVICES.admin();
   if (!manager.ok) {
     return json5(
       {
