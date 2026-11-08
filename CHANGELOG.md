@@ -17,6 +17,7 @@ All notable changes to this project will be documented in this file.
 - A compass's legend names its own kinds of point, Position and Participant on a built atlas, and a compass with no one placed on it says so.
 - The Debate Map's tree view asks for a category to draw the **Tree Chart**, as its button is named.
 - Question Results shows a spinner in place of its question and response counts, and each question's count, until they load, instead of 0.
+- The status line under Results, shown while AI Views or an atlas builds, is readable in Civic, where it measured 3.35:1.
 - The Results menu buttons, the Debate Map view switch and legend, a topic's panel and its compass are readable in Civic, Context Engine and Classic 95: some labels were as low as 1:1. `npm run ai:test-theme:atlas` checks them in each theme at phone and desktop widths.
 - The RxC sessions no longer show twelve pre-filled topic circles: Debate Map appears once an atlas is built, on rxc-ra-test too. On a demo session, a built atlas replaces the demo atlas.
 - Session Settings has a **Results admins** list under Results visibility, where an admin adds or removes the addresses that may build atlases. Saving it signs no one out.
