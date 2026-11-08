@@ -181,4 +181,26 @@ describe('PoliticalCompass tooltip hover behavior', () => {
       container.querySelector('[data-testid="ce-political-compass-point-no-comment-point"] circle'),
     ).not.toBeNull();
   });
+
+  it("shows a participant's own avatar and links to their profile", () => {
+    const compass = createCompass();
+    const avatarUrl = 'data:image/png;base64,AAAA';
+    compass.points.push({
+      name: 'Participant Seven',
+      x: 0.5,
+      y: 0.5,
+      color: 'var(--ce-document-text)',
+      type: 'participant',
+      comment: 'Wants care first.',
+      avatarUrl,
+      profileUrl: '/u/participant-seven?session=salon',
+    } as (typeof compass.points)[number]);
+    render(<StandalonePoliticalCompass compass={compass} compact={false} />);
+    expect(screen.getByTestId('ce-political-compass-point-participant-seven-avatar')).toHaveAttribute('src', avatarUrl);
+    fireEvent.click(screen.getByTestId('ce-political-compass-point-participant-seven'));
+    expect(screen.getByRole('link', { name: 'Participant Seven' })).toHaveAttribute(
+      'href',
+      expect.stringContaining('/u/participant-seven?session=salon'),
+    );
+  });
 });

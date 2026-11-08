@@ -1,8 +1,8 @@
 import React, { Suspense } from 'react';
 import CETooltip from '../Shared/CETooltip';
 import SessionTestEthBadge from '../Shared/SessionTestEthBadge';
-import ReverseAlignmentTopicMap, { hasReverseAlignmentTopicPreview } from './ReverseAlignmentTopicMap';
 import { hasReverseAlignmentContext } from './reverseAlignmentTopics';
+import { useSessionDebateAtlas } from '../DebateAtlas/useSessionDebateAtlas';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faArrowLeft,
@@ -44,6 +44,7 @@ const RiskMatrix = React.lazy(() => import('../MainContent/RiskMatrix'));
 const DemoAnalysisWorkspace = React.lazy(() => import('../DemoViews/DemoAnalysis/DemoAnalysisWorkspace'));
 const SessionGeneratedResultsViews = React.lazy(() => import('../SessionResults/SessionGeneratedResultsViews'));
 const ReverseAlignmentAtlas = React.lazy(() => import('./ReverseAlignmentAtlas'));
+const SessionDebateAtlasView = React.lazy(() => import('../DebateAtlas/SessionDebateAtlasView'));
 
 const DebateMapAny = DebateMap as React.ComponentType<Record<string, unknown>>;
 const DEMO_CORPUS_GITHUB_URL = PUBLIC_AI_DISCOURSE_CORPUS_URL;
@@ -180,24 +181,28 @@ const renderSectionHeading = (title: React.ReactNode, subtitle?: React.ReactNode
   </span>
 );
 
+const DEBATE_ATLAS_VIEW_OPTION: ResultsViewOption = { key: 'debateAtlas', label: 'Debate Map', icon: '🗺️' };
+
 const buildResultsViewOptions = (
   isDemoSlug: boolean,
   showDemoAnalysisView: boolean,
   generatedOptions: ResultsViewOption[] = [],
-  showTopicPreview = false,
-): ResultsViewOption[] => [
-  { key: 'polis', label: 'Report', icon: '🧾' },
-  ...(showTopicPreview ? [{ key: 'debateAtlas', label: 'Debate Map', icon: '🗺️' }] : []),
-  ...(generatedOptions.length > 0
-    ? generatedOptions
-    : isDemoSlug
+  showBuiltAtlas = false,
+): ResultsViewOption[] => {
+  const demoOptions =
+    isDemoSlug && generatedOptions.length === 0
       ? [
-          { key: 'debateAtlas', label: 'Debate Map', icon: '🗺️' },
+          DEBATE_ATLAS_VIEW_OPTION,
           ...(showDemoAnalysisView ? [{ key: 'analysis', label: 'Breakdown', icon: '📊' }] : []),
           { key: 'riskMatrix', label: 'Risk Matrix', icon: '⚠️' },
         ]
-      : []),
-];
+      : [];
+  return [
+    { key: 'polis', label: 'Report', icon: '🧾' },
+    ...(showBuiltAtlas && demoOptions.length === 0 ? [DEBATE_ATLAS_VIEW_OPTION] : []),
+    ...(generatedOptions.length > 0 ? generatedOptions : demoOptions),
+  ];
+};
 
 // The shared reader's limits apply here as in MCP and on the Worker.
 const normalizeSessionContextView = (config: unknown): SessionContextView | null => {
@@ -333,7 +338,17 @@ export default function OnePageSessionStandardShell({
   onViewAllQuestionsClick,
 }: OnePageSessionStandardShellProps) {
   const basePath = readPublicUrlBasePath();
-  const showTopicPreview = hasReverseAlignmentTopicPreview(displaySessionSlug);
+  const atlas = useSessionDebateAtlas({
+    account,
+    chainId: networkChainId,
+    enabled: showResults,
+    provider,
+    sessionConfig: resolvedSessionConfig,
+    sessionSlug: effectiveSlug,
+  });
+  const showBuiltAtlas = !!atlas.build;
+  const atlasBusy = atlas.building || atlas.activeSinceMs !== null;
+  const buildAtlasHelpId = `build-atlas-help-${React.useId().replace(/:/g, '')}`;
   const showContextAtlas = hasReverseAlignmentContext(displaySessionSlug);
   const showDemoAnalysisView = isDemoSlug && hasDemoAnalysisFixture(displaySessionSlug);
   const generatedState = (
@@ -362,14 +377,14 @@ export default function OnePageSessionStandardShell({
       ? requestedResultsViewMode === 'analysis' && !showDemoAnalysisView
         ? 'polis'
         : requestedResultsViewMode
-      : requestedResultsViewMode === 'polis' || (showTopicPreview && requestedResultsViewMode === 'debateAtlas')
+      : requestedResultsViewMode === 'polis' || (showBuiltAtlas && requestedResultsViewMode === 'debateAtlas')
         ? requestedResultsViewMode
         : 'polis';
   const resultsViewOptions = buildResultsViewOptions(
     isDemoSlug,
     showDemoAnalysisView,
     generatedViewOptions,
-    showTopicPreview,
+    showBuiltAtlas,
   );
   const generatedStatus = String(generatedState.status || 'idle');
   const generatedIsRunning = generatedState.isRunning === true || generatedStatus === 'running';
@@ -782,6 +797,30 @@ export default function OnePageSessionStandardShell({
                     <FontAwesomeIcon icon={faExpand} />
                     Raw Results
                   </button>
+                  {atlas.canBuild && (
+                    <>
+                      {/* The "?" sits in the pill so it shares the menu's colours in every state. */}
+                      <button
+                        type="button"
+                        id={buildAtlasHelpId}
+                        onClick={async (event: React.MouseEvent<HTMLElement>) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          if (await atlas.buildAtlas()) onResultsModeChange('debateAtlas');
+                        }}
+                        className={styles.sectionHeaderViewModeButton}
+                        disabled={atlasBusy}
+                        data-testid="ce-session-debate-atlas-build"
+                      >
+                        {atlasBusy ? 'Building atlas…' : 'Build atlas'}
+                        <FontAwesomeIcon icon={faQuestionCircle} aria-hidden="true" />
+                      </button>
+                      <CETooltip target={buildAtlasHelpId} placement="bottom" trigger="hover focus" autohide={false}>
+                        Builds a debate atlas from the responses right now, with a political compass for each topic.
+                        Takes a minute or two. Everyone who sees Results sees it, and earlier builds stay to compare.
+                      </CETooltip>
+                    </>
+                  )}
                   {showGeneratedCheckAction && (
                     <button
                       type="button"
@@ -827,8 +866,26 @@ export default function OnePageSessionStandardShell({
                   {String(generatedState.lastFailure)}
                 </div>
               ) : null}
+              {atlas.canBuild && (atlasBusy || atlas.error) ? (
+                <div
+                  className={styles.generatedResultsStatus}
+                  role="status"
+                  data-testid="ce-session-debate-atlas-status"
+                >
+                  {atlasBusy ? 'Building the atlas. This takes a minute or two.' : atlas.error}
+                </div>
+              ) : null}
               <div>
-                {showTopicPreview && effectiveResultsViewMode === 'debateAtlas' && <ReverseAlignmentTopicMap />}
+                {showBuiltAtlas && effectiveResultsViewMode === 'debateAtlas' && atlas.build && (
+                  <Suspense fallback={<LazyFallback label="Loading Debate Atlas..." minHeight="30vh" />}>
+                    <SessionDebateAtlasView
+                      build={atlas.build}
+                      builds={atlas.builds}
+                      onSelectBuild={atlas.selectBuild}
+                      sessionSlug={displaySessionSlug}
+                    />
+                  </Suspense>
+                )}
                 {effectiveResultsViewMode === 'polis' && (
                   <Suspense fallback={<LazyFallback label="Loading..." minHeight="20vh" />}>
                     <PolisReport
@@ -871,7 +928,7 @@ export default function OnePageSessionStandardShell({
                     <DemoAnalysisWorkspace sessionSlug={slug} />
                   </Suspense>
                 )}
-                {isDemoSlug && effectiveResultsViewMode === 'debateAtlas' && (
+                {isDemoSlug && !showBuiltAtlas && effectiveResultsViewMode === 'debateAtlas' && (
                   <Suspense fallback={<LazyFallback label="Loading Debate Atlas..." minHeight="30vh" />}>
                     <div style={{ maxHeight: '80vh', overflowY: 'auto' }}>
                       <DebateMapAny

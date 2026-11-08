@@ -15,6 +15,8 @@ type CompassPoint = {
   comment?: string;
   profileUsername?: string;
   profileUrl?: string;
+  // A participant's own avatar; demo figures find theirs by name.
+  avatarUrl?: string;
 };
 
 type Compass = {
@@ -266,7 +268,9 @@ const PoliticalCompass = ({ compass, compact = true }: PoliticalCompassProps) =>
     const showInlineLabel = point.type === 'debater' || isSelected || (isHovered && !pointComment);
     const size = point.type === 'debater' ? 10 : 7;
     const activeSize = size + 3;
-    const avatarInfo = getDemoAvatarByName(point.name);
+    const avatarInfo = point.avatarUrl
+      ? { url: point.avatarUrl, fallbackSeed: point.name }
+      : getDemoAvatarByName(point.name);
     const avatarRadius = getAvatarBaseRadius(point) + (isActive ? 3 : 0);
 
     return {
@@ -354,14 +358,16 @@ const PoliticalCompass = ({ compass, compact = true }: PoliticalCompassProps) =>
           const sp = compass.points.find((p) => p.name === selectedPoint);
           const pointComment = getPointComment(sp);
           const profileHref = getCompassPointProfileHref(sp);
+          // Text keeps the panel's own colour; a point's colour marks it only as
+          // a border and tint, since a marker colour need not read as text here.
           const selectedPointTitleStyle: React.CSSProperties = {
-            color: (sp && sp.color) || T.accent,
+            color: T.text,
             textDecoration: 'none',
             fontWeight: 700,
             fontSize: 15,
           };
           const selectedPointCitationStyle: React.CSSProperties = {
-            color: (sp && sp.color) || T.accent,
+            color: T.text,
             textDecoration: 'none',
           };
           const qLabel = sp
@@ -407,7 +413,7 @@ const PoliticalCompass = ({ compass, compact = true }: PoliticalCompassProps) =>
                       padding: '2px 8px',
                       borderRadius: 10,
                       background: soften((sp && sp.color) || T.accent, 0.1),
-                      color: (sp && sp.color) || T.accent,
+                      color: T.text,
                       fontWeight: 600,
                     }}
                   >
@@ -421,7 +427,7 @@ const PoliticalCompass = ({ compass, compact = true }: PoliticalCompassProps) =>
                   style={{
                     fontSize: 13,
                     fontStyle: 'italic',
-                    color: T.textLight,
+                    color: T.text,
                     padding: 12,
                     background: soften((sp && sp.color) || T.accent, 0.08),
                     borderRadius: T.radiusSm,
@@ -435,7 +441,7 @@ const PoliticalCompass = ({ compass, compact = true }: PoliticalCompassProps) =>
                       fontSize: 11,
                       fontStyle: 'normal',
                       fontWeight: 700,
-                      color: (sp && sp.color) || T.accent,
+                      color: T.text,
                     }}
                   >
                     {profileHref ? (

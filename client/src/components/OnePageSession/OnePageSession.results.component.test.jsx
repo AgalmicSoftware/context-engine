@@ -30,6 +30,8 @@ let mockRenderRealPolisReport = false;
 const mockSBTsPage = jest.fn();
 const mockDebateMap = jest.fn();
 const mockTopicCircles = jest.fn();
+// The atlas hook has its own tests; here it stands in for a Worker's answer.
+let mockDebateAtlasState = null;
 const mockRiskMatrix = jest.fn();
 const mockDemoAnalysisWorkspace = jest.fn();
 const mockCorpusViewer = jest.fn();
@@ -191,6 +193,21 @@ jest.mock('../DemoViews/DemoAnalysis/DemoAnalysisWorkspace', () => ({
     return <div data-testid="demo-analysis-workspace-view">Demo Analysis</div>;
   },
 }));
+jest.mock('../DebateAtlas/useSessionDebateAtlas', () => ({
+  useSessionDebateAtlas: () =>
+    mockDebateAtlasState || {
+      supported: false,
+      builds: [],
+      build: null,
+      canBuild: false,
+      building: false,
+      loading: false,
+      activeSinceMs: null,
+      error: '',
+      buildAtlas: async () => false,
+      selectBuild: () => {},
+    },
+}));
 jest.mock('../SessionResults/SessionGeneratedResultsViews', () => ({
   __esModule: true,
   default: (props) => (
@@ -262,6 +279,7 @@ jest.mock('../DemoViews/CorpusViewer', () => {
 describe('OnePageSession results routing', () => {
   afterEach(() => {
     mockRenderRealPolisReport = false;
+    mockDebateAtlasState = null;
     jest.useRealTimers();
     jest.clearAllMocks();
     jest.restoreAllMocks();
@@ -1194,10 +1212,7 @@ describe('OnePageSession results routing', () => {
     expect(within(context).queryByRole('link', { name: /Ignored unsafe link/i })).not.toBeInTheDocument();
   });
 
-  it.each([
-    { slug: 'rxc-test', showDebateMap: true },
-    { slug: 'rxc-ra-test', showDebateMap: false },
-  ])('keeps context and the available results views for $slug', async ({ slug, showDebateMap }) => {
+  it.each(['rxc-test', 'rxc-ra-test'])('keeps context and shows no pre-filled Debate Map for %s', async (slug) => {
     const props = buildProps();
     const sessionRef = React.createRef();
     render(
@@ -1219,7 +1234,6 @@ describe('OnePageSession results routing', () => {
       </MemoryRouter>,
     );
     expect(await screen.findByTestId('survey-page-pile')).toBeInTheDocument();
-    expect(screen.queryByTestId('ce-rxc-topic-map')).not.toBeInTheDocument();
     expect(screen.queryByTestId('ce-rxc-context-atlas')).not.toBeInTheDocument();
     fireEvent.click(screen.getByTestId('ce-demo-documents-toggle'));
     const atlas = await screen.findByTestId('ce-rxc-context-atlas');
@@ -1233,36 +1247,142 @@ describe('OnePageSession results routing', () => {
     expect(atlas).toContainElement(screen.getByTestId('ce-session-context'));
     expect(screen.getAllByTestId('ce-session-context')).toHaveLength(1);
     expect(within(atlas).getByRole('group', { name: 'Explore topic groups' })).toBeVisible();
-    expect(screen.queryByTestId('ce-rxc-topic-map')).not.toBeInTheDocument();
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
-    if (!showDebateMap) {
-      act(() => sessionRef.current.setState({ resultsViewMode: 'debateAtlas' }));
-    }
+    act(() => sessionRef.current.setState({ resultsViewMode: 'debateAtlas' }));
     const nav = screen.getByTestId('ce-session-results-view-nav');
     expect(
       within(nav)
         .getAllByRole('button')
         .map((button) => button.textContent.trim()),
-    ).toEqual(showDebateMap ? ['🧾Report', '🗺️Debate Map', 'Raw Results'] : ['🧾Report', 'Raw Results']);
+    ).toEqual(['🧾Report', 'Raw Results']);
     expect(within(nav).getByRole('button', { name: 'Report' })).toHaveAttribute('aria-pressed', 'true');
     expect(await screen.findByTestId('polis-report')).toBeVisible();
-    expect(screen.queryByTestId('ce-rxc-topic-map')).not.toBeInTheDocument();
-    if (showDebateMap) {
-      fireEvent.click(within(nav).getByRole('button', { name: 'Debate Map' }));
-      expect(await screen.findByTestId('topic-circles')).toBeVisible();
-      expect(screen.getByTestId('ce-rxc-topic-map')).toHaveTextContent('Waiting for more data');
-      expect(mockTopicCircles).toHaveBeenLastCalledWith(
-        expect.objectContaining({ atlasLayoutMode: 'packed', readOnly: true }),
-      );
-      expect(screen.queryByTestId('polis-report')).not.toBeInTheDocument();
-      fireEvent.click(within(nav).getByRole('button', { name: 'Report' }));
-      expect(await screen.findByTestId('polis-report')).toBeVisible();
-      expect(screen.queryByTestId('ce-rxc-topic-map')).not.toBeInTheDocument();
-    }
+    expect(screen.queryByTestId('topic-circles')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('ce-session-debate-atlas')).not.toBeInTheDocument();
     fireEvent.click(within(nav).getByRole('button', { name: 'Raw Results' }));
     expect(await screen.findByTestId('survey-page-full')).toBeVisible();
     await waitFor(() => {
       expect(mockSurveyPage).toHaveBeenLastCalledWith(expect.objectContaining({ autoOpenResults: true }));
+    });
+  });
+
+  describe('built debate atlases', () => {
+    const atlasBuild = {
+      id: 'atlas_k1_00000001',
+      builtAt: '2026-11-08T14:05:00.000Z',
+      title: 'Salon atlas',
+      counts: { responses: 12, participants: 4, aiResponses: 12 },
+      missingTopics: [],
+      branches: [
+        {
+          id: 'b1',
+          label: 'Trust',
+          summary: 'About trust.',
+          topics: [
+            {
+              id: 'b1t1',
+              label: 'Identity',
+              summary: 'They split.',
+              compass: {
+                x: { label: 'Pace', left: 'Slow', right: 'Fast' },
+                y: { label: 'Scope', top: 'Local', bottom: 'Global' },
+              },
+              positions: [{ label: 'Go slow', participantCount: 2, x: 0.2, y: 0.8 }],
+              participants: [],
+            },
+          ],
+        },
+      ],
+    };
+    const atlasState = (overrides = {}) => ({
+      supported: true,
+      builds: [atlasBuild],
+      build: atlasBuild,
+      canBuild: false,
+      building: false,
+      loading: false,
+      activeSinceMs: null,
+      error: '',
+      buildAtlas: jest.fn(async () => true),
+      selectBuild: jest.fn(),
+      ...overrides,
+    });
+    const renderSession = (slug, sessionRef) => {
+      const props = buildProps();
+      render(
+        <MemoryRouter initialEntries={[`/session/${slug}`]}>
+          <OnePageSession {...props} ref={sessionRef} slug={slug} sessionConfig={{ ...props.sessionConfig, slug }} />
+        </MemoryRouter>,
+      );
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
+    };
+
+    it.each(['rxc-test', 'rxc-ra-test', 'edge'])('shows the built atlas as Debate Map on %s', async (slug) => {
+      mockDebateAtlasState = atlasState();
+      renderSession(slug);
+      const nav = screen.getByTestId('ce-session-results-view-nav');
+      expect(
+        within(nav)
+          .getAllByRole('button')
+          .map((button) => button.textContent.trim()),
+      ).toEqual(['🧾Report', '🗺️Debate Map', 'Raw Results']);
+      fireEvent.click(within(nav).getByRole('button', { name: 'Debate Map' }));
+      const view = await screen.findByTestId('ce-session-debate-atlas');
+      expect(within(view).getByRole('heading', { name: 'Salon atlas' })).toBeVisible();
+      expect(view).toHaveTextContent('12 responses · 4 participants');
+      expect(mockDebateMap).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          readOnly: true,
+          hideDemoModeToggle: true,
+          treeData: [expect.objectContaining({ name: 'Trust' })],
+        }),
+      );
+      expect(screen.queryByTestId('polis-report')).not.toBeInTheDocument();
+    });
+
+    it('shows a built atlas in place of the demo atlas on a demo session', async () => {
+      mockDebateAtlasState = atlasState();
+      renderSession('demo');
+      fireEvent.click(await screen.findByRole('button', { name: /^Debate Map$/i }));
+      await screen.findByTestId('ce-session-debate-atlas');
+      expect(mockDebateMap).toHaveBeenCalled();
+      expect(
+        mockDebateMap.mock.calls.every(([props]) => Array.isArray(props.treeData) && props.demoMode !== true),
+      ).toBe(true);
+    });
+
+    it('offers Build atlas to those who may build and opens Debate Map when it finishes', async () => {
+      const buildAtlas = jest.fn(async () => true);
+      mockDebateAtlasState = atlasState({ builds: [], build: null, canBuild: true, buildAtlas });
+      const sessionRef = React.createRef();
+      renderSession('edge', sessionRef);
+      const button = screen.getByRole('button', { name: 'Build atlas' });
+      expect(button).toBe(screen.getByTestId('ce-session-debate-atlas-build'));
+      expect(button.querySelector('svg[aria-hidden="true"]')).not.toBeNull();
+      fireEvent.click(button);
+      await waitFor(() => expect(sessionRef.current.state.resultsViewMode).toBe('debateAtlas'));
+      expect(buildAtlas).toHaveBeenCalledTimes(1);
+    });
+
+    it.each([
+      [{ canBuild: false }, null, null],
+      [{ canBuild: true, building: true }, 'Building atlas…', 'Building the atlas. This takes a minute or two.'],
+      [{ canBuild: true, activeSinceMs: 1 }, 'Building atlas…', 'Building the atlas. This takes a minute or two.'],
+      [{ canBuild: true, error: 'Needs at least 2 participants.' }, 'Build atlas', 'Needs at least 2 participants.'],
+    ])('with %j shows button %s and status %s', (state, buttonText, statusText) => {
+      mockDebateAtlasState = atlasState(state);
+      renderSession('edge');
+      const button = screen.queryByTestId('ce-session-debate-atlas-build');
+      const status = screen.queryByTestId('ce-session-debate-atlas-status');
+      if (!buttonText) {
+        expect(button).not.toBeInTheDocument();
+        expect(status).not.toBeInTheDocument();
+        return;
+      }
+      expect(button).toHaveTextContent(buttonText);
+      if (buttonText === 'Build atlas') expect(button).toBeEnabled();
+      else expect(button).toBeDisabled();
+      expect(status).toHaveTextContent(statusText);
     });
   });
 
