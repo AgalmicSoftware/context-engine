@@ -168,6 +168,42 @@ test('generated and stored artifacts enforce current group thresholds and disabl
   assert.equal(Object.values(hidden.artifact.sections).every((section) => section.available === false), true);
 });
 
+test('maps each synthetic participant to the address that answered, and keeps addresses out of the AI input', async () => {
+  const addressOf = (digit) => `0x${String(digit).repeat(40)}`;
+  const mixedCase = `0x${'AB'.repeat(20)}`;
+  const source = await loadAdminSnapshotResultsAnalysisSource({
+    body: {
+      source: {
+        kind: 'admin-snapshot',
+        snapshot: {
+          sessionSlug: 'session-a',
+          sessionId,
+          questions: [{ questionId: 'q1', prompt: 'Choose?', type: 'freeform' }, { questionId: 'q2', prompt: 'Why?', type: 'freeform' }],
+          responses: [
+            { questionId: 'q1', participantId: addressOf(3), answer: 'three first', submittedAt: '2026-11-01T00:00:00.000Z' },
+            { questionId: 'q1', participantId: addressOf(3), answer: 'three later', submittedAt: '2026-11-02T00:00:00.000Z' },
+            { questionId: 'q2', participantId: mixedCase, answer: 'mixed case' },
+            { questionId: 'q1', participantId: 'agent:seven', answer: 'not an address' },
+            { questionId: 'q2', participantId: addressOf(4), answer: 'four' },
+          ],
+        },
+      },
+    },
+    slug: 'session-a',
+    config,
+  });
+  assert.equal(source.ok, true);
+  const participantOf = Object.fromEntries(source.aiSnapshot.responses.map((row) => [row.answer, row.participantId]));
+  assert.equal(participantOf['three first'], undefined, 'a superseded answer is left out');
+  assert.equal(source.participantAddresses.get(participantOf['three later']), addressOf(3));
+  assert.equal(source.participantAddresses.get(participantOf['mixed case']), mixedCase.toLowerCase());
+  assert.equal(source.participantAddresses.get(participantOf.four), addressOf(4));
+  assert.equal(source.participantAddresses.has(participantOf['not an address']), false);
+  assert.equal(source.participantAddresses.size, 3);
+  assert.doesNotMatch(JSON.stringify(source.aiSnapshot), /0x[0-9a-f]{40}/i);
+  assert.equal(JSON.stringify({ source: source.participantAddresses }), '{"source":{}}');
+});
+
 test('admin snapshot sanitizes to existing schema, accepts 0/false values, and rejects locked rows', async () => {
   const baseBody = {
     source: {
