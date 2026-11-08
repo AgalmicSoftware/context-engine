@@ -435,7 +435,10 @@ const PoliticalCompass = ({ compass, compact = true }: PoliticalCompassProps) =>
                     lineHeight: 1.6,
                   }}
                 >
-                  <div style={{ marginBottom: 8 }}>&quot;{pointComment}&quot;</div>
+                  {/* A participant's comment is the AI's reading of them, not a quotation. */}
+                  <div style={{ marginBottom: 8 }}>
+                    {sp?.type === 'participant' ? pointComment : <>&quot;{pointComment}&quot;</>}
+                  </div>
                   <div
                     style={{
                       fontSize: 11,

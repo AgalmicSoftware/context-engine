@@ -64,7 +64,8 @@ const compassPoints = (topic: DebateAtlasTopic, sessionSlug: string): Historical
       y: participant.y,
       type: 'participant',
       color: POINT_COLOR,
-      comment: participant.reason || '',
+      // The AI wrote this from their answers; it is never their own words.
+      comment: participant.reason ? `AI reading: ${participant.reason}` : '',
       ...(address
         ? {
             // The same avatar and profile link the Report shows for this address.

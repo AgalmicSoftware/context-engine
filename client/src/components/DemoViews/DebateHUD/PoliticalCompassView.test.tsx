@@ -191,13 +191,16 @@ describe('PoliticalCompass tooltip hover behavior', () => {
       y: 0.5,
       color: 'var(--ce-document-text)',
       type: 'participant',
-      comment: 'Wants care first.',
+      comment: 'AI reading: Wants care first.',
       avatarUrl,
       profileUrl: '/u/participant-seven?session=salon',
     } as (typeof compass.points)[number]);
     render(<StandalonePoliticalCompass compass={compass} compact={false} />);
     expect(screen.getByTestId('ce-political-compass-point-participant-seven-avatar')).toHaveAttribute('src', avatarUrl);
     fireEvent.click(screen.getByTestId('ce-political-compass-point-participant-seven'));
+    // The AI's reading of a participant is not shown as their quotation.
+    expect(screen.getByText('AI reading: Wants care first.')).toBeInTheDocument();
+    expect(screen.queryByText(/"AI reading/)).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Participant Seven' })).toHaveAttribute(
       'href',
       expect.stringContaining('/u/participant-seven?session=salon'),

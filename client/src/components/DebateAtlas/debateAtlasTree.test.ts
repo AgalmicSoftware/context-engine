@@ -73,7 +73,7 @@ it('places positions and participants on the topic compass, each under its own n
   ]);
   expect(points[0].comment).toBe('Care first. Held by 2 participants.');
   expect(points[2]).toMatchObject({
-    comment: 'Wants care.',
+    comment: 'AI reading: Wants care.',
     profileUrl: `/u/${address}?session=salon`,
     avatarUrl: expect.stringMatching(/^data:image\//),
   });
