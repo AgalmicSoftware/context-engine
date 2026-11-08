@@ -1,7 +1,7 @@
 import { postSignedAdminWorkerRequest } from '../../utilities/worker/signedAdminWorkerRequest';
 import { normalizeWorkerUrl } from '../../utilities/worker/workerUrl';
 import { getCachedWorkerAuthHeaders } from '../sessionResults/sessionResultsAnalysisWorkerClient';
-import type { DebateAtlasBuild, DebateAtlasBuildSummary } from './debateAtlasTree';
+import type { DebateAtlasBuild, DebateAtlasBuildSummary } from './debateAtlasTypes';
 
 export const DEBATE_ATLAS_BUILD_ACTION = 'debate-atlas/build';
 

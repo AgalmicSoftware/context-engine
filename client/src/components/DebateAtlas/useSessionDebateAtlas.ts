@@ -3,7 +3,7 @@ import { DEBATE_ATLAS_FIELD } from '@ce-shared/workerSessionPublicConfig.mjs';
 
 import { adminWorkerPorts } from '../../domains/worker/adminWorkerPorts';
 import { readDebateAtlas, requestDebateAtlasBuild } from '../../domains/debateAtlas/debateAtlasWorkerClient';
-import type { DebateAtlasBuild, DebateAtlasBuildSummary } from '../../domains/debateAtlas/debateAtlasTree';
+import type { DebateAtlasBuild, DebateAtlasBuildSummary } from '../../domains/debateAtlas/debateAtlasTypes';
 import { isConfiguredAdmin } from '../../utilities/storage/storageClient';
 import { getUsableSessionWorkerUrl } from '../../utilities/session/sessionWorkerAvailability';
 import { resolveWorkerCanonicalSessionIdHex } from '../../utilities/session/sessionWorkerDiscovery';

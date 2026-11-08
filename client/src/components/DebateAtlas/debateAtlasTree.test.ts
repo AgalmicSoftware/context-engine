@@ -1,4 +1,5 @@
-import { buildDebateAtlasTree, describeDebateAtlasBuild, type DebateAtlasBuild } from './debateAtlasTree';
+import { buildDebateAtlasTree, describeDebateAtlasBuild } from './debateAtlasTree';
+import type { DebateAtlasBuild } from '../../domains/debateAtlas/debateAtlasTypes';
 
 const address = `0x${'ab'.repeat(20)}`;
 const compass = {

@@ -1,41 +1,14 @@
 import { generateBlockieDataUrl } from '../../utilities/ui/blockieAvatars.js';
-import type { DebateNode, HistoricalCompassPoint } from '../../components/DebateMap/debateMapTypes';
+import type { DebateNode, HistoricalCompassPoint } from '../DebateMap/debateMapTypes';
+import type {
+  DebateAtlasBuild,
+  DebateAtlasBuildSummary,
+  DebateAtlasPosition,
+  DebateAtlasTopic,
+} from '../../domains/debateAtlas/debateAtlasTypes';
 
-// A build as the Session Worker stores it (workers/sessionCorsWorker/debateAtlasBuild.js).
-export type DebateAtlasPosition = { label: string; summary?: string; participantCount: number; x?: number; y?: number };
-export type DebateAtlasPlacedParticipant = { address?: string; label?: string; x: number; y: number; reason?: string };
-export type DebateAtlasTopic = {
-  id: string;
-  label: string;
-  summary?: string;
-  questions?: Array<{ id: string; prompt: string; type?: string }>;
-  compass?: {
-    x: { label: string; left: string; right: string };
-    y: { label: string; top: string; bottom: string };
-  } | null;
-  positions?: DebateAtlasPosition[];
-  participants?: DebateAtlasPlacedParticipant[];
-};
-export type DebateAtlasBranch = { id: string; label: string; summary?: string; topics: DebateAtlasTopic[] };
-export type DebateAtlasBuildSummary = {
-  id: string;
-  builtAt: string;
-  builtBy?: string;
-  model?: string;
-  title?: string;
-  counts?: {
-    responses?: number;
-    participants?: number;
-    questions?: number;
-    aiResponses?: number;
-    aiQuestions?: number;
-  };
-  missingTopics?: string[];
-};
-export type DebateAtlasBuild = DebateAtlasBuildSummary & { branches: DebateAtlasBranch[] };
-
-// Points take the document's text colour, which every theme keeps readable
-// when the compass also writes a selected point's name in it.
+// Markers take the document's text colour, which every theme keeps readable on
+// the compass's document surface.
 const POINT_COLOR = 'var(--ce-document-text)';
 
 export const shortenAddress = (address: string): string => `${address.slice(0, 6)}…${address.slice(-4)}`;

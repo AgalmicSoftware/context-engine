@@ -4,12 +4,8 @@ import { faQuestionCircle } from '@fortawesome/free-solid-svg-icons';
 
 import DebateMap from '../DebateMap/DebateMap';
 import CETooltip from '../Shared/CETooltip';
-import {
-  buildDebateAtlasTree,
-  describeDebateAtlasBuild,
-  type DebateAtlasBuild,
-  type DebateAtlasBuildSummary,
-} from '../../domains/debateAtlas/debateAtlasTree';
+import { buildDebateAtlasTree, describeDebateAtlasBuild } from './debateAtlasTree';
+import type { DebateAtlasBuild, DebateAtlasBuildSummary } from '../../domains/debateAtlas/debateAtlasTypes';
 import styles from './SessionDebateAtlasView.module.scss';
 
 type Props = {

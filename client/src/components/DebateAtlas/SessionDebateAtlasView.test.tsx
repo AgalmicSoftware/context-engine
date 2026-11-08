@@ -2,7 +2,7 @@ import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 
 import SessionDebateAtlasView from './SessionDebateAtlasView';
-import type { DebateAtlasBuild } from '../../domains/debateAtlas/debateAtlasTree';
+import type { DebateAtlasBuild } from '../../domains/debateAtlas/debateAtlasTypes';
 
 const mockDebateMap = jest.fn();
 jest.mock('../DebateMap/DebateMap', () => ({
