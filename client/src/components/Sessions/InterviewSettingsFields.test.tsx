@@ -93,8 +93,12 @@ it('edits the share of hidden AI drafts, defaulting to off', () => {
 
 it('no longer offers the retired group suggestions box, and keeps a stored value as it is', () => {
   const onChange = jest.fn();
-  render(<InterviewSettingsFields value={{ suggestGroups: true }} onChange={onChange} />);
+  const { rerender } = render(<InterviewSettingsFields value={{}} onChange={onChange} />);
   expect(screen.queryByLabelText('Suggest open groups that fit participants’ answers')).not.toBeInTheDocument();
+  // No box turns it on, whatever its label.
+  for (const box of screen.getAllByRole('checkbox')) fireEvent.click(box);
+  expect(onChange.mock.calls.some(([value]) => value.suggestGroups === true)).toBe(false);
+  rerender(<InterviewSettingsFields value={{ suggestGroups: true }} onChange={onChange} />);
   fireEvent.click(screen.getByLabelText('Show participants how well their AI predicted them'));
   expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ suggestGroups: true, showFidelityScore: true }));
 });
