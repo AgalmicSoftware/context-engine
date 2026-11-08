@@ -41,6 +41,7 @@ type UnknownRecord = Record<string, unknown>;
 export type SessionInterviewGroupRecommendation = {
   groupId: string;
   reason?: string;
+  /** Checked against the person's words by the matcher, never shown: it may name a place. */
   evidence?: string;
   confidence?: number;
 };
@@ -77,7 +78,6 @@ type GroupChoice = {
   label: string;
   description?: string;
   reason: string;
-  evidence: string;
   fromLink: boolean;
   startsTicked: boolean;
 };
@@ -130,7 +130,6 @@ const normalizeRecommendations = (
     .map((recommendation) => ({
       groupId: toText(recommendation?.groupId, 80),
       reason: toText(recommendation?.reason, 240),
-      evidence: toText(recommendation?.evidence, 240),
       confidence: recommendation?.confidence,
     }))
     .filter((recommendation) => {
@@ -281,7 +280,6 @@ export function SessionInterviewRecommendedGroups({
               label: linked?.label || invite.groupId,
               ...(linked?.description ? { description: linked.description } : {}),
               reason: 'From your link.',
-              evidence: '',
               fromLink: true,
               startsTicked: true,
             },
@@ -298,7 +296,6 @@ export function SessionInterviewRecommendedGroups({
             label: group.label,
             ...(group.description ? { description: group.description } : {}),
             reason: recommendation.reason || 'Suggested from your answers.',
-            evidence: recommendation.evidence || '',
             fromLink: false,
             startsTicked: isStrongGroupMatch(recommendation) && (!listedAtJoin || listedAtJoin.includes(group.groupId)),
           },
@@ -426,7 +423,6 @@ export function SessionInterviewRecommendedGroups({
               <strong>{choice.label}</strong>
               {choice.description ? <small>{choice.description}</small> : null}
               <small>{choice.reason}</small>
-              {choice.evidence ? <small>Evidence: {choice.evidence}</small> : null}
             </span>
           </label>
         ))}

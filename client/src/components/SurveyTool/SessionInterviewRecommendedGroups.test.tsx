@@ -141,9 +141,10 @@ describe('SessionInterviewRecommendedGroups', () => {
     expect(await screen.findByRole('heading', { name: 'Groups (2)' })).toBeInTheDocument();
     expect(box(/AI Optimists/)).toBeChecked();
     expect(box(/Maybe/)).not.toBeChecked();
-    expect(
-      within(box(/AI Optimists/).closest('label')!).getByText('Evidence: I support open AI development.'),
-    ).toBeInTheDocument();
+    const row = within(box(/AI Optimists/).closest('label')!);
+    expect(row.getByText('Your reviewed answer explicitly supported optimistic AI governance.')).toBeInTheDocument();
+    // A quote only grounds the match: it may name a place smaller than a country, so it never shows.
+    expect(screen.queryByText(/I support open AI development/)).toBeNull();
     for (const hidden of ['Restricted', 'Expired', 'Unrecommended']) expect(screen.queryByText(hidden)).toBeNull();
     expect(getWorkerSessionToken).not.toHaveBeenCalled();
     expect(joinWorkerGroup).not.toHaveBeenCalled();

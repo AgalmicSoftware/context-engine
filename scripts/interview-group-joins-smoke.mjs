@@ -84,11 +84,11 @@ const probe = (
       source: { platform: 'claude', modelId: 'fixture', verification: 'self_reported' }, responderContext: {},
       responses: [
         { questionId: 'camp', answer: 'd/acc', confidence: 0.8, evidence: 'Stated' },
-        { questionId: 'home', answer: 'Leeds, in the UK', confidence: 0.9, evidence: 'Stated' },
+        { questionId: 'home', answer: 'The United Kingdom', confidence: 0.9, evidence: 'Stated' },
         { questionId: 'priority', answer: 'Audits that outsiders can check', confidence: 0.6, evidence: 'Inferred' },
       ],
       groups: [
-        { groupId: 'uk', reason: 'Lives in Leeds', confidence: 0.9 },
+        { groupId: 'uk', reason: 'Lives in the UK', confidence: 0.9 },
         { groupId: 'builders', reason: 'Mentions side projects', confidence: 0.5 },
       ],
     };
@@ -131,14 +131,12 @@ const readContrast = (root) => {
       if (color.a > 0) layers.push(color);
       if (color.a >= 1) break;
     }
-    return layers
-      .reverse()
-      .reduce((color, layer) => over(layer, color), {
-        r: 255,
-        g: 255,
-        b: 255,
-        a: 1,
-      });
+    return layers.reverse().reduce((color, layer) => over(layer, color), {
+      r: 255,
+      g: 255,
+      b: 255,
+      a: 1,
+    });
   };
   const luminance = ({ r, g, b }) =>
     [r, g, b]
@@ -309,7 +307,7 @@ try {
         assert.equal(await box(/UK residents/).isChecked(), true);
         assert.equal(await box(/Builders/).isChecked(), false);
         await section.getByText("From your link.").waitFor();
-        await section.getByText("Your AI: Lives in Leeds").waitFor();
+        await section.getByText("Your AI: Lives in the UK").waitFor();
         const submit = page.getByTestId("ce-session-interview-apply");
         await expectSubmitLabel(page, "submit and join");
         // The link's own notice stands aside while its group is listed here.
@@ -373,12 +371,10 @@ try {
             path: path.join(output, `before-${theme}-${width}.png`),
             animations: "disabled",
           });
-          await section
-            .locator("xpath=ancestor::details[1]")
-            .screenshot({
-              path: path.join(output, `groups-${theme}-${width}.png`),
-              animations: "disabled",
-            });
+          await section.locator("xpath=ancestor::details[1]").screenshot({
+            path: path.join(output, `groups-${theme}-${width}.png`),
+            animations: "disabled",
+          });
         }
         assert.deepEqual(failures, []);
         console.log(

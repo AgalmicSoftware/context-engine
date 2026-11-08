@@ -353,6 +353,9 @@ describe('session interview group recommendations', () => {
     expect(prompt).toContain('"confidence":0.8');
     expect(prompt).toContain('0.70-1 direct or repeated evidence');
     expect(prompt).toContain('Return every group that fits.');
+    expect(prompt).toContain(
+      'Never say where the respondent lives more precisely than their country: a reason may name a country, never a region, city, neighbourhood, street or postcode.',
+    );
     expect(prompt).not.toMatch(/at most \d+ groups/);
   });
 

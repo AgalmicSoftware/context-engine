@@ -514,6 +514,7 @@ Rules:
 - Recommend a group only when the respondent clearly matches the group's actual description or criteria. Do not infer residence, nationality, job role, support, or identity from a weak topical mention.
 - Honor corrections, uncertainty, and negation. If the evidence is ambiguous, return no recommendation for that group.
 - Do not assign identity to the respondent. Frame matches as optional suggestions.
+- Never say where the respondent lives more precisely than their country: a reason may name a country, never a region, city, neighbourhood, street or postcode. The evidence quote is only checked against the source, never shown.
 - Return JSON only with shape {"groups":[{"groupId":"known-id","reason":"short optional-match reason","evidence":"short exact respondent quote copied from supplied evidence","confidence":0.8}]}.
 - The evidence field must be a short verbatim quote from the supplied respondent evidence, not a paraphrase.
 - confidence (0-1) is how surely the respondent fits the group: 0-0.39 weak, 0.40-0.69 moderate, 0.70-1 direct or repeated evidence.

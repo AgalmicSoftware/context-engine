@@ -311,7 +311,7 @@ describe('session interview protocol', () => {
     expect(kickoff).toContain('Nothing is submitted;');
     expect(kickoff).toContain('Markdown link labeled "Open prefilled interview"');
     expect(kickoff).toContain('never visible text or a code block');
-    expect(kickoff.length).toBeLessThan(3800);
+    expect(kickoff.length).toBeLessThan(4000);
 
     const mappingPrompt = buildInterviewResponseMappingPrompt({
       questions: [{ id: 'q1', prompt: 'What matters?', type: 'freeform', options: [] }],
@@ -324,6 +324,20 @@ describe('session interview protocol', () => {
     expect(mappingPrompt).toContain('the chance from 0 to 1 that the responder keeps this answer unchanged');
     expect(mappingPrompt).toContain('first person');
     expect(mappingPrompt).toContain('Do not add an "(Agent):" prefix');
+    // The AI places someone no more precisely than their country.
+    expect(mappingPrompt).toContain(
+      'Never state where the responder lives more precisely than their country, in any answer, comment or evidence. Leave a question that asks for a smaller place, such as a region or city, without a draft.',
+    );
+  });
+
+  it('never has the voice interviewer place someone more precisely than their country', () => {
+    expect(
+      buildRealtimeInterviewInstructions({
+        questions: [{ id: 'q1', prompt: 'What matters?', type: 'freeform', options: [] }],
+      }),
+    ).toContain(
+      'Never ask where the responder lives more precisely than their country, or repeat a smaller place they mention. Skip session questions that ask for one.',
+    );
   });
 
   it('opens directly on topic and preserves a configured opening', () => {

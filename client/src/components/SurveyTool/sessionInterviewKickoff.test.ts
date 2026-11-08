@@ -53,7 +53,11 @@ it('negotiates v4 to v6, binds the session and exact version/hash, and distingui
     'If the catalog lists groups, add "groups":[{"groupId":"...","reason":"...","confidence":0.8}] for any that clearly fit me, scored like answers.',
   );
   expect(kickoff).not.toContain('groupContract');
-  expect(kickoff.length).toBeLessThan(3800);
+  // Their AI places them no more precisely than their country.
+  expect(kickoff).toContain(
+    'Never say where I live more precisely than my country anywhere in the packet; leave questions asking for a smaller place unanswered.',
+  );
+  expect(kickoff.length).toBeLessThan(4000);
 });
 
 it('reads the person’s AI’s group picks from a packet: listed IDs once each, reasons trimmed, confidence 0-1', () => {
