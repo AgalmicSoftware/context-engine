@@ -5,6 +5,11 @@ import { connect } from 'react-redux';
 import { useWorkerGroupResultsFilter } from '../../domains/worker/useWorkerGroupResultsFilter';
 import { asGroupRecord } from '../../domains/worker/workerGroupResultsFilter';
 import { projectWorkerGroupResultsState } from './surveyResultsWorkerGroups';
+import {
+  isSurveyResultsCountLoading,
+  SURVEY_RESULTS_COUNTS_LOADING_MAX_MS,
+} from './surveyResultsFilterStatusController';
+import { useBoundedLoading } from './useBoundedLoading';
 
 import '../../assets/css/contextEngine.scss';
 import styles from './SurveyResults.module.scss';
@@ -577,6 +582,24 @@ const SurveyResults = (props: SurveyResultsProps): React.ReactElement => {
   stateRef.current = state;
   const propsRef = useRef(props);
   propsRef.current = props;
+  const countsLoading = {
+    questions: useBoundedLoading(
+      isSurveyResultsCountLoading({
+        ready: props.isQuestionCacheReady,
+        total: state.totalQuestionsCount,
+        viewMode: state.viewMode,
+      }),
+      SURVEY_RESULTS_COUNTS_LOADING_MAX_MS,
+    ),
+    responses: useBoundedLoading(
+      isSurveyResultsCountLoading({
+        ready: props.isResponsesCacheReady,
+        total: state.totalResponsesCount,
+        viewMode: state.viewMode,
+      }),
+      SURVEY_RESULTS_COUNTS_LOADING_MAX_MS,
+    ),
+  };
   const questionIdTableRef = useRef<HTMLDivElement>(null);
   const questionFilterRef = useRef<QuestionFilterHandle>(null);
   const instRef = useRef<SurveyResultsInstanceFields | null>(null);
@@ -2044,6 +2067,7 @@ const SurveyResults = (props: SurveyResultsProps): React.ReactElement => {
       questionResponsesNonce: propsRef.current.questionResponsesNonce,
       questionsCacheNonce: propsRef.current.questionsCacheNonce,
       responses,
+      responsesLoading: countsLoading.responses,
       sbtCacheRevision: propsRef.current.sbtCacheRevision,
       styleMap: styles,
       surveyId: stateRef.current.surveyId,
@@ -2441,6 +2465,7 @@ const SurveyResults = (props: SurveyResultsProps): React.ReactElement => {
     state: stateRef.current,
     styleMap: styles,
     syncLoadingStartedAt: inst._syncLoadingStartedAt,
+    countsLoading,
     toggleExportArea,
     toggleLockedResponseDetails,
     toggleQuestionFilter,

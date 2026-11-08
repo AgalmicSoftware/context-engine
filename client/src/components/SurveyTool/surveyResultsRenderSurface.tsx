@@ -132,6 +132,8 @@ export type SurveyResultsRenderSurfaceArgs = {
   state: SurveyResultsState;
   styleMap: Record<string, string>;
   syncLoadingStartedAt: number | null;
+  /** Question Results counts still waiting on their first load. */
+  countsLoading?: { questions: boolean; responses: boolean };
   toggleExportArea: () => void;
   toggleLockedResponseDetails: () => void;
   toggleQuestionFilter: () => void;
@@ -185,6 +187,7 @@ export const renderSurveyResultsRenderSurface = ({
   state,
   styleMap,
   syncLoadingStartedAt,
+  countsLoading = { questions: false, responses: false },
   toggleExportArea,
   toggleLockedResponseDetails,
   toggleQuestionFilter,
@@ -252,6 +255,8 @@ export const renderSurveyResultsRenderSurface = ({
     questionResponsesNonce: props.questionResponsesNonce,
     questionsCacheNonce: props.questionsCacheNonce,
     questionResultsHydrated: state.questionResultsHydrated,
+    questionCountsLoading: countsLoading.questions,
+    responseCountsLoading: countsLoading.responses,
     refreshTargetQuestionBlock: state.refreshTargetQuestionBlock,
     refreshTargetResponseBlock: state.refreshTargetResponseBlock,
     refreshTargetSurveyBlock: state.refreshTargetSurveyBlock,

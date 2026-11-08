@@ -46,4 +46,24 @@ describe('SurveyResultsFilterSummary', () => {
     expect(screen.getAllByText('0')).toHaveLength(2);
     expect(document.querySelectorAll('svg[data-icon="spinner"]')).toHaveLength(2);
   });
+
+  it('shows loading totals instead of zeros until the first questions and responses land', () => {
+    const { container } = render(
+      <SurveyResultsFilterSummary
+        displayedTotalQuestionsCount={28}
+        displayedTotalResponsesCount={0}
+        normalizedFilteredQuestionsCount={28}
+        normalizedFilteredResponsesCount={0}
+        showFilteredCountSpinner={false}
+        responseTotalsLoading
+      />,
+    );
+
+    const text = normalizeSummaryText(container.querySelector('p')?.textContent || '');
+    expect(text).toContain('Questions: 28 Filtered: 28');
+    expect(text).not.toMatch(/Responses: 0/);
+    // The responses' total and filtered count both wait, each named for assistive tech.
+    expect(document.querySelectorAll('svg[data-icon="spinner"]')).toHaveLength(2);
+    expect(screen.getAllByTitle('Loading')).toHaveLength(2);
+  });
 });

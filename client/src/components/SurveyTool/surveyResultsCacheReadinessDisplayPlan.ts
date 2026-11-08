@@ -20,6 +20,8 @@ export type SurveyResultsCacheReadinessDisplayPlanArgs = {
   nowMs?: unknown;
   questionLocalBlock?: unknown;
   questionResultsHydrated?: unknown;
+  questionCountsLoading?: boolean;
+  responseCountsLoading?: boolean;
   refreshTargetQuestionBlock?: unknown;
   refreshTargetResponseBlock?: unknown;
   refreshTargetSurveyBlock?: unknown;
@@ -65,6 +67,8 @@ export const buildSurveyResultsCacheReadinessDisplayPlan = ({
   nowMs = 0,
   questionLocalBlock = 0,
   questionResultsHydrated = false,
+  questionCountsLoading = false,
+  responseCountsLoading = false,
   refreshTargetQuestionBlock = 0,
   refreshTargetResponseBlock = 0,
   refreshTargetSurveyBlock = 0,
@@ -97,6 +101,8 @@ export const buildSurveyResultsCacheReadinessDisplayPlan = ({
     filteredQuestionsCount,
     filteredResponsesCount,
     filterLoading,
+    questionCountsLoading,
+    responseCountsLoading,
     surveyViewMode,
     totalQuestionsCount,
     totalResponsesCount,

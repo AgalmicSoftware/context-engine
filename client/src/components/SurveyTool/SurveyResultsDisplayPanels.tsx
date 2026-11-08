@@ -135,6 +135,8 @@ export const renderSurveyResultsDisplayPanels = ({
         normalizedFilteredQuestionsCount={filterSummaryDisplay.normalizedFilteredQuestionsCount ?? 0}
         normalizedFilteredResponsesCount={filterSummaryDisplay.normalizedFilteredResponsesCount ?? 0}
         showFilteredCountSpinner={!!filterSummaryDisplay.showFilteredCountSpinner}
+        questionTotalsLoading={!!filterSummaryDisplay.questionTotalsLoading}
+        responseTotalsLoading={!!filterSummaryDisplay.responseTotalsLoading}
       />
 
       {filterControlsNode}

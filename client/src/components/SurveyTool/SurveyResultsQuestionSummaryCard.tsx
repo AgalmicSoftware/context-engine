@@ -1,7 +1,7 @@
 import React from 'react';
 import { Card, CardBody, CardHeader, Collapse } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faBookmark, faCaretDown, faCaretUp, faComments } from '@fortawesome/free-solid-svg-icons';
+import { faBookmark, faCaretDown, faCaretUp, faComments, faSpinner } from '@fortawesome/free-solid-svg-icons';
 
 type SurveyResultsQuestionSummaryCardProps = {
   bookmarkIconStyle?: React.CSSProperties;
@@ -17,6 +17,8 @@ type SurveyResultsQuestionSummaryCardProps = {
   renderFreeformSummary: () => React.ReactNode;
   renderMultichoiceSummary: () => React.ReactNode;
   resolvedQuestionType?: string;
+  /** The responses have not arrived yet, so the count is not known. */
+  responsesLoading?: boolean;
   styleMap: Record<string, string>;
   viewableResponsesCount?: number;
 };
@@ -35,6 +37,7 @@ const SurveyResultsQuestionSummaryCard = ({
   renderFreeformSummary,
   renderMultichoiceSummary,
   resolvedQuestionType = '',
+  responsesLoading = false,
   styleMap,
   viewableResponsesCount = 0,
 }: SurveyResultsQuestionSummaryCardProps): React.ReactElement => {
@@ -46,7 +49,9 @@ const SurveyResultsQuestionSummaryCard = ({
         <div className={styleMap.headerLeft}>
           <div className={styleMap.responseCountContainer}>
             <FontAwesomeIcon icon={faComments} className={styleMap.responseCountIcon} />
-            <span className={styleMap.responseCountNumber}>{viewableResponsesCount}</span>
+            <span className={styleMap.responseCountNumber}>
+              {responsesLoading ? <FontAwesomeIcon icon={faSpinner} spin title="Loading" /> : viewableResponsesCount}
+            </span>
           </div>
           <span className={styleMap.questionTitle}>{questionPrompt}</span>
         </div>
