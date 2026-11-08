@@ -3405,6 +3405,10 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   gap: 8px;
 }
 
+.sessionClaimPersonGroup {
+  display: inline-flex;
+}
+
 .sessionClaimPersonButton {
   min-height: 44px;
   padding: 6px 12px;
@@ -3413,6 +3417,44 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   background: var(--ce-text-inverse);
   font-weight: 700;
   cursor: pointer;
+}
+
+// A finger holds the button to drag it, which mustn't select its label or open a callout. Safari reads only the
+// prefixed property, and the build adds no prefixes.
+.sessionClaimPersonDraggable {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+// Joined to its × on the right.
+.sessionClaimPersonGrouped {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.sessionClaimSplit {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 6px 10px;
+  border: 2px solid currentColor !important;
+  border-left: 0 !important;
+  border-radius: 0 var(--ce-radius-8) var(--ce-radius-8) 0;
+  background: var(--ce-text-inverse);
+  cursor: pointer;
+}
+
+.sessionClaimPersonDragging {
+  position: relative;
+  z-index: 2;
+  cursor: grabbing;
+  box-shadow: 0 6px 16px rgb(0 0 0 / 25%);
+}
+
+// Where a dragged person would land: an outline, so the label keeps its contrast.
+.sessionClaimPersonTarget {
+  outline: 3px solid currentColor;
+  outline-offset: 3px;
 }
 
 .sessionClaimHeading {

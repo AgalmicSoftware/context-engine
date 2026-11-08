@@ -1,4 +1,5 @@
 import type { RollingTranscriptSegment } from './rollingTranscription';
+import type { SpeakerMerges } from './speakerMerges';
 import type { KnownSpeaker } from './speakerTranscript';
 
 /** `endedAt` is unset while the page is still hidden. */
@@ -24,6 +25,8 @@ export type RecordingChunk = {
   speakerSamplesRefused?: boolean;
   // Set only on the recording's question-drafts record.
   questionDrafts?: QuestionDrafts;
+  // Set only on the recording's speaker-merges record.
+  speakerMerges?: SpeakerMerges;
 };
 
 const DATABASE = 'ce-recording-chunks';

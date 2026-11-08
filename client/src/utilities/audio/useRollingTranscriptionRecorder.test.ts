@@ -411,6 +411,24 @@ describe('useRollingTranscriptionRecorder', () => {
     reopened.unmount();
   });
 
+  it('hands over the speakers the host merged, and only for their own recording', async () => {
+    const { result, rerender } = renderHook(({ sessionSlug }) => useRollingTranscriptionRecorder({ sessionSlug }), {
+      initialProps: { sessionSlug: 'merged-room' },
+    });
+    await act(flushPromises);
+    expect(result.current.speakerMerges).toEqual({});
+    act(() => {
+      result.current.saveSpeakerMerges({ 'Person 3': 'Person 1' });
+    });
+    expect(result.current.speakerMerges).toEqual({ 'Person 3': 'Person 1' });
+    rerender({ sessionSlug: 'another-room' });
+    await act(flushPromises);
+    expect(result.current.speakerMerges).toEqual({});
+    rerender({ sessionSlug: 'merged-room' });
+    await act(flushPromises);
+    expect(result.current.speakerMerges).toEqual({ 'Person 3': 'Person 1' });
+  });
+
   it('releases the recording after sign-out, once capture stops, so the next account starts afresh', async () => {
     const first = '0x1111111111111111111111111111111111111111';
     const second = '0x2222222222222222222222222222222222222222';

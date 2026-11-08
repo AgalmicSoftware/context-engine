@@ -553,6 +553,42 @@ it('restores hidden periods saved by an earlier page and ends one still open at 
   expect(saved.get('hidden-periods')?.hiddenPeriods).toEqual([]);
 });
 
+it('restores the speakers the host merged, and forgets them when the recording is cleared', async () => {
+  saved.set('speaker-merges', {
+    scope: 'merged-room',
+    labelSpeakers: false,
+    speakerMerges: { 'Person 3': 'Person 1' },
+    segment: { id: 'speaker-merges', index: -1, status: 'recording', text: '', startedAt: 0 },
+  });
+  const queue = create(undefined, 'merged-room');
+  await queue.ready;
+  expect(queue.segments).toEqual([]);
+  expect(queue.speakerMerges).toEqual({ 'Person 3': 'Person 1' });
+  queue.saveSpeakerMerges({ 'Person 3': 'Person 1', 'Person 5': 'Person 2' });
+  await tick();
+  expect(saved.get('speaker-merges')?.speakerMerges).toEqual({ 'Person 3': 'Person 1', 'Person 5': 'Person 2' });
+  await queue.clear();
+  expect(queue.speakerMerges).toEqual({});
+  expect(saved.has('speaker-merges')).toBe(false);
+  // Not even this page's own copy brings them back to the next recording.
+  const next = create(undefined, 'merged-room');
+  await next.ready;
+  expect(next.speakerMerges).toEqual({});
+});
+
+it('keeps merges on this page when device storage refuses them', async () => {
+  const queue = create(undefined, 'full-merges-room');
+  await queue.ready;
+  jest.mocked(putRecordingChunk).mockRejectedValue(new DOMException('Full', 'QuotaExceededError'));
+  queue.saveSpeakerMerges({ 'Person 4': 'Person 2' });
+  await tick();
+  expect(saved.has('speaker-merges')).toBe(false);
+  queue.dispose();
+  const reopened = create(undefined, 'full-merges-room');
+  await reopened.ready;
+  expect(reopened.speakerMerges).toEqual({ 'Person 4': 'Person 2' });
+});
+
 it('drops an open hidden period whose audio carried on, and keeps earlier ones', async () => {
   const queue = create(undefined, 'carried-on-room');
   await queue.ready;

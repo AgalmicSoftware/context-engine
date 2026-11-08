@@ -101,6 +101,8 @@ const buildRecorder = (overrides: Record<string, unknown> = {}) => ({
   addTranscript: jest.fn(),
   questionDrafts: null,
   saveQuestionDrafts: jest.fn(),
+  speakerMerges: {},
+  saveSpeakerMerges: jest.fn(),
   ...overrides,
 });
 const nextFrame = () => act(() => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())));
@@ -1030,6 +1032,24 @@ describe('SessionListeningPanel', () => {
       unmount();
       render(<SessionListeningPanel sessionSlug="demo" />);
       expect(screen.queryByTestId(E2E_TESTIDS.SESSION_CLAIM_SHARE)).toBeNull();
+    });
+
+    it('shows merged speakers under the label they joined, and keeps a split with the recording', () => {
+      const labelled =
+        'Person 1: Enough words here for a whole part of the talk.\nPerson 3: And a little more from the same voice.';
+      const saveSpeakerMerges = jest.fn();
+      (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+        buildRecorder({ transcript: labelled, speakerMerges: { 'Person 3': 'Person 1' }, saveSpeakerMerges }),
+      );
+      render(<SessionListeningPanel sessionSlug="demo" panelMode="recordGroup" embeddedInModal />);
+      const lines = screen.getByTestId(E2E_TESTIDS.SESSION_LISTENING_TRANSCRIPT);
+      expect(lines).toHaveTextContent('Person 1: And a little more from the same voice.');
+      expect(lines).not.toHaveTextContent('Person 3');
+      // The buttons read the same merged transcript: one person, with one code.
+      expect(screen.getByRole('button', { name: 'Person 1 + 3' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Person 3' })).toBeNull();
+      fireEvent.click(screen.getByRole('button', { name: 'Split Person 1 + 3' }));
+      expect(saveSpeakerMerges).toHaveBeenCalledWith({});
     });
 
     it('forgets a chosen code once the transcript is gone, so it can’t reopen unasked', async () => {

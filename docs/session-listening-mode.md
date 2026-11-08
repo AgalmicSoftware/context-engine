@@ -468,6 +468,15 @@ code is the permission, on the assumption that the room trusts each other. On th
 the session's AI drafts the answers from the part, as it does from a voice interview, and
 nothing is saved until the person submits.
 
+When the recorder gives one person two labels, the host drags one button onto the other
+(on a touch screen after holding it still for a moment, so a swipe over the buttons still
+scrolls), or chooses **Same person as…** in that person's code, which needs no dragging. The transcript
+then shows the merged lines under the label they joined, the button reads **Person 1 + 3**,
+and its code carries all those lines as one part. The × beside a merged button splits it
+again. Merges are kept with the recording on this device (`speakerMerges.ts`), so a reload
+keeps them and **Clear recording** forgets them. Question drafting and the transcript added
+to context keep the labels the recorder gave.
+
 The part is that person's lines as `Responder:` and the line before each as
 `Other person:` (its last 240 characters), so a reply such as "I agree" can be read. It is
 packed with the session slug and the group the recorder's link joined as deflated JSON in

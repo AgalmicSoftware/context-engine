@@ -655,6 +655,8 @@ export const useRollingTranscriptionRecorder = ({
     scope: chunks.scope,
     questionDrafts: chunks.questionDrafts,
     saveQuestionDrafts: chunks.saveQuestionDrafts,
+    speakerMerges: chunks.speakerMerges,
+    saveSpeakerMerges: chunks.saveSpeakerMerges,
     downloadableChunkIds: chunks.downloadableChunkIds,
     ownerNotice: chunks.ownerNotice,
     openElsewhere: Boolean(chunks.openElsewhereNotice),

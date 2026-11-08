@@ -10,6 +10,7 @@ import {
 } from './recordingChunkQueue';
 import type { QuestionDrafts } from './recordingChunkStore';
 import { recordingOwner, type RecordingOptions } from './recordingOwner';
+import type { SpeakerMerges } from './speakerMerges';
 import {
   stitchRollingTranscriptSegments,
   type CaptureGap,
@@ -78,6 +79,7 @@ export function useRecordingChunkQueue(options: Options) {
   const [labelsUnavailableReason, setLabelsUnavailableReason] = useState('');
   const [hiddenPeriods, setHiddenPeriods] = useState<Array<{ startedAt: number; endedAt: number }>>([]);
   const [questionDrafts, setQuestionDrafts] = useState<QuestionDrafts | null>(null);
+  const [speakerMerges, setSpeakerMerges] = useState<SpeakerMerges>({});
   const [offline, setOffline] = useState(typeof navigator !== 'undefined' && navigator.onLine === false);
   const [importing, setImporting] = useState(false);
   const importRef = useRef<Promise<unknown>>(Promise.resolve());
@@ -118,6 +120,7 @@ export function useRecordingChunkQueue(options: Options) {
     setSegments([]);
     setHiddenPeriods([]);
     setQuestionDrafts(null);
+    setSpeakerMerges({});
     setOpenElsewhere(false);
     const open = () => {
       const queue = new RecordingChunkQueue({
@@ -152,6 +155,7 @@ export function useRecordingChunkQueue(options: Options) {
             queue.hiddenPeriods.flatMap(({ startedAt, endedAt }) => (endedAt == null ? [] : [{ startedAt, endedAt }])),
           );
           setQuestionDrafts(queue.questionDrafts);
+          setSpeakerMerges(queue.speakerMerges);
         },
       });
       queueRef.current = queue;
@@ -298,6 +302,7 @@ export function useRecordingChunkQueue(options: Options) {
   const pageShown = useCallback((at: number, carriedOn?: boolean) => queueRef.current?.pageShown(at, carriedOn), []);
   const dismissHiddenPeriods = useCallback(() => queueRef.current?.dismissHiddenPeriods(), []);
   const saveQuestionDrafts = useCallback((drafts: QuestionDrafts) => queueRef.current?.saveQuestionDrafts(drafts), []);
+  const saveSpeakerMerges = useCallback((merges: SpeakerMerges) => queueRef.current?.saveSpeakerMerges(merges), []);
   const downloadChunk = useCallback((id: string) => {
     const record = queueRef.current?.records.get(id);
     if (!record?.audio) return;
@@ -349,6 +354,9 @@ export function useRecordingChunkQueue(options: Options) {
     // The draft questions kept with the recording when it opened (null until then, or when none were kept).
     questionDrafts,
     saveQuestionDrafts,
+    // Speakers the host merged in this recording.
+    speakerMerges,
+    saveSpeakerMerges,
     downloadChunk,
     downloadRecording,
     clearDraft,

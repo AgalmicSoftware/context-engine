@@ -26,6 +26,7 @@ import SessionTranscriptContextOption from './SessionTranscriptContextOption';
 import { useTranscriptContextUpload } from './useTranscriptContextUpload';
 import { useRollingTranscriptionRecorder } from '../../utilities/audio/useRollingTranscriptionRecorder';
 import { DEFAULT_ROLLING_TRANSCRIPTION_CHUNK_MS, transcriptSpeech } from '../../utilities/audio/rollingTranscription';
+import { applySpeakerMerges } from '../../utilities/audio/speakerMerges';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { SessionListeningWaveform } from './SessionListeningWaveform';
 export { SessionListeningWaveform } from './SessionListeningWaveform';
@@ -268,6 +269,11 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
   );
   const trimmedTranscript = recorder.transcript.trim();
   const hasTranscript = trimmedTranscript.length > 0;
+  // As the host reads it and hands it out: each speaker they merged under the label that speaker joined.
+  const shownTranscript = useMemo(
+    () => applySpeakerMerges(recorder.transcript, recorder.speakerMerges),
+    [recorder.transcript, recorder.speakerMerges],
+  );
   // A code chosen for a transcript that has since gone (cleared, another account) mustn't come back with the next.
   useEffect(() => {
     if (!hasTranscript) setClaimPerson('');
@@ -760,7 +766,7 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
 
       {hasTranscript && isTranscriptOpen && (
         <SessionListeningTranscript
-          transcript={recorder.transcript}
+          transcript={shownTranscript}
           clearDisabled={
             isRecorderSessionActive ||
             recorder.isBusy ||
@@ -773,11 +779,13 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
 
       {panelMode === 'recordGroup' && hasTranscript ? (
         <SessionTranscriptClaimShare
-          transcript={recorder.transcript}
+          transcript={shownTranscript}
           sessionSlug={sessionSlug}
           sessionConfig={sessionConfig}
           person={claimPerson}
           onPersonChange={setClaimPerson}
+          speakerMerges={recorder.speakerMerges}
+          onSpeakerMergesChange={recorder.saveSpeakerMerges}
         />
       ) : null}
 

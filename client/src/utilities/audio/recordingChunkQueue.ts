@@ -9,6 +9,7 @@ import {
   type RecordingChunk,
 } from './recordingChunkStore';
 import type { CaptureGap, RollingTranscriptSegment } from './rollingTranscription';
+import { readSpeakerMerges, type SpeakerMerges } from './speakerMerges';
 import { cutSpeakerSamples } from './speakerSamples';
 import {
   MAX_KNOWN_SPEAKERS,
@@ -59,6 +60,10 @@ const memorySpeakers = new Map<string, Speakers>();
 // that failed is covered while another tab's later save still wins.
 const QUESTION_DRAFTS_ID = 'question-drafts';
 const memoryQuestionDrafts = new Map<string, QuestionDrafts>();
+// And the speakers the host merged, so the transcript and its codes reopen as the host left them. As with hidden
+// periods, the page's own copy covers a failed save.
+const SPEAKER_MERGES_ID = 'speaker-merges';
+const memorySpeakerMerges = new Map<string, SpeakerMerges>();
 // Cutting voice samples must never hold up later chunks for long.
 const SAMPLE_WAIT_MS = 10_000;
 /** Whether a closed recorder left audio or text that only this page holds for a recording. */
@@ -113,6 +118,7 @@ export class RecordingChunkQueue {
   speakers: Speakers = { knownSpeakers: [], speakerSamplesRefused: false };
   // As restored when the recording opened; saving later drafts leaves it.
   questionDrafts: QuestionDrafts | null = null;
+  speakerMerges: SpeakerMerges = {};
   ready: Promise<void>;
   private disposed = false;
   // Device storage answered at least once, so this recording may be saved there.
@@ -149,9 +155,14 @@ export class RecordingChunkQueue {
       const stripped: RecordingChunk[] = [];
       let storedPeriods: HiddenPeriod[] = [];
       let storedDrafts: QuestionDrafts | null = null;
+      let storedMerges: SpeakerMerges = {};
       for (let entry of [...saved, ...kept]) {
         if (entry.segment.id === HIDDEN_PERIODS_ID) {
           storedPeriods = entry.hiddenPeriods || [];
+          continue;
+        }
+        if (entry.segment.id === SPEAKER_MERGES_ID) {
+          storedMerges = readSpeakerMerges(entry.speakerMerges);
           continue;
         }
         if (entry.segment.id === QUESTION_DRAFTS_ID) {
@@ -178,6 +189,7 @@ export class RecordingChunkQueue {
       this.resaveKept([...stripped, ...kept]);
       this.restoreHiddenPeriods(storedPeriods);
       this.restoreQuestionDrafts(storedDrafts);
+      this.speakerMerges = memorySpeakerMerges.get(this.options.scope) ?? storedMerges;
       this.speakers = memorySpeakers.get(this.options.scope) ?? this.speakers;
       this.forgetSpeakersIfDone();
       this.changed();
@@ -194,6 +206,7 @@ export class RecordingChunkQueue {
       this.resaveKept(kept);
       this.restoreHiddenPeriods([]);
       this.restoreQuestionDrafts(null);
+      this.speakerMerges = memorySpeakerMerges.get(this.options.scope) ?? this.speakerMerges;
       this.speakers = memorySpeakers.get(this.options.scope) ?? this.speakers;
       this.forgetSpeakersIfDone();
       this.changed();
@@ -250,6 +263,12 @@ export class RecordingChunkQueue {
   }
   dismissHiddenPeriods() {
     this.saveHiddenPeriods([]);
+  }
+  saveSpeakerMerges(speakerMerges: SpeakerMerges) {
+    this.speakerMerges = speakerMerges;
+    memorySpeakerMerges.set(this.options.scope, speakerMerges);
+    this.saveReserved(SPEAKER_MERGES_ID, { speakerMerges });
+    this.changed();
   }
   private saveHiddenPeriods(hiddenPeriods: HiddenPeriod[]) {
     this.hiddenPeriods = hiddenPeriods;
@@ -625,7 +644,9 @@ export class RecordingChunkQueue {
     memoryHiddenPeriods.delete(this.options.scope);
     memorySpeakers.delete(this.options.scope);
     memoryQuestionDrafts.delete(this.options.scope);
+    memorySpeakerMerges.delete(this.options.scope);
     this.questionDrafts = null;
+    this.speakerMerges = {};
     this.hiddenPeriods = [];
     this.speakers = { knownSpeakers: [], speakerSamplesRefused: false };
     this.labelsUnavailableReason = '';
