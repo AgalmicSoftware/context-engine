@@ -347,6 +347,8 @@ export default function OnePageSessionStandardShell({
     sessionSlug: effectiveSlug,
   });
   const showBuiltAtlas = !!atlas.build;
+  // Risk Matrix and Context links open nodes of the demo atlas, so it stays the one shown for them.
+  const showDemoAtlas = isDemoSlug && (!showBuiltAtlas || !!embeddedAtlasNodeId);
   const atlasBusy = atlas.building || atlas.activeSinceMs !== null;
   const buildAtlasHelpId = `build-atlas-help-${React.useId().replace(/:/g, '')}`;
   const showContextAtlas = hasReverseAlignmentContext(displaySessionSlug);
@@ -876,7 +878,7 @@ export default function OnePageSessionStandardShell({
                 </div>
               ) : null}
               <div>
-                {showBuiltAtlas && effectiveResultsViewMode === 'debateAtlas' && atlas.build && (
+                {!showDemoAtlas && effectiveResultsViewMode === 'debateAtlas' && atlas.build && (
                   <Suspense fallback={<LazyFallback label="Loading Debate Atlas..." minHeight="30vh" />}>
                     <SessionDebateAtlasView
                       build={atlas.build}
@@ -928,7 +930,7 @@ export default function OnePageSessionStandardShell({
                     <DemoAnalysisWorkspace sessionSlug={slug} />
                   </Suspense>
                 )}
-                {isDemoSlug && !showBuiltAtlas && effectiveResultsViewMode === 'debateAtlas' && (
+                {showDemoAtlas && effectiveResultsViewMode === 'debateAtlas' && (
                   <Suspense fallback={<LazyFallback label="Loading Debate Atlas..." minHeight="30vh" />}>
                     <div style={{ maxHeight: '80vh', overflowY: 'auto' }}>
                       <DebateMapAny
