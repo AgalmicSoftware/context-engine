@@ -1435,6 +1435,12 @@ describe('DebateMap', () => {
       fireEvent.click(await screen.findByTitle('Copy Deep Link URL'));
       await waitFor(() => expect(writeText).toHaveBeenCalledWith('http://localhost/atlas/t1?session=salon'));
     });
+
+    it('asks for a category before drawing the tree chart', () => {
+      renderSessionAtlas();
+      fireEvent.click(getDebateViewModeButton('tree'));
+      expect(screen.getByText('Select a category above to view the Tree Chart')).toBeInTheDocument();
+    });
   });
 
   it('opens a requested atlas node modal and notifies the parent when it closes', async () => {

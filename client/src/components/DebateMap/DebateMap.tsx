@@ -2718,7 +2718,7 @@ const DebateMap = ({
                   </div>
                 </div>
               ) : (
-                <div className={styles.emptyState}>Select a category above to view the Policy Org Chart</div>
+                <div className={styles.emptyState}>Select a category above to view the Tree Chart</div>
               )}
             </div>
           )}
