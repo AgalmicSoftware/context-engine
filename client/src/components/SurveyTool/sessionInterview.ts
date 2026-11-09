@@ -521,7 +521,7 @@ export const buildExternalInterviewKickoff = ({
     'Every response needs confidence (0-1) and evidence. v6 confidence: the chance I keep that answer unchanged on review; v4/v5: strength of support. Anchors: 0-.39 weak, .40-.69 moderate, .70-1 direct/repeated. Optional additionalComments is text; importance/conviction range 0-100. Evidence omits quotes, source names, URLs, timestamps, account IDs, and hidden reasoning. Coverage: count distinct prior chats/memories/sources searched and actually used, and user statements used; do not count your own prior output. Use null when the platform does not reveal a searched count; 0 means none used. searchScopeNote: count limitations only. Platform/model are self-reported fidelity metadata; use "unknown" if unavailable.',
     '',
     // The format is the prompt's own; catalog groups are data, like the rest of the catalog.
-    'If the catalog lists groups, add "groups":[{"groupId":"...","reason":"...","confidence":0.8}] for any that clearly fit me, scored like answers.',
+    'If the catalog lists groups, add "groups":[{"groupId":"...","reason":"...","confidence":0.8}] for any that clearly fit me, scored like answers and judged only on catalog.groupSuggestionData.',
     '',
     'Encode exact JSON as unpadded UTF-8 base64url: catalog.reviewUrl + #prefill=PACKET. Do not POST or upload it. Nothing is submitted; I review editable drafts. Use a Markdown link labeled "Open prefilled interview"; URL as target, never visible text or a code block. If Markdown is unsupported, use the raw URL. With no responses, return clean reviewUrl.',
   ].join('\n');

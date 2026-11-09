@@ -30171,9 +30171,17 @@ var init_workerGroupUrl = __esm({
 });
 
 // shared/interviewSettings.mjs
-var DEFAULT_INTERVIEW_SETTINGS, MAX_HIDDEN_DRAFT_SHARE, MAX_FIDELITY_MINIMUM_PEOPLE, normalizeInterviewSettings, validInterviewSettings, hasInterviewQuestionGrowth;
+var GROUP_SUGGESTION_DATA, GROUP_SUGGESTION_DATA_KINDS, DEFAULT_INTERVIEW_SETTINGS, MAX_HIDDEN_DRAFT_SHARE, MAX_FIDELITY_MINIMUM_PEOPLE, normalizeInterviewSettings, validInterviewSettings, hasInterviewQuestionGrowth;
 var init_interviewSettings = __esm({
   "shared/interviewSettings.mjs"() {
+    GROUP_SUGGESTION_DATA = Object.freeze({
+      country: "the country they live in",
+      town: "where in their country they live (region, town, city or neighbourhood)",
+      work: "their work, studies and roles",
+      interests: "their interests, causes and communities",
+      sensitive: "their health, disability, religion, ethnicity, sexuality, gender identity, or party or union membership"
+    });
+    GROUP_SUGGESTION_DATA_KINDS = Object.keys(GROUP_SUGGESTION_DATA);
     DEFAULT_INTERVIEW_SETTINGS = Object.freeze({
       openingMode: "auto",
       openingPrompt: "",
@@ -30189,6 +30197,7 @@ var init_interviewSettings = __esm({
       showFidelityScore: false,
       suggestGroups: false,
       joinMatchingGroups: false,
+      groupSuggestionData: Object.freeze(["country", "work", "interests"]),
       showFidelityResults: false,
       fidelityMinimumPeople: 5
     });
@@ -30218,6 +30227,11 @@ var init_interviewSettings = __esm({
         // After an interview or AI prefill, suggest open groups that fit the person; the ones
         // they tick join when they submit. Off, nothing is matched.
         joinMatchingGroups: source.joinMatchingGroups === true,
+        // What an AI may base those suggestions on: known kinds in a fixed order. Unset takes the
+        // default; anything else that isn't a list allows nothing, so a bad value never widens it.
+        groupSuggestionData: source.groupSuggestionData === void 0 ? [...DEFAULT_INTERVIEW_SETTINGS.groupSuggestionData] : GROUP_SUGGESTION_DATA_KINDS.filter(
+          (kind) => Array.isArray(source.groupSuggestionData) && source.groupSuggestionData.includes(kind)
+        ),
         // Add "How well AIs predicted people" to Results, scoring everyone's AI-prefill drafts together.
         showFidelityResults: source.showFidelityResults === true,
         // That section hides figures from fewer people than this; 1 shows all.
@@ -30235,6 +30249,8 @@ var init_interviewSettings = __esm({
         return false;
       if (value.researchDetail !== void 0 && !["minimal", "full"].includes(value.researchDetail)) return false;
       if (value.hiddenDraftShare !== void 0 && (!Number.isFinite(value.hiddenDraftShare) || value.hiddenDraftShare < 0 || value.hiddenDraftShare > MAX_HIDDEN_DRAFT_SHARE))
+        return false;
+      if (value.groupSuggestionData !== void 0 && (!Array.isArray(value.groupSuggestionData) || new Set(value.groupSuggestionData).size !== value.groupSuggestionData.length || value.groupSuggestionData.some((kind) => !GROUP_SUGGESTION_DATA_KINDS.includes(kind))))
         return false;
       if (value.fidelityMinimumPeople !== void 0 && (!Number.isInteger(value.fidelityMinimumPeople) || value.fidelityMinimumPeople < 1 || value.fidelityMinimumPeople > MAX_FIDELITY_MINIMUM_PEOPLE))
         return false;
@@ -105777,7 +105793,8 @@ var buildInterviewBriefDocument = ({
   servedWorkerOrigin,
   questions,
   questionSetHash,
-  groups
+  groups,
+  groupSuggestionData
 } = {}) => ({
   type: "context-engine.interview-question-catalog",
   version: 1,
@@ -105806,7 +105823,11 @@ var buildInterviewBriefDocument = ({
     verification: "self_reported"
   },
   questions,
-  ...groups?.length ? { groups: groups.map(catalogGroup) } : {}
+  ...groups?.length ? {
+    groups: groups.map(catalogGroup),
+    // What the session lets an AI base a suggestion on, in words.
+    groupSuggestionData: (groupSuggestionData || []).map((kind) => GROUP_SUGGESTION_DATA[kind])
+  } : {}
 });
 var dispatchInterviewBriefRequest = async ({
   request,
@@ -105878,7 +105899,8 @@ var dispatchInterviewBriefRequest = async ({
     return deps?.json?.({ error: "A session-approved HTTPS (or localhost) sessionUrl is required." }, 400, headers2);
   }
   const questionSetHash = await (deps?.sha256 || sha2563)(JSON.stringify(canonicalizeQuestions(questions)));
-  const groups = normalizeInterviewSettings(config.interviewMode).joinMatchingGroups ? await (deps?.listSelfJoinableWorkerGroupsForVisitor || listSelfJoinableWorkerGroupsForVisitor)({
+  const { joinMatchingGroups, groupSuggestionData } = normalizeInterviewSettings(config.interviewMode);
+  const groups = joinMatchingGroups && groupSuggestionData.length ? await (deps?.listSelfJoinableWorkerGroupsForVisitor || listSelfJoinableWorkerGroupsForVisitor)({
     env,
     config,
     slug,
@@ -105892,7 +105914,8 @@ var dispatchInterviewBriefRequest = async ({
       servedWorkerOrigin: safeServedWorkerOrigin(request.url),
       questions,
       questionSetHash,
-      groups
+      groups,
+      groupSuggestionData
     }),
     200,
     headers2

@@ -400,7 +400,7 @@ try {
         await page.close();
       }
 
-      // The switch in Interview settings, with its help.
+      // The switch in Interview settings, with its help, then what the AI may use.
       {
         const { page, failures } = await run('settings');
         const toggle = page.getByLabel('Suggest groups to join');
@@ -416,11 +416,41 @@ try {
           await page.screenshot({
             path: path.join(output, `setting-${theme}-${width}.png`),
           });
-        assert.match(await tooltip.innerText(), /They tick any they want, and submitting joins them.*Off, no groups are matched/);
+        assert.match(
+          await tooltip.innerText(),
+          /They tick any they want, and submitting joins them.*Off, no groups are matched/,
+        );
         lowest = Math.min(lowest, await expectReadable(tooltip, `${theme} ${width} setting help`));
+        await page.mouse.move(0, 0);
+        await tooltip.waitFor({ state: 'hidden' });
+        const data = page.getByRole('group', { name: 'The AI may use' });
+        assert.deepEqual(
+          await data
+            .getByRole('checkbox')
+            .evaluateAll((boxes) => boxes.map((box) => [box.closest('label').textContent.trim(), box.checked])),
+          [
+            ['Country', true],
+            ['Town or city', false],
+            ['Work', true],
+            ['Interests and causes', true],
+            ['Sensitive details', false],
+          ],
+        );
+        const town = data.getByLabel('Town or city');
+        lowest = Math.min(lowest, await expectReadableInStates(page, town, data, `${theme} ${width} AI may use`));
+        await town.check();
+        assert.equal(await town.isChecked(), true);
+        await data.getByRole('button', { name: 'About what the AI may use' }).hover();
+        await tooltip.waitFor();
+        if (output) await page.screenshot({ path: path.join(output, `setting-data-${theme}-${width}.png`) });
+        assert.match(
+          await tooltip.innerText(),
+          /Town or city means anywhere smaller than a country.*suggested either way/,
+        );
+        lowest = Math.min(lowest, await expectReadable(tooltip, `${theme} ${width} AI may use help`));
         assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false);
         assert.deepEqual(failures, []);
-        console.log(`PASS Setting ${theme} ${width}: switch, help, lowest contrast ${lowest}`);
+        console.log(`PASS Setting ${theme} ${width}: switch, help, what the AI may use, lowest contrast ${lowest}`);
         await page.close();
       }
     }

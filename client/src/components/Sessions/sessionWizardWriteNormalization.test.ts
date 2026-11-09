@@ -951,6 +951,39 @@ describe('sessionWizardWriteNormalization', () => {
     expect(payload.interviewMode.joinMatchingGroups).toBe(joinMatchingGroups || undefined);
   });
 
+  test.each([
+    [['country', 'work', 'interests'], undefined],
+    [['country'], ['country']],
+    [[], []],
+  ])('publishes what the AI may use to suggest groups only when not the default (%j)', (groupSuggestionData, saved) => {
+    const payload = buildSessionWizardWorkerConfigPayload({
+      slug: 'group-data',
+      draft: {
+        sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+        interviewMode: { joinMatchingGroups: true, groupSuggestionData },
+      },
+      account: '0x00000000000000000000000000000000000000aa',
+      sessionId: '123e4567-e89b-12d3-a456-426614174000',
+      workerUrl: 'https://worker.example',
+    });
+    // The default is left out so older Session Workers still accept the save.
+    expect(payload.interviewMode.groupSuggestionData).toEqual(saved);
+  });
+
+  test('leaves out what the AI may use while group suggestions are off', () => {
+    const payload = buildSessionWizardWorkerConfigPayload({
+      slug: 'group-data-off',
+      draft: {
+        sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+        interviewMode: { joinMatchingGroups: false, groupSuggestionData: ['town'] },
+      },
+      account: '0x00000000000000000000000000000000000000aa',
+      sessionId: '123e4567-e89b-12d3-a456-426614174000',
+      workerUrl: 'https://worker.example',
+    });
+    expect(payload.interviewMode).not.toHaveProperty('groupSuggestionData');
+  });
+
   test.each([true, false])('publishes the fidelity section of Results only when on (%s)', (showFidelityResults) => {
     const payload = buildSessionWizardWorkerConfigPayload({
       slug: 'fidelity-results',

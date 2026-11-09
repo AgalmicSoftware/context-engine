@@ -2779,8 +2779,10 @@ Signed login/bootstrap requests:
     when `interviewMode.joinMatchingGroups` is on and the visitor may see groups:
     on a public session, or with a join link's `joinGroup` in `sessionUrl`.
     `groups` lists only those the visitor could join on their own, as `groupId`,
-    `label`, `description` and `tags`; the clipboard prompt says how to suggest
-    them. Binary options,
+    `label`, `description` and `tags`, and `groupSuggestionData` names, in
+    words, the kinds of detail the session lets an AI base a suggestion on
+    (`interviewMode.groupSuggestionData`); with none allowed, no groups are
+    listed. The clipboard prompt says how to suggest them. Binary options,
     the default 0–10 rating range, per-question scale overrides, and additive
     self-reported research-coverage count fields are explicit. It deliberately contains no agent instructions; the
     client-side clipboard prompt carries the user's request.

@@ -96,6 +96,19 @@ test('defaults are stable and settings reject invalid values', () => {
   assert.equal(normalizeInterviewSettings().joinMatchingGroups, false);
   assert.equal(normalizeInterviewSettings({ joinMatchingGroups: true }).joinMatchingGroups, true);
   assert.equal(normalizeInterviewSettings({ joinMatchingGroups: 'true' }).joinMatchingGroups, false);
+  // What an AI may base a group suggestion on: known kinds in a fixed order, the default when
+  // unset, and nothing for a value that isn't a list.
+  for (const [groupSuggestionData, expected] of [
+    [undefined, ['country', 'work', 'interests']],
+    ['country', []],
+    [null, []],
+    [{ country: true }, []],
+    [[], []],
+    [['sensitive', 'country', 'address', 'country'], ['country', 'sensitive']],
+  ])
+    assert.deepEqual(normalizeInterviewSettings({ groupSuggestionData }).groupSuggestionData, expected);
+  for (const groupSuggestionData of [undefined, [], ['town'], ['interests', 'country']])
+    assert.equal(validInterviewSettings({ groupSuggestionData }), true);
   assert.equal(normalizeInterviewSettings().showFidelityResults, false);
   assert.equal(normalizeInterviewSettings({ showFidelityResults: true }).showFidelityResults, true);
   assert.equal(normalizeInterviewSettings({ showFidelityResults: 'true' }).showFidelityResults, false);
@@ -135,6 +148,11 @@ test('defaults are stable and settings reject invalid values', () => {
     { suggestGroups: 'true' },
     { joinMatchingGroups: 'true' },
     { joinMatchingGroups: 1 },
+    { groupSuggestionData: 'country' },
+    { groupSuggestionData: ['address'] },
+    { groupSuggestionData: ['work', 'work'] },
+    { groupSuggestionData: [1] },
+    { groupSuggestionData: null },
     { showFidelityResults: 'true' },
     { showFidelityResults: 1 },
     { fidelityMinimumPeople: 0 },

@@ -4,7 +4,11 @@ import { getSessionWizardInterviewValidationError } from './sessionWizardIntervi
 import useSessionWizardTooltipPreference from './hooks/useSessionWizardTooltipPreference';
 import SessionWizardInfoTooltip from './SessionWizardInfoTooltip';
 import { Input, Label } from 'reactstrap';
-import { DEFAULT_INTERVIEW_SETTINGS, normalizeInterviewSettings } from '../../../../shared/interviewSettings.mjs';
+import {
+  DEFAULT_INTERVIEW_SETTINGS,
+  normalizeInterviewSettings,
+  type GroupSuggestionDataKind,
+} from '../../../../shared/interviewSettings.mjs';
 import { DEFAULT_REALTIME_INTERVIEW_MODEL } from '../../utilities/audio/realtimeInterviewConfig';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 
@@ -28,6 +32,17 @@ const FIDELITY_ABOUT =
 
 const JOIN_GROUPS_ABOUT =
   'After an AI prefill or voice interview, the AI suggests the session’s open groups that fit each participant’s answers, under their drafts. They tick any they want, and submitting joins them. Their own AI can suggest groups too. Off, no groups are matched.';
+// What an AI may base those suggestions on, in the setting's order.
+const GROUP_DATA_LABELS: Record<GroupSuggestionDataKind, string> = {
+  country: 'Country',
+  town: 'Town or city',
+  work: 'Work',
+  interests: 'Interests and causes',
+  sensitive: 'Sensitive details',
+};
+const GROUP_DATA_KINDS = Object.keys(GROUP_DATA_LABELS) as GroupSuggestionDataKind[];
+const GROUP_DATA_ABOUT =
+  'What the session’s AI and each participant’s own AI may go on when suggesting groups; with none ticked, neither suggests any. Town or city means anywhere smaller than a country. Sensitive details are health, disability, religion, ethnicity, sexuality, gender identity, and party or union membership. Groups named like an answer someone chose are suggested either way.';
 
 // The smallest group "How well AIs predicted people" reports on; 1 shows every figure.
 const FIDELITY_MINIMUMS = [1, 3, 5, 10];
@@ -191,26 +206,67 @@ export default function InterviewSettingsFields({ value, onChange, disabled = fa
         ] as const
       ).map((key) =>
         key === 'joinMatchingGroups' ? (
-          <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12 }}>
-            <Label style={{ marginBottom: 0 }}>
-              <input
-                type="checkbox"
-                checked={settings.joinMatchingGroups}
-                aria-describedby={`${joinGroupsId}-about`}
-                onChange={(e) => change(key, e.target.checked)}
-              />{' '}
-              Suggest groups to join
-            </Label>
-            <SessionWizardInfoTooltip
-              enabled={tooltipsEnabled}
-              id={`${joinGroupsId}-help`}
-              content={JOIN_GROUPS_ABOUT}
-              placement="top"
-              ariaLabel="About suggesting groups to join"
-            />
-            <span id={`${joinGroupsId}-about`} hidden>
-              {JOIN_GROUPS_ABOUT}
-            </span>
+          <div key={key} style={{ marginTop: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Label style={{ marginBottom: 0 }}>
+                <input
+                  type="checkbox"
+                  checked={settings.joinMatchingGroups}
+                  aria-describedby={`${joinGroupsId}-about`}
+                  onChange={(e) => change(key, e.target.checked)}
+                />{' '}
+                Suggest groups to join
+              </Label>
+              <SessionWizardInfoTooltip
+                enabled={tooltipsEnabled}
+                id={`${joinGroupsId}-help`}
+                content={JOIN_GROUPS_ABOUT}
+                placement="top"
+                ariaLabel="About suggesting groups to join"
+              />
+              <span id={`${joinGroupsId}-about`} hidden>
+                {JOIN_GROUPS_ABOUT}
+              </span>
+            </div>
+            {settings.joinMatchingGroups ? (
+              <div
+                role="group"
+                aria-labelledby={`${joinGroupsId}-data`}
+                aria-describedby={`${joinGroupsId}-data-about`}
+                style={{ marginLeft: 24, marginTop: 4 }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span id={`${joinGroupsId}-data`}>The AI may use</span>
+                  <SessionWizardInfoTooltip
+                    enabled={tooltipsEnabled}
+                    id={`${joinGroupsId}-data-help`}
+                    content={GROUP_DATA_ABOUT}
+                    placement="top"
+                    ariaLabel="About what the AI may use"
+                  />
+                  <span id={`${joinGroupsId}-data-about`} hidden>
+                    {GROUP_DATA_ABOUT}
+                  </span>
+                </div>
+                {GROUP_DATA_KINDS.map((kind) => (
+                  <Label key={kind} style={{ display: 'block', marginBottom: 0 }}>
+                    <input
+                      type="checkbox"
+                      checked={settings.groupSuggestionData.includes(kind)}
+                      onChange={(e) =>
+                        change(
+                          'groupSuggestionData',
+                          GROUP_DATA_KINDS.filter((each) =>
+                            each === kind ? e.target.checked : settings.groupSuggestionData.includes(each),
+                          ),
+                        )
+                      }
+                    />{' '}
+                    {GROUP_DATA_LABELS[kind]}
+                  </Label>
+                ))}
+              </div>
+            ) : null}
           </div>
         ) : (
           <Label key={key} style={{ display: 'block', marginTop: 12 }}>

@@ -112,7 +112,7 @@ test('missing nested fields take defaults; a mode profile is taken whole', () =>
   const template = valid({
     format,
     ai: { models: { fast: { model: 'claude-sonnet-5-5' } } },
-    interviewMode: { openingPrompt: 'Welcome' },
+    interviewMode: { openingPrompt: 'Welcome', groupSuggestionData: ['town'] },
     resultsAnalysis: { generationMode: 'automatic' },
     sessionContext: { links: [{ label: 'Essay', url: 'https://example.com/essay' }] },
     sessionModeProfile: { preset: 'custom' },
@@ -121,6 +121,7 @@ test('missing nested fields take defaults; a mode profile is taken whole', () =>
   assert.equal(template.ai.models.thinking.model, 'gpt-6.1-sol');
   assert.equal(template.interviewMode.openingPrompt, 'Welcome');
   assert.equal(template.interviewMode.questionGrowthPercent, 20);
+  assert.deepEqual(template.interviewMode.groupSuggestionData, ['town']);
   assert.equal(template.resultsAnalysis.generationMode, 'automatic');
   assert.deepEqual(template.resultsAnalysis.views, DEFAULT_RESULTS_ANALYSIS_SETTINGS.views);
   assert.deepEqual(template.sessionContext, {
@@ -153,6 +154,7 @@ test('types are checked, and the format is required', () => {
   const errors = errorsOf({
     sessionName: 42,
     interviewModeEnabled: 'yes',
+    interviewMode: { groupSuggestionData: 'town' },
     sessionContext: { paragraphs: 'one' },
     contextFiles: [{ name: null }],
     sessionModeProfile: { ...workerProfile(), evm: { registryChainId: '11155420' } },
@@ -163,6 +165,7 @@ test('types are checked, and the format is required', () => {
     'sessionContext.paragraphs',
     'contextFiles.0.name',
     'interviewModeEnabled',
+    'interviewMode.groupSuggestionData',
     'sessionModeProfile.evm.registryChainId',
   ]);
   assert.deepEqual(errorsOf({ format: 'ce.session-template/v2' }).map((error) => error.path), ['format']);
@@ -182,7 +185,12 @@ test('settings with fixed vocabularies or limits are checked', () => {
     draftId: 'has spaces',
     groupCreationPolicy: 'everyone',
     sessionContext: { links: [{ label: 'Bad', url: 'javascript:alert(1)' }, { label: 'Plain', url: 'http://example.com' }] },
-    interviewMode: { hiddenDraftShare: 0.9, openingMode: 'owner', realtimeModel: 'gpt-invented' },
+    interviewMode: {
+      hiddenDraftShare: 0.9,
+      groupSuggestionData: ['address'],
+      openingMode: 'owner',
+      realtimeModel: 'gpt-invented',
+    },
     resultsAnalysis: { generationMode: 'sometimes' },
   });
   assert.deepEqual(errors.map((error) => error.path), [
@@ -191,6 +199,7 @@ test('settings with fixed vocabularies or limits are checked', () => {
     'sessionContext.links.1.url',
     'groupCreationPolicy',
     'interviewMode.hiddenDraftShare',
+    'interviewMode.groupSuggestionData',
     'interviewMode.realtimeModel',
     'interviewMode.openingPrompt',
     'resultsAnalysis.generationMode',

@@ -2,7 +2,7 @@ import { readCurrentSessionConfig } from './sessionConfigAuthority.js';
 import { resolveAnonymousIpDailyLimit } from './anonymousRateLimitPolicy.js';
 import { loadPublicInterviewQuestions as loadPublicInterviewQuestionsBoundary } from './interviewQuestionCatalog.js';
 import { listSelfJoinableWorkerGroupsForVisitor as listSelfJoinableWorkerGroupsForVisitorBoundary } from './workerGroups.js';
-import { normalizeInterviewSettings } from '../../shared/interviewSettings.mjs';
+import { GROUP_SUGGESTION_DATA, normalizeInterviewSettings } from '../../shared/interviewSettings.mjs';
 
 // v6 asks for confidence as the chance the person keeps the answer; hashes follow v5.
 export const INTERVIEW_PROMPT_VERSION = 'ce-interview-brief-v6';
@@ -103,6 +103,7 @@ export const buildInterviewBriefDocument = ({
   questions,
   questionSetHash,
   groups,
+  groupSuggestionData,
 } = {}) => ({
   type: 'context-engine.interview-question-catalog',
   version: 1,
@@ -131,7 +132,13 @@ export const buildInterviewBriefDocument = ({
     verification: 'self_reported',
   },
   questions,
-  ...(groups?.length ? { groups: groups.map(catalogGroup) } : {}),
+  ...(groups?.length
+    ? {
+        groups: groups.map(catalogGroup),
+        // What the session lets an AI base a suggestion on, in words.
+        groupSuggestionData: (groupSuggestionData || []).map((kind) => GROUP_SUGGESTION_DATA[kind]),
+      }
+    : {}),
 });
 
 export const dispatchInterviewBriefRequest = async ({
@@ -207,7 +214,9 @@ export const dispatchInterviewBriefRequest = async ({
   const questionSetHash = await (deps?.sha256 || sha256)(JSON.stringify(canonicalizeQuestions(questions)));
   // With joining matching groups on, the person's own AI may suggest groups too, from those
   // this visitor could see: all of them on a public session, or what a join link allows.
-  const groups = normalizeInterviewSettings(config.interviewMode).joinMatchingGroups
+  // A session that lets an AI use no kind of detail about people lists none.
+  const { joinMatchingGroups, groupSuggestionData } = normalizeInterviewSettings(config.interviewMode);
+  const groups = joinMatchingGroups && groupSuggestionData.length
     ? await (deps?.listSelfJoinableWorkerGroupsForVisitor || listSelfJoinableWorkerGroupsForVisitorBoundary)({
         env,
         config,
@@ -224,6 +233,7 @@ export const dispatchInterviewBriefRequest = async ({
       questions,
       questionSetHash,
       groups,
+      groupSuggestionData,
     }),
     200,
     headers,

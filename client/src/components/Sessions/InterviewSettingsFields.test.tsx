@@ -123,6 +123,50 @@ it('turns on suggesting groups to join, off by default, with its explanation beh
   expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ joinMatchingGroups: false }));
 });
 
+it('asks what the AI may use to suggest groups only while suggesting them', () => {
+  const onChange = jest.fn();
+  const latest = () => onChange.mock.calls.at(-1)?.[0];
+  const { rerender } = render(<InterviewSettingsFields value={{}} onChange={onChange} />);
+  expect(screen.queryByRole('group', { name: 'The AI may use' })).not.toBeInTheDocument();
+  rerender(<InterviewSettingsFields value={{ joinMatchingGroups: true }} onChange={onChange} />);
+  const group = screen.getByRole('group', { name: 'The AI may use' });
+  expect(group).toHaveAccessibleDescription(
+    /with none ticked, neither suggests any.*Town or city means anywhere smaller than a country.*suggested either way/,
+  );
+  fireEvent.click(within(group).getByRole('button', { name: 'About what the AI may use' }));
+  expect(onChange).not.toHaveBeenCalled();
+  // Country, work and interests by default; never where in a country, or sensitive details.
+  expect(
+    within(group)
+      .getAllByRole('checkbox')
+      .map((box) => [box.closest('label')?.textContent?.trim(), (box as HTMLInputElement).checked]),
+  ).toEqual([
+    ['Country', true],
+    ['Town or city', false],
+    ['Work', true],
+    ['Interests and causes', true],
+    ['Sensitive details', false],
+  ]);
+  fireEvent.click(within(group).getByLabelText('Town or city'));
+  expect(latest()).toEqual(
+    expect.objectContaining({
+      joinMatchingGroups: true,
+      groupSuggestionData: ['country', 'town', 'work', 'interests'],
+    }),
+  );
+  rerender(<InterviewSettingsFields value={latest()} onChange={onChange} />);
+  fireEvent.click(screen.getByLabelText('Country'));
+  expect(latest().groupSuggestionData).toEqual(['town', 'work', 'interests']);
+  rerender(<InterviewSettingsFields value={latest()} onChange={onChange} />);
+  // Off, the choice is hidden but kept in the draft; saves leave it out while it's off.
+  fireEvent.click(screen.getByLabelText('Suggest groups to join'));
+  expect(latest()).toEqual(
+    expect.objectContaining({ joinMatchingGroups: false, groupSuggestionData: ['town', 'work', 'interests'] }),
+  );
+  rerender(<InterviewSettingsFields value={latest()} onChange={onChange} />);
+  expect(screen.queryByRole('group', { name: 'The AI may use' })).not.toBeInTheDocument();
+});
+
 it('turns on the private fidelity score, off by default', () => {
   const onChange = jest.fn();
   render(<InterviewSettingsFields value={{}} onChange={onChange} />);

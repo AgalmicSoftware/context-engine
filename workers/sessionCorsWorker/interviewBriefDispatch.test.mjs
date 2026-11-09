@@ -265,16 +265,34 @@ test('the catalog lists groups to join only when the session joins matching grou
   ]);
   // The catalog carries no instructions; the clipboard prompt says how to suggest groups.
   assert.equal('groupContract' in on, false);
+  // What an AI may base a suggestion on, in words: the session's choice, or the default.
+  assert.deepEqual(on.groupSuggestionData, [
+    'the country they live in',
+    'their work, studies and roles',
+    'their interests, causes and communities',
+  ]);
+  const chosen = await run({ joinMatchingGroups: true, groupSuggestionData: ['sensitive', 'town'] }, groups);
+  assert.deepEqual(chosen.groupSuggestionData, [
+    'where in their country they live (region, town, city or neighbourhood)',
+    'their health, disability, religion, ethnicity, sexuality, gender identity, or party or union membership',
+  ]);
   assert.equal(on.questionSetHash, 'question-hash');
-  assert.equal(listed.length, 1);
+  assert.equal(listed.length, 2);
   assert.equal(listed[0].slug, 'demo');
   assert.equal(listed[0].inviteGroupId, 'salon');
   assert.equal(listed[0].env.marker, 'env');
 
-  for (const body of [await run({ joinMatchingGroups: true }, []), await run({ suggestGroups: true }, groups), await run(undefined, groups)]) {
+  for (const body of [
+    await run({ joinMatchingGroups: true }, []),
+    await run({ suggestGroups: true }, groups),
+    await run(undefined, groups),
+    // Nothing about people to go on, so no groups to suggest.
+    await run({ joinMatchingGroups: true, groupSuggestionData: [] }, groups),
+  ]) {
     assert.equal('groups' in body, false);
+    assert.equal('groupSuggestionData' in body, false);
   }
-  assert.equal(listed.length, 2);
+  assert.equal(listed.length, 3);
 });
 
 test('dispatchInterviewBriefRequest applies anonymous IP daily budgets before loading questions', async () => {

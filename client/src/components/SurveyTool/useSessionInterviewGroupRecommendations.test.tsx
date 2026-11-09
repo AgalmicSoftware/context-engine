@@ -18,6 +18,7 @@ jest.mock('./sessionInterviewGroupRecommendations', () => {
     './sessionInterviewGroupRecommendations',
   );
   return {
+    groupSuggestionDataFor: actual.groupSuggestionDataFor,
     matchInterviewGroupsByAnswer: actual.matchInterviewGroupsByAnswer,
     matchInterviewGroupsFromPrefill: actual.matchInterviewGroupsFromPrefill,
     readCachedInterviewWorkerToken: actual.readCachedInterviewWorkerToken,
@@ -146,6 +147,27 @@ describe('useSessionInterviewGroupRecommendations', () => {
     const picked = { groupId: 'old-group', reason: 'Your AI: Works on AI policy', evidence: '', confidence: 0.9 };
     expect(result.current.recommendations).toEqual([choseNewGroup, picked]);
     // The session's AI is asked only about groups nothing else matched; here, none are left.
+    expect(recommendInterviewGroups).not.toHaveBeenCalled();
+  });
+
+  it('suggests only groups named like an answer where the session lets an AI use nothing about people', async () => {
+    const props: HookProps = {
+      ...pickedNewGroup,
+      sessionConfig: { ...sessionConfig, interviewMode: { joinMatchingGroups: true, groupSuggestionData: [] } },
+      request: {
+        ...pickedNewGroup.request!,
+        prefillPacket: {
+          version: 1,
+          sessionSlug: 'demo',
+          source: { platform: 'claude', modelId: 'claude-test', verification: 'self_reported' },
+          responderContext: {},
+          groups: [{ groupId: 'old-group', reason: 'Works on AI policy', confidence: 0.9 }],
+        },
+      },
+    };
+    const { result } = renderHook(() => useSessionInterviewGroupRecommendations(props));
+    await waitFor(() => expect(result.current.availability).toBe('available'));
+    expect(result.current.recommendations).toEqual([choseNewGroup]);
     expect(recommendInterviewGroups).not.toHaveBeenCalled();
   });
 

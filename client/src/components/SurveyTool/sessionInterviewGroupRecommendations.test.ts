@@ -351,6 +351,29 @@ describe('session interview group recommendations', () => {
     expect(prompt).not.toMatch(/at most \d+ groups/);
   });
 
+  it('judges fit only on the kinds of detail the session lets an AI use', () => {
+    const promptFor = (groupSuggestionData?: string[]) =>
+      buildInterviewGroupRecommendationPrompt({
+        candidates: [eligibleCandidate],
+        transcript: 'Responder: I live in Lyon and work on French AI governance pilots.',
+        sessionConfig: groupSuggestionData ? { interviewMode: { groupSuggestionData } } : undefined,
+      });
+    const country = 'the country they live in';
+    const town = 'where in their country they live (region, town, city or neighbourhood)';
+    const work = 'their work, studies and roles';
+    const interests = 'their interests, causes and communities';
+    const sensitive =
+      'their health, disability, religion, ethnicity, sexuality, gender identity, or party or union membership';
+    const rule = (allowed: string[], excluded: string[]) =>
+      `\n- Judge whether the respondent fits a group only on what the evidence shows about ${allowed.join('; ')}. ` +
+      `Nothing else about them counts${excluded.length ? `, such as ${excluded.join('; ')}` : ''}.\n`;
+    expect(promptFor()).toContain(rule([country, work, interests], [town, sensitive]));
+    expect(promptFor(['sensitive', 'town'])).toContain(rule([town, sensitive], [country, work, interests]));
+    expect(promptFor(['country', 'town', 'work', 'interests', 'sensitive'])).toContain(
+      rule([country, town, work, interests, sensitive], []),
+    );
+  });
+
   it('keeps every fitting group and each one’s confidence, clamped to 0-1', () => {
     const candidates = Array.from({ length: 6 }, (_, index) => ({ ...eligibleCandidate, groupId: `group-${index}` }));
     const quote = 'I live in Lyon and work on French AI governance pilots.';
@@ -474,6 +497,20 @@ describe('session interview group recommendations', () => {
       workerUrl: 'https://worker.example',
     });
     expect(result.recommendations.map(({ groupId }) => groupId)).toEqual(candidates.map(({ groupId }) => groupId));
+  });
+
+  it('asks the AI with the session’s own choice of what it may use', async () => {
+    jest.mocked(callAI).mockResolvedValue(JSON.stringify({ groups: [] }));
+    await recommendInterviewGroups({
+      candidates: [eligibleCandidate],
+      transcript: 'Responder: I live in Lyon.',
+      sessionSlug: 'demo4',
+      sessionConfig: { ...workerConfig(), interviewMode: { joinMatchingGroups: true, groupSuggestionData: ['town'] } },
+      workerUrl: 'https://worker.example',
+    });
+    expect(jest.mocked(callAI).mock.calls[0][0]).toContain(
+      'only on what the evidence shows about where in their country they live (region, town, city or neighbourhood).',
+    );
   });
 
   it('recommends eligible groups beyond the first bounded prompt chunk', async () => {

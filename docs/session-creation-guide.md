@@ -144,7 +144,10 @@ Interview settings for the call:
   default) suggests the session's open groups that fit each participant after
   an interview or AI prefill: the ones they tick join when they submit, and
   their own AI can suggest groups too. Off, no groups are matched. The older
-  `interviewMode.suggestGroups` is no longer read.
+  `interviewMode.suggestGroups` is no longer read. While it is on, **The AI may
+  use** (`interviewMode.groupSuggestionData`) sets what an AI may base a
+  suggestion on: Country, Work, and Interests and causes by default; Town or
+  city, and Sensitive details, only when ticked.
 
 Interview settings for research:
 

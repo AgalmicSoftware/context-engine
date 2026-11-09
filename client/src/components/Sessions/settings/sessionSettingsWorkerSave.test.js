@@ -468,6 +468,30 @@ describe('saving the edit page through the Session Worker', () => {
     });
   });
 
+  it('saves what the AI may use for group suggestions only while they are on and it is not the default', () => {
+    // As Interview settings writes an edit: every setting, then the ones changed.
+    const edit = (changes) => (draft) => {
+      draft.interviewMode = { ...draft.interviewMode, ...normalizeInterviewSettings(draft.interviewMode), ...changes };
+    };
+    const stored = publishedSession();
+    const on = editAndSave(stored, edit({ joinMatchingGroups: true }));
+    expect(on.save.patch.interviewMode).toMatchObject({ joinMatchingGroups: true });
+    expect(on.save.patch.interviewMode).not.toHaveProperty('groupSuggestionData');
+
+    const town = editAndSave(stored, edit({ joinMatchingGroups: true, groupSuggestionData: ['town'] }));
+    expect(town.save.patch.interviewMode.groupSuggestionData).toEqual(['town']);
+    expect(town.result).toMatchObject({ ok: true });
+    expect(editAndSave(stored, edit({ groupSuggestionData: ['town'] })).save.patch).toEqual({});
+
+    const back = editAndSave(town.result.config, edit({ groupSuggestionData: ['country', 'work', 'interests'] }));
+    expect(back.save.patch.interviewMode).not.toHaveProperty('groupSuggestionData');
+    expect(back.result.config.interviewMode).not.toHaveProperty('groupSuggestionData');
+
+    const off = editAndSave(town.result.config, edit({ joinMatchingGroups: false }));
+    expect(off.save.patch.interviewMode).not.toHaveProperty('groupSuggestionData');
+    expect(off.result.config.interviewMode).not.toHaveProperty('groupSuggestionData');
+  });
+
   it('saves nothing when nothing changed', () => {
     const stored = publishedSession();
     const { save } = editAndSave(stored, () => {});

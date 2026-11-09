@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { InterviewDraftResponse, InterviewPrefillPacket, InterviewQuestion } from './sessionInterview';
 import {
+  groupSuggestionDataFor,
   loadInterviewWorkerGroupCandidates,
   matchInterviewGroupsByAnswer,
   matchInterviewGroupsFromPrefill,
@@ -124,11 +125,12 @@ export function useSessionInterviewGroupRecommendations({
       });
       const unmatched = (matches: InterviewGroupRecommendation[]) =>
         catalog.candidates.filter((group) => !matches.some((match) => match.groupId === group.groupId));
-      const picked = matchInterviewGroupsFromPrefill({
-        candidates: unmatched(exact),
-        picks: request.prefillPacket?.groups,
-      });
-      const others = unmatched([...exact, ...picked]);
+      // Where the session lets an AI use nothing about people, only groups named like an answer show.
+      const aiMaySuggest = groupSuggestionDataFor(sessionConfig).length > 0;
+      const picked = aiMaySuggest
+        ? matchInterviewGroupsFromPrefill({ candidates: unmatched(exact), picks: request.prefillPacket?.groups })
+        : [];
+      const others = aiMaySuggest ? unmatched([...exact, ...picked]) : [];
       // These need no AI call, so they show at once; the session's AI can take up to 30 seconds.
       if (others.length && (exact.length || picked.length))
         setRecommendationState({
