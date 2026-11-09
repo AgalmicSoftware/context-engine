@@ -316,6 +316,34 @@ test('more than 2000 proposals remain a capped question list marked incomplete',
     'an aggregate must not present the capped source as a complete result');
 });
 
+test('a re-posted question keeps its answer schema, and an archived one stays archived', async () => {
+  const { f } = readableFixture();
+  const admin = await f.credential({ scopes: ['read_questions', 'pose_questions'] });
+  const create = async question => jsonOk(await f.request('/api/agent/questions/create', { method: 'POST', token: admin.token,
+    body: { questions: [question] } }));
+  const proposals = () => [...f.records].filter(([key]) => key.includes('proposed-question'));
+  const choice = { prompt: 'Which fixture season?', questionType: 'multichoice', options: ['Spring', 'Autumn'] };
+  const rating = { prompt: 'Rate the fixture plan', questionType: 'rating', ratingScale: { min: 1, max: 5 } };
+  const [{ questionId: choiceId }] = (await create(choice)).created;
+  const [{ questionId: ratingId }] = (await create(rating)).created;
+  const stored = proposals();
+  for (const changed of [{ ...choice, options: ['Spring', 'Winter'] }, { ...choice, singleSelect: true },
+    { ...rating, ratingScale: { min: 0, max: 100 } }]) {
+    const result = await create(changed);
+    assert.deepEqual(result.created, [], JSON.stringify(changed));
+    assert.equal(result.skipped[0].reason, 'question_schema_conflict');
+  }
+  // The same question again is reported as before, and nothing is rewritten.
+  assert.deepEqual((await create(choice)).created.map(row => row.questionId), [choiceId]);
+  assert.deepEqual(proposals(), stored);
+  await jsonOk(await f.request('/api/agent/admin/questions/delete', { method: 'POST', token: admin.token, body: { questionIds: [ratingId] } }));
+  const archived = proposals();
+  const reposted = await create(rating);
+  assert.deepEqual(reposted.created, []);
+  assert.equal(reposted.skipped[0].reason, 'question_archived');
+  assert.deepEqual(proposals(), archived);
+});
+
 for (const complete of [false, true]) test(`research completion counts stored answers once across retries, overlaps and edits (complete=${complete})`, async () => {
   const { f, coordinated } = readableFixture();
   let time = Date.now();

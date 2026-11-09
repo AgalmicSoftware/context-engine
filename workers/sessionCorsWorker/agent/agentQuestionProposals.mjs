@@ -1,4 +1,4 @@
-import { normalizeRatingScale as normalizeQuestionRatingScale, ratingStepFor } from '../../../shared/questions/ratingScale.mjs';
+import { DEFAULT_RATING_SCALE, normalizeRatingScale as normalizeQuestionRatingScale, ratingStepFor } from '../../../shared/questions/ratingScale.mjs';
 import { validateQuadraticQuestion } from '../../../shared/questions/quadraticAllocation.mjs';
 import { sessionContextPlainText } from '../../../shared/sessionContext.mjs';
 import {
@@ -353,6 +353,19 @@ function questionIdFromPrompt({
   return `${PROPOSED_QUESTION_ID_PREFIX}${buildOpaqueActionId(seed).replace(/^ceab_/, '')}`;
 }
 
+// What an answer to a proposal means. Its id leaves part of this out, so a
+// re-post must not swap it under answers already given.
+function proposedAnswerSchema(record = {}) {
+  const type = normalizeQuestionType(record.questionType);
+  return JSON.stringify({
+    type,
+    options: type === 'multichoice' || type === 'quadratic' ? record.options ?? [] : [],
+    singleSelect: type === 'multichoice' && record.singleSelect === true,
+    ratingScale: type === 'rating' ? record.ratingScale || normalizeRatingScale(DEFAULT_RATING_SCALE) : null,
+    voiceCredits: type === 'quadratic' ? record.voiceCredits ?? 99 : null,
+  });
+}
+
 function proposedRecordToQuestion(record = {}) {
   const questionId = safeString(record.questionId);
   const prompt = normalizePrompt(record.prompt || record.questionText);
@@ -470,7 +483,7 @@ export async function persistAgentProposedQuestion({
   const prefix = proposedQuestionPrefix(slug);
   if (!slug) return { ok: false, reason: 'session_slug_missing' };
   if (!promptText) return { ok: false, reason: 'question_prompt_missing' };
-  if (!prefix || !env?.AGENT_ACTION_KV || typeof env.AGENT_ACTION_KV.put !== 'function') {
+  if (!prefix || !env?.AGENT_ACTION_KV || typeof env.AGENT_ACTION_KV.get !== 'function' || typeof env.AGENT_ACTION_KV.put !== 'function') {
     return { ok: false, reason: 'action_kv_unavailable' };
   }
   const telegramUserId = safeString(normalized.user?.telegramUserId || normalized.telegramUserId);
@@ -507,6 +520,18 @@ export async function persistAgentProposedQuestion({
   if (metadata && typeof metadata === 'object' && !Array.isArray(metadata)) {
     record.actionMetadata = { ...metadata };
   }
+  const key = `${prefix}${questionId}`;
+  const stored = await env.AGENT_ACTION_KV.get(key);
+  if (stored != null) {
+    // A re-post leaves the stored question as it is: an archived one stays
+    // archived, and one with another answer schema is refused.
+    const existing = safeJsonParse(stored, null);
+    const sameSchema = !!existing && typeof existing === 'object' && !Array.isArray(existing) &&
+      proposedAnswerSchema(existing) === proposedAnswerSchema(record);
+    if (!sameSchema) return { ok: false, reason: 'question_schema_conflict', questionId };
+    if (lower(existing.status) !== 'active') return { ok: false, reason: 'question_archived', questionId };
+    return { ok: true, questionId, question: proposedRecordToQuestion(existing), record: existing };
+  }
   assertNoSecretShape(record, "Agent proposed questions must not serialize secrets.");
   const activityMetadata = buildAgentActivityMetadata({
     type: 'proposed_question',
@@ -517,7 +542,7 @@ export async function persistAgentProposedQuestion({
     questionId: record.questionId,
     telegramUserId: record.createdByTelegramUserId,
   });
-  await env.AGENT_ACTION_KV.put(`${prefix}${questionId}`, JSON.stringify(record), {
+  await env.AGENT_ACTION_KV.put(key, JSON.stringify(record), {
     expirationTtl: ttlSeconds,
     metadata: activityMetadata,
   });

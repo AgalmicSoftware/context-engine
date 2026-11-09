@@ -65405,6 +65405,16 @@ function questionIdFromPrompt({
   ].join("|");
   return `${PROPOSED_QUESTION_ID_PREFIX}${buildOpaqueActionId(seed).replace(/^ceab_/, "")}`;
 }
+function proposedAnswerSchema(record4 = {}) {
+  const type = normalizeQuestionType3(record4.questionType);
+  return JSON.stringify({
+    type,
+    options: type === "multichoice" || type === "quadratic" ? record4.options ?? [] : [],
+    singleSelect: type === "multichoice" && record4.singleSelect === true,
+    ratingScale: type === "rating" ? record4.ratingScale || normalizeRatingScale2(DEFAULT_RATING_SCALE2) : null,
+    voiceCredits: type === "quadratic" ? record4.voiceCredits ?? 99 : null
+  });
+}
 function proposedRecordToQuestion(record4 = {}) {
   const questionId4 = safeString(record4.questionId);
   const prompt = normalizePrompt(record4.prompt || record4.questionText);
@@ -65514,7 +65524,7 @@ async function persistAgentProposedQuestion({
   const prefix = proposedQuestionPrefix(slug);
   if (!slug) return { ok: false, reason: "session_slug_missing" };
   if (!promptText) return { ok: false, reason: "question_prompt_missing" };
-  if (!prefix || !env?.AGENT_ACTION_KV || typeof env.AGENT_ACTION_KV.put !== "function") {
+  if (!prefix || !env?.AGENT_ACTION_KV || typeof env.AGENT_ACTION_KV.get !== "function" || typeof env.AGENT_ACTION_KV.put !== "function") {
     return { ok: false, reason: "action_kv_unavailable" };
   }
   const telegramUserId = safeString(normalized.user?.telegramUserId || normalized.telegramUserId);
@@ -65551,6 +65561,15 @@ async function persistAgentProposedQuestion({
   if (metadata && typeof metadata === "object" && !Array.isArray(metadata)) {
     record4.actionMetadata = { ...metadata };
   }
+  const key = `${prefix}${questionId4}`;
+  const stored = await env.AGENT_ACTION_KV.get(key);
+  if (stored != null) {
+    const existing = safeJsonParse(stored, null);
+    const sameSchema = !!existing && typeof existing === "object" && !Array.isArray(existing) && proposedAnswerSchema(existing) === proposedAnswerSchema(record4);
+    if (!sameSchema) return { ok: false, reason: "question_schema_conflict", questionId: questionId4 };
+    if (lower2(existing.status) !== "active") return { ok: false, reason: "question_archived", questionId: questionId4 };
+    return { ok: true, questionId: questionId4, question: proposedRecordToQuestion(existing), record: existing };
+  }
   assertNoSecretShape(record4, "Agent proposed questions must not serialize secrets.");
   const activityMetadata = buildAgentActivityMetadata({
     type: "proposed_question",
@@ -65561,7 +65580,7 @@ async function persistAgentProposedQuestion({
     questionId: record4.questionId,
     telegramUserId: record4.createdByTelegramUserId
   });
-  await env.AGENT_ACTION_KV.put(`${prefix}${questionId4}`, JSON.stringify(record4), {
+  await env.AGENT_ACTION_KV.put(key, JSON.stringify(record4), {
     expirationTtl: ttlSeconds,
     metadata: activityMetadata
   });
