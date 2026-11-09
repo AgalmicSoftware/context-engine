@@ -93,7 +93,7 @@ export const buildDebateAtlasTopicPrompt = ({ branch = '', topic = '', questions
 Branch: ${JSON.stringify(text(branch, 120))}.${topic ? ` Topic: ${JSON.stringify(text(topic, 120))}.` : ''}
 Return one JSON object with no Markdown fences and no tool calls, in this shape:
 {
-  "summary": "two neutral sentences on where participants agree and where they split",
+  "summary": "one or two neutral sentences, under 280 characters in all, on where participants agree and where they split",
   "compass": { "x": { "label": "axis name", "left": "short position", "right": "short position" }, "y": { "label": "axis name", "top": "short position", "bottom": "short position" } },
   "positions": [{ "label": "3-8 word position", "summary": "paraphrased reasoning behind it", "participantIds": ["participant_001"], "x": 0.2, "y": 0.7 }],
   "participants": [{ "participantId": "participant_001", "x": 0.25, "y": 0.65, "reason": "under 15 words on why they sit here" }]
@@ -209,7 +209,8 @@ export const normalizeDebateAtlasTopic = ({ value, answeredBy, placeParticipants
       reason: text(entry?.reason, 160),
     };
   }).filter(Boolean) : [];
-  return positions.length ? { summary: text(value?.summary, 600), compass, positions, participants } : null;
+  // `answered` counts everyone whose answers the AI read here, the whole that each position's holders are part of.
+  return positions.length ? { summary: text(value?.summary, 600), compass, positions, participants, answered: answeredBy.size } : null;
 };
 
 // Runs `task` over `items` with at most `limit` in flight, keeping order.
@@ -356,7 +357,7 @@ export const buildDebateAtlas = async ({ env, slug, config, body = {}, headers, 
         id: branch.id,
         label: branch.label,
         summary: (own && map?.summary) || branch.summary,
-        ...(map ? { compass: map.compass, positions: map.positions, participants: map.participants } : {}),
+        ...(map ? { compass: map.compass, positions: map.positions, participants: map.participants, answered: map.answered } : {}),
         topics: mappedTopics,
       };
     }).filter((branch) => branch.topics.length);

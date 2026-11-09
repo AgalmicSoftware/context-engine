@@ -103268,7 +103268,7 @@ var buildDebateAtlasTopicPrompt = ({ branch = "", topic = "", questions = [], re
 Branch: ${JSON.stringify(text4(branch, 120))}.${topic ? ` Topic: ${JSON.stringify(text4(topic, 120))}.` : ""}
 Return one JSON object with no Markdown fences and no tool calls, in this shape:
 {
-  "summary": "two neutral sentences on where participants agree and where they split",
+  "summary": "one or two neutral sentences, under 280 characters in all, on where participants agree and where they split",
   "compass": { "x": { "label": "axis name", "left": "short position", "right": "short position" }, "y": { "label": "axis name", "top": "short position", "bottom": "short position" } },
   "positions": [{ "label": "3-8 word position", "summary": "paraphrased reasoning behind it", "participantIds": ["participant_001"], "x": 0.2, "y": 0.7 }],
   "participants": [{ "participantId": "participant_001", "x": 0.25, "y": 0.65, "reason": "under 15 words on why they sit here" }]
@@ -103375,7 +103375,7 @@ var normalizeDebateAtlasTopic = ({ value, answeredBy, placeParticipants, partici
       reason: text4(entry2?.reason, 160)
     };
   }).filter(Boolean) : [];
-  return positions.length ? { summary: text4(value?.summary, 600), compass, positions, participants } : null;
+  return positions.length ? { summary: text4(value?.summary, 600), compass, positions, participants, answered: answeredBy.size } : null;
 };
 var runWithConcurrency = async (items, limit, task) => {
   const results = new Array(items.length);
@@ -103505,7 +103505,7 @@ var buildDebateAtlas = async ({ env, slug, config, body = {}, headers: headers2,
         id: branch.id,
         label: branch.label,
         summary: own && map?.summary || branch.summary,
-        ...map ? { compass: map.compass, positions: map.positions, participants: map.participants } : {},
+        ...map ? { compass: map.compass, positions: map.positions, participants: map.participants, answered: map.answered } : {},
         topics: mappedTopics
       };
     }).filter((branch) => branch.topics.length);

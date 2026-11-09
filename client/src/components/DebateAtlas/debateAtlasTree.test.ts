@@ -23,6 +23,7 @@ const build: DebateAtlasBuild = {
       compass,
       positions: [{ label: 'Prove it', participantCount: 1, x: 0.9, y: 0.1 }],
       participants: [{ address, x: 0.8, y: 0.2, reason: 'Wants proof.' }],
+      answered: 3,
       topics: [
         {
           id: 'b1t1',
@@ -39,6 +40,7 @@ const build: DebateAtlasBuild = {
             { address, x: 0.25, y: 0.9, reason: 'Wants care.' },
             { label: 'Participant 4', x: 0.6, y: 0.4 },
           ],
+          answered: 5,
         },
         { id: 'b1t2', label: 'Privacy', compass: null, positions: [{ label: 'Forget at home', participantCount: 3 }] },
       ],
@@ -49,9 +51,16 @@ const build: DebateAtlasBuild = {
 it('nests topics under branches as leaves that open in one click, under ids unique to the build', () => {
   const [branch] = buildDebateAtlasTree(build, { sessionSlug: 'salon' });
   expect(branch).toMatchObject({ id: 'atlas_k1_00000001:b1', name: 'Trust', depth: 0 });
+  // The summary, then each position with how many of those who answered hold it.
   expect(branch.comments).toEqual([
-    { id: 'atlas_k1_00000001:b1:summary:0', comment: 'About trust.' },
-    { id: 'atlas_k1_00000001:b1:summary:1', comment: 'Prove it: Held by 1 participant.' },
+    { id: 'atlas_k1_00000001:b1:summary', comment: 'About trust.' },
+    {
+      id: 'atlas_k1_00000001:b1:position:0',
+      comment: '',
+      label: 'Prove it',
+      participantCount: 1,
+      participantTotal: 3,
+    },
   ]);
   const [identity, privacy] = branch.children || [];
   expect(identity).toMatchObject({ id: 'atlas_k1_00000001:b1t1', name: 'Identity', depth: 1 });
@@ -59,15 +68,20 @@ it('nests topics under branches as leaves that open in one click, under ids uniq
   expect(identity.questions).toEqual([
     { id: 'q1', question: 'Should agents prove they are human?', questionType: 'binary' },
   ]);
-  expect(identity.comments?.map((comment) => comment.comment)).toEqual([
-    'They split.',
-    'Go slow: Care first. Held by 2 participants.',
-    'Go slow: Held by 1 participant.',
-    'Unplaced: Held by 1 participant.',
+  expect(identity.comments?.map(({ comment, label, participantCount }) => [label, comment, participantCount])).toEqual([
+    [undefined, 'They split.', undefined],
+    ['Go slow', 'Care first.', 2],
+    ['Go slow', '', 1],
+    ['Unplaced', '', 1],
   ]);
+  // Counted against everyone who answered, not only the two placed on the compass.
+  expect(identity.comments?.[1].participantTotal).toBe(5);
   expect(new Set(identity.comments?.map((comment) => comment.id)).size).toBe(4);
   expect(privacy.compass).toBeUndefined();
-  expect(privacy.comments?.map((comment) => comment.comment)).toEqual(['Forget at home: Held by 3 participants.']);
+  // A map that does not say how many answered shows no share.
+  expect(privacy.comments).toEqual([
+    { id: 'atlas_k1_00000001:b1t2:position:0', comment: '', label: 'Forget at home', participantCount: 3 },
+  ]);
 });
 
 it('places positions and participants on the topic compass, each under its own name', () => {

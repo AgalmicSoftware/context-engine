@@ -159,6 +159,9 @@ test('builds an atlas from a planning call, a call per topic and one per branch,
   assert.deepEqual(branch.compass, topic.compass);
   assert.deepEqual(branch.positions, topic.positions);
   assert.equal(branch.participants.length, 2);
+  // Positions are counted against everyone whose answers the AI read, not only those it placed.
+  assert.equal(topic.answered, 3);
+  assert.equal(branch.answered, 3);
   const stored = await store.callAtlasStore({}, 'atlas-session', 'read', {});
   assert.deepEqual(stored.body.build, build);
 });
@@ -319,6 +322,7 @@ test('a topic without a usable compass keeps its positions but places no one', (
   assert.equal(topic.compass, null);
   assert.deepEqual(topic.positions, [{ label: 'Go slow', summary: 'Care first.', participantCount: 2 }]);
   assert.deepEqual(topic.participants, []);
+  assert.equal(topic.answered, 2);
 });
 
 test('participants without an address are labelled by number, and AI text loses addresses', () => {
@@ -423,6 +427,8 @@ test('the next build is described with the session model and placeholder prompts
   assert.match(next.prompts.plan, /\n<Questions>\n/);
   assert.match(next.prompts.map, /\{"questions":<Questions>,"responses":<Responses>,"placeParticipants":<Participants>\}$/);
   assert.ok(!/"</.test(next.prompts.plan + next.prompts.map));
+  // A summary short enough to lead a node's panel whole, as a tweet would.
+  assert.match(next.prompts.map, /"summary": "[^"]*under 280 characters/);
 });
 
 const dispatchAs = async ({ action, signer, config }) => {

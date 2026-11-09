@@ -80,6 +80,8 @@ import type {
 
 export { buildExpandedHistoricalCaseBriefMap, buildHistoricalCaseBrief, buildHistoricalCompassPoints };
 
+import DebateMapGeneratedSummary from './DebateMapGeneratedSummary';
+
 const StandalonePoliticalCompass = React.lazy(() =>
   import('../DemoViews/DebateHUD/PoliticalCompassView').then((module) => ({
     default: module.StandalonePoliticalCompass,
@@ -1398,10 +1400,10 @@ const Modal = ({ isOpen, onClose, content, onVote, readOnly = false, copied, onC
 
   if (!isOpen || !content) return null;
 
-  const generatedSummaryComments = readOnly
-    ? (Array.isArray(content.comments) ? content.comments : [])
-        .map((comment) => String(comment?.comment || '').trim())
-        .filter(Boolean)
+  const generatedSummaryEntries = readOnly
+    ? (Array.isArray(content.comments) ? content.comments : []).filter((entry) =>
+        String(entry?.comment || entry?.label || '').trim(),
+      )
     : [];
   const questions = Array.isArray(content.questions) ? content.questions : [];
   const questionSearchKeys = getDebateQuestionListStableKeys(questions, 'question-search');
@@ -1851,13 +1853,8 @@ const Modal = ({ isOpen, onClose, content, onVote, readOnly = false, copied, onC
           ))}
         </div>
 
-        {generatedSummaryComments.length > 0 && (
-          <section className={styles.generatedSummarySection} aria-label="AI-generated summary">
-            <div className={styles.generatedSummaryEyebrow}>AI-generated summary</div>
-            {generatedSummaryComments.map((comment, index) => (
-              <p key={`${content.id || 'generated-summary'}-${index}`}>{comment}</p>
-            ))}
-          </section>
+        {generatedSummaryEntries.length > 0 && (
+          <DebateMapGeneratedSummary key={content.id || 'generated-summary'} entries={generatedSummaryEntries} />
         )}
 
         {compassData && (

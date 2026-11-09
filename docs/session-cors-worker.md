@@ -584,22 +584,25 @@ Admin test panel:
   not use admin credentials.
 - Debate atlases are built apart from the generated Results views.
   `POST /admin/debate-atlas/build` (signed admin action `debate-atlas/build`)
-  accepts the session's admin or an admin hat wearer, as other admin actions do,
-  and also `adminAddresses` and `resultsAdminAddresses` (at most 20, editable in
-  Session Settings without signing anyone out); those lists grant no other admin
-  action. It reads only the responses the Worker stores, through the same
-  sanitizer as the Results views. One planning call groups the answered
-  questions into at most 5 branches and 12 topics, then one call per topic and
-  one per branch of several topics, at most 6 at once and within 4 minutes,
-  writes its summary, its positions and a two-axis compass placing the
-  positions and up to 40 participants. A branch of one topic shares that
-  topic's compass. Branch calls start after every topic call, so a build short
-  of time loses a branch's compass before a topic. Each response reaches its
-  topic's call and its branch's. The AI sees synthetic participant IDs only;
-  the Worker maps them back to addresses afterwards and drops any citation of a
-  participant who did not answer that topic or branch. The coordinator lets one
-  build run at a time per session and keeps the newest 8, each stamped with its
-  time, builder, model and response counts.
+  accepts the session's admin or an admin hat wearer, as other admin actions
+  do, and also `adminAddresses` and `resultsAdminAddresses` (at most 20,
+  editable in Session Settings without signing anyone out); those lists grant
+  no other admin action. It reads only the responses the Worker stores, through
+  the same sanitizer as the Results views. One planning call groups the
+  answered questions into at most 5 branches and 12 topics, then one call per
+  topic and one per branch of several topics, at most 6 at once and within 4
+  minutes, writes a summary under 280 characters, its positions and a two-axis
+  compass placing the positions and up to 40 participants. Each position counts
+  its holders, and each topic and branch stores `answered`, how many
+  participants' answers its call read, as the whole they are part of. A branch
+  of one topic shares that topic's compass. Branch calls start after every
+  topic call, so a build short of time loses a branch's compass before a topic.
+  Each response reaches its topic's call and its branch's. The AI sees
+  synthetic participant IDs only; the Worker maps them back to addresses
+  afterwards and drops any citation of a participant who did not answer that
+  topic or branch. The coordinator lets one build run at a time per session and
+  keeps the newest 8, each stamped with its time, builder, model and response
+  counts.
   `GET /debate-atlas?sessionSlug=<slug>&id=` returns the build list and the
   newest build (or the one named by `id`) to viewers under the artifact rule
   above, and to signed-in builders on any session, with `canBuild`. Builders

@@ -1,7 +1,7 @@
 // Local fixtures only: the Session Worker's replies come from here, so nothing
 // reaches a real Worker and no atlas is built. Checks a built atlas, its Build
 // button, a running build's status and prompts, and a category's and a topic's
-// compass in each theme and width.
+// compass and summary in each theme and width.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -171,6 +171,23 @@ export async function inspectDebateAtlas(page, { screenshotDir = '', tag = '' } 
   await step('open topic', () => page.locator('[data-testid^="ce-political-compass-point-"]').first().waitFor({ timeout: 15000 }));
   const panel = page.locator('[class*="modalContent"]').last();
   await step('topic panel', () => assertReadable(panel));
+
+  // The summary leads short; its positions open on request.
+  const more = panel.getByRole('button', { name: 'Show more' });
+  await more.hover();
+  await step('summary toggle hovered', () => assertReadable(panel));
+  await more.focus();
+  await step('summary toggle focused', () => assertReadable(panel));
+  await more.click();
+  await step('summary positions', async () => {
+    await panel.getByRole('listitem').filter({ hasText: 'Pilot it locally first' }).waitFor();
+    await assertReadable(panel);
+    const overflowing = await panel
+      .getByRole('listitem')
+      .evaluateAll((items) => items.filter((item) => item.scrollWidth > item.clientWidth + 1).map((item) => item.textContent));
+    assert.deepEqual(overflowing, [], 'A position overflows its card');
+  });
+
   await page.locator('[data-testid$="-avatar"]').first().waitFor();
   await page.locator('[data-testid^="ce-political-compass-point-0x"]').first().click({ force: true });
   await step('selected participant', () => assertReadable(panel));

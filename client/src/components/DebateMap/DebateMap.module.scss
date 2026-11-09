@@ -1852,6 +1852,87 @@ $glass-shadow: 0 8px 32px 0 color-mix(in srgb, var(--ce-compat-dark) 37%, transp
       text-transform: uppercase;
     }
 
+    .generatedSummarySection .generatedSummaryLead {
+      font-size: 1rem;
+      font-weight: 600;
+    }
+
+    .generatedSummaryToggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 10px;
+      padding: 2px 0;
+      border: 0;
+      background: none;
+      color: color-mix(in srgb, var(--ce-status-info) 50%, var(--ce-text-inverse));
+      font-size: 0.75rem;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      cursor: pointer;
+    }
+
+    .generatedSummaryPositions {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin: 14px 0 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .generatedSummaryPosition {
+      padding: 10px 12px;
+      border-left: 3px solid var(--ce-status-info);
+      border-radius: var(--ce-radius-6);
+      background: color-mix(in srgb, var(--ce-text-inverse) 5%, transparent);
+
+      p {
+        font-size: 0.9rem;
+      }
+    }
+
+    .generatedSummaryPositionHeader {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 4px 12px;
+      color: $text-main;
+      line-height: 1.4;
+
+      strong {
+        font-weight: 800;
+      }
+    }
+
+    .generatedSummaryCount {
+      flex-shrink: 0;
+      padding: 2px 8px;
+      border-radius: var(--ce-radius-pill);
+      background: color-mix(in srgb, var(--ce-text-inverse) 10%, transparent);
+      color: $text-main;
+      font-size: 0.75rem;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    // How much of the compass holds the position, beside its count.
+    .generatedSummaryShare {
+      height: 4px;
+      margin-top: 6px;
+      overflow: hidden;
+      border-radius: var(--ce-radius-pill);
+      background: color-mix(in srgb, var(--ce-text-inverse) 12%, transparent);
+
+      span {
+        display: block;
+        height: 100%;
+        background: var(--ce-status-info);
+      }
+    }
+
     .argumentClaim {
       font-size: 0.95rem;
       line-height: 1.45;
@@ -2999,8 +3080,26 @@ $glass-shadow: 0 8px 32px 0 color-mix(in srgb, var(--ce-compat-dark) 37%, transp
     .historicalCaseCard .historicalCaseDetailLabel,
     .historicalCaseExploitHeading,
     .generatedSummaryEyebrow,
+    .generatedSummaryToggle,
     .argumentSource {
       color: var(--ce-link);
+    }
+
+    .generatedSummaryPositionHeader,
+    .generatedSummaryCount {
+      color: var(--ce-document-text);
+    }
+
+    .generatedSummaryPosition {
+      background: var(--ce-document-surface);
+    }
+
+    .generatedSummaryCount {
+      background: var(--ce-control-face);
+    }
+
+    .generatedSummaryShare {
+      background: var(--ce-document-border);
     }
 
     .historicalCaseTags span,

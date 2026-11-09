@@ -10,6 +10,8 @@ export type DebateAtlasMapping = {
   } | null;
   positions?: DebateAtlasPosition[];
   participants?: DebateAtlasPlacedParticipant[];
+  // Everyone whose answers the AI read for it; a position's participantCount is a share of this.
+  answered?: number;
 };
 export type DebateAtlasTopic = DebateAtlasMapping & {
   id: string;

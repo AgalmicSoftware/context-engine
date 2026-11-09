@@ -35,6 +35,10 @@ export interface DebateComment {
   id?: string;
   comment?: string;
   username?: string;
+  // A session atlas position: its name, and how many of those who answered hold it.
+  label?: string;
+  participantCount?: number;
+  participantTotal?: number;
   [key: string]: unknown;
 }
 

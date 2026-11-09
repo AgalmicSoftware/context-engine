@@ -6,7 +6,6 @@ import type {
   DebateAtlasBuild,
   DebateAtlasBuildSummary,
   DebateAtlasMapping,
-  DebateAtlasPosition,
 } from '../../domains/debateAtlas/debateAtlasTypes';
 
 // Markers take the document's text colour, which every theme keeps readable on
@@ -87,19 +86,27 @@ const compassPoints = (mapping: DebateAtlasMapping, sessionSlug: string): Histor
   return [...positions, ...participants];
 };
 
-const summaryComments = (id: string, ...texts: Array<string | undefined>) =>
-  texts.filter(Boolean).map((comment, index) => ({ id: `${id}:summary:${index}`, comment: String(comment) }));
-
-const describePosition = (position: DebateAtlasPosition): string =>
-  [`${position.label}:`, position.summary, `Held by ${plural(position.participantCount, 'participant')}.`]
-    .filter(Boolean)
-    .join(' ');
+// The summary, then each position with how many of those who answered hold
+// it. The popup leads with the summary and lists the positions on request.
+const summaryComments = (id: string, mapping: DebateAtlasMapping) => {
+  const answered = Number(mapping.answered) || 0;
+  return [
+    ...(mapping.summary ? [{ id: `${id}:summary`, comment: mapping.summary }] : []),
+    ...(mapping.positions || []).map((position, index) => ({
+      id: `${id}:position:${index}`,
+      comment: position.summary || '',
+      label: position.label,
+      participantCount: position.participantCount,
+      ...(answered ? { participantTotal: answered } : {}),
+    })),
+  ];
+};
 
 // A branch or topic's summary, positions and compass.
 const mappedNode = (id: string, mapping: DebateAtlasMapping, sessionSlug: string) => {
   const points = mapping.compass ? compassPoints(mapping, sessionSlug) : [];
   return {
-    comments: summaryComments(id, mapping.summary, ...(mapping.positions || []).map(describePosition)),
+    comments: summaryComments(id, mapping),
     ...(mapping.compass
       ? {
           compass: {
