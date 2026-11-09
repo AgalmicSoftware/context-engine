@@ -223,6 +223,18 @@ test('concurrent first starts share generation', async () => {
   assert.deepEqual(results[0], results[1]);
   assert.equal(f.calls(), 1);
 });
+test('a start hiding other questions does not join an opening already being written', async () => {
+  const hiding = (f, ids) => ({ ...f.args, config: { ...f.args.config, BLOCKED_QUESTION_IDS: ids } });
+  const f = fixture();
+  const [before, after] = await Promise.all([resolveInterviewStarter(f.args), resolveInterviewStarter(hiding(f, ['Q1']))]);
+  assert.equal(f.calls(), 2);
+  assert.notEqual(after.openingPrompt, before.openingPrompt);
+  assert.equal(after.blockedQuestionIds, '["q1"]');
+  // The same hidden questions, however written, still share one.
+  const g = fixture();
+  await Promise.all([resolveInterviewStarter(hiding(g, ['Q1'])), resolveInterviewStarter(hiding(g, [' q1 ']))]);
+  assert.equal(g.calls(), 1);
+});
 test('starter route preserves CORS and rate limits; public callers cannot force refresh', async () => {
   const f = fixture();
   await resolveInterviewStarter(f.args);

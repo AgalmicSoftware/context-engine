@@ -45,12 +45,14 @@ export const resolveInterviewStarter = async ({ env, slug, config, deps = {}, re
   )
     return withSteeringPrompt(cached);
   // Coalesce concurrent starts within this Worker isolate; cache writes never replace owner config.
+  // Only starts hiding the same questions share one, since an opening may quote a question.
   let pending = inFlight.get(env.GROUP_KV);
   if (!pending) {
     pending = new Map();
     inFlight.set(env.GROUP_KV, pending);
   }
-  if (pending.has(slug)) return pending.get(slug);
+  const pendingKey = `${slug}:${blockedQuestionIds}`;
+  if (pending.has(pendingKey)) return pending.get(pendingKey);
   const generation = (async () => {
     if (config.scopes?.ai === false) throw new Error('AI is disabled for this session.');
     const secrets = await deps.getSessionSecrets(env, slug);
@@ -107,14 +109,14 @@ export const resolveInterviewStarter = async ({ env, slug, config, deps = {}, re
     await write(env, cacheKey(slug), value);
     return withSteeringPrompt(value);
   })();
-  pending.set(slug, generation);
+  pending.set(pendingKey, generation);
   try {
     return await generation;
   } catch (error) {
     if (cached?.openingPrompt && !refresh) return withSteeringPrompt({ ...cached, warning: error.message });
     throw error;
   } finally {
-    pending.delete(slug);
+    pending.delete(pendingKey);
   }
 };
 

@@ -102205,7 +102205,8 @@ var resolveInterviewStarter = async ({ env, slug, config, deps = {}, refresh = f
     pending = /* @__PURE__ */ new Map();
     inFlight2.set(env.GROUP_KV, pending);
   }
-  if (pending.has(slug)) return pending.get(slug);
+  const pendingKey = `${slug}:${blockedQuestionIds2}`;
+  if (pending.has(pendingKey)) return pending.get(pendingKey);
   const generation = (async () => {
     if (config.scopes?.ai === false) throw new Error("AI is disabled for this session.");
     const secrets = await deps.getSessionSecrets(env, slug);
@@ -102270,14 +102271,14 @@ ${contextText}` : ""}`
     await write(env, cacheKey2(slug), value);
     return withSteeringPrompt(value);
   })();
-  pending.set(slug, generation);
+  pending.set(pendingKey, generation);
   try {
     return await generation;
   } catch (error) {
     if (cached?.openingPrompt && !refresh) return withSteeringPrompt({ ...cached, warning: error.message });
     throw error;
   } finally {
-    pending.delete(slug);
+    pending.delete(pendingKey);
   }
 };
 var dispatchInterviewStarterRequest = async ({ request, env, slugHint, baseHeaders, deps, constants }) => {
