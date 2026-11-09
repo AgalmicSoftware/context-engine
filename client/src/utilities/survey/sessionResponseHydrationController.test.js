@@ -998,7 +998,10 @@ describe('createSessionResponseHydrationController', () => {
         };
       };
 
-      it('drops answers after a lowered end block and rewinds the watermark to it', async () => {
+      const scannedRanges = () =>
+        contractScripts.getQuestionResponsesChunkedWithCallback.mock.calls.map((call) => call.slice(1, 3));
+
+      it('drops answers after a lowered end block and rescans the window', async () => {
         const host = createHostWithLateAnswers({ start: 10, end: 12 });
         const controller = createSessionResponseHydrationController(host);
 
@@ -1016,9 +1019,60 @@ describe('createSessionResponseHydrationController', () => {
         contractScripts.getRelevantBlockWindowForFilter.mockResolvedValueOnce({ fromBlock: 10, toBlock: 20 });
         await controller.fetchQuestionResponsesChunkedForGroup(SESSION_SLUG);
 
-        // Raising the end again rescans the dropped blocks.
-        expect(contractScripts.getQuestionResponsesChunkedWithCallback).toHaveBeenCalledTimes(1);
-        expect(contractScripts.getQuestionResponsesChunkedWithCallback.mock.calls[0].slice(1, 3)).toEqual([13, 20]);
+        // Raising the end again scans the dropped blocks.
+        expect(scannedRanges()).toEqual([
+          [10, 12],
+          [13, 20],
+        ]);
+      });
+
+      it('finds the earlier answer in the window once a later one is dropped', async () => {
+        // The responder answered at blocks 11 and 15; the cache kept only the later answer.
+        const host = createMockHost({
+          getSessionCfg: jest.fn(sessionConfigWith({ start: 10, end: 12 })),
+          initialStorage: {
+            questionsCache: {
+              [SESSION_SLUG]: {
+                [NETWORK_ID]: createQuestionCacheNetworkNode({
+                  questionResponsesLatestBlock: 20,
+                  questionResponses: { [QUESTION_ID_A]: { [RESPONDER_LOWER]: 'answer at 15' } },
+                  questionResponsesMeta: { [QUESTION_ID_A]: { [RESPONDER_LOWER]: late } },
+                }),
+              },
+            },
+          },
+        });
+        contractScripts.getQuestionResponsesChunkedWithCallback.mockImplementationOnce(
+          async (_mode, _from, toBlock, _progress, onData) => {
+            const row = { responder: RESPONDER, response: 'answer at 11', blockNumber: 11, timestamp: 1 };
+            onData({ [QUESTION_ID_A]: [row] }, toBlock);
+          },
+        );
+        const controller = createSessionResponseHydrationController(host);
+
+        await controller.fetchQuestionResponsesChunkedForGroup(SESSION_SLUG);
+
+        expect(scannedRanges()).toEqual([[10, 12]]);
+        const net = host.getStored('questionsCache', SESSION_SLUG)[NETWORK_ID];
+        expect(net.questionResponses[QUESTION_ID_A]).toEqual({ [RESPONDER_LOWER]: 'answer at 11' });
+        expect(net.questionResponsesLatestBlock).toBe(12);
+      });
+
+      it('only moves the watermark back to a lowered end block with no answers past it', async () => {
+        const host = createMockHost({
+          getSessionCfg: jest.fn(sessionConfigWith({ start: 10, end: 12 })),
+          initialStorage: {
+            questionsCache: {
+              [SESSION_SLUG]: { [NETWORK_ID]: createQuestionCacheNetworkNode({ questionResponsesLatestBlock: 20 }) },
+            },
+          },
+        });
+        const controller = createSessionResponseHydrationController(host);
+
+        await controller.fetchQuestionResponsesChunkedForGroup(SESSION_SLUG);
+
+        expect(scannedRanges()).toEqual([]);
+        expect(host.getStored('questionsCache', SESSION_SLUG)[NETWORK_ID].questionResponsesLatestBlock).toBe(12);
       });
 
       it.each([

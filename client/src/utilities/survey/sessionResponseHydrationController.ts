@@ -502,13 +502,15 @@ const ensureUserDataRecord = (value: unknown): UserDataRecord => {
   return data;
 };
 
-// Drops answers recorded after an explicit end block and pulls the watermark back
-// to it, so raising the end again rescans them. Rows with no known block stay.
-const pruneQuestionResponsesAfterBlock = (net: unknown, endBlock: number): boolean => {
+// Drops answers recorded after an explicit end block. The cache keeps only each
+// responder's newest answer, so after a removal the watermark rewinds to the
+// window floor to find any earlier answer again; otherwise it moves back to the
+// end, so raising the end rescans past it. Rows with no known block stay.
+const pruneQuestionResponsesAfterBlock = (net: unknown, endBlock: number, floorBlock: number): boolean => {
   if (!isRecord(net)) return false;
   const responses = toRecord(net.questionResponses);
   const meta = toRecord(net.questionResponsesMeta);
-  let changed = false;
+  let removed = false;
   new Set([...Object.keys(responses), ...Object.keys(meta)]).forEach((qid) => {
     const byResponder = toRecord(responses[qid]);
     const metaByResponder = toRecord(meta[qid]);
@@ -516,17 +518,16 @@ const pruneQuestionResponsesAfterBlock = (net: unknown, endBlock: number): boole
       if (toResponseRecencyPair(metaByResponder[responder], byResponder[responder]).bn <= endBlock) return;
       delete byResponder[responder];
       delete metaByResponder[responder];
-      changed = true;
+      removed = true;
     });
     // As after a scan of the new window, a question with no answers has no entry.
     if (!Object.keys(byResponder).length) delete responses[qid];
     if (!Object.keys(metaByResponder).length) delete meta[qid];
   });
-  if (Number(net.questionResponsesLatestBlock) > endBlock) {
-    net.questionResponsesLatestBlock = endBlock;
-    changed = true;
-  }
-  return changed;
+  const watermark = Number(net.questionResponsesLatestBlock) || 0;
+  const rewound = Math.min(watermark, removed ? floorBlock : endBlock);
+  if (rewound !== watermark) net.questionResponsesLatestBlock = rewound;
+  return removed || rewound !== watermark;
 };
 
 const pruneUserQuestionResponsesAfterBlock = (cache: unknown, networkID: string, endBlock: number): boolean => {
@@ -580,12 +581,17 @@ export const createSessionResponseHydrationController = (
   };
   const getSessionChainId = (slug: string): string | number | null | undefined =>
     typeof host.getSessionChainId === 'function' ? host.getSessionChainId(slug) : null;
-  const pruneCachedResponsesAfterBlock = async (slug: string, networkID: string, endBlock: number): Promise<void> => {
+  const pruneCachedResponsesAfterBlock = async (
+    slug: string,
+    networkID: string,
+    endBlock: number,
+    floorBlock: number,
+  ): Promise<void> => {
     // dgRead returns copies: pruning one first leaves an unchanged cache unwritten.
-    if (pruneQuestionResponsesAfterBlock(toRecord(dgRead('questionsCache', slug))[networkID], endBlock)) {
+    if (pruneQuestionResponsesAfterBlock(toRecord(dgRead('questionsCache', slug))[networkID], endBlock, floorBlock)) {
       const persisted = await host.updateQuestionsCacheAtomic(slug, (current) => {
         const next = current || {};
-        pruneQuestionResponsesAfterBlock(next[networkID], endBlock);
+        pruneQuestionResponsesAfterBlock(next[networkID], endBlock, floorBlock);
         return next;
       });
       if (!persisted) throw new ResponseCachePersistenceError(`Failed to persist questions cache for ${slug}`);
@@ -831,7 +837,7 @@ export const createSessionResponseHydrationController = (
       // Merges only add, so answers cached under a later end block would stay in
       // Results once it is lowered. Only an explicit end prunes, never the chain head.
       const endBlock = normalizeBlockLimitsForConfig(sessionConfig?.blockLimits, baseFrom)?.end;
-      if (endBlock != null) await pruneCachedResponsesAfterBlock(slug, networkID, endBlock);
+      if (endBlock != null) await pruneCachedResponsesAfterBlock(slug, networkID, endBlock, initialLastBlockQR);
 
       let questionsCache = (dgRead('questionsCache', slug) || {}) as QuestionCache;
       // Migration: numeric -> string key
