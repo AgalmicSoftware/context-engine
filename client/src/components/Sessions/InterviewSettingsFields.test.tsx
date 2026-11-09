@@ -103,14 +103,16 @@ it('no longer offers the retired group suggestions box, and keeps a stored value
   expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ suggestGroups: true, showFidelityScore: true }));
 });
 
-it('turns on joining strong group matches, off by default, with its explanation behind its help', () => {
+it('turns on suggesting groups to join, off by default, with its explanation behind its help', () => {
   const onChange = jest.fn();
-  const label = 'Join strong group matches on submit';
+  const label = 'Suggest groups to join';
   const { rerender } = render(<InterviewSettingsFields value={{}} onChange={onChange} />);
   const box = screen.getByLabelText(label);
   expect(box).not.toBeChecked();
-  expect(box).toHaveAccessibleDescription(/Strong matches start ticked under their drafts.*Off, no groups are matched/);
-  const helpButton = screen.getByRole('button', { name: 'About joining strong group matches' });
+  expect(box).toHaveAccessibleDescription(
+    /They tick any they want, and submitting joins them.*Off, no groups are matched/,
+  );
+  const helpButton = screen.getByRole('button', { name: 'About suggesting groups to join' });
   fireEvent.click(helpButton);
   expect(onChange).not.toHaveBeenCalled();
   fireEvent.click(box);

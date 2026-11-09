@@ -4,8 +4,8 @@ import path from 'node:path';
 import zlib from 'node:zlib';
 import { chromium } from 'playwright';
 
-// Interview review's Groups section against a fake Worker: a join link's group and strong matches
-// ticked, a weak match not, Submit and join, each join's outcome, and the switch in Settings.
+// Interview review's Groups section against a fake Worker: a join link's group ticked, every match
+// unticked, Submit and join, each join's outcome, and the switch in Settings.
 // Checks readable text in every theme, at phone and desktop widths, hovered, focused and pressed.
 const base = process.env.BASE_URL || 'http://127.0.0.1:3000';
 assert(['localhost', '127.0.0.1'].includes(new URL(base).hostname), 'Use a local Vite server');
@@ -304,8 +304,8 @@ try {
           .evaluateAll((elements) => elements.map((element) => element.textContent));
         assert.deepEqual(names, ['Reverse Alignment Salon', 'd/acc', 'UK residents', 'Builders']);
         assert.equal(await box(/Reverse Alignment Salon/).isChecked(), true);
-        assert.equal(await box(/d\/acc/).isChecked(), true);
-        assert.equal(await box(/UK residents/).isChecked(), true);
+        assert.equal(await box(/d\/acc/).isChecked(), false);
+        assert.equal(await box(/UK residents/).isChecked(), false);
         assert.equal(await box(/Builders/).isChecked(), false);
         await section.getByText('From your link.').waitFor();
         // Each group's image shows beside its name, loaded, with no text of its own.
@@ -342,8 +342,6 @@ try {
         await box(/Builders/).check();
         await box(/Builders/).uncheck();
         await box(/Reverse Alignment Salon/).uncheck();
-        await box(/d\/acc/).uncheck();
-        await box(/UK residents/).uncheck();
         await expectSubmitLabel(page, 'submit responses');
         await box(/Reverse Alignment Salon/).check();
         await box(/d\/acc/).check();
@@ -374,6 +372,8 @@ try {
         const { page, failures } = await run('in');
         const section = page.getByTestId('ce-session-interview-group-recommendations');
         await page.getByRole('heading', { name: 'Groups (4)' }).waitFor();
+        await section.getByRole('checkbox', { name: /d\/acc/ }).check();
+        await section.getByRole('checkbox', { name: /UK residents/ }).check();
         const before = joined.length;
         await page.getByTestId('ce-session-interview-apply').click();
         await section.getByText('Joined Reverse Alignment Salon and d/acc.').waitFor();
@@ -403,20 +403,20 @@ try {
       // The switch in Interview settings, with its help.
       {
         const { page, failures } = await run('settings');
-        const toggle = page.getByLabel('Join strong group matches on submit');
+        const toggle = page.getByLabel('Suggest groups to join');
         await toggle.waitFor();
         const row = toggle.locator('xpath=ancestor::div[1]');
         let lowest = await expectReadableInStates(page, toggle, row, `${theme} ${width} setting`);
         await toggle.check();
         assert.equal(await toggle.isChecked(), true);
-        await page.getByRole('button', { name: 'About joining strong group matches' }).hover();
+        await page.getByRole('button', { name: 'About suggesting groups to join' }).hover();
         const tooltip = page.getByRole('tooltip');
         await tooltip.waitFor();
         if (output)
           await page.screenshot({
             path: path.join(output, `setting-${theme}-${width}.png`),
           });
-        assert.match(await tooltip.innerText(), /Strong matches start ticked under their drafts.*Off, no groups are matched/);
+        assert.match(await tooltip.innerText(), /They tick any they want, and submitting joins them.*Off, no groups are matched/);
         lowest = Math.min(lowest, await expectReadable(tooltip, `${theme} ${width} setting help`));
         assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false);
         assert.deepEqual(failures, []);

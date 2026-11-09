@@ -244,7 +244,7 @@ export default function SessionInterviewPanel({
   );
   const panelRef = useRef<HTMLDivElement | null>(null);
   const showFidelityScore = normalizeInterviewSettings(sessionConfig?.interviewMode).showFidelityScore;
-  // Off by default. On, the AI matches the person to groups; strong matches are ticked and join on submit.
+  // Off by default. On, the AI suggests groups; the ones the person ticks join on submit.
   const { joinMatchingGroups } = normalizeInterviewSettings(sessionConfig?.interviewMode);
   const [showViewResults, setShowViewResults] = useState(false);
   const [hasRefreshableGroups, setHasRefreshableGroups] = useState(false);

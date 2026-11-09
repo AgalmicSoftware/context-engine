@@ -6,7 +6,6 @@ import {
   buildGroupRecommendationRequest,
   buildInterviewGroupRecommendationEvidenceText,
   buildInterviewGroupRecommendationPrompt,
-  isStrongGroupMatch,
   loadInterviewWorkerGroupCandidates,
   matchInterviewGroupsByAnswer,
   matchInterviewGroupsFromPrefill,
@@ -287,13 +286,6 @@ describe('session interview group recommendations', () => {
       { groupId: 'france-builders', reason: 'Your AI suggested this group.', evidence: '' },
     ]);
     expect(matchInterviewGroupsFromPrefill({ candidates: [eligibleCandidate] })).toEqual([]);
-  });
-
-  it('counts a match as strong from 0.7, and a match with no confidence as weak', () => {
-    expect(isStrongGroupMatch({ confidence: 0.7 })).toBe(true);
-    expect(isStrongGroupMatch({ confidence: 1 })).toBe(true);
-    expect(isStrongGroupMatch({ confidence: 0.69 })).toBe(false);
-    expect(isStrongGroupMatch({})).toBe(false);
   });
 
   it('builds a suggestion request from kept, shown answers with the person’s edits', () => {

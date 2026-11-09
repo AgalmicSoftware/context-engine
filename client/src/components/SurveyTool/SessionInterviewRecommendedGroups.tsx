@@ -23,7 +23,6 @@ import {
   type WorkerGroupOverview,
 } from '../../domains/worker/workerGroupPorts';
 import {
-  isStrongGroupMatch,
   normalizeInterviewGroupCandidates,
   readCachedInterviewWorkerToken,
 } from './sessionInterviewGroupRecommendations';
@@ -81,8 +80,8 @@ type GroupChoice = {
   description?: string;
   imageUrl?: string;
   reason: string;
+  /** Only a link's group starts ticked; every match waits for the person to tick it. */
   fromLink: boolean;
-  startsTicked: boolean;
 };
 
 type JoinOutcome = { status: 'idle' | 'joining' | 'done'; joined: string[]; failed: string[] };
@@ -207,17 +206,17 @@ export function SessionInterviewRecommendedGroups({
   const [ticks, setTicks] = useState<Record<string, boolean>>({});
   const [joinedIds, setJoinedIds] = useState<string[]>([]);
   const [outcome, setOutcome] = useState<JoinOutcome>(idleOutcome);
-  // Groups that show up after a submit start unticked: the person didn't see them then.
-  const [listedAtJoin, setListedAtJoin] = useState<string[] | null>(null);
-  // Another account hasn't joined what this one did.
+  // Another account hasn't joined what this one did, or ticked its groups, as on a shared phone.
+  // A link's tick stays: cancelling its join is the browser's, not the account's.
   const accountRef = useRef(normalizedAccount);
   useEffect(() => {
     if (accountRef.current && accountRef.current !== normalizedAccount) {
       setJoinedIds([]);
       setOutcome(idleOutcome);
+      setTicks((current) => (invite && invite.groupId in current ? { [invite.groupId]: current[invite.groupId] } : {}));
     }
     accountRef.current = normalizedAccount;
-  }, [normalizedAccount]);
+  }, [invite, normalizedAccount]);
   const canLoadCatalog = Boolean(workerUrl && sessionId && sessionSlug && (normalizedRecommendations.length || invite));
 
   const loadCatalog = useCallback(async () => {
@@ -285,11 +284,11 @@ export function SessionInterviewRecommendedGroups({
               ...(linked?.imageUrl ? { imageUrl: linked.imageUrl } : {}),
               reason: 'From your link.',
               fromLink: true,
-              startsTicked: true,
             },
           ]
         : []),
-      // Suggestion order, so groups named like a chosen answer stay first.
+      // Suggestion order, so groups named like a chosen answer stay first and a late AI match
+      // joins the end instead of moving a row someone may be about to tick.
       ...normalizedRecommendations.flatMap((recommendation) => {
         const group = overview.groups.find((candidate) => candidate.groupId === recommendation.groupId);
         if (!group || !joinable.has(group.groupId) || hidden(group.groupId) || group.groupId === invite?.groupId)
@@ -302,14 +301,13 @@ export function SessionInterviewRecommendedGroups({
             ...(group.imageUrl ? { imageUrl: group.imageUrl } : {}),
             reason: recommendation.reason || 'Suggested from your answers.',
             fromLink: false,
-            startsTicked: isStrongGroupMatch(recommendation) && (!listedAtJoin || listedAtJoin.includes(group.groupId)),
           },
         ];
       }),
     ];
-  }, [invite, joinedIds, listedAtJoin, normalizedRecommendations, overview, sessionSlug]);
+  }, [invite, joinedIds, normalizedRecommendations, overview, sessionSlug]);
 
-  const tickedIds = choices.filter((choice) => ticks[choice.groupId] ?? choice.startsTicked).map((c) => c.groupId);
+  const tickedIds = choices.filter((choice) => ticks[choice.groupId] ?? choice.fromLink).map((c) => c.groupId);
   const latestRef = useRef({ tickedIds, choices });
   latestRef.current = { tickedIds, choices };
   const anyTicked = tickedIds.length > 0;
@@ -397,7 +395,6 @@ export function SessionInterviewRecommendedGroups({
   useEffect(() => {
     if (!joinRequest || joinRequest === handledJoinRequestRef.current) return;
     handledJoinRequestRef.current = joinRequest;
-    setListedAtJoin(latestRef.current.choices.map(({ groupId }) => groupId));
     void joinTicked();
   }, [joinRequest, joinTicked]);
 
@@ -412,7 +409,7 @@ export function SessionInterviewRecommendedGroups({
     <SessionInterviewReviewSection
       hidden={hidden}
       title={`Groups (${choices.length})`}
-      help="Groups that fit your answers, and any your link joins. Ticked groups are joined when you submit; change any tick first."
+      help="Groups that may fit your answers, and any your link joins. Tick the ones you want; ticked groups are joined when you submit."
       helpId={helpId}
       summaryRef={summaryRef}
     >
@@ -423,7 +420,7 @@ export function SessionInterviewRecommendedGroups({
           <label key={choice.groupId} className={styles.sessionInterviewGroupChoice}>
             <input
               type="checkbox"
-              checked={ticks[choice.groupId] ?? choice.startsTicked}
+              checked={ticks[choice.groupId] ?? choice.fromLink}
               disabled={outcome.status === 'joining'}
               onChange={(event) => toggle(choice, event.target.checked)}
               data-testid={`ce-session-interview-group-choice-${choice.groupId}`}

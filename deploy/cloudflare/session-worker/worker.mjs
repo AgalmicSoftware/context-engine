@@ -30215,8 +30215,8 @@ var init_interviewSettings = __esm({
         showFidelityScore: source.showFidelityScore === true,
         // No longer read: group matching follows joinMatchingGroups. Still accepted, so configs that carry it save.
         suggestGroups: source.suggestGroups === true,
-        // After an interview or AI prefill, match the person to open groups; strong matches start
-        // ticked and join when they submit. Off, nothing is matched.
+        // After an interview or AI prefill, suggest open groups that fit the person; the ones
+        // they tick join when they submit. Off, nothing is matched.
         joinMatchingGroups: source.joinMatchingGroups === true,
         // Add "How well AIs predicted people" to Results, scoring everyone's AI-prefill drafts together.
         showFidelityResults: source.showFidelityResults === true,

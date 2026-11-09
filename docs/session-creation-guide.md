@@ -140,11 +140,11 @@ Interview settings for the call:
   default; when enabled, their default addition threshold is 20%. Question
   suggestions are optional and off by default. Admin refresh is on by default.
 
-- **Join strong group matches on submit** (`interviewMode.joinMatchingGroups`,
-  off by default) matches participants to the session's open groups after an
-  interview or AI prefill: strong matches start ticked and join when they
-  submit, and their own AI can suggest groups too. Off, no groups are matched.
-  The older `interviewMode.suggestGroups` is no longer read.
+- **Suggest groups to join** (`interviewMode.joinMatchingGroups`, off by
+  default) suggests the session's open groups that fit each participant after
+  an interview or AI prefill: the ones they tick join when they submit, and
+  their own AI can suggest groups too. Off, no groups are matched. The older
+  `interviewMode.suggestGroups` is no longer read.
 
 Interview settings for research:
 
@@ -183,8 +183,8 @@ Interview settings for research:
 Older Session Workers reject settings they don't know, so each is saved only
 when changed from its default. The sharing default needs a 0.7.0 or later
 Session Worker; `full` detail, hidden drafts, the score, group suggestions, the
-Results section and its smallest group need one newer than 0.8.0, and joining
-strong group matches needs 0.9.1 or later. See
+Results section and its smallest group need one newer than 0.8.0, and
+suggesting groups to join needs 0.9.1 or later. See
 [session-interview-research.md](session-interview-research.md),
 [session-listening-mode.md](session-listening-mode.md) and [Interview settings
 and lifecycle](session-listening-mode.md#interview).

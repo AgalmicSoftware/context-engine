@@ -936,7 +936,7 @@ describe('sessionWizardWriteNormalization', () => {
     expect(payload.interviewMode.suggestGroups).toBe(suggestGroups || undefined);
   });
 
-  test.each([true, false])('publishes joining strong group matches only when on (%s)', (joinMatchingGroups) => {
+  test.each([true, false])('publishes group suggestions only when on (%s)', (joinMatchingGroups) => {
     const payload = buildSessionWizardWorkerConfigPayload({
       slug: 'group-joins',
       draft: {

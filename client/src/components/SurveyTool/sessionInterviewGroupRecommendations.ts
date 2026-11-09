@@ -39,14 +39,9 @@ export type InterviewGroupRecommendation = {
   groupId: string;
   reason: string;
   evidence: string;
-  /** 0-1: how surely the group fits. Strong matches start ticked when the session joins them. */
+  /** 0-1: how surely the group fits. */
   confidence?: number;
 };
-
-// The kickoff's anchor for direct or repeated support.
-const STRONG_GROUP_MATCH_CONFIDENCE = 0.7;
-export const isStrongGroupMatch = (recommendation: Pick<InterviewGroupRecommendation, 'confidence'>): boolean =>
-  (recommendation.confidence ?? 0) >= STRONG_GROUP_MATCH_CONFIDENCE;
 
 export type InterviewGroupRecommendationUnavailableReason =
   'empty_eligible_catalog' | 'ai_authentication_required' | 'ai_recommendation_failed';

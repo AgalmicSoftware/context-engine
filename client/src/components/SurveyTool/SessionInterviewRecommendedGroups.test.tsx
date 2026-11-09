@@ -85,8 +85,6 @@ const element = (props: Props = {}) => (
   />
 );
 const signedIn = { account, loginComplete: true };
-// A weak match starts unticked.
-const weak = [recommendation({ confidence: 0.5 })];
 
 const box = (name: RegExp | string) => screen.getByRole<HTMLInputElement>('checkbox', { name });
 const pendingLink = (groupId = 'salon', sessionSlug = 'demo') =>
@@ -120,7 +118,7 @@ describe('SessionInterviewRecommendedGroups', () => {
     jest.mocked(joinWorkerGroup).mockResolvedValue({ group: group(), memberCount: 1 });
   });
 
-  it('ticks strong matches, leaves weaker ones unticked, and lists only joinable groups', async () => {
+  it('leaves every match unticked, however strong, and lists only joinable groups', async () => {
     jest
       .mocked(loadPublicWorkerGroups)
       .mockResolvedValue([
@@ -142,7 +140,7 @@ describe('SessionInterviewRecommendedGroups', () => {
     );
 
     expect(await screen.findByRole('heading', { name: 'Groups (2)' })).toBeInTheDocument();
-    expect(box(/AI Optimists/)).toBeChecked();
+    expect(box(/AI Optimists/)).not.toBeChecked();
     expect(box(/Maybe/)).not.toBeChecked();
     const row = within(box(/AI Optimists/).closest('label')!);
     expect(row.getByText('Your reviewed answer explicitly supported optimistic AI governance.')).toBeInTheDocument();
@@ -156,11 +154,17 @@ describe('SessionInterviewRecommendedGroups', () => {
   it('keeps suggestion order, so a group named like a chosen answer stays first, and shows every match', async () => {
     const many = Array.from({ length: 6 }, (_, index) => group({ groupId: `g${index}`, label: `Group ${index}` }));
     jest.mocked(loadPublicWorkerGroups).mockResolvedValue([...many, group({ groupId: 'dacc', label: 'd/acc' })]);
-    render(
+    const named = recommendation({ groupId: 'dacc', reason: 'You chose “d/acc”.', evidence: '', confidence: 1 });
+    const view = render(element({ recommendations: [named, recommendation({ groupId: 'g0', confidence: 0.4 })] }));
+    await screen.findByRole('heading', { name: 'Groups (2)' });
+    fireEvent.click(box(/Group 0/));
+    // The session's AI answers later; its matches join the end, even stronger ones, so no row moves.
+    view.rerender(
       element({
         recommendations: [
-          recommendation({ groupId: 'dacc', reason: 'You chose “d/acc”.', evidence: '', confidence: 1 }),
-          ...many.map(({ groupId }) => recommendation({ groupId })),
+          named,
+          recommendation({ groupId: 'g0', confidence: 0.4 }),
+          ...many.slice(1).map(({ groupId }) => recommendation({ groupId, confidence: 1 })),
         ],
       }),
     );
@@ -168,11 +172,12 @@ describe('SessionInterviewRecommendedGroups', () => {
     expect(
       screen.getAllByRole('checkbox').map((input) => input.closest('label')?.querySelector('strong')?.textContent),
     ).toEqual(['d/acc', ...many.map(({ label }) => label)]);
+    expect(box(/Group 0/)).toBeChecked();
   });
 
   it('tells the page whether any group is ticked, and that none is once it goes', async () => {
     const onTickedChange = jest.fn();
-    const view = render(element({ recommendations: weak, onTickedChange }));
+    const view = render(element({ onTickedChange }));
     fireEvent.click(await screen.findByRole('checkbox', { name: /AI Optimists/ }));
     expect(onTickedChange).toHaveBeenLastCalledWith(true);
     fireEvent.click(box(/AI Optimists/));
@@ -186,7 +191,7 @@ describe('SessionInterviewRecommendedGroups', () => {
     pendingLink();
     jest.mocked(loadPublicWorkerGroups).mockResolvedValue([group(), group({ groupId: 'salon', label: 'Salon' })]);
     const onTickedChange = jest.fn();
-    const { container } = render(element({ recommendations: weak, onTickedChange }));
+    const { container } = render(element({ onTickedChange }));
 
     expect(await screen.findByRole('heading', { name: 'Groups (2)' })).toBeInTheDocument();
     // A signed-out person sees the groups through their link.
@@ -195,6 +200,8 @@ describe('SessionInterviewRecommendedGroups', () => {
     expect(first).toBe(box(/Salon/));
     expect(within(first.closest('label')!).getByText('From your link.')).toBeInTheDocument();
     expect(first).toBeChecked();
+    // Only the link's group starts ticked, not even a strong match.
+    expect(box(/AI Optimists/)).not.toBeChecked();
     expect(onTickedChange).toHaveBeenLastCalledWith(true);
     // The link's own notice stands aside while its group is listed here.
     expect(container.querySelector('[data-ce-auto-join-claim="salon"]')).not.toBeNull();
@@ -248,6 +255,8 @@ describe('SessionInterviewRecommendedGroups', () => {
     const onGroupsChanged = jest.fn();
     const view = render(element({ ...signedIn, recommendations, onGroupsChanged }));
     await screen.findByRole('heading', { name: 'Groups (3)' });
+    fireEvent.click(box(/AI Optimists/));
+    fireEvent.click(box(/Full house/));
     expect(joinWorkerGroup).not.toHaveBeenCalled();
     expect(screen.queryByRole('button', { name: 'Join ticked groups' })).toBeNull();
 
@@ -275,15 +284,19 @@ describe('SessionInterviewRecommendedGroups', () => {
   });
 
   it('does not join again when it reappears after a submit, as after another interview round', async () => {
+    pendingLink();
+    const groups = [group(), group({ groupId: 'salon', label: 'Salon' })];
+    jest.mocked(loadPublicWorkerGroups).mockResolvedValue(groups);
+    jest.mocked(loadWorkerGroupOverview).mockResolvedValue(overview(groups));
     render(element({ ...signedIn, joinRequest: 5 }));
-    await screen.findByRole('heading', { name: 'Groups (1)' });
-    expect(box(/AI Optimists/)).toBeChecked();
+    await screen.findByRole('heading', { name: 'Groups (2)' });
+    expect(box(/Salon/)).toBeChecked();
     await waitFor(() => expect(loadPublicWorkerGroups).toHaveBeenCalled());
     expect(getWorkerSessionToken).not.toHaveBeenCalled();
     expect(joinWorkerGroup).not.toHaveBeenCalled();
     // Ticked groups still join on request.
     fireEvent.click(screen.getByRole('button', { name: 'Join ticked groups' }));
-    expect(await screen.findByText('Joined AI Optimists.')).toBeInTheDocument();
+    expect(await screen.findByText('Joined Salon.')).toBeInTheDocument();
   });
 
   it('counts a membership as joined without asking the Worker to join again', async () => {
@@ -294,6 +307,7 @@ describe('SessionInterviewRecommendedGroups', () => {
       );
     const view = render(element(signedIn));
     await screen.findByRole('heading', { name: 'Groups (1)' });
+    fireEvent.click(box(/AI Optimists/));
     view.rerender(element({ ...signedIn, joinRequest: 1 }));
     expect(await screen.findByText('Joined AI Optimists.')).toBeInTheDocument();
     expect(joinWorkerGroup).not.toHaveBeenCalled();
@@ -302,6 +316,7 @@ describe('SessionInterviewRecommendedGroups', () => {
   it('refuses a group that closed since it was suggested', async () => {
     const view = render(element(signedIn));
     await screen.findByRole('heading', { name: 'Groups (1)' });
+    fireEvent.click(box(/AI Optimists/));
     jest
       .mocked(loadWorkerGroupOverview)
       .mockResolvedValue(overview([group({ joinEndsAt: '2020-01-01T00:00:00.000Z' })]));
@@ -317,9 +332,9 @@ describe('SessionInterviewRecommendedGroups', () => {
     const groups = [group(), group({ groupId: 'salon', label: 'Salon' })];
     jest.mocked(loadPublicWorkerGroups).mockResolvedValue(groups);
     jest.mocked(loadWorkerGroupOverview).mockResolvedValue(overview(groups));
-    const view = render(element({ recommendations: weak }));
+    const view = render(element());
     await screen.findByRole('heading', { name: 'Groups (2)' });
-    view.rerender(element({ ...signedIn, recommendations: weak, joinRequest: 1 }));
+    view.rerender(element({ ...signedIn, joinRequest: 1 }));
     expect(await screen.findByText('Joined Salon.')).toBeInTheDocument();
     expect(jest.mocked(joinWorkerGroup).mock.calls.map(([args]) => args.groupId)).toEqual(['salon']);
     expect(readPendingAutoJoin()).toBeNull();
@@ -328,6 +343,7 @@ describe('SessionInterviewRecommendedGroups', () => {
   it('never joins for someone signed out', async () => {
     const view = render(element());
     await screen.findByRole('heading', { name: 'Groups (1)' });
+    fireEvent.click(box(/AI Optimists/));
     view.rerender(element({ joinRequest: 1 }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Log in to join groups.');
     expect(getWorkerSessionToken).not.toHaveBeenCalled();
@@ -356,14 +372,14 @@ describe('SessionInterviewRecommendedGroups', () => {
     const view = render(element());
     await screen.findByRole('heading', { name: 'Groups (2)' });
     fireEvent.click(box(/AI Optimists/));
-    expect(box(/AI Optimists/)).not.toBeChecked();
+    expect(box(/AI Optimists/)).toBeChecked();
     expect(document.querySelector('[data-ce-auto-join-claim="salon"]')).not.toBeNull();
     view.rerender(element({ hidden: true }));
     expect(screen.getByRole('heading', { name: 'Groups (2)', hidden: true }).closest('details')).not.toBeVisible();
     // While it is out of sight the link's own notice comes back.
     expect(document.querySelector('[data-ce-auto-join-claim]')).toBeNull();
     view.rerender(element());
-    expect(box(/AI Optimists/)).not.toBeChecked();
+    expect(box(/AI Optimists/)).toBeChecked();
     expect(box(/Salon/)).toBeChecked();
   });
 
@@ -378,6 +394,7 @@ describe('SessionInterviewRecommendedGroups', () => {
     const listed = [recommendation(), recommendation({ groupId: 'maybe', confidence: 0.4 })];
     const view = render(element({ recommendations: listed, availability: 'available' }));
     await screen.findByRole('heading', { name: 'Groups (2)' });
+    fireEvent.click(box(/AI Optimists/));
     fireEvent.click(box(/Maybe/));
     view.rerender(element({ recommendations: [], availability: 'idle' }));
     expect(box(/AI Optimists/)).toBeChecked();
@@ -388,27 +405,8 @@ describe('SessionInterviewRecommendedGroups', () => {
     // Fresh suggestions replace them.
     view.rerender(element({ recommendations: [recommendation({ groupId: 'new' })], availability: 'available' }));
     expect(await screen.findByRole('heading', { name: 'Groups (1)' })).toBeInTheDocument();
-    expect(box(/New/)).toBeChecked();
+    expect(box(/New/)).not.toBeChecked();
     expect(screen.queryByRole('checkbox', { name: /AI Optimists/ })).toBeNull();
-  });
-
-  it('leaves unticked a strong match that arrives after a submit, which nobody saw then', async () => {
-    const groups = [group(), group({ groupId: 'late', label: 'Late arrival' })];
-    jest.mocked(loadPublicWorkerGroups).mockResolvedValue(groups);
-    jest.mocked(loadWorkerGroupOverview).mockResolvedValue(overview(groups));
-    const view = render(element({ ...signedIn, joinRequest: 0 }));
-    await screen.findByRole('heading', { name: 'Groups (1)' });
-    view.rerender(element({ ...signedIn, joinRequest: 1 }));
-    expect(await screen.findByText('Joined AI Optimists.')).toBeInTheDocument();
-    view.rerender(
-      element({
-        ...signedIn,
-        joinRequest: 1,
-        recommendations: [recommendation(), recommendation({ groupId: 'late', confidence: 1 })],
-      }),
-    );
-    expect(await screen.findByRole('checkbox', { name: /Late arrival/ })).not.toBeChecked();
-    expect(joinWorkerGroup).toHaveBeenCalledTimes(1);
   });
 
   it('drops the link’s group once it is joined elsewhere, as at sign-in', async () => {
@@ -436,12 +434,42 @@ describe('SessionInterviewRecommendedGroups', () => {
   it('forgets what one account joined when another signs in', async () => {
     const view = render(element(signedIn));
     await screen.findByRole('heading', { name: 'Groups (1)' });
+    fireEvent.click(box(/AI Optimists/));
     view.rerender(element({ ...signedIn, joinRequest: 1 }));
     expect(await screen.findByText('Joined AI Optimists.')).toBeInTheDocument();
     const other = '0x0000000000000000000000000000000000000002';
     view.rerender(element({ account: other, loginComplete: true, joinRequest: 1 }));
     await waitFor(() => expect(screen.queryByText('Joined AI Optimists.')).toBeNull());
-    expect(await screen.findByRole('checkbox', { name: /AI Optimists/ })).toBeInTheDocument();
+    expect(await screen.findByRole('checkbox', { name: /AI Optimists/ })).not.toBeChecked();
+  });
+
+  it('clears one account’s ticks when another signs in, but keeps the link’s, which the browser holds', async () => {
+    pendingLink();
+    jest
+      .mocked(loadPublicWorkerGroups)
+      .mockResolvedValue([
+        group(),
+        group({ groupId: 'salon', label: 'Salon' }),
+        group({ groupId: 'maybe', label: 'Maybe' }),
+      ]);
+    const view = render(
+      element({ ...signedIn, recommendations: [recommendation(), recommendation({ groupId: 'maybe' })] }),
+    );
+    await screen.findByRole('heading', { name: 'Groups (3)' });
+    fireEvent.click(box(/AI Optimists/));
+    fireEvent.click(box(/Salon/));
+    expect(isWorkerGroupAutoJoinCancelled(linkScope)).toBe(true);
+    view.rerender(
+      element({
+        account: '0x0000000000000000000000000000000000000002',
+        loginComplete: true,
+        recommendations: [recommendation(), recommendation({ groupId: 'maybe' })],
+      }),
+    );
+    expect(await screen.findByRole('checkbox', { name: /AI Optimists/ })).not.toBeChecked();
+    expect(box(/Maybe/)).not.toBeChecked();
+    expect(box(/Salon/)).not.toBeChecked();
+    expect(isWorkerGroupAutoJoinCancelled(linkScope)).toBe(true);
   });
 
   it('shows each group’s image beside its name, only from a safe address', async () => {

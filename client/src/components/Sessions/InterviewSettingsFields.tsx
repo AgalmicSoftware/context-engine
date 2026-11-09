@@ -27,7 +27,7 @@ const FIDELITY_ABOUT =
   'Turns on voice interviews, which AI prefill uses, research sharing by default and hidden drafts for 1 in 5 of each person’s AI-prefill drafts, and shows people how well their AI predicted them. Turning it off sets the research settings back to their defaults; each can still be changed below.';
 
 const JOIN_GROUPS_ABOUT =
-  'After an AI prefill or voice interview, the AI matches participants to the session’s open groups. Strong matches start ticked under their drafts and join when they submit; they can untick any first. Their own AI can suggest groups too. Off, no groups are matched.';
+  'After an AI prefill or voice interview, the AI suggests the session’s open groups that fit each participant’s answers, under their drafts. They tick any they want, and submitting joins them. Their own AI can suggest groups too. Off, no groups are matched.';
 
 // The smallest group "How well AIs predicted people" reports on; 1 shows every figure.
 const FIDELITY_MINIMUMS = [1, 3, 5, 10];
@@ -199,14 +199,14 @@ export default function InterviewSettingsFields({ value, onChange, disabled = fa
                 aria-describedby={`${joinGroupsId}-about`}
                 onChange={(e) => change(key, e.target.checked)}
               />{' '}
-              Join strong group matches on submit
+              Suggest groups to join
             </Label>
             <SessionWizardInfoTooltip
               enabled={tooltipsEnabled}
               id={`${joinGroupsId}-help`}
               content={JOIN_GROUPS_ABOUT}
               placement="top"
-              ariaLabel="About joining strong group matches"
+              ariaLabel="About suggesting groups to join"
             />
             <span id={`${joinGroupsId}-about`} hidden>
               {JOIN_GROUPS_ABOUT}
