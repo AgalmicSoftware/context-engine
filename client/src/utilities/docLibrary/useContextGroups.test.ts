@@ -27,10 +27,13 @@ jest.mock('../session/sessionWorkerDiscovery', () => ({
 
 const ME = '0xaaaa000000000000000000000000000000000001';
 const SALON = { workerUrl: 'https://salon-worker.example.test', sessionId: `0x${'1'.repeat(32)}` };
+const DEBATE = { workerUrl: 'https://debate-worker.example.test', sessionId: `0x${'2'.repeat(32)}` };
 const forbidden = () => Object.assign(new Error('worker_group_discovery_not_public'), { status: 403 });
 const group = (groupId: string, label: string) => ({ groupId, label, sessionSlug: 'salon' });
+// Lets a refused list finish loading.
+const settle = () => act(() => new Promise((resolve) => setTimeout(resolve, 0)));
 
-type Props = { sessionConfig: Record<string, string>; account?: string };
+type Props = { sessionSlug?: string; sessionConfig: Record<string, string>; account?: string };
 const mount = (initialProps: Props) =>
   renderHook((props: Props) => useContextGroups({ sessionSlug: 'salon', ...props }), { initialProps });
 
@@ -80,5 +83,29 @@ describe('useContextGroups', () => {
     act(() => hearToken());
     await waitFor(() => expect(result.current).toEqual([{ groupId: 'salon', label: 'Salon' }]));
     expect(loadWorkerGroupOverview).toHaveBeenCalledTimes(1);
+  });
+
+  it('never shows another session’s groups, while its own load or when they can’t be read', async () => {
+    jest.mocked(loadPublicWorkerGroups).mockResolvedValueOnce([group('salon', 'Salon')] as never);
+    const { result, rerender } = mount({ sessionConfig: SALON });
+    await waitFor(() => expect(result.current).toEqual([{ groupId: 'salon', label: 'Salon' }]));
+
+    rerender({ sessionSlug: 'debate', sessionConfig: DEBATE });
+    expect(result.current).toEqual([]);
+    await waitFor(() => expect(loadPublicWorkerGroups).toHaveBeenLastCalledWith({ ...DEBATE, sessionSlug: 'debate' }));
+    await settle();
+    expect(result.current).toEqual([]);
+  });
+
+  it('drops a reader’s groups when they sign out', async () => {
+    jest.mocked(hasCachedWorkerSessionToken).mockResolvedValueOnce(true);
+    const { result, rerender } = mount({ sessionConfig: SALON, account: ME });
+    await waitFor(() => expect(result.current).toEqual([{ groupId: 'salon', label: 'Salon' }]));
+
+    rerender({ sessionConfig: SALON });
+    expect(result.current).toEqual([]);
+    await waitFor(() => expect(loadPublicWorkerGroups).toHaveBeenCalledTimes(1));
+    await settle();
+    expect(result.current).toEqual([]);
   });
 });

@@ -29,10 +29,12 @@ export function useContextGroups({
   const workerUrl = getUsableSessionWorkerUrl({ slug: sessionSlug, sessionConfig });
   const sessionId = resolveWorkerCanonicalSessionIdHex(sessionConfig);
   const reader = String(account || '').toLowerCase();
+  // Whose list it is: another session or reader never sees it, while theirs loads or when it can't be read.
+  const owner = JSON.stringify([workerUrl, sessionId, reader]);
   const configRef = useRef(sessionConfig);
   configRef.current = sessionConfig;
   const active = enabled && !!workerUrl && !!sessionId;
-  const [groups, setGroups] = useState(NO_GROUPS);
+  const [loaded, setLoaded] = useState({ owner: '', groups: NO_GROUPS });
   const [revision, setRevision] = useState(0);
   // A new Worker token can show groups the last list couldn't.
   useEffect(() => {
@@ -51,13 +53,13 @@ export function useContextGroups({
       const credentialToken = await getWorkerSessionToken(signedIn);
       return (await ports.loadWorkerGroupOverview({ workerUrl, credentialToken, sessionId, sessionSlug })).groups;
     })()
-      .then((loaded) => {
-        if (current) setGroups(loaded.map(({ groupId, label }) => ({ groupId, label })));
+      .then((groups) => {
+        if (current) setLoaded({ owner, groups: groups.map(({ groupId, label }) => ({ groupId, label })) });
       })
       .catch(() => undefined);
     return () => {
       current = false;
     };
-  }, [active, workerUrl, sessionId, sessionSlug, reader, revision]);
-  return enabled ? groups : NO_GROUPS;
+  }, [active, owner, workerUrl, sessionId, sessionSlug, reader, revision]);
+  return enabled && loaded.owner === owner ? loaded.groups : NO_GROUPS;
 }
