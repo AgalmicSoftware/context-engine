@@ -49,6 +49,7 @@ import { JsonButtonRow, JsonPanel, JsonToggleButton } from '../Shared/Json/JsonC
 import GateMultiSelectLock from '../Gates/GateMultiSelectLock';
 import { createLogger } from 'utilities/logging.js';
 import { buildQuestionRoutePath } from '../../utilities/survey/questionRouting.js';
+import { stampDecryptedQuestion, stampDecryptedSurvey } from '../../utilities/survey/decryptedQuestionReader.js';
 import { validateNoLockedPlaintextInPayload } from '../../utilities/arweave/noLeakPayloads.js';
 import {
   attachStorageRefCompatibilityFields,
@@ -1833,6 +1834,8 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
       const sourceRows: CreateQuestionsCacheQuestionRow[] = Array.isArray(sourceQuestions)
         ? (sourceQuestions as CreateQuestionsCacheQuestionRow[])
         : [];
+      // The author's own text, shown to the author and locked for other readers.
+      const author = publication ? publication.account : this.props.account;
       const recentRows = normalizedRows.map((row, idx): CreateQuestionsSeededQuestionRow => {
         const source = sourceRows[idx] || null;
         const promptMasked = String(row?.prompt || '').trim() === '[encrypted]';
@@ -1847,13 +1850,16 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
         const shouldHydrateOptions =
           ['multichoice', 'quadratic'].includes(sourceType) && hasEncryptedOptions && sourceOptions.length > 0;
         const shouldHydrateTags = hasEncryptedTags && sourceTags.length > 0;
-        return {
-          ...row,
-          id: row.id,
-          ...(promptMasked && sourcePrompt ? { prompt: sourcePrompt, promptDecrypted: true } : {}),
-          ...(shouldHydrateOptions ? { options: sourceOptions, optionsDecrypted: true } : {}),
-          ...(shouldHydrateTags ? { tags: sourceTags, tagsDecrypted: true } : {}),
-        };
+        return stampDecryptedQuestion(
+          {
+            ...row,
+            id: row.id,
+            ...(promptMasked && sourcePrompt ? { prompt: sourcePrompt, promptDecrypted: true } : {}),
+            ...(shouldHydrateOptions ? { options: sourceOptions, optionsDecrypted: true } : {}),
+            ...(shouldHydrateTags ? { tags: sourceTags, tagsDecrypted: true } : {}),
+          },
+          author,
+        );
       });
 
       try {
@@ -2019,7 +2025,8 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
       const surveys = netBucket.surveys as ManagedResourceMap;
       surveys[sid] = {
         ...(surveys[sid] || {}),
-        ...nextSurvey,
+        // The author's own title and links, shown to the author and locked for other readers.
+        ...stampDecryptedSurvey(nextSurvey, publication ? publication.account : this.props.account),
         sessionSlug: nextSurvey.sessionSlug || primarySlug,
         slug: nextSurvey.slug || nextSurvey.sessionSlug || primarySlug,
       };

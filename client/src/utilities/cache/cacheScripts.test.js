@@ -1313,3 +1313,264 @@ describe('cacheScripts', () => {
     });
   });
 });
+
+describe('cacheScripts question and survey text decrypted for one account', () => {
+  const NET = 11155420;
+  const lockedQuestion = {
+    id: 'q',
+    prompt: '[encrypted]',
+    promptEncrypted: 'envelope',
+    options: [],
+    optionsEncrypted: 'envelope',
+  };
+  const questionFor = (reader) => ({
+    ...lockedQuestion,
+    prompt: 'Private prompt',
+    promptDecrypted: true,
+    options: ['Private option'],
+    optionsDecrypted: true,
+    ...(reader === undefined ? {} : { decryptedFor: reader }),
+  });
+  const lockedSurvey = {
+    id: 's',
+    title: '[encrypted]',
+    titleEncrypted: 'envelope',
+    documentURLs: [],
+    documentURLsEncrypted: 'envelope',
+  };
+  const surveyFor = (reader) => ({
+    ...lockedSurvey,
+    title: 'Private title',
+    titleDecrypted: true,
+    documentURLs: ['https://docs.example/private'],
+    documentURLsDecrypted: true,
+    ...(reader === undefined ? {} : { decryptedFor: reader }),
+  });
+
+  // Each load is a fresh page: storage is seeded before the cache starts.
+  const openPage = ({ reader = '', seed = {} } = {}) => {
+    const loaded = loadCacheScripts();
+    const { setWorkerCanonicalCacheReader } = require('../survey/workerCanonicalCacheReader');
+    setWorkerCanonicalCacheReader(reader);
+    Object.entries(seed).forEach(([key, value]) => loaded.idbState.set(key, value));
+    return { ...loaded, setReader: setWorkerCanonicalCacheReader };
+  };
+  const seeded = () => ({
+    'dg:questionsCache:s1': {
+      [NET]: {
+        questions: { admin: questionFor('0xadmin'), legacy: questionFor(), blank: questionFor('') },
+        questionResponses: { admin: {} },
+      },
+      worker: { questions: { w: questionFor('0xworker') } },
+    },
+    'dg:surveysCache:s1': { [NET]: { surveys: { admin: surveyFor('0xadmin') } } },
+  });
+
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it("shows a signed-out page another account's decrypted text locked", async () => {
+    const { cacheScripts, idbState } = openPage({ seed: seeded() });
+    await cacheScripts.initCacheManager();
+
+    const lockedQuestions = { admin: lockedQuestion, legacy: lockedQuestion, blank: lockedQuestion };
+    expect(cacheScripts.peekCacheSync('questionsCache', 's1')[NET]).toEqual({
+      questions: lockedQuestions,
+      questionResponses: { admin: {} },
+    });
+    expect(cacheScripts.peekCacheSync('questionsCache', 's1', { clone: false })[NET].questions).toEqual(
+      lockedQuestions,
+    );
+    expect((await cacheScripts.readCache('questionsCache', 's1'))[NET].questions).toEqual(lockedQuestions);
+    expect(cacheScripts.listNamespaceEntriesSync('surveysCache', { cloneValues: false })[0].value).toEqual({
+      [NET]: { surveys: { admin: lockedSurvey } },
+    });
+    // Worker nodes carry their own reader check; storage keeps the text for its account.
+    expect(cacheScripts.peekCacheSync('questionsCache', 's1').worker.questions.w).toEqual(questionFor('0xworker'));
+    expect(idbState.get('dg:questionsCache:s1')[NET].questions.admin).toEqual(questionFor('0xadmin'));
+  });
+
+  it('shows the account that decrypted the text its own text, and only that account', async () => {
+    const { cacheScripts, setReader } = openPage({ reader: '0xadmin', seed: seeded() });
+    await cacheScripts.initCacheManager();
+    expect(cacheScripts.peekCacheSync('questionsCache', 's1')[NET].questions.admin).toEqual(questionFor('0xadmin'));
+    expect(cacheScripts.peekCacheSync('surveysCache', 's1')[NET].surveys.admin).toEqual(surveyFor('0xadmin'));
+
+    setReader('0xother');
+    expect(cacheScripts.peekCacheSync('questionsCache', 's1')[NET].questions.admin).toEqual(lockedQuestion);
+    setReader('0xADMIN');
+    expect(cacheScripts.peekCacheSync('questionsCache', 's1')[NET].questions.admin).toEqual(questionFor('0xadmin'));
+  });
+
+  it('keeps the text a writer saw locked when it saves what it read', async () => {
+    const { cacheScripts, idbState } = openPage({ seed: seeded() });
+    await cacheScripts.initCacheManager();
+
+    const read = cacheScripts.peekCacheSync('questionsCache', 's1');
+    read[NET].questions.added = { id: 'added', prompt: 'Open prompt' };
+    await cacheScripts.writeCache('questionsCache', 's1', read);
+    expect(idbState.get('dg:questionsCache:s1')[NET].questions).toEqual({
+      admin: questionFor('0xadmin'),
+      legacy: questionFor(),
+      blank: questionFor(''),
+      added: { id: 'added', prompt: 'Open prompt' },
+    });
+
+    const surveys = cacheScripts.peekCacheSync('surveysCache', 's1');
+    surveys[NET].surveys.open = { id: 'open', title: 'Open title' };
+    await cacheScripts.writeCacheOptimistic('surveysCache', 's1', surveys);
+    expect(idbState.get('dg:surveysCache:s1')[NET].surveys.admin).toEqual(surveyFor('0xadmin'));
+
+    // An updater reads the text locked too, keeps it, and gets it back locked.
+    let seenByUpdater = null;
+    const returned = await cacheScripts.updateCacheAtomic('questionsCache', 's1', (current) => {
+      seenByUpdater = { ...current[NET].questions };
+      current[NET].questions.added = { id: 'added', prompt: 'Changed prompt' };
+      return current;
+    });
+    expect(seenByUpdater.admin).toEqual(lockedQuestion);
+    expect(seenByUpdater.blank).toEqual(lockedQuestion);
+    expect(idbState.get('dg:questionsCache:s1')[NET].questions.admin).toEqual(questionFor('0xadmin'));
+    expect(idbState.get('dg:questionsCache:s1')[NET].questions.added.prompt).toBe('Changed prompt');
+    expect(returned[NET].questions.admin).toEqual(lockedQuestion);
+  });
+
+  it('saves text a writer decrypted itself and leaves out the entries it removed', async () => {
+    const { cacheScripts, idbState } = openPage({ reader: '0xnext', seed: seeded() });
+    await cacheScripts.initCacheManager();
+
+    await cacheScripts.updateCacheAtomic('questionsCache', 's1', (current) => ({
+      ...current,
+      [NET]: { ...current[NET], questions: { admin: questionFor('0xnext') } },
+    }));
+    expect(idbState.get('dg:questionsCache:s1')[NET].questions).toEqual({ admin: questionFor('0xnext') });
+  });
+
+  it("keeps an account's text when it signs in between a read and its write", async () => {
+    const { cacheScripts, idbState, setReader } = openPage({ seed: seeded() });
+    await cacheScripts.initCacheManager();
+    const questions = cacheScripts.peekCacheSync('questionsCache', 's1');
+    const surveys = cacheScripts.peekCacheSync('surveysCache', 's1');
+
+    setReader('0xadmin');
+    await cacheScripts.writeCache('questionsCache', 's1', questions);
+    await cacheScripts.updateCacheAtomic('questionsCache', 's1', () => questions);
+    await cacheScripts.writeCacheOptimistic('surveysCache', 's1', surveys);
+    expect(idbState.get('dg:questionsCache:s1')[NET].questions.admin).toEqual(questionFor('0xadmin'));
+    expect(idbState.get('dg:surveysCache:s1')[NET].surveys.admin).toEqual(surveyFor('0xadmin'));
+    expect(cacheScripts.peekCacheSync('questionsCache', 's1')[NET].questions.admin).toEqual(questionFor('0xadmin'));
+  });
+
+  it('never saves text the current reader may not see', async () => {
+    const { cacheScripts, idbState, setReader } = openPage({ reader: '0xadmin', seed: seeded() });
+    await cacheScripts.initCacheManager();
+    const questions = cacheScripts.peekCacheSync('questionsCache', 's1');
+    const surveys = cacheScripts.peekCacheSync('surveysCache', 's1');
+
+    setReader('');
+    await cacheScripts.lockChainTextHiddenFromReader();
+    // What the account read before signing out is saved after the lock.
+    await cacheScripts.writeCache('questionsCache', 's1', questions);
+    await cacheScripts.writeCacheOptimistic('surveysCache', 's1', surveys);
+    // So is text decrypted for it that lands late, added in place by an updater.
+    const returned = await cacheScripts.updateCacheAtomic('questionsCache', 's1', (current) => {
+      current[NET].questions.late = questionFor('0xadmin');
+      return current;
+    });
+    expect(returned[NET].questions.late).toEqual(lockedQuestion);
+    expect(JSON.stringify(idbState.get('dg:questionsCache:s1')[NET])).not.toContain('Private');
+    expect(JSON.stringify(idbState.get('dg:surveysCache:s1'))).not.toContain('Private');
+  });
+
+  it('keeps the text locked when a write lands during the sign-out lock', async () => {
+    const { cacheScripts, idb, idbState, setReader } = openPage({ reader: '0xadmin', seed: seeded() });
+    await cacheScripts.initCacheManager();
+    setReader('');
+    // Storage answers reads only after the write below has been issued.
+    let answerReads;
+    const reading = new Promise((resolve) => {
+      answerReads = resolve;
+    });
+    const get = idb.get.getMockImplementation();
+    idb.get.mockImplementation(async (...args) => {
+      await reading;
+      return get(...args);
+    });
+
+    const lock = cacheScripts.lockChainTextHiddenFromReader();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const read = cacheScripts.peekCacheSync('questionsCache', 's1');
+    const write = cacheScripts.writeCacheOptimistic('questionsCache', 's1', read);
+    answerReads();
+    await Promise.all([lock, write]);
+    expect(JSON.stringify(idbState.get('dg:questionsCache:s1')[NET])).not.toContain('Private');
+  });
+
+  it('puts kept text back only on the envelope it was decrypted from', async () => {
+    const { cacheScripts, idbState } = openPage({ seed: seeded() });
+    await cacheScripts.initCacheManager();
+
+    const surveys = cacheScripts.peekCacheSync('surveysCache', 's1');
+    surveys[NET].surveys.admin = { ...surveys[NET].surveys.admin, titleEncrypted: 'edited envelope' };
+    await cacheScripts.writeCache('surveysCache', 's1', surveys);
+    expect(idbState.get('dg:surveysCache:s1')[NET].surveys.admin).toEqual({
+      ...lockedSurvey,
+      titleEncrypted: 'edited envelope',
+    });
+  });
+
+  it("sends each update as the reader's view", async () => {
+    const { cacheScripts } = openPage({ seed: seeded() });
+    await cacheScripts.initCacheManager();
+    const updates = [];
+    cacheScripts.subscribeCacheUpdates((update) => updates.push(update));
+
+    // The write keeps the account's text, and its update shows that text locked.
+    await cacheScripts.writeCache('surveysCache', 's1', cacheScripts.peekCacheSync('surveysCache', 's1'));
+    expect(updates.at(-1).value[NET].surveys.admin).toEqual(lockedSurvey);
+  });
+
+  it('locks the text in storage on an account change and tells every view to read again', async () => {
+    const { cacheScripts, idbState } = openPage({
+      reader: '0xnext',
+      seed: {
+        'dg:questionsCache:s1': {
+          [NET]: { questions: { admin: questionFor('0xadmin'), own: questionFor('0xnext'), legacy: questionFor() } },
+          worker: { questions: { w: questionFor('0xnext') } },
+        },
+        'dg:surveysCache:s1': { [NET]: { surveys: { admin: surveyFor('0xadmin'), own: surveyFor('0xnext') } } },
+        'dg:surveysCache:s2': { [NET]: { surveys: { own: surveyFor('0xnext') } } },
+      },
+    });
+    await cacheScripts.initCacheManager();
+    const updates = [];
+    cacheScripts.subscribeCacheUpdates((update) => updates.push(update));
+
+    await cacheScripts.lockChainTextHiddenFromReader();
+    expect(idbState.get('dg:questionsCache:s1')).toEqual({
+      [NET]: { questions: { admin: lockedQuestion, own: questionFor('0xnext'), legacy: lockedQuestion } },
+      worker: { questions: { w: questionFor('0xnext') } },
+    });
+    expect(idbState.get('dg:surveysCache:s1')[NET].surveys).toEqual({
+      admin: lockedSurvey,
+      own: surveyFor('0xnext'),
+    });
+    expect(idbState.get('dg:surveysCache:s2')).toEqual({ [NET]: { surveys: { own: surveyFor('0xnext') } } });
+    expect(
+      updates
+        .filter((update) => update.source === 'reader')
+        .map((update) => `${update.namespace}:${update.slug}`)
+        .sort(),
+    ).toEqual(['questionsCache:s1', 'surveysCache:s1', 'surveysCache:s2']);
+  });
+
+  it('locks every decrypted text in storage on sign-out', async () => {
+    const { cacheScripts, idbState } = openPage({ seed: seeded() });
+    await cacheScripts.initCacheManager();
+
+    await cacheScripts.lockChainTextHiddenFromReader();
+    expect(JSON.stringify(idbState.get('dg:questionsCache:s1')[NET])).not.toContain('Private');
+    expect(JSON.stringify(idbState.get('dg:surveysCache:s1'))).not.toContain('Private');
+  });
+});

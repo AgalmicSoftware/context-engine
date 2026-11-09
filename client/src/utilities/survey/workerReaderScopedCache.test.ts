@@ -1,4 +1,9 @@
-import { listNamespaceSlugsSync, peekCacheSync, updateCacheAtomic } from '../cache/cacheScripts';
+import {
+  listNamespaceSlugsSync,
+  lockChainTextHiddenFromReader,
+  peekCacheSync,
+  updateCacheAtomic,
+} from '../cache/cacheScripts';
 import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../session/sessionModeProfile';
 import {
   purgeWorkerCanonicalCaches,
@@ -14,6 +19,7 @@ import { hydrateWorkerCanonicalResponses, resolveWorkerResponseHydrationRun } fr
 jest.mock('../cache/cacheScripts', () => ({
   ...jest.requireActual<typeof import('../cache/cacheScripts')>('../cache/cacheScripts'),
   listNamespaceSlugsSync: jest.fn(),
+  lockChainTextHiddenFromReader: jest.fn(),
   peekCacheSync: jest.fn(),
   updateCacheAtomic: jest.fn(),
 }));
@@ -234,103 +240,11 @@ it("removes the previous reader's Worker nodes from persistent caches on an acco
   expect((cache.get('questionsCache|b') as Cache).worker).toBeDefined();
   expect(cache.get('userCache|a')).toEqual({ '0xadmin': { 11155420: chainNode }, '0xother': { 11155420: chainNode } });
   expect(updateCacheAtomic).toHaveBeenCalledTimes(2);
-});
-
-describe('question and survey text decrypted into shared chain nodes', () => {
-  const locked = {
-    id: 'q',
-    prompt: '[encrypted]',
-    promptEncrypted: 'envelope',
-    options: [],
-    optionsEncrypted: 'envelope',
-  };
-  const decryptedFor = (reader?: string) => ({
-    ...locked,
-    prompt: 'Private prompt',
-    promptDecrypted: true,
-    options: ['Private option'],
-    optionsDecrypted: true,
-    ...(reader === undefined ? {} : { decryptedFor: reader }),
-  });
-  const lockedSurvey = {
-    title: '[encrypted]',
-    titleEncrypted: 'envelope',
-    documentURLs: [],
-    documentURLsEncrypted: 'envelope',
-  };
-  const surveyDecryptedFor = (reader?: string) => ({
-    ...lockedSurvey,
-    title: 'Private title',
-    titleDecrypted: true,
-    documentURLs: ['https://docs.example/private'],
-    documentURLsDecrypted: true,
-    ...(reader === undefined ? {} : { decryptedFor: reader }),
-  });
-  let cache: Map<string, unknown>;
-  beforeEach(() => {
-    cache = new Map<string, unknown>([
-      [
-        'surveysCache|a',
-        {
-          11155420: {
-            surveys: {
-              admin: surveyDecryptedFor('0xadmin'),
-              own: surveyDecryptedFor('0xnext'),
-              legacy: surveyDecryptedFor(),
-            },
-          },
-        },
-      ],
-      [
-        'questionsCache|a',
-        {
-          11155420: {
-            questions: { admin: decryptedFor('0xadmin'), own: decryptedFor('0xnext'), legacy: decryptedFor() },
-          },
-          worker: withWorkerCanonicalCacheIdentity(
-            { questions: { w: decryptedFor('0xnext') } },
-            resolveWorkerCanonicalCacheIdentity({ sessionConfig: config, sessionSlug: slug, reader: '0xnext' }),
-          ),
-        },
-      ],
-    ]);
-    jest
-      .mocked(listNamespaceSlugsSync)
-      .mockImplementation((namespace) =>
-        [...cache.keys()].filter((key) => key.startsWith(`${namespace}|`)).map((key) => key.split('|')[1]),
-      );
-    jest.mocked(peekCacheSync).mockImplementation((namespace, key) => cache.get(`${namespace}|${key}`) as any);
-    jest.mocked(updateCacheAtomic).mockImplementation(async (namespace, key, update) => {
-      const next = await update!(cache.get(`${namespace}|${key}`) as any);
-      cache.set(`${namespace}|${key}`, next);
-      return next;
-    });
-  });
-
-  it.each([
-    ['an account change', '0xadmin'],
-    ['a sign-in', ''],
-  ])('keeps only the new reader text after %s', async (_change, previousReader) => {
-    setWorkerCanonicalCacheReader('0xnext');
-    await purgeWorkerCanonicalCaches(previousReader);
-
-    const root = cache.get('questionsCache|a') as Cache;
-    expect(root[11155420].questions).toEqual({ admin: locked, own: decryptedFor('0xnext'), legacy: locked });
-    expect(root.worker.questions.w).toEqual(decryptedFor('0xnext'));
-    expect((cache.get('surveysCache|a') as Cache)[11155420].surveys).toEqual({
-      admin: lockedSurvey,
-      own: surveyDecryptedFor('0xnext'),
-      legacy: lockedSurvey,
-    });
-  });
-
-  it('locks every decrypted text on sign-out', async () => {
-    setWorkerCanonicalCacheReader('');
-    await purgeWorkerCanonicalCaches('0xnext');
-
-    expect(JSON.stringify((cache.get('questionsCache|a') as Cache)[11155420])).not.toContain('Private');
-    expect(JSON.stringify(cache.get('surveysCache|a'))).not.toContain('Private');
-  });
+  // Then chain text not decrypted for the new reader is locked as well.
+  expect(lockChainTextHiddenFromReader).toHaveBeenCalledTimes(1);
+  expect(jest.mocked(lockChainTextHiddenFromReader).mock.invocationCallOrder[0]).toBeGreaterThan(
+    Math.max(...jest.mocked(updateCacheAtomic).mock.invocationCallOrder),
+  );
 });
 
 it('keeps draft storage keys independent of the reader so saved drafts stay reachable', () => {

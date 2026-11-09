@@ -10,6 +10,7 @@ import contractScripts from '../../utilities/web3/chainGateway.js';
 import {
   initCacheManager,
   listNamespaceSlugsSync,
+  lockChainTextHiddenFromReader,
   peekCacheSync,
   updateCacheAtomic,
 } from '../../utilities/cache/cacheScripts.js';
@@ -38,7 +39,11 @@ import {
   resolveWorkerCanonicalCacheIdentity,
   withWorkerCanonicalCacheIdentity,
 } from '../../utilities/survey/workerCanonicalCacheIdentity';
-import { setWorkerCanonicalCacheReader } from '../../utilities/survey/workerCanonicalCacheReader';
+import { readerViewOfChainText } from '../../utilities/survey/decryptedQuestionReader';
+import {
+  getWorkerCanonicalCacheReader,
+  setWorkerCanonicalCacheReader,
+} from '../../utilities/survey/workerCanonicalCacheReader';
 
 const mockAdminPage = jest.fn(() => null);
 const mockNavbar = jest.fn(() => null);
@@ -436,6 +441,7 @@ jest.mock('../../utilities/cache/cacheScripts.js', () => ({
   __esModule: true,
   initCacheManager: jest.fn(() => Promise.resolve()),
   listNamespaceSlugsSync: jest.fn(() => []),
+  lockChainTextHiddenFromReader: jest.fn(() => Promise.resolve()),
   peekCacheSync: jest.fn(() => null),
   subscribeCacheUpdates: jest.fn(() => jest.fn()),
   updateCacheAtomic: jest.fn(),
@@ -1090,6 +1096,12 @@ describe('AppShell route render smoke', () => {
       caches.set(`${namespace}|${slug}`, next);
       return next;
     });
+    // The cache locks stored chain text as the new reader sees it.
+    lockChainTextHiddenFromReader.mockImplementation(async () => {
+      caches.forEach((value, key) => {
+        caches.set(key, readerViewOfChainText(key.split('|')[0], value, getWorkerCanonicalCacheReader()));
+      });
+    });
     contractScripts.decryptSurveyPayloadInPlace.mockImplementation(async (payload) => {
       Object.assign(payload, { title: 'Private title', titleDecrypted: true });
     });
@@ -1141,6 +1153,12 @@ describe('AppShell route render smoke', () => {
       const next = await update(caches.get(`${namespace}|${slug}`));
       caches.set(`${namespace}|${slug}`, next);
       return next;
+    });
+    // The cache locks stored chain text as the new reader sees it.
+    lockChainTextHiddenFromReader.mockImplementation(async () => {
+      caches.forEach((value, key) => {
+        caches.set(key, readerViewOfChainText(key.split('|')[0], value, getWorkerCanonicalCacheReader()));
+      });
     });
     const settle = () =>
       act(async () => {

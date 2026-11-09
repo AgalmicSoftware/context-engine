@@ -119,4 +119,29 @@ describe('contractScripts metadata decrypt helpers', () => {
       expect.objectContaining({ preferLitRecipients: true }),
     );
   });
+
+  it('records the decrypting account on text it decrypts, and nothing when none decrypts', async () => {
+    jest.spyOn(cryptoUtils, 'decryptEnvelopeValue').mockImplementation(async (envelopeJson) => {
+      if (envelopeJson === 'stamp-locked-env') throw new Error('not authorized');
+      return `Text of ${envelopeJson}`;
+    });
+    const decryptContext = {
+      account: ACCOUNT.toUpperCase().replace('0X', '0x'),
+      providerLike: 'wagmi',
+      chainId: 84532,
+      litHooks: { getKey: jest.fn() },
+    };
+    const surveyData = { id: 'survey-stamped', titleEncrypted: 'stamp-title-env' };
+    const questionData = { id: 'question-stamped', promptEncrypted: 'stamp-prompt-env' };
+    const unreadQuestion = { id: 'question-unread', promptEncrypted: 'stamp-locked-env' };
+
+    await contractScripts.decryptSurveyPayloadInPlace(surveyData, GROUP_CFG, { decryptContext });
+    await contractScripts.decryptQuestionPayloadInPlace(questionData, GROUP_CFG, { decryptContext });
+    await contractScripts.decryptQuestionPayloadInPlace(unreadQuestion, GROUP_CFG, { decryptContext });
+
+    expect(surveyData).toEqual(expect.objectContaining({ titleDecrypted: true, decryptedFor: ACCOUNT }));
+    expect(questionData).toEqual(expect.objectContaining({ promptDecrypted: true, decryptedFor: ACCOUNT }));
+    expect(unreadQuestion.promptDecryptError).toBe('lit_failure');
+    expect(unreadQuestion).not.toHaveProperty('decryptedFor');
+  });
 });

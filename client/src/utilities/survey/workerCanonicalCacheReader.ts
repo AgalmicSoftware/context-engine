@@ -4,6 +4,9 @@
 // render. This module stays dependency-free so the store can import it.
 let currentReader = '';
 
+// The cache scope holding Worker data; every other scope is a chain node.
+export const WORKER_CANONICAL_CACHE_SCOPE_KEY = 'worker';
+
 export const normalizeWorkerCanonicalCacheReader = (account: unknown): string =>
   typeof account === 'string' ? account.trim().toLowerCase() : '';
 
