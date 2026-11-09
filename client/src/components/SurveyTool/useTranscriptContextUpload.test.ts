@@ -210,4 +210,26 @@ describe('adding a transcript to context', () => {
     expect(removeContextSource).toHaveBeenCalledWith({ id: 'stored-1', reading: null }, expect.anything());
     expect(view.result.current.status).toBe('Transcript added to context.');
   });
+
+  it('leaves the last account’s copy when the next account adds more of the conversation', async () => {
+    const view = await mount();
+    act(() => view.result.current.setChosen(true));
+    await act(() => view.result.current.upload('Person 1: Words.'));
+    view.rerender(input({}, OTHER));
+    jest.mocked(uploadContextFile).mockResolvedValueOnce('stored-2');
+    await act(() => view.result.current.upload('Person 1: Words. More.'));
+    expect(uploadContextFile).toHaveBeenCalledTimes(2);
+    expect(removeContextSource).not.toHaveBeenCalled();
+    expect(view.result.current.status).toBe('Transcript added to context.');
+  });
+
+  it('adds the same transcript again for the next account', async () => {
+    const view = await mount();
+    act(() => view.result.current.setChosen(true));
+    await act(() => view.result.current.upload('Person 1: Words.'));
+    view.rerender(input({}, OTHER));
+    await act(() => view.result.current.upload('Person 1: Words.'));
+    expect(uploadContextFile).toHaveBeenCalledTimes(2);
+    expect(jest.mocked(uploadContextFile).mock.calls[1][1]).toMatchObject({ context: { account: OTHER } });
+  });
 });

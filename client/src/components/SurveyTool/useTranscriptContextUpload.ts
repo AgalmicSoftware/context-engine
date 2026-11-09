@@ -22,11 +22,13 @@ const transcriptFileName = () => {
 type Input = { sessionSlug: string; sessionConfig: unknown; context: unknown; enabled: boolean };
 type Target = Pick<Input, 'sessionSlug' | 'sessionConfig' | 'context'>;
 
-// The same account, and the same session on the same Worker.
-const sameOwner = (left: Target, right: Target) => {
-  const [a, b] = [left, right].map((target) => recordingOwner(target as RecordingOptions));
-  return a.account === b.account && a.identity === b.identity;
+// Who a transcript goes up as, and where: the account, and the session on its Worker.
+const ownerOf = (target: Target) => {
+  const { account, identity } = recordingOwner(target as RecordingOptions);
+  return JSON.stringify([identity, account]);
 };
+
+const NOTHING_UPLOADED = { text: '', id: '', choice: '', owner: '' };
 
 /**
  * The Group Conversation's "Add transcript to context" choice. The file goes up after the questions submit, as
@@ -44,7 +46,7 @@ export function useTranscriptContextUpload({ sessionSlug, sessionConfig, context
     enabled && supportsContextSources(sessionConfig) && (isAdmin || participantsMayAddContext(sessionConfig));
   const latest = useRef({ sessionSlug, sessionConfig, context });
   latest.current = { sessionSlug, sessionConfig, context };
-  const uploaded = useRef({ text: '', id: '', choice: '' });
+  const uploaded = useRef(NOTHING_UPLOADED);
   const pending = useRef<Promise<void>>(Promise.resolve());
   const groups = useContextGroups({ sessionSlug, sessionConfig, account, enabled: available });
 
@@ -71,11 +73,13 @@ export function useTranscriptContextUpload({ sessionSlug, sessionConfig, context
       if (!chosen || !text) return pending.current;
       // A queued upload goes up as the account, to the session and audience, it was asked for, or not at all.
       const target = latest.current;
+      const owner = ownerOf(target);
       pending.current = pending.current.then(async () => {
-        // The upload before this one in the queue has finished by now, so it is the one to compare with or replace.
-        const earlier = uploaded.current;
+        // The upload before this one in the queue has finished by now, so it is the one to compare with or replace,
+        // if the same account made it there. Another account's copy is theirs.
+        const earlier = uploaded.current.owner === owner ? uploaded.current : NOTHING_UPLOADED;
         if (text === earlier.text && choice === earlier.choice) return;
-        if (!sameOwner(target, latest.current)) {
+        if (ownerOf(latest.current) !== owner) {
           setStatus('The transcript wasn’t added to context: the account or session changed.');
           return;
         }
@@ -89,7 +93,7 @@ export function useTranscriptContextUpload({ sessionSlug, sessionConfig, context
             },
             target,
           );
-          uploaded.current = { text, id, choice };
+          uploaded.current = { text, id, choice, owner };
           // More of this conversation, or a new audience for it, replaces its file. Another conversation keeps its own.
           const replaces = !!earlier.id && text.startsWith(earlier.text);
           let replaced = true;
