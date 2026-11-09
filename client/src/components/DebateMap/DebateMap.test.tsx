@@ -1400,6 +1400,7 @@ describe('DebateMap', () => {
           {
             id: 't1',
             name: 'Pilots',
+            depth: 1,
             compass: {
               xAxis: { label: 'Risk', left: 'Careful', right: 'Bold' },
               yAxis: { label: 'Who', top: 'Locals', bottom: 'Experts' },
@@ -1435,6 +1436,33 @@ describe('DebateMap', () => {
       });
       fireEvent.click(await screen.findByTitle('Copy Deep Link URL'));
       await waitFor(() => expect(writeText).toHaveBeenCalledWith('http://localhost/atlas/t1?session=salon'));
+    });
+
+    it('keeps the demo atlas four levels when none are named', () => {
+      render(
+        <MemoryRouter>
+          <DebateMapComponent hideDemoModeToggle embedded treeData={sessionTree} />
+        </MemoryRouter>,
+      );
+      const legend = screen.getAllByTestId(E2E_TESTIDS.DEBATE_VIEW_MODE)[0].parentElement as HTMLElement;
+      for (const level of ['Category', 'Sub-Category', 'Topic', 'Instance']) {
+        expect(within(legend).getByText(level)).toBeInTheDocument();
+      }
+    });
+
+    it('names the levels it has, in a panel and in the legend', async () => {
+      renderSessionAtlas({ requestedModalNodeId: 't1', levelLabels: ['Category', 'Topic'] });
+      const modal = (await screen.findByRole('heading', { name: 'Pilots' })).closest(
+        '[class*="modalContent"]',
+      ) as HTMLElement;
+      expect(within(modal).getByText('Topic')).toBeInTheDocument();
+      expect(within(modal).queryByText('Sub-Category')).not.toBeInTheDocument();
+      // The view switch carries the legend of levels.
+      const legend = screen.getAllByTestId(E2E_TESTIDS.DEBATE_VIEW_MODE)[0].parentElement as HTMLElement;
+      expect(within(legend).getByText('Category')).toBeInTheDocument();
+      expect(within(legend).getByText('Topic')).toBeInTheDocument();
+      expect(within(legend).queryByText('Sub-Category')).not.toBeInTheDocument();
+      expect(within(legend).queryByText('Instance')).not.toBeInTheDocument();
     });
 
     it('opens each question on its own page to answer', async () => {

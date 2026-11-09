@@ -25,6 +25,9 @@ type Props = {
   onRequestedNodeClose?: (() => void) | null;
 };
 
+// A built atlas has categories and, under each, topics.
+const LEVEL_LABELS = ['Category', 'Topic'];
+
 // A built atlas replaces the demo atlas and the RxC topic circles: read-only
 // circles whose categories and topics each open a compass of positions and participants.
 export default function SessionDebateAtlasView({
@@ -86,11 +89,11 @@ export default function SessionDebateAtlasView({
         </div>
         {builds.length > 1 && (
           <label className={styles.picker}>
-            <span>Build</span>
+            <span>Version</span>
             <select
               value={build.id}
               onChange={(event) => {
-                // Another build was picked, so a node a link asked for stays shut.
+                // Another version was picked, so a node a link asked for stays shut.
                 onRequestedNodeClose?.();
                 onSelectBuild(event.target.value);
               }}
@@ -123,6 +126,7 @@ export default function SessionDebateAtlasView({
           onModalClose={onRequestedNodeClose}
           buildNodeLink={buildNodeLink}
           buildQuestionLink={buildQuestionLink}
+          levelLabels={LEVEL_LABELS}
         />
       </div>
     </section>

@@ -267,6 +267,8 @@ export interface DebateMapProps {
   buildNodeLink?: ((nodeId: string) => string) | null;
   /** A question's own page, where it can be answered; its card in a node's panel opens it. */
   buildQuestionLink?: ((questionId: string) => string) | null;
+  /** What each level of the tree is called, from the top; the demo atlas has four. */
+  levelLabels?: string[];
 }
 
 export interface AtlasChromeProps {
@@ -312,6 +314,7 @@ export interface ModalProps {
   onCopy: () => void;
   onTagClick?: ((tag: string) => void) | null;
   buildQuestionLink?: ((questionId: string) => string) | null;
+  levelLabels?: string[];
 }
 
 export interface SuggestNodeModalProps {

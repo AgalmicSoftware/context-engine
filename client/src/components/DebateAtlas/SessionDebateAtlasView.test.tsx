@@ -45,7 +45,7 @@ it('lets viewers open an earlier build', () => {
   render(
     <SessionDebateAtlasView build={build} builds={[build, older]} onSelectBuild={onSelectBuild} sessionSlug="salon" />,
   );
-  const picker = screen.getByRole('combobox', { name: 'Build' });
+  const picker = screen.getByRole('combobox', { name: 'Version' });
   expect(picker).toHaveValue('atlas_k2_00000002');
   fireEvent.change(picker, { target: { value: 'atlas_k1_00000001' } });
   expect(onSelectBuild).toHaveBeenCalledWith('atlas_k1_00000001');
@@ -77,15 +77,16 @@ it('opens the node a link asked for, first showing the build it belongs to', () 
   expect(props.buildNodeLink('atlas_k1_00000001:b1')).toBe(
     '/atlas/atlas_k1_00000001%3Ab1?session=salon&worker=https%3A%2F%2Fce-salon.workers.dev',
   );
-  // A question's card opens its own page.
+  // A question's card opens its own page, and the levels are named as the atlas has them.
   expect(props.buildQuestionLink('0xABC')).toBe(
     '/question/0xabc?session=salon&worker=https%3A%2F%2Fce-salon.workers.dev',
   );
+  expect(props.levelLabels).toEqual(['Category', 'Topic']);
 
   // Picking another build afterwards is the reader's choice, and leaves the node shut.
   rerender(view(build));
   expect(onSelectBuild).toHaveBeenCalledTimes(1);
-  fireEvent.change(screen.getByRole('combobox', { name: 'Build' }), { target: { value: 'atlas_k1_00000001' } });
+  fireEvent.change(screen.getByRole('combobox', { name: 'Version' }), { target: { value: 'atlas_k1_00000001' } });
   expect(onRequestedNodeClose).toHaveBeenCalledTimes(1);
   expect(onSelectBuild).toHaveBeenLastCalledWith('atlas_k1_00000001');
 });

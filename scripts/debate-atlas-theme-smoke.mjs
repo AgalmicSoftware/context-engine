@@ -143,7 +143,7 @@ export async function inspectDebateAtlas(page, { screenshotDir = '', tag = '' } 
   await atlas.waitFor();
   await page.getByTestId('ce-atlas-node').first().waitFor();
   await step('atlas', () => assertReadable(atlas));
-  const picker = atlas.getByRole('combobox', { name: 'Build' });
+  const picker = atlas.getByRole('combobox', { name: 'Version' });
   await picker.hover();
   await step('build picker hovered', () => assertReadable(picker.locator('xpath=..')));
   await picker.focus();

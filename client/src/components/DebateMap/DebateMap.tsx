@@ -326,6 +326,9 @@ export const DEBATE_VISUAL_MODES = Object.freeze({
   LIST: 'list',
 });
 
+const DEMO_LEVEL_LABELS = ['Category', 'Sub-Category', 'Topic', 'Instance'];
+const LEVEL_DOT_CLASSES = ['category', 'subcategory', 'topic', 'instance'];
+
 const getInitialDebateVisualMode = (atlasLayoutMode: AtlasLayoutMode): DebateVisualMode =>
   atlasLayoutMode === ATLAS_LAYOUT_MODES.ORBITAL ? DEBATE_VISUAL_MODES.ATLAS : DEBATE_VISUAL_MODES.CIRCLES;
 
@@ -1198,6 +1201,7 @@ const Modal = ({
   onCopy,
   onTagClick,
   buildQuestionLink = null,
+  levelLabels = DEMO_LEVEL_LABELS,
 }: ModalProps) => {
   const modalContentRef = useRef<HTMLDivElement | null>(null);
   const defaultArgumentData = content?.arguments && typeof content.arguments === 'object' ? content.arguments : null;
@@ -1429,9 +1433,8 @@ const Modal = ({
   const compassTitle = content?.compass?.xAxis?.label || content?.name || 'Compass';
 
   // Logic for Depth Label and Styling
-  const depthLabels = ['Category', 'Sub-Category', 'Topic', 'Instance'];
   const depthIndex = content.depth !== undefined ? content.depth : content.parentPath ? content.parentPath.length : 0;
-  const depthLabel = depthLabels[Math.min(depthIndex, 3)] || 'Node';
+  const depthLabel = levelLabels[Math.min(depthIndex, levelLabels.length - 1)] || 'Node';
   const depthClass = `depth${Math.min(depthIndex, 3)}`; // used for color mapping
 
   const tags = readOnly ? [] : ['AI Safety', 'Policy'];
@@ -2271,6 +2274,7 @@ const DebateMap = ({
   treeData = null,
   buildNodeLink = null,
   buildQuestionLink = null,
+  levelLabels = DEMO_LEVEL_LABELS,
 }: DebateMapProps) => {
   const explicitTreeData = Array.isArray(treeData) ? treeData : null;
   const externalDemoEnabled =
@@ -2634,22 +2638,12 @@ const DebateMap = ({
               {embedded && (
                 <>
                   <span className={styles.viewModeSeparator} />
-                  <span className={styles.inlineLegendItem}>
-                    <span className={`${styles.legendDot} ${styles.category}`} />
-                    <span>Category</span>
-                  </span>
-                  <span className={styles.inlineLegendItem}>
-                    <span className={`${styles.legendDot} ${styles.subcategory}`} />
-                    <span>Sub-Category</span>
-                  </span>
-                  <span className={styles.inlineLegendItem}>
-                    <span className={`${styles.legendDot} ${styles.topic}`} />
-                    <span>Topic</span>
-                  </span>
-                  <span className={styles.inlineLegendItem}>
-                    <span className={`${styles.legendDot} ${styles.instance}`} />
-                    <span>Instance</span>
-                  </span>
+                  {levelLabels.slice(0, LEVEL_DOT_CLASSES.length).map((label, level) => (
+                    <span key={label} className={styles.inlineLegendItem}>
+                      <span className={`${styles.legendDot} ${styles[LEVEL_DOT_CLASSES[level]]}`} />
+                      <span>{label}</span>
+                    </span>
+                  ))}
                 </>
               )}
             </div>
@@ -2679,8 +2673,8 @@ const DebateMap = ({
                 <span className={styles.filterLabel}>Filter Depth:</span>
                 <select value={nodeTypeFilter} onChange={(e) => setNodeTypeFilter(e.target.value)}>
                   <option value="all">All</option>
-                  <option value="category">Category</option>
-                  <option value="subcategory">Sub-category</option>
+                  <option value="category">{levelLabels[0]}</option>
+                  <option value="subcategory">{levelLabels[1]}</option>
                 </select>
               </div>
             )}
@@ -2763,6 +2757,7 @@ const DebateMap = ({
           copied={copied}
           onTagClick={handleTagClick}
           buildQuestionLink={buildQuestionLink}
+          levelLabels={levelLabels}
         />
         <SuggestNodeModal
           isOpen={suggestNodeModalOpen}
