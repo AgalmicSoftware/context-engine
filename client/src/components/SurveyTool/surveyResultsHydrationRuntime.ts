@@ -119,6 +119,7 @@ export const fetchSurveyResultsSurveyModeResponses = async ({
   const slug = ports.getEffectiveSlug();
   const props = ports.getProps();
   const netIdStr = ports.getCacheScope?.() || String(props.network?.id ?? props.networkChainId ?? '');
+  const startedSignature = instance._surveyModeSourceSignature;
 
   let surveysCache = (ports.readSurveyCacheSync(slug) || {}) as SurveyResultsRecord;
   if (!surveysCache || Object.keys(surveysCache).length === 0) {
@@ -132,6 +133,15 @@ export const fetchSurveyResultsSurveyModeResponses = async ({
   ) as SurveyResultsSurveyBucketRecord | null;
 
   if (!hasSurveyNetCache || !surveyNetCache) {
+    // Nothing cached for this reader, as after signing out drops a Worker session's copy, so the
+    // last reader's survey leaves the screen. A hydration that finished during the read stands.
+    const missingSignature = `${slug}|${netIdStr}|${currentSurveyID || ''}|__missing__`;
+    if (startedSignature === missingSignature || instance._surveyModeSourceSignature !== startedSignature) return;
+    instance._surveyModeSourceSignature = missingSignature;
+    instance._surveyModeSourceCoarseSignature = missingSignature;
+    instance._surveyModeSourcePayloadRefSignature = '';
+    instance._surveyModeSourceCacheNonce = Number(instance._surveysCacheChangeNonce || 0);
+    ports.applyStatePatch({ ...buildSurveyResultsEmptySurveyModePatch(), surveyResultsHydrated: false });
     return;
   }
 

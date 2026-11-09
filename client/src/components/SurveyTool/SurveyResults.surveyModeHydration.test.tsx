@@ -610,6 +610,32 @@ describe('SurveyResults chain cache readers', () => {
   });
 });
 
+describe('SurveyResults after the cache loses a survey', () => {
+  it('drops the previous reader’s title, links and rows, as after a sign-out purge', async () => {
+    const surveyId = 'survey-previous-reader';
+    const surveysCache = buildSurveyCache({
+      surveyId,
+      title: 'Reader A survey',
+      documentURLs: ['https://example.com/documents/reader-a'],
+      responsesByResponder: {
+        [RESPONDER_ONE]: { timeStamp: 10, responses: [{ questionID: 'q1', answer: { value: 'A answer' } }] },
+      },
+    });
+    seedCacheReads({ surveysCache });
+
+    const view = mountSurveyResults({ surveyId });
+    await waitForSurveyTitle('Reader A survey');
+    expect(getResponderUserLink(RESPONDER_ONE)).toBeTruthy();
+
+    delete surveysCache[NETWORK_ID];
+    await rerenderWithNonce(view, 1);
+
+    await waitForSurveyTitle('Survey Results');
+    expect(screen.queryByRole('link', { name: 'https://example.com/documents/reader-a' })).not.toBeInTheDocument();
+    expect(getResponderUserLink(RESPONDER_ONE)).toBeNull();
+  });
+});
+
 describe('SurveyResults freeform aggregator summary', () => {
   it('renders the empty freeform state inside the SurveyResults-only aggregator panel', () => {
     const { container } = render(

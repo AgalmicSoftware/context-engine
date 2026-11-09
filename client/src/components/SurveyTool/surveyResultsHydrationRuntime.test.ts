@@ -146,6 +146,44 @@ describe('surveyResultsHydrationRuntime', () => {
     expect(instance._surveyModeSourceSignature).toContain('0xabc');
   });
 
+  it('clears the last reader’s survey once when this reader has nothing cached', async () => {
+    const instance = createInstance();
+    instance._surveyModeSourceSignature = 'session-one|11155420|0xabc|reader-a';
+    const harness = createPorts({ state: createState({ surveyId: '0xabc', viewMode: 'survey' }) });
+
+    await fetchSurveyResultsSurveyModeResponses({ instance, ports: harness.ports });
+    await fetchSurveyResultsSurveyModeResponses({ instance, ports: harness.ports });
+
+    expect(harness.patchCalls).toHaveLength(1);
+    expect(harness.patchCalls[0].patch).toMatchObject({
+      aggregateQuestionResponses: {},
+      responses: [],
+      surveyDocumentURLs: [],
+      surveyResultsHydrated: false,
+      surveyTitle: '',
+      totalResponsesCount: 0,
+    });
+  });
+
+  it('leaves a hydration that finished while the cache was read', async () => {
+    const instance = createInstance();
+    const harness = createPorts({ state: createState({ surveyId: '0xabc', viewMode: 'survey' }) });
+
+    await fetchSurveyResultsSurveyModeResponses({
+      instance,
+      ports: {
+        ...harness.ports,
+        readSurveyCache: async () => {
+          instance._surveyModeSourceSignature = 'session-one|11155420|0xabc|newer';
+          return {};
+        },
+      },
+    });
+
+    expect(harness.patchCalls).toHaveLength(0);
+    expect(instance._surveyModeSourceSignature).toBe('session-one|11155420|0xabc|newer');
+  });
+
   it('keeps only string document URLs and titles from uploaded survey metadata', async () => {
     const state = createState({ surveyId: '0xabc', viewMode: 'survey' });
     const surveyCache = {
