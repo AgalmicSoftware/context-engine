@@ -6,6 +6,7 @@ import { buildSessionWizardDefaultTemplate } from '../sessionWizardDraftState';
 import { applySessionModeProfileSelectionToDraft } from '../sessionWizardModeProfileDraftController';
 import { buildSessionWizardWorkerConfigPayload } from '../sessionWizardWriteNormalization';
 import { editSessionSetupProfile, setEncryptionMode, setResultsVisibility } from '../setup/sessionSetupProfile';
+import { normalizeInterviewSettings } from '@ce-shared/interviewSettings.mjs';
 import { normalizeResultsAnalysisSettings } from '@ce-shared/resultsAnalysisSettings.mjs';
 import { SESSION_TEMPLATE_FORMAT, sessionTemplateFromDraft } from '@ce-shared/sessionTemplate.mjs';
 import {
@@ -448,6 +449,23 @@ describe('saving the edit page through the Session Worker', () => {
     expect(() => buildSessionSettingsSave(before, draft)).toThrow(
       'Instructions for AI agents: up to 8,000 characters.',
     );
+  });
+
+  it('keeps an interview setting changed elsewhere while another one is edited here', () => {
+    const before = projectPublicWorkerSessionConfig(publishedSession());
+    const draft = buildSessionSettingsDraft(before);
+    // As Interview settings writes an edit: every setting, then the one changed.
+    draft.interviewMode = {
+      ...draft.interviewMode,
+      ...normalizeInterviewSettings(draft.interviewMode),
+      steeringPrompt: 'Listen first.',
+    };
+    const fresh = { ...before, interviewMode: { ...before.interviewMode, hiddenDraftShare: 0.2 } };
+
+    const rebased = rebaseSessionSettingsDraft(draft, before, fresh);
+    expect(buildSessionSettingsSave(fresh, rebased).patch).toEqual({
+      interviewMode: { ...fresh.interviewMode, steeringPrompt: 'Listen first.' },
+    });
   });
 
   it('saves nothing when nothing changed', () => {

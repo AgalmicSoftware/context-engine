@@ -112,7 +112,8 @@ export const buildSessionSettingsDraft = (config: unknown): SetupDraft => {
     groupCreationPolicy: source.groupCreationPolicy,
     contextAdditionPolicy: source.contextAdditionPolicy,
     interviewModeEnabled: source.interviewModeEnabled !== false,
-    interviewMode: clone(asRecord(source.interviewMode)),
+    // Every setting, as an edit writes them, so a setting left alone takes a fresh copy's value.
+    interviewMode: { ...normalizeInterviewSettings(source.interviewMode), ...clone(asRecord(source.interviewMode)) },
     resultsAnalysis: normalizeResultsAnalysisSettings(source.resultsAnalysis),
     ai: clone(asRecord(source.ai)),
     sessionModeProfile: clone(source.sessionModeProfile ?? null),
