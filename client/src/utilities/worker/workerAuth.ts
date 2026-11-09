@@ -718,18 +718,23 @@ export const subscribeWorkerSessionToken = (listener: () => void): (() => void) 
   return () => window.removeEventListener(WORKER_SESSION_TOKEN_EVENT, listener);
 };
 
-/** Whether this browser already holds a Worker token for the signed-in person, so using it asks them for nothing. */
-export const hasCachedWorkerSessionToken = async (options: WorkerSessionTokenOptions = {}): Promise<boolean> => {
+/** The Worker token this browser already holds for the signed-in person, or '': unlike getWorkerSessionToken,
+ *  a missing or expired one never starts a sign-in. */
+export const getCachedWorkerSessionToken = async (options: WorkerSessionTokenOptions = {}): Promise<string> => {
   const account = normalizeAddress((options.context as { account?: unknown } | undefined)?.account);
-  if (!account) return false;
+  if (!account) return '';
   try {
-    return !!readCachedWorkerSessionToken(
+    return readCachedWorkerSessionToken(
       await resolveWorkerTokenRequestContext({ ...options, resolvedAddress: account, resolveWorkerUrl: true }),
     );
   } catch {
-    return false;
+    return '';
   }
 };
+
+/** Whether this browser already holds a Worker token for the signed-in person, so using it asks them for nothing. */
+export const hasCachedWorkerSessionToken = async (options: WorkerSessionTokenOptions = {}): Promise<boolean> =>
+  !!(await getCachedWorkerSessionToken(options));
 
 export const getWorkerSessionToken = async ({
   sessionSlug,

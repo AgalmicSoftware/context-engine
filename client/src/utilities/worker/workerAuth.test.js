@@ -5,6 +5,7 @@ import {
   clearAllWorkerSessionTokens,
   __test__workerAuthTokenCache,
   fetchWorkerWithAuth,
+  getCachedWorkerSessionToken,
   getWorkerAuthHeaders,
   getWorkerSessionToken,
   hasCachedWorkerSessionToken,
@@ -561,6 +562,29 @@ describe('workerAuth canonical session resolution', () => {
     stopHearing();
     expect(heard).toHaveBeenCalledTimes(1);
     expect(await hasCachedWorkerSessionToken({ ...options, context: {} })).toBe(false);
+  });
+
+  it('reads a held Worker token without asking anyone to sign, and none once it lapses', async () => {
+    global.fetch = jest
+      .fn()
+      .mockResolvedValueOnce(jsonResp(200, { nonce: 'nonce-1' }))
+      .mockResolvedValueOnce(jsonResp(200, { token: 'token-1', exp: Math.floor(Date.now() / 1000) + 3600 }));
+    const options = { sessionConfig: { slug: 'debate' }, context: authContext, workerUrl: 'https://worker.example' };
+
+    expect(await getCachedWorkerSessionToken(options)).toBe('');
+    expect(global.fetch).not.toHaveBeenCalled();
+    await getWorkerSessionToken(options);
+    expect(await getCachedWorkerSessionToken(options)).toBe('token-1');
+
+    const later = Date.now() + 2 * 60 * 60 * 1000;
+    const clock = jest.spyOn(Date, 'now').mockImplementation(() => later);
+    try {
+      expect(await getCachedWorkerSessionToken(options)).toBe('');
+    } finally {
+      clock.mockRestore();
+    }
+    // Only the one sign-in reached the Worker: its nonce, then its token.
+    expect(global.fetch).toHaveBeenCalledTimes(2);
   });
 
   it('does not inject demo general config into worker lookup for implicit default session in on-chain mode', async () => {

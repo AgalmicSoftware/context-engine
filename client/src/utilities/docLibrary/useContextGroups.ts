@@ -3,11 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 
 import { getUsableSessionWorkerUrl } from '../session/sessionWorkerAvailability';
 import { resolveWorkerCanonicalSessionIdHex } from '../session/sessionWorkerDiscovery';
-import {
-  getWorkerSessionToken,
-  hasCachedWorkerSessionToken,
-  subscribeWorkerSessionToken,
-} from '../worker/workerAuth.js';
+import { getCachedWorkerSessionToken, subscribeWorkerSessionToken } from '../worker/workerAuth.js';
 
 export type ContextGroup = { groupId: string; label: string };
 
@@ -47,11 +43,15 @@ export function useContextGroups({
     const signedIn = { sessionSlug, sessionConfig: configRef.current, context: { account: reader } };
     void (async () => {
       const ports = await import('../../domains/worker/workerGroupPorts');
-      if (!(await hasCachedWorkerSessionToken(signedIn))) {
-        return ports.loadPublicWorkerGroups({ workerUrl, sessionId, sessionSlug });
+      const anonymous = () => ports.loadPublicWorkerGroups({ workerUrl, sessionId, sessionSlug });
+      const credentialToken = await getCachedWorkerSessionToken(signedIn);
+      if (!credentialToken) return anonymous();
+      try {
+        return (await ports.loadWorkerGroupOverview({ workerUrl, credentialToken, sessionId, sessionSlug })).groups;
+      } catch {
+        // A token the Worker no longer takes, as when a settings change signs people out, leaves the public list.
+        return anonymous();
       }
-      const credentialToken = await getWorkerSessionToken(signedIn);
-      return (await ports.loadWorkerGroupOverview({ workerUrl, credentialToken, sessionId, sessionSlug })).groups;
     })()
       .then((groups) => {
         if (current) setLoaded({ owner, groups: groups.map(({ groupId, label }) => ({ groupId, label })) });

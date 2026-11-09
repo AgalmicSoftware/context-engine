@@ -3,6 +3,7 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import { useContextGroups } from './useContextGroups';
 import { loadPublicWorkerGroups, loadWorkerGroupOverview } from '../../domains/worker/workerGroupPorts';
 import {
+  getCachedWorkerSessionToken,
   getWorkerSessionToken,
   hasCachedWorkerSessionToken,
   subscribeWorkerSessionToken,
@@ -13,6 +14,7 @@ jest.mock('../../domains/worker/workerGroupPorts', () => ({
   loadWorkerGroupOverview: jest.fn(),
 }));
 jest.mock('../worker/workerAuth.js', () => ({
+  getCachedWorkerSessionToken: jest.fn(),
   getWorkerSessionToken: jest.fn(),
   hasCachedWorkerSessionToken: jest.fn(),
   subscribeWorkerSessionToken: jest.fn(),
@@ -47,8 +49,8 @@ describe('useContextGroups', () => {
       hearToken = listener;
       return () => undefined;
     });
-    jest.mocked(hasCachedWorkerSessionToken).mockResolvedValue(false);
-    jest.mocked(getWorkerSessionToken).mockResolvedValue('worker-session-credential');
+    // No token is held.
+    jest.mocked(getCachedWorkerSessionToken).mockResolvedValue('');
     // A private session refuses the anonymous list.
     jest.mocked(loadPublicWorkerGroups).mockRejectedValue(forbidden());
     jest.mocked(loadWorkerGroupOverview).mockResolvedValue({
@@ -58,10 +60,10 @@ describe('useContextGroups', () => {
   });
 
   it('lists a private session’s groups for a reader signed in to its Worker', async () => {
-    jest.mocked(hasCachedWorkerSessionToken).mockResolvedValue(true);
+    jest.mocked(getCachedWorkerSessionToken).mockResolvedValue('worker-session-credential');
     const { result } = mount({ sessionConfig: SALON, account: ME });
     await waitFor(() => expect(result.current).toEqual([{ groupId: 'salon', label: 'Salon' }]));
-    expect(hasCachedWorkerSessionToken).toHaveBeenCalledWith(expect.objectContaining({ context: { account: ME } }));
+    expect(getCachedWorkerSessionToken).toHaveBeenCalledWith(expect.objectContaining({ context: { account: ME } }));
     expect(loadWorkerGroupOverview).toHaveBeenCalledWith({
       ...SALON,
       credentialToken: 'worker-session-credential',
@@ -79,10 +81,31 @@ describe('useContextGroups', () => {
     await waitFor(() => expect(loadPublicWorkerGroups).toHaveBeenCalledTimes(2));
     expect(result.current).toEqual([]);
 
-    jest.mocked(hasCachedWorkerSessionToken).mockResolvedValue(true);
+    jest.mocked(getCachedWorkerSessionToken).mockResolvedValue('worker-session-credential');
     act(() => hearToken());
     await waitFor(() => expect(result.current).toEqual([{ groupId: 'salon', label: 'Salon' }]));
     expect(loadWorkerGroupOverview).toHaveBeenCalledTimes(1);
+  });
+
+  it('falls back to the public list when the Worker refuses the reader’s token', async () => {
+    // As when a settings change signs everyone out, while this browser still holds the old token.
+    jest.mocked(getCachedWorkerSessionToken).mockResolvedValue('worker-session-credential');
+    jest.mocked(loadWorkerGroupOverview).mockRejectedValue(Object.assign(new Error('unauthorized'), { status: 401 }));
+    jest.mocked(loadPublicWorkerGroups).mockResolvedValue([group('salon', 'Salon')] as never);
+    const { result } = mount({ sessionConfig: SALON, account: ME });
+    await waitFor(() => expect(result.current).toEqual([{ groupId: 'salon', label: 'Salon' }]));
+    expect(loadWorkerGroupOverview).toHaveBeenCalledTimes(1);
+  });
+
+  it('never asks the reader to sign when their token is missing or has lapsed', async () => {
+    // A check that found the token, then a read after it lapsed, would start a wallet sign-in.
+    jest.mocked(hasCachedWorkerSessionToken).mockResolvedValue(true);
+    jest.mocked(getWorkerSessionToken).mockResolvedValue('worker-session-credential');
+    const { result } = mount({ sessionConfig: SALON, account: ME });
+    await settle();
+    expect(getWorkerSessionToken).not.toHaveBeenCalled();
+    expect(loadPublicWorkerGroups).toHaveBeenCalledWith({ ...SALON, sessionSlug: 'salon' });
+    expect(result.current).toEqual([]);
   });
 
   it('never shows another session’s groups, while its own load or when they can’t be read', async () => {
@@ -98,7 +121,7 @@ describe('useContextGroups', () => {
   });
 
   it('drops a reader’s groups when they sign out', async () => {
-    jest.mocked(hasCachedWorkerSessionToken).mockResolvedValueOnce(true);
+    jest.mocked(getCachedWorkerSessionToken).mockResolvedValueOnce('worker-session-credential');
     const { result, rerender } = mount({ sessionConfig: SALON, account: ME });
     await waitFor(() => expect(result.current).toEqual([{ groupId: 'salon', label: 'Salon' }]));
 
