@@ -403,8 +403,17 @@ const AboutPage = () => {
                 <li className={styles.featureItem}>
                   <span className={styles.featureLabel}>Access Control:</span>
                   <span className={styles.featureText}>
-                    Uses <Link to="/groups">SBT groups</Link> for gated participation, gated content, and sponsored
-                    resources like RPC, AI, transaction costs, Arweave storage, and Lit encryption.
+                    Uses Worker Groups on the Cloudflare Worker, or on-chain{' '}
+                    <Link to="/groups">Soulbound Token groups</Link>, for gated participation and gated content.
+                    Soulbound Token groups can also unlock sponsored resources like RPC, AI, transaction costs, Arweave
+                    storage, and Lit encryption.
+                  </span>
+                </li>
+                <li className={styles.featureItem}>
+                  <span className={styles.featureLabel}>Encryption:</span>
+                  <span className={styles.featureText}>
+                    Can encrypt responses and documents with Worker encryption on the Cloudflare Worker, or with Lit in
+                    on-chain sessions, where a Soulbound Token check releases the key.
                   </span>
                 </li>
                 <li className={styles.featureItem}>

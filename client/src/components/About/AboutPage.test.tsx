@@ -314,6 +314,8 @@ describe('AboutPage', () => {
     const foundations = screen.getByRole('heading', { name: 'Current Foundations' }).closest('li')!;
     expect(within(foundations).getAllByText('Complete:')).toHaveLength(6);
     expect(within(foundations).getByText(/quadratic allocation/)).toBeVisible();
+    expect(within(foundations).getByText(/Use Worker Groups or Soulbound Token groups/)).toBeVisible();
+    expect(within(foundations).getByText(/Persist responses and documents in Cloudflare or on Arweave/)).toBeVisible();
     expect(screen.getAllByText('Planned:')).toHaveLength(14);
     expect(screen.getByText(/unlinkable per-response and per-SBT accounts, ZK\/FHE aggregation/)).toBeVisible();
     expect(screen.getByText(/affiliation proofs, encrypted claims, and conditional timelocks/)).toBeVisible();
@@ -324,7 +326,15 @@ describe('AboutPage', () => {
     expect(screen.queryByRole('heading', { name: 'Current Foundations' })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /functionality/i }));
-    expect(screen.getByRole('link', { name: 'SBT groups' })).toHaveAttribute('href', '/groups');
+    const groupsLink = screen.getByRole('link', { name: 'Soulbound Token groups' });
+    expect(groupsLink).toHaveAttribute('href', '/groups');
+    expect(groupsLink.parentElement).toHaveTextContent(
+      'Uses Worker Groups on the Cloudflare Worker, or on-chain Soulbound Token groups, for gated participation and ' +
+        'gated content. Soulbound Token groups can also unlock sponsored resources like RPC, AI,',
+    );
+    expect(
+      screen.getByText(/Worker encryption on the Cloudflare Worker, or with Lit in on-chain sessions/),
+    ).toBeVisible();
     expect(screen.getByText(/Stores responses and documents in Cloudflare or on Arweave/)).toBeVisible();
   });
 

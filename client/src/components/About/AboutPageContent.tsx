@@ -235,11 +235,11 @@ export const ROADMAP_SECTIONS: RoadmapSection[] = [
       },
       {
         status: 'complete',
-        text: 'Use SBT groups for gated participation, encrypted fields, and sponsored RPC, AI, gas, Arweave, and Lit resources.',
+        text: 'Use Worker Groups or Soulbound Token groups for gated participation and encrypted fields, and Soulbound Token groups for sponsored RPC, AI, gas, Arweave, and Lit resources.',
       },
       {
         status: 'complete',
-        text: 'Persist responses and documents on Arweave with report views, exports, and address-based comparison tools.',
+        text: 'Persist responses and documents in Cloudflare or on Arweave, with report views, exports, and address-based comparison tools.',
       },
       {
         status: 'complete',
