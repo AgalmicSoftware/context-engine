@@ -20,6 +20,7 @@ import {
   readContextSourceRow,
   removeCloudflareStorageRecords,
   resolveSessionAdminAddresses,
+  storageIndexPutOptions,
 } from './storageRouteExecution.js';
 import { executeCoordinatedContextSourceOperation } from './sessionConfigAuthority.js';
 
@@ -145,9 +146,11 @@ export const finishContextPdfReading = async ({ env, slug, pdfId, readingId, rea
   }
   if (earlier.length) await removeCloudflareStorageRecords({ env, slug, rows: earlier, markWrite });
   // The PDF row names its reading, so removing the PDF finds it without a list.
+  const row = { ...current, contextReadingId: readingId };
   await getStorageIndexBinding(env).put(
     buildIndexKey({ slug, resource: 'docsContext', id: pdfId }),
-    JSON.stringify({ ...current, contextReadingId: readingId }),
+    JSON.stringify(row),
+    storageIndexPutOptions(row),
   );
   return { status: 200, body: { ok: true } };
 };

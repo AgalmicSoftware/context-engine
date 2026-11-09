@@ -143,6 +143,11 @@ export const buildIndexKey = ({ slug, resource, id }) => `ce-storage:${sessionSl
 export const buildIndexPrefix = ({ slug, resource }) => `ce-storage:${sessionSlugStorageKey(slug)}:${trim(resource) || 'docsContext'}:`;
 const buildSessionIndexPrefix = ({ slug }) => `ce-storage:${sessionSlugStorageKey(slug)}:`;
 export const buildPayloadKey = ({ slug, id }) => `ce-storage-payload:${sessionSlugStorageKey(slug)}:${id}`;
+// KV list metadata for an index row: on a docsContext row, whether it is a
+// context source, so context scans skip other files unread. Set on every write.
+export const storageIndexPutOptions = (metadata) => ((trim(metadata?.resource) || 'docsContext') === 'docsContext'
+  ? { metadata: { contextSource: metadata?.contextSource === true } }
+  : undefined);
 const safeGroupId = (value) => trim(value).toLowerCase().replace(/[^a-z0-9._:-]+/g, '-').replace(/^-+|-+$/g, '');
 const normalizeGroupIdList = (value) => {
   let raw = value;
@@ -1385,7 +1390,7 @@ export const publishCloudflareOwnedStorageMetadata = async ({ env, config, slug,
     await writeStorageResourceOwner({ index, slug, resource, resourceId: metadata.resourceId,
       uploader, storageRefId: metadata.id, createdAt: metadata.createdAt });
   }
-  await index.put(buildIndexKey({ slug, resource, id: metadata.id }), JSON.stringify(metadata));
+  await index.put(buildIndexKey({ slug, resource, id: metadata.id }), JSON.stringify(metadata), storageIndexPutOptions(metadata));
 };
 
 const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, authScopes, expectedAuthority, payload, resourceId = '', baseHeaders, deps }) => {
@@ -1716,7 +1721,7 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
     const result = await publish({ env, slug, expectedAuthority, metadata, createOwner: owned && !owner && !!uploader });
     if (!result.ok) return responseJson(deps, { error: result.body?.error || 'Storage publication is unavailable; retry.' }, result.status || 503, baseHeaders);
   } else if (index && typeof index.put === 'function') {
-    await index.put(buildIndexKey({ slug, resource, id }), serializedMetadata);
+    await index.put(buildIndexKey({ slug, resource, id }), serializedMetadata, storageIndexPutOptions(metadata));
   }
 
   await markStorageBackupWrite(env, slug);
@@ -2066,7 +2071,8 @@ const handleCloudflareList = async ({ request, env, config, slug, uploaderAddres
     : baseHeaders);
 };
 
-export const listCloudflareMetadataRows = async ({ index, slug, resource = '', budget, strict = false }) => {
+// `skipKey` passes over a listed key, from its list metadata, without reading it.
+export const listCloudflareMetadataRows = async ({ index, slug, resource = '', budget, strict = false, skipKey }) => {
   const rows = [];
   const prefix = trim(resource)
     ? buildIndexPrefix({ slug, resource })
@@ -2083,7 +2089,7 @@ export const listCloudflareMetadataRows = async ({ index, slug, resource = '', b
     const keys = Array.isArray(listed?.keys) ? listed.keys : [];
     for (const keyEntry of keys) {
       const key = trim(keyEntry?.name || keyEntry);
-      if (!key || typeof index.get !== 'function') continue;
+      if (!key || typeof index.get !== 'function' || skipKey?.(keyEntry)) continue;
       budget?.rows();
       budget?.operation();
       try {
@@ -2545,11 +2551,13 @@ export const exportCloudflareEncryptedPayloadEnvelopes = async ({
 };
 
 // Context sources: doc-library rows an upload with a context role created
-// (contextSource is server-authored at upload).
+// (contextSource is server-authored at upload). Rows listed as other files are
+// skipped unread, so they do not count against a scan budget.
 export const listContextSourceRows = async ({ env, slug, budget } = {}) => {
   const index = getStorageIndexBinding(env);
   if (!index || typeof index.list !== 'function' || typeof index.get !== 'function') return [];
-  const rows = await listCloudflareMetadataRows({ index, slug, resource: 'docsContext', budget });
+  const rows = await listCloudflareMetadataRows({ index, slug, resource: 'docsContext', budget,
+    skipKey: (entry) => entry?.metadata?.contextSource === false });
   return rows.map((row) => row.metadata).filter((metadata) => metadata?.contextSource === true);
 };
 

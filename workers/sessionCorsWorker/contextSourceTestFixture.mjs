@@ -22,19 +22,27 @@ export const json = (body, status = 200, baseHeaders = {}) => {
 };
 
 // `lagging` holds keys a KV list does not show yet, as after a recent write.
+// As in KV, a put replaces a key's list metadata, and one without it clears it.
 const createKv = () => {
   const store = new Map();
+  const listMetadata = new Map();
   const lagging = new Set();
   const deletes = [];
   return {
     store,
+    listMetadata,
     lagging,
     deletes,
     get: async (key) => store.get(key) ?? null,
-    put: async (key, value) => { store.set(key, value); },
-    delete: async (key) => { deletes.push(key); store.delete(key); },
+    put: async (key, value, options) => {
+      store.set(key, value);
+      if (options?.metadata) listMetadata.set(key, options.metadata);
+      else listMetadata.delete(key);
+    },
+    delete: async (key) => { deletes.push(key); store.delete(key); listMetadata.delete(key); },
     list: async ({ prefix = '' } = {}) => ({
-      keys: [...store.keys()].filter((key) => key.startsWith(prefix) && !lagging.has(key)).map((name) => ({ name })),
+      keys: [...store.keys()].filter((key) => key.startsWith(prefix) && !lagging.has(key))
+        .map((name) => (listMetadata.has(name) ? { name, metadata: listMetadata.get(name) } : { name })),
       list_complete: true,
     }),
   };

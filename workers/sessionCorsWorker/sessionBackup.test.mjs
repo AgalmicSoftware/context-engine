@@ -25,22 +25,28 @@ const admin = `0x${'1'.repeat(40)}`;
 const expectedAuthority = { actor: admin, revision: 1, authzEpoch: 0 };
 const memoryKv = () => {
   const values = new Map();
+  const listMetadata = new Map();
   const gets = new Map();
   const requests = [];
   let operations = null;
   const operation = () => { if (operations != null && ++operations > 1000) throw new Error('KV request exceeded 1000 operations'); };
-  return { values, gets, requests,
+  return { values, listMetadata, gets, requests,
     request: async (callback) => {
       operations = 0;
       try { return await callback(); } finally { requests.push(operations); operations = null; }
     },
     get: async (key) => { operation(); gets.set(key, (gets.get(key) || 0) + 1); return values.get(key) ?? null; },
-    put: async (key, value) => { operation(); return values.set(key, value); },
-    delete: async (key) => { operation(); return values.delete(key); },
+    put: async (key, value, options) => {
+      operation();
+      if (options?.metadata) listMetadata.set(key, options.metadata);
+      else listMetadata.delete(key);
+      return values.set(key, value);
+    },
+    delete: async (key) => { operation(); listMetadata.delete(key); return values.delete(key); },
     list: async ({ prefix = '', cursor = '', limit = 100 } = {}) => {
       operation();
       const names = [...values.keys()].filter((key) => key.startsWith(prefix) && key > cursor).sort();
-      const keys = names.slice(0, limit).map((name) => ({ name }));
+      const keys = names.slice(0, limit).map((name) => (listMetadata.has(name) ? { name, metadata: listMetadata.get(name) } : { name }));
       return { keys, list_complete: names.length <= limit, cursor: names.length > limit ? keys.at(-1).name : '' };
     } };
 };
@@ -1432,6 +1438,23 @@ test('maximum upload metadata fits a backup header and round-trips unchanged', a
     request: new Request(`https://worker.example/storage/read?id=${id}`), baseHeaders: new Headers(),
   });
   assert.equal(read.status, 200); assert.equal(await read.text(), 'small');
+});
+
+test('restored doc-library rows say in their list metadata whether they are context sources', async () => {
+  const source = fixture();
+  const keyOf = (id) => `ce-storage:${slug}:docsContext:${id}`;
+  for (const [id, contextSource] of [['cf_library_file', false], ['cf_context_file', true]]) {
+    const metadata = { id, resource: 'docsContext', storageLayer: 'kv', ...(contextSource ? { contextSource } : {}) };
+    source.kv.values.set(keyOf(id), JSON.stringify(metadata));
+    source.kv.values.set(`ce-storage-payload:${slug}:${id}`, JSON.stringify({ metadata, payloadBase64url: Buffer.from('small').toString('base64url') }));
+  }
+  const target = fixture(); target.kv.values.delete(`session:${slug}:config`);
+  for (const page of await allPages(source.env)) {
+    const result = await importPage(target.env, page);
+    assert.equal(result.ok, true, JSON.stringify(result));
+  }
+  assert.deepEqual(target.kv.listMetadata.get(keyOf('cf_library_file')), { contextSource: false });
+  assert.deepEqual(target.kv.listMetadata.get(keyOf('cf_context_file')), { contextSource: true });
 });
 
 test('legacy metadata that exceeds the backup entry limit reports the stored id', async () => {

@@ -13,7 +13,7 @@ import { isSafeCloudflareStorageRefId } from './storageRefNormalization.js';
 import { isStorageResourceId } from './storageUploadValidation.js';
 import { STORAGE_EXPORT_PAGE_LIMITS, createStorageExportBudget, jsonByteLength } from './storageScanBudget.js';
 import { rejectKvValueOverLimit, resolveMaxUploadBytes } from './uploadSizeLimits.js';
-import { buildIndexKey, buildObjectKey, buildPayloadKey, getStorageIndexBinding, getStorageR2Binding, readStoredCloudflarePayloadBytes } from './storageRouteExecution.js';
+import { buildIndexKey, buildObjectKey, buildPayloadKey, getStorageIndexBinding, getStorageR2Binding, readStoredCloudflarePayloadBytes, storageIndexPutOptions } from './storageRouteExecution.js';
 
 const fail = (message, status = 400, reason) => { throw Object.assign(new Error(message), { status, reason }); };
 const object = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
@@ -225,7 +225,7 @@ export const importCoordinatorBackupPage = async (coordinator, payload, validato
     await storage.put(stateKey, progress);
   }
   const conflict = (key) => { progress.counts.conflicts += 1; if (progress.conflicts.length < 50) progress.conflicts.push(key); };
-  const write = async (store, key, value, json = false, kind = 'index') => {
+  const write = async (store, key, value, json = false, kind = 'index', options) => {
     const existing = await store.get(key);
     if (existing != null) {
       let identical = existing === value;
@@ -236,10 +236,12 @@ export const importCoordinatorBackupPage = async (coordinator, payload, validato
       return identical;
     }
     await journalBackupImportWrite(storage, page.archiveId, kind, key);
-    await store.put(key, value);
+    await store.put(key, value, options);
     progress.counts.written += 1;
     return true;
   };
+  // A record's list metadata comes from the record, as at upload.
+  const writeRecord = (key, metadata) => write(index, key, JSON.stringify(metadata), true, 'index', storageIndexPutOptions(metadata));
   const assemble = async (header) => {
     const bytes = new Uint8Array(header.size);
     let offset = 0;
@@ -273,7 +275,7 @@ export const importCoordinatorBackupPage = async (coordinator, payload, validato
       if (await storage.get(recordKey(entry.id))) fail('Duplicate backup metadata id.');
       const header = await storage.get(descriptorKey(entry.id));
       if (header?.done) {
-        if (header.payloadOk !== false) await write(index, entry.key, JSON.stringify(entry.metadata), true);
+        if (header.payloadOk !== false) await writeRecord(entry.key, entry.metadata);
         updates.push([recordKey(entry.id), { applied: true }]);
       } else {
         await stage(`${root}record:${entry.id}`, JSON.stringify(entry));
@@ -342,7 +344,7 @@ export const importCoordinatorBackupPage = async (coordinator, payload, validato
             progress.counts.written += 1;
           }
           if (staged && (await storage.get(recordKey(entry.id)))?.pending) {
-            if (payloadOk) await write(index, staged.key, JSON.stringify(staged.metadata), true);
+            if (payloadOk) await writeRecord(staged.key, staged.metadata);
             progress.pendingRecords -= 1;
             updates.push([recordKey(entry.id), { applied: true }]);
           }

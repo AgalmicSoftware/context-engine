@@ -10,7 +10,7 @@ import {
 import { buildSessionContextPrompt } from '../../shared/sessionContextText.mjs';
 import { metadataAccessMatchesPublishedAudience } from './storageAudience.js';
 import { listContextSourceRows, readContextSourceBytes } from './storageRouteExecution.js';
-import { jsonByteLength, StorageReadLimitError } from './storageScanBudget.js';
+import { isStorageReadLimitError, jsonByteLength, StorageReadLimitError } from './storageScanBudget.js';
 
 const MAX_SOURCES = 16;
 const MAX_READ_BYTES = 1024 * 1024;
@@ -50,7 +50,13 @@ export const loadParticipantContextSources = async ({ env, slug, config, deps } 
   let rows = [];
   try {
     rows = await listContextSourceRows({ env, slug, budget: scanBudget() });
-  } catch {
+  } catch (error) {
+    // The AI call goes ahead without context, but the operator should know why.
+    const warn = typeof deps?.log?.warn === 'function' ? deps.log.warn : console.warn;
+    warn('[context] sources left out of an AI prompt', {
+      slug,
+      reason: isStorageReadLimitError(error) ? `${error.kind} limit` : 'storage unavailable',
+    });
     return [];
   }
   const visible = rows.filter((row) => forEveryone(row, config)).sort((a, b) => createdAtOf(a) - createdAtOf(b));

@@ -70493,15 +70493,17 @@ var init_contextSourceRoute = __esm({
         await removeCloudflareStorageRecords({ env, slug, rows: [reading], markWrite });
         return { status: 404, body: { error: "That PDF was removed while the session\u2019s AI read it." } };
       }
-      const earlier = (await readingsOf({ env, slug, row: current })).filter((row) => row.id !== readingId);
-      if (earlier.some((row) => readAtOf(row) > readAt || readAtOf(row) === readAt && row.id > readingId)) {
+      const earlier = (await readingsOf({ env, slug, row: current })).filter((row2) => row2.id !== readingId);
+      if (earlier.some((row2) => readAtOf(row2) > readAt || readAtOf(row2) === readAt && row2.id > readingId)) {
         await removeCloudflareStorageRecords({ env, slug, rows: [reading], markWrite });
         return { status: 409, body: { error: "A newer reading of this PDF finished first.", reason: "context_pdf_reading_superseded" } };
       }
       if (earlier.length) await removeCloudflareStorageRecords({ env, slug, rows: earlier, markWrite });
+      const row = { ...current, contextReadingId: readingId };
       await getStorageIndexBinding(env).put(
         buildIndexKey({ slug, resource: "docsContext", id: pdfId }),
-        JSON.stringify({ ...current, contextReadingId: readingId })
+        JSON.stringify(row),
+        storageIndexPutOptions(row)
       );
       return { status: 200, body: { ok: true } };
     };
@@ -70750,7 +70752,7 @@ var init_storageScanBudget = __esm({
 });
 
 // workers/sessionCorsWorker/storageRouteExecution.js
-var encoder7, decoder5, RESOLVE_STORAGE_GATE_RUNTIME_CONFIG, STORAGE_GROUP_MEMBERSHIP_CACHE, STORAGE_RPC_CHAIN_ATTESTATION_CACHE, trim13, isObj16, isJsonContentType, MEDIA_TYPE_RE, INLINE_MEDIA_TYPE_RE, resolveStorageReadContentType, getStorageR2Binding, DEFAULT_STORAGE_LIST_PAGE_SIZE, MAX_STORAGE_LIST_PAGE_SIZE, DEFAULT_RESOURCE_GATES, isStorageResource, buildCloudflareStorageId, buildObjectKey, buildIndexKey, buildIndexPrefix, buildSessionIndexPrefix, buildPayloadKey, safeGroupId, normalizeGroupIdList, readKvPayloadEnvelope, normalizeTagsForMetadata, normalizeAccessConditionDocument, invalidUploadPolicy, readUploadGroupIds, readUploadAccessConditions, normalizeUploadPolicy, readUploadPolicyFields, readJsonPayload, readMultipartPayload, readStorageUploadRequestPayload, readConfiguredStorageBackendCandidate, resolveConfiguredStorageBackend, resolvePayloadAccessControl, resolveStorageResourceGateKey, normalizeGateMode2, normalizeDirectGate, readStorageGate, normalizeAddress, listRoleAddresses, resolveRoleAddressSet2, resolveSessionAdminAddresses, isEnvelopeExportAuthorized, evaluateWorkerRoleCondition, evaluateAgentGrantScopeCondition, evaluateSbtOnchainCondition, checkWorkerGroupMembership, evaluateWorkerGroupCondition, evaluateAccessCondition, resolvePayloadAccessConditions, evaluateAccessConditionDocument, resolveGroupGateIds, authorizeWorkerGroupAccess, resolveBareRoleGateCondition, authorizeWorkerRoleAccess, hasPrivateResponsePolicy, canReadPrivateResponse, authorizeCloudflareStorageAccess, authorizeCloudflareStorageGate, authorizeCloudflareStorageResourceRead, enforceCloudflareUploadPolicy, responseJson, attachStorageGateRuntimeRpc, resolveStorageGateRuntimeConfig, createStorageRouteGateDeps, parseArweaveUploadResponse, handleArweaveStorageUpload, publishCloudflareOwnedStorageMetadata, handleCloudflareUpload, readRequestId, normalizeStorageListLimit, readStorageListOptions, handleCloudflareRead, handleCloudflareList, listCloudflareMetadataRows, readStoredCloudflarePayloadBytes, readStoredPayloadJson, readIndexRowResourceId, readLegacyRowResourceId, scanLegacyStorageOwnerIds, LEGACY_OWNER, resolveLegacyStorageOwner, VISIBILITY_SCAN_PAGE_ROWS, readVisibilityMetadataPages, setCloudflareStorageResourceHidden, resolveEnvelopeExportKeyProvider, resolveEnvelopeExportManifestKeyProvider, exportCloudflareEncryptedPayloadEnvelopes, listContextSourceRows, readContextSourceRow, readContextSourceBytes, removeCloudflareStorageRecords, storageRoute;
+var encoder7, decoder5, RESOLVE_STORAGE_GATE_RUNTIME_CONFIG, STORAGE_GROUP_MEMBERSHIP_CACHE, STORAGE_RPC_CHAIN_ATTESTATION_CACHE, trim13, isObj16, isJsonContentType, MEDIA_TYPE_RE, INLINE_MEDIA_TYPE_RE, resolveStorageReadContentType, getStorageR2Binding, DEFAULT_STORAGE_LIST_PAGE_SIZE, MAX_STORAGE_LIST_PAGE_SIZE, DEFAULT_RESOURCE_GATES, isStorageResource, buildCloudflareStorageId, buildObjectKey, buildIndexKey, buildIndexPrefix, buildSessionIndexPrefix, buildPayloadKey, storageIndexPutOptions, safeGroupId, normalizeGroupIdList, readKvPayloadEnvelope, normalizeTagsForMetadata, normalizeAccessConditionDocument, invalidUploadPolicy, readUploadGroupIds, readUploadAccessConditions, normalizeUploadPolicy, readUploadPolicyFields, readJsonPayload, readMultipartPayload, readStorageUploadRequestPayload, readConfiguredStorageBackendCandidate, resolveConfiguredStorageBackend, resolvePayloadAccessControl, resolveStorageResourceGateKey, normalizeGateMode2, normalizeDirectGate, readStorageGate, normalizeAddress, listRoleAddresses, resolveRoleAddressSet2, resolveSessionAdminAddresses, isEnvelopeExportAuthorized, evaluateWorkerRoleCondition, evaluateAgentGrantScopeCondition, evaluateSbtOnchainCondition, checkWorkerGroupMembership, evaluateWorkerGroupCondition, evaluateAccessCondition, resolvePayloadAccessConditions, evaluateAccessConditionDocument, resolveGroupGateIds, authorizeWorkerGroupAccess, resolveBareRoleGateCondition, authorizeWorkerRoleAccess, hasPrivateResponsePolicy, canReadPrivateResponse, authorizeCloudflareStorageAccess, authorizeCloudflareStorageGate, authorizeCloudflareStorageResourceRead, enforceCloudflareUploadPolicy, responseJson, attachStorageGateRuntimeRpc, resolveStorageGateRuntimeConfig, createStorageRouteGateDeps, parseArweaveUploadResponse, handleArweaveStorageUpload, publishCloudflareOwnedStorageMetadata, handleCloudflareUpload, readRequestId, normalizeStorageListLimit, readStorageListOptions, handleCloudflareRead, handleCloudflareList, listCloudflareMetadataRows, readStoredCloudflarePayloadBytes, readStoredPayloadJson, readIndexRowResourceId, readLegacyRowResourceId, scanLegacyStorageOwnerIds, LEGACY_OWNER, resolveLegacyStorageOwner, VISIBILITY_SCAN_PAGE_ROWS, readVisibilityMetadataPages, setCloudflareStorageResourceHidden, resolveEnvelopeExportKeyProvider, resolveEnvelopeExportManifestKeyProvider, exportCloudflareEncryptedPayloadEnvelopes, listContextSourceRows, readContextSourceRow, readContextSourceBytes, removeCloudflareStorageRecords, storageRoute;
 var init_storageRouteExecution = __esm({
   "workers/sessionCorsWorker/storageRouteExecution.js"() {
     init_sessionContextSources();
@@ -70830,6 +70832,7 @@ var init_storageRouteExecution = __esm({
     buildIndexPrefix = ({ slug, resource }) => `ce-storage:${sessionSlugStorageKey(slug)}:${trim13(resource) || "docsContext"}:`;
     buildSessionIndexPrefix = ({ slug }) => `ce-storage:${sessionSlugStorageKey(slug)}:`;
     buildPayloadKey = ({ slug, id: id2 }) => `ce-storage-payload:${sessionSlugStorageKey(slug)}:${id2}`;
+    storageIndexPutOptions = (metadata) => (trim13(metadata?.resource) || "docsContext") === "docsContext" ? { metadata: { contextSource: metadata?.contextSource === true } } : void 0;
     safeGroupId = (value) => trim13(value).toLowerCase().replace(/[^a-z0-9._:-]+/g, "-").replace(/^-+|-+$/g, "");
     normalizeGroupIdList = (value) => {
       let raw = value;
@@ -71982,7 +71985,7 @@ var init_storageRouteExecution = __esm({
           createdAt: metadata.createdAt
         });
       }
-      await index.put(buildIndexKey({ slug, resource, id: metadata.id }), JSON.stringify(metadata));
+      await index.put(buildIndexKey({ slug, resource, id: metadata.id }), JSON.stringify(metadata), storageIndexPutOptions(metadata));
     };
     handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, authScopes, expectedAuthority, payload, resourceId = "", baseHeaders, deps }) => {
       const r2 = getStorageR2Binding(env);
@@ -72294,7 +72297,7 @@ var init_storageRouteExecution = __esm({
         const result = await publish({ env, slug, expectedAuthority, metadata, createOwner: owned && !owner && !!uploader });
         if (!result.ok) return responseJson(deps, { error: result.body?.error || "Storage publication is unavailable; retry." }, result.status || 503, baseHeaders);
       } else if (index && typeof index.put === "function") {
-        await index.put(buildIndexKey({ slug, resource, id: id2 }), serializedMetadata);
+        await index.put(buildIndexKey({ slug, resource, id: id2 }), serializedMetadata, storageIndexPutOptions(metadata));
       }
       await markStorageBackupWrite(env, slug);
       return finishUpload(normalizeStorageRef(metadata), metadata, bytesToStore);
@@ -72617,7 +72620,7 @@ var init_storageRouteExecution = __esm({
         ...mine ? { responder, sessionId: resolveCanonicalWorkerSessionIdHex(config) } : {}
       }, 200, mine || hasPrivateResponsePolicy({ config, resource }) ? { ...Object.fromEntries(new Headers(baseHeaders || {})), "Cache-Control": "private, no-store" } : baseHeaders);
     };
-    listCloudflareMetadataRows = async ({ index, slug, resource = "", budget, strict = false }) => {
+    listCloudflareMetadataRows = async ({ index, slug, resource = "", budget, strict = false, skipKey }) => {
       const rows = [];
       const prefix = trim13(resource) ? buildIndexPrefix({ slug, resource }) : buildSessionIndexPrefix({ slug });
       let cursor = "";
@@ -72632,7 +72635,7 @@ var init_storageRouteExecution = __esm({
         const keys = Array.isArray(listed?.keys) ? listed.keys : [];
         for (const keyEntry of keys) {
           const key = trim13(keyEntry?.name || keyEntry);
-          if (!key || typeof index.get !== "function") continue;
+          if (!key || typeof index.get !== "function" || skipKey?.(keyEntry)) continue;
           budget?.rows();
           budget?.operation();
           try {
@@ -73102,7 +73105,13 @@ var init_storageRouteExecution = __esm({
     listContextSourceRows = async ({ env, slug, budget } = {}) => {
       const index = getStorageIndexBinding(env);
       if (!index || typeof index.list !== "function" || typeof index.get !== "function") return [];
-      const rows = await listCloudflareMetadataRows({ index, slug, resource: "docsContext", budget });
+      const rows = await listCloudflareMetadataRows({
+        index,
+        slug,
+        resource: "docsContext",
+        budget,
+        skipKey: (entry2) => entry2?.metadata?.contextSource === false
+      });
       return rows.map((row) => row.metadata).filter((metadata) => metadata?.contextSource === true);
     };
     readContextSourceRow = async ({ env, slug, id: id2 } = {}) => {
@@ -74351,7 +74360,7 @@ var init_sessionBackupImport = __esm({
         progress.counts.conflicts += 1;
         if (progress.conflicts.length < 50) progress.conflicts.push(key);
       };
-      const write = async (store, key, value, json7 = false, kind = "index") => {
+      const write = async (store, key, value, json7 = false, kind = "index", options) => {
         const existing = await store.get(key);
         if (existing != null) {
           let identical = existing === value;
@@ -74367,10 +74376,11 @@ var init_sessionBackupImport = __esm({
           return identical;
         }
         await journalBackupImportWrite(storage, page.archiveId, kind, key);
-        await store.put(key, value);
+        await store.put(key, value, options);
         progress.counts.written += 1;
         return true;
       };
+      const writeRecord = (key, metadata) => write(index, key, JSON.stringify(metadata), true, "index", storageIndexPutOptions(metadata));
       const assemble = async (header) => {
         const bytes3 = new Uint8Array(header.size);
         let offset = 0;
@@ -74411,7 +74421,7 @@ var init_sessionBackupImport = __esm({
           if (await storage.get(recordKey2(entry2.id))) fail9("Duplicate backup metadata id.");
           const header = await storage.get(descriptorKey(entry2.id));
           if (header?.done) {
-            if (header.payloadOk !== false) await write(index, entry2.key, JSON.stringify(entry2.metadata), true);
+            if (header.payloadOk !== false) await writeRecord(entry2.key, entry2.metadata);
             updates.push([recordKey2(entry2.id), { applied: true }]);
           } else {
             await stage(`${root}record:${entry2.id}`, JSON.stringify(entry2));
@@ -74479,7 +74489,7 @@ var init_sessionBackupImport = __esm({
                 progress.counts.written += 1;
               }
               if (staged && (await storage.get(recordKey2(entry2.id)))?.pending) {
-                if (payloadOk) await write(index, staged.key, JSON.stringify(staged.metadata), true);
+                if (payloadOk) await writeRecord(staged.key, staged.metadata);
                 progress.pendingRecords -= 1;
                 updates.push([recordKey2(entry2.id), { applied: true }]);
               }
@@ -75660,7 +75670,12 @@ var init_contextSourceLoader = __esm({
       let rows = [];
       try {
         rows = await listContextSourceRows({ env, slug, budget: scanBudget() });
-      } catch {
+      } catch (error) {
+        const warn = typeof deps?.log?.warn === "function" ? deps.log.warn : console.warn;
+        warn("[context] sources left out of an AI prompt", {
+          slug,
+          reason: isStorageReadLimitError(error) ? `${error.kind} limit` : "storage unavailable"
+        });
         return [];
       }
       const visible = rows.filter((row) => forEveryone(row, config)).sort((a, b2) => createdAtOf2(a) - createdAtOf2(b2));

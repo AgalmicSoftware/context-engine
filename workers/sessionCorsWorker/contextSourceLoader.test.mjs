@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { buildParticipantContextPrompt, loadParticipantContextSources } from './contextSourceLoader.js';
 import { resolveInterviewStarter } from './interviewStarter.js';
 import { runQueuedAutomaticResultsAnalysisJob } from './resultsAnalysisGeneration.js';
-import { buildIndexKey, buildPayloadKey } from './storageRouteExecution.js';
+import { buildIndexKey, buildIndexPrefix, buildPayloadKey } from './storageRouteExecution.js';
 import { groupLockedAccess } from '../../shared/sessionContextSources.mjs';
 import { harness, idOf, json, pageResponse } from './contextSourceTestFixture.mjs';
 
@@ -52,6 +52,33 @@ test('the Worker’s AI gets only what every participant may read', async () => 
     assert.match(prompt, /Notes for everyone/);
     assert.doesNotMatch(prompt, /SECRET|private-deck|unread/);
   }
+});
+
+test('context sources are found among more doc-library files than one scan reads', async () => {
+  const h = await seeded();
+  for (let i = 0; i < 300; i += 1) {
+    await idOf(await h.uploadFile({ name: `library-${i}.txt`, type: 'text/plain', bytes: encode('A library file'), role: 'library' }));
+  }
+  // Every doc-library row's list metadata says whether it is a context source.
+  const keys = [...h.kv.store.keys()].filter((key) => key.startsWith(buildIndexPrefix({ slug: 'salon', resource: 'docsContext' })));
+  assert.equal(keys.length, 309);
+  for (const key of keys) {
+    assert.deepEqual(h.kv.listMetadata.get(key), { contextSource: JSON.parse(h.kv.store.get(key)).contextSource === true }, key);
+  }
+  const warnings = [];
+  const deps = { ...h.deps, log: { warn: (...args) => warnings.push(args) } };
+  const titles = async () =>
+    (await loadParticipantContextSources({ env: h.env, slug: 'salon', config: h.state.config, deps })).map((source) => source.title);
+  assert.deepEqual(await titles(), ['agenda.md', 'example.org', 'deck.pdf']);
+  assert.deepEqual(warnings, []);
+  // Rows stored without list metadata are read, so enough of them still
+  // exceed the scan: the AI then goes without context, and the operator is told.
+  for (let i = 0; i < 300; i += 1) {
+    const id = `cf_unlisted_${i}`;
+    h.kv.store.set(buildIndexKey({ slug: 'salon', resource: 'docsContext', id }), JSON.stringify({ id, resource: 'docsContext' }));
+  }
+  assert.deepEqual(await titles(), []);
+  assert.deepEqual(warnings, [['[context] sources left out of an AI prompt', { slug: 'salon', reason: 'rows limit' }]]);
 });
 
 test('a context row whose access no longer matches the session’s is left out', async () => {
