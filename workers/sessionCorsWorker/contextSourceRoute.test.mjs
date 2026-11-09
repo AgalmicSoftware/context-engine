@@ -237,6 +237,8 @@ test('a PDF is read by the session’s Claude as a native document block, and it
   });
   const pdf = await idOf(await h.uploadFile({ adminsOnly: true }));
   assert.equal((await h.context({ action: 'read-pdf', id: pdf }, PARTICIPANT)).status, 403);
+  // Readings are stamped to the millisecond, so each reading here gets its own time.
+  h.deps.now = () => Date.parse('2026-11-02T10:00:00.000Z');
   const response = await h.context({ action: 'read-pdf', id: pdf });
   const { text } = await response.json();
   assert.equal(response.status, 200);
@@ -267,6 +269,7 @@ test('a PDF is read by the session’s Claude as a native document block, and it
   assert.deepEqual(await h.list(PARTICIPANT), []);
 
   // Reading again replaces the earlier text; removing the PDF removes its text.
+  h.deps.now = () => Date.parse('2026-11-02T10:01:00.000Z');
   const again = (await (await h.context({ action: 'read-pdf', id: pdf })).json()).text;
   const ids = (await h.list(ADMIN)).map((item) => item.storageRef.id).sort();
   assert.deepEqual(ids, [pdf, again.id].sort());
@@ -402,6 +405,8 @@ test('a second read of a PDF already being read is refused, and the first keeps 
       : new Promise((resolve) => { release = () => resolve(json({ content: [{ type: 'text', text: 'First text.' }] })); })),
   });
   const pdf = await idOf(await h.uploadFile());
+  // Readings are stamped to the millisecond, so each reading here gets its own time.
+  h.deps.now = () => Date.parse('2026-11-02T10:00:00.000Z');
   const first = h.context({ action: 'read-pdf', id: pdf });
   while (!release) await new Promise((resolve) => setTimeout(resolve, 5));
   const second = await h.context({ action: 'read-pdf', id: pdf });
@@ -413,6 +418,7 @@ test('a second read of a PDF already being read is refused, and the first keeps 
   assert.equal(await (await h.read(reading, ADMIN)).text(), 'First text.');
   assert.equal(JSON.parse(await h.kv.get(`ce-storage:salon:docsContext:${pdf}`)).contextReadingId, reading);
   // The finished read frees the PDF, and the next reading replaces this one.
+  h.deps.now = () => Date.parse('2026-11-02T10:01:00.000Z');
   const replacement = await idOf(await h.context({ action: 'read-pdf', id: pdf }));
   assert.equal((await h.read(reading, ADMIN)).status, 404);
   assert.equal((await h.read(replacement, ADMIN)).status, 200);
