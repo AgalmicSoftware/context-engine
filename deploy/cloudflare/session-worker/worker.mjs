@@ -62564,9 +62564,8 @@ function shortQuestionId(value = "") {
   if (/^0x[0-9a-fA-F]{64}$/.test(text5)) return `${text5.slice(0, 10)}...${text5.slice(-6)}`;
   return text5.length > 18 ? `${text5.slice(0, 10)}...${text5.slice(-6)}` : text5;
 }
-function questionIdSeedPart(value = "") {
-  const text5 = safeString(value);
-  return /^0x[0-9a-fA-F]{64}$/.test(text5) ? `${text5.slice(2, 10)}${text5.slice(-6)}` : text5;
+function questionIdKeyPart(value = "") {
+  return safeString(value).toLowerCase().replace(/%|0x/g, (match) => match === "%" ? "%25" : "0%78");
 }
 function shortAddress(value = "") {
   const text5 = safeString(value);
@@ -62917,7 +62916,7 @@ function answerDraftKey({
 } = {}) {
   const telegramUserId = safeString(normalized.user?.telegramUserId);
   const slug = sanitizeSessionSlug(sessionSlug);
-  const qid = questionIdSeedPart(selectedQuestionId || "question");
+  const qid = questionIdKeyPart(selectedQuestionId || "question");
   return telegramUserId && slug && qid ? `${ANSWER_DRAFT_KV_PREFIX}${telegramUserId}:${slug}:${qid}` : "";
 }
 function answerDraftViewKey({
@@ -62927,7 +62926,7 @@ function answerDraftViewKey({
 } = {}) {
   const telegramUserId = safeString(normalized.user?.telegramUserId);
   const slug = sanitizeSessionSlug(sessionSlug);
-  const qid = questionIdSeedPart(selectedQuestionId || "question");
+  const qid = questionIdKeyPart(selectedQuestionId || "question");
   return telegramUserId && slug && qid ? `${ANSWER_DRAFT_VIEW_KV_PREFIX}${telegramUserId}:${slug}:${qid}` : "";
 }
 function answerDraftFingerprint(record4 = {}) {
@@ -66213,10 +66212,6 @@ function safeString2(value) {
 function lower3(value) {
   return safeString2(value).toLowerCase();
 }
-function questionIdSeedPart2(value = "") {
-  const text5 = safeString2(value);
-  return /^0x[0-9a-fA-F]{64}$/.test(text5) ? `${text5.slice(2, 10)}${text5.slice(-6)}` : text5;
-}
 function firstValue(...values) {
   return values.find((value) => safeString2(value) !== "");
 }
@@ -66421,7 +66416,7 @@ async function persistDraftEditMetric({
     recordedAt,
     metrics
   });
-  const key = `${DRAFT_EDIT_METRIC_KV_PREFIX}${slug}:${questionIdSeedPart2(qid)}:${fingerprint}`;
+  const key = `${DRAFT_EDIT_METRIC_KV_PREFIX}${slug}:${questionIdKeyPart(qid)}:${fingerprint}`;
   const record4 = {
     type: "telegram_draft_edit_metric",
     version: 1,
@@ -66443,6 +66438,7 @@ var init_agentDraftEditMetrics = __esm({
   "workers/sessionCorsWorker/agent/agentDraftEditMetrics.mjs"() {
     init_runtimePrimitives();
     init_redaction();
+    init_runtimeCore();
     DRAFT_EDIT_METRIC_KV_PREFIX = "telegram:draft-edit-metric:v1:";
   }
 });

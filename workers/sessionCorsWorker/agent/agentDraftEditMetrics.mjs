@@ -1,5 +1,6 @@
 import { safeJsonParse, stableJson, stableFingerprint, sanitizeSessionSlug, sha256Hex } from './runtimePrimitives.mjs';
 import { assertNoSecretShape } from './redaction.mjs';
+import { questionIdKeyPart } from './runtimeCore.mjs';
 
 export const DRAFT_EDIT_METRIC_KV_PREFIX = 'telegram:draft-edit-metric:v1:';
 
@@ -10,11 +11,6 @@ function safeString(value) {
 
 function lower(value) {
   return safeString(value).toLowerCase();
-}
-
-function questionIdSeedPart(value = '') {
-  const text = safeString(value);
-  return /^0x[0-9a-fA-F]{64}$/.test(text) ? `${text.slice(2, 10)}${text.slice(-6)}` : text;
 }
 
 function firstValue(...values) {
@@ -247,7 +243,7 @@ export async function persistDraftEditMetric({
     recordedAt,
     metrics,
   });
-  const key = `${DRAFT_EDIT_METRIC_KV_PREFIX}${slug}:${questionIdSeedPart(qid)}:${fingerprint}`;
+  const key = `${DRAFT_EDIT_METRIC_KV_PREFIX}${slug}:${questionIdKeyPart(qid)}:${fingerprint}`;
   const record = {
     type: 'telegram_draft_edit_metric',
     version: 1,
