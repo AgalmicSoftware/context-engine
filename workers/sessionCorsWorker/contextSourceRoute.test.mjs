@@ -112,6 +112,34 @@ test('a file locked to a group reaches its members and admins, and no one else',
   }
 });
 
+test('a context listing reaches sources past many library files and reads only context rows', async () => {
+  const h = harness();
+  const add = async (role, i) => idOf(await h.uploadFile({ name: `${role}-${i}.txt`, type: 'text/plain', bytes: new TextEncoder().encode(role), role }));
+  const sources = [];
+  for (let i = 0; i < 60; i += 1) sources.push(await add('context', i));
+  for (let i = 0; i < 1000; i += 1) await add('library', i);
+  for (let i = 60; i < 120; i += 1) sources.push(await add('context', i));
+  let reads = 0;
+  const get = h.kv.get;
+  h.kv.get = async (key) => {
+    if (key.includes(':docsContext:')) reads += 1;
+    return get(key);
+  };
+  // As the browser does: at most five pages, each following the last one's cursor.
+  const listed = [];
+  let cursor = '';
+  for (let page = 0; page < 5; page += 1) {
+    const query = new URLSearchParams({ resource: 'docsContext', role: 'context', ...(cursor ? { cursor } : {}) });
+    const body = await (await h.call(`/storage/list?${query}`, { address: ADMIN })).json();
+    assert.ok(body.items.length <= 100, 'a page holds at most its limit');
+    listed.push(...body.items.map((item) => item.storageRef.id));
+    if (body.listComplete) break;
+    cursor = body.cursor;
+  }
+  assert.deepEqual(listed, sources);
+  assert.equal(reads, sources.length, 'library rows are skipped unread');
+});
+
 test('whoever added a file may remove it; anyone else’s needs an admin', async () => {
   const OTHER = `0x${'4'.repeat(40)}`;
   const h = harness();

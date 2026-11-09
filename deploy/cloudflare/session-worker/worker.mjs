@@ -70752,7 +70752,7 @@ var init_storageScanBudget = __esm({
 });
 
 // workers/sessionCorsWorker/storageRouteExecution.js
-var encoder7, decoder5, RESOLVE_STORAGE_GATE_RUNTIME_CONFIG, STORAGE_GROUP_MEMBERSHIP_CACHE, STORAGE_RPC_CHAIN_ATTESTATION_CACHE, trim13, isObj16, isJsonContentType, MEDIA_TYPE_RE, INLINE_MEDIA_TYPE_RE, resolveStorageReadContentType, getStorageR2Binding, DEFAULT_STORAGE_LIST_PAGE_SIZE, MAX_STORAGE_LIST_PAGE_SIZE, DEFAULT_RESOURCE_GATES, isStorageResource, buildCloudflareStorageId, buildObjectKey, buildIndexKey, buildIndexPrefix, buildSessionIndexPrefix, buildPayloadKey, storageIndexPutOptions, safeGroupId, normalizeGroupIdList, readKvPayloadEnvelope, normalizeTagsForMetadata, normalizeAccessConditionDocument, invalidUploadPolicy, readUploadGroupIds, readUploadAccessConditions, normalizeUploadPolicy, readUploadPolicyFields, readJsonPayload, readMultipartPayload, readStorageUploadRequestPayload, readConfiguredStorageBackendCandidate, resolveConfiguredStorageBackend, resolvePayloadAccessControl, resolveStorageResourceGateKey, normalizeGateMode2, normalizeDirectGate, readStorageGate, normalizeAddress, listRoleAddresses, resolveRoleAddressSet2, resolveSessionAdminAddresses, isEnvelopeExportAuthorized, evaluateWorkerRoleCondition, evaluateAgentGrantScopeCondition, evaluateSbtOnchainCondition, checkWorkerGroupMembership, evaluateWorkerGroupCondition, evaluateAccessCondition, resolvePayloadAccessConditions, evaluateAccessConditionDocument, resolveGroupGateIds, authorizeWorkerGroupAccess, resolveBareRoleGateCondition, authorizeWorkerRoleAccess, hasPrivateResponsePolicy, canReadPrivateResponse, authorizeCloudflareStorageAccess, authorizeCloudflareStorageGate, authorizeCloudflareStorageResourceRead, enforceCloudflareUploadPolicy, responseJson, attachStorageGateRuntimeRpc, resolveStorageGateRuntimeConfig, createStorageRouteGateDeps, parseArweaveUploadResponse, handleArweaveStorageUpload, publishCloudflareOwnedStorageMetadata, handleCloudflareUpload, readRequestId, normalizeStorageListLimit, readStorageListOptions, handleCloudflareRead, handleCloudflareList, listCloudflareMetadataRows, readStoredCloudflarePayloadBytes, readStoredPayloadJson, readIndexRowResourceId, readLegacyRowResourceId, scanLegacyStorageOwnerIds, LEGACY_OWNER, resolveLegacyStorageOwner, VISIBILITY_SCAN_PAGE_ROWS, readVisibilityMetadataPages, setCloudflareStorageResourceHidden, resolveEnvelopeExportKeyProvider, resolveEnvelopeExportManifestKeyProvider, exportCloudflareEncryptedPayloadEnvelopes, listContextSourceRows, readContextSourceRow, readContextSourceBytes, removeCloudflareStorageRecords, storageRoute;
+var encoder7, decoder5, RESOLVE_STORAGE_GATE_RUNTIME_CONFIG, STORAGE_GROUP_MEMBERSHIP_CACHE, STORAGE_RPC_CHAIN_ATTESTATION_CACHE, trim13, isObj16, isJsonContentType, MEDIA_TYPE_RE, INLINE_MEDIA_TYPE_RE, resolveStorageReadContentType, getStorageR2Binding, DEFAULT_STORAGE_LIST_PAGE_SIZE, MAX_STORAGE_LIST_PAGE_SIZE, MAX_CONTEXT_LIST_KV_PAGES, DEFAULT_RESOURCE_GATES, isStorageResource, buildCloudflareStorageId, buildObjectKey, buildIndexKey, buildIndexPrefix, buildSessionIndexPrefix, buildPayloadKey, storageIndexPutOptions, safeGroupId, normalizeGroupIdList, readKvPayloadEnvelope, normalizeTagsForMetadata, normalizeAccessConditionDocument, invalidUploadPolicy, readUploadGroupIds, readUploadAccessConditions, normalizeUploadPolicy, readUploadPolicyFields, readJsonPayload, readMultipartPayload, readStorageUploadRequestPayload, readConfiguredStorageBackendCandidate, resolveConfiguredStorageBackend, resolvePayloadAccessControl, resolveStorageResourceGateKey, normalizeGateMode2, normalizeDirectGate, readStorageGate, normalizeAddress, listRoleAddresses, resolveRoleAddressSet2, resolveSessionAdminAddresses, isEnvelopeExportAuthorized, evaluateWorkerRoleCondition, evaluateAgentGrantScopeCondition, evaluateSbtOnchainCondition, checkWorkerGroupMembership, evaluateWorkerGroupCondition, evaluateAccessCondition, resolvePayloadAccessConditions, evaluateAccessConditionDocument, resolveGroupGateIds, authorizeWorkerGroupAccess, resolveBareRoleGateCondition, authorizeWorkerRoleAccess, hasPrivateResponsePolicy, canReadPrivateResponse, authorizeCloudflareStorageAccess, authorizeCloudflareStorageGate, authorizeCloudflareStorageResourceRead, enforceCloudflareUploadPolicy, responseJson, attachStorageGateRuntimeRpc, resolveStorageGateRuntimeConfig, createStorageRouteGateDeps, parseArweaveUploadResponse, handleArweaveStorageUpload, publishCloudflareOwnedStorageMetadata, handleCloudflareUpload, readRequestId, normalizeStorageListLimit, readStorageListOptions, handleCloudflareRead, handleCloudflareList, listCloudflareMetadataRows, readStoredCloudflarePayloadBytes, readStoredPayloadJson, readIndexRowResourceId, readLegacyRowResourceId, scanLegacyStorageOwnerIds, LEGACY_OWNER, resolveLegacyStorageOwner, VISIBILITY_SCAN_PAGE_ROWS, readVisibilityMetadataPages, setCloudflareStorageResourceHidden, resolveEnvelopeExportKeyProvider, resolveEnvelopeExportManifestKeyProvider, exportCloudflareEncryptedPayloadEnvelopes, listContextSourceRows, readContextSourceRow, readContextSourceBytes, removeCloudflareStorageRecords, storageRoute;
 var init_storageRouteExecution = __esm({
   "workers/sessionCorsWorker/storageRouteExecution.js"() {
     init_sessionContextSources();
@@ -70803,6 +70803,7 @@ var init_storageRouteExecution = __esm({
     getStorageR2Binding = (env = {}) => env.CE_STORAGE_R2 || env.STORAGE_R2 || env.R2_BUCKET || null;
     DEFAULT_STORAGE_LIST_PAGE_SIZE = 100;
     MAX_STORAGE_LIST_PAGE_SIZE = 100;
+    MAX_CONTEXT_LIST_KV_PAGES = 10;
     DEFAULT_RESOURCE_GATES = Object.freeze({
       docsContext: "docUploads",
       questions: "questionResponses",
@@ -72516,21 +72517,26 @@ var init_storageRouteExecution = __esm({
       if (!index || typeof index.list !== "function" || typeof index.get !== "function") {
         return responseJson(deps, { error: "Cloudflare storage index binding not configured." }, 501, baseHeaders);
       }
-      const listed = await index.list({
-        prefix: buildIndexPrefix({ slug, resource }),
-        ...cursor ? { cursor } : {},
-        limit
-      });
-      const nextCursor = listed?.list_complete === false ? trim13(listed?.cursor) : "";
-      if (listed?.list_complete === false && !nextCursor) {
-        return responseJson(
-          deps,
-          { error: "Cloudflare storage list cursor is unavailable." },
-          503,
-          baseHeaders
-        );
+      const keys = [];
+      let nextCursor = cursor;
+      for (let page = 0; page < (contextOnly ? MAX_CONTEXT_LIST_KV_PAGES : 1); page += 1) {
+        const listed = await index.list({
+          prefix: buildIndexPrefix({ slug, resource }),
+          ...nextCursor ? { cursor: nextCursor } : {},
+          limit: limit - keys.length
+        });
+        nextCursor = listed?.list_complete === false ? trim13(listed?.cursor) : "";
+        if (listed?.list_complete === false && !nextCursor) {
+          return responseJson(
+            deps,
+            { error: "Cloudflare storage list cursor is unavailable." },
+            503,
+            baseHeaders
+          );
+        }
+        keys.push(...(Array.isArray(listed?.keys) ? listed.keys : []).filter((entry2) => !(contextOnly && entry2?.metadata?.contextSource === false)));
+        if (!nextCursor || keys.length >= limit) break;
       }
-      const keys = Array.isArray(listed?.keys) ? listed.keys : [];
       const rows = [];
       let hiddenIds = null;
       try {

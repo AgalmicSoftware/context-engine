@@ -22,7 +22,8 @@ export const json = (body, status = 200, baseHeaders = {}) => {
 };
 
 // `lagging` holds keys a KV list does not show yet, as after a recent write.
-// As in KV, a put replaces a key's list metadata, and one without it clears it.
+// As in KV, a put replaces a key's list metadata, and one without it clears it,
+// and a list returns at most `limit` keys (1,000 by default) and a cursor.
 const createKv = () => {
   const store = new Map();
   const listMetadata = new Map();
@@ -40,11 +41,17 @@ const createKv = () => {
       else listMetadata.delete(key);
     },
     delete: async (key) => { deletes.push(key); store.delete(key); listMetadata.delete(key); },
-    list: async ({ prefix = '' } = {}) => ({
-      keys: [...store.keys()].filter((key) => key.startsWith(prefix) && !lagging.has(key))
-        .map((name) => (listMetadata.has(name) ? { name, metadata: listMetadata.get(name) } : { name })),
-      list_complete: true,
-    }),
+    // Keys list in the order they were first written; the cursor is the next offset.
+    list: async ({ prefix = '', cursor = '', limit = 1000 } = {}) => {
+      const names = [...store.keys()].filter((key) => key.startsWith(prefix) && !lagging.has(key));
+      const start = Number(cursor) || 0;
+      const end = start + limit;
+      return {
+        keys: names.slice(start, end).map((name) => (listMetadata.has(name) ? { name, metadata: listMetadata.get(name) } : { name })),
+        list_complete: end >= names.length,
+        ...(end < names.length ? { cursor: String(end) } : {}),
+      };
+    },
   };
 };
 const createR2 = () => {

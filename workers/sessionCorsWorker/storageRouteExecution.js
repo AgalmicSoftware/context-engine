@@ -105,6 +105,8 @@ export const getStorageR2Binding = (env = {}) => env.CE_STORAGE_R2 || env.STORAG
 export { getStorageIndexBinding };
 const DEFAULT_STORAGE_LIST_PAGE_SIZE = 100;
 const MAX_STORAGE_LIST_PAGE_SIZE = 100;
+// KV list calls one context listing may make to fill its page.
+const MAX_CONTEXT_LIST_KV_PAGES = 10;
 const DEFAULT_RESOURCE_GATES = Object.freeze({
   docsContext: 'docUploads',
   questions: 'questionResponses',
@@ -1956,21 +1958,31 @@ const handleCloudflareList = async ({ request, env, config, slug, uploaderAddres
   if (!index || typeof index.list !== 'function' || typeof index.get !== 'function') {
     return responseJson(deps, { error: 'Cloudflare storage index binding not configured.' }, 501, baseHeaders);
   }
-  const listed = await index.list({
-    prefix: buildIndexPrefix({ slug, resource }),
-    ...(cursor ? { cursor } : {}),
-    limit,
-  });
-  const nextCursor = listed?.list_complete === false ? trim(listed?.cursor) : '';
-  if (listed?.list_complete === false && !nextCursor) {
-    return responseJson(
-      deps,
-      { error: 'Cloudflare storage list cursor is unavailable.' },
-      503,
-      baseHeaders,
-    );
+  // A context listing skips rows listed as other files unread and lists on
+  // until its page is full, so sources past many library files still reach a
+  // client that reads only a few pages. Each KV call asks for just the rows
+  // still wanted, so the cursor marks exactly where the page stopped.
+  const keys = [];
+  let nextCursor = cursor;
+  for (let page = 0; page < (contextOnly ? MAX_CONTEXT_LIST_KV_PAGES : 1); page += 1) {
+    const listed = await index.list({
+      prefix: buildIndexPrefix({ slug, resource }),
+      ...(nextCursor ? { cursor: nextCursor } : {}),
+      limit: limit - keys.length,
+    });
+    nextCursor = listed?.list_complete === false ? trim(listed?.cursor) : '';
+    if (listed?.list_complete === false && !nextCursor) {
+      return responseJson(
+        deps,
+        { error: 'Cloudflare storage list cursor is unavailable.' },
+        503,
+        baseHeaders,
+      );
+    }
+    keys.push(...(Array.isArray(listed?.keys) ? listed.keys : [])
+      .filter((entry) => !(contextOnly && entry?.metadata?.contextSource === false)));
+    if (!nextCursor || keys.length >= limit) break;
   }
-  const keys = Array.isArray(listed?.keys) ? listed.keys : [];
   const rows = [];
   let hiddenIds = null;
   try {
