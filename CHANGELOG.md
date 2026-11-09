@@ -17,6 +17,7 @@ All notable changes to this project will be documented in this file.
 - A compass's legend names its own kinds of point, Position and Participant on a built atlas, and a compass with no one placed on it says so.
 - A branch or topic's panel leads with a summary no longer than a tweet, and so does an AI Views circle's. **Show more** shows the rest and lists an atlas's positions, each named in bold with how many of those who answered hold it and a bar for their share. New builds ask the AI for a summary under 280 characters and record how many answered each topic.
 - Hovering a participant on a compass shows their address, which was drawn dark on the dark tooltip. Selecting them shows it underlined, as the link to their profile it is. Participants the AI placed on one spot now sit on half rings below it, and no two avatars or a position's dot overlap, at the chart's edges too.
+- A topic's questions look like the session's question cards, and each opens its own page in a new tab, where it can be answered. Question cards in other Debate Map panels take the same Agree, Unsure and Disagree colours, and a freeform question's preview is readable in Context Engine.
 - The Debate Map's tree view asks for a category to draw the **Tree Chart**, as its button is named.
 - Question Results shows a spinner in place of its question and response counts, and each question's count, until they load, instead of 0.
 - The status line under Results, shown while AI Views or an atlas builds, is readable in Civic, where it measured 3.35:1.

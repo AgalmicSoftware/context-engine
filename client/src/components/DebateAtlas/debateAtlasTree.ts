@@ -1,5 +1,6 @@
 import { generateBlockieDataUrl } from '../../utilities/ui/blockieAvatars.js';
 import { buildPublicRoute } from '../../utilities/ui/publicUrl.js';
+import { buildQuestionRoutePath } from '../../utilities/survey/questionRouting.js';
 import { parseSessionWorkerDiscoveryOrigin } from '../../utilities/session/sessionWorkerDiscovery';
 import type { DebateNode, HistoricalCompassPoint } from '../DebateMap/debateMapTypes';
 import type {
@@ -254,4 +255,24 @@ export const buildSessionAtlasLink = ({
     // Without the Worker the link still opens a session the site already knows.
   }
   return `${buildPublicRoute(`/atlas/${encodeURIComponent(nodeId)}`)}?${params}`;
+};
+
+// A question's own page, where it can be answered, with the Worker a fresh browser needs.
+export const buildSessionQuestionLink = ({
+  questionId,
+  sessionSlug,
+  workerUrl = '',
+}: {
+  questionId: string;
+  sessionSlug: string;
+  workerUrl?: string;
+}): string => {
+  const [path, query = ''] = buildQuestionRoutePath(questionId, { sessionSlug }).split('?');
+  const params = new URLSearchParams(query);
+  try {
+    if (workerUrl) params.set('worker', parseSessionWorkerDiscoveryOrigin(workerUrl));
+  } catch {
+    // Without the Worker the page still opens a session the site already knows.
+  }
+  return `${buildPublicRoute(path)}?${params}`;
 };

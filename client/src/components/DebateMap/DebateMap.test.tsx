@@ -1405,6 +1405,7 @@ describe('DebateMap', () => {
               yAxis: { label: 'Who', top: 'Locals', bottom: 'Experts' },
               points: [],
             },
+            questions: [{ id: '0xq1', question: 'Should pilots start local?', questionType: 'binary' }],
           },
         ],
       },
@@ -1434,6 +1435,25 @@ describe('DebateMap', () => {
       });
       fireEvent.click(await screen.findByTitle('Copy Deep Link URL'));
       await waitFor(() => expect(writeText).toHaveBeenCalledWith('http://localhost/atlas/t1?session=salon'));
+    });
+
+    it('opens each question on its own page to answer', async () => {
+      renderSessionAtlas({
+        requestedModalNodeId: 't1',
+        buildQuestionLink: (questionId: string) => `/question/${questionId}?session=salon`,
+      });
+      const modal = (await screen.findByRole('heading', { name: 'Pilots' })).closest(
+        '[class*="modalContent"]',
+      ) as HTMLElement;
+      fireEvent.click(within(modal).getByText('Questions'));
+      const card = within(modal).getByRole('link', {
+        name: 'Answer: Should pilots start local? (opens in a new tab)',
+      });
+      expect(card).toHaveAttribute('href', '/question/0xq1?session=salon');
+      expect(card).toHaveAttribute('target', '_blank');
+      expect(card).toHaveAttribute('rel', expect.stringContaining('noopener'));
+      // The answers look like the session's buttons but stay out of the reading order.
+      expect(within(card).getByText('Agree').closest('[aria-hidden="true"]')).not.toBeNull();
     });
 
     it('asks for a category before drawing the tree chart', () => {

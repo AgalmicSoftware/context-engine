@@ -1188,7 +1188,17 @@ const FlatNode = ({
 };
 
 // 3. Detail Modal
-const Modal = ({ isOpen, onClose, content, onVote, readOnly = false, copied, onCopy, onTagClick }: ModalProps) => {
+const Modal = ({
+  isOpen,
+  onClose,
+  content,
+  onVote,
+  readOnly = false,
+  copied,
+  onCopy,
+  onTagClick,
+  buildQuestionLink = null,
+}: ModalProps) => {
   const modalContentRef = useRef<HTMLDivElement | null>(null);
   const defaultArgumentData = content?.arguments && typeof content.arguments === 'object' ? content.arguments : null;
   const hasDefaultArguments = Boolean(defaultArgumentData);
@@ -1980,12 +1990,25 @@ const Modal = ({ isOpen, onClose, content, onVote, readOnly = false, copied, onC
                   const questionText = q.question || q.prompt || 'Untitled question';
                   const questionAuthor = q.username ? String(q.username).trim() : '';
                   const authorAvatar = questionAuthor ? getUserAvatar(questionAuthor) : '';
+                  const questionHref =
+                    typeof buildQuestionLink === 'function' && q.id ? buildQuestionLink(String(q.id)) : '';
+                  // With its own page, the card opens it in a new tab, as a session card's expand
+                  // button does, to be answered there; the atlas stays open here.
+                  const CardTag = questionHref ? 'a' : 'div';
 
                   return (
-                    <div
+                    <CardTag
                       key={questionCardKeys[i] || getDebateQuestionStableKey(q, 'question-card')}
-                      className={styles.pileCard}
+                      className={`${styles.pileCard} ${questionHref ? styles.pileCardLink : ''}`}
                       data-type={questionType}
+                      {...(questionHref
+                        ? {
+                            href: questionHref,
+                            target: '_blank',
+                            rel: 'noopener noreferrer',
+                            'aria-label': `Answer: ${questionText} (opens in a new tab)`,
+                          }
+                        : {})}
                     >
                       <div className={styles.pileCardHeader}>
                         <div>
@@ -2008,7 +2031,12 @@ const Modal = ({ isOpen, onClose, content, onVote, readOnly = false, copied, onC
                         </div>
                       </div>
                       <div className={styles.pileCardBody}>{renderQuestionPreview(q)}</div>
-                    </div>
+                      {questionHref && (
+                        <span className={styles.pileCardAction} aria-hidden="true">
+                          Answer <FontAwesomeIcon icon={faExternalLinkAlt} />
+                        </span>
+                      )}
+                    </CardTag>
                   );
                 })}
               </div>
@@ -2242,6 +2270,7 @@ const DebateMap = ({
   atlasLayoutMode = ATLAS_LAYOUT_MODES.PACKED,
   treeData = null,
   buildNodeLink = null,
+  buildQuestionLink = null,
 }: DebateMapProps) => {
   const explicitTreeData = Array.isArray(treeData) ? treeData : null;
   const externalDemoEnabled =
@@ -2733,6 +2762,7 @@ const DebateMap = ({
           onCopy={copyToClipboard}
           copied={copied}
           onTagClick={handleTagClick}
+          buildQuestionLink={buildQuestionLink}
         />
         <SuggestNodeModal
           isOpen={suggestNodeModalOpen}

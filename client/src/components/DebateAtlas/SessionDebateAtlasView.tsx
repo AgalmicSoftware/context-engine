@@ -7,6 +7,7 @@ import CETooltip from '../Shared/CETooltip';
 import {
   buildDebateAtlasTree,
   buildSessionAtlasLink,
+  buildSessionQuestionLink,
   debateAtlasBuildIdOf,
   describeDebateAtlasBuild,
 } from './debateAtlasTree';
@@ -53,6 +54,10 @@ export default function SessionDebateAtlasView({
 
   const buildNodeLink = useCallback(
     (nodeId: string) => buildSessionAtlasLink({ nodeId, sessionSlug, workerUrl }),
+    [sessionSlug, workerUrl],
+  );
+  const buildQuestionLink = useCallback(
+    (questionId: string) => buildSessionQuestionLink({ questionId, sessionSlug, workerUrl }),
     [sessionSlug, workerUrl],
   );
 
@@ -117,6 +122,7 @@ export default function SessionDebateAtlasView({
           requestedModalNodeId={requestedBuildId === build.id ? requestedNodeId : null}
           onModalClose={onRequestedNodeClose}
           buildNodeLink={buildNodeLink}
+          buildQuestionLink={buildQuestionLink}
         />
       </div>
     </section>

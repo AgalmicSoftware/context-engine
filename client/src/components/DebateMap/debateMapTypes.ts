@@ -265,6 +265,8 @@ export interface DebateMapProps {
   treeData?: DebateNode[] | null;
   /** The link a node's copy button shares, when it is not the demo atlas's /atlas/<id>. */
   buildNodeLink?: ((nodeId: string) => string) | null;
+  /** A question's own page, where it can be answered; its card in a node's panel opens it. */
+  buildQuestionLink?: ((questionId: string) => string) | null;
 }
 
 export interface AtlasChromeProps {
@@ -309,6 +311,7 @@ export interface ModalProps {
   copied: boolean;
   onCopy: () => void;
   onTagClick?: ((tag: string) => void) | null;
+  buildQuestionLink?: ((questionId: string) => string) | null;
 }
 
 export interface SuggestNodeModalProps {

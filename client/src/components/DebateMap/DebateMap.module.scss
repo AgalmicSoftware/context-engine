@@ -2072,6 +2072,36 @@ $glass-shadow: 0 8px 32px 0 color-mix(in srgb, var(--ce-compat-dark) 37%, transp
         min-height: 48px;
       }
 
+      .pileCardLink {
+        display: block;
+        color: inherit;
+        text-decoration: none;
+        cursor: pointer;
+
+        &:hover,
+        &:focus-visible {
+          border-color: var(--ce-status-info);
+        }
+
+        &:focus-visible {
+          outline: 2px solid var(--ce-focus-ring);
+          outline-offset: 2px;
+        }
+      }
+
+      .pileCardAction {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 6px;
+        margin-top: 10px;
+        color: color-mix(in srgb, var(--ce-status-info) 50%, var(--ce-text-inverse));
+        font-size: 0.75rem;
+        font-weight: 800;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+
       .typeBadge {
         display: inline-flex;
         align-items: center;
@@ -2121,38 +2151,33 @@ $glass-shadow: 0 8px 32px 0 color-mix(in srgb, var(--ce-compat-dark) 37%, transp
         pointer-events: none;
         user-select: none;
 
+        // The session's own answer buttons' colours and shape.
         > span {
           display: inline-flex;
           align-items: center;
           justify-content: center;
           flex: 1 1 0;
           min-width: 110px;
-          padding: 6px 14px;
-          border-radius: var(--ce-radius-pill);
-          border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 12%, transparent);
-          font-size: 0.8rem;
-          font-weight: 700;
-          color: var(--ce-color-white);
-          letter-spacing: 0.02em;
-          background: color-mix(in srgb, var(--ce-text-inverse) 5%, transparent);
+          padding: 8px 14px;
+          border-radius: var(--ce-radius-4);
+          border: 0;
+          font-size: 1rem;
+          font-weight: 600;
         }
 
         > span:nth-child(1) {
-          background: color-mix(in srgb, var(--ce-status-success-text) 16%, transparent);
-          border-color: color-mix(in srgb, var(--ce-status-success-text) 30%, transparent);
-          color: color-mix(in srgb, var(--ce-status-success-text) 92%, var(--ce-text-inverse));
+          background: var(--ce-binary-choice-agree-bg);
+          color: var(--ce-binary-choice-agree-text);
         }
 
         > span:nth-child(2) {
-          background: color-mix(in srgb, var(--ce-status-warning) 16%, transparent);
-          border-color: color-mix(in srgb, var(--ce-status-warning) 28%, transparent);
-          color: color-mix(in srgb, var(--ce-status-warning) 94%, var(--ce-text-inverse));
+          background: var(--ce-binary-choice-unsure-bg);
+          color: var(--ce-color-black);
         }
 
         > span:nth-child(3) {
-          background: color-mix(in srgb, var(--ce-status-error) 15%, transparent);
-          border-color: color-mix(in srgb, var(--ce-status-error) 28%, transparent);
-          color: var(--ce-status-danger-text);
+          background: var(--ce-binary-choice-disagree-bg);
+          color: var(--ce-binary-choice-disagree-text);
         }
       }
 
@@ -2269,7 +2294,8 @@ $glass-shadow: 0 8px 32px 0 color-mix(in srgb, var(--ce-compat-dark) 37%, transp
           color-mix(in srgb, var(--ce-text-inverse) 3.5%, transparent) 0%,
           color-mix(in srgb, var(--ce-text-inverse) 1.5%, transparent) 100%
         );
-        color: color-mix(in srgb, var(--ce-status-info-text) 42%, transparent);
+        // Muted, not faded: the card opens the question, so its preview must stay readable.
+        color: $text-muted;
         font-size: 0.95rem;
         font-style: italic;
         line-height: 1.5;
@@ -3081,6 +3107,7 @@ $glass-shadow: 0 8px 32px 0 color-mix(in srgb, var(--ce-compat-dark) 37%, transp
     .historicalCaseExploitHeading,
     .generatedSummaryEyebrow,
     .generatedSummaryToggle,
+    .questionsSection .pileCardAction,
     .argumentSource {
       color: var(--ce-link);
     }
@@ -3158,20 +3185,18 @@ $glass-shadow: 0 8px 32px 0 color-mix(in srgb, var(--ce-compat-dark) 37%, transp
       color: var(--ce-control-text);
       border-color: var(--ce-document-border);
     }
+  }
+}
 
-    .binaryPills > span:nth-child(1) {
-      background: var(--ce-response-agree-bg);
-      color: var(--ce-response-agree-text);
-    }
-
-    .binaryPills > span:nth-child(2) {
-      background: var(--ce-response-unsure-bg);
-      color: var(--ce-response-unsure-text);
-    }
-
-    .binaryPills > span:nth-child(3) {
-      background: var(--ce-response-disagree-bg);
-      color: var(--ce-response-disagree-text);
-    }
+// Classic draws the session's answers as raised buttons, so these are too.
+@container ce-theme style(--ce-layout-profile: desktop-window) {
+  .debateMap .modalContent .questionsSection .binaryPills > span:nth-child(n) {
+    border: 2px solid;
+    border-color: var(--ce-border-raised);
+    border-radius: 0;
+    background: var(--ce-control-face);
+    box-shadow: var(--ce-shadow-raised);
+    color: var(--ce-control-text);
+    font-weight: 400;
   }
 }

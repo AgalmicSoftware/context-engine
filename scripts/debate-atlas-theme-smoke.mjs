@@ -1,7 +1,7 @@
 // Local fixtures only: the Session Worker's replies come from here, so nothing
 // reaches a real Worker and no atlas is built. Checks a built atlas, its Build
-// button, a running build's status and prompts, and a category's and a topic's
-// compass and summary in each theme and width.
+// button, a running build's status and prompts, a category's and a topic's
+// compass, summary and question cards in each theme and width.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -20,7 +20,10 @@ const topic = (id, label, offset) => ({
   id,
   label,
   summary: `People split on ${label.toLowerCase()}: most want care first, a few want speed.`,
-  questions: [{ id: `q-${id}`, prompt: `How should the city handle ${label.toLowerCase()}?`, type: 'freeform' }],
+  questions: [
+    { id: `q-${id}`, prompt: `How should the city handle ${label.toLowerCase()}?`, type: 'freeform' },
+    { id: `q-${id}-pilot`, prompt: `Should the city pilot ${label.toLowerCase()} first?`, type: 'binary' },
+  ],
   compass: {
     x: { label: 'Pace', left: 'Slow and careful', right: 'Fast and bold' },
     y: { label: 'Scope', top: 'Neighbourhood first', bottom: 'Citywide first' },
@@ -205,6 +208,33 @@ export async function inspectDebateAtlas(page, { screenshotDir = '', tag = '' } 
     assert.equal(await name.evaluate((link) => link.getClientRects().length), 1, 'The participant address breaks across lines');
   });
   if (screenshotDir) await panel.screenshot({ path: `${screenshotDir}/debate-atlas-compass-${tag}.png` });
+
+  // Its questions look like the session's cards and open their own pages, a
+  // freeform one and one with the session's Agree, Unsure and Disagree buttons.
+  await panel.getByText('Questions', { exact: true }).click();
+  const cards = panel.getByRole('link', { name: /^Answer: / });
+  await step('question cards', async () => {
+    assert.equal(await cards.count(), 2);
+    assert.match(String(await cards.first().getAttribute('href')), /^\/question\/q-b1t1\?session=demo-sh/);
+    assert.equal(await cards.first().getAttribute('target'), '_blank');
+    await cards.last().getByText('Agree', { exact: true }).waitFor();
+  });
+  for (const [index, card] of [cards.first(), cards.last()].entries()) {
+    await step(`question card ${index + 1}`, () => assertReadable(card));
+    await card.hover();
+    await step(`question card ${index + 1} hovered`, () => assertReadable(card));
+    await page.mouse.move(0, 0);
+    await card.focus();
+    await step(`question card ${index + 1} focused`, () => assertReadable(card));
+    const cardBox = await card.boundingBox();
+    await page.mouse.move(cardBox.x + cardBox.width / 2, cardBox.y + cardBox.height / 2);
+    await page.mouse.down();
+    await step(`question card ${index + 1} pressed`, () => assertReadable(card));
+    await page.mouse.move(1, 1);
+    await page.mouse.up();
+    await card.blur();
+  }
+  if (screenshotDir) await cards.last().screenshot({ path: `${screenshotDir}/debate-atlas-question-${tag}.png` });
 
   // The category behind it has a compass of its own, with the same legend.
   await panel.getByTitle('Close').click();

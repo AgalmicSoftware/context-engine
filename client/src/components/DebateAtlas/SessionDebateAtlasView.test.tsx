@@ -77,6 +77,10 @@ it('opens the node a link asked for, first showing the build it belongs to', () 
   expect(props.buildNodeLink('atlas_k1_00000001:b1')).toBe(
     '/atlas/atlas_k1_00000001%3Ab1?session=salon&worker=https%3A%2F%2Fce-salon.workers.dev',
   );
+  // A question's card opens its own page.
+  expect(props.buildQuestionLink('0xABC')).toBe(
+    '/question/0xabc?session=salon&worker=https%3A%2F%2Fce-salon.workers.dev',
+  );
 
   // Picking another build afterwards is the reader's choice, and leaves the node shut.
   rerender(view(build));

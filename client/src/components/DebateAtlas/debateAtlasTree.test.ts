@@ -1,6 +1,7 @@
 import {
   buildDebateAtlasTree,
   buildSessionAtlasLink,
+  buildSessionQuestionLink,
   debateAtlasBuildIdOf,
   describeDebateAtlasBuild,
 } from './debateAtlasTree';
@@ -252,6 +253,16 @@ it('links a node to its session, with the Worker a fresh browser needs, and know
   );
   expect(link.pathname).toBe('/atlas/atlas_k1_00000001%3Ab1t1');
   expect(Object.fromEntries(link.searchParams)).toEqual({ session: 'salon', worker: 'https://ce-salon.workers.dev' });
+  // A question opens its own page, in the same session and Worker.
+  const question = new URL(
+    buildSessionQuestionLink({ questionId: '0xABC', sessionSlug: 'salon', workerUrl: 'https://ce-salon.workers.dev' }),
+    'https://site.example',
+  );
+  expect(question.pathname).toBe('/question/0xabc');
+  expect(Object.fromEntries(question.searchParams)).toEqual({
+    session: 'salon',
+    worker: 'https://ce-salon.workers.dev',
+  });
   // A Worker address that is not a plain origin is left out rather than shared.
   expect(
     new URL(
