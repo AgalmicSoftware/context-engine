@@ -19,6 +19,7 @@ jest.mock('../../utilities/docLibrary/useContextGroups', () => ({
 jest.mock('../../utilities/docLibrary/useSessionContextSources', () => ({ supportsContextSources: () => true }));
 
 const ME = '0xaaaa000000000000000000000000000000000001';
+const OTHER = '0xbbbb000000000000000000000000000000000002';
 const input = (sessionConfig: Record<string, unknown> = {}, account = ME) => ({
   sessionSlug: 'salon',
   sessionConfig,
@@ -153,5 +154,39 @@ describe('adding a transcript to context', () => {
     await act(async () => finish('stored-3'));
     await waitFor(() => expect(settled).toBe(true));
     expect(result.current.failed).toBe(false);
+  });
+
+  it('skips an upload queued behind another once the account changes, and says so', async () => {
+    const view = await mount();
+    act(() => view.result.current.setChosen(true));
+    let finish = (_id: string) => {};
+    jest.mocked(uploadContextFile).mockReturnValueOnce(new Promise((resolve) => (finish = resolve)));
+    act(() => {
+      void view.result.current.upload('Person 1: Words.');
+      void view.result.current.upload('Person 1: Words. More.');
+    });
+    await waitFor(() => expect(uploadContextFile).toHaveBeenCalledTimes(1));
+    view.rerender(input({}, OTHER));
+    await act(async () => finish('stored-1'));
+    await act(() => view.result.current.settled());
+    expect(uploadContextFile).toHaveBeenCalledTimes(1);
+    expect(view.result.current.status).toBe('The transcript wasn’t added to context: the account or session changed.');
+  });
+
+  it('replaces its earlier copy as the account that asked, though the account changes during the upload', async () => {
+    const view = await mount();
+    act(() => view.result.current.setChosen(true));
+    await act(() => view.result.current.upload('Person 1: Words.'));
+    let finish = (_id: string) => {};
+    jest.mocked(uploadContextFile).mockReturnValueOnce(new Promise((resolve) => (finish = resolve)));
+    act(() => void view.result.current.upload('Person 1: Words. More.'));
+    await waitFor(() => expect(uploadContextFile).toHaveBeenCalledTimes(2));
+    view.rerender(input({}, OTHER));
+    await act(async () => finish('stored-2'));
+    await act(() => view.result.current.settled());
+    expect(removeContextSource).toHaveBeenCalledWith(
+      { id: 'stored-1', reading: null },
+      expect.objectContaining({ context: { account: ME } }),
+    );
   });
 });

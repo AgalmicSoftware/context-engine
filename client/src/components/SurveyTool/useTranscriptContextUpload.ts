@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { participantsMayAddContext } from '@ce-shared/sessionContextSources.mjs';
 import { readLinkedWorkerGroupId } from '../../domains/worker/workerGroupAutoJoin';
+import { recordingOwner, type RecordingOptions } from '../../utilities/audio/recordingOwner';
 import {
   removeContextSource,
   uploadContextFile,
@@ -19,6 +20,13 @@ const transcriptFileName = () => {
 };
 
 type Input = { sessionSlug: string; sessionConfig: unknown; context: unknown; enabled: boolean };
+type Target = Pick<Input, 'sessionSlug' | 'sessionConfig' | 'context'>;
+
+// The same account, and the same session on the same Worker.
+const sameOwner = (left: Target, right: Target) => {
+  const [a, b] = [left, right].map((target) => recordingOwner(target as RecordingOptions));
+  return a.account === b.account && a.identity === b.identity;
+};
 
 /**
  * The Group Conversation's "Add transcript to context" choice. The file goes up after the questions submit, as
@@ -62,23 +70,29 @@ export function useTranscriptContextUpload({ sessionSlug, sessionConfig, context
       const text = transcript.trim();
       const earlier = uploaded.current;
       if (!chosen || !text || (text === earlier.text && choice === earlier.choice)) return pending.current;
+      // A queued upload goes up as the account, to the session and audience, it was asked for, or not at all.
+      const target = latest.current;
       setFailed(false);
       setStatus('Adding the transcript to context…');
       pending.current = pending.current.then(async () => {
+        if (!sameOwner(target, latest.current)) {
+          setStatus('The transcript wasn’t added to context: the account or session changed.');
+          return;
+        }
         try {
           const id = await uploadContextFile(
             {
               file: new File([text], transcriptFileName(), { type: 'text/plain' }),
               ...contextAccessOf(choice),
             },
-            latest.current,
+            target,
           );
           uploaded.current = { text, id, choice };
           // More of this conversation, or a new audience for it, replaces its file. Another conversation keeps its own.
           const replaces = !!earlier.id && text.startsWith(earlier.text);
           let replaced = true;
           if (replaces) {
-            await removeContextSource({ id: earlier.id, reading: null }, latest.current).catch(() => {
+            await removeContextSource({ id: earlier.id, reading: null }, target).catch(() => {
               replaced = false;
             });
           }
