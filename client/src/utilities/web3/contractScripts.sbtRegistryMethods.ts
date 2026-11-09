@@ -306,6 +306,12 @@ export const createContractScriptsSbtRegistryMethods = (deps: ContractScriptsRun
         });
         return receipt;
       } catch (error: any) {
+        // A sent deploy whose result is unknown may have succeeded, so a retry could
+        // deploy a second SBT: keep its hash and its fixed, cause-free wording.
+        if (error?.receiptUnknown === true) {
+          notify.error(error.message);
+          throw error;
+        }
         const normalizedError = useConfiguredDeterministic
           ? maybeWrapUnsupportedConfiguredDeterministicFactoryError(error, addr)
           : error;

@@ -950,6 +950,41 @@ describe('error paths', () => {
     );
   });
 
+  it('keeps the hash of a sent createSBT whose receipt cannot be read', async () => {
+    window.ethereum = makeRpcProvider();
+    const mockFactory = makeWriteContractMock({
+      address: GROUP_CFG.contracts.sbtFactory.address,
+      methods: ['createSBT'],
+    });
+    jest.spyOn(ethers, 'Contract').mockImplementation(function MockContract() {
+      return mockFactory;
+    });
+    jest
+      .spyOn(ethers.providers.Web3Provider.prototype, 'waitForTransaction')
+      .mockRejectedValueOnce(new Error('receipt read timed out'));
+
+    const error = await createSBT(
+      'wagmi',
+      'Error Path Group',
+      'EPG',
+      0,
+      TEST_ADDRESS,
+      0,
+      false,
+      0,
+      [],
+      'ipfs://token-uri',
+      ethers.constants.HashZero,
+      GROUP_CFG,
+    ).catch((caught) => caught);
+
+    expect(error).toMatchObject({
+      message: 'The transaction was sent, but its result could not be confirmed. Check your wallet before retrying.',
+      txHash: '0xtxhash',
+      receiptUnknown: true,
+    });
+  });
+
   it('uses deployment fallback gas when createSBT gas estimation fails', async () => {
     const rpcProvider = makeRpcProvider({
       sendTxError: Object.assign(new Error('User denied transaction signature.'), {
