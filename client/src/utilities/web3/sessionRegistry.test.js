@@ -18,6 +18,7 @@ import {
   __sessionRegistryTestUtils,
   parseSessionRegistryMetadataUri,
   fetchSessionFromRegistry,
+  loadSessionRegistryCache,
   registerSessionOnChain,
   refreshSessionRegistryFieldsCache,
   setResourceGatesOnChain,
@@ -793,6 +794,33 @@ describe('targeted registry refresh when the metadata cannot load', () => {
     expect(arweaveClient.downloadDataFromArweave).toHaveBeenCalledTimes(1);
     expect(recovered.__registry).toMatchObject({ metadata, metadataLoadState: 'loaded' });
     expect(recovered).toEqual(await f.full());
+  });
+
+  const listOutage = () =>
+    loadSessionRegistryCache({ chainIds: [CONFIGURED_REGISTRY_CHAIN_ID], slugs: ['outage'], force: true });
+
+  it.each([
+    ['a single-session read', (f) => f.full()],
+    ['a registry listing', async () => (await listOutage()).sessions.outage],
+  ])('keeps the last usable copy through repeated failures of %s', async (_label, load) => {
+    const f = await fixture({ keepDocument: true });
+    const first = await load(f);
+    expectLastUsableCopy(first);
+    upsertSessionRegistryCache({ config: first });
+    expectLastUsableCopy(await load(f));
+  });
+
+  it('reports a plain document that cannot load as a listing error, but not keyless encrypted metadata', async () => {
+    const f = await fixture({ keepDocument: true });
+    const outage = await listOutage();
+    expect(outage.__loadMeta.hadLoadErrors).toBe(true);
+    expect(sessionRegistryStore.readCache().__hadLoadErrors).toBe(true);
+    f.record.metadataURI = '';
+    f.record.encryptedMetadataURI = `ar://${'E'.repeat(43)}`;
+    arweaveClient.downloadDataFromArweave.mockResolvedValue(JSON.stringify({ ciphertext: 'synthetic' }));
+    const keyless = await listOutage();
+    expect(keyless.__loadMeta.hadLoadErrors).toBe(false);
+    expectLastUsableCopy(keyless.sessions.outage);
   });
 });
 

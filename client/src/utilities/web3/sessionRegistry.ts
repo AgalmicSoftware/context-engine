@@ -1280,15 +1280,33 @@ const buildSessionConfigFromRegistry = ({
 };
 
 // The last usable copy of a session's metadata: the document kept with its
-// cached entry or, for an entry saved without one, the entry itself when it
-// was built from its loaded document.
+// cached entry, the copy an earlier failed load kept or, for an entry saved
+// without either, the entry itself when it was built from its loaded document.
 const lastUsableRegistryMetadata = (cachedConfig: Record<string, unknown> | null) => {
-  const registryMeta = (cachedConfig?.__registry || {}) as { metadata?: unknown; metadataLoadState?: unknown };
-  if (registryMeta.metadata && typeof registryMeta.metadata === 'object') return registryMeta.metadata;
+  const registryMeta = (cachedConfig?.__registry || {}) as AnyRecord;
+  const kept = registryMeta.metadata || registryMeta.lastUsableMetadata;
+  if (kept && typeof kept === 'object') return kept;
   if (!cachedConfig || registryMeta.metadataLoadState !== 'loaded') return null;
   const entry = { ...cachedConfig };
   delete entry.__registry;
   return entry;
+};
+
+// A failed load (an outage, or encrypted metadata without a key) keeps the
+// last usable copy rather than rebuilding the session from nothing. The copy
+// isn't kept as the record's document, so the next load fetches that again,
+// but it is kept beside it so a second failure still has it.
+const buildSessionConfigKeepingLastUsableMetadata = ({ previousConfig, ...args }: AnyRecord) => {
+  const { session, metadata } = args;
+  const hasMetadataUri = !!(session.metadataURI || session.encryptedMetadataURI);
+  const fallback = !metadata && hasMetadataUri ? lastUsableRegistryMetadata(previousConfig) : null;
+  const config = buildSessionConfigFromRegistry({
+    ...args,
+    metadata: metadata || fallback,
+    metadataLoadState: resolveMetadataLoadState({ metadata, hasMetadataUri }),
+  });
+  if (fallback) Object.assign(config.__registry, { metadata: null, lastUsableMetadata: fallback });
+  return config;
 };
 
 const mergeSessionFieldsIntoCachedConfig = async ({
@@ -1320,21 +1338,14 @@ const mergeSessionFieldsIntoCachedConfig = async ({
           lit,
           caller: 'refreshSessionRegistryFieldsCache',
         });
-  const hasMetadataUri = !!(session.metadataURI || session.encryptedMetadataURI);
-  // A failed load (an outage, or encrypted metadata without a key) keeps the
-  // last usable copy rather than rebuilding the session from nothing. The copy
-  // isn't kept as the record's document, so the next refresh loads that again.
-  const fallback = !metadata && hasMetadataUri ? lastUsableRegistryMetadata(baseConfig) : null;
-  const config = buildSessionConfigFromRegistry({
+  return buildSessionConfigKeepingLastUsableMetadata({
+    previousConfig: baseConfig,
     session,
-    metadata: metadata || fallback,
+    metadata,
     fieldsByKey: fields,
     gatesByResource: registryMeta.gatesByResource,
     registryChainId,
-    metadataLoadState: resolveMetadataLoadState({ metadata, hasMetadataUri }),
   });
-  if (fallback) config.__registry.metadata = null;
-  return config;
 };
 
 const addSessionConfigToCache = (cache: RegistryCache | null, config: AnyRecord | null, opts: AnyRecord = {}) => {
@@ -1471,7 +1482,6 @@ export const fetchSessionFromRegistry = async (
   const session = decodeSessionTuple(tuple);
   if (!session || !session.slug) return null;
 
-  const hasMetadataUri = !!(session.metadataURI || session.encryptedMetadataURI);
   const metadata = await loadRegistrySessionMetadata(session, {
     chainId: resolvedChainId,
     slug: registrySlug,
@@ -1494,13 +1504,13 @@ export const fetchSessionFromRegistry = async (
 
   const fieldsByKey = await fetchSessionFields(contract, session.slug);
 
-  return buildSessionConfigFromRegistry({
+  return buildSessionConfigKeepingLastUsableMetadata({
+    previousConfig: sessionRegistryStore.readCache()?.sessionsById?.[session.sessionIdHex] || null,
     session,
     metadata,
     gatesByResource,
     fieldsByKey,
     registryChainId: resolvedChainId,
-    metadataLoadState: resolveMetadataLoadState({ metadata, hasMetadataUri }),
   });
 };
 
@@ -1735,7 +1745,6 @@ export const loadSessionRegistryCache = async (
         const session = decodeSessionTuple(tuple);
         if (!session) return { config: null, hadLoadErrors: false };
 
-        const hasMetadataUri = !!(session.metadataURI || session.encryptedMetadataURI);
         const metadata = await loadRegistrySessionMetadata(session, {
           chainId,
           slug,
@@ -1758,15 +1767,17 @@ export const loadSessionRegistryCache = async (
 
         const fieldsByKey = await fetchSessionFields(contract, slug);
 
-        const config = buildSessionConfigFromRegistry({
+        const config = buildSessionConfigKeepingLastUsableMetadata({
+          previousConfig: previousCache?.sessionsById?.[session.sessionIdHex] || null,
           session,
           metadata,
           gatesByResource,
           fieldsByKey,
           registryChainId: chainId,
-          metadataLoadState: resolveMetadataLoadState({ metadata, hasMetadataUri }),
         });
-        return { config, hadLoadErrors: false };
+        // A plain document that failed to load is a load error. Encrypted metadata
+        // also reads as missing for anyone without its key, so it is not one.
+        return { config, hadLoadErrors: !metadata && !!session.metadataURI };
       },
     );
 
