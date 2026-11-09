@@ -4,8 +4,6 @@
 
 <p align="center">
   <img src="docs/assets/readme-feature-rotation.gif" alt="Context Engine feature animation: a question card answered as agreement, freeform with voice input, rating, multiple choice, and quadratic allocation; Groups for private access and data, result filtering, and centralized or decentralized options; and Results previews for Opinion Map, Breakdown, and Analysis." />
-  <br />
-  <a href="docs/assets/readme-header-overview.png">View the complete still image</a>
 </p>
 
 **Live demo:** [contextengine.sh](https://contextengine.sh)
