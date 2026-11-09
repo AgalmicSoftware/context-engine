@@ -482,6 +482,8 @@ export async function transcribeAudio(audioBlobOrFile: AudioUploadBlob, opts: un
   // Oversize uploads must be chunked client-side or they fail after multipart wrapping.
   // Models after whisper-1 also stop short on long audio, so theirs is cut by length.
   const chunkedUploads = exceedsUploadLimit ? await split() : maxSeconds ? await splitWithinWait(split) : [];
+  // A request cancelled while its settings or audio were prepared starts no upload.
+  signal?.throwIfAborted();
   if (exceedsUploadLimit && !chunkedUploads.length) {
     throw Object.assign(
       new Error('Audio exceeds the /transcribe 25 MB upload limit and could not be decoded into smaller chunks.'),

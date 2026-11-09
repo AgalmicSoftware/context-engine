@@ -7,6 +7,7 @@
  * Key exports: useWhisper, RECORDING_STATUS
  */
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { transcribeAudio } from './ai/aiClient.js';
 import { getEffectiveTranscriptionConfig } from './ai/aiSettings.js';
 import { getCorsProxyUrlOrThrow } from './worker/corsProxy.js';
 import { fetchWorkerWithAuth } from './worker/workerAuth.js';
@@ -414,14 +415,12 @@ export const useWhisper = ({
     [clearSilenceTimer, ownsRecordingAttempt],
   );
 
+  // Live slices are small, and a failed one leaves the recording going.
   const callWhisperViaWorker = useCallback(
-    async (audioBlob: Blob, isStreamingCall = false) => {
+    async (audioBlob: Blob) => {
       const attempt = recordingAttemptRef.current;
       if (!ownsRecordingAttempt(attempt)) return null;
-      if (!audioBlob || audioBlob.size < 100) {
-        if (isStreamingCall) return null;
-        throw new Error('Audio blob too small');
-      }
+      if (!audioBlob || audioBlob.size < 100) return null;
 
       const formData = new FormData();
       const ext = resolveAudioExtension(audioBlob);
@@ -443,7 +442,6 @@ export const useWhisper = ({
         if (ownsRecordingAttempt(attempt)) {
           setErrorMessage(msg);
           onError(new Error(msg));
-          if (!isStreamingCall) setStatus(RECORDING_STATUS.ERROR);
         }
         return null;
       }
@@ -454,7 +452,6 @@ export const useWhisper = ({
         if (ownsRecordingAttempt(attempt)) {
           setErrorMessage(msg);
           onError(new Error(msg));
-          if (!isStreamingCall) setStatus(RECORDING_STATUS.ERROR);
         }
         return null;
       }
@@ -468,43 +465,17 @@ export const useWhisper = ({
         formData.append('rpcUrl', transcriptionCfg.rpcUrl);
       }
 
-      let controller: AbortController | null = null;
-      if (isStreamingCall) {
-        controller = new AbortController();
-        // Abort any in-flight streaming before starting a new one
-        if (streamAbortControllerRef.current) {
-          try {
-            streamAbortControllerRef.current.abort();
-          } catch (e) {
-            whisperLog.warn('useWhisper: cleanup', e);
-          }
-        }
-        streamAbortControllerRef.current = controller;
-        if (ownsRecordingAttempt(attempt)) setIsStreaming(true);
-      } else {
-        if (ownsRecordingAttempt(attempt)) setIsProcessing(true);
-        // Track and make abortable the final request
-        controller = new AbortController();
-        // Abort any existing final call first
-        if (finalAbortControllerRef.current) {
-          try {
-            finalAbortControllerRef.current.abort();
-          } catch (e) {
-            whisperLog.warn('useWhisper: cleanup', e);
-          }
-        }
-        finalAbortControllerRef.current = controller;
-        // Ensure no lingering streaming call
-        if (streamAbortControllerRef.current) {
-          try {
-            streamAbortControllerRef.current.abort();
-          } catch (e) {
-            whisperLog.warn('useWhisper: cleanup', e);
-          }
-          streamAbortControllerRef.current = null;
-          if (ownsRecordingAttempt(attempt)) setIsStreaming(false);
+      const controller = new AbortController();
+      // Abort any in-flight streaming before starting a new one
+      if (streamAbortControllerRef.current) {
+        try {
+          streamAbortControllerRef.current.abort();
+        } catch (e) {
+          whisperLog.warn('useWhisper: cleanup', e);
         }
       }
+      streamAbortControllerRef.current = controller;
+      if (ownsRecordingAttempt(attempt)) setIsStreaming(true);
 
       try {
         const explicitWorkerUrl = normalizeBaseUrl(workerUrl || '');
@@ -516,13 +487,12 @@ export const useWhisper = ({
             context,
             allowDemoFallback: defaultStrictAllowDemoFallback(),
           }));
-        if (!ownsRecordingAttempt(attempt) || controller?.signal.aborted) return null;
+        if (!ownsRecordingAttempt(attempt) || controller.signal.aborted) return null;
         const endpoint = corsWorkerUrl.endsWith('/transcribe')
           ? corsWorkerUrl
           : `${corsWorkerUrl.replace(/\/+$/, '')}/transcribe`;
 
-        const fetchOpts: RequestInit = { method: 'POST', body: formData };
-        if (controller) fetchOpts.signal = controller.signal;
+        const fetchOpts: RequestInit = { method: 'POST', body: formData, signal: controller.signal };
 
         const baseUrl = corsWorkerUrl.replace(/\/+$/, '').replace(/\/transcribe$/i, '');
         // Regression guard: nonce auth and transcription must share the resolved config;
@@ -568,24 +538,51 @@ export const useWhisper = ({
         if (ownsRecordingAttempt(attempt)) {
           setErrorMessage(msg);
           onError(new Error(msg));
-          if (!isStreamingCall) setStatus(RECORDING_STATUS.ERROR);
         }
         return null;
       } finally {
-        if (isStreamingCall) {
-          if (streamAbortControllerRef.current === controller) {
-            streamAbortControllerRef.current = null;
-          }
-          if (ownsRecordingAttempt(attempt)) setIsStreaming(false);
-        } else {
-          if (ownsRecordingAttempt(attempt)) setIsProcessing(false);
-          if (finalAbortControllerRef.current === controller) {
-            finalAbortControllerRef.current = null;
-          }
+        if (streamAbortControllerRef.current === controller) {
+          streamAbortControllerRef.current = null;
         }
+        if (ownsRecordingAttempt(attempt)) setIsStreaming(false);
       }
     },
     [apiKey, context, effectiveSessionConfig, effectiveSessionSlug, model, onError, workerUrl, ownsRecordingAttempt],
+  );
+
+  // The finished recording goes through the shared pipeline, which cuts audio too large or long for one
+  // request: as one upload, this 16-bit WAV passes the provider's 25 MB limit at about five minutes.
+  const transcribeRecording = useCallback(
+    async (audioBlob: Blob) => {
+      if (audioBlob.size < 100) throw new Error('Audio blob too small');
+      // Ensure no lingering streaming call
+      if (streamAbortControllerRef.current) {
+        try {
+          streamAbortControllerRef.current.abort();
+        } catch (e) {
+          whisperLog.warn('useWhisper: cleanup', e);
+        }
+        streamAbortControllerRef.current = null;
+        setIsStreaming(false);
+      }
+      finalAbortControllerRef.current?.abort();
+      const controller = new AbortController();
+      finalAbortControllerRef.current = controller;
+      try {
+        return await transcribeAudio(audioBlob, {
+          sessionSlug: effectiveSessionSlug,
+          sessionConfig: effectiveSessionConfig,
+          context,
+          workerUrl,
+          model,
+          apiKey,
+          signal: controller.signal,
+        });
+      } finally {
+        if (finalAbortControllerRef.current === controller) finalAbortControllerRef.current = null;
+      }
+    },
+    [apiKey, context, effectiveSessionConfig, effectiveSessionSlug, model, workerUrl],
   );
 
   const handleStreamingTranscription = useCallback(async () => {
@@ -622,7 +619,7 @@ export const useWhisper = ({
 
     try {
       if (ownsRecordingAttempt(attempt)) setIsStreaming(true);
-      const streamingText = await callWhisperViaWorker(wavBlob, true);
+      const streamingText = await callWhisperViaWorker(wavBlob);
       if (!ownsRecordingAttempt(attempt)) return;
       if (typeof streamingText === 'string' && streamingText.length > 0) {
         const newLive = mergeTranscript(transcriptRef.current.live, streamingText);
@@ -839,16 +836,13 @@ export const useWhisper = ({
           // --- continue existing final transcription flow (unchanged for callers) ---
           if (finalWavBlob && finalWavBlob.size > 0) {
             try {
-              const finalText = await callWhisperViaWorker(finalWavBlob, false);
+              const finalText = await transcribeRecording(finalWavBlob);
               if (!ownsRecordingAttempt(attempt)) return;
-              if (typeof finalText === 'string') {
-                const { live, final } = transcriptRef.current;
-                const merged = mergeTranscript(live || final || '', finalText);
-                writeTranscript({ final: merged, live: '' });
-                onTranscriptionComplete(merged);
-              } else {
-                writeTranscript({ final: '', live: '' });
-              }
+              const { live, final } = transcriptRef.current;
+              const merged = mergeTranscript(live || final || '', finalText);
+              writeTranscript({ final: merged, live: '' });
+              onTranscriptionComplete(merged);
+              // Only a transcript returns to ready; a failed one keeps its error below.
               if (ownsRecordingAttempt(attempt)) setStatus(RECORDING_STATUS.READY);
             } catch (apiErr) {
               if (ownsRecordingAttempt(attempt)) {
@@ -883,7 +877,6 @@ export const useWhisper = ({
       setIsProcessing(false);
     }
   }, [
-    callWhisperViaWorker,
     clearSilenceTimer,
     cleanupResources,
     lastRecordingTimestamp,
@@ -891,6 +884,7 @@ export const useWhisper = ({
     onRecordingStop,
     onTranscriptionComplete,
     ownsRecordingAttempt,
+    transcribeRecording,
     writeTranscript,
   ]);
 

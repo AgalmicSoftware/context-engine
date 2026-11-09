@@ -66,6 +66,7 @@ jest.mock('./worker/workerAuth.js', () => ({
 jest.mock('./useWhisper.js', () => jest.requireActual('./useWhisper.js'));
 
 import RecordRTC from 'recordrtc';
+import { TRANSCRIBE_MAX_UPLOAD_BYTES } from './ai/aiClientAudioTranscription.js';
 import { getEffectiveTranscriptionConfig } from './ai/aiSettings.js';
 import { getCorsProxyUrlOrThrow } from './worker/corsProxy.js';
 import { fetchWorkerWithAuth } from './worker/workerAuth.js';
@@ -275,7 +276,8 @@ describe('useWhisper', () => {
       expect.any(Object),
       expect.objectContaining({
         preferAnonymous: true,
-        sessionConfig,
+        // The shared pipeline names the config's session, as its slug.
+        sessionConfig: { ...sessionConfig, slug: 'demo-sh' },
         sessionSlug: 'demo-sh',
       }),
     );
@@ -357,7 +359,7 @@ describe('useWhisper', () => {
         expect(request.body.get('apiKey')).toBe(localOverride ? 'synthetic-transcription-key' : null);
         expect(auth).toMatchObject({
           sessionSlug: 'dictation-session',
-          sessionConfig,
+          sessionConfig: sessionConfig ?? null,
           preferAnonymous: true,
         });
         expect(auth.anonymousOnly).not.toBe(true);
@@ -693,5 +695,79 @@ describe('useWhisper', () => {
     expect(fetchWorkerWithAuth).toHaveBeenCalledTimes(1);
     expect(fetchWorkerWithAuth.mock.calls[0][0]).toBe('https://replacement.worker.test/transcribe');
     expect(onComplete).toHaveBeenCalledTimes(1);
+  });
+
+  it('sends a recording too large for one request in parts the provider accepts', async () => {
+    // About five minutes of the recorder's WAV; the browser decodes it for cutting.
+    RecordRTC.__setBlob(new Blob([new Uint8Array(TRANSCRIBE_MAX_UPLOAD_BYTES + 1)], { type: 'audio/wav' }));
+    const frames = 16000;
+    class DecodingAudioContext extends MockAudioContext {
+      decodeAudioData() {
+        return Promise.resolve({
+          sampleRate: 16000,
+          numberOfChannels: 1,
+          length: frames,
+          getChannelData: () => new Float32Array(frames),
+        });
+      }
+    }
+    Object.defineProperty(window, 'AudioContext', { value: DecodingAudioContext, configurable: true });
+    const onComplete = jest.fn();
+    act(() => {
+      root.render(
+        <WhisperHarness
+          ref={ref}
+          options={{ silenceDetection: false, timeSlice: 0, onTranscriptionComplete: onComplete }}
+        />,
+      );
+    });
+    await act(async () => {
+      await ref.current.startRecording();
+    });
+    ref.current.audioContextRef.current.state = 'closed';
+    setNow(2000);
+    await act(async () => {
+      await ref.current.stopRecording();
+      for (let i = 0; i < 10 && !onComplete.mock.calls.length; i += 1) await flushPromises();
+    });
+
+    expect(onComplete).toHaveBeenCalledWith('hello world');
+    expect(ref.current.status).toBe(RECORDING_STATUS.READY);
+    const sizes = fetchWorkerWithAuth.mock.calls.map(([, request]) => request.body.get('file').size);
+    expect(sizes.length).toBeGreaterThan(0);
+    expect(Math.max(...sizes)).toBeLessThan(TRANSCRIBE_MAX_UPLOAD_BYTES);
+  });
+
+  it('keeps showing the error when the recording cannot be transcribed', async () => {
+    fetchWorkerWithAuth.mockResolvedValueOnce({
+      ok: false,
+      status: 413,
+      json: async () => ({ error: 'Maximum content size limit exceeded.' }),
+    });
+    const onComplete = jest.fn();
+    const onError = jest.fn();
+    act(() => {
+      root.render(
+        <WhisperHarness
+          ref={ref}
+          options={{ silenceDetection: false, onTranscriptionComplete: onComplete, onError }}
+        />,
+      );
+    });
+    await act(async () => {
+      await ref.current.startRecording();
+    });
+    ref.current.audioContextRef.current.state = 'closed';
+    setNow(2000);
+    await act(async () => {
+      await ref.current.stopRecording();
+      await flushPromises();
+      await flushPromises();
+    });
+
+    expect(ref.current.status).toBe(RECORDING_STATUS.ERROR);
+    expect(ref.current.errorMessage).toContain('Maximum content size limit exceeded.');
+    expect(onError).toHaveBeenCalledTimes(1);
+    expect(onComplete).not.toHaveBeenCalled();
   });
 });
