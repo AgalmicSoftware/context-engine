@@ -35,8 +35,11 @@ export type SurveyResultsResponsesJsonExportArgs = SurveyResultsQuestionsJsonExp
 
 export type SurveyResultsQuestionCsvExportRecord = {
   id?: unknown;
+  maxSelections?: unknown;
   options?: unknown;
   prompt?: unknown;
+  scale?: unknown;
+  singleSelect?: unknown;
   tags?: unknown;
   type?: unknown;
   voiceCredits?: unknown;
@@ -371,7 +374,8 @@ const readQuestionOptionsForCsv = (questionData: SurveyResultsRecord): string =>
 export const buildSurveyResultsQuestionsCsvExport = (
   filteredQuestions: readonly SurveyResultsQuestionCsvExportRecord[] = [],
 ): string => {
-  const header = '"questionID","prompt","type","tags","options","voiceCredits"\n';
+  const header =
+    '"questionID","prompt","type","tags","options","voiceCredits","scale","singleSelect","maxSelections"\n';
   const csvRows = filteredQuestions.map((question) => {
     const tags = Array.isArray(question?.tags) ? question.tags.join(';') : '';
     const options = Array.isArray(question?.options) ? JSON.stringify(question.options) : '';
@@ -382,6 +386,10 @@ export const buildSurveyResultsQuestionsCsvExport = (
       quoteCsvCell(tags),
       quoteCsvCell(options),
       quoteCsvCell(question.type === 'quadratic' ? (question.voiceCredits ?? 99) : ''),
+      // Without these, a 1-5 and a 0-10 rating, or pick-one and pick-three, read the same.
+      quoteCsvCell(question.scale ? JSON.stringify(question.scale) : ''),
+      quoteCsvCell(question.singleSelect),
+      quoteCsvCell(question.maxSelections),
     ].join(',');
   });
 

@@ -434,7 +434,9 @@ describe('SurveyResults data export controls', () => {
       capture.restore();
 
       const [questionsCsv, responsesCsv] = await Promise.all(capture.blobs.map(readBlobText));
-      expect(questionsCsv.split('\n')[1]).toBe('"q1","Allocate support","quadratic","","[""Parks"",""Transit""]","25"');
+      expect(questionsCsv.split('\n')[1]).toBe(
+        '"q1","Allocate support","quadratic","","[""Parks"",""Transit""]","25","","",""',
+      );
       expect(responsesCsv.split('\n')[1]).toBe(
         `"q1","Allocate support","quadratic","[""Parks"",""Transit""]","${RESPONDER_ONE}","","[3,-4]","","","false","","","2025-04-01T00:00:00.000Z","25",""`,
       );
@@ -657,7 +659,9 @@ describe('SurveyResults data export controls', () => {
       capture.restore();
     }
 
-    expect(csv.split('\n')[0]).toBe('"questionID","prompt","type","tags","options","voiceCredits"');
+    expect(csv.split('\n')[0]).toBe(
+      '"questionID","prompt","type","tags","options","voiceCredits","scale","singleSelect","maxSelections"',
+    );
     expect(screen.queryByText('No filtered questions to export.')).toBeNull();
     expect(screen.queryByText('Invalid export type selected.')).toBeNull();
   });
