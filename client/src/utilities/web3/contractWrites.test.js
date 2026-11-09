@@ -336,6 +336,23 @@ describe('raw contract write target checks', () => {
     expect(options.signingProvider.request).not.toHaveBeenCalled();
   });
 
+  it('never broadcasts from an account other than the one that started the write', async () => {
+    const started = '0x00000000000000000000000000000000000000cc';
+    const switched = { ...makeOptions(), expectedFrom: started };
+    await expect(sendContractWriteViaProvider(switched)).rejects.toThrow(
+      `The wallet switched accounts, so the transaction was not sent. Switch back to ${started} and try again.`,
+    );
+    expect(switched.signingProvider.request).not.toHaveBeenCalled();
+
+    const sameAccount = { ...makeOptions(), expectedFrom: from.toUpperCase().replace('0X', '0x') };
+    await expect(sendContractWriteViaProvider(sameAccount)).resolves.toEqual(
+      expect.objectContaining({ txHash: '0xtxhash' }),
+    );
+    expect(sameAccount.signingProvider.request).toHaveBeenCalledWith(
+      expect.objectContaining({ params: [expect.objectContaining({ from })] }),
+    );
+  });
+
   it.each([{ status: undefined, to }, { status: 1, to: from }, { status: 1 }])(
     'rejects an unverified receipt %j',
     async (receipt) => {

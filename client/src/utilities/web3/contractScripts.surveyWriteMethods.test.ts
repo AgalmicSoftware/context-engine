@@ -8,6 +8,8 @@ const SURVEYS_ADDRESS = '0x1111111111111111111111111111111111111111';
 const SURVEY_ID = ethers.utils.id('survey-precheck');
 const QUESTION_ID = ethers.utils.id('question-precheck');
 const PUBLISHED_HASH = `0x${'22'.repeat(32)}`;
+const ACCOUNT = '0x00000000000000000000000000000000000000aa';
+const OTHER_ACCOUNT = '0x00000000000000000000000000000000000000bb';
 
 const buildMethods = ({
   surveyHash = ethers.constants.HashZero,
@@ -27,20 +29,27 @@ const buildMethods = ({
     surveyHashes = reads.surveyHashes;
     questionHashes = reads.questionHashes;
   }
+  const wallet = { account: ACCOUNT };
   class MockWeb3Provider {
     getSigner() {
-      return { getAddress: async () => '0x00000000000000000000000000000000000000aa' };
+      return { getAddress: async () => wallet.account };
     }
   }
-  // Stop at the first upload: these tests only cover what happens before it.
-  const uploadJsonPayloadForContractPointer = jest.fn(async () => {
+  // Stop at the first upload unless a test lets the uploads finish.
+  const uploadJsonPayloadForContractPointer = jest.fn(async (): Promise<{ pointerBytes: string }> => {
     throw new Error('upload reached');
   });
+  const sendContractWriteViaProvider = jest.fn(async (_options: { expectedFrom?: string }) => ({
+    receipt: { status: 1 },
+  }));
   const contractsLog = { warn: jest.fn() };
   const methods = createContractScriptsSurveyWriteMethods({
     ARWEAVE_ACTIVE: true,
+    GAS_FALLBACKS: { addSurvey: () => 100000, addQuestions: () => 100000 },
     STORAGE_RESOURCE_KEYS: { QUESTIONS: 'questions', SURVEYS: 'surveys' },
     SURVEYS: [],
+    attachStorageRefCompatibilityFields: (value: unknown) => value,
+    clearReadCachesForGroup: jest.fn(),
     contractsLog,
     cryptoUtils: null,
     ethers: { ...ethers, Contract: MockContract, providers: { Web3Provider: MockWeb3Provider } },
@@ -51,8 +60,12 @@ const buildMethods = ({
     memoizedResolveSession: () => ({ slug: 'registry-session', sessionName: 'Registry session' }),
     normalizeSessionNameFields: (value: unknown) => value,
     normalizeSessionSlug: (value: unknown) => value,
+    notifyUserFacingTransactionError: jest.fn(),
     resolveArweaveUploadOpts: async () => ({}),
     resolveStorageSessionSlug: () => 'registry-session',
+    resolveTxGasOverrides: async () => ({}),
+    rpcLog: jest.fn(),
+    sendContractWriteViaProvider,
     uploadJsonPayloadForContractPointer,
     utils: ethers.utils,
     validateNoLockedPlaintextInPayload: () => {},
@@ -77,7 +90,15 @@ const buildMethods = ({
       [ethers.constants.HashZero],
       'registry-session',
     );
-  return { addQuestions, addSurvey, contractsLog, reads, uploadJsonPayloadForContractPointer };
+  return {
+    addQuestions,
+    addSurvey,
+    contractsLog,
+    reads,
+    sendContractWriteViaProvider,
+    uploadJsonPayloadForContractPointer,
+    wallet,
+  };
 };
 
 describe('survey write id pre-check', () => {
@@ -138,6 +159,25 @@ describe('survey write id pre-check', () => {
       jest.useRealTimers();
     }
   });
+});
+
+describe('survey authoring write account', () => {
+  it.each(['addSurvey', 'addQuestions'] as const)(
+    '%s sends only from the account its uploads started with',
+    async (write) => {
+      const built = buildMethods();
+      // The wallet switches accounts while the payloads upload.
+      built.uploadJsonPayloadForContractPointer.mockImplementation(async () => {
+        built.wallet.account = OTHER_ACCOUNT;
+        return { pointerBytes: PUBLISHED_HASH };
+      });
+
+      await built[write]();
+
+      expect(built.sendContractWriteViaProvider).toHaveBeenCalledTimes(1);
+      expect(built.sendContractWriteViaProvider.mock.calls[0][0].expectedFrom).toBe(ACCOUNT);
+    },
+  );
 });
 
 describe('Worker answer upload check', () => {
@@ -220,22 +260,28 @@ describe('on-chain survey copy re-check', () => {
     stored,
     session = REGISTRY_SESSION,
     cloudflare = false,
+    accountAfterUpload = '',
   }: {
     pointers: string[];
     stored: unknown[];
     session?: Record<string, unknown>;
     cloudflare?: boolean;
+    accountAfterUpload?: string;
   }) => {
     class MockContract {}
+    const wallet = { account: ACCOUNT };
     class MockWeb3Provider {
       getSigner() {
-        return { getAddress: async () => '0x00000000000000000000000000000000000000aa' };
+        return { getAddress: async () => wallet.account };
       }
     }
-    const uploadJsonPayloadForContractPointer = jest.fn(async ({ payload }: { payload: unknown }) => ({
-      pointerBytes: ethers.utils.id(JSON.stringify(payload)),
-      storageRef: { id: 'stored-ref' },
-    }));
+    const uploadJsonPayloadForContractPointer = jest.fn(async ({ payload }: { payload: unknown }) => {
+      if (accountAfterUpload) wallet.account = accountAfterUpload;
+      return {
+        pointerBytes: ethers.utils.id(JSON.stringify(payload)),
+        storageRef: { id: 'stored-ref' },
+      };
+    });
     const sendContractWriteViaProvider = jest.fn(async () => ({ receipt: { status: 1 } }));
     const methods = createContractScriptsSurveyWriteMethods({
       ARWEAVE_ACTIVE: !cloudflare,
@@ -287,6 +333,7 @@ describe('on-chain survey copy re-check', () => {
     responses: [row(OTHER_QUESTION_ID, a), row(QUESTION_ID, b)],
   });
   const sentSurveyPointer = (send: jest.Mock) => (send.mock.calls[0][0] as { args: unknown[] }).args[3];
+  const sentFrom = (send: jest.Mock) => (send.mock.calls[0][0] as { expectedFrom?: string }).expectedFrom;
 
   it('sends the merged copy when nothing changed since it was read', async () => {
     const built = buildSubmit({ pointers: ['pointer-1', 'pointer-1'], stored: [storedCopy('A1', 'B1')] });
@@ -296,6 +343,17 @@ describe('on-chain survey copy re-check', () => {
     expect(built.surveyUploads()).toHaveLength(1);
     expect(built.surveyUploads()[0].responses).toEqual([row(OTHER_QUESTION_ID, 'A1'), row(QUESTION_ID, 'B2')]);
     expect(built.sendContractWriteViaProvider).toHaveBeenCalledTimes(1);
+  });
+
+  it('sends only from the account the answers were uploaded as', async () => {
+    const built = buildSubmit({
+      pointers: ['pointer-1', 'pointer-1'],
+      stored: [storedCopy('A1', 'B1')],
+      accountAfterUpload: OTHER_ACCOUNT,
+    });
+    await built.submit();
+
+    expect(sentFrom(built.sendContractWriteViaProvider)).toBe(ACCOUNT);
   });
 
   it('sends a first submission, when there is no stored copy before or after', async () => {

@@ -170,6 +170,8 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
         questionIds: qIds32,
       });
 
+      // One account for the uploads and the write that points at them.
+      const account = await signer.getAddress().catch(() => '');
       const canUseSessionStorage =
         isCloudflareStorageResource(cfg, STORAGE_RESOURCE_KEYS.SURVEYS) ||
         isCloudflareStorageResource(cfg, STORAGE_RESOURCE_KEYS.QUESTIONS);
@@ -218,7 +220,7 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
           cfg,
           arweaveUploadOpts,
           storageContext: {
-            account: await signer.getAddress().catch(() => ''),
+            account,
             providerLike: ethersProvider,
           },
         });
@@ -231,7 +233,7 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
             cfg,
             arweaveUploadOpts,
             storageContext: {
-              account: await signer.getAddress().catch(() => ''),
+              account,
               providerLike: ethersProvider,
             },
           });
@@ -278,6 +280,7 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
           signingProvider: providerLocation,
           ethersProvider,
           signer,
+          expectedFrom: account,
           contract: SurveyContract,
           expectedChainId: gAddrs.surveys?.chainId || cfg?.networkChainId,
           expectedEvent: 'SurveyAdded',
@@ -366,6 +369,8 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
         questionIds: qIds32,
       });
 
+      // One account for the uploads and the write that points at them.
+      const account = await signer.getAddress().catch(() => '');
       const canUseSessionStorage = isCloudflareStorageResource(cfg, STORAGE_RESOURCE_KEYS.QUESTIONS);
       if (ARWEAVE_ACTIVE || canUseSessionStorage) {
         // Safety net: inject sessionName/sessionSlug if caller omitted it
@@ -402,7 +407,7 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
             cfg,
             arweaveUploadOpts,
             storageContext: {
-              account: await signer.getAddress().catch(() => ''),
+              account,
               providerLike: ethersProvider,
             },
           });
@@ -441,6 +446,7 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
         signingProvider: providerLocation,
         ethersProvider,
         signer,
+        expectedFrom: account,
         contract: SurveyContract,
         expectedChainId: gAddrs.surveys?.chainId || cfg?.networkChainId,
         expectedEvent: 'QuestionsAdded',
@@ -806,6 +812,8 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
           signingProvider,
           ethersProvider,
           signer,
+          // The uploaded answers name this responder.
+          expectedFrom: userAddress,
           contract: SurveyContract,
           expectedChainId: gAddrs.surveys?.chainId || cfg?.networkChainId,
           expectedEvent: 'ResponsesSubmitted',

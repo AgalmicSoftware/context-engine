@@ -39,6 +39,7 @@ type SendContractWriteViaProviderOptions = {
   signingProvider?: AnyRecord | null;
   ethersProvider?: AnyRecord | null;
   signer?: AnyRecord | null;
+  expectedFrom?: string | null;
   contract?: AnyRecord | null;
   method?: string;
   args?: unknown[];
@@ -171,6 +172,7 @@ const sendContractWriteViaProvider = async ({
   signingProvider,
   ethersProvider,
   signer,
+  expectedFrom = null,
   contract,
   method,
   args = [],
@@ -210,6 +212,13 @@ const sendContractWriteViaProvider = async ({
     throw new Error(`No contract bytecode is deployed at ${to}.`);
   }
   const from = await signer.getAddress();
+  // Payloads uploaded for this write name the account that started it, and the
+  // contract records the sender, so a wallet switched since must not send it.
+  if (expectedFrom && String(from).toLowerCase() !== String(expectedFrom).toLowerCase()) {
+    throw new Error(
+      `The wallet switched accounts, so the transaction was not sent. Switch back to ${expectedFrom} and try again.`,
+    );
+  }
   const data = contract.interface.encodeFunctionData(methodName, args);
   const txParams: AnyRecord = {
     chainId: ethers.BigNumber.from(chainId).toHexString(),
