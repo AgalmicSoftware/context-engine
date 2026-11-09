@@ -596,20 +596,6 @@ describe('SurveyResults survey document URLs', () => {
   });
 });
 
-describe('SurveyResults chain cache readers', () => {
-  it('shows a survey title decrypted for another reader locked, leaving the cache as it was', async () => {
-    const surveyId = 'survey-other-reader';
-    const surveysCache = buildSurveyCache({ surveyId, title: 'Private title' });
-    Object.assign(surveysCache[NETWORK_ID].surveys[surveyId], { titleDecrypted: true, decryptedFor: '0xother' });
-    seedCacheReads({ surveysCache });
-
-    mountSurveyResults({ surveyId });
-    await waitForSurveyTitle('[encrypted]');
-    expect(screen.queryByText('Private title')).not.toBeInTheDocument();
-    expect(surveysCache[NETWORK_ID].surveys[surveyId].title).toBe('Private title');
-  });
-});
-
 describe('SurveyResults after the cache loses a survey', () => {
   it('drops the previous reader’s title, links and rows, as after a sign-out purge', async () => {
     const surveyId = 'survey-previous-reader';

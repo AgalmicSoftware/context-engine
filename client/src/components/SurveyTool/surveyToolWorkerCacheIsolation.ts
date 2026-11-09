@@ -1,4 +1,3 @@
-import { remaskQuestionForReader, remaskSurveyForReader } from '../../utilities/survey/decryptedQuestionReader';
 import {
   buildWorkerCanonicalCacheRunKey,
   resolveWorkerCanonicalCacheIdentity,
@@ -6,7 +5,6 @@ import {
   WORKER_CANONICAL_CACHE_SCOPE_KEY,
   type WorkerCanonicalCacheIdentity,
 } from '../../utilities/survey/workerCanonicalCacheIdentity';
-import { getWorkerCanonicalCacheReader } from '../../utilities/survey/workerCanonicalCacheReader';
 import {
   claimsWorkerCanonicalAuthority,
   resolveSessionCapabilityProjection,
@@ -113,29 +111,6 @@ export const persistSurveyToolCachePatchForCurrentTarget = ({
   return true;
 };
 
-const CHAIN_NODE_REMASKS = [
-  ['questions', remaskQuestionForReader],
-  ['surveys', remaskSurveyForReader],
-] as const;
-
-// Chain nodes are shared by every account using this browser, and relocking them
-// in storage waits for an account change. Reads lock text decrypted for another
-// reader, or for anyone while signed out, in a copy of the changed entries.
-const remaskChainNodeForReader = (node: UnknownRecord, reader = getWorkerCanonicalCacheReader()): UnknownRecord => {
-  let next = node;
-  for (const [collection, remask] of CHAIN_NODE_REMASKS) {
-    const entries = node[collection];
-    if (!isRecord(entries)) continue;
-    let masked: UnknownRecord | null = null;
-    for (const id of Object.keys(entries)) {
-      const entry = remask(entries[id], reader);
-      if (entry) (masked ??= { ...entries })[id] = entry;
-    }
-    if (masked) next = { ...next, [collection]: masked };
-  }
-  return next;
-};
-
 export const readSurveyToolScopedCacheNode = ({
   cache,
   cacheScope,
@@ -150,8 +125,7 @@ export const readSurveyToolScopedCacheNode = ({
   const scope = String(cacheScope || '');
   const root = isRecord(cache) ? cache : {};
   const node = isRecord(root[scope]) ? (root[scope] as UnknownRecord) : null;
-  if (!node) return null;
-  if (scope !== WORKER_CANONICAL_CACHE_SCOPE_KEY) return remaskChainNodeForReader(node);
+  if (!node || scope !== WORKER_CANONICAL_CACHE_SCOPE_KEY) return node;
 
   try {
     const identity = resolveWorkerCanonicalCacheIdentity({ sessionConfig, sessionSlug });
