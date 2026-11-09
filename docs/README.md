@@ -69,7 +69,7 @@ Encryption:
 - `docs/lit-protocol-information.md`: How Context Engine uses Lit today (worker-mediated Chipotle, no Lit SDK) plus platform background.
 - `docs/lit-v3-design.md`: Worker-mediated Chipotle runtime design and provisioning flow.
 - `docs/lit-worker-authorization.md`: Worker-signed authorization for Lit key release and what stays trusted.
-- `docs/doc-library.md`: Doc Library for Sessions + SBT groups (tag schema, listing queries, encryption UX).
+- `docs/doc-library.md`: Doc Library for Sessions and Soulbound Tokens (SBTs) for Groups (tag schema, listing queries, encryption UX).
 - `docs/session-context-sources.md`: Session context: notes, links and files for the session's AI, privacy per item, link snapshots, PDF reading and limits.
 
 Payload schemas:

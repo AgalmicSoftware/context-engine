@@ -8,7 +8,7 @@
 
 **Live demo:** [contextengine.sh](https://contextengine.sh)
 
-Context Engine is a toolkit for AI-enhanced deliberation, decision-making, and negotiation in large groups. It supports public and private questions and responses, AI-assisted input and analysis, permanent records, and cryptographic access control. It allows for no-code deployment of [Soulbound Tokens](https://www.radicalxchange.org/wiki/social-identity/) for Groups. Designed for use cases such as public discourse, organizational decision-making, preference-related dataset creation, and turning stakeholder feedback into company-specific AI evaluations.
+Context Engine is a toolkit for AI-enhanced deliberation, decision-making, and negotiation in large groups. It supports public and private questions and responses, AI-assisted input and analysis, permanent records, and cryptographic access control. It allows for no-code deployment of [Soulbound Tokens](https://www.radicalxchange.org/wiki/social-identity/) (SBTs) for Groups. Designed for use cases such as public discourse, organizational decision-making, preference-related dataset creation, and turning stakeholder feedback into company-specific AI evaluations.
 
 ## Architecture At A Glance
 

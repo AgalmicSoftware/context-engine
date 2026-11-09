@@ -1,4 +1,4 @@
-# Doc Library (Sessions + SBT Groups)
+# Doc Library: Sessions and Soulbound Tokens (SBTs) for Groups
 
 The Doc Library is a shared store of files and links. Documents can be:
 - plaintext Arweave transactions indexed via tags (`arweave` storage),

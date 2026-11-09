@@ -997,7 +997,7 @@ to `docsContext`, `questions`, `surveys`, `responses`, `generatedArtifacts`,
 - `gate: "group_gate"` checks worker-native group membership before upload,
   list, or read bytes are exposed. It remains a lower-level runtime storage
   policy and is schema-only in the version-1 `/new` profile; Native Worker
-  Groups themselves do not need this gate to replace SBT Groups. The gate reads
+  Groups themselves do not need this gate to replace Soulbound Tokens (SBTs) for Groups. The gate reads
   group IDs from `storageProfile.payloadAccessControl.groupId`/`groupIds`, or
   from payload metadata for per-payload group storage refs. Missing, deleted, or
   unreadable groups fail closed.
@@ -1436,7 +1436,7 @@ gas, or burn policy. A
 Worker/SBT or Worker/Lit hybrid keeps **Native Worker Groups** as its participant
 Group authority and labels the chain-dependent controls separately as
 **Advanced on-chain access**. Registry-canonical sessions retain the existing
-SBT Groups experience. Agent-enabled sessions use the session-worker JWT
+Soulbound Tokens (SBTs) for Groups experience. Agent-enabled sessions use the session-worker JWT
 returned by client login to call `/groups/list`, `/groups/my-memberships`,
 `/groups/members`, `/groups/join`, and `/groups/leave` directly. Session Wrapped exchanges that JWT in-process for a shorter member credential,
 rechecking the current canonical membership and source token on use. The Admin
@@ -1445,7 +1445,7 @@ management. It labels these controls **Native Worker Groups** for Worker-owned
 participant Groups. A default registry profile does not expose Worker group
 CRUD; when Agent Session Wrapped or its `agentHttp` surface is enabled, Admin
 instead labels the same Worker records **Worker/agent access groups** and states
-that they are separate from registry SBT Groups. These routes require the
+that they are separate from registry Soulbound Tokens (SBTs) for Groups. These routes require the
 explicit `groups` scope; successful registry-backed participant login grants
 that scope after the default session gate passes, and session configuration may
 still disable it explicitly. The legacy `arweave` compatibility scope applies
