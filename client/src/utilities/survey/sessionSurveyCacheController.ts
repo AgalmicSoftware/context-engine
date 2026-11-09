@@ -11,6 +11,7 @@ import {
   resolveSurveyResponseWatermark,
 } from './sessionSurveyResponseHelpers.js';
 import { isResponseRecencyNewer, toResponseRecencyPair } from './responseRecency.js';
+import { normalizeBlockLimitsForConfig } from '../session/blockLimits.js';
 import { sbtEventStreamsPort } from '../../domains/sbts/sbtEventStreamsPort.js';
 import type { SbtEventStreamsPort } from '../../domains/sbts/sbtPorts.js';
 import { readWorkerMetadataSessionConfig, type WorkerMetadataHydrationHost } from './workerCanonicalCacheHydration';
@@ -432,9 +433,9 @@ export const createSessionSurveyCacheController = (host: SessionSurveyCacheHost)
 
         const networkID = String(getSessionChainId(slug) || '');
 
-        const { fromBlock: baseFrom, toBlock: baseTo } = await surveyContractScripts.getRelevantBlockWindowForFilter(
-          getSessionBlockWindowRef(slug),
-        );
+        const blockWindowRef = getSessionBlockWindowRef(slug);
+        const { fromBlock: baseFrom, toBlock: baseTo } =
+          await surveyContractScripts.getRelevantBlockWindowForFilter(blockWindowRef);
         if (baseFrom > baseTo) {
           setSurveyState({ isSurveyCacheReady: true }, checkAllCachesReady);
           return;
@@ -449,6 +450,7 @@ export const createSessionSurveyCacheController = (host: SessionSurveyCacheHost)
         const touchedPendingSurveyMetadata = new Set<string>();
         const deletedPendingSurveyMetadata = new Set<string>();
         const touchedUserNodes = new Set<string>();
+        const resetSurveyResponses = new Set<string>();
         const responseDeltas = new Map<
           string,
           {
@@ -489,6 +491,10 @@ export const createSessionSurveyCacheController = (host: SessionSurveyCacheHost)
           deletedPendingSurveyMetadata.forEach((surveyId) => {
             delete targetNet.pendingSurveyMetadata[surveyId];
           });
+          resetSurveyResponses.forEach((surveyId) => {
+            targetNet.surveyResponses[surveyId] = {};
+            targetNet.surveyResponsesLatestBlock[surveyId] = initialLastBlockSurvey;
+          });
           responseDeltas.forEach((delta, surveyId) => {
             next = mergeSurveyResponseCacheSnapshot({
               currentCache: next,
@@ -514,6 +520,7 @@ export const createSessionSurveyCacheController = (host: SessionSurveyCacheHost)
           deletedSurveyMetadata.clear();
           touchedPendingSurveyMetadata.clear();
           deletedPendingSurveyMetadata.clear();
+          resetSurveyResponses.clear();
           responseDeltas.clear();
           surveysLatestBlockTouched = false;
         };
@@ -533,6 +540,17 @@ export const createSessionSurveyCacheController = (host: SessionSurveyCacheHost)
         ) {
           currentNetworkCache.surveyResponsesLatestBlock = {};
         }
+        // The response map keeps no block numbers, so a survey scanned past a lowered
+        // end block drops its answers and rescans its window. Only an explicit end
+        // counts, never the chain head.
+        const blockLimits = isCacheRecord(blockWindowRef) ? blockWindowRef.blockLimits : null;
+        const endBlock = normalizeBlockLimitsForConfig(blockLimits, baseFrom)?.end;
+        Object.entries(currentNetworkCache.surveyResponsesLatestBlock).forEach(([surveyId, watermark]) => {
+          if (endBlock == null || Number(watermark) <= endBlock) return;
+          currentNetworkCache.surveyResponses[surveyId] = {};
+          currentNetworkCache.surveyResponsesLatestBlock[surveyId] = initialLastBlockSurvey;
+          resetSurveyResponses.add(surveyId);
+        });
         if (
           typeof currentNetworkCache.pendingSurveyMetadata !== 'object' ||
           currentNetworkCache.pendingSurveyMetadata === null

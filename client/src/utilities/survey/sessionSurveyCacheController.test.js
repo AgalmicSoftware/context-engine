@@ -942,6 +942,54 @@ describe('createSessionSurveyCacheController', () => {
       });
     });
 
+    describe('survey answers counted past the block window', () => {
+      const early = { choice: 'early' };
+      const late = { choice: 'late' };
+      const createHostScannedTo20 = (blockLimits) =>
+        createMockHost({
+          getSessionCfg: jest.fn((slug) => ({ slug, networkChainId: 11155420, blockLimits })),
+          initialStorage: {
+            surveysCache: {
+              alpha: {
+                11155420: {
+                  surveysLatestBlock: 12,
+                  surveys: { surv1: { creationBlock: 5 } },
+                  surveyResponses: { surv1: { '0xearly': early, '0xlate': late } },
+                  surveyResponsesLatestBlock: { surv1: 20 },
+                  pendingSurveyMetadata: {},
+                },
+              },
+            },
+          },
+        });
+      beforeEach(() => {
+        contractScripts.getRelevantBlockWindowForFilter.mockResolvedValue({ fromBlock: 1, toBlock: 12 });
+        contractScripts.fetchAllSurveyResponses.mockResolvedValue([{ responder: '0xEARLY', response: early }]);
+      });
+
+      it('drops them after a lowered end block and rescans the window', async () => {
+        const host = createHostScannedTo20({ start: 1, end: 12 });
+
+        await createSessionSurveyCacheController(host).initializeSurveyCacheForGroup('alpha');
+
+        expect(contractScripts.fetchAllSurveyResponses).toHaveBeenCalledWith('none', 'surv1', 5, 12, 'alpha');
+        const stored = host.getStored('surveysCache', 'alpha')['11155420'];
+        expect(stored.surveyResponses.surv1).toEqual({ '0xearly': early });
+        expect(stored.surveyResponsesLatestBlock.surv1).toBe(12);
+      });
+
+      it('keeps them past the chain head without an end block', async () => {
+        const host = createHostScannedTo20({ start: 1, end: null });
+
+        await createSessionSurveyCacheController(host).initializeSurveyCacheForGroup('alpha');
+
+        expect(contractScripts.fetchAllSurveyResponses).not.toHaveBeenCalled();
+        const stored = host.getStored('surveysCache', 'alpha')['11155420'];
+        expect(stored.surveyResponses.surv1).toEqual({ '0xearly': early, '0xlate': late });
+        expect(stored.surveyResponsesLatestBlock.surv1).toBe(20);
+      });
+    });
+
     it('sets surveyCacheInitializationError when initialization work fails', async () => {
       const host = createMockHost();
       const controller = createSessionSurveyCacheController(host);
