@@ -1,7 +1,8 @@
 // Local fixtures only: the Session Worker's replies come from here, so nothing
 // reaches a real Worker and no atlas is built. Checks a built atlas, its Build
 // button, a running build's status and prompts, a category's and a topic's
-// compass, summary and question cards in each theme and width.
+// compass, summary and question cards, and the List and Tree views, in each
+// theme and width.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -65,6 +66,50 @@ const nextBuild = {
 const fixtureState = { active: null };
 const older = { ...build, id: 'atlas_mh0_0a1b2c3e', builtAt: '2026-11-08T13:00:00.000Z', counts: { responses: 30, participants: 8 } };
 const summary = ({ branches, ...rest }) => rest;
+// The light themes' tree connectors are graphics on the chart, so they need 3:1 against it.
+const LIGHT_THEMES = new Set(['civic', 'classic-95']);
+const connectorContrast = (chart) => {
+  const parse = (value) => value.match(/[\d.]+/g)?.map(Number) || [];
+  const luminance = ([r, g, b]) =>
+    [r, g, b]
+      .map((channel) => {
+        const value = channel / 255;
+        return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+      })
+      .reduce((sum, value, index) => sum + value * [0.2126, 0.7152, 0.0722][index], 0);
+  const surface = parse(getComputedStyle(chart).backgroundColor);
+  const lines = [
+    ...chart.querySelectorAll(
+      '[class*="orgChildrenContainer"], [class*="orgChildrenRow"], [class*="orgChildrenRow"] > [class*="orgNodeWrapper"]',
+    ),
+  ].map(
+    (element) => parse(getComputedStyle(element, '::before').backgroundColor),
+  );
+  return lines.map((line) => {
+    const alpha = line[3] ?? 1;
+    const mixed = line.slice(0, 3).map((channel, index) => channel * alpha + surface[index] * (1 - alpha));
+    const levels = [luminance(mixed), luminance(surface)].sort((a, b) => b - a);
+    return (levels[0] + 0.05) / (levels[1] + 0.05);
+  });
+};
+// A tree card's icons are graphics on the card, so they need 3:1 against it too.
+const iconContrast = (chart) => {
+  const parse = (value) => value.match(/[\d.]+/g)?.map(Number) || [];
+  const luminance = ([r, g, b]) =>
+    [r, g, b]
+      .map((channel) => {
+        const value = channel / 255;
+        return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+      })
+      .reduce((sum, value, index) => sum + value * [0.2126, 0.7152, 0.0722][index], 0);
+  return [...chart.querySelectorAll('[class*="orgCard"] svg')].map((icon) => {
+    const card = icon.closest('[class*="orgCard"]');
+    const levels = [luminance(parse(getComputedStyle(icon).color)), luminance(parse(getComputedStyle(card).backgroundColor))].sort(
+      (a, b) => b - a,
+    );
+    return (levels[0] + 0.05) / (levels[1] + 0.05);
+  });
+};
 const step = async (name, run) => {
   try {
     return await run();
@@ -134,7 +179,7 @@ async function inspectBuildButton(page) {
   await page.mouse.up();
 }
 
-export async function inspectDebateAtlas(page, { screenshotDir = '', tag = '' } = {}) {
+export async function inspectDebateAtlas(page, { screenshotDir = '', tag = '', theme = '' } = {}) {
   await page.getByTestId('ce-session-results-toggle').click();
   const nav = page.getByTestId('ce-session-results-view-nav');
   await inspectBuildButton(page);
@@ -244,6 +289,54 @@ export async function inspectDebateAtlas(page, { screenshotDir = '', tag = '' } 
   await step('category compass', () => categoryPanel.getByText('Participant', { exact: true }).waitFor({ timeout: 15000 }));
   await step('category panel', () => assertReadable(categoryPanel));
   if (screenshotDir) await categoryPanel.screenshot({ path: `${screenshotDir}/debate-atlas-category-${tag}.png` });
+  await categoryPanel.getByTitle('Close').click();
+
+  // The List keeps each level's colour and the Tree its connectors, in every theme.
+  await atlas.locator('[data-testid="ce-debate-view-mode"][data-ce-view-mode="list"]').click();
+  await step('list view', async () => {
+    await atlas.getByRole('button', { name: 'Bus lanes', exact: true }).waitFor();
+    await assertReadable(atlas);
+    // Each level's chip has its own colour, as the legend says, not the plain surface.
+    const plain = await atlas.evaluate((element) => {
+      const probe = element.appendChild(document.createElement('span'));
+      probe.style.background = 'var(--ce-document-surface)';
+      const colour = getComputedStyle(probe).backgroundColor;
+      probe.remove();
+      return colour;
+    });
+    const [category, topicChip] = await Promise.all(
+      ['Transport', 'Bus lanes'].map((name) =>
+        atlas
+          .getByRole('button', { name, exact: true })
+          .last()
+          .evaluate((chip) => getComputedStyle(chip).backgroundColor),
+      ),
+    );
+    assert.notEqual(category, topicChip, `List levels share one colour, ${category}`);
+    assert(![category, topicChip].includes(plain), `A List level has no colour of its own: ${category}, ${topicChip}`);
+  });
+  if (screenshotDir) await atlas.screenshot({ path: `${screenshotDir}/debate-atlas-list-${tag}.png` });
+  await atlas.locator('[data-testid="ce-debate-view-mode"][data-ce-view-mode="tree"]').click();
+  await step('tree categories', () => assertReadable(atlas));
+  await atlas.getByRole('button', { name: 'Transport', exact: true }).first().click();
+  await step('tree chart', async () => {
+    await atlas.getByText('Bike parking').first().waitFor();
+    await assertReadable(atlas);
+  });
+  if (LIGHT_THEMES.has(theme)) {
+    const chart = atlas.locator('[class*="orgChartContainer"]').first();
+    await step('tree connectors', async () => {
+      const ratios = await chart.evaluate(connectorContrast);
+      assert(ratios.length > 0, 'The tree draws no connectors');
+      assert(Math.min(...ratios) >= 3, `Tree connector contrast ${ratios.map((ratio) => ratio.toFixed(2)).join(', ')}`);
+    });
+    await step('tree card icons', async () => {
+      const ratios = await chart.evaluate(iconContrast);
+      assert(ratios.length > 0, 'The tree cards draw no icons');
+      assert(Math.min(...ratios) >= 3, `Tree card icon contrast ${ratios.map((ratio) => ratio.toFixed(2)).join(', ')}`);
+    });
+  }
+  if (screenshotDir) await atlas.screenshot({ path: `${screenshotDir}/debate-atlas-tree-${tag}.png` });
 }
 
 // A running build shows its time, model and, on request, its prompts.
@@ -299,7 +392,7 @@ export async function runDebateAtlasThemeSmoke() {
           await page.goto(`${base}/session/demo-sh`, { waitUntil: 'domcontentloaded' });
           await page.waitForFunction((value) => document.documentElement.dataset.ceTheme === value, theme);
           fixtureState.active = null;
-          await inspectDebateAtlas(page, { screenshotDir, tag: `${theme}-${width}` });
+          await inspectDebateAtlas(page, { screenshotDir, tag: `${theme}-${width}`, theme });
           fixtureState.active = { startedAtMs: Date.now() - 42_000 };
           await page.reload({ waitUntil: 'domcontentloaded' });
           await inspectBuildStatus(page, { screenshotDir, tag: `${theme}-${width}` });

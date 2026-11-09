@@ -2920,39 +2920,6 @@ $glass-shadow: 0 8px 32px 0 color-mix(in srgb, var(--ce-compat-dark) 37%, transp
       text-shadow: none;
     }
 
-    .emptyState {
-      opacity: 1;
-      color: var(--ce-document-text-muted);
-    }
-
-    .categorySelector .categoryButton,
-    .categorySelector .categoryButton:hover {
-      color: var(--ce-control-text);
-      background: var(--ce-control-face);
-    }
-
-    .categorySelector .categoryButton.active {
-      color: var(--ce-selection-text);
-      background: var(--ce-selection-bg);
-      box-shadow: none;
-    }
-
-    .orgChartContainer {
-      background: var(--ce-document-surface);
-    }
-
-    .orgCard,
-    .orgCard:hover,
-    .orgCard.collapsed {
-      background: var(--ce-surface);
-      opacity: 1;
-
-      .cardHeader .nodeTitle,
-      .collapseBtn {
-        color: var(--ce-document-text);
-      }
-    }
-
     .flatNodeContainer .pathContainer .pathButton.pathButton {
       color: var(--ce-document-text);
       background: var(--ce-document-surface);
@@ -3198,5 +3165,95 @@ $glass-shadow: 0 8px 32px 0 color-mix(in srgb, var(--ce-compat-dark) 37%, transp
     box-shadow: var(--ce-shadow-raised);
     color: var(--ce-control-text);
     font-weight: 400;
+  }
+}
+
+// On the light document surface each level's chip keeps its colour as a tint
+// behind dark text, and the tree's chart, cards and connectors and the list's
+// muted text take the document's own colours: the base draws them for the dark panel.
+@container ce-theme style(--ce-layout-profile: minimal-app) or style(--ce-layout-profile: desktop-window) {
+  .debateMap {
+    .flatNodeContainer .pathContainer .pathButton.pathButton {
+      color: var(--ce-document-text);
+
+      &.depth0 {
+        background: color-mix(in srgb, var(--ce-status-info) 14%, var(--ce-document-surface));
+        border-color: var(--ce-status-info);
+      }
+
+      &.depth1 {
+        background: color-mix(in srgb, var(--ce-data-series-8) 18%, var(--ce-document-surface));
+        border-color: var(--ce-data-series-8);
+      }
+
+      &.depth2 {
+        background: color-mix(in srgb, var(--ce-status-success-text) 14%, var(--ce-document-surface));
+        border-color: var(--ce-status-success-text);
+      }
+
+      &.depth3 {
+        background: color-mix(in srgb, var(--ce-status-warning) 18%, var(--ce-document-surface));
+        border-color: var(--ce-status-warning-text);
+      }
+    }
+
+    .flatNodeContainer .pathContainer .pathSeparator,
+    .flatNodeContainer .metaInfo,
+    .flatNodeContainer .metaInfo .expandIcon,
+    .controls .secondaryControls .filterGroup .filterLabel {
+      color: var(--ce-document-text-muted);
+      opacity: 1;
+    }
+
+    .emptyState {
+      opacity: 1;
+      color: var(--ce-document-text-muted);
+    }
+
+    .categorySelector .categoryButton,
+    .categorySelector .categoryButton:hover {
+      color: var(--ce-control-text);
+      background: var(--ce-control-face);
+    }
+
+    .categorySelector .categoryButton.active {
+      color: var(--ce-selection-text);
+      background: var(--ce-selection-bg);
+      box-shadow: none;
+    }
+
+    .orgChartContainer {
+      background: var(--ce-document-surface);
+    }
+
+    .orgCard,
+    .orgCard:hover,
+    .orgCard.collapsed {
+      background: var(--ce-surface);
+      opacity: 1;
+
+      .cardHeader .nodeTitle,
+      .collapseBtn {
+        color: var(--ce-document-text);
+      }
+    }
+
+    // A card's counts and icons, light on the dark panel, take the document's muted text.
+    .orgCard .cardStats,
+    .orgCard .cardStats svg,
+    .orgCard .cardStats .bookmark:hover {
+      color: var(--ce-document-text-muted);
+    }
+
+    .orgCard .cardStats .bookmark.bookmarked {
+      color: var(--ce-status-warning-text);
+      filter: none;
+    }
+
+    .orgChildrenContainer::before,
+    .orgChildrenRow::before,
+    .orgChildrenRow > .orgNodeWrapper::before {
+      background: var(--ce-document-border-strong);
+    }
   }
 }

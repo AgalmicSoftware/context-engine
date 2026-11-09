@@ -19,6 +19,7 @@ All notable changes to this project will be documented in this file.
 - Hovering a participant on a compass shows their address, which was drawn dark on the dark tooltip. Selecting them shows it underlined, as the link to their profile it is. Participants the AI placed on one spot now sit on half rings below it, and no two avatars or a position's dot overlap, at the chart's edges too.
 - A topic's questions look like the session's question cards, and each opens its own page in a new tab, where it can be answered. Question cards in other Debate Map panels take the same Agree, Unsure and Disagree colours, and a freeform question's preview is readable in Context Engine.
 - The picker of a session's earlier atlases is called **Version**, and a built atlas calls its levels Category and Topic in its legend, panels and List filter.
+- In Civic and Classic 95 the Debate Map's List colours each level and its Tree draws its connecting lines. Classic 95's Tree category buttons, cards and card icons are readable.
 - The Debate Map's tree view asks for a category to draw the **Tree Chart**, as its button is named.
 - Question Results shows a spinner in place of its question and response counts, and each question's count, until they load, instead of 0.
 - The status line under Results, shown while AI Views or an atlas builds, is readable in Civic, where it measured 3.35:1.
