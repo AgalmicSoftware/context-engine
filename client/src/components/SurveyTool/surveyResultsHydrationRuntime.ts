@@ -1,6 +1,7 @@
 import { isDemoSessionSlug } from '../../utilities/session/demoSessionSlugs.js';
 import { normalizeSessionSlug } from '../../utilities/session/sessionNaming.js';
 import { isResponseAllowedForSessionSlug } from '../../utilities/session/responseSessionScope.js';
+import { getWorkerCanonicalCacheReader } from '../../utilities/survey/workerCanonicalCacheReader';
 import { readSurveyResultsLatestBlock, normalizeSurveyResultsBlockNumber } from './surveyResultsBlockNumbers.js';
 import {
   buildSurveyResultsEmptySurveyModePatch,
@@ -190,7 +191,21 @@ export const fetchSurveyResultsSurveyModeResponses = async ({
     [...hiddenQuestionIds].sort().join(','),
   ].join('::');
   const respondersSignature = buildSurveyRespondersSignature(srMap);
-  const sourceSignature = [coarseSourceSignature, respondersSignature].join('::');
+
+  let foundTitle = '';
+  let foundDocURLs: string[] = [];
+  if (surveyNetCache?.surveys?.[currentSurveyID]) {
+    // Uploaded metadata is untrusted; non-string values would break the header render.
+    const { documentURLs, title } = surveyNetCache.surveys[currentSurveyID];
+    foundTitle = typeof title === 'string' ? title : '';
+    foundDocURLs = Array.isArray(documentURLs)
+      ? documentURLs.filter((url): url is string => typeof url === 'string' && url.trim() !== '')
+      : [];
+  }
+  // An account change relocks decrypted titles and links in storage, maybe after this view re-read the cache
+  // for the new reader, so the reader and the text shown are both part of what must match.
+  const metadataSignature = JSON.stringify([getWorkerCanonicalCacheReader(), foundTitle, foundDocURLs]);
+  const sourceSignature = [coarseSourceSignature, respondersSignature, metadataSignature].join('::');
   if (instance._surveyModeSourceSignature === sourceSignature) {
     instance._surveyModeSourceCoarseSignature = coarseSourceSignature;
     instance._surveyModeSourcePayloadRefSignature = payloadRefSignature;
@@ -238,17 +253,6 @@ export const fetchSurveyResultsSurveyModeResponses = async ({
   const totalRespondersCount = rawResponses.length;
   const finalAggregator = unifyAggregatorWithAllQuestionIDs(aggregatorMap, questionIDsInSurvey);
   const totalQCount = Object.keys(finalAggregator).length;
-
-  let foundTitle = '';
-  let foundDocURLs: string[] = [];
-  if (surveyNetCache?.surveys?.[currentSurveyID]) {
-    // Uploaded metadata is untrusted; non-string values would break the header render.
-    const { documentURLs, title } = surveyNetCache.surveys[currentSurveyID];
-    foundTitle = typeof title === 'string' ? title : '';
-    foundDocURLs = Array.isArray(documentURLs)
-      ? documentURLs.filter((url): url is string => typeof url === 'string' && url.trim() !== '')
-      : [];
-  }
 
   ports.applyStatePatch(
     buildSurveyResultsSurveyModeHydratedPatch({

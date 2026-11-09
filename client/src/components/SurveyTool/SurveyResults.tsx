@@ -663,6 +663,8 @@ const SurveyResults = (props: SurveyResultsProps): React.ReactElement => {
   const handleManagedCacheUpdate = (update: SurveyResultsManagedCacheUpdate = {}): void => {
     if (!update || update.namespace !== 'surveysCache') return;
     inst._surveysCacheChangeNonce += 1;
+    // A survey's title and links change with no new answers, as when an account change relocks them.
+    if (stateRef.current.viewMode === 'survey') queueResultsRefresh('surveys-cache-update');
   };
 
   function getEffectiveSlug(): string {
