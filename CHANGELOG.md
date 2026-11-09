@@ -145,6 +145,7 @@ All notable changes to this project will be documented in this file.
 - Adding a template's questions to a session removes only what was uploaded. A question edited or added while the upload ran stays in the draft.
 - A rating with the same wording but a different scale, step or end labels is no longer reported as already published when another author owns its ID. The upload is refused instead, because the two still share an ID.
 - Results no longer keeps showing the previous account's survey title, links and answers after you sign out or switch accounts.
+- Question and survey text decrypted for one account shows as locked to anyone else using the same browser, including after a reload while signed out. Signing out or switching accounts also clears that text from the browser's saved copy, and signing back in decrypts it again.
 - If the wallet switches accounts during an answer or survey upload, the transaction isn't sent from the other account; the app asks you to switch back and try again.
 - When a sent transaction's result can't be read, the app says it was sent but not confirmed, and to check your wallet before retrying, instead of reporting a failure or a revert. Creating an SBT group no longer suggests a retry that could deploy a second one.
 - Lowering a session's end block removes later answers from Question and Survey Results, showing a person's earlier answer within the range instead. Raising it again brings the later answers back.
