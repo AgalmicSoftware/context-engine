@@ -810,17 +810,12 @@ describe('targeted registry refresh when the metadata cannot load', () => {
     expectLastUsableCopy(await load(f));
   });
 
-  it('reports a plain document that cannot load as a listing error, but not keyless encrypted metadata', async () => {
-    const f = await fixture({ keepDocument: true });
-    const outage = await listOutage();
-    expect(outage.__loadMeta.hadLoadErrors).toBe(true);
-    expect(sessionRegistryStore.readCache().__hadLoadErrors).toBe(true);
-    f.record.metadataURI = '';
-    f.record.encryptedMetadataURI = `ar://${'E'.repeat(43)}`;
-    arweaveClient.downloadDataFromArweave.mockResolvedValue(JSON.stringify({ ciphertext: 'synthetic' }));
-    const keyless = await listOutage();
-    expect(keyless.__loadMeta.hadLoadErrors).toBe(false);
-    expectLastUsableCopy(keyless.sessions.outage);
+  it('reports an unreadable document on its row, not as a listing error', async () => {
+    await fixture({ keepDocument: true });
+    const listing = await listOutage();
+    expect(listing.__loadMeta.hadLoadErrors).toBe(false);
+    expect(sessionRegistryStore.readCache().__hadLoadErrors).toBe(false);
+    expectLastUsableCopy(listing.sessions.outage);
   });
 });
 
@@ -2204,6 +2199,27 @@ describe('registry listing pages', () => {
     contract.getSessionSlugByIndex.mockClear();
     await load({ pageSize: 2, loadOlder: true });
     expect(contract.getSessionSlugByIndex).not.toHaveBeenCalled();
+  });
+
+  it('moves past a row whose metadata document never loads', async () => {
+    contract.getSessionCount.mockResolvedValue(5);
+    contract.getSessionBySlug.mockImplementation(async (slug) => [
+      slug,
+      CONFIGURED_REGISTRY_CHAIN_ID,
+      slug === 'fixture-2' ? 'not-a-metadata-uri' : '',
+      '',
+      TEST_SIGNER_ADDRESS,
+      1,
+      2,
+      '0x00000000000000000000000000000055',
+    ]);
+    await load({ pageSize: 2 });
+    const older = await load({ pageSize: 2, loadOlder: true });
+    expect(older.__loadMeta.hadLoadErrors).toBe(false);
+    expect(older.sessions['fixture-2'].__registry.metadataLoadState).toBe('unavailable');
+    contract.getSessionSlugByIndex.mockClear();
+    await load({ pageSize: 2, loadOlder: true });
+    expect(contract.getSessionSlugByIndex.mock.calls.map(([index]) => index)).toEqual([0]);
   });
 
   it('keeps direct slug lookups direct and preserves the listing cursor', async () => {

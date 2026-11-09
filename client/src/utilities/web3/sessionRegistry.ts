@@ -1283,7 +1283,11 @@ const buildSessionConfigFromRegistry = ({
 // cached entry, the copy an earlier failed load kept or, for an entry saved
 // without either, the entry itself when it was built from its loaded document.
 const lastUsableRegistryMetadata = (cachedConfig: Record<string, unknown> | null) => {
-  const registryMeta = (cachedConfig?.__registry || {}) as AnyRecord;
+  const registryMeta = (cachedConfig?.__registry || {}) as {
+    metadata?: unknown;
+    lastUsableMetadata?: unknown;
+    metadataLoadState?: unknown;
+  };
   const kept = registryMeta.metadata || registryMeta.lastUsableMetadata;
   if (kept && typeof kept === 'object') return kept;
   if (!cachedConfig || registryMeta.metadataLoadState !== 'loaded') return null;
@@ -1296,7 +1300,10 @@ const lastUsableRegistryMetadata = (cachedConfig: Record<string, unknown> | null
 // last usable copy rather than rebuilding the session from nothing. The copy
 // isn't kept as the record's document, so the next load fetches that again,
 // but it is kept beside it so a second failure still has it.
-const buildSessionConfigKeepingLastUsableMetadata = ({ previousConfig, ...args }: AnyRecord) => {
+const buildSessionConfigKeepingLastUsableMetadata = ({
+  previousConfig,
+  ...args
+}: Parameters<typeof buildSessionConfigFromRegistry>[0] & { previousConfig: Record<string, unknown> | null }) => {
   const { session, metadata } = args;
   const hasMetadataUri = !!(session.metadataURI || session.encryptedMetadataURI);
   const fallback = !metadata && hasMetadataUri ? lastUsableRegistryMetadata(previousConfig) : null;
@@ -1775,9 +1782,10 @@ export const loadSessionRegistryCache = async (
           fieldsByKey,
           registryChainId: chainId,
         });
-        // A plain document that failed to load is a load error. Encrypted metadata
-        // also reads as missing for anyone without its key, so it is not one.
-        return { config, hadLoadErrors: !metadata && !!session.metadataURI };
+        // A metadata document that fails to load is not a listing error: anyone can
+        // register a URI that never loads, and retrying its page would never end.
+        // The row's metadataLoadState reports it instead.
+        return { config, hadLoadErrors: false };
       },
     );
 
