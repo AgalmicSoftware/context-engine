@@ -84,7 +84,8 @@ Similarity between a prediction and an answer runs from 0 to 1:
   three others are in it. The most common answer is the mode for choices, the
   median for ratings, options most people picked for multiple choice, and mean
   votes for quadratic. Lift is the Mirror Score minus the baseline on the same
-  predictions.
+  predictions. A prediction no one else's answer can check has no baseline, so
+  the AI's score shown beside a baseline leaves it out too.
 - **Unusual views:** each person's typicality is the mean similarity of their
   answers to every other person's answers on the same questions. The report
   splits people into thirds by typicality and gives the AI's score, the

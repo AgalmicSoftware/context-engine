@@ -352,6 +352,35 @@ test('an agent that knows each person beats the majority guess, most for unusual
   assert.ok(!JSON.stringify(report).includes(people[0].id), 'addresses stay out of the report');
 });
 
+test('the AI and baseline columns score the same predictions as lift', () => {
+  // Each person also answered a question no one else did: it has no baseline,
+  // so the AI's misses there must not lower the AI column beside the baseline.
+  const own = people.map((_person, index) => ({ id: `own${index}`, type: 'binary', prompt: `Own ${index}` }));
+  const answers = [
+    ...answersFor(),
+    ...people.map((person, index) => ({ participantId: person.id, questionId: own[index].id, value: person.view, at: 1 })),
+  ];
+  const misses = people.map((person, index) => ({
+    ...pairsFor((each) => each.view).find((pair) => pair.participantId === person.id),
+    questionId: own[index].id,
+    prediction: person.view === 'Agree' ? 'Disagree' : 'Agree',
+  }));
+  const report = scoreAgentFidelity({
+    questions: [...questions, ...own],
+    pairs: [...pairsFor((person) => person.view), ...misses],
+    answers,
+    options: fast,
+  });
+  assert.ok(Math.abs(report.mirrorScore.overall.value - 0.8) < 1e-12, 'the overall score still counts every prediction');
+  const { population } = report.baselines;
+  assert.equal(population.agent.value, 1);
+  assert.equal(population.baseline.value, 0.6);
+  assert.ok(Math.abs(population.agent.value - population.baseline.value - population.lift.value) < 1e-12);
+  const reported = report.unusualViews.terciles.filter((tercile) => !tercile.suppressed);
+  assert.ok(reported.length >= 2);
+  for (const tercile of reported) assert.ok(Math.abs(tercile.agent - tercile.baseline - tercile.lift) < 1e-12, tercile.tercile);
+});
+
 test("kappa corrects agreement for chance, and rating error is a share of the scale", () => {
   // Knowing each person: every prediction right, well beyond the 0.52 that the
   // 60/40 answer split gives by chance.

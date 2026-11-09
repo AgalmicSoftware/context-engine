@@ -944,14 +944,21 @@ export const scoreAgentFidelity = ({ questions = [], pairs = [], answers = [], g
   // Unusual views: how similar each person's own answers are to everyone
   // else's, across every question they answered.
   const typicality = typicalityByParticipant(questionMap, answersByQuestion);
+  // A baseline exists only where someone else answered, so the AI's score
+  // beside it is taken on those same predictions: AI minus baseline is lift.
+  const comparableTo = (personPairs, key) => personPairs.filter((pair) => finite(pair[key]));
+  const agentOn = (personPairs, key) => {
+    const comparable = comparableTo(personPairs, key);
+    return comparable.length ? meanSimilarity(comparable) : null;
+  };
   const lift = (personPairs, key) => {
-    const comparable = personPairs.filter((pair) => pair[key] !== null);
+    const comparable = comparableTo(personPairs, key);
     return comparable.length ? meanSimilarity(comparable) - mean(comparable.map((pair) => pair[key])) : null;
   };
   const points = people
     .map((person) => ({
       typicality: typicality.get(person.participantId) ?? null,
-      agent: meanSimilarity(person.pairs),
+      agent: agentOn(person.pairs, 'populationSimilarity'),
       baseline: mean(person.pairs.map((pair) => pair.populationSimilarity).filter(finite)),
       lift: lift(person.pairs, 'populationSimilarity'),
     }))
@@ -1029,15 +1036,12 @@ export const scoreAgentFidelity = ({ questions = [], pairs = [], answers = [], g
     },
     baselines: {
       population: {
-        agent: perPerson(meanSimilarity),
+        agent: perPerson((personPairs) => agentOn(personPairs, 'populationSimilarity')),
         baseline: perPerson((personPairs) => mean(personPairs.map((pair) => pair.populationSimilarity).filter(finite))),
         lift: perPerson((personPairs) => lift(personPairs, 'populationSimilarity')),
       },
       group: {
-        agent: perPerson((personPairs) => {
-          const comparable = personPairs.filter((pair) => pair.groupSimilarity !== null);
-          return comparable.length ? meanSimilarity(comparable) : null;
-        }),
+        agent: perPerson((personPairs) => agentOn(personPairs, 'groupSimilarity')),
         baseline: perPerson((personPairs) => mean(personPairs.map((pair) => pair.groupSimilarity).filter(finite))),
         lift: perPerson((personPairs) => lift(personPairs, 'groupSimilarity')),
       },
