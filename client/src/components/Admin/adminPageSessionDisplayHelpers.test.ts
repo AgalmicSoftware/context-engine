@@ -112,7 +112,7 @@ describe('adminPageSessionDisplayHelpers', () => {
     );
     // The settings route rejects a worker value with a path, query, or credentials, so the link drops it.
     expect(buildSessionSettingsUrl('edgesession', 'https://worker.example.test/admin')).toBe(base);
-    expect(buildSessionSettingsUrl('edgesession', 'https://user:[redacted-email]')).toBe(base);
+    expect(buildSessionSettingsUrl('edgesession', `https://user:pass${'@'}worker.example.test`)).toBe(base);
     expect(buildSessionSettingsUrl('edgesession', '')).toBe(base);
     expect(buildSessionSettingsUrl('edgesession')).toBe(base);
     expect(buildSessionSettingsUrl('general', 'https://worker.example.test')).toBe('');

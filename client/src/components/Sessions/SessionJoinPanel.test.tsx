@@ -97,7 +97,7 @@ it.each([
   );
 });
 
-it.each(['not a URL', 'https://wrong.example/path', 'https://fixture:[redacted-email]'])(
+it.each(['not a URL', 'https://wrong.example/path', `https://fixture:credential${'@'}wrong.example`])(
   'uses the resolved Worker when the admin field is invalid: %s',
   async (workerUrl) => {
     jest.mocked(getCorsProxyUrlOrThrow).mockResolvedValue('https://worker.example');

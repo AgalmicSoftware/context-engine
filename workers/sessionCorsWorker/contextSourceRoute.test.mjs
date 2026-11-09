@@ -208,7 +208,7 @@ test('a link is fetched by the Worker under the strict policy and stored with it
   assert.equal(tagOf(item, 'CE-ContextUrl'), 'https://example.org/essay');
   assert.equal(item.metadata.adminsOnly, true);
 
-  for (const url of ['http://example.org/essay', 'https://127.0.0.1/admin', 'https://user:[redacted-email]/', 'https://intranet/']) {
+  for (const url of ['http://example.org/essay', 'https://127.0.0.1/admin', `https://user:pw${'@'}example.org/`, 'https://intranet/']) {
     const refused = await h.context({ action: 'add-link', url });
     assert.ok([400, 422].includes(refused.status), `${url}: ${refused.status}`);
   }

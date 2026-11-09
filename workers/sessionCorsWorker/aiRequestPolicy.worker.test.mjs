@@ -98,7 +98,7 @@ for (const authenticated of [false, true]) test(`real ${authenticated ? 'authent
   }
 });
 
-for (const target of ['http://redirect.example.test/chat', 'https://user:[redacted-email]/chat', 'https://127.0.0.1/chat']) {
+for (const target of ['http://redirect.example.test/chat', `https://user:password${'@'}redirect.example.test/chat`, 'https://127.0.0.1/chat']) {
   test(`authenticated custom AI never sends its prompt to an unsafe redirect: ${target}`, async () => {
     const f = await fixture({ outbound: async () => new Response(null, { status: 307, headers: { location: target } }) });
     const response = await f.request('/ai', { provider: 'custom', rpcUrl: 'https://provider.example.test/chat',
