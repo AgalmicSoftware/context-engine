@@ -8,6 +8,7 @@ import {
   ensureQuestionArweaveCacheBranches,
   mergeQuestionArweaveCacheBranches,
 } from '../arweave/arweaveRetryHelpers.js';
+import { normalizeBlockLimitsForConfig } from '../session/blockLimits.js';
 import { DEFAULT_SESSION_SCAN_MAX_BLOCK_RANGE, readSessionScanMaxBlockRange } from '../session/sessionScanScope.js';
 import { resolvePersistedQuestionResponsesWatermark } from './questionResponsesWatermark.js';
 import { shouldFlushCoalescedRun } from '../session/mainSiteProgressHelpers.js';
@@ -501,6 +502,46 @@ const ensureUserDataRecord = (value: unknown): UserDataRecord => {
   return data;
 };
 
+// Drops answers recorded after an explicit end block and pulls the watermark back
+// to it, so raising the end again rescans them. Rows with no known block stay.
+const pruneQuestionResponsesAfterBlock = (net: unknown, endBlock: number): boolean => {
+  if (!isRecord(net)) return false;
+  const responses = toRecord(net.questionResponses);
+  const meta = toRecord(net.questionResponsesMeta);
+  let changed = false;
+  new Set([...Object.keys(responses), ...Object.keys(meta)]).forEach((qid) => {
+    const byResponder = toRecord(responses[qid]);
+    const metaByResponder = toRecord(meta[qid]);
+    new Set([...Object.keys(byResponder), ...Object.keys(metaByResponder)]).forEach((responder) => {
+      if (toResponseRecencyPair(metaByResponder[responder], byResponder[responder]).bn <= endBlock) return;
+      delete byResponder[responder];
+      delete metaByResponder[responder];
+      changed = true;
+    });
+    // As after a scan of the new window, a question with no answers has no entry.
+    if (!Object.keys(byResponder).length) delete responses[qid];
+    if (!Object.keys(metaByResponder).length) delete meta[qid];
+  });
+  if (Number(net.questionResponsesLatestBlock) > endBlock) {
+    net.questionResponsesLatestBlock = endBlock;
+    changed = true;
+  }
+  return changed;
+};
+
+const pruneUserQuestionResponsesAfterBlock = (cache: unknown, networkID: string, endBlock: number): boolean => {
+  let changed = false;
+  Object.values(toRecord(cache)).forEach((byNetwork) => {
+    const data = toRecord(toRecord(toRecord(byNetwork)[networkID]).data);
+    if (!Array.isArray(data.questionResponses)) return;
+    const kept = data.questionResponses.filter((row) => toResponseRecencyPair(row).bn <= endBlock);
+    if (kept.length === data.questionResponses.length) return;
+    data.questionResponses = kept;
+    changed = true;
+  });
+  return changed;
+};
+
 export const createSessionResponseHydrationController = (
   host: SessionResponseHydrationHost,
 ): SessionResponseHydrationControllerRuntime => {
@@ -539,6 +580,25 @@ export const createSessionResponseHydrationController = (
   };
   const getSessionChainId = (slug: string): string | number | null | undefined =>
     typeof host.getSessionChainId === 'function' ? host.getSessionChainId(slug) : null;
+  const pruneCachedResponsesAfterBlock = async (slug: string, networkID: string, endBlock: number): Promise<void> => {
+    // dgRead returns copies: pruning one first leaves an unchanged cache unwritten.
+    if (pruneQuestionResponsesAfterBlock(toRecord(dgRead('questionsCache', slug))[networkID], endBlock)) {
+      const persisted = await host.updateQuestionsCacheAtomic(slug, (current) => {
+        const next = current || {};
+        pruneQuestionResponsesAfterBlock(next[networkID], endBlock);
+        return next;
+      });
+      if (!persisted) throw new ResponseCachePersistenceError(`Failed to persist questions cache for ${slug}`);
+    }
+    if (pruneUserQuestionResponsesAfterBlock(dgRead('userCache', slug), networkID, endBlock)) {
+      const persisted = await host.updateUserCacheAtomic(slug, (current) => {
+        const next = current || {};
+        pruneUserQuestionResponsesAfterBlock(next, networkID, endBlock);
+        return next;
+      });
+      if (!persisted) throw new ResponseCachePersistenceError(`Failed to persist user cache for ${slug}`);
+    }
+  };
   const getAccount = (): string | null | undefined => (typeof host.getAccount === 'function' ? host.getAccount() : '');
   const getProviderLike = (): unknown => {
     if (typeof host.getProviderLike === 'function') return host.getProviderLike();
@@ -768,6 +828,10 @@ export const createSessionResponseHydrationController = (
         return;
       }
       const initialLastBlockQR = Math.max(0, baseFrom - 1);
+      // Merges only add, so answers cached under a later end block would stay in
+      // Results once it is lowered. Only an explicit end prunes, never the chain head.
+      const endBlock = normalizeBlockLimitsForConfig(sessionConfig?.blockLimits, baseFrom)?.end;
+      if (endBlock != null) await pruneCachedResponsesAfterBlock(slug, networkID, endBlock);
 
       let questionsCache = (dgRead('questionsCache', slug) || {}) as QuestionCache;
       // Migration: numeric -> string key

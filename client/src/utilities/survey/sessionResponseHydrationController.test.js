@@ -933,6 +933,119 @@ describe('createSessionResponseHydrationController', () => {
       });
     });
 
+    describe('answers cached past the block window', () => {
+      const LATE_RESPONDER = `0x${'c'.repeat(40)}`;
+      const UNDATED_RESPONDER = `0x${'d'.repeat(40)}`;
+      const late = { bn: 15, txi: 0, li: 0, ts: 2 };
+      const userBucket = (questionResponses) => ({
+        [NETWORK_ID]: {
+          lastBlockScanned: 15,
+          lastScanTimestamp: 1,
+          data: { sbts: [], createdSurveys: [], createdQuestions: [], surveyResponses: [], questionResponses },
+        },
+      });
+      const sessionConfigWith = (blockLimits) => (slug) => ({ slug, networkChainId: NETWORK_ID, blockLimits });
+      const createHostWithLateAnswers = (blockLimits) =>
+        createMockHost({
+          getSessionCfg: jest.fn(sessionConfigWith(blockLimits)),
+          initialStorage: {
+            questionsCache: {
+              [SESSION_SLUG]: {
+                [NETWORK_ID]: createQuestionCacheNetworkNode({
+                  questionResponsesLatestBlock: 20,
+                  questionResponses: {
+                    [QUESTION_ID_A]: {
+                      [RESPONDER_LOWER]: 'in',
+                      [LATE_RESPONDER]: 'late',
+                      [UNDATED_RESPONDER]: 'undated',
+                    },
+                    [QUESTION_ID_B]: { [LATE_RESPONDER]: 'late' },
+                  },
+                  questionResponsesMeta: {
+                    [QUESTION_ID_A]: { [RESPONDER_LOWER]: { bn: 11, txi: 0, li: 0, ts: 1 }, [LATE_RESPONDER]: late },
+                    [QUESTION_ID_B]: { [LATE_RESPONDER]: late },
+                  },
+                }),
+              },
+            },
+            userCache: {
+              [SESSION_SLUG]: {
+                [RESPONDER_LOWER]: userBucket([{ questionId: QUESTION_ID_A, response: 'in', blockNumber: 11 }]),
+                [LATE_RESPONDER]: userBucket([
+                  { questionId: QUESTION_ID_A, response: 'late', blockNumber: 15 },
+                  { questionId: QUESTION_ID_B, response: 'late', blockNumber: 15 },
+                ]),
+                [UNDATED_RESPONDER]: userBucket([{ questionId: QUESTION_ID_A, response: 'undated' }]),
+              },
+            },
+          },
+        });
+      const respondersByQuestion = (map) =>
+        Object.fromEntries(Object.entries(map).map(([qid, byResponder]) => [qid, Object.keys(byResponder).sort()]));
+      const storedAnswers = (host) => {
+        const net = host.getStored('questionsCache', SESSION_SLUG)[NETWORK_ID];
+        const users = host.getStored('userCache', SESSION_SLUG);
+        return {
+          responders: respondersByQuestion(net.questionResponses),
+          metaResponders: respondersByQuestion(net.questionResponsesMeta),
+          watermark: net.questionResponsesLatestBlock,
+          userRowCounts: Object.fromEntries(
+            Object.entries(users).map(([address, byNetwork]) => [
+              address,
+              byNetwork[NETWORK_ID].data.questionResponses.length,
+            ]),
+          ),
+        };
+      };
+
+      it('drops answers after a lowered end block and rewinds the watermark to it', async () => {
+        const host = createHostWithLateAnswers({ start: 10, end: 12 });
+        const controller = createSessionResponseHydrationController(host);
+
+        await controller.fetchQuestionResponsesChunkedForGroup(SESSION_SLUG);
+
+        expect(storedAnswers(host)).toEqual({
+          responders: { [QUESTION_ID_A]: [RESPONDER_LOWER, UNDATED_RESPONDER].sort() },
+          metaResponders: { [QUESTION_ID_A]: [RESPONDER_LOWER] },
+          watermark: 12,
+          userRowCounts: { [RESPONDER_LOWER]: 1, [LATE_RESPONDER]: 0, [UNDATED_RESPONDER]: 1 },
+        });
+        expect(host.getStateSnapshot()).toMatchObject({ isResponsesCacheReady: true, questionResponsesNonce: 1 });
+
+        host.getSessionCfg.mockImplementation(sessionConfigWith({ start: 10, end: 20 }));
+        contractScripts.getRelevantBlockWindowForFilter.mockResolvedValueOnce({ fromBlock: 10, toBlock: 20 });
+        await controller.fetchQuestionResponsesChunkedForGroup(SESSION_SLUG);
+
+        // Raising the end again rescans the dropped blocks.
+        expect(contractScripts.getQuestionResponsesChunkedWithCallback).toHaveBeenCalledTimes(1);
+        expect(contractScripts.getQuestionResponsesChunkedWithCallback.mock.calls[0].slice(1, 3)).toEqual([13, 20]);
+      });
+
+      it.each([
+        ['without an end block', { start: 10, end: null }],
+        ['with an end block past the chain head', { start: 10, end: 30 }],
+      ])('keeps answers past the chain head %s', async (_label, blockLimits) => {
+        const host = createHostWithLateAnswers(blockLimits);
+        const controller = createSessionResponseHydrationController(host);
+
+        await controller.fetchQuestionResponsesChunkedForGroup(SESSION_SLUG);
+
+        expect(host.dgWrite).not.toHaveBeenCalled();
+        expect(storedAnswers(host)).toEqual({
+          responders: {
+            [QUESTION_ID_A]: [RESPONDER_LOWER, LATE_RESPONDER, UNDATED_RESPONDER].sort(),
+            [QUESTION_ID_B]: [LATE_RESPONDER],
+          },
+          metaResponders: {
+            [QUESTION_ID_A]: [RESPONDER_LOWER, LATE_RESPONDER].sort(),
+            [QUESTION_ID_B]: [LATE_RESPONDER],
+          },
+          watermark: 20,
+          userRowCounts: { [RESPONDER_LOWER]: 1, [LATE_RESPONDER]: 2, [UNDATED_RESPONDER]: 1 },
+        });
+      });
+    });
+
     it('initializes cache structure on first run and calls getQuestionResponsesChunkedWithCallback', async () => {
       const host = createMockHost();
       const controller = createSessionResponseHydrationController(host);
