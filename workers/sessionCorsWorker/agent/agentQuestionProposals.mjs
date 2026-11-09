@@ -11,7 +11,6 @@ import {
 import { buildOpaqueActionId } from './opaqueActions.mjs';
 import { assertNoSecretShape } from './redaction.mjs';
 import { buildAgentActivityMetadata } from './agentActivity.mjs';
-import { assignAgentQuestionNumber } from './agentQuestionNumbers.mjs';
 
 const PROPOSED_QUESTION_KV_PREFIX = 'telegram:proposed-question:';
 const PROPOSED_QUESTION_ID_PREFIX = 'ceq_';
@@ -546,21 +545,7 @@ export async function persistAgentProposedQuestion({
     expirationTtl: ttlSeconds,
     metadata: activityMetadata,
   });
-  const assigned = await assignAgentQuestionNumber({
-    env,
-    sessionSlug: slug,
-    questionId,
-    createdAt: record.createdAt,
-  });
-  if (assigned.ok) record.stableQuestionNumber = assigned.number;
-  return {
-    ok: true,
-    questionId,
-    question: assigned.ok
-      ? { ...proposedRecordToQuestion(record), stableQuestionNumber: assigned.number }
-      : proposedRecordToQuestion(record),
-    record,
-  };
+  return { ok: true, questionId, question: proposedRecordToQuestion(record), record };
 }
 
 export async function archiveAgentProposedQuestion({

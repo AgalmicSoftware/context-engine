@@ -344,6 +344,19 @@ test('a re-posted question keeps its answer schema, and an archived one stays ar
   assert.deepEqual(proposals(), archived);
 });
 
+test('a question batch reports every question it stores under the KV write limit', async () => {
+  const { f } = readableFixture();
+  const admin = await f.credential({ scopes: ['read_questions', 'pose_questions'] });
+  const time = Date.now();
+  const limited = enforceKvWriteLimit(f.env.GROUP_KV, () => time);
+  const result = await jsonOk(await f.request('/api/agent/questions/create', { method: 'POST', token: admin.token,
+    body: { questions: ['one', 'two', 'three'].map(label => ({ prompt: `Batch fixture ${label}?`, questionType: 'binary' })) } }));
+  assert.equal(result.created.length, 3);
+  assert.deepEqual(result.skipped, []);
+  assert.deepEqual(limited.rejected, []);
+  assert.equal([...f.records.keys()].filter(key => key.includes('proposed-question')).length, 3);
+});
+
 for (const complete of [false, true]) test(`research completion counts stored answers once across retries, overlaps and edits (complete=${complete})`, async () => {
   const { f, coordinated } = readableFixture();
   let time = Date.now();

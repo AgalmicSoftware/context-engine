@@ -65090,91 +65090,6 @@ var init_blockedQuestionIds = __esm({
   }
 });
 
-// workers/sessionCorsWorker/agent/agentQuestionNumbers.mjs
-function normalizeQuestionId(value = "") {
-  return safeString(value).slice(0, 256);
-}
-function agentQuestionNumberKvKey(sessionSlug = "") {
-  const slug = sanitizeSessionSlug(sessionSlug);
-  return slug ? `${AGENT_QUESTION_NUMBER_KV_PREFIX}${slug}` : "";
-}
-function normalizeAgentQuestionNumberMap(raw = {}, sessionSlug = "") {
-  const slug = sanitizeSessionSlug(raw.sessionSlug || sessionSlug);
-  const numberToQuestionId = {};
-  const questionIdToNumber = {};
-  const sourceNumberToQuestionId = raw.numberToQuestionId && typeof raw.numberToQuestionId === "object" && !Array.isArray(raw.numberToQuestionId) ? raw.numberToQuestionId : {};
-  const sourceQuestionIdToNumber = raw.questionIdToNumber && typeof raw.questionIdToNumber === "object" && !Array.isArray(raw.questionIdToNumber) ? raw.questionIdToNumber : {};
-  for (const [rawNumber, rawQuestionId] of Object.entries(sourceNumberToQuestionId)) {
-    const number2 = Math.floor(Number(rawNumber));
-    const qid = normalizeQuestionId(rawQuestionId);
-    if (!Number.isInteger(number2) || number2 <= 0 || !qid) continue;
-    numberToQuestionId[String(number2)] = qid;
-    questionIdToNumber[qid] = number2;
-  }
-  for (const [rawQuestionId, rawNumber] of Object.entries(sourceQuestionIdToNumber)) {
-    const number2 = Math.floor(Number(rawNumber));
-    const qid = normalizeQuestionId(rawQuestionId);
-    if (!Number.isInteger(number2) || number2 <= 0 || !qid) continue;
-    if (numberToQuestionId[String(number2)] && numberToQuestionId[String(number2)] !== qid) continue;
-    numberToQuestionId[String(number2)] = qid;
-    questionIdToNumber[qid] = number2;
-  }
-  const highestNumber = Object.keys(numberToQuestionId).map((value) => Number(value)).filter((value) => Number.isInteger(value) && value > 0).reduce((max, value) => Math.max(max, value), 0);
-  const nextNumber = Math.max(highestNumber + 1, Math.floor(Number(raw.nextNumber || 1)) || 1);
-  return {
-    version: 1,
-    sessionSlug: slug,
-    nextNumber,
-    numberToQuestionId,
-    questionIdToNumber,
-    updatedAt: safeString(raw.updatedAt) || null
-  };
-}
-async function loadQuestionNumberMap(env = {}, sessionSlug = "") {
-  const key = agentQuestionNumberKvKey(sessionSlug);
-  const kv = env?.AGENT_ACTION_KV;
-  if (!key || !kv || typeof kv.get !== "function") return normalizeAgentQuestionNumberMap({}, sessionSlug);
-  const parsed = safeJsonParse(await kv.get(key).catch(() => null), {});
-  return normalizeAgentQuestionNumberMap(parsed || {}, sessionSlug);
-}
-async function persistQuestionNumberMap(env = {}, map = {}, createdAt = null) {
-  const key = agentQuestionNumberKvKey(map.sessionSlug);
-  const kv = env?.AGENT_ACTION_KV;
-  if (!key || !kv || typeof kv.put !== "function") return { ok: false, reason: "action_kv_unavailable" };
-  const record4 = normalizeAgentQuestionNumberMap({ ...map, updatedAt: nowIsoOrCurrent(createdAt) }, map.sessionSlug);
-  assertNoSecretShape(record4, "Agent question number map must not serialize secrets.");
-  await kv.put(key, JSON.stringify(record4));
-  return { ok: true, key, record: record4 };
-}
-async function assignAgentQuestionNumber({
-  env = {},
-  sessionSlug = "",
-  questionId: questionId4 = "",
-  createdAt = null
-} = {}) {
-  const slug = sanitizeSessionSlug(sessionSlug);
-  const qid = normalizeQuestionId(questionId4);
-  if (!slug || !qid) return { ok: false, reason: "question_number_input_missing" };
-  const map = await loadQuestionNumberMap(env, slug);
-  let number2 = map.questionIdToNumber[qid];
-  if (!number2) {
-    number2 = map.nextNumber;
-    map.numberToQuestionId[String(number2)] = qid;
-    map.questionIdToNumber[qid] = number2;
-    map.nextNumber = number2 + 1;
-    await persistQuestionNumberMap(env, map, createdAt);
-  }
-  return { ok: true, number: number2, map };
-}
-var AGENT_QUESTION_NUMBER_KV_PREFIX;
-var init_agentQuestionNumbers = __esm({
-  "workers/sessionCorsWorker/agent/agentQuestionNumbers.mjs"() {
-    init_runtimePrimitives();
-    init_redaction();
-    AGENT_QUESTION_NUMBER_KV_PREFIX = "telegram:question-number:";
-  }
-});
-
 // workers/sessionCorsWorker/agent/agentQuestionProposals.mjs
 function normalizeQuestionType3(value = "") {
   const type = lower2(value).replace(/_/g, "-");
@@ -65584,19 +65499,7 @@ async function persistAgentProposedQuestion({
     expirationTtl: ttlSeconds,
     metadata: activityMetadata
   });
-  const assigned = await assignAgentQuestionNumber({
-    env,
-    sessionSlug: slug,
-    questionId: questionId4,
-    createdAt: record4.createdAt
-  });
-  if (assigned.ok) record4.stableQuestionNumber = assigned.number;
-  return {
-    ok: true,
-    questionId: questionId4,
-    question: assigned.ok ? { ...proposedRecordToQuestion(record4), stableQuestionNumber: assigned.number } : proposedRecordToQuestion(record4),
-    record: record4
-  };
+  return { ok: true, questionId: questionId4, question: proposedRecordToQuestion(record4), record: record4 };
 }
 async function archiveAgentProposedQuestion({
   env = {},
@@ -65730,7 +65633,6 @@ var init_agentQuestionProposals = __esm({
     init_opaqueActions();
     init_redaction();
     init_agentActivity();
-    init_agentQuestionNumbers();
     PROPOSED_QUESTION_KV_PREFIX2 = "telegram:proposed-question:";
     PROPOSED_QUESTION_ID_PREFIX = "ceq_";
     DEFAULT_PROPOSED_QUESTION_TTL_SECONDS = 90 * 24 * 60 * 60;
@@ -68116,7 +68018,7 @@ function base64EncodeText(value = "") {
   }
   return btoa(binary);
 }
-function normalizeQuestionId2(value = "") {
+function normalizeQuestionId(value = "") {
   const raw = safeString(value);
   if (/^0x[0-9a-fA-F]{64}$/.test(raw)) return raw.toLowerCase();
   const id2 = raw.replace(/[^A-Za-z0-9_-]+/g, "").slice(0, 96);
@@ -75870,7 +75772,7 @@ var init_resultsAnalysisAnswerValidation = __esm({
 });
 
 // workers/sessionCorsWorker/resultsAnalysisGeneration.js
-var readCoordinatedResultsAnalysisStatusDefault, reserveCoordinatedResultsAnalysisDefault, finalizeCoordinatedResultsAnalysisDefault, decoder7, AI_RESPONSE_CAP, AI_QUESTION_CAP, AI_LIMITS, ANALYSIS_ARTIFACT_VERSION, SOURCE_VERSION, RESULT_SECTION_ORDER, DEFAULT_RESULTS_ANALYSIS_PROVIDER_TIMEOUT_MS, RESULTS_CONTEXT_CHARS, isObj19, hasOwn6, trim15, lower6, getResultsAnalysisSettings, getCanonicalSessionId, publicDraft, applyCurrentArtifactPolicy, normalizeSessionIdHex2, parseJsonBytes, ENCRYPTED_ENVELOPE_KEYS, encryptedEnvelopeValueHasContent, isBlankFieldValue, isClearedFieldWithLockFlag, valueLooksEncrypted, valueFromAnswerLike, FIELD_MASKS, withoutFieldMask, rowLooksLocked, VALIDATED_QUESTION_TYPES, normalizeQuestionId3, normalizeQuestionPrompt, normalizeQuestionType5, normalizeAnalysisRatingScale, normalizeSubmittedAt, enabledSectionsFromSettings, normalizeRequestedSections, resolveResultsAnalysisCapability, compareIdentity, participantDigest, normalizeQuestionRecord, selectRoundRobinResponses, isNewerResponseRow, normalizeSanitizedRows, toResponseRow, readWorkerCanonicalResultsAnalysisSource, loadWorkerCanonicalResultsAnalysisSource, loadAdminSnapshotResultsAnalysisSource, sourceKindFromBody, resolveResultsAnalysisSource, normalizeProviderResponse, resolveAnalysisAiPayload, withTimeout, callResultsAnalysisProvider, normalizeGeneratedArtifact, buildSourceDescriptor, buildReservationKey, filterDraftForStatus, summarizeReservation, analysisEligibility, summarizeActiveState, summarizeFailureState, buildResultsAnalysisStatusBody, readResultsAnalysisAdminStatus, generateResultsAnalysisDraft, maybeTriggerAutomaticResultsAnalysis, runQueuedAutomaticResultsAnalysisJob, normalizedResultsProfile, resolveResultsVisibility, aggregateResultsEnabled, evaluateResultsAnalysisViewerEligibility, readPublishedResultsAnalysisArtifact;
+var readCoordinatedResultsAnalysisStatusDefault, reserveCoordinatedResultsAnalysisDefault, finalizeCoordinatedResultsAnalysisDefault, decoder7, AI_RESPONSE_CAP, AI_QUESTION_CAP, AI_LIMITS, ANALYSIS_ARTIFACT_VERSION, SOURCE_VERSION, RESULT_SECTION_ORDER, DEFAULT_RESULTS_ANALYSIS_PROVIDER_TIMEOUT_MS, RESULTS_CONTEXT_CHARS, isObj19, hasOwn6, trim15, lower6, getResultsAnalysisSettings, getCanonicalSessionId, publicDraft, applyCurrentArtifactPolicy, normalizeSessionIdHex2, parseJsonBytes, ENCRYPTED_ENVELOPE_KEYS, encryptedEnvelopeValueHasContent, isBlankFieldValue, isClearedFieldWithLockFlag, valueLooksEncrypted, valueFromAnswerLike, FIELD_MASKS, withoutFieldMask, rowLooksLocked, VALIDATED_QUESTION_TYPES, normalizeQuestionId2, normalizeQuestionPrompt, normalizeQuestionType5, normalizeAnalysisRatingScale, normalizeSubmittedAt, enabledSectionsFromSettings, normalizeRequestedSections, resolveResultsAnalysisCapability, compareIdentity, participantDigest, normalizeQuestionRecord, selectRoundRobinResponses, isNewerResponseRow, normalizeSanitizedRows, toResponseRow, readWorkerCanonicalResultsAnalysisSource, loadWorkerCanonicalResultsAnalysisSource, loadAdminSnapshotResultsAnalysisSource, sourceKindFromBody, resolveResultsAnalysisSource, normalizeProviderResponse, resolveAnalysisAiPayload, withTimeout, callResultsAnalysisProvider, normalizeGeneratedArtifact, buildSourceDescriptor, buildReservationKey, filterDraftForStatus, summarizeReservation, analysisEligibility, summarizeActiveState, summarizeFailureState, buildResultsAnalysisStatusBody, readResultsAnalysisAdminStatus, generateResultsAnalysisDraft, maybeTriggerAutomaticResultsAnalysis, runQueuedAutomaticResultsAnalysisJob, normalizedResultsProfile, resolveResultsVisibility, aggregateResultsEnabled, evaluateResultsAnalysisViewerEligibility, readPublishedResultsAnalysisArtifact;
 var init_resultsAnalysisGeneration = __esm({
   "workers/sessionCorsWorker/resultsAnalysisGeneration.js"() {
     init_aiRequestPolicy();
@@ -75999,7 +75901,7 @@ var init_resultsAnalysisGeneration = __esm({
       return valueLooksEncrypted(hasOwn6(row, "answer") ? row.answer : hasOwn6(row, "value") ? row.value : row.response);
     };
     VALIDATED_QUESTION_TYPES = /* @__PURE__ */ new Set(["binary", "rating", "multichoice", "quadratic", "freeform"]);
-    normalizeQuestionId3 = (value) => trim15(value).slice(0, 128);
+    normalizeQuestionId2 = (value) => trim15(value).slice(0, 128);
     normalizeQuestionPrompt = (value) => trim15(value).replace(/\s+/g, " ").slice(0, 1200);
     normalizeQuestionType5 = (value) => trim15(value).slice(0, 64) || "text";
     normalizeAnalysisRatingScale = (question = {}) => {
@@ -76075,7 +75977,7 @@ var init_resultsAnalysisGeneration = __esm({
     participantDigest = async (sourceKey) => sha256Hex(`participant:${trim15(sourceKey).toLowerCase()}`);
     normalizeQuestionRecord = (question) => {
       if (!isObj19(question)) return null;
-      const questionId4 = normalizeQuestionId3(question.questionId || question.questionID || question.id);
+      const questionId4 = normalizeQuestionId2(question.questionId || question.questionID || question.id);
       if (!questionId4) return null;
       const type = normalizeQuestionType5(question.type || question.questionType);
       const scale = type === "rating" ? normalizeAnalysisRatingScale(question) : null;
@@ -76139,7 +76041,7 @@ var init_resultsAnalysisGeneration = __esm({
         if (strictLocked && rowLooksLocked(row)) {
           return { ok: false, status: 400, error: "Encrypted or locked response rows cannot be used for admin snapshot generation." };
         }
-        const questionId4 = normalizeQuestionId3(row.questionId || row.questionID || row.id);
+        const questionId4 = normalizeQuestionId2(row.questionId || row.questionID || row.id);
         if (!questionId4 || blocked.has(lower6(questionId4)) || requireKnownQuestion && !questionMap.has(questionId4)) {
           excludedCount += 1;
           continue;
@@ -92273,7 +92175,7 @@ function normalizeQuestionIds2(value = []) {
   const seen = /* @__PURE__ */ new Set();
   const out = [];
   for (const raw of source) {
-    const id2 = normalizeQuestionId2(raw);
+    const id2 = normalizeQuestionId(raw);
     if (!id2 || seen.has(id2)) continue;
     seen.add(id2);
     out.push(id2);
@@ -92286,7 +92188,7 @@ function normalizeEvalTypes(value = {}, enabledQuestionIds = []) {
   const allowedIds = new Set(enabledQuestionIds);
   const out = {};
   Object.entries(source).forEach(([rawId, rawType]) => {
-    const id2 = normalizeQuestionId2(rawId);
+    const id2 = normalizeQuestionId(rawId);
     const type = lower2(rawType).replace(/[^a-z0-9_-]+/g, "_").slice(0, 48);
     if (id2 && allowedIds.has(id2) && AGENT_ONLY_EVAL_TYPES.has(type)) out[id2] = type;
   });
@@ -92377,7 +92279,7 @@ function normalizeStatementQuestionType(questionType = "") {
 }
 async function statementFromQuestion(question = {}) {
   if (question.answerable === false || question.locked || question.encrypted) return null;
-  const questionId4 = normalizeQuestionId2(question.questionId || question.id);
+  const questionId4 = normalizeQuestionId(question.questionId || question.id);
   const text5 = String(question.prompt || question.questionText || question.title || "");
   if (!questionId4 || !text5.trim()) return null;
   const schema = buildAgentQuestionAnswerSchema(question);
