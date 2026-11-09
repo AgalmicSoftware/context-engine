@@ -9,11 +9,23 @@ import { loadPublicInterviewQuestions } from './interviewQuestionCatalog.js';
 import { proxyOpenAI, proxyAnthropic, proxyOpenRouter, proxyCustomRPC } from './aiProviderExecution.js';
 import { buildSessionEndedResponse } from '../shared/sessionLifecycle.mjs';
 import { buildParticipantContextPrompt } from './contextSourceLoader.js';
+import { getStorageIndexBinding } from './storageKvBindings.js';
+import { listHiddenStorageResourceIds } from './storageResourceOwnership.js';
 
 const OPENING_MAX_TOKENS = 2000;
 const OPENING_CONTEXT_CHARS = 4000;
 const inFlight = new WeakMap();
 const cacheKey = (slug) => `session:${slug}:interview-opening`;
+
+// The questions hidden in the session config or from the Storage panel, as the
+// stamp an opening carries. Read here: a cached opening skips the catalog.
+const readHiddenQuestionIds = async ({ env, slug, config }) => {
+  const index = getStorageIndexBinding(env);
+  const hidden = typeof index?.list === 'function'
+    ? await listHiddenStorageResourceIds({ index, slug, resource: 'questions' })
+    : [];
+  return JSON.stringify([...new Set([...readBlockedQuestionIds(config), ...[...hidden].map((id) => id.toLowerCase())])].sort());
+};
 
 export const resolveInterviewStarter = async ({ env, slug, config, deps = {}, refresh = false }) => {
   const settings = normalizeInterviewSettings(config?.interviewMode);
@@ -27,7 +39,7 @@ export const resolveInterviewStarter = async ({ env, slug, config, deps = {}, re
   const write = deps.putKvJson || putKvJson;
   const stored = await read(env, cacheKey(slug));
   // An opening may quote a question hidden since it was written, so hiding one retires it.
-  const blockedQuestionIds = JSON.stringify(readBlockedQuestionIds(config));
+  const blockedQuestionIds = await readHiddenQuestionIds({ env, slug, config });
   const cached = (stored?.blockedQuestionIds || '[]') === blockedQuestionIds ? stored : null;
   if (cached?.openingPrompt && !settings.autoRegenerate && !refresh) return withSteeringPrompt(cached);
   const { questions, incomplete } = await (deps.loadPublicInterviewQuestions || loadPublicInterviewQuestions)({

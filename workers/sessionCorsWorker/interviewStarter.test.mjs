@@ -7,6 +7,7 @@ import { buildSiweMessage, installSessionCoordinatorBinding, makeJsonRequest } f
 import { buildQuestionRecord } from '../../mcp/lib/records.mjs';
 import { DEFAULT_AI_MODEL } from '../../shared/aiDefaults.mjs';
 import { resolveInterviewStarter, dispatchInterviewStarterRequest as boundary } from './interviewStarter.js';
+import { writeStorageResourceHidden } from './storageResourceOwnership.js';
 
 const dispatchInterviewStarterRequest = (args) => boundary({
   ...args, deps: { ...args.deps, readCurrentSessionConfig: args.deps?.readCurrentSessionConfig || (async ({ env, slug }) => ({
@@ -235,6 +236,48 @@ test('a start hiding other questions does not join an opening already being writ
   await Promise.all([resolveInterviewStarter(hiding(g, ['Q1'])), resolveInterviewStarter(hiding(g, [' q1 ']))]);
   assert.equal(g.calls(), 1);
 });
+test('a question hidden from the Storage panel retires the opening, and later starts do not join an earlier one', async () => {
+  const withStorageIndex = (f) => {
+    const records = new Map();
+    f.args.env.CE_STORAGE_INDEX_KV = {
+      get: async (key) => records.get(key) ?? null,
+      put: async (key, value) => { records.set(key, value); },
+      delete: async (key) => { records.delete(key); },
+      list: async ({ prefix = '' } = {}) => ({ keys: [...records.keys()].filter((key) => key.startsWith(prefix)).map((name) => ({ name })), list_complete: true }),
+    };
+    return () => writeStorageResourceHidden({
+      index: f.args.env.CE_STORAGE_INDEX_KV, slug: 'demo', resource: 'questions', resourceId: '3', hidden: true,
+      actor: 'admin', updatedAt: '2026-11-09T00:00:00.000Z',
+    });
+  };
+  const f = fixture();
+  const hide = withStorageIndex(f);
+  await resolveInterviewStarter(f.args);
+  await hide();
+  const after = await resolveInterviewStarter(f.args);
+  assert.equal(f.calls(), 2);
+  assert.equal(after.blockedQuestionIds, '["3"]');
+  await resolveInterviewStarter(f.args);
+  assert.equal(f.calls(), 2, 'the new opening is kept');
+  // A start after the hide does not wait on an opening begun before it.
+  const g = fixture();
+  const hideInG = withStorageIndex(g);
+  const proxy = g.args.deps.proxyOpenAI;
+  let reached;
+  let release;
+  const writing = new Promise((resolve) => { reached = resolve; });
+  const gate = new Promise((resolve) => { release = resolve; });
+  g.args.deps.proxyOpenAI = async (args) => { reached(); await gate; return proxy(args); };
+  const before = resolveInterviewStarter(g.args);
+  await writing;
+  await hideInG();
+  const later = resolveInterviewStarter(g.args);
+  await new Promise(setImmediate);
+  release();
+  assert.deepEqual([(await before).blockedQuestionIds, (await later).blockedQuestionIds], ['[]', '["3"]']);
+  assert.equal(g.calls(), 2);
+});
+
 test('starter route preserves CORS and rate limits; public callers cannot force refresh', async () => {
   const f = fixture();
   await resolveInterviewStarter(f.args);

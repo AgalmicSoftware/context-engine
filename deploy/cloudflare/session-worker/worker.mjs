@@ -102193,10 +102193,17 @@ var loadPublicInterviewQuestions = async ({
 init_aiProviderExecution();
 init_sessionLifecycle();
 init_contextSourceLoader();
+init_storageKvBindings();
+init_storageResourceOwnership();
 var OPENING_MAX_TOKENS = 2e3;
 var OPENING_CONTEXT_CHARS = 4e3;
 var inFlight2 = /* @__PURE__ */ new WeakMap();
 var cacheKey2 = (slug) => `session:${slug}:interview-opening`;
+var readHiddenQuestionIds = async ({ env, slug, config }) => {
+  const index = getStorageIndexBinding(env);
+  const hidden = typeof index?.list === "function" ? await listHiddenStorageResourceIds({ index, slug, resource: "questions" }) : [];
+  return JSON.stringify([.../* @__PURE__ */ new Set([...blockedQuestionIds(config), ...[...hidden].map((id2) => id2.toLowerCase())])].sort());
+};
 var resolveInterviewStarter = async ({ env, slug, config, deps = {}, refresh = false }) => {
   const settings = normalizeInterviewSettings(config?.interviewMode);
   const withSteeringPrompt = (value) => ({ ...value, steeringPrompt: settings.steeringPrompt });
@@ -102208,7 +102215,7 @@ var resolveInterviewStarter = async ({ env, slug, config, deps = {}, refresh = f
   const read = deps.getKvJson || getKvJson;
   const write = deps.putKvJson || putKvJson;
   const stored = await read(env, cacheKey2(slug));
-  const blockedQuestionIds2 = JSON.stringify(blockedQuestionIds(config));
+  const blockedQuestionIds2 = await readHiddenQuestionIds({ env, slug, config });
   const cached = (stored?.blockedQuestionIds || "[]") === blockedQuestionIds2 ? stored : null;
   if (cached?.openingPrompt && !settings.autoRegenerate && !refresh) return withSteeringPrompt(cached);
   const { questions, incomplete } = await (deps.loadPublicInterviewQuestions || loadPublicInterviewQuestions)({
