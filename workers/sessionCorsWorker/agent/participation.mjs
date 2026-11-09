@@ -215,7 +215,12 @@ export async function handlePreferencesRequest({ env = {}, context = {}, input =
       createdAt: null,
     });
     if (!saved.ok) {
-      skipped.push({ questionId, reason: saved.reason || 'draft_save_failed' });
+      skipped.push({
+        questionId,
+        reason: saved.reason || 'draft_save_failed',
+        // Sending the same answer again retries a save storage refused.
+        ...(saved.retryable === true ? { retryable: true } : {}),
+      });
       continue;
     }
     const draftRecord = { ...saved.draft, key: saved.key };

@@ -491,7 +491,7 @@ test('a draft whose history cannot be read is not saved over', async () => {
     metadata: { source: 'mini_app' },
     createdAt: '2026-06-11T10:05:00.000Z',
   });
-  assert.deepEqual(failed, { ok: false, reason: 'answer_draft_read_failed' });
+  assert.deepEqual(failed, { ok: false, reason: 'answer_draft_read_failed', retryable: true });
   env.AGENT_ACTION_KV.get = get;
   const draft = await readAnswerDraft({ env, normalized: NORMALIZED, sessionSlug: 'alpha', selectedQuestionId: 'q-binary' });
   assert.equal(draft.answerLabel, 'Agree');

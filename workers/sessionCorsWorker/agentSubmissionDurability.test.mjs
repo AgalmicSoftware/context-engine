@@ -151,6 +151,21 @@ test('hosted receipt in-progress is retryable and reuses the original payload ti
   assert.deepEqual(state.payloads[0], state.payloads[1]); assert.equal(storedResponses(f), 1);
 });
 
+test('a draft whose history cannot be read is skipped as retryable, and a retry submits it', async () => {
+  const { f, submit, qid } = await submissionFixture();
+  const get = f.env.GROUP_KV.get;
+  let failures = 1;
+  f.env.GROUP_KV.get = async (key) => {
+    if (key.includes(':telegram:answer-draft:') && failures-- > 0) throw new Error('fixture KV outage');
+    return get(key);
+  };
+  const failed = await submit();
+  assert.equal(failed.status, 422);
+  assert.deepEqual((await failed.json()).skipped, [{ questionId: qid, reason: 'answer_draft_read_failed', retryable: true }]);
+  const retry = await submit(); assert.equal(retry.status, 200, await retry.clone().text());
+  assert.equal(requestRecords(f)[0].status, 'direct_submitted');
+});
+
 test('disabled direct submission reports failure and is not counted as an answer', async () => {
   const { f, state, submit } = await submissionFixture();
   f.config.agentHttp.managedAccountSubmitAllowed = false;

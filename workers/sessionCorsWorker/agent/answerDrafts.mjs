@@ -263,7 +263,7 @@ export async function persistAnswerDraft({
       stored = await env.AGENT_ACTION_KV.get(key);
     } catch {
       // Saving without the draft's history would reset its edit count and origin.
-      return { ok: false, reason: 'answer_draft_read_failed' };
+      return { ok: false, reason: 'answer_draft_read_failed', retryable: true };
     }
   }
   const existing = safeJsonParse(stored, null);
