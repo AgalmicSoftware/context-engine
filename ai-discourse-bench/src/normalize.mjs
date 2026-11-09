@@ -16,7 +16,7 @@ const normalizeConfidence = (value) => {
     : null;
 };
 
-const recoverJsonObjects = (text) => {
+export const recoverJsonObjects = (text) => {
   const candidates = [];
   let start = -1;
   let depth = 0;
@@ -47,8 +47,6 @@ const recoverJsonObjects = (text) => {
   }
   return { candidates, truncated: depth > 0 };
 };
-
-export const jsonObjectCandidates = (text) => recoverJsonObjects(text).candidates;
 
 // Reasoning regions are removed before JSON recovery; quoted JSON content is
 // preserved, including rationale strings which happen to contain these tags.

@@ -11,7 +11,7 @@ import {
   IMPORTANCE_PROMPT_TEMPLATE_VERSION,
 } from './config.mjs';
 import { callOpenAiCompatibleChat, getProviderConfig } from './adapters/openai-compatible.mjs';
-import { extractFinalAnswerText, jsonObjectCandidates } from './normalize.mjs';
+import { extractFinalAnswerText, recoverJsonObjects } from './normalize.mjs';
 import { detectHarnessCommit, hashJson, sha256 } from './provenance.mjs';
 
 const compareHash = (left, right) => left < right ? -1 : left > right ? 1 : 0;
@@ -120,12 +120,17 @@ export const parseImportanceAllocation = (rawText, {
   const { text: trimmed, truncated } = extractFinalAnswerText(rawText);
   if (truncated) return { allocations: [], rationale: '', spentCredits: 0, parseError: 'truncated reasoning region' };
   if (!trimmed) return { allocations: [], rationale: '', spentCredits: 0, parseError: 'empty response' };
+  // As with answers, a cut-off object or two different allocations leave no
+  // single final allocation, so the run retries instead of keeping the first.
+  const recovered = recoverJsonObjects(trimmed);
+  if (recovered.truncated) return { allocations: [], rationale: '', spentCredits: 0, parseError: 'truncated JSON response' };
   const knownQuestionIds = questionIds instanceof Set ? questionIds : new Set(questionIds || []);
   const candidates = trimmed.startsWith('{') && trimmed.endsWith('}')
-    ? [trimmed, ...jsonObjectCandidates(trimmed)]
-    : jsonObjectCandidates(trimmed);
+    ? [trimmed, ...recovered.candidates]
+    : recovered.candidates;
   let parsedObject = null;
   let lastFailure = null;
+  const valid = [];
   for (const candidate of [...new Set(candidates)]) {
     try {
       parsedObject = JSON.parse(candidate);
@@ -177,13 +182,16 @@ export const parseImportanceAllocation = (rawText, {
         spentCredits: parseError ? 0 : spentCredits,
         parseError,
       };
-      if (!parseError) return result;
-      lastFailure = result;
+      if (parseError) lastFailure = result;
+      else valid.push(result);
     } catch {
       // Try the next balanced JSON object.
     }
   }
-  return lastFailure || {
+  if (new Set(valid.map((result) => JSON.stringify(result.allocations))).size > 1) {
+    return { allocations: [], rationale: '', spentCredits: 0, parseError: 'conflicting allocation objects' };
+  }
+  return valid[0] || lastFailure || {
     allocations: [],
     rationale: typeof parsedObject?.rationale === 'string' ? parsedObject.rationale.trim() : '',
     spentCredits: 0,

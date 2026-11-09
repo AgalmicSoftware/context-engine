@@ -197,6 +197,7 @@ All notable changes to this project will be documented in this file.
 - Keep the standalone Raw Results heading readable and correctly wrapped at narrow widths, scope Risk Matrix heading colors to their own dialog, and give export buttons readable colors and descriptive accessible names.
 - `answer --resume` asks again when the endpoint, model settings, declared model revision, routing or answer schema change. Answers saved by earlier versions are asked again once. Answer files record each model's revision, and a run that reaches two deployments of one model stops with an error.
 - Typed answers and importance replies ignore drafts inside reasoning tags and refuse truncated reasoning.
+- An importance reply holding two different allocations, or one cut off mid-object, is retried instead of scored by its first allocation.
 - Flipped rating prompts are used only when flipped answers stay on the scale's grid.
 - Mock ratings land on the scale's step grid.
 - `compare-answers` skips a question that the answer file and the export define differently, and says what differs.

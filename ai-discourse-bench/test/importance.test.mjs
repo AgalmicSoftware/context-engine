@@ -104,6 +104,46 @@ test('quadratic importance parser never reads a reasoning draft as the allocatio
   assert.equal(parseImportanceAllocation(`<think>${draft}`, options).parseError, 'truncated reasoning region');
 });
 
+test('quadratic importance parser refuses conflicting or cut-off allocations, and the runner retries them', async () => {
+  const options = {
+    questionIds: new Set(['q1', 'q2']),
+    budget: 10,
+    maxAllocations: 2,
+    maxVotesPerQuestion: 4,
+  };
+  const first = '{"allocations":[{"questionId":"q1","votes":3}],"rationale":"first"}';
+  const corrected = '{"allocations":[{"questionId":"q2","votes":3}],"rationale":"corrected"}';
+  assert.equal(parseImportanceAllocation(`${first}\nCorrection: ${corrected}`, options).parseError, 'conflicting allocation objects');
+  assert.equal(
+    parseImportanceAllocation(`${first}\nCorrection: {"allocations":[{"questionId":"q2"`, options).parseError,
+    'truncated JSON response',
+  );
+  const repeated = parseImportanceAllocation(`${first}\n${first.replace('first', 'again')}`, options);
+  assert.equal(repeated.parseError, '', 'the same allocation twice is not a conflict');
+  assert.deepEqual(repeated.allocations, [{ questionId: 'q1', votes: 3, cost: 9 }]);
+
+  // At this budget the runner allows at most 2 votes per question.
+  const draft = first.replace('"votes":3', '"votes":2');
+  const final = corrected.replace('"votes":3', '"votes":2');
+  let calls = 0;
+  const result = await runImportanceBenchmark({
+    questionBank,
+    modelRoster: { models: modelRoster.models.slice(0, 1) },
+    budget: 10,
+    maxAllocations: 2,
+    repeats: 1,
+    maxAttempts: 2,
+    retryBaseDelayMs: 0,
+    sleepImpl: async () => {},
+    callModelImpl: async ({ modelEntry }) => {
+      calls += 1;
+      return { content: calls === 1 ? `${draft}\nCorrection: ${final}` : final, metadata: { resolvedModel: modelEntry.model } };
+    },
+  });
+  assert.equal(calls, 2);
+  assert.deepEqual(result.runs[0].allocations, [{ questionId: 'q2', votes: 2, cost: 4 }]);
+});
+
 test('quadratic importance parser enforces known ids, integer votes, and squared budget cost', () => {
   const options = {
     questionIds: new Set(['q1', 'q2']),
