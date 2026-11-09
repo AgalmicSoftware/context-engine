@@ -6,6 +6,7 @@ import type {
   DebateAtlasBuild,
   DebateAtlasBuildSummary,
   DebateAtlasMapping,
+  DebateAtlasPlacedParticipant,
 } from '../../domains/debateAtlas/debateAtlasTypes';
 
 // Markers take the document's text colour, which every theme keeps readable on
@@ -49,6 +50,90 @@ const compassLegend = (points: HistoricalCompassPoint[]) => [
   ...(points.some((point) => point.type === 'participant') ? [{ label: 'Participant', shape: 'ring' }] : []),
 ];
 
+// Within this distance on either axis, a participant shares a spot.
+const NEAR = 0.03;
+// Centres closer than this, in chart widths, draw avatars over one another.
+const GAP = 0.05;
+type Spot = { x: number; y: number };
+const near = (a: Spot, b: Spot) => Math.abs(a.x - b.x) < NEAR && Math.abs(a.y - b.y) < NEAR;
+const inside = (value: number) => Math.min(0.98, Math.max(0.02, value));
+
+// Seats on half rings around a spot, left to right: neighbours sit GAP apart,
+// and a full ring starts a wider one.
+const halfRingSeats = (count: number) => {
+  const seats: Array<{ radius: number; angle: number }> = [];
+  for (let ring = 1; seats.length < count; ring += 1) {
+    const radius = GAP * ring;
+    const here = Math.min(Math.floor((Math.PI * radius) / GAP) + 1, count - seats.length);
+    for (let index = 0; index < here; index += 1) {
+      seats.push({ radius, angle: here > 1 ? Math.PI - (Math.PI * index) / (here - 1) : Math.PI / 2 });
+    }
+  }
+  return seats;
+};
+
+// The AI often puts everyone who gave the same answers on one spot, usually a
+// position's, where only the top avatar could be pointed at. Each group sits on
+// half rings below its spot instead, clear of a position's label above it,
+// turning upwards at the chart's bottom edge and shifting inwards at its sides.
+// Whatever still overlaps then moves apart; positions stay put.
+const spreadParticipants = (
+  participants: DebateAtlasPlacedParticipant[],
+  spots: Spot[],
+): DebateAtlasPlacedParticipant[] => {
+  const spread = participants.map((participant) => ({ ...participant }));
+  // A position's spot comes first, so a participant on it joins its group.
+  const groups: Array<Spot & { members: number[]; position: boolean }> = spots.map((spot) => ({
+    x: spot.x,
+    y: spot.y,
+    members: [],
+    position: true,
+  }));
+  participants.forEach((participant, index) => {
+    const group = groups.find((entry) => near(entry, participant));
+    if (group) group.members.push(index);
+    else groups.push({ x: participant.x, y: participant.y, members: [index], position: false });
+  });
+  groups
+    .filter((group) => group.members.length > (group.position ? 0 : 1))
+    .forEach((group) => {
+      const seats = halfRingSeats(group.members.length);
+      const outer = seats[seats.length - 1].radius;
+      const centre = Math.min(0.98 - outer, Math.max(0.02 + outer, group.x));
+      const side = group.y - outer >= 0.02 ? -1 : 1;
+      group.members.forEach((index, order) => {
+        spread[index].x = inside(centre + seats[order].radius * Math.cos(seats[order].angle));
+        spread[index].y = inside(group.y + side * seats[order].radius * Math.sin(seats[order].angle));
+      });
+    });
+  // Each round moves an avatar half of its overlap away from everything it
+  // overlaps. When those moves cancel, between two positions say, it goes below.
+  for (let round = 0; round < 100; round += 1) {
+    let moved = false;
+    spread.forEach((point, index) => {
+      let pushX = 0;
+      let pushY = 0;
+      let total = 0;
+      [...spots, ...spread.filter((_, other) => other !== index)].forEach((other) => {
+        const distance = Math.hypot(point.x - other.x, point.y - other.y);
+        if (distance >= GAP - 1e-6) return;
+        const angle =
+          distance > 1e-9 ? Math.atan2(point.y - other.y, point.x - other.x) : (2 * Math.PI * index) / spread.length;
+        pushX += ((GAP - distance) / 2) * Math.cos(angle);
+        pushY += ((GAP - distance) / 2) * Math.sin(angle);
+        total += (GAP - distance) / 2;
+      });
+      if (!total) return;
+      if (Math.hypot(pushX, pushY) < total / 4) pushY -= GAP / 2;
+      point.x = inside(point.x + pushX);
+      point.y = inside(point.y + pushY);
+      moved = true;
+    });
+    if (!moved) break;
+  }
+  return spread;
+};
+
 const compassPoints = (mapping: DebateAtlasMapping, sessionSlug: string): HistoricalCompassPoint[] => {
   // The compass keys points by name, so a repeated label gets a number.
   const taken = new Set<string>();
@@ -64,7 +149,7 @@ const compassPoints = (mapping: DebateAtlasMapping, sessionSlug: string): Histor
         .filter(Boolean)
         .join(' '),
     }));
-  const participants = (mapping.participants || []).map((participant) => {
+  const participants = spreadParticipants(mapping.participants || [], positions).map((participant) => {
     const address = String(participant.address || '');
     return {
       name: uniqueName(taken, address ? shortenAddress(address) : participant.label || 'Participant'),

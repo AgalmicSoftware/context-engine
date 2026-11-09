@@ -393,15 +393,16 @@ const PoliticalCompass = ({ compass, compact = true }: PoliticalCompassProps) =>
           const profileHref = getCompassPointProfileHref(sp);
           // Text keeps the panel's own colour; a point's colour marks it only as
           // a border and tint, since a marker colour need not read as text here.
+          // A profile link is underlined, so it reads as one in the panel's own colour.
           const selectedPointTitleStyle: React.CSSProperties = {
             color: T.text,
-            textDecoration: 'none',
+            textDecoration: profileHref ? 'underline' : 'none',
             fontWeight: 700,
             fontSize: 15,
           };
           const selectedPointCitationStyle: React.CSSProperties = {
             color: T.text,
-            textDecoration: 'none',
+            textDecoration: profileHref ? 'underline' : 'none',
           };
           const qLabel = sp
             ? (sp.y > 0.5 ? compass.yAxis.top : compass.yAxis.bottom) +
@@ -423,7 +424,16 @@ const PoliticalCompass = ({ compass, compact = true }: PoliticalCompassProps) =>
                 boxShadow: T.shadow,
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+              <div
+                style={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  gap: 8,
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  marginBottom: 10,
+                }}
+              >
                 <div>
                   {profileHref ? (
                     <a href={profileHref} style={selectedPointTitleStyle} target="_blank" rel="noopener noreferrer">
@@ -781,11 +791,13 @@ const PoliticalCompass = ({ compass, compact = true }: PoliticalCompassProps) =>
               zIndex: 4,
             }}
           >
+            {/* The name keeps the tooltip's own text colour: a point's colour marks it only
+                as the border, since a marker colour need not read on the tooltip. */}
             <div
               style={{
                 fontSize: 11,
                 fontWeight: 700,
-                color: tooltipState.color || T.accent,
+                color: 'var(--ce-tooltip-text)',
                 marginBottom: 6,
               }}
             >

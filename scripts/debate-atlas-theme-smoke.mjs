@@ -188,9 +188,22 @@ export async function inspectDebateAtlas(page, { screenshotDir = '', tag = '' } 
     assert.deepEqual(overflowing, [], 'A position overflows its card');
   });
 
+  // Hovering a participant names them, in the tooltip's own colours.
   await page.locator('[data-testid$="-avatar"]').first().waitFor();
-  await page.locator('[data-testid^="ce-political-compass-point-0x"]').first().click({ force: true });
-  await step('selected participant', () => assertReadable(panel));
+  const participant = page.locator('[data-testid^="ce-political-compass-point-0x"]').first();
+  await participant.hover({ force: true });
+  const tooltip = page.getByTestId('ce-political-compass-tooltip');
+  await step('participant tooltip', async () => {
+    await tooltip.getByText(/^0x[0-9a-f]{4}…[0-9a-f]{4}$/).waitFor({ timeout: 5000 });
+    await assertReadable(tooltip);
+  });
+  await participant.click({ force: true });
+  await step('selected participant', async () => {
+    await assertReadable(panel);
+    // The address stays whole on one line; its quadrant moves below it when there is no room.
+    const name = panel.getByRole('link', { name: /^0x[0-9a-f]{4}…[0-9a-f]{4}$/ }).first();
+    assert.equal(await name.evaluate((link) => link.getClientRects().length), 1, 'The participant address breaks across lines');
+  });
   if (screenshotDir) await panel.screenshot({ path: `${screenshotDir}/debate-atlas-compass-${tag}.png` });
 
   // The category behind it has a compass of its own, with the same legend.

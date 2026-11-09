@@ -106,6 +106,106 @@ it('places positions and participants on the topic compass, each under its own n
   expect(points[3].profileUrl).toBeUndefined();
 });
 
+// The compass for one branch with these positions and participants.
+const compassOf = (positions: Array<{ x: number; y: number }>, participants: Array<{ x: number; y: number }>) =>
+  buildDebateAtlasTree({
+    ...build,
+    branches: [
+      {
+        id: 'b1',
+        label: 'Trust',
+        compass,
+        positions: positions.map((spot, index) => ({ label: `Position ${index + 1}`, participantCount: 1, ...spot })),
+        participants: participants.map((spot, index) => ({
+          address: `0x${String(index + 1)
+            .padStart(2, '0')
+            .repeat(20)}`,
+          ...spot,
+        })),
+        topics: [],
+      },
+    ],
+  })[0].compass?.points || [];
+// The closest any two points come, so no avatar covers another or a position's dot.
+const closest = (points: Array<{ x: number; y: number }>) =>
+  Math.min(...points.flatMap((a, i) => points.slice(i + 1).map((b) => Math.hypot(a.x - b.x, a.y - b.y))));
+const onChart = (points: Array<{ x: number; y: number }>) =>
+  points.every((point) => point.x >= 0.02 && point.x <= 0.98 && point.y >= 0.02 && point.y <= 0.98);
+
+it('seats participants who share a position below it, so each can be pointed at', () => {
+  const spot = { x: 0.5, y: 0.9 };
+  const points = compassOf([spot], [spot, { x: 0.51, y: 0.89 }, spot, { x: 0.1, y: 0.1 }]);
+  const [position, ...participants] = points;
+  // The position stays put; the three on its spot sit on a half ring centred on
+  // it, left to right and below it, clear of its label above.
+  expect([position.x, position.y]).toEqual([0.5, 0.9]);
+  const ring = participants.slice(0, 3);
+  ring.forEach((point) => {
+    expect(Math.hypot(point.x - 0.5, point.y - 0.9)).toBeCloseTo(0.05, 6);
+    expect(point.y).toBeLessThanOrEqual(0.9 + 1e-9);
+  });
+  expect(ring[0].x).toBeLessThan(ring[1].x);
+  expect(ring[1].x).toBeLessThan(ring[2].x);
+  // Someone alone stays where the AI put them.
+  expect([participants[3].x, participants[3].y]).toEqual([0.1, 0.1]);
+  expect(closest(points)).toBeGreaterThanOrEqual(0.0499);
+});
+
+it('keeps every avatar apart at the chart edges, in large groups and beside other groups', () => {
+  const cases = [
+    // A crowd on one position, needing several rings.
+    { positions: [{ x: 0.5, y: 0.6 }], participants: Array.from({ length: 20 }, () => ({ x: 0.5, y: 0.6 })) },
+    // Groups against each side, the corners included.
+    {
+      positions: [
+        { x: 0.01, y: 0.5 },
+        { x: 0.99, y: 0.99 },
+      ],
+      participants: [
+        ...Array.from({ length: 5 }, () => ({ x: 0.01, y: 0.5 })),
+        ...Array.from({ length: 5 }, () => ({ x: 0.99, y: 0.99 })),
+      ],
+    },
+    // Someone alone just beside a pair, and two neighbouring positions' groups.
+    {
+      positions: [
+        { x: 0.3, y: 0.5 },
+        { x: 0.36, y: 0.5 },
+      ],
+      participants: [
+        { x: 0.3, y: 0.5 },
+        { x: 0.3, y: 0.5 },
+        { x: 0.34, y: 0.44 },
+        { x: 0.36, y: 0.5 },
+        { x: 0.36, y: 0.5 },
+        { x: 0.7, y: 0.3 },
+        { x: 0.7, y: 0.3 },
+        { x: 0.74, y: 0.3 },
+      ],
+    },
+  ];
+  for (const { positions, participants } of cases) {
+    const points = compassOf(positions, participants);
+    expect(points).toHaveLength(positions.length + participants.length);
+    expect(onChart(points.slice(positions.length))).toBe(true);
+    expect(closest(points)).toBeGreaterThanOrEqual(0.0499);
+    // The positions themselves never move.
+    expect(points.slice(0, positions.length).map(({ x, y }) => ({ x, y }))).toEqual(positions);
+  }
+});
+
+it('turns the half ring upwards at the bottom edge', () => {
+  const spot = { x: 0.4, y: 0.02 };
+  const points = compassOf(
+    [spot],
+    Array.from({ length: 6 }, () => spot),
+  );
+  // None below the position, at the edge; the ring rises above it instead.
+  points.slice(1).forEach((point) => expect(point.y).toBeGreaterThanOrEqual(0.02 - 1e-9));
+  expect(Math.max(...points.slice(1).map((point) => point.y))).toBeGreaterThan(0.06);
+  expect(closest(points)).toBeGreaterThanOrEqual(0.0499);
+});
+
 it('stamps a build with its time and counts', () => {
   const stamp = describeDebateAtlasBuild(build);
   expect(stamp).toMatch(/2026/);
