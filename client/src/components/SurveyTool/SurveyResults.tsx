@@ -760,8 +760,12 @@ const SurveyResults = (props: SurveyResultsProps): React.ReactElement => {
   }
 
   function filterResultsCacheRoot(cache: unknown, slug: string, cacheScope: string): unknown {
-    if (cacheScope !== WORKER_CANONICAL_CACHE_SCOPE_KEY) return cache;
     const node = readResultsScopedCacheNode(cache, slug, cacheScope, {});
+    if (cacheScope !== WORKER_CANONICAL_CACHE_SCOPE_KEY) {
+      // The chain node as the current reader may see it; the rest of the cache passes through.
+      const root = cache as SurveyResultsRecord | null;
+      return !Object.keys(node).length || node === root?.[cacheScope] ? cache : { ...root, [cacheScope]: node };
+    }
     return Object.keys(node).length > 0 ? { [cacheScope]: node } : {};
   }
 

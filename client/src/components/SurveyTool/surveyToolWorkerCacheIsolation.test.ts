@@ -3,6 +3,7 @@ import {
   resolveWorkerCanonicalCacheIdentity,
   withWorkerCanonicalCacheIdentity,
 } from '../../utilities/survey/workerCanonicalCacheIdentity';
+import { setWorkerCanonicalCacheReader } from '../../utilities/survey/workerCanonicalCacheReader';
 import {
   readSurveyToolScopedCacheNode,
   persistSurveyToolCachePatchForCurrentTarget,
@@ -73,6 +74,42 @@ describe('surveyToolWorkerCacheIsolation', () => {
         cacheScope: '11155420',
       }),
     ).toBe(chainNode);
+  });
+
+  it('reads chain text decrypted for another reader, or while signed out, locked without changing the cache', () => {
+    const open = { prompt: 'Open prompt' };
+    const node = {
+      questions: {
+        open,
+        own: { prompt: 'Private prompt', promptEncrypted: 'envelope', promptDecrypted: true, decryptedFor: '0xaaa' },
+      },
+      surveys: {
+        own: {
+          title: 'Private title',
+          titleDecrypted: true,
+          documentURLs: ['https://docs.example/private'],
+          documentURLsDecrypted: true,
+          decryptedFor: '0xaaa',
+        },
+      },
+    };
+    const cache = { '11155420': node };
+    const stored = JSON.stringify(cache);
+    const read = () => readSurveyToolScopedCacheNode({ cache, cacheScope: '11155420' }) as typeof node;
+
+    try {
+      setWorkerCanonicalCacheReader('0xAAA');
+      expect(read()).toBe(node);
+      for (const reader of ['0xbbb', '']) {
+        setWorkerCanonicalCacheReader(reader);
+        expect(read().questions.own).toEqual({ prompt: '[encrypted]', promptEncrypted: 'envelope' });
+        expect(read().questions.open).toBe(open);
+        expect(read().surveys.own).toEqual({ title: '[encrypted]', documentURLs: [] });
+      }
+      expect(JSON.stringify(cache)).toBe(stored);
+    } finally {
+      setWorkerCanonicalCacheReader('');
+    }
   });
 
   it('allows chain fallback only for a resolved chain cache scope', () => {
