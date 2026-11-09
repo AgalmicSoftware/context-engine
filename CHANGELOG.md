@@ -144,6 +144,15 @@ All notable changes to this project will be documented in this file.
 - An on-chain survey edit checks the stored copy again just before sending, so an edit saved from another tab or device moments earlier isn't overwritten.
 - Adding a template's questions to a session removes only what was uploaded. A question edited or added while the upload ran stays in the draft.
 - A rating with the same wording but a different scale, step or end labels is no longer reported as already published when another author owns its ID. The upload is refused instead, because the two still share an ID.
+- Results no longer keeps showing the previous account's survey title, links and answers after you sign out or switch accounts.
+- If the wallet switches accounts during an answer or survey upload, the transaction isn't sent from the other account; the app asks you to switch back and try again.
+- When a sent transaction's result can't be read, the app says it was sent but not confirmed, and to check your wallet before retrying, instead of reporting a failure or a revert. Creating an SBT group no longer suggests a retry that could deploy a second one.
+- Lowering a session's end block removes later answers from Question and Survey Results, showing a person's earlier answer within the range instead. Raising it again brings the later answers back.
+- A session keeps its name, Worker link and hidden questions when a reload can't read its metadata, instead of losing them.
+- On private sessions, signed-in people can lock a context file to one of the session's groups; before, the group list stayed empty. The list no longer shows another session's or account's groups.
+- **Add transcript to context** uploads as the account that submitted and skips an upload still queued when you switch accounts. Submitting again before the last upload finishes replaces its copy instead of adding the transcript twice. The next account to submit on the same device adds its own copy and leaves the previous account's in place.
+- The questions CSV includes each question's rating scale, pick-one setting and pick limit.
+- Dictation longer than about five minutes is transcribed in parts instead of failing, and a failed transcription says so and stays on screen.
 
 ### Workers — requires redeployment
 
@@ -191,6 +200,13 @@ All notable changes to this project will be documented in this file.
 - Automatic Results analysis uses the stored answer rather than its shortened copy in the queue, once the stored one is listed.
 - A bootstrap upload applies the signed-origin check login uses, so an admin's signature made for another site is refused before its nonce is spent. It now needs a browser `Origin` header from a trusted origin.
 - An access rule gives the same answer in any order. A member or admin who qualifies through one condition is let in while another condition's group check is down, instead of getting a 503, and a failed condition in an all-of rule refuses with 403.
+- A first upload that fails partway no longer leaves its ID free for another author to claim; its author can retry it.
+- Agent answer drafts are kept under the question's full ID, so a question with a crafted ID can't share another question's draft.
+- When storage can't read an agent's earlier draft, saving the draft fails with the retryable `answer_draft_read_failed`, instead of resetting its edit count and origin.
+- An agent re-posting a question can't change its options or scale under earlier answers, or bring back an archived one: the re-post is refused with `question_schema_conflict` or `question_archived`. An identical re-post leaves the stored question as it is.
+- An agent's batch of new questions reports every question it stored. Before, it could report stored questions as skipped.
+- Hiding a question from the Storage panel also has the saved interview opening written again, and an interview no longer shares an opening still being written for a different set of hidden questions.
+- The Worker's AI features and the context list find context files among hundreds of other library files. Before, about 300 other files could leave the AI without context, with no sign of it; a failed context scan is now logged.
 
 ### Benchmark
 
