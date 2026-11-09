@@ -53,6 +53,7 @@ import {
 import { getWorkerCanonicalRouteController } from './workerCanonicalRouteController.js';
 import { getSessionAtlasRedirect, getSessionEntryRedirect } from './sessionEntryRedirect';
 import { isRxcSessionEntryPath } from '../../utilities/session/rxcSessionSlugs';
+import { resolveWorkerCanonicalSessionIdHex } from '../../utilities/session/sessionWorkerDiscovery';
 import {
   resolveExplicitWorkerSessionConfig,
   resolveExplicitWorkerSessionNetwork,
@@ -1194,10 +1195,17 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
         sessionConfig: effectiveSessionConfig,
         fallbackNetwork: host.getSessionNetwork(resolvedSlug) || defaultSessionNetwork,
       });
+      // Another session, or this slug on another Worker, starts a fresh page, not the last one's edits.
+      const settingsKey = JSON.stringify([
+        workerOrigin || effectiveSessionConfig.corsWorkerUrl || '',
+        resolvedSlug,
+        resolveWorkerCanonicalSessionIdHex(effectiveSessionConfig),
+      ]);
       return (
         <InitialRouteBoundary fallback={<LazyFallback label="Loading settings..." />} resetKey={fullPath}>
           <div data-testid={E2E_TESTIDS.PAGE_SESSION_SETTINGS_ROOT}>
             <SessionSettingsPage
+              key={settingsKey}
               provider={host.props.provider}
               account={host.props.account}
               network={sessionNetwork}

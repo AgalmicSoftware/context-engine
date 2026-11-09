@@ -447,6 +447,34 @@ describe('SessionSettingsPage', () => {
     expect(screen.getByTestId('ce-settings-content-changes')).not.toHaveTextContent('Description');
   });
 
+  it('drops a Worker copy that arrives after the page moved to another session', async () => {
+    const otherWorker = 'https://other-salon.example.workers.dev';
+    const other = workerConfig({ slug: 'other-salon', sessionName: 'Other salon', corsWorkerUrl: otherWorker });
+    let resolveEarlier: (value: unknown) => void = () => {};
+    mockFetchBootstrap
+      .mockReturnValueOnce(new Promise((resolve) => (resolveEarlier = resolve)))
+      .mockResolvedValueOnce({ ...bootstrapOf(other), sessionSlug: 'other-salon', workerOrigin: otherWorker });
+    const view = renderPage();
+    view.rerender(
+      <SessionSettingsPage
+        account={ADMIN}
+        loginComplete
+        toggleLoginModal={jest.fn()}
+        sessionSlug="other-salon"
+        sessionConfig={other}
+        workerOrigin={otherWorker}
+      />,
+    );
+    await waitFor(() => expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME)).toHaveValue('Other salon'));
+
+    await act(async () => {
+      resolveEarlier(bootstrapOf(workerConfig({ sessionName: 'Edit salon, late' })));
+    });
+    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME)).toHaveValue('Other salon');
+    expect(mockUpsertBootstrap).toHaveBeenCalledTimes(1);
+    expect(mockUpsertBootstrap).toHaveBeenCalledWith(expect.objectContaining({ slug: 'other-salon' }));
+  });
+
   describe('an on-chain session', () => {
     const registryConfig = (registry: Record<string, unknown> = {}) => {
       const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED);

@@ -169,15 +169,17 @@ const SessionSettingsPage = ({
     setDraft((prev) => (keepEdits ? rebaseSessionSettingsDraft(prev, base, fresh) : buildSessionSettingsDraft(fresh)));
   }, []);
 
-  // The Worker's own copy is the "before" for a Worker-hosted session.
+  // The Worker's own copy is the "before" for a Worker-hosted session. A copy
+  // that arrives after the page moved to another session is dropped.
   const refresh = useCallback(
-    async (keepEdits = true) => {
+    async (keepEdits = true, stale: () => boolean = () => false) => {
       if (!capabilities.isWorkerCanonical || !workerOrigin) return null;
       const bootstrap = await fetchWorkerCanonicalSessionBootstrap({
         sessionSlug,
         workerQueryValue: workerOrigin,
         ...(fetchImpl ? { fetchImpl } : {}),
       });
+      if (stale()) return null;
       upsertWorkerCanonicalSessionBootstrap({
         slug: bootstrap.sessionSlug,
         sessionIdHex: bootstrap.sessionId,
@@ -192,7 +194,13 @@ const SessionSettingsPage = ({
   );
 
   useEffect(() => {
-    refresh().catch(() => setStatus('Couldn’t load the latest settings from the Session Worker.'));
+    let stale = false;
+    refresh(true, () => stale).catch(() => {
+      if (!stale) setStatus('Couldn’t load the latest settings from the Session Worker.');
+    });
+    return () => {
+      stale = true;
+    };
   }, [refresh]);
 
   // An on-chain session's config arrives through the registry cache.
