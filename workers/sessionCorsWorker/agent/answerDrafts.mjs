@@ -257,9 +257,16 @@ export async function persistAnswerDraft({
   if (!key || !env?.AGENT_ACTION_KV || typeof env.AGENT_ACTION_KV.put !== 'function') {
     return { ok: false, reason: 'action_kv_unavailable' };
   }
-  const existing = typeof env.AGENT_ACTION_KV.get === 'function'
-    ? safeJsonParse(await env.AGENT_ACTION_KV.get(key).catch(() => null), null)
-    : null;
+  let stored = null;
+  if (typeof env.AGENT_ACTION_KV.get === 'function') {
+    try {
+      stored = await env.AGENT_ACTION_KV.get(key);
+    } catch {
+      // Saving without the draft's history would reset its edit count and origin.
+      return { ok: false, reason: 'answer_draft_read_failed' };
+    }
+  }
+  const existing = safeJsonParse(stored, null);
   const previous = existing && typeof existing === 'object' && !Array.isArray(existing) ? existing : null;
   const savedAt = createdAt || nowIso();
   const record = {

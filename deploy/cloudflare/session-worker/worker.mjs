@@ -63121,7 +63121,15 @@ async function persistAnswerDraft({
   if (!key || !env?.AGENT_ACTION_KV || typeof env.AGENT_ACTION_KV.put !== "function") {
     return { ok: false, reason: "action_kv_unavailable" };
   }
-  const existing = typeof env.AGENT_ACTION_KV.get === "function" ? safeEnvJsonParse(await env.AGENT_ACTION_KV.get(key).catch(() => null), null) : null;
+  let stored = null;
+  if (typeof env.AGENT_ACTION_KV.get === "function") {
+    try {
+      stored = await env.AGENT_ACTION_KV.get(key);
+    } catch {
+      return { ok: false, reason: "answer_draft_read_failed" };
+    }
+  }
+  const existing = safeEnvJsonParse(stored, null);
   const previous = existing && typeof existing === "object" && !Array.isArray(existing) ? existing : null;
   const savedAt = createdAt || nowIso2();
   const record4 = {

@@ -472,3 +472,29 @@ test('distinct question ids never share a draft record', async () => {
   // One question's id in another letter case is still that question.
   assert.equal((await read(`0x${second.slice(2).toUpperCase()}`)).answerLabel, 'Agree');
 });
+
+test('a draft whose history cannot be read is not saved over', async () => {
+  const env = draftEnv();
+  await saveAgentDraft(env);
+  const get = env.AGENT_ACTION_KV.get.bind(env.AGENT_ACTION_KV);
+  env.AGENT_ACTION_KV.get = async () => {
+    throw Object.assign(new Error('agent_storage_unavailable'), { reason: 'agent_storage_unavailable', status: 503 });
+  };
+  const failed = await persistAnswerDraft({
+    env,
+    normalized: NORMALIZED,
+    sessionSlug: 'alpha',
+    selectedQuestionId: 'q-binary',
+    answerLabel: 'Disagree',
+    answerValue: JSON.stringify({ questionType: 'binary', value: 'disagree', comments: '' }),
+    controlType: 'agree_unsure_disagree',
+    metadata: { source: 'mini_app' },
+    createdAt: '2026-06-11T10:05:00.000Z',
+  });
+  assert.deepEqual(failed, { ok: false, reason: 'answer_draft_read_failed' });
+  env.AGENT_ACTION_KV.get = get;
+  const draft = await readAnswerDraft({ env, normalized: NORMALIZED, sessionSlug: 'alpha', selectedQuestionId: 'q-binary' });
+  assert.equal(draft.answerLabel, 'Agree');
+  assert.equal(draft.origin.source, 'agent_handoff');
+  assert.equal(draft.origin.savedAt, '2026-06-11T10:00:00.000Z');
+});
