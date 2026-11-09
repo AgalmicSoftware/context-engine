@@ -27,13 +27,16 @@ The quick path needs only a name, a Cloudflare API token and the OpenAI key.
 filled. Signing in with your passkey is the confirmation step: Create then
 deploys the Session Worker through the deploy helper, saves the signed session
 config and reads it back. **Deploy the Worker now** runs the deploy step early
-if you want to check the Worker first. The token and keys are request-only:
-they are never stored in the browser, the address bar, templates or the
-session config. The default deploy helper is the project's, and its operator can
-see the token, the keys sent with it, and the Worker secrets it generates; see
-[API token setup and handling](session-cors-worker.md#api-token-setup-and-handling).
-The token-free path, a guided Cloudflare dashboard handoff, is under Hosting and
-storage → More; once its Worker is verified, Create needs no token. Lit profiles
+if you want to check the Worker first.
+
+The token and keys are request-only: they are never stored in the browser, the
+address bar, templates or the session config. The default deploy helper is the
+project's, and its operator can see the token, the keys sent with it, and the
+Worker secrets it generates; see [API token setup and
+handling](session-cors-worker.md#api-token-setup-and-handling).
+
+The token-free path is a guided Cloudflare dashboard handoff under Hosting and
+storage → More. Once its Worker is verified, Create needs no token. Lit profiles
 cannot use it. Both paths need a Cloudflare account.
 
 The app's passkey-derived EOA supplies the admin identity and signs the worker
@@ -117,51 +120,71 @@ Each section shows only the settings the chosen hosting supports:
 A pure Worker session does not display or persist block numbers, registry
 contracts, Surveys contracts, faucet settings, or an Ethereum network.
 
-Most sessions can leave Participation at its defaults. **Colors** in Basics
-chooses a curated color scheme. **Who can create groups** in Participation is a
-dropdown: **Anyone in the session** or **Admins only**. **Voice interviews and
-AI prefill** defaults on. **Interview settings** show only while it is on;
-turning it off hides them and keeps their values. They include the OpenAI
-**Interview voice model**, defaulting to `gpt-live-1`; `/new` publishes this as
-`interviewMode.realtimeModel` for both Worker-canonical and Arweave-backed
-sessions. It also lets owners supply an opening question, add an optional
-`interviewMode.steeringPrompt`, or use the default generated opening.
-Automatic regeneration and discovery of new questions during a call are off by
-default; when enabled their default addition threshold is 20%. Question
-suggestions are optional and off by default. Admin refresh is on by default.
-**Measure how well AI represents participants**, at the top of Interview
-settings, turns on three of the settings below together: research sharing by
-default, hidden drafts for 1 in 5 AI-prefill drafts, and the participant score.
-Turning it off sets them back to their defaults, and each stays editable; see
-[Measure how well AI represents participants](#measure-how-well-ai-represents-participants).
-**Share AI draft changes for research by default** controls the initial review
-checkbox through `interviewMode.shareDraftChangesByDefault` (off when unset).
-Participants can change it before submitting, and their saved choices are retained.
-**AI draft research detail** (`interviewMode.researchDetail`) decides what a shared
-comparison keeps: `minimal` (the default) has no AI notes or drafted text; `full`
-adds them and drafts for skipped questions. **Hidden AI drafts**
-(`interviewMode.hiddenDraftShare`, off by default) hides a share of each
-participant's AI-prefill drafts until they answer, to measure how much seeing
-a draft sways answers; it applies only while they share draft changes. **Show
-participants how well their AI predicted them** (`interviewMode.showFidelityScore`,
-off by default) shows a private score after someone submits AI-prefill drafts.
-**Suggest open groups that fit participants’ answers**
-(`interviewMode.suggestGroups`, off by default) offers the session's open groups
-after an interview or AI prefill, without joining for anyone. **Show “How well
-AIs predicted people” in Results** (`interviewMode.showFidelityResults`, off by
-default) adds that section to the Results report once its responses include
-AI-prefill drafts from 5 people; **Smallest group shown in “How well AIs
-predicted people”** (`interviewMode.fidelityMinimumPeople`), under it, changes
-that number, and **Off** shows every figure. Older Session Workers reject
-settings they don't know, so each is saved only when changed from its default:
-the sharing default needs a 0.7.0 or later Session Worker, and `full` detail,
-hidden drafts, the score, group suggestions, the Results section and its
-smallest group need one newer than 0.8.0. See
-[session-interview-research.md](session-interview-research.md) and
-[session-listening-mode.md](session-listening-mode.md).
-Generation waits for public questions and uses the session's fast model with the
-Worker-held key for its provider.
-See [Interview settings and lifecycle](session-listening-mode.md#interview).
+Most sessions can leave Participation at its defaults. **Who can create groups**
+is a dropdown: **Anyone in the session** or **Admins only**. **Voice interviews
+and AI prefill** defaults on. **Interview settings** show only while it is on;
+turning it off hides them and keeps their values.
+
+Interview settings for the call:
+
+- **Interview voice model** is the OpenAI voice model, `gpt-live-1` by default.
+  `/new` publishes it as `interviewMode.realtimeModel` for both Worker-canonical
+  and Arweave-backed sessions.
+
+- The opening: owners can supply an opening question, add an optional
+  `interviewMode.steeringPrompt`, or use the default generated opening.
+  Generation waits for public questions and uses the session's fast model with
+  the Worker-held key for its provider.
+
+- Automatic regeneration and discovery of new questions during a call are off by
+  default; when enabled, their default addition threshold is 20%. Question
+  suggestions are optional and off by default. Admin refresh is on by default.
+
+- **Suggest open groups that fit participants’ answers**
+  (`interviewMode.suggestGroups`, off by default) offers the session's open
+  groups after an interview or AI prefill, without joining for anyone.
+
+Interview settings for research:
+
+- **Measure how well AI represents participants**, at the top of Interview
+  settings, turns on three of the settings below together: research sharing by
+  default, hidden drafts for 1 in 5 AI-prefill drafts, and the participant
+  score. Turning it off sets them back to their defaults, and each stays
+  editable; see [Measure how well AI represents
+  participants](#measure-how-well-ai-represents-participants).
+
+- **Share AI draft changes for research by default**
+  (`interviewMode.shareDraftChangesByDefault`, off when unset) sets the initial
+  review checkbox. Participants can change it before submitting, and their saved
+  choices are retained.
+
+- **AI draft research detail** (`interviewMode.researchDetail`) decides what a
+  shared comparison keeps: `minimal` (the default) has no AI notes or drafted
+  text; `full` adds them and drafts for skipped questions.
+
+- **Hidden AI drafts** (`interviewMode.hiddenDraftShare`, off by default) hides
+  a share of each participant's AI-prefill drafts until they answer, to measure
+  how much seeing a draft sways answers. It applies only while they share draft
+  changes.
+
+- **Show participants how well their AI predicted them**
+  (`interviewMode.showFidelityScore`, off by default) shows a private score
+  after someone submits AI-prefill drafts.
+
+- **Show “How well AIs predicted people” in Results**
+  (`interviewMode.showFidelityResults`, off by default) adds that section to the
+  Results report once its responses include AI-prefill drafts from 5 people.
+  **Smallest group shown in “How well AIs predicted people”**
+  (`interviewMode.fidelityMinimumPeople`), under it, changes that number;
+  **Off** shows every figure.
+
+Older Session Workers reject settings they don't know, so each is saved only
+when changed from its default. The sharing default needs a 0.7.0 or later
+Session Worker; `full` detail, hidden drafts, the score, group suggestions, the
+Results section and its smallest group need one newer than 0.8.0. See
+[session-interview-research.md](session-interview-research.md),
+[session-listening-mode.md](session-listening-mode.md) and [Interview settings
+and lifecycle](session-listening-mode.md#interview).
 
 Results analysis input includes each question prompt once, capped at 900 characters
 (including any response-provided fallback text). Response rows refer to included
@@ -399,7 +422,7 @@ which capabilities are reachable:
 | Cloudflare, Worker envelope                | Session Worker + Cloudflare; `gate: "role_gate"`, `encryption: "worker_envelope"` (the `fast_cheap_cloudflare` preset) | Passkey + **Native Worker Groups**                                                                 | None unless an explicit `sbt_onchain` condition is added                              |
 | Cloudflare + explicit `sbt_onchain`        | Session Worker + Cloudflare; Worker envelope                 | Passkey + **Native Worker Groups**; SBT conditions are separate **Advanced on-chain access gates** | Positive chain ID and RPC; wallet/gas only when `/new` must create an SBT             |
 | Cloudflare + Lit                           | Session Worker + Cloudflare; `encryption: "lit"`             | Passkey + **Native Worker Groups**                                                                 | Positive chain ID, RPC, and Lit credential; this does not make the registry canonical |
-| On-chain registry                          | Ethereum registry + Arweave; Session Worker for AI, auth and Arweave uploads; `encryption: "none"` or `"lit"` | Wallet with passkey support + on-chain SBT Groups                                 | Compatible Session Worker, chain/RPC, registry transactions, gas, and Arweave; Lit also needs its credential |
+| On-chain registry                          | Ethereum registry + Arweave; Session Worker for AI, auth and Arweave uploads; `encryption: "none"` or `"lit"` | Wallet with passkey support + on-chain Soulbound Tokens for Groups                | Compatible Session Worker, chain/RPC, registry transactions, gas, and Arweave; Lit also needs its credential |
 
 Agent Session Wrapped, result-visibility, and export choices do not change that ownership split. Profiles marked
 schema-only or unavailable, and malformed or cross-lineage profiles, do not
@@ -432,30 +455,32 @@ The profile's settings are grouped by section:
 
 Every edit marks the profile `custom`, and storage has one visible authority.
 Publishing writes `sessionModeProfile` as the source of truth and compiles it to
-the storage profile and payload-access fields the runtime reads.
-The publish boundary sends one canonical object-valued `storageProfile`; its
-backend, payload gate, encryption mode, and effective access-condition document
-must agree with the validated profile. Deploy, signed config mutation, and
-public Worker readback all fail closed on missing, ambiguous, or divergent
+the storage profile and payload-access fields the runtime reads. The publish
+boundary sends one canonical object-valued `storageProfile`; its backend,
+payload gate, encryption mode, and effective access-condition document must
+agree with the validated profile. Deploy, signed config mutation, and public
+Worker readback all fail closed on missing, ambiguous, or divergent
 profile/storage policy.
+
 Switching **Runs on** also replaces storage, identity and authorization: Session
 Worker uses Cloudflare with passkey plus Worker roles, while On-chain registry
 uses Arweave with wallet plus on-chain SBT authorization. A stale wallet, Worker
 role, or legacy top-level chain ID cannot survive that switch as a hidden
 capability. The **Storage** selector changes only storage, including its payload
 access gate; identity and authorization stay as set.
-The wizard validates that profile at the publish boundary and rechecks the live
-draft after asynchronous identity and duplicate-session preflight. A profile
-edit made while preflight is running therefore still stops before upload,
-worker, or registry side effects. Invalid settings also show beside the option.
-Mode values are exact enums at every write boundary:
-explicit blanks, friendly aliases, unknown values, and reserved key providers
-are rejected rather than normalized to a less-protective default. Legacy aliases
-remain readable only for stored compatibility.
-Enabling Agent HTTP adds token login alongside ordinary wallet/passkey
-web participation; it does not replace the web session page. New client writes
-keep the reserved `surfaces.telegram` and
-`surfaces.miniApp` booleans false.
+
+The wizard validates the profile at the publish boundary and rechecks the live
+draft after asynchronous identity and duplicate-session preflight, so a profile
+edit made while preflight is running still stops before upload, worker, or
+registry side effects. Invalid settings also show beside the option. Mode values
+are exact enums at every write boundary: explicit blanks, friendly aliases,
+unknown values, and reserved key providers are rejected rather than normalized
+to a less-protective default. Legacy aliases remain readable only for stored
+compatibility.
+
+Enabling Agent HTTP adds token login alongside ordinary wallet/passkey web
+participation; it does not replace the web session page. New client writes keep
+the reserved `surfaces.telegram` and `surfaces.miniApp` booleans false.
 
 `/new` has no steps. The rest of this walkthrough groups its sections by topic:
 
@@ -579,40 +604,45 @@ invite-only.
 
 Before publishing a worker-canonical session, the **Session Access** panel in
 Access and identity can queue Groups through the same form used by normal Worker
-Group creation. Queued
-Group drafts collapse independently while preserving their edits. Each
-draft supports a name, description, image URL or local image file, tags, public
-HTTPS reference URLs, member limit, self-join deadline, group-admin address,
-join mode, and member visibility. Durable text and URL metadata stays in the
-recoverable browser wizard state. A selected local image file stays only in the
-current tab; after the canonical Worker origin, slug, and session ID are
-verified, publish uploads it through the selected session storage and writes
-the resulting public URL back into the draft before creating the Group. Publish
-then creates queued Groups with stable IDs and merges the session's default
-Group tags with each draft's tags. If creation is interrupted, retrying reuses
-an identical already-created ID and continues instead of duplicating it. A
-conflicting record, failed image upload, or other Worker error leaves the
+Group creation. Queued Group drafts collapse independently while preserving
+their edits. Each draft supports a name, description, image URL or local image
+file, tags, public HTTPS reference URLs, member limit, self-join deadline,
+group-admin address, join mode, and member visibility.
+
+Durable text and URL metadata stays in the recoverable browser wizard state. A
+selected local image file stays only in the current tab; after the canonical
+Worker origin, slug, and session ID are verified, publish uploads it through the
+selected session storage and writes the resulting public URL back into the draft
+before creating the Group.
+
+Publish then creates queued Groups with stable IDs and merges the session's
+default Group tags with each draft's tags. If creation is interrupted, retrying
+reuses an identical already-created ID and continues instead of duplicating it.
+A conflicting record, failed image upload, or other Worker error leaves the
 wizard recoverable and reports the failure instead of marking the session
 complete.
 
 After publishing, the session's Groups section manages those native Cloudflare
-records and adds the full editing surface. The worker admin supplies the group name, optional
-description and HTTPS image, tags, public HTTPS reference URLs, an optional
-per-group member limit, an optional self-join deadline, group-admin address,
-join mode, and visibility. The deadline closes participant self-join; configured
-session admins can still manage membership. Image input supports a
-direct HTTPS URL, clipboard paste, or local upload with preview; uploaded files
-are published through the selected session storage before the group record is
-created. Public, ungated sessions can render stored group artwork before
-sign-in, while private-session storage reads keep using the authenticated
-session credential. No SBT contract is deployed, so there is no contract
-address, network transaction, gas payment, RPC setting, or burn authorization.
-The client pins the validated Worker origin,
-canonical slug, and canonical session ID. Worker-canonical nonce/login requests,
-login responses, JWTs, Group requests, Group responses, stored records, and the
-Durable Object coordinator all carry or verify that same slug/session-ID pair.
-A failed, unreachable, mismatched, stale, or empty Worker response never falls
-back to a generic Worker cache, SBT discovery, or a global session scan.
+records and adds the full editing surface. The worker admin supplies the group
+name, optional description and HTTPS image, tags, public HTTPS reference URLs,
+an optional per-group member limit, an optional self-join deadline, group-admin
+address, join mode, and visibility. The deadline closes participant self-join;
+configured session admins can still manage membership. No SBT contract is
+deployed, so there is no contract address, network transaction, gas payment, RPC
+setting, or burn authorization.
+
+Image input supports a direct HTTPS URL, clipboard paste, or local upload with
+preview; uploaded files are published through the selected session storage
+before the group record is created. Public, ungated sessions can render stored
+group artwork before sign-in, while private-session storage reads keep using the
+authenticated session credential.
+
+The client pins the validated Worker origin, canonical slug, and canonical
+session ID. Worker-canonical nonce/login requests, login responses, JWTs, Group
+requests, Group responses, stored records, and the Durable Object coordinator
+all carry or verify that same slug/session-ID pair. A failed, unreachable,
+mismatched, stale, or empty Worker response never falls back to a generic Worker
+cache, SBT discovery, or a global session scan.
 
 A Worker/SBT hybrid still uses native Worker Groups for participation. Its
 configured SBT conditions appear separately as **Advanced on-chain access
@@ -1285,18 +1315,20 @@ For the API token path, also verify that the request-only Cloudflare API token
 has permission to manage Workers scripts and KV and that it can see exactly one
 account.
 
-Hosted Worker verification writes and reads back the prepared public configuration
-without finalizing publication. You can edit and verify again; **Create** writes
-the final publication revision. Verifying an edited session description preserves
-existing sign-ins; authority changes still revoke them. Edits replace what an earlier verification
-stored: a blank end time is sent as `""` and blank request limits as `null`,
-so a cleared value does not stay on the Worker. The browser compares the shared
-public fields, including session appearance and the Worker URL's origin. It
-skips fields the Worker sets itself: the authorization epoch, the publication
-marker, the response field encryption it reports on every read, and, before
-publication, a revision the deploy helper staged. If verification fails, the
-wizard shows the reason: the Worker's error for a rejected write, or where the
-read-back config differs, naming the fields it lacks or adds.
+Hosted Worker verification writes and reads back the prepared public
+configuration without finalizing publication. You can edit and verify again;
+**Create** writes the final publication revision. Verifying an edited session
+description preserves existing sign-ins; authority changes still revoke them.
+
+Edits replace what an earlier verification stored: a blank end time is sent as
+`""` and blank request limits as `null`, so a cleared value does not stay on the
+Worker. The browser compares the shared public fields, including session
+appearance and the Worker URL's origin. It skips fields the Worker sets itself:
+the authorization epoch, the publication marker, the response field encryption
+it reports on every read, and, before publication, a revision the deploy helper
+staged. If verification fails, the wizard shows the reason: the Worker's error
+for a rejected write, or where the read-back config differs, naming the fields
+it lacks or adds.
 
 Retrying queued Group creation compares canonical HTTPS image and document URLs,
 so a host-only URL and the same URL with a trailing slash reuse the saved Group.
@@ -1353,18 +1385,22 @@ on long audio, so uploads to them go in pieces of at most five minutes. OpenAI
 requests use standard processing (`service_tier: default`) unless a caller
 explicitly selects another tier. GPT-Live voice settings are separate.
 
-Setup offers `gpt-6.1-terra`, `gpt-6-luna`, `gpt-6.1-sol` and `gpt-6-astra`
-from OpenAI, and the Claude 5.5 models and Claude Fable 5.1 from Anthropic.
+Setup offers `gpt-6.1-terra`, `gpt-6-luna`, `gpt-6.1-sol` and `gpt-6-astra` from
+OpenAI, and the Claude 5.5 models and Claude Fable 5.1 from Anthropic. The
+account presets are GPT-6.1 Terra and Sol (the default), GPT-6 Astra, Claude
+Sonnet 5.5 and Claude Opus 5.5; a saved preset follows its current models, and a
+removed one falls back to the default.
+
 Existing sessions keep the models they store. A session that stores none names
 no model in its requests, so its Worker chooses: `gpt-6.1-terra` for both lanes
-from 0.9.0, and `gpt-5.6-terra` on earlier Workers. The account presets are
-GPT-6.1 Terra and Sol (the default), GPT-6 Astra, Claude Sonnet 5.5 and Claude
-Opus 5.5; a saved preset follows its current models, and a removed one falls
-back to the default. Claude 5 models, Claude Opus 4.5 or later and Claude
-Sonnet 4.6 or later get the reasoning effort and any JSON schema; older Claude
-models get neither and follow the answer format the prompt describes. A Claude
-refusal or empty answer comes back as an error. Bundled demos without their own
-Worker use these defaults; a demo with its own Worker keeps the models it stores.
+from 0.9.0, and `gpt-5.6-terra` on earlier Workers. Bundled demos without their
+own Worker use these defaults; a demo with its own Worker keeps the models it
+stores.
+
+Claude 5 models, Claude Opus 4.5 or later and Claude Sonnet 4.6 or later get the
+reasoning effort and any JSON schema; older Claude models get neither and follow
+the answer format the prompt describes. A Claude refusal or empty answer comes
+back as an error.
 
 ### Sharing questions
 
@@ -1383,31 +1419,43 @@ full explorer with the selected session included as `?session=<session-slug>`
 (`?session=general` for General). Ctrl/Cmd-click on a tag opens its session-scoped
 link directly.
 
+### Question pile controls
+
 The question pile’s microphone button sits beside the question-actions menu on
 small screens and remains directly visible in the desktop toolbar. It opens the
-voice-mode chooser when the session supports voice features, or resumes an unfinished
-interview. Its idle appearance matches the adjacent controls; an interview in progress
-keeps the microphone emphasized even after closing the modal. Closing stops audio
-capture and retains the transcript and review edits on the current page. Reopen to
-continue, submit, or explicitly discard the interview. Reloading or leaving the page
-clears this in-memory interview; closing does not submit responses. Importing a different
-prefill packet starts a new review, while reopening the same packet retains review edits.
-On small screens,
-Submit and Clear stay beside the menu and microphone. Submit and its pending count
-retain full-size text on phones. When the controls need more
-width, the navigation arrows wrap onto a right-aligned row below, with extra vertical
-space separating them from Clear. On that separate row, the arrows closely frame a
-horizontal question counter (for example, **5 / 50**). The counter only stacks when
-it needs to fit into a shared control row. Mobile question cards keep the same height
-across question types and prompt lengths, so the navigation stays in place. Long
-prompts use the space left by each answer type and shrink only when they overflow,
-down to the normal body-text size. Longer text remains scrollable. Binary choices
-use their original larger sizing when the full-size prompt and controls fit;
-otherwise they share one compact row. Rating sliders sit at the card's vertical
-center when the prompt and footer leave enough room. Multichoice options use two
-rows with horizontal scrolling.
-These layout adjustments apply only at narrow phone widths (480px and below);
-wider views retain their existing typography, button sizes, and answer layout.
+voice-mode chooser when the session supports voice features, or resumes an
+unfinished interview. Its idle appearance matches the adjacent controls; an
+interview in progress keeps the microphone emphasized even after closing the
+modal.
+
+Closing stops audio capture and retains the transcript and review edits on the
+current page. Reopen to continue, submit, or explicitly discard the interview.
+Reloading or leaving the page clears this in-memory interview; closing does not
+submit responses. Importing a different prefill packet starts a new review,
+while reopening the same packet retains review edits.
+
+At narrow phone widths (480px and below) the layout adjusts as follows; wider
+views retain their existing typography, button sizes, and answer layout.
+
+- Submit and Clear stay beside the menu and microphone. Submit and its pending
+  count retain full-size text.
+
+- When the controls need more width, the navigation arrows wrap onto a
+  right-aligned row below, with extra vertical space separating them from Clear.
+  On that row the arrows closely frame a horizontal question counter (for
+  example, **5 / 50**), which only stacks when it needs to fit into a shared
+  control row.
+
+- Question cards keep the same height across question types and prompt lengths,
+  so the navigation stays in place. Long prompts use the space left by each
+  answer type and shrink only when they overflow, down to the normal body-text
+  size. Longer text remains scrollable.
+
+- Binary choices use their original larger sizing when the full-size prompt and
+  controls fit; otherwise they share one compact row. Rating sliders sit at the
+  card's vertical center when the prompt and footer leave enough room.
+  Multichoice options use two rows with horizontal scrolling.
+
 Above 768px, the navigation arrows and question-action icons form one evenly
 spaced vertical rail alongside the full card height, with the question counter
 between the two arrows.
@@ -1419,6 +1467,8 @@ selecting an action, clicking outside, or pressing Escape dismisses the menu.
 In the expanded question-card rating controls, Conviction and Importance each
 show their value directly beside the label. For quadratic questions, these
 expanded controls sit below the centered option-scroll arrows.
+
+### Group drafts and tag suggestions
 
 Participant Group drafts remain attached to the session ID, slug and Worker URL.
 Configuration refreshes preserve edited fields. New default tags update only an
