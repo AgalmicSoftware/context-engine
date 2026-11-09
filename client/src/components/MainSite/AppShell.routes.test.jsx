@@ -204,6 +204,21 @@ jest.mock('../SurveyTool/SurveyTool', () => {
   };
 });
 
+// Holds an edit in its own state, like the real page's draft.
+jest.mock('../Sessions/settings/SessionSettingsPage', () => {
+  const React = require('react');
+  const MockSessionSettingsPage = (props) => {
+    const [draft, setDraft] = React.useState(String(props.sessionConfig?.sessionName || ''));
+    return React.createElement('input', {
+      'aria-label': 'Session name',
+      'data-testid': 'mock-session-settings-draft',
+      value: draft,
+      onChange: (event) => setDraft(event.target.value),
+    });
+  };
+  return { __esModule: true, default: MockSessionSettingsPage };
+});
+
 jest.mock('../DocumentLibrary/SessionDocumentsPage', () => {
   const React = require('react');
   return {
@@ -2519,6 +2534,25 @@ describe('AppShell route render smoke', () => {
       'data-session-id-hex',
       '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
     );
+  });
+
+  it('gives another session’s settings a fresh page instead of the last one’s edits', async () => {
+    const edge = buildSessionConfig();
+    seedSessionRegistryCache(edge);
+    const view = render(createSubject({ path: '/session/edge/settings', sessionConfig: edge }).render());
+    const draft = await screen.findByTestId('mock-session-settings-draft');
+    expect(draft).toHaveValue('Edge Session');
+    fireEvent.change(draft, { target: { value: 'Edited for edge' } });
+
+    const harbor = buildSessionConfig({
+      slug: 'harbor',
+      sessionName: 'Harbor Session',
+      __registry: { sessionIdHex: '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb' },
+    });
+    seedSessionRegistryCache(harbor);
+    view.rerender(createSubject({ path: '/session/harbor/settings', sessionConfig: harbor }).render());
+
+    await waitFor(() => expect(screen.getByTestId('mock-session-settings-draft')).toHaveValue('Harbor Session'));
   });
 
   it('forwards validated worker discovery to an unregistered worker-canonical docs route', async () => {
