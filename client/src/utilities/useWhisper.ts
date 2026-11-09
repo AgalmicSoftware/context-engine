@@ -578,6 +578,10 @@ export const useWhisper = ({
           apiKey,
           signal: controller.signal,
         });
+      } catch (error) {
+        // A second stop or a reset cancelled this request, and what replaced it reports instead.
+        if (controller.signal.aborted) return null;
+        throw error;
       } finally {
         if (finalAbortControllerRef.current === controller) finalAbortControllerRef.current = null;
       }
@@ -837,7 +841,7 @@ export const useWhisper = ({
           if (finalWavBlob && finalWavBlob.size > 0) {
             try {
               const finalText = await transcribeRecording(finalWavBlob);
-              if (!ownsRecordingAttempt(attempt)) return;
+              if (finalText === null || !ownsRecordingAttempt(attempt)) return;
               const { live, final } = transcriptRef.current;
               const merged = mergeTranscript(live || final || '', finalText);
               writeTranscript({ final: merged, live: '' });
@@ -846,7 +850,8 @@ export const useWhisper = ({
               if (ownsRecordingAttempt(attempt)) setStatus(RECORDING_STATUS.READY);
             } catch (apiErr) {
               if (ownsRecordingAttempt(attempt)) {
-                setErrorMessage(`Final transcription error: ${getErrorMessage(apiErr, 'Unknown transcription error')}`);
+                // The reason can quote the provider or name an endpoint, so only onError gets it.
+                setErrorMessage('Couldn’t transcribe the recording. Try again.');
                 setStatus(RECORDING_STATUS.ERROR);
                 onError(apiErr);
                 writeTranscript({ final: '', live: '' });

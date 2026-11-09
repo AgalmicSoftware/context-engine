@@ -509,7 +509,7 @@ describe('useWhisper', () => {
       expect.objectContaining({ message: expect.stringContaining('could not be read') }),
     );
     expect(onComplete).not.toHaveBeenCalled();
-    expect(ref.current.errorMessage).toContain('could not be read');
+    expect(ref.current.errorMessage).toBe('Couldn’t transcribe the recording. Try again.');
   });
 
   it('hands the final transcript to the parent once, outside render', async () => {
@@ -766,8 +766,50 @@ describe('useWhisper', () => {
     });
 
     expect(ref.current.status).toBe(RECORDING_STATUS.ERROR);
-    expect(ref.current.errorMessage).toContain('Maximum content size limit exceeded.');
-    expect(onError).toHaveBeenCalledTimes(1);
+    // People read a plain sentence; the provider's own words go to onError.
+    expect(ref.current.errorMessage).toBe('Couldn’t transcribe the recording. Try again.');
+    expect(onError).toHaveBeenCalledWith(expect.objectContaining({ message: 'Maximum content size limit exceeded.' }));
     expect(onComplete).not.toHaveBeenCalled();
+  });
+
+  it('shows no error for a transcription that a second stop replaced', async () => {
+    // The first upload waits until it is cancelled; the second answers.
+    fetchWorkerWithAuth.mockImplementationOnce(
+      (url, request) =>
+        new Promise((resolve, reject) => {
+          request.signal.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')));
+        }),
+    );
+    const onComplete = jest.fn();
+    const onError = jest.fn();
+    act(() => {
+      root.render(
+        <WhisperHarness
+          ref={ref}
+          options={{ silenceDetection: false, onTranscriptionComplete: onComplete, onError }}
+        />,
+      );
+    });
+    await act(async () => {
+      await ref.current.startRecording();
+    });
+    ref.current.audioContextRef.current.state = 'closed';
+    setNow(2000);
+    await act(async () => {
+      await ref.current.stopRecording();
+      await flushPromises();
+      await flushPromises();
+    });
+    expect(fetchWorkerWithAuth).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      await ref.current.stopRecording();
+      for (let i = 0; i < 10 && !onComplete.mock.calls.length; i += 1) await flushPromises();
+    });
+
+    expect(fetchWorkerWithAuth).toHaveBeenCalledTimes(2);
+    expect(onComplete).toHaveBeenCalledWith('hello world');
+    expect(ref.current.errorMessage).toBe('');
+    expect(ref.current.status).toBe(RECORDING_STATUS.READY);
+    expect(onError).not.toHaveBeenCalled();
   });
 });
