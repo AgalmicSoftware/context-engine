@@ -82,11 +82,22 @@ export async function inspectCivicAbout(page) {
 export async function inspectMinimalPost(page) {
   await page.getByRole('heading', { name: 'Agent Village Wrapped: Does Your Agent Know You? (Experiment + Eval)', exact: true }).waitFor({ state: 'visible' });
   await assertReadable(page.locator('body'));
+  const swarmPoint = page.getByRole('button', { name: /^I am more worried about agents being too passive/ });
+  await swarmPoint.focus();
+  await assertReadable(page.getByRole('tooltip'));
+  await swarmPoint.blur();
   await page.getByRole('button', { name: 'List', exact: true }).click();
   await assertReadable(page.locator('body'));
   const point = page.getByRole('button', { name: 'P1: 3/10, 70% confidence', exact: true });
-  await point.click();
+  // Pin by keyboard, so the close button takes its keyboard focus style.
+  await point.focus();
+  await page.keyboard.press('Enter');
   await assertReadable(page.getByRole('tooltip'));
+  const close = page.getByRole('button', { name: 'Close rating details', exact: true });
+  await close.focus();
+  await assertReadable(close);
+  await close.hover();
+  await assertReadable(close);
   await point.press('Escape');
   await page.getByText('Evaluation protocol, scoring, and record schema', { exact: true }).click();
   await assertReadable(page.locator('body'));
@@ -512,10 +523,15 @@ export async function runSmoke() {
         await assertReadable(dialog);
         await dialog.getByRole('button', { name: 'Close', exact: true }).click();
       }
+      // Classic paints the post on its gray window face, as Civic does on white.
+      await page.goto(`${baseUrl}/posts/agent-village-wrapped-2026`, { waitUntil: 'domcontentloaded' });
+      await inspectMinimalPost(page);
       await context.close();
       console.log(`Civic smoke passed: ${viewport.width}×${viewport.height}`);
     }
-    console.log('Civic theme smoke passed at desktop and mobile sizes; Groups dialog passed in all three themes.');
+    console.log(
+      'Civic theme smoke passed at desktop and mobile sizes; Groups dialog passed in all three themes; the post passed in Classic.',
+    );
   } finally {
     await browser.close();
   }
