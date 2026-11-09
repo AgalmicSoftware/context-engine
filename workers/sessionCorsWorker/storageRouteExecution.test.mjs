@@ -4817,6 +4817,36 @@ test('only the first author or a session admin can upload an existing question o
 	assert.equal((await upload(OWNERSHIP_OTHER, ownedQuestion('New question', '0xq2'))).status, 200);
 });
 
+test('a first upload that fails while publishing keeps its id for its author', async () => {
+	const { common, kv, upload, list } = createOwnershipHarness();
+	// As the session coordinator does, a failed publication answers a retryable 503.
+	common.deps.executeCoordinatedStoragePublication = async (publication) => {
+		try {
+			await publishCloudflareOwnedStorageMetadata({ ...publication, config: common.config, actor: publication.metadata.uploader });
+			return { ok: true, status: 200, body: { ok: true } };
+		} catch (error) {
+			return { ok: false, status: error.status || 503, body: { error: error.message } };
+		}
+	};
+	const put = kv.put.bind(kv);
+	let failRow = true;
+	kv.put = async (key, value) => {
+		if (failRow && key.startsWith('ce-storage:session-a:questions:')) {
+			failRow = false;
+			throw new Error('KV PUT failed: 500 Internal Server Error');
+		}
+		return put(key, value);
+	};
+	assert.equal((await upload(OWNERSHIP_AUTHOR, ownedQuestion('Official?'))).status, 503);
+	assert.deepEqual((await list()).items, []);
+
+	const claim = await upload(OWNERSHIP_OTHER, ownedQuestion('ATTACKER claim'));
+	assert.equal(claim.status, 409);
+	assert.equal(claim.body.reason, 'storage_resource_id_owned');
+	assert.equal((await upload(OWNERSHIP_AUTHOR, ownedQuestion('Official?'))).status, 200);
+	assert.deepEqual((await list()).items.map((item) => item.metadata.uploader), [OWNERSHIP_AUTHOR]);
+});
+
 // Strips what this release records, so the rows look like uploads from before it.
 const makeLegacyOwnedRows = (kv, resource, resourceIds) => {
 	for (const resourceId of resourceIds) kv.store.delete(`ce-storage-owner:session-a:${resource}:${resourceId}`);

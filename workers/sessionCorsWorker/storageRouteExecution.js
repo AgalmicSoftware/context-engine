@@ -1379,11 +1379,13 @@ export const publishCloudflareOwnedStorageMetadata = async ({ env, config, slug,
   if (owner && normalizeAddress(owner.uploader) !== uploader && metadata.uploadAuthority !== 'admin') {
     throw Object.assign(new Error('This id already belongs to another author.'), { status: 409 });
   }
-  await index.put(buildIndexKey({ slug, resource, id: metadata.id }), JSON.stringify(metadata));
+  // Reserve the id before publishing: a failure between the two writes then
+  // leaves its author free to retry, never a row someone else can claim.
   if (createOwner && !owner) {
     await writeStorageResourceOwner({ index, slug, resource, resourceId: metadata.resourceId,
       uploader, storageRefId: metadata.id, createdAt: metadata.createdAt });
   }
+  await index.put(buildIndexKey({ slug, resource, id: metadata.id }), JSON.stringify(metadata));
 };
 
 const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, authScopes, expectedAuthority, payload, resourceId = '', baseHeaders, deps }) => {

@@ -72046,7 +72046,6 @@ var init_storageRouteExecution = __esm({
       if (owner && normalizeAddress(owner.uploader) !== uploader && metadata.uploadAuthority !== "admin") {
         throw Object.assign(new Error("This id already belongs to another author."), { status: 409 });
       }
-      await index.put(buildIndexKey({ slug, resource, id: metadata.id }), JSON.stringify(metadata));
       if (createOwner && !owner) {
         await writeStorageResourceOwner({
           index,
@@ -72058,6 +72057,7 @@ var init_storageRouteExecution = __esm({
           createdAt: metadata.createdAt
         });
       }
+      await index.put(buildIndexKey({ slug, resource, id: metadata.id }), JSON.stringify(metadata));
     };
     handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, authScopes, expectedAuthority, payload, resourceId = "", baseHeaders, deps }) => {
       const r2 = getStorageR2Binding(env);
