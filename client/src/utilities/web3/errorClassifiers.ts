@@ -22,6 +22,7 @@ type RpcErrorLike = {
   errors?: unknown[];
   message?: unknown;
   reason?: unknown;
+  receiptUnknown?: unknown;
   requestBody?: unknown;
   results?: unknown[];
 };
@@ -214,5 +215,7 @@ export const notifyUserFacingTransactionError = (err: unknown, prefix = 'Transac
     notify.error('Wallet request rejected.');
     return;
   }
-  notify.error(`${prefix}${getUserFacingTransactionError(err)}`);
+  const message = getUserFacingTransactionError(err);
+  // A sent transaction whose receipt could not be read may still succeed.
+  notify.error(asRpcErrorLike(err).receiptUnknown === true ? message : `${prefix}${message}`);
 };

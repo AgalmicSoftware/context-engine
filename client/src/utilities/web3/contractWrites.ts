@@ -309,10 +309,14 @@ const sendContractWriteViaProvider = async ({
   try {
     receipt = (await ethersProvider.waitForTransaction(txHash)) as AnyRecord;
   } catch (error) {
-    if (sensitiveArgs) {
-      throw buildSensitiveWriteError(error);
-    }
-    throw error;
+    // The wallet already broadcast this transaction, so a failed receipt read says
+    // nothing about its outcome: keep the hash and never report it as reverted.
+    // A sensitive write leaves out the provider error, which may echo its calldata.
+    throw Object.assign(
+      new Error('The transaction was sent, but its result could not be confirmed. Check your wallet before retrying.'),
+      { txHash, receiptUnknown: true },
+      sensitiveArgs ? {} : { cause: error },
+    );
   }
   if (!receipt || Number(receipt.status) !== 1) {
     const resolvedRevertMessage = sensitiveArgs

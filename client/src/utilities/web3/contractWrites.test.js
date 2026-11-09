@@ -1,5 +1,6 @@
 import { ethers } from 'ethers';
 import { resolveTxGasOverrides, sendContractWriteViaProvider } from './contractWrites.js';
+import { notifyUserFacingTransactionError } from './errorClassifiers.js';
 
 const mockRpcLog = jest.fn();
 jest.mock('../logging.js', () => ({
@@ -9,6 +10,11 @@ jest.mock('../logging.js', () => ({
     log: category === 'rpc' ? (...args) => mockRpcLog(...args) : jest.fn(),
     warn: jest.fn(),
   }),
+}));
+
+const mockNotifyError = jest.fn();
+jest.mock('../ui/notify.js', () => ({
+  notify: { error: (...args) => mockNotifyError(...args) },
 }));
 
 describe('contractWrites gas override fallbacks', () => {
@@ -351,6 +357,39 @@ describe('raw contract write target checks', () => {
     expect(sameAccount.signingProvider.request).toHaveBeenCalledWith(
       expect.objectContaining({ params: [expect.objectContaining({ from })] }),
     );
+  });
+
+  it('keeps the hash and never reports a revert when the receipt cannot be read', async () => {
+    const options = makeOptions();
+    const readFailure = new Error('receipt read timed out');
+    options.ethersProvider.waitForTransaction.mockRejectedValue(readFailure);
+
+    const error = await sendContractWriteViaProvider(options).catch((caught) => caught);
+
+    expect(error).toMatchObject({
+      message: 'The transaction was sent, but its result could not be confirmed. Check your wallet before retrying.',
+      txHash: '0xtxhash',
+      receiptUnknown: true,
+      cause: readFailure,
+    });
+    notifyUserFacingTransactionError(error);
+    expect(mockNotifyError).toHaveBeenLastCalledWith(error.message);
+    notifyUserFacingTransactionError(new Error('execution reverted'));
+    expect(mockNotifyError).toHaveBeenLastCalledWith('Transaction failed: execution reverted');
+  });
+
+  it('keeps the hash but not the provider error for a sensitive write whose receipt cannot be read', async () => {
+    const options = { ...makeOptions(), sensitiveArgs: true, revertMessage: 'claim transaction reverted on-chain.' };
+    options.ethersProvider.waitForTransaction.mockRejectedValue(new Error('provider echoed receipt-secret-sentinel'));
+
+    const error = await sendContractWriteViaProvider(options).catch((caught) => caught);
+
+    expect(error).toMatchObject({
+      message: 'The transaction was sent, but its result could not be confirmed. Check your wallet before retrying.',
+      txHash: '0xtxhash',
+      receiptUnknown: true,
+    });
+    expect(error.cause).toBeUndefined();
   });
 
   it.each([{ status: undefined, to }, { status: 1, to: from }, { status: 1 }])(
