@@ -87,7 +87,7 @@ const ContextSourcesPanel = ({ sessionSlug, sessionConfig, account, pageLinks = 
   const [linkPrivate, setLinkPrivate] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [fileAccess, setFileAccess] = useState(SESSION_WIDE_ACCESS);
-  const groups = useContextGroups({ sessionSlug, sessionConfig });
+  const groups = useContextGroups({ sessionSlug, sessionConfig, account });
   const [analyze, setAnalyze] = useState(true);
   const [fileKey, setFileKey] = useState(0);
   const options = { sessionSlug, sessionConfig, context: { account }, asAdmin: true };

@@ -34,6 +34,7 @@ const SessionContextSources = ({ sessionSlug, sessionConfig, account, list, page
   const groups = useContextGroups({
     sessionSlug,
     sessionConfig,
+    account,
     enabled: canAddFile || list.groupFilesHidden || list.sources.length > 0,
   });
   const [removeError, setRemoveError] = useState('');

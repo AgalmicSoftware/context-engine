@@ -38,7 +38,7 @@ export function useTranscriptContextUpload({ sessionSlug, sessionConfig, context
   latest.current = { sessionSlug, sessionConfig, context };
   const uploaded = useRef({ text: '', id: '', choice: '' });
   const pending = useRef<Promise<void>>(Promise.resolve());
-  const groups = useContextGroups({ sessionSlug, sessionConfig, enabled: available });
+  const groups = useContextGroups({ sessionSlug, sessionConfig, account, enabled: available });
 
   useEffect(() => {
     if (!mayAdd) {
