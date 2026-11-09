@@ -68,17 +68,19 @@ export function useTranscriptContextUpload({ sessionSlug, sessionConfig, context
   const upload = useCallback(
     (transcript: string) => {
       const text = transcript.trim();
-      const earlier = uploaded.current;
-      if (!chosen || !text || (text === earlier.text && choice === earlier.choice)) return pending.current;
+      if (!chosen || !text) return pending.current;
       // A queued upload goes up as the account, to the session and audience, it was asked for, or not at all.
       const target = latest.current;
-      setFailed(false);
-      setStatus('Adding the transcript to context…');
       pending.current = pending.current.then(async () => {
+        // The upload before this one in the queue has finished by now, so it is the one to compare with or replace.
+        const earlier = uploaded.current;
+        if (text === earlier.text && choice === earlier.choice) return;
         if (!sameOwner(target, latest.current)) {
           setStatus('The transcript wasn’t added to context: the account or session changed.');
           return;
         }
+        setFailed(false);
+        setStatus('Adding the transcript to context…');
         try {
           const id = await uploadContextFile(
             {

@@ -189,4 +189,25 @@ describe('adding a transcript to context', () => {
       expect.objectContaining({ context: { account: ME } }),
     );
   });
+
+  it('checks a queued upload against the one before it, once that one is in', async () => {
+    const view = await mount();
+    act(() => view.result.current.setChosen(true));
+    let finish = (_id: string) => {};
+    jest
+      .mocked(uploadContextFile)
+      .mockReturnValueOnce(new Promise((resolve) => (finish = resolve)))
+      .mockResolvedValueOnce('stored-2');
+    act(() => {
+      void view.result.current.upload('Person 1: Words.');
+      void view.result.current.upload('Person 1: Words.');
+      void view.result.current.upload('Person 1: Words. More.');
+    });
+    await act(async () => finish('stored-1'));
+    await act(() => view.result.current.settled());
+    expect(uploadContextFile).toHaveBeenCalledTimes(2);
+    expect(removeContextSource).toHaveBeenCalledTimes(1);
+    expect(removeContextSource).toHaveBeenCalledWith({ id: 'stored-1', reading: null }, expect.anything());
+    expect(view.result.current.status).toBe('Transcript added to context.');
+  });
 });
