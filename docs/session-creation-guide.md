@@ -498,11 +498,16 @@ The core session metadata:
 - `sessionContext` for optional public background shown on the session page,
   in one of two forms, chosen with **Format**: typed text and HTTPS links (up
   to 6 paragraphs and 8 links), or one uploaded HTML file of up to 20,000
-  characters, under the same title. The file loses its scripts, styles,
-  classes, frames and forms before it is saved, and a preview shows the result
-  and what was removed; the session page cleans it again each time it shows
-  it. Either form must not contain secrets, and the session's AI reads its
-  words. The Context section also takes
+  characters, under the same title. The file keeps its own CSS (style blocks,
+  and style and class attributes) but loses its scripts, event handlers,
+  frames, forms and `@import` before it is saved, and a preview shows the
+  result and what was removed; the session page cleans it again each time it
+  shows it. The page renders in a box of its own: its CSS styles only the page
+  and can't place anything outside the box. It can use the site's colours as
+  CSS variables: `--ce-context-text`, `--ce-context-muted`,
+  `--ce-context-link`, `--ce-context-focus`, `--ce-context-border` and
+  `--ce-context-surface`. Either form must not contain secrets, and the
+  session's AI reads its words. The Context section also takes
   files (PDF, Markdown, text, CSV, JSON), each for everyone or for admins only;
   they are added after **Create**, when PDFs can be read by the session's AI and
   the links' pages read for it. See [Session context](session-context-sources.md).

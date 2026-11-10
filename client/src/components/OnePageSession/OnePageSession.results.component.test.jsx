@@ -7,6 +7,7 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { ethers } from 'ethers';
 import { TestMemoryRouter as MemoryRouter } from 'testUtils/TestMemoryRouter';
 import OnePageSession from './OnePageSession';
+import { readContextHtmlPage } from './SessionContextHtml';
 import { loadDemoSessionFixtures } from '../SurveyTool/demoSessionFixtureLoader';
 import OnePageSessionStandardShell, { DEFAULT_CORPUS_VIEWER_LOAD_STATE } from './OnePageSessionStandardShell';
 import styles from './OnePageSession.module.scss';
@@ -1234,12 +1235,13 @@ describe('OnePageSession results routing', () => {
 
     expect(await screen.findByTestId('survey-page-pile')).toBeInTheDocument();
     fireEvent.click(screen.getByTestId('ce-demo-documents-toggle'));
-    const page = await screen.findByTestId('ce-session-context-html');
-    expect(screen.getByTestId('ce-session-context')).toContainElement(page);
-    expect(within(page).getByRole('heading', { name: 'Areas' })).toBeInTheDocument();
-    expect(page).toHaveTextContent('Who decides?');
+    const host = await screen.findByTestId('ce-session-context-html');
+    expect(screen.getByTestId('ce-session-context')).toContainElement(host);
+    const page = readContextHtmlPage(host);
+    expect(page.querySelector('h2').textContent).toBe('Areas');
+    expect(page.textContent).toContain('Who decides?');
     expect(page.querySelector('script, [onclick]')).toBeNull();
-    expect(within(page).getByRole('link', { name: 'Essay' })).toHaveAttribute('rel', 'noopener noreferrer');
+    expect(page.querySelector('a[href="https://example.org/essay"]').getAttribute('rel')).toBe('noopener noreferrer');
   });
 
   it.each(['rxc-test', 'rxc-ra-test'])(

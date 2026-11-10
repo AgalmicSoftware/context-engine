@@ -7,6 +7,7 @@ import { ethers } from 'ethers';
 import { TestMemoryRouter as MemoryRouter } from 'testUtils/TestMemoryRouter';
 import OnePageSession from './OnePageSession';
 import styles from './OnePageSession.module.scss';
+import { CONTEXT_HTML_PAGE_CSS } from './sessionContextHtmlCss';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import contractScripts from '../../utilities/web3/chainGateway.js';
 import * as contractScriptsModule from '../../utilities/web3/chainGateway.js';
@@ -727,13 +728,14 @@ describe('OnePageSession view gating', () => {
       fs.readFileSync(path.join(__dirname, 'OnePageSession.module.scss'), 'utf8'),
       '.sessionContextLinks {',
     );
-    const page = extractMediaBlock(
+    const host = extractMediaBlock(
       fs.readFileSync(path.join(__dirname, 'SessionContextHtml.module.scss'), 'utf8'),
-      '.contextHtml {',
+      '.host {',
     );
     expect(typed).toContain('color: var(--ce-session-chrome-contrast);');
-    expect(page).toMatch(/\n {2}a {[^}]*color: var\(--ce-session-chrome-contrast\);/);
-    for (const block of [typed, page]) {
+    expect(host).toContain('--ce-context-link: var(--ce-session-chrome-contrast);');
+    expect(CONTEXT_HTML_PAGE_CSS).toMatch(/\na\[href\] \{[^}]*color: var\(--ce-context-link\);/);
+    for (const block of [typed, host, CONTEXT_HTML_PAGE_CSS]) {
       expect(block).not.toContain('var(--ce-action-accent)');
       expect(block).not.toContain('var(--ce-session-accent)');
     }

@@ -1,8 +1,10 @@
 import DOMPurify from 'dompurify';
 
 // What an uploaded context page may keep: text structure, https links and
-// images, tables, and details/summary sections that open in place. The rest
-// goes, style and class included, so the site's theme styles what is left.
+// images, tables, details/summary sections that open in place, and its own
+// CSS in style blocks, style and class attributes. Scripts, event handlers,
+// frames, forms and @import go. The page renders in a shadow root inside a
+// box that clips it, so its CSS styles only the page.
 const ALLOWED_TAGS = [
   'h1',
   'h2',
@@ -48,14 +50,29 @@ const ALLOWED_TAGS = [
   'td',
   'details',
   'summary',
+  'style',
 ];
-const ALLOWED_ATTR = ['href', 'src', 'alt', 'title', 'colspan', 'rowspan', 'open'];
-const CONFIG = { ALLOWED_TAGS, ALLOWED_ATTR, ALLOW_DATA_ATTR: false, ALLOW_ARIA_ATTR: false };
+const ALLOWED_ATTR = ['href', 'src', 'alt', 'title', 'colspan', 'rowspan', 'open', 'style', 'class'];
+// FORCE_BODY keeps a style block that opens the page in the page.
+const CONFIG = { ALLOWED_TAGS, ALLOWED_ATTR, ALLOW_DATA_ATTR: false, ALLOW_ARIA_ATTR: false, FORCE_BODY: true };
+const IMPORT_RULE = /@import\b[^;]*;?/gi;
 
 // Its own instance, so no other library's hooks or settings reach it.
 let purifier: ReturnType<typeof DOMPurify> | null = null;
+// Set by the hook while one sanitize call runs; sanitizing is synchronous.
+let importsRemoved = false;
 const getPurifier = () => {
-  purifier = purifier || DOMPurify(window);
+  if (!purifier) {
+    purifier = DOMPurify(window);
+    // @import would load CSS from elsewhere, so it goes from every style block.
+    purifier.addHook('uponSanitizeElement', (node) => {
+      if (node.nodeName !== 'STYLE' || !node.textContent || !IMPORT_RULE.test(node.textContent)) return;
+      IMPORT_RULE.lastIndex = 0;
+      node.textContent = node.textContent.replace(IMPORT_RULE, '');
+      importsRemoved = true;
+    });
+  }
+  IMPORT_RULE.lastIndex = 0;
   return purifier;
 };
 
@@ -80,12 +97,17 @@ const ATTRIBUTE_LABELS: Record<string, string> = { href: 'links that aren’t ht
 // Every https link gets its own target and rel, so the author's are replaced, not lost.
 const REPLACED_ATTRIBUTES = new Set(['target', 'rel']);
 
-// The parser files a page's head, and anything before its first text, away
-// from the body DOMPurify cleans, so what was there is found separately.
-// DOMParser runs no scripts, and nothing it builds is shown.
-const headExtras = (input: string) => {
-  const head = new DOMParser().parseFromString(input, 'text/html').head;
-  return [...head.querySelectorAll('script, style, link, base')].map((node) => `<${node.nodeName.toLowerCase()}>`);
+// A whole page, or a fragment that starts with a style block, has a head the
+// parser keeps apart from its body. Its style blocks join the page, and what
+// else would have loaded or run is reported. DOMParser runs no scripts, and
+// nothing it builds is shown.
+const splitHead = (input: string) => {
+  const doc = new DOMParser().parseFromString(input, 'text/html');
+  const styles = [...doc.head.querySelectorAll('style')].map((node) => node.outerHTML).join('');
+  const dropped = [...doc.head.querySelectorAll('script, link, base')].map(
+    (node) => `<${node.nodeName.toLowerCase()}>`,
+  );
+  return { source: styles + doc.body.innerHTML, dropped };
 };
 
 /**
@@ -95,15 +117,17 @@ const headExtras = (input: string) => {
  */
 export const cleanContextHtml = (input: string): CleanContextHtml => {
   const purify = getPurifier();
-  const source = String(input ?? '');
+  const { source, dropped } = splitHead(String(input ?? ''));
+  importsRemoved = false;
   const fragment = purify.sanitize(source, { ...CONFIG, RETURN_DOM_FRAGMENT: true });
-  const removed = new Set<string>(headExtras(source));
+  const removed = new Set<string>(dropped);
+  if (importsRemoved) removed.add('@import');
   purify.removed.forEach((entry) => {
     if ('element' in entry && entry.element) {
       const name = entry.element.nodeName.toLowerCase();
-      // The parser's own wrappers, not anything the author wrote.
+      // The parser's wrappers and DOMPurify's FORCE_BODY marker, not anything the author wrote.
       if (name === '#comment') removed.add('comments');
-      else if (!['#text', 'html', 'head', 'body'].includes(name)) removed.add(`<${name}>`);
+      else if (!['#text', 'html', 'head', 'body', 'remove'].includes(name)) removed.add(`<${name}>`);
     } else if ('attribute' in entry && entry.attribute) {
       const name = entry.attribute.name.toLowerCase();
       if (!REPLACED_ATTRIBUTES.has(name)) removed.add(ATTRIBUTE_LABELS[name] || name);

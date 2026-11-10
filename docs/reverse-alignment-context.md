@@ -3,7 +3,7 @@
 A Reverse Alignment session shows its atlas as its context: an HTML page with
 the session's introduction and links, then three areas, **Trust and agency**,
 **Collective decisions** and **Learning and work**, of four topics each. Areas
-and topics open in place. Each topic has its summary, a question to carry into
+and topics are cards in the area colours that open in place. Each topic has its summary, a question to carry into
 the session, a prompt to consider who benefits, who decides and how someone
 could contest the outcome, its related topics, and a note on the sources.
 

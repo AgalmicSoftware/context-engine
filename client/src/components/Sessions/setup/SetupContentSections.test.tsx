@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 
 import { SetupContextSection, SetupQuestionsSection, describeContextProblem } from './SetupContentSections';
 import type { SetupDraft, SetupSectionProps } from './setupSectionTypes';
+import { readContextHtmlPage } from '../../OnePageSession/SessionContextHtml';
 
 let latest: SetupDraft = {};
 
@@ -69,17 +70,17 @@ describe('setup content sections', () => {
 
     uploadHtml('<h2>Atlas</h2><script>steal()</script><p style="color:red">Who decides?</p>');
     expect(await screen.findByTestId('ce-setup-context-html-removed')).toHaveTextContent(
-      'Removed from the file: <script>, style.',
+      'Removed from the file: <script>.',
     );
     expect(latest.sessionContext).toEqual({
       title: '',
       paragraphs: [],
       links: [],
-      html: '<h2>Atlas</h2><p>Who decides?</p>',
+      html: '<h2>Atlas</h2><p style="color:red">Who decides?</p>',
     });
-    const shown = await screen.findByTestId('ce-setup-context-html-shown');
-    expect(shown).toHaveTextContent('Who decides?');
-    expect(shown.querySelector('script, [style]')).toBeNull();
+    const shown = readContextHtmlPage(await screen.findByTestId('ce-setup-context-html-shown'));
+    expect(shown?.textContent).toContain('Who decides?');
+    expect(shown?.querySelector('script')).toBeNull();
     expect(screen.getByTestId('ce-setup-summary-context')).toHaveTextContent('HTML file');
 
     uploadHtml('<p>Clean</p>');

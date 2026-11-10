@@ -20,7 +20,7 @@ const readFileText = (file: File) =>
     reader.readAsText(file);
   });
 const FILE_HELP =
-  'One .html file. Scripts, styles, classes, frames and forms are removed before it is saved, and the site’s theme styles the rest. Everyone who can open the session sees it, and the session’s AI reads its words.';
+  'One .html file, with its own CSS if you like. Scripts, event handlers, frames, forms and @import are removed before it is saved. Its CSS styles only the page, and can use the site’s colours, such as var(--ce-context-text). Everyone who can open the session sees it, and the session’s AI reads its words.';
 
 type Props = {
   html: string;
