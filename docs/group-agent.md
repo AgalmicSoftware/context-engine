@@ -36,6 +36,8 @@ session's Settings:
   match can't be checked just now, such as an SBT rule while the chain can't be
   reached, the question is refused rather than passed to a later audience.
 - **Admins** always get Detailed answers, whatever the audiences say.
+- **AI access.** Everyone who asks, admins included, also needs the session's
+  AI access (the `ai` scope), as on the `/ai` route.
 - **No audiences** means only admins may ask.
 - **Off** is no setting. The page then shows no Group Agent. Saving it off sends
   `groupAgent: null`, which the Worker stores as no setting.
@@ -107,8 +109,9 @@ untrusted data.
 Everyone's answers and files are in until they say otherwise. In the Group
 Agent's dialog, turning off **Use my answers and files** keeps them out of every
 answer from the next question on. The files stay in the session's file list, and
-answers already given can't be taken back. Anyone signed in can turn it off,
-even someone the Group Agent doesn't answer, and turn it back on at any time.
+answers already given can't be taken back. Anyone signed in with an address can
+turn it off, even someone the Group Agent doesn't answer, and turn it back on at
+any time.
 
 The Worker keeps one entry per address that turned it off, in the session's
 coordinator, and reads the list on every question; if it can't, the question
@@ -125,9 +128,12 @@ other signed-in routes.
 
 - `POST /group-agent/status` with `{}` returns
   `{ on, answers, audience, optedOut }`. `on` is false when the session has no
-  setting. `answers` is `general`, `detailed`, or `null` when no audience admits
-  the person; `audience` is the admitting audience's position, or `admin`. It
-  checks the sign-in's scopes, and each question checks them afresh.
+  setting. `answers` is `general`, `detailed`, or `null` when the person lacks AI
+  access or no audience admits them; `audience` is the admitting audience's
+  position, or `admin`. `optedOut` is false for someone signed in without an
+  address, who has no switch. It checks the sign-in's scopes, and each question
+  checks them afresh. Like `ask`, it refuses with `410` once the session has
+  ended and with `403` (`ai_disabled`) while AI is off for it.
 - `POST /group-agent/ask` with `{ question }` (at most 500 characters) returns
   `{ answer, answers, audience, read, note? }`. `read` says how much the answer
   drew on: `{ context, results, answers }`, as a count of context items, whether
@@ -144,7 +150,7 @@ checks and rate limit first. Before the AI is called, `ask` refuses:
 | Status | When |
 |---|---|
 | `410` | The session has ended (`code: session_ended`) |
-| `403` | The session has no Group Agent (`reason: group_agent_off`), AI is off for it (`ai_disabled`), or no audience admits the person (`group_agent_not_admitted`) |
+| `403` | The session has no Group Agent (`reason: group_agent_off`), AI is off for it (`ai_disabled`), or the person lacks AI access or no audience admits them (`group_agent_not_admitted`) |
 | `400` | The question is blank or too long |
 | `429` | The `/ai` rate limit, or the provider is busy |
 | `402` | A payment step, which passes every question today (`group_agent_payment_required`) |

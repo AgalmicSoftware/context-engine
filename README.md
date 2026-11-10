@@ -79,7 +79,7 @@ For testing, run modes, and deeper setup:
 
 A session on a Session Worker can have a Group Agent: an AI that answers questions about the session from its own material. It is off until an admin turns it on under AI, on `/new` or in the session's Settings. While it is on, a robot by the session's title says so, and anyone signed in can open it from the session's Context.
 
-- **Who may ask.** An admin lists audiences in order (everyone signed in, members of chosen groups, or SBT holders) and gives each General or Detailed answers. The first audience a person matches sets how they are answered. Admins always get Detailed answers.
+- **Who may ask.** An admin lists audiences in order (everyone signed in, members of chosen groups, or SBT holders) and gives each General or Detailed answers. The first audience a person matches sets how they are answered. Admins always get Detailed answers. Anyone asking also needs the session's AI access.
 - **General answers** draw on the session's context, the files everyone may see, and the results the asker may see. They never use members' answers or files locked to a group.
 - **Detailed answers** draw on everything the asker may see, and on members' answers. No answer names anyone. The Session Worker, not the page, decides what each style reads.
 - **Keeping your answers and files out.** They are in unless you say otherwise. Open the Group Agent and turn off **Use my answers and files**: from the next question on, it leaves out your answers and the files you added. Your files stay in the session's file list, and answers already given can't be taken back. You can turn it off even when the Group Agent doesn't answer you, and turn it back on at any time.

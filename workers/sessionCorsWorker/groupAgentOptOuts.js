@@ -8,6 +8,9 @@ const ADDRESS = /^0x[0-9a-f]{40}$/;
 const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 const addressOf = (value) => (typeof value === 'string' ? value.trim().toLowerCase() : '');
 
+/** Only someone signed in with an address has the switch. */
+export const canOptOut = (value) => ADDRESS.test(addressOf(value));
+
 const listAddresses = async (storage) => {
   const addresses = [];
   for (let startAfter = ''; ;) {
@@ -22,7 +25,7 @@ export const dispatchGroupAgentOptOutStore = async (coordinator, operation, payl
   const storage = coordinator.state.storage;
   if (operation === 'list') return json({ ok: true, addresses: await listAddresses(storage) });
   const address = addressOf(payload.address);
-  if (!ADDRESS.test(address)) return json({ ok: false, error: 'Sign in with an address to change this.' }, 400);
+  if (!canOptOut(address)) return json({ ok: false, error: 'Sign in with an address to change this.' }, 400);
   if (operation === 'read') return json({ ok: true, optedOut: (await storage.get(PREFIX + address)) === true });
   if (operation === 'set') {
     if (typeof payload.optedOut !== 'boolean') {

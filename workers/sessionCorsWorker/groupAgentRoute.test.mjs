@@ -34,6 +34,7 @@ const ask = async (h, {
   path = '/group-agent/ask',
   address = PARTICIPANT,
   body = { question: 'What do people want?' },
+  scopes = { ai: true, storage: true },
   current = { ai: true },
   provider = () => json({ completion: 'They want shorter meetings.', raw: { id: 'RAW provider data' } }),
   deps = {},
@@ -49,7 +50,7 @@ const ask = async (h, {
     env: h.env,
     limit: 10,
     headers: {},
-    scopes: { ai: true, storage: true },
+    scopes,
     deps: {
       ...h.deps,
       evaluateAuthenticatedRoutePreflight,
@@ -101,11 +102,25 @@ test('the first audience that admits someone sets their answers, admins get Deta
   assert.deepEqual([answered.body.answers, answered.body.audience], ['detailed', 0]);
 });
 
-test('no audience admits someone whose AI access has lapsed, or who is in no listed group', async () => {
-  const lapsed = await ask(await seeded({ audiences: [{ who: everyone, answers: 'general' }] }), { current: { ai: false } });
+test('every asker needs the session’s AI access, whichever audience would admit them, admins included', async () => {
+  const h = await seeded();
+  // A group member whose AI access lapsed after signing in, as on /ai.
+  const lapsed = await ask(h, { address: MEMBER, current: { ai: false } });
   assert.equal(lapsed.status, 403);
   assert.equal(lapsed.body.reason, 'group_agent_not_admitted');
   assert.deepEqual(lapsed.calls.ai, []);
+  for (const address of [MEMBER, ADMIN]) {
+    const withoutAi = { address, scopes: { storage: true } };
+    assert.deepEqual((await ask(h, { ...withoutAi, path: '/group-agent/status', body: {} })).body, {
+      on: true, answers: null, audience: null, optedOut: false,
+    });
+    const refused = await ask(h, withoutAi);
+    assert.deepEqual([refused.status, refused.body.reason], [403, 'group_agent_not_admitted']);
+    assert.deepEqual(refused.calls.ai, []);
+  }
+});
+
+test('no audience admits someone in no listed group', async () => {
   const h = await seeded({ audiences: [{ who: salonMembers, answers: 'general' }] });
   assert.deepEqual((await ask(h, { path: '/group-agent/status', body: {} })).body, { on: true, answers: null, audience: null, optedOut: false });
   const outsider = await ask(h);
@@ -216,14 +231,25 @@ test('a question must be there and short, and an ended session or AI turned off 
   assert.equal((await ask(h, { body: { question: '   ' } })).status, 400);
   assert.equal((await ask(h, { body: { question: 'x'.repeat(501) } })).status, 400);
   assert.equal((await ask(h, { body: { question: 'x'.repeat(500) } })).status, 200);
+  // Status says so too, so the dialog doesn't offer a question that would fail.
+  const status = () => ask(h, { path: '/group-agent/status', body: {} });
   h.state.config.scopes = { ai: false };
   const off = await ask(h);
   assert.deepEqual([off.status, off.body.reason], [403, 'ai_disabled']);
+  assert.deepEqual([(await status()).status, (await status()).body.reason], [403, 'ai_disabled']);
   h.state.config.scopes = {};
   h.state.config.sessionEndsAt = '2020-01-01T00:00:00.000Z';
   const ended = await ask(h);
   assert.equal(ended.status, 410);
   assert.deepEqual(ended.calls.ai, []);
+  assert.equal((await status()).status, 410);
+  // Anyone can still keep their answers and files out.
+  assert.deepEqual((await ask(h, { path: '/group-agent/opt-out', body: { optedOut: true } })).body, { optedOut: true });
+});
+
+test('someone signed in without an address has no switch, and status still says how they’d be answered', async () => {
+  const status = await ask(await seeded(), { path: '/group-agent/status', body: {}, address: 'agent:delve-town' });
+  assert.deepEqual(status.body, { on: true, answers: 'general', audience: 1, optedOut: false });
 });
 
 test('each person can turn off the Group Agent’s use of their answers and files, and turn it back on', async () => {

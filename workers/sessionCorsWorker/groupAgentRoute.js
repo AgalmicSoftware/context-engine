@@ -8,6 +8,7 @@ import {
   loadWorkerCanonicalResultsAnalysisSource,
   readPublishedResultsAnalysisArtifact,
 } from './resultsAnalysisGeneration.js';
+import { canOptOut } from './groupAgentOptOuts.js';
 import { callSessionConfigCoordinator } from './sessionConfigAuthority.js';
 import {
   authorizeCloudflareStorageResourceRead,
@@ -30,10 +31,16 @@ const trim = (value) => (typeof value === 'string' ? value.trim() : '');
 const lower = (value) => trim(value).toLowerCase();
 const clip = (value, max) => (value.length <= max ? value : `${value.slice(0, Math.max(0, max - 1)).trimEnd()}…`);
 
-// Admins, as the config names them now, get Detailed answers; anyone else,
-// the first audience that admits them. An outage before a match leaves the
-// answer unknown, so it refuses.
-const resolveAsker = async ({ setting, config, address, access }) => {
+const NOT_ADMITTED = {
+  ok: false, status: 403, error: 'The Group Agent isn’t open to you in this session.', reason: 'group_agent_not_admitted',
+};
+
+// Everyone who asks needs the session's AI access, as on the /ai route.
+// Admins, as the config names them now, then get Detailed answers; anyone
+// else, the first audience that admits them. An outage before a match leaves
+// the answer unknown, so it refuses.
+const resolveAsker = async ({ setting, config, address, aiScope, access }) => {
+  if (!aiScope) return NOT_ADMITTED;
   if (resolveSessionAdminAddresses(config).has(lower(address))) {
     return { ok: true, answers: 'detailed', audience: 'admin' };
   }
@@ -44,7 +51,7 @@ const resolveAsker = async ({ setting, config, address, access }) => {
     }
     if (result.ok) return { ok: true, answers: audience.answers, audience: index };
   }
-  return { ok: false, status: 403, error: 'The Group Agent isn’t open to you in this session.', reason: 'group_agent_not_admitted' };
+  return NOT_ADMITTED;
 };
 
 // The published results analysis as lines of plain text, without IDs.
@@ -162,13 +169,23 @@ export const dispatchGroupAgentRoute = async ({ path, body, config, slug, addres
     if (!saved.ok) return json({ error: saved.status === 400 ? saved.body?.error : OPT_OUTS_UNAVAILABLE }, saved.status === 400 ? 400 : 503);
     return json({ optedOut: saved.body.optedOut });
   }
+  if (!setting) {
+    return path === '/group-agent/status'
+      ? json({ on: false, answers: null, audience: null })
+      : json({ error: 'This session has no Group Agent.', reason: 'group_agent_off' }, 403);
+  }
+  // An ended session, or one with AI off, answers no one, so status says so too.
+  const ended = buildSessionEndedResponse({ config, headers, json: deps.json, now: deps.now });
+  if (ended) return ended;
+  if (config?.scopes?.ai === false) return json({ error: 'AI is turned off for this session.', reason: 'ai_disabled' }, 403);
   // Status only decides what the page shows, so it reads the sign-in's
   // scopes; each question checks them afresh before anything is read.
   if (path === '/group-agent/status') {
-    if (!setting) return json({ on: false, answers: null, audience: null });
     const [asker, own] = await Promise.all([
-      resolveAsker({ setting, config, address, access: accessFor({ env, config, slug, address, scopes, deps }) }),
-      store(env, slug, 'read', { address }),
+      resolveAsker({
+        setting, config, address, aiScope: scopes?.ai === true, access: accessFor({ env, config, slug, address, scopes, deps }),
+      }),
+      canOptOut(address) ? store(env, slug, 'read', { address }) : { ok: true, body: { optedOut: false } },
     ]);
     if (!asker.ok && asker.status === 503) return json({ error: asker.error }, 503);
     if (!own.ok) return json({ error: OPT_OUTS_UNAVAILABLE }, 503);
@@ -177,16 +194,13 @@ export const dispatchGroupAgentRoute = async ({ path, body, config, slug, addres
     });
   }
 
-  const ended = buildSessionEndedResponse({ config, headers, json: deps.json, now: deps.now });
-  if (ended) return ended;
-  if (!setting) return json({ error: 'This session has no Group Agent.', reason: 'group_agent_off' }, 403);
-  if (config?.scopes?.ai === false) return json({ error: 'AI is turned off for this session.', reason: 'ai_disabled' }, 403);
   const question = trim(body?.question);
   if (!question) return json({ error: 'Ask a question.' }, 400);
   if (question.length > GROUP_AGENT_LIMITS.questionChars) {
     return json({ error: `A question can be at most ${GROUP_AGENT_LIMITS.questionChars} characters.` }, 400);
   }
-  // The /ai route's checks: the current AI scope, then its rate limit.
+  // The /ai route's checks: the current AI scope, which every asker needs,
+  // then its rate limit.
   const preflight = await deps.evaluateAuthenticatedRoutePreflight({
     scopes, scope: 'ai', route: 'ai', allowWithoutScope: true, config, env, slug, address, limit, headers,
     deps: { checkRateLimit: deps.checkRateLimit, computeScopesForLogin: deps.computeScopesForLogin, json: deps.json },
@@ -194,7 +208,7 @@ export const dispatchGroupAgentRoute = async ({ path, body, config, slug, addres
   if (!preflight?.ok) return preflight?.response || json({ error: 'Current authorization check failed.' }, 403);
   const currentScopes = { ...scopes, ai: preflight.tokenHasScope === true };
   const access = accessFor({ env, config, slug, address, scopes: currentScopes, deps });
-  const asker = await resolveAsker({ setting, config, address, access });
+  const asker = await resolveAsker({ setting, config, address, aiScope: preflight.tokenHasScope === true, access });
   if (!asker.ok) return json({ error: asker.error, ...(asker.reason ? { reason: asker.reason } : {}) }, asker.status);
   const secretContext = await deps.resolveAuthenticatedRouteSecrets({
     env, slug, headers, deps: { getSessionSecrets: deps.getSessionSecrets, json: deps.json },
