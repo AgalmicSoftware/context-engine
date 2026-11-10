@@ -34,20 +34,14 @@ description, including older Worker and cached metadata. The remaining descripti
 is preserved in the report and its PDF capture. This display correction does not
 rewrite the saved Worker configuration.
 
-`rxc-test` still offers **Report**, **Debate Map**, and **Raw Results**. Report opens
-by default. Debate Map uses the shared Debate Atlas **Circles** view: open one of
-the three topic groups, then select a topic to inspect its assignments. This
-preview appears only in Debate Map and shows **Waiting for more data**. Its
-circles have no question or response assignments, votes, or sample responses.
-The preview keeps its header, data status, and circles, with assignment details
-shown only after selecting a topic. Source links remain in the Context guide.
-There is no classification action yet; a future administrator workflow can
-populate those assignments. The Context atlas does not imply that classification
-has happened. Raw Results continues to open the detailed results view.
+`rxc-test` offers **Report** and **Raw Results**, and Report opens by default.
+Like the other sessions here, it shows **Debate Map** only once a debate atlas
+has been built for it. Source links remain in the Context guide. The Context
+atlas does not imply that any classification has happened. Raw Results
+continues to open the detailed results view.
 
 The Context atlas applies to `rxc-test`, `rxc-ra-test`, `rxc-ra-test-2`,
-`rxc-ra-test-3`, `rxc-ra-test-5` and `rxc-ra-test-6`; the Debate Map preview is enabled for all of them except
-`rxc-ra-test`. This is client
+`rxc-ra-test-3`, `rxc-ra-test-5` and `rxc-ra-test-6`. This is client
 presentation, not session provisioning: each session still needs its own valid
 Worker configuration and question bank. The bundled discovery entries support
 fresh visits to each of them, including the group-recording link
