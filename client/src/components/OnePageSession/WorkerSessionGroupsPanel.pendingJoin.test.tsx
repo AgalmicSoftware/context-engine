@@ -161,14 +161,13 @@ it('cancels the pending Join when switching accounts before a rejected sign-in',
   expect(joinWorkerGroup).not.toHaveBeenCalled();
 });
 
-it('cancels the pending Join when a superseded same-target sign-in is rejected', async () => {
+it('cancels the pending Join when its sign-in is rejected after a config refresh', async () => {
   const joinSignIn = deferred();
-  const autoSignIn = deferred();
   jest
     .mocked(getWorkerSessionToken)
     .mockRejectedValueOnce(new Error('Auth on render rejected')) // render
     .mockImplementationOnce(() => joinSignIn.promise) // Join click
-    .mockImplementationOnce(() => autoSignIn.promise); // effect re-run after the config refresh
+    .mockResolvedValue('token-a');
   const view = render(<WorkerSessionGroupsPanel {...panelProps()} account={A} />);
   await tick(100);
   await act(async () => fireEvent.click(await screen.findByRole('button', { name: 'Sign in to join Community' })));
@@ -177,23 +176,17 @@ it('cancels the pending Join when a superseded same-target sign-in is rejected',
   await act(async () => {
     joinSignIn.reject(new Error('Sign-in rejected'));
   });
-  await tick(40);
-  await act(async () => {
-    autoSignIn.resolve('token-a');
-  });
   await tick(150);
+  expect(getWorkerSessionToken).toHaveBeenCalledTimes(2);
   expect(joinWorkerGroup).not.toHaveBeenCalled();
 });
 
-it.each([true, false])('joins once after a same-content config refresh (shared prompt: %s)', async (sharedPrompt) => {
+it('joins once after a same-content config refresh, without signing in again', async () => {
   const joinSignIn = deferred();
-  const refreshedSignIn = sharedPrompt ? joinSignIn : deferred();
   jest
     .mocked(getWorkerSessionToken)
     .mockRejectedValueOnce(new Error('Auth on render rejected'))
-    .mockImplementationOnce(() => joinSignIn.promise)
-    // workerAuth normally de-duplicates same-target calls onto the open wallet prompt.
-    .mockImplementationOnce(() => refreshedSignIn.promise);
+    .mockImplementationOnce(() => joinSignIn.promise);
   const sessionConfig = configFor(true);
   const props = panelProps({ sessionConfig });
   const view = render(<WorkerSessionGroupsPanel {...props} account={A} />);
@@ -201,12 +194,9 @@ it.each([true, false])('joins once after a same-content config refresh (shared p
   fireEvent.click(await screen.findByRole('button', { name: 'Sign in to join Community' }));
   await waitFor(() => expect(getWorkerSessionToken).toHaveBeenCalledTimes(2));
   view.rerender(<WorkerSessionGroupsPanel {...props} sessionConfig={{ ...sessionConfig }} account={A} />);
-  await waitFor(() => expect(getWorkerSessionToken).toHaveBeenCalledTimes(3));
+  await tick();
+  expect(getWorkerSessionToken).toHaveBeenCalledTimes(2);
   await act(async () => joinSignIn.resolve('token-a'));
-  if (!sharedPrompt) {
-    expect(joinWorkerGroup).not.toHaveBeenCalled();
-    await act(async () => refreshedSignIn.resolve('token-a'));
-  }
   await waitFor(() => expect(joinTokens()).toEqual(['token-a']));
   expect(await screen.findByRole('button', { name: 'Leave Community' })).toBeInTheDocument();
 });
@@ -225,7 +215,8 @@ it('keeps the explicit Join when the parent rerenders with a fresh config object
   fireEvent.click(await screen.findByRole('button', { name: 'Sign in to join Community' }));
   await waitFor(() => expect(getWorkerSessionToken).toHaveBeenCalledTimes(2));
   view.rerender(<Parent />);
-  await waitFor(() => expect(getWorkerSessionToken).toHaveBeenCalledTimes(3));
+  await tick();
+  expect(getWorkerSessionToken).toHaveBeenCalledTimes(2);
   await act(async () => joinSignIn.resolve('token-a'));
   await waitFor(() => expect(joinTokens()).toEqual(['token-a']));
   expect(await screen.findByRole('button', { name: 'Leave Community' })).toBeInTheDocument();
@@ -303,6 +294,32 @@ describe('asking someone signed in to sign in, never showing them the signed-out
       expect(loadWorkerGroupOverview).toHaveBeenCalledWith(expect.objectContaining({ credentialToken: 'token-a' })),
     );
     expect(promptOf(1)).toBe(false);
+  });
+
+  it('never asks again when the page passes an equal config afresh, as after a declined prompt', async () => {
+    jest.mocked(getWorkerSessionToken).mockRejectedValueOnce(new Error('Sign-in declined'));
+    const sessionConfig = configFor(false);
+    const view = render(<WorkerSessionGroupsPanel {...panelProps({ sessionConfig })} account={A} />);
+    await screen.findByText('Sign-in declined');
+    view.rerender(<WorkerSessionGroupsPanel {...panelProps({ sessionConfig: { ...sessionConfig } })} account={A} />);
+    view.rerender(
+      <WorkerSessionGroupsPanel {...panelProps({ sessionConfig: { ...sessionConfig }, provider: {} })} account={A} />,
+    );
+    await tick();
+    expect(getWorkerSessionToken).toHaveBeenCalledTimes(1);
+    expect(screen.getByText('Sign-in declined')).toBeInTheDocument();
+  });
+
+  it('keeps a signed-in panel as it is when the page passes an equal config afresh', async () => {
+    const sessionConfig = configFor(false);
+    const view = render(<WorkerSessionGroupsPanel {...panelProps({ sessionConfig })} account={A} />);
+    await screen.findByRole('button', { name: 'Join Community' });
+    const overviewReads = jest.mocked(loadWorkerGroupOverview).mock.calls.length;
+    view.rerender(<WorkerSessionGroupsPanel {...panelProps({ sessionConfig: { ...sessionConfig } })} account={A} />);
+    expect(screen.queryByText('Authenticating with the session…')).not.toBeInTheDocument();
+    await tick();
+    expect(getWorkerSessionToken).toHaveBeenCalledTimes(1);
+    expect(loadWorkerGroupOverview).toHaveBeenCalledTimes(overviewReads);
   });
 
   it('keeps the public groups and the declined sign-in on screen while a quiet retry still cannot sign in', async () => {

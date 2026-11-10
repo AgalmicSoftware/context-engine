@@ -223,19 +223,22 @@ const WorkerSessionGroupsPanel = ({
     );
   }, [targetKey]);
 
+  const authenticateRef = useRef(authenticate);
+  authenticateRef.current = authenticate;
   useEffect(() => {
     setGroupsRevision(0);
     authRequestIdRef.current += 1;
     // Someone signed in is asked to sign in to the session rather than shown what a signed-out visitor sees.
-    if (shouldAuthenticateOnRender) {
-      void authenticate();
+    // Once per session, Worker and account: an equal config passed afresh must not ask again after a decline.
+    if (shouldAuthenticateOnRender && hasExactWorkerProfile) {
+      void authenticateRef.current();
     } else {
       setAuthState(emptyAuthState(targetKey));
     }
     return () => {
       authRequestIdRef.current += 1;
     };
-  }, [authenticate, shouldAuthenticateOnRender, targetKey]);
+  }, [hasExactWorkerProfile, shouldAuthenticateOnRender, targetKey]);
 
   useEffect(() => {
     if (authStatus !== 'error') return undefined;
