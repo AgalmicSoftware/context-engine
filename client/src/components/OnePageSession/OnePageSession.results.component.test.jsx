@@ -1646,12 +1646,13 @@ describe('OnePageSession results routing', () => {
     const renderSession = async (sources, isAdmin, overrides = {}) => {
       mockContextSources.current = { ...emptyContextSources(), supported: true, isAdmin, sources };
       const props = { ...buildProps(), ...overrides };
-      render(
+      const view = render(
         <MemoryRouter initialEntries={['/session/edge']}>
           <OnePageSession {...props} slug="edge" />
         </MemoryRouter>,
       );
       expect(await screen.findByTestId('survey-page-pile')).toBeInTheDocument();
+      return view;
     };
 
     it('keeps the Context section from participants while there is no context', async () => {
@@ -1710,6 +1711,36 @@ describe('OnePageSession results routing', () => {
       });
       fireEvent.click(within(dialog).getByRole('button', { name: 'Close' }));
       await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    });
+
+    it('closes the Group Agent when its person switches account or signs out', async () => {
+      mockGroupAgentStatus.mockResolvedValue({ on: true, answers: 'general', audience: 0, optedOut: false });
+      const signedIn = withGroupAgent({ account: '0xabc', loginComplete: true });
+      const view = await renderSession([], false, signedIn);
+      const show = (overrides) =>
+        view.rerender(
+          <MemoryRouter initialEntries={['/session/edge']}>
+            <OnePageSession {...buildProps()} {...overrides} slug="edge" />
+          </MemoryRouter>,
+        );
+      const open = async () => {
+        fireEvent.click(screen.getByTestId('ce-group-agent-open'));
+        await screen.findByRole('dialog', { name: 'Group Agent' });
+      };
+      fireEvent.click(screen.getByTestId('ce-demo-documents-toggle'));
+      await open();
+      // Another account never sees the last one's answer.
+      show({ ...signedIn, account: '0xdef' });
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+      await open();
+      // Signing out closes it, and signing back in doesn't open it again.
+      show({ ...signedIn, loginComplete: false });
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+      const checks = mockGroupAgentStatus.mock.calls.length;
+      show(signedIn);
+      expect(await screen.findByTestId('ce-group-agent-open')).toBeInTheDocument();
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      expect(mockGroupAgentStatus).toHaveBeenCalledTimes(checks);
     });
 
     it('says by the title that the Group Agent is on, even to someone signed out', async () => {

@@ -483,6 +483,11 @@ export default function OnePageSessionStandardShell({
   const viewerAccount = loginComplete && typeof account === 'string' ? account : '';
   const showGroupAgent = groupAgentOn && !!viewerAccount;
   const [groupAgentOpen, setGroupAgentOpen] = React.useState(false);
+  // Signing out or switching account closes the dialog, so it never shows one
+  // person's answer to another, or opens again by itself at the next sign-in.
+  React.useEffect(() => {
+    setGroupAgentOpen(false);
+  }, [showGroupAgent, viewerAccount]);
   // Where the Context section's Add and View go, in its header beside the title.
   const [contextActions, setContextActions] = React.useState<HTMLDivElement | null>(null);
   const showContextSection =
