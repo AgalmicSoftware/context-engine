@@ -4,7 +4,7 @@
 // override any of them, with the same colours available as variables.
 export const CONTEXT_HTML_PAGE_CSS = `
 :host { display: block; color: var(--ce-context-muted); font-size: 0.95rem; line-height: 1.55; overflow-wrap: anywhere; text-align: left; }
-:host > :first-child { margin-top: 0; }
+:host > :nth-child(1 of :not(style)) { margin-top: 0; }
 h1, h2, h3, h4, h5, h6 { margin: 1rem 0 0.45rem; color: var(--ce-context-text); font-weight: 800; line-height: 1.3; }
 h1 { font-size: 1.35rem; }
 h2 { font-size: 1.2rem; }
