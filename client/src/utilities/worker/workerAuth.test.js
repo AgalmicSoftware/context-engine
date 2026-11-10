@@ -64,6 +64,7 @@ jest.mock('../../store.js', () => ({
       },
       sessionState: {},
     })),
+    subscribe: jest.fn(() => () => {}),
   },
 }));
 
@@ -565,6 +566,69 @@ describe('workerAuth canonical session resolution', () => {
     expect(await hasCachedWorkerSessionToken({ ...options, context: {} })).toBe(false);
   });
 
+  describe('across reloads', () => {
+    const options = { sessionConfig: { slug: 'debate' }, context: authContext, workerUrl: 'https://worker.example' };
+    const profileFor = (account) => ({ account, provider: 'wagmi', network: { id: 84532 } });
+    // A reload starts with empty page memory. The account arrives once the saved login is restored,
+    // unless the store already holds it when this module loads.
+    const reload = ({ accountAtLoad = '' } = {}) => {
+      let page;
+      let store;
+      jest.isolateModules(() => {
+        store = require('../../store.js').default;
+        store.getState.mockReturnValue({ profile: accountAtLoad ? profileFor(accountAtLoad) : {}, sessionState: {} });
+        page = require('./workerAuth.js');
+      });
+      const setAccount = (account) => {
+        store.getState.mockReturnValue({ profile: profileFor(account), sessionState: {} });
+        store.subscribe.mock.calls.forEach(([listener]) => listener());
+      };
+      if (!accountAtLoad) setAccount(TEST_ADDRESS);
+      return { page, setAccount };
+    };
+
+    beforeEach(() => {
+      global.fetch = jest
+        .fn()
+        .mockResolvedValueOnce(jsonResp(200, { nonce: 'nonce-1' }))
+        .mockResolvedValueOnce(jsonResp(200, { token: 'token-1', exp: Math.floor(Date.now() / 1000) + 3600 }));
+    });
+
+    it('keeps a Worker sign-in across a reload in the same tab, and none after a sign-out', async () => {
+      await getWorkerSessionToken(options);
+      const { page } = reload();
+      expect(await page.getCachedWorkerSessionToken(options)).toBe('token-1');
+      expect(global.fetch).toHaveBeenCalledTimes(2);
+      page.clearAllWorkerSessionTokens();
+      expect(await reload().page.getCachedWorkerSessionToken(options)).toBe('');
+    });
+
+    it('keeps a Worker sign-in made when the account was known as the page loaded', async () => {
+      await reload({ accountAtLoad: TEST_ADDRESS }).page.getWorkerSessionToken(options);
+      expect(await reload().page.getCachedWorkerSessionToken(options)).toBe('token-1');
+      expect(global.fetch).toHaveBeenCalledTimes(2);
+    });
+
+    it('never saves a Worker sign-in that outlasts a sign-out in another tab', async () => {
+      const here = reload();
+      // Another tab signs out after this page learned who is signed in, and this page hasn't noticed.
+      localStorage.setItem('ce:workerSignIns:v1', 'after-another-tab-signed-out');
+      expect(await here.page.getWorkerSessionToken(options)).toBe('token-1');
+      expect(await reload().page.getCachedWorkerSessionToken(options)).toBe('');
+    });
+
+    it('ends the Worker sign-ins other tabs saved, once they reload, after an account switch here', async () => {
+      const here = reload();
+      await here.page.getWorkerSessionToken(options);
+      // Another tab signed in as the same person keeps this copy in its own sessionStorage.
+      const otherTab = Object.keys(sessionStorage).map((key) => [key, sessionStorage.getItem(key)]);
+      expect(otherTab).toHaveLength(1);
+      here.setAccount(NEXT_TEST_ADDRESS);
+      otherTab.forEach(([key, value]) => sessionStorage.setItem(key, value));
+      expect(await reload().page.getCachedWorkerSessionToken(options)).toBe('');
+    });
+  });
+
   it('reads a held Worker token without asking anyone to sign, and none once it lapses', async () => {
     global.fetch = jest
       .fn()
@@ -653,7 +717,7 @@ describe('workerAuth canonical session resolution', () => {
     });
   });
 
-  it('reuses scoped token envelopes in page memory without persisting the bearer', async () => {
+  it('reuses scoped token envelopes from page memory, never writing the bearer to localStorage', async () => {
     const exp = Math.floor(Date.now() / 1000) + 3600;
     global.fetch = jest
       .fn()
@@ -751,6 +815,7 @@ describe('workerAuth canonical session resolution', () => {
 
     await expect(tokenPromise).rejects.toMatchObject({ name: 'AbortError' });
     expect(Object.keys(localStorage).filter((key) => key.startsWith('ce:workerToken:v1:'))).toHaveLength(0);
+    expect(Object.keys(sessionStorage).filter((key) => key.startsWith('ce:workerToken:v1:'))).toHaveLength(0);
     expect(localStorage.getItem('ce:anonClientId:v1')).toMatch(/^[a-z0-9_-]{8,128}$/);
   });
 

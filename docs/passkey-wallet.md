@@ -289,8 +289,12 @@ link included) asks if that session needs a new sign-in, and those requests
 share one prompt. Declining keeps the signed-out view, with a button to try
 again, until anything else on the page signs in; closing and opening the filter
 again doesn't ask. Before the first sign-in, a private session shows a
-**Sign in** button there instead. Worker sign-ins live in page memory, so a
-reload, a new tab, or a sign-in's four hours ending asks once more.
+**Sign in** button there instead. A Worker sign-in lasts four hours and is kept
+for the tab that made it, in that tab's sessionStorage and never localStorage,
+so after a reload these don't ask again. The wallet itself still locks on a
+reload, so anything it signs, such as an encrypted answer, asks for the passkey
+once. A new tab needs a new sign-in, and a sign-out or account switch in any
+tab ends every saved sign-in, in other tabs once they reload.
 
 Capabilities report only what this wallet supports:
 

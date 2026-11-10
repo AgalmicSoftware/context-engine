@@ -28,10 +28,11 @@ import {
 import {
   buildTokenCacheEnvelope,
   buildTokenCacheKey,
-  clearAllTokenCaches,
+  adoptTokenCaches,
   clearTokenCache,
   normalizeTokenCacheEntry,
   readScopedTokenCache,
+  resetTokenCaches,
   writeTokenCache,
 } from './workerAuthTokenCache.js';
 import {
@@ -276,6 +277,7 @@ const doesWorkerAuthAddressMatchStore = (address: unknown): boolean => {
 };
 
 let trackedWorkerAuthAddress = getCurrentWorkerAuthStoreAddress();
+if (trackedWorkerAuthAddress) adoptTokenCaches(trackedWorkerAuthAddress);
 
 const isNonceMismatchError = (message: unknown): boolean => toStr(message).toLowerCase().includes(NONCE_MISMATCH_ERROR);
 
@@ -306,7 +308,10 @@ const abortInFlightTokenRequests = () => {
 const invalidateWorkerAuthState = ({ nextAddress = '' } = {}) => {
   invalidateClientAuthGeneration();
   abortInFlightTokenRequests();
-  clearAllTokenCaches();
+  // Learning who is signed in, as after a reload, keeps the sign-ins this tab saved for them.
+  // A sign-out or account switch ends them all.
+  if (!trackedWorkerAuthAddress && normalizeAddress(nextAddress)) adoptTokenCaches(nextAddress);
+  else resetTokenCaches(nextAddress);
   // Access noted for the previous sign-in says nothing about the next one's tokens.
   workerAccessChangedAtMs = 0;
   tokensIssuedForCurrentAccess.clear();
@@ -325,6 +330,7 @@ const syncWorkerAuthAddress = (address: unknown): number => {
   if (trackedWorkerAuthAddress && trackedWorkerAuthAddress !== normalizedAddress) {
     return invalidateWorkerAuthState({ nextAddress: normalizedAddress });
   }
+  if (!trackedWorkerAuthAddress) adoptTokenCaches(normalizedAddress);
   trackedWorkerAuthAddress = normalizedAddress;
   return getClientAuthGeneration();
 };

@@ -41,6 +41,12 @@ Never persisted:
 - derived AES-GCM key in encrypted-private-key mode
 - decrypted private key in encrypted-private-key mode
 
+Session Worker sign-ins are separate bearer tokens, each valid for up to four
+hours. A tab keeps its own in sessionStorage, never localStorage, so a reload
+in that tab needs no new sign-in. A sign-out or account switch in any tab ends
+every saved one: each is tied to a sign-in generation kept in localStorage,
+which changes then.
+
 ## Unlock Boundary
 
 Unlock requires a successful WebAuthn assertion that returns PRF output. In
