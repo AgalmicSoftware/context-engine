@@ -51,7 +51,7 @@ import {
   scopeInterviewPrefillToQuestions,
 } from './sessionInterviewCatalogValidation';
 import { useSessionInterviewRecorder } from './useSessionInterviewRecorder';
-import { getInterviewCatalogTicket } from './interviewCatalogTicket';
+import { silentCatalogTicketSource } from './interviewCatalogTicket';
 import {
   resolveSuggestedQuestionAuthoringState,
   shouldHideSuggestedQuestionSection,
@@ -247,9 +247,8 @@ export default function SessionInterviewPanel({
     null,
   );
   const panelRef = useRef<HTMLDivElement | null>(null);
-  const showFidelityScore = normalizeInterviewSettings(sessionConfig?.interviewMode).showFidelityScore;
-  // Off by default. On, the AI suggests groups; the ones the person ticks join on submit.
-  const { joinMatchingGroups } = normalizeInterviewSettings(sessionConfig?.interviewMode);
+  // joinMatchingGroups is off by default. On, the AI suggests groups; the ones the person ticks join on submit.
+  const { showFidelityScore, joinMatchingGroups } = normalizeInterviewSettings(sessionConfig?.interviewMode);
   const [showViewResults, setShowViewResults] = useState(false);
   const [hasRefreshableGroups, setHasRefreshableGroups] = useState(false);
   const [groupJoinRequest, setGroupJoinRequest] = useState(0);
@@ -492,7 +491,6 @@ export default function SessionInterviewPanel({
     workerUrl: resolvedWorkerUrl,
     account: authenticatedForSubmit ? String(account) : '',
   });
-  const generatedGroupRecommendations = generatedGroupRecommendationState.recommendations;
 
   useEffect(() => {
     if (generatedGroupRecommendationState.availability === 'available') {
@@ -583,20 +581,7 @@ export default function SessionInterviewPanel({
             sessionUrl: buildInterviewReturnSessionUrl(),
             signal: catalogAbortRef.current.signal,
             // Their AI may have read questions only their sign-in shows; checking never asks them to sign in.
-            ticket: String(account || '').trim()
-              ? async ({ fresh }) =>
-                  getInterviewCatalogTicket({
-                    workerUrl: await resolveWorkerUrl(),
-                    sessionSlug,
-                    sessionConfig,
-                    context: context || { account },
-                    prompt: false,
-                    fresh,
-                  }).then(
-                    (issued) => issued.ticket,
-                    () => '',
-                  )
-              : undefined,
+            ticket: silentCatalogTicketSource({ account, context, sessionSlug, sessionConfig, resolveWorkerUrl }),
           });
           if (disposedRef.current) return;
           // Validate imported evidence once; later additions must not block continued interviews.
@@ -1164,7 +1149,8 @@ export default function SessionInterviewPanel({
   const researchCoverage = prefillPacket?.source?.researchCoverage;
   const researchCoverageDetails = describeResearchCoverage(researchCoverage);
   const hasImportedResponderContext = Boolean(importedContext?.summary?.trim() || importedContext?.facts?.length);
-  const canManuallyRefreshGroupRecommendations = hasRefreshableGroups && drafts.length > 0;
+  const canManuallyRefreshGroupRecommendations =
+    hasRefreshableGroups && drafts.length > 0 && !groupRecommendationRequest;
 
   const { guidance, idle, statusLabel, statusTone } = describeInterviewStatus({
     recordingState,
@@ -1424,15 +1410,11 @@ export default function SessionInterviewPanel({
           {joinMatchingGroups && drafts.length ? (
             <SessionInterviewRecommendedGroups
               hidden={isInterviewBusy || mapping}
-              recommendations={generatedGroupRecommendations}
+              recommendations={generatedGroupRecommendationState.recommendations}
               availability={generatedGroupRecommendationState.availability}
               joinRequest={groupJoinRequest}
               onTickedChange={setGroupsTicked}
-              onRefresh={
-                canManuallyRefreshGroupRecommendations && !groupRecommendationRequest
-                  ? refreshGroupRecommendations
-                  : undefined
-              }
+              onRefresh={canManuallyRefreshGroupRecommendations ? refreshGroupRecommendations : undefined}
               account={account}
               provider={provider}
               network={network}

@@ -1,5 +1,9 @@
 import { fetchWorkerWithAuth } from '../../utilities/worker/workerAuth';
-import { getInterviewCatalogTicket, INTERVIEW_CATALOG_TICKET_RENEW_MS } from './interviewCatalogTicket';
+import {
+  getInterviewCatalogTicket,
+  INTERVIEW_CATALOG_TICKET_RENEW_MS,
+  silentCatalogTicketSource,
+} from './interviewCatalogTicket';
 
 jest.mock('../../utilities/worker/workerAuth', () => ({ fetchWorkerWithAuth: jest.fn() }));
 
@@ -73,4 +77,20 @@ it('refuses anything but a current ticket', async () => {
     fetchMock.mockResolvedValueOnce(response);
     await expect(getInterviewCatalogTicket(request())).rejects.toThrow('Could not get a private catalog link');
   }
+});
+
+it('gives someone signed in tickets that never ask, and nothing when none comes without asking', async () => {
+  const resolveWorkerUrl = async () => 'https://worker.example.test/';
+  expect(silentCatalogTicketSource({ account: ' ', sessionSlug: 'demo', resolveWorkerUrl })).toBeUndefined();
+  const account = `0x${'0'.repeat(39)}3`;
+  const source = silentCatalogTicketSource({ account, sessionSlug: `demo-${session}`, resolveWorkerUrl });
+  fetchMock.mockResolvedValueOnce(issued('ic1.silent', NOW / 1000 + 3600));
+  await expect(source?.({ fresh: false })).resolves.toBe('ic1.silent');
+  expect(fetchMock).toHaveBeenLastCalledWith(
+    'https://worker.example.test/agent/interview-catalog-ticket',
+    expect.anything(),
+    expect.objectContaining({ context: { account }, prompt: false }),
+  );
+  fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ error: 'sign_in_required' }), { status: 401 }));
+  await expect(source?.({ fresh: true })).resolves.toBe('');
 });

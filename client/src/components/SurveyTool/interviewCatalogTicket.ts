@@ -1,4 +1,5 @@
 import { fetchWorkerWithAuth } from '../../utilities/worker/workerAuth';
+import type { InterviewCatalogTicketSource } from './sessionInterviewCatalogValidation';
 
 /** A ticket is renewed while it has this long left, so a copied prompt's link keeps working a while. */
 export const INTERVIEW_CATALOG_TICKET_RENEW_MS = 10 * 60 * 1000;
@@ -45,3 +46,31 @@ export const getInterviewCatalogTicket = async ({
   held.set(key, issued);
   return issued;
 };
+
+/** Tickets for someone signed in that never ask them anything: theirs if one comes without asking, else ''.
+ *  None for someone signed out. */
+export const silentCatalogTicketSource = ({
+  account,
+  context,
+  resolveWorkerUrl,
+  ...session
+}: {
+  account?: unknown;
+  context?: unknown;
+  sessionSlug: string;
+  sessionConfig?: unknown;
+  resolveWorkerUrl: () => Promise<string>;
+}): InterviewCatalogTicketSource | undefined =>
+  String(account || '').trim()
+    ? async ({ fresh }) =>
+        getInterviewCatalogTicket({
+          ...session,
+          workerUrl: await resolveWorkerUrl(),
+          context: context || { account },
+          prompt: false,
+          fresh,
+        }).then(
+          (issued) => issued.ticket,
+          () => '',
+        )
+    : undefined;
