@@ -121,25 +121,35 @@ const toSource = (item: unknown): (ContextSource & { role: string; derivedFrom: 
 
 /** The context sources this reader may see, oldest first, each PDF with its AI reading. */
 export const listContextSources = async (options: ContextSourceOptions): Promise<ContextSource[]> => {
-  const rows: NonNullable<ReturnType<typeof toSource>>[] = [];
-  let cursor: string | null = null;
+  const listRows = async (preferAnonymous: boolean) => {
+    const rows: NonNullable<ReturnType<typeof toSource>>[] = [];
+    let cursor: string | null = null;
+    for (let page = 0; page < MAX_LIST_PAGES; page += 1) {
+      const result = await listSessionStorageRefsPage({
+        ...workerOptions(options),
+        resource: 'docsContext',
+        role: 'context',
+        cursor,
+        preferAnonymous,
+        // Only an admin's own view may ask them to sign in again.
+        prompt: !!options.asAdmin,
+      });
+      result.items.forEach((item) => {
+        const source = toSource(item);
+        if (source) rows.push(source);
+      });
+      if (result.listComplete || !result.cursor) break;
+      cursor = result.cursor;
+    }
+    return rows;
+  };
   // Someone already signed in to this session sees their groups' items too; listing never asks them to sign.
   const asThemselves = options.asAdmin || (await hasCachedWorkerSessionToken(workerOptions(options)));
-  for (let page = 0; page < MAX_LIST_PAGES; page += 1) {
-    const result = await listSessionStorageRefsPage({
-      ...workerOptions(options),
-      resource: 'docsContext',
-      role: 'context',
-      cursor,
-      preferAnonymous: !asThemselves,
-    });
-    result.items.forEach((item) => {
-      const source = toSource(item);
-      if (source) rows.push(source);
-    });
-    if (result.listComplete || !result.cursor) break;
-    cursor = result.cursor;
-  }
+  const rows = await listRows(!asThemselves).catch((error: unknown) => {
+    // Their held sign-in can be refused, as after an access change: show what a signed-out visitor sees.
+    if (options.asAdmin || !asThemselves) throw error;
+    return listRows(true);
+  });
   const readings = new Map(rows.filter((row) => row.role === CONTEXT_TEXT_ROLE).map((row) => [row.derivedFrom, row]));
   return rows
     .filter((row) => row.role === CONTEXT_ROLE)

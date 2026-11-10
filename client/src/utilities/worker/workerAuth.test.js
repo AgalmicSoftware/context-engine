@@ -9,6 +9,7 @@ import {
   getWorkerAuthHeaders,
   getWorkerSessionToken,
   hasCachedWorkerSessionToken,
+  isWorkerSignInNeededError,
   subscribeWorkerSessionToken,
   normalizeWorkerUrl,
   noteWorkerAccessChanged,
@@ -2186,6 +2187,129 @@ describe('workerAuth fetchWorkerWithAuth', () => {
 
     const authedHeaders = new Headers(global.fetch.mock.calls[4][1].headers);
     expect(authedHeaders.get('Authorization')).toBe('Bearer token-2');
+  });
+});
+
+describe('workerAuth sign-ins the page starts by itself', () => {
+  const originalFetch = global.fetch;
+  const context = { account: TEST_ADDRESS, providerLike: 'passkey_eoa', chainId: 84532 };
+  const options = { sessionConfig: { slug: 'debate' }, context, workerUrl: 'https://worker.example' };
+  const nonceCalls = () => global.fetch.mock.calls.filter(([url]) => /\/auth\/nonce$/.test(String(url))).length;
+  let unlocked = false;
+  let unlockLeftMs = Infinity;
+  // A passkey wallet signs without a prompt only while unlocked; any other wallet always asks.
+  const pickWallet = (wallet) => {
+    const { cryptoUtils } = require('../crypto/cryptography.js');
+    cryptoUtils._getProvider.mockImplementation(() =>
+      wallet === 'passkey'
+        ? {
+            isPasskeyEoa: true,
+            isUnlocked: (forMs = 0) => unlocked && forMs < unlockLeftMs,
+            request: mockProviderRequest,
+          }
+        : { request: mockProviderRequest },
+    );
+  };
+  const signIns = () =>
+    jest
+      .fn()
+      .mockResolvedValueOnce(jsonResp(200, { nonce: 'nonce-1' }))
+      .mockResolvedValueOnce(jsonResp(200, { token: 'token-1', exp: Math.floor(Date.now() / 1000) + 3600 }));
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockProviderRequest.mockImplementation(defaultProviderRequest);
+    unlocked = false;
+    unlockLeftMs = Infinity;
+    pickWallet('passkey');
+  });
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+  });
+
+  it('never signs in when that would ask, for a locked passkey wallet or any other wallet', async () => {
+    global.fetch = signIns();
+    for (const wallet of ['passkey', 'extension']) {
+      pickWallet(wallet);
+      const failure = await getWorkerSessionToken({ ...options, prompt: false }).catch((error) => error);
+      expect(isWorkerSignInNeededError(failure)).toBe(true);
+    }
+    expect(global.fetch).not.toHaveBeenCalled();
+    // Something the person does may still ask.
+    await expect(getWorkerSessionToken(options)).resolves.toBe('token-1');
+    expect(nonceCalls()).toBe(1);
+  });
+
+  it('signs in silently while the passkey wallet is unlocked, and uses a held token once it locks', async () => {
+    global.fetch = signIns();
+    unlocked = true;
+    await expect(getWorkerSessionToken({ ...options, prompt: false })).resolves.toBe('token-1');
+    unlocked = false;
+    await expect(getWorkerSessionToken({ ...options, prompt: false })).resolves.toBe('token-1');
+    expect(nonceCalls()).toBe(1);
+  });
+
+  it('returns the refusal, never a prompt, for a read whose sign-in would have to ask', async () => {
+    const denial = {
+      error: 'Anonymous access denied: AI/transcribe require open default+ai gates or a request apiKey.',
+    };
+    global.fetch = jest.fn().mockResolvedValueOnce(jsonResp(403, denial));
+    const anonymous = await fetchWorkerWithAuth(
+      'https://worker.example/storage/list',
+      { method: 'GET' },
+      { ...options, preferAnonymous: true, prompt: false },
+    );
+    expect(anonymous.status).toBe(403);
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+
+    const failure = await fetchWorkerWithAuth('https://worker.example/groups/list', {}, { ...options, prompt: false })
+      .then(() => null)
+      .catch((error) => error);
+    expect(isWorkerSignInNeededError(failure)).toBe(true);
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports a lapsed sign-in as refused instead of asking the person to sign in again', async () => {
+    global.fetch = signIns().mockResolvedValueOnce(jsonResp(401, { error: 'Invalid token.' }));
+    unlocked = true;
+    await getWorkerSessionToken(options);
+    unlocked = false;
+    const response = await fetchWorkerWithAuth('https://worker.example/groups/list', {}, { ...options, prompt: false });
+    expect(response.status).toBe(401);
+    expect(nonceCalls()).toBe(1);
+    expect(await getCachedWorkerSessionToken(options)).toBe('');
+  });
+
+  it('leaves a sign-in the unlock may not outlast to something the person does', async () => {
+    global.fetch = signIns();
+    unlocked = true;
+    unlockLeftMs = 5 * 1000; // locks before a nonce round trip and its retries surely finish
+    const failure = await getWorkerSessionToken({ ...options, prompt: false }).catch((error) => error);
+    expect(isWorkerSignInNeededError(failure)).toBe(true);
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it('keeps a token refused only a newer scope, unless a new one signs in without asking', async () => {
+    let logins = 0;
+    global.fetch = jest.fn(async (url) => {
+      if (String(url).endsWith('/auth/nonce')) return jsonResp(200, { nonce: `nonce-${logins + 1}` });
+      if (String(url).endsWith('/auth/login')) {
+        logins += 1;
+        return jsonResp(200, { token: `token-${logins}`, exp: Math.floor(Date.now() / 1000) + 3600 });
+      }
+      return jsonResp(403, { error: 'Token missing groups scope.' });
+    });
+    await getWorkerSessionToken(options);
+    noteWorkerAccessChanged(); // e.g. the person joins a group
+    const read = () => fetchWorkerWithAuth('https://worker.example/groups/list', {}, { ...options, prompt: false });
+    expect((await read()).status).toBe(403);
+    // Their next action still uses the token rather than asking again.
+    expect(await getCachedWorkerSessionToken(options)).toBe('token-1');
+    expect(logins).toBe(1);
+    unlocked = true;
+    expect((await read()).status).toBe(403);
+    expect(logins).toBe(2);
   });
 });
 

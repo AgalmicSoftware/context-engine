@@ -6,8 +6,6 @@ import { normalizeWorkerUrl } from '../../utilities/worker/workerUrl';
 import { isInertRasterImageMime, toViewerBlob } from '../../utilities/ui/viewerMime';
 
 type WorkerGroupImageProps = {
-  /** False never asks someone to sign in for a protected image; it stays hidden without a token. */
-  allowSignIn?: boolean;
   alt?: string;
   className?: string;
   context?: unknown;
@@ -39,7 +37,6 @@ const resolveProtectedWorkerImage = ({
 };
 
 const WorkerGroupImage = ({
-  allowSignIn = true,
   alt = '',
   className,
   context = null,
@@ -71,11 +68,6 @@ const WorkerGroupImage = ({
       setResolvedSrc(source);
       return undefined;
     }
-    if (!allowSignIn && !toText(workerToken)) {
-      setResolvedSrc('');
-      return undefined;
-    }
-
     const abortController = new AbortController();
     let objectUrl = '';
     setResolvedSrc('');
@@ -89,7 +81,8 @@ const WorkerGroupImage = ({
             },
             signal: abortController.signal,
           })
-        : await fetchWorkerWithAuth(
+        : // An image never asks anyone to sign in: it shows through the page's sign-in or an unlocked wallet.
+          await fetchWorkerWithAuth(
             source,
             { signal: abortController.signal },
             {
@@ -97,6 +90,7 @@ const WorkerGroupImage = ({
               sessionConfig,
               context,
               workerUrl: normalizedWorkerUrl,
+              prompt: false,
             },
           );
       if (!response.ok) throw new Error(`Group image request failed (${response.status}).`);
@@ -118,7 +112,6 @@ const WorkerGroupImage = ({
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
   }, [
-    allowSignIn,
     context,
     contextKey,
     fetchImpl,

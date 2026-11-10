@@ -9,11 +9,18 @@ import {
 } from './workerGroupPorts';
 import { useWorkerGroupResultsFilter } from './useWorkerGroupResultsFilter';
 import { loadWorkerGroupCohort } from './workerGroupResultsAccess';
-jest.mock('./workerGroupPorts', () => ({
-  getWorkerSessionToken: jest.fn(),
-  loadWorkerGroupMembers: jest.fn(),
-  loadWorkerGroupOverview: jest.fn(),
-}));
+jest.mock('./workerGroupPorts', () => {
+  const auth = jest.requireActual<typeof import('../../utilities/worker/workerAuth')>(
+    '../../utilities/worker/workerAuth',
+  );
+  return {
+    getWorkerSessionToken: jest.fn(),
+    isWorkerSignInNeededError: auth.isWorkerSignInNeededError,
+    subscribeWorkerSessionToken: auth.subscribeWorkerSessionToken,
+    loadWorkerGroupMembers: jest.fn(),
+    loadWorkerGroupOverview: jest.fn(),
+  };
+});
 const token = jest.mocked(getWorkerSessionToken),
   members = jest.mocked(loadWorkerGroupMembers),
   overview = jest.mocked(loadWorkerGroupOverview);
@@ -131,4 +138,64 @@ it('keeps loaded members visible while a focus refresh is pending', async () => 
   expect([...result.current.cohort.members[group.groupId]]).toEqual([a]);
   await act(async () => finish(page(b)));
   expect([...result.current.cohort.members[group.groupId]]).toEqual([b]);
+});
+
+const { WorkerSignInNeededError } = jest.requireActual<typeof import('../../utilities/worker/workerAuth')>(
+  '../../utilities/worker/workerAuth',
+);
+const prompts = () => token.mock.calls.map(([options]) => (options as { prompt?: boolean }).prompt);
+
+it('asks the person to sign in only for loads they start, never for a refresh on focus or the timer', async () => {
+  jest.useFakeTimers();
+  try {
+    // The filter is open, so the person opened it.
+    const { result } = renderHook(() => useWorkerGroupResultsFilter({ ...input, discover: true }));
+    await waitFor(() => expect(result.current.cohort.status).toBe('ready'));
+    token.mockRejectedValue(new WorkerSignInNeededError());
+    act(() => window.dispatchEvent(new Event('focus')));
+    await act(async () => jest.advanceTimersByTime(60000));
+    expect(prompts()).toEqual([true, false, false]);
+    // What the filter showed stays, rather than a sign-in error.
+    expect(result.current.cohort.status).toBe('ready');
+    expect([...result.current.cohort.members[group.groupId]]).toEqual([a]);
+    token.mockResolvedValue('synthetic-token');
+    act(() => result.current.refresh());
+    await waitFor(() => expect(prompts()).toEqual([true, false, false, true]));
+    // A Refresh click before a queued quiet refresh runs still counts as the person's.
+    act(() => {
+      dispatchWorkerGroupsChanged(scope);
+      result.current.refresh();
+    });
+    await waitFor(() => expect(prompts()).toEqual([true, false, false, true, true]));
+  } finally {
+    jest.useRealTimers();
+  }
+});
+
+it('loads a saved Group filter without asking: Retry asks, and a sign-in elsewhere loads it', async () => {
+  token.mockRejectedValue(new WorkerSignInNeededError());
+  // Results opened with a Group filter from a link or an earlier visit.
+  const { result } = renderHook(() => useWorkerGroupResultsFilter(input));
+  await waitFor(() => expect(result.current.cohort.status).toBe('error'));
+  expect(result.current.cohort.message).toBe('Sign in to filter results by Group.');
+  expect(prompts()).toEqual([false]);
+  token.mockResolvedValue('synthetic-token');
+  act(() => window.dispatchEvent(new Event('ce:worker-session-token')));
+  await waitFor(() => expect(result.current.cohort.status).toBe('ready'));
+  expect([...result.current.cohort.members[group.groupId]]).toEqual([a]);
+  act(() => result.current.refresh());
+  await waitFor(() => expect(prompts()).toEqual([false, false, true]));
+  // Only that load was the person's.
+  act(() => window.dispatchEvent(new Event('focus')));
+  await waitFor(() => expect(prompts()).toEqual([false, false, true, false]));
+});
+
+it('offers a sign-in, never the last account’s members, when a new filter can’t load without asking', async () => {
+  const { result, rerender } = renderHook((props) => useWorkerGroupResultsFilter(props), { initialProps: input });
+  await waitFor(() => expect(result.current.cohort.status).toBe('ready'));
+  token.mockRejectedValue(new WorkerSignInNeededError());
+  rerender({ ...input, account: b });
+  await waitFor(() => expect(result.current.cohort.status).toBe('error'));
+  expect(result.current.cohort.message).toBe('Sign in to filter results by Group.');
+  expect(result.current.cohort.members).toEqual({});
 });

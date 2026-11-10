@@ -57,7 +57,7 @@ describe('WorkerGroupImage', () => {
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
-  it('never asks someone to sign in for a private image when told not to; a saved token still loads it', async () => {
+  it('never asks someone to sign in for a private image; a saved token still loads it', async () => {
     const createObjectURL = jest.fn().mockReturnValue('blob:private-group-image');
     Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: createObjectURL });
     Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: jest.fn() });
@@ -69,7 +69,6 @@ describe('WorkerGroupImage', () => {
     const src = 'https://private-worker.example/storage/read?id=cf_group_image';
     const image = (workerToken: string) => (
       <WorkerGroupImage
-        allowSignIn={false}
         src={src}
         sessionConfig={privateConfig}
         sessionSlug="private-session"
@@ -83,7 +82,11 @@ describe('WorkerGroupImage', () => {
     await act(async () => {});
     expect(screen.queryByTestId('group-image')).toBeNull();
     expect(fetchImpl).not.toHaveBeenCalled();
-    expect(fetchWorkerWithAuth).not.toHaveBeenCalled();
+    expect(fetchWorkerWithAuth).toHaveBeenCalledWith(
+      src,
+      expect.anything(),
+      expect.objectContaining({ prompt: false }),
+    );
     view.rerender(image('participant-token'));
     expect(await screen.findByTestId('group-image')).toHaveAttribute('src', 'blob:private-group-image');
     expect(fetchImpl).toHaveBeenCalledWith(

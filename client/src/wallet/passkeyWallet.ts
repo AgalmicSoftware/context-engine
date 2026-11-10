@@ -580,10 +580,16 @@ export class PasskeyEoaWalletClient {
     }
   }
 
-  createProvider(): Eip1193Provider & { isPasskeyEoa: true; isMetaMask: false } {
+  createProvider(): Eip1193Provider & {
+    isPasskeyEoa: true;
+    isMetaMask: false;
+    isUnlocked: (forMs?: number) => boolean;
+  } {
     return {
       isPasskeyEoa: true,
       isMetaMask: false,
+      // Whether a request signs without a passkey prompt, now and for the next forMs.
+      isUnlocked: (forMs = 0) => this.isUnlocked() && this.unlockExpiresAt > this.now() + forMs,
       request: (args) => this.request(args),
       on: (_event: unknown, _handler: unknown) => {},
       removeListener: (_event: unknown, _handler: unknown) => {},

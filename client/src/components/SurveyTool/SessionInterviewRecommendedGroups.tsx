@@ -430,7 +430,6 @@ export function SessionInterviewRecommendedGroups({
               <WorkerGroupImage
                 src={choice.imageUrl}
                 alt=""
-                allowSignIn={false}
                 className={styles.sessionInterviewGroupChoiceImage}
                 fetchImpl={fetchImpl}
                 sessionConfig={sessionConfig}

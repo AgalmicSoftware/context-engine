@@ -269,6 +269,19 @@ The EIP-1193 facade is available through:
 createPasskeyEip1193Provider()
 ```
 
+The facade's `isUnlocked(forMs)` says whether a request would sign without a
+passkey prompt, now and for the next `forMs` milliseconds. Requests the page
+makes by itself use it: a group list, a group image, or the Results group filter
+(its refreshes, and a filter saved or in a link) signs in to a session's Worker
+only with a sign-in this page already holds, or silently while the wallet stays
+unlocked for at least 30 more seconds (`getWorkerSessionToken` and
+`fetchWorkerWithAuth` with `prompt: false`). Otherwise it shows what a
+signed-out visitor would see. Such a request also keeps a token the Worker
+refused for one newer scope, unless a new one signs in silently. Only something
+the person does, such as signing in, submitting, joining or clicking **Sign
+in**, asks for the passkey. Worker sign-ins live in page memory, so the first
+such action after a reload, or after a sign-in's four hours, asks once.
+
 Capabilities report only what this wallet supports:
 
 ```ts

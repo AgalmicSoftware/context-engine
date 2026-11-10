@@ -851,13 +851,19 @@ describe('PasskeyEoaWalletClient', () => {
     });
 
     await client.createWallet();
+    // The provider says whether a request would sign without a passkey prompt, now or after a wait.
+    const provider = client.createProvider();
     expect(client.isUnlocked()).toBe(true);
     expect(client.hasSigner()).toBe(true);
+    expect(provider.isUnlocked()).toBe(true);
+    expect(provider.isUnlocked(config.unlockTtlSeconds * 1000 - 1000)).toBe(true);
+    expect(provider.isUnlocked(config.unlockTtlSeconds * 1000 + 1000)).toBe(false);
 
     await client.lock();
     expect(client.getAddress()).toBe(ADDRESS);
     expect(client.isUnlocked()).toBe(false);
     expect(client.hasSigner()).toBe(false);
+    expect(provider.isUnlocked()).toBe(false);
     expect(await storage.read()).toEqual(expect.objectContaining({ evmAddress: ADDRESS }));
 
     const returning = new PasskeyEoaWalletClient({

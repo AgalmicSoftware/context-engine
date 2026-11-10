@@ -7,6 +7,7 @@ import { resolveWorkerCanonicalSessionIdHex } from '../../utilities/session/sess
 import { getUsableSessionWorkerUrl } from '../../utilities/session/sessionWorkerAvailability';
 import {
   getWorkerSessionToken,
+  isWorkerSignInNeededError,
   loadPublicWorkerGroups,
   loadWorkerGroupOverview,
   type WorkerGroup,
@@ -124,18 +125,27 @@ export const loadTagPageWorkerGroupData = async (
       try {
         let groups: WorkerGroup[];
         // Regression guard: mirror the native Groups visibility boundary—public
-        // catalog when anonymous, account-authorized overview when signed in.
-        if (normalizedAccount) {
-          const credentialToken = await ports.getWorkerSessionToken({
-            sessionSlug,
-            sessionConfig,
-            workerUrl,
-            context: {
-              account: normalizedAccount,
-              providerLike: provider,
-              chainId: network?.chainId || network?.id || projection.chainId || 1,
-            },
-          });
+        // catalog when anonymous, account-authorized overview when signed in
+        // through a sign-in that asks the person for nothing.
+        const credentialToken = normalizedAccount
+          ? await ports
+              .getWorkerSessionToken({
+                sessionSlug,
+                sessionConfig,
+                workerUrl,
+                context: {
+                  account: normalizedAccount,
+                  providerLike: provider,
+                  chainId: network?.chainId || network?.id || projection.chainId || 1,
+                },
+                prompt: false,
+              })
+              .catch((error: unknown) => {
+                if (isWorkerSignInNeededError(error)) return '';
+                throw error;
+              })
+          : '';
+        if (credentialToken) {
           const overview = await ports.loadWorkerGroupOverview({
             workerUrl,
             credentialToken,

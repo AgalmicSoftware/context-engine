@@ -1,6 +1,12 @@
 import { loadWorkerGroupCohort, resolveWorkerGroupFilterScope } from './workerGroupResultsAccess';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { getWorkerSessionToken, loadWorkerGroupOverview, type WorkerGroup } from './workerGroupPorts';
+import {
+  getWorkerSessionToken,
+  isWorkerSignInNeededError,
+  loadWorkerGroupOverview,
+  subscribeWorkerSessionToken,
+  type WorkerGroup,
+} from './workerGroupPorts';
 import { subscribeWorkerGroupsChanged } from '../../utilities/worker/workerGroupChangeEvents';
 import {
   hasWorkerGroupSelection,
@@ -17,6 +23,7 @@ export type WorkerGroupFilterInput = {
   selection?: unknown;
   discover?: boolean;
 };
+const SIGN_IN_TO_FILTER = 'Sign in to filter results by Group.';
 const errorMessage = (error: unknown): string => {
   const message = error instanceof Error ? error.message : '';
   if (message === 'worker_group_member_directory_unavailable')
@@ -46,6 +53,11 @@ export function useWorkerGroupResultsFilter({
   const key = JSON.stringify([enabled, scopeKey, viewer, inputKey, discover]);
   const inputs = useRef({ sessionConfig, scope, input });
   inputs.current = { sessionConfig, scope, input };
+  // Only loads the person starts may ask them to sign in: Refresh, and opening or changing the filter
+  // while it is open. A Group filter saved or in a link loads without asking.
+  const asked = useRef(false);
+  const quiet = useRef(false);
+  const loadedKey = useRef('');
   const [revision, setRevision] = useState(0);
   const [snapshot, setSnapshot] = useState<{
     key: string;
@@ -54,22 +66,37 @@ export function useWorkerGroupResultsFilter({
     cohort: WorkerGroupCohort;
     groups: WorkerGroup[];
   } | null>(null);
-  const refresh = useCallback(() => setRevision((value) => value + 1), []);
+  const refresh = useCallback(() => {
+    asked.current = true;
+    setRevision((value) => value + 1);
+  }, []);
   useEffect(() => {
     if (!enabled || (!active && !discover)) return undefined;
+    const refreshQuietly = () => {
+      quiet.current = true;
+      setRevision((value) => value + 1);
+    };
     const unsubscribe = subscribeWorkerGroupsChanged((detail) => {
       const current = inputs.current.scope;
-      if (current && current.sessionSlug === detail.sessionSlug && current.sessionId === detail.sessionId) refresh();
+      if (current && current.sessionSlug === detail.sessionSlug && current.sessionId === detail.sessionId)
+        refreshQuietly();
     });
-    window.addEventListener('focus', refresh);
-    const timer = window.setInterval(refresh, 60000);
+    // A sign-in for something done elsewhere on the page loads what it may now read.
+    const unsubscribeToken = subscribeWorkerSessionToken(refreshQuietly);
+    window.addEventListener('focus', refreshQuietly);
+    const timer = window.setInterval(refreshQuietly, 60000);
     return () => {
       unsubscribe();
-      window.removeEventListener('focus', refresh);
+      unsubscribeToken();
+      window.removeEventListener('focus', refreshQuietly);
       window.clearInterval(timer);
     };
-  }, [enabled, active, discover, refresh]);
+  }, [enabled, active, discover]);
   useEffect(() => {
+    const prompt = asked.current || (discover && (loadedKey.current !== key || !quiet.current));
+    asked.current = false;
+    quiet.current = false;
+    loadedKey.current = key;
     if (!enabled || (!active && !discover)) return undefined;
     let current = true;
     const { scope: target, input: selectionInput, sessionConfig: config } = inputs.current;
@@ -80,12 +107,13 @@ export function useWorkerGroupResultsFilter({
       try {
         if (!target) throw new Error('The session’s Group service is unavailable.');
         const selection = normalizeWorkerGroupSelection(selectionInput, target);
-        if (!viewer) throw new Error('Sign in to filter results by Group.');
+        if (!viewer) throw new Error(SIGN_IN_TO_FILTER);
         const token = await getWorkerSessionToken({
           sessionConfig: config,
           sessionSlug: target.sessionSlug,
           workerUrl: target.workerUrl,
           context: { account: viewer, providerLike: provider, chainId: target.chainId },
+          prompt,
         });
         if (!current) return;
         const overview = discover ? await loadWorkerGroupOverview({ ...target, credentialToken: token }) : null;
@@ -93,6 +121,22 @@ export function useWorkerGroupResultsFilter({
         const members = selection ? await loadWorkerGroupCohort(selection, token) : {};
         publish({ active, selection, members, status: 'ready', message: '' }, overview?.groups || []);
       } catch (error) {
+        if (isWorkerSignInNeededError(error)) {
+          // A load that would have to ask keeps what the filter shows, or offers Retry to sign in.
+          if (current)
+            setSnapshot((shown) =>
+              shown?.key === key && shown.provider === provider
+                ? { ...shown, revision }
+                : {
+                    key,
+                    provider,
+                    revision,
+                    cohort: { active, selection: null, members: {}, status: 'error', message: SIGN_IN_TO_FILTER },
+                    groups: [],
+                  },
+            );
+          return;
+        }
         publish({ active, selection: null, members: {}, status: 'error', message: errorMessage(error) });
       }
     })();
@@ -117,7 +161,7 @@ export function useWorkerGroupResultsFilter({
       cohort: {
         active,
         status: 'loading',
-        message: viewer ? 'Loading Group members…' : 'Sign in to filter results by Group.',
+        message: viewer ? 'Loading Group members…' : SIGN_IN_TO_FILTER,
         selection: null,
         members: {},
       } as WorkerGroupCohort,

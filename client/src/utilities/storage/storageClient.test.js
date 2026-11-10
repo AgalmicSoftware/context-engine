@@ -494,6 +494,25 @@ describe('storageClient', () => {
     );
   });
 
+  test('lets a list the page loads by itself refuse to ask for a sign-in', async () => {
+    fetchWorkerWithAuth.mockResolvedValueOnce(
+      new Response(JSON.stringify({ items: [], cursor: null, listComplete: true }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+    await listSessionStorageRefsPage({
+      sessionSlug: 'alpha',
+      sessionConfig: { storageProfile: { backend: 'cloudflare' } },
+      prompt: false,
+    });
+    expect(fetchWorkerWithAuth).toHaveBeenCalledWith(
+      expect.stringContaining('/storage/list?'),
+      { method: 'GET' },
+      expect.objectContaining({ prompt: false }),
+    );
+  });
+
   test('propagates Cloudflare list cursors through the typed page helper', async () => {
     fetchWorkerWithAuth
       .mockResolvedValueOnce(

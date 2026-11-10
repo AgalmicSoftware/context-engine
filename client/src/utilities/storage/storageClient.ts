@@ -53,6 +53,8 @@ interface ListSessionStorageRefsPageOptions extends StorageWorkerOptions {
   limit?: unknown;
   /** false lists as the signed-in person first, so their admins-only items are included. */
   preferAnonymous?: boolean;
+  /** false never asks the person to sign in, for lists the page loads by itself. */
+  prompt?: boolean;
 }
 
 interface SessionStorageRefsPage {
@@ -399,6 +401,7 @@ export const listSessionStorageRefsPage = async ({
   ownResponses,
   signal,
   preferAnonymous = !ownResponses,
+  prompt,
 }: ListSessionStorageRefsPageOptions = {}): Promise<SessionStorageRefsPage> => {
   const baseUrl = await resolveStorageWorkerUrl({ sessionSlug, sessionConfig, context, workerUrl });
   const params = new URLSearchParams({ resource: toStr(resource).trim() || 'docsContext' });
@@ -419,6 +422,7 @@ export const listSessionStorageRefsPage = async ({
       workerUrl: baseUrl,
       allowDemoFallback: defaultStrictAllowDemoFallback(),
       preferAnonymous,
+      prompt,
     },
   );
   const body = (await response.json().catch(() => ({}))) as UnknownRecord;

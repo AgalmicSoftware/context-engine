@@ -862,6 +862,45 @@ describe('CommunityTab helpers', () => {
     expect(nextEntries.map((entry) => entry.workerGroupIds)).toEqual([['public-catalog'], ['private-active']]);
   });
 
+  it('counts only public groups, without asking, when signing in would prompt', async () => {
+    const token = jest
+      .spyOn(workerAuth, 'getWorkerSessionToken')
+      .mockRejectedValue(new workerAuth.WorkerSignInNeededError());
+    const overview = jest.spyOn(workerGroupPorts, 'loadWorkerGroupOverview');
+    jest.spyOn(workerGroupPorts, 'loadPublicWorkerGroups').mockResolvedValue([{ groupId: 'public-catalog' }]);
+    const instance = new CommunityTab({
+      activeSessionSlug: 'demo-sh',
+      sessionConfig: WORKER_SESSION_CONFIG,
+      account: '0xparticipant',
+    });
+    const entries = instance._buildScopeEntriesFromSlugs(['demo-sh']);
+    await instance._hydrateWorkerGroupCounts(entries);
+    expect(token).toHaveBeenCalledWith(expect.objectContaining({ prompt: false }));
+    expect(overview).not.toHaveBeenCalled();
+    expect(entries.map((entry) => entry.workerGroupIds)).toEqual([['public-catalog']]);
+  });
+
+  it('counts nothing on a private session, without asking or failing, when signing in would prompt', async () => {
+    const token = jest
+      .spyOn(workerAuth, 'getWorkerSessionToken')
+      .mockRejectedValue(new workerAuth.WorkerSignInNeededError());
+    const publicGroups = jest.spyOn(workerGroupPorts, 'loadPublicWorkerGroups').mockResolvedValue([]);
+    const instance = new CommunityTab({
+      activeSessionSlug: 'demo-sh',
+      sessionConfig: WORKER_SESSION_CONFIG,
+      account: '0xparticipant',
+    });
+    const [entry] = instance._buildScopeEntriesFromSlugs(['demo-sh']);
+    entry.sessionConfig = {
+      ...entry.sessionConfig,
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+    };
+    await instance._hydrateWorkerGroupCounts([entry]);
+    expect(token).toHaveBeenCalledWith(expect.objectContaining({ prompt: false }));
+    expect(publicGroups).not.toHaveBeenCalled();
+    expect(entry.workerGroupsStatus).toBe('unavailable');
+  });
+
   it('does not turn a nonactive gated Worker into an anonymous group read', async () => {
     const token = jest.spyOn(workerAuth, 'getWorkerSessionToken').mockResolvedValue('worker-token');
     const publicGroups = jest.spyOn(workerGroupPorts, 'loadPublicWorkerGroups').mockResolvedValue([]);
