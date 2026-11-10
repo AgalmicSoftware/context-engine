@@ -134,6 +134,7 @@ describe('the Context section for participants', () => {
     );
     expect(header).toContainElement(screen.getByRole('button', { name: 'Add' }));
     expect(header).toContainElement(screen.getByRole('button', { name: 'View my groups’ files' }));
+    expect(header).toContainElement(screen.getByRole('button', { name: 'About viewing your groups’ files' }));
     header.remove();
   });
 
@@ -145,6 +146,11 @@ describe('the Context section for participants', () => {
     const view = screen.getByRole('button', { name: 'View my groups’ files' });
     expect(view).toHaveTextContent('View');
     expect(view).toHaveAccessibleDescription(/files locked to your groups/);
+    // Its explanation has a ? of its own, which explains without signing in.
+    const help = screen.getByRole('button', { name: 'About viewing your groups’ files' });
+    expect(help).toHaveAccessibleDescription(/files locked to your groups/);
+    fireEvent.click(help);
+    expect(getWorkerSessionToken).not.toHaveBeenCalled();
     await act(async () => fireEvent.click(view));
     expect(getWorkerSessionToken).toHaveBeenCalledWith(
       expect.objectContaining({ sessionSlug: 'salon', context: { account: ME } }),

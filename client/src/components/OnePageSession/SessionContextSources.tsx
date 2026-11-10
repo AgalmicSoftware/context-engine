@@ -2,7 +2,7 @@ import { useId, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { UncontrolledTooltip } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faExternalLinkAlt, faEye, faFileAlt, faPlus } from '@fortawesome/free-solid-svg-icons';
+import { faExternalLinkAlt, faEye, faFileAlt, faPlus, faQuestionCircle } from '@fortawesome/free-solid-svg-icons';
 
 import { contextGroupsLabel } from '../Sessions/setup/ContextAccessPicker';
 import ContextSourcesPanel from '../Sessions/setup/ContextSourcesPanel';
@@ -67,7 +67,6 @@ const SessionContextSources = ({ sessionSlug, sessionConfig, account, list, page
         <>
           <button
             type="button"
-            id={myGroupsHelpId}
             className={`${setupStyles.button} ${styles.contextHeaderButton}`}
             aria-label="View my groups’ files"
             aria-describedby={`${myGroupsHelpId}-about`}
@@ -83,6 +82,16 @@ const SessionContextSources = ({ sessionSlug, sessionConfig, account, list, page
           >
             <FontAwesomeIcon icon={faEye} aria-hidden="true" />
             View
+          </button>
+          {/* A tap on View signs in, so its explanation has its own button. */}
+          <button
+            type="button"
+            id={myGroupsHelpId}
+            className={`${setupStyles.button} ${styles.contextHeaderButton}`}
+            aria-label="About viewing your groups’ files"
+            aria-describedby={`${myGroupsHelpId}-about`}
+          >
+            <FontAwesomeIcon icon={faQuestionCircle} />
           </button>
           <span id={`${myGroupsHelpId}-about`} hidden>
             {MY_GROUPS_HELP}
