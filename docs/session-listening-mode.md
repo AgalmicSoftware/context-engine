@@ -292,8 +292,9 @@ ticket lasts an hour at most and never past their sign-in, and signing out of
 the page doesn't end one already copied. The page renews it quietly ten
 minutes before it ends, or as it ends when their sign-in ends sooner, and
 checks again rather than copy one that is due; the prompt tells the AI the
-link is private to them. Checking the prompt asks them once to sign in to the session if
-they haven't; declining still offers what a signed-out visitor's AI may read,
+link is private to them. If they haven't signed in to the session, checking
+the prompt asks them once while the page is open, on the choices or on
+Interview; declining still offers what a signed-out visitor's AI may read,
 and **Retry** asks again. A session that lets no signed-out visitor list its
 questions says so: signed out, the card asks the person to use **Log in** at the
 top of the page, and the **Interview & share** panel, whose prompt is for

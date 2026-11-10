@@ -9,7 +9,9 @@ jest.mock('./interviewCatalogTicket', () => ({
 }));
 
 const ticketMock = jest.mocked(getInterviewCatalogTicket);
-const ACCOUNT = '0x0000000000000000000000000000000000000001';
+// The card remembers whom it asked for as long as the page is open, so each test signs in as someone new.
+let people = 0;
+let ACCOUNT = '';
 const catalog = () =>
   new Response(
     JSON.stringify({
@@ -42,6 +44,8 @@ const copy = async () => {
 };
 
 beforeEach(() => {
+  people += 1;
+  ACCOUNT = `0x${String(people).padStart(40, '0')}`;
   ticketMock.mockReset();
   writeText.mockClear();
   Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
@@ -81,6 +85,18 @@ it('on a session that needs a sign-in, asks again only when the person presses R
   expect(ticketMock).toHaveBeenCalledTimes(2);
   expect(ticketMock).toHaveBeenLastCalledWith(expect.objectContaining({ prompt: true }));
   expect(await copy()).toContain('&ticket=ic1.after-retry');
+});
+
+it('asks only once wherever the card shows, as when Back brings it back', async () => {
+  ticketMock.mockRejectedValue(new Error('Declined'));
+  const first = renderCard();
+  await copy();
+  expect(ticketMock).toHaveBeenLastCalledWith(expect.objectContaining({ prompt: true }));
+  first.unmount();
+  renderCard();
+  await copy();
+  expect(ticketMock).toHaveBeenCalledTimes(2);
+  expect(ticketMock).toHaveBeenLastCalledWith(expect.objectContaining({ prompt: false }));
 });
 
 it('tells a signed-out visitor on such a session to log in', async () => {

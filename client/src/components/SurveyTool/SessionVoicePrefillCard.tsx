@@ -14,6 +14,9 @@ import styles from './SurveyTool.module.scss';
 
 const PREFILL_ABOUT =
   'Your AI drafts answers from what it knows about you, and you review them here before anything is submitted.';
+// Who has been asked to sign in for a private catalog link, so only Retry asks them again. It outlives the card,
+// which shows on the choices and on Interview and comes back after Back.
+const askedForTicket = new Set<string>();
 
 type Props = {
   sessionSlug?: string;
@@ -37,8 +40,6 @@ export default function SessionVoicePrefillCard({
   const [promptCopied, setPromptCopied] = useState(false);
   const [showAgentPrompt, setShowAgentPrompt] = useState(false);
   const copyResetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Who has been asked to sign in for a private catalog link, so only Retry asks them again.
-  const askedRef = useRef(new Set<string>());
   const activeWorkerUrl = workerUrl || resolvedWorkerUrl;
   // The pile rebuilds `context` on every render, so the lookup keys on its values
   // and reads the latest objects, rather than restarting each render.
@@ -88,12 +89,12 @@ export default function SessionVoicePrefillCard({
   // asked to sign in to the session once; declining still offers what a signed-out visitor's AI may read.
   const validateKickoff = async ({ retry }: { retry: boolean }) => {
     const askKey = [activeWorkerUrl, sessionSlug, String(account || '').toLowerCase()].join('\n');
-    const prompt = retry || !askedRef.current.has(askKey);
+    const prompt = retry || !askedForTicket.has(askKey);
     let ticketFailed = false;
     let renewAtMs = 0;
     const ticket = account
       ? async ({ fresh }: { fresh: boolean }) => {
-          askedRef.current.add(askKey);
+          askedForTicket.add(askKey);
           try {
             const issued = await getInterviewCatalogTicket({
               workerUrl: activeWorkerUrl,
