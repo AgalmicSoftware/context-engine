@@ -7,6 +7,7 @@ import SessionInterviewPanel from './SessionInterviewPanel';
 import SessionListeningPanel from './SessionListeningPanel';
 import SessionRecordingHelp from './SessionRecordingHelp';
 import SessionTranscriptClaimScanner from './SessionTranscriptClaimScanner';
+import SessionVoiceModeBackButton, { VoiceModeBackContext } from './SessionVoiceModeBack';
 import SessionVoiceModeChooser from './SessionVoiceModeChooser';
 import SessionVoicePrefillCard from './SessionVoicePrefillCard';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
@@ -59,7 +60,8 @@ export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps)
     !isOpen,
   );
   const [hasUnsavedReview, setHasUnsavedReview] = useState(false);
-  const [confirmDiscard, setConfirmDiscard] = useState(false);
+  // What confirming the discard does next: close the dialog, or go back to its two choices.
+  const [confirmDiscard, setConfirmDiscard] = useState<'close' | 'back' | null>(null);
   const [interviewVersion, setInterviewVersion] = useState(0);
   const [discardedPrefill, setDiscardedPrefill] = useState<InterviewPrefillPacket | null>(null);
   const prefillPacket = props.prefillPacket === discardedPrefill ? null : props.prefillPacket;
@@ -88,6 +90,39 @@ export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps)
     if (mode === 'recordGroup' && groupCloseRef.current) void groupCloseRef.current();
     else onClose();
   };
+  // Leaving the interview drops what fed it, so choosing Interview again starts afresh.
+  const leaveInterview = () => {
+    setHasUnsavedReview(false);
+    setDiscardedPrefill(props.prefillPacket || null);
+    setDiscardedClaim(props.claim || null);
+    setInterviewVersion((version) => version + 1);
+  };
+  // Back to the two choices. Group Conversation first finishes its recording and uploads, as closing does,
+  // and an interview with unsaved work asks first, as Discard does.
+  const backAfterGroupClose = useRef(false);
+  const goBack = () => {
+    if (mode === 'recordGroup' && groupCloseRef.current) {
+      backAfterGroupClose.current = true;
+      void groupCloseRef.current().finally(() => {
+        backAfterGroupClose.current = false;
+      });
+    } else if (mode === 'interview' && hasUnsavedReview) setConfirmDiscard('back');
+    else {
+      if (mode === 'interview') leaveInterview();
+      onSelectMode(null);
+    }
+  };
+  // The prompt to have your own AI draft your answers, on the choices and on Interview.
+  const prefillCard = (
+    <SessionVoicePrefillCard
+      questionPool={questionPool}
+      existingResponseSlice={props.existingResponseSlice}
+      sessionSlug={props.sessionSlug}
+      sessionConfig={props.sessionConfig}
+      context={props.context}
+      workerUrl={props.workerUrl}
+    />
+  );
   const questions = useMemo(
     () => normalizeInterviewQuestions(sortInterviewQuestionPoolNewestFirst(questionPool)),
     [questionPool],
@@ -110,21 +145,30 @@ export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps)
       >
         {isOpen ? <div id={VOICE_DIALOG_NOTICE_SLOT_ID} /> : null}
         {mode === 'interview' ? (
-          <SessionInterviewPanel
-            key={`${interviewVersion}:${prefillIdentity}`}
-            {...props}
-            prefillPacket={prefillPacket}
-            claim={claim}
-            onClose={requestClose}
-            questions={questions}
-            onReviewStateChange={setHasUnsavedReview}
-            onRequestDiscard={() => setConfirmDiscard(true)}
-          />
+          <VoiceModeBackContext.Provider value={goBack}>
+            <SessionInterviewPanel
+              key={`${interviewVersion}:${prefillIdentity}`}
+              {...props}
+              prefillPacket={prefillPacket}
+              claim={claim}
+              onClose={requestClose}
+              questions={questions}
+              onReviewStateChange={setHasUnsavedReview}
+              onRequestDiscard={() => setConfirmDiscard('close')}
+            />
+            {/* Until the interview has something to review. */}
+            {!hasUnsavedReview && !prefillPacket && !claim ? (
+              <ModalBody className={styles.sessionInterviewPrefill}>{prefillCard}</ModalBody>
+            ) : null}
+          </VoiceModeBackContext.Provider>
         ) : (
           <>
             <ModalHeader toggle={requestClose}>
               <span className={styles.sessionVoiceModeTitle}>
                 <span className={styles.sessionRecordingHeading}>
+                  {mode === 'recordGroup' ? (
+                    <SessionVoiceModeBackButton id="ce-group-back" onBack={goBack} disabled={groupCapturing} />
+                  ) : null}
                   {/* The dialog takes its name from the title alone, not the icons beside it. */}
                   <span id="ce-session-voice-mode-title">{title}</span>
                   {mode === 'recordGroup' ? <SessionRecordingHelp /> : null}
@@ -158,22 +202,13 @@ export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps)
             </ModalHeader>
             <ModalBody>
               {!mode ? (
-                <SessionVoiceModeChooser onSelectMode={onSelectMode}>
-                  <SessionVoicePrefillCard
-                    questionPool={questionPool}
-                    existingResponseSlice={props.existingResponseSlice}
-                    sessionSlug={props.sessionSlug}
-                    sessionConfig={props.sessionConfig}
-                    context={props.context}
-                    workerUrl={props.workerUrl}
-                  />
-                </SessionVoiceModeChooser>
+                <SessionVoiceModeChooser onSelectMode={onSelectMode}>{prefillCard}</SessionVoiceModeChooser>
               ) : (
                 <SessionListeningPanel
                   {...props}
                   panelMode="recordGroup"
                   embeddedInModal
-                  onClose={onClose}
+                  onClose={() => (backAfterGroupClose.current ? onSelectMode(null) : onClose())}
                   closeActionRef={groupCloseRef}
                   onCaptureChange={setGroupCapturing}
                   headerActionsSlot={headerActions}
@@ -241,20 +276,19 @@ export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps)
         </div>
       ) : null}
       <CEConfirmDialog
-        isOpen={isOpen && confirmDiscard}
+        isOpen={isOpen && confirmDiscard !== null}
         title="Discard this interview?"
         body="Your transcript, imported prefill, and unsaved review edits will be lost. Responses you’ve already submitted are kept."
         confirmLabel="Discard interview"
         cancelLabel="Keep reviewing"
         danger
-        onCancel={() => setConfirmDiscard(false)}
+        onCancel={() => setConfirmDiscard(null)}
         onConfirm={() => {
-          setConfirmDiscard(false);
-          setHasUnsavedReview(false);
-          setDiscardedPrefill(props.prefillPacket || null);
-          setDiscardedClaim(props.claim || null);
-          setInterviewVersion((version) => version + 1);
-          onClose();
+          const next = confirmDiscard;
+          setConfirmDiscard(null);
+          leaveInterview();
+          if (next === 'back') onSelectMode(null);
+          else onClose();
         }}
         testId="ce-interview-discard"
       />

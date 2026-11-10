@@ -1981,11 +1981,24 @@ describe('SessionVoiceModeModal', () => {
     expect(screen.queryByTestId(E2E_TESTIDS.SESSION_VOICE_PREFILL)).not.toBeInTheDocument();
   });
 
-  it('keeps the AI-prefill prompt out of the interview itself', () => {
-    render(<SessionVoiceModeModal {...baseProps} mode="interview" />);
+  it('offers the AI-prefill prompt on Interview too, until the interview has something to review', async () => {
+    const view = render(<SessionVoiceModeModal {...baseProps} mode="interview" />);
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START)).toBeInTheDocument();
-    expect(screen.queryByTestId(E2E_TESTIDS.SESSION_VOICE_PREFILL)).not.toBeInTheDocument();
-    expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_COPY_AGENT_PROMPT)).not.toBeInTheDocument();
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_VOICE_PREFILL)).toBeInTheDocument();
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_COPY_AGENT_PROMPT)).toBeInTheDocument();
+    view.rerender(
+      <SessionVoiceModeModal
+        {...baseProps}
+        mode="interview"
+        prefillPacket={{
+          version: 1 as const,
+          sessionSlug: 'demo',
+          source: { platform: 'other' as const, modelId: 'unknown', verification: 'self_reported' as const },
+          responderContext: { summary: 'Synthetic context' },
+        }}
+      />,
+    );
+    await waitFor(() => expect(screen.queryByTestId(E2E_TESTIDS.SESSION_VOICE_PREFILL)).not.toBeInTheDocument());
   });
 
   it('opens Group Conversation with its input guidance in a title tooltip', async () => {

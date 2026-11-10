@@ -161,6 +161,7 @@ All notable changes to this project will be documented in this file.
 - On `/new`, a starting file can be locked to groups set up before Create, under Access and identity: its **Visible to** lists them, and Create makes the groups before the files are added. A file goes only to the groups Create made, or to admins alone if it made none of them, never more widely. An exported template carries a locked file as admins-only.
 - Wherever a context file is added, on `/new`, the settings page, the session page or with a group conversation's transcript, **Visible to** is a dropdown of toggles like the question filter's tags: everyone in the session, admins only, or any mix of up to 20 of the session's groups, whose members may each read the file.
 - Admins see a **Group Agent** button in a session's context section. For now it only says the Group Agent is coming.
+- Voice mode's Interview and Group Conversation screens have a **Back** button to the two choices. It's off while an interview or recording is under way. Leaving an interview with unsaved work asks first, and Group Conversation finishes its recording and uploads before going back. The Interview screen also offers **Let your AI draft your answers** until there's something to review.
 
 ### Workers — requires redeployment
 

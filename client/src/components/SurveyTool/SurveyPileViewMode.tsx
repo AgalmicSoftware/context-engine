@@ -1577,7 +1577,7 @@ export const toggleSessionVoiceModeModal = (engine: PileViewModeEngine) => {
   });
 };
 
-const selectSessionVoiceMode = (engine: PileViewModeEngine, mode: SessionVoiceMode) => {
+const selectSessionVoiceMode = (engine: PileViewModeEngine, mode: SessionVoiceMode | null) => {
   engine.setState({ showVoiceModeModal: true, sessionVoiceMode: mode }, () => {
     engine.syncSessionVoiceModeQuery(mode);
   });

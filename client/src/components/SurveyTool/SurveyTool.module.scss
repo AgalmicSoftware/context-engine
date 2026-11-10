@@ -3824,6 +3824,11 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   gap: 10px 12px;
 }
 
+// The prompt card under an interview that hasn't started, flush with the interview above it.
+.sessionInterviewPrefill {
+  padding-top: 0;
+}
+
 .sessionInterviewHeader {
   display: inline-flex;
   align-items: center;

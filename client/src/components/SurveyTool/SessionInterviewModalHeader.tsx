@@ -3,6 +3,7 @@ import { ModalHeader, UncontrolledTooltip } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faQuestionCircle } from '@fortawesome/free-solid-svg-icons';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
+import SessionVoiceModeBackButton, { VoiceModeBackContext } from './SessionVoiceModeBack';
 import styles from './SurveyTool.module.scss';
 
 type SessionInterviewModalHeaderProps = {
@@ -26,9 +27,11 @@ export default function SessionInterviewModalHeader({
   statusTone,
   statusRef,
 }: SessionInterviewModalHeaderProps) {
+  const onBack = React.useContext(VoiceModeBackContext);
   return (
     <ModalHeader toggle={onClose}>
       <span className={styles.sessionInterviewHeader}>
+        {onBack ? <SessionVoiceModeBackButton id="ce-interview-back" onBack={onBack} disabled={!idle} /> : null}
         <span id="ce-session-voice-mode-title">Interview</span>
         <button
           type="button"
