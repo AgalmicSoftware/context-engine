@@ -114,6 +114,7 @@ import { defaultSessionSetupProfile, editSessionSetupProfile } from './setup/ses
 import SetupSlugPreview from './setup/SetupSlugPreview';
 import SetupWorkerQuick from './setup/SetupWorkerQuick';
 import { SetupWithAi } from './setup/SetupWithAi';
+import SetupGroupAgent, { describeGroupAgentProblem } from './setup/SetupGroupAgent';
 import SessionHostedFaucetControl from './SessionHostedFaucetControl';
 import WorkerDeployHelperToggle from './WorkerDeployHelperToggle';
 import {
@@ -2664,9 +2665,14 @@ const SessionWizard = ({
     sessionModeRequirements.usesWorkerRuntime && !deployVerifiedInUi && !canUseSponsoredAutoDeployNow;
   const missingSecrets = needsWorkerDeploy && workerSecretsEnabled ? getMissingWorkerSecretsForDeploy() : [];
   const contextProblem = describeContextProblem(draft);
+  // Only a session on a Session Worker has a Group Agent.
+  const groupAgentProblem = sessionModeRequirements.isWorkerCanonical
+    ? describeGroupAgentProblem(draft.groupAgent)
+    : '';
   const missingInputs = [
     toStr(draft.sessionName).trim() ? '' : 'Enter a session name.',
     contextProblem ? `Fix the context: ${contextProblem}` : '',
+    groupAgentProblem ? `Fix the Group Agent: ${groupAgentProblem}` : '',
     needsWorkerDeploy && !toStr(deployForm.apiToken).trim()
       ? 'Enter your Cloudflare API token, or verify a Worker you deployed from the Cloudflare dashboard.'
       : '',
@@ -2960,6 +2966,22 @@ const SessionWizard = ({
               <SetupVoiceKeyNote />
             ) : null}
           </>
+        ) : null
+      }
+      groupAgent={
+        sessionModeRequirements.isWorkerCanonical ? (
+          <SetupGroupAgent
+            value={draft.groupAgent}
+            onChange={(next) => updateDraftValue(['groupAgent'], next)}
+            groups={contextFileGroups.flatMap(({ groupId, label }) =>
+              label.trim() ? [{ groupId, label: label.trim() }] : [],
+            )}
+            sbtChainId={
+              sessionModeRequirements.publish.deployPendingSbts
+                ? Number(draft.networkChainId || registryChainId || 0) || 0
+                : 0
+            }
+          />
         ) : null
       }
       sponsoredStatusProps={{

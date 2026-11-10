@@ -771,6 +771,39 @@ describe('sessionWizardWriteNormalization', () => {
     expect(build(' Join the open group.\n')).toHaveProperty('agentInstructions', 'Join the open group.');
   });
 
+  test('buildSessionWizardWorkerConfigPayload sends the Group Agent as the Worker stores it, and off as a clear', () => {
+    const build = (
+      groupAgent: unknown,
+      preset: Parameters<typeof cloneSessionModePreset>[0] = SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE,
+    ) =>
+      buildSessionWizardWorkerConfigPayload({
+        slug: 'group-agent',
+        draft: { sessionModeProfile: cloneSessionModePreset(preset), groupAgent },
+        workerUrl: 'https://worker.example',
+      });
+    const everyone = {
+      who: { match: 'any', conditions: [{ kind: 'agent_grant_scope', scope: 'ai' }] },
+      answers: 'general',
+    };
+    const salon = (groupId: string) => ({
+      who: { match: 'any', conditions: [{ kind: 'worker_group', groupIds: [groupId] }] },
+      answers: 'detailed',
+    });
+
+    expect(build({ audiences: [salon(' Salon '), everyone], instructions: { general: ' ' } }).groupAgent).toEqual({
+      audiences: [salon('salon'), everyone],
+    });
+    // set-config merges fields, so off clears a setting an earlier verification stored.
+    expect(build(undefined)).toHaveProperty('groupAgent', null);
+    expect(() => build({ audiences: [{ ...everyone, answers: 'everything' }] })).toThrow(
+      'Fix the Group Agent: Audience 1 must get General or Detailed answers.',
+    );
+    // Only a session on a Session Worker has a Group Agent.
+    expect(build({ audiences: [everyone] }, SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED)).not.toHaveProperty(
+      'groupAgent',
+    );
+  });
+
   test('buildSessionWizardWorkerConfigPayload keeps only SBT defaults and Group Factory for explicit hybrid mode', () => {
     const sessionModeProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
     sessionModeProfile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;

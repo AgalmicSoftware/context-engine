@@ -55,6 +55,8 @@ export type SessionWizardShellProps = {
   hostingStatus: string;
   workerPanelProps: WorkerPanelProps;
   aiKeys: React.ReactNode;
+  /** Who may ask the Group Agent; only a session on a Session Worker has one. */
+  groupAgent?: React.ReactNode;
   sponsoredStatusProps: SponsoredStatusProps;
   createPanelProps: CreatePanelProps;
   modalsProps: ModalsProps;
@@ -95,6 +97,7 @@ const SessionWizardShell = ({
   hostingStatus,
   workerPanelProps,
   aiKeys,
+  groupAgent = null,
   sponsoredStatusProps,
   createPanelProps,
   modalsProps,
@@ -152,7 +155,7 @@ const SessionWizardShell = ({
           onRegistryChainChange={onRegistryChainIdChange}
           deployment={<WorkerPanel {...workerPanelProps} />}
         />
-        <SetupAiSection {...section('ai')} keys={aiKeys} />
+        <SetupAiSection {...section('ai')} keys={aiKeys} groupAgent={groupAgent} />
         <SetupCreatePanel {...createPanelProps} />
         <SessionWizardModals {...modalsProps} />
       </div>

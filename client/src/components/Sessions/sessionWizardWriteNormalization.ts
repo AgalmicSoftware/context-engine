@@ -3,6 +3,7 @@ import { normalizeHostedFaucetSelection } from './sessionWizardHostedFaucet';
 import { DEFAULT_TRANSCRIPTION_MODEL } from '../../../../shared/aiDefaults.mjs';
 import { normalizeInterviewSettings } from '../../../../shared/interviewSettings.mjs';
 import { validateSessionContext, type SessionContext } from '@ce-shared/sessionContext.mjs';
+import { validateGroupAgent } from '@ce-shared/groupAgent.mjs';
 import { withoutNewInterviewDefaults } from '../../utilities/session/interviewModeWrite';
 import {
   normalizeResultsAnalysisSettings,
@@ -493,6 +494,11 @@ export const buildSessionWizardWorkerConfigPayload = ({
     // field; the config writers send '' when the Worker's config already has it.
     const agentInstructions = trimString(resolvedDraft.agentInstructions);
     if (agentInstructions) next.agentInstructions = agentInstructions;
+    // In the form the Worker stores, so the readback matches. Off is sent as
+    // null for the same reason as the end time: it clears an earlier one.
+    const groupAgent = validateGroupAgent(resolvedDraft.groupAgent ?? null);
+    if (!groupAgent.ok) throw new Error(`Fix the Group Agent: ${groupAgent.errors[0].message}`);
+    next.groupAgent = groupAgent.value;
     if (usesOnChainSbt) {
       next.defaultSbtTags = trimString(resolvedDraft.defaultSbtTags);
       next.defaultFeaturedSBTs = normalizeSessionWizardDefaultFeaturedSbtMetadata(resolvedDraft.defaultFeaturedSBTs);

@@ -1,3 +1,4 @@
+import { groupAgentSettingOf, validateGroupAgent } from '@ce-shared/groupAgent.mjs';
 import { normalizeInterviewSettings } from '@ce-shared/interviewSettings.mjs';
 import { isRealtimeInterviewModel } from '@ce-shared/realtimeInterviewConfig.mjs';
 import { normalizeResultsAnalysisSettings } from '@ce-shared/resultsAnalysisSettings.mjs';
@@ -127,6 +128,8 @@ export const buildSessionSettingsDraft = (config: unknown): SetupDraft => {
     autoFeatureSBTsBySessionSlug: resolveSessionWizardAutoFeatureBySessionSlug(source) !== false,
     lists: Object.fromEntries(LIST_KEYS.map((key) => [key, formatSettingsList(source[key])])),
     resultsAdminAddresses: storedResultsAdmins(source.resultsAdminAddresses),
+    // Off is null; a setting a writer would refuse reads as off.
+    groupAgent: groupAgentSettingOf(source.groupAgent),
     ...buildSessionSettingsChainDraft(source),
   };
 };
@@ -245,6 +248,12 @@ const editedValues = (before: Config, draft: SetupDraft, { nowMs, onChain }: Edi
     CURATED_ID_LIST_KEYS.forEach((key) => {
       values[key] = idList(before, draft, key);
     });
+  }
+  // Only a session on a Session Worker has a Group Agent; null turns it off.
+  if (!onChain) {
+    const groupAgent = validateGroupAgent(draft.groupAgent ?? null);
+    if (!groupAgent.ok) throw new Error(`Group Agent: ${groupAgent.errors[0].message}`);
+    values.groupAgent = groupAgent.value;
   }
   if (!onChain && workerTakesResultsAdmins(before)) {
     const resultsAdmins = storedResultsAdmins(draft.resultsAdminAddresses);
@@ -432,6 +441,7 @@ const LABELS: Record<string, string> = {
   contextAdditionPolicy: 'Who can add files to context',
   resultsAnalysis: 'Results analysis',
   resultsAdminAddresses: 'Results admins',
+  groupAgent: 'Group Agent',
   ai: 'AI models and effort',
   sessionModeProfile: 'Access, results and hosting',
   storageProfile: 'Storage access',

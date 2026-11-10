@@ -53,6 +53,35 @@ const verifiedConfig = (revision: string, overrides: Record<string, unknown> = {
 });
 
 describe('persistAndVerifySessionWizardWorkerConfig', () => {
+  it('reads a Group Agent sent as null as off, which the Worker stores as no setting', async () => {
+    const publish = (readback: (signed: Record<string, unknown>) => Record<string, unknown>) => {
+      let signed: Record<string, unknown> = {};
+      return persistAndVerifySessionWizardWorkerConfig({
+        workerUrl: WORKER_ORIGIN,
+        slug: 'worker-session',
+        sessionId: SESSION_ID,
+        adminAddress: ADMIN_ADDRESS,
+        config: { ...baseConfig(), groupAgent: null },
+        signAdminAction: async (input: SessionWizardWorkerConfigSignInput) => {
+          signed = input.body.config;
+          return { address: ADMIN_ADDRESS, message: 'signed set-config message', signature: '0xsigned' };
+        },
+        fetchImpl: jest.fn(async (_url, init) =>
+          init?.method === 'POST' ? jsonResponse(200, { ok: true }) : jsonResponse(200, { config: readback(signed) }),
+        ),
+        retryDelaysMs: [],
+      });
+    };
+    await expect(publish(({ groupAgent: _off, ...stored }) => stored)).resolves.toMatchObject({
+      workerOrigin: WORKER_ORIGIN,
+    });
+    await expect(publish((signed) => signed)).resolves.toMatchObject({ workerOrigin: WORKER_ORIGIN });
+    // A setting an earlier write left behind is still caught.
+    await expect(publish((signed) => ({ ...signed, groupAgent: { audiences: [] } }))).rejects.toThrow(
+      'unexpected groupAgent',
+    );
+  });
+
   it('signs and writes non-secret config, then returns only an exactly verified public config', async () => {
     let signedConfig: Record<string, unknown> | null = null;
     const signAdminAction = jest.fn(async (_input: SessionWizardWorkerConfigSignInput) => ({

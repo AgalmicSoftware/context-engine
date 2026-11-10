@@ -199,6 +199,8 @@ const pickFields = (source: UnknownRecord, fields: readonly string[]): UnknownRe
 const buildExpectedPublicConfig = (config: UnknownRecord, ignoredFields: readonly string[]): UnknownRecord =>
   PUBLIC_WORKER_CONFIG_FIELDS.reduce<UnknownRecord>((expected, key) => {
     if (ignoredFields.includes(key) || !Object.prototype.hasOwnProperty.call(config, key)) return expected;
+    // A Group Agent of null is off, as no setting is (see the readback below).
+    if (key === 'groupAgent' && config.groupAgent === null) return expected;
     if (key === 'ai') {
       const ai =
         config.ai && typeof config.ai === 'object' && !Array.isArray(config.ai) ? (config.ai as UnknownRecord) : {};
@@ -272,6 +274,8 @@ const buildComparableActualPublicConfig = ({
   ignoredFields.forEach((key) => {
     delete comparableConfig[key];
   });
+  // The Worker stores an off Group Agent as no setting; null means the same.
+  if (comparableConfig.groupAgent === null) delete comparableConfig.groupAgent;
   // The critical-field check has already matched this URL's origin; a
   // trailing slash or letter case does not change the Worker it names.
   comparableConfig.corsWorkerUrl = workerOrigin;
