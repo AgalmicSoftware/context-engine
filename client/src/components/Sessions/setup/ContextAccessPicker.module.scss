@@ -76,6 +76,17 @@
     outline: 2px solid currentColor;
     outline-offset: 2px;
   }
+
+  &:disabled {
+    cursor: not-allowed;
+  }
+}
+
+// Shown once the most groups a file can be locked to are chosen.
+.limit {
+  flex-basis: 100%;
+  color: var(--ce-control-text);
+  font-size: 0.8rem;
 }
 
 // A chosen one fills with the control text and takes the surface colour, which is

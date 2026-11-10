@@ -2902,12 +2902,10 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   }
 }
 
+// Who may read the transcript: the picker paints its own fields, so this only places it.
 .sessionTranscriptContextAccess {
   order: -1;
   flex: 1 1 100%;
-  // The same white and text as the transcript it describes, whatever the dialog's own colours.
-  background-color: var(--ce-text-inverse) !important;
-  color: var(--ce-document-text) !important;
 }
 
 // In the dialog it rests 10px above the body's edge, inside the body's 18px padding, on a strip of the

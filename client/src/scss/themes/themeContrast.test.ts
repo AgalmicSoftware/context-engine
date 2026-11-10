@@ -743,19 +743,32 @@ describe('bundled app-theme contrast', () => {
     expect(ratios.filter(([, value]) => value < 4.5)).toEqual([]);
   });
 
-  // A file's Visible to paints its own fills, so it reads on any panel; a chosen toggle swaps fill and text.
+  // A file's Visible to paints its own fills, so it reads on any panel, including the transcript box that places it;
+  // a chosen toggle takes the control text as its fill.
   test.each(registry.themes.map(({ id }) => id))('%s keeps a file’s Visible to readable', (themeId) => {
     const values = themeValues(css, themeId);
     const paint = painter(values);
     const pickerCss = compileModule('components/Sessions/setup/ContextAccessPicker.module.scss');
+    const transcriptBox = moduleRule(
+      compileModule('components/SurveyTool/SurveyTool.module.scss'),
+      '.sessionTranscriptContextAccess',
+    );
     const canvas = parseColor(values.canvas);
-    const ratio = (selector: string) => {
-      const rule = moduleRule(pickerCss, selector);
-      const fill = composite(paint(rule.background), canvas);
-      return Number(contrastRatio(composite(paint(rule.color), fill), fill).toFixed(2));
-    };
-    const ratios = ['.toggle', '.choice', '.chosen'].map((selector) => [selector, ratio(selector)] as const);
-    expect(ratios.filter(([, value]) => value < 4.5)).toEqual([]);
+    const ratios = [canvas, composite(paint(transcriptBox['background-color'] ?? 'transparent'), canvas)].flatMap(
+      (under, place) => {
+        const ratio = (selector: string, on = under) => {
+          const rule = moduleRule(pickerCss, selector);
+          const fill = composite(paint(rule.background ?? 'transparent'), on);
+          return Number(contrastRatio(composite(paint(rule.color), fill), fill).toFixed(2));
+        };
+        const panel = composite(paint(moduleRule(pickerCss, '.choices').background), under);
+        return [
+          ...['.toggle', '.choice', '.chosen'].map((selector) => [place, selector, ratio(selector)] as const),
+          [place, '.limit', ratio('.limit', panel)] as const,
+        ];
+      },
+    );
+    expect(ratios.filter(([, , value]) => value < 4.5)).toEqual([]);
   });
 
   test.each(registry.themes.map(({ id }) => id))('%s keeps small binary answer labels readable', (themeId) => {

@@ -1,12 +1,15 @@
 /** @file ContextAccessPicker.tsx: who may read a context file being added. */
 import { useEffect, useRef, useState } from 'react';
 
+import { CONTEXT_SOURCE_LIMITS } from '@ce-shared/sessionContextSources.mjs';
 import type { ContextFileAccess } from '../../../utilities/docLibrary/contextSources';
 import type { ContextGroup } from '../../../utilities/docLibrary/useContextGroups';
 import styles from './ContextAccessPicker.module.scss';
 
 const EVERYONE = 'Everyone in the session';
 const ADMINS = 'Admins only';
+// The Worker checks each group as someone reads, so a lock names at most this many.
+const MAX_GROUPS = CONTEXT_SOURCE_LIMITS.lockedGroups;
 
 const chosenGroupsOf = (access: ContextFileAccess) => (access.adminsOnly ? [] : access.groupIds || []);
 
@@ -46,7 +49,10 @@ const ContextAccessPicker = ({ id, value, groups, allowAdminsOnly, disabled, cla
   const [open, setOpen] = useState(false);
   const wrapper = useRef<HTMLDivElement>(null);
   const toggle = useRef<HTMLButtonElement>(null);
+  // A dialog around it closes on Escape's keyup, so the keyup of an Escape that closed the choices stops here too.
+  const escaped = useRef(false);
   const chosen = chosenGroupsOf(value);
+  const full = chosen.length >= MAX_GROUPS;
   // A group chosen before the list loads, or that it doesn't name, still shows, so it can be taken off.
   const shown = [
     ...groups,
@@ -69,15 +75,19 @@ const ContextAccessPicker = ({ id, value, groups, allowAdminsOnly, disabled, cla
   }, [disabled]);
 
   const toggleGroup = (groupId: string) => {
-    const next = chosen.includes(groupId) ? chosen.filter((chosenId) => chosenId !== groupId) : [...chosen, groupId];
+    const taken = chosen.includes(groupId);
+    // Taking off a group the list doesn't name removes its button, so focus moves to the toggle first.
+    if (taken && !groups.some((group) => group.groupId === groupId)) toggle.current?.focus();
+    const next = taken ? chosen.filter((chosenId) => chosenId !== groupId) : [...chosen, groupId];
     onChange(next.length ? { groupIds: next } : {});
   };
-  const choice = (key: string, label: string, pressed: boolean, choose: () => void) => (
+  const choice = (key: string, label: string, pressed: boolean, choose: () => void, unavailable = false) => (
     <button
       key={key}
       type="button"
       className={[styles.choice, pressed ? styles.chosen : ''].filter(Boolean).join(' ')}
       aria-pressed={pressed}
+      disabled={unavailable}
       onClick={choose}
     >
       {label}
@@ -96,8 +106,14 @@ const ContextAccessPicker = ({ id, value, groups, allowAdminsOnly, disabled, cla
         if (event.key !== 'Escape' || !open) return;
         // Escape closes the choices, not a dialog around them.
         event.stopPropagation();
+        escaped.current = true;
         setOpen(false);
         toggle.current?.focus();
+      }}
+      onKeyUp={(event) => {
+        if (event.key !== 'Escape' || !escaped.current) return;
+        escaped.current = false;
+        event.stopPropagation();
       }}
     >
       <button
@@ -118,12 +134,19 @@ const ContextAccessPicker = ({ id, value, groups, allowAdminsOnly, disabled, cla
         <span className={styles.caret} aria-hidden="true" />
       </button>
       {open ? (
-        <div id={`${id}-choices`} className={styles.choices} role="group">
+        <div id={`${id}-choices`} className={styles.choices} role="group" aria-labelledby={id}>
           {choice('everyone', EVERYONE, !value.adminsOnly && !chosen.length, () => onChange({}))}
           {allowAdminsOnly ? choice('admins', ADMINS, !!value.adminsOnly, () => onChange({ adminsOnly: true })) : null}
           {shown.map(({ groupId, label }) =>
-            choice(`group:${groupId}`, label, chosen.includes(groupId), () => toggleGroup(groupId)),
+            choice(
+              `group:${groupId}`,
+              label,
+              chosen.includes(groupId),
+              () => toggleGroup(groupId),
+              full && !chosen.includes(groupId),
+            ),
           )}
+          {full ? <span className={styles.limit}>Up to {MAX_GROUPS} groups.</span> : null}
         </div>
       ) : null}
     </div>

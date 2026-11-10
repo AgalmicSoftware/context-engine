@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
+import { Modal, ModalBody } from 'reactstrap';
 
 import ContextAccessPicker, { contextAccessKey, contextGroupsLabel } from './ContextAccessPicker';
 import type { ContextFileAccess } from '../../../utilities/docLibrary/contextSources';
@@ -9,8 +10,18 @@ const GROUPS = [
   { groupId: 'hosts', label: 'Hosts' },
 ];
 let latest: ContextFileAccess = {};
-const Harness = ({ allowAdminsOnly = false, onKeyDown }: { allowAdminsOnly?: boolean; onKeyDown?: () => void }) => {
-  const [access, setAccess] = useState<ContextFileAccess>({});
+const Harness = ({
+  allowAdminsOnly = false,
+  groups = GROUPS,
+  initial = {},
+  onKeyDown,
+}: {
+  allowAdminsOnly?: boolean;
+  groups?: typeof GROUPS;
+  initial?: ContextFileAccess;
+  onKeyDown?: () => void;
+}) => {
+  const [access, setAccess] = useState<ContextFileAccess>(initial);
   latest = access;
   return (
     <div onKeyDown={onKeyDown}>
@@ -18,7 +29,7 @@ const Harness = ({ allowAdminsOnly = false, onKeyDown }: { allowAdminsOnly?: boo
       <ContextAccessPicker
         id="access"
         value={access}
-        groups={GROUPS}
+        groups={groups}
         allowAdminsOnly={allowAdminsOnly}
         onChange={setAccess}
       />
@@ -82,6 +93,60 @@ describe('a file’s Visible to', () => {
       relatedTarget: screen.getByRole('button', { name: 'Elsewhere' }),
     });
     expect(screen.queryByRole('group')).toBeNull();
+  });
+
+  it('closes its choices on Escape without closing a dialog around it, which closes on the keyup', () => {
+    const close = jest.fn();
+    const InDialog = () => {
+      const [access, setAccess] = useState<ContextFileAccess>({});
+      return (
+        <Modal isOpen fade={false} toggle={close}>
+          <ModalBody>
+            <ContextAccessPicker
+              id="in-dialog"
+              aria-label="Who can read it"
+              value={access}
+              groups={GROUPS}
+              onChange={setAccess}
+            />
+          </ModalBody>
+        </Modal>
+      );
+    };
+    render(<InDialog />);
+    const opener = screen.getByLabelText('Who can read it');
+    fireEvent.click(opener);
+    expect(screen.getByRole('group', { name: 'Who can read it' })).toBeInTheDocument();
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Salon' }), { key: 'Escape', keyCode: 27 });
+    fireEvent.keyUp(opener, { key: 'Escape', keyCode: 27 });
+    expect(screen.queryByRole('group')).toBeNull();
+    expect(close).not.toHaveBeenCalled();
+    // With the choices closed, Escape belongs to the dialog again.
+    fireEvent.keyDown(opener, { key: 'Escape', keyCode: 27 });
+    fireEvent.keyUp(opener, { key: 'Escape', keyCode: 27 });
+    expect(close).toHaveBeenCalledTimes(1);
+  });
+
+  it('stops at the most groups a file can be locked to, and says so', () => {
+    const many = Array.from({ length: 21 }, (_, index) => ({ groupId: `g${index}`, label: `Group ${index}` }));
+    render(<Harness groups={many} />);
+    fireEvent.click(toggle());
+    for (let index = 0; index < 20; index += 1) press(`Group ${index}`);
+    expect(latest.groupIds).toHaveLength(20);
+    expect(screen.getByRole('button', { name: 'Group 20' })).toBeDisabled();
+    expect(screen.getByText('Up to 20 groups.')).toBeInTheDocument();
+    press('Group 0');
+    expect(screen.getByRole('button', { name: 'Group 20' })).toBeEnabled();
+    expect(screen.queryByText('Up to 20 groups.')).toBeNull();
+  });
+
+  it('keeps focus in the picker when a group the list doesn’t name is taken off', () => {
+    render(<Harness initial={{ groupIds: ['gone'] }} />);
+    expect(toggle()).toHaveTextContent('One group');
+    fireEvent.click(toggle());
+    press('This group');
+    expect(latest).toEqual({});
+    expect(toggle()).toHaveFocus();
   });
 
   it('names the groups it knows and counts the rest, and keys the same choice the same way', () => {

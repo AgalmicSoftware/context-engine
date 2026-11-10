@@ -2,7 +2,7 @@
 // doc-library records (resource docsContext) whose CE-DocRole tag says which:
 // 'context' for a file or link someone added, 'context-text' for the text the
 // session's AI read from one of those PDFs. Each is for everyone with access
-// to the session, for one group, or for admins only.
+// to the session, for the members of some of its groups, or for admins only.
 export const CONTEXT_ROLE = 'context';
 export const CONTEXT_TEXT_ROLE = 'context-text';
 
