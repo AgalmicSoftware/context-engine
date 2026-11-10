@@ -1,9 +1,10 @@
 import React from 'react';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 
 import {
   PILE_LOADING_ICON_WRAP_STYLE,
   PILE_SCAN_ERROR_DETAIL_STYLE,
+  PileSubmittedCheck,
   buildPileCardClassName,
   buildPileFilterButtonClassName,
   buildPileFooterClassName,
@@ -20,6 +21,7 @@ import {
   type PileQuestionLike,
 } from './surveyPileInteractionSurface';
 import styles from './SurveyTool.module.scss';
+import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 
 type TestTreeNode = React.ReactNode;
 type TestElementNode = React.ReactElement<{
@@ -464,6 +466,37 @@ describe('surveyPileInteractionSurface', () => {
     expect(nodeHasClassName(actionsNode, 'pileActionsMenuEligible')).toBe(true);
     expect(findNodeByClassName(tree, 'pileActionMenuToggle')).not.toBeNull();
     expect(findNodeByClassName(tree, 'pileActionButtonGroup')).not.toBeNull();
+  });
+});
+
+describe('the check after a submit', () => {
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('links to the responder’s profile for ten seconds, then hides in its place', () => {
+    jest.useFakeTimers();
+    render(<PileSubmittedCheck href="/u/0xabc?session=alpha" />);
+    const check = screen.getByRole('link', { name: 'View your submitted responses' });
+    expect(check).toHaveAttribute('href', '/u/0xabc?session=alpha');
+    expect(check).toHaveAttribute('data-testid', E2E_TESTIDS.SURVEY_SUBMITTED_INDICATOR);
+    act(() => {
+      jest.advanceTimersByTime(9_999);
+    });
+    expect(check).not.toHaveClass('pileSubmitSuccessBadgeGone');
+    act(() => {
+      jest.advanceTimersByTime(1);
+    });
+    expect(check).toHaveClass('pileSubmitSuccessBadge', 'pileSubmitSuccessBadgeGone');
+  });
+
+  it('is a status without an address to open', () => {
+    render(<PileSubmittedCheck href="" />);
+    expect(screen.getByRole('status', { name: 'Submitted' })).toHaveAttribute(
+      'data-testid',
+      E2E_TESTIDS.SURVEY_SUBMITTED_INDICATOR,
+    );
+    expect(screen.queryByRole('link')).toBeNull();
   });
 });
 

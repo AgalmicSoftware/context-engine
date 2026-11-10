@@ -9,9 +9,12 @@ jest.mock('./SessionVoiceModeModal', () => ({ __esModule: true, default: () => n
 
 const account = '0x00000000000000000000000000000000000000aa';
 
+type Engine = { setState: (patch: Record<string, unknown>) => void };
+const check = () => screen.getByTestId(E2E_TESTIDS.SURVEY_SUBMITTED_INDICATOR);
+
 // The real pile view, signed in on a session's page, just after a submit.
-const submitted = () => {
-  let engine: { setState: (patch: Record<string, unknown>) => void } | null = null;
+const submitted = (): Engine => {
+  let engine: Engine | null = null;
   const strategy = createPileViewRuntimeStrategy() as { render: (engine: never) => unknown };
   const renderPile = strategy.render;
   strategy.render = (current) => {
@@ -38,9 +41,28 @@ const submitted = () => {
     questionPool: [{ id: 'q1', type: 'freeform', prompt: 'What matters?' }],
   } as never);
   act(() => engine!.setState({ submittedSinceLastEdit: true }));
-  return screen.getByTestId(E2E_TESTIDS.SURVEY_SUBMITTED_INDICATOR);
+  return engine!;
 };
 
+afterEach(() => {
+  jest.useRealTimers();
+});
+
 it('links the check after a submit to your profile in this session', () => {
-  expect(submitted()).toHaveAttribute('href', `/u/${account}?session=rxc-ra-test-5`);
+  submitted();
+  expect(check()).toHaveAttribute('href', `/u/${account}?session=rxc-ra-test-5`);
+});
+
+it('shows the check for ten seconds after each submit', () => {
+  jest.useFakeTimers();
+  const engine = submitted();
+  act(() => {
+    jest.advanceTimersByTime(10_000);
+  });
+  expect(check()).toHaveClass('pileSubmitSuccessBadgeGone');
+  // An edit brings back Submit, and the next submit its own check.
+  act(() => engine.setState({ submittedSinceLastEdit: false }));
+  expect(screen.queryByTestId(E2E_TESTIDS.SURVEY_SUBMITTED_INDICATOR)).toBeNull();
+  act(() => engine.setState({ submittedSinceLastEdit: true }));
+  expect(check()).not.toHaveClass('pileSubmitSuccessBadgeGone');
 });

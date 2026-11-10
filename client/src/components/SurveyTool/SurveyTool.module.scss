@@ -6207,6 +6207,11 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   }
 }
 
+// Ten seconds after a submit (see PileSubmittedCheck): hidden, still holding its place.
+.pileSubmitSuccessBadgeGone {
+  visibility: hidden;
+}
+
 .pileSubmitSuccessIcon {
   font-size: 1.35rem;
 }
