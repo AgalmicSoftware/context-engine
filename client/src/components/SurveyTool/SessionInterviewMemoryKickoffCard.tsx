@@ -87,6 +87,12 @@ export default function SessionInterviewMemoryKickoffCard({
   const prompt = compatible ? validation.prompt : kickoff;
   const copyPrompt = () => {
     if (!compatible) return;
+    // A timer can sleep through a renewal, as on a closed laptop: check again rather than copy a link
+    // that ran out, and the person copies the renewed one.
+    if (renewAtMs && Date.now() >= renewAtMs) {
+      setAttempt((value) => value + 1);
+      return;
+    }
     setCopyError('');
     // Safari requires writeText to begin in the tap stack; never await a catalog fetch here.
     void onCopyPrompt(prompt).catch(() => {

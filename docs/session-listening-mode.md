@@ -289,9 +289,10 @@ page first gets a catalog ticket from the Worker and adds it to the copied link
 as `&ticket=…`, so their AI reads the questions that person may see, those shown
 only to their groups included, and the groups they could join and haven't. A
 ticket lasts an hour at most and never past their sign-in, and signing out of
-the page doesn't end one already copied; the page renews it
-quietly ten minutes before it ends, and the prompt tells the AI the link is
-private to them. Checking the prompt asks them once to sign in to the session if
+the page doesn't end one already copied. The page renews it quietly ten
+minutes before it ends, or as it ends when their sign-in ends sooner, and
+checks again rather than copy one that is due; the prompt tells the AI the
+link is private to them. Checking the prompt asks them once to sign in to the session if
 they haven't; declining still offers what a signed-out visitor's AI may read,
 and **Retry** asks again. A session that lets no signed-out visitor list its
 questions says so: signed out, the card asks the person to use **Log in** at the

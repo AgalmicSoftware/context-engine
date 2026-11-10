@@ -112,3 +112,52 @@ it('renews the private link quietly before it runs out', async () => {
     jest.useRealTimers();
   }
 });
+
+it('renews a ticket cut short by the end of its sign-in only as it runs out', async () => {
+  jest.useFakeTimers();
+  try {
+    const start = Date.now();
+    ticketMock
+      .mockResolvedValueOnce({ ticket: 'ic1.short', expiresAtMs: start + 5 * 60 * 1000 })
+      .mockResolvedValueOnce({ ticket: 'ic1.next', expiresAtMs: start + 65 * 60 * 1000 });
+    renderCard();
+    await act(async () => {});
+    expect(await copy()).toContain('&ticket=ic1.short');
+    // Renewing sooner would only get the same short ticket again.
+    await act(async () => {
+      jest.advanceTimersByTime(4 * 60 * 1000);
+    });
+    await act(async () => {});
+    expect(ticketMock).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      jest.advanceTimersByTime(60 * 1000);
+    });
+    await act(async () => {});
+    expect(ticketMock).toHaveBeenCalledTimes(2);
+    expect(await copy()).toContain('&ticket=ic1.next');
+  } finally {
+    jest.useRealTimers();
+  }
+});
+
+it('checks again rather than copy a link whose renewal a sleeping timer missed', async () => {
+  jest.useFakeTimers();
+  try {
+    const start = Date.now();
+    ticketMock
+      .mockResolvedValueOnce({ ticket: 'ic1.before', expiresAtMs: start + 60 * 60 * 1000 })
+      .mockResolvedValueOnce({ ticket: 'ic1.after', expiresAtMs: start + 3 * 60 * 60 * 1000 });
+    renderCard();
+    await act(async () => {});
+    expect(await copy()).toContain('&ticket=ic1.before');
+    // Two hours pass, as over a closed laptop, without the renewal timer firing.
+    jest.setSystemTime(start + 2 * 60 * 60 * 1000);
+    writeText.mockClear();
+    await act(async () => fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_COPY_AGENT_PROMPT)));
+    expect(writeText).not.toHaveBeenCalled();
+    expect(await copy()).toContain('&ticket=ic1.after');
+    expect(ticketMock).toHaveBeenLastCalledWith(expect.objectContaining({ prompt: false }));
+  } finally {
+    jest.useRealTimers();
+  }
+});

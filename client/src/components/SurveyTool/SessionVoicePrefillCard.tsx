@@ -103,7 +103,10 @@ export default function SessionVoicePrefillCard({
               prompt,
               fresh,
             });
-            renewAtMs = issued.expiresAtMs - INTERVIEW_CATALOG_TICKET_RENEW_MS;
+            // A ticket cut short by the end of its sign-in is renewed as it runs out, by a new sign-in;
+            // renewing sooner would only get the same short ticket again.
+            const renewAt = issued.expiresAtMs - INTERVIEW_CATALOG_TICKET_RENEW_MS;
+            renewAtMs = renewAt > Date.now() ? renewAt : issued.expiresAtMs;
             return issued.ticket;
           } catch {
             ticketFailed = true;
