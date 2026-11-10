@@ -447,6 +447,11 @@
   margin: 0 auto 1rem;
   text-align: left;
 
+  // The panel's own text colour, not the site-wide heading colour, which is dark on dark in Context Engine.
+  h3 {
+    color: inherit;
+  }
+
   summary {
     cursor: pointer;
   }
@@ -1512,6 +1517,8 @@
     flex: 0 1 auto;
     width: auto;
     padding: 0;
+    // Its few buttons fit without scrolling, and a scroller would clip their focus rings.
+    overflow: visible;
   }
 
   .sectionHeaderActions {

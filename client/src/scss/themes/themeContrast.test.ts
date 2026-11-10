@@ -802,6 +802,17 @@ describe('bundled app-theme contrast', () => {
     expect(ratios.filter(([, , value]) => value < 4.5)).toEqual([]);
   });
 
+  test.each(registry.themes.map(({ id }) => id))('%s keeps the Context panels’ headings readable', (themeId) => {
+    const values = themeValues(css, themeId);
+    const paint = painter(values);
+    // The headings take the panel's text colour rather than the site-wide heading colour.
+    const shellCss = compileModule('components/OnePageSession/OnePageSession.module.scss');
+    expect(moduleRule(shellCss, '.sessionContextManage h3').color).toBe('inherit');
+    const panel = moduleRule(compileModule('components/Sessions/setup/SessionSetup.module.scss'), '.page');
+    const fill = composite(paint(panel.background), parseColor(values.canvas));
+    expect(contrastRatio(composite(paint(panel.color), fill), fill)).toBeGreaterThanOrEqual(4.5);
+  });
+
   test.each(registry.themes.map(({ id }) => id))('%s keeps small binary answer labels readable', (themeId) => {
     const values = themeValues(css, themeId);
     for (const stance of ['agree', 'disagree']) {
