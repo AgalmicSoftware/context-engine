@@ -150,10 +150,11 @@ export const normalizeSessionWizardContext = (value: unknown): SessionContext | 
     title: context.title ?? '',
     paragraphs: context.paragraphs ?? [],
     links: context.links ?? [],
+    html: context.html ?? '',
   });
   if (!result.ok) throw new Error(result.errors[0].message);
   const normalized = result.value;
-  return normalized && (normalized.title || normalized.paragraphs.length || normalized.links.length)
+  return normalized && (normalized.title || normalized.html || normalized.paragraphs.length || normalized.links.length)
     ? normalized
     : null;
 };

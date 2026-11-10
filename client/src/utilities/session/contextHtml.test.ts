@@ -1,0 +1,57 @@
+import { cleanContextHtml } from './contextHtml';
+
+describe('cleanContextHtml', () => {
+  it('keeps structure, https links and images, tables and sections that open in place', () => {
+    const html =
+      '<h2>Areas</h2><details open><summary>Trust</summary><p>Who <em>decides</em>?</p></details>' +
+      '<table><tr><th>Topic</th><td colspan="2">One</td></tr></table>' +
+      '<a href="https://example.org/essay">Essay</a><img src="https://example.org/map.png" alt="Map">';
+    const cleaned = cleanContextHtml(html);
+    expect(cleaned.removed).toEqual([]);
+    expect(cleaned.html).toContain('<details open=""><summary>Trust</summary><p>Who <em>decides</em>?</p></details>');
+    expect(cleaned.html).toContain('<td colspan="2">One</td>');
+    expect(cleaned.html).toContain(
+      '<a href="https://example.org/essay" target="_blank" rel="noopener noreferrer">Essay</a>',
+    );
+    expect(cleaned.html).toContain('<img src="https://example.org/map.png" alt="Map">');
+  });
+
+  it('removes scripts, handlers, frames, forms, styles and classes, and says what went', () => {
+    const hostile =
+      '<script>steal()</script><p onclick="steal()" style="position:fixed" class="x" id="root">Hi</p>' +
+      '<iframe src="https://example.org"></iframe><form action="https://example.org"><input name="q"></form>' +
+      '<style>p{display:none}</style><svg><script>steal()</script></svg>' +
+      '<a href="javascript:steal()">Bad</a><a href="http://example.org">Plain</a><img src="data:image/png;base64,AAAA">';
+    const cleaned = cleanContextHtml(hostile);
+    expect(cleaned.html).toBe('<p>Hi</p><a>Bad</a><a>Plain</a>');
+    expect(cleaned.removed).toEqual(
+      expect.arrayContaining([
+        '<script>',
+        'onclick',
+        'style',
+        'class',
+        'id',
+        '<iframe>',
+        '<form>',
+        '<input>',
+        '<style>',
+        '<svg>',
+        'links that aren’t https',
+        'images that aren’t https',
+      ]),
+    );
+  });
+
+  it('reports what a whole document carried in its head', () => {
+    const page =
+      '<!doctype html><html><head><title>Atlas</title><style>h2{color:red}</style></head><body><h2>Atlas</h2></body></html>';
+    const cleaned = cleanContextHtml(page);
+    expect(cleaned.html).toBe('<h2>Atlas</h2>');
+    expect(cleaned.removed).toEqual(expect.arrayContaining(['<style>']));
+  });
+
+  it('gives the same result when cleaned again, so stored pages render as previewed', () => {
+    const once = cleanContextHtml('<p style="color:red">Text <a href="https://example.org">link</a></p>').html;
+    expect(cleanContextHtml(once)).toEqual({ html: once, removed: [] });
+  });
+});

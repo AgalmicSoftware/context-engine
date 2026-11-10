@@ -131,7 +131,7 @@ const normalizeContext = (value: unknown) =>
 // The stored context as the draft reads it, so an untouched one is unchanged.
 const storedContext = (value: unknown) => {
   const context = normalizeSessionContext(value);
-  return context.title || context.paragraphs.length || context.links.length
+  return context.title || context.html || context.paragraphs.length || context.links.length
     ? context
     : { title: '', paragraphs: [], links: [] };
 };

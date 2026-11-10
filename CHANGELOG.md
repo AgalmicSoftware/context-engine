@@ -154,6 +154,7 @@ All notable changes to this project will be documented in this file.
 - **Add transcript to context** uploads as the account that submitted and skips an upload still queued when you switch accounts. Submitting again before the last upload finishes replaces its copy instead of adding the transcript twice. The next account to submit on the same device adds its own copy and leaves the previous account's in place.
 - The questions CSV includes each question's rating scale, pick-one setting and pick limit.
 - Dictation longer than about five minutes is transcribed in parts instead of failing, and a failed transcription says so and stays on screen.
+- On `/new` and the settings page, the Context section's **Format** takes typed text or one HTML file. The file is cleaned before it's saved, losing its scripts, styles, classes, frames and forms, and a preview shows the result and what was removed. The session page shows the page in its context section, cleaned again each time.
 
 ### Workers — requires redeployment
 

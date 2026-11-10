@@ -78,6 +78,30 @@ describe('saving the edit page through the Session Worker', () => {
     expect(result.config.authzEpoch).toBe(stored.authzEpoch);
   });
 
+  it('saves an uploaded HTML context as content, and a blank one in the draft is no change', () => {
+    const stored = publishedSession();
+    const html = '<h2>Areas</h2><details><summary>Trust</summary><p>Who decides?</p></details>';
+    const { save, result } = editAndSave(stored, (draft) => {
+      draft.sessionContext = { title: 'Atlas', paragraphs: [], links: [], html };
+    });
+    expect(Object.keys(save.patch)).toEqual(['sessionContext']);
+    expect(save.classification.signsParticipantsOut).toBe(false);
+    expect(result).toMatchObject({ ok: true });
+    expect(result.config.sessionContext).toEqual({ title: 'Atlas', html, paragraphs: [], links: [] });
+
+    // A page with no title is still the stored context, so another edit doesn't resend it.
+    const untitled = { ...stored, sessionContext: { title: '', html, paragraphs: [], links: [] } };
+    const renamed = editAndSave(untitled, (draft) => {
+      draft.sessionName = 'Renamed';
+    });
+    expect(Object.keys(renamed.save.patch)).toEqual(['sessionName']);
+
+    const blank = editAndSave(stored, (draft) => {
+      draft.sessionContext = { ...draft.sessionContext, html: '' };
+    });
+    expect(blank.save.patch).not.toHaveProperty('sessionContext');
+  });
+
   it('keeps an opening-question edit as content, as the Worker does', () => {
     const stored = publishedSession();
     const { save, result } = editAndSave(stored, (draft) => {

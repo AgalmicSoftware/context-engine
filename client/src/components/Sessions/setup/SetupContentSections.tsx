@@ -13,6 +13,7 @@ import {
   normalizeGroupCreationPolicy,
 } from '../../../utilities/session/groupCreationPolicy';
 import { SetupCheck, SetupField, SetupSection, setupHelpId } from './SetupPrimitives';
+import SetupContextHtmlField from './SetupContextHtmlField';
 import {
   SETUP_QUESTION_TYPES,
   asList,
@@ -95,6 +96,7 @@ const readContext = (draft: SetupSectionProps['draft']) => {
     title: text(context.title),
     paragraphs: asList(context.paragraphs).map(text),
     links: asList(context.links).map((link) => ({ label: text(asRecord(link).label), url: text(asRecord(link).url) })),
+    html: text(context.html),
   };
 };
 
@@ -111,7 +113,8 @@ export const describeContextProblem = (draft: SetupSectionProps['draft']): strin
   contextProblems(draft)[0]?.message || '';
 
 export const summarizeContext = (draft: SetupSectionProps['draft']): string => {
-  const { title, paragraphs, links } = readContext(draft);
+  const { title, paragraphs, links, html } = readContext(draft);
+  if (html.trim()) return title ? `${title}: HTML file` : 'HTML file';
   const parts = [
     paragraphs.length ? `${paragraphs.length} ${paragraphs.length === 1 ? 'paragraph' : 'paragraphs'}` : '',
     links.length ? `${links.length} ${links.length === 1 ? 'link' : 'links'}` : '',
@@ -129,6 +132,10 @@ type ContextProps = SetupSectionProps & {
 
 const CONTEXT_HELP =
   'Paragraphs and links show on the session page to everyone who can open it, and the session’s AI reads them. Files and admins-only links go below.';
+const FORMAT_HELP =
+  'Text shows the paragraphs and links below. An HTML file replaces them, under the same title. Switching discards the other one, after asking.';
+const LEAVE_TEXT = 'Use an HTML file instead? The paragraphs and links will be removed.';
+const LEAVE_HTML = 'Use typed text instead? The HTML file will be removed.';
 
 // sessionContext's title, paragraphs and links, then the session's files and
 // links for its AI. Without `sources`, file names from a template come back
@@ -142,12 +149,21 @@ export const SetupContextSection = ({
   publisher = null,
 }: ContextProps) => {
   const context = readContext(draft);
+  const hasText =
+    context.paragraphs.some((paragraph) => paragraph.trim()) || context.links.some((link) => link.url.trim());
+  const [chosenFormat, setChosenFormat] = useState<'text' | 'html'>(context.html ? 'html' : 'text');
+  // Stored or imported HTML always shows as the HTML form.
+  const format = context.html.trim() ? 'html' : chosenFormat;
   // A link's https problem shows beside the link itself.
   const problems = contextProblems(draft).filter((problem) => !LINK_URL_PATH.test(problem.path));
   const files = asList(draft.contextFiles)
     .map((file) => text(asRecord(file).name))
     .filter(Boolean);
-  const save = (next: Partial<typeof context>) => onChange(['sessionContext'], { ...context, ...next });
+  // A blank html is left out, so a text context keeps its usual shape.
+  const save = (next: Partial<typeof context>) => {
+    const { html, ...typed } = { ...context, ...next };
+    onChange(['sessionContext'], html.trim() ? { ...typed, html } : typed);
+  };
   const setLink = (index: number, patch: Partial<ContextLink>) =>
     save({ links: context.links.map((link, at) => (at === index ? { ...link, ...patch } : link)) });
   return (
@@ -168,88 +184,119 @@ export const SetupContextSection = ({
           onChange={(event) => save({ title: event.target.value })}
         />
       </SetupField>
-      {context.paragraphs.map((paragraph, index) => (
-        <SetupField
-          key={`paragraph-${index}`}
-          id={`ce-setup-context-paragraph-${index}`}
-          label={`Paragraph ${index + 1}`}
+      <SetupField id="ce-setup-context-format" label="Format" help={FORMAT_HELP}>
+        <Input
+          id="ce-setup-context-format"
+          type="select"
+          value={format}
+          aria-describedby={setupHelpId('ce-setup-context-format')}
+          data-testid="ce-setup-context-format"
+          onChange={(event) => {
+            const next = event.target.value === 'html' ? 'html' : 'text';
+            if (next === format) return;
+            if (next === 'html' && hasText && !window.confirm(LEAVE_TEXT)) return;
+            if (next === 'text' && context.html.trim() && !window.confirm(LEAVE_HTML)) return;
+            setChosenFormat(next);
+            save(next === 'html' ? { paragraphs: [], links: [] } : { html: '' });
+          }}
         >
-          <Input
+          <option value="text">Text</option>
+          <option value="html">HTML file</option>
+        </Input>
+      </SetupField>
+      {format === 'html' ? (
+        <SetupContextHtmlField
+          html={context.html}
+          onChange={(html) => save({ html })}
+          colorSchemeId={normalizeSessionColorSchemeId(asRecord(draft.appearance).colorSchemeId)}
+        />
+      ) : null}
+      {format === 'text' &&
+        context.paragraphs.map((paragraph, index) => (
+          <SetupField
+            key={`paragraph-${index}`}
             id={`ce-setup-context-paragraph-${index}`}
-            type="textarea"
-            className={styles.textarea}
-            value={paragraph}
-            maxLength={SESSION_CONTEXT_LIMITS.paragraphChars}
-            onChange={(event) =>
-              save({ paragraphs: context.paragraphs.map((entry, at) => (at === index ? event.target.value : entry)) })
-            }
-          />
-          <div className={styles.buttonRow}>
+            label={`Paragraph ${index + 1}`}
+          >
+            <Input
+              id={`ce-setup-context-paragraph-${index}`}
+              type="textarea"
+              className={styles.textarea}
+              value={paragraph}
+              maxLength={SESSION_CONTEXT_LIMITS.paragraphChars}
+              onChange={(event) =>
+                save({ paragraphs: context.paragraphs.map((entry, at) => (at === index ? event.target.value : entry)) })
+              }
+            />
+            <div className={styles.buttonRow}>
+              <button
+                type="button"
+                className={styles.button}
+                onClick={() => save({ paragraphs: context.paragraphs.filter((_entry, at) => at !== index) })}
+              >
+                Remove paragraph
+              </button>
+            </div>
+          </SetupField>
+        ))}
+      {format === 'text' &&
+        context.links.map((link, index) => (
+          <div key={`link-${index}`} className={styles.listRow}>
+            <div className={styles.listRowBody}>
+              <SetupField id={`ce-setup-context-link-label-${index}`} label="Link label">
+                <Input
+                  id={`ce-setup-context-link-label-${index}`}
+                  value={link.label}
+                  maxLength={SESSION_CONTEXT_LIMITS.labelChars}
+                  onChange={(event) => setLink(index, { label: event.target.value })}
+                />
+              </SetupField>
+              <SetupField id={`ce-setup-context-link-url-${index}`} label="Link">
+                <Input
+                  id={`ce-setup-context-link-url-${index}`}
+                  type="url"
+                  value={link.url}
+                  maxLength={SESSION_CONTEXT_LIMITS.urlChars}
+                  invalid={!!link.url && !isHttpsUrl(link.url.trim())}
+                  onChange={(event) => setLink(index, { url: event.target.value })}
+                />
+              </SetupField>
+              {link.url && !isHttpsUrl(link.url.trim()) ? (
+                <p className={styles.errorText}>Use an https:// link.</p>
+              ) : null}
+            </div>
             <button
               type="button"
               className={styles.button}
-              onClick={() => save({ paragraphs: context.paragraphs.filter((_entry, at) => at !== index) })}
+              aria-label={`Remove link ${index + 1}`}
+              onClick={() => save({ links: context.links.filter((_entry, at) => at !== index) })}
             >
-              Remove paragraph
+              Remove
             </button>
           </div>
-        </SetupField>
-      ))}
-      {context.links.map((link, index) => (
-        <div key={`link-${index}`} className={styles.listRow}>
-          <div className={styles.listRowBody}>
-            <SetupField id={`ce-setup-context-link-label-${index}`} label="Link label">
-              <Input
-                id={`ce-setup-context-link-label-${index}`}
-                value={link.label}
-                maxLength={SESSION_CONTEXT_LIMITS.labelChars}
-                onChange={(event) => setLink(index, { label: event.target.value })}
-              />
-            </SetupField>
-            <SetupField id={`ce-setup-context-link-url-${index}`} label="Link">
-              <Input
-                id={`ce-setup-context-link-url-${index}`}
-                type="url"
-                value={link.url}
-                maxLength={SESSION_CONTEXT_LIMITS.urlChars}
-                invalid={!!link.url && !isHttpsUrl(link.url.trim())}
-                onChange={(event) => setLink(index, { url: event.target.value })}
-              />
-            </SetupField>
-            {link.url && !isHttpsUrl(link.url.trim()) ? (
-              <p className={styles.errorText}>Use an https:// link.</p>
-            ) : null}
-          </div>
+        ))}
+      {format === 'text' ? (
+        <div className={styles.buttonRow}>
           <button
             type="button"
             className={styles.button}
-            aria-label={`Remove link ${index + 1}`}
-            onClick={() => save({ links: context.links.filter((_entry, at) => at !== index) })}
+            data-testid="ce-setup-context-add-paragraph"
+            disabled={context.paragraphs.length >= SESSION_CONTEXT_LIMITS.paragraphs}
+            onClick={() => save({ paragraphs: [...context.paragraphs, ''] })}
           >
-            Remove
+            Add paragraph
+          </button>
+          <button
+            type="button"
+            className={styles.button}
+            data-testid="ce-setup-context-add-link"
+            disabled={context.links.length >= SESSION_CONTEXT_LIMITS.links}
+            onClick={() => save({ links: [...context.links, { label: '', url: '' }] })}
+          >
+            Add link
           </button>
         </div>
-      ))}
-      <div className={styles.buttonRow}>
-        <button
-          type="button"
-          className={styles.button}
-          data-testid="ce-setup-context-add-paragraph"
-          disabled={context.paragraphs.length >= SESSION_CONTEXT_LIMITS.paragraphs}
-          onClick={() => save({ paragraphs: [...context.paragraphs, ''] })}
-        >
-          Add paragraph
-        </button>
-        <button
-          type="button"
-          className={styles.button}
-          data-testid="ce-setup-context-add-link"
-          disabled={context.links.length >= SESSION_CONTEXT_LIMITS.links}
-          onClick={() => save({ links: [...context.links, { label: '', url: '' }] })}
-        >
-          Add link
-        </button>
-      </div>
+      ) : null}
       {problems.length ? (
         <ul className={styles.errorText} role="alert" data-testid="ce-setup-context-problems">
           {problems.map((problem) => (

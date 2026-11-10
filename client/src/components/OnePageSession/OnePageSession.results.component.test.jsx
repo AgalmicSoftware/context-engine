@@ -1212,6 +1212,36 @@ describe('OnePageSession results routing', () => {
     expect(within(context).queryByRole('link', { name: /Ignored unsafe link/i })).not.toBeInTheDocument();
   });
 
+  it('renders an uploaded HTML context cleaned, in place of paragraphs and links', async () => {
+    const props = buildProps();
+    render(
+      <MemoryRouter initialEntries={['/session/edge']}>
+        <OnePageSession
+          {...props}
+          slug="edge"
+          sessionConfig={{
+            ...props.sessionConfig,
+            sessionContext: {
+              title: 'Context',
+              html:
+                '<h2>Areas</h2><details><summary>Trust</summary><p onclick="steal()">Who decides?</p></details>' +
+                '<script>steal()</script><a href="https://example.org/essay">Essay</a>',
+            },
+          }}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByTestId('survey-page-pile')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('ce-demo-documents-toggle'));
+    const page = await screen.findByTestId('ce-session-context-html');
+    expect(screen.getByTestId('ce-session-context')).toContainElement(page);
+    expect(within(page).getByRole('heading', { name: 'Areas' })).toBeInTheDocument();
+    expect(page).toHaveTextContent('Who decides?');
+    expect(page.querySelector('script, [onclick]')).toBeNull();
+    expect(within(page).getByRole('link', { name: 'Essay' })).toHaveAttribute('rel', 'noopener noreferrer');
+  });
+
   it.each(['rxc-test', 'rxc-ra-test'])('keeps context and shows no pre-filled Debate Map for %s', async (slug) => {
     const props = buildProps();
     const sessionRef = React.createRef();

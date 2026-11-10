@@ -45,6 +45,8 @@ const RiskMatrix = React.lazy(() => import('../MainContent/RiskMatrix'));
 const DemoAnalysisWorkspace = React.lazy(() => import('../DemoViews/DemoAnalysis/DemoAnalysisWorkspace'));
 const SessionGeneratedResultsViews = React.lazy(() => import('../SessionResults/SessionGeneratedResultsViews'));
 const ReverseAlignmentAtlas = React.lazy(() => import('./ReverseAlignmentAtlas'));
+// Loaded only for a session whose context is an uploaded HTML page, with its sanitizer.
+const SessionContextHtml = React.lazy(() => import('./SessionContextHtml'));
 const SessionDebateAtlasView = React.lazy(() => import('../DebateAtlas/SessionDebateAtlasView'));
 
 const DebateMapAny = DebateMap as React.ComponentType<Record<string, unknown>>;
@@ -219,9 +221,13 @@ const renderSessionContext = (context: SessionContextView | null) => {
   if (!context) return null;
   return (
     <section className={styles.sessionContextSection} aria-label={context.title} data-testid="ce-session-context">
-      {context.paragraphs.map((paragraph, index) => (
-        <p key={`${index}:${paragraph.slice(0, 24)}`}>{paragraph}</p>
-      ))}
+      {context.html ? (
+        <Suspense fallback={<LazyFallback label="Loading context..." minHeight="8vh" />}>
+          <SessionContextHtml html={context.html} />
+        </Suspense>
+      ) : (
+        context.paragraphs.map((paragraph, index) => <p key={`${index}:${paragraph.slice(0, 24)}`}>{paragraph}</p>)
+      )}
       {context.links.length ? (
         <div className={styles.sessionContextLinks}>
           {context.links.map((link) => (

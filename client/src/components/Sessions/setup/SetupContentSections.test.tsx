@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 
 import { SetupContextSection, SetupQuestionsSection, describeContextProblem } from './SetupContentSections';
 import type { SetupDraft, SetupSectionProps } from './setupSectionTypes';
@@ -55,6 +55,108 @@ describe('setup content sections', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Remove paragraph' }));
     fireEvent.click(screen.getByRole('button', { name: 'Remove link 1' }));
     expect(latest.sessionContext).toEqual({ title: 'Background', paragraphs: [], links: [] });
+  });
+
+  const uploadHtml = (body: string, name = 'atlas.html') =>
+    fireEvent.change(screen.getByTestId('ce-setup-context-html-file'), {
+      target: { files: [new File([body], name, { type: 'text/html' })] },
+    });
+
+  it('takes an HTML file instead of text, cleaned, with a preview that says what was removed', async () => {
+    render(<Harness Section={SetupContextSection} initial={{}} />);
+    fireEvent.change(screen.getByTestId('ce-setup-context-format'), { target: { value: 'html' } });
+    expect(screen.queryByTestId('ce-setup-context-add-paragraph')).not.toBeInTheDocument();
+
+    uploadHtml('<h2>Atlas</h2><script>steal()</script><p style="color:red">Who decides?</p>');
+    expect(await screen.findByTestId('ce-setup-context-html-removed')).toHaveTextContent(
+      'Removed from the file: <script>, style.',
+    );
+    expect(latest.sessionContext).toEqual({
+      title: '',
+      paragraphs: [],
+      links: [],
+      html: '<h2>Atlas</h2><p>Who decides?</p>',
+    });
+    const shown = await screen.findByTestId('ce-setup-context-html-shown');
+    expect(shown).toHaveTextContent('Who decides?');
+    expect(shown.querySelector('script, [style]')).toBeNull();
+    expect(screen.getByTestId('ce-setup-summary-context')).toHaveTextContent('HTML file');
+
+    uploadHtml('<p>Clean</p>');
+    await waitFor(() =>
+      expect(screen.getByTestId('ce-setup-context-html-removed')).toHaveTextContent(
+        'Nothing was removed from the file.',
+      ),
+    );
+    fireEvent.click(screen.getByTestId('ce-setup-context-html-remove'));
+    expect(latest.sessionContext).toEqual({ title: '', paragraphs: [], links: [] });
+  });
+
+  it('refuses a file with nothing to show, or over 1 MB, and keeps the page it had', async () => {
+    render(
+      <Harness
+        Section={SetupContextSection}
+        initial={{ sessionContext: { title: '', paragraphs: [], links: [], html: '<p>Kept</p>' } }}
+      />,
+    );
+    uploadHtml('<script>only()</script>');
+    expect(await screen.findByTestId('ce-setup-context-html-error')).toHaveTextContent(
+      'Nothing in this file can be shown.',
+    );
+    uploadHtml('x'.repeat(1024 * 1024 + 1));
+    await waitFor(() =>
+      expect(screen.getByTestId('ce-setup-context-html-error')).toHaveTextContent('The file is larger than 1 MB.'),
+    );
+    expect(latest.sessionContext).toEqual({ title: '', paragraphs: [], links: [], html: '<p>Kept</p>' });
+  });
+
+  it('asks before switching form discards the text or the HTML', () => {
+    const confirm = jest.spyOn(window, 'confirm');
+    try {
+      render(
+        <Harness
+          Section={SetupContextSection}
+          initial={{ sessionContext: { title: 'Notes', paragraphs: ['Typed'], links: [] } }}
+        />,
+      );
+      const format = screen.getByTestId('ce-setup-context-format');
+      confirm.mockReturnValueOnce(false);
+      fireEvent.change(format, { target: { value: 'html' } });
+      expect(format).toHaveValue('text');
+      expect(latest.sessionContext).toEqual({ title: 'Notes', paragraphs: ['Typed'], links: [] });
+
+      confirm.mockReturnValueOnce(true);
+      fireEvent.change(format, { target: { value: 'html' } });
+      expect(format).toHaveValue('html');
+      expect(latest.sessionContext).toEqual({ title: 'Notes', paragraphs: [], links: [] });
+      expect(confirm).toHaveBeenCalledTimes(2);
+    } finally {
+      confirm.mockRestore();
+    }
+  });
+
+  it('shows stored HTML in the HTML form, and asks before going back to text', () => {
+    const confirm = jest.spyOn(window, 'confirm');
+    try {
+      render(
+        <Harness
+          Section={SetupContextSection}
+          initial={{ sessionContext: { title: 'Atlas', paragraphs: [], links: [], html: '<p>Page</p>' } }}
+        />,
+      );
+      const format = screen.getByTestId('ce-setup-context-format');
+      expect(format).toHaveValue('html');
+      confirm.mockReturnValueOnce(false);
+      fireEvent.change(format, { target: { value: 'text' } });
+      expect(latest.sessionContext).toEqual({ title: 'Atlas', paragraphs: [], links: [], html: '<p>Page</p>' });
+      confirm.mockReturnValueOnce(true);
+      fireEvent.change(format, { target: { value: 'text' } });
+      expect(format).toHaveValue('text');
+      expect(latest.sessionContext).toEqual({ title: 'Atlas', paragraphs: [], links: [] });
+      expect(screen.getByTestId('ce-setup-context-add-paragraph')).toBeInTheDocument();
+    } finally {
+      confirm.mockRestore();
+    }
   });
 
   it('names what set-config would refuse and stops adding past the limits', () => {

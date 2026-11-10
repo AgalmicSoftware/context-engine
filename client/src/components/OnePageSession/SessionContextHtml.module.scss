@@ -1,0 +1,126 @@
+// An admin's uploaded page, cleaned of its own styles, in the context section's colours.
+.contextHtml {
+  color: color-mix(in srgb, var(--ce-session-chrome-contrast) 86%, transparent);
+  font-size: 0.95rem;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+
+  > :first-child {
+    margin-top: 0;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    margin: 1rem 0 0.45rem;
+    color: var(--ce-session-chrome-contrast);
+    font-family: var(--ce-font-body);
+    font-weight: 800;
+    line-height: 1.3;
+  }
+
+  h1 {
+    font-size: 1.35rem;
+  }
+
+  h2 {
+    font-size: 1.2rem;
+  }
+
+  h3 {
+    font-size: 1.05rem;
+  }
+
+  h4,
+  h5,
+  h6 {
+    font-size: 0.95rem;
+  }
+
+  p,
+  ul,
+  ol,
+  dl,
+  blockquote,
+  pre,
+  figure {
+    margin: 0.55rem 0 0;
+  }
+
+  ul,
+  ol {
+    padding-left: 1.4rem;
+  }
+
+  a {
+    color: var(--ce-action-accent);
+    font-weight: 700;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  img {
+    max-width: 100%;
+    height: auto;
+  }
+
+  blockquote {
+    padding-left: 0.85rem;
+    border-left: 3px solid color-mix(in srgb, var(--ce-status-info) 40%, transparent);
+  }
+
+  pre {
+    overflow-x: auto;
+  }
+
+  table {
+    display: block;
+    max-width: 100%;
+    margin: 0.55rem 0 0;
+    overflow-x: auto;
+    border-collapse: collapse;
+  }
+
+  th,
+  td {
+    padding: 0.35rem 0.55rem;
+    border: 1px solid color-mix(in srgb, var(--ce-session-chrome-contrast) 22%, transparent);
+    text-align: left;
+    vertical-align: top;
+  }
+
+  details {
+    margin: 0.55rem 0 0;
+    padding: 0.45rem 0.75rem;
+    border: 1px solid color-mix(in srgb, var(--ce-status-info) 24%, transparent);
+    border-radius: var(--ce-radius-8);
+  }
+
+  summary {
+    color: var(--ce-session-chrome-contrast);
+    font-weight: 700;
+    cursor: pointer;
+
+    &:focus-visible {
+      outline: 2px solid var(--ce-action-accent);
+      outline-offset: 2px;
+    }
+  }
+
+  details[open] > summary {
+    margin-bottom: 0.35rem;
+  }
+}
+
+// The session page's context section, for a preview shown elsewhere.
+.frame {
+  padding: 1rem 1.15rem;
+  border: 1px solid color-mix(in srgb, var(--ce-status-info) 24%, transparent);
+  border-radius: var(--ce-radius-8);
+  background: color-mix(in srgb, var(--ce-session-chrome) 88%, var(--ce-status-info));
+  color: var(--ce-session-chrome-contrast);
+  text-align: left;
+}

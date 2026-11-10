@@ -634,6 +634,26 @@ describe('sessionWizardWriteNormalization', () => {
     expect(empty).not.toHaveProperty('sessionContext');
   });
 
+  test('buildSessionWizardWorkerConfigPayload publishes an uploaded HTML context in place of text', () => {
+    const sessionModeProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    const build = (sessionContext: Record<string, unknown>) =>
+      buildSessionWizardWorkerConfigPayload({
+        slug: 'context-session',
+        draft: { sessionName: 'Context session', sessionModeProfile, sessionContext },
+        deployPayload: { adminAddress: '0xAdmin' },
+        workerUrl: 'https://worker.example/',
+      });
+    expect(build({ title: 'Atlas', paragraphs: [], links: [], html: ' <h2>Areas</h2> ' }).sessionContext).toEqual({
+      title: 'Atlas',
+      html: '<h2>Areas</h2>',
+      paragraphs: [],
+      links: [],
+    });
+    expect(() => build({ title: 'Atlas', paragraphs: ['Typed'], links: [], html: '<h2>Areas</h2>' })).toThrow(
+      'not both',
+    );
+  });
+
   test('buildSessionWizardWorkerConfigPayload emits a reload-safe two-key worker-canonical config', () => {
     const sessionModeProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
     const payload = buildSessionWizardWorkerConfigPayload({
