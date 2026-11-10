@@ -429,11 +429,12 @@ describe('PasskeyEoaWalletClient', () => {
     expect(target.addEventListener.mock.calls.map(([type, , options]) => [type, options])).toEqual([
       ['pointerdown', expect.objectContaining({ capture: true })],
       ['keydown', expect.objectContaining({ capture: true })],
+      ['click', expect.objectContaining({ capture: true })],
     ]);
     handlers.forEach((handler) => handler({ isTrusted: false }));
     expect(client.noteActivity).not.toHaveBeenCalled();
     handlers.forEach((handler) => handler({ isTrusted: true }));
-    expect(client.noteActivity).toHaveBeenCalledTimes(2);
+    expect(client.noteActivity).toHaveBeenCalledTimes(3);
   });
 
   it('watches the page for use as soon as the wallet loads', () => {
@@ -442,7 +443,7 @@ describe('PasskeyEoaWalletClient', () => {
       jest.isolateModules(() => {
         require('./passkeyWallet.js');
       });
-      for (const type of ['pointerdown', 'keydown']) {
+      for (const type of ['pointerdown', 'keydown', 'click']) {
         expect(listen).toHaveBeenCalledWith(type, expect.any(Function), expect.objectContaining({ capture: true }));
       }
     } finally {

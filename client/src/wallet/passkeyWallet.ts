@@ -93,8 +93,9 @@ const MISSING_WALLET_CODE = 'CE_PASSKEY_WALLET_RECORD_MISSING';
 const PASSKEY_WALLET_LOCKED_MESSAGE = 'Passkey wallet is locked.';
 // However much the page is used, the wallet locks this long after its passkey prompt.
 const MAX_UNLOCK_SECONDS = 8 * 60 * 60;
-// Input that keeps the wallet unlocked: clicks, taps and key presses.
-const ACTIVITY_EVENTS = ['pointerdown', 'keydown'];
+// Input that keeps the wallet unlocked: clicks, taps and key presses. Screen readers often
+// activate a control with a click alone.
+const ACTIVITY_EVENTS = ['pointerdown', 'keydown', 'click'];
 
 export class MissingPasskeyWalletRecordError extends Error {
   code = MISSING_WALLET_CODE;
