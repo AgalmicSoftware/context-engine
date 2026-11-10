@@ -145,7 +145,7 @@ test('createEthersInterfaceProviderGateHelpersWithWorkerDeps preserves SBT gate 
       chainId: 84532,
       rpcUrlIsPrivate: true,
     }),
-    false,
+    null,
   );
   assert.deepEqual(logs, [[
     '[gating] sbt balanceOf failed',
@@ -185,4 +185,13 @@ test('createEthersInterfaceProviderGateHelpersWithWorkerDeps preserves SBT gate 
   assert.equal(JSON.stringify(logs).includes('TENANT_SECRET'), false);
   assert.equal(JSON.stringify(logs).includes('ALCHEMY_SECRET'), false);
   assert.equal(JSON.stringify(logs).includes('rpcError'), false);
+
+  // A contract that couldn't be read leaves the answer unknown, unless another settles it.
+  const check = (sbtAddresses, mode) => helpers.checkSbtGate({
+    sbtAddresses, address: '0x00000000000000000000000000000000000000cc', rpcUrl: 'https://rpc.example', mode, chainId: 84532,
+  });
+  const [holder, unread, none] = ['aa', 'bb', 'dd'].map((end) => `0x${'0'.repeat(38)}${end}`);
+  assert.equal(await check([holder, unread], 'all'), null);
+  assert.equal(await check([none, unread], 'all'), false);
+  assert.equal(await check([none, unread], 0), null);
 });

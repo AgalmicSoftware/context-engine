@@ -2158,7 +2158,10 @@ Runtime:
 Storage listing authorization reuses each distinct group membership result only
 within the current request. A real denial omits the record; an unavailable
 membership service fails the entire page with a retryable 503 and no completeness
-claim. Later requests check membership again.
+claim. Later requests check membership again. An `sbt_onchain` rule the chain
+can't answer, because no RPC URL serves its chain, the session's RPC secret can't
+be read or no endpoint answers, is unavailable in the same way rather than a
+denial.
 
 ## Session authority model
 

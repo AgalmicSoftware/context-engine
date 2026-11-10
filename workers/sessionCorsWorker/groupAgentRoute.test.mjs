@@ -122,6 +122,19 @@ test('a group check that fails before any audience admits refuses with 503, sinc
   assert.deepEqual(refused.calls.ai, []);
 });
 
+test('an SBT check the chain can’t answer refuses with 503, rather than passing to a later audience', async () => {
+  const holders = { match: 'any', conditions: [{ kind: 'sbt_onchain', chainId: 84532, contract: `0x${'c'.repeat(40)}`, anyOrAll: 'any' }] };
+  const h = await seeded({ audiences: [{ who: holders, answers: 'general' }, { who: everyone, answers: 'detailed' }] });
+  const chain = (answer) => ({ resolveRpcUrlListForGate: () => ['https://rpc.example.test'], checkSbtGate: async () => answer });
+  assert.equal((await ask(h, { path: '/group-agent/status', body: {}, deps: chain(null) })).status, 503);
+  const refused = await ask(h, { deps: chain(null) });
+  assert.equal(refused.status, 503);
+  assert.deepEqual(refused.calls.ai, []);
+  // Once the chain answers, a holder gets the holders' style, and anyone else the next audience's.
+  assert.equal((await ask(h, { deps: chain(true) })).body.answers, 'general');
+  assert.equal((await ask(h, { deps: chain(false) })).body.answers, 'detailed');
+});
+
 test('General answers read the context, open files and visible results, never answers or locked files', async () => {
   const general = await ask(await seeded());
   assert.equal(general.status, 200);

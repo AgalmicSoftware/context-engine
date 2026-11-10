@@ -2683,7 +2683,8 @@ for (const accessKind of ['registry gate', 'explicit condition']) {
       const secretFailure = await call(`/storage/response-field-key/${action}`, body, {
         ...deps, getSessionSecrets: async () => { throw new Error('secret store unavailable'); },
       });
-      assert.equal(secretFailure.status, 403);
+      // An explicit condition counts a secret it can't read as an outage, so try again; the registry gate refuses.
+      assert.equal(secretFailure.status, accessKind === 'explicit condition' ? 503 : 403);
       assert.equal(gateChecks.length, priorChecks + 1, 'secret failure must prevent any SBT read');
       assert.equal((await secretFailure.text()).includes(key), false);
       const denied = await call(`/storage/response-field-key/${action}`, body, { ...deps, checkSbtGate: async () => false });
@@ -5580,6 +5581,29 @@ for (const [label, match, conditions, requester, expected] of [
     }
   });
 }
+
+test('an SBT rule the chain can’t answer is an outage to retry, not a denial', async () => {
+  const sbtRule = { kind: 'sbt_onchain', contract: `0x${'c'.repeat(40)}`, chainId: 31337 };
+  const read = async (deps) => {
+    const result = await authorizeCloudflareStorageResourceRead({
+      env: {},
+      slug: 'policy',
+      resource: 'questions',
+      requesterAddress: policyOutsider,
+      config: {
+        slug: 'policy',
+        adminAddress: policyAdmin,
+        storageProfile: { backend: 'cloudflare', payloadAccessControl: { ...openAccess, accessConditions: { match: 'any', conditions: [sbtRule] } } },
+      },
+      deps: { json, resolveRpcUrlListForGate: () => ['https://rpc.example.test'], ...deps },
+    });
+    return result.ok ? 200 : result.response.status;
+  };
+  assert.equal(await read({ checkSbtGate: async () => true }), 200);
+  assert.equal(await read({ checkSbtGate: async () => false }), 403);
+  assert.equal(await read({ checkSbtGate: async () => null }), 503);
+  assert.equal(await read({ checkSbtGate: async () => true, resolveRpcUrlListForGate: () => [] }), 503);
+});
 for (const [label, groupIds, expected] of [
   ['an outage and a membership', ['down', 'member'], 200],
   ['an outage and a non-member', ['down', 'other'], 503],

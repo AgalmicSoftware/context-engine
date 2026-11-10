@@ -32,7 +32,9 @@ session's Settings:
 
 - **Audiences are in order.** The first one a person matches sets their
   answer style, so a narrower audience, such as a group, goes before everyone
-  else. `/new` and Settings put a new audience first.
+  else. `/new` and Settings put a new audience first. If an audience before the
+  match can't be checked just now, such as an SBT rule while the chain can't be
+  reached, the question is refused rather than passed to a later audience.
 - **Admins** always get Detailed answers, whatever the audiences say.
 - **No audiences** means only admins may ask.
 - **Off** is no setting. The page then shows no Group Agent. Saving it off sends
@@ -146,7 +148,7 @@ checks and rate limit first. Before the AI is called, `ask` refuses:
 | `400` | The question is blank or too long |
 | `429` | The `/ai` rate limit, or the provider is busy |
 | `402` | A payment step, which passes every question today (`group_agent_payment_required`) |
-| `503` | Who may ask or the opt-outs can't be read just now, or the session's AI isn't set up |
+| `503` | Who may ask can't be checked just now, such as a group or SBT check, the opt-outs can't be read, or the session's AI isn't set up |
 
 A provider error comes back as `502`, never as the provider's own reply, and
 never as a `401`, which the page would take for its own sign-in failing.

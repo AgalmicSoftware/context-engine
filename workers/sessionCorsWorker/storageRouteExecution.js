@@ -628,6 +628,10 @@ const evaluateAgentGrantScopeCondition = ({ condition, authScopes }) => {
     : { ok: false, reason: 'agent_grant_scope_denied', condition: { kind: 'agent_grant_scope', scope } };
 };
 
+// An SBT rule the chain can't be asked about is an outage, not a no, so
+// another rule or audience can't stand in for it.
+const sbtUnavailable = (reason, condition) => ({ ok: false, outcome: 'unavailable', status: 503, reason, condition });
+
 const evaluateSbtOnchainCondition = async ({ condition, config, requesterAddress, deps }) => {
   const address = normalizeAddress(requesterAddress);
   if (!address) return { ok: false, reason: 'missing_principal' };
@@ -652,15 +656,16 @@ const evaluateSbtOnchainCondition = async ({ condition, config, requesterAddress
   try {
     gateConfig = await resolveStorageGateRuntimeConfig({ config, deps });
   } catch {
-    return { ok: false, reason: 'sbt_rpc_secret_unavailable' };
+    return sbtUnavailable('sbt_rpc_secret_unavailable', { kind: 'sbt_onchain', chainId });
   }
   const rpcUrls = typeof deps?.resolveRpcUrlListForGate === 'function'
     ? deps.resolveRpcUrlListForGate(gateConfig, chainId)
     : [];
   if (!rpcUrls.length || typeof deps?.checkSbtGate !== 'function') {
-    return { ok: false, reason: 'missing_sbt_rpc' };
+    return sbtUnavailable('missing_sbt_rpc', { kind: 'sbt_onchain', chainId });
   }
   const mode = normalizeGateMode(condition.anyOrAll || condition.mode || condition.match);
+  let unanswered = 0;
   for (const rpcUrl of rpcUrls) {
     const ok = await deps.checkSbtGate({
       sbtAddresses,
@@ -685,8 +690,11 @@ const evaluateSbtOnchainCondition = async ({ condition, config, requesterAddress
         },
       };
     }
+    if (ok === null) unanswered += 1;
   }
-  return { ok: false, reason: 'sbt_onchain_denied', condition: { kind: 'sbt_onchain', chainId, anyOrAll: mode } };
+  const checked = { kind: 'sbt_onchain', chainId, anyOrAll: mode };
+  if (unanswered === rpcUrls.length) return sbtUnavailable('sbt_onchain_unavailable', checked);
+  return { ok: false, reason: 'sbt_onchain_denied', condition: checked };
 };
 
 const checkWorkerGroupMembership = async ({
