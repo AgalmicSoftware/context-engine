@@ -27,7 +27,7 @@ import styles from './SessionSetup.module.scss';
 
 export const CONTEXT_PRIVACY_HELP =
   'Only session admins can open it, and the session’s AI uses it only when it works for an admin. Everyone else never receives it.';
-const FILE_ACCESS_HELP =
+export const FILE_ACCESS_HELP =
   'A locked file is for that group’s members and the session’s admins; an admins-only file is for admins. The session’s AI uses a file only when it works for someone who may read it.';
 export const CONTEXT_ANALYZE_HELP =
   'Sends the PDF to the session’s own AI provider with the session’s key. The text it returns is saved with the PDF. Unticked, the PDF is kept but gives the AI no text.';

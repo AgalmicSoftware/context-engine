@@ -8,7 +8,7 @@ import {
   readContextPdf,
   uploadContextFile,
 } from '../../../utilities/docLibrary/contextSources';
-import { CONTEXT_ANALYZE_HELP, CONTEXT_PRIVACY_HELP } from './ContextSourcesPanel';
+import { CONTEXT_ANALYZE_HELP, FILE_ACCESS_HELP } from './ContextSourcesPanel';
 import { SetupCheck, SetupField } from './SetupPrimitives';
 import { asList, asRecord, text, type SetupDraft } from './setupSectionTypes';
 import styles from './SessionSetup.module.scss';
@@ -36,11 +36,31 @@ export const usePendingContextFiles = (): PendingContextFiles => {
   return { files, set };
 };
 
-type ContextFileEntry = { name: string; adminsOnly: boolean };
+type ContextFileEntry = { name: string; adminsOnly: boolean; groupId?: string };
 export const readContextFiles = (draft: SetupDraft): ContextFileEntry[] =>
   asList(draft.contextFiles)
-    .map((entry) => ({ name: text(asRecord(entry).name).trim(), adminsOnly: asRecord(entry).adminsOnly === true }))
+    .map((value) => {
+      const entry = asRecord(value);
+      const groupId = text(entry.groupId).trim();
+      return { name: text(entry.name).trim(), adminsOnly: entry.adminsOnly === true, ...(groupId ? { groupId } : {}) };
+    })
     .filter((entry) => entry.name);
+
+/** A group set up before Create, which Create makes before the files are added. */
+export type SetupGroupOption = { groupId: string; label: string };
+
+const FILE_VISIBILITY_HELP = `${FILE_ACCESS_HELP} Groups set up under Access and identity are made at Create, before these files are added.`;
+
+// A file locked to a group that is no longer set up stays with admins, never wider.
+const visibilityOf = (entry: ContextFileEntry, groups: SetupGroupOption[]): string => {
+  if (entry.groupId)
+    return groups.some((group) => group.groupId === entry.groupId) ? `group:${entry.groupId}` : 'admins';
+  return entry.adminsOnly ? 'admins' : 'everyone';
+};
+const withVisibility = ({ groupId: _previous, ...entry }: ContextFileEntry, value: string): ContextFileEntry =>
+  value.startsWith('group:')
+    ? { ...entry, adminsOnly: false, groupId: value.slice('group:'.length) }
+    : { ...entry, adminsOnly: value === 'admins' };
 
 const isPdf = (file: File) => resolveContextFileType(file) === CONTEXT_FILE_TYPES.pdf;
 
@@ -48,12 +68,15 @@ type FilesProps = {
   draft: SetupDraft;
   onChange: (path: string[], value: unknown) => void;
   pending: PendingContextFiles;
+  /** Before Create, the groups set up so far; after it, the groups Create made. */
+  groups?: SetupGroupOption[];
 };
 
 // Before Create: the files to add. A name without its file (from a template
 // or a reload) asks for the file again.
-export const SetupContextFiles = ({ draft, onChange, pending }: FilesProps) => {
+export const SetupContextFiles = ({ draft, onChange, pending, groups = [] }: FilesProps) => {
   const entries = readContextFiles(draft);
+  const named = groups.filter((group) => group.label.trim());
   const [problem, setProblem] = useState('');
   const save = (next: ContextFileEntry[]) => onChange(['contextFiles'], next);
   const attach = (file: File | undefined, replacing = '') => {
@@ -64,8 +87,8 @@ export const SetupContextFiles = ({ draft, onChange, pending }: FilesProps) => {
     if (replacing && replacing !== file.name) pending.set(replacing, null);
     pending.set(file.name, { file, analyze: pending.files[replacing]?.analyze ?? true });
     const kept = entries.filter((entry) => entry.name !== file.name && entry.name !== replacing);
-    const privacy = entries.find((entry) => entry.name === (replacing || file.name))?.adminsOnly ?? false;
-    save([...kept, { name: file.name, adminsOnly: privacy }]);
+    const previous = entries.find((entry) => entry.name === (replacing || file.name));
+    save([...kept, { ...(previous || { adminsOnly: false }), name: file.name }]);
   };
   return (
     <div className={styles.listRowBody} data-testid="ce-setup-context-files">
@@ -86,15 +109,29 @@ export const SetupContextFiles = ({ draft, onChange, pending }: FilesProps) => {
                   />
                 </SetupField>
               )}
-              <SetupCheck
-                id={`ce-setup-context-file-private-${index}`}
-                label="Admins only"
-                help={CONTEXT_PRIVACY_HELP}
-                checked={entry.adminsOnly}
-                onChange={(adminsOnly) =>
-                  save(entries.map((other) => (other.name === entry.name ? { ...other, adminsOnly } : other)))
-                }
-              />
+              <SetupField id={`ce-setup-context-file-access-${index}`} label="Visible to" help={FILE_VISIBILITY_HELP}>
+                <Input
+                  id={`ce-setup-context-file-access-${index}`}
+                  type="select"
+                  value={visibilityOf(entry, named)}
+                  data-testid="ce-setup-context-file-access"
+                  onChange={(event) =>
+                    save(
+                      entries.map((other) =>
+                        other.name === entry.name ? withVisibility(other, event.target.value) : other,
+                      ),
+                    )
+                  }
+                >
+                  <option value="everyone">Everyone in the session</option>
+                  <option value="admins">Admins only</option>
+                  {named.map((group) => (
+                    <option key={group.groupId} value={`group:${group.groupId}`}>
+                      {group.label.trim()}
+                    </option>
+                  ))}
+                </Input>
+              </SetupField>
               {chosen && isPdf(chosen.file) ? (
                 <SetupCheck
                   id={`ce-setup-context-file-analyze-${index}`}
@@ -152,6 +189,7 @@ export const SetupContextPublisher = ({
   sessionConfig,
   sessionSlug,
   account,
+  groups = [],
 }: PublisherProps) => {
   const [readLinks, setReadLinks] = useState(true);
   const [readUrls, setReadUrls] = useState<string[]>([]);
@@ -183,11 +221,18 @@ export const SetupContextPublisher = ({
     setBusy(true);
     const problems: string[] = [];
     const added: string[] = [];
+    const made = new Set(groups.map((group) => group.groupId));
     for (const entry of entries) {
       const chosen = pending.files[entry.name];
       setStatus(`Adding ${entry.name}…`);
+      // A file meant for a group that Create didn't make stays with admins, never wider.
+      const access = entry.groupId
+        ? made.has(entry.groupId)
+          ? { groupId: entry.groupId }
+          : { adminsOnly: true }
+        : { adminsOnly: entry.adminsOnly };
       try {
-        const id = await uploadContextFile({ file: chosen.file, adminsOnly: entry.adminsOnly }, options);
+        const id = await uploadContextFile({ file: chosen.file, ...access }, options);
         added.push(entry.name);
         pending.set(entry.name, null);
         if (chosen.analyze && isPdf(chosen.file)) {

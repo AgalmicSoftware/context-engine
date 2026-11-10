@@ -89,7 +89,12 @@ import SessionPublishProgressPanel from './SessionPublishProgressPanel';
 import SessionPublishResultLinks from './SessionPublishResultLinks';
 import { SetupVoiceKeyNote } from './setup/SetupAiSection';
 import { describeContextProblem, readSetupQuestions, withoutPublishedQuestions } from './setup/SetupContentSections';
-import { SetupContextFiles, SetupContextPublisher, usePendingContextFiles } from './setup/SetupContextSources';
+import {
+  SetupContextFiles,
+  SetupContextPublisher,
+  usePendingContextFiles,
+  type SetupGroupOption,
+} from './setup/SetupContextSources';
 import {
   SessionTemplateActions,
   SessionTemplateLinkNotice,
@@ -501,6 +506,8 @@ const SessionWizard = ({
     normalizePendingWorkerGroupDrafts(cachedWizard?.pendingWorkerGroupDrafts),
   );
   const pendingWorkerGroupDraftsRef = useRef(pendingWorkerGroupDrafts);
+  // The groups Create made from those drafts, so files locked to one are added locked.
+  const [createdWorkerGroups, setCreatedWorkerGroups] = useState<SetupGroupOption[]>([]);
   pendingWorkerGroupDraftsRef.current = pendingWorkerGroupDrafts;
   const [createSbtModalState, setCreateSbtModalState] = useState<CreateSbtModalState>(() => ({
     open: false,
@@ -2052,6 +2059,7 @@ const SessionWizard = ({
         });
         setPublishedSessionConfig(publishControllerResult.verifiedWorkerConfig?.publicConfig || null);
         if (publishExecutionPlan.shouldCreateWorkerGroups) {
+          setCreatedWorkerGroups(pendingWorkerGroupDraftSnapshot.map(({ groupId, label }) => ({ groupId, label })));
           setPendingWorkerGroupDrafts([]);
         }
         const completionRequest = resolveSessionWizardPublishCompletionRequest({
@@ -2729,7 +2737,12 @@ const SessionWizard = ({
       }
       contextSources={
         sessionModeRequirements.isWorkerCanonical ? (
-          <SetupContextFiles draft={draft} onChange={updateDraftValue} pending={pendingContextFiles} />
+          <SetupContextFiles
+            draft={draft}
+            onChange={updateDraftValue}
+            pending={pendingContextFiles}
+            groups={pendingWorkerGroupDrafts}
+          />
         ) : null
       }
       contextPublisher={
@@ -2741,6 +2754,7 @@ const SessionWizard = ({
             sessionConfig={sessionCreated ? publishedSessionConfig : null}
             sessionSlug={toStr(draft.slug).trim()}
             account={toStr(account).trim()}
+            groups={createdWorkerGroups}
           />
         ) : null
       }
