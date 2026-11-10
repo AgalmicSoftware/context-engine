@@ -604,6 +604,15 @@ describe('SBTPage metadata display', () => {
       );
 
       expect(actorLink?.props?.href).toBe(`/ce/u/${actorAddress}`);
+      // In a session, the profile opens in it.
+      const effectiveSessionSlug = subject.getEffectiveSessionSlug;
+      subject.getEffectiveSessionSlug = () => 'rxc ra';
+      const sessionLink = findElementInTree(
+        subject.renderAddressLink(actorAddress, 'admin'),
+        (element) => element?.type === 'a' && element?.props?.href?.includes('/u/'),
+      );
+      expect(sessionLink?.props?.href).toBe(`/ce/u/${actorAddress}?session=rxc%20ra`);
+      subject.getEffectiveSessionSlug = effectiveSessionSlug;
 
       subject.state = {
         ...subject.state,

@@ -167,7 +167,9 @@ export const renderSbtPageHolderModal = ({
                   <div className={styles.userItemLeft}>
                     {blockieUrl ? <img src={blockieUrl} alt="" className={styles.userBlockie} /> : null}
                     <a
-                      href={buildPublicRoute(`/u/${address}`)}
+                      href={buildPublicRoute(
+                        `/u/${address}${sessionSlug ? `?session=${encodeURIComponent(sessionSlug)}` : ''}`,
+                      )}
                       target="_blank"
                       rel="noopener noreferrer"
                       className={styles.userAddressLink}

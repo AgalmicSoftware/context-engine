@@ -269,7 +269,7 @@ describe('SBTPage holder modal rendering', () => {
 
       expect(screen.getByRole('link', { name: getShortenedAddress(holderAddress, false) })).toHaveAttribute(
         'href',
-        `/ce/u/${holderAddress}`,
+        `/ce/u/${holderAddress}?session=rxc`,
       );
     } finally {
       if (previousPublicUrl === undefined) delete process.env.PUBLIC_URL;

@@ -85,6 +85,29 @@ describe('SurveyQuestionsResponseView', () => {
     expect(renderSurveyAnswers).not.toHaveBeenCalled();
   });
 
+  it('opens the viewed profile in the session the page was opened in', () => {
+    window.history.replaceState({}, '', '/survey/s1/0xabc1234?session=rxc%20ra');
+    try {
+      render(
+        <SurveyQuestionsResponseView
+          renderQuestionAnswer={renderQuestionAnswer}
+          renderSurveyAnswers={renderSurveyAnswers}
+          routeViewDisplayState={{
+            shortenedViewAddress: '0xabc...1234',
+            viewedAddressLower: '0xabc1234',
+            viewedAddressRaw: '0xABC1234',
+          }}
+        />,
+      );
+      expect(screen.getByRole('link', { name: '0xabc...1234' })).toHaveAttribute(
+        'href',
+        '/u/0xabc1234?session=rxc%20ra',
+      );
+    } finally {
+      window.history.replaceState({}, '', '/');
+    }
+  });
+
   it('renders full-survey answers from own responses with the existing callback contract', () => {
     const responses = [{ questionID: 'q1', answer: 'yes' }];
 
