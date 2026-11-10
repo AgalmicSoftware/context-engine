@@ -1520,6 +1520,7 @@ describe('SurveyPileViewMode runtime surface', () => {
           submittedSinceLastEdit: true,
           account: responderAddress,
           isAddress: (value) => value === responderAddress,
+          sessionSlug: 'alpha',
         }),
       }),
     );
@@ -1534,7 +1535,7 @@ describe('SurveyPileViewMode runtime surface', () => {
     expect(submitButton).toBeNull();
     expect(successBadge).not.toBeNull();
     expect(successBadge.type).toBe('a');
-    expect(successBadge.props.href).toBe(`/u/${responderAddress.toLowerCase()}`);
+    expect(successBadge.props.href).toBe(`/u/${responderAddress.toLowerCase()}?session=alpha`);
     expect(successBadge.props['data-testid']).toBe(E2E_TESTIDS.SURVEY_SUBMITTED_INDICATOR);
     expect(successBadge.props['aria-label']).toBe('View your submitted responses');
     expect(successBadge.props.title).toBe('View your submitted responses');

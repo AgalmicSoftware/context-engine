@@ -32,6 +32,8 @@ type WorkerGroupMembersModalProps = {
   nextCursor: string;
   onClose: () => void;
   onLoadMore: () => void;
+  // Profiles open in this session.
+  sessionSlug: string;
   status: 'idle' | 'loading' | 'ready' | 'error';
 };
 
@@ -44,6 +46,7 @@ const WorkerGroupMembersModal = ({
   nextCursor,
   onClose,
   onLoadMore,
+  sessionSlug,
   status,
 }: WorkerGroupMembersModalProps) => {
   const closeButton = (
@@ -105,7 +108,7 @@ const WorkerGroupMembersModal = ({
                   {blockieUrl ? <img src={blockieUrl} alt="" className={sbtPageStyles.userBlockie} /> : null}
                   {isAddress ? (
                     <a
-                      href={buildPublicRoute(`/u/${identity}`)}
+                      href={buildPublicRoute(`/u/${identity}?session=${encodeURIComponent(sessionSlug)}`)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className={sbtPageStyles.userAddressLink}

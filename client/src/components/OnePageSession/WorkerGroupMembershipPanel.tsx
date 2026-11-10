@@ -325,7 +325,7 @@ const WorkerGroupDetailView = ({
                 <p>
                   <span className={sbtPageStyles.label}>Admin:</span>
                   <a
-                    href={buildPublicRoute(`/u/${group.adminAddress}`)}
+                    href={buildPublicRoute(`/u/${group.adminAddress}?session=${encodeURIComponent(sessionSlug)}`)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className={styles.workerGroupDetailAddress}
@@ -393,6 +393,7 @@ const WorkerGroupDetailView = ({
         nextCursor={memberListState.nextCursor}
         onClose={onCloseMembers}
         onLoadMore={onLoadMoreMembers}
+        sessionSlug={sessionSlug}
         status={memberListState.status}
       />
     </div>

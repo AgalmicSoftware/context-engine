@@ -37,7 +37,7 @@ const SurveyResultsIndividualResponseCard = ({
     <CardHeader onClick={() => onToggleResponse(responseId)} className={styleMap.responseHeader}>
       <span className={styleMap.responderAddress}>
         <a
-          href={`/u/${encodeURIComponent(response.responder)}`}
+          href={`/u/${encodeURIComponent(response.responder)}${effectiveSlug ? `?session=${encodeURIComponent(effectiveSlug)}` : ''}`}
           className={styleMap.responderLink}
           onClick={(e: React.MouseEvent<HTMLAnchorElement>) => e.stopPropagation()}
         >

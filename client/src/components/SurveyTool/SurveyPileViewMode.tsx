@@ -3354,6 +3354,7 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
     pileSubmitLabel,
     account: engine.props.account,
     isAddress: utils.isAddress,
+    sessionSlug: resolveEffectiveSlug(engine.props),
   });
 
   const gatedEmptyHasDetails = lockedGateDetails.length > 0;
