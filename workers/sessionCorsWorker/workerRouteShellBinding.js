@@ -769,7 +769,11 @@ export const createWorkerRouteShellWithWorkerDeps = ({
                     faucet: deps?.faucet,
                     checkRateLimit: deps?.checkRateLimit,
                     getSessionSecrets: deps?.getSessionSecrets,
-                    // The Group Agent checks SBT rules on who may ask and what files say.
+                    // The Group Agent checks who may ask and reads files and results
+                    // under the session's gates, as the storage routes do.
+                    readResourceGateOnChain: deps?.readResourceGateOnChain,
+                    resolveRegistryRpcUrls: deps?.resolveRegistryRpcUrls,
+                    toRegistrySessionSlug: deps?.toRegistrySessionSlug,
                     resolveRpcUrlListForGate: deps?.resolveRpcUrlListForGate,
                     checkSbtGate: deps?.checkSbtGate,
                     json: deps?.json,

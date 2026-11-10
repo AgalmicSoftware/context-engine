@@ -69,6 +69,9 @@ const createBaseDeps = () => ({
   fetchUrl: 'fetchUrl',
   normalizeAiRequestPayload: 'normalizeAiRequestPayload',
   faucet: 'faucet',
+  readResourceGateOnChain: 'readResourceGateOnChain',
+  resolveRegistryRpcUrls: 'resolveRegistryRpcUrls',
+  toRegistrySessionSlug: 'toRegistrySessionSlug',
   resolveRpcUrlListForGate: 'resolveRpcUrlListForGate',
   checkSbtGate: 'checkSbtGate',
 });
@@ -778,6 +781,9 @@ test('createWorkerRouteShellWithWorkerDeps preserves authenticated fallback afte
         assert.equal(value.deps.faucet, 'faucet');
         assert.equal(value.deps.checkRateLimit, 'checkRateLimit');
         assert.equal(value.deps.getSessionSecrets, 'getSessionSecrets');
+        assert.equal(value.deps.readResourceGateOnChain, 'readResourceGateOnChain');
+        assert.equal(value.deps.resolveRegistryRpcUrls, 'resolveRegistryRpcUrls');
+        assert.equal(value.deps.toRegistrySessionSlug, 'toRegistrySessionSlug');
         assert.equal(value.deps.resolveRpcUrlListForGate, 'resolveRpcUrlListForGate');
         assert.equal(value.deps.checkSbtGate, 'checkSbtGate');
         assert.equal(value.deps.json, 'json');
