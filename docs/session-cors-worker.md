@@ -2828,6 +2828,11 @@ Signed login/bootstrap requests:
   - Route scope disables fail before the request-`apiKey` bypass.
   - Provider inference:
     omitted/`default`/`auto` providers infer from `model` (`claude*` => Anthropic, slash models => OpenRouter, `gpt-*`/`o*`/`chatgpt` => OpenAI) before falling back to OpenAI. When both provider and model are omitted on a session-funded request, the Worker selects the saved fast model (or thinking model when `modelType: thinking`), including its provider.
+- `POST /group-agent/ask` answers a question to the session's Group Agent
+  through the session's own AI, under the `/ai` scope check and rate limit.
+  `POST /group-agent/status` says how the signed-in person would be answered,
+  and `POST /group-agent/opt-out` stores their choice to keep their answers and
+  files out of it. See [group-agent.md](group-agent.md).
 - `GET /agent/interview-catalog?slug=<slug>&sessionUrl=<https-session-url>[&ticket=<ticket>]`
   (`/agent/interview-brief` remains a compatibility alias)
   - Public, CORS-scoped, and disabled when `interviewModeEnabled=false` or
