@@ -288,7 +288,8 @@ through the session's existing public access checks. For someone signed in, the
 page first gets a catalog ticket from the Worker and adds it to the copied link
 as `&ticket=…`, so their AI reads the questions that person may see, those shown
 only to their groups included, and the groups they could join and haven't. A
-ticket lasts an hour at most and never past their sign-in; the page renews it
+ticket lasts an hour at most and never past their sign-in, and signing out of
+the page doesn't end one already copied; the page renews it
 quietly ten minutes before it ends, and the prompt tells the AI the link is
 private to them. Checking the prompt asks them once to sign in to the session if
 they haven't; declining still offers what a signed-out visitor's AI may read,

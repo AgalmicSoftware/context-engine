@@ -108,7 +108,7 @@ test('an expired, altered or misplaced ticket is refused', async () => {
   await check(verify({ env: { ...env, TOKEN_HMAC_SECRET: 'other' }, ticket, deps }), 'another Worker key');
 });
 
-test('signing out or losing access ends a ticket', async () => {
+test('a revoked sign-in or lost access ends a ticket', async () => {
   const { env, deps, ticket } = await setup();
   assert.equal((await verify({ env, ticket, deps })).ok, true);
   await revokeAuthTokenRecord({ env, slug: 'demo', sub: ADDRESS, jti: SIGN_IN });

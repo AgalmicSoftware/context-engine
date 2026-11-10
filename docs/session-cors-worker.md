@@ -2873,9 +2873,11 @@ Signed login/bootstrap requests:
   - A ticket lasts an hour at most, and never past the sign-in it came from.
     It is signed with its own key derived from `TOKEN_HMAC_SECRET` and bound
     to the session's slug, session ID and access version (`authzEpoch`), so
-    another session, a new session ID, an access edit or signing out ends
-    it. It names only its person's address, the sign-in's ID and its expiry,
-    and it is never accepted as a sign-in token.
+    another session, a new session ID or an access edit ends it. Signing
+    out of the page doesn't: the Worker can't tell, so a ticket already
+    handed out runs until it expires. It names only its person's address,
+    the sign-in's ID and its expiry, and it is never accepted as a sign-in
+    token.
 - `GET /api/agent/questions` with a session Worker bearer credential returns
   the same public, access-checked question catalog when
   `sessionModeProfile.surfaces.agentHttp=true`.

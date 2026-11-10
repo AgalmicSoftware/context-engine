@@ -6,7 +6,8 @@ import { base64UrlEncode, signHmac, timingSafeEqual } from './tokenSigning.js';
 // A catalog ticket lets one person's own AI read a session's interview catalog as that person.
 // It carries only who it is for, the sign-in it came from and its expiry. The session, its ID
 // and its access version are signed in, not carried, so another session, a rotated session or
-// any access edit ends it, and so does signing out.
+// any access edit ends it. Signing out of the page doesn't: the Worker can't tell, so a ticket
+// already handed out runs until it expires.
 export const INTERVIEW_CATALOG_TICKET_TTL_SECONDS = 60 * 60;
 const TICKET_VERSION = 'ic1';
 const TICKET_KEY_LABEL = 'interview-catalog-ticket-v1';
