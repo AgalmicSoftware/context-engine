@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.9.1] - 2026-11-10
+
+### Client — available when the site deploys
+
+- Voice mode's Interview and Group Conversation screens have a **Back** button to the two choices. It's off while an interview or recording is under way. Leaving an interview with unsaved work asks first, and Group Conversation finishes its recording and uploads before going back. The Interview screen also offers **Let your AI draft your answers** until there's something to review.
+- In an interview's review, **Share for research** sits beside **AI submission info**, with a **?** that says what it shares, and starts ticked: `interviewMode.shareDraftChangesByDefault` is now on unless a session turns it off. **AI submission info** no longer opens by itself to show the choice.
+
+### Workers — requires redeployment
+
+- A Session Worker's interview settings share drafts for research unless a session turns it off (`interviewMode.shareDraftChangesByDefault`), as the client's do.
+
 ## [0.9.0] - 2026-11-02
 
 0.9.0 also contains the 0.8.1 changes listed below, which were never released on their own.
@@ -161,8 +172,6 @@ All notable changes to this project will be documented in this file.
 - On `/new`, a starting file can be locked to groups set up before Create, under Access and identity: its **Visible to** lists them, and Create makes the groups before the files are added. A file goes only to the groups Create made, or to admins alone if it made none of them, never more widely. An exported template carries a locked file as admins-only.
 - Wherever a context file is added, on `/new`, the settings page, the session page or with a group conversation's transcript, **Visible to** is a dropdown of toggles like the question filter's tags: everyone in the session, admins only, or any mix of up to 20 of the session's groups, whose members may each read the file.
 - Admins see a **Group Agent** button in a session's context section. For now it only says the Group Agent is coming.
-- Voice mode's Interview and Group Conversation screens have a **Back** button to the two choices. It's off while an interview or recording is under way. Leaving an interview with unsaved work asks first, and Group Conversation finishes its recording and uploads before going back. The Interview screen also offers **Let your AI draft your answers** until there's something to review.
-- In an interview's review, **Share for research** sits beside **AI submission info**, with a **?** that says what it shares, and starts ticked: `interviewMode.shareDraftChangesByDefault` is now on unless a session turns it off. **AI submission info** no longer opens by itself to show the choice.
 
 ### Workers — requires redeployment
 
