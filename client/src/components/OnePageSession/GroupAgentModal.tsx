@@ -1,5 +1,5 @@
 /** @file GroupAgentModal.tsx: asks the session's Group Agent, and sets whether it may use your answers and files. */
-import React, { useEffect, useId, useState } from 'react';
+import React, { useEffect, useId, useRef, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faQuestionCircle } from '@fortawesome/free-solid-svg-icons';
 import { Modal, ModalBody, ModalHeader } from 'reactstrap';
@@ -56,13 +56,21 @@ export default function GroupAgentModal({ sessionSlug, sessionConfig, account, o
   const [askError, setAskError] = useState('');
   const [savingOptOut, setSavingOptOut] = useState(false);
   const [optOutError, setOptOutError] = useState('');
+  const switchSaves = useRef(0);
 
   // A recheck keeps what was shown until the answer comes, so the form stays put.
+  // A switch saved after the check was sent is newer than its answer, so it stays.
   useEffect(() => {
     let active = true;
+    const savesBefore = switchSaves.current;
     setStatusError('');
     readGroupAgentStatus({ sessionSlug, sessionConfig, account })
-      .then((next) => active && setStatus(next))
+      .then((next) => {
+        if (!active) return;
+        setStatus((current) =>
+          current && switchSaves.current !== savesBefore ? { ...next, optedOut: current.optedOut } : next,
+        );
+      })
       .catch((error) => active && setStatusError(errorText(error)));
     return () => {
       active = false;
@@ -89,6 +97,7 @@ export default function GroupAgentModal({ sessionSlug, sessionConfig, account, o
     setOptOutError('');
     try {
       const optedOut = await setGroupAgentOptOut(!use, options);
+      switchSaves.current += 1;
       setStatus((current) => (current ? { ...current, optedOut } : current));
     } catch (error) {
       setOptOutError(errorText(error));

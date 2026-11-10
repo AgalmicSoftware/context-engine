@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 
 import GroupAgentModal from './GroupAgentModal';
 import {
@@ -117,6 +117,24 @@ describe('GroupAgentModal', () => {
     fireEvent.click(use);
     expect(await dialog.findByRole('alert')).toHaveTextContent('couldn’t be read just now');
     expect(setOptOut).toHaveBeenLastCalledWith(false, OPTIONS);
+    expect(use).not.toBeChecked();
+  });
+
+  it('keeps a switch change saved while a status check was on its way', async () => {
+    readStatus.mockResolvedValueOnce(member);
+    const view = render(<GroupAgentModal {...OPTIONS} onClose={() => {}} />);
+    const dialog = within(await screen.findByRole('dialog', { name: 'Group Agent' }));
+    const use = await dialog.findByRole('switch', { name: 'Use my answers and files' });
+    let answer: (status: GroupAgentStatus) => void = () => {};
+    readStatus.mockReturnValueOnce(new Promise<GroupAgentStatus>((resolve) => (answer = resolve)));
+    // A new config object checks the status again.
+    view.rerender(<GroupAgentModal {...OPTIONS} sessionConfig={{ slug: 'salon' }} onClose={() => {}} />);
+    expect(readStatus).toHaveBeenCalledTimes(2);
+    setOptOut.mockResolvedValueOnce(true);
+    fireEvent.click(use);
+    await waitFor(() => expect(use).not.toBeChecked());
+    // That check was sent before the save, so it still says they're in.
+    await act(async () => answer(member));
     expect(use).not.toBeChecked();
   });
 
