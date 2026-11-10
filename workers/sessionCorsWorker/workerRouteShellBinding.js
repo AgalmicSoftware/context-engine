@@ -769,6 +769,9 @@ export const createWorkerRouteShellWithWorkerDeps = ({
                     faucet: deps?.faucet,
                     checkRateLimit: deps?.checkRateLimit,
                     getSessionSecrets: deps?.getSessionSecrets,
+                    // The Group Agent checks SBT rules on who may ask and what files say.
+                    resolveRpcUrlListForGate: deps?.resolveRpcUrlListForGate,
+                    checkSbtGate: deps?.checkSbtGate,
                     json: deps?.json,
                     toStr: deps?.toStr,
                     now: deps?.now,

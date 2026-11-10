@@ -1375,3 +1375,40 @@ test('context the Worker refuses is reported in terms of what the agent can do',
     await assert.rejects(kami.participant.addContext(addition), refusal);
   }
 });
+
+test('the Group Agent answers a member from stored answers through the real Worker, naming no one', async (t) => {
+  const config = sessionConfig();
+  config.ai = { mode: 'anthropic', models: { fast: { provider: 'anthropic', model: 'claude-sonnet-5-5' } } };
+  config.groupAgent = { audiences: [{ who: { match: 'any', conditions: [{ kind: 'agent_grant_scope', scope: 'ai' }] }, answers: 'detailed' }] };
+  const env = createEnv([config]);
+  await env.GROUP_KV.put(`session:${SLUG}:secrets`, JSON.stringify({ anthropicKey: ['synthetic', 'anthropic', 'key'].join('-') }));
+  const alice = await createAgent(env, 'alice.delve.town', []);
+  const bob = await createAgent(env, 'bob.delve.town', []);
+  await alice.participant.joinSession({ link: LINK });
+  await bob.participant.joinSession({ link: LINK });
+  const { questionId } = await alice.participant.addStatement({ prompt: STATEMENT });
+  await bob.participant.answer({ answers: [{ questionId, value: 'Agree', comment: 'Labels help readers.' }] });
+
+  const sent = [];
+  t.mock.method(globalThis, 'fetch', async (url, init) => {
+    assert.match(String(url), /^https:\/\/api\.anthropic\.com\//);
+    sent.push(init.body);
+    return new Response(JSON.stringify({ content: [{ type: 'text', text: 'Most agree that labels help.' }] }), {
+      headers: { 'Content-Type': 'application/json' },
+    });
+  });
+  const client = createWorkerClient({
+    workerOrigin: WORKER_ORIGIN, slug: SLUG, trustedOrigins: ['https://contextengine.sh'], wallet: alice.wallet, fetchImpl: workerFetch(env),
+  });
+  assert.deepEqual(await client.request('/group-agent/status', { method: 'POST', auth: true, body: {} }), {
+    on: true, answers: 'detailed', audience: 0,
+  });
+  const reply = await client.request('/group-agent/ask', { method: 'POST', auth: true, body: { question: 'Do people want labels?' } });
+  assert.deepEqual({ answer: reply.answer, answers: reply.answers, read: reply.read.answers }, {
+    answer: 'Most agree that labels help.', answers: 'detailed', read: 1,
+  });
+  assert.equal(sent.length, 1);
+  for (const piece of ['Labels help readers', 'Answer as yourself', 'Do people want labels?']) assert.match(sent[0], new RegExp(piece));
+  for (const address of [alice.wallet.address, bob.wallet.address]) assert.doesNotMatch(sent[0], new RegExp(address.slice(2), 'i'));
+  assert.doesNotMatch(sent[0], /delve\.town|participant_/);
+});

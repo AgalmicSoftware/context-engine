@@ -1210,6 +1210,21 @@ export const authorizeCloudflareStorageResourceRead = async ({
   deps: createStorageRouteGateDeps({ config, env, slug, deps }),
 });
 
+// One person's checks within one request, sharing their group and chain
+// lookups: whether an access-condition document admits them, and whether
+// they may read a stored row, as a list or read of it would decide.
+export const createRequesterAccessChecks = ({ env, config, slug, requesterAddress = '', authScopes, deps } = {}) => {
+  const gateDeps = createStorageRouteGateDeps({ config, env, slug, deps });
+  return {
+    admits: (document) => evaluateAccessConditionDocument({
+      document, source: 'request', env, slug, config, requesterAddress, authScopes, deps: gateDeps,
+    }),
+    canRead: async (metadata) => (await authorizeCloudflareStorageAccess({
+      env, config, slug, resource: trim(metadata?.resource) || 'docsContext', requesterAddress, authScopes, metadata, deps: gateDeps,
+    })).ok === true,
+  };
+};
+
 const enforceCloudflareUploadPolicy = async ({ env, config, slug, payload, requesterAddress, baseHeaders, deps }) => {
   const policy = payload?.uploadPolicy;
   if (!policy?.mode) return { ok: true };

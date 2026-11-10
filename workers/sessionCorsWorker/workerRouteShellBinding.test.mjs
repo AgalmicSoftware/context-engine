@@ -69,6 +69,8 @@ const createBaseDeps = () => ({
   fetchUrl: 'fetchUrl',
   normalizeAiRequestPayload: 'normalizeAiRequestPayload',
   faucet: 'faucet',
+  resolveRpcUrlListForGate: 'resolveRpcUrlListForGate',
+  checkSbtGate: 'checkSbtGate',
 });
 
 const createBaseConstants = () => ({
@@ -776,6 +778,8 @@ test('createWorkerRouteShellWithWorkerDeps preserves authenticated fallback afte
         assert.equal(value.deps.faucet, 'faucet');
         assert.equal(value.deps.checkRateLimit, 'checkRateLimit');
         assert.equal(value.deps.getSessionSecrets, 'getSessionSecrets');
+        assert.equal(value.deps.resolveRpcUrlListForGate, 'resolveRpcUrlListForGate');
+        assert.equal(value.deps.checkSbtGate, 'checkSbtGate');
         assert.equal(value.deps.json, 'json');
         assert.equal(value.deps.toStr, 'toStr');
         assert.equal(value.deps.now, 'now');
