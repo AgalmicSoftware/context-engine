@@ -113,7 +113,8 @@ const readMemberAnswers = async ({ env, slug, config, optedOut, deps }) => {
 // What each style reads, decided here and nowhere else. General: the
 // session's context, the files open to everyone, and results the person may
 // see. Detailed: every file they may read, and members' answers as well.
-// Neither uses the answers or files of anyone who opted out.
+// Neither reads the answers or files of anyone who opted out; the published
+// results, built from everyone's answers, are read as the Results page shows them.
 const gatherMaterial = async ({ env, slug, config, address, scopes, asker, access, optedOut, deps }) => {
   const detailed = asker.answers === 'detailed';
   const [sources, results, answers] = await Promise.all([

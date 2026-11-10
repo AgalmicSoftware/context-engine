@@ -70,9 +70,11 @@ token or password are refused. Saving the setting signs no one out.
 
 Admins may always see the results. Members' answers are read as the session's
 own analysis reads them: each person's latest, with withheld and locked answers
-left out. Neither style uses the answers or files of anyone who has kept theirs
+left out. Neither style reads the answers or files of anyone who has kept theirs
 out (below), and Detailed answers leave out answers that carry no address, since
-their authors couldn't have chosen either way. If members' answers can't be read
+their authors couldn't have chosen either way. The published results are the
+session's own, built from everyone's answers, so they are read as the Results
+page shows them. If members' answers can't be read
 for a question, the answer goes ahead without them and says so.
 
 One question reads at most 8,000 characters of context, 2,000 of results and
@@ -109,7 +111,8 @@ untrusted data.
 Everyone's answers and files are in until they say otherwise. In the Group
 Agent's dialog, turning off **Use my answers and files** keeps them out of every
 answer from the next question on. The files stay in the session's file list, and
-answers already given can't be taken back. Anyone signed in with an address can
+answers already given can't be taken back. The published results still count
+everyone's answers, as on the Results page. Anyone signed in with an address can
 turn it off, even someone the Group Agent doesn't answer, and turn it back on at
 any time.
 
