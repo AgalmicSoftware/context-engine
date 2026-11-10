@@ -771,6 +771,37 @@ describe('bundled app-theme contrast', () => {
     expect(ratios.filter(([, , value]) => value < 4.5)).toEqual([]);
   });
 
+  // Sharing for research sits on the AI submission info summary, hovered or not, or under it where the bar is narrow,
+  // and its ? takes the label's colour.
+  test.each(registry.themes.map(({ id }) => id))('%s keeps sharing for research readable on its bar', (themeId) => {
+    const values = themeValues(css, themeId);
+    const paint = painter(values);
+    const surveyCss = compileModule('components/SurveyTool/SurveyTool.module.scss');
+    const consentCss = compileModule('components/SurveyTool/SessionInterviewResearchConsent.module.scss');
+    const canvas = parseColor(values.canvas);
+    const bar = composite(paint(moduleRule(surveyCss, '.sessionInterviewReviewActions').background), canvas);
+    const behind = {
+      summary: composite(paint(moduleRule(surveyCss, '.sessionInterviewConsentOptions > summary').background), bar),
+      hoveredSummary: composite(
+        paint(moduleRule(surveyCss, '.sessionInterviewConsentOptions > summary:hover').background),
+        bar,
+      ),
+      bar,
+    };
+    const label = paint(moduleRule(consentCss, '.provenanceOption').color);
+    const help = moduleRule(consentCss, '.researchHelp');
+    const helpHover = moduleRule(consentCss, '.researchHelp:hover');
+    const ratios = Object.entries(behind).flatMap(([place, under]) => {
+      const hoverFill = composite(paint(helpHover.background), under);
+      return [
+        [place, 'label', contrastRatio(composite(label, under), under)],
+        [place, '?', contrastRatio(composite(paint(help.color), under), under)],
+        [place, '? hovered', contrastRatio(composite(paint(help.color), hoverFill), hoverFill)],
+      ] as const;
+    });
+    expect(ratios.filter(([, , value]) => value < 4.5)).toEqual([]);
+  });
+
   test.each(registry.themes.map(({ id }) => id))('%s keeps small binary answer labels readable', (themeId) => {
     const values = themeValues(css, themeId);
     for (const stance of ['agree', 'disagree']) {

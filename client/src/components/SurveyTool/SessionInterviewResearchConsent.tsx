@@ -15,12 +15,11 @@ type Props = {
   showProvenance?: boolean;
   revisionCount?: number;
   includeProvenance: boolean;
+  // Whether research sharing is on, chosen beside the summary (SessionInterviewResearchShare).
   includeComparison: boolean;
   provenanceMixed?: boolean;
-  comparisonMixed?: boolean;
   preserveSavedProvenance?: boolean;
   onProvenanceChange: (included: boolean) => void;
-  onComparisonChange: (included: boolean) => void;
   coverageDetails: string[];
   selectedCount: number;
   unselectedCount: number;
@@ -38,10 +37,8 @@ export default function SessionInterviewResearchConsent({
   includeProvenance,
   includeComparison,
   provenanceMixed = false,
-  comparisonMixed = false,
   preserveSavedProvenance = false,
   onProvenanceChange,
-  onComparisonChange,
   coverageDetails,
   selectedCount,
   unselectedCount,
@@ -54,63 +51,26 @@ export default function SessionInterviewResearchConsent({
   const platform = describeInterviewPlatform(packet.source.platform);
   return (
     <>
-      <div className={styles.optionGroup}>
-        {showProvenance && (
-          <Label check className={styles.provenanceOption}>
-            <Input
-              type="checkbox"
-              checked={provenanceMixed ? false : includeProvenance}
-              aria-checked={provenanceMixed ? 'mixed' : includeProvenance}
-              innerRef={(element: HTMLInputElement | null) => {
-                if (element) element.indeterminate = provenanceMixed;
-              }}
-              disabled={disabled}
-              onChange={(event) => onProvenanceChange(event.target.checked)}
-            />{' '}
-            <span>Include platform/model provenance{provenanceMixed ? ' (mixed saved choices)' : ''}</span>
-          </Label>
-        )}
-        <div className={styles.researchConsent}>
-          <Label check className={styles.provenanceOption}>
-            <Input
-              type="checkbox"
-              checked={comparisonMixed ? false : includeComparison}
-              aria-checked={comparisonMixed ? 'mixed' : includeComparison}
-              innerRef={(element: HTMLInputElement | null) => {
-                if (element) element.indeterminate = comparisonMixed;
-              }}
-              disabled={disabled}
-              onChange={(event) => onComparisonChange(event.target.checked)}
-              data-testid={E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_PREDICTION_COMPARISON}
-            />{' '}
-            <span>Share AI draft changes for research{comparisonMixed ? ' (mixed saved choices)' : ''}</span>
-          </Label>
-          <button
-            type="button"
-            id="ce-interview-research-help"
-            className={styles.researchHelp}
-            data-ce-control-appearance="frameless"
-            aria-label="About research metadata"
-            aria-describedby="ce-interview-research-description"
-          >
-            <FontAwesomeIcon icon={faQuestionCircle} />
-          </button>
+      {showProvenance || children ? (
+        <div className={styles.optionGroup}>
+          {showProvenance && (
+            <Label check className={styles.provenanceOption}>
+              <Input
+                type="checkbox"
+                checked={provenanceMixed ? false : includeProvenance}
+                aria-checked={provenanceMixed ? 'mixed' : includeProvenance}
+                innerRef={(element: HTMLInputElement | null) => {
+                  if (element) element.indeterminate = provenanceMixed;
+                }}
+                disabled={disabled}
+                onChange={(event) => onProvenanceChange(event.target.checked)}
+              />{' '}
+              <span>Include platform/model provenance{provenanceMixed ? ' (mixed saved choices)' : ''}</span>
+            </Label>
+          )}
+          {children}
         </div>
-        {children}
-      </div>
-      <span id="ce-interview-research-description" className={styles.srOnly}>
-        {minimal
-          ? 'Includes the AI’s predicted answers, ratings and confidence, its revision history, and which fields you changed. It excludes the AI’s notes and drafted text, drafts you did not select, encrypted answers, full interview transcripts, and imported conversation history. Edits are not treated as agreement.'
-          : 'Includes original predictions, AI revisions from continued interviews, reviewed final values, changed fields, and drafts you did not select. Unselected drafts are recorded as research metadata, not submitted answers. Edits are not treated as agreement. Encrypted answer and comment text, full interview transcripts, and imported conversation history are excluded.'}
-      </span>
-      <UncontrolledTooltip target="ce-interview-research-help" placement="top" trigger="hover focus" autohide={false}>
-        {minimal
-          ? 'Records the AI’s predicted answers and confidence and which ones you changed, not its notes or drafted text.'
-          : 'Records draft provenance, revisions, selected status, and changed fields. It excludes encrypted answer text, transcripts, and imported conversation history.'}{' '}
-        <a href={RESEARCH_DOC_URL} target="_blank" rel="noreferrer">
-          How research data is handled
-        </a>
-      </UncontrolledTooltip>
+      ) : null}
       {/* An unticked box already says what is left out; with nothing shared there is nothing to describe. */}
       {preserveSavedProvenance || (showProvenance && includeProvenance) || includeComparison ? (
         <details
@@ -203,5 +163,69 @@ export default function SessionInterviewResearchConsent({
         </details>
       ) : null}
     </>
+  );
+}
+
+type ShareProps = {
+  included: boolean;
+  mixed?: boolean;
+  disabled: boolean;
+  // The session's interviewMode.researchDetail: what a shared comparison keeps.
+  researchDetail?: 'minimal' | 'full';
+  className?: string;
+  onChange: (included: boolean) => void;
+};
+
+/** Sharing the AI's predictions and your changes for research, beside "AI submission info", where it shows closed. */
+export function SessionInterviewResearchShare({
+  included,
+  mixed = false,
+  disabled,
+  researchDetail = 'minimal',
+  className,
+  onChange,
+}: ShareProps) {
+  const minimal = researchDetail === 'minimal';
+  return (
+    <span className={[styles.researchConsent, className].filter(Boolean).join(' ')}>
+      <Label check className={styles.provenanceOption}>
+        <Input
+          type="checkbox"
+          checked={mixed ? false : included}
+          aria-checked={mixed ? 'mixed' : included}
+          innerRef={(element: HTMLInputElement | null) => {
+            if (element) element.indeterminate = mixed;
+          }}
+          disabled={disabled}
+          onChange={(event) => onChange(event.target.checked)}
+          data-testid={E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_PREDICTION_COMPARISON}
+        />{' '}
+        <span>Share for research{mixed ? ' (mixed)' : ''}</span>
+      </Label>
+      <button
+        type="button"
+        id="ce-interview-research-help"
+        className={styles.researchHelp}
+        data-ce-control-appearance="frameless"
+        aria-label="About sharing for research"
+        aria-describedby="ce-interview-research-description"
+      >
+        <FontAwesomeIcon icon={faQuestionCircle} />
+      </button>
+      <span id="ce-interview-research-description" className={styles.srOnly}>
+        {minimal
+          ? 'Includes the AI’s predicted answers, ratings and confidence, its revision history, and which fields you changed. It excludes the AI’s notes and drafted text, drafts you did not select, encrypted answers, full interview transcripts, and imported conversation history. Edits are not treated as agreement.'
+          : 'Includes original predictions, AI revisions from continued interviews, reviewed final values, changed fields, and drafts you did not select. Unselected drafts are recorded as research metadata, not submitted answers. Edits are not treated as agreement. Encrypted answer and comment text, full interview transcripts, and imported conversation history are excluded.'}
+        {mixed ? ' Your saved responses have different choices; ticking or unticking sets them all.' : ''}
+      </span>
+      <UncontrolledTooltip target="ce-interview-research-help" placement="top" trigger="hover focus" autohide={false}>
+        {minimal
+          ? 'Records the AI’s predicted answers and confidence and which ones you changed, not its notes or drafted text.'
+          : 'Records draft provenance, revisions, selected status, and changed fields. It excludes encrypted answer text, transcripts, and imported conversation history.'}{' '}
+        <a href={RESEARCH_DOC_URL} target="_blank" rel="noreferrer">
+          How research data is handled
+        </a>
+      </UncontrolledTooltip>
+    </span>
   );
 }

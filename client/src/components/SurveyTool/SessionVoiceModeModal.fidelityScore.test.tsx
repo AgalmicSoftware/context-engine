@@ -170,9 +170,10 @@ it('counts every hidden draft, scored on the answer given before the reveal', as
   const statement = hidden.find((id) => id !== 'r1')!;
   renderModal({ interviewMode: { showFidelityScore: true, hiddenDraftShare: 0.5, shareDraftChangesByDefault: true } });
   await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
-  // Sharing that starts on opens the submission info before submitting.
+  // Sharing starts on and shows beside the submission info, which stays closed.
   const submissionInfo = screen.getByText('AI submission info').closest('details')!;
-  expect(submissionInfo).toHaveAttribute('open');
+  expect(submissionInfo).not.toHaveAttribute('open');
+  expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_PREDICTION_COMPARISON)).toBeChecked();
   // Blind, the person disagrees, then switches to the AI's guess once it is shown.
   answerWith(statement, 'Disagree');
   answerWith(statement, 'Agree');

@@ -7,7 +7,7 @@ export const DEFAULT_INTERVIEW_SETTINGS = Object.freeze({
   followNewQuestions: false,
   suggestQuestions: false,
   allowManualRefresh: true,
-  shareDraftChangesByDefault: false,
+  shareDraftChangesByDefault: true,
   researchDetail: 'minimal',
   hiddenDraftShare: 0,
   showFidelityScore: false,
@@ -35,7 +35,11 @@ export const normalizeInterviewSettings = (value = {}) => {
     followNewQuestions: source.followNewQuestions === true,
     suggestQuestions: source.suggestQuestions === true,
     allowManualRefresh: source.allowManualRefresh !== false,
-    shareDraftChangesByDefault: source.shareDraftChangesByDefault === true,
+    // Research sharing starts ticked unless the session turns it off; each person can untick it.
+    shareDraftChangesByDefault:
+      typeof source.shareDraftChangesByDefault === 'boolean'
+        ? source.shareDraftChangesByDefault
+        : DEFAULT_INTERVIEW_SETTINGS.shareDraftChangesByDefault,
     // How much an AI draft comparison saves: 'minimal' keeps no AI notes or drafted text.
     researchDetail: source.researchDetail === 'full' ? 'full' : 'minimal',
     // Share of a person's AI prefill drafts hidden until they answer, which measures anchoring.

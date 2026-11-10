@@ -286,7 +286,7 @@ if (isMain) {
     } else {
       const report = runFidelityReport(args);
       if (!report.coverage.predictions) {
-        console.warn('No AI draft comparisons found. They are saved only when "Share AI draft changes for research" is on.');
+        console.warn('No AI draft comparisons found. They are saved only when "Share for research" is on.');
       }
       console.log(
         `${report.coverage.participants} people, ${report.coverage.predictions} predictions; ` +

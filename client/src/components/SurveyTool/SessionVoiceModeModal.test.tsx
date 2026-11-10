@@ -517,10 +517,11 @@ describe('SessionVoiceModeModal', () => {
     expect(submission).toContainElement(screen.getByRole('button', { name: 'Submit responses' }));
     expect(choices).not.toHaveAttribute('open');
     expect(screen.getByLabelText('Include platform/model provenance')).toBeChecked();
-    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_PREDICTION_COMPARISON)).not.toBeChecked();
+    // Sharing for research starts on, beside the closed submission info.
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_PREDICTION_COMPARISON)).toBeChecked();
     fireEvent.click(choices.querySelector('summary')!);
     expect(choices).toHaveAttribute('open');
-    expect(screen.getByRole('button', { name: 'About research metadata' })).toHaveAccessibleDescription(
+    expect(screen.getByRole('button', { name: 'About sharing for research' })).toHaveAccessibleDescription(
       /drafts you did not select/,
     );
     const metadata = screen.getByRole('group', { name: 'AI prefill metadata' });
@@ -534,7 +535,6 @@ describe('SessionVoiceModeModal', () => {
     expect(metadata).toHaveTextContent('ce-interview-brief-v4');
     expect(metadata).toHaveTextContent('a'.repeat(64));
     expect(metadata).not.toHaveTextContent('will not be included');
-    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_PREDICTION_COMPARISON));
     expect(metadata).toHaveTextContent('2 selected drafts and 0 unselected drafts');
     fireEvent.click(choices.querySelector('summary')!);
     expect(choices).not.toHaveAttribute('open');
@@ -2428,9 +2428,9 @@ describe('SessionVoiceModeModal', () => {
     expect(startControl.compareDocumentPosition(toggle) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW)).toBeInTheDocument();
     expect(screen.queryByLabelText(/Include self-reported AI platform/)).not.toBeInTheDocument();
-    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_PREDICTION_COMPARISON)).not.toBeChecked();
-    // Nothing is shared yet, so there is no research metadata to describe.
-    expect(screen.queryByRole('group', { name: 'AI research metadata' })).not.toBeInTheDocument();
+    // Sharing for research starts on, so its metadata is there to read.
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_PREDICTION_COMPARISON)).toBeChecked();
+    expect(screen.getByRole('group', { name: 'AI research metadata' })).toBeInTheDocument();
     expect(baseProps.onSubmitResponses).not.toHaveBeenCalled();
     expect(screen.queryByLabelText('Pause interview')).not.toBeInTheDocument();
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
@@ -2453,7 +2453,7 @@ describe('SessionVoiceModeModal', () => {
         null,
         null,
         false,
-        false,
+        true,
         '',
         expect.any(Array),
         {},
@@ -2556,7 +2556,7 @@ describe('SessionVoiceModeModal', () => {
         prefillPacket.source,
         prefillPacket,
         true,
-        false,
+        true,
         '',
         expect.any(Array),
         {},
@@ -2838,7 +2838,7 @@ describe('SessionVoiceModeModal', () => {
         prefillPacket.source,
         prefillPacket,
         true,
-        false,
+        true,
         '',
         expect.any(Array),
         {},
@@ -3071,7 +3071,7 @@ describe('SessionVoiceModeModal', () => {
       prefillPacket.source,
       prefillPacket,
       true,
-      false,
+      true,
       '',
       [
         expect.objectContaining({
@@ -3140,7 +3140,7 @@ describe('SessionVoiceModeModal', () => {
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_GENERATE)).toBeInTheDocument();
   });
 
-  it('keeps prediction comparison off by default and records each consent independently', async () => {
+  it('starts prediction comparison on by default and records each consent independently', async () => {
     mockedMapInterviewEvidenceToResponses.mockResolvedValue([
       { questionId: 'q1', answer: 'Draft answer', confidence: 0.76 },
     ]);
@@ -3161,13 +3161,17 @@ describe('SessionVoiceModeModal', () => {
 
     expect(await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW)).toBeInTheDocument();
     const includeComparison = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_PREDICTION_COMPARISON);
-    expect(includeComparison).not.toBeChecked();
+    expect(includeComparison).toBeChecked();
     const metadata = screen.getByRole('group', { name: 'AI prefill metadata' });
     fireEvent.click(metadata.querySelector('summary')!);
     expect(metadata).toHaveTextContent('Platform');
     expect(metadata).toHaveTextContent('Claude');
     expect(metadata).toHaveTextContent('Question set');
     expect(metadata).not.toHaveTextContent('will not be included');
+    expect(metadata).toHaveTextContent('1 selected draft:');
+    // Unticked, the comparison leaves the metadata; ticked again, it is the participant's own choice.
+    fireEvent.click(includeComparison);
+    expect(metadata).not.toHaveTextContent('1 selected draft:');
     fireEvent.click(includeComparison);
     expect(metadata).toHaveTextContent('1 selected draft:');
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
@@ -3210,7 +3214,7 @@ describe('SessionVoiceModeModal', () => {
         prefillPacket.source,
         prefillPacket,
         true,
-        false,
+        true,
         '',
         expect.any(Array),
         {},
@@ -3231,7 +3235,7 @@ describe('SessionVoiceModeModal', () => {
         prefillPacket.source,
         prefillPacket,
         true,
-        false,
+        true,
         'Ada Example',
         expect.any(Array),
         { includeResponderName: true },

@@ -2,7 +2,7 @@
 // are newer than some deployed Workers. Leave each out at its default, which readers
 // treat the same as a missing key, so other interview settings still save to them.
 const NEWER_INTERVIEW_DEFAULTS: Record<string, unknown> = {
-  shareDraftChangesByDefault: false,
+  shareDraftChangesByDefault: true,
   researchDetail: 'minimal',
   hiddenDraftShare: 0,
   showFidelityScore: false,

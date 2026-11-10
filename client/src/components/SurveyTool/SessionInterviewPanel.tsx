@@ -15,7 +15,7 @@ import SessionInterviewSuggestions from './SessionInterviewSuggestions';
 import SessionInterviewRecommendedGroups from './SessionInterviewRecommendedGroups';
 import SessionInterviewReviewSection from './SessionInterviewReviewSection';
 import SessionInterviewModalHeader from './SessionInterviewModalHeader';
-import SessionInterviewResearchConsent from './SessionInterviewResearchConsent';
+import SessionInterviewResearchConsent, { SessionInterviewResearchShare } from './SessionInterviewResearchConsent';
 import {
   useSessionInterviewGroupRecommendations,
   type SessionInterviewGroupRecommendationRequest,
@@ -462,15 +462,6 @@ export default function SessionInterviewPanel({
   const hasSavedAi = consentDrafts.some(
     (draft) => resolveConsentFlags(savedConsent[draft.questionId]).includeAiProvenance,
   );
-  // Research sharing that starts on, such as from the session default, must be
-  // seen before submitting, so open the submission info until the participant chooses.
-  const researchSharingStartsOn =
-    (researchAvailable || hasSavedAi) &&
-    consentOverrides.includePredictionComparison === undefined &&
-    (comparisonChoice.checked || comparisonChoice.mixed);
-  useEffect(() => {
-    if (researchSharingStartsOn) setSubmissionInfoOpen(true);
-  }, [researchSharingStartsOn]);
 
   const existingResponsesRef = useRef(existingResponseSlice);
   existingResponsesRef.current = existingResponseSlice;
@@ -1463,15 +1454,10 @@ export default function SessionInterviewPanel({
                           includeProvenance={aiChoice.checked}
                           includeComparison={comparisonChoice.checked}
                           provenanceMixed={aiChoice.mixed}
-                          comparisonMixed={comparisonChoice.mixed}
                           preserveSavedProvenance={hasSavedAi && consentOverrides.includeAiProvenance === undefined}
                           onProvenanceChange={(included) => {
                             setIncludeProvenance(included);
                             setConsentOverrides((prev) => ({ ...prev, includeAiProvenance: included }));
-                          }}
-                          onComparisonChange={(included) => {
-                            setResearchSharingChoice({ contextToken: baseSubmitContextToken, included });
-                            setConsentOverrides((prev) => ({ ...prev, includePredictionComparison: included }));
                           }}
                           coverageDetails={researchCoverageDetails}
                           selectedCount={drafts.filter((draft) => submittableSelection[draft.questionId]).length}
@@ -1485,15 +1471,18 @@ export default function SessionInterviewPanel({
                       {researchAvailable || hasSavedAi ? null : nameOption}
                     </div>
                   </details>
-                  {/* Sharing can be on by default, so say so without opening the panel. */}
-                  {researchAvailable && (comparisonChoice.checked || comparisonChoice.mixed) ? (
-                    <small className={styles.sessionInterviewSharingStatus}>
-                      {comparisonChoice.mixed
-                        ? 'Sharing AI draft changes for research on some responses'
-                        : submitSucceeded
-                          ? 'Shared your AI’s predictions and your changes for research'
-                          : 'Sharing your AI’s predictions and your changes for research'}
-                    </small>
+                  {researchAvailable || hasSavedAi ? (
+                    <SessionInterviewResearchShare
+                      className={styles.sessionInterviewResearchShare}
+                      included={comparisonChoice.checked}
+                      mixed={comparisonChoice.mixed}
+                      disabled={applying}
+                      researchDetail={shownResearchDetail}
+                      onChange={(included) => {
+                        setResearchSharingChoice({ contextToken: baseSubmitContextToken, included });
+                        setConsentOverrides((prev) => ({ ...prev, includePredictionComparison: included }));
+                      }}
+                    />
                   ) : null}
                 </div>
               ) : null}

@@ -44,15 +44,16 @@ it('edits the research-sharing default while retaining other interview settings'
   const { rerender } = render(
     <InterviewSettingsFields value={{ steeringPrompt: 'Listen first.' }} onChange={onChange} />,
   );
-  expect(screen.getByLabelText(label)).toHaveValue('false');
-  fireEvent.change(screen.getByLabelText(label), { target: { value: 'true' } });
-  expect(onChange).toHaveBeenLastCalledWith(
-    expect.objectContaining({ shareDraftChangesByDefault: true, steeringPrompt: 'Listen first.' }),
-  );
-  rerender(<InterviewSettingsFields value={onChange.mock.calls[0][0]} onChange={onChange} />);
+  // On unless the session turns it off.
   expect(screen.getByLabelText(label)).toHaveValue('true');
   fireEvent.change(screen.getByLabelText(label), { target: { value: 'false' } });
-  expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ shareDraftChangesByDefault: false }));
+  expect(onChange).toHaveBeenLastCalledWith(
+    expect.objectContaining({ shareDraftChangesByDefault: false, steeringPrompt: 'Listen first.' }),
+  );
+  rerender(<InterviewSettingsFields value={onChange.mock.calls[0][0]} onChange={onChange} />);
+  expect(screen.getByLabelText(label)).toHaveValue('false');
+  fireEvent.change(screen.getByLabelText(label), { target: { value: 'true' } });
+  expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ shareDraftChangesByDefault: true }));
   rerender(<InterviewSettingsFields value={{ shareDraftChangesByDefault: true }} onChange={onChange} disabled />);
   expect(screen.getByLabelText(label)).toBeDisabled();
 });
@@ -149,9 +150,10 @@ it('turns on every setting that measures how well AI represents people, and back
   fireEvent.click(screen.getByLabelText(label));
   rerender(<InterviewSettingsFields value={latest()} onChange={onChange} />);
   fireEvent.click(screen.getByLabelText(label));
+  // Research sharing's own default is on, so turning measuring off leaves it on.
   expect(latest()).toEqual(
     expect.objectContaining({
-      shareDraftChangesByDefault: false,
+      shareDraftChangesByDefault: true,
       hiddenDraftShare: 0,
       showFidelityScore: false,
       researchDetail: 'full',

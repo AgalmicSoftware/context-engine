@@ -154,9 +154,9 @@ Interview settings for research:
   participants](#measure-how-well-ai-represents-participants).
 
 - **Share AI draft changes for research by default**
-  (`interviewMode.shareDraftChangesByDefault`, off when unset) sets the initial
-  review checkbox. Participants can change it before submitting, and their saved
-  choices are retained.
+  (`interviewMode.shareDraftChangesByDefault`, on when unset) sets the initial
+  **Share for research** checkbox beside **AI submission info**. Participants can
+  change it before submitting, and their saved choices are retained.
 
 - **AI draft research detail** (`interviewMode.researchDetail`) decides what a
   shared comparison keeps: `minimal` (the default) has no AI notes or drafted

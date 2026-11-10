@@ -166,11 +166,12 @@ const researchReviewProps = () => ({
   onSubmitResponses: jest.fn(async () => ({ status: 'submitted' as const })),
 });
 
+// Sharing starts on unless the session turns it off; a value that isn't true or false leaves it on.
 it.each([
-  [undefined, false],
+  [undefined, true],
   [false, false],
   [true, true],
-  ['true', false],
+  ['true', true],
 ])('uses the session research-sharing default %s for new responses', async (setting, expected) => {
   const props = researchReviewProps();
   render(
@@ -185,24 +186,30 @@ it.each([
   expect(props.onRecordProvenance.mock.calls[0][7]).toEqual({});
 });
 
-it('opens the submission info when research sharing starts on, so participants see it before submitting', async () => {
+it('shows research sharing ticked on the submission bar, beside the closed submission info', async () => {
   const props = researchReviewProps();
-  const { rerender } = render(<SessionVoiceModeModal {...props} />);
+  render(<SessionVoiceModeModal {...props} />);
   await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
-  const panel = screen.getByText('AI submission info').closest('details');
+  const panel = screen.getByText('AI submission info').closest('details')!;
+  const share = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_PREDICTION_COMPARISON);
+  expect(share).toBeChecked();
   expect(panel).toHaveProperty('open', false);
-  rerender(
-    <SessionVoiceModeModal {...props} sessionConfig={{ interviewMode: { shareDraftChangesByDefault: true } }} />,
+  expect(panel).not.toContainElement(share);
+  expect(screen.getByRole('group', { name: 'Response submission' })).toContainElement(share);
+  expect(screen.getByRole('button', { name: 'About sharing for research' })).toHaveAccessibleDescription(
+    /predicted answers/,
   );
-  await waitFor(() => expect(panel).toHaveProperty('open', true));
-  // The participant's own choice leaves the panel where it is.
-  fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_PREDICTION_COMPARISON));
-  expect(panel).toHaveProperty('open', true);
+  // Choosing doesn't open the panel.
+  fireEvent.click(share);
+  expect(share).not.toBeChecked();
+  expect(panel).toHaveProperty('open', false);
 });
 
 it('uses late-loaded defaults without overwriting an explicit participant choice', async () => {
   const props = researchReviewProps();
-  const { rerender } = render(<SessionVoiceModeModal {...props} />);
+  const { rerender } = render(
+    <SessionVoiceModeModal {...props} sessionConfig={{ interviewMode: { shareDraftChangesByDefault: false } }} />,
+  );
   await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
   const comparison = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_PREDICTION_COMPARISON);
   expect(comparison).not.toBeChecked();
@@ -260,7 +267,7 @@ it('retains an explicit decline through login and uses the next session’s own 
   expect(comparison).toBeChecked();
 });
 
-it('lists every sharing choice together inside AI submission info, before the prefill metadata', async () => {
+it('keeps provenance and the name inside AI submission info, before its metadata, and sharing on its bar', async () => {
   render(
     <SessionVoiceModeModal
       isOpen
@@ -292,7 +299,6 @@ it('lists every sharing choice together inside AI submission info, before the pr
   const submissionInfo = screen.getByText('AI submission info').closest('details')!;
   const choices = [
     screen.getByLabelText('Include platform/model provenance'),
-    screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_PREDICTION_COMPARISON),
     screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_NAME),
   ];
   const group = choices[0].closest('label')!.parentElement!;
@@ -300,7 +306,10 @@ it('lists every sharing choice together inside AI submission info, before the pr
     expect(submissionInfo).toContainElement(choice);
     expect(group).toContainElement(choice);
   }
+  expect(submissionInfo).not.toContainElement(
+    screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_PREDICTION_COMPARISON),
+  );
   const metadata = screen.getByText('AI prefill metadata');
   expect(submissionInfo).toContainElement(metadata);
-  expect(choices[2].compareDocumentPosition(metadata) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(choices[1].compareDocumentPosition(metadata) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 });

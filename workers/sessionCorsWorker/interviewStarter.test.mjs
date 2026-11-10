@@ -78,9 +78,10 @@ test('defaults are stable and settings reject invalid values', () => {
   assert.equal(normalizeInterviewSettings().followNewQuestions, false);
   assert.equal(normalizeInterviewSettings().questionGrowthPercent, 20);
   assert.equal(normalizeInterviewSettings().allowManualRefresh, true);
-  assert.equal(normalizeInterviewSettings().shareDraftChangesByDefault, false);
-  assert.equal(normalizeInterviewSettings({ shareDraftChangesByDefault: true }).shareDraftChangesByDefault, true);
-  assert.equal(normalizeInterviewSettings({ shareDraftChangesByDefault: 'true' }).shareDraftChangesByDefault, false);
+  // Research sharing starts on unless a session turns it off; a value that isn't a boolean keeps the default.
+  assert.equal(normalizeInterviewSettings().shareDraftChangesByDefault, true);
+  assert.equal(normalizeInterviewSettings({ shareDraftChangesByDefault: false }).shareDraftChangesByDefault, false);
+  assert.equal(normalizeInterviewSettings({ shareDraftChangesByDefault: 'false' }).shareDraftChangesByDefault, true);
   assert.equal(normalizeInterviewSettings().researchDetail, 'minimal');
   assert.equal(normalizeInterviewSettings({ researchDetail: 'full' }).researchDetail, 'full');
   assert.equal(normalizeInterviewSettings({ researchDetail: 'FULL' }).researchDetail, 'minimal');

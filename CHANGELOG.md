@@ -162,6 +162,7 @@ All notable changes to this project will be documented in this file.
 - Wherever a context file is added, on `/new`, the settings page, the session page or with a group conversation's transcript, **Visible to** is a dropdown of toggles like the question filter's tags: everyone in the session, admins only, or any mix of up to 20 of the session's groups, whose members may each read the file.
 - Admins see a **Group Agent** button in a session's context section. For now it only says the Group Agent is coming.
 - Voice mode's Interview and Group Conversation screens have a **Back** button to the two choices. It's off while an interview or recording is under way. Leaving an interview with unsaved work asks first, and Group Conversation finishes its recording and uploads before going back. The Interview screen also offers **Let your AI draft your answers** until there's something to review.
+- In an interview's review, **Share for research** sits beside **AI submission info**, with a **?** that says what it shares, and starts ticked: `interviewMode.shareDraftChangesByDefault` is now on unless a session turns it off. **AI submission info** no longer opens by itself to show the choice.
 
 ### Workers — requires redeployment
 

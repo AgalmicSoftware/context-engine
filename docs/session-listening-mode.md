@@ -121,7 +121,7 @@ Session `interviewMode` settings are available under **Participation** on `/new`
 | `followNewQuestions` | `false` | Check the public question catalog every 30 seconds during active recording and append qualifying additions to the interviewer's context. |
 | `suggestQuestions` | `false` | Propose up to three new respondent-grounded question drafts when preparing responses. Drafts may be freeform, rating, binary, multichoice or quadratic; multichoice and quadratic drafts include suggested options for review. |
 | `allowManualRefresh` | `true` | Enable **Regenerate interview opening** for session admins. |
-| `shareDraftChangesByDefault` | `false` | Initially check **Share AI draft changes for research** for new responses. Participants can change the checkbox before submission; saved per-question choices take precedence. |
+| `shareDraftChangesByDefault` | `true` | Initially check **Share for research**, beside **AI submission info**, for new responses. Participants can change the checkbox before submission; saved per-question choices take precedence. |
 | `researchDetail` | `minimal` | What a shared draft comparison keeps: `minimal` has no AI notes or drafted text; `full` adds them and drafts for skipped questions. `full` needs a Session Worker newer than 0.8.0. |
 | `hiddenDraftShare` | `0` | Share of each participant's AI-prefill drafts, up to 0.5, hidden until they answer, while they share draft changes. Above 0 it needs a Session Worker newer than 0.8.0. |
 | `showFidelityScore` | `false` | After someone submits AI-prefill drafts, show them privately how well their AI predicted them. Needs a Session Worker newer than 0.8.0. |
@@ -206,9 +206,10 @@ upload flow. Stopping alone never submits answers.
 The platform provenance option appears only when an AI augmentation packet was
 imported. When it is retained, submitted response metadata keeps the
 prompt/question-set revision and self-reported source platform/model. A separate
-**Share AI draft changes for research** checkbox appears when imported or
-voice-generated AI drafts or prediction revisions are being reviewed, and it is
-off unless the session's `shareDraftChangesByDefault` starts it on. The platform checkbox is labeled **Include platform/model
+**Share for research** checkbox, beside **AI submission info**, appears when
+imported or voice-generated AI drafts or prediction revisions are being
+reviewed, and it is on unless the session's `shareDraftChangesByDefault` turns
+it off. The platform checkbox is labeled **Include platform/model
 provenance**. An **AI prefill metadata** disclosure explains the included
 platform, revision, question-set hash, coverage
 counts, prediction fields, selected/unselected draft counts, and excluded

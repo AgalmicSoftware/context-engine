@@ -871,9 +871,9 @@ describe('sessionWizardWriteNormalization', () => {
       sessionId: '123e4567-e89b-12d3-a456-426614174000',
       workerUrl: 'https://worker.example',
     });
-    // An off default is left out so Workers before 0.7.0, which reject unknown keys, still accept it.
-    expect(Object.hasOwn(payload.interviewMode, 'shareDraftChangesByDefault')).toBe(shareDraftChangesByDefault);
-    if (shareDraftChangesByDefault) expect(payload.interviewMode.shareDraftChangesByDefault).toBe(true);
+    // The on default is left out so Workers before 0.7.0, which reject unknown keys, still accept it.
+    expect(Object.hasOwn(payload.interviewMode, 'shareDraftChangesByDefault')).toBe(!shareDraftChangesByDefault);
+    if (!shareDraftChangesByDefault) expect(payload.interviewMode.shareDraftChangesByDefault).toBe(false);
   });
 
   test.each(['minimal', 'full'] as const)('publishes the interview research detail (%s)', (researchDetail) => {
