@@ -11,7 +11,7 @@ All notable changes to this project will be documented in this file.
 - When a session page's Context section is open, its header has **Add** and **View**, as the Tool Explorer does. **Add** opens and closes the form to add a file, or an admin's **Manage files and links**, and keeps what you've typed while closed; **View**, with a **?** that explains it, replaces **Show my groups' files**.
 - In Safari, Group Conversation keeps its audio on the device, so a reload can recover the recording. Safari refused to store it, and as soon as recording began the page warned that the recording couldn't be recovered after a reload ("Error preparing Blob/File data to be stored in object store").
 - On a session page, the check after you submit answers opens your profile in that session, as do a group's admin and member links and the addresses on Results' response cards. They opened it in the default session, which doesn't hold those answers, or showed "Browser origin not allowed" on a site whose address that session's Worker doesn't accept.
-- The green check after you submit answers on a session page goes away after 10 seconds, keeping its place so nothing moves. Each new submit shows it again.
+- The green check after you submit answers on a session page goes away after 10 seconds, keeping its place so nothing moves; it waits while pointed at or focused. Each new submit shows it again.
 
 ## [0.9.0] - 2026-11-02
 

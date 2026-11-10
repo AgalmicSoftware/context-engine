@@ -490,6 +490,26 @@ describe('the check after a submit', () => {
     expect(check).toHaveClass('pileSubmitSuccessBadge', 'pileSubmitSuccessBadgeGone');
   });
 
+  it.each([
+    [
+      'pointed at',
+      (check: HTMLElement) => fireEvent.mouseEnter(check),
+      (check: HTMLElement) => fireEvent.mouseLeave(check),
+    ],
+    ['focused', (check: HTMLElement) => act(() => check.focus()), (check: HTMLElement) => act(() => check.blur())],
+  ])('stays while it is %s, and goes once left after its ten seconds', (_how, hold, release) => {
+    jest.useFakeTimers();
+    render(<PileSubmittedCheck href="/u/0xabc?session=alpha" />);
+    const check = screen.getByRole('link', { name: 'View your submitted responses' });
+    hold(check);
+    act(() => {
+      jest.advanceTimersByTime(10_000);
+    });
+    expect(check).not.toHaveClass('pileSubmitSuccessBadgeGone');
+    release(check);
+    expect(check).toHaveClass('pileSubmitSuccessBadgeGone');
+  });
+
   it('is a status without an address to open', () => {
     render(<PileSubmittedCheck href="" />);
     expect(screen.getByRole('status', { name: 'Submitted' })).toHaveAttribute(

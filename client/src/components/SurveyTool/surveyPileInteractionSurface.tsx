@@ -351,21 +351,32 @@ const renderPileActionControls = ({
   );
 };
 
-// The check after a submit goes away after ten seconds, keeping its place so nothing below it moves.
+// The check after a submit goes away after ten seconds, keeping its place so nothing below it moves. It waits
+// while pointed at or focused, so it never goes from under someone about to use it.
 const SUBMITTED_CHECK_MS = 10_000;
 
 /** The check after a submit: a link to the responder's profile, or a status when there's no address to open. */
 export const PileSubmittedCheck = ({ href }: { href: string }): React.ReactElement => {
-  const [gone, setGone] = React.useState(false);
+  const [expired, setExpired] = React.useState(false);
+  const [hovered, setHovered] = React.useState(false);
+  const [focused, setFocused] = React.useState(false);
   React.useEffect(() => {
-    const timer = setTimeout(() => setGone(true), SUBMITTED_CHECK_MS);
+    const timer = setTimeout(() => setExpired(true), SUBMITTED_CHECK_MS);
     return () => clearTimeout(timer);
   }, []);
+  const gone = expired && !hovered && !focused;
   const className = `${styles.pileSubmitSuccessBadge}${gone ? ` ${styles.pileSubmitSuccessBadgeGone}` : ''}`;
+  const hold = {
+    onMouseEnter: () => setHovered(true),
+    onMouseLeave: () => setHovered(false),
+    onFocus: () => setFocused(true),
+    onBlur: () => setFocused(false),
+  };
   const icon = <FontAwesomeIcon icon={faCheck} className={styles.pileSubmitSuccessIcon} />;
   return href ? (
     <a
       href={href}
+      {...hold}
       className={className}
       data-testid={E2E_TESTIDS.SURVEY_SUBMITTED_INDICATOR}
       aria-label="View your submitted responses"
@@ -375,6 +386,7 @@ export const PileSubmittedCheck = ({ href }: { href: string }): React.ReactEleme
     </a>
   ) : (
     <div
+      {...hold}
       className={className}
       data-testid={E2E_TESTIDS.SURVEY_SUBMITTED_INDICATOR}
       role="status"
