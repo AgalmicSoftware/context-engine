@@ -56,23 +56,53 @@ const ALLOWED_ATTR = ['href', 'src', 'alt', 'title', 'colspan', 'rowspan', 'open
 // FORCE_BODY keeps a style block that opens the page in the page.
 const CONFIG = { ALLOWED_TAGS, ALLOWED_ATTR, ALLOW_DATA_ATTR: false, ALLOW_ARIA_ATTR: false, FORCE_BODY: true };
 const IMPORT_RULE = /@import\b[^;]*;?/gi;
+// CSS this check can't read as the browser does, or that tests the site around
+// the page: an @-rule name with escapes reads as the rule it spells (`@\69mport`
+// is @import), and :host-context() and style queries match the site's own
+// elements and values, so a page could load a URL for each guess. A style block
+// that has any of them is dropped whole, and so is a style attribute.
+const HIDDEN_CSS = [
+  { pattern: /@[\w-]*\\/, label: 'escaped @-rules' },
+  { pattern: /:host-context\s*\(/i, label: ':host-context' },
+  { pattern: /\bstyle\s*\(/i, label: 'style queries' },
+];
 
 // Its own instance, so no other library's hooks or settings reach it.
 let purifier: ReturnType<typeof DOMPurify> | null = null;
-// Set by the hook while one sanitize call runs; sanitizing is synchronous.
-let importsRemoved = false;
+// Filled by the hooks while one sanitize call runs; sanitizing is synchronous.
+const cssRemoved = new Set<string>();
+const hiddenIn = (css: string) => HIDDEN_CSS.find(({ pattern }) => pattern.test(css));
+
+// @import would load CSS from elsewhere. Taking one out can join the text around
+// it into another, so it repeats until nothing changes.
+const cleanStyleBlock = (css: string) => {
+  let cleaned = css;
+  for (let before = ''; before !== cleaned;) {
+    before = cleaned;
+    cleaned = cleaned.replace(IMPORT_RULE, '');
+  }
+  if (cleaned !== css) cssRemoved.add('@import');
+  const hidden = hiddenIn(cleaned);
+  if (!hidden) return cleaned;
+  cssRemoved.add(hidden.label);
+  return '';
+};
+
 const getPurifier = () => {
   if (!purifier) {
     purifier = DOMPurify(window);
-    // @import would load CSS from elsewhere, so it goes from every style block.
     purifier.addHook('uponSanitizeElement', (node) => {
-      if (node.nodeName !== 'STYLE' || !node.textContent || !IMPORT_RULE.test(node.textContent)) return;
-      IMPORT_RULE.lastIndex = 0;
-      node.textContent = node.textContent.replace(IMPORT_RULE, '');
-      importsRemoved = true;
+      if (node.nodeName !== 'STYLE' || !node.textContent) return;
+      const cleaned = cleanStyleBlock(node.textContent);
+      if (cleaned !== node.textContent) node.textContent = cleaned;
+    });
+    purifier.addHook('uponSanitizeAttribute', (_node, data) => {
+      const hidden = data.attrName === 'style' ? hiddenIn(data.attrValue) : undefined;
+      if (!hidden) return;
+      cssRemoved.add(hidden.label);
+      data.attrValue = '';
     });
   }
-  IMPORT_RULE.lastIndex = 0;
   return purifier;
 };
 
@@ -118,10 +148,9 @@ const splitHead = (input: string) => {
 export const cleanContextHtml = (input: string): CleanContextHtml => {
   const purify = getPurifier();
   const { source, dropped } = splitHead(String(input ?? ''));
-  importsRemoved = false;
+  cssRemoved.clear();
   const fragment = purify.sanitize(source, { ...CONFIG, RETURN_DOM_FRAGMENT: true });
-  const removed = new Set<string>(dropped);
-  if (importsRemoved) removed.add('@import');
+  const removed = new Set<string>([...dropped, ...cssRemoved]);
   purify.removed.forEach((entry) => {
     if ('element' in entry && entry.element) {
       const name = entry.element.nodeName.toLowerCase();

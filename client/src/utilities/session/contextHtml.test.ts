@@ -50,6 +50,39 @@ describe('cleanContextHtml', () => {
     expect(cleaned.removed).not.toEqual(expect.arrayContaining(['class']));
   });
 
+  it('removes @import however it is nested, in one pass', () => {
+    const nested = [
+      '<style>@imp@import ;ort url(https://example.org/a.css); p { color: teal; }</style>',
+      '<style>@imp@imp@import ;ort ;ort url(https://example.org/a.css); p { color: teal; }</style>',
+    ];
+    for (const page of nested) {
+      const cleaned = cleanContextHtml(page);
+      expect(cleaned).toEqual({ html: '<style> p { color: teal; }</style>', removed: ['@import'] });
+      expect(cleanContextHtml(cleaned.html)).toEqual({ html: cleaned.html, removed: [] });
+    }
+  });
+
+  it('drops CSS it cannot read as the browser does, or that tests the site around the page', () => {
+    const cases = [
+      ['<style>@\\69mport url(https://example.org/a.css); p { color: teal; }</style>', 'escaped @-rules'],
+      ['<style>@i\\mport url(https://example.org/a.css);</style>', 'escaped @-rules'],
+      [
+        '<style>:host-context([data-ce-color-vision^="d"]) p { background: url(https://example.org/d); }</style>',
+        ':host-context',
+      ],
+      [
+        '<style>@container style(--ce-status-success: #1a7f37) { p { background: url(https://example.org/s); } }</style>',
+        'style queries',
+      ],
+    ];
+    for (const [page, label] of cases) {
+      expect(cleanContextHtml(`${page}<p>Hi</p>`)).toEqual({ html: '<style></style><p>Hi</p>', removed: [label] });
+    }
+    const attribute =
+      '<p style="background: if(style(--ce-theme: dark): url(https://example.org/t); else: none)">Hi</p>';
+    expect(cleanContextHtml(attribute)).toEqual({ html: '<p style="">Hi</p>', removed: ['style queries'] });
+  });
+
   it("keeps a whole document's style blocks and reports what else its head would have loaded or run", () => {
     const page =
       '<!doctype html><html><head><title>Atlas</title><style>h2 { color: teal; }</style>' +

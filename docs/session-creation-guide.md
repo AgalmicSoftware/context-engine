@@ -500,7 +500,9 @@ The core session metadata:
   to 6 paragraphs and 8 links), or one uploaded HTML file of up to 20,000
   characters, under the same title. The file keeps its own CSS (style blocks,
   and style and class attributes) but loses its scripts, event handlers,
-  frames, forms and `@import` before it is saved, and a preview shows the
+  frames, forms and `@import` before it is saved, along with any style block
+  or attribute that tests the site around the page (`:host-context`, style
+  queries) or escapes an @-rule's name. A preview shows the
   result and what was removed; the session page cleans it again each time it
   shows it. The page renders in a box of its own: its CSS styles only the page
   and can't place anything outside the box. It can use the site's colours as
