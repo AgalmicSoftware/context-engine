@@ -30170,7 +30170,7 @@ var init_workerGroupUrl = __esm({
 });
 
 // shared/interviewSettings.mjs
-var GROUP_SUGGESTION_DATA, GROUP_SUGGESTION_DATA_KINDS, DEFAULT_INTERVIEW_SETTINGS, MAX_HIDDEN_DRAFT_SHARE, MAX_FIDELITY_MINIMUM_PEOPLE, normalizeInterviewSettings, validInterviewSettings, hasInterviewQuestionGrowth;
+var GROUP_SUGGESTION_DATA, GROUP_SUGGESTION_NEVER, GROUP_SUGGESTION_DATA_KINDS, DEFAULT_INTERVIEW_SETTINGS, MAX_HIDDEN_DRAFT_SHARE, MAX_FIDELITY_MINIMUM_PEOPLE, normalizeInterviewSettings, validInterviewSettings, hasInterviewQuestionGrowth;
 var init_interviewSettings = __esm({
   "shared/interviewSettings.mjs"() {
     GROUP_SUGGESTION_DATA = Object.freeze({
@@ -30179,6 +30179,7 @@ var init_interviewSettings = __esm({
       work: "their work, studies and roles",
       interests: "their interests, causes and communities"
     });
+    GROUP_SUGGESTION_NEVER = "their health, disability, religion, ethnicity, sexuality, gender identity, age, family life, or party or union membership";
     GROUP_SUGGESTION_DATA_KINDS = Object.keys(GROUP_SUGGESTION_DATA);
     DEFAULT_INTERVIEW_SETTINGS = Object.freeze({
       openingMode: "auto",
@@ -105823,8 +105824,9 @@ var buildInterviewBriefDocument = ({
   questions,
   ...groups?.length ? {
     groups: groups.map(catalogGroup),
-    // What the session lets an AI base a suggestion on, in words.
-    groupSuggestionData: (groupSuggestionData || []).map((kind) => GROUP_SUGGESTION_DATA[kind])
+    // What the session lets an AI base a suggestion on, in words, and what it never may.
+    groupSuggestionData: (groupSuggestionData || []).map((kind) => GROUP_SUGGESTION_DATA[kind]),
+    groupSuggestionNever: GROUP_SUGGESTION_NEVER
   } : {}
 });
 var dispatchInterviewBriefRequest = async ({

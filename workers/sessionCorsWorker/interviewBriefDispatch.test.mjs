@@ -271,6 +271,8 @@ test('the catalog lists groups to join only when the session joins matching grou
     'their work, studies and roles',
     'their interests, causes and communities',
   ]);
+  // What no AI may go on, whatever the session allows.
+  assert.match(on.groupSuggestionNever, /^their health, disability, religion, .* or party or union membership$/);
   // A kind no longer offered, such as sensitive details, is never passed on.
   const chosen = await run({ joinMatchingGroups: true, groupSuggestionData: ['sensitive', 'town'] }, groups);
   assert.deepEqual(chosen.groupSuggestionData, [

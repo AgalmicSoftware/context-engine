@@ -2,7 +2,7 @@ import { readCurrentSessionConfig } from './sessionConfigAuthority.js';
 import { resolveAnonymousIpDailyLimit } from './anonymousRateLimitPolicy.js';
 import { loadPublicInterviewQuestions as loadPublicInterviewQuestionsBoundary } from './interviewQuestionCatalog.js';
 import { listSelfJoinableWorkerGroupsForVisitor as listSelfJoinableWorkerGroupsForVisitorBoundary } from './workerGroups.js';
-import { GROUP_SUGGESTION_DATA, normalizeInterviewSettings } from '../../shared/interviewSettings.mjs';
+import { GROUP_SUGGESTION_DATA, GROUP_SUGGESTION_NEVER, normalizeInterviewSettings } from '../../shared/interviewSettings.mjs';
 
 // v6 asks for confidence as the chance the person keeps the answer; hashes follow v5.
 export const INTERVIEW_PROMPT_VERSION = 'ce-interview-brief-v6';
@@ -135,8 +135,9 @@ export const buildInterviewBriefDocument = ({
   ...(groups?.length
     ? {
         groups: groups.map(catalogGroup),
-        // What the session lets an AI base a suggestion on, in words.
+        // What the session lets an AI base a suggestion on, in words, and what it never may.
         groupSuggestionData: (groupSuggestionData || []).map((kind) => GROUP_SUGGESTION_DATA[kind]),
+        groupSuggestionNever: GROUP_SUGGESTION_NEVER,
       }
     : {}),
 });
