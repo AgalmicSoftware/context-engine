@@ -7,7 +7,9 @@ import {
   checkContextFile,
   readContextPdf,
   uploadContextFile,
+  type ContextFileAccess,
 } from '../../../utilities/docLibrary/contextSources';
+import ContextAccessPicker from './ContextAccessPicker';
 import { CONTEXT_ANALYZE_HELP, FILE_ACCESS_HELP } from './ContextSourcesPanel';
 import { SetupCheck, SetupField } from './SetupPrimitives';
 import { asList, asRecord, text, type SetupDraft } from './setupSectionTypes';
@@ -36,13 +38,19 @@ export const usePendingContextFiles = (): PendingContextFiles => {
   return { files, set };
 };
 
-type ContextFileEntry = { name: string; adminsOnly: boolean; groupId?: string };
+type ContextFileEntry = { name: string; adminsOnly: boolean; groupIds?: string[] };
 export const readContextFiles = (draft: SetupDraft): ContextFileEntry[] =>
   asList(draft.contextFiles)
     .map((value) => {
       const entry = asRecord(value);
-      const groupId = text(entry.groupId).trim();
-      return { name: text(entry.name).trim(), adminsOnly: entry.adminsOnly === true, ...(groupId ? { groupId } : {}) };
+      const groupIds = asList(entry.groupIds)
+        .map((groupId) => text(groupId).trim())
+        .filter(Boolean);
+      return {
+        name: text(entry.name).trim(),
+        adminsOnly: entry.adminsOnly === true,
+        ...(groupIds.length ? { groupIds } : {}),
+      };
     })
     .filter((entry) => entry.name);
 
@@ -51,18 +59,22 @@ export type SetupGroupOption = { groupId: string; label: string };
 
 const FILE_VISIBILITY_HELP = `${FILE_ACCESS_HELP} Groups set up under Access and identity are made at Create, before these files are added.`;
 
-// A file locked to a group that is no longer set up stays with admins, never wider.
-const visibilityOf = (entry: ContextFileEntry, groups: SetupGroupOption[]): string => {
-  if (entry.groupId)
-    return groups.some((group) => group.groupId === entry.groupId) ? `group:${entry.groupId}` : 'admins';
-  return entry.adminsOnly ? 'admins' : 'everyone';
+// What a file's Visible to shows. One locked to groups no longer set up stays with admins, never wider.
+const accessOf = (entry: ContextFileEntry, groups: SetupGroupOption[]): ContextFileAccess => {
+  if (!entry.groupIds?.length) return entry.adminsOnly ? { adminsOnly: true } : {};
+  const known = entry.groupIds.filter((groupId) => groups.some((group) => group.groupId === groupId));
+  return known.length ? { groupIds: known } : { adminsOnly: true };
 };
 // A locked file is marked admins-only too, so whatever keeps only that flag, such
 // as a template, keeps the file narrow.
-const withVisibility = ({ groupId: _previous, ...entry }: ContextFileEntry, value: string): ContextFileEntry =>
-  value.startsWith('group:')
-    ? { ...entry, adminsOnly: true, groupId: value.slice('group:'.length) }
-    : { ...entry, adminsOnly: value === 'admins' };
+const withAccess = (entry: ContextFileEntry, access: ContextFileAccess): ContextFileEntry => {
+  const groupIds = access.adminsOnly ? [] : access.groupIds || [];
+  return {
+    name: entry.name,
+    adminsOnly: !!access.adminsOnly || groupIds.length > 0,
+    ...(groupIds.length ? { groupIds } : {}),
+  };
+};
 
 const isPdf = (file: File) => resolveContextFileType(file) === CONTEXT_FILE_TYPES.pdf;
 
@@ -78,7 +90,7 @@ type FilesProps = {
 // or a reload) asks for the file again.
 export const SetupContextFiles = ({ draft, onChange, pending, groups = [] }: FilesProps) => {
   const entries = readContextFiles(draft);
-  const named = groups.filter((group) => group.label.trim());
+  const named = groups.flatMap(({ groupId, label }) => (label.trim() ? [{ groupId, label: label.trim() }] : []));
   const [problem, setProblem] = useState('');
   const save = (next: ContextFileEntry[]) => onChange(['contextFiles'], next);
   const attach = (file: File | undefined, replacing = '') => {
@@ -112,27 +124,16 @@ export const SetupContextFiles = ({ draft, onChange, pending, groups = [] }: Fil
                 </SetupField>
               )}
               <SetupField id={`ce-setup-context-file-access-${index}`} label="Visible to" help={FILE_VISIBILITY_HELP}>
-                <Input
+                <ContextAccessPicker
                   id={`ce-setup-context-file-access-${index}`}
-                  type="select"
-                  value={visibilityOf(entry, named)}
+                  value={accessOf(entry, named)}
+                  groups={named}
+                  allowAdminsOnly
                   data-testid="ce-setup-context-file-access"
-                  onChange={(event) =>
-                    save(
-                      entries.map((other) =>
-                        other.name === entry.name ? withVisibility(other, event.target.value) : other,
-                      ),
-                    )
+                  onChange={(access) =>
+                    save(entries.map((other) => (other.name === entry.name ? withAccess(other, access) : other)))
                   }
-                >
-                  <option value="everyone">Everyone in the session</option>
-                  <option value="admins">Admins only</option>
-                  {named.map((group) => (
-                    <option key={group.groupId} value={`group:${group.groupId}`}>
-                      {group.label.trim()}
-                    </option>
-                  ))}
-                </Input>
+                />
               </SetupField>
               {chosen && isPdf(chosen.file) ? (
                 <SetupCheck
@@ -227,10 +228,11 @@ export const SetupContextPublisher = ({
     for (const entry of entries) {
       const chosen = pending.files[entry.name];
       setStatus(`Adding ${entry.name}…`);
-      // A file meant for a group that Create didn't make stays with admins, never wider.
-      const access = entry.groupId
-        ? made.has(entry.groupId)
-          ? { groupId: entry.groupId }
+      // A file meant for groups Create didn't make goes to those it made, or stays with admins, never wider.
+      const lockedTo = (entry.groupIds || []).filter((groupId) => made.has(groupId));
+      const access = entry.groupIds?.length
+        ? lockedTo.length
+          ? { groupIds: lockedTo }
           : { adminsOnly: true }
         : { adminsOnly: entry.adminsOnly };
       try {

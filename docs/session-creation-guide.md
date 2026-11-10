@@ -510,8 +510,9 @@ The core session metadata:
   `--ce-context-link`, `--ce-context-focus`, `--ce-context-border` and
   `--ce-context-surface`. Either form must not contain secrets, and the
   session's AI reads its words. The Context section also takes
-  files (PDF, Markdown, text, CSV, JSON), each for everyone or for admins only;
-  they are added after **Create**, when PDFs can be read by the session's AI and
+  files (PDF, Markdown, text, CSV, JSON), each for everyone, for admins only, or
+  for any of the groups set up under Access and identity, chosen in its
+  **Visible to** dropdown; they are added after **Create**, when PDFs can be read by the session's AI and
   the links' pages read for it. See [Session context](session-context-sources.md).
 - **Colors** in Basics: `Context Engine`, `Ocean`, or `Amber`. This controls
   only documented session accents/chrome and does not change the app theme.

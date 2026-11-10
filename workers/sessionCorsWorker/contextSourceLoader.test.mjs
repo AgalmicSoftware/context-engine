@@ -26,7 +26,7 @@ const seeded = async (options = {}) => {
     name: 'group.txt',
     type: 'text/plain',
     bytes: encode('SECRET notes for one group'),
-    extra: { accessConditions: JSON.stringify(groupLockedAccess('salon')) },
+    extra: { accessConditions: JSON.stringify(groupLockedAccess(['salon'])) },
   }));
   await idOf(await h.context({ action: 'add-link', url: 'https://example.org/essay' }));
   const deck = await idOf(await h.uploadFile({ name: 'deck.pdf' }));

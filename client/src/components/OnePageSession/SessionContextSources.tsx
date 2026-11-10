@@ -3,6 +3,7 @@ import { UncontrolledTooltip } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faExternalLinkAlt, faFileAlt, faQuestionCircle } from '@fortawesome/free-solid-svg-icons';
 
+import { contextGroupsLabel } from '../Sessions/setup/ContextAccessPicker';
 import ContextSourcesPanel from '../Sessions/setup/ContextSourcesPanel';
 import SessionContextAddFile from './SessionContextAddFile';
 import setupStyles from '../Sessions/setup/SessionSetup.module.scss';
@@ -62,7 +63,6 @@ const SessionContextSources = ({ sessionSlug, sessionConfig, account, list, page
                       kind: 'file',
                       name: source.title,
                     });
-              const group = groups.find(({ groupId }) => groupId === source.lockedGroupId);
               const adder = contextAdderLabel(source, sessionConfig, account);
               return (
                 <span key={source.id} className={styles.sessionContextItem}>
@@ -72,8 +72,10 @@ const SessionContextSources = ({ sessionSlug, sessionConfig, account, list, page
                     {isAdmin && source.adminsOnly ? (
                       <span className={styles.sessionContextBadge}>Admins only</span>
                     ) : null}
-                    {source.lockedGroupId ? (
-                      <span className={styles.sessionContextBadge}>{group?.label || 'One group'}</span>
+                    {source.lockedGroupIds.length ? (
+                      <span className={styles.sessionContextBadge}>
+                        {contextGroupsLabel(source.lockedGroupIds, groups)}
+                      </span>
                     ) : null}
                   </a>
                   {adder ? <span className={styles.sessionContextAdder}>Added by {adder}</span> : null}

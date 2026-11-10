@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { participantsMayAddContext } from '@ce-shared/sessionContextSources.mjs';
 import { readLinkedWorkerGroupId } from '../../domains/worker/workerGroupAutoJoin';
 import { recordingOwner, type RecordingOptions } from '../../utilities/audio/recordingOwner';
@@ -7,11 +7,12 @@ import {
   uploadContextFile,
   workerAcceptsParticipantContext,
   workerSupportsContextSources,
+  type ContextFileAccess,
 } from '../../utilities/docLibrary/contextSources';
 import { useContextGroups } from '../../utilities/docLibrary/useContextGroups';
 import { supportsContextSources } from '../../utilities/docLibrary/useSessionContextSources';
 import { isConfiguredAdmin } from '../../utilities/storage/storageClient';
-import { SESSION_WIDE_ACCESS, contextAccessOf, contextGroupChoice } from '../Sessions/setup/ContextAccessSelect';
+import { contextAccessKey } from '../Sessions/setup/ContextAccessPicker';
 
 const transcriptFileName = () => {
   const now = new Date();
@@ -37,7 +38,7 @@ const NOTHING_UPLOADED = { text: '', id: '', choice: '', owner: '' };
 export function useTranscriptContextUpload({ sessionSlug, sessionConfig, context, enabled }: Input) {
   const [available, setAvailable] = useState(false);
   const [chosen, setChosen] = useState(false);
-  const [access, setAccess] = useState('');
+  const [access, setAccess] = useState<ContextFileAccess | null>(null);
   const [status, setStatus] = useState('');
   const [failed, setFailed] = useState(false);
   const account = (context as { account?: unknown } | null)?.account;
@@ -65,7 +66,9 @@ export function useTranscriptContextUpload({ sessionSlug, sessionConfig, context
   }, [mayAdd, isAdmin, sessionSlug]);
 
   const linkedGroup = readLinkedWorkerGroupId(sessionSlug);
-  const choice = access || (linkedGroup ? contextGroupChoice(linkedGroup) : SESSION_WIDE_ACCESS);
+  // Until someone chooses, the group the page's link joined, or everyone in the session.
+  const chosenAccess = useMemo(() => access || (linkedGroup ? { groupIds: [linkedGroup] } : {}), [access, linkedGroup]);
+  const choice = contextAccessKey(chosenAccess);
 
   const upload = useCallback(
     (transcript: string) => {
@@ -89,7 +92,7 @@ export function useTranscriptContextUpload({ sessionSlug, sessionConfig, context
           const id = await uploadContextFile(
             {
               file: new File([text], transcriptFileName(), { type: 'text/plain' }),
-              ...contextAccessOf(choice),
+              ...chosenAccess,
             },
             target,
           );
@@ -114,15 +117,15 @@ export function useTranscriptContextUpload({ sessionSlug, sessionConfig, context
       });
       return pending.current;
     },
-    [choice, chosen],
+    [chosenAccess, choice, chosen],
   );
 
   return {
     available,
     chosen,
     setChosen,
-    choice,
-    setChoice: setAccess,
+    access: chosenAccess,
+    setAccess,
     groups,
     allowAdminsOnly: isAdmin,
     status,

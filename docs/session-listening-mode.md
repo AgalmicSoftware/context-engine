@@ -449,7 +449,7 @@ Each speaker's label is bold and has its own colour in the transcript
 
 The **Add transcript to context** box sits on the **Submit questions** line and is off
 by default. Ticked, it asks who can read the transcript: anyone who can see the session,
-or one group, starting at the group the page's link joined. Submitting uploads the
+or some of its groups, starting with the group the page's link joined. Submitting uploads the
 transcript as a text file through the same path as any
 [context file](session-context-sources.md), after the questions, so the person has
 signed in by then. A later submit with more of the same conversation, or a new choice

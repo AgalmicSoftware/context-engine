@@ -6,7 +6,7 @@ import {
   CONTEXT_SOURCE_LIMITS,
   resolveContextFileType,
 } from '@ce-shared/sessionContextSources.mjs';
-import ContextAccessSelect, { SESSION_WIDE_ACCESS, contextAccessOf } from './ContextAccessSelect';
+import ContextAccessPicker, { contextGroupsLabel } from './ContextAccessPicker';
 import {
   addContextLink,
   checkContextFile,
@@ -15,6 +15,7 @@ import {
   removeContextSource,
   uploadContextFile,
   workerSupportsContextSources,
+  type ContextFileAccess,
   type ContextSource,
 } from '../../../utilities/docLibrary/contextSources';
 import { useContextGroups, type ContextGroup } from '../../../utilities/docLibrary/useContextGroups';
@@ -28,7 +29,7 @@ import styles from './SessionSetup.module.scss';
 export const CONTEXT_PRIVACY_HELP =
   'Only session admins can open it, and the session’s AI uses it only when it works for an admin. Everyone else never receives it.';
 export const FILE_ACCESS_HELP =
-  'A locked file is for that group’s members and the session’s admins; an admins-only file is for admins. The session’s AI uses a file only when it works for someone who may read it.';
+  'A file locked to groups is for their members and the session’s admins; an admins-only file is for admins. The session’s AI uses a file only when it works for someone who may read it.';
 export const CONTEXT_ANALYZE_HELP =
   'Sends the PDF to the session’s own AI provider with the session’s key. The text it returns is saved with the PDF. Unticked, the PDF is kept but gives the AI no text.';
 const LINK_HELP =
@@ -49,8 +50,8 @@ export const describeContextSource = (
   [
     source.adminsOnly
       ? 'Admins only'
-      : source.lockedGroupId
-        ? groups.find(({ groupId }) => groupId === source.lockedGroupId)?.label || 'One group'
+      : source.lockedGroupIds.length
+        ? contextGroupsLabel(source.lockedGroupIds, groups)
         : 'Everyone in the session',
     ...(adder ? [`Added by ${adder}`] : []),
     source.kind === 'link'
@@ -86,7 +87,7 @@ const ContextSourcesPanel = ({ sessionSlug, sessionConfig, account, pageLinks = 
   const [linkTitle, setLinkTitle] = useState('');
   const [linkPrivate, setLinkPrivate] = useState(false);
   const [file, setFile] = useState<File | null>(null);
-  const [fileAccess, setFileAccess] = useState(SESSION_WIDE_ACCESS);
+  const [fileAccess, setFileAccess] = useState<ContextFileAccess>({});
   const groups = useContextGroups({ sessionSlug, sessionConfig, account });
   const [analyze, setAnalyze] = useState(true);
   const [fileKey, setFileKey] = useState(0);
@@ -290,8 +291,8 @@ const ContextSourcesPanel = ({ sessionSlug, sessionConfig, account, pageLinks = 
         />
       </SetupField>
       {fileProblem ? <p className={styles.errorText}>{fileProblem}</p> : null}
-      <SetupField id="ce-context-file-access" label="Who can read the file" help={FILE_ACCESS_HELP}>
-        <ContextAccessSelect
+      <SetupField id="ce-context-file-access" label="Visible to" help={FILE_ACCESS_HELP}>
+        <ContextAccessPicker
           id="ce-context-file-access"
           value={fileAccess}
           groups={groups}
@@ -319,7 +320,7 @@ const ContextSourcesPanel = ({ sessionSlug, sessionConfig, account, pageLinks = 
           onClick={() =>
             void run('Adding the file…', async () => {
               if (!file) return '';
-              const id = await uploadContextFile({ file, ...contextAccessOf(fileAccess) }, options);
+              const id = await uploadContextFile({ file, ...fileAccess }, options);
               setFile(null);
               setFileKey((key) => key + 1);
               if (!(analyze && fileIsPdf)) return 'File added.';

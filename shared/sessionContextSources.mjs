@@ -30,6 +30,8 @@ export const CONTEXT_SOURCE_LIMITS = Object.freeze({
   titleChars: 120,
   // A link is also a storage tag, and tag values stop at 1,024 characters.
   urlChars: 1000,
+  // The groups one item may be locked to; reading it checks each in turn.
+  lockedGroups: 20,
 });
 
 // File types a context source may have; others (Office files, images) are refused.
@@ -54,12 +56,18 @@ const isRecord = (value) => !!value && typeof value === 'object' && !Array.isArr
 /** Everyone the session admits may add files, unless an admin limits it to admins. */
 export const participantsMayAddContext = (config) => config?.contextAdditionPolicy !== 'admin_only';
 
-/** The rule for an item locked to one group: its members may read it, and admins, who may have to remove it. */
-export const groupLockedAccess = (groupId) => ({
+const groupIdList = (groupIds) =>
+  [...new Set((Array.isArray(groupIds) ? groupIds : []).map((id) => text(id).toLowerCase()).filter(Boolean))].sort();
+
+/**
+ * The rule for an item locked to some of the session's groups: the members of any
+ * of them may read it, and admins, who may have to remove it.
+ */
+export const groupLockedAccess = (groupIds) => ({
   match: 'any',
   conditions: [
     { kind: 'worker_role', role: 'admin' },
-    { kind: 'worker_group', groupIds: [text(groupId).toLowerCase()] },
+    { kind: 'worker_group', groupIds: groupIdList(groupIds) },
   ],
 });
 
@@ -86,17 +94,18 @@ export const isAdminsOnlyAccess = (accessConditions) => {
   );
 };
 
-/** The group an item is locked to, or '' for any other rule, so the privacy levels stay unambiguous. */
-export const lockedGroupOf = (accessConditions) => {
-  if (!isRecord(accessConditions) || text(accessConditions.match).toLowerCase() !== 'any') return '';
+/** The groups an item is locked to, or none for any other rule, so the privacy levels stay unambiguous. */
+export const lockedGroupsOf = (accessConditions) => {
+  if (!isRecord(accessConditions) || text(accessConditions.match).toLowerCase() !== 'any') return [];
   const conditions = Array.isArray(accessConditions.conditions) ? accessConditions.conditions : [];
   const kindOf = (condition) => (isRecord(condition) ? text(condition.kind).toLowerCase() : '');
   const role = conditions.find((condition) => kindOf(condition) === 'worker_role');
   const group = conditions.find((condition) => kindOf(condition) === 'worker_group');
-  const groupIds = Array.isArray(group?.groupIds) ? group.groupIds : [];
-  return conditions.length === 2 && role && text(role.role).toLowerCase() === 'admin' && groupIds.length === 1
-    ? text(groupIds[0]).toLowerCase()
-    : '';
+  const groupIds = Array.isArray(group?.groupIds) ? groupIdList(group.groupIds) : [];
+  return conditions.length === 2 && role && text(role.role).toLowerCase() === 'admin' &&
+    groupIds.length > 0 && groupIds.length <= CONTEXT_SOURCE_LIMITS.lockedGroups
+    ? groupIds
+    : [];
 };
 
 /** A file's content type from its type or name, when context sources accept it; else ''. */

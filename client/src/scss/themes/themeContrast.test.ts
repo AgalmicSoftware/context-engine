@@ -743,6 +743,21 @@ describe('bundled app-theme contrast', () => {
     expect(ratios.filter(([, value]) => value < 4.5)).toEqual([]);
   });
 
+  // A file's Visible to paints its own fills, so it reads on any panel; a chosen toggle swaps fill and text.
+  test.each(registry.themes.map(({ id }) => id))('%s keeps a file’s Visible to readable', (themeId) => {
+    const values = themeValues(css, themeId);
+    const paint = painter(values);
+    const pickerCss = compileModule('components/Sessions/setup/ContextAccessPicker.module.scss');
+    const canvas = parseColor(values.canvas);
+    const ratio = (selector: string) => {
+      const rule = moduleRule(pickerCss, selector);
+      const fill = composite(paint(rule.background), canvas);
+      return Number(contrastRatio(composite(paint(rule.color), fill), fill).toFixed(2));
+    };
+    const ratios = ['.toggle', '.choice', '.chosen'].map((selector) => [selector, ratio(selector)] as const);
+    expect(ratios.filter(([, value]) => value < 4.5)).toEqual([]);
+  });
+
   test.each(registry.themes.map(({ id }) => id))('%s keeps small binary answer labels readable', (themeId) => {
     const values = themeValues(css, themeId);
     for (const stance of ['agree', 'disagree']) {

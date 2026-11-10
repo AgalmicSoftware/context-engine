@@ -67,11 +67,11 @@ describe('adding a transcript to context', () => {
   it('starts at the group this page’s link is for, and uploads the transcript as a text file with that lock', async () => {
     window.history.replaceState({}, '', '/session/salon?joinGroup=salon');
     const { result } = await mount();
-    expect(result.current.choice).toBe('group:salon');
+    expect(result.current.access).toEqual({ groupIds: ['salon'] });
     act(() => result.current.setChosen(true));
     await act(() => result.current.upload(' Person 1: Words. '));
     const [args, options] = jest.mocked(uploadContextFile).mock.calls[0];
-    expect(args.groupId).toBe('salon');
+    expect(args.groupIds).toEqual(['salon']);
     expect(args.file.type).toBe('text/plain');
     expect(args.file.name).toMatch(/^Group conversation \d{4}-\d{2}-\d{2} \d{2}-\d{2}\.txt$/);
     const text = await new Promise((resolve) => {
@@ -86,14 +86,14 @@ describe('adding a transcript to context', () => {
 
   it('leaves it for the session when there’s no linked group, or when chosen', async () => {
     const { result } = await mount();
-    expect(result.current.choice).toBe('session');
+    expect(result.current.access).toEqual({});
     act(() => {
       result.current.setChosen(true);
-      result.current.setChoice('session');
+      result.current.setAccess({});
     });
     await act(() => result.current.upload('Person 1: Words.'));
     const [args] = jest.mocked(uploadContextFile).mock.calls[0];
-    expect(args).not.toHaveProperty('groupId');
+    expect(args).not.toHaveProperty('groupIds');
     expect(args).not.toHaveProperty('adminsOnly');
   });
 
@@ -126,11 +126,11 @@ describe('adding a transcript to context', () => {
     const { result } = await mount();
     act(() => result.current.setChosen(true));
     await act(() => result.current.upload('Person 1: Words.'));
-    act(() => result.current.setChoice('group:salon'));
+    act(() => result.current.setAccess({ groupIds: ['salon'] }));
     jest.mocked(uploadContextFile).mockResolvedValueOnce('stored-2');
     jest.mocked(removeContextSource).mockRejectedValueOnce(new Error('no'));
     await act(() => result.current.upload('Person 1: Words.'));
-    expect(jest.mocked(uploadContextFile).mock.calls[1][0].groupId).toBe('salon');
+    expect(jest.mocked(uploadContextFile).mock.calls[1][0].groupIds).toEqual(['salon']);
     expect(removeContextSource).toHaveBeenCalledWith(expect.objectContaining({ id: 'stored-1' }), expect.anything());
     expect(result.current.status).toBe('Transcript added to context, but its earlier copy is still there.');
   });

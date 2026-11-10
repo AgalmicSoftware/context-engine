@@ -36,8 +36,8 @@ export type ContextSource = {
   size: number;
   createdAt: string;
   adminsOnly: boolean;
-  /** The group it is locked to, or ''. */
-  lockedGroupId: string;
+  /** The groups it is locked to; empty when it isn't. */
+  lockedGroupIds: string[];
   /** The address that added it. */
   addedBy: string;
   /** When the Worker last read a link's page. */
@@ -107,7 +107,9 @@ const toSource = (item: unknown): (ContextSource & { role: string; derivedFrom: 
     size: Number(metadata.size) || 0,
     createdAt: toStr(metadata.createdAt),
     adminsOnly: metadata.adminsOnly === true,
-    lockedGroupId: toStr(metadata.lockedGroupId),
+    lockedGroupIds: (Array.isArray(metadata.lockedGroupIds) ? metadata.lockedGroupIds : [])
+      .map((groupId: unknown) => toStr(groupId).trim().toLowerCase())
+      .filter(Boolean),
     addedBy: toStr(metadata.addedBy).toLowerCase(),
     fetchedAt: contextTagValue(tags, CONTEXT_TAGS.fetchedAt),
     reading:
@@ -213,7 +215,7 @@ export const contextAdderLabel = (
 export const templateContextFiles = (sources: ContextSource[]): Array<{ name: string; adminsOnly: boolean }> =>
   sources
     .filter((source) => source.kind === 'file')
-    .map((source) => ({ name: source.title, adminsOnly: source.adminsOnly || !!source.lockedGroupId }));
+    .map((source) => ({ name: source.title, adminsOnly: source.adminsOnly || source.lockedGroupIds.length > 0 }));
 
 const postContextAction = async (body: UnknownRecord, options: ContextSourceOptions): Promise<UnknownRecord> => {
   const baseUrl = await workerBaseUrl(options);
@@ -272,12 +274,12 @@ export const checkContextFile = (file: { name?: string; type?: string; size?: nu
     : '';
 };
 
-/** Who may read a file: anyone with access to the session, admins alone, or one group (and admins). */
-export type ContextFileAccess = { adminsOnly?: boolean; groupId?: string };
+/** Who may read a file: anyone with access to the session, admins alone, or the members of some groups (and admins). */
+export type ContextFileAccess = { adminsOnly?: boolean; groupIds?: string[] };
 
 /** Uploads a file as a context source and returns its storage id. */
 export const uploadContextFile = async (
-  { file, adminsOnly = false, groupId = '' }: { file: File } & ContextFileAccess,
+  { file, adminsOnly = false, groupIds = [] }: { file: File } & ContextFileAccess,
   options: ContextSourceOptions,
 ): Promise<string> => {
   const problem = checkContextFile(file);
@@ -297,8 +299,8 @@ export const uploadContextFile = async (
     ],
     ...(adminsOnly
       ? { accessConditions: ADMINS_ONLY_ACCESS }
-      : groupId
-        ? { accessConditions: groupLockedAccess(groupId) }
+      : groupIds.length
+        ? { accessConditions: groupLockedAccess(groupIds) }
         : {}),
   });
   return toStr(result.id);

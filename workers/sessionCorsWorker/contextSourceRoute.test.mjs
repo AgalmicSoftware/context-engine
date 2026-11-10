@@ -43,6 +43,8 @@ test('context is a readable PDF or text file, and links and AI text come only fr
     [{ extra: { accessConditions: JSON.stringify({ match: 'all', conditions: [{ kind: 'worker_role', role: 'admin' }, { kind: 'worker_group', groupIds: ['salon'] }] }) } }, 400, 'context_policy_unsupported'],
     [{ extra: { accessConditions: JSON.stringify({ match: 'any', conditions: [{ kind: 'worker_group', groupIds: ['salon'] }] }) } }, 400, 'context_policy_unsupported'],
     [{ extra: { accessConditions: JSON.stringify({ match: 'any', conditions: [{ kind: 'worker_role', role: 'reviewer' }] }) } }, 400, 'context_policy_unsupported'],
+    // A lock checks each group as someone reads, so it names at most 20.
+    [{ extra: { accessConditions: JSON.stringify(groupLockedAccess(Array.from({ length: 21 }, (_, index) => `group-${index}`))) } }, 400, 'context_policy_unsupported'],
     // Links and AI-read text are written by the context route alone.
     [{ role: 'context-text', name: 'deck.txt', type: 'text/plain', bytes: new TextEncoder().encode('forged reading') }, 400, 'context_route_required'],
   ]) {
@@ -86,25 +88,28 @@ test('an admins-only item is refused to participants on read and list; admins re
   }
 });
 
-test('a file locked to a group reaches its members and admins, and no one else', async () => {
+test('a file locked to some groups reaches the members of any of them and admins, and no one else', async () => {
   const MEMBER = `0x${'3'.repeat(40)}`;
+  const HOST = `0x${'4'.repeat(40)}`;
+  const groupsOf = { [MEMBER]: 'salon', [HOST]: 'hosts' };
   for (const encryption of ['none', 'worker_envelope']) {
     const h = harness({ encryption });
     h.deps.isWorkerGroupMember = async ({ groupId, requesterAddress }) =>
-      groupId === 'salon' && String(requesterAddress).toLowerCase() === MEMBER
-        ? { ok: true, principal: { kind: 'address', address: MEMBER } }
+      groupsOf[String(requesterAddress).toLowerCase()] === groupId
+        ? { ok: true, principal: { kind: 'address', address: String(requesterAddress).toLowerCase() } }
         : { ok: false, status: 403, reason: 'worker_group_membership_denied' };
     const id = await idOf(await h.uploadFile({
       address: MEMBER,
       name: 'transcript.txt',
       type: 'text/plain',
       bytes: new TextEncoder().encode('Group words'),
-      extra: { accessConditions: JSON.stringify(groupLockedAccess('Salon')) },
+      extra: { accessConditions: JSON.stringify(groupLockedAccess(['Salon', 'Hosts'])) },
     }));
     const [item] = await h.list(MEMBER);
-    assert.deepEqual([item.storageRef.id, item.metadata.lockedGroupId, item.metadata.adminsOnly, item.metadata.addedBy], [id, 'salon', false, MEMBER]);
+    assert.deepEqual([item.storageRef.id, item.metadata.lockedGroupIds, item.metadata.adminsOnly, item.metadata.addedBy], [id, ['hosts', 'salon'], false, MEMBER]);
     assert.equal(await (await h.read(id, MEMBER)).text(), 'Group words');
-    assert.deepEqual(await h.list(PARTICIPANT), [], 'someone outside the group never learns it exists');
+    assert.equal(await (await h.read(id, HOST)).text(), 'Group words', 'a member of the other group reads it too');
+    assert.deepEqual(await h.list(PARTICIPANT), [], 'someone outside the groups never learns it exists');
     assert.equal((await h.read(id, PARTICIPANT)).status, 403);
     assert.equal((await h.read(id, '')).ok, false, 'nor does a signed-out reader');
     assert.equal((await h.list(ADMIN))[0].storageRef.id, id, 'admins see it, so they can remove it');

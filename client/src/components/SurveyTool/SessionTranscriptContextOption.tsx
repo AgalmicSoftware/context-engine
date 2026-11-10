@@ -2,7 +2,7 @@ import { useId } from 'react';
 import { UncontrolledTooltip } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faQuestionCircle } from '@fortawesome/free-solid-svg-icons';
-import ContextAccessSelect from '../Sessions/setup/ContextAccessSelect';
+import ContextAccessPicker from '../Sessions/setup/ContextAccessPicker';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import type { useTranscriptContextUpload } from './useTranscriptContextUpload';
 import styles from './SurveyTool.module.scss';
@@ -44,14 +44,14 @@ export default function SessionTranscriptContextOption({ upload }: Props) {
         </UncontrolledTooltip>
       </span>
       {upload.chosen ? (
-        <ContextAccessSelect
+        <ContextAccessPicker
           id={`ce-transcript-context-access-${id}`}
           className={styles.sessionTranscriptContextAccess}
           aria-label="Who can read the transcript"
-          value={upload.choice}
+          value={upload.access}
           groups={upload.groups}
           allowAdminsOnly={upload.allowAdminsOnly}
-          onChange={upload.setChoice}
+          onChange={upload.setAccess}
         />
       ) : null}
     </span>

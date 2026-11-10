@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { Input } from 'reactstrap';
 
-import ContextAccessSelect, { SESSION_WIDE_ACCESS, contextAccessOf } from '../Sessions/setup/ContextAccessSelect';
+import ContextAccessPicker from '../Sessions/setup/ContextAccessPicker';
 import { SetupField } from '../Sessions/setup/SetupPrimitives';
 import setupStyles from '../Sessions/setup/SessionSetup.module.scss';
-import { checkContextFile, uploadContextFile } from '../../utilities/docLibrary/contextSources';
+import { checkContextFile, uploadContextFile, type ContextFileAccess } from '../../utilities/docLibrary/contextSources';
 import type { ContextGroup } from '../../utilities/docLibrary/useContextGroups';
 
 type Props = {
@@ -16,13 +16,13 @@ type Props = {
 };
 
 const ABOUT_ACCESS =
-  'A locked file is for that group’s members and the session’s admins. The session’s AI uses it only when it works for one of them.';
+  'A file locked to groups is for their members and the session’s admins. The session’s AI uses it only when it works for one of them.';
 
 // A participant's own addition to the session's context: a file, and who may read it.
 const SessionContextAddFile = ({ sessionSlug, sessionConfig, account, groups, onAdded }: Props) => {
   const [file, setFile] = useState<File | null>(null);
   const [fileKey, setFileKey] = useState(0);
-  const [access, setAccess] = useState(SESSION_WIDE_ACCESS);
+  const [access, setAccess] = useState<ContextFileAccess>({});
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState('');
   const problem = file ? checkContextFile(file) : '';
@@ -31,10 +31,7 @@ const SessionContextAddFile = ({ sessionSlug, sessionConfig, account, groups, on
     setBusy(true);
     setStatus('Adding the file…');
     try {
-      await uploadContextFile(
-        { file, ...contextAccessOf(access) },
-        { sessionSlug, sessionConfig, context: { account } },
-      );
+      await uploadContextFile({ file, ...access }, { sessionSlug, sessionConfig, context: { account } });
       setFile(null);
       setFileKey((key) => key + 1);
       setStatus('File added.');
@@ -57,8 +54,8 @@ const SessionContextAddFile = ({ sessionSlug, sessionConfig, account, groups, on
         />
       </SetupField>
       {problem ? <p className={setupStyles.errorText}>{problem}</p> : null}
-      <SetupField id="ce-session-context-access" label="Who can read it" help={ABOUT_ACCESS}>
-        <ContextAccessSelect id="ce-session-context-access" value={access} groups={groups} onChange={setAccess} />
+      <SetupField id="ce-session-context-access" label="Visible to" help={ABOUT_ACCESS}>
+        <ContextAccessPicker id="ce-session-context-access" value={access} groups={groups} onChange={setAccess} />
       </SetupField>
       <div className={setupStyles.buttonRow}>
         <button

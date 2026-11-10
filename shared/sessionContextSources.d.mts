@@ -22,6 +22,7 @@ export const CONTEXT_SOURCE_LIMITS: Readonly<{
   readTextChars: number;
   titleChars: number;
   urlChars: number;
+  lockedGroups: number;
 }>;
 
 export const CONTEXT_FILE_TYPES: Readonly<{
@@ -43,11 +44,12 @@ export function contextTagValue(tags: unknown, name: string): string;
 export function contextRoleOf(tags: unknown): '' | 'context' | 'context-text';
 export function isAdminsOnlyAccess(accessConditions: unknown): boolean;
 export function participantsMayAddContext(config: unknown): boolean;
-export function groupLockedAccess(groupId: string): {
+export function groupLockedAccess(groupIds: string[]): {
   match: 'any';
   conditions: Array<{ kind: string; role?: string; groupIds?: string[] }>;
 };
-export function lockedGroupOf(accessConditions: unknown): string;
+/** The groups an item is locked to, or none for any other rule. */
+export function lockedGroupsOf(accessConditions: unknown): string[];
 /** The content type context sources accept for this file, or ''. */
 export function resolveContextFileType(file?: { name?: string; type?: string }): string;
 export function contextFileByteLimit(contentType: string): number;

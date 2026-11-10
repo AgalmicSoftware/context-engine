@@ -148,13 +148,16 @@ describe('context sources on the client', () => {
     );
     await uploadContextFile({ file: new File(['x'], 'deck.pdf', { type: 'application/pdf' }) }, options);
     expect(upload.mock.calls[1][2]).not.toHaveProperty('accessConditions');
-    await uploadContextFile({ file: new File(['x'], 'notes.txt', { type: 'text/plain' }), groupId: 'Salon' }, options);
+    await uploadContextFile(
+      { file: new File(['x'], 'notes.txt', { type: 'text/plain' }), groupIds: ['Salon', 'hosts', 'salon'] },
+      options,
+    );
     expect(upload.mock.calls[2][2]).toMatchObject({
       accessConditions: {
         match: 'any',
         conditions: [
           { kind: 'worker_role', role: 'admin' },
-          { kind: 'worker_group', groupIds: ['salon'] },
+          { kind: 'worker_group', groupIds: ['hosts', 'salon'] },
         ],
       },
     });
@@ -177,12 +180,12 @@ describe('context sources on the client', () => {
 
   it('keeps a group’s file narrow in a template, since groups don’t travel between sessions', () => {
     const source = (overrides: Partial<ContextSource>) =>
-      ({ kind: 'file', title: 'x', adminsOnly: false, lockedGroupId: '', ...overrides }) as ContextSource;
+      ({ kind: 'file', title: 'x', adminsOnly: false, lockedGroupIds: [], ...overrides }) as ContextSource;
     expect(
       templateContextFiles([
         source({ title: 'open.txt' }),
         source({ title: 'admins.txt', adminsOnly: true }),
-        source({ title: 'group.txt', lockedGroupId: 'salon' }),
+        source({ title: 'group.txt', lockedGroupIds: ['salon', 'hosts'] }),
         source({ title: 'page', kind: 'link' }),
       ]),
     ).toEqual([
@@ -192,14 +195,17 @@ describe('context sources on the client', () => {
     ]);
   });
 
-  it('reads the group a source is locked to, and says who added it', async () => {
+  it('reads the groups a source is locked to, and says who added it', async () => {
     const locked = item('group-1', [tag('CE-DocRole', 'context'), tag('CE-DocKind', 'file')], {
-      lockedGroupId: 'salon',
+      lockedGroupIds: ['Salon', 'hosts'],
       addedBy: '0xAbCd00000000000000000000000000000000Ef01',
     });
     listPage.mockResolvedValueOnce({ items: [locked], cursor: null, listComplete: true });
     const [source] = await listContextSources(options);
-    expect(source).toMatchObject({ lockedGroupId: 'salon', addedBy: '0xabcd00000000000000000000000000000000ef01' });
+    expect(source).toMatchObject({
+      lockedGroupIds: ['salon', 'hosts'],
+      addedBy: '0xabcd00000000000000000000000000000000ef01',
+    });
     const config = { adminAddress: '0x1111111111111111111111111111111111111111' };
     expect(contextAdderLabel(source, config, '0xABCD00000000000000000000000000000000EF01')).toBe('you');
     expect(contextAdderLabel(source, config, '')).toBe('0xabcd…ef01');

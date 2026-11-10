@@ -6,7 +6,10 @@ import type { SessionContextSourcesState } from '../../utilities/docLibrary/useS
 import { getWorkerSessionToken } from '../../utilities/worker/workerAuth.js';
 
 jest.mock('../../utilities/docLibrary/useContextGroups', () => ({
-  useContextGroups: () => [{ groupId: 'salon', label: 'Salon' }],
+  useContextGroups: () => [
+    { groupId: 'salon', label: 'Salon' },
+    { groupId: 'hosts', label: 'Hosts' },
+  ],
 }));
 jest.mock('../../utilities/worker/workerAuth.js', () => ({ getWorkerSessionToken: jest.fn(async () => 'token') }));
 jest.mock('../../utilities/docLibrary/contextSources', () => ({
@@ -28,7 +31,7 @@ const file = (overrides: Partial<ContextSource>): ContextSource => ({
   size: 1,
   createdAt: '',
   adminsOnly: false,
-  lockedGroupId: '',
+  lockedGroupIds: [],
   addedBy: '',
   fetchedAt: '',
   reading: null,
@@ -64,16 +67,16 @@ describe('the Context section for participants', () => {
     jest.restoreAllMocks();
   });
 
-  it('shows who added each file and its group, and removes only their own', async () => {
+  it('shows who added each file and its groups, and removes only their own', async () => {
     const list = state({
       sources: [
-        file({ id: 'mine', title: 'mine.txt', addedBy: ME, lockedGroupId: 'salon' }),
+        file({ id: 'mine', title: 'mine.txt', addedBy: ME, lockedGroupIds: ['salon', 'hosts'] }),
         file({ id: 'theirs', title: 'theirs.txt', addedBy: THEM }),
       ],
     });
     renderList(list);
     const mine = screen.getByRole('link', { name: /mine\.txt/ }).parentElement as HTMLElement;
-    expect(within(mine).getByText('Salon')).toBeInTheDocument();
+    expect(within(mine).getByText('Salon, Hosts')).toBeInTheDocument();
     expect(within(mine).getByText('Added by you')).toBeInTheDocument();
     const theirs = screen.getByRole('link', { name: /theirs\.txt/ }).parentElement as HTMLElement;
     expect(within(theirs).getByText('Added by 0xbbbb…0002')).toBeInTheDocument();
@@ -87,16 +90,18 @@ describe('the Context section for participants', () => {
     expect(list.reload).toHaveBeenCalled();
   });
 
-  it('adds a file, locked to the group chosen', async () => {
+  it('adds a file, locked to the groups chosen', async () => {
     const list = state();
     renderList(list);
     const notes = new File(['notes'], 'notes.txt', { type: 'text/plain' });
     fireEvent.change(screen.getByLabelText('File'), { target: { files: [notes] } });
-    fireEvent.change(screen.getByLabelText('Who can read it'), { target: { value: 'group:salon' } });
-    expect(screen.queryByRole('option', { name: 'Admins only' })).toBeNull();
+    fireEvent.click(screen.getByLabelText('Visible to'));
+    fireEvent.click(screen.getByRole('button', { name: 'Salon' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Hosts' }));
+    expect(screen.queryByRole('button', { name: 'Admins only' })).toBeNull();
     await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Add file' })));
     expect(uploadContextFile).toHaveBeenCalledWith(
-      { file: notes, groupId: 'salon' },
+      { file: notes, groupIds: ['salon', 'hosts'] },
       expect.objectContaining({ sessionSlug: 'salon' }),
     );
     expect(list.reload).toHaveBeenCalled();

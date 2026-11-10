@@ -9,7 +9,8 @@ coalition's site, a deck. It has two parts.
 - **Sources** are files and links added for the AI. They are doc-library
   records (resource `docsContext`) tagged with a context role, so there is no
   second storage model. Each source is for everyone with access to the session,
-  for one group, or for admins only.
+  for the members of some of its groups (any one of them is enough), or for
+  admins only. Wherever a file is added, its **Visible to** dropdown chooses.
 
 Sources need a session whose storage is on its Session Worker (Cloudflare), not
 Arweave and not Lit-encrypted, because the Worker must be able to read them.

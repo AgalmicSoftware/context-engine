@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 
 import {
   SetupContextFiles,
@@ -58,6 +58,14 @@ beforeEach(() => {
   jest.clearAllMocks();
 });
 
+// Opens a file's Visible to and presses one of its choices.
+const choose = (index: number, label: string) => {
+  const toggle = screen.getAllByLabelText('Visible to')[index];
+  if (toggle.getAttribute('aria-expanded') !== 'true') fireEvent.click(toggle);
+  fireEvent.click(within(toggle.parentElement as HTMLElement).getByRole('button', { name: label }));
+};
+const shown = () => screen.getAllByLabelText('Visible to').map((toggle) => toggle.textContent);
+
 describe('setup context files', () => {
   it('keeps chosen files for after Create, with privacy, and asks again for names alone', () => {
     render(<Harness initial={{ contextFiles: [{ name: 'brief.pdf' }] }} />);
@@ -70,7 +78,7 @@ describe('setup context files', () => {
       { name: 'deck.pdf', adminsOnly: false },
     ]);
     expect(screen.getByText('Added to the session after Create.')).toBeInTheDocument();
-    fireEvent.change(screen.getAllByLabelText('Visible to')[1], { target: { value: 'admins' } });
+    choose(1, 'Admins only');
     expect(latest.contextFiles).toEqual([
       { name: 'brief.pdf', adminsOnly: false },
       { name: 'deck.pdf', adminsOnly: true },
@@ -97,7 +105,7 @@ describe('setup context files', () => {
     const notes = new File(['# Notes'], 'notes.md', { type: 'text/markdown' });
     fireEvent.change(screen.getByTestId('ce-setup-context-file-input'), { target: { files: [deck] } });
     fireEvent.change(screen.getByTestId('ce-setup-context-file-input'), { target: { files: [notes] } });
-    fireEvent.change(screen.getAllByLabelText('Visible to')[0], { target: { value: 'admins' } });
+    choose(0, 'Admins only');
     rerender(<Harness initial={{}} created />);
     // A re-render keeps the same harness state, now with a created session.
     await act(async () => fireEvent.click(screen.getByTestId('ce-setup-context-publish')));
@@ -117,25 +125,36 @@ describe('setup context files', () => {
     expect(screen.queryByTestId('ce-setup-context-publish')).not.toBeInTheDocument();
   });
 
-  it('locks a file to a group set up before Create, and keeps it with admins if that group goes', () => {
+  it('locks a file to groups set up before Create, and keeps it with admins once none of them is', () => {
     const salon = { groupId: 'group-salon', label: 'Reverse Alignment Salon' };
-    const { rerender } = render(<Harness initial={{ contextFiles: [{ name: 'brief.pdf' }] }} groups={[salon]} />);
-    const visibleTo = screen.getByLabelText('Visible to');
-    expect([...visibleTo.querySelectorAll('option')].map((option) => option.textContent)).toEqual([
-      'Everyone in the session',
-      'Admins only',
-      'Reverse Alignment Salon',
+    const hosts = { groupId: 'group-hosts', label: 'Hosts' };
+    const { rerender } = render(
+      <Harness initial={{ contextFiles: [{ name: 'brief.pdf' }] }} groups={[salon, hosts]} />,
+    );
+    const toggle = screen.getByLabelText('Visible to');
+    fireEvent.click(toggle);
+    const choices = within(toggle.parentElement as HTMLElement).getByRole('group');
+    expect(
+      within(choices)
+        .getAllByRole('button')
+        .map((choice) => choice.textContent),
+    ).toEqual(['Everyone in the session', 'Admins only', 'Reverse Alignment Salon', 'Hosts']);
+    choose(0, 'Reverse Alignment Salon');
+    choose(0, 'Hosts');
+    expect(latest.contextFiles).toEqual([
+      { name: 'brief.pdf', adminsOnly: true, groupIds: ['group-salon', 'group-hosts'] },
     ]);
-    fireEvent.change(visibleTo, { target: { value: 'group:group-salon' } });
-    expect(latest.contextFiles).toEqual([{ name: 'brief.pdf', adminsOnly: true, groupId: 'group-salon' }]);
+    expect(shown()).toEqual(['Reverse Alignment Salon, Hosts']);
     // A template keeps no groups, so the file it carries is for admins, not everyone.
     const exported = sessionTemplateFromDraft(latest);
     expect(exported.ok && exported.template.contextFiles).toEqual([{ name: 'brief.pdf', adminsOnly: true }]);
+    rerender(<Harness initial={{}} groups={[hosts]} />);
+    expect(shown()).toEqual(['Hosts']);
     rerender(<Harness initial={{}} groups={[]} />);
-    expect(screen.getByLabelText('Visible to')).toHaveValue('admins');
+    expect(shown()).toEqual(['Admins only']);
   });
 
-  it('after Create, adds a file locked to a group Create made, and keeps one whose group it did not make with admins', async () => {
+  it('after Create, adds each file for the groups Create made, or keeps it with admins if it made none of them', async () => {
     const salon = { groupId: 'group-salon', label: 'Reverse Alignment Salon' };
     const later = { groupId: 'group-later', label: 'Later' };
     const { rerender } = render(<Harness initial={{ contextFiles: [] }} groups={[salon, later]} />);
@@ -143,16 +162,14 @@ describe('setup context files', () => {
     const plan = new File(['# Plan'], 'plan.md', { type: 'text/markdown' });
     fireEvent.change(screen.getByTestId('ce-setup-context-file-input'), { target: { files: [brief] } });
     fireEvent.change(screen.getByTestId('ce-setup-context-file-input'), { target: { files: [plan] } });
-    fireEvent.change(screen.getAllByLabelText('Visible to')[0], { target: { value: 'group:group-salon' } });
-    fireEvent.change(screen.getAllByLabelText('Visible to')[1], { target: { value: 'group:group-later' } });
+    choose(0, 'Reverse Alignment Salon');
+    choose(0, 'Later');
+    choose(1, 'Later');
     // Create made only the salon group, and the list shows where each file will go.
     rerender(<Harness initial={{}} created made={[salon]} />);
-    expect(screen.getAllByLabelText('Visible to').map((select) => (select as HTMLSelectElement).value)).toEqual([
-      'group:group-salon',
-      'admins',
-    ]);
+    expect(shown()).toEqual(['Reverse Alignment Salon', 'Admins only']);
     await act(async () => fireEvent.click(screen.getByTestId('ce-setup-context-publish')));
-    expect(uploadContextFile).toHaveBeenCalledWith({ file: brief, groupId: 'group-salon' }, expect.anything());
+    expect(uploadContextFile).toHaveBeenCalledWith({ file: brief, groupIds: ['group-salon'] }, expect.anything());
     expect(uploadContextFile).toHaveBeenCalledWith({ file: plan, adminsOnly: true }, expect.anything());
   });
 });

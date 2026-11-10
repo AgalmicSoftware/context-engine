@@ -68326,7 +68326,7 @@ var init_wrappedJournal = __esm({
 });
 
 // shared/sessionContextSources.mjs
-var CONTEXT_ROLE, CONTEXT_TEXT_ROLE, CONTEXT_TAGS, CONTEXT_SOURCE_LIMITS, CONTEXT_FILE_TYPES, CONTEXT_FILE_MIMES, ADMINS_ONLY_ACCESS, text2, isRecord4, participantsMayAddContext, contextTagValue, contextRoleOf, isAdminsOnlyAccess, lockedGroupOf, resolveContextFileType, contextFileByteLimit;
+var CONTEXT_ROLE, CONTEXT_TEXT_ROLE, CONTEXT_TAGS, CONTEXT_SOURCE_LIMITS, CONTEXT_FILE_TYPES, CONTEXT_FILE_MIMES, ADMINS_ONLY_ACCESS, text2, isRecord4, participantsMayAddContext, groupIdList, contextTagValue, contextRoleOf, isAdminsOnlyAccess, lockedGroupsOf, resolveContextFileType, contextFileByteLimit;
 var init_sessionContextSources = __esm({
   "shared/sessionContextSources.mjs"() {
     CONTEXT_ROLE = "context";
@@ -68353,7 +68353,9 @@ var init_sessionContextSources = __esm({
       readTextChars: 1e5,
       titleChars: 120,
       // A link is also a storage tag, and tag values stop at 1,024 characters.
-      urlChars: 1e3
+      urlChars: 1e3,
+      // The groups one item may be locked to; reading it checks each in turn.
+      lockedGroups: 20
     });
     CONTEXT_FILE_TYPES = Object.freeze({
       pdf: "application/pdf",
@@ -68371,6 +68373,7 @@ var init_sessionContextSources = __esm({
     text2 = (value) => typeof value === "string" ? value.trim() : "";
     isRecord4 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
     participantsMayAddContext = (config) => config?.contextAdditionPolicy !== "admin_only";
+    groupIdList = (groupIds) => [...new Set((Array.isArray(groupIds) ? groupIds : []).map((id2) => text2(id2).toLowerCase()).filter(Boolean))].sort();
     contextTagValue = (tags, name) => text2((Array.isArray(tags) ? tags : []).find((tag) => isRecord4(tag) && text2(tag.name) === name)?.value);
     contextRoleOf = (tags) => {
       const role = contextTagValue(tags, CONTEXT_TAGS.role).toLowerCase();
@@ -68381,14 +68384,14 @@ var init_sessionContextSources = __esm({
       const conditions = Array.isArray(accessConditions.conditions) ? accessConditions.conditions : [];
       return conditions.length === 1 && isRecord4(conditions[0]) && text2(conditions[0].kind).toLowerCase() === "worker_role" && text2(conditions[0].role || "admin").toLowerCase() === "admin" && Object.keys(conditions[0]).every((key) => key === "kind" || key === "role");
     };
-    lockedGroupOf = (accessConditions) => {
-      if (!isRecord4(accessConditions) || text2(accessConditions.match).toLowerCase() !== "any") return "";
+    lockedGroupsOf = (accessConditions) => {
+      if (!isRecord4(accessConditions) || text2(accessConditions.match).toLowerCase() !== "any") return [];
       const conditions = Array.isArray(accessConditions.conditions) ? accessConditions.conditions : [];
       const kindOf = (condition) => isRecord4(condition) ? text2(condition.kind).toLowerCase() : "";
       const role = conditions.find((condition) => kindOf(condition) === "worker_role");
       const group = conditions.find((condition) => kindOf(condition) === "worker_group");
-      const groupIds = Array.isArray(group?.groupIds) ? group.groupIds : [];
-      return conditions.length === 2 && role && text2(role.role).toLowerCase() === "admin" && groupIds.length === 1 ? text2(groupIds[0]).toLowerCase() : "";
+      const groupIds = Array.isArray(group?.groupIds) ? groupIdList(group.groupIds) : [];
+      return conditions.length === 2 && role && text2(role.role).toLowerCase() === "admin" && groupIds.length > 0 && groupIds.length <= CONTEXT_SOURCE_LIMITS.lockedGroups ? groupIds : [];
     };
     resolveContextFileType = ({ name = "", type = "" } = {}) => {
       const declared = text2(type).split(";")[0].toLowerCase();
@@ -69325,7 +69328,7 @@ var init_contextSourcePolicy = __esm({
   "workers/sessionCorsWorker/contextSourcePolicy.js"() {
     init_sessionContextSources();
     fail3 = (status, error, reason) => ({ ok: false, status, error, reason });
-    POLICY_ERROR = "Context is for everyone in the session, one group or admins only; it takes no other access rule.";
+    POLICY_ERROR = "Context is for everyone in the session, some of its groups or admins only; it takes no other access rule.";
     MIB = 1024 * 1024;
     checkContextSourceUpload = ({ payload = {}, config, uploader = "", isAdmin = false, litEncrypted = false } = {}) => {
       const role = contextRoleOf(payload.tags);
@@ -69336,7 +69339,7 @@ var init_contextSourcePolicy = __esm({
         return fail3(400, "Context must be readable by the Session Worker, so it cannot be Lit-encrypted.", "context_encryption_unsupported");
       }
       if (payload.uploadPolicy || payload.groupIds?.length) return fail3(400, POLICY_ERROR, "context_policy_unsupported");
-      if (payload.accessConditions && payload.contextOrigin !== "worker" && !isAdminsOnlyAccess(payload.accessConditions) && !lockedGroupOf(payload.accessConditions)) {
+      if (payload.accessConditions && payload.contextOrigin !== "worker" && !isAdminsOnlyAccess(payload.accessConditions) && !lockedGroupsOf(payload.accessConditions).length) {
         return fail3(400, POLICY_ERROR, "context_policy_unsupported");
       }
       const kind = contextTagValue(payload.tags, CONTEXT_TAGS.kind);
@@ -69355,7 +69358,7 @@ var init_contextSourcePolicy = __esm({
     contextSourceListFields = (metadata = {}) => metadata?.contextSource === true ? {
       contextSource: true,
       adminsOnly: isAdminsOnlyAccess(metadata.accessConditions),
-      lockedGroupId: lockedGroupOf(metadata.accessConditions),
+      lockedGroupIds: lockedGroupsOf(metadata.accessConditions),
       addedBy: metadata.uploader || ""
     } : {};
   }

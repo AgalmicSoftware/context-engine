@@ -5,13 +5,13 @@ import {
   contextRoleOf,
   contextTagValue,
   isAdminsOnlyAccess,
-  lockedGroupOf,
+  lockedGroupsOf,
   participantsMayAddContext,
   resolveContextFileType,
 } from '../../shared/sessionContextSources.mjs';
 
 const fail = (status, error, reason) => ({ ok: false, status, error, reason });
-const POLICY_ERROR = 'Context is for everyone in the session, one group or admins only; it takes no other access rule.';
+const POLICY_ERROR = 'Context is for everyone in the session, some of its groups or admins only; it takes no other access rule.';
 const MIB = 1024 * 1024;
 
 // Checks a doc-library upload that carries a context role. Signed-in people add
@@ -29,9 +29,9 @@ export const checkContextSourceUpload = ({ payload = {}, config, uploader = '', 
   }
   if (payload.uploadPolicy || payload.groupIds?.length) return fail(400, POLICY_ERROR, 'context_policy_unsupported');
   // The context route copies a PDF's stored rule onto its reading; uploads
-  // choose between the session's access, one group and admins only.
+  // choose between the session's access, some of its groups and admins only.
   if (payload.accessConditions && payload.contextOrigin !== 'worker' &&
-    !isAdminsOnlyAccess(payload.accessConditions) && !lockedGroupOf(payload.accessConditions)) {
+    !isAdminsOnlyAccess(payload.accessConditions) && !lockedGroupsOf(payload.accessConditions).length) {
     return fail(400, POLICY_ERROR, 'context_policy_unsupported');
   }
   const kind = contextTagValue(payload.tags, CONTEXT_TAGS.kind);
@@ -56,7 +56,7 @@ export const contextSourceListFields = (metadata = {}) => (
     ? {
       contextSource: true,
       adminsOnly: isAdminsOnlyAccess(metadata.accessConditions),
-      lockedGroupId: lockedGroupOf(metadata.accessConditions),
+      lockedGroupIds: lockedGroupsOf(metadata.accessConditions),
       addedBy: metadata.uploader || '',
     }
     : {}

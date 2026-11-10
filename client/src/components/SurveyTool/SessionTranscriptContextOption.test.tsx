@@ -7,8 +7,8 @@ const upload = (overrides = {}) =>
     available: true,
     chosen: false,
     setChosen: jest.fn(),
-    choice: 'session',
-    setChoice: jest.fn(),
+    access: {},
+    setAccess: jest.fn(),
     groups: [{ groupId: 'salon', label: 'Salon' }],
     allowAdminsOnly: false,
     status: '',
@@ -27,24 +27,29 @@ describe('the transcript box on the Submit questions line', () => {
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_TRANSCRIPT_CONTEXT));
     expect(state.setChosen).toHaveBeenCalledWith(true);
 
-    const ticked = upload({ chosen: true, choice: 'group:salon' });
+    const ticked = upload({ chosen: true, access: { groupIds: ['salon'] } });
     rerender(<SessionTranscriptContextOption upload={ticked} />);
     const access = screen.getByLabelText('Who can read the transcript');
-    expect(access).toHaveValue('group:salon');
-    expect(screen.queryByRole('option', { name: 'Admins only' })).toBeNull();
-    fireEvent.change(access, { target: { value: 'session' } });
-    expect(ticked.setChoice).toHaveBeenCalledWith('session');
+    expect(access).toHaveTextContent('Salon');
+    fireEvent.click(access);
+    expect(screen.queryByRole('button', { name: 'Admins only' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Everyone in the session' }));
+    expect(ticked.setAccess).toHaveBeenCalledWith({});
   });
 
   it('shows the group chosen even before the list of groups has it, so the choice on screen is the real one', () => {
-    render(<SessionTranscriptContextOption upload={upload({ chosen: true, choice: 'group:later', groups: [] })} />);
+    render(
+      <SessionTranscriptContextOption upload={upload({ chosen: true, access: { groupIds: ['later'] }, groups: [] })} />,
+    );
     const access = screen.getByLabelText('Who can read the transcript');
-    expect(access).toHaveValue('group:later');
-    expect(screen.getByRole('option', { name: 'This group' })).toBeInTheDocument();
+    expect(access).toHaveTextContent('One group');
+    fireEvent.click(access);
+    expect(screen.getByRole('button', { name: 'This group', pressed: true })).toBeInTheDocument();
   });
 
   it('offers Admins only to admins', () => {
     render(<SessionTranscriptContextOption upload={upload({ chosen: true, allowAdminsOnly: true })} />);
-    expect(screen.getByRole('option', { name: 'Admins only' })).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText('Who can read the transcript'));
+    expect(screen.getByRole('button', { name: 'Admins only' })).toBeInTheDocument();
   });
 });

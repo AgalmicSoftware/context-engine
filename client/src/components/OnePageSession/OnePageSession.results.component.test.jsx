@@ -1483,6 +1483,7 @@ describe('OnePageSession results routing', () => {
       size: 1,
       createdAt: '2026-10-31T10:00:00.000Z',
       adminsOnly: true,
+      lockedGroupIds: [],
       fetchedAt: '',
       reading: null,
     };
