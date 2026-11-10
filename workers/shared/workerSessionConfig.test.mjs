@@ -104,6 +104,11 @@ test('public config projection includes structured session context', () => {
   assert.equal(Object.hasOwn(projected, 'sessionSecrets'), false);
 });
 
+test('public config shows the Group Agent setting, so everyone can see who may ask and how they are answered', () => {
+  const groupAgent = { audiences: [{ who: { match: 'any', conditions: [{ kind: 'agent_grant_scope', scope: 'ai' }] }, answers: 'general' }] };
+  assert.deepEqual(projectPublicWorkerSessionConfig({ slug: 'session-a', groupAgent }).groupAgent, groupAgent);
+});
+
 test('deployment retains optional response encryption and exact linked group references', () => {
   const fields = { responseFieldEncryption: { mode: 'optional' }, linkedWorkerGroups: [{ sessionSlug: 'source', sessionId: `0x${'11'.repeat(16)}`, workerUrl: 'https://source.example/', groupId: 'community' }] };
   assert.deepEqual(selectDeployWorkerSessionConfigFields(fields), fields);

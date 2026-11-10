@@ -23,6 +23,7 @@ import { validateWorkerConfigModeValues } from '../shared/workerConfigModeValida
 import { normalizeWorkerSessionAppearance } from '../shared/sessionColorSchemeConfig.mjs';
 import { validResultsAnalysisSettings } from '../../shared/resultsAnalysisSettings.mjs';
 import { validateSessionContext } from '../../shared/sessionContext.mjs';
+import { validateGroupAgent } from '../../shared/groupAgent.mjs';
 import {
   mergeWorkerConfigRecords,
   mergeWorkerLimitRecords,
@@ -354,6 +355,11 @@ export const applySessionConfigMutation = ({ existingConfig, mutation, slug } = 
       if (!context.ok) return { ok: false, status: 400, error: `Invalid session context: ${context.errors[0].message}` };
       incomingConfig = { ...incomingConfig, sessionContext: context.value };
     }
+    if (hasOwn(incomingConfig, 'groupAgent')) {
+      const groupAgent = validateGroupAgent(incomingConfig.groupAgent);
+      if (!groupAgent.ok) return { ok: false, status: 400, error: `Invalid Group Agent setting: ${groupAgent.errors[0].message}` };
+      incomingConfig = { ...incomingConfig, groupAgent: groupAgent.value };
+    }
     // A patch may update the profile without resending the already-persisted
     // canonical storage object. The complete merged record below remains
     // strict and is the only record eligible for persistence.
@@ -373,6 +379,8 @@ export const applySessionConfigMutation = ({ existingConfig, mutation, slug } = 
       incomingConfig = { ...incomingConfig, ai: mergeSetConfigAi(existing.ai, incomingConfig.ai) };
     }
     mergedConfig = mergeWorkerConfigRecords({ existingConfig: existing, incomingConfig, slug });
+    // The Group Agent is off when there is no setting, so null removes it.
+    if (mergedConfig.groupAgent === null) delete mergedConfig.groupAgent;
   } else if (kind === 'set-limits') {
     const incomingLimits = mutation?.incomingLimits && typeof mutation.incomingLimits === 'object'
       ? mutation.incomingLimits

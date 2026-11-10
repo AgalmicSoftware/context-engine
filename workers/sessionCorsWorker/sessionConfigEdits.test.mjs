@@ -169,6 +169,28 @@ test('set-config keeps stored instructions for AI agents it is not sent, and an 
   assert.equal(save({ agentInstructions: '' }).config.agentInstructions, '');
 });
 
+test('a Group Agent setting saves in its checked form, signs no one out, and null turns it off', () => {
+  const everyone = { match: 'any', conditions: [{ kind: 'agent_grant_scope', scope: 'ai' }] };
+  const hosts = { match: 'any', conditions: [{ kind: 'worker_group', groupIds: ['hosts'] }] };
+  const saved = setConfig({
+    groupAgent: { audiences: [{ who: { match: 'any', conditions: [{ kind: 'worker_group', groupIds: [' Hosts '] }] }, answers: 'detailed' }, { who: everyone, answers: 'general' }], instructions: { general: ' Be brief. ' } },
+  });
+  assert.equal(saved.ok, true, JSON.stringify(saved));
+  const groupAgent = { audiences: [{ who: hosts, answers: 'detailed' }, { who: everyone, answers: 'general' }], instructions: { general: 'Be brief.' } };
+  assert.deepEqual(saved.config.groupAgent, groupAgent);
+  assert.deepEqual(classify({}, { groupAgent }), { content: ['groupAgent'], authority: [], signsParticipantsOut: false });
+  assert.equal(revokes({ groupAgent }, {}), false);
+  const refused = setConfig({ groupAgent: { audiences: [{ who: everyone, answers: 'everything' }] } });
+  assert.deepEqual(refused, { ok: false, status: 400, error: 'Invalid Group Agent setting: Audience 1 must get General or Detailed answers.' });
+  const off = applySessionConfigMutation({
+    existingConfig: { ...workerCanonicalConfig(), groupAgent },
+    mutation: { kind: 'set-config', incomingConfig: { groupAgent: null } },
+    slug: 'session-a',
+  });
+  assert.equal(off.ok, true, JSON.stringify(off));
+  assert.equal(Object.hasOwn(off.config, 'groupAgent'), false);
+});
+
 test('lists each edited path as content or as a sign-out', () => {
   const before = {
     sessionName: 'A',

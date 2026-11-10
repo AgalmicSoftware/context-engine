@@ -40,6 +40,7 @@ export const PUBLIC_WORKER_CONFIG_FIELDS = Object.freeze([
   'workerAuthority',
   'groupCreationPolicy',
   'contextAdditionPolicy',
+  'groupAgent',
   'linkedWorkerGroups',
   'storageProfile',
   'ai',
