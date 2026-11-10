@@ -1,7 +1,6 @@
 import React, { Suspense } from 'react';
 import CETooltip from '../Shared/CETooltip';
 import SessionTestEthBadge from '../Shared/SessionTestEthBadge';
-import { hasReverseAlignmentContext } from './reverseAlignmentTopics';
 import { useSessionDebateAtlas } from '../DebateAtlas/useSessionDebateAtlas';
 import DebateAtlasBuildStatus from '../DebateAtlas/DebateAtlasBuildStatus';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -44,7 +43,6 @@ const CorpusViewer = lazyWithRetry(() => import('../DemoViews/CorpusViewer'));
 const RiskMatrix = React.lazy(() => import('../MainContent/RiskMatrix'));
 const DemoAnalysisWorkspace = React.lazy(() => import('../DemoViews/DemoAnalysis/DemoAnalysisWorkspace'));
 const SessionGeneratedResultsViews = React.lazy(() => import('../SessionResults/SessionGeneratedResultsViews'));
-const ReverseAlignmentAtlas = React.lazy(() => import('./ReverseAlignmentAtlas'));
 // Loaded only for a session whose context is an uploaded HTML page, with its sanitizer.
 const SessionContextHtml = React.lazy(() => import('./SessionContextHtml'));
 const SessionDebateAtlasView = React.lazy(() => import('../DebateAtlas/SessionDebateAtlasView'));
@@ -362,7 +360,6 @@ export default function OnePageSessionStandardShell({
   const showDemoAtlas = isDemoSlug && (!showBuiltAtlas || !!embeddedAtlasNodeId);
   const atlasBusy = atlas.building || atlas.activeSinceMs !== null;
   const buildAtlasHelpId = `build-atlas-help-${React.useId().replace(/:/g, '')}`;
-  const showContextAtlas = hasReverseAlignmentContext(displaySessionSlug);
   const showDemoAnalysisView = isDemoSlug && hasDemoAnalysisFixture(displaySessionSlug);
   const generatedState = (
     generatedResultsAnalysis && typeof generatedResultsAnalysis === 'object' ? generatedResultsAnalysis : {}
@@ -430,8 +427,7 @@ export default function OnePageSessionStandardShell({
     account: typeof account === 'string' ? account : '',
   });
   const canEditContext = (contextSources.isAdmin && contextSources.supported) || contextSources.participantsCanAdd;
-  const showContextSection =
-    isDemoSlug || !!sessionContext || showContextAtlas || contextSources.sources.length > 0 || canEditContext;
+  const showContextSection = isDemoSlug || !!sessionContext || contextSources.sources.length > 0 || canEditContext;
   const sectionsGridClassName = [styles.sectionsGrid, !showContextSection ? styles.sectionsGridTwoUp : '']
     .filter(Boolean)
     .join(' ');
@@ -659,7 +655,7 @@ export default function OnePageSessionStandardShell({
 
         {showContextSection && (
           <div
-            className={`${styles.sectionContainer} ${showDocuments ? styles.sectionExpanded : ''} ${showContextAtlas ? styles.compactContextSection : ''}`}
+            className={`${styles.sectionContainer} ${showDocuments ? styles.sectionExpanded : ''}`}
             data-testid="ce-demo-documents-section"
           >
             <div className={`${styles.sectionHeaderRow} ${showDocuments ? styles.documentsHeaderRow : ''}`}>
@@ -713,7 +709,7 @@ export default function OnePageSessionStandardShell({
             </div>
             {showDocuments && (
               <div className={`${styles.miniSectionContent} ${styles.documentsSectionContent}`.trim()}>
-                {!showContextAtlas && renderSessionContext(sessionContext)}
+                {renderSessionContext(sessionContext)}
                 {!isDemoSlug ? (
                   <SessionContextSources
                     sessionSlug={effectiveSlug}
@@ -723,11 +719,6 @@ export default function OnePageSessionStandardShell({
                     pageLinks={sessionContext?.links || []}
                   />
                 ) : null}
-                {showContextAtlas && (
-                  <Suspense fallback={<LazyFallback label="Loading Reverse Alignment Atlas..." minHeight="20vh" />}>
-                    <ReverseAlignmentAtlas context={sessionContext} />
-                  </Suspense>
-                )}
                 {isDemoSlug && (
                   <Suspense fallback={<LazyFallback label="Loading Corpus..." minHeight="20vh" />}>
                     <CorpusViewer

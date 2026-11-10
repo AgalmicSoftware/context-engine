@@ -155,6 +155,7 @@ All notable changes to this project will be documented in this file.
 - The questions CSV includes each question's rating scale, pick-one setting and pick limit.
 - Dictation longer than about five minutes is transcribed in parts instead of failing, and a failed transcription says so and stays on screen.
 - On `/new` and the settings page, the Context section's **Format** takes typed text or one HTML file. The file is cleaned before it's saved, losing its scripts, styles, classes, frames and forms, and a preview shows the result and what was removed. The session page shows the page in its context section, cleaned again each time.
+- The Reverse Alignment atlas is no longer built into the client. A session shows it as its HTML context page, where its areas and topics open in place, and the RxC session list only gives those sessions their short links. A session on an older Worker, such as `rxc-ra-test-3`, shows its typed context instead.
 
 ### Workers — requires redeployment
 

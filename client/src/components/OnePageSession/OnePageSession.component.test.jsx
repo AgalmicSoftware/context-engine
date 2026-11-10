@@ -1791,7 +1791,6 @@ describe('OnePageSession view gating', () => {
     const miniContentBlock = extractMediaBlock(scss, '.miniSectionContent {');
     const documentsHeaderBlock = extractMediaBlock(scss, '.documentsSectionHeader {');
     const documentsContentBlock = extractMediaBlock(scss, '\n.documentsSectionContent {');
-    const compactContextBlock = extractMediaBlock(scss, '.compactContextSection {');
     const sectionsGridBlock = extractMediaBlock(scss, '.sectionsGrid {');
 
     expect(sectionContainerBlock).toContain('box-sizing: border-box;');
@@ -1808,9 +1807,6 @@ describe('OnePageSession view gating', () => {
     expect(documentsHeaderBlock).not.toContain('width: 100%;');
     expect(documentsContentBlock).toContain('margin-top: 10px;');
     expect(documentsContentBlock).toContain('padding-top: 0;');
-    expect(compactContextBlock).toContain('.documentsSectionContent {');
-    expect(compactContextBlock).toContain('margin-top: 12px;');
-    expect(compactContextBlock).toContain('padding-bottom: 0;');
     expect(miniContentBlock).toContain('box-sizing: border-box;');
     expect(miniContentBlock).toContain('max-width: 100%;');
     expect(miniContentBlock).toContain('min-width: 0;');

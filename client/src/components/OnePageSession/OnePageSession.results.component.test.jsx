@@ -1242,59 +1242,67 @@ describe('OnePageSession results routing', () => {
     expect(within(page).getByRole('link', { name: 'Essay' })).toHaveAttribute('rel', 'noopener noreferrer');
   });
 
-  it.each(['rxc-test', 'rxc-ra-test'])('keeps context and shows no pre-filled Debate Map for %s', async (slug) => {
-    const props = buildProps();
-    const sessionRef = React.createRef();
-    render(
-      <MemoryRouter initialEntries={[`/session/${slug}`]}>
-        <OnePageSession
-          {...props}
-          ref={sessionRef}
-          slug={slug}
-          sessionConfig={{
-            ...props.sessionConfig,
-            slug,
-            sessionContext: {
-              title: 'Context',
-              paragraphs: ['A session introduction.', 'More background.'],
-              links: [{ label: 'Official source', url: 'https://example.org/' }],
-            },
-          }}
-        />
-      </MemoryRouter>,
-    );
-    expect(await screen.findByTestId('survey-page-pile')).toBeInTheDocument();
-    expect(screen.queryByTestId('ce-rxc-context-atlas')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByTestId('ce-demo-documents-toggle'));
-    const atlas = await screen.findByTestId('ce-rxc-context-atlas');
-    expect(atlas).toBeVisible();
-    expect(
-      within(screen.getByTestId('ce-demo-documents-section')).getByRole('heading', {
-        name: /^Context(?! View)/,
-        level: 2,
-      }),
-    ).toBeVisible();
-    expect(atlas).toContainElement(screen.getByTestId('ce-session-context'));
-    expect(screen.getAllByTestId('ce-session-context')).toHaveLength(1);
-    expect(within(atlas).getByRole('group', { name: 'Explore topic groups' })).toBeVisible();
-    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
-    act(() => sessionRef.current.setState({ resultsViewMode: 'debateAtlas' }));
-    const nav = screen.getByTestId('ce-session-results-view-nav');
-    expect(
-      within(nav)
-        .getAllByRole('button')
-        .map((button) => button.textContent.trim()),
-    ).toEqual(['🧾Report', 'Raw Results']);
-    expect(within(nav).getByRole('button', { name: 'Report' })).toHaveAttribute('aria-pressed', 'true');
-    expect(await screen.findByTestId('polis-report')).toBeVisible();
-    expect(screen.queryByTestId('topic-circles')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('ce-session-debate-atlas')).not.toBeInTheDocument();
-    fireEvent.click(within(nav).getByRole('button', { name: 'Raw Results' }));
-    expect(await screen.findByTestId('survey-page-full')).toBeVisible();
-    await waitFor(() => {
-      expect(mockSurveyPage).toHaveBeenLastCalledWith(expect.objectContaining({ autoOpenResults: true }));
-    });
-  });
+  it.each(['rxc-test', 'rxc-ra-test'])(
+    'shows %s its own context, with no built-in atlas or pre-filled Debate Map',
+    async (slug) => {
+      const props = buildProps();
+      const sessionRef = React.createRef();
+      render(
+        <MemoryRouter initialEntries={[`/session/${slug}`]}>
+          <OnePageSession
+            {...props}
+            ref={sessionRef}
+            slug={slug}
+            sessionConfig={{
+              ...props.sessionConfig,
+              slug,
+              sessionContext: {
+                title: 'Context',
+                paragraphs: ['A session introduction.', 'More background.'],
+                links: [{ label: 'Official source', url: 'https://example.org/' }],
+              },
+            }}
+          />
+        </MemoryRouter>,
+      );
+      expect(await screen.findByTestId('survey-page-pile')).toBeInTheDocument();
+      fireEvent.click(screen.getByTestId('ce-demo-documents-toggle'));
+      const context = await screen.findByTestId('ce-session-context');
+      expect(context).toBeVisible();
+      expect(
+        within(screen.getByTestId('ce-demo-documents-section')).getByRole('heading', {
+          name: /^Context(?! View)/,
+          level: 2,
+        }),
+      ).toBeVisible();
+      expect(screen.getAllByTestId('ce-session-context')).toHaveLength(1);
+      expect(context).toHaveTextContent('A session introduction.');
+      expect(context).toHaveTextContent('More background.');
+      expect(within(context).getByRole('link', { name: /Official source/ })).toHaveAttribute(
+        'href',
+        'https://example.org/',
+      );
+      // The atlas is a session's own HTML context now, not something the client adds by slug.
+      expect(screen.queryByTestId('ce-rxc-context-atlas')).not.toBeInTheDocument();
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
+      act(() => sessionRef.current.setState({ resultsViewMode: 'debateAtlas' }));
+      const nav = screen.getByTestId('ce-session-results-view-nav');
+      expect(
+        within(nav)
+          .getAllByRole('button')
+          .map((button) => button.textContent.trim()),
+      ).toEqual(['🧾Report', 'Raw Results']);
+      expect(within(nav).getByRole('button', { name: 'Report' })).toHaveAttribute('aria-pressed', 'true');
+      expect(await screen.findByTestId('polis-report')).toBeVisible();
+      expect(screen.queryByTestId('topic-circles')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('ce-session-debate-atlas')).not.toBeInTheDocument();
+      fireEvent.click(within(nav).getByRole('button', { name: 'Raw Results' }));
+      expect(await screen.findByTestId('survey-page-full')).toBeVisible();
+      await waitFor(() => {
+        expect(mockSurveyPage).toHaveBeenLastCalledWith(expect.objectContaining({ autoOpenResults: true }));
+      });
+    },
+  );
 
   describe('built debate atlases', () => {
     const atlasBuild = {
