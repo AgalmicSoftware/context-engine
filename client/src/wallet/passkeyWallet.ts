@@ -739,6 +739,8 @@ export class PasskeyEoaWalletClient {
   private retireSession(): void {
     const session = this.sessionClient;
     this.sessionClient = this.sessionClientFactory();
+    // The key leaves with the retired session, so even switching back asks for the passkey.
+    this.unlockExpiresAt = 0;
     if (this.inFlightBySession.has(session)) this.retiringSessions.add(session);
     else void session.lock().catch((error) => walletLog.warn('Passkey wallet chain-change lock failed:', error));
   }

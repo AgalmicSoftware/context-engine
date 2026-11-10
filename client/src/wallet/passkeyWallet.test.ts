@@ -1127,6 +1127,36 @@ describe('PasskeyEoaWalletClient account binding', () => {
     await client.lock();
   });
 
+  it('needs the passkey again after a chain switch, even back to its own chain', async () => {
+    const hash = `0x${'ab'.repeat(32)}`;
+    const send = jest
+      .spyOn(ethers.Wallet.prototype, 'sendTransaction')
+      .mockResolvedValue({ hash } as ethers.providers.TransactionResponse);
+    const credentials = makeCredentials();
+    const client = new PasskeyEoaWalletClient({
+      config: derivedConfig,
+      storage: createMemoryWalletStorage(),
+      credentials,
+      // Real sessions, so the one after a switch holds no key until the next unlock.
+      sessionClientFactory: createInMemorySoftSessionClient,
+    });
+    try {
+      const address = await client.createWallet();
+      client.setChain(84532);
+      client.setChain(11155420);
+      expect(client.isUnlocked()).toBe(false);
+      client.noteActivity();
+      expect(client.isUnlocked()).toBe(false);
+      // A transaction asks for the passkey, rather than failing as if it may have been sent.
+      await expect(client.sendTransaction({ from: address, to: address, value: '0x0' })).resolves.toBe(hash);
+      expect(credentials.get).toHaveBeenCalledTimes(1);
+      expect(send).toHaveBeenCalledTimes(1);
+    } finally {
+      await client.lock();
+      send.mockRestore();
+    }
+  });
+
   it('unlocks only the requested account when the app has no active wallet yet', async () => {
     const storage = createMemoryWalletStorage();
     const creator = new PasskeyEoaWalletClient({
