@@ -53,8 +53,8 @@ export function useWorkerGroupResultsFilter({
   const key = JSON.stringify([enabled, scopeKey, viewer, inputKey, discover]);
   const inputs = useRef({ sessionConfig, scope, input });
   inputs.current = { sessionConfig, scope, input };
-  // Only loads the person starts may ask them to sign in: Refresh, and opening or changing the filter
-  // while it is open. A Group filter saved or in a link loads without asking.
+  // Refreshes on focus, every minute, or after a group change or a sign-in elsewhere never ask. Any other load,
+  // a Group filter saved or in a link included, asks someone signed in to sign in if it must.
   const asked = useRef(false);
   const quiet = useRef(false);
   const loadedKey = useRef('');
@@ -93,7 +93,7 @@ export function useWorkerGroupResultsFilter({
     };
   }, [enabled, active, discover]);
   useEffect(() => {
-    const prompt = asked.current || (discover && (loadedKey.current !== key || !quiet.current));
+    const prompt = asked.current || !quiet.current || loadedKey.current !== key;
     asked.current = false;
     quiet.current = false;
     loadedKey.current = key;
@@ -122,7 +122,7 @@ export function useWorkerGroupResultsFilter({
         publish({ active, selection, members, status: 'ready', message: '' }, overview?.groups || []);
       } catch (error) {
         if (isWorkerSignInNeededError(error)) {
-          // A load that would have to ask keeps what the filter shows, or offers Retry to sign in.
+          // A refresh that would have to ask keeps what the filter shows, or offers Retry to sign in.
           if (current)
             setSnapshot((shown) =>
               shown?.key === key && shown.provider === provider

@@ -271,17 +271,26 @@ createPasskeyEip1193Provider()
 ```
 
 The facade's `isUnlocked(forMs)` says whether a request would sign without a
-passkey prompt, now and for the next `forMs` milliseconds. Requests the page
-makes by itself use it: a group list, a group image, or the Results group filter
-(its refreshes, and a filter saved or in a link) signs in to a session's Worker
-only with a sign-in this page already holds, or silently while the wallet stays
-unlocked for at least 30 more seconds (`getWorkerSessionToken` and
-`fetchWorkerWithAuth` with `prompt: false`). Otherwise it shows what a
-signed-out visitor would see. Such a request also keeps a token the Worker
-refused for one newer scope, unless a new one signs in silently. Only something
-the person does, such as signing in, submitting, joining or clicking **Sign
-in**, asks for the passkey. Worker sign-ins live in page memory, so the first
-such action after a reload, or after a sign-in's four hours, asks once.
+passkey prompt, now and for the next `forMs` milliseconds. Background requests
+use it: refreshes on focus, on a timer, or after a group change or a sign-in
+elsewhere, group images, and pages that cover many sessions, such as Community
+group counts and tag pages. They sign in to a session's Worker only with a
+sign-in this page already holds, or silently while the wallet stays unlocked
+for at least 30 more seconds (`getWorkerSessionToken` and `fetchWorkerWithAuth`
+with `prompt: false`), and otherwise keep what they show. Such a request also
+keeps a token the Worker refused for one newer scope, unless a new one signs in
+silently. A page that covers many sessions stays quiet because several passkey
+prompts at once would clash.
+
+Someone signed in, whose address shows, is asked for the passkey rather than
+shown what a signed-out visitor sees on a session page. Opening its Groups
+panel, its context files, or the Results group filter (a filter saved or in a
+link included) asks if that session needs a new sign-in, and those requests
+share one prompt. Declining keeps the signed-out view, with a button to try
+again, until anything else on the page signs in. Before the first sign-in, a
+private session shows a **Sign in** button there instead. Worker sign-ins live
+in page memory, so a reload, a new tab, or a sign-in's four hours ending asks
+once more.
 
 Capabilities report only what this wallet supports:
 

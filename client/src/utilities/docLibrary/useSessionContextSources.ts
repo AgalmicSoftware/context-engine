@@ -50,6 +50,8 @@ export function useSessionContextSources({
   const configRef = useRef(sessionConfig);
   configRef.current = sessionConfig;
   const [revision, setRevision] = useState(0);
+  // Only a reader's first list may ask them to sign in; later ones follow a sign-in or group change elsewhere.
+  const listedFor = useRef('');
   const [state, setState] = useState<{ identity: string; sources: ContextSource[]; loading: boolean; error: string }>({
     identity: '',
     sources: [],
@@ -59,9 +61,12 @@ export function useSessionContextSources({
   const active = enabled && supported && !!sessionSlug;
   useEffect(() => {
     if (!active) {
+      listedFor.current = '';
       setState({ identity, sources: [], loading: false, error: '' });
       return undefined;
     }
+    const prompt = listedFor.current !== identity;
+    listedFor.current = identity;
     let current = true;
     // Only a reload for the same identity keeps the current list while loading.
     setState((prev) =>
@@ -69,7 +74,13 @@ export function useSessionContextSources({
         ? { ...prev, loading: true, error: '' }
         : { identity, sources: [], loading: true, error: '' },
     );
-    listContextSources({ sessionSlug, sessionConfig: configRef.current, context: { account }, asAdmin: isAdmin })
+    listContextSources({
+      sessionSlug,
+      sessionConfig: configRef.current,
+      context: { account },
+      asAdmin: isAdmin,
+      prompt,
+    })
       .then((sources) => current && setState({ identity, sources, loading: false, error: '' }))
       .catch((error: unknown) => {
         if (current) {
@@ -96,8 +107,8 @@ export function useSessionContextSources({
       stopHearingGroups();
     };
   }, [active, isAdmin, reload]);
-  // Someone signed in whose browser holds no token, as after a reload, can't yet be shown their groups' files;
-  // listing never asks them to sign, so the page offers it.
+  // Someone signed in whose browser holds no token, as after a declined sign-in, can't yet be shown their
+  // groups' files, so the page offers it.
   const [groupFilesHidden, setGroupFilesHidden] = useState(false);
   useEffect(() => {
     if (!active || isAdmin || !account) {
@@ -128,14 +139,16 @@ export function useSessionContextSources({
   // The render that changes identity runs before the effect clears the old list.
   const { identity: loadedFor, ...loaded } = state;
   const fresh = loadedFor === identity;
+  const loading = fresh ? loaded.loading : active;
   return {
     sources: fresh ? loaded.sources : NO_SOURCES,
-    loading: fresh ? loaded.loading : active,
+    loading,
     error: fresh ? loaded.error : '',
     supported,
     isAdmin,
     participantsCanAdd: mayAdd && workerAccepts,
-    groupFilesHidden,
+    // Not offered while the list, and any sign-in it asked for, is still under way.
+    groupFilesHidden: groupFilesHidden && !loading,
     reload,
   };
 }

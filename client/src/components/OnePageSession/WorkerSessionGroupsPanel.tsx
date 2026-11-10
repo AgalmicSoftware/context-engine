@@ -57,8 +57,7 @@ const toText = (value: unknown): string => String(value ?? '').trim();
 type WorkerGroupsAuthState = {
   targetKey: string;
   token: string;
-  // needs_sign_in: signing in would have asked the person, which only something they do may do.
-  status: 'idle' | 'loading' | 'ready' | 'error' | 'needs_sign_in';
+  status: 'idle' | 'loading' | 'ready' | 'error';
   error: string;
 };
 
@@ -155,10 +154,7 @@ const WorkerSessionGroupsPanel = ({
     !!workerToken ||
     (!authenticateOnRender && !membershipsOnly && allowAnonymousGroupDiscovery) ||
     (!normalizedAccount && !membershipsOnly && allowAnonymousGroupDiscovery) ||
-    (!!normalizedAccount &&
-      (authStatus === 'error' || authStatus === 'needs_sign_in') &&
-      !membershipsOnly &&
-      allowAnonymousGroupDiscovery);
+    (!!normalizedAccount && authStatus === 'error' && !membershipsOnly && allowAnonymousGroupDiscovery);
 
   const authenticate = useCallback(
     async ({ prompt = true }: { prompt?: boolean } = {}) => {
@@ -169,9 +165,9 @@ const WorkerSessionGroupsPanel = ({
       }
       const requestId = authRequestIdRef.current + 1;
       authRequestIdRef.current = requestId;
-      // A quiet try from the signed-out view keeps it on screen until the person's groups load.
+      // A quiet retry keeps the failed sign-in on screen until the person's groups load.
       setAuthState((shown) =>
-        !prompt && shown.targetKey === requestTargetKey && shown.status === 'needs_sign_in'
+        !prompt && shown.targetKey === requestTargetKey && shown.status === 'error'
           ? shown
           : { targetKey: requestTargetKey, token: '', status: 'loading', error: '' },
       );
@@ -191,11 +187,7 @@ const WorkerSessionGroupsPanel = ({
           error: '',
         });
       } catch (error) {
-        if (isWorkerSignInNeededError(error)) {
-          if (authRequestIdRef.current === requestId)
-            setAuthState({ ...emptyAuthState(requestTargetKey), status: 'needs_sign_in' });
-          return;
-        }
+        if (isWorkerSignInNeededError(error)) return;
         setPendingJoin((pending) => (pending?.targetKey === requestTargetKey ? undefined : pending));
         if (authRequestIdRef.current !== requestId) return;
         setAuthState({
@@ -234,8 +226,9 @@ const WorkerSessionGroupsPanel = ({
   useEffect(() => {
     setGroupsRevision(0);
     authRequestIdRef.current += 1;
+    // Someone signed in is asked to sign in to the session rather than shown what a signed-out visitor sees.
     if (shouldAuthenticateOnRender) {
-      void authenticate({ prompt: false });
+      void authenticate();
     } else {
       setAuthState(emptyAuthState(targetKey));
     }
@@ -245,15 +238,10 @@ const WorkerSessionGroupsPanel = ({
   }, [authenticate, shouldAuthenticateOnRender, targetKey]);
 
   useEffect(() => {
-    if (authStatus !== 'needs_sign_in') return undefined;
-    // A Join clicked while signed out goes on through the sign-in it started, asking if it must.
-    if (pendingJoin?.targetKey === targetKey) {
-      void authenticate();
-      return undefined;
-    }
-    // A sign-in for something done elsewhere on the page shows the person's groups here too.
+    if (authStatus !== 'error') return undefined;
+    // After a declined or failed sign-in, one for something done elsewhere on the page shows the person's groups.
     return subscribeWorkerSessionToken(() => void authenticate({ prompt: false }));
-  }, [authStatus, authenticate, pendingJoin, targetKey]);
+  }, [authStatus, authenticate]);
 
   useEffect(() => {
     if (!showCreate || !participantGroupCreationEnabled) {
@@ -449,8 +437,7 @@ const WorkerSessionGroupsPanel = ({
     );
   }
 
-  const needsSignIn = authStatus === 'needs_sign_in' && (membershipsOnly || !allowAnonymousGroupDiscovery);
-  if ((!normalizedAccount && !allowAnonymousGroupDiscovery) || needsSignIn) {
+  if (!normalizedAccount && !allowAnonymousGroupDiscovery) {
     if (createOnly) return <div data-testid="ce-session-worker-groups-native">{renderCreatePanel()}</div>;
     return (
       <div className={styles.workerGroupNotice} data-testid="ce-session-worker-groups-login">

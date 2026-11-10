@@ -128,6 +128,33 @@ describe('useSessionContextSources', () => {
     await resolveLatest([]);
   });
 
+  it('lets only a reader’s first list ask them to sign in, and offers group files only once it has loaded', async () => {
+    mockTokenHeld = false;
+    const { result, rerender } = mount(READER);
+    expect(mockRequests[mockRequests.length - 1].options.prompt).toBe(true);
+    await act(async () => undefined);
+    // The list, and any sign-in it asked for, is still under way.
+    expect(result.current.groupFilesHidden).toBe(false);
+    await resolveLatest([source('public')]);
+    await waitFor(() => expect(result.current.groupFilesHidden).toBe(true));
+    act(() => mockHearToken());
+    expect(mockRequests[mockRequests.length - 1].options.prompt).toBe(false);
+    act(() => mockHearGroups());
+    expect(mockRequests[mockRequests.length - 1].options.prompt).toBe(false);
+    rerender({ sessionSlug: 'salon', sessionConfig: config(), account: ADMIN });
+    expect(mockRequests[mockRequests.length - 1].options.prompt).toBe(true);
+    await resolveLatest([]);
+    // A list hidden and shown again is a first list once more.
+    const shown = renderHook((props: HookProps & { enabled: boolean }) => useSessionContextSources(props), {
+      initialProps: { sessionSlug: 'salon', sessionConfig: config(), account: READER, enabled: true },
+    });
+    await resolveLatest([]);
+    shown.rerender({ sessionSlug: 'salon', sessionConfig: config(), account: READER, enabled: false });
+    shown.rerender({ sessionSlug: 'salon', sessionConfig: config(), account: READER, enabled: true });
+    expect(mockRequests[mockRequests.length - 1].options.prompt).toBe(true);
+    await resolveLatest([]);
+  });
+
   it('asks nothing of admins or signed-out readers about groups’ files', async () => {
     mockTokenHeld = false;
     const admin = mount(ADMIN);

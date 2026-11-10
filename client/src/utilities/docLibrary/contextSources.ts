@@ -52,6 +52,8 @@ export type ContextSourceOptions = {
   context?: unknown;
   /** Admins read as themselves first, so their admins-only items are included. */
   asAdmin?: boolean;
+  /** Listing may ask someone signed in to sign in to the session, so their groups' items are included. */
+  prompt?: boolean;
 };
 
 const MAX_LIST_PAGES = 5;
@@ -121,7 +123,7 @@ const toSource = (item: unknown): (ContextSource & { role: string; derivedFrom: 
 
 /** The context sources this reader may see, oldest first, each PDF with its AI reading. */
 export const listContextSources = async (options: ContextSourceOptions): Promise<ContextSource[]> => {
-  const listRows = async (preferAnonymous: boolean) => {
+  const listRows = async (preferAnonymous: boolean, prompt: boolean) => {
     const rows: NonNullable<ReturnType<typeof toSource>>[] = [];
     let cursor: string | null = null;
     for (let page = 0; page < MAX_LIST_PAGES; page += 1) {
@@ -131,8 +133,7 @@ export const listContextSources = async (options: ContextSourceOptions): Promise
         role: 'context',
         cursor,
         preferAnonymous,
-        // Only an admin's own view may ask them to sign in again.
-        prompt: !!options.asAdmin,
+        prompt,
       });
       result.items.forEach((item) => {
         const source = toSource(item);
@@ -143,12 +144,13 @@ export const listContextSources = async (options: ContextSourceOptions): Promise
     }
     return rows;
   };
-  // Someone already signed in to this session sees their groups' items too; listing never asks them to sign.
-  const asThemselves = options.asAdmin || (await hasCachedWorkerSessionToken(workerOptions(options)));
-  const rows = await listRows(!asThemselves).catch((error: unknown) => {
-    // Their held sign-in can be refused, as after an access change: show what a signed-out visitor sees.
+  // Someone signed in sees their groups' items too, asked to sign in only where the caller allows it.
+  const prompt = !!options.asAdmin || (!!options.prompt && !!toStr(asRecord(options.context).account).trim());
+  const asThemselves = prompt || (await hasCachedWorkerSessionToken(workerOptions(options)));
+  const rows = await listRows(!asThemselves, prompt).catch((error: unknown) => {
+    // A declined or refused sign-in, as after an access change, shows what a signed-out visitor sees.
     if (options.asAdmin || !asThemselves) throw error;
-    return listRows(true);
+    return listRows(true, false);
   });
   const readings = new Map(rows.filter((row) => row.role === CONTEXT_TEXT_ROLE).map((row) => [row.derivedFrom, row]));
   return rows
