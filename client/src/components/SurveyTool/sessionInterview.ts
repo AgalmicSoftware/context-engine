@@ -280,11 +280,17 @@ export const resolveSessionVoiceMode = (search: unknown): SessionVoiceMode | nul
 export const opensSessionVoiceChooser = (search: unknown): boolean =>
   readModeQuery(search) === VOICE_CHOOSER_QUERY_VALUE;
 
-export const buildSessionVoiceModeSearch = (search: unknown, mode: SessionVoiceMode | null): string => {
+const MODE_QUERY_VALUES = {
+  interview: INTERVIEW_MODE_QUERY_VALUE,
+  recordGroup: GROUP_CONVERSATION_MODE_QUERY_VALUE,
+  voice: VOICE_CHOOSER_QUERY_VALUE,
+} as const;
+
+/** `voice` asks for the two choices; null takes any voice mode out of the address. */
+export const buildSessionVoiceModeSearch = (search: unknown, mode: SessionVoiceMode | 'voice' | null): string => {
   const raw = toTrimmedString(search);
   const params = new URLSearchParams(raw.startsWith('?') ? raw : `?${raw}`);
-  if (mode)
-    params.set('mode', mode === 'recordGroup' ? GROUP_CONVERSATION_MODE_QUERY_VALUE : INTERVIEW_MODE_QUERY_VALUE);
+  if (mode) params.set('mode', MODE_QUERY_VALUES[mode]);
   else if (SESSION_VOICE_MODE_QUERY_VALUES.includes(params.get('mode') || '')) params.delete('mode');
   const next = params.toString();
   return next ? `?${next}` : '';

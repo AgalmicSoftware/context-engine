@@ -1548,20 +1548,44 @@ it('explains speaker numbering without exposing audio parts, with the reason beh
   expect(help).toHaveAccessibleDescription(/Person number may refer to someone different/);
 });
 
+it('stays busy while a close finishes, so the dialog keeps Back off until it has', async () => {
+  const onBusyChange = jest.fn();
+  let finish = () => {};
+  (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+    buildRecorder({
+      finalizeRecording: jest.fn(
+        () =>
+          new Promise<void>((resolve) => {
+            finish = resolve;
+          }),
+      ),
+      keepAudio: jest.fn(async () => {}),
+    }),
+  );
+  const onClose = jest.fn();
+  render(<SessionListeningPanel sessionSlug="room" onClose={onClose} onBusyChange={onBusyChange} />);
+  expect(onBusyChange).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByLabelText('Close listening panel'));
+  expect(onBusyChange).toHaveBeenLastCalledWith(true);
+  await act(async () => finish());
+  expect(onClose).toHaveBeenCalledTimes(1);
+  expect(onBusyChange).toHaveBeenLastCalledWith(false);
+});
+
 it('offers Close and keep the audio only after capture stops, with its explanation behind a question mark', () => {
-  const onCaptureChange = jest.fn();
+  const onBusyChange = jest.fn();
   const pending = { segments: [{ id: 'up', index: 0, status: 'transcribing', text: '', startedAt: 1 }] };
   (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
     buildRecorder({ ...pending, pendingSegmentCount: 1, isRecording: true, status: 'recording' }),
   );
   const { rerender } = render(
-    <SessionListeningPanel sessionSlug="room" onClose={jest.fn()} onCaptureChange={onCaptureChange} />,
+    <SessionListeningPanel sessionSlug="room" onClose={jest.fn()} onBusyChange={onBusyChange} />,
   );
   expect(screen.queryByRole('button', { name: 'Close and keep the audio' })).not.toBeInTheDocument();
-  expect(onCaptureChange).toHaveBeenLastCalledWith(true);
+  expect(onBusyChange).toHaveBeenLastCalledWith(true);
   (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(buildRecorder({ ...pending, pendingSegmentCount: 1 }));
-  rerender(<SessionListeningPanel sessionSlug="room" onClose={jest.fn()} onCaptureChange={onCaptureChange} />);
-  expect(onCaptureChange).toHaveBeenLastCalledWith(false);
+  rerender(<SessionListeningPanel sessionSlug="room" onClose={jest.fn()} onBusyChange={onBusyChange} />);
+  expect(onBusyChange).toHaveBeenLastCalledWith(false);
   const keep = screen.getByRole('button', { name: 'Close and keep the audio' });
   const help = screen.getByRole('button', { name: 'About closing and keeping the audio' });
   expect(keep).toHaveAccessibleDescription(/resumes uploading when you reopen this recording/);

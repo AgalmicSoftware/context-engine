@@ -91,6 +91,8 @@ describe('session interview protocol', () => {
     expect(resolveSessionVoiceMode('?mode=voice')).toBeNull();
     expect(buildSessionVoiceModeSearch('?x=1&mode=voice', 'interview')).toBe('?x=1&mode=interview');
     expect(buildSessionVoiceModeSearch('?x=1&mode=voice', null)).toBe('?x=1');
+    // Back from a mode returns to the choices, which the address keeps.
+    expect(buildSessionVoiceModeSearch('?x=1&mode=interview', 'voice')).toBe('?x=1&mode=voice');
   });
 
   it('defaults the feature on and honors explicit per-session disablement', () => {

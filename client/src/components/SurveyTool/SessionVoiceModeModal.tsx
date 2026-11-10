@@ -14,7 +14,7 @@ import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { VOICE_DIALOG_NOTICE_SLOT_ID } from '../../utilities/ui/voiceDialogNoticeSlot';
 import { useKeptRecording } from '../../utilities/audio/useRecordingChunkQueue';
 import { sortInterviewQuestionPoolNewestFirst } from './sessionInterviewQuestionOrder';
-import { normalizeInterviewQuestions, type InterviewPrefillPacket } from './sessionInterview';
+import { normalizeInterviewQuestions, type InterviewPrefillPacket, type SessionVoiceMode } from './sessionInterview';
 import type { TranscriptClaim } from './sessionTranscriptClaim';
 import type { SessionVoiceModeModalProps } from './sessionVoiceModeTypes';
 import styles from './SurveyTool.module.scss';
@@ -43,8 +43,11 @@ export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps)
   const keptHelpId = `ce-kept-audio-help-${useId().replace(/:/g, '')}`;
   // Dismissed until the dialog next closes, so it never covers the page for good.
   const [keptDismissed, setKeptDismissed] = useState(false);
+  // The choice Back left, which takes focus when the two choices return, so focus doesn't drop to the page.
+  const [backFrom, setBackFrom] = useState<SessionVoiceMode | null>(null);
   useEffect(() => {
     if (isOpen) setKeptDismissed(false);
+    else setBackFrom(null);
   }, [isOpen]);
   // While closed, audio a Group Conversation kept on this device still has to be uploaded, and what only this
   // page holds (device storage failed) is lost by a reload.
@@ -76,12 +79,13 @@ export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps)
     onInterviewProgressChange?.(hasUnsavedReview);
   }, [hasUnsavedReview, onInterviewProgressChange]);
   const groupCloseRef = useRef<(() => Promise<void>) | null>(null);
-  // A tap outside or Escape must not end a recording; the header close button still stops and saves it.
-  const [groupCapturing, setGroupCapturing] = useState(false);
+  // Capturing, or finishing a close: a tap outside or Escape must not end a recording (the header close button
+  // still stops and saves it), and Back waits.
+  const [groupBusy, setGroupBusy] = useState(false);
   // The header spot Group Conversation puts its + in, once the header has rendered.
   const [headerActions, setHeaderActions] = useState<HTMLSpanElement | null>(null);
-  // A code opened in a tab that's recording waits for Stop, so it can't end the recording.
-  const scanning = (scanRequested || !!props.claimFrame) && !groupCapturing;
+  // A code opened in a tab that's recording waits until the recording has stopped and finished.
+  const scanning = (scanRequested || !!props.claimFrame) && !groupBusy;
   const stopScanning = () => {
     setScanRequested(false);
     props.onClaimFrameDone?.();
@@ -100,8 +104,14 @@ export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps)
   // Back to the two choices. Group Conversation first finishes its recording and uploads, as closing does,
   // and an interview with unsaved work asks first, as Discard does.
   const backAfterGroupClose = useRef(false);
+  const backToChoices = () => {
+    setBackFrom(mode);
+    onSelectMode(null);
+  };
   const goBack = () => {
     if (mode === 'recordGroup' && groupCloseRef.current) {
+      // A second Back while the first finishes would otherwise turn it into a close.
+      if (backAfterGroupClose.current) return;
       backAfterGroupClose.current = true;
       void groupCloseRef.current().finally(() => {
         backAfterGroupClose.current = false;
@@ -109,7 +119,7 @@ export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps)
     } else if (mode === 'interview' && hasUnsavedReview) setConfirmDiscard('back');
     else {
       if (mode === 'interview') leaveInterview();
-      onSelectMode(null);
+      backToChoices();
     }
   };
   // The prompt to have your own AI draft your answers, on the choices and on Interview.
@@ -134,8 +144,8 @@ export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps)
         isOpen={isOpen}
         unmountOnClose={mode !== 'interview'}
         toggle={requestClose}
-        backdrop={groupCapturing ? 'static' : true}
-        keyboard={!groupCapturing}
+        backdrop={groupBusy ? 'static' : true}
+        keyboard={!groupBusy}
         size="lg"
         centered
         labelledBy="ce-session-voice-mode-title"
@@ -167,7 +177,7 @@ export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps)
               <span className={styles.sessionVoiceModeTitle}>
                 <span className={styles.sessionRecordingHeading}>
                   {mode === 'recordGroup' ? (
-                    <SessionVoiceModeBackButton id="ce-group-back" onBack={goBack} disabled={groupCapturing} />
+                    <SessionVoiceModeBackButton id="ce-group-back" onBack={goBack} disabled={groupBusy} />
                   ) : null}
                   {/* The dialog takes its name from the title alone, not the icons beside it. */}
                   <span id="ce-session-voice-mode-title">{title}</span>
@@ -186,7 +196,7 @@ export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps)
                         className={styles.sessionInterviewHeaderButton}
                         data-ce-control-appearance="frameless"
                         aria-label="Scan code"
-                        disabled={groupCapturing}
+                        disabled={groupBusy}
                         data-testid={E2E_TESTIDS.SESSION_CLAIM_SCAN}
                         onClick={() => setScanRequested(true)}
                       >
@@ -202,15 +212,17 @@ export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps)
             </ModalHeader>
             <ModalBody>
               {!mode ? (
-                <SessionVoiceModeChooser onSelectMode={onSelectMode}>{prefillCard}</SessionVoiceModeChooser>
+                <SessionVoiceModeChooser onSelectMode={onSelectMode} focusMode={backFrom}>
+                  {prefillCard}
+                </SessionVoiceModeChooser>
               ) : (
                 <SessionListeningPanel
                   {...props}
                   panelMode="recordGroup"
                   embeddedInModal
-                  onClose={() => (backAfterGroupClose.current ? onSelectMode(null) : onClose())}
+                  onClose={() => (backAfterGroupClose.current ? backToChoices() : onClose())}
                   closeActionRef={groupCloseRef}
-                  onCaptureChange={setGroupCapturing}
+                  onBusyChange={setGroupBusy}
                   headerActionsSlot={headerActions}
                 />
               )}
@@ -287,7 +299,7 @@ export default function SessionVoiceModeModal(props: SessionVoiceModeModalProps)
           const next = confirmDiscard;
           setConfirmDiscard(null);
           leaveInterview();
-          if (next === 'back') onSelectMode(null);
+          if (next === 'back') backToChoices();
           else onClose();
         }}
         testId="ce-interview-discard"

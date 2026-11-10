@@ -1545,7 +1545,7 @@ const syncListeningModeQuery = (enabled: any) => {
   }
 };
 
-const syncSessionVoiceModeQuery = (mode: SessionVoiceMode | null) => {
+const syncSessionVoiceModeQuery = (mode: SessionVoiceMode | 'voice' | null) => {
   if (typeof window === 'undefined' || !window.history?.replaceState) return;
   try {
     const nextSearch = buildSessionVoiceModeSearch(window.location.search || '', mode);
@@ -1579,7 +1579,8 @@ export const toggleSessionVoiceModeModal = (engine: PileViewModeEngine) => {
 
 const selectSessionVoiceMode = (engine: PileViewModeEngine, mode: SessionVoiceMode | null) => {
   engine.setState({ showVoiceModeModal: true, sessionVoiceMode: mode }, () => {
-    engine.syncSessionVoiceModeQuery(mode);
+    // Back to the two choices keeps them in the address, so a reload reopens them.
+    engine.syncSessionVoiceModeQuery(mode ?? 'voice');
   });
 };
 

@@ -655,6 +655,10 @@ describe('SurveyPileViewMode runtime surface', () => {
     expect(await screen.findByTestId('mock-voice-mode-modal')).toHaveAttribute('data-mode', 'chooser');
     await act(async () => mockVoiceModeProps.onSelectMode('interview'));
     expect(window.location.search).toBe('?foo=1&mode=interview');
+    // Back to the choices keeps them in the address, so a reload reopens them.
+    await act(async () => mockVoiceModeProps.onSelectMode(null));
+    expect(screen.getByTestId('mock-voice-mode-modal')).toHaveAttribute('data-mode', 'chooser');
+    expect(window.location.search).toBe('?foo=1&mode=voice');
     await act(async () => mockVoiceModeProps.onClose());
     expect(window.location.search).toBe('?foo=1');
   });

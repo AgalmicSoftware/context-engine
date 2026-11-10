@@ -1,8 +1,9 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import SessionVoiceModeModal from './SessionVoiceModeModal';
 import SessionInterviewModalHeader from './SessionInterviewModalHeader';
 import { VoiceModeBackContext } from './SessionVoiceModeBack';
+import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 
 jest.mock('./CreateQuestionsAndSurveys', () => ({ __esModule: true, default: () => null }));
 jest.mock('./useInterviewReadiness', () => ({
@@ -27,27 +28,37 @@ jest.mock('./SessionVoicePrefillCard', () => ({
   __esModule: true,
   default: () => <div data-testid="mock-prefill-card" />,
 }));
-// Group Conversation as the dialog sees it: a close action that finishes its work, and the capture it reports.
+// Group Conversation as the dialog sees it: a close action that finishes its work, once at a time as the real
+// panel's does, and the busy state it reports.
 const mockFinishGroup = jest.fn();
+const mockGroupWork = jest.fn(async () => {});
 type MockListeningProps = {
   closeActionRef: { current: (() => Promise<void>) | null };
   onClose: () => void;
-  onCaptureChange: (capturing: boolean) => void;
+  onBusyChange: (busy: boolean) => void;
 };
 jest.mock('./SessionListeningPanel', () => {
   const { useEffect } = jest.requireActual<typeof import('react')>('react');
-  function MockListeningPanel({ closeActionRef, onClose, onCaptureChange }: MockListeningProps) {
+  function MockListeningPanel({ closeActionRef, onClose, onBusyChange }: MockListeningProps) {
     useEffect(() => {
+      let closing = false;
       closeActionRef.current = async () => {
-        mockFinishGroup();
-        onClose();
+        if (closing) return;
+        closing = true;
+        try {
+          mockFinishGroup();
+          await mockGroupWork();
+          onClose();
+        } finally {
+          closing = false;
+        }
       };
       return () => {
         closeActionRef.current = null;
       };
     }, [closeActionRef, onClose]);
     return (
-      <button type="button" onClick={() => onCaptureChange(true)}>
+      <button type="button" onClick={() => onBusyChange(true)}>
         Start recording
       </button>
     );
@@ -81,7 +92,7 @@ const prefillPacket = {
   source: { platform: 'other' as const, modelId: 'unknown', verification: 'self_reported' as const },
   responderContext: { summary: 'Synthetic context' },
 };
-const back = () => screen.getByRole('button', { name: 'Back' });
+const back = () => screen.getByRole('button', { name: 'Back to Voice mode' });
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -91,7 +102,7 @@ describe('Back in the Voice mode dialog', () => {
   it('has no Back on the two choices', () => {
     render(<SessionVoiceModeModal {...baseProps} />);
     expect(screen.getByTestId('mock-prefill-card')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Back' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Back to Voice mode' })).toBeNull();
   });
 
   it('goes back from an Interview with nothing in it, which keeps the prompt card on hand', () => {
@@ -106,6 +117,7 @@ describe('Back in the Voice mode dialog', () => {
     render(<SessionVoiceModeModal {...baseProps} mode="interview" prefillPacket={prefillPacket} />);
     expect(screen.queryByTestId('mock-prefill-card')).toBeNull();
     // Back stays off while the imported answers are mapped to drafts.
+    expect(back()).toBeDisabled();
     await waitFor(() => expect(back()).toBeEnabled());
     fireEvent.click(back());
     const ask = await screen.findByTestId('ce-interview-discard');
@@ -153,5 +165,43 @@ describe('Back in the Voice mode dialog', () => {
     expect(baseProps.onSelectMode).toHaveBeenCalledTimes(1);
     fireEvent.click(screen.getByRole('button', { name: 'Start recording' }));
     expect(back()).toBeDisabled();
+  });
+
+  it('lets a second Back wait for the first, which still goes back rather than closing', async () => {
+    let finish = () => {};
+    mockGroupWork.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    render(<SessionVoiceModeModal {...baseProps} mode="recordGroup" />);
+    fireEvent.click(back());
+    fireEvent.click(back());
+    await act(async () => finish());
+    await waitFor(() => expect(baseProps.onSelectMode).toHaveBeenCalledWith(null));
+    expect(baseProps.onClose).not.toHaveBeenCalled();
+    expect(mockFinishGroup).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ['Interview', 'interview', E2E_TESTIDS.SESSION_VOICE_MODE_INTERVIEW],
+    ['Group Conversation', 'recordGroup', E2E_TESTIDS.SESSION_VOICE_MODE_GROUP],
+  ] as const)('puts focus on %s among the choices it went back to', async (_name, mode, choice) => {
+    const { rerender } = render(<SessionVoiceModeModal {...baseProps} mode={mode} />);
+    fireEvent.click(back());
+    await waitFor(() => expect(baseProps.onSelectMode).toHaveBeenCalledWith(null));
+    rerender(<SessionVoiceModeModal {...baseProps} mode={null} />);
+    expect(screen.getByTestId(choice)).toHaveFocus();
+  });
+
+  it('focuses no choice when the dialog later reopens on them', async () => {
+    const { rerender } = render(<SessionVoiceModeModal {...baseProps} mode="interview" />);
+    fireEvent.click(back());
+    rerender(<SessionVoiceModeModal {...baseProps} mode={null} />);
+    rerender(<SessionVoiceModeModal {...baseProps} mode={null} isOpen={false} />);
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    rerender(<SessionVoiceModeModal {...baseProps} mode={null} />);
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_VOICE_MODE_INTERVIEW)).not.toHaveFocus();
   });
 });
