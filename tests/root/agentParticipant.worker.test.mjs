@@ -1401,7 +1401,7 @@ test('the Group Agent answers a member from stored answers through the real Work
     workerOrigin: WORKER_ORIGIN, slug: SLUG, trustedOrigins: ['https://contextengine.sh'], wallet: alice.wallet, fetchImpl: workerFetch(env),
   });
   assert.deepEqual(await client.request('/group-agent/status', { method: 'POST', auth: true, body: {} }), {
-    on: true, answers: 'detailed', audience: 0,
+    on: true, answers: 'detailed', audience: 0, optedOut: false,
   });
   const reply = await client.request('/group-agent/ask', { method: 'POST', auth: true, body: { question: 'Do people want labels?' } });
   assert.deepEqual({ answer: reply.answer, answers: reply.answers, read: reply.read.answers }, {
@@ -1411,4 +1411,13 @@ test('the Group Agent answers a member from stored answers through the real Work
   for (const piece of ['Labels help readers', 'Answer as yourself', 'Do people want labels?']) assert.match(sent[0], new RegExp(piece));
   for (const address of [alice.wallet.address, bob.wallet.address]) assert.doesNotMatch(sent[0], new RegExp(address.slice(2), 'i'));
   assert.doesNotMatch(sent[0], /delve\.town|participant_/);
+
+  // Bob turns it off: the next answer goes without his.
+  const bobClient = createWorkerClient({
+    workerOrigin: WORKER_ORIGIN, slug: SLUG, trustedOrigins: ['https://contextengine.sh'], wallet: bob.wallet, fetchImpl: workerFetch(env),
+  });
+  assert.deepEqual(await bobClient.request('/group-agent/opt-out', { method: 'POST', auth: true, body: { optedOut: true } }), { optedOut: true });
+  const without = await client.request('/group-agent/ask', { method: 'POST', auth: true, body: { question: 'Do people want labels?' } });
+  assert.equal(without.read.answers, 0);
+  assert.doesNotMatch(sent[1], /Labels help readers/);
 });

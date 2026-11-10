@@ -92,9 +92,9 @@ test('with no setting the Group Agent is off: status says so, and a question is 
 test('the first audience that admits someone sets their answers, admins get Detailed, and the reply names the audience', async () => {
   const h = await seeded();
   const status = async (address) => (await ask(h, { path: '/group-agent/status', body: {}, address })).body;
-  assert.deepEqual(await status(MEMBER), { on: true, answers: 'detailed', audience: 0 });
-  assert.deepEqual(await status(PARTICIPANT), { on: true, answers: 'general', audience: 1 });
-  assert.deepEqual(await status(ADMIN), { on: true, answers: 'detailed', audience: 'admin' });
+  assert.deepEqual(await status(MEMBER), { on: true, answers: 'detailed', audience: 0, optedOut: false });
+  assert.deepEqual(await status(PARTICIPANT), { on: true, answers: 'general', audience: 1, optedOut: false });
+  assert.deepEqual(await status(ADMIN), { on: true, answers: 'detailed', audience: 'admin', optedOut: false });
   // The path decides, whatever action the body names.
   const answered = await ask(h, { address: MEMBER });
   assert.equal(answered.status, 200);
@@ -107,7 +107,7 @@ test('no audience admits someone whose AI access has lapsed, or who is in no lis
   assert.equal(lapsed.body.reason, 'group_agent_not_admitted');
   assert.deepEqual(lapsed.calls.ai, []);
   const h = await seeded({ audiences: [{ who: salonMembers, answers: 'general' }] });
-  assert.deepEqual((await ask(h, { path: '/group-agent/status', body: {} })).body, { on: true, answers: null, audience: null });
+  assert.deepEqual((await ask(h, { path: '/group-agent/status', body: {} })).body, { on: true, answers: null, audience: null, optedOut: false });
   const outsider = await ask(h);
   assert.equal(outsider.status, 403);
   assert.deepEqual(outsider.calls.ai, []);
@@ -211,4 +211,44 @@ test('a question must be there and short, and an ended session or AI turned off 
   const ended = await ask(h);
   assert.equal(ended.status, 410);
   assert.deepEqual(ended.calls.ai, []);
+});
+
+test('each person can turn off the Group Agent’s use of their answers and files, and turn it back on', async () => {
+  const h = await seeded();
+  const optOut = (address, optedOut) => ask(h, { path: '/group-agent/opt-out', address, body: { optedOut } });
+  assert.deepEqual((await optOut(MEMBER, true)).body, { optedOut: true });
+  assert.equal((await ask(h, { path: '/group-agent/status', body: {}, address: MEMBER })).body.optedOut, true);
+  assert.doesNotMatch((await ask(h, { address: ADMIN })).prompt, /ANSWER/);
+  // The admin added the files: opted out, they leave every answer, but the
+  // session's own context stays.
+  await optOut(ADMIN, true);
+  const general = await ask(h);
+  assert.doesNotMatch(general.prompt, /OPEN agenda/);
+  assert.match(general.prompt, /CONTEXT/);
+  await optOut(MEMBER, false);
+  await optOut(ADMIN, false);
+  const admin = await ask(h, { address: ADMIN });
+  for (const piece of ['ANSWER meet less', 'OPEN agenda', 'ADMINS plan']) assert.match(admin.prompt, new RegExp(piece));
+  assert.equal((await optOut(MEMBER, 'yes')).status, 400);
+});
+
+test('answers without an address stay out, and no question goes ahead when opt-outs can’t be read', async () => {
+  const h = await seeded();
+  const anonymous = await ask(h, {
+    address: ADMIN,
+    deps: {
+      loadWorkerCanonicalResultsAnalysisSource: async () => ({
+        ok: true,
+        aiSnapshot: { responses: [{ questionId: 'q1', questionPrompt: 'What should change?', answer: 'ANSWER from no one', participantId: 'participant_001' }] },
+        participantAddresses: new Map(),
+      }),
+    },
+  });
+  assert.doesNotMatch(anonymous.prompt, /ANSWER/);
+  const down = async () => ({ ok: false, status: 503, body: {} });
+  const refused = await ask(h, { deps: { callGroupAgentOptOutStore: down } });
+  assert.equal(refused.status, 503);
+  assert.deepEqual(refused.calls.ai, []);
+  assert.equal((await ask(h, { path: '/group-agent/status', body: {}, deps: { callGroupAgentOptOutStore: down } })).status, 503);
+  assert.equal((await ask(h, { path: '/group-agent/opt-out', body: { optedOut: true }, deps: { callGroupAgentOptOutStore: down } })).status, 503);
 });

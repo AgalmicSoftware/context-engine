@@ -8,17 +8,23 @@ import {
   loadWorkerCanonicalResultsAnalysisSource,
   readPublishedResultsAnalysisArtifact,
 } from './resultsAnalysisGeneration.js';
+import { callSessionConfigCoordinator } from './sessionConfigAuthority.js';
 import {
   authorizeCloudflareStorageResourceRead,
   createRequesterAccessChecks,
   resolveSessionAdminAddresses,
 } from './storageRouteExecution.js';
 
-// POST /group-agent/status says how this person would be answered, and
-// POST /group-agent/ask answers one question. Each request judges who may ask
-// afresh and gathers what the person's answer style may read; the page sends
-// only the question.
-export const GROUP_AGENT_PATHS = Object.freeze(['/group-agent/status', '/group-agent/ask']);
+// POST /group-agent/status says how this person would be answered,
+// POST /group-agent/ask answers one question, and POST /group-agent/opt-out
+// turns the agent's use of their answers and files off or on. Each question
+// judges who may ask afresh and gathers what the person's answer style may
+// read; the page sends only the question.
+export const GROUP_AGENT_PATHS = Object.freeze(['/group-agent/status', '/group-agent/ask', '/group-agent/opt-out']);
+const OPT_OUTS_UNAVAILABLE = 'Who turned the Group Agent off couldn’t be read just now. Try again shortly.';
+
+const callOptOutStore = (env, slug, operation, payload = {}) =>
+  callSessionConfigCoordinator({ env, slug, path: `group-agent/${operation}`, ...payload });
 
 const trim = (value) => (typeof value === 'string' ? value.trim() : '');
 const lower = (value) => trim(value).toLowerCase();
@@ -79,11 +85,15 @@ const readVisibleResults = async ({ env, slug, config, address, scopes, admin, d
 
 // Members' answers by question, as the session's own analysis reads them:
 // latest per person, withheld and locked answers left out, with no names.
-const readMemberAnswers = async ({ env, slug, config, deps }) => {
+// Only answers from an address that hasn't opted out are used; one without an
+// address couldn't have said either way, so it stays out.
+const readMemberAnswers = async ({ env, slug, config, optedOut, deps }) => {
   const source = await (deps.loadWorkerCanonicalResultsAnalysisSource || loadWorkerCanonicalResultsAnalysisSource)({ env, slug, config });
   if (!source?.ok) return null;
   const byQuestion = new Map();
   source.aiSnapshot.responses.forEach((response) => {
+    const from = source.participantAddresses?.get(response.participantId);
+    if (!from || optedOut.has(from)) return;
     const answer = [trim(response.answer), trim(response.additional)].filter(Boolean).join(' — ');
     if (!answer) return;
     const group = byQuestion.get(response.questionId) || { question: trim(response.questionPrompt), answers: [] };
@@ -96,14 +106,16 @@ const readMemberAnswers = async ({ env, slug, config, deps }) => {
 // What each style reads, decided here and nowhere else. General: the
 // session's context, the files open to everyone, and results the person may
 // see. Detailed: every file they may read, and members' answers as well.
-const gatherMaterial = async ({ env, slug, config, address, scopes, asker, access, deps }) => {
+// Neither uses the answers or files of anyone who opted out.
+const gatherMaterial = async ({ env, slug, config, address, scopes, asker, access, optedOut, deps }) => {
   const detailed = asker.answers === 'detailed';
   const [sources, results, answers] = await Promise.all([
     loadParticipantContextSources({
-      env, slug, config, deps, principal: lower(address), ...(detailed ? { readable: access.canRead } : {}),
+      env, slug, config, deps, principal: lower(address), leaveOutUploaders: optedOut,
+      ...(detailed ? { readable: access.canRead } : {}),
     }),
     readVisibleResults({ env, slug, config, address, scopes, admin: asker.audience === 'admin', deps }),
-    detailed ? readMemberAnswers({ env, slug, config, deps }) : [],
+    detailed ? readMemberAnswers({ env, slug, config, optedOut, deps }) : [],
   ]);
   return { material: { sessionContext: config?.sessionContext, sources, results, answers: answers || [] }, answersUnavailable: answers === null };
 };
@@ -144,13 +156,25 @@ const accessFor = ({ env, config, slug, address, scopes, deps }) =>
 export const dispatchGroupAgentRoute = async ({ path, body, config, slug, address, env, limit, headers, scopes, deps } = {}) => {
   const json = (payload, status = 200) => deps.json(payload, status, headers);
   const setting = groupAgentSettingOf(config?.groupAgent);
+  const store = deps.callGroupAgentOptOutStore || callOptOutStore;
+  if (path === '/group-agent/opt-out') {
+    const saved = await store(env, slug, 'set', { address, optedOut: body?.optedOut });
+    if (!saved.ok) return json({ error: saved.status === 400 ? saved.body?.error : OPT_OUTS_UNAVAILABLE }, saved.status === 400 ? 400 : 503);
+    return json({ optedOut: saved.body.optedOut });
+  }
   // Status only decides what the page shows, so it reads the sign-in's
   // scopes; each question checks them afresh before anything is read.
   if (path === '/group-agent/status') {
     if (!setting) return json({ on: false, answers: null, audience: null });
-    const asker = await resolveAsker({ setting, config, address, access: accessFor({ env, config, slug, address, scopes, deps }) });
+    const [asker, own] = await Promise.all([
+      resolveAsker({ setting, config, address, access: accessFor({ env, config, slug, address, scopes, deps }) }),
+      store(env, slug, 'read', { address }),
+    ]);
     if (!asker.ok && asker.status === 503) return json({ error: asker.error }, 503);
-    return json({ on: true, answers: asker.ok ? asker.answers : null, audience: asker.ok ? asker.audience : null });
+    if (!own.ok) return json({ error: OPT_OUTS_UNAVAILABLE }, 503);
+    return json({
+      on: true, answers: asker.ok ? asker.answers : null, audience: asker.ok ? asker.audience : null, optedOut: own.body.optedOut === true,
+    });
   }
 
   const ended = buildSessionEndedResponse({ config, headers, json: deps.json, now: deps.now });
@@ -178,7 +202,13 @@ export const dispatchGroupAgentRoute = async ({ path, body, config, slug, addres
   // Missing secrets come back as a 401, which the page would take for its sign-in.
   if (!secretContext?.ok) return json({ error: 'The session’s AI isn’t set up.' }, 503);
 
-  const { material, answersUnavailable } = await gatherMaterial({ env, slug, config, address, scopes: currentScopes, asker, access, deps });
+  // Who opted out is read on every question, so no answer goes ahead without it.
+  const optOuts = await store(env, slug, 'list');
+  if (!optOuts.ok) return json({ error: OPT_OUTS_UNAVAILABLE }, 503);
+  const optedOut = new Set(optOuts.body.addresses);
+  const { material, answersUnavailable } = await gatherMaterial({
+    env, slug, config, address, scopes: currentScopes, asker, access, optedOut, deps,
+  });
   const payment = await (deps.checkGroupAgentPayment || checkGroupAgentPayment)({ audience: asker.audience, answers: asker.answers });
   if (!payment?.ok) return json({ error: payment?.error || 'This answer needs payment first.', reason: 'group_agent_payment_required' }, 402);
   const { messages, read } = buildGroupAgentMessages({ setting, style: asker.answers, question, material });

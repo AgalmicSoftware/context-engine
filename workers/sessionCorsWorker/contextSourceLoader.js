@@ -46,9 +46,10 @@ const createdAtOf = (row) => Date.parse(row.createdAt) || 0;
  * (an unread PDF gives no text). The Worker's own AI features act for
  * participants, so admins-only items never reach them. `readable(row)`
  * narrows or widens that to one person's access; `principal` names who the
- * read is for in the envelope audit.
+ * read is for in the envelope audit; files added by `leaveOutUploaders`
+ * (lower-case addresses) are left out, with the AI's readings of them.
  */
-export const loadParticipantContextSources = async ({ env, slug, config, deps, readable, principal } = {}) => {
+export const loadParticipantContextSources = async ({ env, slug, config, deps, readable, principal, leaveOutUploaders } = {}) => {
   let rows = [];
   try {
     rows = await listContextSourceRows({ env, slug, budget: scanBudget() });
@@ -73,6 +74,7 @@ export const loadParticipantContextSources = async ({ env, slug, config, deps, r
   for (const row of visible) {
     if (sources.length >= MAX_SOURCES) break;
     if (contextRoleOf(row.tags) !== CONTEXT_ROLE) continue;
+    if (leaveOutUploaders?.has(String(row.uploader || '').trim().toLowerCase())) continue;
     const isPdf = row.contentType === CONTEXT_FILE_TYPES.pdf;
     const textRow = isPdf ? readings.get(row.id) : row;
     if (!textRow) continue;
