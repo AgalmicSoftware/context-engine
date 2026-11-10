@@ -722,6 +722,27 @@ describe('bundled app-theme contrast', () => {
     );
   });
 
+  // The Group Agent's launcher paints the session chrome pair itself, so it reads on any section background, and its
+  // dialog paints the setup page's surface.
+  test.each(registry.themes.map(({ id }) => id))('%s keeps the Group Agent placeholder readable', (themeId) => {
+    const values = themeValues(css, themeId);
+    const paint = painter(values);
+    const onePageCss = compileModule('components/OnePageSession/OnePageSession.module.scss');
+    const agentCss = compileModule('components/OnePageSession/GroupAgentModal.module.scss');
+    const canvas = parseColor(values.canvas);
+    const ratio = (rule: Record<string, string>) => {
+      const fill = composite(paint(rule.background ?? 'transparent'), canvas);
+      return Number(contrastRatio(composite(paint(rule.color), fill), fill).toFixed(2));
+    };
+    const ratios = [
+      ...['', ':hover', ':focus-visible', ':active'].map(
+        (state) => [`.groupAgentButton${state}`, ratio(moduleRule(onePageCss, `.groupAgentButton${state}`))] as const,
+      ),
+      ['.content', ratio(moduleRule(agentCss, '.content'))] as const,
+    ];
+    expect(ratios.filter(([, value]) => value < 4.5)).toEqual([]);
+  });
+
   test.each(registry.themes.map(({ id }) => id))('%s keeps small binary answer labels readable', (themeId) => {
     const values = themeValues(css, themeId);
     for (const stance of ['agree', 'disagree']) {

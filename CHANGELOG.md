@@ -159,6 +159,7 @@ All notable changes to this project will be documented in this file.
 - Links in a session's context, typed or in an HTML page, use the context panel's own text colour, so they read in every theme. In Classic 95 the typed links were about 3:1 against the panel.
 - The Tool Explorer's question generator uploads a transcript summary to Arweave, where it is public and permanent, only when **Upload Summary** is ticked, which it no longer is by default. A summary marked **Encrypt Summary** isn't uploaded at all, because the upload can't encrypt yet. Before, both went up as plain text.
 - On `/new`, a starting file can be locked to a group set up before Create, under Access and identity: its **Visible to** choice lists those groups, and Create makes the groups before the files are added. A file whose group Create didn't make is added for admins only, never more widely.
+- Admins see a **Group Agent** button in a session's context section. For now it only says the Group Agent is coming.
 
 ### Workers — requires redeployment
 

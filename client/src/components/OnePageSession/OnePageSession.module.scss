@@ -459,6 +459,35 @@
   }
 }
 
+.groupAgentBar {
+  display: flex;
+  justify-content: flex-end;
+  width: min(100%, 980px);
+  margin: 0 auto;
+}
+
+// The launcher paints the session chrome and its text colour, a pair every
+// theme keeps readable, so it reads on any section background in every state.
+.groupAgentButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.45rem 0.9rem;
+  background: var(--ce-session-chrome);
+  color: var(--ce-session-chrome-contrast);
+  font-weight: 700;
+  cursor: pointer;
+
+  &:hover,
+  &:focus-visible,
+  &:active {
+    background: var(--ce-session-chrome);
+    color: var(--ce-session-chrome-contrast);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+}
+
 .workerGroupCardLinkButton {
   display: inline-flex;
   align-items: center;

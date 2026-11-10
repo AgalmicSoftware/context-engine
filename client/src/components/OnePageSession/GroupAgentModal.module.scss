@@ -1,0 +1,50 @@
+/* @file GroupAgentModal.module.scss: the Group Agent dialog. */
+
+// The setup page's surface and text, a pair every theme keeps readable. The
+// theme's `.modal-content` rule outranks a plain class, as for the interview.
+.content {
+  overflow: hidden;
+  background: var(--ce-surface) !important;
+  color: var(--ce-panel-text) !important;
+}
+
+// The theme's title bar. Its title and × take the bar's text colour, and so
+// does the ×'s focus ring: the theme's ring is black on Classic 95's navy bar.
+.content .header {
+  align-items: center;
+  padding: 14px 16px;
+
+  :global(.modal-title) {
+    color: inherit;
+    font-size: 1.05rem;
+    font-weight: 700;
+    line-height: 1.25;
+  }
+
+  :global(.btn-close) {
+    width: 32px;
+    height: 32px;
+    margin: 0 0 0 auto;
+    padding: 0;
+    border-color: transparent;
+    background: transparent;
+    box-shadow: none;
+    color: inherit;
+    opacity: 1;
+
+    &:focus-visible {
+      outline-color: currentColor;
+    }
+  }
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+
+  p {
+    margin: 0;
+  }
+}

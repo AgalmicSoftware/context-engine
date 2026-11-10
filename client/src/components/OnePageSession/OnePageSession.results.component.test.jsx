@@ -1532,6 +1532,23 @@ describe('OnePageSession results routing', () => {
       );
       expect(screen.queryByTestId('ce-session-context-sources')).not.toBeInTheDocument();
     });
+
+    it('gives admins a Group Agent placeholder that says it is coming', async () => {
+      await renderSession([], true);
+      fireEvent.click(screen.getByTestId('ce-demo-documents-toggle'));
+      fireEvent.click(screen.getByTestId('ce-group-agent-open'));
+      const dialog = await screen.findByRole('dialog', { name: 'Group Agent' });
+      expect(dialog).toHaveTextContent('Coming soon');
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Close' }));
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    });
+
+    it('keeps the Group Agent placeholder from participants', async () => {
+      await renderSession([file, link], false);
+      fireEvent.click(screen.getByTestId('ce-demo-documents-toggle'));
+      expect(screen.getByTestId('ce-session-context-sources')).toBeInTheDocument();
+      expect(screen.queryByTestId('ce-group-agent-open')).not.toBeInTheDocument();
+    });
   });
 
   it('does not render an empty session context section', async () => {

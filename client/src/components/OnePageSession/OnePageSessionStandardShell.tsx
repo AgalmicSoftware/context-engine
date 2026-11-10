@@ -12,6 +12,7 @@ import {
   faExpand,
   faExternalLinkAlt,
   faQuestionCircle,
+  faRobot,
 } from '@fortawesome/free-solid-svg-icons';
 
 import LazyFallback from '../Shared/LazyFallback';
@@ -46,6 +47,7 @@ const SessionGeneratedResultsViews = React.lazy(() => import('../SessionResults/
 // Loaded only for a session whose context is an uploaded HTML page, with its sanitizer.
 const SessionContextHtml = React.lazy(() => import('./SessionContextHtml'));
 const SessionDebateAtlasView = React.lazy(() => import('../DebateAtlas/SessionDebateAtlasView'));
+const GroupAgentModal = React.lazy(() => import('./GroupAgentModal'));
 
 const DebateMapAny = DebateMap as React.ComponentType<Record<string, unknown>>;
 const DEMO_CORPUS_GITHUB_URL = PUBLIC_AI_DISCOURSE_CORPUS_URL;
@@ -427,6 +429,9 @@ export default function OnePageSessionStandardShell({
     account: typeof account === 'string' ? account : '',
   });
   const canEditContext = (contextSources.isAdmin && contextSources.supported) || contextSources.participantsCanAdd;
+  // The Group Agent is a placeholder for now, so only admins see its launcher.
+  const showGroupAgent = contextSources.isAdmin && !isDemoSlug;
+  const [groupAgentOpen, setGroupAgentOpen] = React.useState(false);
   const showContextSection = isDemoSlug || !!sessionContext || contextSources.sources.length > 0 || canEditContext;
   const sectionsGridClassName = [styles.sectionsGrid, !showContextSection ? styles.sectionsGridTwoUp : '']
     .filter(Boolean)
@@ -709,6 +714,24 @@ export default function OnePageSessionStandardShell({
             </div>
             {showDocuments && (
               <div className={`${styles.miniSectionContent} ${styles.documentsSectionContent}`.trim()}>
+                {showGroupAgent ? (
+                  <div className={styles.groupAgentBar}>
+                    <button
+                      type="button"
+                      className={styles.groupAgentButton}
+                      onClick={() => setGroupAgentOpen(true)}
+                      data-testid="ce-group-agent-open"
+                    >
+                      <FontAwesomeIcon icon={faRobot} aria-hidden="true" />
+                      Group Agent
+                    </button>
+                    {groupAgentOpen ? (
+                      <Suspense fallback={null}>
+                        <GroupAgentModal onClose={() => setGroupAgentOpen(false)} />
+                      </Suspense>
+                    ) : null}
+                  </div>
+                ) : null}
                 {renderSessionContext(sessionContext)}
                 {!isDemoSlug ? (
                   <SessionContextSources
