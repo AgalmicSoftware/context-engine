@@ -62,7 +62,6 @@ const recommendation = (
 ): SessionInterviewGroupRecommendation => ({
   groupId: 'ai-optimists',
   reason: 'Your reviewed answer explicitly supported optimistic AI governance.',
-  evidence: 'I support open AI development.',
   confidence: 0.9,
   ...overrides,
 });
@@ -187,7 +186,7 @@ describe('SessionInterviewRecommendedGroups', () => {
   it('keeps suggestion order, so a group named like a chosen answer stays first, and shows every match', async () => {
     const many = Array.from({ length: 6 }, (_, index) => group({ groupId: `g${index}`, label: `Group ${index}` }));
     jest.mocked(loadPublicWorkerGroups).mockResolvedValue([...many, group({ groupId: 'dacc', label: 'd/acc' })]);
-    const named = recommendation({ groupId: 'dacc', reason: 'You chose “d/acc”.', evidence: '', confidence: 1 });
+    const named = recommendation({ groupId: 'dacc', reason: 'You chose “d/acc”.', confidence: 1 });
     const view = render(element({ recommendations: [named, recommendation({ groupId: 'g0', confidence: 0.4 })] }));
     await screen.findByRole('heading', { name: 'Groups (2)' });
     fireEvent.click(box(/Group 0/));

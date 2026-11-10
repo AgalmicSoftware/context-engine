@@ -20,7 +20,7 @@ import {
   useSessionInterviewGroupRecommendations,
   type SessionInterviewGroupRecommendationRequest,
 } from './useSessionInterviewGroupRecommendations';
-import { buildGroupRecommendationRequest } from './sessionInterviewGroupRecommendations';
+import { buildGroupRecommendationRequest, loadDraftingGroupChoices } from './sessionInterviewGroupRecommendations';
 import type { GeneratedSurveyStatement } from './SurveyGenerator/surveyGeneratorHelpers';
 import { useInterviewOpening } from './useInterviewOpening';
 import { useSessionContextPrompt } from '../../utilities/docLibrary/useSessionContextSources';
@@ -42,6 +42,7 @@ import {
   mapInterviewEvidenceToResponses,
   readImportedInterviewDraftResponses,
   type InterviewDraftResponse,
+  type InterviewPrefillGroupPick,
   type InterviewPrefillPacket,
   type InterviewQuestion,
 } from './sessionInterview';
@@ -153,6 +154,8 @@ export default function SessionInterviewPanel({
   const [resolvedWorkerUrl, setResolvedWorkerUrl] = useState(workerUrl);
   // The claimed part of a group conversation this review has taken in.
   const usedClaimRef = useRef<TranscriptClaim | null>(null);
+  // The groups the session's AI picked as it last drafted, which Refresh lists again.
+  const draftingPicksRef = useRef<InterviewPrefillGroupPick[]>([]);
   const readiness = useInterviewReadiness(resolvedWorkerUrl, sessionSlug);
   // What the interviewer may know: the context this participant may read.
   const sessionContextPrompt = useSessionContextPrompt({
@@ -632,8 +635,17 @@ export default function SessionInterviewPanel({
             : null);
         let mapped = importedDrafts;
         let proposedQuestions: GeneratedSurveyStatement[] = [];
+        let draftingPicks: InterviewPrefillGroupPick[] = [];
         if (mapped === null) {
           const url = await resolveWorkerUrl();
+          if (disposedRef.current) return;
+          // The session's AI picks, as it drafts, from the groups this person could join.
+          const groups = await loadDraftingGroupChoices({
+            sessionConfig,
+            sessionSlug,
+            workerUrl: url,
+            account: authenticatedForSubmit ? String(account) : '',
+          });
           if (disposedRef.current) return;
           // The mapper hears no AI prediction for an answered question, so it can't hand one back
           // as new evidence. Drafts under review keep theirs.
@@ -673,6 +685,10 @@ export default function SessionInterviewPanel({
               })),
             onSuggestedQuestions: (next) => {
               proposedQuestions = next;
+            },
+            groups,
+            onGroupPicks: (picks) => {
+              draftingPicks = picks;
             },
             reconsideration: usedClaimRef.current
               ? {
@@ -772,11 +788,12 @@ export default function SessionInterviewPanel({
           );
         }
         setMappedTranscript(nextTranscript);
+        draftingPicksRef.current = draftingPicks;
         setGroupRecommendationRequest(
           review.drafts.length
             ? buildGroupRecommendationRequest({
-                transcript: nextTranscript,
                 prefillPacket: contextPacket,
+                draftingPicks,
                 drafts: review.drafts,
                 selected: review.selected,
                 edited: review.edited,
@@ -837,7 +854,6 @@ export default function SessionInterviewPanel({
     if (!drafts.length || isInterviewBusy || mapping) return;
     setGroupRecommendationRequest(
       buildGroupRecommendationRequest({
-        transcript,
         prefillPacket: prefillPacket
           ? scopeInterviewPrefillToQuestions(
               prefillPacket,
@@ -845,6 +861,7 @@ export default function SessionInterviewPanel({
               responderContext,
             )
           : null,
+        draftingPicks: draftingPicksRef.current,
         drafts,
         selected,
         edited: editedDrafts,
@@ -861,7 +878,6 @@ export default function SessionInterviewPanel({
     questions,
     responderContext,
     selected,
-    transcript,
   ]);
 
   useEffect(() => {

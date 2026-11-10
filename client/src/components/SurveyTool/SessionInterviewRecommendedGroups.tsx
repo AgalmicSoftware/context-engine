@@ -42,8 +42,6 @@ type UnknownRecord = Record<string, unknown>;
 export type SessionInterviewGroupRecommendation = {
   groupId: string;
   reason?: string;
-  /** Checked against the person's words by the matcher, never shown: it may name a place. */
-  evidence?: string;
   confidence?: number;
 };
 

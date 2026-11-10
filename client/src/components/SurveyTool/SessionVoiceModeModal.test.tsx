@@ -13,6 +13,7 @@ import {
 import { startSessionRealtimeInterview } from '../../utilities/audio/realtimeInterviewClient';
 import { getCorsProxyUrlOrThrow } from '../../utilities/worker/corsProxy.js';
 import { useSessionInterviewGroupRecommendations } from './useSessionInterviewGroupRecommendations';
+import { loadDraftingGroupChoices } from './sessionInterviewGroupRecommendations';
 
 const mockGroupArea = jest.fn();
 const mockGroupAreaMounts = jest.fn();
@@ -36,6 +37,10 @@ jest.mock('./SessionInterviewRecommendedGroups', () => ({
 
 jest.mock('./useSessionInterviewGroupRecommendations', () => ({
   useSessionInterviewGroupRecommendations: jest.fn(() => ({ availability: 'idle', recommendations: [] })),
+}));
+jest.mock('./sessionInterviewGroupRecommendations', () => ({
+  ...jest.requireActual<object>('./sessionInterviewGroupRecommendations'),
+  loadDraftingGroupChoices: jest.fn(),
 }));
 
 jest.mock('./CreateQuestionsAndSurveys', () => ({
@@ -106,6 +111,7 @@ const mockedHashInterviewQuestions = jest.mocked(hashInterviewQuestions);
 const mockedMapInterviewEvidenceToResponses = jest.mocked(mapInterviewEvidenceToResponses);
 const mockedStartSessionRealtimeInterview = jest.mocked(startSessionRealtimeInterview);
 const mockedUseSessionInterviewGroupRecommendations = jest.mocked(useSessionInterviewGroupRecommendations);
+const mockedLoadDraftingGroupChoices = jest.mocked(loadDraftingGroupChoices);
 
 const buildAllowedSuggestionSessionConfig = () => ({
   slug: 'demo',
@@ -215,6 +221,7 @@ describe('SessionVoiceModeModal', () => {
     mockedHashInterviewQuestions.mockResolvedValue('a'.repeat(64));
     mockedMapInterviewEvidenceToResponses.mockResolvedValue([]);
     mockedUseSessionInterviewGroupRecommendations.mockReturnValue({ availability: 'idle', recommendations: [] });
+    mockedLoadDraftingGroupChoices.mockResolvedValue([]);
   });
 
   it('retains review edits and progress through close/reopen, and clears them only on discard', async () => {
@@ -1755,13 +1762,7 @@ describe('SessionVoiceModeModal', () => {
   it('keeps group suggestions off unless the session turns them on', async () => {
     mockedUseSessionInterviewGroupRecommendations.mockReturnValue({
       availability: 'available',
-      recommendations: [
-        {
-          groupId: 'ai-optimists',
-          reason: 'They asked for accountability groups.',
-          evidence: 'I want AI accountability groups.',
-        },
-      ],
+      recommendations: [{ groupId: 'ai-optimists', reason: 'They asked for accountability groups.' }],
     });
     let finishMapping: ((value: []) => void) | null = null;
     mockedMapInterviewEvidenceToResponses.mockImplementation(
@@ -1804,13 +1805,27 @@ describe('SessionVoiceModeModal', () => {
   it('suggests groups after a voice interview once its drafts are ready, when the session turns them on', async () => {
     mockedUseSessionInterviewGroupRecommendations.mockReturnValue({
       availability: 'available',
-      recommendations: [{ groupId: 'ai-optimists', reason: 'They asked for groups.', evidence: 'Groups.' }],
+      recommendations: [{ groupId: 'ai-optimists', reason: 'They asked for groups.' }],
     });
+    const optimists = {
+      groupId: 'ai-optimists',
+      label: 'AI optimists',
+      tags: [],
+      joinMode: 'open' as const,
+      memberVisibility: 'session' as const,
+      requiresAuthentication: true,
+      source: 'public' as const,
+    };
+    mockedLoadDraftingGroupChoices.mockResolvedValue([optimists]);
     let finishMapping: ((value: Array<{ questionId: string; answer: string }>) => void) | null = null;
     mockedMapInterviewEvidenceToResponses.mockImplementation(
-      () =>
+      ({ onGroupPicks }) =>
         new Promise((resolve) => {
-          finishMapping = resolve;
+          finishMapping = (value) => {
+            // The AI that drafts the answers picks groups in the same reply.
+            onGroupPicks?.([{ groupId: 'ai-optimists', reason: 'Wants accountability groups.' }]);
+            resolve(value);
+          };
         }),
     );
     mockedStartSessionRealtimeInterview.mockImplementation(async (options) => {
@@ -1840,21 +1855,37 @@ describe('SessionVoiceModeModal', () => {
       finishMapping?.([{ questionId: 'q1', answer: 'Accountability groups' }]);
     });
     expect(await screen.findByTestId('mock-group-recommendations')).toBeInTheDocument();
+    // The groups offered are those the signed-in account could join.
+    expect(mockedLoadDraftingGroupChoices).toHaveBeenCalledWith(
+      expect.objectContaining({ sessionSlug: 'demo', workerUrl: 'https://worker.example', account: baseProps.account }),
+    );
+    expect(mockedMapInterviewEvidenceToResponses).toHaveBeenCalledWith(
+      expect.objectContaining({ groups: [optimists] }),
+    );
     expect(mockedUseSessionInterviewGroupRecommendations.mock.calls.at(-1)?.[0]).toEqual(
       expect.objectContaining({
         active: true,
         request: expect.objectContaining({
-          transcript: expect.stringContaining('I want AI accountability groups.'),
           draftResponses: [expect.objectContaining({ questionId: 'q1', answer: 'Accountability groups' })],
+          draftingPicks: [{ groupId: 'ai-optimists', reason: 'Wants accountability groups.' }],
         }),
       }),
     );
+    // An edit clears the suggestions; Refresh lists the drafting AI's picks again, without drafting anew.
+    await editReadableDraftText('Draft answer for What matters?', 'Groups for accountability');
+    const lastRequest = () => mockedUseSessionInterviewGroupRecommendations.mock.calls.at(-1)?.[0].request;
+    expect(lastRequest()).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh group suggestions' }));
+    expect(lastRequest()).toEqual(
+      expect.objectContaining({ draftingPicks: [{ groupId: 'ai-optimists', reason: 'Wants accountability groups.' }] }),
+    );
+    expect(mockedMapInterviewEvidenceToResponses).toHaveBeenCalledTimes(1);
   });
 
   it('suggests groups after an AI prefill link, from its drafts', async () => {
     mockedUseSessionInterviewGroupRecommendations.mockReturnValue({
       availability: 'available',
-      recommendations: [{ groupId: 'dacc', reason: 'You chose “d/acc”.', evidence: '' }],
+      recommendations: [{ groupId: 'dacc', reason: 'You chose “d/acc”.' }],
     });
     render(
       <SessionVoiceModeModal
