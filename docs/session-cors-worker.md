@@ -2784,8 +2784,10 @@ Signed login/bootstrap requests:
     the ticket's person: each question passes the same checks as that
     person's signed-in storage read, with their access as it is now, and
     `groups` lists the groups they could join on their own and haven't, less
-    any that are full. An expired, altered or revoked ticket gets 401
-    `catalog_ticket_invalid`; a check that can't run gets 503
+    any that are full. An expired, altered or revoked ticket, or one whose
+    person the session's gate now turns away or can't check, gets 401
+    `catalog_ticket_invalid`, as a signed-in read is refused; if the Worker
+    can't read its key or the sign-in record, it gets 503
     `catalog_ticket_unavailable`. Every catalog response sends
     `referrer-policy: no-referrer`, and `reviewUrl` never carries a ticket.
   - Returns only an inert JSON question catalog: `type`, `version`,

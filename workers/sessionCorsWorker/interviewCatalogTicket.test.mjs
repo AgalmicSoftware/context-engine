@@ -118,6 +118,16 @@ test('signing out or losing access ends a ticket', async () => {
   assert.equal((await verify({ env: lost.env, ticket: lost.ticket, deps: lost.deps })).reason, 'catalog_ticket_invalid');
   // With no way to ask about access now, nothing is read.
   assert.equal((await verify({ env: lost.env, ticket: lost.ticket, deps: { now: lost.deps.now } })).reason, 'catalog_ticket_invalid');
+  // A gate that turns the person away, or can't tell, refuses, as it does a signed-in read.
+  const gate = await setup();
+  for (const message of ['Access denied: default gate failed.', 'Access denied: on-chain gate data unavailable.']) {
+    const gated = await verify({
+      env: gate.env,
+      ticket: gate.ticket,
+      deps: { ...gate.deps, computeScopesForLogin: async () => { throw new Error(message); } },
+    });
+    assert.deepEqual([gated.status, gated.reason], [401, 'catalog_ticket_invalid'], message);
+  }
 });
 
 test('a check that cannot run asks for a retry instead of refusing', async () => {
@@ -127,9 +137,6 @@ test('a check that cannot run asks for a retry instead of refusing', async () =>
   assert.deepEqual(pick(await verify({ env: { ...env, TOKEN_HMAC_SECRET: '' }, ticket, deps })), unavailable);
   assert.deepEqual(pick(await verify({
     env, ticket, deps: { ...deps, validateAuthTokenRecord: async () => { throw new Error('KV down'); } },
-  })), unavailable);
-  assert.deepEqual(pick(await verify({
-    env, ticket, deps: { ...deps, computeScopesForLogin: async () => { throw new Error('RPC down'); } },
   })), unavailable);
 });
 

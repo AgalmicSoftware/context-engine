@@ -73,22 +73,28 @@ export const verifyInterviewCatalogTicket = async ({ env, ticket, config, slug, 
     return UNAVAILABLE;
   }
   if (!timingSafeEqual(expected, mac)) return REFUSED;
+  let record;
   try {
-    // A revoked sign-in, such as one its person signed out of, ends its tickets.
-    const record = await (deps?.validateAuthTokenRecord || validateAuthTokenRecord)({
+    // A revoked sign-in ends its tickets.
+    record = await (deps?.validateAuthTokenRecord || validateAuthTokenRecord)({
       env,
       payload: { sub, jti: parent },
       slug,
     });
-    if (!record?.ok) return REFUSED;
-    // As a signed-in read does, ask whether the person may still read the session now.
-    const scopes = await deps?.computeScopesForLogin?.({ env, slug, address: sub, config, requestedScopes: READ_SCOPES });
-    if (scopes?.storage !== true && scopes?.arweave !== true) return REFUSED;
-    return {
-      ok: true,
-      reader: { address: sub, scopes: { storage: scopes.storage === true, arweave: scopes.arweave === true } },
-    };
   } catch {
     return UNAVAILABLE;
   }
+  if (!record?.ok) return REFUSED;
+  // As a signed-in read does, ask whether the person may still read the session now.
+  let scopes = null;
+  try {
+    scopes = await deps?.computeScopesForLogin?.({ env, slug, address: sub, config, requestedScopes: READ_SCOPES });
+  } catch {
+    // A gate that turns them away, or can't tell, throws; a signed-in read is refused then too.
+  }
+  if (scopes?.storage !== true && scopes?.arweave !== true) return REFUSED;
+  return {
+    ok: true,
+    reader: { address: sub, scopes: { storage: scopes.storage === true, arweave: scopes.arweave === true } },
+  };
 };

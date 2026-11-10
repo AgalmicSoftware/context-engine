@@ -105818,22 +105818,27 @@ var verifyInterviewCatalogTicket = async ({ env, ticket, config, slug, deps } = 
     return UNAVAILABLE;
   }
   if (!timingSafeEqual(expected, mac)) return REFUSED;
+  let record4;
   try {
-    const record4 = await (deps?.validateAuthTokenRecord || validateAuthTokenRecord)({
+    record4 = await (deps?.validateAuthTokenRecord || validateAuthTokenRecord)({
       env,
       payload: { sub, jti: parent },
       slug
     });
-    if (!record4?.ok) return REFUSED;
-    const scopes = await deps?.computeScopesForLogin?.({ env, slug, address: sub, config, requestedScopes: READ_SCOPES });
-    if (scopes?.storage !== true && scopes?.arweave !== true) return REFUSED;
-    return {
-      ok: true,
-      reader: { address: sub, scopes: { storage: scopes.storage === true, arweave: scopes.arweave === true } }
-    };
   } catch {
     return UNAVAILABLE;
   }
+  if (!record4?.ok) return REFUSED;
+  let scopes = null;
+  try {
+    scopes = await deps?.computeScopesForLogin?.({ env, slug, address: sub, config, requestedScopes: READ_SCOPES });
+  } catch {
+  }
+  if (scopes?.storage !== true && scopes?.arweave !== true) return REFUSED;
+  return {
+    ok: true,
+    reader: { address: sub, scopes: { storage: scopes.storage === true, arweave: scopes.arweave === true } }
+  };
 };
 
 // workers/sessionCorsWorker/interviewBriefDispatch.js
