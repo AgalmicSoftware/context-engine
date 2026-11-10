@@ -2,7 +2,7 @@ import { readPublicBoolEnv, readPublicEnv, readPublicIntEnv } from '../variables
 import type { PasskeyWalletCapabilities, PasskeyWalletConfig } from './types.js';
 
 const DEFAULT_RP_NAME = 'Context Engine';
-const DEFAULT_TTL_SECONDS = 900;
+const DEFAULT_TTL_SECONDS = 3600;
 const DEFAULT_WALLET_KEY_MODE = 'passkey-derived';
 const DEFAULT_DERIVATION_NAMESPACE = 'context-engine';
 type PasskeyWalletRuntimeLocation = { origin?: string; hostname?: string };

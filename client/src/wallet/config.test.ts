@@ -51,6 +51,12 @@ describe('passkey wallet config', () => {
     ).toBe('localhost');
   });
 
+  it('keeps the wallet unlocked for an hour when env configuration is absent', () => {
+    expect(
+      getPasskeyWalletConfig({ origin: 'https://app.example.com', hostname: 'app.example.com' }).unlockTtlSeconds,
+    ).toBe(3600);
+  });
+
   it('rejects third-party wallet RP IDs and preview domains by default', () => {
     expect(() => validatePasskeyWalletConfig(baseConfig({ rpId: 'id.porto.sh' }))).toThrow(
       /third-party wallet domain/i,

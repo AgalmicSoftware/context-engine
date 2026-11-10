@@ -61,7 +61,7 @@ NEXT_PUBLIC_WALLET_MODE=passkey-eoa
 NEXT_PUBLIC_WALLET_KEY_MODE=passkey-derived
 NEXT_PUBLIC_WALLET_DERIVATION_NAMESPACE=context-engine
 NEXT_PUBLIC_SESSION_MODE=soft
-NEXT_PUBLIC_WALLET_UNLOCK_TTL_SECONDS=900
+NEXT_PUBLIC_WALLET_UNLOCK_TTL_SECONDS=3600
 ```
 
 Local loopback development may use:
@@ -221,10 +221,11 @@ These values must never be sent to a server or persisted in logs:
 7. The EIP-1193 provider and wallet client expose the account to the app.
 
 Sensitive material is cleared on disconnect/logout, timeout, account switch, and
-worker lock. The default unlock TTL is 900 seconds and can be configured with:
+worker lock. The default unlock TTL is 3600 seconds (60 minutes), counted from
+the passkey prompt rather than from the last use. Configure it with:
 
 ```bash
-NEXT_PUBLIC_WALLET_UNLOCK_TTL_SECONDS=900
+NEXT_PUBLIC_WALLET_UNLOCK_TTL_SECONDS=3600
 ```
 
 ## PRF Support
