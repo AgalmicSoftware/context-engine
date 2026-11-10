@@ -2672,6 +2672,9 @@ const SessionWizard = ({
     ...missingSecrets.map((label) => `Enter the ${label}.`),
   ].filter(Boolean);
   const sessionCreated = workerCanonicalSettlement.publishCompleted || !!toStr(sessionUrl).trim();
+  // The groups a starting file can be locked to: those set up under Access and identity
+  // until Create, then those Create made, so the list shows what the files are added for.
+  const contextFileGroups = sessionCreated ? createdWorkerGroups : pendingWorkerGroupDrafts;
   const createRunningRef = useRef(false);
   // The publish handler reads this render's state, so the effect calls the latest one.
   const handlePublishRef = useRef(handlePublish);
@@ -2741,7 +2744,7 @@ const SessionWizard = ({
             draft={draft}
             onChange={updateDraftValue}
             pending={pendingContextFiles}
-            groups={pendingWorkerGroupDrafts}
+            groups={contextFileGroups}
           />
         ) : null
       }
@@ -2754,7 +2757,7 @@ const SessionWizard = ({
             sessionConfig={sessionCreated ? publishedSessionConfig : null}
             sessionSlug={toStr(draft.slug).trim()}
             account={toStr(account).trim()}
-            groups={createdWorkerGroups}
+            groups={contextFileGroups}
           />
         ) : null
       }

@@ -8,6 +8,7 @@ import {
   type SetupGroupOption,
 } from './SetupContextSources';
 import { addContextLink, readContextPdf, uploadContextFile } from '../../../utilities/docLibrary/contextSources';
+import { sessionTemplateFromDraft } from '@ce-shared/sessionTemplate.mjs';
 import type { SetupDraft } from './setupSectionTypes';
 
 jest.mock('../../../utilities/docLibrary/contextSources', () => ({
@@ -20,7 +21,8 @@ jest.mock('../../../utilities/docLibrary/contextSources', () => ({
 }));
 
 let latest: SetupDraft = {};
-// The page holds the draft and the chosen files; the session exists once `created`.
+// The page holds the draft and the chosen files; the session exists once `created`,
+// and from then on both list the groups Create `made`, as /new does.
 const Harness = ({
   initial,
   created = false,
@@ -38,7 +40,7 @@ const Harness = ({
   const onChange = ([key]: string[], value: unknown) => setDraft((prev) => ({ ...prev, [key]: value }));
   return (
     <>
-      <SetupContextFiles draft={draft} onChange={onChange} pending={pending} groups={groups} />
+      <SetupContextFiles draft={draft} onChange={onChange} pending={pending} groups={created ? made : groups} />
       <SetupContextPublisher
         draft={draft}
         onChange={onChange}
@@ -125,7 +127,10 @@ describe('setup context files', () => {
       'Reverse Alignment Salon',
     ]);
     fireEvent.change(visibleTo, { target: { value: 'group:group-salon' } });
-    expect(latest.contextFiles).toEqual([{ name: 'brief.pdf', adminsOnly: false, groupId: 'group-salon' }]);
+    expect(latest.contextFiles).toEqual([{ name: 'brief.pdf', adminsOnly: true, groupId: 'group-salon' }]);
+    // A template keeps no groups, so the file it carries is for admins, not everyone.
+    const exported = sessionTemplateFromDraft(latest);
+    expect(exported.ok && exported.template.contextFiles).toEqual([{ name: 'brief.pdf', adminsOnly: true }]);
     rerender(<Harness initial={{}} groups={[]} />);
     expect(screen.getByLabelText('Visible to')).toHaveValue('admins');
   });
@@ -140,8 +145,12 @@ describe('setup context files', () => {
     fireEvent.change(screen.getByTestId('ce-setup-context-file-input'), { target: { files: [plan] } });
     fireEvent.change(screen.getAllByLabelText('Visible to')[0], { target: { value: 'group:group-salon' } });
     fireEvent.change(screen.getAllByLabelText('Visible to')[1], { target: { value: 'group:group-later' } });
-    // Create made only the salon group.
+    // Create made only the salon group, and the list shows where each file will go.
     rerender(<Harness initial={{}} created made={[salon]} />);
+    expect(screen.getAllByLabelText('Visible to').map((select) => (select as HTMLSelectElement).value)).toEqual([
+      'group:group-salon',
+      'admins',
+    ]);
     await act(async () => fireEvent.click(screen.getByTestId('ce-setup-context-publish')));
     expect(uploadContextFile).toHaveBeenCalledWith({ file: brief, groupId: 'group-salon' }, expect.anything());
     expect(uploadContextFile).toHaveBeenCalledWith({ file: plan, adminsOnly: true }, expect.anything());

@@ -57,9 +57,11 @@ const visibilityOf = (entry: ContextFileEntry, groups: SetupGroupOption[]): stri
     return groups.some((group) => group.groupId === entry.groupId) ? `group:${entry.groupId}` : 'admins';
   return entry.adminsOnly ? 'admins' : 'everyone';
 };
+// A locked file is marked admins-only too, so whatever keeps only that flag, such
+// as a template, keeps the file narrow.
 const withVisibility = ({ groupId: _previous, ...entry }: ContextFileEntry, value: string): ContextFileEntry =>
   value.startsWith('group:')
-    ? { ...entry, adminsOnly: false, groupId: value.slice('group:'.length) }
+    ? { ...entry, adminsOnly: true, groupId: value.slice('group:'.length) }
     : { ...entry, adminsOnly: value === 'admins' };
 
 const isPdf = (file: File) => resolveContextFileType(file) === CONTEXT_FILE_TYPES.pdf;
