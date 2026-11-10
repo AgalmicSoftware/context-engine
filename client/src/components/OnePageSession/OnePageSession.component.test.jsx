@@ -721,6 +721,24 @@ describe('OnePageSession view gating', () => {
     );
   });
 
+  it("colours context links with the chrome's text colour, which every theme keeps readable on the chrome", () => {
+    // Classic 95 makes the session accent the chrome itself, and the app's accent falls to about 3:1 there.
+    const typed = extractMediaBlock(
+      fs.readFileSync(path.join(__dirname, 'OnePageSession.module.scss'), 'utf8'),
+      '.sessionContextLinks {',
+    );
+    const page = extractMediaBlock(
+      fs.readFileSync(path.join(__dirname, 'SessionContextHtml.module.scss'), 'utf8'),
+      '.contextHtml {',
+    );
+    expect(typed).toContain('color: var(--ce-session-chrome-contrast);');
+    expect(page).toMatch(/\n {2}a {[^}]*color: var\(--ce-session-chrome-contrast\);/);
+    for (const block of [typed, page]) {
+      expect(block).not.toContain('var(--ce-action-accent)');
+      expect(block).not.toContain('var(--ce-session-accent)');
+    }
+  });
+
   it('renders only the session title text at half opacity', () => {
     const scss = fs.readFileSync(path.join(__dirname, 'OnePageSession.module.scss'), 'utf8');
     const titleTextBlock = extractMediaBlock(scss, '.brandingSectionTitle {');

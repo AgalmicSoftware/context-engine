@@ -55,11 +55,18 @@
     padding-left: 1.4rem;
   }
 
+  // The chrome's own text colour, underlined: the only colour every theme and
+  // scheme keeps readable on the chrome (Classic 95 makes its accent the chrome).
   a {
-    color: var(--ce-action-accent);
+    color: var(--ce-session-chrome-contrast);
     font-weight: 700;
     text-decoration: underline;
     text-underline-offset: 3px;
+
+    &:focus-visible {
+      outline: 2px solid var(--ce-session-chrome-contrast);
+      outline-offset: 2px;
+    }
   }
 
   img {
@@ -105,7 +112,7 @@
     cursor: pointer;
 
     &:focus-visible {
-      outline: 2px solid var(--ce-action-accent);
+      outline: 2px solid var(--ce-session-chrome-contrast);
       outline-offset: 2px;
     }
   }
