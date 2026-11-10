@@ -8,7 +8,8 @@ import styles from './SessionSetup.module.scss';
 
 // The sanitizer and the page view load only when someone uses an HTML page.
 const SessionContextHtml = React.lazy(() => import('../../OnePageSession/SessionContextHtml'));
-const loadCleaner = () => import('../../../utilities/session/contextHtml');
+const loadCleaner = () =>
+  import('../../../utilities/session/contextHtml').then(({ loadContextHtmlCleaner }) => loadContextHtmlCleaner());
 
 const MAX_FILE_BYTES = 1024 * 1024;
 // FileReader, as the client's other uploads use.
@@ -43,8 +44,8 @@ const SetupContextHtmlField = ({ html, onChange, colorSchemeId }: Props): React.
     }
     let cleaned;
     try {
-      const [{ cleanContextHtml }, source] = await Promise.all([loadCleaner(), readFileText(file)]);
-      cleaned = cleanContextHtml(source);
+      const [clean, source] = await Promise.all([loadCleaner(), readFileText(file)]);
+      cleaned = clean(source);
     } catch {
       setError('This file couldn’t be read.');
       return;

@@ -1,6 +1,8 @@
-import { cleanContextHtml } from './contextHtml';
+import { cleanContextHtml, loadContextHtmlCleaner } from './contextHtml';
 
 describe('cleanContextHtml', () => {
+  beforeAll(() => loadContextHtmlCleaner());
+
   it('keeps structure, https links and images, tables and sections that open in place', () => {
     const html =
       '<h2>Areas</h2><details open><summary>Trust</summary><p>Who <em>decides</em>?</p></details>' +

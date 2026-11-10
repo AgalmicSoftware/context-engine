@@ -1,5 +1,5 @@
 import React from 'react';
-import { cleanContextHtml } from '../../utilities/session/contextHtml';
+import { loadContextHtmlCleaner } from '../../utilities/session/contextHtml';
 import { CONTEXT_HTML_PAGE_CSS } from './sessionContextHtmlCss';
 import styles from './SessionContextHtml.module.scss';
 
@@ -35,11 +35,27 @@ export const readContextHtmlPage = (host: Element | null): ShadowRoot | null =>
  */
 const SessionContextHtml = ({ html, testId = 'ce-session-context-html', framed = false, colorSchemeId }: Props) => {
   const hostRef = React.useRef<HTMLDivElement>(null);
-  const clean = React.useMemo(() => cleanContextHtml(html).html, [html]);
+  const [cleaner, setCleaner] = React.useState<Awaited<ReturnType<typeof loadContextHtmlCleaner>> | null>(null);
+  const [failed, setFailed] = React.useState(false);
+  React.useEffect(() => {
+    let current = true;
+    loadContextHtmlCleaner().then(
+      (loaded) => current && setCleaner(() => loaded),
+      () => current && setFailed(true),
+    );
+    return () => {
+      current = false;
+    };
+  }, []);
+  const clean = React.useMemo(() => (cleaner ? cleaner(html).html : null), [cleaner, html]);
   React.useLayoutEffect(() => {
-    if (hostRef.current) renderPage(hostRef.current, clean);
+    if (hostRef.current && clean !== null) renderPage(hostRef.current, clean);
   }, [clean]);
-  const page = <div ref={hostRef} className={styles.host} data-testid={testId} />;
+  const page = failed ? (
+    <p data-testid={testId}>This page couldn’t be shown. Reload to try again.</p>
+  ) : (
+    <div ref={hostRef} className={styles.host} data-testid={testId} />
+  );
   return framed ? (
     <div className={styles.frame} data-ce-session-color-scheme={colorSchemeId}>
       {page}

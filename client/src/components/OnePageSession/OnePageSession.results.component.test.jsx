@@ -1237,6 +1237,8 @@ describe('OnePageSession results routing', () => {
     fireEvent.click(screen.getByTestId('ce-demo-documents-toggle'));
     const host = await screen.findByTestId('ce-session-context-html');
     expect(screen.getByTestId('ce-session-context')).toContainElement(host);
+    // The sanitizer loads on first use, then the page renders.
+    await waitFor(() => expect(readContextHtmlPage(host)?.querySelector('h2')).toBeTruthy());
     const page = readContextHtmlPage(host);
     expect(page.querySelector('h2').textContent).toBe('Areas');
     expect(page.textContent).toContain('Who decides?');

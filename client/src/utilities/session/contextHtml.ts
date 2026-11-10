@@ -1,4 +1,6 @@
-import DOMPurify from 'dompurify';
+import type { DOMPurify } from 'dompurify';
+
+import { loadBrowserModuleWithRetry, resolveDefaultExport } from '../ui/browserPdfExport';
 
 // What an uploaded context page may keep: text structure, https links and
 // images, tables, details/summary sections that open in place, and its own
@@ -67,8 +69,10 @@ const HIDDEN_CSS = [
   { pattern: /\bstyle\s*\(/i, label: 'style queries' },
 ];
 
-// Its own instance, so no other library's hooks or settings reach it.
-let purifier: ReturnType<typeof DOMPurify> | null = null;
+// Its own instance, so no other library's hooks or settings reach it. It loads
+// on first use: jsPDF uses DOMPurify too, and the build keeps document export
+// code out of every chunk that loads with the app.
+let purifier: DOMPurify | null = null;
 // Filled by the hooks while one sanitize call runs; sanitizing is synchronous.
 const cssRemoved = new Set<string>();
 const hiddenIn = (css: string) => HIDDEN_CSS.find(({ pattern }) => pattern.test(css));
@@ -88,22 +92,20 @@ const cleanStyleBlock = (css: string) => {
   return '';
 };
 
-const getPurifier = () => {
-  if (!purifier) {
-    purifier = DOMPurify(window);
-    purifier.addHook('uponSanitizeElement', (node) => {
-      if (node.nodeName !== 'STYLE' || !node.textContent) return;
-      const cleaned = cleanStyleBlock(node.textContent);
-      if (cleaned !== node.textContent) node.textContent = cleaned;
-    });
-    purifier.addHook('uponSanitizeAttribute', (_node, data) => {
-      const hidden = data.attrName === 'style' ? hiddenIn(data.attrValue) : undefined;
-      if (!hidden) return;
-      cssRemoved.add(hidden.label);
-      data.attrValue = '';
-    });
-  }
-  return purifier;
+const createPurifier = (factory: DOMPurify): DOMPurify => {
+  const instance = factory(window);
+  instance.addHook('uponSanitizeElement', (node) => {
+    if (node.nodeName !== 'STYLE' || !node.textContent) return;
+    const cleaned = cleanStyleBlock(node.textContent);
+    if (cleaned !== node.textContent) node.textContent = cleaned;
+  });
+  instance.addHook('uponSanitizeAttribute', (_node, data) => {
+    const hidden = data.attrName === 'style' ? hiddenIn(data.attrValue) : undefined;
+    if (!hidden) return;
+    cssRemoved.add(hidden.label);
+    data.attrValue = '';
+  });
+  return instance;
 };
 
 const isHttps = (value: string | null) => {
@@ -146,7 +148,8 @@ const splitHead = (input: string) => {
  * cleans it again every time it shows it. The site's CSP is a second layer.
  */
 export const cleanContextHtml = (input: string): CleanContextHtml => {
-  const purify = getPurifier();
+  const purify = purifier;
+  if (!purify) throw new Error('The context page cleaner has not loaded yet.');
   const { source, dropped } = splitHead(String(input ?? ''));
   cssRemoved.clear();
   const fragment = purify.sanitize(source, { ...CONFIG, RETURN_DOM_FRAGMENT: true });
@@ -181,4 +184,13 @@ export const cleanContextHtml = (input: string): CleanContextHtml => {
   const holder = document.createElement('div');
   holder.appendChild(fragment);
   return { html: holder.innerHTML.trim(), removed: [...removed] };
+};
+
+/** Loads the sanitizer once, then gives the cleaner, which needs it. */
+export const loadContextHtmlCleaner = async (): Promise<typeof cleanContextHtml> => {
+  if (!purifier) {
+    const loaded = await loadBrowserModuleWithRetry(() => import('dompurify'));
+    purifier ||= createPurifier(resolveDefaultExport<DOMPurify>(loaded));
+  }
+  return cleanContextHtml;
 };
