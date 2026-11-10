@@ -1,11 +1,13 @@
 // Run against local Vite with demo surfaces enabled. Synthetic registry/Worker
 // reads and checked-in demo data stay local; this smoke never submits.
 import assert from 'node:assert/strict';
+import { inspectAboutControls } from './about-page-smoke.mjs';
 import { inspectSessionSelectorLayout } from './session-selector-layout-smoke.mjs';
 import { assertReadable, auditPanelContrast, clickQuestionAction, inspectCivicOverlays } from './civic-theme-overlay-smoke.mjs';
 import { inspectCivicExplorerContent } from './civic-theme-explorer-smoke.mjs';
 import { inspectCivicWizard } from './civic-theme-wizard-smoke.mjs';
 import { inspectCivicAuthoring } from './civic-theme-authoring-smoke.mjs';
+import { inspectResultsTheme } from './results-theme-smoke.mjs';
 import { installCivicThemeFixtures, CIVIC_FIXTURE_GROUP_LABEL } from './civic-theme-fixtures.mjs';
 
 export const readControl = (element) => {
@@ -24,6 +26,42 @@ export const readControl = (element) => {
   };
 };
 
+export async function inspectNavbarLogoAlignment(page) {
+  const logo = page.getByRole('link', { name: 'Context Engine home', exact: true }).locator('img');
+  const login = page.getByTestId('ce-account-login-button');
+  await logo.waitFor({ state: 'visible' });
+  await login.waitFor({ state: 'visible' });
+  const artwork = await logo.evaluate(async (image) => {
+    await image.decode();
+    // Measure painted pixels, not the SVG's square box and transparent margins.
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 1024;
+    const context = canvas.getContext('2d');
+    context.drawImage(image, 0, 0, canvas.width, canvas.height);
+    const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+    let firstRow = canvas.height;
+    let lastRow = -1;
+    for (let y = 0; y < canvas.height; y += 1) {
+      for (let x = 0; x < canvas.width; x += 1) {
+        if (pixels[(y * canvas.width + x) * 4 + 3] <= 16) continue;
+        firstRow = Math.min(firstRow, y);
+        lastRow = y;
+        break;
+      }
+    }
+    const rect = image.getBoundingClientRect();
+    const top = rect.top + (firstRow / canvas.height) * rect.height;
+    const bottom = rect.top + ((lastRow + 1) / canvas.height) * rect.height;
+    return { top, bottom, height: bottom - top, paintedRows: lastRow - firstRow + 1 };
+  });
+  const control = await login.evaluate(readControl);
+  assert(artwork.paintedRows > 0, 'The logo has visible artwork');
+  for (const edge of ['top', 'bottom', 'height']) {
+    assert(Math.abs(control[edge] - artwork[edge]) <= 2, `Login ${edge} matches the visible C artwork: ${JSON.stringify({ control, artwork })}`);
+  }
+  return { loginHeight: control.height, artworkHeight: artwork.height };
+}
+
 export async function inspectCivicAbout(page) {
   const hero = page.getByTestId('ce-about-hero');
   await assertReadable(hero);
@@ -32,6 +70,7 @@ export async function inspectCivicAbout(page) {
     return element.getBoundingClientRect().top - container.getBoundingClientRect().top;
   });
   assert(topPadding >= 16, 'The About hero has space above it below the navbar');
+  await inspectAboutControls(page);
   await assertReadable(page.locator('body'));
   for (const name of ['Related Work', 'Recognition', 'Roadmap', 'Functionality']) {
     const section = page.getByRole('button', { name, exact: true });
@@ -43,11 +82,22 @@ export async function inspectCivicAbout(page) {
 export async function inspectMinimalPost(page) {
   await page.getByRole('heading', { name: 'Agent Village Wrapped: Does Your Agent Know You? (Experiment + Eval)', exact: true }).waitFor({ state: 'visible' });
   await assertReadable(page.locator('body'));
+  const swarmPoint = page.getByRole('button', { name: /^I am more worried about agents being too passive/ });
+  await swarmPoint.focus();
+  await assertReadable(page.getByRole('tooltip'));
+  await swarmPoint.blur();
   await page.getByRole('button', { name: 'List', exact: true }).click();
   await assertReadable(page.locator('body'));
   const point = page.getByRole('button', { name: 'P1: 3/10, 70% confidence', exact: true });
-  await point.click();
+  // Pin by keyboard, so the close button takes its keyboard focus style.
+  await point.focus();
+  await page.keyboard.press('Enter');
   await assertReadable(page.getByRole('tooltip'));
+  const close = page.getByRole('button', { name: 'Close rating details', exact: true });
+  await close.focus();
+  await assertReadable(close);
+  await close.hover();
+  await assertReadable(close);
   await point.press('Escape');
   await page.getByText('Evaluation protocol, scoring, and record schema', { exact: true }).click();
   await assertReadable(page.locator('body'));
@@ -344,6 +394,7 @@ export async function inspectMobileSessionSpacing(page) {
 export async function inspectCivicSession(page) {
   const login = page.getByRole('button', { name: 'LOG IN', exact: true });
   await login.waitFor({ state: 'visible' });
+  await inspectNavbarLogoAlignment(page);
   await inspectSectionSubtitles(page);
   const civicLogin = await login.evaluate(readControl);
   await inspectCivicTitleFade(page);
@@ -420,6 +471,7 @@ export async function runSmoke() {
       const page = await context.newPage();
       await page.addInitScript(() => {
         if (!localStorage.getItem('ce:theme')) localStorage.setItem('ce:theme', 'civic');
+        localStorage.setItem('ce:demoSurfaceMode', 'true');
         localStorage.setItem('ce_onboarding_complete', 'true');
         localStorage.setItem('ce:firstVisitRootAboutRedirectConsumed:v20260618b', 'true');
       });
@@ -442,13 +494,23 @@ export async function runSmoke() {
       const civic = await inspectCivicSession(page);
       await inspectCivicOverlays(page);
       await inspectCivicAuthoring(page);
+      await page.goto(`${baseUrl}/session/demo-2/questions/results?session=demo-2`, { waitUntil: 'domcontentloaded' });
+      await inspectResultsTheme(page);
+      await page.goto(`${baseUrl}/session/demo-2`, { waitUntil: 'domcontentloaded' });
       await page.evaluate(() => localStorage.setItem('ce:theme', 'context-engine'));
       await page.reload({ waitUntil: 'domcontentloaded' });
       const login = page.getByRole('button', { name: 'LOG IN', exact: true });
       await login.waitFor({ state: 'visible' });
       const original = await login.evaluate(readControl);
-      for (const property of ['width', 'height', 'fontSize', 'headingSize']) {
+      // Civic deliberately uses a compact mobile login treatment. Compare desktop
+      // geometry; on mobile, protect the touch target instead of equating themes.
+      const matchingProperties = viewport.width > 768 ? ['width', 'height', 'fontSize', 'headingSize'] : [];
+      for (const property of matchingProperties) {
         assert.equal(civic[property], original[property], `Login ${property} matches the existing theme`);
+      }
+      for (const control of [civic, original]) {
+        assert(control.width >= 140 && control.width <= viewport.width, 'Login fits the viewport with a readable label');
+        assert(control.height >= 44, 'Login retains a usable touch target');
       }
       for (const theme of ['context-engine', 'classic-95']) {
         await page.evaluate((value) => localStorage.setItem('ce:theme', value), theme);
@@ -461,10 +523,15 @@ export async function runSmoke() {
         await assertReadable(dialog);
         await dialog.getByRole('button', { name: 'Close', exact: true }).click();
       }
+      // Classic paints the post on its gray window face, as Civic does on white.
+      await page.goto(`${baseUrl}/posts/agent-village-wrapped-2026`, { waitUntil: 'domcontentloaded' });
+      await inspectMinimalPost(page);
       await context.close();
       console.log(`Civic smoke passed: ${viewport.width}×${viewport.height}`);
     }
-    console.log('Civic theme smoke passed at desktop and mobile sizes; Groups dialog passed in all three themes.');
+    console.log(
+      'Civic theme smoke passed at desktop and mobile sizes; Groups dialog passed in all three themes; the post passed in Classic.',
+    );
   } finally {
     await browser.close();
   }

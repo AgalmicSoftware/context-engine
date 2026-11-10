@@ -35,7 +35,7 @@ const WorkerDeployHelperToggle = ({ checked, onChange, renderInfoTooltip }: Work
         {renderTooltip({
           id: 'gw-embedded-deploy-helper-tip',
           content:
-            'Lets this session worker handle sponsored bootstrap deploys locally first. Turn it off to reduce surface area and force sponsored deploys to fall back to the standalone helper URL.',
+            'Lets this session worker handle sponsored bootstrap deploys itself. Turn it off to reduce surface area; this Worker then refuses sponsored deploys.',
           placement: 'right',
           testId: 'ce-wizard-worker-tooltip-gw-embedded-deploy-helper-tip',
           ariaLabel: 'Embedded deploy-helper info',

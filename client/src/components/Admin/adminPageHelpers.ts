@@ -1,3 +1,4 @@
+import { inferAiProviderFromModel } from '../../../../shared/aiModelFamily.mjs';
 import { getChainById } from '../../variables/chains.js';
 import { resolveSessionCapabilityProjection } from '../../utilities/session/sessionCapabilityProjection';
 import { toStr } from '../../utilities/shared/primitives.js';
@@ -22,6 +23,13 @@ export const getChainName = (value: unknown): string => {
   if (!id) return '';
   const chain = getChainById(id);
   return toStr(chain?.name).trim();
+};
+
+// Reads the chain id from inputs like "84532" or "OP Sepolia (11155420)": the last number wins.
+export const parseChainIdInput = (raw: unknown): number => {
+  const matches = toStr(raw).match(/\d+/g);
+  if (!matches || !matches.length) return 0;
+  return Number(matches[matches.length - 1]) || 0;
 };
 
 export const countSessionsForChain = (entries: unknown = [], chainId: unknown = null): number => {
@@ -76,13 +84,24 @@ export const normalizeAiProvider = (raw: unknown, fallback: unknown = 'openai'):
   return String(fallback || '');
 };
 
-export const inferAiProviderFromModel = (modelRaw: unknown): string => {
-  const model = toStr(modelRaw).trim().toLowerCase();
-  if (!model) return '';
-  if (model.startsWith('claude')) return 'anthropic';
-  if (/^(gpt-|o[1-9]|chatgpt)/.test(model)) return 'openai';
-  if (model.includes('/')) return 'openrouter';
-  return '';
+const asAiRecord = (value: unknown): Record<string, unknown> =>
+  value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+
+// The admin AI test pings the session's everyday model, or the provider's default.
+export const resolveAdminAiTestModel = (aiValue: unknown): { provider: string; model: string } => {
+  const ai = asAiRecord(aiValue);
+  const fast = asAiRecord(asAiRecord(ai.models).fast);
+  const fastModel = toStr(fast.model).trim();
+  const legacyModel = toStr(ai.model).trim();
+  const provider = normalizeAiProvider(
+    fast.provider || ai.mode || ai.provider || inferAiProviderFromModel(fastModel || legacyModel) || 'openai',
+  );
+  const providerModel = toStr(asAiRecord(asAiRecord(ai.providers)[provider]).model).trim();
+  const fits = (model: string) => !!model && ['', provider].includes(inferAiProviderFromModel(model));
+  // With no stored model the ping names none, so each Worker uses its own default;
+  // older Workers refuse this release's defaults.
+  const model = (fits(fastModel) ? fastModel : '') || providerModel || (fits(legacyModel) ? legacyModel : '');
+  return { provider, model };
 };
 
 export const buildTxExplorerUrl = (hash: unknown, chainId: unknown): string => {

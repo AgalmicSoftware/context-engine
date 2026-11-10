@@ -53,6 +53,15 @@ test('CI installs the MCP lockfile dependencies before running its packed execut
   }
 });
 
+test('the contracts job installs isolated Worker ethers before importing the registry smoke', () => {
+  const source = readFileSync(new URL('../.github/workflows/ci.yml', import.meta.url), 'utf8');
+  const job = source.split('\n  contracts:\n')[1].split(/\n  [\w-]+:\n/)[0];
+  const install = job.indexOf('run: npm --prefix workers/sessionCorsWorker ci');
+  assert.ok(install >= 0, 'the registry smoke imports the Session Worker and requires its isolated package');
+  assert.ok(install < job.indexOf('run: npm run ci:gate -- contracts'));
+  assert.match(job, /workers\/sessionCorsWorker\/package-lock\.json/);
+});
+
 test('manifest validation accepts explicit local, hosted, and release profiles', () => {
   assert.deepEqual(validateGateManifest(fixtureManifest()), []);
 });

@@ -55,3 +55,19 @@ describe('microphoneSelection', () => {
     expect(iphoneTrack.stop).not.toHaveBeenCalled();
   });
 });
+
+it('keeps the speaker-audio choice when switching away from a Continuity microphone', async () => {
+  const original = buildStream(buildTrack('iPhone Microphone'));
+  const replacement = buildStream(buildTrack('Built-in Microphone'));
+  const getUserMedia = jest.fn().mockResolvedValueOnce(original).mockResolvedValueOnce(replacement);
+  const mediaDevices = {
+    getUserMedia,
+    enumerateDevices: jest.fn().mockResolvedValue([buildDevice('Built-in Microphone', 'built-in')]),
+  } as unknown as MediaDevices;
+  await requestPreferredSpeechMicrophone(mediaDevices, { echoCancellation: false });
+  expect(getUserMedia).toHaveBeenNthCalledWith(1, { audio: { ...SPEECH_AUDIO_CONSTRAINTS, echoCancellation: false } });
+  expect(getUserMedia).toHaveBeenNthCalledWith(2, {
+    audio: { ...SPEECH_AUDIO_CONSTRAINTS, echoCancellation: false, deviceId: { exact: 'built-in' } },
+  });
+  expect(SPEECH_AUDIO_CONSTRAINTS.echoCancellation).toBe(true);
+});

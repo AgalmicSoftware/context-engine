@@ -25,11 +25,6 @@ const getSurveyRuntimeGlobal = (): SurveyRuntimeGlobal | null =>
 export const surveyLog = createLogger('surveys');
 export const GATE_SBT_HYDRATION_RETRY_MS = 45 * 1000;
 
-// Keep this dormant toggle path for future voice-only interview mode.
-// The pile hologram avatar is intentionally hidden for now, but the render/state
-// plumbing stays in place so future voice-mode work can re-enable it cleanly.
-export const SHOW_PILE_HOLOGRAM_TOGGLE = false;
-
 export const resolveStableSurveyAudioWorkerProps = (
   memo: SurveyAudioWorkerPropsMemo | null,
   next: SurveyAudioWorkerProps,
@@ -90,5 +85,4 @@ export const scheduleMicrotask = (cb: unknown): void => {
   Promise.resolve().then(cb as VoidFunction);
 };
 
-export const DEBUG_PREFILL = false;
 export const EMPTY_QUESTION_POOL: never[] = [];

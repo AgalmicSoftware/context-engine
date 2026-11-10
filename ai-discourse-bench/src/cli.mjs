@@ -1,3 +1,4 @@
+import path from 'node:path';
 import {
   readJsonFile,
   readJsonFileIfExists,
@@ -5,11 +6,12 @@ import {
   writeJsonFile,
   writeTextFile,
 } from './io.mjs';
-import { createCheckpointWriter, readCheckpointRuns } from './checkpoint.mjs';
+import { openCheckpoint } from './checkpoint.mjs';
 import { renderHtmlReport } from './render-html.mjs';
 import { buildContextEnginePolisExport } from './ce-export.mjs';
 import { attachAnalysisOverlay, buildSecondPassAnalysisInput } from './analysis-export.mjs';
 import {
+  DEFAULT_ANSWER_REPEATS,
   DEFAULT_CONCURRENCY,
   DEFAULT_IMPORTANCE_BUDGET,
   DEFAULT_IMPORTANCE_MAX_ALLOCATIONS,
@@ -33,12 +35,14 @@ import {
   validatePersonas,
   validateQuestionBank,
   validateReleaseRunFile,
+  validateRunPromptBindings,
   validateRuns,
 } from './schema.mjs';
 import { runBenchmark } from './runner.mjs';
 import {
   runImportanceBenchmark,
   validateImportanceRuns,
+  validateImportancePromptBindings,
   validateReleaseImportanceFile,
 } from './importance.mjs';
 import { buildResultsReport } from './scoring.mjs';
@@ -56,6 +60,8 @@ const usage = `Usage:
   ai-discourse-bench validate --questions <file> --models <file> [--personas <file>]
   ai-discourse-bench plan-run --questions <file> --models <file> [--out <file>] [--provider mock|local|openrouter] [--mode self|persona] [--persona <id>] [--personas <file>] [--repeats <n>] [--limit-questions <n>]
   ai-discourse-bench run --questions <file> --models <file> --out <file> [--provider mock|local|openrouter] [--mode self|persona] [--persona <id>] [--personas <file>] [--repeats <n>] [--concurrency <n>] [--max-attempts <n>] [--resume] [--checkpoint <file.jsonl>]
+  ai-discourse-bench answer --questions <Results export or question JSON> --models <file[,file...]> --out <file> [--provider mock|local|openrouter] [--repeats <n>] [--concurrency <n>] [--max-attempts <n>] [--seed <text>] [--limit-questions <n>] [--resume] [--checkpoint <file.jsonl>]
+  ai-discourse-bench compare-answers --answers <file> --people <Results export> --out <dir> [--groups <file>] [--min-people <n>] [--bootstrap <n>] [--seed <text>]
   ai-discourse-bench run-importance --questions <file> --models <file> --out <file> [--provider mock|local|openrouter] [--budget <credits>] [--max-allocations <n>] [--repeats <n>] [--concurrency <n>] [--max-attempts <n>] [--resume] [--checkpoint <file.jsonl>]
   ai-discourse-bench build-report --questions <file> --models <file[,file...]> --runs <file[,file...]> --out <file> [--importance <file[,file...]>] [--limit-questions <n>] [--release]
   ai-discourse-bench render-report --report <file> --out <file.html> [--analysis <overlay.json>]
@@ -98,10 +104,8 @@ const parsePositiveInt = (value, fallback, label) => {
 const readInputs = async (args, { personasOptional = true } = {}) => {
   if (!args.questions) throw new Error(`Missing --questions\n${usage}`);
   if (!args.models) throw new Error(`Missing --models\n${usage}`);
-  const questionBank = limitQuestionBank(
-    await readJsonFile(args.questions),
-    args['limit-questions'] || 0
-  );
+  const fullQuestionBank = await readJsonFile(args.questions);
+  const questionBank = limitQuestionBank(fullQuestionBank, args['limit-questions'] || 0);
   const modelPaths = parseInputFileList(args.models);
   const modelRosters = await Promise.all(modelPaths.map((modelPath) => readJsonFile(modelPath)));
   modelRosters.forEach((modelRoster, index) => {
@@ -118,7 +122,7 @@ const readInputs = async (args, { personasOptional = true } = {}) => {
     throwIfErrors('personas', validatePersonas(personasFile));
   }
 
-  return { questionBank, modelRoster, personasFile };
+  return { questionBank, fullQuestionBank, modelRoster, personasFile };
 };
 
 const commandValidate = async (args) => {
@@ -142,9 +146,8 @@ const commandRun = async (args) => {
   const inputs = await readInputs(args, { personasOptional: mode !== 'persona' });
   const checkpointPath = args.checkpoint || `${args.out}.jsonl`;
   const priorOutput = args.resume ? await readJsonFileIfExists(args.out, { runs: [] }) : { runs: [] };
-  const checkpointRuns = args.resume ? await readCheckpointRuns(checkpointPath) : [];
+  const { runs: checkpointRuns, write: checkpointWriter } = await openCheckpoint(checkpointPath, { resume: !!args.resume });
   const existingRuns = [...(priorOutput?.runs || []), ...checkpointRuns];
-  const checkpointWriter = await createCheckpointWriter(checkpointPath, { reset: !args.resume });
   const result = await runBenchmark({
     ...inputs,
     providerOverride: provider,
@@ -172,6 +175,75 @@ const commandRun = async (args) => {
   console.log(`wrote ${result.runs.length} runs to ${args.out} (${result.resumedRuns} resumed; checkpoint ${checkpointPath})`);
 };
 
+// Answers any session's questions, every type included, in rows that can be compared with people's answers.
+const commandAnswer = async (args) => {
+  if (!args.questions) throw new Error(`Missing --questions\n${usage}`);
+  if (!args.models) throw new Error(`Missing --models\n${usage}`);
+  if (!args.out) throw new Error(`Missing --out\n${usage}`);
+  const provider = args.provider || '';
+  if (provider && !PROVIDERS.includes(provider)) {
+    throw new Error(`--provider must be one of ${PROVIDERS.join(', ')}`);
+  }
+  const repeats = parsePositiveInt(args.repeats, DEFAULT_ANSWER_REPEATS, '--repeats');
+  const concurrency = parsePositiveInt(args.concurrency, DEFAULT_CONCURRENCY, '--concurrency');
+  const maxAttempts = parsePositiveInt(args['max-attempts'], DEFAULT_MAX_ATTEMPTS, '--max-attempts');
+  // Loaded here, not above: these commands use Context Engine's shared answer
+  // rules and scorer, so they run only inside the repo; the rest of the folder doesn't.
+  const { readQuestionSet, runAnswerSet } = await import('./answer-set.mjs');
+  const questionSet = readQuestionSet(await readJsonFile(args.questions));
+  if (args['limit-questions']) {
+    questionSet.questions = questionSet.questions.slice(0, parsePositiveInt(args['limit-questions'], 1, '--limit-questions'));
+  }
+  if (!questionSet.questions.length) throw new Error(`${args.questions} has no questions a model can answer.`);
+  const modelPaths = parseInputFileList(args.models);
+  const modelRosters = await Promise.all(modelPaths.map((modelPath) => readJsonFile(modelPath)));
+  modelRosters.forEach((modelRoster, index) => {
+    throwIfErrors(`model roster ${modelPaths[index]}`, validateModelRoster(modelRoster));
+  });
+  const modelRoster = mergeModelRosters(modelRosters);
+  const checkpointPath = args.checkpoint || `${args.out}.jsonl`;
+  const priorOutput = args.resume ? await readJsonFileIfExists(args.out, { rows: [] }) : { rows: [] };
+  const { runs: checkpointRows, write: checkpointWriter } = await openCheckpoint(checkpointPath, { resume: !!args.resume });
+  const result = await runAnswerSet({
+    questionSet,
+    modelRoster,
+    providerOverride: provider,
+    repeats,
+    concurrency,
+    maxAttempts,
+    seed: args.seed || '',
+    existingRows: [...(priorOutput?.rows || []), ...checkpointRows],
+    onRow: checkpointWriter,
+  });
+  await writeJsonFile(args.out, result);
+  const skipped = Object.values(questionSet.skipped).reduce((sum, count) => sum + count, 0);
+  console.log(
+    `wrote ${result.rows.length} answers to ${args.out} (${result.unanswered} unanswered, ${result.resumedRows} resumed` +
+      `${skipped ? `, ${skipped} questions skipped` : ''}; checkpoint ${checkpointPath})`,
+  );
+};
+
+// Compares an answer file with people's answers in a Results export, by group and question type.
+const commandCompareAnswers = async (args) => {
+  for (const flag of ['answers', 'people', 'out']) {
+    if (!args[flag]) throw new Error(`Missing --${flag}\n${usage}`);
+  }
+  const { compareAnswers, renderComparisonMarkdown } = await import('./answer-comparison.mjs');
+  const report = compareAnswers({
+    answersFile: await readJsonFile(args.answers),
+    resultsExport: await readJsonFile(args.people),
+    groups: args.groups ? await readJsonFile(args.groups) : null,
+    minPeople: parsePositiveInt(args['min-people'], 5, '--min-people'),
+    bootstrapSamples: parsePositiveInt(args.bootstrap, 1000, '--bootstrap'),
+    ...(args.seed ? { seed: args.seed } : {}),
+  });
+  await writeJsonFile(path.join(args.out, 'answer-comparison.json'), report);
+  await writeTextFile(path.join(args.out, 'answer-comparison.md'), renderComparisonMarkdown(report));
+  console.log(
+    `compared ${report.models.length} models with ${report.people} people over ${report.questions.length} questions; wrote ${args.out}`,
+  );
+};
+
 const commandRunImportance = async (args) => {
   if (!args.out) throw new Error(`Missing --out\n${usage}`);
   const provider = args.provider || '';
@@ -190,8 +262,7 @@ const commandRunImportance = async (args) => {
   const inputs = await readInputs(args);
   const checkpointPath = args.checkpoint || `${args.out}.jsonl`;
   const priorOutput = args.resume ? await readJsonFileIfExists(args.out, { runs: [] }) : { runs: [] };
-  const checkpointRuns = args.resume ? await readCheckpointRuns(checkpointPath) : [];
-  const checkpointWriter = await createCheckpointWriter(checkpointPath, { reset: !args.resume });
+  const { runs: checkpointRuns, write: checkpointWriter } = await openCheckpoint(checkpointPath, { resume: !!args.resume });
   const result = await runImportanceBenchmark({
     questionBank: inputs.questionBank,
     modelRoster: inputs.modelRoster,
@@ -248,9 +319,17 @@ const commandBuildReport = async (args) => {
   if (args.release && args['limit-questions']) {
     throw new Error('--release cannot be combined with --limit-questions');
   }
-  const { questionBank, modelRoster } = await readInputs(args);
+  const { questionBank, fullQuestionBank, modelRoster } = await readInputs(args);
   const runPaths = parseInputFileList(args.runs);
   const runsFiles = await Promise.all(runPaths.map((runPath) => readJsonFile(runPath)));
+  const scheduleSeeds = [...new Set(runsFiles.map(file => file?.manifest?.scheduleSeed ?? null))];
+  const scheduleWarning = scheduleSeeds.length > 1
+    ? `Run files use different scheduleSeed values: ${scheduleSeeds.map(seed => JSON.stringify(seed)).join(', ')}. Release reports require one seed.`
+    : '';
+  if (scheduleWarning) {
+    if (args.release) throw new Error(scheduleWarning);
+    console.warn(`Warning: ${scheduleWarning}`);
+  }
   if (args.release) {
     runsFiles.forEach((runsFile, index) => {
       throwIfErrors(`release run file ${runPaths[index]}`, validateReleaseRunFile(runsFile, {
@@ -263,6 +342,10 @@ const commandBuildReport = async (args) => {
         expectedPromptTemplateVersion: QUESTION_PROMPT_TEMPLATE_VERSION,
         expectedPromptTemplateHash: sha256(buildQuestionPrompt.toString()),
       }));
+    });
+  } else {
+    runsFiles.forEach((runsFile, index) => {
+      throwIfErrors(`preview run file ${runPaths[index]}`, validateRunPromptBindings(runsFile, { questionBank }));
     });
   }
   const runsFile = mergeRunsFiles(runsFiles);
@@ -298,14 +381,28 @@ const commandBuildReport = async (args) => {
         }));
       });
     }
+    importanceFiles.forEach((file, index) => {
+      throwIfErrors(`importance file ${importancePaths[index]}`, validateImportancePromptBindings(file, { questionBank: fullQuestionBank }));
+    });
     importanceFile = mergeImportanceRunFiles(importanceFiles);
     throwIfErrors('importance runs', validateImportanceRuns(importanceFile, {
       modelIds: new Set(modelRoster.models.map((model) => model.id)),
-      questionIds: new Set(questionBank.questions.map((question) => question.id)),
+      questionIds: new Set(fullQuestionBank.questions.map((question) => question.id)),
       benchmarkId: questionBank.benchmarkId,
     }));
   }
-  const report = buildResultsReport({ questionBank, modelRoster, runsFile, importanceFile });
+  const limitedImportance = importanceFile && questionBank.questions.length < fullQuestionBank.questions.length;
+  const report = buildResultsReport({ questionBank, modelRoster, runsFile, importanceFile: limitedImportance ? null : importanceFile });
+  if (limitedImportance) {
+    report.integrity.warnings.unshift('Importance omitted from this question-limited preview: allocations are bound to the full question bank.');
+    report.integrity.releaseReady = false;
+    report.status = 'preview';
+  }
+  if (scheduleWarning) {
+    report.integrity.warnings.unshift(scheduleWarning);
+    report.integrity.releaseReady = false;
+    report.status = 'preview';
+  }
   if (args.release && !report.integrity.releaseReady) {
     throw new Error(`release report integrity failed:\n- ${report.integrity.warnings.join('\n- ')}`);
   }
@@ -383,6 +480,10 @@ export const runCli = async (argv) => {
       return commandValidate(args);
     case 'run':
       return commandRun(args);
+    case 'answer':
+      return commandAnswer(args);
+    case 'compare-answers':
+      return commandCompareAnswers(args);
     case 'run-importance':
       return commandRunImportance(args);
     case 'plan-run':

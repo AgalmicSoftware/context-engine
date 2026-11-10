@@ -87,6 +87,7 @@ function scrubPublicPackageJson(packageJsonPath, referencePackageJsonPath = pack
       /\bscripts\/run-e2e-[^\s'"]+\.js\b/,
       /\bscripts\/run-ux-[^\s'"]+\.js\b/,
       /\bscripts\/capture-ux-[^\s'"]+\.js\b/,
+      /\bscripts\/start-playwright-server\.js\b/,
       /\bscripts\/run-contextengine-cc-tests\.js\b/,
       /\bscripts\/vendor-cecc-ethers-bundle\.js\b/,
       /\bscripts\/restore-private-pack\.sh\b/,

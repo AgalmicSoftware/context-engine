@@ -1,9 +1,9 @@
-import { DEFAULT_AI_MODEL } from '../../shared/aiDefaults.mjs';
+import { DEFAULT_AI_MODEL, GROUP_TRANSCRIPTION_MODEL, TRANSCRIPTION_FALLBACK_MODEL } from '../../shared/aiDefaults.mjs';
 import { isChatReasoningModel, usesOpenAiResponsesApi } from './aiModelParams.js';
 
 const trim = (value) => typeof value === 'string' ? value.trim() : '';
 const record = (value) => value && typeof value === 'object' && !Array.isArray(value) ? value : {};
-const tasks = new Set(['generate', 'rewrite', 'summarize', 'rank', 'analysis', 'compare', 'categorize', 'interview-map', 'interview-opening']);
+const tasks = new Set(['generate', 'rewrite', 'summarize', 'rank', 'analysis', 'compare', 'categorize', 'interview-map', 'interview-opening', 'context-read']);
 const taskName = (payload) => tasks.has(payload?.taskType) ? payload.taskType : '';
 const modelEntry = (entry, provider, fallback = DEFAULT_AI_MODEL) => {
   const obj = record(entry);
@@ -35,22 +35,33 @@ export const AI_MODEL_NOT_ALLOWED = Object.freeze({
   reason: 'ai_model_not_allowed',
 });
 
-export const isSessionTranscriptionModelAllowed = ({ config, provider, model }) => {
+export const isSessionTranscriptionModelAllowed = ({ config, provider, model, groupSpeakerLabels = false }) => {
   const ai = record(config?.ai);
   const entry = record(ai.models?.transcription || ai.transcription);
-  return provider === (trim(entry.provider).toLowerCase() || 'openai') && model === (trim(entry.model) || 'whisper-1');
+  // The caller may opt into this one bounded group operation, never an arbitrary model.
+  if (groupSpeakerLabels && provider === 'openai' && model === GROUP_TRANSCRIPTION_MODEL &&
+      (trim(entry.provider).toLowerCase() || 'openai') === 'openai') return true;
+  return provider === (trim(entry.provider).toLowerCase() || 'openai') &&
+    model === (trim(entry.model) || TRANSCRIPTION_FALLBACK_MODEL);
 };
 
 // These are per-call ceilings, not allowances. Labels are caller-controlled but
 // can select only these bounded operations, never a caller-supplied maximum.
-// Built-ins using the common 16,384-token (Anthropic 32,568) transport
+// Built-ins using the common 16,384-token (Anthropic 32,768) transport
 // default retain up to 16,000; reports and interview tasks keep smaller bounds.
 const operationCeilings = Object.freeze({
   generate: 16000, rewrite: 16000, summarize: 16000, rank: 16000, compare: 16000, categorize: 16000,
-  analysis: 7000, 'interview-map': 8000, 'interview-opening': 600,
+  analysis: 7000, 'interview-map': 8000,
+  // One short question, but models that think spend part of the cap on thinking.
+  'interview-opening': 2000,
+  // A context PDF's text, read once by an admin's request.
+  'context-read': 8000,
 });
 const tokenFields = ['max_tokens', 'max_completion_tokens', 'max_output_tokens', 'max_tokens_to_sample', 'maxTokens'];
 const effortOrder = ['none', 'minimal', 'low', 'medium', 'high'];
+// Interview mapping may use medium effort on a low-effort session; a per-task
+// effort the session sets for it still decides.
+const minimumTaskEffort = Object.freeze({ 'interview-map': 'medium' });
 const configuredFunctions = (config) => {
   const value = config?.ai?.providers?.custom?.functions ?? config?.ai?.custom?.functions;
   if (typeof value !== 'string') return value;
@@ -78,7 +89,9 @@ export const boundSessionAiRequest = ({ payload = {}, provider, config, requestK
   const tokens = Math.min(ceiling, ...requested);
   const ai = record(config?.ai);
   const savedEffort = ai.taskReasoningEffort?.[task] || (task === 'analysis' && ai.taskReasoningEffort?.generate) || ai.reasoningEffort || ai.reasoning_effort || 'low';
-  const maximumEffort = ['low', 'medium', 'high'].includes(savedEffort) ? savedEffort : 'low';
+  const sessionEffort = ['low', 'medium', 'high'].includes(savedEffort) ? savedEffort : 'low';
+  const floor = ai.taskReasoningEffort?.[task] ? '' : minimumTaskEffort[task];
+  const maximumEffort = floor && effortOrder.indexOf(floor) > effortOrder.indexOf(sessionEffort) ? floor : sessionEffort;
   const requestedEffort = trim(payload.reasoning_effort || payload.reasoningEffort || payload.reasoning?.effort);
   const effort = effortOrder.includes(requestedEffort) && effortOrder.indexOf(requestedEffort) < effortOrder.indexOf(maximumEffort)
     ? requestedEffort : maximumEffort;

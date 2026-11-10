@@ -1,5 +1,5 @@
 import { DEFAULT_AI_MODEL } from '../../../../shared/aiDefaults.mjs';
-import type { InterviewPrefillPacket, InterviewResearchCoverage } from './sessionInterview';
+import type { InterviewPrefillPacket, InterviewQuestion, InterviewResearchCoverage } from './sessionInterview';
 
 export type SessionInterviewModalRecord = Record<string, unknown>;
 
@@ -31,6 +31,70 @@ export const displayResponderContext = (packet: InterviewPrefillPacket | null): 
     .join('\n');
 };
 
+const escapeRegExp = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const isWordCharacter = (character = ''): boolean => /[\p{L}\p{M}\p{N}_]/u.test(character);
+
+/** Where a phrase appears as whole words, ignoring case, as [start, end) spans. */
+const findWholePhrase = (text: string, phrase: string): Array<[number, number]> => {
+  const spans: Array<[number, number]> = [];
+  const pattern = new RegExp(escapeRegExp(phrase), 'giu');
+  for (let match = pattern.exec(text); match; match = pattern.exec(text)) {
+    const start = match.index;
+    const end = start + match[0].length;
+    // Step one character, so a match rejected below cannot hide a whole-word match inside it.
+    pattern.lastIndex = start + 1;
+    const wholeStart = !isWordCharacter(text[start]) || !isWordCharacter(text[start - 1]);
+    const wholeEnd = !isWordCharacter(text[end - 1]) || !isWordCharacter(text[end]);
+    if (wholeStart && wholeEnd) spans.push([start, end]);
+  }
+  return spans;
+};
+
+// Where a fact was cut, drop the punctuation left standing alone and spare spaces.
+const tidyCutLine = (line: string): string =>
+  line
+    .replace(/(^|\s)[.,;:!?]+(?=\s|$)/g, '$1')
+    .replace(/[ \t]+/g, ' ')
+    .trim();
+
+export const omitConcealedInterviewFacts = (
+  context: string,
+  packet: InterviewPrefillPacket | null,
+  isConcealed: (questionId: string) => boolean,
+  questions: Array<Pick<InterviewQuestion, 'id'>>,
+): string => {
+  const questionIds = new Set(questions.map(({ id }) => id));
+  const facts = (packet?.responderContext?.facts || []).map((entry) => {
+    // As in the realtime prefill, related questions outside this interview do not count.
+    const ids = (entry.relatedQuestionIds || []).filter((id) => questionIds.has(id));
+    return { fact: String(entry.fact || '').trim(), concealed: ids.length > 0 && ids.every(isConcealed) };
+  });
+  // A concealed fact goes wherever it appears as whole words, the summary and edited lines included,
+  // except inside a shown fact: those spans stay, so a shown fact with the same words is kept whole.
+  const cut = new Uint8Array(context.length);
+  for (const { fact, concealed } of facts) {
+    if (fact && concealed) for (const [start, end] of findWholePhrase(context, fact)) cut.fill(1, start, end);
+  }
+  for (const { fact, concealed } of facts) {
+    if (fact && !concealed) for (const [start, end] of findWholePhrase(context, fact)) cut.fill(0, start, end);
+  }
+  // Line breaks stay, so each line can be compared with the original; a cut line left without words goes.
+  const originalLines = context.split('\n');
+  return context
+    .split('')
+    .filter((character, index) => !cut[index] || character === '\n')
+    .join('')
+    .split('\n')
+    .map((line, index) => (line === originalLines[index] ? line : tidyCutLine(line)))
+    .filter((line, index) => line === originalLines[index] || /[\p{L}\p{N}]/u.test(line))
+    .join('\n')
+    .trim();
+};
+
+/** "ChatGPT", "Claude" or "Other": the platform an AI prefill reports for itself. */
+export const describeInterviewPlatform = (platform: InterviewPrefillPacket['source']['platform']): string =>
+  ({ chatgpt: 'ChatGPT', claude: 'Claude', other: 'Other' })[platform];
+
 export const describeResearchCoverage = (coverage: InterviewResearchCoverage | undefined): string[] => {
   if (!coverage) return [];
   const describeResource = (label: string, searched: number | null, used: number | null): string => {
@@ -44,6 +108,76 @@ export const describeResearchCoverage = (coverage: InterviewResearchCoverage | u
     describeResource('Connected sources', coverage.connectedSourcesSearched, coverage.connectedSourcesUsed),
     coverage.userStatementsUsed !== null ? `${coverage.userStatementsUsed} user statements used` : '',
   ].filter(Boolean);
+};
+
+type InterviewStatusInput = {
+  recordingState: 'idle' | 'starting' | 'recording' | 'paused' | 'stopping';
+  mapping: boolean;
+  applying: boolean;
+  error: string;
+  // The interview's own last status, shown when nothing more pressing applies.
+  status: string;
+  hasQuestions: boolean;
+  hasDrafts: boolean;
+  readiness: 'checking' | 'ready' | 'unavailable' | 'unknown';
+  openingLoading: boolean;
+};
+
+/** The interview header's status and its tone, and the guidance behind its help button. */
+export const describeInterviewStatus = ({
+  recordingState,
+  mapping,
+  applying,
+  error,
+  status,
+  hasQuestions,
+  hasDrafts,
+  readiness,
+  openingLoading,
+}: InterviewStatusInput) => {
+  const isStarting = recordingState === 'starting';
+  const isRecording = recordingState === 'recording';
+  const isPaused = recordingState === 'paused';
+  const isStopping = recordingState === 'stopping';
+  const guidance = isPaused
+    ? 'Microphone and interviewer sound are paused. Resume to continue, or stop to prepare drafts.'
+    : isRecording
+      ? 'Microphone is on. Stop when you are ready to review your drafts.'
+      : isStarting
+        ? 'Connecting your microphone and voice session. Close this dialog to cancel.'
+        : hasDrafts
+          ? 'Review and edit your answers and privacy settings, then select Submit responses. You will be asked to sign in if needed.'
+          : 'Speak with an AI interviewer. Stopping prepares drafts for your review. You choose when to submit responses.';
+  const idle = recordingState === 'idle' && !mapping && !applying;
+  const statusLabel = error
+    ? 'Error'
+    : mapping
+      ? 'Preparing responses…'
+      : applying
+        ? 'Submitting'
+        : idle && !hasQuestions
+          ? 'No questions'
+          : idle && readiness === 'checking'
+            ? 'Checking setup'
+            : idle && readiness === 'unavailable'
+              ? 'Setup needed'
+              : idle && readiness === 'unknown'
+                ? 'Not checked'
+                : idle && openingLoading
+                  ? 'Preparing opening'
+                  : status;
+  const statusTone =
+    error || (idle && (!hasQuestions || readiness === 'unavailable'))
+      ? 'error'
+      : isStarting ||
+          isPaused ||
+          isStopping ||
+          mapping ||
+          applying ||
+          (idle && (readiness !== 'ready' || openingLoading))
+        ? 'pending'
+        : 'ready';
+  return { guidance, idle, statusLabel, statusTone };
 };
 
 export const shouldIgnorePromptCopyEvent = (target: EventTarget | null): boolean => {

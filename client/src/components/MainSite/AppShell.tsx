@@ -18,7 +18,7 @@ import type { MainSiteProps, MainSiteState } from './MainSiteTypes';
 
 // Styles
 import 'assets/css/contextEngine.scss';
-import stylesRaw from './AppShell.module.scss';
+import './AppShell.module.scss';
 
 // Smart contract events / interactions
 import {
@@ -85,7 +85,7 @@ import {
   type SessionResponseHydrationController,
   type SessionResponseHydrationHost,
 } from '../../utilities/survey/sessionResponseHydrationController.js';
-import { isResponseRecencyAtLeast, toResponseRecencyPair } from '../../utilities/survey/responseRecency.js';
+import { isResponseRecencyNewer, toResponseRecencyPair } from '../../utilities/survey/responseRecency.js';
 import { resolveSessionRegistryBootstrapChainIds } from '../../utilities/session/registryBootstrapChainIds.js';
 import { initCacheManager, subscribeCacheUpdates, updateCacheAtomic } from '../../utilities/cache/cacheScripts.js';
 import { createMainSiteDgStorage, type MainSiteDgStorage } from '../../utilities/cache/mainSiteDgStorage.js';
@@ -113,14 +113,13 @@ import { WagmiHooksHOC as WagmiHooksHOCRaw } from '../HooksHOC/withWagmiBridge';
 
 // Components
 import NavbarRaw from '../Navbar/Navbar';
-import MainAreaTabsRaw from '../MainContent/MainAreaTabs';
-import RightSideRaw from '../RightSidebar/RightSide';
+// Route renderers use these two; importing them here keeps their stylesheets in the same bundle order.
+import '../MainContent/MainAreaTabs';
+import '../RightSidebar/RightSide';
 import OnboardingOverlayRaw from '../Onboarding/OnboardingOverlay';
 import { FIRST_VISIT_STORAGE_KEY } from '../Onboarding/onboardingConfig.js';
 import FooterRaw from '../Footer/Footer';
-import LazyFallbackRaw from '../Shared/LazyFallback';
 import DevE2eNavRaw from '../E2E/DevE2eNav';
-import RouteErrorBoundaryRaw from '../ErrorBoundary/RouteErrorBoundary';
 
 import { createLogger } from 'utilities/logging.js';
 import {
@@ -169,11 +168,6 @@ import {
   SESSION_FALLBACK_REDIRECT_STORAGE_KEY_PREFIX,
 } from '../../utilities/cache/sessionCacheConstants.js';
 import { buildMainSiteCacheManagerReadyStatePatch } from '../../utilities/session/mainSiteUtils.js';
-import {
-  ExperimentalStub as ExperimentalStubRaw,
-  NotFoundRoute as NotFoundRouteRaw,
-  SessionLoadingSkeleton as SessionLoadingSkeletonRaw,
-} from './routeStatusViews';
 import { isStaticNonCacheRoute } from './routeConfig.js';
 import { createMainSiteRouteRenderers } from './mainSiteRouteRenderers.js';
 import { createMainSiteSessionScanPolicy } from './mainSiteSessionScanPolicyBinding.js';
@@ -247,22 +241,13 @@ export {
 
 const mainSiteLog = createLogger('mainSite');
 
-const PROFILE_SCAN_REPORT_EVENT = 'ce:profile-scan-report';
 type MainSiteRouteComponent = React.ComponentType<Record<string, unknown>>;
-const styles = stylesRaw as Record<string, string>;
 const WagmiHooksHOC = WagmiHooksHOCRaw;
 const asMainSiteRouteComponent = (component: unknown): MainSiteRouteComponent => component as MainSiteRouteComponent;
 const Navbar = asMainSiteRouteComponent(NavbarRaw);
-const MainAreaTabs = asMainSiteRouteComponent(MainAreaTabsRaw);
-const RightSide = asMainSiteRouteComponent(RightSideRaw);
 const OnboardingOverlay = asMainSiteRouteComponent(OnboardingOverlayRaw);
 const Footer = asMainSiteRouteComponent(FooterRaw);
-const LazyFallback = asMainSiteRouteComponent(LazyFallbackRaw);
 const DevE2eNav = asMainSiteRouteComponent(DevE2eNavRaw);
-const RouteErrorBoundary = asMainSiteRouteComponent(RouteErrorBoundaryRaw);
-const ExperimentalStub = asMainSiteRouteComponent(ExperimentalStubRaw);
-const NotFoundRoute = asMainSiteRouteComponent(NotFoundRouteRaw);
-const SessionLoadingSkeleton = asMainSiteRouteComponent(SessionLoadingSkeletonRaw);
 
 type RefreshSurveyResponsesByIDFn = (surveyID: string) => Promise<void>;
 type RefreshQuestionResponsesFn = (
@@ -332,48 +317,6 @@ type MainSiteProfileScanError = Error & {
   code?: string;
   slug?: string;
 };
-type MainSiteProfileScanSbt = Record<string, unknown> & {
-  sbtAddress?: string;
-  sbtInfo?: Record<string, unknown>;
-};
-type MainSiteProfileActivityEntry = Record<string, unknown> & {
-  id?: string;
-  surveyId?: string;
-  surveyID?: string;
-  questionId?: string;
-  questionID?: string;
-  responder?: string;
-  response?: unknown;
-  data?: MainSiteMutableMetadata;
-  blockNumber?: number | string;
-  transactionIndex?: number | string;
-  txIndex?: number | string;
-  logIndex?: number | string;
-  timestamp?: number | string;
-};
-type MainSiteProfileActivityPayload = {
-  createdSurveys: MainSiteProfileActivityEntry[];
-  createdQuestions: MainSiteProfileActivityEntry[];
-  surveyResponses: MainSiteProfileActivityEntry[];
-  questionResponses: MainSiteProfileActivityEntry[];
-};
-type MainSiteProfileUserData = MainSiteProfileActivityPayload & {
-  sbts: MainSiteProfileScanSbt[];
-};
-type MainSiteProfileUserChainEntry = Record<string, unknown> & {
-  lastBlockScanned?: number;
-  lastScanTimestamp?: number;
-  scanIncomplete?: boolean;
-  surveyActivityLastBlockScanned?: number;
-  surveyActivityScanIncomplete?: boolean;
-  questionActivityLastBlockScanned?: number;
-  questionActivityScanIncomplete?: boolean;
-  sbtLastBlockScanned?: number;
-  sbtScanIncomplete?: boolean;
-  sbtBackfillComplete?: boolean;
-  data?: MainSiteProfileUserData;
-};
-type MainSiteProfileUserCache = Record<string, Record<string, MainSiteProfileUserChainEntry>>;
 type MainSiteProfileScanReport = {
   targetAddress: string;
   usedAllSessions: boolean;
@@ -420,26 +363,6 @@ type MainSiteProfileScanReport = {
   sampleSurveyResponseIds: string[];
   sampleQuestionResponseIds: string[];
 };
-type MainSiteProfileActivityWindow = {
-  fromBlock: number;
-  shouldForceBackfill: boolean;
-};
-type MainSiteProfileTimeoutOutcome<T = unknown> = {
-  timedOut: boolean;
-  value?: T;
-  error?: unknown;
-};
-type MainSiteProfileBackfillTimeoutOptions = Record<string, unknown> & {
-  floorTimeoutMs?: number;
-  spanStepBlocks?: number;
-  timeoutCapMs?: number;
-};
-type MainSiteProfileResponseRecency = {
-  bn: number;
-  txi: number;
-  li: number;
-  ts: number;
-};
 type MainSiteRuntimeFlags = {
   CE_SURVEY_DEEPLINK_RPC_TIMEOUT_MS?: unknown;
   ENABLE_RPC_DEBUG_LOGGING?: unknown;
@@ -461,21 +384,10 @@ type MainSiteSurveyNetworkCache = Record<string, unknown> & {
   surveysLatestBlock?: number;
   surveys: Record<string, SurveyMetadataCacheEntry | unknown>;
   surveyResponses: MainSiteSurveyResponseCache;
+  surveyResponsesMeta?: MainSiteQuestionResponseMetaCache;
   surveyResponsesLatestBlock: MainSiteSurveyResponseBlockCache;
   pendingSurveyMetadata?: Record<string, unknown>;
 };
-type MainSiteSbtProfileCacheEntry = Record<string, unknown> & {
-  blockNumber?: number;
-  mintedAddresses?: string[];
-  sbtAddress?: string;
-  sbtInfo?: Record<string, unknown>;
-  slug?: string;
-};
-type MainSiteSbtNetworkCache = Record<string, unknown> & {
-  lastBlock?: number;
-  sbtList: Record<string, MainSiteSbtProfileCacheEntry | undefined>;
-};
-type MainSiteSbtMetadataCache = Record<string, MainSiteSbtNetworkCache | undefined>;
 type MainSiteQuestionNetworkCache = Record<string, unknown> & {
   questionsLatestBlock?: number;
   questionResponsesLatestBlock?: number;
@@ -496,6 +408,7 @@ const createMainSiteSurveyNetworkCache = (initialLastBlock: number): MainSiteSur
   surveysLatestBlock: initialLastBlock,
   surveys: {},
   surveyResponses: {},
+  surveyResponsesMeta: {},
   surveyResponsesLatestBlock: {},
   pendingSurveyMetadata: {},
 });
@@ -567,19 +480,6 @@ const updateMainSiteCacheAtomic = async <TValue,>(
   }
 };
 
-const hasMainSiteRegistryIdentity = (sessionConfig: MainSiteSessionConfigLike | null | undefined): boolean => {
-  if (!isMainSiteRecord(sessionConfig)) return false;
-  const registry = isMainSiteRecord(sessionConfig.__registry) ? sessionConfig.__registry : {};
-  return !!(
-    sessionConfig.sessionId ||
-    sessionConfig.sessionIdHex ||
-    sessionConfig.metadataURI ||
-    registry.sessionId ||
-    registry.sessionIdHex ||
-    registry.metadataURI
-  );
-};
-
 const isMainSitePresent = <T,>(value: T | null | undefined): value is T => value !== null && value !== undefined;
 
 const readMainSiteErrorMessage = (error: unknown): unknown => (error instanceof Error ? error.message : error);
@@ -593,9 +493,6 @@ const toMainSiteScanScopeContext = (ctx: unknown): MainSiteScanScopeContext | nu
     activeSlugFromRoute: ctx.activeSlugFromRoute === true,
   };
 };
-
-const getMainSiteRuntimeGlobal = (): typeof globalThis & MainSiteRuntimeFlags =>
-  globalThis as typeof globalThis & MainSiteRuntimeFlags;
 
 const getMainSiteRuntimeWindow = (): (Window & MainSiteRuntimeFlags) | null =>
   typeof window === 'undefined' ? null : (window as Window & MainSiteRuntimeFlags);
@@ -778,6 +675,7 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
     getSessionChainId: (slug: string) => this.getCacheSessionChainId(slug),
     getAccount: () => this.props.account,
     getProviderLike: () => this.props.provider,
+    buildDecryptContext: (slug: string) => this.buildQuestionDecryptContext(slug),
     getCurrentPath: () => this.props?.path || (typeof window !== 'undefined' ? window.location.pathname : '') || '',
     shouldSkipSessionScanForSlug: (slug: string, op: string, scopeCtx?: unknown) =>
       this.shouldSkipSessionScanForSlug(slug, op, toMainSiteScanScopeContext(scopeCtx)),
@@ -1757,22 +1655,29 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
     }
   };
 
-  findGroupSlugForQuestion = (questionID: string | null | undefined): string => {
-    return findGroupSlugForQuestionFn(questionID, {
-      getCurrentSlug: () => this.getSessionSlugFromState(),
-      getQueryHintSlug: () => this.getQuestionRouteSessionSlugHint(),
-      isCacheManagerReady: this.state.isCacheManagerReady,
-      getSessionCfg: (slug: string) => this.getSessionCfg(slug),
-      dgRead: (collection: string, slug: string) => this.readDgRecord(collection, slug, { clone: false }),
-      resolveMetadataSessionSlug: (metadata: unknown, fallbackSlug: string) =>
-        this.resolveMetadataSessionSlug(metadata, fallbackSlug),
-      getAllSessionSlugs,
-      normalizeSessionSlug,
-      isKnownOrGeneralSessionSlug: (slug: string) => isKnownOrGeneralSessionSlug(slug, getSessionConfigBySlug),
-      warn: (error: unknown) => {
-        mainSiteLog.warn('MainSite: fallback', error);
+  findGroupSlugForQuestion = (
+    questionID: string | null | undefined,
+    options: { requireCacheHit?: boolean } = {},
+  ): string | null => {
+    return findGroupSlugForQuestionFn(
+      questionID,
+      {
+        getCurrentSlug: () => this.getSessionSlugFromState(),
+        getQueryHintSlug: () => this.getQuestionRouteSessionSlugHint(),
+        isCacheManagerReady: this.state.isCacheManagerReady,
+        getSessionCfg: (slug: string) => this.getSessionCfg(slug),
+        dgRead: (collection: string, slug: string) => this.readDgRecord(collection, slug, { clone: false }),
+        resolveMetadataSessionSlug: (metadata: unknown, fallbackSlug: string) =>
+          this.resolveMetadataSessionSlug(metadata, fallbackSlug),
+        getAllSessionSlugs,
+        normalizeSessionSlug,
+        isKnownOrGeneralSessionSlug: (slug: string) => isKnownOrGeneralSessionSlug(slug, getSessionConfigBySlug),
+        warn: (error: unknown) => {
+          mainSiteLog.warn('MainSite: fallback', error);
+        },
       },
-    });
+      options,
+    );
   };
 
   resolveGroupSlugForSbtAddress = async (
@@ -2260,7 +2165,7 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
       (didRedirectInitialLoadToAbout && typeof window !== 'undefined'
         ? window.location.pathname
         : this.getCurrentPathname()) || '';
-    const mountFallbackTarget = this.applySessionFallbackRedirect({ pathIn: mountPathRaw });
+    this.applySessionFallbackRedirect({ pathIn: mountPathRaw });
     this.syncSessionFallbackRedirectConsumption({ pathIn: mountPathRaw });
     const currentPath = this.getEffectiveRoutePath(mountPathRaw);
     const mountSearch = (typeof window !== 'undefined' ? window.location.search : '') || '';
@@ -2657,6 +2562,7 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
       this._lastProcessedQuestionSlugFromPath = questionSlug;
       const slugsToRefresh = Array.from(new Set([activeSlug, questionSlug].filter(isMainSitePresent)));
       slugsToRefresh.forEach((slug: string) => {
+        void this.refreshEncryptedSurveyPayloadsForGroup(slug);
         if (!this.hasMaskedQuestionPayloadInCache(slug)) return;
         this.refreshEncryptedQuestionPayloadsForGroup(slug).catch((err: unknown) => {
           mainSiteLog.warn('refreshEncryptedQuestionPayloadsForGroup failed during mount:', {
@@ -2763,7 +2669,10 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
     if (accountKey(prevProps.account) !== accountKey(this.props.account)) {
       clearDecryptCaches();
       clearSurveyDraftsForAccount(prevProps.account);
-      void purgeWorkerCanonicalCaches(prevProps.account).catch((e) => mainSiteLog.warn('MainSite: cleanup', e));
+      void purgeWorkerCanonicalCaches(prevProps.account)
+        // Survey titles relocked by the purge are decrypted again for the new reader.
+        .then(() => this.refreshEncryptedSurveyPayloadsForGroup(this.getActiveSessionSlug(), { force: true }))
+        .catch((e) => mainSiteLog.warn('MainSite: cleanup', e));
     }
 
     this.redirectLegacyDemoPath();
@@ -2830,6 +2739,7 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
         const slugsToCheck = Array.from(new Set([activeSlug, questionSlug].filter(isMainSitePresent)));
 
         slugsToCheck.forEach((slug: string) => {
+          if (readinessSignalsChanged) void this.refreshEncryptedSurveyPayloadsForGroup(slug);
           const masked = this.hasMaskedQuestionPayloadInCache(slug);
           const shouldRetry =
             shouldRetryMaskedQuestionRefresh({
@@ -3296,12 +3206,6 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
   sumSbtCountMap: SessionSbtCacheController['sumSbtCountMap'] = (...args) =>
     this._sbtCacheController.sumSbtCountMap(...args);
 
-  seedSbtCountMapFromLegacyAddresses: SessionSbtCacheController['seedSbtCountMapFromLegacyAddresses'] = (...args) =>
-    this._sbtCacheController.seedSbtCountMapFromLegacyAddresses(...args);
-
-  hydrateLegacySbtCountState: SessionSbtCacheController['hydrateLegacySbtCountState'] = (...args) =>
-    this._sbtCacheController.hydrateLegacySbtCountState(...args);
-
   buildSbtHistorySummaryFromCounts: SessionSbtCacheController['buildSbtHistorySummaryFromCounts'] = (...args) =>
     this._sbtCacheController.buildSbtHistorySummaryFromCounts(...args);
 
@@ -3445,6 +3349,7 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
     }
     const eventBlockWindow = await chainScanReadsPort.getRelevantBlockWindowForFilter(slug);
     const { fromBlock: baseFrom } = eventBlockWindow;
+    if (eventBlockWindow.toBlock < baseFrom) return;
     const initialLastBlockDefault = Math.max(0, baseFrom - 1);
 
     let eventBlockNumber = event.blockNumber;
@@ -3470,6 +3375,14 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
     } else if (!eventBlockNumber) {
       eventBlockNumber = eventBlockWindow.toBlock;
     }
+
+    const sessionConfig = sessionRegistryReadsPort.getSessionConfig(slug) || getSessionConfigBySlug(slug);
+    const configuredEnd = isMainSiteRecord(sessionConfig?.blockLimits) ? sessionConfig.blockLimits.end : null;
+    const endBlock = configuredEnd == null ? null : Number(configuredEnd);
+    // The scan window ends at the RPC head, which can lag a valid live event.
+    // Only an explicit configured end limits event admission.
+    if (eventBlockNumber < baseFrom || (endBlock != null && Number.isFinite(endBlock) && eventBlockNumber > endBlock))
+      return;
 
     let surveysCache = (this.readDgRecord('surveysCache', slug) || {}) as Record<
       string,
@@ -3856,25 +3769,27 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
       const eventTimestamp = Number(event?.timestamp || 0);
       let surveyCacheUpdated = false;
       let questionCacheUpdated = false;
+      let surveyResponseData: unknown = null;
+      const fetchedQuestionResponses = new Map<string, Record<string, unknown>>();
+      const bn = Number(eventBlockNumber || 0);
+      const incomingResponseRecency = { bn, txi: eventTransactionIndex, li: eventLogIndex, ts: eventTimestamp };
 
-      // Survey-level responses (preserve watermark logic as-is)
+      // Live events update responder recency only. Advancing a shared scan
+      // watermark here would skip unresolved payloads before this event.
       if (surveyIdFromEvent && surveyIdFromEvent !== ethers.constants.HashZero.toLowerCase()) {
-        if (eventBlockNumber > (currentSurveyNetworkCache.surveyResponsesLatestBlock[surveyIdFromEvent] || 0)) {
+        const previous =
+          currentSurveyNetworkCache.surveyResponsesMeta?.[surveyIdFromEvent]?.[responderAddressLower] || {};
+        if (isResponseRecencyNewer(incomingResponseRecency, previous)) {
           mainSiteLog.log(
             `Fetching survey response for survey ${surveyIdFromEvent}, responder ${responderAddressLower} due to ResponsesSubmitted event.`,
           );
-          const surveyResponseData = await surveyReadsPort.getSurveyResponse(
+          surveyResponseData = await surveyReadsPort.getSurveyResponse(
             'none',
             responderAddressLower,
             surveyIdFromEvent,
             slug,
           );
           if (surveyResponseData) {
-            if (!currentSurveyNetworkCache.surveyResponses[surveyIdFromEvent]) {
-              currentSurveyNetworkCache.surveyResponses[surveyIdFromEvent] = {};
-            }
-            currentSurveyNetworkCache.surveyResponses[surveyIdFromEvent][responderAddressLower] = surveyResponseData;
-            currentSurveyNetworkCache.surveyResponsesLatestBlock[surveyIdFromEvent] = eventBlockNumber;
             surveyCacheUpdated = true;
             mainSiteLog.log(`Survey response for ${surveyIdFromEvent} by ${responderAddressLower} updated in cache.`);
           } else {
@@ -3884,7 +3799,7 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
           }
         } else {
           mainSiteLog.log(
-            `ResponsesSubmitted event for survey ${surveyIdFromEvent} (block ${eventBlockNumber}) is not newer than last processed block (${currentSurveyNetworkCache.surveyResponsesLatestBlock[surveyIdFromEvent] || 0}). Skipping survey response update.`,
+            `ResponsesSubmitted event for survey ${surveyIdFromEvent} is not newer for responder ${responderAddressLower}. Skipping survey response update.`,
           );
         }
       }
@@ -3900,19 +3815,12 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
         }
       });
 
-      const bn = Number(eventBlockNumber || 0);
-      const incomingResponseRecency = {
-        bn,
-        txi: eventTransactionIndex,
-        li: eventLogIndex,
-        ts: eventTimestamp,
-      };
       const qIdsToFetch: string[] = [];
       questionIdsFromEvent.forEach((qId: string) => {
         const responseMetaByResponder = currentQuestionNetworkCache.questionResponsesMeta[qId] || {};
         const prev = responseMetaByResponder[responderAddressLower] || {};
         const previousResponseRecency = toResponseRecencyPair(prev);
-        const isNewer = isResponseRecencyAtLeast(incomingResponseRecency, prev);
+        const isNewer = isResponseRecencyNewer(incomingResponseRecency, prev);
         if (isNewer) {
           qIdsToFetch.push(qId);
         } else {
@@ -3937,12 +3845,7 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
         let acceptedAny = false;
         results.forEach(({ qId, data }: MainSiteResponseFetchResult) => {
           if (!data) return;
-          const responseByResponder = currentQuestionNetworkCache.questionResponses[qId] || {};
-          currentQuestionNetworkCache.questionResponses[qId] = responseByResponder;
-          responseByResponder[responderAddressLower] = data;
-          const responseMetaByResponder = currentQuestionNetworkCache.questionResponsesMeta[qId] || {};
-          currentQuestionNetworkCache.questionResponsesMeta[qId] = responseMetaByResponder;
-          responseMetaByResponder[responderAddressLower] = incomingResponseRecency;
+          fetchedQuestionResponses.set(qId, data);
           acceptedAny = true;
           mainSiteLog.log(
             `[ResponsesSubmitted][recency-guard] ACCEPTED for qId=${qId}, responder=${responderAddressLower} (bn/tx/li/ts=${bn}/${eventTransactionIndex}/${eventLogIndex}/${eventTimestamp}).`,
@@ -3950,10 +3853,6 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
         });
 
         if (acceptedAny) {
-          // Advance watermark only if at least one response was accepted as newer
-          if (bn > (currentQuestionNetworkCache.questionResponsesLatestBlock || 0)) {
-            currentQuestionNetworkCache.questionResponsesLatestBlock = bn;
-          }
           questionCacheUpdated = true;
         }
         if (shouldForceResponseBackfill) {
@@ -3974,18 +3873,17 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
           this.mergeLegacyNumericNetworkKey(next, networkID);
           const targetNet = next[networkID] || createMainSiteSurveyNetworkCache(initialLastBlockDefault);
           if (!isMainSiteRecord(targetNet.surveyResponses)) targetNet.surveyResponses = {};
+          if (!isMainSiteRecord(targetNet.surveyResponsesMeta)) targetNet.surveyResponsesMeta = {};
           if (!isMainSiteRecord(targetNet.surveyResponsesLatestBlock)) targetNet.surveyResponsesLatestBlock = {};
-          const currentWatermark = Number(targetNet.surveyResponsesLatestBlock[surveyIdFromEvent]) || 0;
-          if (Number(eventBlockNumber) > currentWatermark) {
+          const existingMeta = targetNet.surveyResponsesMeta?.[surveyIdFromEvent]?.[responderAddressLower] || {};
+          if (isResponseRecencyNewer(incomingResponseRecency, existingMeta)) {
             if (!isMainSiteRecord(targetNet.surveyResponses[surveyIdFromEvent])) {
               targetNet.surveyResponses[surveyIdFromEvent] = {};
             }
-            targetNet.surveyResponses[surveyIdFromEvent]![responderAddressLower] =
-              currentSurveyNetworkCache.surveyResponses[surveyIdFromEvent]?.[responderAddressLower];
-            targetNet.surveyResponsesLatestBlock[surveyIdFromEvent] = Math.max(
-              currentWatermark,
-              Number(eventBlockNumber) || 0,
-            );
+            targetNet.surveyResponses[surveyIdFromEvent]![responderAddressLower] = surveyResponseData;
+            const surveyMeta = targetNet.surveyResponsesMeta![surveyIdFromEvent] || {};
+            surveyMeta[responderAddressLower] = incomingResponseRecency;
+            targetNet.surveyResponsesMeta![surveyIdFromEvent] = surveyMeta;
             surveyResponsePersisted = true;
           }
           next[networkID] = targetNet;
@@ -4000,23 +3898,16 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
           const targetNet = next[networkID] || createMainSiteQuestionNetworkCache(initialLastBlockDefault);
           ensureQuestionArweaveCacheBranches(targetNet);
           qIdsToFetch.forEach((qId) => {
-            const incomingResponse = currentQuestionNetworkCache.questionResponses[qId]?.[responderAddressLower];
-            const incomingMeta = currentQuestionNetworkCache.questionResponsesMeta[qId]?.[responderAddressLower];
-            if (!incomingResponse || !incomingMeta) return;
+            const incomingResponse = fetchedQuestionResponses.get(qId);
+            if (!incomingResponse) return;
             if (!isMainSiteRecord(targetNet.questionResponses[qId])) targetNet.questionResponses[qId] = {};
             if (!isMainSiteRecord(targetNet.questionResponsesMeta[qId])) targetNet.questionResponsesMeta[qId] = {};
             const existingMeta = targetNet.questionResponsesMeta[qId]?.[responderAddressLower] || {};
-            if (!isResponseRecencyAtLeast(incomingResponseRecency, existingMeta)) return;
+            if (!isResponseRecencyNewer(incomingResponseRecency, existingMeta)) return;
             targetNet.questionResponses[qId]![responderAddressLower] = incomingResponse;
-            targetNet.questionResponsesMeta[qId]![responderAddressLower] = incomingMeta;
+            targetNet.questionResponsesMeta[qId]![responderAddressLower] = incomingResponseRecency;
             questionResponsePersisted = true;
           });
-          if (questionResponsePersisted) {
-            targetNet.questionResponsesLatestBlock = Math.max(
-              Number(targetNet.questionResponsesLatestBlock) || initialLastBlockDefault,
-              bn,
-            );
-          }
           next[networkID] = targetNet;
           return next;
         });
@@ -4032,12 +3923,9 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
 
   // React routing
   _routeRenderers = createMainSiteRouteRenderers(this);
-  _renderDebateRoute = this._routeRenderers._renderDebateRoute;
   _renderBookmarksRoute = this._routeRenderers._renderBookmarksRoute;
   _renderAboutRoute = this._routeRenderers._renderAboutRoute;
-  _renderDemosRoute = this._routeRenderers._renderDemosRoute;
   _renderBenchmarksRoute = this._routeRenderers._renderBenchmarksRoute;
-  _renderMatrixRoute = this._routeRenderers._renderMatrixRoute;
   _renderAgentRoute = this._routeRenderers._renderAgentRoute;
   _renderSimUserRoute = this._routeRenderers._renderSimUserRoute;
   _renderAtlasRoute = this._routeRenderers._renderAtlasRoute;
@@ -4084,6 +3972,9 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
   refreshEncryptedQuestionPayloadsForGroup: RefreshEncryptedQuestionPayloadsForGroupFn = (slug, opts) =>
     this._questionCacheController.refreshEncryptedQuestionPayloadsForGroup(slug, opts);
 
+  refreshEncryptedSurveyPayloadsForGroup = (slug: string, opts?: { force?: boolean }): Promise<void> =>
+    this._surveyCacheController.refreshEncryptedSurveyPayloadsForGroup(slug, opts);
+
   refreshQuestionMetadataForGroup: RefreshQuestionMetadataForGroupFn = async (slug, opts) => {
     const normalizedSlug = normalizeSessionSlug(slug || '');
     if (this.isBuiltInDemoSessionRoutePath() && (normalizedSlug === 'demo' || normalizedSlug === '')) {
@@ -4097,7 +3988,7 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
     this._responseHydrationController.refreshQuestionResponses(questionIds, opts);
 
   render() {
-    const mainViewDisplay = this.getMainView(null);
+    const mainViewDisplay = this.getMainView();
     const activeRouteSessionConfig = this.getDisplaySessionCfg(this.getSessionSlugFromProps());
     const effectivePath = this.getEffectiveRoutePath(this.getCurrentPathname());
     const hasActiveSessionRoute =

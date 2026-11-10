@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { InterviewDraftResponse, InterviewPrefillPacket, InterviewQuestion } from './sessionInterview';
 import {
   loadInterviewWorkerGroupCandidates,
+  matchInterviewGroupsByAnswer,
   recommendInterviewGroups,
   type InterviewGroupRecommendation,
 } from './sessionInterviewGroupRecommendations';
@@ -74,6 +75,10 @@ export function useSessionInterviewGroupRecommendations({
     recommendations: InterviewGroupRecommendation[];
   }>({ availability: 'idle', key: '', scopeKey: '', recommendations: [] });
   const requestRef = useRef(0);
+  // The page can pass new sessionConfig and question objects on every render, so the effect
+  // reads the latest ones here; otherwise each re-render would restart the lookup and its AI call.
+  const inputsRef = useRef({ questions, sessionConfig });
+  inputsRef.current = { questions, sessionConfig };
 
   useEffect(() => {
     if (!active || !request || !requestKey) return undefined;
@@ -88,6 +93,7 @@ export function useSessionInterviewGroupRecommendations({
         scopeKey: availabilityScopeKey,
         recommendations: [],
       });
+      const { questions, sessionConfig } = inputsRef.current;
       const catalog = await loadInterviewWorkerGroupCandidates({ sessionConfig, sessionSlug, workerUrl });
       if (canceled || requestRef.current !== requestId) return;
       if (catalog.status !== 'ready' || !catalog.candidates.length) {
@@ -100,21 +106,30 @@ export function useSessionInterviewGroupRecommendations({
         });
         return;
       }
-      const result = await recommendInterviewGroups({
+      // Groups named like a chosen option come first, without an AI call; the AI covers the rest.
+      const exact = matchInterviewGroupsByAnswer({
         candidates: catalog.candidates,
-        transcript: request.transcript,
-        prefillPacket: request.prefillPacket,
-        draftResponses: withQuestionContext(request.draftResponses, questions),
-        sessionSlug,
-        sessionConfig,
-        workerUrl,
+        draftResponses: request.draftResponses,
+        questions,
       });
+      const others = catalog.candidates.filter((group) => !exact.some((match) => match.groupId === group.groupId));
+      const result = others.length
+        ? await recommendInterviewGroups({
+            candidates: others,
+            transcript: request.transcript,
+            prefillPacket: request.prefillPacket,
+            draftResponses: withQuestionContext(request.draftResponses, questions),
+            sessionSlug,
+            sessionConfig,
+            workerUrl,
+          })
+        : null;
       if (canceled || requestRef.current !== requestId) return;
       setRecommendationState({
         availability: 'available',
         key: requestKey,
         scopeKey: availabilityScopeKey,
-        recommendations: result.status === 'ready' ? result.recommendations : [],
+        recommendations: [...exact, ...(result?.status === 'ready' ? result.recommendations : [])],
       });
     };
 
@@ -132,7 +147,7 @@ export function useSessionInterviewGroupRecommendations({
       canceled = true;
       requestRef.current += 1;
     };
-  }, [active, availabilityScopeKey, questions, request, requestKey, sessionConfig, sessionSlug, workerUrl]);
+  }, [active, availabilityScopeKey, request, requestKey, sessionSlug, workerUrl]);
 
   useEffect(() => {
     if (!requestKey)

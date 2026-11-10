@@ -1,5 +1,6 @@
 import SBTPage from './SBTPage';
 import contractScripts from '../../utilities/web3/chainGateway.js';
+import * as sessionConfig from '../../domains/sessions/sessionConfig';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { buildSbtPageAutoMintStorageKey } from './sbtPageAutoMintHelpers';
 import * as workerAuth from '../../utilities/worker/workerAuth.js';
@@ -23,6 +24,18 @@ const createSubject = (props = {}) => {
 const flushPromises = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 describe('SBTPage auto-mint routing', () => {
+  beforeEach(() => {
+    jest.spyOn(sessionConfig, 'getSessionChainId').mockReturnValue(84532);
+  });
+  it('uses the SBT session chain instead of a route display fallback', () => {
+    const getChain = jest.spyOn(sessionConfig, 'getSessionChainId').mockReturnValue(1);
+    const subject = createSubject({ sessionSlug: 'collection-session', network: { id: 2, name: 'Other network' } });
+    expect(subject.getMintTargetChainId()).toBe('1');
+    expect(getChain).toHaveBeenCalledWith('collection-session');
+    getChain.mockReturnValue(null);
+    expect(subject.getMintTargetChainId()).toBe('');
+  });
+
   afterEach(() => {
     jest.clearAllMocks();
     jest.restoreAllMocks();
@@ -217,7 +230,7 @@ describe('SBTPage auto-mint routing', () => {
       const result = await subject.handleUrlAutoMintIntent();
 
       expect(result).toBe(false);
-      expect(contractScripts.claim).toHaveBeenCalledWith('mock', sbtAddress);
+      expect(contractScripts.claim).toHaveBeenCalledWith('mock', sbtAddress, '84532');
       expect(consoleErrorSpy).toHaveBeenCalledWith('[sbt]', 'Minting failed in handleMint:', walletError);
       expect(window.sessionStorage.getItem(successKey)).toBeNull();
     } finally {
@@ -507,7 +520,7 @@ describe('SBTPage auto-mint routing', () => {
     );
 
     expect(result.ok).toBe(true);
-    expect(contractScripts.claimWithInvite).toHaveBeenCalledWith('mock', sbtAddress, '1', '0xsig');
+    expect(contractScripts.claimWithInvite).toHaveBeenCalledWith('mock', sbtAddress, '1', '0xsig', '84532');
     expect(loadSpy).not.toHaveBeenCalled();
     expect(localSuccessSpy).not.toHaveBeenCalled();
     expect(refreshSpy).toHaveBeenCalledWith(sbtAddress, undefined, 'edge');
@@ -804,7 +817,7 @@ describe('SBTPage auto-mint routing', () => {
     }
   });
 
-  it('does not continue password mints after the network changes during prevalidation', async () => {
+  it('does not continue password mints after the session network changes during prevalidation', async () => {
     const sbtAddress = '0x0000000000000000000000000000000000000126';
     const account = '0x0000000000000000000000000000000000000abc';
     const subject = createSubject({
@@ -824,6 +837,7 @@ describe('SBTPage auto-mint routing', () => {
       sbtInfo: { hasPasswordMint: true },
     };
     jest.spyOn(contractScripts, 'isPasswordValid').mockImplementation(async () => {
+      jest.spyOn(sessionConfig, 'getSessionChainId').mockReturnValue(11155420);
       subject.props = {
         ...subject.props,
         provider: 'op-provider',
@@ -846,7 +860,7 @@ describe('SBTPage auto-mint routing', () => {
     expect(startClaimSpy).not.toHaveBeenCalled();
   });
 
-  it('does not continue password mints when wallet network props are temporarily unavailable', async () => {
+  it('does not continue password mints when the session network becomes unavailable', async () => {
     const sbtAddress = '0x0000000000000000000000000000000000000127';
     const account = '0x0000000000000000000000000000000000000abc';
     const subject = createSubject({
@@ -867,6 +881,7 @@ describe('SBTPage auto-mint routing', () => {
       sbtInfo: { hasPasswordMint: true },
     };
     jest.spyOn(contractScripts, 'isPasswordValid').mockImplementation(async () => {
+      jest.spyOn(sessionConfig, 'getSessionChainId').mockReturnValue(null);
       subject.props = {
         ...subject.props,
         provider: 'transition-provider',
@@ -890,7 +905,8 @@ describe('SBTPage auto-mint routing', () => {
     expect(startClaimSpy).not.toHaveBeenCalled();
   });
 
-  it('does not run URL auto-mints before the wallet chain is known', async () => {
+  it('does not run URL auto-mints before the session chain is known', async () => {
+    jest.spyOn(sessionConfig, 'getSessionChainId').mockReturnValue(null);
     const sbtAddress = '0x0000000000000000000000000000000000000130';
     const previousHref = window.location.href;
     window.history.replaceState(
@@ -959,7 +975,7 @@ describe('SBTPage auto-mint routing', () => {
     );
   });
 
-  it('does not continue password-list mints after network props disappear during validation', async () => {
+  it('does not continue password-list mints after the session chain disappears during validation', async () => {
     const sbtAddress = '0x0000000000000000000000000000000000000129';
     const account = '0x0000000000000000000000000000000000000abc';
     const subject = createSubject({
@@ -979,6 +995,7 @@ describe('SBTPage auto-mint routing', () => {
       sbtInfo: { hasPasswordMint: true },
     };
     jest.spyOn(contractScripts, 'isPasswordValid').mockImplementation(async () => {
+      jest.spyOn(sessionConfig, 'getSessionChainId').mockReturnValue(null);
       subject.props = {
         ...subject.props,
         provider: 'transition-provider',

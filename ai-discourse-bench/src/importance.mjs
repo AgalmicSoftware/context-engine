@@ -1,3 +1,4 @@
+import { assertConsistentDeployments, deploymentIdentityErrors, responseIdentityErrors } from './deployment-identity.mjs';
 import {
   DEFAULT_CONCURRENCY,
   DEFAULT_IMPORTANCE_BUDGET,
@@ -9,9 +10,11 @@ import {
   HARNESS_VERSION,
   IMPORTANCE_PROMPT_TEMPLATE_VERSION,
 } from './config.mjs';
-import { callOpenAiCompatibleChat } from './adapters/openai-compatible.mjs';
-import { jsonObjectCandidates } from './normalize.mjs';
+import { callOpenAiCompatibleChat, getProviderConfig } from './adapters/openai-compatible.mjs';
+import { extractFinalAnswerText, recoverJsonObjects } from './normalize.mjs';
 import { detectHarnessCommit, hashJson, sha256 } from './provenance.mjs';
+
+const compareHash = (left, right) => left < right ? -1 : left > right ? 1 : 0;
 
 const nowIso = () => new Date().toISOString();
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -31,7 +34,7 @@ export const orderImportanceQuestionBank = ({ questionBank, modelId, repeatIndex
   return {
     ...questionBank,
     questions: [...(questionBank.questions || [])].sort((left, right) => (
-      sha256(`${seed}:${left.id}`).localeCompare(sha256(`${seed}:${right.id}`))
+      compareHash(sha256(`${seed}:${left.id}`), sha256(`${seed}:${right.id}`))
     )),
   };
 };
@@ -113,14 +116,21 @@ export const parseImportanceAllocation = (rawText, {
   maxAllocations = DEFAULT_IMPORTANCE_MAX_ALLOCATIONS,
   maxVotesPerQuestion = maximumSafeImportanceVotes({ budget, maxAllocations }),
 } = {}) => {
-  const trimmed = String(rawText || '').trim();
+  // A reasoning region may hold a draft allocation; only the reply after it counts.
+  const { text: trimmed, truncated } = extractFinalAnswerText(rawText);
+  if (truncated) return { allocations: [], rationale: '', spentCredits: 0, parseError: 'truncated reasoning region' };
   if (!trimmed) return { allocations: [], rationale: '', spentCredits: 0, parseError: 'empty response' };
+  // As with answers, a cut-off object or two different allocations leave no
+  // single final allocation, so the run retries instead of keeping the first.
+  const recovered = recoverJsonObjects(trimmed);
+  if (recovered.truncated) return { allocations: [], rationale: '', spentCredits: 0, parseError: 'truncated JSON response' };
   const knownQuestionIds = questionIds instanceof Set ? questionIds : new Set(questionIds || []);
   const candidates = trimmed.startsWith('{') && trimmed.endsWith('}')
-    ? [trimmed, ...jsonObjectCandidates(trimmed)]
-    : jsonObjectCandidates(trimmed);
+    ? [trimmed, ...recovered.candidates]
+    : recovered.candidates;
   let parsedObject = null;
   let lastFailure = null;
+  const valid = [];
   for (const candidate of [...new Set(candidates)]) {
     try {
       parsedObject = JSON.parse(candidate);
@@ -172,13 +182,16 @@ export const parseImportanceAllocation = (rawText, {
         spentCredits: parseError ? 0 : spentCredits,
         parseError,
       };
-      if (!parseError) return result;
-      lastFailure = result;
+      if (parseError) lastFailure = result;
+      else valid.push(result);
     } catch {
       // Try the next balanced JSON object.
     }
   }
-  return lastFailure || {
+  if (new Set(valid.map((result) => JSON.stringify(result.allocations))).size > 1) {
+    return { allocations: [], rationale: '', spentCredits: 0, parseError: 'conflicting allocation objects' };
+  }
+  return valid[0] || lastFailure || {
     allocations: [],
     rationale: typeof parsedObject?.rationale === 'string' ? parsedObject.rationale.trim() : '',
     spentCredits: 0,
@@ -200,7 +213,7 @@ const deterministicMockImportance = ({
 }) => {
   let remaining = budget;
   const allocations = [...(questionBank.questions || [])]
-    .sort((left, right) => sha256(`${model}:${left.id}`).localeCompare(sha256(`${model}:${right.id}`)))
+    .sort((left, right) => compareHash(sha256(`${model}:${left.id}`), sha256(`${model}:${right.id}`)))
     .slice(0, maxAllocations)
     .map((question) => {
       const votes = Math.min(maxVotesPerQuestion, Math.floor(Math.sqrt(remaining)));
@@ -271,31 +284,13 @@ const normalizeModelResponse = (response) => (
     : { content: response?.content || '', metadata: response?.metadata || {} }
 );
 
-const assertConsistentImportanceDeployments = (runs) => {
-  const identitiesByModel = new Map();
-  runs.forEach((run) => {
-    const metadata = run?.responseMetadata || {};
-    if (!identitiesByModel.has(run.modelId)) {
-      identitiesByModel.set(run.modelId, { providers: new Set(), models: new Set(), fingerprints: new Set() });
-    }
-    const identity = identitiesByModel.get(run.modelId);
-    const provider = String(metadata.resolvedProvider || metadata.provider || run?.provider || '').trim();
-    const model = String(metadata.resolvedModel || run?.model || '').trim();
-    const fingerprint = String(metadata.systemFingerprint || '').trim();
-    if (provider) identity.providers.add(provider);
-    if (model) identity.models.add(model);
-    if (fingerprint) identity.fingerprints.add(fingerprint);
-  });
-  identitiesByModel.forEach((identity, modelId) => {
-    if (identity.providers.size > 1 || identity.models.size > 1 || identity.fingerprints.size > 1) {
-      throw new Error(`model ${modelId} resolved to multiple deployment identities; start a new importance artifact instead of resuming`);
-    }
-  });
-};
-
 export const buildImportanceRunId = ({ benchmarkId, modelId, repeatIndex }) => (
   [benchmarkId, 'quadratic-importance', modelId, repeatIndex].join(':')
 );
+
+const canonicalImportancePromptRows = (runs) => [...runs]
+  .sort((left, right) => left.modelId.localeCompare(right.modelId, 'en') || left.repeatIndex - right.repeatIndex)
+  .map(({ runId, promptHash }) => ({ runId, promptHash }));
 
 export const runImportanceBenchmark = async ({
   questionBank,
@@ -335,6 +330,9 @@ export const runImportanceBenchmark = async ({
       });
       return {
         modelEntry,
+        modelId: modelEntry.id,
+        endpoint: (providerOverride || modelEntry.provider) === 'mock'
+          ? 'mock://deterministic-importance' : getProviderConfig(providerOverride || modelEntry.provider).baseUrl,
         repeatIndex,
         orderedQuestionBank,
         questionOrderHash: hashJson(orderedQuestionBank.questions.map((question) => question.id)),
@@ -350,7 +348,7 @@ export const runImportanceBenchmark = async ({
   ));
   const promptHash = tasks.length === 1
     ? tasks[0].promptHash
-    : hashJson(tasks.map((task) => ({ runId: task.runId, promptHash: task.promptHash })));
+    : hashJson(canonicalImportancePromptRows(tasks));
   const expectedRunIds = new Set(tasks.map((task) => task.runId));
   const taskByRunId = new Map(tasks.map((task) => [task.runId, task]));
   const isReusableRun = (run, task) => {
@@ -366,6 +364,7 @@ export const runImportanceBenchmark = async ({
       && !run.parseError
       && Array.isArray(run.allocations)
       && run.allocations.length > 0
+      && run.responseMetadata?.endpoint === task.endpoint
       && run.promptHash === task.promptHash
       && run.questionOrderMethod === IMPORTANCE_QUESTION_ORDER_METHOD
       && run.questionOrderHash === task.questionOrderHash
@@ -420,7 +419,7 @@ export const runImportanceBenchmark = async ({
           maxVotesPerQuestion,
         }));
         rawOutput = response.content;
-        responseMetadata = response.metadata;
+        responseMetadata = { ...response.metadata, endpoint: response.metadata.endpoint || task.endpoint };
         parsed = parseImportanceAllocation(rawOutput, {
           questionIds,
           budget,
@@ -511,7 +510,7 @@ export const runImportanceBenchmark = async ({
   const runs = Array.from(runsById.values())
     .filter((run) => expectedRunIds.has(run.runId))
     .sort((left, right) => left.runId.localeCompare(right.runId));
-  assertConsistentImportanceDeployments(runs);
+  assertConsistentDeployments(runs);
   const completedAt = nowIso();
   return {
     schemaVersion: DEFAULT_OUTPUT_SCHEMA_VERSION,
@@ -634,6 +633,34 @@ export const validateImportanceRuns = (file, {
   return errors;
 };
 
+const importancePromptBinding = (file, run, questionBank) => {
+  const orderedQuestionBank = orderImportanceQuestionBank({
+    questionBank, modelId: run.modelId, repeatIndex: run.repeatIndex,
+  });
+  const prompt = buildImportancePrompt({
+    questionBank: orderedQuestionBank,
+    budget: Number(file.budget),
+    maxAllocations: Number(file.maxAllocations),
+    maxVotesPerQuestion: Number(file.maxVotesPerQuestion),
+  });
+  return {
+    promptHash: sha256(prompt),
+    questionOrderHash: hashJson(orderedQuestionBank.questions.map(question => question.id)),
+  };
+};
+
+export const validateImportancePromptBindings = (file, { questionBank } = {}) => {
+  const errors = [];
+  (file.runs || []).forEach((run, index) => {
+    const expected = importancePromptBinding(file, run, questionBank);
+    if (run.promptHash !== expected.promptHash) errors.push(`runs[${index}].promptHash does not match the current prompt`);
+    if (run.questionOrderHash !== expected.questionOrderHash) {
+      errors.push(`runs[${index}].questionOrderHash does not match the deterministic question order`);
+    }
+  });
+  return errors;
+};
+
 export const validateReleaseImportanceFile = (file, {
   questionBank,
   modelRoster,
@@ -720,35 +747,21 @@ export const validateReleaseImportanceFile = (file, {
   if (Number(manifest.completedRuns) !== expectedRuns || (file.runs || []).length !== expectedRuns) {
     errors.push('release importance runs must be complete');
   }
+  errors.push(...validateImportancePromptBindings(file, { questionBank }));
   const expectedPromptRows = [];
-  const deploymentIdentitiesByModel = new Map();
   (file.runs || []).forEach((run, index) => {
     const model = manifestModelsById.get(run.modelId);
     if (!model) {
       errors.push(`runs[${index}].modelId is absent from manifest.models`);
       return;
     }
-    const orderedQuestionBank = orderImportanceQuestionBank({
-      questionBank,
-      modelId: run.modelId,
-      repeatIndex: run.repeatIndex,
-    });
-    const prompt = buildImportancePrompt({
-      questionBank: orderedQuestionBank,
-      budget: Number(file.budget),
-      maxAllocations: Number(file.maxAllocations),
-      maxVotesPerQuestion: Number(file.maxVotesPerQuestion),
-    });
+    const binding = importancePromptBinding(file, run, questionBank);
     const expectedRunId = buildImportanceRunId({
       benchmarkId: questionBank.benchmarkId,
       modelId: run.modelId,
       repeatIndex: run.repeatIndex,
     });
     if (run.runId !== expectedRunId) errors.push(`runs[${index}].runId does not match its run coordinates`);
-    if (run.promptHash !== sha256(prompt)) errors.push(`runs[${index}].promptHash does not match the current prompt`);
-    if (run.questionOrderHash !== hashJson(orderedQuestionBank.questions.map((question) => question.id))) {
-      errors.push(`runs[${index}].questionOrderHash does not match the deterministic question order`);
-    }
     if (run.error || run.parseError) errors.push(`runs[${index}] must be valid for release`);
     if (run.model !== model.model || run.provider !== model.provider) {
       errors.push(`runs[${index}] model/provider does not match manifest.models`);
@@ -766,37 +779,13 @@ export const validateReleaseImportanceFile = (file, {
     if (hashJson(run.modelProvenance || {}) !== hashJson(model.provenance || {})) {
       errors.push(`runs[${index}].modelProvenance does not match manifest.models`);
     }
-    const metadata = run.responseMetadata || {};
-    const resolvedProvider = String(metadata.resolvedProvider || metadata.provider || run.provider || '').trim();
-    const resolvedModel = String(metadata.resolvedModel || run.model || '').trim();
-    const systemFingerprint = String(metadata.systemFingerprint || '').trim();
-    if (!deploymentIdentitiesByModel.has(run.modelId)) {
-      deploymentIdentitiesByModel.set(run.modelId, {
-        providers: new Set(),
-        models: new Set(),
-        fingerprints: new Set(),
-      });
-    }
-    const deploymentIdentity = deploymentIdentitiesByModel.get(run.modelId);
-    if (resolvedProvider) deploymentIdentity.providers.add(resolvedProvider);
-    if (resolvedModel) deploymentIdentity.models.add(resolvedModel);
-    if (systemFingerprint) deploymentIdentity.fingerprints.add(systemFingerprint);
-    if (resolvedProvider && resolvedProvider !== run.provider) {
-      errors.push(`runs[${index}] resolved provider does not match its declared provider`);
-    }
-    if (resolvedModel && resolvedModel !== run.model) {
-      errors.push(`runs[${index}] resolved model does not match its declared model`);
-    }
-    expectedPromptRows.push({ runId: run.runId, promptHash: sha256(prompt) });
+    errors.push(...responseIdentityErrors(run, model, index));
+    expectedPromptRows.push({ modelId: run.modelId, repeatIndex: run.repeatIndex, runId: run.runId, promptHash: binding.promptHash });
   });
-  deploymentIdentitiesByModel.forEach((identity, modelId) => {
-    if (identity.providers.size > 1 || identity.models.size > 1 || identity.fingerprints.size > 1) {
-      errors.push(`model ${modelId} resolved to multiple deployment identities`);
-    }
-  });
+  errors.push(...deploymentIdentityErrors(file.runs || []));
   const expectedManifestPromptHash = expectedPromptRows.length === 1
     ? expectedPromptRows[0].promptHash
-    : hashJson(expectedPromptRows.sort((left, right) => left.runId.localeCompare(right.runId)));
+    : hashJson(canonicalImportancePromptRows(expectedPromptRows));
   if (manifest.promptHash !== expectedManifestPromptHash) {
     errors.push('manifest.promptHash does not match the release importance runs');
   }
@@ -822,11 +811,11 @@ export const summarizeImportanceRuns = ({ importanceFile, questionBank, modelRos
     if (parsed.parseError) return null;
     return { ...run, allocations: parsed.allocations, spentCredits: parsed.spentCredits };
   }).filter(Boolean);
-  const byModel = {};
+  const byModel = Object.create(null);
   models.forEach((model) => {
     const modelRuns = validRuns.filter((run) => run.modelId === model.id);
     if (!modelRuns.length) return;
-    const byQuestion = {};
+    const byQuestion = Object.create(null);
     questions.forEach((question) => {
       const votes = modelRuns.map((run) => Number(run.allocations.find((entry) => entry.questionId === question.id)?.votes || 0));
       const meanVotes = round(votes.reduce((sum, value) => sum + value, 0) / modelRuns.length);
@@ -848,7 +837,7 @@ export const summarizeImportanceRuns = ({ importanceFile, questionBank, modelRos
     };
   });
   const contributingModelIds = Object.keys(byModel);
-  const byQuestion = {};
+  const byQuestion = Object.create(null);
   questions.forEach((question) => {
     const values = contributingModelIds.map((modelId) => Number(byModel[modelId].byQuestion[question.id]?.meanVotes || 0));
     byQuestion[question.id] = {
@@ -860,7 +849,7 @@ export const summarizeImportanceRuns = ({ importanceFile, questionBank, modelRos
   Object.values(byQuestion).forEach((row) => {
     row.share = totalMeanVotes ? round(row.meanVotes / totalMeanVotes) : 0;
   });
-  const byTopic = {};
+  const byTopic = Object.create(null);
   questions.forEach((question) => {
     const topic = question.topic || 'uncategorized';
     if (!byTopic[topic]) byTopic[topic] = { meanVotes: 0, questionCount: 0, modelCount: contributingModelIds.length };
@@ -884,8 +873,8 @@ export const summarizeImportanceRuns = ({ importanceFile, questionBank, modelRos
     validRuns: validRuns.length,
     contributingModels: contributingModelIds.length,
     totalMeanVotes: round(totalMeanVotes),
-    byModel,
-    byQuestion,
-    byTopic,
+    byModel: Object.fromEntries(Object.entries(byModel).map(([id, row]) => [id, { ...row, byQuestion: { ...row.byQuestion } }])),
+    byQuestion: { ...byQuestion },
+    byTopic: { ...byTopic },
   };
 };

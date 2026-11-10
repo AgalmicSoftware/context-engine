@@ -1,12 +1,13 @@
 import { safeString, lower, safeJsonParse, stableFingerprint, kvKeySafePart, sanitizeSessionSlug } from './runtimePrimitives.mjs';
 import { assertNoSecretShape } from './redaction.mjs';
 import { normalizeQuestionType } from './sessionQuestions.mjs';
+import { createAgentStorage } from './storage.mjs';
+import { resolveCanonicalWorkerSessionIdHex } from '../sessionConfigMutation.js';
 
 export const AGENT_QUESTION_QUEUE_CONFIG_KV_PREFIX = 'telegram:question-queue-config:v1:';
 export const AGENT_QUESTION_QUEUE_STATE_KV_PREFIX = 'telegram:question-queue-state:v1:';
 
 const MAX_SPONSORED_QUESTIONS = 50;
-const MAX_SERVED_QUESTION_IDS = 250;
 const MAX_HISTORY = 50;
 
 function normalizeBoolean(value, fallback = false) {
@@ -220,41 +221,50 @@ function orderCandidates(questions = [], sponsoredIds = [], criteria = {}, serve
   ];
 }
 
-export async function selectNextAgentQuestion({
-  env = {},
+// The served-list step works on question IDs only, so the session coordinator
+// can run it for one participant and queue at a time.
+export async function advanceAgentQuestionQueueState({
+  kv = null,
   sessionSlug = '',
   telegramUserId = '',
-  questions = [],
-  sponsoredQuestionIds = [],
-  input = {},
-  createdAt = null,
+  criteria = {},
+  eligibleIds = [],
+  sponsoredIds = [],
+  advance = true,
+  resetQueue = false,
+  requestId = '',
+  now = '',
 } = {}) {
-  const criteria = normalizeQuestionQueueCriteria(input);
-  const advance = normalizeBoolean(input.advance, true);
-  const resetQueue = normalizeBoolean(input.resetQueue || input.reset, false);
   const key = questionQueueStateKey({ sessionSlug, telegramUserId, queueKey: criteria.queueKey });
-  const kv = env?.AGENT_ACTION_KV;
-  const now = safeString(createdAt) || new Date().toISOString();
   const existing = key && kv && typeof kv.get === 'function' && !resetQueue
     ? safeJsonParse(await kv.get(key).catch(() => null), null)
     : null;
-  const servedQuestionIds = Array.isArray(existing?.servedQuestionIds)
-    ? existing.servedQuestionIds.map(safeString).filter(Boolean)
-    : [];
+  const eligibleSet = new Set(eligibleIds);
+  const previousServed = Array.isArray(existing?.servedQuestionIds) ? existing.servedQuestionIds : [];
+  const servedQuestionIds = [...new Set(previousServed.map(safeString))].filter((id) => eligibleSet.has(id));
   const servedSet = criteria.skipServed ? new Set(servedQuestionIds) : new Set();
-  const sponsoredIds = normalizeQuestionIds(sponsoredQuestionIds);
 
-  let candidates = orderCandidates(questions, sponsoredIds, criteria, servedSet);
+  let candidates = eligibleIds.filter((id) => !servedSet.has(id));
   let cycled = false;
-  let statePersisted = false;
   if (!candidates.length && criteria.skipServed && servedQuestionIds.length) {
-    candidates = orderCandidates(questions, sponsoredIds, criteria, new Set());
+    candidates = eligibleIds;
     cycled = candidates.length > 0;
   }
-  const selected = candidates[0] || null;
-  const selectedQuestionId = safeString(selected?.questionId || selected?.id);
-  const sponsored = selectedQuestionId ? sponsoredIds.includes(selectedQuestionId) : false;
-  if (selected && advance && key && kv && typeof kv.put === 'function') {
+  // A repeated request id is a retry: it gets the question it was served.
+  const lastQuestionId = safeString(existing?.lastQuestionId);
+  if (requestId && existing?.lastRequestId === requestId && eligibleSet.has(lastQuestionId)) {
+    return { questionId: lastQuestionId, sponsored: sponsoredIds.includes(lastQuestionId), cycled: false, advanced: false,
+      replayed: true, servedCount: servedQuestionIds.length, candidateCount: candidates.length };
+  }
+  const questionId = candidates[0] || '';
+  const sponsored = questionId ? sponsoredIds.includes(questionId) : false;
+  const nextServed = !questionId ? servedQuestionIds : cycled ? [questionId] : [
+    ...servedQuestionIds.filter((id) => id !== questionId),
+    questionId,
+  ];
+  const pruned = servedQuestionIds.length !== previousServed.length;
+  let advanced = false;
+  if ((questionId || pruned) && advance && key && kv && typeof kv.put === 'function') {
     const criteriaFingerprint = stableFingerprint(criteria);
     const criteriaSummary = {
       tagCount: criteria.tags.length,
@@ -264,19 +274,15 @@ export async function selectNextAgentQuestion({
       sponsoredFirst: criteria.sponsoredFirst,
       skipServed: criteria.skipServed,
     };
-    const nextServed = cycled ? [selectedQuestionId] : [
-      ...servedQuestionIds.filter((questionId) => questionId !== selectedQuestionId),
-      selectedQuestionId,
-    ].slice(-MAX_SERVED_QUESTION_IDS);
     const history = [
       ...(Array.isArray(existing?.history) ? existing.history : []),
-      {
-        questionId: selectedQuestionId,
+      ...(questionId ? [{
+        questionId,
         sponsored,
         criteriaFingerprint,
         criteriaSummary,
         selectedAt: now,
-      },
+      }] : []),
     ].slice(-MAX_HISTORY);
     const record = {
       type: 'telegram_question_queue_state',
@@ -285,15 +291,52 @@ export async function selectNextAgentQuestion({
       telegramUserId: safeString(telegramUserId),
       queueKey: criteria.queueKey,
       servedQuestionIds: nextServed,
-      lastQuestionId: selectedQuestionId,
+      lastQuestionId: questionId || lastQuestionId,
+      ...(questionId && requestId ? { lastRequestId: requestId } : {}),
       history,
       createdAt: safeString(existing?.createdAt) || now,
       updatedAt: now,
     };
     assertNoSecretShape(record, "Agent question queue state records must not serialize secrets.");
     await kv.put(key, JSON.stringify(record));
-    statePersisted = true;
+    advanced = true;
   }
+  return { questionId, sponsored, cycled, advanced, replayed: false, servedCount: nextServed.length, candidateCount: candidates.length };
+}
+
+export async function selectNextAgentQuestion({
+  env = {},
+  sessionSlug = '',
+  telegramUserId = '',
+  questions = [],
+  sponsoredQuestionIds = [],
+  input = {},
+  createdAt = null,
+  advanceState = (step) => advanceAgentQuestionQueueState({ ...step, kv: env?.AGENT_ACTION_KV }),
+} = {}) {
+  const criteria = normalizeQuestionQueueCriteria(input);
+  const advance = normalizeBoolean(input.advance, true);
+  const resetQueue = normalizeBoolean(input.resetQueue || input.reset, false);
+  const requestId = safeString(input.requestId);
+  const sponsoredIds = normalizeQuestionIds(sponsoredQuestionIds);
+  const byId = new Map();
+  for (const question of orderCandidates(questions, sponsoredIds, criteria, new Set())) {
+    const questionId = safeString(question.questionId || question.id);
+    if (!byId.has(questionId)) byId.set(questionId, question);
+  }
+  const step = await advanceState({
+    sessionSlug,
+    telegramUserId,
+    criteria,
+    eligibleIds: [...byId.keys()],
+    sponsoredIds,
+    advance,
+    resetQueue,
+    requestId: requestId.length <= 200 ? requestId : '',
+    now: safeString(createdAt) || new Date().toISOString(),
+  });
+  const selected = byId.get(safeString(step.questionId)) || null;
+  const sponsored = Boolean(selected) && step.sponsored === true;
   return {
     ok: Boolean(selected),
     question: selected,
@@ -304,18 +347,45 @@ export async function selectNextAgentQuestion({
     queue: {
       queueKey: criteria.queueKey,
       criteria,
-      advanced: statePersisted,
+      advanced: step.advanced === true,
       advanceRequested: Boolean(selected && advance),
+      ...(step.replayed === true ? { replayed: true } : {}),
       reset: resetQueue,
-      cycled,
-      servedCount: selected
-        ? (cycled ? 1 : Math.min(MAX_SERVED_QUESTION_IDS, servedQuestionIds.length + 1))
-        : servedQuestionIds.length,
-      candidateCount: candidates.length,
+      cycled: step.cycled === true,
+      servedCount: step.servedCount,
+      candidateCount: step.candidateCount,
       sponsoredQuestionCount: sponsoredIds.length,
     },
   };
 }
+
+const QUESTION_QUEUE_STATE_PREFIX = 'ce-agent-question-queue:';
+const reply = (body, status = 200) => Response.json(body, { status });
+
+// Runs in the session coordinator, serialized with its other session writes,
+// so overlapping requests never serve one question twice or drop history.
+export const executeAgentQuestionQueueAdvance = (coordinator, payload = {}) => coordinator.serializeSessionConfigOperation(async () => {
+  const authority = await coordinator.readSessionConfigAuthority(payload.slug);
+  const sessionId = resolveCanonicalWorkerSessionIdHex(authority?.config);
+  if (!sessionId || sessionId !== payload.sessionId) return reply({ ok: false, reason: 'question_queue_authority_changed' }, 409);
+  const { criteria } = payload;
+  if (!criteria || typeof criteria !== 'object' || !Array.isArray(payload.eligibleIds) || !Array.isArray(payload.sponsoredIds)) {
+    return reply({ ok: false, reason: 'question_queue_request_invalid' }, 400);
+  }
+  const stateKey = questionQueueStateKey({ sessionSlug: payload.sessionSlug, telegramUserId: payload.telegramUserId, queueKey: criteria.queueKey });
+  const storageKey = `${QUESTION_QUEUE_STATE_PREFIX}${sessionId}:${stateKey}`;
+  let stored = stateKey && payload.resetQueue !== true ? await coordinator.state.storage.get(storageKey) : undefined;
+  // This state used to live in GROUP_KV; its first use here continues from
+  // there, so no served list restarts. A failed read fails the request.
+  if (stored === undefined && stateKey && payload.resetQueue !== true) {
+    stored = await createAgentStorage({ kv: coordinator.env.GROUP_KV, sessionId })?.get(stateKey);
+  }
+  const kv = {
+    get: async (key) => (key === stateKey ? stored ?? null : null),
+    put: (key, value) => key === stateKey ? coordinator.state.storage.put(storageKey, value) : undefined,
+  };
+  return reply({ ok: true, ...(await advanceAgentQuestionQueueState({ ...payload, kv })) });
+});
 
 export const __test__agentQuestionQueue = {
   normalizeQuestionQueueCriteria,

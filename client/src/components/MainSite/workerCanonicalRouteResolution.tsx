@@ -1,6 +1,7 @@
 import React from 'react';
 
 import { BootRecoveryReady } from '../ErrorBoundary/InitialRouteBoundary';
+import setupStyles from '../Sessions/setup/SessionSetup.module.scss';
 import WorkerCanonicalSessionBootstrapBoundary from '../Sessions/WorkerCanonicalSessionBootstrapBoundary';
 import { sessionRegistryReadsPort } from '../../domains/sessions/registry/sessionRegistryReadPorts.js';
 import {
@@ -345,10 +346,18 @@ export const resolveMainSiteSessionRouteForRender = ({
 export const renderWorkerCanonicalRouteError = (route: WorkerCanonicalRouteState): React.ReactElement | null =>
   route.kind === 'error' ? (
     <>
-      <div role="alert" data-testid="ce-worker-canonical-discovery-error">
-        <h3>Worker discovery record missing or invalid</h3>
-        <p>{route.error}</p>
-        <a href={buildPublicRoute('/new')}>Return to session selection</a>
+      <div
+        className={`${setupStyles.banner} ${setupStyles.pageBanner}`}
+        role="alert"
+        data-testid="ce-worker-canonical-discovery-error"
+      >
+        <h3 className={setupStyles.bannerTitle}>Worker discovery record missing or invalid</h3>
+        <div>{route.error}</div>
+        <div className={setupStyles.buttonRow}>
+          <a className={setupStyles.button} data-ce-control-appearance="raised" href={buildPublicRoute('/new')}>
+            Return to session selection
+          </a>
+        </div>
       </div>
       <BootRecoveryReady />
     </>

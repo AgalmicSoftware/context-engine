@@ -1,7 +1,7 @@
 import { DEFAULT_LOG_CHUNK_SIZE, STORAGE_BACKENDS, QUESTIONS_ADDED_TOPIC0, rpcTimeoutMs, questionPayloadTimeoutMs, normalizeBytes32, decodeBytes32ArrayFromData } from './registryQuestionCore.mjs';
 import { rpcWithFallback } from './registryQuestionSource.mjs';
-import { isSkippedQuestionPayload, fetchQuestionPayload } from './registryQuestionPayloads.mjs';
-import { payloadConcurrency, foregroundPayloadBatchSize } from './registryQuestionCache.mjs';
+import { isSkippedQuestionPayload, fetchQuestionPayload, lockedQuestionPlaceholder } from './registryQuestionPayloads.mjs';
+import { payloadConcurrency, foregroundPayloadBatchSize, isPayloadUnavailableQuestion } from './registryQuestionCache.mjs';
 
 export async function fetchQuestionPayloads({
   rpcUrls = [],
@@ -44,10 +44,9 @@ export async function fetchQuestionPayloads({
       }).catch(() => null);
       if (isSkippedQuestionPayload(question)) {
         skippedSessionMismatchCount += 1;
-      } else if (question) {
-        results[index] = question;
       } else {
-        payloadFailureCount += 1;
+        results[index] = question || lockedQuestionPlaceholder({ questionId: id, sessionSlug, pointerBackend });
+        if (isPayloadUnavailableQuestion(results[index])) payloadFailureCount += 1;
       }
     }
   });
@@ -85,6 +84,7 @@ export async function scanQuestionRange({
     order: 'newest_first',
   };
   const questions = [];
+  const unresolvedRanges = [];
   let payloadFailureCount = 0;
   let skippedSessionMismatchCount = 0;
   let lowestScannedBlock = null;
@@ -98,6 +98,7 @@ export async function scanQuestionRange({
       skippedSessionMismatchCount,
       lowestScannedBlock,
       nextScanToBlock,
+      unresolvedRanges,
     };
   }
   const chunkSize = DEFAULT_LOG_CHUNK_SIZE;
@@ -121,8 +122,11 @@ export async function scanQuestionRange({
     });
     if (!result.ok) {
       summary.chunksFailed += 1;
+      unresolvedRanges.push({ fromBlock: from, toBlock: to });
+      lowestScannedBlock = from;
       if (summary.errors.length < 3) summary.errors.push(result.error || 'eth_getLogs failed');
       to = from - 1;
+      nextScanToBlock = to >= fromBlock ? to : null;
       continue;
     }
     summary.chunksSucceeded += 1;
@@ -176,6 +180,7 @@ export async function scanQuestionRange({
       break;
     }
     to = from - 1;
+    nextScanToBlock = to >= fromBlock ? to : null;
     if (to >= fromBlock && summary.chunksAttempted >= maxChunkCount) {
       nextScanToBlock = to;
       break;
@@ -189,6 +194,7 @@ export async function scanQuestionRange({
     skippedSessionMismatchCount,
     lowestScannedBlock,
     nextScanToBlock,
+    unresolvedRanges,
   };
 }
 

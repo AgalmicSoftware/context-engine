@@ -49,19 +49,6 @@ export async function listHandoffKvRecordsByPrefix(env = {}, prefix = '', { limi
   return records;
 }
 
-export function dedupeSubmitRecordsByRequestId(records = []) {
-  const byId = new Map();
-  (Array.isArray(records) ? records : []).forEach((record) => {
-    const requestId = safeString(record?.requestId || record?.idempotencyKey || record?.key);
-    if (!requestId) return;
-    const existing = byId.get(requestId);
-    if (!existing || safeString(existing.createdAt).localeCompare(safeString(record.createdAt)) <= 0) {
-      byId.set(requestId, record);
-    }
-  });
-  return Array.from(byId.values());
-}
-
 export function sessionFromSessionFirstKey(key = '', prefix = '') {
   const rest = safeString(key).startsWith(prefix) ? safeString(key).slice(prefix.length) : '';
   return sanitizeSessionSlug(rest.split(':')[0]);
@@ -96,7 +83,7 @@ export function emptyAdminMetricTotals() {
     agentDraftedAnswers: 0,
     draftEditMetrics: 0,
     groupProposals: 0,
-    sessionsWithBridgeActivity: 0,
+    sessionsWithAgentActivity: 0,
     registrySessionCount: 0,
     distinctRespondents: 0,
   };
@@ -141,12 +128,12 @@ export function publicSessionMetric(metric = {}) {
     agentDraftedAnswers: Number(metric.agentDraftedAnswers || 0),
     draftEditMetrics: Number(metric.draftEditMetrics || 0),
     groupProposals: Number(metric.groupProposals || 0),
-    sessionsWithBridgeActivity: 0,
+    sessionsWithAgentActivity: 0,
     registrySessionCount: Number(metric.registrySessionCount || 0),
     distinctRespondents:
       metric._respondents instanceof Set ? metric._respondents.size : Number(metric.distinctRespondents || 0),
   };
-  out.sessionsWithBridgeActivity = [
+  out.sessionsWithAgentActivity = [
     out.agentsOnboarded,
     out.questionsCreated,
     out.questionsAnswered,

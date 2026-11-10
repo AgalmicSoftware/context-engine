@@ -225,6 +225,7 @@ test('resends the same import page until its operation budget continuation finis
   await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Restore complete'));
   expect(post).toHaveBeenCalledTimes(2);
   expect(post.mock.calls[0][0]).toEqual(post.mock.calls[1][0]);
+  expect(post.mock.calls[0][0].body.workerUrl).toBe(props.workerUrl);
 });
 
 test('streams split UTF-8 lines and reopens the file to resume an interrupted restore', async () => {

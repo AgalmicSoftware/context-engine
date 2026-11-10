@@ -3,7 +3,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import fs from 'fs';
 import path from 'path';
 import { DocsPage } from './DocsPage';
-import deploymentModesGraphic from '../../../../docs/assets/readme-architecture-deployment-modes.jpg';
+import deploymentModesGraphic from '../../../../docs/assets/readme-architecture-session-worker-mcp.png';
 import { buildDocsContractsHref, getContractViewerSourceTestId } from './contractMetadata.js';
 import { buildContractViewerContracts } from './contractViewerUtils.js';
 import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';

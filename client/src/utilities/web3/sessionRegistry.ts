@@ -1,4 +1,3 @@
-// Mechanical Phase 4 extension migration: keep legacy runtime behavior identical and tighten types separately.
 /**
  * @file sessionRegistry.ts
  * @module sessionRegistry
@@ -637,7 +636,6 @@ const resolveRegistryAddress = (chainId: unknown) => {
 
 const resolveBootstrapRpcUrl = (chainId: unknown) => {
   // Bootstrap reads should use public/default RPCs (no PATH) so sessions load without wallet config.
-  // TODO: Move default registry/contract lookups to <chainId>.contracts.contextengine.eth once live.
   return getDefaultHttpRpc(chainId, { allowPath: false });
 };
 
@@ -1148,8 +1146,8 @@ const fetchSessionFields = async (
       const values = await contract.getSessionFields(slug, keys);
       const out: Record<string, string> = {};
       keys.forEach((key, idx) => {
-        const value = toStr(values?.[idx] || '').trim();
-        if (value) out[key] = value;
+        const value = values?.[idx];
+        if (typeof value === 'string') out[key] = value.trim();
       });
       return out;
     } catch (e) {
@@ -1162,13 +1160,22 @@ const fetchSessionFields = async (
   for (const key of keys) {
     try {
       const value = await contract.getSessionField(slug, key);
-      const cleaned = toStr(value || '').trim();
-      if (cleaned) out[key] = cleaned;
+      if (typeof value === 'string') out[key] = value.trim();
     } catch (e) {
       surveysLog.warn('sessionRegistry: fallback', e);
     }
   }
   return out;
+};
+
+const loadRegistrySessionMetadata = async (session: AnyRecord, opts: AnyRecord = {}) => {
+  const options = { ...opts, chainId: session.chainId || opts.chainId, slug: session.slug || opts.slug };
+  if (session.metadataURI) return fetchMetadataFromArweave(session.metadataURI, options);
+  if (session.encryptedMetadataURI) {
+    const encrypted = await fetchMetadataFromArweave(session.encryptedMetadataURI, options);
+    return (await tryDecryptEnvelope(encrypted, options)) || null;
+  }
+  return null;
 };
 
 const buildSessionConfigFromRegistry = ({
@@ -1188,7 +1195,7 @@ const buildSessionConfigFromRegistry = ({
   const sessionIdHex = normalizeSessionIdHex(session?.sessionIdHex || session?.sessionId);
   const sessionId = formatSessionId(sessionIdHex);
   const config: AnyRecord = {
-    ...metadataObj,
+    ...JSON.parse(JSON.stringify(metadataObj)),
     slug: normalizeRegistrySlug(session.slug),
     ...(sessionId ? { sessionId } : {}),
     networkChainId: Number(session.chainId || metadataObj?.networkChainId || 0) || null,
@@ -1218,7 +1225,11 @@ const buildSessionConfigFromRegistry = ({
   });
   config.contracts = mergeSessionContractMaps(chainContracts, metadataObj.contracts, config.contracts);
 
-  const fields: Record<string, unknown> = fieldsByKey && typeof fieldsByKey === 'object' ? fieldsByKey : {};
+  const fields: Record<string, unknown> = Object.fromEntries(
+    Object.entries(fieldsByKey || {})
+      .filter(([, value]) => typeof value === 'string' && value.trim())
+      .map(([key, value]) => [key, toStr(value).trim()]),
+  );
   Object.entries(FIELD_PATHS).forEach(([key, path]) => {
     const value = toStr(fields[key] || '').trim();
     if (!value) return;
@@ -1261,83 +1272,87 @@ const buildSessionConfigFromRegistry = ({
     gateAuthority: hasOnChainGateData ? 'onchain' : 'unknown',
     gatesByResource: gateSnapshot,
     metadataLoadState: toStr(metadataLoadState).trim() || 'loaded',
+    metadata: metadata && typeof metadata === 'object' ? metadataObj : null,
     metadataDefaultedContractKeys,
   };
 
   return normalizeSessionNaming(nextConfig) as AnyRecord;
 };
 
-const mergeSessionFieldsIntoCachedConfig = ({
+// The last usable copy of a session's metadata: the document kept with its
+// cached entry, the copy an earlier failed load kept or, for an entry saved
+// without either, the entry itself when it was built from its loaded document.
+const lastUsableRegistryMetadata = (cachedConfig: Record<string, unknown> | null) => {
+  const registryMeta = (cachedConfig?.__registry || {}) as {
+    metadata?: unknown;
+    lastUsableMetadata?: unknown;
+    metadataLoadState?: unknown;
+  };
+  const kept = registryMeta.metadata || registryMeta.lastUsableMetadata;
+  if (kept && typeof kept === 'object') return kept;
+  if (!cachedConfig || registryMeta.metadataLoadState !== 'loaded') return null;
+  const entry = { ...cachedConfig };
+  delete entry.__registry;
+  return entry;
+};
+
+// A failed load (an outage, or encrypted metadata without a key) keeps the
+// last usable copy rather than rebuilding the session from nothing. The copy
+// isn't kept as the record's document, so the next load fetches that again,
+// but it is kept beside it so a second failure still has it.
+const buildSessionConfigKeepingLastUsableMetadata = ({
+  previousConfig,
+  ...args
+}: Parameters<typeof buildSessionConfigFromRegistry>[0] & { previousConfig: Record<string, unknown> | null }) => {
+  const { session, metadata } = args;
+  const hasMetadataUri = !!(session.metadataURI || session.encryptedMetadataURI);
+  const fallback = !metadata && hasMetadataUri ? lastUsableRegistryMetadata(previousConfig) : null;
+  const config = buildSessionConfigFromRegistry({
+    ...args,
+    metadata: metadata || fallback,
+    metadataLoadState: resolveMetadataLoadState({ metadata, hasMetadataUri }),
+  });
+  if (fallback) Object.assign(config.__registry, { metadata: null, lastUsableMetadata: fallback });
+  return config;
+};
+
+const mergeSessionFieldsIntoCachedConfig = async ({
   baseConfig,
   session,
   fieldsByKey,
   registryChainId,
-}: {
-  baseConfig?: AnyRecord | null;
-  session?: AnyRecord | null;
-  fieldsByKey?: AnyRecord | null;
-  registryChainId?: number | string | null;
-}) => {
-  const base = normalizeSessionNaming(
-    baseConfig && typeof baseConfig === 'object' ? { ...baseConfig } : {},
-  ) as AnyRecord;
-  const registryMeta = base.__registry && typeof base.__registry === 'object' ? base.__registry : {};
-  const sessionIdHex = normalizeSessionIdHex(session?.sessionIdHex || session?.sessionId || registryMeta.sessionIdHex);
-  const sessionId = formatSessionId(sessionIdHex);
-  const networkChainId = Number(session?.chainId || base.networkChainId || registryMeta.chainId || 0) || null;
-  const config: AnyRecord = {
-    ...base,
-    slug: normalizeRegistrySlug(session?.slug || base.slug),
-    ...(sessionId ? { sessionId } : {}),
-    networkChainId,
-  };
-
-  const resolvedChainId = Number(networkChainId || 0) || 0;
-  const chainContractsRaw: AnyRecord = resolvedChainId ? getSessionContractsForChain(resolvedChainId) : {};
-  const chainContracts = REGISTRY_CONTRACT_DEFAULT_KEYS.reduce<AnyRecord>((acc, key) => {
-    const value = toStr(chainContractsRaw?.[key]).trim();
-    if (!value) return acc;
-    acc[key] = { address: value, chainId: resolvedChainId };
-    return acc;
-  }, {});
-  const registryAddress = toStr(getSessionRegistryAddress(resolvedChainId)).trim();
-  if (registryAddress) {
-    chainContracts.sessionRegistry = { address: registryAddress, chainId: resolvedChainId };
-  }
-  config.contracts = mergeSessionContractMaps(chainContracts, base.contracts, config.contracts);
-
-  const fields = {
-    ...(registryMeta.fields && typeof registryMeta.fields === 'object' ? registryMeta.fields : {}),
-    ...(fieldsByKey && typeof fieldsByKey === 'object' ? fieldsByKey : {}),
-  };
-  Object.entries(FIELD_PATHS).forEach(([key, path]) => {
-    const value = toStr(fields[key] || '').trim();
-    if (!value) return;
-    if (SPONSORED_FIELD_KEY_SET.has(key)) {
-      const parsed = parseBool(value);
-      if (parsed === null) return;
-      setValueAtPath(config, path, parsed);
-      return;
-    }
-    setValueAtPath(config, path, value);
+  providerLike,
+  account,
+  lit,
+}: AnyRecord) => {
+  const registryMeta = baseConfig?.__registry || {};
+  const fields = { ...(registryMeta.fields || {}), ...fieldsByKey };
+  // An empty successful read removes the override. Failed and unrequested
+  // fields are absent from fieldsByKey, so they retain their last known value.
+  Object.keys(fields).forEach((key) => {
+    if (fields[key] === '') delete fields[key];
   });
-
-  config.__registry = {
-    ...registryMeta,
-    registryChainId: Number(registryChainId || registryMeta.registryChainId || 0) || null,
-    chainId: Number(session?.chainId || registryMeta.chainId || 0) || null,
-    metadataURI: session?.metadataURI || registryMeta.metadataURI || '',
-    encryptedMetadataURI: session?.encryptedMetadataURI || registryMeta.encryptedMetadataURI || '',
-    adminAddress: session?.adminAddress || registryMeta.adminAddress || null,
-    createdAt: session?.createdAt || registryMeta.createdAt || null,
-    updatedAt: session?.updatedAt || registryMeta.updatedAt || null,
-    sessionId: sessionId || registryMeta.sessionId || null,
-    sessionIdHex: sessionIdHex || registryMeta.sessionIdHex || null,
-    fields,
-    metadataLoadState: registryMeta.metadataLoadState || 'fields-only',
-  };
-
-  return normalizeSessionNaming(config);
+  const sameMetadata =
+    registryMeta.metadataURI === (session.metadataURI || '') &&
+    registryMeta.encryptedMetadataURI === (session.encryptedMetadataURI || '');
+  const metadata =
+    sameMetadata && registryMeta.metadata
+      ? registryMeta.metadata
+      : await loadRegistrySessionMetadata(session, {
+          chainId: registryChainId,
+          providerLike,
+          account,
+          lit,
+          caller: 'refreshSessionRegistryFieldsCache',
+        });
+  return buildSessionConfigKeepingLastUsableMetadata({
+    previousConfig: baseConfig,
+    session,
+    metadata,
+    fieldsByKey: fields,
+    gatesByResource: registryMeta.gatesByResource,
+    registryChainId,
+  });
 };
 
 const addSessionConfigToCache = (cache: RegistryCache | null, config: AnyRecord | null, opts: AnyRecord = {}) => {
@@ -1474,28 +1489,14 @@ export const fetchSessionFromRegistry = async (
   const session = decodeSessionTuple(tuple);
   if (!session || !session.slug) return null;
 
-  let metadata = null;
-  const hasMetadataUri = !!(session.metadataURI || session.encryptedMetadataURI);
-  if (session.metadataURI) {
-    metadata = await fetchMetadataFromArweave(session.metadataURI, {
-      chainId: session.chainId || resolvedChainId,
-      slug: session.slug || registrySlug,
-      caller: 'fetchSessionFromRegistry.metadataURI',
-    });
-  } else if (session.encryptedMetadataURI) {
-    const encrypted = await fetchMetadataFromArweave(session.encryptedMetadataURI, {
-      chainId: session.chainId || resolvedChainId,
-      slug: session.slug || registrySlug,
-      caller: 'fetchSessionFromRegistry.encryptedMetadataURI',
-    });
-    const decrypted = await tryDecryptEnvelope(encrypted, {
-      account,
-      providerLike,
-      chainId: session.chainId || resolvedChainId,
-      lit,
-    });
-    metadata = decrypted || null;
-  }
+  const metadata = await loadRegistrySessionMetadata(session, {
+    chainId: resolvedChainId,
+    slug: registrySlug,
+    providerLike,
+    account,
+    lit,
+    caller: 'fetchSessionFromRegistry',
+  });
 
   const gatesByResource: RegistryGateMap = {};
   const gateEntries = await Promise.all(
@@ -1510,13 +1511,13 @@ export const fetchSessionFromRegistry = async (
 
   const fieldsByKey = await fetchSessionFields(contract, session.slug);
 
-  return buildSessionConfigFromRegistry({
+  return buildSessionConfigKeepingLastUsableMetadata({
+    previousConfig: sessionRegistryStore.readCache()?.sessionsById?.[session.sessionIdHex] || null,
     session,
     metadata,
     gatesByResource,
     fieldsByKey,
     registryChainId: resolvedChainId,
-    metadataLoadState: resolveMetadataLoadState({ metadata, hasMetadataUri }),
   });
 };
 
@@ -1584,11 +1585,15 @@ export const refreshSessionRegistryFieldsCache = async ({
   slug,
   sessionId,
   providerLike,
+  account,
+  lit,
   fieldKeys,
   bootstrapRpc,
 }: AnyRecord = {}) => {
   const registrySlug = toRegistrySlug(slug || '');
-  const existingConfig = sessionRegistryStore.getSessionConfig(registrySlug);
+  // The cached entry itself, not its Worker config overlay: a failed metadata
+  // load rebuilds from it, and the overlay must not be saved into the registry.
+  const existingConfig = sessionRegistryStore.readCache()?.sessions?.[normalizeRegistrySlug(registrySlug)] || null;
   const existingRegistry =
     existingConfig?.__registry && typeof existingConfig.__registry === 'object' ? existingConfig.__registry : {};
   const resolvedChainId =
@@ -1621,11 +1626,14 @@ export const refreshSessionRegistryFieldsCache = async ({
     session.slug,
     Array.isArray(fieldKeys) && fieldKeys.length ? fieldKeys : DEFAULT_FIELDS,
   );
-  const config = mergeSessionFieldsIntoCachedConfig({
+  const config = await mergeSessionFieldsIntoCachedConfig({
     baseConfig: existingConfig,
     session,
     fieldsByKey,
     registryChainId: resolvedChainId,
+    providerLike,
+    account,
+    lit,
   });
   upsertSessionRegistryCache({ config });
   return config;
@@ -1744,28 +1752,14 @@ export const loadSessionRegistryCache = async (
         const session = decodeSessionTuple(tuple);
         if (!session) return { config: null, hadLoadErrors: false };
 
-        let metadata = null;
-        const hasMetadataUri = !!(session.metadataURI || session.encryptedMetadataURI);
-        if (session.metadataURI) {
-          metadata = await fetchMetadataFromArweave(session.metadataURI, {
-            chainId: session.chainId || chainId,
-            slug: session.slug || slug,
-            caller: 'loadSessionRegistryCache.metadataURI',
-          });
-        } else if (session.encryptedMetadataURI) {
-          const encrypted = await fetchMetadataFromArweave(session.encryptedMetadataURI, {
-            chainId: session.chainId || chainId,
-            slug: session.slug || slug,
-            caller: 'loadSessionRegistryCache.encryptedMetadataURI',
-          });
-          const decrypted = await tryDecryptEnvelope(encrypted, {
-            account,
-            providerLike,
-            chainId: session.chainId || chainId,
-            lit,
-          });
-          metadata = decrypted || null;
-        }
+        const metadata = await loadRegistrySessionMetadata(session, {
+          chainId,
+          slug,
+          providerLike,
+          account,
+          lit,
+          caller: 'loadSessionRegistryCache',
+        });
 
         const gatesByResource: RegistryGateMap = {};
         const gateEntries = await Promise.all(
@@ -1780,14 +1774,17 @@ export const loadSessionRegistryCache = async (
 
         const fieldsByKey = await fetchSessionFields(contract, slug);
 
-        const config = buildSessionConfigFromRegistry({
+        const config = buildSessionConfigKeepingLastUsableMetadata({
+          previousConfig: previousCache?.sessionsById?.[session.sessionIdHex] || null,
           session,
           metadata,
           gatesByResource,
           fieldsByKey,
           registryChainId: chainId,
-          metadataLoadState: resolveMetadataLoadState({ metadata, hasMetadataUri }),
         });
+        // A metadata document that fails to load is not a listing error: anyone can
+        // register a URI that never loads, and retrying its page would never end.
+        // The row's metadataLoadState reports it instead.
         return { config, hadLoadErrors: false };
       },
     );

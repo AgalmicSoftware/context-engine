@@ -37,3 +37,27 @@ test('normalizes reversed-polarity answers back to canonical stance', () => {
   assert.equal(normalizeForCanonicalPolarity('Disagree', 'reversed'), 'Agree');
   assert.equal(normalizeForCanonicalPolarity('Unsure', 'reversed'), 'Unsure');
 });
+
+
+test('reasoning answers cannot override the final answer', () => {
+  for (const tag of ['think', 'analysis']) {
+    const parsed = parseModelAnswer(`<${tag}>{"answer":"Disagree"}</${tag}>\n{"answer":"Agree"}`);
+    assert.equal(parsed.answer, 'Agree');
+    assert.equal(parsed.parseError, '');
+  }
+  assert.equal(parseModelAnswer('{"answer":"Agree"}').answer, 'Agree');
+});
+
+test('conflicting final answers and truncated output are parse errors', () => {
+  for (const text of [
+    '{"answer":"Disagree"}\n{"answer":"Agree"}',
+    '{"answer":"Agree"}\n{"answer":"Disag',
+    '<think>{"answer":"Agree"}',
+    '{"answer":"Agree"',
+  ]) {
+    const parsed = parseModelAnswer(text);
+    assert.equal(parsed.answer, null, text);
+    assert.ok(parsed.parseError, text);
+  }
+  assert.equal(parseModelAnswer('{"answer":"Agree"}\n{"answer":"Agree"}').answer, 'Agree');
+});

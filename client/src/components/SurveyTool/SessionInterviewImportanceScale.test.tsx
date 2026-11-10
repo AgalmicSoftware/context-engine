@@ -80,7 +80,7 @@ const createPileRuntime = () => {
     stateRef,
     updateSubmittedSinceLastEdit: () => false,
     utils: { keccak256: () => '0xhash', toUtf8Bytes: (value: string) => value },
-    valuesEqual: (a: unknown, b: unknown) => responseValuesEqual(a, b, true),
+    valuesEqual: (a: unknown, b: unknown) => responseValuesEqual(a, b),
   });
   return { stateRef, runtime };
 };

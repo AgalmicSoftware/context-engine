@@ -85,7 +85,6 @@ export default function DevE2eNav() {
     { testId: E2E_TESTIDS.NAV_SESSION_DOCS, to: `/session/${encodedSession}/docs`, label: 'Session Docs' },
     { testId: E2E_TESTIDS.NAV_SESSION_WIZARD, to: '/session/new', label: 'Wizard' },
     { testId: E2E_TESTIDS.NAV_ATLAS, to: atlasTarget, label: 'Atlas' },
-    { testId: E2E_TESTIDS.NAV_MATRIX, to: '/matrix', label: 'Matrix' },
   ].filter(Boolean);
 
   if (canShowAgent) {

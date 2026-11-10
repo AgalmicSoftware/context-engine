@@ -1,11 +1,14 @@
 /** @file withWagmiBridge.tsx */
 import React, { useEffect, useRef } from 'react';
 
-import { useAccount, useBalance, useBlockNumber, useNetwork, useProvider, useDisconnect } from 'wagmi';
+import { useAccount, useBalance, useBlockNumber, useClient, useNetwork, useProvider, useDisconnect } from 'wagmi';
 import { useConnectModal, useAccountModal, useChainModal } from '../../app/runtime/walletUiRuntime.js';
 import { base, baseSepolia } from '../../variables/chains.js';
 import { getSessionNetwork } from '../../utilities/web3/chainGateway.js';
-import { clearUserExplicitlyDisconnected } from '../../utilities/web3/wagmiDisconnectState.js';
+import {
+  clearUserExplicitlyDisconnected,
+  wasUserExplicitlyDisconnected,
+} from '../../utilities/web3/wagmiDisconnectState.js';
 import { logoutPasskeyWallet } from '../../wallet/passkeyWallet.js';
 import { createLogger } from 'utilities/logging.js';
 
@@ -48,7 +51,7 @@ declare global {
 export function WagmiHooksHOC<P extends object>(Component: React.ComponentType<P>) {
   return function WrappedComponent(props: Omit<P, WagmiManagedPropKeys> & WagmiBridgeRuntimeProps) {
     // wagmi hooks
-    const { address, isConnecting, isDisconnected } = useAccount({
+    const { address } = useAccount({
       onConnect({ address }: { address?: string }) {
         accountLog.log('Connected – address: ' + address);
       },
@@ -57,6 +60,7 @@ export function WagmiHooksHOC<P extends object>(Component: React.ComponentType<P
       },
     });
     const { disconnect } = useDisconnect();
+    const wagmiClient = useClient();
 
     const balance = useBalance({
       address: address,
@@ -175,6 +179,16 @@ export function WagmiHooksHOC<P extends object>(Component: React.ComponentType<P
 
         // CONNECT / REHYDRATE
         if (address) {
+          if (wasUserExplicitlyDisconnected()) {
+            // A logout whose wallet disconnect failed or never answered (WalletConnect offline, for example)
+            // leaves this address behind, and with it the wallet button cannot start a new connection. End it
+            // here as wagmi would after a disconnect, unless this tab is still signed in with the wallet.
+            if (props.provider !== 'wagmi' || !props.loginComplete) {
+              wagmiClient.clearState();
+              wagmiClient.storage.removeItem('connected');
+            }
+            return;
+          }
           const acctMatches = reduxAddrLower === addrLower;
           const alreadyWagmi = props.provider === 'wagmi' && props.loginComplete === true;
 
@@ -250,6 +264,7 @@ export function WagmiHooksHOC<P extends object>(Component: React.ComponentType<P
       props.provider,
       props.account,
       props.loginComplete,
+      wagmiClient,
     ]);
 
     const injectedProps = {

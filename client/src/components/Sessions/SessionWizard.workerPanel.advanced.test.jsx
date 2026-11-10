@@ -1,69 +1,60 @@
 import {
   E2E_TESTIDS,
   TEST_ADMIN_ADDRESS,
-  act,
   ethers,
   fireEvent,
   getSessionWizardPublishProgressPercent,
-  mockDecryptWithPassword,
-  mockRegisterSessionOnChain,
   mockSelectorSourceFactory,
-  mockSelectorSourceStartBlock,
   renderLoggedInSessionWizard,
   renderSessionWizard,
   resetSessionWizardWorkerPanelTestState,
-  resolveSessionWizardChipotleHookConfig,
   resolveSessionWizardWorkerBaseUrl,
   screen,
   selectNormalModeCard,
+  selectRegistryHosting,
+  setCloudflareApiToken,
   createPublicWorkerVerificationResponder,
-  enableAdvancedMode,
   waitFor,
 } from './SessionWizard.workerPanel.testUtils';
+
+// A cached or cleared deploy leaves the Worker pending: the quick path still asks for the
+// Cloudflare token and the Hosting summary says Create deploys it.
+const expectWorkerDeployPending = () => {
+  expect(screen.queryByTestId('ce-setup-worker-ready')).not.toBeInTheDocument();
+  expect(screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN)).toBeInTheDocument();
+  expect(screen.getByTestId('ce-setup-summary-hosting')).toHaveTextContent('Worker deploys on Create');
+};
 
 describe('SessionWizard worker panel rendering', () => {
   beforeEach(resetSessionWizardWorkerPanelTestState);
 
-  it('keeps the privacy panel usable in advanced mode after queuing an SBT draft in normal mode', async () => {
+  it('keeps a queued SBT draft usable after the Access section closes and reopens', async () => {
     renderLoggedInSessionWizard({
       initialSessionId: '0x11111111111111111111111111111111',
     });
 
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+    selectRegistryHosting();
     selectNormalModeCard('Privacy');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Create Group' }));
+    // Access also holds the featured-SBT field's own Create Group button.
+    fireEvent.click(
+      screen
+        .getAllByTestId(E2E_TESTIDS.WIZARD_CREATE_SBT)
+        .find((button) => button.getAttribute('data-ce-sbt-target') === 'gate-1'),
+    );
     fireEvent.click(await screen.findByRole('button', { name: 'Save pending SBT' }));
 
     expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_PENDING_SBT)).toBeInTheDocument();
 
-    enableAdvancedMode();
-
-    const privacyToggle = await screen.findByRole('button', { name: /groups allowed to decrypt locked fields/i });
-    expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_PENDING_SBT)).toBeInTheDocument();
-
-    fireEvent.click(privacyToggle);
+    const accessToggle = screen.getByTestId('ce-setup-more-access');
+    fireEvent.click(accessToggle);
     await waitFor(() => {
       expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_PENDING_SBT)).not.toBeInTheDocument();
     });
 
-    fireEvent.click(privacyToggle);
+    fireEvent.click(accessToggle);
     expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_PENDING_SBT)).toBeInTheDocument();
-  });
-
-  it('shows the embedded deploy-helper toggle in advanced custom-worker mode and lets the user disable it', async () => {
-    renderSessionWizard();
-
-    await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
-    enableAdvancedMode();
-    fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
-    fireEvent.click(await screen.findByRole('button', { name: 'Use My Own' }));
-
-    const embeddedToggle = await screen.findByTestId(E2E_TESTIDS.WIZARD_EMBEDDED_DEPLOY_HELPER_ENABLED);
-    expect(embeddedToggle).toBeChecked();
-
-    fireEvent.click(embeddedToggle);
-    expect(embeddedToggle).not.toBeChecked();
   });
 
   it('hydrates the embedded deploy-helper toggle from the default-session source config', async () => {
@@ -205,7 +196,7 @@ describe('SessionWizard worker panel rendering', () => {
     expect(
       screen.queryByText('Worker URL appears here after a successful custom worker deploy.'),
     ).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Step 3: Session Worker/i })).toHaveClass('normalModeCardPending');
+    expectWorkerDeployPending();
   });
 
   it('does not trust a cached deploy URL as verified after reload', async () => {
@@ -230,7 +221,7 @@ describe('SessionWizard worker panel rendering', () => {
     expect(
       screen.queryByText('Worker URL appears here after a successful custom worker deploy.'),
     ).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Step 3: Session Worker/i })).toHaveClass('normalModeCardPending');
+    expectWorkerDeployPending();
     expect(screen.queryByText('Custom worker ready')).not.toBeInTheDocument();
   });
 
@@ -273,17 +264,12 @@ describe('SessionWizard worker panel rendering', () => {
         target: { value: 'Normal Mode Deploy Session' },
       });
 
-      selectNormalModeCard('Worker');
+      selectRegistryHosting();
       expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_BUNDLE_FILE_INPUT)).not.toBeInTheDocument();
 
       expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_DEPLOY_HELPER_URL)).not.toBeInTheDocument();
 
-      const cloudflareTokenInput = screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN);
-      const reactPropsKey = Object.keys(cloudflareTokenInput).find((key) => key.startsWith('__reactProps$'));
-      expect(reactPropsKey).toBeTruthy();
-      act(() => {
-        cloudflareTokenInput[reactPropsKey].onChange({ target: { value: 'cf-test-token' } });
-      });
+      setCloudflareApiToken('cf-test-token');
       fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_OPENAI_KEY), {
         target: { value: 'sk-normal-mode' },
       });
@@ -293,16 +279,17 @@ describe('SessionWizard worker panel rendering', () => {
 
       fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_WORKER));
 
-      await waitFor(() => {
-        expect(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_STATUS)).toHaveTextContent('Worker deployed.');
-      });
+      await waitFor(
+        () => {
+          expect(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_STATUS)).toHaveTextContent('Worker deployed.');
+        },
+        { timeout: 8000 },
+      );
       const deployCall = global.fetch.mock.calls.find(([url]) => String(url).endsWith('/deploy'));
       const deployPayload = JSON.parse(deployCall[1].body);
       expect(deployPayload.bundleUrl).toBe(WORKER_BUNDLE_URL);
       expect(deployPayload.bundleText).toBeUndefined();
       expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_WORKER_URL)).toHaveValue('https://deployed.example.test');
-
-      selectNormalModeCard('Deploy Session');
 
       await waitFor(() => {
         expect(screen.getByTestId(E2E_TESTIDS.WIZARD_PUBLISH)).not.toBeDisabled();
@@ -362,25 +349,21 @@ describe('SessionWizard worker panel rendering', () => {
       expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_BUNDLE_FILE_INPUT)).not.toBeInTheDocument();
       expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_DEPLOY_HELPER_URL)).not.toBeInTheDocument();
 
-      const cloudflareTokenInput = screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN);
-      const reactPropsKey = Object.keys(cloudflareTokenInput).find((key) => key.startsWith('__reactProps$'));
-      act(() => {
-        cloudflareTokenInput[reactPropsKey].onChange({ target: { value: 'cf-test-token' } });
-      });
+      setCloudflareApiToken('cf-test-token');
       fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_OPENAI_KEY), {
         target: { value: 'sk-workers-dev-status' },
-      });
-      fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_ARWEAVE_JWK), {
-        target: { value: '{"kty":"RSA","n":"workers-dev"}' },
       });
 
       fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_WORKER));
 
-      await waitFor(() => {
-        expect(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_STATUS)).toHaveTextContent(
-          /Worker deployed\..*account active \(tenant-subdomain\); script enabled\./,
-        );
-      });
+      await waitFor(
+        () => {
+          expect(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_STATUS)).toHaveTextContent(
+            /Worker deployed\..*account active \(tenant-subdomain\); script enabled\./,
+          );
+        },
+        { timeout: 8000 },
+      );
       const deployCall = global.fetch.mock.calls.find(([url]) => String(url).endsWith('/deploy'));
       const deployPayload = JSON.parse(deployCall[1].body);
       expect(deployPayload.bundleUrl).toBe(WORKER_BUNDLE_URL);

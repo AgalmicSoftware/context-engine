@@ -328,8 +328,8 @@ describe('surveyToolHydrationFlow draft hydration helpers', () => {
           additionalComments: {},
         },
         prevBaseline: {
-          answers: {},
-          importance: {},
+          answers: { q1: { value: 'baseline-1' } },
+          importance: { q1: 2 },
           conviction: {},
           additionalComments: {},
         },

@@ -43,9 +43,6 @@ export const resolveRegistryRpcUrls = ({
   const mergeRpcUrlLists = typeof deps?.mergeRpcUrlLists === 'function'
     ? deps.mergeRpcUrlLists
     : defaultMergeRpcUrlLists;
-  const toChainId = typeof deps?.toChainId === 'function'
-    ? deps.toChainId
-    : defaultToChainId;
 
   const registryChainId = resolveRegistryChainId(config);
   const map = config?.rpcUrlsByChainId;

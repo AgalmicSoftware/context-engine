@@ -17,8 +17,6 @@ import { handlePreferencesRequest } from './participation.mjs';
 import { handleInviteOnboardRequest } from './invites.mjs';
 import { handleClientLoginExchangeRequest, handleWrappedMemberExchangeRequest } from './exchanges.mjs';
 
-import { AGENT_ROUTES } from './routes.mjs';
-export const AGENT_HTTP_ROUTES = new Set(Object.keys(AGENT_ROUTES));
 const handlers = {
   '/api/agent/credentials/service': handleServiceCredentialBootstrapRequest,
   '/api/agent/invite/onboard': handleInviteOnboardRequest,

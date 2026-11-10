@@ -66,6 +66,7 @@ import {
   type WorkerGroupsChangedDetail,
 } from '../../utilities/worker/workerGroupChangeEvents';
 import {
+  awaitWorkerGroupCountsBriefly,
   getCommunityWorkerGroupCountCacheKey,
   getCommunityWorkerGroupCountState,
   invalidateCommunityWorkerGroupCountCache,
@@ -587,7 +588,10 @@ export class CommunityTab extends Component<any, any> {
     });
 
   _hydrateWorkerGroupCounts = async (scopeEntries: ScopeCacheEntry[]) => {
-    await Promise.all(scopeEntries.map((scopeEntry) => this._loadWorkerGroupCount(scopeEntry)));
+    await awaitWorkerGroupCountsBriefly(
+      Promise.all(scopeEntries.map((scopeEntry) => this._loadWorkerGroupCount(scopeEntry))),
+      () => this._queueCacheDrivenRefresh({ force: true }),
+    );
     scopeEntries.forEach((scopeEntry) => {
       Object.assign(scopeEntry, this._getWorkerGroupCountState(scopeEntry.workerCanonicalIdentity));
     });
@@ -1002,14 +1006,14 @@ export class CommunityTab extends Component<any, any> {
       const surveyIdSet: any = new Set();
       const questionIdSet: any = new Set();
       const userSet: any = new Set();
-      const sbtAddressSet: any = new Set();
+      const sbtIdentitySet: any = new Set();
       const workerGroupIdentitySet = new Set<string>();
       const surveyTitleMap: Record<string, any> = {};
       const surveySlugMap: Record<string, any> = {};
       const surveyRespondersMap: Record<string, any> = {};
 
       for (const scopeEntry of scopeEntries) {
-        const { slug, surveysCache, questionsCache, sbtCache } = scopeEntry;
+        const { slug, netKey, surveysCache, questionsCache, sbtCache } = scopeEntry;
         const surveysData = surveysCache?.surveys || {};
         const surveyResponsesData = surveysCache?.surveyResponses || {};
         const questionsData = questionsCache?.questions || {};
@@ -1076,7 +1080,7 @@ export class CommunityTab extends Component<any, any> {
           if (!entry || !entry.sbtAddress) return;
 
           if (this._shouldCountSbt(entry, slug)) {
-            sbtAddressSet.add(String(entry.sbtAddress || '').toLowerCase());
+            sbtIdentitySet.add(`${netKey}:${String(entry.sbtAddress || '').toLowerCase()}`);
           }
 
           const info = entry.sbtInfo || {};
@@ -1112,7 +1116,7 @@ export class CommunityTab extends Component<any, any> {
         surveyResponsesCount,
         uniqueQuestionsCount: questionIdSet.size,
         surveysList,
-        sbtsCreatedCount: sbtAddressSet.size + workerGroupIdentitySet.size,
+        sbtsCreatedCount: sbtIdentitySet.size + workerGroupIdentitySet.size,
       };
     });
 

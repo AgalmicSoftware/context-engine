@@ -1,3 +1,4 @@
+import { audioFileExtension } from '../audio/audioFileExtension';
 /**
  * @module aiClient
  * @description AI orchestration layer — unified entry point for AI API calls, streaming responses,
@@ -9,10 +10,14 @@
 // All math/heuristics live in utilities/survey/compareUsers.ts
 
 import { aiRewritePrompt } from '../../prompts/aiRewritePrompt.js';
-import buildClusterAnalysisPrompt, { CLUSTER_ANALYSIS_SYSTEM_PROMPT } from '../../prompts/clusterAnalysisPrompt.js';
+import buildClusterAnalysisPrompt, {
+  CLUSTER_ANALYSIS_RESPONSE_FORMAT,
+  CLUSTER_ANALYSIS_SYSTEM_PROMPT,
+} from '../../prompts/clusterAnalysisPrompt.js';
 import buildCompareToolkitPrompt from '../../prompts/compareToolkitPrompt.js';
 import buildPhotoAnalysisPrompt from '../../prompts/photoAnalysisPrompt.js';
-import { rankQuestionsPrompt } from '../../prompts/rankQuestionsPrompt.js';
+import { fillPromptTemplate } from '../../prompts/promptFormat.js';
+import { RANK_QUESTIONS_RESPONSE_FORMAT, rankQuestionsPrompt } from '../../prompts/rankQuestionsPrompt.js';
 import { getEffectiveAiConfig, getEffectiveTranscriptionConfig } from './aiSettings.js';
 import {
   TRANSCRIBE_MAX_UPLOAD_BYTES,
@@ -20,6 +25,7 @@ import {
   mergeTranscriptText,
   normalizeAudioToWav,
   splitAudioBlobToWavChunks,
+  transcriptionChunkSeconds,
 } from './aiClientAudioTranscription.js';
 import { getEffectiveArweaveKey } from '../session/resourceKeys.js';
 import { getCorsProxyUrlOrThrow } from '../worker/corsProxy.js';
@@ -45,7 +51,6 @@ import {
   buildAiConfigRequest,
   buildArweaveKeyRequest,
   buildTranscriptionConfigRequest,
-  inferAiTaskType,
   normalizeAiClientOptions,
   pickAiRequestOpts,
   readAiErrorMessage,
@@ -53,6 +58,7 @@ import {
   readAiOptionThinking,
   readAiOptionThrowOnError,
   readAiOptionWorkerUrl,
+  readAiTaskType,
   readArweaveJwkOption,
   resolveAudioSummaryOptions,
   resolveAiSessionOptions,
@@ -70,7 +76,11 @@ import {
 import {
   resolveTranscriptionWorkerEndpoint,
   uploadAudioForTranscription,
+  uploadAudioForDiarizedTranscription,
+  SpeakerLabelsUnavailableError,
+  type DiarizedTranscription,
 } from './aiClientTranscriptionWorkerTransport.js';
+import type { KnownSpeaker } from '../audio/speakerTranscript';
 import { enqueueAiCallWithRetry } from './aiClientQueue.js';
 
 import { createLogger } from '../logging.js';
@@ -157,7 +167,6 @@ export const analyzePhotoForQuestionGeneration = async (file: PhotoUploadFile, o
   const text = await callAI('', {
     ...pickAiRequestOpts(opts),
     provider: ai.provider,
-    model: ai.model,
     messages,
     maxTokens: 1200,
     temperature: 0.2,
@@ -191,7 +200,7 @@ const callAICompletion = async (prompt: unknown, opts: unknown = {}) => {
     const aiRequestOpts = normalizeAiClientOptions(opts);
     const { context, sessionConfig, sessionSlug } = resolveAiSessionOptions(opts);
     const ai = await getEffectiveAiConfig(buildAiConfigRequest(opts, { thinking: thinkingRequested }));
-    const taskType = inferAiTaskType(prompt, aiRequestOpts);
+    const taskType = readAiTaskType(aiRequestOpts);
 
     const thinking = thinkingRequested && ai.provider === 'anthropic';
 
@@ -313,13 +322,15 @@ export async function rankQuestionsAI(
       .filter((q) => q.id.trim());
     const questionListJson = JSON.stringify(candidates, null, 2);
 
-    const finalPrompt = rankQuestionsPrompt
-      .replace('{{userQueryJson}}', JSON.stringify(String(userQuery || '')))
-      .replace('{{questionListJson}}', questionListJson)
-      .replace('{{topX}}', String(topX));
+    const finalPrompt = fillPromptTemplate(rankQuestionsPrompt, {
+      '{{userQueryJson}}': JSON.stringify(String(userQuery || '')),
+      '{{questionListJson}}': questionListJson,
+      '{{topX}}': String(topX),
+    });
 
     const rawOutput = await callAI(finalPrompt.trim(), {
       ...pickAiRequestOpts(opts),
+      response_format: RANK_QUESTIONS_RESPONSE_FORMAT,
       taskType: readAiOptionTaskType(opts, 'rank'),
     });
 
@@ -370,7 +381,7 @@ export async function rankQuestionsAI(
  */
 export async function requestAiRewrite(originalText: unknown, opts: unknown = {}): Promise<unknown> {
   try {
-    const finalPrompt = aiRewritePrompt.replace('<USER_TEXT>', String(originalText));
+    const finalPrompt = fillPromptTemplate(aiRewritePrompt, { '<USER_TEXT>': String(originalText) });
     const cleaned = await callAI(finalPrompt, {
       ...(opts && typeof opts === 'object' ? opts : {}),
       taskType: readAiOptionTaskType(opts, 'rewrite'),
@@ -382,13 +393,38 @@ export async function requestAiRewrite(originalText: unknown, opts: unknown = {}
   }
 }
 
+// Cutting audio by length decodes it on the device. Audio within the upload limit that
+// fails to decode, or takes longer than this, goes whole, so decoding never holds an upload.
+const LENGTH_SPLIT_WAIT_MS = 30_000;
+
+const splitWithinWait = async <T>(split: () => Promise<T[]>): Promise<T[]> => {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      split(),
+      new Promise<T[]>((resolve) => {
+        timer = setTimeout(() => {
+          aiLog.warn('Audio decode is slow; uploading it whole.');
+          resolve([]);
+        }, LENGTH_SPLIT_WAIT_MS);
+      }),
+    ]);
+  } catch (error) {
+    aiLog.warn('Audio decode failed; uploading it whole:', error);
+    return [];
+  } finally {
+    clearTimeout(timer);
+  }
+};
+
 /**
  * Audio transcription via Worker -> OpenAI Whisper.
  * Worker must expose POST /transcribe and return { text: "<transcript>" }.
  * Accepts a File or Blob. Preserves original filename/type when possible.
  * If the file uses an odd/unknown container, we try a minimal client-side
  * normalization to mono WAV (~16 kHz) using Web Audio.
- * Files above the upstream 25 MB limit are chunked client-side before upload.
+ * Files above the upstream 25 MB limit are chunked client-side before upload, as is
+ * audio longer than five minutes for models after whisper-1.
  *
  * Return contract unchanged: resolves to string (may be empty) or throws on error.
  */
@@ -401,11 +437,13 @@ export async function transcribeAudio(audioBlobOrFile: AudioUploadBlob, opts: un
   // Helper: coerce to a File when available to preserve filename
   const toFileLike = (blob: Blob & { name?: string }, nameFallback?: string): File | (Blob & { name?: string }) => {
     try {
-      return new File([blob], nameFallback || 'audio.wav', { type: blob.type || 'audio/wav' });
+      return new File([blob], nameFallback || `audio.${audioFileExtension(blob.type)}`, {
+        type: blob.type || 'audio/wav',
+      });
     } catch (error) {
       aiLog.warn('Audio File construction failed; falling back to Blob:', error);
       // Older browsers: attach name on Blob for worker-side filename hints
-      blob.name = nameFallback || 'audio.wav';
+      blob.name = nameFallback || `audio.${audioFileExtension(blob.type)}`;
       return blob;
     }
   };
@@ -435,18 +473,25 @@ export async function transcribeAudio(audioBlobOrFile: AudioUploadBlob, opts: un
   }
 
   const transport = await resolveTranscriptionTransport(opts);
+  const maxSeconds = transcriptionChunkSeconds(transport.transcriptionCfg?.model);
+  const exceedsUploadLimit = (uploadFile?.size || 0) > maxUploadBytes || isTooBig;
+  const split = () =>
+    splitAudioBlobToWavChunks(uploadFile, { maxUploadBytes, maxSeconds, targetHz: TRANSCRIBE_WAV_TARGET_HZ });
 
   // Regression guard: OpenAI's /transcribe endpoint accepts at most 25 MB per file.
   // Oversize uploads must be chunked client-side or they fail after multipart wrapping.
-  if ((uploadFile?.size || 0) > maxUploadBytes || isTooBig) {
-    const chunkedUploads = await splitAudioBlobToWavChunks(uploadFile, {
-      maxUploadBytes,
-      targetHz: TRANSCRIBE_WAV_TARGET_HZ,
-    });
-    if (!chunkedUploads.length) {
-      throw new Error('Audio exceeds the /transcribe 25 MB upload limit and could not be chunked client-side.');
-    }
-
+  // Models after whisper-1 also stop short on long audio, so theirs is cut by length.
+  const chunkedUploads = exceedsUploadLimit ? await split() : maxSeconds ? await splitWithinWait(split) : [];
+  // A request cancelled while its settings or audio were prepared starts no upload.
+  signal?.throwIfAborted();
+  if (exceedsUploadLimit && !chunkedUploads.length) {
+    throw Object.assign(
+      new Error('Audio exceeds the /transcribe 25 MB upload limit and could not be decoded into smaller chunks.'),
+      { status: 422 },
+    );
+  }
+  // Audio that fits in one piece goes as recorded.
+  if (exceedsUploadLimit || chunkedUploads.length > 1) {
     let merged = '';
     for (const chunk of chunkedUploads) {
       const chunkText = await uploadAudioForTranscription(chunk, transport, {
@@ -458,7 +503,7 @@ export async function transcribeAudio(audioBlobOrFile: AudioUploadBlob, opts: un
     return merged.trim();
   }
 
-  const fname = uploadFile.name || (looksSupported ? `audio.${ext || 'wav'}` : 'audio.wav');
+  const fname = uploadFile.name || `audio.${audioFileExtension(uploadFile.type || '')}`;
   return uploadAudioForTranscription(
     uploadFile instanceof Blob ? toFileLike(uploadFile, fname) : uploadFile,
     transport,
@@ -468,6 +513,26 @@ export async function transcribeAudio(audioBlobOrFile: AudioUploadBlob, opts: un
       signal,
     },
   );
+}
+
+/** Structured group capture: samples of voices from earlier uploads (`knownSpeakers`) keep their labels. */
+export async function transcribeGroupAudio(audio: AudioUploadBlob, opts: unknown = {}): Promise<DiarizedTranscription> {
+  if (!audio) throw new Error('No audio provided');
+  const { signal } = resolveTranscriptionUploadOptions(opts, { defaultMaxUploadBytes: TRANSCRIBE_MAX_UPLOAD_BYTES });
+  const { knownSpeakers } = (opts || {}) as { knownSpeakers?: KnownSpeaker[] };
+  try {
+    if (audio.size > TRANSCRIBE_MAX_UPLOAD_BYTES)
+      throw new SpeakerLabelsUnavailableError('Speaker labels are unavailable for this audio size.', true);
+    return await uploadAudioForDiarizedTranscription(audio, await resolveTranscriptionTransport(opts), {
+      signal,
+      knownSpeakers,
+    });
+  } catch (error) {
+    if (!(error instanceof SpeakerLabelsUnavailableError)) throw error;
+    // The plain path already normalizes and chunks oversized audio safely.
+    const text = await transcribeAudio(audio, opts);
+    return error.chunkOnly ? { text, segments: [] } : { text, segments: [], labelsUnavailableReason: error.message };
+  }
 }
 
 const resolveTranscriptionTransport = async (opts: unknown = {}) => {
@@ -529,7 +594,10 @@ export async function analyzeClusterOpinions(
     let short = '';
     let long = '';
     let raw = '';
-    const aiCallOpts = withAiTaskTypeFallback(opts, 'summarize');
+    const aiCallOpts = {
+      ...withAiTaskTypeFallback(opts, 'summarize'),
+      response_format: CLUSTER_ANALYSIS_RESPONSE_FORMAT,
+    };
 
     try {
       raw = await callAIQueued(finalPrompt, { ...aiCallOpts, thinking: true });
@@ -566,12 +634,9 @@ export async function analyzeClusterOpinions(
     return { name, short, long };
   } catch (err) {
     aiLog.error('analyzeClusterOpinions error:', err);
-    const fallback = buildHeuristicClusterSummary(clusterData);
-    return {
-      name: deriveFallbackClusterName(clusterData),
-      short: fallback.short,
-      long: fallback.long,
-    };
+    // The report must retain its error/retry state instead of caching a local
+    // heuristic as a successful sponsored AI response.
+    throw err;
   }
 }
 
@@ -584,9 +649,10 @@ export async function analyzeClusterOpinions(
  */
 export async function analyzeUserOpinions(userData: unknown, opts: unknown = {}) {
   try {
-    const { default: buildUserAnalysisPrompt } = await import('../../prompts/userAnalysisPrompt.js');
+    const { default: buildUserAnalysisPrompt, USER_ANALYSIS_RESPONSE_FORMAT } =
+      await import('../../prompts/userAnalysisPrompt.js');
     const prompt = buildUserAnalysisPrompt(userData);
-    const aiCallOpts = withAiTaskTypeFallback(opts, 'summarize');
+    const aiCallOpts = { ...withAiTaskTypeFallback(opts, 'summarize'), response_format: USER_ANALYSIS_RESPONSE_FORMAT };
     const { text: raw, generation } = await enqueueAiCallWithRetry(() =>
       callAICompletion(prompt, { ...aiCallOpts, thinking: true }),
     );
@@ -727,11 +793,12 @@ export async function generateAudioDiscussionSummary(transcript: unknown, opts: 
   try {
     const { audioSummaryPrompt } = await import('../../prompts/audioSummaryPrompt.js');
 
-    // Fill placeholders (keep global to replace all occurrences)
-    let prompt = String(audioSummaryPrompt || '');
-    prompt = prompt.replace(/<TRANSCRIPT>/g, t);
-    prompt = prompt.replace(/<STYLE>/g, style);
-    prompt = prompt.replace(/<SESSION_TITLE\?>/g, sessionTitle);
+    const prompt = fillPromptTemplate(String(audioSummaryPrompt || ''), {
+      '<TITLE>':
+        sessionTitle.replace(/\s+/g, ' ') || 'Reading Group Summary — [a short title you derive from the discussion]',
+      '<STYLE>': style,
+      '<TRANSCRIPT>': t,
+    });
 
     const raw = await callAIQueued(prompt, { ...withAiTaskTypeFallback(aiCallOpts, 'summarize'), thinking: true });
     const md = _stripEnclosingMarkdownFences(String(raw || ''));

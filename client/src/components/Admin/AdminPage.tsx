@@ -1,5 +1,4 @@
 import AdminInterviewOpening from './AdminInterviewOpening';
-import { DEFAULT_AI_MODEL } from '../../../../shared/aiDefaults.mjs';
 /** @file AdminPage.tsx */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button, Input, Label, FormGroup } from 'reactstrap';
@@ -43,7 +42,7 @@ import { toStr } from '../../utilities/shared/primitives.js';
 import SBTSelector from '../SBTs/SBTSelector';
 import { JsonPanel } from '../Shared/Json/JsonControls';
 import CETooltip from '../Shared/CETooltip';
-import AdminPageMetadataEditor from './AdminPageMetadataEditor';
+import SessionJoinPanel from '../Sessions/SessionJoinPanel';
 import AdminPageSessionMetadataSummary from './AdminPageSessionMetadataSummary';
 import AdminPageTestsPanel from './AdminPageTestsPanel';
 import AdminPageWorkerSecretsPanel from './AdminPageWorkerSecretsPanel';
@@ -55,10 +54,6 @@ import AdminStorageVisibilityPanel from './AdminStorageVisibilityPanel';
 import AdminWorkerCapabilities from './AdminWorkerCapabilities';
 import AdminSessionDiagnostics from './AdminSessionDiagnostics';
 import AdminSessionBackupPanel from './AdminSessionBackupPanel';
-import {
-  getBackgroundResultsAnalysisUnsupportedReason,
-  supportsBackgroundResultsAnalysis,
-} from '../Sessions/resultsAnalysisSettingsSupport';
 import { resolveAdminCapabilityRoute, resolveAdminSessionRecoveryMessage } from './adminPageCapabilityRoutingHelpers';
 import { createLogger } from '../../utilities/logging';
 import { notify } from '../../utilities/ui/notify.js';
@@ -67,10 +62,10 @@ import {
   countSessionsForChain,
   getChainName,
   getErrorMessage,
-  inferAiProviderFromModel,
-  normalizeAiProvider,
   normalizeSlug,
   normalizeWorkerUrl,
+  parseChainIdInput,
+  resolveAdminAiTestModel,
   resolveAdminCapabilities,
 } from './adminPageHelpers';
 import {
@@ -92,6 +87,7 @@ import {
 import {
   areAdminEncryptedEntriesEquivalent,
   buildAdminPageSessionIdentityKey,
+  buildSessionSettingsUrl,
   buildSessionUrl,
   collectEncryptedEntries,
   getAdminSessionDisplayUrl,
@@ -136,18 +132,8 @@ import {
   getAdminLitResourceLabel,
 } from './adminPageResourceDisplayHelpers';
 import {
-  ADMIN_EDITABLE_CONTRACT_KEY_SET,
-  applyAdminMetadataDraft,
-  buildAdminMetadataDraft,
-  buildEditableSessionMetadataPayload,
-  buildWorkerCanonicalMetadataConfigPatch,
-  parseChainIdInput,
-  resolveAutoFeatureBySessionSlug,
-} from './adminPageMetadataDraftHelpers';
-import {
   asAdminSessionConfig,
   type AdminDecryptedFieldMap,
-  type AdminMetadataBlockLimitsDraft,
   type AdminOpenSecretCards,
   type AdminPageProps,
   type AdminSecretKeySet,
@@ -158,10 +144,7 @@ import {
 const log = createLogger('general');
 
 export const __adminPageTestUtils = {
-  applyAdminMetadataDraft,
-  buildAdminMetadataDraft,
   buildWorkerSessionConfigPayload,
-  buildEditableSessionMetadataPayload,
   buildHealthAuthMismatchState,
   getAdminSessionDisplayUrl,
   getSessionReadRpcConfig,
@@ -244,20 +227,6 @@ const AdminPageRuntime = ({
   const [hasOlderSessions, setHasOlderSessions] = useState(false);
   const [defaultGateTouched, setDefaultGateTouched] = useState(false);
   const [gateConfigDirty, setGateConfigDirty] = useState(false);
-  const [metadataBlockLimitsDraft, setMetadataBlockLimitsDraft] = useState<AdminMetadataBlockLimitsDraft>({
-    start: '',
-    end: '',
-  });
-  const [metadataDraftTouched, setMetadataDraftTouched] = useState(false);
-  const [metadataAutoFeatureDraft, setMetadataAutoFeatureDraft] = useState(true);
-  const [metadataAutoFeatureTouched, setMetadataAutoFeatureTouched] = useState(false);
-  const [metadataConfigDraft, setMetadataConfigDraft] = useState<any>(() => buildAdminMetadataDraft({}));
-  const [metadataContractDraftTouched, setMetadataContractDraftTouched] = useState(false);
-  const [metadataContractsVerified, setMetadataContractsVerified] = useState(false);
-  const [metadataLatestBlock, setMetadataLatestBlock] = useState<any>(null);
-  const [metadataLatestBlockStatus, setMetadataLatestBlockStatus] = useState('');
-  const [metadataUpdateBusy, setMetadataUpdateBusy] = useState(false);
-  const [metadataUpdateStatus, setMetadataUpdateStatus] = useState('');
   const [copiedRawMetadataJson, setCopiedRawMetadataJson] = useState(false);
   const [heroHeaderImageReady, setHeroHeaderImageReady] = useState(false);
   const [defaultGateDraft, setDefaultGateDraft] = useState<any>({
@@ -302,11 +271,8 @@ const AdminPageRuntime = ({
   const secretPresenceRequestRef = useRef(0);
   const secretPresenceTargetKeyRef = useRef('');
   const rawMetadataCopyResetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const prevSelectedSlugForDraftRef = useRef(selectedSlug);
   const prevSelectedSlugForAllowOriginsDraftRef = useRef(selectedSlug);
   const encryptedFieldsSessionKeyRef = useRef('');
-  const metadataDraftTouchedRef = useRef(metadataDraftTouched);
-  metadataDraftTouchedRef.current = metadataDraftTouched;
 
   const handleSecretChange = useCallback((key: string, value: string) => {
     setSecrets((prev) => ({ ...prev, [key]: value }));
@@ -327,19 +293,6 @@ const AdminPageRuntime = ({
       next.add(key);
       return next;
     });
-  }, []);
-
-  const updateMetadataConfigDraft = useCallback((key: string, value: unknown) => {
-    setMetadataDraftTouched(true);
-    if (
-      key === 'contractSurveysAddress' ||
-      key === 'contractSbtFactoryAddress' ||
-      key === 'contractSessionRegistryAddress'
-    ) {
-      setMetadataContractDraftTouched(true);
-      setMetadataContractsVerified(false);
-    }
-    setMetadataConfigDraft((prev: any) => ({ ...prev, [key]: value }));
   }, []);
 
   const requestedSessionRaw = toStr(initialSessionId).trim();
@@ -604,10 +557,6 @@ const AdminPageRuntime = ({
   }, [availableSessions, selectedSlug]);
   const adminCapabilityRoute = useMemo(() => resolveAdminCapabilityRoute(selectedConfig), [selectedConfig]);
   const { sessionCapabilities, selectedWorkerSessionId, signedWorkerSessionId } = adminCapabilityRoute;
-  const resultsAnalysisBackgroundAutoSupported = supportsBackgroundResultsAnalysis(selectedConfig);
-  const resultsAnalysisBackgroundAutoUnsupportedReason = resultsAnalysisBackgroundAutoSupported
-    ? ''
-    : getBackgroundResultsAnalysisUnsupportedReason(selectedConfig);
   const effectiveWorkerCorsState = useMemo(() => {
     if (!selectedConfig) return { origins: [], reported: false };
     const cachedWorkerConfig: any =
@@ -706,22 +655,6 @@ const AdminPageRuntime = ({
   }, [selectedSlug]);
 
   useEffect(() => {
-    const slugChanged = prevSelectedSlugForDraftRef.current !== selectedSlug;
-    prevSelectedSlugForDraftRef.current = selectedSlug;
-    // Regression guard: selectedSlug and groupMetadata can update in one commit.
-    // Always rehydrate on session changes; only preserve dirty drafts within the same session.
-    if (!slugChanged && metadataDraftTouchedRef.current) return;
-    setMetadataDraftTouched(false);
-    setMetadataContractDraftTouched(false);
-    setMetadataContractsVerified(false);
-    setMetadataAutoFeatureTouched(false);
-    if (slugChanged) setMetadataUpdateStatus('');
-    setMetadataBlockLimitsDraft({
-      start: toStr(groupMetadata?.blockLimits?.start).trim(),
-      end: toStr(groupMetadata?.blockLimits?.end).trim(),
-    });
-    setMetadataConfigDraft(buildAdminMetadataDraft(groupMetadata || {}));
-    setMetadataAutoFeatureDraft(resolveAutoFeatureBySessionSlug(groupMetadata) !== false);
     setCopiedRawMetadataJson(false);
   }, [groupMetadata, selectedSlug]);
 
@@ -739,47 +672,6 @@ const AdminPageRuntime = ({
     },
     [],
   );
-
-  useEffect(() => {
-    if (!sessionCapabilities.usesChainMetadata || !relevantSessionChainId) {
-      setMetadataLatestBlock(null);
-      setMetadataLatestBlockStatus('');
-      return;
-    }
-    let cancelled = false;
-    setMetadataLatestBlockStatus('Loading current block…');
-    rpcProvidersChainReadsPort
-      .getLatestBlockNumberForChain(relevantSessionChainId)
-      .then((blockNumber: number) => {
-        if (cancelled) return;
-        setMetadataLatestBlock(blockNumber);
-        setMetadataLatestBlockStatus('');
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setMetadataLatestBlock(null);
-        setMetadataLatestBlockStatus('Unable to load the current block for the selected session chain.');
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [relevantSessionChainId, sessionCapabilities.usesChainMetadata]);
-
-  useEffect(() => {
-    if (metadataDraftTouched) return;
-    const existingStart = Number(groupMetadata?.blockLimits?.start);
-    if (Number.isFinite(existingStart) && existingStart > 0) return;
-    const latestBlock = Number(metadataLatestBlock || 0);
-    if (!Number.isFinite(latestBlock) || latestBlock <= 0) return;
-    setMetadataBlockLimitsDraft((prev) => {
-      const currentStart = Number(prev?.start || 0);
-      if (Number.isFinite(currentStart) && currentStart > 0) return prev;
-      return {
-        ...(prev || {}),
-        start: String(latestBlock),
-      };
-    });
-  }, [groupMetadata?.blockLimits?.start, metadataDraftTouched, metadataLatestBlock]);
 
   useEffect(() => {
     if (!groupMetadata || defaultGateTouched) return;
@@ -1629,8 +1521,10 @@ const AdminPageRuntime = ({
     }
   };
 
-  const { isWorkerCanonicalSession, workerAdminAddress, hasRegistryEntry, canAdminWorker, canAdminRegistry } =
-    resolveAdminCapabilities({ account, sessionConfig: selectedConfig });
+  const { isWorkerCanonicalSession, hasRegistryEntry, canAdminWorker, canAdminRegistry } = resolveAdminCapabilities({
+    account,
+    sessionConfig: selectedConfig,
+  });
   const { showAdminWorkerGroups, workerGroupsPanelTitle, workerGroupsPanelDescription } = adminCapabilityRoute;
   const sessionRecoveryMessage = resolveAdminSessionRecoveryMessage({ sessionCapabilities, hasRegistryEntry });
   const baseWorkerUrl = normalizeWorkerUrl(workerUrl);
@@ -1652,61 +1546,50 @@ const AdminPageRuntime = ({
     setSessions,
     providerLike: provider,
   });
-  const ensureWorkerSessionConfig = useCallback(
-    async ({
-      sessionConfigOverride,
-      configPayloadOverride,
-      action = 'set-config',
-      workerUrl: workerUrlOverride,
-    }: any = {}) => {
-      const sessionConfigForSync = sessionConfigOverride || selectedConfig;
-      if (!sessionConfigForSync) throw new Error('Select a session first.');
-      if (!account) {
-        if (toggleLoginModal) toggleLoginModal(true);
-        throw new Error('Connect the admin wallet to seed worker config.');
-      }
-      const slug = normalizeSlug(selectedSlug);
-      const baseUrl = normalizeWorkerUrl(workerUrlOverride || baseWorkerUrl || selectedConfigWorkerUrl);
-      if (!baseUrl) throw new Error('Worker URL is missing.');
+  const ensureWorkerSessionConfig = useCallback(async () => {
+    if (!selectedConfig) throw new Error('Select a session first.');
+    if (!account) {
+      if (toggleLoginModal) toggleLoginModal(true);
+      throw new Error('Connect the admin wallet to seed worker config.');
+    }
+    const slug = normalizeSlug(selectedSlug);
+    const baseUrl = normalizeWorkerUrl(baseWorkerUrl || selectedConfigWorkerUrl);
+    if (!baseUrl) throw new Error('Worker URL is missing.');
 
-      const configPayload = configPayloadOverride
-        ? { ...asAdminSessionConfig(configPayloadOverride) }
-        : buildWorkerSessionConfigPayload({
-            sessionConfig: sessionConfigForSync,
-            account,
-            fallbackChainId: testChainId,
-          });
-      const requestBody = {
-        sessionSlug: slug,
-        adminAddress: configPayload.adminAddress || account,
-        config: configPayload,
-      };
-      const { data } = await postSignedAdminRequest({
-        action,
-        body: requestBody,
-        path: '/admin/set-config',
-        chainId: testChainId,
-        workerUrl: baseUrl,
-      });
-      const existingCachedConfig = getCachedSessionWorkerConfig({ slug, sessionConfig: selectedConfig }) || {};
-      upsertCachedSessionWorkerConfig({
-        slug,
-        sessionConfig: selectedConfig,
-        config: { ...existingCachedConfig, ...configPayload, corsWorkerUrl: baseUrl },
-      });
-      return { data, configPayload };
-    },
-    [
+    const configPayload = buildWorkerSessionConfigPayload({
+      sessionConfig: selectedConfig,
       account,
-      baseWorkerUrl,
-      postSignedAdminRequest,
-      selectedConfigWorkerUrl,
-      selectedConfig,
-      selectedSlug,
-      testChainId,
-      toggleLoginModal,
-    ],
-  );
+      fallbackChainId: testChainId,
+    });
+    const requestBody = {
+      sessionSlug: slug,
+      adminAddress: configPayload.adminAddress || account,
+      config: configPayload,
+    };
+    const { data } = await postSignedAdminRequest({
+      action: 'set-config',
+      body: requestBody,
+      path: '/admin/set-config',
+      chainId: testChainId,
+      workerUrl: baseUrl,
+    });
+    const existingCachedConfig = getCachedSessionWorkerConfig({ slug, sessionConfig: selectedConfig }) || {};
+    upsertCachedSessionWorkerConfig({
+      slug,
+      sessionConfig: selectedConfig,
+      config: { ...existingCachedConfig, ...configPayload, corsWorkerUrl: baseUrl },
+    });
+    return { data, configPayload };
+  }, [
+    account,
+    baseWorkerUrl,
+    postSignedAdminRequest,
+    selectedConfigWorkerUrl,
+    selectedConfig,
+    selectedSlug,
+    testChainId,
+    toggleLoginModal,
+  ]);
   const withSessionConfigRetry = useCallback(
     async (run: any) => {
       try {
@@ -1826,38 +1709,12 @@ const AdminPageRuntime = ({
           // Fall through to withSessionConfigRetry for user-visible errors.
         }
       }
-      const aiCfg = selectedConfig?.ai && typeof selectedConfig.ai === 'object' ? selectedConfig.ai : {};
-      const fastModelEntry = aiCfg?.models?.fast && typeof aiCfg.models.fast === 'object' ? aiCfg.models.fast : {};
-      const fastModelCandidate = toStr(fastModelEntry.model).trim();
-      const legacyModelCandidate = toStr(aiCfg?.model).trim();
-      const inferredProvider = inferAiProviderFromModel(fastModelCandidate || legacyModelCandidate);
-      const providerMode = normalizeAiProvider(
-        fastModelEntry.provider || aiCfg?.mode || aiCfg?.provider || inferredProvider || 'openai',
-      );
-      const providerCfg = aiCfg?.providers?.[providerMode] || {};
-      const providerModelCandidate = toStr(providerCfg.model).trim();
-      const inferredFastProvider = inferAiProviderFromModel(fastModelCandidate);
-      const inferredLegacyProvider = inferAiProviderFromModel(legacyModelCandidate);
-      const fastModelMatchesProvider =
-        !!fastModelCandidate && (!inferredFastProvider || inferredFastProvider === providerMode);
-      const legacyModelMatchesProvider =
-        !!legacyModelCandidate && (!inferredLegacyProvider || inferredLegacyProvider === providerMode);
-      const model =
-        (fastModelMatchesProvider ? fastModelCandidate : '') ||
-        providerModelCandidate ||
-        (legacyModelMatchesProvider ? legacyModelCandidate : '') ||
-        (providerMode === 'openai'
-          ? DEFAULT_AI_MODEL
-          : providerMode === 'openrouter'
-            ? `openai/${DEFAULT_AI_MODEL}`
-            : providerMode === 'anthropic'
-              ? 'claude-3-haiku-20240307'
-              : DEFAULT_AI_MODEL);
+      const { provider: providerMode, model } = resolveAdminAiTestModel(selectedConfig?.ai);
 
       const payload = {
         action: 'ai',
         provider: providerMode,
-        model,
+        ...(model ? { model } : {}),
         messages: [{ role: 'user', content: 'ping' }],
         max_tokens: 8,
         temperature: 0,
@@ -2079,131 +1936,6 @@ const AdminPageRuntime = ({
     }
   };
 
-  const currentBlockSummary =
-    Number.isFinite(Number(metadataLatestBlock)) && Number(metadataLatestBlock) > 0
-      ? `Current block on ${relevantSessionChainLabel || 'selected chain'}: ${Number(metadataLatestBlock).toLocaleString()}`
-      : metadataLatestBlockStatus;
-
-  const handleUseCurrentBlockForMetadata = () => {
-    const nextStart = Number(metadataLatestBlock || 0);
-    if (!Number.isFinite(nextStart) || nextStart <= 0) return;
-    setMetadataDraftTouched(true);
-    setMetadataBlockLimitsDraft((prev) => ({
-      ...(prev || {}),
-      start: String(nextStart),
-    }));
-  };
-
-  const handleSaveSessionMetadata = async () => {
-    setMetadataUpdateBusy(true);
-    setMetadataUpdateStatus(canAdminRegistry ? 'Uploading updated metadata…' : 'Updating worker metadata…');
-    try {
-      if (!groupMetadata) throw new Error('Select a session first.');
-      if (!canAdminWorker && !canAdminRegistry) throw new Error('Connect the admin wallet to update session metadata.');
-      if (canAdminRegistry && !relevantRegistryChainId) throw new Error('Registry chain id is missing.');
-      if (canAdminRegistry && !metadataContractsReadyForSave) {
-        throw new Error(
-          'Session metadata contracts are currently synthesized defaults. Verify or edit the contract addresses before saving.',
-        );
-      }
-
-      const metadata = buildEditableSessionMetadataPayload({
-        sessionConfig: groupMetadata,
-        blockLimits: metadataBlockLimitsDraft,
-        fallbackStart: metadataLatestBlock,
-        autoFeatureSBTsBySessionSlug: metadataAutoFeatureDraft,
-        hasAutoFeatureOverride: metadataAutoFeatureTouched,
-        advancedDraft: metadataConfigDraft,
-        requireBlockLimits: canAdminRegistry,
-        includeChainFields: sessionCapabilities.usesChainMetadata,
-      });
-      const nextConfig = { ...selectedConfig, ...metadata };
-      if (!canAdminRegistry) {
-        const configPayload = buildWorkerCanonicalMetadataConfigPatch({
-          metadata,
-          slug: selectedSlug,
-          adminAddress: workerAdminAddress,
-          includeChainFields: sessionCapabilities.usesChainMetadata,
-        });
-        await ensureWorkerSessionConfig({
-          sessionConfigOverride: nextConfig,
-          configPayloadOverride: configPayload,
-          action: 'set-config',
-        });
-        // Keep the route-local canonical source aligned until the next verified
-        // worker bootstrap; otherwise a cache refresh can restore stale metadata.
-        initialWorkerCanonicalConfigRef.current = nextConfig;
-        setSessions((entries) =>
-          entries.map(([slug, config]) =>
-            slug === selectedSlug ? ([slug, nextConfig] as AdminSessionRegistryEntry) : [slug, config],
-          ),
-        );
-        setMetadataDraftTouched(false);
-        setMetadataUpdateStatus('Worker session metadata updated.');
-        return;
-      }
-      const uploadResult = await adminSessionRegistryPorts.writes.uploadSessionMetadata(metadata, {
-        sessionConfig: selectedConfig,
-        sessionSlug: selectedSlug,
-        context: testContext,
-        workerUrl: baseWorkerUrl,
-        ...(toStr(secrets.arweaveJwk).trim() ? { arweaveJwk: toStr(secrets.arweaveJwk).trim() } : {}),
-      });
-      setMetadataUpdateStatus('Updating SessionRegistry metadata URI…');
-      const registryResult = await adminSessionRegistryPorts.writes.updateSessionMetadataOnChain({
-        providerLike: provider,
-        chainId: relevantRegistryChainId,
-        slug: selectedSlug,
-        metadataURI: uploadResult.metadataUri,
-        encryptedMetadataURI: toStr(selectedConfig?.__registry?.encryptedMetadataURI).trim(),
-      });
-      const nextRegistryConfig = {
-        ...selectedConfig,
-        ...metadata,
-        __registry: {
-          ...(selectedConfig?.__registry || {}),
-          metadataURI: uploadResult.metadataUri,
-          encryptedMetadataURI: toStr(selectedConfig?.__registry?.encryptedMetadataURI).trim(),
-        },
-      };
-      adminSessionRegistryPorts.reads.upsertSessionRegistryCache({ config: nextRegistryConfig });
-      setSessions(adminSessionRegistryPorts.reads.getAllSessionEntries() || []);
-      setMetadataDraftTouched(false);
-      const txUrl = buildTxExplorerUrl(registryResult?.txHash, relevantRegistryChainId);
-      const baseSuccessStatus = txUrl ? `Session metadata updated. ${txUrl}` : 'Session metadata updated.';
-      let workerSyncSuffix = '';
-      try {
-        const metadataSyncWorkerUrl = normalizeWorkerUrl(
-          getUsableSessionWorkerUrl({
-            slug: selectedSlug,
-            sessionConfig: nextRegistryConfig,
-            allowSharedFallback: true,
-          }) ||
-            baseWorkerUrl ||
-            selectedConfigWorkerUrl,
-        );
-        if (canAdminWorker && typeof fetch === 'function' && metadataSyncWorkerUrl) {
-          setMetadataUpdateStatus('Syncing worker config…');
-          await ensureWorkerSessionConfig({
-            sessionConfigOverride: nextRegistryConfig,
-            action: 'set-config',
-            workerUrl: metadataSyncWorkerUrl,
-          });
-          workerSyncSuffix = ' Worker config synced.';
-        } else {
-          workerSyncSuffix = ' Worker config sync skipped (worker admin or worker URL unavailable).';
-        }
-      } catch (syncError: any) {
-        workerSyncSuffix = ` Worker config sync failed: ${getErrorMessage(syncError, 'unknown error')}`;
-      }
-      setMetadataUpdateStatus(`${baseSuccessStatus}${workerSyncSuffix}`);
-    } catch (err: any) {
-      setMetadataUpdateStatus(getErrorMessage(err, 'Failed to update session metadata.'));
-    } finally {
-      setMetadataUpdateBusy(false);
-    }
-  };
-
   const resolvedSessionHeader = normalizeSessionMediaUrl(
     groupMetadata?.sessionHeaderImg || groupMetadata?.sessionHeader || '',
     { contextLabel: 'session_header_image' },
@@ -2235,9 +1967,6 @@ const AdminPageRuntime = ({
   const selectedSessionName =
     toStr(groupMetadata?.sessionName || selectedConfig?.sessionName).trim() ||
     (selectedConfig ? selectedSlugLabel : 'No session selected');
-  const relevantRegistryChainLabel = relevantRegistryChainId
-    ? `${getChainName(relevantRegistryChainId) || 'Chain'} (${relevantRegistryChainId})`
-    : '';
   const sessionUrl = getAdminSessionDisplayUrl({
     selectedSlug: selectedSlugLabel,
     selectedConfig,
@@ -2261,29 +1990,18 @@ const AdminPageRuntime = ({
     : [];
   const metadataContractsNeedVerification =
     metadataLoadState === 'unavailable' && metadataDefaultedContractKeys.length > 0;
-  const metadataDefaultedEditableContractKeys = metadataDefaultedContractKeys.filter((key: any) =>
-    ADMIN_EDITABLE_CONTRACT_KEY_SET.has(key),
-  );
-  const metadataContractsReadyForSave =
-    !metadataContractsNeedVerification ||
-    metadataDefaultedEditableContractKeys.length === 0 ||
-    metadataContractsVerified ||
-    metadataContractDraftTouched;
   const metadataLoadStateLabel = (() => {
     if (metadataLoadState === 'loaded') return 'Loaded from session metadata';
     if (metadataLoadState === 'unavailable') return 'Metadata unavailable; contracts below may be chain defaults';
     return 'No registry metadata URI configured';
   })();
-  const metadataContracts = asAdminSessionConfig(groupMetadata?.contracts);
-  const visibleMetadataContracts = Object.entries(metadataContracts).filter(
-    (entry): entry is [string, Record<string, unknown>] => {
-      const value = entry[1];
-      return !!value && typeof value === 'object' && !Array.isArray(value);
-    },
-  );
-  const readonlyMetadataContracts = visibleMetadataContracts.filter(
-    ([key]) => !ADMIN_EDITABLE_CONTRACT_KEY_SET.has(key),
-  );
+  // Sessions are edited on their settings page: Worker-hosted ones on the same Session Worker,
+  // on-chain ones through the registry, so their link names no Worker.
+  const editSettingsUrl = sessionCapabilities.isWorkerCanonical
+    ? buildSessionSettingsUrl(selectedSlug, exactSelectedConfigWorkerUrl)
+    : sessionCapabilities.usesChainMetadata
+      ? buildSessionSettingsUrl(selectedSlug)
+      : '';
   const sessionCardTone = selectedConfig ? 'ready' : availableSessions.length ? 'idle' : 'warning';
   const showHeroMedia = !!resolvedSessionHeader && heroHeaderImageReady;
   const metadataOpen = openSection === 'metadata';
@@ -2425,6 +2143,14 @@ const AdminPageRuntime = ({
                   ) : null}
                 </div>
               </div>
+              {sessionUrl ? (
+                <SessionJoinPanel
+                  sessionUrl={sessionUrl}
+                  workerUrl={workerUrl}
+                  sessionConfig={selectedConfig}
+                  isAdmin
+                />
+              ) : null}
               <div className={styles.heroSessionDetails}>
                 <div className={`${styles.heroSessionDetailRow} ${styles.heroSessionDetailRowAlignStart}`}>
                   <div className={styles.heroCardHeaderWithTooltip}>
@@ -2609,10 +2335,7 @@ const AdminPageRuntime = ({
             <div className={styles.panelTitleGroup}>
               <div className={styles.panelTitleRow}>
                 <div className={styles.panelTitle}>Session metadata</div>
-                {renderInfoTooltip(
-                  'admin-metadata-tip',
-                  'Review the canonical config and make careful live edits when needed.',
-                )}
+                {renderInfoTooltip('admin-metadata-tip', 'Review the canonical session config.')}
               </div>
             </div>
             <Button
@@ -2669,40 +2392,13 @@ const AdminPageRuntime = ({
                   }}
                 />
               )}
-              {(canAdminWorker || canAdminRegistry) && (
-                <AdminPageMetadataEditor
-                  metadataConfigDraft={metadataConfigDraft}
-                  updateMetadataConfigDraft={updateMetadataConfigDraft}
-                  metadataAutoFeatureDraft={metadataAutoFeatureDraft}
-                  setMetadataDraftTouched={setMetadataDraftTouched}
-                  setMetadataAutoFeatureTouched={setMetadataAutoFeatureTouched}
-                  setMetadataAutoFeatureDraft={setMetadataAutoFeatureDraft}
-                  network={network}
-                  relevantSessionChainId={relevantSessionChainId}
-                  relevantSessionChainLabel={relevantSessionChainLabel}
-                  relevantRegistryChainLabel={relevantRegistryChainLabel}
-                  selectedSlug={selectedSlug}
-                  ensureLightSbtUniverse={ensureLightSbtUniverse}
-                  metadataBlockLimitsDraft={metadataBlockLimitsDraft}
-                  setMetadataBlockLimitsDraft={setMetadataBlockLimitsDraft}
-                  currentBlockSummary={currentBlockSummary}
-                  handleUseCurrentBlockForMetadata={handleUseCurrentBlockForMetadata}
-                  metadataUpdateBusy={metadataUpdateBusy}
-                  metadataLatestBlock={metadataLatestBlock}
-                  metadataContractsNeedVerification={metadataContractsNeedVerification}
-                  metadataDefaultedEditableContractKeys={metadataDefaultedEditableContractKeys}
-                  metadataContractsVerified={metadataContractsVerified}
-                  setMetadataContractsVerified={setMetadataContractsVerified}
-                  metadataContractsReadyForSave={metadataContractsReadyForSave}
-                  readonlyMetadataContracts={readonlyMetadataContracts}
-                  visibleMetadataContracts={visibleMetadataContracts}
-                  handleSaveSessionMetadata={handleSaveSessionMetadata}
-                  metadataUpdateStatus={metadataUpdateStatus}
-                  showChainFields={sessionCapabilities.usesChainMetadata}
-                  resultsAnalysisBackgroundAutoSupported={resultsAnalysisBackgroundAutoSupported}
-                  resultsAnalysisBackgroundAutoUnsupportedReason={resultsAnalysisBackgroundAutoUnsupportedReason}
-                />
-              )}
+              {editSettingsUrl ? (
+                <div>
+                  <a href={editSettingsUrl} className={styles.metadataLink} data-testid="ce-admin-edit-settings-link">
+                    Edit settings
+                  </a>
+                </div>
+              ) : null}
               <div className={styles.metadataJsonSection}>
                 <div className={styles.resultBoxLabel}>Raw metadata</div>
                 <JsonPanel
@@ -2739,9 +2435,8 @@ const AdminPageRuntime = ({
               </div>
               {!walletReady && <div className={styles.statusNote}>Connect a wallet to decrypt these fields.</div>}
               <div className={styles.grid}>
-                {Object.entries(encryptedFields).map(([key, envelope]: any) => {
+                {Object.entries(encryptedFields).map(([key]: any) => {
                   const resolved = decryptedFields[key] || {};
-                  const status = resolved.status || 'locked';
                   const decrypted = toStr(resolved.value);
                   const decryptedPreview = decrypted ? formatPreviewValue(decrypted) : null;
                   return (

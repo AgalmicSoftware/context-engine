@@ -197,8 +197,10 @@ const maybeCanonicalizeSessionIdRoute = (host: SessionPathResolverHost, sessionI
   const currentParts = String(normalizedCurrentPath || '')
     .split('/')
     .filter(Boolean);
-  const isDocsSubroute = currentParts.length >= 3 && currentParts[0] === 'session' && currentParts[2] === 'docs';
-  if (isDocsSubroute) return;
+  // Docs and settings keep their own paths; only the session page itself is canonicalized here.
+  const isOwnSubroute =
+    currentParts.length >= 3 && currentParts[0] === 'session' && ['docs', 'settings'].includes(currentParts[2]);
+  if (isOwnSubroute) return;
 
   const resolvedSlug = normalizeSessionSlug(resolvedCfg.slug || '');
   const canonicalToken = resolvedSlug || DEFAULT_SESSION_SLUG_ALIAS;

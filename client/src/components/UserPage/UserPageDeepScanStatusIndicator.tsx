@@ -48,7 +48,6 @@ const renderDeepScanTooltip = (
     <CETooltip
       placement="right"
       target={targetId}
-      className={styles.deepScanTooltip}
       innerClassName={styles.deepScanTooltipInner}
       trigger="hover focus click"
       autohide={false}

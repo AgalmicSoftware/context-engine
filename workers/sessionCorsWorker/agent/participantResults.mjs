@@ -1,36 +1,35 @@
 import { safeString, lower } from './runtimePrimitives.mjs';
 import { safeAnswerString, questionId, shortQuestionId } from './runtimeCore.mjs';
+import { normalizeAnswerValue, ratingScaleFor } from '../../../shared/questions/answerValue.mjs';
 import { questionPromptById } from './submittedResults.mjs';
 
 export function participantAlias(id = '', index = 0) {
   return `P${index + 1}`;
 }
 
-export function answerScore(label = '', value = '') {
-  const text = lower(value || label);
-  if (!text) return 0;
-  if (/\b(agree|yes|true|support|approve)\b/.test(text)) return 1;
-  if (/\b(disagree|no|false|oppose|reject)\b/.test(text)) return -1;
-  if (/\b(unsure|unknown|neutral|mixed|abstain)\b/.test(text)) return 0;
-  const numeric = Number(text.match(/-?\d+(?:\.\d+)?/)?.[0]);
-  if (!Number.isFinite(numeric)) return 0;
-  if (numeric >= 1 && numeric <= 5) return Math.max(-1, Math.min(1, (numeric - 3) / 2));
-  if (numeric >= 0 && numeric <= 10) return Math.max(-1, Math.min(1, (numeric - 5) / 5));
-  return Math.max(-1, Math.min(1, numeric));
+export function answerScore(label = '', value = '', question = {}) {
+  const type = lower(question.questionType || question.type || question.controlType);
+  if (type !== 'binary' && type !== 'rating') return null;
+  const answer = normalizeAnswerValue({ ...question, type }, value === '' || value == null ? label : value);
+  if (!answer.ok) return null;
+  if (type === 'binary') return { Agree: 1, Disagree: -1, Unsure: 0 }[answer.value];
+  const { min, max } = ratingScaleFor(question);
+  return 2 * (answer.value - min) / (max - min) - 1;
 }
 
-export function averageAnswerScore(records = []) {
+export function averageAnswerScore(records = [], questionLookup = new Map()) {
   const scored = records
-    .map((record) => answerScore(record.label, record.value))
+    .map((record) => answerScore(record.label, record.value, questionLookup.get(record.questionId)))
     .filter((score) => Number.isFinite(score));
-  if (!scored.length) return 0;
+  if (!scored.length) return null;
   return scored.reduce((sum, score) => sum + score, 0) / scored.length;
 }
 
-export function countResultVotes(records = []) {
+export function countResultVotes(records = [], questionLookup = new Map()) {
   const counts = { agree: 0, disagree: 0, unsure: 0, responded: 0 };
   for (const record of records) {
-    const score = answerScore(record.label, record.value);
+    const score = answerScore(record.label, record.value, questionLookup.get(record.questionId));
+    if (!Number.isFinite(score)) continue;
     if (score > 0.25) counts.agree += 1;
     else if (score < -0.25) counts.disagree += 1;
     else counts.unsure += 1;
@@ -101,15 +100,17 @@ export function groupThemeForScore(score = 0) {
   return 'mixed or unsure';
 }
 
-export function requestedScoreBuckets({ records = [], participantIds = [], clusterCount = null } = {}) {
+const bucketAverageScore = (bucket) => bucket.scoredCount ? bucket.scoreTotal / bucket.scoredCount : 0;
+
+export function requestedScoreBuckets({ records = [], participantIds = [], questionLookup = new Map(), clusterCount = null } = {}) {
   const count = Number(clusterCount);
   if (!Number.isFinite(count) || count <= 0) return null;
   const scored = participantIds
     .map((id) => ({
       id,
-      score: averageAnswerScore(records.filter((record) => record.telegramUserId === id)),
+      score: averageAnswerScore(records.filter((record) => record.telegramUserId === id), questionLookup),
     }))
-    .sort((left, right) => right.score - left.score || String(left.id).localeCompare(String(right.id)));
+    .sort((left, right) => (right.score ?? 0) - (left.score ?? 0) || String(left.id).localeCompare(String(right.id)));
   const resolvedCount = Math.max(1, Math.min(6, Math.floor(count), scored.length));
   if (!resolvedCount || !scored.length) return [];
   const buckets = Array.from({ length: resolvedCount }, (_, index) => ({
@@ -117,16 +118,19 @@ export function requestedScoreBuckets({ records = [], participantIds = [], clust
     theme: '',
     participantIds: [],
     scoreTotal: 0,
+    scoredCount: 0,
   }));
   scored.forEach((item, index) => {
     const bucketIndex = Math.min(resolvedCount - 1, Math.floor(index * resolvedCount / scored.length));
     const bucket = buckets[bucketIndex];
     bucket.participantIds.push(item.id);
-    bucket.scoreTotal += item.score;
+    if (Number.isFinite(item.score)) {
+      bucket.scoreTotal += item.score;
+      bucket.scoredCount += 1;
+    }
   });
   buckets.forEach((bucket) => {
-    const average = bucket.participantIds.length ? bucket.scoreTotal / bucket.participantIds.length : 0;
-    bucket.theme = groupThemeForScore(average);
+    bucket.theme = groupThemeForScore(bucketAverageScore(bucket));
   });
   return buckets;
 }
@@ -139,14 +143,15 @@ export function buildParticipantResultGroups({
   questionIndex = new Map(),
   promptMap = new Map(),
   questionTypeLookup = new Map(),
+  questionLookup = new Map(),
   clusterCount = null,
 } = {}) {
-  const requestedBuckets = requestedScoreBuckets({ records, participantIds, clusterCount });
+  const requestedBuckets = requestedScoreBuckets({ records, participantIds, questionLookup, clusterCount });
   const buckets = Array.isArray(requestedBuckets) ? requestedBuckets : (() => {
     const out = new Map();
     for (const id of participantIds) {
       const participantRecords = records.filter((record) => record.telegramUserId === id);
-      const score = averageAnswerScore(participantRecords);
+      const score = averageAnswerScore(participantRecords, questionLookup);
       const bucket = groupBucketForScore(score);
       if (!out.has(bucket.bucketId)) {
         out.set(bucket.bucketId, {
@@ -154,11 +159,15 @@ export function buildParticipantResultGroups({
           theme: bucket.theme,
           participantIds: [],
           scoreTotal: 0,
+          scoredCount: 0,
         });
       }
       const item = out.get(bucket.bucketId);
       item.participantIds.push(id);
-      item.scoreTotal += score;
+      if (Number.isFinite(score)) {
+        item.scoreTotal += score;
+        item.scoredCount += 1;
+      }
     }
     return Array.from(out.values());
   })();
@@ -166,8 +175,7 @@ export function buildParticipantResultGroups({
   return buckets
     .filter((bucket) => bucket.participantIds.length)
     .sort((left, right) => (
-      (right.scoreTotal / right.participantIds.length) -
-      (left.scoreTotal / left.participantIds.length) ||
+      bucketAverageScore(right) - bucketAverageScore(left) ||
       right.participantIds.length - left.participantIds.length ||
       left.theme.localeCompare(right.theme)
     ))
@@ -184,14 +192,14 @@ export function buildParticipantResultGroups({
       const topStatements = questionIds.map((id, questionNumber) => {
         const clusterQuestionRecords = clusterRecords.filter((record) => record.questionId === id);
         const overallQuestionRecords = records.filter((record) => record.questionId === id);
-        const clusterAverage = averageAnswerScore(clusterQuestionRecords);
-        const overallAverage = averageAnswerScore(overallQuestionRecords);
+        const clusterAverage = averageAnswerScore(clusterQuestionRecords, questionLookup);
+        const overallAverage = averageAnswerScore(overallQuestionRecords, questionLookup);
         return {
           label: questionIndex.get(id) || `Q${questionNumber + 1}`,
           questionIndex: questionNumber,
           prompt: promptMap.get(id) || shortQuestionId(id),
-          cluster: countResultVotes(clusterQuestionRecords),
-          overall: countResultVotes(overallQuestionRecords),
+          cluster: countResultVotes(clusterQuestionRecords, questionLookup),
+          overall: countResultVotes(overallQuestionRecords, questionLookup),
           differenceScore: Number(Math.abs(clusterAverage - overallAverage).toFixed(3)),
         };
       })
@@ -208,7 +216,7 @@ export function buildParticipantResultGroups({
         theme: bucket.theme,
         size: bucket.participantIds.length,
         aliases: bucket.participantIds.map((id) => aliases.get(id)).filter(Boolean),
-        averageScore: Number((bucket.scoreTotal / bucket.participantIds.length).toFixed(3)),
+        averageScore: Number(bucketAverageScore(bucket).toFixed(3)),
         topStatements,
         qualitativeResponses,
       };
@@ -217,9 +225,10 @@ export function buildParticipantResultGroups({
 
 export function buildParticipantGraph(records = [], questions = [], options = {}) {
   const questionTypeLookup = questionTypeById(questions);
+  const questionLookup = new Map(questions.map((question) => [questionId(question), question]));
   const graphRecords = (Array.isArray(records) ? records : []).map((record) => ({
     ...record,
-    questionType: safeString(record.questionType || questionTypeLookup.get(record.questionId)),
+    questionType: safeString(questionTypeLookup.get(record.questionId) || record.questionType),
   }));
   const questionIds = Array.from(new Set(graphRecords.map((record) => record.questionId).filter(Boolean)));
   const questionIndex = new Map(questionIds.map((id, index) => [id, `Q${index + 1}`]));
@@ -250,6 +259,7 @@ export function buildParticipantGraph(records = [], questions = [], options = {}
     questionIndex,
     promptMap,
     questionTypeLookup,
+    questionLookup,
     clusterCount: options.clusterCount,
   });
   return {

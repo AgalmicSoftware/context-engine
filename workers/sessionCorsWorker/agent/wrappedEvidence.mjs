@@ -214,6 +214,17 @@ export function agentOnlyResponseCoverage(space = {}, state = {}, { runId = '' }
   };
 }
 
+export function agentOnlyRunResponseCoverage(scope = {}) {
+  const ids = Array.isArray(scope.runStatementIds) ? scope.runStatementIds : [];
+  const coverage = String(scope.coverage || '').slice(0, ids.length);
+  const agentPredictionCount = [...coverage].filter(value => value === 'a').length;
+  const privacySkipCount = [...coverage].filter(value => value === 's').length;
+  const agentResponseCount = agentPredictionCount + privacySkipCount;
+  return { statementCount: ids.length, agentPredictionCount, privacySkipCount, agentResponseCount,
+    allStatementsPredicted: ids.length > 0 && agentPredictionCount === ids.length,
+    allStatementsCovered: ids.length > 0 && agentResponseCount === ids.length };
+}
+
 export function wrappedAnswerFormatForSchema(schema = {}) {
   const kind = safeString(schema?.kind);
   if (kind === 'text') return 'freeform text';

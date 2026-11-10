@@ -19,16 +19,43 @@
   font-weight: 700;
   line-height: 1.25;
 
-  :global(.close) {
-    color: var(--ce-text-inverse);
-    opacity: 0.86;
-    text-shadow: none;
+  // Global heading colour is unreadable on dark title bars; the title takes its bar's text colour.
+  :global(.modal-title) {
+    color: inherit;
+    font-size: 1rem;
+    font-weight: inherit;
+    line-height: inherit;
+  }
+}
 
-    &:hover,
-    &:focus {
-      color: var(--ce-text-inverse);
-      opacity: 1;
-    }
+.content .header {
+  padding: 16px;
+}
+
+// A compact × centred in the title bar, without the raised frame themes give other buttons.
+.content .header :global(.btn-close) {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 32px;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  margin: 0 0 0 auto;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  color: inherit;
+  opacity: 1;
+
+  &:hover {
+    background: color-mix(in srgb, currentColor 12%, transparent);
+  }
+
+  // The bar's own text colour: the theme ring was black on Classic 95's navy bar (1.3:1).
+  &:focus-visible {
+    outline-color: currentColor;
   }
 }
 
@@ -50,15 +77,17 @@
   font-weight: 700;
 }
 
+// Control colours keep the label readable on every theme's dialog surface, hovered or not.
 .cancelButton {
-  color: var(--ce-document-surface);
+  color: var(--ce-control-text);
+  background: var(--ce-control-face);
   border-color: color-mix(in srgb, var(--ce-control-text) 62%, transparent);
 
   &:hover,
   &:focus {
-    color: var(--ce-surface-sunken);
-    background: var(--ce-document-surface);
-    border-color: var(--ce-document-surface);
+    color: var(--ce-control-text);
+    background: color-mix(in srgb, var(--ce-control-text) 12%, var(--ce-control-face));
+    border-color: var(--ce-control-text);
   }
 }
 
@@ -66,26 +95,32 @@
   color: var(--ce-action-accent-text);
   border-color: var(--ce-action-accent);
   background: var(--ce-action-accent);
-
-  &:hover,
-  &:focus {
-    color: var(--ce-action-accent-text);
-    border-color: var(--ce-status-success-text);
-    background: var(--ce-status-success-text);
-  }
 }
 
 .dangerButton {
-  color: var(--ce-text-inverse);
+  color: var(--ce-status-error-contrast);
   border-color: var(--ce-status-error);
   background: var(--ce-status-error);
+}
 
-  &:hover,
-  &:focus {
-    color: var(--ce-text-inverse);
-    border-color: var(--ce-status-error);
-    background: var(--ce-status-error);
-  }
+// Global button rules repaint these on hover, focus and press with !important: `.btn:hover` clears the
+// fill (white on white for Minimal's Stop), `.btn-primary:focus` and `.btn-danger:focus` paint gradients,
+// and `.btn-primary:active` whitens the label. From the footer these outrank them.
+// The cancel button's fill is cleared too, which its label survives, but pressing gives it a dark label.
+.footer .cancelButton:is(:hover, :focus, :active):not(:disabled) {
+  color: var(--ce-control-text) !important;
+}
+
+.footer .confirmButton:is(:hover, :focus, :active):not(:disabled) {
+  border-color: var(--ce-action-accent-hover) !important;
+  background: var(--ce-action-accent-hover) !important;
+  color: var(--ce-action-accent-text) !important;
+}
+
+.footer .dangerButton:is(:hover, :focus, :active):not(:disabled) {
+  border-color: var(--ce-status-error) !important;
+  background: var(--ce-status-error) !important;
+  color: var(--ce-status-error-contrast) !important;
 }
 
 @container ce-theme style(--ce-layout-profile: minimal-app) {
@@ -95,25 +130,6 @@
     background: var(--ce-overlay-surface);
     color: var(--ce-overlay-text);
     border-color: var(--ce-document-border);
-  }
-
-  .content .header {
-    padding: 16px;
-  }
-
-  .content .header :global(.close),
-  .content .header :global(.btn-close) {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    flex: 0 0 32px;
-    width: 32px;
-    height: 32px;
-    padding: 0;
-    margin: 0 0 0 auto;
-    background: transparent;
-    color: var(--ce-control-text);
-    opacity: 1;
   }
 
   .footer {

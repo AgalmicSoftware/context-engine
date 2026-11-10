@@ -1,3 +1,4 @@
+import { mergeWorkerCanonicalQuestionMetadata } from '../../domains/surveys/workerCanonicalMetadataHydrationPort';
 import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../session/sessionModeProfile.js';
 import { resolveWorkerCanonicalCacheIdentity } from './workerCanonicalCacheIdentity';
 import {
@@ -543,5 +544,32 @@ describe('capped Worker response listings', () => {
     session.listPage.mockClear();
     await session.refresh();
     expect(session.listPage).toHaveBeenNthCalledWith(1, expect.objectContaining({ cursor: null }));
+  });
+});
+
+describe('hidden Worker questions', () => {
+  it.each(['hide-first', 'answer-first'])('keeps a question absent after %s', (order) => {
+    const identity = resolveWorkerCanonicalCacheIdentity({ sessionConfig: workerConfig, sessionSlug: 'demo-sh' });
+    const hide = (cache: unknown) =>
+      mergeWorkerCanonicalQuestionMetadata(cache, [{ hidden: true, id: 'q1' }], identity);
+    const answer = (cache: unknown) =>
+      mergeWorkerQuestionResponses(
+        cache,
+        [
+          {
+            questionId: 'q1',
+            responder: 'participant',
+            storageRefId: 'answer',
+            timestamp: 1,
+            response: { prompt: 'A hidden question', answer: { value: 'Agree' } },
+          },
+        ],
+        'demo-sh',
+        identity,
+      );
+    const cache = (order === 'hide-first' ? answer(hide(null)) : hide(answer(null))) as any;
+    expect(cache.worker.questions.q1).toBeUndefined();
+    expect(cache.worker.workerQuestionMetadataTombstones.q1).toBe(true);
+    expect(cache.worker.questionResponses.q1.participant).toBeDefined();
   });
 });

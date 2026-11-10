@@ -1,15 +1,9 @@
-const toModelLeaf = (modelRaw = '') => String(modelRaw || '').trim().toLowerCase().split('/').pop();
+import { isOpenAiReasoningModel } from '../../shared/aiModelFamily.mjs';
 
-export const usesOpenAiResponsesApi = ({ provider = '', model = '', endpoint = '' } = {}) => {
-  const normalizedProvider = String(provider || '').trim().toLowerCase();
-  const normalizedEndpoint = String(endpoint || '').trim().toLowerCase();
-  if (normalizedProvider !== 'openai') return false;
-  if (normalizedEndpoint.includes('/responses') || normalizedEndpoint === 'responses') return true;
-  return /^(gpt-5|gpt-6-astra(?:$|-))/.test(toModelLeaf(model));
-};
+export { usesOpenAiResponsesApi } from '../../shared/aiModelFamily.mjs';
 
 export const isChatReasoningModel = ({ model = '', thinking = false } = {}) => (
-  thinking === true || /^o[13]/.test(toModelLeaf(model))
+  thinking === true || isOpenAiReasoningModel(model)
 );
 
 export const applyChatCompletionBudget = ({

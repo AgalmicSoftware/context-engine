@@ -46,7 +46,7 @@ const SurveyResultsQuestionTableRow = ({
         />
         <a
           href={buildQuestionRoutePath(entry.questionId, {
-            sessionSlug: entry.sessionSlug || fallbackSessionSlug,
+            sessionSlug: entry.sessionSlug ?? fallbackSessionSlug,
           })}
           target="_blank"
           rel="noopener noreferrer"

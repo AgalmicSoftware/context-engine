@@ -41,11 +41,6 @@ export type RecognitionGroup = {
   image?: string;
 };
 
-export type RecognitionIndividual = {
-  name: string;
-  url?: string;
-};
-
 type RoadmapSection = {
   category: string;
   items: {
@@ -130,6 +125,7 @@ type PracticeEntry = {
   id: string;
   title: string;
   url: string;
+  links?: RecognitionLink[];
   description: string;
   icon: IconDefinition;
   image?: string;
@@ -143,6 +139,12 @@ export const PRACTICE_ENTRIES: PracticeEntry[] = [
     id: 'cosmos-fire',
     title: 'Cosmos × FIRE grants',
     url: 'https://blog.cosmos-institute.org/p/announcing-80-new-cosmos-grantees',
+    links: [
+      {
+        url: 'https://www.fire.org/news/fire-and-cosmos-institute-launch-1-million-grant-program-ai-advances-truth-seeking',
+        text: 'Truth-Seeking AI grant program',
+      },
+    ],
     description:
       'Context Engine was selected for a Cosmos × FIRE AI for Truth-Seeking grant in September 2026, for group deliberation research testing how faithfully AI agents represent the people they act for.',
     icon: faAward,
@@ -162,7 +164,7 @@ export const PRACTICE_ENTRIES: PracticeEntry[] = [
   {
     id: 'agent-village',
     title: 'Agent Village 2026',
-    url: '/posts/agent-village-wrapped',
+    url: '/posts/agent-village-wrapped-2026',
     description:
       'Context Engine powered Agent Village Wrapped at Edge Esmeralda 2026, comparing personal agents’ predicted answers with their users’ actual responses. The project write-up reports what the experiment revealed about agent representation.',
     icon: faRobot,
@@ -219,8 +221,6 @@ export const PracticeVisual = ({ entry }: { entry: PracticeEntry }) => {
   );
 };
 
-export const RECOGNIZED_INDIVIDUALS: RecognitionIndividual[] = [];
-
 export const ROADMAP_SECTIONS: RoadmapSection[] = [
   {
     category: 'Current Foundations',
@@ -235,11 +235,11 @@ export const ROADMAP_SECTIONS: RoadmapSection[] = [
       },
       {
         status: 'complete',
-        text: 'Use SBT groups for gated participation, encrypted fields, and sponsored RPC, AI, gas, Arweave, and Lit resources.',
+        text: 'Use Worker Groups or Soulbound Token groups for gated participation and encrypted fields, and Soulbound Token groups for sponsored RPC, AI, gas, Arweave, and Lit resources.',
       },
       {
         status: 'complete',
-        text: 'Persist responses and documents on Arweave with report views, exports, and address-based comparison tools.',
+        text: 'Persist responses and documents in Cloudflare or on Arweave, with report views, exports, and address-based comparison tools.',
       },
       {
         status: 'complete',
@@ -394,15 +394,6 @@ export const USE_CASES = [
       'Codify group preferences over time, train representative AI models, and keep community data attributable, licensable, and revocable.',
   },
 ];
-
-export const getConfiguredRecognitionIndividuals = (individuals: unknown[] = []): RecognitionIndividual[] =>
-  individuals.filter(
-    (person): person is RecognitionIndividual =>
-      !!person &&
-      typeof person === 'object' &&
-      typeof (person as { name?: unknown }).name === 'string' &&
-      (person as { name: string }).name.trim().length > 0,
-  );
 
 export const getAboutDemoSessionPath = (selection = readStoredGlobalSessionSelection()) => {
   const scopeMode = String(selection?.selectedSessionScope || '')

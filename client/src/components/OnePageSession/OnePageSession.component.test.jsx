@@ -7,6 +7,7 @@ import { ethers } from 'ethers';
 import { TestMemoryRouter as MemoryRouter } from 'testUtils/TestMemoryRouter';
 import OnePageSession from './OnePageSession';
 import styles from './OnePageSession.module.scss';
+import { CONTEXT_HTML_PAGE_CSS } from './sessionContextHtmlCss';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import contractScripts from '../../utilities/web3/chainGateway.js';
 import * as contractScriptsModule from '../../utilities/web3/chainGateway.js';
@@ -222,6 +223,36 @@ describe('OnePageSession view gating', () => {
   const getAutoMintStorageKey = (account, sbtAddress, chainId = 84532) =>
     `autoMint:${String(account || '').toLowerCase()}:${chainId}:${String(sbtAddress || '').toLowerCase()}`;
 
+  it.each(['registry', 'worker_canonical'])(
+    'shows the normal %s session without an interview sharing panel',
+    async (authorityMode) => {
+      const priorUrl = window.location.href;
+      window.history.replaceState({}, '', '/session/edge');
+      try {
+        const props = buildProps();
+        const profile =
+          authorityMode === 'worker_canonical'
+            ? cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE)
+            : props.sessionConfig.sessionModeProfile;
+        render(
+          <OnePageSession
+            {...props}
+            sessionConfig={{ ...props.sessionConfig, sessionModeProfile: profile, interviewModeEnabled: true }}
+          />,
+        );
+
+        expect(await screen.findByTestId('survey-page-pile')).toBeInTheDocument();
+        expect(screen.queryByTestId('ce-session-join')).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: /Interview & share|^Join$/ })).not.toBeInTheDocument();
+        fireEvent.click(screen.getByTestId('pile-view-all'));
+        expect(await screen.findByTestId('survey-page-full')).toBeInTheDocument();
+        expect(screen.queryByTestId('ce-session-join')).not.toBeInTheDocument();
+      } finally {
+        window.history.replaceState({}, '', priorUrl);
+      }
+    },
+  );
+
   it('renders only one SurveyPage instance when switching from pile to full view', async () => {
     render(<OnePageSession {...buildProps()} />);
 
@@ -258,19 +289,6 @@ describe('OnePageSession view gating', () => {
     expect(screen.getByTestId('survey-page-pile')).toBeInTheDocument();
   });
 
-  it('preserves the agent sign-in shell for profile-less legacy sessions', async () => {
-    const sessionConfig = { ...buildProps().sessionConfig, telegramOnly: true };
-    delete sessionConfig.sessionModeProfile;
-    render(<OnePageSession {...buildProps()} sessionConfig={sessionConfig} />);
-
-    expect(await screen.findByTestId(E2E_TESTIDS.SESSION_AGENT_SIGN_IN_NOTICE)).toHaveTextContent(
-      /Agent-enabled session/i,
-    );
-    expect(screen.getByTestId('ce-session-agent-login-open')).toBeInTheDocument();
-    expect(screen.queryByTestId('survey-page-pile')).not.toBeInTheDocument();
-    expect(mockSurveyPage).not.toHaveBeenCalled();
-  });
-
   it.each([
     ['signed out', false, ''],
     ['wallet', true, 'wagmi'],
@@ -283,7 +301,7 @@ describe('OnePageSession view gating', () => {
         {...buildProps()}
         loginComplete={loginComplete}
         provider={provider}
-        sessionConfig={{ ...buildProps().sessionConfig, sessionModeProfile: profile, telegramOnly: true }}
+        sessionConfig={{ ...buildProps().sessionConfig, sessionModeProfile: profile }}
       />,
     );
 
@@ -371,8 +389,8 @@ describe('OnePageSession view gating', () => {
             JSON.stringify({
               ok: true,
               sessionSlug: 'edge',
-              telegramOnly: true,
-              telegramBridgeEnabled: true,
+              authorityMode: 'worker_canonical',
+              agentHttpEnabled: true,
               clientSubmitReady: true,
             }),
             { status: 200, headers: { 'content-type': 'application/json' } },
@@ -462,20 +480,19 @@ describe('OnePageSession view gating', () => {
     expect(screen.queryByTestId('ce-session-agent-questions')).not.toBeInTheDocument();
   });
 
-  it('keeps /session/demo in the normal shell when stale telegram session-meta belongs to another slug', () => {
+  it('keeps /session/demo in the normal shell when stale session-meta belongs to another slug', () => {
     const subject = createSubject({
       slug: 'demo',
       sessionConfig: {
         ...buildProps().sessionConfig,
         slug: 'demo',
-        sessionMode: 'standard',
       },
     });
     subject.state.agentSessionMeta = {
       ok: true,
       sessionSlug: 'edge',
-      telegramOnly: true,
-      telegramBridgeEnabled: true,
+      authorityMode: 'worker_canonical',
+      agentHttpEnabled: true,
       clientSubmitReady: true,
     };
 
@@ -483,11 +500,12 @@ describe('OnePageSession view gating', () => {
   });
 
   it('clears prior Agent state before a route-state early return on slug change', () => {
+    const agentProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    agentProfile.surfaces.agentHttp = true;
     const alphaConfig = {
       ...buildProps().sessionConfig,
       slug: 'alpha',
-      telegramOnly: true,
-      sessionMode: 'telegram_only',
+      sessionModeProfile: agentProfile,
     };
     const subject = createSubject({
       slug: 'alpha',
@@ -507,8 +525,7 @@ describe('OnePageSession view gating', () => {
       sessionConfig: {
         ...alphaConfig,
         slug: 'beta',
-        telegramOnly: false,
-        sessionMode: 'standard',
+        sessionModeProfile: { ...agentProfile, surfaces: { ...agentProfile.surfaces, agentHttp: false } },
       },
       routeQuestionsOpen: true,
     };
@@ -705,6 +722,25 @@ describe('OnePageSession view gating', () => {
     );
   });
 
+  it("colours context links with the chrome's text colour, which every theme keeps readable on the chrome", () => {
+    // Classic 95 makes the session accent the chrome itself, and the app's accent falls to about 3:1 there.
+    const typed = extractMediaBlock(
+      fs.readFileSync(path.join(__dirname, 'OnePageSession.module.scss'), 'utf8'),
+      '.sessionContextLinks {',
+    );
+    const host = extractMediaBlock(
+      fs.readFileSync(path.join(__dirname, 'SessionContextHtml.module.scss'), 'utf8'),
+      '.host {',
+    );
+    expect(typed).toContain('color: var(--ce-session-chrome-contrast);');
+    expect(host).toContain('--ce-context-link: var(--ce-session-chrome-contrast);');
+    expect(CONTEXT_HTML_PAGE_CSS).toMatch(/\na\[href\] \{[^}]*color: var\(--ce-context-link\);/);
+    for (const block of [typed, host, CONTEXT_HTML_PAGE_CSS]) {
+      expect(block).not.toContain('var(--ce-action-accent)');
+      expect(block).not.toContain('var(--ce-session-accent)');
+    }
+  });
+
   it('renders only the session title text at half opacity', () => {
     const scss = fs.readFileSync(path.join(__dirname, 'OnePageSession.module.scss'), 'utf8');
     const titleTextBlock = extractMediaBlock(scss, '.brandingSectionTitle {');
@@ -890,6 +926,21 @@ describe('OnePageSession view gating', () => {
     expect(reportProps.cacheInitializationError).toBe(true);
     await act(async () => reportProps.onRetryLoad());
     expect(refreshQuestionResponses).toHaveBeenCalledWith(null, { slug: 'edge' });
+  });
+
+  it('lets the embedded report open the login dialog', async () => {
+    const toggleLoginModal = jest.fn();
+    render(<OnePageSession {...buildProps()} toggleLoginModal={toggleLoginModal} />);
+
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
+    await waitFor(() => {
+      expect(screen.getByTestId('polis-report')).toBeInTheDocument();
+    });
+    toggleLoginModal.mockClear();
+
+    const reportProps = mockPolisReport.mock.calls.map((args) => args[0]).at(-1);
+    reportProps.onRequestLogin();
+    expect(toggleLoginModal).toHaveBeenCalledWith(true);
   });
 
   it('passes the built-in demo display slug to the embedded report', async () => {
@@ -1624,18 +1675,16 @@ describe('OnePageSession view gating', () => {
     expect(sectionHeaderBlock).toContain('font-size: 2rem;');
     expect(sectionHeaderBlock).toContain('font-weight: bold;');
     expect(sectionHeaderBlock).toContain('color: color-mix(in srgb, var(--ce-text-inverse) 75%, transparent);');
-    expect(sectionHeaderTitleBlock).toContain('color: color-mix(in srgb, var(--ce-text-inverse) 50%, transparent);');
+    expect(sectionHeaderTitleBlock).toContain('color: var(--ce-panel-text);');
     expect(sectionHeaderSubtitleBlock).toContain('font-size: 0.63em;');
     expect(sectionHeaderSubtitleBlock).toContain('font-weight: 600;');
-    expect(sectionHeaderSubtitleBlock).toContain('color: color-mix(in srgb, var(--ce-text-inverse) 25%, transparent);');
+    expect(sectionHeaderSubtitleBlock).toContain('color: var(--ce-panel-text-muted);');
     expect(scss).toMatch(
       /@container ce-theme style\(--ce-layout-profile: desktop-window\)\s*{[\s\S]*?\.sectionsGrid \.sectionHeader\s*{[\s\S]*?font-family:\s*var\(--ce-font-ui\);[\s\S]*?font-size:\s*1rem;/,
     );
+    expect(classicThemeBlock).toMatch(/\.sectionsGrid \.sectionHeaderTitle\s*{\s*font-size:\s*1\.35rem;\s*}/);
     expect(classicThemeBlock).toMatch(
-      /\.sectionsGrid \.sectionHeaderTitle\s*{[^}]*font-size:\s*1\.35rem;[^}]*opacity:\s*0\.5;/,
-    );
-    expect(classicThemeBlock).toMatch(
-      /\.sectionsGrid \.sectionHeaderSubtitle\s*{[^}]*font-size:\s*1rem;[^}]*opacity:\s*0\.5;/,
+      /\.sectionsGrid \.sectionHeaderSubtitle\s*{\s*font-size:\s*1rem;\s*font-weight:\s*400;\s*}/,
     );
     expect(classicThemeBlock).toMatch(/\.sectionsGrid \.sectionToggleIcon\s*{[^}]*opacity:\s*0\.5;/);
   });
@@ -1762,7 +1811,6 @@ describe('OnePageSession view gating', () => {
     const miniContentBlock = extractMediaBlock(scss, '.miniSectionContent {');
     const documentsHeaderBlock = extractMediaBlock(scss, '.documentsSectionHeader {');
     const documentsContentBlock = extractMediaBlock(scss, '\n.documentsSectionContent {');
-    const compactContextBlock = extractMediaBlock(scss, '.compactContextSection {');
     const sectionsGridBlock = extractMediaBlock(scss, '.sectionsGrid {');
 
     expect(sectionContainerBlock).toContain('box-sizing: border-box;');
@@ -1779,9 +1827,6 @@ describe('OnePageSession view gating', () => {
     expect(documentsHeaderBlock).not.toContain('width: 100%;');
     expect(documentsContentBlock).toContain('margin-top: 10px;');
     expect(documentsContentBlock).toContain('padding-top: 0;');
-    expect(compactContextBlock).toContain('.documentsSectionContent {');
-    expect(compactContextBlock).toContain('margin-top: 12px;');
-    expect(compactContextBlock).toContain('padding-bottom: 0;');
     expect(miniContentBlock).toContain('box-sizing: border-box;');
     expect(miniContentBlock).toContain('max-width: 100%;');
     expect(miniContentBlock).toContain('min-width: 0;');
@@ -1797,7 +1842,7 @@ describe('OnePageSession view gating', () => {
     expect(phoneBlock).toContain('.sectionHeader .sectionHeaderSubtitle {');
     expect(phoneBlock).toContain('font-size: 1em;');
     expect(phoneBlock).toContain('font-weight: inherit;');
-    expect(phoneBlock).toContain('color: color-mix(in srgb, var(--ce-text-inverse) 15%, transparent);');
+    expect(phoneBlock).toContain('color: var(--ce-panel-text-muted);');
     expect(phoneBlock).toContain('.sectionHeader {');
     expect(phoneBlock).toContain('align-items: center;');
     expect(phoneBlock).toContain('.documentsSectionHeader {');
@@ -1823,7 +1868,7 @@ describe('OnePageSession view gating', () => {
     expect(smallTabletBlock).toContain('.sectionHeader .sectionHeaderSubtitle {');
     expect(smallTabletBlock).toContain('font-size: 1em;');
     expect(smallTabletBlock).toContain('font-weight: inherit;');
-    expect(smallTabletBlock).toContain('color: color-mix(in srgb, var(--ce-text-inverse) 15%, transparent);');
+    expect(smallTabletBlock).toContain('color: var(--ce-panel-text-muted);');
     expect(smallTabletBlock).not.toContain('.documentsSectionHeaderText');
     expect(smallTabletBlock).not.toContain('.documentsSectionHeaderTitleRow');
     expect(smallTabletBlock).not.toContain('.documentsSectionHeaderMain');
@@ -1843,7 +1888,7 @@ describe('OnePageSession view gating', () => {
     expect(classicSmallTabletBlock).toContain('gap: 3px;');
     expect(classicSmallTabletBlock).toContain('.sectionsGrid .sectionHeaderSubtitle {');
     expect(classicSmallTabletBlock).toContain('font-size: 1rem;');
-    expect(classicSmallTabletBlock).toContain('opacity: 0.5;');
+    expect(classicSmallTabletBlock).not.toContain('opacity');
     expect(tabletBlock).toContain('.pileHeaderRow {');
     expect(tabletBlock).toContain('flex-wrap: nowrap;');
     expect(tabletBlock).toContain('.pileHeaderTitleWrap {');

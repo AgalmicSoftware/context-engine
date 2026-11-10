@@ -1,4 +1,5 @@
 import { canonicalizeSessionSlug as normalizeSessionSlug } from '../session/sessionSlug.js';
+import { createCacheReadinessOwner } from './cacheReadinessOwner';
 import contractScripts from '../web3/chainGateway.js';
 import { createLogger } from 'utilities/logging.js';
 import { normalizeArweaveFailureMeta, shouldStopPendingMetadataRetry } from '../arweave/arweaveRetryHelpers.js';
@@ -10,6 +11,7 @@ import {
   resolveSurveyResponseWatermark,
 } from './sessionSurveyResponseHelpers.js';
 import { isResponseRecencyNewer, toResponseRecencyPair } from './responseRecency.js';
+import { normalizeBlockLimitsForConfig } from '../session/blockLimits.js';
 import { sbtEventStreamsPort } from '../../domains/sbts/sbtEventStreamsPort.js';
 import type { SbtEventStreamsPort } from '../../domains/sbts/sbtPorts.js';
 import { readWorkerMetadataSessionConfig, type WorkerMetadataHydrationHost } from './workerCanonicalCacheHydration';
@@ -19,6 +21,7 @@ import {
   resolveWorkerMetadataHydrationTarget,
 } from './sessionWorkerMetadataCacheRuntime';
 import { createSessionCacheRevisionUpdater } from './sessionCacheRevisionRuntime';
+import { createMaskedSurveyRefresh } from './maskedSurveyRefresh';
 
 type StateRecord = Record<string, unknown>;
 type CacheRecord = Record<string, unknown>;
@@ -138,6 +141,7 @@ interface SurveyContractScripts {
   ) => Promise<unknown>;
   listenForSurveyEvents?: (providerName: string, handler: (event: unknown) => unknown, slug: string) => unknown;
   removeSurveyEventsListener?: (providerName: string, slug: string) => unknown;
+  decryptSurveyPayloadInPlace: (survey: CacheRecord, slug: string, opts: CacheRecord) => Promise<unknown>;
 }
 type SurveyEventStreamsPort = Pick<SbtEventStreamsPort, 'listenForSurveyEvents' | 'removeSurveyEventsListener'>;
 
@@ -167,10 +171,13 @@ export interface SessionSurveyCacheHost extends WorkerMetadataHydrationHost {
     opts?: Record<string, unknown>,
   ) => Promise<boolean>;
   queueLocalRevisionUpdate?: (opts?: QueueLocalRevisionUpdateOptions) => void;
+  /** The current reader's decrypt context for this session's envelopes. */
+  buildDecryptContext?: (slug: string) => { account?: unknown; providerLike?: unknown; litOpts?: unknown } | null;
 }
 
 export interface SessionSurveyCacheController {
   initializeSurveyCacheForGroup: (slug: string, opts?: SurveyInitOptions) => Promise<void>;
+  refreshEncryptedSurveyPayloadsForGroup: (slug: string, opts?: { force?: boolean }) => Promise<void>;
   refreshSurveyResponsesByIDForGroup: (slug: string, surveyID: string) => Promise<void>;
   startSurveyAndQuestionEventListener: () => boolean;
   startSurveyAndQuestionEventListenerForGroup: (slugIn?: string | null) => boolean;
@@ -184,6 +191,7 @@ const surveyContractScripts = contractScripts as unknown as SurveyContractScript
 class SurveyCachePersistenceError extends Error {}
 
 export const createSessionSurveyCacheController = (host: SessionSurveyCacheHost): SessionSurveyCacheController => {
+  const readiness = createCacheReadinessOwner();
   let _surveyInitInFlight: Record<string, Promise<void> | undefined> = {};
   let _surveyInitPending: Record<string, SurveyInitOptions | undefined> = {};
   let _pendingSurveyMetadataRetryTimers: Record<string, ReturnType<typeof setTimeout> | undefined> = {};
@@ -316,6 +324,25 @@ export const createSessionSurveyCacheController = (host: SessionSurveyCacheHost)
     return current;
   };
   const surveyEventStreams = host.surveyEventStreamsPort || sbtEventStreamsPort;
+  // Scans keep survey titles and document links locked; this decrypts them for the current reader.
+  const maskedSurveyRefresh = createMaskedSurveyRefresh({
+    readSurveys: (slug) => {
+      const networkID = String(getSessionChainId(slug) || '');
+      const surveys = (dgRead('surveysCache', slug) as SurveysCache | null)?.[networkID]?.surveys;
+      return networkID && isCacheRecord(surveys) ? { networkID, surveys } : null;
+    },
+    buildDecryptContext: (slug) => host.buildDecryptContext?.(slug) ?? null,
+    decryptSurvey: (survey, slug, opts) => surveyContractScripts.decryptSurveyPayloadInPlace(survey, slug, opts),
+    saveSurveys: (slug, networkID, update) =>
+      host.updateSurveysCacheAtomic(slug, (current) => {
+        const next = (isCacheRecord(current) ? current : {}) as SurveysCache;
+        mergeLegacyNumericNetworkKey(next, networkID);
+        update(ensureSurveyNetworkCache(next, networkID, 0).surveys);
+        return next;
+      }),
+    onSaved: () => queueLocalRevisionUpdate({ needsQuestionResponsesNonce: true }),
+    logWarn: (message, error) => mainSiteLog.warn(message, error),
+  });
 
   const isInitInFlight = (slugIn = ''): boolean => {
     const slug = normalizeSessionSlug(slugIn || '');
@@ -335,6 +362,7 @@ export const createSessionSurveyCacheController = (host: SessionSurveyCacheHost)
     _pendingSurveyMetadataRetryTimers = {};
     _surveyInitInFlight = {};
     _surveyInitPending = {};
+    maskedSurveyRefresh.destroy();
   };
 
   const mergePendingSurveyInitOpts = (prevOpts: unknown, nextOpts: unknown): SurveyInitOptions => {
@@ -356,12 +384,13 @@ export const createSessionSurveyCacheController = (host: SessionSurveyCacheHost)
         ...((opts && typeof opts === 'object' ? opts : {}) as SurveyInitOptions),
         background: suppressUiState,
       };
-      const setSurveyState = (nextState: SetStateArg, cb?: () => void): void => {
-        if (suppressUiState || !isMounted()) return;
-        setState(nextState, cb);
-      };
       const workerTarget = resolveWorkerMetadataHydrationTarget(host, slug);
       const initRunKey = workerTarget.runKey;
+      if (!suppressUiState) readiness.claim(initRunKey);
+      const ownsReadiness = (): boolean => !suppressUiState && isMounted() && readiness.allows(initRunKey);
+      const setSurveyState = (nextState: SetStateArg, cb?: () => void): void => {
+        if (ownsReadiness()) setState(nextState, cb);
+      };
       if (
         !workerTarget.isWorkerCanonical &&
         scanScopeNoop(slug, 'initializeSurveyCacheForGroup', () => {
@@ -392,7 +421,7 @@ export const createSessionSurveyCacheController = (host: SessionSurveyCacheHost)
             onSuccess: (count) => {
               setSurveyState({ isSurveyCacheReady: true });
               if (count > 0) queueLocalRevisionUpdate({ needsQuestionResponsesNonce: true });
-              if (!suppressUiState) checkAllCachesReady();
+              if (ownsReadiness()) checkAllCachesReady();
             },
             onError: (error) => {
               mainSiteLog.error('Error hydrating Worker survey metadata:', error);
@@ -404,9 +433,9 @@ export const createSessionSurveyCacheController = (host: SessionSurveyCacheHost)
 
         const networkID = String(getSessionChainId(slug) || '');
 
-        const { fromBlock: baseFrom, toBlock: baseTo } = await surveyContractScripts.getRelevantBlockWindowForFilter(
-          getSessionBlockWindowRef(slug),
-        );
+        const blockWindowRef = getSessionBlockWindowRef(slug);
+        const { fromBlock: baseFrom, toBlock: baseTo } =
+          await surveyContractScripts.getRelevantBlockWindowForFilter(blockWindowRef);
         if (baseFrom > baseTo) {
           setSurveyState({ isSurveyCacheReady: true }, checkAllCachesReady);
           return;
@@ -421,6 +450,7 @@ export const createSessionSurveyCacheController = (host: SessionSurveyCacheHost)
         const touchedPendingSurveyMetadata = new Set<string>();
         const deletedPendingSurveyMetadata = new Set<string>();
         const touchedUserNodes = new Set<string>();
+        const resetSurveyResponses = new Set<string>();
         const responseDeltas = new Map<
           string,
           {
@@ -461,6 +491,10 @@ export const createSessionSurveyCacheController = (host: SessionSurveyCacheHost)
           deletedPendingSurveyMetadata.forEach((surveyId) => {
             delete targetNet.pendingSurveyMetadata[surveyId];
           });
+          resetSurveyResponses.forEach((surveyId) => {
+            targetNet.surveyResponses[surveyId] = {};
+            targetNet.surveyResponsesLatestBlock[surveyId] = initialLastBlockSurvey;
+          });
           responseDeltas.forEach((delta, surveyId) => {
             next = mergeSurveyResponseCacheSnapshot({
               currentCache: next,
@@ -486,6 +520,7 @@ export const createSessionSurveyCacheController = (host: SessionSurveyCacheHost)
           deletedSurveyMetadata.clear();
           touchedPendingSurveyMetadata.clear();
           deletedPendingSurveyMetadata.clear();
+          resetSurveyResponses.clear();
           responseDeltas.clear();
           surveysLatestBlockTouched = false;
         };
@@ -505,6 +540,17 @@ export const createSessionSurveyCacheController = (host: SessionSurveyCacheHost)
         ) {
           currentNetworkCache.surveyResponsesLatestBlock = {};
         }
+        // The response map keeps no block numbers, so a survey scanned past a lowered
+        // end block drops its answers and rescans its window. Only an explicit end
+        // counts, never the chain head.
+        const blockLimits = isCacheRecord(blockWindowRef) ? blockWindowRef.blockLimits : null;
+        const endBlock = normalizeBlockLimitsForConfig(blockLimits, baseFrom)?.end;
+        Object.entries(currentNetworkCache.surveyResponsesLatestBlock).forEach(([surveyId, watermark]) => {
+          if (endBlock == null || Number(watermark) <= endBlock) return;
+          currentNetworkCache.surveyResponses[surveyId] = {};
+          currentNetworkCache.surveyResponsesLatestBlock[surveyId] = initialLastBlockSurvey;
+          resetSurveyResponses.add(surveyId);
+        });
         if (
           typeof currentNetworkCache.pendingSurveyMetadata !== 'object' ||
           currentNetworkCache.pendingSurveyMetadata === null
@@ -744,6 +790,7 @@ export const createSessionSurveyCacheController = (host: SessionSurveyCacheHost)
                   try {
                     const surveyData = (await surveyContractScripts.getSurveyDataById('none', sidLower, slug, {
                       throwOnFailure: true,
+                      skipDecrypt: true,
                     })) as SurveyMetadata;
                     return { sid: sidLower, entry, surveyData };
                   } catch (err: unknown) {
@@ -963,6 +1010,7 @@ export const createSessionSurveyCacheController = (host: SessionSurveyCacheHost)
                 try {
                   surveyData = (await surveyContractScripts.getSurveyDataById('none', surveyID, slug, {
                     throwOnFailure: true,
+                    skipDecrypt: true,
                   })) as SurveyMetadata;
                 } catch (e: unknown) {
                   surveyFetchErr = e;
@@ -1127,6 +1175,7 @@ export const createSessionSurveyCacheController = (host: SessionSurveyCacheHost)
           }
 
           schedulePendingSurveyMetadataRetry();
+          void maskedSurveyRefresh.refresh(slug);
 
           mainSiteLog.log('Surveys cache initialized or updated (group-aware).');
         } catch (error: unknown) {
@@ -1145,7 +1194,10 @@ export const createSessionSurveyCacheController = (host: SessionSurveyCacheHost)
           delete _surveyInitPending[initRunKey];
           setTimeout(() => {
             if (!isMounted()) return;
-            void initializeSurveyCacheForGroup(slug, pendingOpts || rerunOpts).catch((error: unknown) => {
+            const queued = pendingOpts || rerunOpts;
+            // A rerun must not take readiness back from a newer load.
+            const nextOpts = readiness.allows(initRunKey) ? queued : { ...queued, background: true };
+            void initializeSurveyCacheForGroup(slug, nextOpts).catch((error: unknown) => {
               mainSiteLog.warn('Deferred survey cache rerun failed', { slug, error });
             });
           }, 0);
@@ -1261,6 +1313,7 @@ export const createSessionSurveyCacheController = (host: SessionSurveyCacheHost)
 
   return {
     initializeSurveyCacheForGroup,
+    refreshEncryptedSurveyPayloadsForGroup: maskedSurveyRefresh.refresh,
     refreshSurveyResponsesByIDForGroup,
     startSurveyAndQuestionEventListener,
     startSurveyAndQuestionEventListenerForGroup,

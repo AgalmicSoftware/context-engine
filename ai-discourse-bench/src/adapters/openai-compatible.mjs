@@ -91,93 +91,131 @@ export const callOpenAiCompatibleChat = async ({
   let usedMode = cachedAutoMode || structuredOutput;
   let fallback = null;
 
-  const request = async (mode) => {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  const controller = new AbortController();
+  const timeoutError = Object.assign(new Error(`${provider} ${model} request timed out after ${timeoutMs}ms`), {
+    code: 'AIDB_REQUEST_TIMEOUT', retryable: true,
+  });
+  let reader = null;
+  let timeout;
+  const deadline = new Promise((_resolve, reject) => {
+    timeout = setTimeout(() => {
+      controller.abort(timeoutError);
+      if (reader) void reader.cancel(timeoutError).catch(() => {});
+      reject(timeoutError);
+    }, timeoutMs);
+  });
+  const readBody = async (response, format) => {
+    controller.signal.throwIfAborted();
+    if (!response.body?.getReader) return response[format]();
+    const currentReader = response.body.getReader();
+    reader = currentReader;
+    const decoder = new TextDecoder();
+    let text = '';
     try {
-      return await fetchImpl(`${config.baseUrl}/chat/completions`, {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          authorization: `Bearer ${config.apiKey}`,
-          ...config.headers,
-        },
-        signal: controller.signal,
-        body: JSON.stringify({
-          model,
-          temperature,
-          max_tokens: maxTokens,
-          ...(responseFormatFor(mode, responseSchema) ? { response_format: responseFormatFor(mode, responseSchema) } : {}),
-          ...(effectiveProviderRouting ? { provider: effectiveProviderRouting } : {}),
-          messages: [
-            {
-              role: 'system',
-              content: systemPrompt,
-            },
-            {
-              role: 'user',
-              content: prompt,
-            },
-          ],
-        }),
-      });
-    } catch (error) {
-      if (controller.signal.aborted) {
-        const timeoutError = new Error(`${provider} ${model} request timed out after ${timeoutMs}ms`);
-        timeoutError.code = 'AIDB_REQUEST_TIMEOUT';
-        throw timeoutError;
+      while (true) {
+        const { done, value } = await currentReader.read();
+        controller.signal.throwIfAborted();
+        if (done) break;
+        text += decoder.decode(value, { stream: true });
       }
-      throw error;
+      text += decoder.decode();
+      return format === 'json' ? JSON.parse(text) : text;
     } finally {
-      clearTimeout(timeout);
+      currentReader.releaseLock();
+      if (reader === currentReader) reader = null;
     }
   };
-
-  let response = await request(usedMode);
-  let responseErrorBody = '';
-  if (!response.ok && structuredOutput === 'auto' && ['auto', 'json_schema'].includes(usedMode)
-    && capabilityErrorStatuses.has(response.status)) {
-    responseErrorBody = await response.text().catch(() => '');
-    if (isStructuredOutputCapabilityError(response.status, responseErrorBody)) {
-      fallback = { from: 'json_schema', to: 'none', status: response.status, reason: responseErrorBody.slice(0, 500) };
-      usedMode = 'none';
-      response = await request(usedMode);
-      responseErrorBody = '';
-      if (response.ok) autoCapabilityCache.set(cacheKey, 'none');
-    }
-  } else if (response.ok && structuredOutput === 'auto' && usedMode === 'auto') {
-    autoCapabilityCache.set(cacheKey, 'json_schema');
-    usedMode = 'json_schema';
-  }
-
-  if (!response.ok) {
-    const body = responseErrorBody || await response.text().catch(() => '');
-    const requestError = new Error(`${provider} ${model} request failed with HTTP ${response.status}: ${body.slice(0, 500)}`);
-    requestError.status = response.status;
-    requestError.retryable = response.status === 408 || response.status === 409 || response.status === 429 || response.status >= 500;
-    throw requestError;
-  }
-  const data = await response.json();
-  const choice = data?.choices?.[0] || {};
-  return {
-    content: choice?.message?.content || '',
-    metadata: {
-      provider,
-      resolvedProvider: data?.provider || provider,
-      requestedModel: model,
-      resolvedModel: data?.model || model,
-      systemFingerprint: data?.system_fingerprint || null,
-      requestId: response.headers?.get?.('x-request-id') || response.headers?.get?.('cf-ray') || null,
-      finishReason: choice?.finish_reason || null,
-      usage: data?.usage || null,
-      latencyMs: Date.now() - startedAtMs,
-      endpoint: config.baseUrl,
-      providerRouting: effectiveProviderRouting,
-      structuredOutput: {
-        requested: requestedMode,
-        used: usedMode === 'auto' ? 'json_schema' : usedMode,
-        fallback,
+  const readErrorBody = (response) => readBody(response, 'text').catch((error) => {
+    if (controller.signal.aborted) throw timeoutError;
+    return '';
+  });
+  const request = async (mode) => {
+    controller.signal.throwIfAborted();
+    const response = await fetchImpl(`${config.baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${config.apiKey}`,
+        ...config.headers,
       },
-    },
+      signal: controller.signal,
+      body: JSON.stringify({
+        model,
+        temperature,
+        max_tokens: maxTokens,
+        ...(responseFormatFor(mode, responseSchema) ? { response_format: responseFormatFor(mode, responseSchema) } : {}),
+        ...(effectiveProviderRouting ? { provider: effectiveProviderRouting } : {}),
+        messages: [
+          {
+            role: 'system',
+            content: systemPrompt,
+          },
+          {
+            role: 'user',
+            content: prompt,
+          },
+        ],
+      }),
+    });
+    if (controller.signal.aborted) {
+      void response.body?.cancel(timeoutError).catch(() => {});
+      throw timeoutError;
+    }
+    return response;
   };
+
+  const complete = async () => {
+    let response = await request(usedMode);
+    let responseErrorBody = '';
+    if (!response.ok && structuredOutput === 'auto' && ['auto', 'json_schema'].includes(usedMode)
+      && capabilityErrorStatuses.has(response.status)) {
+      responseErrorBody = await readErrorBody(response);
+      if (isStructuredOutputCapabilityError(response.status, responseErrorBody)) {
+        fallback = { from: 'json_schema', to: 'none', status: response.status, reason: responseErrorBody.slice(0, 500) };
+        usedMode = 'none';
+        response = await request(usedMode);
+        responseErrorBody = '';
+        if (response.ok) autoCapabilityCache.set(cacheKey, 'none');
+      }
+    } else if (response.ok && structuredOutput === 'auto' && usedMode === 'auto') {
+      autoCapabilityCache.set(cacheKey, 'json_schema');
+      usedMode = 'json_schema';
+    }
+
+    if (!response.ok) {
+      const body = responseErrorBody || await readErrorBody(response);
+      const requestError = new Error(`${provider} ${model} request failed with HTTP ${response.status}: ${body.slice(0, 500)}`);
+      requestError.status = response.status;
+      requestError.retryable = response.status === 408 || response.status === 409 || response.status === 429 || response.status >= 500;
+      throw requestError;
+    }
+    const data = await readBody(response, 'json');
+    const choice = data?.choices?.[0] || {};
+    return {
+      content: choice?.message?.content || '',
+      metadata: {
+        provider,
+        resolvedProvider: data?.provider || provider,
+        requestedModel: model,
+        resolvedModel: data?.model || model,
+        systemFingerprint: data?.system_fingerprint || null,
+        requestId: response.headers?.get?.('x-request-id') || response.headers?.get?.('cf-ray') || null,
+        finishReason: choice?.finish_reason || null,
+        usage: data?.usage || null,
+        latencyMs: Date.now() - startedAtMs,
+        endpoint: config.baseUrl,
+        providerRouting: effectiveProviderRouting,
+        structuredOutput: {
+          requested: requestedMode,
+          used: usedMode === 'auto' ? 'json_schema' : usedMode,
+          fallback,
+        },
+      },
+    };
+  };
+  try {
+    return await Promise.race([complete(), deadline]);
+  } finally {
+    clearTimeout(timeout);
+  }
 };

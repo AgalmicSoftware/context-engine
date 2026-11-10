@@ -109,7 +109,7 @@ const WorkerGroupsListRoute = ({ props, workerSessionConfig }: WorkerGroupsListR
     );
   }, [sessionName, sessionSlug, selectedGroupId]);
 
-  const rootClassName = props.viewMode === 'modal' ? styles.modalViewContainer : styles.standardViewContainer;
+  const rootClassName = props.viewMode === 'modal' ? styles.modalViewContainer : undefined;
 
   return (
     <div

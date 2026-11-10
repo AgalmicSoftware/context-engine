@@ -31,7 +31,6 @@ const PUBLIC_PII_SCANNER = path.join(
   'verify-public-release-pii.sh',
 );
 const SHA_PATTERN = /^[a-f0-9]{40}$/;
-const SHA256_PATTERN = /^[a-f0-9]{64}$/;
 const SAFE_REF_PATTERN = /^refs\/heads\/[A-Za-z0-9._/-]+$/;
 const PUBLIC_GIT_NAME = 'Agalmic';
 const PUBLIC_GIT_EMAIL = 'agalmicsoftware@protonmail.com';

@@ -60,11 +60,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   position: relative;
 }
 
-.surveySelector {
-  // width: 100%;
-  margin-bottom: 20px;
-}
-
 #dropdownToggle {
   display: flex;
   flex-direction: row;
@@ -84,10 +79,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 #dropdownToggleCaret {
   font-size: 1.25em;
   flex-shrink: 0;
-}
-
-#dropdownMenu {
-  // width: 50%;
 }
 
 .questionSelectorSummary {
@@ -140,76 +131,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   line-height: 1;
 }
 
-/* Styling for Survey Questions (general card/layout) */
-.surveyQuestions {
-  width: 100%;
-  .questionCard {
-    margin-bottom: 20px;
-    background: var(--ce-color-surface);
-    border-radius: var(--ce-radius-8);
-    box-shadow:
-      -7px 7px 14px var(--ce-surface-sunken),
-      7px -7px 14px var(--ce-color-surface-alt);
-  }
-
-  .binaryChoice {
-    display: flex;
-    justify-content: space-between;
-    button {
-      width: 48%;
-    }
-  }
-
-  .slider {
-    margin-top: 20px;
-    max-width: 200px;
-  }
-
-  .spectrum {
-    // ... styles for spectrum ...
-  }
-
-  .multiChoice {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-    .option {
-      flex: 1;
-      margin: 5px;
-      padding: 10px;
-      border: 1px solid var(--ce-color-surface-alt);
-      border-radius: var(--ce-radius-4);
-      background: var(--ce-color-surface);
-      cursor: pointer;
-      transition: background-color 0.3s ease;
-      &:hover {
-        background: var(--ce-color-surface-alt);
-      }
-    }
-  }
-
-  .footer {
-    display: flex;
-    flex-direction: row;
-    justify-content: center;
-    align-items: center;
-    button {
-      color: var(--ce-color-white);
-      background: var(--ce-color-surface);
-      border-color: var(--ce-color-white);
-      text-transform: uppercase;
-      font-weight: 600;
-      &:hover {
-        background: transparent;
-      }
-    }
-  }
-}
-
-#surveySlider {
-  max-width: 150px;
-}
-
 #responsePreview {
   color: var(--ce-color-white) !important;
   display: flex;
@@ -233,16 +154,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   margin-top: 10px;
   border-radius: var(--ce-radius-5);
   overflow-x: auto;
-}
-
-#ratingInput {
-  padding: 20px;
-  margin-right: 20px;
-  max-width: 200px;
-}
-
-#textInput {
-  min-height: 100px;
 }
 
 .ratingLabelText {
@@ -567,16 +478,8 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   }
 }
 
-#encryptAdditionalThoughts {
-  border: 0px transparent solid;
-}
-
 // Media queries for responsiveness on encrypt text
 @media (min-width: 0px) and (max-width: 319px) {
-  #inputGroupTextBox {
-    font-size: 1em;
-  }
-
   #encryptIcon {
     font-size: 0.75em;
     margin-right: 5px;
@@ -591,13 +494,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 }
 
 @media (min-width: 320px) and (max-width: 465px) {
-  #inputGroupTextBox {
-    font-size: 1em !important;
-    margin-left: 2px !important;
-    margin-right: 2px !important;
-    padding: 0 !important;
-  }
-
   #encryptIcon {
     font-size: 1.5em !important;
     margin-right: 0 !important;
@@ -619,13 +515,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 }
 
 @media (min-width: 466px) and (max-width: 768px) {
-  #inputGroupTextBox {
-    font-size: 1em !important;
-    margin-left: 3px !important;
-    margin-right: 3px !important;
-    padding: 0 !important;
-  }
-
   #encryptIcon {
     font-size: 1.5em !important;
     margin-right: 0 !important;
@@ -633,13 +522,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 }
 
 @media (min-width: 769px) and (max-width: 1366px) {
-  #inputGroupTextBox {
-    font-size: 1.25em !important;
-    margin-left: 7.5px !important;
-    margin-right: 7.5px !important;
-    padding-left: 5px !important;
-  }
-
   #encryptIcon {
     font-size: 1.5em !important;
     margin-right: 10px !important;
@@ -651,12 +533,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 }
 
 @media (min-width: 1367px) {
-  #inputGroupTextBox {
-    font-size: 1.5em !important;
-    margin-left: 10px !important;
-    margin-right: 10px !important;
-  }
-
   #encryptIcon {
     font-size: 2em !important;
     margin-right: 15px !important;
@@ -709,44 +585,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   flex-direction: column;
   gap: 12px;
   padding: 18px;
-}
-
-.singleQuestionSubmitLayout {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(180px, 20%);
-  align-items: stretch;
-  gap: 24px;
-  width: 100%;
-}
-
-.singleQuestionSubmitLayoutNoRail {
-  grid-template-columns: minmax(0, 1fr) 0;
-  gap: 0;
-}
-
-.singleQuestionSubmitMain {
-  min-width: 0;
-  display: flex;
-
-  .fullQuestionCard {
-    width: 100%;
-    margin-bottom: 0;
-  }
-}
-
-.singleQuestionSubmitRail {
-  display: flex;
-  align-items: stretch;
-  width: 100%;
-  min-height: 100%;
-}
-
-.singleQuestionSubmitRailHidden {
-  width: 0;
-  min-height: 0;
-  opacity: 0;
-  overflow: hidden;
-  pointer-events: none;
 }
 
 .singleQuestionPage {
@@ -837,9 +675,9 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   gap: 10px;
   padding: 12px 14px;
   border-radius: var(--ce-radius-12);
-  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 14%, transparent);
-  background: color-mix(in srgb, var(--ce-compat-dark) 22%, transparent);
-  color: color-mix(in srgb, var(--ce-text-inverse) 90%, transparent);
+  border: 1px solid var(--ce-card-border);
+  background: var(--ce-card-bg);
+  color: var(--ce-panel-text);
   font-weight: 600;
 }
 
@@ -876,8 +714,8 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 .gatedPromptTooltipIcon {
   margin-left: 6px;
   font-size: 0.9em;
-  color: color-mix(in srgb, var(--ce-text-inverse) 94%, transparent);
-  opacity: 0.5 !important;
+  color: inherit;
+  opacity: 1 !important;
 }
 
 .lockedQuestionsBanner {
@@ -955,10 +793,11 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   align-items: center;
 }
 
+// The accent is 1.00:1 on Classic 95's teal, so the button takes the surface's own text colour in every theme.
 %decryptCtaOutline {
   background: transparent !important;
-  border: 1px solid var(--ce-color-accent) !important;
-  color: var(--ce-color-accent) !important;
+  border: 1px solid currentColor !important;
+  color: inherit !important;
   box-shadow: none;
   transition:
     background-color 0.18s ease,
@@ -966,21 +805,19 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     color 0.18s ease,
     box-shadow 0.18s ease;
 
+  // A thicker outline, not a tint: tinting towards the label is what takes it below 4.5:1 on teal.
   &:hover:not(:disabled),
   &:focus:not(:disabled) {
-    background: color-mix(in srgb, var(--ce-action-accent) 15%, transparent) !important;
-    border-color: var(--ce-color-accent) !important;
-    color: var(--ce-color-accent) !important;
-    box-shadow: 0 0 8px color-mix(in srgb, var(--ce-action-accent) 35%, transparent);
+    box-shadow: inset 0 0 0 1px currentColor;
   }
 
   &:focus {
-    outline: 2px solid color-mix(in srgb, var(--ce-action-accent) 28%, transparent);
+    outline: 2px solid currentColor;
     outline-offset: 2px;
   }
 
   &:disabled {
-    opacity: 0.55;
+    opacity: 0.7;
     box-shadow: none;
     cursor: not-allowed;
   }
@@ -1069,13 +906,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   gap: 10px;
 }
 
-.lockedQuestionsGenericMessage {
-  margin: 0;
-  font-size: 0.92rem;
-  line-height: 1.5;
-  color: color-mix(in srgb, var(--ce-overlay-surface) 82%, transparent);
-}
-
 .lockedGateDetailCard {
   border: 1px solid color-mix(in srgb, var(--ce-status-info) 20%, transparent);
   border-radius: var(--ce-radius-10);
@@ -1151,71 +981,64 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 .lockedQuestionsBannerOnDark {
   width: 100%;
   margin: 0;
-  border-color: color-mix(in srgb, var(--ce-status-info) 36%, transparent);
-  background: linear-gradient(
-    150deg,
-    color-mix(in srgb, var(--ce-overlay-surface) 98%, transparent) 0%,
-    color-mix(in srgb, var(--ce-status-info) 96%, transparent) 100%
-  );
-  color: var(--ce-document-surface);
+  border-color: color-mix(in srgb, var(--ce-overlay-text) 28%, transparent);
+  background: var(--ce-overlay-surface);
+  color: var(--ce-overlay-text);
   box-shadow: 0 14px 30px color-mix(in srgb, var(--ce-overlay-base) 32%, transparent);
 }
 
 .lockedQuestionsBannerOnDark .lockedQuestionsBackdrop {
-  color: color-mix(in srgb, var(--ce-status-info-text) 8%, transparent);
+  color: color-mix(in srgb, var(--ce-overlay-text) 8%, transparent);
 }
 
 .lockedQuestionsBannerOnDark .lockedQuestionsSubtext {
-  color: color-mix(in srgb, var(--ce-status-info-text) 78%, transparent);
+  color: var(--ce-overlay-text-muted);
 }
 
 .lockedQuestionsBannerOnDark .lockedSbtInlineLink {
-  color: var(--ce-status-success-text);
+  color: var(--ce-overlay-text);
 
   &:hover,
   &:focus {
-    color: var(--ce-status-success-text);
-    text-decoration-color: var(--ce-status-success-text);
+    color: var(--ce-overlay-text);
+    text-decoration-color: var(--ce-overlay-text);
   }
 }
 
 .lockedQuestionsBannerOnDark .lockedQuestionsDecryptButton {
   background: transparent !important;
-  border: 1px solid var(--ce-color-accent) !important;
-  color: var(--ce-color-accent) !important;
+  border: 1px solid var(--ce-overlay-text) !important;
+  color: var(--ce-overlay-text) !important;
   box-shadow: none;
 
+  // A thicker outline, not a tint: tinting towards the label costs contrast.
   &:hover:not(:disabled),
   &:focus:not(:disabled) {
-    background: color-mix(in srgb, var(--ce-action-accent) 14%, transparent) !important;
-    border-color: var(--ce-color-accent) !important;
-    color: var(--ce-color-accent) !important;
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--ce-action-accent) 12%, transparent);
+    background: transparent !important;
+    border-color: var(--ce-overlay-text) !important;
+    color: var(--ce-overlay-text) !important;
+    box-shadow: inset 0 0 0 1px var(--ce-overlay-text);
   }
 
   &:focus {
-    outline: 2px solid color-mix(in srgb, var(--ce-action-accent) 24%, transparent);
+    outline: 2px solid var(--ce-overlay-text);
     outline-offset: 2px;
   }
 
   &:disabled {
     background: transparent !important;
-    border-color: color-mix(in srgb, var(--ce-action-accent) 35%, transparent) !important;
-    color: color-mix(in srgb, var(--ce-action-accent) 45%, transparent) !important;
+    border-color: var(--ce-overlay-text-muted) !important;
+    color: var(--ce-overlay-text-muted) !important;
   }
 }
 
 .lockedQuestionsBannerOnDark .lockedQuestionsDetails {
-  border-top-color: color-mix(in srgb, var(--ce-status-info-text) 12%, transparent);
-}
-
-.lockedQuestionsBannerOnDark .lockedQuestionsGenericMessage {
-  color: color-mix(in srgb, var(--ce-status-info-text) 86%, transparent);
+  border-top-color: color-mix(in srgb, var(--ce-overlay-text) 12%, transparent);
 }
 
 .lockedQuestionsBannerOnDark .lockedGateDetailCard {
-  border-color: color-mix(in srgb, var(--ce-status-info-text) 14%, transparent);
-  background: color-mix(in srgb, var(--ce-text-inverse) 6%, transparent);
+  border-color: color-mix(in srgb, var(--ce-overlay-text) 14%, transparent);
+  background: transparent;
 }
 
 .lockedQuestionsBannerOnDark .lockedGateDetailCount {
@@ -1223,25 +1046,25 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 }
 
 .lockedQuestionsBannerOnDark .lockedSbtCard {
-  border-color: color-mix(in srgb, var(--ce-status-info-text) 14%, transparent);
-  background: color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
-  color: var(--ce-status-info-text);
+  border-color: color-mix(in srgb, var(--ce-overlay-text) 14%, transparent);
+  background: transparent;
+  color: var(--ce-overlay-text);
 
   &:hover {
-    border-color: color-mix(in srgb, var(--ce-action-accent) 38%, transparent);
+    border-color: var(--ce-overlay-text);
     box-shadow: 0 8px 16px color-mix(in srgb, var(--ce-overlay-base) 24%, transparent);
-    color: var(--ce-status-info-text);
+    color: var(--ce-overlay-text);
   }
 }
 
 .lockedQuestionsBannerOnDark .lockedSbtMeta,
 .lockedQuestionsBannerOnDark .lockedSbtLinkIcon,
 .lockedQuestionsBannerOnDark .lockedQuestionsCaretButton {
-  color: color-mix(in srgb, var(--ce-status-info-text) 74%, transparent);
+  color: var(--ce-overlay-text-muted);
 }
 
 .lockedQuestionsBannerOnDark .lockedQuestionsCaretButton:hover:not(:disabled) {
-  color: var(--ce-status-success-text);
+  color: var(--ce-overlay-text);
 }
 
 .gatedEmptyPanelShell {
@@ -1260,7 +1083,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   font-size: 0.98rem;
   line-height: 1.6;
   text-align: center;
-  color: color-mix(in srgb, var(--ce-status-info-text) 82%, transparent);
+  color: inherit;
 }
 
 .promptTitleBlock {
@@ -1437,25 +1260,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   color: var(--ce-panel-text) !important;
 }
 
-.additionalCommentsSection {
-  display: flex;
-  flex-direction: column;
-  margin-top: 10px;
-  margin-bottom: 10px;
-}
-
-.additionalCommentsLabel {
-  margin-top: 10px;
-  font-size: 1.05em;
-  font-weight: 600;
-}
-
-.additionalCommentsContent {
-  opacity: 0.8;
-  font-weight: 600;
-  font-size: 1.15em;
-}
-
 .questionTitle {
   font-weight: 600;
   font-size: 1.5em;
@@ -1477,46 +1281,11 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   opacity: 1;
 }
 
-// Encrypt button parts
-#encryptOptionButton {
-  display: flex;
-  flex-direction: row-reverse;
-  justify-content: space-evenly;
-  align-items: center;
-  background-color: color-mix(in srgb, var(--ce-status-info) 50%, transparent);
-  border-top-right-radius: var(--ce-radius-5);
-  border-bottom-right-radius: var(--ce-radius-5);
-  border-bottom-left-radius: var(--ce-radius-0);
-  border-top-left-radius: var(--ce-radius-0);
-  cursor: crosshair;
-}
-
 #encryptIcon {
   font-size: 1.5em !important;
   margin-right: 15px;
   color: var(--ce-color-white);
   opacity: 0.25;
-}
-
-#inputGroupTextBox {
-  border: 1px solid transparent;
-  border-radius: var(--ce-radius-0);
-  font-size: 1.5em;
-  font-weight: 600;
-  text-transform: uppercase;
-  opacity: 0.5;
-  display: flex;
-  flex-direction: row;
-  justify-content: space-between;
-  margin-left: 10px;
-  margin-right: 10px;
-}
-
-#encryptCheckbox {
-  margin-top: 5px;
-  margin-bottom: 5px;
-  scale: 1.5;
-  margin-right: 10px;
 }
 
 #surveyButtonText {
@@ -1601,24 +1370,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 }
 
 /* Component media queries */
-@media (min-width: 0px) and (max-width: 319px) {
-  #encryptOptionButton {
-    flex-direction: column !important;
-  }
-}
-
-@media (min-width: 320px) and (max-width: 465px) {
-  #encryptOptionButton {
-    flex-direction: column !important;
-    min-width: 105px;
-  }
-}
-
-@media (min-width: 466px) and (max-width: 768px) {
-  #encryptOptionButton {
-    flex-direction: column !important;
-  }
-}
 
 /* Filter/Results Buttons (part of SurveySelector) */
 #filterButton {
@@ -2032,99 +1783,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   transition: width 0.25s ease;
 }
 
-/* Response display styles (used in SurveyQuestions when viewing answers) */
-.freeformAnswer {
-  font-style: italic;
-  background-color: color-mix(in srgb, var(--ce-text-inverse) 15%, transparent);
-  border-radius: var(--ce-radius-5);
-  padding: 15px;
-  color: var(--ce-color-white);
-  font-weight: bold;
-  margin-bottom: 5px;
-  margin-top: 5px;
-}
-
-.ratingAnswer {
-  display: flex;
-  align-items: center;
-  background-color: color-mix(in srgb, var(--ce-text-inverse) 15%, transparent);
-  border-radius: var(--ce-radius-5);
-  padding: 10px;
-  color: var(--ce-color-white);
-  font-weight: bold;
-  .ratingBar {
-    height: 10px;
-    background-color: var(--ce-color-accent);
-    border-radius: var(--ce-radius-5);
-    margin-right: 10px;
-  }
-
-  span {
-    font-size: 1em;
-  }
-}
-
-.multichoiceAnswer {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
-  background-color: color-mix(in srgb, var(--ce-text-inverse) 15%, transparent);
-  border-radius: var(--ce-radius-5);
-  padding: 10px;
-  color: var(--ce-color-white);
-  font-weight: bold;
-  .choiceItem {
-    background-color: var(--ce-color-accent);
-    color: var(--ce-color-bg);
-    padding: 5px 10px;
-    border-radius: var(--ce-radius-15);
-    font-size: 0.9em;
-  }
-}
-
-.binaryAnswer {
-  background-color: color-mix(in srgb, var(--ce-text-inverse) 15%, transparent);
-  border-radius: var(--ce-radius-5);
-  padding: 10px;
-  color: var(--ce-color-white);
-  font-weight: bold;
-}
-
-/* JSON Preview Copy Button (General Utility) */
-.jsonContainer {
-  position: relative;
-}
-
-.copyJsonButton {
-  position: absolute !important;
-  top: 10px !important;
-  right: 10px !important;
-  background: transparent !important;
-  border: none !important;
-  cursor: pointer !important;
-  transition: none !important;
-  // Ensure link inside the button also inherits the style
-  a.copyJsonButton {
-    color: var(--ce-color-black) !important;
-    font-size: 1.5em !important;
-    text-decoration: none !important; // Ensures no underline on links
-  }
-
-  // Ensures all pseudo-elements have no hover or focus effects
-  &:hover,
-  &:active,
-  &:focus {
-    background-color: transparent !important;
-    outline: none !important;
-    box-shadow: none !important;
-    color: inherit !important; // No color change on focus or hover    transform: none !important;
-  }
-}
-
-.copyJsonButton:hover {
-  color: var(--ce-status-success-text);
-}
-
 /* Styles for the existing user response notice */
 .userResponseNotice {
   display: inline-flex;
@@ -2134,6 +1792,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   margin-bottom: 20px;
   margin-top: 20px;
   background-color: color-mix(in srgb, var(--ce-text-inverse) 90%, transparent);
+  color: var(--ce-document-text);
   border-radius: var(--ce-radius-8);
   border: 1px solid color-mix(in srgb, var(--ce-document-border) 95%, transparent);
   padding: 18px 20px;
@@ -2194,10 +1853,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 /* Buttons within userResponseNotice */
 #startFreshButton,
 #decryptEditButton,
-#editButton,
-#viewAnswersButton,
 #answerSurveyButton,
-#updateResponseButton,
 #exitEditingButton {
   margin-right: 10px;
   font-size: 1em;
@@ -2233,17 +1889,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   letter-spacing: 0.02em;
 }
 
-#editButton {
-  background-color: var(--ce-status-warning);
-  border-color: var(--ce-status-warning);
-  color: var(--ce-color-dark);
-  &:hover {
-    background-color: var(--ce-status-warning);
-    border-color: var(--ce-status-warning);
-  }
-}
-
-#viewAnswersButton,
 #answerSurveyButton {
   /* Combined as they serve similar toggle purpose */
   background-color: var(--ce-status-info);
@@ -2284,16 +1929,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   }
 }
 
-#updateResponseButton {
-  background-color: var(--ce-status-info);
-  border-color: var(--ce-status-info);
-  color: var(--ce-color-white);
-  &:hover {
-    background-color: var(--ce-status-info);
-    border-color: var(--ce-status-info);
-  }
-}
-
 #exitEditingButton {
   background-color: color-mix(in srgb, var(--ce-text-inverse) 72%, transparent);
   border-color: color-mix(in srgb, var(--ce-status-info) 55%, transparent);
@@ -2325,39 +1960,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   flex-direction: row;
   justify-content: space-evenly;
   align-items: center;
-}
-
-#copySurveyIdIcon {
-  font-size: 1.5em;
-  margin-left: 10px;
-  margin-right: 10px;
-}
-
-/* Survey ID Preview */
-.surveyIdContainer {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-top: 10px;
-  font-weight: 600;
-  color: var(--ce-text-muted);
-  opacity: 0.75;
-}
-
-.surveyIdText {
-  font-size: 1.25em;
-  margin-left: 5px;
-  margin-right: 5px;
-}
-
-.copySurveyIdButton {
-  /* Class used in SurveySelector */
-  font-size: 1.25em;
-  background: none;
-  border: none;
-  padding: 0;
-  cursor: pointer;
-  margin-right: 5px;
 }
 
 /* Mobile-specific dropdown styles */
@@ -2523,18 +2125,9 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   backdrop-filter: blur(10px);
 
   .convictionToggleLine,
-  .lockAudienceMeta,
   .lockAudienceGateDetailItem {
     opacity: 0.8;
   }
-}
-
-.lockAudienceMeta {
-  margin-top: 2px;
-  font-size: 0.78rem;
-  font-weight: 600;
-  color: var(--ce-color-white);
-  opacity: 0.7;
 }
 
 .lockAudienceGateRow {
@@ -2678,6 +2271,18 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   color: var(--ce-panel-text);
 }
 
+// The paste box on the dialog. The theme recipe for bare fields outranks its own rule, hence !important:
+// it drew Context Engine's body slate (2.9:1) inside a 1.3:1 edge.
+.sessionListeningPanelEmbedded :global([class*='paste']) textarea {
+  border: 1px solid var(--ce-panel-text-muted) !important;
+  color: var(--ce-panel-text) !important;
+
+  &::placeholder {
+    color: var(--ce-panel-text-muted);
+    opacity: 1;
+  }
+}
+
 .sessionListeningHeader,
 .sessionListeningActions {
   display: flex;
@@ -2696,7 +2301,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   min-width: 0;
   font-size: 0.92rem;
   font-weight: 800;
-  color: var(--ce-overlay-surface);
+  color: var(--ce-document-text);
 }
 
 .sessionListeningClose {
@@ -2729,23 +2334,25 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
 .sessionListeningRecordWrap {
   display: flex;
-  justify-content: center;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
   padding: 0 0 2px;
 }
 
 .sessionListeningRecordButton {
-  width: 132px;
-  height: 132px;
-  border-radius: var(--ce-radius-round) !important;
+  min-width: 132px;
+  min-height: 46px;
+  border-radius: 8px !important;
   border: 2px solid color-mix(in srgb, var(--ce-status-success) 50%, transparent) !important;
   background: var(--ce-status-success) !important;
-  color: var(--ce-text-inverse) !important;
+  color: var(--ce-status-success-contrast) !important;
   display: inline-flex !important;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 14px !important;
+  padding: 10px 16px !important;
   box-shadow: 0 14px 28px color-mix(in srgb, var(--ce-overlay-surface) 25%, transparent);
   font-weight: 900 !important;
   line-height: 1.1;
@@ -2758,7 +2365,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   &:focus:not(:disabled) {
     background: var(--ce-status-success) !important;
     border-color: color-mix(in srgb, var(--ce-status-success) 72%, transparent) !important;
-    color: var(--ce-text-inverse) !important;
+    color: var(--ce-status-success-contrast) !important;
     transform: translateY(-1px);
     box-shadow: 0 18px 34px color-mix(in srgb, var(--ce-overlay-surface) 32%, transparent);
   }
@@ -2770,7 +2377,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 }
 
 .sessionListeningRecordIcon {
-  font-size: 2.2rem;
+  font-size: 1.2rem;
   line-height: 1;
 }
 
@@ -2778,6 +2385,72 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   font-size: 0.95rem;
   max-width: 100%;
   text-align: center;
+}
+
+// In the dialog, Record is centred and looks like the voice interview's microphone: a circle with its label
+// beneath. Outside it, on the light panel, the filled button above stays readable.
+.sessionListeningPanelEmbedded {
+  .sessionListeningRecordWrap {
+    justify-content: center;
+  }
+
+  .sessionListeningRecordButton {
+    flex-direction: column;
+    gap: 12px;
+    min-width: 112px;
+    min-height: 0;
+    padding: 10px 4px !important;
+    border: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    color: var(--ce-panel-text) !important;
+    font-family: var(--ce-font-body);
+    font-weight: 700 !important;
+    line-height: 1.4;
+    text-decoration: none !important;
+
+    &:hover:not(:disabled),
+    &:focus:not(:disabled),
+    &:active:not(:disabled) {
+      background: transparent !important;
+      box-shadow: none !important;
+      color: var(--ce-panel-text) !important;
+      transform: none;
+
+      .sessionListeningRecordIcon {
+        background: color-mix(in srgb, var(--ce-status-info-text) 14%, var(--ce-card-bg));
+        border-color: var(--ce-status-info-text);
+      }
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--ce-status-info-text);
+      outline-offset: 2px;
+    }
+
+    &:disabled {
+      border: 0 !important;
+      background: transparent !important;
+      color: var(--ce-panel-text-muted) !important;
+
+      .sessionListeningRecordIcon {
+        border-style: dashed;
+        color: var(--ce-control-text);
+      }
+    }
+  }
+
+  .sessionListeningRecordIcon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 104px;
+    height: 104px;
+    border: 2px solid var(--ce-panel-text-muted);
+    border-radius: 50%;
+    color: var(--ce-status-info-text);
+    font-size: 3.5rem;
+  }
 }
 
 .sessionListeningActiveRecorder {
@@ -2828,7 +2501,8 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   padding: 4px 8px;
   border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 28%, transparent);
   border-radius: var(--ce-radius-12);
-  background: color-mix(in srgb, var(--ce-compat-dark) 58%, transparent);
+  // Opaque enough for white text over the light waveform canvas (4.3:1 at 58%).
+  background: color-mix(in srgb, var(--ce-compat-dark) 82%, transparent);
   color: var(--ce-text-inverse);
   font-size: 0.82rem;
   font-weight: 800;
@@ -2838,6 +2512,11 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 .sessionListeningTimerDot {
   color: var(--ce-status-error);
   font-size: 0.62rem;
+}
+
+// The recorder's timer chip is dark in every theme; towards its white label, Minimal's red is 3.4:1, not 1.6:1.
+.sessionListeningPanel .sessionListeningTimerDot {
+  color: color-mix(in srgb, var(--ce-status-error) 60%, var(--ce-text-inverse));
 }
 
 .sessionListeningTimerDotPaused {
@@ -2872,8 +2551,10 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   align-items: center;
   justify-content: center;
 
+  // Pressed, the face is halfway to white: the full border colour is Classic 95's dark grey, where the
+  // Stop icon was 2:1.
   &:active:not(:disabled) {
-    background: var(--ce-document-border);
+    background: color-mix(in srgb, var(--ce-document-border) 50%, var(--ce-text-inverse));
     box-shadow:
       inset 1px 1px 0 var(--ce-text-inverse),
       inset -1px -1px 0 var(--ce-text-muted);
@@ -2894,7 +2575,17 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 }
 
 .sessionListeningStopButton {
-  color: var(--ce-status-error);
+  // Deepened towards the pause icon's dark ink: the error red alone was 1.7:1 on Classic 95's grey face.
+  color: color-mix(in srgb, var(--ce-status-error) 65%, var(--ce-compat-dark));
+}
+
+// The recorder box, the transcript box and the panel outside the dialog are light in every theme, where
+// Context Engine's green focus ring was 1.2:1; there it takes the document text colour.
+.sessionListeningPanel
+  :is(.sessionListeningActiveRecorder, .sessionListeningTranscriptDetails)
+  :is(button, [tabindex]):focus-visible,
+.sessionListeningPanel:not(.sessionListeningPanelEmbedded) :is(a, button, input, textarea):focus-visible {
+  outline-color: var(--ce-document-text);
 }
 
 .sessionListeningSrOnly {
@@ -2912,7 +2603,91 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 .sessionListeningGenerate {
   background: var(--ce-status-success) !important;
   border-color: var(--ce-status-success) !important;
-  color: var(--ce-text-inverse) !important;
+  color: var(--ce-status-success-contrast) !important;
+}
+
+// Global `.btn:hover`, `.btn-secondary:focus` and `.btn:active` rules clear button fills with !important,
+// which left this label on the surface behind it (white on white in Minimal). The element selector outranks them.
+button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
+  background: var(--ce-status-success) !important;
+}
+
+.sessionListeningGenerate:disabled,
+.sessionListeningRecordButton:disabled {
+  opacity: 1 !important;
+  background: var(--ce-control-face) !important;
+  color: var(--ce-panel-text-muted) !important;
+  border: 1px dashed currentColor !important;
+  box-shadow: none;
+  cursor: default;
+}
+
+.sessionRecordingOptions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  color: inherit;
+  font-size: 0.82rem;
+
+  label,
+  button {
+    color: inherit;
+  }
+  label {
+    margin: 0;
+  }
+}
+
+.sessionRecordingOption {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+// The recorder's text actions. An outline in the text colour marks them as buttons on any surface,
+// including Minimal, which otherwise frames buttons by their fill alone.
+.sessionRecordingButton {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 8px 14px !important;
+  border: 1px solid currentColor !important;
+  border-radius: var(--ce-radius-6) !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: inherit !important;
+  font-size: 0.95rem !important;
+  font-weight: 700 !important;
+  line-height: 1.2;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    background: color-mix(in srgb, currentColor 12%, transparent) !important;
+  }
+
+  &:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 2px;
+  }
+}
+
+// Capture warnings, such as a paused microphone or no screen lock: a bar and tint set them apart.
+.sessionRecordingWakeNotice {
+  width: 100%;
+  padding: 10px 12px;
+  border-left: 4px solid var(--ce-status-warning-text);
+  border-radius: var(--ce-radius-6);
+  background: color-mix(in srgb, var(--ce-status-warning-text) 12%, transparent);
+  color: inherit;
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1.4;
+
+  p {
+    margin: 0 0 8px;
+  }
 }
 
 .sessionListeningMeta {
@@ -2920,13 +2695,13 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   align-items: center;
   flex-wrap: wrap;
   gap: 6px;
-  color: color-mix(in srgb, var(--ce-overlay-surface) 72%, transparent);
+  color: var(--ce-document-text);
   font-size: 0.82rem;
   font-weight: 700;
 }
 
 .sessionListeningMeta > span {
-  border: 1px solid color-mix(in srgb, var(--ce-overlay-surface) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ce-document-text) 12%, transparent);
   border-radius: var(--ce-radius-pill);
   background: var(--ce-text-inverse);
   padding: 3px 8px;
@@ -2954,7 +2729,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 }
 
 .sessionListeningTranscriptButton span:last-child {
-  color: color-mix(in srgb, var(--ce-overlay-surface) 62%, transparent);
+  color: var(--ce-document-text-muted);
   font-size: 0.78rem;
   font-weight: 700;
 }
@@ -2967,17 +2742,18 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   transform: rotate(180deg);
 }
 
+// The pill is white in every theme, so its label keeps the document text colour (Context Engine's info
+// blue was 3.4:1 on it) and the outline marks hover and focus.
 .sessionListeningTranscriptButton:hover,
 .sessionListeningTranscriptButton:focus-visible {
-  border-color: color-mix(in srgb, var(--ce-status-info) 34%, transparent);
-  color: var(--ce-status-info);
+  border-color: var(--ce-status-info) !important;
 }
 
 .sessionListeningError {
   border: 1px solid color-mix(in srgb, var(--ce-status-error) 24%, transparent);
   border-radius: var(--ce-radius-8);
-  background: var(--ce-status-danger-text);
-  color: var(--ce-status-error);
+  background: color-mix(in srgb, var(--ce-status-error) 14%, var(--ce-surface-sunken));
+  color: var(--ce-panel-text);
   padding: 8px 10px;
   font-size: 0.86rem;
 }
@@ -3006,10 +2782,39 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   color: var(--ce-document-text);
   padding: 10px 42px 10px 12px;
   line-height: 1.45;
+
+  // A phone wraps each turn over several lines; a taller box keeps more of the conversation in view.
+  @media (max-width: 640px) {
+    min-height: min(45vh, 320px);
+  }
 }
 
-.sessionListeningTranscript::placeholder {
-  color: color-mix(in srgb, var(--ce-overlay-surface) 48%, transparent);
+.sessionListeningTranscript p {
+  margin: 0 0 6px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+// A speaker's label, opening their code: it reads as the label it replaces, underlined under the pointer.
+.sessionTranscriptSpeaker {
+  display: inline;
+  // A copied selection of the transcript keeps who said each line.
+  user-select: text;
+  margin: 0;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0;
+  background: none !important;
+  box-shadow: none !important;
+  font: inherit;
+  line-height: inherit;
+  vertical-align: baseline;
+  cursor: pointer;
+
+  &:hover strong,
+  &:focus-visible strong {
+    text-decoration: underline;
+  }
 }
 
 .sessionListeningClearTranscript {
@@ -3020,8 +2825,9 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   height: 28px;
   border: 1px solid color-mix(in srgb, var(--ce-overlay-surface) 16%, transparent);
   border-radius: var(--ce-radius-6);
-  background: color-mix(in srgb, var(--ce-status-info-text) 96%, transparent);
-  color: var(--ce-status-info);
+  // The transcript box is white in every theme; info colours were 2.2:1 here, and navy on navy in Classic 95.
+  background: var(--ce-text-inverse);
+  color: var(--ce-document-text);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -3033,9 +2839,145 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   color: var(--ce-status-error);
 }
 
+// Dimmed while recording, but still 3:1 or more.
 .sessionListeningClearTranscript:disabled {
-  opacity: 0.45;
+  opacity: 0.6;
   cursor: not-allowed;
+}
+
+// The drafts end with the question-type chooser, so the submit button stays at the bottom of the
+// scrolling panel while any draft is in view.
+.sessionListeningSubmit {
+  position: sticky !important;
+  bottom: 0;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  background: var(--ce-surface-sunken);
+}
+
+.sessionListeningSubmitButton {
+  // On a phone its label wraps, so it stays on the line with the transcript box.
+  flex: 1 1 110px;
+  width: auto !important;
+  min-width: 0;
+  min-height: 56px !important;
+  margin: 0 !important;
+  font-size: 1.1rem !important;
+  white-space: normal !important;
+
+  @media (max-width: 480px) {
+    flex-basis: 96px;
+    padding: 8px !important;
+    font-size: 0.95rem !important;
+  }
+}
+
+// On the same line as Submit questions; once ticked, who can read it takes a line of its own above them.
+.sessionTranscriptContext {
+  display: contents;
+}
+
+.sessionTranscriptContextLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 700;
+  line-height: 1.2;
+  cursor: pointer;
+
+  input {
+    flex: none;
+    width: 28px;
+    height: 28px;
+    accent-color: var(--ce-action-accent);
+  }
+
+  span {
+    max-width: 8.5em;
+  }
+}
+
+// Who may read the transcript: the picker paints its own fields, so this only places it.
+.sessionTranscriptContextAccess {
+  order: -1;
+  flex: 1 1 100%;
+}
+
+// In the dialog it rests 10px above the body's edge, inside the body's 18px padding, on a strip of the
+// dialog's own colour (like the interview's review bar), so no draft shows around or beneath it.
+.sessionListeningPanelEmbedded .sessionListeningSubmit {
+  bottom: -8px;
+  box-shadow:
+    0 0 0 10px var(--ce-surface-sunken),
+    0 -12px 24px color-mix(in srgb, var(--ce-overlay-base) 16%, transparent) !important;
+}
+
+// Unseen drafts unpin it, so uploading every draft means scrolling past the new ones first.
+.sessionListeningPanel:has(.sessionNewDraftsCue button) .sessionListeningSubmit {
+  position: relative !important;
+}
+
+// Fields reached by Tab or the caret scroll clear of the pinned button.
+.sessionVoiceModeModal :global(.modal-body):has(.sessionListeningSubmit) {
+  scroll-padding-bottom: 96px;
+}
+
+// And of the new-drafts cue's lane; so does the first new draft when the cue scrolls to it.
+.sessionVoiceModeModal :global(.modal-body):has(.sessionNewDraftsCue > button) {
+  scroll-padding-top: 64px;
+}
+
+// The new-drafts cue. Until it shows it takes no space (the negative margin cancels the panel's 10px gap).
+// While it shows it has a lane above the recorder, across the body's side padding, which sticks to the top of
+// the dialog in the dialog's own colour, so it never sits over the recorder or a draft's chip and buttons, and
+// drafts scroll beneath it.
+.sessionNewDraftsCue {
+  display: flex;
+  justify-content: center;
+  margin-bottom: -10px;
+
+  &:has(> button) {
+    position: sticky;
+    // Sticky offsets start inside the body's padding, where scrolled drafts would show above the lane.
+    top: calc(-1 * var(--ce-voice-body-pad));
+    z-index: 3;
+    box-sizing: border-box;
+    min-height: 56px;
+    margin: 0 calc(-1 * var(--ce-voice-body-pad)) -10px;
+    padding: 8px var(--ce-voice-body-pad);
+    background: var(--ce-surface-sunken);
+  }
+
+  button {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 40px;
+    padding: 8px 16px;
+    border: 0 !important;
+    border-radius: var(--ce-radius-pill) !important;
+    background: var(--ce-action-accent);
+    box-shadow: 0 6px 18px color-mix(in srgb, var(--ce-overlay-base) 32%, transparent) !important;
+    color: var(--ce-action-accent-text);
+    font-size: 0.95rem;
+    font-weight: 800;
+    line-height: 1.2;
+    cursor: pointer;
+
+    &:hover {
+      background: var(--ce-action-accent-hover);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--ce-focus-ring);
+      outline-offset: 2px;
+    }
+  }
 }
 
 .sessionListeningCreateWrap {
@@ -3049,9 +2991,10 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     box-shadow: 0 16px 32px color-mix(in srgb, var(--ce-overlay-base) 14%, transparent) !important;
   }
 
+  // Draft cards' answer previews keep the answer input's own colours.
   h3,
   h4,
-  label,
+  label:where(:not([class*='interviewQuestionPreview'] label)),
   strong {
     color: var(--ce-document-text) !important;
   }
@@ -3097,7 +3040,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     box-shadow: 0 10px 22px color-mix(in srgb, var(--ce-overlay-base) 12%, transparent) !important;
   }
 
-  :global([class*='step']) {
+  :global([class*='step']):where(:not([class*='interviewQuestionPreview'] *)) {
     color: color-mix(in srgb, var(--ce-overlay-surface) 72%, transparent) !important;
 
     span,
@@ -3127,28 +3070,29 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     box-shadow: 0 3px 10px color-mix(in srgb, var(--ce-overlay-base) 8%, transparent) !important;
   }
 
+  // Chips filled with a status text colour take the sunken surface colour, which contrasts with it in every theme.
   :global([class*='pill']) {
     background: var(--ce-status-info-text) !important;
     border-color: color-mix(in srgb, var(--ce-overlay-surface) 18%, transparent) !important;
-    color: var(--ce-document-text) !important;
+    color: var(--ce-surface-sunken) !important;
   }
 
   :global([class*='pillAgree']) {
     background: var(--ce-status-success-text) !important;
     border-color: color-mix(in srgb, var(--ce-status-success) 35%, transparent) !important;
-    color: var(--ce-overlay-surface) !important;
+    color: var(--ce-surface-sunken) !important;
   }
 
   :global([class*='pillDisagree']) {
     background: var(--ce-status-danger-text) !important;
     border-color: color-mix(in srgb, var(--ce-status-error) 32%, transparent) !important;
-    color: var(--ce-status-error) !important;
+    color: var(--ce-surface-sunken) !important;
   }
 
   :global([class*='pillUnsure']) {
     background: var(--ce-status-warning-text) !important;
     border-color: color-mix(in srgb, var(--ce-status-warning) 34%, transparent) !important;
-    color: var(--ce-overlay-surface) !important;
+    color: var(--ce-surface-sunken) !important;
   }
 
   :global([class*='freeformPreview']),
@@ -3174,7 +3118,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   :global([class*='removeOptionButton']):hover {
     background: var(--ce-status-danger-text) !important;
     border-color: color-mix(in srgb, var(--ce-status-error) 35%, transparent) !important;
-    color: var(--ce-status-error) !important;
+    color: var(--ce-surface-sunken) !important;
   }
 
   :global([class*='addOptionButton']):hover,
@@ -3182,7 +3126,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   :global([class*='magicTagButton']):hover {
     background: var(--ce-status-success-text) !important;
     border-color: color-mix(in srgb, var(--ce-status-success) 35%, transparent) !important;
-    color: var(--ce-overlay-surface) !important;
+    color: var(--ce-surface-sunken) !important;
   }
 
   :global([class*='tagInputGroup']) {
@@ -3201,11 +3145,11 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   :global([class*='filterBubble']) {
     background: var(--ce-status-success-text) !important;
     border-color: color-mix(in srgb, var(--ce-status-success) 35%, transparent) !important;
-    color: var(--ce-overlay-surface) !important;
+    color: var(--ce-surface-sunken) !important;
   }
 
   :global([class*='removeIcon']) {
-    color: var(--ce-overlay-surface) !important;
+    color: var(--ce-surface-sunken) !important;
   }
 
   :global([class*='jsonDisplay']) {
@@ -3217,18 +3161,35 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   :global([class*='buttonContent']) {
     color: var(--ce-text-inverse) !important;
   }
+
+  // A Submit held off while new drafts generate, or submitting over its progress bar, had a label of
+  // 1.1:1 in white on Minimal's disabled face and 3.9:1 in the disabled text colour on Context Engine's bar.
+  :disabled > :global([class*='buttonContent']) {
+    color: var(--ce-panel-text) !important;
+  }
 }
 
 .sessionListeningPanelEmbedded .sessionListeningCreateWrap {
+  // The dialog frames the drafts, so the authoring card adds no padding or border of its own.
   :global([class*='createSurveyContainer']) {
+    padding: 0 !important;
+    border: 0 !important;
     background: transparent !important;
     color: var(--ce-panel-text) !important;
     box-shadow: none !important;
   }
 
+  @media (max-width: 640px) {
+    :global([class*='questionContainer']),
+    :global([class*='typeSelectorBlock']),
+    :global([class*='surveySubmissionConfirmation']) {
+      padding: 12px !important;
+    }
+  }
+
   h3,
   h4,
-  label,
+  label:where(:not([class*='interviewQuestionPreview'] label)),
   strong,
   :global([class*='toggleLabel']),
   :global([class*='inheritToggle']),
@@ -3260,14 +3221,17 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   :global([class*='questionTypeSelect']),
   :global([class*='associatedSurveyInput']),
   :global([class*='tagInputField']),
-  :global([class*='tagsInput']) {
-    background: color-mix(in srgb, var(--ce-overlay-surface) 68%, transparent) !important;
-    border-color: color-mix(in srgb, var(--ce-panel-text) 22%, transparent) !important;
+  :global([class*='tagsInput']),
+  :global(.form-control) {
+    // The dialog's own colour, which its text is made for: Classic 95's overlay colour is navy, where black
+    // text was 2.8:1. Muted panel text keeps each field's edge at 3:1 or more on its card.
+    background: color-mix(in srgb, var(--ce-surface-sunken) 68%, transparent) !important;
+    border-color: var(--ce-panel-text-muted) !important;
     color: var(--ce-panel-text) !important;
     caret-color: var(--ce-panel-text) !important;
 
     &::placeholder {
-      color: color-mix(in srgb, var(--ce-panel-text) 62%, transparent) !important;
+      color: var(--ce-panel-text-muted) !important;
     }
   }
 
@@ -3297,6 +3261,16 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     opacity: 1 !important;
   }
 
+  // The tag field is drawn by its group, whose input has no border or outline of its own.
+  :global([class*='tagInputGroup']) {
+    border-color: var(--ce-panel-text-muted) !important;
+
+    &:focus-within {
+      outline: 2px solid var(--ce-focus-ring);
+      outline-offset: 2px;
+    }
+  }
+
   :global([class*='typeButton']):hover,
   :global([class*='jsonPromptBar']) button:hover,
   :global([class*='jsonPromptBar']) button:focus-visible,
@@ -3318,28 +3292,58 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     color: var(--ce-panel-text) !important;
   }
 
+  // These chips are tinted, not filled, so the remove × takes the chip's text colour, not the dialog's.
+  :global([class*='removeIcon']) {
+    color: inherit !important;
+
+    &:hover {
+      color: var(--ce-status-danger-text) !important;
+    }
+  }
+
+  // At half opacity the help icon's accent was 2:1 in Classic 95.
+  :global([class*='singleSelectLabel']) svg {
+    opacity: 1;
+  }
+
+  // Submit progress sits on the dialog, which its labels mask the connecting line in; on the floating
+  // panel's light pill, Context Engine's success green was 1.9:1.
+  :global([class*='step']):where(:not([class*='interviewQuestionPreview'] *)) {
+    color: var(--ce-panel-text-muted) !important;
+
+    span,
+    svg {
+      background: var(--ce-surface-sunken) !important;
+      box-shadow: 0 0 0 8px var(--ce-surface-sunken) !important;
+    }
+  }
+
+  :global([class*='stepCompleted']) {
+    color: var(--ce-status-success-text) !important;
+  }
+
   :global([class*='pillAgree']) {
     background: color-mix(in srgb, var(--ce-status-success-text) 82%, transparent) !important;
     border-color: color-mix(in srgb, var(--ce-status-success) 46%, transparent) !important;
-    color: var(--ce-overlay-surface) !important;
+    color: var(--ce-surface-sunken) !important;
   }
 
   :global([class*='pillDisagree']) {
     background: color-mix(in srgb, var(--ce-status-danger-text) 82%, transparent) !important;
     border-color: color-mix(in srgb, var(--ce-status-error) 44%, transparent) !important;
-    color: var(--ce-status-error) !important;
+    color: var(--ce-surface-sunken) !important;
   }
 
   :global([class*='pillUnsure']) {
     background: color-mix(in srgb, var(--ce-status-warning-text) 90%, transparent) !important;
     border-color: color-mix(in srgb, var(--ce-status-warning) 46%, transparent) !important;
-    color: var(--ce-overlay-surface) !important;
+    color: var(--ce-surface-sunken) !important;
   }
 
   :global([class*='freeformPreview']),
   :global([class*='ratingPreviewWrap']),
   :global([class*='jsonDisplay']) {
-    background: color-mix(in srgb, var(--ce-overlay-surface) 58%, transparent) !important;
+    background: color-mix(in srgb, var(--ce-surface-sunken) 58%, transparent) !important;
     border-color: color-mix(in srgb, var(--ce-panel-text) 18%, transparent) !important;
     color: var(--ce-panel-text) !important;
   }
@@ -3349,7 +3353,180 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   }
 }
 
+.sessionRecordingHeading {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+// The dialog's title row: its heading, then the scan button at the far end, beside the close button.
+.sessionVoiceModeTitle {
+  display: flex;
+  flex: 1;
+  // A phone too narrow for the title and its icons puts the icons on a line of their own, not under the close.
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 8px;
+  width: 100%;
+}
+
+.sessionVoiceModeTitle > :global(.btn) {
+  flex: none;
+  white-space: nowrap;
+}
+
+// The title row's icon buttons, together at its far end.
+.sessionVoiceModeActions {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  margin-inline-start: auto;
+}
+
+.sessionVoiceModeSlot {
+  display: contents;
+}
+
+// Handing a person their part of a recording. The people's colours are for white, as in the transcript.
+.sessionClaimShare {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.sessionClaimPeople {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.sessionClaimPersonGroup {
+  display: inline-flex;
+}
+
+.sessionClaimPersonButton {
+  min-height: 44px;
+  padding: 6px 12px;
+  border: 2px solid currentColor !important;
+  border-radius: var(--ce-radius-8);
+  background: var(--ce-text-inverse);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+// A finger holds the button to drag it, which mustn't select its label or open a callout. Safari reads only the
+// prefixed property, and the build adds no prefixes.
+.sessionClaimPersonDraggable {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+// Joined to its × on the right.
+.sessionClaimPersonGrouped {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.sessionClaimSplit {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 6px 10px;
+  border: 2px solid currentColor !important;
+  border-left: 0 !important;
+  border-radius: 0 var(--ce-radius-8) var(--ce-radius-8) 0;
+  background: var(--ce-text-inverse);
+  cursor: pointer;
+}
+
+.sessionClaimPersonDragging {
+  position: relative;
+  z-index: 2;
+  cursor: grabbing;
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--ce-compat-dark) 25%, transparent);
+}
+
+// Where a dragged person would land: an outline, so the label keeps its contrast.
+.sessionClaimPersonTarget {
+  outline: 3px solid currentColor;
+  outline-offset: 3px;
+}
+
+.sessionClaimHeading {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sessionClaimPerson {
+  padding: 2px 10px;
+  border-radius: var(--ce-radius-6);
+  background: var(--ce-text-inverse);
+  font-weight: 700;
+}
+
+.sessionClaimCode {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+// White and as large as the dialog allows: the camera needs the contrast and the detail, whatever the theme.
+.sessionClaimCodeBox {
+  width: min(100%, 68vh, 640px);
+  background: var(--ce-text-inverse);
+  line-height: 0;
+
+  svg {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+}
+
+.sessionClaimProgress {
+  margin: 0;
+}
+
+.sessionClaimActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+.sessionClaimScanner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+
+  p {
+    margin: 0;
+    text-align: center;
+  }
+}
+
+.sessionClaimVideo {
+  width: min(100%, 60vh);
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: var(--ce-radius-8);
+  background: var(--ce-overlay-base);
+}
+
+.sessionClaimMeter {
+  width: min(100%, 60vh);
+}
+
 .sessionVoiceModeModal {
+  // The body's padding, which the new-drafts cue's lane spans.
+  --ce-voice-body-pad: 18px;
+
   display: flex;
   flex-direction: column;
   max-height: min(90vh, 900px);
@@ -3361,13 +3538,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   box-shadow: var(--ce-card-shadow) !important;
   font-family: var(--ce-font-mono);
 
-  :global(.modal-header),
-  :global(.modal-footer) {
-    border-color: var(--ce-card-border);
-    background: var(--ce-card-bg);
-    color: var(--ce-panel-text);
-  }
-
   :global(.modal-header) {
     background: var(--ce-surface-sunken) !important;
     color: var(--ce-panel-text) !important;
@@ -3377,6 +3547,8 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   }
 
   :global(.modal-title) {
+    // Its row runs the width of the header, so a button can sit in the far corner.
+    flex: 1;
     color: var(--ce-panel-text) !important;
     font-size: clamp(1.35rem, 2.4vw, 1.6rem);
     font-weight: 800;
@@ -3385,7 +3557,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
   :global(.modal-body) {
     min-height: 0;
-    padding: 18px;
+    padding: var(--ce-voice-body-pad);
     overflow-y: auto;
     overscroll-behavior: contain;
     scrollbar-gutter: stable;
@@ -3407,7 +3579,8 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     background: transparent;
     color: var(--ce-panel-text);
     filter: none;
-    opacity: 0.5;
+    // At 0.5 the civic × was 2.9:1, under the 3:1 an icon-only control needs.
+    opacity: 0.75;
   }
 
   :global(.modal-header) :global(.btn-close):hover,
@@ -3436,38 +3609,50 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   }
 }
 
+.sessionVoiceModeLauncher {
+  display: grid;
+  gap: 12px;
+}
+
 .sessionVoiceModeChooser {
+  // The choices' padding, which also places each "?" beside its icon.
+  --ce-voice-choice-pad: clamp(14px, 3vw, 28px);
+
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
+}
 
-  button {
-    min-height: 220px;
-    min-width: 0;
-    padding: clamp(14px, 3vw, 28px);
-    border: 1px solid var(--ce-card-border);
-    border-radius: var(--ce-radius-8);
-    background: var(--ce-card-bg);
-    color: var(--ce-panel-text);
-    box-shadow: var(--ce-card-shadow);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: flex-start;
-    gap: 14px;
-    text-align: center;
-    cursor: pointer;
-  }
+.sessionVoiceModeChoice {
+  position: relative;
+  display: grid;
+  min-width: 0;
+}
 
-  button:hover,
-  button:focus-visible {
+.sessionVoiceModeChoiceButton {
+  min-width: 0;
+  padding: var(--ce-voice-choice-pad);
+  border: 1px solid var(--ce-card-border);
+  border-radius: var(--ce-radius-8);
+  background: var(--ce-card-bg);
+  color: var(--ce-panel-text);
+  box-shadow: var(--ce-card-shadow);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 14px;
+  text-align: center;
+  cursor: pointer;
+
+  &:hover,
+  &:focus-visible {
     background: var(--ce-action-accent);
     color: var(--ce-action-accent-text);
     outline: 2px solid var(--ce-focus-ring);
     outline-offset: 2px;
 
     strong,
-    span,
     svg {
       color: var(--ce-action-accent-text) !important;
     }
@@ -3484,10 +3669,68 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     line-height: 1.25;
     overflow-wrap: anywhere;
   }
+}
 
-  span {
-    font-size: clamp(0.9rem, 2vw, 1rem);
-    line-height: 1.45;
+// Just right of the choice's icon and level with it: below the card's border and
+// padding, half the 2.4rem icon's height down and half its fixed 1.25em width
+// across, less half this 44px button. On very narrow cards it stops at the edge.
+.sessionVoiceModeChoiceHelp {
+  position: absolute;
+  top: calc(var(--ce-border-control-width, 1px) + var(--ce-voice-choice-pad) + 1.2rem - 22px);
+  left: min(calc(50% + 1.5rem), calc(100% - 44px));
+}
+
+// While its card is highlighted, the "?" and its focus ring take the card's
+// highlight color; the theme's ring color can match the highlight itself.
+.sessionVoiceModeChoiceButton:hover + .sessionVoiceModeChoiceHelp,
+.sessionVoiceModeChoiceButton:focus-visible + .sessionVoiceModeChoiceHelp {
+  color: var(--ce-action-accent-text) !important;
+  outline-color: var(--ce-action-accent-text);
+}
+
+// The AI-prefill option below the voice choices; the prompt card inside it drops its own frame.
+.sessionVoicePrefill {
+  display: grid;
+  gap: 8px;
+  padding: clamp(14px, 3vw, 20px);
+  border: 1px solid var(--ce-card-border);
+  border-radius: var(--ce-radius-8);
+  background: var(--ce-card-bg);
+  box-shadow: var(--ce-card-shadow);
+  color: var(--ce-panel-text);
+  // Matches the voice choices above it rather than the dialog's mono titles.
+  font-family: var(--ce-font-body);
+
+  h3 {
+    margin: 0;
+    color: var(--ce-panel-text);
+    font-family: inherit;
+    font-size: clamp(1.05rem, 2.6vw, 1.25rem);
+    font-weight: 800;
+    line-height: 1.25;
+  }
+
+  .sessionAgentKickoff {
+    padding: 0;
+    border: 0;
+    background: none;
+    box-shadow: none;
+  }
+}
+
+// The "?" follows the heading's last word, even when it wraps, and keeps its
+// 44px target without heightening the line.
+.sessionVoicePrefillHeading {
+  // Even lines, so a narrow screen doesn't strand the "?" on a line of its own.
+  text-wrap: balance;
+
+  h3 {
+    display: inline;
+  }
+
+  .sessionInterviewHeaderButton {
+    margin-block: -8px;
+    vertical-align: middle;
   }
 }
 
@@ -3496,6 +3739,13 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   flex-direction: column;
   gap: 14px;
   color: var(--ce-panel-text);
+}
+
+.sessionInterviewPrefillStatus {
+  margin: 0;
+  color: var(--ce-panel-text-muted);
+  font-size: 0.9rem;
+  text-align: center;
 }
 
 .sessionInterviewContext {
@@ -3595,13 +3845,19 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   color: var(--ce-panel-text) !important;
   font-size: 1rem;
 
-  &:hover {
+  &:hover:not(:disabled) {
     background: color-mix(in srgb, currentColor 12%, transparent) !important;
   }
 
   &:focus-visible {
     outline: 2px solid currentColor;
     outline-offset: 2px;
+  }
+
+  // As Scan code is while a recording captures: dimmed, so it doesn't look ready.
+  &:disabled {
+    opacity: 0.5;
+    cursor: default;
   }
 }
 
@@ -3687,6 +3943,51 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   border-radius: 50%;
 }
 
+// Discard sits left of the microphone, level with its circle, and is quieter than
+// it; it takes the danger tone on hover or focus.
+.sessionInterviewPanel .sessionInterviewDiscard,
+.sessionInterviewDiscardBalance {
+  flex: 0 0 44px;
+  align-self: flex-start;
+  // The microphone's 10px top padding and half its 104px circle, less half of this 44px one.
+  margin-top: 40px;
+}
+
+.sessionInterviewPanel .sessionInterviewDiscard {
+  display: inline-flex;
+  padding: 0;
+  border-radius: 50%;
+  background: transparent !important;
+  color: var(--ce-panel-text-muted) !important;
+  cursor: pointer;
+
+  &:hover:not(:disabled),
+  &:focus-visible {
+    color: var(--ce-status-danger-text) !important;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--ce-focus-ring);
+    outline-offset: 2px;
+  }
+
+  &:disabled {
+    cursor: default;
+    opacity: 0.55;
+  }
+}
+
+.sessionInterviewDiscardCircle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+  font-size: 1rem;
+}
+
 .sessionInterviewPanel .sessionListeningWaveformTimer {
   background: var(--ce-control-face);
   color: var(--ce-control-text);
@@ -3703,69 +4004,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   box-shadow: none !important;
 }
 
-.sessionInterviewQuestionEditor {
-  min-width: 0;
-  font-family: var(--ce-font-body);
-
-  #binaryChoice {
-    justify-content: flex-start;
-    margin: 4px 0;
-  }
-}
-
-.sessionInterviewResearchHelp {
-  align-self: flex-start;
-  padding: 2px 4px;
-  border: 0;
-  background: transparent !important;
-  color: var(--ce-panel-text);
-  box-shadow: none !important;
-
-  &:focus-visible {
-    outline: 2px solid var(--ce-focus-ring);
-    outline-offset: 2px;
-  }
-}
-
-.sessionInterviewResearchConsent {
-  display: flex;
-  align-items: flex-start;
-  gap: 4px;
-}
-
-.sessionInterviewMetadata {
-  padding: 12px;
-  border-radius: var(--ce-radius-8);
-  background: var(--ce-surface-sunken);
-  color: var(--ce-panel-text);
-  font-size: 0.875rem;
-  overflow-wrap: anywhere;
-
-  summary {
-    cursor: pointer;
-    font-weight: 700;
-
-    &:focus-visible {
-      outline: 2px solid var(--ce-focus-ring);
-      outline-offset: 4px;
-    }
-  }
-
-  dl,
-  p,
-  ul {
-    margin: 12px 0 0;
-  }
-
-  dd {
-    margin: 0 0 8px;
-  }
-
-  ul {
-    padding-left: 20px;
-  }
-}
-
 .sessionInterviewPanel :global(.btn-primary) {
   background: var(--ce-action-accent);
   color: var(--ce-action-accent-text);
@@ -3778,6 +4016,10 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     background: var(--ce-action-accent-hover) !important;
     color: var(--ce-action-accent-text) !important;
     border-color: var(--ce-action-accent-hover);
+  }
+
+  &:disabled:hover {
+    background: var(--ce-action-accent) !important;
   }
 }
 
@@ -3792,8 +4034,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   outline-offset: 2px;
 }
 
-.sessionInterviewPanel .sessionInterviewMicrophone:focus-visible,
-.sessionInterviewPanel .sessionAgentKickoffCopyTarget:focus-visible {
+.sessionInterviewPanel .sessionInterviewMicrophone:focus-visible {
   outline: 2px solid var(--ce-status-info-text);
 }
 
@@ -3804,11 +4045,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   background: var(--ce-control-face) !important;
   color: var(--ce-control-text) !important;
   border-color: var(--ce-input-border);
-}
-
-.sessionInterviewPanel .sessionListeningError {
-  background: color-mix(in srgb, var(--ce-status-error) 14%, var(--ce-surface-sunken));
-  color: var(--ce-panel-text);
 }
 
 .sessionInterviewMappingNotice {
@@ -4197,13 +4433,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   }
 }
 
-.sessionInterviewFieldOrigin {
-  margin: 8px 0;
-  color: var(--ce-panel-text);
-  font-size: 0.875rem;
-  line-height: 1.4;
-}
-
 .sessionInterviewDraft {
   position: relative;
   display: grid;
@@ -4215,175 +4444,9 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   color: var(--ce-panel-text);
 }
 
-.sessionInterviewDraftRemoved {
-  border-style: dashed;
-  background: color-mix(in srgb, var(--ce-card-bg) 74%, var(--ce-surface-sunken));
-}
-
-.sessionInterviewDraftRemove {
-  appearance: none;
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  width: 30px;
-  height: 30px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  border: 0;
-  border-radius: var(--ce-radius-6);
-  background: transparent;
-  color: var(--ce-panel-text-muted);
-  cursor: pointer;
-
-  &:hover:not(:disabled),
-  &:focus-visible {
-    background: color-mix(in srgb, var(--ce-status-error) 14%, transparent);
-    color: var(--ce-status-error);
-    outline: 2px solid var(--ce-focus-ring);
-    outline-offset: 1px;
-  }
-
-  &:disabled {
-    cursor: default;
-    opacity: 0.28;
-  }
-}
-
-.sessionInterviewQuestion {
-  font-weight: 800;
-  line-height: 1.35;
-}
-
-.sessionInterviewAnswerInput {
-  min-height: 92px;
-  resize: vertical;
-  background: var(--ce-input-bg) !important;
-  color: var(--ce-panel-text) !important;
-  caret-color: var(--ce-panel-text);
-  font-family: var(--ce-font-body);
-  font-size: 1rem;
-  font-weight: 600;
-  line-height: 1.5;
-  opacity: 1;
-}
-
-.sessionInterviewConfidence {
-  display: grid;
-  gap: 6px;
-  width: min(100%, 440px);
-  color: var(--ce-panel-text);
-  font-size: 0.82rem;
-}
-
-.sessionInterviewConfidenceMeta {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-
-  strong {
-    color: var(--ce-panel-text);
-  }
-
-  span {
-    color: var(--ce-panel-text-muted);
-  }
-}
-
-.sessionInterviewConfidenceTrack {
-  width: 100%;
-  height: 9px;
-  overflow: hidden;
-  border: 1px solid var(--ce-card-border);
-  border-radius: var(--ce-radius-round);
-  background: var(--ce-surface-sunken);
-
-  span {
-    display: block;
-    height: 100%;
-    border-radius: inherit;
-    background: linear-gradient(90deg, var(--ce-status-warning), var(--ce-status-success));
-  }
-}
-
-.sessionInterviewEvidenceDisclosure {
-  display: grid;
-  gap: 6px;
-}
-
-.sessionInterviewEvidenceToggle {
-  appearance: none;
-  width: fit-content;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 3px 2px;
-  border: 0;
-  border-radius: var(--ce-radius-4);
-  background: transparent;
-  color: var(--ce-panel-text);
-  font: inherit;
-  font-size: 0.86rem;
-  font-weight: 800;
-  cursor: pointer;
-
-  &:hover,
-  &:focus-visible {
-    color: var(--ce-panel-text);
-    outline: 2px solid var(--ce-focus-ring);
-    outline-offset: 2px;
-  }
-}
-
-.sessionInterviewEvidenceCaret {
-  transform: rotate(-90deg);
-  transition: transform 150ms ease;
-}
-
-.sessionInterviewEvidenceCaretExpanded {
-  transform: rotate(0);
-}
-
-.sessionInterviewEvidence {
-  padding: 8px 10px;
-  border-left: 3px solid var(--ce-card-border);
-  font-size: 0.9rem;
-  color: var(--ce-panel-text-muted);
-  line-height: 1.45;
-}
-
 .sessionInterviewDraftActions {
   display: flex;
   justify-content: flex-end;
-}
-
-.sessionInterviewDraftApply {
-  appearance: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  min-height: 34px;
-  padding: 6px 10px;
-  border: 1px solid var(--ce-card-border);
-  border-radius: var(--ce-radius-6);
-  background: var(--ce-surface-sunken);
-  color: var(--ce-panel-text);
-  font: inherit;
-  font-size: 0.82rem;
-  font-weight: 800;
-  cursor: pointer;
-
-  &:hover,
-  &:focus-visible {
-    border-color: var(--ce-action-accent);
-    color: var(--ce-action-accent);
-    outline: 2px solid var(--ce-focus-ring);
-    outline-offset: 1px;
-  }
 }
 
 .sessionInterviewPanel .sessionInterviewSubmitButton {
@@ -4411,7 +4474,8 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 8px;
-  margin: 0 -18px -18px;
+  // Auto top margin keeps it at the bottom when the panel holds its height for the score.
+  margin: auto -18px -18px;
   padding: 12px 18px;
   border: 1px solid var(--ce-status-info-text);
   border-radius: 10px 10px 0 0;
@@ -4460,30 +4524,51 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     outline: 2px solid var(--ce-focus-ring);
     outline-offset: 2px;
   }
+
+  &[open] > summary {
+    border-radius: 8px 8px 0 0;
+  }
 }
 
-.sessionInterviewChoicesPanel {
-  position: absolute;
-  bottom: calc(100% + 8px);
-  // Anchor to the whole footer so the disclosure fits inside the dialog.
-  left: 18px;
-  right: 18px;
-  max-width: 620px;
+.sessionInterviewConsentGroup {
+  flex: 1 1 220px;
   min-width: 0;
-  max-height: min(45vh, 420px);
+  max-width: 620px;
+  display: grid;
+  gap: 4px;
+}
+
+// Open, the choices take the whole footer row and Submit wraps below, still at the bottom.
+.sessionInterviewConsentGroupOpen {
+  flex-basis: 100%;
+  max-width: none;
+}
+
+.sessionInterviewSharingStatus {
+  color: var(--ce-panel-text-muted);
+  font-size: 0.78rem;
+  line-height: 1.3;
+}
+
+// The choices open inside the dropdown, under its summary, and scroll within it.
+.sessionInterviewChoicesPanel {
+  min-width: 0;
+  max-height: min(35vh, 320px);
   overflow: auto;
   overscroll-behavior: contain;
-  padding: 12px;
+  padding: 10px;
   display: grid;
   gap: 8px;
-  border: 1px solid var(--ce-status-info-text);
-  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--ce-action-accent) 55%, var(--ce-surface-sunken));
+  border-top: 0;
+  border-radius: 0 0 8px 8px;
   background: var(--ce-surface-sunken);
-  box-shadow: 0 -6px 22px color-mix(in srgb, var(--ce-overlay-base) 25%, transparent);
 }
 
 .sessionInterviewReviewActions .sessionInterviewSubmitButton {
   flex: 0 0 min(100%, 280px);
+  // Opening the dropdown grows the footer upward; the button stays at the bottom.
+  align-self: flex-end;
   margin-left: auto;
 }
 
@@ -4502,12 +4587,13 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
   .sessionInterviewReviewActions {
     bottom: -18px;
-    margin: 0 -18px -18px;
+    margin: auto -18px -18px;
     padding: 12px 18px;
     align-items: stretch;
     flex-direction: column;
   }
 
+  .sessionInterviewConsentGroup,
   .sessionInterviewConsentOptions {
     flex-basis: auto;
     width: 100%;
@@ -4544,6 +4630,13 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     width: min(100%, 560px);
     max-width: calc(100% - 24px);
     margin-bottom: 28px;
+  }
+
+  // Inside the dialog the panel fills its body; the inset above is for the page's floating panel.
+  .sessionListeningPanelEmbedded {
+    width: 100%;
+    max-width: 100%;
+    margin-bottom: 0;
   }
 }
 
@@ -4831,310 +4924,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   font-size: 1.25rem;
 }
 
-.pileHologramToggle {
-  position: absolute;
-  top: 6px;
-  right: 16px;
-  width: 42px;
-  height: 42px;
-  border: 1px solid color-mix(in srgb, var(--ce-data-series-8) 34%, transparent);
-  border-radius: var(--ce-radius-pill);
-  background:
-    radial-gradient(
-      circle at 30% 28%,
-      color-mix(in srgb, var(--ce-text-inverse) 20%, transparent),
-      color-mix(in srgb, var(--ce-text-inverse) 3%, transparent) 54%
-    ),
-    color-mix(in srgb, var(--ce-overlay-surface) 74%, transparent);
-  color: var(--ce-data-series-8);
-  opacity: 0.5;
-  box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--ce-status-info) 8%, transparent),
-    0 16px 32px color-mix(in srgb, var(--ce-overlay-base) 34%, transparent);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1rem;
-  z-index: 8;
-  cursor: pointer;
-  backdrop-filter: blur(10px);
-  transition:
-    opacity 0.2s ease,
-    transform 0.2s ease,
-    color 0.2s ease,
-    border-color 0.2s ease,
-    box-shadow 0.2s ease;
-
-  &:hover,
-  &:focus-visible {
-    opacity: 1;
-    color: var(--ce-data-series-8);
-    transform: translateY(-1px) scale(1.05);
-    border-color: color-mix(in srgb, var(--ce-data-series-8) 66%, transparent);
-    box-shadow:
-      0 0 0 1px color-mix(in srgb, var(--ce-data-series-8) 18%, transparent),
-      0 0 28px color-mix(in srgb, var(--ce-data-series-8) 22%, transparent),
-      0 16px 32px color-mix(in srgb, var(--ce-overlay-base) 42%, transparent);
-    outline: none;
-  }
-}
-
-.pileHologramToggleActive {
-  opacity: 1;
-  color: var(--ce-data-series-8);
-  border-color: color-mix(in srgb, var(--ce-data-series-8) 66%, transparent);
-  box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--ce-data-series-8) 18%, transparent),
-    0 0 28px color-mix(in srgb, var(--ce-data-series-8) 22%, transparent),
-    0 16px 32px color-mix(in srgb, var(--ce-overlay-base) 42%, transparent);
-}
-
-.pileHologramPanel {
-  position: relative;
-  width: 100%;
-  height: 400px;
-  margin-top: 30px;
-  padding: 0;
-  border-radius: var(--ce-radius-20);
-  overflow: hidden;
-  isolation: isolate;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  background:
-    radial-gradient(circle at 50% 32%, color-mix(in srgb, var(--ce-data-series-8) 14%, transparent), transparent 22%),
-    radial-gradient(circle at 50% 66%, color-mix(in srgb, var(--ce-status-info) 18%, transparent), transparent 44%),
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--ce-overlay-surface) 99%, transparent) 0%,
-      color-mix(in srgb, var(--ce-overlay-base) 98%, transparent) 100%
-    );
-  border: 1px solid color-mix(in srgb, var(--ce-data-series-8) 20%, transparent);
-  box-shadow:
-    0 18px 46px color-mix(in srgb, var(--ce-overlay-base) 46%, transparent),
-    inset 0 0 28px color-mix(in srgb, var(--ce-data-series-8) 8%, transparent);
-}
-
-.pileHologramBackdrop,
-.pileHologramScanlines {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-}
-
-.pileHologramBackdrop {
-  background:
-    radial-gradient(circle at 50% 34%, color-mix(in srgb, var(--ce-data-series-8) 20%, transparent), transparent 24%),
-    radial-gradient(circle at 50% 78%, color-mix(in srgb, var(--ce-status-info) 16%, transparent), transparent 34%),
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--ce-data-series-8) 2%, transparent) 0%,
-      color-mix(in srgb, var(--ce-data-series-8) 6%, transparent) 100%
-    );
-}
-
-.pileHologramScanlines {
-  background: repeating-linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--ce-text-inverse) 12%, transparent) 0,
-    color-mix(in srgb, var(--ce-text-inverse) 12%, transparent) 1px,
-    transparent 1px,
-    transparent 6px
-  );
-  opacity: 0.08;
-}
-
-.pileHologramStage {
-  position: relative;
-  z-index: 1;
-  flex: 1 1 auto;
-  min-height: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding-top: 18px;
-}
-
-.pileHologramAura {
-  position: absolute;
-  inset: 50% auto auto 50%;
-  transform: translate(-50%, -50%);
-  border-radius: var(--ce-radius-round);
-  pointer-events: none;
-  width: 396px;
-  height: 396px;
-  background: radial-gradient(
-    circle,
-    color-mix(in srgb, var(--ce-data-series-8) 18%, transparent) 0%,
-    color-mix(in srgb, var(--ce-data-series-8) 8%, transparent) 40%,
-    color-mix(in srgb, var(--ce-status-info) 2%, transparent) 64%,
-    transparent 78%
-  );
-  filter: blur(16px);
-  animation: pileHologramPulse 4.2s ease-in-out infinite;
-}
-
-.pileHologramSvg {
-  position: relative;
-  z-index: 1;
-  display: block;
-  width: min(100%, 432px);
-  height: auto;
-  filter: drop-shadow(0 0 10px color-mix(in srgb, var(--ce-data-series-8) 20%, transparent))
-    drop-shadow(0 0 26px color-mix(in srgb, var(--ce-status-info) 18%, transparent));
-}
-
-.pileHologramFloat {
-  transform-origin: 210px 178px;
-  animation: pileHologramFloat 4.8s ease-in-out infinite;
-}
-
-.pileHologramBustFill {
-  stroke: color-mix(in srgb, var(--ce-data-series-8) 24%, transparent);
-  stroke-width: 1.05;
-  opacity: 0.82;
-}
-
-.pileHologramDepthShell,
-.pileHologramFaceCore,
-.pileHologramFaceGlow,
-.pileHologramDepthOutline {
-  pointer-events: none;
-}
-
-.pileHologramDepthShell {
-  opacity: 0.88;
-}
-
-.pileHologramFaceCore {
-  opacity: 0.95;
-}
-
-.pileHologramFaceGlow {
-  opacity: 0.92;
-}
-
-.pileHologramHeadOutline,
-.pileHologramDepthOutline,
-.pileHologramMeshLine,
-.pileHologramFeatureLine,
-.pileHologramFeatureSoftLine,
-.pileHologramNeckLine,
-.pileHologramContourLine,
-.pileHologramBrowLine,
-.pileHologramSmileLine {
-  fill: none;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.pileHologramHeadOutline {
-  stroke: color-mix(in srgb, var(--ce-data-series-8) 92%, transparent);
-  stroke-width: 1.4;
-}
-
-.pileHologramDepthOutline {
-  stroke: color-mix(in srgb, var(--ce-data-series-8) 34%, transparent);
-  stroke-width: 1.1;
-}
-
-.pileHologramMeshGroup {
-  opacity: 0.98;
-}
-
-.pileHologramMeshLine {
-  stroke: color-mix(in srgb, var(--ce-data-series-8) 80%, transparent);
-  stroke-width: 0.78;
-}
-
-.pileHologramFeatureLine {
-  stroke: color-mix(in srgb, var(--ce-data-series-8) 94%, transparent);
-  stroke-width: 1.18;
-}
-
-.pileHologramContourLine {
-  stroke: color-mix(in srgb, var(--ce-data-series-8) 58%, transparent);
-  stroke-width: 0.96;
-}
-
-.pileHologramFeatureSoftLine,
-.pileHologramNeckLine {
-  stroke: color-mix(in srgb, var(--ce-data-series-8) 72%, transparent);
-  stroke-width: 1.02;
-}
-
-.pileHologramBrowLine {
-  stroke: color-mix(in srgb, var(--ce-data-series-8) 70%, transparent);
-  stroke-width: 0.98;
-}
-
-.pileHologramSmileLine {
-  stroke: color-mix(in srgb, var(--ce-data-series-8) 90%, transparent);
-  stroke-width: 1.02;
-}
-
-.pileHologramIrisGlow {
-  fill: color-mix(in srgb, var(--ce-data-series-8) 22%, transparent);
-  filter: drop-shadow(0 0 5px color-mix(in srgb, var(--ce-data-series-8) 28%, transparent));
-}
-
-.pileHologramEyes {
-  transform-origin: 210px 170px;
-  animation: pileHologramBlink 7s infinite;
-}
-
-.pileHologramPupil {
-  fill: color-mix(in srgb, var(--ce-data-series-8) 90%, transparent);
-}
-
-.pileHologramEyeHighlight {
-  fill: color-mix(in srgb, var(--ce-text-inverse) 82%, transparent);
-}
-
-.pileHologramPulseDots {
-  animation: pileHologramPulse 3.2s ease-in-out infinite;
-}
-
-.pileHologramPulseDot {
-  fill: color-mix(in srgb, var(--ce-data-series-8) 88%, transparent);
-  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--ce-data-series-8) 68%, transparent));
-}
-
-@keyframes pileHologramFloat {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-
-  50% {
-    transform: translateY(-5px);
-  }
-}
-
-@keyframes pileHologramPulse {
-  0%,
-  100% {
-    opacity: 0.46;
-  }
-
-  50% {
-    opacity: 0.96;
-  }
-}
-
-@keyframes pileHologramBlink {
-  0%,
-  46%,
-  50%,
-  100% {
-    transform: scaleY(1);
-  }
-
-  48% {
-    transform: scaleY(0.2);
-  }
-}
-
 /* --- Footer (Submit / Clear) --- */
 .pileFooter {
   display: flex;
@@ -5158,8 +4947,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   pointer-events: none;
 }
 
-.pileFooter .pileIconButton,
-.pileFooter .pileSubmitLink {
+.pileFooter .pileIconButton {
   position: absolute;
   top: 50%;
   left: calc(100% + 12px);
@@ -5171,10 +4959,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     top: 0;
   }
 
-  .pileHologramToggle {
-    top: 36px;
-  }
-
   .pileFooter {
     top: -50px;
     right: 32px;
@@ -5183,8 +4967,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     transform: none;
   }
 
-  .pileFooter .pileIconButton,
-  .pileFooter .pileSubmitLink {
+  .pileFooter .pileIconButton {
     left: calc(100% + 8px);
   }
 }
@@ -5233,16 +5016,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     min-height: 64px;
     padding: 16px 18px;
     font-size: 1.15rem;
-  }
-
-  .singleQuestionSubmitLayout {
-    grid-template-columns: 1fr;
-    gap: 18px;
-  }
-
-  .singleQuestionSubmitRail {
-    width: 100%;
-    min-height: 0;
   }
 
   #surveyFooter.singleQuestionSubmitFooter {
@@ -5315,28 +5088,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     margin-top: 10px;
   }
 
-  .pileHologramPanel {
-    height: 380px;
-    margin-top: 10px;
-  }
-
-  .pileHologramToggle {
-    top: 4px;
-    right: 8px;
-    width: 38px;
-    height: 38px;
-    font-size: 0.92rem;
-  }
-
-  .pileHologramAura {
-    width: 302px;
-    height: 302px;
-  }
-
-  .pileHologramSvg {
-    width: min(100%, 320px);
-  }
-
   .pileEmptyState {
     min-height: 380px;
     margin-top: 10px;
@@ -5356,8 +5107,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     gap: 14px;
   }
 
-  .pileFooter .pileIconButton,
-  .pileFooter .pileSubmitLink {
+  .pileFooter .pileIconButton {
     position: static;
     top: auto;
     left: auto;
@@ -5527,10 +5277,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     top: -30px;
   }
 
-  .pileHologramToggle {
-    top: 14px;
-  }
-
   .pileFooter {
     gap: 4px;
     margin-right: 0;
@@ -5587,10 +5333,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     opacity: 0.14;
   }
 
-  .pileHologramToggle {
-    opacity: 0.5;
-  }
-
   .actionButtonActive {
     opacity: 0.75;
     color: var(--ce-color-accent) !important;
@@ -5599,15 +5341,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
   .pileNavArrow:hover:not(:disabled) {
     filter: none;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .pileHologramAura,
-  .pileHologramFloat,
-  .pileHologramEyes,
-  .pileHologramPulseDots {
-    animation: none !important;
   }
 }
 
@@ -5883,19 +5616,12 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
   .fullQuestionFooter .importanceText,
   .fullQuestionFooter .convictionToggleLine,
-  .fullQuestionFooter .convictionToggleButton,
-  .fullQuestionFooter .convictionToggleDivider,
   .fullQuestionFooter .convictionToggleValue,
   .pileCardFooter .importanceText,
   .pileCardFooter .convictionToggleLine,
-  .pileCardFooter .convictionToggleButton,
-  .pileCardFooter .convictionToggleDivider,
   .pileCardFooter .convictionToggleValue,
   .lockAudiencePopover .convictionToggleLine,
-  .lockAudiencePopover .convictionToggleButton,
-  .lockAudiencePopover .convictionToggleDivider,
   .lockAudiencePopover .convictionToggleValue,
-  .lockAudiencePopover .lockAudienceMeta,
   .lockAudiencePopover .lockAudienceGateDetailItem,
   .lockAudiencePopover .lockAudienceCaretButton {
     color: var(--ce-control-text) !important;
@@ -5915,18 +5641,12 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   .fullQuestionFooter .convictionToggleLine:hover,
   .fullQuestionFooter .convictionToggleLine:focus-visible,
   .fullQuestionFooter .convictionToggleButtonActive,
-  .fullQuestionFooter .convictionToggleButton:hover,
-  .fullQuestionFooter .convictionToggleButton:focus-visible,
   .pileCardFooter .convictionToggleLine:hover,
   .pileCardFooter .convictionToggleLine:focus-visible,
   .pileCardFooter .convictionToggleButtonActive,
-  .pileCardFooter .convictionToggleButton:hover,
-  .pileCardFooter .convictionToggleButton:focus-visible,
   .lockAudiencePopover .convictionToggleLine:hover,
   .lockAudiencePopover .convictionToggleLine:focus-visible,
-  .lockAudiencePopover .convictionToggleButtonActive,
-  .lockAudiencePopover .convictionToggleButton:hover,
-  .lockAudiencePopover .convictionToggleButton:focus-visible {
+  .lockAudiencePopover .convictionToggleButtonActive {
     color: var(--ce-control-text) !important;
     opacity: 1;
     text-shadow: none;
@@ -5965,7 +5685,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     backdrop-filter: none;
   }
 
-  .lockAudiencePopover .lockAudienceMeta,
   .lockAudiencePopover .lockAudienceGateDetailItem {
     opacity: 1;
   }
@@ -6388,6 +6107,23 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   text-transform: uppercase;
 }
 
+.pileSubmitButtonCopy {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.pilePendingAnswerNotice {
+  color: inherit;
+  font-size: 0.75rem;
+  font-weight: 400;
+  line-height: 1.3;
+  letter-spacing: normal;
+  text-transform: none;
+  white-space: normal;
+}
+
 .pileSubmitButtonLabel {
   display: inline-flex;
   align-items: center;
@@ -6561,13 +6297,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   width: 0;
 }
 
-.pileSubmitLink {
-  display: inline-flex;
-  align-items: center;
-  font-size: 1.5rem;
-  color: var(--ce-status-success);
-}
-
 .ratingContainer {
   display: flex;
   align-items: center;
@@ -6709,38 +6438,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   }
 }
 
-.aiPromptToggleBtn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  border: 1px solid var(--ce-status-info-text);
-  background: var(--ce-color-white);
-  color: var(--ce-color-surface);
-  border-radius: var(--ce-radius-6);
-  padding: 6px 10px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: transform 0.06s ease;
-  &:hover {
-    box-shadow: 0 2px 6px color-mix(in srgb, var(--ce-overlay-base) 12%, transparent);
-    transform: translateY(-1px);
-  }
-}
-
 /* Subtle, reusable icon glow (used for lock/comment) */
-@keyframes iconPulseGlow {
-  0% {
-    opacity: 0.72;
-  }
-
-  50% {
-    opacity: 1;
-  }
-
-  100% {
-    opacity: 0.72;
-  }
-}
 
 /* Glowing green lock icon consistent with other buttons */
 .iconGlow {
@@ -6753,7 +6451,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
 /* Tiny helpers for decrypt affordances */
 .decryptChip {
-  opacity: 0.6;
   display: flex;
   align-items: center;
   justify-content: flex-end;
@@ -6766,7 +6463,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   font-size: 1.2em;
   /* large text */
   font-weight: 700;
-  color: var(--ce-color-white);
+  color: var(--ce-panel-text-muted);
 }
 
 .decryptQuestionButton {
@@ -6777,32 +6474,10 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   letter-spacing: 0.02em;
 }
 
-/* Unobtrusive loading chip for prefill/decrypt */
-.loadingPreviousAnswersChip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
-  border-radius: var(--ce-radius-pill);
-  font-size: 12px;
-  line-height: 1;
-  color: var(--ce-color-white);
-  background: color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
-  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 16%, transparent);
-  white-space: nowrap;
-  user-select: none;
-}
-
 .convictionValueRow {
   display: inline-flex;
   align-items: center;
   gap: 12px;
-}
-
-.convictionTogglePill {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
 }
 
 .convictionToggleStack {
@@ -6852,25 +6527,9 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   }
 }
 
-.convictionToggleButton {
-  background: transparent;
-  border: none;
-  color: var(--ce-panel-text);
-  padding: 0;
-  margin: 0;
-  cursor: pointer;
-  opacity: 0.58;
-}
-
 .convictionToggleButtonActive {
   opacity: 1;
   text-shadow: 0 0 8px color-mix(in srgb, var(--ce-text-inverse) 35%, transparent);
-}
-
-.convictionToggleDivider {
-  color: var(--ce-panel-text);
-  opacity: 0.5;
-  font-weight: 600;
 }
 
 .convictionToggleValue {
@@ -6885,72 +6544,11 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   color: color-mix(in srgb, var(--ce-text-inverse) 80%, transparent);
 }
 
-.scanningIndicator {
-  color: var(--ce-color-white);
-  opacity: 0.5;
-  font-size: 0.85rem;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-left: 15px;
-  margin-right: 15px;
-  white-space: nowrap;
-  animation: none;
-  font-weight: 700;
-  /* Mobile adjustment */
-  @media (max-width: 600px) {
-    font-size: 0.75rem;
-    margin-left: 8px;
-    margin-right: 8px;
-    span {
-      display: none;
-      /* Hide text on very small screens, keep spinner */
-    }
-
-    span::after {
-      content: 'Scanning...';
-      /* Shorter text for mobile */
-      display: inline;
-    }
-  }
-}
-
-.selectorScanProgressWrap {
-  width: 100%;
-  padding: 4px 0 2px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-
-  to {
-    opacity: 1;
-  }
-}
-
-@keyframes headerPulseBlue {
-  0% {
-    box-shadow: 0 0 0 color-mix(in srgb, var(--ce-status-info) 30%, transparent);
-  }
-  50% {
-    box-shadow: 0 0 14px color-mix(in srgb, var(--ce-status-info) 55%, transparent);
-  }
-  100% {
-    box-shadow: 0 0 0 color-mix(in srgb, var(--ce-status-info) 30%, transparent);
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   .pileSubmitSuccessBadge,
   .pileFooter .pileSubmitButton.submitGlow::before,
   .headerSubmitButton.submitGlow::before,
-  .submitGlow,
-  .scanningIndicator {
+  .submitGlow {
     -webkit-animation: none !important;
     -moz-animation: none !important;
     animation: none !important;
@@ -6963,10 +6561,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   .multiChoice .option,
   #startFreshButton,
   #decryptEditButton,
-  #editButton,
-  #viewAnswersButton,
   #answerSurveyButton,
-  #updateResponseButton,
   #exitEditingButton,
   .iconButton,
   .pileIconButton,
@@ -7128,8 +6723,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
   .pileCardFooter .importanceText,
   .pileCardFooter .convictionToggleLine,
-  .pileCardFooter .convictionToggleButton,
-  .pileCardFooter .convictionToggleDivider,
   .pileCardFooter .convictionToggleValue {
     color: var(--ce-panel-text-muted);
     opacity: 1;
@@ -7247,7 +6840,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   }
 
   .lockAudiencePopover .convictionToggleLine,
-  .lockAudiencePopover .convictionToggleButton,
   .lockAudiencePopover .convictionToggleValue,
   .lockAudiencePopover .lockAudienceCaretButton,
   .lockAudiencePopover .lockAudienceGateDetailItem {
@@ -7256,7 +6848,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     text-shadow: none;
   }
 
-  .lockAudiencePopover .lockAudienceMeta,
   .lockAudiencePopover .lockAudienceGateDetailSbts {
     color: var(--ce-overlay-text-muted);
     opacity: 1;
@@ -7280,8 +6871,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   .pileCardFooter .importanceSlider,
   .fullQuestionFooter .importanceText,
   .fullQuestionFooter .convictionToggleLine,
-  .fullQuestionFooter .convictionToggleButton,
-  .fullQuestionFooter .convictionToggleDivider,
   .fullQuestionFooter .convictionToggleValue {
     color: var(--ce-panel-text);
     opacity: 1;
@@ -7446,12 +7035,12 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     }
   }
 
-  // Keep the shared card height across question types so navigation never moves
-  // with prompt length. Long prompts scroll within the original typography.
+  // The adaptive layout below allocates spare answer space to long prompts.
+  // Retain scrolling only when the full question cannot fit at readable size.
   .pileCardHeader {
     flex: 0 1 auto;
     min-height: 0;
-    max-height: 35%;
+    max-height: none;
     overflow-y: auto;
   }
 
@@ -7505,7 +7094,7 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
   }
 }
 
-@media (max-width: 480px) {
+@media (max-width: 768px) {
   // Reserve only the space each answer needs; the prompt receives the rest of
   // the fixed-height card. Its text can fit without moving the navigation.
   .pileCardInner .pileCardBody,
@@ -7539,10 +7128,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     scrollbar-gutter: auto;
   }
 
-  .pileCardMainContent:has(.binaryQuestionContainer) {
-    flex-basis: 44px;
-  }
-
   .pileCardMainContent:has(.freeformQuestionContainer) {
     flex-basis: 104px;
   }
@@ -7553,23 +7138,6 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
 
   .pileCardInner.pileQuadraticCard .pileCardMainContent {
     flex-basis: 170px;
-  }
-
-  .pileCardInner #binaryChoice {
-    flex-wrap: nowrap;
-    gap: 6px;
-    width: 100%;
-    margin: 0;
-  }
-
-  .pileCardInner #binaryChoice .radioOptionText {
-    flex: 1 1 0;
-    min-width: 0;
-    min-height: 44px;
-    margin: 0;
-    padding: 6px 4px;
-    font-size: 1rem;
-    line-height: 1.25;
   }
 
   .pileCardBody[data-pile-answer-layout='roomy'] {
@@ -7585,11 +7153,13 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
       flex-wrap: wrap;
       gap: 0.5rem;
 
-      .radioOptionText {
-        flex: 0 0 auto;
-        padding: 0.5rem 1rem;
-        font-size: 1.5rem;
-        line-height: 1.5;
+      @media (max-width: 480px) {
+        .radioOptionText {
+          flex: 0 0 auto;
+          padding: 0.5rem 1rem;
+          font-size: 1.5rem;
+          line-height: 1.5;
+        }
       }
     }
   }
@@ -7611,56 +7181,79 @@ $survey-item-bg-hover: var(--ce-color-warning-soft-hover); // Darker yellow for 
     }
   }
 
-  .pileCardInner .multichoiceQuestionContainer {
-    padding: 0 0 6px;
-  }
+  @media (max-width: 480px) {
+    .pileCardMainContent:has(.binaryQuestionContainer) {
+      flex-basis: 44px;
+    }
 
-  .pileCardInner .multichoiceQuestionContainer #multiChoice {
-    display: grid;
-    grid-auto-flow: column;
-    grid-template-rows: repeat(2, minmax(0, 1fr));
-    grid-auto-columns: 72%;
-    gap: 8px;
-    width: 100%;
-    max-width: 100%;
-    min-height: 0;
-    margin: 0;
-    padding: 2px;
-  }
-
-  .pileCardInner .multichoiceQuestionContainer #multiChoice .checkboxOptionText {
-    height: 100%;
-    min-height: 44px;
-    margin: 0;
-    padding: 4px 10px;
-    align-self: stretch;
-    overflow-y: auto;
-  }
-
-  @container ce-theme style(--ce-layout-profile: desktop-window) {
-    .pileCardInner .pileCardHeader {
-      padding: 8px;
+    .pileCardInner #binaryChoice {
+      flex-wrap: nowrap;
+      gap: 6px;
+      width: 100%;
+      margin: 0;
     }
 
     .pileCardInner #binaryChoice .radioOptionText {
-      padding-left: 19px;
-      font-size: 0.82rem;
+      flex: 1 1 0;
+      min-width: 0;
+      min-height: 44px;
+      margin: 0;
+      padding: 6px 4px;
+      font-size: 1rem;
+      line-height: 1.25;
     }
 
-    .pileCardInner #binaryChoice .radioOptionText::before {
-      left: 4px;
-      width: 11px;
-      height: 11px;
+    .pileCardInner .multichoiceQuestionContainer {
+      padding: 0 0 6px;
     }
 
-    .pileCardBody[data-pile-answer-layout='roomy'] #binaryChoice .radioOptionText {
-      padding: 7px 10px 7px 32px;
-      font-size: 0.82rem;
+    .pileCardInner .multichoiceQuestionContainer #multiChoice {
+      display: grid;
+      grid-auto-flow: column;
+      grid-template-rows: repeat(2, minmax(0, 1fr));
+      grid-auto-columns: 72%;
+      gap: 8px;
+      width: 100%;
+      max-width: 100%;
+      min-height: 0;
+      margin: 0;
+      padding: 2px;
+    }
 
-      &::before {
-        left: 9px;
-        width: 13px;
-        height: 13px;
+    .pileCardInner .multichoiceQuestionContainer #multiChoice .checkboxOptionText {
+      height: 100%;
+      min-height: 44px;
+      margin: 0;
+      padding: 4px 10px;
+      align-self: stretch;
+      overflow-y: auto;
+    }
+
+    @container ce-theme style(--ce-layout-profile: desktop-window) {
+      .pileCardInner .pileCardHeader {
+        padding: 8px;
+      }
+
+      .pileCardInner #binaryChoice .radioOptionText {
+        padding-left: 19px;
+        font-size: 0.82rem;
+      }
+
+      .pileCardInner #binaryChoice .radioOptionText::before {
+        left: 4px;
+        width: 11px;
+        height: 11px;
+      }
+
+      .pileCardBody[data-pile-answer-layout='roomy'] #binaryChoice .radioOptionText {
+        padding: 7px 10px 7px 32px;
+        font-size: 0.82rem;
+
+        &::before {
+          left: 9px;
+          width: 13px;
+          height: 13px;
+        }
       }
     }
   }

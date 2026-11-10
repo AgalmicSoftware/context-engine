@@ -4,11 +4,11 @@ import { sbtAdminOpsPort } from './sbtAdminOpsPort.js';
 
 const executeSbtAdminOps = async (port: SbtAdminOpsPort, providerName: SbtProviderRef, sbtAddress: string) => {
   const [addTx, burnTx, passwordTx, isValid, startTx] = await Promise.all([
-    port.addHashedPasswords(providerName, sbtAddress, ['0xhash1', '0xhash2']),
-    port.burnToken(providerName, sbtAddress, '4'),
-    port.claimWithPassword(providerName, sbtAddress, 'open sesame'),
+    port.addHashedPasswords(providerName, sbtAddress, ['0xhash1', '0xhash2'], 11155420),
+    port.burnToken(providerName, sbtAddress, '4', 11155420),
+    port.claimWithPassword(providerName, sbtAddress, 'open sesame', 11155420),
     port.isPasswordValid(providerName, sbtAddress, '0xpasswordHash', 'alpha'),
-    port.startClaim(providerName, sbtAddress, '0xcommit'),
+    port.startClaim(providerName, sbtAddress, '0xcommit', 11155420),
   ]);
 
   return { addTx, burnTx, passwordTx, isValid, startTx };
@@ -19,7 +19,7 @@ describe('SbtAdminOpsPort', () => {
     jest.restoreAllMocks();
   });
 
-  it('supports a fake admin ops port with the legacy call shape', async () => {
+  it('supports a fake admin ops port with an explicit session chain', async () => {
     const fakePort: SbtAdminOpsPort = {
       addHashedPasswords: jest.fn(async () => ({ transactionHash: '0xadd' })),
       burnToken: jest.fn(async () => ({ transactionHash: '0xburn' })),
@@ -38,11 +38,11 @@ describe('SbtAdminOpsPort', () => {
       startTx: { transactionHash: '0xstart' },
     });
 
-    expect(fakePort.addHashedPasswords).toHaveBeenCalledWith(providerRef, sbtAddress, ['0xhash1', '0xhash2']);
-    expect(fakePort.burnToken).toHaveBeenCalledWith(providerRef, sbtAddress, '4');
-    expect(fakePort.claimWithPassword).toHaveBeenCalledWith(providerRef, sbtAddress, 'open sesame');
+    expect(fakePort.addHashedPasswords).toHaveBeenCalledWith(providerRef, sbtAddress, ['0xhash1', '0xhash2'], 11155420);
+    expect(fakePort.burnToken).toHaveBeenCalledWith(providerRef, sbtAddress, '4', 11155420);
+    expect(fakePort.claimWithPassword).toHaveBeenCalledWith(providerRef, sbtAddress, 'open sesame', 11155420);
     expect(fakePort.isPasswordValid).toHaveBeenCalledWith(providerRef, sbtAddress, '0xpasswordHash', 'alpha');
-    expect(fakePort.startClaim).toHaveBeenCalledWith(providerRef, sbtAddress, '0xcommit');
+    expect(fakePort.startClaim).toHaveBeenCalledWith(providerRef, sbtAddress, '0xcommit', 11155420);
   });
 
   it('delegates admin ops through call-time chainGateway property lookup', async () => {
@@ -57,33 +57,51 @@ describe('SbtAdminOpsPort', () => {
     const startClaim = jest.spyOn(chainGateway, 'startClaim').mockResolvedValue({ transactionHash: '0xsecondStart' });
 
     await expect(
-      sbtAdminOpsPort.addHashedPasswords('injected', '0x0000000000000000000000000000000000000001', ['0xfirst']),
+      sbtAdminOpsPort.addHashedPasswords(
+        'injected',
+        '0x0000000000000000000000000000000000000001',
+        ['0xfirst'],
+        11155420,
+      ),
     ).resolves.toEqual({ transactionHash: '0xfirstAdd' });
 
     await expect(
-      sbtAdminOpsPort.burnToken('injected', '0x0000000000000000000000000000000000000002', '5'),
+      sbtAdminOpsPort.burnToken('injected', '0x0000000000000000000000000000000000000002', '5', 11155420),
     ).resolves.toEqual({ transactionHash: '0xsecondBurn' });
     await expect(
-      sbtAdminOpsPort.claimWithPassword('injected', '0x0000000000000000000000000000000000000002', 'pw'),
+      sbtAdminOpsPort.claimWithPassword('injected', '0x0000000000000000000000000000000000000002', 'pw', 11155420),
     ).resolves.toEqual({ transactionHash: '0xsecondPassword' });
     await expect(
       sbtAdminOpsPort.isPasswordValid('none', '0x0000000000000000000000000000000000000002', '0xhash', 'beta'),
     ).resolves.toBe(true);
     await expect(
-      sbtAdminOpsPort.startClaim('injected', '0x0000000000000000000000000000000000000002', '0xcommit'),
+      sbtAdminOpsPort.startClaim('injected', '0x0000000000000000000000000000000000000002', '0xcommit', 11155420),
     ).resolves.toEqual({ transactionHash: '0xsecondStart' });
 
-    expect(addHashedPasswords).toHaveBeenCalledWith('injected', '0x0000000000000000000000000000000000000001', [
-      '0xfirst',
-    ]);
-    expect(burnToken).toHaveBeenCalledWith('injected', '0x0000000000000000000000000000000000000002', '5');
-    expect(claimWithPassword).toHaveBeenCalledWith('injected', '0x0000000000000000000000000000000000000002', 'pw');
+    expect(addHashedPasswords).toHaveBeenCalledWith(
+      'injected',
+      '0x0000000000000000000000000000000000000001',
+      ['0xfirst'],
+      11155420,
+    );
+    expect(burnToken).toHaveBeenCalledWith('injected', '0x0000000000000000000000000000000000000002', '5', 11155420);
+    expect(claimWithPassword).toHaveBeenCalledWith(
+      'injected',
+      '0x0000000000000000000000000000000000000002',
+      'pw',
+      11155420,
+    );
     expect(isPasswordValid).toHaveBeenCalledWith(
       'none',
       '0x0000000000000000000000000000000000000002',
       '0xhash',
       'beta',
     );
-    expect(startClaim).toHaveBeenCalledWith('injected', '0x0000000000000000000000000000000000000002', '0xcommit');
+    expect(startClaim).toHaveBeenCalledWith(
+      'injected',
+      '0x0000000000000000000000000000000000000002',
+      '0xcommit',
+      11155420,
+    );
   });
 });

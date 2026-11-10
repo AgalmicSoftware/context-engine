@@ -1,7 +1,7 @@
 import { assertExpectedSessionAuthority } from '../sessionConfigAuthority.js';
 import { resolveCanonicalWorkerSessionIdHex } from '../sessionConfigMutation.js';
 import { createAgentStorage } from './storage.mjs';
-import { answerStateKey, voteStateKey, MAX_RECENT_REQUEST_IDS } from './wrappedCore.mjs';
+import { answerStateKey, voteStateKey, MAX_RECENT_REQUEST_IDS, MAX_RESEARCH_RUNS, MAX_RUN_SCOPES_BYTES } from './wrappedCore.mjs';
 import { sha256Hex, safeJsonParse } from './runtimePrimitives.mjs';
 
 const reply = (body, status = 200) => Response.json(body, { status });
@@ -70,7 +70,31 @@ export const dispatchWrappedResearch = (coordinator, payload) => coordinator.ser
   const base = state.value || record.initialState;
   if (!base || !record.changes || typeof record.changes !== 'object') return reply({ ok: false, reason: 'wrapped_state_invalid' }, 400);
   let value;
+  let events = record.events;
   if (record.kind === 'answers') {
+    const runScopes = (base.runScopes || []).map(scope => ({ ...scope }));
+    for (const event of events) {
+      const { runId, questionId, eventKind } = event.value;
+      // Freeze membership once, then keep one coverage character per question.
+      // Replays return above; later runs cannot overwrite earlier coverage.
+      let scope = runScopes.find(entry => entry.runId === runId);
+      if (!scope) {
+        if (!Array.isArray(record.runStatementIds) || !record.runStatementIds.length) {
+          return reply({ ok: false, status: 400, reason: 'wrapped_run_scope_invalid' }, 400);
+        }
+        scope = { runId, runStatementIds: [...new Set(record.runStatementIds)], coverage: '' };
+        scope.coverage = '0'.repeat(scope.runStatementIds.length);
+        runScopes.push(scope);
+      }
+      const index = scope.runStatementIds.indexOf(questionId);
+      if (index >= 0) scope.coverage = scope.coverage.slice(0, index) +
+        (eventKind === 'privacy_protective_skip' ? 's' : 'a') + scope.coverage.slice(index + 1);
+    }
+    // Refuse new history before any write rather than silently evicting results.
+    if (runScopes.length > MAX_RESEARCH_RUNS || new TextEncoder().encode(JSON.stringify(runScopes)).length > MAX_RUN_SCOPES_BYTES) {
+      return reply({ ok: false, status: 409, reason: 'wrapped_run_history_full',
+        error: 'Research run history is full. Existing runs remain available; a new run cannot be saved.' }, 409);
+    }
     const byStatement = { ...base.byStatement };
     for (const [id, change] of Object.entries(record.changes)) {
       byStatement[id] = { ...byStatement[id], agent: change.agent, agentSkip: change.agentSkip };
@@ -80,11 +104,11 @@ export const dispatchWrappedResearch = (coordinator, payload) => coordinator.ser
       if (entry.agent) counts.answers++;
       if (entry.agentSkip) counts.skips++;
     }
-    value = { ...base, byStatement, counts, updatedAt: record.createdAt };
+    value = { ...base, byStatement, runScopes, counts, updatedAt: record.createdAt };
   } else value = { ...base, ...record.changes, updatedAt: record.createdAt };
   value.recentRequestIds = [...(base.recentRequestIds || []).filter(entry => entry.requestId !== record.requestId),
     { requestId: record.requestId, summaryHash: record.summaryHash, at: record.createdAt }].slice(-MAX_RECENT_REQUEST_IDS);
-  const pending = { summaryHash: record.summaryHash, events: record.events, stateMetadata: record.stateMetadata,
+  const pending = { summaryHash: record.summaryHash, events, stateMetadata: record.stateMetadata,
     response: record.response, complete: false };
   if (record.kind === 'answers') pending.stateMetadata = { ...pending.stateMetadata, a: value.counts.answers, s: value.counts.skips };
   state = { ...state, value, pending: requestKey };

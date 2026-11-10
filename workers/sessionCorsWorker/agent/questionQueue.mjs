@@ -1,4 +1,4 @@
-import { safeString, lower } from './runtimePrimitives.mjs';
+import { safeString, lower, stableJson, sha256Hex } from './runtimePrimitives.mjs';
 import { normalizeQuestionTags, persistAgentProposedQuestion, sessionContextFromPolicySession } from './agentQuestionProposals.mjs';
 import { loadAgentQuestionQueueConfig, saveAgentQuestionQueueConfig, selectNextAgentQuestion } from './agentQuestionQueue.mjs';
 import { json } from './httpInput.mjs';
@@ -24,6 +24,7 @@ export async function handleNextQuestionRequest({ env = {}, context = {}, input 
     sponsoredQuestionIds: queueConfig.sponsoredQuestionIds,
     input,
     createdAt: input.createdAt || null,
+    advanceState: (step) => env.AGENT_SERVICES.advanceQuestionQueue(step),
   });
   return json(
     {
@@ -325,6 +326,8 @@ export async function buildSponsoredQuestionPlan({ env = {}, context = {}, input
   const existingSponsoredQuestionIds = Array.isArray(queueConfig.sponsoredQuestionIds)
     ? queueConfig.sponsoredQuestionIds
     : [];
+  const mode = input.replace === true || lower(input.mode) === 'replace' ? 'replace' : 'append';
+  const planDigest = await sha256Hex(stableJson({ mode, sponsoredQuestionIds, draftQuestions: drafts }));
   return {
     ok: true,
     sessionSlug: context.session.sessionSlug,
@@ -336,7 +339,8 @@ export async function buildSponsoredQuestionPlan({ env = {}, context = {}, input
     questionSource: loaded.source || '',
     questionSourceReason: loaded.reason || '',
     existingSponsoredQuestionIds,
-    mode: input.replace === true || lower(input.mode) === 'replace' ? 'replace' : 'append',
+    mode,
+    planDigest,
     resolvedExistingQuestions: resolved.matches,
     draftQuestions: drafts,
     sponsoredQuestionIds,
@@ -346,15 +350,14 @@ export async function buildSponsoredQuestionPlan({ env = {}, context = {}, input
     confirmation: {
       endpoint: '/api/agent/question-queue/apply',
       required:
-        'Show resolvedExistingQuestions and draftQuestions to the admin, then call apply only after explicit approval.',
+        'Show resolvedExistingQuestions and draftQuestions to the admin, then send approved: true and this planDigest to apply only after explicit approval.',
     },
   };
 }
 
 export function hasExplicitSponsoredQueueApproval(input = {}) {
-  if (input.approved === true || input.confirm === true || input.confirmed === true) return true;
-  const text = lower(input.approvalText || input.confirmationText || input.userApproval);
-  return /\b(approve|approved|confirm|confirmed|yes|go ahead|do it|ship it|make.+sponsored)\b/.test(text);
+  const flags = [input.approved, input.confirm, input.confirmed];
+  return !flags.includes(false) && flags.includes(true);
 }
 
 export async function handleQuestionQueuePlanRequest({ env = {}, context = {}, input = {}, waitUntil = null } = {}) {
@@ -394,7 +397,7 @@ export async function handleQuestionQueueApplyRequest({ env = {}, context = {}, 
       { status: plan.status || 403 },
     );
   }
-  if (!hasExplicitSponsoredQueueApproval(input)) {
+  if (!hasExplicitSponsoredQueueApproval(input) || typeof input.planDigest !== 'string' || !/^[a-f0-9]{64}$/.test(input.planDigest)) {
     return json(
       {
         ...plan,
@@ -402,6 +405,12 @@ export async function handleQuestionQueueApplyRequest({ env = {}, context = {}, 
         reason: 'sponsored_question_confirmation_required',
       },
       { status: 400 },
+    );
+  }
+  if (input.planDigest !== plan.planDigest) {
+    return json(
+      { ...plan, ok: false, reason: 'sponsored_question_plan_changed' },
+      { status: 409 },
     );
   }
   const createdQuestions = [];

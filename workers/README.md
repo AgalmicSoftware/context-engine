@@ -8,7 +8,7 @@ button.
 | Directory | Responsibility |
 | --- | --- |
 | `sessionCorsWorker/` | Session runtime: authentication, canonical session data, storage, AI/transcription proxies, gates, and related routes. |
-| `deploy-helper/` | Optional legacy installer that deploys a Session Worker through the Cloudflare API. It is a separate Worker, not another Session Worker copy. |
+| `deploy-helper/` | Deploys a Session Worker through the Cloudflare API when `/new` is given a Cloudflare API token. It is a separate Worker, not another Session Worker copy. |
 | `sessionCorsWorker/agent/` | Agent HTTP, scoped credentials, optional registry submission queue, and Session Wrapped within the Session Worker. |
 | `shared/` | Implementation shared by two or more Worker services. |
 

@@ -1,11 +1,15 @@
 import React from 'react';
-import { Button, Input } from 'reactstrap';
+import { Button, Input, UncontrolledTooltip } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCircle, faMicrophone, faPause, faPlay, faSpinner, faStop } from '@fortawesome/free-solid-svg-icons';
+import { faCircle, faMicrophone, faPause, faPlay, faSpinner, faStop, faTrash } from '@fortawesome/free-solid-svg-icons';
 import styles from './SurveyTool.module.scss';
 import SessionInterviewTranscriptDisclosure from './SessionInterviewTranscriptDisclosure';
 import { formatSessionRecordingElapsed, SessionListeningWaveform } from './SessionListeningPanel';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
+
+// What Discard does, for its tooltip and for screen readers, which don't get the tooltip.
+const DISCARD_EXPLANATION =
+  'Clears the transcript, imported AI drafts and unsaved edits, then closes. Responses you’ve submitted are kept.';
 
 type ImportedResponderContextProps = {
   expanded: boolean;
@@ -45,6 +49,7 @@ export function ImportedResponderContextEditor({
 
 type SessionInterviewVoiceControlsProps = {
   isRecorderSessionActive: boolean;
+  wakeLockHeld?: boolean;
   isPaused: boolean;
   isStopping: boolean;
   isStarting: boolean;
@@ -63,10 +68,14 @@ type SessionInterviewVoiceControlsProps = {
   onResume: () => void;
   onToggleTranscript: () => void;
   onGenerateDrafts: () => void;
+  // Shown beside the microphone while there's an interview to discard.
+  onDiscard?: () => void;
+  discardDisabled?: boolean;
 };
 
 export function SessionInterviewVoiceControls({
   isRecorderSessionActive,
+  wakeLockHeld,
   isPaused,
   isStopping,
   isStarting,
@@ -85,11 +94,46 @@ export function SessionInterviewVoiceControls({
   onResume,
   onToggleTranscript,
   onGenerateDrafts,
+  onDiscard,
+  discardDisabled,
 }: SessionInterviewVoiceControlsProps) {
   return (
     <div className={styles.sessionInterviewActions}>
+      {isRecorderSessionActive && !wakeLockHeld ? (
+        <div className={styles.sessionRecordingWakeNotice}>Keep this screen on.</div>
+      ) : null}
       {!isRecorderSessionActive ? (
         <div className={styles.sessionInterviewPrimaryAction}>
+          {onDiscard ? (
+            <>
+              <button
+                type="button"
+                id="ce-interview-discard-button"
+                className={styles.sessionInterviewDiscard}
+                data-ce-control-appearance="frameless"
+                onClick={onDiscard}
+                disabled={discardDisabled}
+                aria-label="Discard interview"
+                aria-describedby="ce-interview-discard-explanation"
+              >
+                <span className={styles.sessionInterviewDiscardCircle} aria-hidden="true">
+                  <FontAwesomeIcon icon={faTrash} />
+                </span>
+                <span id="ce-interview-discard-explanation" className={styles.sessionListeningSrOnly}>
+                  {DISCARD_EXPLANATION}
+                </span>
+              </button>
+              {/* Hover only: focus returns here after the confirmation, which would reopen it. */}
+              <UncontrolledTooltip
+                target="ce-interview-discard-button"
+                placement="top"
+                trigger="hover"
+                autohide={false}
+              >
+                Discard interview: {DISCARD_EXPLANATION}
+              </UncontrolledTooltip>
+            </>
+          ) : null}
           <Button
             color="link"
             className={styles.sessionInterviewMicrophone}
@@ -110,6 +154,9 @@ export function SessionInterviewVoiceControls({
               transcript={transcript}
               onToggleTranscript={onToggleTranscript}
             />
+          ) : onDiscard ? (
+            // Balances the discard button so the microphone stays centered.
+            <span className={styles.sessionInterviewDiscardBalance} aria-hidden="true" />
           ) : null}
         </div>
       ) : (

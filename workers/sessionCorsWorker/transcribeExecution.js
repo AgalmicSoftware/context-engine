@@ -1,7 +1,16 @@
+import { TRANSCRIPTION_FALLBACK_MODEL } from '../../shared/aiDefaults.mjs';
 import { AI_MODEL_NOT_ALLOWED, isSessionTranscriptionModelAllowed } from './aiRequestPolicy.js';
 import { readTranscribeRequestPayload } from './transcribeRequestNormalization.js';
 import { resolveOpenAiTranscribeUrl } from './endpointConfig.js';
 import { STRICT_HTTPS_NO_CREDENTIALS_POLICY } from './outboundUrlSafetyBinding.js';
+
+const normalizeSpeakerSegments = (segments) => (Array.isArray(segments) ? segments : []).flatMap((segment) => {
+  const speaker = typeof segment?.speaker === 'string' ? segment.speaker.trim().slice(0, 128) : '';
+  const text = typeof segment?.text === 'string' ? segment.text.trim() : '';
+  const { start, end } = segment || {};
+  if (!speaker || !text || !Number.isFinite(start) || !Number.isFinite(end) || start < 0 || end < start) return [];
+  return [{ speaker, start, end, text }];
+});
 
 const toTrimmedString = (value, deps) => (
   deps?.toStr
@@ -29,6 +38,7 @@ export const transcribe = async ({
     requestApiKey,
     requestRpcUrl,
     upstreamFormData,
+    groupSpeakerLabels,
   } = normalizedRequest.payload || {};
 
   let targetUrl = resolveOpenAiTranscribeUrl({ constants });
@@ -59,7 +69,7 @@ export const transcribe = async ({
   }
 
   if (provider === 'openai' && !requestApiKey && !isSessionTranscriptionModelAllowed({
-    config, provider, model: normalizedRequest.payload.model || upstreamFormData.get('model') || 'whisper-1',
+    config, provider, groupSpeakerLabels, model: normalizedRequest.payload.model || upstreamFormData.get('model') || TRANSCRIPTION_FALLBACK_MODEL,
   })) return json?.(AI_MODEL_NOT_ALLOWED, 403, baseHeaders);
 
   const headers = {};
@@ -93,5 +103,13 @@ export const transcribe = async ({
     return json?.({ error: String(message), details: data }, response.status, baseHeaders);
   }
 
-  return json?.({ text: data?.text || '' }, 200, baseHeaders);
+  // A success without text is a lost reply, not silence: the browser deletes a chunk's audio once it has a transcript.
+  if (typeof data?.text !== 'string') {
+    return json?.({ error: 'The transcription service sent an unreadable reply.' }, 502, baseHeaders);
+  }
+
+  return json?.({
+    text: data.text,
+    ...(groupSpeakerLabels ? { segments: normalizeSpeakerSegments(data.segments) } : {}),
+  }, 200, baseHeaders);
 };

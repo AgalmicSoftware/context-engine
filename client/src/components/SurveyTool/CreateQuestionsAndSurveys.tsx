@@ -1,3 +1,5 @@
+import { createSurveyDraftContentKey } from './createSurveyDraftContent';
+import { suggestTagsForQuestion, invalidateQuestionTagRequest } from './createSurveyQuestionTagActions';
 /** @file CreateQuestionsAndSurveys.tsx */
 
 import React, { Component } from 'react';
@@ -25,6 +27,7 @@ import InterviewSuggestedQuestionPrompt from './InterviewSuggestedQuestionPrompt
 import { arweaveClient as arweaveClient } from '../../utilities/arweave/arweaveClient';
 import CETooltip from '../Shared/CETooltip';
 import CEConfirmDialog from '../Shared/CEConfirmDialog';
+import AutoGrowTextarea from '../Shared/AutoGrowTextarea';
 import { normalizeArweaveUrl } from '../../utilities/arweave/arweaveUrls.js';
 import { canonicalizeSessionSlug as normalizeSessionSlug } from '../../utilities/session/sessionSlug.js';
 import contractScripts from '../../utilities/web3/chainGateway.js';
@@ -40,13 +43,13 @@ import { getEffectiveArweaveKey } from '../../utilities/session/resourceKeys.js'
 import { sessionRegistryStore, sessionRegistryUtils } from '../../utilities/web3/sessionRegistry.js';
 import { ethers } from 'ethers';
 import AudioSurveyGenerator from './SurveyGenerator/SurveyGenerator';
-import { callAI } from '../../utilities/ai/aiClient.js';
 import { getEffectiveAiConfig } from '../../utilities/ai/aiSettings.js';
 import { seedGenPrompt } from '../../prompts/seedGenPrompt.js';
 import { JsonButtonRow, JsonPanel, JsonToggleButton } from '../Shared/Json/JsonControls';
 import GateMultiSelectLock from '../Gates/GateMultiSelectLock';
 import { createLogger } from 'utilities/logging.js';
 import { buildQuestionRoutePath } from '../../utilities/survey/questionRouting.js';
+import { stampDecryptedQuestion, stampDecryptedSurvey } from '../../utilities/survey/decryptedQuestionReader.js';
 import { validateNoLockedPlaintextInPayload } from '../../utilities/arweave/noLeakPayloads.js';
 import {
   attachStorageRefCompatibilityFields,
@@ -126,7 +129,6 @@ import {
   buildCreateSurveyValidationErrorPatch,
   combineLitRecipientAccessControlConditions,
   formatAiPromptModelLabel,
-  generateSingleQuestionTagsPrompt,
   getErrorCode,
   getErrorMessage,
   getCreateSurveyValidationError,
@@ -271,7 +273,18 @@ type CreateSurveyAiRequestOptions = {
   sessionConfig: CreateSurveyResolvedSessionConfig;
   sessionSlug: string;
 };
+type CreateSurveyPublicationContext = {
+  sessionSlug: string;
+  draftKey: string;
+  submittedDraft: string;
+  storedDraft: string | null | undefined;
+  cacheTarget: CreateQuestionsManagedCacheSeedTargets;
+  workerCacheIdentity: ReturnType<typeof resolveCreateQuestionsManagedWorkerCacheIdentity>;
+  account: string;
+  chainId: number | null;
+};
 type CreateSurveySubmittedSurveyCacheArgs = {
+  publication?: CreateSurveyPublicationContext;
   sourceDocumentUrls?: unknown;
   sourceTitle?: unknown;
   surveyData?: unknown;
@@ -340,6 +353,7 @@ type CreateQuestionsSeededQuestionRow = CreateQuestionsCacheQuestionRow & {
   id: string;
 };
 type SeedUploadedQuestionsCacheArgs = {
+  publication?: CreateSurveyPublicationContext;
   questionDataArray?: unknown;
   uploadedQuestions?: unknown;
   sourceQuestions?: unknown;
@@ -489,9 +503,21 @@ interface CreateQuestionsAndSurveysProps {
   interviewQuestionReview?: boolean;
   appendPreformedQuestions?: boolean;
   questionSubmitLabel?: string;
+  // Holds Submit off, such as while the Group Conversation recorder is still generating drafts.
+  submitDisabled?: boolean;
   submitClassName?: string;
+  /** Shown on the submit button's own line, which then takes `submitRowClassName`. */
+  submitAccessory?: React.ReactNode;
+  submitRowClassName?: string;
+  /** The questions uploaded, as opposed to a submit that failed or was abandoned. */
+  onQuestionsSubmitted?: () => void;
   miniaturized?: boolean;
   onUploadComplete?: (surveyHash: string | null) => void;
+  onDraftEditedChange?: (edited: boolean) => void;
+  // Each change to the draft list, edits included, which the Group Conversation recorder keeps with its recording.
+  onDraftQuestionsChange?: (questions: CreateQuestionsAndSurveysQuestion[]) => void;
+  // Whether a submit is in flight; reported after its uploaded drafts leave the list.
+  onSubmittingChange?: (submitting: boolean) => void;
   hideSurveyQuestionToggleUntilAuthoring?: boolean;
   [key: string]: unknown;
 }
@@ -510,6 +536,8 @@ interface CreateQuestionsAndSurveysState {
   surveyAddedSuccessfully: boolean;
   questionsAddedSuccessfully: boolean;
   uploadedQuestions: CreateQuestionsAndSurveysUploadedQuestion[];
+  // Prompt text of the last upload by lower-case question ID, for its success list only.
+  uploadedQuestionPrompts: Record<string, string>;
   submissionError: string;
   copySurveyIdSuccess: boolean;
   copySurveyLinkSuccess: boolean;
@@ -678,6 +706,10 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
   _promptRefs: Record<string, FocusablePromptElement | null> = {};
   _tagInputRefs: Record<string, FocusablePromptElement | null> = {};
   _lastSavedUnfinishedSurveyJson: string | null = null;
+  // Preformed drafts already added to the list (by id or prompt), so later batches append only new ones.
+  _appendedPreformed = new Set((this.props.preformedQuestions || []).map((question) => question.id || question.prompt));
+  _publication: CreateSurveyPublicationContext | null = null;
+  _initialDraftContent = '';
 
   constructor(props: CreateQuestionsAndSurveysProps) {
     super(props);
@@ -695,6 +727,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
       surveyAddedSuccessfully: false,
       questionsAddedSuccessfully: false,
       uploadedQuestions: [],
+      uploadedQuestionPrompts: {},
       submissionError: '',
       copySurveyIdSuccess: false,
       copySurveyLinkSuccess: false,
@@ -778,6 +811,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
       nextState.docURLInput = '';
     }
     (this.state as CreateQuestionsAndSurveysState).questions = initialQuestions;
+    this._initialDraftContent = createSurveyDraftContentKey(this.state);
     this._copySuccessResetTimers = {
       copySurveyIdSuccess: null,
       copySurveyLinkSuccess: null,
@@ -788,6 +822,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
 
   componentDidMount() {
     this._isMounted = true;
+    this.props.onDraftQuestionsChange?.(this.state.questions);
     window.addEventListener('beforeunload', this.handleDraftBeforeUnload);
     if (this.state.showAIPrompt) {
       this.refreshAIPromptModelLabel();
@@ -823,17 +858,41 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
     }
   }
 
-  clearUnfinishedSurveyDraft: () => void = () => {
-    if (this._draftSaveTimer) {
+  isPublicationContextCurrent = (publication: CreateSurveyPublicationContext): boolean =>
+    this._isMounted &&
+    normalizeSessionSlug(this.getActiveSessionSlug() || '') === publication.sessionSlug &&
+    String(this.props.account || '').toLowerCase() === publication.account.toLowerCase() &&
+    (resolveSessionCapabilityProjection(this.getResolvedSessionConfig()).isPureWorkerCanonical
+      ? null
+      : this.resolveSessionChainId()) === publication.chainId;
+
+  isPublicationDraftCurrent = (publication: CreateSurveyPublicationContext): boolean => {
+    if (!this.isPublicationContextCurrent(publication)) return false;
+    const submitted = JSON.parse(publication.submittedDraft) as UnknownRecord;
+    const current = JSON.parse(this.serializeUnfinishedSurveyDraft()) as UnknownRecord;
+    // Submission progress clears these display fields without changing the draft.
+    for (const key of ['cacheLoaded', 'lastSubmittedSurveyId', 'lastSubmittedSurveyArweaveTxId']) {
+      delete submitted[key];
+      delete current[key];
+    }
+    return JSON.stringify(current) === JSON.stringify(submitted);
+  };
+
+  clearUnfinishedSurveyDraft = (publication?: CreateSurveyPublicationContext): void => {
+    const clearCurrentDraft = !publication || this.isPublicationDraftCurrent(publication);
+    if (clearCurrentDraft && this._draftSaveTimer) {
       clearTimeout(this._draftSaveTimer);
       this._draftSaveTimer = null;
     }
     const storage = getCreateSurveyDraftStorage();
     if (storage) {
       const sessionSlug = normalizeSessionSlug(this.getActiveSessionSlug() || '');
-      const draftKey = buildCreateSurveyDraftStorageKey(sessionSlug);
+      const draftKey = publication?.draftKey || buildCreateSurveyDraftStorageKey(sessionSlug);
       try {
-        storage.removeItem(draftKey);
+        const storedDraft = storage.getItem(draftKey);
+        if (!publication || storedDraft === publication.storedDraft || storedDraft === publication.submittedDraft) {
+          storage.removeItem(draftKey);
+        }
         if (draftKey !== CREATE_SURVEY_DRAFT_LEGACY_KEY) {
           storage.removeItem(CREATE_SURVEY_DRAFT_LEGACY_KEY);
         }
@@ -841,6 +900,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
         surveyLog.warn('[CreateQuestionsAndSurveys] Failed to clear saved survey draft:', error);
       }
     }
+    if (!clearCurrentDraft) return;
     this._lastSavedUnfinishedSurveyJson = null;
     if (this._isMounted && this.state.draftSaveFailed) this.setState({ draftSaveFailed: false });
   };
@@ -998,23 +1058,25 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
     return '';
   };
 
-  resolveLitHooksForSubmit = (sessionConfig: unknown, chainIdFallback: unknown): CreateSurveyLitHooks | null => {
+  resolveLitHooksForSubmit = (
+    sessionConfig: unknown,
+    chainIdFallback: unknown,
+    props: CreateQuestionsAndSurveysProps = this.props,
+  ): CreateSurveyLitHooks | null => {
     const inputSessionConfig = asPlainRecord(sessionConfig);
     const projection = resolveSessionCapabilityProjection(inputSessionConfig);
     const workerCanonicalBoundary = claimsWorkerCanonicalAuthority(inputSessionConfig);
     if (workerCanonicalBoundary && (!projection.profileValid || !projection.isWorkerCanonical)) return null;
 
     const scopedLitHooks =
-      this.props.litHooks && typeof this.props.litHooks === 'object'
-        ? (this.props.litHooks as CreateSurveyLitHooks)
-        : null;
+      props.litHooks && typeof props.litHooks === 'object' ? (props.litHooks as CreateSurveyLitHooks) : null;
     if (scopedLitHooks && typeof scopedLitHooks.saveKey === 'function') return scopedLitHooks;
 
     if (!workerCanonicalBoundary) {
       const globalLitHooks = getGlobalLitHooks() as CreateSurveyLitHooks | null;
       if (globalLitHooks && typeof globalLitHooks.saveKey === 'function') return globalLitHooks;
     }
-    const sessionSlug = normalizeSessionSlug(this.getActiveSessionSlug() || '');
+    const sessionSlug = normalizeSessionSlug(this.getActiveSessionSlug(props) || '');
     const resolvedLitSessionConfig = workerCanonicalBoundary
       ? inputSessionConfig
       : mergeCreateSurveySessionConfigWithRegistry({
@@ -1029,8 +1091,8 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
       });
     if (!chipotle) return null;
     return createLitHooks({
-      providerLike: this.props.provider,
-      account: this.props.account,
+      providerLike: props.provider,
+      account: props.account,
       chainId,
       litChain,
       litNetwork,
@@ -1074,15 +1136,24 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
   };
 
   componentDidUpdate(prevProps: CreateQuestionsAndSurveysProps, prevState: CreateQuestionsAndSurveysState) {
+    if (prevState.questions !== this.state.questions) this.props.onDraftQuestionsChange?.(this.state.questions);
+    if (prevState.isSubmitting !== this.state.isSubmitting) this.props.onSubmittingChange?.(this.state.isSubmitting);
+    this.props.onDraftEditedChange?.(createSurveyDraftContentKey(this.state) !== this._initialDraftContent);
     if (prevProps.account !== this.props.account) this.updateSurveyHash();
     const shouldAppendPreformedQuestions = this.props.interviewQuestionReview || this.props.appendPreformedQuestions;
-    if (shouldAppendPreformedQuestions && prevProps.preformedQuestions !== this.props.preformedQuestions) {
-      const previousIds = new Set(
-        (prevProps.preformedQuestions || []).map((question) => question.id || question.prompt),
-      );
+    // Drafts that arrive while a submit publishes wait until it settles (or no longer applies here), so the
+    // published draft stays as sent.
+    const holding =
+      this.state.isSubmitting && !!this._publication && this.isPublicationContextCurrent(this._publication);
+    if (
+      shouldAppendPreformedQuestions &&
+      !holding &&
+      (prevState.isSubmitting || prevProps.preformedQuestions !== this.props.preformedQuestions)
+    ) {
       const added = (this.props.preformedQuestions || []).filter(
-        (question) => !previousIds.has(question.id || question.prompt),
+        (question) => !this._appendedPreformed.has(question.id || question.prompt),
       );
+      added.forEach((question) => this._appendedPreformed.add(question.id || question.prompt));
       if (added.length) {
         // Append new suggestions without resetting edited prompts/tags or restoring removed questions.
         // If the user uploads a batch and then records more, keep the success links while removing
@@ -1280,7 +1351,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
               options: normalizeAuthoringQuestionOptions(q.type, q.options),
               singleSelect,
               currentTagInputValue: q.currentTagInputValue || '',
-              isGeneratingTags: q.isGeneratingTags || false,
+              isGeneratingTags: false,
               lockGateIds: isStandalone
                 ? normalizeGateIds(q.lockGateIds)
                 : Object.prototype.hasOwnProperty.call(q || {}, 'lockGateIds')
@@ -1352,11 +1423,14 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
     }
     if (stateToSave.questions && Array.isArray(stateToSave.questions)) {
       stateToSave.questions = stateToSave.questions.map((question) => {
-        const { uiKey, aiGeneratedTagsFromSource, ...restOfQuestion } = question;
+        const { uiKey, aiGeneratedTagsFromSource, isGeneratingTags, ...restOfQuestion } = question;
         return restOfQuestion;
       });
     }
     // Clean up submission state so it doesn't persist on reload
+    delete stateToSave.lastSubmittedSurveyId;
+    delete stateToSave.lastSubmittedSurveyArweaveTxId;
+    delete stateToSave.cacheLoaded;
     delete stateToSave.isSubmitting;
     delete stateToSave.progress;
     delete stateToSave.showSubmitSteps;
@@ -1366,12 +1440,20 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
     delete stateToSave.formValidationError;
     delete stateToSave.surveyAddedSuccessfully;
     delete stateToSave.questionsAddedSuccessfully;
+    // Uploaded prompts, including locked ones, stay out of browser storage.
+    delete stateToSave.uploadedQuestionPrompts;
 
     delete stateToSave.draftSaveFailed;
     return JSON.stringify(stateToSave);
   };
 
   handleDraftBeforeUnload = (event: BeforeUnloadEvent): void => {
+    // A list kept elsewhere would come back with its uploading drafts still in it.
+    if (this.state.isSubmitting && this.props.onDraftQuestionsChange) {
+      event.preventDefault();
+      event.returnValue = '';
+      return;
+    }
     if (!this.state.draftSaveFailed) return;
     if (this.serializeUnfinishedSurveyDraft() === this._lastSavedUnfinishedSurveyJson) return;
     event.preventDefault();
@@ -1536,6 +1618,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
   };
 
   handleQuestionChange = (index: number, key: string, value: unknown): void => {
+    invalidateQuestionTagRequest(this, index);
     const updatedQuestions = buildCreateSurveyQuestionFieldUpdateList({
       generateQuestionId: this.generateQuestionId,
       key,
@@ -1550,6 +1633,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
   };
 
   handleOptionChange = (qIdx: number, optIdx: number, val: unknown): void => {
+    invalidateQuestionTagRequest(this, qIdx);
     const updatedQuestions = buildCreateSurveyQuestionOptionList({
       generateQuestionId: this.generateQuestionId,
       operation: 'change',
@@ -1562,6 +1646,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
   };
 
   addOption = (questionIndex: number): void => {
+    invalidateQuestionTagRequest(this, questionIndex);
     const updatedQuestions = buildCreateSurveyQuestionOptionList({
       generateQuestionId: this.generateQuestionId,
       operation: 'add',
@@ -1572,6 +1657,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
   };
 
   removeOption = (questionIndex: number, optionIndex: number): void => {
+    invalidateQuestionTagRequest(this, questionIndex);
     const updatedQuestions = buildCreateSurveyQuestionOptionList({
       generateQuestionId: this.generateQuestionId,
       operation: 'remove',
@@ -1583,6 +1669,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
   };
 
   removeQuestion = (index: number): void => {
+    invalidateQuestionTagRequest(this, index);
     const updated = this.state.questions.filter((_, i) => i !== index);
     this.setState(buildCreateSurveyQuestionListPatch(updated), () => {
       this.updateSurveyHash();
@@ -1686,11 +1773,14 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
     questionDataArray = [],
     uploadedQuestions = [],
     sourceQuestions = [],
+    publication,
   } = {}) => {
     try {
-      const cacheTarget = this.resolveManagedCacheSeedTargets();
+      const cacheTarget = publication?.cacheTarget || this.resolveManagedCacheSeedTargets();
       const { primarySlug, primaryNetId } = cacheTarget;
-      const workerCacheIdentity = this.resolveManagedWorkerCacheIdentity(cacheTarget);
+      const workerCacheIdentity = publication
+        ? publication.workerCacheIdentity
+        : this.resolveManagedWorkerCacheIdentity(cacheTarget);
       if (primaryNetId === 'worker' && !workerCacheIdentity) return false;
 
       const uploadedRows: CreateQuestionsCacheQuestionRow[] = Array.isArray(uploadedQuestions)
@@ -1744,6 +1834,8 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
       const sourceRows: CreateQuestionsCacheQuestionRow[] = Array.isArray(sourceQuestions)
         ? (sourceQuestions as CreateQuestionsCacheQuestionRow[])
         : [];
+      // The author's own text, shown to the author and locked for other readers.
+      const author = publication ? publication.account : this.props.account;
       const recentRows = normalizedRows.map((row, idx): CreateQuestionsSeededQuestionRow => {
         const source = sourceRows[idx] || null;
         const promptMasked = String(row?.prompt || '').trim() === '[encrypted]';
@@ -1758,13 +1850,16 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
         const shouldHydrateOptions =
           ['multichoice', 'quadratic'].includes(sourceType) && hasEncryptedOptions && sourceOptions.length > 0;
         const shouldHydrateTags = hasEncryptedTags && sourceTags.length > 0;
-        return {
-          ...row,
-          id: row.id,
-          ...(promptMasked && sourcePrompt ? { prompt: sourcePrompt, promptDecrypted: true } : {}),
-          ...(shouldHydrateOptions ? { options: sourceOptions, optionsDecrypted: true } : {}),
-          ...(shouldHydrateTags ? { tags: sourceTags, tagsDecrypted: true } : {}),
-        };
+        return stampDecryptedQuestion(
+          {
+            ...row,
+            id: row.id,
+            ...(promptMasked && sourcePrompt ? { prompt: sourcePrompt, promptDecrypted: true } : {}),
+            ...(shouldHydrateOptions ? { options: sourceOptions, optionsDecrypted: true } : {}),
+            ...(shouldHydrateTags ? { tags: sourceTags, tagsDecrypted: true } : {}),
+          },
+          author,
+        );
       });
 
       try {
@@ -1853,7 +1948,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
 
       // Best-effort write-through: failures here must not fail successful on-chain submits.
       try {
-        if (workerCacheIdentity) {
+        if (workerCacheIdentity && !publication) {
           const currentIdentity = this.resolveManagedWorkerCacheIdentity(cacheTarget);
           if (!currentIdentity || currentIdentity.key !== workerCacheIdentity.key) return false;
         }
@@ -1880,6 +1975,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
     surveyId = '',
     sourceTitle = '',
     sourceDocumentUrls = [],
+    publication,
   }: CreateSurveySubmittedSurveyCacheArgs = {}): Promise<boolean> => {
     try {
       const surveyRecord = isObjectLikeRecord(surveyData) ? surveyData : {};
@@ -1888,10 +1984,12 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
         .toLowerCase();
       if (!sid) return false;
 
-      const cacheTarget = this.resolveManagedCacheSeedTargets();
+      const cacheTarget = publication?.cacheTarget || this.resolveManagedCacheSeedTargets();
       const { primarySlug, primaryNetId } = cacheTarget;
       if (!primaryNetId) return false;
-      const workerCacheIdentity = this.resolveManagedWorkerCacheIdentity(cacheTarget);
+      const workerCacheIdentity = publication
+        ? publication.workerCacheIdentity
+        : this.resolveManagedWorkerCacheIdentity(cacheTarget);
       if (primaryNetId === 'worker' && !workerCacheIdentity) return false;
 
       const normalizedDocs = sanitizeDocumentUrls(Array.isArray(sourceDocumentUrls) ? sourceDocumentUrls : []);
@@ -1900,7 +1998,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
         surveyID: sid,
         id: sid,
         questionIDs: Array.isArray(surveyRecord.questionIDs) ? surveyRecord.questionIDs : [],
-        creator: surveyRecord.creator || this.props.account || '',
+        creator: surveyRecord.creator || (publication ? publication.account : this.props.account) || '',
       };
 
       if (String(nextSurvey.title || '').trim() === '[encrypted]' && String(sourceTitle || '').trim()) {
@@ -1927,7 +2025,8 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
       const surveys = netBucket.surveys as ManagedResourceMap;
       surveys[sid] = {
         ...(surveys[sid] || {}),
-        ...nextSurvey,
+        // The author's own title and links, shown to the author and locked for other readers.
+        ...stampDecryptedSurvey(nextSurvey, publication ? publication.account : this.props.account),
         sessionSlug: nextSurvey.sessionSlug || primarySlug,
         slug: nextSurvey.slug || nextSurvey.sessionSlug || primarySlug,
       };
@@ -1939,7 +2038,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
       }
 
       try {
-        if (workerCacheIdentity) {
+        if (workerCacheIdentity && !publication) {
           const currentIdentity = this.resolveManagedWorkerCacheIdentity(cacheTarget);
           if (!currentIdentity || currentIdentity.key !== workerCacheIdentity.key) return false;
         }
@@ -2212,19 +2311,49 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
     }
     const isWorkerCanonicalAuthoring = initialProjection.profileValid && initialProjection.isWorkerCanonical;
     const isPureWorkerCanonicalAuthoring = initialProjection.profileValid && initialProjection.isPureWorkerCanonical;
+    // Publication owns this scope even if the mounted form changes during an await.
+    const submitProps = { ...this.props };
+    const submittedState = JSON.parse(JSON.stringify(this.state)) as CreateQuestionsAndSurveysState;
+    const cacheTarget = this.resolveManagedCacheSeedTargets();
+    const draftKey = buildCreateSurveyDraftStorageKey(this.getActiveSessionSlug());
+    let storedDraft: string | null | undefined;
+    try {
+      storedDraft = getCreateSurveyDraftStorage()?.getItem(draftKey);
+    } catch (_) {
+      /* Storage failure must not block publication. */
+    }
+    const publication: CreateSurveyPublicationContext = {
+      sessionSlug: normalizeSessionSlug(this.getActiveSessionSlug() || ''),
+      draftKey,
+      storedDraft,
+      submittedDraft: this.serializeUnfinishedSurveyDraft(),
+      cacheTarget,
+      workerCacheIdentity: this.resolveManagedWorkerCacheIdentity(cacheTarget),
+      account: String(submitProps.account || ''),
+      chainId: isPureWorkerCanonicalAuthoring ? null : this.resolveSessionChainId(initialSessionConfig, submitProps),
+    };
+    this._publication = publication;
+    const submittedSurveyId = isWorkerCanonicalAuthoring ? this.computeSurveyHash() : submittedState.surveyHash;
+    const setPublicationState: typeof this.setState = (update, callback) => {
+      if (this.isPublicationContextCurrent(publication)) {
+        this.setState(update, () => {
+          if (this.isPublicationContextCurrent(publication)) callback?.();
+        });
+      }
+    };
     const sessionConfig = isWorkerCanonicalAuthoring
       ? initialSessionConfig
       : await this.ensureResolvedSessionConfigForSubmit(initialSessionConfig);
 
     // Wagmi-only network guard (block before any submit work)
-    if (!isPureWorkerCanonicalAuthoring && this.props.provider === 'wagmi') {
+    if (!isPureWorkerCanonicalAuthoring && submitProps.provider === 'wagmi') {
       try {
-        const targetChainId = this.resolveSessionChainId(sessionConfig);
+        const targetChainId = this.resolveSessionChainId(sessionConfig, submitProps);
         const targetId = targetChainId != null && Number(targetChainId) > 0 ? Number(targetChainId) : null;
         const chainHex = await this.getWalletChainId();
         const walletId = chainHex ? parseInt(chainHex, 16) : null;
         if (Number.isFinite(targetId) && walletId != null && walletId !== targetId) {
-          this.setState(buildCreateSurveyNetworkSwitchPatch(true));
+          setPublicationState(buildCreateSurveyNetworkSwitchPatch(true));
           return;
         }
       } catch (e) {
@@ -2232,16 +2361,16 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
       }
     }
 
-    this.setState(buildCreateSurveySubmitStartPatch());
+    setPublicationState(buildCreateSurveySubmitStartPatch());
 
     // === NEW: compute sessionName once from props ===
-    const _sessionName = String(sessionConfig.sessionName || sessionConfig.slug || this.getActiveSessionSlug() || '');
+    const _sessionName = String(sessionConfig.sessionName || sessionConfig.slug || publication.sessionSlug || '');
 
     // Session-scoped slug/config for contract + worker calls
-    const sessionSlug = normalizeSessionSlug(sessionConfig.slug || this.getActiveSessionSlug() || '');
+    const sessionSlug = normalizeSessionSlug(sessionConfig.slug || publication.sessionSlug || '');
     const sessionKeyOrCfg = sessionConfig;
 
-    const { title, questions, isStandaloneQuestion, documentURLs, surveyLockGateIds } = this.state;
+    const { title, questions, isStandaloneQuestion, documentURLs, surveyLockGateIds } = submittedState;
 
     const { gateMap, defaultGateId } = this.resolveGateOptions(sessionConfig, { isStandaloneQuestion });
     const { normalizeKnownGateIds, resolvedSurveyLockGateIds, resolveQuestionSubmitGateIds, needsLit } =
@@ -2253,16 +2382,20 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
         surveyLockGateIds,
       });
 
-    const chainIdFallback = isPureWorkerCanonicalAuthoring ? null : this.resolveSessionChainId(sessionConfig);
+    const chainIdFallback = isPureWorkerCanonicalAuthoring
+      ? null
+      : this.resolveSessionChainId(sessionConfig, submitProps);
 
-    const litHooks = needsLit ? this.resolveLitHooksForSubmit(sessionConfig, chainIdFallback) : null;
+    const litHooks = needsLit ? this.resolveLitHooksForSubmit(sessionConfig, chainIdFallback, submitProps) : null;
     if (needsLit) {
-      if (!this.props.account) {
-        this.setState(buildCreateSurveySubmitFailurePatch(`Connect a ${t('walletLower')} to encrypt this survey.`));
+      if (!submitProps.account) {
+        setPublicationState(
+          buildCreateSurveySubmitFailurePatch(`Connect a ${t('walletLower')} to encrypt this survey.`),
+        );
         return;
       }
       if (!litHooks || typeof litHooks.saveKey !== 'function') {
-        this.setState(
+        setPublicationState(
           buildCreateSurveySubmitFailurePatch(`Lit hooks not initialized; connect a ${t('walletLower')} to encrypt.`),
         );
         return;
@@ -2313,8 +2446,8 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
       const combinedAccessControlConditions = combineLitRecipientAccessControlConditions(recipients);
 
       const envelope = await cryptoUtils.encryptEnvelopeValue(value, {
-        providerLike: this.props.provider,
-        account: this.props.account,
+        providerLike: submitProps.provider,
+        account: submitProps.account,
         chainId: chainIdFallback,
         surveyId,
         qId,
@@ -2340,10 +2473,10 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
       if (isStandaloneQuestion) {
         if (questions.length === 0) {
           alert('Please add at least one question.');
-          this.setState(buildCreateSurveySubmitResetPatch());
+          setPublicationState(buildCreateSurveySubmitResetPatch());
           return;
         }
-        this.setState(buildCreateSurveySubmitProgressPatch({ progress: 10, submitStep: 1 }));
+        setPublicationState(buildCreateSurveySubmitProgressPatch({ progress: 10, submitStep: 1 }));
 
         const uniqueQuestions = this.removeDuplicateQuestions(questions) as CreateQuestionsAndSurveysQuestion[];
 
@@ -2369,7 +2502,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
             });
 
             if (questionEncryption && questionEncryption.recipients.length) {
-              const { gates, recipients } = questionEncryption;
+              const { recipients } = questionEncryption;
 
               const promptResult = await encryptValueWithRecipients({
                 value: q.prompt,
@@ -2417,7 +2550,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
               singleSelect: resolvePayloadSingleSelect(q.type, q.singleSelect),
               ...(q.type === 'quadratic' ? { voiceCredits: q.voiceCredits ?? 99 } : {}),
               tags: tagsValue,
-              creator: this.props.account,
+              creator: submitProps.account,
               associatedSurveyId: surveyContextId,
               sessionName: _sessionName,
               sessionSlug: sessionSlug || '',
@@ -2441,15 +2574,15 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
           });
         });
         // Step 2: publish the durable index entry for this session.
-        this.setState(buildCreateSurveySubmitProgressPatch({ progress: 50, submitStep: 2 }));
+        setPublicationState(buildCreateSurveySubmitProgressPatch({ progress: 50, submitStep: 2 }));
 
         const questionIdsForContract = uniqueQuestions.map((q) => q.id);
         let submittedQuestions: unknown[] = [];
         if (isWorkerCanonicalAuthoring) {
           const workerResult = await workerCanonicalAuthoringPort.publishQuestions(
             {
-              account: this.props.account,
-              providerLike: this.props.provider,
+              account: submitProps.account,
+              providerLike: submitProps.provider,
               questions: questionDataArray,
               sessionConfig,
               sessionSlug,
@@ -2460,7 +2593,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
         } else {
           const surveyIdsForContract = uniqueQuestions.map((q) => q.associatedSurveyId || ethers.constants.HashZero);
           const addQuestionsResult = await contractScriptsForSubmit.addQuestions(
-            this.props.provider,
+            submitProps.provider,
             questionIdsForContract,
             questionDataArray,
             surveyIdsForContract,
@@ -2474,53 +2607,56 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
             : [];
         }
 
-        if (!this.props.preformedQuestions) {
-          this.clearUnfinishedSurveyDraft();
-          // Do not wipe group caches here: clearing questions/surveys can collapse
-          // pile/full mode to only the just-submitted question until a full rescan completes.
-          await this.seedUploadedQuestionsCache({
-            questionDataArray,
-            uploadedQuestions: submittedQuestions,
-            sourceQuestions: uniqueQuestions,
-          });
-          this.setState(
-            buildCreateSurveyQuestionsSubmitSuccessPatch({
-              resetDraft: true,
-              uploadedQuestions: submittedQuestions,
-            }),
-            this.startCacheWatch,
-          );
-        } else {
-          await this.seedUploadedQuestionsCache({
-            questionDataArray,
-            uploadedQuestions: submittedQuestions,
-            sourceQuestions: uniqueQuestions,
-          });
-          this.setState(
-            buildCreateSurveyQuestionsSubmitSuccessPatch({
-              uploadedQuestions: submittedQuestions,
-            }),
-            () => {
-              this.startCacheWatch();
-              if (this.props.appendPreformedQuestions) {
-                this.removeUploadedQuestionDrafts(submittedQuestions);
-              }
-              if (this.props.miniaturized && this.props.onUploadComplete) {
-                this.props.onUploadComplete(null);
-              }
-            },
-          );
+        if (!submitProps.preformedQuestions) this.clearUnfinishedSurveyDraft(publication);
+        await this.seedUploadedQuestionsCache({
+          publication,
+          questionDataArray,
+          uploadedQuestions: submittedQuestions,
+          sourceQuestions: uniqueQuestions,
+        });
+        // A review list keeps its other drafts, so its upload stands (and its drafts leave) even if they changed.
+        const reviewList = submitProps.interviewQuestionReview || submitProps.appendPreformedQuestions;
+        if (!reviewList && !this.isPublicationDraftCurrent(publication)) {
+          setPublicationState(buildCreateSurveySubmitResetPatch());
+          return;
         }
+        const uploadedQuestionPrompts = Object.fromEntries(
+          uniqueQuestions.map((q) => [String(q.id || '').toLowerCase(), String(q.prompt || '').trim()]),
+        );
+        // Uploaded drafts leave before the submit settles, so a batch held back meanwhile arrives as new drafts.
+        if (submitProps.preformedQuestions && submitProps.appendPreformedQuestions) {
+          if (this.isPublicationContextCurrent(publication)) this.removeUploadedQuestionDrafts(submittedQuestions);
+        }
+        setPublicationState(
+          {
+            ...(submitProps.preformedQuestions
+              ? buildCreateSurveyQuestionsSubmitSuccessPatch({ uploadedQuestions: submittedQuestions })
+              : buildCreateSurveyQuestionsSubmitSuccessPatch({
+                  resetDraft: true,
+                  uploadedQuestions: submittedQuestions,
+                })),
+            uploadedQuestionPrompts,
+          },
+          () => {
+            this.startCacheWatch();
+            submitProps.onQuestionsSubmitted?.();
+            if (submitProps.preformedQuestions && submitProps.miniaturized && submitProps.onUploadComplete) {
+              submitProps.onUploadComplete(null);
+            }
+          },
+        );
       } else {
         if (!title.trim()) {
           alert('Please enter a survey title.');
-          this.setState(buildCreateSurveySubmitResetPatch());
+          setPublicationState(buildCreateSurveySubmitResetPatch());
           return;
         }
         // Worker ids carry the uploading account, so recompute them at submit.
-        const surveyIDForUpload = isWorkerCanonicalAuthoring ? this.computeSurveyHash() : this.state.surveyHash;
+        const surveyIDForUpload = submittedSurveyId;
         if (!surveyIDForUpload) {
-          this.setState(buildCreateSurveySubmitBlockingErrorPatch('Internal error: Survey ID could not be generated.'));
+          setPublicationState(
+            buildCreateSurveySubmitBlockingErrorPatch('Internal error: Survey ID could not be generated.'),
+          );
           return;
         }
 
@@ -2595,7 +2731,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
               singleSelect: resolvePayloadSingleSelect(q.type, q.singleSelect),
               ...(q.type === 'quadratic' ? { voiceCredits: q.voiceCredits ?? 99 } : {}),
               tags: tagsValue,
-              creator: this.props.account,
+              creator: submitProps.account,
               associatedSurveyId: surveyIDForUpload,
               sessionName: _sessionName,
               sessionSlug: sessionSlug || '',
@@ -2624,7 +2760,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
         let creationBlock = 0;
         if (!isWorkerCanonicalAuthoring) {
           try {
-            creationBlock = await contractScriptsForSubmit.getLatestBlockNumber(this.props.provider, sessionKeyOrCfg);
+            creationBlock = await contractScriptsForSubmit.getLatestBlockNumber(submitProps.provider, sessionKeyOrCfg);
           } catch (e) {
             surveyLog.warn('Could not fetch creationBlock, defaulting to 0', e);
           }
@@ -2674,7 +2810,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
           surveyID: surveyIDForUpload,
           title: surveyTitleValue,
           questionIDs: questionIdsForContract,
-          creator: this.props.account,
+          creator: submitProps.account,
           documentURLs: docUrlsValue,
           sessionName: _sessionName,
           sessionSlug: sessionSlug || '',
@@ -2694,15 +2830,15 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
         });
 
         // Step 1: Upload to Arweave (survey.json)
-        this.setState(buildCreateSurveySubmitProgressPatch({ progress: 30, submitStep: 1 }));
+        setPublicationState(buildCreateSurveySubmitProgressPatch({ progress: 30, submitStep: 1 }));
         let surveyArweaveTxId = '';
         if (!isWorkerCanonicalAuthoring) {
           const arweaveKey = await getEffectiveArweaveKey({
             sessionSlug,
             sessionConfig: sessionConfig as CreateSurveyEffectiveArweaveSessionConfig,
             context: {
-              account: this.props.account,
-              providerLike: this.props.provider as CreateSurveyResourceKeyProviderLike,
+              account: submitProps.account,
+              providerLike: submitProps.provider as CreateSurveyResourceKeyProviderLike,
               chainId: chainIdFallback,
             },
           });
@@ -2719,8 +2855,8 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
                   sessionSlug,
                   sessionConfig,
                   context: {
-                    account: this.props.account,
-                    providerLike: this.props.provider,
+                    account: submitProps.account,
+                    providerLike: submitProps.provider,
                     chainId: chainIdFallback,
                   },
                 })) || '',
@@ -2736,13 +2872,13 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
         }
 
         // Step 2: publish the durable session index or the configured contract.
-        this.setState(buildCreateSurveySubmitProgressPatch({ progress: 60, submitStep: 2 }));
+        setPublicationState(buildCreateSurveySubmitProgressPatch({ progress: 60, submitStep: 2 }));
         let addSurveyResult: UnknownRecord;
         if (isWorkerCanonicalAuthoring) {
           addSurveyResult = await workerCanonicalAuthoringPort.publishSurvey(
             {
-              account: this.props.account,
-              providerLike: this.props.provider,
+              account: submitProps.account,
+              providerLike: submitProps.provider,
               questions: questionDataArray,
               sessionConfig,
               sessionSlug,
@@ -2752,7 +2888,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
           );
         } else {
           addSurveyResult = await contractScriptsForSubmit.addSurveyWithQuestions(
-            this.props.provider,
+            submitProps.provider,
             surveyIDForUpload,
             completeSurveyData,
             questionIdsForContract,
@@ -2774,6 +2910,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
             arweaveTxId: addSurveyResult.surveyArweaveTxId || surveyArweaveTxId,
           }) || surveyArweaveTxId;
         await this.seedUploadedQuestionsCache({
+          publication,
           questionDataArray,
           uploadedQuestions:
             Array.isArray(addSurveyResult.uploadedQuestions) && addSurveyResult.uploadedQuestions.length
@@ -2782,16 +2919,21 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
           sourceQuestions: uniqueQuestions,
         });
         await this.seedSubmittedSurveyCache({
+          publication,
           surveyData: completeSurveyData,
           surveyId: surveyIDForUpload,
           sourceTitle: title,
           sourceDocumentUrls: documentURLs,
         });
 
-        if (!this.props.preformedQuestions) {
-          this.clearUnfinishedSurveyDraft();
+        if (!submitProps.preformedQuestions) this.clearUnfinishedSurveyDraft(publication);
+        if (!this.isPublicationDraftCurrent(publication)) {
+          setPublicationState(buildCreateSurveySubmitResetPatch());
+          return;
+        }
+        if (!submitProps.preformedQuestions) {
           // Preserve existing group caches and let cache-watch/event refresh converge.
-          this.setState(
+          setPublicationState(
             buildCreateSurveySurveySubmitSuccessPatch({
               resetDraft: true,
               surveyArweaveTxId: submittedSurveyArweaveTxId,
@@ -2800,15 +2942,15 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
             this.startCacheWatch,
           );
         } else {
-          this.setState(
+          setPublicationState(
             buildCreateSurveySurveySubmitSuccessPatch({
               surveyArweaveTxId: submittedSurveyArweaveTxId,
               surveyId: surveyIDForUpload,
             }),
             () => {
               this.startCacheWatch();
-              if (this.props.miniaturized && this.props.onUploadComplete) {
-                this.props.onUploadComplete(surveyIDForUpload);
+              if (submitProps.miniaturized && submitProps.onUploadComplete) {
+                submitProps.onUploadComplete(surveyIDForUpload);
               }
             },
           );
@@ -2818,7 +2960,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
       surveyLog.error('[CreateQuestionsAndSurveys] Failed to create survey/questions:', error);
       const shouldResetSubmitProgress = !!(error as { resetSubmitProgress?: unknown } | null | undefined)
         ?.resetSubmitProgress;
-      this.setState(
+      setPublicationState(
         buildCreateSurveySubmitCatchPatch({
           errorMessage: getErrorMessage(error, 'An error occurred during submission.'),
           shouldResetSubmitProgress,
@@ -2968,62 +3110,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
     }, this.saveToLocalStorage);
   };
 
-  suggestTagsForQuestion = async (qIndex: number): Promise<void> => {
-    const question = this.state.questions[qIndex];
-    if (!question || question.isGeneratingTags) return;
-
-    this.setState((prevState: CreateQuestionsAndSurveysState) => {
-      const updatedQuestions = [...prevState.questions];
-      updatedQuestions[qIndex] = { ...updatedQuestions[qIndex], isGeneratingTags: true };
-      return { questions: updatedQuestions };
-    });
-
-    try {
-      const defaultTagsRaw = this.props.defaultTags;
-      let defaultTagsForAI: string[] = [];
-      if (Array.isArray(defaultTagsRaw)) {
-        defaultTagsForAI = defaultTagsRaw.filter(Boolean).map((t) => t.trim());
-      } else if (typeof defaultTagsRaw === 'string') {
-        defaultTagsForAI = defaultTagsRaw
-          .split(',')
-          .map((t) => t.trim())
-          .filter(Boolean);
-      }
-
-      const prompt = generateSingleQuestionTagsPrompt(
-        String(question.prompt || ''),
-        String(question.type || ''),
-        Array.isArray(question.options) ? question.options : [],
-        defaultTagsForAI,
-      );
-
-      const rawResponse = await callAI(prompt, { ...this.buildAiRequestOptions(), taskType: 'categorize' });
-      const match = rawResponse.match(/\{[\s\S]*\}/);
-      if (!match) throw new Error('No JSON object found in AI response for tags.');
-      const parsedResponse = JSON.parse(match[0]);
-      const newAiTags = (parsedResponse.tags || []).map((tag: unknown) => String(tag || '').trim()).filter(Boolean);
-
-      this.setState((prevState: CreateQuestionsAndSurveysState) => {
-        const updated = [...prevState.questions];
-        updated[qIndex] = {
-          ...updated[qIndex],
-          aiGeneratedTagsFromSource: newAiTags,
-          tags: [...newAiTags],
-          isGeneratingTags: false,
-        };
-        return { questions: updated };
-      }, this.saveToLocalStorage);
-    } catch (_error: unknown) {
-      this.setState((prevState: CreateQuestionsAndSurveysState) => {
-        const updated = [...prevState.questions];
-        updated[qIndex] = { ...updated[qIndex], isGeneratingTags: false };
-        return { questions: updated };
-      });
-      alert(
-        `Failed to generate tags for question "${(question?.prompt || '').substring(0, 30)}...". Please try again.`,
-      );
-    }
-  };
+  suggestTagsForQuestion = suggestTagsForQuestion.bind(this);
 
   removeTagFromQuestion = (qIndex: number, tagIndexToRemove: number): void => {
     this.setState((prevState: CreateQuestionsAndSurveysState) => {
@@ -3198,6 +3285,17 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
   };
 
   // Visual type selector
+  // The submit button alone, or on one line with what the page puts beside it.
+  wrapSubmitRow = (button: React.ReactElement) =>
+    this.props.submitRowClassName ? (
+      <div className={this.props.submitRowClassName}>
+        {this.props.submitAccessory}
+        {button}
+      </div>
+    ) : (
+      button
+    );
+
   renderTypeSelector: () => React.ReactNode = () => {
     return (
       <div className={styles.typeSelectorBlock}>
@@ -3538,6 +3636,108 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
             </Button>
           );
 
+          const optionsEditor = ['multichoice', 'quadratic'].includes(question.type || '') ? (
+            <div className={styles.optionsContainer}>
+              {(question.options || []).map((option: string, oIndex: number) => (
+                <div key={`option-${question.uiKey || qIndex}-${oIndex}`} className={styles.optionItem}>
+                  <AutoGrowTextarea
+                    singleLine
+                    placeholder={`Option ${oIndex + 1}`}
+                    value={option}
+                    onChange={(e: CreateSurveyInputValueEvent) =>
+                      this.handleOptionChange(qIndex, oIndex, e.target.value)
+                    }
+                    className={styles.optionInput}
+                  />
+                  <Button className={styles.removeOptionButton} onClick={() => this.removeOption(qIndex, oIndex)}>
+                    <FontAwesomeIcon icon={faTimes} />
+                  </Button>
+                </div>
+              ))}
+              <div className={styles.optionActions}>
+                {(question.type === 'quadratic' || (question.options || []).length < 10) && (
+                  <Button
+                    className={styles.addOptionButton}
+                    data-testid={E2E_TESTIDS.CREATE_QUESTION_ADD_OPTION}
+                    onClick={() => this.addOption(qIndex)}
+                  >
+                    <FontAwesomeIcon icon={faPlus} /> Add Option
+                  </Button>
+                )}
+                {question.type === 'quadratic' && (
+                  <button
+                    type="button"
+                    className={styles.creditsToggle}
+                    data-testid="ce-quadratic-author-budget-toggle"
+                    aria-expanded={budgetOpen}
+                    aria-controls={budgetPanelId}
+                    onClick={() =>
+                      this.setState({
+                        activeQuadraticBudgetKey: budgetOpen ? '' : budgetKey,
+                        quadraticBudgetSliderMax: Math.max(999, voiceCredits),
+                      })
+                    }
+                  >
+                    {`Credits: ${voiceCredits}`}
+                  </button>
+                )}
+              </div>
+              {question.type === 'quadratic' && budgetOpen && (
+                <div id={budgetPanelId} className={styles.creditsPanel}>
+                  <label htmlFor={`quadratic-budget-${budgetKey}`}>
+                    Voice credits per respondent for this question
+                  </label>
+                  <div className={styles.creditsSliderRow}>
+                    <span aria-hidden="true">1</span>
+                    <input
+                      id={`quadratic-budget-${budgetKey}`}
+                      type="range"
+                      min="1"
+                      max={this.state.quadraticBudgetSliderMax}
+                      step="1"
+                      value={voiceCredits}
+                      data-testid="ce-quadratic-author-budget"
+                      onChange={(event) =>
+                        this.handleQuestionChange(qIndex, 'voiceCredits', Number(event.target.value))
+                      }
+                    />
+                    <span aria-hidden="true">{this.state.quadraticBudgetSliderMax}</span>
+                  </div>
+                  <p>Votes cost their square; unused credits are allowed.</p>
+                </div>
+              )}
+              {/* Single-select limits multichoice answers to one option. */}
+              {question.type === 'multichoice' && (
+                <div className={styles.singleSelectToggle}>
+                  <label className={styles.singleSelectLabel}>
+                    <input
+                      type="checkbox"
+                      data-testid={E2E_TESTIDS.CREATE_QUESTION_SINGLE_SELECT}
+                      checked={!!question.singleSelect}
+                      onChange={(e: CreateSurveyCheckboxChangeEvent) =>
+                        this.handleQuestionChange(qIndex, 'singleSelect', e.target.checked)
+                      }
+                    />
+                    <span>One Selection Only</span>
+                    <FontAwesomeIcon
+                      icon={faQuestionCircle}
+                      className={styles.tooltip}
+                      id={`singleSelectTooltip-${question.uiKey || qIndex}`}
+                    />
+                    <CETooltip
+                      placement="right"
+                      trigger="hover focus click"
+                      target={`singleSelectTooltip-${question.uiKey || qIndex}`}
+                      className={styles.tooltipBubble}
+                    >
+                      Single-select limits respondents to one option. Multi-select allows multiple choices.
+                    </CETooltip>
+                  </label>
+                </div>
+              )}
+            </div>
+          ) : null;
+
           return (
             <div
               key={question.uiKey || `question-${qIndex}`}
@@ -3647,16 +3847,17 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
                   prompt={question.prompt || ''}
                   type={question.type || 'freeform'}
                   options={question.options || []}
+                  singleSelect={!!question.singleSelect}
+                  voiceCredits={voiceCredits}
                   onChange={(value) => this.handleQuestionChange(qIndex, 'prompt', value)}
                   actions={removeQuestionButton}
+                  editor={optionsEditor}
                 />
               ) : (
-                <Input
+                <AutoGrowTextarea
                   innerRef={(el: FocusablePromptElement | null) => {
                     this._promptRefs[question.uiKey] = el;
                   }}
-                  type="textarea"
-                  rows="2"
                   className={styles.questionPromptInput}
                   placeholder="Question prompt"
                   data-testid={E2E_TESTIDS.CREATE_QUESTION_PROMPT}
@@ -3667,106 +3868,8 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
                 />
               )}
 
-              {['multichoice', 'quadratic'].includes(question.type || '') && (
-                <div className={styles.optionsContainer}>
-                  {(question.options || []).map((option: string, oIndex: number) => (
-                    <div key={`option-${question.uiKey || qIndex}-${oIndex}`} className={styles.optionItem}>
-                      <Input
-                        placeholder={`Option ${oIndex + 1}`}
-                        value={option}
-                        onChange={(e: CreateSurveyInputValueEvent) =>
-                          this.handleOptionChange(qIndex, oIndex, e.target.value)
-                        }
-                        className={styles.optionInput}
-                      />
-                      <Button className={styles.removeOptionButton} onClick={() => this.removeOption(qIndex, oIndex)}>
-                        <FontAwesomeIcon icon={faTimes} />
-                      </Button>
-                    </div>
-                  ))}
-                  <div className={styles.optionActions}>
-                    {(question.type === 'quadratic' || (question.options || []).length < 10) && (
-                      <Button
-                        className={styles.addOptionButton}
-                        data-testid={E2E_TESTIDS.CREATE_QUESTION_ADD_OPTION}
-                        onClick={() => this.addOption(qIndex)}
-                      >
-                        <FontAwesomeIcon icon={faPlus} /> Add Option
-                      </Button>
-                    )}
-                    {question.type === 'quadratic' && (
-                      <button
-                        type="button"
-                        className={styles.creditsToggle}
-                        data-testid="ce-quadratic-author-budget-toggle"
-                        aria-expanded={budgetOpen}
-                        aria-controls={budgetPanelId}
-                        onClick={() =>
-                          this.setState({
-                            activeQuadraticBudgetKey: budgetOpen ? '' : budgetKey,
-                            quadraticBudgetSliderMax: Math.max(999, voiceCredits),
-                          })
-                        }
-                      >
-                        {`Credits: ${voiceCredits}`}
-                      </button>
-                    )}
-                  </div>
-                  {question.type === 'quadratic' && budgetOpen && (
-                    <div id={budgetPanelId} className={styles.creditsPanel}>
-                      <label htmlFor={`quadratic-budget-${budgetKey}`}>
-                        Voice credits per respondent for this question
-                      </label>
-                      <div className={styles.creditsSliderRow}>
-                        <span aria-hidden="true">1</span>
-                        <input
-                          id={`quadratic-budget-${budgetKey}`}
-                          type="range"
-                          min="1"
-                          max={this.state.quadraticBudgetSliderMax}
-                          step="1"
-                          value={voiceCredits}
-                          data-testid="ce-quadratic-author-budget"
-                          onChange={(event) =>
-                            this.handleQuestionChange(qIndex, 'voiceCredits', Number(event.target.value))
-                          }
-                        />
-                        <span aria-hidden="true">{this.state.quadraticBudgetSliderMax}</span>
-                      </div>
-                      <p>Votes cost their square; unused credits are allowed.</p>
-                    </div>
-                  )}
-                  {/* Single-select limits multichoice answers to one option. */}
-                  {question.type === 'multichoice' && (
-                    <div className={styles.singleSelectToggle}>
-                      <label className={styles.singleSelectLabel}>
-                        <input
-                          type="checkbox"
-                          data-testid={E2E_TESTIDS.CREATE_QUESTION_SINGLE_SELECT}
-                          checked={!!question.singleSelect}
-                          onChange={(e: CreateSurveyCheckboxChangeEvent) =>
-                            this.handleQuestionChange(qIndex, 'singleSelect', e.target.checked)
-                          }
-                        />
-                        <span>One Selection Only</span>
-                        <FontAwesomeIcon
-                          icon={faQuestionCircle}
-                          className={styles.tooltip}
-                          id={`singleSelectTooltip-${question.uiKey || qIndex}`}
-                        />
-                        <CETooltip
-                          placement="right"
-                          trigger="hover focus click"
-                          target={`singleSelectTooltip-${question.uiKey || qIndex}`}
-                          className={styles.tooltipBubble}
-                        >
-                          Single-select limits respondents to one option. Multi-select allows multiple choices.
-                        </CETooltip>
-                      </label>
-                    </div>
-                  )}
-                </div>
-              )}
+              {!this.props.interviewQuestionReview && optionsEditor}
+
               <div className={styles.questionMetadata}>
                 <div className={styles.tagsManagerContainer}>
                   <div className={styles.tagsContainer}>
@@ -3888,67 +3991,71 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
         {/* Submit Button: only render if at least one question exists */}
         {questions.length > 0 && (
           <>
-            <Button
-              className={[
-                buildCreateSurveySubmitButtonClassName(styles, isSubmitting, submissionError),
-                this.props.submitClassName,
-              ]
-                .filter(Boolean)
-                .join(' ')}
-              data-testid={E2E_TESTIDS.CREATE_SUBMIT}
-              onClick={
-                !isPureWorkerCanonicalAuthoring &&
-                this.state.needsNetworkSwitch &&
-                this.props.provider === 'wagmi' &&
-                this.props.loginComplete
-                  ? this.switchToCorrectNetwork
-                  : this.handleSubmitButtonClick
-              }
-              disabled={
-                isSubmitting ||
-                (!isPureWorkerCanonicalAuthoring &&
-                this.state.needsNetworkSwitch &&
-                this.props.provider === 'wagmi' &&
-                this.props.loginComplete
-                  ? false
-                  : submissionError
-                    ? false
-                    : (!isStandaloneQuestion && !title.trim()) || renderedQuestions.some((q) => q.isGeneratingTags))
-              }
-              aria-busy={isSubmitting ? 'true' : 'false'}
-              title={submissionError ? 'Click to copy error' : undefined}
-            >
-              {isSubmitting && (
-                <span
-                  className={styles.buttonProgressFill}
-                  style={resolveCreateSurveyProgressFillStyle(progress)}
-                  aria-hidden="true"
-                />
-              )}
-              <span className={styles.buttonContent}>
-                {isSubmitting ? (
-                  <>
-                    <FontAwesomeIcon icon={faSpinner} spin style={CREATE_SURVEY_SUBMIT_ICON_STYLE} />
-                    Submitting...
-                  </>
-                ) : submissionError ? (
-                  <>
-                    <FontAwesomeIcon icon={faExclamationCircle} style={CREATE_SURVEY_SUBMIT_ICON_STYLE} />
-                    {submissionError}
-                    <span className={styles.copyHint}>&nbsp;— click to copy</span>
-                  </>
-                ) : !isPureWorkerCanonicalAuthoring &&
+            {this.wrapSubmitRow(
+              <Button
+                className={[
+                  buildCreateSurveySubmitButtonClassName(styles, isSubmitting, submissionError),
+                  this.props.submitClassName,
+                ]
+                  .filter(Boolean)
+                  .join(' ')}
+                data-testid={E2E_TESTIDS.CREATE_SUBMIT}
+                onClick={
+                  !isPureWorkerCanonicalAuthoring &&
                   this.state.needsNetworkSwitch &&
                   this.props.provider === 'wagmi' &&
-                  this.props.loginComplete ? (
-                  'Switch to correct network → Submit'
-                ) : isStandaloneQuestion ? (
-                  this.props.questionSubmitLabel || 'Create Questions'
-                ) : (
-                  'Create Survey'
+                  this.props.loginComplete
+                    ? this.switchToCorrectNetwork
+                    : this.handleSubmitButtonClick
+                }
+                disabled={
+                  isSubmitting ||
+                  (!isPureWorkerCanonicalAuthoring &&
+                  this.state.needsNetworkSwitch &&
+                  this.props.provider === 'wagmi' &&
+                  this.props.loginComplete
+                    ? false
+                    : submissionError
+                      ? false
+                      : (!isStandaloneQuestion && !title.trim()) ||
+                        renderedQuestions.some((q) => q.isGeneratingTags) ||
+                        Boolean(this.props.submitDisabled))
+                }
+                aria-busy={isSubmitting ? 'true' : 'false'}
+                title={submissionError ? 'Click to copy error' : undefined}
+              >
+                {isSubmitting && (
+                  <span
+                    className={styles.buttonProgressFill}
+                    style={resolveCreateSurveyProgressFillStyle(progress)}
+                    aria-hidden="true"
+                  />
                 )}
-              </span>
-            </Button>
+                <span className={styles.buttonContent}>
+                  {isSubmitting ? (
+                    <>
+                      <FontAwesomeIcon icon={faSpinner} spin style={CREATE_SURVEY_SUBMIT_ICON_STYLE} />
+                      Submitting...
+                    </>
+                  ) : submissionError ? (
+                    <>
+                      <FontAwesomeIcon icon={faExclamationCircle} style={CREATE_SURVEY_SUBMIT_ICON_STYLE} />
+                      {submissionError}
+                      <span className={styles.copyHint}>&nbsp;— click to copy</span>
+                    </>
+                  ) : !isPureWorkerCanonicalAuthoring &&
+                    this.state.needsNetworkSwitch &&
+                    this.props.provider === 'wagmi' &&
+                    this.props.loginComplete ? (
+                    'Switch to correct network → Submit'
+                  ) : isStandaloneQuestion ? (
+                    this.props.questionSubmitLabel || 'Create Questions'
+                  ) : (
+                    'Create Survey'
+                  )}
+                </span>
+              </Button>,
+            )}
 
             {/* Progress Indicator: Only visible during/after submission steps */}
             {(isSubmitting || this.state.showSubmitSteps) && (
@@ -3997,6 +4104,8 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
                     const idL = String(questionId).toLowerCase();
                     const bookmarked = this.state.bookmarkedQuestionsSet.has(idL);
                     const sessionSlug = this.getActiveSessionSlug();
+                    const shortId = `${questionId.substring(0, 10)}...${questionId.substring(questionId.length - 8)}`;
+                    const prompt = this.state.uploadedQuestionPrompts?.[idL] || '';
                     return (
                       <li
                         key={`uploaded-${questionId}-${index}`}
@@ -4006,9 +4115,13 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
                           .trim()
                           .toLowerCase()}
                       >
-                        <a href={`${window.location.origin}${buildQuestionRoutePath(questionId, { sessionSlug })}`}>
-                          {questionId.substring(0, 10)}...{questionId.substring(questionId.length - 8)}
-                        </a>
+                        {/* The question text tells uploads apart; the ID stays beneath it. */}
+                        <span className={styles.uploadedQuestionLabel}>
+                          <a href={`${window.location.origin}${buildQuestionRoutePath(questionId, { sessionSlug })}`}>
+                            {prompt || shortId}
+                          </a>
+                          {prompt ? <span className={styles.uploadedQuestionId}>{shortId}</span> : null}
+                        </span>
                         {arweaveTxId && (
                           <a
                             href={normalizeArweaveUrl(arweaveTxId, { contextLabel: 'create_survey_question_link' })}
@@ -4122,64 +4235,68 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
           </div>
         )}
 
-        {/* JSON preview area */}
-        {showJson && (
-          <JsonPanel
-            as="pre"
-            onCopy={() => this.copyJsonPreview(jsonData)}
-            copied={this.state.copyJsonSuccess}
-            copyTitle="Copy JSON"
-          >
-            {JSON.stringify(jsonData, null, 2)}
-          </JsonPanel>
-        )}
-
-        {/* Shared toolbar */}
-        <JsonButtonRow align="end" className={styles.jsonPromptBar}>
-          <JsonToggleButton
-            label={showJson ? 'Hide JSON' : 'Show JSON'}
-            active={showJson}
-            onClick={this.toggleShowJson}
-          />
-          <JsonToggleButton
-            label={this.state.showAIPrompt ? 'Hide AI Prompt' : 'Show AI Prompt'}
-            active={this.state.showAIPrompt}
-            onClick={this.toggleAIPrompt}
-            icon={this.state.showAIPrompt ? faCaretUp : faCaretDown}
-          />
-        </JsonButtonRow>
-
-        {/* AI Prompt panel */}
-        {this.state.showAIPrompt && (
-          <div className={styles.aiPromptWrapper}>
-            <button
-              type="button"
-              className={buildCreateSurveyAiPromptCopyClassName(styles, this.state.aiPromptCopySuccess)}
-              onClick={this.copyAIPromptToClipboard}
-              title="Copy prompt"
+        {/* Developer views, folded away until someone asks for them. */}
+        <details className={styles.developerDetails}>
+          <summary>JSON and AI prompt</summary>
+          {/* JSON preview area */}
+          {showJson && (
+            <JsonPanel
+              as="pre"
+              onCopy={() => this.copyJsonPreview(jsonData)}
+              copied={this.state.copyJsonSuccess}
+              copyTitle="Copy JSON"
             >
-              <FontAwesomeIcon icon={this.state.aiPromptCopySuccess ? faCheck : faClipboard} />
-            </button>
+              {JSON.stringify(jsonData, null, 2)}
+            </JsonPanel>
+          )}
 
-            <div className={styles.aiPromptHeader}>
-              <strong>{`AI Prompt — ${this.state.aiPromptModelLabel}`}</strong>
-            </div>
+          {/* Shared toolbar */}
+          <JsonButtonRow align="end" className={styles.jsonPromptBar}>
+            <JsonToggleButton
+              label={showJson ? 'Hide JSON' : 'Show JSON'}
+              active={showJson}
+              onClick={this.toggleShowJson}
+            />
+            <JsonToggleButton
+              label={this.state.showAIPrompt ? 'Hide AI Prompt' : 'Show AI Prompt'}
+              active={this.state.showAIPrompt}
+              onClick={this.toggleAIPrompt}
+              icon={this.state.showAIPrompt ? faCaretUp : faCaretDown}
+            />
+          </JsonButtonRow>
 
-            <div className={styles.aiPromptMeta}>
-              Variables:&nbsp;
-              <span className={styles.aiVar}>&lt;SourceDocContent&gt;</span>,{' '}
-              <span className={styles.aiVar}>&lt;NumSeedStatements&gt;</span>,{' '}
-              <span className={styles.aiVar}>&lt;Types&gt;</span>,{' '}
-              <span className={styles.aiVar}>&lt;DefaultTags&gt;</span>
-            </div>
+          {/* AI Prompt panel */}
+          {this.state.showAIPrompt && (
+            <div className={styles.aiPromptWrapper}>
+              <button
+                type="button"
+                className={buildCreateSurveyAiPromptCopyClassName(styles, this.state.aiPromptCopySuccess)}
+                onClick={this.copyAIPromptToClipboard}
+                title="Copy prompt"
+              >
+                <FontAwesomeIcon icon={this.state.aiPromptCopySuccess ? faCheck : faClipboard} />
+              </button>
 
-            <div className={styles.jsonDisplayWrapper}>
-              <pre className={styles.jsonDisplay}>
-                {this.highlightPromptVariables(this.state.aiPromptText || '(Prompt not available)')}
-              </pre>
+              <div className={styles.aiPromptHeader}>
+                <strong>{`AI Prompt — ${this.state.aiPromptModelLabel}`}</strong>
+              </div>
+
+              <div className={styles.aiPromptMeta}>
+                Variables:&nbsp;
+                <span className={styles.aiVar}>&lt;SourceDocContent&gt;</span>,{' '}
+                <span className={styles.aiVar}>&lt;NumSeedStatements&gt;</span>,{' '}
+                <span className={styles.aiVar}>&lt;Types&gt;</span>,{' '}
+                <span className={styles.aiVar}>&lt;DefaultTags&gt;</span>
+              </div>
+
+              <div className={styles.jsonDisplayWrapper}>
+                <pre className={styles.jsonDisplay}>
+                  {this.highlightPromptVariables(this.state.aiPromptText || '(Prompt not available)')}
+                </pre>
+              </div>
             </div>
-          </div>
-        )}
+          )}
+        </details>
       </>
     );
 

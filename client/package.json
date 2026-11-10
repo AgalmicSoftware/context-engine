@@ -1,6 +1,6 @@
 {
   "name": "client",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "description": "Context Engine — React client for sessions, surveys, and SBT-gated encryption",
   "author": "Context Engine Contributors",
   "license": "MPL-2.0",
@@ -18,6 +18,7 @@
   },
   "private": true,
   "dependencies": {
+    "@breezystack/lamejs": "1.2.7",
     "@fortawesome/fontawesome-svg-core": "1.2.28",
     "@fortawesome/free-brands-svg-icons": "5.13.0",
     "@fortawesome/free-solid-svg-icons": "5.13.0",
@@ -26,10 +27,12 @@
     "@tanstack/react-query": "4.42.0",
     "arweave": "1.15.7",
     "d3": "7.9.0",
+    "dompurify": "3.4.17",
     "ethers": "5.7.2",
     "hark": "1.2.3",
     "html2canvas": "1.4.1",
     "jspdf": "4.2.1",
+    "jsqr": "1.4.0",
     "ml-kmeans": "6.0.0",
     "poseidon-lite": "0.3.0",
     "qrcode.react": "4.2.0",
@@ -119,7 +122,8 @@
       "ws": "7.5.11"
     },
     "@walletconnect/utils": {
-      "bn.js": "4.12.3"
+      "bn.js": "4.12.3",
+      "query-string": "4.3.4"
     },
     "asn1.js": {
       "bn.js": "4.12.3"
@@ -132,10 +136,11 @@
       "d3-zoom": "3.0.0"
     },
     "@remix-run/router": "1.23.4",
-    "follow-redirects": "1.16.1",
+    "follow-redirects": "1.16.2",
     "@metamask/utils": "9.2.0",
     "ws@^8.0.0": "8.21.0",
-    "form-data": "4.0.6"
+    "form-data": "4.0.6",
+    "strict-uri-encode": "2.0.0"
   },
   "browserslist": [
     ">0.2%",

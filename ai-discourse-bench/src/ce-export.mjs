@@ -24,8 +24,8 @@ export const buildContextEnginePolisExport = (report) => {
   const questions = Array.isArray(report.questions) ? report.questions : [];
   const participants = Array.isArray(report.participants) ? report.participants : [];
   const matrix = report.polisReport?.byModelQuestion || {};
-  const questionResponses = {};
-  const displayNamesMap = {};
+  const questionResponses = Object.create(null);
+  const displayNamesMap = Object.create(null);
 
   participants.forEach((participant) => {
     displayNamesMap[String(participant.id).toLowerCase()] = participant.label || participant.id;
@@ -81,8 +81,8 @@ export const buildContextEnginePolisExport = (report) => {
       participants: participants.length,
       responses: Object.values(questionResponses).reduce((sum, rows) => sum + rows.length, 0),
     },
-    questionResponses,
-    displayNamesMap,
+    questionResponses: { ...questionResponses },
+    displayNamesMap: { ...displayNamesMap },
     questionPrompts: Object.fromEntries(questions.map((question) => [question.id, question.prompt || question.id])),
     participants: participants.map((participant) => ({
       id: participant.id,

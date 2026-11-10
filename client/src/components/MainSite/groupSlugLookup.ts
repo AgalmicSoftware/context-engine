@@ -175,8 +175,9 @@ export function findGroupSlugForSurvey(surveyID: string | null | undefined, deps
 export function findGroupSlugForQuestion(
   questionID: string | null | undefined,
   deps: QuestionGroupSlugLookupDeps,
-): string {
-  if (!questionID) return deps.getCurrentSlug();
+  { requireCacheHit = false }: { requireCacheHit?: boolean } = {},
+): string | null {
+  if (!questionID) return requireCacheHit ? null : deps.getCurrentSlug();
   const questionIdLower = String(questionID).toLowerCase();
   const currentSlug = deps.getCurrentSlug();
   const querySlug = deps.getQueryHintSlug();
@@ -185,7 +186,7 @@ export function findGroupSlugForQuestion(
   if (querySlug !== null) {
     const hintedCachedSlug = getCachedQuestionSlug(questionIdLower, querySlug, deps);
     if (hintedCachedSlug !== null) return hintedCachedSlug;
-    if (querySlugKnown || !deps.isCacheManagerReady) return querySlug;
+    if (!requireCacheHit && (querySlugKnown || !deps.isCacheManagerReady)) return querySlug;
   }
 
   const currentCachedSlug = getCachedQuestionSlug(questionIdLower, currentSlug, deps);
@@ -210,7 +211,7 @@ export function findGroupSlugForQuestion(
     if (cachedSlug !== null) return cachedSlug;
   }
 
-  return refSlug !== null ? refSlug : currentSlug;
+  return requireCacheHit ? null : refSlug !== null ? refSlug : currentSlug;
 }
 
 export async function resolveGroupSlugForSbtAddress(

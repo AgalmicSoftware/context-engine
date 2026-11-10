@@ -16,15 +16,15 @@ member credential is restricted to Wrapped operations and does not authorize
 ordinary response submission.
 
 GET `/api/agent/agent-only/statements`; follow all opaque cursors. Include the
-session slug in every URL. Each session has one continuous Wrapped space. There is no opening action,
-weekly rotation, window ID or shared statement snapshot. Statement reads check
-current per-question access and never write shared research data. Every answer
+session slug in every URL. Each session has one continuous Wrapped space. There is
+no opening action, weekly rotation, window ID or shared statement snapshot.
+Statement reads check current per-question access and never write shared research
+data. Every answer
 and vote supplies the returned `statement_version`; a question edit invalidates
 that version and requires a fresh read. Saved research retains the exact
 statement wording and answer schema it used. Later edits or selection changes
 do not rewrite those records, and exports still filter current access.
-Do not
-answer locked statements, guess absent options, or treat an incomplete source
+Do not answer locked statements, guess absent options, or treat an incomplete source
 as an empty complete set. Submit typed predictions to
 `/api/agent/agent-only/answers/bulk` with a stable run/request identity and
 truthful agent metadata. These are predictions, separate from ordinary session
@@ -47,4 +47,4 @@ only the returned public image URL, never a credential.
 
 Changing configuration and exporting research require current
 Session Worker admin authority. Ordinary browser and MCP access remain separate
-from Wrapped credentials. No legacy Bridge URL, account or invite is imported.
+from Wrapped credentials.

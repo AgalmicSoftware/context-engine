@@ -13,7 +13,7 @@ const envelope: AgentClientLoginEnvelope = {
   expiresAt: '2026-07-05T00:00:00.000Z',
   address: '0x1111111111111111111111111111111111111111',
   capabilities: { readQuestions: true, readResults: true, submitAnswers: true },
-  agentCredential: { kind: 'session_agent_browser_token', token: 'bridge-browser-token' },
+  agentCredential: { kind: 'session_agent_browser_token', token: 'agent-browser-token' },
   workerCredential: { kind: 'session_worker_jwt', token: 'jwt-session-token' },
   agentWorkerUrl: 'https://worker.example',
   workerUrl: 'https://worker.example',
@@ -95,7 +95,7 @@ describe('agentSessionBackend', () => {
       'https://worker.example/api/agent/preferences',
       expect.objectContaining({
         method: 'POST',
-        headers: expect.objectContaining({ Authorization: 'Bearer bridge-browser-token' }),
+        headers: expect.objectContaining({ Authorization: 'Bearer agent-browser-token' }),
       }),
     );
   });

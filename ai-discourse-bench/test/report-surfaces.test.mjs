@@ -4,6 +4,7 @@ import test from 'node:test';
 import vm from 'node:vm';
 
 import { buildResultsReport } from '../src/scoring.mjs';
+import { buildReleaseValidationReceipt } from '../src/provenance.mjs';
 import { renderHtmlReport } from '../src/render-html.mjs';
 import { limitQuestionBank, mergeModelRosters, mergeRunsFiles } from '../src/report-inputs.mjs';
 import { buildContextEnginePolisExport } from '../src/ce-export.mjs';
@@ -244,7 +245,7 @@ test('publication intro explains the benchmark and does not overstate preview ar
   });
   assert.match(wordingSensitiveHtml, /<strong>Wording sensitivity:<\/strong> 1 of 1 questions changed by at least 0\.50 on the normalized -1 to \+1 answer scale when original and reversed wording were compared\. These items require wording review before release\./);
 
-  const releaseHtml = renderHtmlReport({
+  const releaseReport = {
     ...report,
     status: 'release-ready',
     integrity: {
@@ -255,9 +256,17 @@ test('publication intro explains the benchmark and does not overstate preview ar
       repeatConfigurationValid: true,
       declaredRepeatValues: [10],
     },
+  };
+  const readyPreviewHtml = renderHtmlReport(releaseReport);
+  assert.match(readyPreviewHtml, /data-ce-benchmark-publication-status="preview"/);
+  assert.match(readyPreviewHtml, /content="noindex,nofollow"/);
+  assert.match(readyPreviewHtml, /data-ce-benchmark-preview>/);
+  releaseReport.releaseValidationReceipt = buildReleaseValidationReceipt({
+    report: releaseReport, questionBank: {}, modelRoster: {}, runsFiles: [{ manifest: {} }],
   });
+  const releaseHtml = renderHtmlReport(releaseReport);
   assert.match(releaseHtml, /<meta name="robots" content="index,follow" \/>/);
-  assert.match(releaseHtml, /data-ce-benchmark-publication-status="release-ready"/);
+  assert.match(releaseHtml, /data-ce-benchmark-publication-status="released"/);
   assert.doesNotMatch(releaseHtml, /aidb-publication-status/);
   assert.doesNotMatch(releaseHtml, />Release-ready result<\/span>/);
   assert.doesNotMatch(releaseHtml, /<dt>Repeat runs/);
@@ -1326,14 +1335,15 @@ test('report renders models as participants in a OnePageSession-style results sh
   assert.doesNotMatch(html, /\.resultsModal \{ max-width: none;/);
   assert.doesNotMatch(html, /\.aidb-raw-results-modal-pane\.resultsModal/);
   assert.match(html, /\.modalHeader \{ display: flex; position: relative; flex-direction: row; flex-wrap: wrap; overflow-wrap: anywhere; justify-content: space-between; align-items: center; border-bottom: 1px solid #dee2e6; padding-right: 4\.5rem; padding-bottom: 1rem; border-top-left-radius: 12px; border-top-right-radius: 12px; \}/);
-  assert.match(html, /\.modalHeaderContent \{ display: flex; flex-direction: row; flex-wrap: wrap; flex-grow: 1; margin-right: 1rem; gap: 10px; \}/);
+  assert.match(html, /\.modalHeaderContent \{ display: flex; flex-direction: row; flex-wrap: wrap; flex: 1 1 14rem; min-width: 0; margin-right: 1rem; gap: 10px; \}/);
   assert.match(html, /\.modalHeaderControls \{ display: flex; align-items: center; justify-content: flex-end; gap: 10px; flex-wrap: wrap; margin-left: auto; \}/);
   assert.doesNotMatch(html, /\.modalHeader \{[^}]*padding: 1rem 4\.5rem 1rem 1rem/);
   assert.doesNotMatch(html, /\.modalHeader \{[^}]*background: #fff/);
-  assert.doesNotMatch(html, /\.modalHeaderContent \{[^}]*min-width: 0/);
   assert.doesNotMatch(html, /\.modalHeaderControls \{[^}]*min-width: 0/);
-  assert.match(html, /\.modalTitle \{ font-size: 2\.5rem; font-weight: bold; margin: 0; color: var\(--ce-color-black\); \}/);
+  assert.match(html, /\.modalTitle \{ font-size: 2\.5rem; font-weight: bold; margin: 0; overflow-wrap: normal; word-break: normal; color: var\(--ce-color-black\); \}/);
   assert.doesNotMatch(html, /\.modalTitle \{[^}]*line-height: 1\.1/);
+  assert.doesNotMatch(html, /\n\s*\.modalTitle \{ margin: 0; color: rgba\(244, 247, 255/);
+  assert.match(html, /\.riskMatrixCommentModal \.modalTitle \{ margin: 0; color: rgba\(244, 247, 255/);
   assert.doesNotMatch(html, /class="modalSubtitle"/);
   assert.doesNotMatch(html, /class="surveyIdMeta"/);
   assert.doesNotMatch(html, /\.surveyIdMeta \{/);
@@ -1344,7 +1354,7 @@ test('report renders models as participants in a OnePageSession-style results sh
   assert.doesNotMatch(html, /\.demoResultsViewButtonActive[^}]*transform: none/);
   assert.match(html, /@media \(max-width: 768px\) \{\s*\.resultsModal \{ max-width: 95vw; \}/);
   assert.match(html, /\.aidb-raw-results-dialog \{ margin: 0\.5rem auto; \}/);
-  assert.match(html, /\.modalHeader \{ flex-wrap: wrap; gap: 10px; padding-right: 7rem; \}/);
+  assert.match(html, /\.modalHeader \{ flex-wrap: wrap; gap: 10px; padding-right: 3\.5rem; \}/);
   assert.match(html, /\.modalHeaderTitleBlock \{ width: 100%; \}/);
   assert.match(html, /\.modalTitle \{ font-size: 1\.8rem; \}/);
   assert.match(html, /@media \(max-width: 767px\) \{\s*\.modalHeaderControls \{ width: 100%; justify-content: flex-start; flex-wrap: nowrap; gap: 6px; overflow-x: auto; padding-bottom: 2px; \}/);
@@ -1381,7 +1391,7 @@ test('report renders models as participants in a OnePageSession-style results sh
   assert.match(html, /var nextMode = button\.getAttribute\('data-ce-raw-demo-view'\) \|\| 'report';/);
   assert.match(html, /<section class="modal-footer aidb-raw-results-footer"><\/section>/);
   assert.doesNotMatch(html, /<button type="button" class="htmlReportCancelButton" data-ce-close-raw-results>Cancel<\/button>/);
-  assert.match(html, /\.downloadButton \{ background-color: var\(--ce-color-bg\) !important; background-image: none !important; border: 1px solid var\(--ce-color-bg\) !important; color: var\(--ce-color-white\) !important;/);
+  assert.match(html, /\.downloadButton \{ background-color: var\(--ce-action-primary\) !important; background-image: none !important; border: 1px solid var\(--ce-action-primary\) !important; color: var\(--ce-action-primary-text\) !important;/);
   assert.match(html, /class="close htmlReportCloseButton rawResultsCloseButton"/);
   assert.match(html, /\.modalHeader \.close,\s*\.modalHeader \.btn-close,\s*\.rawResultsCloseButton \{ position: absolute; top: 0\.85rem; right: 0\.85rem; z-index: 2; background: transparent; border: 0; box-shadow: none; color: #0f1222; opacity: 1; margin: 0; padding: 0\.25rem; align-self: flex-start; \}/);
   assert.match(html, /\.modalHeader \.close:hover,\s*\.modalHeader \.close:focus,\s*\.modalHeader \.btn-close:hover,\s*\.modalHeader \.btn-close:focus,\s*\.rawResultsCloseButton:hover,\s*\.rawResultsCloseButton:focus \{ background: transparent; color: #0f1222; opacity: 1; outline: none; \}/);
@@ -1392,7 +1402,7 @@ test('report renders models as participants in a OnePageSession-style results sh
   assert.match(html, /class="exportDataBox aidb-raw-export-box" data-ce-export-data-box/);
   assert.match(html, /<button type="button" class="exportToggleButton" aria-expanded="false" aria-controls="surveyResultsExportArea" data-ce-export-toggle>Export Data<\/button>/);
   assert.match(html, /class="exportAreaExpanded" id="surveyResultsExportArea" hidden/);
-  assert.match(html, /class="exportAreaHeader"[\s\S]*<label for="exportType" class="exportLabel">Export Data:<\/label>[\s\S]*class="exportCollapseButton" aria-label="Collapse export area" data-ce-export-toggle/);
+  assert.match(html, /class="exportAreaHeader"[\s\S]*<span class="exportLabel">Export Data:<\/span>[\s\S]*class="exportCollapseButton" aria-label="Collapse export area" data-ce-export-toggle/);
   assert.doesNotMatch(html, /aria-disabled="true" disabled/);
   assert.match(html, /<button type="button" id="exportType" class="downloadButton" data-ce-download-snapshot>Download Snapshot JSON<\/button>/);
   assert.match(html, /data-icon="caret-up" class="svg-inline--fa fa-caret-up exportCollapseIcon"/);
@@ -1980,6 +1990,9 @@ test('report renders models as participants in a OnePageSession-style results sh
   assert.doesNotMatch(html, /\.debateMap \.viewModeSwitch button svg \{[^}]*height: 1em/);
   assert.doesNotMatch(html, /\.debateMap \.viewModeSwitch button svg \{[^}]*vertical-align: -0\.125em/);
   assert.match(html, /\.debateMap \.legendDot\.subcategory \{ background: #2dd4bf; color: #2dd4bf; \}/);
+  // A compass's placement count and Hide toggle read at 4.5:1 or more on the dark panel, as in live Results.
+  assert.match(html, /\.debateMap \.collapseCount \{ font-size: 0\.8rem; color: rgba\(255, 255, 255, 0\.7\); margin-left: 6px; \}/);
+  assert.match(html, /\.debateMap \.collapseToggle \{ margin-left: auto; font-size: 0\.75rem; color: rgba\(255, 255, 255, 0\.7\); text-transform: uppercase; letter-spacing: 0\.05em; \}/);
   assert.match(html, /\.debateMap \.legendDot\.topic \{ background: #4ade80; color: #4ade80; \}/);
   assert.match(html, /\.debateMap \.legendDot\.instance \{ background: #fde047; color: #fde047; \}/);
   assert.doesNotMatch(html, />Demo Mode</);
@@ -2239,8 +2252,8 @@ test('report renders models as participants in a OnePageSession-style results sh
   assert.match(html, /class="breakdownCandleSegment breakdownCandleSegmentAgree"/);
   assert.match(html, /class="breakdownCandleSegment breakdownCandleSegmentUnsure"/);
   assert.match(html, /class="breakdownCandleSegment breakdownCandleSegmentDisagree"/);
-  assert.match(html, /\.workspace \{ display: grid; gap: 1rem; color: var\(--ce-color-dark, #212529\); \}/);
-  assert.match(html, /\.demoAnalysisWorkspace \{ display: grid; gap: 1rem; color: var\(--ce-color-dark, #212529\); \}/);
+  assert.match(html, /\.workspace \{ display: grid; grid-template-columns: minmax\(0, 1fr\); gap: 1rem; color: var\(--ce-color-dark, #212529\); \}/);
+  assert.match(html, /\.demoAnalysisWorkspace \{ display: grid; grid-template-columns: minmax\(0, 1fr\); gap: 1rem; color: var\(--ce-color-dark, #212529\); \}/);
   assert.match(html, /\.primaryGrid,\s*\.secondaryGrid \{ display: grid; gap: 1rem; grid-template-columns: repeat\(2, minmax\(0, 1fr\)\); align-items: stretch; \}/);
   assert.match(html, /\.panel \{ padding: 1rem 1\.1rem; border: 1px solid #dee2e6; border-radius: var\(--ce-radius-8, 8px\); background: #ffffff; box-shadow: 0 2px 4px rgba\(0, 0, 0, 0\.05\); \}/);
   assert.match(html, /\.demoPanel \{ padding: 1rem 1\.1rem; border: 1px solid #dee2e6; border-radius: var\(--ce-radius-8, 8px\); background: #ffffff; box-shadow: 0 2px 4px rgba\(0, 0, 0, 0\.05\); \}/);
@@ -2554,4 +2567,27 @@ test('All Questions Invalid is the question aggregate, including models not run 
   assert.match(row, /aria-label="Model vote distribution: Agree 1, Unsure 0, Disagree 0, Invalid 2\. Model answers: Model a: Agree, Model b: Invalid"/);
   // Only a model that ran gets an Invalid marker.
   assert.doesNotMatch(row, /Model c:/);
+});
+
+
+test('Breakdown exposes question selection independently of trait comparisons', () => {
+  const report = buildResultsReport({
+    questionBank: { benchmarkId: 'selector', questions: ['q1', 'q2'].map((id) => ({ id, canonicalPrompt: `Question ${id}`, topic: 'fixture' })) },
+    modelRoster: { models: [{ id: 'model-a', model: 'fixture', provider: 'local', traits: {} }] },
+    runsFile: { repeats: 1, runs: ['q1', 'q2'].map((questionId) => ({ modelId: 'model-a', questionId, normalizedAnswer: 'Agree', polarity: 'canonical' })) },
+  });
+  const html = renderHtmlReport(report);
+  assert.match(html, /<label for="ce-breakdown-question"[^>]*>Question<\/label>/);
+  assert.match(html, /<select id="ce-breakdown-question"[^>]*data-testid="ce-breakdown-question-select"/);
+  assert.match(html, /<option value="q1" selected>Question q1<\/option>/);
+  assert.match(html, /<option value="q2">Question q2<\/option>/);
+  assert.match(html, /breakdownQuestionSelect.addEventListener\('change'/);
+});
+
+test('Section headers keep the live readable title and subtitle colours', async () => {
+  const source = await fs.readFile(new URL('../src/render-html.mjs', import.meta.url), 'utf8');
+  const colours = (selector) =>
+    [...source.matchAll(new RegExp(`${selector} \\{[^}]*?[^-]color: ([^;]+);`, 'g'))].map(([, colour]) => colour);
+  assert.deepEqual(colours('\\.sectionHeaderTitle'), ['#f4f7ff']);
+  assert.deepEqual(new Set(colours('\\.sectionHeaderSubtitle')), new Set(['rgba(244, 247, 255, 0.65)']));
 });

@@ -21,53 +21,17 @@ const renderSessionHeaderField = (props: Partial<SessionHeaderFieldProps> = {}) 
       onPaste={() => {}}
       onCompactUploadClick={() => {}}
       onCompactFileChange={() => {}}
-      onUseUrlMode={() => {}}
-      onUseUploadMode={() => {}}
-      onAdvancedFileChange={() => {}}
       onClear={() => {}}
-      onExpandPreview={() => {}}
       {...props}
     />,
   );
 
 describe('SessionHeaderField', () => {
-  it('renders the advanced URL mode controls and preview surface', () => {
-    renderSessionHeaderField();
-
-    expect(screen.getByLabelText('Use URL')).toBeChecked();
-    expect(screen.getByLabelText('Upload file')).not.toBeChecked();
-    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SESSION_HEADER_URL)).toHaveValue('https://example.test/header.png');
-    expect(screen.getByRole('img', { name: 'Session header preview' })).toHaveAttribute(
-      'src',
-      'https://example.test/header.png',
-    );
-  });
-
-  it('forwards advanced mode callbacks with their original event objects', () => {
-    const onUrlChange = jest.fn();
-    const onUseUploadMode = jest.fn();
-    const onExpandPreview = jest.fn();
-    renderSessionHeaderField({ onUrlChange, onUseUploadMode, onExpandPreview });
-
-    const urlInput = screen.getByTestId(E2E_TESTIDS.WIZARD_SESSION_HEADER_URL);
-    fireEvent.change(urlInput, {
-      target: { value: 'https://example.test/next.png' },
-    });
-    fireEvent.click(screen.getByLabelText('Upload file'));
-    fireEvent.click(screen.getByRole('button', { name: 'Expand session header image' }));
-
-    expect(onUrlChange).toHaveBeenCalledTimes(1);
-    expect(onUrlChange.mock.calls[0][0].target).toBe(urlInput);
-    expect(onUseUploadMode).toHaveBeenCalledTimes(1);
-    expect(onExpandPreview).toHaveBeenCalledTimes(1);
-  });
-
   it('preserves compact header test IDs and mode callbacks', () => {
     const onToggleCompactUrlMode = jest.fn();
     const onPaste = jest.fn();
     const onCompactUploadClick = jest.fn();
     renderSessionHeaderField({
-      compact: true,
       compactSessionHeaderMode: 'url',
       onToggleCompactUrlMode,
       onPaste,
@@ -87,6 +51,7 @@ describe('SessionHeaderField', () => {
 
   it('renders an empty URL field without preview controls when value and preview are empty', () => {
     renderSessionHeaderField({
+      compactSessionHeaderMode: 'url',
       value: null,
       sessionHeaderPreviewSrc: '',
     });
@@ -96,7 +61,7 @@ describe('SessionHeaderField', () => {
     expect(screen.queryByRole('button', { name: 'Remove session header image' })).not.toBeInTheDocument();
   });
 
-  it('calls onClear when the advanced preview clear button is clicked', () => {
+  it('calls onClear when the preview clear button is clicked', () => {
     const onClear = jest.fn();
     renderSessionHeaderField({ onClear });
 
@@ -106,19 +71,8 @@ describe('SessionHeaderField', () => {
   });
 
   it('renders URL-only controls when file upload is unavailable', () => {
-    const advanced = renderSessionHeaderField({
-      allowFileUpload: false,
-      sessionHeaderMode: 'upload',
-    });
-
-    expect(screen.queryByLabelText('Upload file')).not.toBeInTheDocument();
-    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SESSION_HEADER_URL)).toHaveValue('https://example.test/header.png');
-    expect(advanced.container.querySelector('input[type="file"]')).toBeNull();
-    advanced.unmount();
-
     const compact = renderSessionHeaderField({
       allowFileUpload: false,
-      compact: true,
       compactSessionHeaderMode: 'url',
       sessionHeaderMode: 'upload',
     });
@@ -129,13 +83,9 @@ describe('SessionHeaderField', () => {
     expect(compact.container.querySelector('input[type="file"]')).toBeNull();
   });
 
-  it('offers only header image types that publishing can upload in both pickers', () => {
+  it('offers only header image types that publishing can upload', () => {
     const accepted = 'image/png,image/jpeg,image/jpg,image/gif';
-    const compact = renderSessionHeaderField({ compact: true, sessionHeaderMode: 'upload' });
-    expect(compact.container.querySelector('input[type="file"]')).toHaveAttribute('accept', accepted);
-    compact.unmount();
-
-    const advanced = renderSessionHeaderField({ sessionHeaderMode: 'upload' });
-    expect(advanced.container.querySelector('input[type="file"]')).toHaveAttribute('accept', accepted);
+    const { container } = renderSessionHeaderField({ sessionHeaderMode: 'upload' });
+    expect(container.querySelector('input[type="file"]')).toHaveAttribute('accept', accepted);
   });
 });

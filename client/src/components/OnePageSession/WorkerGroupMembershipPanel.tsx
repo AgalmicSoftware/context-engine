@@ -406,7 +406,6 @@ const WorkerGroupMembershipPanel = ({
   canReadGroups: canReadGroupsProp,
   refreshNonce = 0,
   refreshControlTarget,
-  participantAddress,
   fetchImpl = fetch,
   sessionConfig = null,
   sessionId: sessionIdProp = '',

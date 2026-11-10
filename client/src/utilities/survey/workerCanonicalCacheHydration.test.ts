@@ -38,7 +38,9 @@ describe.each([
     const hydration = hydrate({
       host: {
         getSessionCfg: () => CONFIG,
-        workerCanonicalMetadataHydrationPort: { [loaderKey]: jest.fn(async () => []) },
+        workerCanonicalMetadataHydrationPort: {
+          [loaderKey]: jest.fn(async () => ({ rows: [], listedStorageRefIds: new Set<string>() })),
+        },
       },
       sessionSlug: 'hydration',
       sessionConfig: CONFIG,

@@ -1,3 +1,4 @@
+import { normalizeCallerIp } from './callerIpNormalization.js';
 import { toTrimmedString } from './stringCoercion.js';
 
 export const resolveAnonymousRateIdentity = ({ request, deps, constants } = {}) => {
@@ -8,7 +9,7 @@ export const resolveAnonymousRateIdentity = ({ request, deps, constants } = {}) 
   const isCloudflareRuntime = !!(request?.cf && typeof request.cf === 'object');
   if (isCloudflareRuntime) {
     const cfIp = toTrimmedString(request?.headers?.get('CF-Connecting-IP'), deps).toLowerCase();
-    if (cfIp) return `anon:${cfIp}`;
+    if (cfIp) return `anon:${normalizeCallerIp(cfIp)}`;
   }
 
   // Outside native Cloudflare, use a caller-provided stable anonymous ID as a

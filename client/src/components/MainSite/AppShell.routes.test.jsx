@@ -1,12 +1,19 @@
+import { buildQuestionBookmarkHref } from '../Bookmarks/BookmarksPage';
 import React from 'react';
 import fs from 'fs';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, useLocation, useNavigationType } from 'react-router-dom';
 import { STALE_CHUNK_RELOAD_STORAGE_KEY } from '../../bootRecovery.js';
 import { AppShell, appShellDispatchActions } from './AppShell';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import contractScripts from '../../utilities/web3/chainGateway.js';
-import { initCacheManager, updateCacheAtomic } from '../../utilities/cache/cacheScripts.js';
+import {
+  initCacheManager,
+  listNamespaceSlugsSync,
+  lockChainTextHiddenFromReader,
+  peekCacheSync,
+  updateCacheAtomic,
+} from '../../utilities/cache/cacheScripts.js';
 import {
   getDemoSessionConfigBySlug,
   getSessionConfigBySlug,
@@ -32,6 +39,11 @@ import {
   resolveWorkerCanonicalCacheIdentity,
   withWorkerCanonicalCacheIdentity,
 } from '../../utilities/survey/workerCanonicalCacheIdentity';
+import { readerViewOfChainText } from '../../utilities/survey/decryptedQuestionReader';
+import {
+  getWorkerCanonicalCacheReader,
+  setWorkerCanonicalCacheReader,
+} from '../../utilities/survey/workerCanonicalCacheReader';
 
 const mockAdminPage = jest.fn(() => null);
 const mockNavbar = jest.fn(() => null);
@@ -197,6 +209,21 @@ jest.mock('../SurveyTool/SurveyTool', () => {
   };
 });
 
+// Holds an edit in its own state, like the real page's draft.
+jest.mock('../Sessions/settings/SessionSettingsPage', () => {
+  const React = require('react');
+  const MockSessionSettingsPage = (props) => {
+    const [draft, setDraft] = React.useState(String(props.sessionConfig?.sessionName || ''));
+    return React.createElement('input', {
+      'aria-label': 'Session name',
+      'data-testid': 'mock-session-settings-draft',
+      value: draft,
+      onChange: (event) => setDraft(event.target.value),
+    });
+  };
+  return { __esModule: true, default: MockSessionSettingsPage };
+});
+
 jest.mock('../DocumentLibrary/SessionDocumentsPage', () => {
   const React = require('react');
   return {
@@ -343,11 +370,13 @@ jest.mock('../Posts/PostsPage', () => {
 jest.mock('../../utilities/web3/chainGateway.js', () => {
   const contractScripts = {
     decryptQuestionPayloadInPlace: jest.fn(),
+    decryptSurveyPayloadInPlace: jest.fn(),
     getAllSbtAddressesCached: jest.fn(),
     getLatestBlockNumber: jest.fn(),
     getQuestionData: jest.fn(),
     getReadProviderForSession: jest.fn(),
     getResponse: jest.fn(),
+    getQuestionResponsesChunkedWithCallback: jest.fn(),
     getRelevantBlockWindowForFilter: jest.fn(),
     getSbtCreationBlockByAddress: jest.fn(),
     getSbtHistorySummary: jest.fn(),
@@ -411,6 +440,9 @@ jest.mock('../../utilities/arweave/arweaveUrls.js', () => ({
 jest.mock('../../utilities/cache/cacheScripts.js', () => ({
   __esModule: true,
   initCacheManager: jest.fn(() => Promise.resolve()),
+  listNamespaceSlugsSync: jest.fn(() => []),
+  lockChainTextHiddenFromReader: jest.fn(() => Promise.resolve()),
+  peekCacheSync: jest.fn(() => null),
   subscribeCacheUpdates: jest.fn(() => jest.fn()),
   updateCacheAtomic: jest.fn(),
 }));
@@ -1021,6 +1053,145 @@ describe('AppShell route render smoke', () => {
 
     update(undefined, undefined);
     expect(getDecryptCacheGeneration()).toBe(start + 2);
+  });
+
+  it('decrypts cached survey titles once the signed-in reader can decrypt', () => {
+    const subject = stubMainSiteMountSideEffects(createSubject({ path: '/' }));
+    subject.handleNetworkChange = jest.fn();
+    subject.refreshEncryptedSurveyPayloadsForGroup = jest.fn(async () => undefined);
+    subject.props = { ...subject.props, account: '0x00000000000000000000000000000000000000aa', loginComplete: true };
+    const prevState = subject.state;
+    subject.state = { ...subject.state, litHooks: { getKey: jest.fn() } };
+
+    subject.componentDidUpdate({ ...subject.props }, prevState);
+
+    expect(subject.refreshEncryptedSurveyPayloadsForGroup).toHaveBeenCalledWith('edge');
+  });
+
+  it('decrypts relocked survey titles again for an account that may read them', async () => {
+    const subject = stubMainSiteMountSideEffects(createSubject({ path: '/' }));
+    subject.handleNetworkChange = jest.fn();
+    subject.initializeWorkerCanonicalCachesForGroup = jest.fn(async () => true);
+    const ACCOUNT_X = '0x00000000000000000000000000000000000000aa';
+    const ACCOUNT_Y = '0x00000000000000000000000000000000000000bb';
+    const locked = { title: '[encrypted]', titleEncrypted: 'title-envelope' };
+    const caches = new Map([
+      [
+        'surveysCache|edge',
+        {
+          84532: {
+            surveys: { s: { ...locked, title: 'Private title', titleDecrypted: true, decryptedFor: ACCOUNT_Y } },
+          },
+        },
+      ],
+    ]);
+    const survey = () => caches.get('surveysCache|edge')[84532].surveys.s;
+    subject.DG.read = jest.fn((name, slug) => caches.get(`${name}|${slug}`) || null);
+    listNamespaceSlugsSync.mockImplementation((namespace) =>
+      [...caches.keys()].filter((key) => key.startsWith(`${namespace}|`)).map((key) => key.split('|')[1]),
+    );
+    peekCacheSync.mockImplementation((namespace, slug) => caches.get(`${namespace}|${slug}`) || null);
+    updateCacheAtomic.mockImplementation(async (namespace, slug, update) => {
+      const next = await update(caches.get(`${namespace}|${slug}`));
+      caches.set(`${namespace}|${slug}`, next);
+      return next;
+    });
+    // The cache locks stored chain text as the new reader sees it.
+    lockChainTextHiddenFromReader.mockImplementation(async () => {
+      caches.forEach((value, key) => {
+        caches.set(key, readerViewOfChainText(key.split('|')[0], value, getWorkerCanonicalCacheReader()));
+      });
+    });
+    contractScripts.decryptSurveyPayloadInPlace.mockImplementation(async (payload) => {
+      Object.assign(payload, { title: 'Private title', titleDecrypted: true });
+    });
+    const changeAccount = async (prevAccount, nextAccount) => {
+      // The store switches the cache reader when it dispatches the account.
+      setWorkerCanonicalCacheReader(nextAccount);
+      const prevProps = { ...subject.props, account: prevAccount };
+      subject.props = { ...subject.props, account: nextAccount, provider: 'wallet-provider', loginComplete: true };
+      subject.componentDidUpdate(prevProps, subject.state);
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      });
+    };
+
+    await changeAccount(ACCOUNT_Y, ACCOUNT_X);
+    expect(survey()).toMatchObject({ title: 'Private title', decryptedFor: ACCOUNT_X });
+
+    await changeAccount(ACCOUNT_X, '');
+    expect(survey()).toEqual(locked);
+  });
+
+  it('locks decrypted question text on sign-in and sign-out, but not at startup', async () => {
+    const subject = stubMainSiteMountSideEffects(createSubject({ path: '/' }));
+    subject.handleNetworkChange = jest.fn();
+    subject.initializeWorkerCanonicalCachesForGroup = jest.fn(async () => true);
+    const ACCOUNT_X = '0x00000000000000000000000000000000000000aa';
+    const ACCOUNT_Y = '0x00000000000000000000000000000000000000bb';
+    const decrypted = (decryptedFor) => ({
+      id: 'q',
+      prompt: 'Private prompt',
+      promptEncrypted: 'envelope',
+      promptDecrypted: true,
+      ...(decryptedFor ? { decryptedFor } : {}),
+    });
+    const caches = new Map();
+    const seed = (questions) => caches.set('questionsCache|edge', { 84532: { questions } });
+    const prompts = () =>
+      Object.fromEntries(
+        Object.entries(caches.get('questionsCache|edge')[84532].questions).map(([id, question]) => [
+          id,
+          question.prompt,
+        ]),
+      );
+    listNamespaceSlugsSync.mockImplementation((namespace) =>
+      [...caches.keys()].filter((key) => key.startsWith(`${namespace}|`)).map((key) => key.split('|')[1]),
+    );
+    peekCacheSync.mockImplementation((namespace, slug) => caches.get(`${namespace}|${slug}`) || null);
+    updateCacheAtomic.mockImplementation(async (namespace, slug, update) => {
+      const next = await update(caches.get(`${namespace}|${slug}`));
+      caches.set(`${namespace}|${slug}`, next);
+      return next;
+    });
+    // The cache locks stored chain text as the new reader sees it.
+    lockChainTextHiddenFromReader.mockImplementation(async () => {
+      caches.forEach((value, key) => {
+        caches.set(key, readerViewOfChainText(key.split('|')[0], value, getWorkerCanonicalCacheReader()));
+      });
+    });
+    const settle = () =>
+      act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+    const changeAccount = async (prevAccount, nextAccount) => {
+      // The store switches the cache reader when it dispatches the account.
+      setWorkerCanonicalCacheReader(nextAccount);
+      const prevProps = { ...subject.props, account: prevAccount };
+      subject.props = { ...subject.props, account: nextAccount };
+      subject.componentDidUpdate(prevProps, subject.state);
+      await settle();
+    };
+
+    // A reload or another tab starts signed out while this account's other tabs stay open.
+    setWorkerCanonicalCacheReader('');
+    seed({ own: decrypted(ACCOUNT_X), unstamped: decrypted() });
+    await act(async () => {
+      await subject.componentDidMount();
+    });
+    await settle();
+    expect(prompts()).toEqual({ own: 'Private prompt', unstamped: 'Private prompt' });
+
+    await changeAccount('', ACCOUNT_X);
+    expect(prompts()).toEqual({ own: 'Private prompt', unstamped: '[encrypted]' });
+
+    await changeAccount(ACCOUNT_X, '');
+    expect(prompts()).toEqual({ own: '[encrypted]', unstamped: '[encrypted]' });
+
+    seed({ own: decrypted(ACCOUNT_X) });
+    await changeAccount('', ACCOUNT_Y);
+    expect(prompts()).toEqual({ own: '[encrypted]' });
+    subject.componentWillUnmount();
   });
 
   it('forwards the active session cache context to the home tools explorer', () => {
@@ -1992,9 +2163,9 @@ describe('AppShell route render smoke', () => {
     expect(screen.getByText((_, node) => node?.textContent === 'Path: /telegram-demo-setup')).toBeInTheDocument();
   });
 
-  it.each([['/debate', /Debate view is not part of the supported public surface yet\./i]])(
-    'renders the experimental stub for %s without waiting for cache bootstrap',
-    async (path, descriptionMatcher) => {
+  it.each(['/debate', '/beta', '/contributors', '/matrix', '/demos'])(
+    'renders the normal not-found view for removed page %s without waiting for cache bootstrap',
+    async (path) => {
       const subject = createSubject({ path });
       subject.state = {
         ...subject.state,
@@ -2009,8 +2180,8 @@ describe('AppShell route render smoke', () => {
 
       render(subject.render());
 
-      expect(await screen.findByRole('heading', { name: /this feature is in development/i })).toBeInTheDocument();
-      expect(screen.getByText(descriptionMatcher)).toBeInTheDocument();
+      expect(await screen.findByRole('heading', { name: 'Page not found' })).toBeInTheDocument();
+      expect(screen.getByText(`Path: ${path}`)).toBeInTheDocument();
       expect(screen.getByRole('link', { name: /back to home/i })).toHaveAttribute('href', '/');
     },
   );
@@ -2381,6 +2552,25 @@ describe('AppShell route render smoke', () => {
       'data-session-id-hex',
       '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
     );
+  });
+
+  it('gives another session’s settings a fresh page instead of the last one’s edits', async () => {
+    const edge = buildSessionConfig();
+    seedSessionRegistryCache(edge);
+    const view = render(createSubject({ path: '/session/edge/settings', sessionConfig: edge }).render());
+    const draft = await screen.findByTestId('mock-session-settings-draft');
+    expect(draft).toHaveValue('Edge Session');
+    fireEvent.change(draft, { target: { value: 'Edited for edge' } });
+
+    const harbor = buildSessionConfig({
+      slug: 'harbor',
+      sessionName: 'Harbor Session',
+      __registry: { sessionIdHex: '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb' },
+    });
+    seedSessionRegistryCache(harbor);
+    view.rerender(createSubject({ path: '/session/harbor/settings', sessionConfig: harbor }).render());
+
+    await waitFor(() => expect(screen.getByTestId('mock-session-settings-draft')).toHaveValue('Harbor Session'));
   });
 
   it('forwards validated worker discovery to an unregistered worker-canonical docs route', async () => {
@@ -3116,7 +3306,12 @@ describe('AppShell route render smoke', () => {
       sessionConfig: null,
     });
     render(subject.render());
-    expect(await screen.findByTestId('ce-worker-canonical-discovery-error')).toBeInTheDocument();
+    const alert = await screen.findByTestId('ce-worker-canonical-discovery-error');
+    expect(alert).toHaveClass('banner', 'pageBanner');
+    expect(within(alert).getByRole('heading')).toHaveClass('bannerTitle');
+    const back = within(alert).getByRole('link', { name: 'Return to session selection' });
+    expect(back).toHaveClass('button');
+    expect(back).toHaveAttribute('data-ce-control-appearance', 'raised');
     expect(mockSBTsPage).not.toHaveBeenCalled();
   });
 
@@ -3135,15 +3330,15 @@ describe('AppShell route render smoke', () => {
     expect(screen.getByTestId('mock-sbt-create-page')).toHaveAttribute('data-session-slug', 'edge');
   });
 
-  it('does not access window directly while rendering atlas and stubbed experimental routes', () => {
-    const debateSubject = createSubject({ path: '/debate' });
+  it('does not access window directly while rendering atlas, tag, and unknown routes', () => {
+    const unknownSubject = createSubject({ path: '/missing-page' });
     const atlasSubject = createSubject({ path: '/atlas' });
     const tagSubject = createSubject({ path: '/tag/governance' });
     const originalWindow = global.window;
 
     try {
       delete global.window;
-      expect(() => debateSubject.render()).not.toThrow();
+      expect(() => unknownSubject.render()).not.toThrow();
       expect(() => atlasSubject.render()).not.toThrow();
       expect(() => tagSubject.render()).not.toThrow();
     } finally {
@@ -3325,6 +3520,82 @@ describe('AppShell route render smoke', () => {
     expect(subject._registryBootstrapPromise).toBeNull();
     expect(subject._registryBootstrapScopeKey).toBe('');
   });
+
+  it.each([false, true])('pins a bare General question only after a cache hit (cached=%s)', async (cached) => {
+    const questionId = `0x${'ab'.repeat(32)}`;
+    const config = buildSessionConfig({ slug: '', sessionName: 'General' });
+    const subject = createSubject({
+      path: `/question/${questionId}`,
+      search: '',
+      activeSessionSlug: '',
+      sessionConfig: config,
+    });
+    subject.getSessionSlugFromState = jest.fn(() => '');
+    subject.getQuestionRouteSessionSlugHint = jest.fn(() => null);
+    subject.getSessionCfg = jest.fn(() => config);
+    subject.getDisplaySessionCfg = jest.fn(() => config);
+    subject.readDgRecord = jest.fn((collection, slug) =>
+      collection === 'questionsCache' && slug === '' && cached
+        ? { [DEFAULT_NETWORK.id]: { questions: { [questionId]: { id: questionId, sessionSlug: '' } } } }
+        : null,
+    );
+    render(subject.render());
+    await screen.findByTestId('mock-survey-tool');
+    expect(window.location.search).toBe(cached ? '?session=general' : '');
+  });
+
+  it.each([
+    ['General bookmark', '', 'general'],
+    ['named bookmark', 'edge', 'edge'],
+    ['explicit General link', '', 'general'],
+    ['discovery link', 'beta', 'beta'],
+  ])(
+    'opens a %s with Beta selected and preserves its resolved session when copied',
+    async (source, expectedSlug, expectedQuery) => {
+      const questionId = `0x${'aa'.repeat(32)}`;
+      const href =
+        source === 'explicit General link'
+          ? `/question/${questionId}?session=general`
+          : source === 'discovery link'
+            ? `/question/${questionId}`
+            : buildQuestionBookmarkHref({ id: questionId, sessionSlug: expectedSlug });
+      const config = buildSessionConfig({ slug: expectedSlug, sessionName: expectedQuery });
+      const open = (link) => {
+        const url = new URL(link, window.location.origin);
+        const subject = createSubject({
+          path: url.pathname,
+          search: url.search,
+          activeSessionSlug: 'beta',
+          sessionConfig: config,
+        });
+        subject.findGroupSlugForQuestion = jest.fn(() => 'beta');
+        subject.getDisplaySessionCfg = jest.fn((slug) =>
+          slug === expectedSlug ? config : buildSessionConfig({ slug }),
+        );
+        return subject;
+      };
+      const subject = open(href);
+      const view = render(subject.render());
+      await screen.findByTestId('mock-survey-tool');
+      expect(mockSurveyTool.mock.calls.at(-1)[0]).toEqual(
+        expect.objectContaining({ sessionSlug: expectedSlug, sessionConfig: config }),
+      );
+      expect(window.location.search).toBe(`?session=${expectedQuery}`);
+      if (source === 'discovery link')
+        expect(subject.findGroupSlugForQuestion).toHaveBeenCalledWith(questionId, { requireCacheHit: true });
+      else expect(subject.findGroupSlugForQuestion).not.toHaveBeenCalled();
+      const copied = window.location.href;
+      view.unmount();
+      const reopened = open(copied);
+      render(reopened.render());
+      await screen.findByTestId('mock-survey-tool');
+      expect(mockSurveyTool.mock.calls.at(-1)[0]).toEqual(
+        expect.objectContaining({ sessionSlug: expectedSlug, sessionConfig: config, sessionSlugPinned: true }),
+      );
+      expect(reopened.findGroupSlugForQuestion).not.toHaveBeenCalled();
+      expect(window.location.search).toBe(`?session=${expectedQuery}`);
+    },
+  );
 
   it('keeps an exact pure Worker question route free of registry and wallet-chain context', async () => {
     const questionId = `0x${'12'.repeat(32)}`;
@@ -4314,6 +4585,212 @@ describe('AppShell route render smoke', () => {
     expect(subject.queueLocalRevisionUpdate).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ['above the configured end', { fromBlock: 10, toBlock: 20 }, { start: 10, end: 20 }, 30],
+    ['below the configured start', { fromBlock: 10, toBlock: 25 }, { start: 10, end: null }, 9],
+    ['outside the session scope', { fromBlock: 1, toBlock: 0 }, { start: null, end: null }, 30],
+  ])('drops live responses %s before fetching or writing', async (_label, window, blockLimits, blockNumber) => {
+    const subject = createSubject({
+      path: '/session/edge',
+      activeSessionSlug: 'edge',
+      sessionConfig: buildSessionConfig({ blockLimits }),
+    });
+    const dg = attachDgStore(subject);
+    contractScripts.getRelevantBlockWindowForFilter.mockResolvedValue(window);
+    contractScripts.getSurveyResponse.mockResolvedValue({ answer: 'outside' });
+    await subject.onNewSurveyEventDetectedForGroup('edge', {
+      type: 'ResponsesSubmitted',
+      surveyId: `0x${'1'.repeat(64)}`,
+      questionIds: [],
+      responder: '0x0000000000000000000000000000000000000001',
+      blockNumber,
+    });
+    expect(contractScripts.getSurveyResponse).not.toHaveBeenCalled();
+    expect(contractScripts.getResponse).not.toHaveBeenCalled();
+    expect(updateCacheAtomic).not.toHaveBeenCalled();
+    expect(dg.store.size).toBe(0);
+  });
+
+  it('accepts a live response ahead of a lagging RPC head when no end is configured', async () => {
+    const subject = createSubject({
+      path: '/session/edge',
+      activeSessionSlug: 'edge',
+      sessionConfig: buildSessionConfig({ blockLimits: { start: 10, end: null } }),
+    });
+    attachDgStore(subject);
+    contractScripts.getRelevantBlockWindowForFilter.mockResolvedValue({ fromBlock: 10, toBlock: 25 });
+    contractScripts.getSurveyResponse.mockResolvedValue({ answer: 'in scope' });
+    await subject.onNewSurveyEventDetectedForGroup('edge', {
+      type: 'ResponsesSubmitted',
+      surveyId: `0x${'1'.repeat(64)}`,
+      questionIds: [],
+      responder: '0x0000000000000000000000000000000000000001',
+      blockNumber: 26,
+    });
+    expect(contractScripts.getSurveyResponse).toHaveBeenCalledTimes(1);
+    expect(updateCacheAtomic).toHaveBeenCalled();
+  });
+
+  it('keeps a retryable scan gap after a later live event and resumes an ordinary refresh at that gap', async () => {
+    const surveyId = `0x${'1'.repeat(64)}`;
+    const questionId = `0x${'2'.repeat(64)}`;
+    const responder = '0x0000000000000000000000000000000000000001';
+    const config = buildSessionConfig({ blockLimits: { start: 1, end: null } });
+    const subject = createSubject({ path: '/session/edge', activeSessionSlug: 'edge', sessionConfig: config });
+    subject._mounted = true;
+    subject.getCacheSessionCfg = jest.fn(() => config);
+    subject.getCacheSessionChainId = jest.fn(() => 84532);
+    subject.scanScopeNoop = jest.fn(() => false);
+    subject.queueLocalRevisionUpdate = jest.fn();
+    const dg = attachDgStore(subject);
+    dg.write('questionsCache', 'edge', {
+      84532: {
+        questions: {},
+        questionResponses: {},
+        questionResponsesMeta: {},
+        questionResponsesLatestBlock: 6,
+      },
+    });
+    dg.write('surveysCache', 'edge', {
+      84532: {
+        surveys: {},
+        surveyResponses: {},
+        surveyResponsesMeta: {},
+        surveyResponsesLatestBlock: { [surveyId]: 6 },
+      },
+    });
+    updateCacheAtomic.mockImplementation(async (name, slug, updater) => {
+      const next = await updater(dg.read(name, slug) || {});
+      dg.write(name, slug, next);
+      return next;
+    });
+    contractScripts.getRelevantBlockWindowForFilter.mockResolvedValue({ fromBlock: 1, toBlock: 35 });
+    contractScripts.getSurveyResponse.mockResolvedValue({ answer: 'live survey' });
+    contractScripts.getResponse.mockResolvedValue({ answer: 'live question' });
+    await subject.onNewSurveyEventDetectedForGroup('edge', {
+      type: 'ResponsesSubmitted',
+      surveyId,
+      questionIds: [questionId],
+      responder,
+      blockNumber: 30,
+    });
+    const questions = dg.read('questionsCache', 'edge')['84532'];
+    const surveys = dg.read('surveysCache', 'edge')['84532'];
+    expect(questions.questionResponsesMeta[questionId][responder].bn).toBe(30);
+    expect(surveys.surveyResponsesMeta[surveyId][responder].bn).toBe(30);
+    expect(questions.questionResponsesLatestBlock).toBe(6);
+    expect(surveys.surveyResponsesLatestBlock[surveyId]).toBe(6);
+    contractScripts.getQuestionResponsesChunkedWithCallback.mockImplementation(
+      async (_provider, _from, to, _progress, partial) => partial({}, to),
+    );
+    await subject._responseHydrationController.refreshQuestionResponses(null, { slug: 'edge' });
+    expect(contractScripts.getQuestionResponsesChunkedWithCallback).toHaveBeenCalledWith(
+      'none',
+      7,
+      35,
+      expect.any(Function),
+      expect.any(Function),
+      'edge',
+      expect.any(Object),
+    );
+    expect(dg.read('questionsCache', 'edge')['84532'].questionResponsesLatestBlock).toBe(35);
+    subject._responseHydrationController.destroy();
+  });
+
+  it('caches every survey responder in a block and keeps same-block edits ordered and idempotent', async () => {
+    const surveyId = `0x${'1'.repeat(64)}`;
+    const questionId = `0x${'2'.repeat(64)}`;
+    const first = '0x0000000000000000000000000000000000000001';
+    const second = '0x0000000000000000000000000000000000000002';
+    const subject = createSubject({
+      path: '/session/edge',
+      activeSessionSlug: 'edge',
+      sessionConfig: buildSessionConfig(),
+    });
+    const dg = attachDgStore(subject);
+    updateCacheAtomic.mockImplementation(async (name, slug, updater) => {
+      const next = await updater(dg.read(name, slug) || {});
+      dg.write(name, slug, next);
+      return next;
+    });
+    subject.queueLocalRevisionUpdate = jest.fn();
+    contractScripts.getRelevantBlockWindowForFilter.mockResolvedValue({ fromBlock: 10, toBlock: 30 });
+    contractScripts.getSurveyResponse
+      .mockResolvedValueOnce({ answer: 'first' })
+      .mockResolvedValueOnce({ answer: 'second' })
+      .mockResolvedValueOnce({ answer: 'edited' });
+    contractScripts.getResponse
+      .mockResolvedValueOnce({ answer: 'first' })
+      .mockResolvedValueOnce({ answer: 'second' })
+      .mockResolvedValueOnce({ answer: 'edited' });
+    const event = { type: 'ResponsesSubmitted', surveyId, questionIds: [questionId], blockNumber: 30, timestamp: 1 };
+    await subject.onNewSurveyEventDetectedForGroup('edge', {
+      ...event,
+      responder: first,
+      transactionIndex: 1,
+      logIndex: 2,
+    });
+    await subject.onNewSurveyEventDetectedForGroup('edge', {
+      ...event,
+      responder: second,
+      transactionIndex: 1,
+      logIndex: 3,
+    });
+    const edit = { ...event, responder: first, transactionIndex: 2, logIndex: 0 };
+    await subject.onNewSurveyEventDetectedForGroup('edge', edit);
+    const survey = dg.read('surveysCache', 'edge')['84532'];
+    const questions = dg.read('questionsCache', 'edge')['84532'];
+    expect(survey.surveyResponses[surveyId]).toEqual({ [first]: { answer: 'edited' }, [second]: { answer: 'second' } });
+    expect(questions.questionResponses[questionId]).toEqual(survey.surveyResponses[surveyId]);
+    expect(survey.surveyResponsesLatestBlock[surveyId]).toBeUndefined();
+    const before = JSON.stringify([...dg.store]);
+    const revisions = subject.queueLocalRevisionUpdate.mock.calls.length;
+    await subject.onNewSurveyEventDetectedForGroup('edge', edit);
+    await subject.onNewSurveyEventDetectedForGroup('edge', { ...edit, transactionIndex: 1, logIndex: 99 });
+    expect(JSON.stringify([...dg.store])).toBe(before);
+    expect(contractScripts.getSurveyResponse).toHaveBeenCalledTimes(3);
+    expect(contractScripts.getResponse).toHaveBeenCalledTimes(3);
+    expect(subject.queueLocalRevisionUpdate).toHaveBeenCalledTimes(revisions);
+  });
+
+  it('rechecks survey responder recency in the atomic write after a concurrent newer response', async () => {
+    const surveyId = `0x${'1'.repeat(64)}`;
+    const responder = '0x0000000000000000000000000000000000000001';
+    const subject = createSubject({
+      path: '/session/edge',
+      activeSessionSlug: 'edge',
+      sessionConfig: buildSessionConfig(),
+    });
+    const dg = attachDgStore(subject);
+    updateCacheAtomic.mockImplementation(async (name, slug, updater) => {
+      const current = {
+        84532: {
+          surveys: {},
+          surveyResponses: { [surveyId]: { [responder]: { answer: 'newer' } } },
+          surveyResponsesMeta: { [surveyId]: { [responder]: { bn: 40, txi: 1, li: 1, ts: 1 } } },
+          surveyResponsesLatestBlock: { [surveyId]: 40 },
+        },
+      };
+      const next = await updater(current);
+      dg.write(name, slug, next);
+      return next;
+    });
+    subject.queueLocalRevisionUpdate = jest.fn();
+    contractScripts.getRelevantBlockWindowForFilter.mockResolvedValue({ fromBlock: 10, toBlock: 40 });
+    contractScripts.getSurveyResponse.mockResolvedValue({ answer: 'older' });
+    await subject.onNewSurveyEventDetectedForGroup('edge', {
+      type: 'ResponsesSubmitted',
+      surveyId,
+      questionIds: [],
+      responder,
+      blockNumber: 30,
+      transactionIndex: 1,
+      logIndex: 1,
+    });
+    expect(dg.read('surveysCache', 'edge')['84532'].surveyResponses[surveyId][responder]).toEqual({ answer: 'newer' });
+    expect(subject.queueLocalRevisionUpdate).not.toHaveBeenCalled();
+  });
+
   it('rechecks response-event recency inside the atomic updater before publishing a revision', async () => {
     const questionId = `0x${'8'.repeat(64)}`;
     const responder = '0x00000000000000000000000000000000000000a8';
@@ -4844,7 +5321,7 @@ describe('AppShell single-SBT counts checkpoints', () => {
 
     const checkpointEntry = cacheState['84532'].sbtList[sbtLower];
     expect(checkpointEntry.countsLoaded).toBe(false);
-    expect(checkpointEntry.blockNumber).toBeNull();
+    expect(checkpointEntry.blockNumber).toBe(0);
     expect(checkpointEntry.mintedCountByAddress).toEqual({});
     expect(checkpointEntry.countsScanCheckpoint).toMatchObject({
       phase: 'activity',

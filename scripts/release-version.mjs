@@ -266,8 +266,10 @@ export const WORKER_RELEASE_SOURCE_PATHSPEC = Object.freeze([
   'scripts/cloudflare-session-template.mjs',
   ':(exclude,glob)**/*.test.*',
   // Not imported by any bundle.
+  ':(exclude)shared/agentFidelity.mjs',
   ':(exclude)shared/encryption/envelopeV1Core.mjs',
   ':(exclude)shared/encryption/envelopeWriterFixtures.mjs',
+  ':(exclude)shared/interviewConfidence.mjs',
   ':(exclude)shared/questions/questionId.mjs',
 ]);
 

@@ -10,7 +10,7 @@ import RightSideRaw from '../RightSidebar/RightSide';
 import LazyFallbackRaw from '../Shared/LazyFallback';
 import InitialRouteBoundaryRaw, { BootRecoveryReady } from '../ErrorBoundary/InitialRouteBoundary';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
-import { resolveCompareCachesReady, resolveCompareSessionSlug } from '../UserPage/compareSessionRuntime';
+import { resolveCompareCachesReady, resolveCompareSessionScope } from '../UserPage/compareSessionRuntime';
 import { t } from '../../utilities/ui/terminology.js';
 import { deserializeFilterState } from '../../utilities/survey/filterStateUtils.js';
 import { buildQuestionRoutePath } from '../../utilities/survey/questionRouting.js';
@@ -26,11 +26,7 @@ import {
   composeMainSiteSurveyCacheViewProps,
   composeMainSiteWalletViewProps,
 } from './mainSiteViewProps.js';
-import {
-  ExperimentalStub as ExperimentalStubRaw,
-  NotFoundRoute as NotFoundRouteRaw,
-  removeHashQueryParam,
-} from './routeStatusViews';
+import { NotFoundRoute as NotFoundRouteRaw, removeHashQueryParam } from './routeStatusViews';
 import { QUESTION_RESULTS_RE, SURVEY_RESULTS_RE, VALID_SURVEY_ID_RE } from './routeConfig.js';
 import { resolveMainSiteRouteMatch } from './routeTable.js';
 import { renderMainSiteRouteView } from './mainSiteRouteViewMap.js';
@@ -55,8 +51,9 @@ import {
   resolveMainSiteSessionRouteSourceSlug,
 } from './routeSessionResolution.js';
 import { getWorkerCanonicalRouteController } from './workerCanonicalRouteController.js';
-import { getSessionEntryRedirect } from './sessionEntryRedirect';
+import { getSessionAtlasRedirect, getSessionEntryRedirect } from './sessionEntryRedirect';
 import { isRxcSessionEntryPath } from '../../utilities/session/rxcSessionSlugs';
+import { resolveWorkerCanonicalSessionIdHex } from '../../utilities/session/sessionWorkerDiscovery';
 import {
   resolveExplicitWorkerSessionConfig,
   resolveExplicitWorkerSessionNetwork,
@@ -86,12 +83,11 @@ import {
   BookmarksPage as BookmarksPageRaw,
   CompareAddresses as CompareAddressesRaw,
   DocsPage as DocsPageRaw,
-  DemosIndex as DemosIndexRaw,
   OnePageSession as OnePageSessionRaw,
-  RiskMatrixDemo as RiskMatrixDemoRaw,
   SBTPage as SBTPageRaw,
   SBTsPage as SBTsPageRaw,
   SessionDocumentsPage as SessionDocumentsPageRaw,
+  SessionSettingsPage as SessionSettingsPageRaw,
   SessionWizard as SessionWizardRaw,
   SimulatedUserPage as SimulatedUserPageRaw,
   SponsorPage as SponsorPageRaw,
@@ -135,7 +131,6 @@ const MainAreaTabs = asMainSiteRouteComponent(MainAreaTabsRaw);
 const RightSide = asMainSiteRouteComponent(RightSideRaw);
 const LazyFallback = asMainSiteRouteComponent(LazyFallbackRaw);
 const InitialRouteBoundary = asMainSiteRouteComponent(InitialRouteBoundaryRaw);
-const ExperimentalStub = asMainSiteRouteComponent(ExperimentalStubRaw);
 const NotFoundRoute = asMainSiteRouteComponent(NotFoundRouteRaw);
 const AboutPage = asMainSiteRouteComponent(AboutPageRaw);
 const AdminPage = asMainSiteRouteComponent(AdminPageRaw);
@@ -146,12 +141,11 @@ const DebateMap = asMainSiteRouteComponent(DebateMapRaw);
 const BookmarksPage = asMainSiteRouteComponent(BookmarksPageRaw);
 const CompareAddresses = asMainSiteRouteComponent(CompareAddressesRaw);
 const DocsPage = asMainSiteRouteComponent(DocsPageRaw);
-const DemosIndex = asMainSiteRouteComponent(DemosIndexRaw);
 const OnePageSession = asMainSiteRouteComponent(OnePageSessionRaw);
-const RiskMatrixDemo = asMainSiteRouteComponent(RiskMatrixDemoRaw);
 const SBTPage = asMainSiteRouteComponent(SBTPageRaw);
 const SBTsPage = asMainSiteRouteComponent(SBTsPageRaw);
 const SessionDocumentsPage = asMainSiteRouteComponent(SessionDocumentsPageRaw);
+const SessionSettingsPage = asMainSiteRouteComponent(SessionSettingsPageRaw);
 const SessionWizard = asMainSiteRouteComponent(SessionWizardRaw);
 const SimulatedUserPage = asMainSiteRouteComponent(SimulatedUserPageRaw);
 const SponsorPage = asMainSiteRouteComponent(SponsorPageRaw);
@@ -162,12 +156,6 @@ const UserPage = asMainSiteRouteComponent(UserPageRaw);
 
 export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) => ({
   workerCanonicalRoutes: getWorkerCanonicalRouteController(host),
-  _renderDebateRoute: (fullPath: string) => (
-    <InitialRouteBoundary resetKey={fullPath}>
-      <ExperimentalStub featureName="Debate view" path={fullPath} />
-    </InitialRouteBoundary>
-  ),
-
   _renderBookmarksRoute: () => (
     <InitialRouteBoundary fallback={<LazyFallback label="Loading Bookmarks..." />}>
       <div data-testid={E2E_TESTIDS.PAGE_BOOKMARKS_ROOT}>
@@ -184,24 +172,10 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
     </InitialRouteBoundary>
   ),
 
-  _renderDemosRoute: () => (
-    <InitialRouteBoundary fallback={<div />}>
-      <DemosIndex />
-    </InitialRouteBoundary>
-  ),
-
   _renderBenchmarksRoute: () => (
     <Suspense fallback={<LazyFallback label="Loading benchmarks..." minHeight="60vh" />}>
       <BenchmarksPage />
     </Suspense>
-  ),
-
-  _renderMatrixRoute: () => (
-    <InitialRouteBoundary fallback={<LazyFallback label="Loading..." />}>
-      <div data-testid={E2E_TESTIDS.PAGE_MATRIX_ROOT}>
-        <RiskMatrixDemo />
-      </div>
-    </InitialRouteBoundary>
   ),
 
   _renderAgentRoute: () => {
@@ -231,7 +205,9 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
   },
 
   _renderAtlasRoute: (ctx: RouteRenderCtx) => {
-    const { fullPath, defaultSlug, defaultSessionNetwork, routeDemoMode } = ctx;
+    const { fullPath, defaultSlug, defaultSessionNetwork, routeDemoMode, pathWithoutQuery, searchStr } = ctx;
+    const sessionAtlas = getSessionAtlasRedirect(pathWithoutQuery, searchStr);
+    if (sessionAtlas) return <Navigate replace to={sessionAtlas} />;
     return (
       <InitialRouteBoundary fallback={<LazyFallback label="Loading Atlas..." />} resetKey={fullPath}>
         <div data-testid={E2E_TESTIDS.PAGE_ATLAS_ROOT}>
@@ -283,7 +259,7 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
 
   _renderCompareRoute: (ctx: RouteRenderCtx) => {
     const { fullPath, defaultSlug, defaultSessionCfg } = ctx;
-    const sessionSlug = resolveCompareSessionSlug({
+    const { slug: sessionSlug } = resolveCompareSessionScope({
       activeSessionSlug: defaultSlug,
       pathname: fullPath,
       search: readRouteLocationSearch().searchStr,
@@ -890,15 +866,16 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
     const pageRefreshQuestionResponses =
       isQuestionsListRoute && questionRouteSession.sessionSlugPinned
         ? (questionIds?: string[] | null, opts: RefreshQuestionResponsesOptions = {}) => {
+            // The page's own session starts last, so its load holds readiness.
+            const generalSource = shouldRefreshBuiltInDemoQuestionSources
+              ? host.refreshQuestionResponses(questionIds, { ...(opts || {}), slug: '' })
+              : null;
             const primary = host.refreshQuestionResponses(questionIds, {
               ...(opts || {}),
               slug: effectivePageSlug ?? undefined,
             });
             if (!shouldRefreshBuiltInDemoQuestionSources) return primary;
-            return Promise.all([
-              Promise.resolve(primary),
-              Promise.resolve(host.refreshQuestionResponses(questionIds, { ...(opts || {}), slug: '' })),
-            ]).then(() => undefined);
+            return Promise.all([Promise.resolve(primary), Promise.resolve(generalSource)]).then(() => undefined);
           }
         : host.refreshQuestionResponses;
     const pageRefreshSbtData =
@@ -991,8 +968,17 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
         </div>
       );
     }
-    const effectiveQuestionSlug = questionSlugPinned ? queryQuestionSlug : host.findGroupSlugForQuestion(questionID);
-    if (effectiveQuestionSlug != null && typeof window !== 'undefined') {
+    const cachedQuestionSlug = questionSlugPinned
+      ? null
+      : host.findGroupSlugForQuestion(questionID, { requireCacheHit: true });
+    const effectiveQuestionSlug = questionSlugPinned
+      ? queryQuestionSlug
+      : (cachedQuestionSlug ?? host.findGroupSlugForQuestion(questionID));
+    if (
+      (questionSlugPinned || cachedQuestionSlug !== null) &&
+      effectiveQuestionSlug != null &&
+      typeof window !== 'undefined'
+    ) {
       const canonicalQuestionPath = buildQuestionRoutePath(questionID, {
         responderAddress,
         sessionSlug: effectiveQuestionSlug,
@@ -1084,11 +1070,12 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
     const sessionTokenRaw = (parts[1] || '').trim();
     const subroute = (parts[2] || '').trim().toLowerCase();
     const isDocsRoute = subroute === 'docs';
+    const isSettingsRoute = subroute === 'settings' && !parts[3];
     const nextSubroute = (parts[3] || '').trim().toLowerCase();
     const isQuestionsRoute = subroute === 'questions' && (!nextSubroute || nextSubroute === 'results');
     const isQuestionResultsRoute = isQuestionsRoute && nextSubroute === 'results' && !parts[4];
     const hasUnsupportedSessionSubroute =
-      (!!parts[2] && !isDocsRoute && !isQuestionsRoute) ||
+      (!!parts[2] && !isDocsRoute && !isSettingsRoute && !isQuestionsRoute) ||
       (subroute === 'questions' && !!nextSubroute && nextSubroute !== 'results') ||
       (subroute === 'questions' && nextSubroute === 'results' && !!parts[4]);
     const workerRoute = resolveMainSiteSessionRouteForRender({
@@ -1111,7 +1098,13 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
       const canonicalToken = resolvedSlug || DEFAULT_SESSION_SLUG_ALIAS;
       if (sessionTokenRaw.toLowerCase() !== canonicalToken.toLowerCase()) {
         const nextPath = `/session/${canonicalToken}${
-          isQuestionResultsRoute ? '/questions/results' : isQuestionsRoute ? '/questions' : ''
+          isQuestionResultsRoute
+            ? '/questions/results'
+            : isQuestionsRoute
+              ? '/questions'
+              : isSettingsRoute
+                ? '/settings'
+                : ''
         }`;
         const nextUrl = buildPublicUrl(nextPath, window.location.search || '', window.location.hash || '');
         window.history.replaceState({}, '', nextUrl);
@@ -1189,6 +1182,38 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
               sessionConfig={effectiveSessionConfig}
               sessionIdHex={effectiveRegistryInfo.sessionIdHex || null}
               workerOrigin={workerOrigin}
+            />
+          </div>
+        </InitialRouteBoundary>
+      );
+    }
+
+    if (isSettingsRoute) {
+      const resolvedSlug = normalizeSessionSlug(effectiveSessionConfig.slug || slug);
+      const sessionNetwork = resolveExplicitWorkerSessionNetwork({
+        workerOrigin,
+        sessionConfig: effectiveSessionConfig,
+        fallbackNetwork: host.getSessionNetwork(resolvedSlug) || defaultSessionNetwork,
+      });
+      // Another session, or this slug on another Worker, starts a fresh page, not the last one's edits.
+      const settingsKey = JSON.stringify([
+        workerOrigin || effectiveSessionConfig.corsWorkerUrl || '',
+        resolvedSlug,
+        resolveWorkerCanonicalSessionIdHex(effectiveSessionConfig),
+      ]);
+      return (
+        <InitialRouteBoundary fallback={<LazyFallback label="Loading settings..." />} resetKey={fullPath}>
+          <div data-testid={E2E_TESTIDS.PAGE_SESSION_SETTINGS_ROOT}>
+            <SessionSettingsPage
+              key={settingsKey}
+              provider={host.props.provider}
+              account={host.props.account}
+              network={sessionNetwork}
+              toggleLoginModal={(loginModalIsOpen?: boolean) => host.props.toggleLoginModal(loginModalIsOpen)}
+              loginComplete={host.props.loginComplete}
+              sessionSlug={resolvedSlug}
+              sessionConfig={effectiveSessionConfig}
+              workerOrigin={workerOrigin || ''}
             />
           </div>
         </InitialRouteBoundary>
@@ -1304,7 +1329,7 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
     );
   },
 
-  getMainView: (relevantMatch: RegExpMatchArray | null | undefined) => {
+  getMainView: () => {
     // Variable initialization
     let surveyIDFromPath: string | null = null;
     let parsedFilterStateFromUrl: Record<string, unknown> = {};
@@ -1447,7 +1472,6 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
       renderers: {
         surveyId: () => host._renderSurveyIdRoute(ctx),
         home: () => host._renderHomeRoute(ctx),
-        debate: () => host._renderDebateRoute(fullPath),
         atlas: () => host._renderAtlasRoute(ctx),
         tag: () => host._renderTagRoute(ctx),
         bookmarks: () => host._renderBookmarksRoute(),
@@ -1461,9 +1485,7 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
         userProfile: () => host._renderUserProfileRoute(ctx),
         about: () => host._renderAboutRoute(),
         posts: renderPostsRoute,
-        demos: () => host._renderDemosRoute(),
         benchmarks: () => host._renderBenchmarksRoute(),
-        matrix: () => host._renderMatrixRoute(),
         docs: () => host._renderDocsRoute(ctx),
         admin: () => host._renderAdminRoute(ctx),
         sponsor: () => host._renderSponsorRoute(ctx),

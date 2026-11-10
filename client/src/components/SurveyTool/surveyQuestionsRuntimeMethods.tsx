@@ -1,3 +1,4 @@
+import type { ResponseValuesEqual } from './responseValueEquality';
 import { createLazyPoseidonHasher } from '../../utilities/crypto/poseidonHasher.js';
 import type {
   SurveyQuestionsLegacyRecord,
@@ -36,7 +37,6 @@ export const createSurveyQuestionsRuntimeMethods = (
 ): SurveyQuestionsRuntimeMethods => {
   const {
     GATE_SBT_HYDRATION_RETRY_MS,
-    QuestionsDashboard,
     applyQuestionDecryptCompletionStatusHelper,
     applyQuestionDecryptFailureStatusHelper,
     applySurveyDecryptStaleStatusHelper,
@@ -105,11 +105,9 @@ export const createSurveyQuestionsRuntimeMethods = (
     setState,
     shouldRetryMaskedQuestionRefresh,
     startQuestionDecryptAttemptStatusHelper,
-    state,
     stateRef,
     surveyLog,
     surveyResponseSubmitPort,
-    t,
     updateSubmittedSinceLastEdit,
     utils,
     verifyEncryptionIntegrity,
@@ -429,7 +427,7 @@ export const createSurveyQuestionsRuntimeMethods = (
     resolveFieldEncryptionGateId,
     scheduleJsonPreviewUpdate: () => scheduleJsonPreviewUpdate(),
     updateJsonPreview: () => updateJsonPreview(),
-    valuesEqual: (a: SurveyQuestionsLegacyValue, b: SurveyQuestionsLegacyValue) => valuesEqual(a, b),
+    valuesEqual: (...args: Parameters<ResponseValuesEqual>) => valuesEqual(...args),
   });
 
   const {
@@ -493,6 +491,7 @@ export const createSurveyQuestionsRuntimeMethods = (
       editTracking: () => getEditTrackingQuestionIds(),
       hydration: () => getHydrationQuestionIds(),
     },
+    getQuestionById,
     buildEmptyResponseFieldState,
     buildLocalCacheHydrationSignature,
     ensurePriorResponsesForRenderedIds,
@@ -1966,6 +1965,7 @@ export const createSurveyQuestionsRuntimeMethods = (
   };
 
   const {
+    resolveFieldEncryptionPolicy,
     buildLitEncryptionOptionsForRecipients,
     buildFieldEncryptionWorkGroups,
     encryptFieldWorkGroups,
@@ -2082,7 +2082,11 @@ export const createSurveyQuestionsRuntimeMethods = (
       propsRef.current.isStandalone || propsRef.current.singleQuestionMode ? 0 : propsRef.current.surveyIndex;
     const stateToCheck: SurveyQuestionsLegacyValue =
       sliceOverride || stateRef.current.surveysResponseState[surveyIndex];
-    const { passed, failures }: SurveyQuestionsLegacyValue = verifyEncryptionIntegrity(stateToCheck, onlyTheseQids);
+    const { passed, failures }: SurveyQuestionsLegacyValue = verifyEncryptionIntegrity(
+      stateToCheck,
+      onlyTheseQids,
+      resolveFieldEncryptionPolicy,
+    );
 
     failures.forEach((msg: SurveyQuestionsLegacyValue) => surveyLog.error(msg));
 

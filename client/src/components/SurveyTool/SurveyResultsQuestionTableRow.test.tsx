@@ -43,6 +43,23 @@ describe('SurveyResultsQuestionTableRow', () => {
     expect(container.querySelector('svg')).toHaveAttribute('color', 'gold');
   });
 
+  it('keeps a General row pinned when the table fallback is another session', () => {
+    render(
+      <table>
+        <tbody>
+          <SurveyResultsQuestionTableRow
+            entry={{ questionId: 'q1', prompt: 'General question', responsesCount: 1, sessionSlug: '', type: 'binary' }}
+            fallbackSessionSlug="beta"
+            onToggleQuestionBookmark={() => {}}
+            onViewQuestion={() => {}}
+            styleMap={styleMap}
+          />
+        </tbody>
+      </table>,
+    );
+    expect(screen.getByRole('link')).toHaveAttribute('href', '/question/q1?session=general');
+  });
+
   it('uses fallback prompt/session display and preserves row action wiring', () => {
     const onToggleQuestionBookmark = jest.fn();
     const onViewQuestion = jest.fn();

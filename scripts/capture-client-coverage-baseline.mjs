@@ -13,7 +13,7 @@ const require = createRequire(import.meta.url);
 const {
   CLIENT_COVERAGE_EXCLUSION_RULES,
   listTrackedClientCoverageFiles,
-} = require('./clientCoverageUniverse');
+} = require('./client-coverage-universe');
 
 function parseArgs(argv) {
   const options = { repoDir: process.cwd(), coveragePath: 'client/coverage/coverage-final.json' };

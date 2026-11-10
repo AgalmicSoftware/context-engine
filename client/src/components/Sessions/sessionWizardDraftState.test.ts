@@ -82,15 +82,12 @@ describe('sessionWizardDraftState', () => {
       expect.objectContaining({
         reasoningEffort: 'low',
         models: expect.objectContaining({
-          fast: expect.objectContaining({ provider: 'openai', model: 'gpt-5.6-terra' }),
-          thinking: expect.objectContaining({ provider: 'openai', model: 'gpt-5.6-terra' }),
+          fast: expect.objectContaining({ provider: 'openai', model: 'gpt-6.1-terra' }),
+          thinking: expect.objectContaining({ provider: 'openai', model: 'gpt-6.1-sol' }),
         }),
       }),
     );
     expect(template.sessionModeProfile).toBeUndefined();
-    expect(template.telegramOnly).toBeUndefined();
-    expect(template.sessionMode).toBeUndefined();
-    expect(template.telegramBridgeEnabled).toBeUndefined();
   });
 
   it('preserves an explicit per-session interview-mode opt-out', () => {
@@ -157,41 +154,6 @@ describe('sessionWizardDraftState', () => {
     });
   });
 
-  it('normalizes cached legacy adapter drafts into the profile without rewriting legacy fields', () => {
-    const normalized = normalizeSessionWizardDraftShape({
-      sessionName: 'Legacy Agent',
-      telegramOnly: true,
-      sessionMode: 'telegram_only',
-      telegramBridgeEnabled: true,
-      telegram: { only: true, mode: 'telegram_only' },
-      storageProfile: { backend: 'cloudflare' },
-    });
-
-    expect(normalized.sessionModeProfile).toEqual(
-      expect.objectContaining({
-        preset: 'custom',
-        authority: { mode: 'worker_canonical' },
-        storage: expect.objectContaining({ backend: 'cloudflare' }),
-        surfaces: expect.objectContaining({
-          telegram: false,
-          miniApp: false,
-          agentHttp: true,
-          web: true,
-        }),
-      }),
-    );
-    expect(normalized.storageProfile).toEqual(
-      expect.objectContaining({
-        backend: 'cloudflare',
-        payloadAccessControl: expect.objectContaining({ mode: 'worker_sbt_gate' }),
-      }),
-    );
-    expect(normalized.telegramOnly).toBeUndefined();
-    expect(normalized.sessionMode).toBeUndefined();
-    expect(normalized.telegramBridgeEnabled).toBeUndefined();
-    expect(normalized.telegram).toBeUndefined();
-  });
-
   it('merges cached wizard drafts with source defaults and normal-mode worker fallback', () => {
     const defaultTemplate = {
       slug: '',
@@ -212,7 +174,6 @@ describe('sessionWizardDraftState', () => {
           deployComplete: false,
         },
         defaultTemplate,
-        normalModeSharedHostedWorkerEnabled: false,
         sourceEmbeddedDeployHelperDefault: true,
       }),
     ).toEqual(
@@ -233,7 +194,6 @@ describe('sessionWizardDraftState', () => {
           deployComplete: true,
         },
         defaultTemplate,
-        normalModeSharedHostedWorkerEnabled: false,
         sourceEmbeddedDeployHelperDefault: true,
       }),
     ).toEqual(
@@ -561,7 +521,6 @@ describe('sessionWizardDraftState', () => {
           memberVisibility: 'session',
         },
       ],
-      effectivePersistWorkerSecrets: false,
       workerLimitPerWallet: '7',
       workerLimitPerAnonymousIp: '0',
       workerSecrets: {
@@ -625,7 +584,6 @@ describe('sessionWizardDraftState', () => {
         deployForm: {
           workerName: 'worker',
           adminAddress: '0xAdmin',
-          bundleUrl: 'https://bundle.example/worker.js',
         },
       }),
     );
@@ -657,7 +615,6 @@ describe('sessionWizardDraftState', () => {
     };
 
     const payload = buildSessionWizardCacheWritePayload({
-      effectivePersistWorkerSecrets: true,
       workerSecrets,
     });
 

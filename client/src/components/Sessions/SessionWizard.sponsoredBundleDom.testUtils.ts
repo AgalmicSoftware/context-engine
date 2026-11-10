@@ -1,85 +1,36 @@
-import { act, fireEvent, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
-
-const SPONSORED_FAUCET_NOTICE =
-  'Faucet funding is currently provided by the sponsored bundle. Enter a private key here to override it.';
-const SPONSORED_DEPLOY_NOTICE =
-  'Deploy access is currently provided by the sponsored bundle. Enter a Cloudflare API token here to override it.';
-
-const getFieldInputByLabel = (labelText) =>
-  screen.getByText(labelText).parentElement.querySelector('input,textarea,select');
 
 const getToggleCheckbox = (labelText) =>
   screen.getByText(labelText).closest('label').querySelector('input[type="checkbox"]');
 
-const enableAdvancedMode = () => {
-  ensureSessionModeProfileSelected();
-  const customizeButton = screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED);
-  if (customizeButton.getAttribute('aria-pressed') === 'true') return;
-  act(() => {
-    fireEvent.click(customizeButton);
-  });
+const getFieldInputByLabel = (labelText) =>
+  screen.getByText(labelText).parentElement.querySelector('input,textarea,select');
+
+// Every setup section but Basics starts closed behind its More button.
+const openSetupSection = (key: string) => {
+  const toggle = screen.queryByTestId(`ce-setup-more-${key}`);
+  if (!toggle || toggle.getAttribute('aria-expanded') === 'true') return;
+  fireEvent.click(toggle);
 };
 
-const hasCommittedSessionModeProfile = () => {
-  const continueButton = screen.queryByTestId('ce-new-preset-continue');
-  if (continueButton) return !continueButton.disabled;
-  return !!screen.queryByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+// New drafts start Worker-hosted. This takes the on-chain registry path that the
+// old default (trustless) preset took. It mirrors the worker-panel testUtils
+// helper, which can't be imported here without also installing its jest mocks.
+const selectRegistryHosting = () => {
+  openSetupSection('hosting');
+  fireEvent.change(screen.getByTestId('ce-setup-authority'), { target: { value: 'evm_registry_canonical' } });
 };
 
-const ensureSessionModeProfileSelected = () => {
-  if (hasCommittedSessionModeProfile()) return;
-  if (screen.queryByTestId('ce-new-preset-trustless_public_decentralized')) {
-    act(() => {
-      fireEvent.click(screen.getByTestId('ce-new-preset-trustless_public_decentralized'));
-    });
-    const continueButton = screen.queryByTestId('ce-new-preset-continue');
-    if (continueButton && !continueButton.disabled) {
-      act(() => {
-        fireEvent.click(continueButton);
-      });
-    }
-    return;
-  }
-  const arweavePreset = screen.queryByTestId('ce-new-preset-trustless_public_decentralized');
-  if (arweavePreset) {
-    act(() => {
-      fireEvent.click(arweavePreset);
-    });
-  }
-};
-
-const continueNewSessionEntry = () => {
-  ensureSessionModeProfileSelected();
-};
-
-const selectNormalModeCard = (label) => {
-  ensureSessionModeProfileSelected();
-  const customizeButton = screen.queryByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED);
-  if (customizeButton?.getAttribute('aria-pressed') === 'true') {
-    fireEvent.click(customizeButton);
-  }
-  fireEvent.click(screen.getByRole('button', { name: new RegExp(label, 'i') }));
-};
-
-const openWorkerPanel = () => {
-  fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
-};
-
-const setControlledInputValue = (input, value) => {
-  const reactPropsKey = Object.keys(input).find((key) => key.startsWith('__reactProps$'));
-  if (reactPropsKey) {
-    act(() => {
-      input[reactPropsKey].onChange({ target: { value } });
-    });
-    return;
-  }
-  fireEvent.change(input, { target: { value } });
+// Lit encryption adds the Lit resource card under Hosting.
+const selectLitEncryption = () => {
+  openSetupSection('access');
+  fireEvent.change(screen.getByTestId('ce-setup-encryption'), { target: { value: 'lit' } });
 };
 
 const setCloudflareTokenValue = (value) => {
   const input = screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN);
-  setControlledInputValue(input, value);
+  fireEvent.change(input, { target: { value } });
   return input;
 };
 
@@ -100,72 +51,12 @@ const expectSponsoredStatus = async (message) => {
   );
 };
 
-const configureAdvancedUseUrlDeploy = async ({
-  sessionName = 'Advanced Bundle Retry Session',
-  slug = 'advanced-bundle-retry-session',
-  bundleUrl = 'https://bundles.example.test/sessionCorsWorker.bundle.js',
-  cloudflareToken = 'cf-test-token',
-} = {}) => {
-  enableAdvancedMode();
-  const sessionNameInput = await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
-  if (!screen.queryByTestId(E2E_TESTIDS.WIZARD_SLUG)) {
-    fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_METADATA_PANEL_TOGGLE));
-  }
-  fireEvent.change(sessionNameInput, {
-    target: { value: sessionName },
-  });
-  fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SLUG), {
-    target: { value: slug },
-  });
-
-  openWorkerPanel();
-  fireEvent.click(await screen.findByRole('button', { name: 'Use My Own' }));
-
-  const bundleModeUrlInput = screen.getByTestId(E2E_TESTIDS.WIZARD_BUNDLE_MODE_URL);
-  if (!bundleModeUrlInput.checked) {
-    fireEvent.click(bundleModeUrlInput);
-  }
-
-  const bundleUrlInput = screen.getByPlaceholderText(
-    'https://github.com/<org>/<repo>/releases/download/<release-tag>/sessionCorsWorker.bundle.js',
-  );
-  setControlledInputValue(bundleUrlInput, bundleUrl);
-  await waitFor(() => {
-    expect(bundleUrlInput).toHaveValue(bundleUrl);
-  });
-  setControlledInputValue(
-    screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_HELPER_URL),
-    'https://deploy-helper.example.test',
-  );
-  await waitFor(() => {
-    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_HELPER_URL)).toHaveValue('https://deploy-helper.example.test');
-  });
-  setCloudflareTokenValue(cloudflareToken);
-  fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_OPENAI_KEY), {
-    target: { value: 'sk-test-openai' },
-  });
-  fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_ARWEAVE_JWK), {
-    target: { value: '{"kty":"RSA","n":"abc"}' },
-  });
-  await waitFor(() => {
-    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_NAME)).toHaveTextContent(slug);
-  });
-  return {
-    bundleModeUrlInput,
-    bundleUrlInput,
-  };
-};
-
 export {
-  SPONSORED_DEPLOY_NOTICE,
-  SPONSORED_FAUCET_NOTICE,
-  configureAdvancedUseUrlDeploy,
-  continueNewSessionEntry,
-  enableAdvancedMode,
+  getToggleCheckbox,
   expectSponsoredStatus,
   getFieldInputByLabel,
-  getToggleCheckbox,
-  openWorkerPanel,
-  selectNormalModeCard,
+  openSetupSection,
+  selectLitEncryption,
+  selectRegistryHosting,
   setCloudflareTokenValue,
 };

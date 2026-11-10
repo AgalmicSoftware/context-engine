@@ -177,25 +177,22 @@ const membershipGroupIds = (overview: WorkerGroupOverview, sessionSlug: string):
 const buildRecommendationViews = (
   overview: WorkerGroupOverview,
   recommendations: SessionInterviewGroupRecommendation[],
-  sessionSlug: string,
 ): RecommendationView[] => {
-  const byGroupId = new Map(recommendations.map((recommendation) => [recommendation.groupId, recommendation]));
-  const eligible = normalizeInterviewGroupCandidates({
-    groups: overview.groups,
-    memberships: overview.memberships,
-    source: overview.memberships.length ? 'authenticated' : 'public',
-  });
-  return eligible
-    .filter((group) => byGroupId.has(group.groupId))
-    .slice(0, 6)
-    .map((group) => {
-      const recommendation = byGroupId.get(group.groupId);
-      return {
-        group,
-        reason: recommendation?.reason || 'Suggested from the interview review.',
-        evidence: recommendation?.evidence || '',
-      };
-    });
+  const eligible = new Map(
+    normalizeInterviewGroupCandidates({
+      groups: overview.groups,
+      memberships: overview.memberships,
+      source: overview.memberships.length ? 'authenticated' : 'public',
+    }).map((group) => [group.groupId, group]),
+  );
+  // Suggestion order, so groups named like a chosen answer stay first.
+  const views: RecommendationView[] = [];
+  for (const { groupId, reason, evidence } of recommendations) {
+    const group = eligible.get(groupId);
+    if (group)
+      views.push({ group, reason: reason || 'Suggested from the interview review.', evidence: evidence || '' });
+  }
+  return views.slice(0, 6);
 };
 
 const usePreviousBoolean = (value: boolean): boolean => {
@@ -301,7 +298,11 @@ export function SessionInterviewRecommendedGroups({
   }, [authenticated, canLoadCatalog, fetchImpl, normalizedAccount, sessionId, sessionSlug, targetKey, workerUrl]);
 
   useEffect(() => {
-    setJoinState(emptyJoinState(targetKey));
+    // A join waiting for login survives the account arriving before login completes;
+    // any other join state belongs to the previous account or target.
+    setJoinState((current) =>
+      current.status === 'waiting-login' && current.targetKey === targetKey ? current : emptyJoinState(targetKey),
+    );
     setJoinedGroupState(emptyJoinedGroupState(targetKey, normalizedAccount));
     void loadCatalog();
     return () => {
@@ -311,8 +312,8 @@ export function SessionInterviewRecommendedGroups({
   }, [loadCatalog, normalizedAccount, targetKey]);
 
   const recommendationViews = useMemo(
-    () => buildRecommendationViews(activeViewState.overview, normalizedRecommendations, sessionSlug),
-    [activeViewState.overview, normalizedRecommendations, sessionSlug],
+    () => buildRecommendationViews(activeViewState.overview, normalizedRecommendations),
+    [activeViewState.overview, normalizedRecommendations],
   );
 
   const joinRecommendedGroup = useCallback(
@@ -371,7 +372,7 @@ export function SessionInterviewRecommendedGroups({
           }
           return;
         }
-        const allowed = buildRecommendationViews(overview, normalizedRecommendations, sessionSlug).some(
+        const allowed = buildRecommendationViews(overview, normalizedRecommendations).some(
           (view) => view.group.groupId === groupId,
         );
         if (!allowed) throw new Error('This group is no longer available to join.');
@@ -460,7 +461,7 @@ export function SessionInterviewRecommendedGroups({
   return (
     <SessionInterviewReviewSection title={`Suggested groups (${recommendationViews.length})`}>
       <div className={styles.sessionInterviewSuggestions} data-testid="ce-session-interview-group-recommendations">
-        <p>Based on your interview. Join any groups that fit you.</p>
+        <p>Based on your answers. Join any groups that fit you.</p>
         {recommendationViews.map(({ group, reason, evidence }) => {
           const current = activeJoinState.groupId === group.groupId ? activeJoinState.status : 'idle';
           const joining = current === 'joining';

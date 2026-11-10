@@ -65,13 +65,6 @@ const hasExplicitDefaultWorkerSessionSlug = (env = {}) => (
   hasExplicitWorkerSlugInput(env?.DEFAULT_SESSION_SLUG ?? env?.DEFAULT_GROUP_SLUG)
 );
 
-export const resolveWorkerTenantSlug = ({ envSlug, headerSlug, tokenSlug } = {}) => {
-  if (envSlug) return envSlug;
-  if (headerSlug) return headerSlug;
-  if (tokenSlug) return tokenSlug;
-  return '';
-};
-
 export const resolveRequestedWorkerSlugPayload = (body = {}) => {
   const source = body && typeof body === 'object' ? body : {};
   const hasSessionSlug = (
@@ -180,12 +173,11 @@ export const resolveWorkerRequestSlugContext = ({
   const normalizedHint = normalizeWorkerSessionSlug(slugHint);
   const resolvedTokenSlug = tokenHasSlug ? tokenSlugResult.slug : '';
   const resolvedHeaderSlug = headerSlugResult.slug;
-  const slug = resolveWorkerTenantSlug({
-    envSlug,
-    headerSlug: resolvedHeaderSlug,
-    tokenSlug: resolvedTokenSlug,
-  }) || normalizedHint;
   const explicitHeaderProvided = countEmptyHeaderAsExplicit ? headerPresent : headerHasValue;
+  // General is the empty canonical slug, so precedence follows presence.
+  const slug = hasExplicitDefaultWorkerSessionSlug(env) ? envSlug
+    : explicitHeaderProvided ? resolvedHeaderSlug
+      : tokenHasSlug ? resolvedTokenSlug : normalizedHint;
 
   return {
     ok: true,

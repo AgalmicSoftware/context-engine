@@ -1,3 +1,0 @@
-context-engine-agent-bridge-public-cutover-v1
-audited=2026-07-12
-scope=workers/agentBridgeWorker,scripts/run-agent-bridge-worker-tests.js

@@ -40,16 +40,20 @@ const renderConsent = (props = {}) =>
 
 describe('SessionInterviewResearchConsent', () => {
   it('describes opt-in research metadata without claiming edits are agreement', () => {
-    renderConsent();
+    renderConsent({ researchDetail: 'full' });
     expect(screen.getByText(/Edits are not treated as agreement/i)).toBeInTheDocument();
     expect(screen.getByText(/full interview transcript and imported conversation history/i)).toBeInTheDocument();
-    expect(
-      screen.getByText(/Predictions, reviewed values, changed fields, and unselected drafts will not be included/i),
-    ).toBeInTheDocument();
+    // An unticked box says what is left out, so the metadata doesn't repeat it.
+    expect(screen.queryByText(/will not be included/i)).not.toBeInTheDocument();
+  });
+
+  it('leaves the metadata out when nothing is shared', () => {
+    renderConsent({ includeProvenance: false });
+    expect(screen.queryByRole('group', { name: 'AI prefill metadata' })).not.toBeInTheDocument();
   });
 
   it('links to the branch documentation and shows selected/unselected counts when opted in', () => {
-    renderConsent({ includeComparison: true, revisionCount: 3 });
+    renderConsent({ includeComparison: true, revisionCount: 3, researchDetail: 'full' });
     fireEvent.click(screen.getByRole('group', { name: 'AI prefill metadata' }).querySelector('summary')!);
     expect(screen.getByRole('group', { name: 'AI prefill metadata' }).querySelector('summary')).toHaveTextContent(
       'AI prefill metadata',
@@ -75,13 +79,14 @@ describe('SessionInterviewResearchConsent', () => {
     );
   });
 
-  it('keeps metadata expansion bounded and the help control transparent', () => {
+  it('scrolls metadata with the other choices and keeps the help control transparent', () => {
     const scss = readConsentScss();
 
     expect(scss).toMatch(
       /\.optionGroup\s*\{[\s\S]*?padding:\s*8px;[\s\S]*?border:\s*1px solid color-mix\(in srgb, var\(--ce-text-inverse\) 14%, transparent\);[\s\S]*?background:\s*color-mix\(in srgb, var\(--ce-text-inverse\) 5%, transparent\);/,
     );
-    expect(scss).toMatch(/\.metadata\[open\]\s*\{[\s\S]*?max-height:\s*min\(28vh, 300px\);[\s\S]*?overflow:\s*auto;/);
+    // The submission panel scrolls as one region, so the metadata has no scroll of its own.
+    expect(scss).not.toMatch(/\.metadata\[open\]\s*\{[^}]*max-height/);
     expect(scss).toMatch(
       /\.metadata\[open\] summary\s*\{[\s\S]*?position:\s*sticky;[\s\S]*?background:\s*color-mix\(in srgb, var\(--ce-surface-sunken\) 92%, transparent\);/,
     );
@@ -106,4 +111,29 @@ it('explains that current drafts use current attribution while preserving consen
   renderConsent({ preserveSavedProvenance: true });
   fireEvent.click(screen.getByText('AI prefill metadata', { selector: 'summary' }));
   expect(screen.getByText(/Selected AI drafts use this interview’s source metadata/i)).toBeInTheDocument();
+});
+
+describe('research detail wording', () => {
+  const base = {
+    packet,
+    includeProvenance: true,
+    includeComparison: true,
+    onProvenanceChange: () => undefined,
+    onComparisonChange: () => undefined,
+    coverageDetails: [],
+    selectedCount: 2,
+    unselectedCount: 1,
+    disabled: false,
+  };
+
+  it('describes the minimal record by default', () => {
+    render(<SessionInterviewResearchConsent {...base} />);
+    expect(screen.getByText(/drafts for questions you skipped are not included/)).toBeInTheDocument();
+    expect(screen.queryByText(/Unselected drafts, including original and edited values/)).not.toBeInTheDocument();
+  });
+
+  it('describes the full record when the session keeps full detail', () => {
+    render(<SessionInterviewResearchConsent {...base} researchDetail="full" />);
+    expect(screen.getByText(/Unselected drafts, including original and edited values/)).toBeInTheDocument();
+  });
 });

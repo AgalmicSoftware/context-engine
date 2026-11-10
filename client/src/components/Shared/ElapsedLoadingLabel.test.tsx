@@ -20,3 +20,18 @@ it('counts seconds without changing the accessible label and cleans up on unmoun
     jest.useRealTimers();
   }
 });
+
+it('counts from the start it is given, for a task that began before it appeared', () => {
+  jest.useFakeTimers();
+  try {
+    jest.setSystemTime(50_000);
+    render(<ElapsedLoadingLabel label="Building" since={20_000} />);
+    expect(screen.getByText(/· 30s/)).toBeInTheDocument();
+    act(() => {
+      jest.advanceTimersByTime(2000);
+    });
+    expect(screen.getByText(/· 32s/)).toBeInTheDocument();
+  } finally {
+    jest.useRealTimers();
+  }
+});

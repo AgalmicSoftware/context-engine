@@ -24,6 +24,30 @@ describe('imageFetchClient worker auth options', () => {
     jest.clearAllMocks();
   });
 
+  it('cancels the image transport with its caller signal', async () => {
+    jest.mocked(getCorsProxyUrlOrThrow).mockResolvedValue('https://worker.example.test');
+    jest.mocked(fetchWorkerWithAuth).mockResolvedValue({
+      ok: true,
+      blob: async () => new Blob(['image'], { type: 'image/png' }),
+    } as Response);
+    const controller = new AbortController();
+    await fetchImageFromURL('https://image.example.test/image', { signal: controller.signal });
+    expect(fetchWorkerWithAuth).toHaveBeenCalledWith(
+      'https://worker.example.test',
+      expect.objectContaining({ signal: controller.signal }),
+      expect.any(Object),
+    );
+  });
+
+  it('never starts transport for an already cancelled selection', async () => {
+    const controller = new AbortController();
+    controller.abort();
+    await expect(
+      fetchImageFromURL('https://image.example.test/image', { signal: controller.signal }),
+    ).rejects.toMatchObject({ name: 'AbortError' });
+    expect(fetchWorkerWithAuth).not.toHaveBeenCalled();
+  });
+
   it('uses the strict demo-fallback policy for worker-backed image fetches', async () => {
     (getCorsProxyUrlOrThrow as jest.Mock).mockResolvedValue('https://worker.example.test/base/');
     (fetchWorkerWithAuth as jest.Mock).mockResolvedValue({

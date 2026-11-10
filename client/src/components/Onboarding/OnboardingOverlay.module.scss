@@ -322,13 +322,6 @@
   color: var(--ce-color-panel-text);
 }
 
-.arrowPlaceholder {
-  width: 100%;
-  height: 100%;
-  min-height: 100%;
-  background: color-mix(in srgb, var(--ce-compat-dark) 18%, transparent);
-}
-
 @media (max-width: 1400px) {
   .panelFrame {
     width: min(94vw, 1180px);
@@ -419,12 +412,6 @@
 
   .takeSurveyIcon {
     font-size: 55px;
-  }
-
-  .arrowPlaceholder {
-    width: 100%;
-    height: 100%;
-    background: color-mix(in srgb, var(--ce-compat-dark) 32%, transparent);
   }
 }
 
@@ -519,8 +506,7 @@
     transform: none;
   }
 
-  .takeSurveyButton,
-  .arrowPlaceholder {
+  .takeSurveyButton {
     width: 100%;
     min-width: 0;
     height: 100%;

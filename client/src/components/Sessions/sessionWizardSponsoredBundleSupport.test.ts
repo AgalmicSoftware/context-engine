@@ -1,6 +1,5 @@
 import {
   buildSponsoredBundleAppliedStatusMessage,
-  resolveSponsoredBundleAdvancedFieldNotices,
   resolveSponsoredBundleBootstrapWorkerUrl,
 } from './sessionWizardSponsoredBundleSupport';
 
@@ -26,23 +25,5 @@ describe('sessionWizardSponsoredBundleSupport', () => {
     ).toBe(
       'Sponsored resources applied: OpenAI key, Arweave wallet, Lit Chipotle config, Lit API key, Lit usage key, deploy access.',
     );
-  });
-
-  it('derives advanced-field notices from the sponsored bundle state', () => {
-    expect(
-      resolveSponsoredBundleAdvancedFieldNotices({
-        sponsoredBundle: {
-          faucetPrivateKey: '0xfaucet',
-          deployGrantToken: 'deploy-token',
-        },
-        workerSecrets: {
-          faucetPrivateKey: '0xfaucet',
-        },
-        deployForm: {},
-      }),
-    ).toEqual({
-      showSponsoredFaucetNotice: true,
-      showSponsoredDeployAccessNotice: true,
-    });
   });
 });

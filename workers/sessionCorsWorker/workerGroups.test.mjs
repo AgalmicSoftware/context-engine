@@ -7,7 +7,7 @@ import {
 	deleteWorkerGroup as deleteWorkerGroupBoundary,
 	dispatchAdminWorkerGroupRequest as dispatchAdminWorkerGroupRequestBoundary,
 	dispatchPublicWorkerGroupListRequest,
-	executeCoordinatedWorkerGroupMutation as executeCoordinatedWorkerGroupMutationBoundary,
+	forwardWorkerGroupMutation as executeCoordinatedWorkerGroupMutationBoundary,
 	executeWorkerGroupMutation as executeWorkerGroupMutationBoundary,
 	isWorkerGroupMember,
 	listWorkerGroupMembers as listWorkerGroupMembersBoundary,
@@ -15,15 +15,17 @@ import {
 	listWorkerGroupMemberships as listWorkerGroupMembershipsBoundary,
 	normalizeWorkerGroupId,
 	normalizeWorkerGroupPrincipal,
-	readWorkerGroupMembershipProjection as readWorkerGroupMembershipProjectionBoundary,
 	removeWorkerGroupMember as removeWorkerGroupMemberBoundary,
 	resolveWorkerGroupBootstrap,
 	resolveWorkerGroupsKv,
 	resolveWorkerGroupPrincipal,
-	snapshotWorkerGroupCapacity as snapshotWorkerGroupCapacityBoundary,
 	updateWorkerGroup as updateWorkerGroupBoundary,
 	workerGroupsRoute as workerGroupsRouteBoundary,
 } from './workerGroups.js';
+import {
+	readWorkerGroupMembershipProjection as readWorkerGroupMembershipProjectionBoundary,
+	snapshotWorkerGroupCapacity as snapshotWorkerGroupCapacityBoundary,
+} from './workerGroupProjectionFixture.mjs';
 import { SessionWriteCoordinator } from './sessionWriteCoordinator.js';
 
 const json = (body, status = 200, headers = {}) => ({ body, status, headers });
@@ -105,6 +107,7 @@ const workerGroupsRoute = async (args = {}) => {
 	const { injectSessionId = true, requestedSessionId = sessionId, ...routeArgs } = args;
 	return workerGroupsRouteBoundary({
 		...routeArgs,
+		deps: { executeCoordinatedWorkerGroupMutation, ...routeArgs.deps },
 		request: injectSessionId ? await requestWithSessionId(routeArgs.request, requestedSessionId) : routeArgs.request,
 		config: routeArgs.config ?? workerCanonicalConfig,
 	});
@@ -112,6 +115,7 @@ const workerGroupsRoute = async (args = {}) => {
 const dispatchAdminWorkerGroupRequest = (args = {}) =>
 	dispatchAdminWorkerGroupRequestBoundary({
 		...args,
+		deps: { executeCoordinatedWorkerGroupMutation, ...args.deps },
 		config: args.config ?? workerCanonicalConfig,
 		body: {
 			sessionId,
@@ -771,7 +775,7 @@ test('worker group membership keys cannot collide across distinct principal ids'
 	assert.equal(Buffer.byteLength(membershipKeys[0], 'utf8') <= 512, true);
 });
 
-test('legacy case-folded membership keys require the exact stored integration principal', async () => {
+test('legacy case-folded membership keys are ignored even for the exact integration principal', async () => {
 	const kv = createMockKv();
 	const env = { CE_WORKER_GROUPS_KV: kv };
 	await createWorkerGroup({
@@ -811,12 +815,13 @@ test('legacy case-folded membership keys require the exact stored integration pr
 		principal: { kind: 'agent', grantId: 'grant-a' },
 	});
 
-	assert.equal(exact.ok, true);
-	assert.equal(exact.member.principalKey, 'agent:Grant-A');
+	assert.equal(exact.ok, false);
+	assert.equal(exact.reason, 'worker_group_membership_denied');
+	assert.equal([...kv.store.keys()].filter((key) => key.startsWith('ce-worker-group-member:')).length, 1);
 	assert.equal(collision.ok, false);
 });
 
-test('legacy slug-only projections migrate only for their exact canonical session identity', async () => {
+test('legacy group identity isolation never imports old membership projections', async () => {
 	const kv = createMockKv();
 	const env = installCoordinatorBinding({ CE_WORKER_GROUPS_KV: kv });
 	const groupId = 'legacy-isolated';
@@ -913,7 +918,6 @@ test('legacy slug-only projections migrate only for their exact canonical sessio
 		env,
 		slug: 'session-a',
 		requesterAddress: member.address,
-		authScopes: {},
 		baseHeaders: {},
 		deps: { json },
 	});
@@ -929,28 +933,13 @@ test('legacy slug-only projections migrate only for their exact canonical sessio
 		groupId,
 		principal: member,
 	});
-	assert.equal(exactProjection.ok, true);
-	const migratedPrincipalIndexKey = [...kv.store.keys()].find(
-		(key) => key.startsWith('ce-worker-group-principal:session-a:') && key !== legacyKeys.principalIndex && key.endsWith(`:${groupId}`),
-	);
-	assert.ok(migratedPrincipalIndexKey);
-	kv.store.delete(migratedPrincipalIndexKey);
-
-	const exactMemberships = await listWorkerGroupMemberships({
-		env,
-		slug: 'session-a',
-		principal: member,
-	});
-	assert.deepEqual(
-		exactMemberships.memberships.map((entry) => entry.group.groupId),
-		[groupId],
-	);
-	assert.equal(
-		[...kv.store.keys()].some(
-			(key) => key.startsWith('ce-worker-group-principal:session-a:') && key !== legacyKeys.principalIndex && key.endsWith(`:${groupId}`),
-		),
-		true,
-	);
+	assert.equal(exactProjection.ok, false);
+	assert.equal(exactProjection.reason, 'worker_group_membership_denied');
+	const exactMemberships = await listWorkerGroupMemberships({ env, slug: 'session-a', principal: member });
+	assert.equal(exactMemberships.ok, false);
+	assert.equal(exactMemberships.reason, 'worker_group_projection_unavailable');
+	assert.equal(kv.store.has(canonicalMemberKey), false);
+	assert.equal(kv.store.has(canonicalPrincipalIndexKey), false);
 	assert.equal(
 		(await resolveWorkerGroupBootstrap({ env, slug: 'session-a', sessionId })).reason,
 		'worker_group_capacity_reconciliation_required',
@@ -1353,15 +1342,6 @@ test('worker groups reject deferred join modes and malformed principals fail clo
 		ok: false,
 		reason: 'missing_principal',
 	});
-	assert.deepEqual(
-		resolveWorkerGroupPrincipal({
-			authScopes: { agentGrant: { grantId: 'grant:test-1' } },
-		}).principal,
-		{
-			kind: 'agent',
-			grantId: 'grant:test-1',
-		},
-	);
 });
 
 test('worker group EVM principal normalization uses getAddress while matching lower-case keys', async () => {
@@ -1377,13 +1357,18 @@ test('worker group EVM principal normalization uses getAddress while matching lo
 	assert.equal(normalized.key, 'evm_address:0x0000000000000000000000000000000000000def');
 });
 
-test('obsolete transport hints cannot replace the authenticated EVM group principal', () => {
+test('token claims cannot replace the authenticated EVM group principal', () => {
 	for (const authScopes of [
 		{ telegramPrincipal: 'historical-subject' },
 		{ integrationPrincipal: { telegram: 'historical-subject' } },
 		{ integrationPrincipal: { principalId: 'historical-subject' } },
 		{ telegramUserId: 'historical-user' },
 		{ integrationPrincipal: { telegram_user_id: 'historical-user' } },
+		{ principal: { kind: 'agent', grantId: 'grant:test-1' } },
+		{ grantId: 'grant:test-1' },
+		{ agentGrant: { grantId: 'grant:test-1' } },
+		{ agent_grant: { grantId: 'grant:test-1' } },
+		{ delegation: { grantId: 'grant:test-1' } },
 	]) {
 		assert.deepEqual(resolveWorkerGroupPrincipal({ requesterAddress: actor.address, authScopes }).principal,
 			{ kind: 'evm_address', address: actor.address });
@@ -1398,7 +1383,7 @@ test('explicit historical transport principals still read their original members
 		input: { label: 'Historical group', joinMode: 'admin_add' }, deps: { randomUUID: () => 'historical-group' } });
 	assert.equal(group.ok, true);
 	assert.equal((await addWorkerGroupMember({ env, slug: 'session-a', groupId: 'historical-group', principal, actorPrincipal: actor })).ok, true);
-	const explicit = resolveWorkerGroupPrincipal({ authScopes: { principal } });
+	const explicit = normalizeWorkerGroupPrincipal(principal);
 	assert.equal(explicit.key, 'telegram:Historical-Subject');
 	const membership = await readWorkerGroupMembershipProjection({ env, slug: 'session-a', groupId: 'historical-group', principal: explicit.principal });
 	assert.equal(membership.ok, true);
@@ -1425,7 +1410,6 @@ test('Worker Group routes reject missing or mismatched session ids before coordi
 		env,
 		slug: 'session-a',
 		requesterAddress: member.address,
-		authScopes: {},
 		baseHeaders: {},
 		deps: {
 			json,
@@ -1507,7 +1491,6 @@ test('member routes respect visibility and open join mode', async () => {
 		env,
 		slug: 'session-a',
 		requesterAddress: member.address,
-		authScopes: {},
 		baseHeaders: {},
 		deps: { json },
 	});
@@ -1530,7 +1513,6 @@ test('member routes respect visibility and open join mode', async () => {
 		env,
 		slug: 'session-a',
 		requesterAddress: member.address,
-		authScopes: {},
 		baseHeaders: {},
 		deps: { json, now: () => Date.parse('2026-02-03T04:05:06.000Z') },
 	});
@@ -1566,7 +1548,6 @@ test('member routes respect visibility and open join mode', async () => {
 		env,
 		slug: 'session-a',
 		requesterAddress: member.address,
-		authScopes: {},
 		baseHeaders: {},
 		deps: { json, now: () => Date.parse('2026-02-03T04:06:06.000Z') },
 	});
@@ -1627,7 +1608,6 @@ test('session-visible leave returns the retained group and authoritative count',
 		env,
 		slug: 'session-a',
 		requesterAddress: member.address,
-		authScopes: {},
 		baseHeaders: {},
 		deps: { json },
 	});
@@ -1644,7 +1624,6 @@ test('session-visible leave returns the retained group and authoritative count',
 		env,
 		slug: 'session-a',
 		requesterAddress: member.address,
-		authScopes: {},
 		baseHeaders: {},
 		deps: { json },
 	});
@@ -1758,7 +1737,6 @@ test('participant member-list route binds the authenticated principal and exact 
 		env: {},
 		slug: 'session-a',
 		requesterAddress: member.address,
-		authScopes: {},
 		baseHeaders: {},
 		deps: {
 			json,
@@ -1842,7 +1820,6 @@ test('participant group creation requires the explicit policy and forces an open
 		env: {},
 		slug: 'session-a',
 		requesterAddress: member.address,
-		authScopes: { groups: true },
 		baseHeaders: {},
 		deps,
 	});
@@ -1858,7 +1835,6 @@ test('participant group creation requires the explicit policy and forces an open
 			env: {},
 			slug: 'session-a',
 			requesterAddress: member.address,
-			authScopes: { groups: true },
 			baseHeaders: {},
 			deps,
 		});
@@ -1875,7 +1851,6 @@ test('participant group creation requires the explicit policy and forces an open
 		env: {},
 		slug: 'session-a',
 		requesterAddress: member.address,
-		authScopes: { groups: true },
 		baseHeaders: {},
 		deps,
 	});
@@ -1945,7 +1920,6 @@ test('same slug with a replacement session id cannot expose prior groups or memb
 		env,
 		slug: 'session-a',
 		requesterAddress: member.address,
-		authScopes: {},
 		baseHeaders: {},
 		deps: { json },
 	});
@@ -2105,7 +2079,6 @@ test('group list projection failures return 503 instead of a false empty state',
 		env,
 		slug: 'session-a',
 		requesterAddress: member.address,
-		authScopes: {},
 		baseHeaders: {},
 		deps: { json },
 	});
@@ -2144,7 +2117,6 @@ test('group lists reject a stale-empty KV projection when Durable Objects report
 		env,
 		slug: 'session-a',
 		requesterAddress: member.address,
-		authScopes: {},
 		baseHeaders: {},
 		deps: { json },
 	});
@@ -2213,7 +2185,6 @@ test('member list routes propagate coordinator failures after readiness succeeds
 			env,
 			slug: 'session-a',
 			requesterAddress: member.address,
-			authScopes: {},
 			baseHeaders: {},
 			deps: { json },
 		});
@@ -2282,7 +2253,6 @@ test('participant and admin group lists use authoritative activity and visibilit
 		env,
 		slug: 'session-a',
 		requesterAddress: member.address,
-		authScopes: {},
 		baseHeaders: {},
 		deps: { json },
 	});
@@ -2378,6 +2348,101 @@ test('admin member listing stays below the KV operation ceiling and returns a cu
 	assert.equal(secondPage.members.length, 1);
 	assert.equal(secondPage.nextCursor, '');
 	assert.equal(operations <= 4, true);
+});
+
+test('member listings preserve removals across pages and never import legacy-only members', async () => {
+	const kv = createMockKv();
+	const env = installCoordinatorBinding({ CE_WORKER_GROUPS_KV: kv });
+	const groupId = 'removal-pages';
+	assert.equal(
+		(
+			await executeCoordinatedWorkerGroupMutation({
+				env,
+				slug: 'session-a',
+				operation: 'create',
+				input: { groupId, label: 'Removal pages', joinMode: 'admin_add', memberVisibility: 'members' },
+				actorPrincipal: actor,
+			})
+		).ok,
+		true,
+	);
+	const retained = [
+		{ kind: 'agent', grantId: 'Member-A' },
+		{ kind: 'agent', grantId: 'Member-B' },
+	];
+	for (const principal of [member, ...retained]) {
+		assert.equal(
+			(
+				await executeCoordinatedWorkerGroupMutation({
+					env,
+					slug: 'session-a',
+					operation: 'add-member',
+					groupId,
+					principal,
+					actorPrincipal: actor,
+				})
+			).ok,
+			true,
+		);
+	}
+	const principalKey = normalizeWorkerGroupPrincipal(member).key;
+	const encoded = Buffer.from(principalKey).toString('base64url');
+	const canonicalMemberKey = [...kv.store.keys()].find(
+		(key) => key.startsWith('ce-worker-group-member:') && key.endsWith(`:${groupId}:${encoded}`),
+	);
+	const canonicalIndexKey = [...kv.store.keys()].find(
+		(key) => key.startsWith('ce-worker-group-principal:') && key.endsWith(`:${encoded}:${groupId}`),
+	);
+	assert.ok(canonicalMemberKey);
+	assert.ok(canonicalIndexKey);
+	const original = JSON.parse(kv.store.get(canonicalMemberKey));
+	for (const keyPart of [encoded, principalKey.toLowerCase()]) {
+		kv.store.set(`ce-worker-group-member:session-a:${groupId}:${keyPart}`, JSON.stringify(original));
+		kv.store.set(`ce-worker-group-principal:session-a:${keyPart}:${groupId}`, groupId);
+	}
+	const legacyPrincipal = { kind: 'agent', grantId: 'Legacy-Only' };
+	const legacyPrincipalKey = normalizeWorkerGroupPrincipal(legacyPrincipal).key;
+	const legacyEncoded = Buffer.from(legacyPrincipalKey).toString('base64url');
+	kv.store.set(
+		`ce-worker-group-member:session-a:${groupId}:${legacyEncoded}`,
+		JSON.stringify({ ...original, principal: legacyPrincipal, principalKey: legacyPrincipalKey }),
+	);
+	kv.store.set(`ce-worker-group-principal:session-a:${legacyEncoded}:${groupId}`, groupId);
+	assert.equal(
+		(
+			await executeCoordinatedWorkerGroupMutation({
+				env,
+				slug: 'session-a',
+				operation: 'remove-member',
+				groupId,
+				principal: member,
+				actorPrincipal: actor,
+			})
+		).ok,
+		true,
+	);
+	const tombstone = kv.store.get(canonicalMemberKey);
+	assert.ok(JSON.parse(tombstone).removedAt);
+	assert.equal(kv.store.has(canonicalIndexKey), false);
+	const before = [...kv.store];
+	for (let attempt = 0; attempt < 3; attempt += 1) {
+		let cursor = '';
+		const members = [];
+		let pages = 0;
+		do {
+			const page = await listWorkerGroupMembers({ env, slug: 'session-a', groupId, cursor, limit: 1 });
+			assert.equal(page.ok, true);
+			members.push(...page.members.map((row) => row.principalKey));
+			cursor = page.nextCursor;
+			assert.ok(++pages <= 4);
+		} while (cursor);
+		assert.deepEqual(members.sort(), retained.map((principal) => normalizeWorkerGroupPrincipal(principal).key).sort());
+		assert.equal(kv.store.get(canonicalMemberKey), tombstone);
+		assert.equal(kv.store.has(canonicalIndexKey), false);
+		assert.deepEqual([...kv.store], before);
+	}
+	assert.equal((await readWorkerGroupMembershipProjection({ env, slug: 'session-a', groupId, principal: legacyPrincipal })).ok, false);
+	assert.deepEqual([...kv.store], before);
 });
 
 test('explicit removal and deletion prune list indexes while retaining tombstones', async () => {

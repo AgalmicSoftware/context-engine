@@ -30,8 +30,7 @@ $user-page-background: var(--ce-surface-sunken);
   }
 }
 
-.surveyTitleInput,
-#newSurveyTitleInput {
+.surveyTitleInput {
   font-size: 2em;
   font-weight: 600;
   background-color: transparent;
@@ -147,8 +146,7 @@ $user-page-background: var(--ce-surface-sunken);
   }
 }
 
-.questionPromptInput,
-#newQuestionInput {
+.questionPromptInput {
   font-size: 1.25em;
   margin-bottom: 10px;
   background: $input-bg;
@@ -324,8 +322,7 @@ $user-page-background: var(--ce-surface-sunken);
   }
 }
 
-.createSurveyButton,
-#submitNewSurveyButton {
+.createSurveyButton {
   @include finalSubmitCta.final-submit-cta-shell(
     $padding: 16px 24px,
     $min-height: 72px,
@@ -533,21 +530,38 @@ $user-page-background: var(--ce-surface-sunken);
   }
   li {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     margin-bottom: 10px;
   }
+  // The accent colour was 2.2:1 on the success tint in Classic 95; the card's own text colour reads in every theme.
   li a {
-    flex-grow: 1;
-    color: $clickable-color;
-    text-decoration: none;
+    color: inherit;
+    text-decoration: underline;
+    text-underline-offset: 2px;
     &:hover {
-      text-decoration: underline;
+      text-decoration-thickness: 2px;
     }
   }
 }
 
+// The label wraps, so the icon buttons beside it stay inside a narrow card.
+.uploadedQuestionLabel {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.uploadedQuestionId {
+  font-family: var(--ce-font-mono);
+  font-size: 0.8em;
+}
+
 .copyQuestionIdButton,
 .bookmarkQuestionButton {
+  flex-shrink: 0;
   background: none;
   border: none;
   color: color-mix(in srgb, var(--ce-text-inverse) 50%, transparent);
@@ -557,12 +571,6 @@ $user-page-background: var(--ce-surface-sunken);
   &:hover {
     color: var(--ce-color-white);
   }
-}
-
-#miniCreateSurveyLabel {
-  font-weight: 600;
-  font-size: 1.5em;
-  color: var(--ce-color-white) !important;
 }
 
 .errorButton {
@@ -622,13 +630,6 @@ $user-page-background: var(--ce-surface-sunken);
   color: var(--ce-status-danger-text);
   font-size: 0.88rem;
   font-weight: 600;
-}
-
-#copySurveyIdButton {
-  margin-left: 10px;
-  background-color: transparent;
-  border: none;
-  cursor: pointer;
 }
 
 .miniaturized {
@@ -1057,6 +1058,21 @@ $user-page-background: var(--ce-surface-sunken);
   opacity: 0.7;
 }
 
+// JSON and the AI prompt serve authors who need them, so they stay folded until opened.
+.developerDetails {
+  margin-top: 16px;
+
+  > summary {
+    width: fit-content;
+    margin-left: auto;
+    padding: 8px 4px;
+    color: inherit;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+}
+
 .aiPromptWrapper {
   margin-top: 8px;
   position: relative;
@@ -1335,7 +1351,6 @@ $user-page-background: var(--ce-surface-sunken);
 @media (prefers-reduced-motion: reduce) {
   .removeQuestionButton,
   .createSurveyButton,
-  #submitNewSurveyButton,
   .buttonProgressFill,
   .addDocUrlButton,
   .tagInputGroup,
@@ -1447,7 +1462,10 @@ $user-page-background: var(--ce-surface-sunken);
     overflow-wrap: anywhere;
   }
 
-  button {
+  // The card's own buttons, outranking none of their classes; the answer preview and the option editor keep their
+  // usual look.
+  > button,
+  :where(.interviewQuestionPromptActions) button {
     border: 0;
     background: transparent;
     color: var(--ce-panel-text);
@@ -1458,6 +1476,29 @@ $user-page-background: var(--ce-surface-sunken);
       outline: 2px solid var(--ce-focus-ring);
       outline-offset: 2px;
     }
+  }
+}
+
+// The answer as respondents see it, on the card rather than the answer page. A disabled fieldset, it takes no
+// focus or input, so nothing in it looks pressable, and nothing is dimmed as disabled. Its own stacking context
+// keeps the slider's raised handle beneath the pinned Submit bar and the new-drafts cue.
+.interviewQuestionPreview {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  isolation: isolate;
+
+  label {
+    cursor: default;
+  }
+
+  :global([class*='ratingLabelText']) {
+    color: inherit;
+  }
+
+  button[data-step]:disabled {
+    opacity: 1;
   }
 }
 
@@ -1489,7 +1530,8 @@ $user-page-background: var(--ce-surface-sunken);
 
 .interviewQuestionPromptActions .removeQuestionButton:hover,
 .interviewQuestionPromptActions .removeQuestionButton:focus {
-  color: var(--ce-color-white);
+  color: var(--ce-panel-text);
+  background-color: color-mix(in srgb, var(--ce-status-error) 18%, var(--ce-color-surface)) !important;
 }
 
 .interviewQuestionSummary {
@@ -1513,11 +1555,6 @@ $user-page-background: var(--ce-surface-sunken);
   font-weight: 800;
   letter-spacing: 0.02em;
   text-transform: uppercase;
-}
-
-.interviewQuestionOptions {
-  color: color-mix(in srgb, var(--ce-panel-text) 76%, transparent);
-  overflow-wrap: anywhere;
 }
 
 .interviewQuestionPromptEditButton {
@@ -1592,9 +1629,7 @@ $user-page-background: var(--ce-surface-sunken);
     }
 
     .surveyTitleInput::placeholder,
-    #newSurveyTitleInput::placeholder,
     .questionPromptInput::placeholder,
-    #newQuestionInput::placeholder,
     .docUrlInput::placeholder,
     .optionInput::placeholder,
     .tagInputField::placeholder {
@@ -1623,8 +1658,7 @@ $user-page-background: var(--ce-surface-sunken);
     }
 
     .actionBtn,
-    .actionLink,
-    #miniCreateSurveyLabel {
+    .actionLink {
       color: var(--ce-control-text) !important;
     }
 

@@ -3,9 +3,7 @@ import type { ChainIdLike, NetworkLike, SessionContractsLike } from '../shellTyp
 import type { WorkerPanelProps } from './WorkerPanel';
 import type { SessionWizardResourceGateSelectionState } from './sessionWizardResourceGateSupport';
 
-export type DeployFormState = NonNullable<WorkerPanelProps['deployForm']> & {
-  bundleUrl?: string;
-};
+export type DeployFormState = NonNullable<WorkerPanelProps['deployForm']>;
 
 export type ResourceGateMapState = Record<string, SessionWizardResourceGateSelectionState>;
 

@@ -14,6 +14,8 @@ import { loadWorkerCanonicalQuestions } from '../../client/src/domains/surveys/w
 import { buildReportResponseStats } from '../../client/src/components/PolisReport/polisReportAnswers';
 import { buildRatingMatrixFromRealData } from '../../client/src/components/PolisReport/polisReportRuntime';
 import currentWorker from '../../workers/sessionCorsWorker/worker.js';
+import { buildAiWorkerRequestPlan } from '../../client/src/utilities/ai/aiClientWorkerTransport';
+import { GENERATED_QUESTIONS_RESPONSE_FORMAT } from '../../client/src/prompts/seedGenPrompt';
 
 const repo = path.resolve(__dirname, '../..');
 // Move this immutable pin deliberately when choosing the next previous release,
@@ -51,6 +53,7 @@ const memoryKv = (seed = {}) => {
   let client;
   let config;
   let fetchImpl;
+  let env;
   let token;
   let uploads;
   const originalFetch = globalThis.fetch;
@@ -103,7 +106,7 @@ const memoryKv = (seed = {}) => {
         payloadAccessControl: { gate: 'none', encryption: 'none', mode: 'public_read', enforcement: 'session_worker_public_read', litRequired: false },
       },
     };
-    const env = installSessionCoordinatorBinding({
+    env = installSessionCoordinatorBinding({
       GROUP_KV: memoryKv({ [`session:${slug}:config`]: JSON.stringify(config) }),
       CE_STORAGE_INDEX_KV: memoryKv(), TOKEN_HMAC_SECRET: 'synthetic-previous-release-hmac',
     }, released.SessionWriteCoordinator);
@@ -142,7 +145,7 @@ const memoryKv = (seed = {}) => {
     const submitted = await submitFromBrowser();
     expect((await client.read(submitted.id)).answer.value).toBe('Agree');
     expect((await client.listAll('responses')).items).toHaveLength(1);
-    const questions = await loadWorkerCanonicalQuestions({ sessionSlug: slug, sessionConfig: config });
+    const { rows: questions } = await loadWorkerCanonicalQuestions({ sessionSlug: slug, sessionConfig: config });
     expect(questions.map(row => row.id)).toEqual([question.id]);
     const answers = await loadWorkerResponses({ sessionSlug: slug, sessionConfig: config });
     expect(answers).toHaveLength(1);
@@ -177,6 +180,40 @@ const memoryKv = (seed = {}) => {
       context: { account: wallet.address }, credentialToken: token, fetchImpl,
     })).rejects.toThrow('This Worker cannot safely record admin corrections. Upgrade the session Worker');
     expect(uploads).toHaveLength(1);
+  });
+
+  it('gets a JSON schema that OpenAI accepts through the released Worker’s AI route', async () => {
+    const upstream = [];
+    await env.GROUP_KV.put(`session:${slug}:config`, JSON.stringify({
+      ...config, workerAuthority: { ...config.workerAuthority, anonymousScopes: ['ai'] },
+    }));
+    globalThis.fetch = async (url, init = {}) => {
+      if (new URL(String(url)).origin !== 'https://api.openai.com') return fetchImpl(url, init);
+      upstream.push({ url: String(url), body: JSON.parse(init.body) });
+      return Response.json({ output_text: '{"surveyTitle":"Pilot","questions":[]}' });
+    };
+    // The request the current client builds for question generation on a GPT-6 model, with the
+    // person's own key so the released Worker forwards it without a session allowance.
+    const { requestBody } = buildAiWorkerRequestPlan({
+      ai: { provider: 'openai', model: 'gpt-6.1-terra', reasoningEffort: 'low', apiKeySource: 'local', apiKey: 'sk-synthetic' },
+      prompt: 'Write survey questions.',
+      opts: { response_format: GENERATED_QUESTIONS_RESPONSE_FORMAT },
+      taskType: 'generate',
+    });
+    const response = await fetchImpl(`${origin}/ai`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Origin: 'https://contextengine.sh', 'X-Group-Slug': slug },
+      body: JSON.stringify(requestBody),
+    });
+    expect(response.status).toBe(200);
+    expect(upstream.map(call => call.url)).toEqual(['https://api.openai.com/v1/responses']);
+    // The Responses API takes the schema's name and fields directly in text.format.
+    expect(upstream[0].body.text.format).toEqual({
+      type: 'json_schema',
+      name: 'generated_questions',
+      schema: GENERATED_QUESTIONS_RESPONSE_FORMAT.json_schema.schema,
+      strict: true,
+    });
   });
 
   it('runs the current capabilities route successfully in the same HTTP harness', async () => {

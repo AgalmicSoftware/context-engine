@@ -1,3 +1,4 @@
+import { assertConsistentDeployments } from './deployment-identity.mjs';
 import {
   ANSWER_VALUES,
   DEFAULT_CONCURRENCY,
@@ -118,31 +119,6 @@ const normalizeModelResponse = (response) => (
 
 const shouldRetry = (error) => error?.retryable !== false;
 
-const assertConsistentDeployments = (runs) => {
-  const identitiesByModel = new Map();
-  runs.forEach((run) => {
-    const metadata = run?.responseMetadata || {};
-    if (!identitiesByModel.has(run.modelId)) {
-      identitiesByModel.set(run.modelId, {
-        providers: new Set(), models: new Set(), fingerprints: new Set(), endpoints: new Set(),
-      });
-    }
-    const identity = identitiesByModel.get(run.modelId);
-    const provider = String(metadata.resolvedProvider || metadata.provider || run?.provider || '').trim();
-    const model = String(metadata.resolvedModel || run?.model || '').trim();
-    const fingerprint = String(metadata.systemFingerprint || '').trim();
-    const endpoint = String(metadata.endpoint || '').trim();
-    if (provider) identity.providers.add(provider);
-    if (model) identity.models.add(model);
-    if (fingerprint) identity.fingerprints.add(fingerprint);
-    if (endpoint) identity.endpoints.add(endpoint);
-  });
-  identitiesByModel.forEach((identity, modelId) => {
-    if (identity.providers.size > 1 || identity.models.size > 1 || identity.fingerprints.size > 1 || identity.endpoints.size > 1) {
-      throw new Error(`model ${modelId} resolved to multiple deployment identities; start a new run artifact instead of resuming`);
-    }
-  });
-};
 
 export const runBenchmark = async ({
   questionBank,

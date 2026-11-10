@@ -5,8 +5,6 @@ import {
   type SessionWizardModeFieldPolicy,
 } from './sessionWizardModeFieldPolicy';
 
-type DraftLike = Record<string, unknown>;
-
 export type SessionWizardRenderFieldOptions = {
   forceShow?: boolean;
 };
@@ -23,7 +21,6 @@ type SessionWizardFieldVisibilityOptions = {
   key: string;
   path?: string[];
   currentPath?: string[];
-  wizardMode?: string;
   modeFieldPolicy?: SessionWizardModeFieldPolicy;
 };
 
@@ -41,55 +38,6 @@ const HIDDEN_PATHS = new Set([
   'faucet.encryptedPrivateKey',
   'interviewMode.enabled',
   'interviewMode.provider',
-]);
-
-const TOP_LEVEL_FIELD_ORDER = [
-  'networkChainId',
-  'slug',
-  'sessionName',
-  'sessionInfo',
-  'appearance',
-  'groupCreationPolicy',
-  'sessionModeProfile',
-  'interviewModeEnabled',
-  'interviewMode',
-  'resultsAnalysis',
-  'sessionHeader',
-  'sessionEndsAt',
-  'storageProfile',
-  'contracts',
-  'blockLimits',
-  'sponsored',
-  'faucet',
-  'arweave',
-  'ai',
-  'litCredentials',
-  'defaultTags',
-  'defaultGroupTags',
-  'defaultSbtTags',
-  'defaultFeaturedSBTs',
-  'autoFeatureSBTsBySessionSlug',
-  'questionsGenPrompt',
-  'defaultFilterState',
-];
-
-const WORKER_ONLY_DRAFT_FIELDS = new Set(['embeddedDeployHelperEnabled', 'agentSessionWrapped']);
-
-const MORE_OPTIONS_FIELDS = new Set([
-  'appearance',
-  'interviewModeEnabled',
-  'interviewMode',
-  'resultsAnalysis',
-  'groupCreationPolicy',
-  'sessionEndsAt',
-  'defaultTags',
-  'defaultGroupTags',
-  'defaultSbtTags',
-  'defaultFeaturedSBTs',
-  'autoFeatureSBTsBySessionSlug',
-  'questionsGenPrompt',
-  'defaultFilterState',
-  'sponsoredSbtAddress',
 ]);
 
 const FIELD_TOOLTIPS: Record<string, string> = {
@@ -220,7 +168,6 @@ export const shouldHideSessionWizardField = ({
   key,
   path = [],
   currentPath = [...path, key],
-  wizardMode = 'advanced',
   modeFieldPolicy,
 }: SessionWizardFieldVisibilityOptions): boolean => {
   if (currentPath.length === 1 && isSessionWizardModeHiddenTopLevelField(currentPath[0], modeFieldPolicy)) {
@@ -256,51 +203,9 @@ export const shouldHideSessionWizardField = ({
     return true;
   }
 
-  const isNormalMode = wizardMode !== 'advanced';
-
-  if (isNormalMode && path.length === 0 && NORMAL_MODE_HIDDEN_TOP_LEVEL_FIELDS.has(key)) {
+  if (path.length === 0 && NORMAL_MODE_HIDDEN_TOP_LEVEL_FIELDS.has(key)) {
     return true;
   }
 
   return false;
-};
-
-export const getSessionWizardOrderedDraftEntries = (
-  draft: DraftLike | null | undefined,
-  modeFieldPolicy?: SessionWizardModeFieldPolicy,
-): Array<[string, unknown]> => {
-  const source = draft && typeof draft === 'object' ? draft : {};
-  const keys = Object.keys(source).filter(
-    (key) =>
-      !WORKER_ONLY_DRAFT_FIELDS.has(key) &&
-      !(key === 'storageProfile' && source.sessionModeProfile) &&
-      !isSessionWizardModeHiddenTopLevelField(key, modeFieldPolicy),
-  );
-  const orderedKeys = [
-    ...TOP_LEVEL_FIELD_ORDER.filter((key) => keys.includes(key)),
-    ...keys.filter((key) => !TOP_LEVEL_FIELD_ORDER.includes(key)),
-  ];
-  return orderedKeys.map((key) => [key, source[key]]);
-};
-
-export const splitSessionWizardDraftEntries = (
-  orderedDraftEntries: Array<[string, unknown]>,
-  isNormalMode: boolean,
-): {
-  primaryEntries: Array<[string, unknown]>;
-  moreOptionsEntries: Array<[string, unknown]>;
-} => {
-  const moreOptionsEntries = orderedDraftEntries.filter(
-    ([key]) => MORE_OPTIONS_FIELDS.has(key) || (isNormalMode && key === 'blockLimits'),
-  );
-
-  return {
-    primaryEntries: orderedDraftEntries.filter(
-      ([key]) => !MORE_OPTIONS_FIELDS.has(key) && !(isNormalMode && key === 'blockLimits'),
-    ),
-    moreOptionsEntries: [
-      ...moreOptionsEntries.filter(([key]) => key !== 'appearance'),
-      ...moreOptionsEntries.filter(([key]) => key === 'appearance'),
-    ],
-  };
 };

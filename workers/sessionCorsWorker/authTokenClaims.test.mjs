@@ -123,7 +123,7 @@ test('validateAuthTokenRecord requires jti tokens to have a live KV marker', asy
 
   assert.deepEqual(
     await validateAuthTokenRecord({ env, payload, slug: 'session-a' }),
-    { ok: true, legacy: false },
+    { ok: true },
   );
 
   await revokeAuthTokenRecord({ env, slug: 'session-a', sub: '0xabc', jti: 'jti-1' });

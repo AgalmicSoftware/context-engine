@@ -14,21 +14,35 @@ const DEFAULT_BASE_URL = 'http://127.0.0.1:3000';
 const DEFAULT_ROUTES = Object.freeze([
   '/new',
   '/session/demo',
+  '/session/demo/questions',
   '/session/pe4',
   '/admin',
   '/about',
   '/docs',
   '/contracts',
   '/benchmarks',
+  '/debate',
+  '/beta',
+  '/contributors',
+  '/matrix',
+  '/demos',
 ]);
 const DEFAULT_ROUTE_TEXT = Object.freeze({
-  '/session/new': ['Session Setup'],
+  '/session/new': ['New session'],
   '/session/demo': ['Session'],
+  '/session/demo/questions': ['Questions', 'Results', 'Existential risk from AI justifies extraordinary precautions.'],
   '/session/pe4': ['Groups', 'Results'],
+  '/rxc-ra-test': ['Groups', 'Results'],
+  '/session/rxc-ra-test': ['Groups', 'Results'],
   '/admin': ['Session Admin'],
   '/about': ['Context Engine'],
   '/docs': ['Docs'],
   '/contracts': ['Docs'],
+  '/debate': ['Page not found', 'Path: /debate'],
+  '/beta': ['Page not found', 'Path: /beta'],
+  '/contributors': ['Page not found', 'Path: /contributors'],
+  '/matrix': ['Page not found', 'Path: /matrix'],
+  '/demos': ['Page not found', 'Path: /demos'],
 });
 const DEFAULT_LAYOUT_PROBE_SELECTORS = Object.freeze([
   '[data-testid="ce-survey-submit"]',
@@ -86,13 +100,20 @@ function isSessionSetupRoute(route) {
 }
 
 function shouldInstallDemoWorkerFixture(baseUrl, route) {
+  const pathname = String(route || '').split(/[?#]/, 1)[0];
   return isLocalSmokeBaseUrl(baseUrl) &&
-    (isSessionSetupRoute(route) || String(route || '').startsWith('/session/demo'));
+    (isSessionSetupRoute(route) || pathname.startsWith('/session/demo') ||
+      ['/debate', '/beta', '/contributors', '/matrix', '/demos', '/atlas'].includes(pathname) ||
+      pathname.startsWith('/atlas/') || pathname.startsWith('/su/'));
 }
 
-async function installLocalSmokeFixtureRoutes(page, baseUrl) {
+async function installLocalSmokeFixtureRoutes(page, baseUrl, route = '') {
   if (!isLocalSmokeBaseUrl(baseUrl)) return;
   const appOrigin = new URL(baseUrl).origin;
+  const pinnedSlug = 'rxc-ra-test';
+  const pinnedSession = demoSessions[pinnedSlug];
+  const pinnedOrigin = new URL(pinnedSession.corsWorkerUrl).origin;
+  const pinnedRoute = [`/${pinnedSlug}`, `/session/${pinnedSlug}`].includes(String(route).split(/[?#]/, 1)[0]);
   await page.addInitScript(() => {
     let serviceWorker;
     // Sandboxed report frames throw when this property is read.
@@ -107,6 +128,20 @@ async function installLocalSmokeFixtureRoutes(page, baseUrl) {
     const request = requestRoute.request();
     const url = new URL(request.url());
     if (url.origin === appOrigin) return requestRoute.continue();
+    if (pinnedRoute && request.method() === 'GET' && url.origin === pinnedOrigin) {
+      if (url.pathname === '/session-config' && url.searchParams.get('slug') === pinnedSlug) {
+        return requestRoute.fulfill({ json: {
+          ok: true, sessionSlug: pinnedSlug,
+          config: { ...pinnedSession, configRevision: 'local-navigation-smoke', sessionModeProfile: DEMO_READY_WORKER_CONFIG.sessionModeProfile },
+        } });
+      }
+      if (url.pathname === '/storage/list' && DEMO_STORAGE_LIST_FIXTURE_RESOURCES.has(url.searchParams.get('resource'))) {
+        return requestRoute.fulfill({ json: { items: [], listComplete: true } });
+      }
+      if (url.pathname === '/resource-presence' && !url.search) {
+        return requestRoute.fulfill({ json: { ok: true, interview: { ready: false } } });
+      }
+    }
     if (request.method() === 'GET' && request.url() === 'https://demo-worker-030226.agalmic.workers.dev/capabilities?slug=') {
       return requestRoute.fulfill({ json: { type: 'ce_worker_capabilities', version: 1, apiVersion: 1, bundle: null, features: [] } });
     }
@@ -180,11 +215,11 @@ function buildDemoReadyInterviewConfig() {
 async function installDemoWorkerFixtureRoutes(page, baseUrl, route) {
   if (!shouldInstallDemoWorkerFixture(baseUrl, route) || !DEMO_READY_WORKER_ORIGIN) return;
 
-  // Demo routes use local questions; setup aliases also warm the unrelated default demo cache.
-  // Its pinned Worker can reject loopback origins, so isolate only these local smoke reads.
+  // Setup, unknown-page checks, and shared demo views also warm the default demo cache.
+  // Isolate its pinned read endpoint so local navigation checks stay independent of live data.
   // Non-local base URLs still exercise the real Worker/CORS path.
   await page.route(`${DEMO_READY_WORKER_ORIGIN}/storage/list?*`, (requestRoute) => {
-    if (!isDemoStorageListFixtureRequest(requestRoute.request().url())) {
+    if (requestRoute.request().method() !== 'GET' || !isDemoStorageListFixtureRequest(requestRoute.request().url())) {
       return requestRoute.fallback();
     }
     return requestRoute.fulfill({
@@ -338,52 +373,37 @@ async function dismissOnboardingIfPresent(page, { timeoutMs }) {
   await overlay.waitFor({ state: 'detached', timeout: timeoutMs });
 }
 
-async function restoreRouteForPresetProbe(page, { baseUrl, route, timeoutMs }) {
-  if (!baseUrl || !route) return;
-  await page.goto(routeUrl(baseUrl, route), { waitUntil: 'domcontentloaded', timeout: timeoutMs });
-  await page.waitForSelector('#root', { state: 'attached', timeout: timeoutMs });
-  await dismissOnboardingIfPresent(page, { timeoutMs });
-}
+const SESSION_SETUP_SECTIONS = Object.freeze([
+  'basics',
+  'context',
+  'questions',
+  'participation',
+  'results',
+  'access',
+  'hosting',
+  'ai',
+]);
 
-async function probeSessionModePresets(page, { timeoutMs, baseUrl, route } = {}) {
+// The one-page setup renders every section and Create, and a caret opens a section.
+async function probeSessionSetup(page, { timeoutMs } = {}) {
   await dismissOnboardingIfPresent(page, { timeoutMs });
-
-  const presets = [
-    ['fast_cheap_cloudflare', 'Centralized'],
-    ['trustless_public_decentralized', 'Decentralized'],
-  ];
   const failures = [];
-
-  for (const [index, [presetId, label]] of presets.entries()) {
-    let preset = page.getByTestId(`ce-new-preset-${presetId}`);
-    if (index > 0 && typeof preset.count === 'function' && (await preset.count()) === 0) {
-      await restoreRouteForPresetProbe(page, { baseUrl, route, timeoutMs });
-      preset = page.getByTestId(`ce-new-preset-${presetId}`);
-    }
-    await preset.waitFor({ state: 'visible', timeout: timeoutMs });
-    if (index > 0) {
-      page.once('dialog', (dialog) => dialog.accept());
-    }
-    await preset.click();
-    let selected = '';
+  for (const key of SESSION_SETUP_SECTIONS) {
     try {
-      selected = await preset.getAttribute('aria-checked', { timeout: 1000 });
+      await page.getByTestId(`ce-setup-section-${key}`).waitFor({ state: 'visible', timeout: timeoutMs });
     } catch (_error) {
-      selected = '';
+      failures.push(`setup section ${key} did not render`);
     }
-    if (selected === 'true') continue;
-
-    if (typeof page.locator === 'function') {
-      try {
-        const bodyText = await page.locator('body').innerText({ timeout: timeoutMs });
-        if (bodyText.includes(`Session Setup (${label})`)) continue;
-      } catch (_error) {
-        // Fall through to the normalized failure below.
-      }
-    }
-    failures.push(`${presetId} did not become the selected session mode`);
   }
-
+  try {
+    await page.getByTestId('ce-wizard-publish').waitFor({ state: 'visible', timeout: timeoutMs });
+  } catch (_error) {
+    failures.push('the Create button did not render');
+  }
+  if (failures.length) return failures;
+  const more = page.getByTestId('ce-setup-more-hosting');
+  await more.click();
+  if ((await more.getAttribute('aria-expanded')) !== 'true') failures.push('the hosting caret did not open its section');
   return failures;
 }
 
@@ -426,8 +446,8 @@ async function probeDefaultPublicPreview(page, { timeoutMs, baseUrl, route } = {
 }
 
 const DEFAULT_ROUTE_PROBES = Object.freeze({
-  '/new': probeSessionModePresets,
-  '/session/new': probeSessionModePresets,
+  '/new': probeSessionSetup,
+  '/session/new': probeSessionSetup,
   '/benchmarks': probeBenchmarkReportFrame,
   '/about': probeDefaultPublicPreview,
 });
@@ -441,7 +461,7 @@ async function inspectRoute(browser, baseUrl, route, options = {}) {
   const failedRequests = [];
   const badResponses = [];
 
-  await installLocalSmokeFixtureRoutes(page, baseUrl);
+  await installLocalSmokeFixtureRoutes(page, baseUrl, route);
 
   await installDemoWorkerFixtureRoutes(page, baseUrl, route);
   const securityPolicyViolations = isLocalSmokeBaseUrl(baseUrl)
@@ -748,7 +768,7 @@ module.exports = {
   normalizeLayoutProbeSelectors,
   normalizeRoutes,
   probeBenchmarkReportFrame,
-  probeSessionModePresets,
+  probeSessionSetup,
   resolveViewport,
   routeUrl,
   runRouteProbe,

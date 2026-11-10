@@ -376,6 +376,13 @@ export const buildCreateSbtCountdownTickPatch = ({ state = {} }: BuildCreateSbtC
 
 export const normalizeComparableAddress = (value: unknown): string => toStr(value).trim().toLowerCase();
 
+/** A create stops before its next upload or send once the account that clicked Create is gone. */
+export const assertCreateSbtAccountUnchanged = (createAccount: unknown, liveAccount: unknown): void => {
+  if (normalizeComparableAddress(createAccount) !== normalizeComparableAddress(liveAccount)) {
+    throw new Error('The connected account changed, so this create stopped. Click Create to try again.');
+  }
+};
+
 export const buildCreateSbtAccountDistributionSyncPatch = ({
   currentDistribution = {},
   nextAccount = '',

@@ -3,7 +3,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildAgentQuestionAnswerSchema } from './agentAnswerSchema.mjs';
 import { canonicalAgentOnlyAnswerProjection, semanticFingerprintForAgentOnlyAnswer, __test__agentOnlyMode } from './agentOnlyMode.mjs';
-import { __test__agentHttp } from './agentHttp.mjs';
+import { normalizeDraftForQuestion } from './participation.mjs';
+import { publicAgentQuestion } from './questions.mjs';
 import { buildAgentResponsePayload } from './onChainResponses.mjs';
 
 const question = { questionId: 'q1', questionType: 'quadratic', options: ['Parks', 'Transit'], voiceCredits: 25 };
@@ -41,11 +42,11 @@ test('agent fingerprints preserve the sign, position, and repeated neutral votes
 
 
 test('agent handoff questions and drafts preserve custom budgets and numeric allocations', () => {
-  assert.equal(__test__agentHttp.publicAgentQuestion(question).voiceCredits, 25);
-  const draft = __test__agentHttp.normalizeDraftForQuestion({ value: [3, -4] }, question);
+  assert.equal(publicAgentQuestion(question).voiceCredits, 25);
+  const draft = normalizeDraftForQuestion({ value: [3, -4] }, question);
   assert.deepEqual(draft.value, { questionType: 'quadratic', value: [3, -4], comments: '' });
   assert.match(draft.label, /Parks: \+3; Transit: -4/);
-  assert.equal(__test__agentHttp.normalizeDraftForQuestion({ value: [4, -4] }, question), null);
+  assert.equal(normalizeDraftForQuestion({ value: [4, -4] }, question), null);
 });
 
 

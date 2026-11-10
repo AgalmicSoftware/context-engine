@@ -31,7 +31,7 @@ import {
 import { usesDemoSessionFixtures } from '../../utilities/demo/demoFixtureSessionSlugs';
 import { serializeFilterState, deserializeFilterState } from '../../utilities/survey/filterStateUtils.js';
 import { createLogger } from 'utilities/logging.js';
-import { listNamespaceEntriesSync, peekCacheSync, writeCache } from '../../utilities/cache/cacheScripts.js';
+import { peekCacheSync, writeCache } from '../../utilities/cache/cacheScripts.js';
 import { measureSync } from '../../utilities/ui/uiPerfStats.js';
 import { readPublicUrlBasePath } from '../../utilities/ui/publicUrl.js';
 import { getSbtDisplayName } from '../../utilities/sbt/sbtDisplayNames.js';
@@ -82,6 +82,7 @@ import {
   resetGeneratedResultsAnalysis,
   resolveGeneratedResultsRuntime,
 } from './onePageSessionGeneratedResultsRuntime';
+import { getBlockedQuestionIdsSet } from '../SurveyTool/surveyToolScope';
 import {
   buildOnePageSessionCanonicalBaseUrl,
   buildOnePageSessionRawResultsRoute,
@@ -249,6 +250,8 @@ class OnePageSession extends Component<any, any> {
       autoOpenResults: routeUiState.autoOpenResults,
       embeddedAtlasNodeId: null,
       embeddedAtlasReturnState: null,
+      // A node of this session's built atlas that a link asked to open.
+      requestedAtlasNodeId: null,
       riskMatrixRestoreState: null,
       aggregatorData: {},
       disclaimersActive: true,
@@ -406,6 +409,7 @@ class OnePageSession extends Component<any, any> {
   }
 
   componentDidMount() {
+    this.openRequestedAtlas();
     const routeUiState = resolveOnePageSessionRouteUiState(this.props);
     this.recordOriginalURL(routeUiState.showQuestions ? buildOnePageSessionCanonicalBaseUrl(this.props) : null);
     captureSessionRecruitmentSource(resolveEffectiveSlug(this.props));
@@ -516,6 +520,8 @@ class OnePageSession extends Component<any, any> {
       props.isResponsesCacheReady ? 1 : 0,
       Number(props.questionResponsesNonce || 0),
       state.demoFixturesLoaded ? 1 : 0,
+      // Reads the stored config, so a page with Results closed, as when recording, skips it.
+      state.showResults ? [...getBlockedQuestionIdsSet(questionCacheSlug)].sort().join(',') : '',
     ].join('|');
   }
 
@@ -1447,7 +1453,6 @@ class OnePageSession extends Component<any, any> {
 
   // Await sufficient balance for gas if possible; otherwise skip (non-blocking UX)
   async waitForSufficientBalance(
-    providerIn: any,
     address: any,
     minimumBalanceWei: any,
     timeoutMs: any = 45000,
@@ -1829,7 +1834,6 @@ class OnePageSession extends Component<any, any> {
 
         // Gate before ANY gas-spending tx
         const hasFundsFirst = await this.waitForSufficientBalance(
-          autoMintProvider,
           userAddr,
           MIN_BALANCE_WEI,
           WAIT_TIMEOUT_MS,
@@ -1845,7 +1849,7 @@ class OnePageSession extends Component<any, any> {
         }
 
         if (path === 'public') {
-          await sbtMintExecutionPort.claim(autoMintProvider, sbtAddr);
+          await sbtMintExecutionPort.claim(autoMintProvider, sbtAddr, mintChainId);
           this.consumeAutoMintAttempt(sbtAddr, userAddr);
           updateStatus(sbtKey, { status: 'success', name: `Joined: ${sbtName || 'Group'}` });
           this.onSbtMintSuccess(sbtAddr);
@@ -1864,6 +1868,7 @@ class OnePageSession extends Component<any, any> {
             sbtAddr,
             String(payload.nonce),
             String(payload.signature),
+            mintChainId,
           );
           this.consumeAutoMintAttempt(sbtAddr, userAddr);
           updateStatus(sbtKey, { status: 'success', name: `Joined: ${sbtName || 'Group'}` });
@@ -1968,7 +1973,7 @@ class OnePageSession extends Component<any, any> {
     assertExpectedAccountCurrent();
 
     this.setState({ mintingStatus: 'pending', lastTransactionType: 'mint' });
-    const tx = await sbtMintExecutionPort.mintWithGroupSignature(provider, sbtAddress, String(sig || ''));
+    const tx = await sbtMintExecutionPort.mintWithGroupSignature(provider, sbtAddress, String(sig || ''), mintChainId);
 
     this.setState({
       mintingStatus: 'success',
@@ -2075,6 +2080,34 @@ class OnePageSession extends Component<any, any> {
       corpusViewerLoadRequestNonce: Number(previousState.corpusViewerLoadRequestNonce || 0) + 1,
     }));
   }
+
+  // An atlas link (/atlas?session=…) lands here: Results open on the atlas, at
+  // its node when one is named, and the address bar keeps the session's own URL.
+  openRequestedAtlas() {
+    try {
+      const url = new URL(window.location.href);
+      const requested = url.searchParams.get('atlas');
+      if (requested === null) return;
+      url.searchParams.delete('atlas');
+      window.history.replaceState(window.history.state, '', url.toString());
+      this._pendingReportScroll = true;
+      this._pendingReportScrollIntent = '';
+      this.setState(
+        {
+          showResults: true,
+          resultsViewMode: 'debateAtlas',
+          requestedAtlasNodeId: requested && requested !== '1' ? requested : null,
+        },
+        this.scrollPendingReportIntoView,
+      );
+    } catch (e) {
+      demoLog.warn('OnePageSession: fallback', e);
+    }
+  }
+
+  handleRequestedAtlasNodeClose = () => {
+    if (this.state.requestedAtlasNodeId) this.setState({ requestedAtlasNodeId: null });
+  };
 
   handleEmbeddedAtlasModalClose() {
     this.setState((prevState: Readonly<OnePageSession['state']>) => {
@@ -2436,7 +2469,7 @@ class OnePageSession extends Component<any, any> {
           agentQuestionSubmitError={this.state.agentQuestionSubmitError}
           agentSessionMeta={this.state.agentSessionMeta}
           agentSubmittedQuestionIds={this.state.agentSubmittedQuestionIds}
-          agentSubmittingQuestionId={this.state.agentSubmittingQuestionId}
+          agentSubmittingQuestionIds={this.state.agentSubmittingQuestionIds}
           workerGroupSessionId={String(agentLoginTarget.sessionId || '')}
           workerGroupWorkerUrl={String(agentLoginTarget.workerUrl || '')}
           titleText={titleText}
@@ -2476,6 +2509,8 @@ class OnePageSession extends Component<any, any> {
         effectiveSlug={effectiveSlug}
         embeddedAtlasNodeId={this.state.embeddedAtlasNodeId}
         embeddedAtlasReturnState={this.state.embeddedAtlasReturnState}
+        requestedAtlasNodeId={this.state.requestedAtlasNodeId}
+        onRequestedAtlasNodeClose={this.handleRequestedAtlasNodeClose}
         embeddedGroupsSessionConfig={embeddedGroupsSessionConfig}
         embeddedGroupsSessionSlug={embeddedGroupsSessionSlug}
         embeddedQuestionSessionSlug={embeddedQuestionSessionSlug}

@@ -80,3 +80,98 @@ it('keeps signed costs, budget clamps, reset, drafts, and submission in the reta
   fireEvent.click(screen.getByRole('button', { name: 'Next agent question' }));
   expect(screen.getByRole('textbox', { name: 'Answer' })).toHaveValue('Local draft');
 });
+
+it('keeps either pending answer disabled while navigating between concurrent submissions', () => {
+  const questions = ['first', 'second'].map((id) => ({ ...question, id, questionId: id }));
+  const props = {
+    questions,
+    status: 'loaded',
+    canSubmit: true,
+    onSubmitAnswer: jest.fn(),
+    onActiveIndexChange: jest.fn(),
+  };
+  const { rerender } = render(
+    <AgentQuestionPile {...props} activeIndex={0} submittingQuestionIds={new Set(['first', 'second'])} />,
+  );
+  expect(screen.getByRole('button', { name: 'Submitting' })).toBeDisabled();
+  rerender(<AgentQuestionPile {...props} activeIndex={1} submittingQuestionIds={new Set(['first', 'second'])} />);
+  expect(screen.getByRole('button', { name: 'Submitting' })).toBeDisabled();
+  rerender(<AgentQuestionPile {...props} activeIndex={0} submittingQuestionIds={new Set(['second'])} />);
+  expect(screen.getByRole('button', { name: 'Submit' })).toBeEnabled();
+  rerender(<AgentQuestionPile {...props} activeIndex={1} submittingQuestionIds={new Set(['second'])} />);
+  expect(screen.getByRole('button', { name: 'Submitting' })).toBeDisabled();
+});
+
+describe('question constraints', () => {
+  const renderOne = (asked: AgentQuestion) => {
+    const onSubmitAnswer = jest.fn();
+    render(
+      <AgentQuestionPile
+        activeIndex={0}
+        canSubmit
+        questions={[asked]}
+        status="loaded"
+        onActiveIndexChange={jest.fn()}
+        onSubmitAnswer={onSubmitAnswer}
+      />,
+    );
+    return onSubmitAnswer;
+  };
+  const rating = (scale?: AgentQuestion['scale']): AgentQuestion => ({
+    ...question,
+    type: 'rating',
+    questionType: 'rating',
+    options: [],
+    ...(scale ? { scale } : {}),
+  });
+
+  it('asks a rating on its own scale, showing its end labels and starting on its grid', () => {
+    const asked = rating({ min: -0.5, max: 0.5, step: 0.1, minLabel: 'Less', maxLabel: 'More' });
+    const onSubmitAnswer = renderOne(asked);
+    const slider = screen.getByRole('slider');
+    expect(slider).toHaveAttribute('min', '-0.5');
+    expect(slider).toHaveAttribute('max', '0.5');
+    expect(slider).toHaveAttribute('step', '0.1');
+    expect(screen.getByText('Less')).toBeInTheDocument();
+    expect(screen.getByText('More')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Submit' }));
+    expect(onSubmitAnswer).toHaveBeenLastCalledWith(asked, { value: 0 });
+    fireEvent.change(slider, { target: { value: '0.3' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Submit' }));
+    expect(onSubmitAnswer).toHaveBeenLastCalledWith(asked, { value: 0.3 });
+  });
+
+  it.each([
+    [{ min: 1, max: 5, minLabel: '1', maxLabel: '5' }, 3],
+    [{ min: 0, max: 10, step: 2, minLabel: '0', maxLabel: '10' }, 6],
+    [{ min: 0, max: 10, step: 3, minLabel: '0', maxLabel: '10' }, 6],
+  ])('starts %j on an answer that scale accepts', (scale, start) => {
+    const asked = rating(scale);
+    const onSubmitAnswer = renderOne(asked);
+    fireEvent.click(screen.getByRole('button', { name: 'Submit' }));
+    expect(onSubmitAnswer).toHaveBeenLastCalledWith(asked, { value: start });
+  });
+
+  it('keeps the default scale for a question that names none', () => {
+    const asked = rating();
+    const onSubmitAnswer = renderOne(asked);
+    expect(screen.getByRole('slider')).toHaveAttribute('max', '10');
+    fireEvent.click(screen.getByRole('button', { name: 'Submit' }));
+    expect(onSubmitAnswer).toHaveBeenLastCalledWith(asked, { value: 5 });
+  });
+
+  it('lets a single-choice question hold one option at a time', () => {
+    const asked: AgentQuestion = {
+      ...question,
+      type: 'multichoice',
+      questionType: 'multichoice',
+      options: ['Parks', 'Transit'],
+      singleSelect: true,
+    };
+    const onSubmitAnswer = renderOne(asked);
+    fireEvent.click(screen.getByLabelText('Parks'));
+    fireEvent.click(screen.getByLabelText('Transit'));
+    fireEvent.click(screen.getByRole('button', { name: 'Submit' }));
+    expect(onSubmitAnswer).toHaveBeenLastCalledWith(asked, { values: ['Transit'] });
+  });
+});

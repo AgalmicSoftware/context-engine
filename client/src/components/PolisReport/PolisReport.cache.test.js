@@ -1,4 +1,5 @@
 import React from 'react';
+import { fetchWorkerWithAuth } from '../../utilities/worker/workerAuth.js';
 import { fireEvent, render, screen, within, waitFor } from '@testing-library/react';
 import PolisReport, {
   applyFilterStateToAggregator,
@@ -24,22 +25,49 @@ import PolisReport, {
   shouldAutoEnablePolisDemoData,
 } from './PolisReport';
 import { buildReportResponseStats } from './polisReportAnswers';
-import { buildUmapParticipantData, rememberClusterAnalysis } from './polisReportRuntime';
+import { buildUmapParticipantData, clusterExploratoryPoints, rememberClusterAnalysis } from './polisReportRuntime';
 import { CHART_SERIES_COLORS } from '../../utilities/ui/chartColors';
-import { doUMAP } from '../../utilities/survey/consensusMath';
-import { computePolisCommentStats, computePolisConversationMath } from '../../utilities/survey/consensusReportMath.js';
+import { clusterUMAPPointsKmeans, doUMAP } from '../../utilities/survey/consensusMath';
+import {
+  computePolisCommentStats,
+  computePolisConversationMath,
+  findRepresentativeQuestions,
+} from '../../utilities/survey/consensusReportMath.js';
+import { analyzeClusterOpinions } from '../../utilities/ai/aiClient.js';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import * as sessionScanScope from '../../utilities/session/sessionScanScope.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
+import { saveCanvasAsPagedPdf } from '../../utilities/ui/browserPdfExport';
 import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../../utilities/session/sessionModeProfile';
 import {
   resolveWorkerCanonicalCacheIdentity,
   withWorkerCanonicalCacheIdentity,
 } from '../../utilities/survey/workerCanonicalCacheIdentity';
 
+jest.mock('html2canvas', () => ({
+  __esModule: true,
+  default: jest.fn(async () => ({ width: 100, height: 100 })),
+}));
+jest.mock('jspdf', () => ({ __esModule: true, jsPDF: function JsPdfStub() {} }));
+jest.mock('../../utilities/ui/browserPdfExport', () => ({
+  ...jest.requireActual('../../utilities/ui/browserPdfExport'),
+  saveCanvasAsPagedPdf: jest.fn(),
+}));
+
+jest.mock('../../utilities/worker/workerAuth.js', () => ({
+  ...jest.requireActual('../../utilities/worker/workerAuth.js'),
+  fetchWorkerWithAuth: jest.fn(),
+}));
+
 jest.mock('../../utilities/cache/cacheScripts.js', () => ({
   peekCacheSync: jest.fn(() => ({})),
 }));
+
+// The real client, so the sponsored analysis tests below reach the Worker; one test replaces its answers.
+jest.mock('../../utilities/ai/aiClient.js', () => {
+  const actual = jest.requireActual('../../utilities/ai/aiClient.js');
+  return { ...actual, analyzeClusterOpinions: jest.fn(actual.analyzeClusterOpinions) };
+});
 
 jest.mock('../../utilities/survey/consensusMath', () => ({
   clusterUMAPPointsKmeans: jest.fn((points = []) => new Array(points.length).fill(0)),
@@ -58,6 +86,7 @@ jest.mock('../../utilities/survey/consensusReportMath.js', () => ({
     statementCoords: [],
     commentStats: [],
     clusterAssignments: [],
+    analyticalClusterAssignments: [],
     clusterCount: 0,
     repQuestions: {},
   })),
@@ -140,6 +169,24 @@ const openSettingsRow = () => {
   const btn = screen.queryByLabelText('Show report settings');
   if (btn) fireEvent.click(btn);
 };
+
+describe('PolisReport PDF export', () => {
+  const account = '0x9999999999999999999999999999999999999999';
+  const downloadPdf = async (props) => {
+    saveCanvasAsPagedPdf.mockClear();
+    const view = render(<PolisReport {...baseReportProps} slug="demo" {...props} />);
+    openSettingsRow();
+    fireEvent.click(screen.getByRole('button', { name: /Download as PDF/ }));
+    await waitFor(() => expect(saveCanvasAsPagedPdf).toHaveBeenCalledTimes(1));
+    view.unmount();
+    return saveCanvasAsPagedPdf.mock.calls[0][0];
+  };
+
+  it('stamps the file with the signed-in exporter, and with no one otherwise', async () => {
+    expect((await downloadPdf({ account, loginComplete: true })).exporter).toBe(account);
+    expect((await downloadPdf({ account, loginComplete: false })).exporter).toBe('');
+  });
+});
 
 describe('PolisReport session description', () => {
   const introduction = 'Short questions about institutions and AI.';
@@ -259,9 +306,26 @@ describe('PolisReport cache read options', () => {
       statementCoords: [],
       commentStats: [],
       clusterAssignments: [],
+      analyticalClusterAssignments: [],
       clusterCount: 0,
       repQuestions: {},
     });
+  });
+
+  it('plots one participant without calling UMAP', () => {
+    const point = { x: 0, y: 0, index: 0 };
+    computePolisConversationMath.mockReturnValue({
+      stats: { nParticipants: 1, nComments: 1, totalVotes: 1 },
+      participantCoords: [point],
+      statementCoords: [],
+      commentStats: [],
+      clusterAssignments: [0],
+      clusterCount: 1,
+      repQuestions: { 0: [] },
+    });
+    render(<PolisReport {...baseReportProps} slug="one-voter" questionResponses={seededQuestionResponses} />);
+    expect(doUMAP).not.toHaveBeenCalled();
+    expect(screen.queryByText('(Not enough participant data to plot.)')).not.toBeInTheDocument();
   });
 
   it('plots two participants without calling UMAP with an impossible neighbor count', () => {
@@ -599,6 +663,39 @@ describe('PolisReport cache read options', () => {
     ]);
   });
 
+  it('forms exploratory groups from the analysis and shows everyone else in the nearest one', () => {
+    const previousClustering = clusterUMAPPointsKmeans.getMockImplementation();
+    clusterUMAPPointsKmeans.mockImplementation((points = []) => points.map((point) => (point.x < 5 ? 0 : 1)));
+    // Out of participant order, as the math's coordinates can be.
+    const points = [
+      { x: 10, y: 0, index: 3 },
+      { x: 0, y: 0, index: 0 },
+      { x: 9, y: 0, index: 1 },
+      { x: 1, y: 0, index: 2 },
+    ];
+
+    expect(clusterExploratoryPoints(points, [0, 3], 2, 7)).toEqual({
+      assignments: [0, 1, 0, 1],
+      analytical: [0, -1, -1, 1],
+    });
+    expect(clusterUMAPPointsKmeans.mock.lastCall).toEqual([[points[0], points[1]], 2, 7]);
+    // Without a member list, everyone counts.
+    expect(clusterExploratoryPoints(points, undefined, 2, 7).analytical).toEqual([0, 1, 0, 1]);
+    // Too few members for the groups asked for: one group, not an error.
+    expect(clusterExploratoryPoints(points, [0], 2, 7)).toEqual({
+      assignments: [0, 0, 0, 0],
+      analytical: [0, -1, -1, -1],
+    });
+    clusterUMAPPointsKmeans.mockImplementation(previousClustering);
+  });
+
+  it('gives every participant a UMAP row when a question has fewer responses', () => {
+    expect(buildUmapParticipantData([[1], [1, -1]])).toEqual([
+      [1, 1],
+      [1, -1],
+    ]);
+  });
+
   it('runs UMAP on voters only, with skipped votes mean-filled', async () => {
     const row = (responder, qid, value, extra = {}) => ({
       responder,
@@ -703,7 +800,7 @@ describe('PolisReport cache read options', () => {
   it('keeps participant graph tooltip copy aligned with the Polis graph modes', () => {
     expect(REPORT_DEFAULT_EMBEDDING_LABEL).toBe('Polis Auto');
     expect(PARTICIPANTS_GRAPH_TOOLTIP_TEXT).toBe(
-      "This diagram opens in UMAP with 3 clusters. Switch to SVD/PCA for the PCA view, or Polis Auto for the report's Polis-inspired automatic clustering.",
+      "This diagram opens in UMAP with 3 clusters. Switch to SVD/PCA for the PCA view, or Polis Auto for the report's Polis-inspired automatic clustering. People with too few answers appear in their nearest cluster but aren't counted in its results.",
     );
     expect(REPORT_DEFAULT_EMBEDDING_TOOLTIP_TEXT).toBe(
       "Polis Auto uses Context Engine's Polis-inspired automatic clustering. It keeps the report's PCA-based participant layout and auto-selects opinion clusters from that layout. UMAP and SVD/PCA are exploratory views where you can override K manually. This is Polis-inspired analysis inside Context Engine, not an official Polis/Pol.is integration or endorsement.",
@@ -993,6 +1090,79 @@ describe('PolisReport cache read options', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
     await waitFor(() => expect(onRetryLoad).toHaveBeenCalledTimes(1));
+  });
+
+  describe('a failed load when only signed-in people can read answers', () => {
+    const session = (visibility) => ({
+      sessionModeProfile: { authority: { mode: 'worker_canonical' }, results: { visibility } },
+    });
+    const failedLoad = {
+      ...baseReportProps,
+      slug: 'edge',
+      isResponsesCacheReady: false,
+      cacheInitializationError: true,
+      onRetryLoad: () => {},
+    };
+
+    it('asks a signed-out visitor to log in, because a retry cannot help', () => {
+      const onRequestLogin = jest.fn();
+      render(
+        <PolisReport
+          {...failedLoad}
+          sessionConfig={session('participant_aggregate')}
+          onRequestLogin={onRequestLogin}
+        />,
+      );
+
+      expect(screen.getByText('Log in to see your answers.')).toBeInTheDocument();
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('Loading report')).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'Log in' }));
+      expect(onRequestLogin).toHaveBeenCalledTimes(1);
+    });
+
+    it('still asks a wallet that has not finished logging in', () => {
+      render(
+        <PolisReport
+          {...failedLoad}
+          account="0xabc"
+          loginComplete={false}
+          sessionConfig={session('participant_aggregate')}
+        />,
+      );
+
+      expect(screen.getByText('Log in to see your answers.')).toBeInTheDocument();
+    });
+
+    it('keeps the retry for someone logged in, whose load really failed', () => {
+      render(
+        <PolisReport {...failedLoad} account="0xabc" loginComplete sessionConfig={session('participant_aggregate')} />,
+      );
+
+      expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+      expect(screen.queryByText('Log in to see your answers.')).not.toBeInTheDocument();
+    });
+
+    it('keeps the retry on a session with public Results', () => {
+      render(<PolisReport {...failedLoad} sessionConfig={session('public_full_if_storage_public')} />);
+
+      expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+      expect(screen.queryByText('Log in to see your answers.')).not.toBeInTheDocument();
+    });
+
+    it('keeps showing a report it can render, even after a failed load', async () => {
+      render(
+        <PolisReport
+          {...failedLoad}
+          questionResponses={seededQuestionResponses}
+          sessionConfig={session('participant_aggregate')}
+        />,
+      );
+
+      expect(await screen.findByText('Summary and Statistics')).toBeInTheDocument();
+      expect(screen.queryByText('Log in to see your answers.')).not.toBeInTheDocument();
+    });
   });
 
   it('shows block-count loading progress under the Polis spinner when scoped question scan progress is available', () => {
@@ -1468,6 +1638,158 @@ describe('PolisReport demo data defaults', () => {
     expect(screen.getByTitle(participantLabel)).toBeInTheDocument();
     ['Binary', 'Freeform', 'Ratings', 'Multiple choice', 'Quadratic allocation'].forEach((name) => {
       expect(screen.getByRole('button', { name })).toHaveAttribute('aria-expanded', 'true');
+    });
+  });
+
+  describe('people outside the analysis', () => {
+    // Four people answered; the second answered too little to be in the analysis, but is shown in group 0.
+    const responseRow = (responder, value) => ({
+      responder,
+      questionId: 'q1',
+      response: JSON.stringify({ type: 'binary', prompt: 'Prompt', answer: { value } }),
+    });
+    const questionResponses = {
+      q1: [
+        responseRow('p0', 'Agree'),
+        responseRow('p1', 'Disagree'),
+        responseRow('p2', 'Disagree'),
+        responseRow('p3', 'Disagree'),
+      ],
+    };
+    const analysis = { short: 'Summary', long: 'Long summary', name: 'Group' };
+    // Later tests rely on the mocks they find, so these are put back.
+    let previousMath;
+    let previousClustering;
+
+    beforeEach(() => {
+      previousMath = computePolisConversationMath.getMockImplementation();
+      previousClustering = clusterUMAPPointsKmeans.getMockImplementation();
+      analyzeClusterOpinions.mockReset();
+      analyzeClusterOpinions.mockResolvedValue(analysis);
+      computePolisConversationMath.mockReturnValue({
+        stats: { nParticipants: 4, nComments: 1, totalVotes: 4, votesPerVoterAvg: 1 },
+        participantCoords: [
+          { x: 0, y: 0, index: 0 },
+          { x: 0.1, y: 0, index: 1 },
+          { x: 1, y: 0, index: 2 },
+          { x: 1.1, y: 0, index: 3 },
+        ],
+        statementCoords: [{ x: 0, y: 0, index: 0 }],
+        commentStats: [],
+        clusterAssignments: [0, 0, 1, 1],
+        analyticalClusterAssignments: [0, -1, 1, 1],
+        inConversationParticipantIndices: [0, 2, 3],
+        clusterCount: 2,
+        repQuestions: {
+          0: [{ label: '#1', questionIndex: 0, prompt: 'Prompt', difference: 0.5, repfulFor: 'agree' }],
+          1: [{ label: '#1', questionIndex: 0, prompt: 'Prompt', difference: 0.5, repfulFor: 'disagree' }],
+        },
+      });
+      findRepresentativeQuestions.mockImplementation((_matrix, assignments) =>
+        Object.fromEntries(
+          [...new Set(assignments.filter((group) => group >= 0))].map((group) => [
+            group,
+            [
+              {
+                label: '#1',
+                questionIndex: 0,
+                prompt: 'Prompt',
+                difference: 0.5,
+                repfulFor: group ? 'disagree' : 'agree',
+              },
+            ],
+          ]),
+        ),
+      );
+      // The first person is one group, everyone else the other.
+      clusterUMAPPointsKmeans.mockImplementation((points = []) => points.map((_, position) => (position ? 1 : 0)));
+    });
+
+    afterEach(() => {
+      computePolisConversationMath.mockImplementation(previousMath);
+      clusterUMAPPointsKmeans.mockImplementation(previousClustering);
+      findRepresentativeQuestions.mockImplementation(() => ({}));
+      analyzeClusterOpinions.mockReset();
+      analyzeClusterOpinions.mockImplementation(
+        jest.requireActual('../../utilities/ai/aiClient.js').analyzeClusterOpinions,
+      );
+    });
+
+    const expectAnalysedCounts = async () => {
+      fireEvent.click(await screen.findByLabelText('Expand Clusters'));
+      expect(await screen.findByText('100% agree in this cluster · 33% overall')).toBeInTheDocument();
+      expect(screen.getByText('100% disagree in this cluster · 67% overall')).toBeInTheDocument();
+      // Each section's bar, then the other cluster's beside it: nobody's vote is counted for the second person.
+      expect(screen.getAllByRole('img', { name: 'Agree 1, unsure 0, disagree 0' })).toHaveLength(2);
+      expect(screen.getAllByRole('img', { name: 'Agree 0, unsure 0, disagree 2' })).toHaveLength(2);
+
+      fireEvent.click(await screen.findByTestId(E2E_TESTIDS.POLIS_ANALYZE_CLUSTERS));
+      await waitFor(() => expect(analyzeClusterOpinions).toHaveBeenCalled());
+      expect(analyzeClusterOpinions.mock.calls[0][0]).toEqual(
+        expect.objectContaining({
+          clusterIndex: 0,
+          clusterSize: 1,
+          topStatements: [
+            expect.objectContaining({
+              cluster: expect.objectContaining({ agree: 1, disagree: 0, responded: 1 }),
+              overall: expect.objectContaining({ agree: 1, disagree: 2, responded: 3 }),
+            }),
+          ],
+        }),
+      );
+      expect(analyzeClusterOpinions.mock.calls[0][1]).toEqual(expect.objectContaining({ sizes: { 0: 1, 1: 2 } }));
+    };
+
+    it('keeps each group the same colour on the map and in comparisons', async () => {
+      // Group 0 is too small for an outline, so group 1 is the first one drawn.
+      computePolisConversationMath.mockReturnValue({
+        ...computePolisConversationMath(),
+        clusterAssignments: [0, 1, 1, 1],
+        analyticalClusterAssignments: [0, 1, 1, 1],
+        inConversationParticipantIndices: [0, 1, 2, 3],
+      });
+      const { container } = render(
+        <PolisReport {...baseReportProps} slug="edge" questionResponses={questionResponses} />,
+      );
+
+      fireEvent.change(screen.getByDisplayValue('UMAP'), { target: { value: 'POLIS' } });
+      await screen.findByDisplayValue(REPORT_DEFAULT_EMBEDDING_LABEL);
+      fireEvent.click(await screen.findByLabelText('Expand Clusters'));
+
+      const dots = [...container.querySelectorAll('circle[r="5"]')].map((dot) => dot.getAttribute('fill'));
+      expect(dots).toEqual([
+        POLIS_CLUSTER_COLORS[0],
+        POLIS_CLUSTER_COLORS[1],
+        POLIS_CLUSTER_COLORS[1],
+        POLIS_CLUSTER_COLORS[1],
+      ]);
+      // Cluster 1 is the first name in Cluster 0's comparison, which once gave it the first colour.
+      const comparison = (await screen.findAllByText('Cluster 1')).find((label) => label.style.color);
+      expect(comparison.getAttribute('style')).toContain(POLIS_CLUSTER_COLORS[1]);
+    });
+
+    it('leaves them out of counts in the default UMAP view', async () => {
+      render(<PolisReport {...baseReportProps} slug="edge" questionResponses={questionResponses} />);
+
+      await waitFor(() => expect(clusterUMAPPointsKmeans).toHaveBeenCalled());
+      expect(clusterUMAPPointsKmeans.mock.lastCall[0].map((point) => point.index)).toEqual([0, 2, 3]);
+      await expectAnalysedCounts();
+    });
+
+    it('leaves them out of counts after the group count is set by hand', async () => {
+      render(<PolisReport {...baseReportProps} slug="edge" questionResponses={questionResponses} />);
+
+      fireEvent.change(screen.getByDisplayValue('UMAP'), { target: { value: 'SVD' } });
+      await screen.findByDisplayValue('SVD/PCA');
+      await expectAnalysedCounts();
+    });
+
+    it('leaves them out of counts in Polis Auto', async () => {
+      render(<PolisReport {...baseReportProps} slug="edge" questionResponses={questionResponses} />);
+
+      fireEvent.change(screen.getByDisplayValue('UMAP'), { target: { value: 'POLIS' } });
+      await screen.findByDisplayValue(REPORT_DEFAULT_EMBEDDING_LABEL);
+      await expectAnalysedCounts();
     });
   });
 
@@ -2385,6 +2707,99 @@ it.each([
   });
 });
 
+it('adds how well AIs predicted people below the summary, when the session turns it on', async () => {
+  // Cached metadata is keyed by question ID, without repeating it inside.
+  cacheScripts.peekCacheSync.mockImplementation((namespace) =>
+    namespace === 'questionsCache' ? { 84532: { questions: { q1: { type: 'binary', prompt: 'First' } } } } : {},
+  );
+  const responses = {
+    q1: Array.from({ length: 5 }, (_, index) => ({
+      responder: `0x${String(index + 1).repeat(40)}`,
+      questionId: 'q1',
+      response: JSON.stringify({
+        questionID: 'q1',
+        answer: { value: index < 4 ? 'Agree' : 'Disagree', encrypted: false },
+        interviewProvenance: {
+          draftOrigin: 'external_prefill',
+          source: { platform: 'claude', modelId: 'test-model' },
+          originalPrediction: { answer: 'Agree', confidence: 0.8 },
+          predictionCondition: 'shown',
+          confidenceMeaning: 'keep',
+        },
+      }),
+    })),
+  };
+  try {
+    const { rerender } = render(
+      <PolisReport
+        {...baseReportProps}
+        slug="fidelity-report"
+        questionResponses={responses}
+        sessionConfig={{ interviewMode: { showFidelityResults: true } }}
+      />,
+    );
+    const section = await screen.findByTestId(E2E_TESTIDS.SESSION_RESULTS_FIDELITY);
+    expect(section).toHaveTextContent('5 AI-drafted answers from 5 people');
+    expect(within(section).getByRole('group', { name: 'Mirror Score' })).toHaveTextContent('80%');
+    const summary = screen.getByText('Summary and Statistics');
+    expect(summary.compareDocumentPosition(section) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    rerender(
+      <PolisReport {...baseReportProps} slug="fidelity-report" questionResponses={responses} sessionConfig={{}} />,
+    );
+    expect(screen.queryByTestId(E2E_TESTIDS.SESSION_RESULTS_FIDELITY)).not.toBeInTheDocument();
+  } finally {
+    cacheScripts.peekCacheSync.mockImplementation(() => ({}));
+  }
+});
+
+it("scores only the report's filtered responses", async () => {
+  cacheScripts.peekCacheSync.mockImplementation((namespace) =>
+    namespace === 'questionsCache'
+      ? {
+          84532: {
+            questions: {
+              q1: { type: 'binary', prompt: 'First', tags: ['kept'] },
+              q2: { type: 'binary', prompt: 'Second', tags: ['other'] },
+            },
+          },
+        }
+      : {},
+  );
+  const rows = (questionId) =>
+    Array.from({ length: 5 }, (_, index) => ({
+      responder: `0x${String(index + 1).repeat(40)}`,
+      questionId,
+      response: JSON.stringify({
+        questionID: questionId,
+        answer: { value: 'Agree', encrypted: false },
+        interviewProvenance: {
+          draftOrigin: 'external_prefill',
+          source: { platform: 'claude', modelId: 'test-model' },
+          originalPrediction: { answer: 'Agree', confidence: 0.8 },
+          predictionCondition: 'shown',
+          confidenceMeaning: 'keep',
+        },
+      }),
+    }));
+  try {
+    render(
+      <PolisReport
+        {...baseReportProps}
+        slug="fidelity-filtered"
+        questionResponses={{ q1: rows('q1'), q2: rows('q2') }}
+        filterState={{ selectedTags: ['kept'] }}
+        sessionConfig={{ interviewMode: { showFidelityResults: true } }}
+      />,
+    );
+    expect(await screen.findByTestId(E2E_TESTIDS.SESSION_RESULTS_FIDELITY)).toHaveTextContent(
+      '5 AI-drafted answers from 5 people',
+    );
+  } finally {
+    cacheScripts.peekCacheSync.mockImplementation(() => ({}));
+  }
+});
+
 it('ranks top questions by importance before conviction', () => {
   const row = (responder, questionID, importance, conviction) => ({
     responder,
@@ -2400,4 +2815,114 @@ it('ranks top questions by importance before conviction', () => {
     '',
   );
   expect(Object.keys(out)).toEqual(['highImportance']);
+});
+
+describe('Polis sponsored cluster analysis', () => {
+  const account = '0x0000000000000000000000000000000000000001';
+  const provider = { request: jest.fn() };
+  const config = {
+    slug: 'sponsored-polis',
+    corsWorkerUrl: 'https://sponsored-polis.example.test/',
+    sessionId: '0x' + '9'.repeat(32),
+    sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+    ai: {
+      models: {
+        fast: { provider: 'openai', model: 'gpt-5.6-terra' },
+        thinking: { provider: 'openai', model: 'gpt-5.6-terra' },
+      },
+    },
+  };
+  const reply = () => ({
+    ok: true,
+    json: async () => ({
+      completion: JSON.stringify({
+        name: 'Shared infrastructure',
+        short: 'Support shared tools',
+        long: 'The sponsored model described this group from its recorded votes.',
+      }),
+    }),
+  });
+  const showReport = async (mode = 'POLIS') => {
+    render(
+      <PolisReport
+        {...baseReportProps}
+        network={null}
+        networkChainId={null}
+        sessionSlug={config.slug}
+        sessionConfig={config}
+        account={account}
+        provider={provider}
+        questionResponses={{
+          seedQuestion: [0, 1, 2].map((index) => ({
+            ...seededQuestionResponses.seedQuestion[0],
+            responder: `0xparticipant${index}`,
+          })),
+        }}
+      />,
+    );
+    if (mode === 'POLIS') fireEvent.change(screen.getByDisplayValue('UMAP'), { target: { value: 'POLIS' } });
+    return screen.findByTestId(E2E_TESTIDS.POLIS_ANALYZE_CLUSTERS);
+  };
+
+  beforeEach(() => {
+    localStorage.clear();
+    fetchWorkerWithAuth.mockReset().mockResolvedValue(reply());
+    const identity = resolveWorkerCanonicalCacheIdentity({ sessionConfig: config, sessionSlug: config.slug });
+    cacheScripts.peekCacheSync.mockImplementation((namespace) =>
+      namespace === 'questionsCache'
+        ? {
+            worker: withWorkerCanonicalCacheIdentity(
+              { questions: { seedQuestion: { type: 'binary', prompt: 'Seed prompt' } } },
+              identity,
+            ),
+          }
+        : {},
+    );
+    computePolisConversationMath.mockReturnValue({
+      stats: { nParticipants: 3, nComments: 1, totalVotes: 3 },
+      participantCoords: [0, 1, 2].map((index) => ({ x: index, y: index, index })),
+      statementCoords: [],
+      commentStats: [],
+      clusterAssignments: [0, 0, 0],
+      clusterCount: 1,
+      repQuestions: { 0: [] },
+    });
+  });
+
+  it.each(['UMAP', 'POLIS'])('uses the loaded sponsored model and viewer context in %s', async (mode) => {
+    fireEvent.click(await showReport(mode));
+    expect(await screen.findByText('Cluster 0: Shared infrastructure')).toBeInTheDocument();
+    expect(screen.getByText('The sponsored model described this group from its recorded votes.')).toBeInTheDocument();
+    expect(fetchWorkerWithAuth).toHaveBeenCalledTimes(1);
+    const [url, request, options] = fetchWorkerWithAuth.mock.calls[0];
+    expect(url).toBe('https://sponsored-polis.example.test/ai');
+    expect(JSON.parse(request.body)).toMatchObject({
+      action: 'ai',
+      provider: 'openai',
+      model: 'gpt-5.6-terra',
+      taskType: 'summarize',
+    });
+    expect(JSON.parse(request.body)).not.toHaveProperty('apiKey');
+    expect(options).toMatchObject({
+      sessionSlug: config.slug,
+      sessionConfig: config,
+      context: { account, providerLike: provider },
+      preferAnonymous: true,
+    });
+    expect(provider.request).not.toHaveBeenCalled();
+  });
+
+  it('shows a sponsored request failure and retries without caching a heuristic as AI output', async () => {
+    fetchWorkerWithAuth.mockResolvedValue({ ok: false, json: async () => ({ error: 'Synthetic AI access denied' }) });
+    const button = await showReport();
+    fireEvent.click(button);
+    expect(await screen.findByText(/Couldn’t analyze this cluster: Synthetic AI access denied/)).toBeInTheDocument();
+    expect(screen.getByTestId(E2E_TESTIDS.POLIS_CLUSTER_ANALYSIS)).toHaveAttribute('data-ce-analysis-state', 'error');
+    await waitFor(() => expect(button).toBeEnabled());
+    fetchWorkerWithAuth.mockResolvedValue(reply());
+    fireEvent.click(button);
+    expect(await screen.findByText('Cluster 0: Shared infrastructure')).toBeInTheDocument();
+    expect(screen.queryByText(/Couldn’t analyze this cluster/)).not.toBeInTheDocument();
+    expect(screen.getByTestId(E2E_TESTIDS.POLIS_CLUSTER_ANALYSIS)).toHaveAttribute('data-ce-analysis-state', 'ready');
+  });
 });

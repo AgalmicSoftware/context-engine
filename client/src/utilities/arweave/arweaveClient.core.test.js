@@ -167,7 +167,7 @@ describe('arweaveClient.downloadDataFromArweave', () => {
       arweaveClient.downloadDataFromArweave('missingtx', {
         gateways: [TEST_ARWEAVE_GATEWAY],
         retries: 0,
-        bypassCache: true,
+        cacheBypass: true,
       }),
     ).rejects.toMatchObject({
       name: 'ArweaveFetchError',
@@ -282,7 +282,7 @@ describe('arweaveClient.downloadDataFromArweave', () => {
       arweaveClient.downloadDataFromArweave(txId, {
         gateways: [TEST_ARWEAVE_GATEWAY],
         retries: 0,
-        bypassFailureCache: true,
+        cacheBypass: true,
       }),
     ).rejects.toMatchObject({
       name: 'ArweaveFetchError',
@@ -305,7 +305,7 @@ describe('arweaveClient.downloadDataFromArweave', () => {
       arweaveClient.downloadDataFromArweave('missingtx2', {
         gateways: [TEST_ARWEAVE_GATEWAY, TEST_ARWEAVE_BACKUP_GATEWAY],
         retries: 3,
-        bypassCache: true,
+        cacheBypass: true,
       }),
     ).rejects.toMatchObject({
       name: 'ArweaveFetchError',
@@ -328,7 +328,7 @@ describe('arweaveClient.downloadDataFromArweave', () => {
       arweaveClient.downloadDataFromArweave('missingtx-question-metadata', {
         gateways: [TEST_ARWEAVE_GATEWAY, TEST_ARWEAVE_BACKUP_GATEWAY, TEST_AR_IO_GATEWAY],
         retries: 3,
-        bypassCache: true,
+        cacheBypass: true,
         disableExistencePrecheck: true,
         debugContext: { category: 'question_metadata' },
       }),
@@ -364,7 +364,7 @@ describe('arweaveClient.downloadDataFromArweave', () => {
       arweaveClient.downloadDataFromArweave('mixed-gateway-error', {
         gateways: [TEST_ARWEAVE_GATEWAY],
         retries: 0,
-        bypassCache: true,
+        cacheBypass: true,
         disableExistencePrecheck: true,
         debugContext: { category: 'question_metadata' },
       }),
@@ -409,7 +409,7 @@ describe('arweaveClient.downloadDataFromArweave', () => {
 
     const text = await arweaveClient.downloadDataFromArweave('runtime-fallback-tx', {
       retries: 0,
-      bypassCache: true,
+      cacheBypass: true,
       disableExistencePrecheck: true,
       debugContext: { category: 'question_metadata' },
     });
@@ -437,7 +437,7 @@ describe('arweaveClient.downloadDataFromArweave', () => {
     const text = await arweaveClient.downloadDataFromArweave(`https://example.example.test/ar/${txId}?view=1`, {
       gateways: [TEST_ARWEAVE_GATEWAY],
       retries: 0,
-      bypassCache: true,
+      cacheBypass: true,
       disableExistencePrecheck: true,
     });
 
@@ -476,7 +476,7 @@ describe('arweaveClient.downloadDataFromArweave', () => {
       gateways: [TEST_ARWEAVE_GATEWAY],
       retries: 1,
       retryDelayMs: 0,
-      bypassCache: true,
+      cacheBypass: true,
       disableExistencePrecheck: true,
       debugContext: { category: 'question_metadata' },
     });
@@ -506,7 +506,7 @@ describe('arweaveClient.downloadDataFromArweave', () => {
     const text = await arweaveClient.downloadDataFromArweave(txId, {
       gateways: [TEST_ARWEAVE_GATEWAY, TEST_ARWEAVE_BACKUP_GATEWAY],
       retries: 0,
-      bypassCache: true,
+      cacheBypass: true,
       disableExistencePrecheck: true,
       debugContext: { category: 'question_response_payload' },
     });
@@ -540,7 +540,7 @@ describe('arweaveClient.downloadDataFromArweave', () => {
     const text = await arweaveClient.downloadDataFromArweave(txId, {
       gateways: [TEST_ARWEAVE_GATEWAY, TEST_ARWEAVE_BACKUP_GATEWAY],
       retries: 0,
-      bypassCache: true,
+      cacheBypass: true,
       disableExistencePrecheck: true,
       debugContext: { category: 'question_response_payload' },
     });
@@ -566,7 +566,7 @@ describe('arweaveClient.downloadDataFromArweave', () => {
     const text = await arweaveClient.downloadDataFromArweave(txId, {
       gateways: [TEST_ARWEAVE_GATEWAY],
       retries: 0,
-      bypassCache: true,
+      cacheBypass: true,
       disableExistencePrecheck: true,
       debugContext: { category: 'survey_metadata' },
     });
@@ -589,7 +589,7 @@ describe('arweaveClient.downloadDataFromArweave', () => {
     const text = await arweaveClient.downloadDataFromArweave(txId, {
       gateways: [TEST_ARWEAVE_GATEWAY],
       retries: 0,
-      bypassCache: true,
+      cacheBypass: true,
       disableExistencePrecheck: true,
       debugContext: { category: 'doc_library' },
     });
@@ -625,7 +625,7 @@ describe('arweaveClient.downloadDataFromArweave', () => {
     const text = await arweaveClient.downloadDataFromArweave('gateway-route-fallback', {
       gateways: [TEST_ARWEAVE_GATEWAY, TEST_ARWEAVE_BACKUP_GATEWAY],
       retries: 0,
-      bypassCache: true,
+      cacheBypass: true,
       disableExistencePrecheck: true,
       debugContext: { category: 'question_metadata' },
     });
@@ -673,7 +673,7 @@ describe('arweaveClient.downloadDataFromArweave', () => {
     const text = await arweaveClient.downloadDataFromArweave('wayfinder-fallback-hit', {
       gateways: [TEST_ARWEAVE_GATEWAY],
       retries: 0,
-      bypassCache: true,
+      cacheBypass: true,
       disableExistencePrecheck: true,
       wayfinderResolver,
       debugContext: { category: 'question_metadata' },

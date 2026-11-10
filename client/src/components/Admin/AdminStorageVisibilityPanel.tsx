@@ -84,7 +84,8 @@ const AdminStorageVisibilityPanel = ({
     <section className={styles.panel} data-testid="ce-admin-storage-visibility">
       <div className={styles.panelTitle}>Hide questions or surveys</div>
       <div className={styles.panelSubtitle}>
-        Hidden questions and surveys leave the session lists, the interview catalog, and generated results. The stored
+        Hidden questions and surveys leave the session lists and the interview catalog. Hidden questions and their
+        answers also leave Results and exports. A generated report keeps one until you generate it again. The stored
         records stay, so you can unhide them later.
       </div>
       {!canAdminWorker ? (

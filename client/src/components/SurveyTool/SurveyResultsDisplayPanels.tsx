@@ -36,6 +36,7 @@ export type SurveyResultsDisplayPanelsArgs = {
   getLockedResponseKey: (args: SurveyResultsIndividualLockedResponseKeyArgs) => string;
   getResponseCardProps: () => SurveyResultsIndividualResponseCardDisplayProps;
   lockedResponsesBannerNode?: React.ReactNode;
+  loginPromptNode?: React.ReactNode;
   network?: SurveyResultsIndividualResponseRecord | null;
   onSurveyViewModeKeyDown: (event: React.KeyboardEvent<HTMLElement>) => void;
   onSurveyViewModeToggle: () => void;
@@ -73,6 +74,7 @@ export const renderSurveyResultsDisplayPanels = ({
   getLockedResponseKey,
   getResponseCardProps,
   lockedResponsesBannerNode = null,
+  loginPromptNode = null,
   network,
   onSurveyViewModeKeyDown,
   onSurveyViewModeToggle,
@@ -111,6 +113,8 @@ export const renderSurveyResultsDisplayPanels = ({
         />
       )}
 
+      {loginPromptNode}
+
       {lockedResponsesBannerNode}
 
       <SurveyResultsQuestionListPanel
@@ -131,6 +135,8 @@ export const renderSurveyResultsDisplayPanels = ({
         normalizedFilteredQuestionsCount={filterSummaryDisplay.normalizedFilteredQuestionsCount ?? 0}
         normalizedFilteredResponsesCount={filterSummaryDisplay.normalizedFilteredResponsesCount ?? 0}
         showFilteredCountSpinner={!!filterSummaryDisplay.showFilteredCountSpinner}
+        questionTotalsLoading={!!filterSummaryDisplay.questionTotalsLoading}
+        responseTotalsLoading={!!filterSummaryDisplay.responseTotalsLoading}
       />
 
       {filterControlsNode}

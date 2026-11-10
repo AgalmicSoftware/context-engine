@@ -3,6 +3,8 @@ import { DEFAULT_CACHE_TTL_SECONDS, DEFAULT_PAYLOAD_CONCURRENCY, DEFAULT_FOREGRO
 import { normalizePayloadSessionSlug } from './registryQuestionPayloads.mjs';
 import { refreshSessionQuestionIndex } from './registryQuestions.mjs';
 
+const pendingIndexRefreshes = new Map();
+
 export function cacheTtlSeconds(env = {}) {
   return DEFAULT_CACHE_TTL_SECONDS;
 }
@@ -31,6 +33,36 @@ export function cacheKey(sessionSlug = '') {
   return `${QUESTION_CACHE_PREFIX}${lower(sessionSlug) || 'general'}`;
 }
 
+export function sessionQuestionCacheKey(env, sessionSlug) {
+  const { sessionId, revision, address } = env.AGENT_CONTEXT;
+  return cacheKey(`${sessionId}:${revision}:${address}:${lower(sessionSlug)}`);
+}
+
+export function mergeQuestionRanges(ranges = []) {
+  const sorted = ranges.map(range => ({
+    fromBlock: normalizeBlock(range.fromBlock), toBlock: normalizeBlock(range.toBlock),
+  })).filter(range => range.fromBlock != null && range.toBlock != null && range.fromBlock <= range.toBlock)
+    .sort((a, b) => a.fromBlock - b.fromBlock);
+  const merged = [];
+  for (const range of sorted) {
+    const last = merged.at(-1);
+    if (last && range.fromBlock <= last.toBlock + 1) last.toBlock = Math.max(last.toBlock, range.toBlock);
+    else merged.push(range);
+  }
+  return merged;
+}
+
+export function removeScannedQuestionRange(ranges, fromBlock, toBlock) {
+  if (fromBlock == null) return ranges;
+  return ranges.flatMap(range => {
+    if (range.toBlock < fromBlock || range.fromBlock > toBlock) return [range];
+    return [
+      ...(range.fromBlock < fromBlock ? [{ fromBlock: range.fromBlock, toBlock: fromBlock - 1 }] : []),
+      ...(range.toBlock > toBlock ? [{ fromBlock: toBlock + 1, toBlock: range.toBlock }] : []),
+    ];
+  });
+}
+
 export function normalizeQuestionIndex(value = {}) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   if (!Array.isArray(value.questions)) return null;
@@ -51,6 +83,7 @@ export function normalizeQuestionIndex(value = {}) {
     targetFromBlock: normalizeBlock(value.targetFromBlock),
     targetToBlock: normalizeBlock(value.targetToBlock),
     nextScanToBlock: normalizeBlock(value.nextScanToBlock),
+    unresolvedRanges: mergeQuestionRanges(value.unresolvedRanges || []),
     complete: value.complete === true,
     cached: true,
   };
@@ -115,17 +148,24 @@ export function scheduleIndexRefresh({
   env = {},
   sessionSlug = '',
   existingIndex = null,
+  refreshExpired = false,
   fetchImpl = globalThis.fetch,
 } = {}) {
-  if (typeof waitUntil !== 'function') return;
-  if (!existingIndex || (existingIndex.complete === true && !hasPayloadUnavailableQuestions(existingIndex))) return;
-  waitUntil(refreshSessionQuestionIndex({
+  if (typeof waitUntil !== 'function' || !existingIndex) return;
+  const needsCompletion = existingIndex.complete !== true || hasPayloadUnavailableQuestions(existingIndex);
+  const needsFreshness = refreshExpired && !isFreshQuestionIndex(existingIndex, cacheTtlSeconds(env));
+  if (!needsCompletion && !needsFreshness) return;
+  const key = sessionQuestionCacheKey(env, sessionSlug);
+  if (pendingIndexRefreshes.has(key)) return;
+  const refresh = refreshSessionQuestionIndex({
     env,
     sessionSlug,
     existingIndex,
     mode: 'complete',
     fetchImpl,
-  }).catch(() => null));
+  }).catch(() => null).finally(() => pendingIndexRefreshes.delete(key));
+  pendingIndexRefreshes.set(key, refresh);
+  waitUntil(refresh);
 }
 
 export async function readKvQuestionIndex(env = {}, key = '') {

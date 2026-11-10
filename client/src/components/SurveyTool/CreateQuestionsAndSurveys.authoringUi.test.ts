@@ -1,3 +1,4 @@
+import { createElement } from 'react';
 import {
   E2E_TESTIDS,
   REGISTRY_CACHE_KEY,
@@ -78,6 +79,161 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
     expect(save).toHaveBeenCalled();
   });
 
+  const pendingTags = () => {
+    let resolve!: (value: string) => void;
+    let reject!: (error: Error) => void;
+    const promise = new Promise<string>((yes, no) => {
+      resolve = yes;
+      reject = no;
+    });
+    return { promise, resolve, reject };
+  };
+  const tagDraft = () => {
+    const instance = makeInstance();
+    jest.spyOn(instance, 'saveToLocalStorage').mockImplementation(() => {});
+    jest.spyOn(instance, 'updateSurveyHash').mockImplementation(() => {});
+    jest.spyOn(window, 'alert').mockImplementation(() => {});
+    instance.setState({
+      showAutoTool: false,
+      isStandaloneQuestion: true,
+      questions: [
+        { id: 'q1', uiKey: 'row-one', type: 'freeform', prompt: 'First question?', tags: ['first'] },
+        { id: 'q2', uiKey: 'row-two', type: 'freeform', prompt: 'Second question?', tags: ['second'] },
+      ],
+    });
+    return instance;
+  };
+  const expectTagSubmitEnabled = (instance: ReturnType<typeof makeInstance>) => {
+    const [submit] = collectTreeNodes(
+      instance.render(),
+      (node) => node.props?.['data-testid'] === E2E_TESTIDS.CREATE_SUBMIT,
+    );
+    expect(asRenderTreeNode(submit).props.disabled).toBe(false);
+  };
+  it.each([
+    [0, false],
+    [1, false],
+    [0, true],
+    [1, true],
+  ] as const)(
+    'tag request for row %s remains with its question after removal (failure=%s)',
+    async (requestIndex, fails) => {
+      const pending = pendingTags();
+      jest.spyOn(aiClient, 'callAI').mockReturnValue(pending.promise);
+      const instance = tagDraft();
+      const run = instance.suggestTagsForQuestion(requestIndex);
+      instance.removeQuestion(0);
+      if (fails) pending.reject(new Error('model failed'));
+      else pending.resolve('{"tags":["own-result"]}');
+      await run;
+      expect(instance.state.questions).toHaveLength(1);
+      expect(instance.state.questions[0]).toMatchObject({
+        id: 'q2',
+        prompt: 'Second question?',
+        tags: requestIndex === 1 && !fails ? ['own-result'] : ['second'],
+      });
+      expect(instance.state.questions[0].isGeneratingTags).not.toBe(true);
+      expectTagSubmitEnabled(instance);
+    },
+  );
+  it('saves editable draft content without prior publication or hydration status', () => {
+    const instance = tagDraft();
+    Object.assign(instance.state, {
+      lastSubmittedSurveyId: 'published-survey',
+      lastSubmittedSurveyArweaveTxId: 'published-transaction',
+      cacheLoaded: true,
+    });
+    const draft = JSON.parse(instance.serializeUnfinishedSurveyDraft());
+    expect(draft.questions[0].prompt).toBe('First question?');
+    for (const key of ['lastSubmittedSurveyId', 'lastSubmittedSurveyArweaveTxId', 'cacheLoaded']) {
+      expect(draft).not.toHaveProperty(key);
+    }
+  });
+
+  it('never stores an in-progress tag request in a draft', async () => {
+    const pending = pendingTags();
+    jest.spyOn(aiClient, 'callAI').mockReturnValue(pending.promise);
+    const instance = tagDraft();
+    const run = instance.suggestTagsForQuestion(0);
+    try {
+      expect(instance.state.questions[0].isGeneratingTags).toBe(true);
+      expect(JSON.parse(instance.serializeUnfinishedSurveyDraft()).questions[0]).not.toHaveProperty('isGeneratingTags');
+    } finally {
+      pending.resolve('{"tags":["generated"]}');
+      await run;
+    }
+  });
+
+  it('keeps tags entered while a tag request is pending', async () => {
+    const pending = pendingTags();
+    jest.spyOn(aiClient, 'callAI').mockReturnValue(pending.promise);
+    const instance = tagDraft();
+    const run = instance.suggestTagsForQuestion(0);
+    instance.handleCurrentTagInputChange(0, 'typed-while-pending');
+    instance.processTagInput(0);
+    pending.resolve('{"tags":["generated"]}');
+    await run;
+    expect(instance.state.questions[0].tags).toEqual(['generated', 'typed-while-pending']);
+    expectTagSubmitEnabled(instance);
+  });
+
+  it('keeps a tag removed while a tag request is pending removed', async () => {
+    const pending = pendingTags();
+    jest.spyOn(aiClient, 'callAI').mockReturnValue(pending.promise);
+    const instance = tagDraft();
+    const run = instance.suggestTagsForQuestion(0);
+    instance.removeTagFromQuestion(0, 0);
+    pending.resolve('{"tags":["first","generated"]}');
+    await run;
+    expect(instance.state.questions[0].tags).toEqual(['generated']);
+    expect(instance.state.questions[0].aiGeneratedTagsFromSource).toEqual(['first', 'generated']);
+  });
+
+  it('editing a question discards pending tags and releases its busy state', async () => {
+    const pending = pendingTags();
+    jest.spyOn(aiClient, 'callAI').mockReturnValue(pending.promise);
+    const instance = tagDraft();
+    const run = instance.suggestTagsForQuestion(0);
+    instance.handleQuestionChange(0, 'prompt', 'Edited first question?');
+    pending.resolve('{"tags":["stale"]}');
+    await run;
+    expect(instance.state.questions[0]).toMatchObject({ prompt: 'Edited first question?', tags: ['first'] });
+    expect(instance.state.questions[0].isGeneratingTags).not.toBe(true);
+    expectTagSubmitEnabled(instance);
+  });
+  it('an older tag generation cannot clear a newer request after editing back to the same text', async () => {
+    const first = pendingTags();
+    const second = pendingTags();
+    jest.spyOn(aiClient, 'callAI').mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+    const instance = tagDraft();
+    instance.handleQuestionChange(0, 'prompt', 'Original question?');
+    const firstRun = instance.suggestTagsForQuestion(0);
+    instance.handleQuestionChange(0, 'prompt', 'Edited question?');
+    instance.handleQuestionChange(0, 'prompt', 'Original question?');
+    const secondRun = instance.suggestTagsForQuestion(0);
+    first.resolve('{"tags":["stale"]}');
+    await firstRun;
+    expect(instance.state.questions[0].isGeneratingTags).toBe(true);
+    expect(instance.state.questions[0].tags).toEqual(['first']);
+    second.resolve('{"tags":["current"]}');
+    await secondRun;
+    expect(instance.state.questions[0].tags).toEqual(['current']);
+    expectTagSubmitEnabled(instance);
+  });
+
+  it('tag completion survives repeated React state-updater evaluation', async () => {
+    jest.spyOn(aiClient, 'callAI').mockResolvedValue('{"tags":["current"]}');
+    const instance = tagDraft();
+    jest.spyOn(instance, 'setState').mockImplementation((update, callback) => {
+      if (typeof update === 'function') update(instance.state, instance.props);
+      const patch = typeof update === 'function' ? update(instance.state, instance.props) : update;
+      if (patch && typeof patch === 'object') instance.state = { ...instance.state, ...patch };
+      callback?.();
+    });
+    await instance.suggestTagsForQuestion(0);
+    expect(instance.state.questions[0]).toMatchObject({ tags: ['current'], isGeneratingTags: false });
+  });
+
   it('supports the Interview upload label and styling through the existing submit handler', () => {
     const instance = makeInstance({
       interviewQuestionReview: true,
@@ -125,7 +281,9 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
     const markup = renderToStaticMarkup(tree);
 
     expect(markup).toContain('Multichoice');
-    expect(markup).toContain('Options: Pilot · Full launch');
+    // The card previews the answer, options included; their fields wait behind Edit.
+    expect(markup).toMatch(/aria-label="Answer preview"[\s\S]*Pilot[\s\S]*Full launch/);
+    expect(markup).not.toContain('Add Option');
     expect(treeHasText(tree, 'Survey')).toBe(false);
     expect(treeHasText(tree, 'from URL / Content')).toBe(false);
     expect(markup).toContain('interviewQuestionPromptEditButton');
@@ -135,6 +293,9 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
     expect(promptNodes).toHaveLength(1);
     expect(
       nodeHasClassName((promptNodes[0] as { props?: { actions?: unknown } })?.props?.actions, 'removeQuestionButton'),
+    ).toBe(true);
+    expect(
+      nodeHasClassName((promptNodes[0] as { props?: { editor?: unknown } })?.props?.editor, 'optionsContainer'),
     ).toBe(true);
     expect(markup).toContain('revealTagInputButton');
     expect(markup).toContain('aria-label="Add tag"');
@@ -585,6 +746,61 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
     const markup = renderToStaticMarkup(instance.render());
 
     expect(markup).toContain(`href="https://ar-io.example.test/${txId}"`);
+  });
+
+  it('names each uploaded question by its text, with its ID beneath', () => {
+    const named = '0xaaaaaaaa11111111222222223333333344444444555555556666666677777777';
+    const unnamed = '0xbbbbbbbb11111111222222223333333344444444555555556666666688888888';
+    const instance = makeInstance();
+    instance.state = {
+      ...instance.state,
+      showAutoTool: false,
+      questionsAddedSuccessfully: true,
+      uploadedQuestions: [{ questionId: named }, { questionId: unnamed }],
+      uploadedQuestionPrompts: { [named]: 'Who should check an AI summary?' },
+    };
+
+    const items = collectTreeNodes(instance.render(), (node) => nodeHasClassName(node, 'uploadedQuestionLabel')).map(
+      (node) => renderToStaticMarkup(node as Parameters<typeof renderToStaticMarkup>[0]).replace(/<[^>]+>/g, '|'),
+    );
+
+    expect(items).toEqual(['||Who should check an AI summary?||0xaaaaaaaa...77777777||', '||0xbbbbbbbb...88888888||']);
+  });
+
+  it('puts what a page offers beside the submit button on one line, and leaves the button alone otherwise', () => {
+    const question = { id: 'q1', type: 'freeform', prompt: 'Why?', tags: [] as string[] };
+    const reviewList = {
+      interviewQuestionReview: true,
+      preformedQuestions: [question],
+      preformedMode: 'questions' as const,
+    };
+    const plain = makeInstance({ ...reviewList, submitClassName: 'button' });
+    plain.setState({ questions: [question] });
+    expect(collectTreeNodes(plain.render(), (node) => nodeHasClassName(node, 'submitLine'))).toHaveLength(0);
+
+    const instance = makeInstance({
+      ...reviewList,
+      submitRowClassName: 'submitLine',
+      submitAccessory: createElement('input', { 'aria-label': 'Beside the button' }),
+    });
+    instance.setState({ questions: [question] });
+    const markup = renderToStaticMarkup(
+      collectTreeNodes(instance.render(), (node) => nodeHasClassName(node, 'submitLine'))[0] as never,
+    );
+    expect(markup).toMatch(/aria-label="Beside the button"[\s\S]*Create Questions/);
+  });
+
+  it('folds the JSON and AI prompt views into a closed disclosure', () => {
+    const instance = makeInstance();
+    instance.state = { ...instance.state, showAutoTool: false };
+
+    const detailsNodes = collectTreeNodes(instance.render(), (node) => asRenderTreeNode(node).type === 'details');
+    expect(detailsNodes).toHaveLength(1);
+    expect(asRenderTreeNode(detailsNodes[0]).props.open).toBeUndefined();
+    const markup = renderToStaticMarkup(detailsNodes[0] as Parameters<typeof renderToStaticMarkup>[0]);
+    expect(markup).toMatch(/^<details[^>]*><summary>JSON and AI prompt<\/summary>/);
+    expect(markup).toContain('Show JSON');
+    expect(markup).toContain('Show AI Prompt');
   });
 
   it('renders submitted-survey Arweave links against ar.io when direct mode is enabled', () => {

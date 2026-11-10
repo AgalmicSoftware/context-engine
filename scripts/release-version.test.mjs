@@ -487,6 +487,7 @@ test('the Worker source pathspec covers every local input of the release bundles
   );
 
   assert.ok(bundleInputs.has('workers/sessionCorsWorker/worker.js'));
+  assert.ok(bundleInputs.has('shared/questions/answerValue.mjs'));
   assert.deepEqual([...bundleInputs].filter((input) => !covered.has(input)), []);
   // The native Cloudflare template the pin also selects.
   for (const templateInput of [
@@ -500,8 +501,10 @@ test('the Worker source pathspec covers every local input of the release bundles
   }
   // Files no bundle imports would only force needless pin moves.
   for (const nonInput of [
+    'shared/agentFidelity.mjs',
     'shared/encryption/envelopeV1Core.mjs',
     'shared/encryption/envelopeWriterFixtures.mjs',
+    'shared/interviewConfidence.mjs',
     'shared/questions/questionId.mjs',
   ]) {
     assert.ok(!covered.has(nonInput), `${nonInput} is not a bundle input`);

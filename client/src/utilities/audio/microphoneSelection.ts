@@ -33,8 +33,12 @@ export const selectLocalComputerMicrophone = (devices: MediaDeviceInfo[]): Media
   return candidates[0]?.device || null;
 };
 
-export const requestPreferredSpeechMicrophone = async (mediaDevices: MediaDevices): Promise<MediaStream> => {
-  const initialStream = await mediaDevices.getUserMedia({ audio: SPEECH_AUDIO_CONSTRAINTS });
+export const requestPreferredSpeechMicrophone = async (
+  mediaDevices: MediaDevices,
+  overrides: Pick<MediaTrackConstraints, 'echoCancellation'> = {},
+): Promise<MediaStream> => {
+  const constraints = { ...SPEECH_AUDIO_CONSTRAINTS, ...overrides };
+  const initialStream = await mediaDevices.getUserMedia({ audio: constraints });
   if (!isContinuityMicrophone(readActiveMicrophoneLabel(initialStream)) || !mediaDevices.enumerateDevices) {
     return initialStream;
   }
@@ -46,7 +50,7 @@ export const requestPreferredSpeechMicrophone = async (mediaDevices: MediaDevice
 
     const replacementStream = await mediaDevices.getUserMedia({
       audio: {
-        ...SPEECH_AUDIO_CONSTRAINTS,
+        ...constraints,
         deviceId: { exact: localMicrophone.deviceId },
       },
     });

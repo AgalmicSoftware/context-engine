@@ -37,9 +37,11 @@ export function shortQuestionId(value = '') {
   return text.length > 18 ? `${text.slice(0, 10)}...${text.slice(-6)}` : text;
 }
 
-export function questionIdSeedPart(value = '') {
-  const text = safeString(value);
-  return /^0x[0-9a-fA-F]{64}$/.test(text) ? `${text.slice(2, 10)}${text.slice(-6)}` : text;
+// A question id as part of a KV key: the whole id in lower case, so distinct
+// ids never share a record. Submit records carry draft keys, so escaping 0x
+// (and %, to stay unambiguous) keeps a hash id from reading as a secret there.
+export function questionIdKeyPart(value = '') {
+  return safeString(value).toLowerCase().replace(/%|0x/g, (match) => (match === '%' ? '%25' : '0%78'));
 }
 
 export function shortAddress(value = '') {

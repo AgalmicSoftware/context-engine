@@ -1,9 +1,10 @@
+import { QUADRATIC_READING_RULE } from '../../../../shared/promptRules.mjs';
 import { buildSurveyResultsAnalysisResponsesForExport } from './surveyResultsAnalysisDataModel';
 import { buildSurveyResultsFilteredQuestionsForExport } from './surveyResultsExportRows';
 import { buildSurveyResultsQuestionsCsvExport } from './surveyResultsExportPlans';
 import { buildSurveyResultsHtmlReportQuestionsForExport } from './surveyResultsHtmlReportDataModel';
 import {
-  buildRedactedSessionResultsSnapshot,
+  buildSessionResultsSnapshot,
   renderSessionResultsHtmlReport,
 } from '../../utilities/sessionResultsExport/sessionResultsExport';
 import {
@@ -27,7 +28,7 @@ it('preserves a custom quadratic budget through filtered CSV and report snapshot
   expect(filtered[0]).toMatchObject({ voiceCredits: 25 });
   expect(buildSurveyResultsQuestionsCsvExport(filtered)).toContain('"[""Parks"",""Transit""]","25"');
   const reportQuestions = buildSurveyResultsHtmlReportQuestionsForExport({ filteredQuestions: filtered });
-  const snapshot = buildRedactedSessionResultsSnapshot({ sections: { report: { questions: reportQuestions } } });
+  const snapshot = buildSessionResultsSnapshot({ sections: { report: { questions: reportQuestions } } });
   expect(snapshot.sections.report.questions[0]).toMatchObject({ voiceCredits: 25 });
   expect(renderSessionResultsHtmlReport(snapshot, { format: 'single-html' })).toContain('25 voice credits');
 });
@@ -48,7 +49,7 @@ it('gives AI analysis named signed votes and a budget, including neutral answers
   });
   expect(aiPayload.questions[0]).toMatchObject({ voiceCredits: 25 });
   expect(aiPayload.responses.map((row) => row.answer)).toEqual(['Parks: +3; Transit: -4', 'Parks: 0; Transit: 0']);
-  expect(buildSessionResultsAnalysisPrompt(aiPayload)).toContain('sum of squared votes');
+  expect(buildSessionResultsAnalysisPrompt(aiPayload)).toContain(QUADRATIC_READING_RULE);
 });
 
 it('keeps option-to-vote mapping in AI answers when question options exceed the context cap', () => {

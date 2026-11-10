@@ -20,6 +20,7 @@ jest.mock('../web3/chainGateway.js', () => ({
     fetchAllSurveyResponses: jest.fn(),
     listenForSurveyEvents: jest.fn(),
     removeSurveyEventsListener: jest.fn(),
+    decryptSurveyPayloadInPlace: jest.fn(),
   },
 }));
 
@@ -43,6 +44,8 @@ jest.mock('../session/metadataSessionBinding.js', () => ({
   __esModule: true,
   resolveScopedMetadataSessionSlug: jest.fn(),
 }));
+
+const metadataListing = (rows) => ({ rows, listedStorageRefIds: new Set(rows.map((row) => row.storageRefId)) });
 
 const { createSessionSurveyCacheController } = require('./sessionSurveyCacheController.js');
 const contractScriptsModule = require('../web3/chainGateway.js');
@@ -305,6 +308,94 @@ describe('createSessionSurveyCacheController', () => {
   });
 
   describe('destroy', () => {
+    it('an earlier session finishing late does not mark the newer load ready', async () => {
+      const host = createMockHost();
+      const controller = createSessionSurveyCacheController(host);
+      const [alphaWindow, betaWindow] = [createDeferred(), createDeferred()];
+      contractScripts.getRelevantBlockWindowForFilter
+        .mockReturnValueOnce(alphaWindow.promise)
+        .mockReturnValueOnce(betaWindow.promise);
+
+      const alpha = controller.initializeSurveyCacheForGroup('alpha');
+      const beta = controller.initializeSurveyCacheForGroup('beta');
+      alphaWindow.resolve({ fromBlock: 2, toBlock: 1 });
+      await alpha;
+      expect(host.getStateSnapshot().isSurveyCacheReady).toBeUndefined();
+
+      betaWindow.resolve({ fromBlock: 2, toBlock: 1 });
+      await beta;
+      expect(host.getStateSnapshot().isSurveyCacheReady).toBe(true);
+    });
+
+    it('an earlier session failing after the newer load finished cannot overwrite it', async () => {
+      const host = createMockHost();
+      const controller = createSessionSurveyCacheController(host);
+      const alphaFetch = createDeferred();
+      contractScripts.getRelevantBlockWindowForFilter
+        .mockResolvedValueOnce({ fromBlock: 10, toBlock: 12 })
+        .mockResolvedValueOnce({ fromBlock: 2, toBlock: 1 });
+      contractScripts.fetchUserSubmittedSurveyIDs.mockReturnValueOnce(alphaFetch.promise);
+
+      const alpha = controller.initializeSurveyCacheForGroup('alpha');
+      await controller.initializeSurveyCacheForGroup('beta');
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      alphaFetch.reject(new Error('fixture: read failed'));
+      await alpha;
+
+      expect(host.getStateSnapshot()).toMatchObject({
+        isSurveyCacheReady: true,
+        surveyCacheInitializationError: false,
+      });
+    });
+
+    it('a skipped session is ready at once while an earlier load still runs', async () => {
+      const host = createMockHost({
+        scanScopeNoop: jest.fn((slug, _operation, onSkipped) => {
+          if (slug !== 'beta') return false;
+          onSkipped();
+          return true;
+        }),
+      });
+      const controller = createSessionSurveyCacheController(host);
+      const alphaWindow = createDeferred();
+      contractScripts.getRelevantBlockWindowForFilter.mockReturnValueOnce(alphaWindow.promise);
+
+      const alpha = controller.initializeSurveyCacheForGroup('alpha');
+      await controller.initializeSurveyCacheForGroup('beta');
+      expect(host.getStateSnapshot().isSurveyCacheReady).toBe(true);
+
+      alphaWindow.resolve({ fromBlock: 2, toBlock: 1 });
+      await alpha;
+    });
+
+    it('a queued rerun of the earlier session does not take readiness from the newer load', async () => {
+      // Earlier tests may leave a rerun timer that would use this test's mocks.
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      contractScripts.getRelevantBlockWindowForFilter.mockClear();
+      const host = createMockHost();
+      const controller = createSessionSurveyCacheController(host);
+      const [alphaWindow, betaWindow, rerunWindow] = [createDeferred(), createDeferred(), createDeferred()];
+      contractScripts.getRelevantBlockWindowForFilter
+        .mockReturnValueOnce(alphaWindow.promise)
+        .mockReturnValueOnce(betaWindow.promise)
+        .mockReturnValueOnce(rerunWindow.promise);
+
+      const alpha = controller.initializeSurveyCacheForGroup('alpha');
+      void controller.initializeSurveyCacheForGroup('alpha');
+      const beta = controller.initializeSurveyCacheForGroup('beta');
+      alphaWindow.resolve({ fromBlock: 2, toBlock: 1 });
+      await alpha;
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(contractScripts.getRelevantBlockWindowForFilter).toHaveBeenCalledTimes(3);
+
+      betaWindow.resolve({ fromBlock: 2, toBlock: 1 });
+      await beta;
+      expect(host.getStateSnapshot().isSurveyCacheReady).toBe(true);
+
+      rerunWindow.resolve({ fromBlock: 2, toBlock: 1 });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
     it('clears pending retry timers without throwing', async () => {
       jest.useFakeTimers();
       const clearTimeoutSpy = jest.spyOn(global, 'clearTimeout');
@@ -347,25 +438,27 @@ describe('createSessionSurveyCacheController', () => {
   describe('initializeSurveyCacheForGroup', () => {
     it('hydrates fresh Worker survey metadata before the chain-scan no-op without RPC calls', async () => {
       const sessionCfg = createWorkerCanonicalSessionConfig();
-      const loadSurveys = jest.fn().mockResolvedValue([
-        {
-          id: '0xworkersurvey',
-          createdAtMs: 456,
-          storageRefId: 'cf_survey_fresh',
-          storageRef: {
-            backend: 'cloudflare',
-            id: 'cf_survey_fresh',
-            resource: 'surveys',
-          },
-          payload: {
+      const loadSurveys = jest.fn().mockResolvedValue(
+        metadataListing([
+          {
             id: '0xworkersurvey',
-            surveyID: '0xworkersurvey',
-            title: 'Fresh Worker survey',
-            sessionId: WORKER_SESSION_ID,
-            sessionSlug: 'alpha',
+            createdAtMs: 456,
+            storageRefId: 'cf_survey_fresh',
+            storageRef: {
+              backend: 'cloudflare',
+              id: 'cf_survey_fresh',
+              resource: 'surveys',
+            },
+            payload: {
+              id: '0xworkersurvey',
+              surveyID: '0xworkersurvey',
+              title: 'Fresh Worker survey',
+              sessionId: WORKER_SESSION_ID,
+              sessionSlug: 'alpha',
+            },
           },
-        },
-      ]);
+        ]),
+      );
       const host = createMockHost({
         chainId: null,
         getAccount: jest.fn(() => 'worker-account'),
@@ -473,27 +566,29 @@ describe('createSessionSurveyCacheController', () => {
         workerCanonicalIdentity: identityB,
       });
 
-      delayedB.resolve([]);
+      delayedB.resolve(metadataListing([]));
       await runB;
-      delayedA.resolve([
-        {
-          id: 'survey-a-delayed',
-          createdAtMs: 987,
-          storageRefId: 'cf_survey_a_delayed',
-          storageRef: {
-            backend: 'cloudflare',
-            id: 'cf_survey_a_delayed',
-            resource: 'surveys',
-          },
-          payload: {
+      delayedA.resolve(
+        metadataListing([
+          {
             id: 'survey-a-delayed',
-            surveyID: 'survey-a-delayed',
-            title: 'Delayed Session A survey',
-            sessionId: sessionConfigA.sessionId,
-            sessionSlug: 'alpha',
+            createdAtMs: 987,
+            storageRefId: 'cf_survey_a_delayed',
+            storageRef: {
+              backend: 'cloudflare',
+              id: 'cf_survey_a_delayed',
+              resource: 'surveys',
+            },
+            payload: {
+              id: 'survey-a-delayed',
+              surveyID: 'survey-a-delayed',
+              title: 'Delayed Session A survey',
+              sessionId: sessionConfigA.sessionId,
+              sessionSlug: 'alpha',
+            },
           },
-        },
-      ]);
+        ]),
+      );
       await runA;
 
       expect(host.getStored('surveysCache', 'alpha').worker).toMatchObject({
@@ -847,6 +942,54 @@ describe('createSessionSurveyCacheController', () => {
       });
     });
 
+    describe('survey answers counted past the block window', () => {
+      const early = { choice: 'early' };
+      const late = { choice: 'late' };
+      const createHostScannedTo20 = (blockLimits) =>
+        createMockHost({
+          getSessionCfg: jest.fn((slug) => ({ slug, networkChainId: 11155420, blockLimits })),
+          initialStorage: {
+            surveysCache: {
+              alpha: {
+                11155420: {
+                  surveysLatestBlock: 12,
+                  surveys: { surv1: { creationBlock: 5 } },
+                  surveyResponses: { surv1: { '0xearly': early, '0xlate': late } },
+                  surveyResponsesLatestBlock: { surv1: 20 },
+                  pendingSurveyMetadata: {},
+                },
+              },
+            },
+          },
+        });
+      beforeEach(() => {
+        contractScripts.getRelevantBlockWindowForFilter.mockResolvedValue({ fromBlock: 1, toBlock: 12 });
+        contractScripts.fetchAllSurveyResponses.mockResolvedValue([{ responder: '0xEARLY', response: early }]);
+      });
+
+      it('drops them after a lowered end block and rescans the window', async () => {
+        const host = createHostScannedTo20({ start: 1, end: 12 });
+
+        await createSessionSurveyCacheController(host).initializeSurveyCacheForGroup('alpha');
+
+        expect(contractScripts.fetchAllSurveyResponses).toHaveBeenCalledWith('none', 'surv1', 5, 12, 'alpha');
+        const stored = host.getStored('surveysCache', 'alpha')['11155420'];
+        expect(stored.surveyResponses.surv1).toEqual({ '0xearly': early });
+        expect(stored.surveyResponsesLatestBlock.surv1).toBe(12);
+      });
+
+      it('keeps them past the chain head without an end block', async () => {
+        const host = createHostScannedTo20({ start: 1, end: null });
+
+        await createSessionSurveyCacheController(host).initializeSurveyCacheForGroup('alpha');
+
+        expect(contractScripts.fetchAllSurveyResponses).not.toHaveBeenCalled();
+        const stored = host.getStored('surveysCache', 'alpha')['11155420'];
+        expect(stored.surveyResponses.surv1).toEqual({ '0xearly': early, '0xlate': late });
+        expect(stored.surveyResponsesLatestBlock.surv1).toBe(20);
+      });
+    });
+
     it('sets surveyCacheInitializationError when initialization work fails', async () => {
       const host = createMockHost();
       const controller = createSessionSurveyCacheController(host);
@@ -1163,6 +1306,56 @@ describe('createSessionSurveyCacheController', () => {
         'Failed to persist surveys cache',
       );
       expect(host.getStateSnapshot()).toMatchObject({ surveyCacheInitializationError: true });
+    });
+  });
+
+  describe('encrypted survey titles and document links', () => {
+    const locked = {
+      title: '[encrypted]',
+      titleEncrypted: 'title-envelope',
+      documentURLs: [],
+      documentURLsEncrypted: 'links-envelope',
+      questionIDs: [],
+    };
+    const decryptForReader = async (survey) => {
+      Object.assign(survey, {
+        title: 'Private title',
+        titleDecrypted: true,
+        documentURLs: ['https://docs.example/private'],
+        documentURLsDecrypted: true,
+      });
+      return survey;
+    };
+    const settle = async () => {
+      for (let i = 0; i < 5; i += 1) await new Promise((resolve) => setTimeout(resolve, 0));
+    };
+
+    it('stores scanned surveys locked, then decrypts them for the current reader', async () => {
+      const host = createMockHost({
+        activeSlug: 'alpha',
+        buildDecryptContext: jest.fn(() => ({ account: '0xReader', providerLike: 'provider' })),
+      });
+      const controller = createSessionSurveyCacheController(host);
+      contractScripts.fetchUserSubmittedSurveyIDs.mockResolvedValue([{ surveyId: 'SURV1', creationBlock: 11 }]);
+      contractScripts.getSurveyDataById.mockImplementation(async (_provider, _id, _slug, opts) =>
+        opts?.skipDecrypt ? { ...locked } : decryptForReader({ ...locked }),
+      );
+      contractScripts.decryptSurveyPayloadInPlace.mockImplementation(decryptForReader);
+
+      await controller.initializeSurveyCacheForGroup('alpha');
+      await settle();
+
+      expect(contractScripts.getSurveyDataById).toHaveBeenCalledWith(
+        'none',
+        'surv1',
+        'alpha',
+        expect.objectContaining({ skipDecrypt: true }),
+      );
+      expect(host.getStored('surveysCache', 'alpha')['11155420'].surveys.surv1).toMatchObject({
+        title: 'Private title',
+        documentURLs: ['https://docs.example/private'],
+        decryptedFor: '0xreader',
+      });
     });
   });
 

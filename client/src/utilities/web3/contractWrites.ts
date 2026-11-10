@@ -7,6 +7,7 @@
  */
 
 import { ethers } from 'ethers';
+import { getChainById } from '../../variables/chains.js';
 import { createLogger } from '../logging.js';
 import { isExecutionRevertDuringEstimate, extractEstimateErrorMessage } from './errorClassifiers.js';
 
@@ -33,11 +34,12 @@ type ResolveTxGasOverridesOptions = {
   preferFallbackGasLimit?: boolean;
 };
 type SendContractWriteViaProviderOptions = {
-  expectedChainId?: unknown;
+  expectedChainId: unknown;
   expectedEvent?: string;
   signingProvider?: AnyRecord | null;
   ethersProvider?: AnyRecord | null;
   signer?: AnyRecord | null;
+  expectedFrom?: string | null;
   contract?: AnyRecord | null;
   method?: string;
   args?: unknown[];
@@ -170,6 +172,7 @@ const sendContractWriteViaProvider = async ({
   signingProvider,
   ethersProvider,
   signer,
+  expectedFrom = null,
   contract,
   method,
   args = [],
@@ -179,7 +182,11 @@ const sendContractWriteViaProvider = async ({
   revertMessage = `${method} transaction reverted on-chain.`,
   sensitiveArgs = false,
   resolveSensitiveErrorMessage = null,
-}: SendContractWriteViaProviderOptions = {}): Promise<{ txHash: unknown; receipt: AnyRecord }> => {
+}: SendContractWriteViaProviderOptions): Promise<{ txHash: unknown; receipt: AnyRecord }> => {
+  const chainId = Number(expectedChainId);
+  if (!Number.isSafeInteger(chainId) || chainId <= 0) {
+    throw new Error('The session network must be known before sending a transaction.');
+  }
   const methodName = String(method || '');
   if (!contract?.interface || typeof contract.interface.encodeFunctionData !== 'function') {
     throw new Error(`sendContractWriteViaProvider requires a contract interface for ${methodName}.`);
@@ -192,21 +199,26 @@ const sendContractWriteViaProvider = async ({
     throw new Error(`sendContractWriteViaProvider requires a signer for ${methodName}.`);
   }
 
-  if (!ethersProvider?.getNetwork || !ethersProvider?.getCode || !ethersProvider?.send) {
+  if (!ethersProvider?.getCode || !ethersProvider?.send) {
     throw new Error('Connected wallet provider cannot verify the contract target.');
   }
-  // Pin the configured chain where supplied, otherwise the wallet's current
-  // chain. Include it in the approved transaction to guard a later wallet switch.
-  const chainId = Number(expectedChainId ?? (await ethersProvider.getNetwork()).chainId);
-  if (!Number.isSafeInteger(chainId) || chainId <= 0) throw new Error('Invalid expected chain ID.');
+  // Include the session chain in the approved transaction to guard a later wallet switch.
+  if (Number(await ethersProvider.send('eth_chainId', [])) !== chainId) {
+    const networkName = getChainById(chainId)?.name || `chain ${chainId}`;
+    throw new Error(`Wrong network for ${methodName}: expected the session network ${networkName} (${chainId}).`);
+  }
   const code = await ethersProvider.getCode(to);
   if (typeof code !== 'string' || !/^0x(?:[0-9a-f]{2})+$/i.test(code)) {
     throw new Error(`No contract bytecode is deployed at ${to}.`);
   }
-  if (Number(await ethersProvider.send('eth_chainId', [])) !== chainId) {
-    throw new Error(`Wrong network for ${methodName}: expected chain ${chainId}.`);
-  }
   const from = await signer.getAddress();
+  // Payloads uploaded for this write name the account that started it, and the
+  // contract records the sender, so a wallet switched since must not send it.
+  if (expectedFrom && String(from).toLowerCase() !== String(expectedFrom).toLowerCase()) {
+    throw new Error(
+      `The wallet switched accounts, so the transaction was not sent. Switch back to ${expectedFrom} and try again.`,
+    );
+  }
   const data = contract.interface.encodeFunctionData(methodName, args);
   const txParams: AnyRecord = {
     chainId: ethers.BigNumber.from(chainId).toHexString(),
@@ -297,10 +309,14 @@ const sendContractWriteViaProvider = async ({
   try {
     receipt = (await ethersProvider.waitForTransaction(txHash)) as AnyRecord;
   } catch (error) {
-    if (sensitiveArgs) {
-      throw buildSensitiveWriteError(error);
-    }
-    throw error;
+    // The wallet already broadcast this transaction, so a failed receipt read says
+    // nothing about its outcome: keep the hash and never report it as reverted.
+    // A sensitive write leaves out the provider error, which may echo its calldata.
+    throw Object.assign(
+      new Error('The transaction was sent, but its result could not be confirmed. Check your wallet before retrying.'),
+      { txHash, receiptUnknown: true },
+      sensitiveArgs ? {} : { cause: error },
+    );
   }
   if (!receipt || Number(receipt.status) !== 1) {
     const resolvedRevertMessage = sensitiveArgs

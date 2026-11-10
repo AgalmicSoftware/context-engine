@@ -11,6 +11,7 @@ import {
   buildSurveyResultsResponsesJsonExport,
   getSurveyResultsExportTypeLabel,
 } from './surveyResultsExportPlans';
+import { buildSurveyResultsFilteredQuestionsForExport } from './surveyResultsExportRows';
 
 describe('surveyResultsExportPlans', () => {
   it('keeps export options in the existing render order', () => {
@@ -201,9 +202,35 @@ describe('surveyResultsExportPlans', () => {
         },
       ]),
     ).toBe(
-      '"questionID","prompt","type","tags","options","voiceCredits"\n' +
-        '"q1","Question ""One""","multichoice","tag-a;tag-b","[""Alpha"",""Beta""]",""',
+      '"questionID","prompt","type","tags","options","voiceCredits","scale","singleSelect","maxSelections"\n' +
+        '"q1","Question ""One""","multichoice","tag-a;tag-b","[""Alpha"",""Beta""]","","","",""',
     );
+  });
+
+  it('keeps each question’s answer scale and selection limits', () => {
+    const questions = buildSurveyResultsFilteredQuestionsForExport({
+      networkQuestions: {
+        fives: { type: 'rating', scale: { min: 1, max: 5, minLabel: 'Low', maxLabel: 'High' } },
+        tens: { type: 'rating' },
+        one: { type: 'multichoice', options: ['A', 'B', 'C'], singleSelect: true },
+        three: { type: 'multichoice', options: ['A', 'B', 'C'], maxSelections: 3 },
+        open: { type: 'freeform' },
+      },
+      questionIds: ['fives', 'tens', 'one', 'three', 'open'],
+    });
+    const [header, ...rows] = buildSurveyResultsQuestionsCsvExport(questions)
+      .split('\n')
+      .map((line) => Array.from(line.matchAll(/"((?:[^"]|"")*)"(?:,|$)/g), (match) => match[1].replace(/""/g, '"')));
+    const column = (name: string) => rows.map((row) => row[header.indexOf(name)]);
+    expect(column('scale').map((scale) => scale && JSON.parse(scale))).toEqual([
+      { min: 1, max: 5, minLabel: 'Low', maxLabel: 'High', step: 1 },
+      { min: 0, max: 10, minLabel: '0', maxLabel: '10', step: 1 },
+      '',
+      '',
+      '',
+    ]);
+    expect(column('singleSelect')).toEqual(['', '', 'true', 'false', '']);
+    expect(column('maxSelections')).toEqual(['', '', '', '3', '']);
   });
 
   it('round-trips punctuation inside option names and selected answers', () => {
@@ -211,7 +238,7 @@ describe('surveyResultsExportPlans', () => {
     const readCells = (csv: string) =>
       Array.from(csv.matchAll(/"((?:[^"]|"")*)"(?:,|\n|$)/g), (match) => match[1].replace(/""/g, '"'));
     const questionsCsv = buildSurveyResultsQuestionsCsvExport([{ id: 'q1', type: 'multichoice', options }]);
-    expect(JSON.parse(readCells(questionsCsv)[10])).toEqual(options);
+    expect(JSON.parse(readCells(questionsCsv)[13])).toEqual(options);
     for (const individuals of [false, true]) {
       const response = { questionID: 'q1', answer: { value: options } };
       const csv = buildSurveyResultsResponsesCsvExport({
@@ -407,7 +434,7 @@ describe('surveyResultsExportPlans', () => {
     expect(cell(second, 'additionalComments')).toBe("'@cmd\t-1");
 
     const questionsCsv = buildSurveyResultsQuestionsCsvExport([{ id: 'q1', prompt: '\t=1+1', type: 'freeform' }]);
-    expect(questionsCsv.split('\n')[1]).toBe(`"q1","'\t=1+1","freeform","","",""`);
+    expect(questionsCsv.split('\n')[1]).toBe(`"q1","'\t=1+1","freeform","","","","","",""`);
   });
 
   it('builds questions JSON from an explicit export snapshot', () => {

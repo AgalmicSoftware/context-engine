@@ -12,12 +12,15 @@ host starts (Claude Code, Codex, OpenClaw, an AT Protocol agent using
 `at_mcp`, and so on). Nothing is hosted for you and no Worker changes are
 needed: it talks to the session's existing Worker. Ordinary MCP participant
 access also works when the optional **Agents (HTTP API)** surface is disabled.
-That scoped API and Session Wrapped now run in the same Worker, with separate
-fresh credentials; there is no Bridge deployment or credential migration.
+That scoped API and Session Wrapped run in the same Worker, with separate
+credentials.
 
 Hosted links include `?worker=<origin>`. Normal links such as
 `https://contextengine.sh/session/<slug>` use the OP Sepolia session registry.
 Registry participation supports unencrypted sessions and standalone questions.
+The creation-block lookup is reused for each registry creation timestamp during a joined session; explicit start-block settings still take precedence.
+Reads honor configured start/end blocks, and bounded results retain each answer
+as of the end block. Unavailable historical state is reported as partial.
 
 See [docs/agent-participants.md](../docs/agent-participants.md) for what this
 means for session admins and readers.
@@ -38,8 +41,17 @@ and `npm --prefix mcp start` from the repository root.
 
 The default command checks for a newer published version each time the host
 starts the server. For reproducible runs, replace `@latest` with an exact
-published version, such as `npx -y @agalmic/contextengine@0.1.2` once 0.1.2 is
-published. A running server does not update itself.
+published version, such as `npx -y @agalmic/contextengine@0.1.2`. A running
+server does not update itself.
+
+## Upgrading to 0.2.0
+
+Rating answers follow each question's minimum, maximum, and stored step.
+The default step is 1. Fractional steps are supported, and values between steps
+are rejected even if earlier versions accepted them. Agents should read the
+question's scale before answering; for a 0–10 scale with step 2, submit 0, 2, 4,
+6, 8, or 10. Existing stored answers are not rewritten. Keep the same state
+directory when upgrading; identities and saved session access do not change.
 
 ## Connect an agent
 
@@ -76,11 +88,6 @@ With Claude Code, save it as `mcp.json` and start a session with
 `claude --mcp-config mcp.json`, or add it alongside other servers such as
 `at_mcp` in the same file.
 
-Existing users who want updates on restart should update their host configuration
-to the command and arguments above once, then restart the server. Keep the same
-state directory to retain the agent's identity. Exact version pins remain an
-option for reproducible runs.
-
 Then ask the agent to join with the session link it was given:
 
 > Use join_session with https://contextengine.sh/session/<slug>?worker=<origin>.
@@ -104,8 +111,9 @@ Then ask the agent to join with the session link it was given:
 | `claim_sbt` | Claims a session SBT (soulbound membership token) to the agent's own address. |
 
 Answer values by question type: binary `"Agree"`, `"Unsure"` or `"Disagree"`;
-rating a whole number on the question's scale (0–10 unless it says
-otherwise); multichoice the option text (an array when several are allowed);
+rating a number on the question's scale and step grid (0–10 with step 1
+unless stored bounds or a positive step say otherwise); multichoice the option
+text (an array when several are allowed);
 quadratic one signed whole-number vote per option, with squared votes summing
 to at most the credit budget (99 unless it says otherwise); freeform text.
 
@@ -133,6 +141,9 @@ unknown `CE_MCP_*` name.
   to start when the key is missing or belongs to another agent, rather than
   mixing one agent's remembered answers into another's. Restore both files
   together, or move `state.json` aside to start as a new agent.
+  On filesystems supporting hard links, concurrent first starts see only a
+  complete key file and load the same identity. Other filesystems use an
+  exclusive write that still refuses to replace an existing key.
 - **Agent answers are labeled, not verified.** The agent marker, display name,
   model and platform are self-reported, like a person typing their name.
 - **Public sessions are public.** When a session publishes its results, anyone
@@ -171,18 +182,23 @@ unknown `CE_MCP_*` name.
   the session, so the server also remembers what the agent answered; in very
   large sessions it says when answers given elsewhere may be missing.
 
-The 0.8.0 application release prepares MCP 0.1.2 for separate npm publication.
-The `@latest` command uses the most recent published version until 0.1.2 is
-published. Source 0.1.2
-redacts RPC URLs and transaction data from registry write errors, preserves known
-transaction hashes, and tells callers to check uncertain submissions before
-retrying. If local answer-history storage fails after a successful upload or
+The server redacts RPC URLs and transaction data from registry write errors,
+preserves known transaction hashes, and tells callers to check uncertain
+submissions before retrying. If local answer-history storage fails after a successful upload or
 confirmed transaction, `answer` retains its successful results and returns a
 `warning`; repeating an answer does not repair local history.
+
+Cancellation is checked again after the final chain read and immediately before
+Worker requests, including after sign-in or token refresh. Saving an answer's
+local retry key does not authorize an upload after cancellation. Once a write
+has been sent, its result and any transaction hash remain available for
+reconciliation.
 
 ## Registry sessions
 
 Join with `https://contextengine.sh/session/<slug>` (no `worker=`).
+The default `general` session uses the registered `general` slug; an empty
+slug resolves to the same registry entry.
 Config comes from SessionRegistry and its public metadata. Public questions
 and results need no Worker sign-in; a refused sign-in joins read-only and
 explains which writes are unavailable. Uploads require the Worker's `arweave`
@@ -214,7 +230,15 @@ confirmed writes from the running agent, without replacing newer chain answers.
 Answer scans read new blocks first
 and resume older history across calls, with separate progress for public and
 own-answer reads. Bounded or unfinished scans report `questionsComplete: false`
-or `partial: true`. Saved plaintext is not restored over an incomplete
+or `partial: true`. Hosted reads also stay incomplete while a listed payload is
+unavailable, including during the one-minute 404 retry delay. Results expose
+`unreadAnswers`; the question list exposes `unreadQuestions` and `unreadMyAnswers`
+when nonzero, alongside its completeness flags. An unread hosted answer cannot
+be mapped to a question from its listing, so readable older answers remain in
+partial results until recovery. Successfully read records excluded by visibility,
+session identity or malformed content do not count as unread. An incomplete own-
+answer scan is retried on the next call instead of being cached for ten minutes.
+Saved plaintext is not restored over an incomplete
 own-answer scan, because another client may have cleared or encrypted it.
 Public results include identity-free web answers only for known session
 questions and use chain event ordering to select the latest answer.
@@ -264,10 +288,6 @@ after successful push CI on public `main`. Version selection remains part of
 review: a published version cannot be replaced, and changed package contents
 require a new version. See [MCP release setup](../docs/mcp-releases.md) for
 account configuration, activation and recovery.
-
-The default launch command is `npx -y --prefer-online @agalmic/contextengine@latest`.
-Exact version pins remain available for reproducibility; an already-running
-server does not update itself.
 
 Worker answer uploads save a pending question, payload digest and request ID in
 `state.json` before sending. Repeating an identical failed call, including after

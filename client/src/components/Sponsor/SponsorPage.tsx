@@ -234,14 +234,6 @@ const buildEmptyBundleForm = (): SponsorBundleForm => ({
   litUsageApiKey: '',
   cloudflareApiToken: '',
 });
-const normalizeSponsorBundleForm = (raw: unknown = {}): SponsorBundleForm => {
-  const source = isRecord(raw) ? raw : {};
-  const next = buildEmptyBundleForm();
-  (Object.keys(next) as SponsorBundleFieldKey[]).forEach((key) => {
-    next[key] = toStr(source[key] || '').trim();
-  });
-  return next;
-};
 const normalizeSponsorBundleDraftForm = (raw: unknown = {}): SponsorBundleForm => {
   const source = isRecord(raw) ? raw : {};
   return {
@@ -454,7 +446,7 @@ const SponsorPage = ({
 
   const loadSessions = useCallback(
     async ({ forceOnChain, isCancelled, loadOlder = false }: LoadSessionsOptions = {}) => {
-      const cached = syncSessionsFromRegistryCache({ isCancelled });
+      syncSessionsFromRegistryCache({ isCancelled });
 
       const chainIds = requestedChainId ? [requestedChainId] : undefined;
       const shouldForceRegistryRead = !USE_ONCHAIN_SESSION_REGISTRY || !!forceOnChain;

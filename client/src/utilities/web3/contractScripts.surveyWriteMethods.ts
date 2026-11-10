@@ -2,19 +2,8 @@ import type { ContractScriptsMethodMap, ContractScriptsRuntimeDeps } from './con
 import { resolveSessionCapabilityProjection } from '../session/sessionCapabilityProjection';
 import { resolveWorkerCanonicalSessionIdHex } from '../session/sessionWorkerDiscovery';
 import { readStoredAnswersUploadProblem } from '../survey/answerSizeBudget';
+import { mergeSurveyResponseSnapshot } from '../survey/surveyResponseSnapshot';
 
-type SbtReadProviderRef = string | Record<string, unknown>;
-type SbtReadGroupKeyOrConfig = string | Record<string, unknown> | null | undefined;
-type SbtReadOptions = { allowInjectedReadFallback?: boolean; [key: string]: unknown };
-type SbtMintBurnCountsByAddressResult = {
-  mintedCountByAddress: Record<string, number>;
-  burnedCountByAddress: Record<string, number>;
-  mintedEventCount?: number;
-  burnedEventCount?: number;
-  scannedToBlock?: number | null;
-  ok?: boolean;
-  [key: string]: unknown;
-};
 type ProviderName = string;
 type GroupKeyOrConfig = string | Record<string, unknown> | null | undefined;
 type Bytes32Input = string | number | null | undefined;
@@ -27,6 +16,7 @@ type PayloadPointerUpload = {
 
 const toMetadataPayload = (value: MetadataPayload | null | undefined): MetadataPayload => value || {};
 const ID_PRECHECK_TIMEOUT_MS = 10_000;
+const SURVEY_COPY_RECHECK_LIMIT = 2;
 
 export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRuntimeDeps): ContractScriptsMethodMap => {
   const {
@@ -180,6 +170,8 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
         questionIds: qIds32,
       });
 
+      // One account for the uploads and the write that points at them.
+      const account = await signer.getAddress().catch(() => '');
       const canUseSessionStorage =
         isCloudflareStorageResource(cfg, STORAGE_RESOURCE_KEYS.SURVEYS) ||
         isCloudflareStorageResource(cfg, STORAGE_RESOURCE_KEYS.QUESTIONS);
@@ -228,7 +220,7 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
           cfg,
           arweaveUploadOpts,
           storageContext: {
-            account: await signer.getAddress().catch(() => ''),
+            account,
             providerLike: ethersProvider,
           },
         });
@@ -241,7 +233,7 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
             cfg,
             arweaveUploadOpts,
             storageContext: {
-              account: await signer.getAddress().catch(() => ''),
+              account,
               providerLike: ethersProvider,
             },
           });
@@ -288,6 +280,7 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
           signingProvider: providerLocation,
           ethersProvider,
           signer,
+          expectedFrom: account,
           contract: SurveyContract,
           expectedChainId: gAddrs.surveys?.chainId || cfg?.networkChainId,
           expectedEvent: 'SurveyAdded',
@@ -376,6 +369,8 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
         questionIds: qIds32,
       });
 
+      // One account for the uploads and the write that points at them.
+      const account = await signer.getAddress().catch(() => '');
       const canUseSessionStorage = isCloudflareStorageResource(cfg, STORAGE_RESOURCE_KEYS.QUESTIONS);
       if (ARWEAVE_ACTIVE || canUseSessionStorage) {
         // Safety net: inject sessionName/sessionSlug if caller omitted it
@@ -412,7 +407,7 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
             cfg,
             arweaveUploadOpts,
             storageContext: {
-              account: await signer.getAddress().catch(() => ''),
+              account,
               providerLike: ethersProvider,
             },
           });
@@ -451,6 +446,7 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
         signingProvider: providerLocation,
         ethersProvider,
         signer,
+        expectedFrom: account,
         contract: SurveyContract,
         expectedChainId: gAddrs.surveys?.chainId || cfg?.networkChainId,
         expectedEvent: 'QuestionsAdded',
@@ -605,6 +601,36 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
       const canUseSessionStorage = isCloudflareStorageResource(cfg, STORAGE_RESOURCE_KEYS.RESPONSES);
       const workerCanonicalStorage =
         sessionProjection.profileValid && sessionProjection.isWorkerCanonical && canUseSessionStorage;
+      // On-chain sessions save the whole survey as one copy, so an edit is merged
+      // into the stored copy. Worker sessions keep each answer as its own row.
+      const submittedSurveyResponse = surveyResponse as MetadataPayload;
+      const mergesStoredCopy = !workerCanonicalStorage && !!surveyResponse;
+      const readSurveyPointer = () =>
+        this.getResponseHash('none', userAddress, hashedSurveyId, cfg, { throwOnError: true, blockTag: 'latest' });
+      let mergedFromPointer: unknown = null;
+      const mergeStoredCopy = async (): Promise<void> => {
+        try {
+          // The pointer first: a save landing between these reads is then seen as a change.
+          const pointer = await readSurveyPointer();
+          const stored = await this.getSurveyResponse('none', userAddress, hashedSurveyId, cfg, {
+            throwOnError: true,
+            rawPayload: true,
+            forceArweaveFetch: true,
+            blockTag: 'latest',
+          });
+          surveyResponse = mergeSurveyResponseSnapshot(stored, submittedSurveyResponse, questionResponses);
+          mergedFromPointer = pointer;
+        } catch (cause: unknown) {
+          throw Object.assign(
+            new Error('Unable to read the complete stored survey response. Please retry submission.'),
+            {
+              cause,
+              retryable: true,
+            },
+          );
+        }
+      };
+      if (mergesStoredCopy) await mergeStoredCopy();
       const workerSubmissionReceipt = (uploads: PayloadPointerUpload[]) => ({
         workerCanonicalSubmission: true,
         questionResponseRefs: uploads.map((upload, index) => ({
@@ -614,6 +640,7 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
         sessionSlug: workerResponseIdentity?.sessionSlug || resolveStorageSessionSlug(groupKeyOrCfg, cfg),
         storageRefs: [surveyResponseUpload?.storageRef, ...uploads.map((upload) => upload.storageRef)].filter(Boolean),
       });
+      let uploadSurveyResponse = async (): Promise<void> => {};
       if (ARWEAVE_ACTIVE || canUseSessionStorage) {
         const uploadContext = {
           account: userAddress,
@@ -638,10 +665,10 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
           );
           if (uploadProblem) throw new Error(uploadProblem);
         }
-        if (surveyResponse) {
-          const surveyResponsePayload = workerResponseIdentity
-            ? { ...surveyResponse, ...workerResponseIdentity }
-            : surveyResponse;
+        uploadSurveyResponse = async () => {
+          const surveyResponsePayload = (
+            workerResponseIdentity ? { ...surveyResponse, ...workerResponseIdentity } : surveyResponse
+          ) as MetadataPayload;
           validateNoLockedPlaintextInPayload(surveyResponsePayload, {
             family: 'survey_response_payload',
             path: 'survey response',
@@ -659,7 +686,8 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
           const surveyRevision = uploadRevisions.get(hashedSurveyId);
           if (surveyRevision) surveyRevision.settled = true;
           surveyResponseHashBytes = surveyResponseUpload?.pointerBytes || ethers.constants.HashZero;
-        }
+        };
+        if (surveyResponse) await uploadSurveyResponse();
         // Upload response objects sequentially to avoid Arweave anchor/signature races
         // that can appear when multiple uploads are posted in parallel for one wallet.
         questionResponseUploads = [];
@@ -698,6 +726,32 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
         }
       } else {
         return; // no-op when no configured payload storage path is available
+      }
+
+      // A save from another tab or device since the merge would lose its edit to this
+      // one, so build the copy again from what it saved. The contract can't check this,
+      // so two saves within the last few seconds before sending can still collide.
+      for (let attempt = 0; mergesStoredCopy; attempt += 1) {
+        let latestPointer: unknown;
+        try {
+          latestPointer = await readSurveyPointer();
+        } catch (cause: unknown) {
+          throw Object.assign(new Error('Unable to check the stored survey response. Please retry submission.'), {
+            cause,
+            retryable: true,
+          });
+        }
+        if (latestPointer === mergedFromPointer) break;
+        if (attempt >= SURVEY_COPY_RECHECK_LIMIT) {
+          throw Object.assign(
+            new Error('Your answers to this survey are changing elsewhere. Please retry submission.'),
+            {
+              retryable: true,
+            },
+          );
+        }
+        await mergeStoredCopy();
+        await uploadSurveyResponse();
       }
 
       const questionResponseHashesBytes = questionResponseUploads.map((upload) => upload.pointerBytes);
@@ -758,6 +812,8 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
           signingProvider,
           ethersProvider,
           signer,
+          // The uploaded answers name this responder.
+          expectedFrom: userAddress,
           contract: SurveyContract,
           expectedChainId: gAddrs.surveys?.chainId || cfg?.networkChainId,
           expectedEvent: 'ResponsesSubmitted',
@@ -768,7 +824,7 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
           revertMessage: 'submitResponses transaction reverted on-chain.',
         });
         clearReadCachesForGroup(groupKeyOrCfg);
-        return receipt;
+        return surveyResponse ? { ...receipt, __ceSurveyResponse: surveyResponse } : receipt;
       } catch (error: unknown) {
         notifyUserFacingTransactionError(error);
         contractsLog.error('Error sending transaction with provider.request:', error);

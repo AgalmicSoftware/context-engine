@@ -57,14 +57,6 @@
     height: auto;
   }
 
-  #navbarSearchCol {
-    display: none;
-  }
-
-  #emptyCol {
-    display: none;
-  }
-
   #accountSection {
     padding: 0px;
   }
@@ -114,14 +106,6 @@
   #mainLogoLoggedIn {
     max-width: 110px;
     object-fit: contain;
-  }
-
-  #navbarSearchCol {
-    display: none;
-  }
-
-  #emptyCol {
-    display: none;
   }
 
   #accountSection {
@@ -404,16 +388,6 @@
     padding: 0px;
   }
 
-  #AccountHover {
-    width: 75%;
-    justify-content: center;
-    margin-top: 5px;
-    margin-bottom: 5px;
-    margin-left: 5px;
-    margin-right: 5px;
-    margin: 5px;
-  }
-
   #walletSettingsIcon {
     font-size: 28px;
     padding-top: 5px;
@@ -430,12 +404,6 @@
     align-items: flex-end;
     justify-content: center;
     padding-left: 0px;
-  }
-
-  #AccountHover {
-    justify-content: flex-end;
-    padding-left: 10px;
-    padding-right: 10px;
   }
 
   #walletSettingsIcon {
@@ -455,10 +423,6 @@
     padding: 10px;
   }
 
-  #AccountHover {
-    padding: 10px;
-  }
-
   #walletSettingsIcon {
     font-size: 28px;
     padding-top: 5px;
@@ -474,10 +438,6 @@
     align-items: center;
     border-radius: var(--ce-radius-2);
     padding: 0px;
-  }
-
-  #AccountHover {
-    padding: 10px;
   }
 
   #walletSettingsIcon {
@@ -497,23 +457,11 @@
     padding: 0px;
   }
 
-  #AccountHover {
-    padding: 10px;
-  }
-
   #walletSettingsIcon {
     font-size: 28px;
     padding-top: 5px;
     display: inline;
   }
-}
-
-#AccountHover {
-}
-
-#threeboxAddress {
-  align-self: center;
-  padding-left: 10px;
 }
 
 #walletSettingsButton {
@@ -527,12 +475,6 @@
   #addressDisplay {
     width: 50%;
   }
-}
-
-@media (min-width: 320px) and (max-width: 465px) {
-}
-
-@media (min-width: 466px) and (max-width: 768px) {
 }
 
 @media (min-width: 769px) and (max-width: 1366px) {
@@ -549,11 +491,6 @@
     padding-top: 15px;
     padding-bottom: 15px;
   }
-}
-
-#profileHover {
-  display: inline;
-  color: var(--ce-color-white);
 }
 
 #addressDisplay {
@@ -685,7 +622,7 @@
     }
 
     #navbarContainer {
-      --ce-navbar-control-size: 48px;
+      --ce-navbar-control-size: var(--ce-navbar-logo-size);
       --ce-navbar-control-scale: 1;
     }
   }

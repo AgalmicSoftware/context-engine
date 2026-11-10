@@ -33,6 +33,7 @@ import {
 import {
   dispatchResultsAnalysisArtifactRequest as dispatchResultsAnalysisArtifactRequestBoundary,
 } from './resultsAnalysisArtifactDispatch.js';
+import { dispatchDebateAtlasReadRequest as dispatchDebateAtlasReadRequestBoundary } from './debateAtlasBuild.js';
 import {
   dispatchAuthNonceRequest as dispatchAuthNonceRequestBoundary,
 } from './authNonceRequestDispatch.js';
@@ -105,6 +106,7 @@ export const createWorkerRouteShellWithWorkerDeps = ({
   const dispatchResultsAnalysisArtifactRequest = (
     deps?.dispatchResultsAnalysisArtifactRequest || dispatchResultsAnalysisArtifactRequestBoundary
   );
+  const dispatchDebateAtlasReadRequest = deps?.dispatchDebateAtlasReadRequest || dispatchDebateAtlasReadRequestBoundary;
   const dispatchAnonymousRouteEntry = (
     deps?.dispatchAnonymousRouteEntry || dispatchAnonymousRouteEntryBoundary
   );
@@ -495,7 +497,8 @@ export const createWorkerRouteShellWithWorkerDeps = ({
       }
 
 
-      if (routeSelection.kind === 'results-analysis-artifact') {
+      // Atlases share this route's slug, CORS and optional sign-in handling.
+      if (routeSelection.kind === 'results-analysis-artifact' || routeSelection.kind === 'debate-atlas') {
         const withQuerySlugHeader = (() => {
           try {
             const params = new URL(request.url).searchParams;
@@ -550,6 +553,29 @@ export const createWorkerRouteShellWithWorkerDeps = ({
           config = context.config;
           address = context.address;
           scopes = context.scopes;
+        }
+        if (routeSelection.kind === 'debate-atlas') {
+          return await dispatchDebateAtlasReadRequest({
+            request: withQuerySlugHeader,
+            env,
+            config,
+            slug: targetSlug,
+            address,
+            scopes,
+            headers: corsContext?.headers || routeBaseHeaders,
+            deps: {
+              json: deps?.json,
+              validateAdmin: deps?.validateAdmin,
+              authorizeCloudflareStorageResourceRead: deps?.authorizeCloudflareStorageResourceRead,
+              evaluateResultsAnalysisViewerEligibility: deps?.evaluateResultsAnalysisViewerEligibility,
+              getSessionSecrets: deps?.getSessionSecrets,
+              readResourceGateOnChain: deps?.readResourceGateOnChain,
+              resolveRegistryRpcUrls: deps?.resolveRegistryRpcUrls,
+              toRegistrySessionSlug: deps?.toRegistrySessionSlug,
+              resolveRpcUrlListForGate: deps?.resolveRpcUrlListForGate,
+              checkSbtGate: deps?.checkSbtGate,
+            },
+          });
         }
         return await dispatchResultsAnalysisArtifactRequest({
           request: withQuerySlugHeader,

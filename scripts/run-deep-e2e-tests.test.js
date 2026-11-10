@@ -65,7 +65,7 @@ test('app server launch honors the requested E2E port and refuses silent fallbac
   );
 });
 
-test('buildDeepE2eSteps only includes private bridge checks when the root script is available', () => {
+test('buildDeepE2eSteps only includes session agent checks when the root script is available', () => {
   const baseScripts = {
     'ai:test-worker-scopes:matrix': 'npm run -s ai:node -- scripts/test-worker-scopes-matrix.js',
     'ai:test-gated-decrypt:all-types': 'npm run -s ai:node -- scripts/test-session-gated-decrypt-all-types.js',
@@ -91,7 +91,7 @@ test('buildDeepE2eSteps only includes private bridge checks when the root script
   assert.deepEqual(
     buildDeepE2eSteps({
       ...baseScripts,
-      'test:worker:agent-bridge': 'node scripts/run-agent-bridge-worker-tests.js',
+      'test:worker:agent': 'node scripts/run-session-agent-tests.js',
     })
       .map(([label]) => label),
     [
@@ -99,7 +99,7 @@ test('buildDeepE2eSteps only includes private bridge checks when the root script
       'gated decrypt all types',
       'survey response encryption matrix',
       'doc library session filetypes',
-      'agent bridge worker',
+      'session agent',
     ],
   );
 });

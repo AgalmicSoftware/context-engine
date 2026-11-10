@@ -5,7 +5,9 @@ import { createWorkerRuntime } from './worker.js';
 import { putSessionSecrets } from './sessionConfigSecretsStore.js';
 import { buildSiweMessage, installSessionCoordinatorBinding, makeJsonRequest } from '../../tests/helpers/sessionCorsWorkerTestUtils.mjs';
 import { buildQuestionRecord } from '../../mcp/lib/records.mjs';
+import { DEFAULT_AI_MODEL } from '../../shared/aiDefaults.mjs';
 import { resolveInterviewStarter, dispatchInterviewStarterRequest as boundary } from './interviewStarter.js';
+import { writeStorageResourceHidden } from './storageResourceOwnership.js';
 
 const dispatchInterviewStarterRequest = (args) => boundary({
   ...args, deps: { ...args.deps, readCurrentSessionConfig: args.deps?.readCurrentSessionConfig || (async ({ env, slug }) => ({
@@ -27,12 +29,12 @@ const fixture = () => {
   };
   const deps = {
     loadPublicInterviewQuestions: async () =>
-      Array.from({ length: count }, (_, id) => ({ id: String(id), prompt: `AI topic ${id}` })),
+      ({ questions: Array.from({ length: count }, (_, id) => ({ id: String(id), prompt: `AI topic ${id}` })), incomplete: false }),
     getSessionSecrets: async () => ({ openaiKey: 'worker-only-fixture' }),
     proxyOpenAI: async ({ payload, secrets }) => {
       calls++;
       assert.equal(secrets.openaiKey, 'worker-only-fixture');
-      assert.equal(payload.model, 'gpt-5.6-terra');
+      assert.equal(payload.model, DEFAULT_AI_MODEL);
       assert.equal(payload.service_tier, 'default');
       assert.match(payload.messages[0].content, /Session topic/);
       return Response.json({ completion: `What is your uncommon view on AI? ${calls}` });
@@ -52,21 +54,22 @@ const fixture = () => {
 for (const [provider, model, secret] of [
   ['openai', 'gpt-4o-mini', 'openaiKey'], ['anthropic', 'claude-sonnet-4-6', 'anthropicKey'],
   ['openrouter', 'openai/gpt-4o-mini', 'openrouterKey'], ['custom', 'owner-model', 'customRpcKey'],
-]) test(`opening generation honors the saved ${provider} model and its 600-token limit`, async () => {
+]) test(`opening generation honors the saved ${provider} model and leaves room to think`, async () => {
   const f = fixture();
   f.args.config.ai = { mode: provider, models: { fast: model } };
   delete f.args.deps.proxyOpenAI;
   f.args.deps.getSessionSecrets = async () => ({ [secret]: 'synthetic-key', customRpcUrl: 'https://rpc.example.test' });
   let body;
   const fetch = async (_, init) => {
+    if (provider === 'custom') assert.equal(init.outboundUrlPolicy, 'strict-https-no-credentials');
     body = JSON.parse(init.body);
-    return Response.json({ choices: [{ message: { content: 'What matters to you?' } }], content: [{ text: 'What matters to you?' }] });
+    return Response.json({ choices: [{ message: { content: 'What matters to you?' } }], content: [{ type: 'text', text: 'What matters to you?' }] });
   };
   Object.assign(f.args.deps, { fetch, safeFetch: fetch, log: () => {} });
   const result = await resolveInterviewStarter(f.args);
   assert.equal(result.openingPrompt, 'What matters to you?');
   assert.equal(body.model, model);
-  assert.equal(body.max_tokens, 600);
+  assert.equal(body.max_tokens, 2000);
 });
 
 test('defaults are stable and settings reject invalid values', () => {
@@ -78,6 +81,36 @@ test('defaults are stable and settings reject invalid values', () => {
   assert.equal(normalizeInterviewSettings().shareDraftChangesByDefault, false);
   assert.equal(normalizeInterviewSettings({ shareDraftChangesByDefault: true }).shareDraftChangesByDefault, true);
   assert.equal(normalizeInterviewSettings({ shareDraftChangesByDefault: 'true' }).shareDraftChangesByDefault, false);
+  assert.equal(normalizeInterviewSettings().researchDetail, 'minimal');
+  assert.equal(normalizeInterviewSettings({ researchDetail: 'full' }).researchDetail, 'full');
+  assert.equal(normalizeInterviewSettings({ researchDetail: 'FULL' }).researchDetail, 'minimal');
+  assert.equal(normalizeInterviewSettings().hiddenDraftShare, 0);
+  assert.equal(normalizeInterviewSettings({ hiddenDraftShare: 0.2 }).hiddenDraftShare, 0.2);
+  assert.equal(normalizeInterviewSettings({ hiddenDraftShare: 0.9 }).hiddenDraftShare, 0.5);
+  assert.equal(normalizeInterviewSettings({ hiddenDraftShare: '0.2' }).hiddenDraftShare, 0);
+  assert.equal(normalizeInterviewSettings().showFidelityScore, false);
+  assert.equal(normalizeInterviewSettings({ showFidelityScore: true }).showFidelityScore, true);
+  assert.equal(normalizeInterviewSettings().suggestGroups, false);
+  assert.equal(normalizeInterviewSettings({ suggestGroups: true }).suggestGroups, true);
+  assert.equal(normalizeInterviewSettings().showFidelityResults, false);
+  assert.equal(normalizeInterviewSettings({ showFidelityResults: true }).showFidelityResults, true);
+  assert.equal(normalizeInterviewSettings({ showFidelityResults: 'true' }).showFidelityResults, false);
+  // The smallest group shown in "How well AIs predicted people": 1 turns it off.
+  for (const [fidelityMinimumPeople, expected] of [
+    [undefined, 5],
+    [1, 1],
+    [10, 10],
+    [50, 50],
+    [0, 1],
+    [51, 50],
+    [2.5, 5],
+    ['3', 5],
+    [Number.NaN, 5],
+    [null, 5],
+  ])
+    assert.equal(normalizeInterviewSettings({ fidelityMinimumPeople }).fidelityMinimumPeople, expected);
+  for (const fidelityMinimumPeople of [undefined, 1, 5, 50])
+    assert.equal(validInterviewSettings({ fidelityMinimumPeople }), true);
   assert.equal(normalizeInterviewSettings().steeringPrompt, '');
   assert.equal(normalizeInterviewSettings({ steeringPrompt: '  Guide the interview.  ' }).steeringPrompt, 'Guide the interview.');
   assert.equal(
@@ -90,6 +123,19 @@ test('defaults are stable and settings reject invalid values', () => {
     { followNewQuestions: 'true' },
     { shareDraftChangesByDefault: 'true' },
     { shareDraftChangesByDefault: 1 },
+    { researchDetail: 'everything' },
+    { hiddenDraftShare: 0.6 },
+    { hiddenDraftShare: -0.1 },
+    { hiddenDraftShare: '0.2' },
+    { showFidelityScore: 'true' },
+    { suggestGroups: 'true' },
+    { showFidelityResults: 'true' },
+    { showFidelityResults: 1 },
+    { fidelityMinimumPeople: 0 },
+    { fidelityMinimumPeople: 51 },
+    { fidelityMinimumPeople: 2.5 },
+    { fidelityMinimumPeople: '5' },
+    { fidelityMinimumPeople: null },
     { questionGrowthPercent: 0 },
     { steeringPrompt: 42 },
     { steeringPrompt: 'x'.repeat(3001) },
@@ -135,6 +181,24 @@ test('regeneration accumulates additions from the last successful generation', a
   await resolveInterviewStarter(f.args);
   assert.equal(f.calls(), 2);
 });
+test('hiding a question writes the opening again, since the old one may quote it', async () => {
+  const f = fixture();
+  const initial = await resolveInterviewStarter(f.args);
+  assert.equal(f.calls(), 1);
+  f.args.config.BLOCKED_QUESTION_IDS = ['Q1'];
+  const rewritten = await resolveInterviewStarter(f.args);
+  assert.notEqual(rewritten.openingPrompt, initial.openingPrompt);
+  assert.equal(f.calls(), 2);
+  await resolveInterviewStarter(f.args);
+  f.args.config.BLOCKED_QUESTION_IDS = [' q1 '];
+  await resolveInterviewStarter(f.args);
+  assert.equal(f.calls(), 2);
+  // With no question left to ask about, the old opening is not served either.
+  f.args.config.BLOCKED_QUESTION_IDS = ['q1', 'q2'];
+  f.setCount(0);
+  assert.equal((await resolveInterviewStarter(f.args)).source, 'waiting-for-questions');
+  assert.equal(f.calls(), 2);
+});
 test('manual refresh works when enabled and rejects disabled refresh', async () => {
   const f = fixture();
   await resolveInterviewStarter(f.args);
@@ -160,6 +224,60 @@ test('concurrent first starts share generation', async () => {
   assert.deepEqual(results[0], results[1]);
   assert.equal(f.calls(), 1);
 });
+test('a start hiding other questions does not join an opening already being written', async () => {
+  const hiding = (f, ids) => ({ ...f.args, config: { ...f.args.config, BLOCKED_QUESTION_IDS: ids } });
+  const f = fixture();
+  const [before, after] = await Promise.all([resolveInterviewStarter(f.args), resolveInterviewStarter(hiding(f, ['Q1']))]);
+  assert.equal(f.calls(), 2);
+  assert.notEqual(after.openingPrompt, before.openingPrompt);
+  assert.equal(after.blockedQuestionIds, '["q1"]');
+  // The same hidden questions, however written, still share one.
+  const g = fixture();
+  await Promise.all([resolveInterviewStarter(hiding(g, ['Q1'])), resolveInterviewStarter(hiding(g, [' q1 ']))]);
+  assert.equal(g.calls(), 1);
+});
+test('a question hidden from the Storage panel retires the opening, and later starts do not join an earlier one', async () => {
+  const withStorageIndex = (f) => {
+    const records = new Map();
+    f.args.env.CE_STORAGE_INDEX_KV = {
+      get: async (key) => records.get(key) ?? null,
+      put: async (key, value) => { records.set(key, value); },
+      delete: async (key) => { records.delete(key); },
+      list: async ({ prefix = '' } = {}) => ({ keys: [...records.keys()].filter((key) => key.startsWith(prefix)).map((name) => ({ name })), list_complete: true }),
+    };
+    return () => writeStorageResourceHidden({
+      index: f.args.env.CE_STORAGE_INDEX_KV, slug: 'demo', resource: 'questions', resourceId: '3', hidden: true,
+      actor: 'admin', updatedAt: '2026-11-09T00:00:00.000Z',
+    });
+  };
+  const f = fixture();
+  const hide = withStorageIndex(f);
+  await resolveInterviewStarter(f.args);
+  await hide();
+  const after = await resolveInterviewStarter(f.args);
+  assert.equal(f.calls(), 2);
+  assert.equal(after.blockedQuestionIds, '["3"]');
+  await resolveInterviewStarter(f.args);
+  assert.equal(f.calls(), 2, 'the new opening is kept');
+  // A start after the hide does not wait on an opening begun before it.
+  const g = fixture();
+  const hideInG = withStorageIndex(g);
+  const proxy = g.args.deps.proxyOpenAI;
+  let reached;
+  let release;
+  const writing = new Promise((resolve) => { reached = resolve; });
+  const gate = new Promise((resolve) => { release = resolve; });
+  g.args.deps.proxyOpenAI = async (args) => { reached(); await gate; return proxy(args); };
+  const before = resolveInterviewStarter(g.args);
+  await writing;
+  await hideInG();
+  const later = resolveInterviewStarter(g.args);
+  await new Promise(setImmediate);
+  release();
+  assert.deepEqual([(await before).blockedQuestionIds, (await later).blockedQuestionIds], ['[]', '["3"]']);
+  assert.equal(g.calls(), 2);
+});
+
 test('starter route preserves CORS and rate limits; public callers cannot force refresh', async () => {
   const f = fixture();
   await resolveInterviewStarter(f.args);
@@ -205,9 +323,9 @@ test('starter route resolves anonymous IP daily budgets before generation', asyn
       expectedLimit: 0,
     },
     {
-      name: 'malformed anonymous limit keeps legacy wallet fallback',
+      name: 'malformed anonymous limit leaves anonymous routes unlimited',
       limits: { perWalletPerDay: 12, perAnonymousIpPerDay: null },
-      expectedLimit: 12,
+      expectedLimit: 0,
     },
   ];
 

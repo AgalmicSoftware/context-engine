@@ -173,3 +173,13 @@ test('answers carry the link recruitment source like the web client', () => {
   assert.deepEqual(built.record.recruitment, { source: 'delve-town' });
   assert.equal('recruitment' in buildResponseRecord({ question, value: 'Agree', responder: RESPONDER, session: SESSION, recruitmentSource: '!!' }).record, false);
 });
+
+// The fixture is also exercised by the browser, agent transport and benchmark.
+import { ratingConformance } from '../../shared/questions/ratingConformance.mjs';
+for (const { name, scale, input, expected } of ratingConformance) {
+  test(`MCP rating conformance: ${name}`, () => {
+    const result = buildResponseRecord({ question: { id: 'q-rating', type: 'rating', scale }, value: input, responder: RESPONDER, session: SESSION });
+    assert.equal(result.ok, expected !== null);
+    if (result.ok) assert.equal(result.record.answer.value, expected);
+  });
+}

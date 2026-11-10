@@ -53,7 +53,7 @@ export type OnePageSessionAgentShellProps = {
   agentQuestionSubmitError: string;
   agentSessionMeta: AgentSessionMeta | null;
   agentSubmittedQuestionIds: string[];
-  agentSubmittingQuestionId: string;
+  agentSubmittingQuestionIds: Set<string>;
   workerGroupSessionId: string;
   workerGroupWorkerUrl: string;
   titleText: string;
@@ -97,7 +97,7 @@ const OnePageSessionAgentShell = ({
   agentQuestionSubmitError,
   agentSessionMeta,
   agentSubmittedQuestionIds,
-  agentSubmittingQuestionId,
+  agentSubmittingQuestionIds,
   workerGroupSessionId,
   workerGroupWorkerUrl,
   titleText,
@@ -182,7 +182,7 @@ const OnePageSessionAgentShell = ({
               questions={agentQuestions}
               status={agentQuestionsStatus}
               submittedQuestionIds={agentSubmittedQuestionIds}
-              submittingQuestionId={agentSubmittingQuestionId}
+              submittingQuestionIds={agentSubmittingQuestionIds}
               submitError={agentQuestionSubmitError}
               onActiveIndexChange={onQuestionPileIndexChange}
               onSubmitAnswer={onSubmitAnswer}

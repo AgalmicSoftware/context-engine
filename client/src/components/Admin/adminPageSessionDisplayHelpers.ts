@@ -1,4 +1,5 @@
 import { toStr } from '../../utilities/shared/primitives.js';
+import { parseSessionWorkerDiscoveryOrigin } from '../../utilities/session/sessionWorkerDiscovery.js';
 import { getChainName } from './adminPageHelpers';
 import { normalizeSlug } from './adminPageHelpers';
 
@@ -83,6 +84,20 @@ export const buildSessionUrl = (slug: unknown, { allowGeneral = false }: BuildSe
   const base = typeof window !== 'undefined' && window.location ? window.location.origin : '';
   if (!normalized) return allowGeneral && hasExplicitSlug ? `${base}/session` : '';
   return `${base}/session/${encodeURIComponent(normalized)}`;
+};
+
+// /session/<slug>/settings, pinned with ?worker= to the session's Worker when its
+// origin is a valid discovery origin (the route rejects any other worker value).
+export const buildSessionSettingsUrl = (slug: unknown, workerOrigin: unknown = ''): string => {
+  const sessionUrl = buildSessionUrl(slug);
+  if (!sessionUrl) return '';
+  let worker = '';
+  try {
+    worker = parseSessionWorkerDiscoveryOrigin(workerOrigin);
+  } catch {
+    worker = '';
+  }
+  return `${sessionUrl}/settings${worker ? `?${new URLSearchParams({ worker })}` : ''}`;
 };
 
 export const shortAddress = (addr: unknown): string => {

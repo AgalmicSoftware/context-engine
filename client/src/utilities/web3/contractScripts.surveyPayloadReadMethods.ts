@@ -1,17 +1,5 @@
+import { historicalResponseReadError, responseReadWindowOptions } from './responseReadWindow.js';
 import type { ContractScriptsMethodMap, ContractScriptsRuntimeDeps } from './contractScripts.runtimeDeps.js';
-
-type SbtReadProviderRef = string | Record<string, unknown>;
-type SbtReadGroupKeyOrConfig = string | Record<string, unknown> | null | undefined;
-type SbtReadOptions = { allowInjectedReadFallback?: boolean; [key: string]: unknown };
-type SbtMintBurnCountsByAddressResult = {
-  mintedCountByAddress: Record<string, number>;
-  burnedCountByAddress: Record<string, number>;
-  mintedEventCount?: number;
-  burnedEventCount?: number;
-  scannedToBlock?: number | null;
-  ok?: boolean;
-  [key: string]: unknown;
-};
 
 export const createContractScriptsSurveyPayloadReadMethods = (
   deps: ContractScriptsRuntimeDeps,
@@ -110,9 +98,7 @@ export const createContractScriptsSurveyPayloadReadMethods = (
             arweaveOpts: {
               disableExistencePrecheck: true,
               preflightTxExistence: false,
-              forceRetry: forceArweaveFetch,
               cacheBypass: forceArweaveFetch,
-              bypassFailureCache: forceArweaveFetch,
               debugContext: buildArweaveDebugContext(groupKeyOrCfg, 'survey_metadata', {
                 fn: 'getSurveyDataById',
                 surveyId: sId,
@@ -191,8 +177,20 @@ export const createContractScriptsSurveyPayloadReadMethods = (
       };
       const idB32 = ensureHash(id);
       const responderLower = String(userAddress || '').toLowerCase();
+      let blockTag = opts?.blockTag;
+      if (blockTag == null && cfg?.blockLimits?.end != null) {
+        try {
+          const window =
+            opts?._responseReadWindow ||
+            (await this.getBoundedResponseReadWindow(groupKeyOrCfg, { _resolvedCfg: cfg, responder: responderLower }));
+          blockTag = responseReadWindowOptions(window, responderLower, idB32).blockTag;
+        } catch (error: unknown) {
+          if (throwOnError) throw error;
+          return null;
+        }
+      }
       const { baseKey } = resolveReadContext(groupKeyOrCfg);
-      const inflightKey = `${baseKey}|${responderLower}|${idB32}|hash`;
+      const inflightKey = `${baseKey}|${responderLower}|${idB32}|block:${blockTag ?? 'latest'}|hash`;
 
       try {
         const result = await runInFlightCoalesced(READ_INFLIGHT.response, inflightKey, async () => {
@@ -201,10 +199,18 @@ export const createContractScriptsSurveyPayloadReadMethods = (
             method: 'SurveyContract.getResponse',
             params: { userAddress: responderLower, id: idB32 },
           });
-          const arweaveHash = await callWithRetry(
-            () => SurveyContract.getResponse(responderLower, idB32),
-            'SurveyContract.getResponse',
-          );
+          const arweaveHash = await callWithRetry(async () => {
+            try {
+              return await SurveyContract.getResponse(
+                responderLower,
+                idB32,
+                ...(blockTag == null ? [] : [{ blockTag }]),
+              );
+            } catch (error: unknown) {
+              if (blockTag != null) throw historicalResponseReadError(error, blockTag);
+              throw error;
+            }
+          }, 'SurveyContract.getResponse');
           if (!arweaveHash || arweaveHash === ethers.constants.HashZero) {
             return null;
           }
@@ -259,8 +265,22 @@ export const createContractScriptsSurveyPayloadReadMethods = (
           ? 'survey_response_payload'
           : 'question_response_payload';
       const forceArweaveFetch = !!opts?.forceArweaveFetch;
+      const rawPayload = opts?.rawPayload === true;
+      let blockTag = opts?.blockTag;
+      if (blockTag == null && cfg?.blockLimits?.end != null) {
+        try {
+          const window =
+            opts?._responseReadWindow ||
+            (await this.getBoundedResponseReadWindow(groupKeyOrCfg, { _resolvedCfg: cfg, responder: responderLower }));
+          blockTag = responseReadWindowOptions(window, responderLower, idB32).blockTag;
+        } catch (error: unknown) {
+          if (throwOnError) throw error;
+          return null;
+        }
+      }
       const { baseKey } = resolveReadContext(groupKeyOrCfg);
-      const inflightKey = `${baseKey}|${responderLower}|${idB32}|strict:${throwOnError ? '1' : '0'}|force:${forceArweaveFetch ? '1' : '0'}`;
+      const inflightKey = `${baseKey}|${responderLower}|${idB32}|block:${blockTag ?? 'latest'}|strict:${throwOnError ? '1' : '0'}|force:${forceArweaveFetch ? '1' : '0'}`;
+      const payloadInflightKey = `${inflightKey}|raw:${rawPayload ? '1' : '0'}`;
       const readE2EMockedViewedResponse = () => {
         if (typeof window === 'undefined') return null;
         if (globalThis.CE_E2E_LIT_MOCK !== true) return null;
@@ -290,17 +310,29 @@ export const createContractScriptsSurveyPayloadReadMethods = (
         return null;
       };
       try {
-        const result = await runInFlightCoalesced(READ_INFLIGHT.response, inflightKey, async () => {
+        const result = await runInFlightCoalesced(READ_INFLIGHT.response, payloadInflightKey, async () => {
           rpcLog('RPC Call:', {
             function: 'getResponse',
             method: 'SurveyContract.getResponse',
             params: { userAddress: responderLower, id: idB32 },
           });
-          const arweaveHash = await callWithRetry(
-            () => SurveyContract.getResponse(responderLower, idB32),
-            'SurveyContract.getResponse',
-          );
+          const arweaveHash = await callWithRetry(async () => {
+            try {
+              return await SurveyContract.getResponse(
+                responderLower,
+                idB32,
+                ...(blockTag == null ? [] : [{ blockTag }]),
+              );
+            } catch (error: unknown) {
+              if (blockTag != null) throw historicalResponseReadError(error, blockTag);
+              throw error;
+            }
+          }, 'SurveyContract.getResponse');
 
+          if (rawPayload && arweaveHash === ethers.constants.HashZero) return null;
+          if (rawPayload && !utils.isHexString(arweaveHash, 32)) {
+            throw new Error('Invalid response pointer returned by the contract.');
+          }
           if (!arweaveHash || arweaveHash === ethers.constants.HashZero) {
             if (throwOnError && ARWEAVE_ACTIVE) {
               throw buildHashUnavailableMetadataError(
@@ -311,7 +343,7 @@ export const createContractScriptsSurveyPayloadReadMethods = (
             return null;
           }
           const payloadPointerId = arweaveClient.hexToBase64url(arweaveHash);
-          const mockedResponse = readE2EMockedViewedResponse();
+          const mockedResponse = rawPayload ? null : readE2EMockedViewedResponse();
           if (mockedResponse) {
             normalizeSessionNameFields(mockedResponse);
             const mockedStorageRef = isCloudflareStorageResource(cfg, STORAGE_RESOURCE_KEYS.RESPONSES)
@@ -334,6 +366,7 @@ export const createContractScriptsSurveyPayloadReadMethods = (
             );
           }
           if (!ARWEAVE_ACTIVE && !isCloudflareStorageResource(cfg, STORAGE_RESOURCE_KEYS.RESPONSES)) {
+            if (rawPayload) throw new Error('Response payload storage is unavailable.');
             return null;
           }
           const storageRead = await readPayloadPointerTextForGroup({
@@ -355,9 +388,7 @@ export const createContractScriptsSurveyPayloadReadMethods = (
               gatewayTimeoutMs: Number.isFinite(Number(opts?.arweaveGatewayTimeoutMs))
                 ? Number(opts.arweaveGatewayTimeoutMs)
                 : 4500,
-              forceRetry: forceArweaveFetch,
               cacheBypass: forceArweaveFetch,
-              bypassFailureCache: forceArweaveFetch,
             },
           });
           const arweaveData = storageRead?.text;
@@ -371,6 +402,12 @@ export const createContractScriptsSurveyPayloadReadMethods = (
               message: `Invalid response JSON for pointer ${payloadPointerId}`,
               cause: parseErr,
             });
+          }
+          if (rawPayload) {
+            if (!responseJson || typeof responseJson !== 'object' || Array.isArray(responseJson)) {
+              throw new Error('The stored response payload is not an object.');
+            }
+            return responseJson;
           }
           normalizeSessionNameFields(responseJson);
           return normalizeConvictionImportance(
@@ -563,52 +600,6 @@ export const createContractScriptsSurveyPayloadReadMethods = (
       }
     },
 
-    getQuestionSurvey: async function (providerName: any, questionId: any, groupKeyOrCfg: any = null) {
-      const cfg = resolveSession(groupKeyOrCfg || '');
-      const gAddrs = getSessionAddresses(cfg);
-      const addr = gAddrs.surveys?.address;
-      const chId = gAddrs.surveys?.chainId || cfg?.networkChainId || undefined;
-
-      if (!addr || !utils.isAddress(addr)) {
-        return null;
-      }
-
-      const provider = getSurveysReadProviderForSession(groupKeyOrCfg, cfg, chId);
-      if (!provider) {
-        return null;
-      }
-      const SurveyContract = new ethers.Contract(addr, SURVEYS, provider as any);
-
-      // 🔐 Normalize
-      const ensureHash = (v: any) => {
-        try {
-          if (cryptoUtils && typeof cryptoUtils.hashIdentifier === 'function') return cryptoUtils.hashIdentifier(v);
-        } catch {}
-        try {
-          if (utils.isHexString(v, 32)) return String(v).toLowerCase();
-        } catch {}
-        const s = v === null || v === undefined ? '' : String(v);
-        return s.trim() === '' ? ethers.constants.HashZero : utils.id(s);
-      };
-      const qId = ensureHash(questionId);
-
-      try {
-        rpcLog('RPC Call:', {
-          function: 'getQuestionSurvey',
-          method: 'SurveyContract.getQuestionSurvey',
-          params: { questionId: qId },
-        });
-        const surveyIdResult = await callWithRetry(
-          () => SurveyContract.getQuestionSurvey(qId),
-          'SurveyContract.getQuestionSurvey',
-        );
-        return surveyIdResult;
-      } catch (error: any) {
-        contractsLog.error("Error getting question's associated survey:", error);
-        return null;
-      }
-    },
-
     // === CHANGED: +groupKeyOrCfg (optional). Threads group to getQuestionHash.
     async getQuestionData(providerName: any, questionId: any, groupKeyOrCfg: any, opts: any = {}) {
       const qId = String(questionId || '').toLowerCase();
@@ -646,9 +637,7 @@ export const createContractScriptsSurveyPayloadReadMethods = (
             arweaveOpts: {
               disableExistencePrecheck: true,
               preflightTxExistence: false,
-              forceRetry: forceArweaveFetch,
               cacheBypass: forceArweaveFetch,
-              bypassFailureCache: forceArweaveFetch,
               ...(Number.isFinite(Number(opts?.arweaveRetries))
                 ? { retries: Math.max(0, Number(opts.arweaveRetries)) }
                 : {}),

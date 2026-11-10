@@ -221,10 +221,6 @@
       padding-right: 5px;
     }
 
-    .welcomeSlideLayoutImageRight {
-      flex-direction: reverse-row !important;
-    }
-
     .welcomeSlideLayout {
       display: flex;
       flex-direction: row;
@@ -453,12 +449,6 @@ input[type='radio']:checked:after {
   filter: var(--ce-welcome-artwork-detail-filter);
 }
 
-.welcomeSlideImageLegacy {
-  max-height: 100%;
-  max-width: 100%;
-  filter: opacity(0.2);
-}
-
 .welcomeSlideImageToolkit {
   max-height: 100%;
   max-width: 116%;
@@ -555,15 +545,6 @@ input[type='radio']:checked:after {
   filter: brightness(1.08) saturate(1.18) contrast(1.08) var(--ce-welcome-artwork-detail-filter);
 }
 
-.welcomeSlideImageAudienceBlend {
-  mix-blend-mode: multiply;
-}
-
-.twitterUpdatesLogo {
-  color: var(--ce-text-inverse);
-  font-size: 1.5em;
-}
-
 .welcomeSlideBulletList {
   display: flex;
   box-sizing: border-box;
@@ -603,11 +584,6 @@ input[type='radio']:checked:after {
 .welcomeSlideBulletList.isTitlelessBulletList .welcomeSlideBulletText {
   margin-top: 0;
   margin-bottom: 0;
-}
-
-.welcomeSlideMediaText {
-  font-size: 50px;
-  color: var(--ce-color-white);
 }
 
 .welcomeSlideBulletText {

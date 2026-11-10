@@ -2,7 +2,916 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [0.9.0] - 2026-11-02
+
+0.9.0 also contains the 0.8.1 changes listed below, which were never released on their own.
+
+### Release verification
+
+- Reject raw provider-key shapes in release scans, including test fixtures, and generate synthetic secret-detection inputs at runtime.
+
+### Client — available when the site deploys
+
+- Session admins can press **Build atlas** in the open Results menu to build a debate atlas from the responses at that moment. While it runs, the status shows the seconds since it started, the AI model, and the prompts it sends under **Show AI prompt**. **Debate Map** shows it as read-only circles: branches and their topics. A branch or topic opens to its summary, the positions found in it, and a political compass whose two axes the AI chose from its main disagreement, with those positions and up to 40 of the participants who answered placed on it by avatar and address. Beside each participant is the AI's reading of their answers, labelled as such. Every build is kept, stamped with its time and response count, and a picker opens earlier ones. Everyone who can see a session's full Results sees its atlases; on other sessions only those who may build do.
+- Closing a branch or topic of a session's atlas keeps you on the session page. Its link button copies `/atlas/<topic>?session=<slug>`, which opens that session's Results at the topic, for those who may see them.
+- A compass's legend names its own kinds of point, Position and Participant on a built atlas, and a compass with no one placed on it says so.
+- A branch or topic's panel leads with a summary no longer than a tweet, and so does an AI Views circle's. **Show more** shows the rest and lists an atlas's positions, each named in bold with how many of those who answered hold it and a bar for their share. New builds ask the AI for a summary under 280 characters and record how many answered each topic.
+- Hovering a participant on a compass shows their address, which was drawn dark on the dark tooltip. Selecting them shows it underlined, as the link to their profile it is. Participants the AI placed on one spot now sit on half rings below it, and no two avatars or a position's dot overlap, at the chart's edges too.
+- A topic's questions look like the session's question cards, and each opens its own page in a new tab, where it can be answered. Question cards in other Debate Map panels take the same Agree, Unsure and Disagree colours, and a freeform question's preview is readable in Context Engine.
+- The picker of a session's earlier atlases is called **Version**, and a built atlas calls its levels Category and Topic in its legend, panels and List filter.
+- In Civic and Classic 95 the Debate Map's List colours each level and its Tree draws its connecting lines. Classic 95's Tree category buttons, cards and card icons are readable.
+- The Debate Map's tree view asks for a category to draw the **Tree Chart**, as its button is named.
+- Question Results shows a spinner in place of its question and response counts, and each question's count, until they load, instead of 0.
+- The status line under Results, shown while AI Views or an atlas builds, is readable in Civic, where it measured 3.35:1.
+- The Results menu buttons, the Debate Map view switch and legend, a topic's panel and its compass are readable in Civic, Context Engine and Classic 95: some labels were as low as 1:1. `npm run ai:test-theme:atlas` checks them in each theme at phone and desktop widths.
+- The Agent Village post is readable in Classic 95, where its tags, chart labels and tooltips, List view and evaluation protocol measured as low as 1.1:1. A pinned tooltip's close button also stays visible on hover and focus there and in Civic. `npm run ai:test-theme:civic` now checks the post in Classic 95 too.
+- The About page says Soulbound Token groups instead of SBT groups, and names the Cloudflare Worker alternatives: Worker Groups for access control, and Worker encryption beside Lit for on-chain sessions.
+- The RxC sessions no longer show twelve pre-filled topic circles: Debate Map appears once an atlas is built, on rxc-ra-test too. On a demo session, a built atlas replaces the demo atlas.
+- Session Settings has a **Results admins** list under Results visibility, where an admin adds or removes the addresses that may build atlases. Saving it signs no one out.
+- A session's error pages show their title and message on a readable card, with their actions as a row of matching buttons.
+- A link styled as a button matches the theme's buttons and keeps its readable colour on hover.
+- In a Group Conversation's transcript, each speaker's label is bold and has its own colour.
+- Group Conversation can hand each speaker their part: the recorder taps a person, and that person scans a looping code with their own phone, signed in or not, to open the interview with their answers drafted from what they said. The part goes from screen to phone without being stored; on the phone, the session's AI drafts the answers from it, and nothing is saved until they submit. It's slow enough to work over a shared screen on a video call, and **Copy link instead** covers a phone whose camera can't be used. The QR-code icon in the dialog's header starts the same scan, and a speaker's label in the transcript opens their code, as their button does.
+- When the recorder gives one person two labels, drag one person's button onto the other's to make them one (on a touch screen, hold it still first): the transcript shows their lines under one label, and one code carries the whole part. **Same person as…** in a person's code does the same without dragging, the × on a merged button splits it again, and merges stay with the recording through a reload.
+- When someone claims their part, the answers and files they already have in the session are reconsidered against it: a changed answer shows for review, and answers that still fit stay as they are.
+- Group Conversation's **Add transcript to context** box, on the **Submit questions** line, uploads the transcript as a context file for the group or the session, off by default.
+- The question selector no longer shows "(cache error)" when a signed-out visitor's request for other people's answers is refused on a private session.
+- Results group sizes, vote bars, overall figures, representative statements and AI group summaries now count only people who answered enough to be in the analysis, as pol.is does, in every view. People with few answers still appear on the map in their nearest group. Representative statements keep a group's five strongest before showing agreements first, and uneven or very small sets of responses no longer break the Results maps.
+- Recording is less likely to stall on networks that close a connection after a minute of silence: while a chunk waits for its transcript, the page sends a small request every 20 seconds to keep the connection in use.
+- The `/docs` page and Tool Explorer descriptions match current behavior: new sessions start public, storage depends on the session, and Lit protects only the fields you lock. `/docs` shows the current deployment diagram.
+- The setup page's Results summary shows the saved analysis choice instead of always saying manual.
+- The "Set up with your AI" heading on `/new` is readable on the Context Engine theme.
+- The About page's Agent Mirror Test and Agent Village links open the published post.
+- Worker setup help no longer calls the API token deploy legacy, says a blank anonymous IP budget means no cap, and says a disabled embedded helper refuses sponsored deploys.
+- Removed unreachable setup branches, the hidden hologram assistant, unused styles, and Bridge-era session flags, with no visible change.
+- Refresh the light-theme About page with colored use-case buttons, pressed selection states, teal actions, compact sections, and consistently sized Recognition logos.
+- Keep About actions on one line on narrow phones, enlarge resource touch targets, move section previews below their headings, and give the mobile video a clearly visible play icon.
+- Improve footer contrast, link directly to the CommonGround environments and Truth-Seeking AI grant program, and refresh the README feature slideshow and architecture artwork.
+- Let long question prompts use spare card space at phone and tablet widths, moving answer controls down before reducing text size. Extremely long prompts remain keyboard-scrollable.
+- Match the Minimal mobile Login button height to the visible C logo artwork, excluding the SVG's transparent padding.
+- Correct light-theme contrast in raw question results, expanded answers, sorting/export controls, bookmarks, sync indicators and Worker group notices, including Classic 95 counters, links and binary-answer labels. Keep the results title readable at narrow widths. Browser coverage now checks these surfaces in all three themes.
+- The login dialog's Create and Login buttons keep their fill when hovered, focused or pressed, so their labels stay readable in every theme; in Minimal, Create's label vanished on hover.
+- The locked-answers controls in Raw Results are readable in every theme, hovered, focused or pressed: Decrypt, Log in, the required-group links, the toggle that opens them, and their focus rings.
+- Primary buttons keep a readable fill in every theme, hovered, focused or pressed, including See Questions, the Agent token Login and the Worker group and document buttons. They use the theme's action colours instead of a purple that reached only 3.70:1 with their white label.
+- The HTML report's Cancel, Download and Generate buttons and the Admin and Sponsor action buttons are readable in every state and theme.
+- Decrypt on answers and questions takes the surface's own text colour, so it no longer disappears on Classic 95's teal. The locked-question notice and the locked-questions banner are readable in every theme.
+- Create and Login fit the login dialog at phone width.
+- A link with both `mode` and `joinGroup` shows the group notice inside the voice dialog, where it can be read and cancelled before signing in.
+- Creating a group says when sign-ins are rate limited instead of showing an internal code.
+- Session settings shows **Sign in** as a clear button at the start of its sentence. The buttons on the Setup and Settings pages have a fill, so Minimal no longer shows them as plain words.
+- Session settings says which account you're signed in as when it isn't one of the session's admins.
+- New groups start open to anyone who can see the session, with their members visible to it. Admins can still choose to add members themselves.
+- `rxc-ra-test-5` and `rxc-ra-test-6` open from their clean links on a device that has never seen them.
+- The Groups panel, its create and edit forms, the session's Results and Groups headers, and the Session Admin page's heading, labels and cards are readable in every theme.
+- Group Conversation offers a compact Record button and an icon-only **+** menu for audio uploads, transcript files, and pasted text. Imported audio keeps the recorder’s retry/download recovery. Internal audio parts stay hidden; downloads combine the audio not yet transcribed into one local MP3. Typed draft cards include a top-right remove button and **Submit questions**. Input guidance sits in the title tooltip.
+- Protected question storage shows a sign-in requirement instead of a generic cache error while signed out. Standard session pages omit the interview sharing panel; **Interview & share** remains on admin and publish screens.
+
+- Drop the retired Goerli test network from wallet connections and a collection metadata lookup that always failed.
+- Trust a cached Worker sign-in only when it records the Worker, session and account it was issued for; the older unscoped format, which nothing writes, is ignored.
+- Group Conversation shows who spoke as `Person 1:`, `Person 2:` lines. A five-second sample of each new voice goes with later chunks, so up to four voices keep their number across three-minute chunks; a fifth voice, or one heard only briefly, is numbered within its chunk. With a Session Worker before 0.9.0, numbers restart in each chunk and the recorder says so.
+- The voice dialog's close button asks before it stops a recording.
+- The recorder notes when the device takes the microphone, as a call can, and marks the gap in the transcript. Capture that stops without telling the page gets a fresh microphone stream.
+- On a computer, which keeps recording in a background tab, switching tabs no longer raises the hidden-page notice while audio keeps arriving. A gap in the audio, a muted microphone or a phone still gets it.
+- Only one tab at a time opens a recording; another tab says so and takes over once the first closes it.
+- The session page says when audio kept by Close and keep the audio is still waiting to upload, after a reload too, and offers Reopen recording.
+- Group Conversation is readable in every theme, hovered or focused too: recorder status, transcript details and errors, the Record, Stop, Generate questions and Reopen recording buttons, destructive confirmations, dark dialog titles and close buttons, question-type chips, draft fields, tag remove buttons, icons, focus rings and the recording timer. Civic, the default, uses system monospace fonts, and its "Transcribing…" is no longer white on white.
+- Group recording opens the transcript once it has text, in a taller box on phones, and keeps it on the newest line unless the host scrolls up. A "new draft questions" cue appears above the recorder while new drafts are out of view, and scrolls to them; it takes no space otherwise.
+- Draft review on phones shows each question and its options in full at the dialog's width, and keeps Submit questions at the bottom once every draft has been seen. Question fields resize again after fonts load or the theme changes.
+- The upload success list names each question by its text, with its ID beneath; the JSON and AI prompt views are in a closed disclosure.
+- Recorder warnings (microphone paused, screen lock, hidden page) look like notices, and Close and keep the audio, Retry and Download look like buttons. "Record speaker audio" is now "Recording voices coming from this device".
+- If device storage fails, the session page says a closed recording can't be recovered after a reload, and the browser asks before a reload, for pasted transcripts too, until the recording is reopened and saved or cleared. Audio not yet transcribed stays downloadable meanwhile, even during capture.
+- Group Conversation deletes each chunk's audio from the device once its transcript is saved, and its voice samples once every chunk is transcribed. Audio goes only to the Session Worker, which passes it to the transcription service and stores none. A reload or a closed tab can lose up to the last 10 seconds. Clear always asks first.
+- Imported audio up to 30 minutes is split on the device into three-minute parts, saved together, each uploaded and retried on its own. Longer or unreadable files are refused with a message. Record and closing wait while a file decodes.
+- Group Conversation keeps draft questions, with the host's edits and removals, after closing or reloading until they are submitted or deleted, and drafts only new conversation.
+- Draft question cards, in Group Conversation and the voice interview's review, preview the answer: Agree/Unsure/Disagree, the rating slider, the options or the credits.
+- Drafts generated while Submit uploads join the list afterwards as new drafts instead of undoing the upload, so the success list always appears and uploaded drafts can't be sent twice. Submit reads "Waiting for new drafts…" while drafts generate.
+- Text pasted while a chunk transcribes no longer stops that chunk's automatic questions, and Retry transcription appears only for failed or stalled uploads.
+- The bundled session list includes rxc-ra-test-3, so its group recorder link opens on a device that has never visited the session.
+- `/skill.md` sends agents to the session's Session Worker instead of the removed Agent Bridge.
+- `/new` is one page. Each section shows a summary, a conflict shows as a plain message beside the option, and Create confirms with your passkey, then deploys and saves.
+- Admins edit sessions at `/session/<slug>/settings`, which replaces the `/admin` metadata editor; `/admin` links there. The page says which edits sign participants out, saves only changed fields and copies the group recorder link. For an on-chain session it uploads the new metadata, has the admin's wallet update the SessionRegistry, shows each step and the transaction link, then syncs the session's Worker.
+- The settings page edits AI models, reasoning effort (for the session and per task) and transcription model; default question filters; highlighted and hidden questions and surveys; moving on after an answer; and SBT defaults. On-chain sessions also get contracts, block range, faucet amounts and SBT lists. Edits typed while the page loads are kept. Request limits and co-admins aren't editable there yet.
+- Session templates: Export, Import and share links (`/new#template=`) carry a setup's questions and context, never keys. Context files are listed by name and privacy, to attach again. Import refuses a file over 256 KB before reading it.
+- Setup offers only current OpenAI and Claude models and is readable in every theme at phone width. New sessions use GPT-6.1 Terra for everyday tasks and GPT-6.1 Sol for harder ones, and transcribe with gpt-transcribe.
+- The account presets are GPT-6.1 Terra and Sol, GPT-6 Astra, Claude Sonnet 5.5 and Claude Opus 5.5. A saved preset that no longer exists uses the default.
+- Generated questions state one plain, neutral idea each and don't repeat; breakout questions cover concrete next steps.
+- Audio summaries no longer send the transcript twice, and `$&` in typed or spoken text no longer corrupts a prompt.
+- The HTML report uses the same analysis prompt as the Results views.
+- "Set up with your AI" on `/new` copies a setup prompt, or opens it in ChatGPT or Claude. Your AI interviews you and returns a link that fills in the page, or JSON to paste under Import. Nothing is created until you review the page, add keys there and press Create.
+- `/new` reads `#setup=` links (plain base64url JSON, which an AI can write) as well as `#template=` share links, and removes either from the address bar once read.
+- Setup, share and prefill links share one decoder: wrapped links and missing padding work, invalid text is refused, and a cut-off or damaged link says which.
+- A broken prefill link opens the interview with its reason and a box to paste the AI's JSON. Drafts the page leaves out are counted instead of disappearing.
+- Admins can copy the group recorder link (`?mode=groupRecording`, with any Worker pin) from the Join panel. Unknown `mode` values are ignored and removed from the address.
+- The Context section on `/new`, on the settings page and, for admins, on the session page takes files (PDF, Markdown, text, CSV, JSON) and links for the session's AI. Each item is for everyone or for admins only; others don't see the section while the session has no context.
+- Question generation and the voice interviewer read the session's notes and links, plus the files and links the person may read, as untrusted background.
+- Setup and the settings page check context against shared limits: up to 6 paragraphs of 2,000 characters, 8 https links, and no text that looks like a secret.
+- GPT-5 and GPT-6 requests send their JSON schema in the form every released Session Worker passes to OpenAI, so question generation, summaries, profile analysis, tags and the AI filter keep working on Workers from 0.6 to 0.8.0.
+- A session that stores no AI model, and the admin AI test, let the Worker pick the model, so Workers from 0.8.0 and earlier don't refuse them.
+- Transcription with models other than whisper-1 sends audio in pieces of at most five minutes, so long recordings and uploads aren't cut short.
+- The settings page shows the highlighted and hidden lists read-only on an older Session Worker instead of failing the whole save, and checks only an edited context against the context rules. On-chain saves keep an older "don't feature SBTs" choice and AI provider, check the admin wallet's account and network before the paid upload, and offer "Retry the Worker sync" after a failed sync.
+- When a session's metadata can't be loaded, the page keeps its last usable name, Worker link and settings, so the settings page can't publish a stripped copy.
+- Clearing the cache also drops writes still waiting to save, and the cache keeps working when the browser blocks site storage.
+- SBT pages show the chain's holder count, not 0, until a full count loads.
+- An already-saved interview answer reports "Responses already saved" while another answer has an unsent edit, and a tag removed while AI suggestions load stays removed.
+- A link padded with thousands of `=` no longer freezes the page, and a setup link opened over a draft with a problem lists what it changes.
+- If another account signs in while Group Conversation records, recording stops and its chunks wait on the device until the account that made them signs back in. A recording started signed out belongs to the first account that signs in during it. A sign-out still uploads signed out.
+- HTML and PDF reports hold what the exporter can see in Results: question text they decrypted, answers, comments, conviction and responder addresses. Answers still locked for them stay out. AI analysis, and the Generated AI views that other viewers open, still leave out questions whose text the author encrypted, and their answers.
+- Reports carry the exporter's full address in the file's data and on the page. A PDF also has it in its properties and as text on every page, and the Polis report PDF is stamped the same way.
+- A long report's PDF is captured a block at a time, so it no longer outgrows what one image can hold. Its closed items are open. A very long report takes a while and makes a large file: 3,000 answers took about 20 seconds and 50 MB.
+- Reports show each rating's scale, and the browser's AI analysis receives it, so a saved analysis of a session with ratings is generated again once.
+- A transcription reply that can't be read, such as one cut off by a dropped connection, no longer counts as silence, which deleted that chunk's audio. The chunk keeps its audio and retries, and dictation shows an error instead of an empty transcript.
+- Clear reports a failed delete and can be tried again, even after an earlier save failed, instead of saying the recording is gone while chunks stay on the device.
+- An ended on-chain session reads each answer at a block, never at the latest state, so an edit made during the read can't appear as an answer from before the end.
+- The Agent page asks each rating on its own scale and step, with its end labels, and a single-choice question holds one option.
+- Results drops answers decrypted for one account when the account changes, including a decryption that finishes after the change, and stops decrypting the remaining rows.
+- Question text, survey titles and survey document links decrypted for one account are locked again when another account signs in or the account signs out, until they are decrypted for the current reader. A Decrypt Prompt that finishes after an account change is neither shown nor saved.
+- Session context files and links reset when the reader or the session's Worker changes, so the next reader never sees or sends the previous reader's admins-only items.
+- Profile SBT badges are kept per chain, so a badge burned on one chain no longer hides one earned at the same address on another.
+- Results analysis of on-chain sessions keeps answers to options whose text has repeated spaces.
+- Creating an SBT group stops before the next upload, transaction or draft save if the wallet account changes after Create.
+- Stats show cached counts within a few seconds while live group counts load or wait for a sign-in, and later updates don't wait for those counts again.
+- A changed multiple-choice draft is always saved; some option labels containing commas could make it look unchanged.
+- The Results report ignores ratings that are off the question's step grid.
+- Interview drafts snap ratings to the question's step.
+- Answer commitments in encrypted envelopes bind the exact answer: rating hashes keep the value on any scale, and Poseidon commitments include each value's length. Existing envelopes still decrypt; only new commitments change.
+- An earlier session's questions, surveys or answers finishing late no longer change whether the session you switched to counts as loaded, whether they succeed or fail.
+- A question an admin hid, from the admin panel or the settings list, and its answers leave the Results report, its filters, Raw Results, the AI's input and every export, including for admins.
+- The hidden and highlighted question lists in session settings apply in the browser for Worker-hosted sessions. They only took effect there for on-chain sessions before.
+- An admin on a session with public Results can sign in and generate AI views when no report exists yet. The check button stayed disabled.
+- A signed-out visitor to a session whose Results aren't public is asked to log in, in the report and in Raw Results. The report offered a Retry that couldn't work, and Raw Results read as if nobody had answered.
+- New sessions start with public Results, so anyone can read them and answers are stored unencrypted. Encryption and other Results visibility stay available in setup. Existing sessions keep their settings.
+- Closing the login dialog no longer stops a dialog beneath it, such as Raw Results or Group Conversation, from scrolling.
+- An on-chain survey edit checks the stored copy again just before sending, so an edit saved from another tab or device moments earlier isn't overwritten.
+- Adding a template's questions to a session removes only what was uploaded. A question edited or added while the upload ran stays in the draft.
+- A rating with the same wording but a different scale, step or end labels is no longer reported as already published when another author owns its ID. The upload is refused instead, because the two still share an ID.
+- Results no longer keeps showing the previous account's survey title, links and answers after you sign out or switch accounts.
+- Question and survey text decrypted for one account shows as locked to anyone else using the same browser, including after a reload while signed out. Signing out or switching accounts also clears that text from the browser's saved copy, and signing back in decrypts it again.
+- If the wallet switches accounts during an answer or survey upload, the transaction isn't sent from the other account; the app asks you to switch back and try again.
+- When a sent transaction's result can't be read, the app says it was sent but not confirmed, and to check your wallet before retrying, instead of reporting a failure or a revert. Creating an SBT group no longer suggests a retry that could deploy a second one.
+- Lowering a session's end block removes later answers from Question and Survey Results, showing a person's earlier answer within the range instead. Raising it again brings the later answers back.
+- A session keeps its name, Worker link and hidden questions when a reload can't read its metadata, instead of losing them.
+- On private sessions, signed-in people can lock a context file to one of the session's groups; before, the group list stayed empty. The list no longer shows another session's or account's groups.
+- **Add transcript to context** uploads as the account that submitted and skips an upload still queued when you switch accounts. Submitting again before the last upload finishes replaces its copy instead of adding the transcript twice. The next account to submit on the same device adds its own copy and leaves the previous account's in place.
+- The questions CSV includes each question's rating scale, pick-one setting and pick limit.
+- Dictation longer than about five minutes is transcribed in parts instead of failing, and a failed transcription says so and stays on screen.
+- On `/new` and the settings page, the Context section's **Format** takes typed text or one HTML file. The file keeps its own CSS, in style blocks and style and class attributes, but loses its scripts, event handlers, frames, forms and `@import` before it's saved, along with any CSS that tests the site around the page or escapes an @-rule's name, and a preview shows the result and what was removed. The session page shows it in its context section, cleaned again each time, in a box of its own: its CSS styles only the page, can't place anything outside the box, and can use the site's colours as `--ce-context-*` variables.
+- The Reverse Alignment atlas is no longer built into the client. A session shows it as its HTML context page, where its areas and topics open in place, and the RxC session list only gives those sessions their short links. A session on an older Worker, such as `rxc-ra-test-3`, shows its typed context instead.
+- Links in a session's context, typed or in an HTML page, use the context panel's own text colour, so they read in every theme. In Classic 95 the typed links were about 3:1 against the panel.
+- The Tool Explorer's question generator uploads a transcript summary to Arweave, where it is public and permanent, only when **Upload Summary** is ticked, which it no longer is by default. A summary marked **Encrypt Summary** isn't uploaded at all, because the upload can't encrypt yet. Before, both went up as plain text.
+- On `/new`, a starting file can be locked to groups set up before Create, under Access and identity: its **Visible to** lists them, and Create makes the groups before the files are added. A file goes only to the groups Create made, or to admins alone if it made none of them, never more widely. An exported template carries a locked file as admins-only.
+- Wherever a context file is added, on `/new`, the settings page, the session page or with a group conversation's transcript, **Visible to** is a dropdown of toggles like the question filter's tags: everyone in the session, admins only, or any mix of up to 20 of the session's groups, whose members may each read the file.
+- Admins see a **Group Agent** button in a session's context section. For now it only says the Group Agent is coming.
+
+### Workers — requires redeployment
+
+- `POST /admin/debate-atlas/build` builds an atlas from the responses the Worker stores. One planning call groups the questions into at most 5 branches and 12 topics, then one call per topic maps it and one per branch of several topics maps the branch, at most 6 at once and within 4 minutes, using the session's analysis model. Each response goes to its topic's call and its branch's, so a build reads about twice what one AI Views run does, and no participant address reaches the AI. A topic whose call fails is named on the atlas. One build runs at a time per session, and the newest 8 are kept. `GET /debate-atlas` reads the newest build, or one by `id`, and tells those who may build the model and prompts a build would use.
+- The session's admin, its co-admins and the new `resultsAdminAddresses` (up to 20) may build atlases; results admins can do nothing else an admin does. The public config carries `resultsAdminAddresses`, and `debateAtlas: true` to tell the site that the Worker builds atlases.
+- Anyone signed in to a session can add files to its context, each showing who added it. They can lock a file to up to 20 of the session's groups, whose members may each read it, or leave it for anyone who can see the session, and remove their own. The file list names a file's groups in `lockedGroupIds`. Admins can remove any file, and can limit adding to admins in Settings. The Worker's own AI features leave group-locked files out.
+- Sessions deployed with Deploy to Cloudflare or a manual config can store questions and answers. These Workers bind only `GROUP_KV`, so the template and the manual guide now set `CE_STORAGE_IN_GROUP_KV=1` to keep payloads there; before, uploads returned 501 and `/capabilities` reported `storage_missing`. Other Workers without a storage index behave as before. Uploads and hide requests can no longer reach Cloudflare storage on a session not configured for it.
+- Removed the retired Agent Bridge source. Agent HTTP stays in the Session Worker; admin metrics report `sessionsWithAgentActivity`, and agent on-chain answers record source `session-agent`.
+- Encrypted-envelope export takes a session admin. The session config lists `responseExportAllowedAddresses`, `telegramResponseExportAllowedAddresses`, `export.allowedAddresses` and `export.adminAddresses` no longer grant it. Nothing in Context Engine writes them, and a Hosted session's settings can't set them.
+- Removed unread Telegram fields and unused Worker exports. Stored record fields and KV prefixes are unchanged.
+- Worker routes no longer read grant lists, export claims or a substitute Worker Group identity from login tokens. Nothing issued them, so nobody loses access. Reading another participant's individual response in a Hosted session whose results aren't public still takes a session admin. Worker Groups still use the signed-in address.
+- Anonymous visitors have no daily per-IP request limit unless the session sets one. The per-wallet daily limit no longer doubles as one, so a room sharing one venue connection isn't cut off.
+- A transcription reply with no readable text returns 502, so the browser keeps the chunk's audio and retries. Earlier Workers report such a reply as silence.
+- Agent submissions count test-ETH payouts against the per-wallet daily faucet limit they share with participants. Past the limit, the submission carries on without funding.
+- Voice interviews leave out the session's hidden questions, in the question list, its hash and the opening. Hiding a question has a saved opening written again.
+- The Agent question list, answers, results and Wrapped statements, and Results analysis, leave out the session's hidden questions too, and an Agent list is complete even if a hidden question's stored object is lost. A published analysis keeps one hidden after it was generated, until it is generated again.
+- Group transcription forwards up to four known-speaker samples (a name and a short WAV) to OpenAI, so voices keep their labels across chunks. Invalid samples are dropped without failing the chunk.
+- Claude requests work on current models. The Worker sends no `temperature`, which Opus 5.5 and Fable 5.1 refuse and Sonnet and Haiku 5.5 refuse at 0.7, so older Claude models also sample at their default. It reads the answer from the reply's text blocks after any thinking, and a request without a model uses `claude-opus-5-5` instead of a model retired in 2025.
+- Only admins add context items. For a link, the Worker fetches the page itself: https on a public host only, every redirect re-checked, up to 2 MB and 10 seconds. A PDF can be read by the session's own Claude or OpenAI key. Admins-only items never reach participants through reads, lists or the AI.
+- The interview opening and results analysis use the context every participant may read.
+- set-config checks a `sessionContext` it is sent.
+- Saving part of a session's AI settings keeps the rest: set-config merges `ai` one level deep. The public config now shows reasoning effort and says that the Worker merges `ai`, so the settings page edits AI only on Workers that do.
+- set-config accepts the highlighted and hidden question and survey lists, up to 500 IDs each. Changing them signs no one out.
+- `fetch_url` and `fetch_image` need https on a public host and give up after 10 seconds; `fetch_url` also reads plain text and Markdown.
+- Agent-proposed questions are no longer tagged "object".
+- GPT-6.1 models use the Responses API, and every model is sent a reasoning effort it accepts.
+- Requests to Claude 5.x, Opus 4.5 or later and Sonnet 4.6 or later carry the session's effort and any JSON schema. A refusal or an empty answer returns HTTP 422 instead of an empty reply.
+- Interview mapping can run at medium effort on a low-effort session, and the interview opening allows 2,000 tokens, so models that think have room to answer.
+- Results analysis accepts JSON wrapped in a code fence. Agent results record the model that actually ran.
+- Wrapped posters use gpt-image-2.5-flare.
+- Storage export manifests drop `rewrapRequiredForNewDeployment`, the deprecated copy of `deploymentKekContinuityRequired`, and Lit requests no longer read the retired `gateChainId` field; send `chainId`.
+- After an upgrade from 0.8.0, a restore that 0.8.0 had already published is finished, instead of being offered for abandonment or deleted when it expires.
+- A retried answer upload keeps its own storage ID, so a stalled first attempt that finishes late can't make the saved answer unreadable; the late attempt removes its own copy.
+- An agent's overlapping next-question requests are handled one at a time, so none repeats a question or loses history, and a repeated `requestId` returns the same question. A restore target that holds agent question state is no longer treated as empty.
+- Session context accepts Wikipedia, Notion and block-explorer links. The secret check also refuses Telegram bot tokens, RPC links carrying an Alchemy or Infura key, and Stripe and Hugging Face keys.
+- A payload's own groups narrow a group-gated session's audience instead of adding to it, so a session member outside them can't read or list the payload.
+- Session Wrapped loads catalogs of more than 200 questions instead of returning 503. It still reads at most 1,000 stored question rows, and re-uploaded or hidden questions count toward that.
+- Context links drop hidden script, style and navigation text however the closing tag is written.
+- A context link or PDF reading started by an admin who has since been replaced is refused instead of published.
+- One request at a time reads a context PDF; another gets 409 "already being read", and readings and removals no longer undo each other.
+- Faucet payouts take turns with their signing wallet, in hosted and registry sessions, for agents and for sponsored grants, so concurrent requests no longer fail on the same nonce, even when sessions share a key. A running payout keeps its turn; a request that waits 30 seconds gets 503 and leaves a sponsored grant unspent.
+- Results analysis drops ratings off the question's step grid, agent-created rating questions keep their end labels, and the interview catalog and brief include each rating's step.
+- Results analysis respects each answer's own access rule. The automatic queue lost the rule, so an answer limited to admins could reach the AI and the published analysis. Sessions that ran automatic analysis with such answers should regenerate it.
+- Results analysis picks the current version of each question and answer before checking who may read it, so a newer restricted version no longer brings back the older public one.
+- Automatic Results analysis uses the stored answer rather than its shortened copy in the queue, once the stored one is listed.
+- A bootstrap upload applies the signed-origin check login uses, so an admin's signature made for another site is refused before its nonce is spent. It now needs a browser `Origin` header from a trusted origin.
+- An access rule gives the same answer in any order. A member or admin who qualifies through one condition is let in while another condition's group check is down, instead of getting a 503, and a failed condition in an all-of rule refuses with 403.
+- A first upload that fails partway no longer leaves its ID free for another author to claim; its author can retry it.
+- Agent answer drafts are kept under the question's full ID, so a question with a crafted ID can't share another question's draft.
+- When storage can't read an agent's earlier draft, saving the draft fails with the retryable `answer_draft_read_failed`, instead of resetting its edit count and origin.
+- An agent re-posting a question can't change its options or scale under earlier answers, or bring back an archived one: the re-post is refused with `question_schema_conflict` or `question_archived`. An identical re-post leaves the stored question as it is.
+- An agent's batch of new questions reports every question it stored. Before, it could report stored questions as skipped.
+- Hiding a question from the Storage panel also has the saved interview opening written again, and an interview no longer shares an opening still being written for a different set of hidden questions.
+- The Worker's AI features and the context list find context files among hundreds of other library files. Before, about 300 other files could leave the AI without context, with no sign of it; a failed context scan is now logged.
+- A session's context can be an uploaded HTML page of up to 20,000 characters, in place of its paragraphs and links. Set-config refuses the two together and checks the page, as written and as its words, for anything that looks like a key. The session's AI reads the page as plain text, in no more room than typed paragraphs get, so attached files still fit.
+
+### Benchmark
+
+- Keep the standalone Raw Results heading readable and correctly wrapped at narrow widths, scope Risk Matrix heading colors to their own dialog, and give export buttons readable colors and descriptive accessible names.
+- `answer --resume` asks again when the endpoint, model settings, declared model revision, routing or answer schema change. Answers saved by earlier versions are asked again once. Answer files record each model's revision, and a run that reaches two deployments of one model stops with an error.
+- Typed answers and importance replies ignore drafts inside reasoning tags and refuse truncated reasoning.
+- An importance reply holding two different allocations, or one cut off mid-object, is retried instead of scored by its first allocation.
+- Flipped rating prompts are used only when flipped answers stay on the scale's grid.
+- Mock ratings land on the scale's step grid.
+- `compare-answers` skips a question that the answer file and the export define differently, and says what differs.
+- `compare-answers` reports everyone apart from groups, so a group named `everyone` stays separate.
+
+### Agents and MCP
+
+- Several Agent HTTP names no longer say Telegram. In question sources and reasons, `telegram_only_*` is now `hosted_*`, `telegram_worker_question_index` is now `worker_question_index`, and a question with no id gets a `hosted-` one. In submit results, `telegram_submit_queue_*` is now `agent_submit_queue_*`. In group data, a `membershipSource` of `telegram_user` is now `agent_principal`. An agent that matches the old strings must switch to the new ones.
+- Agent admin status no longer reports `canManageResponseExportAllowlist`, because sessions have no export allowlist.
+- Agent fidelity takes the latest record by the time the Worker stored it, never by the participant's own clock, so a later withdrawal or edit counts.
+- Agent fidelity and MCP `get_results` reject ratings off the step grid and allocations over the voice-credit budget.
+- Agent fidelity keeps equally typical people in one group, so reordering records can't change the most-unusual and most-typical results. When everyone is equally typical, it reports no groups. Confident misses with equal confidence list in question order.
+- Agent fidelity's AI score beside the most common answer, overall and in each typicality third, counts only the predictions that answer can be checked against, so the two differ by exactly the lift.
+- Agents read an uploaded HTML context as its words, in `paragraphs`, never as markup; a page with no words gives no paragraph.
+
+### Local tooling
+
+- `npm run test:worker:agent` is the agent test command; `test:worker:agent-bridge` is gone. Public history replay keeps the audited cutover for old commits and accepts only a complete retirement of the Bridge subtree.
+- Corrected documentation across the README, guides, spec, private runbooks and companion docs, and deleted finished audit notes. Three scripts now use kebab-case names.
+- `deploy:evm` passes the RPC URL to `forge script`, which ignored `ETH_RPC_URL` and only simulated.
+- `deploy:evm` stops with an error instead of printing wrong addresses when another transaction from the deployer moves its nonce.
+- The public package no longer lists `ai:playwright-server`, whose script the public tree leaves out.
+- Corpus freshness with `--as-of` ignores entries dated after that day.
+- Rendering a film frame range that skips frame 0 still writes the video still.
+
+## [0.8.1] - not released; included in 0.9.0
+
+### Verification and shared rules
+
+- Pin the recovery-key export test's clock to midday UTC so it no longer fails near midnight.
+
+- Give the AI prediction results tests 8 seconds to show their scores; hosted CI under coverage needed more than 1.
+
+- Separate the voice-mode modal shell and interview panel to keep client components within the release size limits.
+
+- Include catalog completeness in the interview compatibility fixture.
+
+- Complete mocked Lit provisioning checkpoints before testing atomic configuration writes.
+
+- Give upload-diagnostics fixtures the durable storage targets required by receipts.
+
+- Isolate SBT name tests by clearing their complete cache namespace.
+
+- Use hexadecimal commitments in answer-size regression fixtures.
+
+- Mark the Lit provisioning mock credential as an explicit fixture for release scans.
+
+- Isolate community regression tests by clearing complete cache namespaces.
+
+- Use complete encrypted-envelope fixtures in decrypt-and-resubmit regression tests.
+
+- Verify interview submission leaves unrelated manual answers pending for ordinary Submit.
+
+- Verify mixed-file generation retains rejected-file notices while sending only supported extracted text to the model.
+
+- Provide the mocked wallet-action boundary in shared Jest setup for session-page imports as well as account components.
+
+- Keep the wallet URI encoder override effective after npm hoisting and validate the installed query-dependency tree.
+
+- Mock wallet disconnection in community and sponsorship lifecycle tests when importing the shared logout boundary.
+
+- Install the Session Worker package in the hosted contracts job before its registry smoke imports Worker code.
+
+- Refresh the client coverage inventory count without changing measured coverage or enforced floors.
+
+- Cover the pinned Worker session route with read-only navigation fixtures and
+  loaded-session assertions while keeping unmatched network requests blocked.
+
+- Seed encrypted provisioned secrets in admin integration fixtures.
+
+- Align integration assertions with explicit General comparison links and scanned
+  SBT mint totals.
+
+- Keep the analysis session-switch regression mock compatible with typed Jest.
+
+- Preserve the Session Worker's isolated dependencies in public replay checks.
+
+- Include shared answer validation in Worker release source comparisons.
+
+- Check signed payment hashes in proof-authorized faucet integration tests.
+
+- Verify authenticated faucet replies against the signed payment hash and amount.
+
+- Preserve the original benchmark rating prompts for integer-origin, step-1
+  scales; describe increments only for other rating grids.
+
+- Reject eager client runtime import cycles in the wiring gate, with a zero
+  baseline and exclusions for type-only imports and deferred loads.
+
+- Use one rating bounds and step rule across browser sliders, agent drafts and
+  submissions, Wrapped, MCP and benchmark answers; suggested buttons are display hints.
+
+### Arweave
+
+- Use one forced-refresh option across payload caches and in-flight requests.
+  Evict malformed JSON replies so ordinary reads can retry immediately.
+
+### Agents and MCP
+
+- Keep up to 50 research runs per agent identity, up from 20, and state the limit in the agent instructions.
+
+- Mark research summaries incomplete when they hold records an earlier Worker wrote without a participant or run, instead of showing an invented participant.
+
+- Prepare MCP 0.2.0 with shared rating validation: fractional grids are supported, and new answers must follow the stored step (default 1). Existing answers remain unchanged. The minor version marks the changed accepted-input behavior; application and MCP versions remain independent.
+
+- Summarize research runs from bounded per-principal journal coverage, storing each frozen question list once. Summary exports read attempt metadata and one answer state per principal instead of every answer event.
+
+- Reuse registry creation-block lookup across MCP configuration refreshes.
+
+- Bound MCP registry reads and cached/local answers to the configured session window, using historical pointers at its end.
+
+- Read research gold and wide exports from permanent submitted-answer history,
+  preserving revision order and gold answers from before each prediction.
+
+- Count research completion from distinct stored answers and privacy skips, using
+  the Wrapped image coverage rule. Retried attempts remain marked as replays.
+
+- Recheck MCP cancellation after chain validation, token refresh and retry-key
+  persistence before sending writes, preserving results already broadcast.
+
+- Mark MCP results, question lists and own-answer reads incomplete when listed
+  payloads are unread, including cached misses, and report unread answer counts.
+
+- Require the storage target and timestamp on every upload receipt reservation and
+  execute reply, while preserving interrupted uploads at their original target.
+
+- Persist and retry failed question-index ranges, and keep unread question payloads
+  incomplete until recovery succeeds.
+
+- Refresh expired registry question indexes even after their historical scan is
+  complete, sharing concurrent background refreshes and preserving the indexed block.
+
+- Publish complete MCP key files atomically on filesystems with hard links, so
+  concurrent first launches share one identity without reading a partial key.
+
+- Resolve default MCP registry links to the registered `general` session while
+  continuing to reject mismatched session identities.
+
+- Serve every eligible question before repeating, including catalogs larger than
+  250 questions. Prune removed questions while preserving sponsored priority.
+
+- Limit failed-issuance credential cleanup to its own token record, preserving
+  newer credentials issued concurrently and reporting failed revocation writes.
+
+- Keep targeted question-vote matches regardless of catalog size or position,
+  with stable ordering for equally relevant recommendations.
+
+- Score participant results from each question's type and rating scale. Keep
+  freeform, choice and other unscored answers out of agreement counts and averages.
+
+- Require structured approval for sponsored question changes; text-only approval
+  no longer applies them. Require a valid plan digest and reject it when the plan changes.
+
+- Keep canonical submitted answers when a stale submission-index copy has the
+  same timestamp. Newer timestamps still take precedence when deduplicating copies.
+
+- Keep the CC package's shipped rating-scale module synchronized with the shared
+  rating validation rules.
+
+- Give each agent answer edit a durable revision and request identity, so changing
+  back to an earlier answer submits the edit while retries remain idempotent.
+
+- Count one current answer per participant and question in agent results and
+  answered-state views, using a shared deterministic revision order within each
+  participant/question and chronological order across the selected answers.
+
+### Local tooling
+
+- Add an in-process participation rehearsal for concurrent invite, Wrapped prediction and signed-in browser response flows, with optional KV write throttling.
+
+### Client — available when the site deploys
+
+- Open the group recorder from `?mode=groupRecording` links; `?mode=recordGroup` no longer opens it.
+
+- Keep a Group Conversation recording running when someone taps outside the dialog or presses Escape, and offer "Close and keep the audio" only after Stop.
+
+- Retry a recording upload that stops responding instead of letting it hold up later chunks, and add Retry to uploading chunks.
+
+- Let Clear work without device storage and with failed chunks, asking before it deletes audio. A recording stays with the account that made it: another account or a signed-out visitor starts fresh, and audio held only on this page stays until it is saved or downloaded.
+
+- Require real speech, not just gap markers, before generating questions from a recording.
+
+- Keep speaker labels on when one chunk's audio is rejected as too large or unreadable; any other refusal, such as an older Worker's, turns them off for the rest of the recording with a notice.
+
+- Stagger chunk retries so rooms sharing a key don't retry together, and apply a slow speaker-label check that answers before Record is pressed.
+
+- Save hidden-page notices with the recording so they survive a reload and reopening the recorder.
+
+- Keep the voice dialog and its recording when someone signs in with a wallet on a different chain from a chain session's.
+
+- Stop the unsaved-answers notice from returning after an interview submission and Clear.
+
+- Report a skipped file once, on the next Generate, instead of on every later run or after the sources change.
+
+- Leave hidden draft facts out of voice interviews wherever they appear, including the summary, while keeping shown facts that contain the same words intact.
+
+- End the wallet connection when logout can't reach the wallet, so the next sign-in starts with a fresh connection.
+
+- Shorten the passkey sign-out error to one sentence, with details behind a "?" button.
+
+- Keep Group Conversation audio held only in memory when stored recordings can't be read on reopening, when the recorder is left without Close and keep the audio, and when Close and keep runs before saved audio has loaded.
+
+- Show when the microphone or recorder stops ahead of the storage, offline and question-generation notices; the storage notice no longer says that recording continues. A chunk-rotation error clears once the next chunk starts.
+
+- Keep Group Conversation audio held only in memory when its dialog is closed and reopened more than once, and retry saving it to the device on each reopening.
+
+- Reject malformed WalletConnect query escapes with native URI decoding, removing the vulnerable decoder dependency while keeping the existing wallet stack.
+
+- Remove the unused SBT canvas image-load callback; previews continue to use fetched image files.
+
+- Preserve the pinned Worker session through the full question view, filters, and response editor so alias routes such as `/session/demo/questions` load without an EVM network.
+
+- Remove the unused standalone `/debate`, `/beta`, `/contributors`, `/matrix`, and `/demos` pages and obsolete navigation. Preserve Atlas, simulated profiles, demo sessions, and the shared risk matrix.
+
+- Preserve an in-flight SBT image when pasting supplies no usable replacement; only an applied image supersedes it.
+
+- Keep bare question URLs unpinned until their session is explicit or found in cache, so General fallback cannot become permanent.
+
+- Recheck invalid Arweave metadata after the terminal cooldown so a temporary gateway error cannot hide SBT metadata permanently.
+
+- Omit imported facts tied only to hidden drafts from voice interview context, including copied context text.
+
+- Give hidden-draft help an accessible description and keep its tooltip open while hovered.
+
+- Keep rejected file names visible when question generation starts, while clearing stale extraction failures.
+
+- Show passkey disconnect failures in the login modal after local sign-out clears the account, instead of leaving an unhandled button promise.
+
+- Accept configured Claude model IDs for photo requests through Anthropic and OpenRouter without restricting the family name or version.
+
+- Track all pending agent answers so navigating between concurrent submissions keeps each pending answer disabled until its own request finishes.
+
+- Show the pending-page-answer notice beside Submit only after an interview submission leaves answers unsaved. Clear it after ordinary submission.
+
+- Keep previous publication IDs and cache-hydration status out of saved authoring drafts.
+
+- Preserve internal option spacing through the live Results controller so Breakdown counts match stored selections.
+
+- Keep a closed profile analysis dialog closed when refreshed inputs invalidate its result.
+
+- Disconnect wagmi and persist logout intent in shared teardown, including agent logout, so stale wallet props cannot sign the participant back in.
+
+- Document phone recording limits, a dedicated powered recorder, and the revised 45-minute recovery rehearsal.
+
+- Enable Group Conversation recording with plain transcription when the speaker-label provider check takes more than two seconds.
+
+- Leave no empty recording chunk when microphone capture fails to start or rotate; retain the active chunk on rotation failure.
+
+- Keep timestamped hidden-page recording notices after returning and stopping, until dismissed.
+
+- Name recording uploads and audio downloads by their MIME container, including WebM, MP4, M4A, Ogg and WAV.
+
+- Fall back to plain transcription on provider speaker-label rejections, including errors nested in the Worker response, while keeping temporary errors in the retry queue.
+
+- Keep breakout capture and its transcript together across sign-in or delayed account restoration by pinning the recording scope until it is cleared.
+
+- Retry temporary recording failures for as long as the page is open, keep failed audio with transcript gap markers, continue later chunks after permanent errors, and offer closing with pending audio kept for reopening.
+
+- Keep recording and transcription running from memory when device storage fails or is unavailable. Save cumulative audio snapshots at most every ten seconds and retain audio until its transcript is saved.
+
+- Enable speaker labels by default for OpenAI Group Conversation recordings, with the existing plain-transcription fallback.
+
+- Keep recording chunks in IndexedDB until their transcripts are saved, retry uploads in order, and offer per-chunk retry/download controls with storage, offline and microphone guidance.
+
+- Show concealed AI guesses as grey answer areas with readable help text in both themes until the participant answers.
+
+- Preserve multiple-choice selections in generated results so options containing semicolons count correctly.
+
+- Require at least one question type before generation and explain responses with no usable questions.
+
+- Reuse cached and in-flight Arweave payloads when loading SBT metadata.
+
+- Release agent login loading after account changes and allow independent answer submissions to finish.
+
+- Keep profile analysis open across data refreshes while discarding stale results.
+
+- Accept Claude 5 model names for photo analysis through Anthropic and OpenRouter.
+
+- Clear stale source and rejected-file warnings when starting a new question generation.
+
+- Keep tags entered during generation and exclude generation progress from saved drafts.
+
+- Clear unchanged authoring drafts after publication even when their debounced save lagged behind the form.
+
+- Recheck encrypted wallet storage before saving a newly created passkey wallet.
+
+- Show the remaining unsubmitted page-answer count with Submit after an interview.
+
+- Keep response scan watermarks unchanged when live events arrive, so refreshes retry earlier unreadable payloads.
+
+- Fall back to plain transcription when speaker labels are unavailable, retain text-only replies, and hide the labels toggle for other providers.
+
+- Preserve registry routing in join links and recover from invalid admin Worker fields when resolving interview compatibility.
+
+- Preserve internal whitespace in Breakdown choice labels so valid selections and participant totals match the Report.
+
+- Disconnect MetaMask before logout clears account props, preserve explicit disconnect intent, and surface passkey disconnect failures.
+
+- Keep General-session question bookmarks, result links, and copied URLs pinned to General even when another session is selected.
+
+- Preserve the latest SBT image choice and saved bytes when an earlier image request finishes late.
+
+- Count Community groups by chain and contract address, while counting the same contract across session caches only once.
+
+- Open the saved-filter loader in inline Results even when no filters are active or after clearing them; tokens and full URLs restore Group and Top question selections.
+
+- Finish and save Group Conversation transcription before Close, Escape, or outside dismissal; keep failed audio available in the open dialog for retry.
+
+- Count every quadratic step in double and triple clicks after pile auto-advance,
+  while still ignoring leftover clicks from the previous question.
+
+- Use session-sponsored AI and viewer authentication for Polis group analysis,
+  and show failed requests with a working retry instead of caching a local summary.
+
+- Preserve edited questions and saved drafts on failed regeneration, asking before a usable replacement overwrites edits.
+
+- Count distinct demo personas separately from their modeled responses, omitting unknown persona counts.
+
+- Accept photo sources with the built-in Claude presets using explicit preset image capabilities.
+
+- Open Breakdown distributions directly and select questions even when no demographic segments exist.
+
+- Include public response explanations in comparison AI input and expanded details.
+
+- Keep pending AI tag suggestions attached to the question that requested them, releasing busy state after edits or removal.
+
+- Cap question text once in Results analysis input and keep every included response linked to an included question.
+
+- Keep profile analysis, cached results and pending updates bound to their original person, session and inputs.
+
+- Clear all agent and Worker credentials on either logout, cancelling pending logins and requests before resetting mounted views.
+
+- Generate questions only from extracted source text; name skipped files and stop offering PDF or PowerPoint generation input.
+
+- Limit HTML report files and snapshot downloads to the selected sections; hide the JSON download when unchecked.
+
+- Release participant Group creation after an account change while preserving its draft and ignoring old completions.
+
+- Preserve participant Group drafts across configuration refreshes; update default tags only while untouched.
+
+- Keep cleared cache namespaces empty after storage recovery and report incomplete clears without reloading.
+
+- Limit interview submissions to selected changed answers through validation,
+  encryption, upload and draft cleanup; leave unselected manual drafts intact.
+
+- Preserve multilingual speech after overlapping audio chunks by trimming
+  only verified transcript offsets in both uploaded and rolling audio.
+
+- Try another document index after malformed GraphQL replies and retain the
+  current document list when every endpoint fails.
+
+- Compare freeform answers and comments as exact text throughout editing,
+  dirty counts, submission differences and interview review; only rating
+  answers use numeric equivalence.
+
+- Keep loaded empty saved answers distinct from unknown baselines, so a newer
+  saved clear drops older draft edits while incomplete loading preserves them.
+
+- Hold back an invalid saved locked response individually while submitting other
+  valid changes, and keep rejecting newly typed lone asterisks before upload.
+
+- Refuse lone asterisks in answers and comments before upload, require valid
+  envelopes for encrypted response fields, and clear old ciphertext on edits.
+
+- Re-encrypt response fields and ratings when gate conditions or chains change;
+  require decryption before submitting a still-locked field to a different gate.
+
+- Clear cached registry overrides when their on-chain fields are empty, restoring
+  metadata or defaults while preserving failed and unrequested fields.
+
+- Keep Realtime interview questions and answers in conversation order when
+  transcription completions arrive late or repeat.
+
+- Keep cluster AI explanations on the selected session Worker with the current viewer authentication context.
+
+- Prioritize newer unanswered questions in the voice interview and personal AI-prefill prompt using the browser’s own answer state, preserving public catalog versions and fingerprints.
+
+- Add optional Group Conversation speaker labels, stored per recording chunk in the local transcript draft. Speaker review and claiming remain unavailable.
+
+- Keep Group Conversation and Interview screens awake where supported, and offer a remembered speaker-audio option for recording remote participants heard through the device speakers.
+
+- Add a compact Join panel with a voice-interview QR code, a copyable session link and the existing review-only AI prompt on session, admin and publish-result pages.
+
+- Preserve every stored survey answer when submitting a partial edit. Read the
+  current raw container before uploads, retain unchanged encrypted rows exactly,
+  and refuse submission when that snapshot cannot be read.
+
+- Finish question and survey publication in its original session, preserve drafts
+  edited while publishing, and leave newly opened forms and their timers untouched.
+
+- Pin all SBT writes to the collection session’s configured chain, reject missing
+  chains and wallet mismatches, and include the chain in the approved transaction.
+
+- Keep SBT history reads on the session chain and retain cached counts when its
+  provider is unavailable, without substituting an injected wallet’s history.
+
+- Separate SBT count-scan coverage from pending live activity. Fill missed history
+  without double counting, replace orphaned counts on complete scans, and rebuild
+  obsolete cache entries instead of migrating them.
+
+- Read later-edited answers at the configured scan end, with separate historical
+  requests and partial-failure reasons when archive state is unavailable.
+
+- Apply pending decrypts only to their original response and unchanged viewer,
+  profile and source-session context, preserving newer response revisions.
+
+- Limit General comparisons to General data and carry the same explicit session
+  through comparison URLs, provenance and AI requests.
+
+- Treat retired SBT collections as fully hydrated when their admin is the zero
+  address, so discovery advances and does not repeatedly fetch their metadata.
+
+- Keep in-flight AI analysis tied to its starting session, reader and chain;
+  exports omit analysis when the current filtered inputs have changed.
+
+- Drop live events outside the session scope or configured block limits without
+  treating a lagging RPC head as a configured end.
+
+- Cache every live survey responder in a block, order same-block edits by transaction
+  and log position, and ignore duplicate events.
+
+- Reloading the Session Wizard preserves explicit start blocks. New blank starts record draft-only provenance so automatic defaults can follow chain changes without entering published configuration.
+
+- Empty completed filters export zero questions and responses, with report availability based on those same counts. Session totals remain the fallback while filters hydrate.
+
+- Survey discovery retains creation blocks from raw event logs and keeps the earliest block for duplicate survey IDs.
+
+- Retry chain-backed response payload failures from their event block instead of
+  advancing past them. Forced refreshes rescan from the session's start block.
+
+- Refuse encrypted-key wallet creation when a wallet is already saved for this
+  RP ID, preserving its recovery key before any new passkey prompt.
+
+- Cancel pending passkey creation, unlocks, and signing on logout or deletion.
+  Late replies cannot restore the signer or connected metadata; expiry still
+  permits one signature re-unlock.
+
+- Remove circular session-parser and Arweave imports while preserving resource
+  diagnostics and gateway URL normalization.
+
+- Validate wallet transaction quantities before policy checks and sign that same
+  normalized transaction in both the Worker and in-memory fallback.
+
+- Reconcile Worker question and survey caches against complete catalogs, keeping
+  pending writes and a ten-minute grace period for new records.
+
+- Keep hidden Worker questions and surveys hidden in the reader cache, including
+  when saved answers carry their question text. Clear hides only after a complete catalog refresh.
+
+- Add a **Measure how well AI represents participants** switch to Interview
+  settings, in the wizard and `/admin` (needs a Session Worker newer than
+  0.8.0). It turns on research sharing by default, hidden drafts for 1 in 5
+  AI-prefill drafts and the participant score together, and in `/admin` turns
+  voice interviews back on if they were off; turning it off restores the
+  research defaults.
+
+- Add **How well AIs predicted people** to the Results report of sessions that
+  turn on **Show “How well AIs predicted people” in Results**: the overall and
+  hidden-draft Mirror Scores, how often people changed a shown draft, stated
+  confidence against answers kept, and results by platform. It appears once
+  the responses include AI-prefill drafts from the session's minimum number
+  of people, 5 by default, and withholds any figure from fewer, and a
+  platform also when subtracting it from the overall score would reveal
+  fewer. It scores in a background thread.
+
+- Add two Interview settings for that section, in the wizard and `/admin`
+  (each needs a Session Worker newer than 0.8.0): **Show “How well AIs
+  predicted people” in Results** (`interviewMode.showFidelityResults`, off by
+  default), which adds it, while the participant score stays private to each
+  person; and under it, **Smallest group shown in “How
+  well AIs predicted people”** (`interviewMode.fidelityMinimumPeople`, 5 by
+  default), whose **Off** shows every figure, even one person's.
+
+- Suggest the session's open groups after an interview or AI prefill link
+  (`interviewMode.suggestGroups`, off by default; needs a Session Worker
+  newer than 0.8.0). A group named like the person's single-choice answer
+  comes first without an AI call, hidden AI drafts stay out until shown, and
+  suggestions never join anyone. A join started before sign-in now survives
+  it, and suggestions no longer reload, with an AI call, on every render.
+
+- Resolve the `rxc-ra-test-2` session from its short URL through bundled Worker
+  discovery, without requiring a `worker` query parameter.
+
+- Move Discard interview out of the modal footer into a trash button beside
+  the microphone. Its tooltip, and its description for screen readers, say
+  what discarding clears and that submitted responses are kept.
+
+- Offer the ChatGPT or Claude prefill prompt from the voice chooser, in a
+  **Let your AI draft your answers** card below Interview and Group
+  Conversation, instead of inside the interview; the chooser's descriptions
+  now sit behind question-mark tooltips. `?mode=voice` opens the chooser.
+  Prefill links still open the interview on their drafts, now with a status
+  line and a **Talk through your drafts** microphone.
+
+- Open the interview's AI submission choices inside their dropdown instead of
+  over the drafts, with every sharing choice listed before the prefill metadata.
+  The metadata no longer repeats what an unticked box leaves out, and is hidden
+  when nothing is shared.
+
+- Leave questions people have already answered out of interview and AI-prefill
+  drafts, and say how many were left out. A voice or typed interview that gives
+  a different answer still shows that draft, noting the answer it changes.
+  Answers saved earlier but not yet loaded on the page now count too, so an
+  interview no longer replaces them unasked. While questions remain open, the
+  voice interviewer asks only about those.
+
+- Update `follow-redirects` to 1.16.2, which fixes a case where custom credential
+  headers could follow a redirect.
+
+### Workers — requires redeployment
+
+- Clear saved Lit setup only when Lit confirms it is gone (the saved key is refused, or a complete list lacks the saved group or wallet), including after an operator replaces a revoked key, so setup can start over; network, rate-limit and billing errors keep saved progress.
+
+- Isolate Wrapped and submit permission revocation tests from invite removal.
+
+- Mark interview discovery incomplete for temporary Cloudflare payload-read failures, and stop retrying permanently missing or malformed on-chain payloads.
+
+- Preserve Lit accounts and setup resources across failed attempts. Authority-choice switches with a saved group, PKP or action name those resources and offer Resume; supplied keys are checked before reserving an attempt.
+
+- Keep web and agent sessions signed in across effective content-only settings edits, including wizard verification, while revoking authorization for authority changes.
+
+- Return speaker-labelled transcription segments for Group Conversation recordings.
+
+- Recover lost restore handoff replies using a scoped, expiring completion receipt for the importing signer.
+
+- Mark interview discovery incomplete when question pointers or payloads cannot be read, while retaining readable eligible questions and retryable empty results.
+
+- Calculate research completion from each run’s own answer events and initial statement set.
+
+- Allow failed Lit setup to restart with a fresh authority choice, reject conflicting credentials clearly, and preserve checkpoint writes across content revisions.
+
+- Preserve rating scales and fractional steps through public agent questions and results scoring.
+
+- Route automatic custom-provider results analysis through the same checked HTTPS fetch path as manual analysis, including redirect checks.
+
+- Store and revoke General-session login tokens under one namespace, preserving explicit session isolation.
+
+- Checkpoint Lit setup resources in encrypted coordinator storage and resume
+  failed attempts without recreating completed resources; activate only after
+  the complete setup is finalized atomically.
+
+- Count only eligible public questions toward interview discovery's 100-question
+  limit, with separate scan budgets and retryable incomplete-discovery errors.
+
+- Reject encrypted response fields without a valid envelope and public lone-asterisk masks.
+
+- Require public HTTPS targets without embedded credentials throughout custom AI
+  redirects, and refuse requests when outbound safety checks are unavailable.
+
+- Bind restored session Worker URLs to the signed, verified destination origin so
+  recovery at a new Worker passes client discovery without loosening ordinary edits.
+
+- Keep the importing admin authorized through restore cleanup; publish the restored
+  authority and release its lock atomically, with status reads able to finish cleanup.
+
+- Check each listing group once per request and return a retryable failure when
+  membership is unavailable, instead of reporting an incomplete page as complete.
+
+- Patch the committed encrypted secret document, preserving key replacements
+  and removals across stale KV reads, retries, Lit setup and backup restore.
+
+- Recheck group mutation authority in the session config coordinator and order the separate group commit against admin rotation, including participant epoch checks.
+
+- Remove legacy membership reads and migration from group rosters, preserving
+  removal tombstones across repeated paginated listings.
+
+- Research CSV exports use the browser's shared formula guard and quote every cell; JSONL exports retain exact participant text.
+
+- Groups result images draw only participants in groups that meet the minimum size, matching JSON group counts without assigning suppressed participants to another group.
+
+- Anonymous IPv6 callers in one /64 now share a quota; IPv4-mapped addresses share the corresponding IPv4 quota.
+
+- Extract fetched HTML in linear time, including responses with repeated
+  unclosed tags, while preserving ordinary visible text.
+
+- Sign each faucet payment once and resend the same bytes across RPC fallback.
+  Return the transaction hash on uncertain outcomes, including agent requests.
+
+- Cap Cloudflare upload metadata at 64 KiB with bounded tags so accepted records
+  fit backup entries; legacy oversized export errors name the affected storage ID.
+
+- Preserve zero-byte documents through backup and restore, treating an empty KV
+  payload as valid bytes rather than a missing object.
+
+- Reject question options that are not strings; client cache and input readers
+  ignore malformed legacy options without converting untrusted objects.
+
+- Resume interrupted response uploads at their reserved storage ID and timestamp,
+  retaining pending receipts and avoiding duplicate published answers after a crash.
+
+### Benchmark reports
+
+- Compare importance shuffle and mock-allocation hashes in code-point order; model fingerprint ordering retains its explicit English locale.
+
+- Omit full-bank importance from question-limited previews with an explicit integrity warning instead of silently dropping allocation runs.
+
+- Require one schedule seed per release report and warn when previews combine different seeds.
+
+- Allow completed benchmark runs at different repeat depths to share a report while preserving their seeds and strict resume checks.
+
+- Keep importance prompt fingerprints stable across host locales.
+
+- Bind preview importance allocations to the full question wording and order before display limits.
+
+- Refuse preview reports with missing or mismatched question prompt hashes before answers can be exported against changed wording.
+
+- Bind longitudinal snapshots to the persona instructions and prompt template actually used, rejecting changed or missing context.
+
+- Parse benchmark answers after removing inline reasoning, and retry conflicting or truncated final answers.
+
+- Publish rendered previews with the same validated analysis overlay, retaining HTML equality and integrity checks.
+
+- Keep report trait names and values as own dictionary keys, including built-in
+  names such as constructor, across grouping, filtering and export.
+
+- Audit every model the full OpenRouter runner will send, using one effective
+  roster for preflight, planning and execution.
+
+- Validate OpenRouter's transport and serving provider separately. Enforce upstream
+  routing restrictions with normalized comparisons while preserving reported metadata.
+
+- Use the validated release receipt for benchmark labels, indexing and publication
+  status. Require explicit release confirmation and verify the embedded report's hash.
+
+- Compare similarity drift over the same usable question set in both snapshots,
+  report its IDs and count, and mark insufficient common overlap unavailable.
+
+- Keep benchmark deadlines active through success/error bodies and structured-output
+  fallback attempts, cancelling stalled streams so tasks can retry.
+
+- Repair incomplete checkpoint tails and missing final newlines before any
+  benchmark resume appends new records; reject corrupt middle lines.
+
+- Bind importance resume to its recorded endpoint and reject mixed endpoints
+  using the deployment identity check shared with stance runs.
+
+- Hash importance prompts in model-id and numeric-repeat order for both generation
+  and release validation, independent of roster order.
+
+- Let the AI discourse benchmark answer any session's questions, every type
+  included: `answer` asks each model with reversed wording, flipped rating
+  scales and shuffled options, and checks replies with the MCP's answer rules,
+  now shared in `shared/questions/answerValue.mjs`. `compare-answers` then
+  compares models with everyone and with each group, using statistics suited
+  to each question type; a group is withheld when it has fewer than 5 people
+  or when subtracting it from everyone would leave fewer.
+
+### Research
+
+- Add Cohen's kappa for choice predictions and rating error, as a share of
+  the scale, to the agent fidelity report.
+
+- Add an agent fidelity report: `scripts/agent-fidelity-report.mjs` scores
+  how well AI drafts predicted participants' answers from a Results JSON
+  export or Session Wrapped rows. It reports Mirror Score, correction rate,
+  calibration, lift over a majority guess, accuracy for unusual views, and
+  whether drafts flatten strong or varied views. See `docs/agent-fidelity.md`.
+  It counts each response under the responder the Worker or chain recorded,
+  not the payload's own claim, reads platforms as ChatGPT, Claude or other,
+  and withholds calibration bands from fewer than 5 people, and any platform,
+  draft-source or group row whose subtraction from the total would reveal
+  fewer.
+
+- Keep shared AI draft comparisons minimal by default: predicted answers, ratings,
+  confidence and changed fields, without the AI's notes, drafted text or drafts
+  for skipped questions. Owners can choose full detail with
+  `interviewMode.researchDetail`, which needs a Session Worker newer than 0.8.0.
+  Records now carry `version: 2`, `researchTier` and `draftOrigin`, and a line
+  beside Submit says when sharing is on.
+
+- Hide a share of AI-prefill drafts until people answer, to measure how much
+  seeing a draft sways answers: `interviewMode.hiddenDraftShare`, which needs a
+  Session Worker newer than 0.8.0. Each hidden question shows the AI's guess
+  after the answer, and research records keep `predictionCondition`, the answer
+  from before the reveal and when it was shown. Anchoring now compares hidden
+  drafts only with shown drafts from the same source.
+
+- Ask AI prefill and interview drafting for confidence as the chance the
+  person keeps the answer unchanged (prompt `ce-interview-brief-v6`), so it can
+  be calibrated. v4 and v5 links and catalogs still work; the fidelity report
+  calibrates only confidences with this meaning.
+
+- Show participants a private score after they submit AI-prefill drafts
+  (`interviewMode.showFidelityScore`, which needs a Session Worker newer than
+  0.8.0): how many answers their AI matched, its Mirror Score, its hidden-draft
+  guesses and most confident misses, worked out in the browser. The footer
+  button stays in place.
+
+## [0.8.0] - 2026-10-28
 
 ### Agents and MCP
 
@@ -224,6 +1133,7 @@ All notable changes to this project will be documented in this file.
 
 - File questions without valid answers under "no data" in the report's tag
   filter instead of "mixed / unsure".
+
 
 ## [0.7.0] - 2026-10-21
 

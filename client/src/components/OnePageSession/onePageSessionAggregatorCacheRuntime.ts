@@ -3,6 +3,7 @@ import {
   normalizeAuthoritativeQuestionPoolId,
   resolveAuthoritativeQuestionPoolScope,
 } from '../SurveyTool/surveyAuthoritativeQuestionPool';
+import { getBlockedQuestionIdsSet } from '../SurveyTool/surveyToolScope';
 import {
   resolveWorkerCanonicalCacheIdentity,
   type WorkerCanonicalCacheIdentity,
@@ -314,15 +315,18 @@ export const buildOnePageSessionAggregatorCacheResult = ({
     const networkNodeForAggregation = useDemoFallback
       ? scopeAggregatorNetworkNodeToQuestionPool(networkNode, fallbackQuestions, slug)
       : networkNode;
+    const hiddenQuestionIds = getBlockedQuestionIdsSet(slug);
     sourceSigParts.push(
       [
         slug || '__general__',
         computeAggregatorSourceSnapshotSignature(networkNodeForAggregation.questionResponses || {}),
         computeAggregatorQuestionMetadataSignature(networkNodeForAggregation.questions || {}),
+        [...hiddenQuestionIds].sort().join(','),
       ].join(':'),
     );
 
     const { map, dirty } = buildAggregatorFromLocalCache(networkNodeForAggregation, {
+      hiddenQuestionIds,
       parseMemo,
       sessionSlug: slug,
     });

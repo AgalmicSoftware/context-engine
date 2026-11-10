@@ -32,14 +32,10 @@ const createDeferred = <T = any,>(): Deferred<T> => {
 
 jest.mock('../Shared/AsyncSearchSelect', () => ({
   __esModule: true,
-  default: ({ options = [], isLoading = false, noOptionsMessage, loadingMessage, placeholder }: any) => (
+  default: ({ options = [], isLoading = false, noOptionsMessage, placeholder }: any) => (
     <div data-testid="mock-sbt-select">
       {placeholder ? <div data-testid="mock-sbt-select-placeholder">{placeholder}</div> : null}
-      {isLoading && (
-        <div data-testid="mock-sbt-select-loading">
-          {typeof loadingMessage === 'function' ? loadingMessage() : 'Loading'}
-        </div>
-      )}
+      {isLoading && <div data-testid="mock-sbt-select-loading">Loading</div>}
       {!isLoading && options.length === 0 && (
         <div data-testid="mock-sbt-select-empty">
           {typeof noOptionsMessage === 'function' ? noOptionsMessage() : null}

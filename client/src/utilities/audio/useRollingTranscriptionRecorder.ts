@@ -1,14 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { transcribeAudio } from '../ai/aiClient.js';
 import { requestPreferredSpeechMicrophone } from './microphoneSelection';
-import {
-  DEFAULT_ROLLING_TRANSCRIPTION_CHUNK_MS,
-  RollingTranscriptSegment,
-  clearListeningDraft,
-  readListeningDraft,
-  stitchRollingTranscriptSegments,
-  writeListeningDraft,
-} from './rollingTranscription';
+import { useRecordingWakeLock } from './useRecordingWakeLock';
+import { useRecordingLeaveGuard } from './useRecordingLeaveGuard';
+import { useRecordingChunkQueue } from './useRecordingChunkQueue';
+import { DEFAULT_ROLLING_TRANSCRIPTION_CHUNK_MS, type CaptureGap } from './rollingTranscription';
 
 type UseRollingTranscriptionRecorderOptions = {
   sessionSlug?: string;
@@ -16,7 +11,8 @@ type UseRollingTranscriptionRecorderOptions = {
   context?: unknown;
   workerUrl?: string;
   chunkMs?: number;
-  retainRawAudio?: boolean;
+  recordSpeakerAudio?: boolean;
+  labelSpeakers?: boolean;
 };
 
 type FinalizeRecordingOptions = {
@@ -35,6 +31,18 @@ const pickSupportedMimeType = () => {
 
 const describeError = (error: unknown): string =>
   error instanceof Error ? error.message : String(error || 'Unknown recording error');
+// How long a stopped recorder gets to hand over its last audio and confirm the stop.
+const STOP_WAIT_MS = 2000;
+// How often to check that audio still arrives. A browser may deliver it only at each chunk's end, so the
+// microphone is restarted only after a chunk length and 30 seconds without any.
+const STALL_CHECK_MS = 5000;
+const STALL_GRACE_MS = 30_000;
+// A recorder hands over audio each second; a longer wait while the page is hidden means capture may have stopped.
+const HIDDEN_AUDIO_GAP_MS = 3000;
+// Only a computer is known to keep recording in a background tab. A phone can feed the page silence while a call
+// holds the microphone, with no event to say so, so its hidden spells always keep their notice.
+const recordsInBackground = () => typeof window !== 'undefined' && !!window.matchMedia?.('(pointer: fine)').matches;
+const CAPTURE_RESTARTED_NOTICE = 'No audio arrived for a while, so the microphone was restarted.';
 
 export const useRollingTranscriptionRecorder = ({
   sessionSlug = '',
@@ -42,60 +50,90 @@ export const useRollingTranscriptionRecorder = ({
   context,
   workerUrl,
   chunkMs = DEFAULT_ROLLING_TRANSCRIPTION_CHUNK_MS,
-  retainRawAudio = false,
+  recordSpeakerAudio = false,
+  labelSpeakers = false,
 }: UseRollingTranscriptionRecorderOptions = {}) => {
   const [status, setStatus] = useState<RollingRecorderStatus>('idle');
-  const [segments, setSegments] = useState<RollingTranscriptSegment[]>([]);
-  const [transcript, setTranscript] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
-  const [elapsedSeconds, setElapsedSeconds] = useState(0);
-
+  const chunkDurationMs =
+    Number.isFinite(Number(chunkMs)) && Number(chunkMs) > 0
+      ? Math.max(15_000, Math.floor(Number(chunkMs)))
+      : DEFAULT_ROLLING_TRANSCRIPTION_CHUNK_MS;
+  const chunks = useRecordingChunkQueue({
+    sessionSlug,
+    sessionConfig,
+    context,
+    workerUrl,
+    labelSpeakers,
+    chunkMs: chunkDurationMs,
+    capturing: status !== 'idle' && status !== 'error',
+  });
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const { segments, transcript, labelsUnavailableReason, beginChunk, prepare, finishTranscription, retryChunk } =
+    chunks;
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  // The device took the microphone (a call, Siri) without hiding the page; recording goes on when it returns.
+  const [microphonePaused, setMicrophonePaused] = useState(false);
+  const mutedAtRef = useRef<number | null>(null);
+  const lastAudioAtRef = useRef(0);
+  const restartingRef = useRef(false);
+  const [captureRestarts, setCaptureRestarts] = useState(0);
+
   const streamRef = useRef<MediaStream | null>(null);
   const mountedRef = useRef(false);
-  const segmentsRef = useRef<RollingTranscriptSegment[]>([]);
-  const segmentIndexRef = useRef(0);
+  const requestGenerationRef = useRef(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const rotationTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const recordingActiveRef = useRef(false);
   const endingRecordersRef = useRef<Set<MediaRecorder>>(new Set());
   const stopWaitersRef = useRef<Set<() => void>>(new Set());
-  const queueRef = useRef<Promise<void>>(Promise.resolve());
-  const rawChunksRef = useRef<Map<string, Blob>>(new Map());
-
-  const chunkDurationMs =
-    Number.isFinite(Number(chunkMs)) && Number(chunkMs) > 0
-      ? Math.max(15_000, Math.floor(Number(chunkMs)))
-      : DEFAULT_ROLLING_TRANSCRIPTION_CHUNK_MS;
-
-  const updateSegments = useCallback(
-    (updater: (previous: RollingTranscriptSegment[]) => RollingTranscriptSegment[]) => {
-      const next = updater(segmentsRef.current);
-      segmentsRef.current = next;
-      const stitched = stitchRollingTranscriptSegments(next);
-      setSegments(next);
-      setTranscript(stitched);
-      writeListeningDraft(sessionSlug, { transcript: stitched, segments: next });
+  // Ends a recorder's chunk with the audio it has delivered, for when it never confirms Stop.
+  const finishersRef = useRef(new WeakMap<MediaRecorder, () => void>());
+  // While the page is hidden: whether audio kept arriving, and whether the device paused the microphone.
+  const hiddenCaptureRef = useRef<{ lastAudioAt: number; stopped: boolean } | null>(null);
+  const { pageHidden: savePageHidden, pageShown: savePageShown } = chunks;
+  const onPageHidden = useCallback(
+    (at: number) => {
+      hiddenCaptureRef.current = { lastAudioAt: at, stopped: false };
+      savePageHidden(at);
+      // Hand over the part second not yet delivered, so it is saved too.
+      try {
+        mediaRecorderRef.current?.requestData();
+      } catch (_) {
+        // An inactive recorder has nothing more to give.
+      }
     },
-    [sessionSlug],
+    [savePageHidden],
+  );
+  // A computer goes on recording in a background tab: a hidden spell it filled with audio, with no gap, the
+  // microphone never paused and recording still on, needs no notice.
+  const onPageShown = useCallback(
+    (at: number) => {
+      const hidden = hiddenCaptureRef.current;
+      hiddenCaptureRef.current = null;
+      const carriedOn =
+        !!hidden &&
+        !hidden.stopped &&
+        at - hidden.lastAudioAt <= HIDDEN_AUDIO_GAP_MS &&
+        mutedAtRef.current == null &&
+        recordingActiveRef.current &&
+        recordsInBackground();
+      savePageShown(at, carriedOn);
+    },
+    [savePageShown],
+  );
+  const { wakeLockHeld, pageHidden } = useRecordingWakeLock(
+    status === 'recording' || status === 'paused',
+    onPageHidden,
+    onPageShown,
   );
 
   useEffect(() => {
     mountedRef.current = true;
-    const draft = readListeningDraft(sessionSlug);
-    if (draft) {
-      const restoredTranscript = draft.transcript || stitchRollingTranscriptSegments(draft.segments);
-      segmentsRef.current = draft.segments;
-      setSegments(draft.segments);
-      setTranscript(restoredTranscript);
-      writeListeningDraft(sessionSlug, { transcript: restoredTranscript, segments: draft.segments });
-      const maxIndex = draft.segments.reduce((max, segment) => Math.max(max, Number(segment.index || 0)), -1);
-      segmentIndexRef.current = maxIndex + 1;
-    }
     return () => {
       mountedRef.current = false;
     };
-  }, [sessionSlug]);
+  }, []);
 
   const stopTimer = useCallback(() => {
     if (timerRef.current) {
@@ -131,77 +169,6 @@ export const useRollingTranscriptionRecorder = ({
     }
   }, []);
 
-  const processSegment = useCallback(
-    (blob: Blob) => {
-      if (!blob || blob.size < 100) return;
-      const index = segmentIndexRef.current;
-      segmentIndexRef.current += 1;
-      const id = `segment-${Date.now()}-${index}`;
-      const startedAt = Date.now();
-      const segment: RollingTranscriptSegment = {
-        id,
-        index,
-        status: 'queued',
-        text: '',
-        startedAt,
-      };
-
-      if (retainRawAudio) {
-        rawChunksRef.current.set(id, blob);
-      }
-
-      updateSegments((previous) => [...previous, segment]);
-
-      queueRef.current = queueRef.current
-        .catch(() => undefined)
-        .then(async () => {
-          if (!mountedRef.current) return;
-          updateSegments((previous) =>
-            previous.map((entry) => (entry.id === id ? { ...entry, status: 'transcribing' } : entry)),
-          );
-
-          try {
-            const text = await transcribeAudio(blob, {
-              sessionSlug,
-              sessionConfig,
-              context,
-              workerUrl,
-            });
-            if (!mountedRef.current) return;
-            const cleanedText = String(text || '').trim();
-            if (cleanedText) {
-              setErrorMessage('');
-            }
-            updateSegments((previous) =>
-              previous.map((entry) =>
-                entry.id === id
-                  ? {
-                      ...entry,
-                      status: 'complete',
-                      text: cleanedText,
-                      completedAt: Date.now(),
-                    }
-                  : entry,
-              ),
-            );
-            if (!retainRawAudio) {
-              rawChunksRef.current.delete(id);
-            }
-          } catch (error) {
-            if (!mountedRef.current) return;
-            const message = describeError(error);
-            setErrorMessage(message);
-            updateSegments((previous) =>
-              previous.map((entry) =>
-                entry.id === id ? { ...entry, status: 'error', error: message, completedAt: Date.now() } : entry,
-              ),
-            );
-          }
-        });
-    },
-    [context, retainRawAudio, sessionConfig, sessionSlug, updateSegments, workerUrl],
-  );
-
   const stopRecorder = useCallback((recorder: MediaRecorder | null, endSession: boolean): boolean => {
     if (!recorder || recorder.state === 'inactive') return false;
     if (endSession) {
@@ -209,6 +176,9 @@ export const useRollingTranscriptionRecorder = ({
     }
     try {
       recorder.stop();
+      // The stop event finishes the recorder's chunk. If it never comes, finish the chunk with the audio
+      // already delivered, or it stays Recording and holds up every later upload.
+      setTimeout(() => finishersRef.current.get(recorder)?.(), STOP_WAIT_MS);
       return true;
     } catch (error) {
       if (endSession) {
@@ -227,13 +197,42 @@ export const useRollingTranscriptionRecorder = ({
   }, []);
 
   const createRecorder = useCallback(
-    (stream: MediaStream): MediaRecorder => {
+    (stream: MediaStream, gapBefore?: CaptureGap): MediaRecorder => {
       const mimeType = pickSupportedMimeType();
       const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
 
+      let capture: ReturnType<typeof beginChunk> | undefined;
+      let finished = false;
+      const fragments: Blob[] = [];
+      const snapshot = (finishing = false) => {
+        // Once the chunk is finished, with or without the stop event, later audio from this recorder is
+        // ignored: it would turn the finished chunk back into Recording.
+        if (finished) return;
+        finished = finishing;
+        const audio = new Blob(fragments, {
+          type: recorder.mimeType || mimeType || fragments[0]?.type || 'audio/webm',
+        });
+        if (!capture && audio.size) capture = beginChunk(gapBefore);
+        capture?.(audio, finishing);
+      };
       recorder.ondataavailable = (event: BlobEvent) => {
         if (event.data && event.data.size > 0) {
-          processSegment(event.data);
+          lastAudioAtRef.current = Date.now();
+          // Only the live recorder's audio, with the microphone not paused, shows that capture carries on.
+          const hidden = hiddenCaptureRef.current;
+          if (
+            hidden &&
+            recorder === mediaRecorderRef.current &&
+            recorder.state === 'recording' &&
+            mutedAtRef.current == null
+          ) {
+            const now = Date.now();
+            if (now - hidden.lastAudioAt > HIDDEN_AUDIO_GAP_MS) hidden.stopped = true;
+            hidden.lastAudioAt = now;
+          }
+          // Timeslice fragments share a container header; persist the cumulative chunk.
+          fragments.push(event.data);
+          snapshot();
         }
       };
       recorder.onerror = (event: Event) => {
@@ -242,12 +241,23 @@ export const useRollingTranscriptionRecorder = ({
         clearRotationTimer();
         stopTimer();
         stopTracks();
-        setErrorMessage(describeError(error));
+        setErrorMessage(
+          `Recording stopped. Check microphone permission, then press Record again. ${describeError(error)}`,
+        );
         setStatus('error');
+        if (recorder.state !== 'inactive') stopRecorder(recorder, true);
+        else snapshot(true);
       };
       recorder.onstop = () => {
+        snapshot(true);
         const shouldEndSession = endingRecordersRef.current.delete(recorder);
-        if (!shouldEndSession) {
+        // A recorder that stops by itself while capturing (no Stop, rotation or error event) has ended the
+        // recording; without this the dialog would keep showing Recording while nothing is captured.
+        const stoppedItself = !shouldEndSession && mediaRecorderRef.current === recorder && recordingActiveRef.current;
+        if (stoppedItself) {
+          setErrorMessage('Recording stopped. Press Record to continue. What was recorded so far is kept.');
+          setStatus('error');
+        } else if (!shouldEndSession) {
           if (mediaRecorderRef.current === recorder && !recordingActiveRef.current) {
             mediaRecorderRef.current = null;
           }
@@ -267,30 +277,38 @@ export const useRollingTranscriptionRecorder = ({
         }
       };
 
+      // A constructor/start failure must not publish an empty chunk to the queue.
+      recorder.start(1000);
+      capture ??= beginChunk(gapBefore);
+      finishersRef.current.set(recorder, () => snapshot(true));
       return recorder;
     },
-    [clearRotationTimer, processSegment, resolveStopWaiters, stopTimer, stopTracks],
+    [beginChunk, clearRotationTimer, resolveStopWaiters, stopRecorder, stopTimer, stopTracks],
   );
 
-  const rotateRecorder = useCallback(() => {
-    if (!recordingActiveRef.current || !streamRef.current) return;
-    const previousRecorder = mediaRecorderRef.current;
-    if (!previousRecorder || previousRecorder.state === 'inactive') return;
+  const rotateRecorder = useCallback(
+    (gapBefore?: CaptureGap) => {
+      if (!recordingActiveRef.current || !streamRef.current) return;
+      const previousRecorder = mediaRecorderRef.current;
+      if (!previousRecorder || previousRecorder.state === 'inactive') return;
 
-    try {
-      const nextRecorder = createRecorder(streamRef.current);
-      nextRecorder.start();
-      mediaRecorderRef.current = nextRecorder;
-      stopRecorder(previousRecorder, false);
-    } catch (error) {
-      setErrorMessage(describeError(error));
       try {
-        previousRecorder.requestData();
-      } catch (_) {
-        // Keep the active recorder running; the next timer tick will retry rotation.
+        const nextRecorder = createRecorder(streamRef.current, gapBefore);
+        mediaRecorderRef.current = nextRecorder;
+        stopRecorder(previousRecorder, false);
+        // Rotation is the only error raised while capture continues; a successful one clears it.
+        setErrorMessage('');
+      } catch (error) {
+        setErrorMessage(describeError(error));
+        try {
+          previousRecorder.requestData();
+        } catch (_) {
+          // Keep the active recorder running; the next timer tick will retry rotation.
+        }
       }
-    }
-  }, [createRecorder, stopRecorder]);
+    },
+    [createRecorder, stopRecorder],
+  );
 
   const startRotationTimer = useCallback(() => {
     clearRotationTimer();
@@ -299,8 +317,129 @@ export const useRollingTranscriptionRecorder = ({
     }, chunkDurationMs);
   }, [chunkDurationMs, clearRotationTimer, rotateRecorder]);
 
+  const watchMicrophone = useCallback(
+    (stream: MediaStream) => {
+      stream.getTracks().forEach((track) => {
+        track.addEventListener?.(
+          'ended',
+          () => {
+            if (streamRef.current !== stream || !recordingActiveRef.current) return;
+            setErrorMessage(
+              'Microphone access ended. Restore microphone permission, then press Record to continue. What was recorded so far is kept.',
+            );
+            setStatus('error');
+            recordingActiveRef.current = false;
+            clearRotationTimer();
+            stopTimer();
+            stopRecorder(mediaRecorderRef.current, true);
+          },
+          { once: true },
+        );
+        track.addEventListener?.('mute', () => {
+          if (streamRef.current !== stream || !recordingActiveRef.current) return;
+          if (hiddenCaptureRef.current) hiddenCaptureRef.current.stopped = true;
+          mutedAtRef.current ??= Date.now();
+          setMicrophonePaused(true);
+        });
+        track.addEventListener?.('unmute', () => {
+          const startedAt = mutedAtRef.current;
+          if (streamRef.current !== stream || startedAt == null) return;
+          if (hiddenCaptureRef.current) hiddenCaptureRef.current.stopped = true;
+          mutedAtRef.current = null;
+          setMicrophonePaused(false);
+          // Nothing was captured meanwhile: speech carries on in a new chunk, and the transcript notes the gap.
+          if (mediaRecorderRef.current?.state !== 'recording') return;
+          rotateRecorder({ startedAt, endedAt: Date.now(), cause: 'muted' });
+          startRotationTimer();
+        });
+      });
+    },
+    [clearRotationTimer, rotateRecorder, startRotationTimer, stopRecorder, stopTimer],
+  );
+
+  // Audio stopped arriving with no event, as when a phone's capture dies after an interruption. A new recorder
+  // on the same stream would hear nothing either, so take a fresh microphone stream.
+  const restartCapture = useCallback(async () => {
+    // One restart at a time: asking for the microphone can take longer than another stall.
+    if (restartingRef.current) return;
+    restartingRef.current = true;
+    const generation = requestGenerationRef.current;
+    const stalledSince = lastAudioAtRef.current;
+    lastAudioAtRef.current = Date.now();
+    const stalled = mediaRecorderRef.current;
+    // The silent recorder's stop must not end the recording. Audio it still holds comes with its stop event,
+    // which finishes its chunk; without that event the chunk ends with what it delivered.
+    mediaRecorderRef.current = null;
+    clearRotationTimer();
+    const finishStalled = () => stalled && finishersRef.current.get(stalled)?.();
+    try {
+      if (stalled?.state === 'inactive') finishStalled();
+      else if (stalled) {
+        stalled.stop();
+        setTimeout(finishStalled, STOP_WAIT_MS);
+      }
+    } catch (_) {
+      finishStalled();
+    }
+    stopTracks();
+    setCaptureRestarts((restarts) => restarts + 1);
+    // Stop, a new Record press or closing the recorder while the microphone is asked for ends this restart.
+    const superseded = () =>
+      !mountedRef.current || !recordingActiveRef.current || generation !== requestGenerationRef.current;
+    try {
+      const stream = await requestPreferredSpeechMicrophone(navigator.mediaDevices, {
+        echoCancellation: !recordSpeakerAudio,
+      });
+      if (superseded()) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
+      streamRef.current = stream;
+      watchMicrophone(stream);
+      mediaRecorderRef.current = createRecorder(stream, {
+        startedAt: stalledSince,
+        endedAt: Date.now(),
+        cause: 'stalled',
+      });
+      lastAudioAtRef.current = Date.now();
+      startRotationTimer();
+    } catch (error) {
+      if (superseded()) return;
+      recordingActiveRef.current = false;
+      stopTimer();
+      stopTracks();
+      setErrorMessage(
+        `Recording stopped: no audio arrived and the microphone couldn't restart. Press Record to continue. What was recorded so far is kept. ${describeError(error)}`,
+      );
+      setStatus('error');
+    } finally {
+      restartingRef.current = false;
+    }
+  }, [
+    clearRotationTimer,
+    createRecorder,
+    recordSpeakerAudio,
+    startRotationTimer,
+    stopTimer,
+    stopTracks,
+    watchMicrophone,
+  ]);
+
+  useEffect(() => {
+    if (status !== 'recording') return undefined;
+    lastAudioAtRef.current = Date.now();
+    const timer = setInterval(() => {
+      // No audio is expected while the page is hidden or the device holds the microphone.
+      if (document.visibilityState === 'hidden' || mutedAtRef.current != null) lastAudioAtRef.current = Date.now();
+      else if (Date.now() - lastAudioAtRef.current > chunkDurationMs + STALL_GRACE_MS) void restartCapture();
+    }, STALL_CHECK_MS);
+    return () => clearInterval(timer);
+  }, [chunkDurationMs, restartCapture, status]);
+
   const startRecording = useCallback(async () => {
     if (status === 'recording' || status === 'paused' || status === 'requesting') return;
+    // Another account's recording, or another tab, holds this one; its notice says what to do.
+    if (chunks.ownerNotice || chunks.openElsewhereNotice) return;
     if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
       setErrorMessage('Microphone recording is not available in this browser.');
       setStatus('error');
@@ -312,34 +451,54 @@ export const useRollingTranscriptionRecorder = ({
       return;
     }
 
+    const requestGeneration = ++requestGenerationRef.current;
     setStatus('requesting');
     setErrorMessage('');
 
     try {
-      const stream = await requestPreferredSpeechMicrophone(navigator.mediaDevices);
-      if (!mountedRef.current) {
+      await prepare();
+      if (!mountedRef.current || requestGeneration !== requestGenerationRef.current) return;
+      const stream = await requestPreferredSpeechMicrophone(navigator.mediaDevices, {
+        echoCancellation: !recordSpeakerAudio,
+      });
+      if (!mountedRef.current || requestGeneration !== requestGenerationRef.current) {
         stream.getTracks().forEach((track) => track.stop());
         return;
       }
       streamRef.current = stream;
+      watchMicrophone(stream);
+      recordingActiveRef.current = true;
       const recorder = createRecorder(stream);
       mediaRecorderRef.current = recorder;
-
-      recordingActiveRef.current = true;
-      recorder.start();
       setElapsedSeconds(0);
       startElapsedTimer();
       startRotationTimer();
       setStatus('recording');
     } catch (error) {
+      if (!mountedRef.current || requestGeneration !== requestGenerationRef.current) return;
       recordingActiveRef.current = false;
       clearRotationTimer();
       stopTimer();
       stopTracks();
-      setErrorMessage(describeError(error));
+      setErrorMessage(
+        `Could not start recording. Check microphone permission and recording support, then try again. ${describeError(error)}`,
+      );
       setStatus('error');
     }
-  }, [clearRotationTimer, createRecorder, startElapsedTimer, startRotationTimer, status, stopTimer, stopTracks]);
+  }, [
+    clearRotationTimer,
+    createRecorder,
+    recordSpeakerAudio,
+    prepare,
+    startElapsedTimer,
+    startRotationTimer,
+    status,
+    stopTimer,
+    stopTracks,
+    watchMicrophone,
+    chunks.ownerNotice,
+    chunks.openElsewhereNotice,
+  ]);
 
   const pauseRecording = useCallback(() => {
     if (status !== 'recording') return;
@@ -373,8 +532,11 @@ export const useRollingTranscriptionRecorder = ({
 
   const finalizeRecording = useCallback(
     async ({ waitForTranscription = true }: FinalizeRecordingOptions = {}) => {
+      if (waitForTranscription) retryChunk();
       const recorder = mediaRecorderRef.current;
       if (!recorder || recorder.state === 'inactive') {
+        // A recorder that went quiet without a stop event still holds its chunk open.
+        if (recorder) finishersRef.current.get(recorder)?.();
         recordingActiveRef.current = false;
         clearRotationTimer();
         stopTimer();
@@ -383,7 +545,7 @@ export const useRollingTranscriptionRecorder = ({
           setStatus('idle');
         }
         if (waitForTranscription) {
-          await queueRef.current.catch(() => undefined);
+          await finishTranscription();
         }
         return;
       }
@@ -405,7 +567,7 @@ export const useRollingTranscriptionRecorder = ({
         timeout = setTimeout(() => {
           stopWaitersRef.current.delete(waiter);
           settle(false);
-        }, 2000);
+        }, STOP_WAIT_MS);
         const stopStarted = stopRecorder(recorder, true);
         if (!stopStarted) {
           stopWaitersRef.current.delete(waiter);
@@ -414,32 +576,41 @@ export const useRollingTranscriptionRecorder = ({
       });
 
       if (!stopped) {
+        // The browser never confirmed Stop. Finish the chunk with the audio delivered so far, so it uploads,
+        // and leave Stopping; a stop event that turns up later finds the chunk finished.
+        endingRecordersRef.current.delete(recorder);
+        finishersRef.current.get(recorder)?.();
+        if (mediaRecorderRef.current === recorder) mediaRecorderRef.current = null;
         stopTimer();
         stopTracks();
+        if (mountedRef.current) setStatus((previous) => (previous === 'error' ? 'error' : 'idle'));
       }
       if (waitForTranscription) {
-        await queueRef.current.catch(() => undefined);
+        await finishTranscription();
       }
     },
-    [clearRotationTimer, stopRecorder, stopTimer, stopTracks],
+    [clearRotationTimer, finishTranscription, retryChunk, stopRecorder, stopTimer, stopTracks],
   );
 
   const stopRecording = useCallback(() => finalizeRecording({ waitForTranscription: false }), [finalizeRecording]);
+  // Another account signed in mid-recording: stop capture; the chunks wait for the account that made them.
+  useEffect(() => {
+    if (chunks.accountSwitched && (status === 'recording' || status === 'paused')) void stopRecording();
+  }, [chunks.accountSwitched, status, stopRecording]);
 
-  const clearDraft = useCallback(() => {
-    if (status === 'recording' || status === 'paused' || status === 'requesting' || status === 'stopping') return;
-    rawChunksRef.current.clear();
-    segmentIndexRef.current = 0;
-    setSegments([]);
-    segmentsRef.current = [];
-    setTranscript('');
-    setElapsedSeconds(0);
-    setErrorMessage('');
-    clearListeningDraft(sessionSlug);
-  }, [sessionSlug, status]);
+  const clearDraft = useCallback(
+    (discardAudio = false) => {
+      if (status !== 'idle' && status !== 'error') return;
+      void chunks.clearDraft(discardAudio);
+      setElapsedSeconds(0);
+      setErrorMessage('');
+    },
+    [chunks.clearDraft, status],
+  );
 
   useEffect(
     () => () => {
+      ++requestGenerationRef.current;
       recordingActiveRef.current = false;
       clearRotationTimer();
       stopTimer();
@@ -452,24 +623,78 @@ export const useRollingTranscriptionRecorder = ({
       }
       stopTracks();
     },
-    [clearRotationTimer, stopRecorder, stopTimer, stopTracks],
+    [chunks.scope, clearRotationTimer, stopRecorder, stopTimer, stopTracks],
   );
 
+  useEffect(() => {
+    setStatus('idle');
+    setErrorMessage('');
+  }, [chunks.scope]);
+
+  useEffect(() => {
+    if (status !== 'idle' && status !== 'error') return;
+    mutedAtRef.current = null;
+    setMicrophonePaused(false);
+    setCaptureRestarts(0);
+  }, [status]);
+
   const pendingSegmentCount = segments.filter(
-    (segment) => segment.status === 'queued' || segment.status === 'transcribing',
+    (segment) => segment.status === 'queued' || segment.status === 'transcribing' || segment.status === 'retrying',
   ).length;
+  const backBlocked = useRecordingLeaveGuard(
+    status === 'recording' || status === 'paused' || status === 'stopping',
+    pendingSegmentCount > 0 || chunks.unsaved,
+  );
 
   return {
+    wakeLockHeld,
+    pageHidden,
+    hiddenPeriods: chunks.hiddenPeriods,
+    dismissHiddenPeriods: chunks.dismissHiddenPeriods,
+    // The recording open now; it changes with the session, or when another account's recording gives way.
+    scope: chunks.scope,
+    questionDrafts: chunks.questionDrafts,
+    saveQuestionDrafts: chunks.saveQuestionDrafts,
+    speakerMerges: chunks.speakerMerges,
+    saveSpeakerMerges: chunks.saveSpeakerMerges,
+    downloadableChunkIds: chunks.downloadableChunkIds,
+    ownerNotice: chunks.ownerNotice,
+    openElsewhere: Boolean(chunks.openElsewhereNotice),
     status,
     isRecording: status === 'recording',
     isPaused: status === 'paused',
     isStopping: status === 'stopping',
     isBusy: status === 'requesting' || status === 'stopping',
     elapsedSeconds,
+    microphonePaused,
+    // Counts microphone restarts in this recording, so a waveform can follow the new stream.
+    captureRestarts,
+    captureNotice: captureRestarts ? CAPTURE_RESTARTED_NOTICE : '',
     transcript,
     segments,
     pendingSegmentCount,
-    errorMessage,
+    backBlocked,
+    // Device storage failed, so some of the recording may be held only by this page.
+    storageFailed: Boolean(chunks.storageError) || chunks.unsaved,
+    // An imported file is still decoding.
+    importing: chunks.importing,
+    // A capture stop leads; the storage and offline notices only say where the audio is kept.
+    errorMessage: [
+      errorMessage,
+      chunks.ownerNotice,
+      chunks.openElsewhereNotice,
+      chunks.storageError,
+      chunks.offline ? 'Offline. Audio stays on this device; reconnect to resume uploads in order.' : '',
+    ]
+      .filter(Boolean)
+      .join(' '),
+    labelsUnavailableReason,
+    retryChunk,
+    downloadChunk: chunks.downloadChunk,
+    downloadRecording: chunks.downloadRecording,
+    addAudio: chunks.addAudio,
+    addTranscript: chunks.addTranscript,
+    keepAudio: chunks.keepAudio,
     mediaStreamRef: streamRef,
     startRecording,
     pauseRecording,

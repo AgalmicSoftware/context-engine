@@ -1,10 +1,20 @@
 import { resolveWorkerCanonicalStorageTarget } from '../../domains/surveys/workerCanonicalAuthoringPort';
-import { initCacheManager, listNamespaceSlugsSync, peekCacheSync, updateCacheAtomic } from '../cache/cacheScripts';
-import { getWorkerCanonicalCacheReader, normalizeWorkerCanonicalCacheReader } from './workerCanonicalCacheReader';
+import {
+  initCacheManager,
+  listNamespaceSlugsSync,
+  lockChainTextHiddenFromReader,
+  peekCacheSync,
+  updateCacheAtomic,
+} from '../cache/cacheScripts';
+import {
+  getWorkerCanonicalCacheReader,
+  normalizeWorkerCanonicalCacheReader,
+  WORKER_CANONICAL_CACHE_SCOPE_KEY,
+} from './workerCanonicalCacheReader';
 
 type UnknownRecord = Record<string, unknown>;
 
-export const WORKER_CANONICAL_CACHE_SCOPE_KEY = 'worker';
+export { WORKER_CANONICAL_CACHE_SCOPE_KEY };
 export const WORKER_CANONICAL_CACHE_IDENTITY_FIELD = 'workerCanonicalIdentity';
 
 export type WorkerCanonicalCacheIdentity = {
@@ -171,25 +181,26 @@ const stripWorkerCanonicalCacheNodes = (
 
 const READER_SCOPED_CACHE_NAMESPACES = ['questionsCache', 'surveysCache', 'userCache'];
 
+// Applies `change` to every cached slug of `namespace` it alters.
+const updateChangedCaches = (namespace: string, change: (cacheRoot: unknown) => UnknownRecord | null) =>
+  listNamespaceSlugsSync(namespace)
+    .filter((slug) => change(peekCacheSync(namespace, slug, { clone: false })))
+    .map((slug) => updateCacheAtomic<UnknownRecord>(namespace, slug, (current) => change(current) || current || {}));
+
 // Worker nodes hold what the previous account was authorized to read, including
 // Worker-decrypted answers, so an account change also removes them from storage.
+// Every account change, sign-in and sign-out included, also locks chain-node
+// question text and survey titles and links not decrypted for the new reader.
+// Startup does not: other tabs of the same account share these nodes, and every
+// read already locks that text for whoever is reading.
 export const purgeWorkerCanonicalCaches = async (previousReader: unknown): Promise<void> => {
   const reader = normalizeWorkerCanonicalCacheReader(previousReader);
   // The slug listing reads the in-memory mirror, which loads from storage once.
   await initCacheManager();
   await Promise.all(
     READER_SCOPED_CACHE_NAMESPACES.flatMap((namespace) =>
-      listNamespaceSlugsSync(namespace)
-        .filter((slug) =>
-          stripWorkerCanonicalCacheNodes(namespace, peekCacheSync(namespace, slug, { clone: false }), reader),
-        )
-        .map((slug) =>
-          updateCacheAtomic<UnknownRecord>(
-            namespace,
-            slug,
-            (current) => stripWorkerCanonicalCacheNodes(namespace, current, reader) || current || {},
-          ),
-        ),
+      updateChangedCaches(namespace, (cacheRoot) => stripWorkerCanonicalCacheNodes(namespace, cacheRoot, reader)),
     ),
   );
+  await lockChainTextHiddenFromReader();
 };

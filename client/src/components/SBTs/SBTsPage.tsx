@@ -550,7 +550,7 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
 
     const { provider, network, account, loginComplete, toggleLoginModal, isSBTCacheReady, sbtCacheRevision } =
       this.props;
-    const { showSBTsList, showCreateGroup } = this.state;
+    const { showCreateGroup } = this.state;
     const effectiveShowCreateGroup =
       typeof this.props.showCreateGroupExternal === 'boolean' ? this.props.showCreateGroupExternal : showCreateGroup;
     const hideMiniActionRow = this.props.hideMiniActionRow === true;

@@ -7,6 +7,7 @@ import {
 	setCloudflareStorageResourceHidden,
 	publishCloudflareOwnedStorageMetadata,
 	storageRoute as storageRouteBoundary,
+	authorizeCloudflareStorageResourceRead,
 } from './storageRouteExecution.js';
 import { dispatchAuthenticatedSecretPathRoute } from './authenticatedSecretPathRouteDispatch.js';
 import { getSessionSecrets } from './sessionConfigSecretsStore.js';
@@ -15,7 +16,8 @@ import { createWorkerExecutionServicesWithWorkerDeps } from './workerExecutionSe
 import { resolveRpcUrlListForGate } from './gateRpcResolution.js';
 import { createEthersInterfaceProviderGateHelpersWithWorkerDeps } from './ethersInterfaceProviderGateBinding.js';
 import { PRIVATE_SESSION_RPC_LABEL } from './rpcDiagnosticSafety.js';
-import { addWorkerGroupMember, createWorkerGroup, deleteWorkerGroup, readWorkerGroupMembershipProjection } from './workerGroups.js';
+import { addWorkerGroupMember, createWorkerGroup, deleteWorkerGroup } from './workerGroups.js';
+import { readWorkerGroupMembershipProjection } from './workerGroupProjectionFixture.mjs';
 import { SessionWriteCoordinator, enqueueCoordinatedResultsAnalysisAutoJob } from './sessionWriteCoordinator.js';
 import { resolveWorkerCanonicalLoginScopes } from './workerCanonicalAuthority.js';
 import { validateWorkerConfigModeValues } from '../shared/workerConfigModeValidation.mjs';
@@ -115,6 +117,9 @@ const createMockR2 = () => {
 		},
 		async get(key) {
 			return store.get(key) || null;
+		},
+		async delete(key) {
+			store.delete(key);
 		},
 	};
 };
@@ -649,12 +654,19 @@ test('private response reads separate participant submission scope from non-owne
 			const adminScopes = await scopesFor(admin);
 			assert.equal((await read(firstId, admin, adminScopes)).status, 200);
 			assert.equal((await (await list(admin, adminScopes)).json()).items.length, 2);
-			const delegated = { storage: true, delegationScopes: ['storage'] };
-			assert.equal((await read(firstId, second, delegated)).status, 200);
-			assert.equal((await (await list(second, delegated)).json()).items.length, 2);
-			assert.equal((await read(firstId, second, { storage: true, delegationScopes: ['ai'] })).status, 403);
-			assert.equal((await read(firstId, second, { storage: true, principal: { kind: 'agent', grantId: 'synthetic-grant' } })).status, 200);
-			assert.equal((await read(firstId, second, { storage: true, principal: { kind: 'agent', grantId: '' } })).status, 403);
+			// Login tokens carry no grant claims, and these would not open other people's answers.
+			for (const claims of [
+				{ delegationScopes: ['storage'] },
+				{ agentGrant: ['storage'] },
+				{ agent_grant: ['storage'] },
+				{ principal: { kind: 'agent', grantId: 'synthetic-grant' } },
+				{ grantId: 'synthetic-grant' },
+				{ delegation: { grantId: 'synthetic-grant' } },
+			]) {
+				const claimed = { storage: true, ...claims };
+				assert.equal((await read(firstId, second, claimed)).status, 403, JSON.stringify(claims));
+				assert.deepEqual((await (await list(second, claimed)).json()).items.map((item) => item.storageRef.id), [secondId]);
+			}
 			// Old rows without a server-recorded owner fail closed for participants.
 			const missingOwner = await readStorageIndexMetadata(kv, 'session-a', 'responses', firstId);
 			delete missingOwner.responder;
@@ -662,8 +674,9 @@ test('private response reads separate participant submission scope from non-owne
 			assert.equal((await read(firstId, first, firstScopes)).status, 403);
 			assert.equal((await read(firstId, admin, adminScopes)).status, 200);
 			// Per-item restrictions still apply to an owner who otherwise qualifies.
-			const adminOnlyId = await upload(admin, adminScopes, { accessConditions: { match: 'all', conditions: [{ kind: 'worker_role', role: 'admin' }] } });
-			assert.equal((await read(adminOnlyId, second, delegated)).status, 403);
+			const adminOnlyId = await upload(second, secondScopes, { accessConditions: { match: 'all', conditions: [{ kind: 'worker_role', role: 'admin' }] } });
+			assert.equal((await read(adminOnlyId, second, secondScopes)).status, 403);
+			assert.equal((await read(adminOnlyId, admin, adminScopes)).status, 200);
 			// Public EDDY-style policy still permits anonymous raw reads and lists.
 			const publicAccess = { gate: 'none', encryption: 'none' };
 			config = { ...config, storageProfile: { backend: 'cloudflare', payloadAccessControl: publicAccess }, sessionModeProfile: {
@@ -1371,6 +1384,150 @@ test('storageRoute accepts deploy-helper KV alias bindings for Cloudflare payloa
 
 	assert.equal(readResponse.status, 200);
 	assert.deepEqual(JSON.parse(await readResponse.text()), { id: 'q-fixture', type: 'binary', prompt: 'Aliased KV storage works', ok: true });
+});
+
+test('storageRoute keeps Cloudflare payloads in GROUP_KV when the Worker opts in', async () => {
+	const kv = createMockKv();
+	const env = { GROUP_KV: kv, CE_STORAGE_IN_GROUP_KV: '1' };
+	const question = { id: 'q-fixture', type: 'binary', prompt: 'GROUP_KV storage works', ok: true };
+	const uploadResponse = await storageRoute({
+		path: '/storage/upload',
+		method: 'POST',
+		request: new Request('https://worker.example/storage/upload', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ data: question, contentType: 'application/json', resource: 'questions' }),
+		}),
+		env,
+		config: CLOUDFLARE_WORKER_GATE_CONFIG,
+		slug: 'session-a',
+		uploaderAddress: '0xabc',
+		baseHeaders: {},
+		deps: { json, randomBytes: fixedRandomBytes },
+	});
+
+	assert.equal(uploadResponse.status, 200);
+	const { storageRef } = await readJson(uploadResponse);
+	assert.equal(kv.store.has(`ce-storage-payload:session-a:${storageRef.id}`), true);
+
+	const readResponse = await storageRoute({
+		path: '/storage/read',
+		method: 'GET',
+		request: new Request(`https://worker.example/storage/read?id=${storageRef.id}`),
+		env,
+		config: CLOUDFLARE_WORKER_GATE_CONFIG,
+		slug: 'session-a',
+		uploaderAddress: '0xabc',
+		baseHeaders: {},
+		deps: { json },
+	});
+
+	assert.equal(readResponse.status, 200);
+	assert.deepEqual(JSON.parse(await readResponse.text()), question);
+});
+
+const uploadToCloudflareStorage = (env) => storageRoute({
+	path: '/storage/upload',
+	method: 'POST',
+	request: new Request('https://worker.example/storage/upload', {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ data: 'a stored payload', resource: 'docsContext' }),
+	}),
+	env,
+	config: CLOUDFLARE_WORKER_GATE_CONFIG,
+	slug: 'session-a',
+	uploaderAddress: '0xabc',
+	baseHeaders: {},
+	deps: { json, randomBytes: fixedRandomBytes },
+});
+
+test('storageRoute leaves GROUP_KV alone unless the Worker opts in', async () => {
+	for (const optIn of [{}, { CE_STORAGE_IN_GROUP_KV: '0' }]) {
+		const kv = createMockKv();
+		const response = await uploadToCloudflareStorage({ GROUP_KV: kv, ...optIn });
+
+		assert.equal(response.status, 501);
+		assert.equal(kv.store.size, 0);
+	}
+});
+
+test('a bound storage index keeps payloads out of GROUP_KV even when the Worker opts in', async () => {
+	const groupKv = createMockKv();
+	const index = createMockKv();
+	const response = await uploadToCloudflareStorage({ GROUP_KV: groupKv, CE_STORAGE_INDEX_KV: index, CE_STORAGE_IN_GROUP_KV: '1' });
+
+	assert.equal(response.status, 200);
+	assert.equal(groupKv.store.size, 0);
+	assert.equal([...index.store.keys()].some((key) => key.startsWith('ce-storage-payload:session-a:')), true);
+});
+
+test('storage routes refuse sessions that do not use Cloudflare storage, even when the Worker opts in', async () => {
+	for (const config of [{}, { storageProfile: { backend: 'arweave' } }]) {
+		const kv = createMockKv();
+		const env = { GROUP_KV: kv, CE_STORAGE_IN_GROUP_KV: '1' };
+		for (const [path, method, body] of [
+			['/storage/upload', 'POST', { data: 'not this session', backend: 'cloudflare', resource: 'docsContext' }],
+			['/storage/read', 'GET'],
+			['/storage/list', 'GET'],
+			['/storage/context', 'POST', {}],
+			['/storage/export-envelopes', 'GET'],
+		]) {
+			const response = await storageRoute({
+				path,
+				method,
+				request: new Request(`https://worker.example${path}`, {
+					method,
+					...(body ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {}),
+				}),
+				env,
+				config,
+				slug: 'session-a',
+				uploaderAddress: '0xabc',
+				baseHeaders: {},
+				deps: { json, randomBytes: fixedRandomBytes },
+			});
+			assert.equal(response.status, 400, path);
+			assert.match((await readJson(response)).error, /only available for Cloudflare storage/, path);
+		}
+		assert.equal(kv.store.size, 0);
+	}
+});
+
+test('hiding needs a session configured for Cloudflare storage', async () => {
+	const hide = (config, kv) => setCloudflareStorageResourceHidden({
+		env: { GROUP_KV: kv, CE_STORAGE_IN_GROUP_KV: '1' },
+		config,
+		slug: 'session-a',
+		body: { resource: 'questions', id: `0x${'1'.repeat(64)}`, hidden: true },
+		actor: '0xabc',
+	});
+	for (const config of [{}, { storageProfile: { backend: 'arweave' } }, { storageProfile: { backend: 'lit-arweave' } }]) {
+		const kv = createMockKv();
+		const refused = await hide(config, kv);
+		assert.equal(refused.status, 400);
+		assert.match(refused.error, /only available for Cloudflare storage/);
+		assert.equal(kv.store.size, 0);
+	}
+	for (const config of [CLOUDFLARE_WORKER_GATE_CONFIG, { docLibrary: { provider: 'cloudflare' } }]) {
+		assert.equal((await hide(config, createMockKv())).status, 200);
+	}
+});
+
+test('envelope audits land in GROUP_KV only when the Worker opts in', async () => {
+	const kv = createMockKv();
+	const audit = (env) => writeStorageEnvelopeKeyReleaseAudit({
+		env,
+		slug: 'session-a',
+		payloadId: 'payload-group-kv',
+		principal: '0x00000000000000000000000000000000000000aa',
+		conditionMatched: 'public',
+	});
+
+	await assert.rejects(audit({ GROUP_KV: kv }), /Storage envelope audit store is not configured/);
+	assert.equal(kv.store.size, 0);
+	assert.equal((await audit({ GROUP_KV: kv, CE_STORAGE_IN_GROUP_KV: '1' })).ok, true);
+	assert.equal([...kv.store.keys()].some((key) => key.startsWith('ce-storage-audit:session-a:')), true);
 });
 
 test('storageRoute uses Web Crypto getRandomValues for Cloudflare storage refs when randomBytes is absent', async () => {
@@ -3076,6 +3233,76 @@ test('storageRoute enforces worker group gates and group upload allowlists', asy
 	assert.equal(allowedSbtPolicyUpload.status, 200);
 });
 
+test('a payload group narrows a group-gated session instead of adding to it', async () => {
+	const kv = createMockKv();
+	const env = { CE_STORAGE_INDEX_KV: kv };
+	const adminPrincipal = { kind: 'evm_address', address: '0x0000000000000000000000000000000000000abc' };
+	const reviewerAddress = '0x0000000000000000000000000000000000000def';
+	const memberAddress = '0x0000000000000000000000000000000000000111';
+	for (const groupId of ['members', 'reviewers']) {
+		await createWorkerGroup({
+			env,
+			slug: 'session-a',
+			sessionId: WORKER_GROUP_SESSION_ID,
+			input: { groupId, label: groupId, joinMode: 'admin_add' },
+			actorPrincipal: adminPrincipal,
+		});
+	}
+	for (const [groupId, address] of [['members', reviewerAddress], ['reviewers', reviewerAddress], ['members', memberAddress]]) {
+		await addWorkerGroupMember({
+			env,
+			slug: 'session-a',
+			sessionId: WORKER_GROUP_SESSION_ID,
+			groupId,
+			principal: { kind: 'evm_address', address },
+			actorPrincipal: adminPrincipal,
+		});
+	}
+	const config = {
+		sessionId: WORKER_GROUP_SESSION_ID,
+		storageProfile: {
+			backend: 'cloudflare',
+			payloadAccessControl: { gate: 'group_gate', encryption: 'none', groupIds: ['members'] },
+		},
+	};
+	const call = (path, request, address, extraDeps = {}) => storageRoute({
+		path,
+		method: request.method,
+		request,
+		env,
+		config,
+		slug: 'session-a',
+		uploaderAddress: address,
+		authScopes: {},
+		baseHeaders: {},
+		deps: { json, isWorkerGroupMember: readWorkerGroupMembershipProjection, ...extraDeps },
+	});
+	const upload = async (body, randomBytes) => readJson(await call('/storage/upload', new Request('https://worker.example/storage/upload', {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ resource: 'docsContext', ...body }),
+	}), reviewerAddress, { randomBytes }));
+	const read = (id, address) => call('/storage/read', new Request(`https://worker.example/storage/read?id=${id}`), address);
+	const listIds = async (address) => (await readJson(await call(
+		'/storage/list',
+		new Request('https://worker.example/storage/list?resource=docsContext'),
+		address,
+	))).items.map((item) => item.storageRef.id);
+
+	const narrow = (await upload({ data: 'reviewers only', groupIds: ['reviewers'] }, fixedRandomBytes)).storageRef.id;
+	const whole = (await upload({ data: 'whole session' }, createSequenceRandomBytes(33))).storageRef.id;
+
+	assert.equal((await read(narrow, memberAddress)).status, 403);
+	assert.deepEqual(await listIds(memberAddress), [whole]);
+	const allowed = await read(narrow, reviewerAddress);
+	assert.equal(allowed.status, 200);
+	assert.equal(await allowed.text(), 'reviewers only');
+	assert.deepEqual((await listIds(reviewerAddress)).sort(), [narrow, whole].sort());
+	// A row without its own groups keeps the session's, so it still reads as published to everyone.
+	assert.deepEqual((await readStorageIndexMetadata(kv, 'session-a', 'docsContext', narrow)).groupIds, ['reviewers']);
+	assert.deepEqual((await readStorageIndexMetadata(kv, 'session-a', 'docsContext', whole)).groupIds, ['members']);
+});
+
 test('storageRoute scaffold rejects plaintext Cloudflare lit_encrypted uploads', async () => {
 	const r2 = createMockR2();
 	const env = { CE_STORAGE_R2: r2, CE_STORAGE_INDEX_KV: createMockKv() };
@@ -3902,6 +4129,11 @@ test('storageRoute worker_envelope evaluates any/all and supported condition kin
 	const anyResponse = await read({ authScopes: { storage: true } });
 	assert.equal(anyResponse.status, 200);
 	assert.equal(await anyResponse.text(), 'classified payload');
+	// Only an issued scope satisfies the rule; login tokens carry no grant lists.
+	for (const claims of [{ delegationScopes: ['storage'] }, { agentGrant: ['storage'] }, { agent_grant: ['storage'] }]) {
+		const claimed = await read({ authScopes: claims });
+		assert.equal(claimed.status, 403, JSON.stringify(claims));
+	}
 
 	await setConditions({
 		match: 'all',
@@ -4050,7 +4282,7 @@ test('exportCloudflareEncryptedPayloadEnvelopes emits ciphertext and envelope me
 	assert.equal(exported.manifest.wrappedKeysIncluded, true);
 	assert.equal(exported.manifest.keyProvider, 'mixed');
 	assert.equal(exported.manifest.deploymentKekContinuityRequired, true);
-	assert.equal(exported.manifest.rewrapRequiredForNewDeployment, true);
+	assert.equal(Object.hasOwn(exported.manifest, 'rewrapRequiredForNewDeployment'), false);
 	assert.ok(exported.sessionEnvelope.sessionKey.wrappedKey);
 	const dump = JSON.stringify(exported);
 	assert.doesNotMatch(dump, /classified export payload/);
@@ -4079,7 +4311,6 @@ test('exportCloudflareEncryptedPayloadEnvelopes emits ciphertext and envelope me
 	});
 	assert.equal(litOnly.manifest.keyProvider, 'lit');
 	assert.equal(litOnly.manifest.deploymentKekContinuityRequired, false);
-	assert.equal(litOnly.manifest.rewrapRequiredForNewDeployment, false);
 
 	const emptyLit = await exportCloudflareEncryptedPayloadEnvelopes({
 		env,
@@ -4089,7 +4320,6 @@ test('exportCloudflareEncryptedPayloadEnvelopes emits ciphertext and envelope me
 		includeSessionEnvelope: false,
 	});
 	assert.equal(emptyLit.manifest.deploymentKekContinuityRequired, false);
-	assert.equal(emptyLit.manifest.rewrapRequiredForNewDeployment, false);
 });
 
 test('storageRoute /storage/export-envelopes omits session key material', async () => {
@@ -4124,7 +4354,7 @@ test('storageRoute /storage/export-envelopes omits session key material', async 
 	});
 	assert.equal(deniedResponse.status, 403);
 	assert.deepEqual(await readJson(deniedResponse), {
-		error: 'Encrypted-envelope export requires session export admin authorization.',
+		error: 'Encrypted-envelope export requires a session admin.',
 	});
 
 	const response = await storageRoute({
@@ -4167,6 +4397,41 @@ test('storageRoute /storage/export-envelopes omits session key material', async 
 	assert.equal(postResponse.status, 200);
 	assert.equal(postBody.manifest.resource, 'docsContext');
 	assert.equal(postBody.payloads.length, 1);
+});
+
+test('storageRoute /storage/export-envelopes takes a session admin, not a token claim or an export list', async () => {
+	const env = {
+		CE_STORAGE_INDEX_KV: createMockKv(),
+		CE_STORAGE_ENVELOPE_KEK: 'test deployment envelope kek',
+	};
+	const config = createEnvelopeConfig();
+	const outsider = '0x0000000000000000000000000000000000000bad';
+	const exportAs = (authScopes, sessionConfig = config) => storageRoute({
+		path: '/storage/export-envelopes',
+		method: 'GET',
+		request: new Request('https://worker.example/storage/export-envelopes?resource=docsContext'),
+		env,
+		config: sessionConfig,
+		slug: 'session-a',
+		uploaderAddress: outsider,
+		authScopes,
+		baseHeaders: {},
+		deps: { json },
+	});
+	// Login tokens carry only issued scopes, and none of these is issued.
+	for (const claim of ['responseExport', 'response_export', 'encryptedEnvelopeExport']) {
+		assert.equal((await exportAs({ storage: true, [claim]: true })).status, 403, claim);
+	}
+	// Nothing in Context Engine writes these session config lists.
+	for (const list of [
+		{ responseExportAllowedAddresses: outsider },
+		{ export: { allowedAddresses: [outsider] } },
+		{ export: { adminAddresses: [outsider] } },
+	]) {
+		assert.equal((await exportAs({ storage: true }, { ...config, ...list })).status, 403, JSON.stringify(list));
+	}
+	assert.equal((await exportAs({ admin: true })).status, 200);
+	assert.equal((await exportAs({ storage: true }, { ...config, adminAddresses: [outsider] })).status, 200);
 });
 
 test('exportCloudflareEncryptedPayloadEnvelopes counts encrypted rows when payload bytes are missing', async () => {
@@ -4552,6 +4817,36 @@ test('only the first author or a session admin can upload an existing question o
 	assert.equal((await upload(OWNERSHIP_OTHER, ownedQuestion('New question', '0xq2'))).status, 200);
 });
 
+test('a first upload that fails while publishing keeps its id for its author', async () => {
+	const { common, kv, upload, list } = createOwnershipHarness();
+	// As the session coordinator does, a failed publication answers a retryable 503.
+	common.deps.executeCoordinatedStoragePublication = async (publication) => {
+		try {
+			await publishCloudflareOwnedStorageMetadata({ ...publication, config: common.config, actor: publication.metadata.uploader });
+			return { ok: true, status: 200, body: { ok: true } };
+		} catch (error) {
+			return { ok: false, status: error.status || 503, body: { error: error.message } };
+		}
+	};
+	const put = kv.put.bind(kv);
+	let failRow = true;
+	kv.put = async (key, value) => {
+		if (failRow && key.startsWith('ce-storage:session-a:questions:')) {
+			failRow = false;
+			throw new Error('KV PUT failed: 500 Internal Server Error');
+		}
+		return put(key, value);
+	};
+	assert.equal((await upload(OWNERSHIP_AUTHOR, ownedQuestion('Official?'))).status, 503);
+	assert.deepEqual((await list()).items, []);
+
+	const claim = await upload(OWNERSHIP_OTHER, ownedQuestion('ATTACKER claim'));
+	assert.equal(claim.status, 409);
+	assert.equal(claim.body.reason, 'storage_resource_id_owned');
+	assert.equal((await upload(OWNERSHIP_AUTHOR, ownedQuestion('Official?'))).status, 200);
+	assert.deepEqual((await list()).items.map((item) => item.metadata.uploader), [OWNERSHIP_AUTHOR]);
+});
+
 // Strips what this release records, so the rows look like uploads from before it.
 const makeLegacyOwnedRows = (kv, resource, resourceIds) => {
 	for (const resourceId of resourceIds) kv.store.delete(`ce-storage-owner:session-a:${resource}:${resourceId}`);
@@ -4795,12 +5090,13 @@ test('hide requests validate the resource, id, and flag', async () => {
 });
 
 
-const createResponseReceiptFixture = ({ binding = true, maxKvValueBytes } = {}) => {
+const createResponseReceiptFixture = ({ binding = true, maxKvValueBytes, encrypted = false, r2 = null } = {}) => {
   const kv = createMockKv();
-  const env = { CE_STORAGE_INDEX_KV: kv, TOKEN_HMAC_SECRET: 'synthetic-receipt-secret' };
-  const config = { storageProfile: { backend: 'cloudflare', payloadAccessControl: { gate: 'none', encryption: 'none' } } };
+  const env = { CE_STORAGE_INDEX_KV: kv, TOKEN_HMAC_SECRET: 'synthetic-receipt-secret', CE_STORAGE_ENVELOPE_KEK: 'fixture envelope key',
+    ...(r2 ? { CE_STORAGE_R2: r2 } : {}) };
+  let config = encrypted ? createEnvelopeConfig() : { storageProfile: { backend: 'cloudflare', payloadAccessControl: { gate: 'none', encryption: 'none' } } };
   let now = 1_000;
-  if (binding) attachSessionCoordinator(env, () => {}, { now: () => now });
+  if (binding) attachSessionCoordinator(env, next => { config = next; }, { now: () => now });
   const queued = [];
   const deps = { json, randomBytes: createSequenceRandomBytes(), now: () => now, maxKvValueBytes,
     enqueueResultsAnalysisAutoJob: async (args) => {
@@ -4816,7 +5112,9 @@ const createResponseReceiptFixture = ({ binding = true, maxKvValueBytes } = {}) 
       body: JSON.stringify({ resource: 'responses', requestId, data }),
     }),
   });
-  return { kv, env, queued, upload, advance: (ms) => { now += ms; } };
+  const read = id => storageRoute({ path: '/storage/read', method: 'GET', env, config, slug: 'session-a', uploaderAddress: '', baseHeaders: {}, deps,
+    request: new Request(`https://worker.example/storage/read?id=${id}`) });
+  return { kv, env, queued, upload, read, advance: (ms) => { now += ms; } };
 };
 
 test('response receipts replay the stored reference without writes or another analysis job', async () => {
@@ -4836,7 +5134,7 @@ test('response receipts replay the stored reference without writes or another an
   assert.notEqual(other.id, first.id, 'receipt scope belongs to the authenticated participant');
 });
 
-test('pending response uploads wait, and an expired attempt gets a fresh storage id', async () => {
+test('pending response uploads wait, and an expired attempt writes its own storage id', async () => {
   const f = createResponseReceiptFixture();
   const put = f.kv.put;
   let failed = false;
@@ -4853,8 +5151,12 @@ test('pending response uploads wait, and an expired attempt gets a fresh storage
   const retried = await f.upload();
   assert.equal(retried.status, 200);
   const saved = await retried.json();
+  // The first attempt might still be running, so its unpublished payload is
+  // never rewritten; it stays unlisted because it has no index row.
   assert.notEqual(orphanKey, `ce-storage-payload:session-a:${saved.id}`);
   assert.equal(f.kv.store.has(orphanKey), true);
+  assert.deepEqual([...f.kv.store.keys()].filter(key => key.startsWith('ce-storage:session-a:responses:')),
+    [`ce-storage:session-a:responses:${saved.id}`]);
   assert.equal(f.queued.length, 1);
 });
 
@@ -4866,6 +5168,27 @@ test('response upload receipts fail closed when coordination is unavailable', as
   assert.equal(f.kv.store.size, 0);
   assert.equal(f.queued.length, 0);
 });
+
+for (const omitted of [['storageId'], ['createdAt'], ['storageId', 'createdAt']]) {
+  test(`an execute receipt missing ${omitted.join(' and ')} cannot fall back to a provisional target`, async () => {
+    const f = createResponseReceiptFixture();
+    const get = f.env.CE_SESSION_COORDINATOR.get;
+    f.env.CE_SESSION_COORDINATOR.get = id => {
+      const stub = get(id);
+      return { fetch: async (url, init) => {
+        const response = await stub.fetch(url, init);
+        if (!url.endsWith('/reserve') || !response.ok) return response;
+        const body = await response.json();
+        for (const field of omitted) delete body[field];
+        return Response.json(body);
+      } };
+    };
+    const response = await f.upload();
+    assert.equal(response.status, 503);
+    assert.equal(f.kv.store.size, 0);
+    assert.equal(f.queued.length, 0);
+  });
+}
 
 test('a lost settlement reply retries to the original saved response', async () => {
   const f = createResponseReceiptFixture();
@@ -4912,3 +5235,244 @@ test('oversize response retries return the same validation failure without reser
   assert.equal(f.queued.length, 0);
   assert.equal(f.env.CE_SESSION_COORDINATOR.instances.size, 0);
 });
+
+
+for (const encrypted of [false, true]) for (const interrupted of ['index', 'settle']) {
+  test(`${encrypted ? 'encrypted' : 'plaintext'} upload resumes after interruption before ${interrupted}`, async () => {
+    const f = createResponseReceiptFixture({ encrypted });
+    let fail = true;
+    if (interrupted === 'index') {
+      const put = f.kv.put;
+      f.kv.put = async (key, value) => {
+        if (fail && key.startsWith('ce-storage:session-a:responses:')) { fail = false; throw new Error('interrupted index'); }
+        return put(key, value);
+      };
+      await assert.rejects(f.upload(), /interrupted index/);
+    } else {
+      const get = f.env.CE_SESSION_COORDINATOR.get;
+      f.env.CE_SESSION_COORDINATOR.get = id => {
+        const stub = get(id);
+        return { fetch: async (url, init) => {
+          if (fail && url.endsWith('/settle')) { fail = false; throw new Error('interrupted settlement'); }
+          return stub.fetch(url, init);
+        } };
+      };
+      assert.equal((await f.upload()).status, 503);
+    }
+    const payloadKeys = () => [...f.kv.store.keys()].filter(key => key.startsWith('ce-storage-payload:session-a:'));
+    const indexKeys = () => [...f.kv.store.keys()].filter(key => key.startsWith('ce-storage:session-a:responses:'));
+    const firstKey = payloadKeys()[0];
+    const firstMetadata = JSON.parse(f.kv.store.get(firstKey)).metadata;
+    const firstId = firstMetadata.id;
+    const before = [...f.kv.store];
+    f.advance(120001);
+    const retried = await f.upload();
+    assert.equal(retried.status, 200, await retried.clone().text());
+    const result = await retried.json();
+    // A published row is adopted unchanged; an unpublished target is never
+    // rewritten, because its attempt might still be writing it.
+    assert.equal(result.id === firstId, interrupted === 'settle');
+    assert.equal(payloadKeys().length, interrupted === 'settle' ? 1 : 2); assert.equal(indexKeys().length, 1);
+    assert.equal(JSON.parse(f.kv.store.get(indexKeys()[0])).createdAt, firstMetadata.createdAt);
+    if (interrupted === 'settle') assert.deepEqual([...f.kv.store], before, 'published payloads are not rewritten');
+    const read = await f.read(result.id);
+    assert.equal(read.status, 200, await read.clone().text());
+    assert.deepEqual(await read.json(), { questionID: 'q1', answer: { value: 'Agree' } });
+    assert.equal(f.queued.length, 1);
+  });
+}
+
+for (const useR2 of [true, false]) {
+  test(`a superseded encrypted attempt that publishes late cannot change the retry's answer (R2 ${useR2})`, async () => {
+    const r2 = useR2 ? createMockR2() : null;
+    const f = createResponseReceiptFixture({ encrypted: true, r2 });
+    const put = f.kv.put;
+    let release, arrived;
+    const stalled = new Promise(resolve => { arrived = resolve; });
+    const gate = new Promise(resolve => { release = resolve; });
+    let held = false;
+    f.kv.put = async (key, value) => {
+      if (!held && key.startsWith('ce-storage:session-a:responses:')) { held = true; arrived(); await gate; }
+      return put(key, value);
+    };
+    // The first attempt writes its payload, then stalls past its lease.
+    const late = f.upload();
+    await stalled;
+    f.advance(120_001);
+    const retried = await f.upload();
+    assert.equal(retried.status, 200, await retried.clone().text());
+    const saved = await retried.json();
+    const indexKey = `ce-storage:session-a:responses:${saved.id}`;
+    const published = f.kv.store.get(indexKey);
+    release();
+    assert.equal((await late).status, 503);
+    assert.equal(f.kv.store.get(indexKey), published, "the retry's row keeps its own envelope");
+    const read = await f.read(saved.id);
+    assert.equal(read.status, 200, await read.clone().text());
+    assert.deepEqual(await read.json(), { questionID: 'q1', answer: { value: 'Agree' } });
+    // The late attempt withdrew its own row and payload: one answer remains.
+    assert.deepEqual([...f.kv.store.keys()].filter(key => key.startsWith('ce-storage:session-a:responses:')), [indexKey]);
+    const payloads = useR2 ? [...r2.store.keys()] : [...f.kv.store.keys()].filter(key => key.startsWith('ce-storage-payload:'));
+    assert.equal(payloads.length, 1);
+    const replay = await (await f.upload()).json();
+    assert.equal(replay.id, saved.id);
+    assert.equal(replay.replayed, true);
+    assert.equal(f.queued.length, 1);
+  });
+}
+
+test('stored payload byte reads distinguish empty strings from missing payloads', async () => {
+  const { readStoredCloudflarePayloadBytes } = await import('./storageRouteExecution.js');
+  const index = createMockKv();
+  const metadata = { id: CF_ID, resource: 'docsContext' };
+  for (const payloadBase64url of ['', null, 7, undefined]) {
+    await index.put(`ce-storage-payload:session-a:${CF_ID}`, JSON.stringify({ metadata, payloadBase64url }));
+    const bytes = await readStoredCloudflarePayloadBytes({ env: {}, index, slug: 'session-a', metadata, strict: true });
+    if (payloadBase64url === '') assert.deepEqual(bytes, new Uint8Array());
+    else assert.equal(bytes, null);
+  }
+});
+
+for (const useR2 of [false, true]) test(`metadata upload limits include encoded bytes and tag caps (R2 ${useR2})`, async () => {
+  const kv = createMockKv();
+  const env = { CE_STORAGE_INDEX_KV: kv, ...(useR2 ? { CE_STORAGE_R2: createMockR2() } : {}) };
+  const config = { storageProfile: { backend: 'cloudflare', payloadAccessControl: { gate: 'none', encryption: 'none' } } };
+  const upload = (tags) => storageRoute({ path: '/storage/upload', method: 'POST', env, config, slug: 'session-a',
+    uploaderAddress: '0x00000000000000000000000000000000000000aa', baseHeaders: {},
+    deps: { json, randomBytes: fixedRandomBytes, now: () => Date.parse('2026-10-28T00:00:00Z') },
+    request: new Request('https://worker.example/storage/upload', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ resource: 'docsContext', data: 'small', contentType: 'text/plain', tags }) }),
+  });
+  const limit = 64 * 1024;
+  const tags = Array.from({ length: 32 }, (_, index) => ({ name: `tag-${index}`, value: index < 31 ? 'é'.repeat(1024) : 'x' }));
+  assert.equal((await upload(tags)).status, 200);
+  const key = `ce-storage:session-a:docsContext:${CF_ID}`;
+  tags[31].value = 'x'.repeat(limit - Buffer.byteLength(kv.store.get(key)) + 1);
+  assert.ok(tags[31].value.length > 0 && tags[31].value.length <= 1024);
+  assert.equal((await upload(tags)).status, 200);
+  assert.equal(Buffer.byteLength(kv.store.get(key)), limit);
+  const before = [...kv.store];
+  const tooLarge = await upload(tags.map((tag, index) => index === 31 ? { ...tag, value: `${tag.value}x` } : tag));
+  assert.equal(tooLarge.status, 413);
+  assert.match((await tooLarge.json()).error, /metadata/i);
+  assert.deepEqual([...kv.store], before);
+  for (const invalidTags of [
+    Array.from({ length: 33 }, () => ({ name: 'tag', value: 'value' })),
+    [{ name: 'n'.repeat(65), value: 'value' }],
+    [{ name: 'tag', value: 'v'.repeat(1025) }],
+  ]) {
+    const response = await upload(invalidTags);
+    assert.equal(response.status, 413);
+    assert.match((await response.json()).error, /tags/i);
+    assert.deepEqual([...kv.store], before);
+  }
+  assert.equal((await upload([{ name: 'n'.repeat(64), value: 'v'.repeat(1024) }])).status, 200);
+});
+
+const membershipListingFixture = ({ count = 100, groups, check, conditions = false }) => {
+  const rows = new Map(Array.from({ length: count }, (_, i) => {
+    const id = `cf_membership_${i}`;
+    const groupIds = groups(i);
+    return [`ce-storage:session-a:docsContext:${id}`, JSON.stringify({ id, backend: 'cloudflare', resource: 'docsContext',
+      ...(conditions ? { accessConditions: { match: 'any', conditions: [{ kind: 'worker_group', groupIds }] } } : { groupIds }) })];
+  }));
+  let calls = 0;
+  const env = {
+    CE_STORAGE_INDEX_KV: { get: async (key) => rows.get(key), list: async () => ({ keys: [...rows.keys()].map((name) => ({ name })), list_complete: true }) },
+    CE_SESSION_COORDINATOR: { idFromName: (name) => name, get: () => ({ fetch: async (_url, init) => {
+      calls += 1;
+      const result = check(JSON.parse(init.body).groupId);
+      return Response.json(result, { status: result.status || 200 });
+    } }) },
+  };
+  return { calls: () => calls, run: () => storageRoute({ path: '/storage/list', method: 'GET',
+    request: new Request('https://worker.example/storage/list?resource=docsContext&limit=100'), env,
+    config: { sessionId: WORKER_GROUP_SESSION_ID, storageProfile: { backend: 'cloudflare', payloadAccessControl: { gate: 'none', encryption: 'none' } } },
+    slug: 'session-a', uploaderAddress: '0x0000000000000000000000000000000000000def', deps: { json },
+  }) };
+};
+
+test('a listing checks each distinct group once across one hundred records and groups', async () => {
+  const groupIds = Array.from({ length: 100 }, (_, i) => `group-${i}`);
+  const fixture = membershipListingFixture({ groups: () => groupIds,
+    check: (groupId) => groupId === 'group-99' ? { ok: true } : { ok: false, reason: 'worker_group_membership_denied' } });
+  const response = await fixture.run();
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).items.length, 100);
+  assert.equal(fixture.calls(), 100);
+  await fixture.run();
+  assert.equal(fixture.calls(), 200, 'a later request must check current memberships again');
+});
+
+for (const conditions of [false, true]) test(`unavailable membership fails the entire listing page (conditions=${conditions})`, async () => {
+  const fixture = membershipListingFixture({ count: 5, conditions, groups: (i) => [`group-${i}`],
+    check: (groupId) => groupId === 'group-2' ? { ok: false, status: 503, reason: 'worker_group_coordination_unavailable' } : { ok: true } });
+  const response = await fixture.run();
+  assert.equal(response.status, 503);
+  const body = await response.json();
+  assert.equal(body.retryable, true);
+  assert.equal(body.listComplete, undefined);
+  assert.equal(body.items, undefined);
+});
+
+test('a real membership denial still omits its record', async () => {
+  const fixture = membershipListingFixture({ count: 2, groups: (i) => [`group-${i}`],
+    check: (groupId) => groupId === 'group-0' ? { ok: false, reason: 'worker_group_membership_denied' } : { ok: true } });
+  const response = await fixture.run();
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.deepEqual(body.items.map((item) => item.storageRef.id), ['cf_membership_1']);
+  assert.equal(body.listComplete, true);
+});
+
+// Allowed decides ANY and denied decides ALL. Only with neither is an outage the answer.
+const policyAdmin = `0x${'a'.repeat(40)}`;
+const policyOutsider = `0x${'b'.repeat(40)}`;
+const groupRule = (...groupIds) => ({ kind: 'worker_group', groupIds });
+const adminRule = { kind: 'worker_role', role: 'admin' };
+const readWithPolicy = async (access, requesterAddress) => {
+  const result = await authorizeCloudflareStorageResourceRead({
+    env: {},
+    slug: 'policy',
+    resource: 'questions',
+    requesterAddress,
+    config: { slug: 'policy', adminAddress: policyAdmin, storageProfile: { backend: 'cloudflare', payloadAccessControl: access } },
+    deps: {
+      json,
+      isWorkerGroupMember: async ({ groupId, requesterAddress: principal }) => (
+        groupId === 'down' ? { ok: false, status: 503, reason: 'worker_group_membership_unavailable' }
+          : groupId === 'member' ? { ok: true, principal }
+            : { ok: false, status: 403, reason: 'worker_group_membership_denied' }
+      ),
+    },
+  });
+  return result.ok ? 200 : result.response.status;
+};
+const openAccess = { gate: 'none', encryption: 'none' };
+for (const [label, match, conditions, requester, expected] of [
+  ['ANY: an outage and a grant', 'any', [groupRule('down'), adminRule], policyAdmin, 200],
+  ['ANY: an outage and a denial', 'any', [groupRule('down'), adminRule], policyOutsider, 503],
+  ['ANY: only denials', 'any', [groupRule('other'), adminRule], policyOutsider, 403],
+  ['ALL: an outage and a denial', 'all', [groupRule('down'), adminRule], policyOutsider, 403],
+  ['ALL: an outage and a grant', 'all', [groupRule('down'), adminRule], policyAdmin, 503],
+  ['ALL: only grants', 'all', [groupRule('member'), adminRule], policyAdmin, 200],
+]) {
+  test(`an access policy reads the same in either order: ${label}`, async () => {
+    for (const ordered of [conditions, [...conditions].reverse()]) {
+      assert.equal(await readWithPolicy({ ...openAccess, accessConditions: { match, conditions: ordered } }, requester), expected);
+    }
+  });
+}
+for (const [label, groupIds, expected] of [
+  ['an outage and a membership', ['down', 'member'], 200],
+  ['an outage and a non-member', ['down', 'other'], 503],
+  ['only non-members', ['other', 'another'], 403],
+]) {
+  test(`one group rule and a group gate read the same in either order: ${label}`, async () => {
+    for (const ordered of [groupIds, [...groupIds].reverse()]) {
+      const rule = { match: 'any', conditions: [groupRule(...ordered)] };
+      assert.equal(await readWithPolicy({ ...openAccess, accessConditions: rule }, policyOutsider), expected);
+      assert.equal(await readWithPolicy({ gate: 'group_gate', encryption: 'none', groupIds: ordered }, policyOutsider), expected);
+    }
+  });
+}

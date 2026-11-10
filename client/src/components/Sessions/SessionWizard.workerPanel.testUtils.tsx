@@ -32,7 +32,6 @@ const mockSecondPendingSbtAddress = ethers.utils.getAddress('0xe7f1725E7734CE288
 const mockReplacementSbtAddress = ethers.utils.getAddress('0x8ba1f109551bd432803012645ac136ddd64dba72');
 const mockTestAdminAddress = '0x00000000000000000000000000000000000000aa';
 const TEST_ADMIN_ADDRESS = mockTestAdminAddress;
-const NEW_SESSION_BANNER_DISMISSED_KEY = 'ce_new_session_banner_dismissed';
 const ORIGINAL_PUBLIC_URL = process.env.PUBLIC_URL;
 const ORIGINAL_FETCH = global.fetch;
 const mockSelectorSourceFactory = '0x538A48BC439A36D2A86e63114DCD9c429d2ddEcA';
@@ -313,11 +312,7 @@ import SessionWizard, {
 } from './SessionWizard';
 import { resolveSessionWizardChipotleHookConfig } from './sessionWizardWorkerSecretSupport';
 
-const renderSessionWizard = (props = {}) => {
-  const view = render(<SessionWizard network={{ id: 84532 }} {...props} />);
-  commitSessionModeProfileGateIfPresent();
-  return view;
-};
+const renderSessionWizard = (props = {}) => render(<SessionWizard network={{ id: 84532 }} {...props} />);
 const createTooltipStore = (tooltipsEnabled = true) =>
   createStore((state = { sessionState: { tooltipsEnabled } }, action) => {
     if (action.type === 'SET_TOOLTIPS') {
@@ -353,90 +348,42 @@ const getWizardResourceCard = (resourceKey) =>
   screen
     .getAllByTestId(E2E_TESTIDS.WIZARD_RESOURCE_CARD)
     .find((card) => card.getAttribute('data-ce-resource-key') === resourceKey);
-const enableAdvancedMode = () => {
-  ensureSessionModeProfileReady();
-  const customizeButton = screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED);
-  if (customizeButton.getAttribute('aria-pressed') === 'true') return;
-  act(() => {
-    fireEvent.click(customizeButton);
+const SETUP_SECTION_KEYS = ['context', 'questions', 'participation', 'results', 'access', 'hosting', 'ai'];
+// Every setup section but Basics starts closed behind its More button.
+const openSetupSection = (key: string) => {
+  const toggle = screen.queryByTestId(`ce-setup-more-${key}`);
+  if (!toggle || toggle.getAttribute('aria-expanded') === 'true') return;
+  fireEvent.click(toggle);
+};
+// The one-page layout has no advanced mode; its settings sit behind each section's More.
+const enableAdvancedMode = () => SETUP_SECTION_KEYS.forEach(openSetupSection);
+// The old step cards map to sections: Details is Basics (always open), Access or
+// Privacy is Access, Worker is Hosting; Deploy and Publish are the Create section.
+const selectNormalModeCard = (label: string) => {
+  const name = String(label).toLowerCase();
+  if (/access|privacy/.test(name)) openSetupSection('access');
+  if (/worker/.test(name)) openSetupSection('hosting');
+};
+const PUBLIC_RESULTS_VISIBILITY = 'public_full_if_storage_public';
+// New drafts start Worker-hosted. This takes the on-chain registry path that the
+// old default (trustless) preset took; publicResults also restores that preset's
+// public results and whole-session export.
+const selectRegistryHosting = ({ publicResults = false } = {}) => {
+  openSetupSection('hosting');
+  fireEvent.change(screen.getByTestId('ce-setup-authority'), { target: { value: 'evm_registry_canonical' } });
+  if (!publicResults) return;
+  openSetupSection('results');
+  fireEvent.change(screen.getByTestId('ce-setup-results-visibility'), {
+    target: { value: PUBLIC_RESULTS_VISIBILITY },
   });
+  const exportScope = document.getElementById('ce-setup-export');
+  if (!exportScope) throw new Error('Export scope select not found.');
+  fireEvent.change(exportScope, { target: { value: 'all_session' } });
 };
-const readCachedSessionWizardDraft = () => {
-  try {
-    const cached = JSON.parse(sessionStorage.getItem('ce:sessionWizardDraft:v1') || '{}');
-    return cached?.draft && typeof cached.draft === 'object' ? cached.draft : {};
-  } catch (_) {
-    return {};
-  }
-};
-const resolveSessionModePresetTestId = () => {
-  const cachedDraft = readCachedSessionWizardDraft();
-  const storageProfile =
-    cachedDraft.storageProfile && typeof cachedDraft.storageProfile === 'object' ? cachedDraft.storageProfile : {};
-  return storageProfile.backend === 'cloudflare'
-    ? 'ce-new-preset-fast_cheap_cloudflare'
-    : 'ce-new-preset-trustless_public_decentralized';
-};
-const clickSessionModePresetForTest = (testId) => {
-  const preset = screen.queryByTestId(testId);
-  if (!preset) return false;
-  const originalConfirm = window.confirm;
-  window.confirm = jest.fn(() => true);
-  try {
-    act(() => {
-      fireEvent.click(preset);
-    });
-  } finally {
-    window.confirm = originalConfirm;
-  }
-  return true;
-};
-const hasSelectedSessionModeProfile = () => {
-  const continueButton = screen.queryByTestId('ce-new-preset-continue');
-  if (continueButton) return !continueButton.disabled;
-  return !!screen.queryByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
-};
-function ensureSessionModeProfileReady() {
-  if (hasSelectedSessionModeProfile()) return true;
-  let continueButton = screen.queryByTestId('ce-new-preset-continue');
-  if (!continueButton || continueButton.disabled) {
-    const candidatePresets = [
-      resolveSessionModePresetTestId(),
-      'ce-new-preset-fast_cheap_cloudflare',
-      'ce-new-preset-trustless_public_decentralized',
-    ];
-    for (const presetTestId of [...new Set(candidatePresets)]) {
-      if (!clickSessionModePresetForTest(presetTestId)) continue;
-      if (hasSelectedSessionModeProfile()) break;
-      continueButton = screen.queryByTestId('ce-new-preset-continue');
-      if (continueButton && !continueButton.disabled) break;
-    }
-  }
-  continueButton = screen.queryByTestId('ce-new-preset-continue');
-  if (!hasSelectedSessionModeProfile() && continueButton && !continueButton.disabled) {
-    act(() => {
-      fireEvent.click(continueButton);
-    });
-  }
-  return hasSelectedSessionModeProfile();
-}
-function commitSessionModeProfileGateIfPresent() {
-  ensureSessionModeProfileReady();
-}
-const ensureSessionModeProfileSelected = () => {
-  if (hasSelectedSessionModeProfile()) return;
-  commitSessionModeProfileGateIfPresent();
-  if (hasSelectedSessionModeProfile()) return;
-  const presetTestId = resolveSessionModePresetTestId();
-  clickSessionModePresetForTest(presetTestId);
-};
-const selectNormalModeCard = (label) => {
-  ensureSessionModeProfileSelected();
-  const customizeButton = screen.queryByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED);
-  if (customizeButton?.getAttribute('aria-pressed') === 'true') {
-    fireEvent.click(customizeButton);
-  }
-  fireEvent.click(screen.getByRole('button', { name: new RegExp(label, 'i') }));
+const setCloudflareApiToken = (value: string) => {
+  const input = screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN);
+  fireEvent.change(input, { target: { value } });
+  return input;
 };
 const createPublicWorkerVerificationResponder = () => {
   type PublicWorkerVerificationConfig = {
@@ -498,26 +445,21 @@ const deployVerifiedWorkerForCurrentDraft = async ({
   arweaveJwk = '{"kty":"RSA","n":"render-test"}',
 } = {}) => {
   const fetchMock = installVerifiedWorkerDeploymentFetch(workerUrl);
-  const customizeButton = screen.queryByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED);
-  if (customizeButton?.getAttribute('aria-pressed') === 'true') fireEvent.click(customizeButton);
-  selectNormalModeCard('Worker');
-
-  const tokenInput = screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN);
-  const reactPropsKey = Object.keys(tokenInput).find((key) => key.startsWith('__reactProps$'));
-  if (!reactPropsKey) throw new Error('Cloudflare token input does not expose React change props.');
-  const reactProps = Reflect.get(tokenInput, reactPropsKey) as {
-    onChange: (event: { target: { value: string } }) => void;
-  };
-  act(() => reactProps.onChange({ target: { value: 'cf-render-test-token' } }));
+  // Resource cards other than AI sit under Hosting's More; the token and AI key stay visible.
+  openSetupSection('hosting');
+  setCloudflareApiToken('cf-render-test-token');
   fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_OPENAI_KEY), {
     target: { value: openaiKey },
   });
   const arweaveInput = screen.queryByTestId(E2E_TESTIDS.WIZARD_SECRET_ARWEAVE_JWK);
   if (arweaveInput) fireEvent.change(arweaveInput, { target: { value: arweaveJwk } });
   fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_WORKER));
-  await waitFor(() => {
-    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_STATUS)).toHaveTextContent('Worker deployed.');
-  });
+  await waitFor(
+    () => {
+      expect(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_STATUS)).toHaveTextContent('Worker deployed.');
+    },
+    { timeout: 8000 },
+  );
   return fetchMock;
 };
 const getMockSelectorById = (selectorId) =>
@@ -531,9 +473,9 @@ const expectSelectorAddresses = async (selectorId, expectedAddresses) => {
     expect(selector).toHaveAttribute('data-selected-addresses', expectedAddresses.join(','));
   });
 };
+// On-chain SBT defaults (tags, featured SBTs) render under Access's More, below the gates.
 const openAdvancedMoreOptions = async () => {
-  enableAdvancedMode();
-  fireEvent.click(screen.getByRole('button', { name: /more options/i }));
+  openSetupSection('access');
 };
 const getFeaturedCreateButton = async (): Promise<HTMLElement> =>
   await waitFor(() => {
@@ -543,10 +485,14 @@ const getFeaturedCreateButton = async (): Promise<HTMLElement> =>
     if (!button) throw new Error('Featured SBT create button not found.');
     return button;
   });
+// The gates panel's Create button; on-chain sessions also show one beside featured SBTs.
+const getGateCreateSbtButton = () => {
+  const gatesPanel = document.getElementById('session-wizard-section-encryption');
+  if (!gatesPanel) throw new Error('Access gates panel not found.');
+  return within(gatesPanel).getByTestId(E2E_TESTIDS.WIZARD_CREATE_SBT);
+};
 const ensureGateASelectorVisible = async () => {
-  if (!getMockSelectorById('encryption-gate-gate-1')) {
-    fireEvent.click(screen.getByRole('button', { name: /groups allowed to decrypt locked fields/i }));
-  }
+  openSetupSection('access');
   await waitFor(() => {
     expect(getMockSelectorById('encryption-gate-gate-1')).toBeTruthy();
   });
@@ -656,7 +602,6 @@ export {
   mockSecondPendingSbtAddress,
   mockReplacementSbtAddress,
   TEST_ADMIN_ADDRESS,
-  NEW_SESSION_BANNER_DISMISSED_KEY,
   ORIGINAL_PUBLIC_URL,
   mockSelectorSourceFactory,
   mockSelectorSourceStartBlock,
@@ -682,8 +627,11 @@ export {
   renderLoggedInSessionWizard,
   rerenderSessionWizard,
   getWizardResourceCard,
+  openSetupSection,
   enableAdvancedMode,
   selectNormalModeCard,
+  selectRegistryHosting,
+  setCloudflareApiToken,
   createPublicWorkerVerificationResponder,
   installVerifiedWorkerDeploymentFetch,
   deployVerifiedWorkerForCurrentDraft,
@@ -691,6 +639,7 @@ export {
   expectSelectorAddresses,
   openAdvancedMoreOptions,
   getFeaturedCreateButton,
+  getGateCreateSbtButton,
   ensureGateASelectorVisible,
   createPendingFeaturedDraft,
   resetSessionWizardWorkerPanelTestState,

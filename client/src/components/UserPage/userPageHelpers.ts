@@ -1,3 +1,4 @@
+import { buildUserPageAnalysisResetStatePatch } from './userPageAnalysisStateHelpers';
 import { isPlainAnalysisObject, toAnalysisRecord, type UserPageUnknownRecord } from './userPageCoreHelpers';
 import { normalizeUserAnalysisResult } from './userPageAnalysisStateHelpers';
 import { normalizeUserPageSourceSlugForSignature } from './userPageGateHelpers';
@@ -134,6 +135,7 @@ export {
   applyUserPageDecryptedPatchToResponseField,
   buildUserPageDecryptableResponseField,
   buildUserPageDecryptedResponseStatePatch,
+  getUserPageResponseImmutableIdentity,
   buildUserPageDecryptedResponsePatch,
   buildUserPageEncryptedVisibilityDisplayState,
   buildUserPageEncryptedVisibilityStatusRequestPlan,
@@ -1442,6 +1444,8 @@ export const buildUserPageMissingAddressCacheStateUpdate = (prevState: unknown =
 export const buildUserPageAddressContextResetStatePatch = ({
   viewAddress = '',
 }: BuildUserPageAddressContextResetStatePatchArgs = {}): UserPageUnknownRecord => ({
+  ...buildUserPageAnalysisResetStatePatch(),
+  showAnalysisModal: false,
   surveyResponseInfo: [],
   surveyCreationInfo: [],
   questionCreationInfo: [],

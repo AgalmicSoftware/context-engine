@@ -70,40 +70,93 @@ describe('DemoAnalysisWorkspace', () => {
     expect(promptBlock).not.toContain('var(--ce-document-surface)');
   });
 
-  it('starts with empty map and question breakdown states until a question is selected', () => {
-    render(<DemoAnalysisWorkspace />);
+  it('opens the first available distribution without demographic segments', () => {
+    render(
+      <DemoAnalysisWorkspace
+        analysisData={{
+          questions: [{ id: 'q1', text: 'Keep the workshop?', options: ['Agree', 'Disagree', 'Unsure'] }],
+          flatResponses: [
+            {
+              questionId: 'q1',
+              segmentKey: 'All',
+              responseText: 'Agree',
+              count: 2,
+              rate: 2 / 3,
+              totalVotes: 3,
+              participantCount: 3,
+            },
+            {
+              questionId: 'q1',
+              segmentKey: 'All',
+              responseText: 'Disagree',
+              count: 1,
+              rate: 1 / 3,
+              totalVotes: 3,
+              participantCount: 3,
+            },
+          ],
+          demographics: {},
+          segmentCounts: {},
+          questionTagsData: {},
+        }}
+      />,
+    );
+    expect(screen.getByRole('combobox', { name: 'Question' })).toHaveValue('q1');
+    expect(screen.getByTestId('demo-analysis-selected-question')).toHaveTextContent('Keep the workshop?');
+    const chart = screen.getByTestId('demo-analysis-question-breakdown');
+    expect(chart).toHaveTextContent('Overall');
+    expect(within(chart).getByLabelText(/Agree 67%.*Disagree 33%/)).toBeVisible();
+    expect(within(chart).getByTitle('Agree: 67%')).toBeVisible();
+    expect(within(chart).getByTitle('Disagree: 33%')).toBeVisible();
+    expect(screen.queryByLabelText(/Auto-select strongest correlation/i)).not.toBeInTheDocument();
+    expect(screen.queryByTestId('demo-analysis-empty-state')).not.toBeInTheDocument();
+  });
 
-    expect(screen.getByTestId('demo-analysis-world-map')).toHaveTextContent(/choose a comparison suggestion/i);
-    expect(screen.getByTestId('demo-analysis-question-breakdown')).toHaveTextContent(/select a question to inspect/i);
-    expect(screen.queryByTestId('demo-analysis-selected-question')).not.toBeInTheDocument();
+  it('selects a question with distributions and allows switching without selecting segments', () => {
+    const data = {
+      questions: [
+        { id: 'empty', text: 'No answers yet?', options: ['Agree'] },
+        { id: 'q1', text: 'First answered?', options: ['Agree'] },
+        { id: 'q2', text: 'Second answered?', options: ['Disagree'] },
+      ],
+      flatResponses: ['q1', 'q2'].map((questionId) => ({
+        questionId,
+        segmentKey: 'All',
+        responseText: questionId === 'q1' ? 'Agree' : 'Disagree',
+        rate: 1,
+        totalVotes: 1,
+      })),
+      demographics: {},
+      segmentCounts: {},
+      questionTagsData: {},
+    };
+    const { rerender } = render(<DemoAnalysisWorkspace analysisData={data} />);
+    const selector = screen.getByRole('combobox', { name: 'Question' });
+    expect(selector).toHaveValue('q1');
+    fireEvent.change(selector, { target: { value: 'q2' } });
+    expect(screen.getByTestId('demo-analysis-selected-question')).toHaveTextContent('Second answered?');
+    rerender(<DemoAnalysisWorkspace analysisData={{ ...data, questions: data.questions.slice(0, 2) }} />);
+    expect(selector).toHaveValue('q1');
   });
 
   it('does not fall back to demo fixtures when explicit analysis data is null', () => {
     render(<DemoAnalysisWorkspace analysisData={null} />);
-
-    expect(screen.getByTestId('demo-analysis-world-map')).toHaveTextContent(/choose a comparison suggestion/i);
     expect(screen.getByTestId('demo-analysis-question-breakdown')).toHaveTextContent(/select a question to inspect/i);
     expect(screen.queryByText(/Era:/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/Modern/i)).not.toBeInTheDocument();
   });
 
-  it('updates the report when demographics are selected while keeping the map unselected', async () => {
+  it('updates the report from demographics while preserving the selected question', async () => {
     render(<DemoAnalysisWorkspace />);
-
+    const selectedPrompt = screen.getByTestId('demo-analysis-selected-question').textContent;
     expect(screen.getByTestId('demo-analysis-empty-state')).toBeInTheDocument();
-    expect(screen.getByTestId('demo-analysis-world-map')).toHaveTextContent(/choose a comparison suggestion/i);
-
     setMultiSelectValues('demo-analysis-select-era', ['Modern', 'Industrial']);
-
     await waitFor(() => {
       expect(screen.getByTestId('demo-analysis-report-summary')).toHaveTextContent('Era: Modern');
       expect(screen.getByTestId('demo-analysis-report-summary')).toHaveTextContent('Era: Industrial');
     });
-
     expect(screen.queryByTestId('demo-analysis-empty-state')).not.toBeInTheDocument();
-    expect(screen.getByTestId('demo-analysis-world-map')).toHaveTextContent(/choose a comparison suggestion/i);
-    expect(screen.getAllByText('Era: Modern').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Era: Industrial').length).toBeGreaterThan(0);
+    expect(screen.getByTestId('demo-analysis-selected-question')).toHaveTextContent(selectedPrompt || '');
     expect(screen.getByRole('button', { name: /Show .* More Tags/i })).toBeInTheDocument();
   });
 

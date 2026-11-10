@@ -22,7 +22,7 @@ const shouldFail = (counterMap = {}, key = '') => {
 };
 
 const waitForCondition = async (predicate, label = 'condition') => {
-  for (let i = 0; i < 20; i += 1) {
+  for (let i = 0; i < 100; i += 1) {
     if (predicate()) return;
     await Promise.resolve();
   }
@@ -167,6 +167,30 @@ describe('cacheScripts', () => {
 
   afterEach(() => {
     global.BroadcastChannel = BASELINE_BROADCAST_CHANNEL;
+  });
+
+  it('discards old SBT entries and resets discovery before reads and atomic updates', async () => {
+    const { cacheScripts, idbState } = loadCacheScripts();
+    const { buildSbtActivityCacheEntry } = require('../sbt/sbtActivityCacheEntry.js');
+    const valid = buildSbtActivityCacheEntry({ sbtAddress: '0xcurrent' });
+    idbState.set('dg:sbtCache:old-shape', {
+      1: {
+        lastBlock: 200,
+        lightDiscoveryLatestBlock: 200,
+        sbtList: {
+          '0xold': { schemaVersion: 1, blockNumber: 200, countsLoaded: true, mintedCountByAddress: { '0xorphan': 1 } },
+          '0xcurrent': valid,
+        },
+      },
+    });
+    const expected = { 1: { lastBlock: 0, sbtList: { '0xcurrent': valid } } };
+    await cacheScripts.initCacheManager();
+    expect(cacheScripts.peekCacheSync('sbtCache', 'old-shape')).toEqual(expected);
+    expect(await cacheScripts.readCache('sbtCache', 'old-shape')).toEqual(expected);
+    const updater = jest.fn((current) => current);
+    await cacheScripts.updateCacheAtomic('sbtCache', 'old-shape', updater);
+    expect(updater).toHaveBeenCalledWith(expected);
+    expect(idbState.get('dg:sbtCache:old-shape')).toEqual(expected);
   });
 
   it('reconciles managed namespace dg keys from localStorage into IDB and mirror during init', async () => {
@@ -512,6 +536,195 @@ describe('cacheScripts', () => {
         }),
       ]),
     );
+  });
+
+  it('clears all namespace stores while preserving other namespaces', async () => {
+    const { cacheScripts, idbState } = loadCacheScripts();
+    await cacheScripts.writeCache('questionsCache', 'clear-healthy', { old: true });
+    await cacheScripts.writeCache('surveysCache', 'keep', { keep: true });
+    localStorage.setItem('dg:questionsCache:hidden-local', JSON.stringify({ old: true }));
+    idbState.set('dg:questionsCache:hidden-idb', { old: true });
+    await expect(cacheScripts.clearCacheNamespace('questionsCache')).resolves.toBe(true);
+    expect(cacheScripts.listNamespaceEntriesSync('questionsCache')).toEqual([]);
+    expect([...idbState.keys()].some((key) => key.startsWith('dg:questionsCache:'))).toBe(false);
+    expect(localStorage.getItem('dg:questionsCache:hidden-local')).toBeNull();
+    expect(await cacheScripts.readCache('surveysCache', 'keep')).toEqual({ keep: true });
+  });
+
+  it('does not retry a pre-clear write into the new cache generation', async () => {
+    const { cacheScripts, idb, idbState } = loadCacheScripts();
+    await cacheScripts.initCacheManager();
+    const baseSet = idb.set.getMockImplementation();
+    let release;
+    const gate = new Promise((resolve) => {
+      release = resolve;
+    });
+    let started = false;
+    idb.set.mockImplementation(async (...args) => {
+      if (args[0] === 'dg:questionsCache:pending-clear') {
+        started = true;
+        await gate;
+      }
+      return baseSet(...args);
+    });
+    const pending = cacheScripts.writeCache('questionsCache', 'pending-clear', { old: true });
+    await waitForCondition(() => started, 'write start');
+    await cacheScripts.clearCacheNamespace('questionsCache');
+    release();
+    await expect(pending).resolves.toBe(false);
+    expect(await cacheScripts.readCache('questionsCache', 'pending-clear')).toBeNull();
+    expect([...idbState.keys()].some((key) => key.startsWith('dg:questionsCache:'))).toBe(false);
+  });
+
+  it('discards an atomic update whose updater was still running when the namespace was cleared', async () => {
+    const { cacheScripts, idbState } = loadCacheScripts();
+    await cacheScripts.writeCache('questionsCache', 'atomic-clear', { old: true });
+    let release;
+    const gate = new Promise((resolve) => {
+      release = resolve;
+    });
+    let started = false;
+    const pending = cacheScripts.updateCacheAtomic('questionsCache', 'atomic-clear', async (current) => {
+      started = true;
+      await gate;
+      return { ...(current || {}), touched: true };
+    });
+    await waitForCondition(() => started, 'updater start');
+    await expect(cacheScripts.clearCacheNamespace('questionsCache')).resolves.toBe(true);
+    release();
+    await expect(pending).rejects.toThrow('Failed to persist atomic update');
+    expect(cacheScripts.peekCacheSync('questionsCache', 'atomic-clear')).toBeNull();
+    expect(await cacheScripts.readCache('questionsCache', 'atomic-clear')).toBeNull();
+    expect([...idbState.keys()].some((key) => key.startsWith('dg:questionsCache:'))).toBe(false);
+  });
+
+  it.each(['writeCache', 'writeCacheOptimistic'])('discards a %s queued before a clear', async (method) => {
+    const { cacheScripts, idb, idbState } = loadCacheScripts();
+    await cacheScripts.initCacheManager();
+    const baseSet = idb.set.getMockImplementation();
+    let release;
+    const gate = new Promise((resolve) => {
+      release = resolve;
+    });
+    let started = false;
+    idb.set.mockImplementation(async (...args) => {
+      if (args[0] === 'dg:questionsCache:queued-clear' && !started) {
+        started = true;
+        await gate;
+      }
+      return baseSet(...args);
+    });
+    const first = cacheScripts.writeCache('questionsCache', 'queued-clear', { first: true });
+    await waitForCondition(() => started, 'first write start');
+    const queued = cacheScripts[method]('questionsCache', 'queued-clear', { queued: true });
+    await expect(cacheScripts.clearCacheNamespace('questionsCache')).resolves.toBe(true);
+    release();
+    await expect(Promise.all([first, queued])).resolves.toEqual([false, false]);
+    expect(cacheScripts.peekCacheSync('questionsCache', 'queued-clear')).toBeNull();
+    expect(await cacheScripts.readCache('questionsCache', 'queued-clear')).toBeNull();
+    expect([...idbState.keys()].some((key) => key.startsWith('dg:questionsCache:'))).toBe(false);
+    await expect(cacheScripts.writeCache('questionsCache', 'queued-clear', { fresh: true })).resolves.toBe(true);
+    expect(await cacheScripts.readCache('questionsCache', 'queued-clear')).toEqual({ fresh: true });
+  });
+
+  it('keeps all cleared namespaces empty when IndexedDB recovers', async () => {
+    const namespaces = ['questionsCache', 'surveysCache', 'bookmarksCache'];
+    const { cacheScripts, idb, idbState } = loadCacheScripts();
+    for (const namespace of namespaces) {
+      await cacheScripts.writeCache(namespace, 'clear-outage', { old: true });
+    }
+    const baseDel = idb.del.getMockImplementation();
+    idb.del.mockImplementation(async () => {
+      throw new Error('IDB offline');
+    });
+    for (const namespace of namespaces) {
+      await expect(cacheScripts.clearCacheNamespace(namespace)).resolves.toBe(false);
+      expect(cacheScripts.peekCacheSync(namespace, 'clear-outage')).toBeNull();
+    }
+    idb.del.mockImplementation(baseDel);
+    for (const namespace of namespaces) {
+      expect(await cacheScripts.readCache(namespace, 'clear-outage')).toBeNull();
+      expect(cacheScripts.listNamespaceEntriesSync(namespace)).toEqual([]);
+      expect(idbState.has(`dg:${namespace}:clear-outage`)).toBe(false);
+    }
+    await expect(cacheScripts.writeCache('questionsCache', 'clear-outage', { fresh: true })).resolves.toBe(true);
+    expect(await cacheScripts.readCache('questionsCache', 'clear-outage')).toEqual({ fresh: true });
+  });
+
+  it('clears IDB-only entries after an outage hides them from the mirror', async () => {
+    const { cacheScripts, idb, idbState } = loadCacheScripts({ failProbe: true });
+    idbState.set('dg:questionsCache:hidden', { stale: true });
+    await cacheScripts.initCacheManager();
+    await expect(cacheScripts.clearCacheNamespace('questionsCache')).resolves.toBe(false);
+    const baseSet = idb.set.getMockImplementation();
+    idb.set.mockImplementation(async (key, value, store) => {
+      if (key === '__dg_cache_probe__') return;
+      return baseSet(key, value, store);
+    });
+    expect(await cacheScripts.readCache('questionsCache', 'hidden')).toBeNull();
+    expect(idbState.has('dg:questionsCache:hidden')).toBe(false);
+  });
+
+  it('reports a failed local deletion even when the IndexedDB delete succeeds', async () => {
+    const { cacheScripts } = loadCacheScripts();
+    await cacheScripts.writeCache('questionsCache', 'clear-local-failure', { old: true });
+    localStorage.setItem('dg:questionsCache:clear-local-failure', JSON.stringify({ old: true }));
+    const remove = jest.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => {
+      throw new Error('storage locked');
+    });
+    try {
+      await expect(cacheScripts.removeCache('questionsCache', 'clear-local-failure')).resolves.toBe(false);
+    } finally {
+      remove.mockRestore();
+    }
+  });
+
+  const denyLocalStorageReads = () =>
+    jest.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new DOMException('The operation is insecure.', 'SecurityError');
+    });
+
+  it('keeps memory and IndexedDB access when the generation marker cannot be read', async () => {
+    const { cacheScripts } = loadCacheScripts();
+    await cacheScripts.writeCache('questionsCache', 'marker-denied', { value: 1 });
+    const get = denyLocalStorageReads();
+    try {
+      expect(cacheScripts.peekCacheSync('questionsCache', 'marker-denied')).toEqual({ value: 1 });
+      expect(await cacheScripts.readCache('questionsCache', 'marker-denied')).toEqual({ value: 1 });
+      await expect(cacheScripts.writeCache('questionsCache', 'marker-denied', { value: 2 })).resolves.toBe(true);
+      expect(await cacheScripts.readCache('questionsCache', 'marker-denied')).toEqual({ value: 2 });
+    } finally {
+      get.mockRestore();
+    }
+  });
+
+  it('keeps a namespace cleared in this tab cleared when its marker later cannot be read', async () => {
+    const { cacheScripts, idbState } = loadCacheScripts();
+    await cacheScripts.writeCache('questionsCache', 'marker-cleared', { old: true });
+    await expect(cacheScripts.clearCacheNamespace('questionsCache')).resolves.toBe(true);
+    // The pre-clear entry, as a clear during an IndexedDB outage leaves it.
+    idbState.set('dg:questionsCache:marker-cleared', { old: true });
+    const get = denyLocalStorageReads();
+    try {
+      expect(cacheScripts.peekCacheSync('questionsCache', 'marker-cleared')).toBeNull();
+      expect(await cacheScripts.readCache('questionsCache', 'marker-cleared')).toBeNull();
+    } finally {
+      get.mockRestore();
+    }
+  });
+
+  it('reports a generation marker failure without claiming the namespace was cleared', async () => {
+    const { cacheScripts } = loadCacheScripts();
+    await cacheScripts.writeCache('questionsCache', 'clear-marker-failure', { old: true });
+    const set = jest.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('storage locked');
+    });
+    try {
+      await expect(cacheScripts.clearCacheNamespace('questionsCache')).resolves.toBe(false);
+      expect(await cacheScripts.readCache('questionsCache', 'clear-marker-failure')).toEqual({ old: true });
+    } finally {
+      set.mockRestore();
+    }
   });
 
   it('retries transient IDB failures once and keeps IDB active', async () => {
@@ -1098,5 +1311,266 @@ describe('cacheScripts', () => {
       expect(saved()).toEqual({ questions: ['q1', 'q2'] });
       tabs.forEach((tab) => expect(tab.peekCacheSync('bookmarksCache', 's')).toEqual({ questions: ['q1', 'q2'] }));
     });
+  });
+});
+
+describe('cacheScripts question and survey text decrypted for one account', () => {
+  const NET = 11155420;
+  const lockedQuestion = {
+    id: 'q',
+    prompt: '[encrypted]',
+    promptEncrypted: 'envelope',
+    options: [],
+    optionsEncrypted: 'envelope',
+  };
+  const questionFor = (reader) => ({
+    ...lockedQuestion,
+    prompt: 'Private prompt',
+    promptDecrypted: true,
+    options: ['Private option'],
+    optionsDecrypted: true,
+    ...(reader === undefined ? {} : { decryptedFor: reader }),
+  });
+  const lockedSurvey = {
+    id: 's',
+    title: '[encrypted]',
+    titleEncrypted: 'envelope',
+    documentURLs: [],
+    documentURLsEncrypted: 'envelope',
+  };
+  const surveyFor = (reader) => ({
+    ...lockedSurvey,
+    title: 'Private title',
+    titleDecrypted: true,
+    documentURLs: ['https://docs.example/private'],
+    documentURLsDecrypted: true,
+    ...(reader === undefined ? {} : { decryptedFor: reader }),
+  });
+
+  // Each load is a fresh page: storage is seeded before the cache starts.
+  const openPage = ({ reader = '', seed = {} } = {}) => {
+    const loaded = loadCacheScripts();
+    const { setWorkerCanonicalCacheReader } = require('../survey/workerCanonicalCacheReader');
+    setWorkerCanonicalCacheReader(reader);
+    Object.entries(seed).forEach(([key, value]) => loaded.idbState.set(key, value));
+    return { ...loaded, setReader: setWorkerCanonicalCacheReader };
+  };
+  const seeded = () => ({
+    'dg:questionsCache:s1': {
+      [NET]: {
+        questions: { admin: questionFor('0xadmin'), legacy: questionFor(), blank: questionFor('') },
+        questionResponses: { admin: {} },
+      },
+      worker: { questions: { w: questionFor('0xworker') } },
+    },
+    'dg:surveysCache:s1': { [NET]: { surveys: { admin: surveyFor('0xadmin') } } },
+  });
+
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it("shows a signed-out page another account's decrypted text locked", async () => {
+    const { cacheScripts, idbState } = openPage({ seed: seeded() });
+    await cacheScripts.initCacheManager();
+
+    const lockedQuestions = { admin: lockedQuestion, legacy: lockedQuestion, blank: lockedQuestion };
+    expect(cacheScripts.peekCacheSync('questionsCache', 's1')[NET]).toEqual({
+      questions: lockedQuestions,
+      questionResponses: { admin: {} },
+    });
+    expect(cacheScripts.peekCacheSync('questionsCache', 's1', { clone: false })[NET].questions).toEqual(
+      lockedQuestions,
+    );
+    expect((await cacheScripts.readCache('questionsCache', 's1'))[NET].questions).toEqual(lockedQuestions);
+    expect(cacheScripts.listNamespaceEntriesSync('surveysCache', { cloneValues: false })[0].value).toEqual({
+      [NET]: { surveys: { admin: lockedSurvey } },
+    });
+    // Worker nodes carry their own reader check; storage keeps the text for its account.
+    expect(cacheScripts.peekCacheSync('questionsCache', 's1').worker.questions.w).toEqual(questionFor('0xworker'));
+    expect(idbState.get('dg:questionsCache:s1')[NET].questions.admin).toEqual(questionFor('0xadmin'));
+  });
+
+  it('shows the account that decrypted the text its own text, and only that account', async () => {
+    const { cacheScripts, setReader } = openPage({ reader: '0xadmin', seed: seeded() });
+    await cacheScripts.initCacheManager();
+    expect(cacheScripts.peekCacheSync('questionsCache', 's1')[NET].questions.admin).toEqual(questionFor('0xadmin'));
+    expect(cacheScripts.peekCacheSync('surveysCache', 's1')[NET].surveys.admin).toEqual(surveyFor('0xadmin'));
+
+    setReader('0xother');
+    expect(cacheScripts.peekCacheSync('questionsCache', 's1')[NET].questions.admin).toEqual(lockedQuestion);
+    setReader('0xADMIN');
+    expect(cacheScripts.peekCacheSync('questionsCache', 's1')[NET].questions.admin).toEqual(questionFor('0xadmin'));
+  });
+
+  it('keeps the text a writer saw locked when it saves what it read', async () => {
+    const { cacheScripts, idbState } = openPage({ seed: seeded() });
+    await cacheScripts.initCacheManager();
+
+    const read = cacheScripts.peekCacheSync('questionsCache', 's1');
+    read[NET].questions.added = { id: 'added', prompt: 'Open prompt' };
+    await cacheScripts.writeCache('questionsCache', 's1', read);
+    expect(idbState.get('dg:questionsCache:s1')[NET].questions).toEqual({
+      admin: questionFor('0xadmin'),
+      legacy: questionFor(),
+      blank: questionFor(''),
+      added: { id: 'added', prompt: 'Open prompt' },
+    });
+
+    const surveys = cacheScripts.peekCacheSync('surveysCache', 's1');
+    surveys[NET].surveys.open = { id: 'open', title: 'Open title' };
+    await cacheScripts.writeCacheOptimistic('surveysCache', 's1', surveys);
+    expect(idbState.get('dg:surveysCache:s1')[NET].surveys.admin).toEqual(surveyFor('0xadmin'));
+
+    // An updater reads the text locked too, keeps it, and gets it back locked.
+    let seenByUpdater = null;
+    const returned = await cacheScripts.updateCacheAtomic('questionsCache', 's1', (current) => {
+      seenByUpdater = { ...current[NET].questions };
+      current[NET].questions.added = { id: 'added', prompt: 'Changed prompt' };
+      return current;
+    });
+    expect(seenByUpdater.admin).toEqual(lockedQuestion);
+    expect(seenByUpdater.blank).toEqual(lockedQuestion);
+    expect(idbState.get('dg:questionsCache:s1')[NET].questions.admin).toEqual(questionFor('0xadmin'));
+    expect(idbState.get('dg:questionsCache:s1')[NET].questions.added.prompt).toBe('Changed prompt');
+    expect(returned[NET].questions.admin).toEqual(lockedQuestion);
+  });
+
+  it('saves text a writer decrypted itself and leaves out the entries it removed', async () => {
+    const { cacheScripts, idbState } = openPage({ reader: '0xnext', seed: seeded() });
+    await cacheScripts.initCacheManager();
+
+    await cacheScripts.updateCacheAtomic('questionsCache', 's1', (current) => ({
+      ...current,
+      [NET]: { ...current[NET], questions: { admin: questionFor('0xnext') } },
+    }));
+    expect(idbState.get('dg:questionsCache:s1')[NET].questions).toEqual({ admin: questionFor('0xnext') });
+  });
+
+  it("keeps an account's text when it signs in between a read and its write", async () => {
+    const { cacheScripts, idbState, setReader } = openPage({ seed: seeded() });
+    await cacheScripts.initCacheManager();
+    const questions = cacheScripts.peekCacheSync('questionsCache', 's1');
+    const surveys = cacheScripts.peekCacheSync('surveysCache', 's1');
+
+    setReader('0xadmin');
+    await cacheScripts.writeCache('questionsCache', 's1', questions);
+    await cacheScripts.updateCacheAtomic('questionsCache', 's1', () => questions);
+    await cacheScripts.writeCacheOptimistic('surveysCache', 's1', surveys);
+    expect(idbState.get('dg:questionsCache:s1')[NET].questions.admin).toEqual(questionFor('0xadmin'));
+    expect(idbState.get('dg:surveysCache:s1')[NET].surveys.admin).toEqual(surveyFor('0xadmin'));
+    expect(cacheScripts.peekCacheSync('questionsCache', 's1')[NET].questions.admin).toEqual(questionFor('0xadmin'));
+  });
+
+  it('never saves text the current reader may not see', async () => {
+    const { cacheScripts, idbState, setReader } = openPage({ reader: '0xadmin', seed: seeded() });
+    await cacheScripts.initCacheManager();
+    const questions = cacheScripts.peekCacheSync('questionsCache', 's1');
+    const surveys = cacheScripts.peekCacheSync('surveysCache', 's1');
+
+    setReader('');
+    await cacheScripts.lockChainTextHiddenFromReader();
+    // What the account read before signing out is saved after the lock.
+    await cacheScripts.writeCache('questionsCache', 's1', questions);
+    await cacheScripts.writeCacheOptimistic('surveysCache', 's1', surveys);
+    // So is text decrypted for it that lands late, added in place by an updater.
+    const returned = await cacheScripts.updateCacheAtomic('questionsCache', 's1', (current) => {
+      current[NET].questions.late = questionFor('0xadmin');
+      return current;
+    });
+    expect(returned[NET].questions.late).toEqual(lockedQuestion);
+    expect(JSON.stringify(idbState.get('dg:questionsCache:s1')[NET])).not.toContain('Private');
+    expect(JSON.stringify(idbState.get('dg:surveysCache:s1'))).not.toContain('Private');
+  });
+
+  it('keeps the text locked when a write lands during the sign-out lock', async () => {
+    const { cacheScripts, idb, idbState, setReader } = openPage({ reader: '0xadmin', seed: seeded() });
+    await cacheScripts.initCacheManager();
+    setReader('');
+    // Storage answers reads only after the write below has been issued.
+    let answerReads;
+    const reading = new Promise((resolve) => {
+      answerReads = resolve;
+    });
+    const get = idb.get.getMockImplementation();
+    idb.get.mockImplementation(async (...args) => {
+      await reading;
+      return get(...args);
+    });
+
+    const lock = cacheScripts.lockChainTextHiddenFromReader();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const read = cacheScripts.peekCacheSync('questionsCache', 's1');
+    const write = cacheScripts.writeCacheOptimistic('questionsCache', 's1', read);
+    answerReads();
+    await Promise.all([lock, write]);
+    expect(JSON.stringify(idbState.get('dg:questionsCache:s1')[NET])).not.toContain('Private');
+  });
+
+  it('puts kept text back only on the envelope it was decrypted from', async () => {
+    const { cacheScripts, idbState } = openPage({ seed: seeded() });
+    await cacheScripts.initCacheManager();
+
+    const surveys = cacheScripts.peekCacheSync('surveysCache', 's1');
+    surveys[NET].surveys.admin = { ...surveys[NET].surveys.admin, titleEncrypted: 'edited envelope' };
+    await cacheScripts.writeCache('surveysCache', 's1', surveys);
+    expect(idbState.get('dg:surveysCache:s1')[NET].surveys.admin).toEqual({
+      ...lockedSurvey,
+      titleEncrypted: 'edited envelope',
+    });
+  });
+
+  it("sends each update as the reader's view", async () => {
+    const { cacheScripts } = openPage({ seed: seeded() });
+    await cacheScripts.initCacheManager();
+    const updates = [];
+    cacheScripts.subscribeCacheUpdates((update) => updates.push(update));
+
+    // The write keeps the account's text, and its update shows that text locked.
+    await cacheScripts.writeCache('surveysCache', 's1', cacheScripts.peekCacheSync('surveysCache', 's1'));
+    expect(updates.at(-1).value[NET].surveys.admin).toEqual(lockedSurvey);
+  });
+
+  it('locks the text in storage on an account change and tells every view to read again', async () => {
+    const { cacheScripts, idbState } = openPage({
+      reader: '0xnext',
+      seed: {
+        'dg:questionsCache:s1': {
+          [NET]: { questions: { admin: questionFor('0xadmin'), own: questionFor('0xnext'), legacy: questionFor() } },
+          worker: { questions: { w: questionFor('0xnext') } },
+        },
+        'dg:surveysCache:s1': { [NET]: { surveys: { admin: surveyFor('0xadmin'), own: surveyFor('0xnext') } } },
+        'dg:surveysCache:s2': { [NET]: { surveys: { own: surveyFor('0xnext') } } },
+      },
+    });
+    await cacheScripts.initCacheManager();
+    const updates = [];
+    cacheScripts.subscribeCacheUpdates((update) => updates.push(update));
+
+    await cacheScripts.lockChainTextHiddenFromReader();
+    expect(idbState.get('dg:questionsCache:s1')).toEqual({
+      [NET]: { questions: { admin: lockedQuestion, own: questionFor('0xnext'), legacy: lockedQuestion } },
+      worker: { questions: { w: questionFor('0xnext') } },
+    });
+    expect(idbState.get('dg:surveysCache:s1')[NET].surveys).toEqual({
+      admin: lockedSurvey,
+      own: surveyFor('0xnext'),
+    });
+    expect(idbState.get('dg:surveysCache:s2')).toEqual({ [NET]: { surveys: { own: surveyFor('0xnext') } } });
+    expect(
+      updates
+        .filter((update) => update.source === 'reader')
+        .map((update) => `${update.namespace}:${update.slug}`)
+        .sort(),
+    ).toEqual(['questionsCache:s1', 'surveysCache:s1', 'surveysCache:s2']);
+  });
+
+  it('locks every decrypted text in storage on sign-out', async () => {
+    const { cacheScripts, idbState } = openPage({ seed: seeded() });
+    await cacheScripts.initCacheManager();
+
+    await cacheScripts.lockChainTextHiddenFromReader();
+    expect(JSON.stringify(idbState.get('dg:questionsCache:s1')[NET])).not.toContain('Private');
+    expect(JSON.stringify(idbState.get('dg:surveysCache:s1'))).not.toContain('Private');
   });
 });

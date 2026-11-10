@@ -1,14 +1,14 @@
 # Deploy Helper
 
-`workers/deploy-helper/` is an optional supported OSS component for one-click `sessionCorsWorker` deployment from the Session Wizard.
+`workers/deploy-helper/` is the Worker that `/new` calls to deploy a `sessionCorsWorker` when Create is given a Cloudflare API token. The Cloudflare dashboard path under Hosting and storage > More does not use it.
 
 It is a trusted helper:
 
-- browsers send a Cloudflare API token to this worker
-- the helper creates the target worker, KV namespace, and initial session config/secrets
-- the helper operator can therefore see and misuse that Cloudflare token
+- browsers send a Cloudflare API token and the session's secrets, such as AI keys, to this worker
+- the helper creates the target worker, KV namespace, and initial session config/secrets, and generates the Worker's runtime secrets
+- the helper operator can therefore see and misuse that token and those secrets
 
-Prefer self-hosting it on infrastructure you control.
+Unless `REACT_APP_CE_DEPLOY_HELPER_URL` points elsewhere, `/new` uses the project's helper. Prefer self-hosting one on infrastructure you control.
 
 ## Quick Self-Host Bootstrap
 
@@ -23,7 +23,7 @@ Starter files shipped in this folder:
 
 ## Supported Local Outputs
 
-- `npm run worker:bundle` now emits generated local fallback bundles at `dist/deployHelper.bundle.js` and `dist/sessionCorsWorker.bundle.js`
+- `npm run worker:bundle` emits generated local fallback bundles at `dist/deployHelper.bundle.js` and `dist/sessionCorsWorker.bundle.js`
 - `npm run deploy-helper:deploy -- --worker-name <name> --api-token <token>` bundles and publishes this helper to your Cloudflare account without requiring Wrangler
   - if you omit `--admin-secret`, the script generates one and prints it after deploy
   - if you omit `--allowed-origins`, the CLI seeds the stable Context Engine hosted/local defaults used by `/new`
@@ -99,7 +99,7 @@ Wrangler is the preferred deploy path. The checked-in `worker.js` imports `../sh
     `workers.dev` activation state and clean up only exactly owned test resources
   - the requested worker name is a readable prefix, not an exact physical
     script name. Requests with `deploymentRequestId` derive a stable suffix and
-    KV title marker; legacy requests without it use a random suffix. The helper
+    KV title marker; requests without it use a random suffix. The helper
     reserves stable requests in `SessionWriteCoordinator` before mutation,
     keeps the resumable step journal in KV, replays a terminal safe receipt for
     response-loss retries, and rejects reuse of the ID with a conflicting
@@ -114,10 +114,7 @@ Wrangler is the preferred deploy path. The checked-in `worker.js` imports `../sh
   - the new session Worker records the release it was deployed with in its
     `WORKER_BUNDLE_URL` and `WORKER_BUNDLE_MANIFEST_URL` vars. Only a bundle
     fetched from `bundleUrl` that matched its manifest is recorded;
-    `bundleText` records nothing. An Agents HTTP session also records
-    `AGENT_BRIDGE_BUNDLE_URL` and `AGENT_BRIDGE_BUNDLE_MANIFEST_URL` when its
-    bridge bundle matched its manifest; the helper checks that bundle before
-    it uploads the session Worker. The vars pin the Worker's sponsored grant
+    `bundleText` records nothing. The vars pin the Worker's sponsored grant
     deploys to that release only when the deployed release is 0.6.8 or later
     code; older Worker code still deploys whatever bundle the redeemer sends.
     Client builds outside Netlify default to the release in

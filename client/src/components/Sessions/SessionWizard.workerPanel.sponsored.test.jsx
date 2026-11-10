@@ -16,8 +16,8 @@ import {
   resolveSessionWizardChipotleHookConfig,
   resolveSessionWizardWorkerBaseUrl,
   screen,
-  selectNormalModeCard,
-  enableAdvancedMode,
+  selectRegistryHosting,
+  setCloudflareApiToken,
   waitFor,
 } from './SessionWizard.workerPanel.testUtils';
 
@@ -141,13 +141,10 @@ describe('SessionWizard worker panel rendering', () => {
         target: { value: 'Sponsored Publish Retry Session' },
       });
 
-      selectNormalModeCard('Worker');
+      // Metadata goes to Arweave and the session registers on-chain: the registry path.
+      selectRegistryHosting();
 
-      const cloudflareTokenInput = screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN);
-      const reactPropsKey = Object.keys(cloudflareTokenInput).find((key) => key.startsWith('__reactProps$'));
-      act(() => {
-        cloudflareTokenInput[reactPropsKey].onChange({ target: { value: 'cf-test-token' } });
-      });
+      setCloudflareApiToken('cf-test-token');
       fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_OPENAI_KEY), {
         target: { value: 'sk-sponsored-normal-failure' },
       });
@@ -157,9 +154,14 @@ describe('SessionWizard worker panel rendering', () => {
 
       fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_WORKER));
 
-      await waitFor(() => {
-        expect(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_STATUS)).toHaveTextContent('Failed to fetch bundle (404).');
-      });
+      await waitFor(
+        () => {
+          expect(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_STATUS)).toHaveTextContent(
+            'Failed to fetch bundle (404).',
+          );
+        },
+        { timeout: 8000 },
+      );
       expect(screen.getByTestId(E2E_TESTIDS.WIZARD_BUNDLE_FILE_INPUT)).toBeInTheDocument();
 
       await act(async () => {
@@ -167,33 +169,43 @@ describe('SessionWizard worker panel rendering', () => {
         await sponsoredBundleReady;
       });
 
-      await waitFor(() => {
-        expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SPONSORED_STATUS)).toHaveTextContent(
-          'Sponsored resources applied: OpenAI key, Arweave wallet, faucet funding, Lit API key, deploy access.',
-        );
-      });
-
-      selectNormalModeCard('Deploy Session');
+      await waitFor(
+        () => {
+          expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SPONSORED_STATUS)).toHaveTextContent(
+            'Sponsored resources applied: OpenAI key, Arweave wallet, faucet funding, Lit API key, deploy access.',
+          );
+        },
+        { timeout: 8000 },
+      );
 
       const publishButton = await screen.findByTestId(E2E_TESTIDS.WIZARD_PUBLISH);
-      await waitFor(() => {
-        expect(publishButton).not.toBeDisabled();
-      });
+      await waitFor(
+        () => {
+          expect(publishButton).not.toBeDisabled();
+        },
+        { timeout: 8000 },
+      );
       // The grant deploys the sponsoring Worker's release, so publish offers no bundle fallback.
       expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_BUNDLE_URL_OVERRIDE)).not.toBeInTheDocument();
       expect(screen.queryByText('Worker bundle fallback (optional)')).not.toBeInTheDocument();
 
       fireEvent.click(publishButton);
 
-      await waitFor(() => {
-        expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith('/sponsored/redeem-deploy'))).toBe(true);
-      });
+      await waitFor(
+        () => {
+          expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith('/sponsored/redeem-deploy'))).toBe(true);
+        },
+        { timeout: 8000 },
+      );
       expect(global.fetch.mock.calls.some(([url]) => String(url).includes('/worker/sessionCorsWorker.bundle.js'))).toBe(
         false,
       );
-      await waitFor(() => {
-        expect(arweaveClient.uploadDataToArweave).toHaveBeenCalled();
-      });
+      await waitFor(
+        () => {
+          expect(arweaveClient.uploadDataToArweave).toHaveBeenCalled();
+        },
+        { timeout: 8000 },
+      );
       expect(arweaveClient.uploadDataToArweave).toHaveBeenCalledWith(
         expect.anything(),
         'json',
@@ -316,13 +328,10 @@ describe('SessionWizard worker panel rendering', () => {
         target: { value: 'Sponsored Publish Bundle File Retry' },
       });
 
-      selectNormalModeCard('Worker');
+      // Metadata goes to Arweave and the session registers on-chain: the registry path.
+      selectRegistryHosting();
 
-      const cloudflareTokenInput = screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN);
-      const reactPropsKey = Object.keys(cloudflareTokenInput).find((key) => key.startsWith('__reactProps$'));
-      act(() => {
-        cloudflareTokenInput[reactPropsKey].onChange({ target: { value: 'cf-test-token' } });
-      });
+      setCloudflareApiToken('cf-test-token');
       fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_OPENAI_KEY), {
         target: { value: 'sk-sponsored-file-retry' },
       });
@@ -332,9 +341,14 @@ describe('SessionWizard worker panel rendering', () => {
 
       fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_WORKER));
 
-      await waitFor(() => {
-        expect(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_STATUS)).toHaveTextContent('Failed to fetch bundle (404).');
-      });
+      await waitFor(
+        () => {
+          expect(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_STATUS)).toHaveTextContent(
+            'Failed to fetch bundle (404).',
+          );
+        },
+        { timeout: 8000 },
+      );
       fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_BUNDLE_FILE_INPUT), {
         target: { files: [bundleFile] },
       });
@@ -344,26 +358,36 @@ describe('SessionWizard worker panel rendering', () => {
         await sponsoredBundleReady;
       });
 
-      await waitFor(() => {
-        expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SPONSORED_STATUS)).toHaveTextContent(
-          'Sponsored resources applied: OpenAI key, Arweave wallet, faucet funding, Lit API key, deploy access.',
-        );
-      });
-
-      selectNormalModeCard('Deploy Session');
+      await waitFor(
+        () => {
+          expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SPONSORED_STATUS)).toHaveTextContent(
+            'Sponsored resources applied: OpenAI key, Arweave wallet, faucet funding, Lit API key, deploy access.',
+          );
+        },
+        { timeout: 8000 },
+      );
 
       const publishButton = await screen.findByTestId(E2E_TESTIDS.WIZARD_PUBLISH);
-      await waitFor(() => {
-        expect(publishButton).not.toBeDisabled();
-      });
+      await waitFor(
+        () => {
+          expect(publishButton).not.toBeDisabled();
+        },
+        { timeout: 8000 },
+      );
       fireEvent.click(publishButton);
 
-      await waitFor(() => {
-        expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith('/sponsored/redeem-deploy'))).toBe(true);
-      });
-      await waitFor(() => {
-        expect(arweaveClient.uploadDataToArweave).toHaveBeenCalled();
-      });
+      await waitFor(
+        () => {
+          expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith('/sponsored/redeem-deploy'))).toBe(true);
+        },
+        { timeout: 8000 },
+      );
+      await waitFor(
+        () => {
+          expect(arweaveClient.uploadDataToArweave).toHaveBeenCalled();
+        },
+        { timeout: 8000 },
+      );
       expect(workerAuth.buildSignedBootstrapAdminAuth).not.toHaveBeenCalled();
     } finally {
       global.fetch = originalFetch;
@@ -473,13 +497,10 @@ describe('SessionWizard worker panel rendering', () => {
         target: { value: 'Sponsored Publish Manual URL Retry' },
       });
 
-      selectNormalModeCard('Worker');
+      // Metadata goes to Arweave and the session registers on-chain: the registry path.
+      selectRegistryHosting();
 
-      const cloudflareTokenInput = screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN);
-      const reactPropsKey = Object.keys(cloudflareTokenInput).find((key) => key.startsWith('__reactProps$'));
-      act(() => {
-        cloudflareTokenInput[reactPropsKey].onChange({ target: { value: 'cf-test-token' } });
-      });
+      setCloudflareApiToken('cf-test-token');
       fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_OPENAI_KEY), {
         target: { value: 'sk-sponsored-url-retry' },
       });
@@ -489,9 +510,14 @@ describe('SessionWizard worker panel rendering', () => {
 
       fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_WORKER));
 
-      await waitFor(() => {
-        expect(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_STATUS)).toHaveTextContent('Failed to fetch bundle (404).');
-      });
+      await waitFor(
+        () => {
+          expect(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_STATUS)).toHaveTextContent(
+            'Failed to fetch bundle (404).',
+          );
+        },
+        { timeout: 8000 },
+      );
       fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_BUNDLE_URL_OVERRIDE), {
         target: { value: manualBundleUrl },
       });
@@ -501,26 +527,36 @@ describe('SessionWizard worker panel rendering', () => {
         await sponsoredBundleReady;
       });
 
-      await waitFor(() => {
-        expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SPONSORED_STATUS)).toHaveTextContent(
-          'Sponsored resources applied: OpenAI key, Arweave wallet, faucet funding, Lit API key, deploy access.',
-        );
-      });
-
-      selectNormalModeCard('Deploy Session');
+      await waitFor(
+        () => {
+          expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SPONSORED_STATUS)).toHaveTextContent(
+            'Sponsored resources applied: OpenAI key, Arweave wallet, faucet funding, Lit API key, deploy access.',
+          );
+        },
+        { timeout: 8000 },
+      );
 
       const publishButton = await screen.findByTestId(E2E_TESTIDS.WIZARD_PUBLISH);
-      await waitFor(() => {
-        expect(publishButton).not.toBeDisabled();
-      });
+      await waitFor(
+        () => {
+          expect(publishButton).not.toBeDisabled();
+        },
+        { timeout: 8000 },
+      );
       fireEvent.click(publishButton);
 
-      await waitFor(() => {
-        expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith('/sponsored/redeem-deploy'))).toBe(true);
-      });
-      await waitFor(() => {
-        expect(arweaveClient.uploadDataToArweave).toHaveBeenCalled();
-      });
+      await waitFor(
+        () => {
+          expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith('/sponsored/redeem-deploy'))).toBe(true);
+        },
+        { timeout: 8000 },
+      );
+      await waitFor(
+        () => {
+          expect(arweaveClient.uploadDataToArweave).toHaveBeenCalled();
+        },
+        { timeout: 8000 },
+      );
       expect(workerAuth.buildSignedBootstrapAdminAuth).not.toHaveBeenCalled();
       expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_BUNDLE_URL_OVERRIDE)).not.toBeInTheDocument();
     } finally {

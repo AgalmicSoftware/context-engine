@@ -1,4 +1,7 @@
-import { DEFAULT_AI_MODEL, DEFAULT_AI_MODELS } from '../../../../shared/aiDefaults.mjs';
+import { AI_PRESET_CONFIGS, AI_PROVIDERS } from './aiModelPresets';
+export { AI_PRESET_CONFIGS, AI_PROVIDERS } from './aiModelPresets';
+import { DEFAULT_AI_MODEL, DEFAULT_AI_MODELS, TRANSCRIPTION_FALLBACK_MODEL } from '../../../../shared/aiDefaults.mjs';
+import { toModelLeaf } from '../../../../shared/aiModelFamily.mjs';
 /**
  * @module aiSettings
  * @description Central AI settings resolver — merges session-level defaults with local user overrides
@@ -53,10 +56,7 @@ type NormalizedAiSettings = UnknownRecord & {
   _sessionSlug?: string;
   _sessionName?: string;
   _sessionConfigSource?: string;
-};
-type AiPresetConfig = {
-  provider: string;
-  models: Record<string, string>;
+  _storedModels?: Record<string, boolean>;
 };
 type AiSettingsEnvelopeMetadata = UnknownRecord & {
   encryptedAvailable?: boolean;
@@ -106,14 +106,6 @@ const asProviderEntry = (value: unknown): NormalizedAiProviderSettings => normal
 const getErrorMessage = (error: unknown): string =>
   isRecord(error) && typeof error.message === 'string' ? error.message : toStr(error);
 
-export const AI_PROVIDERS = Object.freeze({
-  ANTHROPIC: 'anthropic',
-  OPENAI: 'openai',
-  OPENROUTER: 'openrouter',
-  CUSTOM: 'custom',
-  LOCAL: 'local',
-});
-
 export const AI_MODEL_TYPES = Object.freeze({
   FAST: 'fast',
   THINKING: 'thinking',
@@ -133,47 +125,16 @@ const DEFAULT_MODEL_PROVIDERS = Object.freeze({
   thinking: AI_PROVIDERS.OPENAI,
 });
 
+// Read fallback for settings that store no transcription model; new sessions store theirs.
 const DEFAULT_TRANSCRIPTION = Object.freeze({
   provider: AI_PROVIDERS.OPENAI,
-  model: 'whisper-1',
+  model: TRANSCRIPTION_FALLBACK_MODEL,
   rpcUrl: '',
 });
 
 const DEFAULT_PROVIDER = Object.freeze({
   apiKey: '',
   encryptedApiKey: '',
-});
-
-export const AI_PRESET_CONFIGS: Record<string, AiPresetConfig> = Object.freeze({
-  [DEFAULT_AI_MODEL]: Object.freeze({ provider: AI_PROVIDERS.OPENAI, models: DEFAULT_AI_MODELS }),
-  'gpt-5': Object.freeze({
-    provider: AI_PROVIDERS.OPENAI,
-    models: Object.freeze({
-      fast: 'gpt-5',
-      thinking: 'gpt-5',
-    }),
-  }),
-  'gpt-4o': Object.freeze({
-    provider: AI_PROVIDERS.OPENAI,
-    models: Object.freeze({
-      fast: 'gpt-4o',
-      thinking: 'gpt-4o',
-    }),
-  }),
-  'claude-sonnet': Object.freeze({
-    provider: AI_PROVIDERS.ANTHROPIC,
-    models: Object.freeze({
-      fast: 'claude-sonnet-4-6',
-      thinking: 'claude-sonnet-4-6',
-    }),
-  }),
-  'claude-opus': Object.freeze({
-    provider: AI_PROVIDERS.ANTHROPIC,
-    models: Object.freeze({
-      fast: 'claude-opus-4-6',
-      thinking: 'claude-opus-4-6',
-    }),
-  }),
 });
 
 const PRELOGIN_PROVIDER_PRESETS: Record<string, string> = Object.freeze({
@@ -214,7 +175,6 @@ const normalizeOptionalReasoningEffort = (value: unknown): string | null => {
   const normalized = toLower(value);
   return normalized ? normalizeReasoningEffort(normalized) : null;
 };
-export const toModelLeaf = (model: unknown): string => toLower(model).split('/').pop() || '';
 export const deriveAiPreset = ({
   mode,
   models,
@@ -229,7 +189,7 @@ export const deriveAiPreset = ({
   const fastProvider = toLower(modelProviders?.fast || mode || '');
   const thinkingProvider = toLower(modelProviders?.thinking || mode || '');
 
-  if (!fastModel || !thinkingModel || fastModel !== thinkingModel) return 'custom';
+  if (!fastModel || !thinkingModel) return 'custom';
   if (!fastProvider || !thinkingProvider || fastProvider !== thinkingProvider) return 'custom';
 
   const match = Object.entries(AI_PRESET_CONFIGS).find(
@@ -462,6 +422,14 @@ const applyAiPresetConfig = (settings: unknown = {}, presetKey = ''): Normalized
   };
 };
 
+// A saved preset keeps its preset's current models, and a saved key that no
+// longer exists falls back to the default preset. Custom settings keep theirs.
+const applySavedAiPreset = (settings: NormalizedAiSettings, savedPreset: unknown): NormalizedAiSettings => {
+  const key = toStr(savedPreset).trim();
+  if (!key || key === 'custom') return settings;
+  return applyAiPresetConfig(settings, AI_PRESET_CONFIGS[key] ? key : DEFAULT_PRESET);
+};
+
 export const applyPreLoginAiProviderKeyChange = (
   settings: unknown = {},
   { provider, apiKey }: { provider?: unknown; apiKey?: unknown } = {},
@@ -595,7 +563,10 @@ export const normalizeLocalAiSettingsEnvelopeRecord = (raw: unknown = null): Loc
 
   const record = raw as AiSettingsEnvelopeRecord;
   if (Number(record.v || 0) === AI_SETTINGS_ENVELOPE_VERSION && record.kind === AI_SETTINGS_ENVELOPE_KIND) {
-    const settings = normalizeAiSettings(record.settings || {}, { includeUseLocal: true });
+    const settings = applySavedAiPreset(
+      normalizeAiSettings(record.settings || {}, { includeUseLocal: true }),
+      asRecord(record.settings).preset,
+    );
     const secretMeta = summarizeAiSettingsSecretMetadata(settings);
     const metadata = asRecord(record.metadata);
     return {
@@ -610,7 +581,7 @@ export const normalizeLocalAiSettingsEnvelopeRecord = (raw: unknown = null): Loc
     };
   }
 
-  const settings = normalizeAiSettings(record, { includeUseLocal: true });
+  const settings = applySavedAiPreset(normalizeAiSettings(record, { includeUseLocal: true }), record.preset);
   return {
     ok: true,
     status: 'legacy',
@@ -717,8 +688,6 @@ const resolveSessionConfigEntry = (slugIn = '', suppliedConfig?: unknown) => {
   };
 };
 
-// Legacy alias removed — function is now resolveSessionConfigEntry directly.
-
 const getActiveSessionSlugFromStore = (): string => {
   try {
     return resolveActiveSessionSlug(asRecord(store?.getState?.()?.sessionState));
@@ -727,7 +696,19 @@ const getActiveSessionSlugFromStore = (): string => {
   }
 };
 
-// Legacy alias removed — function is now getActiveSessionSlugFromStore directly.
+// The lanes a session names a model for. A request on a lane it leaves empty
+// names no model, so each Worker applies its own fallback: an older Worker
+// refuses today's default model.
+const readStoredModelLanes = (ai: unknown): Record<string, boolean> => {
+  const record = asRecord(ai);
+  const models = asRecord(record.models);
+  const names = (entry: unknown) => !!toStr(isRecord(entry) ? entry.model || entry.name || entry.value : entry).trim();
+  const legacy = names(record.model);
+  return {
+    fast: legacy || names(models.fast || models.default),
+    thinking: legacy || names(models.thinking || models.reasoning),
+  };
+};
 
 export const getSessionAiSettings = (slugIn = '', sessionConfig?: unknown): NormalizedAiSettings => {
   const resolved = resolveSessionConfigEntry(slugIn, sessionConfig);
@@ -739,10 +720,9 @@ export const getSessionAiSettings = (slugIn = '', sessionConfig?: unknown): Norm
     _sessionSlug: toStr(resolved.sessionSlug || session?.slug || ''),
     _sessionName: toStr(session?.sessionName || ''),
     _sessionConfigSource: resolved.sessionConfigSource || 'missing',
+    _storedModels: readStoredModelLanes(session?.ai),
   };
 };
-
-// Legacy alias removed — function is now getSessionAiSettings directly.
 
 export const getLocalAiSettings = (): NormalizedAiSettings => {
   const result = readLocalAiSettingsEnvelope();
@@ -988,10 +968,13 @@ export const getEffectiveAiConfig = async ({
   const resolvedKey = useLocalKey ? localKey : sessionKey;
   const apiKey = resolvedKey.apiKey || '';
   const selectedModel = useLocalKey ? localModel : sessionModel;
+  const sessionNamesModel = !!toStr(model).trim() || session._storedModels?.[modelType] !== false;
 
   return {
     provider: selectedProvider,
     model: selectedModel,
+    // Empty when the session names no model for this lane: the request then names none.
+    requestModel: useLocalKey || sessionNamesModel ? selectedModel : '',
     modelType,
     preset:
       toStr(

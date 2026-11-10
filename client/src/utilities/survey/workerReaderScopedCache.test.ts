@@ -1,4 +1,9 @@
-import { listNamespaceSlugsSync, peekCacheSync, updateCacheAtomic } from '../cache/cacheScripts';
+import {
+  listNamespaceSlugsSync,
+  lockChainTextHiddenFromReader,
+  peekCacheSync,
+  updateCacheAtomic,
+} from '../cache/cacheScripts';
 import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../session/sessionModeProfile';
 import {
   purgeWorkerCanonicalCaches,
@@ -14,6 +19,7 @@ import { hydrateWorkerCanonicalResponses, resolveWorkerResponseHydrationRun } fr
 jest.mock('../cache/cacheScripts', () => ({
   ...jest.requireActual<typeof import('../cache/cacheScripts')>('../cache/cacheScripts'),
   listNamespaceSlugsSync: jest.fn(),
+  lockChainTextHiddenFromReader: jest.fn(),
   peekCacheSync: jest.fn(),
   updateCacheAtomic: jest.fn(),
 }));
@@ -234,6 +240,11 @@ it("removes the previous reader's Worker nodes from persistent caches on an acco
   expect((cache.get('questionsCache|b') as Cache).worker).toBeDefined();
   expect(cache.get('userCache|a')).toEqual({ '0xadmin': { 11155420: chainNode }, '0xother': { 11155420: chainNode } });
   expect(updateCacheAtomic).toHaveBeenCalledTimes(2);
+  // Then chain text not decrypted for the new reader is locked as well.
+  expect(lockChainTextHiddenFromReader).toHaveBeenCalledTimes(1);
+  expect(jest.mocked(lockChainTextHiddenFromReader).mock.invocationCallOrder[0]).toBeGreaterThan(
+    Math.max(...jest.mocked(updateCacheAtomic).mock.invocationCallOrder),
+  );
 });
 
 it('keeps draft storage keys independent of the reader so saved drafts stay reachable', () => {

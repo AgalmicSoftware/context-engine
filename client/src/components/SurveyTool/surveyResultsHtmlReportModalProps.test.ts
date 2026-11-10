@@ -1,7 +1,4 @@
-import {
-  buildRedactedSessionResultsSnapshot,
-  SESSION_RESULTS_EXPORT_FORMAT_PDF,
-} from '../../utilities/sessionResultsExport';
+import { buildSessionResultsSnapshot, SESSION_RESULTS_EXPORT_FORMAT_PDF } from '../../utilities/sessionResultsExport';
 import { buildSurveyResultsHtmlReportModalProps } from './surveyResultsHtmlReportModalProps';
 
 const styleMap = {
@@ -9,7 +6,7 @@ const styleMap = {
 };
 
 const buildSnapshot = () =>
-  buildRedactedSessionResultsSnapshot({
+  buildSessionResultsSnapshot({
     exportedAt: '2026-06-08T12:00:00.000Z',
     session: {
       chainId: 11155420,

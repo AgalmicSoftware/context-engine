@@ -3,7 +3,6 @@ import { responseValuesEqual } from './responseValueEquality';
 import React from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 
-import PileHologramAssistant from './PileHologramAssistant';
 import SurveyQuestionsFullQuestionSliderSection from './SurveyQuestionsFullQuestionSliderSection';
 import {
   buildPileRuntimeInitialState,
@@ -29,7 +28,9 @@ import {
 } from './surveyQuestionSubmitFeedback.js';
 import { buildSurveyQuestionPoolLoadState } from './surveyQuestionsTypes.js';
 import { buildListeningModeSearch, isListeningModeQueryEnabled } from '../../utilities/audio/rollingTranscription';
-import { encodeInterviewPrefillPacket, resolveSessionVoiceMode } from './sessionInterview';
+import * as recordingChunkStore from '../../utilities/audio/recordingChunkStore';
+import { resolveSessionVoiceMode } from './sessionInterview';
+import { encodeLinkJson } from '../../../../shared/linkPayload.mjs';
 import { readSessionRecruitmentSource } from './sessionRecruitmentSource';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../../utilities/session/sessionModeProfile';
@@ -139,8 +140,6 @@ const baseRail = (overrides = {}) =>
 const buildSurfaceProps = (overrides = {}) => {
   const rail = overrides.rail || baseRail();
   return {
-    showHologramAssistant: false,
-    toggleHologramAssistant: jest.fn(),
     showMiniBackgroundSpinner: false,
     priorResponsesHydrating: false,
     showLongLoading: false,
@@ -615,6 +614,20 @@ describe('SurveyPileViewMode runtime surface', () => {
     expect(await screen.findByTestId('mock-voice-mode-modal')).toHaveAttribute('data-mode', 'chooser');
   });
 
+  it('mounts the voice-mode modal closed when this device keeps unsent recording audio', async () => {
+    mockVoiceModeProps = undefined;
+    const kept = jest.spyOn(recordingChunkStore, 'hasKeptRecordingAudio').mockResolvedValue(true);
+    try {
+      renderDemoPile({}, { route: '/session/demo' });
+      // After a reload its notice asks for the recording to be reopened, without the dialog opening.
+      await waitFor(() => expect(mockVoiceModeProps?.isOpen).toBe(false));
+      expect(screen.queryByTestId('mock-voice-mode-modal')).not.toBeInTheDocument();
+      expect(kept).toHaveBeenCalledWith(expect.stringMatching(/,"demo"\]$/));
+    } finally {
+      kept.mockRestore();
+    }
+  });
+
   it('keeps the microphone active for retained interviews and resumes them after closing', async () => {
     renderDemoPile({}, { route: '/session/demo' });
     const toggle = await screen.findByTestId(E2E_TESTIDS.SESSION_LISTENING_TOGGLE);
@@ -637,15 +650,32 @@ describe('SurveyPileViewMode runtime surface', () => {
     expect(await screen.findByTestId('mock-voice-mode-modal')).toHaveAttribute('data-mode', 'chooser');
   });
 
+  it('opens the voice chooser from ?mode=voice and swaps in the picked mode', async () => {
+    renderDemoPile({}, { route: '/session/demo?foo=1&mode=voice' });
+    expect(await screen.findByTestId('mock-voice-mode-modal')).toHaveAttribute('data-mode', 'chooser');
+    await act(async () => mockVoiceModeProps.onSelectMode('interview'));
+    expect(window.location.search).toBe('?foo=1&mode=interview');
+    await act(async () => mockVoiceModeProps.onClose());
+    expect(window.location.search).toBe('?foo=1');
+  });
+
   it('opens interview and group conversation directly from their mode query values', async () => {
     const first = renderDemoPile({}, { route: '/session/demo?foo=1&mode=interview' });
     expect(await screen.findByTestId('mock-voice-mode-modal')).toHaveAttribute('data-mode', 'interview');
     expect(resolveSessionVoiceMode(window.location.search)).toBe('interview');
     first.unmount();
 
-    renderDemoPile({}, { route: '/session/demo?mode=recordGroup' });
+    renderDemoPile({}, { route: '/session/demo?mode=groupRecording' });
     expect(await screen.findByTestId('mock-voice-mode-modal')).toHaveAttribute('data-mode', 'recordGroup');
     expect(resolveSessionVoiceMode(window.location.search)).toBe('recordGroup');
+  });
+
+  it('ignores a mode no session link uses and strips it from the address', async () => {
+    renderDemoPile({}, { route: '/session/demo?foo=1&mode=recordGroup#keep' });
+    await screen.findByTestId(E2E_TESTIDS.SESSION_LISTENING_TOGGLE);
+    expect(screen.queryByTestId('mock-voice-mode-modal')).not.toBeInTheDocument();
+    expect(window.location.search).toBe('?foo=1');
+    expect(window.location.hash).toBe('#keep');
   });
 
   it('returns embedded interviews to the session Results section without opening raw results', async () => {
@@ -753,7 +783,7 @@ describe('SurveyPileViewMode runtime surface', () => {
   });
 
   it('imports a valid prefill hash when the mounted session URL changes', async () => {
-    const encoded = encodeInterviewPrefillPacket({
+    const encoded = encodeLinkJson({
       version: 1,
       sessionSlug: 'demo',
       questionSetHash: 'b'.repeat(64),
@@ -784,7 +814,7 @@ describe('SurveyPileViewMode runtime surface', () => {
   });
 
   it('can import the same valid prefill again after the URL hash is cleared', async () => {
-    const encoded = encodeInterviewPrefillPacket({
+    const encoded = encodeLinkJson({
       version: 1,
       sessionSlug: 'demo',
       questionSetHash: 'd'.repeat(64),
@@ -833,7 +863,7 @@ describe('SurveyPileViewMode runtime surface', () => {
     await waitFor(() => expect(window.location.hash).toBe(''));
     expect(screen.getByTestId('mock-voice-mode-modal')).toHaveAttribute('data-prefill-model', '');
 
-    const encoded = encodeInterviewPrefillPacket({
+    const encoded = encodeLinkJson({
       version: 1,
       sessionSlug: 'demo',
       questionSetHash: 'c'.repeat(64),
@@ -855,8 +885,55 @@ describe('SurveyPileViewMode runtime surface', () => {
     rendered.unmount();
   });
 
+  it('opens a broken prefill link in the interview with its reason, even without a mode', async () => {
+    const rendered = renderDemoPile({ activeSessionSlug: 'demo' }, { route: '/session/demo#prefill=eyJ2ZXJzaW9u' });
+    expect(await screen.findByTestId('mock-voice-mode-modal')).toHaveAttribute('data-mode', 'interview');
+    expect(mockVoiceModeProps.initialError).toMatch(/cut off/);
+    expect(mockVoiceModeProps.initialError).toMatch(/paste the JSON packet/);
+    await waitFor(() => expect(window.location.hash).toBe(''));
+    rendered.unmount();
+  });
+
+  it('imports a pasted JSON packet the way it imports a link, for this session only', async () => {
+    const packet = {
+      version: 1,
+      sessionSlug: 'demo',
+      questionSetHash: 'e'.repeat(64),
+      promptVersion: 'ce-interview-brief-v6',
+      source: { platform: 'chatgpt', modelId: 'gpt-pasted', verification: 'self_reported' },
+      responderContext: { summary: 'Pasted context.' },
+      responses: [
+        { questionId: 'q1', answer: 'Pasted draft', confidence: 0.6 },
+        { questionId: 'q2', answer: 'No confidence' },
+      ],
+    };
+    const rendered = renderDemoPile(
+      { activeSessionSlug: 'demo' },
+      { route: '/session/demo?mode=interview#prefill=%%%' },
+    );
+    await screen.findByTestId('mock-voice-mode-modal');
+    expect(mockVoiceModeProps.initialError).toMatch(/damaged/);
+    let result;
+    act(() => {
+      result = mockVoiceModeProps.onImportPrefillJson(JSON.stringify({ ...packet, sessionSlug: 'other' }));
+    });
+    expect(result).toMatch(/different session/);
+    act(() => {
+      result = mockVoiceModeProps.onImportPrefillJson(JSON.stringify(packet));
+    });
+    expect(result).toBe('');
+    await waitFor(() =>
+      expect(screen.getByTestId('mock-voice-mode-modal')).toHaveAttribute('data-prefill-model', 'gpt-pasted'),
+    );
+    expect(mockVoiceModeProps.initialError).toBe('');
+    expect(mockVoiceModeProps.prefillNotice).toBe(
+      'Left out 1 draft from your AI that was incomplete or repeated; each needs a question, an answer and a confidence.',
+    );
+    rendered.unmount();
+  });
+
   it('keeps an imported prefill through initialization and clears it only after mount', async () => {
-    const encoded = encodeInterviewPrefillPacket({
+    const encoded = encodeLinkJson({
       version: 1,
       sessionSlug: 'demo',
       questionSetHash: 'a'.repeat(64),
@@ -1028,7 +1105,8 @@ describe('SurveyPileViewMode runtime surface', () => {
 
   it('persists unselected research once on a changed selected answer and removes it on opt-out', async () => {
     const engine = {
-      props: { sessionConfig: {} },
+      // Drafts for skipped questions are kept only at full research detail.
+      props: { sessionConfig: { interviewMode: { researchDetail: 'full' } } },
       state: { surveysResponseState: [{ answers: { q1: { value: 'Agree' }, q2: { value: 'Edited answer' } } }] },
       getChangedQidsAndFields: () => ({ changedQids: new Set(['q2']) }),
       persistDraft: jest.fn(),
@@ -1486,51 +1564,6 @@ describe('SurveyPileViewMode runtime surface', () => {
     expect(successIcon).not.toBeNull();
   });
 
-  it('renders the pile hologram as a full-card takeover and hides pile controls while active', () => {
-    const closedTree = renderPileInteractionSurface(
-      buildSurfaceProps({
-        renderActiveQuestion: jest.fn(() => null),
-        showHologramAssistant: false,
-      }),
-    );
-    const closedToggleButton = findElement(
-      closedTree,
-      (node) => isElementNode(node) && node.props['data-testid'] === E2E_TESTIDS.SURVEY_PILE_HOLOGRAM_TOGGLE,
-    );
-    const closedHologram = findElement(
-      closedTree,
-      (node) => isElementNode(node) && node.type === PileHologramAssistant,
-    );
-    const closedControls = findNodeByClassName(closedTree, 'pileControls');
-    const closedActions = findNodeByClassName(closedControls?.props?.children, 'pileActions');
-    const closedFooter = findNodeByClassName(closedControls?.props?.children, 'pileFooter');
-    const closedNav = findNodeByClassName(closedControls?.props?.children, 'pileNav');
-
-    expect(closedToggleButton).toBeNull();
-    expect(closedControls).not.toBeNull();
-    expect(closedActions).not.toBeNull();
-    expect(closedFooter).not.toBeNull();
-    expect(closedNav).not.toBeNull();
-    expect(closedHologram).toBeNull();
-
-    const openTree = renderPileInteractionSurface(
-      buildSurfaceProps({
-        renderActiveQuestion: jest.fn(() => null),
-        showHologramAssistant: true,
-      }),
-    );
-    const openToggleButton = findElement(
-      openTree,
-      (node) => isElementNode(node) && node.props['data-testid'] === E2E_TESTIDS.SURVEY_PILE_HOLOGRAM_TOGGLE,
-    );
-    const openHologram = findElement(openTree, (node) => isElementNode(node) && node.type === PileHologramAssistant);
-
-    expect(openToggleButton).toBeNull();
-    expect(findNodeByClassName(openTree, 'pileControls')).toBeNull();
-    expect(findNodeByClassName(openTree, 'pileFooter')).toBeNull();
-    expect(openHologram).not.toBeNull();
-  });
-
   it('does not call getPendingEditStats during PileViewMode.render', () => {
     const getPendingEditStats = jest.fn(() => ({ total: 7, encrypted: 2 }));
     const rail = buildPileSubmitRailViewState({
@@ -1733,7 +1766,7 @@ describe('independent interview own-answer hydration', () => {
         surveysResponseState: [{ answers: { q1: encrypted }, importance: {}, conviction: {}, additionalComments: {} }],
         editBaseline: { answers: { q1: plain }, importance: {}, conviction: {}, additionalComments: {} },
       },
-      valuesEqual: (a, b) => responseValuesEqual(a, b, true),
+      valuesEqual: (a, b) => responseValuesEqual(a, b),
       getDefaultResponseEncryptionAudience: () => 'self',
       normalizeResponseEncryptionAudience: (audience) => audience,
       getDefaultResponseEncryptionAudienceForQid: () => 'self',

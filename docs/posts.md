@@ -22,9 +22,9 @@ Add a Markdown file under root `posts/`, then add it to
 {
   "posts": [
     {
-      "slug": "agent-village-wrapped",
+      "slug": "agent-village-wrapped-2026",
       "title": "Agent Village Wrapped",
-      "date": "2026-07-03",
+      "date": "2026-07-06",
       "summary": "Short listing copy.",
       "author": "Context Engine",
       "tags": ["agent evals"],
@@ -76,19 +76,16 @@ Production builds generate crawler-facing HTML at both
 link-preview services read post metadata without executing the React app. The
 preview uses the manifest `title` and `summary`, sets the Open Graph type to
 `article`, and uses `headerImage.src` for the Open Graph and Twitter image with
-a `summary_large_image` card.
+a `summary_large_image` card (a `summary` card when there is no header image).
 
 Header images should therefore be compressed web assets, preferably JPEG or
 WebP, rather than full-resolution working files.
 
 Non-post routes (the homepage, `/about` and app routes) use the site-wide
 preview defined in `client/src/variables/publicSocialPreview.json`: a 1200×630
-poster plus the product film as `og:video` (see
-[`media/product-film/README.md`](../media/product-film/README.md)). Individual
+poster plus the product film as `og:video`. Individual
 posts replace that default with their manifest header image and do not
-advertise the film. The earlier square mark remains at
-`/context-engine-social-preview-square.png` for previews that were
-cached before the change.
+advertise the film.
 
 ## Disclosure Blocks
 

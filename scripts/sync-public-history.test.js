@@ -443,6 +443,104 @@ test('sync-public-history accepts a target base from the fetched public target h
   });
 });
 
+test('sync-public-history extends a pushed candidate that already carries the release version', () => {
+  withSourceRepo(({ sourceDir }) => {
+    const first = runSyncScript(sourceDir, ['--push', '--release-version', '0.2.0', 'release-staging-next']);
+    assert.equal(first.status, 0, syncFailureMessage(first));
+    const replayedThrough = git(sourceDir, ['rev-parse', 'dev']).trim();
+    const pushed = git(sourceDir, ['rev-parse', 'release-staging-next']).trim();
+
+    writeFile(sourceDir, 'later.txt', 'later public change\n');
+    commitAll(sourceDir, 'fix: add a later public change', {
+      authorDate: '2025-01-06T00:00:00Z',
+      committerDate: '2025-01-06T00:00:00Z',
+    });
+
+    const second = runSyncScript(sourceDir, [
+      '--force-with-lease',
+      '--source-base',
+      replayedThrough,
+      '--target-base',
+      pushed,
+      '--keep-release-version',
+      'release-staging-next',
+    ]);
+
+    assert.equal(second.status, 0, syncFailureMessage(second));
+    assert.equal(git(sourceDir, ['log', '-1', '--format=%s', 'release-staging-next']).trim(), 'fix: add a later public change');
+    assert.equal(git(sourceDir, ['rev-parse', 'release-staging-next^']).trim(), pushed);
+    assert.equal(JSON.parse(git(sourceDir, ['show', 'release-staging-next:package.json'])).version, '0.2.0');
+  });
+});
+
+test('sync-public-history stops a kept version once that candidate has reached public main', () => {
+  withSourceRepo(({ sourceDir, remoteDir }) => {
+    const first = runSyncScript(sourceDir, ['--push', '--release-version', '0.2.0', 'release-staging-next']);
+    assert.equal(first.status, 0, syncFailureMessage(first));
+    const replayedThrough = git(sourceDir, ['rev-parse', 'dev']).trim();
+    const pushed = git(sourceDir, ['rev-parse', 'release-staging-next']).trim();
+    git(remoteDir, ['update-ref', 'refs/heads/main', pushed]);
+
+    writeFile(sourceDir, 'later.txt', 'later public change\n');
+    commitAll(sourceDir, 'fix: add a later public change', {
+      authorDate: '2025-01-06T00:00:00Z',
+      committerDate: '2025-01-06T00:00:00Z',
+    });
+
+    const second = runSyncScript(sourceDir, [
+      '--force-with-lease',
+      '--source-base',
+      replayedThrough,
+      '--target-base',
+      pushed,
+      '--keep-release-version',
+      'release-staging-next',
+    ]);
+
+    assert.equal(second.status, 2, syncFailureMessage(second));
+    assert.match(second.stderr, /kept version does not pass/);
+    assert.equal(git(sourceDir, ['rev-parse', 'release-staging-next']).trim(), pushed);
+  });
+});
+
+test('sync-public-history refuses a kept version it cannot honour', () => {
+  withSourceRepo(({ sourceDir }) => {
+    const withVersion = runSyncScript(sourceDir, ['--keep-release-version', '--release-version', '0.5.0', 'release-staging-next']);
+    assert.equal(withVersion.status, 1);
+    assert.match(withVersion.stderr, /cannot be combined/);
+
+    const unpushed = runSyncScript(sourceDir, ['--keep-release-version', 'release-staging-next']);
+    assert.equal(unpushed.status, 1);
+    assert.match(unpushed.stderr, /extends a pushed candidate/);
+  });
+});
+
+test('sync-public-history replays onto a remote that a stale local target does not contain', () => {
+  withSourceRepo(({ sourceDir }) => {
+    git(sourceDir, ['branch', 'release-candidate', 'main']);
+    git(sourceDir, ['checkout', '--quiet', '-b', 'rewritten', 'main']);
+    writeFile(sourceDir, 'rewritten.txt', 'rewritten public candidate\n');
+    commitAll(sourceDir, 'Rewritten public candidate', {
+      authorDate: '2025-01-02T00:00:00Z',
+      committerDate: '2025-01-02T00:00:00Z',
+    });
+    const rewritten = git(sourceDir, ['rev-parse', 'HEAD']).trim();
+    git(sourceDir, ['push', '--quiet', 'origin', 'HEAD:release-candidate']);
+    git(sourceDir, ['checkout', '--quiet', 'dev']);
+    git(sourceDir, ['branch', '--quiet', '-D', 'rewritten']);
+    const staleTree = git(sourceDir, ['rev-parse', 'main^{tree}']).trim();
+    const stale = git(sourceDir, ['commit-tree', staleTree, '-p', 'main', '-m', 'Stale local candidate'], {
+      env: { ...process.env, GIT_AUTHOR_DATE: '2025-01-03T00:00:00Z', GIT_COMMITTER_DATE: '2025-01-03T00:00:00Z' },
+    }).trim();
+    git(sourceDir, ['branch', '--quiet', '-f', 'release-candidate', stale]);
+
+    const result = runSyncScript(sourceDir, ['--force-with-lease', '--target-base', rewritten, 'release-candidate']);
+
+    assert.equal(result.status, 0, syncFailureMessage(result));
+    assert.equal(git(sourceDir, ['merge-base', '--is-ancestor', rewritten, 'release-candidate']), '');
+  });
+});
+
 test('sync-public-history can replay patch-new commits from a source branch diverged from main', () => {
   withSourceRepo(({ sourceDir }) => {
     git(sourceDir, ['checkout', '--quiet', 'main']);
@@ -893,6 +991,228 @@ test('sync-public-history rejects a runner secret added and deleted after the Ag
   });
 });
 
+const AGENT_BRIDGE_MARKER = path.join('workers', 'agentBridgeWorker', 'PUBLIC_RELEASE_CUTOVER');
+const AGENT_BRIDGE_SUBTREE = path.join('workers', 'agentBridgeWorker');
+const AGENT_BRIDGE_RUNNER = path.join('scripts', 'run-agent-bridge-worker-tests.js');
+const SESSION_AGENT_RUNNER = path.join('scripts', 'run-session-agent-tests.js');
+
+function removeFromSource(sourceDir, ...relativePaths) {
+  for (const relativePath of relativePaths) {
+    fs.rmSync(path.join(sourceDir, relativePath), { recursive: true });
+  }
+}
+
+function commitAt(sourceDir, message, day) {
+  const date = `2025-02-${String(day).padStart(2, '0')}T00:00:00Z`;
+  commitAll(sourceDir, message, { authorDate: date, committerDate: date });
+  return git(sourceDir, ['rev-parse', 'HEAD']).trim();
+}
+
+function retireAgentBridge(sourceDir, day) {
+  removeFromSource(sourceDir, AGENT_BRIDGE_SUBTREE, AGENT_BRIDGE_RUNNER);
+  writeFile(sourceDir, SESSION_AGENT_RUNNER, "console.log('session agent tests');\n");
+  const pkg = JSON.parse(fs.readFileSync(path.join(sourceDir, 'package.json'), 'utf8'));
+  delete pkg.scripts['test:worker:agent-bridge'];
+  pkg.scripts['test:worker:agent'] = 'node scripts/run-session-agent-tests.js';
+  writeFile(sourceDir, 'package.json', `${JSON.stringify(pkg, null, 2)}\n`);
+  return commitAt(sourceDir, 'Retire the separate agent worker', day);
+}
+
+function trackedPathsAt(sourceDir, rev) {
+  return git(sourceDir, ['ls-tree', '-r', '--name-only', rev]);
+}
+
+test('sync-public-history replays across the Agent Bridge retirement commit', () => {
+  withSourceRepo(({ sourceDir }) => {
+    writeFile(sourceDir, path.join('workers', 'agentBridgeWorker', 'worker.js'), 'public agent bridge worker v2\n');
+    const lastBridgeCommit = commitAt(sourceDir, 'Update the worker before retirement', 1);
+    const retirementCommit = retireAgentBridge(sourceDir, 2);
+    writeFile(sourceDir, 'public.txt', 'public one\npublic two\npublic three\n');
+    commitAt(sourceDir, 'Public commit after retirement', 3);
+    writeFile(sourceDir, path.join('workers', 'agentBridgeWorker', 'stray.txt'), 'must stay stripped\n');
+    writeFile(sourceDir, AGENT_BRIDGE_RUNNER, 'must stay stripped\n');
+    commitAt(sourceDir, 'Add a stray retired file', 4);
+    removeFromSource(sourceDir, AGENT_BRIDGE_SUBTREE, AGENT_BRIDGE_RUNNER);
+    commitAt(sourceDir, 'Remove the stray retired file', 5);
+
+    const dryRun = runSyncScript(sourceDir, ['--dry-run', 'release-candidate']);
+    assert.equal(dryRun.status, 0, syncFailureMessage(dryRun));
+    assert.equal(parseSummaryValue(dryRun.stdout, 'Would replay'), '5');
+    assert.equal(parseSummaryValue(dryRun.stdout, 'Would skip'), '4');
+
+    const result = runSyncScript(sourceDir, ['release-candidate']);
+    assert.equal(result.status, 0, syncFailureMessage(result));
+    assert.match(result.stderr, new RegExp(`Agent Bridge public history retired at: ${retirementCommit}`));
+
+    const replayedByMessage = new Map(
+      git(sourceDir, ['log', '--format=%H %s', 'origin/main..release-candidate'])
+        .trim()
+        .split('\n')
+        .map((line) => [line.slice(41), line.slice(0, 40)]),
+    );
+    assert.equal(replayedByMessage.size, 5);
+    assert.match(
+      git(sourceDir, ['log', '-1', '--format=%B', replayedByMessage.get('Retire the separate agent worker')]),
+      new RegExp(`CE-Private-Source: ${retirementCommit}`),
+    );
+
+    // The audited window still publishes the subtree, runner, marker and command.
+    const lastBridgeReplay = replayedByMessage.get('Update the worker before retirement');
+    assert.match(
+      git(sourceDir, ['log', '-1', '--format=%B', lastBridgeReplay]),
+      new RegExp(`CE-Private-Source: ${lastBridgeCommit}`),
+    );
+    assert.equal(
+      git(sourceDir, ['show', `${lastBridgeReplay}:workers/agentBridgeWorker/worker.js`]),
+      'public agent bridge worker v2\n',
+    );
+    const lastBridgePaths = trackedPathsAt(sourceDir, lastBridgeReplay);
+    assert.match(lastBridgePaths, /^workers\/agentBridgeWorker\/PUBLIC_RELEASE_CUTOVER$/m);
+    assert.match(lastBridgePaths, /^scripts\/run-agent-bridge-worker-tests\.js$/m);
+    assert.equal(
+      JSON.parse(git(sourceDir, ['show', `${lastBridgeReplay}:package.json`])).scripts['test:worker:agent-bridge'],
+      'node scripts/run-agent-bridge-worker-tests.js',
+    );
+
+    // From the retirement commit on, only the renamed runner remains.
+    for (const subject of ['Retire the separate agent worker', 'Public commit after retirement']) {
+      const replayed = replayedByMessage.get(subject);
+      const paths = trackedPathsAt(sourceDir, replayed);
+      assert.doesNotMatch(paths, /^workers\/agentBridgeWorker\//m, subject);
+      assert.doesNotMatch(paths, /^scripts\/run-agent-bridge-worker-tests\.js$/m, subject);
+      assert.match(paths, /^scripts\/run-session-agent-tests\.js$/m, subject);
+      const { scripts } = JSON.parse(git(sourceDir, ['show', `${replayed}:package.json`]));
+      assert.equal(scripts['test:worker:agent'], 'node scripts/run-session-agent-tests.js', subject);
+      assert.equal(Object.hasOwn(scripts, 'test:worker:agent-bridge'), false, subject);
+    }
+
+    assert.equal(replayedByMessage.has('Add a stray retired file'), false);
+    assert.equal(replayedByMessage.has('Remove the stray retired file'), false);
+    assert.equal(
+      git(sourceDir, ['show', 'release-candidate:public.txt']),
+      'public one\npublic two\npublic three\n',
+    );
+  });
+});
+
+test('sync-public-history keeps the retired paths out after a later side-line commit', () => {
+  withSourceRepo(({ sourceDir }) => {
+    writeFile(sourceDir, path.join('workers', 'agentBridgeWorker', 'worker.js'), 'public agent bridge worker v2\n');
+    const branchPoint = commitAt(sourceDir, 'Update the worker before retirement', 1);
+    const mainBranch = git(sourceDir, ['symbolic-ref', '--short', 'HEAD']).trim();
+    retireAgentBridge(sourceDir, 2);
+    git(sourceDir, ['checkout', '-q', '-b', 'side-line', branchPoint]);
+    writeFile(sourceDir, 'side.txt', 'late side line\n');
+    commitAt(sourceDir, 'Late side-line commit', 3);
+    git(sourceDir, ['checkout', '-q', mainBranch]);
+    git(sourceDir, ['merge', '-q', '--no-ff', '--no-edit', 'side-line']);
+
+    const result = runSyncScript(sourceDir, ['--allow-diverged-source', 'release-candidate']);
+    assert.equal(result.status, 0, syncFailureMessage(result));
+
+    const paths = trackedPathsAt(sourceDir, 'release-candidate');
+    assert.match(paths, /^side\.txt$/m);
+    assert.doesNotMatch(paths, /^workers\/agentBridgeWorker\//m);
+    assert.doesNotMatch(paths, /^scripts\/run-agent-bridge-worker-tests\.js$/m);
+    const { scripts } = JSON.parse(git(sourceDir, ['show', 'release-candidate:package.json']));
+    assert.equal(Object.hasOwn(scripts, 'test:worker:agent-bridge'), false);
+    assert.equal(scripts['test:worker:agent'], 'node scripts/run-session-agent-tests.js');
+  });
+});
+
+test('sync-public-history dry run counts a retirement that only deletes Agent Bridge paths', () => {
+  withSourceRepo(({ sourceDir }) => {
+    removeFromSource(sourceDir, AGENT_BRIDGE_SUBTREE, AGENT_BRIDGE_RUNNER);
+    const retirementCommit = commitAt(sourceDir, 'Remove the retired agent worker', 1);
+
+    const result = runSyncScript(sourceDir, ['--dry-run', 'release-candidate']);
+
+    assert.equal(result.status, 0, syncFailureMessage(result));
+    assert.match(result.stderr, new RegExp(`DRY RUN replay ${retirementCommit}`));
+    assert.equal(parseSummaryValue(result.stdout, 'Would replay'), '3');
+  });
+});
+
+for (const [label, removedPaths, leftoverPattern] of [
+  ['only the marker', [AGENT_BRIDGE_MARKER], /workers\/agentBridgeWorker is still on dev/],
+  ['the marker and subtree', [AGENT_BRIDGE_SUBTREE], /scripts\/run-agent-bridge-worker-tests\.js is still on dev/],
+  ['the marker and runner', [AGENT_BRIDGE_MARKER, AGENT_BRIDGE_RUNNER], /workers\/agentBridgeWorker is still on dev/],
+]) {
+  test(`sync-public-history rejects a partial Agent Bridge removal of ${label}`, () => {
+    withSourceRepo(({ sourceDir }) => {
+      removeFromSource(sourceDir, ...removedPaths);
+      commitAt(sourceDir, 'Partly remove the agent worker', 1);
+
+      const result = runSyncScript(sourceDir, ['release-candidate']);
+
+      assert.equal(result.status, 2, syncFailureMessage(result));
+      assert.match(result.stderr, leftoverPattern);
+      assert.match(result.stderr, /Remove the whole subtree and runner, or restore the marker/);
+      assert.equal(git(sourceDir, ['branch', '--list', 'release-candidate']).trim(), '');
+    });
+  });
+}
+
+test('sync-public-history still requires the runner while the Agent Bridge marker remains', () => {
+  withSourceRepo(({ sourceDir }) => {
+    removeFromSource(sourceDir, AGENT_BRIDGE_RUNNER);
+    commitAt(sourceDir, 'Remove the runner but keep the marker', 1);
+
+    const result = runSyncScript(sourceDir, ['release-candidate']);
+
+    assert.equal(result.status, 2, syncFailureMessage(result));
+    assert.match(result.stderr, /Agent Bridge public test runner is missing after the cutover/);
+  });
+});
+
+test('sync-public-history scans commits before the Agent Bridge retirement even when it deletes the secret', () => {
+  withSourceRepo(({ sourceDir }) => {
+    const unsafeToken = ['live', 'credential', 'material', 'must', 'not', 'ship'].join('-');
+    writeFile(sourceDir, AGENT_BRIDGE_RUNNER, `const agent_api_token = '${unsafeToken}';\n`);
+    commitAt(sourceDir, 'Add a credential before retirement', 1);
+    retireAgentBridge(sourceDir, 2);
+
+    const result = runSyncScript(sourceDir, ['release-candidate']);
+
+    assert.equal(result.status, 2, syncFailureMessage(result));
+    assert.match(result.stderr, /Scanning Agent Bridge public replay commit for PII\/secrets/);
+    assert.match(result.stderr, /public release PII scan failed/);
+    assert.equal(git(sourceDir, ['branch', '--list', 'release-candidate']).trim(), '');
+  });
+});
+
+test('sync-public-history requires Agent Bridge package wiring on commits before retirement', () => {
+  withSourceRepo(({ sourceDir }) => {
+    const pkg = JSON.parse(fs.readFileSync(path.join(sourceDir, 'package.json'), 'utf8'));
+    delete pkg.scripts['test:worker:agent-bridge'];
+    writeFile(sourceDir, 'package.json', `${JSON.stringify(pkg, null, 2)}\n`);
+    commitAt(sourceDir, 'Remove the package command before retirement', 1);
+    removeFromSource(sourceDir, AGENT_BRIDGE_SUBTREE, AGENT_BRIDGE_RUNNER);
+    commitAt(sourceDir, 'Retire the separate agent worker', 2);
+
+    const result = runSyncScript(sourceDir, ['release-candidate']);
+
+    assert.notEqual(result.status, 0, syncFailureMessage(result));
+    assert.match(result.stderr, /Agent Bridge public cutover source is missing test:worker:agent-bridge/);
+    assert.equal(git(sourceDir, ['branch', '--list', 'release-candidate']).trim(), '');
+  });
+});
+
+test('sync-public-history still audits the cutover commit after Agent Bridge retirement', () => {
+  withSourceRepo(({ sourceDir }) => {
+    removeFromSource(sourceDir, AGENT_BRIDGE_MARKER);
+    commitAt(sourceDir, 'Drop the audited marker', 1);
+    writeFile(sourceDir, AGENT_BRIDGE_MARKER, 'unreviewed-cutover-header\n');
+    commitAt(sourceDir, 'Add an unreviewed marker', 2);
+    retireAgentBridge(sourceDir, 3);
+
+    const result = runSyncScript(sourceDir, ['release-candidate']);
+
+    assert.equal(result.status, 2, syncFailureMessage(result));
+    assert.match(result.stderr, /Agent Bridge public cutover marker has an unsupported header/);
+  });
+});
+
 test('sync-public-history rejects a public secret added and deleted outside Agent Bridge', () => {
   withSourceRepo(({ sourceDir }) => {
     const unsafeToken = ['live', 'credential', 'material', 'must', 'not', 'ship'].join('-');
@@ -1056,6 +1376,41 @@ test('sync-public-history links source node_modules for public Node ESM imports 
     assert.equal(result.status, 0, syncFailureMessage(result));
     assert.match(result.stderr, /Linking source node_modules into public test checkout/);
     assert.match(result.stdout, /public node ESM fixture passed/);
+  });
+});
+
+test('sync-public-history keeps Worker dependencies isolated from root dependencies', () => {
+  withSourceRepo(({ sourceDir }) => {
+    const packagePath = path.join(sourceDir, 'package.json');
+    const packageJson = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
+    packageJson.scripts['test:node'] = 'node scripts/public-node-test-fixture.mjs';
+    fs.writeFileSync(packagePath, `${JSON.stringify(packageJson, null, 2)}\n`);
+    writeFile(sourceDir, path.join('scripts', 'public-node-test-fixture.mjs'), [
+      "import assert from 'node:assert/strict';",
+      "import { marker as rootMarker } from 'public-node-fixture';",
+      "import { marker as workerMarker } from '../workers/sessionCorsWorker/read-local-package.mjs';",
+      "assert.equal(rootMarker, 'root');",
+      "assert.equal(workerMarker, 'worker');",
+      "console.log('package boundaries preserved');",
+      '',
+    ].join('\n'));
+    writeFile(sourceDir, path.join('workers', 'sessionCorsWorker', 'read-local-package.mjs'),
+      "export { marker } from 'public-node-fixture';\n");
+    commitAll(sourceDir, 'Exercise isolated Worker dependencies', {
+      authorDate: '2025-01-05T07:08:10Z',
+      committerDate: '2025-01-05T07:08:10Z',
+    });
+    for (const [packageRoot, marker] of [['', 'root'], ['workers/sessionCorsWorker', 'worker']]) {
+      const dependencyRoot = path.join(packageRoot, 'node_modules', 'public-node-fixture');
+      writeFile(sourceDir, path.join(dependencyRoot, 'package.json'),
+        `${JSON.stringify({ type: 'module', exports: './index.js' })}\n`);
+      writeFile(sourceDir, path.join(dependencyRoot, 'index.js'), `export const marker = '${marker}';\n`);
+    }
+
+    const result = runSyncScript(sourceDir, ['release-candidate']);
+
+    assert.equal(result.status, 0, syncFailureMessage(result));
+    assert.match(result.stdout, /package boundaries preserved/);
   });
 });
 

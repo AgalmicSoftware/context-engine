@@ -128,10 +128,12 @@
   align-items: flex-start;
 }
 
+// The accent is 1.00:1 on Classic 95's teal, so the button takes the surface's own text colour in every theme. The
+// card this sits in resets `color`, so a surface that isn't a panel, such as the Results dialog, names its colour here.
 %decryptCtaOutline {
   background: transparent !important;
-  border: 1px solid var(--ce-color-accent) !important;
-  color: var(--ce-color-accent) !important;
+  border: 1px solid currentColor !important;
+  color: var(--decrypt-cta-text, var(--ce-panel-text)) !important;
   box-shadow: none;
   transition:
     background-color 0.18s ease,
@@ -139,21 +141,19 @@
     color 0.18s ease,
     box-shadow 0.18s ease;
 
+  // A thicker outline, not a tint: tinting towards the label is what takes it below 4.5:1 on teal.
   &:hover:not(:disabled),
   &:focus:not(:disabled) {
-    background: color-mix(in srgb, var(--ce-action-accent) 15%, transparent) !important;
-    border-color: var(--ce-color-accent) !important;
-    color: var(--ce-color-accent) !important;
-    box-shadow: 0 8px 18px color-mix(in srgb, var(--ce-action-accent) 22%, transparent);
+    box-shadow: inset 0 0 0 1px currentColor;
   }
 
   &:focus {
-    outline: 2px solid color-mix(in srgb, var(--ce-action-accent) 28%, transparent);
+    outline: 2px solid currentColor;
     outline-offset: 2px;
   }
 
   &:disabled {
-    opacity: 0.55;
+    opacity: 0.7;
     cursor: not-allowed;
     box-shadow: none;
   }
@@ -250,93 +250,13 @@
   margin-top: 5px;
 }
 
-/* multi-choice styling */
-.multiChoice {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-left: 10px;
-}
-
-.checkboxOptionText {
-  font-size: 1em;
-  font-weight: 600;
-  color: var(--ce-color-border-light);
-}
-
 /* rating slider */
 .importanceSlider {
   margin-top: 10px;
   margin-bottom: 10px;
 }
-.ratingLabelText {
-  margin-left: 10px;
-  font-weight: 600;
-  color: var(--ce-color-white);
-  font-size: 1.2em;
-  margin-right: 10px;
-}
 .ratingSlider {
   width: 200px;
-}
-
-/* binary styling */
-.binaryChoice {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  margin-top: 1rem;
-  .radioOptionText {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin: 0 0.5rem;
-    font-size: 1rem;
-    color: var(--ce-border-light);
-    cursor: pointer;
-    padding: 0.5rem 1rem;
-    border-radius: var(--ce-radius-4);
-    transition: font-weight 0.3s ease;
-    &.selected {
-      font-weight: 900;
-      font-style: italic;
-    }
-
-    input[type='radio'] {
-      display: none;
-    }
-
-    &:hover {
-      background-color: var(--ce-color-border);
-    }
-
-    &.agree {
-      background-color: var(--ce-binary-choice-agree-bg);
-      color: var(--ce-color-white);
-      &:before {
-        font-weight: 900;
-        margin-right: 0.5rem;
-      }
-    }
-
-    &.unsure {
-      background-color: var(--ce-binary-choice-unsure-bg);
-      color: var(--ce-text);
-    }
-
-    &.disagree {
-      background-color: var(--ce-binary-choice-disagree-bg);
-      color: var(--ce-color-white);
-      &:before {
-        font-weight: 900;
-        margin-right: 0.5rem;
-      }
-    }
-
-    .optionIcon {
-      margin-right: 0.5rem;
-    }
-  }
 }
 
 /* importance text style */
@@ -405,16 +325,6 @@
   }
 }
 
-.miniAnswer {
-  background-color: color-mix(in srgb, var(--ce-text-inverse) 15%, transparent);
-  padding: 8px;
-  border-radius: var(--ce-radius-4);
-  color: var(--ce-color-white);
-  font-weight: 600;
-  margin-top: 5px;
-  margin-bottom: 5px;
-}
-
 /* NEW - Read-only Answer Styles */
 .readOnlyBinary {
   display: inline-flex;
@@ -431,17 +341,17 @@
   border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 10%, transparent);
   &.agree {
     background-color: var(--ce-binary-choice-agree-bg);
-    color: var(--ce-color-white);
+    color: var(--ce-binary-choice-agree-text);
   }
 
   &.unsure {
     background-color: var(--ce-binary-choice-unsure-bg);
-    color: var(--ce-text);
+    color: var(--ce-color-black);
   }
 
   &.disagree {
     background-color: var(--ce-binary-choice-disagree-bg);
-    color: var(--ce-color-white);
+    color: var(--ce-binary-choice-disagree-text);
   }
 
   .optionIcon {
@@ -537,22 +447,6 @@
     font-size: 0.9em;
     font-weight: 600;
   }
-}
-
-/*
-     Additional detail row for the expanded mini mode
-  */
-.miniExpandedTopRow {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 10px;
-}
-
-.miniIdLabel {
-  font-size: 0.9em;
-  color: var(--ce-color-border-light);
-  font-weight: 600;
 }
 
 .externalLink {
@@ -778,67 +672,17 @@
   }
 }
 
-.affordanceStack {
-  margin-top: 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.affordanceBlock {
-  border: 1px dashed color-mix(in srgb, var(--ce-text-inverse) 12%, transparent);
-  border-radius: var(--ce-radius-8);
-  padding: 8px;
-}
-
 .answerPillsRow {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
 }
 
-/* Visually disabled look, but allows the parent to receive the click */
-.disabledVisual {
-  opacity: 0.6;
-  filter: grayscale(10%);
-  pointer-events: none;
-}
-
-/* For inputs we want to look disabled while letting click-through happen on container */
-.disabledInput {
-  pointer-events: none;
-  opacity: 0.6;
-}
-
-/* Small header row for prompt + open icon */
-.questionHeaderRow {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.openLinkButton {
-  background: none;
-  border: 0;
-  color: inherit;
-  cursor: pointer;
-  padding: 4px;
-  line-height: 1;
-  &:focus {
-    outline: 2px solid color-mix(in srgb, var(--ce-compat-indigo) 70%, transparent);
-    outline-offset: 2px;
-  }
-}
-
 @container ce-theme style(--ce-layout-profile: minimal-app) {
   .questionTitle,
   .miniPromptAbbrev:not(.maskedPromptActionButton),
-  .checkboxOptionText,
-  .ratingLabelText,
   .ratingValueLabel,
   .importanceText,
-  .miniIdLabel,
   .aggregatorText,
   .multiChoiceOption,
   .optionStats {
@@ -861,7 +705,6 @@
 
   .freeformAnswer,
   .additionalCommentsContent,
-  .miniAnswer,
   .encryptedResponseText,
   .readOnlyRating,
   .readOnlyMultichoice .choiceItem {

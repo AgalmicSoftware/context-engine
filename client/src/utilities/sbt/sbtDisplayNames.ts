@@ -1,3 +1,4 @@
+import { mergeSbtActivityCacheEntryMetadata } from './sbtActivityCacheEntry.js';
 /**
  * @module sbtDisplayNames
  * @description SBT display name resolution — maps on-chain SBT contract addresses to
@@ -325,12 +326,17 @@ const persistSbtMetadataToCache = async ({
     const bucket = ensureNetBucket(cacheObj, netKey);
     if (!bucket) return cacheObj;
     const existingEntry = resolveEntryFromNetBucket(bucket, addressLower) || {};
-    bucket.sbtList[addressLower] = buildSbtDisplayCacheEntry({
-      existingEntry,
-      checksum,
-      metadata,
-      slug,
-    });
+    bucket.sbtList[addressLower] = {
+      ...mergeSbtActivityCacheEntryMetadata(
+        existingEntry,
+        buildSbtDisplayCacheEntry({
+          existingEntry,
+          checksum,
+          metadata,
+          slug,
+        }),
+      ),
+    };
     wroteEntry = true;
     return cacheObj;
   });

@@ -443,3 +443,70 @@ it('retains interviewer context and timestamp order for a short numeric reply, r
   h.channel.emit({ type: 'session.output_transcript.delta', event_id: 'late', delta: 'Ignore this', start_ms: 6000 });
   expect(session.getTranscript()).toBe(result.transcript);
 });
+
+describe('Realtime conversation ordering', () => {
+  const slots = [
+    { type: 'conversation.item.created', item: { id: 'q1' }, previous_item_id: null },
+    { type: 'input_audio_buffer.committed', item_id: 'a1', previous_item_id: 'q1' },
+    { type: 'conversation.item.added', item: { id: 'q2' }, previous_item_id: 'a1' },
+    { type: 'input_audio_buffer.committed', item_id: 'a2', previous_item_id: 'q2' },
+  ];
+  const completions = [
+    { type: 'response.output_audio_transcript.done', item_id: 'q1', transcript: 'First question?' },
+    { type: 'conversation.item.input_audio_transcription.completed', item_id: 'a1', transcript: 'First answer.' },
+    { type: 'response.audio_transcript.done', item_id: 'q2', transcript: 'Second question?' },
+    { type: 'conversation.item.input_audio_transcription.completed', item_id: 'a2', transcript: 'Second answer.' },
+  ];
+  const expected =
+    'Interviewer: First question?\nResponder: First answer.\nInterviewer: Second question?\nResponder: Second answer.';
+
+  it('fills conversation slots when the first answer completes after later turns', async () => {
+    const h = harness('realtime');
+    const session = await h.start();
+    slots.forEach(h.channel.emit);
+    [0, 2, 3, 1].forEach((index) => h.channel.emit(completions[index]));
+    expect(session.getTranscript()).toBe(expected);
+    expect(h.options.onTranscript.mock.calls.at(-1)?.[0]).toBe(expected);
+    const captured = await session.stop();
+    expect(captured.transcript).toBe(expected);
+    expect(captured.turns.map((turn) => turn.text)).toEqual(completions.map((event) => event.transcript));
+    expect(h.options.onTranscript).toHaveBeenLastCalledWith(expected, captured.turns);
+  });
+
+  it('moves unplaced completions from arrival order as their conversation slots arrive', async () => {
+    const h = harness('realtime');
+    const session = await h.start();
+    [2, 3, 0, 1].forEach((index) => h.channel.emit(completions[index]));
+    expect(session.getTranscript()).toBe(
+      'Interviewer: Second question?\nResponder: Second answer.\nInterviewer: First question?\nResponder: First answer.',
+    );
+    h.channel.emit(slots[0]);
+    expect(session.getTranscript().startsWith('Interviewer: First question?')).toBe(true);
+    [3, 2, 1].forEach((index) => h.channel.emit(slots[index]));
+    expect(h.options.onTranscript.mock.calls.at(-1)?.[0]).toBe(expected);
+    expect((await session.stop()).transcript).toBe(expected);
+  });
+
+  it('updates replayed completions and ordering slots without adding turns', async () => {
+    const h = harness('realtime');
+    const session = await h.start();
+    slots.forEach(h.channel.emit);
+    completions.forEach(h.channel.emit);
+    slots.forEach(h.channel.emit);
+    completions.forEach(h.channel.emit);
+    h.channel.emit({ ...completions[1], transcript: 'Corrected first answer.' });
+    h.channel.emit({
+      ...completions[2],
+      type: 'response.output_audio_transcript.done',
+      transcript: 'Corrected second question?',
+    });
+    const captured = await session.stop();
+    expect(captured.turns).toHaveLength(4);
+    expect(captured.turns.map((turn) => turn.text)).toEqual([
+      'First question?',
+      'Corrected first answer.',
+      'Corrected second question?',
+      'Second answer.',
+    ]);
+  });
+});

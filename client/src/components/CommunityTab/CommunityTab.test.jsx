@@ -1,3 +1,5 @@
+jest.mock('wagmi/actions', () => ({ disconnect: jest.fn(async () => {}) }));
+import { buildSbtActivityCacheEntry } from '../../utilities/sbt/sbtActivityCacheEntry.js';
 import React from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { Provider, connect } from 'react-redux';
@@ -14,10 +16,9 @@ import { Modal, ModalBody, ModalHeader } from 'reactstrap';
 import * as polisReportModule from '../PolisReport/PolisReport';
 import {
   initCacheManager,
-  listNamespaceEntriesSync,
+  clearCacheNamespace,
   peekCacheSync,
   readCache,
-  removeCache,
   writeCache,
 } from '../../utilities/cache/cacheScripts.js';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
@@ -34,6 +35,7 @@ import {
   resolveWorkerCanonicalCacheIdentity,
   withWorkerCanonicalCacheIdentity,
 } from '../../utilities/survey/workerCanonicalCacheIdentity';
+import { WORKER_GROUP_COUNT_WAIT_MS } from './communityWorkerGroupStats';
 import BeeswarmPlot from '../Shared/BeeswarmPlot/BeeswarmPlot';
 import SBTsList from '../SBTs/SBTsList';
 import SBTFilter from '../SBTs/SBTFilter';
@@ -104,9 +106,8 @@ const writeWorkerStatsCaches = async ({
 const clearManagedCaches = async () => {
   await initCacheManager();
   for (const namespace of MANAGED_NAMESPACES) {
-    const entries = listNamespaceEntriesSync(namespace);
-    await Promise.all(entries.map((entry) => removeCache(namespace, entry?.slug || '')));
-    await removeCache(namespace, '');
+    // Namespace invalidation clears the mirror even when this fixture has no IDB.
+    await clearCacheNamespace(namespace);
   }
 };
 
@@ -150,6 +151,8 @@ describe('CommunityTab helpers', () => {
     localStorage.clear();
     globalThis.CE_SESSION_SCAN_SCOPE = 'active';
     globalThis.CE_SESSION_SCAN_SLUGS = [];
+    // Stats count the groups of every bundled Worker session; tests stub those reads instead of calling live Workers.
+    jest.spyOn(workerGroupPorts, 'loadPublicWorkerGroups').mockResolvedValue([]);
     const nativeCreateElement = document.createElement.bind(document);
     canvasCreateElementSpy = jest.spyOn(document, 'createElement').mockImplementation((tagName, options) => {
       if (tagName === 'canvas') {
@@ -765,6 +768,71 @@ describe('CommunityTab helpers', () => {
     expect(instance.state.stats.find((stat) => stat.label === 'Groups').count).toBe(2);
     expect(instance.state.stats.find((stat) => stat.label === 'Users').count).toBe(3);
     expect(instance.state.uniqueUsers).toContain('0x0000000000000000000000000000000000000011');
+  });
+
+  it('publishes cached Stats while a Worker sign-in is still unanswered', async () => {
+    writeGlobalSessionSelection({ selectedSessionScope: 'active', primarySessionSlug: 'demo-sh' });
+    await writeWorkerStatsCaches();
+    let answerSignIn = () => {};
+    jest
+      .spyOn(workerAuth, 'getWorkerSessionToken')
+      .mockImplementation(() => new Promise((resolve) => (answerSignIn = () => resolve('worker-token'))));
+    jest.spyOn(workerGroupPorts, 'loadWorkerGroupOverview').mockResolvedValue({ groups: [], memberships: [] });
+    const instance = attachMutableSetState(
+      new CommunityTab({
+        activeSessionSlug: 'demo-sh',
+        sessionConfig: WORKER_SESSION_CONFIG,
+        account: '0x00000000000000000000000000000000000000aa',
+        isQuestionCacheReady: true,
+        isSurveyCacheReady: true,
+      }),
+    );
+    jest.spyOn(instance, '_shouldUseDemoBeeswarmData').mockReturnValue(false);
+    jest.spyOn(instance, 'checkIfInitialLoadDone').mockResolvedValue(true);
+    const queueRefresh = jest.spyOn(instance, '_queueCacheDrivenRefresh').mockImplementation(() => {});
+    jest.useFakeTimers();
+    try {
+      const refresh = instance._refreshCommunityStats({ force: true, markLoading: true });
+      await jest.advanceTimersByTimeAsync(WORKER_GROUP_COUNT_WAIT_MS);
+
+      expect(instance.state.stats.find((stat) => stat.label === 'Questions').count).toBe(1);
+      expect(instance.state.loadingSurveyData).toBe(false);
+      expect(instance._statsRefreshInFlight).toBe(false);
+      expect(queueRefresh).not.toHaveBeenCalled();
+
+      answerSignIn();
+      await jest.advanceTimersByTimeAsync(0);
+      expect(queueRefresh).toHaveBeenCalledWith({ force: true });
+      await refresh;
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('waits for a late Worker group count only once', async () => {
+    jest.spyOn(workerAuth, 'getWorkerSessionToken').mockImplementation(() => new Promise(() => {}));
+    const instance = new CommunityTab({
+      activeSessionSlug: 'demo-sh',
+      sessionConfig: WORKER_SESSION_CONFIG,
+      account: '0x00000000000000000000000000000000000000aa',
+    });
+    jest.spyOn(instance, '_queueCacheDrivenRefresh').mockImplementation(() => {});
+    jest.useFakeTimers();
+    try {
+      const first = instance._hydrateWorkerGroupCounts(instance._buildScopeEntriesFromSlugs(['demo-sh']));
+      await jest.advanceTimersByTimeAsync(WORKER_GROUP_COUNT_WAIT_MS);
+      await first;
+
+      let secondDone = false;
+      const second = instance
+        ._hydrateWorkerGroupCounts(instance._buildScopeEntriesFromSlugs(['demo-sh']))
+        .then(() => (secondDone = true));
+      await jest.advanceTimersByTimeAsync(0);
+      expect(secondDone).toBe(true);
+      await second;
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('only authenticates the active Worker while counting the broader catalog', async () => {
@@ -1932,6 +2000,7 @@ describe('CommunityTab helpers', () => {
         lastBlock: 10,
         sbtList: {
           '0x1': {
+            ...buildSbtActivityCacheEntry({ sbtAddress: '0x1' }),
             sbtAddress: '0x1',
             sbtInfo: {},
             mintedAddresses: [],
@@ -2061,6 +2130,7 @@ describe('CommunityTab helpers', () => {
         lastBlock: 10,
         sbtList: {
           '0x1': {
+            ...buildSbtActivityCacheEntry({ sbtAddress: '0x1' }),
             sbtAddress: '0x1',
             sbtInfo: { name: 'Badge 1' },
             mintedAddresses: ['0xaaa'],
@@ -2103,6 +2173,7 @@ describe('CommunityTab helpers', () => {
         lastBlock: 10,
         sbtList: {
           '0x1': {
+            ...buildSbtActivityCacheEntry({ sbtAddress: '0x1' }),
             sbtAddress: '0x1',
             sbtInfo: { creator: '0xabc' },
             mintedAddresses: [],
@@ -2148,6 +2219,7 @@ describe('CommunityTab helpers', () => {
         lastBlock: 10,
         sbtList: {
           '0x1': {
+            ...buildSbtActivityCacheEntry({ sbtAddress: '0x1' }),
             sbtAddress: '0x1',
             sbtInfo: { creator: '0xabc' },
             mintedAddresses: [],
@@ -2235,6 +2307,7 @@ describe('CommunityTab helpers', () => {
         lastBlock: 10,
         sbtList: {
           '0x1': {
+            ...buildSbtActivityCacheEntry({ sbtAddress: '0x1' }),
             sbtAddress: '0x1',
             sbtInfo: { admin: '0xaaa' },
             mintedAddresses: ['0x111'],
@@ -2283,6 +2356,7 @@ describe('CommunityTab helpers', () => {
         lastBlock: 10,
         sbtList: {
           '0x1': {
+            ...buildSbtActivityCacheEntry({ sbtAddress: '0x1' }),
             sbtAddress: '0x1',
             sbtInfo: { creator: '0xaaa' },
             mintedAddresses: ['0x111'],
@@ -2332,6 +2406,7 @@ describe('CommunityTab helpers', () => {
         lastBlock: 10,
         sbtList: {
           '0x1': {
+            ...buildSbtActivityCacheEntry({ sbtAddress: '0x1' }),
             sbtAddress: '0x1',
             sbtInfo: { hidden: false },
             mintedAddresses: ['0x111'],
@@ -2386,6 +2461,7 @@ describe('CommunityTab helpers', () => {
         lastBlock: 10,
         sbtList: {
           '0x1': {
+            ...buildSbtActivityCacheEntry({ sbtAddress: '0x1' }),
             sbtAddress: '0x1',
             creationBlock: 1,
             countsLoaded: false,
@@ -2425,6 +2501,7 @@ describe('CommunityTab helpers', () => {
         lastBlock: 10,
         sbtList: {
           '0x1': {
+            ...buildSbtActivityCacheEntry({ sbtAddress: '0x1' }),
             sbtAddress: '0x1',
             creationBlock: 1,
             countsLoaded: false,
@@ -2440,6 +2517,7 @@ describe('CommunityTab helpers', () => {
           sbtList: {
             ...(((current || {})[netKey] || {}).sbtList || {}),
             '0x2': {
+              ...buildSbtActivityCacheEntry({ sbtAddress: '0x2' }),
               sbtAddress: '0x2',
               creationBlock: 2,
               countsLoaded: false,
@@ -2949,5 +3027,51 @@ describe('CommunityTab helpers', () => {
     window.requestAnimationFrame = originalRaf;
     window.cancelAnimationFrame = originalCancelRaf;
     jest.useRealTimers();
+  });
+
+  it.each([
+    {
+      rule: 'same address on different chains counts twice',
+      chains: ['1', '10'],
+      addresses: ['0x' + 'ab'.repeat(20), '0x' + 'ab'.repeat(20)],
+      count: 2,
+    },
+    {
+      rule: 'different addresses on the same chain count twice',
+      chains: ['1', '1'],
+      addresses: ['0x' + 'ab'.repeat(20), '0x' + 'cd'.repeat(20)],
+      count: 2,
+    },
+    {
+      rule: 'same chain and address across sessions counts once',
+      chains: ['10', '10'],
+      addresses: ['0x' + 'AB'.repeat(20), '0x' + 'ab'.repeat(20)],
+      count: 1,
+    },
+  ])('$rule without counting an account twice', async ({ chains, addresses, count }) => {
+    const slugs = ['chain-fixture-a', 'chain-fixture-b'];
+    const instance = new CommunityTab({});
+    instance._resolveNetKeyForSlug = jest.fn((slug) => chains[slugs.indexOf(slug)]);
+    instance._resolveScopeAuthority = jest.fn(() => ({ isWorkerCanonical: false, workerCanonicalIdentity: null }));
+    for (const [index, slug] of slugs.entries()) {
+      await writeCache('sbtCache', slug, {
+        [chains[index]]: {
+          sbtList: {
+            [addresses[index].toLowerCase()]: {
+              ...buildSbtActivityCacheEntry({ sbtAddress: addresses[index] }),
+              sbtAddress: addresses[index],
+              sbtInfo: { creator: '0x123', admin: '0x123' },
+              mintedAddresses: ['0x123'],
+              burnedAddresses: [],
+            },
+          },
+        },
+      });
+    }
+    const entries = instance._buildScopeEntriesFromSlugs(slugs);
+    expect(entries.map((entry) => entry.netKey)).toEqual(chains);
+    const stats = instance._computeUniverseStatsSnapshot(entries);
+    expect(stats.sbtsCreatedCount).toBe(count);
+    expect(stats.uniqueUsers).toEqual(['0x123']);
   });
 });

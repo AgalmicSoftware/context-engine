@@ -1,3 +1,4 @@
+import { callSessionConfigCoordinator } from './sessionConfigAuthority.js';
 import { readAuthorizationEpoch } from './authorizationScopeFreshness.js';
 import * as ethersModule from 'ethers';
 
@@ -352,6 +353,13 @@ export const resolveAdminRequestAuthority = async ({
       config: existingConfig,
       body,
     });
+  }
+  if (!adminOk && existingConfig && (action === 'session-backup-status' ||
+      (action === 'import-session-backup' && body?.adoptSessionId === true))) {
+    const completion = await callSessionConfigCoordinator({ env, slug: targetSlug, path: 'backup/status', completedOnly: true,
+      archiveId: action === 'import-session-backup' ? body?.page?.archiveId : body?.archiveId,
+      expectedAuthority: { actor: address.toLowerCase(), revision: corsState.revision, authzEpoch: readAuthorizationEpoch(existingConfig) } });
+    adminOk = completion.ok === true;
   }
   if (!adminOk) {
     return {

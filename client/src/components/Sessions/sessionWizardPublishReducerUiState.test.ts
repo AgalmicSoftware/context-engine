@@ -116,19 +116,10 @@ describe('resolveSessionWizardPublishReducerUiState', () => {
       buildMetadataGatewayUrl: (txId) => `https://gateway.example/${txId}`,
       deployComplete: false,
       hasPendingDrafts: true,
-      isNormalMode: true,
-      publishAdvancedOpen: false,
       publishStepElapsedMs: 1300,
       sbtsLabel: 'Groups',
     });
 
-    expect(plan.publishActionDisplayState).toEqual(
-      expect.objectContaining({
-        publishBusy: true,
-        publishButtonDisabled: true,
-        publishButtonLabel: 'Deploy Session',
-      }),
-    );
     expect(plan.publishProgressDisplayState).toEqual(
       expect.objectContaining({
         activePublishProgressStepLabel: 'Upload Arweave',

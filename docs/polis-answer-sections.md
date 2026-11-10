@@ -20,6 +20,12 @@ show the percentage agreeing (or disagreeing) in the cluster alongside the overa
 percentage. Both use responses to that question, including Unsure and excluding
 missing answers, within the current report filters; overall includes the cluster.
 
+**Analyze clusters** uses the loaded session's AI model and Worker configuration,
+including sponsored AI, together with the current viewer's authentication context.
+Participants do not need a personal API key when the session sponsors analysis.
+If both model attempts fail, the affected cluster displays the error and can be
+retried; a failed request is not cached as a successful AI summary.
+
 **Summary and Statistics** counts participants, answered questions, responses,
 and average responses per participant across all five question types. Each value
 shows its binary subset in parentheses only when the displayed values differ,
@@ -73,8 +79,9 @@ report-only examples live in `polis_report_answer_examples.json`. They do not
 alter published question IDs, Worker data, or the original binary opinion clusters.
 Custom report datasets and live-response mode do not receive these examples.
 
-Blank, malformed, still-encrypted, and out-of-session answers are excluded. A
-zero rating and an explicit all-zero quadratic allocation remain valid answers.
+Blank, malformed, still-encrypted, and out-of-session answers are excluded, as
+are questions an admin has hidden. A zero rating and an explicit all-zero
+quadratic allocation remain valid answers.
 Repeated rows for the same respondent count once within the new sections.
 Multiple-choice percentages use respondents as the denominator, so a question
 allowing several choices can exceed 100% across its options. Quadratic bars show
@@ -95,8 +102,9 @@ possible. Export measures the desktop capture layout even when initiated from a
 mobile screen, normalizes modern theme colors for the canvas renderer, and
 restores the previous interactive expansion state when finished.
 
-Regression coverage lives beside `PolisReport` and `browserPdfExport`. The
-credential-free browser smoke is covered by the repository E2E command notes.
+Regression coverage lives beside `PolisReport` and `browserPdfExport`. With a
+client dev server running, `BASE_URL=http://127.0.0.1:3000 node scripts/polis-answer-sections-smoke.mjs`
+runs the credential-free browser smoke.
 
 Filtered Raw Results JSON exports retain each question’s normalized rating scale,
 selection limits, quadratic budget, ordering, and public benchmark/source IDs.
@@ -111,3 +119,5 @@ the analysis. Input controls retain their existing clamping behavior.
 Breakdown's spectrum details open outside the chart panel so they are not clipped
 by its edges. Click a point to pin its details; long popups scroll within the
 viewport and have a close button.
+
+The saved-filter loader is available from **Load a saved filter** in both inline Results and the filter dialog, including when no filters are active or immediately after clearing them. Paste a saved token or its full URL to restore the selection, including Group and Top questions settings.

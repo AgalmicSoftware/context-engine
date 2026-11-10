@@ -18,7 +18,6 @@ describe('routeConfig', () => {
   });
 
   it('identifies static non-cache routes', () => {
-    expect(isStaticNonCacheRoute('/debate')).toBe(true);
     expect(isStaticNonCacheRoute('/tag/governance')).toBe(true);
     expect(isStaticNonCacheRoute('/contracts/0xabc')).toBe(true);
     expect(isStaticNonCacheRoute('/docs')).toBe(true);
@@ -32,6 +31,15 @@ describe('routeConfig', () => {
     expect(isStaticNonCacheRoute('/surveys')).toBe(false);
     expect(isStaticNonCacheRoute('/session/edge')).toBe(false);
   });
+
+  it.each(['debate', 'beta', 'contributors', 'matrix', 'demos'])(
+    'does not reserve the removed %s page prefix',
+    (prefix) => {
+      expect(KNOWN_ROUTE_PREFIXES.has(prefix)).toBe(false);
+      expect(isStaticNonCacheRoute(`/${prefix}`)).toBe(false);
+      expect(isStaticNonCacheRoute(`/${prefix}/`)).toBe(false);
+    },
+  );
 
   it('matches valid survey ids and results routes', () => {
     const surveyId = `0x${'a'.repeat(64)}`;

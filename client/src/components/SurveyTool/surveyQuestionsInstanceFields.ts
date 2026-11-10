@@ -125,7 +125,6 @@ export type SurveyQuestionsLocalCacheHydrationEntryArgs = {
   cachedConviction?: unknown;
   allowMaskedAnswerDraftEmpty?: boolean;
   allowMaskedAdditionalDraftEmpty?: boolean;
-  debugLabel?: string;
 };
 type SurveyQuestionsDraftHydrationEntryApplier = (args?: SurveyQuestionsDraftHydrationEntryArgs) => boolean;
 type SurveyQuestionsResponseHydrationEntryApplier = (args?: SurveyQuestionsResponseHydrationEntryArgs) => boolean;

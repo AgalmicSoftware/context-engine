@@ -79,12 +79,6 @@
   overflow-wrap: anywhere;
 }
 
-.metadata[open] {
-  max-height: min(28vh, 300px);
-  overflow: auto;
-  overscroll-behavior: contain;
-}
-
 .metadata summary {
   cursor: pointer;
   font-weight: 850;

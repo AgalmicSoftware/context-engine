@@ -1,3 +1,4 @@
+import { callSessionConfigCoordinator } from './sessionConfigAuthority.js';
 import { normalizeWorkerGroupUrl } from '../../shared/workerGroupUrl.mjs';
 import {
 	normalizeWorkerSessionSlug,
@@ -38,12 +39,6 @@ export const MAX_WORKER_GROUP_MEMBER_PAGE_SIZE = 250;
 const WORKER_GROUPS_FRESH_BOOTSTRAP_SENTINEL = 'fresh-template-v2';
 
 const IMPLEMENTED_JOIN_MODES = new Set([WORKER_GROUP_JOIN_MODES.OPEN, WORKER_GROUP_JOIN_MODES.ADMIN_ADD]);
-
-const safeKeyPart = (value) =>
-	trim(value || 'id')
-		.toLowerCase()
-		.replace(/[^a-z0-9._:-]+/g, '-')
-		.replace(/^-+|-+$/g, '') || 'id';
 
 export const normalizeWorkerGroupId = (value) => {
 	const normalized = trim(value).toLowerCase();
@@ -117,7 +112,7 @@ const decodeWorkerGroupMemberCursor = (cursor = '') => {
 	const encoded = cursor.slice(WORKER_GROUP_MEMBER_CURSOR_PREFIX.length);
 	const separatorIndex = encoded.indexOf(':');
 	const source = encoded.slice(0, separatorIndex);
-	if (separatorIndex < 0 || (source !== 'canonical' && source !== 'legacy')) {
+	if (separatorIndex < 0 || source !== 'canonical') {
 		throw new Error('Worker group member cursor is invalid.');
 	}
 	return {
@@ -187,20 +182,6 @@ const legacyGroupKey = ({ slug, groupId }) => `ce-worker-group:${sessionSlugStor
 const legacyGroupPrefix = ({ slug }) => `ce-worker-group:${sessionSlugStorageKey(slug)}:`;
 const legacyGroupIndexKey = ({ slug, groupId }) => `ce-worker-group-index:${sessionSlugStorageKey(slug)}:${normalizeWorkerGroupId(groupId)}`;
 const legacyGroupIndexPrefix = ({ slug }) => `ce-worker-group-index:${sessionSlugStorageKey(slug)}:`;
-const legacyEncodedMemberKey = ({ slug, groupId, principalKey }) =>
-	`ce-worker-group-member:${sessionSlugStorageKey(slug)}:${normalizeWorkerGroupId(groupId)}:${encodedPrincipalKeyPart(principalKey)}`;
-const legacyCaseFoldedMemberKey = ({ slug, groupId, principalKey }) =>
-	`ce-worker-group-member:${sessionSlugStorageKey(slug)}:${normalizeWorkerGroupId(groupId)}:${safeKeyPart(principalKey)}`;
-const legacyMemberPrefix = ({ slug, groupId }) => `ce-worker-group-member:${sessionSlugStorageKey(slug)}:${normalizeWorkerGroupId(groupId)}:`;
-const legacyEncodedPrincipalPrefix = ({ slug, principalKey }) =>
-	`ce-worker-group-principal:${sessionSlugStorageKey(slug)}:${encodedPrincipalKeyPart(principalKey)}:`;
-const legacyCaseFoldedPrincipalPrefix = ({ slug, principalKey }) =>
-	`ce-worker-group-principal:${sessionSlugStorageKey(slug)}:${safeKeyPart(principalKey)}:`;
-const legacyEncodedMemberIndexKey = ({ slug, principalKey, groupId }) =>
-	`${legacyEncodedPrincipalPrefix({ slug, principalKey })}${normalizeWorkerGroupId(groupId)}`;
-const legacyCaseFoldedMemberIndexKey = ({ slug, principalKey, groupId }) =>
-	`${legacyCaseFoldedPrincipalPrefix({ slug, principalKey })}${normalizeWorkerGroupId(groupId)}`;
-
 const jsonResponse = (deps, body, status, headers) =>
 	deps?.json?.(body, status, headers) || new Response(JSON.stringify(body), { status, headers });
 
@@ -345,13 +326,7 @@ export const normalizeWorkerGroupPrincipal = (input, deps = {}) => {
 	return { ok: false, reason: 'unsupported_principal_kind' };
 };
 
-export const resolveWorkerGroupPrincipal = ({ requesterAddress, authScopes, principal, deps = {} } = {}) => {
-	if (principal) return normalizeWorkerGroupPrincipal(principal, deps);
-	const scopes = isObj(authScopes) ? authScopes : {};
-	const explicit = scopes.principal || scopes.workerPrincipal || scopes.subjectPrincipal || scopes.delegationPrincipal;
-	if (explicit) return normalizeWorkerGroupPrincipal(explicit, deps);
-	const grantId = trim(scopes.grantId || scopes.agentGrant?.grantId || scopes.agent_grant?.grantId || scopes.delegation?.grantId);
-	if (grantId) return normalizeWorkerGroupPrincipal({ kind: 'agent', grantId }, deps);
+export const resolveWorkerGroupPrincipal = ({ requesterAddress, deps = {} } = {}) => {
 	// Retained HTTP clients authenticate with SIWE. Historical transport kinds
 	// remain readable only through an explicit principal and keep their old keys.
 	if (requesterAddress) return normalizeWorkerGroupPrincipal({ kind: 'evm_address', address: requesterAddress }, deps);
@@ -871,256 +846,63 @@ const readMembershipRecord = async ({ store, slug, sessionId, groupId, principal
 		return canonical;
 	}
 
-	const legacyKeys = [legacyEncodedMemberKey({ slug, groupId, principalKey }), legacyCaseFoldedMemberKey({ slug, groupId, principalKey })];
-	for (const key of new Set(legacyKeys)) {
-		const row = await kvGetLegacyJson(store.store, key);
-		const canonical = canonicalizeMembershipRecord({
-			row,
-			slug,
-			sessionId: canonicalSessionId,
-			groupId,
-			principalKey,
-		});
-		if (!canonical) continue;
-		await writeMembershipRecord({
-			store,
-			slug,
-			sessionId: canonicalSessionId,
-			groupId,
-			member: canonical,
-		});
-		return canonical;
-	}
 	return null;
 };
 
 const listMembershipRecords = async ({ store, slug, sessionId, groupId = '', principalKey = '' }) => {
 	const canonicalSessionId = resolveCanonicalWorkerSessionIdHex({ sessionId });
 	if (!canonicalSessionId) throw new Error('Worker group session identity is invalid.');
-	const sources = groupId
-		? [
-				{
-					legacy: false,
-					prefix: memberPrefix({
-						slug,
-						sessionId: canonicalSessionId,
-						groupId,
-					}),
-				},
-				{
-					legacy: true,
-					prefix: legacyMemberPrefix({ slug, groupId }),
-				},
-			]
-		: [
-				{
-					legacy: false,
-					prefix: principalPrefix({
-						slug,
-						sessionId: canonicalSessionId,
-						principalKey,
-					}),
-				},
-				{
-					legacy: true,
-					prefix: legacyEncodedPrincipalPrefix({ slug, principalKey }),
-				},
-				{
-					legacy: true,
-					prefix: legacyCaseFoldedPrincipalPrefix({ slug, principalKey }),
-				},
-			];
-	const keyedSources = new Map();
-	for (const source of sources) {
-		const keys = await kvListKeys(store.store, source.prefix);
-		for (const key of keys) {
-			const existing = keyedSources.get(key);
-			if (!existing || (existing.legacy && !source.legacy)) {
-				keyedSources.set(key, source);
-			}
-		}
-	}
-	const members = new Map();
-	for (const [key, source] of keyedSources) {
+	const prefix = groupId
+		? memberPrefix({ slug, sessionId: canonicalSessionId, groupId })
+		: principalPrefix({ slug, sessionId: canonicalSessionId, principalKey });
+	const members = [];
+	for (const key of await kvListKeys(store.store, prefix)) {
 		let indexedGroupId = groupId;
 		if (!indexedGroupId) {
 			try {
 				indexedGroupId = await store.store.get(key);
 			} catch {
-				if (source.legacy) continue;
 				throw new Error('Worker group membership index is unavailable.');
 			}
 		}
-		if (!normalizeWorkerGroupId(indexedGroupId)) {
-			if (source.legacy) continue;
-			throw new Error('Worker group membership index is malformed.');
-		}
-		if (!groupId) {
-			const validIndexKey = source.legacy
-				? key === legacyEncodedMemberIndexKey({ slug, principalKey, groupId: indexedGroupId }) ||
-					key === legacyCaseFoldedMemberIndexKey({ slug, principalKey, groupId: indexedGroupId })
-				: key ===
-					memberIndexKey({
-						slug,
-						sessionId: canonicalSessionId,
-						principalKey,
-						groupId: indexedGroupId,
-					});
-			if (!validIndexKey) {
-				if (source.legacy) continue;
-				throw new Error('Worker group membership index does not match its key.');
-			}
+		if (!normalizeWorkerGroupId(indexedGroupId)) throw new Error('Worker group membership index is malformed.');
+		if (!groupId && key !== memberIndexKey({ slug, sessionId: canonicalSessionId, principalKey, groupId: indexedGroupId })) {
+			throw new Error('Worker group membership index does not match its key.');
 		}
 		const rawRow = groupId
-			? source.legacy
-				? await kvGetLegacyJson(store.store, key)
-				: await kvGetJsonStrict(store.store, key)
-			: await readMembershipRecord({
-					store,
-					slug,
-					sessionId: canonicalSessionId,
-					groupId: indexedGroupId,
-					principalKey,
-				});
-		const row = canonicalizeMembershipRecord({
-			row: rawRow,
-			slug,
-			sessionId: canonicalSessionId,
-			groupId: indexedGroupId,
-			principalKey,
-		});
-		if (!row && !source.legacy && rawRow) {
-			throw new Error('Worker group membership KV record does not match its key.');
-		}
-		if (
-			row &&
-			!row.removedAt &&
-			(!groupId || normalizeWorkerGroupId(row.groupId) === normalizeWorkerGroupId(groupId)) &&
-			(!principalKey || row.principalKey === principalKey)
-		) {
-			if (source.legacy) {
-				await writeMembershipRecord({
-					store,
-					slug,
-					sessionId: canonicalSessionId,
-					groupId: indexedGroupId,
-					member: row,
-				});
-			}
-			members.set(`${row.groupId}\n${row.principalKey}`, row);
-		}
+			? await kvGetJsonStrict(store.store, key)
+			: await readMembershipRecord({ store, slug, sessionId: canonicalSessionId, groupId: indexedGroupId, principalKey });
+		const row = canonicalizeMembershipRecord({ row: rawRow, slug, sessionId: canonicalSessionId, groupId: indexedGroupId, principalKey });
+		if (!row && rawRow) throw new Error('Worker group membership KV record does not match its key.');
+		if (row && !row.removedAt) members.push(row);
 	}
-	return [...members.values()];
+	return members;
 };
 
 const listMembershipRecordPage = async ({ store, slug, sessionId, groupId, cursor, limit }) => {
 	const canonicalSessionId = resolveCanonicalWorkerSessionIdHex({ sessionId });
 	if (!canonicalSessionId) throw new Error('Worker group session identity is invalid.');
 	const decodedCursor = decodeWorkerGroupMemberCursor(cursor);
-	const members = new Map();
-	const readPage = async ({ source, pageCursor = '', pageLimit }) => {
-		const legacy = source === 'legacy';
-		const page = await kvListKeyPage(
-			store.store,
-			legacy ? legacyMemberPrefix({ slug, groupId }) : memberPrefix({ slug, sessionId: canonicalSessionId, groupId }),
-			{
-				cursor: pageCursor,
-				limit: pageLimit,
-			},
-		);
-		for (const key of page.keys) {
-			const rawRow = legacy ? await kvGetLegacyJson(store.store, key) : await kvGetJsonStrict(store.store, key);
-			const row = canonicalizeMembershipRecord({
-				row: rawRow,
-				slug,
-				sessionId: canonicalSessionId,
-				groupId,
-			});
-			if (!row) {
-				if (!legacy && rawRow) {
-					throw new Error('Worker group membership KV record does not match its key.');
-				}
-				continue;
-			}
-			const validKey = legacy
-				? key ===
-						legacyEncodedMemberKey({
-							slug,
-							groupId,
-							principalKey: row.principalKey,
-						}) ||
-					key ===
-						legacyCaseFoldedMemberKey({
-							slug,
-							groupId,
-							principalKey: row.principalKey,
-						})
-				: key ===
-					memberKey({
-						slug,
-						sessionId: canonicalSessionId,
-						groupId,
-						principalKey: row.principalKey,
-					});
-			if (!validKey) {
-				if (!legacy) {
-					throw new Error('Worker group membership KV record does not match its key.');
-				}
-				continue;
-			}
-			if (legacy) {
-				await writeMembershipRecord({
-					store,
-					slug,
-					sessionId: canonicalSessionId,
-					groupId,
-					member: row,
-				});
-			}
-			if (!row.removedAt) {
-				members.set(`${row.groupId}\n${row.principalKey}`, row);
-			}
+	const page = await kvListKeyPage(store.store, memberPrefix({ slug, sessionId: canonicalSessionId, groupId }), {
+		cursor: decodedCursor.cursor,
+		limit,
+	});
+	const members = [];
+	for (const key of page.keys) {
+		const rawRow = await kvGetJsonStrict(store.store, key);
+		const row = canonicalizeMembershipRecord({ row: rawRow, slug, sessionId: canonicalSessionId, groupId });
+		if (!row) {
+			if (rawRow) throw new Error('Worker group membership KV record does not match its key.');
+			continue;
 		}
-		return page;
-	};
-
-	if (decodedCursor.source === 'legacy') {
-		const legacyPage = await readPage({
-			source: 'legacy',
-			pageCursor: decodedCursor.cursor,
-			pageLimit: limit,
-		});
-		return {
-			members: [...members.values()],
-			nextCursor: legacyPage.nextCursor ? encodeWorkerGroupMemberCursor('legacy', legacyPage.nextCursor) : '',
-		};
+		if (key !== memberKey({ slug, sessionId: canonicalSessionId, groupId, principalKey: row.principalKey })) {
+			throw new Error('Worker group membership KV record does not match its key.');
+		}
+		if (!row.removedAt) members.push(row);
 	}
-
-	const canonicalPage = await readPage({
-		source: 'canonical',
-		pageCursor: decodedCursor.cursor,
-		pageLimit: limit,
-	});
-	if (canonicalPage.nextCursor) {
-		return {
-			members: [...members.values()],
-			nextCursor: encodeWorkerGroupMemberCursor('canonical', canonicalPage.nextCursor),
-		};
-	}
-	const remainingLimit = limit - members.size;
-	if (remainingLimit <= 0) {
-		return {
-			members: [...members.values()],
-			nextCursor: encodeWorkerGroupMemberCursor('legacy'),
-		};
-	}
-	const legacyPage = await readPage({
-		source: 'legacy',
-		pageLimit: remainingLimit,
-	});
 	return {
-		members: [...members.values()],
-		nextCursor: legacyPage.nextCursor ? encodeWorkerGroupMemberCursor('legacy', legacyPage.nextCursor) : '',
+		members,
+		nextCursor: page.nextCursor ? encodeWorkerGroupMemberCursor('canonical', page.nextCursor) : '',
 	};
 };
 
@@ -1636,77 +1418,6 @@ export const listWorkerGroupMemberships = async ({ env, slug, sessionId, princip
 	return { ok: true, store: store.kind, principal: normalized.principal, memberships };
 };
 
-export const readWorkerGroupMembershipProjection = async ({
-	env,
-	slug,
-	sessionId,
-	groupId,
-	principal,
-	requesterAddress,
-	authScopes,
-	deps = {},
-} = {}) => {
-	const store = resolveWorkerGroupStore(env);
-	if (!store) return { ok: false, reason: 'worker_group_store_not_configured' };
-	const normalized = principal
-		? normalizeWorkerGroupPrincipal(principal, deps)
-		: resolveWorkerGroupPrincipal({ requesterAddress, authScopes, deps });
-	if (!normalized.ok) return { ok: false, reason: normalized.reason || 'missing_principal' };
-	const group = await readGroupRecord({ store, slug, sessionId, groupId });
-	if (!group || group.deletedAt) return { ok: false, reason: 'worker_group_not_found' };
-	const member = await readMembershipRecord({
-		store,
-		slug,
-		sessionId,
-		groupId,
-		principalKey: normalized.key,
-	});
-	if (!member || member.removedAt) {
-		return {
-			ok: false,
-			reason: 'worker_group_membership_denied',
-			group: redactGroupForMember(group),
-			principal: normalized.principal,
-		};
-	}
-	return {
-		ok: true,
-		store: store.kind,
-		group: redactGroupForMember(group),
-		principal: normalized.principal,
-		member,
-	};
-};
-
-export const snapshotWorkerGroupCapacity = async ({ env, slug, sessionId } = {}) => {
-	const store = resolveWorkerGroupStore(env);
-	if (!store) {
-		return { ok: false, status: 501, reason: 'worker_group_store_not_configured' };
-	}
-	if (typeof store.store.list !== 'function') {
-		return { ok: false, status: 503, reason: 'worker_group_capacity_seed_unavailable' };
-	}
-	try {
-		const groups = await scanWorkerGroupRecordsForIdentity({
-			store,
-			slug,
-			sessionId,
-		});
-		const { maxGroupsPerSession } = resolveWorkerGroupCaps(env);
-		if (groups.length > maxGroupsPerSession) {
-			throw new Error('Worker group inventory exceeds the configured reconciliation budget.');
-		}
-		return {
-			ok: true,
-			groups: groups.map((group) => ({
-				groupId: normalizeWorkerGroupId(group.groupId),
-			})),
-		};
-	} catch {
-		return { ok: false, status: 503, reason: 'worker_group_capacity_seed_unavailable' };
-	}
-};
-
 export const executeWorkerGroupMutation = async ({
 	env,
 	slug,
@@ -1876,10 +1587,10 @@ export const readCoordinatedWorkerGroupMemberships = async ({ env, slug, session
 		payload: { principal },
 	});
 
-export const isWorkerGroupMember = async ({ env, slug, sessionId, groupId, principal, requesterAddress, authScopes, deps = {} } = {}) => {
+export const isWorkerGroupMember = async ({ env, slug, sessionId, groupId, principal, requesterAddress, deps = {} } = {}) => {
 	const normalized = principal
 		? normalizeWorkerGroupPrincipal(principal, deps)
-		: resolveWorkerGroupPrincipal({ requesterAddress, authScopes, deps });
+		: resolveWorkerGroupPrincipal({ requesterAddress, deps });
 	const normalizedGroupId = normalizeWorkerGroupId(groupId);
 	if (!normalized.ok) {
 		return { ok: false, status: 400, reason: normalized.reason || 'missing_principal' };
@@ -1899,7 +1610,7 @@ export const isWorkerGroupMember = async ({ env, slug, sessionId, groupId, princ
 	});
 };
 
-export const executeCoordinatedWorkerGroupMutation = async ({
+export const forwardWorkerGroupMutation = async ({
 	env,
 	slug,
 	sessionId,
@@ -1922,6 +1633,14 @@ export const executeCoordinatedWorkerGroupMutation = async ({
 			actorPrincipal,
 		},
 	});
+};
+
+export const executeCoordinatedWorkerGroupMutation = async ({ env, slug, expectedAuthority, ...mutation } = {}) => {
+	const result = await callSessionConfigCoordinator({ env, slug, expectedAuthority,
+		path: 'worker-groups/mutate', ...mutation });
+	return { ...result.body, ok: result.ok, status: result.status,
+		...(!result.ok && !result.body?.reason ? { reason: result.status === 409
+			? 'session_authority_changed' : 'worker_group_coordination_unavailable' } : {}) };
 };
 
 const parseRouteBody = async (request) => {
@@ -2014,7 +1733,7 @@ export const dispatchPublicWorkerGroupListRequest = async ({ request, config, en
 	return jsonResponse(deps, { ok: true, ...sessionIdentity, store: result.store, groups: result.groups }, 200, baseHeaders);
 };
 
-export const dispatchAdminWorkerGroupRequest = async ({ action, body, config, env, slug, adminAddress, headers, deps } = {}) => {
+export const dispatchAdminWorkerGroupRequest = async ({ action, body, config, env, slug, adminAddress, expectedAuthority, headers, deps } = {}) => {
 	const sessionIdentity = resolveWorkerGroupSessionIdentity({ config, slug });
 	if (!sessionIdentity.ok) return routeError(deps, sessionIdentity, headers);
 	const requestedSessionId = resolveCanonicalWorkerSessionIdHex({ sessionId: body?.sessionId });
@@ -2058,6 +1777,7 @@ export const dispatchAdminWorkerGroupRequest = async ({ action, body, config, en
 	const mutate = deps?.executeCoordinatedWorkerGroupMutation || executeCoordinatedWorkerGroupMutation;
 	if (action === 'groups/create') {
 		const result = await mutate({
+			expectedAuthority,
 			env,
 			slug,
 			sessionId: sessionIdentity.sessionId,
@@ -2070,6 +1790,7 @@ export const dispatchAdminWorkerGroupRequest = async ({ action, body, config, en
 	}
 	if (action === 'groups/update') {
 		const result = await mutate({
+			expectedAuthority,
 			env,
 			slug,
 			sessionId: sessionIdentity.sessionId,
@@ -2083,6 +1804,7 @@ export const dispatchAdminWorkerGroupRequest = async ({ action, body, config, en
 	}
 	if (action === 'groups/delete') {
 		const result = await mutate({
+			expectedAuthority,
 			env,
 			slug,
 			sessionId: sessionIdentity.sessionId,
@@ -2106,6 +1828,7 @@ export const dispatchAdminWorkerGroupRequest = async ({ action, body, config, en
 	}
 	if (action === 'groups/add-member') {
 		const result = await mutate({
+			expectedAuthority,
 			env,
 			slug,
 			sessionId: sessionIdentity.sessionId,
@@ -2130,6 +1853,7 @@ export const dispatchAdminWorkerGroupRequest = async ({ action, body, config, en
 	}
 	if (action === 'groups/remove-member') {
 		const result = await mutate({
+			expectedAuthority,
 			env,
 			slug,
 			sessionId: sessionIdentity.sessionId,
@@ -2230,7 +1954,7 @@ export const workerGroupsRoute = async ({
 	env,
 	slug,
 	requesterAddress,
-	authScopes,
+	expectedAuthority,
 	baseHeaders,
 	deps,
 } = {}) => {
@@ -2262,7 +1986,7 @@ export const workerGroupsRoute = async ({
 			baseHeaders,
 		);
 	}
-	const actor = resolveWorkerGroupPrincipal({ requesterAddress, authScopes, deps });
+	const actor = resolveWorkerGroupPrincipal({ requesterAddress, deps });
 	if (!actor.ok) {
 		return jsonResponse(deps, { error: 'Missing worker group principal.', reason: actor.reason }, 401, baseHeaders);
 	}
@@ -2387,6 +2111,7 @@ export const workerGroupsRoute = async ({
 		}
 		const mutate = deps?.executeCoordinatedWorkerGroupMutation || executeCoordinatedWorkerGroupMutation;
 		const result = await mutate({
+			expectedAuthority,
 			env,
 			slug,
 			sessionId: sessionIdentity.sessionId,
@@ -2411,6 +2136,7 @@ export const workerGroupsRoute = async ({
 	if (path === '/groups/join' && method === 'POST') {
 		const mutate = deps?.executeCoordinatedWorkerGroupMutation || executeCoordinatedWorkerGroupMutation;
 		const result = await mutate({
+			expectedAuthority,
 			env,
 			slug,
 			sessionId: sessionIdentity.sessionId,
@@ -2440,6 +2166,7 @@ export const workerGroupsRoute = async ({
 	if (path === '/groups/leave' && method === 'POST') {
 		const mutate = deps?.executeCoordinatedWorkerGroupMutation || executeCoordinatedWorkerGroupMutation;
 		const result = await mutate({
+			expectedAuthority,
 			env,
 			slug,
 			sessionId: sessionIdentity.sessionId,
@@ -2470,4 +2197,12 @@ export const workerGroupsRoute = async ({
 		);
 	}
 	return jsonResponse(deps, { error: 'Not found.' }, 404, baseHeaders);
+};
+
+export const __test__workerGroups = {
+	readGroupRecord,
+	readMembershipRecord,
+	redactGroupForMember,
+	resolveWorkerGroupStore,
+	scanWorkerGroupRecordsForIdentity,
 };

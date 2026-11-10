@@ -1,3 +1,4 @@
+import { quoteCsvCell } from '../../../../shared/csv/quoteCell.mjs';
 import { readStoredRating } from '../../utilities/survey/storedRating';
 import { formatTsForCsv, pickTimestampMs } from './surveyResultsHelpers.js';
 
@@ -34,8 +35,11 @@ export type SurveyResultsResponsesJsonExportArgs = SurveyResultsQuestionsJsonExp
 
 export type SurveyResultsQuestionCsvExportRecord = {
   id?: unknown;
+  maxSelections?: unknown;
   options?: unknown;
   prompt?: unknown;
+  scale?: unknown;
+  singleSelect?: unknown;
   tags?: unknown;
   type?: unknown;
   voiceCredits?: unknown;
@@ -305,17 +309,6 @@ export const buildSurveyResultsExportBaseFileName = ({
   return questionsOnly ? 'contextEngine_filteredQuestions' : 'contextEngine_questionResults';
 };
 
-// Spreadsheet apps run a cell that starts with one of these characters as a
-// formula. Participant text must stay text, so it gets a leading apostrophe.
-const CSV_FORMULA_START = /^[=+\-@\t\r]/;
-const CSV_PLAIN_NUMBER = /^[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?$/i;
-
-const quoteCsvCell = (value: unknown): string => {
-  const text = String(value !== undefined && value !== null ? value : '');
-  const safeText = CSV_FORMULA_START.test(text) && !CSV_PLAIN_NUMBER.test(text) ? `'${text}` : text;
-  return `"${safeText.replace(/"/g, '""')}"`;
-};
-
 const quoteResponseCsvCell = (value: unknown): string => {
   const cellValue = Array.isArray(value) ? JSON.stringify(value) : value;
   return quoteCsvCell(cellValue);
@@ -381,7 +374,8 @@ const readQuestionOptionsForCsv = (questionData: SurveyResultsRecord): string =>
 export const buildSurveyResultsQuestionsCsvExport = (
   filteredQuestions: readonly SurveyResultsQuestionCsvExportRecord[] = [],
 ): string => {
-  const header = '"questionID","prompt","type","tags","options","voiceCredits"\n';
+  const header =
+    '"questionID","prompt","type","tags","options","voiceCredits","scale","singleSelect","maxSelections"\n';
   const csvRows = filteredQuestions.map((question) => {
     const tags = Array.isArray(question?.tags) ? question.tags.join(';') : '';
     const options = Array.isArray(question?.options) ? JSON.stringify(question.options) : '';
@@ -392,6 +386,10 @@ export const buildSurveyResultsQuestionsCsvExport = (
       quoteCsvCell(tags),
       quoteCsvCell(options),
       quoteCsvCell(question.type === 'quadratic' ? (question.voiceCredits ?? 99) : ''),
+      // Without these, a 1-5 and a 0-10 rating, or pick-one and pick-three, read the same.
+      quoteCsvCell(question.scale ? JSON.stringify(question.scale) : ''),
+      quoteCsvCell(question.singleSelect),
+      quoteCsvCell(question.maxSelections),
     ].join(',');
   });
 

@@ -1,6 +1,5 @@
 import { arweaveClient } from '../../../utilities/arweave/arweaveClient.js';
 import * as publishUploadAuth from '../../../utilities/arweave/publishUploadAuth.js';
-import * as sponsoredBundles from '../../../utilities/arweave/sponsoredBundles.js';
 import * as sbtFactoryReceipt from '../../../utilities/web3/sbtFactoryReceipt.js';
 import * as sessionRegistry from '../../../utilities/web3/sessionRegistry.js';
 import { sbtMetadataReadsPort } from '../../sbts/sbtMetadataReadsPort.js';
@@ -10,7 +9,6 @@ import {
   sbtFactoryReceiptPublishAdapter,
   sessionRegistryPublishAdapter,
   sessionPublishSbtMetadataAdapter,
-  sponsoredBundlePublishAdapter,
   type WorkerAuthPublishModule,
 } from './sessionPublishAdapters';
 
@@ -139,27 +137,16 @@ describe('session publish adapters', () => {
     expect(workerAuth.buildSignedAdminActionAuth).toHaveBeenCalledWith(actionInput);
   });
 
-  it('routes sponsored bundle and receipt helpers without changing their call shape', () => {
-    const normalizeSparseSponsoredBundlePayload = jest
-      .spyOn(sponsoredBundles, 'normalizeSparseSponsoredBundlePayload')
-      .mockReturnValue({ openaiKey: 'key' });
-    const hasSponsoredBundleFields = jest.spyOn(sponsoredBundles, 'hasSponsoredBundleFields').mockReturnValue(true);
+  it('routes receipt helpers without changing their call shape', () => {
     const resolveSbtAddressFromFactoryReceipt = jest
       .spyOn(sbtFactoryReceipt, 'resolveSbtAddressFromFactoryReceipt')
       .mockReturnValue('0x0000000000000000000000000000000000000001');
-    const rawBundle = { openaiKey: 'key' };
     const receipt = { logs: [] };
 
-    expect(sponsoredBundlePublishAdapter.normalizeSparseSponsoredBundlePayload(rawBundle)).toEqual({
-      openaiKey: 'key',
-    });
-    expect(sponsoredBundlePublishAdapter.hasSponsoredBundleFields({ openaiKey: 'key' })).toBe(true);
     expect(sbtFactoryReceiptPublishAdapter.resolveSbtAddressFromFactoryReceipt({ receipt })).toBe(
       '0x0000000000000000000000000000000000000001',
     );
 
-    expect(normalizeSparseSponsoredBundlePayload).toHaveBeenCalledWith(rawBundle);
-    expect(hasSponsoredBundleFields).toHaveBeenCalledWith({ openaiKey: 'key' });
     expect(resolveSbtAddressFromFactoryReceipt).toHaveBeenCalledWith(receipt);
   });
 

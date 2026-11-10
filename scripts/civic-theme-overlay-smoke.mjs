@@ -142,7 +142,7 @@ export async function inspectCivicOverlays(page) {
 
   await clickQuestionAction(page, 'Open voice mode');
   await assertReadable(page.getByRole('dialog'));
-  await page.getByRole('button', { name: /^Interview Talk/ }).click();
+  await page.getByTestId('ce-session-voice-mode-interview').click();
   await assertReadable(page.getByRole('dialog'));
   await page.getByRole('button', { name: 'Close', exact: true }).click();
   await page.getByRole('dialog').waitFor({ state: 'hidden' });

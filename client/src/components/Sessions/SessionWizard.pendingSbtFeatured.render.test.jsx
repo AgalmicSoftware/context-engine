@@ -1,7 +1,6 @@
 import {
   E2E_TESTIDS,
   createPendingFeaturedDraft,
-  enableAdvancedMode,
   ensureGateASelectorVisible,
   expectSelectorAddresses,
   fireEvent,
@@ -11,6 +10,7 @@ import {
   renderLoggedInSessionWizard,
   resetSessionWizardWorkerPanelTestState,
   screen,
+  selectRegistryHosting,
   waitFor,
   within,
 } from './SessionWizard.workerPanel.testUtils';
@@ -23,6 +23,7 @@ describe('SessionWizard pending featured SBT rendering', () => {
     renderLoggedInSessionWizard();
 
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+    selectRegistryHosting();
     await createPendingFeaturedDraft();
 
     await expectSelectorAddresses('default-featured-sbts', [mockPendingSbtAddress]);
@@ -34,6 +35,7 @@ describe('SessionWizard pending featured SBT rendering', () => {
     const firstRender = renderLoggedInSessionWizard();
 
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+    selectRegistryHosting();
     await createPendingFeaturedDraft();
 
     await expectSelectorAddresses('default-featured-sbts', [mockPendingSbtAddress]);
@@ -56,6 +58,7 @@ describe('SessionWizard pending featured SBT rendering', () => {
     const firstRender = renderLoggedInSessionWizard();
 
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+    selectRegistryHosting();
     await createPendingFeaturedDraft();
     await ensureGateASelectorVisible();
 
@@ -84,6 +87,7 @@ describe('SessionWizard pending featured SBT rendering', () => {
     const firstRender = renderLoggedInSessionWizard();
 
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+    selectRegistryHosting();
     await createPendingFeaturedDraft();
     await ensureGateASelectorVisible();
 
@@ -111,6 +115,7 @@ describe('SessionWizard pending featured SBT rendering', () => {
     const firstRender = renderLoggedInSessionWizard();
 
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+    selectRegistryHosting();
     await createPendingFeaturedDraft();
     await ensureGateASelectorVisible();
 
@@ -143,6 +148,7 @@ describe('SessionWizard pending featured SBT rendering', () => {
     const firstRender = renderLoggedInSessionWizard();
 
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+    selectRegistryHosting();
     await createPendingFeaturedDraft();
     await ensureGateASelectorVisible();
 
@@ -170,8 +176,8 @@ describe('SessionWizard pending featured SBT rendering', () => {
     const firstRender = renderLoggedInSessionWizard();
 
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
-    enableAdvancedMode();
-    fireEvent.click(screen.getByRole('button', { name: /more options/i }));
+    selectRegistryHosting();
+    await openAdvancedMoreOptions();
 
     const featuredCreateButton = await waitFor(() => {
       const button = screen
@@ -197,8 +203,7 @@ describe('SessionWizard pending featured SBT rendering', () => {
     renderLoggedInSessionWizard();
 
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
-    enableAdvancedMode();
-    fireEvent.click(screen.getByRole('button', { name: /more options/i }));
+    await openAdvancedMoreOptions();
 
     await waitFor(() => {
       const selectors = screen.getAllByTestId('mock-wizard-sbt-selector');

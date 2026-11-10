@@ -5,6 +5,11 @@ import { connect } from 'react-redux';
 import { useWorkerGroupResultsFilter } from '../../domains/worker/useWorkerGroupResultsFilter';
 import { asGroupRecord } from '../../domains/worker/workerGroupResultsFilter';
 import { projectWorkerGroupResultsState } from './surveyResultsWorkerGroups';
+import {
+  isSurveyResultsCountLoading,
+  SURVEY_RESULTS_COUNTS_LOADING_MAX_MS,
+} from './surveyResultsFilterStatusController';
+import { useBoundedLoading } from './useBoundedLoading';
 
 import '../../assets/css/contextEngine.scss';
 import styles from './SurveyResults.module.scss';
@@ -131,6 +136,10 @@ import {
   type SurveyResultsScopedQuestionNetworkData,
   type SurveyResultsScopedQuestionNetworkMemo,
 } from './surveyResultsQuestionNetworkReadController';
+import { getBlockedQuestionIdsSet } from './surveyToolScope';
+import { toggleLoginModal } from '../../actions/sessionStateActions';
+import { sessionAnswersRequireLogin } from '../../utilities/session/sessionCapabilityProjection';
+import { SurveyResultsLoginPrompt } from './SurveyResultsLockedResponsesPanel';
 import {
   applySurveyResultsBuiltInDemoQuestionMetadataFallbackToBucket,
   isSurveyResultsDemoQuestionResultsContext,
@@ -339,6 +348,7 @@ export type SurveyResultsProps = SurveyResultsRecord & {
   sessionState?: unknown;
   setFilterLoading?: (loading: unknown) => void;
   surveyId?: string;
+  toggleLoginModal?: (isOpen: boolean) => unknown;
   viewMode?: string;
 };
 export type SurveyResultsState = SurveyResultsRecord & {
@@ -572,6 +582,24 @@ const SurveyResults = (props: SurveyResultsProps): React.ReactElement => {
   stateRef.current = state;
   const propsRef = useRef(props);
   propsRef.current = props;
+  const countsLoading = {
+    questions: useBoundedLoading(
+      isSurveyResultsCountLoading({
+        ready: props.isQuestionCacheReady,
+        total: state.totalQuestionsCount,
+        viewMode: state.viewMode,
+      }),
+      SURVEY_RESULTS_COUNTS_LOADING_MAX_MS,
+    ),
+    responses: useBoundedLoading(
+      isSurveyResultsCountLoading({
+        ready: props.isResponsesCacheReady,
+        total: state.totalResponsesCount,
+        viewMode: state.viewMode,
+      }),
+      SURVEY_RESULTS_COUNTS_LOADING_MAX_MS,
+    ),
+  };
   const questionIdTableRef = useRef<HTMLDivElement>(null);
   const questionFilterRef = useRef<QuestionFilterHandle>(null);
   const instRef = useRef<SurveyResultsInstanceFields | null>(null);
@@ -635,6 +663,8 @@ const SurveyResults = (props: SurveyResultsProps): React.ReactElement => {
   const handleManagedCacheUpdate = (update: SurveyResultsManagedCacheUpdate = {}): void => {
     if (!update || update.namespace !== 'surveysCache') return;
     inst._surveysCacheChangeNonce += 1;
+    // A survey's title and links change with no new answers, as when an account change relocks them.
+    if (stateRef.current.viewMode === 'survey') queueResultsRefresh('surveys-cache-update');
   };
 
   function getEffectiveSlug(): string {
@@ -712,6 +742,23 @@ const SurveyResults = (props: SurveyResultsProps): React.ReactElement => {
       sessionSlug: slug,
     });
     return (node || fallback) as SurveyResultsRecord;
+  }
+
+  // Questions an admin hid: the session's hidden list, and those the admin panel
+  // marked, which reach the browser as tombstones in the question cache.
+  function getHiddenQuestionIds(): Set<string> {
+    const slug = getEffectiveSlug();
+    const node = readResultsScopedCacheNode(
+      surveyResultsCachePort.peekCacheSync('questionsCache', slug, { clone: false }) || {},
+      slug,
+      getEffectiveCacheScope(),
+      {},
+    );
+    const tombstones = (node.workerQuestionMetadataTombstones || {}) as SurveyResultsRecord;
+    return new Set([
+      ...getBlockedQuestionIdsSet(slug),
+      ...Object.keys(tombstones).filter((id) => tombstones[id] === true),
+    ]);
   }
 
   function filterResultsCacheRoot(cache: unknown, slug: string, cacheScope: string): unknown {
@@ -815,6 +862,7 @@ const SurveyResults = (props: SurveyResultsProps): React.ReactElement => {
       requireAuthoritativeBinding,
       viewMode,
       ports: {
+        readHiddenQuestionIds: getBlockedQuestionIdsSet,
         readQuestionBucket: (slug, networkId) =>
           applyBuiltInDemoQuestionMetadataFallbackToBucket(
             readResultsScopedCacheNode(
@@ -851,6 +899,7 @@ const SurveyResults = (props: SurveyResultsProps): React.ReactElement => {
       questionReadSlugs,
       requireAuthoritativeBinding,
       ports: {
+        readHiddenQuestionIds: getBlockedQuestionIdsSet,
         peekQuestionBucket: (slug, networkId) => {
           const bucket = readResultsScopedCacheNode(
             surveyResultsCachePort.peekCacheSync('questionsCache', slug, { clone: false }) || {},
@@ -1303,6 +1352,7 @@ const SurveyResults = (props: SurveyResultsProps): React.ReactElement => {
         applyStatePatch: (patch, afterApply) => setState(asSurveyResultsStatePatch(patch), afterApply),
         getCacheScope: getEffectiveCacheScope,
         getEffectiveSlug,
+        getHiddenQuestionIds,
         getNetworkQuestionsForCurrentContext,
         getProps: () => propsRef.current,
         getScopedQuestionNetworkData,
@@ -1335,6 +1385,7 @@ const SurveyResults = (props: SurveyResultsProps): React.ReactElement => {
         applyStatePatch: (patch, afterApply) => setState(asSurveyResultsStatePatch(patch), afterApply),
         getCacheScope: getEffectiveCacheScope,
         getEffectiveSlug,
+        getHiddenQuestionIds,
         getNetworkQuestionsForCurrentContext,
         getProps: () => propsRef.current,
         getScopedQuestionNetworkData,
@@ -1409,6 +1460,7 @@ const SurveyResults = (props: SurveyResultsProps): React.ReactElement => {
   };
 
   const htmlReportRuntime = createSurveyResultsHtmlReportRuntime({
+    applyDecryptedOverride: lockedResponsesRuntime.applyDecryptedOverrideToRow,
     getEffectiveSlug,
     getFilteredQuestionsForExport,
     getNetworkQuestionsForCurrentContext,
@@ -1434,7 +1486,7 @@ const SurveyResults = (props: SurveyResultsProps): React.ReactElement => {
     buildSessionResultsHtmlReportSnapshot,
     getHtmlReportAnalysisArtifact,
     getHtmlReportAnalysisSectionsToGenerate,
-    getHtmlReportExporterMetadata,
+    getHtmlReportChainId,
     getHtmlReportSelectedSections,
     getSessionResultsAnalysisCacheKey,
     getSessionResultsAnalysisCacheSlug,
@@ -1480,6 +1532,10 @@ const SurveyResults = (props: SurveyResultsProps): React.ReactElement => {
     setState(buildSurveyResultsHtmlReportFormatPatch(format));
   };
 
+  const activeAnalysisGenerationRef = useRef<{ isCurrent: () => boolean } | null>(null);
+  const isHtmlReportAnalysisGenerating = () =>
+    stateRef.current.htmlReportAnalysisGenerating && !!activeAnalysisGenerationRef.current?.isCurrent();
+
   const generateHtmlReportAnalysisViews = async (): Promise<void> => {
     if (isHtmlReportDemoModeActive()) {
       setState(buildSurveyResultsHtmlReportAnalysisDemoReadyPatch(buildHtmlReportDemoAnalysisArtifact()));
@@ -1505,6 +1561,39 @@ const SurveyResults = (props: SurveyResultsProps): React.ReactElement => {
       return;
     }
 
+    const readGenerationContext = () => {
+      const config = getEffectiveSessionContext().sessionConfig;
+      return {
+        slug: getEffectiveSlug() || '',
+        sessionId: String(config?.sessionId || config?.__registry?.sessionIdHex || ''),
+        account: String(propsRef.current.account || '')
+          .trim()
+          .toLowerCase(),
+        chainId: getHtmlReportChainId(),
+      };
+    };
+    const context = readGenerationContext();
+    const cacheTarget = {
+      slug: getSessionResultsAnalysisCacheSlug(),
+      cacheKey: getSessionResultsAnalysisCacheKey(inputSignature),
+    };
+    const contextIsCurrent = () => {
+      const current = readGenerationContext();
+      return (
+        inst._isMounted &&
+        activeAnalysisGenerationRef.current?.isCurrent === contextIsCurrent &&
+        current.slug === context.slug &&
+        current.sessionId === context.sessionId &&
+        current.account === context.account &&
+        current.chainId === context.chainId &&
+        buildSessionResultsAnalysisPayloadForAi().inputSignature === inputSignature
+      );
+    };
+    activeAnalysisGenerationRef.current = { isCurrent: contextIsCurrent };
+    const applyCurrentLifecycleState: typeof applyHtmlReportAnalysisLifecycleStatePatch = (patch) => {
+      if (contextIsCurrent()) applyHtmlReportAnalysisLifecycleStatePatch(patch);
+    };
+
     const cached = readSessionResultsAnalysisArtifactFromCache(inputSignature);
     const currentArtifact = getHtmlReportAnalysisArtifact();
     const analysisLifecyclePlan = buildSurveyResultsAnalysisLifecyclePlan({
@@ -1519,9 +1608,9 @@ const SurveyResults = (props: SurveyResultsProps): React.ReactElement => {
     const lifecycleResult = runSurveyResultsAnalysisLifecycleController({
       plan: analysisLifecyclePlan,
       ports: {
-        applyBlockedState: applyHtmlReportAnalysisLifecycleStatePatch,
-        applyGenerateStartState: applyHtmlReportAnalysisLifecycleStatePatch,
-        applyReadyState: applyHtmlReportAnalysisLifecycleStatePatch,
+        applyBlockedState: applyCurrentLifecycleState,
+        applyGenerateStartState: applyCurrentLifecycleState,
+        applyReadyState: applyCurrentLifecycleState,
       },
     });
     if (!lifecycleResult.shouldGenerate) {
@@ -1535,6 +1624,7 @@ const SurveyResults = (props: SurveyResultsProps): React.ReactElement => {
       for (let index = 0; index < missingSections.length; index += 1) {
         const section = missingSections[index];
         const label = HTML_REPORT_ANALYSIS_SECTION_LABELS[section];
+        if (!contextIsCurrent()) return;
         setState(
           buildSurveyResultsHtmlReportAnalysisProgressPatch(
             `Generating ${label} (${index + 1}/${missingSections.length})`,
@@ -1544,8 +1634,9 @@ const SurveyResults = (props: SurveyResultsProps): React.ReactElement => {
         const rawOutput = await surveyResultsAnalysisGenerationPort.generateSection({
           maxTokens: HTML_REPORT_ANALYSIS_SECTION_MAX_TOKENS[section],
           prompt,
-          sessionSlug: getEffectiveSlug() || '',
+          sessionSlug: context.slug,
         });
+        const stillCurrentAfterGeneration = contextIsCurrent();
         const sectionArtifact = surveyResultsAnalysisArtifactMergePort.normalizeGeneratedArtifact({
           generatedAt: new Date().toISOString(),
           inputSignature,
@@ -1566,18 +1657,22 @@ const SurveyResults = (props: SurveyResultsProps): React.ReactElement => {
         });
         completionPlan = buildSurveyResultsAnalysisGeneratedArtifactCompletionPlan({
           artifact,
-          cacheKey: artifact ? getSessionResultsAnalysisCacheKey(artifact.inputSignature) : '',
+          cacheKey: cacheTarget.cacheKey,
           failureStatePatch: analysisLifecyclePlan.failureRecovery.statePatch,
           inputSignature,
           requestedSections: analysisLifecyclePlan.sectionsToGenerate,
-          slug: getSessionResultsAnalysisCacheSlug(),
+          slug: cacheTarget.slug,
         });
         const completionResult = await runSurveyResultsAnalysisGeneratedArtifactCompletion({
           plan: completionPlan,
           ports: {
-            writeArtifactToCache: writeSessionResultsAnalysisArtifactToCache,
+            writeArtifactToCache: (completedArtifact) =>
+              writeSessionResultsAnalysisArtifactToCache(completedArtifact, cacheTarget),
           },
         });
+        // A finished section can be saved for its original context, but must
+        // never publish state or launch more sections in a different one.
+        if (!stillCurrentAfterGeneration || !contextIsCurrent()) return;
         if (!completionResult.ok) {
           if (completionResult.error instanceof Error) throw completionResult.error;
           throw new Error(completionResult.errorMessage);
@@ -1587,14 +1682,15 @@ const SurveyResults = (props: SurveyResultsProps): React.ReactElement => {
       if (!completionPlan || !completionLifecyclePatch) {
         throw new Error('Generated analysis artifact completion did not produce a lifecycle patch.');
       }
-      setState(asSurveyResultsStatePatch(completionLifecyclePatch));
+      if (contextIsCurrent()) setState(asSurveyResultsStatePatch(completionLifecyclePatch));
     } catch (error) {
+      if (!contextIsCurrent()) return;
       surveyLog.error('[SurveyResults.generateHtmlReportAnalysisViews] Failed to generate analysis:', error);
       runSurveyResultsAnalysisLifecycleController({
         phase: 'failure-recovery',
         plan: analysisLifecyclePlan,
         ports: {
-          applyFailureRecoveryState: applyHtmlReportAnalysisLifecycleStatePatch,
+          applyFailureRecoveryState: applyCurrentLifecycleState,
         },
       });
     }
@@ -1602,11 +1698,11 @@ const SurveyResults = (props: SurveyResultsProps): React.ReactElement => {
 
   const downloadHtmlReport = async (): Promise<void> => {
     const exportedAt = stateRef.current.htmlReportExportedAt || new Date().toISOString();
-    const snapshot = buildSessionResultsHtmlReportSnapshot(exportedAt);
+    const snapshot = buildSessionResultsHtmlReportSnapshot(exportedAt, { withAnswers: true });
     const selectedSections = getHtmlReportSelectedSections();
     const format = stateRef.current.htmlReportExportFormat || SESSION_RESULTS_EXPORT_FORMAT_VIEWER;
     const downloadPlan = buildSurveyResultsHtmlReportDownloadExecutionPlan({
-      analysisGenerating: stateRef.current.htmlReportAnalysisGenerating,
+      analysisGenerating: isHtmlReportAnalysisGenerating(),
       format,
       isAuthorized: isHtmlReportExportAuthorized(),
       selectedSections,
@@ -1973,6 +2069,7 @@ const SurveyResults = (props: SurveyResultsProps): React.ReactElement => {
       questionResponsesNonce: propsRef.current.questionResponsesNonce,
       questionsCacheNonce: propsRef.current.questionsCacheNonce,
       responses,
+      responsesLoading: countsLoading.responses,
       sbtCacheRevision: propsRef.current.sbtCacheRevision,
       styleMap: styles,
       surveyId: stateRef.current.surveyId,
@@ -2195,9 +2292,9 @@ const SurveyResults = (props: SurveyResultsProps): React.ReactElement => {
     const analysisPayload = buildSessionResultsAnalysisPayloadForAi();
 
     return buildSurveyResultsHtmlReportModalProps({
-      analysisGenerating: stateRef.current.htmlReportAnalysisGenerating,
+      analysisGenerating: isHtmlReportAnalysisGenerating(),
       analysisPayload,
-      analysisProgress: stateRef.current.htmlReportAnalysisProgress,
+      analysisProgress: isHtmlReportAnalysisGenerating() ? stateRef.current.htmlReportAnalysisProgress : '',
       exportFormat: stateRef.current.htmlReportExportFormat,
       htmlReportAnalysisError: stateRef.current.htmlReportAnalysisError,
       isAuthorized,
@@ -2294,6 +2391,11 @@ const SurveyResults = (props: SurveyResultsProps): React.ReactElement => {
   }, []);
 
   return renderSurveyResultsRenderSurface({
+    loginPromptNode:
+      !(props.loginComplete && props.account) &&
+      sessionAnswersRequireLogin(getEffectiveSessionContext().sessionConfig) ? (
+        <SurveyResultsLoginPrompt onLogin={() => props.toggleLoginModal?.(true)} />
+      ) : null,
     workerGroupFilterNotice:
       groupResolution.cohort.active && groupResolution.cohort.message ? (
         <div role={groupResolution.cohort.status === 'error' ? 'alert' : 'status'}>
@@ -2365,6 +2467,7 @@ const SurveyResults = (props: SurveyResultsProps): React.ReactElement => {
     state: stateRef.current,
     styleMap: styles,
     syncLoadingStartedAt: inst._syncLoadingStartedAt,
+    countsLoading,
     toggleExportArea,
     toggleLockedResponseDetails,
     toggleQuestionFilter,
@@ -2384,4 +2487,4 @@ const mapStateToProps = (state: SurveyResultsRecord = {}) => {
     loginComplete: !!sessionState.loginComplete,
   };
 };
-export default connect(mapStateToProps)(SurveyResults);
+export default connect(mapStateToProps, { toggleLoginModal })(SurveyResults);

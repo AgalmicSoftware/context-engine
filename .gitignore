@@ -159,18 +159,19 @@ contextEngine-cc/.cache/
 contextEngine-cc/cache/
 contextEngine-cc/tmp/
 
-# Private agent bridge worker secrets, local state, dependencies, and generated artifacts.
-workers/agentBridgeWorker/.dev.vars
-workers/agentBridgeWorker/dev.vars
-workers/agentBridgeWorker/wrangler.toml
-workers/agentBridgeWorker/.wrangler/
-workers/agentBridgeWorker/.data/
-workers/agentBridgeWorker/.state/
-workers/agentBridgeWorker/node_modules/
-workers/agentBridgeWorker/**/*.log
-workers/agentBridgeWorker/**/*.key
-workers/agentBridgeWorker/**/*.pem
-workers/agentBridgeWorker/**/*.jwt
+# Local Worker secrets and state, in any Worker directory
+**/.dev.vars
+**/.dev.vars.*
+!**/.dev.vars.example
+**/dev.vars
+workers/**/wrangler.toml
+workers/**/.wrangler/
+workers/**/.data/
+workers/**/.state/
+workers/**/*.log
+workers/**/*.key
+workers/**/*.pem
+workers/**/*.jwt
 
 # E2E test layer (stripped from public release)
 scripts/.tmp-*/

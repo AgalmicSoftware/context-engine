@@ -49,7 +49,6 @@ const buildHookOptions = () => ({
   updateDraftValue: jest.fn(),
   updateDeploymentState: jest.fn(),
   clearSelectedBundleFile: jest.fn(),
-  clearCachedWorkerSecretsAfterDeploy: jest.fn(),
   verifyPublicWorkerDeployment: jest.fn(
     async ({ workerUrl }: { workerUrl: unknown; config?: Record<string, unknown> }) => ({
       workerOrigin: String(workerUrl),
@@ -83,8 +82,6 @@ const buildDeployHookOptions = () => {
     loginComplete: true,
     registryAddress: '0x00000000000000000000000000000000000000bb',
     registryChainId: 11155420,
-    wizardMode: 'advanced',
-    bundleMode: 'url',
     workerSecretsEnabled: false,
     embeddedDeployHelperEnabled: true,
     network: { id: 11155420 },
@@ -529,7 +526,6 @@ describe('useSessionWizardWorkerDeploy', () => {
   const prepareSponsoredAgentsHttpRedeem = (redeemResponse: { status: number; body: Record<string, unknown> }) => {
     const options = buildDeployHookOptions();
     const runtime = options.refs.runtimeRef.current as SessionWizardWorkerDeployRuntime;
-    runtime.wizardMode = 'normal';
     // A manual retry source stays out of grants: only the configured release goes.
     runtime.forceManualBundleFile = true;
     runtime.bundleFile = { name: 'sessionCorsWorker.bundle.js', text: async () => 'unused' } as unknown as File;
@@ -647,7 +643,7 @@ describe('useSessionWizardWorkerDeploy', () => {
       const capability = {
         version: 1,
         enabled: true,
-        origin: sameOrigin ? 'https://deployed.example.test' : 'https://retired-bridge.example.test',
+        origin: sameOrigin ? 'https://deployed.example.test' : 'https://retired-agent.example.test',
         protocolVersion: 'agent-session-wrapped-v1',
         revision: 'wrapped-0123456789abcdef',
         verifiedAt: '2026-07-20T18:00:00.000Z',
@@ -796,7 +792,6 @@ describe('useSessionWizardWorkerDeploy', () => {
       expect.objectContaining({
         backend: 'cloudflare',
         sessionOwned: true,
-        telegramOwned: false,
         payloadAccessControl: expect.objectContaining({
           gate: 'sbt_gate',
           encryption: 'worker_envelope',
@@ -925,8 +920,6 @@ describe('useSessionWizardWorkerDeploy', () => {
     const options = buildDeployHookOptions();
     options.refs.runtimeRef.current = {
       ...options.refs.runtimeRef.current,
-      wizardMode: 'normal',
-      bundleMode: 'url',
       forceManualBundleFile: false,
       bundleFile: null,
     } as SessionWizardWorkerDeployRuntime;

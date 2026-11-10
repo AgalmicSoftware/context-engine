@@ -16,6 +16,7 @@ import {
   resetSurveyResultsExportControlsHarness,
   seedQuestionsCache,
   seedSingleBinaryQuestion,
+  seedWorkerSession,
   selectExportType,
   waitForHydratedResponseCount,
 } from './SurveyResults.exportControlsHarness';
@@ -189,6 +190,121 @@ describe('SurveyResults data export controls', () => {
     expect(lines).toHaveLength(3);
   });
 
+  describe('hidden questions in a Worker session', () => {
+    const answer = (questionID: string, value: string) => ({
+      additional: { encrypted: false, value: '' },
+      answer: { encrypted: false, value },
+      questionID,
+      timeStamp: '2025-01-01T00:00:00.000Z',
+    });
+    const questions = {
+      q1: { id: 'q1', prompt: 'Question One', type: 'freeform' },
+      q2: { id: 'q2', prompt: 'Question Two', type: 'freeform' },
+    };
+    const emptyQuestionBucket = { questionResponses: {}, questionsLatestBlock: 0, questionResponsesLatestBlock: 0 };
+    const seedSurvey = (inWorkerCache: (node: Record<string, unknown>) => unknown) =>
+      cacheStore.set(
+        cacheStoreKey('surveysCache', 'pilot'),
+        inWorkerCache({
+          surveyResponses: {
+            [SURVEY_ID]: {
+              [RESPONDER_ONE]: { responses: [answer('q1', 'Visible text'), answer('q2', 'Hidden text one')] },
+              [RESPONDER_TWO]: { responses: [answer('q2', 'Hidden text two')] },
+            },
+          },
+          surveyResponsesLatestBlock: { [SURVEY_ID]: 1 },
+          surveys: { [SURVEY_ID]: { questionIDs: ['q1', 'q2'], title: 'Survey' } },
+          surveysLatestBlock: 1,
+        }),
+      );
+    const downloadCsv = async () => {
+      openExportArea();
+      const capture = installBrowserDownloadCapture();
+      try {
+        clickExportDownload();
+        expect(capture.createObjectURLMock).toHaveBeenCalledTimes(1);
+        capture.restore();
+        return await readBlobText(capture.blobs[0]);
+      } finally {
+        capture.restore();
+      }
+    };
+
+    it('leaves a question on the settings list out of the question CSV', async () => {
+      const session = seedWorkerSession({ hidden: ['Q2'] });
+      cacheStore.set(
+        cacheStoreKey('questionsCache', 'pilot'),
+        session.inWorkerCache({
+          ...emptyQuestionBucket,
+          questions,
+          questionResponses: {
+            q1: { [RESPONDER_ONE]: answer('q1', 'Visible text') },
+            q2: { [RESPONDER_TWO]: answer('q2', 'Hidden text') },
+          },
+        }),
+      );
+      mountSurveyResults(session.mountProps);
+      await waitForHydratedResponseCount(1);
+
+      const csv = await downloadCsv();
+      expect(csv).toContain('Visible text');
+      expect(csv).not.toContain('Question Two');
+      expect(csv).not.toContain('Hidden text');
+    });
+
+    it('leaves a question on the settings list out of the survey CSV', async () => {
+      const session = seedWorkerSession({ hidden: ['q2'] });
+      seedSurvey(session.inWorkerCache);
+      cacheStore.set(
+        cacheStoreKey('questionsCache', 'pilot'),
+        session.inWorkerCache({ ...emptyQuestionBucket, questions }),
+      );
+      mountSurveyResults({ ...session.mountProps, surveyId: SURVEY_ID, viewMode: 'survey' });
+      await waitForHydratedResponseCount(1);
+
+      const csv = await downloadCsv();
+      expect(csv).toContain('Visible text');
+      expect(csv).not.toContain('Question Two');
+      expect(csv).not.toContain('Hidden text');
+      expect(csv).not.toContain(RESPONDER_TWO);
+    });
+
+    it('leaves a question hidden from the admin panel out of the survey CSV', async () => {
+      const session = seedWorkerSession();
+      seedSurvey(session.inWorkerCache);
+      cacheStore.set(
+        cacheStoreKey('questionsCache', 'pilot'),
+        session.inWorkerCache({
+          ...emptyQuestionBucket,
+          questions: { q1: questions.q1 },
+          workerQuestionMetadataTombstones: { q2: true },
+        }),
+      );
+      mountSurveyResults({ ...session.mountProps, surveyId: SURVEY_ID, viewMode: 'survey' });
+      await waitForHydratedResponseCount(1);
+
+      const csv = await downloadCsv();
+      expect(csv).toContain('Visible text');
+      expect(csv).not.toContain('Hidden text');
+      expect(csv).not.toContain(RESPONDER_TWO);
+    });
+
+    it('keeps every question when nothing is hidden', async () => {
+      const session = seedWorkerSession();
+      seedSurvey(session.inWorkerCache);
+      cacheStore.set(
+        cacheStoreKey('questionsCache', 'pilot'),
+        session.inWorkerCache({ ...emptyQuestionBucket, questions }),
+      );
+      mountSurveyResults({ ...session.mountProps, surveyId: SURVEY_ID, viewMode: 'survey' });
+      await waitForHydratedResponseCount(2);
+
+      const csv = await downloadCsv();
+      expect(csv).toContain('Hidden text one');
+      expect(csv).toContain(RESPONDER_TWO);
+    });
+  });
+
   it('exports aggregate response CSV from mixed object/string payloads using current question metadata', async () => {
     // port note: the original direct-state duplicate-row branch is covered by the
     // survey-response CSV case above; this cache-driven port preserves mixed raw
@@ -318,7 +434,9 @@ describe('SurveyResults data export controls', () => {
       capture.restore();
 
       const [questionsCsv, responsesCsv] = await Promise.all(capture.blobs.map(readBlobText));
-      expect(questionsCsv.split('\n')[1]).toBe('"q1","Allocate support","quadratic","","[""Parks"",""Transit""]","25"');
+      expect(questionsCsv.split('\n')[1]).toBe(
+        '"q1","Allocate support","quadratic","","[""Parks"",""Transit""]","25","","",""',
+      );
       expect(responsesCsv.split('\n')[1]).toBe(
         `"q1","Allocate support","quadratic","[""Parks"",""Transit""]","${RESPONDER_ONE}","","[3,-4]","","","false","","","2025-04-01T00:00:00.000Z","25",""`,
       );
@@ -541,7 +659,9 @@ describe('SurveyResults data export controls', () => {
       capture.restore();
     }
 
-    expect(csv.split('\n')[0]).toBe('"questionID","prompt","type","tags","options","voiceCredits"');
+    expect(csv.split('\n')[0]).toBe(
+      '"questionID","prompt","type","tags","options","voiceCredits","scale","singleSelect","maxSelections"',
+    );
     expect(screen.queryByText('No filtered questions to export.')).toBeNull();
     expect(screen.queryByText('Invalid export type selected.')).toBeNull();
   });

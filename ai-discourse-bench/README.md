@@ -5,7 +5,9 @@ shift under reversed wording across a broad bank of AI discourse questions.
 
 This is a self-contained benchmark folder inside Context Engine. It uses the
 OSS `ai-discourse-corpus/` as the source substrate for question generation, then
-renders results in a Context Engine-style report shape.
+renders results in a Context Engine-style report shape. Only the `answer` and
+`compare-answers` commands need the rest of the repo, for its shared answer
+rules and fidelity scorer.
 
 The benchmark is descriptive, not a model leaderboard. Each model is one
 participant; repeated generations are nested measurements of that participant.
@@ -142,7 +144,10 @@ node ./bin/ai-discourse-bench.mjs run \
 If your local server requires a key, set `AIDB_LOCAL_API_KEY`.
 The runner writes a JSONL checkpoint beside the output. Re-run the same command
 with `--resume` after an interruption; deterministic run ids prevent completed
-model/question/polarity/repeat cells from being launched again.
+model/question/polarity/repeat cells from being launched again. All resume commands
+repair an incomplete final JSONL record before appending, or add a missing newline
+after a complete final record. Corrupt middle lines stop resume without changing
+the checkpoint.
 
 `data/model-roster.local-environment.json` records the five local model
 participants used by the checked-in development preview, including quantization
@@ -221,7 +226,9 @@ npm run openrouter:plan
 
 The sample roster uses valid OpenRouter request ids while recording their dated
 canonical revisions and per-million-token prices as of `2026-07-13`. The full
-runner fetches OpenRouter's current model catalog before making any completion
+runner resolves every model to its effective OpenRouter provider once, then uses
+that same roster for catalog audit, plan and execution, including entries declared
+as local. It fetches OpenRouter's current model catalog before making any completion
 calls and fails if a revision, price, expiration, or structured-output
 capability has drifted. It also requests routes that support every submitted
 parameter without provider fallback.
@@ -240,10 +247,16 @@ The full runner refuses an estimated cost above `$10` by default; set
 `AIDB_MAX_ESTIMATED_COST_USD` to an explicit positive ceiling for the run.
 
 OpenRouter roster entries may include a validated `providerRouting` object with
-`order`, `allow_fallbacks`, `require_parameters`, `data_collection`, and `zdr`.
+`order`, `only`, `allow_fallbacks`, `require_parameters`, `data_collection`, and `zdr`.
 The exact policy is sent as OpenRouter's `provider` request field, preserved in
 run provenance, and included in resume/release compatibility checks. The
 observed serving provider and resolved model are recorded from every response.
+Release validation checks the transport against the manifest independently of
+that upstream. An `only` list restricts serving providers; `order` does too when
+`allow_fallbacks` is false. Provider comparison lowercases names and replaces
+spaces or underscores with hyphens, while recorded metadata stays unchanged.
+Unrestricted routing accepts any upstream, but one model must still resolve to
+one deployment identity across its runs.
 
 ## Persona Mode
 
@@ -320,6 +333,103 @@ versions, and results remain unchanged; any redesigned instrument needs its own
 measurement version.
 Use `--max-allocations` to change that cap for a separately identified run.
 
+## Answer Any Question Set
+
+`answer` asks every model in a roster every question of a Context Engine
+session, whatever its type: agree/disagree, rating, single and multiple choice,
+quadratic allocation and freeform. It writes one row per reply, with the answer
+in the form people's answers are stored in, so models can be compared with
+people.
+
+```bash
+node ./bin/ai-discourse-bench.mjs answer \
+  --provider openrouter \
+  --questions ./results.json \
+  --models ./data/model-roster.openrouter.sample.json \
+  --out ./runs/session-answers.json \
+  --repeats 3
+```
+
+`--questions` takes the Results screen's **JSON: Questions + Responses**
+download, a plain list of questions, or this benchmark's own bank. Questions
+whose text the export couldn't read (shown as `[encrypted]`) are skipped, but a
+gated question you could read is asked like any other: its text goes to the
+model provider, so remove it from the file first if it shouldn't. Older `poll`
+questions are asked as single choices, as the web client shows them. Answers
+are checked with the same rules as people's and MCP agents'
+(`shared/questions/answerValue.mjs`); a reply that fails them is asked again,
+then kept as unanswered with the reason.
+
+Each question is asked in the ways that expose wording and ordering effects:
+
+- agree/disagree statements also in their reversed wording, when the set has
+  one (this benchmark's bank does; session questions don't);
+- ratings with labelled ends also with the scale flipped, mapped back to the
+  question's own scale (unless the step skips the maximum, as 0 to 10 in steps
+  of 3 does, since flipped answers would then fall off the grid);
+- choice and allocation questions with a fresh option order on every repeat,
+  recorded in each row, with allocations mapped back to the question's order.
+
+Rating prompts retain their original whole-number wording when the minimum is an
+integer and the step is 1. Other grids state the step and origin explicitly.
+
+The command has the same retry, concurrency, checkpoint and `--resume`
+behavior as stance runs; `--seed` fixes the option orders. Resuming reuses an
+answer only when its `requestHash` and `modelProvenance` match: a changed prompt,
+model, declared revision, endpoint, generation setting, routing or answer schema
+asks again. Answers saved before rows carried both are asked again once. As with
+stance runs, a model that reached two deployments stops the run: start a new
+artifact instead of resuming.
+
+Completed stance runs can be combined with `build-report --runs file1.json,file2.json`
+when the bank, prompt template, harness, mode, and persona identity agree.
+Preview builds allow different repeat depths and schedule seeds, warn about
+mixed seeds in the terminal and saved report, and preserve every source manifest.
+`build-report --release` requires one `scheduleSeed` across all run files and names
+the differing seeds when refusing a mixed set. Release repeat-coverage checks
+continue to apply. Resuming a run is stricter: changed
+schedule or request contracts cause saved rows to be rerun, never reused.
+
+## Compare Models With People
+
+`compare-answers` reads an `answer` file and the same session's Results export,
+then reports how close each model is to everyone and to each group of people,
+and for each question the statistics suited to its type.
+
+```bash
+node ./bin/ai-discourse-bench.mjs compare-answers \
+  --answers ./runs/session-answers.json \
+  --people ./results.json \
+  --out ./results/session-comparison
+```
+
+It writes `answer-comparison.json` and `answer-comparison.md`. People are
+grouped by `--groups` (a JSON object from address to group id or ids) or else by
+the link they arrived through, and self-declared agents are left out. A group
+is withheld when it has fewer than `--min-people` people (default 5), or when
+subtracting it from everyone, or from the other groups, would leave fewer;
+each question is checked again with the people who answered it, and a question
+with fewer is withheld for everyone. Each model counts as one respondent: its replies are
+summarized as its most common answer (an even split between agreeing and
+disagreeing counts as Unsure), the options it picked in at least half its
+replies, its median rating, or its mean allocation. A question the answer file
+defines differently from the export (another type, scale, end labels, options,
+selection rule or credit budget) is listed as not compared, naming what
+differs, since the models' answers would not read the same way as people's.
+
+| Type | One model against a group | Models against a group |
+| --- | --- | --- |
+| Agree / Unsure / Disagree | Share of the group giving the same answer | Difference in % agree with a Newcombe interval; earth mover's distance on the three-point scale |
+| Single choice | Share choosing the same option | Total variation and Jensen–Shannon distances |
+| Multiple choice | Mean Jaccard similarity to people's sets | Per-option inclusion-rate differences with Newcombe intervals |
+| Rating | Percentile within the group; distance from its median | Earth mover's distance; median difference with a bootstrap interval |
+| Quadratic | Cosine to the group's mean allocation | Per-option mean vote differences with bootstrap intervals; top-option shares |
+| Freeform | Not compared yet: it needs theme coding by a judge model against a human-checked codebook | |
+
+Every comparison also gives the mean similarity (0 to 1) of the model's answer
+to each person's, using the agent fidelity report's per-type measure
+(`shared/agentFidelity.mjs`); the headline table averages it over questions.
+
 ## Generate a Report
 
 ```bash
@@ -358,11 +468,20 @@ npm run publish:static -- \
   --topic "AI Futures & Policy"
 ```
 
+When rendering with `render-report --analysis`, pass the same `--analysis` file
+to `publish:static`. Publication validates its source-report fingerprint and
+compares the supplied HTML with a rendering of that same report and overlay.
+Altered HTML and mismatched overlays are refused.
+
 This writes a deterministic gzip artifact and updates the route manifest. A
-preview report remains visibly marked `development-preview`. Add `--release`
-for an official artifact; the publisher then refuses to write unless the report
-declares `integrity.releaseReady: true`. API keys and raw provider responses are
-never part of the route artifact.
+preview report remains visibly marked and unindexed, including a release-ready
+report built without `build-report --release`. Only a valid release validation
+receipt makes a report a release. Publishing that report requires `--release`
+confirmation; the flag is refused for previews. Renderer, publisher and verifier
+use that same receipt-bound status. Released artifacts are indexed, omit the
+preview notice, and bind the manifest release hash to the embedded original
+report. Preview manifest entries retain the `development-preview` label.
+API keys and raw provider responses are never part of the route artifact.
 
 Build one report from multiple separately-run local/OpenRouter model artifacts:
 
@@ -433,8 +552,22 @@ node ./bin/ai-discourse-bench.mjs compare-snapshots \
   --out ./results/model-drift.json
 ```
 
+Snapshots bind the exact persona label used in the prompt, mode and recorded prompt
+template hash/version in a separate versioned experiment-context fingerprint.
+Comparisons refuse changed contexts or snapshots missing this fingerprint; rebuild
+those snapshots from reports with complete run manifests. Comparison output names
+the experiment context it compared. Request settings such as temperature, token
+limits, routing and the system prompt are recorded in each run manifest but not
+in this fingerprint, so a comparison can span runs that differ in them; check the
+manifests before reading a shift as model drift.
+
 Comparisons report per-model stance shifts, direction changes, and pairwise
-similarity drift on common models and questions.
+similarity drift on common models and questions. Each model pair recomputes both
+similarities from questions present in both snapshots with usable distributions
+for both models at both times. The pair lists those question IDs and their count;
+new questions or newly available observations cannot change its comparison.
+Pairs covering fewer than half of the questions common to the two snapshots
+(rounded up, at least one) are unavailable and excluded from the summary.
 
 For second-pass AI analysis, export a compact analysis input:
 
@@ -475,11 +608,8 @@ live-client synchronization details.
 
 ## Question Bank Prompt
 
-The coding-model handoff prompt lives at:
-
-```text
-prompts/question-bank-generator.md
-```
+The coding-model handoff prompt lives at `prompts/question-bank-generator.md`;
+`node ./bin/ai-discourse-bench.mjs print-prompt` prints it.
 
 It asks a repository-aware model to derive and rank exactly 500 source-resolved
 candidate questions from the OSS AI discourse corpus. The prompt reserves
@@ -487,15 +617,10 @@ substantial coverage for norms governing human use of AI agents, requires
 canonical and reversed wording, and produces provenance, coverage, rejection,
 and human-review artifacts without treating generation as validation.
 
-The second-pass analysis overlay prompt lives at:
-
-```text
-prompts/analysis-overlay-generator.md
-```
-
-It asks an analysis model to return compact JSON for risk-matrix popups,
-generated Debate Map topics, modal-ready issue areas, topic edges, compasses,
-and report-level analysis.
+The second-pass analysis overlay prompt lives at
+`prompts/analysis-overlay-generator.md`. It asks an analysis model to return
+compact JSON for risk-matrix popups, generated Debate Map topics, modal-ready
+issue areas, topic edges, compasses, and report-level analysis.
 
 ## Keeping Results Styling In Sync
 
@@ -521,76 +646,69 @@ model/question cell's full Agree / Unsure / Disagree distribution. Question,
 cohort, and opinion-group summaries average those normalized distributions with
 one weight per contributing model. Model summaries give each answered question
 one weight. Repeats and failed attempts cannot increase a model's weight; cells
-with no valid answers contribute to missing/invalid coverage instead. The
+with no valid answers count toward missing/invalid coverage instead. The
 standalone report uses the same aggregation function for initial views and
 interactive cohort filters.
 
 `observedDistribution.probabilities` contains the three observed shares;
 `observedDistribution.counts` contains fractional model (or question) equivalents,
 whose sum is `validUnits`. `totalUnits` includes cells without a valid answer.
-`runSummary` retains actual valid, invalid, and attempted run counts separately.
-Thus a model that answers Agree and Disagree equally has zero observed Unsure,
-while a model that always answers Unsure has an observed Unsure share of one,
-even though both have mean stance zero. The observed-share histogram is separate
-from each model's explicitly labeled -1 to +1 mean-stance axis. Nearby markers
-use separate vertical lanes without moving their means. Marker tooltips and
-keyboard focus expose observed shares; majority-Unsure observations are labeled
-"Mostly Unsure", and all-Unsure observations remain "Unsure". A central mean
-without majority uncertainty is labeled "Mixed (mean stance)". Displayed model
-equivalents are rounded to at most four decimal places; stored values and raw
-trial counts are unchanged. Within-polarity repeat consistency and wording
-sensitivity calculations are unchanged.
+`runSummary` keeps actual valid, invalid, and attempted run counts separately.
+A model that answers Agree and Disagree equally has zero observed Unsure, while a
+model that always answers Unsure has an observed Unsure share of one, even though
+both have mean stance zero. The observed-share histogram is separate from each
+model's labeled -1 to +1 mean-stance axis. Nearby markers use separate vertical
+lanes without moving their means. Marker tooltips and keyboard focus expose
+observed shares; majority-Unsure observations are labeled "Mostly Unsure", and
+all-Unsure observations remain "Unsure". A central mean without majority
+uncertainty is labeled "Mixed (mean stance)". Displayed model equivalents are
+rounded to at most four decimal places; stored values and raw trial counts are
+unchanged.
 
-This is a semantic revision within report schema v2 and native dataset v1,
-identified by `responseDistributionVersion: 1`; it is not wholly additive.
-Existing report/analysis aggregate `counts` and report `responseEntropy` retain their discretized mean
-stance semantics for compatibility; `countsUnit: 'discretized-mean-stances'` and
-`meanStance` make that interpretation explicit. Aggregate `uncertaintyRate` now
-means the equal-weight observed Unsure share among valid cells, as declared by
-`polisReport.uncertaintyRateSemantics`. Use the version/semantics fields when
-comparing new summaries with older saved reports. Rebuild reports from their run
-artifacts for full reproducibility. A schema-v2 preview with complete saved
-model/question and polarity counts can instead receive this narrow correction:
+Aggregate `counts` and report `responseEntropy` keep their discretized mean-stance
+semantics, declared by `countsUnit: 'discretized-mean-stances'` and `meanStance`.
+Aggregate `uncertaintyRate` is the equal-weight observed Unsure share among valid
+cells, declared by `polisReport.uncertaintyRateSemantics`. Check these fields when
+comparing a report with one saved before `responseDistributionVersion: 1`, and
+rebuild reports from their run artifacts for full reproducibility. A schema-v2
+preview with complete saved model/question and polarity counts can instead receive
+a narrow correction:
 
 ```bash
 node scripts/correct-saved-report-distributions.mjs old-report.json corrected-report.json
 node bin/ai-discourse-bench.mjs render-report --report corrected-report.json --out corrected-report.html
 ```
 
-The correction verifies legacy means against both the count-derived mean and
-its original calculation from rounded cell means. It retains the stored mean
-and interval; it does not widen the tolerance for arbitrary inconsistent values.
+The correction verifies saved means against both the count-derived mean and its
+original calculation from rounded cell means. It keeps the stored mean and
+interval, original cells, run summaries, source hashes, model metadata, and
+preview status, and does not widen the tolerance for inconsistent values. It
+records the source report digest and method in `summaryCorrection` and displays a
+notice that the original runs were not rerun or revalidated. Incomplete counts,
+changed means, analysis overlays, and release receipts need separate
+regeneration; the correction does not fabricate individual responses or rebind
+old analysis. No stored report is rewritten implicitly.
 
-The correction preserves original cells, run summaries, intervals, source hashes,
-model metadata, and preview status. It records the source report digest and the
-correction method in `summaryCorrection` and displays a notice that the original
-runs were not rerun or revalidated. Incomplete counts, changed means, analysis
-overlays, and release receipts require separate regeneration; the correction
-does not fabricate individual responses or rebind old analysis. No stored report
-is rewritten implicitly. The compatibility CE export still discretizes a mean into one answer;
-its `answerSemantics` flag and `averagedFrom.observedDistribution` distinguish that
+A report without `responseDistributionVersion` renders distributions derived from
+its retained model/question histograms, including interactive cohort and tag
+views, and shows a notice. An omitted question in a model row means no attempts;
+a missing row or a cell with incomplete counts makes that distribution
+unavailable. Mean-stance buckets are never presented as observed Unsure.
+
+The compatibility CE export still discretizes a mean into one answer; its
+`answerSemantics` flag and `averagedFrom.observedDistribution` distinguish that
 lossy answer from observed uncertainty. The analysis input includes observed
 shares, valid model counts, raw run counts, and the separate mean stance.
 
-When rendering an older report, visible distributions are derived from its
-retained model/question histograms, including interactive cohort and tag views.
-An omitted question in an existing model row denotes no attempts; a missing row
-or a present cell with incomplete counts makes that distribution unavailable.
-The legacy notice explains this read-only view. Original aggregates and cell
-evidence remain in Raw Results; legacy mean-stance buckets are never presented
-as observed Unsure.
-
 Native, compatibility, analysis-input, and longitudinal exports carry
-`summaryCorrection`. The analysis fingerprint includes that provenance whenever
-it is present. Uncorrected reports retain the historical fingerprint algorithm;
-older fingerprints for corrected reports must not be accepted or rebound.
-Regenerate the analysis input and its overlay against the corrected report.
-Rendering a corrected report also rejects an attached overlay with an obsolete
-fingerprint. The HTML analysis-input download stays bound to the original saved
-report, even when display normalization withholds legacy opinion groups. Attach
-its overlay to that original JSON; the normalized embedded Snapshot JSON is a
-derived display artifact and can have a different fingerprint.
-Release-content hashing already includes the correction record and is unchanged.
+`summaryCorrection`. The analysis fingerprint includes it whenever present, so
+regenerate the analysis input and its overlay against a corrected report;
+rendering a corrected report rejects an overlay with an obsolete fingerprint. The
+HTML analysis-input download stays bound to the original saved report even when
+display normalization withholds legacy opinion groups: attach its overlay to that
+original JSON, since the normalized embedded Snapshot JSON is a derived display
+artifact with a possibly different fingerprint. Release-content hashing already
+includes the correction record.
 
 Participant embedding and automatic or manual opinion groups require at least
 two eligible participants and measured similarity for every eligible pair.
@@ -602,3 +720,26 @@ participant does not supply a measured distance. Measured edges and raw
 distributions remain available. Remaining groups are exploratory descriptions
 of this sample, with no established stability claim. Missing similarity is never
 filled with maximal disagreement.
+
+Report grouping treats roster trait names and values as data, including names
+such as `constructor` and `__proto__`. Grouped JSON retains them as own properties;
+the same key handling applies to interactive trait filters and model dictionaries.
+
+Model answer and importance parsing removes inline `<think>` and `<analysis>`
+reasoning regions before recovering final JSON. Conflicting final answers or
+allocations, and truncated JSON/reasoning, are parse errors, so the runner retries
+them within its configured attempt budget.
+
+Every preview and release report checks each run's prompt hash against the
+selected question wording, polarity, mode and recorded persona. Missing or
+mismatched hashes stop the build and name the question; rerun it or restore the
+matching bank. Preview coverage may still be incomplete.
+
+Importance allocations also require matching prompt and question-order hashes in
+preview builds. These checks use the complete selected bank before any
+`--limit-questions` display restriction, so edits outside that subset still
+require new importance runs.
+
+Importance question shuffles and mock allocation selection compare hexadecimal hashes in code-point order. Prompt fingerprints order model identifiers using the explicit English locale, so host locale settings cannot alter these manifest inputs.
+
+Question-limited previews validate importance against the full bank, then omit it with an integrity warning. Use the full question bank to display quadratic importance; allocations outside a displayed subset cannot be treated as invalid runs.

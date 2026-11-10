@@ -4,6 +4,7 @@ import { fixture, wallet, origin, sessionId } from './agentTestFixture.mjs';
 import { signToken } from './tokenSigning.js';
 import { persistAuthTokenRecord } from './authTokenClaims.js';
 import { buildAdminActionBodyHash, buildAdminActionTypedData } from './adminTypedData.mjs';
+import { loadAgentLightweightGroups, saveAgentLightweightGroupMembership } from './agent/agentGroups.mjs';
 
 async function jsonOk(response, status = 200) {
   assert.equal(response.status, status, await response.clone().text());
@@ -24,13 +25,13 @@ async function signed(f, path, body = {}, method = 'POST') {
   return f.request(path, { method, body: input });
 }
 async function hosted() {
-  const f = fixture(); f.withCoordinator(); f.env.CE_STORAGE_INDEX_KV = f.env.GROUP_KV;
+  const f = fixture(); const coordinator = f.withCoordinator(); f.env.CE_STORAGE_INDEX_KV = f.env.GROUP_KV;
   f.config.storageProfile = { backend: 'cloudflare', payloadAccessControl: { gate: 'public', encryption: 'none' } };
   const agent = await f.credential({ scopes: ['read_questions', 'draft_answers', 'pose_questions', 'read_groups', 'propose_groups', 'recommend_question_votes', 'apply_question_votes'] });
   await jsonOk(await f.request('/api/agent/questions/create', { method: 'POST', token: agent.token,
     body: { questions: [{ prompt: 'Would a shared garden help?', questionType: 'binary', tags: ['garden'] }, { prompt: 'Choose a season.', questionType: 'freeform' }] } }));
   const questions = (await jsonOk(await f.request('/api/agent/questions', { token: agent.token }))).questions;
-  return { f, agent, questions };
+  return { f, agent, questions, coordinator };
 }
 
 test('public descriptors and skill redirects disclose current same-origin metadata without materializing state', async () => {
@@ -51,6 +52,7 @@ test('question selection, queue planning, voting and auxiliary groups retain the
   for (const path of ['/api/agent/tags', '/api/agent/questions/next', '/api/agent/onboarding', '/api/agent/groups', '/api/agent/actions', '/api/agent/admin/status']) {
     await jsonOk(await f.request(path, { token }));
   }
+  assert.deepEqual((await jsonOk(await f.request('/api/agent/admin/status', { token }))).capabilities, { canManageSponsoredQuestions: true });
   await jsonOk(await f.request('/api/agent/onboarding', { method: 'POST', token, body: { topicPreferences: ['garden'] } }));
   await jsonOk(await f.request('/api/agent/groups/propose', { method: 'POST', token,
     body: { category: { categoryId: 'role', label: 'Role', options: [{ optionId: 'reader', label: 'Reader' }] }, optionIds: ['reader'] } }));
@@ -58,14 +60,73 @@ test('question selection, queue planning, voting and auxiliary groups retain the
   const jwt = await participant(f);
   await jsonOk(await f.request('/api/agent/question-queue', { token: jwt }));
   await jsonOk(await signed(f, '/api/agent/question-queue', { sponsoredQuestionIds: [questions[0].questionId] }));
-  await jsonOk(await f.request('/api/agent/question-queue/plan', { method: 'POST', token, body: { questionIds: [questions[0].questionId] } }));
+  const queuePlan = await jsonOk(await f.request('/api/agent/question-queue/plan', { method: 'POST', token, body: { questionIds: [questions[0].questionId] } }));
   assert.equal((await f.request('/api/agent/question-queue/apply', { method: 'POST', token, body: { questionIds: [questions[0].questionId] } })).status, 400);
-  await jsonOk(await f.request('/api/agent/question-queue/apply', { method: 'POST', token, body: { questionIds: [questions[0].questionId], approved: true } }));
+  await jsonOk(await f.request('/api/agent/question-queue/apply', { method: 'POST', token, body: { questionIds: [questions[0].questionId], approved: true, planDigest: queuePlan.planDigest } }));
   await jsonOk(await f.request('/api/agent/question-votes/recommend', { method: 'POST', token, body: {} }));
   await jsonOk(await f.request('/api/agent/question-votes/apply', { method: 'POST', token,
     body: { decisions: [{ questionId: questions[0].questionId, vote: 'up' }], approvalText: 'Approve this vote' } }));
   f.config.adminAddress = '0x2222222222222222222222222222222222222222';
   assert.equal((await f.request('/api/agent/question-queue/plan', { method: 'POST', token, body: {} })).status, 403);
+  assert.equal((await f.request('/api/agent/admin/metrics', { token })).status, 403);
+});
+
+test('group membership saved for an agent reports the agent principal as its source', async () => {
+  const { f, agent } = await hosted(); const token = agent.token;
+  const groups = async () => (await jsonOk(await f.request('/api/agent/groups', { token }))).groups;
+  assert.equal((await groups()).membershipSource, null);
+  const saved = await jsonOk(await f.request('/api/agent/onboarding', { method: 'POST', token,
+    body: { answers: { demographic_link_opt_in: true }, groupSelections: { age_bucket: '25_34' } } }));
+  assert.equal(saved.groups.membershipSource, 'agent_principal');
+  assert.equal((await groups()).membershipSource, 'agent_principal');
+});
+
+test('group membership kept only under an account reports the managed wallet as its source', async () => {
+  const account = { env: { AGENT_ACTION_KV: fixture().env.GROUP_KV }, session: { sessionSlug: 'fixture' }, accountAddress: wallet.address };
+  const saved = await saveAgentLightweightGroupMembership({ ...account, selections: { age_bucket: '25_34' } });
+  assert.equal(saved.groups.membershipSource, 'managed_wallet');
+  const loaded = await loadAgentLightweightGroups(account);
+  assert.equal(loaded.membershipSource, 'managed_wallet');
+  assert.deepEqual(loaded.selections, saved.groups.selections);
+});
+
+test('overlapping next-question calls serve different questions, and a repeated requestId replays', async () => {
+  const { f, agent, coordinator } = await hosted(); const token = agent.token;
+  // A slow queue read lets both requests read before either one writes.
+  const get = f.env.GROUP_KV.get;
+  f.env.GROUP_KV.get = async (key, ...rest) => {
+    const value = await get(key, ...rest);
+    if (key.includes('question-queue-state')) await new Promise(resolve => setTimeout(resolve, 10));
+    return value;
+  };
+  const next = (body = {}) => f.request('/api/agent/questions/next', { method: 'POST', token, body });
+  const queueState = () => [...coordinator.durable].filter(([key]) => key.startsWith('ce-agent-question-queue:'));
+  const [first, second] = await Promise.all([next(), next()]);
+  const served = [await jsonOk(first), await jsonOk(second)].map(body => body.question.questionId);
+  assert.notEqual(served[0], served[1], 'one participant is never served the same question twice at once');
+  assert.equal(queueState().length, 1);
+  const history = () => JSON.parse(queueState()[0][1]).history.map(entry => entry.questionId);
+  assert.deepEqual(history().sort(), [...served].sort());
+  const asked = await jsonOk(await next({ requestId: 'retry-1' }));
+  const replayed = await jsonOk(await next({ requestId: 'retry-1' }));
+  assert.equal(replayed.question.questionId, asked.question.questionId);
+  assert.equal(replayed.queue.advanced, false);
+  assert.equal(replayed.queue.replayed, true);
+  assert.equal(history().length, 3, 'a replay records no new event');
+});
+
+test('the first coordinated next-question call continues the participant\'s GROUP_KV queue', async () => {
+  const { f, agent, coordinator } = await hosted(); const token = agent.token;
+  const first = await jsonOk(await f.request('/api/agent/questions/next', { token }));
+  // Move the state back to where earlier releases kept it.
+  const [storageKey, state] = [...coordinator.durable].find(([key]) => key.startsWith('ce-agent-question-queue:'));
+  coordinator.durable.delete(storageKey);
+  const stateKey = storageKey.slice(`ce-agent-question-queue:${sessionId}:`.length);
+  f.records.set(`ce-agent:${sessionId}:${stateKey}`, state);
+  const second = await jsonOk(await f.request('/api/agent/questions/next', { token }));
+  assert.notEqual(second.question.questionId, first.question.questionId, 'no participant is asked again');
+  assert.deepEqual(JSON.parse(coordinator.durable.get(storageKey)).history.map(entry => entry.questionId),
+    [first.question.questionId, second.question.questionId]);
 });
 
 test('Wrapped config, statements, predictions, allocations, poster links and research export use the retained routes', async () => {
@@ -123,7 +184,11 @@ test('results, deterministic images, shared operator caches and Geo backlinks en
   const backlink = await jsonOk(await f.request(`/api/agent/geo-backlink?questionId=${questions[0].questionId}`, { token }));
   assert.equal(new URL(backlink.backlink.questionEndpoint).origin, origin);
   const cache = { viewType: 'consensus', dataVersionKey: 'fixture-results-v1', value: { label: 'Fixture aggregate' } };
-  await jsonOk(await signed(f, '/api/agent/result-view-cache', cache));
+  // The cache records the model its poster reports running, never one of its own.
+  assert.equal('model' in await jsonOk(await signed(f, '/api/agent/result-view-cache', cache)), false);
+  const reported = await jsonOk(await signed(f, '/api/agent/result-view-cache',
+    { ...cache, dataVersionKey: 'fixture-results-v0', model: 'claude-opus-5-5', reasoning_effort: 'medium' }));
+  assert.deepEqual([reported.model, reported.reasoning_effort], ['claude-opus-5-5', 'medium']);
   assert.equal((await f.request('/api/agent/result-view-cache', { method: 'POST', token, body: cache })).status, 403);
   const path = '/api/agent/result-view-cache?viewType=consensus&dataVersionKey=fixture-results-v1';
   const cached = await jsonOk(await f.request(path, { token })); assert.equal(cached.cached, true); assert.equal(cached.value.label, cache.value.label);
@@ -131,4 +196,60 @@ test('results, deterministic images, shared operator caches and Geo backlinks en
   for (const route of [path, '/api/agent/results?view=consensus&demo=true', '/api/agent/results-image?view=consensus&demo=true']) {
     const hidden = await f.request(route, { token }); assert.equal(hidden.status, 403); assert.ok(!(await hidden.text()).includes(cache.value.label));
   }
+});
+
+for (const approval of [
+  { approved: false, approvalText: 'Do not approve this change.' },
+  { approved: true, confirm: false },
+  { confirm: true, confirmed: false },
+  { approvalText: 'I do not confirm' },
+  { approvalText: 'Maybe yes, but wait for the organizer.' },
+  { approvalText: 'Approve this change' },
+]) {
+  test(`sponsored apply rejects unapproved structured decisions: ${JSON.stringify(approval)}`, async () => {
+    const { f, agent, questions } = await hosted();
+    const body = { questionIds: [questions[0].questionId], createQuestions: ['A new sponsored question?'] };
+    const plan = await jsonOk(await f.request('/api/agent/question-queue/plan', { method: 'POST', token: agent.token, body }));
+    const writesBefore = f.writes.length;
+    const response = await f.request('/api/agent/question-queue/apply', { method: 'POST', token: agent.token,
+      body: { ...body, planDigest: plan.planDigest, ...approval } });
+    assert.equal(response.status, 400);
+    assert.equal((await response.json()).reason, 'sponsored_question_confirmation_required');
+    assert.equal(f.writes.length, writesBefore, 'rejected approval writes neither a question nor a queue');
+  });
+}
+
+test('sponsored plans bind approval to the mode, resolved IDs and draft contents', async () => {
+  const { f, agent, questions } = await hosted();
+  const body = { questionIds: [questions[0].questionId], createQuestions: [{ prompt: 'A new sponsored question?', tags: ['garden'] }] };
+  const plan = await jsonOk(await f.request('/api/agent/question-queue/plan', { method: 'POST', token: agent.token, body }));
+  assert.match(plan.planDigest, /^[a-f0-9]{64}$/);
+  assert.match(plan.confirmation.required, /approved: true/);
+  assert.match(plan.confirmation.required, /planDigest/);
+  for (const change of [
+    { mode: 'replace' },
+    { questionIds: [questions[1].questionId] },
+    { createQuestions: [{ prompt: 'A different sponsored question?', tags: ['garden'] }] },
+    { createQuestions: [{ prompt: 'A new sponsored question?', tags: ['changed'] }] },
+  ]) {
+    const writesBefore = f.writes.length;
+    const response = await f.request('/api/agent/question-queue/apply', { method: 'POST', token: agent.token,
+      body: { ...body, ...change, approved: true, planDigest: plan.planDigest } });
+    assert.equal(response.status, 409);
+    assert.equal((await response.json()).reason, 'sponsored_question_plan_changed');
+    assert.equal(f.writes.length, writesBefore);
+  }
+  const applied = await jsonOk(await f.request('/api/agent/question-queue/apply', { method: 'POST', token: agent.token,
+    body: { ...body, approved: true, planDigest: plan.planDigest, approvalText: 'Admin approved this plan.' } }));
+  assert.equal(applied.createdQuestions.length, 1);
+});
+
+test('sponsored apply requires a plan digest even with explicit approval and writes nothing without it', async () => {
+  const { f, agent, questions } = await hosted();
+  const writesBefore = f.writes.length;
+  const response = await f.request('/api/agent/question-queue/apply', { method: 'POST', token: agent.token,
+    body: { questionIds: [questions[0].questionId], createQuestions: ['A new sponsored question?'], approved: true } });
+  assert.equal(response.status, 400);
+  assert.equal((await response.json()).reason, 'sponsored_question_confirmation_required');
+  assert.equal(f.writes.length, writesBefore);
 });

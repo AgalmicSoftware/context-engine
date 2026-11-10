@@ -314,7 +314,6 @@ describe('surveyToolHydrationController', () => {
 
     expect(
       executeSurveyResponsePrefill({
-        state: {},
         surveyIndex: 2,
         userAnswers: {
           responses: [{ questionID: 'q1' }],
@@ -374,7 +373,6 @@ describe('surveyToolHydrationController', () => {
 
     expect(
       executeSurveySingleQuestionPrefill({
-        state: {},
         questionId: 'q1',
         userAnswer: { questionID: 'q1' },
         buildSliceFromUserAnswers: jest.fn(),
@@ -603,4 +601,21 @@ describe('surveyToolHydrationController', () => {
     expect(answers.q1.value).toBe('Decrypted');
     expect(answers.q2.value).toBe('Saved q2');
   });
+});
+
+test.each([true, false])('draft restoration distinguishes loaded empty from unknown: %s', (isResponsesCacheReady) => {
+  const baseline = { answers: {}, additionalComments: {} };
+  const buildDraftRunPlan = jest.fn((_args?: Record<string, unknown>) => ({ renderedQuestionIds: [], updates: {} }));
+  executeSurveyDraftHydration({
+    props: { isResponsesCacheReady },
+    state: { editBaseline: baseline },
+    loadDraft: () => ({ answers: { q1: { value: 'Draft' } } }),
+    skipDraftHydrationRun: () => false,
+    buildDraftRunPlan,
+  });
+  expect(buildDraftRunPlan).toHaveBeenCalledWith(
+    expect.objectContaining({
+      prevBaseline: isResponsesCacheReady ? baseline : null,
+    }),
+  );
 });

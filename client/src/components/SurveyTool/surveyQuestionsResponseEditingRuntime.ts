@@ -1,3 +1,4 @@
+import type { ResponseValuesEqual } from './responseValueEquality';
 import type { SurveyQuestionsLegacyRecord, SurveyQuestionsLegacyValue } from './surveyQuestionsTypes.js';
 
 export type SurveyQuestionsResponseEditingRuntime = SurveyQuestionsLegacyRecord;
@@ -67,7 +68,7 @@ export const createSurveyQuestionsResponseEditingRuntime = (
       ansf: SurveyQuestionsLegacyValue,
       qid: SurveyQuestionsLegacyValue,
     ) => buildInheritedAdditionalFieldState(af, ansf, qid)) as SurveyQuestionsLegacyValue,
-    valuesEqual: (a: SurveyQuestionsLegacyValue, b: SurveyQuestionsLegacyValue) => valuesEqual(a, b),
+    valuesEqual: (...args: Parameters<ResponseValuesEqual>) => valuesEqual(...args),
     getQuestionById: (qid: SurveyQuestionsLegacyValue) => getQuestionById(qid),
     computeHash: (value: SurveyQuestionsLegacyValue) => utils.keccak256(utils.toUtf8Bytes(value)),
   });

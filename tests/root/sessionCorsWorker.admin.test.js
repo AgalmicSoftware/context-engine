@@ -3,7 +3,7 @@ import { webcrypto } from 'crypto';
 import sessionCorsWorker, {
   SessionWriteCoordinator,
 } from '../../workers/sessionCorsWorker/worker.js';
-import { getSessionSecrets } from '../../workers/sessionCorsWorker/sessionConfigSecretsStore.js';
+import { getSessionSecrets, putSessionSecrets } from '../../workers/sessionCorsWorker/sessionConfigSecretsStore.js';
 import {
   buildRpcFetchMock,
   createMemoryKv,
@@ -474,6 +474,7 @@ describe('sessionCorsWorker admin routes', () => {
   it('ignores malformed set-config limits and scopes branches instead of corrupting stored config', async () => {
     const existingConfig = {
       adminAddress: adminWallet.address,
+      authzEpoch: 7,
       sessionName: 'Existing Session',
       limits: {
         perWalletPerDay: 3,
@@ -509,7 +510,7 @@ describe('sessionCorsWorker admin routes', () => {
     expect(response.status).toBe(200);
     expect(readStoredJson(kv, SESSION_CONFIG_KEY(sessionSlug))).toEqual({
       adminAddress: adminWallet.address,
-      authzEpoch: 1,
+      authzEpoch: 7,
       sessionName: 'Updated Session',
       limits: {
         perWalletPerDay: 3,
@@ -623,9 +624,9 @@ describe('sessionCorsWorker admin routes', () => {
       [SESSION_CONFIG_KEY(sessionSlug)]: JSON.stringify({
         adminAddress: adminWallet.address,
       }),
-      [SESSION_SECRETS_KEY(sessionSlug)]: JSON.stringify(existingSecrets),
     });
     const env = createCoordinatorEnv(kv);
+    await putSessionSecrets(env, sessionSlug, existingSecrets);
     const body = await createSignedSiweBody({
       worker: sessionCorsWorker,
       env,

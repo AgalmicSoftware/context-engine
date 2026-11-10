@@ -86,9 +86,12 @@ describe('AudioSurveyGenerator session context saves', () => {
     delete window.__litHooks;
     const scopedSaveKey = jest.fn(async () => ({ ciphertext: 'ciphertext', dataToEncryptHash: 'hash' }));
     const onQuestionsGenerated = jest.fn();
-    mockProcessAdditionalSources.mockResolvedValue(
-      'This additional source content is long enough to drive question generation on its own.',
-    );
+    mockProcessAdditionalSources.mockResolvedValue({
+      text: 'This additional source content is long enough to drive question generation on its own.',
+      extractedCharacters: 'This additional source content is long enough to drive question generation on its own.'
+        .length,
+      skipped: [],
+    });
     mockCallAI.mockResolvedValue(
       JSON.stringify({
         surveyTitle: 'Private Context Survey',
@@ -214,9 +217,11 @@ describe('AudioSurveyGenerator session context saves', () => {
       if (normalized === 'rxc') return { slug: 'rxc', sessionName: 'Debate Session' };
       return {};
     });
-    mockProcessAdditionalSources.mockResolvedValue(
-      'This saved source has enough content to drive question generation.',
-    );
+    mockProcessAdditionalSources.mockResolvedValue({
+      text: 'This saved source has enough content to drive question generation.',
+      extractedCharacters: 'This saved source has enough content to drive question generation.'.length,
+      skipped: [],
+    });
     mockCallAI.mockResolvedValue(
       JSON.stringify({
         surveyTitle: 'Slug Resolved Survey',
@@ -259,9 +264,11 @@ describe('AudioSurveyGenerator session context saves', () => {
   it('saves queued file sources through the shared doc-library upload helper', async () => {
     const onQuestionsGenerated = jest.fn();
     const file = new File(['file-source-content'], 'notes.txt', { type: 'text/plain' });
-    mockProcessAdditionalSources.mockResolvedValue(
-      'This uploaded file contributes enough content for question generation.',
-    );
+    mockProcessAdditionalSources.mockResolvedValue({
+      text: 'This uploaded file contributes enough content for question generation.',
+      extractedCharacters: 'This uploaded file contributes enough content for question generation.'.length,
+      skipped: [],
+    });
     mockCallAI.mockResolvedValue(
       JSON.stringify({
         surveyTitle: 'Saved File Survey',

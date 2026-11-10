@@ -38,7 +38,7 @@ jest.mock('../../utilities/ai/aiClient.js', () => ({
 const mockListNamespaceEntriesSync = cacheScripts.listNamespaceEntriesSync as jest.Mock;
 const mockRunCompareToolkit = runCompareToolkit as jest.Mock;
 const buildNicknameMap = buildNicknameByAddressMap as (entries: Array<Record<string, unknown>>) => Map<string, string>;
-const readObjectValues = readDgObjectValues as (namespace: string, sessionSlug?: string) => unknown[];
+const readObjectValues = readDgObjectValues;
 
 describe('CompareAddresses cache scan helpers', () => {
   beforeEach(() => {
@@ -50,10 +50,10 @@ describe('CompareAddresses cache scan helpers', () => {
       { slug: 'edge', value: { a: 1 } },
       { slug: 'edge2', value: null },
       { slug: 'edge3', value: 'x' },
-      { slug: 'edge4', value: { b: 2 } },
+      { slug: 'edge', value: { b: 2 } },
     ]);
 
-    const result = readObjectValues('questionsCache');
+    const result = readObjectValues('questionsCache', { kind: 'session', slug: 'edge' });
 
     expect(cacheScripts.listNamespaceEntriesSync).toHaveBeenCalledWith('questionsCache', { cloneValues: false });
     expect(result).toEqual([{ a: 1 }, { b: 2 }]);
@@ -65,7 +65,7 @@ describe('CompareAddresses cache scan helpers', () => {
       { slug: 'worker', value: { id: 'worker' } },
     ]);
 
-    expect(readObjectValues('questionsCache', 'worker')).toEqual([{ id: 'worker' }]);
+    expect(readObjectValues('questionsCache', { kind: 'session', slug: 'worker' })).toEqual([{ id: 'worker' }]);
   });
 
   it('builds compare profile links under the configured PUBLIC_URL base path', () => {
@@ -198,14 +198,14 @@ describe('CompareAddresses subject routes', () => {
   const walletA = `0x${'1'.repeat(40)}`;
   const walletB = `0x${'2'.repeat(40)}`;
   const comparisonPath = `/compare?subject=wallet:${walletA}&subject=wallet:${walletB}`;
-  const seedWorkerAnswers = () =>
+  const seedWorkerAnswers = (slugs = ['alpha', 'beta']) =>
     mockListNamespaceEntriesSync.mockImplementation((...args: unknown[]) =>
       args[0] === 'questionsCache'
-        ? ['alpha', 'beta'].map((slug) => ({
+        ? slugs.map((slug) => ({
             slug,
             value: {
               worker: {
-                questions: { shared: { prompt: `${slug} shared question`, type: 'binary' } },
+                questions: { shared: { prompt: `${slug || 'General'} shared question`, type: 'binary' } },
                 questionResponses: {
                   shared: {
                     [walletA]: JSON.stringify({ answer: { value: 'Agree' } }),
@@ -217,6 +217,29 @@ describe('CompareAddresses subject routes', () => {
           }))
         : [],
     );
+
+  it.each([true, false])('General compares only General answers with explicit AI scope (query=%s)', async (query) => {
+    seedWorkerAnswers(['', 'alpha']);
+    render(
+      <MemoryRouter initialEntries={[comparisonPath + (query ? '&session=general' : '')]}>
+        <CompareAddress activeSessionSlug={query ? 'alpha' : ''} sessionCachesReady />
+      </MemoryRouter>,
+    );
+    await waitFor(() =>
+      expect(mockRunCompareToolkit).toHaveBeenCalledWith('compare', expect.objectContaining({ sessionSlug: '' })),
+    );
+    const payload = mockRunCompareToolkit.mock.calls.find(([task]) => task === 'compare')?.[1];
+    expect(payload).toEqual(
+      expect.objectContaining({
+        users: [walletA, walletB].map(() =>
+          expect.objectContaining({
+            questions: [expect.objectContaining({ prompt: 'General shared question' })],
+            provenance: expect.objectContaining({ sessionSlug: '' }),
+          }),
+        ),
+      }),
+    );
+  });
 
   it('labels malformed AI results as local fallbacks, not model output', async () => {
     seedWorkerAnswers();

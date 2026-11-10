@@ -1,8 +1,8 @@
 import React, { Suspense } from 'react';
 import CETooltip from '../Shared/CETooltip';
 import SessionTestEthBadge from '../Shared/SessionTestEthBadge';
-import ReverseAlignmentTopicMap, { hasReverseAlignmentTopicPreview } from './ReverseAlignmentTopicMap';
-import { hasReverseAlignmentContext } from './reverseAlignmentTopics';
+import { useSessionDebateAtlas } from '../DebateAtlas/useSessionDebateAtlas';
+import DebateAtlasBuildStatus from '../DebateAtlas/DebateAtlasBuildStatus';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faArrowLeft,
@@ -12,10 +12,12 @@ import {
   faExpand,
   faExternalLinkAlt,
   faQuestionCircle,
+  faRobot,
 } from '@fortawesome/free-solid-svg-icons';
 
 import LazyFallback from '../Shared/LazyFallback';
 import { formatPolisReportSessionInfo } from '../PolisReport/polisReportSessionInfo';
+import { hasSessionContext, normalizeSessionContext, type SessionContext } from '@ce-shared/sessionContext.mjs';
 import { lazyWithRetry } from '../../utilities/ui/lazyImportRetry.js';
 import { readPublicUrlBasePath } from '../../utilities/ui/publicUrl.js';
 import { PUBLIC_AI_DISCOURSE_CORPUS_URL } from '../../variables/publicRepoMetadata.js';
@@ -30,6 +32,8 @@ import type {
 } from '../../domains/sessionResults/sessionResultsAnalysisController';
 import styles from './OnePageSession.module.scss';
 import OnePageSessionAutoMintAlerts, { type OnePageSessionAutoMintAlertsProps } from './OnePageSessionAutoMintAlerts';
+import SessionContextSources from './SessionContextSources';
+import { useSessionContextSources } from '../../utilities/docLibrary/useSessionContextSources';
 
 const SurveyPage = React.lazy(() => import('../SurveyTool/SurveyPage'));
 const MemoSurveyPage = React.memo((props: Record<string, unknown>) => <SurveyPage {...props} />);
@@ -40,7 +44,10 @@ const CorpusViewer = lazyWithRetry(() => import('../DemoViews/CorpusViewer'));
 const RiskMatrix = React.lazy(() => import('../MainContent/RiskMatrix'));
 const DemoAnalysisWorkspace = React.lazy(() => import('../DemoViews/DemoAnalysis/DemoAnalysisWorkspace'));
 const SessionGeneratedResultsViews = React.lazy(() => import('../SessionResults/SessionGeneratedResultsViews'));
-const ReverseAlignmentAtlas = React.lazy(() => import('./ReverseAlignmentAtlas'));
+// Loaded only for a session whose context is an uploaded HTML page, with its sanitizer.
+const SessionContextHtml = React.lazy(() => import('./SessionContextHtml'));
+const SessionDebateAtlasView = React.lazy(() => import('../DebateAtlas/SessionDebateAtlasView'));
+const GroupAgentModal = React.lazy(() => import('./GroupAgentModal'));
 
 const DebateMapAny = DebateMap as React.ComponentType<Record<string, unknown>>;
 const DEMO_CORPUS_GITHUB_URL = PUBLIC_AI_DISCOURSE_CORPUS_URL;
@@ -63,16 +70,7 @@ type ResultsViewOption = {
   icon: React.ReactNode;
 };
 
-type SessionContextLink = {
-  label: string;
-  url: string;
-};
-
-type SessionContextView = {
-  title: string;
-  paragraphs: string[];
-  links: SessionContextLink[];
-};
+type SessionContextView = SessionContext;
 
 type OnePageSessionStandardShellProps = {
   account: unknown;
@@ -99,6 +97,8 @@ type OnePageSessionStandardShellProps = {
   effectiveSlug: string;
   embeddedAtlasNodeId: unknown;
   embeddedAtlasReturnState: unknown;
+  requestedAtlasNodeId?: string | null;
+  onRequestedAtlasNodeClose?: () => void;
   embeddedGroupsSessionConfig: unknown;
   embeddedGroupsSessionSlug: string;
   embeddedQuestionSessionSlug: string;
@@ -186,77 +186,48 @@ const renderSectionHeading = (title: React.ReactNode, subtitle?: React.ReactNode
   </span>
 );
 
+const DEBATE_ATLAS_VIEW_OPTION: ResultsViewOption = { key: 'debateAtlas', label: 'Debate Map', icon: '🗺️' };
+
 const buildResultsViewOptions = (
   isDemoSlug: boolean,
   showDemoAnalysisView: boolean,
   generatedOptions: ResultsViewOption[] = [],
-  showTopicPreview = false,
-): ResultsViewOption[] => [
-  { key: 'polis', label: 'Report', icon: '🧾' },
-  ...(showTopicPreview ? [{ key: 'debateAtlas', label: 'Debate Map', icon: '🗺️' }] : []),
-  ...(generatedOptions.length > 0
-    ? generatedOptions
-    : isDemoSlug
+  showBuiltAtlas = false,
+): ResultsViewOption[] => {
+  const demoOptions =
+    isDemoSlug && generatedOptions.length === 0
       ? [
-          { key: 'debateAtlas', label: 'Debate Map', icon: '🗺️' },
+          DEBATE_ATLAS_VIEW_OPTION,
           ...(showDemoAnalysisView ? [{ key: 'analysis', label: 'Breakdown', icon: '📊' }] : []),
           { key: 'riskMatrix', label: 'Risk Matrix', icon: '⚠️' },
         ]
-      : []),
-];
-
-const toTrimmedText = (value: unknown, maxLength = 2000) => {
-  if (typeof value !== 'string') return '';
-  return value.trim().slice(0, maxLength);
+      : [];
+  return [
+    { key: 'polis', label: 'Report', icon: '🧾' },
+    ...(showBuiltAtlas && demoOptions.length === 0 ? [DEBATE_ATLAS_VIEW_OPTION] : []),
+    ...(generatedOptions.length > 0 ? generatedOptions : demoOptions),
+  ];
 };
 
-const normalizeSessionContextLinks = (raw: unknown): SessionContextLink[] => {
-  if (!Array.isArray(raw)) return [];
-  return raw
-    .map((entry) => {
-      const record = entry && typeof entry === 'object' ? (entry as UnknownRecord) : {};
-      const label = toTrimmedText(record.label, 120);
-      const url = toTrimmedText(record.url, 500);
-      let parsedUrl: URL;
-      try {
-        parsedUrl = new URL(url);
-      } catch {
-        return null;
-      }
-      if (!label || parsedUrl.protocol !== 'https:') return null;
-      return { label, url };
-    })
-    .filter((entry): entry is SessionContextLink => !!entry)
-    .slice(0, 4);
-};
-
+// The shared reader's limits apply here as in MCP and on the Worker.
 const normalizeSessionContextView = (config: unknown): SessionContextView | null => {
   const record = config && typeof config === 'object' ? (config as UnknownRecord) : {};
-  const rawContext =
-    record.sessionContext && typeof record.sessionContext === 'object'
-      ? (record.sessionContext as UnknownRecord)
-      : null;
-  if (!rawContext) return null;
-  const paragraphs = (Array.isArray(rawContext.paragraphs) ? rawContext.paragraphs : [rawContext.body])
-    .map((entry) => toTrimmedText(entry, 1400))
-    .filter(Boolean)
-    .slice(0, 4);
-  const links = normalizeSessionContextLinks(rawContext.links);
-  if (!paragraphs.length && !links.length) return null;
-  return {
-    title: toTrimmedText(rawContext.title, 80) || 'Context',
-    paragraphs,
-    links,
-  };
+  if (!hasSessionContext(record.sessionContext)) return null;
+  const context = normalizeSessionContext(record.sessionContext);
+  return { ...context, title: context.title || 'Context' };
 };
 
 const renderSessionContext = (context: SessionContextView | null) => {
   if (!context) return null;
   return (
     <section className={styles.sessionContextSection} aria-label={context.title} data-testid="ce-session-context">
-      {context.paragraphs.map((paragraph, index) => (
-        <p key={`${index}:${paragraph.slice(0, 24)}`}>{paragraph}</p>
-      ))}
+      {context.html ? (
+        <Suspense fallback={<LazyFallback label="Loading context..." minHeight="8vh" />}>
+          <SessionContextHtml html={context.html} />
+        </Suspense>
+      ) : (
+        context.paragraphs.map((paragraph, index) => <p key={`${index}:${paragraph.slice(0, 24)}`}>{paragraph}</p>)
+      )}
       {context.links.length ? (
         <div className={styles.sessionContextLinks}>
           {context.links.map((link) => (
@@ -296,6 +267,8 @@ export default function OnePageSessionStandardShell({
   effectiveSlug,
   embeddedAtlasNodeId,
   embeddedAtlasReturnState,
+  requestedAtlasNodeId = null,
+  onRequestedAtlasNodeClose,
   embeddedGroupsSessionConfig,
   embeddedGroupsSessionSlug,
   embeddedQuestionSessionSlug,
@@ -376,8 +349,19 @@ export default function OnePageSessionStandardShell({
   onViewAllQuestionsClick,
 }: OnePageSessionStandardShellProps) {
   const basePath = readPublicUrlBasePath();
-  const showTopicPreview = hasReverseAlignmentTopicPreview(displaySessionSlug);
-  const showContextAtlas = hasReverseAlignmentContext(displaySessionSlug);
+  const atlas = useSessionDebateAtlas({
+    account,
+    chainId: networkChainId,
+    enabled: showResults,
+    provider,
+    sessionConfig: resolvedSessionConfig,
+    sessionSlug: effectiveSlug,
+  });
+  const showBuiltAtlas = !!atlas.build;
+  // Risk Matrix and Context links open nodes of the demo atlas, so it stays the one shown for them.
+  const showDemoAtlas = isDemoSlug && (!showBuiltAtlas || !!embeddedAtlasNodeId);
+  const atlasBusy = atlas.building || atlas.activeSinceMs !== null;
+  const buildAtlasHelpId = `build-atlas-help-${React.useId().replace(/:/g, '')}`;
   const showDemoAnalysisView = isDemoSlug && hasDemoAnalysisFixture(displaySessionSlug);
   const generatedState = (
     generatedResultsAnalysis && typeof generatedResultsAnalysis === 'object' ? generatedResultsAnalysis : {}
@@ -405,14 +389,14 @@ export default function OnePageSessionStandardShell({
       ? requestedResultsViewMode === 'analysis' && !showDemoAnalysisView
         ? 'polis'
         : requestedResultsViewMode
-      : requestedResultsViewMode === 'polis' || (showTopicPreview && requestedResultsViewMode === 'debateAtlas')
+      : requestedResultsViewMode === 'polis' || (showBuiltAtlas && requestedResultsViewMode === 'debateAtlas')
         ? requestedResultsViewMode
         : 'polis';
   const resultsViewOptions = buildResultsViewOptions(
     isDemoSlug,
     showDemoAnalysisView,
     generatedViewOptions,
-    showTopicPreview,
+    showBuiltAtlas,
   );
   const generatedStatus = String(generatedState.status || 'idle');
   const generatedIsRunning = generatedState.isRunning === true || generatedStatus === 'running';
@@ -437,7 +421,18 @@ export default function OnePageSessionStandardShell({
   const sessionInfoTooltip =
     typeof sessionInfo === 'string' ? formatPolisReportSessionInfo(sessionInfo, displaySessionSlug) : sessionInfo;
   const sessionContext = normalizeSessionContextView(resolvedSessionConfig);
-  const showContextSection = isDemoSlug || !!sessionContext || showContextAtlas;
+  // Files and links this reader may see. Admins also get the Context section
+  // with nothing in it yet, to add the first; everyone else sees it only with context.
+  const contextSources = useSessionContextSources({
+    sessionSlug: effectiveSlug,
+    sessionConfig: resolvedSessionConfig,
+    account: typeof account === 'string' ? account : '',
+  });
+  const canEditContext = (contextSources.isAdmin && contextSources.supported) || contextSources.participantsCanAdd;
+  // The Group Agent is a placeholder for now, so only admins see its launcher.
+  const showGroupAgent = contextSources.isAdmin && !isDemoSlug;
+  const [groupAgentOpen, setGroupAgentOpen] = React.useState(false);
+  const showContextSection = isDemoSlug || !!sessionContext || contextSources.sources.length > 0 || canEditContext;
   const sectionsGridClassName = [styles.sectionsGrid, !showContextSection ? styles.sectionsGridTwoUp : '']
     .filter(Boolean)
     .join(' ');
@@ -665,7 +660,7 @@ export default function OnePageSessionStandardShell({
 
         {showContextSection && (
           <div
-            className={`${styles.sectionContainer} ${showDocuments ? styles.sectionExpanded : ''} ${showContextAtlas ? styles.compactContextSection : ''}`}
+            className={`${styles.sectionContainer} ${showDocuments ? styles.sectionExpanded : ''}`}
             data-testid="ce-demo-documents-section"
           >
             <div className={`${styles.sectionHeaderRow} ${showDocuments ? styles.documentsHeaderRow : ''}`}>
@@ -719,12 +714,34 @@ export default function OnePageSessionStandardShell({
             </div>
             {showDocuments && (
               <div className={`${styles.miniSectionContent} ${styles.documentsSectionContent}`.trim()}>
-                {!showContextAtlas && renderSessionContext(sessionContext)}
-                {showContextAtlas && (
-                  <Suspense fallback={<LazyFallback label="Loading Reverse Alignment Atlas..." minHeight="20vh" />}>
-                    <ReverseAlignmentAtlas context={sessionContext} />
-                  </Suspense>
-                )}
+                {showGroupAgent ? (
+                  <div className={styles.groupAgentBar}>
+                    <button
+                      type="button"
+                      className={styles.groupAgentButton}
+                      onClick={() => setGroupAgentOpen(true)}
+                      data-testid="ce-group-agent-open"
+                    >
+                      <FontAwesomeIcon icon={faRobot} aria-hidden="true" />
+                      Group Agent
+                    </button>
+                    {groupAgentOpen ? (
+                      <Suspense fallback={null}>
+                        <GroupAgentModal onClose={() => setGroupAgentOpen(false)} />
+                      </Suspense>
+                    ) : null}
+                  </div>
+                ) : null}
+                {renderSessionContext(sessionContext)}
+                {!isDemoSlug ? (
+                  <SessionContextSources
+                    sessionSlug={effectiveSlug}
+                    sessionConfig={(resolvedSessionConfig as Record<string, unknown> | null) || null}
+                    account={typeof account === 'string' ? account : ''}
+                    list={contextSources}
+                    pageLinks={sessionContext?.links || []}
+                  />
+                ) : null}
                 {isDemoSlug && (
                   <Suspense fallback={<LazyFallback label="Loading Corpus..." minHeight="20vh" />}>
                     <CorpusViewer
@@ -807,6 +824,31 @@ export default function OnePageSessionStandardShell({
                     <FontAwesomeIcon icon={faExpand} />
                     Raw Results
                   </button>
+                  {atlas.canBuild && (
+                    <>
+                      {/* The "?" sits in the pill so it shares the menu's colours in every state. */}
+                      <button
+                        type="button"
+                        id={buildAtlasHelpId}
+                        onClick={async (event: React.MouseEvent<HTMLElement>) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          if (await atlas.buildAtlas()) onResultsModeChange('debateAtlas');
+                        }}
+                        className={styles.sectionHeaderViewModeButton}
+                        disabled={atlasBusy}
+                        data-testid="ce-session-debate-atlas-build"
+                      >
+                        {atlasBusy ? 'Building atlas…' : 'Build atlas'}
+                        <FontAwesomeIcon icon={faQuestionCircle} aria-hidden="true" />
+                      </button>
+                      <CETooltip target={buildAtlasHelpId} placement="bottom" trigger="hover focus" autohide={false}>
+                        Builds a debate atlas from the responses right now, with a political compass for each category
+                        and topic. Takes a few minutes. Everyone who sees Results sees it, and earlier builds stay to
+                        compare.
+                      </CETooltip>
+                    </>
+                  )}
                   {showGeneratedCheckAction && (
                     <button
                       type="button"
@@ -852,8 +894,29 @@ export default function OnePageSessionStandardShell({
                   {String(generatedState.lastFailure)}
                 </div>
               ) : null}
+              {atlas.canBuild && (atlasBusy || atlas.error) ? (
+                <DebateAtlasBuildStatus
+                  className={styles.generatedResultsStatus}
+                  busy={atlasBusy}
+                  error={atlas.error}
+                  nextBuild={atlas.nextBuild}
+                  startedAtMs={atlas.buildStartedAtMs}
+                />
+              ) : null}
               <div>
-                {showTopicPreview && effectiveResultsViewMode === 'debateAtlas' && <ReverseAlignmentTopicMap />}
+                {!showDemoAtlas && effectiveResultsViewMode === 'debateAtlas' && atlas.build && (
+                  <Suspense fallback={<LazyFallback label="Loading Debate Atlas..." minHeight="30vh" />}>
+                    <SessionDebateAtlasView
+                      build={atlas.build}
+                      builds={atlas.builds}
+                      onSelectBuild={atlas.selectBuild}
+                      sessionSlug={displaySessionSlug}
+                      workerUrl={atlas.workerUrl}
+                      requestedNodeId={requestedAtlasNodeId}
+                      onRequestedNodeClose={onRequestedAtlasNodeClose}
+                    />
+                  </Suspense>
+                )}
                 {effectiveResultsViewMode === 'polis' && (
                   <Suspense fallback={<LazyFallback label="Loading..." minHeight="20vh" />}>
                     <PolisReport
@@ -878,6 +941,7 @@ export default function OnePageSessionStandardShell({
                           ? () => refreshQuestionResponses(null, { slug: embeddedQuestionSessionSlug })
                           : undefined
                       }
+                      onRequestLogin={typeof toggleLoginModal === 'function' ? () => toggleLoginModal(true) : undefined}
                       questionScanProgress={questionScanProgress}
                       questionResponsesNonce={questionResponsesNonce}
                       sessionSlug={displaySessionSlug}
@@ -895,7 +959,7 @@ export default function OnePageSessionStandardShell({
                     <DemoAnalysisWorkspace sessionSlug={slug} />
                   </Suspense>
                 )}
-                {isDemoSlug && effectiveResultsViewMode === 'debateAtlas' && (
+                {showDemoAtlas && effectiveResultsViewMode === 'debateAtlas' && (
                   <Suspense fallback={<LazyFallback label="Loading Debate Atlas..." minHeight="30vh" />}>
                     <div style={{ maxHeight: '80vh', overflowY: 'auto' }}>
                       <DebateMapAny

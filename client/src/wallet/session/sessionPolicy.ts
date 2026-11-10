@@ -1,4 +1,5 @@
 import { ethers } from 'ethers';
+import { parseTransactionQuantity } from './sessionTransaction.js';
 import type { HexString, SoftSessionPolicy } from '../types.js';
 
 export const createSoftSessionPolicy = ({
@@ -37,23 +38,6 @@ const normalizeAddress = (value: unknown): string => {
   } catch (_) {
     return '';
   }
-};
-
-const valueToWei = (value: unknown): bigint => {
-  if (value == null || value === '') return 0n;
-  if (typeof value === 'bigint') return value >= 0n ? value : 0n;
-  if (typeof value === 'number') {
-    return Number.isFinite(value) && value > 0 ? BigInt(Math.trunc(value)) : 0n;
-  }
-  const raw = String(value || '').trim();
-  if (!raw) return 0n;
-  try {
-    if (/^0x[0-9a-f]+$/i.test(raw)) return BigInt(raw);
-    if (/^\d+$/.test(raw)) return BigInt(raw);
-  } catch (_) {
-    return 0n;
-  }
-  return 0n;
 };
 
 const chainIdToNumber = (value: unknown): number | null => {
@@ -115,9 +99,10 @@ export const assertSoftSessionAllowed = ({
       throw new Error('Soft session does not allow this transaction target.');
     }
   }
-  const maxValue = valueToWei(policy.maxTransactionValueWei);
-  const value = valueToWei(tx?.value);
-  if (value > maxValue) {
+  const maxValue =
+    parseTransactionQuantity(policy.maxTransactionValueWei, 'maxTransactionValueWei') ?? ethers.constants.Zero;
+  const value = parseTransactionQuantity(tx?.value, 'value') ?? ethers.constants.Zero;
+  if (value.gt(maxValue)) {
     throw new Error('Value-bearing transactions require explicit wallet confirmation.');
   }
 };

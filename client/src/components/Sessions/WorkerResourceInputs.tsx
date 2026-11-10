@@ -22,8 +22,6 @@ export type WorkerResourceInputsProps = {
   fields?: ResourceSecretField[];
   workerSecrets?: WorkerSecrets;
   workerSecretsEnabled: boolean;
-  isNormalMode: boolean;
-  showSponsoredFaucetNotice: boolean;
   effectiveDefaultWorkerRpcUrl?: string;
   getSecretFieldTestId?: (fieldKey: string) => string | undefined;
   onUpdateSecret: (fieldKey: string, value: string) => void;
@@ -34,8 +32,6 @@ const WorkerResourceInputs = ({
   fields = [],
   workerSecrets = {},
   workerSecretsEnabled,
-  isNormalMode,
-  showSponsoredFaucetNotice,
   effectiveDefaultWorkerRpcUrl = '',
   getSecretFieldTestId,
   onUpdateSecret,
@@ -71,11 +67,6 @@ const WorkerResourceInputs = ({
             {faucetAddress
               ? `Faucet address: ${faucetAddress}`
               : 'Faucet private key must be a valid 32-byte hexadecimal EVM key.'}
-          </div>
-        )}
-        {!isNormalMode && field.key === 'faucetPrivateKey' && showSponsoredFaucetNotice && (
-          <div className={styles.helperText}>
-            Faucet funding is currently provided by the sponsored bundle. Enter a private key here to override it.
           </div>
         )}
       </FormGroup>

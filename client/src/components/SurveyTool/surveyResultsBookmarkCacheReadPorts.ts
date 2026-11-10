@@ -4,12 +4,6 @@ export type SurveyResultsBookmarksCacheReadOptions = {
   clone: false;
 };
 
-export type SurveyResultsBookmarksCacheReadPort = (
-  namespace: SurveyResultsBookmarksCacheNamespace,
-  slug: string,
-  options: SurveyResultsBookmarksCacheReadOptions,
-) => unknown;
-
 export type SurveyResultsBookmarksCacheReadRequest = {
   namespace: SurveyResultsBookmarksCacheNamespace;
   slug: string;

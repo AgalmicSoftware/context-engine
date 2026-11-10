@@ -1,3 +1,4 @@
+import type { ResponseValuesEqual } from './responseValueEquality';
 import { getChangedInterviewConsentQids } from './sessionInterviewConsent';
 import type { UnknownRecord } from './surveyToolTypes';
 
@@ -50,7 +51,7 @@ export interface ChangedFieldsOrchestrationDeps {
   getDefaultResponseEncryptionAudienceForQid: (qid: string) => unknown;
   resolveFieldEncryptionGateId: (field: ResponseFieldState, qid: string | null, fieldKey: string) => unknown;
   normalizeFieldAudienceMode: (mode: unknown, fieldKey: string, field: ResponseFieldState) => unknown;
-  valuesEqual: (left: unknown, right: unknown) => boolean;
+  valuesEqual: ResponseValuesEqual;
   buildSurveyResponseSliceSignature: (
     slice: ResponseSlice,
     opts?: { normalizedIdFilter?: Set<string> | null },
@@ -478,7 +479,7 @@ export const computeChangedQidsAndFields = ({
   baselineConvictionKeys: IndexedKeyMap | null;
   currentConvictionKeys: IndexedKeyMap | null;
   ratingEnvelopeQids: Set<string>;
-  valuesEqual: (left: unknown, right: unknown) => boolean;
+  valuesEqual: ResponseValuesEqual;
   hasMeaningfulFieldValue: (value: unknown) => boolean;
   resolveAudience: (field: ResponseFieldState, qid: string | null) => unknown;
   resolveGateId: (field: ResponseFieldState, qid: string | null, fieldKey: string) => unknown;
@@ -498,8 +499,8 @@ export const computeChangedQidsAndFields = ({
     const cConvN = pickBestNumber(currentSlice.conviction, currentConvictionKeys, qId);
 
     // valuesEqual('*','*') -> unchanged; arrays/nums handled
-    const ansChanged = !valuesEqual(bAns.value, cAns.value);
-    const addChanged = !valuesEqual(bAdd.value, cAdd.value);
+    const ansChanged = !valuesEqual(bAns.value, cAns.value, qId, 'answer');
+    const addChanged = !valuesEqual(bAdd.value, cAdd.value, qId, 'additional');
 
     const qLower = String(qId || '')
       .trim()

@@ -1,3 +1,4 @@
+import { ratingConformance } from '../../../../shared/questions/ratingConformance.mjs';
 import { buildReportAnswerQuestions, buildReportResponseStats } from './polisReportAnswers';
 
 const row = (type: string, value: unknown, responder = 'person-a', extra = {}) => ({
@@ -133,6 +134,14 @@ describe('Worker analysis-validation parity', () => {
       expect(result).toMatchObject({ count: 2, average: 3, min: 1, max: 5 });
     },
   );
+});
+
+describe('shared rating rule', () => {
+  it.each(ratingConformance)('counts only ratings on the scale grid: $name', ({ scale, input, expected }) => {
+    const result = buildReportAnswerQuestions({ q: [row('rating', input)] }, { q: { type: 'rating', scale } });
+    if (expected === null) expect(result).toEqual([]);
+    else expect(result).toMatchObject([{ id: 'q', count: 1, average: expected }]);
+  });
 });
 
 describe('Polis response statistics', () => {

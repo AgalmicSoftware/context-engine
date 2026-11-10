@@ -1,5 +1,12 @@
-import { getVoiceCredits } from '../../../../shared/questions/quadraticAllocation.mjs';
-import type { SessionResultsReportQuestion } from '../../utilities/sessionResultsExport';
+import {
+  formatQuadraticAllocation,
+  getVoiceCredits,
+  validateQuadraticAllocation,
+} from '../../../../shared/questions/quadraticAllocation.mjs';
+import { readStoredRating } from '../../../../shared/questions/storedRating.mjs';
+import type { SessionResultsReportAnswer, SessionResultsReportQuestion } from '../../utilities/sessionResultsExport';
+import type { RatingScale } from '../../utilities/survey/ratingValue';
+import { getSurveyResultsLatestResponsesByResponder } from './surveyResultsSummaryModels';
 
 type SurveyResultsRecord = Record<string, unknown>;
 
@@ -10,6 +17,7 @@ export type SurveyResultsHtmlReportQuestionRecord = {
   id?: unknown;
   options?: unknown;
   prompt?: unknown;
+  scale?: RatingScale;
   tags?: unknown;
   type?: unknown;
   voiceCredits?: unknown;
@@ -34,6 +42,19 @@ export type BuildSurveyResultsHtmlReportParticipantCountArgs = {
 export type BuildSurveyResultsHtmlReportQuestionsArgs = {
   filteredQuestions?: readonly SurveyResultsHtmlReportQuestionRecord[] | null;
   responseCountsByQuestion?: Map<string, number> | null;
+};
+
+export type BuildSurveyResultsHtmlReportAnswersArgs = {
+  aggregatorQuestionResponses?: unknown;
+  // What this reader decrypted, which the Results view shows in place of the stored field.
+  applyDecryptedOverride?:
+    ((response: SurveyResultsRecord, responder: unknown, questionId: string, surveyId?: unknown) => unknown) | null;
+  filteredResponses?: unknown;
+  getResponseQuestionId?: SurveyResultsHtmlReportQuestionIdPort | null;
+  networkQuestions?: unknown;
+  parseResponse?: SurveyResultsHtmlReportParsePort | null;
+  surveyViewMode?: unknown;
+  viewMode?: unknown;
 };
 
 const isRecord = (value: unknown): value is SurveyResultsRecord =>
@@ -137,6 +158,74 @@ export const buildSurveyResultsHtmlReportParticipantCount = ({
   return participants.size;
 };
 
+const readViewedText = (field: unknown, question: SurveyResultsRecord = {}): string => {
+  const value = isRecord(field) ? (field.value ?? field.text ?? field.answer) : field;
+  if (value === null || value === undefined || value === '*') return '';
+  if (Array.isArray(value)) {
+    return question.type === 'quadratic' && !validateQuadraticAllocation(value, question)
+      ? formatQuadraticAllocation(value, normalizeStringList(question.options))
+      : value.join('; ');
+  }
+  return typeof value === 'object' ? JSON.stringify(value) : String(value).trim();
+};
+
+/** One row per answer the Results view shows this reader: not locked ones, nor those to a question still masked. */
+export const buildSurveyResultsHtmlReportAnswersForExport = ({
+  aggregatorQuestionResponses = {},
+  applyDecryptedOverride = null,
+  filteredResponses = [],
+  getResponseQuestionId = defaultQuestionId,
+  networkQuestions = {},
+  parseResponse = defaultParseResponse,
+  surveyViewMode = '',
+  viewMode = '',
+}: BuildSurveyResultsHtmlReportAnswersArgs = {}): SessionResultsReportAnswer[] => {
+  const answers: SessionResultsReportAnswer[] = [];
+  const questions = toRecord(networkQuestions);
+  const parsePort = typeof parseResponse === 'function' ? parseResponse : defaultParseResponse;
+  const questionIdPort = typeof getResponseQuestionId === 'function' ? getResponseQuestionId : defaultQuestionId;
+  const addAnswer = (stored: unknown, responder: unknown, listedUnder = '', surveyId?: unknown): void => {
+    if (!isRecord(stored)) return;
+    // As in the Results view, the question an answer is listed under outranks what its author's payload names.
+    const questionId = listedUnder || questionIdPort(stored);
+    if (!questionId) return;
+    const question = toRecord(questions[questionId.toLowerCase()] || questions[questionId]);
+    if (String(question.prompt || '').trim() === '[encrypted]') return;
+    const viewed = toRecord(
+      applyDecryptedOverride ? applyDecryptedOverride(stored, responder, questionId, surveyId) : stored,
+    );
+    const answer = readViewedText(viewed.answer, question);
+    const comment = readViewedText(viewed.additional);
+    const conviction = readStoredRating(viewed.conviction !== undefined ? viewed.conviction : viewed.importance);
+    if (!answer && !comment && conviction === null) return;
+    answers.push({
+      questionId,
+      responder: readParticipantAddress(responder),
+      answer,
+      comment,
+      ...(conviction === null ? {} : { conviction }),
+    });
+  };
+
+  if (isSurveyIndividualsMode(viewMode, surveyViewMode)) {
+    (Array.isArray(filteredResponses) ? filteredResponses : []).forEach((responseRow) => {
+      const row = toRecord(responseRow);
+      const parsed = toRecord(parsePort(row.response));
+      (Array.isArray(parsed.responses) ? parsed.responses : []).forEach((answer) =>
+        addAnswer(answer, row.responder, '', row.surveyId),
+      );
+    });
+    return answers;
+  }
+
+  Object.entries(toRecord(aggregatorQuestionResponses)).forEach(([questionId, rows]) => {
+    getSurveyResultsLatestResponsesByResponder(rows).forEach((row) =>
+      addAnswer(parsePort(row.response), row.responder, questionId),
+    );
+  });
+  return answers;
+};
+
 export const buildSurveyResultsHtmlReportQuestionsForExport = ({
   filteredQuestions = [],
   responseCountsByQuestion = new Map<string, number>(),
@@ -149,6 +238,7 @@ export const buildSurveyResultsHtmlReportQuestionsForExport = ({
       prompt: String(question.prompt || '').trim(),
       type: String(question.type || '').trim(),
       ...(question.type === 'quadratic' ? { voiceCredits: getVoiceCredits(question) } : {}),
+      ...(question.scale ? { scale: question.scale } : {}),
       tags: normalizeStringList(question.tags),
       options: normalizeStringList(question.options),
       responseCount: responseCountsByQuestion?.get(countKey) || 0,

@@ -188,6 +188,119 @@ describe('CreateSBTGroup deploy and persistence flows', () => {
     expect(localStorage.getItem(SBT_PASSWORD_RECOVERY_STORAGE_KEY)).toBeNull();
   });
 
+  it('sends no create transaction when the account changes during the create', async () => {
+    const instance = makeInstance({
+      provider: 'mock-provider',
+      account: '0xCreator',
+      loginComplete: true,
+      network: { id: 84532, name: 'Base Sepolia' },
+    });
+    instance.state = {
+      ...instance.state,
+      sbtName: 'Open Group',
+      tokenURI: 'ar://metadata',
+      sbtDistribution: {
+        ...instance.state.sbtDistribution,
+        burnAuth: 'AdminOnly',
+        distributionOption: 'anyoneCanMint',
+      },
+    };
+    instance.getSessionConfigForNetwork = jest.fn(() => ({ slug: 'edge', networkChainId: 84532 }));
+    jest.spyOn(contractScripts, 'countSBTCreated').mockImplementation(async () => {
+      instance.props = { ...instance.props, account: '0xOther' };
+      return 2;
+    });
+    const createSpy = jest.spyOn(contractScripts, 'createSBT').mockResolvedValue({
+      events: [{ event: 'SBTCreated', args: { sbtAddress: '0x00000000000000000000000000000000000000b4' } }],
+    });
+
+    await instance.mintSBT();
+
+    expect(createSpy).not.toHaveBeenCalled();
+    expect(instance.state).toMatchObject({ startedMinting: false, currentStep: 0, sbtMinted: false });
+    expect(instance.state.error).toMatch(/account changed/);
+  });
+
+  it('saves no draft when the account changes while the draft is prepared', async () => {
+    const onSaveDraft = jest.fn();
+    const instance = makeInstance({
+      account: '0xCreator',
+      loginComplete: true,
+      deferredDeploy: true,
+      attemptImmediateDeferredUpload: false,
+      onSaveDraft,
+    });
+    instance.state = { ...instance.state, sbtName: 'Draft Group' };
+    instance.buildSerializableAuthoringPayload = jest.fn(async () => ({}));
+    instance.getEffectiveArweaveUploadKey = jest.fn(async () => {
+      instance.props = { ...instance.props, account: '0xOther' };
+      return {};
+    });
+    const planSpy = jest
+      .spyOn(instance, 'resolvePredictableDeployPlan')
+      .mockResolvedValue({ predictedAddress: '0x00000000000000000000000000000000000000b5', tokenURI: '' });
+
+    await expect(instance.handleDeferredSave()).rejects.toThrow(/account changed/);
+    expect(planSpy).not.toHaveBeenCalled();
+    expect(onSaveDraft).not.toHaveBeenCalled();
+  });
+
+  describe('uploads after an account switch', () => {
+    const CREATOR = '0x00000000000000000000000000000000000000c1';
+    const OTHER = '0x00000000000000000000000000000000000000c2';
+    const switchAccount = (instance) => {
+      instance.props = { ...instance.props, account: OTHER };
+    };
+    const stubUploads = (instance, switchBetweenUploads) => {
+      instance.uploadImageToArweave = jest.fn(async () => {
+        if (switchBetweenUploads) switchAccount(instance);
+      });
+      instance.uploadTokenUriToArweave = jest.fn(async () => 'ar://metadata');
+    };
+
+    it.each([
+      ['before the image upload', false],
+      ['between the image and metadata uploads', true],
+    ])('uploads nothing more for a create when the account changes %s', async (_when, switchBetweenUploads) => {
+      const instance = makeInstance({ account: CREATOR, loginComplete: true, toggleLoginModal: jest.fn() });
+      instance.state = { ...instance.state, sbtName: 'Open Group' };
+      instance.commitPendingDocumentUrl = jest.fn(async () => {
+        if (!switchBetweenUploads) switchAccount(instance);
+      });
+      stubUploads(instance, switchBetweenUploads);
+      instance.mintSBT = jest.fn();
+
+      await instance.handleMintClick();
+
+      expect(instance.uploadImageToArweave).toHaveBeenCalledTimes(switchBetweenUploads ? 1 : 0);
+      expect(instance.uploadTokenUriToArweave).not.toHaveBeenCalled();
+      expect(instance.mintSBT).not.toHaveBeenCalled();
+      expect(instance.state).toMatchObject({ startedMinting: false, currentStep: 0 });
+      expect(instance.state.error).toMatch(/account changed/);
+    });
+
+    it.each([
+      ['before the image upload', false],
+      ['between the image and metadata uploads', true],
+    ])('uploads nothing more for a draft when the account changes %s', async (_when, switchBetweenUploads) => {
+      const onSaveDraft = jest.fn();
+      const instance = makeInstance({ account: CREATOR, loginComplete: true, deferredDeploy: true, onSaveDraft });
+      instance.state = { ...instance.state, sbtName: 'Draft Group' };
+      instance.buildSerializableAuthoringPayload = jest.fn(async () => ({}));
+      instance.getResolvedArweaveUploadWorkerUrl = jest.fn(() => 'https://uploads.example');
+      instance.getEffectiveArweaveUploadKey = jest.fn(async () => {
+        if (!switchBetweenUploads) switchAccount(instance);
+        return {};
+      });
+      stubUploads(instance, switchBetweenUploads);
+
+      await expect(instance.handleDeferredSave()).rejects.toThrow(/account changed/);
+      expect(instance.uploadImageToArweave).toHaveBeenCalledTimes(switchBetweenUploads ? 1 : 0);
+      expect(instance.uploadTokenUriToArweave).not.toHaveBeenCalled();
+      expect(onSaveDraft).not.toHaveBeenCalled();
+    });
+  });
+
   it('applies an sbt bookmark to the latest saved bookmarks', async () => {
     const instance = makeInstance({ sessionSlug: 'edge' });
     instance.state.bookmarkedSbtsSet = new Set();

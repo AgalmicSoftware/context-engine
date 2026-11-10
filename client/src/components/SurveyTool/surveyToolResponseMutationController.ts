@@ -1,3 +1,4 @@
+import type { ResponseValuesEqual } from './responseValueEquality';
 import type { UnknownRecord } from './surveyToolTypes';
 
 export interface ResponseFieldState {
@@ -23,7 +24,7 @@ export interface MutationDeps {
     answerField: ResponseFieldState,
     qid: string | null,
   ) => ResponseFieldState;
-  valuesEqual: (a: unknown, b: unknown) => boolean;
+  valuesEqual: ResponseValuesEqual;
   getQuestionById: (qid: string) => UnknownRecord | null | undefined;
   computeHash: (value: string) => string;
 }
@@ -36,10 +37,9 @@ type MutationSourceSlice = {
 const isBlankValue = (value: unknown): boolean =>
   value === undefined || value === null || (Array.isArray(value) ? value.length === 0 : String(value).length === 0);
 
-// A cleared field keeps its lock choice but never the saved envelope, which would
-// otherwise be uploaded again with the old text.
-const withoutStaleEnvelope = (field: ResponseFieldState): ResponseFieldState => {
-  if (!isBlankValue(field.value) || !field.encryptedPortion) return field;
+// An edited field keeps its lock choice but must never reuse the saved ciphertext.
+const withoutStaleEnvelope = (field: ResponseFieldState, valueChanged: boolean): ResponseFieldState => {
+  if ((!valueChanged && !isBlankValue(field.value)) || !field.encryptedPortion) return field;
   const { encryptedPortion: _staleEnvelope, ...cleared } = field;
   return cleared;
 };
@@ -110,7 +110,7 @@ export const buildAnswerUpdatePlan = (
   const currentAnswer = prevAnswerState.value;
 
   let finalAnswer = answer;
-  if (isBinaryQuestion && deps.valuesEqual(currentAnswer, answer)) {
+  if (isBinaryQuestion && deps.valuesEqual(currentAnswer, answer, questionId, 'answer')) {
     finalAnswer = '';
   }
 
@@ -124,7 +124,7 @@ export const buildAnswerUpdatePlan = (
 
   const shouldHash = !Array.isArray(finalAnswer) && typeof finalAnswer !== 'number' && !isBinaryQuestion;
   const hasExistingHash = typeof prevAnswerState.hash === 'string' && prevAnswerState.hash.length > 0;
-  const unchangedValue = deps.valuesEqual(currentAnswer, finalAnswer);
+  const unchangedValue = deps.valuesEqual(currentAnswer, finalAnswer, questionId, 'answer');
   const unchangedEncryption =
     !!prevAnswerState.encrypted === !!nextEncrypted &&
     (previousAudience || '') === (resolvedAudience || '') &&
@@ -146,15 +146,18 @@ export const buildAnswerUpdatePlan = (
       : String(finalAnswer ?? '');
   const newAnswerHash = shouldHash ? deps.computeHash(answerStr) : '';
 
-  const nextAnswerState: ResponseFieldState = withoutStaleEnvelope({
-    ...prevAnswerState,
-    value: finalAnswer,
-    encrypted: nextEncrypted,
-    encryptionAudience: resolvedAudience,
-    encryptionGateId: resolvedGateId,
-    audienceMode: 'explicit',
-    hash: newAnswerHash,
-  });
+  const nextAnswerState: ResponseFieldState = withoutStaleEnvelope(
+    {
+      ...prevAnswerState,
+      value: finalAnswer,
+      encrypted: nextEncrypted,
+      encryptionAudience: resolvedAudience,
+      encryptionGateId: resolvedGateId,
+      audienceMode: 'explicit',
+      hash: newAnswerHash,
+    },
+    !unchangedValue,
+  );
 
   const prevAdditionalState =
     sourceSlice.additionalComments?.[questionId] || deps.buildEmptyResponseFieldState(questionId, 'additional');
@@ -209,7 +212,7 @@ export const buildAdditionalUpdatePlan = (
     deps,
   );
 
-  const unchangedValue = deps.valuesEqual(currentValue, normalizedAdditional);
+  const unchangedValue = deps.valuesEqual(currentValue, normalizedAdditional, questionId, 'additional');
   const unchangedEncryption =
     !!prevAdditionalState.encrypted === !!nextEncrypted &&
     (previousAudience || '') === (resolvedAudience || '') &&
@@ -226,15 +229,18 @@ export const buildAdditionalUpdatePlan = (
   }
 
   const newAdditionalHash = deps.computeHash(normalizedAdditional);
-  const nextAdditionalState: ResponseFieldState = withoutStaleEnvelope({
-    ...prevAdditionalState,
-    value: normalizedAdditional,
-    encrypted: nextEncrypted,
-    encryptionAudience: resolvedAudience,
-    encryptionGateId: resolvedGateId,
-    audienceMode: additionalAudienceMode,
-    hash: newAdditionalHash,
-  });
+  const nextAdditionalState: ResponseFieldState = withoutStaleEnvelope(
+    {
+      ...prevAdditionalState,
+      value: normalizedAdditional,
+      encrypted: nextEncrypted,
+      encryptionAudience: resolvedAudience,
+      encryptionGateId: resolvedGateId,
+      audienceMode: additionalAudienceMode,
+      hash: newAdditionalHash,
+    },
+    !unchangedValue,
+  );
 
   return {
     changed: true,

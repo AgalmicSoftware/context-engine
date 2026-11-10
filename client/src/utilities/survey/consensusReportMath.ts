@@ -126,11 +126,10 @@ const isMissingVote = (value: unknown): value is null | undefined => value === n
 const isCountedVote = (value: unknown): value is -1 | 0 | 1 => value === 1 || value === -1 || value === 0;
 const isAgreeVote = (value: unknown): value is 1 => value === 1;
 const isDisagreeVote = (value: unknown): value is -1 => value === -1;
-const isBinaryVote = (value: unknown): value is -1 | 1 => isAgreeVote(value) || isDisagreeVote(value);
 
 function matrixShape(matrix: PolisReportRatingMatrix = []): [number, number] {
   const rows = Array.isArray(matrix) ? matrix.length : 0;
-  const cols = rows > 0 && Array.isArray(matrix[0]) ? matrix[0].length : 0;
+  const cols = rows ? matrix.reduce((maxWidth, row) => Math.max(maxWidth, Array.isArray(row) ? row.length : 0), 0) : 0;
   return [rows, cols];
 }
 
@@ -161,13 +160,6 @@ function normalize(vector: NumericVector = []): NumericVector {
   const length = norm(vector);
   if (length < 1e-12) return vector.map(() => 0);
   return vector.map((value) => value / length);
-}
-
-function mean(values: NumericVector = []): number {
-  if (!values.length) return 0;
-  let total = 0;
-  for (let i = 0; i < values.length; i += 1) total += values[i];
-  return total / values.length;
 }
 
 function zipRest<T, R>(items: T[] = [], mapper: (item: T, rest: T[]) => R): R[] {
@@ -896,13 +888,13 @@ function buildMemberIndicesByGroup(assignments: number[] = []): {
   groupIds: number[];
   byGroup: Record<number, number[]>;
 } {
-  const groupIds = Array.from(new Set(assignments.filter((clusterId) => Number.isInteger(clusterId)))).sort(
-    (left, right) => left - right,
-  );
+  const groupIds = Array.from(
+    new Set(assignments.filter((clusterId) => Number.isInteger(clusterId) && clusterId >= 0)),
+  ).sort((left, right) => left - right);
 
   const byGroup: Record<number, number[]> = Object.fromEntries(groupIds.map((groupId) => [groupId, []]));
   assignments.forEach((groupId, participantIndex) => {
-    if (!Number.isInteger(groupId) || !byGroup[groupId]) return;
+    if (!Number.isInteger(groupId) || groupId < 0 || !byGroup[groupId]) return;
     byGroup[groupId].push(participantIndex);
   });
   return { groupIds, byGroup };
@@ -1070,10 +1062,10 @@ export function findRepresentativeQuestions(
     }
 
     const sufficient = state.sufficient.filter((item) => item.questionIndex !== bestAgree?.questionIndex);
-    finalizedByGroup[groupId] = agreesBeforeDisagrees([
-      ...(bestAgree ? [bestAgree] : []),
-      ...repnessSort(sufficient),
-    ]).slice(0, 5);
+    // The top five first, as pol.is does: ordering first would let mild agrees push out strong disagrees.
+    finalizedByGroup[groupId] = agreesBeforeDisagrees(
+      [...(bestAgree ? [bestAgree] : []), ...repnessSort(sufficient)].slice(0, 5),
+    );
   });
 
   return finalizedByGroup;
@@ -1090,6 +1082,7 @@ export function computePolisConversationMath(
   statementCoords: PolisPoint[];
   commentStats: ReturnType<typeof computePolisCommentStats>;
   clusterAssignments: number[];
+  analyticalClusterAssignments: number[];
   clusterCount: number;
   repQuestions: Record<number, RepresentativeComment[]>;
   baseClusters: Cluster[];
@@ -1108,8 +1101,18 @@ export function computePolisConversationMath(
     baseClusters,
     clusteredBase.groupClusters,
   );
-  const repQuestions = findRepresentativeQuestions(ratingMatrix, clusterAssignments, questionPromptsMap, allQuestions);
-
+  const inConversationParticipantSet = new Set(inConversationParticipantIndices);
+  // Regression guard: display assignments include every participant, but analytical
+  // repness and group tallies must exclude low-participation nearest-group outliers.
+  const analyticalClusterAssignments = clusterAssignments.map((clusterId, participantIndex) =>
+    inConversationParticipantSet.has(participantIndex) ? clusterId : -1,
+  );
+  const repQuestions = findRepresentativeQuestions(
+    ratingMatrix,
+    analyticalClusterAssignments,
+    questionPromptsMap,
+    allQuestions,
+  );
   return {
     stats,
     participantCoords: pcaBundle.participantCoords,
@@ -1119,6 +1122,7 @@ export function computePolisConversationMath(
       pcaBundle,
     }),
     clusterAssignments,
+    analyticalClusterAssignments,
     clusterCount: clusteredBase.clusterCount || (clusterAssignments.length ? 1 : 0),
     repQuestions,
     baseClusters,

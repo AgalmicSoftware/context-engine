@@ -218,7 +218,7 @@ const klDivergence = (left, right) => left.reduce((sum, probability, index) => (
   probability > 0 ? sum + probability * Math.log2(probability / right[index]) : sum
 ), 0);
 
-const distributionSimilarity = (leftSummary, rightSummary) => {
+export const distributionSimilarity = (leftSummary, rightSummary) => {
   const left = distribution(leftSummary);
   const right = distribution(rightSummary);
   if (!left || !right) return null;
@@ -285,10 +285,12 @@ const buildCoverage = ({
   }));
 };
 
+export const minimumSimilarityQuestionOverlap = (questionCount) => Math.max(1, Math.ceil(questionCount * 0.5));
+
 const buildSimilarity = ({ questionBank, modelRoster, byModelQuestion, coverage, minimumSimilarityOverlap }) => {
   const models = modelRoster.models || [];
-  const similarityMatrix = Object.fromEntries(models.map((model) => [model.id, {}]));
-  const similarityDetails = Object.fromEntries(models.map((model) => [model.id, {}]));
+  const similarityMatrix = Object.fromEntries(models.map((model) => [model.id, Object.create(null)]));
+  const similarityDetails = Object.fromEntries(models.map((model) => [model.id, Object.create(null)]));
   const similarityEdges = [];
   models.forEach((left, leftIndex) => {
     similarityMatrix[left.id][left.id] = 1;
@@ -341,7 +343,11 @@ const buildSimilarity = ({ questionBank, modelRoster, byModelQuestion, coverage,
       sufficientOverlap: eligibleForSimilarity,
     };
   });
-  return { similarityMatrix, similarityDetails, similarityEdges };
+  return {
+    similarityMatrix: Object.fromEntries(Object.entries(similarityMatrix).map(([id, row]) => [id, { ...row }])),
+    similarityDetails: Object.fromEntries(Object.entries(similarityDetails).map(([id, row]) => [id, { ...row }])),
+    similarityEdges,
+  };
 };
 
 const buildOpinionGroups = (models, similarityMatrix, coverage, threshold = 0.72) => {
@@ -350,7 +356,7 @@ const buildOpinionGroups = (models, similarityMatrix, coverage, threshold = 0.72
     .filter((id) => coverage[id]?.eligibleForSimilarity);
   if (opinionGroupAvailability(eligibleIds, similarityMatrix).status !== 'available') return {};
   const unvisited = new Set(eligibleIds);
-  const groupById = {};
+  const groupById = Object.create(null);
   let groupIndex = 0;
   while (unvisited.size) {
     const [seed] = [...unvisited].sort();
@@ -462,7 +468,7 @@ export const buildResultsReport = ({ questionBank, modelRoster, runsFile, import
   assertSafeUniqueIdentifiers(questions.map((question) => question.id), 'question bank');
   assertSafeUniqueIdentifiers(models.map((model) => model.id), 'model roster');
   const runtimeProvenance = buildObservedRuntimeProvenance(models, runs);
-  const byModelQuestion = Object.fromEntries(models.map((model) => [model.id, {}]));
+  const byModelQuestion = Object.fromEntries(models.map((model) => [model.id, Object.create(null)]));
 
   for (const [key, groupedRuns] of groupBy(runs, (run) => `${run.modelId}\u0000${run.questionId}`)) {
     const [modelId, questionId] = key.split('\u0000');
@@ -505,7 +511,7 @@ export const buildResultsReport = ({ questionBank, modelRoster, runsFile, import
     && declaredRepeatValues.every((value) => Number.isInteger(value) && value === expectedRepeats);
   const bankReleaseStatus = questionBank.releaseStatus || 'unvalidated';
   const bankValidated = bankReleaseStatus === 'validated';
-  const minimumSimilarityOverlap = Math.max(1, Math.ceil(questions.length * 0.5));
+  const minimumSimilarityOverlap = minimumSimilarityQuestionOverlap(questions.length);
   const coverage = buildCoverage({
     questionBank,
     modelRoster,
@@ -525,10 +531,10 @@ export const buildResultsReport = ({ questionBank, modelRoster, runsFile, import
   const opinionGroups = buildOpinionGroups(models, similarity.similarityMatrix, coverage);
   const importance = summarizeImportanceRuns({ importanceFile, questionBank, modelRoster });
 
-  const breakdown = {};
+  const breakdown = Object.create(null);
   models.forEach((model) => {
     Object.entries(model.traits || {}).forEach(([trait, value]) => {
-      if (!breakdown[trait]) breakdown[trait] = {};
+      if (!breakdown[trait]) breakdown[trait] = Object.create(null);
       const key = String(value || 'unknown');
       if (!breakdown[trait][key]) breakdown[trait][key] = [];
       breakdown[trait][key].push(model.id);
@@ -616,7 +622,7 @@ export const buildResultsReport = ({ questionBank, modelRoster, runsFile, import
       repeatedRunsAreNestedObservations: true,
       byModel,
       byQuestion,
-      byModelQuestion,
+      byModelQuestion: Object.fromEntries(Object.entries(byModelQuestion).map(([id, row]) => [id, { ...row }])),
       ...similarity,
     },
     participantGraph: {
@@ -639,7 +645,7 @@ export const buildResultsReport = ({ questionBank, modelRoster, runsFile, import
       edges: similarity.similarityEdges,
     },
     importance,
-    breakdown,
+    breakdown: Object.fromEntries(Object.entries(breakdown).map(([trait, groups]) => [trait, { ...groups }])),
     debateAtlas: buildQuestionTopicAtlas(questionBank, byQuestion, importance),
     riskMatrix: buildRiskMatrixInputs(questionBank, byQuestion),
     rawMaterial: {

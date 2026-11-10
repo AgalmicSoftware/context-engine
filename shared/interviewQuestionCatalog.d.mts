@@ -4,7 +4,7 @@ export type PublicInterviewQuestion = {
   type: string;
   options: string[];
   singleSelect?: boolean;
-  scale?: { min: number; max: number; minLabel: string; maxLabel: string };
+  scale?: { min: number; max: number; minLabel: string; maxLabel: string; step?: number };
   voiceCredits?: number;
 };
 export function normalizePublicInterviewQuestions(input: unknown, limit?: number): PublicInterviewQuestion[];

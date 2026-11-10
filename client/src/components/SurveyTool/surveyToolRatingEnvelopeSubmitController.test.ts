@@ -29,6 +29,8 @@ type TestRatingResponse = Record<string, unknown> & {
   questionId?: string;
 };
 
+const selfEnvelope = (ciphertext: string) => JSON.stringify({ recipients: [{ type: 'self-eip712-v1' }], ciphertext });
+
 const buildMockDeps = (overrides: Partial<RatingEnvelopeDeps> = {}): RatingEnvelopeDeps => ({
   isQuestionLockedForResponse: () => false,
   resolveFieldEncryptionAudience: () => 'self',
@@ -390,8 +392,8 @@ describe('surveyToolRatingEnvelopeSubmitController', () => {
                 questionID: 'Q1',
                 importance: 4,
                 conviction: 6,
-                importanceEncrypted: 'baseline-importance',
-                convictionEncrypted: 'baseline-conviction',
+                importanceEncrypted: selfEnvelope('baseline-importance'),
+                convictionEncrypted: selfEnvelope('baseline-conviction'),
               },
             ],
           },
@@ -403,8 +405,8 @@ describe('surveyToolRatingEnvelopeSubmitController', () => {
         buildMockDeps({ encryptEnvelopeValue }),
       );
 
-      expect(respObj.importanceEncrypted).toBe('baseline-importance');
-      expect(respObj.convictionEncrypted).toBe('baseline-conviction');
+      expect(respObj.importanceEncrypted).toBe(selfEnvelope('baseline-importance'));
+      expect(respObj.convictionEncrypted).toBe(selfEnvelope('baseline-conviction'));
       expect(encryptEnvelopeValue).not.toHaveBeenCalled();
     });
 
@@ -443,8 +445,8 @@ describe('surveyToolRatingEnvelopeSubmitController', () => {
         questionID: 'Q1',
         importance: null,
         conviction: 3,
-        importanceEncrypted: 'stale-importance',
-        convictionEncrypted: 'keep-conviction',
+        importanceEncrypted: selfEnvelope('stale-importance'),
+        convictionEncrypted: selfEnvelope('keep-conviction'),
       };
 
       await processRatingEnvelopesForSubmit(
@@ -458,7 +460,7 @@ describe('surveyToolRatingEnvelopeSubmitController', () => {
       );
 
       expect(respObj.importanceEncrypted).toBe('');
-      expect(respObj.convictionEncrypted).toBe('keep-conviction');
+      expect(respObj.convictionEncrypted).toBe(selfEnvelope('keep-conviction'));
       expect(encryptEnvelopeValue).not.toHaveBeenCalled();
     });
 

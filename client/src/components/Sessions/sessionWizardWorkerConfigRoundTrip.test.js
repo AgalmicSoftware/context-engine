@@ -90,7 +90,7 @@ beforeEach(() => {
 
 afterEach(() => jest.restoreAllMocks());
 
-it('verifies, edits, verifies again, then publishes through the real Worker mutation and readback', async () => {
+it('verifies content edits without revoking authorization before publishing', async () => {
   const config = buildConfig();
   const worker = createWorker();
   const input = buildInput(config, worker);
@@ -104,7 +104,7 @@ it('verifies, edits, verifies again, then publishes through the real Worker muta
   config.sessionInfo = 'Edited description';
   await verifySessionWizardWorkerPublicDeployment(input);
   expect(worker.stored.sessionInfo).toBe('Edited description');
-  expect(worker.stored.authzEpoch).toBe(2);
+  expect(worker.stored.authzEpoch).toBe(1);
   expect(worker.stored).not.toHaveProperty('workerCanonicalPublicationRevision');
   const published = await persistAndVerifySessionWizardWorkerConfig({ ...input, retryDelaysMs: [] });
   expect(worker.stored.workerCanonicalPublicationRevision).toBe(published.configRevision);

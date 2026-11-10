@@ -1,26 +1,21 @@
 # Scaling
 
-Context Engine separates four choices that older deployment descriptions often
-collapsed together: where the web app is hosted, whether a session is public or
-private, which infrastructure profile owns the session, and which scaling
-techniques that profile uses. Hosting the static client does not determine the
+Context Engine separates four choices: where the web app is hosted, whether a
+session is public or private, which infrastructure profile owns the session, and
+which scaling techniques that profile uses. Hosting the static client does not determine the
 session's authority, storage, access policy, or settlement path.
 
 ## Current Implemented Profiles
 
-The `/new` chooser opens with no preset automatically selected. Its default and
-recommended path is **Hosted & Fast**, labeled `Centralized (Cloudflare)` in
-the wizard. **Trustless & Slower**, labeled
-`Decentralized (Arweave + EVM)`, is an implemented opt-in path. Advanced
-per-axis changes are recorded as `Custom`.
+`/new` starts on **Hosted & Fast**, shown as `Session Worker` under `Runs on`.
+**Trustless & Slower**, shown as `On-chain registry`, is an implemented opt-in
+path.
 
 | Profile | Availability | Canonical authority and storage | Creator setup | Chain requirement |
 | --- | --- | --- | --- | --- |
-| Hosted & Fast | Implemented; default path | Creator-owned per-session Cloudflare Worker, Worker KV/Cloudflare payload storage, `worker_canonical` authority, and `worker_envelope` encryption by default | Cloudflare account sign-in through the native deploy flow; an AI-provider key for enabled AI features | None by default; the passkey-derived EOA signs worker config without submitting a transaction |
-| Trustless & Slower | Implemented; opt-in | Public EVM registry/contracts and Arweave | Wallet transaction, gas, RPC access, Arweave JWK, and one AI-provider key | Required; Lit credentials are required only when Lit encryption is selected |
+| Hosted & Fast | Implemented; default path | Creator-owned per-session Cloudflare Worker, Worker KV/Cloudflare payload storage, and `worker_canonical` authority; results start public with unencrypted answers, and `worker_envelope` encryption is optional | Cloudflare account; an AI-provider key (OpenAI by default); a Cloudflare API token or the token-free dashboard handoff | None by default; the passkey-derived EOA signs worker config without submitting a transaction |
+| Trustless & Slower | Implemented; opt-in | Public EVM registry/contracts and Arweave | Compatible Session Worker, wallet transaction, gas, the 0.0001 ETH creation fee, RPC access, Arweave JWK, and an AI-provider key (OpenAI by default) | Required; Lit credentials are required only when Lit encryption is selected |
 | Company-Operated | Planned; not generally available | Intended organizational IAM, key-release/KMS, storage, AI gateway, networking, and observability adapters | To be defined by the operator's environment | Not required by the architecture; an entirely off-chain deployment is a target, while a private EVM could only be an optional future adapter |
-
-The advanced deploy helper or CLI path uses a Cloudflare API token; the native Hosted deployment flow uses Cloudflare account sign-in.
 
 Creators need deployment credentials only while provisioning infrastructure.
 Participants joining or using an existing session never need the creator's
@@ -60,6 +55,8 @@ session worker and its Cloudflare bindings. Small payload envelopes can use the
 KV-only fallback; an existing R2 bucket is an explicit advanced option rather
 than a default requirement.
 
+Public Worker response hydration reads at most 100 pages per refresh (10,000 stored response revisions). At that limit it keeps the loaded rows and displays a partial-results warning; results and exports may omit answers or later edits. The public cache is not marked fully ready. Interviews load the signed-in participant's saved answers independently and follow every own-answer page before allowing submission, so a partial public cache does not block a completed own-answer load. A failed own-answer read keeps submission waiting and offers a retry. Ordinary complete public loads clear the warning.
+
 Trustless & Slower currently reads registry/contracts through RPC and resolves
 Arweave-backed metadata and payloads. Repeated raw RPC scans do not scale, so an
 open-source index follower remains a useful planned optimization for this
@@ -74,7 +71,7 @@ or an Arweave mirror.
 
 ## Encryption and Private Compute
 
-`worker_envelope` is the Hosted & Fast default. It encrypts payloads at rest in
+`worker_envelope` is optional in Hosted & Fast. It encrypts payloads at rest in
 the session-worker trust domain and releases them according to worker-evaluated
 roles or conditions. The operator and Cloudflare runtime remain inside that
 trust boundary.
@@ -82,8 +79,8 @@ trust boundary.
 The stock Trustless & Slower profile defaults to no payload encryption. Lit is
 an implemented opt-in when SBT-gated key release is desired; selecting it adds
 Lit and chain/RPC requirements. Content keys pass through the session Worker,
-and holders of the session's Lit API key can request them, so it is not
-end-to-end encryption.
+and the Worker operator and Lit account administrators remain trusted, so it is
+not end-to-end encryption.
 
 Company-Operated encryption and private compute remain planned. Intended
 adapters include passkey-backed or organizational identity, KMS/Vault/OpenBao
@@ -92,9 +89,9 @@ not shipped packages.
 
 | Mode | Availability | Trust model | Best fit |
 | --- | --- | --- | --- |
-| `worker_envelope` | Implemented default for Hosted & Fast | Session operator and Cloudflare worker runtime | Cloudflare-backed private sessions |
-| `lit` | Implemented opt-in | Session Worker operator, holders of the session's Lit API key, and Lit's Chipotle service checking SBT ownership on the selected EVM chain | SBT-gated data in Arweave-backed sessions |
-| `none` | Implemented; decentralized preset default | Storage visibility and session policy | Intentionally public data |
+| `worker_envelope` | Implemented opt-in for Hosted & Fast | Session operator and Cloudflare worker runtime | Cloudflare-backed private sessions |
+| `lit` | Implemented opt-in | Session Worker operator, Lit account administrators, and Lit's Chipotle service checking SBT ownership on the selected EVM chain | SBT-gated data in Arweave-backed sessions |
+| `none` | Implemented; default for new sessions and the decentralized preset | Storage visibility and session policy | Intentionally public data |
 | Organizational KMS/key release | Planned | Customer IAM and key-service policy | Company-operated environments |
 | TEE or permissioned threshold compute | Planned research | Attested operator or permissioned threshold trust | Advanced private query and compute |
 
@@ -131,7 +128,3 @@ private-compute services. They do not require a public or private EVM.
 - [Cloudflare worker reference](session-cors-worker.md)
 - [Top-level architecture](../ARCHITECTURE.md)
 - [Public roadmap](../ROADMAP.md)
-
-Public Worker response hydration reads at most 100 pages per refresh (10,000 stored response revisions). At that limit it keeps the loaded rows and displays a partial-results warning; results and exports may omit answers or later edits. The public cache is not marked fully ready. Interviews load the signed-in participant's saved answers independently and follow every own-answer page before allowing submission, so a partial public cache does not block a completed own-answer load. A failed own-answer read keeps submission waiting and offers a retry. Ordinary complete public loads clear the warning.
-
-Build runtime helpers are assigned to a separate `vendor-runtime` chunk so the HTML bootstrap does not pull chain vendors through shared helper imports. Application routes still load their own dependencies; this configuration change alone does not eliminate the chain stack from Hosted pages.

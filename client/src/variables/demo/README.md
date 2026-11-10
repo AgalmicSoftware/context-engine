@@ -11,11 +11,11 @@ This directory contains demo and fixture data for the Context Engine survey plat
 | [`all_300_questions.json`](./all_300_questions.json)                                         | Full question bank of roughly 300 survey questions used across demo sessions. Questions are stored in declarative statement form for survey presentation.                                                                                                                                                                                                                                                                   |
 | [`policy_atlas_council.json`](./policy_atlas_council.json)                                   | Canonical source for roughly 54 historical figure "council members" in the AI Policy Atlas. Entries include `id`, `name`, `bio`, `atlasCategory`, SBT metadata, created questions, and avatar placeholders. Categories include Macro Trends, Supply Chains, Actors/Civil Society, and Governance Institutions.                                                                                                              |
 | [`additional_historical_figures.json`](./additional_historical_figures.json)                 | Supplementary set of 15 figures with richer persona fields such as questions, votes, comments, `biggestHope`, `biggestFear`, and `avatarPrompt`.                                                                                                                                                                                                                                                                            |
-| [`historical_figure_users.json`](./historical_figure_users.json)                             | Rich per-figure profile data for roughly 50 figures, including Q&A responses, legislation stances, bios, featured quotes, and highlighted advice. Used heavily by simulated user profile views.                                                                                                                                                                                                                             |
+| [`historical_figure_users.json`](./historical_figure_users.json)                             | Rich per-figure profile data for 62 figures, including Q&A responses, legislation stances, bios, featured quotes, and highlighted advice. Used heavily by simulated user profile views.                                                                                                                                                                                                                                     |
 | [`historical_figures_merged.json`](./historical_figures_merged.json)                         | Consolidated superset combining data from the richer figure sources. Used for demographic computation, avatar resolution, and shared profile question lookups.                                                                                                                                                                                                                                                              |
 | [`historical_figures_tree_qs_and_votes.json`](./historical_figures_tree_qs_and_votes.json)   | Debate-oriented dataset for 66 figures with tree-structured questions, in-character comments, and vote stances. Used by debate tree and political compass views.                                                                                                                                                                                                                                                            |
 | [`demo_polis_data.json`](./demo_polis_data.json)                                             | Polis-format clustering dataset with participants, vote arrays, and group assignments. Used by the demo analysis adapter and Polis report surfaces.                                                                                                                                                                                                                                                                         |
-| [`demo_1_onchain_question_ids.json`](./demo_1_onchain_question_ids.json)                     | Stable IDs for the 42 Context corpus questions shared by legacy `demo-1` and Cloudflare-canonical `demo-sh`.                                                                                                                                                                                                                                                                                                                |
+| [`demo_1_onchain_question_ids.json`](./demo_1_onchain_question_ids.json)                     | Stable IDs for the 42 Context corpus questions shared by `demo-1` and Cloudflare-canonical `demo-sh`.                                                                                                                                                                                                                                                                                                                       |
 | [`demo_2_question_set.json`](./demo_2_question_set.json)                                     | Source set for the 40-question `demo-2` session, including binary, poll, rating, and freeform prompts.                                                                                                                                                                                                                                                                                                                      |
 | [`demo_2_persona_stances.json`](./demo_2_persona_stances.json)                               | Source stance model for 62 demo personas across three clusters.                                                                                                                                                                                                                                                                                                                                                             |
 | [`demo_2_question_seed.json`](./demo_2_question_seed.json)                                   | Generated compact session/comment projection used to seed the 40 `demo-2` questions without loading participant or analysis data into the app shell. Do not edit by hand.                                                                                                                                                                                                                                                   |
@@ -23,6 +23,10 @@ This directory contains demo and fixture data for the Context Engine survey plat
 | [`demo_analysis_data.json`](./demo_analysis_data.json)                                       | Dedicated breakdown-tab analysis fixture. Uses the canonical 42 questions and seeded historical-figure personas, then expands them with deterministic synthetic responses so the breakdown view has richer comparison density without hardcoding question content in the generator. Participant rows now also carry explicit profile metadata so the UI can distinguish baseline historical personas from modeled variants. |
 | [`demo_analysis_generation_config.json`](./demo_analysis_generation_config.json)             | Corpus-backed curation config for the breakdown fixture generator. Keeps vetted question-to-node mappings, selected statement overrides, and deterministic synthetic-response settings in demo data, not in the generator script. Variant profiles include labels, rationale, and confidence so modeled rows stay inspectable.                                                                                              |
 | [`demo_sessions.json`](./demo_sessions.json)                                                 | Demo session definitions keyed by slug with metadata and worker configuration. Used by session resolution code and worker/cors proxy tests.                                                                                                                                                                                                                                                                                 |
+| [`debate_map_demo_data.json`](./debate_map_demo_data.json)                                   | Atlas node tree with each node's compass axes. Read by `debateMapHistoricalData.ts` for the Debate Map.                                                                                                                                                                                                                                                                                                                     |
+| [`polis_report_answer_examples.json`](./polis_report_answer_examples.json)                   | Example answers for the Polis report's written-response demo (`polisReportDemoAnswers.ts`).                                                                                                                                                                                                                                                                                                                                 |
+| [`riskMatrixSeedComments.json`](./riskMatrixSeedComments.json)                               | Seed comments for the Risk Matrix cells, each with a valence and an intensity.                                                                                                                                                                                                                                                                                                                                              |
+| [`riskMatrixCommentContext.json`](./riskMatrixCommentContext.json)                           | Per-subcategory historical figure and corpus references that enrich Risk Matrix comments.                                                                                                                                                                                                                                                                                                                                   |
 | [`sim_profile_answer_reconciliation.json`](./sim_profile_answer_reconciliation.json)         | Curated evidence config for `scripts/reconcile-sim-profile-answers.mjs`. Pins the polarity of key_tension links between the policy question bank and demo comments, and whitelists tree-node fallbacks (with explicit polarity, anchors, and rationale) used to keep simulated profile answers consistent with the vote fixtures.                                                                                           |
 | [`expanded_tag_list.json`](./expanded_tag_list.json)                                         | Taxonomy tag list for survey question classification and topic labeling.                                                                                                                                                                                                                                                                                                                                                    |
 | [`corpus_sample.json`](./corpus_sample.json)                                                 | Sample AI discourse corpus documents used by demo corpus views. This now includes visible `LessWrong` and `Cross-Corpus Debates` slices instead of leaving those tabs hidden or empty.                                                                                                                                                                                                                                      |
@@ -30,13 +34,15 @@ This directory contains demo and fixture data for the Context Engine survey plat
 | [`loophole_historical_figure_principles.json`](./loophole_historical_figure_principles.json) | Per-figure moral principles used to deepen the atlas historical-case briefs in the Loophole-style demo flow.                                                                                                                                                                                                                                                                                                                |
 | [`loophole_historical_cases.json`](./loophole_historical_cases.json)                         | Historical-figure cases inspired by `brendanhogan/loophole`, injected into relevant atlas nodes as a dedicated demo-mode section and mirrored into [`ai-discourse-corpus/corpuses/loophole-historical-cases.json`](../../../../ai-discourse-corpus/corpuses/loophole-historical-cases.json).                                                                                                                                |
 
-### JS Modules
+### TypeScript Modules
 
 | File                                                                                 | Purpose                                                                                                                                                                                |
 | ------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [`historical_figure_demographics.ts`](./historical_figure_demographics.ts)           | Computes demographic breakdowns from merged historical figure data plus the Polis fixture. Exports `DEMO_ANALYSIS_DEMOGRAPHIC_FIELDS` and the default historical figure lookup object. |
 | [`historical_figure_demographics.test.ts`](./historical_figure_demographics.test.ts) | Regression coverage for the demographics lookup and fixture completeness.                                                                                                              |
 | [`debateData.ts`](./debateData.ts)                                                   | Debate HUD fixture module with debate cards, argument trees, and voter profiles.                                                                                                       |
+| [`riskMatrixCommentContext.ts`](./riskMatrixCommentContext.ts)                       | Loads `riskMatrixCommentContext.json` and enriches Risk Matrix comment records with figures and corpus citations. Tests: `riskMatrixCommentContext.test.ts`.                           |
+| [`riskMatrixAtlasScenarioData.ts`](./riskMatrixAtlasScenarioData.ts)                 | Atlas scenario samples for Risk Matrix cells, with lookups by cell and by atlas node.                                                                                                  |
 
 ## Primary Consumers
 
@@ -62,8 +68,8 @@ the live Worker KV remains authoritative for operational configuration.
 
 The question fixture supplies an immediate client rendering of the same
 stable IDs and prompts stored in `demo-sh` KV. These rows are marked
-`cloudflareDemoSeed`, not `temporaryDemoSeed`. `demo-1` remains in the fixture
-as a temporary compatibility route while links migrate.
+`cloudflareDemoSeed`, not `temporaryDemoSeed`. The fixture also keeps `demo-1`,
+which has no Worker URL and uses `temporaryDemoSeed` rows.
 
 ## Regenerating The Demo-2 Fixture
 
@@ -78,11 +84,11 @@ Generation writes both the compact question seed and the full Polis results
 fixture. The build keeps the synchronous seed in its own small cacheable chunk,
 while lazy results consumers own the full participant and analysis data. It is
 deterministic, so unchanged inputs must produce no diff. The
-dataset registry in `utilities/demo/demoPolisDatasets.ts` keeps the legacy demo
+dataset registry in `utilities/demo/demoPolisDatasets.ts` keeps the other demo
 slugs on `demo_polis_data.json`, gives only `demo-2` the generated override,
-and excludes `demo-2` from the legacy Breakdown overlay until a matching
-Breakdown fixture exists. Its generated Polis data already carries the three
-authored opinion-group summaries used in Polis Auto mode. Worker URLs and AI
+and hides Breakdown for `demo-2` until a matching Breakdown fixture exists. Its
+generated Polis data already carries the three authored opinion-group summaries
+used in Polis Auto mode. Worker URLs and AI
 credentials remain operational session configuration and must never be stored
 in these fixtures.
 
@@ -99,7 +105,7 @@ demo-2 authority.
 This is the logical relationship between the core demo fixtures. It describes how the datasets build on each other; it is not an automated build graph by itself.
 
 ```text
-Raw corpus / demo integration package
+ai-discourse-corpus/
   |
   v
 all_300_questions.json
@@ -119,7 +125,7 @@ historical_figures_merged.json
   +--> historical_figures_tree_qs_and_votes.json
   |
   v
-historical_figure_demographics.js
+historical_figure_demographics.ts
   |
   v
 DemoAnalysisAdapter, DebateMap, PolisReport, SimUserPage
@@ -136,10 +142,10 @@ policy_atlas_council.json
 additional_historical_figures.json
   |
   v
-utilities/ui/demoAvatars.js
+utilities/ui/demoAvatars.ts
   |
   v
-utilities/ui/historicalFigureAvatars.js
+utilities/ui/historicalFigureAvatars.ts
   |
   +--> utilities/ui/historicalFigureLocalPhotoManifest.json
   |
@@ -197,9 +203,3 @@ The breakdown tab now uses [`demo_analysis_data.json`](./demo_analysis_data.json
 - The script lives at [`scripts/reconcile-sim-profile-answers.mjs`](../../../../scripts/reconcile-sim-profile-answers.mjs)
 - Profile questions reference the `all_300_questions.json` policy list via `commentIndex`. Evidence priority per answer: the figure's POLIS vote on the demo comment linked by a verbatim `key_tension` match, then the figure's atlas tree vote on the validated node for that comment from [`demo_analysis_generation_config.json`](./demo_analysis_generation_config.json), then a manually validated bank-question node mapping from [`sim_profile_answer_reconciliation.json`](./sim_profile_answer_reconciliation.json). Answers without evidence are left unchanged.
 - Tree-node mappings are only allowed on nodes whose tree votes empirically agree with the node's anchor POLIS statements for at least 80% of figures with both signals; [`sim_profile_answer_consistency.test.js`](./sim_profile_answer_consistency.test.js) enforces this plus the POLIS-link consistency invariant.
-
-## Naming And Compatibility Notes
-
-- Most JSON fixtures in this folder use `snake_case`.
-- Most fixture filenames in this folder now follow `snake_case`, including [`demo_polis_data.json`](./demo_polis_data.json).
-- TypeScript modules in this folder now follow the same `snake_case` filename convention, including [`historical_figure_demographics.ts`](./historical_figure_demographics.ts).

@@ -1,6 +1,6 @@
 import { ethers } from 'ethers';
+import { clearCacheNamespace } from '../cache/cacheScripts.js';
 import contractScripts from './chainGateway.js';
-import { getWeb3Context } from './contractScripts.impl.js';
 import { arweaveClient } from '../arweave/arweaveClient.js';
 
 describe('contractScripts.getSbtMetadata tokenURI parsing', () => {
@@ -44,7 +44,8 @@ describe('contractScripts.getSbtMetadata tokenURI parsing', () => {
     hasPasswordMint: jest.fn().mockResolvedValue(false),
   });
 
-  beforeEach(() => {
+  beforeEach(async () => {
+    await clearCacheNamespace('questionsCache');
     jest.clearAllMocks();
     originalFetch = global.fetch;
     if (!global.fetch) {
@@ -69,6 +70,51 @@ describe('contractScripts.getSbtMetadata tokenURI parsing', () => {
     try {
       delete globalThis.CE_ARWEAVE_DIRECT_TO_AR_IO;
     } catch (_) {}
+  });
+
+  it('rechecks failed SBT metadata after the terminal cooldown and caches recovery', async () => {
+    const clock = jest.spyOn(Date, 'now');
+    const start = Date.now();
+    clock.mockReturnValue(start);
+    const stub = baseContractStub('EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE');
+    contractSpy = jest.spyOn(ethers, 'Contract').mockImplementation(() => stub);
+    arweaveSpy = jest
+      .spyOn(arweaveClient, 'downloadDataFromArweave')
+      .mockRejectedValueOnce(Object.assign(new Error('Gateway unavailable'), { status: 522, retryable: false }))
+      .mockResolvedValue(JSON.stringify({ name: 'Recovered metadata' }));
+    const config = { slug: 'sbt-recovery-fixture', networkChainId: 11155420, contracts: {} };
+    try {
+      expect((await contractScripts.getSbtMetadata('none', sbtAddress, config)).name).toBe('Metadata Test SBT');
+      expect((await contractScripts.getSbtMetadata('none', sbtAddress, config)).name).toBe('Metadata Test SBT');
+      expect(arweaveSpy).toHaveBeenCalledTimes(1);
+      clock.mockReturnValue(start + 30 * 60 * 1000 + 1);
+      expect((await contractScripts.getSbtMetadata('none', sbtAddress, config)).name).toBe('Recovered metadata');
+      expect((await contractScripts.getSbtMetadata('none', sbtAddress, config)).name).toBe('Recovered metadata');
+      expect(arweaveSpy).toHaveBeenCalledTimes(2);
+    } finally {
+      clock.mockRestore();
+    }
+  });
+
+  it('shares concurrent metadata downloads and reuses their successful payload', async () => {
+    const stub = baseContractStub('DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD');
+    contractSpy = jest.spyOn(ethers, 'Contract').mockImplementation(() => stub);
+    let release;
+    const payload = new Promise((resolve) => {
+      release = resolve;
+    });
+    arweaveSpy = jest.spyOn(arweaveClient, 'downloadDataFromArweave').mockReturnValue(payload);
+    const config = { slug: 'sbt-cache-fixture', networkChainId: 84532, contracts: {} };
+    const first = contractScripts.getSbtMetadata('none', sbtAddress, config);
+    const second = contractScripts.getSbtMetadata('none', sbtAddress, config);
+    await flushAsync(100);
+    release(JSON.stringify({ name: 'Shared metadata' }));
+    const values = await Promise.all([first, second]);
+    expect(values.map((value) => value.name)).toEqual(['Shared metadata', 'Shared metadata']);
+    expect(arweaveSpy).toHaveBeenCalledTimes(1);
+    const cached = await contractScripts.getSbtMetadata('none', sbtAddress, config);
+    expect(cached.name).toBe('Shared metadata');
+    expect(arweaveSpy).toHaveBeenCalledTimes(1);
   });
 
   it('does not invent an owner authority when the admin read fails', async () => {
@@ -559,7 +605,7 @@ describe('contractScripts.getSbtMetadata tokenURI parsing', () => {
       text: async () => '',
     });
 
-    const ctx = getWeb3Context({
+    const ctx = {
       slug: 'edge',
       networkChainId: 84532,
       blockLimits: {
@@ -572,7 +618,7 @@ describe('contractScripts.getSbtMetadata tokenURI parsing', () => {
           chainId: 84532,
         },
       },
-    });
+    };
 
     const meta = await contractScripts.getSbtMetadata('none', sbtAddress, ctx);
 
@@ -697,9 +743,9 @@ describe('contractScripts.getSbtMetadata tokenURI parsing', () => {
     const [, arweaveOpts] = arweaveSpy.mock.calls[0];
     expect(arweaveSpy).toHaveBeenCalledTimes(1);
     expect(arweaveSpy).toHaveBeenCalledWith(rawTxId, expect.any(Object));
+    expect(arweaveOpts.cacheBypass).not.toBe(true);
     expect(arweaveOpts).toEqual(
       expect.objectContaining({
-        bypassFailureCache: true,
         debugContext: expect.objectContaining({
           category: 'sbt_metadata',
         }),

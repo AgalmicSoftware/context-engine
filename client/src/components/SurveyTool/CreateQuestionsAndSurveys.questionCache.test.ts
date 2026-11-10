@@ -218,6 +218,74 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
     expect(writeCacheOptimisticMock).toHaveBeenCalledWith('questionsCache', 'primary-session', expect.any(Object));
   });
 
+  it('records the publishing account on the text it keeps for that author', async () => {
+    peekCacheSyncMock.mockReturnValue({});
+    writeCacheOptimisticMock.mockImplementation(async () => undefined);
+
+    // Another account signed in while the publication was landing.
+    const instance = makeInstance({ account: '0xbbb' });
+    instance.getSessionConfig = jest.fn(() => ({
+      slug: 'edge',
+      networkChainId: 84532,
+      contracts: { surveys: { chainId: 84532 } },
+    }));
+    const cacheTarget = instance.resolveManagedCacheSeedTargets();
+    const publication = {
+      sessionSlug: 'edge',
+      draftKey: '',
+      submittedDraft: '{}',
+      storedDraft: null,
+      cacheTarget,
+      workerCacheIdentity: instance.resolveManagedWorkerCacheIdentity(cacheTarget),
+      account: '0xAAA',
+      chainId: 84532,
+    };
+
+    try {
+      await expect(
+        instance.seedUploadedQuestionsCache({
+          questionDataArray: [
+            { id: 'q1', type: 'freeform', prompt: '[encrypted]', creator: '0xaaa' },
+            { id: 'q2', type: 'freeform', prompt: 'Open question', creator: '0xaaa' },
+          ],
+          uploadedQuestions: [{ questionId: 'q1' }, { questionId: 'q2' }],
+          sourceQuestions: [
+            { id: 'q1', type: 'freeform', prompt: 'Private question' },
+            { id: 'q2', type: 'freeform', prompt: 'Open question' },
+          ],
+          publication,
+        }),
+      ).resolves.toBe(true);
+      await expect(
+        instance.seedSubmittedSurveyCache({
+          surveyData: { surveyID: 's1', title: '[encrypted]', questionIDs: ['q1'] },
+          surveyId: 's1',
+          sourceTitle: 'Private survey',
+          publication,
+        }),
+      ).resolves.toBe(true);
+
+      const recent = JSON.parse(window.sessionStorage.getItem('dg:recentQuestionPayloads') || '{}');
+      expect(recent.q1).toEqual(
+        expect.objectContaining({ prompt: 'Private question', promptDecrypted: true, decryptedFor: '0xaaa' }),
+      );
+      expect(recent.q2).not.toHaveProperty('decryptedFor');
+      expect(writeCacheOptimisticMock).toHaveBeenCalledWith(
+        'surveysCache',
+        'edge',
+        expect.objectContaining({
+          '84532': expect.objectContaining({
+            surveys: expect.objectContaining({
+              s1: expect.objectContaining({ title: 'Private survey', titleDecrypted: true, decryptedFor: '0xaaa' }),
+            }),
+          }),
+        }),
+      );
+    } finally {
+      window.sessionStorage.removeItem('dg:recentQuestionPayloads');
+    }
+  });
+
   it('does not clear managed caches after standalone question submit success', async () => {
     const addQuestionsSpy = jest.spyOn(contractScripts, 'addQuestions').mockResolvedValue({
       receipt: { status: 1 },

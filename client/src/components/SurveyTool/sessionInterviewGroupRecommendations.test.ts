@@ -2,9 +2,11 @@ import { callAI } from '../../utilities/ai/aiClient.js';
 import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';
 import { loadPublicWorkerGroups, loadWorkerGroupOverview } from '../../domains/worker/workerGroupPorts';
 import {
+  INTERVIEW_GROUP_AI_TIMEOUT_MS,
   buildInterviewGroupRecommendationEvidenceText,
   buildInterviewGroupRecommendationPrompt,
   loadInterviewWorkerGroupCandidates,
+  matchInterviewGroupsByAnswer,
   normalizeInterviewGroupCandidates,
   parseInterviewGroupRecommendations,
   recommendInterviewGroups,
@@ -101,6 +103,64 @@ describe('session interview group recommendations', () => {
       supported: false,
       reason: 'registry_groups_inline_join_unsupported',
     });
+  });
+
+  it('suggests groups named exactly like a chosen single-choice option, without the AI', () => {
+    const outlook = {
+      id: 'outlook',
+      prompt: 'Your outlook?',
+      type: 'multichoice',
+      options: ['d/acc', 'e/acc'],
+      singleSelect: true,
+    };
+    const tools = {
+      id: 'tools',
+      prompt: 'Tools you use?',
+      type: 'multichoice',
+      options: ['d/acc', 'Other'],
+      singleSelect: false,
+    };
+    const group = (groupId: string, label: string) => ({ ...eligibleCandidate, groupId, label });
+    const candidates = normalizeInterviewGroupCandidates({
+      source: 'authenticated',
+      memberships: [{ group: { ...baseGroup, groupId: 'joined' }, member: { groupId: 'joined' } }],
+      groups: [
+        { ...baseGroup, groupId: 'dacc', label: 'd/acc' },
+        { ...baseGroup, groupId: 'joined', label: 'e/acc' },
+      ],
+    });
+    const match = (answer: unknown, questionId = 'outlook') =>
+      matchInterviewGroupsByAnswer({
+        candidates,
+        questions: [outlook, tools],
+        draftResponses: [{ questionId, answer }],
+      });
+    // Exact, then case and spacing differences.
+    expect(match('d/acc')).toEqual([{ groupId: 'dacc', reason: 'You chose “d/acc”.', evidence: '' }]);
+    expect(match('  D/ACC ')).toEqual([expect.objectContaining({ groupId: 'dacc', reason: 'You chose “D/ACC”.' })]);
+    expect(match(['d/acc'])).toEqual([expect.objectContaining({ groupId: 'dacc' })]);
+    expect(
+      matchInterviewGroupsByAnswer({
+        candidates: [group('open-source', 'Open source')],
+        questions: [{ ...outlook, options: ['Open  source'] }],
+        draftResponses: [{ questionId: 'outlook', answer: 'open \t source' }],
+      }),
+    ).toEqual([expect.objectContaining({ groupId: 'open-source' })]);
+    // No match, an already-joined group, and a multiple-selection question suggest nothing.
+    expect(match('dacc')).toEqual([]);
+    expect(match('e/acc')).toEqual([]);
+    expect(match(['d/acc'], 'tools')).toEqual([]);
+    // One suggestion per group, however many answers name it.
+    expect(
+      matchInterviewGroupsByAnswer({
+        candidates: [group('dacc', 'd/acc')],
+        questions: [outlook, { ...outlook, id: 'outlook-2' }],
+        draftResponses: [
+          { questionId: 'outlook', answer: 'd/acc' },
+          { questionId: 'OUTLOOK-2', answer: 'd/acc' },
+        ],
+      }),
+    ).toHaveLength(1);
   });
 
   it('filters catalog entries to open session-visible groups and excludes known full or already-joined groups', () => {
@@ -316,6 +376,37 @@ describe('session interview group recommendations', () => {
       ],
     });
     expect(callAI).toHaveBeenCalledTimes(2);
+  });
+
+  it('gives up on a stalled AI call, without starting the next batch of groups', async () => {
+    jest.useFakeTimers();
+    try {
+      let answerLate: (raw: string) => void = () => {};
+      jest.mocked(callAI).mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            answerLate = resolve;
+          }),
+      );
+      const result = recommendInterviewGroups({
+        candidates: Array.from({ length: 101 }, (_, index) => ({ ...eligibleCandidate, groupId: `group-${index}` })),
+        transcript: 'Responder: I live in Lyon.',
+        sessionSlug: 'demo4',
+        sessionConfig: workerConfig(),
+        workerUrl: 'https://worker.example',
+      });
+      jest.advanceTimersByTime(INTERVIEW_GROUP_AI_TIMEOUT_MS);
+      await expect(result).resolves.toEqual({
+        status: 'unavailable',
+        recommendations: [],
+        reason: 'ai_recommendation_failed',
+      });
+      answerLate(JSON.stringify({ groups: [] }));
+      await jest.runAllTimersAsync();
+      expect(callAI).toHaveBeenCalledTimes(1);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('returns recoverable recommendation statuses for empty catalogs and explicit session auth-required AI routes', async () => {

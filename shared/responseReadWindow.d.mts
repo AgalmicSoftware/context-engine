@@ -1,0 +1,9 @@
+export type ResponseReadWindow =
+  | { blockTag: number; laterPairs?: undefined }
+  | { blockTag: number; laterPairs: Set<string>; unchangedBlockTag: number }
+  | null;
+export declare const responsePairKey: (responder: unknown, id: unknown) => string;
+export declare const responseReadWindowOptions: (
+  window: ResponseReadWindow, responder: unknown, id: unknown,
+) => { _responseReadWindow?: ResponseReadWindow; blockTag?: number };
+export declare const historicalResponseReadError: (error: unknown, blockTag: unknown) => Error;

@@ -272,6 +272,25 @@ test('set-config persists only exact group creation policies', () => {
   }
 });
 
+test('set-config accepts only the two context addition policies', () => {
+  for (const contextAdditionPolicy of ['admin_only', 'participants']) {
+    const result = applySessionConfigMutation({
+      existingConfig: baseConfig,
+      mutation: { kind: 'set-config', incomingConfig: { contextAdditionPolicy } },
+      slug: 'session-a',
+    });
+    assert.equal(result.ok, true);
+    assert.equal(result.config.contextAdditionPolicy, contextAdditionPolicy);
+  }
+  for (const contextAdditionPolicy of ['everyone', 'Participants', true]) {
+    assert.deepEqual(applySessionConfigMutation({
+      existingConfig: baseConfig,
+      mutation: { kind: 'set-config', incomingConfig: { contextAdditionPolicy } },
+      slug: 'session-a',
+    }), { ok: false, status: 400, error: 'Invalid context addition policy.' });
+  }
+});
+
 test('set-config validates profile patches against the complete canonical storage record', () => {
   const existingConfig = {
     ...cloneJson(profileBearingConfig),
@@ -346,6 +365,62 @@ test('set-config accepts Worker lifecycle and generic Group defaults', () => {
     realtimeModel: 'gpt-realtime-2.1',
   });
   assert.deepEqual(result.config.appearance, { colorSchemeId: 'ocean' });
+});
+
+test('set-config checks a sent session context and stores its trimmed form', () => {
+  const setContext = (sessionContext, existing = profileBearingConfig) => applySessionConfigMutation({
+    existingConfig: cloneJson(existing),
+    mutation: { kind: 'set-config', incomingConfig: { sessionContext } },
+    slug: 'session-a',
+  });
+  const stored = setContext({
+    title: ' Context ',
+    paragraphs: [' Notes. ', ' '],
+    links: [{ label: ' Essay ', url: ' https://example.org/essay ' }, { label: '', url: '' }],
+  });
+  assert.equal(stored.ok, true, JSON.stringify(stored));
+  assert.deepEqual(stored.config.sessionContext, {
+    title: 'Context',
+    paragraphs: ['Notes.'],
+    links: [{ label: 'Essay', url: 'https://example.org/essay' }],
+  });
+  for (const [sessionContext, message] of [
+    ['notes', /must be an object/],
+    [{ paragraphs: ['x'.repeat(2001)] }, /longer than 2,000 characters/],
+    [{ paragraphs: Array(7).fill('p') }, /at most 6 paragraphs/],
+    [{ links: [{ label: 'Plain', url: 'http://example.org' }] }, /must be an https:\/\/ link/],
+    [{ links: Array.from({ length: 9 }, (_, index) => ({ label: `L${index}`, url: `https://example.org/${index}` })) }, /at most 8 links/],
+    [{ title: 'x'.repeat(81) }, /title is longer than 80/],
+    [{ paragraphs: [], extra: true }, /unknown field: extra/],
+    [{ paragraphs: ['Key: sk-live-0123456789abcdefghij'] }, /secrets never go in context/],
+    [{ html: '<p>Page</p>', paragraphs: ['Typed'] }, /typed text or an HTML file, not both/],
+    [{ html: 'x'.repeat(20001) }, /HTML is longer than 20,000 characters/],
+  ]) {
+    const refused = setContext(sessionContext);
+    assert.equal(refused.ok, false, JSON.stringify(sessionContext));
+    assert.equal(refused.status, 400);
+    assert.match(refused.error, /^Invalid session context: /);
+    assert.match(refused.error, message);
+  }
+  assert.equal(setContext(null).ok, true);
+  // Uploaded HTML is stored as sent, trimmed; only the page's sanitizer renders it.
+  const page = setContext({ title: 'Atlas', html: ' <h2>Areas</h2><script>x()</script> ' });
+  assert.equal(page.ok, true, JSON.stringify(page));
+  assert.deepEqual(page.config.sessionContext, {
+    title: 'Atlas',
+    html: '<h2>Areas</h2><script>x()</script>',
+    paragraphs: [],
+    links: [],
+  });
+  // A stored context from before these limits does not block other edits.
+  const legacy = { ...cloneJson(profileBearingConfig), sessionContext: { links: [{ label: 'Plain', url: 'http://example.org' }] } };
+  const renamed = applySessionConfigMutation({
+    existingConfig: legacy,
+    mutation: { kind: 'set-config', incomingConfig: { sessionName: 'Renamed' } },
+    slug: 'session-a',
+  });
+  assert.equal(renamed.ok, true, JSON.stringify(renamed));
+  assert.deepEqual(renamed.config.sessionContext, legacy.sessionContext);
 });
 
 test('set-config accepts boolean pile navigation overrides and preserves them in later patches', () => {
@@ -454,6 +529,8 @@ test('set-config rejects malformed or unsupported interview mode config', () => 
     { interviewMode: { openingMode: 'owner', openingPrompt: '' } },
     { interviewMode: { followNewQuestions: 'true' } },
     { interviewMode: { shareDraftChangesByDefault: 'true' } },
+    { interviewMode: { researchDetail: 'everything' } },
+    { interviewMode: { hiddenDraftShare: 0.75 } },
     { interviewMode: { questionGrowthPercent: 0 } },
     { interviewMode: { steeringPrompt: 42 } },
     { interviewMode: { steeringPrompt: 'x'.repeat(3001) } },
@@ -466,6 +543,50 @@ test('set-config rejects malformed or unsupported interview mode config', () => 
     assert.equal(result.ok, false);
     assert.equal(result.status, 400);
   }
+});
+
+test('set-config accepts the switch that shows fidelity results in Results only as a boolean', () => {
+  const apply = (showFidelityResults) => applySessionConfigMutation({
+    existingConfig: cloneJson(profileBearingConfig),
+    mutation: { kind: 'set-config', incomingConfig: { interviewMode: { enabled: true, showFidelityResults } } },
+    slug: 'session-a',
+  });
+  for (const showFidelityResults of [true, false]) {
+    const result = apply(showFidelityResults);
+    assert.equal(result.ok, true, JSON.stringify(result));
+    assert.equal(result.config.interviewMode.showFidelityResults, showFidelityResults);
+  }
+  for (const showFidelityResults of ['true', 1, null]) {
+    const result = apply(showFidelityResults);
+    assert.equal(result.ok, false, String(showFidelityResults));
+    assert.equal(result.status, 400);
+  }
+});
+
+test('set-config accepts a whole number of people from 1 to 50 as the smallest group shown in fidelity results', () => {
+  const apply = (fidelityMinimumPeople) => applySessionConfigMutation({
+    existingConfig: cloneJson(profileBearingConfig),
+    mutation: { kind: 'set-config', incomingConfig: { interviewMode: { enabled: true, fidelityMinimumPeople } } },
+    slug: 'session-a',
+  });
+  for (const fidelityMinimumPeople of [1, 5, 10, 50]) {
+    const result = apply(fidelityMinimumPeople);
+    assert.equal(result.ok, true, JSON.stringify(result));
+    assert.equal(result.config.interviewMode.fidelityMinimumPeople, fidelityMinimumPeople);
+  }
+  for (const fidelityMinimumPeople of [0, 51, 2.5, '5']) {
+    const result = apply(fidelityMinimumPeople);
+    assert.equal(result.ok, false, String(fidelityMinimumPeople));
+    assert.equal(result.status, 400);
+  }
+  // Clients leave the default out, so a saved interviewMode replaces the stored one whole.
+  const reset = applySessionConfigMutation({
+    existingConfig: apply(1).config,
+    mutation: { kind: 'set-config', incomingConfig: { interviewMode: { enabled: true } } },
+    slug: 'session-a',
+  });
+  assert.equal(reset.ok, true, JSON.stringify(reset));
+  assert.deepEqual(reset.config.interviewMode, { enabled: true });
 });
 
 test('set-config rejects unsafe or unregistered session appearance config', () => {
@@ -670,7 +791,7 @@ test('set-config preserves an identical server-managed Worker Group bootstrap ma
   });
 
   assert.equal(result.ok, true);
-  assert.equal(result.config.authzEpoch, 4);
+  assert.equal(result.config.authzEpoch, 3);
   assert.equal(result.config.sessionName, 'Renamed Session');
   assert.deepEqual(result.config.workerGroupsBootstrap, workerGroupsBootstrap);
 });
@@ -778,6 +899,10 @@ test('set-config preserves owner opening and optional interview features', () =>
     suggestQuestions: true,
     allowManualRefresh: false,
     shareDraftChangesByDefault: true,
+    researchDetail: 'full',
+    hiddenDraftShare: 0.2,
+    showFidelityScore: true,
+    suggestGroups: true,
   };
   const result = applySessionConfigMutation({
     existingConfig: cloneJson(profileBearingConfig),
@@ -786,4 +911,43 @@ test('set-config preserves owner opening and optional interview features', () =>
   });
   assert.equal(result.ok, true);
   assert.deepEqual(result.config.interviewMode, interviewMode);
+});
+
+test('set-config merges ai one level deep, so an edit of one part keeps the rest', () => {
+  const ai = {
+    models: { fast: { provider: 'openai', model: 'gpt-5' }, transcription: { provider: 'openai', model: 'whisper-1' } },
+    reasoningEffort: 'high',
+    taskReasoningEffort: { generate: 'medium' },
+    providers: { custom: { functions: '[{"name":"lookup"}]' } },
+  };
+  const stored = applySessionConfigMutation({
+    existingConfig: {},
+    mutation: { kind: 'set-config', incomingConfig: { ...cloneJson(profileBearingConfig), ai } },
+    slug: 'session-a',
+  }).config;
+  const save = (incomingConfig) =>
+    applySessionConfigMutation({ existingConfig: stored, mutation: { kind: 'set-config', incomingConfig }, slug: 'session-a' });
+
+  // A sent subkey replaces that subkey whole; the omitted ones stay.
+  const models = { fast: { provider: 'anthropic', model: 'claude-sonnet-5-5' } };
+  const edited = save({ ai: { models } });
+  assert.equal(edited.ok, true);
+  assert.deepEqual(edited.config.ai, { ...ai, models });
+  assert.notEqual(edited.config.authzEpoch, stored.authzEpoch);
+
+  assert.deepEqual(save({ ai: { reasoningEffort: 'low' } }).config.ai, { ...ai, reasoningEffort: 'low' });
+  assert.deepEqual(save({ ai: { taskReasoningEffort: {} } }).config.ai, { ...ai, taskReasoningEffort: {} });
+
+  // Resending what is stored changes nothing, so no one is signed out.
+  const resent = save({ ai: { reasoningEffort: 'high', models: ai.models } });
+  assert.equal(resent.ok, true);
+  assert.deepEqual(resent.config.ai, ai);
+  assert.equal(resent.config.authzEpoch, stored.authzEpoch);
+
+  // Merging never lets a secret in.
+  assert.deepEqual(save({ ai: { models: { fast: { apiKey: 'sk-secret' } } } }), {
+    ok: false,
+    status: 400,
+    error: 'Secret-like values are not allowed in public session config fields.',
+  });
 });

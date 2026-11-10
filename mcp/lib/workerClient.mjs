@@ -146,8 +146,12 @@ export const createWorkerClient = ({ workerOrigin, slug, trustedOrigins, wallet,
   let presence = null;
   let presenceLoadedAt = -Infinity;
 
-  const request = async (path, { method = 'GET', headers = {}, body, auth = false, retried = false, maxBytes = MAX_RESPONSE_BYTES } = {}) => {
+  const request = async (path, { method = 'GET', headers = {}, body, auth = false, retried = false, maxBytes = MAX_RESPONSE_BYTES, signal } = {}) => {
+    const checkpoint = () => { if (signal?.aborted) throw new Error('Stopped before the Worker request was sent.'); };
+    checkpoint();
     if (auth) await ensureToken();
+    // Login and token refresh can await. Once sent, retain the response for reconciliation.
+    checkpoint();
     let response;
     try {
       response = await fetchImpl(`${workerOrigin}${path}`, {
@@ -177,7 +181,7 @@ export const createWorkerClient = ({ workerOrigin, slug, trustedOrigins, wallet,
     const error = isRecord(data) ? text(data.error) || text(data.message) : '';
     if (response.status === 401 && auth && !retried && (!error || TOKEN_ERROR_RE.test(error))) {
       token = '';
-      return request(path, { method, headers, body, auth, retried: true, maxBytes });
+      return request(path, { method, headers, body, auth, retried: true, maxBytes, signal });
     }
     if (response.status === 401 && error && !TOKEN_ERROR_RE.test(error)) {
       throw new WorkerRequestError(error.slice(0, MAX_ERROR_DETAIL), { status: 401, code: error });
@@ -311,8 +315,9 @@ export const createWorkerClient = ({ workerOrigin, slug, trustedOrigins, wallet,
     return data;
   };
 
-  const upload = async ({ resource, data, tags = [], requestId = '' }) => {
+  const upload = async ({ resource, data, tags = [], requestId = '', signal }) => {
     const result = await request('/storage/upload', {
+      signal,
       method: 'POST',
       auth: true,
       body: { backend: 'cloudflare', resource, contentType: 'application/json', payloadEncrypted: false, tags, data, ...(requestId ? { requestId } : {}) },
@@ -320,7 +325,7 @@ export const createWorkerClient = ({ workerOrigin, slug, trustedOrigins, wallet,
     return isRecord(result?.storageRef) ? result.storageRef : { id: text(result?.id) };
   };
 
-  const joinGroup = (groupId) => request('/groups/join', { method: 'POST', auth: true, body: { sessionId, groupId } });
+  const joinGroup = (groupId, { signal } = {}) => request('/groups/join', { method: 'POST', auth: true, signal, body: { sessionId, groupId } });
 
   const describeTestEth = async () => {
     await refreshConfig();

@@ -1,6 +1,7 @@
 export type ResponseHydrationInitOptions = {
   background?: boolean;
   forceArweaveFetch?: boolean;
+  forceFull?: boolean;
   notifyOnCompletion?: boolean;
 };
 
@@ -11,6 +12,7 @@ export const mergeResponseHydrationInitOptions = (
   return {
     background: next?.background === true && (!previous || previous.background === true),
     forceArweaveFetch: previous?.forceArweaveFetch === true || next?.forceArweaveFetch === true,
+    forceFull: previous?.forceFull === true || next?.forceFull === true,
     notifyOnCompletion: previous?.notifyOnCompletion === true || next?.notifyOnCompletion === true,
   };
 };

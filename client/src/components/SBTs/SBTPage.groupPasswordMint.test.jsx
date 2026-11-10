@@ -1,5 +1,6 @@
 import { ethers } from 'ethers';
 import SBTPage from './SBTPage';
+import * as sessionConfig from '../../domains/sessions/sessionConfig';
 import contractScripts from '../../utilities/web3/chainGateway.js';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import {
@@ -38,6 +39,9 @@ const createSubject = (props = {}) => {
 };
 
 describe('SBTPage group-password mint', () => {
+  beforeEach(() => {
+    jest.spyOn(sessionConfig, 'getSessionChainId').mockReturnValue(84532);
+  });
   afterEach(() => {
     jest.restoreAllMocks();
   });
@@ -68,7 +72,7 @@ describe('SBTPage group-password mint', () => {
     );
     expect(checkingDuringSign).toEqual([true]);
     expect(subject.state.groupPasswordChecking).toBe(false);
-    expect(mint).toHaveBeenCalledWith('mock', SBT_ADDRESS, '0xsig');
+    expect(mint).toHaveBeenCalledWith('mock', SBT_ADDRESS, '0xsig', '84532');
   });
 
   it('explains the pre-0.6.8 password format when the password does not match', async () => {

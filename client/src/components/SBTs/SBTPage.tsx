@@ -23,12 +23,7 @@ import defaultSbtImage from '../../assets/img/ce_circuit_logo.png';
 import { cryptoUtils } from 'utilities/crypto/cryptography.js';
 import { getGlobalLitHooks, litStorage } from 'utilities/crypto/litProtocol.js';
 import { createLogger } from 'utilities/logging.js';
-import {
-  listNamespaceEntriesSync,
-  peekCacheSync,
-  readCache,
-  updateCacheAtomic,
-} from '../../utilities/cache/cacheScripts.js';
+import { listNamespaceEntriesSync, readCache, updateCacheAtomic } from '../../utilities/cache/cacheScripts.js';
 import { applyBookmarkChange } from '../../utilities/cache/bookmarkChanges';
 import { measureSync } from '../../utilities/ui/uiPerfStats.js';
 import { buildPublicRoute, readPublicUrlBasePath } from '../../utilities/ui/publicUrl.js';
@@ -807,7 +802,7 @@ class SBTPage extends Component<any, any> {
     propsIn: SbtAddressPropsLike = this.props,
   ): SbtPageUrlAutoMintIntent | null => {
     return this._urlAutoMintIntentRuntime.resolve({
-      chainId: this.props.network?.id || this.props.networkChainId,
+      chainId: this.getMintTargetChainId(),
       propsIn,
       searchRaw,
       sessionSlug: this.getEffectiveSessionSlug(),
@@ -1077,7 +1072,10 @@ class SBTPage extends Component<any, any> {
     return true;
   };
 
-  getMintTargetChainId = (): string => String(this.props.network?.id || this.props.networkChainId || '').trim();
+  getMintTargetChainId = (): string => {
+    const chainId = Number(getSessionChainId(this.getEffectiveSessionSlug()));
+    return Number.isSafeInteger(chainId) && chainId > 0 ? String(chainId) : '';
+  };
 
   buildMintTargetKey = ({
     accountLower = '',
@@ -1403,6 +1401,7 @@ class SBTPage extends Component<any, any> {
         sbt,
         String(payload.nonce),
         String(payload.signature),
+        mintChainId,
       );
 
       await this.completeMintSuccessForTarget({
@@ -3044,7 +3043,12 @@ class SBTPage extends Component<any, any> {
       });
 
       sbtLog.log('[MANUAL-MINT] Sending transaction...');
-      const tx = await sbtMintExecutionPort.mintWithGroupSignature(this.props.provider, sbt, String(sig || ''));
+      const tx = await sbtMintExecutionPort.mintWithGroupSignature(
+        this.props.provider,
+        sbt,
+        String(sig || ''),
+        mintChainId,
+      );
       sbtLog.log('[MANUAL-MINT] Tx hash:', tx.transactionHash);
 
       await this.completeMintSuccessForTarget({
@@ -3181,7 +3185,12 @@ class SBTPage extends Component<any, any> {
 
           const userCommit = ethers.utils.solidityKeccak256(['string', 'address'], [effectivePassword, mintAccount]);
 
-          const tx = await sbtAdminOpsPort.startClaim(this.props.provider, sbtAddressOriginalCase, userCommit);
+          const tx = await sbtAdminOpsPort.startClaim(
+            this.props.provider,
+            sbtAddressOriginalCase,
+            userCommit,
+            mintChainId,
+          );
           if (
             this._isMounted &&
             this.isMintTargetContextCurrent({
@@ -3229,6 +3238,7 @@ class SBTPage extends Component<any, any> {
             this.props.provider,
             sbtAddressOriginalCase,
             effectivePassword,
+            mintChainId,
           );
           this.cacheTransactionHash(tx.transactionHash, mintAccountLower);
           await this.completeMintSuccessForTarget({
@@ -3260,7 +3270,7 @@ class SBTPage extends Component<any, any> {
           sbtAddress: sbtAddressOriginalCase,
           sessionSlug: slug,
         });
-        const tx = await sbtMintExecutionPort.claim(this.props.provider, sbtAddressOriginalCase);
+        const tx = await sbtMintExecutionPort.claim(this.props.provider, sbtAddressOriginalCase, mintChainId);
         this.cacheTransactionHash(tx.transactionHash, mintAccountLower);
         await this.completeMintSuccessForTarget({
           accountLower: mintAccountLower,
@@ -3304,6 +3314,7 @@ class SBTPage extends Component<any, any> {
   };
 
   miniBurnHandler = async (): Promise<void> => {
+    const burnChainId = this.getMintTargetChainId();
     if (!this.props.account) {
       this.props.toggleLoginModal(true);
       return;
@@ -3326,7 +3337,12 @@ class SBTPage extends Component<any, any> {
         return;
       }
 
-      const tx = await sbtAdminOpsPort.burnToken(this.props.provider, sbtAddressOriginalCase, tokenIdToBurn);
+      const tx = await sbtAdminOpsPort.burnToken(
+        this.props.provider,
+        sbtAddressOriginalCase,
+        tokenIdToBurn,
+        burnChainId,
+      );
       await this.loadSBTInfo(true);
       if (this._isMounted) this.setState(buildSbtPageBurnSuccessPatch({ txHash: tx.transactionHash }));
       this.cacheTransactionHash(tx.transactionHash);
@@ -3413,6 +3429,7 @@ class SBTPage extends Component<any, any> {
   };
 
   handleBurn = async (): Promise<void> => {
+    const burnChainId = this.getMintTargetChainId();
     if (!this.props.account) {
       this.props.toggleLoginModal(true);
       return;
@@ -3466,7 +3483,12 @@ class SBTPage extends Component<any, any> {
 
     try {
       if (this._isMounted) this.setState(buildSbtPageBurnPendingPatch());
-      const tx = await sbtAdminOpsPort.burnToken(this.props.provider, sbtAddressOriginalCase, tokenIdToBurn);
+      const tx = await sbtAdminOpsPort.burnToken(
+        this.props.provider,
+        sbtAddressOriginalCase,
+        tokenIdToBurn,
+        burnChainId,
+      );
       await this.loadSBTInfo(true);
       if (this._isMounted)
         this.setState(
@@ -3603,7 +3625,12 @@ class SBTPage extends Component<any, any> {
       const sbtAddressOriginalCase = resolveSbtAddressString(this.props.SBTAddress);
       if (!sbtAddressOriginalCase) return;
 
-      const tx = await sbtAdminOpsPort.addHashedPasswords(this.props.provider, sbtAddressOriginalCase, hashedPasswords);
+      const tx = await sbtAdminOpsPort.addHashedPasswords(
+        this.props.provider,
+        sbtAddressOriginalCase,
+        hashedPasswords,
+        this.getMintTargetChainId(),
+      );
       sbtLog.log('addHashedPasswords transaction hash:', tx.transactionHash);
 
       this.cacheTransactionHash(tx.transactionHash);
@@ -3875,6 +3902,7 @@ class SBTPage extends Component<any, any> {
       this.props.provider,
       sbtAddressOriginalCaseForAdminBurn,
       burnSearchResultRecord?.tokenId,
+      this.getMintTargetChainId(),
     );
     await this.loadSBTInfo(true);
     if (this._isMounted)
@@ -4005,7 +4033,6 @@ class SBTPage extends Component<any, any> {
       showActions,
       showMoreDetails,
       showAdminSection,
-      showDocsSection,
       loadingMintersBurners,
       mintingStatus,
       burningStatus,

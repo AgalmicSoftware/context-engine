@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildDraftProvenance, persistAnswerDraft, readAnswerDraft } from './answerDrafts.mjs';
+import { hasSecretShape } from './redaction.mjs';
 class MemoryKv {
   constructor() {
     this.store = new Map();
@@ -441,4 +442,59 @@ test('reordering the same multichoice selection set is not an edit', async () =>
   assert.equal(provenance.delta.changed, false);
   assert.deepEqual(provenance.delta.addedValues, []);
   assert.deepEqual(provenance.delta.removedValues, []);
+});
+
+test('distinct question ids never share a draft record', async () => {
+  const env = draftEnv();
+  // Two hex ids alike in the leading and trailing digits a short key keeps.
+  const first = `0x${'a'.repeat(8)}${'1'.repeat(50)}${'b'.repeat(6)}`;
+  const second = `0x${'a'.repeat(8)}${'2'.repeat(50)}${'b'.repeat(6)}`;
+  const save = (selectedQuestionId, answerLabel) => persistAnswerDraft({
+    env,
+    normalized: NORMALIZED,
+    sessionSlug: 'alpha',
+    selectedQuestionId,
+    answerLabel,
+    answerValue: JSON.stringify({ questionType: 'binary', value: answerLabel.toLowerCase(), comments: '' }),
+    controlType: 'agree_unsure_disagree',
+    metadata: { source: 'agent_handoff' },
+    createdAt: '2026-06-11T10:00:00.000Z',
+  });
+  const read = (selectedQuestionId) => readAnswerDraft({ env, normalized: NORMALIZED, sessionSlug: 'alpha', selectedQuestionId });
+  await save(second, 'Agree');
+  assert.equal(await read(first), null);
+  const saved = await save(first, 'Disagree');
+  assert.equal(saved.draft.editCount, 0);
+  assert.equal(saved.draft.origin.answerLabel, 'Disagree');
+  // Submit records carry the key, so a hash id in it must not read as a secret.
+  assert.equal(hasSecretShape({ key: saved.key }), false);
+  assert.equal((await read(second)).answerLabel, 'Agree');
+  // One question's id in another letter case is still that question.
+  assert.equal((await read(`0x${second.slice(2).toUpperCase()}`)).answerLabel, 'Agree');
+});
+
+test('a draft whose history cannot be read is not saved over', async () => {
+  const env = draftEnv();
+  await saveAgentDraft(env);
+  const get = env.AGENT_ACTION_KV.get.bind(env.AGENT_ACTION_KV);
+  env.AGENT_ACTION_KV.get = async () => {
+    throw Object.assign(new Error('agent_storage_unavailable'), { reason: 'agent_storage_unavailable', status: 503 });
+  };
+  const failed = await persistAnswerDraft({
+    env,
+    normalized: NORMALIZED,
+    sessionSlug: 'alpha',
+    selectedQuestionId: 'q-binary',
+    answerLabel: 'Disagree',
+    answerValue: JSON.stringify({ questionType: 'binary', value: 'disagree', comments: '' }),
+    controlType: 'agree_unsure_disagree',
+    metadata: { source: 'mini_app' },
+    createdAt: '2026-06-11T10:05:00.000Z',
+  });
+  assert.deepEqual(failed, { ok: false, reason: 'answer_draft_read_failed', retryable: true });
+  env.AGENT_ACTION_KV.get = get;
+  const draft = await readAnswerDraft({ env, normalized: NORMALIZED, sessionSlug: 'alpha', selectedQuestionId: 'q-binary' });
+  assert.equal(draft.answerLabel, 'Agree');
+  assert.equal(draft.origin.source, 'agent_handoff');
+  assert.equal(draft.origin.savedAt, '2026-06-11T10:00:00.000Z');
 });

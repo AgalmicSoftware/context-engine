@@ -1588,6 +1588,7 @@ export class SurveySelector extends Component<any, any> {
             onFilterActivityChange={this.handleFilterActivityChange}
             sessionSlug={this.props.sessionSlug}
             activeSessionSlug={activeSessionSlug}
+            sessionSlugPinned={this.props.sessionSlugPinned}
             sessionConfig={this.props.sessionConfig}
             ensureLightSbtUniverse={this.props.ensureLightSbtUniverse}
             ensureQuestionCached={this.props.ensureQuestionCached}
@@ -1905,6 +1906,7 @@ export class QuestionsDashboard extends Component<any, any> {
           defaultFeaturedSBTs={this.props.defaultFeaturedSBTs}
           activeSessionSlug={getActiveSessionSlugFromProps(this.props)}
           sessionSlug={this.props.sessionSlug}
+          sessionSlugPinned={this.props.sessionSlugPinned}
           sessionConfig={this.props.sessionConfig}
           ensureLightSbtUniverse={this.props.ensureLightSbtUniverse}
           isQuestionCacheReady={this.props.isQuestionCacheReady}
@@ -1944,6 +1946,7 @@ export class QuestionsDashboard extends Component<any, any> {
               network={this.props.network}
               activeSessionSlug={getActiveSessionSlugFromProps(this.props)}
               sessionSlug={this.props.sessionSlug}
+              sessionSlugPinned={this.props.sessionSlugPinned}
               sessionConfig={this.props.sessionConfig}
               networkChainId={this.props.networkChainId}
               refreshSurveyResponsesByID={this.props.refreshSurveyResponsesByID}

@@ -803,8 +803,7 @@ const shouldIncludeSessionRegistryChainInLists = (chainId: unknown): boolean => 
   return readIncludeLocalSessionRegistryFlag();
 };
 
-// Session registry + contract defaults are bundled client-side for now.
-// TODO: Resolve from registry.contextengine.eth and <chainId>.contracts.contextengine.eth in the future.
+// Session registry and contract defaults are bundled client-side.
 export const SESSION_REGISTRY_ADDRESSES: Record<number, string> = Object.fromEntries(
   Object.entries({
     ...(contractsConfig.sessionRegistryAddresses || {}),

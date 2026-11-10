@@ -102,6 +102,7 @@ type SurveyResultsQuestionSummaryProps = {
   questionResponsesNonce?: unknown;
   questionsCacheNonce?: unknown;
   responses?: unknown;
+  responsesLoading?: boolean;
   sbtCacheRevision?: unknown;
   styleMap: Record<string, string>;
   surveyId?: unknown;
@@ -205,6 +206,7 @@ const SurveyResultsQuestionSummary = ({
   questionResponsesNonce,
   questionsCacheNonce,
   responses = [],
+  responsesLoading = false,
   sbtCacheRevision,
   styleMap,
   surveyId = '',
@@ -259,6 +261,7 @@ const SurveyResultsQuestionSummary = ({
         />
       )}
       resolvedQuestionType={model.resolvedQuestionType}
+      responsesLoading={responsesLoading}
       styleMap={styleMap}
       viewableResponsesCount={model.viewableResponsesCount}
     />

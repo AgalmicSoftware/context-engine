@@ -198,6 +198,8 @@ describe('WorkerGroupAutoJoin', () => {
 
   it('allows cancellation before sign-in without leaving a retry on refresh', async () => {
     const { unmount } = render(<WorkerGroupAutoJoin {...props} account="" loginComplete={false} />);
+    // Short on screen; a screen reader still hears what it cancels.
+    expect(screen.getByRole('button', { name: 'Cancel auto-join' })).toHaveTextContent(/^Cancel$/);
     fireEvent.click(screen.getByRole('button', { name: 'Cancel auto-join' }));
     expect(screen.getByText('Auto-join cancelled.')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Dismiss group notice' }));

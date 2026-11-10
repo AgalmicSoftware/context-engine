@@ -528,6 +528,9 @@ describe('CreateQuestionsAndSurveys Worker-canonical authoring', () => {
     expect(fetchRegistry).not.toHaveBeenCalled();
     expect(addQuestions).not.toHaveBeenCalled();
     expect(instance.state.questionsAddedSuccessfully).toBe(true);
+    // The success list names each upload; the names never reach the saved draft.
+    expect(instance.state.uploadedQuestionPrompts).toEqual({ '0xquestion': 'Worker-native prompt' });
+    expect(JSON.parse(instance.serializeUnfinishedSurveyDraft())).not.toHaveProperty('uploadedQuestionPrompts');
   });
 
   it('publishes surveys through Worker storage without a block read, Arweave upload, or contract call', async () => {
@@ -698,6 +701,7 @@ describe('CreateQuestionsAndSurveys Worker-canonical authoring', () => {
     expect(instance.ensureResolvedSessionConfigForSubmit).not.toHaveBeenCalled();
     expect(instance.resolveSessionChainId).toHaveBeenCalledWith(
       expect.objectContaining({ sessionModeProfile: sessionConfig.sessionModeProfile }),
+      expect.objectContaining({ account: instance.props.account }),
     );
     expect(fetchRegistry).not.toHaveBeenCalled();
     expect(addQuestions).not.toHaveBeenCalled();

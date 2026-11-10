@@ -1,3 +1,4 @@
+import { deploymentIdentityErrors, responseIdentityErrors } from './deployment-identity.mjs';
 import {
   ANSWER_VALUES,
   HARNESS_VERSION,
@@ -259,16 +260,17 @@ export const validateModelRoster = (modelRoster) => {
       if (model.provider !== 'openrouter') {
         errors.push(`${base}.providerRouting is only valid for openrouter models`);
       }
-      const allowedRoutingFields = new Set(['order', 'allow_fallbacks', 'require_parameters', 'data_collection', 'zdr']);
+      const allowedRoutingFields = new Set(['order', 'only', 'allow_fallbacks', 'require_parameters', 'data_collection', 'zdr']);
       Object.keys(model.providerRouting).forEach((field) => {
         if (!allowedRoutingFields.has(field)) errors.push(`${base}.providerRouting.${field} is not supported`);
       });
-      if (model.providerRouting.order !== undefined) {
-        const order = requireArray(errors, model.providerRouting.order, `${base}.providerRouting.order`);
+      for (const field of ['order', 'only']) {
+        if (model.providerRouting[field] === undefined) continue;
+        const providers = requireArray(errors, model.providerRouting[field], `${base}.providerRouting.${field}`);
         const seenProviders = new Set();
-        order.forEach((providerName, providerIndex) => {
-          requireString(errors, providerName, `${base}.providerRouting.order[${providerIndex}]`);
-          if (seenProviders.has(providerName)) errors.push(`${base}.providerRouting.order duplicates ${providerName}`);
+        providers.forEach((providerName, providerIndex) => {
+          requireString(errors, providerName, `${base}.providerRouting.${field}[${providerIndex}]`);
+          if (seenProviders.has(providerName)) errors.push(`${base}.providerRouting.${field} duplicates ${providerName}`);
           seenProviders.add(providerName);
         });
       }
@@ -444,6 +446,34 @@ export const validateRuns = (runsFile, {
   return errors;
 };
 
+export const validateRunPromptBindings = (runsFile, { questionBank } = {}) => {
+  const errors = [];
+  const manifest = runsFile?.manifest || {};
+  const mode = manifest.mode || runsFile?.mode || 'self';
+  const personaId = manifest.personaId || runsFile?.personaId || null;
+  const persona = manifest.personaProfile || null;
+  const questionsById = new Map((questionBank?.questions || []).map(question => [question.id, question]));
+  for (const [index, run] of (runsFile?.runs || []).entries()) {
+    const name = `runs[${index}] (question ${run?.questionId || '(missing)'})`;
+    const question = questionsById.get(run?.questionId);
+    if (!question) {
+      errors.push(`${name} is absent from the selected question bank; rerun or restore the matching bank`);
+      continue;
+    }
+    if (!['self', 'persona'].includes(mode) || (run.mode || 'self') !== mode ||
+        (run.personaId || null) !== personaId ||
+        (mode === 'persona' && (!persona || persona.id !== personaId || typeof persona.label !== 'string'))) {
+      errors.push(`${name} has mismatched prompt mode or persona; rerun with the recorded context`);
+      continue;
+    }
+    const expectedPromptHash = sha256(buildQuestionPrompt({ question, mode, persona, polarity: run.polarity }));
+    if (!run.promptHash || run.promptHash !== expectedPromptHash) {
+      errors.push(`${name}.promptHash does not match the selected question and prompt template; rerun or restore the matching bank`);
+    }
+  }
+  return errors;
+};
+
 export const validateReleaseRunFile = (runsFile, {
   questionBankHash,
   requiredRepeats,
@@ -458,6 +488,7 @@ export const validateReleaseRunFile = (runsFile, {
   if (!isRecord(runsFile)) return ['release run file must be an object'];
   const manifest = runsFile.manifest;
   if (!isRecord(manifest)) return ['manifest must be an object for release'];
+  if (questionBank) errors.push(...validateRunPromptBindings(runsFile, { questionBank }));
   if (manifest.kind !== 'ai_discourse_bench_run_manifest') {
     errors.push('manifest.kind must be ai_discourse_bench_run_manifest');
   }
@@ -578,7 +609,6 @@ export const validateReleaseRunFile = (runsFile, {
   } else {
     errors.push('manifest.mode must be self or persona');
   }
-  const deploymentIdentitiesByModel = new Map();
   runs.forEach((run, index) => {
     const model = manifestModelsById.get(run?.modelId);
     if (!model) {
@@ -605,27 +635,7 @@ export const validateReleaseRunFile = (runsFile, {
       && hashJson(run.modelProvenance) !== hashJson(model.provenance || {})) {
       errors.push(`runs[${index}].modelProvenance does not match manifest.models`);
     }
-    const metadata = run.responseMetadata || {};
-    const resolvedProvider = String(metadata.resolvedProvider || metadata.provider || run.provider || '').trim();
-    const resolvedModel = String(metadata.resolvedModel || run.model || '').trim();
-    const systemFingerprint = String(metadata.systemFingerprint || '').trim();
-    const endpoint = String(metadata.endpoint || '').trim();
-    if (!deploymentIdentitiesByModel.has(run.modelId)) {
-      deploymentIdentitiesByModel.set(run.modelId, {
-        providers: new Set(), models: new Set(), fingerprints: new Set(), endpoints: new Set(),
-      });
-    }
-    const deploymentIdentity = deploymentIdentitiesByModel.get(run.modelId);
-    if (resolvedProvider) deploymentIdentity.providers.add(resolvedProvider);
-    if (resolvedModel) deploymentIdentity.models.add(resolvedModel);
-    if (systemFingerprint) deploymentIdentity.fingerprints.add(systemFingerprint);
-    if (endpoint) deploymentIdentity.endpoints.add(endpoint);
-    if (resolvedProvider && resolvedProvider !== run.provider) {
-      errors.push(`runs[${index}] resolved provider does not match its declared provider`);
-    }
-    if (resolvedModel && resolvedModel !== run.model) {
-      errors.push(`runs[${index}] resolved model does not match its declared model`);
-    }
+    errors.push(...responseIdentityErrors(run, model, index));
     if (questionBank) {
       const question = questionsById.get(run.questionId);
       if (!question) {
@@ -638,26 +648,10 @@ export const validateReleaseRunFile = (runsFile, {
         } else if (run.normalizedAnswer !== expectedNormalizedAnswer) {
           errors.push(`runs[${index}].normalizedAnswer does not match rawAnswer and polarity`);
         }
-        const expectedPromptHash = sha256(buildQuestionPrompt({
-          question,
-          mode: manifest.mode || run.mode || 'self',
-          persona: manifest.personaProfile || null,
-          polarity: run.polarity,
-        }));
-        if (run.promptHash !== expectedPromptHash) {
-          errors.push(`runs[${index}].promptHash does not match the selected question and prompt template`);
-        }
       }
     }
   });
-  deploymentIdentitiesByModel.forEach((identity, modelId) => {
-    if (identity.providers.size > 1
-      || identity.models.size > 1
-      || identity.fingerprints.size > 1
-      || identity.endpoints.size > 1) {
-      errors.push(`model ${modelId} resolved to multiple deployment identities`);
-    }
-  });
+  errors.push(...deploymentIdentityErrors(runs.filter((run) => manifestModelsById.has(run?.modelId))));
   return errors;
 };
 

@@ -1,7 +1,13 @@
 import React, { Suspense } from 'react';
-import { Button, CardBody } from 'reactstrap';
+import { Button, CardBody, UncontrolledTooltip } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faBookmark, faFingerprint, faSignOutAlt, faSpinner } from '@fortawesome/free-solid-svg-icons';
+import {
+  faBookmark,
+  faFingerprint,
+  faQuestionCircle,
+  faSignOutAlt,
+  faSpinner,
+} from '@fortawesome/free-solid-svg-icons';
 import { MetaMaskLoginButton } from '../../app/runtime/walletUiRuntime.js';
 import styles from './Account.module.scss';
 import type { PasskeyWalletActionMode } from './loginAndSettingsPasskeyActions';
@@ -32,6 +38,7 @@ type LoginModalDisplayBodyProps = {
   openCryptoModal: () => void;
   passkeyWalletStatusMessage: string;
   passkeyWalletStatusTone: string;
+  passkeyWalletStatusHelp: string;
   passkeyMode: PasskeyWalletActionMode;
   provider: string;
   renderAgentTokenLoginPanel: () => React.ReactNode;
@@ -60,6 +67,7 @@ const LoginModalDisplayBody = ({
   openCryptoModal,
   passkeyWalletStatusMessage,
   passkeyWalletStatusTone,
+  passkeyWalletStatusHelp,
   passkeyMode,
   provider,
   renderAgentTokenLoginPanel,
@@ -127,6 +135,33 @@ const LoginModalDisplayBody = ({
               data-testid="ce-passkey-wallet-status"
             >
               {passkeyWalletStatusMessage}
+              {passkeyWalletStatusHelp ? (
+                <>
+                  <button
+                    type="button"
+                    id="ce-passkey-wallet-status-help"
+                    className={styles.passkeyWalletStatusHelp}
+                    data-ce-control-appearance="frameless"
+                    aria-label="What does this mean?"
+                    aria-describedby="ce-passkey-wallet-status-about"
+                  >
+                    <FontAwesomeIcon icon={faQuestionCircle} />
+                  </button>
+                  <span id="ce-passkey-wallet-status-about" hidden>
+                    {passkeyWalletStatusHelp}
+                  </span>
+                  {/* networkTooltip lifts it above the login modal, like the other tooltips here. */}
+                  <UncontrolledTooltip
+                    target="ce-passkey-wallet-status-help"
+                    placement="top"
+                    trigger="hover focus"
+                    autohide={false}
+                    className={styles.networkTooltip}
+                  >
+                    {passkeyWalletStatusHelp}
+                  </UncontrolledTooltip>
+                </>
+              ) : null}
             </div>
           )}
 

@@ -45,6 +45,7 @@ jest.mock('../../utilities/docLibrary/arweaveGraphql.js', () => ({
 }));
 
 jest.mock('../../utilities/docLibrary/config.js', () => ({
+  DEFAULT_ARWEAVE_GRAPHQL_URLS: ['https://fallback.example/graphql'],
   resolveDocLibraryProvider: (...args: any[]) => mockResolveDocLibraryProvider(...args),
   resolveArweaveGraphqlUrl: (...args: any[]) => mockResolveArweaveGraphqlUrl(...args),
   resolveArweaveGraphqlUrls: (...args: any[]) => mockResolveArweaveGraphqlUrls(...args),

@@ -57,6 +57,8 @@ video-clickthrough-local
 .env.e2e
 .env.e2e.example
 .keys
+workers/*/.dev.vars
+workers/*/dev.vars
 .e2e-secrets
 .e2e-cache
 .npm-cache
@@ -101,6 +103,7 @@ whitepaper/IdeasMap.md
 client/src/utilities/worker/sessionCorsWorker.*.proxy.test.js
 client/src/utilities/web3/contractScripts.*.proxy.test.js
 ai-discourse-corpus/corpuses/_*.js
+media
 EOF
   ce_public_release_private_doc_patterns
 }
@@ -109,6 +112,7 @@ ce_public_release_strip_assert_absent_patterns() {
   cat <<'EOF'
 TODO
 contextEngine-cc
+media
 Claude outputs
 outreach-and-applications
 grant-applications
@@ -127,6 +131,8 @@ CLAUDE.md
 .env.e2e
 .env.e2e.example
 .keys
+workers/*/.dev.vars
+workers/*/dev.vars
 .e2e-secrets
 .e2e-cache
 .npm-cache

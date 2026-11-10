@@ -1,5 +1,6 @@
 import type React from 'react';
 
+import { getDecryptCacheGeneration } from '../../utilities/crypto/cryptography.js';
 import { buildResponseGatePolicy } from '../../utilities/crypto/litGatePolicy.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { getShortenedAddress } from 'utilities/ui/displayHelpers.js';
@@ -235,6 +236,23 @@ export const createSurveyResultsLockedResponsesRuntime = ({
     return changed ? (next as SurveyResultsResponseRecord) : response;
   };
 
+  // What the Results view shows for one stored answer, for callers that hold the row rather than its key.
+  const applyDecryptedOverrideToRow = (
+    response: SurveyResultsResponseRecord,
+    responder: unknown,
+    questionId: string,
+    surveyId?: unknown,
+  ): SurveyResultsResponseRecord | null =>
+    applyDecryptedOverrideToResponse({
+      response,
+      key: getLockedResponseKey({
+        responder,
+        questionId,
+        surveyId: surveyId || ports.getState().surveyId,
+        response,
+      }),
+    });
+
   const buildLockedGateDetails = (
     lockedRows: unknown = [],
     questionLookup: Record<string, SurveyResultsQuestionWithEncryption> = {},
@@ -425,6 +443,9 @@ export const createSurveyResultsLockedResponsesRuntime = ({
     if (lockedRows.length === 0) return;
 
     ports.applyStatePatch(buildSurveyResultsLockedResponsesDecryptingPatch(true));
+    // The account changes (or signs out) whenever the decrypt generation moves.
+    const decryptGeneration = getDecryptCacheGeneration();
+    const accountChanged = () => decryptGeneration !== getDecryptCacheGeneration();
 
     let anyDecrypted = false;
     const nextOverrides: Record<string, SurveyResultsDecryptedResponseOverride> = {
@@ -435,6 +456,8 @@ export const createSurveyResultsLockedResponsesRuntime = ({
     };
 
     for (const row of lockedRows) {
+      // Stop before the new account is asked to sign for work that is discarded.
+      if (accountChanged()) return;
       const response: SurveyResultsResponseRecord = row?.response || {};
       const override: SurveyResultsDecryptedResponseOverride = { ...(nextOverrides[row.key] || {}) };
 
@@ -494,6 +517,8 @@ export const createSurveyResultsLockedResponsesRuntime = ({
       }
     }
 
+    // Plaintext unlocked for the previous reader must not reach the next one.
+    if (accountChanged()) return;
     ports.applyStatePatch(
       buildSurveyResultsLockedResponsesDecryptCompletePatch({
         anyDecrypted,
@@ -509,6 +534,7 @@ export const createSurveyResultsLockedResponsesRuntime = ({
 
   return {
     applyDecryptedOverrideToResponse,
+    applyDecryptedOverrideToRow,
     getLockedResponseKey,
     getMemoizedLockedResponsesModel,
     getQuestionEncryptionGates,

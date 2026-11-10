@@ -4,6 +4,12 @@ import { callSessionConfigCoordinator } from './sessionConfigAuthority.js';
 import {
   ADMIN_SESSION_SECRET_KEYS as ALLOWED_SECRET_KEYS,
   ensureSessionLitAuthorizationSigner,
+  beginSessionLitProvisioning,
+  preflightSessionLitProvisioning,
+  checkpointSessionLitProvisioning,
+  releaseSessionLitProvisioning,
+  checkSessionLitProvisioning,
+  discardSessionLitProvisioning,
   finalizeSessionLitAuthorization,
   updateSessionSecretsAfterLitRepair,
 } from './sessionLitAuthorizationCoordinator.js';
@@ -13,6 +19,10 @@ import {
 } from './adminRequestAuthority.js';
 import {
   bootstrapLitChipotleSession,
+  confirmLitSetupGone,
+  ensureChipotleManagementApiKey,
+  LIT_PROVISIONING_CREDENTIALS_CONFLICT,
+  mayMeanLitSetupGone,
   provisionLitChipotleAction,
   readLitChipotleStatus,
   resolveLitChipotleProvisioningRuntime,
@@ -43,6 +53,7 @@ import {
 } from '../shared/workerSessionConfig.mjs';
 import { executeCoordinatedSessionConfigMutation } from './sessionWriteCoordinator.js';
 import { generateResultsAnalysisDraft } from './resultsAnalysisGeneration.js';
+import { buildDebateAtlas, canBuildDebateAtlas, DEBATE_ATLAS_BUILD_ACTION } from './debateAtlasBuild.js';
 
 const toTrimmedString = (value) => (
   typeof value === 'string'
@@ -164,7 +175,10 @@ export const dispatchAdminRequest = async ({
       validateSiweAddressMatchesRequest: deps?.validateSiweAddressMatchesRequest,
       consumeNonce: deps?.consumeNonce,
       validateBootstrapAdmin: deps?.validateBootstrapAdmin,
-      validateAdmin: deps?.validateAdmin,
+      // Co-admins and results admins may build atlases and do nothing else here.
+      validateAdmin: action === DEBATE_ATLAS_BUILD_ACTION
+        ? (args) => canBuildDebateAtlas({ ...args, validateAdmin: deps?.validateAdmin })
+        : deps?.validateAdmin,
       MISSING_SLUG_ERROR: deps?.MISSING_SLUG_ERROR,
     },
   });
@@ -188,6 +202,7 @@ export const dispatchAdminRequest = async ({
       env,
       slug: targetSlug,
       adminAddress: authorityResult.address || body?.address,
+      expectedAuthority,
       headers,
       deps: {
         json: deps?.json,
@@ -223,6 +238,20 @@ export const dispatchAdminRequest = async ({
     } catch (error) {
       return deps?.json?.({ error: error?.message || 'Results analysis generation failed.' }, 500, privateHeaders);
     }
+  }
+
+  if (action === DEBATE_ATLAS_BUILD_ACTION) {
+    const privateHeaders = withPrivateNoStoreHeaders(headers);
+    const result = await (deps?.buildDebateAtlas || buildDebateAtlas)({
+      env,
+      slug: targetSlug,
+      config: existingConfig,
+      body,
+      headers: privateHeaders,
+      builderAddress: authorityResult.address,
+      deps,
+    });
+    return deps?.json?.(result, result?.status || (result?.ok ? 200 : 500), privateHeaders);
   }
 
   if (action === 'storage/set-hidden') {
@@ -331,14 +360,38 @@ export const dispatchAdminRequest = async ({
   }
 
   if (action === 'lit-chipotle-provision' || action === 'lit-chipotle-bootstrap-session') {
+    let attempt;
+    const coordination = { env, slug: targetSlug, baseConfig: existingConfig, expectedAuthority };
+    // Fence and renew the attempt immediately before every remote call;
+    // individual requests expire well before the five-minute lease.
+    const fetchImpl = async (url, init) => {
+      await (deps?.checkpointSessionLitProvisioning || checkpointSessionLitProvisioning)({
+        ...coordination, attemptId: attempt.attemptId, checkpoint: {},
+      });
+      return (deps?.fetchImpl || globalThis.fetch)(url, { ...init, signal: AbortSignal.timeout(30_000) });
+    };
     try {
       const existingSecrets = { ...((await deps?.getSessionSecrets?.(env, targetSlug)) || {}) };
+      const runtime = action === 'lit-chipotle-provision'
+        ? (deps?.resolveLitChipotleProvisioningRuntime || resolveLitChipotleProvisioningRuntime)({ env, config: existingConfig, secrets: existingSecrets, body })
+        : null;
+      if (runtime) ensureChipotleManagementApiKey(runtime);
+      const beginArgs = { ...coordination, freshAuthority: body.freshAuthority === true,
+        accountApiKeys: [body.litAccountApiKey, existingSecrets.litAccountApiKey || body.litAccountApiKey || runtime?.litManagementApiKey || env.LIT_ACCOUNT_API_KEY] };
+      await (deps?.preflightSessionLitProvisioning || preflightSessionLitProvisioning)(beginArgs);
+      // Begin repeats the check under the coordinator lock so the read preflight
+      // cannot race a newly created resource or changed account checkpoint.
+      attempt = await (deps?.beginSessionLitProvisioning || beginSessionLitProvisioning)(beginArgs);
       const options = {
         env,
         config: existingConfig,
         secrets: existingSecrets,
         request: body,
         sessionSlug: targetSlug,
+        provisioning: attempt.checkpoint,
+        checkpointProvisioning: checkpoint => (deps?.checkpointSessionLitProvisioning || checkpointSessionLitProvisioning)({
+          ...coordination, attemptId: attempt.attemptId, checkpoint,
+        }),
         persistAuthorizationSecret: async (proposedPrivateKey) => {
           const privateKey = await (deps?.ensureSessionLitAuthorizationSigner || ensureSessionLitAuthorizationSigner)({
             env, slug: targetSlug, proposedPrivateKey, baseConfig: existingConfig, expectedAuthority,
@@ -346,13 +399,10 @@ export const dispatchAdminRequest = async ({
           existingSecrets.litAuthorizationPrivateKey = privateKey;
           return privateKey;
         },
-        fetchImpl: deps?.fetchImpl,
+        fetchImpl,
       };
       let result;
       if (action === 'lit-chipotle-provision') {
-        const runtime = (deps?.resolveLitChipotleProvisioningRuntime || resolveLitChipotleProvisioningRuntime)({
-          env, config: existingConfig, secrets: existingSecrets, body,
-        });
         result = await (deps?.provisionLitChipotleAction || provisionLitChipotleAction)({ ...options, runtime });
       } else {
         result = await (deps?.bootstrapLitChipotleSession || bootstrapLitChipotleSession)(options);
@@ -361,6 +411,7 @@ export const dispatchAdminRequest = async ({
       // Separate KV writes can mix credentials from concurrent bootstrap completions.
       const finalized = await (deps?.finalizeSessionLitAuthorization || finalizeSessionLitAuthorization)({
         env, slug: targetSlug, baseConfig: existingConfig, expectedAuthority,
+        attemptId: attempt.attemptId,
         litCredentials: result?.litCredentials,
         secretOutputs: result?.secretOutputs,
       });
@@ -372,7 +423,37 @@ export const dispatchAdminRequest = async ({
       delete responseBody.litCredentials;
       return deps?.json?.(responseBody, 200, headers);
     } catch (error) {
-      return deps?.json?.({ error: error?.message || 'Failed to provision Lit authorization.' }, error?.status || 502, headers);
+      // Only Lit confirming that saved resources are gone clears the saved
+      // setup so a retry starts over; any other failure keeps it for Resume.
+      // A supplied key that conflicts with saved setup is refused before Lit is
+      // asked, so lease the saved setup and ask; that key then replaces the
+      // saved account too.
+      const conflict = error?.code === 'lit_provisioning_credentials_conflict';
+      const keyConflict = conflict && !attempt;
+      try {
+        if (keyConflict) attempt = await (deps?.checkSessionLitProvisioning || checkSessionLitProvisioning)(coordination);
+        const gone = attempt && (conflict || mayMeanLitSetupGone(error))
+          ? await confirmLitSetupGone({ checkpoint: attempt.checkpoint, env, fetchImpl })
+          : '';
+        if (gone) {
+          await (deps?.discardSessionLitProvisioning || discardSessionLitProvisioning)({
+            ...coordination, attemptId: attempt.attemptId, keepAccount: gone === 'resources' && !keyConflict,
+          });
+          return deps?.json?.({ error: gone === 'account'
+            ? 'Lit no longer accepts the saved Lit account key, so the saved setup was cleared. Retry to start over.'
+            : 'Lit no longer has the saved Lit group or PKP, so the saved setup was cleared. Retry to start over.',
+          }, 409, headers);
+        }
+      } catch {}
+      return deps?.json?.({ error: error?.code === 'lit_provisioning_credentials_conflict'
+        ? LIT_PROVISIONING_CREDENTIALS_CONFLICT
+        : error?.code === 'lit_management_key_missing' ? 'Lit account API key not configured.'
+        : error?.code === 'lit_provisioning_resources_pending' ? error.message
+        : 'Lit provisioning did not finish. Retry to resume its saved progress.' }, error?.status || 502, headers);
+    } finally {
+      if (attempt) {
+        try { await (deps?.releaseSessionLitProvisioning || releaseSessionLitProvisioning)({ ...coordination, attemptId: attempt.attemptId }); } catch {}
+      }
     }
   }
 
@@ -418,7 +499,8 @@ export const dispatchAdminRequest = async ({
     const responseHeaders = new Headers(headers);
     responseHeaders.set('Cache-Control', 'no-store');
     const result = await callSessionConfigCoordinator({ env, slug: targetSlug, path: action === 'import-session-backup' ? 'backup/import' : action === 'session-backup-status' ? 'backup/status' : 'backup/abandon',
-      expectedAuthority, page: body?.page, archiveId: body?.archiveId, adoptSessionId: body?.adoptSessionId === true });
+      expectedAuthority, page: body?.page, archiveId: body?.archiveId, adoptSessionId: body?.adoptSessionId === true,
+      workerUrl: body?.workerUrl, requestOrigin: new URL(request.url).origin });
     return deps?.json?.(result.body, result.status, responseHeaders);
   }
 

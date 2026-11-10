@@ -22,7 +22,7 @@ for (const deploymentKind of [undefined]) {
   });
 }
 
-test('retired Bridge deployment rejects before account or artifact requests', async () => {
+test('retired separate agent deployment rejects before account or artifact requests', async () => {
   const result = await executeDeployHelperRequest({
     body: { apiToken: 'fixture-invalid', deploymentKind: 'agent_session_wrapped',
       workerName: 'fixture-worker', bundleUrl: 'https://assets.example/worker.js', bundleManifestUrl: assetUrl },

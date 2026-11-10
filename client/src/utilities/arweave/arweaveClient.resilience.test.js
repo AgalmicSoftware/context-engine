@@ -170,7 +170,7 @@ describe('arweaveClient upload/download resilience', () => {
     const readOpts = {
       gateways: [TEST_ARWEAVE_GATEWAY],
       retries: 0,
-      bypassFailureCache: true,
+      cacheBypass: true,
       disableExistencePrecheck: true,
       includeRawRoute: false,
       includeTxDataRoute: false,

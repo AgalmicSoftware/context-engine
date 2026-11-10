@@ -78,6 +78,8 @@ jest.mock('./questionRouting.js', () => ({
   pickBetterQuestionPayload: jest.fn(),
 }));
 
+const metadataListing = (rows) => ({ rows, listedStorageRefIds: new Set(rows.map((row) => row.storageRefId)) });
+
 const {
   createSessionQuestionCacheController,
   mayHaveTemporaryDemoQuestionFixtures,
@@ -110,6 +112,7 @@ const {
 } = require('../session/mainSiteProgressHelpers.js');
 const { isMaskedQuestionPayload, pickBetterQuestionPayload } = require('./questionRouting.js');
 const { resolveWorkerCanonicalCacheIdentity } = require('./workerCanonicalCacheIdentity.js');
+const { clearDecryptCaches } = require('../crypto/cryptography.js');
 
 const NETWORK_ID = '11155420';
 const SESSION_SLUG = 'alpha';
@@ -450,6 +453,98 @@ describe('createSessionQuestionCacheController', () => {
     });
   });
 
+  describe('readiness ownership', () => {
+    it('an earlier session finishing late does not mark the newer load ready', async () => {
+      const host = createMockHost();
+      const controller = createSessionQuestionCacheController(host);
+      const [alphaWindow, betaWindow] = [createDeferred(), createDeferred()];
+      contractScripts.getRelevantBlockWindowForFilter
+        .mockReturnValueOnce(alphaWindow.promise)
+        .mockReturnValueOnce(betaWindow.promise);
+
+      const alpha = controller.initializeQuestionCacheForGroup('alpha');
+      const beta = controller.initializeQuestionCacheForGroup('beta');
+      alphaWindow.resolve({ fromBlock: 4, toBlock: 3 });
+      await alpha;
+      expect(host.getStateSnapshot().isQuestionCacheReady).toBe(false);
+
+      betaWindow.resolve({ fromBlock: 4, toBlock: 3 });
+      await beta;
+      expect(host.getStateSnapshot().isQuestionCacheReady).toBe(true);
+    });
+
+    it('an earlier session failing after the newer load finished cannot overwrite it', async () => {
+      const host = createMockHost();
+      const controller = createSessionQuestionCacheController(host);
+      const alphaScan = createDeferred();
+      contractScripts.getRelevantBlockWindowForFilter
+        .mockResolvedValueOnce({ fromBlock: 10, toBlock: 12 })
+        .mockResolvedValueOnce({ fromBlock: 4, toBlock: 3 });
+      contractScripts.getAllQuestionIDsChunkedWithCallback.mockReturnValueOnce(alphaScan.promise);
+
+      const alpha = controller.initializeQuestionCacheForGroup('alpha');
+      await controller.initializeQuestionCacheForGroup('beta');
+      expect(host.getStateSnapshot().isQuestionCacheReady).toBe(true);
+
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      alphaScan.reject(new Error('fixture: read failed'));
+      await alpha;
+
+      expect(host.getStateSnapshot()).toMatchObject({
+        isQuestionCacheReady: true,
+        questionCacheInitializationError: false,
+      });
+    });
+
+    it('a skipped session is ready at once while an earlier load still runs', async () => {
+      const host = createMockHost({
+        scanScopeNoop: jest.fn((slug, _operation, onSkipped) => {
+          if (slug !== 'beta') return false;
+          onSkipped();
+          return true;
+        }),
+      });
+      const controller = createSessionQuestionCacheController(host);
+      const alphaWindow = createDeferred();
+      contractScripts.getRelevantBlockWindowForFilter.mockReturnValueOnce(alphaWindow.promise);
+
+      const alpha = controller.initializeQuestionCacheForGroup('alpha');
+      await controller.initializeQuestionCacheForGroup('beta');
+      expect(host.getStateSnapshot().isQuestionCacheReady).toBe(true);
+
+      alphaWindow.resolve({ fromBlock: 4, toBlock: 3 });
+      await alpha;
+    });
+
+    it('a queued rerun of the earlier session does not take readiness from the newer load', async () => {
+      // Earlier tests may leave a rerun timer that would use this test's mocks.
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      contractScripts.getRelevantBlockWindowForFilter.mockClear();
+      const host = createMockHost();
+      const controller = createSessionQuestionCacheController(host);
+      const [alphaWindow, betaWindow, rerunWindow] = [createDeferred(), createDeferred(), createDeferred()];
+      contractScripts.getRelevantBlockWindowForFilter
+        .mockReturnValueOnce(alphaWindow.promise)
+        .mockReturnValueOnce(betaWindow.promise)
+        .mockReturnValueOnce(rerunWindow.promise);
+
+      const alpha = controller.initializeQuestionCacheForGroup('alpha');
+      void controller.initializeQuestionCacheForGroup('alpha');
+      const beta = controller.initializeQuestionCacheForGroup('beta');
+      alphaWindow.resolve({ fromBlock: 4, toBlock: 3 });
+      await alpha;
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(contractScripts.getRelevantBlockWindowForFilter).toHaveBeenCalledTimes(3);
+
+      betaWindow.resolve({ fromBlock: 4, toBlock: 3 });
+      await beta;
+      expect(host.getStateSnapshot().isQuestionCacheReady).toBe(true);
+
+      rerunWindow.resolve({ fromBlock: 4, toBlock: 3 });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+  });
+
   describe('destroy', () => {
     it('clears timers and prevents queued continuation runs', async () => {
       jest.useFakeTimers();
@@ -503,24 +598,26 @@ describe('createSessionQuestionCacheController', () => {
   describe('initializeQuestionCacheForGroup', () => {
     it('hydrates fresh Worker/SBT question metadata before the chain-scan no-op without RPC calls', async () => {
       const sessionCfg = createWorkerCanonicalSessionConfig({ hybrid: true });
-      const loadQuestions = jest.fn().mockResolvedValue([
-        {
-          id: '0xworkerquestion',
-          createdAtMs: 123,
-          storageRefId: 'cf_question_fresh',
-          storageRef: {
-            backend: 'cloudflare',
-            id: 'cf_question_fresh',
-            resource: 'questions',
-          },
-          payload: {
+      const loadQuestions = jest.fn().mockResolvedValue(
+        metadataListing([
+          {
             id: '0xworkerquestion',
-            prompt: 'Fresh Worker question',
-            sessionId: WORKER_SESSION_ID,
-            sessionSlug: SESSION_SLUG,
+            createdAtMs: 123,
+            storageRefId: 'cf_question_fresh',
+            storageRef: {
+              backend: 'cloudflare',
+              id: 'cf_question_fresh',
+              resource: 'questions',
+            },
+            payload: {
+              id: '0xworkerquestion',
+              prompt: 'Fresh Worker question',
+              sessionId: WORKER_SESSION_ID,
+              sessionSlug: SESSION_SLUG,
+            },
           },
-        },
-      ]);
+        ]),
+      );
       const host = createMockHost({
         sessionCfg,
         chainId: null,
@@ -625,26 +722,28 @@ describe('createSessionQuestionCacheController', () => {
         workerCanonicalIdentity: identityB,
       });
 
-      delayedB.resolve([]);
+      delayedB.resolve(metadataListing([]));
       await runB;
-      delayedA.resolve([
-        {
-          id: 'question-a-delayed',
-          createdAtMs: 789,
-          storageRefId: 'cf_question_a_delayed',
-          storageRef: {
-            backend: 'cloudflare',
-            id: 'cf_question_a_delayed',
-            resource: 'questions',
-          },
-          payload: {
+      delayedA.resolve(
+        metadataListing([
+          {
             id: 'question-a-delayed',
-            prompt: 'Delayed Session A question',
-            sessionId: sessionConfigA.sessionId,
-            sessionSlug: SESSION_SLUG,
+            createdAtMs: 789,
+            storageRefId: 'cf_question_a_delayed',
+            storageRef: {
+              backend: 'cloudflare',
+              id: 'cf_question_a_delayed',
+              resource: 'questions',
+            },
+            payload: {
+              id: 'question-a-delayed',
+              prompt: 'Delayed Session A question',
+              sessionId: sessionConfigA.sessionId,
+              sessionSlug: SESSION_SLUG,
+            },
           },
-        },
-      ]);
+        ]),
+      );
       await runA;
 
       expect(host.getStored('questionsCache', SESSION_SLUG).worker).toMatchObject({
@@ -1734,7 +1833,7 @@ describe('createSessionQuestionCacheController', () => {
       expect(host.queueLocalRevisionUpdate).not.toHaveBeenCalled();
     });
 
-    it('writes improved masked payloads and queues a local revision update', async () => {
+    it('writes improved masked payloads for their reader and queues a local revision update', async () => {
       const host = createMockHost({
         initialStorage: {
           questionsCache: {
@@ -1777,6 +1876,7 @@ describe('createSessionQuestionCacheController', () => {
                 masked: false,
                 prompt: 'Decrypted prompt',
                 promptDecrypted: true,
+                decryptedFor: ACCOUNT.toLowerCase(),
               }),
             }),
           }),
@@ -1785,6 +1885,33 @@ describe('createSessionQuestionCacheController', () => {
       expect(host.queueLocalRevisionUpdate).toHaveBeenCalledWith({
         needsQuestionResponsesNonce: true,
       });
+    });
+
+    it('keeps text decrypted before an account change out of the cache', async () => {
+      const host = createMockHost({
+        initialStorage: {
+          questionsCache: {
+            [SESSION_SLUG]: createQuestionsCacheEnvelope({
+              q1: createMaskedQuestion('q1'),
+            }),
+          },
+        },
+      });
+      const controller = createSessionQuestionCacheController(host);
+
+      hasMaskedQuestionPayloadImproved.mockReturnValue(true);
+      contractScripts.decryptQuestionPayloadInPlace.mockImplementation(async (question) => {
+        question.masked = false;
+        question.prompt = 'Previous reader prompt';
+        question.promptDecrypted = true;
+        // AppShell clears the decrypt caches on every account change and sign-out.
+        clearDecryptCaches();
+      });
+
+      await controller.refreshEncryptedQuestionPayloadsForGroup(SESSION_SLUG, { force: true });
+
+      expect(contractScripts.decryptQuestionPayloadInPlace).toHaveBeenCalled();
+      expect(JSON.stringify(host.getStored('questionsCache', SESSION_SLUG))).not.toContain('Previous reader prompt');
     });
 
     it('preserves backoff entries created across multiple refresh batches', async () => {

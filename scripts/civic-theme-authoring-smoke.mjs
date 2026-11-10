@@ -18,6 +18,8 @@ export async function inspectCivicAuthoring(page) {
   await panel.locator('[class*="toggleSwitch_"]').click();
   await panel.getByRole('textbox', { name: 'Title', exact: true }).waitFor({ state: 'visible' });
   await assertReadable(panel);
+  // The JSON and prompt views are folded into a disclosure.
+  await panel.locator('summary').filter({ hasText: 'JSON and AI prompt' }).click();
   for (const name of ['Show JSON', 'Show AI Prompt']) {
     const show = panel.getByRole('button', { name, exact: true });
     if (await show.isVisible()) await show.click();

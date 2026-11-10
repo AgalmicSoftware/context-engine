@@ -1,28 +1,15 @@
 #sbtDropdown,
-#customSbtAddressInput,
-#sbtAddButton,
-#customSbtAddButton,
-#removeIncludedSbtButton,
-#removeExcludedSbtButton,
-#onlyVerifiedHumansCheckbox {
+#sbtAddButton {
   color: var(--ce-color-black);
 }
 
-#sbtDropdown::placeholder,
-#customSbtAddressInput::placeholder {
+#sbtDropdown::placeholder {
   color: var(--ce-color-black);
 }
 
-#sbtAddButton,
-#customSbtAddButton,
-#removeIncludedSbtButton,
-#removeExcludedSbtButton {
+#sbtAddButton {
   background-color: var(--ce-color-white);
   border: 1px solid var(--ce-color-border-light);
-}
-
-#onlyVerifiedHumansCheckbox + label {
-  color: var(--ce-color-black);
 }
 
 .sbtSelector {
@@ -89,12 +76,6 @@
   line-height: 1.4;
 }
 
-.menuFooter {
-  padding: 8px;
-  border-top: 1px solid color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
-  background: color-mix(in srgb, var(--ce-compat-dark) 20%, transparent);
-}
-
 .loadingMessage {
   display: inline-flex;
   align-items: center;
@@ -128,18 +109,6 @@
 .loadingStatusText {
   white-space: nowrap;
   font-weight: 600;
-}
-
-.loadingStatusSrOnly {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
 }
 
 .selectorRow {
@@ -218,12 +187,6 @@
   margin-right: 10px;
 }
 
-.sbtThumbnail {
-  width: 50px;
-  height: 50px;
-  margin-right: 10px;
-}
-
 //
 
 .addressTag {
@@ -249,44 +212,13 @@
   /* Increase the font size */
 }
 
-.greyedOutLabel {
-  color: var(--ce-text-muted);
-}
-
-.greyedOutLabel input[type='checkbox'] {
-  cursor: not-allowed;
-}
-
-.greyedOutLabel span {
-  cursor: default;
-}
-
 // SBTFilter
-
-.sbtFilter {
-  // background: color-mix(in srgb, var(--ce-status-info) 78%, transparent);
-  // padding: 10px;
-  // border-radius: var(--ce-radius-5);
-  // font-weight: 500;
-}
 
 .filterOptions {
   background: color-mix(in srgb, var(--ce-status-info) 78%, transparent);
   padding: 10px;
   border-radius: var(--ce-radius-5);
   font-weight: 500;
-}
-
-#humanOnlyCheckbox {
-  color: var(--ce-color-black);
-  font-weight: 600;
-  font-size: 1.15em;
-}
-
-#verifiedHumansLabel {
-  color: var(--ce-color-black);
-  font-weight: 600;
-  font-size: 1.15em;
 }
 
 .linkIcon {
@@ -514,8 +446,7 @@
 
   .adminVariant,
   .adminVariant .groupPicker,
-  .createVariant .groupPicker,
-  .menuFooter {
+  .createVariant .groupPicker {
     background: var(--ce-document-surface);
   }
 

@@ -265,10 +265,10 @@ test('release workflow fetches preserve public ancestry for exact release refs',
 });
 
 test('agent behavior runner fails when maintained tests are missing', () => {
-  const { runAgentBridgeWorkerTests } = require('./run-agent-bridge-worker-tests');
+  const { runSessionAgentTests } = require('./run-session-agent-tests');
 
   withTempRepo((rootDir) => {
-    assert.throws(() => runAgentBridgeWorkerTests(rootDir), /ENOENT|missing/);
+    assert.throws(() => runSessionAgentTests(rootDir), /ENOENT|missing/);
   });
 });
 
@@ -286,7 +286,7 @@ test('public-release style copies without .git still pass wiring checks', () => 
           'test:root:jest':
             "cd client && npm test -- --watchAll=false --runInBand --testMatch '<rootDir>/../tests/root/deployHelper.worker.test.js' '<rootDir>/../tests/root/sessionCorsWorker.auth.test.js'",
           'test:worker:session-cors': 'npm --prefix workers/sessionCorsWorker test',
-          'test:worker:agent-bridge': 'node scripts/run-agent-bridge-worker-tests.js',
+          'test:worker:agent': 'node scripts/run-session-agent-tests.js',
           'test:node': 'node scripts/run-node-tests.js',
           'test:node:tracked': 'node scripts/run-node-tests.js --tracked-only',
           'client-boundaries:check': 'node scripts/check-client-boundaries.mjs',
@@ -486,7 +486,6 @@ test('public-release style copies without .git still pass wiring checks', () => 
         '          worker-bundles-${{ steps.run.outputs.sourceCommit }}',
         '          sessionCorsWorker.bundle.js',
         '          deployHelper.bundle.js',
-        '          agentBridgeWorker.bundle.js',
         '          worker-release-manifest.json',
         '      - run: node "${RUNNER_TEMP}/worker-latest-channel.mjs" --mode automatic',
       ].join('\n'),
@@ -553,14 +552,14 @@ test('public-release style copies without .git still pass wiring checks', () => 
       'scripts/capture-client-coverage-baseline.mjs',
       'scripts/check-client-coverage-floors.mjs',
       'scripts/check-client-coverage-floors.test.mjs',
-      'scripts/clientCoverageUniverse.js',
-      'scripts/clientCoverageUniverse.test.js',
+      'scripts/client-coverage-universe.js',
+      'scripts/client-coverage-universe.test.js',
       'scripts/client-coverage-exclusions.json',
       'scripts/client-coverage-full-baseline.json',
       'scripts/check-client-test-types.mjs',
       'scripts/check-client-test-types.test.mjs',
-      'scripts/clientTestTypeUniverse.js',
-      'scripts/clientTestTypeUniverse.test.js',
+      'scripts/client-test-type-universe.js',
+      'scripts/client-test-type-universe.test.js',
       'scripts/client-test-type-contract.json',
       'scripts/client-test-type-diagnostics-baseline.json',
       'scripts/client-bundle-budget.json',
@@ -585,7 +584,7 @@ test('public-release style copies without .git still pass wiring checks', () => 
       'scripts/verify-abi-sync.test.mjs',
       'scripts/lib/audit-verdict.sh',
       'scripts/audit-verdict.test.js',
-      'scripts/testInventoryConfig.js',
+      'scripts/node-test-inventory-config.js',
       'scripts/verify-test-inventory.js',
       'scripts/verify-test-inventory.test.js',
       'scripts/vite-navigation-smoke.js',
@@ -602,7 +601,7 @@ test('public-release style copies without .git still pass wiring checks', () => 
       'scripts/verify-public-release-pii.sh',
       'scripts/verify-public-release-pii.test.js',
       'scripts/lib/public-release-strip-patterns.sh',
-      'scripts/run-agent-bridge-worker-tests.js',
+      'scripts/run-session-agent-tests.js',
       'workers/sessionCorsWorker/package.json',
       'workers/sessionCorsWorker/agent/requestBoundary.mjs',
       'workers/deploy-helper/wrangler.example.toml',

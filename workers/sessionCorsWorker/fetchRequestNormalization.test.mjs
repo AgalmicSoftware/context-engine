@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 
 import { normalizeFetchTargetUrl } from './fetchRequestNormalization.js';
 
-test('normalizeFetchTargetUrl trims and preserves valid http(s) targets', () => {
+test('normalizeFetchTargetUrl trims and preserves valid https targets', () => {
   assert.deepEqual(
     normalizeFetchTargetUrl({
       url: ' https://example.com/path?q=1 ',
@@ -45,18 +45,20 @@ test('normalizeFetchTargetUrl preserves missing, invalid, protocol, and blocked-
     }
   );
 
-  assert.deepEqual(
-    normalizeFetchTargetUrl({
-      url: 'ftp://example.com/file.txt',
-      deps: { isBlockedOutboundUrl: () => false },
-    }),
-    {
-      ok: false,
-      status: 400,
-      error: 'URL must be http(s)',
-      targetUrl: 'ftp://example.com/file.txt',
-    }
-  );
+  for (const url of ['ftp://example.com/file.txt', 'http://example.com/page']) {
+    assert.deepEqual(
+      normalizeFetchTargetUrl({
+        url,
+        deps: { isBlockedOutboundUrl: () => false },
+      }),
+      {
+        ok: false,
+        status: 400,
+        error: 'URL must be https',
+        targetUrl: url,
+      }
+    );
+  }
 
   assert.deepEqual(
     normalizeFetchTargetUrl({

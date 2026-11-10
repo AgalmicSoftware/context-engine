@@ -1,0 +1,51 @@
+.panel {
+  max-width: 28rem;
+  margin-block: 0.75rem;
+  color: var(--ce-panel-text);
+  background: var(--ce-surface);
+  border: 1px solid var(--ce-border-strong);
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+  button,
+  a {
+    color: inherit;
+  }
+  button {
+    background: var(--ce-control-face);
+    border: 1px solid var(--ce-input-border-strong);
+    border-radius: 0.3rem;
+    padding: 0.35rem 0.6rem;
+  }
+  button:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+  }
+  button:focus-visible,
+  a:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 3px;
+  }
+}
+.toggle {
+  font-weight: 600;
+}
+.content {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.65rem;
+  margin-top: 0.75rem;
+  overflow-wrap: anywhere;
+}
+.heading {
+  font-weight: 600;
+}
+.panel .help {
+  border: 0;
+  background: transparent;
+}
+.panel textarea {
+  width: 100%;
+  color: var(--ce-panel-text);
+  background: var(--ce-input-bg);
+}

@@ -1,22 +1,28 @@
 import { ethers } from 'ethers';
-import { getVoiceCredits, validateQuadraticAllocation, validateQuadraticQuestion } from '../../shared/questions/quadraticAllocation.mjs';
+import {
+  BINARY_ANSWERS,
+  QUESTION_TYPES,
+  isSingleSelect,
+  normalizeAnswerValue,
+  ratingScaleFor,
+} from '../../shared/questions/answerValue.mjs';
+import { validateQuadraticQuestion } from '../../shared/questions/quadraticAllocation.mjs';
 import { createQuestionIdDerivation } from '../../shared/questions/questionId.mjs';
-import { normalizeRatingScale } from '../../shared/questions/ratingScale.mjs';
 
 // Builds the same stored records the web client writes for a passkey
 // participant in a Worker-hosted session, plus a self-declared agent marker.
 // Keep in step with client/src/components/SurveyTool/surveyToolResponsePayloadController.ts
 // (pile response records) and CreateQuestionsAndSurveys.tsx (question records);
 // tests/root/agentParticipant.hydration.test.js checks them against the client.
+// Answer rules live in shared/questions/answerValue.mjs, shared with the benchmark.
 
-export const QUESTION_TYPES = Object.freeze(['binary', 'rating', 'multichoice', 'quadratic', 'freeform']);
-export const BINARY_ANSWERS = Object.freeze(['Agree', 'Unsure', 'Disagree']);
+export { BINARY_ANSWERS, QUESTION_TYPES, isSingleSelect, normalizeAnswerValue, ratingScaleFor };
+
 const MAX_PROMPT_LENGTH = 1000;
 const MAX_OPTION_LENGTH = 200;
 const MAX_OPTIONS = 12;
 const MAX_TAGS = 10;
 const MAX_TAG_LENGTH = 40;
-const MAX_FREEFORM_LENGTH = 8000;
 const MAX_COMMENT_LENGTH = 4000;
 
 const trim = (value) => (typeof value === 'string' ? value.trim() : typeof value === 'number' ? String(value) : '');
@@ -25,13 +31,6 @@ const fail = (error) => ({ ok: false, error });
 
 // Shared with the web client, so agent ids match web-authored ones.
 export const { generateQuestionId, questionIdMatchesContent } = createQuestionIdDerivation(ethers);
-
-export const ratingScaleFor = (question = {}) => normalizeRatingScale(question) || { min: 0, max: 10, minLabel: '0', maxLabel: '10' };
-
-const optionsOf = (question) => (Array.isArray(question.options) ? question.options.filter((option) => typeof option === 'string') : []);
-// Older questions marked single choice as oneSelectionOnly; the web client honours both.
-export const isSingleSelect = (question) =>
-  question.singleSelect === true || question.oneSelectionOnly === true || question.singleChoice === true;
 
 // Same test as the web client's isLockedQuestionPayload: gated questions keep
 // their text encrypted and need gated (encrypted) answers, which agents cannot
@@ -47,65 +46,11 @@ export const normalizeRecruitmentSource = (value) => {
   return /^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}$/.test(normalized) ? normalized : '';
 };
 
-const matchOption = (options, value) => {
-  const wanted = trim(value).toLowerCase();
-  return options.find((option) => option.trim().toLowerCase() === wanted);
-};
-
 const readScore = (value, field) => {
   if (value === undefined || value === null || value === '') return { ok: true, value: null };
   const number = Number(value);
   if (!Number.isInteger(number) || number < 0 || number > 10) return fail(`${field} must be a whole number from 0 to 10.`);
   return { ok: true, value: number };
-};
-
-/** Validates an agent's answer against the question and returns the stored value. */
-export const normalizeAnswerValue = (question = {}, value) => {
-  switch (question.type) {
-    case 'binary': {
-      const match = BINARY_ANSWERS.find((answer) => answer.toLowerCase() === trim(value).toLowerCase());
-      return match ? { ok: true, value: match } : fail('Binary answers must be "Agree", "Unsure", or "Disagree".');
-    }
-    case 'rating': {
-      const scale = ratingScaleFor(question);
-      const number = typeof value === 'string' && trim(value) !== '' ? Number(value) : value;
-      if (!Number.isInteger(number) || number < scale.min || number > scale.max) {
-        return fail(`Rating answers must be a whole number from ${scale.min} to ${scale.max}.`);
-      }
-      return { ok: true, value: number };
-    }
-    case 'multichoice': {
-      const options = optionsOf(question);
-      const picks = Array.isArray(value) ? value : [value];
-      const chosen = [];
-      for (const pick of picks) {
-        const option = matchOption(options, pick);
-        if (!option) return fail(`"${trim(pick)}" is not one of this question's options: ${options.join(' | ')}`);
-        if (!chosen.includes(option)) chosen.push(option);
-      }
-      if (!chosen.length) return fail('Choose at least one option.');
-      if (isSingleSelect(question) && chosen.length !== 1) return fail('This question accepts exactly one option.');
-      const max = Number(question.maxSelections);
-      if (Number.isInteger(max) && max > 0 && chosen.length > max) return fail(`Choose at most ${max} options.`);
-      return { ok: true, value: chosen };
-    }
-    case 'quadratic': {
-      const votes = Array.isArray(value) ? value.map((vote) => (typeof vote === 'string' && trim(vote) !== '' ? Number(vote) : vote)) : value;
-      const error = validateQuadraticAllocation(votes, question);
-      if (error) {
-        return fail(`${error} Options in order: ${optionsOf(question).join(' | ')}; budget ${getVoiceCredits(question)} credits (sum of squared votes).`);
-      }
-      return { ok: true, value: votes };
-    }
-    case 'freeform': {
-      const text = trim(value);
-      if (!text) return fail('Freeform answers must be non-empty text.');
-      if (text.length > MAX_FREEFORM_LENGTH) return fail(`Freeform answers must be ${MAX_FREEFORM_LENGTH} characters or fewer.`);
-      return { ok: true, value: text };
-    }
-    default:
-      return fail(`Unsupported question type "${trim(question.type)}".`);
-  }
 };
 
 const plaintextField = (value, hash) => ({

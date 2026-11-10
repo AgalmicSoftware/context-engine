@@ -1,5 +1,5 @@
 import { isWorkerCanonicalSessionConfig } from '../../utilities/survey/workerResponseHydration';
-import { responseValuesEqual } from './responseValueEquality';
+import { responseValuesEqual, answerValueType, type ResponseValuesEqual } from './responseValueEquality';
 import type {
   SurveyQuestionsInstanceFields,
   SurveyQuestionsSetStateCallback,
@@ -19,7 +19,6 @@ import {
 import { executeSurveyFormStateReset, executeSurveyPendingRevert } from './surveyToolResponseResetController';
 import { resolveSurveyBaselineSourceSlice } from './surveyToolResponseSourceController';
 import {
-  DEBUG_PREFILL,
   areEnvelopesEquivalent,
   buildDraftAnswersByQuestionId,
   buildDraftAwareCacheHydrationState,
@@ -64,6 +63,7 @@ export type SurveyQuestionsResponseStateDeps = {
   setResponseHydrationState: SetSurveyQuestionsState;
   drafts: { load: () => SurveyQuestionsLegacyValue; persist: () => void; clear: () => void };
   questionIds: { rendered: () => string[]; editTracking: () => Set<string>; hydration: () => string[] };
+  getQuestionById: (questionId: string) => { type?: unknown } | null | undefined;
   buildEmptyResponseFieldState: (questionId?: string, fieldKey?: string) => unknown;
   buildLocalCacheHydrationSignature: (surveyIndex: number, questionIds: string[]) => string;
   ensurePriorResponsesForRenderedIds: () => Promise<unknown>;
@@ -86,7 +86,7 @@ export type SurveyQuestionsResponseStateRuntime = {
   resetFormStateForAccountChange: (callback: SurveyQuestionsLegacyValue, persistCurrentIdentity?: boolean) => void;
   resolveDiffBaselineSlice: (allowLocalCache?: boolean) => SurveyQuestionsLegacyValue;
   syncViewAllQuestions: (options?: { restoreAll?: boolean }) => void;
-  valuesEqual: (a: unknown, b: unknown) => boolean;
+  valuesEqual: ResponseValuesEqual;
 };
 
 export const createSurveyQuestionsResponseStateRuntime = ({
@@ -101,6 +101,7 @@ export const createSurveyQuestionsResponseStateRuntime = ({
     editTracking: getEditTrackingQuestionIds,
     hydration: getHydrationQuestionIds,
   },
+  getQuestionById,
   buildEmptyResponseFieldState,
   buildLocalCacheHydrationSignature,
   ensurePriorResponsesForRenderedIds,
@@ -143,7 +144,12 @@ export const createSurveyQuestionsResponseStateRuntime = ({
     }
   };
 
-  const valuesEqual = (a: SurveyQuestionsLegacyValue, b: SurveyQuestionsLegacyValue) => responseValuesEqual(a, b, true);
+  const valuesEqual: ResponseValuesEqual = (a, b, questionId, field = 'answer') =>
+    responseValuesEqual(
+      a,
+      b,
+      field === 'answer' && questionId ? answerValueType(getQuestionById(questionId)?.type) : 'text',
+    );
 
   const computeModifiedQuestionsCount = (
     baselineSlice: SurveyQuestionsLegacyValue,
@@ -213,8 +219,8 @@ export const createSurveyQuestionsResponseStateRuntime = ({
       const cConv: SurveyQuestionsLegacyValue = pickNumber(currentSlice.conviction, qId);
 
       let changed: SurveyQuestionsLegacyValue = false;
-      if (!valuesEqual(bAns.value, cAns.value)) changed = true;
-      if (!valuesEqual(bAdd.value, cAdd.value)) changed = true;
+      if (!valuesEqual(bAns.value, cAns.value, qId, 'answer')) changed = true;
+      if (!valuesEqual(bAdd.value, cAdd.value, qId, 'additional')) changed = true;
       if (bImp !== cImp) changed = true;
       if (bConv !== cConv) changed = true;
       if (!!bAns.encrypted !== !!cAns.encrypted) changed = true;
@@ -289,7 +295,6 @@ export const createSurveyQuestionsResponseStateRuntime = ({
       : setState;
 
     executeSurveyResponsePrefill({
-      state: stateRef.current,
       surveyIndex,
       userAnswers,
       buildSliceFromUserAnswers: buildSliceFromUserAnswers,
@@ -327,14 +332,7 @@ export const createSurveyQuestionsResponseStateRuntime = ({
       setLocalCacheMemo: (nextMemo: SurveyQuestionsLegacyValue) => {
         inst._localCacheSliceMemo = nextMemo;
       },
-      onError: (error: SurveyQuestionsLegacyValue) => {
-        DEBUG_PREFILL && surveyLog.error('[Survey][buildSlice] Error:', error);
-      },
     });
-    if (slice) {
-      DEBUG_PREFILL &&
-        surveyLog.log('[Survey][buildSlice] Building for rendered IDs:', getCurrentRenderedQuestionIds());
-    }
     return slice;
   };
 
@@ -388,12 +386,6 @@ export const createSurveyQuestionsResponseStateRuntime = ({
       },
       callback: finalCallback,
       bumpNoop: () => bumpSurveyPerfCounter('noopSkipCount'),
-      onNoChange: () => {
-        DEBUG_PREFILL && surveyLog.log('[Survey][rehydrateLocal] No changes to apply.');
-      },
-      onError: (error: SurveyQuestionsLegacyValue) => {
-        DEBUG_PREFILL && surveyLog.error('[Survey][rehydrateLocal] Error:', error);
-      },
       isStaleRun,
     });
     // The cache read covered these questions; once saved answers are known they count as loaded.
@@ -488,7 +480,7 @@ export const createSurveyQuestionsResponseStateRuntime = ({
           renderedQuestionIds: restoreIds.filter(present),
           draft,
           prevSlice: loaded.nextSlice,
-          prevBaseline: loaded.nextBaseline,
+          prevBaseline: savedAnswersKnown ? loaded.nextBaseline : null,
           allowOverwrite: true,
           applyDraftEntryToSlice: inst._applyDraftHydrationEntryToSlice,
         });

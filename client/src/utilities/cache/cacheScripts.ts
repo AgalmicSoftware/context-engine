@@ -1,3 +1,4 @@
+import { discardOutdatedSbtActivityEntries } from '../sbt/sbtActivityCacheEntry.js';
 /**
  * @module cacheScripts
  * @description IndexedDB cache CRUD via a small private key-value helper — namespace-scoped read/write/subscribe
@@ -7,12 +8,24 @@
  */
 import {
   createStore,
+  advanceCacheNamespace,
+  cacheNamespaceGeneration,
+  currentCacheStorageKey,
+  logicalCacheStorageKey,
+  removeNamespaceLocalEntries,
   del as idbDel,
   entries as idbEntries,
   get as idbGet,
   set as idbSet,
-} from './cacheScripts.idb.impl.js';
+} from './cacheScripts.generationStore.js';
 import { createLogger } from '../logging.js';
+import {
+  decryptedChainTextIn,
+  holdsChainText,
+  readerViewOfChainText,
+  withChainTextKept,
+} from '../survey/decryptedQuestionReader.js';
+import { getWorkerCanonicalCacheReader } from '../survey/workerCanonicalCacheReader.js';
 import { DG_MANAGED_CACHE_NAMESPACE_LIST } from './sessionCacheConstants.js';
 
 const cacheLog = createLogger('cacheScripts');
@@ -117,6 +130,7 @@ const safeClone = <T>(value: T): T => {
 
 const MANAGED_NAMESPACES = new Set(DG_MANAGED_CACHE_NAMESPACE_LIST);
 
+const mirrorGenerations = new Map<string, string>();
 const mirrorByKey = new Map<string, CacheValue>();
 const mirrorByNamespace = new Map<string, Map<string, CacheValue>>();
 const writeQueuesByKey = new Map<string, Promise<unknown>>();
@@ -202,8 +216,22 @@ const mergeMigrationValues = (existingValue: CacheValue, incomingValue: CacheVal
   return next;
 };
 
+const syncMirrorGeneration = (namespace: string): void => {
+  const generation = cacheNamespaceGeneration(namespace);
+  if (mirrorGenerations.get(namespace) === generation) return;
+  mirrorGenerations.set(namespace, generation);
+  mirrorByNamespace.delete(namespace);
+  for (const key of mirrorByKey.keys()) {
+    if (parseStorageKey(key)?.namespace === namespace) {
+      mirrorByKey.delete(key);
+      optimisticWriteSeqByKey.delete(key);
+    }
+  }
+};
+
 const getNamespaceBucket = (namespace: unknown): Map<string, CacheValue> => {
   const ns = String(namespace || '');
+  syncMirrorGeneration(ns);
   if (!mirrorByNamespace.has(ns)) {
     mirrorByNamespace.set(ns, new Map());
   }
@@ -216,8 +244,9 @@ const clearMirror = () => {
 };
 
 const setMirrorValue = (namespace: unknown, slug: unknown, value: CacheValue): void => {
+  syncMirrorGeneration(String(namespace || ''));
   const key = toStorageKey(namespace, slug);
-  const next = cloneValue(value);
+  const next = cloneValue(namespace === 'sbtCache' ? discardOutdatedSbtActivityEntries(value) : value);
   mirrorByKey.set(key, next);
   getNamespaceBucket(namespace).set(String(slug || ''), next);
 };
@@ -228,6 +257,39 @@ const removeMirrorValue = (namespace: unknown, slug: unknown): void => {
   const bucket = getNamespaceBucket(namespace);
   bucket.delete(String(slug || ''));
 };
+
+// Question and survey text decrypted into chain nodes belongs to one account, but
+// every reader of this browser shares those nodes. So every read sees the text as
+// the current reader may, and no write saves text that reader may not see.
+const asReader = <T>(namespace: string, value: T): T =>
+  readerViewOfChainText(namespace, value, getWorkerCanonicalCacheReader()) as T;
+
+// Mirror values are replaced, never changed in place, so a value's view holds
+// until the value or the reader changes, and repeated reads get the same object.
+const mirrorViews = new WeakMap<object, { reader: string; view: unknown }>();
+
+const mirrorView = <T>(namespace: string, value: T): T => {
+  if (!value || typeof value !== 'object' || !holdsChainText(namespace)) return value;
+  const reader = getWorkerCanonicalCacheReader();
+  const known = mirrorViews.get(value);
+  if (known?.reader === reader) return known.view as T;
+  const view = readerViewOfChainText(namespace, value, reader) as T;
+  mirrorViews.set(value, { reader, view });
+  return view;
+};
+
+// What a write of `next` saves. Text the reader may not see is locked, then `kept`,
+// the decrypted text of the copy being replaced, goes back where `next` has none.
+const chainTextToSave = (namespace: string, next: CacheValue, kept: ReturnType<typeof decryptedChainTextIn>) =>
+  withChainTextKept(namespace, asReader(namespace, next), kept) as CacheValue;
+
+const storedMirrorValue = (namespace: string, key: string): CacheValue => {
+  syncMirrorGeneration(namespace);
+  return mirrorByKey.get(key);
+};
+
+const decryptedTextInMirror = (namespace: string, key: string) =>
+  holdsChainText(namespace) ? decryptedChainTextIn(namespace, storedMirrorValue(namespace, key)) : null;
 
 const snapshotActiveOptimisticMirrorEntries = (): ActiveOptimisticMirrorEntry[] => {
   const entries: ActiveOptimisticMirrorEntry[] = [];
@@ -252,9 +314,13 @@ const restoreActiveOptimisticMirrorEntries = (entries: ActiveOptimisticMirrorEnt
 };
 
 const emitUpdate = (payload: CacheUpdatePayload = {}): void => {
+  const update =
+    payload.value === undefined
+      ? payload
+      : { ...payload, value: asReader(String(payload.namespace || ''), payload.value) };
   subscribers.forEach((handler) => {
     try {
-      handler(payload);
+      handler(update);
     } catch (e) {
       cacheLog.warn('cacheScripts: callback', e);
     }
@@ -325,7 +391,7 @@ const parseJsonOrNull = (raw: string | null): CacheValue | null => {
 const readLocalStorageKey = (key: string): CacheValue | null => {
   try {
     if (typeof localStorage === 'undefined') return null;
-    return parseJsonOrNull(localStorage.getItem(key));
+    return parseJsonOrNull(localStorage.getItem(currentCacheStorageKey(key)));
   } catch (_) {
     return null;
   }
@@ -334,7 +400,7 @@ const readLocalStorageKey = (key: string): CacheValue | null => {
 const writeLocalStorageKey = (key: string, value: CacheValue): boolean => {
   try {
     if (typeof localStorage === 'undefined') return false;
-    localStorage.setItem(key, JSON.stringify(value));
+    localStorage.setItem(currentCacheStorageKey(key), JSON.stringify(value));
     return true;
   } catch (e) {
     cacheLog.warn('[cacheScripts] localStorage write failed', { key, error: getErrorMessage(e) });
@@ -345,7 +411,7 @@ const writeLocalStorageKey = (key: string, value: CacheValue): boolean => {
 const removeLocalStorageKey = (key: string): boolean => {
   try {
     if (typeof localStorage === 'undefined') return false;
-    localStorage.removeItem(key);
+    localStorage.removeItem(currentCacheStorageKey(key));
     return true;
   } catch (_) {
     return false;
@@ -364,7 +430,7 @@ const attachStorageListenerOnce = (): void => {
   if (typeof window === 'undefined' || typeof window.addEventListener !== 'function') return;
   window.addEventListener('storage', (event) => {
     try {
-      const key = String(event?.key || '');
+      const key = logicalCacheStorageKey(String(event?.key || '')) || '';
       if (!key.startsWith('dg:')) return;
       const parsed = parseStorageKey(key);
       if (!parsed || !isManagedNamespace(parsed.namespace)) return;
@@ -475,7 +541,8 @@ const hydrateMirrorFromLocalStorage = (): void => {
       return;
     }
     for (let i = 0; i < localStorage.length; i += 1) {
-      const key = localStorage.key(i);
+      const rawKey = localStorage.key(i);
+      const key = rawKey ? logicalCacheStorageKey(rawKey) : null;
       if (!key) continue;
       const parsed = parseStorageKey(key);
       if (!parsed || !isManagedNamespace(parsed.namespace)) continue;
@@ -492,7 +559,8 @@ const hydrateMissingMirrorFromLocalStorage = (): number => {
   try {
     if (typeof localStorage === 'undefined') return hydrated;
     for (let i = 0; i < localStorage.length; i += 1) {
-      const key = localStorage.key(i);
+      const rawKey = localStorage.key(i);
+      const key = rawKey ? logicalCacheStorageKey(rawKey) : null;
       if (!key || mirrorByKey.has(key)) continue;
       const parsed = parseStorageKey(key);
       if (!parsed || !isManagedNamespace(parsed.namespace)) continue;
@@ -516,7 +584,8 @@ const migrateManagedKeysFromLocalStorage = async ({
   const keys: string[] = [];
   try {
     for (let i = 0; i < localStorage.length; i += 1) {
-      const key = localStorage.key(i);
+      const rawKey = localStorage.key(i);
+      const key = rawKey ? logicalCacheStorageKey(rawKey) : null;
       if (!key) continue;
       const parsed = parseStorageKey(key);
       if (!parsed || !isManagedNamespace(parsed.namespace)) continue;
@@ -626,16 +695,24 @@ const repairIdbKeyFromLocalStorage = async (storageKey: string, fallbackValue: C
   }
 };
 
-const persistKey = async (storageKey: string, value: CacheValue): Promise<boolean> => {
+// generationKey is the storage key when the write was called. A namespace
+// cleared since then refuses the write, even one that waited in a queue.
+const persistKey = async (
+  storageKey: string,
+  value: CacheValue,
+  generationKey = currentCacheStorageKey(storageKey),
+): Promise<boolean> => {
   await ensureBackendReady();
   if (!idbAvailable) {
     await attemptIdbRecovery();
   }
+  if (generationKey !== currentCacheStorageKey(storageKey)) return false;
   if (idbAvailable) {
     try {
       try {
         await idbSet(storageKey, cloneValue(value), IDB_STORE);
       } catch (firstError) {
+        if (generationKey !== currentCacheStorageKey(storageKey)) return false;
         cacheLog.warn('[cacheScripts] IDB write failed; retrying once', {
           storageKey,
           error: getErrorMessage(firstError),
@@ -646,6 +723,7 @@ const persistKey = async (storageKey: string, value: CacheValue): Promise<boolea
       removeLocalStorageKey(storageKey);
       return true;
     } catch (e) {
+      if (generationKey !== currentCacheStorageKey(storageKey)) return false;
       noteIdbFailure('write', storageKey, e);
       if (!idbAvailable) {
         return writeLocalStorageKey(storageKey, value);
@@ -653,7 +731,7 @@ const persistKey = async (storageKey: string, value: CacheValue): Promise<boolea
       return false;
     }
   }
-  return writeLocalStorageKey(storageKey, value);
+  return generationKey === currentCacheStorageKey(storageKey) && writeLocalStorageKey(storageKey, value);
 };
 
 const deleteKey = async (storageKey: string): Promise<boolean> => {
@@ -673,17 +751,15 @@ const deleteKey = async (storageKey: string): Promise<boolean> => {
         await idbDel(storageKey, IDB_STORE);
       }
       noteIdbSuccess();
-      removeLocalStorageKey(storageKey);
-      return true;
+      return removeLocalStorageKey(storageKey);
     } catch (e) {
       noteIdbFailure('delete', storageKey, e);
-      if (!idbAvailable) {
-        return removeLocalStorageKey(storageKey);
-      }
+      removeLocalStorageKey(storageKey);
       return false;
     }
   }
-  return removeLocalStorageKey(storageKey);
+  removeLocalStorageKey(storageKey);
+  return false;
 };
 
 const readPersistentKey = async (storageKey: string): Promise<CacheValue | null | typeof READ_FAILED> => {
@@ -816,30 +892,39 @@ export const readCache = async <TValue = CacheLegacyNode>(
   const sl = String(slug || '');
   if (!isManagedNamespace(ns)) return null;
   await initCacheManager();
+  syncMirrorGeneration(ns);
   const key = toStorageKey(ns, sl);
+  const mirrorCopy = () => cloneValue(mirrorView(ns, mirrorByKey.get(key))) as TValue;
   const value = await readPersistentKey(key);
   if (value === READ_FAILED) {
-    if (mirrorByKey.has(key)) return cloneValue(mirrorByKey.get(key)) as TValue;
+    if (mirrorByKey.has(key)) return mirrorCopy();
     return null;
   }
   if (value == null) {
     if (optimisticWriteSeqByKey.has(key) && mirrorByKey.has(key)) {
-      return cloneValue(mirrorByKey.get(key)) as TValue;
+      return mirrorCopy();
     }
     removeMirrorValue(ns, sl);
     return null;
   }
   if (optimisticWriteSeqByKey.has(key) && mirrorByKey.has(key)) {
-    return cloneValue(mirrorByKey.get(key)) as TValue;
+    return mirrorCopy();
   }
   setMirrorValue(ns, sl, value);
-  return cloneValue(value) as TValue;
+  return mirrorCopy();
 };
 
-const writeCacheDirect = async ({ namespace, slug, key, value }: ManagedWriteInput): Promise<boolean> => {
+// admittedKey is the storage key when the write was called (see persistKey).
+const writeCacheDirect = async ({
+  namespace,
+  slug,
+  key,
+  value,
+  admittedKey,
+}: ManagedWriteInput & { admittedKey: string }): Promise<boolean> => {
   await initCacheManager();
-  const ok = await persistKey(key, value);
-  if (!ok) return false;
+  const ok = await persistKey(key, value, admittedKey);
+  if (!ok || admittedKey !== currentCacheStorageKey(key)) return false;
   commitManagedWrite({ namespace, slug, key, value });
   return true;
 };
@@ -853,7 +938,13 @@ export const writeCache = async (
   const sl = String(slug || '');
   if (!isManagedNamespace(ns)) return false;
   const key = toStorageKey(ns, sl);
-  return enqueueWriteTaskForStorageKey(key, async () => writeCacheDirect({ namespace: ns, slug: sl, key, value }));
+  const admittedKey = currentCacheStorageKey(key);
+  return enqueueWriteTaskForStorageKey(key, async () => {
+    await initCacheManager();
+    // A plain write doesn't read storage: this tab's mirror holds the copy it replaces.
+    const kept = decryptedTextInMirror(ns, key);
+    return writeCacheDirect({ namespace: ns, slug: sl, key, value: chainTextToSave(ns, value, kept), admittedKey });
+  });
 };
 
 // Optimistic write for read-after-write flows that intentionally do not await persistence.
@@ -868,11 +959,14 @@ export const writeCacheOptimistic = (
   if (!isManagedNamespace(ns)) return Promise.resolve(false);
 
   const key = toStorageKey(ns, sl);
+  const admittedKey = currentCacheStorageKey(key);
   const hadPrevious = mirrorByKey.has(key);
   const previousValue = hadPrevious ? cloneValue(mirrorByKey.get(key)) : null;
   const writeSeq = (optimisticWriteSeqCounter += 1);
   optimisticWriteSeqByKey.set(key, writeSeq);
-  setMirrorValue(ns, sl, value);
+  // The mirror shows the write now. What is saved is worked out again in the queue,
+  // from the copy replaced then, which an account change may have locked meanwhile.
+  setMirrorValue(ns, sl, chainTextToSave(ns, value, decryptedTextInMirror(ns, key)));
 
   const restoreMirrorFromSnapshot = (
     snapshotValue: CacheValue | null | typeof READ_FAILED,
@@ -924,15 +1018,24 @@ export const writeCacheOptimistic = (
   const run = enqueueWriteTaskForStorageKey(key, async () => {
     await initCacheManager();
     const persistedBeforeWrite = await readPersistentKey(key);
-    const ok = await persistKey(key, value);
+    const saved = chainTextToSave(
+      ns,
+      value,
+      persistedBeforeWrite === READ_FAILED
+        ? decryptedTextInMirror(ns, key)
+        : decryptedChainTextIn(ns, persistedBeforeWrite),
+    );
+    const ok = await persistKey(key, saved, admittedKey);
     if (!ok) {
       await rollback({ persistedSnapshot: persistedBeforeWrite });
       return false;
     }
+    // A clear after the save leaves the value under the old generation, unread.
+    if (admittedKey !== currentCacheStorageKey(key)) return false;
     if (optimisticWriteSeqByKey.get(key) !== writeSeq) {
       return true;
     }
-    commitManagedWrite({ namespace: ns, slug: sl, key, value });
+    commitManagedWrite({ namespace: ns, slug: sl, key, value: saved });
     settle();
     return true;
   });
@@ -943,30 +1046,71 @@ export const writeCacheOptimistic = (
   });
 };
 
-export const updateCacheAtomic = async <TValue = CacheLegacyNode>(
+const updateCacheAtomicAs = async <TValue = CacheLegacyNode>(
   namespace: unknown,
-  slug: unknown = '',
-  updater: (current: TValue | null) => TValue | Promise<TValue> = (current) => current as TValue,
+  slug: unknown,
+  updater: (current: TValue | null) => TValue | Promise<TValue>,
+  // Locks the text the current reader sees locked instead of keeping it.
+  { lockHiddenText = false }: { lockHiddenText?: boolean } = {},
 ): Promise<TValue | null> => {
   const ns = String(namespace || '');
   const sl = String(slug || '');
   if (!isManagedNamespace(ns)) return null;
   if (typeof updater !== 'function') throw new Error('updateCacheAtomic requires an updater function');
+  const key = toStorageKey(ns, sl);
+  const admittedKey = currentCacheStorageKey(key);
   await initCacheManager();
 
-  const key = toStorageKey(ns, sl);
   return enqueueWriteTaskForStorageKey(key, async () => {
     // The saved value, not this tab's mirror: another tab may have written since.
     const persisted = await readPersistentKey(key);
     const current = (persisted === READ_FAILED ? cloneValue(mirrorByKey.get(key)) : persisted) as
       TValue | null | undefined;
-    const next = await updater(current == null ? null : current);
-    const ok = await writeCacheDirect({ namespace: ns, slug: sl, key, value: next });
+    // Copied before the updater runs, which may change what it reads in place.
+    const kept = lockHiddenText ? null : decryptedChainTextIn(ns, current);
+    // The updater reads `current` as the reader sees it, like any other read.
+    const next = await updater(
+      current == null
+        ? null
+        : ((ns === 'sbtCache' ? discardOutdatedSbtActivityEntries(current) : asReader(ns, current)) as TValue),
+    );
+    const value = chainTextToSave(ns, next as CacheValue, kept);
+    const ok = await writeCacheDirect({ namespace: ns, slug: sl, key, value, admittedKey });
     if (!ok) {
       throw new Error(`[cacheScripts] Failed to persist atomic update for ${key}`);
     }
-    return cloneValue(next) as TValue;
+    return cloneValue(asReader(ns, value)) as TValue;
   });
+};
+
+export const updateCacheAtomic = async <TValue = CacheLegacyNode>(
+  namespace: unknown,
+  slug: unknown = '',
+  updater: (current: TValue | null) => TValue | Promise<TValue> = (current) => current as TValue,
+): Promise<TValue | null> => updateCacheAtomicAs(namespace, slug, updater);
+
+/**
+ * Locks, in storage too, the chain text the current reader sees locked, so that a
+ * later reader of this browser finds it locked even outside the app. Every cached
+ * view of question and survey text is then told to read it again as this reader.
+ */
+export const lockChainTextHiddenFromReader = async (): Promise<void> => {
+  await initCacheManager();
+  const namespaces = DG_MANAGED_CACHE_NAMESPACE_LIST.filter(holdsChainText);
+  await Promise.all(
+    namespaces.flatMap((namespace) =>
+      listNamespaceSlugsSync(namespace).map(async (slug) => {
+        const key = toStorageKey(namespace, slug);
+        const stored = storedMirrorValue(namespace, key);
+        if (mirrorView(namespace, stored) !== stored) {
+          await updateCacheAtomicAs<CacheValue>(namespace, slug, (current) => current, { lockHiddenText: true });
+        }
+        if (!mirrorByKey.has(key)) return;
+        const value = cloneValue(mirrorByKey.get(key));
+        emitUpdate({ action: 'write', namespace, slug, key, value, source: 'reader' });
+      }),
+    ),
+  );
 };
 
 const removeCacheDirect = async ({ namespace, slug, key }: ManagedKeyInput): Promise<boolean> => {
@@ -998,6 +1142,23 @@ export const removeCache = async (namespace: unknown, slug: unknown = ''): Promi
   return enqueueWriteTaskForStorageKey(key, async () => removeCacheDirect({ namespace: ns, slug: sl, key }));
 };
 
+export const clearCacheNamespace = async (namespace: string): Promise<boolean> => {
+  if (!isManagedNamespace(namespace) || !advanceCacheNamespace(namespace)) return false;
+  syncMirrorGeneration(namespace);
+  const localCleared = removeNamespaceLocalEntries(namespace);
+  emitUpdate({ action: 'remove', namespace, source: 'local' });
+  await ensureBackendReady();
+  if (!idbAvailable) return false;
+  try {
+    await idbEntries(IDB_STORE);
+    noteIdbSuccess();
+    return localCleared;
+  } catch (error) {
+    noteIdbFailure('clear', namespace, error);
+    return false;
+  }
+};
+
 export const peekCacheSync = <TValue = CacheLegacyNode>(
   namespace: unknown,
   slug: unknown = '',
@@ -1007,9 +1168,10 @@ export const peekCacheSync = <TValue = CacheLegacyNode>(
   const sl = String(slug || '');
   if (!isManagedNamespace(ns)) return null;
   const key = toStorageKey(ns, sl);
+  syncMirrorGeneration(ns);
   if (!mirrorByKey.has(key)) return null;
   const shouldClone = options?.clone !== false;
-  const value = mirrorByKey.get(key);
+  const value = mirrorView(ns, mirrorByKey.get(key));
   return (shouldClone ? cloneValue(value) : value) as TValue;
 };
 
@@ -1035,12 +1197,15 @@ export const listNamespaceEntriesSync = <TValue = CacheLegacyNode>(
   if (!isManagedNamespace(ns)) return [];
   const bucket = getNamespaceBucket(ns);
   const shouldCloneValues = options?.cloneValues !== false;
-  return Array.from(bucket.entries()).map(([slug, value]) => ({
-    namespace: ns,
-    slug: String(slug || ''),
-    key: toStorageKey(ns, slug),
-    value: (shouldCloneValues ? cloneValue(value) : value) as TValue,
-  }));
+  return Array.from(bucket.entries()).map(([slug, stored]) => {
+    const value = mirrorView(ns, stored);
+    return {
+      namespace: ns,
+      slug: String(slug || ''),
+      key: toStorageKey(ns, slug),
+      value: (shouldCloneValues ? cloneValue(value) : value) as TValue,
+    };
+  });
 };
 
 export const getCacheBackendDiagnostics = (): CacheBackendDiagnostics => {

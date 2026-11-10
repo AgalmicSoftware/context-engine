@@ -14,11 +14,11 @@ import { audioSummaryPrompt } from '../../prompts/audioSummaryPrompt.js';
 import buildClusterAnalysisPrompt, { CLUSTER_ANALYSIS_SYSTEM_PROMPT } from '../../prompts/clusterAnalysisPrompt.js';
 import buildCompareToolkitPrompt from '../../prompts/compareToolkitPrompt.js';
 import buildPhotoAnalysisPrompt from '../../prompts/photoAnalysisPrompt.js';
-import { questionSelectionPrompt } from '../../prompts/questionSelectionPrompt.js';
+import { rankQuestionsPrompt } from '../../prompts/rankQuestionsPrompt.js';
 import buildUserAnalysisPrompt from '../../prompts/userAnalysisPrompt.js';
 // CSS
 import styles from './DocsPage.module.scss';
-import deploymentModesGraphic from '../../../../docs/assets/readme-architecture-deployment-modes.jpg';
+import deploymentModesGraphic from '../../../../docs/assets/readme-architecture-session-worker-mcp.png';
 //
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faGithub } from '@fortawesome/free-brands-svg-icons';
@@ -275,40 +275,40 @@ export const DocsPage = ({ activeSessionSlug, reduxActiveSessionSlug }: DocsPage
 
   const promptItems = useMemo<PromptItem[]>(
     () => [
-      { id: 'seedGen', title: 'Question Generation', file: 'seedGenPrompt.js', content: seedGenPrompt },
+      { id: 'seedGen', title: 'Question Generation', file: 'seedGenPrompt.ts', content: seedGenPrompt },
       {
-        id: 'questionSelection',
-        title: 'Question Selection',
-        file: 'questionSelectionPrompt.js',
-        content: questionSelectionPrompt,
+        id: 'rankQuestions',
+        title: 'Question Ranking',
+        file: 'rankQuestionsPrompt.ts',
+        content: rankQuestionsPrompt,
       },
-      { id: 'audioSummary', title: 'Audio Summary', file: 'audioSummaryPrompt.js', content: audioSummaryPrompt },
+      { id: 'audioSummary', title: 'Audio Summary', file: 'audioSummaryPrompt.ts', content: audioSummaryPrompt },
       {
         id: 'photoAnalysis',
         title: 'Photo Analysis',
-        file: 'photoAnalysisPrompt.js',
+        file: 'photoAnalysisPrompt.ts',
         content: photoAnalysisPromptDisplay,
       },
       {
         id: 'compareToolkit',
         title: 'Compare Toolkit',
-        file: 'compareToolkitPrompt.js',
+        file: 'compareToolkitPrompt.ts',
         content: compareToolkitPromptDisplay,
       },
       {
         id: 'clusterAnalysisSystem',
         title: 'Cluster Analysis (System)',
-        file: 'clusterAnalysisPrompt.js',
+        file: 'clusterAnalysisPrompt.ts',
         content: CLUSTER_ANALYSIS_SYSTEM_PROMPT,
       },
       {
         id: 'clusterAnalysis',
         title: 'Cluster Analysis (User)',
-        file: 'clusterAnalysisPrompt.js',
+        file: 'clusterAnalysisPrompt.ts',
         content: clusterAnalysisPromptDisplay,
       },
-      { id: 'userAnalysis', title: 'User Analysis', file: 'userAnalysisPrompt.js', content: userAnalysisPromptDisplay },
-      { id: 'aiRewrite', title: 'AI Rewrite', file: 'aiRewritePrompt.js', content: aiRewritePrompt },
+      { id: 'userAnalysis', title: 'User Analysis', file: 'userAnalysisPrompt.ts', content: userAnalysisPromptDisplay },
+      { id: 'aiRewrite', title: 'AI Rewrite', file: 'aiRewritePrompt.ts', content: aiRewritePrompt },
     ],
     [clusterAnalysisPromptDisplay, compareToolkitPromptDisplay, photoAnalysisPromptDisplay, userAnalysisPromptDisplay],
   );

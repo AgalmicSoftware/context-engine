@@ -235,20 +235,12 @@ export const buildArweaveKeyRequest = (
   };
 };
 
-export const inferAiTaskType = (prompt: unknown = '', opts: Record<string, unknown> = {}): string | null => {
-  const explicit = String(opts?.taskType || '')
+// Each caller names its task, never the prompt's wording: the Worker picks the
+// task's token ceiling and effort from it.
+export const readAiTaskType = (opts: Record<string, unknown> = {}): string | null =>
+  String(opts?.taskType || '')
     .trim()
-    .toLowerCase();
-  if (explicit) return explicit;
-
-  const promptText = String(prompt || '');
-  // Older question-generation flows still call `callAI` directly, so fall back
-  // to the seed-generation prompt signature when no explicit task type is passed.
-  if (/numberOfSeedStatementsOrPrompts:/i.test(promptText) && /"surveyTitle"\s*:/i.test(promptText)) {
-    return 'generate';
-  }
-  return null;
-};
+    .toLowerCase() || null;
 
 export const pickAiRequestOpts = (input: unknown = {}): Record<string, unknown> => {
   const src = input && typeof input === 'object' ? (input as Record<string, unknown>) : {};

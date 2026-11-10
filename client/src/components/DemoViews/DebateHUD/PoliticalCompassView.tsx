@@ -15,7 +15,11 @@ type CompassPoint = {
   comment?: string;
   profileUsername?: string;
   profileUrl?: string;
+  // A participant's own avatar; demo figures find theirs by name.
+  avatarUrl?: string;
 };
+
+type LegendEntry = { label: string; shape: 'circle' | 'diamond' | 'square' | 'ring' };
 
 type Compass = {
   xAxis: {
@@ -28,6 +32,31 @@ type Compass = {
     bottom: string;
   };
   points: CompassPoint[];
+  // What the markers stand for; the demo's figures when not given, none when empty.
+  legend?: LegendEntry[];
+};
+
+const DEMO_LEGEND: LegendEntry[] = [
+  { label: 'Debater', shape: 'circle' },
+  { label: 'Tweeter', shape: 'diamond' },
+  { label: 'Insider / Historical', shape: 'square' },
+];
+
+const LegendMarker = ({ shape }: { shape: LegendEntry['shape'] }) => {
+  const marker = { fill: 'var(--ce-text-muted)', stroke: 'var(--ce-document-canvas)', strokeWidth: 1 };
+  return (
+    <svg width="12" height="12" aria-hidden="true">
+      {shape === 'diamond' ? (
+        <polygon points="6,1 11,6 6,11 1,6" {...marker} />
+      ) : shape === 'square' ? (
+        <rect x="1" y="1" width="10" height="10" rx="1.5" {...marker} />
+      ) : shape === 'ring' ? (
+        <circle cx="6" cy="6" r="4.5" fill="none" stroke="var(--ce-text-muted)" strokeWidth="2" />
+      ) : (
+        <circle cx="6" cy="6" r="5" {...marker} />
+      )}
+    </svg>
+  );
 };
 
 type VoterProfile = {
@@ -266,7 +295,9 @@ const PoliticalCompass = ({ compass, compact = true }: PoliticalCompassProps) =>
     const showInlineLabel = point.type === 'debater' || isSelected || (isHovered && !pointComment);
     const size = point.type === 'debater' ? 10 : 7;
     const activeSize = size + 3;
-    const avatarInfo = getDemoAvatarByName(point.name);
+    const avatarInfo = point.avatarUrl
+      ? { url: point.avatarUrl, fallbackSeed: point.name }
+      : getDemoAvatarByName(point.name);
     const avatarRadius = getAvatarBaseRadius(point) + (isActive ? 3 : 0);
 
     return {
@@ -293,6 +324,12 @@ const PoliticalCompass = ({ compass, compact = true }: PoliticalCompassProps) =>
   );
 
   const getShape = (point: CompassPoint, px: number, py: number, size: number) => {
+    if (point.type === 'participant') {
+      // Under an avatar, or alone when there is none: the ring the legend shows.
+      return (
+        <circle cx={px} cy={py} r={size} fill="var(--ce-document-canvas)" stroke={point.color} strokeWidth={2.5} />
+      );
+    }
     if (point.type === 'tweeter') {
       const d = size * 0.9;
       return <polygon points={`${px},${py - d} ${px + d},${py} ${px},${py + d} ${px - d},${py}`} />;
@@ -354,15 +391,18 @@ const PoliticalCompass = ({ compass, compact = true }: PoliticalCompassProps) =>
           const sp = compass.points.find((p) => p.name === selectedPoint);
           const pointComment = getPointComment(sp);
           const profileHref = getCompassPointProfileHref(sp);
+          // Text keeps the panel's own colour; a point's colour marks it only as
+          // a border and tint, since a marker colour need not read as text here.
+          // A profile link is underlined, so it reads as one in the panel's own colour.
           const selectedPointTitleStyle: React.CSSProperties = {
-            color: (sp && sp.color) || T.accent,
-            textDecoration: 'none',
+            color: T.text,
+            textDecoration: profileHref ? 'underline' : 'none',
             fontWeight: 700,
             fontSize: 15,
           };
           const selectedPointCitationStyle: React.CSSProperties = {
-            color: (sp && sp.color) || T.accent,
-            textDecoration: 'none',
+            color: T.text,
+            textDecoration: profileHref ? 'underline' : 'none',
           };
           const qLabel = sp
             ? (sp.y > 0.5 ? compass.yAxis.top : compass.yAxis.bottom) +
@@ -384,7 +424,16 @@ const PoliticalCompass = ({ compass, compact = true }: PoliticalCompassProps) =>
                 boxShadow: T.shadow,
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+              <div
+                style={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  gap: 8,
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  marginBottom: 10,
+                }}
+              >
                 <div>
                   {profileHref ? (
                     <a href={profileHref} style={selectedPointTitleStyle} target="_blank" rel="noopener noreferrer">
@@ -407,7 +456,7 @@ const PoliticalCompass = ({ compass, compact = true }: PoliticalCompassProps) =>
                       padding: '2px 8px',
                       borderRadius: 10,
                       background: soften((sp && sp.color) || T.accent, 0.1),
-                      color: (sp && sp.color) || T.accent,
+                      color: T.text,
                       fontWeight: 600,
                     }}
                   >
@@ -421,7 +470,7 @@ const PoliticalCompass = ({ compass, compact = true }: PoliticalCompassProps) =>
                   style={{
                     fontSize: 13,
                     fontStyle: 'italic',
-                    color: T.textLight,
+                    color: T.text,
                     padding: 12,
                     background: soften((sp && sp.color) || T.accent, 0.08),
                     borderRadius: T.radiusSm,
@@ -429,13 +478,16 @@ const PoliticalCompass = ({ compass, compact = true }: PoliticalCompassProps) =>
                     lineHeight: 1.6,
                   }}
                 >
-                  <div style={{ marginBottom: 8 }}>&quot;{pointComment}&quot;</div>
+                  {/* A participant's comment is the AI's reading of them, not a quotation. */}
+                  <div style={{ marginBottom: 8 }}>
+                    {sp?.type === 'participant' ? pointComment : <>&quot;{pointComment}&quot;</>}
+                  </div>
                   <div
                     style={{
                       fontSize: 11,
                       fontStyle: 'normal',
                       fontWeight: 700,
-                      color: (sp && sp.color) || T.accent,
+                      color: T.text,
                     }}
                   >
                     {profileHref ? (
@@ -631,19 +683,7 @@ const PoliticalCompass = ({ compass, compact = true }: PoliticalCompassProps) =>
           {renderSideLabel(compass.xAxis.right, padX + cW + 12, 'start')}
 
           {pointLayouts.map(
-            ({
-              point,
-              px,
-              py,
-              pointComment,
-              isSelected,
-              isActive,
-              showInlineLabel,
-              size,
-              activeSize,
-              avatarInfo,
-              avatarRadius,
-            }) => {
+            ({ point, px, py, pointComment, isSelected, isActive, showInlineLabel, size, activeSize }) => {
               return (
                 <g
                   key={point.name}
@@ -751,11 +791,13 @@ const PoliticalCompass = ({ compass, compact = true }: PoliticalCompassProps) =>
               zIndex: 4,
             }}
           >
+            {/* The name keeps the tooltip's own text colour: a point's colour marks it only
+                as the border, since a marker colour need not read on the tooltip. */}
             <div
               style={{
                 fontSize: 11,
                 fontWeight: 700,
-                color: tooltipState.color || T.accent,
+                color: 'var(--ce-tooltip-text)',
                 marginBottom: 6,
               }}
             >
@@ -776,45 +818,11 @@ const PoliticalCompass = ({ compass, compact = true }: PoliticalCompassProps) =>
           marginBottom: 8,
         }}
       >
-        <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-          <svg width="12" height="12">
-            <circle
-              cx="6"
-              cy="6"
-              r="5"
-              fill="var(--ce-text-muted)"
-              stroke="var(--ce-document-canvas)"
-              strokeWidth="1"
-            />
-          </svg>{' '}
-          Debater
-        </span>
-        <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-          <svg width="12" height="12">
-            <polygon
-              points="6,1 11,6 6,11 1,6"
-              fill="var(--ce-text-muted)"
-              stroke="var(--ce-document-canvas)"
-              strokeWidth="1"
-            />
-          </svg>{' '}
-          Tweeter
-        </span>
-        <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-          <svg width="12" height="12">
-            <rect
-              x="1"
-              y="1"
-              width="10"
-              height="10"
-              rx="1.5"
-              fill="var(--ce-text-muted)"
-              stroke="var(--ce-document-canvas)"
-              strokeWidth="1"
-            />
-          </svg>{' '}
-          Insider / Historical
-        </span>
+        {(compass.legend ?? DEMO_LEGEND).map((entry) => (
+          <span key={entry.label} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <LegendMarker shape={entry.shape} /> {entry.label}
+          </span>
+        ))}
       </div>
     </>
   );

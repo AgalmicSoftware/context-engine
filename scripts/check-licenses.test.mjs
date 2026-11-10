@@ -33,6 +33,13 @@ test('installed package metadata controls the gate; missing and version-mismatch
   await installed('MIT');
   assert.equal(check().failures.length, 0);
   assert.match(check({ 'synthetic-dependency@1.0.0': override }).failures[0], /stale or incomplete/);
+  await installed('LGPL-3.0');
+  assert.match(check().failures[0], /LGPL-3.0/);
+  const approved = { declaredLicense: 'LGPL-3.0', license: 'LGPL-3.0', allow: true,
+    evidence: { source: 'synthetic source archive and notices', reviewed: '2026-11-01', note: 'Explicit version-scoped approval.' } };
+  assert.deepEqual(check({ 'synthetic-dependency@1.0.0': approved }).failures, []);
+  assert.ok(check({ 'synthetic-dependency@2.0.0': approved }).failures.length);
+  assert.ok(check({ 'synthetic-dependency@1.0.0': { ...approved, evidence: {} } }).failures.length);
 });
 
 test('bundled development packages are checked from esbuild and Vite inputs', async (t) => {
@@ -71,7 +78,7 @@ test('an override for an absent installed version fails even when all shipped li
   assert.match(result.failures[0], /synthetic-removed@1.0.0.*no longer installed/);
 });
 
-test('the default release gate checks root-installed Bridge and deploy-helper dependencies and bundle notices', async (t) => {
+test('the default release gate checks root-installed Session Worker and deploy-helper dependencies and bundle notices', async (t) => {
   const rootDir = await mkdtemp(path.join(os.tmpdir(), 'ce-release-license-fixture-'));
   t.after(() => rm(rootDir, { recursive: true, force: true }));
   for (const tree of ['.', 'client', 'mcp', 'workers/sessionCorsWorker']) {

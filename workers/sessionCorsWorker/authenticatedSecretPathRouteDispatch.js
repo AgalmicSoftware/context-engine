@@ -24,6 +24,7 @@ export const dispatchAuthenticatedSecretPathRoute = async ({
   const isStorageRoute = (
     (['/storage/response-field-key/wrap', '/storage/response-field-key/unwrap'].includes(path) && method === 'POST') ||
     (path === '/storage/upload' && method === 'POST') ||
+    (path === '/storage/context' && method === 'POST') ||
     (path === '/storage/read' && (method === 'GET' || method === 'POST')) ||
     (path === '/storage/list' && (method === 'GET' || method === 'POST')) ||
     (path === '/storage/export-envelopes' && (method === 'GET' || method === 'POST'))
@@ -93,13 +94,16 @@ export const dispatchAuthenticatedSecretPathRoute = async ({
 
   if (isAgentQuestionsRoute) {
     const loadPublicInterviewQuestions = deps?.loadPublicInterviewQuestions || loadPublicInterviewQuestionsBoundary;
-    const questions = await loadPublicInterviewQuestions({
+    const { questions, incomplete } = await loadPublicInterviewQuestions({
       env,
       config,
       slug,
       storageRoute: deps?.storageRoute,
       fetch: deps?.fetch,
     });
+    if (!questions.length && incomplete) {
+      return { handled: true, response: deps?.json?.({ error: 'Interview question discovery is incomplete. Retry shortly.' }, 503, headers) };
+    }
     const url = new URL(request.url);
     const requestedLimit = Number(url.searchParams.get('limit') || url.searchParams.get('count') || 0);
     const limitCount = Number.isFinite(requestedLimit) && requestedLimit > 0
@@ -153,7 +157,7 @@ export const dispatchAuthenticatedSecretPathRoute = async ({
         config,
         slug,
         requesterAddress: address,
-        authScopes: scopes,
+        expectedAuthority,
         baseHeaders: headers,
         deps: {
           json: deps?.json,

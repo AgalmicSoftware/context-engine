@@ -51,7 +51,7 @@ export type OnePageSessionAgentDataResetState = {
   agentQuestionPileIndex: 0;
   agentQuestionSubmitError: '';
   agentSubmittedQuestionIds: [];
-  agentSubmittingQuestionId: '';
+  agentSubmittingQuestionIds: Set<string>;
 };
 
 export type AgentClientLoginEnvelopeMemoryGlobal = {
@@ -145,7 +145,7 @@ export const isOnePageAgentShellMode = ({
 }): boolean => {
   if (!isOnePageAgentBackendMode({ sessionConfig, sessionSlug, agentSessionMeta })) return false;
   const config = toRecord(sessionConfig);
-  // HTTP enables another login method; only profile-less legacy sessions force the agent shell.
+  // HTTP enables another login method; only a profile-less session known from its probe forces the agent shell.
   if (!Object.hasOwn(config, 'sessionModeProfile') && !Object.hasOwn(config, 'authority')) return true;
   return (
     provider === 'agent_token' &&
@@ -173,7 +173,7 @@ export const buildAgentDataResetState = (): OnePageSessionAgentDataResetState =>
   agentQuestions: [],
   agentAnswerState: null,
   agentQuestionPileIndex: 0,
-  agentSubmittingQuestionId: '',
+  agentSubmittingQuestionIds: new Set<string>(),
   agentSubmittedQuestionIds: [],
   agentQuestionSubmitError: '',
   agentResultsStatus: 'idle',
@@ -187,7 +187,7 @@ export const getAgentClientLoginEnvelopeMemoryKey = (target: unknown | AgentClie
     normalizeOnePageSessionSlug(source.sessionSlug) || 'general',
     resolveWorkerCanonicalSessionIdHex({ sessionId: source.sessionId }) || 'no-session-id',
     normalizeWorkerUrl(toTrimmedString(source.workerUrl)) || 'no-worker-origin',
-    normalizeWorkerUrl(toTrimmedString(source.agentWorkerUrl)) || 'no-bridge-origin',
+    normalizeWorkerUrl(toTrimmedString(source.agentWorkerUrl)) || 'no-agent-origin',
   ].join('\n');
 };
 

@@ -1,3 +1,4 @@
+jest.mock('wagmi/actions', () => ({ disconnect: jest.fn(async () => {}) }));
 import React from 'react';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { LoginAndSettingsModal } from './LoginAndSettingsModal';

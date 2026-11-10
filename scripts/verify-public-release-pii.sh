@@ -208,6 +208,8 @@ function scanTextFile(relativePath, text, findings, warnings) {
   const emailRe = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/ig;
   const homePathRe = /(?:^|[\s"'(=:{])((?:\/Users|\/home)\/[A-Za-z0-9._-]+(?:\/[^\s"'`<>\\)]*)?)/g;
   const pemRe = /-----BEGIN [A-Z0-9 ]*(?:PRIVATE KEY|RSA PRIVATE KEY|EC PRIVATE KEY|OPENSSH PRIVATE KEY)[A-Z0-9 ]*-----/i;
+  // Push protection also rejects provider-shaped fixtures outside credential assignments.
+  const providerApiKeyRe = /\b[rs]k_(?:live|test)_[A-Za-z0-9]{16,}/g;
   const envSecretLineRe = /^\s*(?:export\s+)?([A-Z0-9_]*(?:API_KEY|SECRET|TOKEN|PASSWORD|PRIVATE_KEY|PRIVATEKEY|CREDENTIAL)[A-Z0-9_]*)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s#;]+))\s*(?:#.*)?$/;
   const quotedEnvSecretLiteralRe = /['"]([A-Z0-9_]*(?:API_KEY|SECRET|TOKEN|PASSWORD|PRIVATE_KEY|PRIVATEKEY|CREDENTIAL)[A-Z0-9_]*)\s*=\s*([^'"\s][^'"]*)['"]/g;
   const codeSecretRe = /\b([A-Za-z_$][A-Za-z0-9_$]*(?:apiKey|api_key|secret|token|password|privateKey|private_key|credential)[A-Za-z0-9_$]*)\b\s*[:=]\s*['"]([^'"\n]{12,})['"]/g;
@@ -238,6 +240,11 @@ function scanTextFile(relativePath, text, findings, warnings) {
 
     if (pemRe.test(line)) {
       addFinding(findings, 'pem-private-key', relativePath, lineNumber, 'private key PEM block');
+    }
+
+    providerApiKeyRe.lastIndex = 0;
+    while ((match = providerApiKeyRe.exec(line)) !== null) {
+      addFinding(findings, 'provider-api-key', relativePath, lineNumber, redactSecret(match[0]));
     }
 
     match = envSecretLineRe.exec(line);

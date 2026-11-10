@@ -483,6 +483,31 @@ describe('SurveyResults locked responses banner', () => {
     expect(decryptSpy).toHaveBeenCalled();
   });
 
+  it('locks decrypted responses again when the account changes', async () => {
+    jest.spyOn(contractScriptsModule, 'getSessionConfigBySlug').mockReturnValue(null);
+    jest.spyOn(cryptoUtils, 'decryptEnvelopeValue').mockResolvedValue('Unlocked answer');
+    const view = mountSurveyResults({
+      viewMode: 'survey',
+      loginComplete: true,
+      account: '0xabc',
+      provider: 'mock-provider',
+    });
+    await switchToAggregateView();
+    injectSbtFilteredResponses({
+      q1: [buildLockedAggregatorRow('0xaaa0000000000000000000000000000000000001')],
+    });
+
+    fireEvent.click(await screen.findByTestId('ce-results-locked-toggle'));
+    fireEvent.click(await screen.findByTestId('ce-results-decrypt-btn'));
+    await waitFor(() => expect(screen.queryByTestId('ce-results-locked-toggle')).toBeNull());
+
+    view.rerenderSurveyResults({ account: '0xdef' });
+    expect(await screen.findByTestId('ce-results-locked-toggle')).toHaveAttribute(
+      'aria-label',
+      expect.stringMatching(/ 1 locked response$/),
+    );
+  });
+
   it('skips the locked banner model for self-encrypted responses without gate access rules', async () => {
     jest.spyOn(contractScriptsModule, 'getSessionConfigBySlug').mockReturnValue(null);
 
@@ -551,16 +576,15 @@ describe('SurveyResults module styles', () => {
       /\.aggregatorSummaryCard:not\(:has\(\.surveyResultsResponseCard\)\) \.questionSummaryHeader\s*{[\s\S]*?border-radius:\s*var\(--ce-radius-12\) !important;/,
     );
     expect(scss).toMatch(
-      /\.surveyResultsResponseCard\s*{[\s\S]*?background:\s*color-mix\(in srgb,\s*var\(--ce-status-info\) 98%,\s*transparent\) !important;[\s\S]*?border-top:\s*0 !important;[\s\S]*?border-radius:\s*var\(--ce-radius-0\) var\(--ce-radius-0\) var\(--ce-radius-12\) var\(--ce-radius-12\) !important;/,
+      /\.surveyResultsResponseCard\s*{[\s\S]*?background:\s*var\(--ce-overlay-surface-alt\) !important;[\s\S]*?border-top:\s*0 !important;[\s\S]*?border-radius:\s*var\(--ce-radius-0\) var\(--ce-radius-0\) var\(--ce-radius-12\) var\(--ce-radius-12\) !important;/,
     );
     expect(scss).toMatch(/\.surveyResultsResponseCardBody\s*{[\s\S]*?padding:\s*0 !important;/);
     expect(scss).toMatch(
       /\.surveyResultsAggregatorPanel\s*{[\s\S]*?background:\s*transparent !important;[\s\S]*?border:\s*0;[\s\S]*?border-radius:\s*var\(--ce-radius-0\);/,
     );
     expect(scss).toMatch(
-      /\.lockedBanner\s*{[\s\S]*?background:\s*color-mix\(in srgb,\s*var\(--ce-overlay-surface\) 96%,\s*transparent\);[\s\S]*?border-left:\s*4px solid color-mix\(in srgb,\s*var\(--ce-action-accent\) 70%,\s*transparent\);[\s\S]*?color:\s*var\(--ce-color-panel-text\);/,
+      /\.lockedBanner\s*{[\s\S]*?background:\s*color-mix\(in srgb,\s*var\(--ce-overlay-surface\) 96%,\s*transparent\);[\s\S]*?border-left:\s*4px solid color-mix\(in srgb,\s*var\(--ce-action-accent\) 70%,\s*transparent\);[\s\S]*?color:\s*var\(--ce-overlay-text\);/,
     );
-    expect(scss).toMatch(/\.lockedBannerCaret\s*{[\s\S]*?margin:\s*8px 0 0 auto;[\s\S]*?padding:\s*0;/);
     expect(scss).toMatch(
       /\.lockedBannerDetails\s*{[\s\S]*?border-top:\s*1px solid color-mix\(in srgb,\s*var\(--ce-text-inverse\) 12%,\s*transparent\);/,
     );
@@ -581,7 +605,7 @@ describe('SurveyResults module styles', () => {
       /\.filterSummaryBox\s*{[\s\S]*?background:\s*color-mix\(in srgb,\s*var\(--ce-overlay-text\) 6%,\s*transparent\);[\s\S]*?color:\s*var\(--ce-overlay-text-muted\);/,
     );
     expect(scss).toMatch(
-      /\.filterSummaryBox\s*{[\s\S]*?p > strong\s*{[\s\S]*?color:\s*var\(--ce-action-accent\) !important;/,
+      /\.filterSummaryBox\s*{[\s\S]*?p > strong\s*{[\s\S]*?color:\s*var\(--ce-overlay-text\) !important;/,
     );
     expect(scss).toMatch(/\.demoResultsAtlasSurface,\s*\.demoResultsRiskMatrixSurface\s*{[\s\S]*?padding:\s*1rem;/);
     expect(scss).toMatch(

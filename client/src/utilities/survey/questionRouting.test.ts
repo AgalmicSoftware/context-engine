@@ -52,6 +52,21 @@ describe('questionRouting session query helpers', () => {
     expect(route).toBe('/question/0xabc?responder=0xdeadbeef');
   });
 
+  it.each(['', 'general'])('preserves explicit General (%s) separately from discovery', (sessionSlug) => {
+    expect(buildQuestionRoutePath('0xABC', { sessionSlug })).toBe('/question/0xabc?session=general');
+    expect(parseQuestionSessionSlugFromSearch('?session=general')).toBe('');
+  });
+
+  it.each([undefined, null])('keeps a missing session available for discovery (%s)', (sessionSlug) => {
+    expect(buildQuestionRoutePath('0xABC', { sessionSlug })).toBe('/question/0xabc');
+  });
+
+  it('prefers an explicit General pin over a conflicting session id', () => {
+    expect(buildQuestionRoutePath('0xABC', { sessionSlug: '', sessionId: 'other' })).toBe(
+      '/question/0xabc?session=general',
+    );
+  });
+
   it('builds bare question routes when no responder or session hint is provided', () => {
     const route = buildQuestionRoutePath('0xABC');
     expect(route).toBe('/question/0xabc');

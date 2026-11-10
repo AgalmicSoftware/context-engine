@@ -1,4 +1,4 @@
-// Preserve the bridge's legacy coercion: falsy non-strings such as 0 and false become empty.
+// Falsy non-strings such as 0 and false become empty.
 // Callers that must preserve those values intentionally keep a local variant.
 export function safeString(value) {
   return String(value || '').trim();
@@ -8,9 +8,8 @@ export function lower(value) {
   return safeString(value).toLowerCase();
 }
 
-// Session slugs are transport identifiers. This intentionally preserves the
-// bridge's existing lowercase/filter/truncate behavior and does not substitute
-// a default-session sentinel.
+// Session slugs are transport identifiers: lowercased, filtered and truncated,
+// never replaced by a default-session sentinel.
 export function sanitizeSessionSlug(value = '') {
   return lower(value).replace(/[^a-z0-9_-]/g, '').slice(0, 128);
 }
@@ -99,7 +98,7 @@ export function bytesToHex(bytes) {
   return [...bytes].map((byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
-// Lowercase hex SHA-256 of UTF-8 text; falsy inputs hash as '' (legacy bridge coercion).
+// Lowercase hex SHA-256 of UTF-8 text; falsy inputs hash as ''.
 export async function sha256Hex(input = '') {
   const digest = await globalThis.crypto.subtle.digest('SHA-256', new TextEncoder().encode(String(input || '')));
   return bytesToHex(new Uint8Array(digest));

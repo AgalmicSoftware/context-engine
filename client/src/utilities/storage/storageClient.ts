@@ -26,6 +26,8 @@ interface StorageWorkerOptions {
 
 interface UploadDataToSessionStorageOptions extends StorageWorkerOptions {
   requestId?: string;
+  /** A per-item rule the Worker enforces on read and list, such as admins only. */
+  accessConditions?: unknown;
   tags?: unknown;
   contentType?: unknown;
   resource?: unknown;
@@ -37,14 +39,20 @@ interface UploadDataToSessionStorageOptions extends StorageWorkerOptions {
 interface ReadSessionStorageBlobOptions extends StorageWorkerOptions {
   signal?: AbortSignal;
   storageRef?: unknown;
+  /** false reads as the signed-in person first, so their admins-only items are included. */
+  preferAnonymous?: boolean;
 }
 
 interface ListSessionStorageRefsPageOptions extends StorageWorkerOptions {
   ownResponses?: { account: string; sessionId: string };
   signal?: AbortSignal;
   resource?: unknown;
+  /** 'context' lists only context sources. */
+  role?: 'context';
   cursor?: unknown;
   limit?: unknown;
+  /** false lists as the signed-in person first, so their admins-only items are included. */
+  preferAnonymous?: boolean;
 }
 
 interface SessionStorageRefsPage {
@@ -68,7 +76,8 @@ const listAddresses = (value: unknown): string[] => {
   if (value && typeof value === 'object') return listAddresses(asRecord(value).addresses || asRecord(value).members);
   return typeof value === 'string' ? [value.trim().toLowerCase()] : [];
 };
-const isConfiguredAdmin = (sessionConfig: unknown, context: unknown): boolean => {
+/** True when the context's account is one of the session config's admins. */
+export const isConfiguredAdmin = (sessionConfig: unknown, context: unknown): boolean => {
   const config = asRecord(sessionConfig);
   const account = toStr(asRecord(context).account).trim().toLowerCase();
   const roles = [config.workerRoles, config.roles, asRecord(config.authorization).roles];
@@ -222,6 +231,7 @@ export const uploadDataToSessionStorage = async (
     arweaveJwk = '',
     credentialToken = '',
     requestId = '',
+    accessConditions = null,
     fetchImpl = fetch,
   }: UploadDataToSessionStorageOptions = {},
 ): Promise<UnknownRecord> => {
@@ -301,6 +311,7 @@ export const uploadDataToSessionStorage = async (
     form.append('payloadEncrypted', payloadIsEncrypted ? 'true' : 'false');
     if (requestId) form.append('requestId', requestId);
     if (normalizedTags.length) form.append('tags', JSON.stringify(normalizedTags));
+    if (accessConditions) form.append('accessConditions', JSON.stringify(accessConditions));
     requestInit = { method: 'POST', body: form };
   } else {
     requestInit = {
@@ -313,6 +324,7 @@ export const uploadDataToSessionStorage = async (
         payloadEncrypted: payloadIsEncrypted,
         tags: normalizedTags,
         ...(requestId ? { requestId } : {}),
+        ...(accessConditions ? { accessConditions } : {}),
         data,
       }),
     };
@@ -350,6 +362,7 @@ export const readSessionStorageBlob = async ({
   context = null,
   workerUrl = '',
   signal,
+  preferAnonymous = true,
 }: ReadSessionStorageBlobOptions = {}): Promise<Response> => {
   const ref = normalizeStorageRef(storageRef, { fallbackBackend: STORAGE_BACKENDS.CLOUDFLARE });
   if (!ref || ref.backend !== STORAGE_BACKENDS.CLOUDFLARE) throw new Error('Cloudflare storageRef is required.');
@@ -364,7 +377,7 @@ export const readSessionStorageBlob = async ({
       context,
       workerUrl: baseUrl,
       allowDemoFallback: defaultStrictAllowDemoFallback(),
-      preferAnonymous: true,
+      preferAnonymous,
     },
   );
   if (!response.ok) {
@@ -380,10 +393,12 @@ export const listSessionStorageRefsPage = async ({
   context = null,
   workerUrl = '',
   resource = 'docsContext',
+  role,
   cursor = null,
   limit = null,
   ownResponses,
   signal,
+  preferAnonymous = !ownResponses,
 }: ListSessionStorageRefsPageOptions = {}): Promise<SessionStorageRefsPage> => {
   const baseUrl = await resolveStorageWorkerUrl({ sessionSlug, sessionConfig, context, workerUrl });
   const params = new URLSearchParams({ resource: toStr(resource).trim() || 'docsContext' });
@@ -392,6 +407,7 @@ export const listSessionStorageRefsPage = async ({
   if (normalizedCursor) params.set('cursor', normalizedCursor);
   if (Number.isFinite(normalizedLimit) && normalizedLimit > 0) params.set('limit', String(normalizedLimit));
   if (ownResponses) params.set('mine', 'true');
+  if (role) params.set('role', role);
   const endpoint = `${baseUrl}/storage/list?${params.toString()}`;
   const response = await fetchWorkerWithAuth(
     endpoint,
@@ -402,7 +418,7 @@ export const listSessionStorageRefsPage = async ({
       context,
       workerUrl: baseUrl,
       allowDemoFallback: defaultStrictAllowDemoFallback(),
-      preferAnonymous: !ownResponses,
+      preferAnonymous,
     },
   );
   const body = (await response.json().catch(() => ({}))) as UnknownRecord;

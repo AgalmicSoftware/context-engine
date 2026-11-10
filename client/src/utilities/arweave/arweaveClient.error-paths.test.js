@@ -108,7 +108,7 @@ describe('error paths', () => {
       arweaveClient.downloadDataFromArweave(TX_ID_404, {
         gateways: [TEST_ARWEAVE_GATEWAY],
         retries: 0,
-        bypassCache: true,
+        cacheBypass: true,
         disableExistencePrecheck: true,
       }),
     ).rejects.toMatchObject({
@@ -127,7 +127,7 @@ describe('error paths', () => {
       arweaveClient.downloadDataFromArweave(TX_ID_TIMEOUT, {
         gateways: [TEST_ARWEAVE_GATEWAY],
         retries: 0,
-        bypassCache: true,
+        cacheBypass: true,
         disableExistencePrecheck: true,
         gatewayTimeoutMs: 100,
       }),
@@ -149,7 +149,7 @@ describe('error paths', () => {
     const pending = arweaveClient.downloadDataFromArweave(TX_ID_TIMEOUT, {
       gateways: [TEST_AR_IO_GATEWAY],
       retries: 0,
-      bypassCache: true,
+      cacheBypass: true,
       disableExistencePrecheck: true,
       gatewayTimeoutMs: 50,
     });

@@ -10,6 +10,7 @@ are not practical to colocate with client, worker, or script sources.
 - `scripts/` contains JS/Python tooling, audits, and supported automation.
 - `tests/root/` contains root Node/Jest tests for workers, deploy helpers, and compatibility harnesses.
 - `tests/helpers/` contains helper modules shared by `tests/root/`.
+- `tests/fixtures/` contains fixtures for those tests, such as `worker-compat`, synthetic stored records in the previous format.
 
 If you are deciding where to add new files:
 

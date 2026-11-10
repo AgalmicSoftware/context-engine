@@ -183,7 +183,8 @@
 
 .agentSecondaryButton,
 .agentLogoutButton {
-  background: color-mix(in srgb, var(--ce-overlay-surface) 88%, transparent);
+  background: var(--ce-overlay-surface-alt);
+  color: var(--ce-overlay-text);
 }
 
 .agentTabButtonActive {
@@ -201,8 +202,8 @@
 .agentListPanel {
   border: 1px solid color-mix(in srgb, var(--ce-status-info) 28%, transparent);
   border-radius: var(--ce-radius-8);
-  background: color-mix(in srgb, var(--ce-document-text) 66%, transparent);
-  color: var(--ce-document-surface);
+  background: var(--ce-overlay-surface-alt);
+  color: var(--ce-overlay-text);
   padding: 16px;
 }
 
@@ -212,7 +213,7 @@
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 14px;
-  color: var(--ce-document-border);
+  color: var(--ce-overlay-text-muted);
   font-weight: 700;
 }
 
@@ -222,7 +223,7 @@
 
 .agentListEmpty,
 .agentListError {
-  color: var(--ce-document-border);
+  color: var(--ce-overlay-text-muted);
   font-size: 0.95rem;
 }
 
@@ -283,17 +284,9 @@
   padding: 12px 14px;
   border: 1px solid color-mix(in srgb, var(--ce-status-info) 28%, transparent);
   border-radius: var(--ce-radius-6);
-  background: color-mix(in srgb, var(--ce-document-text) 58%, transparent);
-  color: var(--ce-document-border);
+  background: var(--ce-overlay-surface-alt);
+  color: var(--ce-overlay-text-muted);
   font-size: 0.95rem;
-}
-
-.workerGroupImage {
-  width: min(100%, 240px);
-  aspect-ratio: 16 / 9;
-  object-fit: cover;
-  border-radius: var(--ce-radius-6);
-  border: 1px solid color-mix(in srgb, var(--ce-status-info) 28%, transparent);
 }
 
 .workerGroupsListPanel {
@@ -361,13 +354,6 @@
   }
 }
 
-.compactContextSection {
-  .documentsSectionContent {
-    margin-top: 12px;
-    padding-bottom: 0;
-  }
-}
-
 .sessionContextSection {
   width: min(100%, 980px);
   margin: 1.25rem auto 1rem;
@@ -400,11 +386,13 @@
   gap: 0.65rem;
   margin-top: 0.85rem;
 
+  // The chrome's text colour reads on the chrome in every theme; the app's accent
+  // falls to about 3:1 in Classic 95.
   a {
     display: inline-flex;
     align-items: center;
     gap: 0.4rem;
-    color: var(--ce-action-accent);
+    color: var(--ce-session-chrome-contrast);
     font-weight: 700;
     text-decoration: none;
 
@@ -413,6 +401,90 @@
       text-decoration: underline;
       text-underline-offset: 3px;
     }
+  }
+}
+
+// Files and links have no paragraph above them, so no top gap.
+.sessionContextSection > .sessionContextLinks:first-child {
+  margin-top: 0;
+}
+
+.sessionContextItem {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.sessionContextAdder {
+  color: var(--ce-session-chrome-contrast);
+  font-size: 0.75rem;
+}
+
+.sessionContextHelp {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: help;
+}
+
+.sessionContextRemove {
+  border: 1px solid currentColor;
+  border-radius: var(--ce-radius-6);
+  padding: 0 0.45rem;
+  background: transparent;
+  color: var(--ce-session-chrome-contrast);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.sessionContextBadge {
+  border: 1px solid currentColor;
+  border-radius: var(--ce-radius-pill, 999px);
+  padding: 0 0.45rem;
+  color: var(--ce-session-chrome-contrast);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+// The admin controls keep the setup page's own surface and text colors.
+.sessionContextManage {
+  width: min(100%, 980px);
+  margin: 0 auto 1rem;
+  text-align: left;
+
+  summary {
+    cursor: pointer;
+  }
+}
+
+.groupAgentBar {
+  display: flex;
+  justify-content: flex-end;
+  width: min(100%, 980px);
+  margin: 0 auto;
+}
+
+// The launcher paints the session chrome and its text colour, a pair every
+// theme keeps readable, so it reads on any section background in every state.
+.groupAgentButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.45rem 0.9rem;
+  background: var(--ce-session-chrome);
+  color: var(--ce-session-chrome-contrast);
+  font-weight: 700;
+  cursor: pointer;
+
+  &:hover,
+  &:focus-visible,
+  &:active {
+    background: var(--ce-session-chrome);
+    color: var(--ce-session-chrome-contrast);
+    text-decoration: underline;
+    text-underline-offset: 3px;
   }
 }
 
@@ -464,7 +536,6 @@
 
 .workerGroupCardPrimaryButton,
 .workerGroupCardLeaveButton,
-.workerGroupCardMemberStatus,
 .workerGroupCardInactiveStatus {
   display: inline-flex;
   align-items: center;
@@ -537,12 +608,6 @@
     box-shadow: none;
     transform: none;
   }
-}
-
-.workerGroupCardMemberStatus {
-  border: 1px solid color-mix(in srgb, var(--ce-action-accent) 42%, transparent);
-  background: color-mix(in srgb, var(--ce-action-accent) 12%, transparent);
-  color: var(--ce-status-success-text);
 }
 
 .workerGroupCardInactiveStatus {
@@ -692,7 +757,6 @@
 
   .workerGroupCardPrimaryButton,
   .workerGroupCardLeaveButton,
-  .workerGroupCardMemberStatus,
   .workerGroupCardInactiveStatus {
     width: auto;
     min-width: 88px;
@@ -791,6 +855,17 @@
 .agentSubmitDisabledReason {
   color: var(--ce-document-border);
   font-size: 0.88rem;
+}
+
+// Takes the card's text color, as the question above it does.
+.agentRatingEnds {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  margin-top: 6px;
+  font-size: 0.88rem;
+  overflow-wrap: anywhere;
 }
 
 .agentChipRow,
@@ -999,57 +1074,6 @@
   }
 }
 
-/* Make the Foresight logo bigger */
-.brandLogo {
-  max-width: 350px;
-  margin-bottom: 0px; // for Edge Logo
-  -webkit-filter: invert(100%);
-  /* Safari/Chrome */
-  filter: invert(100%);
-}
-
-/* Flex item for the text portion */
-.brandText {
-  flex: 1 1 auto;
-  /* allow it to expand */
-  font-size: 1.3rem;
-  line-height: 1.5;
-}
-
-/* Flex item for the header image portion */
-.brandImage {
-  flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.headerImage {
-  max-width: 300px;
-  margin-top: 12px;
-  margin-bottom: 0px;
-  mix-blend-mode: luminosity;
-}
-
-.eventBlurb {
-  font-size: 1.25rem;
-  line-height: 1.2;
-  padding: 15px;
-  border-radius: var(--ce-radius-6);
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  justify-content: space-between;
-}
-
-#blurbText {
-  line-height: 1.6;
-  padding: 20px;
-  font-weight: 500;
-  font-size: 1em;
-  margin: 20px;
-}
-
 /* Each collapsible section wrapper (Questions, Groups, Results) */
 .sectionContainer {
   box-sizing: border-box;
@@ -1135,7 +1159,7 @@
   display: block;
   max-width: 100%;
   line-height: 1;
-  color: color-mix(in srgb, var(--ce-text-inverse) 50%, transparent);
+  color: var(--ce-panel-text);
 }
 
 .sectionHeaderSubtitle {
@@ -1144,7 +1168,7 @@
   font-size: 0.63em;
   line-height: 1.12;
   font-weight: 600;
-  color: color-mix(in srgb, var(--ce-text-inverse) 25%, transparent);
+  color: var(--ce-panel-text-muted);
 }
 
 .sectionHeaderTooltip {
@@ -1155,12 +1179,6 @@
   margin-left: 6px;
   align-self: center;
   flex: 0 0 auto;
-}
-
-.sectionHeaderMeta {
-  align-items: center;
-  display: inline-flex;
-  gap: 10px;
 }
 
 .documentsSectionHeader {
@@ -1218,10 +1236,12 @@
   min-height: 50px;
   min-width: 138px;
   padding: 10px 20px;
+  // Opaque and darker than the info colour, so the white label reads at 4.5:1
+  // on any panel; translucent, it was 3.77:1 on Context Engine.
   background: linear-gradient(
     180deg,
-    color-mix(in srgb, var(--ce-status-info) 72%, transparent) 0%,
-    color-mix(in srgb, var(--ce-status-info) 90%, transparent) 100%
+    color-mix(in srgb, var(--ce-status-info) 75%, var(--ce-compat-dark)) 0%,
+    color-mix(in srgb, var(--ce-status-info) 68%, var(--ce-compat-dark)) 100%
   );
   color: color-mix(in srgb, var(--ce-text-inverse) 98%, transparent);
   font-size: 0.98rem;
@@ -1246,8 +1266,8 @@
   &:focus-visible {
     background: linear-gradient(
       180deg,
-      color-mix(in srgb, var(--ce-status-info) 82%, transparent) 0%,
-      color-mix(in srgb, var(--ce-status-info) 94%, transparent) 100%
+      color-mix(in srgb, var(--ce-status-info) 70%, var(--ce-compat-dark)) 0%,
+      color-mix(in srgb, var(--ce-status-info) 62%, var(--ce-compat-dark)) 100%
     );
     border-color: color-mix(in srgb, var(--ce-text-inverse) 36%, transparent);
     color: var(--ce-color-white);
@@ -1613,99 +1633,8 @@
   }
 }
 
-/* (Optional) older placeholder classes if needed */
-.surveySection {
-  background: transparent;
-  padding: 15px;
-  margin-bottom: 20px;
-  border-radius: var(--ce-radius-6);
-}
-.groupsSection {
-  background: transparent;
-  border: 1px solid var(--ce-border-light);
-  padding: 15px;
-  border-radius: var(--ce-radius-6);
-}
-.miniSbtArea {
-  margin-top: 10px;
-  background: color-mix(in srgb, var(--ce-data-series-2) 5%, transparent);
-  border: 1px solid var(--ce-data-series-2);
-  padding: 10px;
-  border-radius: var(--ce-radius-4);
-}
-
-/* Torus modal classes if still needed */
-.torusModalBackdrop {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: color-mix(in srgb, var(--ce-compat-dark) 35%, transparent);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 9999;
-}
-.torusModal {
-  background: var(--ce-color-white);
-  border-radius: var(--ce-radius-8);
-  padding: 20px;
-  width: 320px;
-  box-shadow: 0 2px 8px color-mix(in srgb, var(--ce-compat-dark) 20%, transparent);
-  text-align: center;
-  color: var(--ce-document-text);
-}
-
 /* --------------------------------------------
      NEW: Additional classes for "About" collapsible  --------------------------------------------- */
-.aboutContainer {
-  display: flex;
-  flex-direction: column;
-  flex-wrap: wrap;
-  background: color-mix(in srgb, var(--ce-status-success) 50.2%, transparent);
-  border-radius: var(--ce-radius-7);
-  margin-right: 15px;
-  margin-left: 15px;
-  padding: 20px;
-  color: var(--ce-color-white);
-  font-size: 1.65em;
-  margin-bottom: 15px;
-  margin-top: 15px;
-  font-weight: 600;
-  border: 1px var(--ce-color-bg) solid;
-  border-radius: var(--ce-radius-5);
-  box-shadow:
-    5px 5px 12px var(--ce-overlay-base),
-    -5px -5px 12px var(--ce-status-info);
-}
-
-.aboutHeader {
-  display: flex;
-  flex-direction: row-reverse;
-  align-self: center;
-  opacity: 0.75;
-  font-weight: 600;
-  color: var(--ce-color-white);
-  align-items: center;
-  text-transform: uppercase;
-  font-size: 1.2em;
-}
-
-.aboutContent {
-  font-size: 0.85em;
-  font-weight: 700;
-  color: var(--ce-color-white);
-}
-
-#aboutText {
-  font-weight: 600;
-}
-
-#aboutArrowIcon {
-  font-size: 2em;
-  margin-right: 20px;
-}
 
 /* -------------------------------------------
      Responsive adjustments for smartphones
@@ -1732,27 +1661,6 @@
     font-size: 0.9rem;
   }
 
-  .brandLogo {
-    max-width: 250px;
-    margin-bottom: 0px; // below if for Edge Logo
-    -webkit-filter: invert(100%);
-    /* Safari/Chrome */
-    filter: invert(100%);
-    opacity: 0.25;
-  }
-
-  .eventBlurb {
-    flex-direction: column-reverse;
-    align-items: center;
-    padding-top: 0px;
-  }
-
-  #blurbText {
-    margin: 20px 0;
-    font-size: 0.95rem;
-    padding: 0;
-  }
-
   .sectionContainer {
     padding-left: 0px;
     padding-right: 0px;
@@ -1776,7 +1684,7 @@
     font-size: 1em;
     font-weight: inherit;
     line-height: 1;
-    color: color-mix(in srgb, var(--ce-text-inverse) 15%, transparent);
+    color: var(--ce-panel-text-muted);
   }
 
   .sectionHeaderRow {
@@ -1845,13 +1753,6 @@
   .miniSectionContent {
     padding: 10px;
   }
-
-  .headerImage {
-    max-width: 250px;
-    margin-top: 8px;
-    margin-bottom: 8px;
-    mix-blend-mode: luminosity;
-  }
 }
 
 /* Keep smaller tablets on the inline header layout without pulling in the full phone chrome. */
@@ -1873,7 +1774,7 @@
     font-size: 1em;
     font-weight: inherit;
     line-height: 1;
-    color: color-mix(in srgb, var(--ce-text-inverse) 15%, transparent);
+    color: var(--ce-panel-text-muted);
   }
 
   .sectionHeaderRow {
@@ -1964,33 +1865,6 @@
     align-items: center;
     grid-gap: 15px;
     gap: 0px;
-  }
-
-  .brandLogo {
-    max-width: 280px;
-    margin-bottom: 0px; // for Edge Logo
-    -webkit-filter: invert(100%);
-    /* Safari/Chrome */
-    filter: invert(100%);
-  }
-
-  .eventBlurb {
-    padding: 10px;
-    font-size: 1.1rem;
-    flex-direction: column;
-  }
-
-  #blurbText {
-    margin: 0px;
-    font-size: 1.2rem;
-    padding: 10px;
-  }
-
-  .headerImage {
-    max-width: 200px;
-    margin-top: 10px;
-    margin-bottom: 10px;
-    mix-blend-mode: luminosity;
   }
 
   .sectionHeader {
@@ -2134,19 +2008,6 @@
   color: var(--ce-overlay-surface);
 }
 
-#viewAllQuestionsButton {
-  display: inline-block;
-  font-size: 0.9rem;
-  font-weight: 600;
-  padding: 8px 14px;
-  border-radius: var(--ce-radius-4);
-  background-color: transparent;
-  color: var(--ce-text-muted);
-  border: 0px solid var(--ce-color-black);
-  cursor: pointer;
-  opacity: 0.75;
-}
-
 /* ===================================================== */
 /* NEW: Globally-scoped close button for Reactstrap Alert */
 /* ===================================================== */
@@ -2215,6 +2076,17 @@
     color: var(--ce-panel-text);
   }
 
+  // The selected Results view: the shared tint left its white label at 1.6:1
+  // on the grey window, so it takes the primary button's colours, as Minimal does.
+  .sectionHeaderViewModeButtonActive,
+  .sectionHeaderViewModeButtonActive:hover,
+  .sectionHeaderViewModeButtonActive:focus-visible {
+    background: var(--ce-action-primary);
+    border-color: var(--ce-action-primary);
+    color: var(--ce-action-primary-text);
+    text-shadow: none;
+  }
+
   .brandingSection {
     overflow: visible;
   }
@@ -2274,7 +2146,6 @@
 
   .sectionsGrid .sectionHeaderTitle {
     font-size: 1.35rem;
-    opacity: 0.5;
   }
 
   .sectionsGrid .sectionHeaderTooltip {
@@ -2284,7 +2155,6 @@
   .sectionsGrid .sectionHeaderSubtitle {
     font-size: 1rem;
     font-weight: 400;
-    opacity: 0.5;
   }
 
   .sectionsGrid .sectionToggleIcon {
@@ -2401,7 +2271,6 @@
 
     .sectionsGrid .sectionHeaderSubtitle {
       font-size: 1rem;
-      opacity: 0.5;
     }
   }
 }
@@ -2414,9 +2283,11 @@
 
 .generatedResultsStatus,
 .generatedResultsEmpty {
-  border: 1px solid color-mix(in srgb, var(--ce-status-info) 34%, transparent);
-  background: color-mix(in srgb, var(--ce-status-info-text) 72%, transparent);
-  color: var(--ce-text-primary);
+  // The atlas panel's pair, readable in every theme; the info colour only edges it.
+  border: 1px solid var(--ce-card-border);
+  border-left: 4px solid var(--ce-status-info);
+  background: var(--ce-surface-sunken);
+  color: var(--ce-panel-text);
   padding: 0.75rem 0.9rem;
   border-radius: 0.75rem;
   line-height: 1.45;

@@ -1,4 +1,7 @@
+import { logoutClientAuth, CLIENT_AUTH_LOGOUT_EVENT } from '../../utilities/session/clientAuthLogout';
+import { getClientAuthGeneration } from '../../utilities/session/clientAuthGeneration';
 import { DEFAULT_AI_MODEL } from '../../../../shared/aiDefaults.mjs';
+import { takesReasoningEffort } from '../../../../shared/aiModelFamily.mjs';
 /** @file LoginAndSettingsModal.tsx */
 import React, { Component, Suspense } from 'react';
 import { connect } from 'react-redux';
@@ -65,7 +68,6 @@ import {
   DEFAULT_REASONING_EFFORT,
   applyPreLoginAiProviderKeyChange,
   deriveAiPreset,
-  toModelLeaf,
 } from '../../utilities/ai/aiSettings.js';
 import {
   getLocalSessionResourceKeys,
@@ -75,7 +77,7 @@ import {
 import { getWorkerSessionToken, clearAllWorkerSessionTokens } from '../../utilities/worker/workerAuth.js';
 import type { WorkerResourcePresence } from '../../utilities/worker/workerResourcePresence';
 import { resolveActiveSessionSlug, resolveSessionSlugFromPathname } from '../../utilities/session/sessionNaming.js';
-import { markUserExplicitlyDisconnected } from '../../utilities/web3/wagmiDisconnectState.js';
+import { wasUserExplicitlyDisconnected } from '../../utilities/web3/wagmiDisconnectState.js';
 import { notify } from '../../utilities/ui/notify.js';
 import {
   normalizeSessionScanScope,
@@ -83,7 +85,7 @@ import {
   readSessionScanScope,
   readSessionScanSlugs,
 } from '../../utilities/session/sessionScanScope.js';
-import { initCacheManager, listNamespaceEntriesSync, removeCache } from '../../utilities/cache/cacheScripts.js';
+import { clearCacheNamespace, initCacheManager } from '../../utilities/cache/cacheScripts.js';
 import { toStr } from '../../utilities/shared/primitives.js';
 import {
   derivePrimarySessionSlugFromList,
@@ -182,6 +184,8 @@ interface LoginAndSettingsModalState {
   testFundsStatusTone: string;
   passkeyWalletStatusMessage: string;
   passkeyWalletStatusTone: string;
+  // Explanation behind the status's "?" button; any new status clears it.
+  passkeyWalletStatusHelp: string;
   passkeyMode: PasskeyWalletActionMode;
   autoRequestTestnetFundsEnabled: boolean;
   autoSendTriggered: boolean;
@@ -211,14 +215,6 @@ interface LoginAndSettingsModalState {
   agentTokenError: string;
   walletBalanceWei: ethers.BigNumber | null;
 }
-
-type SponsoredSessionEntry = Record<string, unknown> & {
-  slug: string;
-  label: string;
-  sponsoredKeys: Record<string, unknown>;
-  isActive?: boolean;
-  inRpcScope?: boolean;
-};
 
 type AiSettingsLike = Record<string, unknown> & {
   mode?: unknown;
@@ -281,11 +277,10 @@ const readChainIdLike = (value: ChainIdLike): unknown =>
 const readWagmiBalanceValue = (value: WagmiBalanceLike): unknown =>
   value && typeof value === 'object' ? (value.data?.value ?? value.value ?? null) : null;
 const AI_PRESET_LABELS: Record<string, { label: string; badgeLabel: string }> = Object.freeze({
-  [DEFAULT_AI_MODEL]: { label: 'GPT-5.6 Terra (default)', badgeLabel: 'GPT-5.6 Terra' },
-  'gpt-5': { label: 'GPT-5', badgeLabel: 'GPT-5' },
-  'gpt-4o': { label: 'GPT-4o', badgeLabel: 'GPT-4o' },
-  'claude-sonnet': { label: 'Claude Sonnet 4.6', badgeLabel: 'Claude Sonnet 4.6' },
-  'claude-opus': { label: 'Claude Opus 4.6', badgeLabel: 'Claude Opus 4.6' },
+  [DEFAULT_AI_MODEL]: { label: 'GPT-6.1 Terra and Sol (default)', badgeLabel: 'GPT-6.1 Terra and Sol' },
+  'gpt-6-astra': { label: 'GPT-6 Astra', badgeLabel: 'GPT-6 Astra' },
+  'claude-sonnet': { label: 'Claude Sonnet 5.5', badgeLabel: 'Claude Sonnet 5.5' },
+  'claude-opus': { label: 'Claude Opus 5.5', badgeLabel: 'Claude Opus 5.5' },
 });
 
 const AI_PRESET_OPTIONS: readonly AiPresetOption[] = Object.freeze([
@@ -330,9 +325,7 @@ const formatAiPresetBadgeLabel = (settings: AiSettingsLike = {}) => {
 };
 
 const settingsSupportReasoning = (settings: AiSettingsLike = {}) =>
-  [settings?.models?.fast, settings?.models?.thinking]
-    .map((model) => toModelLeaf(model))
-    .some((modelLeaf) => /^(gpt-5|o[13])/.test(toStr(modelLeaf)));
+  [settings?.models?.fast, settings?.models?.thinking].some((model) => takesReasoningEffort(model));
 
 export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps, LoginAndSettingsModalState> {
   static displayName = 'LoginAndSettingsModal';
@@ -352,6 +345,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       testFundsStatusTone: '',
       passkeyWalletStatusMessage: '',
       passkeyWalletStatusTone: '',
+      passkeyWalletStatusHelp: '',
       passkeyMode: '',
       autoRequestTestnetFundsEnabled: DEFAULT_AUTO_REQUEST_TESTNET_FUNDS,
       autoSendTriggered: false,
@@ -416,7 +410,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     setActionMode: (passkeyMode) => this.setStateIfMounted({ passkeyMode }),
     setStatus: (patch) => {
       if (patch.passkeyWalletStatusTone === 'error') this._purposefulPasskeyActionId = null;
-      this.setStateIfMounted(patch);
+      this.setStateIfMounted({ ...patch, passkeyWalletStatusHelp: '' });
     },
     startAction: () => this.startPurposefulPasskeyWalletAction(),
     updateLoginInfo: (payload) => this.props.updateLoginInfo(payload),
@@ -584,6 +578,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
 
   async componentDidMount() {
     this._isMounted = true;
+    window.addEventListener(CLIENT_AUTH_LOGOUT_EVENT, this.resetClientAuthState);
     this.applyLoginModalFocus(this.props.loginModalFocus);
     this.checkAndSendTestFundsIfNeeded();
 
@@ -615,6 +610,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
   }
 
   componentWillUnmount() {
+    window.removeEventListener(CLIENT_AUTH_LOGOUT_EVENT, this.resetClientAuthState);
     this._isMounted = false;
     this._sponsoredReqId += 1;
     this._testFundsRequestId += 1;
@@ -862,34 +858,42 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
   isCurrentPasskeyWalletAction = (actionId: number): boolean =>
     this._isMounted && actionId === this._passkeyWalletActionId;
 
-  handleLogout = async () => {
+  _lastAuthResetGeneration = -1;
+  resetClientAuthState = () => {
+    const generation = getClientAuthGeneration();
+    if (this._lastAuthResetGeneration === generation) return;
+    this._lastAuthResetGeneration = generation;
     this._passkeyWalletActionId += 1;
+    this._passkeyWalletRestoreReqId += 1;
     this._purposefulPasskeyActionId = null;
+    this.setStateIfMounted({ agentTokenInput: '', agentTokenStatus: '', agentTokenError: '' });
+    this.props.updateLoginInfo({ loginInProgress: false, loginComplete: false, provider: null });
+    this.props.changeAccount({});
+  };
+
+  handleLogout = async () => {
+    const { provider, wagmiDisconnect } = this.props;
+    this.setStateIfMounted({
+      passkeyWalletStatusMessage: '',
+      passkeyWalletStatusTone: '',
+      passkeyWalletStatusHelp: '',
+    });
     // Disconnect a saved passkey wallet on every logout, not only a passkey one,
     // so the start-up restore cannot sign the visitor back in as that account.
     try {
-      await passkeyWallet.logoutPasskeyWallet();
+      const disconnected = logoutClientAuth({ disconnectWallet: wagmiDisconnect });
+      this.resetClientAuthState();
+      await disconnected;
     } catch (error) {
-      if (this.props.provider === 'passkey_eoa') throw error;
+      if (provider === 'passkey_eoa') {
+        this.setStateIfMounted({
+          passkeyWalletStatusMessage: 'Passkey sign-out could not be completed.',
+          passkeyWalletStatusHelp: 'Your app session has been cleared, but disconnecting the saved wallet failed.',
+          passkeyWalletStatusTone: 'error',
+        });
+      }
       accountLog.warn('Saved passkey wallet disconnect failed during logout:', error);
     }
-
-    if (this.props.provider === 'wagmi' && this.props.wagmiDisconnect) {
-      markUserExplicitlyDisconnected();
-      try {
-        await this.props.wagmiDisconnect();
-      } catch (e) {
-        accountLog.error('wagmiDisconnect failed:', e);
-      }
-    }
-
-    this.props.updateLoginInfo({
-      loginInProgress: false,
-      loginComplete: false,
-      provider: null,
-    });
-    this.props.changeAccount({});
-    clearAllWorkerSessionTokens();
   };
 
   componentDidUpdate(prevProps: Readonly<LoginAndSettingsModalProps>, prevState: Readonly<LoginAndSettingsModalState>) {
@@ -900,6 +904,9 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       this.getTestFundsRequestContextKey(this.props, this.state) !==
       this.getTestFundsRequestContextKey(prevProps, prevState);
     const accountChanged = this.props.account !== prevProps.account;
+    if ((accountChanged || activeSessionChanged) && this.state.agentTokenStatus === 'loading') {
+      this.setStateIfMounted({ agentTokenInput: '', agentTokenStatus: '', agentTokenError: '' });
+    }
     const settingsOpened = this.props.loginModalToggled && !prevProps.loginModalToggled;
     const focusChanged = this.props.loginModalFocus !== prevProps.loginModalFocus;
     if (this.props.loginModalToggled && (settingsOpened || focusChanged)) {
@@ -1101,14 +1108,13 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     const managedNamespaces = ['questionsCache', 'surveysCache', 'bookmarksCache', 'filters', 'sbtCache', 'userCache'];
     try {
       await initCacheManager();
-      for (const namespace of managedNamespaces) {
-        const entries = listNamespaceEntriesSync(namespace, { cloneValues: false });
-        const slugs: any = new Set(entries.map((entry: any) => String(entry?.slug || '')).filter((slug: any) => slug));
-        await Promise.all(Array.from(slugs).map((slug: any) => removeCache(namespace, slug)));
-        await removeCache(namespace, '');
-      }
+      const results = await Promise.all(managedNamespaces.map((namespace) => clearCacheNamespace(namespace)));
+      if (results.some((cleared) => !cleared)) throw new Error('A cache store could not be cleared');
     } catch (error) {
       accountLog.warn('[LoginAndSettingsModal] Failed to clear managed caches:', error);
+      this._cacheClearInFlight = false;
+      window.alert('Could not completely clear caches. Please try again when browser storage is available.');
+      return;
     }
     try {
       localStorage.removeItem('cacheHasLoaded');
@@ -1127,6 +1133,9 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       }
     } catch (e) {
       accountLog.warn('LoginAndSettingsModal: fallback', e);
+      this._cacheClearInFlight = false;
+      window.alert('Could not completely clear caches. Please try again when browser storage is available.');
+      return;
     }
     this._cacheClearInFlight = false;
     this.reloadPage();
@@ -2149,7 +2158,6 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
         ? card.sessions.filter((entry: any) => !entry?.isActive)
         : [];
     const extrasExpanded = !!this.state.expandedSponsorResources?.[card.key];
-    const extraCount = extraSessions.length;
 
     return (
       <LoginSettingsSupportedResourceCard
@@ -2195,7 +2203,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
 
   getSettingsDisplay = () => {
     const overview = this.getSettingsOverviewContext();
-    const { activeSession, cryptoTerminology, needsNetworkSwitch, sponsorSessions, targetNetwork } = overview;
+    const { activeSession, cryptoTerminology, needsNetworkSwitch, sponsorSessions } = overview;
 
     const aiLocal = this.state.aiSettings || getLocalAiSettings() || {};
     const sessionSlug = this.getActiveSessionSlug();
@@ -2445,13 +2453,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     );
   }
 
-  openLoginModal = () => {
-    document.body.classList.add('modal-open');
-    this.props.toggleLoginModal(true);
-  };
-
   closeLoginModal = () => {
-    document.body.classList.remove('modal-open');
     this.props.toggleLoginModal(false);
     if (this.state.firstModalAfterLogin === true) {
       this.setState({ firstModalAfterLogin: false });
@@ -2459,6 +2461,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
   };
 
   updateStateUponWagmiLogin = async () => {
+    if (wasUserExplicitlyDisconnected()) return;
     const wagmiAddr = (this.props.wagmiAddress || '').toLowerCase();
     const reduxAddr = (this.props.account || '').toLowerCase();
     const reduxIsWagmi = this.props.provider === 'wagmi' && this.props.loginComplete === true;
@@ -2575,6 +2578,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       openCryptoModal: this.openCryptoModal,
       passkeyWalletStatusMessage: this.state.passkeyWalletStatusMessage,
       passkeyWalletStatusTone: this.state.passkeyWalletStatusTone,
+      passkeyWalletStatusHelp: this.state.passkeyWalletStatusHelp,
       passkeyMode: this.state.passkeyMode,
       provider: this.props.provider,
       renderAgentTokenLoginPanel: this.renderAgentTokenLoginPanel,
@@ -2598,7 +2602,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       !this.props.loginComplete && !this.props.loginInProgress ? this.getPreLoginSettingsDisplay() : null;
 
     return (
-      <div id={styles.loginModal}>
+      <div>
         <Modal
           isOpen={this.props.loginModalToggled}
           modalClassName="modal-login"

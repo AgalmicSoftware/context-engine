@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useRecordingWakeLock } from '../../utilities/audio/useRecordingWakeLock';
 import {
   startSessionRealtimeInterview,
   type RealtimeInterviewSession,
@@ -28,6 +29,7 @@ export function useSessionInterviewRecorder({
   const mountedRef = useRef(true);
   const stateRef = useRef<RecorderState>('idle');
   const [recordingState, setRecordingState] = useState<RecorderState>('idle');
+  const { wakeLockHeld } = useRecordingWakeLock(recordingState === 'recording' || recordingState === 'paused');
   const [recordingElapsedSeconds, setElapsed] = useState(0);
   const update = useCallback((value: RecorderState) => {
     stateRef.current = value;
@@ -146,6 +148,7 @@ export function useSessionInterviewRecorder({
   const resume = () => sessionRef.current?.resume();
   const appendInstructions = (content: string) => sessionRef.current?.appendInstructions?.(content) || false;
   return {
+    wakeLockHeld,
     appendInstructions,
     audioRef,
     mediaStreamRef,

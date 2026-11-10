@@ -136,7 +136,7 @@ describe('workerCanonicalMetadataHydrationPort', () => {
       return { json: async () => payload } as Response;
     });
 
-    const rows = await loadWorkerCanonicalQuestions(
+    const { rows } = await loadWorkerCanonicalQuestions(
       {
         account: 'passkey-account',
         providerLike: 'passkey-provider',
@@ -240,7 +240,7 @@ describe('workerCanonicalMetadataHydrationPort', () => {
         }) as Response,
     );
 
-    const rows = await loadWorkerCanonicalQuestions(
+    const { rows } = await loadWorkerCanonicalQuestions(
       {
         sessionConfig,
         sessionSlug: 'worker-session',
@@ -305,7 +305,7 @@ describe('workerCanonicalMetadataHydrationPort', () => {
       }),
     });
 
-    const rows = await loadWorkerCanonicalSurveys(
+    const { rows } = await loadWorkerCanonicalSurveys(
       {
         account: 'gated-account',
         providerLike: 'gated-provider',
@@ -462,7 +462,7 @@ describe('workerCanonicalMetadataHydrationPort', () => {
         async ({ storageRef }: any) => ({ json: async () => payloads[storageRef.id] }) as Response,
       );
       const load = resource === 'questions' ? loadWorkerCanonicalQuestions : loadWorkerCanonicalSurveys;
-      const rows = await load(
+      const { rows } = await load(
         { sessionConfig, sessionSlug: 'worker-session' },
         {
           listSessionStorageRefsPage: jest.fn().mockResolvedValue({ items, cursor: null, listComplete: true }),
@@ -758,7 +758,7 @@ describe('workerCanonicalMetadataHydrationPort', () => {
         return { json: async () => question({ id: `0xq${index}`, prompt: `Question ${index}` }) } as Response;
       });
 
-      const rows = await loadWorkerCanonicalQuestions(
+      const { rows } = await loadWorkerCanonicalQuestions(
         { sessionConfig, sessionSlug: 'worker-session' },
         {
           listSessionStorageRefsPage: jest.fn().mockResolvedValue({ items, cursor: null, listComplete: true }),
@@ -846,7 +846,7 @@ describe('workerCanonicalMetadataHydrationPort', () => {
         const merge =
           resource === 'questions' ? mergeWorkerCanonicalQuestionMetadata : mergeWorkerCanonicalSurveyMetadata;
         for (const adminAddress of ['', ADMIN, AUTHOR, ATTACKER]) {
-          const rows = await load(
+          const { rows } = await load(
             { sessionConfig: { ...sessionConfig, adminAddress }, sessionSlug: 'worker-session' },
             {
               listSessionStorageRefsPage: jest.fn().mockResolvedValue({ items, cursor: null, listComplete: true }),
@@ -979,6 +979,26 @@ describe('workerCanonicalMetadataHydrationPort', () => {
         expect(matches(question({ prompt: '[encrypted]', promptEncrypted: { ciphertext: 'x' } }))).toBe(false);
         const otherId = String(generateQuestionId('binary', 'Another question', [], false, 99)).toLowerCase();
         expect(matches(question({ id: otherId, prompt: 'Another question' }))).toBe(false);
+      });
+
+      it('does not call a rating on another scale already published', async () => {
+        const ratingId = String(generateQuestionId('rating', 'How safe?', [], false, 99)).toLowerCase();
+        const rating = (scale?: Record<string, unknown>) =>
+          question({ id: ratingId, type: 'rating', prompt: 'How safe?', ...(scale ? { scale } : {}) });
+        const fiveStars = { min: 1, max: 5, minLabel: 'Not', maxLabel: 'Very' };
+        const matches = await loadMatcher([listedItem('cf_rating', '2026-10-01T00:00:00.000Z', AUTHOR)], {
+          cf_rating: rating(fiveStars),
+        });
+        expect(matches(rating(fiveStars))).toBe(true);
+        expect(matches(rating({ ...fiveStars, min: 0, max: 100 }))).toBe(false);
+        expect(matches(rating({ ...fiveStars, step: 2 }))).toBe(false);
+        expect(matches(rating({ ...fiveStars, maxLabel: 'Extremely' }))).toBe(false);
+        // No scale means the default one, and a stored default matches it.
+        expect(matches(rating())).toBe(false);
+        const defaults = await loadMatcher([listedItem('cf_default', '2026-10-01T00:00:00.000Z', AUTHOR)], {
+          cf_default: rating({ min: 0, max: 10 }),
+        });
+        expect(defaults(rating())).toBe(true);
       });
 
       it('does not match an id another author filled with different content', async () => {
@@ -1167,4 +1187,176 @@ describe('workerCanonicalMetadataHydrationPort', () => {
     expect(surveyCacheB.worker.workerCanonicalIdentity).toEqual(identityB);
     expect(surveyCacheB['11155420']).toEqual(registryCache['11155420']);
   });
+});
+
+describe('Worker metadata tombstones', () => {
+  it.each(['questions', 'surveys'] as const)(
+    'retains hidden %s until a complete unhidden listing',
+    async (resource) => {
+      const sessionConfig = buildWorkerSessionConfig();
+      const identity = resolveWorkerCanonicalCacheIdentity({ sessionConfig, sessionSlug: 'worker-session' });
+      const merge =
+        resource === 'questions' ? mergeWorkerCanonicalQuestionMetadata : mergeWorkerCanonicalSurveyMetadata;
+      const load = resource === 'questions' ? loadWorkerCanonicalQuestions : loadWorkerCanonicalSurveys;
+      const field = resource === 'questions' ? 'workerQuestionMetadataTombstones' : 'workerSurveyMetadataTombstones';
+      const hidden = merge(null, [{ hidden: true, id: 'q1' }], identity) as any;
+      expect(hidden.worker[field]).toEqual({ q1: true });
+      expect((merge(hidden, [], identity) as any).worker[field]).toEqual({ q1: true });
+      const listing = await load(
+        { sessionConfig, sessionSlug: 'worker-session' },
+        {
+          listSessionStorageRefsPage: async () => ({
+            items: [buildListedItem('cf_ref1', resource, '2026-01-01T00:00:00Z')],
+            listComplete: true,
+            cursor: null,
+          }),
+          readSessionStorageBlob: async () =>
+            ({
+              json: async () => ({
+                id: 'q1',
+                title: 'Survey',
+                prompt: 'Question',
+                sessionSlug: 'worker-session',
+                sessionId: SESSION_ID,
+              }),
+            }) as Response,
+        },
+      );
+      const unhidden = merge(hidden, listing, identity) as any;
+      expect(unhidden.worker[field]).toEqual({});
+      expect(unhidden.worker[resource].q1).toBeDefined();
+      expect(hidden.worker[field]).toEqual({ q1: true });
+    },
+  );
+});
+
+describe.each(['questions', 'surveys'] as const)('complete %s catalog reconciliation', (resource) => {
+  const sessionConfig = buildWorkerSessionConfig();
+  const identity = resolveWorkerCanonicalCacheIdentity({
+    sessionConfig,
+    sessionSlug: 'worker-session',
+    reader: 'participant',
+  });
+  const merge = resource === 'questions' ? mergeWorkerCanonicalQuestionMetadata : mergeWorkerCanonicalSurveyMetadata;
+  const load = resource === 'questions' ? loadWorkerCanonicalQuestions : loadWorkerCanonicalSurveys;
+  const refsField = resource === 'questions' ? 'workerQuestionMetadataRefs' : 'workerSurveyMetadataRefs';
+  const pendingField = resource === 'questions' ? 'pendingQuestionMetadata' : 'pendingSurveyMetadata';
+  const now = Date.parse('2026-10-28T12:00:00Z');
+  const entry = (id: string, storageRefId: string, createdAtMs: number): WorkerCanonicalMetadataEntry => ({
+    id,
+    storageRefId,
+    createdAtMs,
+    uploadAuthority: 'admin',
+    storageRef: { backend: 'cloudflare', id: storageRefId, resource },
+    payload: { id, title: storageRefId, prompt: storageRefId, sessionSlug: 'worker-session', sessionId: SESSION_ID },
+  });
+  beforeEach(() => {
+    jest.spyOn(Date, 'now').mockReturnValue(now);
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+    (peekCacheSync as jest.Mock).mockReturnValue(null);
+  });
+
+  it.each([
+    ['stale', 600001, false, false],
+    ['recent', 599999, false, true],
+    ['boundary', 600000, false, true],
+    ['pending', 600001, true, true],
+  ] as const)('reconciles an omitted %s entry', (_label, age, pending, keep) => {
+    const cache = merge(null, [entry('q1', 'cf_saved', now - age)], identity) as any;
+    if (pending) cache.worker[pendingField].q1 = { attempts: 1 };
+    const next = merge(cache, { rows: [], listedStorageRefIds: new Set() }, identity) as any;
+    expect(Boolean(next.worker[resource].q1)).toBe(keep);
+    expect(Boolean(next.worker[refsField].q1)).toBe(keep);
+    expect(cache.worker[resource].q1).toBeDefined();
+  });
+
+  it('replaces an omitted preferred version with an older accessible version', async () => {
+    const cache = merge(null, [entry('q1', 'cf_preferred', now - 700000)], identity) as any;
+    (peekCacheSync as jest.Mock).mockReturnValue(cache);
+    const listing = await load(
+      { sessionConfig, sessionSlug: 'worker-session', account: 'participant' },
+      {
+        listSessionStorageRefsPage: async () => ({
+          items: [buildListedItem('cf_older', resource, new Date(now - 800000).toISOString())],
+          cursor: null,
+          listComplete: true,
+        }),
+        readSessionStorageBlob: async () =>
+          ({
+            json: async () => ({
+              id: 'q1',
+              title: 'Older',
+              prompt: 'Older',
+              sessionSlug: 'worker-session',
+              sessionId: SESSION_ID,
+            }),
+          }) as Response,
+      },
+    );
+    const next = merge(cache, listing, identity) as any;
+    expect(next.worker[refsField].q1.storageRefId).toBe('cf_older');
+    expect(next.worker[resource].q1.prompt).toBe('Older');
+  });
+
+  it('includes cached refs in the complete set without reading their blobs again', async () => {
+    const cache = merge(null, [entry('q1', 'cf_cached', now - 700000)], identity);
+    (peekCacheSync as jest.Mock).mockReturnValue(cache);
+    const readSessionStorageBlob = jest.fn();
+    const listing = await load(
+      { sessionConfig, sessionSlug: 'worker-session', account: 'participant' },
+      {
+        listSessionStorageRefsPage: async () => ({
+          items: [buildListedItem('cf_cached', resource, new Date(now - 700000).toISOString())],
+          cursor: null,
+          listComplete: true,
+        }),
+        readSessionStorageBlob,
+      },
+    );
+    expect(listing.rows).toEqual([]);
+    expect(listing.listedStorageRefIds).toEqual(new Set(['cf_cached']));
+    expect(readSessionStorageBlob).not.toHaveBeenCalled();
+    expect((merge(cache, listing, identity) as any).worker[resource].q1).toBeDefined();
+  });
+
+  it('leaves cached items and tombstones alone when any listing page fails', async () => {
+    const cache = merge(null, [entry('q1', 'cf_saved', now - 700000), { hidden: true, id: 'hidden' }], identity);
+    (peekCacheSync as jest.Mock).mockReturnValue(cache);
+    const before = JSON.stringify(cache);
+    const listSessionStorageRefsPage = jest
+      .fn()
+      .mockResolvedValueOnce({ items: [], cursor: 'next', listComplete: false })
+      .mockRejectedValueOnce(new Error('listing failed'));
+    await expect(
+      load({ sessionConfig, sessionSlug: 'worker-session', account: 'participant' }, { listSessionStorageRefsPage }),
+    ).rejects.toThrow('listing failed');
+    expect(JSON.stringify(cache)).toBe(before);
+  });
+});
+
+it('keeps only string options when merging legacy question metadata', () => {
+  const identity = resolveWorkerCanonicalCacheIdentity({
+    sessionConfig: buildWorkerSessionConfig(),
+    sessionSlug: 'worker-session',
+  });
+  const cache = mergeWorkerCanonicalQuestionMetadata(
+    null,
+    [
+      {
+        id: 'q-options',
+        createdAtMs: 1,
+        storageRefId: 'cf-options',
+        storageRef: { backend: 'cloudflare', id: 'cf-options', resource: 'questions' },
+        payload: {
+          type: 'multichoice',
+          prompt: 'Choose a fixture option',
+          options: ['Alpha', { toString: 'not callable' }, 7, null, 'Beta'],
+        },
+      },
+    ],
+    identity,
+  );
+  expect(cache).toMatchObject({ worker: { questions: { 'q-options': { options: ['Alpha', 'Beta'] } } } });
 });

@@ -83,8 +83,7 @@ class AccountSection extends Component<AccountSectionProps> {
   };
 
   launchAccountSettings = () => {
-    const open = true;
-    this.props.toggleLoginModal(open);
+    this.props.toggleLoginModal(true);
   };
 
   render() {

@@ -1,11 +1,11 @@
 .workspace {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 1rem;
   color: var(--ce-color-dark, var(--ce-compat-dark));
 }
 
-.primaryGrid,
-.secondaryGrid {
+.primaryGrid {
   display: grid;
   gap: 1rem;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -20,8 +20,33 @@
   box-shadow: 0 2px 4px color-mix(in srgb, var(--ce-compat-dark) 5%, transparent);
 }
 
-.reportPanel {
-  background: var(--ce-status-info-text);
+.questionSelectorPanel {
+  min-width: 0;
+  display: grid;
+  gap: 0.6rem;
+  color: var(--ce-document-text);
+}
+
+.questionSelect {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0.6rem;
+  border: 1px solid var(--ce-document-border);
+  border-radius: var(--ce-radius-8);
+  background: var(--ce-document-surface);
+  color: var(--ce-document-text);
+  font: inherit;
+
+  &:hover {
+    border-color: var(--ce-status-info);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--ce-status-info);
+    outline-offset: 2px;
+  }
 }
 
 .filterPanel {
@@ -125,15 +150,6 @@
   }
 }
 
-.selectedQuestionTagButtonActive,
-.selectedQuestionTagButtonActive:hover,
-.selectedQuestionTagButtonActive:focus-visible {
-  background: var(--ce-status-info);
-  border-color: var(--ce-status-info);
-  color: var(--ce-text-inverse);
-  box-shadow: 0 6px 16px color-mix(in srgb, var(--ce-status-info) 24%, transparent);
-}
-
 .chartPanel,
 .mapPanel {
   background: var(--ce-text-inverse);
@@ -184,21 +200,13 @@
   }
 }
 
-.activePills,
-.tagFilterRow,
 .mapLegend {
   display: flex;
   flex-wrap: wrap;
   gap: 0.55rem;
 }
 
-.activePills {
-  margin-bottom: 1rem;
-}
-
-.pillButton,
-.legendPill,
-.ratePill {
+.legendPill {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
@@ -209,17 +217,6 @@
   color: var(--ce-document-text-muted);
   font-size: 0.88rem;
   font-weight: 500;
-}
-
-.pillButton {
-  cursor: pointer;
-}
-
-.pillButtonActive,
-.segmentButtonActive {
-  border-color: var(--ce-status-info-text);
-  background: var(--ce-status-info-text);
-  color: var(--ce-status-info);
 }
 
 .legendSwatch {
@@ -392,8 +389,7 @@
   gap: 0.75rem;
 }
 
-.suggestionButton,
-.reportRowButton {
+.suggestionButton {
   display: grid;
   gap: 0.35rem;
   text-align: left;
@@ -427,17 +423,6 @@
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--ce-status-warning) 8%, transparent);
 }
 
-.reportRowButton {
-  border: 1px solid var(--ce-document-border);
-  border-radius: var(--ce-radius-8, var(--ce-radius-8));
-  background: var(--ce-text-inverse);
-
-  &:hover {
-    background: var(--ce-surface-light);
-    box-shadow: 0 2px 4px color-mix(in srgb, var(--ce-compat-dark) 6%, transparent);
-  }
-}
-
 .suggestionPair {
   display: flex;
   flex-wrap: wrap;
@@ -453,130 +438,12 @@
   font-weight: 600;
 }
 
-.suggestionQuestion,
-.reportRowQuestion,
-.reportRowAnswer,
-.reportRowScore {
+.suggestionQuestion {
   line-height: 1.4;
 }
 
-.suggestionQuestion,
-.reportRowAnswer,
-.reportRowScore {
+.suggestionQuestion {
   color: var(--ce-document-text-muted);
-}
-
-.reportRowQuestion {
-  font-weight: 600;
-}
-
-.reportRowRates {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-}
-
-.sectionCollapse {
-  margin-top: 1rem;
-  border: 1px solid var(--ce-document-border);
-  border-radius: var(--ce-radius-8, var(--ce-radius-8));
-  background-color: var(--ce-text-inverse);
-  overflow: hidden;
-  box-shadow: 0 2px 4px color-mix(in srgb, var(--ce-compat-dark) 5%, transparent);
-}
-
-.sectionHeaderRow {
-  display: flex;
-  align-items: center;
-  padding: 0.75rem 1.25rem;
-  cursor: pointer;
-  border-bottom: 1px solid var(--ce-surface-subtle);
-
-  &:hover {
-    background-color: var(--ce-surface-light);
-  }
-}
-
-.sectionTitle {
-  margin: 0;
-  font-size: 1.05rem;
-  font-weight: 500;
-  color: var(--ce-compat-dark);
-
-  svg {
-    margin-right: 10px;
-  }
-}
-
-.analysisList {
-  list-style: none;
-  padding: 1rem;
-  margin: 0;
-  display: grid;
-  gap: 1rem;
-  grid-template-columns: 1fr;
-
-  @media (min-width: 1024px) {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
-.analysisListItem {
-  padding: 0;
-  background-color: var(--ce-text-inverse);
-  border: 1px solid var(--ce-document-border);
-  border-radius: var(--ce-radius-8, var(--ce-radius-8));
-  overflow: hidden;
-}
-
-.reportTagFilter {
-  margin-top: 1rem;
-  padding: 1rem 1.25rem;
-  background-color: var(--ce-surface-light);
-  border: 1px solid var(--ce-surface-subtle);
-  border-radius: var(--ce-radius-8, var(--ce-radius-8));
-}
-
-.reportTagFilterHeader {
-  font-size: 0.9rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: var(--ce-document-text-muted);
-  margin: 0 0 12px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.noData {
-  padding: 1.5rem;
-  text-align: center;
-  color: var(--ce-text-muted);
-  font-style: italic;
-}
-
-.viewMoreContainer {
-  padding: 0.5rem 0 0;
-  text-align: center;
-}
-
-.viewMoreButton {
-  background-color: var(--ce-surface-light);
-  border: 1px solid var(--ce-document-border);
-  color: var(--ce-compat-dark);
-  padding: 0.5rem 1rem;
-  border-radius: var(--ce-radius-6, var(--ce-radius-6));
-  cursor: pointer;
-  font-weight: 500;
-  transition:
-    background-color 0.2s ease,
-    border-color 0.2s ease;
-
-  &:hover {
-    background-color: var(--ce-document-surface);
-    border-color: var(--ce-document-border);
-  }
 }
 
 .breakdownDataset {
@@ -605,14 +472,6 @@
   font-size: 0.88rem;
 }
 
-.breakdownQuestionText {
-  margin: 0.35rem 0 0;
-  color: var(--ce-document-text-muted);
-  font-size: 0.96rem;
-  line-height: 1.45;
-  max-width: 60rem;
-}
-
 .breakdownCandlestick {
   display: flex;
   width: 100%;
@@ -638,13 +497,6 @@
 
 .breakdownCandleSegmentDisagree {
   background: var(--ce-status-error);
-}
-
-.legendTitle {
-  font-weight: 500;
-  color: var(--ce-document-text-muted);
-  white-space: nowrap;
-  font-size: 0.9rem;
 }
 
 .mapFrame {
@@ -704,8 +556,7 @@
 }
 
 @media (max-width: 980px) {
-  .primaryGrid,
-  .secondaryGrid {
+  .primaryGrid {
     grid-template-columns: 1fr;
   }
 

@@ -1,3 +1,5 @@
+import { normalizeRatingScale, ratingStepFor, DEFAULT_RATING_SCALE } from '../../../shared/questions/ratingScale.mjs';
+import { selectCurrentSubmittedAnswers } from './submittedResults.mjs';
 import { authorityError } from './authority.mjs';
 import { safeString, lower, safeJsonParse, sanitizeSessionSlug, sha256Hex } from './runtimePrimitives.mjs';
 import { loadQuestionsForSession, readAgentSkillUpdateFlag } from './agentSessionRuntime.mjs';
@@ -6,7 +8,7 @@ import { assertNoSecretShape } from './redaction.mjs';
 import { SUBMITTED_RESULT_STATUSES, submitRequestUserKvPrefix } from './agentSubmitQueue.mjs';
 import { ADMIN_METRICS_SUBMIT_ENTRY_LIMIT, CE_AGENT_ACCESS_SKILL_VERSION } from './httpConstants.mjs';
 import { sessionAgentOrigin, firstValue, json, safeAnswerString } from './httpInput.mjs';
-import { dedupeSubmitRecordsByRequestId, listHandoffKvRecordsByPrefix } from './adminMetrics.mjs';
+import { listHandoffKvRecordsByPrefix } from './adminMetrics.mjs';
 
 export function questionIsLocked(question = {}) {
   const visibility = lower(question.visibility);
@@ -47,6 +49,8 @@ export function publicAgentQuestion(question = {}, { session = {} } = {}) {
     questionType,
     prompt,
     options,
+    ...(questionType === 'rating' && !locked && !unavailable
+      ? { scale: { ...(normalizeRatingScale(question) || DEFAULT_RATING_SCALE), step: ratingStepFor(question) } } : {}),
     ...(questionType === 'quadratic' ? { voiceCredits: question.voiceCredits ?? 99 } : {}),
     ...(questionType === 'multichoice' && question.singleSelect === true ? { singleSelect: true } : {}),
     tags,
@@ -164,15 +168,14 @@ export async function loadAgentQuestionAnswerState({ env = {}, context = {}, que
         : [];
     }),
   );
-  const records = dedupeSubmitRecordsByRequestId(indexedRecordGroups.flat());
+  const records = selectCurrentSubmittedAnswers(indexedRecordGroups.flat().filter(record =>
+    safeString(record.telegramUserId) === telegramUserId && submittedStatuses.has(safeString(record.status))));
   const answeredByRef = new Map();
   records.forEach((record) => {
     if (safeString(record.telegramUserId) !== telegramUserId) return;
     if (!submittedStatuses.has(safeString(record.status))) return;
     const ref = agentQuestionAnswerRef(record.sessionSlug, record.questionId);
     if (!questionByRef.has(ref)) return;
-    const existing = answeredByRef.get(ref);
-    if (existing && safeString(existing.answeredAt).localeCompare(safeString(record.createdAt)) >= 0) return;
     answeredByRef.set(ref, {
       answeredByUser: true,
       answeredAt: safeString(record.createdAt),

@@ -1,3 +1,4 @@
+import { participantsMayAddContext } from '../../shared/sessionContextSources.mjs';
 import { markStorageBackupWrite } from './storageBackupRevision.js';
 import {
   STORAGE_BACKENDS,
@@ -24,11 +25,10 @@ import {
   writeStorageEnvelopeKeyReleaseAudit,
   writeStorageVisibilityAudit,
 } from './storageEnvelopeEncryption.js';
+import { isWorkerGroupMember } from './workerGroups.js';
 import {
-  isWorkerGroupMember,
-  resolveWorkerGroupPrincipal,
-} from './workerGroups.js';
-import {
+  MAX_STORAGE_METADATA_BYTES,
+  STORAGE_METADATA_TAG_LIMITS,
   rejectBytesOverLimit,
   rejectContentLengthOverLimit,
   rejectKvValueOverLimit,
@@ -63,7 +63,10 @@ import {
 import { checkCoordinatedLegacyStorageOwner, coordinateResponseUploadReceipt } from './sessionWriteCoordinator.js';
 import { executeCoordinatedStoragePublication, SUPERSEDED_AUTHORITY_ERROR } from './sessionConfigAuthority.js';
 import { sessionSlugStorageKey } from './sessionSlugResolution.js';
+import { getStorageIndexBinding } from './storageKvBindings.js';
 import { responseFieldKeyRoute } from './responseFieldKeyRoute.js';
+import { checkContextSourceUpload, contextSourceListFields } from './contextSourcePolicy.js';
+import { contextSourceRoute } from './contextSourceRoute.js';
 import { toStr } from './stringCoercion.js';
 import {
   isStorageReadLimitError, jsonByteLength, parseStorageExportCursor, readStorageBytesBounded,
@@ -73,6 +76,7 @@ import {
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 const RESOLVE_STORAGE_GATE_RUNTIME_CONFIG = Symbol('resolve-storage-gate-runtime-config');
+const STORAGE_GROUP_MEMBERSHIP_CACHE = Symbol('storage-group-membership-cache');
 const STORAGE_RPC_CHAIN_ATTESTATION_CACHE = Symbol('storage-rpc-chain-attestation-cache');
 const trim = (value) => toStr(value).trim();
 const isObj = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
@@ -98,9 +102,11 @@ const resolveStorageReadContentType = (storedContentType) => {
 };
 
 export const getStorageR2Binding = (env = {}) => env.CE_STORAGE_R2 || env.STORAGE_R2 || env.R2_BUCKET || null;
-export const getStorageIndexBinding = (env = {}) => env.CE_STORAGE_INDEX_KV || env.STORAGE_INDEX_KV || env.STORAGE_KV || null;
+export { getStorageIndexBinding };
 const DEFAULT_STORAGE_LIST_PAGE_SIZE = 100;
 const MAX_STORAGE_LIST_PAGE_SIZE = 100;
+// KV list calls one context listing may make to fill its page.
+const MAX_CONTEXT_LIST_KV_PAGES = 10;
 const DEFAULT_RESOURCE_GATES = Object.freeze({
   docsContext: 'docUploads',
   questions: 'questionResponses',
@@ -139,6 +145,11 @@ export const buildIndexKey = ({ slug, resource, id }) => `ce-storage:${sessionSl
 export const buildIndexPrefix = ({ slug, resource }) => `ce-storage:${sessionSlugStorageKey(slug)}:${trim(resource) || 'docsContext'}:`;
 const buildSessionIndexPrefix = ({ slug }) => `ce-storage:${sessionSlugStorageKey(slug)}:`;
 export const buildPayloadKey = ({ slug, id }) => `ce-storage-payload:${sessionSlugStorageKey(slug)}:${id}`;
+// KV list metadata for an index row: on a docsContext row, whether it is a
+// context source, so context scans skip other files unread. Set on every write.
+export const storageIndexPutOptions = (metadata) => ((trim(metadata?.resource) || 'docsContext') === 'docsContext'
+  ? { metadata: { contextSource: metadata?.contextSource === true } }
+  : undefined);
 const safeGroupId = (value) => trim(value).toLowerCase().replace(/[^a-z0-9._:-]+/g, '-').replace(/^-+|-+$/g, '');
 const normalizeGroupIdList = (value) => {
   let raw = value;
@@ -588,35 +599,11 @@ const resolveRoleAddressSet = ({ config = {}, role }) => {
 
 export const resolveSessionAdminAddresses = (config = {}) => resolveRoleAddressSet({ config, role: 'admin' });
 
-const listDelimitedAddresses = (value) => {
-  if (typeof value === 'string') {
-    return value.split(/[\s,;]+/).map(normalizeAddress).filter(Boolean);
-  }
-  return listRoleAddresses(value);
-};
-
-const resolveEnvelopeExportAddressSet = (config = {}) => {
-  const addresses = new Set(resolveRoleAddressSet({ config, role: 'admin' }));
-  listDelimitedAddresses(config.responseExportAllowedAddresses).forEach((address) => addresses.add(address));
-  listDelimitedAddresses(config.telegramResponseExportAllowedAddresses).forEach((address) => addresses.add(address));
-  listDelimitedAddresses(config.export?.allowedAddresses).forEach((address) => addresses.add(address));
-  listDelimitedAddresses(config.export?.adminAddresses).forEach((address) => addresses.add(address));
-  return addresses;
-};
-
 const isEnvelopeExportAuthorized = ({ config, requesterAddress, authScopes }) => {
-  const scopes = isObj(authScopes) ? authScopes : {};
-  if (
-    scopes.admin === true ||
-    scopes.responseExport === true ||
-    scopes.response_export === true ||
-    scopes.encryptedEnvelopeExport === true
-  ) {
-    return true;
-  }
+  if (isObj(authScopes) && authScopes.admin === true) return true;
   const address = normalizeAddress(requesterAddress);
   if (!address) return false;
-  return resolveEnvelopeExportAddressSet(config).has(address);
+  return resolveSessionAdminAddresses(config).has(address);
 };
 
 const evaluateWorkerRoleCondition = ({ condition, config, requesterAddress }) => {
@@ -634,13 +621,7 @@ const evaluateAgentGrantScopeCondition = ({ condition, authScopes }) => {
   const scope = trim(condition.scope || condition.value);
   if (!scope) return { ok: false, reason: 'missing_agent_grant_scope' };
   const scopes = isObj(authScopes) ? authScopes : {};
-  const scopeLists = [
-    scopes.agent_grant,
-    scopes.agentGrant,
-    scopes.delegationScopes,
-  ].filter(Array.isArray);
-  const ok = scopes[scope] === true || scopeLists.some((items) => items.map(trim).includes(scope));
-  return ok
+  return scopes[scope] === true
     ? { ok: true, matchedCondition: { kind: 'agent_grant_scope', scope } }
     : { ok: false, reason: 'agent_grant_scope_denied', condition: { kind: 'agent_grant_scope', scope } };
 };
@@ -712,19 +693,23 @@ const checkWorkerGroupMembership = async ({
   config,
   groupId,
   requesterAddress,
-  authScopes,
   deps,
 }) => {
+  const cache = deps?.[STORAGE_GROUP_MEMBERSHIP_CACHE];
+  if (cache?.has(groupId)) return cache.get(groupId);
   const check = typeof deps?.isWorkerGroupMember === 'function' ? deps.isWorkerGroupMember : isWorkerGroupMember;
-  return check({
-    env,
-    slug,
-    sessionId: resolveCanonicalWorkerSessionIdHex(config),
-    groupId,
-    requesterAddress,
-    authScopes,
-    deps,
-  });
+  const pending = Promise.resolve().then(() => check({
+    env, slug, sessionId: resolveCanonicalWorkerSessionIdHex(config), groupId, requesterAddress, deps,
+  })).then((result) => {
+    const denied = result?.ok === false &&
+      ([400, 401, 403, 404].includes(Number(result.status)) ||
+        ['worker_group_membership_denied', 'worker_group_not_found', 'missing_principal', 'invalid_worker_group_id'].includes(result.reason)) &&
+      !/unavailable|not_configured|ambiguous/.test(result.reason || '');
+    return result?.ok ? { ...result, outcome: 'allowed' } : denied ? { ...result, outcome: 'denied' }
+      : { ok: false, outcome: 'unavailable', status: 503, reason: 'worker_group_membership_unavailable' };
+  }, () => ({ ok: false, outcome: 'unavailable', status: 503, reason: 'worker_group_membership_unavailable' }));
+  cache?.set(groupId, pending);
+  return pending;
 };
 
 const evaluateWorkerGroupCondition = async ({
@@ -733,12 +718,12 @@ const evaluateWorkerGroupCondition = async ({
   slug,
   config,
   requesterAddress,
-  authScopes,
   deps,
 }) => {
   const groupIds = normalizeGroupIdList(condition.groupIds || condition.groups || condition.groupId);
   if (!groupIds.length) return { ok: false, reason: 'missing_worker_group', condition: { kind: 'worker_group' } };
   let firstFailure = null;
+  let unavailable = null;
   for (const groupId of groupIds) {
     const result = await checkWorkerGroupMembership({
       env,
@@ -746,9 +731,13 @@ const evaluateWorkerGroupCondition = async ({
       config,
       groupId,
       requesterAddress,
-      authScopes,
       deps,
     });
+    // Another group can still admit, so an outage decides only at the end.
+    if (result.outcome === 'unavailable') {
+      unavailable ||= result;
+      continue;
+    }
     if (result?.ok) {
       return {
         ok: true,
@@ -761,6 +750,7 @@ const evaluateWorkerGroupCondition = async ({
     }
     if (!firstFailure) firstFailure = result;
   }
+  if (unavailable) return unavailable;
   return {
     ok: false,
     reason: firstFailure?.reason || 'worker_group_membership_denied',
@@ -780,7 +770,6 @@ const evaluateAccessCondition = async ({ condition, env, slug, config, requester
       slug,
       config,
       requesterAddress,
-      authScopes,
       deps,
     });
   }
@@ -816,6 +805,7 @@ const evaluateAccessConditionDocument = async ({
   const match = document.match === 'all' ? 'all' : 'any';
   const matched = [];
   let firstFailure = null;
+  let unavailable = null;
   for (const condition of conditions) {
     const result = await evaluateAccessCondition({
       condition,
@@ -826,6 +816,12 @@ const evaluateAccessConditionDocument = async ({
       authScopes,
       deps,
     });
+    // A later grant decides ANY and a later denial decides ALL, so an outage
+    // is the answer only when neither comes, whatever the order.
+    if (result.outcome === 'unavailable') {
+      unavailable ||= result;
+      continue;
+    }
     if (result.ok) {
       matched.push(result.matchedCondition || { kind: trim(condition.kind).toLowerCase() });
       if (match === 'any') {
@@ -836,6 +832,7 @@ const evaluateAccessConditionDocument = async ({
       if (match === 'all') break;
     }
   }
+  if (unavailable && !(match === 'all' && firstFailure)) return unavailable;
   if (match === 'all' && matched.length === conditions.length) {
     return { ok: true, conditionMatched: { source, match, conditions: matched } };
   }
@@ -861,7 +858,6 @@ const authorizeWorkerGroupAccess = async ({
   config,
   groupIds,
   requesterAddress,
-  authScopes,
   baseHeaders,
   deps,
 }) => {
@@ -872,6 +868,7 @@ const authorizeWorkerGroupAccess = async ({
     };
   }
   let firstFailure = null;
+  let unavailable = null;
   for (const groupId of groupIds) {
     const result = await checkWorkerGroupMembership({
       env,
@@ -879,9 +876,12 @@ const authorizeWorkerGroupAccess = async ({
       config,
       groupId,
       requesterAddress,
-      authScopes,
       deps,
     });
+    if (result.outcome === 'unavailable') {
+      unavailable ||= result;
+      continue;
+    }
     if (result?.ok) {
       return {
         ok: true,
@@ -895,6 +895,10 @@ const authorizeWorkerGroupAccess = async ({
     }
     if (!firstFailure) firstFailure = result;
   }
+  if (unavailable) return {
+    ok: false, response: responseJson(deps, { error: 'Worker group membership is unavailable; retry.',
+      reason: unavailable.reason, retryable: true }, 503, baseHeaders),
+  };
   return {
     ok: false,
     response: responseJson(deps, {
@@ -959,12 +963,6 @@ const canReadPrivateResponse = ({ config, resource, metadata, requesterAddress, 
   const scopes = isObj(authScopes) ? authScopes : {};
   const address = normalizeAddress(requesterAddress);
   if (address && resolveRoleAddressSet({ config, role: 'admin' }).has(address)) return true;
-  const delegatedScopes = [scopes.agent_grant, scopes.agentGrant, scopes.delegationScopes].filter(Array.isArray);
-  const agent = resolveWorkerGroupPrincipal({ requesterAddress, authScopes: scopes });
-  if (
-    delegatedScopes.some((items) => items.map(trim).includes('storage')) ||
-    (scopes.storage === true && agent.ok && agent.principal.kind === 'agent')
-  ) return true;
 
   // A participant's route scope permits submission, not reading everyone else's
   // answers. List preflight permits scanning; each row still requires its owner.
@@ -992,7 +990,7 @@ const authorizeCloudflareStorageAccess = async ({
     return {
       ok: false,
       response: responseJson(deps, {
-        error: 'Access denied: individual response access requires its author, a session admin, or a delegated storage grant.',
+        error: 'Access denied: individual response access requires its author or a session admin.',
         reason: 'private_response_owner_required',
       }, 403, baseHeaders),
     };
@@ -1049,7 +1047,8 @@ const authorizeCloudflareStorageGate = async ({
       response: responseJson(deps, {
         error: 'Access denied: Cloudflare storage conditions failed.',
         reason: conditionResult.reason,
-      }, 403, baseHeaders),
+        ...(conditionResult.outcome === 'unavailable' ? { retryable: true } : {}),
+      }, conditionResult.status || 403, baseHeaders),
     };
   }
   if (access.encryption === PAYLOAD_ENCRYPTION_MODES.LIT) {
@@ -1065,7 +1064,6 @@ const authorizeCloudflareStorageGate = async ({
       config,
       groupIds: resolveGroupGateIds({ metadata, access }),
       requesterAddress,
-      authScopes,
       baseHeaders,
       deps,
     });
@@ -1204,7 +1202,7 @@ export const authorizeCloudflareStorageResourceRead = async ({
   deps: createStorageRouteGateDeps({ config, env, slug, deps }),
 });
 
-const enforceCloudflareUploadPolicy = async ({ env, config, slug, payload, requesterAddress, authScopes, baseHeaders, deps }) => {
+const enforceCloudflareUploadPolicy = async ({ env, config, slug, payload, requesterAddress, baseHeaders, deps }) => {
   const policy = payload?.uploadPolicy;
   if (!policy?.mode) return { ok: true };
   if (policy.mode === 'group_allowlist') {
@@ -1215,7 +1213,6 @@ const enforceCloudflareUploadPolicy = async ({ env, config, slug, payload, reque
       config,
       groupIds,
       requesterAddress,
-      authScopes,
       baseHeaders,
       deps,
     });
@@ -1314,7 +1311,7 @@ const resolveStorageGateRuntimeConfig = async ({ config, deps }) => {
 
 const createStorageRouteGateDeps = ({ config, env, slug, deps }) => {
   let runtimeConfigPromise = null;
-  const routeDeps = { ...(deps || {}) };
+  const routeDeps = { ...(deps || {}), [STORAGE_GROUP_MEMBERSHIP_CACHE]: new Map() };
   Object.defineProperty(routeDeps, RESOLVE_STORAGE_GATE_RUNTIME_CONFIG, {
     configurable: false,
     enumerable: false,
@@ -1372,25 +1369,30 @@ const handleArweaveStorageUpload = async ({ request, env, config, slug, uploader
 
 // Called only inside the session config serialization boundary. The external
 // payload write stays outside it; permanent publication uses current authority.
+// Context publishes only while its uploader may still add it.
 export const publishCloudflareOwnedStorageMetadata = async ({ env, config, slug, actor, metadata, createOwner }) => {
   const uploader = normalizeAddress(actor);
   const resource = metadata?.resource;
-  if (!isOwnedStorageResource(resource) || !isStorageResourceId(metadata?.resourceId) ||
+  const isAdmin = resolveSessionAdminAddresses(config).has(uploader);
+  const context = metadata?.contextSource === true && resource === 'docsContext';
+  if (!(context ? isAdmin || participantsMayAddContext(config) : isOwnedStorageResource(resource) && isStorageResourceId(metadata?.resourceId)) ||
     !isSafeCloudflareStorageRefId(metadata?.id) || !uploader || metadata.uploader !== uploader ||
-    metadata.uploadAuthority !== (resolveSessionAdminAddresses(config).has(uploader) ? 'admin' : 'author')) {
+    metadata.uploadAuthority !== (isAdmin ? 'admin' : 'author')) {
     throw Object.assign(new Error(SUPERSEDED_AUTHORITY_ERROR), { status: 409 });
   }
   const index = getStorageIndexBinding(env);
   if (typeof index?.get !== 'function' || typeof index?.put !== 'function') throw new Error('Cloudflare storage index binding not configured.');
-  const owner = await readStorageResourceOwner({ index, slug, resource, resourceId: metadata.resourceId });
+  const owner = context ? null : await readStorageResourceOwner({ index, slug, resource, resourceId: metadata.resourceId });
   if (owner && normalizeAddress(owner.uploader) !== uploader && metadata.uploadAuthority !== 'admin') {
     throw Object.assign(new Error('This id already belongs to another author.'), { status: 409 });
   }
-  await index.put(buildIndexKey({ slug, resource, id: metadata.id }), JSON.stringify(metadata));
+  // Reserve the id before publishing: a failure between the two writes then
+  // leaves its author free to retry, never a row someone else can claim.
   if (createOwner && !owner) {
     await writeStorageResourceOwner({ index, slug, resource, resourceId: metadata.resourceId,
       uploader, storageRefId: metadata.id, createdAt: metadata.createdAt });
   }
+  await index.put(buildIndexKey({ slug, resource, id: metadata.id }), JSON.stringify(metadata), storageIndexPutOptions(metadata));
 };
 
 const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, authScopes, expectedAuthority, payload, resourceId = '', baseHeaders, deps }) => {
@@ -1404,6 +1406,11 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
   }
   if (canWriteR2 && !canUseR2Index) {
     return responseJson(deps, { error: 'Cloudflare R2 storage requires an index KV binding.' }, 501, baseHeaders);
+  }
+  const tags = payload.tags || [];
+  if (tags.length > STORAGE_METADATA_TAG_LIMITS.count || tags.some((tag) =>
+    tag.name.length > STORAGE_METADATA_TAG_LIMITS.nameChars || tag.value.length > STORAGE_METADATA_TAG_LIMITS.valueChars)) {
+    return responseJson(deps, { error: `Upload tags exceed metadata limits: at most ${STORAGE_METADATA_TAG_LIMITS.count} tags, ${STORAGE_METADATA_TAG_LIMITS.nameChars}-character names and ${STORAGE_METADATA_TAG_LIMITS.valueChars}-character values.` }, 413, baseHeaders);
   }
   const access = await authorizeCloudflareStorageAccess({
     env,
@@ -1424,7 +1431,6 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
     slug,
     payload,
     requesterAddress: uploaderAddress,
-    authScopes,
     baseHeaders,
     deps,
   });
@@ -1437,6 +1443,19 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
   const uploader = normalizeAddress(uploaderAddress);
   const owned = isOwnedStorageResource(resource);
   const uploaderIsAdmin = owned && resolveSessionAdminAddresses(config).has(uploader);
+  const contextUploaderIsAdmin = resolveSessionAdminAddresses(config).has(uploader);
+  const contextCheck = resource === 'docsContext'
+    ? checkContextSourceUpload({
+      payload,
+      config,
+      uploader,
+      isAdmin: contextUploaderIsAdmin,
+      litEncrypted: payloadAccess.encryption === PAYLOAD_ENCRYPTION_MODES.LIT,
+    })
+    : { ok: true, role: '' };
+  if (!contextCheck.ok) {
+    return responseJson(deps, { error: contextCheck.error, reason: contextCheck.reason }, contextCheck.status, baseHeaders);
+  }
   let owner = null;
   let hidden = false;
   if (owned) {
@@ -1510,94 +1529,111 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
   if (!isSafeCloudflareStorageRefId(id)) {
     return responseJson(deps, { error: 'Failed to create safe Cloudflare storage reference.' }, 500, baseHeaders);
   }
-  const createdAt = new Date((deps?.now?.() || Date.now())).toISOString();
-  const objectKey = buildObjectKey({ slug, id });
-  const storageLayer = canWriteR2 ? 'r2' : 'kv';
-  let bytesToStore = payload.bytes || new Uint8Array();
-  let envelope = null;
-  let accessConditions = payload.accessConditions || null;
-  let conditionRef = accessConditions?.conditions?.length ? 'payload' : 'gate_fallback';
-  if (!accessConditions?.conditions?.length && payloadAccess.conditions?.conditions?.length) {
-    accessConditions = payloadAccess.conditions;
-    conditionRef = 'session';
-  }
-  if (payloadAccess.encryption === PAYLOAD_ENCRYPTION_MODES.WORKER_ENVELOPE) {
-    try {
-      const encrypted = await encryptPayloadWithStorageEnvelope({
-        env,
-        config,
-        slug,
-        payloadId: id,
-        plaintextBytes: bytesToStore,
-        contentType: payload.contentType,
-        accessConditions,
-        conditionRef,
-        deps,
-      });
-      bytesToStore = encrypted.ciphertextBytes;
-      envelope = encrypted.envelope;
-    } catch (error) {
-      return responseJson(deps, { error: error?.message || 'Cloudflare worker envelope encryption failed.' }, 500, baseHeaders);
+  let createdAt = new Date((deps?.now?.() || Date.now())).toISOString();
+  const prepareStorageWrite = async (id, createdAt) => {
+    const objectKey = buildObjectKey({ slug, id });
+    const storageLayer = canWriteR2 ? 'r2' : 'kv';
+    let bytesToStore = payload.bytes || new Uint8Array();
+    let envelope = null;
+    let accessConditions = payload.accessConditions || null;
+    let conditionRef = accessConditions?.conditions?.length ? 'payload' : 'gate_fallback';
+    if (!accessConditions?.conditions?.length && payloadAccess.conditions?.conditions?.length) {
+      accessConditions = payloadAccess.conditions;
+      conditionRef = 'session';
     }
-  }
-  const effectiveGroupIds = normalizeGroupIdList([
-    ...normalizeGroupIdList(payload.groupIds),
-    ...normalizeGroupIdList(uploadPolicy.groupIds),
-    ...normalizeGroupIdList(payloadAccess.groupIds),
-  ]);
-  const metadata = {
-    id,
-    backend: STORAGE_BACKENDS.CLOUDFLARE,
-    resource,
-    contentType: trim(payload.contentType) || 'application/octet-stream',
-    encrypted: payload.payloadEncrypted === true || payloadAccess.encryption === PAYLOAD_ENCRYPTION_MODES.WORKER_ENVELOPE,
-    gate: trim(payload.gate),
-    tags: payload.tags,
-    groupIds: effectiveGroupIds,
-    uploadPolicy: payload.uploadPolicy?.mode ? payload.uploadPolicy : undefined,
-    size: bytesToStore?.length || 0,
-    createdAt,
-    ...(resource === 'responses' && trim(uploaderAddress)
-      ? { responder: trim(uploaderAddress).toLowerCase() }
-      : {}),
-    // Authorship and precedence are server-authored; payload fields cannot grant
-    // admin correction authority, and later role changes cannot withdraw it.
-    ...(owned ? { resourceId, uploadAuthority: uploaderIsAdmin ? 'admin' : 'author', ...(uploader ? { uploader } : {}), ...(hidden ? { hidden: true } : {}) } : {}),
-    payloadAccessMode: payloadAccess.mode,
-    payloadAccessControl: {
-      gate: payloadAccess.gate,
-      encryption: payloadAccess.encryption,
-      ...(effectiveGroupIds.length ? { groupIds: effectiveGroupIds } : {}),
-    },
-    ...(accessConditions?.conditions?.length ? { accessConditions } : {}),
-    ...(envelope ? { envelope } : {}),
-    storageLayer,
-  };
-  assertNoCloudflarePrivateMaterial({
-    id,
-    backend: metadata.backend,
-    resource,
-    contentType: metadata.contentType,
-    gate: metadata.gate,
-    createdAt,
-    payloadAccessMode: payloadAccess.mode,
-    payloadAccessControl: metadata.payloadAccessControl,
-  });
+    if (payloadAccess.encryption === PAYLOAD_ENCRYPTION_MODES.WORKER_ENVELOPE) {
+      try {
+        const encrypted = await encryptPayloadWithStorageEnvelope({
+          env,
+          config,
+          slug,
+          payloadId: id,
+          plaintextBytes: bytesToStore,
+          contentType: payload.contentType,
+          accessConditions,
+          conditionRef,
+          deps,
+        });
+        bytesToStore = encrypted.ciphertextBytes;
+        envelope = encrypted.envelope;
+      } catch (error) {
+        return { response: responseJson(deps, { error: error?.message || 'Cloudflare worker envelope encryption failed.' }, 500, baseHeaders) };
+      }
+    }
+    // Readers must be in one of the stored groups, so adding the session's
+    // groups to a payload's own would let every session member read it.
+    const ownGroupIds = normalizeGroupIdList([
+      ...normalizeGroupIdList(payload.groupIds),
+      ...normalizeGroupIdList(uploadPolicy.groupIds),
+    ]);
+    const effectiveGroupIds = ownGroupIds.length ? ownGroupIds : normalizeGroupIdList(payloadAccess.groupIds);
+    const metadata = {
+      id,
+      backend: STORAGE_BACKENDS.CLOUDFLARE,
+      resource,
+      contentType: trim(payload.contentType) || 'application/octet-stream',
+      encrypted: payload.payloadEncrypted === true || payloadAccess.encryption === PAYLOAD_ENCRYPTION_MODES.WORKER_ENVELOPE,
+      gate: trim(payload.gate),
+      tags: payload.tags,
+      groupIds: effectiveGroupIds,
+      uploadPolicy: payload.uploadPolicy?.mode ? payload.uploadPolicy : undefined,
+      size: bytesToStore?.length || 0,
+      createdAt,
+      ...(resource === 'responses' && trim(uploaderAddress)
+        ? { responder: trim(uploaderAddress).toLowerCase() }
+        : {}),
+      // Authorship and precedence are server-authored; payload fields cannot grant
+      // admin correction authority, and later role changes cannot withdraw it.
+      ...(owned ? { resourceId, uploadAuthority: uploaderIsAdmin ? 'admin' : 'author', ...(uploader ? { uploader } : {}), ...(hidden ? { hidden: true } : {}) } : {}),
+      // Server-authored: only an upload the policy passed with a context role is context.
+      ...(contextCheck.role ? {
+        contextSource: true,
+        uploadAuthority: contextUploaderIsAdmin ? 'admin' : 'author',
+        uploader,
+        ...(payload.contextOrigin === 'worker' ? { contextOrigin: 'worker' } : {}),
+      } : {}),
+      payloadAccessMode: payloadAccess.mode,
+      payloadAccessControl: {
+        gate: payloadAccess.gate,
+        encryption: payloadAccess.encryption,
+        ...(effectiveGroupIds.length ? { groupIds: effectiveGroupIds } : {}),
+      },
+      ...(accessConditions?.conditions?.length ? { accessConditions } : {}),
+      ...(envelope ? { envelope } : {}),
+      storageLayer,
+    };
+    assertNoCloudflarePrivateMaterial({
+      id,
+      backend: metadata.backend,
+      resource,
+      contentType: metadata.contentType,
+      gate: metadata.gate,
+      createdAt,
+      payloadAccessMode: payloadAccess.mode,
+      payloadAccessControl: metadata.payloadAccessControl,
+    });
 
-  const serializedMetadata = JSON.stringify(metadata);
-  const serializedKvPayload = canWriteR2
-    ? ''
-    : JSON.stringify({
-        metadata,
-        payloadBase64url: bytesToBase64url(bytesToStore || new Uint8Array()),
-      });
-  const kvValueFailure = (
-    (!canWriteR2 && rejectKvValueOverLimit({ serializedValue: serializedKvPayload, deps })) ||
-    (index && rejectKvValueOverLimit({ serializedValue: serializedMetadata, deps }))
-  );
-  if (kvValueFailure) {
-    return responseJson(deps, { error: kvValueFailure.error }, kvValueFailure.status, baseHeaders);
-  }
+    const serializedMetadata = JSON.stringify(metadata);
+    if (jsonByteLength(serializedMetadata) > MAX_STORAGE_METADATA_BYTES) {
+      return { response: responseJson(deps, { error: `Upload metadata exceeds ${MAX_STORAGE_METADATA_BYTES} bytes.` }, 413, baseHeaders) };
+    }
+    const serializedKvPayload = canWriteR2
+      ? ''
+      : JSON.stringify({
+          metadata,
+          payloadBase64url: bytesToBase64url(bytesToStore || new Uint8Array()),
+        });
+    const kvValueFailure = (
+      (!canWriteR2 && rejectKvValueOverLimit({ serializedValue: serializedKvPayload, deps })) ||
+      (index && rejectKvValueOverLimit({ serializedValue: serializedMetadata, deps }))
+    );
+    if (kvValueFailure) {
+      return { response: responseJson(deps, { error: kvValueFailure.error }, kvValueFailure.status, baseHeaders) };
+    }
+    return { objectKey, bytesToStore, metadata, serializedMetadata, serializedKvPayload };
+  };
+  let prepared = await prepareStorageWrite(id, createdAt);
+  if (prepared.response) return prepared.response;
 
   // Validation, encryption and serialized KV limits must pass before a retry lease starts.
   const requestId = trim(payload.requestId);
@@ -1605,7 +1641,7 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
   if (resource === 'responses' && uploader && requestId && requestId.length <= 200) {
     const digest = await (deps?.crypto || globalThis.crypto).subtle.digest('SHA-256', payload.bytes || new Uint8Array());
     const payloadDigest = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
-    uploadReceipt = await coordinateResponseUploadReceipt({ env, slug, responder: uploader, operation: 'reserve', payload: { requestId, payloadDigest } });
+    uploadReceipt = await coordinateResponseUploadReceipt({ env, slug, responder: uploader, operation: 'reserve', payload: { requestId, payloadDigest, storageId: id, createdAt } });
     if (uploadReceipt?.kind === 'replay') {
       await enqueueResponseAnalysis(uploadReceipt.storageRef.id);
       return responseJson(deps, { id: uploadReceipt.storageRef.id, storageRef: uploadReceipt.storageRef, replayed: true }, 200, baseHeaders);
@@ -1613,6 +1649,56 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
     if (uploadReceipt && uploadReceipt.kind !== 'execute') {
       return responseJson(deps, { error: uploadReceipt.error, reason: uploadReceipt.reason }, uploadReceipt.status || 503, baseHeaders);
     }
+  }
+
+  if (uploadReceipt && (uploadReceipt.storageId !== id || uploadReceipt.createdAt !== createdAt)) {
+    id = uploadReceipt.storageId;
+    createdAt = uploadReceipt.createdAt;
+    // Envelope AAD, metadata and serialized sizes all belong to the reserved
+    // target: this attempt's own id with the first reservation's timestamp.
+    prepared = await prepareStorageWrite(id, createdAt);
+    if (prepared.response) return prepared.response;
+  }
+  const { objectKey, bytesToStore, metadata, serializedMetadata, serializedKvPayload } = prepared;
+  // A retry took over while this attempt was still writing. Remove the row it
+  // published under its own id unless a later retry adopted that row.
+  const withdrawSupersededUpload = async () => {
+    try {
+      const withdrawn = await coordinateResponseUploadReceipt({ env, slug, responder: uploader, operation: 'withdraw',
+        payload: { requestId, attemptId: uploadReceipt.attemptId, storageId: id } });
+      if (!withdrawn?.ok) return;
+      await markStorageBackupWrite(env, slug);
+      await index.delete(buildIndexKey({ slug, resource, id }));
+      if (canWriteR2) {
+        if (typeof r2.delete === 'function') await r2.delete(objectKey);
+      } else await index.delete(buildPayloadKey({ slug, id }));
+      await markStorageBackupWrite(env, slug);
+    } catch { /* a row left behind is a readable duplicate, never a broken answer */ }
+  };
+  const finishUpload = async (storageRef, publishedMetadata, publishedBytes, replayed = false) => {
+    if (uploadReceipt) {
+      const settled = await coordinateResponseUploadReceipt({ env, slug, responder: uploader, operation: 'settle',
+        payload: { requestId, attemptId: uploadReceipt.attemptId, storageRef },
+      });
+      if (!settled?.ok) {
+        if (!replayed && settled?.reason === 'upload_attempt_superseded') await withdrawSupersededUpload();
+        return responseJson(deps, { error: 'Upload settlement is unavailable; retry.', reason: 'upload_receipt_unavailable' }, 503, baseHeaders);
+      }
+    }
+    await enqueueResponseAnalysis(storageRef.id, publishedMetadata, publishedBytes);
+    return responseJson(deps, { id: storageRef.id, storageRef, ...(replayed ? { replayed: true } : {}) }, 200, baseHeaders);
+  };
+  // An earlier attempt may still be writing its own target, so a retry only
+  // adopts a target whose row was already published and otherwise writes its own.
+  for (const priorId of uploadReceipt?.resumed ? uploadReceipt.priorStorageIds || [] : []) {
+    const stored = await index.get(buildIndexKey({ slug, resource, id: priorId }));
+    if (stored == null) continue;
+    let published;
+    try { published = typeof stored === 'string' ? JSON.parse(stored) : stored; } catch { /* fail closed below */ }
+    const storageRef = published?.id === priorId && published?.resource === resource && published?.responder === uploader
+      ? normalizeStorageRef(published) : null;
+    if (!storageRef) return responseJson(deps, { error: 'Stored upload metadata is unavailable; retry.' }, 503, baseHeaders);
+    return finishUpload(storageRef, undefined, undefined, true);
   }
 
   await markStorageBackupWrite(env, slug);
@@ -1632,27 +1718,16 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
     await index.put(buildPayloadKey({ slug, id }), serializedKvPayload);
   }
 
-  if (owned) {
+  if (owned || metadata.contextSource) {
     const publish = deps?.executeCoordinatedStoragePublication || executeCoordinatedStoragePublication;
-    const result = await publish({ env, slug, expectedAuthority, metadata, createOwner: !owner && !!uploader });
+    const result = await publish({ env, slug, expectedAuthority, metadata, createOwner: owned && !owner && !!uploader });
     if (!result.ok) return responseJson(deps, { error: result.body?.error || 'Storage publication is unavailable; retry.' }, result.status || 503, baseHeaders);
   } else if (index && typeof index.put === 'function') {
-    await index.put(buildIndexKey({ slug, resource, id }), serializedMetadata);
+    await index.put(buildIndexKey({ slug, resource, id }), serializedMetadata, storageIndexPutOptions(metadata));
   }
 
   await markStorageBackupWrite(env, slug);
-  const storageRef = normalizeStorageRef(metadata);
-  if (uploadReceipt) {
-    const settled = await coordinateResponseUploadReceipt({ env, slug, responder: uploader, operation: 'settle',
-      payload: { requestId, attemptId: uploadReceipt.attemptId, storageRef },
-    });
-    if (!settled?.ok) return responseJson(deps, { error: 'Upload settlement is unavailable; retry.', reason: 'upload_receipt_unavailable' }, 503, baseHeaders);
-  }
-  await enqueueResponseAnalysis(id, metadata, bytesToStore);
-  return responseJson(deps, {
-    id,
-    storageRef,
-  }, 200, baseHeaders);
+  return finishUpload(normalizeStorageRef(metadata), metadata, bytesToStore);
 };
 
 const readRequestId = async ({ request, url }) => {
@@ -1861,6 +1936,8 @@ const handleCloudflareList = async ({ request, env, config, slug, uploaderAddres
   const { cursor, limit, resource } = listOptions;
   const mine = url.searchParams.get('mine') === 'true';
   const responder = mine ? normalizeAddress(uploaderAddress) : '';
+  // ?role=context lists only context sources (a narrower view, never a wider one).
+  const contextOnly = resource === 'docsContext' && url.searchParams.get('role') === 'context';
   if (mine && (resource !== 'responses' || !responder)) {
     return responseJson(deps, { error: 'Own responses require authentication and the responses resource.' }, 403, baseHeaders);
   }
@@ -1881,21 +1958,31 @@ const handleCloudflareList = async ({ request, env, config, slug, uploaderAddres
   if (!index || typeof index.list !== 'function' || typeof index.get !== 'function') {
     return responseJson(deps, { error: 'Cloudflare storage index binding not configured.' }, 501, baseHeaders);
   }
-  const listed = await index.list({
-    prefix: buildIndexPrefix({ slug, resource }),
-    ...(cursor ? { cursor } : {}),
-    limit,
-  });
-  const nextCursor = listed?.list_complete === false ? trim(listed?.cursor) : '';
-  if (listed?.list_complete === false && !nextCursor) {
-    return responseJson(
-      deps,
-      { error: 'Cloudflare storage list cursor is unavailable.' },
-      503,
-      baseHeaders,
-    );
+  // A context listing skips rows listed as other files unread and lists on
+  // until its page is full, so sources past many library files still reach a
+  // client that reads only a few pages. Each KV call asks for just the rows
+  // still wanted, so the cursor marks exactly where the page stopped.
+  const keys = [];
+  let nextCursor = cursor;
+  for (let page = 0; page < (contextOnly ? MAX_CONTEXT_LIST_KV_PAGES : 1); page += 1) {
+    const listed = await index.list({
+      prefix: buildIndexPrefix({ slug, resource }),
+      ...(nextCursor ? { cursor: nextCursor } : {}),
+      limit: limit - keys.length,
+    });
+    nextCursor = listed?.list_complete === false ? trim(listed?.cursor) : '';
+    if (listed?.list_complete === false && !nextCursor) {
+      return responseJson(
+        deps,
+        { error: 'Cloudflare storage list cursor is unavailable.' },
+        503,
+        baseHeaders,
+      );
+    }
+    keys.push(...(Array.isArray(listed?.keys) ? listed.keys : [])
+      .filter((entry) => !(contextOnly && entry?.metadata?.contextSource === false)));
+    if (!nextCursor || keys.length >= limit) break;
   }
-  const keys = Array.isArray(listed?.keys) ? listed.keys : [];
   const rows = [];
   let hiddenIds = null;
   try {
@@ -1930,6 +2017,7 @@ const handleCloudflareList = async ({ request, env, config, slug, uploaderAddres
     if (mine && !trim(metadata?.responder)) {
       return responseJson(deps, { error: 'Response ownership is unavailable.' }, 503, baseHeaders);
     }
+    if (contextOnly && metadata?.contextSource !== true) continue;
     if (mine && normalizeAddress(metadata.responder) !== responder) continue;
     const itemAccess = await authorizeCloudflareStorageAccess({
       env,
@@ -1944,7 +2032,7 @@ const handleCloudflareList = async ({ request, env, config, slug, uploaderAddres
     });
     // A denied own answer is not evidence of an empty answer history.
     if (!itemAccess.ok) {
-      if (mine) return itemAccess.response;
+      if (mine || itemAccess.response.status >= 500) return itemAccess.response;
       continue;
     }
     const owned = isOwnedStorageResource(storageRef.resource);
@@ -1981,6 +2069,7 @@ const handleCloudflareList = async ({ request, env, config, slug, uploaderAddres
           encryption: metadataAccess.encryption,
         },
         payloadAccessMode: deriveLegacyPayloadAccessMode(metadataAccess),
+        ...contextSourceListFields(metadata),
       },
     });
   }
@@ -1994,7 +2083,8 @@ const handleCloudflareList = async ({ request, env, config, slug, uploaderAddres
     : baseHeaders);
 };
 
-export const listCloudflareMetadataRows = async ({ index, slug, resource = '', budget, strict = false }) => {
+// `skipKey` passes over a listed key, from its list metadata, without reading it.
+export const listCloudflareMetadataRows = async ({ index, slug, resource = '', budget, strict = false, skipKey }) => {
   const rows = [];
   const prefix = trim(resource)
     ? buildIndexPrefix({ slug, resource })
@@ -2011,7 +2101,7 @@ export const listCloudflareMetadataRows = async ({ index, slug, resource = '', b
     const keys = Array.isArray(listed?.keys) ? listed.keys : [];
     for (const keyEntry of keys) {
       const key = trim(keyEntry?.name || keyEntry);
-      if (!key || typeof index.get !== 'function') continue;
+      if (!key || typeof index.get !== 'function' || skipKey?.(keyEntry)) continue;
       budget?.rows();
       budget?.operation();
       try {
@@ -2049,7 +2139,7 @@ export const readStoredCloudflarePayloadBytes = async ({ env, index, slug, metad
   }
   budget?.operation();
   const envelope = await readKvPayloadEnvelope({ index, slug, id, strict, maxBytes: limit });
-  if (!envelope?.payloadBase64url) return null;
+  if (typeof envelope?.payloadBase64url !== 'string') return null;
   // Check encoded length before decoding a whole KV payload. R2 uses its size
   // and a bounded stream above; neither path relies only on index size hints.
   if (Math.floor(envelope.payloadBase64url.length * 3 / 4) > limit) throw new StorageReadLimitError('payloadBytes');
@@ -2223,6 +2313,9 @@ export const setCloudflareStorageResourceHidden = async ({ env, config, slug, bo
   }
   if (!isStorageResourceId(resourceId)) return { ok: false, status: 400, error: `Invalid ${resource} id.` };
   if (typeof body?.hidden !== 'boolean') return { ok: false, status: 400, error: 'hidden must be true or false.' };
+  if (resolveConfiguredStorageBackend({ config }) !== STORAGE_BACKENDS.CLOUDFLARE) {
+    return { ok: false, status: 400, error: 'Hiding is only available for Cloudflare storage.' };
+  }
   const index = getStorageIndexBinding(env);
   if (!index || ['get', 'put', 'list', 'delete'].some((method) => typeof index[method] !== 'function')) {
     return { ok: false, status: 501, error: 'Cloudflare storage index binding not configured.' };
@@ -2460,8 +2553,6 @@ export const exportCloudflareEncryptedPayloadEnvelopes = async ({
     storageListError, readErrors, gatewayErrors: [], errors: [...(storageListError ? [storageListError] : []), ...readErrors],
     wrappedKeysIncluded: !!sessionEnvelope?.sessionKey?.wrappedKey || payloads.some((entry) => entry.wrappedKeysIncluded),
     keyProvider, deploymentKekContinuityRequired,
-    // Version-1 consumers still read this continuity warning under its old name.
-    rewrapRequiredForNewDeployment: deploymentKekContinuityRequired,
   };
   return {
     ok: !storageListError,
@@ -2469,6 +2560,65 @@ export const exportCloudflareEncryptedPayloadEnvelopes = async ({
     cursor: nextCursor, listComplete: !nextCursor && !storageListError,
     manifest, ...(sessionEnvelope ? { sessionEnvelope } : {}), payloads,
   };
+};
+
+// Context sources: doc-library rows an upload with a context role created
+// (contextSource is server-authored at upload). Rows listed as other files are
+// skipped unread, so they do not count against a scan budget.
+export const listContextSourceRows = async ({ env, slug, budget } = {}) => {
+  const index = getStorageIndexBinding(env);
+  if (!index || typeof index.list !== 'function' || typeof index.get !== 'function') return [];
+  const rows = await listCloudflareMetadataRows({ index, slug, resource: 'docsContext', budget,
+    skipKey: (entry) => entry?.metadata?.contextSource === false });
+  return rows.map((row) => row.metadata).filter((metadata) => metadata?.contextSource === true);
+};
+
+export const readContextSourceRow = async ({ env, slug, id } = {}) => {
+  const index = getStorageIndexBinding(env);
+  if (!isSafeCloudflareStorageRefId(trim(id)) || typeof index?.get !== 'function') return null;
+  let metadata = null;
+  try {
+    const raw = await index.get(buildIndexKey({ slug, resource: 'docsContext', id: trim(id) }));
+    metadata = typeof raw === 'string' ? JSON.parse(raw) : raw;
+  } catch {
+    return null;
+  }
+  return isObj(metadata) && metadata.contextSource === true && trim(metadata.id) === trim(id) ? metadata : null;
+};
+
+// A context source's stored bytes, decrypted. The Worker reads them for the
+// session's AI, so each worker_envelope read is audited under that principal.
+export const readContextSourceBytes = async ({ env, config, slug, metadata, maxBytes, principal = 'session-ai', deps } = {}) => {
+  const index = getStorageIndexBinding(env);
+  let bytes = await readStoredCloudflarePayloadBytes({ env, index, slug, metadata, maxBytes });
+  if (!bytes) return null;
+  if (isObj(metadata?.envelope)) {
+    await writeStorageEnvelopeKeyReleaseAudit({
+      env, slug, payloadId: trim(metadata.id), principal, conditionMatched: 'context_source', deps,
+    });
+    bytes = await decryptPayloadWithStorageEnvelope({
+      env, config, slug, payloadId: trim(metadata.id), ciphertextBytes: bytes, envelope: metadata.envelope, deps,
+    });
+  }
+  return toUint8Array(bytes);
+};
+
+// Removes stored records: payload first, index row last, so a failure part
+// way leaves a row a retry removes rather than a payload nothing lists.
+// `markWrite` lets the session coordinator count its own writes without calling itself.
+export const removeCloudflareStorageRecords = async ({ env, slug, rows = [], markWrite = () => markStorageBackupWrite(env, slug) } = {}) => {
+  const r2 = getStorageR2Binding(env);
+  const index = getStorageIndexBinding(env);
+  if (!index || typeof index.delete !== 'function') throw new Error('Cloudflare storage index binding not configured.');
+  await markWrite();
+  for (const metadata of rows) {
+    const id = trim(metadata?.id);
+    if (!isSafeCloudflareStorageRefId(id)) continue;
+    if (r2 && typeof r2.delete === 'function') await r2.delete(buildObjectKey({ slug, id }));
+    await index.delete(buildPayloadKey({ slug, id }));
+    await index.delete(buildIndexKey({ slug, resource: trim(metadata.resource) || 'docsContext', id }));
+  }
+  await markWrite();
 };
 
 export const storageRoute = async ({ path, method, request, env, config, slug, uploaderAddress, authScopes, expectedAuthority, baseHeaders, deps } = {}) => {
@@ -2504,6 +2654,10 @@ export const storageRoute = async ({ path, method, request, env, config, slug, u
     if (isArweaveStorageBackend(backend)) {
       return handleArweaveStorageUpload({ request, env, config, slug, uploaderAddress, backend, payload, baseHeaders, deps });
     }
+    // A request can't move a session onto Cloudflare storage: reads below refuse it.
+    if (resolveConfiguredStorageBackend({ config }) !== STORAGE_BACKENDS.CLOUDFLARE) {
+      return responseJson(deps, { error: 'Storage route upload is only available for Cloudflare storage.' }, 400, baseHeaders);
+    }
     const routeDeps = createStorageRouteGateDeps({ config, env, slug, deps });
     return handleCloudflareUpload({
       env, config, slug, uploaderAddress, authScopes, expectedAuthority, payload, resourceId: checked.resourceId, baseHeaders, deps: routeDeps,
@@ -2513,6 +2667,16 @@ export const storageRoute = async ({ path, method, request, env, config, slug, u
   const configuredBackend = resolveConfiguredStorageBackend({ config });
   if (configuredBackend !== STORAGE_BACKENDS.CLOUDFLARE) {
     return responseJson(deps, { error: 'Storage route read/list is only available for Cloudflare storage.' }, 400, baseHeaders);
+  }
+  if (path === '/storage/context' && method === 'POST') {
+    const routeDeps = createStorageRouteGateDeps({ config, env, slug, deps });
+    return contextSourceRoute({
+      request, env, config, slug, uploaderAddress, authScopes, baseHeaders, deps: routeDeps,
+      store: (payload) => handleCloudflareUpload({
+        env, config, slug, uploaderAddress, authScopes, expectedAuthority, baseHeaders, deps: routeDeps,
+        payload: { resource: 'docsContext', groupIds: [], uploadPolicy: null, payloadEncrypted: false, ...payload, contextOrigin: 'worker' },
+      }),
+    });
   }
   if (path === '/storage/read' && (method === 'GET' || method === 'POST')) {
     const routeDeps = createStorageRouteGateDeps({ config, env, slug, deps });
@@ -2524,7 +2688,7 @@ export const storageRoute = async ({ path, method, request, env, config, slug, u
   }
   if (path === '/storage/export-envelopes' && (method === 'GET' || method === 'POST')) {
     if (!isEnvelopeExportAuthorized({ config, requesterAddress: uploaderAddress, authScopes })) {
-      return responseJson(deps, { error: 'Encrypted-envelope export requires session export admin authorization.' }, 403, baseHeaders);
+      return responseJson(deps, { error: 'Encrypted-envelope export requires a session admin.' }, 403, baseHeaders);
     }
     const url = new URL(request.url);
     let resource = trim(url.searchParams.get('resource'));

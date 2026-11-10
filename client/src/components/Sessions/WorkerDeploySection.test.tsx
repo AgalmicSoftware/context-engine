@@ -3,21 +3,15 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import WorkerDeploySection, { type WorkerDeploySectionProps } from './WorkerDeploySection';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 
-type RenderInfoTooltipProps = Parameters<NonNullable<WorkerDeploySectionProps['renderInfoTooltip']>>[0];
-
 const buildWorkerDeploySectionProps = (props: Partial<WorkerDeploySectionProps> = {}): WorkerDeploySectionProps => ({
   allowNativeWorkerVerification: true,
-  isNormalMode: false,
-  renderInfoTooltip: ({ testId }: RenderInfoTooltipProps) => <button type="button" data-testid={testId} />,
   workerMode: 'custom',
   shouldUseSponsoredAutoDeployFlow: false,
-  deployForm: { workerName: 'demo-worker', bundleUrl: '', apiToken: '', adminAddress: '' },
+  deployForm: { workerName: 'demo-worker', apiToken: '', adminAddress: '' },
   deployHelperToggle: <div>helper toggle</div>,
   shouldShowDeployHelperUrlInput: true,
   deployHelperUrl: '',
   setDeployHelperUrl: () => {},
-  bundleMode: 'url',
-  setBundleMode: () => {},
   normalModeBundleUrl: 'https://bundle.example/release.js',
   normalModeBundleHelpText: 'Release bundle',
   showNormalModeManualBundleControls: false,
@@ -31,18 +25,8 @@ const buildWorkerDeploySectionProps = (props: Partial<WorkerDeploySectionProps> 
   bundleFile: null,
   normalModeManualBundleHelpText: '',
   localWorkerBundleFallbackFilePath: '/dist/sessionCorsWorker.bundle.js',
-  advancedBundleFileInputRef: { current: null },
-  showSponsoredDeployAccessNotice: false,
   account: '0xabc',
-  toggleLoginModal: jest.fn(),
   cloudflareTokenSlug: 'demo-worker',
-  setDeployForm: () => {},
-  handleDeployWorker: () => {},
-  deployStatusDisplayState: {
-    deployButtonDisabled: false,
-    deployStatusText: '',
-    isError: false,
-  },
   ...props,
 });
 
@@ -80,8 +64,8 @@ describe('WorkerDeploySection', () => {
       /^[a-f0-9]{64}$/,
     );
     expect(screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_DEPLOY)).toHaveAttribute('href', nativeDeployUrl);
-    expect(screen.getByText('Legacy deploy-helper fallback')).toBeInTheDocument();
-    expect(screen.getByText('Legacy deploy-helper fallback').closest('details')).not.toHaveAttribute('open');
+    expect(screen.getByText('Deploy helper (API token)')).toBeInTheDocument();
+    expect(screen.getByText('Deploy helper (API token)').closest('details')).not.toHaveAttribute('open');
   });
 
   it('does not open native deployment until the admin address is available', () => {
@@ -95,50 +79,6 @@ describe('WorkerDeploySection', () => {
 
     expect(screen.getByText(/Connect or sign in as the session admin/i)).toBeInTheDocument();
     expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_DEPLOY)).not.toBeInTheDocument();
-  });
-
-  it('opens login from the admin address control when no wallet is signed in', () => {
-    const toggleLoginModal = jest.fn();
-    renderWorkerDeploySection({
-      account: '',
-      toggleLoginModal,
-      deployForm: { workerName: 'demo-worker', bundleUrl: '', apiToken: '', adminAddress: '' },
-    });
-
-    const loginControl = screen.getByTestId(E2E_TESTIDS.WIZARD_ADMIN_ADDRESS);
-    expect(loginControl).toHaveAttribute('type', 'button');
-    expect(loginControl).toHaveValue('Click to login');
-
-    fireEvent.click(loginControl);
-
-    expect(toggleLoginModal).toHaveBeenCalledWith(true);
-  });
-
-  it('shows the connected wallet in the admin address input while the form syncs', () => {
-    renderWorkerDeploySection({
-      account: '0x00000000000000000000000000000000000000aa',
-      deployForm: { workerName: 'demo-worker', bundleUrl: '', apiToken: '', adminAddress: '' },
-    });
-
-    const adminAddress = screen.getByTestId(E2E_TESTIDS.WIZARD_ADMIN_ADDRESS);
-    expect(adminAddress).toHaveAttribute('type', 'text');
-    expect(adminAddress).toHaveValue('0x00000000000000000000000000000000000000aa');
-  });
-
-  it('keeps a restored admin address editable when the wallet disconnects', () => {
-    renderWorkerDeploySection({
-      account: '',
-      deployForm: {
-        workerName: 'demo-worker',
-        bundleUrl: '',
-        apiToken: '',
-        adminAddress: '0x00000000000000000000000000000000000000bb',
-      },
-    });
-
-    const adminAddress = screen.getByTestId(E2E_TESTIDS.WIZARD_ADMIN_ADDRESS);
-    expect(adminAddress).toHaveAttribute('type', 'text');
-    expect(adminAddress).toHaveValue('0x00000000000000000000000000000000000000bb');
   });
 
   it('does not report success until Worker reachability, CORS, and canonical config readback verify', async () => {
@@ -451,30 +391,21 @@ describe('WorkerDeploySection', () => {
     );
   });
 
-  it('shows the sponsored auto-deploy note without manual controls in normal mode', () => {
+  it('shows the sponsored auto-deploy note without manual controls', () => {
     renderWorkerDeploySection({
-      isNormalMode: true,
       shouldUseSponsoredAutoDeployFlow: true,
     });
 
     expect(screen.getByText(/Sponsored deploy bundle is ready\./i)).toHaveTextContent(
       'The sponsor selects the Worker release for this deployment. Manual bundle URLs and uploads do not change that release.',
     );
-    expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_DEPLOY_WORKER)).not.toBeInTheDocument();
+    expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_BUNDLE_URL)).not.toBeInTheDocument();
   });
 
-  it('renders deploy controls and forwards core callbacks', () => {
+  it('renders the deploy helper controls and the read-only release bundle URL', () => {
     const setDeployHelperUrl = jest.fn();
-    const setBundleMode = jest.fn();
-    const setDeployForm = jest.fn();
-    const handleDeployWorker = jest.fn();
 
-    renderWorkerDeploySection({
-      setDeployHelperUrl,
-      setBundleMode,
-      setDeployForm,
-      handleDeployWorker,
-    });
+    renderWorkerDeploySection({ setDeployHelperUrl });
 
     expect(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_NAME)).toHaveTextContent('demo-worker');
     expect(screen.getByText('helper toggle')).toBeInTheDocument();
@@ -484,238 +415,8 @@ describe('WorkerDeploySection', () => {
     });
     expect(setDeployHelperUrl).toHaveBeenCalledWith('https://helper.example');
 
-    fireEvent.click(screen.getByLabelText('Upload file'));
-    expect(setBundleMode).toHaveBeenCalledWith('upload');
-
-    fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_BUNDLE_URL), {
-      target: { value: 'https://bundle.example/custom.js' },
-    });
-    expect(setDeployForm).toHaveBeenCalledWith(expect.any(Function));
-
-    const tokenLink = screen.getByRole('link', { name: 'Create prefilled API token' });
-    expect(tokenLink).toHaveAttribute('target', '_blank');
-    expect(tokenLink).toHaveAttribute('rel', 'noopener noreferrer');
-    expect(tokenLink).toHaveAttribute('data-testid', E2E_TESTIDS.WIZARD_CLOUDFLARE_TOKEN_CREATE_LINK);
-    const tokenUrl = new URL(String(tokenLink.getAttribute('href')));
-    expect(tokenUrl.searchParams.get('name')).toContain('demo-worker');
-    expect(tokenUrl.searchParams.get('accountId')).toBe('*');
-    expect(JSON.parse(tokenUrl.searchParams.get('permissionGroupKeys') || '[]')).toEqual([
-      { key: 'workers_scripts', type: 'edit' },
-      { key: 'workers_kv_storage', type: 'edit' },
-    ]);
-    expect(screen.queryByText(/Cloudflare may preselect All accounts/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/only when the token can see exactly one account/i)).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Cloudflare API token setup and security guide' })).toHaveAttribute(
-      'href',
-      'https://github.com/AgalmicSoftware/context-engine/blob/main/docs/session-cors-worker.md#api-token-setup-and-handling',
-    );
-
-    fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_WORKER));
-    expect(handleDeployWorker).toHaveBeenCalledTimes(1);
-  });
-
-  it('does not let hidden legacy account state scope the token template', () => {
-    renderWorkerDeploySection({
-      deployForm: {
-        workerName: 'demo-worker',
-        bundleUrl: '',
-        apiToken: '',
-        accountId: 'cf-account-1',
-        adminAddress: '',
-      },
-    });
-
-    const tokenUrl = new URL(
-      String(screen.getByRole('link', { name: 'Create prefilled API token' }).getAttribute('href')),
-    );
-    expect(tokenUrl.searchParams.get('accountId')).toBe('*');
-    expect(screen.queryByText(/Cloudflare may preselect All accounts/i)).not.toBeInTheDocument();
-  });
-
-  it('describes the least-privilege default Cloudflare token scopes', () => {
-    renderWorkerDeploySection({
-      renderInfoTooltip: ({ content, testId }: RenderInfoTooltipProps) => <div data-testid={testId}>{content}</div>,
-    });
-
-    expect(screen.getByTestId('ce-wizard-worker-tooltip-gw-cf-token-tip')).toHaveTextContent(
-      'Workers Scripts: Edit and Workers KV Storage: Edit',
-    );
-    expect(screen.getByTestId('ce-wizard-worker-tooltip-gw-cf-token-tip')).not.toHaveTextContent(
-      /R2|D1|Durable Objects|Account Settings/,
-    );
-  });
-
-  it('links to token handling documentation instead of repeating operational guidance', () => {
-    renderWorkerDeploySection({
-      deployHelperUrl: 'https://deploy-helper.example.test',
-    });
-
-    expect(screen.queryByText(/browser sends this token only for this deployment attempt/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/not saved to the session draft or browser storage/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/earliest expiration Cloudflare permits/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/revoke the token as soon as deployment succeeds/i)).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Cloudflare API token setup and security guide' })).toHaveAttribute(
-      'href',
-      'https://github.com/AgalmicSoftware/context-engine/blob/main/docs/session-cors-worker.md#api-token-setup-and-handling',
-    );
-  });
-
-  it('drops a stale cached Cloudflare account id whenever the API token is filled', () => {
-    const setDeployForm = jest.fn();
-
-    renderWorkerDeploySection({
-      deployForm: {
-        workerName: 'demo-worker',
-        bundleUrl: '',
-        apiToken: '',
-        accountId: 'cf-account-1',
-        adminAddress: '',
-      },
-      setDeployForm,
-    });
-
-    fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN), {
-      target: { value: 'new-token' },
-    });
-
-    expect(setDeployForm).toHaveBeenCalledWith(expect.any(Function));
-    const updater = setDeployForm.mock.calls[0][0];
-    expect(
-      updater({
-        workerName: 'demo-worker',
-        apiToken: '',
-        accountId: 'cf-account-1',
-        adminAddress: '',
-      }),
-    ).toEqual({
-      workerName: 'demo-worker',
-      apiToken: 'new-token',
-      adminAddress: '',
-    });
-  });
-
-  it('keeps the account id absent when replacing an API token', () => {
-    const setDeployForm = jest.fn();
-
-    renderWorkerDeploySection({
-      deployForm: {
-        workerName: 'demo-worker',
-        bundleUrl: '',
-        apiToken: 'old-token',
-        accountId: 'cf-account-1',
-        adminAddress: '',
-      },
-      setDeployForm,
-    });
-
-    fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN), {
-      target: { value: 'new-token' },
-    });
-
-    expect(setDeployForm).toHaveBeenCalledWith(expect.any(Function));
-    const updater = setDeployForm.mock.calls[0][0];
-    expect(
-      updater({
-        workerName: 'demo-worker',
-        apiToken: 'old-token',
-        accountId: 'cf-account-1',
-        adminAddress: '',
-      }),
-    ).toEqual({
-      workerName: 'demo-worker',
-      apiToken: 'new-token',
-      adminAddress: '',
-    });
-    expect(
-      updater({
-        workerName: 'demo-worker',
-        apiToken: 'new-token',
-        accountId: 'cf-account-1',
-        adminAddress: '',
-      }),
-    ).toEqual({
-      workerName: 'demo-worker',
-      apiToken: 'new-token',
-      adminAddress: '',
-    });
-  });
-
-  it('renders deploy status from the display descriptor', () => {
-    renderWorkerDeploySection({
-      deployStatusDisplayState: {
-        deployButtonDisabled: false,
-        deployStatusText: 'Missing API token.',
-        isError: true,
-      },
-    });
-
-    const status = screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_STATUS);
-    expect(status).toHaveTextContent('Missing API token.');
-    expect(status.className).toContain('copyStatusError');
-  });
-
-  it('disables deploy from the display descriptor', () => {
-    renderWorkerDeploySection({
-      deployStatusDisplayState: {
-        deployButtonDisabled: true,
-        deployStatusText: 'Deploying worker...',
-        isError: false,
-      },
-    });
-
-    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_WORKER)).toBeDisabled();
-  });
-
-  it('keeps bundle and token inputs controlled when partial deployForm state hydrates later', () => {
-    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-    const { rerender } = renderWorkerDeploySection({
-      deployForm: { workerName: 'demo-worker' },
-    });
-
-    rerenderWorkerDeploySection(rerender, {
-      deployForm: {
-        workerName: 'demo-worker',
-        bundleUrl: 'https://bundle.example/custom.js',
-        apiToken: 'secret-token',
-        adminAddress: '0xabc',
-      },
-    });
-
-    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_BUNDLE_URL)).toHaveValue('https://bundle.example/custom.js');
-    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN)).toHaveValue('secret-token');
-    expect(
-      consoleErrorSpy.mock.calls.some(([message]) =>
-        String(message).includes('A component is changing an uncontrolled input to be controlled'),
-      ),
-    ).toBe(false);
-
-    consoleErrorSpy.mockRestore();
-  });
-
-  it('remounts cleanly when advanced bundle mode switches from file upload to url input', () => {
-    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-    const { rerender } = renderWorkerDeploySection({
-      bundleMode: 'upload',
-    });
-
-    rerenderWorkerDeploySection(rerender, {
-      bundleMode: 'url',
-      deployForm: {
-        workerName: 'demo-worker',
-        bundleUrl: 'https://bundle.example/from-url.js',
-        apiToken: '',
-        adminAddress: '',
-      },
-    });
-
-    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_BUNDLE_URL)).toHaveValue('https://bundle.example/from-url.js');
-    expect(
-      consoleErrorSpy.mock.calls.some(([message]) =>
-        String(message).includes('A component is changing an uncontrolled input to be controlled'),
-      ),
-    ).toBe(false);
-
-    consoleErrorSpy.mockRestore();
+    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_BUNDLE_URL)).toHaveValue('https://bundle.example/release.js');
+    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_BUNDLE_URL)).toHaveAttribute('readonly');
   });
 });
 

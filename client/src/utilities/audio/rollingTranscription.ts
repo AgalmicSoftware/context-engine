@@ -1,165 +1,88 @@
+import { joinTranscriptText, transcriptOverlapTail } from './transcriptOverlap';
+import type { SpeakerTranscriptTurn } from './speakerTranscript';
 export const DEFAULT_ROLLING_TRANSCRIPTION_CHUNK_MS = 3 * 60 * 1000;
 export const LISTENING_MODE_QUERY_VALUE = 'listening';
-export const LISTENING_DRAFT_STORAGE_PREFIX = 'ce:listening-draft:';
 
-export type RollingTranscriptSegmentStatus = 'queued' | 'transcribing' | 'complete' | 'error';
+export type RollingTranscriptSegmentStatus =
+  'recording' | 'queued' | 'transcribing' | 'complete' | 'failed' | 'retrying';
+
+/** Time before a chunk when no audio was captured: the device paused the microphone, or audio stopped arriving. */
+export type CaptureGap = { startedAt: number; endedAt: number; cause: 'muted' | 'stalled' };
 
 export type RollingTranscriptSegment = {
   id: string;
   index: number;
   status: RollingTranscriptSegmentStatus;
   text: string;
+  source?: 'text';
   error?: string;
   startedAt: number;
   completedAt?: number;
+  speakerTurns?: SpeakerTranscriptTurn[];
+  // No voice matched the samples sent, so this chunk numbers its voices on its own.
+  speakersRenumbered?: boolean;
+  gapBefore?: CaptureGap;
 };
 
-export type ListeningDraft = {
-  version: 1;
-  sessionSlug: string;
-  transcript: string;
-  segments: RollingTranscriptSegment[];
-  updatedAt: number;
+// A chunk boundary repeats at most a second of speech, so only its last 80 words are compared.
+const OVERLAP_WORDS = 80;
+
+const recordingGap = () => '[Recording gap: audio could not be transcribed.]';
+const duration = (milliseconds: number) => {
+  const seconds = Math.max(1, Math.round(milliseconds / 1000));
+  const minutes = Math.floor(seconds / 60);
+  return minutes ? `${minutes} min${seconds % 60 ? ` ${seconds % 60} s` : ''}` : `${seconds} s`;
+};
+const captureGap = ({ startedAt, endedAt, cause }: CaptureGap) =>
+  `[${cause === 'muted' ? 'Microphone paused' : 'No audio'} for ${duration(endedAt - startedAt)}.]`;
+/** The words people said: gap markers keep a transcript honest about missing audio, but they are not speech. */
+export const transcriptSpeech = (transcript: string): string =>
+  transcript
+    .replace(/\[Recording gap: chunk \d+ could not be transcribed\.\]/g, '')
+    .replace(/\[Recording gap: audio could not be transcribed\.\]/g, '')
+    .replace(/\[(?:Microphone paused|No audio) for [\w ]+\.\]/g, '')
+    .replace(/^Person \d+: /gm, '')
+    .trim();
+
+// A line of the transcript: a voice's turn, or plain text and gap markers (no speaker).
+type TranscriptLine = { speaker: string; text: string };
+const chunkLines = (segment: RollingTranscriptSegment): TranscriptLine[] => {
+  const gap = segment.gapBefore ? [{ speaker: '', text: captureGap(segment.gapBefore) }] : [];
+  if (segment.status === 'failed') return [...gap, { speaker: '', text: recordingGap() }];
+  const turns = (segment.speakerTurns || []).filter((turn) => turn.speaker && turn.text.trim());
+  const lines = turns.length ? turns : [{ speaker: '', text: segment.text }];
+  return [...gap, ...lines.map(({ speaker, text }) => ({ speaker, text: text.trim() })).filter((line) => line.text)];
 };
 
-const normalizeDraftSegment = (segment: Partial<RollingTranscriptSegment>): RollingTranscriptSegment => {
-  const rawStatus = segment.status;
-  const status: RollingTranscriptSegmentStatus =
-    rawStatus === 'complete' || rawStatus === 'error' ? rawStatus : 'error';
-  const completedAt = Number(segment.completedAt || 0) || Date.now();
-  return {
-    id: String(segment.id || `segment-${segment.index || 0}`),
-    index: Number(segment.index || 0),
-    status,
-    text: String(segment.text || ''),
-    startedAt: Number(segment.startedAt || 0),
-    ...(status === 'error' && rawStatus !== 'error'
-      ? { error: 'Recording interrupted before transcription completed.', completedAt }
-      : {}),
-    ...(status === 'error' && segment.error ? { error: String(segment.error), completedAt } : {}),
-    ...(status === 'complete' && segment.completedAt ? { completedAt: Number(segment.completedAt || 0) } : {}),
-  };
-};
-
-const normalizeTranscriptTokens = (value: string) =>
-  String(value || '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, ' ')
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean);
-
-export const mergeRollingTranscriptText = (previous: string, next: string): string => {
-  const a = String(previous || '').trim();
-  const b = String(next || '').trim();
-  if (!a) return b;
-  if (!b) return a;
-
-  const left = normalizeTranscriptTokens(a);
-  const right = normalizeTranscriptTokens(b);
-  let bestOverlap = 0;
-  const maxOverlap = Math.min(left.length, right.length, 80);
-
-  for (let size = maxOverlap; size >= 1; size -= 1) {
-    let matches = true;
-    for (let i = 0; i < size; i += 1) {
-      if (left[left.length - size + i] !== right[i]) {
-        matches = false;
-        break;
-      }
+/**
+ * Chunks in order, each voice's turns as "Person N: …" lines. Speech that the text so far already ends with
+ * is dropped from a chunk's start, and a voice that carries on, like plain text and gap markers, stays on
+ * the same line.
+ */
+export const stitchRollingTranscriptSegments = (segments: RollingTranscriptSegment[] = []): string => {
+  const lines: TranscriptLine[] = [];
+  for (const segment of [...segments].sort((a, b) => a.index - b.index)) {
+    if (segment.status !== 'complete' && segment.status !== 'failed') continue;
+    let next = chunkLines(segment);
+    const tail = transcriptOverlapTail(
+      lines.map((line) => line.text).join(' '),
+      next.map((line) => line.text).join(' '),
+      OVERLAP_WORDS,
+    );
+    // Drop the repeated characters, line by line (lines are joined by one space).
+    let repeated = tail == null ? 0 : next.map((line) => line.text).join(' ').length - tail.length;
+    next = next.flatMap((line) => {
+      const text = line.text.slice(repeated).trimStart();
+      repeated = Math.max(0, repeated - line.text.length - 1);
+      return text ? [{ ...line, text }] : [];
+    });
+    for (const line of next) {
+      const last = lines[lines.length - 1];
+      if (last?.speaker === line.speaker) last.text = joinTranscriptText(last.text, line.text);
+      else lines.push(line);
     }
-    if (matches) {
-      bestOverlap = size;
-      break;
-    }
   }
-
-  if (bestOverlap > 0 && right.slice(0, bestOverlap).join(' ').length < 8) {
-    bestOverlap = 0;
-  }
-
-  let trimmedNext = b;
-  if (bestOverlap > 0) {
-    const leadingTokenPattern = new RegExp(`^(([\\s\\W]*\\w+[\\s\\W]*){${bestOverlap}})`);
-    trimmedNext = b.replace(leadingTokenPattern, '').trim();
-  }
-
-  if (!trimmedNext) return a;
-  return `${a}${/\s$/.test(a) ? '' : ' '}${trimmedNext}`.trim();
-};
-
-export const stitchRollingTranscriptSegments = (segments: RollingTranscriptSegment[] = []): string =>
-  [...segments]
-    .filter((segment) => segment.status === 'complete' && segment.text.trim())
-    .sort((a, b) => a.index - b.index)
-    .reduce((merged, segment) => mergeRollingTranscriptText(merged, segment.text), '');
-
-export const buildListeningDraftStorageKey = (sessionSlug: unknown): string => {
-  const safeSlug =
-    String(sessionSlug || 'default')
-      .trim()
-      .toLowerCase() || 'default';
-  return `${LISTENING_DRAFT_STORAGE_PREFIX}${safeSlug}`;
-};
-
-const getLocalStorage = (): Storage | null => {
-  try {
-    return typeof window !== 'undefined' ? window.localStorage : null;
-  } catch (_) {
-    return null;
-  }
-};
-
-export const readListeningDraft = (sessionSlug: unknown): ListeningDraft | null => {
-  const storage = getLocalStorage();
-  if (!storage) return null;
-  try {
-    const raw = storage.getItem(buildListeningDraftStorageKey(sessionSlug));
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as Partial<ListeningDraft>;
-    if (!parsed || parsed.version !== 1) return null;
-    return {
-      version: 1,
-      sessionSlug: String(parsed.sessionSlug || sessionSlug || ''),
-      transcript: String(parsed.transcript || ''),
-      segments: Array.isArray(parsed.segments) ? parsed.segments.map((segment) => normalizeDraftSegment(segment)) : [],
-      updatedAt: Number(parsed.updatedAt || 0),
-    };
-  } catch (_) {
-    return null;
-  }
-};
-
-export const writeListeningDraft = (
-  sessionSlug: unknown,
-  draft: Pick<ListeningDraft, 'transcript' | 'segments'>,
-): boolean => {
-  const storage = getLocalStorage();
-  if (!storage) return false;
-  try {
-    const payload: ListeningDraft = {
-      version: 1,
-      sessionSlug: String(sessionSlug || ''),
-      transcript: String(draft.transcript || ''),
-      segments: Array.isArray(draft.segments) ? draft.segments : [],
-      updatedAt: Date.now(),
-    };
-    storage.setItem(buildListeningDraftStorageKey(sessionSlug), JSON.stringify(payload));
-    return true;
-  } catch (_) {
-    return false;
-  }
-};
-
-export const clearListeningDraft = (sessionSlug: unknown): boolean => {
-  const storage = getLocalStorage();
-  if (!storage) return false;
-  try {
-    storage.removeItem(buildListeningDraftStorageKey(sessionSlug));
-    return true;
-  } catch (_) {
-    return false;
-  }
+  return lines.map(({ speaker, text }) => (speaker ? `${speaker}: ${text}` : text)).join('\n');
 };
 
 export const isListeningModeQueryEnabled = (search: unknown): boolean => {

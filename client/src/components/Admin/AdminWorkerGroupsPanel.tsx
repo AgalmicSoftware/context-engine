@@ -21,6 +21,7 @@ import {
 import { uploadWorkerGroupImage } from '../../domains/worker/workerGroupImageUpload';
 import { canonicalizeSessionSlug } from '../../utilities/session/canonicalSessionContext.js';
 import { normalizeWorkerCanonicalSessionIdHex } from '../../utilities/session/sessionWorkerDiscovery.js';
+import { getWorkerAuthRemoteErrorMessage } from '../../utilities/worker/workerAuthRemoteError';
 import { normalizeWorkerUrl } from '../../utilities/worker/workerUrl.js';
 import WorkerGroupCreateForm from '../Shared/WorkerGroupCreateForm';
 import WorkerGroupImage from '../Shared/WorkerGroupImage';
@@ -65,8 +66,9 @@ const emptyDraft = (adminAddress = '', tags: string[] = []): WorkerGroupDraft =>
   memberLimit: '',
   joinEndsAt: '',
   adminAddress,
-  joinMode: 'admin_add',
-  memberVisibility: 'admin_only',
+  // Open to anyone who can see the session: everyone on a public session, participants on a private one.
+  joinMode: 'open',
+  memberVisibility: 'session',
 });
 
 const toLocalDateTimeInput = (value: unknown): string => {
@@ -89,11 +91,17 @@ const buildGroupInput = (draft: WorkerGroupDraft, label: string) => ({
   memberVisibility: draft.memberVisibility,
 });
 
-const withJoinMode = (draft: WorkerGroupDraft, joinMode: WorkerGroupJoinMode): WorkerGroupDraft => ({
-  ...draft,
-  joinMode,
-  memberVisibility: joinMode === 'open' && draft.memberVisibility === 'admin_only' ? 'session' : draft.memberVisibility,
-});
+// A group admins fill by hand keeps its roster with them, so choosing it never leaves the list open to the session.
+const withJoinMode = (draft: WorkerGroupDraft, joinMode: WorkerGroupJoinMode): WorkerGroupDraft => {
+  const { memberVisibility } = draft;
+  if (joinMode === 'open' && memberVisibility === 'admin_only') {
+    return { ...draft, joinMode, memberVisibility: 'session' };
+  }
+  if (joinMode === 'admin_add' && memberVisibility === 'session') {
+    return { ...draft, joinMode, memberVisibility: 'admin_only' };
+  }
+  return { ...draft, joinMode };
+};
 
 const memberAddress = (member: WorkerGroupMember): string => {
   const principal = member.principal;
@@ -149,6 +157,9 @@ const AdminWorkerGroupsPanel = ({
           workerUrl: normalizedWorkerUrl,
         });
       } catch (error) {
+        // Signing can fail before the Worker's group route runs, as when sign-ins are rate limited.
+        const signingFailure = getWorkerAuthRemoteErrorMessage(error);
+        if (signingFailure) throw new Error(signingFailure);
         throw sanitizeWorkerGroupRequestError(error, 'worker_group_admin_request_failed');
       }
     },
@@ -466,7 +477,14 @@ const AdminWorkerGroupsPanel = ({
           <div className={styles.panelTitle}>{title}</div>
           <div className={styles.panelSubtitle}>{description}</div>
         </div>
-        <Button size="sm" color="secondary" outline disabled={busy} onClick={() => void loadGroups()}>
+        <Button
+          className={styles.subtleActionButton}
+          size="sm"
+          color="secondary"
+          outline
+          disabled={busy}
+          onClick={() => void loadGroups()}
+        >
           Refresh
         </Button>
       </div>
@@ -508,6 +526,7 @@ const AdminWorkerGroupsPanel = ({
             {group.adminAddress ? <span>Group admin: {group.adminAddress}</span> : null}
             <div>
               <Button
+                className={styles.subtleActionButton}
                 size="sm"
                 color="secondary"
                 outline
@@ -517,6 +536,7 @@ const AdminWorkerGroupsPanel = ({
                 Edit
               </Button>{' '}
               <Button
+                className={styles.subtleActionButton}
                 size="sm"
                 color="secondary"
                 outline
@@ -526,6 +546,7 @@ const AdminWorkerGroupsPanel = ({
                 Members
               </Button>{' '}
               <Button
+                className={styles.dangerActionButton}
                 size="sm"
                 color="danger"
                 outline
@@ -708,6 +729,7 @@ const AdminWorkerGroupsPanel = ({
                 <span>{address || member.principalKey}</span>
                 {address ? (
                   <Button
+                    className={styles.dangerActionButton}
                     size="sm"
                     color="danger"
                     outline
@@ -722,6 +744,7 @@ const AdminWorkerGroupsPanel = ({
           })}
           {memberNextCursor ? (
             <Button
+              className={styles.subtleActionButton}
               size="sm"
               color="secondary"
               outline

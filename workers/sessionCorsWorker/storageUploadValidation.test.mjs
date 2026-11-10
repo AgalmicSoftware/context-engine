@@ -126,7 +126,7 @@ const lockedField = async (value, kind) => {
   ];
   const envelope = buildEnvelopeObject({
     iv, ciphertextBytes: ciphertext, aadObj: aad, recipients,
-    commitments: { keccak256: hex(32), poseidon: (2n ** 254n).toString() }, kind,
+    commitments: { keccak256: hex(32), poseidon: hex(32) }, kind,
   });
   return JSON.stringify(envelope);
 };
@@ -162,5 +162,35 @@ test('keeps encrypted answers opaque but requires readable questions and surveys
 test('leaves documents, media, and images to the deployment-wide limit', () => {
   for (const resource of ['docsContext', 'media', 'images', 'generatedArtifacts']) {
     assert.deepEqual(check(resource, 'x'.repeat(STORAGE_RESOURCE_MAX_BYTES.responses + 1)), { ok: true });
+  }
+});
+
+for (const option of [null, 7, false, { label: 'North' }, { toString: 'not callable' }, ['North']]) {
+  test(`question options reject non-string ${JSON.stringify(option)}`, () => {
+    const result = check('questions', { ...clientQuestion, options: ['North', option] });
+    assert.equal(result.ok, false);
+    assert.equal(result.status, 400);
+    assert.match(result.error, /options.*strings/);
+  });
+}
+
+
+for (const encryptedPortion of [undefined, '', 'not-json', '{}', '{"ciphertext":"fake"}']) {
+  test(`encrypted responses require a valid envelope: ${encryptedPortion}`, () => {
+    for (const key of ['answer', 'additional']) {
+      const item = clientAnswer({ [key]: { value: '*', encrypted: true, encryptedPortion } });
+      for (const payload of [item, { responses: [item] }]) {
+        const result = check('responses', payload);
+        assert.equal(result.status, 400);
+        assert.match(result.error, /valid.*envelope/i);
+      }
+    }
+  });
+}
+
+test('refuses a public lone asterisk but keeps longer text', () => {
+  for (const key of ['answer', 'additional']) {
+    assert.equal(check('responses', clientAnswer({ [key]: { value: '*', encrypted: false } })).status, 400);
+    assert.equal(check('responses', clientAnswer({ [key]: { value: 'a * b', encrypted: false } })).ok, true);
   }
 });

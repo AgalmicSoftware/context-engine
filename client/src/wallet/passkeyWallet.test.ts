@@ -98,6 +98,16 @@ const makeSessionClient = () => {
   return client;
 };
 
+const deferred = <T>() => {
+  let resolve!: (value: T) => void;
+  let reject!: (error: Error) => void;
+  const promise = new Promise<T>((yes, no) => {
+    resolve = yes;
+    reject = no;
+  });
+  return { promise, resolve, reject };
+};
+
 describe('PasskeyEoaWalletClient', () => {
   describe.each([config, derivedConfig])('persistent disconnect ($walletKeyMode)', (walletConfig) => {
     it('preserves wallet recovery but suppresses automatic restore until explicit login', async () => {
@@ -134,6 +144,191 @@ describe('PasskeyEoaWalletClient', () => {
     jest.useRealTimers();
   });
 
+  describe.each([config, derivedConfig])('logout completion order ($walletKeyMode)', (walletConfig) => {
+    const setup = () => {
+      const storage = createMemoryWalletStorage();
+      const credentials = makeCredentials();
+      const session = makeSessionClient();
+      const client = new PasskeyEoaWalletClient({
+        config: walletConfig,
+        storage,
+        credentials,
+        sessionClient: session,
+        sessionClientFactory: () => session,
+        privateKeyFactory: () => PRIVATE_KEY,
+      });
+      return { client, storage, credentials, session };
+    };
+
+    it.each(['disconnect', 'deleteWallet'] as const)('a late unlock cannot undo %s', async (end) => {
+      const { client, storage, credentials, session } = setup();
+      await client.createWallet();
+      const reply = deferred<PublicKeyCredential>();
+      const prompted = deferred<void>();
+      (credentials.get as jest.Mock).mockImplementationOnce(() => {
+        prompted.resolve();
+        return reply.promise;
+      });
+      const outcome = client.unlockWallet().catch((error: unknown) => error);
+      await prompted.promise;
+      await client[end]();
+      const savedAfterLogout = await storage.read();
+      reply.resolve(makeCredential());
+      expect(await outcome).toMatchObject({ code: 'CE_PASSKEY_WALLET_OPERATION_CANCELLED' });
+      expect(client.isUnlocked()).toBe(false);
+      expect(client.getAddress()).toBeNull();
+      expect(session.locked).toBe(true);
+      expect(await storage.read()).toEqual(savedAfterLogout);
+      if (end === 'disconnect') expect(savedAfterLogout?.disconnected).toBe(true);
+      else expect(savedAfterLogout).toBeNull();
+    });
+
+    it('a late create cannot activate or save after logout', async () => {
+      const { client, storage, credentials, session } = setup();
+      const reply = deferred<PublicKeyCredential>();
+      const prompted = deferred<void>();
+      (credentials.create as jest.Mock).mockImplementationOnce(() => {
+        prompted.resolve();
+        return reply.promise;
+      });
+      const outcome = client.createWallet().catch((error: unknown) => error);
+      await prompted.promise;
+      await client.disconnect();
+      reply.resolve(makeCredential({ prfOutput: null }));
+      expect(await outcome).toMatchObject({ code: 'CE_PASSKEY_WALLET_OPERATION_CANCELLED' });
+      expect(credentials.get).not.toHaveBeenCalled();
+      expect(session.calls).toHaveLength(0);
+      expect(client.getAddress()).toBeNull();
+      expect(await storage.read()).toBeNull();
+    });
+
+    it('logout waits for signer initialization to finish and leaves it locked', async () => {
+      const { client, storage, session } = setup();
+      const initialized = deferred<string>();
+      const started = deferred<void>();
+      jest.spyOn(session, 'init').mockImplementationOnce(async () => {
+        started.resolve();
+        await initialized.promise;
+        session.locked = false;
+        return ADDRESS;
+      });
+      const outcome = client.createWallet().catch((error: unknown) => error);
+      await started.promise;
+      const logout = client.disconnect();
+      initialized.resolve(ADDRESS);
+      await logout;
+      expect(await outcome).toMatchObject({ code: 'CE_PASSKEY_WALLET_OPERATION_CANCELLED' });
+      expect(session.locked).toBe(true);
+      expect(client.getAddress()).toBeNull();
+      expect((await storage.read())?.disconnected).toBe(true);
+    });
+
+    it.each(['success', 'locked'] as const)(
+      'logout cancels a pending signature with a late %s reply',
+      async (replyKind) => {
+        const { client, credentials, session } = setup();
+        const address = await client.createWallet();
+        const reply = deferred<unknown>();
+        const requested = deferred<void>();
+        jest.spyOn(session, 'request').mockImplementationOnce(() => {
+          requested.resolve();
+          return reply.promise;
+        });
+        const outcome = client.signMessage('synthetic message', address).catch((error: unknown) => error);
+        await requested.promise;
+        await client.disconnect();
+        if (replyKind === 'locked') reply.reject(new Error('Passkey wallet is locked.'));
+        else reply.resolve('0x' + '11'.repeat(65));
+        expect(await outcome).toMatchObject({ code: 'CE_PASSKEY_WALLET_OPERATION_CANCELLED' });
+        expect(credentials.get).not.toHaveBeenCalled();
+        expect(client.isUnlocked()).toBe(false);
+      },
+    );
+  });
+
+  it('logout remains final when an earlier metadata write completes late', async () => {
+    const storage = createMemoryWalletStorage();
+    const credentials = makeCredentials();
+    const session = makeSessionClient();
+    const client = new PasskeyEoaWalletClient({
+      config: derivedConfig,
+      storage,
+      credentials,
+      sessionClient: session,
+      sessionClientFactory: () => session,
+    });
+    await client.createWallet();
+    const release = deferred<void>();
+    const started = deferred<void>();
+    const write = storage.write.bind(storage);
+    jest.spyOn(storage, 'write').mockImplementationOnce(async (record) => {
+      started.resolve();
+      await release.promise;
+      await write(record);
+    });
+    const outcome = client.unlockWallet().catch((error: unknown) => error);
+    await started.promise;
+    const logout = client.disconnect();
+    release.resolve();
+    await logout;
+    expect(await outcome).toMatchObject({ code: 'CE_PASSKEY_WALLET_OPERATION_CANCELLED' });
+    expect((await storage.read())?.disconnected).toBe(true);
+    expect(session.locked).toBe(true);
+    expect(client.getAddress()).toBeNull();
+  });
+
+  it('a replacing create cancels an earlier unlock without changing the new wallet', async () => {
+    const storage = createMemoryWalletStorage();
+    const credentials = makeCredentials();
+    const client = new PasskeyEoaWalletClient({
+      config: derivedConfig,
+      storage,
+      credentials,
+      sessionClient: makeSessionClient(),
+      sessionClientFactory: makeSessionClient,
+    });
+    await client.createWallet();
+    const reply = deferred<PublicKeyCredential>();
+    const prompted = deferred<void>();
+    (credentials.get as jest.Mock).mockImplementationOnce(() => {
+      prompted.resolve();
+      return reply.promise;
+    });
+    const outcome = client.unlockWallet().catch((error: unknown) => error);
+    await prompted.promise;
+    (credentials.create as jest.Mock).mockImplementationOnce(async () =>
+      makeCredential({ rawId: ALT_RAW_ID, prfOutput: ALT_PRF_OUTPUT }),
+    );
+    const replacementAddress = await client.createWallet();
+    const replacement = await storage.read();
+    reply.resolve(makeCredential());
+    expect(await outcome).toMatchObject({ code: 'CE_PASSKEY_WALLET_OPERATION_CANCELLED' });
+    expect(await storage.read()).toEqual(replacement);
+    expect(client.getAddress()).toBe(replacementAddress);
+    expect(client.isUnlocked()).toBe(true);
+    await client.lock();
+  });
+
+  it('TTL expiry still permits one fresh unlock for a signature', async () => {
+    let now = Date.now();
+    const credentials = makeCredentials();
+    const session = makeSessionClient();
+    const client = new PasskeyEoaWalletClient({
+      config: derivedConfig,
+      storage: createMemoryWalletStorage(),
+      credentials,
+      sessionClient: session,
+      sessionClientFactory: () => session,
+      now: () => now,
+    });
+    const address = await client.createWallet();
+    now += 61000;
+    await expect(client.signMessage('after expiry', address)).resolves.toMatch(/^0x11/);
+    expect(credentials.get).toHaveBeenCalledTimes(1);
+    expect(session.calls).toHaveLength(2);
+    await client.lock();
+  });
+
   it.each([
     ['encrypted private-key', config],
     ['passkey-derived', derivedConfig],
@@ -153,32 +348,92 @@ describe('PasskeyEoaWalletClient', () => {
     expect(credentials.get).not.toHaveBeenCalled();
   });
 
-  it.each([
-    ['encrypted private-key', config, true],
-    ['passkey-derived', derivedConfig, false],
-  ])('creates a second %s wallet with the saved passkey excluded: %s', async (_label, walletConfig, excluded) => {
+  it('keeps an existing encrypted wallet recoverable when creation is requested again', async () => {
     const storage = createMemoryWalletStorage();
     const credentials = makeCredentials();
     const createClient = () =>
       new PasskeyEoaWalletClient({
-        config: walletConfig,
+        config,
         storage,
         credentials,
         sessionClient: makeSessionClient(),
+        sessionClientFactory: makeSessionClient,
         privateKeyFactory: () => PRIVATE_KEY,
       });
-    await createClient().createWallet();
+    const first = createClient();
+    await first.createWallet();
+    await first.disconnect();
     const saved = await storage.read();
-    await createClient().createWallet();
+    const returning = createClient();
+    await expect(returning.createWallet()).rejects.toThrow(
+      'A passkey wallet already exists in this browser. Sign in, or delete it first.',
+    );
+    expect(credentials.create).toHaveBeenCalledTimes(1);
+    expect(credentials.get).not.toHaveBeenCalled();
+    expect(await storage.read()).toEqual(saved);
+    await expect(returning.unlockWallet()).resolves.toBe(ADDRESS);
+    await returning.lock();
+  });
 
+  it('keeps a wallet saved while another passkey creation prompt was open', async () => {
+    const storage = createMemoryWalletStorage();
+    const prompt = deferred<PublicKeyCredential>();
+    const started = deferred<void>();
+    const credentials = makeCredentials();
+    (credentials.create as jest.Mock).mockImplementationOnce(() => {
+      started.resolve();
+      return prompt.promise;
+    });
+    const sessionClient = makeSessionClient();
+    const first = new PasskeyEoaWalletClient({
+      config,
+      storage,
+      credentials,
+      sessionClient,
+      sessionClientFactory: makeSessionClient,
+      privateKeyFactory: () => PRIVATE_KEY,
+    });
+    const second = new PasskeyEoaWalletClient({
+      config,
+      storage,
+      credentials: makeCredentials(),
+      sessionClient: makeSessionClient(),
+      sessionClientFactory: makeSessionClient,
+      privateKeyFactory: () => PRIVATE_KEY,
+    });
+    try {
+      const outcome = first.createWallet().catch((error: unknown) => error);
+      await started.promise;
+      await second.createWallet();
+      const saved = await storage.read();
+      prompt.resolve(makeCredential({ rawId: ALT_RAW_ID }));
+      expect(await outcome).toEqual(expect.objectContaining({ message: expect.stringContaining('already exists') }));
+      expect(await storage.read()).toEqual(saved);
+      expect(sessionClient.calls).toHaveLength(0);
+    } finally {
+      await first.lock();
+      await second.lock();
+    }
+  });
+
+  it('still creates a passkey-derived wallet without excluding the saved credential', async () => {
+    const storage = createMemoryWalletStorage();
+    const credentials = makeCredentials();
+    const client = new PasskeyEoaWalletClient({
+      config: derivedConfig,
+      storage,
+      credentials,
+      sessionClient: makeSessionClient(),
+      sessionClientFactory: makeSessionClient,
+    });
+    await client.createWallet();
+    await client.createWallet();
     const [firstOptions, secondOptions] = (credentials.create as jest.Mock).mock.calls.map(
       ([options]) => (options as CredentialCreationOptions).publicKey,
     );
     expect(firstOptions).not.toHaveProperty('excludeCredentials');
-    const secondExclusions = secondOptions?.excludeCredentials || [];
-    expect(secondExclusions.map(({ id }) => bufferToBase64URL(id as ArrayBuffer))).toEqual(
-      excluded ? [saved?.credentialId] : [],
-    );
+    expect(secondOptions).not.toHaveProperty('excludeCredentials');
+    await client.lock();
   });
 
   it('falls back to one assertion when registration reports PRF support without returning output', async () => {
@@ -698,6 +953,7 @@ describe('PasskeyEoaWalletClient account binding', () => {
       sessionClient: makeSessionClient(),
       privateKeyFactory: () => `0x${'42'.repeat(32)}` as `0x${string}`,
     });
+    if (walletConfig.walletKeyMode === 'encrypted-private-key') await second.deleteWallet();
     const secondAddress = await second.createWallet();
     await second.lock();
     expect(secondAddress).not.toBe(firstAddress);

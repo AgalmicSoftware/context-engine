@@ -1,3 +1,6 @@
+import { GROUP_TRANSCRIPTION_MODEL } from '../../../../shared/aiDefaults.mjs';
+import { audioFileExtension } from '../audio/audioFileExtension';
+import { normalizeSpeakerTurns, type KnownSpeaker, type SpeakerTranscriptTurn } from '../audio/speakerTranscript';
 import { createNamedAudioFile } from './aiClientAudioTranscription';
 import { fetchWorkerWithAuth } from '../worker/workerAuth.js';
 import { defaultStrictAllowDemoFallback } from '../worker/workerSessionResolution.js';
@@ -24,6 +27,8 @@ export type TranscriptionUploadOptions = {
   fileName?: string;
   onJsonParseError?: (error: unknown) => void;
   signal?: AbortSignal;
+  // Group labels only: voices from earlier chunks, so the model gives them the same names.
+  knownSpeakers?: KnownSpeaker[];
 };
 
 const asRecord = (value: unknown): UnknownRecord =>
@@ -62,22 +67,71 @@ const parseTranscriptionErrorMessage = (data: unknown, status: unknown): string 
   );
 };
 
-export const uploadAudioForTranscription = async (
+// A labelled 3-minute chunk takes over a minute to answer, and some networks close a connection after 60 quiet
+// seconds. A small request on the same connection (HTTP/2 or HTTP/3) keeps it in use while the transcription waits.
+const CONNECTION_KEEP_ALIVE_MS = 20_000;
+
+const keepConnectionInUse = (baseUrl: string, signal?: AbortSignal): (() => void) => {
+  let request: AbortController | undefined;
+  const stop = () => {
+    clearInterval(timer);
+    request?.abort();
+    signal?.removeEventListener('abort', stop);
+  };
+  const timer = setInterval(() => {
+    // One at a time, so a stuck request can't hold the browser's connections. no-store keeps it from its cache.
+    request?.abort();
+    request = new AbortController();
+    fetch(`${baseUrl}/capabilities`, { cache: 'no-store', signal: request.signal }).then(
+      // Workers before 0.8.0 count this missing route as a failed login, and have no slow labelled transcription.
+      ({ status }) => {
+        if (status === 401 || status === 404) stop();
+      },
+      // Only the traffic matters.
+      () => undefined,
+    );
+  }, CONNECTION_KEEP_ALIVE_MS);
+  signal?.addEventListener('abort', stop);
+  return stop;
+};
+
+/** `chunkOnly` refusals (this audio's size or content) leave labels on for the rest of the recording. */
+export class SpeakerLabelsUnavailableError extends Error {
+  name = 'SpeakerLabelsUnavailableError';
+  constructor(
+    message: string,
+    readonly chunkOnly = false,
+  ) {
+    super(message);
+  }
+}
+
+const requestAudioTranscription = async (
   audioFileOrBlob: unknown,
   transport: TranscriptionWorkerTransport,
-  { fileName = '', signal, onJsonParseError }: TranscriptionUploadOptions = {},
-): Promise<string> => {
+  { fileName = '', signal, onJsonParseError, knownSpeakers = [] }: TranscriptionUploadOptions = {},
+  groupSpeakerLabels = false,
+): Promise<UnknownRecord & { text: string }> => {
   const maybeBlob = typeof Blob !== 'undefined' && audioFileOrBlob instanceof Blob ? audioFileOrBlob : null;
   const sourceName = stringValue(asRecord(audioFileOrBlob).name);
   const sourceType = stringValue(asRecord(audioFileOrBlob).type);
+  const defaultName = `audio.${audioFileExtension(sourceType)}`;
   const fileLike = maybeBlob
-    ? createNamedAudioFile(maybeBlob, fileName || sourceName || 'audio.wav', sourceType || 'audio/wav')
+    ? createNamedAudioFile(maybeBlob, fileName || sourceName || defaultName, sourceType || 'audio/wav')
     : audioFileOrBlob;
-  const resolvedName = fileName || stringValue(asRecord(fileLike).name) || 'audio.wav';
+  const resolvedName = fileName || stringValue(asRecord(fileLike).name) || defaultName;
   const form = new FormData();
   form.append('file', fileLike as Blob, resolvedName);
   appendTranscriptionConfig(form, transport?.transcriptionCfg);
+  if (groupSpeakerLabels) {
+    form.append('purpose', 'group-conversation');
+    form.append('labelSpeakers', 'true');
+    // Paired by position; Workers before 0.9.0 drop them.
+    for (const { name } of knownSpeakers) form.append('known_speaker_names[]', name);
+    for (const { sample } of knownSpeakers) form.append('known_speaker_references[]', sample);
+  }
 
+  const stopKeepingConnection = keepConnectionInUse(transport.baseUrl, signal);
   const resp = await fetchWorkerWithAuth(
     transport.endpoint,
     { method: 'POST', body: form, ...(signal ? { signal } : {}) },
@@ -92,7 +146,7 @@ export const uploadAudioForTranscription = async (
       fallbackOnGateUnavailable: true,
       allowDemoFallback: defaultStrictAllowDemoFallback(),
     },
-  );
+  ).finally(stopKeepingConnection);
   let data: unknown = {};
   try {
     data = await resp.json();
@@ -102,9 +156,76 @@ export const uploadAudioForTranscription = async (
   }
 
   if (!resp.ok) {
-    throw new Error(parseTranscriptionErrorMessage(data, resp.status));
+    const transient = resp.status === 408 || resp.status === 429 || resp.status >= 500;
+    if (groupSpeakerLabels && !transient && resp.status >= 400 && resp.status < 500) {
+      // Only a rejection of this chunk's audio (too large, or a provider error naming the file, which older
+      // Workers relay under `details.error`) leaves labels on for later chunks. Anything else, such as a
+      // Worker without label support, would refuse every chunk, so labels end for the recording.
+      const audioRejected = resp.status === 413 || asRecord(asRecord(asRecord(data).details).error).param === 'file';
+      throw audioRejected
+        ? new SpeakerLabelsUnavailableError('This chunk was rejected with speaker labels.', true)
+        : new SpeakerLabelsUnavailableError('Speaker labels are unavailable for this provider or Worker.');
+    }
+    throw Object.assign(new Error(parseTranscriptionErrorMessage(data, resp.status)), { status: resp.status });
   }
 
-  const text = asRecord(data).text;
-  return typeof text === 'string' ? text : '';
+  // A success without text is a lost reply (a dropped connection, say), not silence: saving it as a transcript
+  // would delete the chunk's audio. Released Workers always send text, so this leaves real silence alone.
+  const { text } = asRecord(data);
+  if (typeof text !== 'string') {
+    throw Object.assign(new Error('The transcription reply could not be read.'), { status: 502 });
+  }
+  return { ...asRecord(data), text };
+};
+
+export const uploadAudioForTranscription = async (
+  audioFileOrBlob: unknown,
+  transport: TranscriptionWorkerTransport,
+  options: TranscriptionUploadOptions = {},
+): Promise<string> => (await requestAudioTranscription(audioFileOrBlob, transport, options)).text;
+
+export type DiarizedTranscription = {
+  text: string;
+  segments: SpeakerTranscriptTurn[];
+  labelsUnavailableReason?: string;
+  // The known speaker samples were refused, so this chunk was labelled without them.
+  speakerSamplesRefused?: boolean;
+};
+
+export const uploadAudioForDiarizedTranscription = async (
+  audioFileOrBlob: unknown,
+  transport: TranscriptionWorkerTransport,
+  options: TranscriptionUploadOptions = {},
+): Promise<DiarizedTranscription> => {
+  const config = transport.transcriptionCfg || {};
+  if (config.provider && config.provider !== 'openai')
+    throw new SpeakerLabelsUnavailableError('Speaker labels require OpenAI transcription.');
+  const labelled = {
+    ...transport,
+    transcriptionCfg: { ...config, provider: 'openai', model: GROUP_TRANSCRIPTION_MODEL },
+  };
+  let data: UnknownRecord & { text: string };
+  let speakerSamplesRefused = false;
+  try {
+    data = await requestAudioTranscription(audioFileOrBlob, labelled, options, true);
+  } catch (error) {
+    // Samples are an extra: their refusal must not end labels for the recording, so send this chunk once more
+    // without them. A refusal of that request too ends labels as before.
+    if (!(error instanceof SpeakerLabelsUnavailableError) || error.chunkOnly || !options.knownSpeakers?.length)
+      throw error;
+    data = await requestAudioTranscription(audioFileOrBlob, labelled, { ...options, knownSpeakers: [] }, true);
+    speakerSamplesRefused = true;
+  }
+  if (!Array.isArray(data.segments)) {
+    return {
+      text: data.text,
+      segments: [],
+      labelsUnavailableReason: 'This Worker returned text without speaker labels.',
+    };
+  }
+  return {
+    text: data.text,
+    segments: normalizeSpeakerTurns(data.segments),
+    ...(speakerSamplesRefused ? { speakerSamplesRefused } : {}),
+  };
 };

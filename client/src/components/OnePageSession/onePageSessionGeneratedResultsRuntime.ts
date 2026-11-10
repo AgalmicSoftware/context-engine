@@ -5,6 +5,7 @@ import {
 } from '../../domains/sessionResults/sessionResultsAnalysisController';
 import { SESSION_GENERATED_RESULTS_VIEW_KEYS } from '../../domains/sessionResults/sessionResultsGeneratedViewTypes';
 import { buildResultsAnalysisBrowserSnapshotFromCacheNode } from '../../domains/sessionResults/sessionResultsAnalysisBrowserSnapshot';
+import { getBlockedQuestionIdsSet } from '../SurveyTool/surveyToolScope';
 import {
   readSessionResultsAnalysisArtifact,
   readSessionResultsAnalysisStatus,
@@ -158,6 +159,7 @@ export const resolveGeneratedResultsRuntime = (
     const cacheScope = resolveOnePageSessionAggregatorCacheScope({ ...host.props, sessionConfig });
     const questionsCache = toRecord(mergedPorts.readQuestionsCache(questionSourceSlug));
     snapshotResult = buildResultsAnalysisBrowserSnapshotFromCacheNode({
+      hiddenQuestionIds: getBlockedQuestionIdsSet(questionSourceSlug),
       networkNode: questionsCache[cacheScope],
       sessionSlug: normalizedSlug,
     });
@@ -610,6 +612,23 @@ export const loadGeneratedResultsArtifactForHost = async (
       });
       applyGeneratedResultsStatusBody(host, pendingStatusBody, toRecord(toRecord(pendingStatusBody).state).lastGood);
       await pollGeneratedResultsArtifactForHost({ host, mergedPorts, requestSeq, runtime, sessionConfig });
+      return;
+    }
+    if (toStatusCode(artifactBody) === 404) {
+      // No report yet, which is not an expired poll: an admin must still be able to sign in and generate one.
+      const previous = toRecord(host.state.generatedResultsStatusBody);
+      applyGeneratedResultsStatusBody(
+        host,
+        {
+          ...previous,
+          ok: true,
+          viewerAuthorized: true,
+          pollExpired: false,
+          settings: previous.settings || toRecord(sessionConfig).resultsAnalysis,
+          state: { ...toRecord(previous.state), active: null, jobState: 'idle' },
+        },
+        toRecord(previous.state).lastGood,
+      );
       return;
     }
     markGeneratedResultsPollExpired({

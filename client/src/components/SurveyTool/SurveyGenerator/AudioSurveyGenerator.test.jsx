@@ -143,7 +143,7 @@ describe('AudioSurveyGenerator input and question generation', () => {
 
     expect(getPhotoCards()).toHaveLength(2);
     expect(container.textContent).toContain(
-      'Skipped 1 unsupported file. Use pdf, md, txt, csv, ppt, pptx, json, png, jpg, jpeg, webp, or gif.',
+      'Skipped 2 unsupported files. Use md, txt, csv, json, png, jpg, jpeg, webp, or gif.',
     );
     expect(container.textContent).toContain('memo.png');
     expect(container.textContent).toContain('diagram.gif');
@@ -341,13 +341,17 @@ describe('AudioSurveyGenerator input and question generation', () => {
     expect(container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_QUESTION_COUNT_VALUE}"]`).textContent).toBe(
       '15',
     );
-    expect(mockCallAI.mock.calls[0][0]).toMatch(/numberOfSeedStatementsOrPrompts:\s*15\b/);
+    expect(mockCallAI.mock.calls[0][0]).toMatch(/Write 15 questions/);
   });
 
   it('uses webpage source type when only additional URL sources are provided', async () => {
-    mockProcessAdditionalSources.mockResolvedValue(
-      'This is extracted webpage content from additional sources only, and it is long enough to pass validation.',
-    );
+    mockProcessAdditionalSources.mockResolvedValue({
+      text: 'This is extracted webpage content from additional sources only, and it is long enough to pass validation.',
+      extractedCharacters:
+        'This is extracted webpage content from additional sources only, and it is long enough to pass validation.'
+          .length,
+      skipped: [],
+    });
     mockCallAI.mockResolvedValue(
       JSON.stringify({
         surveyTitle: 'URL Source Survey',
@@ -388,6 +392,59 @@ describe('AudioSurveyGenerator input and question generation', () => {
     expect(mockProcessAdditionalSources).toHaveBeenCalledTimes(1);
     expect(mockFetchContentFromURL).not.toHaveBeenCalled();
     expect(mockCallAI).toHaveBeenCalledTimes(1);
-    expect(mockCallAI.mock.calls[0][0]).toMatch(/SourceType:\s*webpage/);
+    expect(mockCallAI.mock.calls[0][0]).toMatch(/Source type: webpage\./);
+  });
+  it('rejects a PDF alone with an actionable message and no model call', async () => {
+    await renderSubject(
+      <AudioSurveyGenerator provider={{}} network={{}} account="0x123" loginComplete toggleLoginModal={jest.fn()} />,
+    );
+    addAdditionalPhoto([new File(['PDF_BINARY_MARKER'], 'memo.pdf', { type: 'application/pdf' })]);
+    expect(container.textContent).toContain('memo.pdf');
+    expect(container.textContent).toMatch(/unsupported|cannot extract/i);
+    expect(container.textContent).toMatch(/txt|paste/i);
+    expect(findGenerateQuestionsButton()).toBeUndefined();
+    expect(mockCallAI).not.toHaveBeenCalled();
+  });
+
+  it.each([true, false])('generates only from extracted TXT text with mixed PDF=%s', async (includePdf) => {
+    const { processAdditionalSources } = jest.requireActual('../../../utilities/ai/aiClientSourceFetch');
+    mockProcessAdditionalSources.mockImplementation(processAdditionalSources);
+    mockCallAI.mockResolvedValue(JSON.stringify({ questions: buildAiQuestions(5) }));
+    await renderSubject(
+      <AudioSurveyGenerator provider={{}} network={{}} account="0x123" loginComplete toggleLoginModal={jest.fn()} />,
+    );
+    const text = 'TXT_CONTENT_MARKER useful source notes long enough for question generation.';
+    addAdditionalPhoto([
+      ...(includePdf ? [new File(['PDF_BINARY_MARKER'], 'memo.pdf', { type: 'application/pdf' })] : []),
+      new File([text], 'notes.txt', { type: 'text/plain' }),
+    ]);
+    if (includePdf) {
+      expect(container.textContent).toContain('memo.pdf');
+      expect(container.textContent).toContain('Skipped');
+    }
+    await act(async () => {
+      container.querySelector('form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
+    expect(mockCallAI).toHaveBeenCalledTimes(1);
+    expect(mockCallAI.mock.calls[0][0]).toContain(text);
+    expect(mockCallAI.mock.calls[0][0]).not.toMatch(/PDF_BINARY_MARKER|memo.pdf|not currently supported/);
+    expect(container.textContent.includes('memo.pdf')).toBe(includePdf);
+    expect(container.textContent.includes('Skipped')).toBe(includePdf);
+  });
+
+  it('does not count source headings toward minimum extracted text', async () => {
+    const { processAdditionalSources } = jest.requireActual('../../../utilities/ai/aiClientSourceFetch');
+    mockProcessAdditionalSources.mockImplementation(processAdditionalSources);
+    await renderSubject(
+      <AudioSurveyGenerator provider={{}} network={{}} account="0x123" loginComplete toggleLoginModal={jest.fn()} />,
+    );
+    addAdditionalPhoto([new File(['short'], 'a-very-long-source-name-which-would-pass-fifty-characters.txt')]);
+    await act(async () => {
+      container.querySelector('form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
+    expect(mockCallAI).not.toHaveBeenCalled();
+    expect(container.textContent).toContain('min 50');
   });
 });

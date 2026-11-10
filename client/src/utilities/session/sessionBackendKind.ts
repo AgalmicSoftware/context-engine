@@ -1,4 +1,4 @@
-import { hasLegacyHostedAgentFlags, isSessionModeProfileAgentHttpEnabled } from './sessionModeProfile';
+import { isSessionModeProfileAgentHttpEnabled } from './sessionModeProfile';
 import { normalizeSessionSlugAlias as normalizeSessionSlug } from './sessionSlug';
 
 export type SessionBackendKind = 'onchain' | 'agent';
@@ -6,9 +6,6 @@ export type SessionBackendKind = 'onchain' | 'agent';
 export type AgentSessionMeta = {
   ok?: boolean;
   sessionSlug?: string;
-  // Compatibility fields returned by older deployed Bridges.
-  telegramOnly?: boolean;
-  telegramBridgeEnabled?: boolean;
   authorityMode?: string;
   agentHttpEnabled?: boolean;
   clientSubmitReady?: boolean;
@@ -27,23 +24,19 @@ const hasExplicitProfile = (metadata: unknown): boolean =>
     Object.prototype.hasOwnProperty.call(metadata, 'authority'));
 
 export const isHostedAgentSessionConfig = (metadata: unknown): boolean =>
-  hasExplicitProfile(metadata) ? isSessionModeProfileAgentHttpEnabled(metadata) : hasLegacyHostedAgentFlags(metadata);
+  isSessionModeProfileAgentHttpEnabled(metadata);
 
 export const resolveSessionBackendKind = ({
   sessionConfig = null,
   probeResult = null,
   sessionSlug = '',
 }: ResolveSessionBackendKindArgs = {}): SessionBackendKind => {
-  // Explicit HTTP-off settings must not be overridden by stale legacy metadata.
+  // An explicit profile is authoritative; the probe only speaks for sessions without one.
   if (hasExplicitProfile(sessionConfig)) return isHostedAgentSessionConfig(sessionConfig) ? 'agent' : 'onchain';
-  const probeEnabled =
-    typeof probeResult?.agentHttpEnabled === 'boolean'
-      ? probeResult.authorityMode === 'worker_canonical' && probeResult.agentHttpEnabled
-      : probeResult?.telegramOnly === true;
-  return isHostedAgentSessionConfig(sessionConfig) ||
-    (probeEnabled &&
-      (!normalizeSessionSlug(sessionSlug) ||
-        normalizeSessionSlug(probeResult?.sessionSlug) === normalizeSessionSlug(sessionSlug)))
+  const probeEnabled = probeResult?.authorityMode === 'worker_canonical' && probeResult?.agentHttpEnabled === true;
+  return probeEnabled &&
+    (!normalizeSessionSlug(sessionSlug) ||
+      normalizeSessionSlug(probeResult?.sessionSlug) === normalizeSessionSlug(sessionSlug))
     ? 'agent'
     : 'onchain';
 };

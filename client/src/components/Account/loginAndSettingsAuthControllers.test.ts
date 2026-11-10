@@ -1,3 +1,4 @@
+import { clearAllWorkerSessionTokens } from '../../utilities/worker/workerAuth';
 import type { AgentClientLoginEnvelope } from '../../utilities/session/agentClientLogin';
 import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';
 import { buildPasskeyWalletNetwork, createLoginPasskeyActions } from './loginAndSettingsPasskeyActions';
@@ -7,7 +8,7 @@ const envelope: AgentClientLoginEnvelope = {
   v: 3,
   sessionSlug: 'alpha',
   address: '0x0000000000000000000000000000000000000001',
-  agentCredential: { kind: 'session_agent_browser_token', token: 'ceagt_bridge_test' },
+  agentCredential: { kind: 'session_agent_browser_token', token: 'ceagt_agent_test' },
   workerCredential: { kind: 'session_worker_jwt', token: 'jwt-worker-test' },
   capabilities: { submitAnswers: true },
   expiresAt: '2026-01-01T00:00:00.000Z',
@@ -105,6 +106,44 @@ describe('loginAndSettings auth controllers', () => {
     expect(setActionMode.mock.calls).toEqual([['create'], ['']]);
   });
 
+  it.each(['create', 'sign-in'] as const)('wallet cancellation leaves no %s error banner', async (mode) => {
+    const setStatus = jest.fn();
+    const accountLogError = jest.fn();
+    const changeAccount = jest.fn();
+    const cancelled = Object.assign(new Error('Wallet operation cancelled.'), {
+      code: 'CE_PASSKEY_WALLET_OPERATION_CANCELLED',
+    });
+    const action = jest.fn().mockRejectedValue(cancelled);
+    const actions = createLoginPasskeyActions({
+      accountLogError,
+      changeAccount,
+      clearAllWorkerSessionTokens: jest.fn(),
+      getAccount: () => '',
+      getErrorMessage: () => cancelled.message,
+      getProvider: () => '',
+      getTargetNetwork: () => ({ id: 11155420 }),
+      isCurrentAction: () => true,
+      normalizeAccountForComparison: String,
+      notifyInfo: jest.fn(),
+      passkeyWallet: {
+        createPasskeyWallet: action,
+        unlockPasskeyWallet: action,
+        setPasskeyWalletChain: jest.fn(),
+        isPasskeyWalletOperationCancelledError: (error) => error === cancelled,
+      },
+      setActionMode: jest.fn(),
+      setStatus,
+      startAction: () => 1,
+      updateLoginInfo: jest.fn(),
+    });
+    if (mode === 'create') await actions.handlePasskeyWalletCreate();
+    else await actions.handlePasskeyWalletSignIn();
+    expect(setStatus).toHaveBeenCalledTimes(1);
+    expect(setStatus).toHaveBeenCalledWith({ passkeyWalletStatusMessage: '', passkeyWalletStatusTone: '' });
+    expect(changeAccount).not.toHaveBeenCalled();
+    expect(accountLogError).not.toHaveBeenCalled();
+  });
+
   it('formats agent-token errors with current user-facing copy', () => {
     expect(formatAgentTokenError(new Error('expired'))).toBe(
       'This token is expired. Request a fresh agent token from your session administrator and paste it again.',
@@ -123,10 +162,10 @@ describe('loginAndSettings auth controllers', () => {
       getActiveSessionSlug: () => 'alpha',
       getAgentTokenInput: () => '',
       getDemoSessionConfigBySlug: () => ({ slug: 'demo' }),
-      getPropSessionConfig: () => ({ slug: 'alpha', agentWorkerUrl: 'https://bridge.example/' }),
+      getPropSessionConfig: () => ({ slug: 'alpha', agentWorkerUrl: 'https://agent.example/' }),
       getSessionConfigBySlugOrDefault: () => ({
         slug: 'alpha',
-        agentWorkerUrl: 'https://registry-bridge.example/',
+        agentWorkerUrl: 'https://registry-agent.example/',
         sponsoredKeys: { ai: true },
       }),
       getTargetNetwork: () => ({ id: 11155420 }),
@@ -145,7 +184,7 @@ describe('loginAndSettings auth controllers', () => {
       sessionSlug: 'alpha',
       sessionConfig: {
         slug: 'alpha',
-        agentWorkerUrl: 'https://registry-bridge.example/',
+        agentWorkerUrl: 'https://registry-agent.example/',
         sponsoredKeys: { ai: true },
         contracts: {},
       },
@@ -163,7 +202,7 @@ describe('loginAndSettings auth controllers', () => {
       sessionId: '0x00112233445566778899aabbccddeeff',
       configRevision: 'route-revision-1',
       corsWorkerUrl: 'https://route-worker.example',
-      agentWorkerUrl: 'https://route-bridge.example',
+      agentWorkerUrl: 'https://route-agent.example',
       sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
     };
     const actions = createLoginAgentActions({
@@ -181,7 +220,7 @@ describe('loginAndSettings auth controllers', () => {
         slug: 'alpha',
         sessionId: '0xffeeddccbbaa99887766554433221100',
         corsWorkerUrl: 'https://registry-worker.example',
-        agentWorkerUrl: 'https://registry-bridge.example',
+        agentWorkerUrl: 'https://registry-agent.example',
       }),
       getTargetNetwork: () => ({ id: 11155420 }),
       isHostedAgentSessionConfig: () => true,
@@ -205,5 +244,66 @@ describe('loginAndSettings auth controllers', () => {
       workerCanonical: true,
       workerUrl: 'https://route-worker.example',
     });
+  });
+});
+
+it('a login controller cannot apply a completion from before logout, while a fresh login succeeds', async () => {
+  let release!: (value: AgentClientLoginEnvelope) => void;
+  const pending = new Promise<AgentClientLoginEnvelope>((resolve) => {
+    release = resolve;
+  });
+  const exchange = jest.fn().mockReturnValueOnce(pending).mockResolvedValue(envelope);
+  const changeAccount = jest.fn();
+  const updateLoginInfo = jest.fn();
+  const setStateIfMounted = jest.fn();
+  const actions = createLoginAgentActions({
+    changeAccount,
+    updateLoginInfo,
+    setStateIfMounted,
+    exchangeAgentClientLogin: exchange,
+    extractAgentClientToken: () => ({ ok: true }),
+    getActiveSessionSlug: () => 'alpha',
+    getAgentTokenInput: () => 'ceagt_fixture_1234567890',
+    getDemoSessionConfigBySlug: () => ({}),
+    getPropSessionConfig: () => null,
+    getSessionConfigBySlugOrDefault: () => ({ slug: 'alpha', corsWorkerUrl: 'https://worker.example' }),
+    getTargetNetwork: () => ({}),
+    isHostedAgentSessionConfig: () => true,
+    normalizeSettingsSessionSlug: String,
+    setState: jest.fn(),
+    windowTarget: null,
+  });
+  const form = document.createElement('form');
+  const event: Parameters<typeof actions.handleAgentTokenLoginSubmit>[0] = {
+    nativeEvent: new Event('submit'),
+    currentTarget: form,
+    target: form,
+    bubbles: false,
+    cancelable: true,
+    defaultPrevented: false,
+    eventPhase: 2,
+    isTrusted: false,
+    preventDefault: jest.fn(),
+    isDefaultPrevented: () => false,
+    stopPropagation: jest.fn(),
+    isPropagationStopped: () => false,
+    persist: jest.fn(),
+    timeStamp: 0,
+    type: 'submit',
+  };
+  const login = actions.handleAgentTokenLoginSubmit(event);
+  clearAllWorkerSessionTokens();
+  updateLoginInfo.mockClear();
+  release(envelope);
+  await login;
+  expect(changeAccount).not.toHaveBeenCalled();
+  expect(updateLoginInfo).not.toHaveBeenCalled();
+  expect(setStateIfMounted).not.toHaveBeenCalled();
+  await actions.handleAgentTokenLoginSubmit(event);
+  expect(changeAccount).toHaveBeenCalledTimes(1);
+  expect(updateLoginInfo).toHaveBeenLastCalledWith({
+    loginInProgress: false,
+    loginComplete: true,
+    provider: 'agent_token',
   });
 });

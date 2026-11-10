@@ -6,7 +6,6 @@ export type MainSiteRouteKey =
   | 'wizard'
   | 'surveyId'
   | 'home'
-  | 'debate'
   | 'atlas'
   | 'tag'
   | 'bookmarks'
@@ -20,9 +19,7 @@ export type MainSiteRouteKey =
   | 'userProfile'
   | 'about'
   | 'posts'
-  | 'demos'
   | 'benchmarks'
-  | 'matrix'
   | 'docs'
   | 'admin'
   | 'sponsor'
@@ -97,10 +94,6 @@ const routeDefinitions: RouteDefinition[] = [
     match: ({ fullPath }) => fullPath === '/' || fullPath === '',
   },
   {
-    key: 'debate',
-    match: ({ fullPath }) => isExactRoute(fullPath, '/debate'),
-  },
-  {
     key: 'atlas',
     match: ({ fullPath }) => isOnOrWithinRoutePath(fullPath, '/atlas'),
   },
@@ -157,16 +150,8 @@ const routeDefinitions: RouteDefinition[] = [
     match: ({ fullPath }) => isOnOrWithinRoutePath(fullPath, '/posts'),
   },
   {
-    key: 'demos',
-    match: ({ fullPath }) => isExactRoute(fullPath, '/demos'),
-  },
-  {
     key: 'benchmarks',
     match: ({ fullPath }) => isExactRoute(fullPath, '/benchmarks'),
-  },
-  {
-    key: 'matrix',
-    match: ({ fullPath }) => fullPath === '/matrix',
   },
   {
     key: 'docs',
@@ -227,8 +212,6 @@ export function resolveMainSiteRouteMatch({
     KNOWN_ROUTE_PREFIXES.has(firstPathSegment) ||
     isUserProfileRoute;
   const shouldBypassCacheHydrationWait =
-    pathWithoutQuery === '/debate' ||
-    pathWithoutQuery === '/debate/' ||
     pathWithoutQuery.startsWith('/tag/') ||
     firstPathSegment === 'groups' ||
     isWorkerGroupDetailRoute ||

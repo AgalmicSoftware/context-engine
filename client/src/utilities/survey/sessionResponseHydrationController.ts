@@ -1,5 +1,6 @@
 import { ethers } from 'ethers';
 import { canonicalizeSessionSlug as normalizeSessionSlug } from '../session/sessionSlug.js';
+import { createCacheReadinessOwner } from './cacheReadinessOwner';
 import contractScripts from '../web3/chainGateway.js';
 import { cryptoUtils } from '../crypto/cryptography.js';
 import { createLogger } from 'utilities/logging.js';
@@ -7,6 +8,7 @@ import {
   ensureQuestionArweaveCacheBranches,
   mergeQuestionArweaveCacheBranches,
 } from '../arweave/arweaveRetryHelpers.js';
+import { normalizeBlockLimitsForConfig } from '../session/blockLimits.js';
 import { DEFAULT_SESSION_SCAN_MAX_BLOCK_RANGE, readSessionScanMaxBlockRange } from '../session/sessionScanScope.js';
 import { resolvePersistedQuestionResponsesWatermark } from './questionResponsesWatermark.js';
 import { shouldFlushCoalescedRun } from '../session/mainSiteProgressHelpers.js';
@@ -500,6 +502,47 @@ const ensureUserDataRecord = (value: unknown): UserDataRecord => {
   return data;
 };
 
+// Drops answers recorded after an explicit end block. The cache keeps only each
+// responder's newest answer, so after a removal the watermark rewinds to the
+// window floor to find any earlier answer again; otherwise it moves back to the
+// end, so raising the end rescans past it. Rows with no known block stay.
+const pruneQuestionResponsesAfterBlock = (net: unknown, endBlock: number, floorBlock: number): boolean => {
+  if (!isRecord(net)) return false;
+  const responses = toRecord(net.questionResponses);
+  const meta = toRecord(net.questionResponsesMeta);
+  let removed = false;
+  new Set([...Object.keys(responses), ...Object.keys(meta)]).forEach((qid) => {
+    const byResponder = toRecord(responses[qid]);
+    const metaByResponder = toRecord(meta[qid]);
+    new Set([...Object.keys(byResponder), ...Object.keys(metaByResponder)]).forEach((responder) => {
+      if (toResponseRecencyPair(metaByResponder[responder], byResponder[responder]).bn <= endBlock) return;
+      delete byResponder[responder];
+      delete metaByResponder[responder];
+      removed = true;
+    });
+    // As after a scan of the new window, a question with no answers has no entry.
+    if (!Object.keys(byResponder).length) delete responses[qid];
+    if (!Object.keys(metaByResponder).length) delete meta[qid];
+  });
+  const watermark = Number(net.questionResponsesLatestBlock) || 0;
+  const rewound = Math.min(watermark, removed ? floorBlock : endBlock);
+  if (rewound !== watermark) net.questionResponsesLatestBlock = rewound;
+  return removed || rewound !== watermark;
+};
+
+const pruneUserQuestionResponsesAfterBlock = (cache: unknown, networkID: string, endBlock: number): boolean => {
+  let changed = false;
+  Object.values(toRecord(cache)).forEach((byNetwork) => {
+    const data = toRecord(toRecord(toRecord(byNetwork)[networkID]).data);
+    if (!Array.isArray(data.questionResponses)) return;
+    const kept = data.questionResponses.filter((row) => toResponseRecencyPair(row).bn <= endBlock);
+    if (kept.length === data.questionResponses.length) return;
+    data.questionResponses = kept;
+    changed = true;
+  });
+  return changed;
+};
+
 export const createSessionResponseHydrationController = (
   host: SessionResponseHydrationHost,
 ): SessionResponseHydrationControllerRuntime => {
@@ -507,6 +550,7 @@ export const createSessionResponseHydrationController = (
   let _responseInitPending: Record<string, ResponseInitOptions | undefined> = {};
   const completedWorkerRuns = new Set<string>();
   let _destroyed: boolean = false;
+  const readiness = createCacheReadinessOwner();
   let _continuationTimers: ReturnType<typeof setTimeout>[] = [];
 
   const setState = (updater: SetStateArg, cb?: () => void): void => {
@@ -537,6 +581,30 @@ export const createSessionResponseHydrationController = (
   };
   const getSessionChainId = (slug: string): string | number | null | undefined =>
     typeof host.getSessionChainId === 'function' ? host.getSessionChainId(slug) : null;
+  const pruneCachedResponsesAfterBlock = async (
+    slug: string,
+    networkID: string,
+    endBlock: number,
+    floorBlock: number,
+  ): Promise<void> => {
+    // dgRead returns copies: pruning one first leaves an unchanged cache unwritten.
+    if (pruneQuestionResponsesAfterBlock(toRecord(dgRead('questionsCache', slug))[networkID], endBlock, floorBlock)) {
+      const persisted = await host.updateQuestionsCacheAtomic(slug, (current) => {
+        const next = current || {};
+        pruneQuestionResponsesAfterBlock(next[networkID], endBlock, floorBlock);
+        return next;
+      });
+      if (!persisted) throw new ResponseCachePersistenceError(`Failed to persist questions cache for ${slug}`);
+    }
+    if (pruneUserQuestionResponsesAfterBlock(dgRead('userCache', slug), networkID, endBlock)) {
+      const persisted = await host.updateUserCacheAtomic(slug, (current) => {
+        const next = current || {};
+        pruneUserQuestionResponsesAfterBlock(next, networkID, endBlock);
+        return next;
+      });
+      if (!persisted) throw new ResponseCachePersistenceError(`Failed to persist user cache for ${slug}`);
+    }
+  };
   const getAccount = (): string | null | undefined => (typeof host.getAccount === 'function' ? host.getAccount() : '');
   const getProviderLike = (): unknown => {
     if (typeof host.getProviderLike === 'function') return host.getProviderLike();
@@ -600,10 +668,13 @@ export const createSessionResponseHydrationController = (
     const slug = normalizeSessionSlug(slugIn || '');
     const suppressUiState = !!(opts && opts.background === true);
     const forceArweaveFetch = !!(opts && opts.forceArweaveFetch === true);
+    const forceFull = opts.forceFull === true;
     const notifyOnCompletion = !!(opts && opts.notifyOnCompletion === true);
     const sessionConfig = getSessionCfg(slug);
     const workerRun = resolveWorkerResponseHydrationRun({ sessionConfig, sessionSlug: slug, reader: getAccount() });
     const initRunKey = workerRun?.key || slug;
+    if (!suppressUiState) readiness.claim(initRunKey);
+    const ownsReadiness = (): boolean => !suppressUiState && isMounted() && readiness.allows(initRunKey);
     const rerunOpts: ResponseInitOptions = {
       ...(opts && typeof opts === 'object' ? opts : {}),
       background: suppressUiState,
@@ -611,16 +682,14 @@ export const createSessionResponseHydrationController = (
       notifyOnCompletion,
     };
     const setResponseState = (nextState: SetStateArg, cb?: () => void): void => {
-      if (suppressUiState || !isMounted()) return;
-      setState(nextState, cb);
+      if (ownsReadiness()) setState(nextState, cb);
     };
     const notifyBackgroundCompletion = (): void => {
       if (!suppressUiState || !notifyOnCompletion) return;
       queueLocalRevisionUpdate({ needsQuestionResponsesNonce: true });
     };
     const maybeCheckAllCachesReady = (): void => {
-      if (suppressUiState) return;
-      checkAllCachesReady();
+      if (ownsReadiness()) checkAllCachesReady();
     };
     _responseInitInFlight = _responseInitInFlight || {};
     _responseInitPending = _responseInitPending || {};
@@ -633,13 +702,21 @@ export const createSessionResponseHydrationController = (
       try {
         return await run;
       } finally {
+        // A superseded load publishes no readiness, but its answers are cached for
+        // whatever reads that session, such as the demo page's second source.
+        if (!suppressUiState && !readiness.allows(initRunKey)) {
+          queueLocalRevisionUpdate({ needsQuestionResponsesNonce: true });
+        }
         delete _responseInitInFlight[initRunKey];
         if (_responseInitPending[initRunKey]) {
           const pendingOpts = _responseInitPending[initRunKey];
           delete _responseInitPending[initRunKey];
           const continuationTimer = setTimeout(() => {
             if (_destroyed || !isMounted()) return;
-            void fetchQuestionResponsesChunkedForGroup(slug, pendingOpts || rerunOpts).catch((error: unknown) => {
+            const queued = pendingOpts || rerunOpts;
+            // A rerun must not take readiness back from a newer load.
+            const nextOpts = readiness.allows(initRunKey) ? queued : { ...queued, background: true };
+            void fetchQuestionResponsesChunkedForGroup(slug, nextOpts).catch((error: unknown) => {
               mainSiteLog.warn(error);
             });
           }, 0);
@@ -757,6 +834,10 @@ export const createSessionResponseHydrationController = (
         return;
       }
       const initialLastBlockQR = Math.max(0, baseFrom - 1);
+      // Merges only add, so answers cached under a later end block would stay in
+      // Results once it is lowered. Only an explicit end prunes, never the chain head.
+      const endBlock = normalizeBlockLimitsForConfig(sessionConfig?.blockLimits, baseFrom)?.end;
+      if (endBlock != null) await pruneCachedResponsesAfterBlock(slug, networkID, endBlock, initialLastBlockQR);
 
       let questionsCache = (dgRead('questionsCache', slug) || {}) as QuestionCache;
       // Migration: numeric -> string key
@@ -785,7 +866,10 @@ export const createSessionResponseHydrationController = (
       let lastProcessedQRBlock =
         Number((questionsCache[networkID] as QuestionCacheNetworkNode).questionResponsesLatestBlock) || 0;
       const floorBlock = initialLastBlockQR;
-      if (lastProcessedQRBlock < floorBlock) lastProcessedQRBlock = floorBlock;
+      if (forceFull || lastProcessedQRBlock < floorBlock) lastProcessedQRBlock = floorBlock;
+      if (forceFull) {
+        (questionsCache[networkID] as QuestionCacheNetworkNode).questionResponsesLatestBlock = floorBlock;
+      }
 
       const latestBlock = baseTo;
       const responseScanMaxBlockRange = readSessionScanMaxBlockRange(DEFAULT_SESSION_SCAN_MAX_BLOCK_RANGE);
@@ -990,10 +1074,14 @@ export const createSessionResponseHydrationController = (
         );
         mergeQuestionArweaveCacheBranches(mergedNet, pendingNet);
         mergeResponseMapsByRecency(mergedNet, pendingNet);
-        mergedNet.questionResponsesLatestBlock = Math.max(
-          Number(pendingNet.questionResponsesLatestBlock || 0),
-          Number(freshNet.questionResponsesLatestBlock || 0),
-        );
+        // A forced rescan owns its completion watermark; an older high value
+        // cannot hide retryable payload failures found during that rescan.
+        mergedNet.questionResponsesLatestBlock = forceFull
+          ? Number(pendingNet.questionResponsesLatestBlock || 0)
+          : Math.max(
+              Number(pendingNet.questionResponsesLatestBlock || 0),
+              Number(freshNet.questionResponsesLatestBlock || 0),
+            );
         fresh[networkID] = mergedNet;
         Object.keys(pending).forEach((netKey) => {
           if (!Object.prototype.hasOwnProperty.call(fresh, netKey)) fresh[netKey] = pending[netKey];
@@ -1678,7 +1766,9 @@ export const createSessionResponseHydrationController = (
         responder: responderLower,
         questionCount: normalizedQids.length,
       });
-      setState({ isResponsesCacheReady: false });
+      // Refreshing another session's answers leaves the current load's readiness alone.
+      const ownsReadiness = (): boolean => readiness.allows(slug);
+      if (ownsReadiness()) setState({ isResponsesCacheReady: false });
 
       const networkID = String(getSessionChainId(slug) || '');
       const { fromBlock: baseFrom } = await responseHydrationContractScripts.getRelevantBlockWindowForFilter(
@@ -1794,10 +1884,12 @@ export const createSessionResponseHydrationController = (
         }
       }
 
-      setState((prev) => ({
-        isQuestionCacheReady: updatedAny ? true : prev.isQuestionCacheReady,
-        isResponsesCacheReady: true,
-      }));
+      if (ownsReadiness()) {
+        setState((prev) => ({
+          isQuestionCacheReady: updatedAny ? true : prev.isQuestionCacheReady,
+          isResponsesCacheReady: true,
+        }));
+      }
       queueLocalRevisionUpdate({
         needsQuestionResponsesNonce: true,
         checkAllCachesReady: true,
@@ -1817,7 +1909,7 @@ export const createSessionResponseHydrationController = (
     });
     // No wallet network required; we use group-aware read providers internally.
     setReadinessStateIfChanged({ isQuestionCacheReady: false, isResponsesCacheReady: false });
-    await fetchQuestionResponsesChunkedForGroup(slug);
+    await fetchQuestionResponsesChunkedForGroup(slug, { forceFull });
     checkAllCachesReady();
     mainSiteLog.log('refreshQuestionResponses() - done');
   };

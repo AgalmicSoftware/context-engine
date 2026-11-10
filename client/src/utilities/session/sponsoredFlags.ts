@@ -31,7 +31,6 @@ const createEmptySponsoredFieldSnapshot = (): SponsoredFieldSnapshot =>
   }) as SponsoredFieldSnapshot;
 
 export const normalizeSponsoredFieldSnapshot = (value: LooseRecord = {}): SponsoredFieldSnapshot => {
-  const source = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
   return (Object.values(SPONSORED_FIELD_KEYS) as SponsoredFieldKey[]).reduce((acc, fieldKey) => {
     acc[fieldKey] = toStr(value?.[fieldKey]).trim() === '1' ? '1' : '0';
     return acc;

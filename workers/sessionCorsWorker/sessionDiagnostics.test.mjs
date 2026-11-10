@@ -77,7 +77,7 @@ const fixture = async () => {
   const authority = await named('session-config:fixture');
   authority.store.set('session-config-authority', { schemaVersion: 1, slug: 'fixture', revision: 1, config, projectionPending: false });
   const receipt = (responder, requestId, operation = 'reserve', extra = {}) => coordinateResponseUploadReceipt({
-    env, slug: 'fixture', responder, operation, payload: { requestId, payloadDigest: 'a'.repeat(64), ...extra },
+    env, slug: 'fixture', responder, operation, payload: { requestId, payloadDigest: 'a'.repeat(64), storageId: ref.id, createdAt: new Date(now).toISOString(), ...extra },
   });
   const status = (payload = { sub: ADMIN, sessionId: SESSION_ID, authzEpoch: 0 }, cursor = '', authenticated = true) => dispatchAdminResultsAnalysisStatusRequest({
     request: new Request(`https://worker.example/admin/diagnostics?sessionSlug=fixture${cursor ? `&cursor=${cursor}` : ''}`),

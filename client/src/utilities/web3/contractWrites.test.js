@@ -1,5 +1,6 @@
 import { ethers } from 'ethers';
 import { resolveTxGasOverrides, sendContractWriteViaProvider } from './contractWrites.js';
+import { notifyUserFacingTransactionError } from './errorClassifiers.js';
 
 const mockRpcLog = jest.fn();
 jest.mock('../logging.js', () => ({
@@ -9,6 +10,11 @@ jest.mock('../logging.js', () => ({
     log: category === 'rpc' ? (...args) => mockRpcLog(...args) : jest.fn(),
     warn: jest.fn(),
   }),
+}));
+
+const mockNotifyError = jest.fn();
+jest.mock('../ui/notify.js', () => ({
+  notify: { error: (...args) => mockNotifyError(...args) },
 }));
 
 describe('contractWrites gas override fallbacks', () => {
@@ -63,6 +69,7 @@ describe('contractWrites gas override fallbacks', () => {
     };
 
     const result = await sendContractWriteViaProvider({
+      expectedChainId: 11155420,
       signingProvider,
       ethersProvider,
       signer,
@@ -132,6 +139,7 @@ describe('contractWrites gas override fallbacks', () => {
     });
 
     const result = await sendContractWriteViaProvider({
+      expectedChainId: 11155420,
       signingProvider,
       ethersProvider,
       signer,
@@ -175,6 +183,7 @@ describe('contractWrites gas override fallbacks', () => {
 
     await expect(
       sendContractWriteViaProvider({
+        expectedChainId: 11155420,
         signingProvider,
         ethersProvider,
         signer,
@@ -221,6 +230,7 @@ describe('contractWrites gas override fallbacks', () => {
 
     await expect(
       sendContractWriteViaProvider({
+        expectedChainId: 11155420,
         signingProvider,
         ethersProvider,
         signer,
@@ -265,6 +275,7 @@ describe('contractWrites gas override fallbacks', () => {
 
     await expect(
       sendContractWriteViaProvider({
+        expectedChainId: 11155420,
         signingProvider,
         ethersProvider,
         signer,
@@ -312,11 +323,73 @@ describe('raw contract write target checks', () => {
     expect(options.signingProvider.request).not.toHaveBeenCalled();
   });
 
+  it.each([undefined, null, '', 0, -1, 1.5, 'bad'])(
+    'rejects a missing or invalid session chain before wallet interaction: %s',
+    async (chainId) => {
+      const options = { ...makeOptions(), expectedChainId: chainId };
+      await expect(sendContractWriteViaProvider(options)).rejects.toThrow(/chain|network/i);
+      expect(options.ethersProvider.getNetwork).not.toHaveBeenCalled();
+      expect(options.ethersProvider.getCode).not.toHaveBeenCalled();
+      expect(options.signer.getAddress).not.toHaveBeenCalled();
+      expect(options.signingProvider.request).not.toHaveBeenCalled();
+    },
+  );
+
   it('rejects a different chain before broadcasting', async () => {
     const options = makeOptions();
     options.ethersProvider.send.mockResolvedValue('0x2105');
     await expect(sendContractWriteViaProvider(options)).rejects.toThrow(/chain|network/i);
     expect(options.signingProvider.request).not.toHaveBeenCalled();
+  });
+
+  it('never broadcasts from an account other than the one that started the write', async () => {
+    const started = '0x00000000000000000000000000000000000000cc';
+    const switched = { ...makeOptions(), expectedFrom: started };
+    await expect(sendContractWriteViaProvider(switched)).rejects.toThrow(
+      `The wallet switched accounts, so the transaction was not sent. Switch back to ${started} and try again.`,
+    );
+    expect(switched.signingProvider.request).not.toHaveBeenCalled();
+
+    const sameAccount = { ...makeOptions(), expectedFrom: from.toUpperCase().replace('0X', '0x') };
+    await expect(sendContractWriteViaProvider(sameAccount)).resolves.toEqual(
+      expect.objectContaining({ txHash: '0xtxhash' }),
+    );
+    expect(sameAccount.signingProvider.request).toHaveBeenCalledWith(
+      expect.objectContaining({ params: [expect.objectContaining({ from })] }),
+    );
+  });
+
+  it('keeps the hash and never reports a revert when the receipt cannot be read', async () => {
+    const options = makeOptions();
+    const readFailure = new Error('receipt read timed out');
+    options.ethersProvider.waitForTransaction.mockRejectedValue(readFailure);
+
+    const error = await sendContractWriteViaProvider(options).catch((caught) => caught);
+
+    expect(error).toMatchObject({
+      message: 'The transaction was sent, but its result could not be confirmed. Check your wallet before retrying.',
+      txHash: '0xtxhash',
+      receiptUnknown: true,
+      cause: readFailure,
+    });
+    notifyUserFacingTransactionError(error);
+    expect(mockNotifyError).toHaveBeenLastCalledWith(error.message);
+    notifyUserFacingTransactionError(new Error('execution reverted'));
+    expect(mockNotifyError).toHaveBeenLastCalledWith('Transaction failed: execution reverted');
+  });
+
+  it('keeps the hash but not the provider error for a sensitive write whose receipt cannot be read', async () => {
+    const options = { ...makeOptions(), sensitiveArgs: true, revertMessage: 'claim transaction reverted on-chain.' };
+    options.ethersProvider.waitForTransaction.mockRejectedValue(new Error('provider echoed receipt-secret-sentinel'));
+
+    const error = await sendContractWriteViaProvider(options).catch((caught) => caught);
+
+    expect(error).toMatchObject({
+      message: 'The transaction was sent, but its result could not be confirmed. Check your wallet before retrying.',
+      txHash: '0xtxhash',
+      receiptUnknown: true,
+    });
+    expect(error.cause).toBeUndefined();
   });
 
   it.each([{ status: undefined, to }, { status: 1, to: from }, { status: 1 }])(

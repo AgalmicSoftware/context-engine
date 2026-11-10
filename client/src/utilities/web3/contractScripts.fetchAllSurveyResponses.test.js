@@ -57,6 +57,14 @@ const QUESTION_ID = ethers.utils.id('fetch-all-survey-question');
 const RESPONSES_SUBMITTED_IFACE = new ethers.utils.Interface([
   'event ResponsesSubmitted(address indexed responder,bytes32[] questionIds,bytes32 indexed surveyId)',
 ]);
+const SURVEY_ADDED_IFACE = new ethers.utils.Interface(require('../../contractsABI/SURVEYS_ABI.json'));
+const makeSurveyAddedLog = (surveyId, blockNumber) => ({
+  ...SURVEY_ADDED_IFACE.encodeEventLog(SURVEY_ADDED_IFACE.getEvent('SurveyAdded'), [
+    '0x00000000000000000000000000000000000000aa',
+    surveyId,
+  ]),
+  blockNumber,
+});
 
 const makeResponsesSubmittedLog = (responder, blockNumber, logIndex = 0, transactionIndex = 0) => {
   const encoded = RESPONSES_SUBMITTED_IFACE.encodeEventLog(RESPONSES_SUBMITTED_IFACE.getEvent('ResponsesSubmitted'), [
@@ -162,7 +170,7 @@ describe('isRetryableSurveyResponseReadError', () => {
   });
 });
 
-describe('contractScripts.fetchAllSurveyResponses', () => {
+describe('contractScripts survey event reads', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockFetchLogsSmartWithProvider.mockReset();
@@ -175,6 +183,7 @@ describe('contractScripts.fetchAllSurveyResponses', () => {
       return {
         address: GROUP_CFG.contracts.surveys.address,
         filters: {
+          SurveyAdded: jest.fn(() => ({ address: GROUP_CFG.contracts.surveys.address })),
           ResponsesSubmitted: jest.fn((_responder, _questionIds, surveyId) => ({
             address: GROUP_CFG.contracts.surveys.address,
             topics: ['0xtopic', surveyId],
@@ -195,6 +204,153 @@ describe('contractScripts.fetchAllSurveyResponses', () => {
   afterEach(() => {
     jest.restoreAllMocks();
   });
+
+  it('keeps the raw creation block from an ABI-encoded SurveyAdded event', async () => {
+    mockFetchLogsSmartWithProvider.mockResolvedValue([makeSurveyAddedLog(SURVEY_ID, 5)]);
+    await expect(contractScripts.fetchUserSubmittedSurveyIDs('none', 1, 30, GROUP_CFG)).resolves.toEqual([
+      { surveyId: SURVEY_ID, creationBlock: 5 },
+    ]);
+  });
+
+  it('keeps the earliest creation block when survey logs repeat out of order', async () => {
+    mockFetchLogsSmartWithProvider.mockResolvedValue([
+      makeSurveyAddedLog(SURVEY_ID, 9),
+      makeSurveyAddedLog(SURVEY_ID, 5),
+      makeSurveyAddedLog(SURVEY_ID, 7),
+    ]);
+    await expect(contractScripts.fetchUserSubmittedSurveyIDs('none', 1, 30, GROUP_CFG)).resolves.toEqual([
+      { surveyId: SURVEY_ID, creationBlock: 5 },
+    ]);
+  });
+
+  it.each(['survey', 'question'])(
+    'reads later-edited %s answers at the end, unchanged ones at a proven block',
+    async (kind) => {
+      const edited = '0x00000000000000000000000000000000000000aa';
+      const unchanged = '0x00000000000000000000000000000000000000bb';
+      const cfg = { ...GROUP_CFG, blockLimits: { start: 1, end: 20 } };
+      contractScripts.getRelevantBlockWindowForFilter.mockResolvedValue({ fromBlock: 1, toBlock: 20 });
+      const head = jest.spyOn(contractScripts, 'getLatestBlockNumber').mockResolvedValue(100);
+      mockFetchLogsSmartWithProvider.mockImplementation(async (_provider, _filter, from) =>
+        from > 20
+          ? [makeResponsesSubmittedLog(edited, 25)]
+          : [makeResponsesSubmittedLog(edited, 15), makeResponsesSubmittedLog(unchanged, 16)],
+      );
+      const read = jest
+        .spyOn(contractScripts, kind === 'survey' ? 'getSurveyResponse' : 'getResponse')
+        .mockImplementation(async (_p, responder, _id, _cfg, options) => ({
+          answer: responder === edited && options.blockTag !== 20 ? 'Disagree' : 'Agree',
+        }));
+      const scan = async (config) => {
+        if (kind === 'survey')
+          return (await contractScripts.fetchAllSurveyResponses('none', SURVEY_ID, 1, 'latest', config)).responses;
+        const partial = jest.fn();
+        await contractScripts.getQuestionResponsesChunkedWithCallback('none', 1, 'latest', null, partial, config);
+        return partial.mock.calls[0][0][QUESTION_ID];
+      };
+      const rows = await scan(cfg);
+      expect(rows).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ responder: edited, blockNumber: 15, response: { answer: 'Agree' } }),
+          expect.objectContaining({ responder: unchanged, response: { answer: 'Agree' } }),
+        ]),
+      );
+      expect(read.mock.calls.find((call) => call[1] === edited)[4].blockTag).toBe(20);
+      // Never latest, which could return an edit made after the scan: a few blocks below the scanned head.
+      expect(read.mock.calls.find((call) => call[1] === unchanged)[4].blockTag).toBe(84);
+      expect(mockFetchLogsSmartWithProvider).toHaveBeenCalledTimes(2);
+      read.mockClear();
+      mockFetchLogsSmartWithProvider.mockClear();
+      head.mockClear();
+      contractScripts.getRelevantBlockWindowForFilter.mockResolvedValue({ fromBlock: 1, toBlock: 30 });
+      mockFetchLogsSmartWithProvider.mockResolvedValue([makeResponsesSubmittedLog(edited, 25)]);
+      expect((await scan(GROUP_CFG))[0]).toMatchObject({ blockNumber: 25, response: { answer: 'Disagree' } });
+      expect(mockFetchLogsSmartWithProvider).toHaveBeenCalledTimes(1);
+      expect(head).not.toHaveBeenCalled();
+    },
+  );
+
+  it('bounds reads when the chain has just reached the end block, and stays open before it', async () => {
+    const cfg = { ...GROUP_CFG, blockLimits: { start: 1, end: 20 } };
+    const head = jest.spyOn(contractScripts, 'getLatestBlockNumber').mockResolvedValue(20);
+    mockFetchLogsSmartWithProvider.mockClear();
+    await expect(contractScripts.getBoundedResponseReadWindow(cfg, { _resolvedCfg: cfg })).resolves.toEqual({
+      blockTag: 20,
+      laterPairs: new Set(),
+      unchangedBlockTag: 20,
+    });
+    expect(mockFetchLogsSmartWithProvider).not.toHaveBeenCalled();
+    head.mockResolvedValue(19);
+    await expect(contractScripts.getBoundedResponseReadWindow(cfg, { _resolvedCfg: cfg })).resolves.toBeNull();
+    // Close to the end the proven block never falls below it.
+    head.mockResolvedValue(25);
+    mockFetchLogsSmartWithProvider.mockResolvedValue([]);
+    await expect(contractScripts.getBoundedResponseReadWindow(cfg, { _resolvedCfg: cfg })).resolves.toMatchObject({
+      unchangedBlockTag: 20,
+    });
+  });
+
+  it.each(['survey', 'question'])(
+    'reports an unavailable historical %s answer without a later payload',
+    async (kind) => {
+      const responder = '0x00000000000000000000000000000000000000aa';
+      const cfg = { ...GROUP_CFG, blockLimits: { start: 1, end: 20 } };
+      contractScripts.getRelevantBlockWindowForFilter.mockResolvedValue({ fromBlock: 1, toBlock: 20 });
+      jest.spyOn(contractScripts, 'getLatestBlockNumber').mockResolvedValue(30);
+      mockFetchLogsSmartWithProvider.mockImplementation(async (_p, _f, from) => [
+        makeResponsesSubmittedLog(responder, from > 20 ? 25 : 15),
+      ]);
+      jest
+        .spyOn(contractScripts, kind === 'survey' ? 'getSurveyResponse' : 'getResponse')
+        .mockImplementation(async (_p, _r, _id, _cfg, options) => {
+          if (options.blockTag === 20) {
+            throw makeResponseReadError('missing trie node', { code: 'RESPONSE_HISTORY_UNAVAILABLE' });
+          }
+          return { answer: 'Disagree' };
+        });
+      const partial = jest.fn();
+      const result =
+        kind === 'survey'
+          ? await contractScripts.fetchAllSurveyResponses('none', SURVEY_ID, 1, 'latest', cfg)
+          : await contractScripts.getQuestionResponsesChunkedWithCallback('none', 1, 'latest', null, partial, cfg);
+      expect(result).toMatchObject({
+        hadPartialFailure: true,
+        lowestFailedBlock: 15,
+        failedResponses: [
+          expect.objectContaining({ responder, blockTag: 20, reason: expect.stringContaining('missing trie node') }),
+        ],
+      });
+      if (kind === 'survey') expect(result.responses).toEqual([]);
+      else expect(partial).toHaveBeenCalledWith({}, 14);
+    },
+  );
+
+  it.each(['survey', 'question'])(
+    'lets a bad %s payload in an ended session go instead of rescanning for it on every load',
+    async (kind) => {
+      const responder = '0x00000000000000000000000000000000000000aa';
+      const cfg = { ...GROUP_CFG, blockLimits: { start: 1, end: 20 } };
+      contractScripts.getRelevantBlockWindowForFilter.mockResolvedValue({ fromBlock: 1, toBlock: 20 });
+      jest.spyOn(contractScripts, 'getLatestBlockNumber').mockResolvedValue(100);
+      mockFetchLogsSmartWithProvider.mockImplementation(async (_p, _f, from) =>
+        from > 20 ? [] : [makeResponsesSubmittedLog(responder, 15)],
+      );
+      jest
+        .spyOn(contractScripts, kind === 'survey' ? 'getSurveyResponse' : 'getResponse')
+        .mockImplementation(async () => {
+          throw makeResponseReadError('Invalid response JSON for tx bad-payload', {
+            arweaveFailure: { retryable: false, state: 'terminal_invalid', kind: 'invalid' },
+          });
+        });
+      const partial = jest.fn();
+      const result =
+        kind === 'survey'
+          ? await contractScripts.fetchAllSurveyResponses('none', SURVEY_ID, 1, 'latest', cfg)
+          : await contractScripts.getQuestionResponsesChunkedWithCallback('none', 1, 'latest', null, partial, cfg);
+      expect(result).toMatchObject({ hadPartialFailure: false, lowestFailedBlock: null });
+      if (kind === 'question') expect(partial).toHaveBeenCalledWith({}, 20);
+    },
+  );
 
   it('returns successful responses without a partial-failure signal when all reads succeed', async () => {
     const responderA = '0x00000000000000000000000000000000000000aa';
@@ -265,6 +421,53 @@ describe('contractScripts.fetchAllSurveyResponses', () => {
         logIndex: 3,
       }),
     ]);
+  });
+
+  it('holds the question-response watermark before the earliest retryable payload failure', async () => {
+    const responderA = '0x00000000000000000000000000000000000000aa';
+    const responderB = '0x00000000000000000000000000000000000000bb';
+    mockFetchLogsSmartWithProvider.mockResolvedValue([
+      makeResponsesSubmittedLog(responderA, 9),
+      makeResponsesSubmittedLog(responderB, 7),
+    ]);
+    let available = false;
+    const getResponseSpy = jest
+      .spyOn(contractScripts, 'getResponse')
+      .mockImplementation(async (_provider, _responder, _question, _session, options) => {
+        if (available) return { answer: 'recovered' };
+        if (options?.throwOnError) throw makeResponseReadError('Service unavailable', { status: 503 });
+        return null;
+      });
+    const onPartialData = jest.fn();
+    await contractScripts.getQuestionResponsesChunkedWithCallback('none', 1, 30, null, onPartialData, GROUP_CFG);
+    expect(onPartialData).toHaveBeenLastCalledWith({}, 6);
+    expect(getResponseSpy.mock.calls.every((call) => call[4].throwOnError === true)).toBe(true);
+
+    available = true;
+    await contractScripts.getQuestionResponsesChunkedWithCallback('none', 7, 30, null, onPartialData, GROUP_CFG);
+    expect(onPartialData).toHaveBeenLastCalledWith(
+      {
+        [QUESTION_ID.toLowerCase()]: expect.arrayContaining([
+          expect.objectContaining({ responder: responderB, response: { answer: 'recovered' } }),
+        ]),
+      },
+      30,
+    );
+  });
+
+  it('does not hold the question-response watermark for an invalid payload', async () => {
+    const responder = '0x00000000000000000000000000000000000000aa';
+    mockFetchLogsSmartWithProvider.mockResolvedValue([makeResponsesSubmittedLog(responder, 7)]);
+    jest.spyOn(contractScripts, 'getResponse').mockRejectedValue(
+      makeResponseReadError('Invalid response JSON', {
+        retryable: false,
+        state: 'terminal_invalid',
+        kind: 'invalid',
+      }),
+    );
+    const onPartialData = jest.fn();
+    await contractScripts.getQuestionResponsesChunkedWithCallback('none', 1, 30, null, onPartialData, GROUP_CFG);
+    expect(onPartialData).toHaveBeenLastCalledWith({}, 30);
   });
 
   it('threads forced Arweave recovery into chunked question response reads', async () => {

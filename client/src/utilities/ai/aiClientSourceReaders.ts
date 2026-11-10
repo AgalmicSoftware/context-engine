@@ -26,40 +26,40 @@ export const extractMainContent = (htmlString: unknown): string => {
     .trim();
 };
 
-export const readFileContent = (file: File): Promise<unknown> =>
-  new Promise((resolve, reject) => {
+export type SourceExtractionOutcome =
+  { status: 'text'; text: string } | { status: 'unsupported' | 'failed'; reason: string };
+
+export const readFileContent = (file: File): Promise<SourceExtractionOutcome> =>
+  new Promise((resolve) => {
     const name = file.name.toLowerCase();
-    // Basic text-like extensions
+    const isBinary = /\.(pdf|ppt|pptx|doc|docx|xls|xlsx)$/.test(name);
     const isText =
-      name.endsWith('.txt') ||
-      name.endsWith('.md') ||
-      name.endsWith('.csv') ||
-      name.endsWith('.json') ||
-      name.endsWith('.xml') ||
-      file.type.startsWith('text/');
-
-    // Known binaries that we explicitly don't parse client-side yet
-    const isBinary =
-      name.endsWith('.pdf') ||
-      name.endsWith('.ppt') ||
-      name.endsWith('.pptx') ||
-      name.endsWith('.doc') ||
-      name.endsWith('.docx') ||
-      name.endsWith('.xls') ||
-      name.endsWith('.xlsx');
-
-    if (isBinary) {
-      resolve(`[Binary content parsing not currently supported client-side for file: ${file.name}]`);
+      /\.(txt|md|csv|json|xml|html?)$/.test(name) || file.type.startsWith('text/') || file.type === 'application/json';
+    if (isBinary || !isText) {
+      resolve({
+        status: 'unsupported',
+        reason: 'Cannot extract this file type. Paste its text or upload TXT, Markdown, CSV, or JSON.',
+      });
       return;
     }
 
-    if (!isText) {
-      // Fallback: try reading as text, but might be garbage if unknown binary.
-      // Given constraints, we attempt reading.
-    }
-
     const reader = new FileReader();
-    reader.onload = (event) => resolve(event.target?.result);
-    reader.onerror = () => reject(new Error(`Failed to read file: ${file.name}`));
-    reader.readAsText(file);
+    const failed = () =>
+      resolve({ status: 'failed', reason: `Failed to read ${file.name}. Try uploading it again or paste its text.` });
+    reader.onload = () => {
+      const raw = typeof reader.result === 'string' ? reader.result : '';
+      const text = (/\.html?$/.test(name) || file.type === 'text/html' ? extractMainContent(raw) : raw).trim();
+      resolve(
+        text
+          ? { status: 'text', text }
+          : { status: 'failed', reason: 'No text was extracted. Paste the source text instead.' },
+      );
+    };
+    reader.onerror = failed;
+    reader.onabort = failed;
+    try {
+      reader.readAsText(file);
+    } catch {
+      failed();
+    }
   });

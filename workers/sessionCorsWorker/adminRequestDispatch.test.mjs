@@ -181,6 +181,10 @@ const createAdminDeps = (overrides = {}) => {
       return { ok: true, status: 200, body: { ok: true } };
     };
   }
+  deps.preflightSessionLitProvisioning ||= async () => ({});
+  deps.beginSessionLitProvisioning ||= async () => ({ attemptId: 'fixture-attempt', checkpoint: {} });
+  deps.checkpointSessionLitProvisioning ||= async () => ({});
+  deps.releaseSessionLitProvisioning ||= async () => ({});
   if (!Object.prototype.hasOwnProperty.call(overrides, 'ensureSessionLitAuthorizationSigner')) {
     deps.ensureSessionLitAuthorizationSigner = async ({ proposedPrivateKey }) => proposedPrivateKey;
   }
@@ -2338,7 +2342,7 @@ test('opening refresh requires admin authority and respects the session switch',
     action: 'refresh-interview-opening',
   };
   const deps = createAdminDeps({
-    loadPublicInterviewQuestions: async () => [{ id: 'q1', prompt: 'An AI question' }],
+    loadPublicInterviewQuestions: async () => ({ questions: [{ id: 'q1', prompt: 'An AI question' }], incomplete: false }),
     proxyOpenAI: async () => {
       generationCalls++;
       return Response.json({ completion: 'What is your AI expertise?' });
@@ -2403,7 +2407,7 @@ test('Lit bootstrap reserves the coordinator signer before upstream calls and ke
 });
 
 test('manual Lit provisioning strips generated secret outputs and persists only public authorization metadata in config', async () => {
-  const env = { GROUP_KV: createMemoryKv(), CE_STORAGE_ENVELOPE_KEK: 'session-secrets-test-kek' };
+  const env = { LIT_ACCOUNT_API_KEY: 'fixture-management-key', GROUP_KV: createMemoryKv(), CE_STORAGE_ENVELOPE_KEK: 'session-secrets-test-kek' };
   const existingConfig = { slug: 'session-a', adminAddress: '0xabc', litCredentials: {} };
   await putSessionConfig(env, 'session-a', existingConfig);
   const privateKey = `0x${'12'.repeat(32)}`;
@@ -2426,4 +2430,78 @@ test('manual Lit provisioning strips generated secret outputs and persists only 
   assert.deepEqual((await getSessionConfig(env, 'session-a')).litCredentials, credentials);
   assert.equal((await getSessionSecrets(env, 'session-a')).litAuthorizationPrivateKey, privateKey);
   assert.equal((await getSessionSecrets(env, 'session-a')).litUsageApiKey, 'fresh-key');
+});
+
+test('the admin Lit route resumes only its reserved checkpoint and releases failures without exposing keys', async () => {
+  const checkpoint = { litAccountApiKey: 'private-recovery-key', litGroupId: '7' };
+  let released = 0;
+  let saved = 0;
+  const result = await dispatchAdminRequest({
+    request: { json: async () => createSignedBody() }, env: { GROUP_KV: {} }, baseHeaders: {}, slug: '', action: 'lit-chipotle-bootstrap-session',
+    deps: createAdminDeps({
+      resolveAdminRequestAuthority: async () => ({ ok: true, existingConfig: { adminAddress: '0xabc' }, headers: {}, targetSlug: 'session-a' }),
+      getSessionSecrets: async () => ({}),
+      beginSessionLitProvisioning: async () => ({ attemptId: 'reserved', checkpoint }),
+      checkpointSessionLitProvisioning: async args => { assert.equal(args.attemptId, 'reserved'); saved++; },
+      bootstrapLitChipotleSession: async options => {
+        assert.deepEqual(options.provisioning, checkpoint);
+        await options.checkpointProvisioning({ ...checkpoint, litPkpId: 'wallet' });
+        throw new Error('upstream echoed private-recovery-key');
+      },
+      releaseSessionLitProvisioning: async args => { assert.equal(args.attemptId, 'reserved'); released++; },
+    }),
+  });
+  assert.equal(result.status, 502);
+  assert.equal(saved, 1);
+  assert.equal(released, 1);
+  assert.ok(!JSON.stringify(result).includes('private-recovery-key'));
+});
+
+test('Lit setup reports credential conflicts with safe actionable text', async () => {
+  const result = await dispatchAdminRequest({
+    request: { json: async () => createSignedBody() }, env: { GROUP_KV: {} }, baseHeaders: {}, slug: '', action: 'lit-chipotle-bootstrap-session',
+    deps: createAdminDeps({
+      resolveAdminRequestAuthority: async () => ({ ok: true, existingConfig: { adminAddress: '0xabc' }, headers: {}, targetSlug: 'session-a' }),
+      bootstrapLitChipotleSession: async () => { throw Object.assign(new Error('secret must not escape'), { status: 409, code: 'lit_provisioning_credentials_conflict' }); },
+    }),
+  });
+  assert.equal(result.status, 409);
+  assert.match(result.body.error, /conflict with saved setup/);
+  assert.ok(!result.body.error.includes('secret must not escape'));
+});
+
+
+test('the Lit admin route checks supplied keys before beginning an attempt', async () => {
+  let began = 0;
+  const result = await dispatchAdminRequest({
+    request: { json: async () => createSignedBody({ litAccountApiKey: 'wrong-private-key' }) }, env: { GROUP_KV: {} },
+    baseHeaders: {}, slug: '', action: 'lit-chipotle-bootstrap-session',
+    deps: createAdminDeps({
+      resolveAdminRequestAuthority: async () => ({ ok: true, existingConfig: { adminAddress: '0xabc' }, headers: {}, targetSlug: 'session-a' }),
+      getSessionSecrets: async () => ({}),
+      preflightSessionLitProvisioning: async args => {
+        assert.ok(args.accountApiKeys.includes('wrong-private-key'));
+        throw Object.assign(new Error('do not expose wrong-private-key'), { status: 409, code: 'lit_provisioning_credentials_conflict' });
+      },
+      beginSessionLitProvisioning: async () => { began++; return { attemptId: 'fixture' }; },
+      bootstrapLitChipotleSession: async () => ({ ok: true }),
+    }),
+  });
+  assert.equal(result.status, 409);
+  assert.equal(began, 0);
+  assert.ok(!JSON.stringify(result).includes('wrong-private-key'));
+});
+
+test('provisioning without a management key does not begin an attempt', async () => {
+  let began = 0;
+  const result = await dispatchAdminRequest({
+    request: { json: async () => createSignedBody() }, env: { GROUP_KV: {} }, baseHeaders: {}, slug: '', action: 'lit-chipotle-provision',
+    deps: createAdminDeps({
+      resolveAdminRequestAuthority: async () => ({ ok: true, existingConfig: { adminAddress: '0xabc' }, headers: {}, targetSlug: 'session-a' }),
+      getSessionSecrets: async () => ({}),
+      beginSessionLitProvisioning: async () => { began++; return { attemptId: 'fixture' }; },
+    }),
+  });
+  assert.equal(began, 0);
+  assert.match(result.body.error, /account API key not configured/);
 });

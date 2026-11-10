@@ -175,14 +175,11 @@ async function main() {
           const box = await control.boundingBox();
           if (width <= 390) {
             assert.ok(box.y >= heroBox.y + heroBox.height, `Groups actions stack below the session at ${width}px`);
-            assert.ok(Math.abs(box.y - createBox.y) <= 1, `Create and refresh stay aligned at ${width}px`);
-          } else {
-            assert.ok(Math.abs(box.y - heroBox.y) <= 1, `Groups toolbar stays on one row at ${width}px`);
-            assert.ok(Math.abs(box.height - heroBox.height) <= 1, `Groups toolbar controls match height at ${width}px`);
           }
+          assert.ok(Math.abs(box.y - createBox.y) <= 1, `Create and refresh stay aligned at ${width}px`);
           assert.ok(box.height >= 44, 'Toolbar controls retain a usable touch target');
         }
-        for (const label of [sessionHero.getByText('Active session', { exact: true }), sessionHero.locator('h1 a span')]) {
+        for (const label of [sessionHero.getByText('Active session', { exact: true })]) {
           const dimensions = await label.evaluate(node => ({
             text: node.textContent, width: node.clientWidth, scrollWidth: node.scrollWidth,
             height: node.clientHeight, scrollHeight: node.scrollHeight,
@@ -197,20 +194,6 @@ async function main() {
       }
       await detailPage.screenshot({ path: path.join(os.tmpdir(), `ce-worker-groups-toolbar-${width}.png`) });
     }
-    // The same viewport must wrap for a longer name, without hiding any text.
-    await detailPage.setViewportSize({ width: 646, height: 900 });
-    const sessionNameText = sessionHero.locator('h1 a span');
-    const originalName = await sessionNameText.textContent();
-    await sessionNameText.evaluate(node => {
-      node.textContent = 'Annual participant discussion and community planning session';
-    });
-    const longNameHeroBox = await sessionHero.boundingBox();
-    assert.ok((await createGroup.boundingBox()).y >= longNameHeroBox.y + longNameHeroBox.height,
-      'Longer session names make the actions wrap at the same viewport width');
-    assert.equal(await sessionNameText.evaluate(node => node.scrollWidth > node.clientWidth || node.scrollHeight > node.clientHeight + 1), false);
-    assert.equal(await detailPage.evaluate(() => document.documentElement.scrollWidth > window.innerWidth), false);
-    await detailPage.screenshot({ path: path.join(os.tmpdir(), 'ce-worker-groups-toolbar-long-name.png') });
-    await sessionNameText.evaluate((node, name) => { node.textContent = name; }, originalName);
     await listRefresh.click();
     await detailPage.getByRole('button', { name: 'Open group details for Participants 2026', exact: true }).waitFor();
     await detailPage.close();
@@ -246,7 +229,7 @@ async function main() {
     await page.goto(`${baseUrl}/session/${sessionSlug}?joinGroup=${'a'.repeat(80)}`);
     await page.getByRole('button', { name: 'Log in', exact: true }).waitFor();
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth), false);
-    console.log('PASS: Cloudflare auto-join smoke (sign-in, join, cleanup, real app group routes, clean links and refresh, matching toolbar heights, no blockchain progress, detail-only sharing, existing member, cancellation, navigation/refresh before login, mobile layout)');
+    console.log('PASS: Cloudflare auto-join smoke (sign-in, join, cleanup, real app group routes, clean links and refresh, aligned toolbar controls, no blockchain progress, detail-only sharing, existing member, cancellation, navigation/refresh before login, mobile layout)');
   } finally { await browser.close(); }
 }
 

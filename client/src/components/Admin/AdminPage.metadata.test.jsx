@@ -1,12 +1,12 @@
 /** @file AdminPage.metadata.test.jsx */
 import React, { act } from 'react';
 import { ethers } from 'ethers';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';
 
 const ADMIN_ADDRESS = '0x00000000000000000000000000000000000000aa';
 const SESSION_REGISTRY_CACHE_UPDATED_EVENT = 'ce:session-registry-cache-updated';
+const EDIT_SETTINGS_LINK_TESTID = 'ce-admin-edit-settings-link';
 
 const buildSessionConfig = (overrides = {}) => ({
   slug: 'edge',
@@ -27,13 +27,8 @@ const mockLoadSessionRegistryCache = jest.fn();
 const mockGetAllSessionEntries = jest.fn();
 const mockBuildSignedAdminActionAuth = jest.fn();
 const mockSetSessionFieldsOnChain = jest.fn();
-const mockUploadSessionMetadata = jest.fn();
-const mockUpdateSessionMetadataOnChain = jest.fn();
 const mockUpsertSessionRegistryCache = jest.fn();
-const mockReadProvider = {
-  getBlockNumber: jest.fn(),
-};
-const mockGetReadProviderForChain = jest.fn(() => mockReadProvider);
+const mockGetReadProviderForChain = jest.fn();
 
 jest.mock('../../utilities/worker/corsProxy.js', () => ({
   corsProxyUtils: {
@@ -83,8 +78,6 @@ jest.mock('../../utilities/web3/sessionRegistry.js', () => ({
   setResourceGatesOnChain: jest.fn(),
   fetchSessionFromRegistry: jest.fn(),
   upsertSessionRegistryCache: (...args) => mockUpsertSessionRegistryCache(...args),
-  uploadSessionMetadata: (...args) => mockUploadSessionMetadata(...args),
-  updateSessionMetadataOnChain: (...args) => mockUpdateSessionMetadataOnChain(...args),
   sessionRegistryUtils: {
     SESSION_REGISTRY_CACHE_UPDATED_EVENT,
     fetchSessionFromRegistry: jest.fn(),
@@ -110,12 +103,7 @@ jest.mock('../SBTs/SBTSelector', () => () => <div data-testid="mock-admin-sbt-se
 
 const AdminPage = require('./AdminPage').default;
 
-const renderAdminPage = async ({
-  account = ADMIN_ADDRESS,
-  initialSessionId,
-  initialRegistryChainId,
-  initialSessionConfig,
-} = {}) => {
+const renderAdminPage = async ({ account = ADMIN_ADDRESS, initialSessionConfig } = {}) => {
   let utils;
   await act(async () => {
     utils = render(
@@ -124,8 +112,6 @@ const renderAdminPage = async ({
         network={{ id: 84532 }}
         loginComplete={true}
         toggleLoginModal={jest.fn()}
-        initialSessionId={initialSessionId}
-        initialRegistryChainId={initialRegistryChainId}
         initialSessionConfig={initialSessionConfig}
       />,
     );
@@ -135,17 +121,14 @@ const renderAdminPage = async ({
   return utils;
 };
 
-const getFieldInputByLabel = (labelText) =>
-  screen.getByText(labelText).parentElement.querySelector('input,textarea,select');
-const clickAndSettle = async (element) => {
-  await act(async () => {
-    fireEvent.click(element);
-    await Promise.resolve();
-  });
-};
 const waitForResolvedWorkerUrl = () => screen.findByDisplayValue('https://worker.example.test');
+const openMetadataPanel = () => {
+  const metadataPanel = screen.getByText('Session metadata').closest('section');
+  fireEvent.click(within(metadataPanel).getByRole('button', { name: 'Toggle Session metadata section' }));
+  return metadataPanel;
+};
 
-describe('AdminPage metadata controls', () => {
+describe('AdminPage metadata panel', () => {
   const originalFetch = global.fetch;
   let web3ProviderSpy;
   let sessionEntries;
@@ -162,20 +145,10 @@ describe('AdminPage metadata controls', () => {
     sessionEntries = [['edge', buildSessionConfig()]];
     mockLoadSessionRegistryCache.mockResolvedValue(undefined);
     mockGetAllSessionEntries.mockImplementation(() => sessionEntries);
-    mockGetReadProviderForChain.mockImplementation(() => mockReadProvider);
-    mockReadProvider.getBlockNumber.mockResolvedValue(12345678);
     mockResolveCorsProxyUrl.mockResolvedValue({
       url: 'https://worker.example.test',
       source: 'session-config',
       status: 'ok',
-    });
-    mockUploadSessionMetadata.mockResolvedValue({
-      txId: 'metadata_tx_id',
-      metadataUri: 'ar://metadata_tx_id',
-    });
-    mockUpdateSessionMetadataOnChain.mockResolvedValue({
-      ok: true,
-      txHash: '0xmetadatahash',
     });
     mockBuildSignedAdminActionAuth.mockImplementation(async ({ action, slug }) => ({
       address: ADMIN_ADDRESS,
@@ -199,182 +172,6 @@ describe('AdminPage metadata controls', () => {
     web3ProviderSpy?.mockRestore();
   });
 
-  it('defaults metadata start block to the selected session chain and updates metadata in place', async () => {
-    mockReadProvider.getBlockNumber.mockResolvedValue(12345678);
-    sessionEntries = [
-      [
-        'edge',
-        buildSessionConfig({
-          networkChainId: 8453,
-          blockLimits: {},
-          __registry: {
-            registryChainId: 84532,
-            chainId: 84532,
-            adminAddress: ADMIN_ADDRESS,
-            metadataURI: 'ar://old-metadata',
-          },
-        }),
-      ],
-    ];
-
-    await renderAdminPage();
-    await waitForResolvedWorkerUrl();
-
-    const metadataPanel = screen.getByText('Session metadata').closest('section');
-    fireEvent.click(within(metadataPanel).getAllByRole('button')[0]);
-
-    await waitFor(() => {
-      expect(screen.getByText('Current block on Base (8453): 12,345,678')).toBeInTheDocument();
-    });
-    expect(screen.getByDisplayValue('12345678')).toBeInTheDocument();
-
-    await clickAndSettle(screen.getByRole('button', { name: 'Update metadata' }));
-
-    await waitFor(() => {
-      expect(mockUploadSessionMetadata).toHaveBeenCalledTimes(1);
-    });
-    expect(mockUploadSessionMetadata).toHaveBeenCalledWith(
-      expect.objectContaining({
-        slug: 'edge',
-        networkChainId: 8453,
-        blockLimits: {
-          start: 12345678,
-          end: null,
-        },
-      }),
-      expect.any(Object),
-    );
-    const uploadedMetadata = mockUploadSessionMetadata.mock.calls[0][0];
-    expect(uploadedMetadata.__registry).toBeUndefined();
-    expect(uploadedMetadata.sponsoredKeys).toBeUndefined();
-
-    await waitFor(() => {
-      expect(mockUpdateSessionMetadataOnChain).toHaveBeenCalledWith(
-        expect.objectContaining({
-          chainId: 84532,
-          slug: 'edge',
-          metadataURI: 'ar://metadata_tx_id',
-        }),
-      );
-      expect(screen.getByText(/Session metadata updated\./)).toBeInTheDocument();
-    });
-  });
-
-  it('updates the metadata auto-feature flag from admin', async () => {
-    mockReadProvider.getBlockNumber.mockResolvedValue(12345678);
-    sessionEntries = [
-      [
-        'edge',
-        buildSessionConfig({
-          autoFeatureSBTsWithFeaturedSbtTags: false,
-          blockLimits: {},
-          __registry: {
-            registryChainId: 84532,
-            chainId: 84532,
-            adminAddress: ADMIN_ADDRESS,
-            metadataURI: 'ar://old-metadata',
-          },
-        }),
-      ],
-    ];
-
-    await renderAdminPage();
-    await waitForResolvedWorkerUrl();
-
-    const metadataPanel = screen.getByText('Session metadata').closest('section');
-    fireEvent.click(within(metadataPanel).getAllByRole('button')[0]);
-
-    const autoFeatureToggle = await screen.findByLabelText('Auto-feature by session slug');
-    expect(autoFeatureToggle).not.toBeChecked();
-
-    fireEvent.click(autoFeatureToggle);
-    expect(autoFeatureToggle).toBeChecked();
-
-    await clickAndSettle(screen.getByRole('button', { name: 'Update metadata' }));
-
-    await waitFor(() => {
-      expect(mockUploadSessionMetadata).toHaveBeenCalledTimes(1);
-    });
-    expect(mockUploadSessionMetadata).toHaveBeenCalledWith(
-      expect.objectContaining({
-        autoFeatureSBTsBySessionSlug: true,
-      }),
-      expect.any(Object),
-    );
-    expect(mockUploadSessionMetadata.mock.calls[0][0]).not.toHaveProperty('autoFeatureSBTsWithFeaturedSbtTags');
-  });
-
-  it('prefers canonical metadata auto-feature flag over the legacy alias in admin', async () => {
-    sessionEntries = [
-      [
-        'edge',
-        buildSessionConfig({
-          autoFeatureSBTsBySessionSlug: false,
-          autoFeatureSBTsWithFeaturedSbtTags: true,
-        }),
-      ],
-    ];
-
-    await renderAdminPage();
-    await waitForResolvedWorkerUrl();
-
-    const metadataPanel = screen.getByText('Session metadata').closest('section');
-    fireEvent.click(within(metadataPanel).getAllByRole('button')[0]);
-
-    const autoFeatureToggle = await screen.findByLabelText('Auto-feature by session slug');
-    expect(autoFeatureToggle).not.toBeChecked();
-  });
-
-  it('rehydrates metadata draft when switching sessions even if previous session had unsaved edits', async () => {
-    const session1 = buildSessionConfig({
-      slug: 'session-one',
-      sessionName: 'Session One',
-      blockLimits: { start: 100 },
-      defaultTags: 'tags-for-one',
-      __registry: {
-        registryChainId: 84532,
-        chainId: 84532,
-        adminAddress: ADMIN_ADDRESS,
-        metadataURI: 'ar://meta-one',
-      },
-    });
-    const session2 = buildSessionConfig({
-      slug: 'session-two',
-      sessionName: 'Session Two',
-      blockLimits: { start: 200 },
-      defaultTags: 'tags-for-two',
-      __registry: {
-        registryChainId: 84532,
-        chainId: 84532,
-        adminAddress: ADMIN_ADDRESS,
-        metadataURI: 'ar://meta-two',
-      },
-    });
-    sessionEntries = [
-      ['session-one', session1],
-      ['session-two', session2],
-    ];
-
-    await renderAdminPage();
-
-    const sessionSelect = await screen.findByTestId(E2E_TESTIDS.ADMIN_SESSION_SELECT);
-    expect(sessionSelect).toHaveValue('session-one');
-
-    const metadataPanel = screen.getByText('Session metadata').closest('section');
-    fireEvent.click(within(metadataPanel).getByRole('button', { name: 'Toggle Session metadata section' }));
-
-    const tagsInput = getFieldInputByLabel('Default tags');
-    fireEvent.change(tagsInput, { target: { value: 'modified-tags' } });
-    expect(tagsInput).toHaveValue('modified-tags');
-
-    fireEvent.change(sessionSelect, { target: { value: 'session-two' } });
-    expect(sessionSelect).toHaveValue('session-two');
-
-    await waitFor(() => {
-      expect(getFieldInputByLabel('Default tags')).toHaveValue('tags-for-two');
-    });
-  });
-
   it('renders clickable metadata links and a raw metadata copy control', async () => {
     sessionEntries = [
       [
@@ -394,8 +191,7 @@ describe('AdminPage metadata controls', () => {
     await renderAdminPage();
     await waitForResolvedWorkerUrl();
 
-    const metadataPanel = screen.getByText('Session metadata').closest('section');
-    fireEvent.click(within(metadataPanel).getAllByRole('button')[0]);
+    const metadataPanel = openMetadataPanel();
 
     expect(within(metadataPanel).getByRole('link', { name: 'edge' })).toHaveAttribute(
       'href',
@@ -404,37 +200,28 @@ describe('AdminPage metadata controls', () => {
     expect(metadataPanel.querySelector(`a[href="/u/${encodeURIComponent(ADMIN_ADDRESS)}"]`)).not.toBeNull();
     expect(metadataPanel.querySelector('a[href*="old-metadata"]')).not.toBeNull();
     expect(within(metadataPanel).getByRole('button', { name: 'Copy raw metadata JSON' })).toBeInTheDocument();
+    // A registry session is edited on its settings page too, found through the registry.
+    expect(within(metadataPanel).getByTestId(EDIT_SETTINGS_LINK_TESTID)).toHaveAttribute(
+      'href',
+      'http://localhost/session/edge/settings',
+    );
   });
 
-  it('saves advanced metadata fields from the updated metadata payload', async () => {
-    mockReadProvider.getBlockNumber.mockResolvedValue(12345678);
+  it('warns when registry contract addresses are synthesized from chain defaults', async () => {
     sessionEntries = [
       [
         'edge',
         buildSessionConfig({
-          blockLimits: { start: 100, end: null },
-          faucet: {
-            amountEth: '0.0001',
-            balanceThresholdEth: '0.0009',
-          },
-          ai: {
-            models: {
-              fast: { provider: 'openai', model: 'gpt-4o' },
-              thinking: { provider: 'openai', model: 'gpt-4o' },
-              transcription: { provider: 'openai', model: 'whisper-1' },
-            },
-          },
           contracts: {
-            surveys: {
-              address: '0x00000000000000000000000000000000000000f1',
-              chainId: 84532,
-            },
+            surveys: { address: '0x00000000000000000000000000000000000000f1', chainId: 84532 },
           },
           __registry: {
             registryChainId: 84532,
             chainId: 84532,
             adminAddress: ADMIN_ADDRESS,
-            metadataURI: 'ar://old-metadata',
+            metadataURI: 'ar://missing-metadata',
+            metadataLoadState: 'unavailable',
+            metadataDefaultedContractKeys: ['surveys'],
           },
         }),
       ],
@@ -443,67 +230,13 @@ describe('AdminPage metadata controls', () => {
     await renderAdminPage();
     await waitForResolvedWorkerUrl();
 
-    const metadataPanel = screen.getByText('Session metadata').closest('section');
-    fireEvent.click(within(metadataPanel).getAllByRole('button')[0]);
+    const metadataPanel = openMetadataPanel();
 
-    fireEvent.change(getFieldInputByLabel('Default tags'), {
-      target: { value: 'governance, research' },
-    });
-    fireEvent.change(getFieldInputByLabel('Question generation prompt'), {
-      target: { value: 'Ask better governance questions' },
-    });
-    fireEvent.change(getFieldInputByLabel('Default filter state'), {
-      target: { value: '{"sort":"recent"}' },
-    });
-    fireEvent.change(getFieldInputByLabel('Faucet amount (ETH)'), {
-      target: { value: '0.0002' },
-    });
-    fireEvent.change(getFieldInputByLabel('Faucet threshold (ETH)'), {
-      target: { value: '0.001' },
-    });
-    fireEvent.change(getFieldInputByLabel('Thinking provider'), {
-      target: { value: 'anthropic' },
-    });
-    fireEvent.change(getFieldInputByLabel('Thinking model'), {
-      target: { value: 'claude-3-7-sonnet' },
-    });
-    fireEvent.change(getFieldInputByLabel('Highlighted question IDs'), {
-      target: { value: 'q1\nq2' },
-    });
-
-    await clickAndSettle(screen.getByRole('button', { name: 'Update metadata' }));
-
-    await waitFor(() => {
-      expect(mockUploadSessionMetadata).toHaveBeenCalledTimes(1);
-    });
-    expect(mockUploadSessionMetadata).toHaveBeenCalledWith(
-      expect.objectContaining({
-        defaultTags: 'governance, research',
-        questionsGenPrompt: 'Ask better governance questions',
-        defaultFilterState: { sort: 'recent' },
-        HIGHLIGHTED_QUESTION_IDS: ['q1', 'q2'],
-        faucet: expect.objectContaining({
-          amountEth: '0.0002',
-          balanceThresholdEth: '0.001',
-        }),
-        ai: expect.objectContaining({
-          models: expect.objectContaining({
-            thinking: expect.objectContaining({
-              provider: 'anthropic',
-              model: 'claude-3-7-sonnet',
-            }),
-          }),
-        }),
-      }),
-      expect.any(Object),
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText(/Session metadata updated\./)).toBeInTheDocument();
-    });
+    expect(within(metadataPanel).getByText(/Session metadata could not be loaded/i)).toBeInTheDocument();
+    expect(within(metadataPanel).getByText(/contracts below may be chain defaults/i)).toBeInTheDocument();
   });
 
-  it('persists registry-free worker-canonical metadata directly to the worker without on-chain writes', async () => {
+  it('links a Worker-hosted session to its settings page on the same Session Worker', async () => {
     sessionEntries = [];
     const initialSessionConfig = {
       slug: 'worker-metadata',
@@ -513,7 +246,6 @@ describe('AdminPage metadata controls', () => {
       corsWorkerUrl: 'https://worker-metadata.example.test',
       adminAddress: ADMIN_ADDRESS,
       sessionModeProfile: cloneSessionModePreset('fast_cheap_cloudflare'),
-      ai: { models: { fast: { provider: 'openai', model: 'gpt-5' } } },
     };
     mockResolveCorsProxyUrl.mockResolvedValue({
       url: initialSessionConfig.corsWorkerUrl,
@@ -523,123 +255,16 @@ describe('AdminPage metadata controls', () => {
 
     await renderAdminPage({ initialSessionConfig });
     expect(await screen.findByDisplayValue(initialSessionConfig.corsWorkerUrl)).toBeInTheDocument();
-    expect(mockGetReadProviderForChain).not.toHaveBeenCalled();
-    const metadataPanel = screen.getByText('Session metadata').closest('section');
-    fireEvent.click(within(metadataPanel).getByRole('button', { name: 'Toggle Session metadata section' }));
-    fireEvent.change(getFieldInputByLabel('Default tags'), {
-      target: { value: 'worker, canonical' },
-    });
-    await clickAndSettle(screen.getByRole('button', { name: 'Update metadata' }));
 
-    await waitFor(() => {
-      expect(screen.getByText('Worker session metadata updated.')).toBeInTheDocument();
-    });
-    const workerWrite = global.fetch.mock.calls.find(([url]) => String(url).endsWith('/admin/set-config'));
-    expect(workerWrite).toBeTruthy();
-    const workerPayload = JSON.parse(workerWrite[1].body);
-    expect(workerPayload.config).toEqual(
-      expect.objectContaining({
-        slug: 'worker-metadata',
-        adminAddress: ADMIN_ADDRESS,
-        defaultTags: 'worker, canonical',
-      }),
+    const metadataPanel = openMetadataPanel();
+    const link = within(metadataPanel).getByTestId(EDIT_SETTINGS_LINK_TESTID);
+
+    expect(link).toHaveTextContent('Edit settings');
+    expect(link).toHaveAttribute(
+      'href',
+      'http://localhost/session/worker-metadata/settings?worker=https%3A%2F%2Fworker-metadata.example.test',
     );
-    expect(workerPayload.config).not.toHaveProperty('configRevision');
-    expect(workerPayload.config).not.toHaveProperty('workerCanonicalPublicationRevision');
-    expect(mockUploadSessionMetadata).not.toHaveBeenCalled();
-    expect(mockUpdateSessionMetadataOnChain).not.toHaveBeenCalled();
-    expect(mockSetSessionFieldsOnChain).not.toHaveBeenCalled();
-  });
-
-  it('does not infer on-chain metadata authority from stale registry fields on a pure Worker profile', async () => {
-    const registryAdminAddress = '0x00000000000000000000000000000000000000bb';
-    const initialSessionConfig = {
-      slug: 'split-metadata-admins',
-      sessionId: '0xabcdefabcdefabcdefabcdefabcdefab',
-      configRevision: 'split-metadata-revision',
-      corsWorkerUrl: 'https://split-metadata.example.test',
-      adminAddress: ADMIN_ADDRESS,
-      blockLimits: { start: 123, end: null },
-      __registry: {
-        registryChainId: 84532,
-        chainId: 84532,
-        adminAddress: registryAdminAddress,
-      },
-      sessionModeProfile: cloneSessionModePreset('fast_cheap_cloudflare'),
-    };
-    sessionEntries = [['split-metadata-admins', initialSessionConfig]];
-    mockResolveCorsProxyUrl.mockResolvedValue({
-      url: initialSessionConfig.corsWorkerUrl,
-      source: 'session-config',
-      status: 'ok',
-    });
-
-    await renderAdminPage({ account: registryAdminAddress, initialSessionConfig });
-    expect(await screen.findByDisplayValue(initialSessionConfig.corsWorkerUrl)).toBeInTheDocument();
-    const metadataPanel = screen.getByText('Session metadata').closest('section');
-    fireEvent.click(within(metadataPanel).getByRole('button', { name: 'Toggle Session metadata section' }));
-
-    expect(screen.queryByText('Default tags')).not.toBeInTheDocument();
-    expect(screen.getByText(/You are not the admin for this session/i)).toBeInTheDocument();
-    expect(mockGetReadProviderForChain).not.toHaveBeenCalled();
-    expect(mockUploadSessionMetadata).not.toHaveBeenCalled();
-    expect(mockUpdateSessionMetadataOnChain).not.toHaveBeenCalled();
-    expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith('/admin/set-config'))).toBe(false);
-    expect(mockSetSessionFieldsOnChain).not.toHaveBeenCalled();
-  });
-
-  it('requires explicit verification before saving synthesized fallback contract defaults', async () => {
-    sessionEntries = [
-      [
-        'edge',
-        buildSessionConfig({
-          blockLimits: { start: 100, end: null },
-          contracts: {
-            surveys: {
-              address: '0x00000000000000000000000000000000000000f1',
-              chainId: 84532,
-            },
-            sbtFactory: {
-              address: '0x00000000000000000000000000000000000000f2',
-              chainId: 84532,
-            },
-            sessionRegistry: {
-              address: '0x00000000000000000000000000000000000000f3',
-              chainId: 84532,
-            },
-          },
-          __registry: {
-            registryChainId: 84532,
-            chainId: 84532,
-            adminAddress: ADMIN_ADDRESS,
-            metadataURI: 'ar://missing-metadata',
-            metadataLoadState: 'unavailable',
-            metadataDefaultedContractKeys: ['surveys', 'sbtFactory', 'sessionRegistry'],
-          },
-        }),
-      ],
-    ];
-
-    await renderAdminPage();
-    await waitForResolvedWorkerUrl();
-
-    const metadataPanel = screen.getByText('Session metadata').closest('section');
-    fireEvent.click(within(metadataPanel).getAllByRole('button')[0]);
-
-    expect(within(metadataPanel).getByText(/Session metadata could not be loaded/i)).toBeInTheDocument();
-
-    await clickAndSettle(screen.getByRole('button', { name: 'Update metadata' }));
-
-    await waitFor(() => {
-      expect(screen.getByText(/Verify or edit the contract addresses before saving/i)).toBeInTheDocument();
-    });
-    expect(mockUploadSessionMetadata).not.toHaveBeenCalled();
-
-    fireEvent.click(screen.getByLabelText(/I verified these fallback defaults/i));
-    await clickAndSettle(screen.getByRole('button', { name: 'Update metadata' }));
-
-    await waitFor(() => {
-      expect(mockUploadSessionMetadata).toHaveBeenCalledTimes(1);
-    });
+    expect(link).not.toHaveAttribute('target');
+    expect(within(metadataPanel).queryByRole('button', { name: 'Update metadata' })).not.toBeInTheDocument();
   });
 });

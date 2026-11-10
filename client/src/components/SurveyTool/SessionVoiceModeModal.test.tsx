@@ -8,8 +8,10 @@ import {
   buildExternalInterviewKickoff,
   hashInterviewQuestions,
   mapInterviewEvidenceToResponses,
+  type InterviewDraftResponse,
 } from './sessionInterview';
 import { startSessionRealtimeInterview } from '../../utilities/audio/realtimeInterviewClient';
+import { getCorsProxyUrlOrThrow } from '../../utilities/worker/corsProxy.js';
 import { useSessionInterviewGroupRecommendations } from './useSessionInterviewGroupRecommendations';
 
 jest.mock('./SessionInterviewRecommendedGroups', () => ({
@@ -32,7 +34,7 @@ jest.mock('./useInterviewReadiness', () => ({
 }));
 
 jest.mock('./useInterviewOpening', () => ({
-  useInterviewOpening: () => ({ opening: '', notice: '', loading: false }),
+  useInterviewOpening: jest.fn(() => ({ opening: '', notice: '', loading: false })),
 }));
 
 jest.mock('./SessionListeningPanel', () => ({
@@ -121,6 +123,59 @@ const editReadableDraftText = async (label: string, value: string) => {
   fireEvent.blur(editor);
 };
 
+// A voice round whose transcript is ready when it stops.
+const mockVoiceRound = (transcript: string) =>
+  mockedStartSessionRealtimeInterview.mockImplementation(async (options) => {
+    options.onRecordingState?.('recording');
+    options.onTranscript?.(transcript, []);
+    return {
+      mediaStream: {} as MediaStream,
+      stop: jest.fn(async () => ({ transcript, turns: [] })),
+      pause: jest.fn(),
+      resume: jest.fn(),
+      getTranscript: () => transcript,
+    };
+  });
+const speak = async () => {
+  fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START));
+  await screen.findByLabelText('Pause interview');
+  fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STOP));
+};
+const draftIds = () =>
+  screen.getAllByTestId(E2E_TESTIDS.SESSION_INTERVIEW_DRAFT).map((card) => card.getAttribute('data-ce-question-id'));
+type SavedSlice = {
+  answers: Record<string, unknown>;
+  importance: Record<string, unknown>;
+  conviction: Record<string, unknown>;
+  additionalComments: Record<string, unknown>;
+};
+const deferredSavedAnswers = () => {
+  let resolve: (slice: SavedSlice) => void = () => {};
+  const load = jest.fn(
+    () =>
+      new Promise<SavedSlice>((done) => {
+        resolve = done;
+      }),
+  );
+  return {
+    load,
+    finish: (answers: Record<string, unknown>) =>
+      act(async () => resolve({ answers, importance: {}, conviction: {}, additionalComments: {} })),
+  };
+};
+const aiPrefill = (responses: Array<{ questionId: string; answer: unknown }>) => ({
+  version: 1 as const,
+  sessionSlug: 'demo',
+  source: { platform: 'claude' as const, modelId: 'claude-test', verification: 'self_reported' as const },
+  responderContext: {},
+  responses: responses.map((response) => ({ ...response, confidence: 0.8 })),
+});
+const threeQuestions = [
+  { id: 'q1', prompt: 'What matters?', type: 'freeform' },
+  { id: 'q2', prompt: 'Second question?', type: 'freeform' },
+  { id: 'q3', prompt: 'Third question?', type: 'freeform' },
+];
+
 describe('SessionVoiceModeModal', () => {
   beforeEach(() => {
     jest.restoreAllMocks();
@@ -173,7 +228,15 @@ describe('SessionVoiceModeModal', () => {
     view.rerender(<SessionVoiceModeModal {...props} />);
     await expectReadableDraftText('Draft answer for What matters?', 'My unsaved edit');
     expect(mockedMapInterviewEvidenceToResponses).toHaveBeenCalledTimes(1);
-    fireEvent.click(screen.getByRole('button', { name: 'Discard interview' }));
+    // Discard sits beside the microphone and explains itself on hover, and to screen readers.
+    const discard = screen.getByRole('button', { name: 'Discard interview' });
+    expect(discard.parentElement).toContainElement(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START));
+    expect(document.querySelector('.modal-footer')).toBeNull();
+    expect(discard).toHaveAccessibleDescription(/Responses you’ve submitted are kept\.$/);
+    fireEvent.mouseOver(discard);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Responses you’ve submitted are kept.');
+    fireEvent.mouseOut(discard);
+    fireEvent.click(discard);
     fireEvent.click(await screen.findByRole('button', { name: 'Keep reviewing' }));
     await waitFor(() => expect(screen.queryByRole('button', { name: 'Keep reviewing' })).not.toBeInTheDocument());
     await expectReadableDraftText('Draft answer for What matters?', 'My unsaved edit');
@@ -439,6 +502,8 @@ describe('SessionVoiceModeModal', () => {
         mode="interview"
         onInterviewProgressChange={onInterviewProgressChange}
         prefillPacket={prefillPacket}
+        // Unselected drafts are kept only at full research detail.
+        sessionConfig={{ interviewMode: { researchDetail: 'full' } }}
         questionPool={[...baseProps.questionPool, { id: 'q2', prompt: 'Second question?', type: 'freeform' }]}
         renderFieldLock={(id, field) => <button type="button" aria-label={`Privacy ${id} ${field}`} />}
       />,
@@ -468,9 +533,7 @@ describe('SessionVoiceModeModal', () => {
     expect(metadata).toHaveTextContent('Self-reported');
     expect(metadata).toHaveTextContent('ce-interview-brief-v4');
     expect(metadata).toHaveTextContent('a'.repeat(64));
-    expect(metadata).toHaveTextContent(
-      'Predictions, reviewed values, changed fields, and unselected drafts will not be included.',
-    );
+    expect(metadata).not.toHaveTextContent('will not be included');
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_PREDICTION_COMPARISON));
     expect(metadata).toHaveTextContent('2 selected drafts and 0 unselected drafts');
     fireEvent.click(choices.querySelector('summary')!);
@@ -812,10 +875,79 @@ describe('SessionVoiceModeModal', () => {
     expect(baseProps.onSubmitResponses).toHaveBeenCalled();
   });
 
-  it('requires review before replacing an answer discovered during a queued submit', async () => {
-    mockedMapInterviewEvidenceToResponses.mockResolvedValue([
-      { questionId: 'q1', answer: 'New answer', confidence: 0.8, evidence: 'Context' },
-    ]);
+  it.each([
+    ['differs from', 'New answer', true],
+    ['repeats', 'Already saved', false],
+  ])(
+    'when an answer loads during a queued submit, holds a typed-context draft that %s it for a check, or drops it',
+    async (_label, drafted, kept) => {
+      mockedMapInterviewEvidenceToResponses.mockResolvedValue([
+        { questionId: 'q1', answer: drafted, confidence: 0.8, evidence: 'Context' },
+      ]);
+      type Slice = {
+        answers: Record<string, unknown>;
+        importance: Record<string, unknown>;
+        conviction: Record<string, unknown>;
+        additionalComments: Record<string, unknown>;
+      };
+      let resolveSaved: (slice: Slice) => void = () => {};
+      const onLoadSavedResponses = jest.fn(
+        () =>
+          new Promise<Slice>((resolve) => {
+            resolveSaved = resolve;
+          }),
+      );
+      render(
+        <SessionVoiceModeModal
+          {...baseProps}
+          mode="interview"
+          isResponsesCacheReady={false}
+          onLoadSavedResponses={onLoadSavedResponses}
+          prefillPacket={{
+            version: 1,
+            sessionSlug: 'demo',
+            questionSetHash: 'a'.repeat(64),
+            promptVersion: 'ce-interview-brief-v1',
+            source: { platform: 'chatgpt', modelId: 'synthetic', verification: 'self_reported' },
+            responderContext: { summary: 'Context' },
+          }}
+        />,
+      );
+      await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
+      await act(async () =>
+        resolveSaved({
+          answers: { q1: { value: 'Already saved' } },
+          importance: {},
+          conviction: {},
+          additionalComments: {},
+        }),
+      );
+      expect(baseProps.onApplyAnswer).not.toHaveBeenCalled();
+      expect(baseProps.onSubmitResponses).not.toHaveBeenCalled();
+      if (kept) {
+        // The person's own words give a new answer: it stays chosen, says what it changes,
+        // and the queued submit waits for them to check it.
+        expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveTextContent(
+          'Saved answers loaded. Check drafts that change an earlier answer, then submit.',
+        );
+        await expectReadableDraftText('Draft answer for What matters?', 'New answer');
+        expect(screen.getByText('Changes your earlier answer')).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Replace with draft' })).not.toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Remove draft for What matters?' })).toBeEnabled();
+        expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY)).toBeEnabled();
+        expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_MAPPING_NOTICE)).not.toBeInTheDocument();
+      } else {
+        expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW)).not.toBeInTheDocument();
+        expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_MAPPING_NOTICE)).toHaveTextContent(
+          'You’ve already answered the question this draft covers.',
+        );
+        expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveTextContent('Ready');
+      }
+    },
+  );
+
+  it('drops untouched drafts whose saved answers load late, and keeps an edited one with a note', async () => {
     type Slice = {
       answers: Record<string, unknown>;
       importance: Record<string, unknown>;
@@ -833,31 +965,60 @@ describe('SessionVoiceModeModal', () => {
       <SessionVoiceModeModal
         {...baseProps}
         mode="interview"
-        isResponsesCacheReady={false}
         onLoadSavedResponses={onLoadSavedResponses}
+        questionPool={[
+          ...baseProps.questionPool,
+          { id: 'q2', prompt: 'Second question?', type: 'freeform' },
+          { id: 'q3', prompt: 'Third question?', type: 'freeform' },
+        ]}
         prefillPacket={{
           version: 1,
           sessionSlug: 'demo',
-          questionSetHash: 'a'.repeat(64),
-          promptVersion: 'ce-interview-brief-v1',
-          source: { platform: 'chatgpt', modelId: 'synthetic', verification: 'self_reported' },
-          responderContext: { summary: 'Context' },
+          source: { platform: 'claude', modelId: 'claude-test', verification: 'self_reported' },
+          responderContext: {},
+          responses: [
+            { questionId: 'q1', answer: 'Drafted one', confidence: 0.8 },
+            { questionId: 'q2', answer: 'Drafted two', confidence: 0.8 },
+            { questionId: 'q3', answer: 'Drafted three', confidence: 0.8 },
+          ],
         }}
       />,
     );
-    await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
-    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
+    await expectReadableDraftText('Draft answer for What matters?', 'Drafted one');
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_PREFILL_STATUS)).toHaveTextContent(
+      'Your AI drafted 3 answers',
+    );
+    await editReadableDraftText('Draft answer for Second question?', 'My own answer');
     await act(async () =>
       resolveSaved({
-        answers: { q1: { value: 'Already saved' } },
+        answers: { q1: { value: 'Saved one' }, q2: { value: 'Saved two' } },
         importance: {},
         conviction: {},
         additionalComments: {},
       }),
     );
-    expect(baseProps.onApplyAnswer).not.toHaveBeenCalled();
-    expect(baseProps.onSubmitResponses).not.toHaveBeenCalled();
-    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveTextContent('Saved answers loaded');
+    // The untouched draft goes; the edited one stays as it was, saying what it changes.
+    expect(screen.queryByText('What matters?')).not.toBeInTheDocument();
+    expect(screen.getAllByTestId(E2E_TESTIDS.SESSION_INTERVIEW_DRAFT)).toHaveLength(2);
+    await expectReadableDraftText('Draft answer for Second question?', 'My own answer');
+    expect(screen.getAllByText('Changes your earlier answer')).toHaveLength(1);
+    expect(screen.queryByRole('button', { name: 'Replace with draft' })).not.toBeInTheDocument();
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveTextContent(
+      'Saved answers loaded. Check drafts that change an earlier answer, then submit.',
+    );
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_MAPPING_NOTICE)).toHaveTextContent(
+      'Left out 1 draft for a question you’ve already answered.',
+    );
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_PREFILL_STATUS)).toHaveTextContent(
+      'Your AI drafted 2 answers',
+    );
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
+    await waitFor(() => expect(baseProps.onSubmitResponses).toHaveBeenCalledWith(['q2', 'q3']));
+    expect(baseProps.onApplyAnswer).toHaveBeenCalledWith('q2', 'My own answer');
+    expect(baseProps.onApplyAnswer).toHaveBeenCalledTimes(2);
+    expect(
+      baseProps.onRecordProvenance.mock.calls[0][6].map(({ questionId }: { questionId: string }) => questionId),
+    ).toEqual(['q2', 'q3']);
   });
 
   it('uses complete public-cache readiness for a verified legacy Worker', async () => {
@@ -907,7 +1068,7 @@ describe('SessionVoiceModeModal', () => {
     expect(onLoadSavedResponses).toHaveBeenCalledTimes(2);
   });
 
-  it('does not preselect an existing answer when its saved lookup completes before draft mapping', async () => {
+  it('marks a typed-context draft that changes an answer whose saved lookup completes before draft mapping', async () => {
     type Draft = { questionId: string; answer: string; evidence: string; confidence: number };
     let resolveMapping: (drafts: Draft[]) => void = () => {};
     mockedMapInterviewEvidenceToResponses.mockImplementationOnce(
@@ -940,8 +1101,436 @@ describe('SessionVoiceModeModal', () => {
     await waitFor(() => expect(mockedMapInterviewEvidenceToResponses).toHaveBeenCalled());
     await act(async () => resolveMapping([{ questionId: 'q1', answer: 'New', evidence: 'Context', confidence: 0.8 }]));
     await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
-    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY)).toBeDisabled();
+    expect(screen.getByText('Changes your earlier answer')).toBeInTheDocument();
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY)).toBeEnabled();
     expect(baseProps.onSubmitResponses).not.toHaveBeenCalled();
+  });
+
+  it('shows AI-prefill drafts only for unanswered questions and keeps the others out of research', async () => {
+    const prefillPacket = {
+      version: 1 as const,
+      sessionSlug: 'demo',
+      source: { platform: 'claude' as const, modelId: 'claude-test', verification: 'self_reported' as const },
+      responderContext: {},
+      responses: [
+        { questionId: 'q1', answer: 'Drafted one', confidence: 0.8 },
+        { questionId: 'q2', answer: 'Drafted two', confidence: 0.8 },
+        { questionId: 'q3', answer: 'Drafted three', confidence: 0.8 },
+      ],
+    };
+    render(
+      <SessionVoiceModeModal
+        {...baseProps}
+        mode="interview"
+        questionPool={[
+          ...baseProps.questionPool,
+          { id: 'q2', prompt: 'Second question?', type: 'freeform' },
+          { id: 'q3', prompt: 'Third question?', type: 'freeform' },
+        ]}
+        // q1 was answered before; q3 is typed on the page but not yet submitted.
+        existingResponseSlice={{ answers: { q1: { value: 'Saved answer' }, q3: { value: 'Unsaved answer' } } }}
+        // Full detail keeps unselected drafts for research, so a left-out one would show up there.
+        sessionConfig={{ interviewMode: { researchDetail: 'full', shareDraftChangesByDefault: true } }}
+        prefillPacket={prefillPacket}
+      />,
+    );
+    await expectReadableDraftText('Draft answer for Second question?', 'Drafted two');
+    expect(screen.getAllByTestId(E2E_TESTIDS.SESSION_INTERVIEW_DRAFT)).toHaveLength(1);
+    expect(screen.queryByText('What matters?')).not.toBeInTheDocument();
+    expect(screen.queryByText('Third question?')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Replace with draft' })).not.toBeInTheDocument();
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_MAPPING_NOTICE)).toHaveTextContent(
+      'Left out 2 drafts for questions you’ve already answered.',
+    );
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_PREFILL_STATUS)).toHaveTextContent(
+      'Your AI drafted 1 answer · Claude, self-reported',
+    );
+    expect(screen.getByRole('group', { name: 'AI prefill metadata' })).toHaveTextContent(
+      '1 selected draft and 0 unselected drafts',
+    );
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
+    await waitFor(() => expect(baseProps.onSubmitResponses).toHaveBeenCalledWith(['q2']));
+    expect(baseProps.onApplyAnswer).toHaveBeenCalledTimes(1);
+    expect(baseProps.onRecordProvenance.mock.calls[0][6]).toEqual([
+      expect.objectContaining({ questionId: 'q2', selected: true }),
+    ]);
+  });
+
+  it('explains a review where every draft is for a question the person already answered', async () => {
+    render(
+      <SessionVoiceModeModal
+        {...baseProps}
+        mode="interview"
+        questionPool={[...baseProps.questionPool, { id: 'q2', prompt: 'Second question?', type: 'freeform' }]}
+        existingResponseSlice={{ answers: { q1: { value: 'Saved one' }, q2: { value: 'Saved two' } } }}
+        prefillPacket={{
+          version: 1,
+          sessionSlug: 'demo',
+          source: { platform: 'claude', modelId: 'claude-test', verification: 'self_reported' },
+          responderContext: {},
+          responses: [
+            { questionId: 'q1', answer: 'Drafted one', confidence: 0.8 },
+            { questionId: 'q2', answer: 'Drafted two', confidence: 0.8 },
+          ],
+        }}
+      />,
+    );
+    expect(await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_MAPPING_NOTICE)).toHaveTextContent(
+      /^You’ve already answered every question these drafts cover\.$/,
+    );
+    expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW)).not.toBeInTheDocument();
+    expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_PREFILL_STATUS)).not.toBeInTheDocument();
+    expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_GENERATE)).not.toBeInTheDocument();
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveAccessibleName('Interview status: Ready');
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START)).toHaveAccessibleName('Start voice interview');
+  });
+
+  it('says which of the AI’s drafts were left out instead of dropping them silently', async () => {
+    render(
+      <SessionVoiceModeModal
+        {...baseProps}
+        mode="interview"
+        prefillNotice="Left out 1 draft from your AI that was incomplete or repeated."
+        prefillPacket={aiPrefill([
+          { questionId: 'q1', answer: 'Drafted one' },
+          { questionId: 'q-not-here', answer: 'Stray draft' },
+        ])}
+      />,
+    );
+    expect(await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_MAPPING_NOTICE)).toHaveTextContent(
+      'Left out 1 draft from your AI that was incomplete or repeated. Left out 1 draft from your AI that doesn’t fit this session’s questions or their options.',
+    );
+    expect(draftIds()).toEqual(['q1']);
+  });
+
+  it('offers a paste box for the AI’s JSON packet when a prefill link is broken', async () => {
+    const onImportPrefillJson = jest.fn((_json: string) => 'This interview prefill belongs to a different session.');
+    const { rerender } = render(<SessionVoiceModeModal {...baseProps} mode="interview" />);
+    expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_PREFILL_PASTE)).not.toBeInTheDocument();
+    rerender(
+      <SessionVoiceModeModal
+        {...baseProps}
+        mode="interview"
+        initialError="This link is incomplete: it was cut off when it was copied."
+        onImportPrefillJson={onImportPrefillJson}
+      />,
+    );
+    const paste = await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_PREFILL_PASTE);
+    // The link's reason shows even though the review was already open.
+    expect(screen.getByText('This link is incomplete: it was cut off when it was copied.')).toBeInTheDocument();
+    const button = within(paste).getByRole('button', { name: 'Review these drafts' });
+    expect(button).toBeDisabled();
+    fireEvent.change(within(paste).getByLabelText('Paste the JSON packet your AI gave you'), {
+      target: { value: '{"version":1}' },
+    });
+    fireEvent.click(button);
+    expect(onImportPrefillJson).toHaveBeenCalledWith('{"version":1}');
+    expect(within(paste).getByRole('alert')).toHaveTextContent('different session');
+  });
+
+  it('after a submit, a voice interview adds drafts only for new questions and keeps updating submitted ones', async () => {
+    let instructions = '';
+    mockedStartSessionRealtimeInterview.mockImplementation(async (options) => {
+      instructions = options.instructions;
+      options.onRecordingState?.('recording');
+      options.onTranscript?.('Responder: More detail.', []);
+      return {
+        mediaStream: {} as MediaStream,
+        stop: jest.fn(async () => ({ transcript: 'Responder: More detail.', turns: [] })),
+        pause: jest.fn(),
+        resume: jest.fn(),
+        getTranscript: () => 'Responder: More detail.',
+      };
+    });
+    mockedMapInterviewEvidenceToResponses.mockResolvedValue([
+      { questionId: 'q1', answer: 'Refined answer', confidence: 0.9 },
+      // Repeats the person's earlier answer, so it adds nothing new.
+      { questionId: 'q2', answer: 'Mine', confidence: 0.9 },
+      { questionId: 'q3', answer: 'New answer', confidence: 0.9 },
+    ]);
+    const props = {
+      ...baseProps,
+      mode: 'interview' as const,
+      questionPool: [
+        ...baseProps.questionPool,
+        { id: 'q2', prompt: 'Second question?', type: 'freeform' },
+        { id: 'q3', prompt: 'Third question?', type: 'freeform' },
+      ],
+      prefillPacket: {
+        version: 1 as const,
+        sessionSlug: 'demo',
+        source: { platform: 'claude' as const, modelId: 'claude-test', verification: 'self_reported' as const },
+        responderContext: {},
+        responses: [{ questionId: 'q1', answer: 'Drafted one', confidence: 0.8 }],
+      },
+    };
+    const view = render(
+      <SessionVoiceModeModal {...props} existingResponseSlice={{ answers: { q2: { value: 'Mine' } } }} />,
+    );
+    await expectReadableDraftText('Draft answer for What matters?', 'Drafted one');
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
+    await waitFor(() => expect(baseProps.onApplyAnswer).toHaveBeenCalledWith('q1', 'Drafted one'));
+    await screen.findByRole('button', { name: 'Responses submitted' });
+    // Submitting writes the answer into the form; the submitted draft stays in review.
+    view.rerender(
+      <SessionVoiceModeModal
+        {...props}
+        existingResponseSlice={{ answers: { q1: { value: 'Drafted one' }, q2: { value: 'Mine' } } }}
+      />,
+    );
+    await expectReadableDraftText('Draft answer for What matters?', 'Drafted one');
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START));
+    await screen.findByLabelText('Pause interview');
+    // The interviewer spends the conversation on the question still open.
+    expect(instructions).toContain('[q3]');
+    expect(instructions).not.toContain('[q1]');
+    expect(instructions).not.toContain('[q2]');
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STOP));
+    await expectReadableDraftText('Draft answer for Third question?', 'New answer');
+    await expectReadableDraftText('Draft answer for What matters?', 'Refined answer');
+    expect(screen.queryByText('Second question?')).not.toBeInTheDocument();
+    expect(screen.getAllByTestId(E2E_TESTIDS.SESSION_INTERVIEW_DRAFT)).toHaveLength(2);
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_MAPPING_NOTICE)).toHaveTextContent(
+      'Left out 1 draft for a question you’ve already answered.',
+    );
+  });
+
+  it('keeps a voice correction to an AI-prefill draft when the saved answer loads after login', async () => {
+    mockVoiceRound('Responder: Actually, I disagree.');
+    mockedMapInterviewEvidenceToResponses.mockResolvedValue([
+      { questionId: 'q1', answer: 'Disagree', confidence: 0.9 },
+    ]);
+    const onLoadSavedResponses = jest.fn().mockResolvedValue({
+      answers: { q1: { value: 'Agree' } },
+      additionalComments: {},
+      importance: {},
+      conviction: {},
+    });
+    const onSubmitResponses = jest.fn().mockResolvedValue({ status: 'login-required' });
+    const props = {
+      ...baseProps,
+      mode: 'interview' as const,
+      onLoadSavedResponses,
+      onSubmitResponses,
+      prefillPacket: aiPrefill([{ questionId: 'q1', answer: 'Agree' }]),
+    };
+    const view = render(<SessionVoiceModeModal {...props} account="" loginComplete={false} />);
+    await expectReadableDraftText('Draft answer for What matters?', 'Agree');
+    await speak();
+    await expectReadableDraftText('Draft answer for What matters?', 'Disagree');
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
+    await waitFor(() => expect(onSubmitResponses).toHaveBeenCalledTimes(1));
+    // Signing in loads the earlier "Agree": the spoken correction stays, says what it changes,
+    // and the queued submit waits for the person to check it.
+    view.rerender(<SessionVoiceModeModal {...props} />);
+    await waitFor(() =>
+      expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveTextContent(
+        'Saved answers loaded. Check drafts that change an earlier answer, then submit.',
+      ),
+    );
+    await expectReadableDraftText('Draft answer for What matters?', 'Disagree');
+    expect(screen.getByText('Changes your earlier answer')).toBeInTheDocument();
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY)).toBeEnabled();
+    expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_MAPPING_NOTICE)).not.toBeInTheDocument();
+    expect(baseProps.onApplyAnswer).not.toHaveBeenCalled();
+    expect(onSubmitResponses).toHaveBeenCalledTimes(1);
+  });
+
+  it('leaves out an answered question even when the voice mapper hands back its AI-prefill guess', async () => {
+    mockVoiceRound('Responder: Transit matters to me.');
+    mockedMapInterviewEvidenceToResponses.mockResolvedValue([
+      // The AI prefill's guess for the answered q1, handed back as if it were new.
+      { questionId: 'q1', answer: 'Agree', confidence: 0.9 },
+      { questionId: 'q2', answer: 'Agree', confidence: 0.9 },
+    ]);
+    render(
+      <SessionVoiceModeModal
+        {...baseProps}
+        mode="interview"
+        questionPool={threeQuestions.slice(0, 2)}
+        existingResponseSlice={{ answers: { q1: { value: 'Disagree' } } }}
+        prefillPacket={aiPrefill([
+          { questionId: 'q1', answer: 'Agree' },
+          { questionId: 'q2', answer: 'Agree' },
+        ])}
+      />,
+    );
+    await expectReadableDraftText('Draft answer for Second question?', 'Agree');
+    await speak();
+    await waitFor(() => expect(mockedMapInterviewEvidenceToResponses).toHaveBeenCalled());
+    // The mapper never hears the guess for the answered question.
+    expect(
+      mockedMapInterviewEvidenceToResponses.mock.calls[0][0].prefillPacket?.responses?.map(
+        ({ questionId }) => questionId,
+      ),
+    ).toEqual(['q2']);
+    await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+    expect(draftIds()).toEqual(['q2']);
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_MAPPING_NOTICE)).toHaveTextContent(
+      'Left out 1 draft for a question you’ve already answered.',
+    );
+  });
+
+  it('keeps out a draft whose saved answer loads while the mapper works', async () => {
+    mockVoiceRound('Responder: More detail.');
+    let finishMapping: (drafts: InterviewDraftResponse[]) => void = () => {};
+    mockedMapInterviewEvidenceToResponses.mockImplementation(
+      () =>
+        new Promise<InterviewDraftResponse[]>((resolve) => {
+          finishMapping = resolve;
+        }),
+    );
+    const saved = deferredSavedAnswers();
+    render(
+      <SessionVoiceModeModal
+        {...baseProps}
+        mode="interview"
+        onLoadSavedResponses={saved.load}
+        questionPool={threeQuestions}
+        prefillPacket={aiPrefill([
+          { questionId: 'q1', answer: 'Drafted one' },
+          { questionId: 'q2', answer: 'Drafted two' },
+        ])}
+      />,
+    );
+    await expectReadableDraftText('Draft answer for What matters?', 'Drafted one');
+    await speak();
+    await waitFor(() => expect(mockedMapInterviewEvidenceToResponses).toHaveBeenCalled());
+    await saved.finish({ q1: { value: 'Saved one' } });
+    await act(async () =>
+      finishMapping([
+        { questionId: 'q2', answer: 'Refined two', confidence: 0.9 },
+        { questionId: 'q3', answer: 'New three', confidence: 0.9 },
+      ]),
+    );
+    await expectReadableDraftText('Draft answer for Third question?', 'New three');
+    await expectReadableDraftText('Draft answer for Second question?', 'Refined two');
+    expect(draftIds()).toEqual(['q2', 'q3']);
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_MAPPING_NOTICE)).toHaveTextContent(
+      'Left out 1 draft for a question you’ve already answered.',
+    );
+  });
+
+  it('counts only drafts the person hadn’t already dismissed when saved answers load late', async () => {
+    const saved = deferredSavedAnswers();
+    render(
+      <SessionVoiceModeModal
+        {...baseProps}
+        mode="interview"
+        onLoadSavedResponses={saved.load}
+        questionPool={threeQuestions}
+        prefillPacket={aiPrefill([
+          { questionId: 'q1', answer: 'Drafted one' },
+          { questionId: 'q2', answer: 'Drafted two' },
+          { questionId: 'q3', answer: 'Drafted three' },
+        ])}
+      />,
+    );
+    await expectReadableDraftText('Draft answer for What matters?', 'Drafted one');
+    fireEvent.click(screen.getByRole('button', { name: 'Remove draft for What matters?' }));
+    await saved.finish({ q1: { value: 'Saved one' }, q2: { value: 'Saved two' } });
+    expect(draftIds()).toEqual(['q3']);
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_MAPPING_NOTICE)).toHaveTextContent(
+      /^Left out 1 draft for a question you’ve already answered\.$/,
+    );
+  });
+
+  it.each([
+    ['kept', ['q2', 'q3']],
+    ['dismissed', ['q3']],
+  ])(
+    'offers a voice draft that changes a saved answer, and submits it only while chosen (%s)',
+    async (choice, submitted) => {
+      mockVoiceRound('Responder: I now care most about speed.');
+      mockedMapInterviewEvidenceToResponses.mockResolvedValue([
+        { questionId: 'q1', answer: 'Safety', confidence: 0.9 },
+        { questionId: 'q2', answer: 'Speed', confidence: 0.9 },
+        { questionId: 'q3', answer: 'Trains', confidence: 0.9 },
+      ]);
+      render(
+        <SessionVoiceModeModal
+          {...baseProps}
+          mode="interview"
+          questionPool={threeQuestions}
+          existingResponseSlice={{ answers: { q1: { value: 'Safety' }, q2: { value: 'Cost' } } }}
+        />,
+      );
+      await speak();
+      // New evidence changes the saved "Cost"; repeating "Safety" adds nothing.
+      await expectReadableDraftText('Draft answer for Second question?', 'Speed');
+      expect(draftIds()).toEqual(['q2', 'q3']);
+      expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_MAPPING_NOTICE)).toHaveTextContent(
+        /^Left out 1 draft for a question you’ve already answered\.$/,
+      );
+      expect(screen.getAllByText('Changes your earlier answer')).toHaveLength(1);
+      expect(screen.queryByRole('button', { name: 'Replace with draft' })).not.toBeInTheDocument();
+      if (choice === 'dismissed')
+        fireEvent.click(screen.getByRole('button', { name: 'Remove draft for Second question?' }));
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
+      await waitFor(() => expect(baseProps.onSubmitResponses).toHaveBeenCalledWith(submitted));
+      expect(baseProps.onApplyAnswer.mock.calls.map(([questionId]) => questionId)).toEqual(submitted);
+      // Research sees the draft as shown either way, chosen or not.
+      expect(baseProps.onRecordProvenance.mock.calls[0][6]).toEqual([
+        expect.objectContaining({ questionId: 'q2', answer: 'Speed', selected: choice === 'kept' }),
+        expect.objectContaining({ questionId: 'q3', selected: true }),
+      ]);
+    },
+  );
+
+  it('gives the voice interviewer only unanswered questions and their drafts, or every question once all are answered', async () => {
+    mockedStartSessionRealtimeInterview.mockImplementation(async (options) => {
+      options.onRecordingState?.('recording');
+      return {
+        mediaStream: {} as MediaStream,
+        stop: jest.fn(async () => ({ transcript: '', turns: [] })),
+        pause: jest.fn(),
+        resume: jest.fn(),
+        getTranscript: () => '',
+      };
+    });
+    const props = {
+      ...baseProps,
+      mode: 'interview' as const,
+      questionPool: [...baseProps.questionPool, { id: 'q2', prompt: 'Second question?', type: 'freeform' }],
+      prefillPacket: {
+        version: 1 as const,
+        sessionSlug: 'demo',
+        source: { platform: 'claude' as const, modelId: 'claude-test', verification: 'self_reported' as const },
+        responderContext: {},
+        responses: [
+          { questionId: 'q1', answer: 'Drafted one', evidence: 'EVIDENCE-q1', confidence: 0.8 },
+          { questionId: 'q2', answer: 'Drafted two', evidence: 'EVIDENCE-q2', confidence: 0.8 },
+        ],
+      },
+    };
+    const first = render(
+      <SessionVoiceModeModal {...props} existingResponseSlice={{ answers: { q1: { value: 'Saved' } } }} />,
+    );
+    await expectReadableDraftText('Draft answer for Second question?', 'Drafted two');
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START));
+    await screen.findByLabelText('Pause interview');
+    const open = mockedStartSessionRealtimeInterview.mock.calls[0][0].instructions;
+    expect(open).toContain('[q2]');
+    expect(open).toContain('EVIDENCE-q2');
+    expect(open).not.toContain('[q1]');
+    expect(open).not.toContain('EVIDENCE-q1');
+    first.unmount();
+
+    // With nothing left unanswered, the interviewer keeps the whole question list but no drafts for it.
+    render(
+      <SessionVoiceModeModal
+        {...props}
+        existingResponseSlice={{ answers: { q1: { value: 'Saved' }, q2: { value: 'Saved' } } }}
+      />,
+    );
+    await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_MAPPING_NOTICE);
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START));
+    await waitFor(() => expect(mockedStartSessionRealtimeInterview).toHaveBeenCalledTimes(2));
+    const answered = mockedStartSessionRealtimeInterview.mock.calls[1][0].instructions;
+    expect(answered).toContain('[q1]');
+    expect(answered).toContain('[q2]');
+    expect(answered).not.toContain('EVIDENCE-q1');
+    expect(answered).not.toContain('EVIDENCE-q2');
   });
 
   it('does not apply signed-in drafts after the hydrated account changes', async () => {
@@ -1149,7 +1738,7 @@ describe('SessionVoiceModeModal', () => {
     expect(screen.getByTestId('mock-create-questions')).not.toBeVisible();
   });
 
-  it('keeps group recommendations disabled during mapping and draft review', async () => {
+  it('keeps group suggestions off unless the session turns them on', async () => {
     mockedUseSessionInterviewGroupRecommendations.mockReturnValue({
       availability: 'available',
       recommendations: [
@@ -1198,14 +1787,165 @@ describe('SessionVoiceModeModal', () => {
     ).toBe(true);
   });
 
-  it('offers the two large requested voice-mode choices', () => {
-    render(<SessionVoiceModeModal {...baseProps} />);
-    expect(screen.getByTestId(E2E_TESTIDS.SESSION_VOICE_MODE_INTERVIEW)).toHaveTextContent(
-      'Talk with an AI interviewer to answer the session’s questions, then review your responses.',
+  it('suggests groups after a voice interview once its drafts are ready, when the session turns them on', async () => {
+    mockedUseSessionInterviewGroupRecommendations.mockReturnValue({
+      availability: 'available',
+      recommendations: [{ groupId: 'ai-optimists', reason: 'They asked for groups.', evidence: 'Groups.' }],
+    });
+    let finishMapping: ((value: Array<{ questionId: string; answer: string }>) => void) | null = null;
+    mockedMapInterviewEvidenceToResponses.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finishMapping = resolve;
+        }),
     );
-    expect(screen.getByTestId(E2E_TESTIDS.SESSION_VOICE_MODE_GROUP)).toHaveTextContent(
+    mockedStartSessionRealtimeInterview.mockImplementation(async (options) => {
+      options.onRecordingState?.('recording');
+      return {
+        mediaStream: { getTracks: () => [], getAudioTracks: () => [] } as unknown as MediaStream,
+        pause: jest.fn(),
+        resume: jest.fn(),
+        stop: jest.fn(async () => ({ transcript: 'Responder: I want AI accountability groups.', turns: [] })),
+        getTranscript: () => 'Responder: I want AI accountability groups.',
+      };
+    });
+    render(
+      <SessionVoiceModeModal
+        {...baseProps}
+        mode="interview"
+        sessionConfig={{ interviewMode: { suggestGroups: true } }}
+      />,
+    );
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START));
+    await screen.findByLabelText('Pause interview');
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STOP));
+    await waitFor(() => expect(mockedMapInterviewEvidenceToResponses).toHaveBeenCalledTimes(1));
+    // Nothing is suggested while the drafts are still being prepared.
+    expect(screen.queryByTestId('mock-group-recommendations')).not.toBeInTheDocument();
+    await act(async () => {
+      finishMapping?.([{ questionId: 'q1', answer: 'Accountability groups' }]);
+    });
+    expect(await screen.findByTestId('mock-group-recommendations')).toBeInTheDocument();
+    expect(mockedUseSessionInterviewGroupRecommendations.mock.calls.at(-1)?.[0]).toEqual(
+      expect.objectContaining({
+        active: true,
+        request: expect.objectContaining({
+          transcript: expect.stringContaining('I want AI accountability groups.'),
+          draftResponses: [expect.objectContaining({ questionId: 'q1', answer: 'Accountability groups' })],
+        }),
+      }),
+    );
+  });
+
+  it('suggests groups after an AI prefill link, from its drafts', async () => {
+    mockedUseSessionInterviewGroupRecommendations.mockReturnValue({
+      availability: 'available',
+      recommendations: [{ groupId: 'dacc', reason: 'You chose “d/acc”.', evidence: '' }],
+    });
+    render(
+      <SessionVoiceModeModal
+        {...baseProps}
+        mode="interview"
+        sessionConfig={{ interviewMode: { suggestGroups: true } }}
+        prefillPacket={{
+          version: 1,
+          sessionSlug: 'demo',
+          source: { platform: 'claude', modelId: 'claude-test', verification: 'self_reported' },
+          responderContext: {},
+          responses: [{ questionId: 'q1', answer: 'Drafted by the AI', confidence: 0.7 }],
+        }}
+      />,
+    );
+    await expectReadableDraftText('Draft answer for What matters?', 'Drafted by the AI');
+    expect(await screen.findByTestId('mock-group-recommendations')).toBeInTheDocument();
+    expect(mockedUseSessionInterviewGroupRecommendations.mock.calls.at(-1)?.[0]).toEqual(
+      expect.objectContaining({
+        active: true,
+        request: expect.objectContaining({
+          draftResponses: [expect.objectContaining({ questionId: 'q1', answer: 'Drafted by the AI' })],
+        }),
+      }),
+    );
+  });
+
+  it('suggests groups from kept answers only, and clears them when an answer is removed', async () => {
+    mockedUseSessionInterviewGroupRecommendations.mockReturnValue({ availability: 'available', recommendations: [] });
+    render(
+      <SessionVoiceModeModal
+        {...baseProps}
+        mode="interview"
+        questionPool={[
+          ...baseProps.questionPool,
+          { id: 'q2', prompt: 'Which camp?', type: 'freeform' },
+          { id: 'q3', prompt: 'Where do you live?', type: 'freeform' },
+        ]}
+        sessionConfig={{ interviewMode: { suggestGroups: true } }}
+        existingResponseSlice={{ answers: { q3: { value: 'My saved answer' } } }}
+        prefillPacket={{
+          version: 1,
+          sessionSlug: 'demo',
+          source: { platform: 'claude', modelId: 'claude-test', verification: 'self_reported' },
+          responderContext: {},
+          responses: [
+            { questionId: 'q1', answer: 'Drafted by the AI', confidence: 0.7 },
+            { questionId: 'q2', answer: 'd/acc', confidence: 0.7 },
+            { questionId: 'q3', answer: 'Lyon', confidence: 0.7 },
+          ],
+        }}
+      />,
+    );
+    const lastRequest = () => mockedUseSessionInterviewGroupRecommendations.mock.calls.at(-1)?.[0].request;
+    // The draft for an already-saved answer is left out, so it doesn't count.
+    await waitFor(() =>
+      expect(lastRequest()?.draftResponses.map(({ questionId }) => questionId)).toEqual(['q1', 'q2']),
+    );
+    expect(screen.queryByText('Where do you live?')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove draft for Which camp?' }));
+    expect(lastRequest()).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh group suggestions' }));
+    expect(lastRequest()?.draftResponses.map(({ questionId }) => questionId)).toEqual(['q1']);
+    // The refresh button goes once clicked, so focus moves to the review heading.
+    expect(screen.getByText('Review proposed responses').closest('summary')).toHaveFocus();
+  });
+
+  it('offers the two large requested voice-mode choices, with the AI-prefill option below them', async () => {
+    render(<SessionVoiceModeModal {...baseProps} />);
+    // Each choice shows its icon and title; its description sits behind a "?" beside the icon.
+    const interviewAbout = 'Talk with an AI interviewer to answer the session’s questions, then review your responses.';
+    const interview = screen.getByTestId(E2E_TESTIDS.SESSION_VOICE_MODE_INTERVIEW);
+    expect(interview).toHaveTextContent(/^Interview$/);
+    expect(interview).toHaveAccessibleDescription(interviewAbout);
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_VOICE_MODE_GROUP)).toHaveAccessibleDescription(
       'Record a group discussion and generate questions and context from it.',
     );
+    // A "?" explains its choice on hover or keyboard focus, and never picks it.
+    const interviewHelp = screen.getByRole('button', { name: 'About Interview' });
+    fireEvent.click(interviewHelp);
+    expect(baseProps.onSelectMode).not.toHaveBeenCalled();
+    fireEvent.mouseOver(interviewHelp);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(interviewAbout);
+    fireEvent.mouseOut(interviewHelp);
+    await waitFor(() => expect(screen.queryByRole('tooltip')).not.toBeInTheDocument());
+    const groupHelp = screen.getByRole('button', { name: 'About Group Conversation' });
+    fireEvent.focus(groupHelp);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Record a group discussion');
+    fireEvent.blur(groupHelp);
+    const prefill = screen.getByRole('region', { name: 'Let your AI draft your answers' });
+    // Its description is only read out with its "?", not shown as text.
+    const prefillAbout =
+      'Your AI drafts answers from what it knows about you, and you review them here before anything is submitted.';
+    expect(within(prefill).getByText(prefillAbout)).not.toBeVisible();
+    expect(
+      within(prefill).getByRole('button', { name: 'About letting your AI draft your answers' }),
+    ).toHaveAccessibleDescription(prefillAbout);
+    expect(prefill).toHaveAttribute('data-testid', E2E_TESTIDS.SESSION_VOICE_PREFILL);
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_VOICE_MODE_CHOOSER)).not.toContainElement(prefill);
+    expect(
+      screen.getByTestId(E2E_TESTIDS.SESSION_VOICE_MODE_GROUP).compareDocumentPosition(prefill) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(within(prefill).getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_COPY_AGENT_PROMPT)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_VOICE_MODE_INTERVIEW));
     expect(baseProps.onSelectMode).toHaveBeenCalledWith('interview');
@@ -1215,10 +1955,47 @@ describe('SessionVoiceModeModal', () => {
     expect(baseProps.onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('opens Group Conversation directly as an embedded recorder', () => {
+  it('finds the session Worker for the AI-prefill card once, even as the page re-renders', async () => {
+    let resolveWorker: (url: string) => void = () => {};
+    jest.mocked(getCorsProxyUrlOrThrow).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveWorker = resolve;
+        }),
+    );
+    const props = { ...baseProps, workerUrl: undefined };
+    const view = render(<SessionVoiceModeModal {...props} context={{ account: '0xabc' }} />);
+    // The page passes a new context object on every render; the lookup isn't restarted.
+    view.rerender(<SessionVoiceModeModal {...props} context={{ account: '0xabc' }} />);
+    expect(getCorsProxyUrlOrThrow).toHaveBeenCalledTimes(1);
+    expect(screen.queryByTestId(E2E_TESTIDS.SESSION_VOICE_PREFILL)).not.toBeInTheDocument();
+    await act(async () => resolveWorker('https://worker.example'));
+    expect(await screen.findByTestId(E2E_TESTIDS.SESSION_VOICE_PREFILL)).toBeInTheDocument();
+  });
+
+  it('leaves the AI-prefill card out when the session has no Worker', async () => {
+    jest.mocked(getCorsProxyUrlOrThrow).mockRejectedValueOnce(new Error('No session Worker'));
+    render(<SessionVoiceModeModal {...baseProps} workerUrl={undefined} />);
+    await act(async () => {});
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_VOICE_MODE_CHOOSER)).toBeInTheDocument();
+    expect(screen.queryByTestId(E2E_TESTIDS.SESSION_VOICE_PREFILL)).not.toBeInTheDocument();
+  });
+
+  it('keeps the AI-prefill prompt out of the interview itself', () => {
+    render(<SessionVoiceModeModal {...baseProps} mode="interview" />);
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START)).toBeInTheDocument();
+    expect(screen.queryByTestId(E2E_TESTIDS.SESSION_VOICE_PREFILL)).not.toBeInTheDocument();
+    expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_COPY_AGENT_PROMPT)).not.toBeInTheDocument();
+  });
+
+  it('opens Group Conversation with its input guidance in a title tooltip', async () => {
     render(<SessionVoiceModeModal {...baseProps} mode="recordGroup" />);
     expect(screen.getByTestId('mock-group-listening')).toHaveAttribute('data-mode', 'recordGroup');
     expect(screen.getByTestId('mock-group-listening')).toHaveAttribute('data-embedded', 'true');
+    const help = screen.getByRole('button', { name: 'About Group Conversation' });
+    expect(help).toHaveAccessibleDescription('Record, upload audio, or add a transcript.');
+    fireEvent.focus(help);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Record, upload audio, or add a transcript.');
   });
 
   it('stops audio on close while retaining the transcript for continuing the interview', async () => {
@@ -1300,7 +2077,7 @@ describe('SessionVoiceModeModal', () => {
         }),
     );
     try {
-      render(<SessionVoiceModeModal {...baseProps} mode="interview" />);
+      render(<SessionVoiceModeModal {...baseProps} />);
       expect(fetchMock).toHaveBeenCalled();
       expect(screen.getByText('Checking session compatibility…')).toBeInTheDocument();
       const copy = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_COPY_AGENT_PROMPT);
@@ -1349,7 +2126,7 @@ describe('SessionVoiceModeModal', () => {
       jest.mocked(navigator.clipboard.writeText).mockRejectedValue(new Error('NotAllowedError'));
     else Object.defineProperty(navigator, 'clipboard', { configurable: true, value: undefined });
     try {
-      render(<SessionVoiceModeModal {...baseProps} mode="interview" />);
+      render(<SessionVoiceModeModal {...baseProps} />);
       await act(async () => {});
       fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_COPY_AGENT_PROMPT));
       expect(await screen.findByRole('alert')).toHaveTextContent('Copy the prompt below by hand');
@@ -1371,7 +2148,7 @@ describe('SessionVoiceModeModal', () => {
       }),
     } as Response);
     try {
-      render(<SessionVoiceModeModal {...baseProps} mode="interview" />);
+      render(<SessionVoiceModeModal {...baseProps} />);
       await act(async () => {});
       await act(async () => fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_COPY_AGENT_PROMPT)));
       expect(navigator.clipboard.writeText).not.toHaveBeenCalled();
@@ -1397,7 +2174,7 @@ describe('SessionVoiceModeModal', () => {
       .spyOn(globalThis, 'fetch')
       .mockRejectedValueOnce(new Error('offline'))
       .mockResolvedValueOnce(catalog('demo'));
-    const view = render(<SessionVoiceModeModal {...baseProps} mode="interview" />);
+    const view = render(<SessionVoiceModeModal {...baseProps} />);
     const retry = await screen.findByRole('button', { name: 'Retry' });
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_COPY_AGENT_PROMPT));
     expect(navigator.clipboard.writeText).not.toHaveBeenCalled();
@@ -1418,7 +2195,7 @@ describe('SessionVoiceModeModal', () => {
           resolveCatalog = resolve;
         }),
     );
-    view.rerender(<SessionVoiceModeModal {...baseProps} mode="interview" sessionSlug="next" />);
+    view.rerender(<SessionVoiceModeModal {...baseProps} sessionSlug="next" />);
     expect(screen.getByText('Checking session compatibility…')).toBeInTheDocument();
     expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT)).not.toBeInTheDocument();
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_COPY_AGENT_PROMPT));
@@ -1439,11 +2216,10 @@ describe('SessionVoiceModeModal', () => {
         prefillPromptVersion: 'ce-interview-brief-v4',
       }),
     } as Response);
-    render(<SessionVoiceModeModal {...baseProps} mode="interview" />);
+    render(<SessionVoiceModeModal {...baseProps} />);
 
     expect(screen.queryByText(/A realtime voice interviewer will cover/i)).not.toBeInTheDocument();
     expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_CONTEXT)).not.toBeInTheDocument();
-    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveAccessibleName('Interview status: Ready');
     expect(screen.getByRole('button', { name: 'Copy memory augmentation prompt' })).toBeInTheDocument();
     const promptToggle = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT_TOGGLE);
     expect(promptToggle).toHaveAccessibleName('Prompt');
@@ -1453,9 +2229,7 @@ describe('SessionVoiceModeModal', () => {
     expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_AGENT_PROMPT)).not.toBeInTheDocument();
     const copyButton = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_COPY_AGENT_PROMPT);
     expect(copyButton).toHaveAccessibleName('Copy memory augmentation prompt');
-    expect(copyButton).toHaveTextContent(
-      'Copy and paste this prompt into ChatGPT or Claude to augment your interview and draft responses.',
-    );
+    expect(copyButton).toHaveTextContent('Copy and paste this prompt into ChatGPT or Claude.');
     expect(copyButton).toHaveTextContent('Copy');
     expect(screen.queryByText('Copy prompt')).not.toBeInTheDocument();
 
@@ -1484,6 +2258,7 @@ describe('SessionVoiceModeModal', () => {
     fireEvent.click(helpButton!);
     expect(navigator.clipboard.writeText).toHaveBeenCalledTimes(3);
     const plainPrompt = buildExternalInterviewKickoff({
+      questionPriority: { unansweredQuestionIds: ['q1'], answeredQuestionIds: [] },
       workerUrl: baseProps.workerUrl,
       sessionSlug: baseProps.sessionSlug,
       sessionUrl: `${window.location.origin}${window.location.pathname}`,
@@ -1543,7 +2318,7 @@ describe('SessionVoiceModeModal', () => {
         '',
         '/session/demo?src=partner launch&joinGroup=EDDY-2026&agentToken=private#prefill=hidden',
       );
-      render(<SessionVoiceModeModal {...baseProps} mode="interview" />);
+      render(<SessionVoiceModeModal {...baseProps} />);
 
       await act(async () => {});
       await act(async () => fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_COPY_AGENT_PROMPT)));
@@ -1637,13 +2412,12 @@ describe('SessionVoiceModeModal', () => {
     });
     const toggle = await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_TRANSCRIPT_TOGGLE);
     const startControl = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START);
-    const copyPromptButton = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_COPY_AGENT_PROMPT);
     expect(startControl.compareDocumentPosition(toggle) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(toggle.compareDocumentPosition(copyPromptButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW)).toBeInTheDocument();
     expect(screen.queryByLabelText(/Include self-reported AI platform/)).not.toBeInTheDocument();
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_PREDICTION_COMPARISON)).not.toBeChecked();
-    expect(screen.getByRole('group', { name: 'AI research metadata' })).toBeInTheDocument();
+    // Nothing is shared yet, so there is no research metadata to describe.
+    expect(screen.queryByRole('group', { name: 'AI research metadata' })).not.toBeInTheDocument();
     expect(baseProps.onSubmitResponses).not.toHaveBeenCalled();
     expect(screen.queryByLabelText('Pause interview')).not.toBeInTheDocument();
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
@@ -1654,7 +2428,6 @@ describe('SessionVoiceModeModal', () => {
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
     const transcriptContent = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_TRANSCRIPT);
     expect(transcriptContent).toHaveTextContent('Responder: Reversible decisions matter.');
-    expect(transcriptContent.compareDocumentPosition(copyPromptButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     await waitFor(() =>
       expect(mockedMapInterviewEvidenceToResponses).toHaveBeenCalledWith(
         expect.objectContaining({ transcript: 'Responder: Reversible decisions matter.' }),
@@ -1727,7 +2500,7 @@ describe('SessionVoiceModeModal', () => {
     },
   );
 
-  it('maps imported context into reviewable drafts and never selects replacement of an existing draft silently', async () => {
+  it('maps imported context into reviewable drafts and says when one changes an existing answer', async () => {
     mockedMapInterviewEvidenceToResponses.mockResolvedValue([
       { questionId: 'q1', answer: 'Original prediction', evidence: 'Related memory', confidence: 0.81 },
     ]);
@@ -1753,12 +2526,11 @@ describe('SessionVoiceModeModal', () => {
 
     expect(await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW)).toBeInTheDocument();
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_CONTEXT)).toHaveValue('Relevant context');
-    const replacement = screen.getByRole('button', { name: 'Replace with draft' });
-    expect(replacement).toBeEnabled();
-    expect(screen.getByRole('button', { name: 'Remove draft for What matters?' })).toBeDisabled();
-    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY)).toBeDisabled();
+    expect(screen.getByText('Changes your earlier answer')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Replace with draft' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Remove draft for What matters?' })).toBeEnabled();
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY)).toBeEnabled();
 
-    fireEvent.click(replacement);
     await editReadableDraftText('Draft answer for What matters?', 'Reviewed answer');
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
 
@@ -1806,7 +2578,6 @@ describe('SessionVoiceModeModal', () => {
 
     const review = await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
     expect(within(review).queryByText('*')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Replace with draft' }));
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
 
     await waitFor(() => expect(baseProps.onApplyAnswer).toHaveBeenCalledWith('q1', 'Original prediction'));
@@ -1906,32 +2677,39 @@ describe('SessionVoiceModeModal', () => {
     }
   });
 
-  it('hides manual group refresh after edits even when a group catalog was available', async () => {
-    mockedUseSessionInterviewGroupRecommendations.mockReturnValue({
-      availability: 'available',
-      recommendations: [],
-    });
-    mockedMapInterviewEvidenceToResponses.mockResolvedValue([{ questionId: 'q1', answer: 'Draft answer' }]);
-    render(
-      <SessionVoiceModeModal
-        {...baseProps}
-        mode="interview"
-        prefillPacket={{
-          version: 1,
-          sessionSlug: 'demo',
-          questionSetHash: 'a'.repeat(64),
-          promptVersion: 'ce-interview-brief-v1',
-          source: { platform: 'other', modelId: 'fixture', verification: 'self_reported' },
-          responderContext: { summary: 'Relevant context' },
-        }}
-      />,
-    );
+  it.each([true, false])(
+    'offers group refresh after edits only while suggestions are on (%s)',
+    async (suggestGroups) => {
+      mockedUseSessionInterviewGroupRecommendations.mockReturnValue({
+        availability: 'available',
+        recommendations: [],
+      });
+      mockedMapInterviewEvidenceToResponses.mockResolvedValue([{ questionId: 'q1', answer: 'Draft answer' }]);
+      render(
+        <SessionVoiceModeModal
+          {...baseProps}
+          mode="interview"
+          sessionConfig={{ interviewMode: { suggestGroups } }}
+          prefillPacket={{
+            version: 1,
+            sessionSlug: 'demo',
+            questionSetHash: 'a'.repeat(64),
+            promptVersion: 'ce-interview-brief-v1',
+            source: { platform: 'other', modelId: 'fixture', verification: 'self_reported' },
+            responderContext: { summary: 'Relevant context' },
+          }}
+        />,
+      );
 
-    await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
-    expect(screen.queryByRole('button', { name: 'Refresh group suggestions' })).not.toBeInTheDocument();
-    await editReadableDraftText('Draft answer for What matters?', 'Edited answer');
-    expect(screen.queryByRole('button', { name: 'Refresh group suggestions' })).not.toBeInTheDocument();
-  });
+      await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+      expect(screen.queryByRole('button', { name: 'Refresh group suggestions' })).not.toBeInTheDocument();
+      await editReadableDraftText('Draft answer for What matters?', 'Edited answer');
+      // An edit clears the suggestions until the person asks for fresh ones.
+      expect(screen.queryAllByRole('button', { name: 'Refresh group suggestions' })).toHaveLength(
+        suggestGroups ? 1 : 0,
+      );
+    },
+  );
 
   it('hides manual group refresh after edits when the session has no configured groups', async () => {
     mockedUseSessionInterviewGroupRecommendations.mockReturnValue({
@@ -2089,6 +2867,12 @@ describe('SessionVoiceModeModal', () => {
     render(<SessionVoiceModeModal {...baseProps} mode="interview" prefillPacket={prefillPacket} />);
 
     await expectReadableDraftText('Draft answer for What matters?', 'Predicted answer from memory');
+    // A prefill link opens on its drafts, with a status line, and the interview talks them through.
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_PREFILL_STATUS)).toHaveTextContent(
+      'Your AI drafted 1 answer · Claude, self-reported',
+    );
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START)).toHaveAccessibleName('Talk through your drafts');
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START)).toBeEnabled();
     await editReadableDraftText('Draft answer for What matters?', 'Reviewed correction before speaking');
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START));
 
@@ -2102,6 +2886,22 @@ describe('SessionVoiceModeModal', () => {
     expect(instructions).toContain('Related prior signal.');
     expect(instructions).not.toContain('Unknown question answer');
     expect(instructions).not.toContain('claude-example');
+  });
+
+  it('notes how many answers any AI prefill drafted, naming only a known platform', async () => {
+    const prefillPacket = {
+      version: 1 as const,
+      sessionSlug: 'demo',
+      source: { platform: 'other' as const, modelId: 'other-model', verification: 'self_reported' as const },
+      responderContext: {},
+      responses: [{ questionId: 'q1', answer: 'Drafted by another AI', confidence: 0.5 }],
+    };
+    render(<SessionVoiceModeModal {...baseProps} mode="interview" prefillPacket={prefillPacket} />);
+    await expectReadableDraftText('Draft answer for What matters?', 'Drafted by another AI');
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_PREFILL_STATUS)).toHaveTextContent(
+      /^Your AI drafted 1 answer$/,
+    );
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START)).toHaveAccessibleName('Talk through your drafts');
   });
 
   it('sends only the reviewed responder context to the interviewer and the draft mapper', async () => {
@@ -2354,11 +3154,9 @@ describe('SessionVoiceModeModal', () => {
     expect(metadata).toHaveTextContent('Platform');
     expect(metadata).toHaveTextContent('Claude');
     expect(metadata).toHaveTextContent('Question set');
-    expect(metadata).toHaveTextContent(
-      'Predictions, reviewed values, changed fields, and unselected drafts will not be included.',
-    );
+    expect(metadata).not.toHaveTextContent('will not be included');
     fireEvent.click(includeComparison);
-    expect(metadata).toHaveTextContent('1 selected draft and 0 unselected drafts');
+    expect(metadata).toHaveTextContent('1 selected draft:');
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
 
     await waitFor(() =>
@@ -2830,5 +3628,60 @@ describe('Interview cancellation and recovery', () => {
       ),
     );
     await expectReadableDraftText('Draft answer for What matters?', 'New evidence');
+  });
+  it('opens the interview and personal AI prompt with the newest unanswered breakout questions', async () => {
+    const props = {
+      ...baseProps,
+      questionPool: [
+        { id: 'q1', prompt: 'Opening question', type: 'freeform', storageRef: { createdAt: '2026-10-28T10:00:00Z' } },
+        {
+          id: 'q2',
+          prompt: 'First breakout question',
+          type: 'freeform',
+          storageRef: { createdAt: '2026-10-29T10:00:00Z' },
+        },
+        {
+          id: 'q3',
+          prompt: 'Newest breakout question',
+          type: 'freeform',
+          storageRef: { createdAt: '2026-10-29T11:00:00Z' },
+        },
+      ],
+      existingResponseSlice: { answers: { q1: { value: 'Private prior answer' } } },
+    };
+    jest.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          type: 'context-engine.interview-question-catalog',
+          version: 1,
+          sessionSlug: 'demo',
+          prefillPromptVersion: 'ce-interview-brief-v6',
+        }),
+      ),
+    );
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: jest.fn(async () => undefined) },
+    });
+    const openingHook = require('./useInterviewOpening').useInterviewOpening;
+    openingHook.mockReturnValue({ opening: 'Already covered opening', notice: '', loading: false });
+    mockVoiceRound('');
+    const voice = render(<SessionVoiceModeModal {...props} mode="interview" />);
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START));
+    await screen.findByLabelText('Pause interview');
+    const brief = mockedStartSessionRealtimeInterview.mock.lastCall?.[0].instructions || '';
+    expect(brief.indexOf('[q3]')).toBeLessThan(brief.indexOf('[q2]'));
+    expect(brief).not.toContain('[q1]');
+    expect(brief).not.toContain('Already covered opening');
+    openingHook.mockReturnValue({ opening: '', notice: '', loading: false });
+    voice.unmount();
+    render(<SessionVoiceModeModal {...props} mode={null} />);
+    const copy = await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_COPY_AGENT_PROMPT);
+    await waitFor(() => expect(copy).toHaveAttribute('aria-disabled', 'false'));
+    fireEvent.click(copy);
+    const prompt = jest.mocked(navigator.clipboard.writeText).mock.lastCall?.[0] || '';
+    expect(prompt).toContain('Unanswered question IDs, newest first: ["q3","q2"]');
+    expect(prompt).toContain('Already answered IDs, only for changes I request: ["q1"]');
+    expect(prompt).not.toContain('Private prior answer');
   });
 });

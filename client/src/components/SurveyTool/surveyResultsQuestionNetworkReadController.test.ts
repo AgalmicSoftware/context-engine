@@ -4,6 +4,43 @@ import {
 } from './surveyResultsQuestionNetworkReadController';
 
 describe('surveyResultsQuestionNetworkReadController', () => {
+  describe('hidden questions', () => {
+    const bucket = {
+      questions: {
+        q1: { id: 'q1', prompt: 'Shown', sessionSlug: 'edge', type: 'freeform' },
+        Q2: { id: 'Q2', prompt: 'Hidden', sessionSlug: 'edge', type: 'freeform' },
+      },
+      questionResponses: { q1: { '0xa': 'one' }, Q2: { '0xa': 'two' } },
+    };
+    const readArgs = (hidden: string[]) => ({
+      netIdStr: '1',
+      questionReadSlugs: ['edge'],
+      ports: {
+        readQuestionBucket: () => bucket,
+        readHiddenQuestionIds: () => new Set(hidden),
+      },
+    });
+
+    it('leaves them and their answers out', async () => {
+      const { result } = runSurveyResultsQuestionNetworkReadController(readArgs(['q2']));
+      expect(Object.keys(result.questions)).toEqual(['q1']);
+      expect(Object.keys(result.questionResponses)).toEqual(['q1']);
+      const asyncRead = await runSurveyResultsQuestionNetworkAsyncReadController(readArgs(['q2']));
+      expect(Object.keys(asyncRead.result.questions)).toEqual(['q1']);
+      expect(Object.keys(asyncRead.result.questionResponses)).toEqual(['q1']);
+    });
+
+    it('reads again when the hidden list changes, with the same cached data', () => {
+      const first = runSurveyResultsQuestionNetworkReadController(readArgs([]));
+      expect(Object.keys(first.result.questions)).toEqual(['q1', 'q2']);
+      const same = runSurveyResultsQuestionNetworkReadController({ ...readArgs([]), previousMemo: first.memo });
+      expect(same.memoHit).toBe(true);
+      const changed = runSurveyResultsQuestionNetworkReadController({ ...readArgs(['q2']), previousMemo: first.memo });
+      expect(changed.memoHit).toBe(false);
+      expect(Object.keys(changed.result.questions)).toEqual(['q1']);
+    });
+  });
+
   it('reads scoped question buckets through the injected read port and returns a plain memo result', () => {
     const buckets: Record<string, unknown> = {
       edge: {

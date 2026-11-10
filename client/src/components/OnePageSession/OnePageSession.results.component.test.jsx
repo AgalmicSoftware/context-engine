@@ -7,6 +7,7 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { ethers } from 'ethers';
 import { TestMemoryRouter as MemoryRouter } from 'testUtils/TestMemoryRouter';
 import OnePageSession from './OnePageSession';
+import { readContextHtmlPage } from './SessionContextHtml';
 import { loadDemoSessionFixtures } from '../SurveyTool/demoSessionFixtureLoader';
 import OnePageSessionStandardShell, { DEFAULT_CORPUS_VIEWER_LOAD_STATE } from './OnePageSessionStandardShell';
 import styles from './OnePageSession.module.scss';
@@ -18,6 +19,7 @@ import * as sessionScanScope from '../../utilities/session/sessionScanScope.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { t } from '../../utilities/ui/terminology.js';
 import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../../utilities/session/sessionModeProfile';
+import { upsertWorkerCanonicalSessionBootstrap } from '../../utilities/session/sessionWorkerConfigCache';
 import {
   resolveWorkerCanonicalCacheIdentity,
   withWorkerCanonicalCacheIdentity,
@@ -29,6 +31,8 @@ let mockRenderRealPolisReport = false;
 const mockSBTsPage = jest.fn();
 const mockDebateMap = jest.fn();
 const mockTopicCircles = jest.fn();
+// The atlas hook has its own tests; here it stands in for a Worker's answer.
+let mockDebateAtlasState = null;
 const mockRiskMatrix = jest.fn();
 const mockDemoAnalysisWorkspace = jest.fn();
 const mockCorpusViewer = jest.fn();
@@ -82,6 +86,22 @@ const extractMediaBlock = (scss, query, requiredSnippet = '') => {
 
   return null;
 };
+
+// The page's context sources, as the Worker would list them for this reader.
+const mockContextSources = { current: null };
+const emptyContextSources = () => ({
+  sources: [],
+  loading: false,
+  error: '',
+  supported: false,
+  isAdmin: false,
+  reload: () => {},
+});
+jest.mock('../../utilities/docLibrary/useSessionContextSources', () => ({
+  ...jest.requireActual('../../utilities/docLibrary/useSessionContextSources'),
+  useSessionContextSources: () => mockContextSources.current || emptyContextSources(),
+}));
+jest.mock('../Sessions/setup/ContextSourcesPanel', () => () => <div data-testid="mock-context-sources-panel" />);
 
 jest.mock('../SurveyTool/SurveyPage', () => (props) => {
   mockSurveyPage(props);
@@ -174,6 +194,21 @@ jest.mock('../DemoViews/DemoAnalysis/DemoAnalysisWorkspace', () => ({
     return <div data-testid="demo-analysis-workspace-view">Demo Analysis</div>;
   },
 }));
+jest.mock('../DebateAtlas/useSessionDebateAtlas', () => ({
+  useSessionDebateAtlas: () =>
+    mockDebateAtlasState || {
+      supported: false,
+      builds: [],
+      build: null,
+      canBuild: false,
+      building: false,
+      loading: false,
+      activeSinceMs: null,
+      error: '',
+      buildAtlas: async () => false,
+      selectBuild: () => {},
+    },
+}));
 jest.mock('../SessionResults/SessionGeneratedResultsViews', () => ({
   __esModule: true,
   default: (props) => (
@@ -245,6 +280,7 @@ jest.mock('../DemoViews/CorpusViewer', () => {
 describe('OnePageSession results routing', () => {
   afterEach(() => {
     mockRenderRealPolisReport = false;
+    mockDebateAtlasState = null;
     jest.useRealTimers();
     jest.clearAllMocks();
     jest.restoreAllMocks();
@@ -299,6 +335,55 @@ describe('OnePageSession results routing', () => {
     });
     return subject;
   };
+
+  it('rebuilds a reopened report when the session hidden list changed', () => {
+    const storeSession = (hidden) =>
+      upsertWorkerCanonicalSessionBootstrap({
+        slug: 'edge',
+        sessionIdHex: `0x${'1'.repeat(32)}`,
+        workerOrigin: 'https://report-worker.example.test',
+        configRevision: 'r1',
+        config: {
+          slug: 'edge',
+          sessionId: `0x${'1'.repeat(32)}`,
+          corsWorkerUrl: 'https://report-worker.example.test',
+          BLOCKED_QUESTION_IDS: hidden,
+          sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+        },
+      });
+    jest.useFakeTimers();
+    window.localStorage.clear();
+    const subject = createSubject({ slug: 'edge' });
+    subject.state = { ...subject.state, showResults: true };
+    subject.buildAggregator = jest.fn();
+    const scheduleBuild = () => {
+      subject.scheduleBuildAggregator(0);
+      jest.runOnlyPendingTimers();
+    };
+
+    storeSession([]);
+    scheduleBuild();
+    expect(subject.buildAggregator).toHaveBeenCalledTimes(1);
+    scheduleBuild();
+    expect(subject.buildAggregator).toHaveBeenCalledTimes(1);
+
+    storeSession(['q2']);
+    scheduleBuild();
+    expect(subject.buildAggregator).toHaveBeenCalledTimes(2);
+
+    window.localStorage.clear();
+    jest.useRealTimers();
+  });
+
+  it('reads no session config for the report check while Results is closed', () => {
+    const subject = createSubject({ slug: 'edge' });
+    const getItem = jest.spyOn(Storage.prototype, 'getItem');
+
+    subject.buildAggregatorInputSignature(subject.props, subject.state);
+
+    expect(getItem).not.toHaveBeenCalledWith('ce:sessionWorkerConfigCache:v1');
+    getItem.mockRestore();
+  });
 
   it('opens and scrolls to the inline report after an interview without opening raw results', () => {
     const subject = createSubject();
@@ -775,6 +860,16 @@ describe('OnePageSession results routing', () => {
   it('does not restore consumed interview or prefill intent when sections reopen', () => {
     const priorUrl = window.location.href;
     try {
+      // A ?mode=voice visit is consumed the same way.
+      window.history.replaceState({}, '', '/session/alpha?mode=voice&src=event');
+      const chooserVisit = new OnePageSession(buildProps());
+      chooserVisit.hasAutoMintIntent = jest.fn(() => false);
+      chooserVisit.recordOriginalURL();
+      window.history.replaceState({}, '', '/session/alpha?src=event');
+      chooserVisit.resetDemoURL();
+      expect(new URLSearchParams(window.location.search).get('mode')).toBeNull();
+      expect(new URLSearchParams(window.location.search).get('src')).toBe('event');
+
       window.history.replaceState(
         {},
         '',
@@ -954,6 +1049,54 @@ describe('OnePageSession results routing', () => {
     expect(screen.queryByTestId('ai-policy-atlas')).not.toBeInTheDocument();
   });
 
+  it('lets an admin check AI views when the public report route finds no report', async () => {
+    const originalFetch = global.fetch;
+    const fetchMock = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 404,
+      json: async () => ({
+        ok: false,
+        jobState: 'idle',
+        error: 'No generated results analysis artifact is available yet.',
+      }),
+    });
+    global.fetch = fetchMock;
+    try {
+      render(
+        <OnePageSession
+          {...buildProps()}
+          account="0xabc"
+          loginComplete={true}
+          sessionConfig={{
+            ...buildProps().sessionConfig,
+            adminAddress: '0xAbC',
+            corsWorkerUrl: 'https://worker.example',
+            resultsAnalysis: {
+              version: 1,
+              generationMode: 'manual',
+              views: { circles: true, breakdown: true, riskMatrix: true },
+              autoAfter: { threshold: 10, unit: 'distinctParticipants' },
+              inputScope: 'submitted',
+              publication: 'latest_success_visible',
+            },
+          }}
+        />,
+      );
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
+      await waitFor(() =>
+        expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/results-analysis/artifact'))).toBe(true),
+      );
+      // Let the 404 land: the button is enabled before it does.
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      });
+      expect(screen.getByTestId('ce-session-generated-results-check')).toBeEnabled();
+      expect(screen.getByTestId('ce-session-generated-results-check')).toHaveTextContent('Check AI Views');
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
+
   it('offers only the explicit generated AI status check for a plausible admin hint', async () => {
     render(
       <OnePageSession
@@ -1070,75 +1213,344 @@ describe('OnePageSession results routing', () => {
     expect(within(context).queryByRole('link', { name: /Ignored unsafe link/i })).not.toBeInTheDocument();
   });
 
-  it.each([
-    { slug: 'rxc-test', showDebateMap: true },
-    { slug: 'rxc-ra-test', showDebateMap: false },
-  ])('keeps context and the available results views for $slug', async ({ slug, showDebateMap }) => {
+  it('renders an uploaded HTML context cleaned, in place of paragraphs and links', async () => {
     const props = buildProps();
-    const sessionRef = React.createRef();
     render(
-      <MemoryRouter initialEntries={[`/session/${slug}`]}>
+      <MemoryRouter initialEntries={['/session/edge']}>
         <OnePageSession
           {...props}
-          ref={sessionRef}
-          slug={slug}
+          slug="edge"
           sessionConfig={{
             ...props.sessionConfig,
-            slug,
             sessionContext: {
               title: 'Context',
-              paragraphs: ['A session introduction.', 'More background.'],
-              links: [{ label: 'Official source', url: 'https://example.org/' }],
+              html:
+                '<h2>Areas</h2><details><summary>Trust</summary><p onclick="steal()">Who decides?</p></details>' +
+                '<script>steal()</script><a href="https://example.org/essay">Essay</a>',
             },
           }}
         />
       </MemoryRouter>,
     );
+
     expect(await screen.findByTestId('survey-page-pile')).toBeInTheDocument();
-    expect(screen.queryByTestId('ce-rxc-topic-map')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('ce-rxc-context-atlas')).not.toBeInTheDocument();
     fireEvent.click(screen.getByTestId('ce-demo-documents-toggle'));
-    const atlas = await screen.findByTestId('ce-rxc-context-atlas');
-    expect(atlas).toBeVisible();
-    expect(
-      within(screen.getByTestId('ce-demo-documents-section')).getByRole('heading', {
-        name: /^Context(?! View)/,
-        level: 2,
-      }),
-    ).toBeVisible();
-    expect(atlas).toContainElement(screen.getByTestId('ce-session-context'));
-    expect(screen.getAllByTestId('ce-session-context')).toHaveLength(1);
-    expect(within(atlas).getByRole('group', { name: 'Explore topic groups' })).toBeVisible();
-    expect(screen.queryByTestId('ce-rxc-topic-map')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
-    if (!showDebateMap) {
+    const host = await screen.findByTestId('ce-session-context-html');
+    expect(screen.getByTestId('ce-session-context')).toContainElement(host);
+    // The sanitizer loads on first use, then the page renders.
+    await waitFor(() => expect(readContextHtmlPage(host)?.querySelector('h2')).toBeTruthy());
+    const page = readContextHtmlPage(host);
+    expect(page.querySelector('h2').textContent).toBe('Areas');
+    expect(page.textContent).toContain('Who decides?');
+    expect(page.querySelector('script, [onclick]')).toBeNull();
+    expect(page.querySelector('a[href="https://example.org/essay"]').getAttribute('rel')).toBe('noopener noreferrer');
+  });
+
+  it.each(['rxc-test', 'rxc-ra-test'])(
+    'shows %s its own context, with no built-in atlas or pre-filled Debate Map',
+    async (slug) => {
+      const props = buildProps();
+      const sessionRef = React.createRef();
+      render(
+        <MemoryRouter initialEntries={[`/session/${slug}`]}>
+          <OnePageSession
+            {...props}
+            ref={sessionRef}
+            slug={slug}
+            sessionConfig={{
+              ...props.sessionConfig,
+              slug,
+              sessionContext: {
+                title: 'Context',
+                paragraphs: ['A session introduction.', 'More background.'],
+                links: [{ label: 'Official source', url: 'https://example.org/' }],
+              },
+            }}
+          />
+        </MemoryRouter>,
+      );
+      expect(await screen.findByTestId('survey-page-pile')).toBeInTheDocument();
+      fireEvent.click(screen.getByTestId('ce-demo-documents-toggle'));
+      const context = await screen.findByTestId('ce-session-context');
+      expect(context).toBeVisible();
+      expect(
+        within(screen.getByTestId('ce-demo-documents-section')).getByRole('heading', {
+          name: /^Context(?! View)/,
+          level: 2,
+        }),
+      ).toBeVisible();
+      expect(screen.getAllByTestId('ce-session-context')).toHaveLength(1);
+      expect(context).toHaveTextContent('A session introduction.');
+      expect(context).toHaveTextContent('More background.');
+      expect(within(context).getByRole('link', { name: /Official source/ })).toHaveAttribute(
+        'href',
+        'https://example.org/',
+      );
+      // The atlas is a session's own HTML context now, not something the client adds by slug.
+      expect(screen.queryByTestId('ce-rxc-context-atlas')).not.toBeInTheDocument();
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
       act(() => sessionRef.current.setState({ resultsViewMode: 'debateAtlas' }));
-    }
-    const nav = screen.getByTestId('ce-session-results-view-nav');
-    expect(
-      within(nav)
-        .getAllByRole('button')
-        .map((button) => button.textContent.trim()),
-    ).toEqual(showDebateMap ? ['🧾Report', '🗺️Debate Map', 'Raw Results'] : ['🧾Report', 'Raw Results']);
-    expect(within(nav).getByRole('button', { name: 'Report' })).toHaveAttribute('aria-pressed', 'true');
-    expect(await screen.findByTestId('polis-report')).toBeVisible();
-    expect(screen.queryByTestId('ce-rxc-topic-map')).not.toBeInTheDocument();
-    if (showDebateMap) {
+      const nav = screen.getByTestId('ce-session-results-view-nav');
+      expect(
+        within(nav)
+          .getAllByRole('button')
+          .map((button) => button.textContent.trim()),
+      ).toEqual(['🧾Report', 'Raw Results']);
+      expect(within(nav).getByRole('button', { name: 'Report' })).toHaveAttribute('aria-pressed', 'true');
+      expect(await screen.findByTestId('polis-report')).toBeVisible();
+      expect(screen.queryByTestId('topic-circles')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('ce-session-debate-atlas')).not.toBeInTheDocument();
+      fireEvent.click(within(nav).getByRole('button', { name: 'Raw Results' }));
+      expect(await screen.findByTestId('survey-page-full')).toBeVisible();
+      await waitFor(() => {
+        expect(mockSurveyPage).toHaveBeenLastCalledWith(expect.objectContaining({ autoOpenResults: true }));
+      });
+    },
+  );
+
+  describe('built debate atlases', () => {
+    const atlasBuild = {
+      id: 'atlas_k1_00000001',
+      builtAt: '2026-11-08T14:05:00.000Z',
+      title: 'Salon atlas',
+      counts: { responses: 12, participants: 4, aiResponses: 12 },
+      missingTopics: [],
+      branches: [
+        {
+          id: 'b1',
+          label: 'Trust',
+          summary: 'About trust.',
+          topics: [
+            {
+              id: 'b1t1',
+              label: 'Identity',
+              summary: 'They split.',
+              compass: {
+                x: { label: 'Pace', left: 'Slow', right: 'Fast' },
+                y: { label: 'Scope', top: 'Local', bottom: 'Global' },
+              },
+              positions: [{ label: 'Go slow', participantCount: 2, x: 0.2, y: 0.8 }],
+              participants: [],
+            },
+          ],
+        },
+      ],
+    };
+    const atlasState = (overrides = {}) => ({
+      supported: true,
+      builds: [atlasBuild],
+      build: atlasBuild,
+      canBuild: false,
+      building: false,
+      loading: false,
+      activeSinceMs: null,
+      error: '',
+      buildAtlas: jest.fn(async () => true),
+      selectBuild: jest.fn(),
+      ...overrides,
+    });
+    const renderSession = (slug, sessionRef) => {
+      const props = buildProps();
+      render(
+        <MemoryRouter initialEntries={[`/session/${slug}`]}>
+          <OnePageSession {...props} ref={sessionRef} slug={slug} sessionConfig={{ ...props.sessionConfig, slug }} />
+        </MemoryRouter>,
+      );
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
+    };
+
+    it.each(['rxc-test', 'rxc-ra-test', 'edge'])('shows the built atlas as Debate Map on %s', async (slug) => {
+      mockDebateAtlasState = atlasState();
+      renderSession(slug);
+      const nav = screen.getByTestId('ce-session-results-view-nav');
+      expect(
+        within(nav)
+          .getAllByRole('button')
+          .map((button) => button.textContent.trim()),
+      ).toEqual(['🧾Report', '🗺️Debate Map', 'Raw Results']);
       fireEvent.click(within(nav).getByRole('button', { name: 'Debate Map' }));
-      expect(await screen.findByTestId('topic-circles')).toBeVisible();
-      expect(screen.getByTestId('ce-rxc-topic-map')).toHaveTextContent('Waiting for more data');
-      expect(mockTopicCircles).toHaveBeenLastCalledWith(
-        expect.objectContaining({ atlasLayoutMode: 'packed', readOnly: true }),
+      const view = await screen.findByTestId('ce-session-debate-atlas');
+      expect(within(view).getByRole('heading', { name: 'Salon atlas' })).toBeVisible();
+      expect(view).toHaveTextContent('12 responses · 4 participants');
+      expect(mockDebateMap).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          readOnly: true,
+          hideDemoModeToggle: true,
+          treeData: [expect.objectContaining({ name: 'Trust' })],
+        }),
       );
       expect(screen.queryByTestId('polis-report')).not.toBeInTheDocument();
-      fireEvent.click(within(nav).getByRole('button', { name: 'Report' }));
-      expect(await screen.findByTestId('polis-report')).toBeVisible();
-      expect(screen.queryByTestId('ce-rxc-topic-map')).not.toBeInTheDocument();
-    }
-    fireEvent.click(within(nav).getByRole('button', { name: 'Raw Results' }));
-    expect(await screen.findByTestId('survey-page-full')).toBeVisible();
-    await waitFor(() => {
-      expect(mockSurveyPage).toHaveBeenLastCalledWith(expect.objectContaining({ autoOpenResults: true }));
+    });
+
+    it('shows a built atlas in place of the demo atlas on a demo session', async () => {
+      mockDebateAtlasState = atlasState();
+      renderSession('demo');
+      fireEvent.click(await screen.findByRole('button', { name: /^Debate Map$/i }));
+      await screen.findByTestId('ce-session-debate-atlas');
+      expect(mockDebateMap).toHaveBeenCalled();
+      expect(
+        mockDebateMap.mock.calls.every(([props]) => Array.isArray(props.treeData) && props.demoMode !== true),
+      ).toBe(true);
+    });
+
+    it('offers Build atlas to those who may build and opens Debate Map when it finishes', async () => {
+      const buildAtlas = jest.fn(async () => true);
+      mockDebateAtlasState = atlasState({ builds: [], build: null, canBuild: true, buildAtlas });
+      const sessionRef = React.createRef();
+      renderSession('edge', sessionRef);
+      const button = screen.getByRole('button', { name: 'Build atlas' });
+      expect(button).toBe(screen.getByTestId('ce-session-debate-atlas-build'));
+      expect(button.querySelector('svg[aria-hidden="true"]')).not.toBeNull();
+      fireEvent.click(button);
+      await waitFor(() => expect(sessionRef.current.state.resultsViewMode).toBe('debateAtlas'));
+      expect(buildAtlas).toHaveBeenCalledTimes(1);
+    });
+
+    it.each([
+      [{ canBuild: false }, null, null],
+      [{ canBuild: true, building: true }, 'Building atlas…', /^\s*Building the atlas · \d+s$/],
+      [{ canBuild: true, activeSinceMs: 1 }, 'Building atlas…', /^\s*Building the atlas · \d+s$/],
+      [{ canBuild: true, error: 'Needs at least 2 participants.' }, 'Build atlas', 'Needs at least 2 participants.'],
+    ])('with %j shows button %s and status %s', (state, buttonText, statusText) => {
+      mockDebateAtlasState = atlasState(state);
+      renderSession('edge');
+      const button = screen.queryByTestId('ce-session-debate-atlas-build');
+      const status = screen.queryByTestId('ce-session-debate-atlas-status');
+      if (!buttonText) {
+        expect(button).not.toBeInTheDocument();
+        expect(status).not.toBeInTheDocument();
+        return;
+      }
+      expect(button).toHaveTextContent(buttonText);
+      if (buttonText === 'Build atlas') expect(button).toBeEnabled();
+      else expect(button).toBeDisabled();
+      expect(status).toHaveTextContent(statusText);
+    });
+
+    it('times a running build from its start and offers the model and prompts the Worker gave', () => {
+      mockDebateAtlasState = atlasState({
+        canBuild: true,
+        building: true,
+        buildStartedAtMs: Date.now() - 65_000,
+        nextBuild: { model: 'deep-model', prompts: { plan: 'Plan <Questions>', map: 'Map <Responses>' } },
+      });
+      renderSession('edge');
+      const status = screen.getByTestId('ce-session-debate-atlas-status');
+      expect(within(status).getByRole('status')).toHaveTextContent(/Building the atlas · 6[5-7]s/);
+      expect(status).toHaveTextContent('AI model: deep-model');
+      fireEvent.click(within(status).getByRole('button', { name: /Show AI prompt/ }));
+      expect(within(status).getByRole('region', { name: 'Planning prompt' })).toHaveTextContent('Plan <Questions>');
+    });
+
+    it('opens the atlas at the node an /atlas link asked for, and keeps the session URL', async () => {
+      window.history.replaceState({}, '', '/session/edge?worker=https%3A%2F%2Fw.example&atlas=atlas_k1_00000001%3Ab1');
+      mockDebateAtlasState = atlasState();
+      const sessionRef = React.createRef();
+      const props = buildProps();
+      render(
+        <MemoryRouter initialEntries={['/session/edge']}>
+          <OnePageSession
+            {...props}
+            ref={sessionRef}
+            slug="edge"
+            sessionConfig={{ ...props.sessionConfig, slug: 'edge' }}
+          />
+        </MemoryRouter>,
+      );
+      expect(window.location.search).toBe('?worker=https%3A%2F%2Fw.example');
+      await screen.findByTestId('ce-session-debate-atlas');
+      expect(sessionRef.current.state).toMatchObject({
+        showResults: true,
+        resultsViewMode: 'debateAtlas',
+        requestedAtlasNodeId: 'atlas_k1_00000001:b1',
+      });
+      const { requestedModalNodeId, onModalClose } = mockDebateMap.mock.calls.at(-1)[0];
+      expect(requestedModalNodeId).toBe('atlas_k1_00000001:b1');
+      act(() => onModalClose());
+      expect(sessionRef.current.state.requestedAtlasNodeId).toBeNull();
+      window.history.replaceState({}, '', '/');
+    });
+  });
+
+  describe('context files and links', () => {
+    afterEach(() => {
+      mockContextSources.current = null;
+    });
+    const file = {
+      id: 'file-1',
+      kind: 'file',
+      title: 'deck.pdf',
+      url: '',
+      mime: 'application/pdf',
+      size: 1,
+      createdAt: '2026-10-31T10:00:00.000Z',
+      adminsOnly: true,
+      lockedGroupIds: [],
+      fetchedAt: '',
+      reading: null,
+    };
+    const link = {
+      ...file,
+      id: 'link-1',
+      kind: 'link',
+      title: 'Essay',
+      url: 'https://example.org/essay',
+      adminsOnly: false,
+    };
+    const renderSession = async (sources, isAdmin) => {
+      mockContextSources.current = { ...emptyContextSources(), supported: true, isAdmin, sources };
+      const props = buildProps();
+      render(
+        <MemoryRouter initialEntries={['/session/edge']}>
+          <OnePageSession {...props} slug="edge" />
+        </MemoryRouter>,
+      );
+      expect(await screen.findByTestId('survey-page-pile')).toBeInTheDocument();
+    };
+
+    it('keeps the Context section from participants while there is no context', async () => {
+      await renderSession([], false);
+      expect(screen.queryByTestId('ce-demo-documents-section')).not.toBeInTheDocument();
+    });
+
+    it('shows participants the files and links they may read, without admin controls', async () => {
+      await renderSession([file, link], false);
+      fireEvent.click(screen.getByTestId('ce-demo-documents-toggle'));
+      const list = screen.getByTestId('ce-session-context-sources');
+      expect(within(list).getByRole('link', { name: /Essay/ })).toHaveAttribute('href', 'https://example.org/essay');
+      expect(
+        within(list)
+          .getByRole('link', { name: /deck\.pdf/ })
+          .getAttribute('href'),
+      ).toContain('__ceDocTx=file-1');
+      expect(within(list).queryByText('Admins only')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('ce-session-context-manage')).not.toBeInTheDocument();
+    });
+
+    it('gives admins the Context section with its controls, even before the first item', async () => {
+      await renderSession([], true);
+      fireEvent.click(screen.getByTestId('ce-demo-documents-toggle'));
+      expect(screen.getByTestId('ce-session-context-manage')).toContainElement(
+        screen.getByTestId('mock-context-sources-panel'),
+      );
+      expect(screen.queryByTestId('ce-session-context-sources')).not.toBeInTheDocument();
+    });
+
+    it('gives admins a Group Agent placeholder that says it is coming', async () => {
+      await renderSession([], true);
+      fireEvent.click(screen.getByTestId('ce-demo-documents-toggle'));
+      fireEvent.click(screen.getByTestId('ce-group-agent-open'));
+      const dialog = await screen.findByRole('dialog', { name: 'Group Agent' });
+      expect(dialog).toHaveTextContent('Coming soon');
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Close' }));
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    });
+
+    it('keeps the Group Agent placeholder from participants', async () => {
+      await renderSession([file, link], false);
+      fireEvent.click(screen.getByTestId('ce-demo-documents-toggle'));
+      expect(screen.getByTestId('ce-session-context-sources')).toBeInTheDocument();
+      expect(screen.queryByTestId('ce-group-agent-open')).not.toBeInTheDocument();
     });
   });
 
@@ -1492,56 +1904,76 @@ describe('OnePageSession results routing', () => {
     });
   });
 
-  it('opens linked atlas nodes from the embedded risk matrix and returns to risk matrix when the atlas modal closes', async () => {
-    const props = buildProps();
+  it.each([false, true])(
+    'opens linked atlas nodes from the embedded risk matrix and returns to risk matrix when the atlas modal closes (built atlas: %s)',
+    async (withBuiltAtlas) => {
+      if (withBuiltAtlas) {
+        // The links name demo atlas nodes, so the demo atlas opens for them even beside a built one.
+        const builtAtlas = { id: 'atlas_k1_00000001', builtAt: '2026-11-08T14:05:00.000Z', branches: [] };
+        mockDebateAtlasState = {
+          supported: true,
+          builds: [builtAtlas],
+          build: builtAtlas,
+          canBuild: false,
+          building: false,
+          loading: false,
+          activeSinceMs: null,
+          error: '',
+          buildAtlas: async () => false,
+          selectBuild: () => {},
+        };
+      }
+      const props = buildProps();
 
-    render(
-      <MemoryRouter initialEntries={['/session/demo']}>
-        <OnePageSession {...props} slug="demo" sessionConfig={{ ...props.sessionConfig, slug: 'demo' }} />
-      </MemoryRouter>,
-    );
+      render(
+        <MemoryRouter initialEntries={['/session/demo']}>
+          <OnePageSession {...props} slug="demo" sessionConfig={{ ...props.sessionConfig, slug: 'demo' }} />
+        </MemoryRouter>,
+      );
 
-    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
 
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: /Risk Matrix/i })).toBeInTheDocument();
-    });
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /Risk Matrix/i })).toBeInTheDocument();
+      });
 
-    fireEvent.click(screen.getByRole('button', { name: /Risk Matrix/i }));
+      fireEvent.click(screen.getByRole('button', { name: /Risk Matrix/i }));
 
-    await waitFor(() => {
-      expect(screen.getByTestId('risk-matrix-view')).toBeInTheDocument();
-    });
+      await waitFor(() => {
+        expect(screen.getByTestId('risk-matrix-view')).toBeInTheDocument();
+      });
 
-    fireEvent.click(screen.getByTestId('risk-matrix-open-atlas-node'));
+      fireEvent.click(screen.getByTestId('risk-matrix-open-atlas-node'));
 
-    await waitFor(() => {
-      expect(screen.getByTestId('ai-policy-atlas')).toBeInTheDocument();
-    });
+      await waitFor(() => {
+        expect(screen.getByTestId('ai-policy-atlas')).toBeInTheDocument();
+      });
 
-    const atlasCalls = mockDebateMap.mock.calls.map((args) => args[0]).filter(Boolean);
-    expect(atlasCalls[atlasCalls.length - 1]).toMatchObject({
-      embedded: true,
-      requestedModalNodeId: '0x4110000000000000000000000000000000000000000000000000000000000000',
-    });
+      const atlasCalls = mockDebateMap.mock.calls.map((args) => args[0]).filter(Boolean);
+      expect(atlasCalls[atlasCalls.length - 1]).toMatchObject({
+        embedded: true,
+        requestedModalNodeId: '0x4110000000000000000000000000000000000000000000000000000000000000',
+      });
+      expect(screen.queryByTestId('ce-session-debate-atlas')).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Close Atlas Modal' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Close Atlas Modal' }));
 
-    await waitFor(() => {
-      expect(screen.getByTestId('risk-matrix-view')).toBeInTheDocument();
-    });
+      await waitFor(() => {
+        expect(screen.getByTestId('risk-matrix-view')).toBeInTheDocument();
+      });
 
-    const riskMatrixCalls = mockRiskMatrix.mock.calls.map((args) => args[0]).filter(Boolean);
-    expect(
-      riskMatrixCalls.some(
-        (props) =>
-          props?.restoreState?.modal === true &&
-          props?.restoreState?.selectedCellId === 'Capabilities_vs_Labor' &&
-          props?.restoreState?.comment === 'Return here after checking the atlas node.',
-      ),
-    ).toBe(true);
-    expect(screen.queryByTestId('ai-policy-atlas')).not.toBeInTheDocument();
-  });
+      const riskMatrixCalls = mockRiskMatrix.mock.calls.map((args) => args[0]).filter(Boolean);
+      expect(
+        riskMatrixCalls.some(
+          (props) =>
+            props?.restoreState?.modal === true &&
+            props?.restoreState?.selectedCellId === 'Capabilities_vs_Labor' &&
+            props?.restoreState?.comment === 'Return here after checking the atlas node.',
+        ),
+      ).toBe(true);
+      expect(screen.queryByTestId('ai-policy-atlas')).not.toBeInTheDocument();
+    },
+  );
 
   it('restores the one-page session view after closing an atlas node opened from Context', async () => {
     const props = buildProps();

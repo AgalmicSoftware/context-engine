@@ -1,7 +1,9 @@
+import { quoteCsvCell } from '../../../shared/csv/quoteCell.mjs';
 import { safeString, lower, safeJsonParse, nowIsoOrCurrent as nowIso, sanitizeSessionSlug } from './runtimePrimitives.mjs';
-import { SUBMIT_REQUEST_USER_KV_PREFIX, SUBMITTED_RESULT_STATUSES } from './agentSubmitQueue.mjs';
+import { loadSubmittedResultRecords, selectCurrentSubmittedAnswers } from './submittedResults.mjs';
 import { AGENT_ONLY_ANSWER_EVENT_KV_PREFIX, AGENT_ONLY_ANSWER_STATE_KV_PREFIX, AGENT_ONLY_VOTE_EVENT_KV_PREFIX, AGENT_ONLY_HUMAN_VOTE_EVENT_KV_PREFIX, AGENT_ONLY_WRAPPED_IMAGE_KV_PREFIX, AGENT_ONLY_ATTEMPT_EVENT_KV_PREFIX, AGENT_ONLY_PRINCIPAL_ID_SALT, hmacSha256Hex, normalizeAgentOnlyRunId } from './wrappedCore.mjs';
 import { loadWrappedStatements } from './wrappedStatements.mjs';
+import { agentOnlyRunResponseCoverage } from './wrappedEvidence.mjs';
 import { WRAPPED_QUESTION_SOURCE_MODES } from './wrappedQuestionSource.mjs';
 import { normalizeTokenCount, normalizeDailyTokenUsage, normalizeTokenUsageDates } from './wrappedMetadata.mjs';
 import { reviewStatusForCurrentAgentAnswer } from './wrappedReview.mjs';
@@ -21,48 +23,20 @@ export async function readKvJson(env = {}, key = '') {
 
 export function csvEscape(value) {
   const text = typeof value === 'string' ? value : JSON.stringify(value ?? '');
-  return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+  return quoteCsvCell(text);
 }
 
 export function rowsToCsv(rows = []) {
   if (!rows.length) return '';
   const columns = [...new Set(rows.flatMap((row) => Object.keys(row)))];
   return [
-    columns.join(','),
+    columns.map(quoteCsvCell).join(','),
     ...rows.map((row) => columns.map((column) => csvEscape(row[column])).join(',')),
   ].join('\n');
 }
 
 export function rowsToJsonl(rows = []) {
   return rows.map((row) => JSON.stringify(row)).join('\n');
-}
-
-export async function latestSubmittedAnswerFor({
-  env = {},
-  sessionSlug = '',
-  telegramUserId = '',
-  questionId = '',
-  beforeIso = '',
-} = {}) {
-  const slug = sanitizeSessionSlug(sessionSlug);
-  const user = safeString(telegramUserId).replace(/[^0-9A-Za-z_-]/g, '').slice(0, 128);
-  const question = safeString(questionId).replace(/[^0-9A-Za-z._:-]/g, '').slice(0, 160);
-  if (!slug || !user || !question) return null;
-  const prefix = `${SUBMIT_REQUEST_USER_KV_PREFIX}${slug}:${user}:${question}:`;
-  const entries = await listKvEntriesByPrefix(env, prefix);
-  const beforeMs = Date.parse(safeString(beforeIso));
-  let latest = null;
-  for (const entry of entries) {
-    const record = await readKvJson(env, entry.key);
-    if (!record || safeString(record.questionId) !== safeString(questionId)) continue;
-    const status = safeString(record.status);
-    if (status && !SUBMITTED_RESULT_STATUSES.includes(status)) continue;
-    const createdAt = safeString(record.createdAt || record.processedAt || record.updatedAt);
-    const createdMs = Date.parse(createdAt);
-    if (Number.isFinite(beforeMs) && (!Number.isFinite(createdMs) || createdMs >= beforeMs)) continue;
-    if (!latest || Date.parse(safeString(latest.createdAt)) < createdMs) latest = { ...record, createdAt };
-  }
-  return latest;
 }
 
 export async function exportAgentOnlyData({
@@ -102,6 +76,20 @@ export async function exportAgentOnlyData({
       const other = await loadWrappedStatements({ env, sessionSlug: slug, readabilityOnly: true, questionSourceMode });
       if (!other.ok) return other;
       for (const statement of other.space.statements) readable.add(statement.statement_id);
+    }
+  }
+  const submittedHistory = new Map();
+  const currentSubmitted = new Map();
+  const answerKey = (user, question) => JSON.stringify([safeString(user), safeString(question)]);
+  if (view === 'gold' || view === 'wide' && !compactExport) {
+    const records = await loadSubmittedResultRecords(env, slug, { includeRawAnswer: true });
+    for (const record of records) {
+      const key = answerKey(record.telegramUserId, record.questionId);
+      if (!submittedHistory.has(key)) submittedHistory.set(key, []);
+      submittedHistory.get(key).push(record);
+    }
+    for (const record of selectCurrentSubmittedAnswers(records)) {
+      currentSubmitted.set(answerKey(record.telegramUserId, record.questionId), record);
     }
   }
   if (['answers', 'wide', 'calibration', 'gold'].includes(view)) {
@@ -190,13 +178,9 @@ export async function exportAgentOnlyData({
             created_at: safeString(record.createdAt),
           });
         } else if (safeString(record.source) === 'agent_autofill' && record.eventKind === 'answer') {
-          const prior = await latestSubmittedAnswerFor({
-            env,
-            sessionSlug: slug,
-            telegramUserId: record.telegramUserId,
-            questionId: record.questionId,
-            beforeIso: record.createdAt,
-          });
+          const beforeMs = Date.parse(record.createdAt);
+          const history = submittedHistory.get(answerKey(record.telegramUserId, record.questionId)) || [];
+          const [prior] = selectCurrentSubmittedAnswers(history.filter(answer => Date.parse(answer.createdAt) < beforeMs));
           if (!prior) continue;
           rows.push({
             principal_id: principalId,
@@ -235,12 +219,7 @@ export async function exportAgentOnlyData({
             sessionSlug: slug,
             questionId: statementId,
           });
-          const normal = compactExport ? null : await latestSubmittedAnswerFor({
-            env,
-            sessionSlug: slug,
-            telegramUserId: state.telegramUserId,
-            questionId: statementId,
-          });
+          const normal = compactExport ? null : currentSubmitted.get(answerKey(state.telegramUserId, statementId));
           rows.push({
             principal_id: principalId,
             statement_id: safeString(statementId),
@@ -301,6 +280,7 @@ export async function exportAgentOnlyData({
         status: Number(record.status) || 0,
         reason: safeString(record.reason),
         request_id: safeString(record.requestId),
+        replay: record.replay === true,
         accepted: record.counts?.accepted ?? null,
         skips_recorded: record.counts?.skipsRecorded ?? null,
         budget_used: record.counts?.budgetUsed ?? null,
@@ -312,15 +292,27 @@ export async function exportAgentOnlyData({
       });
     }
   } else if (view === 'summary') {
+    const catalog = await loadWrappedStatements({ env, sessionSlug: slug, readabilityOnly: true });
+    if (!catalog.ok) return catalog;
     const entries = await listKvEntriesByPrefix(env, `${AGENT_ONLY_ATTEMPT_EVENT_KV_PREFIX}${slug}:`);
     const principalRows = new Map();
     const runRows = new Map();
     let firstAttemptAt = '';
     let latestAttemptAt = '';
     let includedAttemptEventCount = 0;
+    // Records written by an earlier Worker lack the principal and run that
+    // this summary counts by. Count them as unreadable and report the summary
+    // as incomplete; never attribute them to a guessed principal or run.
+    let unreadableAttemptEventCount = 0;
+    let unreadableAnswerStateCount = 0;
     for (const entry of entries) {
-      const record = await readKvJson(env, entry.key);
-      if (!record) continue;
+      const metadata = entry.metadata;
+      if (!metadata || typeof metadata.u !== 'string' || !metadata.u || typeof metadata.run !== 'string') {
+        unreadableAttemptEventCount += 1;
+        continue;
+      }
+      const record = { telegramUserId: metadata.u, runId: metadata.run, createdAt: metadata.at,
+        stage: metadata.st, ok: metadata.ok === 1 };
       includedAttemptEventCount += 1;
       const createdAt = safeString(record.createdAt);
       if (createdAt && (!firstAttemptAt || createdAt < firstAttemptAt)) firstAttemptAt = createdAt;
@@ -364,22 +356,32 @@ export async function exportAgentOnlyData({
       if (createdAt && (!run.first_attempt_at || createdAt < run.first_attempt_at)) run.first_attempt_at = createdAt;
       if (createdAt && (!run.latest_attempt_at || createdAt > run.latest_attempt_at)) run.latest_attempt_at = createdAt;
       const stage = safeString(record.stage);
-      const counts = record.counts && typeof record.counts === 'object' && !Array.isArray(record.counts)
-        ? record.counts
-        : {};
-      if (stage === 'answers_bulk' && record.ok === true) {
-        run.accepted_answer_count += Number(counts.accepted || 0) || 0;
-      }
-      run.statement_count = Math.max(run.statement_count, Number(counts.statementCount || 0) || 0);
-      run.agent_response_count = Math.max(run.agent_response_count, Number(counts.agentResponseCount || 0) || 0);
-      run.privacy_skip_count = Math.max(run.privacy_skip_count, Number(counts.privacySkipCount || 0) || 0);
+
       if (stage === 'wrapped_image' && record.ok === true) run.wrapped_image_ok = true;
     }
+    const coverageByRun = new Map();
+    const stateEntries = await listKvEntriesByPrefix(env, `${AGENT_ONLY_ANSWER_STATE_KV_PREFIX}${slug}:`);
+    for (const entry of stateEntries) {
+      const state = await readKvJson(env, entry.key);
+      if (!state) continue;
+      if (!Array.isArray(state.runScopes)) {
+        if (Object.values(state.byStatement || {}).some(value => value?.agent || value?.agentSkip)) unreadableAnswerStateCount += 1;
+        continue;
+      }
+      const principalId = await agentOnlyPrincipalId(env, state.telegramUserId);
+      for (const scope of state.runScopes) {
+        coverageByRun.set(`${principalId}\t${scope.runId}`, agentOnlyRunResponseCoverage(scope));
+      }
+    }
     const runs = [...runRows.values()].map((run) => {
-      const answerTarget = Math.max(Number(run.statement_count || 0), Number(run.agent_response_count || 0));
-      const answerComplete = answerTarget > 0 && Number(run.accepted_answer_count || 0) >= answerTarget;
+      const coverage = coverageByRun.get(`${run.principal_id}\t${run.run_id}`) || agentOnlyRunResponseCoverage();
+      const answerComplete = coverage.allStatementsCovered;
       return {
         ...run,
+        accepted_answer_count: coverage.agentResponseCount,
+        statement_count: coverage.statementCount,
+        agent_response_count: coverage.agentResponseCount,
+        privacy_skip_count: coverage.privacySkipCount,
         answer_complete: answerComplete,
         successful: answerComplete || run.wrapped_image_ok,
       };
@@ -394,10 +396,14 @@ export async function exportAgentOnlyData({
     }
     const principals = [...principalRows.values()]
       .sort((left, right) => safeString(left.first_attempt_at).localeCompare(safeString(right.first_attempt_at)));
+    const complete = unreadableAttemptEventCount === 0 && unreadableAnswerStateCount === 0;
     const summary = {
       ok: true,
       session_slug: slug,
       generated_at: nowIso(now),
+      complete,
+      unreadable_attempt_event_count: unreadableAttemptEventCount,
+      unreadable_answer_state_count: unreadableAnswerStateCount,
       attempt_event_count: includedAttemptEventCount,
       distinct_principal_count: principals.length,
       answer_complete_principal_count: principals.filter((principal) => principal.answer_complete_run_count > 0).length,
@@ -414,6 +420,8 @@ export async function exportAgentOnlyData({
     };
     const outputFormat = lower(format) === 'csv' ? 'csv' : lower(format) === 'jsonl' ? 'jsonl' : 'json';
     if (outputFormat === 'csv') {
+      // Principal rows cannot carry the summary's completeness.
+      if (!complete) return { ok: false, status: 409, reason: 'agent_only_summary_incomplete' };
       return {
         ok: true,
         rows: principals,

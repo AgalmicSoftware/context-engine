@@ -18,10 +18,6 @@ export type PostImage = {
   caption?: string;
 };
 
-export type PostsManifest = {
-  posts: PostManifestEntry[];
-};
-
 export type LoadedPost = PostManifestEntry & {
   markdown: string;
 };

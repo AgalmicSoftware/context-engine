@@ -23,8 +23,7 @@ import {
   getAdminSecretFieldStatusLabel,
   type AdminSecretPresenceStatus,
 } from './adminPageSecretCardHelpers';
-import { shouldShowInlineResourceSummary } from './adminPageMetadataDraftHelpers';
-import type { AdminResourceDisplayState } from './adminPageResourceDisplayHelpers';
+import { shouldShowInlineResourceSummary, type AdminResourceDisplayState } from './adminPageResourceDisplayHelpers';
 import styles from './AdminPage.module.scss';
 
 type AdminSecrets = Record<string, string>;

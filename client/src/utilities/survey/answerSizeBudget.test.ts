@@ -108,7 +108,7 @@ const envelopeFor = (value: unknown, kind: string, audience: string, sbtCount = 
         fieldKey: kind,
       }),
       recipients: recipientsFor(audience, context, sbtCount),
-      commitments: { keccak256: hex(32), poseidon: (2n ** 254n).toString() },
+      commitments: { keccak256: hex(32), poseidon: hex(32) },
       kind,
     }),
   );

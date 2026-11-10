@@ -67,6 +67,7 @@ export async function recordAgentOnlyAttemptEvent({
     runId: normalizeAgentOnlyRunId(result?.run_id || result?.runId || runIdFromBody(body)),
     mode: lower(result?.mode || body.mode || body.image_mode || body.imageMode),
     requestId: safeString(result?.request_id || result?.requestId || body.request_id || body.requestId),
+    replay: result.replay === true,
     counts: attemptCountsFromResult(result),
     createdAt: nowIso(now),
   };
@@ -80,6 +81,9 @@ export async function recordAgentOnlyAttemptEvent({
       st: normalizedStage.slice(0, 16),
       ok: ok ? 1 : 0,
       r: reason.slice(0, 48),
+      u: record.telegramUserId,
+      run: record.runId,
+      at: record.createdAt,
     },
   });
   return { ok: true, key };

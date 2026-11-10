@@ -22,7 +22,14 @@ registry; a parity test keeps this documentation aligned with it.
 
 `bookmarksCache` and `filters` hold user-authored choices that a refresh cannot
 rebuild. `analysisCache` mixes retained Results analysis artifacts with expiring
-profile summaries; both writers preserve other saved entries. `questionsCache`,
+profile summaries; both writers preserve other saved entries. Profile analysis owns
+its address, session/network, input fingerprint and request generation. Changing
+that context clears the view and modal; late results can still save to the
+original cache but cannot change the new view, timer or busy state. Results generation
+captures its session and cache key before asynchronous work. A completed section
+may be saved to that original cache, but session, reader, chain or input changes
+prevent it from updating the current view. Exports include analysis only when
+its input signature matches the current filtered report. `questionsCache`,
 `surveysCache`, `sbtCache` and `userCache` hold derived remote records and scans.
 
 Logical key format:
@@ -42,7 +49,7 @@ trailing colon.
 
 ## Shared backend behavior
 
-- Primary backend: IndexedDB via `idb-keyval`
+- Primary backend: IndexedDB via the private key/value helper
   - DB name: `ce_cache_v1`
   - store name: `ce_cache_entries_v1`
 - Synchronous render-safe reads come from the in-memory mirror (`peekCacheSync`, `listNamespaceEntriesSync`)
@@ -59,7 +66,14 @@ trailing colon.
 - Fallback behavior:
   - the cache layer does not immediately demote to localStorage on a single IndexedDB error
   - it falls back only after repeated consecutive IDB failures
-- Legacy localStorage keys are still migrated best-effort for older installs
+- Managed localStorage entries are reconciled after IndexedDB outages.
+- Clearing a namespace first persists a new generation in localStorage. Older
+  entries become unreadable immediately and are removed when IndexedDB recovers,
+  including entries absent from the in-memory mirror. New writes use the current
+  generation; a write interrupted by a clear cannot retry into the new one.
+- Deletes report success only after both stores are cleared. Settings reports
+  incomplete clears and reloads only on success; generation markers keep an
+  outage-time clear effective even when physical cleanup must wait.
 - `npm run test:cache-guard` scans all production client paths, including the
   canonical cache implementation, and rejects direct managed-cache access in
   dot, bracket, or optional-bracket form unless a dynamic namespace is guarded
@@ -91,8 +105,6 @@ Cache docs in this folder refer to `<slug>` as the canonical session slug used b
 - `demo_sessions.json`
 - route/session state
 
-Older references to `demoGroups.json` are historical and no longer canonical.
-
 ## Namespace docs
 
 - [`surveys-and-questions-cache-structure.md`](surveys-and-questions-cache-structure.md)
@@ -107,11 +119,11 @@ fields. Equal timestamps use the case-sensitive storage reference as a stable
 fallback, not proof of chronology. Payload-supplied blockchain fields do not
 participate in Worker ordering; on-chain response ordering is unchanged.
 
-The response-cache version clears legacy Worker response rows, response metadata,
-and seen-reference sets once before rehydration. Question/discovery data and
-other chain scopes remain intact. Failed reads remain retryable, and subsequent
-runs reuse immutable references. Rolling back to older client code can restore
-the former ordering behavior; reload/rebuild affected caches after rollback.
+A change to the Worker response-cache version (`workerResponseCacheVersion`)
+clears Worker response rows, response metadata, and seen-reference sets once
+before rehydration. Question and discovery data and other chain scopes stay.
+Failed reads remain retryable, and later runs reuse immutable references. After
+rolling back to older client code, reload to rebuild the affected caches.
 
 Older submission receipts without per-question storage metadata use precise local
 time for the immediate cache write; clock skew can affect that legacy fallback.

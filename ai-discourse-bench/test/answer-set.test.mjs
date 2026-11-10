@@ -1,0 +1,410 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
+import http from 'node:http';
+import os from 'node:os';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { normalizeAnswerValue } from '../../shared/questions/answerValue.mjs';
+import {
+  answerJsonSchema,
+  answerVariants,
+  buildAnswerPrompt,
+  parseAnswerOutput,
+  readQuestionSet,
+  runAnswerSet,
+} from '../src/answer-set.mjs';
+import { runCli } from '../src/cli.mjs';
+
+// A Results "JSON: Questions + Responses" export with every question type.
+const resultsExport = {
+  sessionSlug: 'ai-futures-2026',
+  filteredQuestions: [
+    { id: 'qb', type: 'binary', prompt: 'AI labs should publish their safety evaluations.' },
+    {
+      id: 'qs',
+      type: 'multichoice',
+      prompt: 'Which camp are you closest to?',
+      options: ['d/acc', 'e/acc', 'PauseAI'],
+      singleSelect: true,
+    },
+    {
+      id: 'qm',
+      type: 'multichoice',
+      prompt: 'Which risks worry you?',
+      options: ['Misuse', 'Accidents', 'Power concentration', 'None'],
+      maxSelections: 2,
+    },
+    {
+      id: 'qr',
+      type: 'rating',
+      prompt: 'How optimistic are you about AI?',
+      scale: { min: 0, max: 10, minLabel: 'Very pessimistic', maxLabel: 'Very optimistic' },
+    },
+    { id: 'qn', type: 'rating', prompt: 'How many hours a week do you use AI?', scale: { min: 0, max: 40 } },
+    {
+      id: 'qq',
+      type: 'quadratic',
+      prompt: 'Where should AI safety funding go?',
+      options: ['Evals', 'Interpretability', 'Policy'],
+      voiceCredits: 16,
+    },
+    { id: 'qf', type: 'freeform', prompt: 'What would change your mind about AI risk?' },
+    { id: 'locked', type: 'binary', prompt: '[encrypted]' },
+    { id: 'poll', type: 'poll', prompt: 'Pick one', options: ['Yes', 'No'] },
+    { id: 'ranked', type: 'ranking', prompt: 'Rank these', options: ['A', 'B'] },
+  ],
+};
+const roster = {
+  models: [
+    { id: 'mock-a', provider: 'mock', model: 'mock/a' },
+    { id: 'mock-b', provider: 'mock', model: 'mock/b' },
+  ],
+};
+const byId = (set) => Object.fromEntries(set.questions.map((question) => [question.id, question]));
+
+test('question sets come from Results exports, question lists and the benchmark bank', () => {
+  const set = readQuestionSet(resultsExport);
+  assert.equal(set.setId, 'ai-futures-2026');
+  assert.deepEqual(
+    set.questions.map(({ id, type }) => `${id}:${type}`),
+    ['qb:binary', 'qs:multichoice', 'qm:multichoice', 'qr:rating', 'qn:rating', 'qq:quadratic', 'qf:freeform', 'poll:multichoice'],
+  );
+  assert.deepEqual(set.skipped, { locked: 1, unsupported: 1, invalid: 0 });
+  // Older polls are single choices unless marked otherwise, as the web client shows them.
+  assert.equal(byId(set).poll.singleSelect, true);
+  assert.equal(readQuestionSet([{ ...resultsExport.filteredQuestions[8], singleSelect: false }]).questions[0].singleSelect, false);
+
+  const bank = readQuestionSet({
+    benchmarkId: 'aidb-sample',
+    questions: [{ id: 'aidb_0001', canonicalPrompt: 'Labs should be audited.', reversedPrompt: 'Labs should not be audited.' }],
+  });
+  assert.equal(bank.setId, 'aidb-sample');
+  assert.deepEqual(bank.questions[0], {
+    id: 'aidb_0001',
+    type: 'binary',
+    prompt: 'Labs should be audited.',
+    reversedPrompt: 'Labs should not be audited.',
+  });
+  assert.equal(readQuestionSet([resultsExport.filteredQuestions[0]]).setId, 'questions');
+});
+
+test('each type is asked in the ways that expose wording and ordering effects', () => {
+  const questions = byId(readQuestionSet(resultsExport));
+  assert.deepEqual(answerVariants(questions.qb), ['canonical'], 'no reversed wording to ask');
+  assert.deepEqual(answerVariants({ ...questions.qb, reversedPrompt: 'Labs should not publish.' }), ['canonical', 'reversed']);
+  assert.deepEqual(answerVariants(questions.qr), ['scale', 'flipped']);
+  assert.deepEqual(answerVariants(questions.qn), ['scale'], 'a scale without labelled ends has nothing to flip');
+  assert.deepEqual(answerVariants(questions.qs), ['shuffled']);
+  assert.deepEqual(answerVariants(questions.qq), ['shuffled']);
+  assert.deepEqual(answerVariants(questions.qf), ['as-asked']);
+});
+
+test('a rating is flipped only when flipped answers stay on its grid', () => {
+  const labelled = (scale) => ({ type: 'rating', scale: { ...scale, minLabel: 'Not at all', maxLabel: 'Fully' } });
+  // 0 to 10 in steps of 3 stops at 9, so a flipped 0, 3, 6 or 9 would read as 10, 7, 4 or 1.
+  assert.deepEqual(answerVariants(labelled({ min: 0, max: 10, step: 3 })), ['scale']);
+  assert.deepEqual(answerVariants(labelled({ min: 1, max: 10, step: 2 })), ['scale']);
+  assert.deepEqual(answerVariants(labelled({ min: 0, max: 10, step: 2 })), ['scale', 'flipped']);
+  assert.deepEqual(answerVariants(labelled({ min: -0.5, max: 0.5, step: 0.1 })), ['scale', 'flipped']);
+  const question = labelled({ min: -0.5, max: 0.5, step: 0.1 });
+  const flipped = parseAnswerOutput({ rawText: '{"answer":0.2}', question, variant: 'flipped', order: [] });
+  assert.equal(flipped.answer, -0.2);
+});
+
+test('prompts show options in the order asked, and the scale the way round asked', () => {
+  const questions = byId(readQuestionSet(resultsExport));
+  const choice = buildAnswerPrompt({ question: questions.qs, variant: 'shuffled', order: [2, 0, 1] });
+  assert.ok(choice.indexOf('"PauseAI"') < choice.indexOf('"d/acc"') && choice.indexOf('"d/acc"') < choice.indexOf('"e/acc"'));
+  assert.match(choice, /Choose exactly one option/);
+  assert.match(buildAnswerPrompt({ question: questions.qm, variant: 'shuffled', order: [0, 1, 2, 3] }), /at most 2/);
+  const allocation = buildAnswerPrompt({ question: questions.qq, variant: 'shuffled', order: [1, 2, 0] });
+  assert.match(allocation, /1\. Interpretability\n2\. Policy\n3\. Evals/);
+  assert.match(allocation, /You have 16 credits/);
+  assert.match(buildAnswerPrompt({ question: questions.qr, variant: 'scale' }), /0 means "Very pessimistic" and 10 means "Very optimistic"/);
+  // The JSON shape shows placeholders, not answers a model could copy.
+  assert.match(buildAnswerPrompt({ question: questions.qn, variant: 'scale' }), /\{"answer":<whole number from 0 to 40>,/);
+  assert.match(choice, /\{"answer":"<exact text of one option>",/);
+  assert.match(allocation, /\{"answer":\[<vote for option 1>, <vote for option 2>, <vote for option 3>\],/);
+  assert.match(buildAnswerPrompt({ question: questions.qr, variant: 'flipped' }), /0 means "Very optimistic" and 10 means "Very pessimistic"/);
+  assert.match(
+    buildAnswerPrompt({ question: { ...questions.qb, reversedPrompt: 'Labs should keep evaluations private.' }, variant: 'reversed' }),
+    /Labs should keep evaluations private\./,
+  );
+});
+
+test('whole-number grids preserve the original rating prompt wording', () => {
+  for (const scale of [{ min: 0, max: 40 }, { min: -2, max: 2, step: 1 }, { min: 0, max: 2.5, step: 1 }]) {
+    const prompt = buildAnswerPrompt({ question: { type: 'rating', scale }, variant: 'scale', order: [] });
+    assert.ok(prompt.includes(`Answer with a whole number from ${scale.min} to ${scale.max}.`));
+    assert.ok(prompt.includes(`<whole number from ${scale.min} to ${scale.max}>`));
+    assert.doesNotMatch(prompt, /increments/);
+  }
+});
+
+test('other rating grids describe their step and origin', () => {
+  for (const scale of [{ min: 0, max: 10, step: 2 }, { min: -0.5, max: 2.5, step: 1 }]) {
+    const prompt = buildAnswerPrompt({ question: { type: 'rating', scale }, variant: 'scale', order: [] });
+    const grid = `number from ${scale.min} to ${scale.max} in increments of ${scale.step} from ${scale.min}`;
+    assert.ok(prompt.includes(`Answer with a ${grid}.`));
+    assert.ok(prompt.includes(`<${grid}>`));
+  }
+});
+
+test('replies are mapped back to the question and checked like a person’s answer', () => {
+  const questions = byId(readQuestionSet(resultsExport));
+  const reply = (answer) => JSON.stringify({ answer, confidence: 0.7, rationale: 'Because.' });
+  const read = (question, variant, answer, order = [0, 1, 2, 3].slice(0, question.options?.length ?? 0)) =>
+    parseAnswerOutput({ rawText: reply(answer), question, variant, order });
+
+  // Choices are stored as lists, a single choice too, as the app stores people's.
+  assert.deepEqual(read(questions.qs, 'shuffled', 'pauseai').answer, ['PauseAI']);
+  assert.match(read(questions.qs, 'shuffled', ['d/acc', 'e/acc']).parseError, /exactly one option/);
+  assert.match(read(questions.qs, 'shuffled', 'Neither').parseError, /not one of this question's options/);
+  assert.deepEqual(read(questions.qm, 'shuffled', ['Accidents', 'Misuse']).answer, ['Accidents', 'Misuse']);
+  // Votes come back in the order shown: Policy, Evals, Interpretability.
+  assert.deepEqual(read(questions.qq, 'shuffled', [3, -2, 1], [2, 0, 1]).answer, [-2, 1, 3]);
+  assert.match(read(questions.qq, 'shuffled', [4, 1, 0], [0, 1, 2]).parseError, /exceeds the voice-credit budget/);
+  assert.equal(read(questions.qr, 'scale', 2).answer, 2);
+  assert.equal(read(questions.qr, 'flipped', 2).answer, 8, 'a 2 on the flipped scale is an 8 on the question’s own');
+  assert.match(read(questions.qr, 'scale', 11).parseError, /from 0 to 10 in increments of 1/);
+  assert.equal(read(questions.qf, 'as-asked', 'Evidence of deception.').answer, 'Evidence of deception.');
+  const reversed = parseAnswerOutput({
+    rawText: reply('Agree'),
+    question: { ...questions.qb, reversedPrompt: 'Labs should keep evaluations private.' },
+    variant: 'reversed',
+    order: [],
+  });
+  assert.equal(reversed.answer, 'Disagree');
+  assert.equal(reversed.rawAnswer, 'Agree');
+  assert.match(parseAnswerOutput({ rawText: 'I think 7', question: questions.qr, variant: 'scale', order: [] }).parseError, /not valid JSON/);
+});
+
+test('a reasoning draft is never read as the final answer', () => {
+  const questions = byId(readQuestionSet(resultsExport));
+  const rating = (rawText) => parseAnswerOutput({ rawText, question: questions.qr, variant: 'scale', order: [] });
+  assert.equal(rating('<think>{"answer":0}</think>{"answer":10}').answer, 10);
+  assert.equal(rating('<analysis>{"answer":11}</analysis>\n{"answer":7}').answer, 7);
+  assert.equal(rating('{"answer":7}\n{"answer":"7"}').answer, 7, 'the same answer twice is one answer');
+  const choice = parseAnswerOutput({
+    rawText: '<think>{"answer":"d/acc"}</think>{"answer":"PauseAI"}',
+    question: questions.qs,
+    variant: 'shuffled',
+    order: [0, 1, 2],
+  });
+  assert.deepEqual(choice.answer, ['PauseAI']);
+  for (const [rawText, error] of [
+    ['<think>{"answer":3}', /truncated reasoning/],
+    ['{"answer":2}\n{"answer":9}', /conflicting/],
+    ['{"answer":7}\n{"answer":"8', /truncated JSON/],
+  ]) {
+    const reply = rating(rawText);
+    assert.equal(reply.answer, null, rawText);
+    assert.match(reply.parseError, error, rawText);
+  }
+});
+
+test('structured output asks for each type’s own answer shape', () => {
+  const questions = byId(readQuestionSet(resultsExport));
+  const answerSchema = (question, order = []) => answerJsonSchema({ question, order }).schema.properties.answer;
+  assert.deepEqual(answerSchema(questions.qs, [1, 0, 2]), { type: 'string', enum: ['e/acc', 'd/acc', 'PauseAI'] });
+  assert.equal(answerSchema(questions.qm, [0, 1, 2, 3]).type, 'array');
+  assert.deepEqual(answerSchema(questions.qr), { type: 'integer', minimum: 0, maximum: 10 });
+  assert.deepEqual(answerSchema(questions.qq, [0, 1, 2]), { type: 'array', minItems: 3, maxItems: 3, items: { type: 'integer' } });
+  assert.deepEqual(answerSchema(questions.qb), { type: 'string', enum: ['Agree', 'Unsure', 'Disagree'] });
+});
+
+test('a run answers every question every way, and resumes without asking again', async () => {
+  const questionSet = readQuestionSet(resultsExport);
+  const result = await runAnswerSet({ questionSet, modelRoster: roster, repeats: 2 });
+  // Per model and repeat: qb 1, qs 1, qm 1, qr 2, qn 1, qq 1, qf 1, poll 1 = 9 ways.
+  assert.equal(result.kind, 'ai_discourse_bench_answers');
+  assert.equal(result.rows.length, 2 * 2 * 9);
+  assert.equal(result.unanswered, 0);
+  const questions = byId(questionSet);
+  for (const row of result.rows) {
+    assert.deepEqual(normalizeAnswerValue(questions[row.questionId], row.answer), { ok: true, value: row.answer });
+  }
+  const orders = result.rows.filter((row) => row.questionId === 'qm').map((row) => row.presentedOptions.join('|'));
+  assert.ok(new Set(orders).size > 1, 'option order changes between repeats and models');
+
+  let calls = 0;
+  const resumed = await runAnswerSet({
+    questionSet,
+    modelRoster: roster,
+    repeats: 2,
+    existingRows: result.rows,
+    callModelImpl: async () => {
+      calls += 1;
+      throw new Error('should not be asked');
+    },
+  });
+  assert.equal(calls, 0);
+  assert.equal(resumed.resumedRows, result.rows.length);
+});
+
+test('mock ratings land on each scale’s grid', async () => {
+  for (const scale of [
+    { min: 0, max: 10, step: 3 },
+    { min: 0, max: 100, step: 5 },
+    { min: 0, max: 0.3, step: 0.1 },
+    { min: -0.5, max: 0.5, step: 0.1, minLabel: 'Low', maxLabel: 'High' },
+    { min: 0, max: 10, step: 2, minLabel: 'Low', maxLabel: 'High' },
+  ]) {
+    const questionSet = readQuestionSet([{ id: 'qr', type: 'rating', prompt: 'Rate', scale }]);
+    const result = await runAnswerSet({ questionSet, modelRoster: roster, repeats: 10, maxAttempts: 1 });
+    assert.equal(result.unanswered, 0, JSON.stringify(scale));
+    assert.ok(new Set(result.rows.map((row) => row.answer)).size > 1, `${JSON.stringify(scale)} uses more than one point`);
+  }
+});
+
+// A loopback OpenAI-compatible server that records the temperature of each request.
+const startAnswerServer = async () => {
+  const temperatures = [];
+  const server = http.createServer((request, response) => {
+    let body = '';
+    request.on('data', (chunk) => {
+      body += chunk;
+    });
+    request.on('end', () => {
+      const payload = JSON.parse(body || '{}');
+      temperatures.push(payload.temperature);
+      const content = JSON.stringify({ answer: 'Agree', confidence: 0.6, rationale: 'Loopback reply.' });
+      response.writeHead(200, { 'content-type': 'application/json' });
+      response.end(JSON.stringify({ model: payload.model, choices: [{ message: { content }, finish_reason: 'stop' }] }));
+    });
+  });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  return {
+    temperatures,
+    baseUrl: `http://127.0.0.1:${server.address().port}/v1`,
+    close: () => new Promise((resolve) => server.close(resolve)),
+  };
+};
+
+test('a resumed run asks again when the endpoint or a model setting changed', async (t) => {
+  const [first, second] = await Promise.all([startAnswerServer(), startAnswerServer()]);
+  const previousBaseUrl = process.env.AIDB_LOCAL_BASE_URL;
+  t.after(async () => {
+    if (previousBaseUrl === undefined) delete process.env.AIDB_LOCAL_BASE_URL;
+    else process.env.AIDB_LOCAL_BASE_URL = previousBaseUrl;
+    await Promise.all([first.close(), second.close()]);
+  });
+  const questionSet = readQuestionSet({ questions: [resultsExport.filteredQuestions[0]] });
+  const run = (baseUrl, temperature, existingRows = []) => {
+    process.env.AIDB_LOCAL_BASE_URL = baseUrl;
+    const model = { id: 'local-model', model: 'loopback-model', provider: 'local', temperature, structuredOutput: 'none' };
+    return runAnswerSet({ questionSet, modelRoster: { models: [model] }, repeats: 1, existingRows });
+  };
+
+  const saved = await run(first.baseUrl, 0.2);
+  assert.equal((await run(first.baseUrl, 0.2, saved.rows)).resumedRows, 1, 'the same request resumes');
+  assert.deepEqual(first.temperatures, [0.2]);
+
+  assert.equal((await run(second.baseUrl, 0.2, saved.rows)).resumedRows, 0);
+  assert.deepEqual(second.temperatures, [0.2], 'a new endpoint is asked');
+
+  assert.equal((await run(first.baseUrl, 1.5, saved.rows)).resumedRows, 0);
+  assert.deepEqual(first.temperatures, [0.2, 1.5], 'a changed temperature is asked again');
+});
+
+test('a resumed run asks again when a model’s declared revision changed', async () => {
+  const questionSet = readQuestionSet(resultsExport);
+  questionSet.questions = questionSet.questions.slice(0, 1);
+  const roster = (modelRevision) => ({
+    models: [{ id: 'm', provider: 'mock', model: 'mock-model', provenance: { modelRevision } }],
+  });
+  const first = await runAnswerSet({ questionSet, modelRoster: roster('revision-1'), repeats: 1 });
+  assert.equal(first.models[0].provenance.modelRevision, 'revision-1');
+  assert.equal(first.rows[0].modelProvenance.modelRevision, 'revision-1');
+  const same = await runAnswerSet({ questionSet, modelRoster: roster('revision-1'), repeats: 1, existingRows: first.rows });
+  assert.equal(same.resumedRows, first.rows.length);
+  const changed = await runAnswerSet({ questionSet, modelRoster: roster('revision-2'), repeats: 1, existingRows: first.rows });
+  assert.equal(changed.resumedRows, 0);
+  assert.equal(changed.rows[0].modelProvenance.modelRevision, 'revision-2');
+});
+
+test('a run that reached two deployments of one model is refused', async () => {
+  const questionSet = readQuestionSet(resultsExport);
+  questionSet.questions = questionSet.questions.filter(({ type }) => type === 'binary');
+  const modelRoster = { models: [{ id: 'm', provider: 'mock', model: 'mock-model' }] };
+  const fingerprints = ['fp-1', 'fp-2'];
+  const reply = (metadata) => ({ content: JSON.stringify({ answer: 'Agree' }), metadata });
+  await assert.rejects(
+    runAnswerSet({
+      questionSet, modelRoster, repeats: 2, concurrency: 1,
+      callModelImpl: async () => reply({ systemFingerprint: fingerprints.shift() }),
+    }),
+    /multiple deployment identities/,
+  );
+  // A request that failed outright reached no deployment, so it doesn't count as a second one.
+  const calls = [reply({ resolvedProvider: 'one-host' }), null];
+  const result = await runAnswerSet({
+    questionSet, modelRoster, repeats: 2, concurrency: 1, maxAttempts: 1,
+    callModelImpl: async () => {
+      const next = calls.shift();
+      if (!next) throw new Error('Synthetic outage');
+      return next;
+    },
+  });
+  assert.equal(result.unanswered, 1);
+});
+
+test('a reply that fails the checks is asked again, then kept as unanswered', async () => {
+  const questionSet = readQuestionSet({ questions: [resultsExport.filteredQuestions[3]] });
+  let calls = 0;
+  const result = await runAnswerSet({
+    questionSet,
+    modelRoster: { models: [roster.models[0]] },
+    repeats: 1,
+    maxAttempts: 2,
+    sleepImpl: async () => {},
+    callModelImpl: async () => {
+      calls += 1;
+      return JSON.stringify({ answer: 42, confidence: 0.5, rationale: 'Off the scale.' });
+    },
+  });
+  assert.equal(calls, 4, 'two attempts for each way of asking');
+  assert.equal(result.unanswered, 2);
+  assert.match(result.rows[0].parseError, /from 0 to 10 in increments of 1/);
+});
+
+test('the answer command writes rows for a session’s questions', async () => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), 'aidb-answer-'));
+  const questionsPath = path.join(dir, 'results.json');
+  const rosterPath = fileURLToPath(new URL('../data/model-roster.sample.json', import.meta.url));
+  const outPath = path.join(dir, 'answers.json');
+  await writeFile(questionsPath, JSON.stringify(resultsExport));
+  const log = [];
+  const originalLog = console.log;
+  console.log = (line) => log.push(line);
+  try {
+    await runCli(['answer', '--questions', questionsPath, '--models', rosterPath, '--out', outPath, '--repeats', '1']);
+  } finally {
+    console.log = originalLog;
+  }
+  const written = JSON.parse(await readFile(outPath, 'utf8'));
+  assert.equal(written.setId, 'ai-futures-2026');
+  assert.equal(written.rows.length, 2 * 9);
+  assert.match(log.join('\n'), /wrote 18 answers .* 2 questions skipped/);
+  await assert.rejects(
+    runCli(['answer', '--questions', questionsPath, '--models', rosterPath]),
+    /Missing --out/,
+  );
+});
+
+import { ratingConformance } from '../../shared/questions/ratingConformance.mjs';
+for (const { name, scale, input, expected } of ratingConformance) {
+  test(`benchmark rating conformance: ${name}`, () => {
+    const question = readQuestionSet([{ id: 'q-rating', prompt: 'A fixture rating', type: 'rating', scale }]).questions[0];
+    const result = parseAnswerOutput({ rawText: JSON.stringify({ answer: input }), question, variant: 'scale', order: [] });
+    assert.equal(result.parseError === '', expected !== null);
+    assert.equal(result.answer, expected);
+  });
+}
+
+test('fractional rating prompts and schema accept the shared scale', () => {
+  const question = { type: 'rating', scale: { min: -0.5, max: 0.5, step: 0.1 } };
+  assert.match(buildAnswerPrompt({ question, variant: 'scale', order: [] }), /increments of 0.1/);
+  assert.equal(answerJsonSchema({ question, variant: 'scale', order: [] }).schema.properties.answer.type, 'number');
+});

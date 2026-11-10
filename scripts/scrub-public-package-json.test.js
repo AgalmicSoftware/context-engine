@@ -2,6 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const { execFileSync } = require('node:child_process');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -35,6 +36,37 @@ test('scrubPublicPackageJson uses source metadata to remove absent private comma
     const result = JSON.parse(fs.readFileSync(targetPath, 'utf8'));
     assert.deepEqual(Object.keys(result.scripts), ['test:node', 'test:ci']);
     assert.equal(result.scripts['test:ci'], 'npm run test:node');
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+
+test('scrubPublicPackageJson removes every root script that runs a stripped file', () => {
+  const repoRoot = path.resolve(__dirname, '..');
+  const stripped = execFileSync('bash', [
+    '-c',
+    'source scripts/lib/public-release-strip-patterns.sh && ce_public_release_strip_patterns',
+  ], { cwd: repoRoot, encoding: 'utf8' })
+    .split('\n')
+    .filter(Boolean)
+    .map((glob) => new RegExp(`^${glob
+      .split('*')
+      .map((part) => part.replace(/[.+?^${}()|[\]\\]/g, '\\$&'))
+      .join('[^/]*')}(?:/.*)?$`));
+  const sourceScripts = JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf8')).scripts;
+  const runsStrippedFile = (command) => command
+    .split(/[\s'"]+/)
+    .some((token) => stripped.some((pattern) => pattern.test(token.replace(/^\.\//, ''))));
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ce-public-package-stripped-'));
+  try {
+    const targetPath = path.join(tempDir, 'package.json');
+    fs.writeFileSync(targetPath, JSON.stringify({ scripts: sourceScripts }));
+
+    scrubPublicPackageJson(targetPath);
+
+    const publicScripts = JSON.parse(fs.readFileSync(targetPath, 'utf8')).scripts;
+    const dangling = Object.keys(publicScripts).filter((name) => runsStrippedFile(publicScripts[name]));
+    assert.deepEqual(dangling, []);
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });
   }

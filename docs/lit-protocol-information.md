@@ -9,9 +9,7 @@ New authorities require Worker-signed authorization, so a scoped usage API key
 alone cannot impersonate an SBT holder. See
 [`lit-v3-design.md`](lit-v3-design.md) for the trust boundary.
 
-This file records the current wiring plus platform background from the move
-off the former Naga-era browser SDK. It does not imply that any older hosted
-Lit network still exists.
+This file records the current wiring plus background on the Lit platform.
 
 Primary docs:
 - What is Lit: https://developer.litprotocol.com/what-is-lit
@@ -19,15 +17,14 @@ Primary docs:
 
 ---
 
-## Current CE Chipotle plan (2026-05-09)
+## Current CE Chipotle wiring
 
-- Context Engine cannot preserve its old browser-native Naga auth-context / ACC flow as-is on Chipotle.
-- The current migration direction is therefore **worker-mediated Chipotle execution**:
+- Lit runs through **worker-mediated Chipotle execution**:
   - browser/session authoring stores non-secret Lit config in worker config
   - worker secrets store the Lit API key material when a per-session account or per-session override is needed
-  - the worker can still fall back to a deployment-level server env key for sponsored/shared-account setups
+  - the worker can fall back to a deployment-level server env key for sponsored/shared-account setups
 - Current worker/runtime split:
-  - worker env fallback: `LIT_ACCOUNT_API_KEY` (or `LIT_USAGE_API_KEY` when self-hosts prefer a usage-only env key)
+  - worker env fallback: `LIT_USAGE_API_KEY` runs the Action (falling back to `LIT_ACCOUNT_API_KEY`); `LIT_ACCOUNT_API_KEY` provisions authorities (`lit-chipotle-provision` alone falls back to `LIT_USAGE_API_KEY`; without an account key, `lit-chipotle-bootstrap-session` creates a new Lit account); `LIT_API_BASE` overrides the API base
   - per-session worker secrets: `litAccountApiKey`, `litUsageApiKey`, and the Worker-generated `litAuthorizationPrivateKey`
   - per-session Worker-private config: `litCredentials = { litApiBase, litGroupId, litPkpId, litActionCid, litAuthorizationVersion, litAuthorizationSigner }`; the public `/session-config` response strips this entire descriptor
 - Runtime security contract:
@@ -37,88 +34,76 @@ Primary docs:
   - legacy v1 / bare-hex Chipotle wrapped keys are rejected by default and should be recreated, not migrated in-place
   - check/decrypt RPC selection is a worker trust decision: request `rpcUrl` / `customRpcUrl` is rejected unless it exactly matches a worker-approved URL, the action verifies `provider.getNetwork().chainId`, and stored Chipotle metadata does not carry RPC URLs
 - These fields are intentionally treated differently:
-  - `litUsageApiKey` is a secret
+  - `litAccountApiKey`, `litUsageApiKey`, and `litAuthorizationPrivateKey` are secrets
   - `litApiBase`, `litGroupId`, `litPkpId`, and `litActionCid` are not cryptographic secrets, but still operational metadata and should stay in worker config rather than public session metadata by default
   - the real security boundary is still API-key scope + group membership + Lit Action code; hiding IDs alone is not a sufficient protection model
   - the Action verifies a 60-second Worker signature over the requester, policy, approved HTTPS RPC, operation, and reply key before any gate or key operation; decrypt replies are encrypted to the original Worker request. Account management credentials remain trusted because they can alter permissions. See [authorization and cutover](lit-worker-authorization.md).
   - all permission paths available to untrusted execution keys must restrict the relevant PKP to its Worker-authorized Action: no wildcard Action/PKP grants or another unsigned Action attached to that PKP. CE creates its narrow group but does not audit or repair account-wide permissions; broad account management authority remains trusted
-- Current Chipotle endpoints/source-of-truth:
+- Current Chipotle endpoints:
   - prod API: `https://api.chipotle.litprotocol.com`
   - prod dashboard: `https://dashboard.chipotle.litprotocol.com/dapps/dashboard/`
   - dev API: `https://api.dev.litprotocol.com`
   - dev docs: `https://docs.dev.litprotocol.com`
   - local self-hosted dev node: `http://localhost:8000`
   - OpenAPI surface: `https://api.chipotle.litprotocol.com/core/v1/openapi.json`
-  - public prod/dev node-chain config currently reports Base mainnet (`chain_id: 8453`) for the control plane
-- First worker-backed Chipotle slice now implemented in this repo:
-  - worker config/secret schema split for Chipotle fields
-  - sponsored-bundle plumbing for those fields
-  - worker admin actions:
-    - `lit-chipotle-status`
-    - `lit-chipotle-provision`
-    - `lit-chipotle-bootstrap-session`
-- Re-provisioning note: unsigned or incomplete authorities fail closed.
-  Preserve required plaintext with the old working runtime **before updating
-  the Worker**; the updated Worker cannot decrypt legacy unsigned ciphertext.
-  In `/admin`, open **Worker secrets → Lit**, save the account key, refresh
-  status, acknowledge the warning, and select **Create fresh Lit authority**.
-  This sends the existing signed provision request with `freshAuthority: true`
-  to create a new PKP, group, scoped key, and specialized Action. Refresh status
-  and verify new content before retiring old permissions separately. Replacing
-  any authority cuts off its old ciphertext in this application; no automatic
-  content migration is provided. See
+- Worker admin actions: `lit-chipotle-status`, `lit-chipotle-provision`, `lit-chipotle-bootstrap-session`.
+- Authorities created before Worker-signed authorization fail closed. Preserve
+  any plaintext you need **before updating the Worker**, then follow
   [the upgrade runbook](lit-worker-authorization.md#upgrade-and-cutover).
-- Current default CE architecture direction:
-  - create one new Lit account per session
-  - create one default group inside that account
-  - create one session PKP
-  - create one scoped runtime usage key
-  - keep groups available for later internal trust boundaries such as
-    `session-content`, `survey-responses`, or future group-prompting action families
-- Live smoke result on April 29, 2026:
-  - the current scoped usage-key test can reach Chipotle through the worker
-  - arbitrary inline `lit_action` execution was rejected as unauthorized
-  - CE should therefore assume real migrations need a registered action CID and matching group scope rather than ad-hoc inline code, and the unsupported generic admin execute helper has been removed
+- Default setup: each session gets its own group, PKP, and scoped runtime usage
+  key. When no account key is supplied, the Worker also creates a new Lit account
+  for the session.
 
-### Immediate migration implications
+### Environments and keys
 
-- Public prod and public dev currently both report `chain_name: "Base"`, `chain_id: 8453`, and `testnet: false`; the current split is different contract state on the same chain, not a separate Chipotle testnet.
-- Practical environment guidance:
-  - use `http://localhost:8000` when you need a true disposable/local dev surface
-  - treat `https://api.dev.litprotocol.com` / `https://docs.dev.litprotocol.com` as preview-style hosted dev materials, not as a durable hosted staging substitute
-  - use separate production Chipotle accounts for staging and production isolation
-- Current Chipotle auth/billing model is account-key + usage-key based, not AuthManager/session-key/PaymentManager based:
+- The Worker accepts only `https://api.chipotle.litprotocol.com` as the API base,
+  plus a loopback base such as the local node when
+  `LIT_CHIPOTLE_ALLOW_LOCAL_API_BASE` is set.
+- Public prod and public dev both report Base mainnet (see External Lit platform
+  state below), so isolate staging from production with separate production
+  Chipotle accounts. Treat the hosted dev API and docs as preview materials, not a
+  staging substitute.
+- Chipotle auth is account-key + usage-key based:
   - account key = master credential; keep it server-side only
   - usage key = scoped operational secret; rotate/delete it instead of exposing the account key
   - billing is credit-based; read-only management calls are free while action execution and mutating management calls are metered
-- Current action/runtime migration constraints:
-  - Chipotle docs now center `POST /core/v1/lit_action`, `async function main(...)`, and direct return values
-  - older Naga runtime helpers such as `getRpcUrl`, `signAndCombine*`, runtime permission lookup helpers, and the old ACC/browser auth-context flow should be treated as legacy-only in CE
-  - current primary sources do not document a Chipotle equivalent of arbitrary custom RPC injection at the control-plane layer, so CE should treat custom RPCs as app-supplied worker-managed inputs rather than a guaranteed Lit platform feature
-- Current public docs do not document a Naga-to-Chipotle import path for accounts, usage keys, PKPs, groups, permissions, or balances; plan to recreate those resources during migration.
-- Current public docs are also internally inconsistent about IPFS action execution. CE should therefore treat inline `code` execution as the most certain worker-mediated path until Lit documents the `ipfs_id` / cached-action model more cleanly.
+- The Worker runs the session's registered Action by `ipfs_id` (`litActionCid`) and resubmits the canonical Action `code` on a cache miss. CE registers the Action and attaches it, with the PKP, to the session group.
+- Chipotle's public docs do not describe custom RPC injection, so CE passes custom RPCs as app-supplied, Worker-managed inputs.
 
 The sections below cover the current runtime, the Lit platform state, brief
 Lit background with the concepts Context Engine uses, and the repo wiring.
 
 ---
 
-## Context Engine runtime status (Chipotle cutover)
+## Context Engine runtime status
 
-- Worker-mediated Chipotle execution is now the active CE Lit runtime for supported sessions.
+- Worker-mediated Chipotle execution is the CE Lit runtime for supported sessions.
 - The frontend has no Lit SDK client. `MainSite` and `/session/new` do not invent a default hosted Lit network when no Chipotle runtime is configured.
 - `window.__litHooks` are published only when the active session or wizard has a Chipotle runtime: a session Worker URL plus complete `litCredentials`, a `chipotle` network hint, configured SBT gate addresses, or a validated worker-canonical Lit profile.
-- `/session/new` now presents the Lit setup as one manual field:
+- `/session/new` presents the Lit setup as one manual field, **Lit API key**:
   - bootstrap authority: `litAccountApiKey` / `LIT_ACCOUNT_API_KEY`
   - the worker uses the default Chipotle API base unless worker config/env overrides it, then derives and persists `litApiBase`, `litGroupId`, `litPkpId`, `litActionCid`, and `litUsageApiKey`
-  - scoped-runtime identifiers remain supported as worker-side/admin/sponsored-bundle config, but they are no longer hand-entered in the `/new` Lit card
-- `/admin` Lit quick tests now run against the currently active hook runtime rather than assuming a hidden legacy default.
+  - scoped-runtime identifiers are worker-side, admin, or sponsored-bundle config; they are not entered in the `/new` Lit card
+- `/admin` Lit quick tests run against the currently active hook runtime.
 - `/admin` Lit status preserves `needsFreshAuthority` even when no execution
   API key is configured, so operators can distinguish authority replacement
   from an ordinary ready runtime. The fresh-authority control requires signed
   status from an updated Worker, saved secret changes, and explicit
   acknowledgement on every attempt. A missing account key produces guidance
-  to save one; failures do not automatically retry provisioning.
+  to save one; failures do not automatically retry provisioning. An allocated account
+  and its key survive a fresh-authority switch. A saved group, PKP or action blocks
+  the switch with its identifiers and a Resume instruction. Saved progress is
+  discarded only when Lit confirms it is gone: if Lit refuses the saved account
+  key, or its complete group or wallet list no longer includes the saved group or
+  PKP, the pending record is cleared (keeping an account Lit still accepts) and
+  the next attempt starts over. Network errors, timeouts, 5xx, rate limits and
+  billing refusals keep it. A supplied key alone, without an account wallet or any
+  remote resource, does not reserve a resource and can be corrected. Both endpoints
+  check supplied keys against saved resources before beginning an attempt, and
+  repeat that check under the coordinator lock. Conflicts never expose keys: restore
+  the prior credentials and Resume. Checkpoint writes survive content-only
+  config revisions while still checking the attempt token and authority epoch;
+  finalization continues to require current config authority.
 - When passkey EOA soft-session mode is enabled and the current page has an
   unlocked in-memory signer, typed-data signatures are auto-signed, so worker
   auth can run without extra passkey prompts. Passive wallet restores only
@@ -144,18 +129,7 @@ Lit background with the concepts Context Engine uses, and the repo wiring.
   - public prod and public dev both report `chain_name: "Base"`, `chain_id: 8453`, `testnet: false`
   - the environments differ by contract address/state, not by blockchain identity
 - There is no documented Chipotle equivalent of a decentralized/public staging network with the old Naga semantics.
-- Practical migration planning should assume:
-  - true free/local development = self-hosted local node (`http://localhost:8000`)
-  - hosted dev API/docs = preview / non-guaranteed environment
-  - staging = separate production Chipotle account, not a separate testnet
-- CE should therefore treat Chipotle migration as a **re-platform**, not a package bump:
-  - Naga: SDK-first, wallet/auth-context/session-manager/payment-manager, multi-node execution
-  - Chipotle: REST/API-key first, account/usage-key/group/PKP/action registration, single-TEE execution
 - Re-check official Lit docs before implementation; the hosted docs still move and contain contradictions around dev support level and IPFS/action semantics.
-- The currently documented safe path is:
-  - local node for free/local development
-  - separate production Chipotle accounts for staging vs production
-  - worker-mediated CE execution using scoped usage keys rather than browser-held master credentials
 
 ---
 
@@ -181,14 +155,14 @@ Source: https://developer.litprotocol.com/what-is-lit
 
 ### 2.1 Access Control Conditions (ACCs)
 - **What it is**: a policy describing who can decrypt or sign.
-- **How CE uses it**: the client still builds SBT `balanceOf` conditions, then sends only their SBT addresses, gate mode, and chain ID to the session Worker; the Lit Action evaluates that gate.
+- **How CE uses it**: the client builds SBT `balanceOf` conditions, then sends only their SBT addresses, gate mode, and chain ID to the session Worker; the Lit Action evaluates that gate.
 
 ---
 
 ### 2.2 What CE stores
 Lit does **not** store content. The content itself is AES-GCM ciphertext kept
 on Arweave or in Cloudflare storage, as the session profile decides. Each
-`lit-sbt-v1` recipient in a CE envelope stores:
+`lit-sbt-v1` recipient in a CE envelope stores, under its `lit` object:
 - `ciphertext`: the content key wrapped by the Chipotle action
 - `dataToEncryptHash`: a policy-bound sentinel, not a Lit SDK hash
 - `chipotle`: version-2 policy metadata (`litActionCid`, `litPkpId`, `sbtAddresses`, `gateMode`, `chainId`, `policyFingerprint`, `policy`)
@@ -215,18 +189,13 @@ on Arweave or in Cloudflare storage, as the session profile decides. Each
 - Dev helpers (development builds only; production builds never publish `window.__litTools`):
   - `window.__litTools.encryptForSbt({ value, sbtAddresses, contextLabel })` returns a v1 envelope string.
   - `window.__litTools.decryptEnvelope(envelopeJson)` decrypts a v1 envelope (if you hold the gate SBT).
-- `/admin` now uses worker-mediated Lit status/bootstrap/provision checks; there is no supported generic admin execute helper.
-- `/new` Session Wizard no longer shows a Lit quick-test panel or scoped runtime fields; when old Lit metadata is rewritten it normalizes legacy network labels onto `chipotle`.
-- Demo session secrets live in `client/src/variables/demo/demo_sessions.json` under the `test` session.
-
+- `/admin` uses worker-mediated Lit status/bootstrap/provision checks; there is no generic admin execute helper.
+- The `/new` Session Wizard has no Lit quick-test panel or scoped runtime fields; rewriting old Lit metadata normalizes legacy network labels to `chipotle`.
 - Each session authority uses its own PKP and group containing only its Worker-authorized Action. Never add an older unsigned Action to that PKP/group. The SBT gate remains in the signed policy and Action logic.
-- Reused Action CIDs are checked against the canonical source specialized for
-  the pinned Worker signer, session, and PKP before bootstrap accepts a
-  completed setup or changes permissions. Changing that source changes the
-  CID and requires another fresh-authority cutover, with preservation before
-  deployment. Ordinary Worker updates that leave Action source unchanged do
-  not themselves require replacement. Fresh authority preserves the Worker
-  signing key; this release provides no signer-rotation procedure.
-- Session Wizard can now automate both Chipotle setup modes from canonical CE action source:
-  - existing-account mode: `lit-chipotle-provision` uses the same fresh-authority bootstrap path, preferring a stored session `litAccountApiKey` and falling back to deployment-level `LIT_ACCOUNT_API_KEY`; legacy authority replacement requires `freshAuthority: true`
+- Bootstrap checks a reused Action CID against the canonical source specialized
+  for the pinned Worker signer, session, and PKP. A change to that source changes
+  the CID and needs another fresh-authority cutover; see
+  [the upgrade runbook](lit-worker-authorization.md#upgrade-and-cutover).
+- Chipotle setup runs from the canonical CE action source in two modes:
+  - existing-account mode: `lit-chipotle-provision` uses the same fresh-authority bootstrap path, preferring a stored session `litAccountApiKey` and falling back to deployment-level `LIT_ACCOUNT_API_KEY`; replacing an existing authority requires `freshAuthority: true`
   - bootstrap mode: use `lit-chipotle-bootstrap-session` with a stored/session/deployment `litAccountApiKey` to derive the missing default group, PKP, usage key, and CE action before persisting the returned `litCredentials`; if no account key is available, the worker can still create a brand-new session account

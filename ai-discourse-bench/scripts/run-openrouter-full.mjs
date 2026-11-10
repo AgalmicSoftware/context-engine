@@ -6,7 +6,7 @@ import {
   writeJsonFile,
   writeTextFile,
 } from '../src/io.mjs';
-import { createCheckpointWriter, readCheckpointRuns } from '../src/checkpoint.mjs';
+import { openCheckpoint } from '../src/checkpoint.mjs';
 import { assertWithinEstimatedCostBudget, buildExperimentPlan } from '../src/experiment-plan.mjs';
 import { auditOpenRouterRoster, fetchOpenRouterCatalog } from '../src/openrouter-catalog.mjs';
 import { limitQuestionBank } from '../src/report-inputs.mjs';
@@ -46,7 +46,12 @@ const questionLimit = process.env.AIDB_LIMIT_QUESTIONS
   : 0;
 
 const questionBank = limitQuestionBank(await readJsonFile(questionBankPath), questionLimit);
-const modelRoster = await readJsonFile(modelRosterPath);
+const declaredRoster = await readJsonFile(modelRosterPath);
+throwIfErrors('model roster', validateModelRoster(declaredRoster));
+const modelRoster = {
+  ...declaredRoster,
+  models: declaredRoster.models.map(model => ({ ...model, provider: 'openrouter' })),
+};
 const personasFile = mode === 'persona' ? await readJsonFile(personasPath) : { personas: [] };
 const persona = mode === 'persona'
   ? personasFile.personas.find((entry) => entry.id === personaId)
@@ -85,7 +90,6 @@ const plan = {
   modelRoster,
   mode,
   persona,
-  providerOverride: 'openrouter',
   repeats,
   }),
   openRouterCatalogAudit: catalogAudit,
@@ -104,14 +108,12 @@ console.log(`models: ${modelRoster.models.map((model) => model.model).join(', ')
 console.log(`repeats per polarity: ${repeats}; concurrency: ${concurrency}; max attempts: ${maxAttempts}`);
 
 const priorOutput = resume ? await readJsonFileIfExists(runPath, { runs: [] }) : { runs: [] };
-const checkpointRuns = resume ? await readCheckpointRuns(checkpointPath) : [];
-const checkpointWriter = await createCheckpointWriter(checkpointPath, { reset: !resume });
+const { runs: checkpointRuns, write: checkpointWriter } = await openCheckpoint(checkpointPath, { resume });
 
 const runsFile = await runBenchmark({
   questionBank,
   modelRoster,
   personasFile,
-  providerOverride: 'openrouter',
   mode,
   personaId,
   repeats,

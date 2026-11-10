@@ -6,7 +6,7 @@
     <title>Context Engine Discovery Summary</title>
     <meta
       name="description"
-      content="Static Context Engine summary for crawlers and AI tools, with links to the live site, GitHub repository, latest source tree, README, AI agent bootstrap docs, architecture, and whitepaper."
+      content="Static Context Engine summary for crawlers and AI tools, with links to the live site, GitHub repository, latest source tree, README, user docs, architecture, and whitepaper."
     />
     <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1" />
     <link rel="canonical" href="https://contextengine.sh/discoverability.html" />
@@ -17,13 +17,13 @@
       <p>
         Context Engine is an open-source toolkit for AI-enhanced deliberation and
         large-group sensemaking. It supports public and private questions and
-        responses, AI-assisted input and analysis, permanent records, and
-        cryptographic access control.
+        responses, AI-assisted input and analysis, configurable storage, and
+        encrypted fields with gated access.
       </p>
       <p>
-        The project includes survey authoring and response workflows, SBT-gated
-        groups, passkey-based user onboarding, Cloudflare Worker support, a
-        deterministic browser TestID API, and an OSS GitHub repository.
+        The project includes survey authoring and response workflows, Worker-native
+        and SBT-gated groups, passkey sign-in, a per-session Cloudflare Worker,
+        scoped Agent HTTP, and an open-source GitHub repository.
       </p>
 
       <h2>Primary Links</h2>
@@ -32,7 +32,6 @@
         <li><a href="https://github.com/AgalmicSoftware/context-engine">Canonical GitHub repository</a></li>
         <li><a href="https://github.com/AgalmicSoftware/context-engine/tree/main">Latest public repository version on GitHub</a></li>
         <li><a href="https://raw.githubusercontent.com/AgalmicSoftware/context-engine/main/README.md">Latest README</a></li>
-        <li><a href="https://raw.githubusercontent.com/AgalmicSoftware/context-engine/main/docs/ai-agent-bootstrap.md">Latest AI agent bootstrap doc</a></li>
         <li><a href="https://contextengine.sh/docs">Interactive user docs</a></li>
         <li><a href="https://raw.githubusercontent.com/AgalmicSoftware/context-engine/main/ARCHITECTURE.md">Latest architecture</a></li>
         <li><a href="https://raw.githubusercontent.com/AgalmicSoftware/context-engine/main/docs/architecture-overview.md">Architecture and verification overview</a></li>
@@ -42,13 +41,18 @@
 
       <h2>Summary</h2>
       <p>
-        Context Engine is designed for large-group deliberation, survey-based
-        sensemaking, and cryptographically gated access to content and results.
-        The platform supports AI-assisted input, profile-selected Cloudflare or
-        decentralized storage, group-oriented participation flows, and an
-        agent-aware surface through stable docs, TestIDs, and an opt-in browser
-        bridge. EVM and Arweave are profile-specific options rather than
-        baseline dependencies.
+        New sessions start on Hosted &amp; Fast: a creator-owned per-session
+        Cloudflare Worker with Cloudflare storage, public results, and unencrypted
+        answers. Choosing encryption or another results visibility keeps them
+        private. Trustless &amp; Slower is an opt-in path that adds public EVM
+        contracts, wallet transactions, and Arweave, and still uses a Session
+        Worker. Company-Operated is planned. EVM and Arweave are profile-specific
+        options rather than baseline dependencies.
+      </p>
+      <p>
+        Agents use scoped HTTP at <code>/api/agent/*</code> on the Session Worker.
+        Browser automation can use stable TestIDs; development and E2E builds also
+        offer an opt-in bridge.
       </p>
     </main>
   </body>

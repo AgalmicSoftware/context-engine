@@ -46,28 +46,7 @@ jest.mock('../session/sessionNaming.js', () => ({
 jest.mock('../session/mainSiteUtils', () => ({
   __esModule: true,
   emitMainSiteSbtDebug: jest.fn(),
-  hasCoreSbtMetadata: jest.fn((info) => {
-    if (!info || typeof info !== 'object') return false;
-    const hasValue = (value) => value !== undefined && value !== null && String(value).trim() !== '';
-    const tokenUri = info.tokenURI ?? info.tokenUri ?? null;
-    const mintingEndRaw = info.mintingEndTime;
-    const burnAuthRaw = info.burnAuth;
-    const admin = String(info.admin || info.admin_ || '')
-      .trim()
-      .toLowerCase();
-    const mintingEndOk =
-      mintingEndRaw !== undefined && mintingEndRaw !== null && Number.isFinite(Number(mintingEndRaw));
-    const burnAuthOk = burnAuthRaw !== undefined && burnAuthRaw !== null && Number.isFinite(Number(burnAuthRaw));
-    return (
-      hasValue(tokenUri) &&
-      mintingEndOk &&
-      burnAuthOk &&
-      typeof info.hasPasswordMint === 'boolean' &&
-      hasValue(info.maxTokens) &&
-      !!admin &&
-      admin !== '0x0000000000000000000000000000000000000000'
-    );
-  }),
+  hasCoreSbtMetadata: jest.fn(),
   isForcedSbtSelectorDebugEnabled: jest.fn(() => false),
 }));
 
@@ -102,6 +81,8 @@ const {
 } = require('../session/mainSiteUtils');
 const { mergeSbtLiveProgressEntry, shouldCommitThrottledProgress } = require('../session/mainSiteProgressHelpers');
 
+const { buildSbtActivityCacheEntry, applySbtActivityCacheEntryUpdate } = require('./sbtActivityCacheEntry.js');
+
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
 
 const createCompleteSbtMetadata = (overrides = {}) => ({
@@ -116,27 +97,7 @@ const createCompleteSbtMetadata = (overrides = {}) => ({
   ...overrides,
 });
 
-const hasMockCoreSbtMetadata = (info) => {
-  if (!info || typeof info !== 'object') return false;
-  const hasValue = (value) => value !== undefined && value !== null && String(value).trim() !== '';
-  const tokenUri = info.tokenURI ?? info.tokenUri ?? null;
-  const mintingEndRaw = info.mintingEndTime;
-  const burnAuthRaw = info.burnAuth;
-  const admin = String(info.admin || info.admin_ || '')
-    .trim()
-    .toLowerCase();
-  const mintingEndOk = mintingEndRaw !== undefined && mintingEndRaw !== null && Number.isFinite(Number(mintingEndRaw));
-  const burnAuthOk = burnAuthRaw !== undefined && burnAuthRaw !== null && Number.isFinite(Number(burnAuthRaw));
-  return (
-    hasValue(tokenUri) &&
-    mintingEndOk &&
-    burnAuthOk &&
-    typeof info.hasPasswordMint === 'boolean' &&
-    hasValue(info.maxTokens) &&
-    !!admin &&
-    admin !== ZERO_ADDRESS
-  );
-};
+const hasMockCoreSbtMetadata = jest.requireActual('../session/mainSiteUtils').hasCoreSbtMetadata;
 
 const deepClone = (value) => (value == null ? value : JSON.parse(JSON.stringify(value)));
 
@@ -194,6 +155,24 @@ const createMockHost = (overrides = {}) => {
     ...(deepClone(initialState) || {}),
   };
   const storage = deepClone(initialStorage || {});
+  // The fixture shorthand describes covered counts in the current cache shape.
+  for (const cache of Object.values(storage.sbtCache || {})) {
+    for (const bucket of Object.values(cache)) {
+      for (const [address, entry] of Object.entries(bucket.sbtList || {})) {
+        if (entry.schemaVersion) continue;
+        bucket.sbtList[address] = {
+          ...buildSbtActivityCacheEntry({ sbtAddress: address }),
+          ...entry,
+          coveredCounts: {
+            mintedCountByAddress: entry.mintedCountByAddress || {},
+            burnedCountByAddress: entry.burnedCountByAddress || {},
+            mintedEventCount: entry.mintedEventCount || 0,
+            burnedEventCount: entry.burnedEventCount || 0,
+          },
+        };
+      }
+    }
+  }
   const applyStatePatch = (patch) => {
     if (!patch || typeof patch !== 'object') return;
     state = {
@@ -415,24 +394,6 @@ describe('createSessionSbtCacheController', () => {
       ).toBe(5);
     });
 
-    it('seeds missing count entries from legacy address arrays', () => {
-      const controller = createSessionSbtCacheController(createMockHost());
-
-      expect(
-        controller.seedSbtCountMapFromLegacyAddresses({ '0xabc': 2, '0xdef': 0 }, [
-          '0xABC',
-          '0xdef',
-          '0xghi',
-          '',
-          null,
-        ]),
-      ).toEqual({
-        '0xabc': 2,
-        '0xdef': 1,
-        '0xghi': 1,
-      });
-    });
-
     it('returns only current holders from minted and burned counts', () => {
       const controller = createSessionSbtCacheController(createMockHost());
 
@@ -509,36 +470,6 @@ describe('createSessionSbtCacheController', () => {
         activeSupply: '3',
         currentHolderCount: '2',
         historicalHolderCount: '10',
-      });
-    });
-
-    it('hydrates legacy address arrays into normalized count state', () => {
-      const controller = createSessionSbtCacheController(createMockHost());
-      const entry = {
-        mintedAddresses: ['0xAAA', '0xbbb', '0xAAA'],
-        burnedAddresses: ['0xccc'],
-        mintedCountByAddress: { '0xAAA': 2 },
-        burnedCountByAddress: { '0xBBB': 2 },
-        mintedEventCount: 1,
-        burnedEventCount: 0,
-      };
-
-      const hydrated = controller.hydrateLegacySbtCountState(entry);
-
-      expect(hydrated).toBe(entry);
-      expect(hydrated).toEqual({
-        mintedAddresses: ['0xaaa', '0xbbb'],
-        burnedAddresses: ['0xccc'],
-        mintedCountByAddress: {
-          '0xaaa': 2,
-          '0xbbb': 1,
-        },
-        burnedCountByAddress: {
-          '0xbbb': 2,
-          '0xccc': 1,
-        },
-        mintedEventCount: 3,
-        burnedEventCount: 3,
       });
     });
   });
@@ -1124,6 +1055,25 @@ describe('createSessionSbtCacheController', () => {
       );
     });
 
+    it('finishes retired SBT hydration and does not rehydrate at the same head', async () => {
+      const sbtAddress = '0x0000000000000000000000000000000000000f01';
+      const host = createMockHost();
+      const controller = createSessionSbtCacheController(host);
+      contractScripts.getAllSbtAddressesCached.mockReset().mockResolvedValue([sbtAddress]);
+      contractScripts.getSbtMetadata.mockReset().mockResolvedValue(
+        createCompleteSbtMetadata({
+          admin: ZERO_ADDRESS,
+          description: 'Retired fixture',
+          image: 'ar://fixture',
+          tokenUriMetadataFetched: true,
+        }),
+      );
+      await controller.ensureLightSbtDiscovery('alpha');
+      expect(host.getStored('sbtCache', 'alpha')[11155420].lastBlock).toBe(12);
+      await controller.ensureLightSbtDiscovery('alpha');
+      expect(contractScripts.getSbtMetadata).toHaveBeenCalledTimes(1);
+    });
+
     it('keeps light discovery watermark behind failed metadata hydration so later runs retry', async () => {
       const sbtAddress = '0x0000000000000000000000000000000000000f01';
       const hydratedMetadata = createCompleteSbtMetadata({
@@ -1465,7 +1415,7 @@ describe('createSessionSbtCacheController', () => {
       await hydrationRun;
 
       const stored = host.getStored('sbtCache', 'alpha');
-      expect(stored[84532].sbtList.preserved).toEqual({ marker: true });
+      expect(stored[84532].sbtList.preserved).toMatchObject({ marker: true });
       expect(stored[11155420].sbtList).toEqual(
         expect.objectContaining({
           [hydratedAddress.toLowerCase()]: expect.objectContaining({
@@ -1557,6 +1507,101 @@ describe('createSessionSbtCacheController', () => {
   });
 
   describe('refreshSbtDataForGroup', () => {
+    it('keeps the session summary when its current history read is unavailable', async () => {
+      const summary = {
+        totalMinted: '4',
+        totalBurned: '1',
+        activeSupply: '3',
+        currentHolderCount: '2',
+        historicalHolderCount: '3',
+      };
+      const host = createMockHost({
+        initialStorage: {
+          sbtCache: {
+            alpha: {
+              11155420: {
+                lastBlock: 10,
+                sbtList: { '0xsbt': { sbtInfo: { name: 'Incomplete metadata' }, historySummary: summary } },
+              },
+            },
+          },
+        },
+      });
+      hasCoreSbtMetadata.mockReturnValue(false);
+      contractScripts.getSbtMetadata.mockResolvedValue(createCompleteSbtMetadata());
+      contractScripts.getSbtHistorySummary.mockResolvedValue(null);
+      await createSessionSbtCacheController(host).refreshSbtDataForGroup('alpha', '0xSBT');
+      expect(contractScripts.getSbtHistorySummary).toHaveBeenCalledWith('none', '0xSBT', 'alpha');
+      expect(host.getStored('sbtCache', 'alpha')[11155420].sbtList['0xsbt'].historySummary).toEqual(summary);
+    });
+
+    it('stores the summary read from the chain for an SBT not cached yet', async () => {
+      const summary = {
+        totalMinted: '2',
+        totalBurned: '0',
+        activeSupply: '2',
+        currentHolderCount: '2',
+        historicalHolderCount: '2',
+      };
+      const host = createMockHost({ initialStorage: { sbtCache: {} } });
+      contractScripts.getSbtHistorySummary.mockResolvedValue(summary);
+      await createSessionSbtCacheController(host).refreshSbtDataForGroup('alpha', '0xSBT');
+      // Counts are not loaded, so the SBT page shows this summary instead of zero holders.
+      expect(host.getStored('sbtCache', 'alpha')[11155420].sbtList['0xsbt']).toMatchObject({
+        countsLoaded: false,
+        historySummary: summary,
+      });
+    });
+
+    it('fills a gap before a live mint without skipping or double-counting holders', async () => {
+      const { buildSbtActivityCacheEntry, mergeSbtActivityCacheEntryCounts } = require('./sbtActivityCacheEntry.js');
+      const entry = mergeSbtActivityCacheEntryCounts(
+        buildSbtActivityCacheEntry({
+          sbtAddress: '0xSBT',
+          sbtInfo: createCompleteSbtMetadata({ creationBlock: 1 }),
+        }),
+        { blockNumber: 10, countsLoaded: true, mintedCountByAddress: { '0xaaa': 1 }, mintedEventCount: 1 },
+      );
+      const host = createMockHost({
+        initialStorage: {
+          sbtCache: {
+            alpha: {
+              11155420: {
+                lastBlock: 10,
+                sbtList: { '0xsbt': entry },
+              },
+            },
+          },
+        },
+      });
+      const controller = createSessionSbtCacheController(host);
+      contractScripts.getRelevantBlockWindowForFilter.mockResolvedValue({ fromBlock: 1, toBlock: 30 });
+      await controller.onSbtActivityDetectedForGroup('alpha', '0xSBT', '0xccc', false, 20, {
+        blockNumber: 20,
+        transactionIndex: 0,
+        logIndex: 0,
+      });
+      contractScripts.getSbtMintBurnCountsByAddress.mockImplementation(async (_p, _sbt, from) => ({
+        ok: true,
+        mintedCountByAddress: from <= 15 ? { '0xbbb': 1, '0xccc': 1 } : {},
+        burnedCountByAddress: {},
+        mintedEventCount: from <= 15 ? 2 : 0,
+        burnedEventCount: 0,
+      }));
+      await controller.refreshSbtDataForGroup('alpha', '0xSBT', { forceCounts: true, countsOnly: true });
+      expect(contractScripts.getSbtMintBurnCountsByAddress).toHaveBeenCalledWith(
+        'none',
+        '0xSBT',
+        11,
+        30,
+        'alpha',
+        null,
+      );
+      const result = host.getStored('sbtCache', 'alpha')[11155420].sbtList['0xsbt'];
+      expect(result.mintedCountByAddress).toEqual({ '0xaaa': 1, '0xbbb': 1, '0xccc': 1 });
+      expect(result).toMatchObject({ blockNumber: 30, mintedEventCount: 3, pendingActivity: {} });
+    });
+
     it('preserves newer realtime activity while a delayed count refresh completes', async () => {
       const countsDeferred = createDeferred();
       const host = createMockHost({
@@ -1596,12 +1641,12 @@ describe('createSessionSbtCacheController', () => {
       await host.updateSbtCacheAtomic('alpha', (current) => {
         const next = deepClone(current);
         next[11155420].lastRealtimeEventCursor = { blockNumber: 13, transactionIndex: 0, logIndex: 1 };
-        next[11155420].sbtList['0xsbt'] = {
-          ...next[11155420].sbtList['0xsbt'],
-          blockNumber: 13,
-          mintedCountByAddress: { '0xholder': 2 },
-          mintedEventCount: 2,
-        };
+        applySbtActivityCacheEntryUpdate(next[11155420].sbtList['0xsbt'], {
+          account: '0xholder',
+          burned: false,
+          eventBlockNumber: 13,
+          eventId: '13:0:1',
+        });
         return next;
       });
       countsDeferred.resolve({
@@ -1618,9 +1663,10 @@ describe('createSessionSbtCacheController', () => {
           lastRealtimeEventCursor: { blockNumber: 13, transactionIndex: 0, logIndex: 1 },
           sbtList: expect.objectContaining({
             '0xsbt': expect.objectContaining({
-              blockNumber: 13,
-              mintedCountByAddress: { '0xholder': 2 },
-              mintedEventCount: 2,
+              blockNumber: 12,
+              lastActivityBlock: 13,
+              mintedCountByAddress: { '0xholder': 3 },
+              mintedEventCount: 3,
             }),
           }),
         }),
@@ -1695,7 +1741,7 @@ describe('createSessionSbtCacheController', () => {
             lastBlock: 9,
             sbtList: expect.objectContaining({
               '0xsbt': expect.objectContaining({
-                schemaVersion: 1,
+                schemaVersion: 2,
                 sbtAddress: '0xSBT',
                 sbtInfo: expect.objectContaining({
                   name: 'Cached SBT',

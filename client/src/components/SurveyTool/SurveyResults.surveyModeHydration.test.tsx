@@ -2,6 +2,7 @@ import React from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import * as cacheScriptsModule from '../../utilities/cache/cacheScripts.js';
 import contractScriptsDefault from '../../utilities/web3/chainGateway.js';
+import { setWorkerCanonicalCacheReader } from '../../utilities/survey/workerCanonicalCacheReader';
 import { SurveyResultsFreeformAggregatorSummary } from './SurveyResultsAggregatorSummaries';
 import { buildSurveyResultsFreeformSummaryModel } from './surveyResultsSummaryModels';
 import { renderSurveyResults } from './surveyResultsTestHarness';
@@ -593,6 +594,74 @@ describe('SurveyResults survey document URLs', () => {
       expect(screen.queryByRole('link', { name: 'https://example.com/documents/stale' })).not.toBeInTheDocument();
     });
     // port note: the exact empty-surveyId stale-doc branch requires state injection; TASK 7 should cover buildSurveyResultsEmptySurveyModePatch directly.
+  });
+});
+
+describe('SurveyResults after the cache loses a survey', () => {
+  it('drops the previous reader’s title, links and rows, as after a sign-out purge', async () => {
+    const surveyId = 'survey-previous-reader';
+    const surveysCache = buildSurveyCache({
+      surveyId,
+      title: 'Reader A survey',
+      documentURLs: ['https://example.com/documents/reader-a'],
+      responsesByResponder: {
+        [RESPONDER_ONE]: { timeStamp: 10, responses: [{ questionID: 'q1', answer: { value: 'A answer' } }] },
+      },
+    });
+    seedCacheReads({ surveysCache });
+
+    const view = mountSurveyResults({ surveyId });
+    await waitForSurveyTitle('Reader A survey');
+    expect(getResponderUserLink(RESPONDER_ONE)).toBeTruthy();
+
+    delete surveysCache[NETWORK_ID];
+    await rerenderWithNonce(view, 1);
+
+    await waitForSurveyTitle('Survey Results');
+    expect(screen.queryByRole('link', { name: 'https://example.com/documents/reader-a' })).not.toBeInTheDocument();
+    expect(getResponderUserLink(RESPONDER_ONE)).toBeNull();
+  });
+});
+
+describe('SurveyResults after an account change on a chain session', () => {
+  const READER_A = '0xaaaa00000000000000000000000000000000000a';
+  const READER_B = '0xbbbb00000000000000000000000000000000000b';
+
+  afterEach(() => setWorkerCanonicalCacheReader(''));
+
+  it('drops the last account’s decrypted title and links once storage relocks them', async () => {
+    const cacheListeners: Array<(update: unknown) => void> = [];
+    jest.spyOn(cacheScripts, 'subscribeCacheUpdates').mockImplementation((listener: any) => {
+      cacheListeners.push(listener);
+      return () => undefined;
+    });
+    const surveyId = 'survey-account-change';
+    const documentLink = 'https://example.com/documents/reader-a';
+    const surveysCache = buildSurveyCache({ surveyId, title: 'Reader A title', documentURLs: [documentLink] });
+    Object.assign(surveysCache[NETWORK_ID].surveys[surveyId], {
+      titleDecrypted: true,
+      documentURLsDecrypted: true,
+      decryptedFor: READER_A,
+    });
+    seedCacheReads({ surveysCache });
+    setWorkerCanonicalCacheReader(READER_A);
+    const view = mountSurveyResults({ surveyId, account: READER_A, loginComplete: true });
+    await waitForSurveyTitle('Reader A title');
+    expect(screen.getByRole('link', { name: documentLink })).toBeInTheDocument();
+
+    // The store moves the reader at once; a refresh may read the cache before AppShell relocks it.
+    setWorkerCanonicalCacheReader(READER_B);
+    view.rerenderSurveyResults({ account: READER_B });
+    await rerenderWithNonce(view, 1);
+    surveysCache[NETWORK_ID].surveys[surveyId] = { title: '[encrypted]', questionIDs: ['q1'], documentURLs: [] };
+    await act(async () => {
+      cacheListeners.forEach((listener) => listener({ namespace: 'surveysCache', slug: SESSION_SLUG }));
+      await flushAsync(10);
+    });
+
+    await waitForSurveyTitle('[encrypted]');
+    expect(screen.queryByText('Reader A title')).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: documentLink })).not.toBeInTheDocument();
   });
 });
 

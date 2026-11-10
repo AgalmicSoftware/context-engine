@@ -97,6 +97,7 @@ import {
   buildCreateSbtDeterministicSymbol,
   buildCreateSbtDistributionFieldPatch,
   buildCreateSbtDocumentUrlAdditionPatch,
+  assertCreateSbtAccountUnchanged,
   buildCreateSbtDocumentUrlRemovalPatch,
   buildCreateSbtEditResetPatch,
   buildEffectiveCreateSbtDocumentUrls,
@@ -272,7 +273,7 @@ const buildDeferredDraftCreate2Salt = () =>
   });
 const LOCKED_FIELD_MASK = '[encrypted]';
 const CREATED_GROUP_PASSWORD_COPY_KEY = 'created_group_password';
-const DEFERRED_MODAL_SURFACE_BG = 'var(--ce-overlay-surface)';
+const DEFERRED_MODAL_SURFACE_BG = 'var(--ce-surface-raised)';
 const DISTRIBUTION_OPTION_CONFIGS = Object.freeze([
   {
     value: 'hasPasswords',
@@ -772,6 +773,27 @@ class CreateSBTGroup extends Component<any, any> {
     });
   };
 
+  _imageSelectionGeneration = 0;
+  _imageFetchController: AbortController | null = null;
+
+  invalidateImageSelection = (): number => {
+    // Cancellation saves work; the generation also rejects providers that settle after abort.
+    ++this._imageSelectionGeneration;
+    this._imageFetchController?.abort();
+    this._imageFetchController = null;
+    return this._imageSelectionGeneration;
+  };
+
+  fetchSelectedImage = async (url: string): Promise<File> => {
+    const controller = new AbortController();
+    this._imageFetchController = controller;
+    try {
+      return await fetchImageFromURL(url, { signal: controller.signal });
+    } finally {
+      if (this._imageFetchController === controller) this._imageFetchController = null;
+    }
+  };
+
   _cacheWriteSeq = 0;
   _memoizedImageDataUrl: string | null = null;
   _memoizedImageFileRef: Blob | null = null;
@@ -930,6 +952,8 @@ class CreateSBTGroup extends Component<any, any> {
   applyAuthoringPayload = (parsed: unknown = {}): boolean => {
     const nextState = this.buildRestoredFormStateFromPayload(parsed);
     if (!nextState) return false;
+    this.invalidateImageSelection();
+    ++this._cacheWriteSeq;
     this.setState(nextState, () => {
       this.updateGroupHash();
     });
@@ -1526,6 +1550,7 @@ class CreateSBTGroup extends Component<any, any> {
 
   componentWillUnmount() {
     this._isMounted = false;
+    this.invalidateImageSelection();
     this.clearCountdownTimer();
     this.clearTrackedTimeouts();
     this.clearPredictAddressTimer();
@@ -2007,6 +2032,7 @@ class CreateSBTGroup extends Component<any, any> {
   };
 
   resetForm = (): void => {
+    this.invalidateImageSelection();
     const nextAuthoringChain = this.getAuthoringChainState();
     this.resumeFormCachePersistence();
     this.clearFormCache();
@@ -2115,6 +2141,7 @@ class CreateSBTGroup extends Component<any, any> {
     const target = event.target;
     let value = target.type === 'checkbox' ? target.checked : target.value;
     const name = target.name;
+    const imageGeneration = name === 'sbtImageUrl' ? this.invalidateImageSelection() : null;
 
     // Special handling for tags is done via separate handlers, ignore here if accidentally caught
     if (name === 'tags') return;
@@ -2144,12 +2171,14 @@ class CreateSBTGroup extends Component<any, any> {
 
       if (name === 'sbtImageUrl') {
         this.setState(buildCreateSbtImageLoadReadyPatch(), async () => {
+          if (imageGeneration !== this._imageSelectionGeneration) return;
           const trimmedUrl = this.state.sbtImageUrl.trim();
           const fetchableUrl = this.getFetchableImageUrl(trimmedUrl);
 
           if (trimmedUrl !== '' && fetchableUrl) {
             try {
-              const file = await fetchImageFromURL(fetchableUrl);
+              const file = await this.fetchSelectedImage(fetchableUrl);
+              if (imageGeneration !== this._imageSelectionGeneration) return;
               this.setState(
                 buildCreateSbtImageFilePatch({
                   clearLockedAsset: true,
@@ -2161,6 +2190,7 @@ class CreateSBTGroup extends Component<any, any> {
                 },
               );
             } catch (error) {
+              if (imageGeneration !== this._imageSelectionGeneration) return;
               sbtLog.error('Failed to fetch image via worker:', error);
               this.setState(
                 buildCreateSbtImageLoadErrorPatch({
@@ -2200,6 +2230,7 @@ class CreateSBTGroup extends Component<any, any> {
       }
       return false;
     }
+    this.invalidateImageSelection();
     this.resetFormStateForEdit();
     this.setState(
       buildCreateSbtSelectedImageFilePatch({
@@ -2225,9 +2256,11 @@ class CreateSBTGroup extends Component<any, any> {
   };
 
   handlePasteImage = async (): Promise<void> => {
+    const imageGeneration = this._imageSelectionGeneration;
     const clipboardResult = await readCompactImageClipboard({
       fileNamePrefix: 'clipboard-sbt-image',
     });
+    if (imageGeneration !== this._imageSelectionGeneration) return;
 
     if (clipboardResult?.kind === 'file' && clipboardResult.file) {
       const applied = this.applySelectedImageFile(clipboardResult.file, {
@@ -2265,7 +2298,9 @@ class CreateSBTGroup extends Component<any, any> {
       );
 
       try {
-        const file = await fetchImageFromURL(fetchableUrl);
+        const file = await this.fetchSelectedImage(fetchableUrl);
+        if (imageGeneration !== this._imageSelectionGeneration) return;
+        this.invalidateImageSelection();
         this.resetFormStateForEdit();
         await this.setStateAsync(
           buildCreateSbtSelectedImageFilePatch({
@@ -2277,6 +2312,7 @@ class CreateSBTGroup extends Component<any, any> {
         this.updateGroupHash();
         this.persistFormCache();
       } catch (error) {
+        if (imageGeneration !== this._imageSelectionGeneration) return;
         sbtLog.error('Failed to fetch pasted image via worker:', error);
         this.setState(
           buildCreateSbtImageChooserStatusPatch({
@@ -2301,6 +2337,7 @@ class CreateSBTGroup extends Component<any, any> {
   };
 
   setImageUploadMethod = (useImageUrl: unknown, afterUpdate: (() => void) | null = null): void => {
+    this.invalidateImageSelection();
     this.resetFormStateForEdit();
     this.setState(
       () => buildCreateSbtImageUploadMethodPatch({ useImageUrl }),
@@ -2322,6 +2359,7 @@ class CreateSBTGroup extends Component<any, any> {
   };
 
   resetImage = (): void => {
+    this.invalidateImageSelection();
     this.resetFormStateForEdit();
     this.setState(buildCreateSbtImageResetPatch(), () => {
       this.updateGroupHash();
@@ -2922,12 +2960,13 @@ class CreateSBTGroup extends Component<any, any> {
 
   handleDeferredSave = async ({
     groupPassword,
-  }: { groupPassword?: string } = {}): Promise<CreateSbtDeferredDraftPayload> => {
+    account = this.props.account,
+  }: { groupPassword?: string; account?: unknown } = {}): Promise<CreateSbtDeferredDraftPayload> => {
     if (typeof this.props.onSaveDraft !== 'function') {
       throw new Error('Session draft save is unavailable.');
     }
     await this.commitPendingDocumentUrl();
-    const draftPayload = await this.buildDeferredDraftPayload({ groupPassword });
+    const draftPayload = await this.buildDeferredDraftPayload({ groupPassword, account });
     await this.props.onSaveDraft(draftPayload);
     this.clearFormCache();
     await this.setStateAsync({
@@ -3290,7 +3329,8 @@ class CreateSBTGroup extends Component<any, any> {
 
   buildDeferredDraftPayload = async ({
     groupPassword = cryptoUtils.normalizeGroupPasswordInput(this.state.groupPassword),
-  }: { groupPassword?: string } = {}): Promise<CreateSbtDeferredDraftPayload> => {
+    account = this.props.account,
+  }: { groupPassword?: string; account?: unknown } = {}): Promise<CreateSbtDeferredDraftPayload> => {
     const authoringPayload = await this.buildSerializableAuthoringPayload();
     const arweaveKey = await this.getEffectiveArweaveUploadKey();
     let tokenURI = String(this.state.tokenURI || '').trim();
@@ -3302,8 +3342,10 @@ class CreateSBTGroup extends Component<any, any> {
       const hasImmediateUploadPath =
         hasConnectedCreator && (!!toStr(arweaveKey?.arweaveJwk).trim() || !!this.getResolvedArweaveUploadWorkerUrl());
       if (hasImmediateUploadPath) {
+        assertCreateSbtAccountUnchanged(account, this.props.account);
         try {
           await this.uploadImageToArweave();
+          assertCreateSbtAccountUnchanged(account, this.props.account);
           tokenURI = String(await this.uploadTokenUriToArweave()).trim();
           metadataUploadStatus = tokenURI ? 'ready' : 'pending-upload';
         } catch (error) {
@@ -3316,6 +3358,7 @@ class CreateSBTGroup extends Component<any, any> {
         }
       }
     }
+    assertCreateSbtAccountUnchanged(account, this.props.account);
     const deployPlan = await this.resolvePredictableDeployPlan({ tokenURI, groupPassword });
     const metadataPreview = this.buildMetadataPreview();
     return {
@@ -3347,7 +3390,10 @@ class CreateSBTGroup extends Component<any, any> {
     };
   };
 
-  async mintSBT({ groupPassword: groupPasswordSnapshot }: { groupPassword?: string } = {}) {
+  async mintSBT({
+    groupPassword: groupPasswordSnapshot,
+    account = this.props.account,
+  }: { groupPassword?: string; account?: unknown } = {}) {
     if (!this.props.loginComplete) {
       // Nothing has been sent: end this create so the form unlocks and Create works again after login.
       this.setState({ startedMinting: false, currentStep: 0 });
@@ -3361,7 +3407,6 @@ class CreateSBTGroup extends Component<any, any> {
       sbtName,
       sbtDistribution,
       passwordList,
-      numInviteLinks,
       tokenURI,
       groupPassword: rawGroupPassword,
       create2Salt,
@@ -3453,6 +3498,7 @@ class CreateSBTGroup extends Component<any, any> {
 
       this.setState(buildCreateSbtSymbolPatch({ sbtSymbol }));
 
+      assertCreateSbtAccountUnchanged(account, this.props.account);
       const receipt = await createSbtContractScripts.createSBT(
         this.props.provider,
         contractName,
@@ -3554,18 +3600,6 @@ class CreateSBTGroup extends Component<any, any> {
     this.setState(buildCreateSbtInviteLinksBackupPatch({ sbtInviteLinks, sbtInviteBackupDate }));
   }
 
-  massSendSBTs = async (): Promise<void> => {
-    const { csvAddresses } = this.state;
-    const addresses = String(csvAddresses || '')
-      .split(',')
-      .map((address) => address.trim());
-    try {
-      // placeholder
-    } catch (e) {
-      sbtLog.warn('CreateSBTGroup: fallback', e);
-    }
-  };
-
   updateNumInviteLinks = (): void => {
     if (
       this.state.sbtDistribution.isLimited &&
@@ -3631,7 +3665,8 @@ class CreateSBTGroup extends Component<any, any> {
 
   handleMintClick = async (): Promise<void> => {
     // Must be connected
-    if (!this.props.account) {
+    const { account } = this.props;
+    if (!account) {
       this.props.toggleLoginModal(true);
       return;
     }
@@ -3678,28 +3713,38 @@ class CreateSBTGroup extends Component<any, any> {
 
     const fetchableImageUrl = this.getFetchableImageUrl(this.state.sbtImageUrl);
     if (this.state.useImageUrl && fetchableImageUrl && !this.state.sbtImageFile) {
+      const imageGeneration = this.invalidateImageSelection();
       try {
-        const file = await fetchImageFromURL(fetchableImageUrl);
+        const file = await this.fetchSelectedImage(fetchableImageUrl);
         // Await state update so sbtImageFile is set before uploadImageToArweave reads it
         await new Promise<void>((resolve) => {
-          this.setState(buildCreateSbtImageFilePatch({ file }), () => {
-            this.updateGroupHash();
-            this.persistFormCache();
-            resolve();
-          });
+          this.setState(
+            () => (imageGeneration === this._imageSelectionGeneration ? buildCreateSbtImageFilePatch({ file }) : null),
+            () => {
+              if (imageGeneration === this._imageSelectionGeneration) {
+                this.updateGroupHash();
+                this.persistFormCache();
+              }
+              resolve();
+            },
+          );
         });
       } catch (error) {
-        this.setState(buildCreateSbtImageLoadErrorPatch({ clearFile: false }), this.persistFormCache);
+        if (imageGeneration === this._imageSelectionGeneration) {
+          this.setState(buildCreateSbtImageLoadErrorPatch({ clearFile: false }), this.persistFormCache);
+        }
       }
     }
 
     try {
       if (this.isDeferredDeployMode()) {
-        await this.handleDeferredSave({ groupPassword });
+        await this.handleDeferredSave({ groupPassword, account });
       } else {
+        assertCreateSbtAccountUnchanged(account, this.props.account);
         await this.uploadImageToArweave();
+        assertCreateSbtAccountUnchanged(account, this.props.account);
         await this.uploadTokenUriToArweave();
-        await this.mintSBT({ groupPassword });
+        await this.mintSBT({ groupPassword, account });
       }
     } catch (error) {
       if (this.state.error) return;
@@ -3710,49 +3755,6 @@ class CreateSBTGroup extends Component<any, any> {
       );
     }
   };
-
-  async handleImageLoaded(imgRef: HTMLImageElement): Promise<void> {
-    try {
-      imgRef.crossOrigin = 'anonymous';
-      const imageElement = imgRef;
-      if (!imageElement.complete || imageElement.naturalWidth === 0) {
-        this.setState(buildCreateSbtImageLoadErrorPatch(), this.persistFormCache);
-        return;
-      }
-
-      const canvas = document.createElement('canvas');
-      canvas.width = imageElement.naturalWidth;
-      canvas.height = imageElement.naturalHeight;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) {
-        throw new Error('Unable to create image canvas context.');
-      }
-
-      imageElement.setAttribute('crossOrigin', 'anonymous');
-
-      ctx.drawImage(imageElement, 0, 0);
-      const blob = await new Promise<Blob>((resolve, reject) => {
-        canvas.toBlob((b: Blob | null) => {
-          if (!b) {
-            reject(new Error('Failed to create blob from canvas'));
-            return;
-          }
-          resolve(b);
-        }, 'image/png');
-      });
-      if (!blob) {
-        this.setState(buildCreateSbtImageLoadErrorPatch(), this.persistFormCache);
-        return;
-      }
-      const file = new File([blob], 'url_image.png', { type: 'image/png' });
-      this.setState(buildCreateSbtImageFilePatch({ file }), () => {
-        this.updateGroupHash();
-        this.persistFormCache();
-      });
-    } catch (error) {
-      this.setState(buildCreateSbtImageLoadErrorPatch(), this.persistFormCache);
-    }
-  }
 
   commitPendingDocumentUrl = async ({ persist = true }: { persist?: boolean } = {}): Promise<boolean> => {
     this.resetFormStateForEdit();
@@ -3902,7 +3904,6 @@ class CreateSBTGroup extends Component<any, any> {
   renderShareableBlock = (
     title: string,
     tooltipText: string,
-    description: string | null,
     url: string,
     qrId: string,
     fileSuffix: string,
@@ -3935,31 +3936,25 @@ class CreateSBTGroup extends Component<any, any> {
       sbtImageUrl,
       useImageUrl,
       sbtDistribution,
-      imageUploaded,
       tokenURI,
-      tokenUriUploaded,
       sbtMinted,
       sbtAddress,
-      csvAddresses,
       tokenInfoCollapsed,
       mintOptionsCollapsed,
       distributionOptionsCollapsed,
       currentStep,
       mintingFailed,
       sbtInviteLinks,
-      numInviteLinks,
       network,
       copiedLinkIndex,
       copyIdSuccess,
       copyLinkSuccess,
       exportFormat,
-      sbtSymbol,
       passwordList,
       tags,
       currentTagInput,
       documentIDHashes,
       documentUrl,
-      showTagsInput,
       imageLoadError,
       imageChooserStatusText,
       imageChooserStatusTone,
@@ -4600,7 +4595,6 @@ class CreateSBTGroup extends Component<any, any> {
                 {this.renderShareableBlock(
                   'URL Where Anyone Can Join',
                   'Anyone with this link can open the session page and trigger the open-mint flow immediately.',
-                  null,
                   openMintAutoJoinUrl,
                   'qr-code-auto-join',
                   'autojoin',
@@ -4619,7 +4613,6 @@ class CreateSBTGroup extends Component<any, any> {
                   sbtDistribution.isLimited
                     ? 'This link identifies the group only. Send one exported invite code separately; it permits one claim.'
                     : 'This link identifies the group only. Send the group password separately; the recipient enters it in the claim form.',
-                  null,
                   autoJoinUrl,
                   'qr-code-one-click',
                   'oneclick',

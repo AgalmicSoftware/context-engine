@@ -1,3 +1,4 @@
+import { isWorkerGroupMember, executeCoordinatedWorkerGroupMutation } from './workerGroups.js';
 import { dispatchAdminRequest } from './adminRequestDispatch.js';
 import { executeCoordinatedStorageVisibilityMutation } from './sessionConfigAuthority.js';
 import { createWorkerRouteShellWithWorkerDeps } from './workerRouteShellBinding.js';
@@ -14,11 +15,13 @@ import { buildAdminActionBodyHash } from './adminTypedData.mjs';
 import { updateSessionSecretsAfterLitRepair, ensureSessionLitAuthorizationSigner, finalizeSessionLitAuthorization } from './sessionLitAuthorizationCoordinator.js';
 import { ethers } from 'ethers';
 import { readCurrentSessionConfig } from './sessionConfigAuthority.js';
+import { createOutboundUrlSafetyHelpersWithWorkerDeps } from './outboundUrlSafetyBinding.js';
 
 const ACTOR_A = `0x${'aa'.repeat(20)}`;
 const ACTOR_B = `0x${'bb'.repeat(20)}`;
 const KEY = `0x${'11'.repeat(32)}`;
 const json = (body, status, headers) => ({ body, status, headers });
+const CLOUDFLARE_STORAGE_CONFIG = { slug: 'fixture', adminAddress: ACTOR_A, storageProfile: { backend: 'cloudflare', payloadAccessControl: { gate: 'none', encryption: 'none' } } };
 const createFixture = (config = { slug: 'fixture', adminAddress: ACTOR_A }) => {
   const kv = new Map(config ? [['session:fixture:config', JSON.stringify(config)]] : []);
   const durable = new Map();
@@ -144,6 +147,46 @@ test('publication rejects an admin upload revoked while external payload storage
   }
 });
 
+test('a context link started by a replaced admin is refused; a content edit meanwhile still publishes', async () => {
+  for (const [edit, status] of [['admin', 409], ['content', 200]]) {
+    const f = createFixture({ adminAddress: ACTOR_A, storageProfile: { backend: 'cloudflare', payloadAccessControl: { gate: 'none', encryption: 'none' } } });
+    const rows = new Map();
+    f.env.CE_STORAGE_INDEX_KV = {
+      get: async (key) => rows.get(key) ?? null,
+      put: async (key, value) => { rows.set(key, value); },
+      delete: async (key) => { rows.delete(key); },
+      list: async ({ prefix }) => ({ keys: [...rows.keys()].filter((key) => key.startsWith(prefix)).map((name) => ({ name })), list_complete: true }),
+    };
+    let reached;
+    let resume;
+    const fetching = new Promise((resolve) => { reached = resolve; });
+    const page = new Promise((resolve) => { resume = resolve; });
+    const { safeFetch, isBlockedOutboundUrl } = createOutboundUrlSafetyHelpersWithWorkerDeps({ deps: { fetch: async () => { reached(); return page; } } });
+    const respond = (body, status = 200, headers = {}) => Response.json(body, { status, headers });
+    const context = await f.context();
+    assert.equal(context.ok, true);
+    const request = new Request('https://worker.example/storage/context', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'add-link', url: 'https://example.com/notes' }) });
+    const adding = dispatchAuthenticatedRoute({ path: '/storage/context', method: 'POST', request, authenticatedContext: context,
+      deps: { dispatchAuthenticatedSecretPathRoute: (args) => dispatchAuthenticatedSecretPathRoute({ ...args, env: f.env, deps: {
+        evaluateAuthenticatedRoutePreflight: async () => ({ ok: true }),
+        storageRoute: (value) => storageRoute({ ...value, deps: { json: respond, safeFetch, isBlockedOutboundUrl } }),
+      } }) } });
+    await fetching;
+    try {
+      const changed = edit === 'admin' ? await f.rotate() : await executeCoordinatedSessionConfigMutation({ env: f.env, slug: 'fixture',
+        existingConfig: f.config, expectedAuthority: await f.authorized(), mutation: { kind: 'set-config', incomingConfig: { sessionName: 'Renamed' } } });
+      assert.equal(changed.status, 200, edit);
+    } finally {
+      resume(new Response('<p>Notes from the page, long enough to keep as its snapshot.</p>', { headers: { 'content-type': 'text/html' } }));
+    }
+    const result = await adding;
+    assert.equal(result.status, status, edit);
+    const published = [...rows.keys()].filter((key) => key.startsWith('ce-storage:') && key.includes(':docsContext:'));
+    assert.equal(published.length, status === 200 ? 1 : 0, edit);
+  }
+});
+
 test('publication with current authority records server stamps and rejects missing or mismatched proof', async () => {
   for (const resource of ['questions', 'surveys']) {
     const f = createFixture({ adminAddress: ACTOR_A, storageProfile: { backend: 'cloudflare', payloadAccessControl: { gate: 'none', encryption: 'none' } } });
@@ -175,7 +218,7 @@ test('publication with current authority records server stamps and rejects missi
 });
 
 test('current config reads finish while an existing visibility scan is waiting on storage', async () => {
-  const f = createFixture();
+  const f = createFixture(CLOUDFLARE_STORAGE_CONFIG);
   const expectedAuthority = await f.authorized();
   let reached;
   let resume;
@@ -243,7 +286,7 @@ const visibilityIndex = (count = 121) => {
 };
 
 test('visibility pages recheck authority after scan reads and stop writes after a completed rotation', async () => {
-  const f = createFixture();
+  const f = createFixture(CLOUDFLARE_STORAGE_CONFIG);
   const v = visibilityIndex();
   f.env.CE_STORAGE_INDEX_KV = v.index;
   const expectedAuthority = await f.authorized();
@@ -276,7 +319,7 @@ test('visibility pages recheck authority after scan reads and stop writes after 
 });
 
 test('concurrent same-id hide and unhide complete in order across bounded pages', async () => {
-  const f = createFixture();
+  const f = createFixture(CLOUDFLARE_STORAGE_CONFIG);
   const v = visibilityIndex();
   f.env.CE_STORAGE_INDEX_KV = v.index;
   const expectedAuthority = await f.authorized();
@@ -291,7 +334,7 @@ test('concurrent same-id hide and unhide complete in order across bounded pages'
 });
 
 test('visibility write failure within a page is an explicit failure and can be completed on retry', async () => {
-  const f = createFixture();
+  const f = createFixture(CLOUDFLARE_STORAGE_CONFIG);
   const v = visibilityIndex();
   f.env.CE_STORAGE_INDEX_KV = v.index;
   const expectedAuthority = await f.authorized();
@@ -406,6 +449,126 @@ test('a verified admin request delayed by authorization work cannot overwrite a 
   resume();
   assert.equal((await pending).status, 409);
   assert.equal((await f.snapshot()).config.adminAddress, ACTOR_B);
+});
+
+const groupAuthorityFixture = async () => {
+  const sessionId = '0x' + 'ab'.repeat(16);
+  const f = createFixture({ slug: 'fixture', adminAddress: ACTOR_A, sessionId });
+  f.env.CE_WORKER_GROUPS_BOOTSTRAP = 'fresh-template-v2';
+  f.env.GROUP_KV.delete = async (key) => { f.writes.push(key); f.kv.delete(key); };
+  f.env.GROUP_KV.list = async ({ prefix = '' } = {}) => ({
+    keys: [...f.kv.keys()].filter((name) => name.startsWith(prefix)).map((name) => ({ name })), list_complete: true,
+  });
+  const groupStore = new Map();
+  const storage = {
+    get: async (key) => structuredClone(groupStore.get(key)),
+    put: async (key, value) => groupStore.set(key, structuredClone(value)),
+    delete: async (key) => groupStore.delete(key),
+    list: async ({ prefix = '' } = {}) => new Map([...groupStore].filter(([key]) => key.startsWith(prefix))),
+  };
+  storage.transaction = async (fn) => fn(storage);
+  const groups = new SessionWriteCoordinator({ storage }, f.env);
+  f.env.CE_WORKER_GROUP_COORDINATOR = { idFromName: (name) => name, get: (name) => {
+    assert.equal(name, `worker-groups:fixture:${sessionId}`);
+    return { fetch: (url, init) => groups.fetch(new Request(url, init)) };
+  } };
+  const args = { env: f.env, slug: 'fixture', sessionId, groupId: 'reviewers', principal: { kind: 'evm_address', address: ACTOR_A }, actorPrincipal: { kind: 'evm_address', address: ACTOR_A } };
+  const created = await groups.fetch(new Request('https://session-coordinator.internal/worker-groups/mutate', {
+    method: 'POST', body: JSON.stringify({ ...args, env: undefined, operation: 'create',
+      input: { groupId: 'reviewers', label: 'Reviewers', joinMode: 'open' } }),
+  }));
+  assert.equal(created.status, 200, JSON.stringify(await created.json()));
+  return { ...f, args, groupStore, groups, sessionId };
+};
+
+test('a stale authority proof never changes membership in a separate group coordinator', async () => {
+  const f = await groupAuthorityFixture();
+  let admitted;
+  let resume;
+  const admission = new Promise((resolve) => { admitted = resolve; });
+  const blocked = new Promise((resolve) => { resume = resolve; });
+  const pending = dispatchAdminRequest({ env: f.env, action: 'groups/add-member',
+    request: { json: async () => ({ sessionId: f.sessionId, groupId: 'reviewers', principal: f.args.principal }) },
+    deps: { json, resolveAdminRequestAuthority: async () => {
+      const authority = await adminAuthority(f, ACTOR_A);
+      admitted(); await blocked; return authority;
+    } },
+  });
+  await admission;
+  assert.equal((await f.rotate()).ok, true);
+  const before = { kv: [...f.kv], groups: structuredClone([...f.groupStore]), writes: f.writes.length };
+  resume();
+  assert.equal((await pending).status, 409);
+  assert.deepEqual([...f.kv], before.kv);
+  assert.deepEqual([...f.groupStore], before.groups);
+  assert.equal(f.writes.length, before.writes);
+  const fresh = await dispatchAdminRequest({ env: f.env, action: 'groups/add-member',
+    request: { json: async () => ({ sessionId: f.sessionId, groupId: 'reviewers', principal: f.args.principal }) },
+    deps: { json, resolveAdminRequestAuthority: () => adminAuthority(f, ACTOR_B) },
+  });
+  assert.equal(fresh.status, 200);
+  assert.equal((await isWorkerGroupMember(f.args)).ok, true);
+  assert.equal(f.groupStore.has('session-config-authority'), false, 'only session config owns the authority');
+});
+
+test('rotation waits for an admitted group commit and missing authority never enters the group object', async () => {
+  const f = await groupAuthorityFixture();
+  const before = structuredClone([...f.groupStore]);
+  assert.equal((await executeCoordinatedWorkerGroupMutation({ ...f.args, operation: 'add-member' })).status, 409);
+  assert.deepEqual([...f.groupStore], before);
+  const proof = await f.authorized();
+  const put = f.env.GROUP_KV.put;
+  let entered;
+  let resume;
+  const committing = new Promise((resolve) => { entered = resolve; });
+  const blocked = new Promise((resolve) => { resume = resolve; });
+  f.env.GROUP_KV.put = async (key, value) => { entered(); await blocked; await put(key, value); };
+  const mutation = executeCoordinatedWorkerGroupMutation({ ...f.args, operation: 'add-member', expectedAuthority: proof });
+  await committing;
+  let rotated = false;
+  const rotation = f.rotate().then((result) => { rotated = true; return result; });
+  try {
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(rotated, false);
+  } finally { resume(); }
+  assert.equal((await mutation).ok, true);
+  assert.equal((await rotation).ok, true);
+  assert.equal((await isWorkerGroupMember(f.args)).ok, true);
+});
+
+test('participant join and leave preserve the admitted epoch through group dispatch', async () => {
+  for (const path of ['/groups/join', '/groups/leave']) {
+    const f = await groupAuthorityFixture();
+    const admitted = await f.authorized();
+    assert.equal((await executeCoordinatedWorkerGroupMutation({ ...f.args, operation: 'join', expectedAuthority: admitted })).ok, true);
+    assert.equal((await f.rotate()).ok, true);
+    const before = structuredClone([...f.groupStore]);
+    const result = await dispatchAuthenticatedSecretPathRoute({ env: f.env, path, method: 'POST',
+      request: new Request(`https://worker.example${path}`, { method: 'POST',
+        body: JSON.stringify({ sessionId: f.sessionId, groupId: 'reviewers' }) }),
+      config: f.config, slug: 'fixture', address: ACTOR_A, expectedAuthority: admitted, scopes: { groups: true },
+      deps: { json, evaluateAuthenticatedRoutePreflight: async () => ({ ok: true }) },
+    });
+    assert.equal(result.response.status, 409, path);
+    assert.deepEqual([...f.groupStore], before);
+  }
+});
+
+test('a committed group intent finishes recovery after the admitting authority changes', async () => {
+  const f = await groupAuthorityFixture();
+  const put = f.env.GROUP_KV.put;
+  let interrupted = false;
+  f.env.GROUP_KV.put = async (key, value) => {
+    await put(key, value);
+    if (!interrupted && key.includes('member')) { interrupted = true; throw new Error('interrupted projection'); }
+  };
+  const started = await executeCoordinatedWorkerGroupMutation({ ...f.args, operation: 'add-member', expectedAuthority: await f.authorized() });
+  assert.equal(started.status, 503);
+  assert.equal(interrupted, true);
+  assert.equal((await f.rotate()).ok, true);
+  assert.equal((await isWorkerGroupMember(f.args)).ok, true);
+  assert.equal(f.groupStore.has('session-config-authority'), false);
+  assert.equal([...f.groupStore.values()].some((value) => value?.pendingMutation), false);
 });
 
 test('Lit provisioning in flight rejects completion after rotation and does not persist its remote outputs', async () => {

@@ -1,8 +1,8 @@
 import { DEFAULT_INTERVIEW_SETTINGS } from '../../../../shared/interviewSettings.mjs';
-import { withoutOffResearchSharingDefault } from '../../utilities/session/interviewModeWrite';
+import { withoutNewInterviewDefaults } from '../../utilities/session/interviewModeWrite';
 
-// Interview defaults as saved: the research-sharing default is left out while off.
-const SAVED_INTERVIEW_DEFAULTS = withoutOffResearchSharingDefault({ ...DEFAULT_INTERVIEW_SETTINGS });
+// Interview defaults as saved: newer keys are left out at their defaults.
+const SAVED_INTERVIEW_DEFAULTS = withoutNewInterviewDefaults({ ...DEFAULT_INTERVIEW_SETTINGS });
 import { DEFAULT_RESULTS_ANALYSIS_SETTINGS } from '../../../../shared/resultsAnalysisSettings.mjs';
 import { ethers } from 'ethers';
 import { DEFAULT_CHAIN_ID } from '../../variables/appConfig.js';
@@ -84,7 +84,7 @@ describe('sessionWizardWriteNormalization', () => {
       },
       agentSessionWrapped: {
         enabled: true,
-        bridgeUrl: 'https://wrapped.example.test',
+        agentUrl: 'https://wrapped.example.test',
       },
     };
     const buildMetadataPayload = buildSessionWizardMetadataPayloadBuilder({
@@ -173,7 +173,7 @@ describe('sessionWizardWriteNormalization', () => {
     sessionModeProfile.surfaces.agentHttp = true;
     const agentSessionWrapped = {
       enabled: true,
-      bridgeUrl: 'https://wrapped.example.test',
+      agentUrl: 'https://wrapped.example.test',
     };
 
     expect(
@@ -266,7 +266,7 @@ describe('sessionWizardWriteNormalization', () => {
           surveys: { address: '0x111', chainId: 84532 },
           reputation: { address: '0x999', chainId: 84532 },
         },
-        blockLimits: { start: '100', end: '120' },
+        blockLimits: { start: '100', end: '120', startDefault: { chainId: DEFAULT_CONFIG_CHAIN_ID, blockNumber: 100 } },
       },
       {
         fieldOrder: ['slug', 'sessionName', 'sessionInfo', 'sessionHeaderImg', 'faucet', 'contracts', 'blockLimits'],
@@ -296,10 +296,6 @@ describe('sessionWizardWriteNormalization', () => {
       slug: 'profile-session',
       sessionName: 'Profile Session',
       sessionModeProfile: profile,
-      telegramOnly: true,
-      sessionMode: 'telegram_only',
-      telegramBridgeEnabled: true,
-      telegram: { only: true, mode: 'telegram_only' },
     });
 
     expect(metadata.sessionModeProfile).toEqual({
@@ -312,10 +308,6 @@ describe('sessionWizardWriteNormalization', () => {
         payloadAccessControl: expect.objectContaining({ mode: 'worker_sbt_gate' }),
       }),
     );
-    expect(metadata.telegramOnly).toBeUndefined();
-    expect(metadata.sessionMode).toBeUndefined();
-    expect(metadata.telegramBridgeEnabled).toBeUndefined();
-    expect(metadata.telegram).toBeUndefined();
   });
 
   test('sanitizeSessionWizardMetadataPayload preserves public interview model configuration', () => {
@@ -382,39 +374,6 @@ describe('sessionWizardWriteNormalization', () => {
       expect(payload.sessionModeProfile.surfaces).toMatchObject({ telegram: false, miniApp: false, agentHttp });
     }
     expect(profile.surfaces).toMatchObject({ telegram: true, miniApp: true, agentHttp });
-  });
-
-  test.each([
-    { telegramOnly: true },
-    { telegram_only: true },
-    { sessionMode: 'telegram_only' },
-    { telegramMode: 'telegram_only' },
-    { telegram: { only: true } },
-    { telegram: { mode: 'telegram_only' } },
-  ])('upgrades legacy agent access %j without dual-write fields', (legacyFlags) => {
-    const metadata = sanitizeSessionWizardMetadataPayload({
-      slug: 'legacy-telegram',
-      sessionName: 'Legacy Agent',
-      ...legacyFlags,
-      storageProfile: { backend: 'cloudflare' },
-    });
-
-    expect(metadata.sessionModeProfile).toEqual(
-      expect.objectContaining({
-        preset: 'custom',
-        authority: { mode: 'worker_canonical' },
-        surfaces: expect.objectContaining({ telegram: false, miniApp: false, agentHttp: true, web: true }),
-      }),
-    );
-    expect(metadata.storageProfile).toEqual(
-      expect.objectContaining({
-        backend: 'cloudflare',
-        payloadAccessControl: expect.objectContaining({ mode: 'worker_sbt_gate' }),
-      }),
-    );
-    expect(metadata.telegramOnly).toBeUndefined();
-    expect(metadata.sessionMode).toBeUndefined();
-    expect(metadata.telegramBridgeEnabled).toBeUndefined();
   });
 
   test('buildSessionWizardRegistrySessionFields keeps compatibility mirrors and sponsored flags only', () => {
@@ -571,7 +530,7 @@ describe('sessionWizardWriteNormalization', () => {
       draft: {
         networkChainId: DEFAULT_CONFIG_CHAIN_ID,
         corsWorkerUrl: 'https://draft-worker.example',
-        blockLimits: { start: '250', end: '275' },
+        blockLimits: { start: '250', end: '275', startDefault: { chainId: DEFAULT_CONFIG_CHAIN_ID, blockNumber: 250 } },
         contracts: {
           surveys: { address: '0x111', chainId: DEFAULT_CONFIG_CHAIN_ID },
           reputation: { address: '0x999', chainId: DEFAULT_CONFIG_CHAIN_ID },
@@ -632,6 +591,67 @@ describe('sessionWizardWriteNormalization', () => {
       chainId: DEFAULT_CONFIG_CHAIN_ID,
     });
     expect(payload.contracts.reputation).toBeUndefined();
+  });
+
+  test('buildSessionWizardWorkerConfigPayload publishes the setup page context, trimmed', () => {
+    const sessionModeProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    const payload = buildSessionWizardWorkerConfigPayload({
+      slug: 'context-session',
+      draft: {
+        sessionName: 'Context session',
+        sessionModeProfile,
+        sessionContext: {
+          title: ' Read first ',
+          paragraphs: [' Why it matters. ', '  '],
+          links: [
+            { label: ' Essay ', url: ' https://example.org/essay ' },
+            { label: 'No link', url: '' },
+          ],
+        },
+        questions: [{ prompt: 'Kept out of config.', type: 'binary' }],
+        draftId: 'draft-1',
+        contextFiles: [{ name: 'deck.pdf' }],
+      },
+      deployPayload: { adminAddress: '0xAdmin' },
+      sessionId: '123e4567-e89b-12d3-a456-426614174000',
+      workerUrl: 'https://worker.example/',
+    });
+
+    expect(payload.sessionContext).toEqual({
+      title: 'Read first',
+      paragraphs: ['Why it matters.'],
+      links: [{ label: 'Essay', url: 'https://example.org/essay' }],
+    });
+    expect(payload).not.toHaveProperty('questions');
+    expect(payload).not.toHaveProperty('draftId');
+    expect(payload).not.toHaveProperty('contextFiles');
+    const empty = buildSessionWizardWorkerConfigPayload({
+      slug: 'context-session',
+      draft: { sessionModeProfile, sessionContext: { title: '', paragraphs: [], links: [] } },
+      deployPayload: { adminAddress: '0xAdmin' },
+      workerUrl: 'https://worker.example/',
+    });
+    expect(empty).not.toHaveProperty('sessionContext');
+  });
+
+  test('buildSessionWizardWorkerConfigPayload publishes an uploaded HTML context in place of text', () => {
+    const sessionModeProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    const build = (sessionContext: Record<string, unknown>) =>
+      buildSessionWizardWorkerConfigPayload({
+        slug: 'context-session',
+        draft: { sessionName: 'Context session', sessionModeProfile, sessionContext },
+        deployPayload: { adminAddress: '0xAdmin' },
+        workerUrl: 'https://worker.example/',
+      });
+    expect(build({ title: 'Atlas', paragraphs: [], links: [], html: ' <h2>Areas</h2> ' }).sessionContext).toEqual({
+      title: 'Atlas',
+      html: '<h2>Areas</h2>',
+      paragraphs: [],
+      links: [],
+    });
+    expect(() => build({ title: 'Atlas', paragraphs: ['Typed'], links: [], html: '<h2>Areas</h2>' })).toThrow(
+      'not both',
+    );
   });
 
   test('buildSessionWizardWorkerConfigPayload emits a reload-safe two-key worker-canonical config', () => {
@@ -856,6 +876,85 @@ describe('sessionWizardWriteNormalization', () => {
     if (shareDraftChangesByDefault) expect(payload.interviewMode.shareDraftChangesByDefault).toBe(true);
   });
 
+  test.each(['minimal', 'full'] as const)('publishes the interview research detail (%s)', (researchDetail) => {
+    const payload = buildSessionWizardWorkerConfigPayload({
+      slug: 'research-detail',
+      draft: {
+        sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+        interviewMode: { researchDetail },
+      },
+      account: '0x00000000000000000000000000000000000000aa',
+      sessionId: '123e4567-e89b-12d3-a456-426614174000',
+      workerUrl: 'https://worker.example',
+    });
+    // Minimal is the default, left out so older Session Workers still accept the save.
+    expect(payload.interviewMode.researchDetail).toBe(researchDetail === 'full' ? 'full' : undefined);
+  });
+
+  test('publishes the share of hidden AI drafts', () => {
+    const payload = buildSessionWizardWorkerConfigPayload({
+      slug: 'hidden-drafts',
+      draft: {
+        sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+        interviewMode: { hiddenDraftShare: 0.2 },
+      },
+      account: '0x00000000000000000000000000000000000000aa',
+      sessionId: '123e4567-e89b-12d3-a456-426614174000',
+      workerUrl: 'https://worker.example',
+    });
+    expect(payload.interviewMode.hiddenDraftShare).toBe(0.2);
+  });
+
+  test.each([true, false])('publishes group suggestions only when on (%s)', (suggestGroups) => {
+    const payload = buildSessionWizardWorkerConfigPayload({
+      slug: 'group-suggestions',
+      draft: {
+        sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+        interviewMode: { suggestGroups },
+      },
+      account: '0x00000000000000000000000000000000000000aa',
+      sessionId: '123e4567-e89b-12d3-a456-426614174000',
+      workerUrl: 'https://worker.example',
+    });
+    // Off is the default, left out so older Session Workers still accept the save.
+    expect(payload.interviewMode.suggestGroups).toBe(suggestGroups || undefined);
+  });
+
+  test.each([true, false])('publishes the fidelity section of Results only when on (%s)', (showFidelityResults) => {
+    const payload = buildSessionWizardWorkerConfigPayload({
+      slug: 'fidelity-results',
+      draft: {
+        sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+        interviewMode: { showFidelityResults },
+      },
+      account: '0x00000000000000000000000000000000000000aa',
+      sessionId: '123e4567-e89b-12d3-a456-426614174000',
+      workerUrl: 'https://worker.example',
+    });
+    // Off is the default, left out so older Session Workers still accept the save.
+    expect(payload.interviewMode.showFidelityResults).toBe(showFidelityResults || undefined);
+  });
+
+  test.each([1, 5, 10])(
+    'publishes the smallest group shown in fidelity results only when changed (%s)',
+    (fidelityMinimumPeople) => {
+      const payload = buildSessionWizardWorkerConfigPayload({
+        slug: 'fidelity-minimum',
+        draft: {
+          sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+          interviewMode: { fidelityMinimumPeople },
+        },
+        account: '0x00000000000000000000000000000000000000aa',
+        sessionId: '123e4567-e89b-12d3-a456-426614174000',
+        workerUrl: 'https://worker.example',
+      });
+      // 5 is the default, left out so older Session Workers still accept the save.
+      expect(payload.interviewMode.fidelityMinimumPeople).toBe(
+        fidelityMinimumPeople === 5 ? undefined : fidelityMinimumPeople,
+      );
+    },
+  );
+
   test('write payload builders reject invalid results analysis settings', () => {
     const invalidResultsAnalysis = {
       version: 1,
@@ -973,7 +1072,6 @@ describe('sessionWizardWriteNormalization', () => {
 
     expect(metadata.storageProfile.backend).toBe('cloudflare');
     expect(metadata.storageProfile.sessionOwned).toBe(true);
-    expect(metadata.storageProfile.telegramOwned).toBe(false);
     expect(metadata.storageProfile.resources.docsContext).toBe('active');
     expect(metadata.storageProfile.resources.questions).toBe('active');
     expect(metadata.storageProfile.resources.surveys).toBe('active');
@@ -997,62 +1095,8 @@ describe('sessionWizardWriteNormalization', () => {
 
     expect(workerPayload.storageProfile.backend).toBe('cloudflare');
     expect(workerPayload.storageProfile.sessionOwned).toBe(true);
-    expect(workerPayload.storageProfile.telegramOwned).toBe(false);
     expect(workerPayload.storageProfile.payloadAccessControl.mode).toBe('worker_sbt_gate');
     expect(workerPayload.litCredentials).toEqual({});
-  });
-
-  test('legacy adapter mode is published as profile-only session metadata', () => {
-    const metadata = sanitizeSessionWizardMetadataPayload(
-      {
-        slug: 'telegram-native',
-        sessionName: 'Agent Native',
-        telegramOnly: true,
-        storageProfile: { backend: 'cloudflare', payloadAccessControl: { mode: 'public_read' } },
-      },
-      {
-        fieldOrder: ['slug', 'sessionName', 'telegramOnly', 'storageProfile'],
-      },
-    );
-
-    expect(metadata.sessionModeProfile).toEqual(
-      expect.objectContaining({
-        preset: 'custom',
-        authority: { mode: 'worker_canonical' },
-        surfaces: expect.objectContaining({ telegram: false, miniApp: false, agentHttp: true, web: true }),
-      }),
-    );
-    expect(metadata.telegramOnly).toBeUndefined();
-    expect(metadata.sessionMode).toBeUndefined();
-    expect(metadata.telegramBridgeEnabled).toBeUndefined();
-    expect(metadata.telegram).toBeUndefined();
-
-    const workerPayload = buildSessionWizardWorkerConfigPayload({
-      slug: 'telegram-native',
-      draft: {
-        networkChainId: DEFAULT_CONFIG_CHAIN_ID,
-        telegramOnly: true,
-        storageProfile: { backend: 'cloudflare', payloadAccessControl: { mode: 'public_read' } },
-      },
-      deployPayload: {},
-    });
-
-    expect(workerPayload.sessionModeProfile).toEqual(
-      expect.objectContaining({
-        preset: 'custom',
-        authority: { mode: 'worker_canonical' },
-        surfaces: expect.objectContaining({ telegram: false, miniApp: false, agentHttp: true, web: true }),
-      }),
-    );
-    expect(workerPayload.storageProfile).toEqual(
-      expect.objectContaining({
-        backend: 'cloudflare',
-        payloadAccessControl: expect.objectContaining({ mode: 'public_read' }),
-      }),
-    );
-    expect(workerPayload.telegramOnly).toBeUndefined();
-    expect(workerPayload.sessionMode).toBeUndefined();
-    expect(workerPayload.telegramBridgeEnabled).toBeUndefined();
   });
 });
 

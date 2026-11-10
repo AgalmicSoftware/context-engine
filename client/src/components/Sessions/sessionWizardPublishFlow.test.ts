@@ -226,21 +226,11 @@ describe('sessionWizardPublishFlow', () => {
     );
   });
 
-  it('validates and resolves the normal-mode bundle URL without leaking stale advanced URLs', () => {
+  it('validates and resolves the bundle URL from the override', () => {
     expect(getSessionWizardNormalModeBundleUrlOverrideValidationError('http://bundle.example')).toMatch(/https:\/\//i);
 
     expect(
       resolveSessionWizardBundleUrlForMode({
-        wizardMode: 'advanced',
-        bundleUrl: 'https://advanced.example/bundle.js',
-        normalModeBundleUrlOverride: 'https://override.example/bundle.js',
-      }),
-    ).toBe('https://advanced.example/bundle.js');
-
-    expect(
-      resolveSessionWizardBundleUrlForMode({
-        wizardMode: 'normal',
-        bundleUrl: 'https://advanced.example/bundle.js',
         normalModeBundleUrlOverride: 'https://override.example/bundle.js',
         normalModeDefaultBundleUrl: 'https://default.example/bundle.js',
       }),
@@ -379,9 +369,6 @@ describe('sessionWizardPublishFlow', () => {
   it('resolves deploy bundle mode from normal-mode overrides and manual fallback choices', () => {
     expect(
       resolveSessionWizardDeployBundleMode({
-        wizardMode: 'normal',
-        bundleMode: 'upload',
-        bundleUrl: '',
         sponsoredAutoDeployReady: false,
         normalModeBundleUrlOverride: 'https://override.example/bundle.js',
         normalModeDefaultBundleUrl: '',
@@ -390,8 +377,6 @@ describe('sessionWizardPublishFlow', () => {
 
     expect(
       resolveSessionWizardDeployBundleMode({
-        wizardMode: 'normal',
-        bundleMode: 'url',
         sponsoredAutoDeployReady: false,
         forceManualBundleFile: true,
         hasBundleFile: true,
@@ -400,24 +385,12 @@ describe('sessionWizardPublishFlow', () => {
 
     expect(
       resolveSessionWizardDeployBundleMode({
-        wizardMode: 'advanced',
-        bundleMode: 'upload',
-        sponsoredAutoDeployReady: true,
-      }),
-    ).toBe('upload');
-
-    expect(
-      resolveSessionWizardDeployBundleMode({
-        wizardMode: 'normal',
-        bundleMode: 'upload',
         sponsoredAutoDeployReady: true,
       }),
     ).toBe('url');
 
     expect(
       resolveSessionWizardDeployBundleMode({
-        wizardMode: 'normal',
-        bundleMode: 'url',
         sponsoredAutoDeployReady: true,
         forceSponsoredAutoDeploy: true,
         forceManualBundleFile: true,
@@ -429,7 +402,6 @@ describe('sessionWizardPublishFlow', () => {
   it('plans sponsored auto-deploy publish surface without deploy or upload ports', () => {
     expect(
       resolveSessionWizardSponsoredPublishSurfaceState({
-        isNormalMode: true,
         workerMode: 'custom',
         sponsoredAutoDeployState: {
           active: true,
@@ -456,7 +428,6 @@ describe('sessionWizardPublishFlow', () => {
   it('lets a ready sponsored deploy publish when no hosted bundle URL is configured', () => {
     expect(
       resolveSessionWizardSponsoredPublishSurfaceState({
-        isNormalMode: true,
         workerMode: 'custom',
         sponsoredAutoDeployState: { active: true, ready: true, missing: [] },
         forceManualBundleFile: true,
@@ -561,22 +532,11 @@ describe('sessionWizardPublishFlow', () => {
     });
   });
 
-  it('drops stale advanced-mode bundle URLs from normal-mode payload resolution when the hosted default is blank', async () => {
-    const staleAdvancedBundleUrl = 'https://assets.example.test/stale-advanced-sessionCorsWorker.bundle.js';
+  it('resolves no bundle URL when the hosted default and override are blank', async () => {
     const normalModeOverrideUrl = 'https://assets.example.test/manual-normal-sessionCorsWorker.bundle.js';
 
     expect(
       resolveSessionWizardBundleUrlForMode({
-        wizardMode: 'advanced',
-        bundleUrl: staleAdvancedBundleUrl,
-        normalModeDefaultBundleUrl: '',
-      }),
-    ).toBe(staleAdvancedBundleUrl);
-
-    expect(
-      resolveSessionWizardBundleUrlForMode({
-        wizardMode: 'normal',
-        bundleUrl: staleAdvancedBundleUrl,
         normalModeDefaultBundleUrl: '',
       }),
     ).toBe('');
@@ -585,8 +545,6 @@ describe('sessionWizardPublishFlow', () => {
       resolveSessionWizardDeployBundlePayload({
         effectiveBundleMode: 'url',
         bundleUrl: resolveSessionWizardBundleUrlForMode({
-          wizardMode: 'normal',
-          bundleUrl: staleAdvancedBundleUrl,
           normalModeDefaultBundleUrl: '',
         }),
       }),
@@ -600,8 +558,6 @@ describe('sessionWizardPublishFlow', () => {
 
     expect(
       resolveSessionWizardBundleUrlForMode({
-        wizardMode: 'normal',
-        bundleUrl: staleAdvancedBundleUrl,
         normalModeBundleUrlOverride: normalModeOverrideUrl,
         normalModeDefaultBundleUrl: '',
       }),
@@ -649,7 +605,6 @@ describe('sessionWizardPublishFlow', () => {
           message: 'Worker deploy failed.',
           responseError: 'Failed to fetch bundle (404).',
         },
-        wizardMode: 'normal',
         effectiveBundleMode: 'url',
         hasBundleFile: false,
       }),
@@ -667,7 +622,6 @@ describe('sessionWizardPublishFlow', () => {
             hasFetchHandler: false,
           },
         },
-        wizardMode: 'normal',
         effectiveBundleMode: 'url',
         hasBundleFile: false,
       }),
@@ -675,20 +629,7 @@ describe('sessionWizardPublishFlow', () => {
 
     expect(
       shouldForceSessionWizardNormalModeManualBundleRetry({
-        err: {
-          message: 'Worker deploy failed.',
-          responseError: 'Failed to fetch bundle (404).',
-        },
-        wizardMode: 'advanced',
-        effectiveBundleMode: 'url',
-        hasBundleFile: false,
-      }),
-    ).toBe(false);
-
-    expect(
-      shouldForceSessionWizardNormalModeManualBundleRetry({
         err: 'Failed to fetch bundle (404).',
-        wizardMode: 'normal',
         effectiveBundleMode: 'url',
         hasBundleFile: false,
       }),
@@ -700,7 +641,6 @@ describe('sessionWizardPublishFlow', () => {
           message: 'Worker deploy failed.',
           responseError: 'The uploaded script has no registered event handlers.',
         },
-        wizardMode: 'normal',
         effectiveBundleMode: 'url',
         hasBundleFile: false,
       }),

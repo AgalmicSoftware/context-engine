@@ -52,10 +52,11 @@ export const hasMeaningfulFieldValue = (field: SurveyDraftField | null | undefin
   return false;
 };
 
+// Strings and keys are JSON-quoted so separators inside them cannot make two values match.
 export const buildStableDraftValueSignature = (value: unknown): string => {
   if (value === undefined) return 'u';
   if (value === null) return 'n';
-  if (typeof value === 'string') return `s:${value}`;
+  if (typeof value === 'string') return `s:${JSON.stringify(value)}`;
   if (typeof value === 'number') return `d:${Number.isNaN(value) ? 'NaN' : String(value)}`;
   if (typeof value === 'boolean') return value ? 'b:1' : 'b:0';
   if (Array.isArray(value)) {
@@ -63,7 +64,7 @@ export const buildStableDraftValueSignature = (value: unknown): string => {
   }
   if (isRecord(value)) {
     const keys = Object.keys(value).sort();
-    return `o:{${keys.map((key) => `${key}:${buildStableDraftValueSignature(value[key])}`).join('|')}}`;
+    return `o:{${keys.map((key) => `${JSON.stringify(key)}:${buildStableDraftValueSignature(value[key])}`).join('|')}}`;
   }
   return `${typeof value}:${String(value)}`;
 };
@@ -121,6 +122,7 @@ export const readSliceQuestion = (slice: PersistedDraftSliceLike, qid: string) =
 /**
  * The saved answer a draft was written against. Locked fields keep only their
  * envelope, so the draft never stores decrypted plaintext of a saved answer.
+ * A loaded empty answer is `{}`; only an unknown saved slice is `null`.
  * `ratingsEncrypted` says the saved ratings carry envelopes of their own.
  */
 export const buildDraftBaselineEntry = (
@@ -143,7 +145,7 @@ export const buildDraftBaselineEntry = (
     ...(!locked && importance !== null ? { importance } : {}),
     ...(!locked && conviction !== null ? { conviction } : {}),
   };
-  return Object.keys(entry).length ? entry : null;
+  return entry;
 };
 
 /**

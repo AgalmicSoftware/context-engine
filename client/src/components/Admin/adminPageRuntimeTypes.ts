@@ -12,11 +12,6 @@ export type AdminDecryptedFieldEntry = {
 
 export type AdminDecryptedFieldMap = Record<string, AdminDecryptedFieldEntry>;
 
-export type AdminMetadataBlockLimitsDraft = {
-  start: string;
-  end: string;
-};
-
 export type AdminSessionConfigLike = {
   sessionName?: unknown;
   sessionId?: unknown;

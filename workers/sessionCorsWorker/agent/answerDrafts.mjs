@@ -2,7 +2,7 @@ import { safeString, lower, stableFingerprint, nowIso, safeEnvJsonParse as safeJ
 import { LEGACY_TRANSPORT_LANES } from './constants.mjs';
 import { assertNoSecretShape } from './redaction.mjs';
 import { buildAgentActivityMetadata } from './agentActivity.mjs';
-import { ANSWER_DRAFT_KV_PREFIX, ANSWER_DRAFT_VIEW_KV_PREFIX, DEFAULT_GROUP_SESSION_TTL_SECONDS, questionIdSeedPart, CANONICAL_ANSWER_KINDS } from './runtimeCore.mjs';
+import { ANSWER_DRAFT_KV_PREFIX, ANSWER_DRAFT_VIEW_KV_PREFIX, DEFAULT_GROUP_SESSION_TTL_SECONDS, questionIdKeyPart, CANONICAL_ANSWER_KINDS } from './runtimeCore.mjs';
 
 export function answerDraftKey({
   normalized = {},
@@ -11,7 +11,7 @@ export function answerDraftKey({
 } = {}) {
   const telegramUserId = safeString(normalized.user?.telegramUserId);
   const slug = sanitizeSessionSlug(sessionSlug);
-  const qid = questionIdSeedPart(selectedQuestionId || 'question');
+  const qid = questionIdKeyPart(selectedQuestionId || 'question');
   return telegramUserId && slug && qid
     ? `${ANSWER_DRAFT_KV_PREFIX}${telegramUserId}:${slug}:${qid}`
     : '';
@@ -24,7 +24,7 @@ export function answerDraftViewKey({
 } = {}) {
   const telegramUserId = safeString(normalized.user?.telegramUserId);
   const slug = sanitizeSessionSlug(sessionSlug);
-  const qid = questionIdSeedPart(selectedQuestionId || 'question');
+  const qid = questionIdKeyPart(selectedQuestionId || 'question');
   return telegramUserId && slug && qid
     ? `${ANSWER_DRAFT_VIEW_KV_PREFIX}${telegramUserId}:${slug}:${qid}`
     : '';
@@ -257,9 +257,16 @@ export async function persistAnswerDraft({
   if (!key || !env?.AGENT_ACTION_KV || typeof env.AGENT_ACTION_KV.put !== 'function') {
     return { ok: false, reason: 'action_kv_unavailable' };
   }
-  const existing = typeof env.AGENT_ACTION_KV.get === 'function'
-    ? safeJsonParse(await env.AGENT_ACTION_KV.get(key).catch(() => null), null)
-    : null;
+  let stored = null;
+  if (typeof env.AGENT_ACTION_KV.get === 'function') {
+    try {
+      stored = await env.AGENT_ACTION_KV.get(key);
+    } catch {
+      // Saving without the draft's history would reset its edit count and origin.
+      return { ok: false, reason: 'answer_draft_read_failed', retryable: true };
+    }
+  }
+  const existing = safeJsonParse(stored, null);
   const previous = existing && typeof existing === 'object' && !Array.isArray(existing) ? existing : null;
   const savedAt = createdAt || nowIso();
   const record = {

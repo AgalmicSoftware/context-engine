@@ -17,6 +17,8 @@ try {
     for (const width of [390, 1280]) {
       for (const enabled of [true, false]) {
         const page = await browser.newPage({ viewport: { width, height: 900 }, reducedMotion: 'reduce', hasTouch: true, isMobile: width < 600 });
+        await page.route('**/*', route => new URL(route.request().url()).origin === new URL(baseUrl).origin
+          ? route.continue() : route.abort());
         // Override only this browser's config reads; never change the deployed session.
         // The enabled case omits the field and exercises the normal environment default.
         const config = { ...demoSessions['demo-sh'], ...(enabled ? {} : { pileAutoAdvanceEnabled: false }) };
@@ -33,6 +35,8 @@ try {
           prompt: `Synthetic navigation question ${index}`, options: [], tags: [],
           sessionSlug: 'demo-sh', sessionId: config.sessionId,
         }));
+        questions.push({ id: `0x${'4'.padStart(64, '0')}`, type: 'quadratic', prompt: 'Allocate synthetic votes',
+          options: ['Parks', 'Transit'], voiceCredits: 99, tags: [], sessionSlug: 'demo-sh', sessionId: config.sessionId });
         await page.route(`${new URL(config.corsWorkerUrl).origin}/storage/list?*`, route => route.fulfill({ json: {
           items: new URL(route.request().url()).searchParams.get('resource') === 'questions'
             ? questions.map(question => ({ storageRef: { backend: 'cloudflare', id: question.id, resource: 'questions' } })) : [],
@@ -111,6 +115,30 @@ try {
             await waitForCard(page, 2);
             assert(!await activeCard(page).getByRole('radio', { name: 'Agree', exact: true }).isChecked(), 'Double-tap must not answer the revealed card');
           }
+          await page.reload({ waitUntil: 'domcontentloaded' });
+          await waitForCard(page, 1);
+          for (const index of [1, 2, 3]) {
+            const agree = activeCard(page).getByRole('radio', { name: 'Agree', exact: true });
+            const choice = await agree.isChecked() ? activeCard(page).getByRole('radio', { name: 'Disagree', exact: true }) : agree;
+            await choice.press('Space');
+            await waitForCard(page, index + 1);
+          }
+          const up = activeCard(page).getByTestId('ce-quadratic-increase-0');
+          const down = activeCard(page).getByTestId('ce-quadratic-decrease-0');
+          const vote = activeCard(page).getByRole('slider', { name: 'Parks' });
+          await up.dblclick();
+          assert.equal(await vote.inputValue(), '2', 'Both clicks count after auto-advance to a quadratic question');
+          await up.click({ clickCount: 3 });
+          assert.equal(await vote.inputValue(), '5', 'All three clicks increase the quadratic allocation');
+          await down.click({ clickCount: 3 });
+          await down.click({ clickCount: 3 });
+          assert.equal(await vote.inputValue(), '-1', 'Rapid decrease crosses neutral without sticking');
+          assert.match(await activeCard(page).getByTestId('ce-quadratic-budget').textContent(), /98 credits left/);
+          await waitForCard(page, 4);
+          await page.getByRole('button', { name: 'Previous Question', exact: true }).click();
+          await page.getByRole('button', { name: 'Next Question', exact: true }).click();
+          await waitForCard(page, 4);
+          assert.equal(await vote.inputValue(), '-1', 'Navigation preserves the complete rapid-click draft');
         }
         await page.getByRole('button', { name: /^LOG IN$/i }).click();
         await page.waitForFunction(() => [...document.querySelectorAll('[role=dialog]')].some((el) => getComputedStyle(el).opacity === '1'));
@@ -122,11 +150,13 @@ try {
         await page.getByRole('dialog').getByRole('button', { name: 'Close', exact: true }).click();
         await page.reload({ waitUntil: 'domcontentloaded' });
         await waitForCard(page, 1);
-        await activeCard(page).getByRole('radio', { name: 'Disagree', exact: true }).press('Space');
+        const disagree = activeCard(page).getByRole('radio', { name: 'Disagree', exact: true });
+        await (enabled && await disagree.isChecked()
+          ? activeCard(page).getByRole('radio', { name: 'Agree', exact: true }) : disagree).press('Space');
         await waitForCard(page, enabled ? 2 : 1);
         if (!enabled) assert(await activeCard(page).getByRole('radio', { name: 'Disagree', exact: true }).isChecked());
         await page.close();
-        console.log(`PASS ${theme} ${width} auto-advance=${enabled}: config, answer, Back, deselect, reload, Settings${enabled ? ', double-click, arrows, comments' : ''}${enabled && width < 600 ? ', double-tap' : ''}`);
+        console.log(`PASS ${theme} ${width} auto-advance=${enabled}: config, answer, Back, deselect, reload, Settings${enabled ? ', double-click, arrows, comments, quadratic rapid steps' : ''}${enabled && width < 600 ? ', double-tap' : ''}`);
       }
     }
   }

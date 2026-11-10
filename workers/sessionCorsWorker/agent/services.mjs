@@ -3,7 +3,7 @@ import { resolveCanonicalWorkerSessionIdHex } from '../sessionConfigMutation.js'
 import { readAuthorizationEpoch } from '../authorizationScopeFreshness.js';
 import { buildAuthTokenJti, persistAuthTokenRecord, revokeAuthTokenRecord } from '../authTokenClaims.js';
 import { signToken } from '../tokenSigning.js';
-import { executeCoordinatedSessionConfigMutation } from '../sessionWriteCoordinator.js';
+import { executeCoordinatedSessionConfigMutation, withCoordinatedFaucetWalletTurn } from '../sessionWriteCoordinator.js';
 import { readCoordinatedWorkerGroupMemberships } from '../workerGroups.js';
 import { resolveSessionAiModel } from '../aiRequestPolicy.js';
 import { authorityError, agentHttpEnabled, validateCredentialAuthority, validateMemberSource } from './authority.mjs';
@@ -44,7 +44,7 @@ export const createAgentServices = ({ env, agentEnv, deps }) => {
   const submitJournal = async (operation, record) => {
     if (record.sessionId !== ctx.sessionId || record.sessionSlug !== ctx.slug || record.workerOrigin !== ctx.origin) throw authorityError('submit_outcome_identity_mismatch');
     const result = await callSessionConfigCoordinator({ env, slug: ctx.slug, path: `agent-submit/${operation}`, record,
-      ...(operation === 'begin' ? { expectedAuthority: expectedAuthority() } : {}) });
+      ...(['begin', 'claim'].includes(operation) ? { expectedAuthority: expectedAuthority() } : {}) });
     if (!result.ok) return { ok: false, retryable: true, reason: result.body?.reason || 'submit_coordinator_unavailable' };
     return result.body;
   };
@@ -56,6 +56,7 @@ export const createAgentServices = ({ env, agentEnv, deps }) => {
         expectedAuthority: expectedAuthority(), record: { ...record, sessionId: ctx.sessionId, sessionSlug: ctx.slug } });
       return result.body || { ok: false, status: 503, reason: 'wrapped_coordinator_unavailable', retryable: true };
     },
+    claimAnswerSubmission: record => submitJournal('claim', record),
     readSubmitRecord: record => submitJournal('read', record),
     async persistSubmitIntent(record) {
       await current();
@@ -116,13 +117,22 @@ export const createAgentServices = ({ env, agentEnv, deps }) => {
         uploaderAddress: ctx.address, authScopes: ctx.scopes, expectedAuthority: expectedAuthority(), baseHeaders: {} });
     },
     async faucet() {
-      await current();
+      const { config } = await current();
       if (!ctx.scopes?.faucet || ctx.config.agentHttp?.sponsoredFaucetAllowed !== true) return { ok: false, skipped: true, reason: 'session_faucet_not_allowed' };
       const secrets = await deps.getSessionSecrets(env, ctx.slug);
-      const response = await deps.faucet({ payload: { to: ctx.address }, secrets, config: ctx.config, slug: ctx.slug,
-        requesterAddress: ctx.address, tokenHasFaucetScope: true, baseHeaders: {} });
+      // The same wallet turn as participant payouts, so neither signs the other's nonce.
+      const takeWalletTurn = deps.withCoordinatedFaucetWalletTurn || withCoordinatedFaucetWalletTurn;
+      const response = await takeWalletTurn({ env, secrets }, () => deps.faucet({ payload: { to: ctx.address },
+        secrets, config: ctx.config, slug: ctx.slug, requesterAddress: ctx.address, tokenHasFaucetScope: true, baseHeaders: {},
+        // The participant route's daily limit, counted together with it. Submissions ask with every answer, so only
+        // a payout counts. A refusal doesn't stop the answer: the account may already hold enough to submit it.
+        beforePayout: () => deps.checkRateLimit({ env, slug: ctx.slug, address: ctx.address, route: 'faucet', limit: config.limits?.perWalletPerDay || 0 }),
+      }));
+      if (!response) return { ok: false, reason: 'faucet_busy', status: 503 };
       const body = await response.json();
-      return response.ok ? { ok: true, ...body } : { ok: false, reason: 'faucet_request_failed', status: response.status };
+      if (response.status === 429) return { ok: false, reason: 'faucet_rate_limited', status: 429 };
+      return response.ok ? { ok: true, ...body } : { ok: false, reason: 'faucet_request_failed', status: response.status,
+        ...(body.txHash ? { txHash: body.txHash } : {}) };
     },
     async uploadArweave(payload) {
       await current();
@@ -170,6 +180,13 @@ export const createAgentServices = ({ env, agentEnv, deps }) => {
       const result = await callSessionConfigCoordinator({ env, slug: ctx.slug, path: `agent-invite/${operation}`,
         sessionId: ctx.sessionId, revision: ctx.revision, ...payload });
       return { ...result.body, ok: result.ok, status: result.status };
+    },
+    async advanceQuestionQueue(step) {
+      await current();
+      const result = await callSessionConfigCoordinator({ env, slug: ctx.slug, path: 'agent-question-queue/advance',
+        ...step, sessionId: ctx.sessionId });
+      if (!result.ok) throw authorityError(result.body?.reason || 'question_queue_unavailable', result.status === 409 ? 409 : 503);
+      return result.body;
     },
   });
 };

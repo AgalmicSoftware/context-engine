@@ -73,7 +73,7 @@ const loadWorkerCanonicalQuestionMetadata = async (
     host.workerCanonicalMetadataHydrationPort?.loadQuestions || workerCanonicalMetadataHydrationPort.loadQuestions;
   const rows = await loader({ ...resolveHydrationContext(host), sessionConfig, sessionSlug });
   return {
-    count: rows.length,
+    count: rows.rows.length,
     identity,
     merge: (current) => mergeWorkerCanonicalQuestionMetadata(current, rows, identity),
   };
@@ -87,7 +87,7 @@ const loadWorkerCanonicalSurveyMetadata = async (
     host.workerCanonicalMetadataHydrationPort?.loadSurveys || workerCanonicalMetadataHydrationPort.loadSurveys;
   const rows = await loader({ ...resolveHydrationContext(host), sessionConfig, sessionSlug });
   return {
-    count: rows.length,
+    count: rows.rows.length,
     identity,
     merge: (current) => mergeWorkerCanonicalSurveyMetadata(current, rows, identity),
   };

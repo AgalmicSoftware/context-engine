@@ -36,6 +36,8 @@ Options:
                instead of the automatic next patch
   --acknowledge-patch
                Keep a patch bump after reviewing a major/minor suggestion
+  --keep-release-version
+               Extend a pushed candidate without changing its public version
   --force-with-lease
                Replace an existing local target branch safely
   -h, --help   Show this help text
@@ -80,6 +82,8 @@ AGENT_BRIDGE_PUBLIC_CUTOVER_REQUIRED_PATHS=(
   "scripts/run-agent-bridge-worker-tests.js"
 )
 AGENT_BRIDGE_PUBLIC_CUTOVER_COMMIT=""
+AGENT_BRIDGE_PUBLIC_RETIREMENT_COMMIT=""
+AGENT_BRIDGE_RETIREMENT_REPLAYED=""
 
 PRIVATE_REPLAY_MESSAGE_TOKENS=(
   "contextEngine-cc"
@@ -127,6 +131,7 @@ RELEASE_CHANGED_PATHS_FILE=""
 RELEASE_SUBJECTS_FILE=""
 RELEASE_PLAN_FILE=""
 RELEASE_VERSIONING_ENABLED=0
+KEEP_RELEASE_VERSION=0
 
 cleanup() {
   if [ "${SYNC_PUBLIC_HISTORY_KEEP_TMP:-0}" = "1" ]; then
@@ -152,11 +157,42 @@ is_agent_bridge_public_history_path() {
   esac
 }
 
+agent_bridge_is_retired_for_source_commit() {
+  local commit_sha="$1"
+
+  [ -n "$AGENT_BRIDGE_PUBLIC_RETIREMENT_COMMIT" ] &&
+    git -C "$REPO_ROOT" merge-base --is-ancestor "$AGENT_BRIDGE_PUBLIC_RETIREMENT_COMMIT" "$commit_sha"
+}
+
+# Replay lists commits by date, so a side-line commit can follow the retirement
+# commit without descending from it. Once retirement is behind the replay,
+# nothing may restore the retired paths or their package wiring.
+begin_agent_bridge_replay_pass() {
+  local commit_sha
+
+  AGENT_BRIDGE_RETIREMENT_REPLAYED=""
+  [ -n "$AGENT_BRIDGE_PUBLIC_RETIREMENT_COMMIT" ] || return 0
+  for commit_sha in "${COMMITS[@]}"; do
+    [ "$commit_sha" != "$AGENT_BRIDGE_PUBLIC_RETIREMENT_COMMIT" ] || return 0
+  done
+  AGENT_BRIDGE_RETIREMENT_REPLAYED=1
+}
+
+note_agent_bridge_replay_position() {
+  if [ "$1" = "$AGENT_BRIDGE_PUBLIC_RETIREMENT_COMMIT" ]; then
+    AGENT_BRIDGE_RETIREMENT_REPLAYED=1
+  fi
+}
+
+# True only inside the published window: from the audited cutover commit up to,
+# but not including, the commit that deleted the cutover marker.
 agent_bridge_is_public_for_source_commit() {
   local commit_sha="$1"
 
-  [ -n "$AGENT_BRIDGE_PUBLIC_CUTOVER_COMMIT" ] &&
-    git -C "$REPO_ROOT" merge-base --is-ancestor "$AGENT_BRIDGE_PUBLIC_CUTOVER_COMMIT" "$commit_sha"
+  [ -z "$AGENT_BRIDGE_RETIREMENT_REPLAYED" ] &&
+    [ -n "$AGENT_BRIDGE_PUBLIC_CUTOVER_COMMIT" ] &&
+    git -C "$REPO_ROOT" merge-base --is-ancestor "$AGENT_BRIDGE_PUBLIC_CUTOVER_COMMIT" "$commit_sha" &&
+    ! agent_bridge_is_retired_for_source_commit "$commit_sha"
 }
 
 path_matches_strip_pattern() {
@@ -180,7 +216,10 @@ path_matches_strip_pattern() {
   done
 
   if [ -n "$commit_sha" ] && is_agent_bridge_public_history_path "$relative_path"; then
-    if ! agent_bridge_is_public_for_source_commit "$commit_sha"; then
+    # The retirement commit's own deletions change public files, so dry runs and
+    # release evidence must count them. Later touches of these paths stay stripped.
+    if [ "$commit_sha" != "$AGENT_BRIDGE_PUBLIC_RETIREMENT_COMMIT" ] &&
+      ! agent_bridge_is_public_for_source_commit "$commit_sha"; then
       return 0
     fi
   fi
@@ -346,7 +385,8 @@ apply_agent_bridge_public_history_policy() {
 
     # Always clear the replay checkout first. At the cutover commit this turns
     # the reviewed source tree into one complete public snapshot instead of
-    # exposing the formerly private file-by-file development history.
+    # exposing the formerly private file-by-file development history. At and
+    # after retirement, nothing is restored and the paths stay out of public.
     for path in "${AGENT_BRIDGE_PUBLIC_HISTORY_PATHS[@]}"; do
       git rm -rf --ignore-unmatch -- "$path" >/dev/null 2>&1 || true
       rm -rf -- "$path"
@@ -689,6 +729,8 @@ ensure_public_node_modules_link() {
   local temp_node_path="$TEMP_CLONE/node_modules"
   local client_node_path="$REPO_ROOT/client/node_modules"
   local temp_client_node_path="$TEMP_CLONE/client/node_modules"
+  local worker_node_path="$REPO_ROOT/workers/sessionCorsWorker/node_modules"
+  local temp_worker_node_path="$TEMP_CLONE/workers/sessionCorsWorker/node_modules"
 
   if [ -d "$node_path" ] && [ ! -e "$temp_node_path" ]; then
     log_info "Linking source node_modules into public test checkout."
@@ -698,6 +740,11 @@ ensure_public_node_modules_link() {
   if [ -d "$client_node_path" ] && [ -d "$TEMP_CLONE/client" ] && [ ! -e "$temp_client_node_path" ]; then
     log_info "Linking source client/node_modules into public test checkout."
     ln -s "$client_node_path" "$temp_client_node_path"
+  fi
+
+  if [ -d "$worker_node_path" ] && [ -d "$TEMP_CLONE/workers/sessionCorsWorker" ] && [ ! -e "$temp_worker_node_path" ]; then
+    log_info "Linking source Session Worker node_modules into public test checkout."
+    ln -s "$worker_node_path" "$temp_worker_node_path"
   fi
 }
 
@@ -788,7 +835,9 @@ collect_source_release_evidence() {
   : > "$RELEASE_CHANGED_PATHS_FILE"
   : > "$RELEASE_SUBJECTS_FILE"
 
+  begin_agent_bridge_replay_pass
   for commit_sha in "${COMMITS[@]}"; do
+    note_agent_bridge_replay_position "$commit_sha"
     git -C "$REPO_ROOT" log -1 --format='%s' "$commit_sha" >> "$RELEASE_SUBJECTS_FILE"
     while IFS= read -r changed_path; do
       [ -n "$changed_path" ] || continue
@@ -918,6 +967,9 @@ while [ $# -gt 0 ]; do
       fi
       EXPLICIT_RELEASE_VERSION="$1"
       ;;
+    --keep-release-version)
+      KEEP_RELEASE_VERSION=1
+      ;;
     --acknowledge-patch)
       ACKNOWLEDGE_PATCH=1
       ;;
@@ -941,9 +993,15 @@ while [ $# -gt 0 ]; do
   shift
 done
 
+if [ "$KEEP_RELEASE_VERSION" -eq 1 ] && { [ -n "$EXPLICIT_RELEASE_VERSION" ] || [ "$ACKNOWLEDGE_PATCH" -eq 1 ]; }; then
+  fail "--keep-release-version cannot be combined with --release-version or --acknowledge-patch." 1
+fi
+
 case "$TARGET_BRANCH" in
   release-staging*)
-    RELEASE_VERSIONING_ENABLED=1
+    if [ "$KEEP_RELEASE_VERSION" -ne 1 ]; then
+      RELEASE_VERSIONING_ENABLED=1
+    fi
     ;;
 esac
 
@@ -987,7 +1045,34 @@ if git -C "$REPO_ROOT" cat-file -e "${SOURCE_BRANCH}:${AGENT_BRIDGE_PUBLIC_CUTOV
   if [ -z "$AGENT_BRIDGE_PUBLIC_CUTOVER_COMMIT" ]; then
     fail "Agent Bridge public cutover marker exists, but its introducing commit could not be resolved." 2
   fi
+elif [ -n "$AGENT_BRIDGE_PUBLIC_CUTOVER_COMMIT" ]; then
+  AGENT_BRIDGE_PUBLIC_RETIREMENT_COMMIT=$(
+    git -C "$REPO_ROOT" log \
+      --diff-filter=D \
+      --format='%H' \
+      "$SOURCE_BRANCH" \
+      -- "$AGENT_BRIDGE_PUBLIC_CUTOVER_MARKER" |
+      sed -n '1p'
+  )
 
+  if [ -z "$AGENT_BRIDGE_PUBLIC_RETIREMENT_COMMIT" ] ||
+    ! git -C "$REPO_ROOT" merge-base --is-ancestor \
+      "$AGENT_BRIDGE_PUBLIC_CUTOVER_COMMIT" "$AGENT_BRIDGE_PUBLIC_RETIREMENT_COMMIT"; then
+    fail "Agent Bridge public cutover marker was removed, but its removing commit could not be resolved." 2
+  fi
+
+  for retired_path in "${AGENT_BRIDGE_PUBLIC_HISTORY_PATHS[@]}"; do
+    if git -C "$REPO_ROOT" cat-file -e "${SOURCE_BRANCH}:${retired_path}" 2>/dev/null; then
+      fail "Agent Bridge public cutover marker was removed, but $retired_path is still on $SOURCE_BRANCH. Remove the whole subtree and runner, or restore the marker." 2
+    fi
+  done
+
+  log_info "Agent Bridge public history retired at: $AGENT_BRIDGE_PUBLIC_RETIREMENT_COMMIT"
+else
+  log_info "Agent Bridge public history remains stripped; no cutover marker is present."
+fi
+
+if [ -n "$AGENT_BRIDGE_PUBLIC_CUTOVER_COMMIT" ]; then
   cutover_header=$(
     git -C "$REPO_ROOT" show \
       "${AGENT_BRIDGE_PUBLIC_CUTOVER_COMMIT}:${AGENT_BRIDGE_PUBLIC_CUTOVER_MARKER}" |
@@ -1005,10 +1090,6 @@ if git -C "$REPO_ROOT" cat-file -e "${SOURCE_BRANCH}:${AGENT_BRIDGE_PUBLIC_CUTOV
   done
 
   log_info "Agent Bridge public history cutover: $AGENT_BRIDGE_PUBLIC_CUTOVER_COMMIT"
-elif [ -n "$AGENT_BRIDGE_PUBLIC_CUTOVER_COMMIT" ]; then
-  fail "Agent Bridge public cutover marker was removed from the source branch." 2
-else
-  log_info "Agent Bridge public history remains stripped; no cutover marker is present."
 fi
 
 git -C "$REPO_ROOT" fetch --quiet origin main
@@ -1098,8 +1179,13 @@ if git -C "$TEMP_CLONE" ls-remote --exit-code --heads origin "$TARGET_BRANCH" >/
   else
     log_info "Remote branch origin/$TARGET_BRANCH already exists and will be refreshed automatically with --force-with-lease."
   fi
+  # Forced: the clone's copy came from a local branch, which a rewritten remote may not extend.
   git -C "$TEMP_CLONE" fetch --quiet origin \
-    "refs/heads/$TARGET_BRANCH:refs/remotes/origin/$TARGET_BRANCH"
+    "+refs/heads/$TARGET_BRANCH:refs/remotes/origin/$TARGET_BRANCH"
+fi
+
+if [ "$KEEP_RELEASE_VERSION" -eq 1 ] && [ "$REMOTE_BRANCH_EXISTS" -ne 1 ]; then
+  fail "--keep-release-version extends a pushed candidate, but origin/$TARGET_BRANCH does not exist." 1
 fi
 
 TARGET_BASE_IS_PUBLIC=0
@@ -1118,7 +1204,9 @@ git -C "$TEMP_CLONE" checkout --quiet -B "$TARGET_BRANCH" "$TARGET_BASE_SHA"
 log_info "Prepared temp branch $TARGET_BRANCH from $TARGET_BASE."
 
 if [ "$DRY_RUN" -eq 1 ]; then
+  begin_agent_bridge_replay_pass
   for commit_sha in "${COMMITS[@]}"; do
+    note_agent_bridge_replay_position "$commit_sha"
     subject=$(git -C "$REPO_ROOT" log -1 --format='%s' "$commit_sha")
     if commit_is_empty_after_strip "$commit_sha"; then
       SKIPPED_COUNT=$((SKIPPED_COUNT + 1))
@@ -1151,7 +1239,9 @@ if [ "$DRY_RUN" -eq 1 ]; then
   exit 0
 fi
 
+begin_agent_bridge_replay_pass
 for commit_sha in "${COMMITS[@]}"; do
+  note_agent_bridge_replay_position "$commit_sha"
   subject=$(git -C "$REPO_ROOT" log -1 --format='%s' "$commit_sha")
   author_date=$(git -C "$REPO_ROOT" log -1 --format='%aI' "$commit_sha")
   committer_date=$(git -C "$REPO_ROOT" log -1 --format='%cI' "$commit_sha")
@@ -1217,6 +1307,17 @@ if [ "$RELEASE_VERSIONING_ENABLED" -eq 1 ]; then
   collect_replayed_release_evidence
   plan_release_candidate_version 0
   stamp_release_candidate_version
+fi
+
+# A kept version skips the plan above, so check here what the pre-push hook would refuse.
+if [ "$KEEP_RELEASE_VERSION" -eq 1 ]; then
+  if ! node "$REPO_ROOT/scripts/release-version.mjs" verify-ref \
+    --repo-root "$TEMP_CLONE" \
+    --candidate-ref HEAD \
+    --minimum-ref "$TARGET_BASE_SHA" \
+    --baseline-ref origin/main >&2; then
+    fail "The kept version does not pass release version verification." 2
+  fi
 fi
 
 if strip_findings=$(verify_strip_patterns_absent); then

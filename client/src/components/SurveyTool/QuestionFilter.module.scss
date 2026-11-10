@@ -29,27 +29,6 @@ $text-color: var(--ce-border);
   }
 }
 
-.summaryContainer {
-  background: color-mix(in srgb, var(--ce-document-surface) 97%, var(--ce-text-inverse));
-  border: 1px solid $pastel-border;
-  padding: 0.75rem;
-  border-radius: var(--ce-radius-5);
-  margin-bottom: 1rem;
-  .summaryTitle {
-    font-weight: 600;
-    font-size: 1rem;
-    margin-bottom: 0.5rem;
-    color: $heading-color;
-  }
-
-  .noFiltersMsg {
-    font-style: italic;
-    color: var(--ce-text-muted);
-    font-size: 0.9rem;
-    margin-bottom: 0;
-  }
-}
-
 .filterSummaryContainer {
   background: color-mix(in srgb, var(--ce-document-surface) 97%, var(--ce-text-inverse));
   border: 1px solid $pastel-border;
@@ -83,10 +62,6 @@ $text-color: var(--ce-border);
   /* margin-top: 1rem; */
   padding-top: 0; // border-top: 1px solid var(--ce-data-series-8);
   margin-bottom: 1rem;
-}
-
-.clearButton {
-  margin-right: 1rem;
 }
 
 .loadFilterContainer {
@@ -123,13 +98,6 @@ $text-color: var(--ce-border);
     color: $heading-color;
   }
 }
-// --- MODIFICATION END ---
-
-.filterSummaryCount {
-  font-size: 0.95rem;
-  color: $heading-color;
-  margin-bottom: 1rem;
-}
 
 .summaryItemsRow {
   display: flex;
@@ -157,17 +125,6 @@ $text-color: var(--ce-border);
 
 .removeIcon {
   margin-left: 6px;
-}
-
-.modalHeaderSummary {
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  .modalTitle {
-    margin-bottom: 1rem;
-    font-size: 1.25rem;
-    color: $heading-color;
-  }
 }
 
 .modalHeader {
@@ -623,31 +580,6 @@ $text-color: var(--ce-border);
 .aiErrorText {
   color: var(--ce-status-error);
   font-weight: 500;
-}
-
-.searchInput {
-  width: 100%;
-  padding: 0.75rem;
-  border: 1px solid $pastel-border;
-  border-radius: var(--ce-radius-6);
-  margin-bottom: 1rem;
-  &:focus {
-    outline: none;
-    border-color: $pastel-darker;
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--ce-status-info) 10%, transparent);
-  }
-}
-
-// Popular Questions Badge
-.popularBadge {
-  display: inline-flex;
-  align-items: center;
-  padding: 0.25rem 0.5rem;
-  background: color-mix(in srgb, var(--ce-status-info-soft) 10%, transparent);
-  color: $text-color;
-  border-radius: var(--ce-radius-16);
-  font-size: 0.875rem;
-  margin-left: 0.5rem;
 }
 
 .disabledSection {

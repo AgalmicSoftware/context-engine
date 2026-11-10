@@ -3,8 +3,6 @@ import {
   sumSbtCountMap,
   mergeSbtCountMaps,
   mergeSbtCountsPayload,
-  seedSbtCountMapFromLegacyAddresses,
-  hydrateLegacySbtCountState,
   getCurrentHolderAddressesFromCounts,
   normalizeSbtCountsScanCheckpoint,
 } from './sbtCountHelpers.js';
@@ -125,87 +123,6 @@ describe('sbtCountHelpers', () => {
         mintedEventCount: 8,
         burnedEventCount: 7,
       });
-    });
-  });
-
-  describe('seedSbtCountMapFromLegacyAddresses', () => {
-    it('returns an empty map for empty input', () => {
-      expect(seedSbtCountMapFromLegacyAddresses(null, [])).toEqual({});
-      expect(seedSbtCountMapFromLegacyAddresses({}, null)).toEqual({});
-    });
-
-    it('deduplicates legacy addresses through count preservation', () => {
-      expect(seedSbtCountMapFromLegacyAddresses(null, ['0xABC', '0xabc', '', null])).toEqual({
-        '0xabc': 1,
-      });
-    });
-
-    it('preserves existing counts while seeding missing addresses', () => {
-      expect(
-        seedSbtCountMapFromLegacyAddresses(
-          {
-            '0xabc': 2,
-            '0xdef': 0,
-          },
-          ['0xABC', '0xdef', '0xghi'],
-        ),
-      ).toEqual({
-        '0xabc': 2,
-        '0xdef': 1,
-        '0xghi': 1,
-      });
-    });
-  });
-
-  describe('hydrateLegacySbtCountState', () => {
-    it('returns null input as-is and hydrates an empty entry', () => {
-      expect(hydrateLegacySbtCountState(null)).toBeNull();
-      expect(hydrateLegacySbtCountState({})).toEqual({
-        mintedAddresses: [],
-        burnedAddresses: [],
-        mintedCountByAddress: {},
-        burnedCountByAddress: {},
-        mintedEventCount: 0,
-        burnedEventCount: 0,
-      });
-    });
-
-    it('hydrates legacy arrays into count maps', () => {
-      const entry = hydrateLegacySbtCountState({
-        mintedAddresses: ['0xABC', '0xabc', '0xDEF'],
-        burnedAddresses: ['0xDEF'],
-      });
-
-      expect(entry).toMatchObject({
-        mintedAddresses: ['0xabc', '0xdef'],
-        burnedAddresses: ['0xdef'],
-        mintedCountByAddress: {
-          '0xabc': 1,
-          '0xdef': 1,
-        },
-        burnedCountByAddress: {
-          '0xdef': 1,
-        },
-        mintedEventCount: 2,
-        burnedEventCount: 1,
-      });
-    });
-
-    it('uses summed count maps as an event count floor', () => {
-      const entry = hydrateLegacySbtCountState({
-        mintedCountByAddress: {
-          '0xabc': 2,
-          '0xdef': 1,
-        },
-        burnedCountByAddress: {
-          '0xabc': 1,
-        },
-        mintedEventCount: 1,
-        burnedEventCount: 9.9,
-      });
-
-      expect(entry.mintedEventCount).toBe(3);
-      expect(entry.burnedEventCount).toBe(9);
     });
   });
 

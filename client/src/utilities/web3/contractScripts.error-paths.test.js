@@ -848,6 +848,7 @@ describe('error paths', () => {
       address: GROUP_CFG.contracts.surveys.address,
       methods: ['submitResponses'],
     });
+    mockSurveyContract.getResponse = jest.fn(async () => ethers.constants.HashZero);
     jest.spyOn(ethers, 'Contract').mockImplementation(function MockContract() {
       return mockSurveyContract;
     });
@@ -857,7 +858,14 @@ describe('error paths', () => {
     const submitSpy = jest.spyOn(contractScripts, 'submitResponses');
 
     await expect(
-      submitResponses('wagmi', [QUESTION_ID], [{ answer: 'yes' }], SURVEY_ID, { complete: true }, GROUP_CFG),
+      submitResponses(
+        'wagmi',
+        [QUESTION_ID],
+        [{ questionID: QUESTION_ID, answer: 'yes' }],
+        SURVEY_ID,
+        { complete: true },
+        GROUP_CFG,
+      ),
     ).rejects.toBe(timeoutError);
 
     expect(submitSpy).toHaveBeenCalledTimes(1);
@@ -940,6 +948,41 @@ describe('error paths', () => {
         gas: ethers.BigNumber.from('5000000').toHexString(),
       }),
     );
+  });
+
+  it('keeps the hash of a sent createSBT whose receipt cannot be read', async () => {
+    window.ethereum = makeRpcProvider();
+    const mockFactory = makeWriteContractMock({
+      address: GROUP_CFG.contracts.sbtFactory.address,
+      methods: ['createSBT'],
+    });
+    jest.spyOn(ethers, 'Contract').mockImplementation(function MockContract() {
+      return mockFactory;
+    });
+    jest
+      .spyOn(ethers.providers.Web3Provider.prototype, 'waitForTransaction')
+      .mockRejectedValueOnce(new Error('receipt read timed out'));
+
+    const error = await createSBT(
+      'wagmi',
+      'Error Path Group',
+      'EPG',
+      0,
+      TEST_ADDRESS,
+      0,
+      false,
+      0,
+      [],
+      'ipfs://token-uri',
+      ethers.constants.HashZero,
+      GROUP_CFG,
+    ).catch((caught) => caught);
+
+    expect(error).toMatchObject({
+      message: 'The transaction was sent, but its result could not be confirmed. Check your wallet before retrying.',
+      txHash: '0xtxhash',
+      receiptUnknown: true,
+    });
   });
 
   it('uses deployment fallback gas when createSBT gas estimation fails', async () => {
@@ -1397,6 +1440,7 @@ describe('error paths', () => {
       address: GROUP_CFG.contracts.surveys.address,
       methods: ['submitResponses'],
     });
+    mockSurveyContract.getResponse = jest.fn(async () => ethers.constants.HashZero);
     jest.spyOn(ethers, 'Contract').mockImplementation(function MockContract() {
       return mockSurveyContract;
     });
@@ -1411,7 +1455,7 @@ describe('error paths', () => {
     await submitResponses(
       'wagmi',
       [QUESTION_ID],
-      [{ answer: 'yes' }],
+      [{ questionID: QUESTION_ID, answer: 'yes' }],
       SURVEY_ID,
       { complete: true },
       CLOUDFLARE_GROUP_CFG,
@@ -1550,9 +1594,14 @@ describe('error paths', () => {
     });
 
     const hashedPassword = `0x${'11'.repeat(32)}`;
-    const claimReceipt = await contractScripts.claim('wagmi', TEST_ADDRESS);
-    const addPasswordsReceipt = await contractScripts.addHashedPasswords('wagmi', TEST_ADDRESS, [hashedPassword]);
-    const burnReceipt = await contractScripts.burnToken('wagmi', TEST_ADDRESS, 7);
+    const claimReceipt = await contractScripts.claim('wagmi', TEST_ADDRESS, 84532);
+    const addPasswordsReceipt = await contractScripts.addHashedPasswords(
+      'wagmi',
+      TEST_ADDRESS,
+      [hashedPassword],
+      84532,
+    );
+    const burnReceipt = await contractScripts.burnToken('wagmi', TEST_ADDRESS, 7, 84532);
 
     expect(claimReceipt).toEqual(expect.objectContaining({ status: 1, transactionHash: '0xtxhash' }));
     expect(addPasswordsReceipt).toEqual(expect.objectContaining({ status: 1, transactionHash: '0xtxhash' }));

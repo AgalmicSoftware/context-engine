@@ -45,32 +45,6 @@ const SESSION_CONFIG = {
   corsWorkerUrl: 'https://worker.example',
   __registry: { registryChainId: 11155420, sessionIdHex: '0x00112233445566778899aabbccddeeff' },
 };
-const SAVED_SOURCE = { platform: 'claude', modelId: 'saved-model', verification: 'self_reported' };
-const field = (value) => ({
-  value,
-  encrypted: false,
-  encryptionAudience: 'self',
-  audienceMode: 'explicit',
-  hash: '',
-  encryptedPortion: '',
-});
-const saved = {
-  questionID: 'q1',
-  type: 'binary',
-  prompt: 'Q1',
-  answer: field('Agree'),
-  additional: field(''),
-  importance: null,
-  conviction: null,
-  responderName: 'Participant A',
-  interviewProvenance: {
-    version: 1,
-    source: SAVED_SOURCE,
-    promptVersion: 'ce-interview-brief-v4',
-    questionSetHash: 'b'.repeat(64),
-    appliedAt: 1,
-  },
-};
 const packet = (responderContext, answer = 'Agree') => ({
   version: 1,
   sessionSlug: 'edge',
@@ -86,9 +60,10 @@ const mockCaches = () => {
     .mockImplementation((slug) => (slug === 'edge' ? SESSION_CONFIG : null));
   const cache = () => ({
     11155420: {
+      // q1 has no saved answer, so the interview offers its draft.
       questions: { q1: { id: 'q1', type: 'binary', prompt: 'Q1' } },
-      questionResponses: { q1: { [A]: JSON.stringify(saved) } },
-      questionResponsesMeta: { q1: { [A]: { ts: 1000, storageRefId: 'ref-a' } } },
+      questionResponses: {},
+      questionResponsesMeta: {},
       pendingQuestionMetadata: {},
     },
   });
@@ -97,9 +72,7 @@ const mockCaches = () => {
 };
 const ownAnswersLoad = () => {
   jest.spyOn(workerHydration, 'isWorkerCanonicalSessionConfig').mockReturnValue(true);
-  return jest
-    .spyOn(workerHydration, 'loadWorkerResponses')
-    .mockResolvedValue([{ questionId: 'q1', responder: A, timestamp: 1000, storageRefId: 'ref-a', response: saved }]);
+  return jest.spyOn(workerHydration, 'loadWorkerResponses').mockResolvedValue([]);
 };
 const { cryptoUtils } = require('../../utilities/crypto/cryptography.js');
 const mockSubmit = () => {
@@ -164,10 +137,6 @@ const openModal = async (getEngine, prefillPacket) => {
   await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
   await settle();
 };
-const selectDraft = () => {
-  const replace = screen.queryByText(/Replace with draft|Restore draft/);
-  if (replace) fireEvent.click(replace);
-};
 
 const prepare = async () => {
   mockCaches();
@@ -175,7 +144,6 @@ const prepare = async () => {
   const upload = mockSubmit();
   const pile = await mount({ ready: false });
   await openModal(pile.getEngine, packet({}, 'Disagree'));
-  selectDraft();
   return { ...pile, ownLoad, upload };
 };
 const apply = async () => {

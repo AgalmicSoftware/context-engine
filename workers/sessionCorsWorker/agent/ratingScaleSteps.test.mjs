@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { __test__sessionQuestions } from './sessionQuestions.mjs';
 import { normalizeAgentRatingScale, normalizeAgentRatingAnswer } from './ratingScale.mjs';
 import { buildAgentQuestionAnswerSchema } from './agentAnswerSchema.mjs';
+import { listAgentProposedQuestionsForSession, persistAgentProposedQuestion } from './agentQuestionProposals.mjs';
 
 test('stored steps survive long scales without changing submit validation', () => {
   const question = { type: 'rating', questionId: 'q1', scale: { min: 0, max: 100, step: 1 } };
@@ -30,4 +31,20 @@ test('cached questions retain the stored step used by cards and submits', () => 
   const qid = `0x${'ab'.repeat(32)}`;
   const normalized = __test__sessionQuestions.normalizeQuestionPayload({ id: qid, type: 'rating', scale: { min: 0, max: 100, step: 1 } });
   assert.equal(normalized.scale.step, 1);
+});
+
+test('agent-created rating questions keep their end labels', async () => {
+  const store = new Map();
+  const env = { AGENT_ACTION_KV: {
+    get: async (key) => store.get(key) ?? null,
+    put: async (key, value) => { store.set(key, value); },
+    list: async ({ prefix }) => ({ keys: [...store.keys()].filter((key) => key.startsWith(prefix)).map((name) => ({ name })), list_complete: true }),
+  } };
+  const saved = await persistAgentProposedQuestion({ env, sessionSlug: 'fixture', prompt: 'How useful was the session?', questionType: 'rating',
+    ratingScale: { min: 1, max: 5, minLabel: '  Not   useful ', maxLabel: 'Very useful' } });
+  assert.equal(saved.ok, true, saved.reason);
+  const expected = { min: 1, max: 5, minLabel: 'Not useful', maxLabel: 'Very useful', step: 1 };
+  assert.deepEqual(saved.question.ratingScale, expected);
+  const [listed] = await listAgentProposedQuestionsForSession(env, 'fixture');
+  assert.deepEqual(listed.ratingScale, expected);
 });

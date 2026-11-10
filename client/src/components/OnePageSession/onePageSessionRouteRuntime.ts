@@ -2,6 +2,7 @@ import { canonicalizeSessionSlug } from '../../utilities/session/sessionSlug.js'
 import { readPublicUrlBasePath } from '../../utilities/ui/publicUrl.js';
 import { resolveSessionCapabilityProjection } from '../../utilities/session/sessionCapabilityProjection';
 import { resolveEffectiveSlug } from '../SurveyTool/surveyToolUtils';
+import { SESSION_VOICE_MODE_QUERY_VALUES } from '../SurveyTool/sessionVoiceModeQuery';
 
 export const resolveOnePageSessionRouteUiState = (props: any = {}) => {
   const autoOpenResults = props.routeAutoOpenResults === true;
@@ -39,12 +40,13 @@ const buildOnePageSessionPublicRoute = (pathname: unknown = '') => {
 
 export const removeOnePageSessionInterviewIntent = (path: string): string => {
   const url = new URL(path, window.location.origin);
-  if (['interview', 'recordGroup'].includes(url.searchParams.get('mode') || '')) {
+  if (SESSION_VOICE_MODE_QUERY_VALUES.includes(url.searchParams.get('mode') || '')) {
     url.searchParams.delete('mode');
   }
   const fragment = new URLSearchParams(url.hash.slice(1));
-  if (fragment.has('prefill')) {
+  if (fragment.has('prefill') || fragment.has('claim')) {
     fragment.delete('prefill');
+    fragment.delete('claim');
     url.hash = fragment.toString();
   }
   return `${url.pathname}${url.search}${url.hash}`;

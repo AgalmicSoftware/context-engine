@@ -70,8 +70,8 @@ const editComment = (value: string) =>
 
 describe('interview draft comments', () => {
   it('counts clearing the saved comment shown for a draft as a human edit', async () => {
+    // A comment on a question without an answer yet, so its draft is offered.
     renderDraftWithoutAiComment({
-      answers: { 'q-text': { value: 'Saved answer' } },
       additionalComments: { 'q-text': { value: 'Saved note' } },
     });
 

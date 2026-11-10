@@ -448,7 +448,6 @@ export default function BeeswarmPlot({
             const isActive =
               activePoint?.key === point.key ||
               (activeKey == null && positionedPoints.length === 1 && !singlePointDeselected);
-            const isInteractive = true;
             return (
               <g key={point.key}>
                 <circle
@@ -460,7 +459,7 @@ export default function BeeswarmPlot({
                     pointClassName,
                     isActive ? styles.pointActive : '',
                     isActive ? activePointClassName : '',
-                    isInteractive ? styles.pointInteractive : '',
+                    styles.pointInteractive,
                   ]
                     .filter(Boolean)
                     .join(' ')}

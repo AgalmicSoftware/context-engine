@@ -38,7 +38,7 @@ import SessionChipSelector from '../../Shared/SessionChipSelector';
 import WorkerCanonicalSessionBootstrapBoundary from '../../Sessions/WorkerCanonicalSessionBootstrapBoundary';
 import { useContextSessionConfig } from './useContextSessionConfig';
 
-import { seedGenPrompt } from '../../../prompts/seedGenPrompt.js';
+import { GENERATED_QUESTIONS_RESPONSE_FORMAT, seedGenPrompt } from '../../../prompts/seedGenPrompt.js';
 import {
   buildSbtAccessControlConditions,
   getGlobalLitHooks,
@@ -58,6 +58,7 @@ import {
   uploadDocLibraryFile,
   uploadDocLibraryUrlRecord,
 } from '../../../utilities/docLibrary/uploads.js';
+import { useSessionContextPrompt } from '../../../utilities/docLibrary/useSessionContextSources';
 import {
   resolveSponsoredGateStateForResource,
   getGateSbtAddresses,
@@ -113,6 +114,7 @@ import {
   buildUnsupportedSourceMessage,
   buildPhotoPreviewUrl,
   clampQuestionCount,
+  getSelectedQuestionTypes,
   formatAiPromptModelLabel,
   getSurveyGeneratorErrorMessage,
   getPhotoStatusLabel,
@@ -337,15 +339,12 @@ function QueuedPhotoPreview({ file, photoName, sourceId }: QueuedPhotoPreviewPro
   );
 }
 
-// Dev-only logger
-const debug = (...args: unknown[]) => {
-  if (process.env.NODE_ENV !== 'production') cacheLog.log(...args);
-};
-
 const LazyCorpusViewer = React.lazy(() => import('../../DemoViews/CorpusViewer'));
 // CreateQuestionsAndSurveys embeds this generator, so load it lazily instead of
 // importing it back; it is only needed once questions have been generated.
 const LazyCreateQuestionsAndSurveys = React.lazy(() => import('../CreateQuestionsAndSurveys'));
+
+const GENERATOR_CONTEXT_CHARS = 20_000;
 
 export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {} as SurveyGeneratorProps) {
   const {
@@ -370,8 +369,8 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
   } = rawProps;
   // UI Modes
   const [transcriptMode, setTranscriptMode] = useState(false);
-  // NEW: Toggle for Arweave upload
-  const [uploadSummaryToArweave, setUploadSummaryToArweave] = useState(true);
+  // Off by default: an Arweave upload is public and permanent.
+  const [uploadSummaryToArweave, setUploadSummaryToArweave] = useState(false);
   const [encryptSummary, setEncryptSummary] = useState(false);
 
   // Input States
@@ -397,20 +396,26 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
     rating: false,
     freeform: false,
   });
+  const selectedQuestionTypes = getSelectedQuestionTypes(questionTypes);
+  const questionTypeHintId = React.useId();
   const [count, setCount] = useState(DEFAULT_QUESTION_COUNT);
 
   const [loading, setLoading] = useState(false);
   const [activeAction, setActiveAction] = useState('');
   const [error, setError] = useState('');
+  const [sourceWarnings, setSourceWarnings] = useState<string[]>([]);
+  // Files rejected at selection, repeated by the next Generate only while the source list stays the same.
+  const selectionWarningsRef = React.useRef<string[]>([]);
   const [waitingSeconds, setWaitingSeconds] = useState(0);
   const waitTimerRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
   const [surveyTitle, setSurveyTitle] = useState('');
   const [statementsToUpload, setStatementsToUpload] = useState<GeneratedSurveyStatement[]>([]);
   const [showCreateSurvey, setShowCreateSurvey] = useState(false);
+  const [authoringGeneration, setAuthoringGeneration] = useState(0);
+  const draftEditedRef = React.useRef(false);
   const [documentURLs, setDocumentURLs] = useState<string[]>([]);
 
   // AUDIO summary-first flow state
-  const [summaryMd, setSummaryMd] = useState('');
 
   const [showSessionSelector, setShowSessionSelector] = useState(false);
   const [localSessionOverrideSlug, setLocalSessionOverrideSlug] = useState<string | null>(null);
@@ -542,6 +547,13 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
     if (slug) return slug;
     return 'Session';
   }, [resolvedSessionConfig, resolvedSessionSlug]);
+  // The session's notes, links and the sources this person may read, for the questions to draw on.
+  const sessionContextPrompt = useSessionContextPrompt({
+    sessionSlug: resolvedSessionSlug || '',
+    sessionConfig: resolvedSessionConfig,
+    account,
+    totalChars: GENERATOR_CONTEXT_CHARS,
+  });
   const aiRequestOptions = useMemo(
     () => ({
       sessionSlug: resolvedSessionSlug || '',
@@ -688,7 +700,6 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
       const newVal = !prev;
       if (!newVal) {
         setAudioFile(null);
-        setSummaryMd('');
       }
       return newVal;
     });
@@ -699,7 +710,7 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
       promptTemplate: seedGenPrompt,
       sourceDocContent,
       count,
-      questionTypes,
+      selectedTypes: selectedQuestionTypes,
       defaultTags,
       transcriptMode,
       overrides,
@@ -713,7 +724,11 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
     requestedCount: number = count,
   ) {
     const prompt = buildSinglePrompt(sourceDocContent, overrides);
-    const raw = await callAI(prompt, aiRequestOptions);
+    const raw = await callAI(prompt, {
+      ...aiRequestOptions,
+      taskType: 'generate',
+      response_format: GENERATED_QUESTIONS_RESPONSE_FORMAT,
+    });
     const match = raw.match(/\{[\s\S]*\}/);
     if (!match) throw new Error('No JSON object found in AI response');
     const parsed = JSON.parse(match[0]) as GeneratedAiQuestionPayload;
@@ -735,22 +750,42 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
   ) {
     const { statements, surveyTitle } = buildGeneratedSurveyStatements({
       aiData,
-      questionTypes,
+      selectedTypes: selectedQuestionTypes,
       count,
       fallbackTitle,
       generateQuestionId: generateSurveyGeneratorQuestionId,
     });
+    if (!statements.length) {
+      throw new Error(
+        'Generation returned no usable questions. Try a different source or enable another question type.',
+      );
+    }
+    if (
+      draftEditedRef.current &&
+      !window.confirm('Replace your edited questions with the newly generated questions?')
+    ) {
+      return false;
+    }
+    draftEditedRef.current = false;
+    setAuthoringGeneration((generation) => generation + 1);
     setStatementsToUpload(statements);
+    setShowCreateSurvey(true);
     setSurveyTitle(surveyTitle);
     setDocumentURLs(docs);
 
     if (typeof onQuestionsGenerated === 'function') {
       onQuestionsGenerated(statements, docs, surveyTitle);
     }
+    return true;
   }
 
+  const changeAdditionalSources: typeof setAdditionalSources = (update) => {
+    selectionWarningsRef.current = [];
+    setAdditionalSources(update);
+  };
+
   const queueAdditionalUrlSource = (rawUrl: string) => {
-    setAdditionalSources((prev) => [
+    changeAdditionalSources((prev) => [
       ...prev,
       {
         id: buildAdditionalSourceId(additionalSourceIdRef),
@@ -806,7 +841,7 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
     const { invalidCount, nextSources, validFiles } = buildQueuedPhotoSourceBatch(files, additionalSourceIdRef);
 
     if (validFiles.length > 0) {
-      setAdditionalSources((prev) => [...prev, ...nextSources]);
+      changeAdditionalSources((prev) => [...prev, ...nextSources]);
     }
 
     if (invalidCount > 0) {
@@ -821,11 +856,17 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
     const { nextSources, invalidCount } = buildQueuedUploadedSourceBatch(files, additionalSourceIdRef);
 
     if (nextSources.length > 0) {
-      setAdditionalSources((prev) => [...prev, ...nextSources]);
+      changeAdditionalSources((prev) => [...prev, ...nextSources]);
     }
 
     if (invalidCount > 0) {
-      setError(buildUnsupportedSourceMessage(invalidCount));
+      const selected = Array.isArray(files) ? files : [files];
+      const skippedNames = selected
+        .filter((file) => !nextSources.some((source) => source.value === file))
+        .map((file) => file.name || 'Unnamed file');
+      const warning = `${buildUnsupportedSourceMessage(invalidCount)} Skipped: ${skippedNames.join(', ')}.`;
+      selectionWarningsRef.current = [...new Set([...selectionWarningsRef.current, warning])];
+      setSourceWarnings((previous) => [...new Set([...previous, warning])]);
     } else if (nextSources.length > 0) {
       setError('');
     }
@@ -870,7 +911,7 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
   };
 
   const removeAdditionalSource = (sourceId: string) => {
-    setAdditionalSources((prev) => prev.filter((source) => source?.id !== sourceId));
+    changeAdditionalSources((prev) => prev.filter((source) => source?.id !== sourceId));
   };
 
   const updateAdditionalSourceById = (sourceId: string, patch: SurveyGeneratorAdditionalSourcePatch) => {
@@ -1159,7 +1200,7 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
       if (abortedRef.current) return;
 
       const savedSourceIds = new Set(savedDocRefs.map((entry) => entry.sourceId).filter(Boolean));
-      setAdditionalSources((current) => current.filter((source) => !savedSourceIds.has(source.id)));
+      changeAdditionalSources((current) => current.filter((source) => !savedSourceIds.has(source.id)));
       setAdditionalUrlInput('');
       setSaveExtraSourcesToDocLibrary(false);
       setDocumentURLs(savedDocRefs.flatMap((entry) => entry.viewerUrls).filter(Boolean));
@@ -1190,17 +1231,15 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    localStorage.removeItem('unfinishedSurvey');
-
+    if (!selectedQuestionTypes.length) return;
     setError('');
-    setShowCreateSurvey(false);
-    setStatementsToUpload([]);
-    setDocumentURLs([]);
-    setSummaryMd('');
     setActiveAction('generate');
+    setSourceWarnings([...selectionWarningsRef.current]);
+    selectionWarningsRef.current = [];
 
     let currentDocumentURLs: string[] = [];
     let content = '';
+    let extractedCharacters = 0;
     const { effectiveSources } = buildEffectiveAdditionalSources();
     const shouldClearAdditionalUrlInput = Boolean(additionalUrlInput && additionalUrlInput.trim());
     let sourceTypeOverride = '';
@@ -1236,6 +1275,7 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
         }
       }
 
+      extractedCharacters = content.length;
       const photoAnalysisBySourceId = await analyzeQueuedPhotoSources(effectiveSources);
       if (abortedRef.current) return;
       const savedDocRefs = await saveQueuedSourcesToDocLibrary(effectiveSources, photoAnalysisBySourceId);
@@ -1258,6 +1298,7 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
           photoSources.forEach((src) => {
             const analysisText = toStr(photoAnalysisBySourceId.get(src?.id)).trim();
             if (!analysisText) return;
+            extractedCharacters += analysisText.length;
             additionalContentSections.push(`--- Photo Source: ${src.name} ---\n\n${analysisText}`);
           });
         }
@@ -1267,7 +1308,16 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
             nonPhotoSources as Array<{ type: 'url' | 'file'; value: string | File; name: string }>,
             aiRequestOptions,
           );
-          if (additionalContent) additionalContentSections.push(additionalContent.trim());
+          if (additionalContent.text) additionalContentSections.push(additionalContent.text.trim());
+          extractedCharacters += additionalContent.extractedCharacters;
+          if (additionalContent.skipped.length) {
+            setSourceWarnings((previous) => [
+              ...new Set([
+                ...previous,
+                ...additionalContent.skipped.map(({ name, reason }) => `Skipped ${name}: ${reason}`),
+              ]),
+            ]);
+          }
         }
 
         const mergedAdditionalContent = additionalContentSections.filter(Boolean).join('\n\n');
@@ -1296,9 +1346,9 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
         }
       }
 
-      if (!content || content.length < 50) {
+      if (!content || extractedCharacters < 50) {
         throw new Error(
-          'Total extracted content is too short (min 50 chars). Please enter text, audio, or add valid URLs/Files.',
+          'Total extracted content is too short (min 50 chars). Paste the source text, record audio, or add a readable TXT, Markdown, CSV, JSON, or URL source.',
         );
       }
 
@@ -1314,12 +1364,12 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
           ...aiRequestOptions,
         });
         if (abortedRef.current) return;
-        setSummaryMd((md || '').trim());
 
         sourceForQuestions = md;
 
-        // B. Upload to Arweave (if toggled)
-        if (uploadSummaryToArweave) {
+        // B. Upload to Arweave (if toggled). The upload can't encrypt yet, so a
+        // summary marked for encryption stays off Arweave rather than going up as plain text.
+        if (uploadSummaryToArweave && !encryptSummary) {
           try {
             // We do NOT block on loginComplete here; the worker handles the upload wallet.
             const arweaveKey = await getEffectiveArweaveKey({
@@ -1327,7 +1377,7 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
               sessionConfig: resolvedSessionConfig,
               context: { account, providerLike: provider as ResourceKeyProviderLike, chainId: network?.id },
             });
-            const { txId, url } = await uploadMarkdownSummaryToArweave(md, {
+            const { url } = await uploadMarkdownSummaryToArweave(md, {
               sessionSlug: resolvedSessionSlug || '',
               sessionConfig: resolvedSessionConfig,
               arweaveJwk: arweaveKey?.arweaveJwk || '',
@@ -1346,7 +1396,8 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
         }
       }
 
-      // 4. Generate Questions
+      // 4. Generate Questions, with the session's context as untrusted background.
+      if (sessionContextPrompt.text) sourceForQuestions = `${sourceForQuestions}\n\n${sessionContextPrompt.text}`;
       const aiData = await makeSingleAiCall(
         sourceForQuestions,
         {
@@ -1359,9 +1410,9 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
 
       // 5. Spawn Survey Tool
       // This updates state.documentURLs, which CreateQuestionsAndSurveys picks up
-      processAndSetQuestions(aiData, finalDocUrls);
-      if (shouldClearAdditionalUrlInput) setAdditionalUrlInput('');
-      setShowCreateSurvey(true);
+      if (processAndSetQuestions(aiData, finalDocUrls)) {
+        if (shouldClearAdditionalUrlInput) setAdditionalUrlInput('');
+      }
     } catch (err: unknown) {
       if (!abortedRef.current) {
         if ((err as { code?: unknown } | null | undefined)?.code === CONTEXT_SAVE_LOGIN_REQUIRED_CODE) return;
@@ -1386,6 +1437,10 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
       <div className={styles.createSurveyContainer}>
         <Suspense fallback={<div className={styles.viewModeEmptyState}>Loading question authoring...</div>}>
           <LazyCreateQuestionsAndSurveys
+            key={authoringGeneration}
+            onDraftEditedChange={(edited: boolean) => {
+              draftEditedRef.current = edited;
+            }}
             miniaturized={minified}
             preformedQuestions={statementsToUpload}
             preformedSurvey={preformedSurvey}
@@ -1401,6 +1456,7 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
             documentURLs={documentURLs}
             litHooks={scopedLitHooks}
             onUploadComplete={(surveyHash: unknown) => {
+              draftEditedRef.current = false;
               setShowCreateSurvey(false);
               setStatementsToUpload([]);
               setSurveyTitle('');
@@ -1542,7 +1598,6 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
     if (!hasTranscriptModeInput && transcriptMode) {
       setTranscriptMode(false);
       setAudioFile(null);
-      setSummaryMd('');
     }
   }, [hasTranscriptModeInput, transcriptMode]);
 
@@ -1720,7 +1775,7 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
                   <div
                     className={buildSurveyGeneratorTranscriptToggleClassName(styles, transcriptMode)}
                     onClick={handleTranscriptModeToggle}
-                    title="Enable Transcript Mode (Summary + Arweave Upload)"
+                    title="Summarize the transcript before drafting questions from it."
                     data-testid="transcript-mode-toggle"
                   >
                     <FontAwesomeIcon icon={transcriptMode ? faCheckSquare : faSquare} className={styles.checkboxIcon} />
@@ -1732,7 +1787,7 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
                   <div
                     className={buildSurveyGeneratorTranscriptToggleClassName(styles, uploadSummaryToArweave)}
                     onClick={() => setUploadSummaryToArweave(!uploadSummaryToArweave)}
-                    title="If checked, the summary is uploaded to Arweave and attached as a permanent document. If unchecked, the summary is passed directly to AI for question generation without permanent storage."
+                    title="If checked, the summary is uploaded to Arweave, where it is public and permanent, and attached as a document. If unchecked, it goes only to the AI that drafts the questions."
                   >
                     <FontAwesomeIcon
                       icon={uploadSummaryToArweave ? faCheckSquare : faSquare}
@@ -1746,7 +1801,7 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
                   <div
                     className={buildSurveyGeneratorTranscriptToggleClassName(styles, encryptSummary)}
                     onClick={() => setEncryptSummary(!encryptSummary)}
-                    title="Encrypt the summary before uploading to Arweave (Lit + SBT gate)."
+                    title="The upload can't encrypt yet, so while this is ticked the summary isn't uploaded."
                   >
                     <FontAwesomeIcon icon={encryptSummary ? faCheckSquare : faSquare} className={styles.checkboxIcon} />
                     <span>Encrypt Summary</span>
@@ -2097,6 +2152,16 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
                   </div>
                 </div>
 
+                {!selectedQuestionTypes.length && (
+                  <div
+                    id={questionTypeHintId}
+                    role="status"
+                    className={styles.error}
+                    style={SURVEY_GENERATOR_ERROR_STYLE}
+                  >
+                    Select at least one question type before generating.
+                  </div>
+                )}
                 <div className={styles.formSection}>
                   <div className={styles.countControlRow} role="group" aria-label="Number of questions">
                     <span className={styles.countInlineLabel} aria-hidden="true">
@@ -2141,7 +2206,12 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
             {(shouldShowGenerateButton || shouldShowAddToSessionButton) && (
               <div className={styles.actionRow}>
                 {shouldShowGenerateButton ? (
-                  <Button type="submit" className={styles.generateButton} disabled={loading}>
+                  <Button
+                    type="submit"
+                    className={styles.generateButton}
+                    disabled={loading || !selectedQuestionTypes.length}
+                    aria-describedby={!selectedQuestionTypes.length ? questionTypeHintId : undefined}
+                  >
                     {loading && activeAction === 'generate' ? (
                       <>
                         {isTranscribing ? 'Transcribing... ' : 'Processing... '}
@@ -2173,6 +2243,11 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
             )}
           </form>
 
+          {sourceWarnings.length > 0 && (
+            <div role="status" className={styles.error} style={SURVEY_GENERATOR_ERROR_STYLE}>
+              {sourceWarnings.join(' ')}
+            </div>
+          )}
           {error && !loading && (
             <div className={styles.error} style={SURVEY_GENERATOR_ERROR_STYLE}>
               {error}

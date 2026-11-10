@@ -186,13 +186,17 @@ describe('hasCoreSbtMetadata', () => {
     expect(hasCoreSbtMetadata({ tokenURI: 'ar://metadata' })).toBe(false);
   });
 
-  it('returns false when admin is the zero address', () => {
+  it('accepts a retired admin as complete metadata', () => {
     expect(
       hasCoreSbtMetadata({
         ...validMetadata,
         admin: '0x0000000000000000000000000000000000000000',
       }),
-    ).toBe(false);
+    ).toBe(true);
+  });
+
+  it.each([undefined, null, '', 'retired', '0x1234'])('rejects a missing or malformed admin: %p', (admin) => {
+    expect(hasCoreSbtMetadata({ ...validMetadata, admin })).toBe(false);
   });
 
   it('returns true when all required fields are present', () => {

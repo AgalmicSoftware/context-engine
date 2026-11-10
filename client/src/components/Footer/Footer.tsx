@@ -4,8 +4,7 @@ import React from 'react';
 import { connect } from 'react-redux';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faGithub } from '@fortawesome/free-brands-svg-icons';
-import { changeFocusedTab, toggleLoginModal } from '../../actions/sessionStateActions.js';
-import type { RootState } from '../../reducers/index.js';
+import { toggleLoginModal } from '../../actions/sessionStateActions.js';
 import { PUBLIC_REPO_URL } from '../../variables/publicRepoMetadata.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { buildPublicRoute } from '../../utilities/ui/publicUrl.js';
@@ -19,11 +18,8 @@ import styles from './Footer.module.scss';
 import { NavLink } from 'reactstrap';
 
 type FooterProps = {
-  changeFocusedTab: (tab: number) => void;
   toggleLoginModal: (isOpen: boolean) => void;
-  focusedTab?: number;
   flowAtDocumentEnd?: boolean;
-  loginModalToggled?: boolean;
 };
 
 type FooterState = {
@@ -97,13 +93,6 @@ class Footer extends React.Component<FooterProps, FooterState> {
   };
 
   clickedAboutLink = () => this.closeStartMenu();
-
-  clickedBetaLink = () => {
-    const betaTab = 5;
-    this.props.changeFocusedTab(betaTab);
-  };
-
-  clickedContributorsLink = () => {};
 
   clickedDocsLink = () => this.closeStartMenu();
 
@@ -185,16 +174,6 @@ class Footer extends React.Component<FooterProps, FooterState> {
                   POSTS
                 </NavLink>
               </li>
-              {/* <li>
-                  <NavLink
-                    href="/contributors"
-                    target=""
-                    onClick={this.clickedContributorsLink}
-                    className={styles.footerLink}
-                    >
-                    CONTRIBUTORS
-                  </NavLink>
-                </li> */}
               <li>
                 <NavLink
                   href=""
@@ -226,16 +205,6 @@ class Footer extends React.Component<FooterProps, FooterState> {
                   DOCS
                 </NavLink>
               </li>
-              {/* <li>
-                  <NavLink
-                    href="/beta"
-                    target=""
-                    onClick={this.clickedBetaLink}
-                    className={`ml-1 ${styles.footerLink}`}
-                  >
-                    BETA
-                  </NavLink>
-                </li> */}
             </ul>
           </nav>
           <div className={styles.copyright}>
@@ -262,9 +231,4 @@ class Footer extends React.Component<FooterProps, FooterState> {
   }
 }
 
-const mapStateToProps = (state: RootState) => ({
-  focusedTab: state.sessionState.focusedTab,
-  loginModalToggled: state.sessionState.loginModalToggled,
-});
-
-export default connect(mapStateToProps, { changeFocusedTab, toggleLoginModal })(Footer);
+export default connect(null, { toggleLoginModal })(Footer);

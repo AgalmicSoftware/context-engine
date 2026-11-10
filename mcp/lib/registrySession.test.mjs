@@ -34,6 +34,9 @@ const fixture = (overrides = {}) => {
   const records = new Map();
   const hashes = new Map();
   const responseHashes = new Map();
+  const responseHistory = new Map();
+  const responseReads = [];
+  const unavailable = new Set();
   // A reorganization gives each replaced block a new hash.
   const generations = new Map();
   const blockHash = (number) => ethers.utils.id(`block ${number} ${generations.get(number) || 0}`);
@@ -58,7 +61,11 @@ const fixture = (overrides = {}) => {
     surveys = {
       interface: iface, address: surveysAddress,
       getQuestionHash: async (id) => hashes.get(id), questionHashes: async (id) => hashes.get(id) || ethers.constants.HashZero,
-      getResponse: async (_responder, id) => responseHashes.get(id),
+      getResponse: async (_responder, id, options) => {
+        responseReads.push({ id, options });
+        return options?.blockTag == null ? responseHashes.get(id)
+          : responseHistory.get(id)?.filter((row) => row.block <= options.blockTag).at(-1)?.pointer;
+      },
       connect: () => surveys,
       addQuestions: async (...args) => {
         if (faults.send) throw faults.send;
@@ -80,8 +87,11 @@ const fixture = (overrides = {}) => {
     };
     return surveys;
   };
-  const fetchImpl = async (url) => Response.json(records.get(new URL(url).pathname.split('/').pop()));
-  const open = () => createRegistrySession({ info: { slug: 'town', chainId: 11155420 }, config: { rpcUrl: '', allowLocalWorkers: false }, wallet, fetchImpl,
+  const fetchImpl = async (url) => {
+    const id = new URL(url).pathname.split('/').pop();
+    return unavailable.has(id) ? new Response('', { status: 404 }) : Response.json(records.get(id));
+  };
+  const open = (slug = 'town') => createRegistrySession({ info: { slug, chainId: 11155420 }, config: { rpcUrl: '', allowLocalWorkers: false }, wallet, fetchImpl,
     options: { provider, addresses: { sessionRegistry: registryAddress, surveys: surveysAddress }, createContract: factory } });
   const addQuestion = (id, payload, block = 1) => {
     const pointer = ethers.utils.id(id);
@@ -97,14 +107,42 @@ const fixture = (overrides = {}) => {
   const addResponse = (id, payload, blockNumber) => {
     const pointer = ethers.utils.id(JSON.stringify(payload));
     responseHashes.set(id, pointer);
+    responseHistory.set(id, [...(responseHistory.get(id) || []), { block: blockNumber, pointer }]);
     records.set(Buffer.from(pointer.slice(2), 'hex').toString('base64url'), payload);
     const event = surveys.interface.encodeEventLog(surveys.interface.getEvent('ResponsesSubmitted'), [wallet.address, [id], ethers.constants.HashZero]);
     logs.push({ ...event, blockNumber, transactionIndex: 0, logIndex: logs.length });
   };
-  return { open, addQuestion, addResponse, hashes, responseHashes, logs, reorg, uploaded, writes, faults, client, fetchImpl, registry,
+  return { open, addQuestion, addResponse, hashes, responseHashes, responseReads, meta, unavailable, logs, reorg, uploaded, writes, faults, client, fetchImpl, registry,
     options: { provider, addresses: { sessionRegistry: registryAddress, surveys: surveysAddress }, createContract: factory },
     setChain: (value) => { chain = value; }, setGasPrice: (value) => { gasPrice = value; }, setBalance: (value) => { balance = value; } };
 };
+
+for (const slug of ['', 'general', 'town']) test(`registry links resolve ${JSON.stringify(slug)} to its registered session`, async () => {
+  const f = fixture();
+  const expected = slug || 'general';
+  const calls = [];
+  const readRow = f.registry.getSessionBySlug;
+  f.registry.getSessionBySlug = async (requested) => {
+    calls.push(['session', requested]);
+    assert.equal(requested, expected);
+    const row = await readRow();
+    row[0] = expected;
+    return row;
+  };
+  f.registry.getSessionFields = async (requested, fields) => {
+    calls.push(['fields', requested]);
+    assert.equal(requested, expected);
+    assert.deepEqual(fields, ['corsWorkerUrl']);
+    return [''];
+  };
+  await f.open(slug);
+  assert.deepEqual(calls, [['session', expected], ['fields', expected]]);
+});
+
+test('a registry link still rejects a row belonging to another session', async () => {
+  const f = fixture();
+  await assert.rejects(f.open('general'), /registry returned a different session/);
+});
 
 test('registry question reads filter sessions and blocked ids, trust chain ids and reuse payloads', async () => {
   const f = fixture({ BLOCKED_QUESTION_IDS: [blockedId] });
@@ -668,7 +706,7 @@ const rpcFailure = (reason, code, method, params = [], fields = {}) => Object.as
 }), fields);
 const retry = (detail) => `The chain request failed (${detail}). Check the RPC connection and retry.`;
 
-const serveRegistry = async (t, f) => {
+const serveRegistry = async (t, f, now = Date.now) => {
   const stateDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ce-registry-rpc-'));
   t.after(() => fs.rm(stateDir, { recursive: true, force: true }));
   const fetchImpl = async (url, init) => {
@@ -681,7 +719,7 @@ const serveRegistry = async (t, f) => {
     throw new Error(`Unexpected route ${pathname}`);
   };
   const logs = [];
-  const participant = createParticipant({ config: readConfig({ CE_MCP_STATE_DIR: stateDir }), wallet, registry: f.options, fetchImpl });
+  const participant = createParticipant({ config: readConfig({ CE_MCP_STATE_DIR: stateDir }), wallet, registry: f.options, fetchImpl, now });
   const server = createMcpServer({ serverInfo: { name: 'test', version: '1' }, tools: buildTools(participant), log: (line) => logs.push(line) });
   let id = 0;
   const call = async (name, args = {}) =>
@@ -781,4 +819,166 @@ test('a missing stored mark holds both scans until new blocks can be covered by 
   assert.deepEqual(answers.entries, beforeAnswers.entries);
   assert.equal(questions.complete, true);
   assert.equal(answers.complete, true);
+});
+
+test('participant question reads retain stored rating steps for answer validation', async (t) => {
+  const stateDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ce-rating-participant-'));
+  t.after(() => fs.rm(stateDir, { recursive: true, force: true }));
+  const f = fixture();
+  const participant = createParticipant({ config: readConfig({ CE_MCP_STATE_DIR: stateDir }), wallet, registry: f.options,
+    fetchImpl: async (url, init) => {
+      if (new URL(url).hostname !== 'w.example.dev') return f.fetchImpl(url, init);
+      const pathname = new URL(url).pathname;
+      if (pathname === '/resource-presence') return Response.json({ resources: { txGas: false } });
+      if (pathname === '/auth/nonce') return Response.json({ nonce: 'nonce123456' });
+      if (pathname === '/auth/login') return Response.json({ error: 'fixture read only' }, { status: 403 });
+      throw new Error(`Unexpected Worker read ${pathname}`);
+    },
+  });
+  await participant.joinSession({ link: 'https://contextengine.sh/session/town' });
+  f.addQuestion(qid, { sessionSlug: 'town', prompt: 'A fractional rating', type: 'rating', scale: { min: -0.5, max: 0.5, step: 0.1 } });
+  const question = (await participant.listQuestions()).questions[0];
+  assert.equal(question.scale.step, 0.1);
+});
+
+for (const value of ['Disagree', '']) test(`an unread registry ${value || 'cleared'} answer is counted until its payload recovers`, async () => {
+  const f = fixture();
+  const session = await f.open();
+  f.addResponse(qid, { questionID: qid, answer: { value: 'Agree' } }, 1);
+  f.addResponse(qid, { questionID: qid, answer: { value } }, 2);
+  const pointer = Buffer.from(f.responseHashes.get(qid).slice(2), 'hex').toString('base64url');
+  f.unavailable.add(pointer);
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const result = await session.readAnswers({ questionIds: [qid] });
+    assert.equal(result.complete, false);
+    assert.equal(result.unreadAnswers, 1);
+    assert.deepEqual(result.entries, []);
+  }
+  f.unavailable.clear();
+  const recovered = await session.readAnswers({ questionIds: [qid] });
+  assert.equal(recovered.complete, true);
+  assert.equal(recovered.unreadAnswers, 0);
+  assert.equal(recovered.entries[0].payload.answer.value, value);
+});
+
+for (const end of [5, undefined]) test(`public registry handlers apply the configured window with end=${end}`, async (t) => {
+  const f = fixture({ blockLimits: { start: 2, ...(end === undefined ? {} : { end }) } });
+  const scans = [];
+  const getLogs = f.options.provider.getLogs;
+  f.options.provider.getLogs = (filter) => { scans.push(filter); return getLogs(filter); };
+  const { call } = await serveRegistry(t, f);
+  assert.equal((await call('join_session', { link })).isError, undefined);
+  f.addQuestion(qid, { sessionSlug: 'town', prompt: 'Inside window', type: 'binary' }, 3);
+  f.addQuestion(otherId, { sessionSlug: 'town', prompt: 'After window', type: 'binary' }, 8);
+  f.addQuestion(blockedId, { sessionSlug: 'town', prompt: 'Before window', type: 'binary' }, 1);
+  f.addResponse(qid, { questionID: qid, answer: { value: 'Agree' } }, 4);
+  f.addResponse(qid, { questionID: qid, answer: { value: 'Disagree' } }, 8);
+  f.addResponse(otherId, { questionID: otherId, answer: { value: 'Agree' } }, 8);
+  const listed = (await call('list_questions', { filter: 'all' })).structuredContent;
+  assert.deepEqual(listed.questions.map((question) => question.id), end ? [qid] : [qid, otherId]);
+  const results = (await call('get_results')).structuredContent;
+  assert.equal(results.partial, false);
+  assert.deepEqual(results.questions.map((question) => question.questionId), end ? [qid] : [qid, otherId]);
+  assert.equal(results.questions[0].counts[end ? 'Agree' : 'Disagree'], 1);
+  assert.ok(scans.every((scan) => scan.fromBlock >= 2 && scan.toBlock <= (end || 10)));
+  assert.ok(f.responseReads.every((read) => end ? read.options?.blockTag === end : read.options?.blockTag === undefined));
+});
+
+test('changing the registry window drops cached and remembered out-of-window answers', async (t) => {
+  let now = 1000;
+  const f = fixture({ blockLimits: { start: 2 } });
+  const { call } = await serveRegistry(t, f, () => now);
+  assert.equal((await call('join_session', { link })).isError, undefined);
+  f.addQuestion(qid, { sessionSlug: 'town', prompt: 'Inside window', type: 'binary' }, 3);
+  f.addQuestion(otherId, { sessionSlug: 'town', prompt: 'After window', type: 'binary' }, 8);
+  f.addResponse(qid, { questionID: qid, answer: { value: 'Agree' } }, 4);
+  f.addResponse(otherId, { questionID: otherId, answer: { value: 'Agree' } }, 8);
+  assert.equal((await call('list_questions', { filter: 'all' })).structuredContent.total, 2);
+  assert.equal((await call('get_results')).structuredContent.questions.length, 2);
+  const answer = await call('answer', { answers: [{ questionId: qid, value: 'Disagree' }] });
+  assert.equal(answer.isError, undefined);
+  const added = await call('add_statement', { prompt: 'Remembered outside window' });
+  assert.equal(added.isError, undefined);
+  f.meta.blockLimits = { start: 2, end: 5 };
+  now += 31000;
+  const listed = (await call('list_questions', { filter: 'all' })).structuredContent;
+  assert.deepEqual(listed.questions.map((question) => question.id), [qid]);
+  assert.equal(listed.questions[0].myAnswer.value, 'Agree');
+  const results = (await call('get_results')).structuredContent;
+  assert.equal(results.partial, false);
+  assert.deepEqual(results.questions.map((question) => question.questionId), [qid]);
+  assert.equal(results.questions[0].counts.Agree, 1);
+  f.meta.blockLimits = { start: 5, end: 10 };
+  now += 31000;
+  assert.deepEqual((await call('list_questions', { filter: 'all' })).structuredContent.questions.map((question) => question.id), [otherId]);
+});
+
+for (const blockLimits of [{ start: 2, end: 1 }, { start: -1 }, { start: 2, end: 2.5 }, { start: 2, end: 'invalid' }]) {
+  test(`registry windows reject invalid limits ${JSON.stringify(blockLimits)}`, async (t) => {
+    const { call } = await serveRegistry(t, fixture({ blockLimits }));
+    const joined = await call('join_session', { link });
+    assert.equal(joined.isError, true);
+    assert.match(joined.content[0].text, /block.*window|block.*limit/i);
+  });
+}
+
+test('a configured end beyond the head is capped for both scans and pointer reads', async (t) => {
+  const f = fixture({ blockLimits: { start: 2, end: 20 } });
+  const getLogs = f.options.provider.getLogs;
+  f.options.provider.getLogs = (filter) => { assert.ok(filter.toBlock <= 10); return getLogs(filter); };
+  const { call } = await serveRegistry(t, f);
+  await call('join_session', { link });
+  f.addQuestion(qid, { sessionSlug: 'town', prompt: 'Inside window', type: 'binary' }, 3);
+  f.addResponse(qid, { questionID: qid, answer: { value: 'Agree' } }, 4);
+  assert.equal((await call('get_results')).structuredContent.partial, false);
+  assert.ok(f.responseReads.length > 0);
+  assert.ok(f.responseReads.every((read) => read.options?.blockTag === 10));
+});
+
+test('an unavailable bounded pointer keeps results partial without reading latest', async (t) => {
+  const f = fixture({ blockLimits: { start: 2, end: 5 } });
+  const createContract = f.options.createContract;
+  const reads = [];
+  f.options.createContract = (...args) => {
+    const contract = createContract(...args);
+    if (args[0] === surveysAddress) contract.getResponse = async (_responder, _id, options) => {
+      reads.push(options);
+      throw new Error('historical state unavailable');
+    };
+    return contract;
+  };
+  const { call } = await serveRegistry(t, f);
+  await call('join_session', { link });
+  f.addQuestion(qid, { sessionSlug: 'town', prompt: 'Inside window', type: 'binary' }, 3);
+  f.addResponse(qid, { questionID: qid, answer: { value: 'Agree' } }, 4);
+  const results = (await call('get_results')).structuredContent;
+  assert.equal(results.partial, true);
+  assert.equal(results.unreadAnswers, 1);
+  assert.equal(results.questions[0].responses, 0);
+  assert.ok(reads.length > 0);
+  assert.ok(reads.every((options) => options?.blockTag === 5));
+});
+
+
+test('config reloads reuse creation-block lookup until the registry creation time changes', async (t) => {
+  const f = fixture({ blockLimits: {} });
+  const lookup = t.mock.method(f.options.provider, 'getBlock');
+  const session = await f.open();
+  assert.ok(lookup.mock.callCount() > 0);
+  lookup.mock.resetCalls();
+  await Promise.all([session.loadConfig(), session.loadConfig()]);
+  assert.equal(lookup.mock.callCount(), 0);
+  const getRow = f.registry.getSessionBySlug;
+  f.registry.getSessionBySlug = async () => { const row = await getRow(); row[5] = 1006; return row; };
+  await session.loadConfig();
+  assert.ok(lookup.mock.callCount() > 0);
+  assert.equal(session.containsBlock(5), false);
+  assert.equal(session.containsBlock(6), true);
+  lookup.mock.resetCalls();
+  await session.loadConfig();
+  assert.equal(lookup.mock.callCount(), 0);
+  f.meta.blockLimits = { start: 2 };
+  await session.loadConfig();
+  assert.equal(session.containsBlock(2), true);
+  assert.equal(lookup.mock.callCount(), 0);
 });

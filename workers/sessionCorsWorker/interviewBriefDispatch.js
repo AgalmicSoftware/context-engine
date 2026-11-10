@@ -2,7 +2,8 @@ import { readCurrentSessionConfig } from './sessionConfigAuthority.js';
 import { resolveAnonymousIpDailyLimit } from './anonymousRateLimitPolicy.js';
 import { loadPublicInterviewQuestions as loadPublicInterviewQuestionsBoundary } from './interviewQuestionCatalog.js';
 
-export const INTERVIEW_PROMPT_VERSION = 'ce-interview-brief-v5';
+// v6 asks for confidence as the chance the person keeps the answer; hashes follow v5.
+export const INTERVIEW_PROMPT_VERSION = 'ce-interview-brief-v6';
 
 const trim = (value) => String(value == null ? '' : value).trim();
 const isObj = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
@@ -101,7 +102,7 @@ export const buildInterviewBriefDocument = ({
   answerContract: {
     binary: ['Agree', 'Unsure', 'Disagree'],
     rating: { min: 0, max: 10, step: 1 },
-    ratingScaleOverrides: 'Use a question.scale object when present; otherwise use the default rating contract.',
+    ratingScaleOverrides: 'Use a question.scale object when present: answer min plus a whole number of steps (1 when no step is given), at most max. Otherwise use the default rating contract.',
     multichoice: 'When singleSelect is true, use one exact question option. Otherwise use an array of one or more exact question options.',
     quadratic: 'Signed integer array in option order; sum(vote²) <= voiceCredits (99 default). Zero is neutral; unused credits are allowed.',
   },
@@ -163,13 +164,17 @@ export const dispatchInterviewBriefRequest = async ({
   }
 
   const loadPublicInterviewQuestions = deps?.loadPublicInterviewQuestions || loadPublicInterviewQuestionsBoundary;
-  const questions = await loadPublicInterviewQuestions({
+  const { questions, incomplete } = await loadPublicInterviewQuestions({
     env,
     config,
     slug,
     storageRoute: deps?.storageRoute,
     fetch: deps?.fetch,
   });
+  if (!questions.length && incomplete) {
+    headers.set('retry-after', '5');
+    return deps?.json?.({ error: 'Interview question discovery is incomplete. Retry shortly.' }, 503, headers);
+  }
   if (!questions.length) {
     return deps?.json?.({ error: 'No public, accessible questions are available for interview prefill.' }, 404, headers);
   }

@@ -1,5 +1,6 @@
 import type { AgentClientLoginEnvelope } from './agentClientLogin';
 import { buildSessionAgentAuthHeaders } from './agentClientLogin';
+import { normalizeRatingScale, type RatingScale } from '../survey/ratingValue';
 
 type UnknownRecord = Record<string, unknown>;
 export type AgentPolisRow = { responder: string; questionId: string; response: string };
@@ -43,6 +44,8 @@ export type AgentQuestion = {
   questionText: string;
   options: string[];
   voiceCredits?: number;
+  scale?: RatingScale;
+  singleSelect?: boolean;
   tags: string[];
   answeredByUser: boolean;
   answerable: boolean;
@@ -61,6 +64,9 @@ export const normalizeAgentQuestion = (input: unknown): AgentQuestion => {
     prompt,
     questionText: prompt,
     ...(questionType === 'quadratic' ? { voiceCredits: Number(question.voiceCredits ?? 99) } : {}),
+    // The Worker checks answers against these, so the controls must offer the same choices.
+    ...(questionType === 'rating' ? { scale: normalizeRatingScale(question) } : {}),
+    ...(questionType === 'multichoice' && question.singleSelect === true ? { singleSelect: true } : {}),
     options: (Array.isArray(question.options) ? question.options : []).map(toStr).filter(Boolean),
     tags: (Array.isArray(question.tags) ? question.tags : []).map(toStr).filter(Boolean).slice(0, 8),
     answeredByUser: question.answeredByUser === true,
@@ -89,12 +95,14 @@ export const fetchAgentQuestions = async ({
   agentWorkerUrl,
   limit = 30,
   fetchImpl = fetch,
+  signal,
 }: {
   envelope: AgentClientLoginEnvelope | null;
   sessionSlug?: unknown;
   agentWorkerUrl?: unknown;
   limit?: number;
   fetchImpl?: typeof fetch;
+  signal?: AbortSignal;
 }): Promise<AgentQuestionsResult> => {
   const base = resolveAgentWorkerUrl(envelope, agentWorkerUrl);
   if (!envelope?.agentCredential?.token || !base) {
@@ -109,12 +117,15 @@ export const fetchAgentQuestions = async ({
     let answerState: UnknownRecord = {};
     let expectedTotal: number | undefined;
     for (let page = 0; page < 1000; page++) {
+      if (signal?.aborted) throw new DOMException('Agent request cancelled.', 'AbortError');
       const response = await fetchImpl(url.toString(), {
         method: 'GET',
         headers: buildSessionAgentAuthHeaders(envelope),
         cache: 'no-store',
+        ...(signal ? { signal } : {}),
       });
       const body = toRecord(await response.json().catch(() => ({})));
+      if (signal?.aborted) throw new DOMException('Agent request cancelled.', 'AbortError');
       if (!response.ok || body.ok !== true) {
         return {
           ok: false,
@@ -513,11 +524,13 @@ export const fetchAgentResults = async ({
   sessionSlug,
   agentWorkerUrl,
   fetchImpl = fetch,
+  signal,
 }: {
   envelope: AgentClientLoginEnvelope | null;
   sessionSlug?: unknown;
   agentWorkerUrl?: unknown;
   fetchImpl?: typeof fetch;
+  signal?: AbortSignal;
 }): Promise<AgentResultsResult> => {
   const base = resolveAgentWorkerUrl(envelope, agentWorkerUrl);
   if (!envelope?.agentCredential?.token || !base) {
@@ -532,8 +545,10 @@ export const fetchAgentResults = async ({
         method: 'GET',
         headers: buildSessionAgentAuthHeaders(envelope),
         cache: 'no-store',
+        ...(signal ? { signal } : {}),
       });
       const body = toRecord(await response.json().catch(() => ({})));
+      if (signal?.aborted) throw new DOMException('Agent request cancelled.', 'AbortError');
       if (response.ok && body.ok === true) {
         if (key === 'polis') return { status: 'ready', data: normalizePolisDataset(body) };
         if (key === 'groups') return { status: 'ready', data: normalizeGroups(body) };

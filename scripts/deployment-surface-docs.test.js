@@ -35,46 +35,60 @@ test('session creation docs align mode-specific deployment inputs', () => {
 
   assert.match(
     creationDoc,
-    /\| Cloudflare API token[^\n]*explicit legacy deploy-helper fallback[^\n]*not the native default/,
+    /\| Cloudflare API token[^\n]*deploy helper[^\n]*token-free alternative is the dashboard handoff/,
   );
   assert.match(creationDoc, /\| AI provider key[^\n]*every reachable `\/new` profile/);
   assert.match(creationDoc, /key for every provider used by the selected fast,\s+thinking,\s+and\s+transcription models/i);
   assert.doesNotMatch(creationDoc, /changes which single provider key is required/i);
 });
 
-test('canonical docs keep native Hosted deployment separate from token-based fallbacks', () => {
+test('canonical docs name both Hosted deployment paths', () => {
   const readme = read('README.md');
   const architecture = read('ARCHITECTURE.md');
   const overview = read('docs/architecture-overview.md');
   const spec = read('spec.md');
 
-  assert.match(readme, /Native setup uses a Cloudflare account\/dashboard login[\s\S]{0,160}does not ask for a Cloudflare API token/);
+  assert.match(readme, /Cloudflare account, an AI-provider key \(OpenAI by default\), and either a Cloudflare API token or the token-free dashboard setup/);
   assert.doesNotMatch(readme, /default Cloudflare profile needs only a Cloudflare deploy token/i);
-  assert.match(architecture, /Native Deploy to Cloudflare[\s\S]{0,80}no API token/);
-  assert.match(architecture, /Legacy deploy-helper[\s\S]{0,100}request-only Cloudflare token/);
-  assert.match(overview, /native Deploy to Cloudflare template[\s\S]{0,100}no API token/);
-  assert.match(overview, /default `\/new` path[\s\S]{0,160}without requesting an API token/);
-  assert.match(spec, /explicit legacy Session[\s\S]{0,160}default Hosted & Fast path uses the native Cloudflare dashboard handoff/);
+  assert.match(architecture, /Deploy helper[\s\S]{0,80}request-only Cloudflare API token/);
+  assert.match(architecture, /Native Deploy to Cloudflare[\s\S]{0,80}token-free dashboard handoff/);
+  assert.match(overview, /deploy helper with a request-only API token/);
+  assert.match(overview, /native Deploy to Cloudflare template[\s\S]{0,100}token-free dashboard handoff/);
+  assert.match(spec, /Session\s+Wizard's API-token[\s\S]{0,120}token-free path\s+uses the native Cloudflare dashboard handoff/);
 });
 
 test('profile docs use the current wizard labels', () => {
+  const wizardPolicy = read('client/src/components/Sessions/setup/SetupPolicySections.tsx');
   const runModes = read('docs/run-modes.md');
   const workerDoc = read('docs/session-cors-worker.md');
   const e2eCadence = readIfPresent('docs/e2e-cadence.md');
 
-  assert.match(runModes, /Hosted & Fast[\s\S]*`Centralized \(Cloudflare\)`/);
-  assert.match(runModes, /Trustless & Slower[\s\S]*`Decentralized \(Arweave \+ EVM\)`/);
-  assert.match(workerDoc, /Hosted & Fast[\s\S]{0,100}`Centralized \(Cloudflare\)`/);
+  assert.match(wizardPolicy, /label="Runs on"/);
+  assert.match(wizardPolicy, /<option value="worker_canonical">Session Worker<\/option>/);
+  assert.match(wizardPolicy, /<option value="evm_registry_canonical">On-chain registry<\/option>/);
+  assert.match(runModes, /Hosted & Fast[\s\S]*`Session Worker`/);
+  assert.match(runModes, /Trustless & Slower[\s\S]*`On-chain registry`/);
+  assert.match(workerDoc, /Hosted & Fast[\s\S]{0,100}`Session Worker`/);
   if (e2eCadence) {
-    assert.match(e2eCadence, /Hosted & Fast profile \(`Centralized \(Cloudflare\)`/);
+    assert.match(e2eCadence, /Hosted & Fast profile \(`Session Worker`/);
   }
 
   for (const [relativePath, source] of [
+    ['README.md', read('README.md')],
+    ['ARCHITECTURE.md', read('ARCHITECTURE.md')],
+    ['docs/architecture-overview.md', read('docs/architecture-overview.md')],
+    ['docs/scaling.md', read('docs/scaling.md')],
     ['docs/run-modes.md', runModes],
     ['docs/session-cors-worker.md', workerDoc],
+    ['docs/session-creation-guide.md', read('docs/session-creation-guide.md')],
     ...(e2eCadence ? [['docs/e2e-cadence.md', e2eCadence]] : []),
   ]) {
-    assert.doesNotMatch(source, /Fast & Private \(Cloudflare\)|Trustless & Public \(Decentralized\)/, relativePath);
+    assert.doesNotMatch(
+      source,
+      /Centralized \(Cloudflare\)|Decentralized \(Arweave \+ EVM\)|Fast & Private \(Cloudflare\)|Trustless & Public \(Decentralized\)/,
+      relativePath,
+    );
+    assert.doesNotMatch(source, /chooser (initially|opens)|path after selection/, relativePath);
   }
 });
 
@@ -159,7 +173,6 @@ test('public agent docs define fresh single-Worker storage and deployment', () =
   assert.match(agentReadme, /Hosted & Fast uses canonical Cloudflare payload storage/);
   assert.match(agentReadme, /Trustless & Slower/);
   assert.match(agentReadme, /SessionWriteCoordinator/);
-  assert.match(agentReadme, /Existing Bridge-backed sessions keep their old deployments/);
   assert.match(agentReadme, /ce-agent:/);
 });
 
@@ -203,7 +216,7 @@ test('session publication docs keep Worker-canonical and chain-backed effects se
     assert.match(registryRefreshLine, /chain-backed success/);
     assert.match(hostedSettlementLine, /without the registry publish adapter/);
     assert.match(wizardMap, /Feeds profile-selected Worker config persistence or Arweave metadata\/EVM registration/);
-    assert.match(wizardMap, /selected default\/recommended Hosted profile compiles to Cloudflare/);
+    assert.match(wizardMap, /default Hosted profile, which compiles to Cloudflare/);
     assert.match(wizardMap, /pending on-chain SBT metadata\/deploy\/finalize, independent of the session authority profile/);
     assert.match(wizardMap, /deferred draft held in tab memory[\s\S]{0,120}does not survive reload/);
   }
@@ -221,9 +234,9 @@ test('active agent docs preserve HTTP access and distinguish historical review e
   assert.match(architecture, /OnePageSessionAgentShell\.tsx/);
   assert.match(architecture, /agentSessionBackend\.ts/);
   assert.doesNotMatch(architecture, /telegramAgentData\.ts|telegramSessionBackend\.ts/);
-  assert.match(workerDoc, /HTTP-off overrides stale legacy flags/);
+  assert.doesNotMatch(workerDoc, /stale legacy flags/);
   assert.match(workerDoc, /historical `telegram`|Historical explicit\s+`telegram`/);
-  assert.match(read('workers/sessionCorsWorker/agent/README.md'), /retired/);
+  assert.doesNotMatch(read('workers/sessionCorsWorker/agent/README.md'), /\bBridge\b/);
   assert.doesNotMatch(workerDoc, /Telegram-first|Telegram remains independently optional/);
   if (contract) {
     assert.match(contract, /Session Worker now owns the canonical authenticated/);

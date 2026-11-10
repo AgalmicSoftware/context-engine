@@ -37,14 +37,22 @@ describe('sessionListeningQuestions', () => {
       sessionInstructions: 'Prefer operational questions.',
     });
 
-    expect(prompt).toContain('* SourceType: transcript');
-    expect(prompt).toContain('* MultiSpeakerHint: likely_multiple_speakers');
-    expect(prompt).toContain('numberOfSeedStatementsOrPrompts: 3');
-    expect(prompt).toContain('Allowed Default Tags');
-    expect(prompt).toContain('budget, planning');
-    expect(prompt).toContain('read the entire transcript');
-    expect(prompt).toContain('Do not overweight the opening topic');
+    expect(prompt).toContain('Source type: transcript.');
+    expect(prompt).toContain('Speakers: likely_multiple_speakers.');
+    expect(prompt).toContain('Write 3 questions');
+    expect(prompt).toContain('Suggested tags: budget, planning.');
+    expect(prompt).toContain('Weigh the whole recorded conversation');
+    // Breakout questions let the room back or reject concrete next steps.
+    expect(prompt).toContain('concrete next steps');
     expect(prompt).toContain('Prefer operational questions.');
+    expect(prompt).toContain('is not double-barrelled');
+  });
+
+  it('fills the template once, keeping placeholders and $ patterns in the transcript as spoken', () => {
+    const transcript = 'Speaker A read out "<NumSeedStatements>" and "$&" from the agenda, then disagreed with B.';
+    const prompt = buildListeningQuestionPrompt(transcript, { count: 4 });
+    expect(prompt).toContain(transcript);
+    expect(prompt).toContain('Write 4 questions');
   });
 
   it('keeps late transcript topics in the prompt for full-session coverage', () => {
@@ -66,8 +74,8 @@ describe('sessionListeningQuestions', () => {
       multiSpeakerHintOverride: 'likely_multiple_speakers',
     });
 
-    expect(prompt).toContain('* SourceType: document');
-    expect(prompt).toContain('* MultiSpeakerHint: likely_multiple_speakers');
+    expect(prompt).toContain('Source type: document.');
+    expect(prompt).toContain('Speakers: likely_multiple_speakers.');
   });
 
   it('adds prior generated prompts to the model context and requests the configured thinking tier', async () => {
@@ -92,6 +100,7 @@ describe('sessionListeningQuestions', () => {
         sessionSlug: 'demo',
         taskType: 'generate',
         thinking: true,
+        response_format: expect.objectContaining({ type: 'json_schema' }),
       }),
     );
     expect(callAI).toHaveBeenCalledWith(

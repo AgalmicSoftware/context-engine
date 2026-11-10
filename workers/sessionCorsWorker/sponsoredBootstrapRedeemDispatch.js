@@ -18,6 +18,7 @@ import {
   executeCoordinatedSponsoredDeploy as executeCoordinatedSponsoredDeployBoundary,
   finalizeCoordinatedSponsoredFaucet as finalizeCoordinatedSponsoredFaucetBoundary,
   reserveCoordinatedSponsoredFaucet as reserveCoordinatedSponsoredFaucetBoundary,
+  withCoordinatedFaucetWalletTurn,
 } from './sessionWriteCoordinator.js';
 
 const INVALID_GRANT_ERROR = 'Invalid, expired, or already used sponsored bootstrap grant.';
@@ -241,9 +242,6 @@ export const dispatchSponsoredBootstrapRedeem = async ({
       bundleUrl: _discardedBundleUrl,
       bundleSha256: _discardedBundleSha256,
       bundleManifestUrl: _discardedBundleManifestUrl,
-      agentBridgeBundleUrl: _discardedAgentBridgeBundleUrl,
-      agentBridgeBundleManifestUrl: _discardedAgentBridgeBundleManifestUrl,
-      agentBridgeBundleSha256: _discardedAgentBridgeBundleSha256,
       ...accountIndependentDeployPayload
     } = deployPayload;
     // Regression guard: the one-shot grant, not a page-lifetime hook ref,
@@ -346,11 +344,53 @@ export const dispatchSponsoredBootstrapRedeem = async ({
   const reserveCoordinatedSponsoredFaucet = (
     deps?.reserveCoordinatedSponsoredFaucet || reserveCoordinatedSponsoredFaucetBoundary
   );
-  const faucetReservation = await reserveCoordinatedSponsoredFaucet({
-    env,
-    grantToken,
-    requestDigest,
+  const faucetSecrets = { faucetPrivateKey: toTrimmedString(grantRecord?.faucetPrivateKey) };
+  // The grant's wallet takes turns with any session or grant sharing its key. The turn comes
+  // before the one-shot reservation, so a busy wallet refuses without spending the grant.
+  const takeWalletTurn = deps?.withCoordinatedFaucetWalletTurn || withCoordinatedFaucetWalletTurn;
+  const outcome = await takeWalletTurn({ env, secrets: faucetSecrets }, async () => {
+    const reservation = await reserveCoordinatedSponsoredFaucet({ env, grantToken, requestDigest });
+    if (reservation?.kind !== 'execute') return { reservation };
+    try {
+      return {
+        reservation,
+        response: await deps?.faucet?.({
+          payload: {
+            action: 'request_test_eth',
+            to: recipientAddress,
+          },
+          secrets: faucetSecrets,
+          config: sourceConfig,
+          baseHeaders: headers,
+          slug: toTrimmedString(grantRecord?.sourceSessionSlug),
+          requesterAddress: recipientAddress,
+          tokenHasFaucetScope: true,
+        }),
+      };
+    } catch {
+      // Faucet/RPC providers may include request objects or signer material in
+      // thrown messages. Once the one-shot reservation exists, expose only a
+      // fixed recovery-safe error and never authorize a second transfer.
+      return {
+        reservation,
+        response: {
+          status: 502,
+          body: {
+            error: 'Sponsored faucet redemption was interrupted; transfer status is unknown and it will not be repeated.',
+          },
+        },
+      };
+    }
   });
+  if (!outcome) {
+    return buildGrantErrorResponse(
+      deps,
+      headers,
+      503,
+      'The sponsored faucet wallet is busy; nothing was sent. Try again shortly.',
+    );
+  }
+  const faucetReservation = outcome.reservation;
   if (faucetReservation?.kind === 'terminal' && faucetReservation.receipt) {
     try {
       await writeSponsoredGrantReceipt({
@@ -397,33 +437,7 @@ export const dispatchSponsoredBootstrapRedeem = async ({
     );
   }
 
-  let faucetResponse;
-  try {
-    faucetResponse = await deps?.faucet?.({
-      payload: {
-        action: 'request_test_eth',
-        to: recipientAddress,
-      },
-      secrets: {
-        faucetPrivateKey: toTrimmedString(grantRecord?.faucetPrivateKey),
-      },
-      config: sourceConfig,
-      baseHeaders: headers,
-      slug: toTrimmedString(grantRecord?.sourceSessionSlug),
-      requesterAddress: recipientAddress,
-      tokenHasFaucetScope: true,
-    });
-  } catch (error) {
-    // Faucet/RPC providers may include request objects or signer material in
-    // thrown messages. Once the one-shot reservation exists, expose only a
-    // fixed recovery-safe error and never authorize a second transfer.
-    faucetResponse = {
-      status: 502,
-      body: {
-        error: 'Sponsored faucet redemption was interrupted; transfer status is unknown and it will not be repeated.',
-      },
-    };
-  }
+  const faucetResponse = outcome.response;
 
   const rawReceiptResponse = await readReceiptResponse(faucetResponse);
   const receiptResponse = {

@@ -1,7 +1,5 @@
-import { createLogger } from 'utilities/logging.js';
 import { isResponseAllowedForSessionSlug } from '../../utilities/session/responseSessionScope.js';
 
-const demoLog = createLogger('demo');
 const AGGREGATOR_PARSE_MEMO_MAX = 3000;
 
 type UnknownRecord = Record<string, unknown>;
@@ -18,6 +16,7 @@ type AggregatorNetworkNode = {
   questionResponses?: Record<string, QuestionResponses>;
 };
 type AggregatorBuildOptions = {
+  hiddenQuestionIds?: Set<string>;
   parseMemo?: Map<string, unknown> | null;
   sessionSlug?: unknown;
 };
@@ -179,6 +178,7 @@ export function buildAggregatorFromLocalCache(
   let dirty = false;
 
   Object.keys(questionResponses).forEach((qId) => {
+    if (opts?.hiddenQuestionIds?.has(String(qId).trim().toLowerCase())) return;
     if (!hasVisibleQuestionMetadataForAggregator(questions, qId, sessionSlug)) return;
     const responderMap = asRecord(questionResponses[qId]);
     aggregatorMap[qId] = [];

@@ -1,7 +1,7 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { getEffectiveTranscriptionConfig } from '../../utilities/ai/aiSettings';
+import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
-  faCaretDown,
   faCircle,
   faMicrophone,
   faPause,
@@ -11,14 +11,27 @@ import {
   faStop,
   faTimes,
 } from '@fortawesome/free-solid-svg-icons';
-import { Button } from 'reactstrap';
+import { Button, UncontrolledTooltip } from 'reactstrap';
 import styles from './SurveyTool.module.scss';
 import CreateQuestionsAndSurveys from './CreateQuestionsAndSurveys';
+import CEConfirmDialog from '../Shared/CEConfirmDialog';
+import { SessionRecordingChunks } from './SessionRecordingChunks';
+import SessionRecordingInput from './SessionRecordingInput';
+import SessionRecordingHelp from './SessionRecordingHelp';
+import { SessionRecordingNotices } from './SessionRecordingNotices';
+import { SessionNewDraftsCue } from './SessionNewDraftsCue';
+import { SessionListeningTranscript, SessionListeningTranscriptToggle } from './SessionListeningTranscript';
+import SessionTranscriptClaimShare from './SessionTranscriptClaimShare';
+import SessionTranscriptContextOption from './SessionTranscriptContextOption';
+import { useTranscriptContextUpload } from './useTranscriptContextUpload';
 import { useRollingTranscriptionRecorder } from '../../utilities/audio/useRollingTranscriptionRecorder';
-import { DEFAULT_ROLLING_TRANSCRIPTION_CHUNK_MS } from '../../utilities/audio/rollingTranscription';
+import { DEFAULT_ROLLING_TRANSCRIPTION_CHUNK_MS, transcriptSpeech } from '../../utilities/audio/rollingTranscription';
+import { applySpeakerMerges } from '../../utilities/audio/speakerMerges';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
-import { readThemeToken, subscribeThemeChanges } from '../../utilities/ui/themeRuntime';
+import { SessionListeningWaveform } from './SessionListeningWaveform';
+export { SessionListeningWaveform } from './SessionListeningWaveform';
 import { generateQuestionsFromListeningTranscript, LISTENING_QUESTION_COUNT } from './sessionListeningQuestions';
+import type { QuestionDrafts } from '../../utilities/audio/recordingChunkStore';
 
 type SessionListeningPanelProps = Record<string, unknown> & {
   sessionSlug?: string;
@@ -29,13 +42,13 @@ type SessionListeningPanelProps = Record<string, unknown> & {
   onClose?: () => void;
   panelMode?: 'recordGroup' | 'listening';
   embeddedInModal?: boolean;
+  // The dialog header's spot for the + that adds audio or a transcript.
+  headerActionsSlot?: HTMLElement | null;
+  closeActionRef?: React.MutableRefObject<(() => Promise<void>) | null>;
+  // Lets the dialog ignore backdrop taps and Escape while the microphone is capturing.
+  onCaptureChange?: (capturing: boolean) => void;
 };
 type CreateQuestionsAndSurveysPanelProps = React.ComponentProps<typeof CreateQuestionsAndSurveys>;
-type BrowserAudioWindow = Window &
-  typeof globalThis & {
-    webkitAudioContext?: typeof AudioContext;
-  };
-
 type GeneratedQuestionDraft = {
   id?: unknown;
   prompt?: unknown;
@@ -50,16 +63,15 @@ const getGeneratedQuestionKey = (question: GeneratedQuestionDraft | null | undef
 const getGeneratedQuestionPrompt = (question: GeneratedQuestionDraft | null | undefined): string =>
   String(question?.prompt || '').trim();
 
+// Drafted prompts include drafts the host removed or submitted, so none of them comes back.
 const mergeGeneratedQuestionDrafts = (
   previous: GeneratedQuestionDraft[],
   incoming: GeneratedQuestionDraft[],
+  drafted: string[] = [],
 ): GeneratedQuestionDraft[] => {
   const seenKeys = new Set(previous.map(getGeneratedQuestionKey).filter(Boolean));
   const seenPrompts = new Set(
-    previous
-      .map(getGeneratedQuestionPrompt)
-      .map((prompt) => prompt.toLowerCase())
-      .filter(Boolean),
+    [...previous.map(getGeneratedQuestionPrompt), ...drafted].map((prompt) => prompt.toLowerCase()).filter(Boolean),
   );
   const additions = incoming.filter((question) => {
     const key = getGeneratedQuestionKey(question);
@@ -79,249 +91,13 @@ export const formatSessionRecordingElapsed = (secondsRaw: unknown) => {
   return `${minutes}:${String(rest).padStart(2, '0')}`;
 };
 
+const KEEP_AUDIO_HELP =
+  'Closes without waiting for transcription. Audio still waiting for it stays on this device and resumes uploading when you reopen this recording.';
+
 const getSessionInstructions = (sessionConfig: unknown) =>
   sessionConfig && typeof sessionConfig === 'object'
     ? (sessionConfig as Record<string, unknown>).questionsGenPrompt || ''
     : '';
-
-type SessionListeningWaveformProps = {
-  streamRef?: React.MutableRefObject<MediaStream | null>;
-  isActive: boolean;
-  isPaused: boolean;
-};
-
-const requestWaveformFrame = (callback: FrameRequestCallback) => {
-  if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
-    return window.requestAnimationFrame(callback);
-  }
-  return setTimeout(() => callback(Date.now()), 33) as unknown as number;
-};
-
-const cancelWaveformFrame = (handle: number) => {
-  if (typeof window !== 'undefined' && typeof window.cancelAnimationFrame === 'function') {
-    window.cancelAnimationFrame(handle);
-    return;
-  }
-  clearTimeout(handle as unknown as ReturnType<typeof setTimeout>);
-};
-
-export function SessionListeningWaveform({ streamRef, isActive, isPaused }: SessionListeningWaveformProps) {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null);
-  const sourceNodeRef = useRef<MediaStreamAudioSourceNode | null>(null);
-  const animationRef = useRef<number | null>(null);
-  const retryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const dataArrayRef = useRef<Uint8Array | null>(null);
-  const bufferLenRef = useRef(0);
-  const ctx2dRef = useRef<CanvasRenderingContext2D | null>(null);
-  const lastDrawRef = useRef(0);
-  const waveformColorsRef = useRef({ canvas: 'Canvas', bars: 'Highlight' });
-
-  useEffect(() => {
-    const refreshWaveformColors = () => {
-      waveformColorsRef.current = {
-        canvas: readThemeToken('ce-control-face', 'Canvas'),
-        bars: readThemeToken('ce-action-primary', 'Highlight'),
-      };
-    };
-    refreshWaveformColors();
-    return subscribeThemeChanges(refreshWaveformColors);
-  }, []);
-
-  const sizeCanvas = useCallback(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const width = Math.max(canvas.clientWidth || 0, 260);
-    const height = Math.max(canvas.clientHeight || 0, 80);
-    if (canvas.width !== width) canvas.width = width;
-    if (canvas.height !== height) canvas.height = height;
-  }, []);
-
-  const drawWaveform = useCallback(function drawWaveform() {
-    const analyser = analyserRef.current;
-    const canvas = canvasRef.current;
-    if (!analyser || !canvas) {
-      animationRef.current = null;
-      return;
-    }
-
-    const now =
-      typeof performance !== 'undefined' && typeof performance.now === 'function' ? performance.now() : Date.now();
-    if (now - lastDrawRef.current < 33) {
-      if (animationRef.current !== null) {
-        animationRef.current = requestWaveformFrame(drawWaveform);
-      }
-      return;
-    }
-    lastDrawRef.current = now;
-
-    let ctx = ctx2dRef.current;
-    if (!ctx) {
-      ctx = canvas.getContext('2d');
-      ctx2dRef.current = ctx;
-    }
-    if (!ctx) return;
-
-    const bufferLength = analyser.frequencyBinCount;
-    if (!dataArrayRef.current || bufferLenRef.current !== bufferLength) {
-      dataArrayRef.current = new Uint8Array(bufferLength);
-      bufferLenRef.current = bufferLength;
-    }
-    const dataArray = dataArrayRef.current;
-    analyser.getByteFrequencyData(dataArray);
-
-    const canvasWidth = canvas.width;
-    const canvasHeight = canvas.height;
-    const visualHeight = Math.max(1, canvasHeight - 4);
-    ctx.fillStyle = waveformColorsRef.current.canvas;
-    ctx.fillRect(0, 0, canvasWidth, canvasHeight);
-
-    const barWidth = (canvasWidth / bufferLength) * 2.5;
-    let peak = 0;
-    for (let i = 0; i < bufferLength; i += 1) {
-      if (dataArray[i] > peak) peak = dataArray[i];
-    }
-    const scale = peak > 0 ? visualHeight / Math.max(peak, 16) : 0;
-    let x = 0;
-    ctx.fillStyle = waveformColorsRef.current.bars;
-    for (let i = 0; i < bufferLength; i += 1) {
-      const barHeight = peak > 0 ? Math.max(2, Math.min(dataArray[i] * scale, visualHeight)) : 0;
-      ctx.fillRect(x, canvasHeight - 2 - barHeight, barWidth, barHeight);
-      x += barWidth + 1;
-    }
-
-    if (animationRef.current !== null) {
-      animationRef.current = requestWaveformFrame(drawWaveform);
-    }
-  }, []);
-
-  const clearRetry = useCallback(() => {
-    if (retryTimeoutRef.current) {
-      clearTimeout(retryTimeoutRef.current);
-      retryTimeoutRef.current = null;
-    }
-  }, []);
-
-  const cleanupWaveform = useCallback(() => {
-    clearRetry();
-    if (animationRef.current !== null) {
-      cancelWaveformFrame(animationRef.current);
-      animationRef.current = null;
-    }
-    try {
-      if (sourceNodeRef.current && analyserRef.current) {
-        sourceNodeRef.current.disconnect(analyserRef.current);
-      } else if (sourceNodeRef.current) {
-        sourceNodeRef.current.disconnect();
-      } else if (analyserRef.current) {
-        analyserRef.current.disconnect();
-      }
-    } catch (_) {
-      // Best-effort audio graph cleanup.
-    }
-    sourceNodeRef.current = null;
-    analyserRef.current = null;
-    dataArrayRef.current = null;
-    bufferLenRef.current = 0;
-    ctx2dRef.current = null;
-    if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
-      audioContextRef.current.close().catch(() => undefined);
-    }
-    audioContextRef.current = null;
-  }, [clearRetry]);
-
-  const ensureWaveformSetup = useCallback(() => {
-    if (!isActive || typeof window === 'undefined') return false;
-    const stream = streamRef?.current;
-    const canvas = canvasRef.current;
-    if (!stream || !canvas) return false;
-    const audioWindow = window as BrowserAudioWindow;
-    const AudioContextCtor = audioWindow.AudioContext || audioWindow.webkitAudioContext;
-    if (!AudioContextCtor) return false;
-
-    try {
-      sizeCanvas();
-      if (!audioContextRef.current || audioContextRef.current.state === 'closed') {
-        audioContextRef.current = new AudioContextCtor();
-      }
-      const audioContext = audioContextRef.current;
-      if (!audioContext) return false;
-      if (audioContext.state === 'suspended') {
-        audioContext.resume().catch(() => undefined);
-      }
-      if (!analyserRef.current) {
-        const analyser = audioContext.createAnalyser();
-        analyser.fftSize = 256;
-        analyserRef.current = analyser;
-      }
-      if (!sourceNodeRef.current) {
-        const analyser = analyserRef.current;
-        if (!analyser) return false;
-        const sourceNode = audioContext.createMediaStreamSource(stream);
-        sourceNodeRef.current = sourceNode;
-        sourceNode.connect(analyser);
-      }
-      if (!isPaused && animationRef.current === null) {
-        lastDrawRef.current = 0;
-        animationRef.current = requestWaveformFrame(drawWaveform);
-      }
-      return true;
-    } catch (_) {
-      return false;
-    }
-  }, [drawWaveform, isActive, isPaused, sizeCanvas, streamRef]);
-
-  useEffect(() => {
-    if (!isActive) {
-      cleanupWaveform();
-      return undefined;
-    }
-
-    let cancelled = false;
-    const trySetup = () => {
-      if (cancelled) return;
-      if (ensureWaveformSetup()) {
-        clearRetry();
-        return;
-      }
-      clearRetry();
-      retryTimeoutRef.current = setTimeout(() => {
-        retryTimeoutRef.current = null;
-        trySetup();
-      }, 50);
-    };
-
-    trySetup();
-    if (typeof window !== 'undefined') {
-      window.addEventListener('resize', sizeCanvas);
-    }
-    return () => {
-      cancelled = true;
-      if (typeof window !== 'undefined') {
-        window.removeEventListener('resize', sizeCanvas);
-      }
-      cleanupWaveform();
-    };
-  }, [cleanupWaveform, clearRetry, ensureWaveformSetup, isActive, sizeCanvas]);
-
-  useEffect(() => {
-    if (!isActive) return;
-    if (isPaused) {
-      if (animationRef.current !== null) {
-        cancelWaveformFrame(animationRef.current);
-        animationRef.current = null;
-      }
-      return;
-    }
-    if (analyserRef.current && canvasRef.current && animationRef.current === null) {
-      lastDrawRef.current = 0;
-      animationRef.current = requestWaveformFrame(drawWaveform);
-    }
-  }, [drawWaveform, isActive, isPaused]);
-
-  return <canvas ref={canvasRef} className={styles.sessionListeningWaveformCanvas} aria-hidden="true" />;
-}
 
 export default function SessionListeningPanel(props: SessionListeningPanelProps) {
   const {
@@ -333,50 +109,190 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
     onClose,
     panelMode = 'listening',
     embeddedInModal = false,
+    headerActionsSlot = null,
+    closeActionRef,
+    onCaptureChange,
   } = props;
+  const [labelSpeakers, setLabelSpeakers] = useState(true);
+  const [speakerLabelsSupported, setSpeakerLabelsSupported] = useState<boolean | null>(null);
+  const [speakerLabelsCheckTimedOut, setSpeakerLabelsCheckTimedOut] = useState(false);
+  const recordPressedRef = useRef(false);
+  useEffect(() => {
+    let current = true;
+    let timedOut = false;
+    setSpeakerLabelsSupported(null);
+    setSpeakerLabelsCheckTimedOut(false);
+    const complete = (supported: boolean) => {
+      // A late result still applies until Record is pressed, so it never switches labels on during capture.
+      if (!current || (timedOut && recordPressedRef.current)) return;
+      current = false;
+      clearTimeout(timeout);
+      setSpeakerLabelsCheckTimedOut(false);
+      setSpeakerLabelsSupported(supported);
+    };
+    const timeout = setTimeout(() => {
+      timedOut = true;
+      setSpeakerLabelsCheckTimedOut(true);
+      setSpeakerLabelsSupported(false);
+    }, 2000);
+    // Checking availability must not unlock credentials or delay Record indefinitely.
+    void getEffectiveTranscriptionConfig({ sessionSlug, sessionConfig }).then(
+      (config) => complete(config.provider === 'openai'),
+      () => complete(false),
+    );
+    return () => {
+      current = false;
+      clearTimeout(timeout);
+    };
+  }, [sessionSlug, sessionConfig]);
+  const [recordSpeakerAudio, setRecordSpeakerAudio] = useState(() => {
+    try {
+      return window.localStorage.getItem('ce:record-speaker-audio:v1') === 'true';
+    } catch {
+      return false;
+    }
+  });
+  const speakerHelpId = `ce-record-speaker-help-${useId().replace(/:/g, '')}`;
+  const labelsHelpId = `ce-speaker-labels-help-${useId().replace(/:/g, '')}`;
+  const keepHelpId = `ce-keep-audio-help-${useId().replace(/:/g, '')}`;
+  const recordingContext = useMemo(
+    () => ({
+      ...(context && typeof context === 'object' ? context : {}),
+      account: context && typeof context === 'object' && 'account' in context ? context.account : props.account,
+    }),
+    [context, props.account],
+  );
   const recorder = useRollingTranscriptionRecorder({
     sessionSlug,
     sessionConfig,
-    context,
+    context: recordingContext,
     workerUrl,
     chunkMs: DEFAULT_ROLLING_TRANSCRIPTION_CHUNK_MS,
+    labelSpeakers: panelMode === 'recordGroup' && speakerLabelsSupported === true && labelSpeakers,
+    recordSpeakerAudio: panelMode === 'recordGroup' && recordSpeakerAudio,
   });
+  const transcriptContext = useTranscriptContextUpload({
+    sessionSlug,
+    sessionConfig,
+    context: recordingContext,
+    enabled: panelMode === 'recordGroup',
+  });
+  const latestTranscriptRef = useRef(recorder.transcript);
+  latestTranscriptRef.current = recorder.transcript;
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationError, setGenerationError] = useState('');
   const [generatedQuestions, setGeneratedQuestions] = useState<GeneratedQuestionDraft[]>([]);
+  const [pendingDraftCount, setPendingDraftCount] = useState<number | null>(null);
   const [generatedTitle, setGeneratedTitle] = useState('');
   const [generationElapsedSeconds, setGenerationElapsedSeconds] = useState(0);
   const [isTranscriptOpen, setIsTranscriptOpen] = useState(false);
+  // The speaker whose code is showing, chosen by their button or their label in the transcript.
+  const [claimPerson, setClaimPerson] = useState('');
+  const [confirmClear, setConfirmClear] = useState(false);
+  const [confirmStop, setConfirmStop] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
+  const closingRef = useRef(false);
+  const panelRef = useRef<HTMLElement | null>(null);
+  const draftsRef = useRef<HTMLDivElement | null>(null);
+  const [closeError, setCloseError] = useState('');
   const isMountedRef = useRef(true);
   const lastAutoRequestedTranscriptRef = useRef('');
   const generationInFlightRef = useRef(false);
   const activeGenerationRequestRef = useRef(0);
+  // Kept with the recording (see recordingChunkQueue), so reopening shows the drafts as the host left them and
+  // drafts only newer transcript text.
+  const keptRef = useRef<QuestionDrafts>({ questions: [], prompts: [], draftedTranscript: '' });
+  const { questionDrafts: keptDrafts, saveQuestionDrafts } = recorder;
+  const keepDrafts = useCallback(
+    (change: Partial<QuestionDrafts>) => {
+      keptRef.current = { ...keptRef.current, ...change };
+      saveQuestionDrafts(keptRef.current);
+    },
+    [saveQuestionDrafts],
+  );
+  // A submit in flight, which closing waits for, so its uploaded drafts leave the kept ones first.
+  const submitRef = useRef<{ settled: Promise<void>; settle: () => void } | null>(null);
+  const handleSubmittingChange = useCallback((submitting: boolean) => {
+    if (submitting && !submitRef.current) {
+      let settle = () => {};
+      const settled = new Promise<void>((resolve) => (settle = resolve));
+      submitRef.current = { settled, settle };
+    } else if (!submitting) {
+      submitRef.current?.settle();
+      submitRef.current = null;
+    }
+  }, []);
+  // Clear deletes the kept drafts, and another recording (as after an account change) has its own; `drafted`
+  // is the transcript not to draft again.
+  const forgetDrafts = useCallback(
+    (drafted: string) => {
+      activeGenerationRequestRef.current += 1;
+      generationInFlightRef.current = false;
+      lastAutoRequestedTranscriptRef.current = drafted;
+      keptRef.current = { questions: [], prompts: [], draftedTranscript: '' };
+      handleSubmittingChange(false);
+      setIsGenerating(false);
+      setGeneratedQuestions([]);
+      setPendingDraftCount(null);
+      setGeneratedTitle('');
+      setGenerationError('');
+    },
+    [handleSubmittingChange],
+  );
+  const scopeRef = useRef(recorder.scope);
+  useEffect(() => {
+    if (scopeRef.current === recorder.scope) return;
+    scopeRef.current = recorder.scope;
+    forgetDrafts('');
+  }, [forgetDrafts, recorder.scope]);
+  // Remounts the new-drafts cue, which counts the kept drafts as seen.
+  const [keptDraftsShown, setKeptDraftsShown] = useState(0);
+  // Before the effect below that drafts new transcript text.
+  useEffect(() => {
+    if (!keptDrafts) return;
+    keptRef.current = keptDrafts;
+    lastAutoRequestedTranscriptRef.current = keptDrafts.draftedTranscript;
+    setGeneratedQuestions(keptDrafts.questions);
+    setKeptDraftsShown((shown) => shown + 1);
+  }, [keptDrafts]);
+  const handleDraftQuestionsChange = useCallback(
+    (questions: QuestionDrafts['questions']) => {
+      setPendingDraftCount(questions.length);
+      keepDrafts({ questions });
+    },
+    [keepDrafts],
+  );
 
   const failedCount = useMemo(
-    () => recorder.segments.filter((segment) => segment.status === 'error').length,
+    () => recorder.segments.filter((segment) => segment.status === 'failed').length,
     [recorder.segments],
   );
   const trimmedTranscript = recorder.transcript.trim();
   const hasTranscript = trimmedTranscript.length > 0;
-  const hasGeneratedDraft = generatedQuestions.length > 0;
-  const latestSuccessfulTranscriptAt = useMemo(
-    () =>
-      recorder.segments.reduce((latest, segment) => {
-        if (segment.status !== 'complete' || !String(segment.text || '').trim()) return latest;
-        return Math.max(latest, Number(segment.completedAt || segment.startedAt || 0));
-      }, 0),
-    [recorder.segments],
+  // As the host reads it and hands it out: each speaker they merged under the label that speaker joined.
+  const shownTranscript = useMemo(
+    () => applySpeakerMerges(recorder.transcript, recorder.speakerMerges),
+    [recorder.transcript, recorder.speakerMerges],
   );
-  const latestFailedTranscriptAt = useMemo(
-    () =>
-      recorder.segments.reduce((latest, segment) => {
-        if (segment.status !== 'error') return latest;
-        return Math.max(latest, Number(segment.completedAt || segment.startedAt || 0));
-      }, 0),
-    [recorder.segments],
-  );
-  const hasActionableFailedSegment = latestFailedTranscriptAt > latestSuccessfulTranscriptAt;
+  // A code chosen for a transcript that has since gone (cleared, another account) mustn't come back with the next.
+  useEffect(() => {
+    if (!hasTranscript) setClaimPerson('');
+  }, [hasTranscript]);
+  const draftCount = pendingDraftCount ?? generatedQuestions.length;
+  const hasGeneratedDraft = draftCount > 0;
+  const latestSuccessfulTranscriptAt = useMemo(() => {
+    // The latest to complete decides, not the order of parts: text pasted while a chunk transcribes leaves that
+    // chunk's questions automatic, and text added after the last chunk waits for an explicit Generate.
+    const latestComplete = [...recorder.segments]
+      .filter((segment) => segment.status === 'complete')
+      .sort((a, b) => Number(b.completedAt || 0) - Number(a.completedAt || 0) || b.index - a.index)[0];
+    if (latestComplete?.source === 'text') return 0;
+    return recorder.segments.reduce((latest, segment) => {
+      if (segment.source === 'text' || segment.status !== 'complete' || !String(segment.text || '').trim())
+        return latest;
+      return Math.max(latest, Number(segment.completedAt || segment.startedAt || 0));
+    }, 0);
+  }, [recorder.segments]);
   const hasVisibleStatus =
     recorder.isRecording ||
     recorder.isPaused ||
@@ -387,32 +303,44 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
     failedCount > 0 ||
     Boolean(recorder.errorMessage || generationError);
   const isRecorderSessionActive = recorder.isRecording || recorder.isPaused || recorder.isStopping;
+  const isCapturing = isRecorderSessionActive || recorder.isBusy;
+  useEffect(() => {
+    if (!isCapturing || !onCaptureChange) return undefined;
+    onCaptureChange(true);
+    return () => onCaptureChange(false);
+  }, [isCapturing, onCaptureChange]);
   const hasPendingTranscription = Number(recorder.pendingSegmentCount || 0) > 0;
-  const canGenerate = trimmedTranscript.length >= 50 && !isGenerating && !hasPendingTranscription;
+  useEffect(() => {
+    // Switching Record/Stop removes the focused button; keep Escape inside the modal.
+    if (embeddedInModal && document.activeElement === document.body) panelRef.current?.focus();
+  }, [embeddedInModal, isRecorderSessionActive]);
+
+  const spokenLength = useMemo(() => transcriptSpeech(trimmedTranscript).length, [trimmedTranscript]);
+  const canGenerate = !isClosing && spokenLength >= 50 && !isGenerating && !hasPendingTranscription;
+  // Only audio not yet transcribed stays on the device; Clear asks before deleting it.
+  const retainedAudioCount = recorder.downloadableChunkIds?.length ?? 0;
   const isStarting = !isRecorderSessionActive && recorder.isBusy;
-  const recorderError = recorder.errorMessage && !hasTranscript ? recorder.errorMessage : '';
-  const shouldShowGenericRecorderError = Boolean(
-    hasTranscript &&
-    (hasActionableFailedSegment ||
-      (recorder.errorMessage &&
-        latestFailedTranscriptAt > 0 &&
-        latestFailedTranscriptAt >= latestSuccessfulTranscriptAt)),
-  );
+  // A stopped recorder leads: an older close or generation error must not hide it.
   const visibleError =
+    (recorder.status === 'error' && recorder.errorMessage) ||
+    closeError ||
     generationError ||
-    recorderError ||
-    (hasActionableFailedSegment || shouldShowGenericRecorderError
-      ? 'Some audio could not be transcribed. You can keep recording or generate questions from the transcript already captured.'
-      : '');
+    recorder.errorMessage ||
+    '';
+  const gapWarning =
+    failedCount > 0 ? "Some audio couldn't be transcribed. Retry transcription or download the audio below." : '';
+  const isPreparingRecording = panelMode === 'recordGroup' && speakerLabelsSupported === null;
   const recordButtonLabel = isRecorderSessionActive
     ? recorder.isStopping
       ? 'Stopping'
       : 'Stop'
-    : isStarting
-      ? 'Starting'
-      : hasTranscript
-        ? 'Record more'
-        : 'Record';
+    : isPreparingRecording
+      ? 'Preparing recording'
+      : isStarting
+        ? 'Starting'
+        : hasTranscript
+          ? 'Record more'
+          : 'Record';
   const recordButtonIcon = isRecorderSessionActive
     ? recorder.isStopping
       ? faSpinner
@@ -444,31 +372,46 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
   }, [isGenerating]);
 
   useEffect(() => {
-    if (!hasTranscript) {
-      setIsTranscriptOpen(false);
-    }
-  }, [hasTranscript]);
+    // A group host follows the transcript as it fills, so it opens once text exists; they can still collapse it.
+    setIsTranscriptOpen(hasTranscript && panelMode === 'recordGroup');
+  }, [hasTranscript, panelMode]);
 
-  const handleClose = async () => {
-    if (isClosing) return;
-    const shouldFinalize = isRecorderSessionActive || hasPendingTranscription;
-    if (!shouldFinalize) {
-      onClose?.();
-      return;
-    }
-
+  const { finalizeRecording, keepAudio } = recorder;
+  const settleTranscriptContext = transcriptContext.settled;
+  const handleClose = useCallback(async () => {
+    if (closingRef.current) return;
+    closingRef.current = true;
     setIsClosing(true);
+    setCloseError('');
     try {
-      if (typeof recorder.finalizeRecording === 'function') {
-        await recorder.finalizeRecording({ waitForTranscription: true });
-      } else if (typeof recorder.stopRecording === 'function') {
-        await recorder.stopRecording();
-      }
+      await finalizeRecording({ waitForTranscription: true });
+      await keepAudio();
+      await submitRef.current?.settled;
+      await settleTranscriptContext();
+      if (isMountedRef.current) onClose?.();
+    } catch (error) {
+      if (isMountedRef.current)
+        setCloseError(error instanceof Error ? error.message : 'Could not finish recording. Close again to retry.');
     } finally {
-      setIsClosing(false);
-      onClose?.();
+      closingRef.current = false;
+      if (isMountedRef.current) setIsClosing(false);
     }
-  };
+  }, [onClose, finalizeRecording, keepAudio, settleTranscriptContext]);
+
+  // Closing during capture would end the recording, so it asks first.
+  const capturingAudio = recorder.isRecording || recorder.isPaused;
+  const requestClose = useCallback(async () => {
+    if (capturingAudio) setConfirmStop(true);
+    else await handleClose();
+  }, [capturingAudio, handleClose]);
+
+  useEffect(() => {
+    if (!closeActionRef) return;
+    closeActionRef.current = requestClose;
+    return () => {
+      closeActionRef.current = null;
+    };
+  }, [closeActionRef, requestClose]);
 
   const handleGenerateQuestions = useCallback(
     async ({ auto = false }: { auto?: boolean } = {}) => {
@@ -480,7 +423,9 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
       const requestId = activeGenerationRequestRef.current + 1;
       activeGenerationRequestRef.current = requestId;
       generationInFlightRef.current = true;
-      const existingPrompts = generatedQuestions.map(getGeneratedQuestionPrompt).filter(Boolean);
+      // Every prompt drafted so far, and the host's edits of them.
+      const { prompts: drafted, questions: shown } = keptRef.current;
+      const existingPrompts = [...new Set([...drafted, ...shown.map(getGeneratedQuestionPrompt)])].filter(Boolean);
       setIsGenerating(true);
       setGenerationError('');
       try {
@@ -499,8 +444,16 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
           existingQuestionPrompts: existingPrompts,
         });
         if (!isMountedRef.current || activeGenerationRequestRef.current !== requestId) return;
-        setGeneratedQuestions((previous) => mergeGeneratedQuestionDrafts(previous, result.statements));
+        const addDrafts = (previous: GeneratedQuestionDraft[]) =>
+          mergeGeneratedQuestionDrafts(previous, result.statements, drafted);
+        setGeneratedQuestions(addDrafts);
         setGeneratedTitle((previous) => previous || result.surveyTitle);
+        // Kept with the recording at once, so drafts held back while a submit publishes are never lost.
+        keepDrafts({
+          questions: addDrafts(keptRef.current.questions),
+          prompts: [...new Set([...drafted, ...result.statements.map(getGeneratedQuestionPrompt).filter(Boolean)])],
+          draftedTranscript: transcriptSnapshot,
+        });
       } catch (error) {
         if (!isMountedRef.current || activeGenerationRequestRef.current !== requestId) return;
         const message = error instanceof Error ? error.message : String(error || 'Failed to generate questions.');
@@ -512,7 +465,7 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
         }
       }
     },
-    [canGenerate, context, defaultTags, generatedQuestions, recorder.transcript, sessionConfig, sessionSlug, workerUrl],
+    [canGenerate, context, defaultTags, keepDrafts, recorder.transcript, sessionConfig, sessionSlug, workerUrl],
   );
 
   useEffect(() => {
@@ -521,21 +474,17 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
     void handleGenerateQuestions({ auto: true });
   }, [canGenerate, handleGenerateQuestions, latestSuccessfulTranscriptAt, panelMode, trimmedTranscript]);
 
-  const handleClear = () => {
-    recorder.clearDraft();
-    activeGenerationRequestRef.current += 1;
-    generationInFlightRef.current = false;
-    lastAutoRequestedTranscriptRef.current = trimmedTranscript;
-    setIsGenerating(false);
-    setGeneratedQuestions([]);
-    setGeneratedTitle('');
-    setGenerationError('');
+  const handleClear = (discardAudio = false) => {
+    recorder.clearDraft(discardAudio);
+    forgetDrafts(trimmedTranscript);
   };
 
   const showPanelHeader = !embeddedInModal;
 
   return (
     <aside
+      ref={panelRef}
+      tabIndex={-1}
       className={[
         styles.sessionListeningPanel,
         embeddedInModal ? styles.sessionListeningPanelEmbedded : '',
@@ -543,14 +492,20 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
       ]
         .filter(Boolean)
         .join(' ')}
+      aria-busy={isClosing}
       data-testid={E2E_TESTIDS.SESSION_LISTENING_PANEL}
     >
+      {panelMode === 'recordGroup' ? (
+        <SessionNewDraftsCue key={keptDraftsShown} count={draftCount} draftsRef={draftsRef} />
+      ) : null}
+      {isClosing ? <div role="status">Finalizing recording…</div> : null}
       {showPanelHeader ? (
         <div className={styles.sessionListeningHeader}>
-          {hasVisibleStatus ? (
+          {hasVisibleStatus || panelMode === 'recordGroup' ? (
             <div className={styles.sessionListeningTitle}>
               <FontAwesomeIcon icon={faMicrophone} />
               <span>{panelMode === 'recordGroup' ? 'Group Conversation' : 'Listening'}</span>
+              {panelMode === 'recordGroup' ? <SessionRecordingHelp /> : null}
             </div>
           ) : (
             <div aria-hidden="true" />
@@ -560,7 +515,7 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
               type="button"
               className={styles.sessionListeningClose}
               onClick={() => {
-                void handleClose();
+                void requestClose();
               }}
               disabled={isClosing}
               aria-label={isClosing ? 'Finalizing recording before closing' : 'Close listening panel'}
@@ -572,67 +527,160 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
         </div>
       ) : null}
 
-      {isRecorderSessionActive ? (
-        <div className={styles.sessionListeningActiveRecorder}>
-          <div className={styles.sessionListeningWaveformShell}>
-            <SessionListeningWaveform
-              streamRef={recorder.mediaStreamRef}
-              isActive={isRecorderSessionActive}
-              isPaused={recorder.isPaused}
-            />
-            <div className={styles.sessionListeningWaveformTimer} aria-live="polite" aria-atomic="true">
-              <FontAwesomeIcon
-                icon={faCircle}
-                className={recorder.isPaused ? styles.sessionListeningTimerDotPaused : styles.sessionListeningTimerDot}
+      {panelMode !== 'recordGroup' ? <p>Record, upload audio, or add a transcript.</p> : null}
+      <div className={styles.sessionListeningRecordWrap}>
+        {isRecorderSessionActive ? (
+          <div className={styles.sessionListeningActiveRecorder}>
+            <div className={styles.sessionListeningWaveformShell}>
+              <SessionListeningWaveform
+                key={recorder.captureRestarts}
+                streamRef={recorder.mediaStreamRef}
+                isActive={isRecorderSessionActive}
+                isPaused={recorder.isPaused}
               />
-              <span>{recorder.isPaused ? 'Paused' : 'Recording'}</span>
-              <span>{formatSessionRecordingElapsed(recorder.elapsedSeconds)}</span>
+              <div className={styles.sessionListeningWaveformTimer} aria-live="polite" aria-atomic="true">
+                <FontAwesomeIcon
+                  icon={faCircle}
+                  className={
+                    recorder.isPaused || recorder.microphonePaused
+                      ? styles.sessionListeningTimerDotPaused
+                      : styles.sessionListeningTimerDot
+                  }
+                />
+                <span>{recorder.microphonePaused ? 'Mic paused' : recorder.isPaused ? 'Paused' : 'Recording'}</span>
+                <span>{formatSessionRecordingElapsed(recorder.elapsedSeconds)}</span>
+              </div>
+            </div>
+            <div className={styles.sessionListeningButtonColumn} role="group" aria-label="Recording controls">
+              <button
+                type="button"
+                className={[styles.sessionListeningAudioButton, styles.sessionListeningStopButton].join(' ')}
+                onClick={() => {
+                  void recorder.stopRecording();
+                }}
+                disabled={recorder.isStopping}
+                aria-label="Stop recording"
+                title="Stop recording"
+                data-testid={E2E_TESTIDS.SESSION_LISTENING_STOP}
+              >
+                <FontAwesomeIcon icon={recorder.isStopping ? faSpinner : faStop} spin={recorder.isStopping} />
+                <span className={styles.sessionListeningSrOnly}>Stop</span>
+              </button>
+              <button
+                type="button"
+                className={styles.sessionListeningAudioButton}
+                onClick={recorder.isPaused ? recorder.resumeRecording : recorder.pauseRecording}
+                disabled={recorder.isStopping}
+                aria-label={recorder.isPaused ? 'Resume recording' : 'Pause recording'}
+                title={recorder.isPaused ? 'Resume recording' : 'Pause recording'}
+              >
+                <FontAwesomeIcon icon={recorder.isPaused ? faPlay : faPause} />
+                <span className={styles.sessionListeningSrOnly}>{recorder.isPaused ? 'Resume' : 'Pause'}</span>
+              </button>
             </div>
           </div>
-          <div className={styles.sessionListeningButtonColumn} role="group" aria-label="Recording controls">
-            <button
-              type="button"
-              className={[styles.sessionListeningAudioButton, styles.sessionListeningStopButton].join(' ')}
-              onClick={() => {
-                void recorder.stopRecording();
-              }}
-              disabled={recorder.isStopping}
-              aria-label="Stop recording"
-              title="Stop recording"
-              data-testid={E2E_TESTIDS.SESSION_LISTENING_STOP}
-            >
-              <FontAwesomeIcon icon={recorder.isStopping ? faSpinner : faStop} spin={recorder.isStopping} />
-              <span className={styles.sessionListeningSrOnly}>Stop</span>
-            </button>
-            <button
-              type="button"
-              className={styles.sessionListeningAudioButton}
-              onClick={recorder.isPaused ? recorder.resumeRecording : recorder.pauseRecording}
-              disabled={recorder.isStopping}
-              aria-label={recorder.isPaused ? 'Resume recording' : 'Pause recording'}
-              title={recorder.isPaused ? 'Resume recording' : 'Pause recording'}
-            >
-              <FontAwesomeIcon icon={recorder.isPaused ? faPlay : faPause} />
-              <span className={styles.sessionListeningSrOnly}>{recorder.isPaused ? 'Resume' : 'Pause'}</span>
-            </button>
-          </div>
-        </div>
-      ) : (
-        <div className={styles.sessionListeningRecordWrap}>
+        ) : (
           <Button
             type="button"
+            // In the dialog it is a round microphone, as in the voice interview; elsewhere a filled button.
+            color={embeddedInModal ? 'link' : 'secondary'}
             className={styles.sessionListeningRecordButton}
-            onClick={recorder.startRecording}
-            disabled={recorder.isBusy}
+            onClick={() => {
+              recordPressedRef.current = true;
+              void recorder.startRecording();
+            }}
+            disabled={
+              isClosing ||
+              recorder.isBusy ||
+              isPreparingRecording ||
+              Boolean(recorder.ownerNotice) ||
+              recorder.openElsewhere ||
+              recorder.importing
+            }
             data-testid={E2E_TESTIDS.SESSION_LISTENING_START}
           >
-            <span className={styles.sessionListeningRecordIcon}>
+            <span className={styles.sessionListeningRecordIcon} aria-hidden="true">
               <FontAwesomeIcon icon={recordButtonIcon} spin={isRecordButtonSpinning} />
             </span>
             <span className={styles.sessionListeningRecordText}>{recordButtonLabel}</span>
           </Button>
+        )}
+        <SessionRecordingInput
+          disabled={
+            isRecorderSessionActive ||
+            isClosing ||
+            recorder.isBusy ||
+            Boolean(recorder.ownerNotice) ||
+            Boolean(recorder.openElsewhere)
+          }
+          onAudio={recorder.addAudio}
+          onTranscript={async (text) => {
+            await recorder.addTranscript(text);
+            setIsTranscriptOpen(true);
+          }}
+          triggerSlot={headerActionsSlot}
+        />
+      </div>
+
+      {panelMode === 'recordGroup' ? (
+        <div className={styles.sessionRecordingOptions}>
+          <span className={styles.sessionRecordingOption}>
+            <label>
+              <input
+                type="checkbox"
+                checked={recordSpeakerAudio}
+                disabled={isRecorderSessionActive || recorder.isBusy}
+                onChange={(event) => {
+                  setRecordSpeakerAudio(event.target.checked);
+                  try {
+                    window.localStorage.setItem('ce:record-speaker-audio:v1', String(event.target.checked));
+                  } catch {
+                    /* The option still works when browser storage is unavailable. */
+                  }
+                }}
+              />{' '}
+              Recording voices coming from this device
+            </label>
+            <button
+              type="button"
+              id={speakerHelpId}
+              className={styles.sessionInterviewHeaderButton}
+              aria-label="About recording voices coming from this device"
+            >
+              <FontAwesomeIcon icon={faQuestionCircle} />
+            </button>
+            <UncontrolledTooltip target={speakerHelpId} trigger="hover focus" autohide={false}>
+              Turns off echo cancellation so the mic also records people heard through this device&apos;s speakers. Use
+              speakers, not headphones.
+            </UncontrolledTooltip>
+          </span>
+          {speakerLabelsSupported ? (
+            <span className={styles.sessionRecordingOption}>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={labelSpeakers}
+                  disabled={isRecorderSessionActive || recorder.isBusy || Boolean(recorder.labelsUnavailableReason)}
+                  onChange={(event) => setLabelSpeakers(event.target.checked)}
+                />{' '}
+                Label speakers
+              </label>
+              <button
+                type="button"
+                id={labelsHelpId}
+                className={styles.sessionInterviewHeaderButton}
+                aria-label="About speaker labels"
+              >
+                <FontAwesomeIcon icon={faQuestionCircle} />
+              </button>
+              <UncontrolledTooltip target={labelsHelpId} trigger="hover focus" autohide={false}>
+                Shows who spoke as Person 1, Person 2… using OpenAI. Up to four voices keep their number across the
+                conversation; a fifth may change number. Numbers don&apos;t identify people.
+              </UncontrolledTooltip>
+            </span>
+          ) : null}
         </div>
-      )}
+      ) : null}
 
       {shouldShowMeta && (
         <div className={styles.sessionListeningMeta} aria-live="polite">
@@ -644,27 +692,12 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
             </span>
           )}
           {hasTranscript && (
-            <button
-              type="button"
-              className={styles.sessionListeningTranscriptButton}
-              onClick={() => setIsTranscriptOpen((open) => !open)}
-              aria-expanded={isTranscriptOpen}
-              aria-busy={hasPendingTranscription}
-              data-testid={E2E_TESTIDS.SESSION_LISTENING_TRANSCRIPT_DETAILS}
-            >
-              <span>Transcript</span>
-              <span>{trimmedTranscript.length} chars</span>
-              <FontAwesomeIcon
-                icon={faCaretDown}
-                className={[
-                  styles.sessionListeningTranscriptCaret,
-                  isTranscriptOpen ? styles.sessionListeningTranscriptCaretExpanded : '',
-                ]
-                  .filter(Boolean)
-                  .join(' ')}
-                aria-hidden="true"
-              />
-            </button>
+            <SessionListeningTranscriptToggle
+              length={trimmedTranscript.length}
+              open={isTranscriptOpen}
+              pending={hasPendingTranscription}
+              onToggle={() => setIsTranscriptOpen((open) => !open)}
+            />
           )}
           {isGenerating && <span>{`Generating questions... ${generationElapsedSeconds}s`}</span>}
         </div>
@@ -676,32 +709,120 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
         </div>
       )}
 
+      {gapWarning ? <div role="status">{gapWarning}</div> : null}
+      {/* One tap must not end capture: Stop first, then close without waiting for uploads. */}
+      {!isCapturing && (hasPendingTranscription || failedCount > 0 || isClosing) && onClose ? (
+        <span className={styles.sessionRecordingOption}>
+          <Button
+            type="button"
+            className={styles.sessionRecordingButton}
+            aria-describedby={`${keepHelpId}-about`}
+            onClick={async () => {
+              try {
+                await finalizeRecording({ waitForTranscription: false });
+                await keepAudio();
+                if (isMountedRef.current) onClose();
+              } catch (error) {
+                setCloseError(
+                  error instanceof Error ? error.message : 'Could not keep the audio. Download it before leaving.',
+                );
+              }
+            }}
+          >
+            Close and keep the audio
+          </Button>
+          <button
+            type="button"
+            id={keepHelpId}
+            className={styles.sessionInterviewHeaderButton}
+            aria-label="About closing and keeping the audio"
+            aria-describedby={`${keepHelpId}-about`}
+          >
+            <FontAwesomeIcon icon={faQuestionCircle} />
+          </button>
+          <span id={`${keepHelpId}-about`} hidden>
+            {KEEP_AUDIO_HELP}
+          </span>
+          <UncontrolledTooltip target={keepHelpId} trigger="hover focus" autohide={false}>
+            {KEEP_AUDIO_HELP}
+          </UncontrolledTooltip>
+        </span>
+      ) : null}
+      <SessionRecordingNotices
+        recorder={recorder}
+        capturing={isRecorderSessionActive}
+        labelCheckTimedOut={panelMode === 'recordGroup' && speakerLabelsCheckTimedOut}
+      />
+
+      <SessionRecordingChunks
+        segments={recorder.segments}
+        downloadableChunkIds={recorder.downloadableChunkIds}
+        onRetry={recorder.retryChunk}
+        onDownload={recorder.downloadChunk}
+        onDownloadRecording={recorder.downloadRecording}
+        capturing={isRecorderSessionActive}
+        storageFailed={recorder.storageFailed}
+      />
+
       {hasTranscript && isTranscriptOpen && (
-        <div className={styles.sessionListeningTranscriptDetails}>
-          <div className={styles.sessionListeningTranscriptShell}>
-            <textarea
-              className={styles.sessionListeningTranscript}
-              value={recorder.transcript}
-              readOnly
-              placeholder="Transcript"
-              data-testid={E2E_TESTIDS.SESSION_LISTENING_TRANSCRIPT}
-            />
-            <button
-              type="button"
-              className={styles.sessionListeningClearTranscript}
-              onClick={handleClear}
-              disabled={isRecorderSessionActive || recorder.isBusy}
-              aria-label="Clear transcript"
-              title="Clear transcript"
-              data-testid={E2E_TESTIDS.SESSION_LISTENING_CLEAR}
-            >
-              <FontAwesomeIcon icon={faTimes} />
-            </button>
-          </div>
-        </div>
+        <SessionListeningTranscript
+          transcript={shownTranscript}
+          clearDisabled={
+            isRecorderSessionActive ||
+            recorder.isBusy ||
+            recorder.segments.some((segment) => !['complete', 'failed'].includes(segment.status))
+          }
+          onClear={() => setConfirmClear(true)}
+          onSelectSpeaker={panelMode === 'recordGroup' ? setClaimPerson : undefined}
+        />
       )}
 
-      {hasTranscript && (
+      {panelMode === 'recordGroup' && hasTranscript ? (
+        <SessionTranscriptClaimShare
+          transcript={shownTranscript}
+          sessionSlug={sessionSlug}
+          sessionConfig={sessionConfig}
+          person={claimPerson}
+          onPersonChange={setClaimPerson}
+          speakerMerges={recorder.speakerMerges}
+          onSpeakerMergesChange={recorder.saveSpeakerMerges}
+        />
+      ) : null}
+
+      <CEConfirmDialog
+        isOpen={confirmStop}
+        title="Stop recording?"
+        body="Stop ends the recording and closes once its audio has uploaded."
+        confirmLabel="Stop"
+        cancelLabel="Keep recording"
+        onCancel={() => setConfirmStop(false)}
+        onConfirm={() => {
+          setConfirmStop(false);
+          void handleClose();
+        }}
+        testId="ce-recording-stop"
+      />
+
+      <CEConfirmDialog
+        isOpen={confirmClear}
+        title="Clear this recording?"
+        body={
+          retainedAudioCount
+            ? 'This deletes the transcript and the audio not yet transcribed. Download that audio first to keep it.'
+            : 'This deletes the transcript from this device.'
+        }
+        confirmLabel="Clear recording"
+        cancelLabel="Keep recording"
+        danger
+        onCancel={() => setConfirmClear(false)}
+        onConfirm={() => {
+          setConfirmClear(false);
+          handleClear(true);
+        }}
+        testId="ce-recording-clear"
+      />
+
+      {hasTranscript && !hasGeneratedDraft && (
         <div className={styles.sessionListeningActions}>
           <Button
             type="button"
@@ -718,16 +839,49 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
         </div>
       )}
 
+      {transcriptContext.status ? (
+        <span className={styles.sessionRecordingOption} role="status">
+          <span>{transcriptContext.status}</span>
+          {transcriptContext.failed ? (
+            <Button
+              type="button"
+              className={styles.sessionRecordingButton}
+              onClick={() => void transcriptContext.upload(latestTranscriptRef.current)}
+            >
+              Try again
+            </Button>
+          ) : null}
+        </span>
+      ) : null}
+
       {generatedQuestions.length > 0 && (
-        <div className={styles.sessionListeningCreateWrap} data-testid={E2E_TESTIDS.SESSION_LISTENING_SUGGESTIONS}>
+        <div
+          ref={draftsRef}
+          tabIndex={-1}
+          role="region"
+          aria-label="Draft questions"
+          className={styles.sessionListeningCreateWrap}
+          data-testid={E2E_TESTIDS.SESSION_LISTENING_SUGGESTIONS}
+        >
           <CreateQuestionsAndSurveys
             {...(props as CreateQuestionsAndSurveysPanelProps)}
+            interviewQuestionReview
             appendPreformedQuestions
+            questionSubmitLabel={isGenerating ? 'Waiting for new drafts…' : 'Submit questions'}
+            submitDisabled={isGenerating}
+            onDraftQuestionsChange={handleDraftQuestionsChange}
+            onSubmittingChange={handleSubmittingChange}
             preformedQuestions={generatedQuestions as CreateQuestionsAndSurveysPanelProps['preformedQuestions']}
             preformedSurvey={{ title: generatedTitle }}
             preformedMode="questions"
             defaultTags={defaultTags as CreateQuestionsAndSurveysPanelProps['defaultTags']}
             documentURLs={[]}
+            submitClassName={styles.sessionListeningSubmitButton}
+            submitRowClassName={styles.sessionListeningSubmit}
+            submitAccessory={
+              transcriptContext.available ? <SessionTranscriptContextOption upload={transcriptContext} /> : null
+            }
+            onQuestionsSubmitted={() => void transcriptContext.upload(latestTranscriptRef.current)}
           />
         </div>
       )}

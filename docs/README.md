@@ -45,15 +45,18 @@ Architecture and repository conventions:
 Session, gates, and the Worker:
 - `docs/session-creation-guide.md`: End-to-end setup guide for creating a session from `/new`, including the "what a new session needs" checklist, sponsored bundle handoff, worker deploy paths, on-chain registration, and `/admin` verification.
 - `docs/posts.md`: Public `/posts` route, root `posts/` Markdown authoring, and `ce-viz` exhibit blocks.
-- `docs/session-listening-mode.md`: session voice modes, including `?mode=interview`, `?mode=recordGroup`, the zero-install ChatGPT/Claude prefill handoff, and legacy `?mode=listening` compatibility.
+- `docs/session-listening-mode.md`: session voice modes, including `?mode=voice`, `?mode=interview`, `?mode=groupRecording`, the zero-install ChatGPT/Claude prefill handoff, and legacy `?mode=listening` compatibility.
 - [`docs/session-interview-research.md`](session-interview-research.md): optional interview research metadata, consent boundaries, redaction behavior, and the submitted `responses[].interviewProvenance` record. Diagrams live in [`docs/assets/interview-research/README.md`](assets/interview-research/README.md).
+- [`docs/agent-fidelity.md`](agent-fidelity.md): scoring how well AI drafts predict participants' answers (Mirror Score, calibration, baselines, unusual views, synthesis checks) with `scripts/agent-fidelity-report.mjs`.
 - `docs/standard-sponsored-links-fixture.md`: Temporary tracked fixture for publishing a small set of public sponsored setup links with minimal onboarding friction.
-- `docs/session-registry.md`: SessionRegistry migration and on-chain gate authority model.
+- `docs/session-registry.md`: SessionRegistry and on-chain gate authority model.
 - `docs/session-cors-worker.md`: Cloudflare `sessionCorsWorker` behavior, endpoints, KV layouts, and wizard flow.
+- `docs/publication-upgrade.md`: Session Worker upgrades: capabilities, supported client and Worker versions, config preflight, and republishing admin corrections.
 - `../workers/sessionCorsWorker/agent/README.md`: optional Session Worker Agent HTTP API,
   credentials, Session Wrapped, canonical authority, and fresh deployment.
 - `docs/agent-participants.md`: AI agents taking part in hosted or unencrypted registry sessions as
   their own participants through the Context Engine MCP server (`../mcp/README.md`).
+- `docs/mcp-releases.md`: how the `@agalmic/contextengine` MCP package is built, tested, and published.
 - `docs/scaling.md`: Public scaling reference covering write-path settlement, indexed reads, private compute modes, and deployment profiles.
 
 Keys and RPCs:
@@ -64,11 +67,20 @@ Keys and RPCs:
 
 Encryption:
 - `docs/lit-protocol-information.md`: How Context Engine uses Lit today (worker-mediated Chipotle, no Lit SDK) plus platform background.
-- `docs/lit-v3-design.md`: Worker-mediated Chipotle runtime design, provisioning flow, and migration notes.
-- `docs/doc-library.md`: Doc Library for Sessions + SBT groups (tag schema, listing queries, encryption UX).
+- `docs/lit-v3-design.md`: Worker-mediated Chipotle runtime design and provisioning flow.
+- `docs/lit-worker-authorization.md`: Worker-signed authorization for Lit key release and what stays trusted.
+- `docs/doc-library.md`: Doc Library for Sessions and Soulbound Tokens (SBTs) for Groups (tag schema, listing queries, encryption UX).
+- `docs/session-context-sources.md`: Session context: notes, links and files for the session's AI, privacy per item, link snapshots, PDF reading and limits.
 
 Payload schemas:
 - `docs/arweave-payloads.md`: Example Arweave payload shapes for surveys, questions, and SBT tokenURI JSON.
+
+Questions, results, and analysis:
+- `docs/quadratic-allocation.md`: quadratic allocation questions: authoring, credits, and results.
+- `docs/polis-answer-sections.md`: Polis-style report answer sections and layout.
+- `docs/comparison-view.md`: comparing participants: session scope, AI explanation, and model attribution.
+- `docs/profile-analysis-and-comparison.md`: profile analysis caching, model provenance, and comparison loading.
+- `docs/reverse-alignment-context.md`: the Reverse Alignment context explorer in the RxC session.
 
 Local development:
 - `docs/bundle-budget.md`: bundle-size budget and regression policy.
@@ -87,10 +99,6 @@ Wallets:
 - `docs/passkey-wallet.md`: passkey-unlocked EOA wallet wiring and deterministic test wallet workflow.
 - `docs/forking-wallet.md`: RP ID and wallet setup checklist for forks.
 - `docs/security-model.md`: embedded wallet and soft-session security model.
-
-Verification:
-- `docs/testing.md`: public test commands and supported local verification paths.
-- `docs/bundle-budget.md`: client bundle-size thresholds and remediation guidance.
 
 Public discovery:
 - `docs/discoverability.md`: Static crawl assets, live GitHub branch links, and the Google Search Console checklist.

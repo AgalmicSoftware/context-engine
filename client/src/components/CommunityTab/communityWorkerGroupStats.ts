@@ -54,6 +54,30 @@ type CommunityWorkerGroupRuntime = {
 };
 
 const WORKER_GROUP_COUNT_TTL_MS = 30000;
+export const WORKER_GROUP_COUNT_WAIT_MS = 2500;
+
+/**
+ * Live group counts are optional: a load can wait on a Worker sign-in that is
+ * never answered. Wait briefly so cached Stats can publish, and call
+ * `onSettledLate` once slower loads finish.
+ */
+export const awaitWorkerGroupCountsBriefly = async (
+  loads: Promise<unknown>,
+  onSettledLate: () => void,
+): Promise<void> => {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const late = new Promise<'late'>((resolve) => {
+    timer = setTimeout(() => resolve('late'), WORKER_GROUP_COUNT_WAIT_MS);
+  });
+  try {
+    if ((await Promise.race([loads, late])) === 'late') {
+      void loads.finally(onSettledLate).catch(() => undefined);
+    }
+  } finally {
+    clearTimeout(timer);
+  }
+};
+
 export const isDisplayableWorkerUserId = (value: unknown): boolean =>
   /^0x[0-9a-f]{40}$/i.test(String(value || '').trim());
 
@@ -221,10 +245,9 @@ export const loadCommunityWorkerGroupCount = async ({
   const requestRevision = Number(revisions.get(countCacheKey) || 0);
   const requestIsCurrent = () => Number(revisions.get(countCacheKey) || 0) === requestRevision;
   const existing = cache.get(countCacheKey);
-  if (existing?.promise) {
-    await existing.promise;
-    return;
-  }
+  // Still loading from an earlier Stats cycle, which refreshes Stats when it settles
+  // (awaitWorkerGroupCountsBriefly): later cycles show the current counts instead of waiting again.
+  if (existing?.promise) return;
   if (existing && Date.now() - existing.updatedAtMs < WORKER_GROUP_COUNT_TTL_MS) return;
 
   const { sessionConfig, slug } = scopeEntry;

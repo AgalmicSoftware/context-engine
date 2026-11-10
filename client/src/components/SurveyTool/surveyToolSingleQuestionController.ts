@@ -458,7 +458,7 @@ export const executeOwnSingleQuestionResponseBootstrap = async ({
   safeSetState?: SafeSetState;
   getResponse?: (args?: UnknownRecord) => Promise<unknown>;
   writeResponseToCache?: (responder: string, respObj: unknown) => Promise<unknown>;
-  areResponsesConsistent?: (latest: unknown, surveyIndex: number) => boolean;
+  areResponsesConsistent?: (latest: unknown) => boolean;
   prefillSingleQuestionResponse?: (userAnswer: unknown) => void;
 } = {}) => {
   const nextProps = props || {};
@@ -485,7 +485,7 @@ export const executeOwnSingleQuestionResponseBootstrap = async ({
   if (isStaleRun()) return { applied: false, reason: 'stale' };
 
   if (nextState.submissionComplete) {
-    if (latest && areResponsesConsistent(latest, 0)) {
+    if (latest && areResponsesConsistent(latest)) {
       const hasEncrypted = hasEncryptedResponseFields(latest);
       safeSetState({
         userHasResponse: true,

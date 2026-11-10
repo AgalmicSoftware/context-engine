@@ -14,9 +14,7 @@ type RenderInfoTooltip = (props: {
 }) => React.ReactNode;
 
 export type WorkerSecretsSectionProps = {
-  isNormalMode: boolean;
   showUserPaidUsage?: boolean;
-  translate?: (key: string) => string;
   renderInfoTooltip?: RenderInfoTooltip;
   workerSecretsEnabled: boolean;
   setWorkerSecretsEnabled: (value: boolean) => void;
@@ -33,9 +31,7 @@ export type WorkerSecretsSectionProps = {
 };
 
 const WorkerSecretsSection = ({
-  isNormalMode,
   showUserPaidUsage = false,
-  translate,
   renderInfoTooltip,
   workerSecretsEnabled,
   setWorkerSecretsEnabled,
@@ -50,60 +46,41 @@ const WorkerSecretsSection = ({
   setWorkerLimitPerAnonymousIp,
   defaultAllowedOrigins,
 }: WorkerSecretsSectionProps) => {
-  const t = typeof translate === 'function' ? translate : (key: string) => key;
   const renderTooltip = typeof renderInfoTooltip === 'function' ? renderInfoTooltip : () => null;
   const renderResourceCard = typeof renderResource === 'function' ? renderResource : () => null;
 
   return (
     <div className={styles.workerSecretsPanel}>
-      {!isNormalMode && (
+      {/* On-chain sessions keep their pay-for-usage choice on the one-page setup too. */}
+      {showUserPaidUsage && (
         <div className={styles.workerSecretsHeader}>
           <div className={styles.workerSecretsTitle}>Worker secrets</div>
-          {showUserPaidUsage && (
-            <div className={styles.workerSecretsToggles}>
-              <Label className={styles.workerToggle}>
-                <Input
-                  type="checkbox"
-                  checked={!workerSecretsEnabled}
-                  data-testid={E2E_TESTIDS.WIZARD_WORKER_SECRETS_REQUIRE_PAY}
-                  onChange={(e) => {
-                    const requirePay = !!e.target.checked;
-                    setWorkerSecretsEnabled(!requirePay);
-                    if (!requirePay) clearWorkerSecretFields();
-                  }}
-                />
-                <span>Require users to pay for usage</span>
-                {renderTooltip({
-                  id: 'gw-worker-kv-tip',
-                  content:
-                    'When enabled, users must provide their own API keys and fund minimal transaction and storage fees. When off (default), the session admin provides keys via worker secrets.',
-                  placement: 'right',
-                  testId: 'ce-wizard-worker-tooltip-gw-worker-kv-tip',
-                  ariaLabel: 'Worker secrets mode info',
-                })}
-              </Label>
-            </div>
-          )}
+          <div className={styles.workerSecretsToggles}>
+            <Label className={styles.workerToggle}>
+              <Input
+                type="checkbox"
+                checked={!workerSecretsEnabled}
+                data-testid={E2E_TESTIDS.WIZARD_WORKER_SECRETS_REQUIRE_PAY}
+                onChange={(e) => {
+                  const requirePay = !!e.target.checked;
+                  setWorkerSecretsEnabled(!requirePay);
+                  if (!requirePay) clearWorkerSecretFields();
+                }}
+              />
+              <span>Require users to pay for usage</span>
+              {renderTooltip({
+                id: 'gw-worker-kv-tip',
+                content:
+                  'When enabled, users must provide their own API keys and fund minimal transaction and storage fees. When off (default), the session admin provides keys via worker secrets.',
+                placement: 'right',
+                testId: 'ce-wizard-worker-tooltip-gw-worker-kv-tip',
+                ariaLabel: 'Worker secrets mode info',
+              })}
+            </Label>
+          </div>
         </div>
       )}
       <div className={styles.resourceSection}>
-        {!isNormalMode && (
-          <>
-            <div className={styles.resourceHeader}>
-              <span className={styles.subSectionTitle}>{`Resource ${t('gatesLower')} (on-chain)`}</span>
-              {renderTooltip({
-                id: 'gw-tip-resource-gates',
-                content: `SessionRegistry ${t('gatesLower')} are authoritative for login/resource access. Default ${t('gateLower')} applies to all resources; click a lock icon to assign a different ${t('gateLower')}.`,
-                placement: 'right',
-                testId: 'ce-wizard-worker-tooltip-gw-tip-resource-gates',
-                ariaLabel: 'Resource gates info',
-              })}
-            </div>
-            <div className={styles.helperText}>
-              Secrets stay in this tab&apos;s memory only — re-enter them if you refresh the page.
-            </div>
-          </>
-        )}
         <div className={styles.gateGrid}>{workerResourceKeys.map(renderResourceCard)}</div>
       </div>
       <div className={styles.workerConfigGrid}>
@@ -158,7 +135,7 @@ const WorkerSecretsSection = ({
             {renderTooltip({
               id: 'gw-limit-per-anonymous-ip',
               content:
-                'Daily budget for anonymous users sharing the same public IP address across public reads and enabled AI, transcription, and realtime routes. Use 0 to disable this Worker daily cap; provider limits and access policy still apply. Leave blank only when importing an older config that should inherit the wallet limit.',
+                'Daily budget for anonymous users sharing the same public IP address across public reads and enabled AI, transcription, and realtime routes. Use 0 or leave blank for no Worker daily cap; provider limits and access policy still apply.',
               placement: 'right',
               testId: 'ce-wizard-worker-tooltip-gw-limit-per-anonymous-ip',
               ariaLabel: 'Anonymous IP request limit info',
@@ -170,7 +147,7 @@ const WorkerSecretsSection = ({
             min="0"
             step="1"
             value={workerLimitPerAnonymousIp}
-            placeholder="Inherit authenticated wallet limit"
+            placeholder="No daily cap"
             onChange={(e) => setWorkerLimitPerAnonymousIp(e.target.value)}
           />
           <div className={styles.helperText}>

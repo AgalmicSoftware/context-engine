@@ -65,4 +65,11 @@ describe('computeQuestionDivisiveness', () => {
   it('returns an empty result for an empty matrix', () => {
     expect(computeQuestionDivisiveness([])).toEqual([]);
   });
+
+  it('uses the widest row for ragged matrices', () => {
+    expect(computeQuestionDivisiveness([[], [1, -1]])).toEqual([
+      { commentIndex: 0, agrees: 0, disagrees: 0, total: 0, divisiveness: 0 },
+      { commentIndex: 1, agrees: 1, disagrees: 1, total: 2, divisiveness: 1 },
+    ]);
+  });
 });

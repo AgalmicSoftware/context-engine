@@ -3,8 +3,10 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 
-import { createCheckpointWriter, readCheckpointRuns } from '../src/checkpoint.mjs';
+import { openCheckpoint } from '../src/checkpoint.mjs';
 import { runBenchmark } from '../src/runner.mjs';
 import { buildResultsReport } from '../src/scoring.mjs';
 
@@ -255,17 +257,72 @@ test('runner records provider routing and does not reuse runs after routing chan
 test('checkpoint writer appends durable JSONL records that can be resumed', async () => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'aidb-checkpoint-'));
   const checkpoint = path.join(directory, 'runs.jsonl');
-  const write = await createCheckpointWriter(checkpoint, { reset: true });
+  const { write } = await openCheckpoint(checkpoint);
   await Promise.all([write({ runId: 'a' }), write({ runId: 'b' })]);
-  assert.deepEqual(await readCheckpointRuns(checkpoint), [{ runId: 'a' }, { runId: 'b' }]);
+  assert.deepEqual((await openCheckpoint(checkpoint, { resume: true })).runs, [{ runId: 'a' }, { runId: 'b' }]);
 });
 
-test('checkpoint reader ignores only a truncated final append', async () => {
+test('checkpoint resume repairs only a truncated final append', async () => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'aidb-checkpoint-truncated-'));
   const checkpoint = path.join(directory, 'runs.jsonl');
   await fs.writeFile(checkpoint, '{"runId":"a"}\n{"runId":"partial"');
-  assert.deepEqual(await readCheckpointRuns(checkpoint), [{ runId: 'a' }]);
+  assert.deepEqual((await openCheckpoint(checkpoint, { resume: true })).runs, [{ runId: 'a' }]);
 
   await fs.writeFile(checkpoint, '{broken}\n{"runId":"b"}\n');
-  await assert.rejects(() => readCheckpointRuns(checkpoint), /line 1 is invalid JSON/);
+  await assert.rejects(() => openCheckpoint(checkpoint, { resume: true }), /line 1 is invalid JSON/);
+});
+
+for (const tail of ['{"runId":"partial"', '{"runId":"complete"}']) {
+  test(`checkpoint resume repairs its tail before repeated appends: ${tail}`, async () => {
+    const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'aidb-checkpoint-repair-'));
+    const checkpoint = path.join(directory, 'runs.jsonl');
+    const open = () => openCheckpoint(checkpoint, { resume: true });
+    try {
+      await fs.writeFile(checkpoint, '{"runId":"first","text":"☀"}\n' + tail);
+      const first = await open();
+      const expected = tail.endsWith('}') ? ['first', 'complete'] : ['first'];
+      assert.deepEqual(first.runs.map((run) => run.runId), expected);
+      await first.write({ runId: 'resumed' });
+      const second = await open();
+      assert.deepEqual(second.runs.map((run) => run.runId), [...expected, 'resumed']);
+      await second.write({ runId: 'again' });
+      assert.deepEqual((await open()).runs.map((run) => run.runId), [...expected, 'resumed', 'again']);
+      const corrupt = '{bad}\n{"runId":"last"}';
+      await fs.writeFile(checkpoint, corrupt);
+      await assert.rejects(open, /line 1 is invalid JSON/);
+      assert.equal(await fs.readFile(checkpoint, 'utf8'), corrupt);
+    } finally { await fs.rm(directory, { recursive: true, force: true }); }
+  });
+}
+
+
+test('run and build-report use the final answer and retry conflicting answers', async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'aidb-final-answer-'));
+  try {
+    const sample = JSON.parse(await fs.readFile(new URL('../data/question-bank.sample.json', import.meta.url), 'utf8'));
+    const bank = { ...sample, runPlan: { ...sample.runPlan, repeatsPerPolarity: 1 }, questions: sample.questions.slice(0, 1) };
+    const calls = new Map();
+    const runs = await runBenchmark({
+      questionBank: bank, modelRoster, repeats: 1, concurrency: 1, maxAttempts: 2,
+      sleepImpl: async () => {},
+      callModelImpl: async ({ prompt }) => {
+        const count = (calls.get(prompt) || 0) + 1;
+        calls.set(prompt, count);
+        const final = prompt.includes(bank.questions[0].reversedPrompt) ? 'Disagree' : 'Agree';
+        const opposite = final === 'Agree' ? 'Disagree' : 'Agree';
+        return { content: count === 1
+          ? `{"answer":"${opposite}"}\n{"answer":"${final}"}`
+          : `<think>{"answer":"${opposite}"}</think>\n{"answer":"${final}"}`, metadata: {} };
+      },
+    });
+    for (const [name, data] of [['bank', bank], ['models', modelRoster], ['runs', runs]]) {
+      await fs.writeFile(path.join(root, name + '.json'), JSON.stringify(data));
+    }
+    execFileSync(process.execPath, [fileURLToPath(new URL('../bin/ai-discourse-bench.mjs', import.meta.url)),
+      'build-report', '--questions', 'bank.json', '--models', 'models.json', '--runs', 'runs.json', '--out', 'report.json'],
+    { cwd: root, stdio: 'pipe' });
+    const report = JSON.parse(await fs.readFile(path.join(root, 'report.json'), 'utf8'));
+    assert.equal(report.polisReport.byModelQuestion['model-a'][bank.questions[0].id].meanScore, 1);
+    assert.ok(runs.runs.every(row => row.attempts.length === 2 && row.attempts[0].parseError && !row.parseError));
+  } finally { await fs.rm(root, { recursive: true, force: true }); }
 });

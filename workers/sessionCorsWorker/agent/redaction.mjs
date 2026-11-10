@@ -16,6 +16,7 @@ const SAFE_HASH_VALUE_KEYS = new Set([
 const SAFE_HASH_VALUE_CONTAINER_KEYS = new Set([
   'numbertoquestionid',
   'legacycursorstatementids',
+  'runstatementids',
 ]);
 const SAFE_AUTHORITY_METADATA_KEYS = new Set([
   'privatekeyauthority',
@@ -66,7 +67,7 @@ export function redactSecrets(value, path = []) {
   ]));
 }
 
-export function assertNoSecretShape(value, message = 'Agent bridge records must not serialize secrets.') {
+export function assertNoSecretShape(value, message = 'Agent records must not serialize secrets.') {
   if (hasSecretShape(value)) {
     throw new Error(message);
   }

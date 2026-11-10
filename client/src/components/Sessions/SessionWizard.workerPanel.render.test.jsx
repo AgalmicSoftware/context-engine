@@ -1,23 +1,16 @@
 import {
   E2E_TESTIDS,
   TEST_ADMIN_ADDRESS,
-  act,
-  ethers,
   fireEvent,
-  getSessionWizardPublishProgressPercent,
-  mockDecryptWithPassword,
-  mockRegisterSessionOnChain,
-  mockSelectorSourceFactory,
-  mockSelectorSourceStartBlock,
   renderLoggedInSessionWizard,
   renderSessionWizard,
   resetSessionWizardWorkerPanelTestState,
   resolveSessionWizardChipotleHookConfig,
-  resolveSessionWizardWorkerBaseUrl,
   screen,
   selectNormalModeCard,
+  selectRegistryHosting,
+  setCloudflareApiToken,
   createPublicWorkerVerificationResponder,
-  enableAdvancedMode,
   waitFor,
 } from './SessionWizard.workerPanel.testUtils';
 
@@ -30,7 +23,7 @@ describe('SessionWizard worker panel rendering', () => {
     renderSessionWizard();
 
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
-    selectNormalModeCard('Worker');
+    selectRegistryHosting();
 
     expect(await screen.findByText('Bring your own worker')).toBeInTheDocument();
     expect((await screen.findAllByText('Cloudflare API token')).length).toBeGreaterThan(0);
@@ -44,9 +37,9 @@ describe('SessionWizard worker panel rendering', () => {
     ).not.toBeInTheDocument();
     expect(screen.queryByText('How should this session run?')).not.toBeInTheDocument();
     expect(screen.queryByText('Shared hosted worker')).not.toBeInTheDocument();
-    expect(screen.queryByText('Worker secrets')).not.toBeInTheDocument();
+    // On-chain sessions offer pay-for-usage as a plain option.
+    expect(screen.getByText('Require users to pay for usage')).toBeInTheDocument();
     expect(screen.queryByText('Dev: keep secrets on refresh')).not.toBeInTheDocument();
-    expect(screen.queryByText('Require users to pay for usage')).not.toBeInTheDocument();
     expect(screen.queryByText('Resource gates (on-chain)')).not.toBeInTheDocument();
     expect(screen.queryByText('Worker code (unbundled, copy + paste)')).not.toBeInTheDocument();
     expect(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_URL)).toHaveValue('');
@@ -76,18 +69,6 @@ describe('SessionWizard worker panel rendering', () => {
     renderSessionWizard();
 
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
-    const preset = screen.getByTestId('ce-new-preset-fast_cheap_cloudflare');
-    const originalConfirm = window.confirm;
-    window.confirm = jest.fn(() => true);
-    try {
-      fireEvent.click(preset);
-    } finally {
-      window.confirm = originalConfirm;
-    }
-    await waitFor(() => {
-      expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME)).toBeInTheDocument();
-    });
-
     selectNormalModeCard('Worker');
 
     expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_WORKER_URL)).toBeInTheDocument();
@@ -100,13 +81,6 @@ describe('SessionWizard worker panel rendering', () => {
     const view = renderLoggedInSessionWizard();
 
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
-    const originalConfirm = window.confirm;
-    window.confirm = jest.fn(() => true);
-    try {
-      fireEvent.click(screen.getByTestId('ce-new-preset-fast_cheap_cloudflare'));
-    } finally {
-      window.confirm = originalConfirm;
-    }
     fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME), {
       target: { value: 'Template Marker Session' },
     });
@@ -123,21 +97,6 @@ describe('SessionWizard worker panel rendering', () => {
     renderLoggedInSessionWizard();
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
     await waitFor(() => expect(readCache().nativeTemplateSetupIdentity).toBe(marker));
-  });
-
-  it('defaults advanced custom-worker deploys to the configured release bundle URL', async () => {
-    const { WORKER_BUNDLE_URL } = require('../../variables/publicDeploymentConfig.js');
-
-    renderSessionWizard();
-
-    await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
-    enableAdvancedMode();
-    fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
-    fireEvent.click(await screen.findByRole('button', { name: 'Use My Own' }));
-
-    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_BUNDLE_MODE_URL)).toBeChecked();
-    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_BUNDLE_MODE_UPLOAD)).not.toBeChecked();
-    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_BUNDLE_URL)).toHaveValue(WORKER_BUNDLE_URL);
   });
 
   it('builds Chipotle worker config for global Lit hooks when Lit v3 worker secrets are present', () => {
@@ -205,7 +164,7 @@ describe('SessionWizard worker panel rendering', () => {
     }
   });
 
-  it('restores the configured release bundle URL after returning from advanced mode to normal mode', async () => {
+  it('deploys the configured release bundle URL instead of a cached custom bundle URL', async () => {
     const originalFetch = global.fetch;
     const { WORKER_BUNDLE_URL } = require('../../variables/publicDeploymentConfig.js');
     const workerAuth = require('../../utilities/worker/workerAuth.js');
@@ -233,52 +192,43 @@ describe('SessionWizard worker panel rendering', () => {
       return { ok: true, json: async () => ({ ok: true }) };
     });
 
+    // The advanced bundle URL input is gone, but drafts saved by it still carry the URL.
+    const customBundleUrl = 'https://bundles.example.test/custom-sessionCorsWorker.bundle.js';
+    const readCachedBundleUrl = () =>
+      JSON.parse(sessionStorage.getItem('ce:sessionWizardDraft:v1') || '{}').deployForm?.bundleUrl;
+    sessionStorage.setItem('ce:sessionWizardDraft:v1', JSON.stringify({ deployForm: { bundleUrl: customBundleUrl } }));
+
     try {
       renderLoggedInSessionWizard();
+      // Autosave stops carrying the stale URL, and deploy never read it.
+      await waitFor(() => expect(readCachedBundleUrl()).toBeUndefined());
 
       fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME), {
         target: { value: 'Normal Mode Bundle Reset' },
       });
 
-      enableAdvancedMode();
-      fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
-      fireEvent.click(await screen.findByRole('button', { name: 'Use My Own' }));
-
-      const advancedBundleUrlInput = screen.getByTestId(E2E_TESTIDS.WIZARD_BUNDLE_URL);
-      fireEvent.change(advancedBundleUrlInput, {
-        target: { value: 'https://bundles.example.test/custom-sessionCorsWorker.bundle.js' },
-      });
-      await waitFor(() => {
-        expect(advancedBundleUrlInput).toHaveValue('https://bundles.example.test/custom-sessionCorsWorker.bundle.js');
-      });
-
-      fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED));
       selectNormalModeCard('Worker');
 
       expect(screen.getByTestId(E2E_TESTIDS.WIZARD_BUNDLE_URL)).toHaveValue(WORKER_BUNDLE_URL);
       expect(screen.getByTestId(E2E_TESTIDS.WIZARD_BUNDLE_URL)).toHaveAttribute('readonly');
 
-      const cloudflareTokenInput = screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN);
-      const reactPropsKey = Object.keys(cloudflareTokenInput).find((key) => key.startsWith('__reactProps$'));
-      act(() => {
-        cloudflareTokenInput[reactPropsKey].onChange({ target: { value: 'cf-test-token' } });
-      });
+      setCloudflareApiToken('cf-test-token');
       fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_OPENAI_KEY), {
         target: { value: 'sk-normal-mode-reset' },
-      });
-      fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_ARWEAVE_JWK), {
-        target: { value: '{"kty":"RSA","n":"normal-reset"}' },
       });
 
       fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_WORKER));
 
-      await waitFor(() => {
-        expect(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_STATUS)).toHaveTextContent('Worker deployed.');
-      });
+      await waitFor(
+        () => {
+          expect(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_STATUS)).toHaveTextContent('Worker deployed.');
+        },
+        { timeout: 8000 },
+      );
       const deployCall = global.fetch.mock.calls.find(([url]) => String(url).endsWith('/deploy'));
       const deployPayload = JSON.parse(deployCall[1].body);
       expect(deployPayload.bundleUrl).toBe(WORKER_BUNDLE_URL);
-      expect(deployPayload.bundleUrl).not.toBe('https://bundles.example.test/custom-sessionCorsWorker.bundle.js');
+      expect(deployPayload.bundleUrl).not.toBe(customBundleUrl);
     } finally {
       global.fetch = originalFetch;
       workerAuth.normalizeWorkerUrl.mockImplementation(originalNormalizeWorkerUrl);

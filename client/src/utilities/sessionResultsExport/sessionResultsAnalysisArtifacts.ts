@@ -3,6 +3,8 @@ import {
   getVoiceCredits,
   validateQuadraticAllocation,
 } from '../../../../shared/questions/quadraticAllocation.mjs';
+import { buildResultsAnalysisPrompt } from '../../../../shared/resultsAnalysisPrompt.mjs';
+import { normalizeRatingScale, type RatingScale } from '../survey/ratingValue';
 
 export const SESSION_RESULTS_ANALYSIS_ARTIFACT_KIND = 'ce_session_results_analysis_artifact';
 export const SESSION_RESULTS_ANALYSIS_ARTIFACT_VERSION = 1;
@@ -48,6 +50,7 @@ export type SessionResultsAnalysisQuestionInput = {
   id: string;
   options?: string[];
   prompt: string;
+  scale?: RatingScale;
   tags?: string[];
   type?: string;
   voiceCredits?: number;
@@ -75,7 +78,6 @@ export type SessionResultsAnalysisAiResponse = {
   answer: string;
   participantId: string;
   questionId: string;
-  questionPrompt?: string;
   questionType?: string;
 };
 
@@ -302,6 +304,11 @@ export const buildSessionResultsAnalysisInputSignature = (payload: SessionResult
   );
 };
 
+const normalizeAnalysisRatingScale = (question: SessionResultsAnalysisQuestionInput): RatingScale => {
+  const scale = normalizeRatingScale(question);
+  return { ...scale, minLabel: truncateAiText(scale.minLabel, 120), maxLabel: truncateAiText(scale.maxLabel, 120) };
+};
+
 export const buildSessionResultsAnalysisAiPayload = ({
   questions = [],
   responses = [],
@@ -327,6 +334,16 @@ export const buildSessionResultsAnalysisAiPayload = ({
     return participant;
   };
 
+  const questionKey = (id: unknown): string => normalizeAiText(id).toLowerCase();
+  const fallbackPrompts = new Map<string, string>();
+  responses.slice(0, SESSION_RESULTS_ANALYSIS_INPUT_LIMITS.maxResponses).forEach((response) => {
+    const key = questionKey(response.questionId);
+    const prompt = truncateAiText(
+      response.questionPrompt,
+      SESSION_RESULTS_ANALYSIS_INPUT_LIMITS.maxQuestionPromptChars,
+    );
+    if (key && prompt && !fallbackPrompts.has(key)) fallbackPrompts.set(key, prompt);
+  });
   const normalizedQuestions = questions
     .slice(0, SESSION_RESULTS_ANALYSIS_INPUT_LIMITS.maxQuestions)
     .map((question) => ({
@@ -337,7 +354,10 @@ export const buildSessionResultsAnalysisAiPayload = ({
             .map((option) => truncateAiText(option, 140))
             .filter(Boolean)
         : [],
-      prompt: truncateAiText(question?.prompt, SESSION_RESULTS_ANALYSIS_INPUT_LIMITS.maxQuestionPromptChars),
+      prompt: truncateAiText(
+        normalizeAiText(question?.prompt) || fallbackPrompts.get(questionKey(question?.id)),
+        SESSION_RESULTS_ANALYSIS_INPUT_LIMITS.maxQuestionPromptChars,
+      ),
       tags: Array.isArray(question?.tags)
         ? question.tags
             .slice(0, SESSION_RESULTS_ANALYSIS_INPUT_LIMITS.maxTagsPerQuestion)
@@ -346,16 +366,20 @@ export const buildSessionResultsAnalysisAiPayload = ({
         : [],
       type: normalizeAiText(question?.type),
       ...(question?.type === 'quadratic' ? { voiceCredits: getVoiceCredits(question) } : {}),
+      // A rating's number means nothing without its ends, so the AI sees them as the Worker's analysis does.
+      ...(question?.type === 'rating' ? { scale: normalizeAnalysisRatingScale(question) } : {}),
     }))
-    .filter((question) => question.id || question.prompt);
+    .filter((question) => question.id);
+  const includedQuestionsById = new Map(normalizedQuestions.map((question) => [questionKey(question.id), question]));
 
-  const questionsById = new Map(
-    questions.map((question) => [toSafeString(question?.id).trim().toLowerCase(), question]),
-  );
+  const questionsById = new Map(questions.map((question) => [questionKey(question?.id), question]));
   const normalizedResponses = responses
     .slice(0, SESSION_RESULTS_ANALYSIS_INPUT_LIMITS.maxResponses)
     .map((response) => {
-      const question = questionsById.get(toSafeString(response?.questionId).trim().toLowerCase());
+      const key = questionKey(response?.questionId);
+      const includedQuestion = includedQuestionsById.get(key);
+      if (!includedQuestion) return null;
+      const question = questionsById.get(key);
       const questionType = question?.type || toSafeString(response?.questionType);
       const allocation = Array.isArray(response?.answer) ? response.answer : toPlainRecord(response?.answer).value;
       // Label against the full option list before applying context limits; slicing
@@ -377,8 +401,7 @@ export const buildSessionResultsAnalysisAiPayload = ({
         ...(additional ? { additional } : {}),
         answer,
         participantId: participant.syntheticId,
-        questionId: normalizeAiText(response?.questionId),
-        questionPrompt: normalizeAiText(response?.questionPrompt),
+        questionId: includedQuestion.id,
         questionType: normalizeAiText(questionType),
       };
     })
@@ -436,121 +459,18 @@ export const evaluateSessionResultsAnalysisEligibility = (
   };
 };
 
-const SESSION_RESULTS_SECTION_PROMPTS: Record<
-  SessionResultsAnalysisSectionKey,
-  {
-    description: string;
-    jsonShape: string;
-    outputKey: SessionResultsAnalysisSectionKey;
-  }
-> = {
-  breakdown: {
-    description: 'Breakdown: infer dataset-specific comparison/filter dimensions and concise thematic groups.',
-    outputKey: 'breakdown',
-    jsonShape: `{
-  "breakdown": {
-    "summary": { "overview": "short neutral synthesis" },
-    "dimensions": [{ "id": "sbt_groups", "label": "SBT / Groups", "source": "sbt", "values": [{ "id": "builders", "label": "Builders", "count": 3 }] }],
-    "groups": [{ "id": "group_1", "label": "theme", "summary": "paraphrased summary", "participantIds": ["participant_001"], "questionIds": ["q1"] }]
-  }
-}`,
-  },
-  argumentMap: {
-    description: 'Argument Map: identify debates, claims, stances, and supporting/opposing relationships.',
-    outputKey: 'argumentMap',
-    jsonShape: `{
-  "argumentMap": {
-    "debates": [{ "id": "debate_1", "title": "debate title", "claims": [{ "id": "claim_1", "label": "paraphrased claim", "stance": "support|oppose|mixed", "participantIds": ["participant_001"], "questionIds": ["q1"] }] }]
-  }
-}`,
-  },
-  riskMatrix: {
-    description:
-      'Risk Matrix: infer a custom per-session risk taxonomy, likelihood/impact values, and paraphrased evidence.',
-    outputKey: 'riskMatrix',
-    jsonShape: `{
-  "riskMatrix": {
-    "categories": [{ "id": "risk_1", "label": "custom category", "description": "why it matters" }],
-    "heatmap": { "risk_1": { "likelihood": "low|medium|high", "impact": "low|medium|high" } },
-    "comments": [{ "id": "risk_comment_1", "categoryId": "risk_1", "summary": "paraphrased evidence", "participantIds": ["participant_001"], "questionIds": ["q1"] }],
-    "scenarioLinks": []
-  }
-}`,
-  },
-  atlas: {
-    description: 'Atlas Nodes: create explorable conceptual nodes and labeled edges from the session discussion.',
-    outputKey: 'atlas',
-    jsonShape: `{
-  "atlas": {
-    "nodes": [{ "id": "atlas_1", "label": "node label", "summary": "paraphrased node summary", "participantIds": ["participant_001"], "questionIds": ["q1"] }],
-    "edges": [{ "source": "atlas_1", "target": "atlas_2", "label": "relationship" }]
-  }
-}`,
-  },
-};
-
 const isSessionResultsAnalysisSectionKey = (value: unknown): value is SessionResultsAnalysisSectionKey =>
   (SESSION_RESULTS_ANALYSIS_SECTION_KEYS as readonly string[]).includes(String(value || ''));
 
-const buildAllSectionsJsonShape = (): string => `{
-  "breakdown": {
-    "summary": { "overview": "short neutral synthesis" },
-    "dimensions": [{ "id": "sbt_groups", "label": "SBT / Groups", "source": "sbt", "values": [{ "id": "builders", "label": "Builders", "count": 3 }] }],
-    "groups": [{ "id": "group_1", "label": "theme", "summary": "paraphrased summary", "participantIds": ["participant_001"], "questionIds": ["q1"] }]
-  },
-  "argumentMap": {
-    "debates": [{ "id": "debate_1", "title": "debate title", "claims": [{ "id": "claim_1", "label": "paraphrased claim", "stance": "support|oppose|mixed", "participantIds": ["participant_001"], "questionIds": ["q1"] }] }]
-  },
-  "riskMatrix": {
-    "categories": [{ "id": "risk_1", "label": "custom category", "description": "why it matters" }],
-    "heatmap": { "risk_1": { "likelihood": "low|medium|high", "impact": "low|medium|high" } },
-    "comments": [{ "id": "risk_comment_1", "categoryId": "risk_1", "summary": "paraphrased evidence", "participantIds": ["participant_001"], "questionIds": ["q1"] }],
-    "scenarioLinks": []
-  },
-  "atlas": {
-    "nodes": [{ "id": "atlas_1", "label": "node label", "summary": "paraphrased node summary", "participantIds": ["participant_001"], "questionIds": ["q1"] }],
-    "edges": [{ "source": "atlas_1", "target": "atlas_2", "label": "relationship" }]
-  }
-}`;
-
+// The Session Worker sends the same prompt, so the two never drift apart.
 export const buildSessionResultsAnalysisPrompt = (
   payload: SessionResultsAnalysisAiPayload,
   section: SessionResultsAnalysisSectionKey | 'all' = 'all',
-): string => {
-  const sectionConfig = isSessionResultsAnalysisSectionKey(section) ? SESSION_RESULTS_SECTION_PROMPTS[section] : null;
-  const sectionLine = sectionConfig
-    ? `Generate only this result view: ${sectionConfig.description}`
-    : 'Generate all Context Engine session analysis result views.';
-  const outputInstruction = sectionConfig
-    ? `Return exactly one top-level "${sectionConfig.outputKey}" object. Do not include other result-view keys.`
-    : 'Return all top-level result-view objects shown below.';
-  const jsonShape = sectionConfig ? sectionConfig.jsonShape : buildAllSectionsJsonShape();
-
-  return `You are generating Context Engine session analysis artifacts.
-
-Return only valid JSON. Do not include markdown fences.
-
-${sectionLine}
-${outputInstruction}
-
-Privacy rules:
-- The input uses synthetic participant IDs only. Never invent or request wallet addresses.
-- If segmentDimensions is non-empty, use those dataset-specific dimensions for Breakdown comparison/filter controls. They may represent SBTs, gates, groups, tags, or other non-address cohort labels.
-- Do not use demo-only dimensions such as Era, Region, Country, Gender, Affiliation, or Atlas Category unless those exact dimensions are present in segmentDimensions.
-- Never put wallet addresses or contract addresses in generated segment labels, ids, summaries, or participant references.
-- You may reason from raw answer text, but your summaries must paraphrase instead of quoting identifiable freeform responses.
-- Keep participant references as synthetic IDs such as participant_001.
-- The input is capped by inputLimits to protect context windows. Work only from included data and mention uncertainty in summaries when the visible sample is thin.
-
-Question semantics:
-- Quadratic allocations use signed whole-number votes per named option: positive supports and negative opposes. The sum of squared votes spends voiceCredits (99 by default); unused credits are allowed. Aggregate signed votes, not credit costs. An all-zero allocation is an explicit neutral response, not missing data.
-
-Generate this JSON shape:
-${jsonShape}
-
-Session input:
-${JSON.stringify(payload, null, 2)}`;
-};
+): string =>
+  buildResultsAnalysisPrompt({
+    sections: isSessionResultsAnalysisSectionKey(section) ? [section] : SESSION_RESULTS_ANALYSIS_SECTION_KEYS,
+    input: payload,
+  });
 
 const parseJsonObject = (raw: unknown): Record<string, unknown> => {
   if (raw && typeof raw === 'object' && !Array.isArray(raw)) return raw as Record<string, unknown>;
@@ -577,6 +497,38 @@ const sectionArray = (record: Record<string, unknown>, key: string): unknown[] =
 
 const normalizeSectionRecord = (value: unknown): Record<string, unknown> => toPlainRecord(value);
 
+// The prompt asks for generated axes and assessments, while the report keeps
+// categories, comments and a heatmap: each assessment fills all three.
+const riskMatrixFromAssessments = (riskMatrix: Record<string, unknown>) => {
+  const axes = toPlainRecord(riskMatrix.axes);
+  const position = (axisValue: unknown, levelId: unknown) => {
+    const axis = toPlainRecord(axisValue);
+    const level = toArray(axis.levels)
+      .map(toPlainRecord)
+      .find((entry) => normalizeText(entry.id) === normalizeText(levelId));
+    return [normalizeText(axis.label) || 'Axis', normalizeText(level?.label) || normalizeText(levelId)];
+  };
+  const assessments = toArray(riskMatrix.assessments)
+    .map(toPlainRecord)
+    .filter((entry) => normalizeText(entry.id) && normalizeText(entry.label));
+  return {
+    categories: assessments.map((entry) => ({ id: entry.id, label: entry.label, description: entry.summary })),
+    comments: assessments.map((entry) => ({
+      id: `${normalizeText(entry.id)}_evidence`,
+      categoryId: entry.id,
+      summary: entry.summary,
+      participantIds: toArray(entry.participantIds),
+      questionIds: toArray(entry.questionIds),
+    })),
+    heatmap: Object.fromEntries(
+      assessments.map((entry) => [
+        normalizeText(entry.id),
+        Object.fromEntries([position(axes.x, entry.xLevelId), position(axes.y, entry.yLevelId)]),
+      ]),
+    ),
+  };
+};
+
 export const normalizeGeneratedSessionResultsAnalysisArtifact = ({
   generatedAt = new Date().toISOString(),
   inputSignature = '',
@@ -594,7 +546,10 @@ export const normalizeGeneratedSessionResultsAnalysisArtifact = ({
   const sourceSections = normalizeSectionRecord(parsed.sections || parsed);
   const breakdown = normalizeSectionRecord(sourceSections.breakdown);
   const argumentMap = normalizeSectionRecord(sourceSections.argumentMap);
-  const riskMatrix = normalizeSectionRecord(sourceSections.riskMatrix);
+  const rawRiskMatrix = normalizeSectionRecord(sourceSections.riskMatrix);
+  const riskMatrix = toArray(rawRiskMatrix.assessments).length
+    ? { ...rawRiskMatrix, ...riskMatrixFromAssessments(rawRiskMatrix) }
+    : rawRiskMatrix;
   const atlas = normalizeSectionRecord(sourceSections.atlas);
   const generatedAtDate = new Date(toSafeString(generatedAt));
   const normalizedGeneratedAt = Number.isNaN(generatedAtDate.getTime())

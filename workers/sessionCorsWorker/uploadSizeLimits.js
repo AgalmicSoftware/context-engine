@@ -2,6 +2,9 @@ export const DEFAULT_MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
 // Cloudflare KV's hard value limit is 25 MiB. Keep one MiB of headroom for
 // serialization drift and reject the final encoded record, not just raw input.
 export const DEFAULT_MAX_KV_VALUE_BYTES = 24 * 1024 * 1024;
+// Index metadata is repeated in backup payload headers; keep it well below a page.
+export const MAX_STORAGE_METADATA_BYTES = 64 * 1024;
+export const STORAGE_METADATA_TAG_LIMITS = Object.freeze({ count: 32, nameChars: 64, valueChars: 1024 });
 export const MAX_UPLOAD_BYTES_ENV = 'CE_MAX_UPLOAD_BYTES';
 export const UPLOAD_TOO_LARGE_ERROR = 'Upload payload too large.';
 export const KV_VALUE_TOO_LARGE_ERROR = 'KV storage payload too large after encoding.';

@@ -9,7 +9,7 @@ const {
   ROOT_NODE_TEST_FILES,
   ROOT_PRIVATE_STRIPPED_TEST_FILE_RE,
   ROOT_TEST_FILES,
-} = require('./testInventoryConfig');
+} = require('./node-test-inventory-config');
 
 const ROOT_TEST_FILE_RE = /\.test\.(?:c?js|mjs)$/;
 const WORKER_TEST_FILE_RE = /\.test\.mjs$/;
@@ -107,7 +107,7 @@ function verifyRootScripts(rootDir, failures) {
     ['test:node:tracked', 'scripts/run-node-tests.js --tracked-only'],
     ['test:root:jest', '--testMatch'],
     ['test:worker:session-cors', 'npm --prefix workers/sessionCorsWorker test'],
-    ['test:worker:agent-bridge', 'scripts/run-agent-bridge-worker-tests.js'],
+    ['test:worker:agent', 'scripts/run-session-agent-tests.js'],
     ['test:e2e', 'npm run -s test:e2e:smoke'],
     ['test:e2e:quick', 'npm run -s test:e2e:smoke'],
     ['test:e2e:smoke', 'npm run -s ai:test-nav:smoke'],
@@ -183,7 +183,7 @@ function verifyRootScripts(rootDir, failures) {
       ['client', 'npm run coverage-floor:check'],
       ['root-jest', 'npm run test:root:jest'],
       ['workers', 'npm run test:worker:session-cors'],
-      ['workers', 'npm run test:worker:agent-bridge'],
+      ['workers', 'npm run test:worker:agent'],
       ['e2e-smoke', 'npm run test:e2e:smoke'],
       ['cecc-and-node', 'npm run test:node:tracked'],
       ['cecc-and-node', 'npm run test:cache-guard'],

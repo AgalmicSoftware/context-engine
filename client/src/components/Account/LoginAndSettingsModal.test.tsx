@@ -1,3 +1,7 @@
+import { render, screen, within } from '@testing-library/react';
+jest.mock('wagmi/actions', () => ({ disconnect: jest.fn(async () => {}) }));
+import { readAgentClientLoginEnvelope, writeAgentClientLoginEnvelope } from '../../utilities/session/agentClientLogin';
+import { cacheAgentClientLoginEnvelope } from '../OnePageSession/onePageSessionAgentController';
 import { ethers } from 'ethers';
 import { LoginAndSettingsModal } from './LoginAndSettingsModal';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
@@ -65,13 +69,7 @@ jest.mock('../../utilities/ai/aiSettings.js', () => {
     })),
     saveLocalAiSettings: jest.fn(),
     clearLocalAiSettings: jest.fn(),
-    deriveAiPreset: jest.fn(() => 'gpt-5'),
-    toModelLeaf: jest.fn((m) =>
-      String(m || '')
-        .toLowerCase()
-        .split('/')
-        .pop(),
-    ),
+    deriveAiPreset: jest.fn(() => 'gpt-6-astra'),
   };
 });
 
@@ -115,6 +113,7 @@ jest.mock('../../utilities/cache/cacheScripts.js', () => ({
   initCacheManager: jest.fn(async () => undefined),
   listNamespaceEntriesSync: jest.fn(() => []),
   removeCache: jest.fn(async () => true),
+  clearCacheNamespace: jest.fn(async () => true),
 }));
 
 const LoginAndSettingsModalSubject = LoginAndSettingsModal as any;
@@ -376,6 +375,23 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
       loginComplete: true,
       provider: 'wagmi',
     });
+  });
+
+  it('releases the token login form when another account signs in during exchange', () => {
+    const previous = buildProps({ account: '', provider: 'none', loginComplete: false });
+    const subject = mountClassSubject(
+      new LoginAndSettingsModalSubject(
+        buildProps({
+          account: PASSKEY_ADDRESS,
+          provider: 'passkey_eoa',
+          loginComplete: true,
+        }),
+      ),
+    );
+    subject.checkAndSendTestFundsIfNeeded = jest.fn();
+    subject.state = { ...subject.state, agentTokenStatus: 'loading' };
+    subject.componentDidUpdate(previous, subject.state);
+    expect(subject.state.agentTokenStatus).toBe('');
   });
 
   it('does not prefetch worker auth when loginComplete flips true after restore', () => {
@@ -704,7 +720,7 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
     expect(subject.loadSponsoredAccess).toHaveBeenCalledTimes(1);
   });
 
-  it('scans managed cache entries without cloning values and de-duplicates slug clears', async () => {
+  it('clears every namespace including entries absent from the mirror', async () => {
     mockedCacheScripts.listNamespaceEntriesSync.mockImplementation((namespace: string) => {
       if (namespace === 'questionsCache') {
         return [
@@ -721,13 +737,29 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
 
     await subject.handleClearAllCaches();
 
-    expect(mockedCacheScripts.listNamespaceEntriesSync).toHaveBeenCalledWith('questionsCache', { cloneValues: false });
-    const edgeCalls = mockedCacheScripts.removeCache.mock.calls.filter(
-      ([namespace, slug]: any[]) => namespace === 'questionsCache' && slug === 'edge',
-    );
-    expect(edgeCalls).toHaveLength(1);
-    expect(mockedCacheScripts.removeCache).toHaveBeenCalledWith('questionsCache', '');
+    expect(mockedCacheScripts.clearCacheNamespace.mock.calls.map(([namespace]: [string]) => namespace)).toEqual([
+      'questionsCache',
+      'surveysCache',
+      'bookmarksCache',
+      'filters',
+      'sbtCache',
+      'userCache',
+    ]);
     expect(subject.reloadPage).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports an incomplete clear and does not reload', async () => {
+    mockedCacheScripts.clearCacheNamespace.mockResolvedValueOnce(false);
+    const subject = mountClassSubject(new LoginAndSettingsModalSubject(buildProps()));
+    subject.reloadPage = jest.fn();
+    const alert = jest.spyOn(window, 'alert').mockImplementation(() => {});
+    try {
+      await subject.handleClearAllCaches();
+      expect(subject.reloadPage).not.toHaveBeenCalled();
+      expect(alert).toHaveBeenCalledWith(expect.stringMatching(/could not.*clear/i));
+    } finally {
+      alert.mockRestore();
+    }
   });
 
   it('deduplicates in-flight cache clear requests', async () => {
@@ -787,6 +819,74 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
 
     expect(treeHasPropValue(tree, 'className', 'aiSettingsPanel')).toBe(true);
     expect(treeHasPropValue(tree, 'data-testid', 'ce-prelogin-config-panel')).toBe(false);
+  });
+
+  it('disconnects before teardown resets provider props and cannot log the wallet back in', async () => {
+    const props = buildProps({ provider: 'wagmi', wagmiAddress: WAGMI_ADDRESS, loginComplete: true });
+    const subject = mountClassSubject(new LoginAndSettingsModalSubject(props));
+    const wagmiDisconnect = jest.fn(() => {
+      subject.props = { ...subject.props, wagmiAddress: undefined };
+    });
+    subject.props = { ...subject.props, wagmiDisconnect };
+    props.changeAccount.mockImplementation(() => {
+      subject.props = { ...subject.props, provider: 'none', loginComplete: false, wagmiDisconnect: undefined };
+    });
+
+    await subject.handleLogout();
+    await subject.updateStateUponWagmiLogin();
+
+    expect(wagmiDisconnect).toHaveBeenCalledTimes(1);
+    expect(localStorage.getItem('ce:userDisconnected')).toBe('true');
+    expect(props.changeAccount.mock.calls).toEqual([[{}]]);
+    expect(wagmiDisconnect.mock.invocationCallOrder[0]).toBeLessThan(props.changeAccount.mock.invocationCallOrder[0]);
+    expect(props.updateLoginInfo).not.toHaveBeenCalledWith(expect.objectContaining({ loginComplete: true }));
+  });
+
+  it('never rehydrates a lingering wallet address after logout', async () => {
+    const props = buildProps({
+      provider: 'wagmi',
+      wagmiAddress: WAGMI_ADDRESS,
+      loginComplete: true,
+      wagmiDisconnect: jest.fn(),
+    });
+    const subject = mountClassSubject(new LoginAndSettingsModalSubject(props));
+    props.changeAccount.mockImplementation(() => {
+      subject.props = { ...subject.props, provider: 'none', loginComplete: false };
+    });
+    await subject.handleLogout();
+    subject.state.wagmiLoginUpdateNeeded = true;
+    await subject.updateStateUponWagmiLogin();
+    expect(props.changeAccount.mock.calls).toEqual([[{}]]);
+    expect(props.updateLoginInfo).not.toHaveBeenCalledWith(expect.objectContaining({ loginComplete: true }));
+  });
+
+  it('surfaces a passkey disconnect failure after teardown resets provider props', async () => {
+    const failure = new Error('passkey storage unavailable');
+    mockedPasskeyWallet.logoutPasskeyWallet.mockRejectedValueOnce(failure);
+    const props = buildProps({ provider: 'passkey_eoa' });
+    const subject = mountClassSubject(new LoginAndSettingsModalSubject(props));
+    props.changeAccount.mockImplementation(() => {
+      subject.props = { ...subject.props, provider: 'none', loginComplete: false };
+    });
+
+    await expect(subject.handleLogout()).resolves.toBeUndefined();
+    const view = render(subject.getModalDisplay());
+    // One short visible sentence; the explanation sits behind the "?" button.
+    const status = screen.getByTestId('ce-passkey-wallet-status');
+    expect(status.firstChild?.textContent).toBe('Passkey sign-out could not be completed.');
+    expect(within(status).getByRole('button', { name: 'What does this mean?' })).toHaveAccessibleDescription(
+      'Your app session has been cleared, but disconnecting the saved wallet failed.',
+    );
+    expect(subject.state.passkeyWalletStatusTone).toBe('error');
+    expect(props.changeAccount).toHaveBeenCalledWith({});
+    expect(clearAllWorkerSessionTokens).toHaveBeenCalledTimes(1);
+
+    // A later notice brings no stale explanation.
+    mockedPasskeyWallet.unlockPasskeyWallet.mockRejectedValueOnce(new Error('No credential chosen'));
+    await subject.handlePasskeyWalletSignIn();
+    view.rerender(subject.getModalDisplay());
+    expect(screen.getByTestId('ce-passkey-wallet-status')).toHaveTextContent('Login failed: No credential chosen');
+    expect(screen.queryByRole('button', { name: 'What does this mean?' })).not.toBeInTheDocument();
   });
 
   it('sets persistent wagmi disconnect flag on wagmi logout', async () => {
@@ -860,7 +960,7 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
     }
   });
 
-  it('does not set wagmi disconnect flag when logging out passkey wallet', async () => {
+  it('also records wallet disconnect intent when logging out a passkey wallet', async () => {
     const subject = new LoginAndSettingsModalSubject(
       buildProps({
         provider: 'passkey_eoa',
@@ -871,7 +971,7 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
     await subject.handleLogout();
 
     expect(mockedPasskeyWallet.logoutPasskeyWallet).toHaveBeenCalledTimes(1);
-    expect(localStorage.getItem('ce:userDisconnected')).toBeNull();
+    expect(localStorage.getItem('ce:userDisconnected')).toBe('true');
   });
 
   it('clears worker tokens and notifies when passkey wallet sign-in switches passkey accounts', () => {
@@ -1885,4 +1985,29 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
     expect(readWorkerResourcePresence).toHaveBeenCalledTimes(1);
     expect(readWorkerResourcePresence).toHaveBeenCalledWith(expect.objectContaining({ sessionSlug: 'demo-1' }));
   });
+});
+
+test('settings logout clears every session agent credential before a later visit', async () => {
+  const expiry = '2035-01-01T00:00:00.000Z';
+  const envelopes = ['alpha', 'beta'].map((sessionSlug) => ({
+    v: 3 as const,
+    sessionSlug,
+    address: '0x1111111111111111111111111111111111111111',
+    expiresAt: expiry,
+    capabilities: { readQuestions: true },
+    workerUrl: 'https://worker.example',
+    agentWorkerUrl: 'https://worker.example',
+    agentCredential: { kind: 'session_agent_browser_token', token: `agent-${sessionSlug}`, expiresAt: expiry },
+    workerCredential: { kind: 'session_worker_jwt', token: `worker-${sessionSlug}`, expiresAt: expiry },
+  }));
+  for (const envelope of envelopes) {
+    writeAgentClientLoginEnvelope(envelope);
+    cacheAgentClientLoginEnvelope(envelope);
+  }
+  const subject = new LoginAndSettingsModalSubject(buildProps({ provider: 'agent_token' }));
+  await subject.handleLogout();
+  for (const envelope of envelopes) expect(readAgentClientLoginEnvelope(envelope)).toBeNull();
+  expect((globalThis as { __CE_AGENT_CLIENT_LOGIN_ENVELOPES__?: unknown }).__CE_AGENT_CLIENT_LOGIN_ENVELOPES__).toEqual(
+    {},
+  );
 });

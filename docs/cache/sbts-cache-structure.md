@@ -11,6 +11,8 @@ The SBT cache namespace is:
 
 Network keys inside cache values are strings such as `"84532"`.
 
+Community statistics identify a group by its network key and lowercased contract address. The same address deployed on two chains counts as two groups; repeated sightings of one chain/address across session caches count once. Participant addresses remain deduplicated independently of chain.
+
 ## Per-network shape
 
 ```jsonc
@@ -21,6 +23,18 @@ Network keys inside cache values are strings such as `"84532"`.
       "0xd417c701cf8ef4282cb62bfbf047b338b2f4feb8": {
         "sbtAddress": "0xd417C701Cf8ef4282CB62bFBf047B338b2f4FeB8",
         "slug": "edge",
+        "schemaVersion": 2,
+        "lastActivityBlock": 32562007,
+        "pendingActivity": {},
+        "coveredCounts": {
+          "mintedCountByAddress": {
+            "0xabc0000000000000000000000000000000000abc": 1,
+            "0xdef0000000000000000000000000000000000def": 1,
+          },
+          "burnedCountByAddress": {},
+          "mintedEventCount": 2,
+          "burnedEventCount": 0,
+        },
         "creationBlock": 32560000,
         "blockNumber": 32562007,
         "sbtInfo": {
@@ -84,12 +98,20 @@ Network keys inside cache values are strings such as `"84532"`.
 - `sbtList[addressLower]`: one entry per SBT contract
 - `slug`: cache/source bucket slug for the entry
 - `creationBlock`: best-known SBT creation block
-- `blockNumber`: last block at which that entry was refreshed or updated
-- `sbtInfo`: merged tokenURI/on-chain metadata
+- `schemaVersion`: `2`; incompatible entries are discarded and the discovery cursor
+  is reset so a full scan rebuilds them. No count or coverage migration is performed.
+- `blockNumber`: contiguous count-scan coverage. Incremental reads start at this block + 1.
+- `lastActivityBlock`: newest live activity observed; it never advances scan coverage.
+- `coveredCounts`: cumulative counts established by the contiguous scan.
+- `pendingActivity`: live deltas keyed by event identity, each with account, burn flag
+  and block. Public counts overlay only deltas beyond the covered range.
+- `sbtInfo`: merged tokenURI/on-chain metadata. A valid zero admin address means
+  the collection is retired and counts as complete metadata; absent or malformed
+  admin addresses still require hydration. Admin actions remain disabled.
 - `mintedAddresses` / `burnedAddresses`: convenience sets materialized as arrays
 - `mintedCountByAddress` / `burnedCountByAddress`: authoritative holder-count source for newer cache consumers
 - `mintedEventCount` / `burnedEventCount`: total event counts observed for that contract
-- `historySummary`: compressed count-only snapshot sourced from `getHistorySummary()` or derived from a full `SBTActivity` scan
+- `historySummary`: compressed count-only snapshot sourced from `getHistorySummary()` or derived from a full `SBTActivity` scan. Reads use the session provider exclusively; a failed read returns unavailable and preserves the existing summary, counts and holder bounds. The injected wallet is never a history fallback.
 - `countsScanCheckpoint`: resumable single-pass `SBTActivity` checkpoint for holders-modal/history reads
 
 ## Write and merge contract
@@ -100,7 +122,9 @@ networks and entries must survive concurrent discovery, detail hydration, profil
 filter, selector, and realtime-event work.
 
 - metadata hydration merges fields without replacing holder counts or activity;
-- count scans merge address counts and event totals monotonically with newer realtime activity;
+- count scans replace covered counts and retire pending events within their range,
+  avoiding double counting; a complete replacement can remove orphaned mints while
+  preserving pending events beyond its end;
 - `lastBlock` advances only after a contiguous discovery range persists successfully;
 - realtime events advance `lastRealtimeEventCursor`, not the discovery watermark;
 - a finalized count scan clears a resumable checkpoint only when it covers that checkpoint;
@@ -151,9 +175,8 @@ When only counts are needed, newer reads can also use:
 - `historySummary.currentHolderCount`
 - `historySummary.historicalHolderCount`
 
-The address arrays remain useful for compatibility and convenience, but `CommunityTab`
-and other newer reads can backfill or recompute count maps when they are missing in
-older caches.
+The address arrays are derived conveniences. Counts come from the covered scan plus
+pending live events; obsolete address-only cache entries are discarded.
 
 ## General-session key examples
 
@@ -198,3 +221,5 @@ These are documented centrally in [`docs/cache/README.md`](README.md):
 - `dg:sbt:partialReady:<slug>`
 - `dg:sbt:deferredFullScanNeeded:<slug>`
 - `dg:sbt:fullScanInProgress:<slug>`
+
+Arweave token-URI metadata reads reuse the shared successful payload cache and concurrent download work. On-chain collection fields still refresh normally, and metadata timeouts keep their on-chain fallback without later mutation.

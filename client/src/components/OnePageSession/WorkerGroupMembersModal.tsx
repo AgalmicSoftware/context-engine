@@ -1,4 +1,3 @@
-import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faSpinner, faTimes } from '@fortawesome/free-solid-svg-icons';
 import { Modal, ModalBody, ModalHeader } from 'reactstrap';

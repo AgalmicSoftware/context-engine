@@ -131,6 +131,17 @@ describe('runtime SCSS theme contract', () => {
     });
   });
 
+  test('a link can take the same chrome as a button, in its resting, pressed and Minimal rules', () => {
+    const recipes = fs.readFileSync(path.resolve(__dirname, '_recipes.scss'), 'utf8');
+    expect(recipes).toMatch(
+      /\[role='button'\],\s*\[data-ce-control-appearance='raised'\] \{\s*border-color: var\(--ce-border-raised\);/,
+    );
+    expect(recipes).toMatch(/\[role='button'\]:active,\s*\[data-ce-control-appearance='raised'\]:active \{/);
+    expect(recipes).toMatch(
+      /:root\[data-ce-theme\] \[role='button'\],\s*:root\[data-ce-theme\] \[data-ce-control-appearance='raised'\] \{\s*border-color: transparent;/,
+    );
+  });
+
   test('frameless controls drop the raised chrome but keep the focus outline', () => {
     const recipes = fs.readFileSync(path.resolve(__dirname, '_recipes.scss'), 'utf8');
     expect(framelessOutlineGuardPasses(recipes)).toBe(true);

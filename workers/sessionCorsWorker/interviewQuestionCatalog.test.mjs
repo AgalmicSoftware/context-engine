@@ -41,6 +41,12 @@ test('rating catalog questions retain exact scale metadata for interview prefill
         type: 'rating',
         scale: { min: 10, max: 1, minLabel: 'High', maxLabel: 'Low' },
       },
+      {
+        id: 'rating-q4',
+        prompt: 'Rate in fives',
+        type: 'rating',
+        scale: { min: 0, max: 100, step: 5 },
+      },
     ]),
     [
       {
@@ -63,6 +69,13 @@ test('rating catalog questions retain exact scale metadata for interview prefill
         type: 'rating',
         options: [],
         scale: { min: 0, max: 10, minLabel: '0', maxLabel: '10' },
+      },
+      {
+        id: 'rating-q4',
+        prompt: 'Rate in fives',
+        type: 'rating',
+        options: [],
+        scale: { min: 0, max: 100, minLabel: '0', maxLabel: '100', step: 5 },
       },
     ],
   );
@@ -104,7 +117,7 @@ test('on-chain question discovery fails closed on payloads from another session'
   const eventData = `0x${(32n).toString(16).padStart(64, '0')}${(1n).toString(16).padStart(64, '0')}${qid.slice(2)}`;
   const pointerBytes = Buffer.alloc(32, 1);
   const pointer = pointerBytes.toString('base64url');
-  const questions = await loadPublicInterviewQuestions({
+  const { questions } = await loadPublicInterviewQuestions({
     slug: 'demo',
     config: {
       contracts: { surveys: '0x1111111111111111111111111111111111111111' },
@@ -133,6 +146,41 @@ test('on-chain question discovery fails closed on payloads from another session'
   assert.deepEqual(questions, []);
 });
 
+
+test('on-chain question discovery leaves out questions on the session blocklist', async () => {
+  const blocked = `0x${'11'.repeat(32)}`;
+  const allowed = `0x${'22'.repeat(32)}`;
+  const word = (value) => value.toString(16).padStart(64, '0');
+  const eventData = `0x${word(32n)}${word(2n)}${blocked.slice(2)}${allowed.slice(2)}`;
+  const pointerBytes = Buffer.alloc(32, 1);
+  const pointerReads = [];
+  const load = (BLOCKED_QUESTION_IDS) => loadPublicInterviewQuestions({
+    slug: 'demo',
+    config: {
+      BLOCKED_QUESTION_IDS,
+      contracts: { surveys: '0x1111111111111111111111111111111111111111' },
+      rpcUrl: 'https://rpc.example',
+      blockLimits: { start: 1, end: 1 },
+    },
+    fetch: async (url, init) => {
+      if (String(url) === 'https://rpc.example') {
+        const body = JSON.parse(String(init?.body || '{}'));
+        if (body.method === 'eth_call') pointerReads.push(`0x${body.params[0].data.slice(10)}`);
+        const result = body.method === 'eth_blockNumber'
+          ? '0x1'
+          : body.method === 'eth_getLogs'
+            ? [{ data: eventData }]
+            : `0x${pointerBytes.toString('hex')}`;
+        return new Response(JSON.stringify({ jsonrpc: '2.0', id: 1, result }));
+      }
+      return new Response(JSON.stringify({ sessionSlug: 'demo', prompt: 'A question' }));
+    },
+  });
+  assert.deepEqual((await load([])).questions.map(({ id }) => id), [blocked, allowed]);
+  pointerReads.length = 0;
+  assert.deepEqual((await load([blocked.toUpperCase().replace('0X', '0x')])).questions.map(({ id }) => id), [allowed]);
+  assert.deepEqual(pointerReads, [allowed]);
+});
 
 test('quadratic catalog questions retain ordered options and the configured or default credit budget', () => {
   const questions = helpers.dedupeQuestions([
@@ -192,7 +240,7 @@ const createQuestionStore = () => {
       if (args.path === '/storage/read') reads.push(new URL(args.request.url).searchParams.get('id'));
       return storageRoute(args);
     },
-  });
+  }).then(result => result.questions);
   return { kv, put, load, reads };
 };
 
@@ -227,6 +275,16 @@ test('Cloudflare catalog keeps the first or admin version of each question and s
     assert.equal(rotated.find((entry) => entry.id === 'q2').prompt, 'Admin correction');
   }
 
+});
+
+test('Cloudflare catalog leaves out questions on the session blocklist before reading them', async () => {
+  const { put, load, reads } = createQuestionStore();
+  await put('aa-blocked', '2026-10-01T00:00:00.000Z', { uploader: author, resourceId: 'q1' }, question('q1', 'Blocked prompt'));
+  await put('bb-allowed', '2026-10-01T00:00:00.000Z', { uploader: author, resourceId: 'q2' }, question('q2', 'Allowed prompt'));
+  assert.deepEqual((await load()).map((entry) => entry.id).sort(), ['q1', 'q2']);
+  reads.length = 0;
+  assert.deepEqual((await load({ ...config, BLOCKED_QUESTION_IDS: [' Q1 '] })).map((entry) => entry.id), ['q2']);
+  assert.equal(reads.includes('aa-blocked'), false);
 });
 
 test('Cloudflare catalog chooses from every list page and reads only the chosen payload', async () => {
@@ -278,7 +336,7 @@ test('Cloudflare catalog still chooses among the rows it listed when it cannot f
     [(cursor) => (cursor ? page({ error: 'unavailable' }, 503) : page({ items: [listed], cursor: 'next', listComplete: false })), 2],
   ]) {
     let listCalls = 0;
-    const questions = await loadPublicInterviewQuestions({
+    const { questions } = await loadPublicInterviewQuestions({
       slug: 'session-a',
       storageRoute: async ({ path, request }) => {
         if (path !== '/storage/list') return page(question('q1', 'Listed question'));
@@ -310,4 +368,37 @@ test('Cloudflare catalog keeps room for its payload reads within the per-request
   const questions = await load();
   assert.equal(questions.length, 100);
   assert.ok(operations <= 800, `${operations} KV operations`);
+});
+
+for (const failure of [503, 429, 'network', 404, 'non-json']) test(`Cloudflare read ${failure} distinguishes incomplete discovery from a permanent unusable payload`, async () => {
+  const result = await loadPublicInterviewQuestions({ slug: 'fixture', config,
+    storageRoute: async ({ path }) => {
+      if (path === '/storage/list') return Response.json({ items: [{ storageRef: { id: 'fixture-ref' }, metadata: { resourceId: 'q1' } }], listComplete: true });
+      if (failure === 'network') throw new Error('Synthetic network failure');
+      return failure === 'non-json' ? new Response('not json') : new Response('', { status: failure });
+    },
+    fetch: () => assert.fail('A Worker-only fixture must not call RPC'),
+  });
+  assert.deepEqual(result.questions, []);
+  assert.equal(result.incomplete, [503, 429, 'network'].includes(failure));
+});
+
+for (const failure of [503, 429, 'network', 404, 'non-json']) test(`on-chain payload ${failure} only retries temporary gateway failures`, async () => {
+  const qid = `0x${'11'.repeat(32)}`;
+  const eventData = `0x${(32n).toString(16).padStart(64, '0')}${(1n).toString(16).padStart(64, '0')}${qid.slice(2)}`;
+  const result = await loadPublicInterviewQuestions({ slug: 'fixture',
+    config: { contracts: { surveys: '0x1111111111111111111111111111111111111111' }, rpcUrl: 'https://rpc.example', blockLimits: { start: 1, end: 1 } },
+    fetch: async (url, init) => {
+      if (url === 'https://rpc.example') {
+        const body = JSON.parse(init.body);
+        const result = body.method === 'eth_blockNumber' ? '0x1' : body.method === 'eth_getLogs' ? [{ data: eventData }] : `0x${'01'.repeat(32)}`;
+        return Response.json({ jsonrpc: '2.0', id: 1, result });
+      }
+      assert.ok(['ar-io.dev', 'arweave.net'].includes(new URL(url).hostname));
+      if (failure === 'network') throw new Error('Synthetic network failure');
+      return failure === 'non-json' ? new Response('not json') : new Response('', { status: failure });
+    },
+  });
+  assert.deepEqual(result.questions, []);
+  assert.equal(result.incomplete, [503, 429, 'network'].includes(failure));
 });

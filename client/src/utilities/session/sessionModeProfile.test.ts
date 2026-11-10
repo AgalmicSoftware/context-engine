@@ -4,7 +4,6 @@ import {
   classifySessionModeProfileSupport,
   cloneSessionModePreset,
   compileSessionModeProfile,
-  hasLegacyHostedAgentFlags,
   isSessionModeProfileAgentHttpEnabled,
   mergeSessionModeProfileStorageAccess,
   profileFromLegacyConfig,
@@ -68,7 +67,6 @@ describe('sessionModeProfile', () => {
       minGroupSize: 2,
     });
     expect(compiled.exportScope).toBe('admin_raw');
-    expect(compiled.telegramBridgeEnabled).toBe(false);
   });
 
   it('round-trips the exact Cloudflare preset through its compiled storage profile', () => {
@@ -549,28 +547,7 @@ describe('sessionModeProfile', () => {
     expect(compiled.payloadAccessMode).toBe('public_read');
   });
 
-  it('normalizes legacy access flags and storage configs into profiles', () => {
-    const agentProfile = profileFromLegacyConfig({
-      sessionMode: 'telegram_only',
-      storageProfile: { backend: 'cloudflare' },
-    });
-    expect(agentProfile).toEqual(
-      expect.objectContaining({
-        preset: 'custom',
-        authority: { mode: 'worker_canonical' },
-        storage: expect.objectContaining({ backend: 'cloudflare' }),
-      }),
-    );
-    expect(agentProfile.surfaces).toEqual(
-      expect.objectContaining({
-        telegram: false,
-        miniApp: false,
-        agentHttp: true,
-        web: true,
-      }),
-    );
-    expect(compileSessionModeProfile(agentProfile).storageProfile.backend).toBe('cloudflare');
-
+  it('normalizes legacy storage configs into profiles', () => {
     const litArweaveProfile = profileFromLegacyConfig({
       networkChainId: 84532,
       storageProfile: { backend: 'lit-arweave' },
@@ -584,11 +561,10 @@ describe('sessionModeProfile', () => {
     );
   });
 
-  it('detects hosted agent HTTP mode while preserving legacy variants', () => {
+  it('detects hosted agent HTTP mode', () => {
     const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
     profile.surfaces.agentHttp = true;
     expect(isSessionModeProfileAgentHttpEnabled({ sessionModeProfile: profile })).toBe(true);
-    expect(hasLegacyHostedAgentFlags({ telegram: { mode: 'telegram_only' } })).toBe(true);
   });
 
   it('keeps compile pure', () => {
@@ -614,16 +590,5 @@ describe('session mode write normalization', () => {
     normalized.results.exposure.minGroupSize = 9;
     expect(profile.results.exposure?.minGroupSize).toBe(2);
     expect(profile.surfaces.telegram).toBe(true);
-  });
-
-  it.each([
-    [{ agentHttpEnabled: false, agentHttp: true }, false],
-    [{ agentHttp: false }, false],
-    [{ agentHttpEnabled: true, agentHttp: false }, true],
-    [{}, true],
-  ])('retains explicit legacy HTTP settings during migration: %j', (flags, expected) => {
-    const profile = profileFromLegacyConfig({ telegramOnly: true, ...flags });
-    expect(profile.surfaces.agentHttp).toBe(expected);
-    expect(normalizeSessionModeProfileForWrite(profile).surfaces.agentHttp).toBe(expected);
   });
 });

@@ -15,7 +15,6 @@ type AsyncSearchSelectProps = {
   onChange?: (option: AsyncSearchOption) => void;
   placeholder?: string;
   isLoading?: boolean;
-  loadingMessage?: () => React.ReactNode;
   noOptionsMessage?: () => React.ReactNode;
   formatOptionLabel?: (option: AsyncSearchOption) => React.ReactNode;
   formatValueLabel?: (option: AsyncSearchOption) => React.ReactNode;
@@ -44,7 +43,6 @@ const AsyncSearchSelect = ({
   onChange,
   placeholder = '',
   isLoading = false,
-  loadingMessage,
   noOptionsMessage,
   formatOptionLabel,
   formatValueLabel,

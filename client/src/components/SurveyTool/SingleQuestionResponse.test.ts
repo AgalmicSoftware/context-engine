@@ -354,7 +354,7 @@ describe('SingleQuestionResponse card actions', () => {
 
     const generalTree = generalSubject.render();
     expect(findElement(generalTree, (node) => node?.props?.title === 'View question page')?.props?.href).toBe(
-      '/question/q-general',
+      '/question/q-general?session=general',
     );
   });
 

@@ -15,6 +15,8 @@ import {
   toChainId,
 } from './chainIdNormalization.js';
 
+export const LIT_PROVISIONING_CREDENTIALS_CONFLICT = 'Lit credentials conflict with saved setup. Restore the previous credentials and Resume the saved setup.';
+
 const DEFAULT_LIT_API_BASE = 'https://api.chipotle.litprotocol.com';
 const CHIPOTLE_API_PREFIX = '/core/v1';
 const APPROVED_LIT_CHIPOTLE_API_HOSTS = new Set(['api.chipotle.litprotocol.com']);
@@ -282,7 +284,8 @@ export const fetchChipotleJson = async ({
   const text = await response.text().catch(() => '');
   const parsed = parseJsonIfPossible(text);
   if (!response.ok) {
-    throw new Error(extractChipotleErrorMessage(response.status, parsed, 'Chipotle request failed'));
+    throw Object.assign(new Error(extractChipotleErrorMessage(response.status, parsed, 'Chipotle request failed')),
+      { litStatus: response.status });
   }
   if (isObj(parsed) && toTrimmedString(parsed.error || '').trim()) {
     throw new Error(extractChipotleErrorMessage(response.status, parsed, 'Chipotle request failed'));
@@ -370,9 +373,9 @@ const ensureChipotleApiKey = (runtime = {}) => {
   }
 };
 
-const ensureChipotleManagementApiKey = (runtime = {}) => {
+export const ensureChipotleManagementApiKey = (runtime = {}) => {
   if (!toTrimmedString(runtime?.litManagementApiKey)) {
-    throw new Error('Lit account API key not configured.');
+    throw Object.assign(new Error('Lit account API key not configured.'), { status: 400, code: 'lit_management_key_missing' });
   }
 };
 
@@ -432,20 +435,6 @@ const listGroupActions = async ({ runtime, fetchImpl } = {}) => {
   return listActions({ runtime, fetchImpl, groupId: runtime.litGroupId });
 };
 
-const listGroups = async ({ runtime, fetchImpl } = {}) => {
-  const response = await fetchChipotleJson({
-    apiBase: runtime.litApiBase,
-    apiKey: runtime.litManagementApiKey,
-    allowLocalApiBase: runtimeAllowsLocalApiBase(runtime),
-    path: buildPagedPath('/list_groups', {
-      page_number: DEFAULT_PAGE_NUMBER,
-      page_size: DEFAULT_PAGE_SIZE,
-    }),
-    fetchImpl,
-  });
-  return Array.isArray(response) ? response : [];
-};
-
 const listWallets = async ({ runtime, fetchImpl } = {}) => {
   const response = await fetchChipotleJson({
     apiBase: runtime.litApiBase,
@@ -458,6 +447,62 @@ const listWallets = async ({ runtime, fetchImpl } = {}) => {
     fetchImpl,
   });
   return Array.isArray(response) ? response : [];
+};
+
+const MAX_GONE_CHECK_PAGES = 10;
+const GONE_CHECK_STATUSES = new Set([400, 401, 403, 404, 410, 422]);
+
+// Every id in a complete listing, or null when the listing is partial or an
+// item has no recognizable id.
+const listAllIds = async ({ runtime, path, idsOf, fetchImpl } = {}) => {
+  const ids = new Set();
+  for (let page = 0; page < MAX_GONE_CHECK_PAGES; page += 1) {
+    const items = await fetchChipotleJson({
+      apiBase: runtime.litApiBase,
+      apiKey: runtime.litManagementApiKey,
+      allowLocalApiBase: runtimeAllowsLocalApiBase(runtime),
+      path: buildPagedPath(path, { page_number: page, page_size: DEFAULT_PAGE_SIZE }),
+      fetchImpl,
+    });
+    if (!Array.isArray(items)) return null;
+    for (const item of items) {
+      const itemIds = idsOf(item);
+      if (!itemIds.length) return null;
+      itemIds.forEach((id) => ids.add(id));
+    }
+    if (items.length < DEFAULT_PAGE_SIZE) return ids;
+  }
+  return null;
+};
+
+// Only a Lit client error can mean saved setup is gone; network errors,
+// timeouts, 5xx, rate limits and billing refusals never start a check.
+export const mayMeanLitSetupGone = (failure) => GONE_CHECK_STATUSES.has(failure?.litStatus);
+
+// Saved setup is gone only when Lit says so: it refuses the saved account key,
+// or its complete group or wallet list (read with that key) lacks a saved
+// group or PKP. Failed, partial or unrecognized listings confirm nothing, so
+// the saved progress stays resumable.
+export const confirmLitSetupGone = async ({ checkpoint = {}, env = {}, fetchImpl = globalThis.fetch } = {}) => {
+  const apiKey = toTrimmedString(checkpoint.litAccountApiKey);
+  if (!apiKey) return '';
+  const groupId = toTrimmedString(checkpoint.litGroupId);
+  const pkpId = normalizeChipotleMembershipValue(checkpoint.litPkpId);
+  try {
+    const allowLocalApiBase = isLitChipotleLocalApiBaseAllowed(env);
+    const runtime = { litApiBase: normalizeLitChipotleApiBase(checkpoint.litApiBase || DEFAULT_LIT_API_BASE, { allowLocalApiBase }),
+      allowLocalApiBase, litManagementApiKey: apiKey };
+    // Listing groups also checks the key. Group ids are decimal.
+    const groups = await listAllIds({ runtime, path: '/list_groups', fetchImpl,
+      idsOf: (group) => [group?.id, group?.group_id].map(toTrimmedString).filter((id) => /^\d+$/.test(id)) });
+    if (groups && /^\d+$/.test(groupId) && !groups.has(groupId)) return 'resources';
+    if (!pkpId) return '';
+    const wallets = await listAllIds({ runtime, path: '/list_wallets', fetchImpl,
+      idsOf: (wallet) => [normalizeValidChipotlePkpId(wallet?.id), wallet?.wallet_address].map(normalizeChipotleMembershipValue).filter(Boolean) });
+    return wallets && !wallets.has(pkpId) ? 'resources' : '';
+  } catch (error) {
+    return [401, 403].includes(error?.litStatus) ? 'account' : '';
+  }
 };
 
 const resolveActionCidMembership = async ({ runtime, actions = [], fetchImpl } = {}) => {
@@ -793,6 +838,7 @@ const createLitChipotleGroup = async ({
 const createLitChipotleWallet = async ({
   runtime = {},
   fetchImpl = globalThis.fetch,
+  checkpointWallet,
 } = {}) => {
   const response = await fetchChipotleJson({
     apiBase: runtime.litApiBase,
@@ -802,6 +848,7 @@ const createLitChipotleWallet = async ({
     fetchImpl,
   });
   const walletAddress = toTrimmedString(response?.wallet_address);
+  if (walletAddress) await checkpointWallet?.(walletAddress);
   const wallets = await listWallets({ runtime, fetchImpl }).catch(() => []);
   const matchedWallet = wallets.find((entry) => {
     const entryWalletAddress = toTrimmedString(entry?.wallet_address).toLowerCase();
@@ -962,12 +1009,12 @@ const ensurePkpInGroup = async ({ runtime = {}, groupId = '', fetchImpl = global
   };
 };
 
-export const provisionLitChipotleAction = async ({ runtime = {}, config = {}, secrets = {}, request = {}, sessionSlug = '', persistAuthorizationSecret, fetchImpl = globalThis.fetch } = {}) => {
+export const provisionLitChipotleAction = async ({ runtime = {}, config = {}, secrets = {}, request = {}, sessionSlug = '', persistAuthorizationSecret, provisioning, checkpointProvisioning, fetchImpl = globalThis.fetch } = {}) => {
   ensureChipotleManagementApiKey(runtime);
   return bootstrapLitChipotleSession({
     env: { LIT_API_BASE: runtime.litApiBase, LIT_ACCOUNT_API_KEY: runtime.litManagementApiKey,
       LIT_CHIPOTLE_ALLOW_LOCAL_API_BASE: runtime.allowLocalApiBase ? 'true' : '' },
-    config, secrets, request, sessionSlug, persistAuthorizationSecret, fetchImpl,
+    config, secrets, request, sessionSlug, persistAuthorizationSecret, provisioning, checkpointProvisioning, fetchImpl,
   });
 };
 
@@ -1009,331 +1056,123 @@ export const bootstrapLitChipotleSession = async (options = {}) => {
 };
 
 const bootstrapLitChipotleSessionCore = async ({
-  env = {},
-  config = {},
-  secrets = {},
-  request = {},
-  sessionSlug = '',
-  buildActionCode,
-  fetchImpl = globalThis.fetch,
+  env = {}, config = {}, secrets = {}, request = {}, sessionSlug = '', buildActionCode,
+  provisioning = {}, checkpointProvisioning, fetchImpl = globalThis.fetch,
 } = {}) => {
+  const progress = { ...provisioning };
+  const checkpoint = async (values) => {
+    Object.assign(progress, values);
+    await checkpointProvisioning?.({ ...progress });
+  };
   const litCredentials = isObj(config?.litCredentials) ? config.litCredentials : {};
-  const secretAccountApiKey = toTrimmedString(secrets?.litAccountApiKey);
   const requestBody = isObj(request) ? request : {};
+  const secretAccountApiKey = toTrimmedString(secrets?.litAccountApiKey);
   const requestAccountApiKey = toTrimmedString(requestBody.litAccountApiKey);
   const envAccountApiKey = toTrimmedString(env?.LIT_ACCOUNT_API_KEY);
-  const existingAccountApiKey = secretAccountApiKey || requestAccountApiKey || envAccountApiKey;
-  const existingAccountApiKeySource = secretAccountApiKey
-    ? 'session-secret'
-    : requestAccountApiKey
-      ? 'admin-request'
-      : envAccountApiKey
-      ? 'worker-env'
-      : 'missing';
-  // A complete intended secret snapshot must explicitly clear an old session
-  // account when switching to the Worker account, including durable retries.
-  const accountSecretOutput = existingAccountApiKeySource === 'worker-env' ? '' : existingAccountApiKey;
-  const existingUsageApiKey = toTrimmedString(secrets?.litUsageApiKey);
-  const existingGroupId = toTrimmedString(litCredentials?.litGroupId);
-  const existingPkpId = toTrimmedString(litCredentials?.litPkpId);
-  const existingActionCid = toTrimmedString(litCredentials?.litActionCid);
+  const supplied = {
+    litAccountApiKey: [requestAccountApiKey, secretAccountApiKey || requestAccountApiKey || envAccountApiKey],
+    litApiBase: [requestBody.litApiBase, litCredentials.litApiBase || env.LIT_API_BASE],
+    litGroupId: [litCredentials.litGroupId],
+    litPkpId: [litCredentials.litPkpId],
+    litActionCid: [litCredentials.litActionCid],
+    litUsageApiKey: [litCredentials.litGroupId === progress.litGroupId ? secrets.litUsageApiKey : ''],
+  };
+  for (const [key, candidates] of Object.entries(supplied)) {
+    const normalize = value => {
+      const text = toTrimmedString(value);
+      if (key !== 'litApiBase' || !text) return text;
+      try { return normalizeLitChipotleApiBase(text, { allowLocalApiBase: isLitChipotleLocalApiBaseAllowed(env) }); }
+      catch { return text; }
+    };
+    const saved = normalize(progress[key]);
+    if (saved && candidates.some(value => normalize(value) && normalize(value) !== saved)) {
+      throw Object.assign(new Error(LIT_PROVISIONING_CREDENTIALS_CONFLICT), {
+        status: 409, code: 'lit_provisioning_credentials_conflict',
+      });
+    }
+  }
+  let accountApiKey = toTrimmedString(progress.litAccountApiKey) || secretAccountApiKey || requestAccountApiKey || envAccountApiKey;
+  const accountSource = secretAccountApiKey ? 'session-secret' : requestAccountApiKey ? 'admin-request' : envAccountApiKey ? 'worker-env' : 'missing';
+  let accountSecretOutput = Object.hasOwn(progress, 'accountSecretOutput') ? progress.accountSecretOutput : accountSource === 'worker-env' ? '' : accountApiKey;
+  let groupId = toTrimmedString(progress.litGroupId || litCredentials.litGroupId);
+  let usageApiKey = toTrimmedString(progress.litUsageApiKey || (groupId && groupId === toTrimmedString(litCredentials.litGroupId) ? secrets?.litUsageApiKey : ''));
+  let litPkpId = toTrimmedString(progress.litPkpId || litCredentials.litPkpId);
+  let litActionCid = toTrimmedString(progress.litActionCid || litCredentials.litActionCid);
   const allowLocalApiBase = isLitChipotleLocalApiBaseAllowed(env);
-  const litApiBase = normalizeLitChipotleApiBase(
-    requestBody.litApiBase ||
-    litCredentials.litApiBase ||
-    env?.LIT_API_BASE ||
-    DEFAULT_LIT_API_BASE,
-    { allowLocalApiBase }
-  );
+  const litApiBase = normalizeLitChipotleApiBase(progress.litApiBase || requestBody.litApiBase || litCredentials.litApiBase || env.LIT_API_BASE || DEFAULT_LIT_API_BASE, { allowLocalApiBase });
+  const steps = { createdAccount: false, createdGroup: false, createdWallet: false, derivedCid: false,
+    registeredAction: false, addedActionToGroup: false, addedPkpToGroup: false, createdUsageKey: false };
 
-  if (existingActionCid) {
-    if (!existingPkpId) throw new Error(LIT_AUTHORIZATION_REPROVISION_ERROR);
-    // Validate before the completed-setup return or any permission mutation:
-    // attaching a stale unsigned Action would bypass Worker authorization.
-    const expectedCid = await deriveLitActionCid({
-      runtime: { litApiBase, allowLocalApiBase },
-      actionCode: buildActionCode(existingPkpId),
-      fetchImpl,
-    });
-    if (expectedCid !== existingActionCid) {
-      throw new Error('Lit Action code does not match the configured Lit Action CID. Reprovision with a fresh session authority.');
-    }
+  // A saved checkpoint binds this CID to the already-selected signer and PKP.
+  // Only externally configured credentials need the fresh code comparison.
+  if (litActionCid && !progress.litActionCid) {
+    if (!litPkpId) throw new Error(LIT_AUTHORIZATION_REPROVISION_ERROR);
+    const expectedCid = await deriveLitActionCid({ runtime: { litApiBase, allowLocalApiBase }, actionCode: buildActionCode(litPkpId), fetchImpl });
+    if (expectedCid !== litActionCid) throw new Error('Lit Action code does not match the configured Lit Action CID. Reprovision with a fresh session authority.');
   }
-
-  if (
-    existingAccountApiKey &&
-    existingUsageApiKey &&
-    existingGroupId &&
-    existingPkpId &&
-    existingActionCid
-  ) {
-    return {
-      ok: true,
-      bootstrapMode: envAccountApiKey && !secretAccountApiKey ? 'existing-account' : 'session-account',
-      alreadyBootstrapped: true,
-      apiBase: litApiBase,
-      litActionCid: existingActionCid,
-      litGroupId: existingGroupId,
-      litPkpId: existingPkpId,
-      litCredentials: {
-        litApiBase,
-        litActionCid: existingActionCid,
-        litGroupId: existingGroupId,
-        litPkpId: existingPkpId,
-      },
-      secretOutputs: {
-        litAccountApiKey: accountSecretOutput,
-        litUsageApiKey: existingUsageApiKey,
-      },
-      steps: {
-        createdAccount: false,
-        createdGroup: false,
-        createdWallet: false,
-        derivedCid: false,
-        registeredAction: false,
-        addedActionToGroup: false,
-        addedPkpToGroup: false,
-        createdUsageKey: false,
-      },
-    };
+  const alreadyBootstrapped = !!(accountApiKey && usageApiKey && groupId && litPkpId && litActionCid && !Object.keys(provisioning).length);
+  await checkpoint({ litApiBase, ...(accountApiKey ? { litAccountApiKey: accountApiKey, accountSecretOutput } : {}),
+    ...(groupId ? { litGroupId: groupId } : {}), ...(litPkpId ? { litPkpId } : {}),
+    ...(litActionCid ? { litActionCid } : {}), ...(usageApiKey && groupId ? { litUsageApiKey: usageApiKey } : {}),
+    ...(alreadyBootstrapped ? { registeredAction: true, addedActionToGroup: true, addedPkpToGroup: true } : {}) });
+  if (!toTrimmedString(requestBody.actionCode || requestBody.code) && !litActionCid) throw new Error('Lit Action code is required.');
+  if (!accountApiKey) {
+    const account = await createLitChipotleAccount({ apiBase: litApiBase, allowLocalApiBase, request: requestBody, sessionSlug, fetchImpl });
+    accountApiKey = toTrimmedString(account.accountApiKey);
+    if (!accountApiKey) throw new Error('Lit account bootstrap did not return an account API key.');
+    accountSecretOutput = accountApiKey;
+    steps.createdAccount = true;
+    await checkpoint({ litAccountApiKey: accountApiKey, accountSecretOutput, accountWalletAddress: account.accountWalletAddress });
   }
-
-  const actionCode = toTrimmedString(requestBody.actionCode || requestBody.code);
-  if (!actionCode && !existingActionCid) {
-    throw new Error('Lit Action code is required.');
-  }
-
-  if (existingAccountApiKey) {
-    const runtime = {
-      litApiBase,
-      allowLocalApiBase,
-      litManagementApiKey: existingAccountApiKey,
-      apiKeySource: existingAccountApiKeySource,
-    };
-
-    let groupId = existingGroupId;
-    let createdGroup = false;
-    if (!groupId) {
-      const group = await createLitChipotleGroup({
-        runtime,
-        request: requestBody,
-        sessionSlug,
-        fetchImpl,
-      });
-      groupId = toTrimmedString(group.groupId);
-      if (!groupId) {
-        throw new Error('Lit session bootstrap did not return a group ID.');
-      }
-      createdGroup = true;
-    }
-
-    let litPkpId = existingPkpId;
-    let createdWallet = false;
-    if (!litPkpId) {
-      const wallet = await createLitChipotleWallet({
-        runtime,
-        fetchImpl,
-      });
-      litPkpId = toTrimmedString(wallet.litPkpId);
-      if (!litPkpId) {
-        throw new Error('Lit session bootstrap did not return a PKP ID.');
-      }
-      createdWallet = true;
-    }
-
-    const runtimeWithGroup = {
-      ...runtime,
-      litGroupId: groupId,
-      litPkpId,
-    };
-    const litActionCid = existingActionCid || await deriveLitActionCid({
-      runtime: runtimeWithGroup,
-      actionCode: buildActionCode(litPkpId),
-      fetchImpl,
-    });
-    const metadata = await ensureActionMetadata({
-      runtime: runtimeWithGroup,
-      litActionCid,
-      actionName: requestBody.actionName || requestBody.name,
-      actionDescription: requestBody.actionDescription || requestBody.description,
-      fetchImpl,
-    });
-    const groupAction = await ensureActionInGroup({
-      runtime: runtimeWithGroup,
-      groupId,
-      litActionCid,
-      fetchImpl,
-    });
-    const groupPkp = await ensurePkpInGroup({
-      runtime: runtimeWithGroup,
-      groupId,
-      fetchImpl,
-    });
-
-    let usageApiKey = existingUsageApiKey;
-    let createdUsageKey = false;
-    if (!usageApiKey || createdGroup) {
-      const usageKey = await createLitChipotleUsageKey({
-        runtime: runtimeWithGroup,
-        groupId,
-        request: requestBody,
-        sessionSlug,
-        fetchImpl,
-      });
-      usageApiKey = toTrimmedString(usageKey.usageApiKey);
-      if (!usageApiKey) {
-        throw new Error('Lit session bootstrap did not return a usage API key.');
-      }
-      createdUsageKey = true;
-    }
-    const billingBalance = await readChipotleBillingBalance({
-      apiBase: litApiBase,
-      apiKey: existingAccountApiKey,
-      allowLocalApiBase,
-      fetchImpl,
-    });
-
-    return {
-      ok: true,
-      bootstrapMode: 'existing-account',
-      alreadyBootstrapped: false,
-      apiBase: litApiBase,
-      litActionCid,
-      litGroupId: groupId,
-      litPkpId,
-      billingBalance,
-      litCredentials: {
-        litApiBase,
-        litActionCid,
-        litGroupId: groupId,
-        litPkpId,
-      },
-      secretOutputs: {
-        litAccountApiKey: accountSecretOutput,
-        ...(usageApiKey ? { litUsageApiKey: usageApiKey } : {}),
-      },
-      steps: {
-        createdAccount: false,
-        createdGroup,
-        createdWallet,
-        derivedCid: !existingActionCid,
-        registeredAction: metadata.created,
-        addedActionToGroup: groupAction.added,
-        addedPkpToGroup: groupPkp.added,
-        createdUsageKey,
-      },
-    };
-  }
-
-  const account = await createLitChipotleAccount({
-    apiBase: litApiBase,
-    allowLocalApiBase,
-    request: requestBody,
-    sessionSlug,
-    fetchImpl,
-  });
-  if (!account.accountApiKey) {
-    throw new Error('Lit account bootstrap did not return an account API key.');
-  }
-
-  const runtime = {
-    litApiBase,
-    allowLocalApiBase,
-    litManagementApiKey: account.accountApiKey,
-    apiKeySource: 'bootstrap-account',
-  };
-  const group = await createLitChipotleGroup({
-    runtime,
-    request: requestBody,
-    sessionSlug,
-    fetchImpl,
-  });
-  const groupId = toTrimmedString(group.groupId);
+  const runtime = { litApiBase, allowLocalApiBase, litManagementApiKey: accountApiKey, apiKeySource: accountSource };
   if (!groupId) {
-    throw new Error('Lit session bootstrap did not return a group ID.');
+    groupId = toTrimmedString((await createLitChipotleGroup({ runtime, request: requestBody, sessionSlug, fetchImpl })).groupId);
+    if (!groupId) throw new Error('Lit session bootstrap did not return a group ID.');
+    steps.createdGroup = true;
+    await checkpoint({ litGroupId: groupId });
   }
-
-  const wallet = await createLitChipotleWallet({
-    runtime,
-    fetchImpl,
-  });
-  const litPkpId = toTrimmedString(wallet.litPkpId);
   if (!litPkpId) {
-    throw new Error('Lit session bootstrap did not return a PKP ID.');
+    const wallet = await createLitChipotleWallet({ runtime, fetchImpl,
+      checkpointWallet: id => checkpoint({ litPkpId: id }),
+    });
+    litPkpId = toTrimmedString(wallet.litPkpId);
+    if (!litPkpId) throw new Error('Lit session bootstrap did not return a PKP ID.');
+    steps.createdWallet = true;
+    await checkpoint({ litPkpId });
   }
-
-  const runtimeWithGroup = {
-    ...runtime,
-    litGroupId: groupId,
-    litPkpId,
-  };
-  const litActionCid = await deriveLitActionCid({
-    runtime: runtimeWithGroup,
-    actionCode: buildActionCode(litPkpId),
-    fetchImpl,
-  });
-  const metadata = await ensureActionMetadata({
-    runtime: runtimeWithGroup,
-    litActionCid,
-    actionName: requestBody.actionName || requestBody.name,
-    actionDescription: requestBody.actionDescription || requestBody.description,
-    fetchImpl,
-  });
-  const groupAction = await ensureActionInGroup({
-    runtime: runtimeWithGroup,
-    groupId,
-    litActionCid,
-    fetchImpl,
-  });
-  const groupPkp = await ensurePkpInGroup({
-    runtime: runtimeWithGroup,
-    groupId,
-    fetchImpl,
-  });
-  const usageKey = await createLitChipotleUsageKey({
-    runtime: runtimeWithGroup,
-    groupId,
-    request: requestBody,
-    sessionSlug,
-    fetchImpl,
-  });
-  const billingBalance = await readChipotleBillingBalance({
-    apiBase: litApiBase,
-    apiKey: account.accountApiKey,
-    allowLocalApiBase,
-    fetchImpl,
-  });
-
+  const runtimeWithGroup = { ...runtime, litGroupId: groupId, litPkpId };
+  if (!litActionCid) {
+    litActionCid = await deriveLitActionCid({ runtime: runtimeWithGroup, actionCode: buildActionCode(litPkpId), fetchImpl });
+    steps.derivedCid = true;
+    await checkpoint({ litActionCid });
+  }
+  if (!alreadyBootstrapped && !progress.registeredAction) {
+    steps.registeredAction = (await ensureActionMetadata({ runtime: runtimeWithGroup, litActionCid,
+      actionName: requestBody.actionName || requestBody.name, actionDescription: requestBody.actionDescription || requestBody.description, fetchImpl })).created;
+    await checkpoint({ registeredAction: true });
+  }
+  if (!alreadyBootstrapped && !progress.addedActionToGroup) {
+    steps.addedActionToGroup = (await ensureActionInGroup({ runtime: runtimeWithGroup, groupId, litActionCid, fetchImpl })).added;
+    await checkpoint({ addedActionToGroup: true });
+  }
+  if (!alreadyBootstrapped && !progress.addedPkpToGroup) {
+    steps.addedPkpToGroup = (await ensurePkpInGroup({ runtime: runtimeWithGroup, groupId, fetchImpl })).added;
+    await checkpoint({ addedPkpToGroup: true });
+  }
+  if (!usageApiKey || steps.createdGroup) {
+    usageApiKey = toTrimmedString((await createLitChipotleUsageKey({ runtime: runtimeWithGroup, groupId, request: requestBody, sessionSlug, fetchImpl })).usageApiKey);
+    if (!usageApiKey) throw new Error('Lit session bootstrap did not return a usage API key.');
+    steps.createdUsageKey = true;
+    await checkpoint({ litUsageApiKey: usageApiKey });
+  }
+  const billingBalance = alreadyBootstrapped ? undefined : await readChipotleBillingBalance({ apiBase: litApiBase, apiKey: accountApiKey, allowLocalApiBase, fetchImpl });
   return {
-    ok: true,
-    bootstrapMode: 'session-account',
-    alreadyBootstrapped: false,
-    apiBase: litApiBase,
-    litActionCid,
-    litGroupId: groupId,
-    litPkpId,
-    accountWalletAddress: account.accountWalletAddress,
-    billingBalance,
-    litCredentials: {
-      litApiBase,
-      litActionCid,
-      litGroupId: groupId,
-      litPkpId,
-    },
-    secretOutputs: {
-      litAccountApiKey: account.accountApiKey,
-      litUsageApiKey: toTrimmedString(usageKey.usageApiKey),
-    },
-    steps: {
-      createdAccount: true,
-      createdGroup: true,
-      createdWallet: true,
-      derivedCid: true,
-      registeredAction: metadata.created,
-      addedActionToGroup: groupAction.added,
-      addedPkpToGroup: groupPkp.added,
-      createdUsageKey: true,
-    },
+    ok: true, bootstrapMode: steps.createdAccount || (alreadyBootstrapped && (secretAccountApiKey || !envAccountApiKey)) ? 'session-account' : 'existing-account',
+    alreadyBootstrapped, apiBase: litApiBase, litActionCid, litGroupId: groupId, litPkpId,
+    ...(steps.createdAccount ? { accountWalletAddress: progress.accountWalletAddress } : {}),
+    ...(billingBalance !== undefined ? { billingBalance } : {}),
+    litCredentials: { litApiBase, litActionCid, litGroupId: groupId, litPkpId },
+    secretOutputs: { litAccountApiKey: accountSecretOutput, litUsageApiKey: usageApiKey }, steps,
   };
 };
 
@@ -1440,11 +1279,8 @@ export const executeSessionLitChipotleAction = async ({
   const gateChainId = resolveChainIdWithLegacyFallback(
     requestBody.chainId,
     resolveChainIdWithLegacyFallback(
-      requestBody.gateChainId,
-      resolveChainIdWithLegacyFallback(
-        config?.networkChainId,
-        resolveChainIdWithLegacyFallback(config?.registryChainId, 0),
-      ),
+      config?.networkChainId,
+      resolveChainIdWithLegacyFallback(config?.registryChainId, 0),
     ),
   );
   if (!gateChainId) {

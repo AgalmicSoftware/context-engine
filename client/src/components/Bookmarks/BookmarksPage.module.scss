@@ -35,13 +35,6 @@ $muted-text: var(--ce-panel-text-muted);
   letter-spacing: -0.3px;
 }
 
-.subtitle {
-  margin: 0.5rem 0 0;
-  color: $muted-text;
-  max-width: 640px;
-  line-height: 1.5;
-}
-
 .refreshButton {
   width: 46px;
   height: 46px;

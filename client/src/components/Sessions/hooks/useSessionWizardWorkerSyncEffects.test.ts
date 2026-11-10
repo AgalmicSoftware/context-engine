@@ -17,7 +17,6 @@ const renderWorkerSync = (
     buildWorkerName: jest.Mock<string, [unknown]>;
     deployComplete: boolean;
     deployWorkerUrl: unknown;
-    wizardMode: string;
     workerMode: string;
   }> = {},
 ) => {
@@ -40,7 +39,6 @@ const renderWorkerSync = (
       deployComplete: overrides.deployComplete ?? false,
       deployWorkerUrl: overrides.deployWorkerUrl ?? '',
       setDeployComplete,
-      wizardMode: overrides.wizardMode ?? 'advanced',
       workerMode: overrides.workerMode ?? 'custom',
       setWorkerMode,
       setWorkerUrlAutoFilled,
@@ -108,13 +106,12 @@ describe('useSessionWizardWorkerSyncEffects', () => {
     expect(setDeployComplete).toHaveBeenCalledWith(false);
   });
 
-  it('clears the shared fallback worker in normal mode when hosted worker sharing is disabled', () => {
+  it('clears the shared fallback worker', () => {
     const defaultWorkerUrl = getSessionWizardDefaultWorkerUrl();
     expect(defaultWorkerUrl).toBeTruthy();
 
     const { setWorkerMode, setWorkerUrlAutoFilled, updateDraftValue } = renderWorkerSync({
       draftCorsWorkerUrl: defaultWorkerUrl,
-      wizardMode: 'normal',
       workerMode: 'default',
     });
 

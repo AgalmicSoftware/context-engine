@@ -132,7 +132,3 @@ export const deriveLegacyPayloadAccessMode = (accessControl) => {
   }
   return LEGACY_PAYLOAD_ACCESS_MODES.WORKER_SBT_GATE;
 };
-
-export const payloadAccessUsesWorkerEnvelope = (accessControl) => (
-  normalizePayloadAccessControl(accessControl).encryption === PAYLOAD_ENCRYPTION_MODES.WORKER_ENVELOPE
-);

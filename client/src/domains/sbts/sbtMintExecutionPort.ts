@@ -6,9 +6,9 @@ import type { SbtMintExecutionPort } from './sbtPorts.js';
 export { noteWorkerAccessChanged } from '../../utilities/worker/workerAuth.js';
 
 export const sbtMintExecutionPort: SbtMintExecutionPort = {
-  claim: (providerName, sbtAddress) => chainGateway.claim(providerName, sbtAddress),
-  claimWithInvite: (providerName, sbtAddress, nonce, signature) =>
-    chainGateway.claimWithInvite(providerName, sbtAddress, nonce, signature),
-  mintWithGroupSignature: (providerName, sbtAddress, signature) =>
-    chainGateway.mintWithGroupSignature(providerName, sbtAddress, signature),
+  claim: (providerName, sbtAddress, expectedChainId) => chainGateway.claim(providerName, sbtAddress, expectedChainId),
+  claimWithInvite: (providerName, sbtAddress, nonce, signature, expectedChainId) =>
+    chainGateway.claimWithInvite(providerName, sbtAddress, nonce, signature, expectedChainId),
+  mintWithGroupSignature: (providerName, sbtAddress, signature, expectedChainId) =>
+    chainGateway.mintWithGroupSignature(providerName, sbtAddress, signature, expectedChainId),
 };

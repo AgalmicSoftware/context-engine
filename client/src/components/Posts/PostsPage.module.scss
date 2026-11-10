@@ -47,14 +47,6 @@ $viz-panel-border: var(--ce-card-border);
   padding: 0;
 }
 
-.eyebrow {
-  margin: 0 0 8px;
-  color: $muted;
-  font-size: 0.78rem;
-  letter-spacing: 0;
-  text-transform: uppercase;
-}
-
 .mainTitle,
 .postTitle {
   margin: 0;
@@ -1922,13 +1914,6 @@ h3.postHeading {
   height: 100%;
 }
 
-.binaryBeeswarmHint {
-  margin: 0;
-  color: color-mix(in srgb, var(--ce-control-text) 50%, transparent);
-  font-size: 0.74rem;
-  line-height: 1.32;
-}
-
 .vizToolbar {
   display: flex;
   align-items: center;
@@ -2719,7 +2704,7 @@ h3.postHeading {
 
 // These charts originally paired inverse text with translucent dark surfaces.
 // Keep complete foreground/background pairs when the page uses a light canvas.
-@container ce-theme style(--ce-layout-profile: minimal-app) {
+@container ce-theme style(--ce-layout-profile: minimal-app) or style(--ce-layout-profile: desktop-window) {
   .postDisclosure,
   .postCode,
   .precisionBeeswarmCard,
@@ -2762,6 +2747,15 @@ h3.postHeading {
     fill: var(--ce-panel-text-muted);
   }
 
+  .binaryListConfidence {
+    color: var(--ce-status-warning-text);
+  }
+
+  .binaryBeeswarmTooltipClose:hover,
+  .binaryBeeswarmTooltipClose:focus-visible {
+    color: var(--ce-panel-text);
+  }
+
   .markdownBody a {
     &,
     &:visited,
@@ -2770,6 +2764,14 @@ h3.postHeading {
       background: var(--ce-surface-subtle);
       color: var(--ce-link);
     }
+  }
+}
+
+// Classic's accent teal is too light for text on its gray window face.
+@container ce-theme style(--ce-layout-profile: desktop-window) {
+  .tag,
+  .editorialSummaryValue strong {
+    color: var(--ce-panel-text);
   }
 }
 

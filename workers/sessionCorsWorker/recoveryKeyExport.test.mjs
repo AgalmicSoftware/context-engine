@@ -27,7 +27,8 @@ const fixture = () => {
 };
 
 test('recovery key export requires admin signature and explicit signed confirmation, limits and audits exports', async (t) => {
-  let clock = Date.now();
+  // Start at midday UTC so these requests never cross the daily limit's midnight.
+  let clock = new Date().setUTCHours(12, 0, 0, 0);
   t.mock.method(Date, 'now', () => clock);
   const env = fixture();
   const worker = createWorkerRuntime(env, { now: () => clock });

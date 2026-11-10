@@ -47,9 +47,6 @@ export const AGENT_CREDENTIAL_DEFAULT_SCOPES = Object.freeze([
   AGENT_CREDENTIAL_SCOPES.POSE_QUESTIONS,
 ]);
 
-// Compatibility exports for the Telegram adapter. New transport-neutral code
-// should use the AGENT_CREDENTIAL names above.
-
 function normalizeSessionId(value = '') {
   const normalized = safeString(value).toLowerCase().replace(/^0x/, '').replace(/-/g, '');
   return /^[0-9a-f]{32}$/.test(normalized) && !/^0+$/.test(normalized) ? `0x${normalized}` : '';
@@ -404,24 +401,16 @@ export async function loadAgentCredentialHash({ env = {}, tokenHash = '', now = 
 export async function revokeAgentCredentialHash({ env = {}, tokenHash = '' } = {}) {
   const kv = env?.AGENT_ACTION_KV;
   const key = tokenKvKey(tokenHash);
-  if (!key || !kv || typeof kv.get !== 'function' || typeof kv.delete !== 'function') {
+  if (!key || !kv || typeof kv.delete !== 'function') {
     return { ok: false, reason: 'agent_token_storage_unavailable' };
   }
-  const loaded = await readKvJson(kv, key);
-  if (!loaded.ok) return { ok: false, reason: loaded.reason };
-  const slotKey = safeString(loaded.value?.slotKey);
-  if (slotKey) {
-    const slot = await readKvJson(kv, slotKey);
-    if (!slot.ok) return { ok: false, reason: slot.reason };
-    if (safeString(slot.value?.tokenHash).toLowerCase() === safeString(tokenHash).toLowerCase()) {
-      try {
-        await kv.delete(slotKey);
-      } catch {
-        return { ok: false, reason: 'agent_token_storage_unavailable' };
-      }
-    }
+  // A newer issuance may already own the shared slot. Removing this token's
+  // record is sufficient to revoke it without touching that newer credential.
+  try {
+    await kv.delete(key);
+  } catch {
+    return { ok: false, reason: 'agent_token_storage_unavailable' };
   }
-  await deleteKvBestEffort(kv, key);
   return { ok: true, tokenHash: safeString(tokenHash).toLowerCase() };
 }
 

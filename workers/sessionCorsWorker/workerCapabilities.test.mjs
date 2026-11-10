@@ -69,6 +69,16 @@ test('missing KEK blocks envelope writes but leaves plaintext submissions availa
   }
 });
 
+test('storage readiness accepts GROUP_KV only when the Worker opts in', async () => {
+  for (const [optIn, storage] of [[{ CE_STORAGE_IN_GROUP_KV: '1' }, 'ok'], [{}, 'missing']]) {
+    const env = { ...envFor({ ok: true, revision: 1, config: {} }), GROUP_KV: { get() {}, put() {} }, ...optIn };
+    delete env.CE_STORAGE_INDEX_KV;
+    const body = await (await fetchCapabilities(env, '?slug=sample')).json();
+    assert.equal(body.session.readiness.storage, storage);
+    assert.equal(body.session.unavailable.some((item) => item.reason === 'storage_missing'), storage === 'missing');
+  }
+});
+
 test('capabilities rejects malformed slugs without calling the coordinator', async () => {
   const env = envFor({});
   env.CE_SESSION_COORDINATOR.get = () => { throw new Error('must not call'); };

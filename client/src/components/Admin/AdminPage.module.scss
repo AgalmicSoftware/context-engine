@@ -8,8 +8,9 @@ $admin-border: var(--ce-card-border);
 $admin-border-soft: var(--ce-card-border);
 $admin-surface: var(--ce-card-bg);
 $admin-surface-strong: var(--ce-surface-raised);
-$admin-deep: color-mix(in srgb, var(--ce-overlay-base) 72%, transparent);
-$admin-deep-strong: color-mix(in srgb, var(--ce-overlay-base) 84%, transparent);
+// Tints of the panel's own text, so they stay light behind dark text and dark behind light text.
+$admin-deep: color-mix(in srgb, var(--ce-panel-text) 6%, transparent);
+$admin-deep-strong: color-mix(in srgb, var(--ce-panel-text) 10%, transparent);
 $admin-accent: var(--ce-action-accent);
 $admin-accent-soft: color-mix(in srgb, var(--ce-action-accent) 14%, transparent);
 $admin-cyan-soft: color-mix(in srgb, var(--ce-data-series-8) 18%, transparent);
@@ -76,7 +77,7 @@ $card-shadow: var(--ce-card-shadow);
 }
 
 .adminPage :global(.form-control::placeholder) {
-  color: color-mix(in srgb, var(--ce-text-inverse) 45%, transparent);
+  color: $admin-muted;
 }
 
 .adminPage :global(.form-control:focus) {
@@ -96,7 +97,7 @@ $card-shadow: var(--ce-card-shadow);
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: color-mix(in srgb, var(--ce-text-inverse) 72%, transparent);
+  color: $admin-text;
   margin-bottom: 0.55rem;
 }
 
@@ -108,6 +109,7 @@ $card-shadow: var(--ce-card-shadow);
   padding: clamp(20px, 3vw, 30px);
   border-radius: var(--ce-radius-18);
   border: 1px solid $admin-border;
+  background: $admin-surface;
   // background:
   //   linear-gradient(135deg, color-mix(in srgb, var(--ce-data-series-8) 14%, transparent) 0%, color-mix(in srgb, var(--ce-data-series-8) 3%, transparent) 24%, color-mix(in srgb, var(--ce-text-inverse) 5%, transparent) 100%),
   //   $admin-bg;
@@ -119,13 +121,6 @@ $card-shadow: var(--ce-card-shadow);
   display: flex;
   flex-direction: column;
   gap: 16px;
-}
-
-.heroKicker {
-  font-size: 0.72rem;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: color-mix(in srgb, var(--ce-text-inverse) 62%, transparent);
 }
 
 .heroTopRow {
@@ -153,6 +148,8 @@ $card-shadow: var(--ce-card-shadow);
   font-size: clamp(2rem, 4vw, 2.5rem);
   line-height: 1;
   letter-spacing: 0.01em;
+  // A global h1 colour would otherwise turn it white on light themes.
+  color: $admin-text;
 }
 
 .subtitle {
@@ -178,7 +175,7 @@ $card-shadow: var(--ce-card-shadow);
 .connectionBadgeActive {
   background: color-mix(in srgb, var(--ce-action-accent) 12%, transparent);
   border-color: color-mix(in srgb, var(--ce-action-accent) 34%, transparent);
-  color: color-mix(in srgb, var(--ce-action-accent) 96%, transparent);
+  color: $admin-text;
 }
 
 .connectionBadgeIdle {
@@ -220,7 +217,7 @@ $card-shadow: var(--ce-card-shadow);
   font-size: 0.68rem;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: color-mix(in srgb, var(--ce-text-inverse) 58%, transparent);
+  color: $admin-muted;
 }
 
 .heroStatHeader {
@@ -327,12 +324,11 @@ $card-shadow: var(--ce-card-shadow);
 }
 
 .heroSessionDetailLabel {
-  opacity: 0.5;
   font-size: 1.1rem;
   font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: color-mix(in srgb, var(--ce-text-inverse) 58%, transparent);
+  color: $admin-muted;
   white-space: nowrap;
 }
 
@@ -463,7 +459,7 @@ $card-shadow: var(--ce-card-shadow);
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: color-mix(in srgb, var(--ce-text-inverse) 58%, transparent);
+  color: $admin-muted;
 }
 
 .heroAllowlistInput:global(.form-control) {
@@ -531,8 +527,36 @@ $card-shadow: var(--ce-card-shadow);
   border-radius: var(--ce-radius-16);
   border: 1px solid $admin-border;
   background: $admin-surface;
+  color: $admin-text;
   backdrop-filter: blur(12px);
   box-shadow: $card-shadow;
+}
+
+// Outside .adminPage too: the Groups panel also sits on the session page. The theme's input colours outrank a plain rule.
+.panel :global(.form-control),
+.panel :global(.form-select) {
+  border: 1px solid var(--ce-input-border-strong) !important;
+  color: var(--ce-control-text) !important;
+  -webkit-text-fill-color: var(--ce-control-text);
+}
+
+// Over an opaque surface, since a translucent input fill would otherwise add up with every layer under it.
+.panel :global(.form-control) {
+  background: linear-gradient(var(--ce-input-bg), var(--ce-input-bg)), var(--ce-surface) !important;
+}
+
+// Only the colour, to keep the select's arrow, which is a background image.
+.panel :global(.form-select) {
+  background-color: var(--ce-surface) !important;
+}
+
+.panel :global(.form-control::placeholder) {
+  color: var(--ce-panel-text-muted) !important;
+  -webkit-text-fill-color: var(--ce-panel-text-muted);
+}
+
+.panel :global(label) {
+  color: $admin-text;
 }
 
 .panel:focus-within {
@@ -562,7 +586,6 @@ $card-shadow: var(--ce-card-shadow);
 }
 
 .panelTitle {
-  opacity: 0.5;
   margin: 0;
   font-size: 1.4rem;
   font-weight: 700;
@@ -582,7 +605,7 @@ $card-shadow: var(--ce-card-shadow);
   font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: color-mix(in srgb, var(--ce-text-inverse) 58%, transparent);
+  color: $admin-muted;
 }
 
 .collapseToggle:global(.btn) {
@@ -598,7 +621,7 @@ $card-shadow: var(--ce-card-shadow);
   border: 0px solid color-mix(in srgb, var(--ce-text-inverse) 14%, transparent);
   /* border-radius: var(--ce-radius-12); */
   /* background: color-mix(in srgb, var(--ce-text-inverse) 4%, transparent); */
-  color: color-mix(in srgb, var(--ce-text-inverse) 76%, transparent);
+  color: $admin-muted;
   box-shadow: none;
 }
 
@@ -627,27 +650,25 @@ $card-shadow: var(--ce-card-shadow);
   flex-wrap: wrap;
 }
 
-.workerUrlRow {
-  display: flex;
-  align-items: stretch;
-  gap: 8px;
-}
-
-.workerUrlRow :global(.form-control) {
-  flex: 1 1 auto;
-}
-
 .actionButton:global(.btn) {
   align-self: flex-start;
   min-height: 40px;
   padding: 0.6rem 0.95rem;
   border: 1px solid transparent;
   border-radius: var(--ce-radius-12);
-  background: linear-gradient(180deg, var(--ce-status-success-text) 0%, var(--ce-status-success) 100%);
-  color: var(--ce-overlay-base);
   font-weight: 700;
   letter-spacing: 0.01em;
   box-shadow: 0 10px 18px color-mix(in srgb, var(--ce-overlay-base) 24%, transparent);
+}
+
+// Global `.btn:hover`, `.btn:active` and `.btn-primary:focus` repaint fills with !important, so these keep theirs the
+// same way. Every label here stays on the pair the contrast test holds to 4.5:1.
+.actionButton:global(.btn),
+.actionButton:global(.btn:hover:not(:disabled)),
+.actionButton:global(.btn:focus:not(:disabled)),
+.actionButton:global(.btn:active:not(:disabled)) {
+  background: linear-gradient(180deg, var(--ce-status-success-text) 0%, var(--ce-status-success) 100%) !important;
+  color: var(--ce-status-success-contrast) !important;
 }
 
 .actionButton:global(.btn:hover:not(:disabled)),
@@ -663,35 +684,53 @@ $card-shadow: var(--ce-card-shadow);
 }
 
 .actionButton:global(.btn-outline-secondary) {
-  background: color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
-  border-color: color-mix(in srgb, var(--ce-text-inverse) 16%, transparent);
-  color: $admin-text;
+  background: color-mix(in srgb, var(--ce-text-inverse) 8%, transparent) !important;
+  border-color: var(--ce-card-border);
+  color: $admin-text !important;
   box-shadow: none;
 }
 
 .actionButton:global(.btn-outline-secondary:hover:not(:disabled)),
-.actionButton:global(.btn-outline-secondary:focus-visible) {
-  border-color: color-mix(in srgb, var(--ce-action-accent) 32%, transparent);
-  background: color-mix(in srgb, var(--ce-action-accent) 10%, transparent);
-  color: $admin-accent;
+.actionButton:global(.btn-outline-secondary:focus:not(:disabled)),
+.actionButton:global(.btn-outline-secondary:active:not(:disabled)) {
+  border-color: $admin-text;
+  background: color-mix(in srgb, var(--ce-panel-text) 8%, transparent) !important;
+  color: $admin-text !important;
 }
 
 .subtleActionButton:global(.btn),
 .subtleActionButton:global(.btn-outline-secondary) {
-  background: transparent;
-  border-color: color-mix(in srgb, var(--ce-text-inverse) 14%, transparent);
-  color: color-mix(in srgb, var(--ce-control-text) 82%, transparent);
-  opacity: 0.5;
+  background: transparent !important;
+  border-color: var(--ce-card-border) !important;
+  color: $admin-muted !important;
   box-shadow: none;
 }
 
 .subtleActionButton:global(.btn:hover:not(:disabled)),
-.subtleActionButton:global(.btn:focus-visible) {
-  background: transparent;
-  border-color: color-mix(in srgb, var(--ce-text-inverse) 22%, transparent);
-  color: $admin-text;
-  opacity: 0.85;
+.subtleActionButton:global(.btn:focus:not(:disabled)),
+.subtleActionButton:global(.btn:active:not(:disabled)) {
+  background: transparent !important;
+  border-color: $admin-text !important;
+  color: $admin-text !important;
   box-shadow: none;
+}
+
+// Hover and press would otherwise clear its fill and leave a white label on the card. The red stays in the outline.
+.dangerActionButton:global(.btn),
+.dangerActionButton:global(.btn-outline-danger),
+.dangerActionButton:global(.btn:hover:not(:disabled)),
+.dangerActionButton:global(.btn:focus:not(:disabled)),
+.dangerActionButton:global(.btn:active:not(:disabled)) {
+  background: transparent !important;
+  border-color: var(--ce-status-danger) !important;
+  color: $admin-text !important;
+  box-shadow: none;
+}
+
+.dangerActionButton:global(.btn:hover:not(:disabled)),
+.dangerActionButton:global(.btn:focus:not(:disabled)),
+.dangerActionButton:global(.btn:active:not(:disabled)) {
+  box-shadow: inset 0 0 0 1px var(--ce-status-danger) !important;
 }
 
 .copyButton {
@@ -733,8 +772,8 @@ $card-shadow: var(--ce-card-shadow);
 }
 
 .statusNote {
-  background: color-mix(in srgb, var(--ce-overlay-base) 58%, transparent);
-  color: color-mix(in srgb, var(--ce-control-text) 82%, transparent);
+  background: color-mix(in srgb, var(--ce-panel-text) 8%, transparent);
+  color: $admin-text;
 }
 
 .statusNote a {
@@ -777,12 +816,12 @@ $card-shadow: var(--ce-card-shadow);
 }
 
 .metadataItem,
-.resourceCard,
 .statusItem {
   border-radius: var(--ce-radius-14);
   border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
   background: $admin-deep;
   box-shadow: inset 0 1px 0 color-mix(in srgb, var(--ce-text-inverse) 3%, transparent);
+  color: $admin-text;
 }
 
 .workerGroupImage {
@@ -805,92 +844,12 @@ $card-shadow: var(--ce-card-shadow);
   font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: color-mix(in srgb, var(--ce-text-inverse) 52%, transparent);
+  color: $admin-muted;
 }
 
 .metadataItem span:last-child {
   color: $admin-text;
   font-weight: 700;
-  line-height: 1.45;
-  word-break: break-word;
-}
-
-.metadataEditorCard {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 16px;
-  border-radius: var(--ce-radius-14);
-  background: color-mix(in srgb, var(--ce-overlay-base) 82%, transparent);
-  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
-}
-
-.metadataEditorIntro {
-  font-size: 0.84rem;
-  line-height: 1.55;
-  color: $admin-muted;
-}
-
-.metadataSectionGrid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.metadataSectionCard {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 14px;
-  border-radius: var(--ce-radius-14);
-  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
-  background: color-mix(in srgb, var(--ce-text-inverse) 4%, transparent);
-}
-
-.metadataEditorGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 12px;
-}
-
-.metadataTextAreaGroup {
-  margin-bottom: 0;
-}
-
-.metadataTextAreaGroup :global(textarea.form-control) {
-  min-height: 96px;
-}
-
-.metadataSelectorGroup {
-  margin-bottom: 0;
-}
-
-.metadataReadonlyGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 10px;
-}
-
-.metadataReadonlyItem {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 12px;
-  border-radius: var(--ce-radius-12);
-  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
-  background: color-mix(in srgb, var(--ce-overlay-base) 55%, transparent);
-}
-
-.metadataReadonlyItem span:first-child,
-.metadataReadonlyItem span:last-child {
-  font-size: 0.74rem;
-  line-height: 1.4;
-  color: color-mix(in srgb, var(--ce-text-inverse) 58%, transparent);
-}
-
-.metadataReadonlyItem strong {
-  color: $admin-text;
-  font-size: 0.9rem;
   line-height: 1.45;
   word-break: break-word;
 }
@@ -904,27 +863,6 @@ $card-shadow: var(--ce-card-shadow);
 .metadataLink:focus-visible {
   color: var(--ce-status-success-text);
   text-decoration: underline;
-}
-
-.metadataToggle {
-  margin-top: 2px;
-}
-
-.metadataToggleLabel {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 0.88rem;
-  font-weight: 500;
-  letter-spacing: 0.01em;
-  text-transform: none;
-  color: $admin-muted-strong;
-}
-
-.metadataEditorActions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
 }
 
 .resultBox {
@@ -945,7 +883,7 @@ $card-shadow: var(--ce-card-shadow);
   font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: color-mix(in srgb, var(--ce-text-inverse) 54%, transparent);
+  color: $admin-muted;
 }
 
 .resultBox pre {
@@ -994,13 +932,17 @@ $card-shadow: var(--ce-card-shadow);
   opacity: 0.78;
 }
 
+.statusItem strong:first-child {
+  padding-left: 12px;
+}
+
 .statusItem span:first-child {
   padding-left: 12px;
   font-size: 0.68rem;
   font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: color-mix(in srgb, var(--ce-text-inverse) 52%, transparent);
+  color: $admin-muted;
 }
 
 .statusItem span:last-child {
@@ -1011,7 +953,7 @@ $card-shadow: var(--ce-card-shadow);
 }
 
 .statusItem a {
-  color: $admin-accent;
+  color: var(--ce-link);
 }
 
 .statusItemClickable {
@@ -1025,15 +967,7 @@ $card-shadow: var(--ce-card-shadow);
 .statusItemClickable:hover,
 .statusItemClickable:focus-visible {
   border-color: color-mix(in srgb, var(--ce-action-accent) 34%, transparent);
-  background: color-mix(in srgb, var(--ce-overlay-base) 92%, transparent);
   transform: translateY(-1px);
-}
-
-.checklist {
-  margin: 0;
-  padding-left: 20px;
-  line-height: 1.6;
-  font-size: 0.92rem;
 }
 
 .gateLabelRow {
@@ -1113,7 +1047,7 @@ $card-shadow: var(--ce-card-shadow);
   font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: color-mix(in srgb, var(--ce-text-inverse) 52%, transparent);
+  color: $admin-muted;
 }
 
 .secretOptionBody {
@@ -1152,7 +1086,7 @@ $card-shadow: var(--ce-card-shadow);
   border-radius: var(--ce-radius-10);
   border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 16%, transparent);
   background: color-mix(in srgb, var(--ce-text-inverse) 5%, transparent);
-  color: color-mix(in srgb, var(--ce-text-inverse) 78%, transparent);
+  color: $admin-muted;
   cursor: pointer;
   transition:
     border-color 0.15s ease,
@@ -1178,7 +1112,7 @@ $card-shadow: var(--ce-card-shadow);
   font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: color-mix(in srgb, var(--ce-text-inverse) 55%, transparent);
+  color: $admin-muted;
 }
 
 .resourceRefreshButton:disabled {
@@ -1194,7 +1128,7 @@ $card-shadow: var(--ce-card-shadow);
   padding: 12px 14px;
   border-radius: var(--ce-radius-12);
   border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
-  background: color-mix(in srgb, var(--ce-text-inverse) 4%, transparent);
+  background: $admin-surface;
 }
 
 .inlineResourceHeader {
@@ -1213,19 +1147,20 @@ $card-shadow: var(--ce-card-shadow);
   }
 
   .actionButton:global(.btn) {
-    background: var(--ce-action-primary);
-    color: var(--ce-action-primary-text);
+    background: var(--ce-action-primary) !important;
+    color: var(--ce-action-primary-text) !important;
   }
 
   .actionButton:global(.btn:hover:not(:disabled)),
-  .actionButton:global(.btn:focus-visible) {
-    background: var(--ce-action-primary-hover);
-    color: var(--ce-action-primary-text);
+  .actionButton:global(.btn:focus:not(:disabled)),
+  .actionButton:global(.btn:active:not(:disabled)) {
+    background: var(--ce-action-primary-hover) !important;
+    color: var(--ce-action-primary-text) !important;
   }
 
   .actionButton:global(.btn:disabled) {
-    background: var(--ce-control-disabled-bg);
-    color: var(--ce-control-disabled-text);
+    background: var(--ce-control-disabled-bg) !important;
+    color: var(--ce-control-disabled-text) !important;
     opacity: 1;
   }
 }
@@ -1274,14 +1209,6 @@ $card-shadow: var(--ce-card-shadow);
   gap: 6px;
 }
 
-.gateRow,
-.linkRow,
-.fileActions,
-.previewImage,
-.sessionWorkerRow {
-  /* legacy admin page hooks retained for compatibility */
-}
-
 @media (max-width: 1100px) {
   .hero {
     grid-template-columns: 1fr;
@@ -1294,17 +1221,12 @@ $card-shadow: var(--ce-card-shadow);
   .metadataPanel,
   .gatePanel,
   .secretsPanel,
-  .resourcesPanel,
   .testsPanel {
     grid-column: auto;
   }
 }
 
 @media (max-width: 900px) {
-  .metadataSectionGrid {
-    grid-template-columns: 1fr;
-  }
-
   .heroSessionPrimaryRow,
   .heroSessionDetailRow {
     grid-template-columns: 1fr;
@@ -1327,20 +1249,12 @@ $card-shadow: var(--ce-card-shadow);
     padding: 16px;
   }
 
-  .metadataEditorGrid {
-    grid-template-columns: 1fr;
-  }
-
   .litActionRow {
     flex-direction: column;
   }
 
   .heroTitleBlock h1 {
     font-size: 1.8rem;
-  }
-
-  .workerUrlRow {
-    flex-wrap: wrap;
   }
 
   .heroCardInputShell {

@@ -1,5 +1,7 @@
 import { boundSessionAiRequest } from './aiRequestPolicy.js';
-import { DEFAULT_AI_MODEL } from '../../shared/aiDefaults.mjs';
+import { STRICT_HTTPS_NO_CREDENTIALS_POLICY } from './outboundUrlSafetyBinding.js';
+import { DEFAULT_AI_MODEL, DEFAULT_ANTHROPIC_MODEL } from '../../shared/aiDefaults.mjs';
+import { fitReasoningEffort, isOpenAiReasoningModel, takesReasoningEffort } from '../../shared/aiModelFamily.mjs';
 import {
   applyChatCompletionBudget,
   isChatReasoningModel,
@@ -19,7 +21,7 @@ const OPENROUTER_CHAT_URL = 'https://openrouter.ai/api/v1/chat/completions';
 export const CUSTOM_RPC_URL_OVERRIDE_REQUIRES_REQUEST_KEY_ERROR =
   'Custom provider rpcUrl override requires a request apiKey/rpcKey.';
 
-const extractOpenAiCompletion = (data, useResponses = false) => {
+export const extractOpenAiCompletion = (data, useResponses = false) => {
   if (!data || typeof data !== 'object') return '';
   if (useResponses) {
     if (typeof data.output_text === 'string') return data.output_text;
@@ -70,6 +72,33 @@ const normalizeComparableRpcUrl = (raw) => {
 
 const resolveJson = (deps) => deps?.json || jsonResponse;
 
+// A response_format's JSON schema, from the Chat Completions or Responses shape.
+const jsonSchemaOf = (format) => {
+  if (format?.type !== 'json_schema') return null;
+  const schema = format.json_schema?.schema ?? format.schema;
+  return schema && typeof schema === 'object' ? schema : null;
+};
+
+// The Responses API takes a schema's name and fields at the top of text.format.
+const toResponsesTextFormat = (format) => (
+  format?.type === 'json_schema' && format.json_schema && typeof format.json_schema === 'object'
+    ? { type: 'json_schema', ...format.json_schema }
+    : format
+);
+
+// Effort and a JSON schema go in output_config, for the Claude models the shared
+// rule knows; older ones keep a plain request. A JSON object with no schema has
+// no Claude form, so its request relies on the prompt's wording.
+const claudeOutputConfig = ({ model, effort, responseFormat }) => {
+  if (!takesReasoningEffort(model)) return null;
+  const schema = jsonSchemaOf(responseFormat);
+  const config = {
+    ...(effort ? { effort: fitReasoningEffort(model, effort) } : {}),
+    ...(schema ? { format: { type: 'json_schema', schema } } : {}),
+  };
+  return Object.keys(config).length ? config : null;
+};
+
 export const proxyAnthropic = async ({
   payload,
   secrets,
@@ -92,25 +121,29 @@ export const proxyAnthropic = async ({
 
   const {
     model,
-    temperature,
     max_tokens,
     messages,
     prompt,
     max_tokens_to_sample,
+    reasoning_effort,
+    response_format,
   } = payload || {};
+  const claudeModel = model || DEFAULT_ANTHROPIC_MODEL;
+  // No temperature: current Claude models refuse it (Opus 5.5 and Fable 5.1 any value,
+  // Sonnet and Haiku 5.5 anything but the default), so they sample at their default.
   const body = messages
     ? {
-        model: model || 'claude-3-5-sonnet-20240620',
-        temperature: temperature ?? 0.7,
+        model: claudeModel,
         max_tokens: max_tokens ?? 4096,
         messages,
       }
     : {
-        model: model || 'claude-3-5-sonnet-20240620',
-        temperature: temperature ?? 0.7,
+        model: claudeModel,
         max_tokens: max_tokens ?? max_tokens_to_sample ?? 4096,
         messages: [{ role: 'user', content: String(prompt || '') }],
       };
+  const outputConfig = claudeOutputConfig({ model: claudeModel, effort: reasoning_effort, responseFormat: response_format });
+  if (outputConfig) body.output_config = outputConfig;
 
   const response = await fetchImpl(constants?.anthropicUrl || ANTHROPIC_URL, {
     method: 'POST',
@@ -130,7 +163,21 @@ export const proxyAnthropic = async ({
       retryAfter ? responseHeaders : baseHeaders);
   }
 
-  const completion = data?.content?.[0]?.text || '';
+  // A refusal or an empty answer is a failure the caller sees, not blank text.
+  if (data?.stop_reason === 'refusal') {
+    return json({ error: 'Claude declined this request.', reason: 'ai_refused', details: data }, 422, baseHeaders);
+  }
+  // Models that think reply with thinking blocks before the answer, so the reply is its text blocks.
+  const completion = (Array.isArray(data?.content) ? data.content : [])
+    .filter((block) => block?.type === 'text')
+    .map((block) => toStr(block.text))
+    .join('');
+  if (!completion.trim()) {
+    const error = data?.stop_reason === 'max_tokens'
+      ? 'Claude used its whole token budget before answering.'
+      : 'Claude returned an empty answer.';
+    return json({ error, reason: 'ai_empty', details: data }, 422, baseHeaders);
+  }
   return json({ completion, raw: data }, 200, baseHeaders);
 };
 
@@ -180,17 +227,17 @@ export const proxyOpenAI = async ({
         input: messages || prompt || '',
       }
     : {
-        model: model || (isReasoning ? 'o3-mini' : DEFAULT_AI_MODEL),
+        model: defaultModel,
         messages: messages || [{ role: 'user', content: String(prompt || '') }],
       };
 
   body.service_tier = ['fast', 'priority', 'default', 'auto'].includes(payload?.service_tier) ? payload.service_tier : 'default';
 
   if (useResponses) {
-    if (response_format) body.text = { format: response_format };
+    if (response_format) body.text = { format: toResponsesTextFormat(response_format) };
     if (payload?.tools) body.tools = payload.tools;
     if (payload?.functions && !payload?.tools) body.functions = payload.functions;
-    body.reasoning = { effort: reasoning_effort || 'low' };
+    body.reasoning = { effort: fitReasoningEffort(defaultModel, reasoning_effort || 'low') };
     body.max_output_tokens = resolveResponsesOutputTokens({
       max_output_tokens,
       max_completion_tokens,
@@ -201,9 +248,8 @@ export const proxyOpenAI = async ({
     if (response_format) body.response_format = response_format;
     if (payload?.tools) body.tools = payload.tools;
     if (payload?.functions && !payload?.tools) body.functions = payload.functions;
-    const effectiveLeaf = toStr(body.model).toLowerCase().split('/').pop();
-    if (reasoning_effort && /^(gpt-5|o[13])/.test(effectiveLeaf)) {
-      body.reasoning_effort = reasoning_effort;
+    if (reasoning_effort && isOpenAiReasoningModel(body.model)) {
+      body.reasoning_effort = fitReasoningEffort(body.model, reasoning_effort);
     }
     applyChatCompletionBudget({
       body,
@@ -276,7 +322,7 @@ export const proxyOpenRouter = async ({
   if (response_format) body.response_format = response_format;
   if (payload?.tools) body.tools = payload.tools;
   if (payload?.functions && !payload?.tools) body.functions = payload.functions;
-  if (reasoning_effort) body.reasoning_effort = reasoning_effort;
+  if (reasoning_effort) body.reasoning_effort = fitReasoningEffort(body.model, reasoning_effort);
 
   applyChatCompletionBudget({
     body,
@@ -323,7 +369,7 @@ export const proxyCustomRPC = async ({
   auth,
 } = {}) => {
   const json = resolveJson(deps);
-  const safeFetch = deps?.safeFetch || fetch;
+  const safeFetch = deps?.safeFetch;
   const isBlockedOutboundUrl = deps?.isBlockedOutboundUrl || (() => false);
   const payloadRpcUrl = toStr(payload?.rpcUrl).trim();
   const secretRpcUrl = toStr(secrets?.customRpcUrl).trim();
@@ -390,9 +436,8 @@ export const proxyCustomRPC = async ({
   if (response_format) body.response_format = response_format;
   if (payload?.tools) body.tools = payload.tools;
   if (payload?.functions && !payload?.tools) body.functions = payload.functions;
-  const effectiveLeaf = toStr(body.model).toLowerCase().split('/').pop();
-  if (reasoning_effort && /^(gpt-5|o[13])/.test(effectiveLeaf)) {
-    body.reasoning_effort = reasoning_effort;
+  if (reasoning_effort && isOpenAiReasoningModel(body.model)) {
+    body.reasoning_effort = fitReasoningEffort(body.model, reasoning_effort);
   }
 
   applyChatCompletionBudget({
@@ -408,7 +453,11 @@ export const proxyCustomRPC = async ({
   const headers = { 'content-type': 'application/json' };
   if (key) headers.authorization = `Bearer ${key}`;
 
+  if (typeof safeFetch !== 'function') {
+    return json({ error: 'Custom provider outbound checks are unavailable.' }, 503, baseHeaders);
+  }
   const response = await safeFetch(rpcUrl, {
+    outboundUrlPolicy: STRICT_HTTPS_NO_CREDENTIALS_POLICY,
     method: 'POST',
     headers,
     body: JSON.stringify(body),

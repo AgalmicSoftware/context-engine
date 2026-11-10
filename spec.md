@@ -1,7 +1,7 @@
 # Context Engine Specification
 
 Status: Living specification (update alongside feature work)
-Last reviewed: 2026-08-23
+Last reviewed: 2026-11-06
 Canonical deep-dive docs: `docs/` (see `docs/README.md`)
 
 ## Purpose
@@ -38,8 +38,8 @@ deliberation and coordination, centered on:
   roles, and gated access.
 - A per-session Cloudflare Worker for canonical Hosted & Fast sessions and for
   profile-enabled AI, transcription, storage, fetch, and chain/Arweave helpers.
-- An optional Session Agent HTTP that exposes scoped `/api/agent/*` requests
-  and Session Wrapped without replacing session authority.
+- Optional Agent HTTP inside that Worker, which exposes scoped `/api/agent/*`
+  requests and Session Wrapped without replacing session authority.
 
 Primary storage and authority split:
 - Hosted & Fast: the creator-owned Session Worker is canonical for config,
@@ -47,9 +47,9 @@ Primary storage and authority split:
   storage; it does not require EVM or Arweave.
 - Trustless & Slower: public EVM contracts anchor identity and gate state, while
   Arweave stores durable metadata and payloads.
-- Agent HTTP: Session Worker domain modules that enforce canonical session
-  membership, gates, and storage to the configured Session Worker when needed.
-- Browser IndexedDB/local storage: caches, encrypted wallet records, and user
+- Agent HTTP: modules inside the Session Worker that use its canonical session
+  membership, gates, and storage.
+- Browser IndexedDB/local storage: caches, passkey wallet records, and user
   settings for performance and usability, never shared authority.
 
 ## Glossary (Core Concepts)
@@ -60,19 +60,20 @@ Primary storage and authority split:
 - Gate: A profile-owned access rule. Chain-backed sessions use `SessionRegistry`
   Any/All SBT rules; Worker-canonical sessions use the Session Worker's signed
   config and native group authority.
-- Passkey EOA wallet: A passkey-unlocked embedded EOA wallet using WebAuthn PRF
-  to derive the EOA key by default, with optional AES-GCM encrypted private-key
-  compatibility mode and soft worker-held sessions.
+- Passkey EOA wallet: An embedded EOA wallet unlocked with a passkey. By default
+  it derives the EOA key from WebAuthn PRF output. An optional compatibility mode
+  stores an AES-GCM encrypted private key, and an optional soft session holds the
+  unlocked key in a browser web worker.
 - Doc Library: A per-session and per-group document store whose provider follows
   the session profile: Cloudflare storage with profile-selected Worker access
-  and encryption (Worker-envelope in the Hosted & Fast preset), or Arweave with
-  optional Lit encryption for Arweave-backed sessions.
+  and optional Worker-envelope encryption, or Arweave with optional Lit
+  encryption for Arweave-backed sessions.
 - Sponsored resource: A service that uses secrets (AI keys, Arweave wallet, faucet key) and therefore routes through the Worker.
 - Sponsored grant: A pre-authorized access token for worker resources (deploy, faucet) redeemable without full auth.
 - Worker token: A short-lived session token minted after login; it encodes
   scopes granted by the selected session authority.
 - Metadata URI: An Arweave JSON payload containing session content/config (non-authoritative for gates).
-- Lit encryption: The browser encrypts content locally; a registered Lit Action, called through the session Worker, wraps the content key and releases it after an SBT ownership check. The Worker operator and Lit account administrators remain trusted. New authorities require per-session Worker-signed authorization and encrypt replies to the original Worker request; a scoped usage API key alone cannot impersonate a holder. This is not end-to-end encryption.
+- Lit encryption: The browser encrypts content locally; a registered Lit Action, called through the session Worker, wraps the content key and releases it after an SBT ownership check. The Worker operator and Lit account administrators remain trusted. Lit authorities require per-session Worker-signed authorization and encrypt replies to the original Worker request; a scoped usage API key alone cannot impersonate a holder. Lit encrypts only the fields you lock; who answered which question stays public. This is not end-to-end encryption.
 
 ## User Roles
 
@@ -83,68 +84,79 @@ Primary storage and authority split:
 
 ## Primary Routes (Pages)
 
-The client uses React Router to route all paths to `MainSite`, which then renders page modules based on `window.location.pathname`.
+React Router sends every path to `AppShell` (`client/src/components/MainSite/AppShell.tsx`), which selects a page through `client/src/components/MainSite/routeTable.ts`.
 
 Core routes:
-- `/`: Home (tabs: Latest, Community, Tools, Welcome).
-- `/session/new` (alias: `/new`; sponsored links can land here as `/new?sponsored=<txId>#k=<secret>`): Session Wizard. Hosted & Fast publishes canonical Worker config without EVM/Arweave; Trustless & Slower uploads metadata and registers on-chain.
+- `/`: Home (tabs: Stats, Tools, Welcome).
+- `/session/new` (alias: `/new`; sponsored links land here as `/new?sponsored=<txId>`, with the decryption key delivered separately): Session Wizard. Hosted & Fast publishes canonical Worker config without EVM/Arweave; Trustless & Slower uploads metadata and registers on-chain.
 - `/session/:token`: Session landing page (accepts a slug or a UUID-like session id token; resolves and renders a one-page session view).
 - `/session/:token/questions`, `/session/:token/questions/results`: Session-scoped question list/results rendered inside the session shell.
 - `/session/:token/docs`: Session Doc Library. Worker-canonical sessions use the
   resolved session identity and opaque Cloudflare storage refs; Arweave-backed
   sessions use `sessionIdHex` indexing and optional Lit encryption. Session-id
   route tokens remain stable on this subroute.
+- `/session/:token/settings`: Session settings page for the session's admin.
 - `/surveys`, `/survey/:id`, `/survey/:id/results`: Survey list/view/results.
 - `/questions`, `/questions/results`: Question list/results.
-- `/question/:id`: Single question view. Canonical session hint uses `?session=<slug>` (legacy `?group=<slug>` accepted).
-- `/sbts` and `/groups`: group list and creation UI. Registry-backed SBT
-  sessions accept scoped aliases such as `/sbts/:slug` and `/groups/:slug`.
-  Worker-canonical sessions use `/groups?sessionName=<slug>`; a selected native
-  Group uses `#group-<groupId>` for its full SBT-style detail view. Legacy
-  Worker `/groups/:slug` links are accepted and silently canonicalized.
-- `/sbt/:address` and `/group/:address` (legacy password suffixes still supported on detail flows where applicable): SBT detail and minting/claim UI.
+- `/question/:id`: Single question view. The session hint is `?session=<slug>`; `?sessionSlug=` and `?s=` are also accepted.
+- `/sbts` and `/groups`: group list. `/sbts/new` and `/groups/new` open group
+  creation. Registry-backed SBT sessions accept scoped aliases such as
+  `/sbts/:slug` and `/groups/:slug`. Worker-canonical sessions use
+  `/groups?sessionSlug=<slug>`, and `?sessionName=<slug>` is also accepted. A
+  native Group's detail view is `/group/<groupId>?sessionSlug=<slug>`. A Group ID
+  shaped like an address uses `#group-<groupId>` on the list route instead,
+  because `/group/<address>` is reserved for SBT detail.
+- `/sbt/:address` and `/group/:address`: SBT detail and minting/claim UI. A
+  password path suffix is read once and removed from the address.
 - `/admin`: Session admin UI (registry and worker tests; sessionId query supported).
 - `/sponsor`: Sponsor page for generating grant-backed sponsored-bundle links into the Session Wizard.
 - `/bookmarks`: Bookmarked surveys/questions/SBTs/users.
-- `/debate`: Experimental stub for an older debate/discussion surface; not part of the supported public surface in this build.
 - `/atlas` and `/tag/...`: Debate map / AI Policy Atlas demo surface.
-- `/matrix`: Risk matrix demo view.
-- `/demos`: Demo sessions launcher (`/agent` also exists as a dev-only route).
 - `/benchmarks`: Static benchmark index and interactive report viewer. Bundled
   manifests identify each artifact as either a development preview or a
   released result; the report itself runs in a sandboxed iframe.
 - `/posts` and `/posts/:slug`: Public Markdown post index and rendered post pages.
 - `/docs`: User-facing quickstart, session-options guide, FAQ, AI-prompt
   reference, and an explicit session selector for published smart-contract
-  deployment details. Legacy `/contracts` links redirect here without dropping
-  their path suffix, query, or hash.
+  deployment details. `/contracts` links redirect here and keep their path
+  suffix, query, and hash.
 - `/:0x...`: Address-based user profile page (activity, responses, comparisons).
 - `/u/:address`: Alias for the address-based user profile page.
 - `/su/:username`: Simulated historical-user profile view used by demo/atlas surfaces.
 - `/compare/...`: Address comparison view.
 - `/about`: About page.
+- `/agent`: Development-only agent page.
 
 ## Feature Inventory (Current App Capabilities)
 
 ### 0) Home Tabs and Primary Navigation
 
 The home route (`/`) is tab-based and functions as the app's main "portal":
-- Latest: home landing surface for the current match/feed view.
-- Community: universe/group discovery, aggregate stats, and leaderboard-style views sourced from caches and on-chain fetches.
+- Stats: universe/group discovery, aggregate stats, and leaderboard-style views sourced from caches and on-chain fetches.
 - Tools: a plugin-style launcher for the core Context Engine modules (surveys/questions, SBT groups, AI data tool, debate map, risk matrix).
 - Welcome: onboarding slides and entry points into the Tools tab.
-
-Legacy note:
-- `Votes` is no longer a current top-level home tab.
-- `Community` is still a current home tab, and Polis-style reports are still current embedded results surfaces.
-- The remaining older demo-oriented surface is Atlas / debate-map UI, while `/debate` itself is currently an experimental stub.
 
 ### 1) Sessions (Spaces)
 
 What users can do:
 - Open a session by slug or by session id link (`/session/<slug-or-id>`).
-- Open one-person Interview with `/session/<slug-or-id>?mode=interview`, or Group Conversation with `?mode=recordGroup`. The microphone opens a two-choice modal; Interview creates reviewable response drafts from a realtime responder transcript, while Group Conversation creates draft questions from rolling transcription. Legacy `?mode=listening` remains supported for the pile-adjacent recorder.
-- Paste the session's user-authored interview request into ordinary ChatGPT or Claude without installing MCP/plugins. The linked Worker endpoint is an inert JSON catalog with no instructions. The AI searches only already-authorized conversation history, memory, and connected sources directly related to accessible session questions, reports its platform/model, shows the exact response packet before encoding, attaches an explained confidence value to each direct or defensibly inferred response, and returns a fragment-prefill link for local review. If it finds no relevant signal, it returns the clean interview link instead. The Worker accepts only a session-approved return origin and matching session path.
+- Open one-person Interview with `/session/<slug-or-id>?mode=interview`, Group
+  Conversation with `?mode=groupRecording`, or the voice chooser with
+  `?mode=voice`. The microphone also opens the chooser: two choices, with the
+  ChatGPT/Claude prefill prompt in a card below them. Interview creates reviewable
+  response drafts from a realtime responder transcript. Group Conversation creates
+  draft questions from rolling transcription. `?mode=listening` opens the
+  pile-adjacent recorder.
+- Paste the session's user-authored interview request into ordinary ChatGPT or
+  Claude without installing MCP or plugins. The linked Worker endpoint is an inert
+  JSON catalog with no instructions. The request asks the AI to search only
+  already-authorized conversation history, memory, and connected sources directly
+  related to accessible session questions, and to report its platform and model.
+  It shows the exact response packet before encoding, attaches an explained
+  confidence value to each direct or defensibly inferred response, and returns a
+  fragment-prefill link for local review. If it finds no relevant signal, it
+  returns the clean interview link instead. The Worker accepts only a
+  session-approved return origin and matching session path.
 - Open session-scoped question views via `/session/<slug-or-id>/questions` and `/session/<slug-or-id>/questions/results`.
 - Open the session doc library via `/session/<slug-or-id>/docs`.
 - Create a new session via the Session Wizard (`/session/new` or `/new`), including grant-backed sponsored-bundle entry links.
@@ -154,6 +166,9 @@ What users can do:
   stylesheets, or CSS.
 
 What the system does:
+- Starts a new draft on Hosted & Fast with public results and unencrypted
+  answers. Choosing encryption or another results visibility keeps them private;
+  `Runs on` under Hosting and storage switches to Trustless & Slower.
 - In Hosted & Fast, stores canonical signed session config, secrets,
   Worker-native group/gate state, and Cloudflare payload indexes in the
   per-session Worker; publication does not perform an EVM transaction or
@@ -161,7 +176,7 @@ What the system does:
 - In Trustless & Slower, stores session gates and operational pointers in
   `SessionRegistry` and content/config on Arweave, optionally with Lit-encrypted
   fields.
-- Maintains compatibility readers for older demo and chain-backed session data
+- Reads shipped demo session configs alongside registry and Worker sessions,
   while keeping authority explicit per selected profile.
 
 Deep-dive docs:
@@ -218,14 +233,22 @@ What users can do:
 - Answer surveys and questions, including optional voice-to-text input.
 - After a successful submit, see a stable `Submitted` state (instead of `Submit (N)`) until making a new edit.
 - View results and filter responses by SBT membership and other criteria.
-- Export results for external analysis (CSV, JSON, redacted session-results HTML viewer/static HTML/PDF report options, and Polis-style PDF/report generation). Session-results exports require a logged-in authorized viewer, embed downloader metadata, and can derive local/session-private AI analysis sections using synthetic participant ids instead of sending wallet addresses to AI.
-- Generate/read Polis-style report views inside survey/question/session result surfaces (rather than on a standalone top-level route).
+- Export results for external analysis: CSV, JSON, and a session-results report
+  as an HTML viewer, a single HTML file, or a PDF. Polis-style report views also
+  export to PDF.
+- Session-results reports require a logged-in authorized viewer. A report holds
+  what that viewer can see, including decrypted fields, and is stamped with their
+  address. Secrets, unreadable ciphertext, and contact handles stay out. Its AI
+  analysis sections use synthetic participant IDs instead of wallet addresses and
+  skip questions whose author encrypted the text.
+- Read Polis-style report views inside survey, question, and session results.
 
 Question types (current core set):
 - Binary (agree/disagree style).
 - Rating scales.
 - Multiple choice (single-select and multi-select).
 - Freeform text.
+- Quadratic allocation.
 
 Privacy and integrity:
 - Response fields can be optionally encrypted (for self or for a gated audience), with hashes retained for verification.
@@ -263,11 +286,11 @@ What the system does:
   Session Worker's signed config/native groups for Worker-canonical sessions.
 - Worker login checks the selected profile's authority on `/auth/login` and
   issues only the permitted scopes (`ai`, `arweave`, `transcribe`, `faucet`,
-  `fetch`, `lit`, `storage`, and `groups` as configured).
-- Gated encryption/decrypt uses the worker-mediated Lit Chipotle runtime for supported sessions; legacy Lit payload readers remain for compatibility.
-- Stores per-field metadata encryption decisions via `encryptedFieldGates` (values are `string | string[]`; 1 gate stays legacy `string`, 2+ gates become `string[]`).
+  `faucet_self`, `fetch`, `lit`, `storage`, and `groups` as configured).
+- Gated encryption and decryption use the worker-mediated Lit Chipotle runtime.
+- Stores per-field metadata encryption decisions via `encryptedFieldGates` (values are `string | string[]`).
 - Stores per-question/per-survey encryption audiences in the payload (`encryption.gates`), and SurveyTool derives response encryption recipients per question from that lock state (with fallback to session response gate policy when a question is not locked).
-- Keeps answer and additional-comment locks independent by default; comments inherit the answer audience only after an explicit **same as answer** selection or when a mandatory session/question gate applies.
+- Keeps answer and additional-comment locks independent by default; comments inherit the answer audience only after an explicit **Match Answer** selection or when a mandatory session/question gate applies.
 
 Deep-dive docs:
 - `docs/session-registry.md`
@@ -310,16 +333,15 @@ What integrations can do:
   implemented account, session, question, response, preference, and agent-only
   flows.
 - Log in to the browser with an agent token for Hosted & Fast sessions with
-  `authority.mode=worker_canonical` and `surfaces.agentHttp=true`. Explicit
-  Agent HTTP disablement overrides legacy enablement flags.
-- Exchange an authorized Session Worker identity for a scoped member credential on the
-  implemented wrapped-member handoff.
+  `authority.mode=worker_canonical` and `surfaces.agentHttp=true`.
+- Exchange an authorized Session Worker identity for a scoped member credential
+  at `/api/agent/wrapped/member-exchange`.
 
 What the system does:
 - Runs `workers/sessionCorsWorker/agent/` inside the Session Worker.
-- Delegates canonical membership, gates, storage, and chain operations to the
-  configured Session Worker or contract boundary when required. Auxiliary agent
-  indexes are not presented as canonical session state.
+- Uses the Session Worker's canonical membership, gates, and storage, and the
+  contracts for chain-backed writes. Auxiliary agent indexes are not presented as
+  canonical session state.
 - Keeps reusable worker modules under `workers/shared/`; that directory is not a
   deployable Worker.
 
@@ -335,8 +357,9 @@ What users can do:
   (optional) for smoother UX.
 
 What the system does:
-- Maintains an encrypted passkey EOA wallet record in IndexedDB. Plaintext
-  private keys, PRF output, and derived encryption keys are not persisted.
+- Keeps a passkey wallet record in IndexedDB. The default record holds no key
+  material; the optional compatibility mode adds an encrypted private key.
+  Plaintext private keys, PRF output, and derived encryption keys are not persisted.
 - Uses the connected wallet identity for contract actions, worker login, and Lit auth.
 
 Deep-dive docs:
@@ -350,7 +373,7 @@ What users can do:
 - Bookmark surveys, questions, SBTs, users, and saved filters.
 - View user profiles (address-based) and compare addresses.
 - Open simulated historical-user profiles used by Atlas/demo surfaces (`/su/:username`).
-- Use "deep search" style scans (cached) to aggregate a user's historical activity.
+- Use cached scans to aggregate a user's historical activity.
 
 Deep-dive docs:
 - `docs/cache/bookmarks-cache-structure.md`
@@ -389,11 +412,11 @@ What the system does:
   unavailable, Arweave session docs default to plaintext rather than falling
   back to a “general” gate.
 - For Worker-canonical Cloudflare storage, encryption and access conditions
-  follow `storageProfile`; the Hosted & Fast preset uses Worker-envelope
-  encryption with Worker role/scope conditions and does not infer plaintext
-  from the absence of a SessionRegistry `docUploads` gate.
+  follow `storageProfile`; Worker-envelope encryption uses Worker role/scope
+  conditions, and the Worker does not infer plaintext from the absence of a
+  SessionRegistry `docUploads` gate.
 - For Lit-Arweave uploads, allows either the session `docUploads` gate or a
-  custom SBT audience, with a "Copy from session gate" shortcut.
+  custom SBT audience.
 - Enforces provider-appropriate association integrity and anti-spam at upload
   time in the Worker:
   - For Arweave tags, `CE-SessionId` must match the authenticated session's
@@ -405,26 +428,22 @@ Deep-dive docs:
 
 ### 11) Older Atlas / Debate Surfaces
 
-This repo still includes an older Atlas / debate-map demo surface alongside the primary session, survey, and SBT workflows.
-That remaining surface is mainly `/atlas`, `/tag/...`, and embedded debate-map UI inside demo session results.
-The older `/debate` path itself is currently an experimental stub rather than a supported public feature.
-
-Intent for these features:
-- Either retire them cleanly (if no longer needed), or explicitly scope and bring them back under test.
+An older Atlas / debate-map demo surface sits alongside the primary session, survey, and group workflows.
+It consists of `/atlas`, `/tag/...`, and embedded debate-map UI inside demo session results.
+The home Tools tab and embedded session views also include the shared risk matrix.
 
 ## System Architecture (How It Works)
 
 ### Frontend (React)
 
-- UI lives under `client/`; production React components are TSX, with a smaller
-  set of JavaScript compatibility modules remaining outside the component
-  surface.
+- UI lives under `client/`. Production React components are TSX; a few
+  non-component modules remain JavaScript.
 - Vite is the canonical client dev/build toolchain. From `client/`, `npm run dev` starts the local Vite server, `npm run build` writes the production build to `client/build/`, and `npm run preview` serves a local Vite preview.
 - Routing is centralized through `client/src/components/MainSite/AppShell.tsx`,
   `client/src/components/MainSite/routeTable.ts`, and the co-located lazy route
   modules.
 - State management uses Redux (`client/src/store.ts`, reducers under `client/src/reducers/`).
-- Group/session-aware caches are stored in localStorage under `dg:<cacheName>:<slug>` keys (see `docs/cache/*`).
+- Session-aware caches live in IndexedDB, with a localStorage fallback, under logical `dg:<cacheName>:<slug>` keys (see `docs/cache/*`).
 
 ### Smart Contracts (Solidity)
 
@@ -441,30 +460,45 @@ Primary runtime worker:
   Cloudflare storage for Worker-canonical profiles, plus profile-enabled AI,
   transcription, fetch, chain, Arweave, and faucet services.
 
-Optional legacy/sponsored helper:
-- `workers/deploy-helper/`: Trusted endpoint for the explicit legacy Session
-  Wizard fallback, sponsored deployment, and same-Worker agent setup; the
-  default Hosted & Fast path uses the native Cloudflare dashboard handoff.
+Deploy helper:
+- `workers/deploy-helper/`: Trusted endpoint for the Session Wizard's API-token
+  path and same-Worker agent setup; the token-free path
+  uses the native Cloudflare dashboard handoff. The helper's operator can see the
+  token, the session secrets sent with it, and the Worker secrets it generates.
+  Sponsored deploys run in the sponsoring Session Worker's embedded deploy core,
+  not through this helper.
 
-Optional agent sidecar:
+Optional agent modules:
 - `workers/sessionCorsWorker/agent/`: Scoped Agent HTTP API, submission queue, and
-  Session Wrapped. It delegates canonical session authority rather than
-  duplicating it.
+  Session Wrapped. It uses the Session Worker's authority rather than duplicating
+  it.
 - `workers/shared/`: Reusable modules bundled into worker packages; not a
   deployable Worker.
 
 Worker API (selected endpoints):
+- `GET /capabilities`: Public Worker feature list; `?slug=<slug>` adds that
+  session's Agent HTTP readiness.
+- `GET /session-config`: Public session config projection, without secrets.
+- `GET /resource-presence`: Reports which sponsored resources are configured,
+  without returning their values.
 - `POST /auth/nonce`: Start SIWE-style login (returns nonce).
 - `POST /auth/login`: Verify signature + gates and mint a session token with scopes.
 - `GET /health`: Authenticated health check.
 - `POST /ai`: AI proxy (provider-based); authenticated by default, with anonymous access supported when the session config allows it. Also supports `POST /` with `{ action: "ai", ... }`.
-- `GET /agent/interview-catalog` (`/agent/interview-brief` compatibility alias): Public inert per-session question catalog for the client-authored, zero-install ChatGPT/Claude prefill handoff. It declares binary, rating, and multichoice answer formats and is disabled by `interviewModeEnabled=false`.
+- `GET /agent/interview-catalog` (alias: `/agent/interview-brief`): Public inert
+  per-session question catalog for the client-authored, zero-install
+  ChatGPT/Claude prefill handoff. It declares binary, rating, multichoice, and
+  quadratic answer formats and is disabled by `interviewModeEnabled=false`.
+- `POST /interview/starter`: Returns the interview opening prompt, either the
+  owner's or an AI-written one, plus the steering prompt.
 - `POST /realtime/call`: OpenAI Realtime WebRTC SDP exchange using the session Worker key and the session's anonymous AI eligibility policy.
 - `POST /transcribe`: Transcription proxy; authenticated by default, with anonymous access supported when the session config allows it (`workerAuthority.anonymousScopes` for worker-canonical sessions).
 - `POST /arweave/upload`: Authenticated Arweave upload (also supports an admin-signed bootstrap path when no auth header).
 - `POST /storage/upload`: Profile-aware payload upload to Cloudflare or Arweave.
-- `GET|POST /storage/read`: Authorized read by opaque storage reference.
+- `GET|POST /storage/read`: Read by opaque storage reference after the payload
+  access check. Public-read sessions may serve it without sign-in.
 - `GET|POST /storage/list`: Bounded, authorization-filtered metadata/index pages.
+  Public-read sessions may list without sign-in.
 - `GET|POST /storage/export-envelopes`: Authorized export of encrypted payload
   ciphertext and envelope metadata; session KEK material is never returned.
 - `POST /groups/create`: Authenticated participant Worker-group creation,
@@ -489,9 +523,9 @@ Worker API (selected endpoints):
 - `POST /admin/groups/create`: Signed-admin Worker-group creation under either
   creation policy, including Worker-native metadata, membership limits, join
   deadlines, and a group-admin address.
-- `POST /admin/groups/reconcile-empty`: Signed-admin recovery for an exact
-  `legacy_locked` coordinator; succeeds only with a valid server-managed fresh
-  bootstrap proof and no current or deleted Group rows.
+- `POST /admin/groups/reconcile-empty`: Signed-admin recovery for a locked Group
+  coordinator; succeeds only with a valid server-managed bootstrap proof and no
+  current or deleted Group rows.
 - `POST /lit/chipotle-action`: Authenticated worker-mediated Lit Chipotle execution for check/encrypt/decrypt requests.
 - `POST /sponsored/redeem-deploy`: Redeem a sponsored worker deploy grant.
 - `POST /sponsored/redeem-faucet`: Redeem a sponsored faucet grant.
@@ -499,11 +533,18 @@ Worker API (selected endpoints):
 - `POST /admin/set-secrets`: Signed admin action to store session secrets in KV.
 - `POST /admin/set-limits`: Signed admin action to update rate limits in KV.
 - `POST /admin/lit-chipotle-status`: Signed admin action to check worker-mediated Chipotle readiness without returning stored API keys.
-- `POST /admin/lit-chipotle-provision`: Signed admin action using the canonical Worker-authorized bootstrap path; legacy replacement requires `freshAuthority: true`.
-- `POST /admin/lit-chipotle-bootstrap-session`: Signed admin action to create the session Chipotle group, PKP, execution-only usage key, and specialized CE Action. Public config includes `litAuthorizationVersion`/`litAuthorizationSigner`; the private signing key stays in encrypted session secrets. Explicit fresh-authority cutover and old-permission retirement are documented in [Lit authorization](docs/lit-worker-authorization.md).
+- `POST /admin/lit-chipotle-provision`: Signed admin action using the canonical Worker-authorized bootstrap path; replacing an existing authority requires `freshAuthority: true`.
+- `POST /admin/lit-chipotle-bootstrap-session`: Signed admin action to create the session Chipotle group, PKP, execution-only usage key, and specialized CE Action. Public config includes `litAuthorizationVersion`/`litAuthorizationSigner`; the private signing key stays in encrypted session secrets. See [Lit authorization](docs/lit-worker-authorization.md).
 - `POST /admin/issue-sponsored-grants`: Signed admin action to issue sponsored access grants.
 - `GET /admin/abuse-summary`: Bearer-admin abuse/rate-limit summary for a bounded
   number of coordinator windows.
+- `GET /admin/diagnostics`: Bearer-admin session diagnostics.
+- `POST /admin/results-analysis/generate`, `GET /admin/results-analysis/status`,
+  and `GET /results-analysis/artifact`: Generate admin Results analysis, read its
+  status, and let authorized viewers read the latest successful artifact.
+- `POST /admin/debate-atlas/build` and `GET /debate-atlas`: Build a debate atlas
+  from the stored responses (admins, co-admins and `resultsAdminAddresses`), and
+  read the newest build or one by `id` under the same viewer rule.
 - `POST /`: Authenticated action-style requests using an `action` field: `request_test_eth` (testnet faucet), `fetch_url`, `fetch_image`.
 
 Agent HTTP API families (selected):
@@ -512,33 +553,32 @@ Agent HTTP API families (selected):
 - `/api/agent/skill`: Current runtime instructions from
   `workers/sessionCorsWorker/agent/skills/ce-agent-access/SKILL.md`. The old
   `/telegram/agent/api/*` prefix is retired and returns 404.
-- Bot webhook, command, and Mini App routes are retired. New sessions use fresh
-  session-namespaced agent state; existing Bridge data is not imported.
+- Bot webhook, command, and Mini App routes are retired.
 
 ### Storage and Data
 
-- Cloudflare Worker storage: canonical signed config, secrets, payload envelopes,
-  authorization metadata/index rows, and optional advanced R2 blobs for Hosted &
-  Fast.
+- Cloudflare Worker storage: canonical signed config, secrets, payloads
+  (Worker-encrypted when selected), authorization metadata/index rows, and
+  optional advanced R2 blobs for Hosted & Fast.
 - Arweave: durable JSON payloads for chain-backed session metadata, survey and
   question payloads, SBT tokenURI metadata, and explicitly Arweave-backed
   resources.
-- Browser localStorage: caches for surveys/questions/responses/SBTs/bookmarks/user scans.
-- Browser IndexedDB: passkey EOA encrypted wallet records. Plaintext wallet
-  keys must not be stored in localStorage or IndexedDB.
+- Browser IndexedDB: managed caches for surveys, questions, SBTs, bookmarks,
+  filters, user scans, and analysis, with a localStorage fallback; also passkey
+  wallet records. Plaintext wallet keys must not be stored in localStorage or
+  IndexedDB.
 
 ## Configuration Surfaces
 
 Client-side:
 - `client/src/variables/appConfig.ts`: user-visible feature flags and default endpoints (worker URLs, chain defaults, debug toggles).
-- `client/src/variables/demo/demo_sessions.json`: legacy session config source and fallback during migration.
+- `client/src/variables/demo/demo_sessions.json`: shipped demo and bootstrap session configs.
 - `client/src/variables/local-contracts.json`: local chain contract address overrides (written by deploy scripts).
 
 Worker-side:
 - Worker KV session config and secrets, including the top-level
-  `groupCreationPolicy` enum (`admin_only` or `participants`; omitted legacy
-  Worker configs default to `admin_only`), optional `sessionEndsAt`, and generic
-  `defaultGroupTags`. Pure Worker profiles reject block/faucet/registry
+  `groupCreationPolicy` enum (`admin_only` or `participants`; `admin_only` when
+  omitted), optional `sessionEndsAt`, and generic `defaultGroupTags`. Pure Worker profiles reject block/faucet/registry
   configuration; explicit Worker + on-chain SBT profiles accept only the
   required network and Group Factory subset. See `docs/session-cors-worker.md`
   for shapes and bindings.
@@ -558,12 +598,12 @@ Client tests:
 Published workflow verification:
 - `npm run test:e2e` runs the Vite navigation and route-style smoke.
 - `npm run test:node` runs public Node regression suites.
-- `npm run verify:release` runs client lint, typecheck, client tests, public
-  surface validation, worker bundle verification, and the production build.
+- `npm run verify:release` runs client lint and typecheck, client, Node, and MCP
+  release tests, benchmark checks, public surface validation, Worker bundle and
+  Cloudflare package verification, and the production build.
 
 See also:
 - `docs/local-chain.md`
-- `README.md` for the AI wallet test workflow
 
 ## Appendix: Canonical Docs Index
 

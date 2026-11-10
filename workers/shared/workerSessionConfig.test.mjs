@@ -108,3 +108,31 @@ test('deployment retains optional response encryption and exact linked group ref
   const fields = { responseFieldEncryption: { mode: 'optional' }, linkedWorkerGroups: [{ sessionSlug: 'source', sessionId: `0x${'11'.repeat(16)}`, workerUrl: 'https://source.example/', groupId: 'community' }] };
   assert.deepEqual(selectDeployWorkerSessionConfigFields(fields), fields);
 });
+
+test('public config shows the AI models and effort, hides the rest of ai, and says set-config merges ai and atlases build', () => {
+  const projected = projectPublicWorkerSessionConfig({
+    slug: 'session-a',
+    ai: {
+      models: { fast: { provider: 'openai', model: 'gpt-5' }, transcription: { provider: 'openai', model: 'whisper-1' } },
+      reasoningEffort: 'medium',
+      taskReasoningEffort: { 'interview-map': 'high' },
+      providers: { custom: { functions: '[{"name":"lookup"}]' } },
+      modelProviders: { fast: 'openai' },
+      mode: 'openai',
+    },
+    setConfigMergesAi: false,
+    debateAtlas: false,
+  });
+
+  assert.deepEqual(projected, {
+    slug: 'session-a',
+    ai: {
+      models: { fast: { provider: 'openai', model: 'gpt-5' }, transcription: { provider: 'openai', model: 'whisper-1' } },
+      reasoningEffort: 'medium',
+      taskReasoningEffort: { 'interview-map': 'high' },
+    },
+    // Set by this code on every read, never taken from storage.
+    setConfigMergesAi: true,
+    debateAtlas: true,
+  });
+});

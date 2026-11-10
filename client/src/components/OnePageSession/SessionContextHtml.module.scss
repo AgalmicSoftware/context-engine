@@ -1,0 +1,28 @@
+// The box an uploaded page renders in. contain: paint clips the page and holds
+// whatever it positions, position: fixed included, inside the box. The padding
+// leaves room for focus rings at its edges.
+.host {
+  display: block;
+  margin: -3px;
+  padding: 3px;
+  contain: paint;
+  // Colours the page's CSS can use. They follow the session's scheme and the
+  // site's theme, and the text ones stay readable on the context section.
+  --ce-context-text: var(--ce-session-chrome-contrast);
+  --ce-context-muted: color-mix(in srgb, var(--ce-session-chrome-contrast) 86%, transparent);
+  --ce-context-link: var(--ce-session-chrome-contrast);
+  --ce-context-focus: var(--ce-session-chrome-contrast);
+  --ce-context-border: color-mix(in srgb, var(--ce-status-info) 32%, transparent);
+  --ce-context-surface: color-mix(in srgb, var(--ce-session-chrome-contrast) 7%, transparent);
+}
+
+// The session page's context section, for a preview shown elsewhere.
+.frame {
+  padding: 1rem 1.15rem;
+  border: 1px solid color-mix(in srgb, var(--ce-status-info) 24%, transparent);
+  border-radius: var(--ce-radius-8);
+  background: color-mix(in srgb, var(--ce-session-chrome) 88%, var(--ce-status-info));
+  color: var(--ce-session-chrome-contrast);
+  font-family: var(--ce-font-body);
+  text-align: left;
+}

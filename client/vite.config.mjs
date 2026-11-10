@@ -647,6 +647,8 @@ export default defineConfig(({ mode }) => {
         },
       },
       include: [
+        // The export-only Worker must not trigger a full dev-page reload on the first download.
+        '@breezystack/lamejs',
         'buffer',
         'process/browser',
         '@ce-shared/crypto/groupPasswordDerivation.cjs',

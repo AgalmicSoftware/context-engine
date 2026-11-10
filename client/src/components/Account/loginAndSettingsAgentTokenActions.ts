@@ -1,3 +1,4 @@
+import { getClientAuthGeneration } from '../../utilities/session/clientAuthGeneration';
 import type { FormEvent } from 'react';
 import type { AgentClientLoginEnvelope } from '../../utilities/session/agentClientLogin';
 import {
@@ -216,6 +217,7 @@ export const createLoginAgentActions = (deps: LoginAgentActionsDeps): LoginAgent
 
   const handleAgentTokenLoginSubmit = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
     event.preventDefault();
+    const generation = getClientAuthGeneration();
     if (!shouldShowAgentTokenLogin()) return;
     const { sessionSlug, agentWorkerUrl, sessionId, workerCanonical, workerUrl } = getAgentTokenLoginSessionContext();
     const tokenOrLink = deps.getAgentTokenInput();
@@ -249,6 +251,7 @@ export const createLoginAgentActions = (deps: LoginAgentActionsDeps): LoginAgent
         tokenOrLink,
         workerUrl,
       });
+      if (generation !== getClientAuthGeneration()) return;
       deps.setStateIfMounted({
         agentTokenInput: '',
         agentTokenStatus: 'success',
@@ -256,6 +259,7 @@ export const createLoginAgentActions = (deps: LoginAgentActionsDeps): LoginAgent
       });
       completeAgentClientLogin(envelope);
     } catch (error) {
+      if (generation !== getClientAuthGeneration()) return;
       deps.updateLoginInfo({
         loginInProgress: false,
         loginComplete: false,

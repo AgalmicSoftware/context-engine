@@ -160,13 +160,13 @@ export interface RatingMatrixBuildResult {
 
 export interface PolisReportProps {
   [key: string]: unknown;
+  onRequestLogin?: () => void;
   questionResponses?: PolisQuestionResponses | UnknownRecord | null;
   network?: UnknownRecord | null;
   disclaimersActive?: boolean;
   sbtFilterString?: string;
   filterState?: PolisFilterState | null;
   sessionName?: unknown;
-  sessionHeader?: unknown;
   sessionInfo?: unknown;
   onePageDemo?: boolean;
   demoMode?: boolean;
@@ -188,7 +188,7 @@ export type ClusterPointsFn = (points: PolisPoint[], clusterCount: number, rando
 export type AnalyzeClusterOpinionsFn = (
   payload: UnknownRecord,
   allClustersData: UnknownRecord,
-  options: { sessionSlug: string },
+  options: { sessionSlug: string; sessionConfig?: unknown; context?: UnknownRecord },
 ) => Promise<Partial<PolisClusterAnalysisResult>>;
 
 export type D3LinearScale = {
@@ -198,7 +198,6 @@ export type D3LinearScale = {
 };
 
 export type D3ReportApi = {
-  scaleOrdinal(range: readonly string[]): (value: string | number) => string;
   schemeCategory10: readonly string[];
   polygonHull(points: [number, number][]): [number, number][] | null;
   min(values: number[]): number | undefined;
@@ -225,8 +224,6 @@ const getD3StringArray = (key: string): readonly string[] => {
 };
 
 export const d3Report: D3ReportApi = {
-  scaleOrdinal: (range) =>
-    Reflect.apply(getD3Function('scaleOrdinal'), d3, [range]) as (value: string | number) => string,
   schemeCategory10: getD3StringArray('schemeCategory10'),
   polygonHull: (points) => Reflect.apply(getD3Function('polygonHull'), d3, [points]) as [number, number][] | null,
   min: (values) => Reflect.apply(getD3Function('min'), d3, [values]) as number | undefined,
@@ -238,6 +235,58 @@ export const doUMAPTyped: DoUMAPFn = (data, nNeighbors, randomSeed) =>
   Reflect.apply(doUMAP, null, [data, nNeighbors, randomSeed]) as [number, number][];
 export const clusterUMAPPointsKmeansTyped: ClusterPointsFn = (points, clusterCount, randomSeed) =>
   Reflect.apply(clusterUMAPPointsKmeans, null, [points, clusterCount, randomSeed]) as number[];
+
+export interface ExploratoryGroups {
+  /** Each participant's group on the map, by participant index. */
+  assignments: number[];
+  /** The same, with -1 for anyone outside the analysis, for every count and comparison. */
+  analytical: number[];
+}
+
+/**
+ * Exploratory groups, formed the way automatic ones are: people in the analysis define the groups, and everyone
+ * else is shown in the nearest one without counting towards it. Without a member list, everyone counts.
+ */
+export function clusterExploratoryPoints(
+  points: PolisPoint[],
+  memberIndices: number[] | null | undefined,
+  clusterCount: number,
+  randomSeed: number,
+): ExploratoryGroups {
+  const members = memberIndices?.length ? new Set(memberIndices) : null;
+  const listedPoints = members ? points.filter((point) => members.has(point.index)) : points;
+  const groupPoints = listedPoints.length ? listedPoints : points;
+  const groups =
+    groupPoints.length < clusterCount
+      ? new Array<number>(groupPoints.length).fill(0)
+      : clusterUMAPPointsKmeansTyped(groupPoints, clusterCount, randomSeed);
+
+  const groupByPoint = new Map(groupPoints.map((point, position) => [point, groups[position]]));
+  const totals = new Map<number, { x: number; y: number; count: number }>();
+  groupPoints.forEach((point, position) => {
+    const total = totals.get(groups[position]) ?? { x: 0, y: 0, count: 0 };
+    totals.set(groups[position], { x: total.x + point.x, y: total.y + point.y, count: total.count + 1 });
+  });
+  const centers = Array.from(totals, ([group, { x, y, count }]) => ({ group, x: x / count, y: y / count }));
+  const nearestGroup = (point: PolisPoint) =>
+    centers.reduce(
+      (nearest, center) => {
+        const distance = (point.x - center.x) ** 2 + (point.y - center.y) ** 2;
+        return distance < nearest.distance ? { group: center.group, distance } : nearest;
+      },
+      { group: 0, distance: Infinity },
+    ).group;
+
+  const assignments: number[] = [];
+  const analytical: number[] = [];
+  points.forEach((point) => {
+    const group = groupByPoint.get(point);
+    assignments[point.index] = group ?? nearestGroup(point);
+    analytical[point.index] = group ?? -1;
+  });
+  return { assignments, analytical };
+}
+
 export const analyzeClusterOpinionsTyped: AnalyzeClusterOpinionsFn = (payload, allClustersData, options) =>
   Reflect.apply(analyzeClusterOpinions, null, [payload, allClustersData, options]) as Promise<
     Partial<PolisClusterAnalysisResult>
@@ -956,7 +1005,7 @@ export function buildRatingMatrixFromRealData(
  * would pull participants who skipped the same questions together.
  */
 export function buildUmapParticipantData(ratingMatrix: RatingMatrix): number[][] {
-  const nParticipants = ratingMatrix[0]?.length || 0;
+  const nParticipants = ratingMatrix.reduce((widest, votes) => Math.max(widest, votes.length), 0);
   const means = ratingMatrix.map((votes) => {
     const answered = votes.filter((vote): vote is ConcretePolisVote => vote !== null && vote !== undefined);
     return answered.length ? answered.reduce<number>((sum, vote) => sum + vote, 0) / answered.length : 0;
@@ -1210,7 +1259,7 @@ export function getUTCDataTimestamp() {
 }
 
 export const REPORT_DEFAULT_EMBEDDING_LABEL = 'Polis Auto';
-export const PARTICIPANTS_GRAPH_TOOLTIP_TEXT = `This diagram opens in UMAP with 3 clusters. Switch to SVD/PCA for the PCA view, or ${REPORT_DEFAULT_EMBEDDING_LABEL} for the report's Polis-inspired automatic clustering.`;
+export const PARTICIPANTS_GRAPH_TOOLTIP_TEXT = `This diagram opens in UMAP with 3 clusters. Switch to SVD/PCA for the PCA view, or ${REPORT_DEFAULT_EMBEDDING_LABEL} for the report's Polis-inspired automatic clustering. People with too few answers appear in their nearest cluster but aren't counted in its results.`;
 export const REPORT_DEFAULT_EMBEDDING_TOOLTIP_TEXT =
   "Polis Auto uses Context Engine's Polis-inspired automatic clustering. It keeps the report's PCA-based participant layout and auto-selects opinion clusters from that layout. UMAP and SVD/PCA are exploratory views where you can override K manually. This is Polis-inspired analysis inside Context Engine, not an official Polis/Pol.is integration or endorsement.";
 export const OPINION_GROUPS_TOOLTIP_TEXT =

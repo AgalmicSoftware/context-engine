@@ -474,7 +474,7 @@ describe('sessionCorsWorker authenticated ai/transcribe routes', () => {
       ok: true,
       status: 200,
       json: async () => ({
-        content: [{ text: 'pong' }],
+        content: [{ type: 'text', text: 'pong' }],
       }),
       }),
     });
@@ -500,7 +500,7 @@ describe('sessionCorsWorker authenticated ai/transcribe routes', () => {
     expect(payload).toEqual({
       completion: 'pong',
       raw: {
-        content: [{ text: 'pong' }],
+        content: [{ type: 'text', text: 'pong' }],
       },
     });
     expect(upstreamFetch).toHaveBeenCalledWith(
@@ -513,8 +513,7 @@ describe('sessionCorsWorker authenticated ai/transcribe routes', () => {
           'x-api-key': 'sk-request-anthropic',
         },
         body: JSON.stringify({
-          model: 'claude-3-5-sonnet-20240620',
-          temperature: 0.7,
+          model: 'claude-opus-5-5',
           max_tokens: 123,
           messages: [{ role: 'user', content: 'ping' }],
         }),

@@ -8,6 +8,9 @@ Use it for new files, refactors, and cleanup PRs.
 - `client/` holds the React SPA, frontend assets, and frontend-adjacent tests.
 - `ai-discourse-bench/` holds the standalone benchmark harness, question banks,
   report generator, release validation, and benchmark-specific documentation.
+- `mcp/` holds the Context Engine MCP server (`@agalmic/contextengine`).
+- `shared/` holds modules used by more than one runtime, such as the client,
+  Workers, and MCP server.
 - `workers/` holds Cloudflare Worker source and worker-specific support files.
 - `deploy/` holds reviewed, installable deployment packages generated from
   canonical source. It is separate from `workers/` source, untracked `dist/`
@@ -18,9 +21,10 @@ Use it for new files, refactors, and cleanup PRs.
 - `foundry/` holds Foundry-specific Solidity entry points; `foundry/script/` and `foundry/test/` intentionally keep Foundry's singular directory names one level below repo root.
 - `docs/` holds canonical implementation and operations documentation.
 - `posts/` holds public Markdown posts and the `/posts` route manifest.
-- `media/` holds editable sources and render tooling for public media such as
-  the product film. Files the site serves are copied into `client/public/media/`;
-  local render output stays in each project's ignored `dist/`.
+- `ai-discourse-corpus/` and `whitepaper/` hold the curated discourse corpus and
+  the whitepaper.
+- `client/public/media/` holds the media files the site serves, such as the
+  product film.
 - `tests/` holds source-of-truth root Node/Jest test harnesses that are not practical to colocate elsewhere; shared helpers live under `tests/helpers/`.
 - `broadcast/`, `cache/`, `dist/`, `out/`, `release-public/`, and `tmp/` are
   generated or runtime output locations and are not canonical homes for new
@@ -36,7 +40,7 @@ Use it for new files, refactors, and cleanup PRs.
 - Session page shell UI belongs under `client/src/components/OnePageSession/`; keep `OnePageSession.tsx` and its helper/test modules co-located there.
 - Demo-only route views belong under `client/src/components/DemoViews/`; keep reusable demo subareas grouped there instead of under generic catch-all names.
 - Session doc-library UI belongs under `client/src/components/DocumentLibrary/`; keep `SessionDocumentsPage.tsx` and `DocumentLibraryPanel.tsx` together there.
-- Rendered React component files use PascalCase filenames and `.tsx` extensions. All production components are now TypeScript.
+- Rendered React component files use PascalCase filenames and `.tsx` extensions. All production components are TypeScript.
 - Component-specific styles are co-located as `<ComponentName>.module.scss`.
 - Component-specific tests are co-located beside the source component.
 - Preferred component test naming is `<ComponentName>.test.jsx` for JavaScript tests and `<ComponentName>.test.tsx` once the test itself is converted.
@@ -61,7 +65,7 @@ Use it for new files, refactors, and cleanup PRs.
 
 - Tests live beside the source they exercise whenever practical.
 - Valid test suffixes are `.test.js`, `.test.jsx`, `.test.ts`, `.test.tsx`, and `.test.mjs`.
-- Optional middle qualifiers are allowed before `.test`: `.render`, `.cache`, `.proxy`, `.ui`, `.api`, `.module`, `.routes`, `.component`.
+- Descriptive middle qualifiers are allowed before `.test`, for example `.render`, `.cache`, `.proxy`, `.ui`, `.api`, `.module`, `.routes`, and `.component`.
 - Use `.test.jsx` or `.test.tsx` for React-rendering and component behavior tests.
 - Use `.test.js`, `.test.ts`, or `.test.mjs` for pure helpers, data modules, Node-only code, and script tests.
 - If a test targets a helper module inside a component folder, the helper may stay camelCase and the test may stay `.test.js`.
@@ -78,8 +82,8 @@ Use it for new files, refactors, and cleanup PRs.
 
 - Canonical acronyms in this repo are `SBT`, `AI`, `RPC`, and `UX`.
 - In PascalCase names, keep the acronym uppercase: `SBTSelector.tsx`, `DebateMap.tsx`.
-- In camelCase module names, a leading acronym may be lowercase to satisfy camelCase: `sbtDisplayNames.js`, `sbtCreateFormCache.js`, `rpcSelection.js`.
-- In lowercase-only naming schemes such as kebab-case script filenames, use lowercase segments: `test-sbt-auto-mint.ui.js`, `run-ux-workflows.js`, `rpc-errors.js`.
+- In camelCase module names, a leading acronym may be lowercase to satisfy camelCase: `sbtDisplayNames.ts`, `sbtCreateFormCache.ts`, `rpcSelection.ts`.
+- In lowercase-only naming schemes such as kebab-case script filenames, use lowercase segments: `sbt-authorization-smoke.js`, `ai-wallet.js`, `rpc-defaults-parity.test.js`.
 - Do not mix title-cased acronym fragments such as `Sbt`, `Ai`, `Rpc`, or `Ux` inside mixed-case filenames.
 
 ## 7. Reuse Vs. New Directory
@@ -102,8 +106,9 @@ The client, MCP and local SBT scripts pass their ethers v5 instance into this
 shared WebCrypto implementation.
 
 The SIWE wire format and canonical session-ID normalization live in
-`shared/auth/siweMessage.mjs`, with no ethers dependency. Browser, MCP and Agent
-Bridge adapters supply their own clock and origin defaults. The Session Worker
-also uses the shared ID normalizer; stored configs are trimmed on read while new
-IDs must satisfy the shared grammar. Conformance tests cover all four consumers
-and check message bytes against the Session Worker parser and validator.
+`shared/auth/siweMessage.mjs`, with no ethers dependency. Browser and MCP
+adapters supply their own clock and origin defaults. The Session Worker also
+uses the shared ID normalizer; stored configs are trimmed on read while new IDs
+must satisfy the shared grammar. Conformance tests cover the browser, MCP and
+Session Worker and check message bytes against the Session Worker parser and
+validator.

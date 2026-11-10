@@ -106,6 +106,17 @@ export const createSurveyQuestionsSubmitRuntime = (
     return out;
   };
 
+  const resolveFieldEncryptionPolicy = (field: SurveyQuestionsLegacyValue, qid: string, fieldKey: string) => {
+    const audience = resolveFieldEncryptionAudience(field, qid, fieldKey);
+    return {
+      audience,
+      lit:
+        audience === 'gate'
+          ? buildLitEncryptionOptionsForRecipients(getEffectiveRecipientsForField({ questionId: qid, fieldKey, field }))
+          : undefined,
+    };
+  };
+
   const buildFieldEncryptionWorkGroups = (
     slice: SurveyQuestionsLegacyValue = {},
     changedQids: SurveyQuestionsLegacyValue = new Set(),
@@ -322,6 +333,7 @@ export const createSurveyQuestionsSubmitRuntime = (
       captureInterviewPredictionComparisonSubmissions(slice, changedQids) as SurveyQuestionsLegacyValue,
       stateRef.current.editBaseline,
       changedQids,
+      resolveFieldEncryptionPolicy,
     );
     const built: SurveyQuestionsLegacyValue = prepareJsonAndHash(
       submitContext.surveyIndex,
@@ -379,7 +391,7 @@ export const createSurveyQuestionsSubmitRuntime = (
     return oversize;
   };
 
-  const encryptAndUpload = async () => {
+  const encryptAndUpload = async (overrideChangedQids: Set<string> | null = null) => {
     let submitContext: SurveyQuestionsLegacyValue = null;
     let heldBackNotice = '';
     try {
@@ -435,7 +447,14 @@ export const createSurveyQuestionsSubmitRuntime = (
 
       // Compute changed set once (used for encrypt + submit)
       const surveyIndex: SurveyQuestionsLegacyValue = submitContext.surveyIndex;
-      const { changedQids, changedMap }: SurveyQuestionsLegacyValue = getChangedQidsAndFields(surveyIndex);
+      const diff: SurveyQuestionsLegacyValue = getChangedQidsAndFields(surveyIndex);
+      const changedMap = diff.changedMap;
+      const changedQids = new Set<string>(
+        Array.from(diff.changedQids as Set<string>).filter(
+          (qid) => !overrideChangedQids || overrideChangedQids.has(qid),
+        ),
+      );
+      if (!changedQids.size) throw new Error('No new or changed responses to submit.');
 
       // Local state tracker to ensure baseline syncs with encrypted data even if React is slow
       let activeSlice: SurveyQuestionsLegacyValue = stateRef.current.surveysResponseState?.[surveyIndex] || {
@@ -447,6 +466,15 @@ export const createSurveyQuestionsSubmitRuntime = (
       const submitQuestionPool: SurveyQuestionsLegacyValue = stateRef.current.questionPool?.length
         ? stateRef.current.questionPool
         : resolveEditableQuestionList(stateRef.current);
+      // Typed asterisks have no envelope: editing always clears the old ciphertext.
+      // Saved masks go through per-question holdback so other answers can still submit.
+      for (const qid of changedQids as Set<string>) {
+        for (const field of [activeSlice.answers?.[qid], activeSlice.additionalComments?.[qid]]) {
+          if (typeof field?.value === 'string' && field.value.trim() === '*' && !field.encryptedPortion) {
+            throw new Error("A lone * can't be saved; add more text.");
+          }
+        }
+      }
       for (const question of submitQuestionPool) {
         // The diff and the slice use normalized ids; pool ids may differ in case.
         const qid = normalizeQuestionIdKey(question.id);
@@ -463,7 +491,17 @@ export const createSurveyQuestionsSubmitRuntime = (
       const oversize = readOversizeAnswers(submitContext, activeSlice, changedQids, submitQuestionPool);
       // A still-locked field with a new audience can't be re-encrypted until it is decrypted again.
       Array.from(changedQids as Set<string>).forEach((qid) => {
-        if ([activeSlice.answers?.[qid], activeSlice.additionalComments?.[qid]].some(isLockedAudienceChange))
+        if (
+          (
+            [
+              ['answers', 'answer'],
+              ['additionalComments', 'additional'],
+            ] as const
+          ).some(([bucket, key]) => {
+            const field = activeSlice[bucket]?.[qid];
+            return field && isLockedAudienceChange(field, resolveFieldEncryptionPolicy(field, qid, key));
+          })
+        )
           oversize.set(
             qid,
             "It is still locked, so its new audience can't be applied yet. Decrypt it, then submit again.",
@@ -483,7 +521,12 @@ export const createSurveyQuestionsSubmitRuntime = (
 
       activeSlice = captureInterviewPredictionComparisonSubmissions(activeSlice, submitQids);
 
-      activeSlice = remaskUnchangedEncryptedFields(activeSlice, stateRef.current.editBaseline, submitQids);
+      activeSlice = remaskUnchangedEncryptedFields(
+        activeSlice,
+        stateRef.current.editBaseline,
+        submitQids,
+        resolveFieldEncryptionPolicy,
+      );
       const shouldEncrypt = Array.from(submitQids).some(
         (qid) =>
           shouldEncryptResponseFieldForSubmit(activeSlice.answers?.[qid]) ||
@@ -597,7 +640,7 @@ export const createSurveyQuestionsSubmitRuntime = (
       } catch (_: any) {
         if (propsRef.current.singleQuestionMode && propsRef.current.questionID) {
           clearDraftFor(propsRef.current.questionID.toLowerCase());
-        } else {
+        } else if (!overrideChangedQids) {
           clearDraft();
         }
       }
@@ -817,6 +860,7 @@ export const createSurveyQuestionsSubmitRuntime = (
     }
   };
   return {
+    resolveFieldEncryptionPolicy,
     buildLitEncryptionOptionsForRecipients,
     buildFieldEncryptionWorkGroups,
     encryptFieldWorkGroups,

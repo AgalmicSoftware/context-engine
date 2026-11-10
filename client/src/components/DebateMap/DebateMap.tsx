@@ -60,27 +60,16 @@ import type {
   AtlasViewProps,
   CompassData,
   DebateArgument,
-  DebateComment,
   DebateMapProps,
   DebateNode,
   DebateQuestion,
   DebateQuestionOption,
-  DebateVoteTotals,
   DebateVisualMode,
   DisagreementRange,
   FlatNodeProps,
   FlattenedDebateNode,
   HistoricalCase,
-  HistoricalCaseBrief,
-  HistoricalCaseBriefBuilder,
-  HistoricalCasePanel,
-  HistoricalDraftArticle,
-  HistoricalFieldDefinition,
   HistoricalFieldRow,
-  HistoricalFigureRecord,
-  HistoricalCompassPoint,
-  HistoricalPatchOption,
-  HistoricalVoteEntry,
   LocalVoteDeltas,
   ModalProps,
   PackedAtlasLayoutNode,
@@ -90,6 +79,8 @@ import type {
 } from './debateMapTypes';
 
 export { buildExpandedHistoricalCaseBriefMap, buildHistoricalCaseBrief, buildHistoricalCompassPoints };
+
+import DebateMapGeneratedSummary from './DebateMapGeneratedSummary';
 
 const StandalonePoliticalCompass = React.lazy(() =>
   import('../DemoViews/DebateHUD/PoliticalCompassView').then((module) => ({
@@ -334,6 +325,9 @@ export const DEBATE_VISUAL_MODES = Object.freeze({
   TREE: 'tree',
   LIST: 'list',
 });
+
+const DEMO_LEVEL_LABELS = ['Category', 'Sub-Category', 'Topic', 'Instance'];
+const LEVEL_DOT_CLASSES = ['category', 'subcategory', 'topic', 'instance'];
 
 const getInitialDebateVisualMode = (atlasLayoutMode: AtlasLayoutMode): DebateVisualMode =>
   atlasLayoutMode === ATLAS_LAYOUT_MODES.ORBITAL ? DEBATE_VISUAL_MODES.ATLAS : DEBATE_VISUAL_MODES.CIRCLES;
@@ -1197,7 +1191,18 @@ const FlatNode = ({
 };
 
 // 3. Detail Modal
-const Modal = ({ isOpen, onClose, content, onVote, readOnly = false, copied, onCopy, onTagClick }: ModalProps) => {
+const Modal = ({
+  isOpen,
+  onClose,
+  content,
+  onVote,
+  readOnly = false,
+  copied,
+  onCopy,
+  onTagClick,
+  buildQuestionLink = null,
+  levelLabels = DEMO_LEVEL_LABELS,
+}: ModalProps) => {
   const modalContentRef = useRef<HTMLDivElement | null>(null);
   const defaultArgumentData = content?.arguments && typeof content.arguments === 'object' ? content.arguments : null;
   const hasDefaultArguments = Boolean(defaultArgumentData);
@@ -1409,10 +1414,10 @@ const Modal = ({ isOpen, onClose, content, onVote, readOnly = false, copied, onC
 
   if (!isOpen || !content) return null;
 
-  const generatedSummaryComments = readOnly
-    ? (Array.isArray(content.comments) ? content.comments : [])
-        .map((comment) => String(comment?.comment || '').trim())
-        .filter(Boolean)
+  const generatedSummaryEntries = readOnly
+    ? (Array.isArray(content.comments) ? content.comments : []).filter((entry) =>
+        String(entry?.comment || entry?.label || '').trim(),
+      )
     : [];
   const questions = Array.isArray(content.questions) ? content.questions : [];
   const questionSearchKeys = getDebateQuestionListStableKeys(questions, 'question-search');
@@ -1428,9 +1433,8 @@ const Modal = ({ isOpen, onClose, content, onVote, readOnly = false, copied, onC
   const compassTitle = content?.compass?.xAxis?.label || content?.name || 'Compass';
 
   // Logic for Depth Label and Styling
-  const depthLabels = ['Category', 'Sub-Category', 'Topic', 'Instance'];
   const depthIndex = content.depth !== undefined ? content.depth : content.parentPath ? content.parentPath.length : 0;
-  const depthLabel = depthLabels[Math.min(depthIndex, 3)] || 'Node';
+  const depthLabel = levelLabels[Math.min(depthIndex, levelLabels.length - 1)] || 'Node';
   const depthClass = `depth${Math.min(depthIndex, 3)}`; // used for color mapping
 
   const tags = readOnly ? [] : ['AI Safety', 'Policy'];
@@ -1862,13 +1866,8 @@ const Modal = ({ isOpen, onClose, content, onVote, readOnly = false, copied, onC
           ))}
         </div>
 
-        {generatedSummaryComments.length > 0 && (
-          <section className={styles.generatedSummarySection} aria-label="AI-generated summary">
-            <div className={styles.generatedSummaryEyebrow}>AI-generated summary</div>
-            {generatedSummaryComments.map((comment, index) => (
-              <p key={`${content.id || 'generated-summary'}-${index}`}>{comment}</p>
-            ))}
-          </section>
+        {generatedSummaryEntries.length > 0 && (
+          <DebateMapGeneratedSummary key={content.id || 'generated-summary'} entries={generatedSummaryEntries} />
         )}
 
         {compassData && (
@@ -1892,6 +1891,9 @@ const Modal = ({ isOpen, onClose, content, onVote, readOnly = false, copied, onC
                     <StandalonePoliticalCompass compass={compassData as any} />
                   </React.Suspense>
                 </div>
+                {!compassData.points?.length && (
+                  <p className={styles.compassEmpty}>No one is placed on this compass yet.</p>
+                )}
               </div>
             )}
           </div>
@@ -1991,12 +1993,25 @@ const Modal = ({ isOpen, onClose, content, onVote, readOnly = false, copied, onC
                   const questionText = q.question || q.prompt || 'Untitled question';
                   const questionAuthor = q.username ? String(q.username).trim() : '';
                   const authorAvatar = questionAuthor ? getUserAvatar(questionAuthor) : '';
+                  const questionHref =
+                    typeof buildQuestionLink === 'function' && q.id ? buildQuestionLink(String(q.id)) : '';
+                  // With its own page, the card opens it in a new tab, as a session card's expand
+                  // button does, to be answered there; the atlas stays open here.
+                  const CardTag = questionHref ? 'a' : 'div';
 
                   return (
-                    <div
+                    <CardTag
                       key={questionCardKeys[i] || getDebateQuestionStableKey(q, 'question-card')}
-                      className={styles.pileCard}
+                      className={`${styles.pileCard} ${questionHref ? styles.pileCardLink : ''}`}
                       data-type={questionType}
+                      {...(questionHref
+                        ? {
+                            href: questionHref,
+                            target: '_blank',
+                            rel: 'noopener noreferrer',
+                            'aria-label': `Answer: ${questionText} (opens in a new tab)`,
+                          }
+                        : {})}
                     >
                       <div className={styles.pileCardHeader}>
                         <div>
@@ -2019,7 +2034,12 @@ const Modal = ({ isOpen, onClose, content, onVote, readOnly = false, copied, onC
                         </div>
                       </div>
                       <div className={styles.pileCardBody}>{renderQuestionPreview(q)}</div>
-                    </div>
+                      {questionHref && (
+                        <span className={styles.pileCardAction} aria-hidden="true">
+                          Answer <FontAwesomeIcon icon={faExternalLinkAlt} />
+                        </span>
+                      )}
+                    </CardTag>
                   );
                 })}
               </div>
@@ -2252,6 +2272,9 @@ const DebateMap = ({
   onModalClose = null,
   atlasLayoutMode = ATLAS_LAYOUT_MODES.PACKED,
   treeData = null,
+  buildNodeLink = null,
+  buildQuestionLink = null,
+  levelLabels = DEMO_LEVEL_LABELS,
 }: DebateMapProps) => {
   const explicitTreeData = Array.isArray(treeData) ? treeData : null;
   const externalDemoEnabled =
@@ -2377,8 +2400,10 @@ const DebateMap = ({
       onModalClose();
       return;
     }
+    // Inside a session page, closing a node keeps the reader on that page.
+    if (embedded) return;
     navigate(modalReturnTo || buildPublicRoute('/atlas'), { replace: true });
-  }, [modalReturnTo, navigate, onModalClose]);
+  }, [embedded, modalReturnTo, navigate, onModalClose]);
 
   const handleBookmark = useCallback((id: string) => {
     setBookmarkedNodes((prev) => {
@@ -2392,8 +2417,13 @@ const DebateMap = ({
   const copyToClipboard = useCallback(() => {
     const modalContentId = String(modalContent?.id || '').trim();
     if (modalContent && modalContentId) {
-      const deepLink = new URL(buildPublicRoute(`/atlas/${modalContentId}`), window.location.origin);
-      if (demoMode) {
+      const deepLink = new URL(
+        typeof buildNodeLink === 'function'
+          ? buildNodeLink(modalContentId)
+          : buildPublicRoute(`/atlas/${modalContentId}`),
+        window.location.origin,
+      );
+      if (demoMode && typeof buildNodeLink !== 'function') {
         deepLink.searchParams.set('demo', '1');
       }
       navigator.clipboard
@@ -2408,7 +2438,7 @@ const DebateMap = ({
           notify.warn('Copy failed');
         });
     }
-  }, [demoMode, modalContent]);
+  }, [buildNodeLink, demoMode, modalContent]);
 
   // --- NEW: Handle Tag Clicks to route ---
   const handleTagClick = useCallback(
@@ -2608,22 +2638,12 @@ const DebateMap = ({
               {embedded && (
                 <>
                   <span className={styles.viewModeSeparator} />
-                  <span className={styles.inlineLegendItem}>
-                    <span className={`${styles.legendDot} ${styles.category}`} />
-                    <span>Category</span>
-                  </span>
-                  <span className={styles.inlineLegendItem}>
-                    <span className={`${styles.legendDot} ${styles.subcategory}`} />
-                    <span>Sub-Category</span>
-                  </span>
-                  <span className={styles.inlineLegendItem}>
-                    <span className={`${styles.legendDot} ${styles.topic}`} />
-                    <span>Topic</span>
-                  </span>
-                  <span className={styles.inlineLegendItem}>
-                    <span className={`${styles.legendDot} ${styles.instance}`} />
-                    <span>Instance</span>
-                  </span>
+                  {levelLabels.slice(0, LEVEL_DOT_CLASSES.length).map((label, level) => (
+                    <span key={label} className={styles.inlineLegendItem}>
+                      <span className={`${styles.legendDot} ${styles[LEVEL_DOT_CLASSES[level]]}`} />
+                      <span>{label}</span>
+                    </span>
+                  ))}
                 </>
               )}
             </div>
@@ -2653,8 +2673,8 @@ const DebateMap = ({
                 <span className={styles.filterLabel}>Filter Depth:</span>
                 <select value={nodeTypeFilter} onChange={(e) => setNodeTypeFilter(e.target.value)}>
                   <option value="all">All</option>
-                  <option value="category">Category</option>
-                  <option value="subcategory">Sub-category</option>
+                  <option value="category">{levelLabels[0]}</option>
+                  <option value="subcategory">{levelLabels[1]}</option>
                 </select>
               </div>
             )}
@@ -2721,7 +2741,7 @@ const DebateMap = ({
                   </div>
                 </div>
               ) : (
-                <div className={styles.emptyState}>Select a category above to view the Policy Org Chart</div>
+                <div className={styles.emptyState}>Select a category above to view the Tree Chart</div>
               )}
             </div>
           )}
@@ -2736,6 +2756,8 @@ const DebateMap = ({
           onCopy={copyToClipboard}
           copied={copied}
           onTagClick={handleTagClick}
+          buildQuestionLink={buildQuestionLink}
+          levelLabels={levelLabels}
         />
         <SuggestNodeModal
           isOpen={suggestNodeModalOpen}

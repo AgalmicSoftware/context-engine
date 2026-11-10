@@ -1,3 +1,4 @@
+import type { ResponseValuesEqual } from './responseValueEquality';
 import { LegacyOwnResponseListingError } from '../../utilities/storage/storageClient';
 import { isWorkerCanonicalSessionConfig, loadWorkerResponses } from '../../utilities/survey/workerResponseHydration';
 import { isWorkerResponseNewer } from '../../utilities/survey/workerResponseRecency';
@@ -96,7 +97,7 @@ export const loadSessionInterviewSavedAnswers = async ({
 
 export type InterviewSavedAnswerDiffDeps = ChangedFieldResolverDeps & {
   normalizeQuestionIdKey: (questionId: string) => string;
-  valuesEqual: (a: unknown, b: unknown) => boolean;
+  valuesEqual: ResponseValuesEqual;
   ratingEnvelopeQids?: Set<string>;
 };
 

@@ -1,3 +1,6 @@
+import { takesImageInput, usesOpenAiResponsesApi } from '../../../../shared/aiModelFamily.mjs';
+import { AI_PRESET_CONFIGS } from './aiModelPresets';
+
 type PhotoLike = {
   name?: unknown;
   type?: unknown;
@@ -61,15 +64,6 @@ export const stripDataUrlPrefix = (dataUrl: unknown = ''): string => {
   return commaIndex >= 0 ? raw.slice(commaIndex + 1) : raw;
 };
 
-export const isChatReasoningModel = (modelRaw: unknown = ''): boolean => /^o[13]/.test(modelLeaf(modelRaw));
-
-export const usesOpenAiResponsesApi = (providerRaw: unknown = '', modelRaw: unknown = ''): boolean => {
-  const provider = String(providerRaw || '')
-    .trim()
-    .toLowerCase();
-  return provider === 'openai' && /^(gpt-5|gpt-6-astra(?:$|-))/.test(modelLeaf(modelRaw));
-};
-
 export const resolvePhotoAnalysisSupport = ({
   provider,
   model,
@@ -82,25 +76,27 @@ export const resolvePhotoAnalysisSupport = ({
     .toLowerCase();
   const leaf = modelLeaf(model);
 
-  if (normalizedProvider === 'openai') {
-    if (/^(gpt-5|gpt-4o|gpt-4\.1)/.test(leaf)) {
-      return {
-        supported: true,
-        format: usesOpenAiResponsesApi(normalizedProvider, leaf) ? 'openai-responses' : 'openai-chat',
-      };
-    }
-  }
-
-  if (normalizedProvider === 'anthropic') {
-    if (/^claude-(3|4)/.test(leaf)) {
-      return { supported: true, format: 'anthropic' };
-    }
-  }
-
-  if (normalizedProvider === 'openrouter') {
-    if (/^(gpt-5|gpt-4o|gpt-4\.1)/.test(leaf) || /claude-(3|4)/.test(leaf)) {
-      return { supported: true, format: 'openai-chat' };
-    }
+  const preset = Object.values(AI_PRESET_CONFIGS).find(
+    (candidate) =>
+      (candidate.provider === normalizedProvider || normalizedProvider === 'openrouter') &&
+      Object.values(candidate.models).some((modelName) => modelLeaf(modelName) === leaf),
+  );
+  const isClaudeModel = leaf.startsWith('claude-');
+  const customModelSupported =
+    takesImageInput(leaf) &&
+    ((normalizedProvider === 'openai' && !isClaudeModel) ||
+      (normalizedProvider === 'anthropic' && isClaudeModel) ||
+      normalizedProvider === 'openrouter');
+  if (preset ? preset.supportsImages : customModelSupported) {
+    return {
+      supported: true,
+      format:
+        normalizedProvider === 'anthropic'
+          ? 'anthropic'
+          : usesOpenAiResponsesApi({ provider: normalizedProvider, model: leaf })
+            ? 'openai-responses'
+            : 'openai-chat',
+    };
   }
 
   return {

@@ -130,7 +130,7 @@ describe('surveyQuestionsEditDiffRuntime', () => {
     const context = createContext();
     const runtime = createSurveyQuestionsEditDiffRuntime(context);
 
-    expect(runtime.areResponsesConsistent({ responses: [] }, 0)).toBe(true);
+    expect(runtime.areResponsesConsistent({ responses: [] })).toBe(true);
     expect(context.areSurveyResponsesConsistent).toHaveBeenCalledWith(
       expect.objectContaining({
         buildSliceFromUserAnswers: context.buildSliceFromUserAnswers,

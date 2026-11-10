@@ -1,5 +1,6 @@
+import { SESSION_SECRETS_AUTHORITY_KEY } from './sessionSecretsAuthority.js';
 import { assertAgentBackupTargetEmpty } from './agent/backup.mjs';
-import { BACKUP_IMPORT_TTL_MS, BACKUP_IMPORT_ACTIVE_KEY, backupImportStagePrefix, backupImportJournalKey, journalBackupImportWrite, readActiveBackupImport, cleanupCompletedBackupImport } from './sessionBackupLifecycle.js';
+import { BACKUP_IMPORT_TTL_MS, BACKUP_IMPORT_ACTIVE_KEY, backupImportStagePrefix, backupImportJournalKey, journalBackupImportWrite, readActiveBackupImport, cleanupCompletedBackupImport, readCompletedBackupImport } from './sessionBackupLifecycle.js';
 import { verifyBackupPage } from './sessionBackupAuthentication.js';
 import { recoveryKeyFingerprint } from '../shared/recoveryKey.mjs';
 import { sha256Hex } from '../shared/deployHelperCore.mjs';
@@ -12,7 +13,7 @@ import { isSafeCloudflareStorageRefId } from './storageRefNormalization.js';
 import { isStorageResourceId } from './storageUploadValidation.js';
 import { STORAGE_EXPORT_PAGE_LIMITS, createStorageExportBudget, jsonByteLength } from './storageScanBudget.js';
 import { rejectKvValueOverLimit, resolveMaxUploadBytes } from './uploadSizeLimits.js';
-import { buildIndexKey, buildObjectKey, buildPayloadKey, getStorageIndexBinding, getStorageR2Binding, readStoredCloudflarePayloadBytes } from './storageRouteExecution.js';
+import { buildIndexKey, buildObjectKey, buildPayloadKey, getStorageIndexBinding, getStorageR2Binding, readStoredCloudflarePayloadBytes, storageIndexPutOptions } from './storageRouteExecution.js';
 
 const fail = (message, status = 400, reason) => { throw Object.assign(new Error(message), { status, reason }); };
 const object = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
@@ -22,10 +23,20 @@ const digest = async (bytes) => [...new Uint8Array(await crypto.subtle.digest('S
 const hashPattern = /^[a-f0-9]{64}$/;
 const resources = new Set(['docsContext', 'questions', 'surveys', 'responses', 'generatedArtifacts', 'media', 'images']);
 const temporary = { expirationTtl: 7 * 86400 };
+const workerUrlFields = ['corsWorkerUrl', 'corsWorkerURL', 'CorsWorkerURL', 'workerUrl',
+  'sessionCorsWorkerUrl', 'sessionWorkerUrl', 'sessionWorkerURL', 'workerURL'];
+const workerOrigin = (value) => {
+  if (typeof value !== 'string' || !value || value !== value.trim()) return '';
+  try {
+    const url = new URL(value);
+    return ['http:', 'https:'].includes(url.protocol) && !url.username && !url.password &&
+      url.pathname === '/' && !url.search && !url.hash ? url.origin : '';
+  } catch { return ''; }
+};
 
 const assertEmptyTarget = async ({ coordinator, current, slug, page, index, budget }) => {
   const nonempty = () => fail('Restore requires an empty target session. Abandon any unfinished restore before starting again.', 409, 'backup_target_not_empty');
-  if (current || await coordinator.state.storage.get('session-lit-authorization-signer-v1')) nonempty();
+  if (current || await coordinator.state.storage.get('session-lit-authorization-signer-v1') || await coordinator.state.storage.get(SESSION_SECRETS_AUTHORITY_KEY)) nonempty();
   const groupKv = budget.wrap(coordinator.env.GROUP_KV);
   await assertAgentBackupTargetEmpty({ kv: groupKv, storage: coordinator.state.storage, sessionId: page.manifest.sessionId });
   budget.consume(1);
@@ -112,6 +123,8 @@ export const importCoordinatorBackupPage = async (coordinator, payload, validato
   const { env, state: { storage } } = coordinator;
   const { page, expectedAuthority } = payload || {};
   const slug = sessionSlugStorageKey(payload?.slug);
+  const destination = workerOrigin(payload?.workerUrl);
+  if (!destination || destination !== payload?.requestOrigin) fail('Restore Worker origin must match the receiving request origin.');
   validatePage(page, slug);
   const manifest = page.manifest;
   const fingerprints = await Promise.all([env.CE_STORAGE_ENVELOPE_KEK, env.CE_STORAGE_ENVELOPE_PREVIOUS_KEK].filter(Boolean).map(recoveryKeyFingerprint));
@@ -119,7 +132,19 @@ export const importCoordinatorBackupPage = async (coordinator, payload, validato
   const missing = required.filter((fingerprint) => !fingerprints.includes(fingerprint));
   if (missing.length) fail(`The target is missing backup recovery keys: ${missing.join(', ')}.`, 409, 'recovery_key_mismatch');
   if (!await verifyBackupPage(page, env)) fail('Backup page authentication failed. Use the original unmodified archive.', 403, 'backup_authentication_failed');
+  const completed = await readCompletedBackupImport(coordinator, { ...payload, archiveId: page.archiveId });
+  if (completed) {
+    if (completed.pageNumber !== page.pageNumber || completed.pageHash !== await sha256Hex(JSON.stringify(page))) {
+      fail('Resume completion with the final unchanged backup page.', 409);
+    }
+    return Response.json({ ok: true, archiveId: page.archiveId, pageNumber: page.pageNumber,
+      counts: completed.counts, conflicts: [], complete: true, replayed: true, restore: null });
+  }
   const current = await coordinator.assertSessionAuthority(payload, { allowRestore: true });
+  if (current && (!workerOrigin(current.config?.corsWorkerUrl) || workerUrlFields.some(key =>
+    Object.hasOwn(current.config, key) && workerOrigin(current.config[key]) !== destination))) {
+    fail('The target config Worker origin does not match this restore destination.', 409);
+  }
   const targetId = resolveCanonicalWorkerSessionIdHex(current?.config || {});
   if (current ? targetId !== manifest.sessionId : payload.adoptSessionId !== true) fail('The backup session identity does not match this target.', 409, 'backup_session_mismatch');
   if (page.archiveId !== await sha256Hex(`${manifest.sessionId}:${manifest.exportedAt}:${page.snapshotDigest}`)) fail('Invalid backup archive identity.');
@@ -130,11 +155,10 @@ export const importCoordinatorBackupPage = async (coordinator, payload, validato
   const stateKey = `session-backup-import:${page.archiveId}`;
   const activeKey = BACKUP_IMPORT_ACTIVE_KEY;
   const active = await readActiveBackupImport(coordinator, slug, true, budget);
+  // Only 0.8.0 progress lacks a destination, and it started on this Worker.
+  if (active && !active.progress.workerUrl) active.progress.workerUrl = destination;
+  if (active && active.progress.workerUrl !== destination) fail('Restore Worker origin cannot change between pages.', 409);
   if (active && (active.archiveId !== page.archiveId || active.progress.abandoning)) fail('Another backup restore is in progress. Check restore status to abandon it.', 409, 'backup_restore_in_progress');
-  if (active?.progress.finished) {
-    await assertEmptyTarget({ coordinator, current, slug, page, index, budget });
-    fail('Previous restore cleanup is still in progress. Retry this page.', 503, 'backup_cleanup_pending');
-  }
   const pageHash = await sha256Hex(JSON.stringify(page));
   const receiptKey = `${stateKey}:page:${page.pageNumber}`;
   const complete = async (progress) => {
@@ -144,7 +168,7 @@ export const importCoordinatorBackupPage = async (coordinator, payload, validato
       ...(done ? {} : { pageComplete: false }),
       restore: done ? null : { archiveId: page.archiveId, inProgress: true, canAbandon: false, cleaning: true } });
   };
-  if (active?.progress.finishing) {
+  if (active?.progress.committedAuthority) {
     if (active.progress.actor !== expectedAuthority.actor || active.progress.pageNumber !== page.pageNumber || active.progress.pageHash !== pageHash) {
       fail('Resume completion with the final unchanged backup page.', 409);
     }
@@ -169,10 +193,10 @@ export const importCoordinatorBackupPage = async (coordinator, payload, validato
   if (!progress) {
     await assertEmptyTarget({ coordinator, current, slug, page, index, budget });
     if (page.pageNumber !== 0 || !page.coordinator) fail('Import must begin with the first backup page.', 409);
-    progress = { actor: expectedAuthority.actor, pageNumber: 0, nextEntry: 0, pageHash, manifest: { ...manifest, counts: undefined, complete: undefined },
+    progress = { actor: expectedAuthority.actor, workerUrl: destination, pageNumber: 0, nextEntry: 0, pageHash, manifest: { ...manifest, counts: undefined, complete: undefined },
       counts: { written: 0, skipped: 0, conflicts: 0 }, conflicts: [], observed: { records: 0, payloads: 0, owners: 0, hidden: 0, bytes: 0 },
-      expiresAt: coordinator.now() + BACKUP_IMPORT_TTL_MS, configPublished: false,
-      pendingPayloads: 0, pendingRecords: 0, snapshotReady: false, finished: false };
+      expiresAt: coordinator.now() + BACKUP_IMPORT_TTL_MS,
+      pendingPayloads: 0, pendingRecords: 0, snapshotReady: false };
     if (page.coordinator.chunked !== true) {
       validateSnapshot({ snapshot: page.coordinator, manifest, ...validators });
       if (await sha256Hex(JSON.stringify(page.coordinator)) !== page.snapshotDigest) fail('The coordinator snapshot checksum does not match.');
@@ -184,7 +208,7 @@ export const importCoordinatorBackupPage = async (coordinator, payload, validato
       await transaction.put(stateKey, progress);
     });
   }
-  if (progress.actor !== expectedAuthority.actor || progress.pageNumber !== page.pageNumber || progress.finished ||
+  if (progress.actor !== expectedAuthority.actor || progress.pageNumber !== page.pageNumber ||
       (progress.nextEntry > 0 && progress.pageHash !== pageHash) ||
       !same(progress.manifest, { ...manifest, counts: undefined, complete: undefined })) fail('Backup pages must be imported unchanged and in order.', 409);
   progress.pageHash = pageHash;
@@ -201,7 +225,7 @@ export const importCoordinatorBackupPage = async (coordinator, payload, validato
     await storage.put(stateKey, progress);
   }
   const conflict = (key) => { progress.counts.conflicts += 1; if (progress.conflicts.length < 50) progress.conflicts.push(key); };
-  const write = async (store, key, value, json = false, kind = 'index') => {
+  const write = async (store, key, value, json = false, kind = 'index', options) => {
     const existing = await store.get(key);
     if (existing != null) {
       let identical = existing === value;
@@ -212,10 +236,12 @@ export const importCoordinatorBackupPage = async (coordinator, payload, validato
       return identical;
     }
     await journalBackupImportWrite(storage, page.archiveId, kind, key);
-    await store.put(key, value);
+    await store.put(key, value, options);
     progress.counts.written += 1;
     return true;
   };
+  // A record's list metadata comes from the record, as at upload.
+  const writeRecord = (key, metadata) => write(index, key, JSON.stringify(metadata), true, 'index', storageIndexPutOptions(metadata));
   const assemble = async (header) => {
     const bytes = new Uint8Array(header.size);
     let offset = 0;
@@ -234,7 +260,7 @@ export const importCoordinatorBackupPage = async (coordinator, payload, validato
     await storage.put(stateKey, progress);
     return Response.json({ ok: true, archiveId: page.archiveId, pageNumber: page.pageNumber, pageComplete: false,
       counts: progress.counts, conflicts: progress.conflicts, complete: false,
-      restore: { archiveId: page.archiveId, inProgress: true, canAbandon: !progress.configPublished } });
+      restore: { archiveId: page.archiveId, inProgress: true, canAbandon: !progress.committedAuthority } });
   };
   for (let i = progress.nextEntry; i < page.entries.length; i += 1) {
     const entry = page.entries[i];
@@ -249,7 +275,7 @@ export const importCoordinatorBackupPage = async (coordinator, payload, validato
       if (await storage.get(recordKey(entry.id))) fail('Duplicate backup metadata id.');
       const header = await storage.get(descriptorKey(entry.id));
       if (header?.done) {
-        if (header.payloadOk !== false) await write(index, entry.key, JSON.stringify(entry.metadata), true);
+        if (header.payloadOk !== false) await writeRecord(entry.key, entry.metadata);
         updates.push([recordKey(entry.id), { applied: true }]);
       } else {
         await stage(`${root}record:${entry.id}`, JSON.stringify(entry));
@@ -318,7 +344,7 @@ export const importCoordinatorBackupPage = async (coordinator, payload, validato
             progress.counts.written += 1;
           }
           if (staged && (await storage.get(recordKey(entry.id)))?.pending) {
-            if (payloadOk) await write(index, staged.key, JSON.stringify(staged.metadata), true);
+            if (payloadOk) await writeRecord(staged.key, staged.metadata);
             progress.pendingRecords -= 1;
             updates.push([recordKey(entry.id), { applied: true }]);
           }
@@ -362,7 +388,9 @@ export const importCoordinatorBackupPage = async (coordinator, payload, validato
       ? JSON.parse(new TextDecoder().decode(await assemble(snapshotHeader)))
       : JSON.parse(await index.get(`${root}coordinator`) || 'null');
     validateSnapshot({ snapshot, manifest, ...validators });
-    const authority = snapshot.configAuthority;
+    const config = { ...snapshot.configAuthority.config, corsWorkerUrl: progress.workerUrl };
+    for (const field of workerUrlFields) if (Object.hasOwn(config, field)) config[field] = progress.workerUrl;
+    const authority = { ...snapshot.configAuthority, config };
     if (!progress.counts.conflicts) {
       if (!progress.groupsComplete) {
         if (budget.remaining < 32) return pending();
@@ -379,6 +407,16 @@ export const importCoordinatorBackupPage = async (coordinator, payload, validato
         if (groups.nextCursor) return pending();
       }
       if (snapshot.secrets) await write(budget.wrap(env.GROUP_KV), `session:${normalizeWorkerSessionSlug(slug)}:secrets`, JSON.stringify(snapshot.secrets), true, 'group');
+      if (snapshot.secrets) {
+        const restored = { version: 1, slug, revision: 1, envelope: snapshot.secrets, projectionPending: false };
+        const existing = await storage.get(SESSION_SECRETS_AUTHORITY_KEY);
+        if (existing && (!await storage.get(backupImportJournalKey(page.archiveId, 'durable', SESSION_SECRETS_AUTHORITY_KEY)) || !same(existing, restored))) conflict(SESSION_SECRETS_AUTHORITY_KEY);
+        else if (existing) progress.counts.skipped += 1;
+        else {
+          await journalBackupImportWrite(storage, page.archiveId, 'durable', SESSION_SECRETS_AUTHORITY_KEY);
+          await storage.put(SESSION_SECRETS_AUTHORITY_KEY, restored); progress.counts.written += 1;
+        }
+      }
       const signer = snapshot.wrappedSessionKeys.litAuthorizationSigner;
       if (signer) {
         const existing = await storage.get('session-lit-authorization-signer-v1');
@@ -389,26 +427,20 @@ export const importCoordinatorBackupPage = async (coordinator, payload, validato
           await storage.put('session-lit-authorization-signer-v1', signer); progress.counts.written += 1;
         }
       }
-      if (!progress.counts.conflicts && !progress.configPublished) {
-        progress.configPublished = true;
-        await storage.transaction(async (transaction) => {
-          await transaction.put('session-config-authority', { ...authority, projectionPending: true, projectionPendingSinceMs: coordinator.now() });
-          await transaction.put(stateKey, progress);
-        });
-        await coordinator.projectSessionConfigAuthority(authority);
+      if (!progress.counts.conflicts) {
+        // Commit the verified authority before reclaiming its staged snapshot.
+        // The importing actor remains authorized until cleanup and handoff end.
+        progress.committedAuthority = authority;
         progress.counts.written += 1;
+        await storage.put(stateKey, progress);
+        return complete(progress);
       }
-      if (progress.configPublished) await coordinator.repairPendingSessionConfigProjection();
-    }
-    if (progress.configPublished && !progress.counts.conflicts) {
-      progress.finishing = true;
-      await storage.put(stateKey, progress);
-      return complete(progress);
     }
   }
+
   const result = { ok: true, archiveId: page.archiveId, pageNumber: page.pageNumber, counts: progress.counts,
-    conflicts: progress.conflicts, complete: progress.finished && !progress.counts.conflicts,
-    restore: progress.finished ? null : { archiveId: page.archiveId, inProgress: true, canAbandon: !progress.configPublished } };
+    conflicts: progress.conflicts, complete: false,
+    restore: { archiveId: page.archiveId, inProgress: true, canAbandon: true } };
   progress.pageNumber += 1;
   progress.nextEntry = 0;
   progress.cleanupIndex = 0;

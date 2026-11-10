@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import WorkerParticipantGroupCreatePanel from './WorkerParticipantGroupCreatePanel';
 
 const SESSION_ID = '0x11111111111111111111111111111111';
@@ -88,6 +88,102 @@ describe('WorkerParticipantGroupCreatePanel', () => {
     expect(await screen.findByText('Group created. It is open to session participants.')).toBeInTheDocument();
     expect(onGroupsChanged).toHaveBeenCalledTimes(1);
     expect(screen.getByTestId('ce-session-worker-participant-group-label')).toHaveValue('');
+  });
+
+  it.each([200, 500])('releases an old account create without losing the draft (status %s)', async (status) => {
+    let finish!: (response: Response) => void;
+    const fetchImpl = jest.fn(
+      () =>
+        new Promise<Response>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const onGroupsChanged = jest.fn();
+    const props = {
+      sessionId: SESSION_ID,
+      sessionSlug: 'draft',
+      workerUrl: 'https://worker.example',
+      fetchImpl,
+      onGroupsChanged,
+    };
+    const { rerender } = render(
+      <WorkerParticipantGroupCreatePanel {...props} participantAddress={ADDRESS} workerToken="first-token" />,
+    );
+    fireEvent.change(screen.getByLabelText('Group name'), { target: { value: 'Kept draft' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create Group' }));
+    expect(screen.getByRole('button', { name: 'Creating…' })).toBeDisabled();
+    rerender(
+      <WorkerParticipantGroupCreatePanel
+        {...props}
+        participantAddress="0x00000000000000000000000000000000000000bb"
+        workerToken="second-token"
+      />,
+    );
+    expect(screen.getByRole('button', { name: 'Create Group' })).toBeEnabled();
+    expect(screen.getByLabelText('Group name')).toHaveValue('Kept draft');
+    await act(async () =>
+      finish(
+        new Response(
+          JSON.stringify({
+            ok: status === 200,
+            error: 'Old failure',
+            sessionId: SESSION_ID,
+            sessionSlug: 'draft',
+            group: {
+              groupId: 'created',
+              label: 'Kept draft',
+              sessionSlug: 'draft',
+              joinMode: 'open',
+              memberVisibility: 'session',
+            },
+          }),
+          { status },
+        ),
+      ),
+    );
+    expect(screen.getByRole('button', { name: 'Create Group' })).toBeEnabled();
+    expect(screen.getByLabelText('Group name')).toHaveValue('Kept draft');
+    expect(onGroupsChanged).not.toHaveBeenCalled();
+    expect(screen.queryByText('Old failure')).not.toBeInTheDocument();
+  });
+
+  it('an old completion cannot clear a newer create busy state', async () => {
+    const completions: Array<(response: Response) => void> = [];
+    const fetchImpl = jest.fn(() => new Promise<Response>((resolve) => completions.push(resolve)));
+    const props = {
+      sessionId: SESSION_ID,
+      sessionSlug: 'draft',
+      workerUrl: 'https://worker.example',
+      participantAddress: ADDRESS,
+      fetchImpl,
+    };
+    const { rerender } = render(<WorkerParticipantGroupCreatePanel {...props} workerToken="first-token" />);
+    fireEvent.change(screen.getByLabelText('Group name'), { target: { value: 'Kept draft' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create Group' }));
+    rerender(<WorkerParticipantGroupCreatePanel {...props} workerToken="second-token" />);
+    fireEvent.click(screen.getByRole('button', { name: 'Create Group' }));
+    const response = () =>
+      new Response(
+        JSON.stringify({
+          ok: true,
+          sessionId: SESSION_ID,
+          sessionSlug: 'draft',
+          group: {
+            groupId: 'created',
+            sessionSlug: 'draft',
+            label: 'Kept draft',
+            joinMode: 'open',
+            memberVisibility: 'session',
+          },
+        }),
+        { status: 200 },
+      );
+    await act(async () => completions[0](response()));
+    expect(screen.getByRole('button', { name: 'Creating…' })).toBeDisabled();
+    expect(screen.getByLabelText('Group name')).toHaveValue('Kept draft');
+    await act(async () => completions[1](response()));
+    expect(screen.getByRole('button', { name: 'Create Group' })).toBeEnabled();
+    expect(screen.getByLabelText('Group name')).toHaveValue('');
   });
 
   it('does not issue a request without a group label', () => {
@@ -192,6 +288,70 @@ describe('WorkerParticipantGroupCreatePanel', () => {
       memberLimit: 40,
       adminAddress: ADDRESS,
     });
+  });
+
+  it('keeps all draft fields through equivalent configs and unrelated settings changes', () => {
+    const props = {
+      sessionId: SESSION_ID,
+      sessionSlug: 'draft',
+      workerUrl: 'https://worker.example',
+      workerToken: 'token',
+    };
+    const config = { defaultGroupTags: 'default-tag' };
+    const { rerender } = render(<WorkerParticipantGroupCreatePanel {...props} sessionConfig={config} />);
+    fireEvent.change(screen.getByLabelText('Group name'), { target: { value: 'Edited group' } });
+    fireEvent.change(screen.getByLabelText('Description'), { target: { value: 'Edited description' } });
+    fireEvent.change(screen.getByLabelText('Image URL'), { target: { value: 'https://images.example/draft.png' } });
+    fireEvent.change(screen.getByLabelText('Member limit'), { target: { value: '23' } });
+    fireEvent.change(screen.getByLabelText('Tag'), { target: { value: 'edited-tag' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add tag' }));
+    for (const replacement of [
+      { ...config },
+      { ...config, unrelated: true },
+      { defaultGroupTags: 'changed-default' },
+    ]) {
+      rerender(<WorkerParticipantGroupCreatePanel {...props} sessionConfig={replacement} />);
+      expect(screen.getByLabelText('Group name')).toHaveValue('Edited group');
+      expect(screen.getByLabelText('Description')).toHaveValue('Edited description');
+      expect(screen.getByLabelText('Image URL')).toHaveValue('https://images.example/draft.png');
+      expect(screen.getByLabelText('Member limit')).toHaveValue(23);
+      expect(screen.getByRole('button', { name: 'Remove edited-tag' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Remove default-tag' })).toBeInTheDocument();
+    }
+  });
+
+  it('updates untouched default tags without resetting the other fields', () => {
+    const props = {
+      sessionId: SESSION_ID,
+      sessionSlug: 'draft',
+      workerUrl: 'https://worker.example',
+      workerToken: 'token',
+    };
+    const { rerender } = render(
+      <WorkerParticipantGroupCreatePanel {...props} sessionConfig={{ defaultGroupTags: 'old' }} />,
+    );
+    fireEvent.change(screen.getByLabelText('Group name'), { target: { value: 'Edited group' } });
+    rerender(<WorkerParticipantGroupCreatePanel {...props} sessionConfig={{ defaultGroupTags: 'new' }} />);
+    expect(screen.getByLabelText('Group name')).toHaveValue('Edited group');
+    expect(screen.getByRole('button', { name: 'Remove new' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Remove old' })).not.toBeInTheDocument();
+  });
+
+  it.each([
+    { sessionId: '0x22222222222222222222222222222222' },
+    { sessionSlug: 'other' },
+    { workerUrl: 'https://other.example' },
+  ])('starts a fresh draft when session identity changes: %j', (change) => {
+    const props = {
+      sessionId: SESSION_ID,
+      sessionSlug: 'draft',
+      workerUrl: 'https://worker.example',
+      workerToken: 'token',
+    };
+    const { rerender } = render(<WorkerParticipantGroupCreatePanel {...props} />);
+    fireEvent.change(screen.getByLabelText('Group name'), { target: { value: 'Edited group' } });
+    rerender(<WorkerParticipantGroupCreatePanel {...props} {...change} />);
+    expect(screen.getByLabelText('Group name')).toHaveValue('');
   });
 
   it('prefills Worker-native tag defaults from the selected session', () => {

@@ -1,3 +1,4 @@
+import { normalizeAgentRatingAnswer } from './ratingScale.mjs';
 import { buildAgentQuestionAnswerSchema } from './agentAnswerSchema.mjs';
 import { formatQuadraticAllocation, validateQuadraticAllocation } from '../../../shared/questions/quadraticAllocation.mjs';
 import { safeString, lower } from './runtimePrimitives.mjs';
@@ -85,8 +86,8 @@ export function normalizeDraftForQuestion(answer = {}, question = {}) {
     };
   }
   if (questionType === 'rating') {
-    const value = Number(firstValue(source.value, source.rating, source.answer, source.label));
-    if (!Number.isFinite(value)) return null;
+    const value = normalizeAgentRatingAnswer(firstValue(source.value, source.rating, source.answer, source.label), question);
+    if (value === null) return null;
     return {
       label: String(value),
       value: { questionType: 'rating', value, comments },
@@ -214,7 +215,12 @@ export async function handlePreferencesRequest({ env = {}, context = {}, input =
       createdAt: null,
     });
     if (!saved.ok) {
-      skipped.push({ questionId, reason: saved.reason || 'draft_save_failed' });
+      skipped.push({
+        questionId,
+        reason: saved.reason || 'draft_save_failed',
+        // Sending the same answer again retries a save storage refused.
+        ...(saved.retryable === true ? { retryable: true } : {}),
+      });
       continue;
     }
     const draftRecord = { ...saved.draft, key: saved.key };

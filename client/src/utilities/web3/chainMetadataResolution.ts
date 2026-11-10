@@ -10,6 +10,7 @@ import { getGlobalLitHooks } from '../crypto/litProtocol.js';
 import { createLogger } from '../logging.js';
 import { memoizedResolveSession } from '../cache/contractScriptsCache.js';
 import { toStr } from '../shared/primitives.js';
+import { markDecryptedFor } from '../survey/decryptedQuestionReader.js';
 import { normalizeAddress } from './addressNormalization.js';
 import { coerceStringArray } from './contractScripts.payloadNormalizers.js';
 
@@ -652,6 +653,8 @@ export const createChainMetadataResolutionHelpers = (deps: MetadataResolutionDep
       return surveyData;
     }
 
+    // Text decrypted here is this account's; other readers of the browser see it locked.
+    let decrypted = false;
     if (encryptedTitle) {
       const result = await decryptEnvelopeCached(encryptedTitle, decryptCtx, {
         field: 'title',
@@ -663,6 +666,7 @@ export const createChainMetadataResolutionHelpers = (deps: MetadataResolutionDep
       } else if (result.value !== null && result.value !== undefined && result.value !== '') {
         surveyRecord.title = String(result.value);
         surveyRecord.titleDecrypted = true;
+        decrypted = true;
       }
     }
 
@@ -679,10 +683,12 @@ export const createChainMetadataResolutionHelpers = (deps: MetadataResolutionDep
         if (urls.length) {
           surveyRecord.documentURLs = urls;
           surveyRecord.documentURLsDecrypted = true;
+          decrypted = true;
         }
       }
     }
 
+    if (decrypted) markDecryptedFor(surveyRecord, decryptCtx.account);
     return surveyData;
   };
 
@@ -725,6 +731,8 @@ export const createChainMetadataResolutionHelpers = (deps: MetadataResolutionDep
       return questionData;
     }
 
+    // Text decrypted here is this account's; other readers of the browser see it locked.
+    let decrypted = false;
     if (encryptedPrompt) {
       const result = await decryptEnvelopeCached(encryptedPrompt, decryptCtx, {
         field: 'prompt',
@@ -736,6 +744,7 @@ export const createChainMetadataResolutionHelpers = (deps: MetadataResolutionDep
       } else if (result.value !== null && result.value !== undefined && result.value !== '') {
         questionRecord.prompt = String(result.value);
         questionRecord.promptDecrypted = true;
+        decrypted = true;
       }
     }
 
@@ -752,6 +761,7 @@ export const createChainMetadataResolutionHelpers = (deps: MetadataResolutionDep
         if (options.length) {
           questionRecord.options = options;
           questionRecord.optionsDecrypted = true;
+          decrypted = true;
         }
       }
     }
@@ -769,10 +779,12 @@ export const createChainMetadataResolutionHelpers = (deps: MetadataResolutionDep
         if (tags.length) {
           questionRecord.tags = tags;
           questionRecord.tagsDecrypted = true;
+          decrypted = true;
         }
       }
     }
 
+    if (decrypted) markDecryptedFor(questionRecord, decryptCtx.account);
     return questionData;
   };
 

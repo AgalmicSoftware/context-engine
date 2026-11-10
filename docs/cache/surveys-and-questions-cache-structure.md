@@ -75,11 +75,15 @@ Per-network shape:
 Semantics:
 
 - `surveysLatestBlock`: watermark for survey discovery for that session+network
-- `surveyResponsesLatestBlock[surveyId]`: per-survey response watermark
+- `surveyResponsesLatestBlock[surveyId]`: per-survey scan progress, never a responder admission guard
+- `surveyResponsesMeta[surveyId][responder]`: live-event recency as `bn`, `txi`, `li`, and `ts`; each responder is ordered independently, including edits within one block
 - `surveys[surveyId]`: hydrated survey payloads
 - `surveys[surveyId].sessionSlugExplicit`: `true` when metadata authoritatively declared the session slug; `false` when the cache derived a slug from legacy name mapping or rebucketed unresolved metadata to general
 - `surveyResponses[surveyId][responder]`: latest known response payload for a survey responder
 - `pendingSurveyMetadata[surveyId]`: retry/backoff state for survey metadata that failed to hydrate from Arweave
+- Live events are admitted only within the session scope and configured start/end
+  blocks before fetching payloads. The RPC head is a scan bound, not a hard event
+  end when the session has no configured end.
 - Survey discovery and `SurveyAdded` event commits merge only the surveys,
   pending-metadata entries, and watermark produced by the active scan or event
   into the latest snapshot. Unrelated surveys, responses, and retry entries are
@@ -190,7 +194,20 @@ Semantics:
 - `questionsDiscoveryCheckpointBlock`: in-progress checkpoint used for resume-after-refresh behavior
 - `questions[qid].sessionSlugExplicit`: `true` when metadata authoritatively declared the session slug; `false` when the cache derived a slug from legacy name mapping or rebucketed unresolved metadata to general
 - `questions[qid].__ceQuestionMetadataPending`: temporary placeholder marker used when a response has been discovered before its question metadata has hydrated
-- `questionResponsesLatestBlock`: response watermark for the session+network
+- `questionResponsesLatestBlock`: response scan watermark for the session+network.
+  Live response events update per-responder recency only; neither question nor survey
+  response scan watermarks advance until the scan processes those blocks.
+  Chain response scans stop this watermark before the earliest event whose payload
+  failed with a retryable error, so ordinary refreshes revisit it. Invalid pointers
+  and malformed payloads are skipped without holding the watermark. A forced full
+  refresh rescans from the session start and persists that run's completed range,
+  including a lower watermark if it finds a retryable failure.
+- With a configured end block below the chain head, response scans inspect later
+  response events and read only changed responder/id pointers at that end block.
+  Historical and latest reads use separate in-flight keys. If historical state is
+  unavailable, the answer is omitted with a partial-failure reason and the scan
+  watermark stays before its event; a later payload is never substituted. Unbounded
+  scans add no later-event or historical-state reads.
 - `questionResponsesMeta[qid][responder]`: recency guard used to reject stale response payload writes
 - `pendingQuestionMetadata[qid]`: retry/backoff state for question metadata hydration failures and response-discovered metadata gaps
 - `arweaveTxCache[txId]`: cached raw Arweave payload text
@@ -204,6 +221,13 @@ Semantics:
   monotonically advancing `questionsLatestBlock`; a partial or failed pass keeps
   its retryable frontier. Readiness and UI revisions are published only after
   persistence succeeds.
+- Decrypted question text in a chain node records `decryptedFor`, the account it
+  was decrypted for; text saved without it counts as another account's. A sign-in,
+  sign-out or account switch locks text decrypted for anyone else again. Survey
+  titles and document links follow the same rule: scans store them locked, and the
+  current reader's refresh decrypts and stamps the ones it may read. Known limit:
+  text left by an account that closed the browser while signed in stays readable
+  to a signed-out visitor until someone signs in.
 
 ## Important normalization rules
 
@@ -236,3 +260,38 @@ These are documented centrally in [`docs/cache/README.md`](README.md):
 - `dg:sbt:partialReady:<slug>`
 - `dg:sbt:deferredFullScanNeeded:<slug>`
 - `dg:sbt:fullScanInProgress:<slug>`
+
+Worker catalog merges retain `workerQuestionMetadataTombstones` and
+`workerSurveyMetadataTombstones` beside their metadata refs in the identity-scoped
+`worker` node. Hidden ids lose their cached item, ref and pending metadata, and
+answer hydration cannot recreate their placeholder questions. A complete catalog
+that no longer marks an id hidden clears its tombstone; local merges do not.
+
+Complete Worker catalogs also remove cached items and refs omitted from the
+listing, before selecting among the versions still accessible to the reader.
+Locally pending metadata and writes created within ten minutes are retained to
+allow for KV listing lag. A failed or incomplete listing never reconciles items.
+
+## Saved answers and local response drafts
+
+A draft records the saved answer it was edited against. A loaded empty answer
+has an empty baseline entry; an unknown saved answer has no entry. When a newer
+saved answer clears a field, restoration drops the older conflicting draft
+field. While saved answers are still loading, drafts remain intact. Drafts
+written against an empty answer that remains empty are preserved, as are
+consent withdrawals even when another draft field is stale.
+
+Response change detection uses the question's declared type. Freeform answers
+and comments compare as exact text, including leading zeros and large integer
+strings. Only rating answers compare numerically. Editing, pending counts,
+submission differences and interview review share this policy.
+
+Successful question or survey publication clears the unchanged saved authoring
+draft captured at submit, even if a debounced save lagged behind the submitted
+form. A newer stored draft written during publication is preserved.
+
+Authoring drafts do not persist tag-generation progress, previous publication IDs, or cache-hydration status. Reloaded questions are
+ready to generate tags again. A completed generation keeps any tags manually
+added while that request was pending.
+
+Terminal invalid Arweave responses have the same bounded 30-minute recheck as terminal missing responses. A later ordinary metadata read can recover, including SBT names and images; successful payload caching and concurrent read reuse remain enabled.

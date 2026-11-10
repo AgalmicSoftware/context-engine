@@ -1,3 +1,4 @@
+import { selectCurrentSubmittedAnswers } from './submittedResults.mjs';
 import { loadSessionPolicy } from './sessionPolicyLoader.mjs';
 import { loadPublicQuestionsForHandoff } from './questions.mjs';
 import { safeString, lower, safeJsonParse, stableFingerprint, sanitizeSessionSlug, sha256Hex } from './runtimePrimitives.mjs';
@@ -107,7 +108,7 @@ async function currentResultSourceFingerprint(env, sessionSlug) {
         responses.push({ id, payload: await payload.json() });
       }
       cursor = safeString(body.cursor);
-      complete = body.listComplete === true || (body.listComplete === undefined && !cursor);
+      complete = body.listComplete === true;
       if (!complete && (!cursor || seen.has(cursor))) throw new Error('result_cache_source_incomplete');
       seen.add(cursor);
     }
@@ -135,7 +136,7 @@ export async function loadResultViewCache(env = {}, { sessionSlug = '', viewType
 
 export async function saveResultViewCache(
   env = {},
-  { sessionSlug = '', viewType = '', dataVersionKey = '', value = {} } = {},
+  { sessionSlug = '', viewType = '', dataVersionKey = '', value = {}, model = '', reasoningEffort = '' } = {},
 ) {
   const kv = env?.AGENT_ACTION_KV;
   if (!kv || typeof kv.put !== 'function') return null;
@@ -150,8 +151,9 @@ export async function saveResultViewCache(
     viewType: type,
     dataVersionKey: dataKey,
     generatedAt: new Date().toISOString(),
-    model: 'gpt-5.5',
-    reasoning_effort: 'high',
+    // The poster ran the model, so the cache records what it reports, or nothing.
+    ...(safeString(model) ? { model: safeString(model).slice(0, 128) } : {}),
+    ...(safeString(reasoningEffort) ? { reasoning_effort: safeString(reasoningEffort).slice(0, 16) } : {}),
     value: normalizeResultViewAnalysisValue(value, type),
   };
   assertNoSecretShape(payload, "Agent result view cache payload must not serialize secrets.");
@@ -197,6 +199,8 @@ export async function handleResultViewCacheRequest({ env = {}, context = {}, inp
     viewType,
     dataVersionKey,
     value: input.value || input.result || input.cache || {},
+    model: input.model,
+    reasoningEffort: input.reasoning_effort || input.reasoningEffort,
   });
   if (saved?.ok === false) {
     return jsonResultViewCache(request, env, saved, { status: 413 });
@@ -283,9 +287,10 @@ export const AGENT_RESULTS_SUPPORTED_VIEWS = ['topic-map', 'consensus', 'differe
 
 export const AGENT_RESULTS_IMAGE_SUPPORTED_VIEWS = ['topic-map', 'consensus', 'groups'];
 
-export function anonymizeAgentGroups(groups = [], minGroupSize = 2) {
+export function anonymizeAgentGroups(groups = [], minGroupSize = 2, participants = []) {
   const source = Array.isArray(groups) ? groups : [];
   const kept = source.filter((group) => Number(group?.size) >= minGroupSize);
+  const aliases = new Set(kept.flatMap((group) => Array.isArray(group.aliases) ? group.aliases : []));
   const safe = kept.map((group) => ({
     groupId: safeString(group.groupId),
     label: safeString(group.label),
@@ -310,6 +315,9 @@ export function anonymizeAgentGroups(groups = [], minGroupSize = 2) {
   }));
   return {
     groups: safe,
+    imageGroups: kept,
+    participants: (Array.isArray(participants) ? participants : []).filter((participant) => aliases.has(participant.participant)),
+    participantCount: aliases.size,
     suppressedGroupCount: source.length - kept.length,
   };
 }
@@ -379,7 +387,7 @@ export async function loadAgentResultsDataset({ env = {}, context = {}, input = 
   const sourceQuestions = demo ? demoAgentResultsQuestions(questions) : questions;
   const sourceRecords = demo
     ? demoAgentResultsRecords(sourceQuestions)
-    : await loadSubmittedResultRecords(env, sessionSlug).then(rows => rows.filter(row => visibleIds.has(row.questionId)));
+    : await loadSubmittedResultRecords(env, sessionSlug).then(rows => selectCurrentSubmittedAnswers(rows.filter(row => visibleIds.has(row.questionId))));
   return {
     sessionSlug,
     questions,
@@ -406,12 +414,7 @@ export function buildAgentPolisDataset({ sessionSlug = '', sourceRecords = [], s
       AGENT_POLIS_BINARY_LABELS.has(safeString(record.label)) &&
       safeString(record.telegramUserId),
   );
-  // Latest answer per participant+question wins (records arrive createdAt-sorted).
-  const latestByParticipantQuestion = new Map();
-  for (const record of records) {
-    latestByParticipantQuestion.set(`${safeString(record.telegramUserId)}|${safeString(record.questionId)}`, record);
-  }
-  const latestRecords = Array.from(latestByParticipantQuestion.values());
+  const latestRecords = demo ? records : selectCurrentSubmittedAnswers(records);
   const participants = Array.from(new Set(latestRecords.map((record) => safeString(record.telegramUserId))));
   const aliasById = new Map(participants.map((id, index) => [id, `P${index + 1}`]));
   const responses = {};
@@ -494,7 +497,7 @@ export async function buildAgentTopicMap({ env = {}, context = {}, input = {} } 
   const loaded = await loadPublicQuestionsForHandoff({ env, context });
   const questions = loaded.questions.filter(q => q.answerable !== false && !q.locked && !q.encrypted);
   const visibleIds = new Set(questions.map(q => q.questionId));
-  const records = await loadSubmittedResultRecords(env, sessionSlug).then(rows => rows.filter(row => visibleIds.has(row.questionId)));
+  const records = await loadSubmittedResultRecords(env, sessionSlug).then(rows => selectCurrentSubmittedAnswers(rows.filter(row => visibleIds.has(row.questionId))));
   const demo = agentBoolean(input.demo);
   const sourceQuestions = demo
     ? [
@@ -670,7 +673,7 @@ export async function handleResultsRequest({
   const loaded = await loadAgentResultsDataset({ env, context, input });
   const graph = buildParticipantGraph(loaded.sourceRecords, loaded.sourceQuestions);
   const minGroupSize = agentResultsMinGroupSize(context.session);
-  const anonymized = anonymizeAgentGroups(graph.groups, minGroupSize);
+  const anonymized = anonymizeAgentGroups(graph.groups, minGroupSize, graph.participants);
   const body = {
     ok: true,
     sessionSlug: loaded.sessionSlug,
@@ -679,7 +682,7 @@ export async function handleResultsRequest({
     minGroupSize,
     groupCount: anonymized.groups.length,
     suppressedGroupCount: anonymized.suppressedGroupCount,
-    participantCount: graph.participantCount,
+    participantCount: anonymized.participantCount,
     questionCount: graph.questionCount,
     groups: anonymized.groups,
   };
@@ -806,9 +809,8 @@ export async function handleResultsImageRequest({
   const loaded = await loadAgentResultsDataset({ env, context, input });
   const graph = buildParticipantGraph(loaded.sourceRecords, loaded.sourceQuestions);
   const minGroupSize = agentResultsMinGroupSize(context.session);
-  const keptGroupIds = new Set(anonymizeAgentGroups(graph.groups, minGroupSize).groups.map((group) => group.groupId));
-  const keptGroups = graph.groups.filter((group) => keptGroupIds.has(group.groupId));
-  if (!loaded.demo && (!loaded.sourceRecords.length || !keptGroups.length)) {
+  const anonymized = anonymizeAgentGroups(graph.groups, minGroupSize, graph.participants);
+  if (!loaded.demo && (!loaded.sourceRecords.length || !anonymized.groups.length)) {
     const body = {
       ok: false,
       reason: 'not_enough_data_for_view',
@@ -823,8 +825,8 @@ export async function handleResultsImageRequest({
     sessionTitle: context.session.sessionName || context.session.sessionSlug,
     responseCount: loaded.sourceRecords.length,
     demo: loaded.demo,
-    participants: graph.participants,
-    groups: keptGroups,
+    participants: anonymized.participants,
+    groups: anonymized.imageGroups,
   });
   return new Response(image.bytes, {
     status: 200,

@@ -192,17 +192,6 @@ $icon-size-standard: 1.25rem;
   }
 }
 
-/* keep for legacy icon use outside header;
- header icon removed in h1 */
-#externalLinkIcon {
-  font-size: 1.75rem;
-  background: none;
-  border: none;
-  color: var(--ce-color-white);
-  cursor: pointer;
-  margin-left: 10px;
-}
-
 /* NEW: when the bookmark lives next to the explorer icon in the header */
 .headerBookmark {
   /* Matches the margin of other action buttons */
@@ -215,19 +204,6 @@ $icon-size-standard: 1.25rem;
 .bookmarkButton {
   opacity: 0.5;
   /* font-size is inherited from the shared block above */
-}
-.copyButton {
-  /* font-size is inherited from the shared block above */
-}
-
-.plusIcon {
-  font-size: 1rem;
-  margin-right: 10px;
-}
-
-.userActions {
-  display: flex;
-  align-items: center;
 }
 
 /* New wrapper used by header right-side actions */
@@ -256,38 +232,6 @@ $icon-size-standard: 1.25rem;
   transition: color 0.3s ease;
   &:hover {
     color: $clickable-color;
-  }
-}
-
-/* === Username === */
-.usernameSection {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  input {
-    padding: 8px 12px;
-    background-color: $input-background-color;
-    border: 1px solid $input-border-color;
-    color: $user-page-text-color;
-    border-radius: var(--ce-radius-6);
-  }
-
-  button {
-    padding: 8px 12px;
-    background-color: $light-blue;
-    color: var(--ce-color-black);
-    border: none;
-    border-radius: var(--ce-radius-6);
-    cursor: pointer;
-    transition: background-color 0.2s ease;
-    &:hover {
-      background-color: color-mix(in srgb, var(--ce-compat-indigo) 90%, var(--ce-compat-dark));
-    }
-  }
-
-  .error {
-    color: var(--ce-status-error);
-    margin-left: 6px;
   }
 }
 
@@ -333,15 +277,6 @@ $icon-size-standard: 1.25rem;
   color: var(--ce-status-error);
   margin-left: 6px;
   font-size: 0.95rem;
-}
-
-/* === Relocated action buttons === */
-.actionButtons {
-  flex-basis: 100%;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-top: 4px;
 }
 
 /* Reuse the same button styles wherever these classes appear (header or action bar) */
@@ -428,15 +363,7 @@ $icon-size-standard: 1.25rem;
   flex: 0 0 auto;
 }
 
-@media (max-width: 640px) {
-  .cornerLoadingStatus {
-  }
-}
-
 /* Deep scan tooltip: allow long session lists without abbreviation */
-.deepScanTooltip {
-  /* hook for popper wrapper if we need to tune placement/spacing later */
-}
 
 .deepScanTooltipInner {
   max-width: 560px;
@@ -510,8 +437,7 @@ $icon-size-standard: 1.25rem;
 }
 
 /* Cards/links */
-.surveyPreview,
-.questionPreview {
+.surveyPreview {
   display: block;
   /* UPDATED: Match .miniQuestionContainer style */
   background: var(--ce-surface-alt);
@@ -534,14 +460,12 @@ $icon-size-standard: 1.25rem;
     background: color-mix(in srgb, var(--ce-surface-alt) 97%, var(--ce-text-inverse));
   }
 
-  .surveyTitle,
-  .questionPrompt {
+  .surveyTitle {
     font-size: 18px;
     font-weight: 700;
     margin-bottom: 5px;
   }
-  .surveyInfo,
-  .questionInfo {
+  .surveyInfo {
     font-size: 14px;
     opacity: 0.8;
   }
@@ -586,12 +510,6 @@ $icon-size-standard: 1.25rem;
       color: color-mix(in srgb, var(--ce-text-inverse) 50%, transparent);
     }
   }
-
-  .plusIcon {
-    font-size: 0.95rem;
-    cursor: pointer;
-    opacity: 0.9;
-  }
 }
 
 .compareSection .compareAction {
@@ -616,59 +534,6 @@ $icon-size-standard: 1.25rem;
   }
 }
 
-.comparisonSummary {
-  margin-top: 10px;
-  /* was 12px */
-  background: color-mix(in srgb, var(--ce-text-inverse) 5%, transparent);
-  border: 1px dashed color-mix(in srgb, var(--ce-text-inverse) 18%, transparent);
-  padding: 10px;
-  /* was 12px */
-  border-radius: var(--ce-radius-12);
-}
-
-.comparisonResults {
-  margin-top: 12px;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-  .agreementSection,
-  .disagreementSection {
-    background: color-mix(in srgb, var(--ce-text-inverse) 6%, transparent);
-    border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 14%, transparent);
-    border-radius: var(--ce-radius-12);
-    padding: 12px 14px;
-    h5 {
-      margin: 0 0 8px 0;
-      font-size: 1.05rem;
-      font-weight: 800;
-      color: color-mix(in srgb, var(--ce-text-inverse) 92%, transparent);
-    }
-  }
-}
-
-.resultList {
-  margin: 10px 0 0 18px;
-  padding: 0 0 0 4px;
-  list-style: disc;
-  list-style-position: outside;
-}
-.resultItem {
-  margin-bottom: 12px;
-  line-height: 1.45;
-}
-.resultPlus {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.75rem;
-  margin-right: 6px;
-  opacity: 0.7;
-  transform: translateY(1px);
-}
-.resultText {
-  display: inline;
-}
-
 .resultBadge {
   display: inline-block;
   margin: 4px 6px 0 0;
@@ -683,13 +548,6 @@ $icon-size-standard: 1.25rem;
 .comparisonError {
   color: var(--ce-status-danger-text);
   font-size: 0.95rem;
-}
-
-.comparisonSummaryRow {
-  margin-top: 6px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
 }
 
 .modalContent {
@@ -799,15 +657,6 @@ $icon-size-standard: 1.25rem;
     font-size: 1.75rem;
   }
 
-  .actionButtons {
-    flex-direction: column;
-    align-items: stretch;
-    .collapseButton,
-    .analyzeButton {
-      width: 100%;
-    }
-  }
-
   #refreshAnalysisIcon {
     margin-right: 10px;
   }
@@ -841,10 +690,6 @@ $icon-size-standard: 1.25rem;
     > button {
       width: 100%;
     }
-  }
-
-  .comparisonResults {
-    grid-template-columns: 1fr;
   }
 
   .simulatedUserActions {
@@ -886,68 +731,12 @@ $icon-size-standard: 1.25rem;
 
 .analyzeButton {
   position: relative;
-  .comingSoon {
-    position: absolute;
-    top: -5px;
-    right: -25px;
-    font-size: 0.7em;
-    color: var(--ce-data-series-8);
-  }
 }
 
 .placeholderNote {
   font-style: italic;
   color: var(--ce-text-muted);
   margin-bottom: 15px;
-}
-
-.breadcrumbToggle {
-  background: transparent;
-  border: none;
-  color: inherit;
-  cursor: pointer;
-  padding: 0;
-  margin-bottom: 20px;
-  font-family: inherit;
-  font-size: 1rem;
-  opacity: 0.8;
-  text-decoration: none;
-  &:hover,
-  &:focus {
-    opacity: 1;
-    outline: none;
-    text-decoration: underline;
-    text-decoration-style: dotted;
-    color: $clickable-color;
-  }
-}
-
-.comparisonResults {
-  margin-top: 12px;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-}
-
-.resultList {
-  margin: 10px 0 0 18px;
-  padding: 0 0 0 4px;
-  list-style: disc;
-  list-style-position: outside;
-}
-
-.resultItem {
-  margin-bottom: 12px;
-  line-height: 1.45;
-  color: color-mix(in srgb, var(--ce-text-inverse) 92%, transparent);
-  font-size: 1.05rem;
-  font-weight: 600;
-}
-.resultEmpty {
-  margin-bottom: 6px;
-  line-height: 1.35;
-  color: color-mix(in srgb, var(--ce-text-inverse) 70%, transparent);
-  font-style: italic;
 }
 
 .resultBadge {
@@ -963,13 +752,6 @@ $icon-size-standard: 1.25rem;
 .comparisonError {
   color: var(--ce-status-danger);
   font-size: 0.95rem;
-}
-
-.comparisonSummaryRow {
-  margin-top: 6px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
 }
 
 /* Modal helper text */
@@ -1035,11 +817,6 @@ $icon-size-standard: 1.25rem;
   font-size: 0.95rem;
   color: var(--ce-document-border);
   opacity: 0.9;
-}
-
-.additionalLabel {
-  font-weight: 700;
-  margin-right: 6px;
 }
 
 /* --- Added: bolder prompt in "Questions Created" section --- */
@@ -1148,307 +925,9 @@ $icon-size-standard: 1.25rem;
  * Drill-Down Panel & Tree (append-only)
  * ================================ */
 
-.drillDownPanel {
-  /* Ensure old green text styles don't leak here */
-  color: $user-page-text-color;
-  /* use theme body color explicitly */
-  background: color-mix(in srgb, var(--ce-text-inverse) 6%, transparent);
-  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 14%, transparent);
-  border-radius: var(--ce-radius-10);
-  padding: 12px;
-  box-shadow: $card-shadow;
-}
-
-.drillList {
-  margin: 6px 0 0 18px;
-  padding: 0;
-  color: inherit;
-  li {
-    color: inherit;
-    margin-bottom: 6px;
-    line-height: 1.35;
-  }
-}
-
-/* Vertical tree with connectors on the left */
-.drillTree {
-  list-style: none;
-  margin: 6px 0 0 0;
-  padding-left: 14px;
-  /* room for left border and elbows */
-  border-left: 2px solid color-mix(in srgb, var(--ce-text-inverse) 16%, transparent);
-  display: block;
-  color: inherit;
-  /* inherit theme color, not the green resultItem */
-  li {
-    color: inherit;
-  }
-}
-
-/* Node rows */
-.drillNode {
-  position: relative;
-  margin: 0 0 8px 0;
-  padding: 2px 0 2px 6px;
-  color: inherit;
-  /* title weight + hover */
-  > div:first-child {
-    font-weight: 700;
-    color: inherit;
-  }
-
-  &:hover {
-    background: color-mix(in srgb, var(--ce-text-inverse) 4%, transparent);
-    border-radius: var(--ce-radius-6);
-  }
-}
-.drillNodeHeader {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  align-items: baseline;
-}
-.drillToggle {
-  border: 0;
-  background: color-mix(in srgb, var(--ce-text-inverse) 10%, transparent);
-  color: inherit;
-  width: 20px;
-  height: 20px;
-  border-radius: var(--ce-radius-6);
-  font-weight: 700;
-  line-height: 1;
-  padding: 0;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-.drillToggle:hover,
-.drillToggle:focus {
-  background: color-mix(in srgb, var(--ce-text-inverse) 20%, transparent);
-  outline: none;
-}
-.drillTitle {
-  font-weight: 700;
-  margin-bottom: 6px;
-}
-.drillSummary {
-  font-size: 0.85rem;
-  opacity: 0.8;
-  margin: 4px 0 0 0;
-}
-.drillDetail {
-  font-size: 0.85rem;
-  opacity: 0.8;
-  margin-top: 4px;
-}
-.drillBadgeRow {
-  display: inline-flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-/* Elbow connector pseudo-element */
-.drillConnector::before {
-  content: '';
-  position: absolute;
-  left: -14px;
-  /* aligns with .drillTree padding-left */
-  top: 12px;
-  width: 12px;
-  height: calc(100% - 12px);
-  border-left: 2px solid color-mix(in srgb, var(--ce-text-inverse) 16%, transparent);
-  border-bottom: 2px solid color-mix(in srgb, var(--ce-text-inverse) 16%, transparent);
-  border-bottom-left-radius: var(--ce-radius-6);
-}
-
-/* Tiny pills for drilldown tags */
-.drillBadge {
-  display: inline-block;
-  padding: 2px 6px;
-  border-radius: var(--ce-radius-pill);
-  font-size: 0.75rem;
-  line-height: 1;
-  background: color-mix(in srgb, var(--ce-text-inverse) 12%, transparent);
-  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 28%, transparent);
-  color: inherit;
-  /* no green leakage */
-  vertical-align: middle;
-}
-.drillBadgeAgree {
-  background: color-mix(in srgb, var(--ce-status-success) 18%, transparent);
-  border-color: color-mix(in srgb, var(--ce-status-success) 55%, transparent);
-  color: var(--ce-status-success-text);
-}
-.drillBadgeDisagree {
-  background: color-mix(in srgb, var(--ce-status-danger-text) 18%, transparent);
-  border-color: color-mix(in srgb, var(--ce-status-danger-text) 55%, transparent);
-  color: var(--ce-status-danger-text);
-}
-.drillBadgeUnsure {
-  background: color-mix(in srgb, var(--ce-status-warning) 18%, transparent);
-  border-color: color-mix(in srgb, var(--ce-status-warning) 55%, transparent);
-  color: var(--ce-status-warning-text);
-}
-.drillBadgeInfo {
-  background: color-mix(in srgb, var(--ce-status-info-text) 16%, transparent);
-  border-color: color-mix(in srgb, var(--ce-status-info-text) 45%, transparent);
-  color: var(--ce-status-info-text);
-}
-.drillBadgeMuted {
-  background: color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
-  border-color: color-mix(in srgb, var(--ce-text-inverse) 20%, transparent);
-  color: color-mix(in srgb, var(--ce-text-inverse) 75%, transparent);
-}
-.drillParticipants {
-  margin-top: 6px;
-  display: grid;
-  gap: 6px;
-}
-.drillParticipantRow {
-  padding: 6px 8px;
-  border-radius: var(--ce-radius-8);
-  background: color-mix(in srgb, var(--ce-text-inverse) 4%, transparent);
-}
-.drillParticipantHeader {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  align-items: baseline;
-}
-.drillParticipantName {
-  font-weight: 600;
-}
-.drillParticipantResponse {
-  font-size: 0.85rem;
-  opacity: 0.85;
-}
-.drillParticipantComment {
-  margin-top: 4px;
-  font-size: 0.82rem;
-  opacity: 0.75;
-}
-
-/* Inline spinner placement */
-.drillSpinner {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  vertical-align: middle;
-  margin-left: 2px;
-  color: color-mix(in srgb, var(--ce-text-inverse) 80%, transparent);
-}
 /* ====== APPEND-ONLY: Compare visuals hardening ====== */
 
-/* Responsive horizontal scroll wrapper for the Overlap Matrix */
-.overlapWrap {
-  position: relative;
-  max-width: 100%;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-  color: inherit;
-  /* prevent green leakage */
-}
-
-/* Fixed-layout table with sticky first column and clamped widths */
-.overlapTable {
-  table-layout: fixed;
-  border-collapse: separate;
-  border-spacing: 0;
-  width: max-content;
-  min-width: 100%;
-  color: inherit;
-  th,
-  td {
-    padding: 6px 8px;
-    width: var(--col-w, 140px);
-    max-width: clamp(100px, var(--col-w, 140px), 200px);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    vertical-align: middle;
-  }
-
-  th:first-child,
-  td:first-child {
-    position: sticky;
-    left: 0;
-    min-width: var(--first-col-w, 180px);
-    width: var(--first-col-w, 180px);
-    background: color-mix(in srgb, var(--ce-compat-dark) 15%, transparent);
-    /* subtle backing so text stays readable */
-    color: inherit;
-    box-shadow: 2px 0 0 color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
-    z-index: 1;
-  }
-
-  thead th {
-    font-weight: 700;
-  }
-}
-
-/* Muted visual note (used for Matrix suppression + tooltips) */
-.vizNote {
-  font-size: 0.95rem;
-  line-height: 1.4;
-  color: inherit;
-  /* make sure green list color doesn't bleed */
-  background: color-mix(in srgb, var(--ce-text-inverse) 6%, transparent);
-  border: 1px dashed color-mix(in srgb, var(--ce-text-inverse) 28%, transparent);
-  border-radius: var(--ce-radius-8);
-  padding: 8px 10px;
-}
-
-/* Explicit again for clarity in this block */
-.vizNote {
-  color: inherit;
-}
-
-/* === Append-only: responsive two-column split for Compare visuals + lists === */
-.compareSplit {
-  display: grid;
-  grid-template-columns: 1.2fr 1fr;
-  gap: 12px;
-  /* MODIFIED */
-  align-items: start;
-}
-@media (max-width: 900px) {
-  .compareSplit {
-    grid-template-columns: 1fr;
-  }
-}
-
 /* --- Compass overlay icon & figure wrapper --- */
-/* --- Compass overlay icon & figure wrapper --- */
-.compassFigure {
-  position: relative;
-  max-width: 100%;
-  display: inline-block;
-}
-.compassExportBtn {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  width: 28px;
-  height: 28px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 35%, transparent);
-  background: color-mix(in srgb, var(--ce-compat-dark) 35%, transparent);
-  border-radius: var(--ce-radius-6);
-  cursor: pointer;
-  z-index: 2;
-  color: var(--ce-color-white);
-  opacity: 0.4;
-  &:hover,
-  &:focus {
-    background: color-mix(in srgb, var(--ce-compat-dark) 50%, transparent);
-    outline: none;
-    border-color: color-mix(in srgb, var(--ce-text-inverse) 55%, transparent);
-    opacity: 1;
-  }
-}
 
 @media (max-width: 600px) {
   .header {
@@ -1828,12 +1307,10 @@ $icon-size-standard: 1.25rem;
     box-shadow: var(--ce-shadow-raised);
     min-height: 36px;
   }
-  .resultItem,
   h5 {
     color: var(--ce-panel-text);
   }
-  .placeholderNote,
-  .resultEmpty {
+  .placeholderNote {
     color: var(--ce-panel-text-muted);
   }
   .comparisonError {
@@ -1843,11 +1320,5 @@ $icon-size-standard: 1.25rem;
   input:focus-visible {
     outline: 2px solid var(--ce-focus-ring);
     outline-offset: 3px;
-  }
-}
-
-@media (max-width: 600px) {
-  :global(:root) .compareSection.compareSection .comparisonResults {
-    grid-template-columns: minmax(0, 1fr);
   }
 }

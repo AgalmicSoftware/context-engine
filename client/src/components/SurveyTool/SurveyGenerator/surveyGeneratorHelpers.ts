@@ -1,11 +1,12 @@
 import type { CSSProperties } from 'react';
+import { fillPromptTemplate } from '../../../prompts/promptFormat';
 import { toStr } from '../../../utilities/shared/primitives.js';
 import { generateQuestionId as generateSharedQuestionId } from '../../../utilities/shared/questionUtils.mjs';
 
 export const MIN_QUESTION_COUNT = 5;
 export const MAX_QUESTION_COUNT = 50;
-export const SUPPORTED_SOURCE_FILE_EXTENSIONS = /\.(pdf|md|txt|csv|ppt|pptx|json)$/i;
-export const SUPPORTED_SOURCE_FILE_ACCEPT = '.pdf,.md,.txt,.csv,.ppt,.pptx,.json';
+export const SUPPORTED_SOURCE_FILE_EXTENSIONS = /\.(md|txt|csv|json)$/i;
+export const SUPPORTED_SOURCE_FILE_ACCEPT = '.md,.txt,.csv,.json';
 export const SUPPORTED_PHOTO_EXTENSIONS = /\.(png|jpe?g|webp|gif)$/i;
 export const SUPPORTED_PHOTO_ACCEPT = '.png,.jpg,.jpeg,.webp,.gif,image/png,image/jpeg,image/webp,image/gif';
 export const SUPPORTED_SOURCE_UPLOAD_ACCEPT = `${SUPPORTED_SOURCE_FILE_ACCEPT},${SUPPORTED_PHOTO_ACCEPT}`;
@@ -212,7 +213,7 @@ export type GeneratedSurveyStatement = {
 
 export type GeneratedSurveyStatementsInput = {
   aiData: GeneratedAiQuestionPayload;
-  questionTypes: QuestionTypeSelection;
+  selectedTypes: string[];
   count: number;
   fallbackTitle?: unknown;
   generateQuestionId?: (
@@ -238,7 +239,7 @@ export type BuildSingleGenerationPromptInput = {
   promptTemplate: string;
   sourceDocContent: unknown;
   count: number;
-  questionTypes: QuestionTypeSelection;
+  selectedTypes: string[];
   defaultTags?: string | Array<string | null | undefined | false | ''> | null;
   transcriptMode?: boolean;
   overrides?: GenerationPromptOverrides;
@@ -259,9 +260,7 @@ export const isSupportedPhotoFile = (file: SourceFileLike | null | undefined) =>
 
 export const isSupportedAdditionalFile = (file: SourceFileLike | null | undefined) =>
   Boolean(file) &&
-  (/^(application\/pdf|text\/markdown|text\/plain|text\/csv|application\/json|application\/vnd\.ms-powerpoint|application\/vnd\.openxmlformats-officedocument\.presentationml\.presentation)$/i.test(
-    String(file?.type || '').trim(),
-  ) ||
+  (/^(text\/markdown|text\/plain|text\/csv|application\/json)$/i.test(String(file?.type || '').trim()) ||
     SUPPORTED_SOURCE_FILE_EXTENSIONS.test(String(file?.name || '').trim()));
 
 export const buildQueuedFileSource = <TFile extends SourceFileLike>(
@@ -385,7 +384,7 @@ export const buildUnsupportedPhotoMessage = (count = 0) =>
   `Skipped ${count} unsupported photo${count === 1 ? '' : 's'}. Use png, jpg, jpeg, webp, or gif.`;
 
 export const buildUnsupportedSourceMessage = (count = 0) =>
-  `Skipped ${count} unsupported file${count === 1 ? '' : 's'}. Use pdf, md, txt, csv, ppt, pptx, json, png, jpg, jpeg, webp, or gif.`;
+  `Skipped ${count} unsupported file${count === 1 ? '' : 's'}. Use md, txt, csv, json, png, jpg, jpeg, webp, or gif.`;
 
 export const getPhotoStatusLabel = (source: PhotoStatusSource = {}) => {
   const status = toStr(source?.analysisStatus || 'queued')
@@ -509,15 +508,14 @@ const isUsableGeneratedQuestion = (question: unknown): question is GeneratedAiQu
 
 export const buildGeneratedSurveyStatements = ({
   aiData,
-  questionTypes,
+  selectedTypes,
   count,
   fallbackTitle = '',
   generateQuestionId = generateSharedQuestionId,
 }: GeneratedSurveyStatementsInput): GeneratedSurveyStatementsResult => {
-  const wantedTypes = getSelectedQuestionTypes(questionTypes);
   const questions = (Array.isArray(aiData?.questions) ? aiData.questions : [])
     .filter(isUsableGeneratedQuestion)
-    .filter((question) => wantedTypes.includes(question.questionType))
+    .filter((question) => selectedTypes.includes(question.questionType))
     .slice(0, count);
 
   questions.forEach((question) => {
@@ -552,7 +550,7 @@ export const buildSingleGenerationPrompt = ({
   promptTemplate,
   sourceDocContent,
   count,
-  questionTypes,
+  selectedTypes,
   defaultTags,
   transcriptMode = false,
   overrides = {},
@@ -561,21 +559,21 @@ export const buildSingleGenerationPrompt = ({
   const allowed = normalizeTags(defaultTags);
   const defaultTagsStr = allowed.length > 0 ? allowed.join(', ') : '';
 
-  const selectedTypes = getSelectedQuestionTypes(questionTypes);
-  const typesStr = selectedTypes.length > 0 ? selectedTypes.join(',') : 'binary,rating,freeform,multichoice,quadratic';
+  if (!selectedTypes.length) throw new Error('Select at least one question type before generating.');
+  const typesStr = selectedTypes.join(',');
 
   const sourceType = overrides.sourceTypeOverride || (transcriptMode ? 'transcript' : 'text');
 
   const multiSpeakerHint = overrides.multiSpeakerHintOverride || 'unknown';
-  const literalReplacement = (value: unknown) => () => toStr(value);
 
-  return promptTemplate
-    .replace('<SourceDocContent>', literalReplacement(sourceDocContent))
-    .replace('<NumSeedStatements>', String(count))
-    .replace('<Types>', typesStr)
-    .replace(/<DefaultTags>/g, literalReplacement(defaultTagsStr))
-    .replace(/<SourceType>/g, literalReplacement(sourceType))
-    .replace('<MultiSpeakerHint>', toStr(multiSpeakerHint))
-    .replace('<GroupCustomInstructions>', literalReplacement(sessionInstructions))
-    .replace('<ClipDurationMinutes>', '');
+  // One literal pass: source text that holds a placeholder is never rescanned.
+  return fillPromptTemplate(promptTemplate, {
+    '<SourceDocContent>': toStr(sourceDocContent),
+    '<NumSeedStatements>': String(count),
+    '<Types>': typesStr,
+    '<DefaultTags>': defaultTagsStr || 'none',
+    '<SourceType>': toStr(sourceType),
+    '<MultiSpeakerHint>': toStr(multiSpeakerHint),
+    '<GroupCustomInstructions>': toStr(sessionInstructions).trim() || '(none)',
+  });
 };

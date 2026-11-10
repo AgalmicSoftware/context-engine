@@ -1,14 +1,14 @@
 import {
   E2E_TESTIDS,
-  enableAdvancedMode,
   fireEvent,
+  getGateCreateSbtButton,
   mockPendingSbtAddress,
   renderLoggedInSessionWizard,
   resetSessionWizardWorkerPanelTestState,
   screen,
   selectNormalModeCard,
+  selectRegistryHosting,
   waitFor,
-  within,
 } from './SessionWizard.workerPanel.testUtils';
 
 describe('SessionWizard pending SBT lifecycle rendering', () => {
@@ -18,9 +18,10 @@ describe('SessionWizard pending SBT lifecycle rendering', () => {
     renderLoggedInSessionWizard();
 
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+    selectRegistryHosting();
     selectNormalModeCard('Privacy');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Create Group' }));
+    fireEvent.click(getGateCreateSbtButton());
 
     expect(await screen.findByText('Add Group to Session')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Save pending SBT' }));
@@ -38,9 +39,10 @@ describe('SessionWizard pending SBT lifecycle rendering', () => {
     renderLoggedInSessionWizard();
 
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+    selectRegistryHosting();
     selectNormalModeCard('Privacy');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Create Group' }));
+    fireEvent.click(getGateCreateSbtButton());
     fireEvent.click(await screen.findByRole('button', { name: 'Save pending SBT' }));
 
     expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_PENDING_SBT)).toBeInTheDocument();
@@ -52,11 +54,9 @@ describe('SessionWizard pending SBT lifecycle rendering', () => {
       expect(gateOneSelector).toHaveAttribute('data-selected-addresses', mockPendingSbtAddress);
     });
 
-    enableAdvancedMode();
-
-    const chainSelectorWrap = screen.getByText('Network:').parentElement;
-    expect(chainSelectorWrap).toBeTruthy();
-    const chainSelect = within(chainSelectorWrap).getByRole('combobox');
+    // The registry network select sits under Hosting's More, already open for the registry path.
+    const chainSelect = document.getElementById('ce-setup-chain');
+    expect(chainSelect).toBeTruthy();
     const alternateOption = Array.from(chainSelect.querySelectorAll('option')).find(
       (option) => option.value && option.value !== chainSelect.value,
     );
@@ -76,9 +76,10 @@ describe('SessionWizard pending SBT lifecycle rendering', () => {
     renderLoggedInSessionWizard();
 
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+    selectRegistryHosting();
     selectNormalModeCard('Privacy');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Create Group' }));
+    fireEvent.click(getGateCreateSbtButton());
     fireEvent.click(await screen.findByRole('button', { name: 'Save pending SBT' }));
 
     await waitFor(() => {

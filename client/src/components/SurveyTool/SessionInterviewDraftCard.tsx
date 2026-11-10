@@ -1,4 +1,5 @@
-import { responseValuesEqual as valuesEqual } from './responseValueEquality';
+import { responseValuesEqual, answerValueType } from './responseValueEquality';
+import SessionInterviewHiddenAnswer from './SessionInterviewHiddenAnswer';
 import MultichoiceQuestionInput from './MultichoiceQuestionInput';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Input } from 'reactstrap';
@@ -13,7 +14,8 @@ import AdditionalCommentsInlineRow from './AdditionalCommentsInlineRow';
 import SurveyQuestionsFullQuestionSliderSection from './SurveyQuestionsFullQuestionSliderSection';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import type { InterviewDraftResponse, InterviewQuestion } from './sessionInterview';
-import { interviewDraftFieldValue } from './sessionInterviewReviewState';
+import { describeInterviewAnswer } from './sessionInterviewHiddenDrafts';
+import { changesEarlierAnswer, interviewDraftFieldValue } from './sessionInterviewReviewState';
 import styles from './SessionInterviewDraftCard.module.scss';
 
 export type InterviewQuestionControls = {
@@ -36,8 +38,13 @@ type Props = InterviewQuestionControls & {
   question?: InterviewQuestion;
   selected: boolean;
   existing: boolean;
+  // The responder's current answer to this question, saved or typed on the page, if any.
+  earlierAnswer?: unknown;
   // The responder's saved comment, which review shows when the AI proposed none.
   savedComment?: string;
+  // A hidden draft's status line. The card then holds only the responder's own answer.
+  blindNote?: string;
+  concealed?: boolean;
   disabled: boolean;
   onSelect: (selected: boolean) => void;
   onEdit: (patch: Partial<InterviewDraftResponse>) => void;
@@ -208,6 +215,15 @@ const DraftEditableText = ({
   );
 };
 
+// Earlier answers short enough to quote back; others, and locked ones, are only mentioned.
+const QUOTED_ANSWER_TYPES = new Set(['binary', 'multichoice', 'rating']);
+const describeChangedAnswer = (answer: unknown, earlier: unknown, question?: InterviewQuestion) => {
+  if (!changesEarlierAnswer(answer, earlier, question?.type)) return '';
+  return earlier !== '*' && QUOTED_ANSWER_TYPES.has(String(question?.type))
+    ? `Changes your earlier answer: ${describeInterviewAnswer(earlier, question)}`
+    : 'Changes your earlier answer';
+};
+
 const isNativeAnswerType = (question?: InterviewQuestion): boolean => {
   const type = String(question?.type || '').toLowerCase();
   return (
@@ -225,7 +241,10 @@ function SessionInterviewDraftCardContent({
   question,
   selected,
   existing,
+  earlierAnswer,
   savedComment = '',
+  blindNote,
+  concealed = false,
   disabled,
   onSelect,
   onEdit,
@@ -247,16 +266,29 @@ function SessionInterviewDraftCardContent({
   );
   const rawComments = String(edited.additionalComments || '');
   const answerValue = edited.answer;
+  // Chosen or not, a draft that would replace a different earlier answer says so.
+  const changeNote = describeChangedAnswer(answerValue, earlierAnswer, question);
   const useNativeAnswer = isNativeAnswerType(question);
   // Review shows the saved comment when the AI proposed none, so edits start from it.
   const startingValue = (field: EditableField) =>
     field === 'additionalComments' ? draft.additionalComments || savedComment : draft[field];
+  const valuesEqual = (left: unknown, right: unknown, field: EditableField = 'answer') =>
+    responseValuesEqual(
+      left,
+      right,
+      field === 'answer'
+        ? answerValueType(question?.type)
+        : field === 'importance' || field === 'conviction'
+          ? 'rating'
+          : 'text',
+    );
   const markEdit = (field: EditableField, value: unknown) => {
-    if (valuesEqual(value, edited[field])) return { [field]: value } as Partial<InterviewDraftResponse>;
+    if (valuesEqual(value, edited[field], field)) return { [field]: value } as Partial<InterviewDraftResponse>;
     // A full revert to the starting value returns that field to its unedited state.
     const isEdited = !valuesEqual(
       interviewDraftFieldValue(field, value),
       interviewDraftFieldValue(field, startingValue(field)),
+      field,
     );
     const userEditedFields = withEditedField(edited, field, isEdited);
     return { [field]: value, userEditedFields } as Partial<InterviewDraftResponse>;
@@ -277,14 +309,23 @@ function SessionInterviewDraftCardContent({
         onClick={() => onSelect(false)}
         aria-label={`Remove draft for ${prompt}`}
         title="Remove draft"
-        disabled={disabled || !selected}
+        disabled={disabled}
         data-testid={E2E_TESTIDS.SESSION_INTERVIEW_DRAFT_REMOVE}
         data-ce-question-id={draft.questionId}
       >
         <FontAwesomeIcon icon={faTimes} />
       </button>
       <div className={styles.questionText}>{prompt}</div>
+      {concealed ? (
+        <SessionInterviewHiddenAnswer note={blindNote} />
+      ) : blindNote ? (
+        <p className={styles.blindNote} role="status">
+          {blindNote}
+        </p>
+      ) : null}
+      {changeNote ? <p className={styles.blindNote}>{changeNote}</p> : null}
       <div className={styles.editorStack}>
+        {blindNote ? <strong>Your answer</strong> : null}
         {useNativeAnswer && renderAnswerInput ? (
           renderAnswerInput(draft.questionId, answerValue, onAnswerChange, question, draft.answer)
         ) : question?.type === 'quadratic' ? (
@@ -351,7 +392,7 @@ function SessionInterviewDraftCardContent({
             />
             <QuadraticScrollControlsSlot />
             <div className={styles.footerIconCluster}>
-              {!hasHumanEditedDraft ? (
+              {!hasHumanEditedDraft && !blindNote ? (
                 <span className={styles.agentCommentMarker} aria-label="AI-proposed response">
                   <FontAwesomeIcon icon={faRobot} />
                 </span>
@@ -413,7 +454,7 @@ function SessionInterviewDraftCardContent({
               {draft.confidence !== undefined ? (
                 <div
                   className={styles.confidence}
-                  title="The AI’s estimate of how well this draft is supported by the available evidence."
+                  title="The AI’s confidence in this draft."
                   aria-label={`AI-estimated confidence: ${percent}%`}
                   data-testid={E2E_TESTIDS.SESSION_INTERVIEW_DRAFT_CONFIDENCE}
                   data-ce-question-id={draft.questionId}

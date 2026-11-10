@@ -12,7 +12,6 @@ describe('useSessionWizardPublishAdvancedState', () => {
     expect(result.current.manualGasPriceGwei).toBe('');
     expect(result.current.manualMaxFeePerGasGwei).toBe('');
     expect(result.current.manualMaxPriorityFeePerGasGwei).toBe('');
-    expect(result.current.publishAdvancedOpen).toBe(false);
   });
 
   it('hydrates manual gas values from cached wizard state', () => {
@@ -56,7 +55,6 @@ describe('useSessionWizardPublishAdvancedState', () => {
       result.current.setManualGasPriceGwei('1');
       result.current.setManualMaxFeePerGasGwei('2');
       result.current.setManualMaxPriorityFeePerGasGwei('0.1');
-      result.current.setPublishAdvancedOpen(true);
     });
 
     expect(result.current.metadataUrl).toBe('ar://metadata');
@@ -66,6 +64,5 @@ describe('useSessionWizardPublishAdvancedState', () => {
     expect(result.current.manualGasPriceGwei).toBe('1');
     expect(result.current.manualMaxFeePerGasGwei).toBe('2');
     expect(result.current.manualMaxPriorityFeePerGasGwei).toBe('0.1');
-    expect(result.current.publishAdvancedOpen).toBe(true);
   });
 });

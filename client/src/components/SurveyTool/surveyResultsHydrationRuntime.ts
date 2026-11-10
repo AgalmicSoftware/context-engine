@@ -1,6 +1,7 @@
 import { isDemoSessionSlug } from '../../utilities/session/demoSessionSlugs.js';
 import { normalizeSessionSlug } from '../../utilities/session/sessionNaming.js';
 import { isResponseAllowedForSessionSlug } from '../../utilities/session/responseSessionScope.js';
+import { getWorkerCanonicalCacheReader } from '../../utilities/survey/workerCanonicalCacheReader';
 import { readSurveyResultsLatestBlock, normalizeSurveyResultsBlockNumber } from './surveyResultsBlockNumbers.js';
 import {
   buildSurveyResultsEmptySurveyModePatch,
@@ -93,6 +94,7 @@ export type SurveyResultsHydrationPorts = {
   applyStatePatch: (patch: unknown, afterApply?: () => void) => void;
   getCacheScope?: () => string;
   getEffectiveSlug: () => string;
+  getHiddenQuestionIds: () => Set<string>;
   getNetworkQuestionsForCurrentContext: () => Record<string, SurveyResultsRecord>;
   getProps: () => SurveyResultsProps;
   getScopedQuestionNetworkData: (viewMode?: unknown) => Promise<SurveyResultsScopedQuestionNetworkData>;
@@ -118,6 +120,7 @@ export const fetchSurveyResultsSurveyModeResponses = async ({
   const slug = ports.getEffectiveSlug();
   const props = ports.getProps();
   const netIdStr = ports.getCacheScope?.() || String(props.network?.id ?? props.networkChainId ?? '');
+  const startedSignature = instance._surveyModeSourceSignature;
 
   let surveysCache = (ports.readSurveyCacheSync(slug) || {}) as SurveyResultsRecord;
   if (!surveysCache || Object.keys(surveysCache).length === 0) {
@@ -131,6 +134,15 @@ export const fetchSurveyResultsSurveyModeResponses = async ({
   ) as SurveyResultsSurveyBucketRecord | null;
 
   if (!hasSurveyNetCache || !surveyNetCache) {
+    // Nothing cached for this reader, as after signing out drops a Worker session's copy, so the
+    // last reader's survey leaves the screen. A hydration that finished during the read stands.
+    const missingSignature = `${slug}|${netIdStr}|${currentSurveyID || ''}|__missing__`;
+    if (startedSignature === missingSignature || instance._surveyModeSourceSignature !== startedSignature) return;
+    instance._surveyModeSourceSignature = missingSignature;
+    instance._surveyModeSourceCoarseSignature = missingSignature;
+    instance._surveyModeSourcePayloadRefSignature = '';
+    instance._surveyModeSourceCacheNonce = Number(instance._surveysCacheChangeNonce || 0);
+    ports.applyStatePatch({ ...buildSurveyResultsEmptySurveyModePatch(), surveyResultsHydrated: false });
     return;
   }
 
@@ -150,9 +162,13 @@ export const fetchSurveyResultsSurveyModeResponses = async ({
   const srMap = surveyNetCache.surveyResponses?.[currentSurveyID] || {};
   const allResponders = Object.keys(srMap);
   const networkQuestions = ports.getNetworkQuestionsForCurrentContext();
-  const questionIDsInSurvey: string[] = Array.isArray(surveyNetCache?.surveys?.[currentSurveyID]?.questionIDs)
-    ? (surveyNetCache.surveys[currentSurveyID].questionIDs as string[])
-    : [];
+  // An answer row carries its own prompt, so a hidden question's rows go here, not just its metadata.
+  const hiddenQuestionIds = ports.getHiddenQuestionIds();
+  const questionIDsInSurvey: string[] = (
+    Array.isArray(surveyNetCache?.surveys?.[currentSurveyID]?.questionIDs)
+      ? (surveyNetCache.surveys[currentSurveyID].questionIDs as string[])
+      : []
+  ).filter((qid) => !hiddenQuestionIds.has(String(qid || '').toLowerCase()));
   const questionIdsSignature = questionIDsInSurvey.map((qid) => String(qid || '').toLowerCase()).join('|');
   const surveyResponsesLatestBlock = readSurveyResultsLatestBlock(
     surveyNetCache?.surveyResponsesLatestBlock,
@@ -172,9 +188,24 @@ export const fetchSurveyResultsSurveyModeResponses = async ({
     surveyDefinitionLatestBlock,
     allResponders.length,
     questionIdsSignature,
+    [...hiddenQuestionIds].sort().join(','),
   ].join('::');
   const respondersSignature = buildSurveyRespondersSignature(srMap);
-  const sourceSignature = [coarseSourceSignature, respondersSignature].join('::');
+
+  let foundTitle = '';
+  let foundDocURLs: string[] = [];
+  if (surveyNetCache?.surveys?.[currentSurveyID]) {
+    // Uploaded metadata is untrusted; non-string values would break the header render.
+    const { documentURLs, title } = surveyNetCache.surveys[currentSurveyID];
+    foundTitle = typeof title === 'string' ? title : '';
+    foundDocURLs = Array.isArray(documentURLs)
+      ? documentURLs.filter((url): url is string => typeof url === 'string' && url.trim() !== '')
+      : [];
+  }
+  // An account change relocks decrypted titles and links in storage, maybe after this view re-read the cache
+  // for the new reader, so the reader and the text shown are both part of what must match.
+  const metadataSignature = JSON.stringify([getWorkerCanonicalCacheReader(), foundTitle, foundDocURLs]);
+  const sourceSignature = [coarseSourceSignature, respondersSignature, metadataSignature].join('::');
   if (instance._surveyModeSourceSignature === sourceSignature) {
     instance._surveyModeSourceCoarseSignature = coarseSourceSignature;
     instance._surveyModeSourcePayloadRefSignature = payloadRefSignature;
@@ -190,9 +221,16 @@ export const fetchSurveyResultsSurveyModeResponses = async ({
   const rawResponses: SurveyResultsResponseListEntry[] = [];
   allResponders.forEach((responder) => {
     const responderLower = String(responder || '').toLowerCase();
-    const rawResp = normalizeSurveyResponsePayloadByQuestionId(
+    const parsedResp = normalizeSurveyResponsePayloadByQuestionId(
       ports.parseResponse(srMap[responder]),
     ) as SurveyResultsSurveyResponsePayload | null;
+    const rawResp =
+      parsedResp && Array.isArray(parsedResp.responses)
+        ? {
+            ...parsedResp,
+            responses: parsedResp.responses.filter((ans) => !hiddenQuestionIds.has(getSurveyResponseQuestionId(ans))),
+          }
+        : parsedResp;
     if (!hasAnyCountableSurveyAnswer(rawResp, networkQuestions)) return;
     rawResponses.push({
       responder: responderLower,
@@ -215,17 +253,6 @@ export const fetchSurveyResultsSurveyModeResponses = async ({
   const totalRespondersCount = rawResponses.length;
   const finalAggregator = unifyAggregatorWithAllQuestionIDs(aggregatorMap, questionIDsInSurvey);
   const totalQCount = Object.keys(finalAggregator).length;
-
-  let foundTitle = '';
-  let foundDocURLs: string[] = [];
-  if (surveyNetCache?.surveys?.[currentSurveyID]) {
-    // Uploaded metadata is untrusted; non-string values would break the header render.
-    const { documentURLs, title } = surveyNetCache.surveys[currentSurveyID];
-    foundTitle = typeof title === 'string' ? title : '';
-    foundDocURLs = Array.isArray(documentURLs)
-      ? documentURLs.filter((url): url is string => typeof url === 'string' && url.trim() !== '')
-      : [];
-  }
 
   ports.applyStatePatch(
     buildSurveyResultsSurveyModeHydratedPatch({

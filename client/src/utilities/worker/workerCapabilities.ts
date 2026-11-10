@@ -11,7 +11,9 @@ export type WorkerCapabilities = {
 };
 
 export const KNOWN_WORKER_FEATURES = [
+  'context_sources_v1',
   'envelope_export_identity_v1',
+  'participant_context_v1',
   'recovery_key_export',
   'response_upload_receipts',
   'results_analysis_retry_v1',

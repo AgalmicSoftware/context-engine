@@ -229,10 +229,11 @@ describe('persistAndVerifySessionWizardWorkerConfig', () => {
       .mockResolvedValueOnce(jsonResponse(200, { ok: true }))
       .mockResolvedValueOnce(jsonResponse(200, { config: persistedConfig }));
 
+    // Whatever the default model, the transcription block is just provider and model.
     expect(config.ai).toEqual(
       expect.objectContaining({
         models: expect.objectContaining({
-          transcription: { provider: 'openai', model: 'whisper-1' },
+          transcription: { provider: 'openai', model: expect.any(String) },
         }),
       }),
     );
@@ -371,6 +372,41 @@ describe('persistAndVerifySessionWizardWorkerConfig', () => {
     expect(fetchImpl).toHaveBeenCalledTimes(2);
   });
 
+  it('checks the AI effort a Worker that merges ai shows, and only the models an older Worker shows', async () => {
+    const ai = { models: baseConfig().ai.models, reasoningEffort: 'low', taskReasoningEffort: { generate: 'medium' } };
+    const persist = (readbackAi: unknown, readbackExtras: Record<string, unknown>) =>
+      persistAndVerifySessionWizardWorkerConfig({
+        workerUrl: WORKER_ORIGIN,
+        slug: 'worker-session',
+        sessionId: SESSION_ID,
+        adminAddress: ADMIN_ADDRESS,
+        config: { ...baseConfig(), ai },
+        signAdminAction: async () => ({ signature: '0xsigned' }),
+        fetchImpl: jest
+          .fn()
+          .mockResolvedValueOnce(jsonResponse(200, { ok: true }))
+          .mockResolvedValueOnce(
+            jsonResponse(200, { config: verifiedConfig('revision-ai', { ai: readbackAi, ...readbackExtras }) }),
+          ),
+        configRevision: 'revision-ai',
+        retryDelaysMs: [],
+      });
+
+    await expect(persist(ai, { setConfigMergesAi: true })).resolves.toEqual(
+      expect.objectContaining({ configRevision: 'revision-ai' }),
+    );
+    await expect(persist({ ...ai, reasoningEffort: 'high' }, { setConfigMergesAi: true })).rejects.toThrow(
+      /public config mismatch at "config\.ai\.reasoningEffort"/i,
+    );
+    await expect(persist({ models: ai.models }, { setConfigMergesAi: true })).rejects.toThrow(
+      /config\.ai" \(missing reasoningEffort, taskReasoningEffort\)/i,
+    );
+    // An older Worker shows only ai.models and has no merges-ai field.
+    await expect(persist({ models: ai.models }, {})).resolves.toEqual(
+      expect.objectContaining({ configRevision: 'revision-ai' }),
+    );
+  });
+
   it('fails closed when the matching revision contains an unexpected nested public field', async () => {
     const fetchImpl = jest
       .fn()
@@ -487,6 +523,7 @@ describe('persistAndVerifySessionWizardWorkerConfig', () => {
             authzEpoch: 3,
             workerCanonicalPublicationRevision: revision,
             responseFieldEncryption: { version: 1 },
+            setConfigMergesAi: true,
             corsWorkerUrl: `${WORKER_ORIGIN.toUpperCase()}/`,
           }),
         }),

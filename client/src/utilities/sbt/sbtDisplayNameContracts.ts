@@ -9,13 +9,6 @@ export type SbtDisplayMetadataRecord = Record<string, unknown> & {
   encryptedFields?: unknown;
 };
 
-export type SbtCacheEntryLike = Record<string, unknown> & {
-  sbtAddress?: unknown;
-  sbtInfo?: unknown;
-  chainID?: unknown;
-  chainId?: unknown;
-};
-
 export type SbtCacheNameHit = {
   name: string;
   info: unknown;

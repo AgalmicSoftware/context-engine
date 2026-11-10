@@ -495,7 +495,13 @@ export function fallbackBullets(users: CompareUser[] = []): { agreements: string
 const extractAdditionalComment = (obj: unknown): string | null => {
   const record = asRecordOrNull(obj);
   if (!record) return null;
-  const candidates = [record.additionalComment, record.additionalComments, record.comment, record.comments];
+  const candidates = [
+    record.additional,
+    record.additionalComment,
+    record.additionalComments,
+    record.comment,
+    record.comments,
+  ];
   for (const c of candidates) {
     if (c == null) continue;
     const commentRecord = asRecordOrNull(c);
@@ -518,6 +524,35 @@ const extractImportance = (obj: unknown): unknown => {
     answer.importance ??
     answer.conviction;
   return cand === '*' || asRecordOrNull(cand)?.encrypted === true ? undefined : cand;
+};
+
+const isNonBlankAnswer = (val: unknown): boolean =>
+  Array.isArray(val) ? val.length > 0 : val !== '*' && val !== '' && val != null;
+
+const responseToCompareQuestion = (qid: string, candidate: unknown, qData: UnknownRecord): CompareQuestion | null => {
+  let response = candidate;
+  if (typeof response === 'string') {
+    try {
+      response = JSON.parse(response);
+    } catch {
+      return null;
+    }
+  }
+  const record = asRecord(response);
+  const answer = asRecord(record.answer).value;
+  if (!isNonBlankAnswer(answer)) return null;
+  if (qData.type === 'quadratic' && validateQuadraticAllocation(answer, qData)) return null;
+  return {
+    id: qid,
+    type: String(qData.type || record.type || 'unknown'),
+    prompt: String(qData.prompt || record.prompt || 'Unknown Question'),
+    answer,
+    ...(Array.isArray(qData.options) ? { options: qData.options } : {}),
+    ...(qData.type === 'rating' ? { scale: normalizeRatingScale(qData) } : {}),
+    ...(qData.type === 'quadratic' ? { voiceCredits: getVoiceCredits(qData) } : {}),
+    importance: extractImportance(record),
+    additionalComment: extractAdditionalComment(record) || undefined,
+  };
 };
 
 /** buildUsersFromCaches(addresses, sbtCaches, questionsCaches, surveysCaches, options) – session-scoped aggregation */
@@ -658,10 +693,6 @@ export function buildUsersFromCaches(
     cacheLog.error('compareUsers: error aggregating survey caches:', e);
   }
 
-  // ---------- Helpers ----------
-  const isNonBlankAnswer = (val: unknown): boolean =>
-    Array.isArray(val) ? val.length > 0 : val !== '*' && val !== '' && val != null;
-
   // ---------- Build per-user profiles ----------
   const users = addrs.map((address) => {
     const addrLower = String(address || '').toLowerCase();
@@ -700,34 +731,10 @@ export function buildUsersFromCaches(
       const candidate = perQ[addrLower];
       if (!candidate) return;
 
-      let obj: unknown = candidate;
-      if (typeof obj === 'string') {
-        try {
-          obj = JSON.parse(obj);
-        } catch {
-          obj = null;
-        }
-      }
-      if (!obj) return;
-      const objRecord = asRecord(obj);
-      const answerRecord = asRecord(objRecord.answer);
-      const ans = answerRecord.value;
-      if (!isNonBlankAnswer(ans)) return;
-
-      const qData = combinedQuestions[qid] || {};
-      if (qData.type === 'quadratic' && validateQuadraticAllocation(ans, qData)) return;
+      const question = responseToCompareQuestion(qid, candidate, combinedQuestions[qid] || {});
+      if (!question) return;
       qSeen.add(qid);
-      questions.push({
-        id: qid,
-        type: String(qData.type || objRecord.type || 'unknown'),
-        prompt: String(qData.prompt || objRecord.prompt || 'Unknown Question'),
-        answer: ans,
-        ...(Array.isArray(qData.options) ? { options: qData.options } : {}),
-        ...(qData.type === 'rating' ? { scale: normalizeRatingScale(qData) } : {}),
-        ...(qData.type === 'quadratic' ? { voiceCredits: getVoiceCredits(qData) } : {}),
-        importance: extractImportance(obj),
-        additionalComment: extractAdditionalComment(obj) || undefined,
-      });
+      questions.push(question);
     });
 
     // From surveyResponses (fill gaps only)
@@ -749,26 +756,12 @@ export function buildUsersFromCaches(
 
       respRecord.responses.forEach((rawResponse) => {
         const r = asRecord(rawResponse);
-        const answer = asRecord(r.answer);
         const qid = String(r?.questionID || '').toLowerCase();
         if (!qid || qSeen.has(qid)) return;
-        const val = answer.value;
-        if (!isNonBlankAnswer(val)) return;
-
-        const qData = combinedQuestions[qid] || {};
-        if (qData.type === 'quadratic' && validateQuadraticAllocation(val, qData)) return;
+        const question = responseToCompareQuestion(qid, r, combinedQuestions[qid] || {});
+        if (!question) return;
         qSeen.add(qid);
-        questions.push({
-          id: qid,
-          type: String(qData.type || r.type || 'unknown'),
-          prompt: String(qData.prompt || r.prompt || 'Unknown Question'),
-          answer: val,
-          ...(Array.isArray(qData.options) ? { options: qData.options } : {}),
-          ...(qData.type === 'rating' ? { scale: normalizeRatingScale(qData) } : {}),
-          ...(qData.type === 'quadratic' ? { voiceCredits: getVoiceCredits(qData) } : {}),
-          importance: extractImportance(r),
-          additionalComment: extractAdditionalComment(r) || undefined,
-        });
+        questions.push(question);
       });
     });
 

@@ -424,9 +424,7 @@ describe('contractScripts arweave tx cache + failure cache', () => {
       expect(arweaveClient.downloadDataFromArweave).toHaveBeenCalledWith(
         surveyTxId,
         expect.objectContaining({
-          forceRetry: true,
           cacheBypass: true,
-          bypassFailureCache: true,
         }),
       );
     } finally {
@@ -444,7 +442,7 @@ describe('contractScripts arweave tx cache + failure cache', () => {
           setTimeout(() => {
             resolve(
               JSON.stringify({
-                title: opts?.forceRetry ? 'Forced survey' : 'Normal survey',
+                title: opts?.cacheBypass ? 'Forced survey' : 'Normal survey',
                 questionIDs: [],
               }),
             );
@@ -480,17 +478,13 @@ describe('contractScripts arweave tx cache + failure cache', () => {
       expect(arweaveClient.downloadDataFromArweave).toHaveBeenCalledWith(
         surveyTxId,
         expect.objectContaining({
-          forceRetry: false,
           cacheBypass: false,
-          bypassFailureCache: false,
         }),
       );
       expect(arweaveClient.downloadDataFromArweave).toHaveBeenCalledWith(
         surveyTxId,
         expect.objectContaining({
-          forceRetry: true,
           cacheBypass: true,
-          bypassFailureCache: true,
         }),
       );
     } finally {

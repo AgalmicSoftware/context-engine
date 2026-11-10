@@ -14,7 +14,7 @@ import { normalizeWorkerSessionSlug } from './sessionSlugResolution.js';
 import {
 	addWorkerGroupMember as addWorkerGroupMemberBoundary,
 	createWorkerGroup as createWorkerGroupBoundary,
-	executeCoordinatedWorkerGroupMutation as executeCoordinatedWorkerGroupMutationBoundary,
+	forwardWorkerGroupMutation as executeCoordinatedWorkerGroupMutationBoundary,
 	isWorkerGroupMember as isWorkerGroupMemberBoundary,
 } from './workerGroups.js';
 
@@ -2868,10 +2868,21 @@ const receiptRequest = (operation, payload) => new Request(`https://session-coor
 });
 const receiptRef = { backend: 'cloudflare', id: 'AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA', resource: 'responses' };
 
+for (const target of [{}, { storageId: receiptRef.id }, { createdAt: new Date(1000).toISOString() }]) {
+  test(`an upload reservation requires both target fields: ${JSON.stringify(target)}`, async () => {
+    const { state, store } = createTransactionalState();
+    const coordinator = new SessionWriteCoordinator(state, { TOKEN_HMAC_SECRET: 'synthetic-receipt-secret' });
+    const response = await coordinator.fetch(receiptRequest('reserve', { requestId: 'missing-target', payloadDigest: 'a'.repeat(64), ...target }));
+    assert.equal(response.status, 400);
+    assert.match((await response.json()).error, /Invalid upload receipt target/);
+    assert.equal(store.size, 0);
+  });
+}
+
 test('response upload receipts reserve atomically, replay settled writes and reject digest conflicts', async () => {
   const { state, store } = createTransactionalState();
   const coordinator = new SessionWriteCoordinator(state, { TOKEN_HMAC_SECRET: 'synthetic-receipt-secret' }, { now: () => 1_000 });
-  const payload = { requestId: 'answer:v1:test', payloadDigest: 'a'.repeat(64) };
+  const payload = { requestId: 'answer:v1:test', payloadDigest: 'a'.repeat(64), storageId: receiptRef.id, createdAt: new Date(1000).toISOString() };
   const responses = await Promise.all([1, 2].map(() => coordinator.fetch(receiptRequest('reserve', payload))));
   assert.deepEqual(responses.map((response) => response.status).sort(), [200, 503]);
   const results = await Promise.all(responses.map((response) => response.json()));
@@ -2895,7 +2906,7 @@ test('expired upload leases use a new attempt and cannot be settled by the old a
   const { state } = createTransactionalState();
   let now = 1_000;
   const coordinator = new SessionWriteCoordinator(state, { TOKEN_HMAC_SECRET: 'synthetic-receipt-secret' }, { now: () => now });
-  const payload = { requestId: 'expired', payloadDigest: 'a'.repeat(64) };
+  const payload = { requestId: 'expired', payloadDigest: 'a'.repeat(64), storageId: receiptRef.id, createdAt: new Date(1000).toISOString() };
   const first = await (await coordinator.fetch(receiptRequest('reserve', payload))).json();
   now += 120_001;
   const second = await (await coordinator.fetch(receiptRequest('reserve', payload))).json();
@@ -2913,7 +2924,7 @@ test('upload receipt writes prune the oldest settlements and expire them after s
   for (let index = 0; index < 2000; index += 1) store.set(`upload-receipt-v1:old-${index}`, {
     state: 'settled', payloadDigest: 'a'.repeat(64), storageRef: receiptRef, settledAt: index + 1,
   });
-  const payload = { requestId: 'new', payloadDigest: 'b'.repeat(64) };
+  const payload = { requestId: 'new', payloadDigest: 'b'.repeat(64), storageId: receiptRef.id, createdAt: new Date(1000).toISOString() };
   const reservation = await (await coordinator.fetch(receiptRequest('reserve', payload))).json();
   await coordinator.fetch(receiptRequest('settle', { requestId: 'new', attemptId: reservation.attemptId, storageRef: receiptRef }));
   assert.equal(store.size, 2000);
@@ -2955,10 +2966,10 @@ test('receipt alarms remove expired pending and settled entries without another 
   state.storage.setAlarm = async (time) => { alarmAt = time; };
   const env = { TOKEN_HMAC_SECRET: 'synthetic-receipt-secret' };
   const coordinator = new SessionWriteCoordinator(state, env, { now: () => now });
-  const payload = { requestId: 'private-answer-request', payloadDigest: 'a'.repeat(64) };
+  const payload = { requestId: 'private-answer-request', payloadDigest: 'a'.repeat(64), storageId: receiptRef.id, createdAt: new Date(1000).toISOString() };
   const pending = await (await coordinator.fetch(receiptRequest('reserve', payload))).json();
   assert.equal(pending.kind, 'execute');
-  assert.equal(alarmAt, now + 120_000);
+  assert.equal(alarmAt, now + 7 * 24 * 60 * 60 * 1000);
   now = alarmAt;
   await new SessionWriteCoordinator(state, env, { now: () => now }).alarm();
   assert.equal(store.size, 0);
@@ -2971,7 +2982,7 @@ test('receipt alarms remove expired pending and settled entries without another 
 });
 
 test('receipt identifiers depend on the deployment secret and fail closed without it', async () => {
-  const payload = { requestId: 'private-answer-request', payloadDigest: 'a'.repeat(64) };
+  const payload = { requestId: 'private-answer-request', payloadDigest: 'a'.repeat(64), storageId: receiptRef.id, createdAt: new Date(1000).toISOString() };
   const stored = [];
   for (const secret of ['synthetic-receipt-secret-one', 'synthetic-receipt-secret-two', '']) {
     const { state, store } = createTransactionalState();
@@ -3042,3 +3053,80 @@ for (const concurrent of [false, true]) {
     assert.equal(store.has('results-analysis-auto-job-v1'), false);
   });
 }
+
+test('expired pending receipts keep their timestamp, move to the retry target and reject different bytes', async () => {
+  const { state, store } = createTransactionalState();
+  let now = 1000;
+  const coordinator = new SessionWriteCoordinator(state, { TOKEN_HMAC_SECRET: 'fixture-receipt-secret' }, { now: () => now });
+  const payload = { requestId: 'resume-target', payloadDigest: 'a'.repeat(64), storageId: receiptRef.id, createdAt: new Date(now).toISOString() };
+  const first = await (await coordinator.fetch(receiptRequest('reserve', payload))).json();
+  assert.equal(first.storageId, payload.storageId);
+  assert.deepEqual(first.priorStorageIds, []);
+  now += 120001;
+  await coordinator.scheduleUploadReceiptCleanup();
+  assert.equal(store.size, 1);
+  const conflict = await coordinator.fetch(receiptRequest('reserve', { ...payload, payloadDigest: 'b'.repeat(64) }));
+  assert.equal(conflict.status, 409);
+  assert.equal((await conflict.json()).reason, 'upload_request_conflict');
+  const next = await (await coordinator.fetch(receiptRequest('reserve', { ...payload, storageId: 'different-target', createdAt: new Date(now).toISOString() }))).json();
+  assert.equal(next.kind, 'execute'); assert.equal(next.resumed, true);
+  // The superseded attempt may still write its own target, so the retry gets a
+  // different one and may only adopt the earlier target once it is published.
+  assert.equal(next.storageId, 'different-target'); assert.equal(next.createdAt, payload.createdAt);
+  assert.deepEqual(next.priorStorageIds, [payload.storageId]);
+  assert.notEqual(next.attemptId, first.attemptId);
+  const stale = await coordinator.fetch(receiptRequest('settle', { requestId: payload.requestId, attemptId: first.attemptId, storageRef: receiptRef }));
+  assert.equal(stale.status, 409);
+  const unrelated = { ...receiptRef, id: 'unrelated-target' };
+  const mismatch = await coordinator.fetch(receiptRequest('settle', { requestId: payload.requestId, attemptId: next.attemptId, storageRef: unrelated }));
+  assert.equal((await mismatch.json()).reason, 'upload_receipt_target_mismatch');
+  now = 1000 + 7 * 24 * 60 * 60 * 1000;
+  await coordinator.scheduleUploadReceiptCleanup();
+  assert.equal(store.size, 0, 'retention starts at the original reservation');
+});
+
+test('a superseded target is adoptable once published and can be withdrawn only while unadopted', async () => {
+  const { state } = createTransactionalState();
+  let now = 1000;
+  const coordinator = new SessionWriteCoordinator(state, { TOKEN_HMAC_SECRET: 'fixture-receipt-secret' }, { now: () => now });
+  const call = async (operation, body) => {
+    const response = await coordinator.fetch(receiptRequest(operation, body));
+    return { status: response.status, ...(await response.json()) };
+  };
+  const retryRef = { ...receiptRef, id: 'retry-target' };
+  const takeOver = async (requestId) => {
+    const target = { requestId, payloadDigest: 'a'.repeat(64), createdAt: new Date(now).toISOString() };
+    const first = await call('reserve', { ...target, storageId: receiptRef.id });
+    now += 120001;
+    const next = await call('reserve', { ...target, storageId: retryRef.id });
+    assert.deepEqual(next.priorStorageIds, [receiptRef.id]);
+    return { first, next, withdraw: (attempt, storageId = receiptRef.id) => call('withdraw', { requestId, attemptId: attempt.attemptId, storageId }) };
+  };
+  const adopted = await takeOver('adopted');
+  assert.equal((await call('settle', { requestId: 'adopted', attemptId: adopted.next.attemptId, storageRef: receiptRef })).status, 200);
+  assert.equal((await adopted.withdraw(adopted.first)).reason, 'upload_target_in_use', 'an adopted target stays');
+  const withdrawn = await takeOver('withdrawn');
+  assert.equal((await withdrawn.withdraw(withdrawn.next, retryRef.id)).reason, 'upload_target_in_use', 'the current attempt settles instead');
+  assert.equal((await withdrawn.withdraw(withdrawn.first)).status, 200);
+  assert.equal((await call('settle', { requestId: 'withdrawn', attemptId: withdrawn.next.attemptId, storageRef: receiptRef })).reason,
+    'upload_receipt_target_mismatch', 'a withdrawn target can no longer be adopted');
+  assert.equal((await call('settle', { requestId: 'withdrawn', attemptId: withdrawn.next.attemptId, storageRef: retryRef })).status, 200);
+  assert.equal((await withdrawn.withdraw(withdrawn.first)).status, 200);
+});
+
+test('receipt cap counts retained pending records and never evicts a live lease', async () => {
+  const { state, store } = createTransactionalState();
+  const now = 200000;
+  const coordinator = new SessionWriteCoordinator(state, { TOKEN_HMAC_SECRET: 'fixture-receipt-secret' }, { now: () => now });
+  for (let index = 0; index < 1999; index++) store.set(`upload-receipt-v1:settled-${index}`, { state: 'settled', settledAt: index + 10 });
+  store.set('upload-receipt-v1:expired', { state: 'pending', storageId: receiptRef.id, createdAt: new Date(1).toISOString(), reservedAt: 1, leaseUntil: 120001 });
+  store.set('upload-receipt-v1:live', { state: 'pending', storageId: receiptRef.id, createdAt: new Date(1).toISOString(), reservedAt: 1, leaseUntil: now + 120000 });
+  await coordinator.scheduleUploadReceiptCleanup();
+  assert.equal(store.size, 2000);
+  assert.equal(store.has('upload-receipt-v1:expired'), false);
+  assert.equal(store.has('upload-receipt-v1:live'), true);
+  store.clear();
+  for (let index = 0; index < 2000; index++) store.set(`upload-receipt-v1:live-${index}`, { state: 'pending', storageId: receiptRef.id, createdAt: new Date(now).toISOString(), reservedAt: now, leaseUntil: now + 120000 });
+  const response = await coordinator.fetch(receiptRequest('reserve', { requestId: 'full', payloadDigest: 'a'.repeat(64), storageId: receiptRef.id, createdAt: new Date(now).toISOString() }));
+  assert.equal(response.status, 503); assert.equal(store.size, 2000);
+});

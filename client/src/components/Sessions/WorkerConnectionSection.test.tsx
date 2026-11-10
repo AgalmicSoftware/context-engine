@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import WorkerConnectionSection from './WorkerConnectionSection';
 
 describe('WorkerConnectionSection', () => {
@@ -11,16 +11,13 @@ describe('WorkerConnectionSection', () => {
         renderField={() => null}
         workerUrlAutoFilled={false}
         renderInfoTooltip={() => null}
-        showSharedWorkerChoice={false}
-        onResetToDefault={() => {}}
       />,
     );
 
     expect(screen.getByText('Worker URL appears here after a successful custom worker deploy.')).toBeInTheDocument();
   });
 
-  it('renders the URL field, auto-fill badge, and reset action when a custom worker URL is available', () => {
-    const onResetToDefault = jest.fn();
+  it('renders the URL field and auto-fill badge when a custom worker URL is available', () => {
     const renderField = jest.fn(() => <div data-testid="mock-worker-url-field">Worker URL field</div>);
 
     render(
@@ -30,8 +27,6 @@ describe('WorkerConnectionSection', () => {
         renderField={renderField}
         workerUrlAutoFilled
         renderInfoTooltip={({ testId }) => <button type="button" data-testid={testId} />}
-        showSharedWorkerChoice
-        onResetToDefault={onResetToDefault}
       />,
     );
 
@@ -39,8 +34,5 @@ describe('WorkerConnectionSection', () => {
     expect(screen.getByTestId('mock-worker-url-field')).toBeInTheDocument();
     expect(screen.getByText('Auto-filled from deploy-helper')).toBeInTheDocument();
     expect(screen.getByTestId('ce-wizard-worker-tooltip-gw-worker-autofill-tip')).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Reset to default' }));
-    expect(onResetToDefault).toHaveBeenCalledTimes(1);
   });
 });

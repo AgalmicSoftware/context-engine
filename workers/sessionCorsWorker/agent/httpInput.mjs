@@ -1,5 +1,4 @@
 import { safeString, lower } from './runtimePrimitives.mjs';
-import { LEGACY_TRANSPORT_LANES } from './constants.mjs';
 
 
 export function safeAnswerString(value) {
@@ -38,26 +37,12 @@ export function titleAnswer(value = '') {
   return safeString(value);
 }
 
-export function normalizeAgentRequestContext(input = {}) {
-  const telegram =
-    input.telegram && typeof input.telegram === 'object' && !Array.isArray(input.telegram) ? input.telegram : {};
-  const telegramUserId = safeString(input.telegramUserId || input.userId || telegram.telegramUserId || telegram.userId);
-  const username = safeString(input.username || telegram.username);
-  const groupChatId = safeString(input.groupChatId || input.chatId || telegram.groupChatId || telegram.chatId);
-  const chatId = groupChatId || telegramUserId;
-  const isPrivate = !groupChatId;
+// Stored agent records name the principal `telegramUserId` and `chatId`.
+export function normalizeAgentRequestContext({ telegramUserId, username } = {}) {
+  const principalId = safeString(telegramUserId);
   return {
-    type: 'telegram_mock_update',
-    updateId: safeString(input.updateId) || `agent-${Date.now()}`,
-    kind: 'agent_handoff',
-    lane: isPrivate ? LEGACY_TRANSPORT_LANES.PRIVATE_ACCOUNT : LEGACY_TRANSPORT_LANES.GROUP_LOBBY,
-    user: { telegramUserId, username },
-    chat: {
-      chatId,
-      chatType: groupChatId ? 'supergroup' : 'private',
-      type: groupChatId ? 'supergroup' : 'private',
-      isPrivate,
-    },
+    user: { telegramUserId: principalId, username: safeString(username) },
+    chat: { chatId: principalId },
   };
 }
 
@@ -71,10 +56,7 @@ export function inputFromRequest(request, body = {}) {
   return {
     ...body,
     sessionSlug: safeString(body.sessionSlug || url.searchParams.get('sessionSlug')),
-    telegramUserId: safeString(body.telegramUserId || url.searchParams.get('telegramUserId')),
     createdAt: safeString(body.createdAt || url.searchParams.get('createdAt')),
-    chatId: safeString(body.chatId || url.searchParams.get('chatId')),
-    groupChatId: safeString(body.groupChatId || url.searchParams.get('groupChatId')),
     username: safeString(body.username || url.searchParams.get('username')),
     tags: body.tags || url.searchParams.get('tags') || url.searchParams.get('tag'),
     interests: body.interests || url.searchParams.get('interests'),
@@ -148,9 +130,6 @@ export function inputFromRequest(request, body = {}) {
     result: Object.hasOwn(body, 'result') ? body.result : undefined,
     cache: Object.hasOwn(body, 'cache') ? body.cache : undefined,
     demo: Object.hasOwn(body, 'demo') ? body.demo : url.searchParams.get('demo'),
-    includeLegacySessions: Object.hasOwn(body, 'includeLegacySessions')
-      ? body.includeLegacySessions
-      : body.includeLegacy || url.searchParams.get('includeLegacySessions') || url.searchParams.get('includeLegacy'),
     questionId: safeString(body.questionId || url.searchParams.get('questionId')),
     geoId: safeString(
       body.geoId || body.geoNodeId || url.searchParams.get('geoId') || url.searchParams.get('geoNodeId'),

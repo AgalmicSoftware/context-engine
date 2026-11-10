@@ -3,6 +3,7 @@ import { selectCanonicalStorageVersions } from '../../../shared/storage/canonica
 import { listCachedSessionQuestions, payloadConcurrency } from './sessionQuestions.mjs';
 import { loadSessionPolicy } from './sessionPolicyLoader.mjs';
 import { MAX_WORKER_QUESTION_LIST_PAGES } from './runtimeCore.mjs';
+import { blockedQuestionIds } from '../blockedQuestionIds.js';
 import { normalizePreloadedQuestionRecord, selectWorkerCloudflareQuestionItems, questionIsPayloadUnavailable, cloudflareQuestionItemHasInlinePayload, questionRecordMalformedReason, orderQuestionsForPresentationWithSummary, withSkippedMalformed, orderQuestionsForPresentation, withAgentProposedQuestions } from './hostedQuestionNormalization.mjs';
 
 export function sessionUsesWorkerBackedQuestions(session) {
@@ -34,7 +35,7 @@ export async function loadWorkerCloudflareQuestions({
   } catch (error) {
     return {
       ok: false,
-      reason: 'telegram_only_cloudflare_questions_list_failed',
+      reason: 'hosted_cloudflare_questions_list_failed',
       authReason: 'session_worker_auth_failed',
       error: safeString(error?.message || error),
       questions: [],
@@ -43,7 +44,7 @@ export async function loadWorkerCloudflareQuestions({
   if (!auth?.ok) {
     return {
       ok: false,
-      reason: 'telegram_only_cloudflare_questions_list_failed',
+      reason: 'hosted_cloudflare_questions_list_failed',
       authReason: safeString(auth?.reason),
       questions: [],
     };
@@ -63,7 +64,7 @@ export async function loadWorkerCloudflareQuestions({
     if (!listed.ok) {
       return {
         ok: false,
-        reason: 'telegram_only_cloudflare_questions_list_failed',
+        reason: 'hosted_cloudflare_questions_list_failed',
         error: listed.error,
         status: listed.status || 0,
         questions: [],
@@ -71,13 +72,12 @@ export async function loadWorkerCloudflareQuestions({
     }
     if (Array.isArray(listed.body?.items)) items.push(...listed.body.items);
     cursor = safeString(listed.body?.cursor);
-    // A filtered page can be empty and still continue. Workers that predate
-    // pagination send neither field and list everything at once.
-    listComplete = listed.body?.listComplete === true || (listed.body?.listComplete === undefined && !cursor);
+    // A filtered page can be empty and still continue.
+    listComplete = listed.body?.listComplete === true;
     if (!listComplete && (!cursor || seenCursors.has(cursor))) {
       return {
         ok: false,
-        reason: 'telegram_only_cloudflare_questions_list_failed',
+        reason: 'hosted_cloudflare_questions_list_failed',
         error: 'Worker question list cursor is missing or repeated.',
         questions: [],
       };
@@ -95,9 +95,13 @@ export async function loadWorkerCloudflareQuestions({
   });
   const listedVersions = items.filter((item) => item?.hidden !== true).map(versionOf);
   const currentRefs = new Set(selectCanonicalStorageVersions(listedVersions).map((version) => version.storageRefId));
+  // Hidden questions are skipped before reading, so one whose object is lost cannot
+  // make the list read as incomplete. Rows with no resourceId are filtered after.
+  const blocked = new Set(blockedQuestionIds(env.AGENT_CONTEXT?.config));
   const currentItems = items.filter((item) => {
     const version = versionOf(item);
-    return item?.hidden !== true && (!version.resourceId || currentRefs.has(version.storageRefId));
+    return item?.hidden !== true && !blocked.has(version.resourceId.toLowerCase()) &&
+      (!version.resourceId || currentRefs.has(version.storageRefId));
   });
   const selectedItems = selectWorkerCloudflareQuestionItems(currentItems, {
     questionLimit,
@@ -120,7 +124,7 @@ export async function loadWorkerCloudflareQuestions({
         {
           index,
           fallbackSessionSlug: sessionSlug,
-          source: 'telegram_only_cloudflare_questions',
+          source: 'hosted_cloudflare_questions',
           },
       );
       if (normalized && !questionIsPayloadUnavailable(normalized) && !questionRecordMalformedReason(normalized)) {
@@ -144,7 +148,7 @@ export async function loadWorkerCloudflareQuestions({
       {
         index,
         fallbackSessionSlug: sessionSlug,
-        source: 'telegram_only_cloudflare_questions',
+        source: 'hosted_cloudflare_questions',
         },
     );
     return normalized ? { question: normalized, version: versionOf(item) } : null;
@@ -180,9 +184,9 @@ export async function loadWorkerCloudflareQuestions({
   return {
     ok: readErrors.length === 0 || questions.length > 0,
     reason: readErrors.length && questions.length === 0
-      ? 'telegram_only_cloudflare_questions_read_failed'
-      : (questions.length ? 'telegram_only_cloudflare_questions_loaded' : 'telegram_only_cloudflare_questions_empty'),
-    source: 'telegram_only_cloudflare_storage',
+      ? 'hosted_cloudflare_questions_read_failed'
+      : (questions.length ? 'hosted_cloudflare_questions_loaded' : 'hosted_cloudflare_questions_empty'),
+    source: 'hosted_cloudflare_storage',
     questions,
     questionCount: questions.length,
     complete: listComplete && selectedItems.length >= currentItems.length && readErrors.length === 0,
@@ -201,10 +205,18 @@ export async function loadWorkerQuestionsForSession(env, sessionSlug, options = 
   return { ...result, questions: orderQuestionsForPresentation(result.questions || []) };
 }
 
+// A question on the session's hidden list is gone for every Agent reader, answers included.
+export function withoutBlockedQuestions(env = {}, loaded = {}) {
+  const blocked = new Set(blockedQuestionIds(env.AGENT_CONTEXT?.config));
+  if (!blocked.size) return loaded;
+  const questions = (loaded.questions || []).filter((question) => !blocked.has(safeString(question.questionId || question.id).toLowerCase()));
+  return { ...loaded, questions, ...(loaded.questionCount === undefined ? {} : { questionCount: questions.length }) };
+}
+
 export async function loadQuestionsForSession(env = {}, sessionSlug = '', options = {}) {
   const hosted = await loadWorkerQuestionsForSession(env, sessionSlug, options);
   const result = hosted || await listCachedSessionQuestions({ env, sessionSlug, ...options });
   const summary = orderQuestionsForPresentationWithSummary(result.questions || []);
   return withAgentProposedQuestions(env, sessionSlug, { ...result, questions: summary.questions })
-    .then(value => withSkippedMalformed(value, summary.skippedMalformed));
+    .then(value => withoutBlockedQuestions(env, withSkippedMalformed(value, summary.skippedMalformed)));
  }

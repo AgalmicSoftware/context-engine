@@ -1,3 +1,4 @@
+import type { ResponseValuesEqual } from './responseValueEquality';
 type UnknownRecord = Record<string, unknown>;
 
 type ResponseFieldState = UnknownRecord & {
@@ -180,7 +181,7 @@ export const areSurveyResponsesConsistent = ({
   editBaseline?: unknown;
   renderedIds?: unknown[];
   buildSliceFromUserAnswers?: (sourceAnswers: unknown) => unknown;
-  valuesEqual?: (left: unknown, right: unknown) => boolean;
+  valuesEqual?: ResponseValuesEqual;
 } = {}) => {
   if (!latest || !editBaseline || typeof buildSliceFromUserAnswers !== 'function') {
     return false;
@@ -217,8 +218,8 @@ export const areSurveyResponsesConsistent = ({
         (typeof latestRespObj.convictionEncrypted === 'string' && latestRespObj.convictionEncrypted))
     );
 
-    if (!valuesEqual(baseAns?.value, chainAns?.value)) return false;
-    if (!valuesEqual(baseAdd?.value, chainAdd?.value)) return false;
+    if (!valuesEqual(baseAns?.value, chainAns?.value, qid, 'answer')) return false;
+    if (!valuesEqual(baseAdd?.value, chainAdd?.value, qid, 'additional')) return false;
 
     if (baselineSlice.importance && Object.prototype.hasOwnProperty.call(baselineSlice.importance, qid)) {
       const baseImp = Number(baselineSlice.importance[qid]);

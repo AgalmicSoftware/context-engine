@@ -78,7 +78,9 @@ const normalizeSnapshotQuestion = (question: unknown, index: number): GeneratedR
   const id = toText(record.id || record.questionId || record.questionID) || `question_${index + 1}`;
   return {
     id,
-    options: toArray(record.options).map(toText).filter(Boolean),
+    options: toArray(record.options)
+      .map((option) => String(option ?? '').trim())
+      .filter(Boolean),
     prompt: toText(record.prompt || record.questionPrompt || record.questionText || record.text || record.title) || id,
     tags: toArray(record.tags).map(toText).filter(Boolean),
     type: toText(record.type || record.questionType),

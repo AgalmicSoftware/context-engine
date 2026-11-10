@@ -1,7 +1,9 @@
 import { getSessionWizardInterviewValidationError } from './sessionWizardInterviewValidation';
 import { normalizeHostedFaucetSelection } from './sessionWizardHostedFaucet';
+import { DEFAULT_TRANSCRIPTION_MODEL } from '../../../../shared/aiDefaults.mjs';
 import { normalizeInterviewSettings } from '../../../../shared/interviewSettings.mjs';
-import { withoutOffResearchSharingDefault } from '../../utilities/session/interviewModeWrite';
+import { validateSessionContext, type SessionContext } from '@ce-shared/sessionContext.mjs';
+import { withoutNewInterviewDefaults } from '../../utilities/session/interviewModeWrite';
 import {
   normalizeResultsAnalysisSettings,
   validResultsAnalysisSettings,
@@ -39,10 +41,8 @@ import {
 import {
   classifySessionModeProfileSupport,
   compileSessionModeProfile,
-  hasLegacyHostedAgentFlags,
   normalizeSessionModeProfileForWrite,
   mergeSessionModeProfileStorageAccess,
-  profileFromLegacyConfig,
   type SessionModeProfile,
 } from '../../utilities/session/sessionModeProfile';
 import { resolveSessionWizardModeRequirements } from './sessionWizardModeRequirements';
@@ -141,6 +141,24 @@ const buildSessionWizardPublicAiConfig = (value: unknown): AnyRecord => {
   return next;
 };
 
+// The draft's context in the stored form the Worker accepts (the shared
+// writer: trimmed text, no blank paragraphs or link-less links, within the
+// limits). Throws the first problem; null when nothing is left to publish.
+export const normalizeSessionWizardContext = (value: unknown): SessionContext | null => {
+  const context = isObj(value) ? value : {};
+  const result = validateSessionContext({
+    title: context.title ?? '',
+    paragraphs: context.paragraphs ?? [],
+    links: context.links ?? [],
+    html: context.html ?? '',
+  });
+  if (!result.ok) throw new Error(result.errors[0].message);
+  const normalized = result.value;
+  return normalized && (normalized.title || normalized.html || normalized.paragraphs.length || normalized.links.length)
+    ? normalized
+    : null;
+};
+
 export const sanitizeSessionWizardMetadataPayload = (
   metadata: AnyRecord,
   {
@@ -170,21 +188,8 @@ export const sanitizeSessionWizardMetadataPayload = (
   next = normalizeSessionNaming(next) as AnyRecord;
   next.sessionName = trimString(next.sessionName);
   next.sessionInfo = trimString(next.sessionInfo);
-  if (!next.sessionModeProfile && hasLegacyHostedAgentFlags(next)) {
-    next.sessionModeProfile = profileFromLegacyConfig(next);
-  }
   if (isObj(next.sessionModeProfile)) {
     next.sessionModeProfile = normalizeSessionModeProfileForWrite(next.sessionModeProfile as SessionModeProfile);
-  }
-  delete next.telegram_only;
-  delete next.telegramOnly;
-  delete next.telegramMode;
-  delete next.telegramBridgeEnabled;
-  delete next.sessionMode;
-  if (isObj(next.telegram)) {
-    delete next.telegram.only;
-    delete next.telegram.mode;
-    if (!Object.keys(next.telegram).length) delete next.telegram;
   }
   if (!next.sessionName) delete next.sessionName;
   if (!next.sessionInfo) delete next.sessionInfo;
@@ -235,7 +240,7 @@ export const sanitizeSessionWizardMetadataPayload = (
     if (isObj(ai.models?.transcription)) {
       ai.models.transcription = {
         provider: normalizeAiProvider(ai.models.transcription.provider || 'openai'),
-        model: trimString(ai.models.transcription.model || 'whisper-1'),
+        model: trimString(ai.models.transcription.model || DEFAULT_TRANSCRIPTION_MODEL),
       };
     }
   }
@@ -275,6 +280,7 @@ export const sanitizeSessionWizardMetadataPayload = (
   }
 
   if (isObj(next.blockLimits)) {
+    delete next.blockLimits.startDefault;
     const start = Number(next.blockLimits.start);
     const endRaw = next.blockLimits.end;
     const end = endRaw == null || endRaw === '' ? null : Number(endRaw);
@@ -315,9 +321,7 @@ export const resolveSessionWizardWorkerStorageProfilePayload = ({
   }
   const sessionModeProfile = isObj(resolvedDraft.sessionModeProfile)
     ? (resolvedDraft.sessionModeProfile as SessionModeProfile)
-    : hasLegacyHostedAgentFlags(resolvedDraft)
-      ? profileFromLegacyConfig(resolvedDraft)
-      : null;
+    : null;
   const effectiveSessionModeProfile = sessionModeProfile
     ? mergeSessionModeProfileStorageAccess(normalizeSessionModeProfileForWrite(sessionModeProfile), rawStorageProfile)
     : null;
@@ -414,6 +418,7 @@ export const buildSessionWizardWorkerConfigPayload = ({
   const publishedAppearance = Object.prototype.hasOwnProperty.call(resolvedDraft, 'appearance')
     ? normalizeSessionAppearance(resolvedDraft.appearance)
     : null;
+  const publishedContext = normalizeSessionWizardContext(resolvedDraft.sessionContext);
   const next: AnyRecord = {
     slug: trimString(slug),
     adminAddress: trimString(resolvedDeployPayload.adminAddress || account),
@@ -421,8 +426,9 @@ export const buildSessionWizardWorkerConfigPayload = ({
     sessionInfo: trimString(resolvedDraft.sessionInfo),
     sessionHeaderImg: trimString(resolvedDraft.sessionHeader || resolvedDraft.sessionHeaderImg),
     ...(publishedAppearance ? { appearance: publishedAppearance } : {}),
+    ...(publishedContext ? { sessionContext: publishedContext } : {}),
     interviewModeEnabled: resolvedDraft.interviewModeEnabled !== false,
-    interviewMode: withoutOffResearchSharingDefault({
+    interviewMode: withoutNewInterviewDefaults({
       ...normalizeInterviewSettings(resolvedDraft.interviewMode),
       enabled: resolvedDraft.interviewModeEnabled !== false,
       provider: REALTIME_INTERVIEW_PROVIDER,

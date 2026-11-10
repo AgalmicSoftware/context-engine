@@ -13,7 +13,6 @@ const buildRenderers = (calls: string[] = []): MainSiteRouteViewRenderers => {
   return {
     surveyId: render('surveyId'),
     home: render('home'),
-    debate: render('debate'),
     atlas: render('atlas'),
     tag: render('tag'),
     bookmarks: render('bookmarks'),
@@ -27,9 +26,7 @@ const buildRenderers = (calls: string[] = []): MainSiteRouteViewRenderers => {
     userProfile: render('userProfile'),
     about: render('about'),
     posts: render('posts'),
-    demos: render('demos'),
     benchmarks: render('benchmarks'),
-    matrix: render('matrix'),
     docs: render('docs'),
     admin: render('admin'),
     sponsor: render('sponsor'),

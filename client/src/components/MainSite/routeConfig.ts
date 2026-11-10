@@ -8,7 +8,6 @@
 
 /** Set of first-segment prefixes that getMainView recognizes (prevents cache wait for unknown paths) */
 export const KNOWN_ROUTE_PREFIXES = new Set([
-  'debate',
   'atlas',
   'tag',
   'bookmarks',
@@ -24,12 +23,9 @@ export const KNOWN_ROUTE_PREFIXES = new Set([
   'su',
   'u',
   'new',
-  'demo',
   'benchmarks',
   'about',
   'posts',
-  'demos',
-  'matrix',
   'contracts', // Permanent legacy alias for /docs.
   'admin',
   'sponsor',
@@ -41,18 +37,13 @@ export const KNOWN_ROUTE_PREFIXES = new Set([
 /** Routes that render without waiting for cache hydration */
 export function isStaticNonCacheRoute(path: string) {
   return (
-    path === '/debate' ||
-    path === '/debate/' ||
     path.startsWith('/tag/') ||
     path === '/about' ||
     path === '/posts' ||
     path === '/posts/' ||
     path.startsWith('/posts/') ||
-    path === '/demos' ||
-    path === '/demos/' ||
     path === '/benchmarks' ||
     path === '/benchmarks/' ||
-    path === '/matrix' ||
     path === '/contracts' ||
     path === '/contracts/' ||
     path.startsWith('/contracts/') ||

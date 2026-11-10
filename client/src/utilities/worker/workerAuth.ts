@@ -1,3 +1,4 @@
+import { getClientAuthGeneration, invalidateClientAuthGeneration } from '../session/clientAuthGeneration';
 import { buildSiweMessage as buildSharedSiweMessage } from '@ce-shared/auth/siweMessage.mjs';
 /**
  * @file workerAuth.ts
@@ -195,7 +196,6 @@ const getWalletContext = (overrideIn: unknown = {}) => {
 };
 
 const inFlightTokenRequests = new Map<string, InFlightTokenRequest>();
-let workerAuthEpoch = 0;
 // A token carries the scopes its sign-in granted. Tokens issued since access
 // last changed reflect current access, so their scope denials are final; a
 // token issued before the change gets one fresh sign-in on a scope denial.
@@ -279,29 +279,29 @@ const abortInFlightTokenRequests = () => {
 };
 
 const invalidateWorkerAuthState = ({ nextAddress = '' } = {}) => {
-  workerAuthEpoch += 1;
+  invalidateClientAuthGeneration();
   abortInFlightTokenRequests();
   clearAllTokenCaches();
   // Access noted for the previous sign-in says nothing about the next one's tokens.
   workerAccessChangedAtMs = 0;
   tokensIssuedForCurrentAccess.clear();
   trackedWorkerAuthAddress = normalizeAddress(nextAddress);
-  return workerAuthEpoch;
+  return getClientAuthGeneration();
 };
 
 const syncWorkerAuthAddress = (address: unknown): number => {
   const normalizedAddress = normalizeAddress(address);
-  if (!normalizedAddress) return workerAuthEpoch;
+  if (!normalizedAddress) return getClientAuthGeneration();
   // The Redux store is the active-account source of truth. Stale request
   // context must not be able to re-adopt a logged-out or switched account.
   if (!doesWorkerAuthAddressMatchStore(normalizedAddress)) {
-    return workerAuthEpoch;
+    return getClientAuthGeneration();
   }
   if (trackedWorkerAuthAddress && trackedWorkerAuthAddress !== normalizedAddress) {
     return invalidateWorkerAuthState({ nextAddress: normalizedAddress });
   }
   trackedWorkerAuthAddress = normalizedAddress;
-  return workerAuthEpoch;
+  return getClientAuthGeneration();
 };
 
 const assertWorkerAuthRequestCurrent = (
@@ -312,7 +312,7 @@ const assertWorkerAuthRequestCurrent = (
   if (signal?.aborted) {
     throw createAbortError();
   }
-  if (requestAuthEpoch !== workerAuthEpoch) {
+  if (requestAuthEpoch !== getClientAuthGeneration()) {
     throw createAbortError('Worker auth request invalidated.');
   }
   const normalizedRequestAddress = normalizeAddress(requestAddress);
@@ -710,6 +710,32 @@ const readCachedWorkerSessionToken = ({
   return cached?.ok && cached.token ? cached.token : '';
 };
 
+const WORKER_SESSION_TOKEN_EVENT = 'ce:worker-session-token';
+
+/** Hears each new Worker token, as what someone may read can widen once the Worker knows who they are. */
+export const subscribeWorkerSessionToken = (listener: () => void): (() => void) => {
+  window.addEventListener(WORKER_SESSION_TOKEN_EVENT, listener);
+  return () => window.removeEventListener(WORKER_SESSION_TOKEN_EVENT, listener);
+};
+
+/** The Worker token this browser already holds for the signed-in person, or '': unlike getWorkerSessionToken,
+ *  a missing or expired one never starts a sign-in. */
+export const getCachedWorkerSessionToken = async (options: WorkerSessionTokenOptions = {}): Promise<string> => {
+  const account = normalizeAddress((options.context as { account?: unknown } | undefined)?.account);
+  if (!account) return '';
+  try {
+    return readCachedWorkerSessionToken(
+      await resolveWorkerTokenRequestContext({ ...options, resolvedAddress: account, resolveWorkerUrl: true }),
+    );
+  } catch {
+    return '';
+  }
+};
+
+/** Whether this browser already holds a Worker token for the signed-in person, so using it asks them for nothing. */
+export const hasCachedWorkerSessionToken = async (options: WorkerSessionTokenOptions = {}): Promise<boolean> =>
+  !!(await getCachedWorkerSessionToken(options));
+
 export const getWorkerSessionToken = async ({
   sessionSlug,
   sessionConfig,
@@ -876,6 +902,7 @@ export const getWorkerSessionToken = async ({
         address,
       }),
     );
+    if (typeof window !== 'undefined') window.dispatchEvent(new Event(WORKER_SESSION_TOKEN_EVENT));
     // An access change during sign-in may postdate the scopes this token holds.
     if (requestAccessEpoch === workerAccessEpoch && Date.now() - workerAccessChangedAtMs >= ACCESS_CHANGE_SETTLE_MS) {
       tokensIssuedForCurrentAccess.add(loginData.token);
@@ -996,7 +1023,7 @@ export const fetchWorkerWithAuth = async (
   const bodyIsStream = isStreamBody(options?.body);
   const anonymousOnly = opts.anonymousOnly === true;
   const startedSignedOut = !getCurrentWorkerAuthStoreAddress();
-  const startingAuthEpoch = workerAuthEpoch;
+  const startingAuthEpoch = getClientAuthGeneration();
   const canAttemptAnonymous = (opts.preferAnonymous || anonymousOnly) && (!bodyIsStream || anonymousOnly);
   let anonymousResponse: Response | null = null;
   if (canAttemptAnonymous) {
@@ -1038,7 +1065,7 @@ export const fetchWorkerWithAuth = async (
     anonymousResponse &&
     startedSignedOut &&
     !getCurrentWorkerAuthStoreAddress() &&
-    startingAuthEpoch === workerAuthEpoch
+    startingAuthEpoch === getClientAuthGeneration()
   ) {
     return anonymousResponse;
   }

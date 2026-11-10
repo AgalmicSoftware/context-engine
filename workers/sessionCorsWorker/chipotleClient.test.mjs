@@ -8,10 +8,12 @@ const ethersV5 = createRequire(new URL('../../package.json', import.meta.url))('
 
 import {
   bootstrapLitChipotleSession,
+  confirmLitSetupGone,
   executeLitChipotleAction,
   executeSessionLitChipotleAction,
   fetchChipotleJson,
   isLitChipotleLocalApiBaseAllowed,
+  mayMeanLitSetupGone,
   normalizeLitChipotleApiBase,
   provisionLitChipotleAction,
   readLitChipotleStatus,
@@ -689,6 +691,41 @@ test('executeSessionLitChipotleAction rejects malformed explicit gate chains ins
     );
     assert.equal(actionCalls, 0, String(chainId));
   }
+});
+
+test('executeSessionLitChipotleAction no longer reads the retired gateChainId request field', async () => {
+  let actionCalls = 0;
+  const fetchImpl = async (url) => {
+    if (String(url).endsWith('/core/v1/get_lit_action_ipfs_id')) {
+      return jsonResponse(TEST_ACTION_CID);
+    }
+    actionCalls += 1;
+    return jsonResponse({ has_error: false, response: { ok: true } });
+  };
+
+  await assert.rejects(
+    () => executeSessionLitChipotleAction({
+      config: {
+        litCredentials: { ...AUTH_CONFIG,
+          litApiBase: 'https://api.chipotle.litprotocol.com',
+          litActionCid: TEST_ACTION_CID,
+          litPkpId: TEST_PKP_ID,
+        },
+      },
+      secrets: { ...AUTH_SECRETS, litUsageApiKey: 'usage-key' },
+      request: {
+        actionCode: 'async function main() { return { ok: true }; }',
+        op: 'encrypt',
+        sbtAddresses: [TEST_GATE_ADDRESS],
+        gateChainId: 11155420,
+        message: `0x${'12'.repeat(32)}`,
+      },
+      requesterAddress: TEST_REQUESTER,
+      fetchImpl,
+    }),
+    /requires a gate chain ID/i,
+  );
+  assert.equal(actionCalls, 0);
 });
 
 test('executeSessionLitChipotleAction submits verified source code when configured action CID is not cached yet', async () => {
@@ -1707,4 +1744,67 @@ test('provider errors cannot reflect signed tickets back to the participant', as
     assert.equal(error.message.includes(signature), false);
     return true;
   });
+});
+
+for (const request of [{ litAccountApiKey: 'replacement-private-key' }, { litApiBase: 'http://localhost:4000' }]) {
+  test(`resuming Lit setup refuses conflicting ${Object.keys(request)[0]} without exposing credentials`, async () => {
+    let calls = 0;
+    await assert.rejects(bootstrapLitChipotleSession({
+      config: {}, secrets: AUTH_SECRETS, sessionSlug: 'fixture', request,
+      provisioning: { litAccountApiKey: 'saved-private-key', litGroupId: '7', litApiBase: 'https://api.chipotle.litprotocol.com' },
+      fetchImpl: async () => { calls++; throw new Error('unexpected provider call'); },
+    }), error => {
+      assert.equal(error.status, 409);
+      assert.equal(error.code, 'lit_provisioning_credentials_conflict');
+      assert.match(error.message, /conflict with saved setup/);
+      assert.ok(!error.message.includes('private-key'));
+      return true;
+    });
+    assert.equal(calls, 0);
+  });
+}
+
+test('saved Lit setup counts as gone only on a complete listing without it or a refused saved key', async () => {
+  const group = { litApiBase: 'https://api.chipotle.litprotocol.com', litAccountApiKey: 'saved-key', litGroupId: '7' };
+  const pkp = { ...group, litGroupId: '', litPkpId: 'pkp-7' };
+  const others = Array.from({ length: 100 }, (_, index) => ({ id: 1000 + index }));
+  const check = async (checkpoint, lists) => {
+    let calls = 0;
+    const fetchImpl = async (url, options) => {
+      calls += 1;
+      assert.equal(options.headers['X-Api-Key'], 'saved-key');
+      const { pathname, searchParams } = new URL(url);
+      const answer = lists[pathname.replace('/core/v1', '')];
+      const listed = typeof answer === 'function' ? answer(Number(searchParams.get('page_number'))) : answer;
+      return typeof listed === 'number' ? jsonResponse({ error: 'Refused.' }, { ok: false, status: listed }) : jsonResponse(listed);
+    };
+    return [await confirmLitSetupGone({ checkpoint, fetchImpl }), calls];
+  };
+  for (const [checkpoint, lists, expected] of [
+    [group, { '/list_groups': [{ id: 7 }] }, ''],
+    [group, { '/list_groups': [{ group_id: '7', name: 'kept' }] }, ''],
+    [group, { '/list_groups': page => page ? [{ id: 7 }] : others }, ''],
+    [group, { '/list_groups': [] }, 'resources'],
+    [group, { '/list_groups': page => page ? [] : others }, 'resources'],
+    // Partial, unrecognized or failed listings confirm nothing.
+    [group, { '/list_groups': () => others }, ''],
+    [group, { '/list_groups': [{ name: 'no id' }] }, ''],
+    [group, { '/list_groups': { success: true } }, ''],
+    [group, { '/list_groups': 500 }, ''],
+    [group, { '/list_groups': 401 }, 'account'],
+    [pkp, { '/list_groups': [], '/list_wallets': [{ id: 'pkp-7' }] }, ''],
+    [pkp, { '/list_groups': [], '/list_wallets': [{ id: '0', wallet_address: 'PKP-7' }] }, ''],
+    [pkp, { '/list_groups': [], '/list_wallets': [{ id: 'other', wallet_address: 'other' }] }, 'resources'],
+    [pkp, { '/list_groups': [], '/list_wallets': 503 }, ''],
+    [{ ...group, litGroupId: '' }, { '/list_groups': 403 }, 'account'],
+    [{ ...group, litGroupId: '' }, { '/list_groups': [] }, ''],
+  ]) {
+    assert.equal((await check(checkpoint, lists))[0], expected, JSON.stringify(lists, (key, value) => typeof value === 'function' ? 'paged' : value));
+  }
+  assert.deepEqual(await check({ ...group, litAccountApiKey: '' }, { '/list_groups': [] }), ['', 0]);
+  // Only a Lit client error on a failed setup call starts a check.
+  const failure = litStatus => Object.assign(new Error('Failed.'), { litStatus });
+  for (const status of [400, 401, 403, 404, 410, 422]) assert.equal(mayMeanLitSetupGone(failure(status)), true, status);
+  for (const status of [402, 408, 409, 429, 500, 503]) assert.equal(mayMeanLitSetupGone(failure(status)), false, status);
+  assert.equal(mayMeanLitSetupGone(new Error('fetch failed')), false);
 });

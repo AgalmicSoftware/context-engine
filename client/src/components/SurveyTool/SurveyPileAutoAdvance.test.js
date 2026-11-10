@@ -170,6 +170,39 @@ it('keeps arrow-key radio selection on the card and still advances on a later Sp
   expect(card()).toHaveAccessibleName('Question 2 of 6');
 });
 
+it('accepts every quadratic step in a new double or triple click after auto-advance', async () => {
+  const allocation = {
+    id: 'q2',
+    type: 'quadratic',
+    prompt: 'Allocate votes',
+    options: ['Parks', 'Transit'],
+    voiceCredits: 99,
+  };
+  const pile = await mountPile(SESSION_CONFIG, [questions[0], allocation, questions[5]]);
+  const first = within(card()).getByRole('radio', { name: 'Agree' });
+  fireEvent.mouseDown(first.closest('label'), { detail: 1 });
+  fireEvent.click(first, { detail: 0 });
+  await waitFor(() => expect(card()).toHaveAccessibleName('Question 2 of 3'));
+  const step = (direction, detail) => {
+    const button = within(card()).getByTestId(`ce-quadratic-${direction}-0`);
+    fireEvent.mouseDown(button, { detail });
+    fireEvent.click(button, { detail });
+  };
+  // A remaining press from the previous card must still be ignored.
+  step('increase', 2);
+  step('increase', 3);
+  expect(answer(pile, 'q2') || '').toBe('');
+  for (const detail of [1, 2, 3]) step('increase', detail);
+  expect(answer(pile, 'q2')).toEqual([3, 0]);
+  expect(within(card()).getByRole('slider', { name: 'Parks' })).toHaveValue('3');
+  expect(within(card()).getByTestId('ce-quadratic-budget')).toHaveTextContent('90 credits left');
+  for (const detail of [1, 2]) step('increase', detail);
+  expect(answer(pile, 'q2')).toEqual([5, 0]);
+  for (const detail of [1, 2, 3, 1, 2, 3]) step('decrease', detail);
+  expect(answer(pile, 'q2')).toEqual([-1, 0]);
+  expect(card()).toHaveAccessibleName('Question 2 of 3');
+});
+
 it('keeps an open comment editor mounted while choosing an answer so pending dictation can finish', async () => {
   const pile = await mountPile();
   await act(async () => pile.engine().toggleComments('q1'));

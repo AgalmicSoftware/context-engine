@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { proxyOpenAI, proxyAnthropic, proxyOpenRouter, proxyCustomRPC } from './aiProviderExecution.js';
 import { transcribe } from './transcribeExecution.js';
-import { boundSessionAiRequest } from './aiRequestPolicy.js';
+import { boundSessionAiRequest, isSessionTranscriptionModelAllowed } from './aiRequestPolicy.js';
 import { normalizeTranscribeRequestPayload } from './transcribeRequestNormalization.js';
 
 const adapters = [
@@ -17,7 +17,7 @@ const invoke = async (adapter, payload = {}, config) => {
   const calls = [];
   const fetch = async (url, init) => {
     calls.push({ url, body: JSON.parse(init.body), headers: init.headers });
-    return Response.json({ choices: [{ message: { content: 'answer' } }], content: [{ text: 'answer' }], output_text: 'answer' });
+    return Response.json({ choices: [{ message: { content: 'answer' } }], content: [{ type: 'text', text: 'answer' }], output_text: 'answer' });
   };
   const response = await proxy({ payload: { model, messages: [{ role: 'user', content: 'Synthetic request' }], ...payload },
     config: config || configFor(provider, model), secrets: { [secret]: 'synthetic-session-key', customRpcUrl: 'https://rpc.example.test' },
@@ -58,7 +58,7 @@ for (const adapter of adapters) {
     assert.equal(byo.response.status, 200);
     const output = byo.calls[0].body;
     assert.equal(output.model, otherModel);
-    assert.equal(output.max_tokens ?? output.max_output_tokens, 64000);
+    assert.equal(output.max_tokens ?? output.max_output_tokens ?? output.max_completion_tokens, 64000);
     if (provider !== 'anthropic') assert.deepEqual(output.tools, tools);
     if (provider === 'openai') {
       assert.equal(output.service_tier, 'priority');
@@ -67,8 +67,8 @@ for (const adapter of adapters) {
   });
   test(`${provider}: feature ceilings preserve generation, report, interview and photo requests`, async () => {
     for (const [taskType, requested, expected] of [
-      ['generate', 32568, 16000], ['analysis', 7000, 7000], ['interview-map', 8000, 8000],
-      ['summarize', 1200, 1200], ['interview-opening', 600, 600], ['rewrite', 64000, 16000], ['rank', 64000, 16000], ['summarize', 32568, 16000],
+      ['generate', 32768, 16000], ['analysis', 7000, 7000], ['interview-map', 8000, 8000],
+      ['summarize', 1200, 1200], ['interview-opening', 2000, 2000], ['interview-opening', 8000, 2000], ['rewrite', 64000, 16000], ['rank', 64000, 16000], ['summarize', 32768, 16000],
       ['compare', 16384, 16000], ['categorize', 16384, 16000], ['unknown-task', 64000, 2048],
     ]) {
       const { calls } = await invoke(adapter, { taskType, max_output_tokens: requested });
@@ -98,6 +98,19 @@ test('Responses and reasoning limits converge aliases and cap saved task/global 
     assert.equal(result.calls[0].body.reasoning?.effort ?? result.calls[0].body.reasoning_effort, 'low');
     assert.equal(result.calls[0].body.max_output_tokens ?? result.calls[0].body.max_completion_tokens, 20);
   }
+});
+
+test('interview mapping may use medium effort on a low-effort session', () => {
+  const config = configFor('openai', 'gpt-6.1-terra');
+  const effort = (payload, cfg = config) =>
+    boundSessionAiRequest({ provider: 'openai', config: cfg, payload: { model: 'gpt-6.1-terra', ...payload } }).payload.reasoning_effort;
+  assert.equal(effort({ taskType: 'interview-map', reasoning_effort: 'medium' }), 'medium');
+  // Group suggestions ask for low and get it; other tasks keep the session's effort.
+  assert.equal(effort({ taskType: 'interview-map', reasoning_effort: 'low' }), 'low');
+  assert.equal(effort({ taskType: 'generate', reasoning_effort: 'medium' }), 'low');
+  // A per-task effort the session sets still decides, and a higher session effort still bounds.
+  assert.equal(effort({ taskType: 'interview-map', reasoning_effort: 'medium' }, { ai: { ...config.ai, taskReasoningEffort: { 'interview-map': 'low' } } }), 'low');
+  assert.equal(effort({ taskType: 'interview-map', reasoning_effort: 'high' }, { ai: { ...config.ai, reasoningEffort: 'high' } }), 'high');
 });
 
 test('stored custom Functions remain usable but caller definitions cannot replace them', async () => {
@@ -170,3 +183,11 @@ for (const [provider, model] of [['openrouter', 'openai/gpt-5'], ['openrouter', 
     assert.equal(photo.calls[0].body.max_completion_tokens, 1200, 'A smaller caller bound still wins');
   });
 }
+
+test('only explicit group labeling adds the curated diarization model', () => {
+  const request = { provider: 'openai', model: 'gpt-4o-transcribe-diarize' };
+  assert.equal(isSessionTranscriptionModelAllowed(request), false);
+  assert.equal(isSessionTranscriptionModelAllowed({ ...request, groupSpeakerLabels: true }), true);
+  assert.equal(isSessionTranscriptionModelAllowed({ ...request, model: 'unbounded-model', groupSpeakerLabels: true }), false);
+  assert.equal(isSessionTranscriptionModelAllowed({ ...request, config: { ai: { transcription: { provider: 'custom' } } }, groupSpeakerLabels: true }), false);
+});

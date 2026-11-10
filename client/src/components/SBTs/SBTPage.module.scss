@@ -235,7 +235,6 @@ $input-border: var(--ce-input-border);
       gap: 16px;
       .statsSection,
       .actionsSection,
-      .docsSection,
       .adminSection,
       .moreDetailsSection {
         width: 100%;
@@ -269,8 +268,6 @@ $input-border: var(--ce-input-border);
 
       .stats,
       .actions,
-      .docsContainer,
-      .moreDetails,
       .adminContainer {
         padding: 20px;
         border-top: 1px solid color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
@@ -391,21 +388,6 @@ $input-border: var(--ce-input-border);
             outline: none;
             border-color: $clickable-color;
             background: color-mix(in srgb, var(--ce-text-inverse) 12%, transparent);
-          }
-        }
-      }
-
-      .moreDetails {
-        p {
-          margin-bottom: 10px;
-          color: color-mix(in srgb, var(--ce-text-inverse) 80%, transparent);
-          font-size: 1rem;
-        }
-        a {
-          color: $light-blue;
-          text-decoration: none;
-          &:hover {
-            text-decoration: underline;
           }
         }
       }
@@ -1000,12 +982,6 @@ $input-border: var(--ce-input-border);
   color: color-mix(in srgb, var(--ce-text-inverse) 92%, transparent);
 }
 
-.loadingSubtitle {
-  font-size: 0.95rem;
-  font-family: var(--ce-font-ui);
-  color: color-mix(in srgb, var(--ce-text-inverse) 60%, transparent);
-}
-
 /* --- Relevant Info (Docs / Tags / IDs) --- */
 .relevantInfo {
   margin-top: 10px;
@@ -1273,11 +1249,6 @@ $input-border: var(--ce-input-border);
   }
 
   .sbtInfo .rightColumn {
-    .stats p {
-      // font-size: 0.95rem;
-      /* Smaller font size for tight screens */
-    }
-
     .sectionHeader {
       font-size: 1.1rem;
       /* Slightly smaller header */
@@ -1319,8 +1290,7 @@ $input-border: var(--ce-input-border);
   // The loading screen sits on the white page, not on a dark card.
   .loadingPage,
   .loading,
-  .loadingTitle,
-  .loadingSubtitle {
+  .loadingTitle {
     color: var(--ce-document-text);
   }
 
@@ -1346,7 +1316,6 @@ $input-border: var(--ce-input-border);
 
   .sbtPage .sbtInfo .rightColumn .sectionHeader,
   .sbtPage .sbtInfo .rightColumn .stats p,
-  .sbtPage .sbtInfo .rightColumn .moreDetails p,
   .sbtPage .adminContainer .adminActions .autoMintUrlText,
   .relevantInfo,
   .passwordAlert {

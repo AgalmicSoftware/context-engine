@@ -1,5 +1,7 @@
+import { computeAddress } from 'ethers';
 import { dispatchAgentSubmissionJournal, nextAgentSubmitProjectionAt, repairAgentSubmitProjections } from './agent/submissionJournal.mjs';
 import { dispatchAgentInviteJournal } from './agent/inviteJournal.mjs';
+import { executeAgentQuestionQueueAdvance } from './agent/agentQuestionQueue.mjs';
 import { dispatchWrappedResearch } from './agent/wrappedJournal.mjs';
 import { controlCoordinatorBackupImport, assertNoActiveBackupImport } from './sessionBackupLifecycle.js';
 import { registerUploadReceiptStore, readUploadReceiptRegistrationRetryAt, dispatchUploadReceiptIndex, sweepUploadReceiptIndex } from './sessionDiagnostics.js';
@@ -9,7 +11,7 @@ import { withFreshRecoveryKey } from '../shared/recoveryKey.mjs';
 import { assertExpectedSessionAuthority } from './sessionConfigAuthority.js';
 import { exportCoordinatorBackup, exportWorkerGroupBackup, importWorkerGroupBackup, controlWorkerGroupBackupImport, BACKUP_GROUP_IMPORT_ACTIVE_KEY } from './sessionBackupCoordinator.js';
 import { importCoordinatorBackupPage } from './sessionBackupImport.js';
-import { normalizeStorageRef } from './storageRefNormalization.js';
+import { normalizeStorageRef, isSafeCloudflareStorageRefId } from './storageRefNormalization.js';
 import {
   executeDeployHelperRequest,
   lookupCloudflareAccount,
@@ -19,17 +21,21 @@ import {
 import { buildSafeSponsoredReceiptBody } from './sponsoredBootstrapGrantStore.js';
 import { runQueuedAutomaticResultsAnalysisJob, valueLooksEncrypted } from './resultsAnalysisGeneration.js';
 import { publishCloudflareOwnedStorageMetadata, scanLegacyStorageOwnerIds, setCloudflareStorageResourceHidden } from './storageRouteExecution.js';
+import { finishContextPdfReading, removeContextSource } from './contextSourceRoute.js';
+import { dispatchDebateAtlasStore } from './debateAtlasStore.js';
 import {
   applySessionConfigMutation,
   resolveCanonicalWorkerSessionIdHex,
 } from './sessionConfigMutation.js';
+import { repairPendingSessionSecretsProjection } from './sessionSecretsAuthority.js';
 import { normalizeWorkerConfigRecord } from './sessionConfigNormalization.js';
 import {
-  getSessionConfig, getLegacySessionConfigForAuthority, putSessionConfig,
+  getLegacySessionConfigForAuthority, putSessionConfig,
   SESSION_CONFIG_MIGRATION_REQUIRED_REASON, legacySessionConfigMigrationError,
 } from './sessionConfigSecretsStore.js';
 import {
   executeLitAuthorizationSignerEnsure,
+  executeLitProvisioning,
   executeLitAuthorizationFinalize,
   executeSessionSecretsAfterLitRepair,
   hasPendingLitAuthorizationSetup,
@@ -46,6 +52,7 @@ import {
 import {
   createWorkerGroupId,
   executeWorkerGroupMutation,
+  forwardWorkerGroupMutation,
   isAddressShapedWorkerGroupId,
   normalizeWorkerGroupId,
   normalizeWorkerGroupPrincipal,
@@ -68,6 +75,15 @@ const AUTH_NONCE_ACTIVE_KEY = 'auth-nonce-active';
 const AUTH_NONCE_USED_KEY = 'auth-nonce-used';
 const AUTH_RATE_RECORD_KEY = 'auth-rate-record';
 const HOSTED_FAUCET_QUOTA_KEY = 'hosted-faucet-quota-v1';
+const FAUCET_WALLET_TURN_KEY = 'faucet-wallet-turn-v1';
+// A crashed request's turn expires after this; a live one renews it while it sends.
+const FAUCET_WALLET_TURN_MS = 60_000;
+const FAUCET_WALLET_RENEW_MS = 20_000;
+const FAUCET_WALLET_WAIT_MS = 30_000;
+const FAUCET_WALLET_POLL_MS = 100;
+const CONTEXT_PDF_READING_PREFIX = 'context-pdf-reading:';
+// Longer than a PDF reading's AI deadline, so an abandoned reading frees its PDF.
+const CONTEXT_PDF_READING_LEASE_MS = 5 * 60 * 1000;
 const WORKER_GROUP_CAPACITY_META_KEY = 'worker-group-capacity-meta-v3';
 const WORKER_GROUP_CAPACITY_GROUP_PREFIX = 'worker-group-capacity-group-v3:';
 const WORKER_GROUP_CAPACITY_MEMBER_PREFIX = 'worker-group-capacity-member-v3:';
@@ -79,7 +95,13 @@ const RESULTS_ANALYSIS_UPLOAD_PREFIX = 'results-analysis-upload-v1:';
 const UPLOAD_RECEIPT_PREFIX = 'upload-receipt-v1:';
 const UPLOAD_RECEIPT_LEASE_MS = 120_000;
 const UPLOAD_RECEIPT_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
+const uploadReceiptExpiresAt = record => record.state === 'settled'
+  ? record.settledAt + UPLOAD_RECEIPT_RETENTION_MS
+  : record.state === 'pending'
+    ? record.reservedAt + UPLOAD_RECEIPT_RETENTION_MS
+    : 0;
 const MAX_UPLOAD_RECEIPTS = 2000;
+const MAX_PRIOR_UPLOAD_TARGETS = 8;
 const MAX_RESULTS_ANALYSIS_REQUESTS = 24;
 const RESULTS_ANALYSIS_VALUE_CHUNK_CHARS = 24_000;
 const RESULTS_ANALYSIS_MAX_DRAFT_CHUNKS = 64;
@@ -421,6 +443,7 @@ export class SessionWriteCoordinator {
     this.activeDirectAttemptId = '';
     this.sessionConfigTail = Promise.resolve();
     this.storageVisibilityTail = Promise.resolve();
+    this.contextSourceTail = Promise.resolve();
     this.workerGroupTail = Promise.resolve();
     this.resultsAnalysisTail = Promise.resolve();
     this.storageOwnerTail = Promise.resolve();
@@ -430,18 +453,19 @@ export class SessionWriteCoordinator {
 
   async pruneUploadReceipts(transaction, nowMs) {
     const records = await transaction.list({ prefix: UPLOAD_RECEIPT_PREFIX });
-    const settled = [];
-    let nextExpiry = Infinity;
+    const retained = [];
     for (const [key, record] of records) {
-      if (record.state === 'settled' && nowMs - record.settledAt < UPLOAD_RECEIPT_RETENTION_MS) settled.push([key, record]);
-      else if (record.state !== 'pending' || record.leaseUntil <= nowMs) await transaction.delete(key);
-      else nextExpiry = Math.min(nextExpiry, record.leaseUntil);
+      const live = record.state === 'pending' && record.leaseUntil > nowMs;
+      const expiresAt = uploadReceiptExpiresAt(record);
+      if (!live && !(expiresAt > nowMs)) await transaction.delete(key);
+      else retained.push({ key, live, expiresAt: Math.max(expiresAt, live ? record.leaseUntil : 0) });
     }
-    settled.sort((a, b) => a[1].settledAt - b[1].settledAt);
-    const excess = Math.max(0, settled.length - MAX_UPLOAD_RECEIPTS);
-    for (const [key] of settled.slice(0, excess)) await transaction.delete(key);
-    for (const [, record] of settled.slice(excess)) nextExpiry = Math.min(nextExpiry, record.settledAt + UPLOAD_RECEIPT_RETENTION_MS);
-    return nextExpiry;
+    // Pending targets count toward the cap, but an in-flight writer must never
+    // lose its lease to cleanup. Evict only the oldest inactive receipts.
+    const removable = retained.filter(record => !record.live).sort((a, b) => a.expiresAt - b.expiresAt);
+    const evicted = new Set(removable.slice(0, Math.max(0, retained.length - MAX_UPLOAD_RECEIPTS)).map(record => record.key));
+    for (const key of evicted) await transaction.delete(key);
+    return retained.reduce((next, record) => evicted.has(record.key) ? next : Math.min(next, record.expiresAt), Infinity);
   }
 
   async scheduleUploadReceiptCleanup() {
@@ -450,11 +474,20 @@ export class SessionWriteCoordinator {
     if (Number.isFinite(nextAlarm) && typeof this.state.storage.setAlarm === 'function') await this.state.storage.setAlarm(nextAlarm);
   }
 
-  async executeUploadReceipt(payload, settle = false) {
+  async executeUploadReceipt(payload, operation = 'reserve') {
+    const reserve = operation === 'reserve';
+    const settle = operation === 'settle';
+    const withdraw = operation === 'withdraw';
     const requestId = toTrimmedString(payload?.requestId);
     let payloadDigest = toTrimmedString(payload?.payloadDigest);
-    if (!requestId || requestId.length > 200 || (!settle && !/^[a-f0-9]{64}$/.test(payloadDigest))) {
+    if (!requestId || requestId.length > 200 || (reserve && !/^[a-f0-9]{64}$/.test(payloadDigest))) {
       return jsonResponse({ error: 'Invalid upload receipt request.' }, 400);
+    }
+    const storageId = toTrimmedString(payload?.storageId);
+    const createdAt = toTrimmedString(payload?.createdAt);
+    if ((reserve && (!isSafeCloudflareStorageRefId(storageId) || !Number.isFinite(Date.parse(createdAt)))) ||
+        (withdraw && (!isSafeCloudflareStorageRefId(storageId) || !toTrimmedString(payload?.attemptId)))) {
+      return jsonResponse({ error: 'Invalid upload receipt target.' }, 400);
     }
     let storageRef;
     if (settle) {
@@ -467,7 +500,7 @@ export class SessionWriteCoordinator {
     if (!secret) return jsonResponse({ error: 'Upload receipt coordination is unavailable.', reason: 'upload_receipt_unavailable' }, 503);
     // Diagnostics must not block receipt durability. In particular, a daily
     // renewal during settle must never turn an already-stored answer into a retry.
-    if (!settle) {
+    if (reserve) {
       try { await registerUploadReceiptStore(this, payload?.diagnostics); } catch { /* best-effort diagnostics only */ }
     }
     // Low-entropy answers must not be guessable from a copy of coordinator
@@ -479,13 +512,29 @@ export class SessionWriteCoordinator {
     const macKey = await this.crypto.subtle.importKey('raw', derived, algorithm, false, ['sign']);
     const mac = async (domain, value) => bytesToHex(new Uint8Array(await this.crypto.subtle.sign('HMAC', macKey, encoder.encode(`${domain}:${value}`))));
     const key = `${UPLOAD_RECEIPT_PREFIX}${await mac('request', requestId)}`;
-    if (!settle) payloadDigest = await mac('payload', payloadDigest);
+    if (reserve) payloadDigest = await mac('payload', payloadDigest);
     const nowMs = Number(this.now()) || Date.now();
     const result = await this.state.storage.transaction(async (transaction) => {
+      if (reserve) await this.pruneUploadReceipts(transaction, nowMs);
       const record = await transaction.get(key);
+      if (withdraw) {
+        // A superseded attempt may remove the row it published late only while
+        // no retry adopted that target; afterwards no retry can adopt it.
+        const adopted = record?.state === 'settled' ? record.storageRef?.id === storageId : record?.storageId === storageId;
+        if (!record || adopted || record.attemptId === payload.attemptId) {
+          return { status: 409, error: 'This upload target is still in use.', reason: 'upload_target_in_use' };
+        }
+        if (record.priorStorageIds?.includes(storageId)) {
+          await transaction.put(key, { ...record, priorStorageIds: record.priorStorageIds.filter(id => id !== storageId) });
+        }
+        return { status: 200, ok: true };
+      }
       if (settle) {
         if (record?.state !== 'pending' || record.attemptId !== payload.attemptId) {
           return { status: 409, error: 'Upload attempt no longer owns this receipt.', reason: 'upload_attempt_superseded' };
+        }
+        if (record.storageId !== storageRef.id && !record.priorStorageIds?.includes(storageRef.id)) {
+          return { status: 409, error: 'Upload target does not match this receipt.', reason: 'upload_receipt_target_mismatch' };
         }
         await transaction.put(key, { state: 'settled', payloadDigest: record.payloadDigest, storageRef, settledAt: nowMs });
         await this.pruneUploadReceipts(transaction, nowMs);
@@ -499,10 +548,25 @@ export class SessionWriteCoordinator {
       if (record?.state === 'pending' && record.leaseUntil > nowMs) {
         return { status: 503, error: 'This upload is still in progress; retry shortly.', reason: 'upload_in_progress' };
       }
+      const resumed = record?.state === 'pending' && uploadReceiptExpiresAt(record) > nowMs;
+      if (resumed && !equalText(record.payloadDigest, payloadDigest)) {
+        return { status: 409, error: 'This upload request id already reserved different content.', reason: 'upload_request_conflict' };
+      }
+      const records = await transaction.list({ prefix: UPLOAD_RECEIPT_PREFIX });
+      if ([...records.values()].filter(record => record.state === 'pending' && record.leaseUntil > nowMs).length >= MAX_UPLOAD_RECEIPTS) {
+        return { status: 503, error: 'Upload receipt capacity is busy; retry shortly.', reason: 'upload_in_progress' };
+      }
+      // A superseded attempt may still be writing its target, so a retry never
+      // writes that target again. It keeps the first timestamp and may adopt an
+      // earlier target only after that target's row was published.
+      const target = resumed ? { storageId, createdAt: record.createdAt, reservedAt: record.reservedAt,
+        priorStorageIds: [...(record.priorStorageIds || []), record.storageId].slice(-MAX_PRIOR_UPLOAD_TARGETS) }
+        : { storageId, createdAt, reservedAt: nowMs };
       const attemptId = createAttemptId(this.crypto);
-      await transaction.put(key, { state: 'pending', attemptId, payloadDigest, leaseUntil: nowMs + UPLOAD_RECEIPT_LEASE_MS });
+      await transaction.put(key, { state: 'pending', attemptId, payloadDigest, leaseUntil: nowMs + UPLOAD_RECEIPT_LEASE_MS, ...target });
       await this.pruneUploadReceipts(transaction, nowMs);
-      return { status: 200, kind: 'execute', attemptId };
+      return { status: 200, kind: 'execute', attemptId, storageId: target.storageId, createdAt: target.createdAt,
+        priorStorageIds: target.priorStorageIds || [], resumed };
     });
     await this.scheduleUploadReceiptCleanup();
     const { status, ...body } = result;
@@ -711,6 +775,8 @@ export class SessionWriteCoordinator {
               groupIds: Array.isArray(metadata.groupIds)
                 ? metadata.groupIds.map((entry) => toTrimmedString(entry).slice(0, 160)).filter(Boolean).slice(0, 24)
                 : [],
+              // Whole or not at all: a cut-down rule could read as a wider audience.
+              accessConditions: metadata.accessConditions ?? null,
             },
             payload: sanitizedPayload,
           };
@@ -1905,6 +1971,23 @@ export class SessionWriteCoordinator {
     });
   }
 
+  async executeAuthorizedWorkerGroupMutation(payload) {
+    // Hold the authority queue across the separate group object's commit. Group
+    // mutation/recovery uses only its own durable state and KV; it must not call
+    // back into session config while this queue is held.
+    return this.serializeSessionConfigOperation(async () => {
+      try {
+        await this.assertSessionAuthority(payload);
+        const { expectedAuthority: _expectedAuthority, ...mutation } = payload;
+        const result = await forwardWorkerGroupMutation({ ...mutation, env: this.env });
+        return jsonResponse(result, result.status || (result.ok ? 200 : 503));
+      } catch (error) {
+        return jsonResponse({ ok: false, error: error.message || 'Worker group request failed.',
+          reason: error.status === 409 ? 'session_authority_changed' : 'worker_group_coordination_unavailable' }, error.status || 503);
+      }
+    });
+  }
+
   async executeWorkerGroupMutation(payload) {
     return this.serializeWorkerGroupOperation(async () => {
       if (
@@ -2115,10 +2198,10 @@ export class SessionWriteCoordinator {
     });
   }
 
-  async assertSessionAuthority(payload, { allowRestore = false } = {}) {
+  async assertSessionAuthority(payload, { allowRestore = false, requireRevision = true } = {}) {
     const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
     const authority = slug ? await this.readSessionConfigAuthority(slug) : null;
-    assertExpectedSessionAuthority(authority, payload?.expectedAuthority, slug);
+    assertExpectedSessionAuthority(authority, payload?.expectedAuthority, slug, { requireRevision });
     if (!allowRestore) await assertNoActiveBackupImport(this);
     return authority;
   }
@@ -2185,7 +2268,9 @@ export class SessionWriteCoordinator {
   async executeStoragePublication(payload) {
     return this.serializeSessionConfigOperation(async () => {
       try {
-        const authority = await this.assertSessionAuthority(payload);
+        // A context row may follow a long PDF read; a content edit meanwhile
+        // keeps the authorization epoch, and publishing rechecks the admin.
+        const authority = await this.assertSessionAuthority(payload, { requireRevision: payload?.metadata?.contextSource !== true });
         await this.repairPendingSessionConfigProjection();
         await publishCloudflareOwnedStorageMetadata({ env: this.env, slug: normalizeWorkerSessionSlug(payload.slug),
           config: authority?.config, actor: payload.expectedAuthority.actor,
@@ -2224,6 +2309,46 @@ export class SessionWriteCoordinator {
     return run;
   }
 
+  // Context changes to a PDF's readings run one at a time per session, so a
+  // reading, a removal and the PDF's pointer to its reading never interleave.
+  async executeContextSourceOperation(operation, payload) {
+    const run = this.contextSourceTail.then(async () => {
+      try {
+        const slug = normalizeWorkerSessionSlug(payload?.slug);
+        const id = toTrimmedString(payload?.id);
+        const leaseKey = `${CONTEXT_PDF_READING_PREFIX}${id}`;
+        const markWrite = () => bumpStorageBackupRevision(this.state.storage);
+        if (operation === 'begin-read') {
+          const nowMs = Number(this.now()) || Date.now();
+          if ((await this.state.storage.get(leaseKey))?.expiresAtMs > nowMs) {
+            return jsonResponse({ error: 'This PDF is already being read.', reason: 'context_pdf_reading' }, 409);
+          }
+          const token = createAttemptId(this.crypto);
+          await this.state.storage.put(leaseKey, { token, expiresAtMs: nowMs + CONTEXT_PDF_READING_LEASE_MS });
+          return jsonResponse({ ok: true, token });
+        }
+        if (operation === 'end-read') {
+          if ((await this.state.storage.get(leaseKey))?.token === payload.token) await this.state.storage.delete(leaseKey);
+          if (!payload.readingId) return jsonResponse({ ok: true });
+          await assertNoActiveBackupImport(this);
+          const result = await finishContextPdfReading({ env: this.env, slug, pdfId: id, readingId: toTrimmedString(payload.readingId),
+            readAt: toTrimmedString(payload.readAt), markWrite });
+          return jsonResponse(result.body, result.status);
+        }
+        if (operation === 'remove') {
+          await assertNoActiveBackupImport(this);
+          const result = await removeContextSource({ env: this.env, slug, id, readingIds: payload.readingIds, markWrite });
+          return jsonResponse(result.body, result.status);
+        }
+        return jsonResponse({ error: 'Not found.' }, 404);
+      } catch (error) {
+        return jsonResponse({ error: error.message || 'Context update failed.' }, error.status || 503);
+      }
+    });
+    this.contextSourceTail = run.catch(() => undefined);
+    return run;
+  }
+
   async finalizeSessionConfigProjection(revision) {
     await this.state.storage.transaction(async (transaction) => {
       const current = await transaction.get(SESSION_CONFIG_AUTHORITY_KEY);
@@ -2247,6 +2372,7 @@ export class SessionWriteCoordinator {
 
   async repairPendingSessionConfigProjection() {
     await repairPendingLitAuthorizationSetup(this);
+    await repairPendingSessionSecretsProjection(this);
     const authority = await this.state.storage.get(SESSION_CONFIG_AUTHORITY_KEY);
     if (authority?.projectionPending !== true) return;
     await this.projectSessionConfigAuthority(authority);
@@ -2566,6 +2692,27 @@ export class SessionWriteCoordinator {
     return jsonResponse(result);
   }
 
+  async executeFaucetWalletTurn(payload, action) {
+    const nowMs = Number(this.now()) || Date.now();
+    const result = await this.state.storage.transaction(async (transaction) => {
+      const turn = await transaction.get(FAUCET_WALLET_TURN_KEY);
+      const held = Boolean(turn) && turn.token === toTrimmedString(payload?.token);
+      if (action === 'release') {
+        if (held) await transaction.delete(FAUCET_WALLET_TURN_KEY);
+        return { ok: true };
+      }
+      if (action === 'renew') {
+        if (held) await transaction.put(FAUCET_WALLET_TURN_KEY, { token: turn.token, expiresAtMs: nowMs + FAUCET_WALLET_TURN_MS });
+        return { ok: true, held };
+      }
+      if (turn?.expiresAtMs > nowMs) return { ok: true, acquired: false };
+      const token = createAttemptId(this.crypto);
+      await transaction.put(FAUCET_WALLET_TURN_KEY, { token, expiresAtMs: nowMs + FAUCET_WALLET_TURN_MS });
+      return { ok: true, acquired: true, token };
+    });
+    return jsonResponse(result);
+  }
+
   async reserveSponsoredDeploy(requestDigest) {
     const nowMs = Number(this.now()) || Date.now();
     return this.state.storage.transaction(async (transaction) => {
@@ -2877,7 +3024,8 @@ export class SessionWriteCoordinator {
       if (url.pathname.startsWith('/upload-receipts/index/')) return dispatchUploadReceiptIndex(this, url.pathname, payload);
       if (url.pathname === '/upload-receipts/diagnostics') return this.readUploadReceiptDiagnostics();
       if (url.pathname === '/upload-receipts/reserve') return this.executeUploadReceipt(payload);
-      if (url.pathname === '/upload-receipts/settle') return this.executeUploadReceipt(payload, true);
+      if (url.pathname === '/upload-receipts/settle') return this.executeUploadReceipt(payload, 'settle');
+      if (url.pathname === '/upload-receipts/withdraw') return this.executeUploadReceipt(payload, 'withdraw');
     }
     if (url.pathname.startsWith('/session-config/') && url.hostname !== 'session-coordinator.internal') {
       return jsonResponse({ error: 'Not found.' }, 404);
@@ -2890,10 +3038,15 @@ export class SessionWriteCoordinator {
       try { return await dispatchAgentInviteJournal(this, url.pathname.split('/').pop(), payload); }
       catch { return jsonResponse({ ok: false, reason: 'invite_coordinator_unavailable' }, 503); }
     }
+    if (url.pathname === '/session-config/agent-question-queue/advance') {
+      try { return await executeAgentQuestionQueueAdvance(this, payload); }
+      catch { return jsonResponse({ ok: false, reason: 'question_queue_unavailable' }, 503); }
+    }
     if (url.pathname === '/session-config/agent-wrapped/commit') {
       try { return await dispatchWrappedResearch(this, payload); }
       catch (error) { return jsonResponse({ ok: false, reason: 'wrapped_coordinator_unavailable', retryable: true }, error.status || 503); }
     }
+    if (url.pathname === '/session-config/worker-groups/mutate') return this.executeAuthorizedWorkerGroupMutation(payload);
     if (url.pathname === '/session-config/current') return this.executeSessionConfigCurrent(payload);
     if (url.pathname === '/session-config/diagnostics') return this.executeSessionDiagnostics(payload);
     if (url.pathname === '/session-config/recovery-key/export') {
@@ -2934,6 +3087,15 @@ export class SessionWriteCoordinator {
     }
     if (url.pathname === '/session-config/storage/set-hidden') return this.executeStorageVisibilityMutation(payload);
     if (url.pathname === '/session-config/storage/publish') return this.executeStoragePublication(payload);
+    if (url.pathname.startsWith('/session-config/context-source/')) {
+      return this.executeContextSourceOperation(url.pathname.split('/').pop(), payload);
+    }
+    if (url.pathname.startsWith('/session-config/debate-atlas/')) {
+      return dispatchDebateAtlasStore(this, url.pathname.split('/').pop(), payload || {});
+    }
+    if (['preflight', 'begin', 'check', 'checkpoint', 'release', 'discard'].some(operation => url.pathname === `/session-config/lit-authorization/provisioning/${operation}`)) {
+      return this.serializeSessionConfigOperation(() => executeLitProvisioning(this, payload, url.pathname.split('/').at(-1)));
+    }
     if (url.pathname === '/session-config/lit-authorization/ensure') {
       return this.serializeSessionConfigOperation(() => executeLitAuthorizationSignerEnsure(this, payload));
     }
@@ -2972,6 +3134,9 @@ export class SessionWriteCoordinator {
     }
     if (url.pathname === '/hosted-faucet/reserve' || url.pathname === '/hosted-faucet/finalize') {
       return this.executeHostedFaucetQuota(payload, url.pathname.endsWith('/finalize'));
+    }
+    if (['/faucet-wallet/acquire', '/faucet-wallet/renew', '/faucet-wallet/release'].includes(url.pathname)) {
+      return this.executeFaucetWalletTurn(payload, url.pathname.slice('/faucet-wallet/'.length));
     }
     if (url.pathname === '/auth-state/rate/check') {
       return this.executeAuthRateCheck(payload);
@@ -3146,14 +3311,18 @@ export const coordinateResponseUploadReceipt = async ({ env, slug, responder, op
     const normalizedSlug = resolveCoordinatorSessionSlugStorageKey(slug);
     const owner = await sha256Hex(`upload-receipts:${normalizedSlug}:${toTrimmedString(responder).toLowerCase()}`);
     const stub = env.CE_SESSION_COORDINATOR.get(env.CE_SESSION_COORDINATOR.idFromName(owner));
-    if (!stub?.fetch || !['reserve', 'settle'].includes(operation)) return unavailable;
+    if (!stub?.fetch || !['reserve', 'settle', 'withdraw'].includes(operation)) return unavailable;
     const response = await stub.fetch(`https://session-coordinator.internal/upload-receipts/${operation}`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...payload, diagnostics: { slug: normalizedSlug, owner } }),
     });
     const body = await response.json();
     if (!isObjectRecord(body) || (!response.ok && ![409, 503].includes(response.status))) return unavailable;
-    if (response.ok && (operation === 'settle' ? body.ok !== true
+    if (response.ok && (operation !== 'reserve' ? body.ok !== true
       : !(body.kind === 'execute' && toTrimmedString(body.attemptId)) && !(body.kind === 'replay' && body.storageRef?.id))) return unavailable;
+    const priorStorageIds = body.priorStorageIds ?? [];
+    if (response.ok && body.kind === 'execute' &&
+        (!isSafeCloudflareStorageRefId(body.storageId) || !Number.isFinite(Date.parse(body.createdAt)) ||
+          !Array.isArray(priorStorageIds) || !priorStorageIds.every(isSafeCloudflareStorageRefId))) return unavailable;
     return { ...body, status: response.status };
   } catch {
     return unavailable;
@@ -3253,6 +3422,36 @@ export const reserveCoordinatedHostedFaucet = (args = {}) => callHostedFaucetQuo
   ...args, requestId: crypto.randomUUID(),
 }, false);
 export const finalizeCoordinatedHostedFaucet = (args = {}) => callHostedFaucetQuota(args, true);
+
+// One send at a time per faucet wallet on this Worker, whichever sessions or grants share its key: each
+// request reads the pending nonce, signs and sends before the next reads it. The turn is renewed while
+// the send runs, so a stalled RPC call can't let another request in. Returns null without a turn. A
+// missing or malformed key fails in the faucet before any nonce read, so it sends without a turn.
+export const withCoordinatedFaucetWalletTurn = async ({ env, secrets, now = Date.now,
+  sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)), renewEveryMs = FAUCET_WALLET_RENEW_MS }, send) => {
+  let wallet = '';
+  try {
+    wallet = computeAddress(toTrimmedString(secrets?.faucetPrivateKey)).toLowerCase();
+  } catch {
+    return send();
+  }
+  const identity = `faucet-wallet:${wallet}`;
+  const call = (action, payload = {}) => callAuthStateCoordinator({ env, identity, path: `/faucet-wallet/${action}`, payload });
+  const deadline = now() + FAUCET_WALLET_WAIT_MS;
+  let turn = await call('acquire');
+  while (turn.ok === true && !turn.acquired && now() < deadline) {
+    await sleep(FAUCET_WALLET_POLL_MS);
+    turn = await call('acquire');
+  }
+  if (!turn.acquired) return null;
+  const renewal = setInterval(() => { void call('renew', { token: turn.token }); }, renewEveryMs);
+  try {
+    return await send();
+  } finally {
+    clearInterval(renewal);
+    await call('release', { token: turn.token });
+  }
+};
 
 export const checkCoordinatedAuthRateLimit = async ({
   env,

@@ -1,3 +1,5 @@
+import { TRANSCRIPTION_FALLBACK_MODEL } from '../../../../shared/aiDefaults.mjs';
+import { mergeTranscriptOverlap } from '../audio/transcriptOverlap';
 import { createLogger } from '../logging.js';
 
 const audioLog = createLogger('ai');
@@ -6,6 +8,20 @@ const audioLog = createLogger('ai');
 // We stay below that with a 24 MiB client-side ceiling to leave multipart headroom.
 export const TRANSCRIBE_MAX_UPLOAD_BYTES = 24 * 1024 * 1024;
 export const TRANSCRIBE_WAV_TARGET_HZ = 16000;
+// whisper-1 transcribes a whole upload. Later models stop short on long audio:
+// gpt-4o-transcribe writes at most 2,000 tokens, about ten minutes of speech, and
+// gpt-transcribe publishes no limit. So they hear at most five minutes per request.
+export const TRANSCRIBE_MAX_CHUNK_SECONDS = 5 * 60;
+
+/** The most audio, in seconds, one request to `model` may carry; null when only the upload size limits it. */
+export const transcriptionChunkSeconds = (model: unknown): number | null => {
+  // A request that names no model gets whisper-1 from the Worker.
+  const name =
+    String(model ?? '')
+      .trim()
+      .toLowerCase() || TRANSCRIPTION_FALLBACK_MODEL;
+  return name === TRANSCRIPTION_FALLBACK_MODEL ? null : TRANSCRIBE_MAX_CHUNK_SECONDS;
+};
 const TRANSCRIBE_CHUNK_HEADROOM_BYTES = 64 * 1024;
 const TRANSCRIBE_CHUNK_OVERLAP_MS = 250;
 
@@ -27,12 +43,14 @@ type DecodedMonoAudio = {
 
 type SplitAudioOptions = {
   maxUploadBytes?: number;
+  maxSeconds?: number | null;
   targetHz?: number;
   overlapMs?: number;
 };
 
 type AudioRuntimeWindow = Window & {
   webkitAudioContext?: typeof AudioContext;
+  webkitOfflineAudioContext?: typeof OfflineAudioContext;
 };
 
 const getAudioContextConstructor = (): typeof AudioContext | null => {
@@ -182,56 +200,13 @@ const decodeAudioToMonoFloat32 = async (
   }
 };
 
-export const mergeTranscriptText = (prev: unknown, next: unknown): string => {
-  const a = String(prev || '').trim();
-  const b = String(next || '').trim();
-  if (!a) return b;
-  if (!b) return a;
-
-  const tokenize = (s: string): string[] =>
-    s
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, ' ')
-      .trim()
-      .split(/\s+/)
-      .filter(Boolean);
-
-  const A = tokenize(a);
-  const B = tokenize(b);
-  let bestK = 0;
-  const maxK = Math.min(A.length, B.length);
-  for (let k = maxK; k >= 1; k -= 1) {
-    let ok = true;
-    for (let i = 0; i < k; i += 1) {
-      if (A[A.length - k + i] !== B[i]) {
-        ok = false;
-        break;
-      }
-    }
-    if (ok) {
-      bestK = k;
-      break;
-    }
-  }
-
-  if (bestK > 0) {
-    const overlappedChars = B.slice(0, bestK).join(' ').length;
-    if (overlappedChars < 8) bestK = 0;
-  }
-
-  let bTrimmed = b;
-  if (bestK > 0) {
-    const re = new RegExp(`^(([\\s\\W]*\\w+[\\s\\W]*){${bestK}})`);
-    bTrimmed = b.replace(re, '');
-  }
-
-  return `${a}${a && bTrimmed && !/\s$/.test(a) ? ' ' : ''}${bTrimmed}`.trim();
-};
+export const mergeTranscriptText = (previous: unknown, next: unknown): string => mergeTranscriptOverlap(previous, next);
 
 export const splitAudioBlobToWavChunks = async (
   inputBlob: AudioBlobLike,
   {
     maxUploadBytes = TRANSCRIBE_MAX_UPLOAD_BYTES,
+    maxSeconds = null,
     targetHz = TRANSCRIBE_WAV_TARGET_HZ,
     overlapMs = TRANSCRIBE_CHUNK_OVERLAP_MS,
   }: SplitAudioOptions = {},
@@ -243,7 +218,13 @@ export const splitAudioBlobToWavChunks = async (
   if (!(downsampled instanceof Float32Array) || downsampled.length === 0) return [];
 
   const safeMaxBytes = Math.max(1024, Math.floor(maxUploadBytes) - TRANSCRIBE_CHUNK_HEADROOM_BYTES);
-  const maxSamplesPerChunk = Math.max(1, Math.floor((safeMaxBytes - 44) / 2));
+  const maxSamplesPerChunk = Math.max(
+    1,
+    Math.min(
+      Math.floor((safeMaxBytes - 44) / 2),
+      maxSeconds && maxSeconds > 0 ? Math.floor(maxSeconds * targetHz) : Number.POSITIVE_INFINITY,
+    ),
+  );
   const overlapSamples = Math.max(
     0,
     Math.min(Math.floor((overlapMs / 1000) * targetHz), Math.floor(maxSamplesPerChunk / 8)),
@@ -264,6 +245,51 @@ export const splitAudioBlobToWavChunks = async (
   }
 
   return chunks;
+};
+
+/**
+ * Decodes audio once at `sampleRate`. An OfflineAudioContext at that rate resamples while decoding, so the result
+ * holds only that rate's samples. Resolves null when the browser can't decode it.
+ */
+export const decodeAudioAtRate = async (inputBlob: AudioBlobLike, sampleRate: number): Promise<AudioBuffer | null> => {
+  const runtimeWindow = typeof window === 'undefined' ? undefined : (window as AudioRuntimeWindow);
+  const OfflineContext = runtimeWindow?.OfflineAudioContext || runtimeWindow?.webkitOfflineAudioContext;
+  if (!OfflineContext) return null;
+  try {
+    const arrayBuf = await readBlobAsArrayBuffer(inputBlob);
+    // Decoding renders nothing, so the context is one frame long.
+    const ctx = new OfflineContext(1, 1, sampleRate);
+    return await new Promise<AudioBuffer>((resolve, reject) => {
+      const result = ctx.decodeAudioData(arrayBuf, resolve, reject);
+      if (result && typeof result.then === 'function') result.then(resolve).catch(reject);
+    });
+  } catch (error) {
+    audioLog.warn('Audio decode failed:', error);
+    return null;
+  }
+};
+
+/**
+ * Cuts decoded audio into mono 16-bit WAV parts of `partSeconds`, mixing channels one part at a time. Each part
+ * after the first starts a second early, so a word cut at a boundary is whole in one of them (stitching drops
+ * the repeat), and a last second or less joins the part before it, as too short to transcribe alone.
+ */
+export const audioBufferToWavParts = (audio: AudioBuffer, partSeconds: number): Blob[] => {
+  const channels = Array.from({ length: audio.numberOfChannels }, (_, index) => audio.getChannelData(index));
+  const partLength = Math.max(1, Math.round(partSeconds * audio.sampleRate));
+  const overlap = Math.min(audio.sampleRate, Math.floor(partLength / 2));
+  const parts: Blob[] = [];
+  for (let start = 0, end = 0; end < audio.length; start = end - overlap) {
+    end = audio.length - start - partLength <= audio.sampleRate ? audio.length : start + partLength;
+    let mono = channels[0].subarray(start, end);
+    if (channels.length > 1) {
+      mono = new Float32Array(end - start);
+      for (const channel of channels)
+        for (let index = start; index < end; index += 1) mono[index - start] += channel[index] / channels.length;
+    }
+    parts.push(buildMonoWavBlob(float32ToInt16(mono), audio.sampleRate));
+  }
+  return parts;
 };
 
 /**

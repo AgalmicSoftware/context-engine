@@ -5,8 +5,11 @@ import {
   clearAllWorkerSessionTokens,
   __test__workerAuthTokenCache,
   fetchWorkerWithAuth,
+  getCachedWorkerSessionToken,
   getWorkerAuthHeaders,
   getWorkerSessionToken,
+  hasCachedWorkerSessionToken,
+  subscribeWorkerSessionToken,
   normalizeWorkerUrl,
   noteWorkerAccessChanged,
 } from './workerAuth.js';
@@ -197,7 +200,6 @@ describe('workerAuth token cache envelopes', () => {
         token: 'token-1',
         expiresAt: 4600,
         issuedAt: 1000,
-        legacy: false,
       }),
     );
   });
@@ -254,54 +256,19 @@ describe('workerAuth token cache envelopes', () => {
     ).toEqual({ ok: false, status: 'scope-mismatch' });
   });
 
-  it('keeps legacy token entries readable only when they still have a valid expiry', () => {
-    expect(
-      __test__workerAuthTokenCache.normalizeTokenCacheEntry(
-        {
-          token: 'legacy-token',
-          exp: 4600,
-        },
-        {
-          nowSeconds: 1200,
-          skewSeconds: 30,
-        },
-      ),
-    ).toEqual(
-      expect.objectContaining({
-        ok: true,
-        token: 'legacy-token',
-        legacy: true,
-      }),
-    );
+  it('rejects unscoped token records, even unexpired ones with no expected scope', () => {
+    const unscoped = { token: 'unscoped-token', exp: 4600, expiresAt: 4600 };
 
+    expect(__test__workerAuthTokenCache.normalizeTokenCacheEntry(unscoped, { nowSeconds: 1200 })).toEqual({
+      ok: false,
+      status: 'unsupported-version',
+    });
     expect(
       __test__workerAuthTokenCache.normalizeTokenCacheEntry(
-        {
-          token: 'legacy-token',
-        },
-        {
-          nowSeconds: 1200,
-        },
+        { ...unscoped, v: '1', sessionSlug: 'edge' },
+        { sessionSlug: 'edge', nowSeconds: 1200 },
       ),
-    ).toEqual({ ok: false, status: 'missing-expiry' });
-  });
-
-  it('rejects a legacy cache entry when an exact canonical session identity is expected', () => {
-    expect(
-      __test__workerAuthTokenCache.normalizeTokenCacheEntry(
-        {
-          token: 'legacy-token',
-          exp: 4600,
-        },
-        {
-          workerUrl: 'https://worker.example',
-          sessionId: CANONICAL_SESSION_ID,
-          sessionSlug: 'edge',
-          address: TEST_ADDRESS,
-          nowSeconds: 1200,
-        },
-      ),
-    ).toEqual({ ok: false, status: 'scope-mismatch' });
+    ).toEqual({ ok: false, status: 'unsupported-version' });
   });
 
   it('rejects scoped v1 token envelopes with excessive cache lifetimes', () => {
@@ -335,7 +302,6 @@ describe('workerAuth token cache envelopes', () => {
       expect.objectContaining({
         ok: true,
         token: 'token-1',
-        legacy: false,
       }),
     );
   });
@@ -575,6 +541,50 @@ describe('workerAuth canonical session resolution', () => {
 
     expect(JSON.parse(global.fetch.mock.calls[0][1].body)).not.toHaveProperty('sessionId');
     expect(JSON.parse(global.fetch.mock.calls[1][1].body)).not.toHaveProperty('sessionId');
+  });
+
+  it('says whether a Worker token is already held, without asking anyone to sign', async () => {
+    global.fetch = jest
+      .fn()
+      .mockResolvedValueOnce(jsonResp(200, { nonce: 'nonce-1' }))
+      .mockResolvedValueOnce(jsonResp(200, { token: 'token-1', exp: Math.floor(Date.now() / 1000) + 3600 }));
+    const options = { sessionConfig: { slug: 'debate' }, context: authContext, workerUrl: 'https://worker.example' };
+
+    const heard = jest.fn();
+    const stopHearing = subscribeWorkerSessionToken(heard);
+    expect(await hasCachedWorkerSessionToken(options)).toBe(false);
+    expect(global.fetch).not.toHaveBeenCalled();
+    await getWorkerSessionToken(options);
+    expect(heard).toHaveBeenCalledTimes(1);
+    expect(await hasCachedWorkerSessionToken(options)).toBe(true);
+    // A token already held is no news.
+    await getWorkerSessionToken(options);
+    stopHearing();
+    expect(heard).toHaveBeenCalledTimes(1);
+    expect(await hasCachedWorkerSessionToken({ ...options, context: {} })).toBe(false);
+  });
+
+  it('reads a held Worker token without asking anyone to sign, and none once it lapses', async () => {
+    global.fetch = jest
+      .fn()
+      .mockResolvedValueOnce(jsonResp(200, { nonce: 'nonce-1' }))
+      .mockResolvedValueOnce(jsonResp(200, { token: 'token-1', exp: Math.floor(Date.now() / 1000) + 3600 }));
+    const options = { sessionConfig: { slug: 'debate' }, context: authContext, workerUrl: 'https://worker.example' };
+
+    expect(await getCachedWorkerSessionToken(options)).toBe('');
+    expect(global.fetch).not.toHaveBeenCalled();
+    await getWorkerSessionToken(options);
+    expect(await getCachedWorkerSessionToken(options)).toBe('token-1');
+
+    const later = Date.now() + 2 * 60 * 60 * 1000;
+    const clock = jest.spyOn(Date, 'now').mockImplementation(() => later);
+    try {
+      expect(await getCachedWorkerSessionToken(options)).toBe('');
+    } finally {
+      clock.mockRestore();
+    }
+    // Only the one sign-in reached the Worker: its nonce, then its token.
+    expect(global.fetch).toHaveBeenCalledTimes(2);
   });
 
   it('does not inject demo general config into worker lookup for implicit default session in on-chain mode', async () => {

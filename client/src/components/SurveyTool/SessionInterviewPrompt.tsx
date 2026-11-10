@@ -2,7 +2,7 @@ import React from 'react';
 import styles from './SurveyTool.module.scss';
 
 const emphasis =
-  /(Help me prepare a review-only Context Engine interview prefill\.|Search only conversation history, memory, and connected sources already available to you|Return only:|Every response needs confidence from 0 to 1 and evidence:|Evidence must omit quotes, source names, URLs, timestamps, account IDs, and hidden reasoning\.|Do not POST or upload it\.|Nothing is submitted; the link opens editable drafts for my review\.)/g;
+  /(Help me prepare a review-only Context Engine interview prefill\.|Search only conversation history, memory, and connected sources already available to you|Return only:|Every response needs confidence \(0-1\) and evidence\.|Evidence must omit quotes, source names, URLs, timestamps, account IDs, and hidden reasoning\.|Do not POST or upload it\.|Nothing is submitted; the link opens editable drafts for my review\.)/g;
 
 const urlPattern = /(https?:\/\/[^\s)]+[^\s).,;:!?])/g;
 const catalogShapeIntro = 'Use catalog values in this compact shape:';

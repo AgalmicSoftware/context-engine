@@ -1,5 +1,4 @@
 export type HexString = `0x${string}`;
-export type WalletProviderName = 'passkey_eoa' | 'wagmi' | 'web3auth' | 'none';
 export type PasskeyWalletKeyMode = 'passkey-derived' | 'encrypted-private-key';
 export type PasskeyWalletEncryptionVersion = 'passkey-prf-aes-gcm-v1';
 export type PasskeyWalletDerivationVersion = 'passkey-prf-hkdf-secp256k1-v1';

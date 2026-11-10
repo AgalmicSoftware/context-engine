@@ -1,3 +1,5 @@
+import { logoutClientAuth, CLIENT_AUTH_LOGOUT_EVENT } from '../../utilities/session/clientAuthLogout';
+import { getClientAuthGeneration } from '../../utilities/session/clientAuthGeneration';
 import type {
   AgentClientLoginEnvelope,
   clearAgentClientLoginEnvelope,
@@ -36,7 +38,7 @@ export type OnePageSessionAgentState = {
   agentSessionMeta: AgentSessionMeta | null;
   agentSessionMetaStatus: string;
   agentSubmittedQuestionIds: string[];
-  agentSubmittingQuestionId: string;
+  agentSubmittingQuestionIds: Set<string>;
 };
 
 type AgentStatePatch = Partial<OnePageSessionAgentState>;
@@ -94,7 +96,7 @@ export const buildInitialAgentState = (
   agentQuestions: [],
   agentAnswerState: null,
   agentQuestionPileIndex: 0,
-  agentSubmittingQuestionId: '',
+  agentSubmittingQuestionIds: new Set<string>(),
   agentSubmittedQuestionIds: [],
   agentQuestionSubmitError: '',
   agentResultsStatus: 'idle',
@@ -118,31 +120,57 @@ export const createOnePageSessionAgentActions = ({
     });
 
   type RequestChannel = 'meta' | 'questions' | 'results' | 'submit';
-  type RequestSnapshot = { channel: RequestChannel; generation: number; identityKey: string };
+  type RequestSnapshot = {
+    channel: RequestChannel;
+    generation: number;
+    authGeneration: number;
+    signal: AbortSignal;
+    identityKey: string;
+  };
   const requestGenerations: Record<RequestChannel, number> = {
     meta: 0,
     questions: 0,
     results: 0,
     submit: 0,
   };
+  const requestControllers = new Map<RequestChannel, AbortController>();
+  const submitControllers = new Map<AbortSignal, AbortController>();
   let disposed = false;
+  let listeningForLogout = false;
   const resolveCurrentIdentityKey = () => getAgentClientLoginEnvelopeMemoryKey(resolveCurrentIdentityTarget());
-  const beginRequest = (channel: RequestChannel): RequestSnapshot => ({
-    channel,
-    generation: ++requestGenerations[channel],
-    identityKey: resolveCurrentIdentityKey(),
-  });
+  const beginRequest = (channel: RequestChannel): RequestSnapshot => {
+    const controller = new AbortController();
+    // Read requests supersede each other; independent answer writes must finish.
+    if (channel === 'submit') submitControllers.set(controller.signal, controller);
+    else {
+      requestControllers.get(channel)?.abort();
+      requestControllers.set(channel, controller);
+      requestGenerations[channel] += 1;
+    }
+    return {
+      channel,
+      generation: requestGenerations[channel],
+      authGeneration: getClientAuthGeneration(),
+      identityKey: resolveCurrentIdentityKey(),
+      signal: controller.signal,
+    };
+  };
   const isRequestCurrent = (snapshot: RequestSnapshot): boolean =>
     !disposed &&
+    snapshot.authGeneration === getClientAuthGeneration() &&
     requestGenerations[snapshot.channel] === snapshot.generation &&
     resolveCurrentIdentityKey() === snapshot.identityKey;
   const invalidateAgentRequests = (): void => {
+    submitControllers.forEach((controller) => controller.abort());
+    submitControllers.clear();
     (Object.keys(requestGenerations) as RequestChannel[]).forEach((channel) => {
+      requestControllers.get(channel)?.abort();
       requestGenerations[channel] += 1;
     });
   };
   const disposeAgentActions = (): void => {
     disposed = true;
+    if (listeningForLogout) window.removeEventListener(CLIENT_AUTH_LOGOUT_EVENT, resetAgentAuthState);
     invalidateAgentRequests();
   };
 
@@ -171,7 +199,11 @@ export const createOnePageSessionAgentActions = ({
       url.searchParams.set('sessionSlug', sessionSlug);
       // Native browser fetch rejects the ports object as its receiver.
       const fetchImpl = ports.fetchImpl;
-      const response = await fetchImpl(url.toString(), { method: 'GET', cache: 'no-store' });
+      const response = await fetchImpl(url.toString(), {
+        method: 'GET',
+        cache: 'no-store',
+        signal: requestSnapshot.signal,
+      });
       const body = (await response.json().catch(() => null)) as AgentSessionMeta | null;
       if (!isRequestCurrent(requestSnapshot)) return null;
       if (!response.ok || !body || body.ok === false) {
@@ -222,6 +254,7 @@ export const createOnePageSessionAgentActions = ({
     const result = await ports.loadQuestions({
       envelope,
       agentWorkerUrl: resolveSessionAgentWorkerUrl(sessionConfig),
+      signal: requestSnapshot.signal,
     });
     if (!isRequestCurrent(requestSnapshot)) return result;
     if (!result.ok) {
@@ -257,6 +290,7 @@ export const createOnePageSessionAgentActions = ({
     const result = await ports.loadResultsDataset({
       envelope,
       agentWorkerUrl: resolveSessionAgentWorkerUrl(sessionConfig),
+      signal: requestSnapshot.signal,
     });
     if (!isRequestCurrent(requestSnapshot)) return result;
     const authFailureReason = resolveAgentResultsAuthFailureReason(result);
@@ -281,52 +315,70 @@ export const createOnePageSessionAgentActions = ({
   const handleAgentQuestionSubmit = async (question: AgentQuestion, answer: AgentAnswerInput): Promise<void> => {
     if (disposed) return;
     const state = getState();
+    if (state.agentSubmittingQuestionIds.has(question.questionId)) return;
     const envelope = state.agentClientEnvelope;
     if (!ports.envelopeAllowsSubmit(envelope, state.agentSessionMeta)) {
       setState({ agentQuestionSubmitError: 'Submitting from the client is not enabled for this deployment yet.' });
       return;
     }
     const requestSnapshot = beginRequest('submit');
-    setState({ agentSubmittingQuestionId: question.questionId, agentQuestionSubmitError: '' });
-    const result = await ports.submitAnswer({
-      envelope,
-      agentWorkerUrl: resolveSessionAgentWorkerUrl(),
-      question,
-      answer,
-    });
+    setState((prev) => ({
+      agentSubmittingQuestionIds: new Set([...prev.agentSubmittingQuestionIds, question.questionId]),
+      agentQuestionSubmitError: '',
+    }));
+    const result = await ports
+      .submitAnswer({
+        envelope,
+        agentWorkerUrl: resolveSessionAgentWorkerUrl(),
+        question,
+        answer,
+        signal: requestSnapshot.signal,
+      })
+      .finally(() => submitControllers.delete(requestSnapshot.signal));
     if (!isRequestCurrent(requestSnapshot)) return;
     if (!result.ok) {
       if (ports.isAuthFailure({ status: result.status, reason: result.reason })) {
         handleAgentAuthFailure(result.reason);
       } else {
-        setState({
-          agentSubmittingQuestionId: '',
+        setState((prev: Readonly<OnePageSessionAgentState>) => ({
+          agentSubmittingQuestionIds: new Set(
+            [...prev.agentSubmittingQuestionIds].filter((id) => id !== question.questionId),
+          ),
           agentQuestionSubmitError: result.reason || 'Could not submit this answer.',
-        });
+        }));
       }
       return;
     }
     setState((prev: Readonly<OnePageSessionAgentState>) => ({
-      agentSubmittingQuestionId: '',
+      agentSubmittingQuestionIds: new Set(
+        [...prev.agentSubmittingQuestionIds].filter((id) => id !== question.questionId),
+      ),
       agentSubmittedQuestionIds: Array.from(new Set([...(prev.agentSubmittedQuestionIds || []), question.questionId])),
     }));
     void loadAgentData(true);
   };
 
-  const handleAgentLogout = (): void => {
+  const resetAgentAuthState = (): void => {
     if (disposed) return;
     invalidateAgentRequests();
-    const sessionSlug = resolveCurrentSessionSlug();
-    ports.clearStoredEnvelope(resolveCurrentIdentityTarget());
-    clearAgentEnvelopeMemoryCache(sessionSlug);
-    setState({
-      ...buildAgentDataResetState(),
-      agentClientEnvelope: null,
+    setState({ ...buildAgentDataResetState(), agentClientEnvelope: null });
+  };
+
+  const handleAgentLogout = (): void => {
+    if (disposed) return;
+    resetAgentAuthState();
+    void logoutClientAuth().catch(() => {
+      if (!disposed)
+        setState({ agentQuestionSubmitError: 'Could not disconnect the saved wallet. Try logging out again.' });
     });
   };
 
   const bootstrapAgentSession = (): void => {
     if (disposed) return;
+    if (!listeningForLogout && typeof window !== 'undefined') {
+      window.addEventListener(CLIENT_AUTH_LOGOUT_EVENT, resetAgentAuthState);
+      listeningForLogout = true;
+    }
     if (!isAgentBackendMode(resolveCurrentSessionConfig())) return;
     const envelope = restoreAgentEnvelopeFromStorage();
     if (envelope) {

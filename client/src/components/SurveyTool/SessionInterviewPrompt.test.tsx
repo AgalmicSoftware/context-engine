@@ -1,8 +1,16 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
 import SessionInterviewPrompt from './SessionInterviewPrompt';
+import { buildExternalInterviewKickoff } from './sessionInterview';
 
 describe('SessionInterviewPrompt', () => {
+  it('bolds the confidence instruction in the real kickoff prompt', () => {
+    const prompt = buildExternalInterviewKickoff({ workerUrl: 'https://worker.example', sessionSlug: 'demo' });
+    const { container } = render(<SessionInterviewPrompt prompt={prompt} />);
+    const bold = [...container.querySelectorAll('strong')].map((node) => node.textContent);
+    expect(bold).toContain('Every response needs confidence (0-1) and evidence.');
+  });
+
   it('renders long URLs as safe descriptive links without changing surrounding prompt text', () => {
     const prompt =
       'Help me prepare a review-only Context Engine interview prefill. Open https://worker.example/agent/interview-catalog?slug=demo-interview-4&sessionUrl=https%3A%2F%2Fapp.example%2Fsession%2Fdemo-interview-4 then return JSON. Do not POST or upload it.';

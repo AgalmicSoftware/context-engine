@@ -1,5 +1,6 @@
 import {
   resolveTranscriptionWorkerEndpoint,
+  uploadAudioForDiarizedTranscription,
   uploadAudioForTranscription,
 } from './aiClientTranscriptionWorkerTransport';
 import { fetchWorkerWithAuth } from '../worker/workerAuth.js';
@@ -81,7 +82,7 @@ describe('aiClientTranscriptionWorkerTransport', () => {
     expect((form.get('file') as File).name).toBe('meeting.wav');
   });
 
-  it('uses worker error messages without throwing on JSON parse failures', async () => {
+  it('reports a JSON parse failure to its callback and uses worker error messages', async () => {
     mockedFetchWorkerWithAuth.mockResolvedValueOnce({
       ok: true,
       json: async () => {
@@ -99,7 +100,7 @@ describe('aiClientTranscriptionWorkerTransport', () => {
         },
         { onJsonParseError },
       ),
-    ).resolves.toBe('');
+    ).rejects.toMatchObject({ status: 502 });
     expect(onJsonParseError).toHaveBeenCalledWith(expect.any(Error));
 
     mockedFetchWorkerWithAuth.mockResolvedValueOnce({
@@ -114,5 +115,254 @@ describe('aiClientTranscriptionWorkerTransport', () => {
         baseUrl: 'https://worker.example',
       }),
     ).rejects.toThrow('Too large');
+  });
+});
+
+it('opts group transcription into speaker labels without changing the text-only caller', async () => {
+  const transport = { endpoint: 'https://worker.example/transcribe', baseUrl: 'https://worker.example' };
+  const turns = [{ speaker: 'A', start: 0, end: 2, text: 'Room question.' }];
+  mockedFetchWorkerWithAuth.mockResolvedValue({
+    ok: true,
+    json: async () => ({ text: 'Room question.', segments: turns }),
+  } as Response);
+  const { uploadAudioForDiarizedTranscription } = await import('./aiClientTranscriptionWorkerTransport');
+  await expect(uploadAudioForDiarizedTranscription(new Blob(['audio']), transport)).resolves.toEqual({
+    text: 'Room question.',
+    segments: turns,
+  });
+  const form = mockedFetchWorkerWithAuth.mock.lastCall?.[1]?.body as FormData;
+  expect(form.get('model')).toBe('gpt-4o-transcribe-diarize');
+  expect(form.get('purpose')).toBe('group-conversation');
+  expect(form.get('labelSpeakers')).toBe('true');
+  await expect(uploadAudioForTranscription(new Blob(['audio']), transport)).resolves.toBe('Room question.');
+  expect((mockedFetchWorkerWithAuth.mock.lastCall?.[1]?.body as FormData).get('labelSpeakers')).toBeNull();
+});
+
+it('handles silent labeled clips, old Workers, and provider errors explicitly', async () => {
+  const { uploadAudioForDiarizedTranscription } = await import('./aiClientTranscriptionWorkerTransport');
+  const transport = { endpoint: 'https://worker.example/transcribe', baseUrl: 'https://worker.example' };
+  mockedFetchWorkerWithAuth.mockResolvedValueOnce({
+    ok: true,
+    json: async () => ({ text: '', segments: [] }),
+  } as Response);
+  await expect(uploadAudioForDiarizedTranscription(new Blob(['audio']), transport)).resolves.toEqual({
+    text: '',
+    segments: [],
+  });
+  mockedFetchWorkerWithAuth.mockResolvedValueOnce({ ok: true, json: async () => ({ text: 'Plain text' }) } as Response);
+  await expect(uploadAudioForDiarizedTranscription(new Blob(['audio']), transport)).resolves.toEqual({
+    text: 'Plain text',
+    segments: [],
+    labelsUnavailableReason: expect.any(String),
+  });
+  mockedFetchWorkerWithAuth.mockResolvedValueOnce({
+    ok: false,
+    status: 429,
+    json: async () => ({ error: 'Synthetic capacity error' }),
+  } as Response);
+  await expect(uploadAudioForDiarizedTranscription(new Blob(['audio']), transport)).rejects.toThrow(
+    'Synthetic capacity error',
+  );
+});
+
+it('fails a success reply without readable text, so the chunk keeps its audio and retries', async () => {
+  const { uploadAudioForDiarizedTranscription } = await import('./aiClientTranscriptionWorkerTransport');
+  const transport = { endpoint: 'https://worker.example/transcribe', baseUrl: 'https://worker.example' };
+  const replies = [
+    // The connection dropped part way through the body.
+    {
+      ok: true,
+      json: async () => {
+        throw new SyntaxError('Unexpected end of JSON input');
+      },
+    },
+    { ok: true, json: async () => ({}) },
+    { ok: true, json: async () => ({ text: { value: 'Spoken.' } }) },
+    { ok: true, json: async () => ({ text: { value: 'Spoken.' }, segments: [] }) },
+  ] as Response[];
+  for (const reply of replies) {
+    mockedFetchWorkerWithAuth.mockResolvedValueOnce(reply);
+    await expect(uploadAudioForTranscription(new Blob(['audio']), transport)).rejects.toMatchObject({ status: 502 });
+    mockedFetchWorkerWithAuth.mockResolvedValueOnce(reply);
+    await expect(uploadAudioForDiarizedTranscription(new Blob(['audio']), transport)).rejects.toMatchObject({
+      status: 502,
+    });
+  }
+});
+
+it('sends known speaker samples and keeps labels when they are refused', async () => {
+  const { uploadAudioForDiarizedTranscription, SpeakerLabelsUnavailableError } =
+    await import('./aiClientTranscriptionWorkerTransport');
+  const transport = { endpoint: 'https://worker.example/transcribe', baseUrl: 'https://worker.example' };
+  const knownSpeakers = [
+    { name: 'Person 1', sample: 'data:audio/wav;base64,UklGRgAAAABXQVZF' },
+    { name: 'Person 2', sample: 'data:audio/wav;base64,UklGRgEAAABXQVZF' },
+  ];
+  const turn = (speaker: string) => ({ speaker, start: 0, end: 1, text: 'Room question.' });
+  const reply = (body: unknown, status = 200) => ({ ok: status < 300, status, json: async () => body }) as Response;
+  const sent = () => mockedFetchWorkerWithAuth.mock.calls.map(([, init]) => init?.body as FormData);
+  mockedFetchWorkerWithAuth.mockReset();
+  mockedFetchWorkerWithAuth.mockResolvedValueOnce(reply({ text: 'Room question.', segments: [turn('Person 2')] }));
+  await expect(uploadAudioForDiarizedTranscription(new Blob(['audio']), transport, { knownSpeakers })).resolves.toEqual(
+    {
+      text: 'Room question.',
+      segments: [turn('Person 2')],
+    },
+  );
+  expect(sent()[0].getAll('known_speaker_names[]')).toEqual(['Person 1', 'Person 2']);
+  expect(sent()[0].getAll('known_speaker_references[]')).toEqual(knownSpeakers.map((speaker) => speaker.sample));
+
+  // A refusal of the samples sends the chunk again with labels but without them.
+  mockedFetchWorkerWithAuth.mockClear();
+  mockedFetchWorkerWithAuth
+    .mockResolvedValueOnce(
+      reply({ error: 'Invalid sample.', details: { error: { param: 'known_speaker_references' } } }, 400),
+    )
+    .mockResolvedValueOnce(reply({ text: 'Room question.', segments: [turn('A')] }));
+  await expect(uploadAudioForDiarizedTranscription(new Blob(['audio']), transport, { knownSpeakers })).resolves.toEqual(
+    {
+      text: 'Room question.',
+      segments: [turn('A')],
+      speakerSamplesRefused: true,
+    },
+  );
+  const [refused, retried] = sent();
+  expect(refused.getAll('known_speaker_names[]')).toHaveLength(2);
+  expect(retried.get('labelSpeakers')).toBe('true');
+  expect(retried.getAll('known_speaker_names[]')).toEqual([]);
+  expect(retried.getAll('known_speaker_references[]')).toEqual([]);
+
+  // A Worker that refuses labels altogether still ends them, as without samples.
+  mockedFetchWorkerWithAuth.mockClear();
+  mockedFetchWorkerWithAuth.mockResolvedValue(reply({ error: 'Model is not allowed' }, 403));
+  await expect(
+    uploadAudioForDiarizedTranscription(new Blob(['audio']), transport, { knownSpeakers }),
+  ).rejects.toBeInstanceOf(SpeakerLabelsUnavailableError);
+  expect(sent()).toHaveLength(2);
+  // A rejection of the audio itself is left to the caller, without a second labelled upload.
+  mockedFetchWorkerWithAuth.mockClear();
+  mockedFetchWorkerWithAuth.mockResolvedValue(reply({ error: 'Too large' }, 413));
+  await expect(
+    uploadAudioForDiarizedTranscription(new Blob(['audio']), transport, { knownSpeakers }),
+  ).rejects.toMatchObject({ chunkOnly: true });
+  expect(sent()).toHaveLength(1);
+});
+
+describe('keeping the connection in use while a transcription waits', () => {
+  const transport = { endpoint: 'https://worker.example/transcribe', baseUrl: 'https://worker.example' };
+  const originalFetch = global.fetch;
+  const keepAlive = jest.fn();
+  const answered = (body: unknown) => ({ ok: true, json: async () => body }) as Response;
+  // The upload's answer arrives only when the test says so.
+  const pendingUpload = () => {
+    let answer!: { resolve: (reply: Response) => void; reject: (error: Error) => void };
+    mockedFetchWorkerWithAuth.mockReturnValueOnce(
+      new Promise<Response>((resolve, reject) => {
+        answer = { resolve, reject };
+      }),
+    );
+    return answer;
+  };
+
+  beforeEach(() => {
+    jest.useFakeTimers();
+    mockedFetchWorkerWithAuth.mockReset();
+    keepAlive.mockReset().mockResolvedValue({ status: 200 });
+    global.fetch = keepAlive;
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+    global.fetch = originalFetch;
+  });
+
+  it.each([
+    ['text', uploadAudioForTranscription, { text: 'Said.' }, 'Said.'],
+    ['labelled', uploadAudioForDiarizedTranscription, { text: 'Said.', segments: [] }, { text: 'Said.', segments: [] }],
+  ])(
+    'sends a small uncached request every 20 seconds until a %s upload is answered',
+    async (_, upload, body, expected) => {
+      const answer = pendingUpload();
+      const result = upload(new Blob(['audio']), transport);
+      await jest.advanceTimersByTimeAsync(19_999);
+      expect(keepAlive).not.toHaveBeenCalled();
+      await jest.advanceTimersByTimeAsync(1);
+      expect(keepAlive.mock.calls).toEqual([
+        ['https://worker.example/capabilities', { cache: 'no-store', signal: expect.any(AbortSignal) }],
+      ]);
+      await jest.advanceTimersByTimeAsync(40_000);
+      expect(keepAlive).toHaveBeenCalledTimes(3);
+
+      answer.resolve(answered(body));
+      await expect(result).resolves.toEqual(expected);
+      await jest.advanceTimersByTimeAsync(60_000);
+      expect(keepAlive).toHaveBeenCalledTimes(3);
+    },
+  );
+
+  it('stops when the upload fails', async () => {
+    const answer = pendingUpload();
+    const result = uploadAudioForTranscription(new Blob(['audio']), transport);
+    await jest.advanceTimersByTimeAsync(20_000);
+    expect(keepAlive).toHaveBeenCalledTimes(1);
+
+    answer.reject(new Error('Network down'));
+    await expect(result).rejects.toThrow('Network down');
+    await jest.advanceTimersByTimeAsync(60_000);
+    expect(keepAlive).toHaveBeenCalledTimes(1);
+  });
+
+  it('stops on abort, even while the upload has not settled', async () => {
+    const controller = new AbortController();
+    pendingUpload();
+    void uploadAudioForTranscription(new Blob(['audio']), transport, { signal: controller.signal });
+    await jest.advanceTimersByTimeAsync(20_000);
+    expect(keepAlive).toHaveBeenCalledTimes(1);
+
+    controller.abort();
+    await jest.advanceTimersByTimeAsync(60_000);
+    expect(keepAlive).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps one request open at a time and ends the last when the upload is answered', async () => {
+    keepAlive.mockImplementation(() => new Promise(() => undefined));
+    const answer = pendingUpload();
+    const result = uploadAudioForTranscription(new Blob(['audio']), transport);
+    const signals = () => keepAlive.mock.calls.map(([, init]) => (init as RequestInit).signal as AbortSignal);
+    await jest.advanceTimersByTimeAsync(20_000);
+    expect(signals().map((signal) => signal.aborted)).toEqual([false]);
+    await jest.advanceTimersByTimeAsync(20_000);
+    expect(signals().map((signal) => signal.aborted)).toEqual([true, false]);
+
+    answer.resolve(answered({ text: 'Said.' }));
+    await expect(result).resolves.toBe('Said.');
+    expect(signals().map((signal) => signal.aborted)).toEqual([true, true]);
+  });
+
+  it.each([401, 404])('stops after one request when a Worker has no such route (%i)', async (status) => {
+    keepAlive.mockResolvedValue({ status });
+    pendingUpload();
+    void uploadAudioForTranscription(new Blob(['audio']), transport);
+    await jest.advanceTimersByTimeAsync(80_000);
+    expect(keepAlive).toHaveBeenCalledTimes(1);
+  });
+
+  it('carries on after a passing error from the Worker', async () => {
+    keepAlive.mockResolvedValue({ status: 503 });
+    pendingUpload();
+    void uploadAudioForTranscription(new Blob(['audio']), transport);
+    await jest.advanceTimersByTimeAsync(40_000);
+    expect(keepAlive).toHaveBeenCalledTimes(2);
+  });
+
+  it('carries on when a keep-alive request fails', async () => {
+    keepAlive.mockRejectedValue(new TypeError('Failed to fetch'));
+    const answer = pendingUpload();
+    const result = uploadAudioForTranscription(new Blob(['audio']), transport);
+    await jest.advanceTimersByTimeAsync(40_000);
+    expect(keepAlive).toHaveBeenCalledTimes(2);
+
+    answer.resolve(answered({ text: 'Said.' }));
+    await expect(result).resolves.toBe('Said.');
   });
 });

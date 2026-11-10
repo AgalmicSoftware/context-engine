@@ -57,6 +57,16 @@ describe('sbtFilterHelpers cache helpers', () => {
         otherNetValue: 'keep',
         sbtList: {
           '0xabc': {
+            schemaVersion: 2,
+            blockNumber: 10,
+            lastActivityBlock: 0,
+            pendingActivity: {},
+            coveredCounts: {
+              mintedCountByAddress: { '0x1': 1 },
+              burnedCountByAddress: {},
+              mintedEventCount: 1,
+              burnedEventCount: 0,
+            },
             name: 'Old',
             mintedAddresses: ['0x1'],
           },
@@ -72,7 +82,10 @@ describe('sbtFilterHelpers cache helpers', () => {
       netKey: 84532,
       sbtAddress: '0xabc',
       entryPatch: {
+        blockNumber: 20,
         countsLoaded: true,
+        mintedCountByAddress: { '0x2': 1 },
+        mintedEventCount: 1,
         mintedAddresses: ['0x2'],
       },
     });
@@ -83,7 +96,7 @@ describe('sbtFilterHelpers cache helpers', () => {
         sbtList: {
           '0xabc': {
             name: 'Old',
-            mintedAddresses: ['0x1', '0x2'],
+            mintedAddresses: ['0x2'],
             countsLoaded: true,
           },
           '0xdef': {
@@ -109,6 +122,15 @@ describe('sbtFilterHelpers cache helpers', () => {
         '84532': {
           sbtList: {
             '0xabc': {
+              schemaVersion: 2,
+              lastActivityBlock: 105,
+              pendingActivity: {},
+              coveredCounts: {
+                mintedCountByAddress: { '0xholder': 2 },
+                burnedCountByAddress: {},
+                mintedEventCount: 2,
+                burnedEventCount: 0,
+              },
               blockNumber: 105,
               countsLoaded: false,
               countsScanCheckpoint: { blockNumber: 110, phase: 'activity' },

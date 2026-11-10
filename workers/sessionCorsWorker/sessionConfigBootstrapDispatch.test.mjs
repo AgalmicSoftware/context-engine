@@ -185,6 +185,8 @@ test('projectPublicWorkerSessionConfig returns canonical fields and recursively 
     ai: {
       models: { fast: { provider: 'openai', model: 'gpt-5' } },
     },
+    setConfigMergesAi: true,
+    debateAtlas: true,
   });
   for (const secret of [
     'sk-never-public',
@@ -237,6 +239,8 @@ test('projectPublicWorkerSessionConfig cannot expose the non-enumerable runtime 
     slug: 'session-a',
     networkChainId: 31337,
     sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+    setConfigMergesAi: true,
+    debateAtlas: true,
   });
   assert.equal(JSON.stringify(projected).includes(secretRpcUrl), false);
 });
@@ -280,6 +284,8 @@ test('projectPublicWorkerSessionConfig keeps worker-canonical editable text meta
     BLOCKED_SURVEY_IDS: ['s2'],
     ignored_SBTs_LIST: ['0x0000000000000000000000000000000000000002'],
     featured_SBTs_LIST: ['0x0000000000000000000000000000000000000003'],
+    setConfigMergesAi: true,
+    debateAtlas: true,
   });
 });
 
@@ -308,6 +314,8 @@ test('projectPublicWorkerSessionConfig publishes only the versioned Agent Sessio
       revision: 'wrapped-revision-1',
       verifiedAt: '2026-07-20T18:00:00.000Z',
     },
+    setConfigMergesAi: true,
+    debateAtlas: true,
   });
   assert.equal(JSON.stringify(projected).includes('must-not-publish'), false);
 });
@@ -401,7 +409,7 @@ test('Cloudflare deployment-token detection covers aliases and nested Cloudflare
   );
   assert.deepEqual(
     projectPublicWorkerSessionConfig({ sessionModeProfile: { authorization: 'Bearer secret' } }),
-    { sessionModeProfile: {} },
+    { sessionModeProfile: {}, setConfigMergesAi: true, debateAtlas: true },
   );
   assert.equal(findForbiddenWorkerConfigSecretPath({ keyProvider: 'worker_secret' }), '');
   assert.equal(findForbiddenWorkerConfigSecretPath({ publicKey: 'public-id' }), '');
@@ -661,6 +669,8 @@ test('field-key capability requires the deployed KEK and audit binding, not a pe
   for (const [env, version] of [
     [{}, 0], [{ CE_STORAGE_ENVELOPE_KEK: 'test-key' }, 0],
     [{ CE_STORAGE_ENVELOPE_KEK: 'test-key', CE_STORAGE_INDEX_KV: { put: async () => {} } }, 1],
+    [{ CE_STORAGE_ENVELOPE_KEK: 'test-key', GROUP_KV: { put: async () => {} } }, 0],
+    [{ CE_STORAGE_ENVELOPE_KEK: 'test-key', GROUP_KV: { put: async () => {} }, CE_STORAGE_IN_GROUP_KV: '1' }, 1],
   ]) {
     const response = await dispatchSessionConfigBootstrapRequest({
       request: new Request('https://worker.example/session-config?slug=session-a'), env,

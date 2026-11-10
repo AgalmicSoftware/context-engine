@@ -1,4 +1,5 @@
-import { sessionSlugStorageKey } from './sessionSlugResolution.js';
+import { readAuthorizationEpoch } from './authorizationScopeFreshness.js';
+import { normalizeWorkerSessionSlug, sessionSlugStorageKey } from './sessionSlugResolution.js';
 import { getStorageIndexBinding, getStorageR2Binding } from './storageRouteExecution.js';
 import { coordinateWorkerGroupBackup } from './workerGroups.js';
 
@@ -33,6 +34,7 @@ export const clearBackupImportMetadata = async (storage, archiveId) => {
 
 export const cleanupCompletedBackupImport = async (coordinator, slug, archiveId, progress, budget) => {
   const { storage } = coordinator.state;
+  if (!progress.committedAuthority) fail('Only a committed restore can complete.');
   if (budget && budget.remaining < 32) return false;
   const groups = await coordinateWorkerGroupBackup({ env: coordinator.env, slug, sessionId: progress.manifest.sessionId,
     operation: 'finish', archiveId });
@@ -45,11 +47,17 @@ export const cleanupCompletedBackupImport = async (coordinator, slug, archiveId,
   if (!Array.isArray(staged.keys)) throw new Error('Restore cleanup storage could not be read.');
   for (const { name } of staged.keys) await index.delete(name);
   if (staged.list_complete === false || !await clearBackupImportMetadata(storage, archiveId)) return false;
+  const authority = { ...progress.committedAuthority, projectionPending: true, projectionPendingSinceMs: coordinator.now() };
   await storage.transaction(async (transaction) => {
-    await transaction.put('session-backup-import-completion', { archiveId, completedAt: coordinator.now(), counts: progress.counts });
+    await transaction.put('session-config-authority', authority);
+    await transaction.put('session-backup-import-completion', { archiveId, completedAt: coordinator.now(), counts: progress.counts,
+      actor: progress.actor, revision: authority.revision, authzEpoch: readAuthorizationEpoch(authority.config),
+      pageNumber: progress.pageNumber, pageHash: progress.pageHash });
     await transaction.delete(backupImportStateKey(archiveId));
     await transaction.delete(BACKUP_IMPORT_ACTIVE_KEY);
   });
+  await coordinator.projectSessionConfigAuthority(authority);
+  await coordinator.repairPendingSessionConfigProjection();
   return true;
 };
 
@@ -57,7 +65,7 @@ export const assertNoActiveBackupImport = async (coordinator) => {
   const { storage } = coordinator.state;
   const archiveId = await storage.get(BACKUP_IMPORT_ACTIVE_KEY);
   const progress = archiveId && await storage.get(backupImportStateKey(archiveId));
-  if (progress && !progress.finished) throw Object.assign(new Error('A backup restore is in progress. Resume or abandon it first.'),
+  if (progress) throw Object.assign(new Error('A backup restore is in progress. Resume or abandon it first.'),
     { status: 409, reason: 'backup_restore_in_progress' });
 };
 
@@ -98,31 +106,58 @@ export const readActiveBackupImport = async (coordinator, slug, cleanExpired = t
   if (!archiveId) return null;
   const progress = await storage.get(backupImportStateKey(archiveId));
   if (!progress) return null;
-  if (progress.finished) {
-    // Older versions retained completed receipts indefinitely. Reclaim them,
-    // but never let them bypass the next import's empty-target check.
-    if (await cleanupCompletedBackupImport(coordinator, slug, archiveId, progress, budget)) return null;
-    return { archiveId, progress };
+  // 0.8.0 published the restored config before its cleanup and recorded only
+  // configPublished. That config is live, so such a restore can only finish.
+  if (progress.configPublished === true && !progress.committedAuthority) {
+    progress.committedAuthority = await storage.get('session-config-authority');
+    if (!progress.committedAuthority) fail('The published restore has no session authority; nothing was deleted.');
   }
   const expired = !Number.isFinite(progress.expiresAt) || progress.expiresAt <= coordinator.now();
-  if (cleanExpired && (expired || progress.abandoning) && !progress.configPublished) {
+  if (cleanExpired && (expired || progress.abandoning) && !progress.committedAuthority) {
     if (await cleanup(coordinator, slug, archiveId, progress, budget)) return null;
   }
   return { archiveId, progress };
 };
 
+export const readCompletedBackupImport = async (coordinator, payload) => {
+  const receipt = await coordinator.state.storage.get('session-backup-import-completion');
+  if (!receipt || receipt.actor !== payload.expectedAuthority?.actor ||
+      (payload.archiveId && receipt.archiveId !== payload.archiveId) ||
+      !Number.isFinite(receipt.completedAt) || receipt.completedAt + BACKUP_IMPORT_TTL_MS <= coordinator.now()) return null;
+  const authority = await coordinator.readSessionConfigAuthority(sessionSlugStorageKey(payload.slug));
+  // This receipt only recovers the handoff result; later configuration changes
+  // end that access, and it never authorizes a new restore or other admin action.
+  if (!authority || authority.revision !== receipt.revision ||
+      readAuthorizationEpoch(authority.config) !== receipt.authzEpoch) return null;
+  await coordinator.repairPendingSessionConfigProjection();
+  const projected = await coordinator.env.GROUP_KV.get(`session:${normalizeWorkerSessionSlug(payload.slug)}:config`);
+  if (projected == null) return null;
+  return receipt;
+};
+
 export const controlCoordinatorBackupImport = async (coordinator, payload, abandon = false) => {
+  if (!abandon && await readCompletedBackupImport(coordinator, payload)) {
+    return Response.json({ ok: true, restore: null });
+  }
+  if (payload.completedOnly) return Response.json({ error: 'Admin authorization failed.' }, { status: 403 });
   await coordinator.assertSessionAuthority(payload, { allowRestore: true });
-  const active = await readActiveBackupImport(coordinator, payload.slug, !abandon);
+  let active = await readActiveBackupImport(coordinator, payload.slug, !abandon);
+  // A 0.8.0 restore already handed its config to that config's admins.
+  if (active?.progress.committedAuthority && !active.progress.configPublished &&
+      active.progress.actor !== payload.expectedAuthority.actor) {
+    fail('Only the importing admin can finish this restore.');
+  }
   if (abandon) {
-    if (!active || active.archiveId !== payload.archiveId || active.progress.configPublished) {
-      fail('Only an unfinished restore whose config has not been published can be abandoned.');
+    if (!active || active.archiveId !== payload.archiveId || active.progress.committedAuthority) {
+      fail('Only an uncommitted restore can be abandoned.');
     }
     const complete = await cleanup(coordinator, payload.slug, active.archiveId, active.progress);
     return Response.json({ ok: true, complete });
   }
+  if (active?.progress.committedAuthority &&
+      await cleanupCompletedBackupImport(coordinator, payload.slug, active.archiveId, active.progress)) active = null;
   return Response.json({ ok: true, restore: active ? {
-    archiveId: active.archiveId, inProgress: true, canAbandon: !active.progress.configPublished,
-    cleaning: active.progress.abandoning === true || active.progress.finishing === true || active.progress.finished === true, expiresAt: active.progress.expiresAt,
+    archiveId: active.archiveId, inProgress: true, canAbandon: !active.progress.committedAuthority,
+    cleaning: active.progress.abandoning === true || !!active.progress.committedAuthority, expiresAt: active.progress.expiresAt,
   } : null });
 };

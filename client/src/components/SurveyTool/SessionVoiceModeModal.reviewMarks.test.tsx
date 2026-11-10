@@ -121,7 +121,6 @@ it('continuing an interview keeps an untouched draft marked as AI-proposed', asy
 
 it('continuing an interview does not record the seeded saved comment as a human edit', async () => {
   const { onRecordProvenance } = await renderTwoRounds();
-  fireEvent.click(screen.getByRole('button', { name: 'Replace with draft' }));
   fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
   await waitFor(() => expect(onRecordProvenance).toHaveBeenCalled());
   const review = onRecordProvenance.mock.calls[0][6];
@@ -132,7 +131,6 @@ it('continuing an interview does not record the seeded saved comment as a human 
 
 it('attributes voice predictions to the configured mapping model', async () => {
   const { onRecordProvenance } = await renderTwoRounds('gpt-4o-mini');
-  fireEvent.click(screen.getByRole('button', { name: 'Replace with draft' }));
   fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
   await waitFor(() => expect(onRecordProvenance).toHaveBeenCalled());
   const review = onRecordProvenance.mock.calls[0][6];

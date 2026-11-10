@@ -14,8 +14,6 @@ describe('WorkerResourceInputs', () => {
         fields={[{ key: 'customRpcUrl', label: 'Custom RPC URL', type: 'text' }]}
         workerSecrets={{ customRpcUrl: '' }}
         workerSecretsEnabled
-        isNormalMode
-        showSponsoredFaucetNotice={false}
         effectiveDefaultWorkerRpcUrl="https://rpc.example"
         getSecretFieldTestId={buildSecretFieldTestId}
         onUpdateSecret={onUpdateSecret}
@@ -45,8 +43,6 @@ describe('WorkerResourceInputs', () => {
           litUsageApiKey: 'lit-secret',
         }}
         workerSecretsEnabled
-        isNormalMode={false}
-        showSponsoredFaucetNotice={false}
         effectiveDefaultWorkerRpcUrl=""
         getSecretFieldTestId={buildSecretFieldTestId}
         onUpdateSecret={onUpdateSecret}
@@ -72,8 +68,6 @@ describe('WorkerResourceInputs', () => {
         fields={[{ key: 'litAccountApiKey', label: 'Lit API key', type: 'password' }]}
         workerSecrets={{ litUsageApiKey: 'lit-secret', litAccountApiKey: 'account-secret' }}
         workerSecretsEnabled
-        isNormalMode={false}
-        showSponsoredFaucetNotice={false}
         effectiveDefaultWorkerRpcUrl=""
         getSecretFieldTestId={buildSecretFieldTestId}
         onUpdateSecret={() => {}}

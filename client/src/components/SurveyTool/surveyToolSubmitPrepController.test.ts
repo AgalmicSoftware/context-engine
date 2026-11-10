@@ -299,7 +299,12 @@ describe('surveyToolSubmitPrepController', () => {
     it('rejects plaintext beside an existing encryptedPortion', () => {
       const slice = makeSlice({
         answers: {
-          q1: { encrypted: true, encryptedPortion: 'abc', value: 'secret' },
+          q1: {
+            encrypted: true,
+            encryptedPortion: JSON.stringify({ recipients: [{ type: 'self-eip712-v1' }] }),
+            encryptionAudience: 'self',
+            value: 'secret',
+          },
         },
       });
 
@@ -355,7 +360,12 @@ describe('surveyToolSubmitPrepController', () => {
     it('passes for empty encrypted additional comment without encryptedPortion', () => {
       const slice = makeSlice({
         answers: {
-          q1: { encrypted: true, encryptedPortion: 'abc', value: '*' },
+          q1: {
+            encrypted: true,
+            encryptedPortion: JSON.stringify({ recipients: [{ type: 'self-eip712-v1' }] }),
+            encryptionAudience: 'self',
+            value: '*',
+          },
         },
         additionalComments: {
           q1: { encrypted: true, value: '' },
@@ -371,7 +381,12 @@ describe('surveyToolSubmitPrepController', () => {
     it('fails for non-empty encrypted additional comment without encryptedPortion', () => {
       const slice = makeSlice({
         answers: {
-          q1: { encrypted: true, encryptedPortion: 'abc', value: '*' },
+          q1: {
+            encrypted: true,
+            encryptedPortion: JSON.stringify({ recipients: [{ type: 'self-eip712-v1' }] }),
+            encryptionAudience: 'self',
+            value: '*',
+          },
         },
         additionalComments: {
           q1: { encrypted: true, value: 'notes' },
@@ -454,7 +469,7 @@ describe('remaskUnchangedEncryptedFields', () => {
   const saved = {
     value: 'private',
     encrypted: true,
-    encryptedPortion: 'saved-envelope',
+    encryptedPortion: JSON.stringify({ recipients: [{ type: 'self-eip712-v1' }] }),
     hash: 'saved-hash',
     encryptionAudience: 'self',
   };
@@ -493,8 +508,8 @@ describe('isLockedAudienceChange', () => {
     expect(isLockedAudienceChange(masked('self'))).toBe(false);
   });
 
-  it('leaves decrypted values and unreadable envelopes to the later checks', () => {
+  it('allows decrypted values but refuses an unreadable policy', () => {
     expect(isLockedAudienceChange({ ...masked('self_admin'), value: 'Decrypted text' })).toBe(false);
-    expect(isLockedAudienceChange(masked('self_admin', 'not-json'))).toBe(false);
+    expect(isLockedAudienceChange(masked('self_admin', 'not-json'))).toBe(true);
   });
 });

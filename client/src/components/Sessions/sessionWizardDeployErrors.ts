@@ -186,7 +186,7 @@ export const formatSessionWizardDeployOrphanResources = (value: unknown = {}): s
 // The sponsoring Worker refuses a grant, before using it, when no Worker
 // release is configured on it (its bundle and manifest URL variables).
 const SPONSOR_RELEASE_NOT_CONFIGURED_PATTERN =
-  /^Sponsored (?:Agents HTTP )?deploys need [A-Z0-9_]+ and [A-Z0-9_]+ on the sponsoring Worker\.?$/;
+  /^Sponsored deploys need [A-Z0-9_]+ and [A-Z0-9_]+ on the sponsoring Worker\.?$/;
 // A sponsoring Worker running code older than 0.6.8 deploys the bundle the
 // request names, else its own WORKER_BUNDLE_URL. With neither it deploys
 // nothing but keeps the grant reserved for that exact request, so only the

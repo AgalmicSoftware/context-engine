@@ -4,11 +4,12 @@ import { assertReadable } from './civic-theme-overlay-smoke.mjs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { chromium } from 'playwright';
 import { ethers } from 'ethers';
-import worker from '../workers/sessionCorsWorker/worker.js';
+import { createWorkerRuntime } from '../workers/sessionCorsWorker/worker.js';
 import { installSessionCoordinatorBinding } from '../tests/helpers/sessionCorsWorkerTestUtils.mjs';
 import { createWorkerClient } from '../mcp/lib/workerClient.mjs';
 import { buildQuestionRecord } from '../mcp/lib/records.mjs';
 import { buildPasskeyDerivedWallet, toPasskeyEoaSeedRecord } from './lib/passkey-derived-wallet.js';
+import { DEFAULT_AI_MODELS } from '../shared/aiDefaults.mjs';
 
 const baseUrl = (process.env.BASE_URL || 'http://127.0.0.1:3000').replace(/\/$/, '');
 assert(['127.0.0.1', 'localhost', '[::1]'].includes(new URL(baseUrl).hostname), 'This smoke requires a local client');
@@ -36,9 +37,10 @@ const kv = () => {
     }),
   };
 };
+// This run takes the dashboard path, so bind only the KV namespace its template declares.
 const env = installSessionCoordinatorBinding({
   GROUP_KV: kv(),
-  CE_STORAGE_INDEX_KV: kv(),
+  CE_STORAGE_IN_GROUP_KV: '1',
   BOOTSTRAP_ADMIN_ADDRESS: admin.address,
   LOGIN_TRUSTED_ORIGINS: baseUrl,
   ADMIN_TRUSTED_ORIGINS: baseUrl,
@@ -50,6 +52,24 @@ const originalFetch = globalThis.fetch;
 globalThis.fetch = async () => {
   throw new Error('Session setup smoke must not call an external service');
 };
+const aiProviderCalls = [];
+let failSponsoredAnalysis = false;
+const worker = createWorkerRuntime(env, {
+  fetch: async (url, init) => {
+    assert.equal(url, 'https://api.openai.com/v1/responses');
+    assert.equal(init.headers.authorization, 'Bearer synthetic-ai-key-not-a-credential');
+    const body = JSON.parse(init.body);
+    // Group analysis tries the new session's thinking model, then its fast model.
+    assert.ok([DEFAULT_AI_MODELS.thinking, DEFAULT_AI_MODELS.fast].includes(body.model), body.model);
+    aiProviderCalls.push({ model: body.model, failed: failSponsoredAnalysis });
+    if (failSponsoredAnalysis) return Response.json({ error: { message: 'Synthetic sponsored analysis outage' } }, { status: 503 });
+    return Response.json({ output_text: JSON.stringify({
+      name: 'Shared infrastructure', short: 'Support shared tools',
+      long: 'The sponsored model described this group from its recorded votes.',
+    }) });
+  },
+  rpcFetch: async () => assert.fail('Session setup smoke must not call an external RPC'),
+});
 const browser = await chromium.launch({
   headless: true,
   args: [`--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE ${new URL(baseUrl).hostname}`],
@@ -89,6 +109,12 @@ const fixtureContext = async ({ seed }, { workerEnv = env, failResponseUploadAt 
     const url = new URL(request.url());
     if (url.origin === new URL(baseUrl).origin) return route.continue();
     if (url.origin !== workerOrigin) return route.abort();
+    if (url.pathname === '/ai') {
+      const payload = request.postDataJSON();
+      assert.equal(payload.provider, 'openai');
+      assert.ok([DEFAULT_AI_MODELS.thinking, DEFAULT_AI_MODELS.fast].includes(payload.model), payload.model);
+      assert.equal(Object.hasOwn(payload, 'apiKey'), false, 'Polis uses the sponsored Worker key');
+    }
     const upload = url.pathname === '/storage/upload' && request.method() === 'POST'
       ? request.postDataJSON()
       : null;
@@ -203,13 +229,15 @@ try {
   page = await adminContext.newPage();
   await page.goto(`${baseUrl}/new`, { waitUntil: 'domcontentloaded' });
   await login(page, admin);
-  await page.getByTestId('ce-new-preset-fast_cheap_cloudflare').click();
   await page.getByTestId('ce-wizard-session-name').fill('Setup smoke session');
   await page.getByTestId('ce-wizard-session-info').fill('Synthetic publication and participant fixture.');
-  await page.getByTestId('ce-wizard-customize').click();
-  const key = page.getByTestId('ce-wizard-secret-openai-key');
-  if (!(await key.isVisible())) await page.getByTestId('ce-wizard-worker-panel-toggle').click();
-  await key.fill('synthetic-ai-key-not-a-credential');
+  await page.getByTestId('ce-wizard-secret-openai-key').fill('synthetic-ai-key-not-a-credential');
+  // New sessions start public and unencrypted; this run proves the encrypted path.
+  await page.getByTestId('ce-setup-more-access').click();
+  const encryption = page.getByTestId('ce-setup-encryption');
+  assert.equal(await encryption.inputValue(), 'none', 'A new session starts unencrypted');
+  await encryption.selectOption('worker_envelope');
+  await page.getByTestId('ce-setup-more-hosting').click();
   await page.getByRole('checkbox', { name: 'Agents (HTTP API)', exact: true }).check();
   await page
     .locator('label')
@@ -224,9 +252,9 @@ try {
     .first()
     .waitFor({ timeout: 30000 });
   console.log('Session Worker attachment verified through signed real Worker requests.');
-  await page.locator('#session-wizard-section-publish').getByRole('button', { name: 'Publish', exact: true }).click();
-  await page.getByTestId('ce-wizard-publish').click();
-  await page.getByText('Session Created', { exact: true }).waitFor({ timeout: 30000 });
+  const create = page.getByTestId('ce-wizard-publish');
+  await create.click();
+  await create.filter({ hasText: 'Session created' }).waitFor({ timeout: 30000 });
   console.log('Wizard publication completed.');
   const sessionLink = await page.locator('a[href*="/session/"][href*="worker="]').first().getAttribute('href');
   assert(sessionLink, 'Publication returns a portable session link');
@@ -281,10 +309,12 @@ try {
     assert.equal(response.status, 200, await response.clone().text());
     return response.json();
   };
-  const beforeStatements = new Map(env.GROUP_KV.values);
+  // Reading an encrypted question records its key release, which isn't a statement.
+  const statementRows = () => new Map([...env.GROUP_KV.values].filter(([key]) => !key.startsWith('ce-storage-audit:')));
+  const beforeStatements = statementRows();
   const wrapped = await wrappedRequest('/api/agent/agent-only/statements');
   assert.equal(Object.hasOwn(wrapped, 'window_id'), false);
-  assert.deepEqual(env.GROUP_KV.values, beforeStatements, 'Wrapped reads must not write shared statements');
+  assert.deepEqual(statementRows(), beforeStatements, 'Wrapped reads must not write shared statements');
   const statement = wrapped.statements.find(row => row.statement_id === question.id);
   assert.equal(statement.text, question.record.prompt);
   const answersBeforeWrapped = await adminClient.listAll('responses', { mine: true });
@@ -327,6 +357,22 @@ try {
     .getByTestId('ce-polis-all-questions')
     .getByText(/^Agree: 1\s*\/\s*Unsure: 0\s*\/\s*Disagree: 0\s*\/\s*Responses: 1$/)
     .waitFor();
+  const showReportSettings = page.getByRole('button', { name: 'Show report settings', exact: true });
+  if (await showReportSettings.isVisible()) await showReportSettings.click();
+  await page.getByRole('combobox').filter({ has: page.locator('option[value="POLIS"]') }).selectOption('POLIS');
+  const analyze = page.getByTestId('ce-polis-analyze-clusters');
+  failSponsoredAnalysis = true;
+  await analyze.click();
+  await page.getByText(/Couldn’t analyze this cluster: Synthetic sponsored analysis outage/).waitFor();
+  assert.ok(aiProviderCalls.length >= 2, 'Both thinking and fast attempts reached the sponsored Worker provider');
+  assert.ok(aiProviderCalls.every((call) => call.failed));
+  failSponsoredAnalysis = false;
+  await analyze.click();
+  await page.getByText('Cluster 0: Shared infrastructure', { exact: true }).waitFor();
+  await page.getByText('The sponsored model described this group from its recorded votes.', { exact: true }).waitFor();
+  assert.equal(aiProviderCalls.at(-1).failed, false);
+  assert.equal(await page.getByText(/Couldn’t analyze this cluster/).count(), 0);
+  console.log('Polis group analysis used the sponsored Worker key and recovered from a provider failure.');
   const makeClient = (wallet) =>
     createWorkerClient({
       workerOrigin,
@@ -361,7 +407,7 @@ try {
   });
   assert.equal(anonymous.status, 403, 'Anonymous access to the private response is denied');
   assert.equal(
-    [...env.CE_STORAGE_INDEX_KV.values.values()].some((value) => String(value).includes(question.record.prompt)),
+    [...env.GROUP_KV.values].some(([key, value]) => key.startsWith('ce-storage') && String(value).includes(question.record.prompt)),
     false,
     'The stored encrypted payloads do not contain the question plaintext',
   );
@@ -565,7 +611,7 @@ try {
   await page.getByRole('alert').filter({ hasText: 'Restore requires an empty target session' }).waitFor();
   const sourceAdminPage = page;
   const restoreEnv = installSessionCoordinatorBinding({
-    GROUP_KV: kv(), CE_STORAGE_INDEX_KV: kv(), DEFAULT_SESSION_SLUG: slug,
+    GROUP_KV: kv(), CE_STORAGE_IN_GROUP_KV: '1', DEFAULT_SESSION_SLUG: slug,
     BOOTSTRAP_ADMIN_ADDRESS: admin.address, LOGIN_TRUSTED_ORIGINS: baseUrl, ADMIN_TRUSTED_ORIGINS: baseUrl,
     TOKEN_HMAC_SECRET: 'synthetic-fresh-restore-token-key', CE_STORAGE_ENVELOPE_KEK: env.CE_STORAGE_ENVELOPE_KEK,
   });
@@ -579,8 +625,8 @@ try {
   await page.getByLabel('Adopt the backup session ID on a fresh deployment').check();
   await page.getByTestId('ce-admin-backup-restore').click();
   await page.getByRole('status').filter({ hasText: 'Restore complete.' }).waitFor({ timeout: 120000 });
-  assert.deepEqual([...restoreEnv.CE_STORAGE_INDEX_KV.values].filter(([key]) => key.startsWith(`ce-storage:${slug}:`)).sort(),
-    [...env.CE_STORAGE_INDEX_KV.values].filter(([key]) => key.startsWith(`ce-storage:${slug}:`)).sort(), 'Fresh restore preserves every metadata record');
+  assert.deepEqual([...restoreEnv.GROUP_KV.values].filter(([key]) => key.startsWith(`ce-storage:${slug}:`)).sort(),
+    [...env.GROUP_KV.values].filter(([key]) => key.startsWith(`ce-storage:${slug}:`)).sort(), 'Fresh restore preserves every metadata record');
   assert.equal([...restoreEnv.GROUP_KV.values.keys()].some(key => key.startsWith(`ce-agent:${adminClient.sessionId}:`)), false);
   const restoredAgentCaps = await (await worker.fetch(new Request(`${workerOrigin}/capabilities?slug=${slug}`), restoreEnv)).json();
   assert.equal(restoredAgentCaps.agentHttp.ready, false, 'Restored session needs fresh agent resources and credentials');
@@ -704,6 +750,7 @@ try {
           'fresh-context answer submission',
           'reload persistence',
           'participant Results UI',
+          'Polis sponsored group analysis, visible provider failure and successful retry without a personal key',
           'author and admin readback',
           'other-participant and anonymous denial',
           'encrypted storage',
@@ -720,6 +767,7 @@ try {
         ],
         securityPolicyViolations: securityPolicyRuns.flat(),
         walletWorkerUrls: [...walletWorkerUrls],
+        aiProviderCalls,
         responseUploads,
         lostReplyUploads,
         reloadRecoveryUploads,

@@ -1,3 +1,4 @@
+import { responseEnvelopeFixture } from '../../testUtils/responseEnvelopeFixture';
 import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import { renderSurveyPileViewMode } from './surveyQuestionsTestHarness';
 import { createPileViewRuntimeStrategy } from './SurveyPileViewMode';
@@ -134,16 +135,10 @@ const fixture = async () => {
   jest.spyOn(contractScriptsModule, 'getSessionConfigBySlug').mockReturnValue(CONFIG);
   jest.spyOn(cryptoUtils, 'getProviderKind').mockReturnValue('browser');
   const encrypt = (value, audience = 'self') => {
-    const envelope = JSON.stringify({
-      v: 1,
-      ciphertext: `cipher-${envelopes.size}`,
-      recipients: [
-        { type: 'self-eip712-v1' },
-        ...(audience === 'self_admin'
-          ? [{ type: 'worker-response-field-v1', policy: { audience: 'self_admin' } }]
-          : []),
-      ],
-    });
+    const envelope = responseEnvelopeFixture(`cipher-${envelopes.size}`, [
+      { type: 'self-eip712-v1' },
+      ...(audience === 'self_admin' ? [{ type: 'worker-response-field-v1', policy: { audience: 'self_admin' } }] : []),
+    ]);
     envelopes.set(envelope, { value, audience });
     return envelope;
   };
@@ -382,6 +377,8 @@ it.each(['answers', 'additionalComments'])(
 
 it('keeps an unsubmitted blank lock when interview Apply runs its own-answer merge', async () => {
   const h = await setup();
+  // The draft is for a question without a saved answer, so the interview offers it.
+  const OPEN_QID = QUESTION_IDS[1];
   await lockBlank(h, 'answers');
   await act(async () =>
     h.engine().setState({
@@ -393,19 +390,17 @@ it('keeps an unsubmitted blank lock when interview Apply runs its own-answer mer
         questionSetHash: 'a'.repeat(64),
         promptVersion: 'ce-interview-brief-v5',
         source: { platform: 'claude', modelId: 'example-model', verification: 'self_reported' },
-        responses: [{ questionId: QID, answer: 'Reviewed answer', confidence: 0.8 }],
+        responses: [{ questionId: OPEN_QID, answer: 'Reviewed answer', confidence: 0.8 }],
       },
     }),
   );
   await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
   await waitFor(() => expect(ownCalls(h).length).toBeGreaterThan(0));
-  const replace = await screen.findByText(/Replace with draft|Restore draft/);
-  fireEvent.click(replace);
   const before = ownCalls(h).length;
   await act(async () => fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY)));
   await waitFor(() => expect(h.submitResponses).toHaveBeenCalledTimes(1));
   expect(ownCalls(h).length).toBeGreaterThan(before);
-  expect(h.submitResponses.mock.calls[0][1]).toEqual([QID]);
+  expect(h.submitResponses.mock.calls[0][1]).toEqual([OPEN_QID]);
   expect(slice(h).answers[BLANK_QID]).toMatchObject({ encrypted: true, encryptionAudience: 'self' });
 });
 

@@ -1,12 +1,14 @@
 import {
   E2E_TESTIDS,
   fireEvent,
+  getGateCreateSbtButton,
   mockPendingSbtAddress,
   renderLoggedInSessionWizard,
   renderSessionWizard,
   resetSessionWizardWorkerPanelTestState,
   screen,
   selectNormalModeCard,
+  selectRegistryHosting,
   waitFor,
 } from './SessionWizard.workerPanel.testUtils';
 import { clearSessionWizardPendingSbtDraftsCache } from './hooks/usePendingSbtDrafts';
@@ -18,9 +20,10 @@ describe('SessionWizard pending SBT tab-memory rendering', () => {
     renderLoggedInSessionWizard();
 
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+    selectRegistryHosting();
     selectNormalModeCard('Privacy');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Create Group' }));
+    fireEvent.click(getGateCreateSbtButton());
     fireEvent.click(await screen.findByRole('button', { name: 'Save pending SBT' }));
 
     await waitFor(() => {
@@ -55,8 +58,10 @@ describe('SessionWizard pending SBT tab-memory rendering', () => {
     renderSessionWizard();
 
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+    selectRegistryHosting();
     selectNormalModeCard('Privacy');
 
+    expect(getGateCreateSbtButton()).toBeInTheDocument();
     expect(screen.queryByText('Cached Pending SBT')).not.toBeInTheDocument();
     expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_PENDING_SBT)).not.toBeInTheDocument();
   });
@@ -65,9 +70,10 @@ describe('SessionWizard pending SBT tab-memory rendering', () => {
     const firstRender = renderLoggedInSessionWizard();
 
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+    selectRegistryHosting();
     selectNormalModeCard('Privacy');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Create Group' }));
+    fireEvent.click(getGateCreateSbtButton());
     fireEvent.click(await screen.findByRole('button', { name: 'Save pending SBT' }));
 
     expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_PENDING_SBT)).toBeInTheDocument();
@@ -83,6 +89,7 @@ describe('SessionWizard pending SBT tab-memory rendering', () => {
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
     selectNormalModeCard('Privacy');
 
+    expect(getGateCreateSbtButton()).toBeInTheDocument();
     expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_PENDING_SBT)).not.toBeInTheDocument();
     expect(sessionStorage.getItem('ce:sessionWizardPendingSbtDrafts:v1')).toBeNull();
   });

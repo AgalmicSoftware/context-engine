@@ -149,6 +149,7 @@ export type {
   ResolveCreateSbtCollapseHeaderDisplayStateArgs,
 } from './createSbtGroupDisplayHelpers';
 export {
+  assertCreateSbtAccountUnchanged,
   buildCreateSbtAccountDistributionSyncPatch,
   buildCreateSbtAccountDistributionSyncStatePatch,
   buildCreateSbtBooleanTogglePatch,

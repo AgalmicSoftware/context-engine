@@ -12,7 +12,8 @@ import { createLogger } from '../logging.js';
 
 const sbtLog = createLogger('sbt');
 
-export const fetchImageFromURL = async (imageUrl: string): Promise<File> => {
+export const fetchImageFromURL = async (imageUrl: string, { signal }: { signal?: AbortSignal } = {}): Promise<File> => {
+  signal?.throwIfAborted();
   if (!imageUrl || imageUrl.trim() === '') {
     sbtLog.error('No URL provided for image.');
     throw new Error('No URL provided');
@@ -22,11 +23,13 @@ export const fetchImageFromURL = async (imageUrl: string): Promise<File> => {
     const corsWorkerUrl = await getCorsProxyUrlOrThrow({
       allowDemoFallback: defaultStrictAllowDemoFallback(),
     });
+    signal?.throwIfAborted();
     const baseUrl = corsWorkerUrl.replace(/\/+$/, '');
     const response = await fetchWorkerWithAuth(
       corsWorkerUrl,
       {
         method: 'POST',
+        signal,
         headers: {
           'Content-Type': 'application/json',
         },

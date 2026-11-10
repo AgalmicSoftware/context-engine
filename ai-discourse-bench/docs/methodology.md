@@ -97,7 +97,9 @@ questions can never exceed the budget (`3` votes at the default 100-credit,
 must match when artifacts are merged. To prevent a fixed 200- or 500-question
 listing from favoring early items, every model and repeat receives a
 deterministic hash-shuffled question order. The order method and exact order
-hash are recorded with the artifact and run.
+hash are recorded with the artifact and run. The combined prompt hash uses
+model-id order and numeric repeat order, independent of roster order; generation
+and release validation use the same canonical rows.
 
 At those defaults this is a capped top-ten rating task: at most ten ratings of
 three cost 90 credits, so the 100-credit budget never binds a schema-valid
@@ -145,7 +147,12 @@ engine and runtime version, source URL, license, system prompt id, and as-of
 date. Response metadata separately records observed resolved provider/model,
 endpoint, system fingerprint, and structured-output mode. `auto` structured
 output falls back from JSON Schema only for endpoint capability errors and
-records the downgrade.
+records the downgrade. Importance resume reuses a saved row only when its
+recorded endpoint matches the current provider endpoint. Both runners and
+importance release validation reject mixed deployment identities, including
+endpoint changes within a model. The request timeout covers headers and the full
+success/error body, including any structured-output fallback attempt. Expiry
+cancels the active stream and returns the retryable `AIDB_REQUEST_TIMEOUT` error.
 
 Each release manifest model is matched against the model roster selected for
 the report, including effective provider and generation settings. This prevents

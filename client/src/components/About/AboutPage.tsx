@@ -13,19 +13,17 @@ import {
 import { buildPublicRoute } from '../MainSite/urlUtils.js';
 import {
   getAboutDemoSessionPath,
-  getConfiguredRecognitionIndividuals,
   getRecognitionFallback,
   getRecognitionSlug,
   PracticeVisual,
   PRACTICE_ENTRIES,
   RECOGNITION_GROUPS,
-  RECOGNIZED_INDIVIDUALS,
   ROADMAP_SECTIONS,
   USE_CASES,
   type RecognitionGroup,
 } from './AboutPageContent';
 
-export { getAboutDemoSessionPath, getConfiguredRecognitionIndividuals } from './AboutPageContent';
+export { getAboutDemoSessionPath } from './AboutPageContent';
 
 const ABOUT_DEMO_VIDEO_MEDIA_URL = buildPublicRoute('/about-demo.mp4');
 
@@ -46,8 +44,6 @@ const AboutPage = () => {
   const useCaseDetailRef = useRef<HTMLElement | null>(null);
   const mobileDemoVideoRef = useRef<HTMLVideoElement | null>(null);
   const activeUseCaseConfig = USE_CASES.find(({ slug }) => slug === activeUseCase) || null;
-  const configuredRecognitionIndividuals = getConfiguredRecognitionIndividuals(RECOGNIZED_INDIVIDUALS);
-  const hasRecognizedIndividuals = configuredRecognitionIndividuals.length > 0;
 
   useEffect(() => {
     const updateUsesJump = () => {
@@ -407,8 +403,17 @@ const AboutPage = () => {
                 <li className={styles.featureItem}>
                   <span className={styles.featureLabel}>Access Control:</span>
                   <span className={styles.featureText}>
-                    Uses <Link to="/groups">SBT groups</Link> for gated participation, gated content, and sponsored
-                    resources like RPC, AI, transaction costs, Arweave storage, and Lit encryption.
+                    Uses Worker Groups on the Cloudflare Worker, or on-chain{' '}
+                    <Link to="/groups">Soulbound Token groups</Link>, for gated participation and gated content.
+                    Soulbound Token groups can also unlock sponsored resources like RPC, AI, transaction costs, Arweave
+                    storage, and Lit encryption.
+                  </span>
+                </li>
+                <li className={styles.featureItem}>
+                  <span className={styles.featureLabel}>Encryption:</span>
+                  <span className={styles.featureText}>
+                    Can encrypt responses and documents with Worker encryption on the Cloudflare Worker, or with Lit in
+                    on-chain sessions, where a Soulbound Token check releases the key.
                   </span>
                 </li>
                 <li className={styles.featureItem}>
@@ -482,7 +487,7 @@ const AboutPage = () => {
                   <div className={styles.relatedCardHeading}>
                     <span className={styles.relatedPill}>eval</span>
                     <h3 className={styles.featureLabel}>
-                      <Link to="/posts/agent-village-wrapped">The Agent Mirror Test</Link>
+                      <Link to="/posts/agent-village-wrapped-2026">The Agent Mirror Test</Link>
                     </h3>
                   </div>
                   <p className={styles.featureText}>
@@ -493,21 +498,30 @@ const AboutPage = () => {
                 <li className={styles.featureItem}>
                   <div className={styles.relatedCardHeading}>
                     <span className={styles.relatedPill}>eval</span>
-                    <h3 className={styles.featureLabel}>
-                      <a
-                        href="https://app.primeintellect.ai/dashboard/environments"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        CommonGround · Prime Intellect
-                      </a>
-                    </h3>
+                    <h3 className={styles.featureLabel}>CommonGround · Prime Intellect</h3>
                   </div>
                   <p className={styles.featureText}>
                     Context Engine exports deliberation data for CommonGround, an evaluation environment designed for
                     Prime Intellect’s tooling. Models predict held-out participant responses and receive deterministic
                     scores. This work connects a company’s stakeholder feedback to tests of how well its AI represents
                     those preferences.
+                  </p>
+                  <p className={styles.featureText}>
+                    <a
+                      href="https://app.primeintellect.ai/dashboard/environments/charliethompson/commonground-predict"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      CommonGround Predict
+                    </a>
+                    {' · '}
+                    <a
+                      href="https://app.primeintellect.ai/dashboard/environments/charliethompson/commonground-elicit"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      CommonGround Elicit
+                    </a>
                   </p>
                 </li>
                 <li className={styles.featureItem}>
@@ -554,7 +568,12 @@ const AboutPage = () => {
                     {RECOGNITION_GROUPS.map((group) => (
                       <span className={styles.practiceVisual} key={group.name}>
                         {group.logo ? (
-                          <img src={group.logo} alt="" loading="lazy" />
+                          <img
+                            src={group.logo}
+                            alt=""
+                            loading="lazy"
+                            className={group.logoClassName ? styles[group.logoClassName] : undefined}
+                          />
                         ) : (
                           getRecognitionFallback(group.name)
                         )}
@@ -572,7 +591,7 @@ const AboutPage = () => {
                 <h3 className={styles.recognitionSubheading} id="ce-about-used-by-heading">
                   Recognized &amp; Used By
                 </h3>
-                <ul className={styles.featureList}>
+                <ul className={`${styles.featureList} ${styles.practiceGrid}`}>
                   {PRACTICE_ENTRIES.map((entry) => (
                     <li className={`${styles.featureItem} ${styles.practiceCard}`} key={entry.id}>
                       <div className={styles.practiceCardHeading}>
@@ -588,6 +607,13 @@ const AboutPage = () => {
                         </h4>
                       </div>
                       <p className={styles.featureText}>{entry.description}</p>
+                      {entry.links?.map((link) => (
+                        <p className={styles.featureText} key={link.url}>
+                          <a href={link.url} target="_blank" rel="noopener noreferrer">
+                            {link.text}
+                          </a>
+                        </p>
+                      ))}
                     </li>
                   ))}
                 </ul>
@@ -630,22 +656,6 @@ const AboutPage = () => {
                       );
                     })}
                   </div>
-
-                  {hasRecognizedIndividuals && (
-                    <div className={styles.recognitionIndividuals} data-testid="ce-about-recognition-individuals">
-                      {configuredRecognitionIndividuals.map((person) => (
-                        <span key={person.name} className={styles.recognitionIndividual}>
-                          {person.url ? (
-                            <a href={person.url} target="_blank" rel="noopener noreferrer">
-                              {person.name}
-                            </a>
-                          ) : (
-                            person.name
-                          )}
-                        </span>
-                      ))}
-                    </div>
-                  )}
                 </div>
               </section>
             </div>

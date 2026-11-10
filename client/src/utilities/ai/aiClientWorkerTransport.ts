@@ -1,4 +1,9 @@
-import { isChatReasoningModel, usesOpenAiResponsesApi } from './aiClientPhotoSupport';
+import {
+  fitReasoningEffort,
+  isOpenAiReasoningModel,
+  takesReasoningEffort,
+  usesOpenAiResponsesApi,
+} from '../../../../shared/aiModelFamily.mjs';
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -45,24 +50,40 @@ export const buildAiWorkerRequestPlan = ({
   const opts = asRecord(optsInput);
   const provider = ai.provider;
   const model = ai.model;
-  const usesResponsesApi = usesOpenAiResponsesApi(provider, model);
-  const usesCompletionTokens = !usesResponsesApi && isChatReasoningModel(model);
+  const usesResponsesApi = usesOpenAiResponsesApi({ provider, model });
+  const usesCompletionTokens = !usesResponsesApi && isOpenAiReasoningModel(model);
   const messages = Array.isArray(opts.messages) ? opts.messages : [{ role: 'user', content: prompt }];
-  const maxTokens = opts.max_tokens ?? opts.maxTokens ?? (provider === 'anthropic' ? 32568 : 16384);
+  // Claude counts its thinking toward max_tokens, so it gets the larger default.
+  const maxTokens = opts.max_tokens ?? opts.maxTokens ?? (provider === 'anthropic' ? 32768 : 16384);
   const maxOutputTokens = opts.max_output_tokens ?? (usesResponsesApi ? maxTokens : undefined);
   const maxCompletionTokens = opts.max_completion_tokens ?? (usesCompletionTokens ? maxTokens : undefined);
+  // A JSON schema goes only to OpenAI and Claude; other providers rely on the prompt's description.
+  // The Responses API takes the schema's fields at the top of the format, and released
+  // Workers pass the format to it unchanged, so the client sends that flat form itself.
+  const format = asRecord(opts.response_format);
+  const jsonSchema = asRecord(format.json_schema);
+  const responseFormat =
+    format.type !== 'json_schema'
+      ? opts.response_format
+      : provider !== 'openai' && provider !== 'anthropic'
+        ? null
+        : usesResponsesApi && Object.keys(jsonSchema).length
+          ? { type: 'json_schema', ...jsonSchema }
+          : opts.response_format;
 
   const requestBody: UnknownRecord = {
     action: 'ai',
     ...(taskType ? { taskType } : {}),
     provider,
-    model,
+    // A session that names no model lets its Worker pick its own fallback.
+    ...(ai.requestModel === '' ? {} : { model }),
     ...(usesResponsesApi ? { endpoint: 'responses' } : {}),
     ...maybeNumberProp('max_output_tokens', maxOutputTokens),
     ...maybeNumberProp('max_completion_tokens', maxCompletionTokens),
     ...(!usesResponsesApi && !usesCompletionTokens && typeof maxTokens === 'number' ? { max_tokens: maxTokens } : {}),
-    ...(opts.response_format ? { response_format: opts.response_format } : {}),
-    ...(!usesResponsesApi && !usesCompletionTokens
+    ...(responseFormat ? { response_format: responseFormat } : {}),
+    // Current Claude models refuse temperature, and the Worker sends them none.
+    ...(!usesResponsesApi && !usesCompletionTokens && provider !== 'anthropic'
       ? typeof opts.temperature === 'number'
         ? { temperature: opts.temperature }
         : { temperature: 0.7 }
@@ -83,9 +104,8 @@ export const buildAiWorkerRequestPlan = ({
     ai.reasoning_effort ||
     ai.reasoningEffort ||
     'medium';
-  const modelLeaf = asString(model).toLowerCase().split('/').pop();
-  if (modelLeaf && /^(gpt-5|gpt-6-astra(?:$|-)|o[13])/.test(modelLeaf)) {
-    requestBody.reasoning_effort = reasoningEffort;
+  if (takesReasoningEffort(model)) {
+    requestBody.reasoning_effort = fitReasoningEffort(model, reasoningEffort);
   }
 
   const useLocalOverride = ai.apiKeySource === 'local';

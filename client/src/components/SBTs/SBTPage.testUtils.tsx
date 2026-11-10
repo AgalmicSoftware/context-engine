@@ -1,5 +1,6 @@
 // Shared harness for SBTPage coverage.
 import SBTPage from './SBTPage';
+import * as sessionConfig from '../../domains/sessions/sessionConfig';
 import { ethers } from 'ethers';
 import contractScripts from '../../utilities/web3/chainGateway.js';
 import * as contractScriptsModule from '../../utilities/web3/chainGateway.js';
@@ -147,6 +148,7 @@ export const createReadCachePayload = ({
 
 export const setupSBTPageTestLifecycle = () => {
   beforeEach(() => {
+    jest.spyOn(sessionConfig, 'getSessionChainId').mockReturnValue(84532);
     jest.clearAllMocks();
     localStorage.clear();
     window.sessionStorage.clear();

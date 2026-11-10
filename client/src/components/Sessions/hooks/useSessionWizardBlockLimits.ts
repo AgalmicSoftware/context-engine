@@ -16,6 +16,7 @@ type DraftWithBlockLimits = {
   blockLimits?: {
     start?: unknown;
     end?: unknown;
+    startDefault?: { chainId: number; blockNumber: number };
   } | null;
 };
 
@@ -56,7 +57,15 @@ const useSessionWizardBlockLimits = <TDraft extends DraftWithBlockLimits>({
   updateDraftValueRef,
   readLatestBlockNumber = readLatestBlockNumberWithEthers,
 }: UseSessionWizardBlockLimitsOptions<TDraft>) => {
-  const [latestChainBlock, setLatestChainBlock] = useState<number | null>(null);
+  const chainId = Number(registryChainId || 0) || 0;
+  const [latestBlockRecord, setLatestBlockRecord] = useState<{ chainId: number; blockNumber: number } | null>(null);
+  const latestChainBlock = latestBlockRecord?.chainId === chainId ? latestBlockRecord.blockNumber : null;
+  const setLatestChainBlock = useCallback(
+    (blockNumber: number | null) => {
+      setLatestBlockRecord(blockNumber === null ? null : { chainId, blockNumber });
+    },
+    [chainId],
+  );
   const [latestBlockStatus, setLatestBlockStatus] = useState('');
   const [blockLimitDuration, setBlockLimitDuration] = useState('');
   const [blockLimitUnit, setBlockLimitUnit] = useState('hours');
@@ -100,24 +109,30 @@ const useSessionWizardBlockLimits = <TDraft extends DraftWithBlockLimits>({
     return () => {
       alive = false;
     };
-  }, [enabled, readLatestBlockNumber, registryChainId]);
+  }, [enabled, readLatestBlockNumber, registryChainId, setLatestChainBlock]);
 
   useEffect(() => {
     if (!enabled) return;
     if (!latestChainBlock) return;
     if (blockStartManualRef.current) return;
     setDraft((prev) => {
+      const start = prev.blockLimits?.start;
+      const startDefault = prev.blockLimits?.startDefault;
+      const unset = start == null || start === '';
+      // Older drafts have no provenance and are explicit. A saved default may
+      // follow a chain change only while its value still matches that default.
+      const followsChain =
+        startDefault && Number(start) === startDefault.blockNumber && startDefault.chainId !== chainId;
+      if (!unset && !followsChain) return prev;
       const next = deepClone(prev) as DraftWithBlockLimits;
       if (!next.blockLimits || typeof next.blockLimits !== 'object') {
         next.blockLimits = {};
       }
-      const currentStart = Number(next.blockLimits.start);
-      if (!Number.isFinite(currentStart) || currentStart !== latestChainBlock) {
-        next.blockLimits.start = latestChainBlock;
-      }
+      next.blockLimits.start = latestChainBlock;
+      next.blockLimits.startDefault = { chainId, blockNumber: latestChainBlock };
       return next as TDraft;
     });
-  }, [enabled, latestChainBlock, setDraft]);
+  }, [chainId, enabled, latestChainBlock, setDraft]);
 
   useEffect(() => {
     if (!enabled) {
@@ -158,7 +173,13 @@ const useSessionWizardBlockLimits = <TDraft extends DraftWithBlockLimits>({
 
   const markBlockStartManual = useCallback(() => {
     blockStartManualRef.current = true;
-  }, []);
+    setDraft((prev) => {
+      if (!prev.blockLimits?.startDefault) return prev;
+      const next = deepClone(prev);
+      delete next.blockLimits!.startDefault;
+      return next;
+    });
+  }, [setDraft]);
 
   return {
     latestChainBlock,

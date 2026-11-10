@@ -33,6 +33,24 @@ const fixture = (disconnected = false) => {
   });
 };
 
+// Inspect the resolved colors so unrelated modal styles cannot silently turn
+// a light-surface heading white while source-level CSS assertions still pass.
+const renderedTextContrast = (element) => {
+  const parse = (rgb) => rgb.match(/[\d.]+/g).map(Number);
+  let surface = element;
+  while (surface && parse(getComputedStyle(surface).backgroundColor)[3] === 0) surface = surface.parentElement;
+  const background = parse(getComputedStyle(surface).backgroundColor);
+  const foreground = parse(getComputedStyle(element).color);
+  const alpha = foreground[3] ?? 1;
+  const text = foreground.slice(0, 3).map((value, index) => value * alpha + background[index] * (1 - alpha));
+  const luminance = (rgb) => rgb.slice(0, 3).map((value) => {
+    const srgb = value / 255;
+    return srgb <= 0.04045 ? srgb / 12.92 : ((srgb + 0.055) / 1.055) ** 2.4;
+  }).reduce((sum, value, index) => sum + value * [0.2126, 0.7152, 0.0722][index], 0);
+  const levels = [luminance(text), luminance(background)].sort((a, b) => b - a);
+  return (levels[0] + 0.05) / (levels[1] + 0.05);
+};
+
 const report = args.report ? JSON.parse(await readFile(path.resolve(args.report), 'utf8')) : fixture();
 const reportPath = path.join(outDir, 'report.html');
 await writeFile(reportPath, renderHtmlReport(report));
@@ -45,7 +63,7 @@ try {
   // Font downloads are not needed for functional checks; do not depend on a
   // remote CDN becoming available before an offline artifact can be inspected.
   await page.route('https://**/*', (route) => route.abort());
-  for (const [name, width, height] of [['desktop', 1280, 900], ['mobile', 390, 844], ['narrow-mobile', 320, 800]]) {
+  for (const [name, width, height] of [['desktop', 1280, 900], ['tablet', 653, 853], ['mobile', 390, 844], ['narrow-mobile', 320, 800]]) {
     await page.setViewportSize({ width, height });
     await page.goto(pathToFileURL(reportPath).href, { waitUntil: 'load' });
     const row = page.locator('#all-questions .questionListItem').first();
@@ -92,7 +110,42 @@ try {
     assert.equal(await tooltip.isVisible(), true);
     assert.match(await tooltip.textContent(), /Agree:.*Unsure:.*Disagree:/);
     await page.screenshot({ path: path.join(outDir, `${name}-beeswarm-hover.png`) });
+    await page.locator('[data-ce-report-view-mode="breakdown"]').click();
+    const questionSelect = page.getByTestId('ce-breakdown-question-select');
+    const options = await questionSelect.locator('option').evaluateAll((items) => items.map((option) => ({ value: option.value, text: option.textContent })));
+    for (const option of [options[options.length - 1], options[0]]) {
+      await questionSelect.selectOption(option.value);
+      assert.equal(await page.getByTestId('demo-analysis-selected-question').innerText(), option.text);
+    }
+    await questionSelect.focus();
+    const selectorBounds = await questionSelect.boundingBox();
+    const panelBounds = await questionSelect.locator('..').boundingBox();
+    assert.ok(selectorBounds && panelBounds && selectorBounds.x >= panelBounds.x && selectorBounds.x + selectorBounds.width <= Math.min(width, panelBounds.x + panelBounds.width), `${name}: question selector fits its panel and viewport`);
+    await page.screenshot({ path: path.join(outDir, `${name}-breakdown-selector.png`) });
+    await page.locator('[data-ce-open-raw-results]').click();
+    const raw = page.locator('#snapshot-json');
+    const rawGeometry = await raw.locator('.modalTitle').evaluate((title) => {
+      const box = title.getBoundingClientRect();
+      const header = title.closest('.modalHeader').getBoundingClientRect();
+      const range = document.createRange(); range.selectNodeContents(title);
+      const lines = [...range.getClientRects()];
+      return { width: box.width, headerWidth: header.width, lines: lines.length,
+        fits: lines.every((line) => line.left >= box.left - 1 && line.right <= box.right + 1) };
+    });
+    assert(rawGeometry.fits && rawGeometry.lines <= 2, `${name}: raw Results title wraps within two complete lines: ${JSON.stringify(rawGeometry)}`);
+    assert(await raw.locator('.modalTitle').evaluate(renderedTextContrast) >= 4.5, `${name}: raw Results heading remains readable on its surface`);
+    await raw.getByRole('button', { name: 'Export Data', exact: true }).click();
+    const download = raw.getByRole('button', { name: 'Download Snapshot JSON', exact: true });
+    for (const state of ['default', 'hover', 'focus']) {
+      if (state === 'hover') await download.hover();
+      if (state === 'focus') await download.focus();
+      const contrast = await download.evaluate(renderedTextContrast);
+      assert(contrast >= 4.5, `${name}: ${state} export label remains readable`);
+    }
+    await page.screenshot({ path: path.join(outDir, `${name}-raw-results.png`) });
+    await raw.getByRole('button', { name: 'Close', exact: true }).click();
     checks.push({ viewport: name, width, ...geometry });
+    await page.locator('[data-ce-report-view-mode="report"]').click();
   }
   await page.setViewportSize({ width: 1280, height: 900 });
   const participant = page.locator('[data-ce-graph-participant-point]').first();
@@ -134,7 +187,7 @@ try {
   await page.screenshot({ path: path.join(outDir, 'desktop-incomplete-legacy-hover.png') });
   assert.deepEqual(errors, [], 'report runtime errors');
   await writeFile(path.join(outDir, 'browser-checks.json'), `${JSON.stringify({ checks, runtimeErrors: errors, screenshots: outDir }, null, 2)}\n`);
-  console.log(`Browser report checks passed at 1280px, 390px and 320px; evidence: ${outDir}`);
+  console.log(`Browser report checks passed at 1280px, 653px, 390px and 320px; evidence: ${outDir}`);
 } finally {
   await browser.close();
 }

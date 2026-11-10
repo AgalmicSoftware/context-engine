@@ -7,7 +7,7 @@
  *              parseLocalResourceOverrides
  */
 import { hasOwn, toStr, normalizeSessionIdHex } from '../shared/primitives.js';
-import { canonicalizeSessionSlug } from './canonicalSessionContext.js';
+import { canonicalizeSessionSlug } from './sessionSlug.js';
 import {
   stripAuthoritativeSessionGateFields,
   normalizeSessionNaming,

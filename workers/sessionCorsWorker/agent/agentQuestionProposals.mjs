@@ -1,4 +1,6 @@
+import { DEFAULT_RATING_SCALE, normalizeRatingScale as normalizeQuestionRatingScale, ratingStepFor } from '../../../shared/questions/ratingScale.mjs';
 import { validateQuadraticQuestion } from '../../../shared/questions/quadraticAllocation.mjs';
+import { sessionContextPlainText } from '../../../shared/sessionContext.mjs';
 import {
   safeString,
   lower,
@@ -9,7 +11,6 @@ import {
 import { buildOpaqueActionId } from './opaqueActions.mjs';
 import { assertNoSecretShape } from './redaction.mjs';
 import { buildAgentActivityMetadata } from './agentActivity.mjs';
-import { assignAgentQuestionNumber } from './agentQuestionNumbers.mjs';
 
 const PROPOSED_QUESTION_KV_PREFIX = 'telegram:proposed-question:';
 const PROPOSED_QUESTION_ID_PREFIX = 'ceq_';
@@ -102,25 +103,25 @@ function firstString(...values) {
   return values.find((value) => safeString(value) !== '');
 }
 
+// Text or a stored { title, paragraphs, links } context, as one line of text.
 export function normalizeSessionContext(value = '') {
-  return safeString(value).replace(/\s+/g, ' ').slice(0, 1200);
+  return safeString(sessionContextPlainText(value)).replace(/\s+/g, ' ').slice(0, 1200);
 }
 
 export function sessionContextFromPolicySession(session = {}) {
   const metadata = session?.metadata && typeof session.metadata === 'object' && !Array.isArray(session.metadata)
     ? session.metadata
     : {};
-  return normalizeSessionContext(firstString(
+  return [
     session.sessionContext,
-    session.telegramSessionContext,
     session.context,
     session.description,
     session.purpose,
     session.topic,
     metadata.sessionContext,
     metadata.context,
-    metadata.description
-  ));
+    metadata.description,
+  ].map(normalizeSessionContext).find(Boolean) || '';
 }
 
 function addQuestionTags(target, tags = []) {
@@ -157,7 +158,6 @@ function sessionSourceTags(session = {}) {
   return [
     session.questionTags,
     session.defaultQuestionTags,
-    session.telegramQuestionTags,
     session.defaultTags,
     session.tags,
     metadata.questionTags,
@@ -221,37 +221,13 @@ function normalizeOptions(value = []) {
     .slice(0, 12);
 }
 
-function leadingNumber(value) {
-  const match = safeString(value).match(/^-?\d+(?:\.\d+)?/);
-  if (!match) return null;
-  const numeric = Number(match[0]);
-  return Number.isFinite(numeric) ? numeric : null;
-}
-
-function normalizeRatingScale(value = {}, options = []) {
-  const source = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
-  const optionNumbers = normalizeOptions(options)
-    .map((option) => leadingNumber(option))
-    .filter((number) => Number.isFinite(number));
-  let min = Number(source.min ?? source.minimum);
-  let max = Number(source.max ?? source.maximum);
-  let step = Number(source.step ?? source.interval);
-  if (!Number.isFinite(min) && optionNumbers.length >= 2) min = Math.min(...optionNumbers);
-  if (!Number.isFinite(max) && optionNumbers.length >= 2) max = Math.max(...optionNumbers);
-  if (!Number.isFinite(step)) {
-    const sorted = [...new Set(optionNumbers)].sort((left, right) => left - right);
-    const diffs = sorted.slice(1).map((number, index) => number - sorted[index]).filter((number) => number > 0);
-    step = diffs.length ? Math.min(...diffs) : 1;
-  }
-  min = Math.floor(min);
-  max = Math.floor(max);
-  step = Math.floor(step);
-  if (!Number.isFinite(min) || !Number.isFinite(max) || max < min) return null;
-  if (!Number.isFinite(step) || step < 1) step = 1;
-  min = Math.max(-100, Math.min(100, min));
-  max = Math.max(-100, Math.min(100, max));
-  if (Math.floor((max - min) / step) + 1 > 21) return null;
-  return { min, max, step };
+function normalizeRatingScale(value = {}) {
+  const question = { scale: value };
+  const scale = normalizeQuestionRatingScale(question);
+  const label = (text) => text.replace(/\s+/g, ' ').slice(0, 120);
+  return scale ? {
+    min: scale.min, max: scale.max, minLabel: label(scale.minLabel), maxLabel: label(scale.maxLabel), step: ratingStepFor(question),
+  } : null;
 }
 
 function normalizeReferenceUrl(value = '') {
@@ -376,6 +352,19 @@ function questionIdFromPrompt({
   return `${PROPOSED_QUESTION_ID_PREFIX}${buildOpaqueActionId(seed).replace(/^ceab_/, '')}`;
 }
 
+// What an answer to a proposal means. Its id leaves part of this out, so a
+// re-post must not swap it under answers already given.
+function proposedAnswerSchema(record = {}) {
+  const type = normalizeQuestionType(record.questionType);
+  return JSON.stringify({
+    type,
+    options: type === 'multichoice' || type === 'quadratic' ? record.options ?? [] : [],
+    singleSelect: type === 'multichoice' && record.singleSelect === true,
+    ratingScale: type === 'rating' ? record.ratingScale || normalizeRatingScale(DEFAULT_RATING_SCALE) : null,
+    voiceCredits: type === 'quadratic' ? record.voiceCredits ?? 99 : null,
+  });
+}
+
 function proposedRecordToQuestion(record = {}) {
   const questionId = safeString(record.questionId);
   const prompt = normalizePrompt(record.prompt || record.questionText);
@@ -404,7 +393,7 @@ function proposedRecordToQuestion(record = {}) {
   }
   if (questionType === 'quadratic') question.voiceCredits = record.voiceCredits ?? 99;
   if (questionType === 'rating') {
-    const ratingScale = normalizeRatingScale(record.ratingScale || record.rating_scale, options);
+    const ratingScale = normalizeRatingScale(record.ratingScale || record.rating_scale);
     if (ratingScale) question.ratingScale = ratingScale;
   }
   if (tags.length) question.tags = tags;
@@ -473,7 +462,7 @@ export async function persistAgentProposedQuestion({
     if (reason) return { ok: false, reason };
   }
   const normalizedRatingScale = type === 'rating'
-    ? normalizeRatingScale(ratingScale, normalizedOptions)
+    ? normalizeRatingScale(ratingScale)
     : null;
   const normalizedReferences = normalizeQuestionReferences(references);
   const normalizedGeoRefs = normalizeQuestionGeoRefs(geoRefs);
@@ -493,7 +482,7 @@ export async function persistAgentProposedQuestion({
   const prefix = proposedQuestionPrefix(slug);
   if (!slug) return { ok: false, reason: 'session_slug_missing' };
   if (!promptText) return { ok: false, reason: 'question_prompt_missing' };
-  if (!prefix || !env?.AGENT_ACTION_KV || typeof env.AGENT_ACTION_KV.put !== 'function') {
+  if (!prefix || !env?.AGENT_ACTION_KV || typeof env.AGENT_ACTION_KV.get !== 'function' || typeof env.AGENT_ACTION_KV.put !== 'function') {
     return { ok: false, reason: 'action_kv_unavailable' };
   }
   const telegramUserId = safeString(normalized.user?.telegramUserId || normalized.telegramUserId);
@@ -530,6 +519,18 @@ export async function persistAgentProposedQuestion({
   if (metadata && typeof metadata === 'object' && !Array.isArray(metadata)) {
     record.actionMetadata = { ...metadata };
   }
+  const key = `${prefix}${questionId}`;
+  const stored = await env.AGENT_ACTION_KV.get(key);
+  if (stored != null) {
+    // A re-post leaves the stored question as it is: an archived one stays
+    // archived, and one with another answer schema is refused.
+    const existing = safeJsonParse(stored, null);
+    const sameSchema = !!existing && typeof existing === 'object' && !Array.isArray(existing) &&
+      proposedAnswerSchema(existing) === proposedAnswerSchema(record);
+    if (!sameSchema) return { ok: false, reason: 'question_schema_conflict', questionId };
+    if (lower(existing.status) !== 'active') return { ok: false, reason: 'question_archived', questionId };
+    return { ok: true, questionId, question: proposedRecordToQuestion(existing), record: existing };
+  }
   assertNoSecretShape(record, "Agent proposed questions must not serialize secrets.");
   const activityMetadata = buildAgentActivityMetadata({
     type: 'proposed_question',
@@ -540,25 +541,11 @@ export async function persistAgentProposedQuestion({
     questionId: record.questionId,
     telegramUserId: record.createdByTelegramUserId,
   });
-  await env.AGENT_ACTION_KV.put(`${prefix}${questionId}`, JSON.stringify(record), {
+  await env.AGENT_ACTION_KV.put(key, JSON.stringify(record), {
     expirationTtl: ttlSeconds,
     metadata: activityMetadata,
   });
-  const assigned = await assignAgentQuestionNumber({
-    env,
-    sessionSlug: slug,
-    questionId,
-    createdAt: record.createdAt,
-  });
-  if (assigned.ok) record.stableQuestionNumber = assigned.number;
-  return {
-    ok: true,
-    questionId,
-    question: assigned.ok
-      ? { ...proposedRecordToQuestion(record), stableQuestionNumber: assigned.number }
-      : proposedRecordToQuestion(record),
-    record,
-  };
+  return { ok: true, questionId, question: proposedRecordToQuestion(record), record };
 }
 
 export async function archiveAgentProposedQuestion({

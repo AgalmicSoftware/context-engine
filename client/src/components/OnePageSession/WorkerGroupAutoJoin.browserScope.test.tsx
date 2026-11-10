@@ -98,6 +98,7 @@ describe('WorkerGroupAutoJoin', () => {
     const { unmount } = render(
       <WorkerGroupAutoJoin {...props} account="" loginComplete={false} sessionConfig={null} sessionSlug="" />,
     );
+    expect(screen.getByRole('button', { name: 'Cancel auto-join' })).toHaveTextContent(/^Cancel$/);
     fireEvent.click(screen.getByRole('button', { name: 'Cancel auto-join' }));
     unmount();
     window.history.replaceState({}, '', '/session/alpha?joinGroup=participants-2026');

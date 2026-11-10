@@ -1,7 +1,28 @@
+import { resolveGeneratedResultsControllerState } from './sessionResultsAnalysisController';
+import { buildGeneratedBreakdownAnalysisData } from '../../components/SessionResults/sessionResultsGeneratedViewAdapters';
 import { buildResultsAnalysisBrowserSnapshotFromCacheNode } from './sessionResultsAnalysisBrowserSnapshot';
 import { loadAdminSnapshotResultsAnalysisSource } from '../../../../workers/sessionCorsWorker/resultsAnalysisGeneration';
 
 describe('sessionResultsAnalysisBrowserSnapshot', () => {
+  it('leaves hidden questions and their answers out of what the AI receives', () => {
+    const answer = (value: string) => ({ answer: { value, encrypted: false }, sessionSlug: 'edge' });
+    const result = buildResultsAnalysisBrowserSnapshotFromCacheNode({
+      hiddenQuestionIds: new Set(['q2']),
+      sessionSlug: 'edge',
+      networkNode: {
+        questions: {
+          q1: { id: 'q1', prompt: 'Shown', type: 'text', sessionSlug: 'edge' },
+          Q2: { id: 'Q2', prompt: 'Hidden', type: 'text', sessionSlug: 'edge' },
+        },
+        questionResponses: { q1: { '0xaaa': answer('Visible') }, Q2: { '0xaaa': answer('Secret') } },
+      },
+    });
+    expect(result.ok).toBe(true);
+    expect(JSON.stringify(result)).toContain('Visible');
+    expect(JSON.stringify(result)).not.toContain('Hidden');
+    expect(JSON.stringify(result)).not.toContain('Secret');
+  });
+
   it('builds sanitized same-session snapshots and skips locked/demo rows', () => {
     const result = buildResultsAnalysisBrowserSnapshotFromCacheNode({
       sessionSlug: 'edge',
@@ -75,7 +96,7 @@ describe('sessionResultsAnalysisBrowserSnapshot', () => {
     if (!result.ok) throw new Error(result.reason);
     expect(result.snapshot.questions).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ id: 'rating', scale }),
+        expect.objectContaining({ id: 'rating', scale: { ...scale, step: 1 } }),
         expect.objectContaining({ id: 'single', singleSelect: true }),
         expect.objectContaining({ id: 'multi', singleSelect: false, maxSelections: 2 }),
         expect.objectContaining({ id: 'quadratic', voiceCredits: 25 }),
@@ -103,7 +124,7 @@ describe('sessionResultsAnalysisBrowserSnapshot', () => {
     );
     expect(source.aiSnapshot.questions).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ id: 'rating', scale }),
+        expect.objectContaining({ id: 'rating', scale: { ...scale, step: 1 } }),
         expect.objectContaining({ id: 'quadratic', voiceCredits: 25 }),
       ]),
     );
@@ -134,6 +155,60 @@ describe('sessionResultsAnalysisBrowserSnapshot', () => {
       tags: [],
       voiceCredits: 99,
     });
+  });
+
+  it('keeps inner option spacing so the Worker still matches the answers', async () => {
+    const result = buildResultsAnalysisBrowserSnapshotFromCacheNode({
+      sessionSlug: 'edge',
+      networkNode: {
+        questions: { q1: { id: 'q1', prompt: 'Pick', type: 'multichoice', options: ['Option  A', ' Option B ', ' '] } },
+        questionResponses: {
+          q1: {
+            first: JSON.stringify({ sessionSlug: 'edge', answer: ['Option  A'] }),
+            second: JSON.stringify({ sessionSlug: 'edge', answer: ['Option B'] }),
+          },
+        },
+      },
+    });
+    if (!result.ok) throw new Error(result.reason);
+    expect(result.snapshot.questions[0]).toEqual(expect.objectContaining({ options: ['Option  A', 'Option B'] }));
+    const source = await loadAdminSnapshotResultsAnalysisSource({
+      slug: 'edge',
+      config: { slug: 'edge' },
+      body: { source: { kind: 'admin-snapshot', snapshot: result.snapshot } },
+    });
+    if (!source.ok || !('counts' in source)) throw new Error('Worker did not accept the snapshot.');
+    expect(source.counts).toEqual(expect.objectContaining({ responseCount: 2, excludedCount: 0 }));
+  });
+
+  it('leaves questions with author-encrypted text and their answers out of the shared snapshot', () => {
+    const result = buildResultsAnalysisBrowserSnapshotFromCacheNode({
+      sessionSlug: 'edge',
+      networkNode: {
+        questions: {
+          q1: { id: 'q1', prompt: 'Open question?', type: 'text', sessionSlug: 'edge' },
+          q2: {
+            id: 'q2',
+            prompt: 'Decrypted gated prompt',
+            promptDecrypted: true,
+            promptEncrypted: { ciphertext: 'fixture' },
+            options: ['Gated option'],
+            type: 'multichoice',
+            sessionSlug: 'edge',
+          },
+        },
+        questionResponses: {
+          q1: { '0xaaa': { answer: { value: 'Visible answer' }, sessionSlug: 'edge' } },
+          q2: { '0xaaa': { answer: { value: ['Gated option'] }, sessionSlug: 'edge' } },
+        },
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    const serialized = JSON.stringify(result);
+    expect(serialized).toContain('Open question?');
+    expect(serialized).not.toContain('Decrypted gated prompt');
+    expect(serialized).not.toContain('Gated option');
   });
 
   it('reports unsupported when cache is not hydrated', () => {
@@ -218,3 +293,49 @@ it('counts a note-only encrypted response as locked like the Worker', () => {
   expect(result.counts.skippedCount).toBe(1);
   expect(result.snapshot.responses).toHaveLength(1);
 });
+
+it.each(['Two  spaces', 'Non\u00a0breaking'])(
+  'keeps option whitespace from Worker through the live controller and Breakdown: %s',
+  async (option) => {
+    const source = await loadAdminSnapshotResultsAnalysisSource({
+      slug: 'edge',
+      config: { slug: 'edge' },
+      body: {
+        source: {
+          kind: 'admin-snapshot',
+          snapshot: {
+            sessionSlug: 'edge',
+            questions: [{ id: 'q1', prompt: 'Choose', type: 'multichoice', options: [option, 'Other'] }],
+            responses: [
+              { questionId: 'q1', participantId: 'participant-one', answer: [` ${option} `] },
+              { questionId: 'q1', participantId: 'participant-two', answer: ['Other'] },
+            ],
+          },
+        },
+      },
+    });
+    expect(source.ok).toBe(true);
+    if (!source.ok || !('snapshot' in source)) throw new Error('Worker did not return a normalized snapshot.');
+    expect(source.snapshot.responses.map((row) => row.answer)).toEqual(expect.arrayContaining([[option], ['Other']]));
+    const state = resolveGeneratedResultsControllerState({
+      statusBody: {
+        ok: true,
+        viewerAuthorized: true,
+        state: { jobState: 'succeeded', lastGood: { snapshot: source.snapshot } },
+      },
+    });
+    const result = buildGeneratedBreakdownAnalysisData({ questions: state.questions, responses: state.responses });
+    expect(
+      result.analysisData?.flatResponses.map(({ responseText, count, participantCount, totalVotes, rate }) => [
+        responseText,
+        count,
+        participantCount,
+        totalVotes,
+        rate,
+      ]),
+    ).toEqual([
+      [option, 1, 2, 2, 0.5],
+      ['Other', 1, 2, 2, 0.5],
+    ]);
+  },
+);

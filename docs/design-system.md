@@ -12,7 +12,7 @@ global compatibility styles, and browser-rendered visualizations.
   `client/src/scss/themes/registry.json`.
 - Shared theme-aware control recipes live in `client/src/scss/themes/_recipes.scss`.
 - `client/src/assets/css/contextEngine.scss` emits the theme package and keeps
-  legacy `--ce-color-*` aliases during migration.
+  legacy `--ce-color-*` aliases.
 - `client/src/scss/_variables.scss` remains for structural/build-time Sass
   values. Do not add theme-dependent component values there.
 
@@ -25,8 +25,10 @@ spread across the panel and center when wrapping on phones. The toolbar stays
 pinned 10px below the viewport top while the question list scrolls, including
 pending Submit controls; Back and Session scroll away. JSON debug controls are hidden
 in this embedded Questions view; the underlying JSON UI remains available to other
-surfaces. Run `node scripts/session-selector-layout-smoke.mjs` against the local
-server to check short and long selections at mobile, compact, and desktop widths.
+surfaces. Question authoring folds its JSON and AI prompt views into a closed
+"JSON and AI prompt" disclosure. Run `node scripts/session-selector-layout-smoke.mjs`
+against the local server to check short and long selections at mobile, compact,
+and desktop widths.
 
 In a session's full question list, a confirmed empty survey list moves the live
 filtered count beside the Questions heading and removes the redundant selector
@@ -80,8 +82,8 @@ The Settings selector is enabled by default. Set
 hides user theme selection. The preference remains restricted to the bundled
 registry and cannot load CSS, URLs, or arbitrary token maps.
 
-**Color-blind mode** is available in Settings → Theme, independently of the
-theme selector. It persists locally as `ce:color-vision`, restores before paint,
+**Color-blind mode** is available in Settings → Appearance, independently of
+the theme selector. It persists locally as `ce:color-vision`, restores before paint,
 and synchronizes across tabs. The shared palette uses blue for support/agree,
 orange for oppose/disagree, and gray for unsure. Quadratic allocation bars use
 brighter fill tokens independently of text colors, and Agree/Disagree buttons
@@ -127,7 +129,7 @@ on their narrower semantic tokens rather than adding structural queries.
 
 Minimal is the default white theme. Its stable configuration and storage ID remains
 `civic`, preserving existing saved selections. Select
-**Minimal** in Settings → App theme, or use `REACT_APP_CE_DEFAULT_THEME=civic`
+**Minimal** in Settings → Appearance, or use `REACT_APP_CE_DEFAULT_THEME=civic`
 for a deployment default. It uses dark slate text, blue actions, subtle borders,
 modest corner radii, sans-serif typography with system fallbacks, and flat surfaces.
 Login and Submit share the brighter blue submit palette, including hover states.
@@ -146,21 +148,25 @@ using the same title margins, collapse height, and submit-rail offsets as Contex
 Engine, with the shared five-second fade and hover/focus reveal. Loading labels
 use `--ce-loading-text`: black on the Minimal and Classic 95 light surfaces and
 near-white in Context Engine. On mobile, Minimal uses a compact navigation header
-with the visible logo artwork matched to the Login button's height while preserving
+with the blue Login button sharing the 64px visible-logo height while preserving
 the account controls. Across themes and responsive breakpoints, the visible logo
 artwork matches the Login button's height and keeps that size after signing in.
-Both account states retain 16px of header padding above and below the logo.
+Both account states retain balanced header padding above and below the logo:
+16px by default and 12px in the compact Minimal mobile header.
 The Account button retains its own sizing. Narrow Classic 95 headers let the
 Account control wrap below the logo when needed.
 The profile presents session
 sections as a single column of compact rows, and removes decorative depth from
-question cards and account controls. At widths up to 768px, question actions
+question cards and account controls. At widths up to 768px, long prompts use the
+space left after reserving the answer controls and footer; they can push answers
+down before reducing type to the root font size. Prompts that still cannot fit
+remain keyboard-scrollable. Card height and navigation stay fixed. At these
+widths, question actions
 start in the hamburger menu. The menu, pending Submit and clear controls, and
 previous/next arrows share one row. Submit shrinks within the available space;
 at phone widths up to 640px, the question counter forms a narrow column between
 the arrows. The home Explorer offers Stats, Tools, and
 Welcome; Tools remains the default, including for a retained Latest-tab selection.
-Session title tooltips share the Results description cleanup for retired RxC instructions.
 Explorer tabs use blue selected/hover text
 and dark inactive icons on the light header. On narrow Minimal phones, the
 selected label is 20px and the tab icons are 22px, with 44px minimum touch targets.
@@ -286,13 +292,13 @@ mobile and checks its visible control/text pairs at 4.5:1.
 When the bundled-theme selector is enabled, signed-in Settings exposes it
 directly beneath the equal 2×2 Config, Session, Explainers, and Demo Mode quick
 controls. At phone widths up to 480px, these controls stack into full-width rows
-so the Session dropdown remains readable. Signed-out Settings keeps it in the final `Appearance & colors`
-section. This selector changes the complete app theme; it is separate from a
-session's curated color scheme and does not accept arbitrary color values. Its
-default option reads `<theme label> (default)` for a valid embedded
-choice, or `Default` when that choice cannot be named. Native dropdown options
-use paired document text and surface colors for readability. The theme bar
-uses the same border opacity as adjacent quick controls without dimming its
+so the Session dropdown remains readable. Signed-out Settings keeps it at the
+end of the panel, below Config. This selector changes the complete app theme; it
+is separate from a session's curated color scheme and does not accept arbitrary
+color values. Its default option reads `<theme label> (default)` for a valid
+embedded choice, or `Default` when that choice cannot be named. Native dropdown
+options use paired document text and surface colors for readability. The theme
+bar uses the same border opacity as adjacent quick controls without dimming its
 text. Opening Config scrolls its start into view only when clipped by the
 screen or account dialog. Selected reasoning buttons retain the paired accent
 text color even when session defaults disable editing.
@@ -353,6 +359,12 @@ control states without component selectors in a theme file.
 | Geometry               | `--ce-radius-*`, `--ce-border-control-width`, `--ce-control-padding-*`        | theme-selectable shape and control density                                     |
 | Typography             | `--ce-font-*`, `--ce-font-button-weight`                                      | body, UI, mono, and control typography                                         |
 
+Labels on `--ce-status-success` fills, such as the recorder's Record and
+Generate questions buttons, use `--ce-status-success-contrast`; labels on
+`--ce-status-error` fills, such as destructive confirmation buttons, use
+`--ce-status-error-contrast`. Each is white where its fill is dark and
+near-black where it is bright, including color-blind mode.
+
 The legacy `--ce-color-*` aliases remain only for source compatibility and
 resolve through the active semantic contract. New code uses `--ce-*` semantic
 tokens directly.
@@ -374,19 +386,19 @@ Escape, the backdrop, or its close button dismiss it and restore trigger focus.
 
 ## Typography
 
-| Token                     | `context-engine`                | `classic-95`                           |
-| ------------------------- | ------------------------------- | -------------------------------------- |
-| `--ce-font-body`          | Poppins fallback stack          | bundled Wine Tahoma + system fallbacks |
-| `--ce-font-ui`            | Open Sans fallback stack        | bundled Wine Tahoma + system fallbacks |
-| `--ce-font-mono`          | system monospace fallback stack | Courier New fallback stack             |
-| `--ce-font-button-weight` | `600`                           | `400`                                  |
+| Token                     | `context-engine`                | `classic-95`                           | `civic` (Minimal)               |
+| ------------------------- | ------------------------------- | -------------------------------------- | ------------------------------- |
+| `--ce-font-body`          | Poppins fallback stack          | bundled Wine Tahoma + system fallbacks | Open Sans + system fallbacks    |
+| `--ce-font-ui`            | Open Sans fallback stack        | bundled Wine Tahoma + system fallbacks | Open Sans + system fallbacks    |
+| `--ce-font-mono`          | system monospace fallback stack | Courier New fallback stack             | system monospace fallback stack |
+| `--ce-font-button-weight` | `600`                           | `400`                                  | `600`                           |
 
 Guideline:
 
 - Use `var(--ce-font-body)` or `var(--ce-font-mono)` directly in component rules.
-- Sass font values in `_variables.scss` seed the default theme only. Component
-  rules use runtime variables so changing `data-ce-theme` repaints without a
-  reload.
+- Sass font values in `_variables.scss` seed the `context-engine` theme only.
+  Component rules use runtime variables so changing `data-ce-theme` repaints
+  without a reload.
 
 ## Spacing And Radius
 
@@ -413,8 +425,8 @@ Radius tokens:
 
 Guideline: component rules use runtime radius tokens. In `classic-95`, every
 non-round radius slot resolves to square geometry; `context-engine` retains its
-rounded scale. Sass radius values seed the default map and are not a component
-theme API.
+rounded scale. Sass radius values seed the `context-engine` map and are not a
+component theme API.
 
 ## Button Patterns
 
@@ -508,7 +520,7 @@ npm run build
 
 The runtime Playwright smoke covers the home Welcome/Login and Community Stats
 surfaces, `/about`, `/session/new`, `/session/demo-sh`, a simulated-user profile,
-session Groups, `/docs`, `/demos`, and a not-found route at desktop and mobile
+session Groups, `/docs`, and a not-found route at desktop and mobile
 widths. It boots `classic-95`, switches to `context-engine`
 without reload, and verifies palette, typography, geometry, modal chrome,
 Session Wizard preview scope, Community Stats/tooltip contrast and data spread,
@@ -544,3 +556,41 @@ mode chooser/setup. Manual authoring checks cover all five question types, surve
 fields, and JSON/AI prompt panels. It checks rendered text contrast with ancestor opacity, translucent surfaces,
 gradient stops, and text-field fill colors included. It never deploys a session,
 submits responses, or starts recording.
+
+Raw question results use paired overlay surface/text tokens for question headings,
+expanded answers, bookmarks and sync status. Export and table actions use paired
+control/action tokens. Do not use fixed inverse text on a surface that changes
+with the theme. Worker group notices and membership lists use the same overlay
+pairs. Results headings can wrap between words without squeezing beside controls.
+Run `BASE_URL=http://127.0.0.1:3000 npm run ai:test-theme:results` to check raw results,
+expanded summaries, sorting tables, export controls, bookmark states and group
+sign-in notices in all three themes at 390, 653 and 1280px. The Civic suite also
+includes the raw-results checks. These tests use synthetic fixtures and do not
+submit data; `THEMES` and `WIDTHS` accept comma-separated values for focused runs.
+
+HTML Results exports project the selected sections before rendering or embedding
+any snapshot data. Excluded analysis is absent from both interactive and static
+HTML bytes. The Snapshot JSON option adds a download of that same projection;
+when unchecked, the viewer has no snapshot download control.
+
+Question generation accepts text, Markdown, CSV and JSON files, plus supported
+images for analysis. PDF and PowerPoint files are not offered as generation
+sources: paste their text instead. Skipped files and extraction failures are
+named in the generator. Each new generation clears previous extraction failures; new extraction failures produce new warnings. The next generation repeats the notices for files rejected during selection, unless the source list changed after the rejection; later generations do not. Only extracted text counts toward its 50-character
+minimum. The document library's separate file-upload support is unchanged.
+
+Photo generation sources use the image capability declared by each built-in AI preset. Custom Anthropic and OpenRouter Claude names accept versions 3, 4 and 5 in both family-first (`claude-sonnet-4-6`) and version-first (`claude-3-5-sonnet`) forms. Unsupported models keep the existing vision-capability error before a request is sent.
+
+Generated-question editors stay mounted while regeneration runs. Failed or unusable generations preserve the edited questions, document links and saved drafts. Once usable replacement questions arrive, edited drafts require confirmation; cancelling keeps the current editor. Unedited drafts are replaced directly.
+
+### Breakdown question selection
+
+Demo comparison cards count distinct personas separately from modeled responses. When persona counts are absent, they show only the response count.
+
+Breakdown provides a labeled Question selector independently of demographic comparisons and opens the first question with response distributions. Sessions without segments show overall distributions; segment controls and comparison reports appear only when segment data exists. The selector uses document-surface contrast tokens and a visible keyboard focus outline. Standalone benchmark reports expose the same question control alongside model cohort filters.
+
+Question generation requires at least one selected type. With no type selected, Generate is disabled and explains how to continue. A response containing no usable questions shows an actionable message and keeps the current draft.
+
+The SBT image picker preserves an in-flight selection when Paste is empty, unsupported, oversized, or fails to fetch. A usable pasted image replaces it only when applied.
+
+Pasted and URL-based SBT artwork use fetched image files for their preview and stored bytes. There is no separate canvas load callback.

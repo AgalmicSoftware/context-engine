@@ -33,6 +33,31 @@ const buildArtifact = (): SessionResultsGeneratedAnalysisArtifact =>
   });
 
 describe('surveyResultsHtmlReportSnapshotDataModel', () => {
+  it('reports zero for a completed empty filter instead of the session totals', () => {
+    const snapshot = buildSurveyResultsHtmlReportSnapshot({
+      filteredQuestionsCount: 0,
+      filteredResponsesCount: 0,
+      questions: [],
+      countsByQuestion: new Map(),
+      totalQuestionsCount: 17,
+      totalResponsesCount: 105,
+    });
+    expect(snapshot.counts).toMatchObject({ questions: 0, responses: 0 });
+    expect(snapshot.sections.report.available).toBe(false);
+    expect(snapshot.sections.report.reason).toBe('No filtered questions or responses are hydrated yet.');
+  });
+
+  it('uses session totals while filtered counts are unknown', () => {
+    const snapshot = buildSurveyResultsHtmlReportSnapshot({
+      filteredQuestionsCount: null,
+      filteredResponsesCount: null,
+      totalQuestionsCount: 17,
+      totalResponsesCount: 105,
+    });
+    expect(snapshot.counts).toMatchObject({ questions: 17, responses: 105 });
+    expect(snapshot.sections.report.available).toBe(true);
+  });
+
   it('builds a redacted snapshot from question and response counts', () => {
     const snapshot = buildSurveyResultsHtmlReportSnapshot({
       chainId: 11155420,

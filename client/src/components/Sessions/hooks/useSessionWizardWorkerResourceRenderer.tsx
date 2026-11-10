@@ -23,11 +23,9 @@ type UseSessionWizardWorkerResourceRendererOptions = {
   defaultGateId?: string;
   effectiveDefaultWorkerRpcUrl?: string;
   gateOptions: WorkerResourceCardProps['gateOptions'];
-  isNormalMode: boolean;
   openResourceGateKey: string;
   resourceGateMap: Record<string, SessionWizardResourceGateSelectionState>;
   resourceGateOptions: ResourceGateSelectionOption[];
-  showSponsoredFaucetNotice: boolean;
   workerSecrets: WorkerSecretsLike;
   workerSecretsEnabled: boolean;
   applyWorkerSecretsUpdate: StateUpdater<WorkerSecretsLike>;
@@ -41,11 +39,9 @@ const useSessionWizardWorkerResourceRenderer = ({
   defaultGateId = '',
   effectiveDefaultWorkerRpcUrl = '',
   gateOptions,
-  isNormalMode,
   openResourceGateKey,
   resourceGateMap,
   resourceGateOptions,
-  showSponsoredFaucetNotice,
   workerSecrets,
   workerSecretsEnabled,
   applyWorkerSecretsUpdate,
@@ -73,8 +69,6 @@ const useSessionWizardWorkerResourceRenderer = ({
           fields={fields}
           workerSecrets={workerSecrets}
           workerSecretsEnabled={workerSecretsEnabled}
-          isNormalMode={isNormalMode}
-          showSponsoredFaucetNotice={showSponsoredFaucetNotice}
           effectiveDefaultWorkerRpcUrl={effectiveDefaultWorkerRpcUrl}
           getSecretFieldTestId={getSessionWizardSecretFieldTestId}
           onUpdateSecret={(fieldKey: string, nextValue: string) => {
@@ -87,8 +81,6 @@ const useSessionWizardWorkerResourceRenderer = ({
       applyWorkerSecretsUpdate,
       effectiveDefaultWorkerRpcUrl,
       getResourceSecretFields,
-      isNormalMode,
-      showSponsoredFaucetNotice,
       workerSecrets,
       workerSecretsEnabled,
     ],

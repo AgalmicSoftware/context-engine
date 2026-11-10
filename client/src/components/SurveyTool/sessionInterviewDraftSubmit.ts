@@ -163,7 +163,9 @@ export const runInterviewDraftSubmit = async ({
       await onApplyAnswer(draft.questionId, draft.answer);
       if (!isSubmitContextCurrent(attemptToken)) return;
       // Review shows the form's comment when the AI proposed none; only a proposal or an edit replaces it.
-      if (String(original.additionalComments || '').trim() || draft.userEditedFields?.includes('additionalComments')) {
+      // A hidden draft's proposal was never shown, so only an edit counts there.
+      const proposedComment = draft.predictionCondition !== 'blind' && String(original.additionalComments || '').trim();
+      if (proposedComment || draft.userEditedFields?.includes('additionalComments')) {
         await onApplyAdditional(draft.questionId, String(draft.additionalComments || ''));
         if (!isSubmitContextCurrent(attemptToken)) return;
       }

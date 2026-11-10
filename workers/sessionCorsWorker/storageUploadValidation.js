@@ -1,3 +1,4 @@
+import { isResponseFieldEnvelope } from '../../shared/encryption/envelopeValidation.mjs';
 import { UPLOAD_TOO_LARGE_ERROR } from './uploadSizeLimits.js';
 
 const KIB = 1024;
@@ -55,6 +56,16 @@ const validateResponseItem = (item, label) => {
       error: `${UPLOAD_TOO_LARGE_ERROR} Each answer may use at most ${MAX_RESPONSE_ITEM_BYTES} bytes.`,
     };
   }
+  for (const key of ['answer', 'additional']) {
+    const field = item[key];
+    if (!isObj(field)) continue;
+    if (field.encrypted === true && !isResponseFieldEnvelope(field.encryptedPortion)) {
+      return invalid('responses', `${label}.${key} requires a valid encrypted envelope`);
+    }
+    if (typeof field.value === 'string' && field.value.trim() === '*' && field.encrypted !== true) {
+      return invalid('responses', `${label}.${key}: A lone * can't be saved; add more text`);
+    }
+  }
   return null;
 };
 
@@ -109,6 +120,9 @@ export const validateStorageUploadPayload = ({ resource, bytes, payloadEncrypted
     }
     if (payload.options != null && !Array.isArray(payload.options)) {
       return invalid(resource, 'expected an options array');
+    }
+    if (Array.isArray(payload.options) && payload.options.some((option) => typeof option !== 'string')) {
+      return invalid(resource, 'expected options to be strings');
     }
   } else {
     if (typeof payload.title !== 'string') return invalid(resource, 'expected a string title');

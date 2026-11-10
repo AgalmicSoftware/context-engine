@@ -80,6 +80,7 @@ export type SurveyResultsRenderSurfaceDisplayStyles = {
 
 export type SurveyResultsRenderSurfaceArgs = {
   workerGroupFilterNotice?: React.ReactNode;
+  loginPromptNode?: React.ReactNode;
   applyDecryptedOverrideToResponse: SurveyResultsDisplayPanelsArgs['applyDecryptedOverrideToResponse'];
   closeModal: () => void;
   displayStyles: SurveyResultsRenderSurfaceDisplayStyles;
@@ -131,6 +132,8 @@ export type SurveyResultsRenderSurfaceArgs = {
   state: SurveyResultsState;
   styleMap: Record<string, string>;
   syncLoadingStartedAt: number | null;
+  /** Question Results counts still waiting on their first load. */
+  countsLoading?: { questions: boolean; responses: boolean };
   toggleExportArea: () => void;
   toggleLockedResponseDetails: () => void;
   toggleQuestionFilter: () => void;
@@ -141,6 +144,7 @@ export type SurveyResultsRenderSurfaceArgs = {
 
 export const renderSurveyResultsRenderSurface = ({
   workerGroupFilterNotice,
+  loginPromptNode,
   applyDecryptedOverrideToResponse,
   closeModal,
   displayStyles,
@@ -183,6 +187,7 @@ export const renderSurveyResultsRenderSurface = ({
   state,
   styleMap,
   syncLoadingStartedAt,
+  countsLoading = { questions: false, responses: false },
   toggleExportArea,
   toggleLockedResponseDetails,
   toggleQuestionFilter,
@@ -191,7 +196,6 @@ export const renderSurveyResultsRenderSurface = ({
   toggleSurveyBookmark,
 }: SurveyResultsRenderSurfaceArgs): React.ReactElement => {
   const {
-    responses,
     sbtFilteredResponses,
     exportType,
     alertMessage,
@@ -201,7 +205,6 @@ export const renderSurveyResultsRenderSurface = ({
     filteredResponsesCount,
     surveyViewMode,
     exportAreaOpen,
-    aggregatorQuestionResponses,
     sbtFilteredAggregatorQuestionResponses,
     surveyTitle,
     surveyDocumentURLs,
@@ -252,6 +255,8 @@ export const renderSurveyResultsRenderSurface = ({
     questionResponsesNonce: props.questionResponsesNonce,
     questionsCacheNonce: props.questionsCacheNonce,
     questionResultsHydrated: state.questionResultsHydrated,
+    questionCountsLoading: countsLoading.questions,
+    responseCountsLoading: countsLoading.responses,
     refreshTargetQuestionBlock: state.refreshTargetQuestionBlock,
     refreshTargetResponseBlock: state.refreshTargetResponseBlock,
     refreshTargetSurveyBlock: state.refreshTargetSurveyBlock,
@@ -344,6 +349,7 @@ export const renderSurveyResultsRenderSurface = ({
     getFallbackQuestion,
     getLockedResponseKey,
     getResponseCardProps,
+    loginPromptNode,
     lockedResponsesBannerNode: SurveyResultsLockedResponsesBanner({
       decrypting: !!state.lockedResponsesDecrypting,
       isOpen: !!state.lockedResponseDetailsOpen,

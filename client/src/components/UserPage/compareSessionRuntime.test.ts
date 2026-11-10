@@ -1,6 +1,6 @@
 import {
   COMPARE_GRAPHIC_FILENAME,
-  resolveCompareSessionSlug,
+  resolveCompareSessionScope,
   resolveCompareRunLabel,
   runCompareSectionTasks,
   scanCompareAddressesSequentially,
@@ -10,24 +10,52 @@ import {
 describe('compare session runtime', () => {
   it('prefers the resolved session prop and falls back to query or session pathname context', () => {
     expect(
-      resolveCompareSessionSlug({
+      resolveCompareSessionScope({
         activeSessionSlug: 'Worker-Session',
         pathname: '/session/onchain-session',
         search: '?session=query-session',
       }),
-    ).toBe('Worker-Session');
-    expect(resolveCompareSessionSlug({ pathname: '/compare/a&b', search: '?session=CloudFlare' })).toBe('CloudFlare');
-    expect(resolveCompareSessionSlug({ pathname: '/session/OnChain', search: '' })).toBe('OnChain');
+    ).toEqual({ kind: 'session', slug: 'Worker-Session' });
+    expect(resolveCompareSessionScope({ pathname: '/compare/a&b', search: '?session=CloudFlare' })).toEqual({
+      kind: 'session',
+      slug: 'CloudFlare',
+    });
+    expect(resolveCompareSessionScope({ pathname: '/session/OnChain', search: '' })).toEqual({
+      kind: 'session',
+      slug: 'OnChain',
+    });
   });
 
   it('keeps an explicit comparison session instead of a stale global selection', () => {
     expect(
-      resolveCompareSessionSlug({
+      resolveCompareSessionScope({
         activeSessionSlug: 'stale',
         pathname: '/compare',
         search: '?session=hosted-session',
       }),
-    ).toBe('hosted-session');
+    ).toEqual({ kind: 'session', slug: 'hosted-session' });
+  });
+
+  it('keeps General explicit and selects only its cache', () => {
+    expect(resolveCompareSessionScope({ activeSessionSlug: '', pathname: '/session/alpha' })).toEqual({
+      kind: 'session',
+      slug: '',
+    });
+    const slug = resolveCompareSessionScope({
+      activeSessionSlug: 'alpha',
+      pathname: '/compare',
+      search: '?session=general',
+    });
+    expect(slug).toEqual({ kind: 'session', slug: '' });
+    expect(
+      selectCompareCacheValues(
+        [
+          { slug: '', value: { id: 'general' } },
+          { slug: 'alpha', value: { id: 'alpha' } },
+        ],
+        slug,
+      ),
+    ).toEqual([{ id: 'general' }]);
   });
 
   it('selects only the active session cache when a session is resolved', () => {
@@ -38,12 +66,11 @@ describe('compare session runtime', () => {
       { slug: 'alpha', value: null },
     ];
 
-    expect(selectCompareCacheValues(entries, 'alpha')).toEqual([{ id: 'alpha' }, { id: 'alpha-second-entry' }]);
-    expect(selectCompareCacheValues(entries, '')).toEqual([
+    expect(selectCompareCacheValues(entries, { kind: 'session', slug: 'alpha' })).toEqual([
       { id: 'alpha' },
-      { id: 'beta' },
       { id: 'alpha-second-entry' },
     ]);
+    expect(selectCompareCacheValues(entries, { kind: 'session', slug: '' })).toEqual([]);
   });
 
   it('awaits valid on-chain profile scans sequentially and leaves failed addresses retryable', async () => {

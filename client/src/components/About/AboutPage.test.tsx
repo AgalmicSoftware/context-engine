@@ -5,7 +5,7 @@ import path from 'path';
 import { TestMemoryRouter as MemoryRouter } from 'testUtils/TestMemoryRouter';
 import { normalizeScssContract } from 'testUtils/scssContractAssertions';
 
-import AboutPage, { getAboutDemoSessionPath, getConfiguredRecognitionIndividuals } from './AboutPage';
+import AboutPage, { getAboutDemoSessionPath } from './AboutPage';
 
 const mutableEnv = process.env as Record<string, string | undefined>;
 const ORIGINAL_PUBLIC_URL = process.env.PUBLIC_URL;
@@ -314,6 +314,8 @@ describe('AboutPage', () => {
     const foundations = screen.getByRole('heading', { name: 'Current Foundations' }).closest('li')!;
     expect(within(foundations).getAllByText('Complete:')).toHaveLength(6);
     expect(within(foundations).getByText(/quadratic allocation/)).toBeVisible();
+    expect(within(foundations).getByText(/Use Worker Groups or Soulbound Token groups/)).toBeVisible();
+    expect(within(foundations).getByText(/Persist responses and documents in Cloudflare or on Arweave/)).toBeVisible();
     expect(screen.getAllByText('Planned:')).toHaveLength(14);
     expect(screen.getByText(/unlinkable per-response and per-SBT accounts, ZK\/FHE aggregation/)).toBeVisible();
     expect(screen.getByText(/affiliation proofs, encrypted claims, and conditional timelocks/)).toBeVisible();
@@ -324,7 +326,15 @@ describe('AboutPage', () => {
     expect(screen.queryByRole('heading', { name: 'Current Foundations' })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /functionality/i }));
-    expect(screen.getByRole('link', { name: 'SBT groups' })).toHaveAttribute('href', '/groups');
+    const groupsLink = screen.getByRole('link', { name: 'Soulbound Token groups' });
+    expect(groupsLink).toHaveAttribute('href', '/groups');
+    expect(groupsLink.parentElement).toHaveTextContent(
+      'Uses Worker Groups on the Cloudflare Worker, or on-chain Soulbound Token groups, for gated participation and ' +
+        'gated content. Soulbound Token groups can also unlock sponsored resources like RPC, AI,',
+    );
+    expect(
+      screen.getByText(/Worker encryption on the Cloudflare Worker, or with Lit in on-chain sessions/),
+    ).toBeVisible();
     expect(screen.getByText(/Stores responses and documents in Cloudflare or on Arweave/)).toBeVisible();
   });
 
@@ -336,12 +346,16 @@ describe('AboutPage', () => {
     expect(related.getByRole('link', { name: 'AI Opinions Benchmark' })).toHaveAttribute('href', '/benchmarks');
     expect(related.getByRole('link', { name: 'The Agent Mirror Test' })).toHaveAttribute(
       'href',
-      '/posts/agent-village-wrapped',
+      '/posts/agent-village-wrapped-2026',
     );
     expect(related.getByRole('heading', { name: 'Ladders Made of Numbers' })).toBeVisible();
-    expect(related.getByRole('link', { name: 'CommonGround · Prime Intellect' })).toHaveAttribute(
+    expect(related.getByRole('link', { name: 'CommonGround Predict' })).toHaveAttribute(
       'href',
-      'https://app.primeintellect.ai/dashboard/environments',
+      'https://app.primeintellect.ai/dashboard/environments/charliethompson/commonground-predict',
+    );
+    expect(related.getByRole('link', { name: 'CommonGround Elicit' })).toHaveAttribute(
+      'href',
+      'https://app.primeintellect.ai/dashboard/environments/charliethompson/commonground-elicit',
     );
     const practice = within(screen.getByTestId('ce-about-used-by'));
     expect(practice.getByRole('link', { name: 'Cosmos × FIRE grants' })).toHaveAttribute(
@@ -349,6 +363,13 @@ describe('AboutPage', () => {
       'https://blog.cosmos-institute.org/p/announcing-80-new-cosmos-grantees',
     );
     expect(practice.getByText(/Context Engine was selected for a Cosmos × FIRE/)).toBeVisible();
+    const fireProgram = practice.getByRole('link', { name: 'Truth-Seeking AI grant program' });
+    expect(fireProgram).toHaveAttribute(
+      'href',
+      'https://www.fire.org/news/fire-and-cosmos-institute-launch-1-million-grant-program-ai-advances-truth-seeking',
+    );
+    expect(fireProgram).toHaveAttribute('target', '_blank');
+    expect(fireProgram).toHaveAttribute('rel', 'noopener noreferrer');
     expect(practice.getByRole('link', { name: 'Foresight Institute grant · 2026' })).toHaveAttribute(
       'href',
       'https://foresight.org/grants/ai-science-safety-nodes-rfp/',
@@ -356,7 +377,7 @@ describe('AboutPage', () => {
     expect(practice.getByText(/Context Engine received a grant through Foresight Institute/)).toBeVisible();
     expect(practice.getByRole('link', { name: 'Agent Village 2026' })).toHaveAttribute(
       'href',
-      '/posts/agent-village-wrapped',
+      '/posts/agent-village-wrapped-2026',
     );
     expect(practice.getByRole('link', { name: 'EDDY 2026 demo' })).toHaveAttribute(
       'href',
@@ -370,7 +391,7 @@ describe('AboutPage', () => {
     expect(artwork).toHaveLength(6);
     artwork.forEach((img) => fireEvent.error(img));
     expect(practice.queryAllByRole('presentation', { hidden: true })).toHaveLength(0);
-    expect(practice.getAllByRole('link')).toHaveLength(5);
+    expect(practice.getAllByRole('link')).toHaveLength(6);
     expect(screen.queryByRole('heading', { name: /^Media$/ })).not.toBeInTheDocument();
   });
 
@@ -402,7 +423,7 @@ describe('AboutPage', () => {
     expect(screen.queryByRole('link', { name: 'Cosmos × FIRE grants' })).not.toBeInTheDocument();
   });
 
-  it('keeps the recognition section visible without rendering empty individuals content', () => {
+  it('keeps the recognition section visible', () => {
     renderAboutPage();
 
     const recognitionSection = screen.getByTestId('ce-about-in-practice');
@@ -417,7 +438,6 @@ describe('AboutPage', () => {
     expect(within(recognitionSection).getByRole('heading', { name: 'Acknowledgements' })).toBeVisible();
     expect(screen.queryByRole('button', { name: 'Acknowledgements' })).not.toBeInTheDocument();
     expect(screen.getByTestId('ce-about-recognition-radicalxchange')).toBeInTheDocument();
-    expect(screen.queryByTestId('ce-about-recognition-individuals')).not.toBeInTheDocument();
     expect(screen.queryByText(/No recognized individuals yet/i)).not.toBeInTheDocument();
 
     fireEvent.click(recognitionToggle);
@@ -433,18 +453,6 @@ describe('AboutPage', () => {
     ['Functionality', 'Roadmap', 'Related Work', 'Recognition'].forEach((name) => {
       expect(screen.getByRole('button', { name })).toHaveAttribute('data-ce-control-appearance', 'frameless');
     });
-  });
-
-  it('only treats named recognition individuals as renderable configuration', () => {
-    expect(getConfiguredRecognitionIndividuals()).toEqual([]);
-    expect(
-      getConfiguredRecognitionIndividuals([
-        null,
-        {},
-        { name: '   ' },
-        { name: 'Audrey Tang', url: 'https://example.com/audrey' },
-      ]),
-    ).toEqual([{ name: 'Audrey Tang', url: 'https://example.com/audrey' }]);
   });
 
   it('uses the configured public demo route when list scope has no concrete session slug', () => {
@@ -540,15 +548,14 @@ describe('AboutPage', () => {
       /@container ce-theme style\(--ce-layout-profile:\s*desktop-window\)\s*{[\s\S]*?\.recognitionModalTitle\s*{[\s\S]*?color:\s*var\(--ce-titlebar-text\);/,
     );
     expect(scss).toMatch(
-      /@container ce-theme style\(--ce-layout-profile:\s*desktop-window\)\s*{[\s\S]*?\.heroPrimaryButton,\s*\.tertiaryLink,\s*\.titleRepoLink\s*{[\s\S]*?border:\s*2px solid;[\s\S]*?box-shadow:\s*var\(--ce-shadow-raised\);[\s\S]*?font-family:\s*var\(--ce-font-body\);/,
+      /@container ce-theme style\(--ce-layout-profile:\s*desktop-window\)\s*{[\s\S]*?\.heroPrimaryButton,\s*\.titleRepoLink\s*{[\s\S]*?border:\s*2px solid;[\s\S]*?box-shadow:\s*var\(--ce-shadow-raised\);[\s\S]*?font-family:\s*var\(--ce-font-body\);/,
     );
     expect(scss).toMatch(/\.heroPrimaryButton\s*{[\s\S]*?min-width:\s*148px;[\s\S]*?min-height:\s*48px;/);
-    expect(scss).toMatch(/\.tertiaryLink\s*{[\s\S]*?min-width:\s*108px;[\s\S]*?min-height:\s*34px;/);
     expect(scss).toMatch(
       /\.titleRepoLink\s*{[\s\S]*?width:\s*64px;[\s\S]*?height:\s*44px;[\s\S]*?background:\s*var\(--ce-control-face\);/,
     );
     expect(scss).toMatch(
-      /\.heroPrimaryButton:active,[\s\S]*?\.tertiaryLink:active,[\s\S]*?\.titleRepoLink:active\s*{[\s\S]*?box-shadow:\s*var\(--ce-shadow-pressed\);/,
+      /\.heroPrimaryButton:active,[\s\S]*?\.titleRepoLink:active\s*{[\s\S]*?box-shadow:\s*var\(--ce-shadow-pressed\);/,
     );
   });
 
@@ -563,12 +570,6 @@ describe('AboutPage', () => {
     );
     expect(scss).toMatch(
       /@media \(max-width:\s*640px\)\s*{[\s\S]*?\.toggleHeaderAside\s*{[\s\S]*?display:\s*flex;[\s\S]*?flex:\s*1 1 auto;[\s\S]*?margin-left:\s*0;/,
-    );
-    expect(scss).toMatch(
-      /@media \(max-width:\s*640px\)\s*{[\s\S]*?\.recognitionSummary\s*{[\s\S]*?display:\s*flex;[\s\S]*?flex:\s*0 1 auto;[\s\S]*?margin-top:\s*0;[\s\S]*?overflow:\s*hidden;/,
-    );
-    expect(scss).toMatch(
-      /@media \(max-width:\s*640px\)\s*{[\s\S]*?\.recognitionSummaryLogo \+ \.recognitionSummaryLogo\s*{[\s\S]*?margin-left:\s*-6px;/,
     );
     expect(scss).toMatch(
       /\.recognitionItem\s*{[\s\S]*?box-sizing:\s*border-box;[\s\S]*?min-width:\s*0;[\s\S]*?max-width:\s*100%;/,

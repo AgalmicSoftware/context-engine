@@ -228,7 +228,7 @@ describe('OnePageSession auto-mint queue', () => {
     const nativeBalanceSpy = jest
       .spyOn(contractScripts, 'getNativeBalance')
       .mockResolvedValue(ethers.utils.parseEther('0.1'));
-    const ok = await subject.waitForSufficientBalance('mock', account, ethers.utils.parseEther('0.00002'), 50, 1);
+    const ok = await subject.waitForSufficientBalance(account, ethers.utils.parseEther('0.00002'), 50, 1);
 
     expect(ok).toBe(true);
     expect(nativeBalanceSpy).toHaveBeenCalledWith(account, expect.any(String));
@@ -296,7 +296,7 @@ describe('OnePageSession auto-mint queue', () => {
 
     await subject.runAutoMintQueue();
 
-    expect(claimSpy).toHaveBeenCalledWith('wagmi', sbtAddress);
+    expect(claimSpy).toHaveBeenCalledWith('wagmi', sbtAddress, 84532);
     expect(subject.state.autoMintStatuses[sbtAddress.toLowerCase()]).toMatchObject({
       status: 'success',
       name: 'Joined: Public Badge',
@@ -460,7 +460,6 @@ describe('OnePageSession auto-mint queue', () => {
     const queueRun = subject.runAutoMintQueue();
     await waitFor(() =>
       expect(subject.waitForSufficientBalance).toHaveBeenCalledWith(
-        'wagmi',
         accountA.toLowerCase(),
         expect.anything(),
         expect.any(Number),
@@ -747,7 +746,7 @@ describe('OnePageSession auto-mint queue', () => {
     jest.spyOn(contractScripts, 'getGroupPasswordHash').mockResolvedValue(ethers.constants.HashZero);
     const claim = jest.spyOn(contractScripts, 'claim').mockResolvedValue({ transactionHash: '0xlocalclaim' });
     await subject.runAutoMintQueue();
-    expect(claim).toHaveBeenCalledWith('wagmi', sbtAddress);
+    expect(claim).toHaveBeenCalledWith('wagmi', sbtAddress, 84532);
   });
 
   it('auto-mints invite-code SBTs through the session queue', async () => {
@@ -780,7 +779,7 @@ describe('OnePageSession auto-mint queue', () => {
 
     await subject.runAutoMintQueue();
 
-    expect(claimInviteSpy).toHaveBeenCalledWith('wagmi', sbtAddress, '7', '0xinvite');
+    expect(claimInviteSpy).toHaveBeenCalledWith('wagmi', sbtAddress, '7', '0xinvite', 84532);
     expect(subject.state.autoMintStatuses[sbtAddress.toLowerCase()]).toMatchObject({
       status: 'success',
       name: 'Joined: Invite Badge',
@@ -1059,7 +1058,7 @@ describe('OnePageSession auto-mint queue', () => {
       await subject.runAutoMintQueue();
 
       expect(claimSpy).not.toHaveBeenCalled();
-      expect(inviteSpy).toHaveBeenCalledWith('wagmi', sbtAddress, '3', '0xsig');
+      expect(inviteSpy).toHaveBeenCalledWith('wagmi', sbtAddress, '3', '0xsig', 84532);
     });
 
     it('skips with a read-failure message, not a public claim, when the hash cannot be read', async () => {
@@ -1155,7 +1154,7 @@ describe('OnePageSession auto-mint queue', () => {
       chainId: 84532,
       groupPasswordHash: onchainHash,
     });
-    expect(sendSpy).toHaveBeenCalledWith('wagmi', sbtAddress, '0xsig');
+    expect(sendSpy).toHaveBeenCalledWith('wagmi', sbtAddress, '0xsig', 84532);
     expect(order).toEqual(['sign', 'accepted', 'send']);
     expect(subject.state.mintingStatus).toBe('success');
   });
@@ -1262,6 +1261,6 @@ describe('OnePageSession auto-mint queue', () => {
 
     await subject.runAutoMintQueue();
 
-    expect(claimSpy).toHaveBeenCalledWith('wagmi', sbtAddress);
+    expect(claimSpy).toHaveBeenCalledWith('wagmi', sbtAddress, 84532);
   });
 });

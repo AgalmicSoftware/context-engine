@@ -1,10 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { fixture, wallet, sessionId, enforceKvWriteLimit } from './agentTestFixture.mjs';
+import { persistAgentSubmitRecord, canonicalAnswerSessionKvPrefix } from './agent/agentSubmitQueue.mjs';
 import { saveAgentOnlyModeConfig } from './agent/wrappedConfig.mjs';
 import { createWorkerExecutionServicesWithWorkerDeps } from './workerExecutionServiceBinding.js';
 import { signToken } from './tokenSigning.js';
 import { persistAuthTokenRecord } from './authTokenClaims.js';
+import { dispatchWrappedResearch } from './agent/wrappedJournal.mjs';
 import { SessionWriteCoordinator } from './sessionWriteCoordinator.js';
 const openQ = '0x' + 'a'.repeat(64), gatedQ = '0x' + 'b'.repeat(64);
 const metadata = { model: 'fixture-model', scaffold_version: 'fixture-v1' };
@@ -312,4 +314,284 @@ test('more than 2000 proposals remain a capped question list marked incomplete',
   assert.equal(page.hasMore, true);
   assert.equal((await f.request('/api/agent/results?view=consensus', { token: admin.token })).status, 503,
     'an aggregate must not present the capped source as a complete result');
+});
+
+test('a re-posted question keeps its answer schema, and an archived one stays archived', async () => {
+  const { f } = readableFixture();
+  const admin = await f.credential({ scopes: ['read_questions', 'pose_questions'] });
+  const create = async question => jsonOk(await f.request('/api/agent/questions/create', { method: 'POST', token: admin.token,
+    body: { questions: [question] } }));
+  const proposals = () => [...f.records].filter(([key]) => key.includes('proposed-question'));
+  const choice = { prompt: 'Which fixture season?', questionType: 'multichoice', options: ['Spring', 'Autumn'] };
+  const rating = { prompt: 'Rate the fixture plan', questionType: 'rating', ratingScale: { min: 1, max: 5 } };
+  const [{ questionId: choiceId }] = (await create(choice)).created;
+  const [{ questionId: ratingId }] = (await create(rating)).created;
+  const stored = proposals();
+  for (const changed of [{ ...choice, options: ['Spring', 'Winter'] }, { ...choice, singleSelect: true },
+    { ...rating, ratingScale: { min: 0, max: 100 } }]) {
+    const result = await create(changed);
+    assert.deepEqual(result.created, [], JSON.stringify(changed));
+    assert.equal(result.skipped[0].reason, 'question_schema_conflict');
+  }
+  // The same question again is reported as before, and nothing is rewritten.
+  assert.deepEqual((await create(choice)).created.map(row => row.questionId), [choiceId]);
+  assert.deepEqual(proposals(), stored);
+  await jsonOk(await f.request('/api/agent/admin/questions/delete', { method: 'POST', token: admin.token, body: { questionIds: [ratingId] } }));
+  const archived = proposals();
+  const reposted = await create(rating);
+  assert.deepEqual(reposted.created, []);
+  assert.equal(reposted.skipped[0].reason, 'question_archived');
+  assert.deepEqual(proposals(), archived);
+});
+
+test('a question batch reports every question it stores under the KV write limit', async () => {
+  const { f } = readableFixture();
+  const admin = await f.credential({ scopes: ['read_questions', 'pose_questions'] });
+  const time = Date.now();
+  const limited = enforceKvWriteLimit(f.env.GROUP_KV, () => time);
+  const result = await jsonOk(await f.request('/api/agent/questions/create', { method: 'POST', token: admin.token,
+    body: { questions: ['one', 'two', 'three'].map(label => ({ prompt: `Batch fixture ${label}?`, questionType: 'binary' })) } }));
+  assert.equal(result.created.length, 3);
+  assert.deepEqual(result.skipped, []);
+  assert.deepEqual(limited.rejected, []);
+  assert.equal([...f.records.keys()].filter(key => key.includes('proposed-question')).length, 3);
+});
+
+for (const complete of [false, true]) test(`research completion counts stored answers once across retries, overlaps and edits (complete=${complete})`, async () => {
+  const { f, coordinated } = readableFixture();
+  let time = Date.now();
+  coordinated.coordinator.now = () => time;
+  f.config.agentHttp.wrapped = { posterEnabled: true, posterRenderer: 'local' };
+  const member = await memberToken(f);
+  const admin = await f.credential({ scopes: ['read_questions'] });
+  const page = await jsonOk(await f.request('/api/agent/agent-only/statements', { token: member }));
+  const runId = 'coverage-run';
+  const bodyFor = (requestId, ids, value = 'agree') => ({ run_id: runId, request_id: requestId, agent_metadata: metadata,
+    answers: page.statements.filter(q => ids.includes(q.statement_id)).map(q => ({ statement_id: q.statement_id,
+      statement_version: q.statement_version, answer: { value }, confidence: 80 })) });
+  const send = async body => { time += 1000; return jsonOk(await f.request('/api/agent/agent-only/answers/bulk', { method: 'POST', token: member, body })); };
+  const summary = async () => (await jsonOk(await f.request('/api/agent/admin/agent-only/export?view=summary&format=json', { token: admin.token })));
+  const first = bodyFor('first-batch', [openQ]);
+  await send(first);
+  assert.equal((await send(first)).replay, true);
+  let result = await summary();
+  assert.equal(result.runs[0].accepted_answer_count, 1);
+  assert.equal(result.runs[0].answer_complete, false);
+  assert.equal(result.runs[0].successful, false);
+  const image = await f.request('/api/agent/agent-only/wrapped-image', { method: 'POST', token: member, body: { run_id: runId } });
+  assert.equal(image.status, 409);
+  assert.equal((await image.json()).agent_response_count, 1);
+  await send(bodyFor('overlapping-batch', complete ? [openQ, gatedQ] : [openQ]));
+  await send(bodyFor('edited-answer', [openQ], 'disagree'));
+  result = await summary();
+  assert.equal(result.runs[0].accepted_answer_count, complete ? 2 : 1);
+  assert.equal(result.runs[0].agent_response_count, complete ? 2 : 1);
+  assert.equal(result.runs[0].statement_count, 2);
+  assert.equal(result.runs[0].answer_complete, complete);
+  assert.equal(result.runs[0].successful, complete);
+  const attempts = await f.request('/api/agent/admin/agent-only/export?view=attempts', { token: admin.token });
+  assert.equal(attempts.status, 200);
+  const answerAttempts = (await attempts.text()).trim().split('\n').map(JSON.parse).filter(row => row.stage === 'answers_bulk');
+  assert.equal(answerAttempts.length, 4);
+  assert.equal(answerAttempts.filter(row => row.replay).length, 1);
+});
+
+for (const revised of [false, true]) test(`research exports retain canonical answers after index expiry and obey revision/time ordering (revised=${revised})`, async () => {
+  const { f } = readableFixture();
+  const member = await memberToken(f);
+  const admin = await f.credential({ scopes: ['read_questions'] });
+  const page = await jsonOk(await f.request('/api/agent/agent-only/statements', { token: member }));
+  await jsonOk(await f.request('/api/agent/agent-only/answers/bulk', { method: 'POST', token: member, body: {
+    run_id: 'history-run', request_id: 'history-prediction', agent_metadata: metadata,
+    answers: page.statements.map(q => ({ statement_id: q.statement_id, statement_version: q.statement_version, answer: { value: 'agree' }, confidence: 80 })),
+  } }));
+  const event = JSON.parse(f.records.get([...f.records.keys()].find(key => key.includes(':answer-event:'))));
+  const predictedAt = Date.parse(event.createdAt);
+  const answer = (value, comments) => ({ value, comments, questionType: 'binary' });
+  const prior = answer('agree', 'Prior exact answer');
+  const revision = answer('disagree', 'Current revision before prediction');
+  const later = answer('unsure', 'After prediction');
+  const store = async (requestId, questionId, answerRevision, offset, payload) => {
+    const result = await persistAgentSubmitRecord({ env: f.agentEnv, record: { sessionSlug: 'fixture',
+      telegramUserId: event.telegramUserId, questionId, requestId, answerRevision, status: 'direct_submitted',
+      createdAt: new Date(predictedAt + offset).toISOString(), answer: payload } });
+    assert.equal(result.ok, true);
+  };
+  await store('prior', openQ, 1, -1000, prior);
+  if (revised) await store('revision', openQ, 2, -2000, revision);
+  await store('later', openQ, 3, 1000, later);
+  await store('only-later', gatedQ, 1, 1000, later);
+  const lists = [];
+  const list = f.env.GROUP_KV.list.bind(f.env.GROUP_KV);
+  f.env.GROUP_KV.list = async options => { lists.push(options.prefix); return list(options); };
+  const exported = async view => {
+    lists.length = 0;
+    const response = await f.request(`/api/agent/admin/agent-only/export?view=${view}`, { token: admin.token });
+    assert.equal(response.status, 200, await response.clone().text());
+    const rows = (await response.text()).trim().split('\n').filter(Boolean).map(JSON.parse);
+    assert.equal(lists.filter(prefix => prefix.endsWith(canonicalAnswerSessionKvPrefix('fixture'))).length, 1, 'load canonical history once per export');
+    return rows;
+  };
+  const gold = await exported('gold');
+  assert.equal(gold.length, 1, 'a human answer after the prediction is not gold');
+  assert.deepEqual(gold[0].prior_human_answer, revised ? revision : prior);
+  const wide = await exported('wide');
+  assert.equal(wide.length, 2);
+  assert.ok(wide.every(row => JSON.stringify(row.human_current_answer) === JSON.stringify(later)));
+  for (const key of f.records.keys()) if (key.includes('telegram:submit-request')) f.records.delete(key);
+  assert.deepEqual(await exported('gold'), gold);
+  assert.deepEqual(await exported('wide'), wide);
+});
+
+test('research summaries retain each run own answers and original statement set', async () => {
+  const { f, coordinated, questions } = readableFixture();
+  let time = Date.now(); coordinated.coordinator.now = () => time;
+  const member = await memberToken(f);
+  const admin = await f.credential({ scopes: ['read_questions'] });
+  const statements = async () => (await jsonOk(await f.request('/api/agent/agent-only/statements', { token: member }))).statements;
+  const send = async (runId, requestId, ids) => {
+    const page = await statements(); time += 1000;
+    return jsonOk(await f.request('/api/agent/agent-only/answers/bulk', { method: 'POST', token: member,
+      body: { run_id: runId, request_id: requestId, agent_metadata: metadata,
+        answers: page.filter(q => ids.includes(q.statement_id)).map(q => ({ statement_id: q.statement_id,
+          statement_version: q.statement_version, answer: { value: 'agree' }, confidence: 80 })) } }));
+  };
+  const summary = async () => (await jsonOk(await f.request('/api/agent/admin/agent-only/export?view=summary&format=json', { token: admin.token }))).runs
+    .map(run => [run.run_id, run.agent_response_count, run.statement_count, run.answer_complete]).sort();
+  await send('run-one', 'first', [openQ, gatedQ]);
+  await send('run-two', 'second', [openQ]);
+  assert.deepEqual(await summary(), [['run-one', 2, 2, true], ['run-two', 1, 2, false]]);
+  const addedQ = `0x${'c'.repeat(64)}`;
+  questions.set('later-ref', { questionId: addedQ, sessionSlug: 'fixture', prompt: 'Added after both runs', questionType: 'binary' });
+  assert.equal((await statements()).length, 3);
+  assert.deepEqual(await summary(), [['run-one', 2, 2, true], ['run-two', 1, 2, false]]);
+  await send('run-one', 'later-edit', [openQ]);
+  assert.deepEqual(await summary(), [['run-one', 2, 2, true], ['run-two', 1, 2, false]]);
+  await send('run-three', 'third', [openQ]);
+  assert.deepEqual(await summary(), [['run-one', 2, 2, true], ['run-three', 1, 3, false], ['run-two', 1, 2, false]]);
+  const events = [...f.records.entries()].filter(([key]) => key.includes('answer-event:')).map(([, value]) => JSON.parse(value));
+  assert.ok(events.every(event => !Object.hasOwn(event, 'runStatementIds')), 'events never duplicate the frozen bank');
+  const state = JSON.parse(f.records.get([...f.records.keys()].find(key => key.includes('answer-state:'))));
+  assert.equal(state.runScopes.find(scope => scope.runId === 'run-one').runStatementIds.length, 2);
+});
+
+test('a research summary reports earlier-Worker records as unreadable instead of guessing their principal or run', async () => {
+  const { f } = readableFixture();
+  const member = await memberToken(f);
+  const admin = await f.credential({ scopes: ['read_questions'] });
+  const page = await jsonOk(await f.request('/api/agent/agent-only/statements', { token: member }));
+  await jsonOk(await f.request('/api/agent/agent-only/answers/bulk', { method: 'POST', token: member,
+    body: { run_id: 'current-run', request_id: 'current-first', agent_metadata: metadata,
+      answers: page.statements.map(q => ({ statement_id: q.statement_id, statement_version: q.statement_version,
+        answer: { value: 'agree' }, confidence: 80 })) } }));
+  const summary = format => f.request(`/api/agent/admin/agent-only/export?view=summary&format=${format}`, { token: admin.token });
+  const clean = await jsonOk(await summary('json'));
+  // What a 0.8.0 Worker wrote: attempt metadata without principal or run, and
+  // an answered state without run scopes.
+  const attemptKey = [...f.records.keys()].find(key => key.includes('attempt-event:'));
+  const stateKey = [...f.records.keys()].find(key => key.includes('answer-state:'));
+  f.records.set(`${attemptKey}-earlier`, f.records.get(attemptKey));
+  f.metadata.set(`${attemptKey}-earlier`, { v: 1, t: 'ao_attempt', sg: 'fixture', st: 'answers_bulk', ok: 1, r: '' });
+  const { runScopes, ...earlierState } = JSON.parse(f.records.get(stateKey));
+  assert.ok(runScopes.length);
+  f.records.set(`${stateKey}-earlier`, JSON.stringify({ ...earlierState, telegramUserId: 'earlier-member' }));
+  const partial = await jsonOk(await summary('json'));
+  assert.deepEqual(partial.principals, clean.principals, 'no principal is derived from a missing id');
+  assert.deepEqual(partial.runs, clean.runs, 'no run is derived from a missing run id');
+  assert.equal(partial.attempt_event_count, clean.attempt_event_count);
+  assert.equal(clean.complete, true);
+  assert.equal(clean.unreadable_attempt_event_count, 0);
+  assert.equal(clean.unreadable_answer_state_count, 0);
+  assert.equal(partial.complete, false);
+  assert.equal(partial.unreadable_attempt_event_count, 1);
+  assert.equal(partial.unreadable_answer_state_count, 1);
+  assert.equal(JSON.parse((await (await summary('jsonl')).text()).trim()).complete, false);
+  const csv = await summary('csv');
+  assert.equal(csv.status, 409, 'principal rows cannot say that they are partial');
+  assert.equal((await csv.json()).reason, 'agent_only_summary_incomplete');
+});
+
+
+test('a summary of over a thousand answer and attempt events stays below the KV operation budget', async () => {
+  const { f } = readableFixture();
+  const member = await memberToken(f);
+  const admin = await f.credential({ scopes: ['read_questions'] });
+  const page = await jsonOk(await f.request('/api/agent/agent-only/statements', { token: member }));
+  await jsonOk(await f.request('/api/agent/agent-only/answers/bulk', { method: 'POST', token: member,
+    body: { run_id: 'budget-run', request_id: 'budget-first', agent_metadata: metadata,
+      answers: page.statements.map(q => ({ statement_id: q.statement_id, statement_version: q.statement_version,
+        answer: { value: 'agree' }, confidence: 80 })) } }));
+  for (const marker of ['answer-event:', 'attempt-event:']) {
+    const key = [...f.records.keys()].find(key => key.includes(marker));
+    assert.ok(key, marker);
+    for (let i = 0; i < 1100; i++) {
+      const copy = `${key}-copy-${i}`;
+      f.records.set(copy, f.records.get(key));
+      f.metadata.set(copy, f.metadata.get(key));
+    }
+  }
+  let operations = 0, answerReads = 0, stateReads = 0;
+  const get = f.env.GROUP_KV.get.bind(f.env.GROUP_KV), list = f.env.GROUP_KV.list.bind(f.env.GROUP_KV);
+  f.env.GROUP_KV.get = async key => { operations++; if (key.includes('answer-event:')) answerReads++;
+    if (key.includes('answer-state:')) stateReads++; return get(key); };
+  f.env.GROUP_KV.list = async options => {
+    operations++;
+    const all = await list(options), offset = Number(options.cursor || 0), end = offset + options.limit;
+    return { keys: all.keys.slice(offset, end), list_complete: end >= all.keys.length,
+      ...(end < all.keys.length ? { cursor: String(end) } : {}) };
+  };
+  const summary = await jsonOk(await f.request('/api/agent/admin/agent-only/export?view=summary&format=json', { token: admin.token }));
+  assert.ok(operations < 1000, `${operations} KV operations exceed the budget`);
+  assert.equal(answerReads, 0);
+  assert.equal(stateReads, 1);
+  assert.equal(summary.runs[0].agent_response_count, 2);
+  assert.equal(summary.runs[0].answer_complete, true);
+  assert.ok(summary.attempt_event_count > 1000);
+});
+
+test('a pending 50-answer commit for a 600-statement bank stays below two MiB', async () => {
+  const { f, coordinated } = readableFixture();
+  const ids = Array.from({ length: 600 }, (_, i) => `0x${i.toString(16).padStart(64, '0')}`);
+  const runId = 'large-bank', createdAt = new Date().toISOString();
+  const put = f.env.GROUP_KV.put.bind(f.env.GROUP_KV);
+  f.env.GROUP_KV.put = async (key, value, options) => {
+    if (key.includes('answer-event:')) throw new Error('Projection unavailable');
+    return put(key, value, options);
+  };
+  const response = await dispatchWrappedResearch(coordinated.coordinator, { slug: 'fixture',
+    expectedAuthority: { actor: wallet.address.toLowerCase(), revision: 1, authzEpoch: 1 },
+    record: { kind: 'answers', subjectId: 'fixture-member', sessionSlug: 'fixture', sessionId,
+      requestId: 'large-bank-first', summaryHash: 'a'.repeat(64), createdAt, runStatementIds: ids,
+      initialState: { byStatement: {}, telegramUserId: 'fixture-member' }, changes: {}, response: { ok: true },
+      events: ids.slice(0, 50).map(questionId => ({ key: `answer-event:${questionId}`, metadata: {},
+        value: { runId, questionId, eventKind: 'answer', answer: { value: 'agree' }, createdAt } })) } });
+  assert.equal(response.status, 503);
+  const pending = [...coordinated.durable.values()].find(value => value.complete === false && value.events);
+  assert.ok(pending);
+  const bytes = Buffer.byteLength(JSON.stringify(pending));
+  assert.ok(bytes < 2 * 1024 * 1024, `${bytes} pending bytes exceed two MiB`);
+  const state = [...coordinated.durable.values()].find(value => value.value?.runScopes);
+  assert.equal(state.value.runScopes[0].runStatementIds?.length, 600);
+  assert.ok(pending.events.every(event => !Object.hasOwn(event.value, 'runStatementIds')));
+});
+
+test('bounded run history refuses a new run without dropping existing coverage', async () => {
+  const { f, coordinated } = readableFixture();
+  let time = Date.now(); coordinated.coordinator.now = () => time;
+  const member = await memberToken(f);
+  const page = await jsonOk(await f.request('/api/agent/agent-only/statements', { token: member }));
+  const send = async runId => { time += 1000; return f.request('/api/agent/agent-only/answers/bulk', { method: 'POST', token: member,
+    body: { run_id: runId, request_id: runId, agent_metadata: metadata,
+      answers: page.statements.map(q => ({ statement_id: q.statement_id, statement_version: q.statement_version,
+        answer: { value: 'agree' }, confidence: 80 })) } }); };
+  // Runs 1 to 50 are kept, including the 21st that a 20-run cap refused.
+  for (let i = 0; i < 50; i++) await jsonOk(await send(`run-${i + 1}`));
+  const stateKey = [...f.records.keys()].find(key => key.includes('answer-state:'));
+  const original = f.records.get(stateKey);
+  assert.equal(JSON.parse(original).runScopes.length, 50);
+  const rejected = await send('run-51');
+  assert.equal(rejected.status, 409);
+  assert.equal((await rejected.json()).reason, 'wrapped_run_history_full');
+  assert.equal(f.records.get(stateKey), original);
+  await jsonOk(await send('run-50'));
 });

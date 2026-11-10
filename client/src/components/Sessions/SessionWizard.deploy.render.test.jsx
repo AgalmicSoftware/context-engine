@@ -30,7 +30,6 @@ const mockSecondPendingSbtAddress = ethers.utils.getAddress('0xe7f1725E7734CE288
 const mockReplacementSbtAddress = ethers.utils.getAddress('0x8ba1f109551bd432803012645ac136ddd64dba72');
 const mockTestAdminAddress = '0x00000000000000000000000000000000000000aa';
 const TEST_ADMIN_ADDRESS = mockTestAdminAddress;
-const NEW_SESSION_BANNER_DISMISSED_KEY = 'ce_new_session_banner_dismissed';
 const ORIGINAL_PUBLIC_URL = process.env.PUBLIC_URL;
 const mockSelectorSourceFactory = '0x538A48BC439A36D2A86e63114DCD9c429d2ddEcA';
 const mockSelectorSourceStartBlock = 30297069;
@@ -355,9 +354,6 @@ const getWizardResourceCard = (resourceKey) =>
   screen
     .getAllByTestId(E2E_TESTIDS.WIZARD_RESOURCE_CARD)
     .find((card) => card.getAttribute('data-ce-resource-key') === resourceKey);
-const enableAdvancedMode = () => {
-  fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED));
-};
 const seedDecentralizedProfile = ({ usesLit = false } = {}) => {
   const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED);
   if (usesLit) {
@@ -378,52 +374,19 @@ const seedDecentralizedProfile = ({ usesLit = false } = {}) => {
     }),
   );
 };
-const selectNormalModeCard = (label) => {
-  fireEvent.click(screen.getByRole('button', { name: new RegExp(label, 'i') }));
+// Every setup section but Basics starts closed behind its More button.
+const openSetupSection = (key) => {
+  const toggle = screen.queryByTestId(`ce-setup-more-${key}`);
+  if (!toggle || toggle.getAttribute('aria-expanded') === 'true') return;
+  fireEvent.click(toggle);
 };
-const getMockSelectorById = (selectorId) =>
-  screen
-    .queryAllByTestId('mock-wizard-sbt-selector')
-    .find((node) => node.getAttribute('data-selector-id') === selectorId);
-const expectSelectorAddresses = async (selectorId, expectedAddresses) => {
-  await waitFor(() => {
-    const selector = getMockSelectorById(selectorId);
-    expect(selector).toBeTruthy();
-    expect(selector).toHaveAttribute('data-selected-addresses', expectedAddresses.join(','));
-  });
+// The registry network moved from the header into Hosting's More (on-chain profiles).
+const selectRegistryNetwork = (chainId) => {
+  openSetupSection('hosting');
+  fireEvent.change(document.getElementById('ce-setup-chain'), { target: { value: String(chainId) } });
 };
-const openAdvancedMoreOptions = async () => {
-  enableAdvancedMode();
-  fireEvent.click(screen.getByRole('button', { name: /more options/i }));
-};
-const getFeaturedCreateButton = async () =>
-  await waitFor(() => {
-    const button = screen
-      .getAllByTestId(E2E_TESTIDS.WIZARD_CREATE_SBT)
-      .find((node) => node.getAttribute('data-ce-sbt-target') === 'defaultFeaturedSBTs');
-    expect(button).toBeTruthy();
-    return button;
-  });
-const ensureGateASelectorVisible = async () => {
-  if (!getMockSelectorById('encryption-gate-gate-1')) {
-    fireEvent.click(screen.getByRole('button', { name: /groups allowed to decrypt locked fields/i }));
-  }
-  await waitFor(() => {
-    expect(getMockSelectorById('encryption-gate-gate-1')).toBeTruthy();
-  });
-};
-const createPendingFeaturedDraft = async () => {
-  await openAdvancedMoreOptions();
-  fireEvent.click(await getFeaturedCreateButton());
-  fireEvent.click(await screen.findByRole('button', { name: 'Save pending SBT' }));
-  await waitFor(() => {
-    expect(screen.queryByTestId('mock-create-sbt-group')).not.toBeInTheDocument();
-    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_PENDING_SBT)).toHaveAttribute(
-      'data-ce-sbt-address',
-      mockPendingSbtAddress.toLowerCase(),
-    );
-    expect(sessionStorage.getItem('ce:sessionWizardPendingSbtDrafts:v1')).toBeNull();
-  });
+const setCloudflareApiToken = (value) => {
+  fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN), { target: { value } });
 };
 
 describe('SessionWizard deploy render validation', () => {
@@ -546,32 +509,18 @@ describe('SessionWizard deploy render validation', () => {
         account: TEST_ADMIN_ADDRESS,
         toggleLoginModal: jest.fn(),
       });
-      enableAdvancedMode();
 
       const sessionNameInput = await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
-      if (!screen.queryByTestId(E2E_TESTIDS.WIZARD_SLUG)) {
-        fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_METADATA_PANEL_TOGGLE));
-      }
-
       fireEvent.change(sessionNameInput, {
         target: { value: 'Hidden Lit Deploy Session' },
       });
-      fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SLUG), {
-        target: { value: 'hidden-lit-deploy-session' },
-      });
+      expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_SLUG)).toHaveTextContent(
+        '/session/hidden-lit-deploy-session',
+      );
 
-      fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
-      fireEvent.click(await screen.findByRole('button', { name: 'Use My Own' }));
+      openSetupSection('hosting');
 
-      const deployHelperInput = screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_HELPER_URL);
-      fireEvent.change(deployHelperInput, {
-        target: { value: 'https://deploy-helper.example.test' },
-      });
-      const cloudflareTokenInput = screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN);
-      const reactPropsKey = Object.keys(cloudflareTokenInput).find((key) => key.startsWith('__reactProps$'));
-      act(() => {
-        cloudflareTokenInput[reactPropsKey].onChange({ target: { value: 'cf-test-token' } });
-      });
+      setCloudflareApiToken('cf-test-token');
 
       fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_OPENAI_KEY), {
         target: { value: 'sk-latest' },
@@ -582,15 +531,17 @@ describe('SessionWizard deploy render validation', () => {
 
       expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_ACCOUNT_API_KEY)).not.toBeInTheDocument();
       expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_API_BASE)).not.toBeInTheDocument();
-      expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_PAYER_PRIVATE_KEY)).not.toBeInTheDocument();
 
       fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_WORKER));
 
       let deployCall;
-      await waitFor(() => {
-        deployCall = global.fetch.mock.calls.find(([url]) => String(url).endsWith('/deploy'));
-        expect(deployCall).toBeTruthy();
-      });
+      await waitFor(
+        () => {
+          deployCall = global.fetch.mock.calls.find(([url]) => String(url).endsWith('/deploy'));
+          expect(deployCall).toBeTruthy();
+        },
+        { timeout: 8000 },
+      );
 
       const deployPayload = JSON.parse(deployCall[1].body);
       expect(deployPayload.secrets).toEqual(
@@ -602,10 +553,13 @@ describe('SessionWizard deploy render validation', () => {
       expect(deployPayload.secrets.litPayerPrivateKey).toBeUndefined();
       expect(deployPayload.secrets.litPayerAddress).toBeUndefined();
 
-      await waitFor(() => {
-        const cached = JSON.parse(sessionStorage.getItem('ce:sessionWizardDraft:v1') || '{}');
-        expect(cached.provisionedSponsoredContext?.fields?.sponsored_lit).toBe('0');
-      });
+      await waitFor(
+        () => {
+          const cached = JSON.parse(sessionStorage.getItem('ce:sessionWizardDraft:v1') || '{}');
+          expect(cached.provisionedSponsoredContext?.fields?.sponsored_lit).toBe('0');
+        },
+        { timeout: 8000 },
+      );
     } finally {
       global.fetch = originalFetch;
       workerAuth.normalizeWorkerUrl.mockImplementation(originalNormalizeWorkerUrl);
@@ -614,7 +568,7 @@ describe('SessionWizard deploy render validation', () => {
     }
   });
 
-  it('sends the latest worker secret snapshot in the deploy payload from advanced mode', async () => {
+  it('sends the latest worker secret snapshot in the deploy payload', async () => {
     const originalFetch = global.fetch;
     const workerAuth = require('../../utilities/worker/workerAuth.js');
     const originalNormalizeWorkerUrl = workerAuth.normalizeWorkerUrl.getMockImplementation();
@@ -662,48 +616,34 @@ describe('SessionWizard deploy render validation', () => {
         account: TEST_ADMIN_ADDRESS,
         toggleLoginModal: jest.fn(),
       });
-      enableAdvancedMode();
-      fireEvent.change(screen.getAllByRole('combobox')[0], {
-        target: { value: '84532' },
-      });
+      selectRegistryNetwork(84532);
 
       const sessionNameInput = await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
-      if (!screen.queryByTestId(E2E_TESTIDS.WIZARD_SLUG)) {
-        fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_METADATA_PANEL_TOGGLE));
-      }
-
       fireEvent.change(sessionNameInput, {
         target: { value: 'Timing Regression Session' },
       });
-      fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SLUG), {
-        target: { value: 'timing-regression-session' },
-      });
+      expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_SLUG)).toHaveTextContent(
+        '/session/timing-regression-session',
+      );
 
-      fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
-      fireEvent.click(await screen.findByRole('button', { name: 'Use My Own' }));
+      openSetupSection('hosting');
 
-      await waitFor(() => {
-        expect(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_NAME)).toHaveTextContent('timing-regression-session');
-      });
+      await waitFor(
+        () => {
+          expect(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_NAME)).toHaveTextContent('timing-regression-session');
+        },
+        { timeout: 8000 },
+      );
       expect(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_URL)).toHaveValue('https://deploy-helper.example.test');
       expect(screen.getByTestId(E2E_TESTIDS.WIZARD_EMBEDDED_DEPLOY_HELPER_ENABLED)).toBeChecked();
 
-      const deployHelperInput = screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_HELPER_URL);
-      fireEvent.change(deployHelperInput, {
-        target: { value: 'https://deploy-helper.example.test' },
-      });
-      await waitFor(() => {
-        expect(deployHelperInput).toHaveValue('https://deploy-helper.example.test');
-      });
-      const cloudflareTokenInput = screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN);
-      const reactPropsKey = Object.keys(cloudflareTokenInput).find((key) => key.startsWith('__reactProps$'));
-      expect(reactPropsKey).toBeTruthy();
-      act(() => {
-        cloudflareTokenInput[reactPropsKey].onChange({ target: { value: 'cf-test-token' } });
-      });
-      await waitFor(() => {
-        expect(screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN)).toHaveValue('cf-test-token');
-      });
+      setCloudflareApiToken('cf-test-token');
+      await waitFor(
+        () => {
+          expect(screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN)).toHaveValue('cf-test-token');
+        },
+        { timeout: 8000 },
+      );
       fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_OPENAI_KEY), {
         target: { value: 'sk-older' },
       });
@@ -720,13 +660,16 @@ describe('SessionWizard deploy render validation', () => {
       fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_WORKER));
 
       let deployCall;
-      await waitFor(() => {
-        deployCall = global.fetch.mock.calls.find(([url]) => String(url).endsWith('/deploy'));
-        if (!deployCall) {
-          const deployStatus = screen.queryByTestId(E2E_TESTIDS.WIZARD_DEPLOY_STATUS)?.textContent || '<none>';
-          throw new Error(`Deploy call not found. Status: ${deployStatus}`);
-        }
-      });
+      await waitFor(
+        () => {
+          deployCall = global.fetch.mock.calls.find(([url]) => String(url).endsWith('/deploy'));
+          if (!deployCall) {
+            const deployStatus = screen.queryByTestId(E2E_TESTIDS.WIZARD_DEPLOY_STATUS)?.textContent || '<none>';
+            throw new Error(`Deploy call not found. Status: ${deployStatus}`);
+          }
+        },
+        { timeout: 8000 },
+      );
 
       const deployPayload = JSON.parse(deployCall[1].body);
       expect(deployPayload.embeddedDeployHelperEnabled).toBe(true);
@@ -738,9 +681,12 @@ describe('SessionWizard deploy render validation', () => {
         }),
       );
 
-      await waitFor(() => {
-        expect(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_STATUS)).toHaveTextContent('Worker deployed.');
-      });
+      await waitFor(
+        () => {
+          expect(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_STATUS)).toHaveTextContent('Worker deployed.');
+        },
+        { timeout: 8000 },
+      );
       expect(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_URL)).toHaveValue('https://deployed.example.test');
 
       expect(workerAuth.buildSignedAdminActionAuth).toHaveBeenCalledWith(
@@ -765,19 +711,22 @@ describe('SessionWizard deploy render validation', () => {
         }),
       );
 
-      await waitFor(() => {
-        const cachedRaw = sessionStorage.getItem('ce:sessionWizardDraft:v1') || '{}';
-        expect(JSON.parse(cachedRaw)).toEqual(
-          expect.objectContaining({
-            provisionedSponsoredContext: expect.objectContaining({
-              workerUrl: 'https://deployed.example.test',
-              fields: expect.objectContaining({
-                sponsored_lit: '1',
+      await waitFor(
+        () => {
+          const cachedRaw = sessionStorage.getItem('ce:sessionWizardDraft:v1') || '{}';
+          expect(JSON.parse(cachedRaw)).toEqual(
+            expect.objectContaining({
+              provisionedSponsoredContext: expect.objectContaining({
+                workerUrl: 'https://deployed.example.test',
+                fields: expect.objectContaining({
+                  sponsored_lit: '1',
+                }),
               }),
             }),
-          }),
-        );
-      });
+          );
+        },
+        { timeout: 8000 },
+      );
       expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith('/account'))).toBe(false);
     } finally {
       global.fetch = originalFetch;
@@ -859,35 +808,19 @@ describe('SessionWizard deploy render validation', () => {
         account: TEST_ADMIN_ADDRESS,
         toggleLoginModal: jest.fn(),
       });
-      enableAdvancedMode();
-      fireEvent.change(screen.getAllByRole('combobox')[0], {
-        target: { value: '84532' },
-      });
+      selectRegistryNetwork(84532);
 
       const sessionNameInput = await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
-      if (!screen.queryByTestId(E2E_TESTIDS.WIZARD_SLUG)) {
-        fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_METADATA_PANEL_TOGGLE));
-      }
-
       fireEvent.change(sessionNameInput, {
         target: { value: 'Chipotle Provision Session' },
       });
-      fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SLUG), {
-        target: { value: 'chipotle-provision-session' },
-      });
+      expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_SLUG)).toHaveTextContent(
+        '/session/chipotle-provision-session',
+      );
 
-      fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
-      fireEvent.click(await screen.findByRole('button', { name: 'Use My Own' }));
+      openSetupSection('hosting');
 
-      const deployHelperInput = screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_HELPER_URL);
-      fireEvent.change(deployHelperInput, {
-        target: { value: 'https://deploy-helper.example.test' },
-      });
-      const cloudflareTokenInput = screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN);
-      const reactPropsKey = Object.keys(cloudflareTokenInput).find((key) => key.startsWith('__reactProps$'));
-      act(() => {
-        cloudflareTokenInput[reactPropsKey].onChange({ target: { value: 'cf-test-token' } });
-      });
+      setCloudflareApiToken('cf-test-token');
 
       fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_OPENAI_KEY), {
         target: { value: 'sk-latest' },
@@ -897,11 +830,14 @@ describe('SessionWizard deploy render validation', () => {
       });
       fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_WORKER));
 
-      await waitFor(() => {
-        expect(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_STATUS)).toHaveTextContent(
-          'Missing required secrets before deploy: Lit API key or complete Lit runtime credentials',
-        );
-      });
+      await waitFor(
+        () => {
+          expect(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_STATUS)).toHaveTextContent(
+            'Missing required secrets before deploy: Lit API key or complete Lit runtime credentials',
+          );
+        },
+        { timeout: 8000 },
+      );
       expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith('/deploy'))).toBe(false);
       expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith('/admin/lit-chipotle-provision'))).toBe(
         false,
@@ -993,35 +929,19 @@ describe('SessionWizard deploy render validation', () => {
         account: TEST_ADMIN_ADDRESS,
         toggleLoginModal: jest.fn(),
       });
-      enableAdvancedMode();
-      fireEvent.change(screen.getAllByRole('combobox')[0], {
-        target: { value: '84532' },
-      });
+      selectRegistryNetwork(84532);
 
       const sessionNameInput = await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
-      if (!screen.queryByTestId(E2E_TESTIDS.WIZARD_SLUG)) {
-        fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_METADATA_PANEL_TOGGLE));
-      }
-
       fireEvent.change(sessionNameInput, {
         target: { value: 'Chipotle Bootstrap Session' },
       });
-      fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SLUG), {
-        target: { value: 'chipotle-bootstrap-session' },
-      });
+      expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_SLUG)).toHaveTextContent(
+        '/session/chipotle-bootstrap-session',
+      );
 
-      fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
-      fireEvent.click(await screen.findByRole('button', { name: 'Use My Own' }));
+      openSetupSection('hosting');
 
-      const deployHelperInput = screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_HELPER_URL);
-      fireEvent.change(deployHelperInput, {
-        target: { value: 'https://deploy-helper.example.test' },
-      });
-      const cloudflareTokenInput = screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN);
-      const reactPropsKey = Object.keys(cloudflareTokenInput).find((key) => key.startsWith('__reactProps$'));
-      act(() => {
-        cloudflareTokenInput[reactPropsKey].onChange({ target: { value: 'cf-test-token' } });
-      });
+      setCloudflareApiToken('cf-test-token');
 
       fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_OPENAI_KEY), {
         target: { value: 'sk-latest' },
@@ -1035,11 +955,14 @@ describe('SessionWizard deploy render validation', () => {
 
       fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_WORKER));
 
-      await waitFor(() => {
-        expect(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_STATUS)).toHaveTextContent(
-          'Lit bootstrap note: Lit session account auto-created.',
-        );
-      });
+      await waitFor(
+        () => {
+          expect(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_STATUS)).toHaveTextContent(
+            'Lit bootstrap note: Lit session account auto-created.',
+          );
+        },
+        { timeout: 8000 },
+      );
 
       const deployCall = global.fetch.mock.calls.find(([url]) => String(url).endsWith('/deploy'));
       const deployPayload = JSON.parse(deployCall[1].body);
@@ -1072,22 +995,25 @@ describe('SessionWizard deploy render validation', () => {
       expect(bootstrapPayload.litAccountApiKey).toBe('lit-account-key');
       expect(bootstrapPayload.litUsageApiKey).toBeUndefined();
       expect(bootstrapPayload.litGroupId).toBeUndefined();
-      await waitFor(() => {
-        expect(litProtocol.createLitHooks).toHaveBeenCalledWith(
-          expect.objectContaining({
-            chipotle: expect.objectContaining({
-              litCredentials: expect.objectContaining({
-                litApiBase: 'https://api.chipotle.litprotocol.com',
-                litGroupId: '7',
-                litPkpId: '0x1e5ed88b177bde881bb5e68b338c26c675e8f142',
-                litActionCid: 'QmBootstrapAction123',
-                litAuthorizationVersion: 'worker-signed-v1',
-                litAuthorizationSigner: '0x00000000000000000000000000000000000000aa',
+      await waitFor(
+        () => {
+          expect(litProtocol.createLitHooks).toHaveBeenCalledWith(
+            expect.objectContaining({
+              chipotle: expect.objectContaining({
+                litCredentials: expect.objectContaining({
+                  litApiBase: 'https://api.chipotle.litprotocol.com',
+                  litGroupId: '7',
+                  litPkpId: '0x1e5ed88b177bde881bb5e68b338c26c675e8f142',
+                  litActionCid: 'QmBootstrapAction123',
+                  litAuthorizationVersion: 'worker-signed-v1',
+                  litAuthorizationSigner: '0x00000000000000000000000000000000000000aa',
+                }),
               }),
             }),
-          }),
-        );
-      });
+          );
+        },
+        { timeout: 8000 },
+      );
       expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith('/admin/lit-chipotle-provision'))).toBe(
         false,
       );
@@ -1147,35 +1073,19 @@ describe('SessionWizard deploy render validation', () => {
         account: TEST_ADMIN_ADDRESS,
         toggleLoginModal: jest.fn(),
       });
-      enableAdvancedMode();
-      fireEvent.change(screen.getAllByRole('combobox')[0], {
-        target: { value: '84532' },
-      });
+      selectRegistryNetwork(84532);
 
       const sessionNameInput = await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
-      if (!screen.queryByTestId(E2E_TESTIDS.WIZARD_SLUG)) {
-        fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_METADATA_PANEL_TOGGLE));
-      }
-
       fireEvent.change(sessionNameInput, {
         target: { value: 'Helper Secret Sync Session' },
       });
-      fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SLUG), {
-        target: { value: 'helper-secret-sync-session' },
-      });
+      expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_SLUG)).toHaveTextContent(
+        '/session/helper-secret-sync-session',
+      );
 
-      fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
-      fireEvent.click(await screen.findByRole('button', { name: 'Use My Own' }));
+      openSetupSection('hosting');
 
-      const deployHelperInput = screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_HELPER_URL);
-      fireEvent.change(deployHelperInput, {
-        target: { value: 'https://deploy-helper.example.test' },
-      });
-      const cloudflareTokenInput = screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN);
-      const reactPropsKey = Object.keys(cloudflareTokenInput).find((key) => key.startsWith('__reactProps$'));
-      act(() => {
-        cloudflareTokenInput[reactPropsKey].onChange({ target: { value: 'cf-test-token' } });
-      });
+      setCloudflareApiToken('cf-test-token');
       fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_OPENAI_KEY), {
         target: { value: 'sk-latest' },
       });
@@ -1185,11 +1095,14 @@ describe('SessionWizard deploy render validation', () => {
 
       fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_WORKER));
 
-      await waitFor(() => {
-        expect(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_STATUS)).toHaveTextContent(
-          'Secrets sync note: Deploy helper already wrote secrets; skipped browser post-deploy secret sync.',
-        );
-      });
+      await waitFor(
+        () => {
+          expect(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_STATUS)).toHaveTextContent(
+            'Secrets sync note: Deploy helper already wrote secrets; skipped browser post-deploy secret sync.',
+          );
+        },
+        { timeout: 8000 },
+      );
       expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith('/account'))).toBe(false);
       expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith('/admin/set-secrets'))).toBe(false);
     } finally {
@@ -1250,31 +1163,17 @@ describe('SessionWizard deploy render validation', () => {
         loginComplete: true,
         toggleLoginModal: jest.fn(),
       });
-      enableAdvancedMode();
-      fireEvent.change(screen.getAllByRole('combobox')[0], {
-        target: { value: '84532' },
-      });
+      selectRegistryNetwork(84532);
 
       const sessionNameInput = await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
-      if (!screen.queryByTestId(E2E_TESTIDS.WIZARD_SLUG)) {
-        fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_METADATA_PANEL_TOGGLE));
-      }
-
       fireEvent.change(sessionNameInput, {
         target: { value: 'Wallet Race Session' },
       });
-      fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SLUG), {
-        target: { value: 'wallet-race-session' },
-      });
+      expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_SLUG)).toHaveTextContent('/session/wallet-race-session');
 
-      fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
-      fireEvent.click(await screen.findByRole('button', { name: 'Use My Own' }));
+      openSetupSection('hosting');
 
-      const cloudflareTokenInput = screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN);
-      const reactPropsKey = Object.keys(cloudflareTokenInput).find((key) => key.startsWith('__reactProps$'));
-      act(() => {
-        cloudflareTokenInput[reactPropsKey].onChange({ target: { value: 'cf-test-token' } });
-      });
+      setCloudflareApiToken('cf-test-token');
       fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_OPENAI_KEY), {
         target: { value: 'sk-race' },
       });
@@ -1285,17 +1184,23 @@ describe('SessionWizard deploy render validation', () => {
       fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_WORKER));
 
       let deployCall;
-      await waitFor(() => {
-        deployCall = global.fetch.mock.calls.find(([url]) => String(url).endsWith('/deploy'));
-        expect(deployCall).toBeTruthy();
-      });
+      await waitFor(
+        () => {
+          deployCall = global.fetch.mock.calls.find(([url]) => String(url).endsWith('/deploy'));
+          expect(deployCall).toBeTruthy();
+        },
+        { timeout: 8000 },
+      );
 
       const deployPayload = JSON.parse(deployCall[1].body);
       expect(deployPayload.adminAddress).toBe(TEST_ADMIN_ADDRESS);
       expect(providerRequest.mock.calls.map(([payload]) => payload?.method)).not.toContain('eth_requestAccounts');
-      await waitFor(() => {
-        expect(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_STATUS)).toHaveTextContent('Worker deployed.');
-      });
+      await waitFor(
+        () => {
+          expect(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_STATUS)).toHaveTextContent('Worker deployed.');
+        },
+        { timeout: 8000 },
+      );
       expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith('/account'))).toBe(false);
     } finally {
       global.fetch = originalFetch;

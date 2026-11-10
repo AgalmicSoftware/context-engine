@@ -24,7 +24,6 @@ import { fetchWorkerWithAuth, normalizeWorkerUrl } from '../worker/workerAuth.js
 
 type UnknownRecord = Record<string, unknown>;
 type ChainInput = unknown;
-type ByteInput = Uint8Array | ArrayBuffer | ArrayBufferView | ArrayLike<number>;
 type LitProviderLike = unknown;
 type LitAccessControlCondition = UnknownRecord & {
   operator?: 'and' | 'or' | string;
@@ -84,7 +83,6 @@ type LitUploadPayload = UnknownRecord & {
   encoding?: 'utf-8' | 'base64' | string;
   data?: string;
 };
-type ArweaveJwkLike = string | UnknownRecord;
 type LitUploadOptions = UnknownRecord & {
   data?: unknown;
   format?: unknown;
@@ -145,11 +143,6 @@ declare global {
 const isRecord = (value: unknown): value is UnknownRecord =>
   !!value && typeof value === 'object' && !Array.isArray(value);
 const asRecord = (value: unknown): UnknownRecord => (isRecord(value) ? value : {});
-const toErrorMessage = (err: unknown, fallback = ''): string => {
-  if (isRecord(err) && typeof err.message === 'string') return err.message;
-  const message = String(err || '').trim();
-  return message || fallback;
-};
 const toBytes = (value: unknown): Uint8Array => {
   if (value instanceof Uint8Array) return value;
   if (value instanceof ArrayBuffer) return new Uint8Array(value);
@@ -604,27 +597,6 @@ const normalizeAccessControlConditions = (
     if (!chain) return cond;
     return { ...cond, chain };
   });
-};
-
-const summarizeAccConditions = (conditions: unknown) => {
-  if (!Array.isArray(conditions) || !conditions.length) {
-    return {
-      hasConditions: false,
-      conditionCount: 0,
-      firstChain: null,
-      firstMethod: null,
-      operatorCount: 0,
-    };
-  }
-  const firstCond = conditions.find((c) => c && typeof c === 'object' && !c.operator) || null;
-  const operatorCount = conditions.filter((c) => c && typeof c === 'object' && !!c.operator).length;
-  return {
-    hasConditions: true,
-    conditionCount: conditions.length,
-    firstChain: toStr(firstCond?.chain || '').trim() || null,
-    firstMethod: toStr(firstCond?.method || '').trim() || null,
-    operatorCount,
-  };
 };
 
 /* ----------------------- Lit getKey memoization ------------------------ */

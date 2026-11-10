@@ -14,6 +14,8 @@ import {
   setInputValue,
   setAudioInputValue,
   addAdditionalPhoto,
+  addAdditionalFile,
+  addAdditionalUrl,
   renderSubject,
   makeSessionConfig,
   mockCallAI,
@@ -26,6 +28,86 @@ import {
 
 describe('AudioSurveyGenerator photo and extra source handling', () => {
   setupAudioSurveyGeneratorTestLifecycle();
+
+  it('keeps selection-time rejections visible when generation starts', async () => {
+    await renderSubject(<AudioSurveyGenerator activeSessionSlug="edge" sessionConfig={makeSessionConfig()} />);
+    addAdditionalPhoto(new File(['fixture'], 'memo.pdf', { type: 'application/pdf' }));
+    setAudioInputValue('A long discussion about shared priorities and practical ways to improve public decisions.');
+    expect(container.textContent).toContain('Skipped: memo.pdf');
+    mockCallAI.mockImplementationOnce(() => new Promise(() => {}));
+    await act(async () => {
+      container.querySelector('form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    });
+    expect(mockCallAI).toHaveBeenCalled();
+    expect(container.textContent).toContain('Skipped: memo.pdf');
+  });
+
+  it('repeats a selection-time rejection for the next generation only', async () => {
+    await renderSubject(<AudioSurveyGenerator activeSessionSlug="edge" sessionConfig={makeSessionConfig()} />);
+    addAdditionalPhoto(new File(['fixture'], 'memo.pdf', { type: 'application/pdf' }));
+    setAudioInputValue('A long discussion about shared priorities and practical ways to improve public decisions.');
+    const form = container.querySelector('form');
+    mockCallAI.mockRejectedValueOnce(new Error('Provider unavailable.'));
+    await act(async () => {
+      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    });
+    expect(container.textContent).toContain('Skipped: memo.pdf');
+
+    mockCallAI.mockImplementationOnce(() => new Promise(() => {}));
+    await act(async () => {
+      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    });
+    expect(mockCallAI).toHaveBeenCalledTimes(2);
+    expect(container.textContent).not.toContain('Skipped: memo.pdf');
+  });
+
+  it('leaves a selection-time rejection out of generation once the sources change', async () => {
+    await renderSubject(<AudioSurveyGenerator activeSessionSlug="edge" sessionConfig={makeSessionConfig()} />);
+    addAdditionalPhoto(new File(['fixture'], 'memo.pdf', { type: 'application/pdf' }));
+    expect(container.textContent).toContain('Skipped: memo.pdf');
+    addAdditionalFile(new File(['notes'], 'memo.txt', { type: 'text/plain' }));
+    setAudioInputValue('A long discussion about shared priorities and practical ways to improve public decisions.');
+    mockProcessAdditionalSources.mockResolvedValueOnce({
+      text: 'Notes from the memo about shared priorities.',
+      extractedCharacters: 44,
+      skipped: [],
+    });
+    mockCallAI.mockImplementationOnce(() => new Promise(() => {}));
+    await act(async () => {
+      container.querySelector('form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    });
+    expect(mockCallAI).toHaveBeenCalled();
+    expect(container.textContent).not.toContain('Skipped: memo.pdf');
+  });
+
+  it('clears source warnings when a new generation successfully reads the source', async () => {
+    mockProcessAdditionalSources.mockResolvedValueOnce({
+      text: '',
+      extractedCharacters: 0,
+      skipped: [{ name: 'Retry source', reason: 'Temporarily unreadable' }],
+    });
+    mockCallAI.mockResolvedValueOnce(
+      JSON.stringify({ questions: [{ prompt: 'Choose a shared priority?', questionType: 'binary' }] }),
+    );
+    await renderSubject(<AudioSurveyGenerator activeSessionSlug="edge" sessionConfig={makeSessionConfig()} />);
+    await addAdditionalUrl();
+    const form = container.querySelector('form');
+    await act(async () => {
+      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    });
+    expect(container.textContent).toContain('Skipped Retry source: Temporarily unreadable');
+    mockProcessAdditionalSources.mockResolvedValueOnce({
+      text: 'A readable source about public decision making and shared priorities.',
+      extractedCharacters: 70,
+      skipped: [],
+    });
+    await act(async () => {
+      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    });
+    expect(mockProcessAdditionalSources).toHaveBeenCalledTimes(2);
+    expect(mockCallAI).toHaveBeenCalledTimes(1);
+    expect(container.textContent).not.toContain('Skipped Retry source: Temporarily unreadable');
+  });
 
   it('blocks question generation when photo analysis is unsupported by the configured AI provider or model', async () => {
     mockAnalyzePhotoForQuestionGeneration.mockRejectedValueOnce(
@@ -368,7 +450,9 @@ describe('AudioSurveyGenerator photo and extra source handling', () => {
     );
 
     const fileInput = container.querySelector(`[data-testid="${E2E_TESTIDS.DATABASE_IMAGE_FILE_INPUT}"]`);
-    expect(fileInput.getAttribute('accept')).toContain('.pdf');
+    expect(fileInput.getAttribute('accept')).not.toContain('.pdf');
+    expect(fileInput.getAttribute('accept')).not.toContain('.ppt');
+    expect(fileInput.getAttribute('accept')).toContain('.txt');
     expect(fileInput.getAttribute('accept')).toContain('.jpeg');
     expect(fileInput.getAttribute('accept')).toContain('.jpg');
   });

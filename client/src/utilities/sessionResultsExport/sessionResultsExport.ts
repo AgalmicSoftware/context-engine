@@ -1,37 +1,19 @@
 import { getVoiceCredits } from '../../../../shared/questions/quadraticAllocation.mjs';
-import {
-  loadBrowserModuleWithRetry,
-  resolveDefaultExport,
-  resolveJsPdfConstructor,
-  saveCanvasAsPagedPdf,
-} from '../ui/browserPdfExport';
+import { normalizeRatingScale, type RatingScale } from '../survey/ratingValue';
 
 export const SESSION_RESULTS_HTML_SNAPSHOT_TYPE = 'ce_session_results_html_snapshot';
 export const SESSION_RESULTS_HTML_SNAPSHOT_VERSION = 1;
-export const SESSION_RESULTS_HTML_PRIVACY_REDACTED = 'redacted';
+// The report holds what its exporter could see in the Results view.
+export const SESSION_RESULTS_HTML_PRIVACY_AS_VIEWED = 'as-viewed';
 export const SESSION_RESULTS_EXPORT_FORMAT_VIEWER = 'viewer';
 export const SESSION_RESULTS_EXPORT_FORMAT_SINGLE_HTML = 'single-html';
 export const SESSION_RESULTS_EXPORT_FORMAT_PDF = 'pdf-report';
 
 const DEFAULT_UNAVAILABLE_REASON = 'No hydrated data was available for this section when the export was created.';
-const DEFAULT_REDACTIONS = [
-  'wallet_addresses',
-  'raw_responses',
-  'encrypted_payloads',
-  'gated_values',
-  'telegram_identifiers',
-] as const;
-const ETH_ADDRESS_TEXT_PATTERN = /\b0x[a-fA-F0-9]{40}\b/g;
-const REDACTED_ADDRESS_PLACEHOLDER = '[redacted-address]';
+const DEFAULT_REDACTIONS = ['encrypted_payloads', 'secrets', 'contact_handles'] as const;
 
-const SENSITIVE_KEY_PATTERNS = [
-  /^address$/i,
-  /^wallet$/i,
-  /^walletAddress$/i,
-  /^responder$/i,
-  /^responderAddress$/i,
-  /^participantAddress$/i,
-  /^participantAddresses$/i,
+// A report keeps what its exporter can see. Only unreadable ciphertext, secrets and contact handles stay out.
+const OMITTED_KEY_PATTERNS = [
   /^telegram(Id|UserId|ChatId|Handle|Username)$/i,
   /^privateKey$/i,
   /^apiKey$/i,
@@ -39,17 +21,12 @@ const SENSITIVE_KEY_PATTERNS = [
   /^token$/i,
   /^provider$/i,
   /^ciphertext$/i,
-  /^encrypted(Data|Envelope|Payload|Portion)?$/i,
+  /^(prompt|options|tags)Encrypted$/i,
+  /^encrypted(Data|Envelope|Payload|Portion|Prompt|Options|Tags)?$/i,
   /^litEnvelope$/i,
-  /^rawResponses?$/i,
-  /^responses?$/i,
-  /^answer$/i,
-  /^additional$/i,
-  /^additionalComments$/i,
-  /^freeformAnswer$/i,
 ];
 
-export type SessionResultsPrivacyMode = typeof SESSION_RESULTS_HTML_PRIVACY_REDACTED;
+export type SessionResultsPrivacyMode = typeof SESSION_RESULTS_HTML_PRIVACY_AS_VIEWED;
 export type SessionResultsExportFormat =
   | typeof SESSION_RESULTS_EXPORT_FORMAT_VIEWER
   | typeof SESSION_RESULTS_EXPORT_FORMAT_SINGLE_HTML
@@ -68,9 +45,18 @@ export type SessionResultsReportQuestion = {
   options: string[];
   prompt: string;
   responseCount: number;
+  scale?: RatingScale;
   voiceCredits?: number;
   tags: string[];
   type: string;
+};
+
+export type SessionResultsReportAnswer = {
+  answer: string;
+  comment: string;
+  conviction?: number;
+  questionId: string;
+  responder: string;
 };
 
 export type SessionResultsCounts = {
@@ -96,6 +82,7 @@ export type SessionResultsExporterMetadata = {
 };
 
 export type SessionResultsReportSection = {
+  answers: SessionResultsReportAnswer[];
   available: boolean;
   dimensions: unknown[];
   groups: unknown[];
@@ -175,14 +162,6 @@ export type SessionResultsHtmlReportRenderOptions = {
   sections?: SessionResultsSectionSelection;
 };
 
-export type SessionResultsPdfDownloadOptions = {
-  documentRef?: Document;
-  filename: string;
-  html: string;
-  html2canvasLoader?: () => Promise<unknown>;
-  jsPdfLoader?: () => Promise<unknown>;
-};
-
 const toSafeString = (value: unknown): string => (value === null || value === undefined ? '' : String(value));
 
 const toFiniteCount = (value: unknown): number => {
@@ -197,13 +176,6 @@ const toFiniteNullableNumber = (value: unknown): number | null => {
 
 const toStringArray = (value: unknown): string[] =>
   Array.isArray(value) ? value.map((item) => toSafeString(item).trim()).filter(Boolean) : [];
-
-const shortenAddress = (value: unknown): string => {
-  const address = toSafeString(value).trim();
-  if (!address) return '';
-  if (address.length <= 12) return address;
-  return `${address.slice(0, 6)}...${address.slice(-4)}`;
-};
 
 const toPlainRecord = (value: unknown): Record<string, unknown> =>
   value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
@@ -224,31 +196,39 @@ const normalizeExporterMetadata = (
   return {
     address,
     chainId: toFiniteNullableNumber(value?.chainId),
-    displayAddress: toSafeString(value?.displayAddress).trim() || shortenAddress(address),
+    displayAddress: toSafeString(value?.displayAddress).trim() || address,
   };
 };
 
-const shouldDropRedactedKey = (key: string): boolean => SENSITIVE_KEY_PATTERNS.some((pattern) => pattern.test(key));
+const shouldOmitKey = (key: string): boolean => OMITTED_KEY_PATTERNS.some((pattern) => pattern.test(key));
 
-export const redactSnapshotValue = (value: unknown): unknown => {
+const omitSecretValues = (value: unknown): unknown => {
   if (Array.isArray(value)) {
-    return value.map((item) => redactSnapshotValue(item));
-  }
-  if (typeof value === 'string') {
-    return value.replace(ETH_ADDRESS_TEXT_PATTERN, REDACTED_ADDRESS_PLACEHOLDER);
+    return value.map((item) => omitSecretValues(item));
   }
   if (!value || typeof value !== 'object') return value;
 
   const out: Record<string, unknown> = {};
   Object.entries(value as Record<string, unknown>).forEach(([key, entryValue]) => {
-    if (shouldDropRedactedKey(key)) return;
-    out[key] = redactSnapshotValue(entryValue);
+    if (shouldOmitKey(key)) return;
+    out[key] = omitSecretValues(entryValue);
   });
   return out;
 };
 
+const normalizeReportAnswer = (value: unknown): SessionResultsReportAnswer => {
+  const record = toPlainRecord(value);
+  return {
+    questionId: toSafeString(record.questionId).trim(),
+    responder: toSafeString(record.responder).trim(),
+    answer: toSafeString(record.answer),
+    comment: toSafeString(record.comment),
+    ...(typeof record.conviction === 'number' ? { conviction: record.conviction } : {}),
+  };
+};
+
 const normalizeReportQuestion = (value: unknown): SessionResultsReportQuestion => {
-  const record = toPlainRecord(redactSnapshotValue(value));
+  const record = toPlainRecord(omitSecretValues(value));
   return {
     id: toSafeString(record.id).trim(),
     options: toStringArray(record.options),
@@ -257,6 +237,7 @@ const normalizeReportQuestion = (value: unknown): SessionResultsReportQuestion =
     tags: toStringArray(record.tags),
     type: toSafeString(record.type).trim(),
     ...(record.type === 'quadratic' ? { voiceCredits: getVoiceCredits(record) } : {}),
+    ...(record.type === 'rating' ? { scale: normalizeRatingScale(record) } : {}),
   };
 };
 
@@ -264,14 +245,18 @@ const normalizeReportSection = (input?: Partial<SessionResultsReportSection>): S
   const questions = Array.isArray(input?.questions)
     ? input.questions.map(normalizeReportQuestion).filter((question) => question.id || question.prompt)
     : [];
-  const summary = toPlainRecord(redactSnapshotValue(input?.summary));
-  const dimensions = Array.isArray(input?.dimensions) ? input.dimensions.map(redactSnapshotValue) : [];
-  const groups = Array.isArray(input?.groups) ? input.groups.map(redactSnapshotValue) : [];
+  const answers = Array.isArray(input?.answers)
+    ? input.answers.map(normalizeReportAnswer).filter((answer) => answer.questionId)
+    : [];
+  const summary = toPlainRecord(omitSecretValues(input?.summary));
+  const dimensions = Array.isArray(input?.dimensions) ? input.dimensions.map(omitSecretValues) : [];
+  const groups = Array.isArray(input?.groups) ? input.groups.map(omitSecretValues) : [];
   const representativeQuestions = Array.isArray(input?.representativeQuestions)
-    ? input.representativeQuestions.map(redactSnapshotValue)
+    ? input.representativeQuestions.map(omitSecretValues)
     : [];
   const hasContent =
     questions.length > 0 ||
+    answers.length > 0 ||
     dimensions.length > 0 ||
     groups.length > 0 ||
     representativeQuestions.length > 0 ||
@@ -279,6 +264,7 @@ const normalizeReportSection = (input?: Partial<SessionResultsReportSection>): S
   const available = input?.available === true || (input?.available !== false && hasContent);
 
   return {
+    answers,
     available,
     dimensions,
     groups,
@@ -292,7 +278,7 @@ const normalizeReportSection = (input?: Partial<SessionResultsReportSection>): S
 const normalizeArgumentMapSection = (
   input?: Partial<SessionResultsArgumentMapSection>,
 ): SessionResultsArgumentMapSection => {
-  const debates = Array.isArray(input?.debates) ? input.debates.map(redactSnapshotValue) : [];
+  const debates = Array.isArray(input?.debates) ? input.debates.map(omitSecretValues) : [];
   const available = input?.available === true || (input?.available !== false && debates.length > 0);
   return {
     available,
@@ -304,10 +290,10 @@ const normalizeArgumentMapSection = (
 const normalizeRiskMatrixSection = (
   input?: Partial<SessionResultsRiskMatrixSection>,
 ): SessionResultsRiskMatrixSection => {
-  const categories = Array.isArray(input?.categories) ? input.categories.map(redactSnapshotValue) : [];
-  const comments = Array.isArray(input?.comments) ? input.comments.map(redactSnapshotValue) : [];
-  const scenarioLinks = Array.isArray(input?.scenarioLinks) ? input.scenarioLinks.map(redactSnapshotValue) : [];
-  const heatmap = toPlainRecord(redactSnapshotValue(input?.heatmap));
+  const categories = Array.isArray(input?.categories) ? input.categories.map(omitSecretValues) : [];
+  const comments = Array.isArray(input?.comments) ? input.comments.map(omitSecretValues) : [];
+  const scenarioLinks = Array.isArray(input?.scenarioLinks) ? input.scenarioLinks.map(omitSecretValues) : [];
+  const heatmap = toPlainRecord(omitSecretValues(input?.heatmap));
   const hasContent =
     categories.length > 0 || comments.length > 0 || scenarioLinks.length > 0 || Object.keys(heatmap).length > 0;
   const available = input?.available === true || (input?.available !== false && hasContent);
@@ -322,8 +308,8 @@ const normalizeRiskMatrixSection = (
 };
 
 const normalizeAtlasSection = (input?: Partial<SessionResultsAtlasSection>): SessionResultsAtlasSection => {
-  const nodes = Array.isArray(input?.nodes) ? input.nodes.map(redactSnapshotValue) : [];
-  const edges = Array.isArray(input?.edges) ? input.edges.map(redactSnapshotValue) : [];
+  const nodes = Array.isArray(input?.nodes) ? input.nodes.map(omitSecretValues) : [];
+  const edges = Array.isArray(input?.edges) ? input.edges.map(omitSecretValues) : [];
   const available = input?.available === true || (input?.available !== false && (nodes.length > 0 || edges.length > 0));
   return {
     available,
@@ -333,7 +319,7 @@ const normalizeAtlasSection = (input?: Partial<SessionResultsAtlasSection>): Ses
   };
 };
 
-export const buildRedactedSessionResultsSnapshot = (
+export const buildSessionResultsSnapshot = (
   input: BuildSessionResultsSnapshotInput = {},
 ): SessionResultsHtmlSnapshot => {
   const counts = input.counts || {};
@@ -351,7 +337,7 @@ export const buildRedactedSessionResultsSnapshot = (
     type: SESSION_RESULTS_HTML_SNAPSHOT_TYPE,
     version: SESSION_RESULTS_HTML_SNAPSHOT_VERSION,
     exportedAt: normalizeIsoTimestamp(input.exportedAt),
-    privacyMode: SESSION_RESULTS_HTML_PRIVACY_REDACTED,
+    privacyMode: SESSION_RESULTS_HTML_PRIVACY_AS_VIEWED,
     session: {
       slug: toSafeString(session.slug).trim(),
       name: toSafeString(session.name).trim(),
@@ -367,7 +353,7 @@ export const buildRedactedSessionResultsSnapshot = (
       atlasNodes: toFiniteCount(counts.atlasNodes),
       riskMatrixComments: toFiniteCount(counts.riskMatrixComments),
     },
-    filters: toPlainRecord(redactSnapshotValue(input.filters)),
+    filters: toPlainRecord(omitSecretValues(input.filters)),
     sections: {
       report: normalizeReportSection(input.sections?.report),
       argumentMap: normalizeArgumentMapSection(input.sections?.argumentMap),
@@ -400,12 +386,18 @@ const renderUnavailable = (label: string, reason?: string): string => `
       <p>${escapeHtml(reason || DEFAULT_UNAVAILABLE_REASON)}</p>
     </section>`;
 
+const formatRatingEnd = (value: number, label: string): string =>
+  label && label !== String(value) ? `${value} (${label})` : String(value);
+
+const formatRatingScale = ({ min, max, minLabel, maxLabel, step = 1 }: RatingScale): string =>
+  `${formatRatingEnd(min, minLabel)} to ${formatRatingEnd(max, maxLabel)}${step === 1 ? '' : `, step ${step}`}`;
+
 const renderQuestionRows = (questions: SessionResultsReportQuestion[]): string => {
   if (questions.length === 0) {
     return '<p>No report questions were captured in this snapshot.</p>';
   }
   return `
-      <table>
+      <table class="ce-report-questions">
         <thead>
           <tr>
             <th scope="col">Question</th>
@@ -429,7 +421,7 @@ const renderQuestionRows = (questions: SessionResultsReportQuestion[]): string =
               <td>${escapeHtml(question.type || 'unknown')}</td>
               <td>${escapeHtml(question.responseCount)}</td>
               <td>${escapeHtml(question.tags.join(', '))}</td>
-              <td>${escapeHtml(question.options.join(', '))}${question.type === 'quadratic' ? `<div class="ce-report-muted">${escapeHtml(getVoiceCredits(question))} voice credits</div>` : ''}</td>
+              <td>${escapeHtml(question.options.join(', '))}${question.type === 'quadratic' ? `<div class="ce-report-muted">${escapeHtml(getVoiceCredits(question))} voice credits</div>` : ''}${question.scale ? `<div class="ce-report-muted">${escapeHtml(formatRatingScale(question.scale))}</div>` : ''}</td>
             </tr>`,
             )
             .join('')}
@@ -468,12 +460,81 @@ const renderReportDimensions = (dimensions: unknown[]): string => {
         .join('')}`;
 };
 
-const renderReportSection = (snapshot: SessionResultsHtmlSnapshot): string => {
-  const { report } = snapshot.sections;
-  if (!report.available) return renderUnavailable('report', report.reason);
+type SelectedResultsSnapshot = Omit<SessionResultsHtmlSnapshot, 'sections'> & {
+  sections: Partial<SessionResultsSnapshotSections>;
+};
 
+const renderAnswerTable = (answers: SessionResultsReportAnswer[]): string => {
+  const hasConviction = answers.some((answer) => answer.conviction !== undefined);
   return `
-    <section id="report" class="ce-report-section">
+      <table class="ce-report-answers">
+        <thead>
+          <tr>
+            <th scope="col">Responder</th>
+            <th scope="col">Answer</th>
+            <th scope="col">Comment</th>
+            ${hasConviction ? '<th scope="col">Conviction</th>' : ''}
+          </tr>
+        </thead>
+        <tbody>
+          ${answers
+            .map(
+              (answer) => `
+            <tr>
+              <td>${escapeHtml(answer.responder)}</td>
+              <td>${escapeHtml(answer.answer)}</td>
+              <td>${escapeHtml(answer.comment)}</td>
+              ${hasConviction ? `<td>${escapeHtml(answer.conviction ?? '')}</td>` : ''}
+            </tr>`,
+            )
+            .join('')}
+        </tbody>
+      </table>`;
+};
+
+// Each question with answers, in the report's order, then any answers whose question it no longer lists.
+const groupReportAnswers = ({ answers, questions }: SessionResultsReportSection) => {
+  const groups = new Map<string, { title: string; answers: SessionResultsReportAnswer[] }>();
+  questions.forEach((question) => {
+    groups.set(question.id.toLowerCase(), { title: question.prompt || question.id, answers: [] });
+  });
+  answers.forEach((answer) => {
+    const key = answer.questionId.toLowerCase();
+    const group = groups.get(key) || { title: answer.questionId, answers: [] };
+    group.answers.push(answer);
+    groups.set(key, group);
+  });
+  return Array.from(groups.values()).filter((group) => group.answers.length > 0);
+};
+
+const renderReportAnswers = (report: SessionResultsReportSection): string => {
+  const groups = groupReportAnswers(report);
+  if (groups.length === 0) return '';
+  return `
+      <h3>Answers</h3>
+      ${groups
+        .map(
+          ({ title, answers }) => `
+      <details data-ce-searchable>
+        <summary>${escapeHtml(title)} <span class="ce-report-muted">(${escapeHtml(answers.length)})</span></summary>
+        ${renderAnswerTable(answers)}
+      </details>`,
+        )
+        .join('')}`;
+};
+
+const PDF_ROWS_PER_BLOCK = 16;
+
+const toPdfRowBlocks = <T>(rows: T[]): T[][] =>
+  Array.from({ length: Math.ceil(rows.length / PDF_ROWS_PER_BLOCK) }, (_, index) =>
+    rows.slice(index * PDF_ROWS_PER_BLOCK, (index + 1) * PDF_ROWS_PER_BLOCK),
+  );
+
+const renderReportSection = (snapshot: SelectedResultsSnapshot, isPdf = false): string => {
+  const { report } = snapshot.sections;
+  if (!report?.available) return renderUnavailable('report', report?.reason);
+
+  const overview = `
       <h2>Report</h2>
       <dl class="ce-report-stats">
         <div><dt>Questions</dt><dd>${escapeHtml(snapshot.counts.questions)}</dd></div>
@@ -481,9 +542,29 @@ const renderReportSection = (snapshot: SessionResultsHtmlSnapshot): string => {
         <div><dt>Participants</dt><dd>${escapeHtml(snapshot.counts.participants)}</dd></div>
         <div><dt>Latest Block</dt><dd>${escapeHtml(snapshot.session.latestKnownBlock ?? 'Unknown')}</dd></div>
       </dl>
-      ${renderReportDimensions(report.dimensions)}
+      ${renderReportDimensions(report.dimensions)}`;
+
+  if (!isPdf) {
+    return `
+    <section id="report" class="ce-report-section">${overview}
       ${renderQuestionRows(report.questions)}
+      ${renderReportAnswers(report)}
     </section>`;
+  }
+  // A PDF is captured one section at a time, so long tables go in several.
+  return [
+    overview,
+    ...(report.questions.length ? toPdfRowBlocks(report.questions).map(renderQuestionRows) : [renderQuestionRows([])]),
+    ...groupReportAnswers(report).flatMap(({ title, answers }) =>
+      toPdfRowBlocks(answers).map(
+        (rows, index) => `
+      <h3>${escapeHtml(title)}${index ? ' (continued)' : ''}</h3>
+      ${renderAnswerTable(rows)}`,
+      ),
+    ),
+  ]
+    .map((block) => `<section class="ce-report-section">${block}</section>`)
+    .join('\n');
 };
 
 const renderJsonRows = (items: unknown[], emptyText: string): string => {
@@ -499,9 +580,9 @@ const renderJsonRows = (items: unknown[], emptyText: string): string => {
     .join('');
 };
 
-const renderArgumentMapSection = (snapshot: SessionResultsHtmlSnapshot): string => {
+const renderArgumentMapSection = (snapshot: SelectedResultsSnapshot): string => {
   const { argumentMap } = snapshot.sections;
-  if (!argumentMap.available) return renderUnavailable('argument-map', argumentMap.reason);
+  if (!argumentMap?.available) return renderUnavailable('argument-map', argumentMap?.reason);
   return `
     <section id="argument-map" class="ce-report-section">
       <h2>Argument Map</h2>
@@ -509,9 +590,9 @@ const renderArgumentMapSection = (snapshot: SessionResultsHtmlSnapshot): string 
     </section>`;
 };
 
-const renderRiskMatrixSection = (snapshot: SessionResultsHtmlSnapshot): string => {
+const renderRiskMatrixSection = (snapshot: SelectedResultsSnapshot): string => {
   const { riskMatrix } = snapshot.sections;
-  if (!riskMatrix.available) return renderUnavailable('risk-matrix', riskMatrix.reason);
+  if (!riskMatrix?.available) return renderUnavailable('risk-matrix', riskMatrix?.reason);
   return `
     <section id="risk-matrix" class="ce-report-section">
       <h2>Risk Matrix</h2>
@@ -524,9 +605,9 @@ const renderRiskMatrixSection = (snapshot: SessionResultsHtmlSnapshot): string =
     </section>`;
 };
 
-const renderAtlasSection = (snapshot: SessionResultsHtmlSnapshot): string => {
+const renderAtlasSection = (snapshot: SelectedResultsSnapshot): string => {
   const { atlas } = snapshot.sections;
-  if (!atlas.available) return renderUnavailable('atlas', atlas.reason);
+  if (!atlas?.available) return renderUnavailable('atlas', atlas?.reason);
   return `
     <section id="atlas" class="ce-report-section">
       <h2>Atlas Nodes</h2>
@@ -547,6 +628,26 @@ const resolveRenderSections = (
   snapshotJson: isSelected(sections, 'snapshotJson'),
 });
 
+const projectSelectedSnapshot = (
+  snapshot: SessionResultsHtmlSnapshot,
+  selected: Required<SessionResultsSectionSelection>,
+): SelectedResultsSnapshot => ({
+  ...snapshot,
+  counts: {
+    questions: selected.report ? snapshot.counts.questions : 0,
+    responses: selected.report ? snapshot.counts.responses : 0,
+    participants: selected.report ? snapshot.counts.participants : 0,
+    atlasNodes: selected.atlas ? snapshot.counts.atlasNodes : 0,
+    riskMatrixComments: selected.riskMatrix ? snapshot.counts.riskMatrixComments : 0,
+  },
+  sections: {
+    ...(selected.report ? { report: snapshot.sections.report } : {}),
+    ...(selected.argumentMap ? { argumentMap: snapshot.sections.argumentMap } : {}),
+    ...(selected.riskMatrix ? { riskMatrix: snapshot.sections.riskMatrix } : {}),
+    ...(selected.atlas ? { atlas: snapshot.sections.atlas } : {}),
+  },
+});
+
 const renderNavLinks = (sections: Required<SessionResultsSectionSelection>): string =>
   [
     sections.report ? '<a href="#report">Report</a>' : '',
@@ -559,11 +660,12 @@ const renderNavLinks = (sections: Required<SessionResultsSectionSelection>): str
     .join('\n      ');
 
 const renderSelectedReportSections = (
-  snapshot: SessionResultsHtmlSnapshot,
+  snapshot: SelectedResultsSnapshot,
   sections: Required<SessionResultsSectionSelection>,
-): string =>
-  [
-    sections.report ? renderReportSection(snapshot) : '',
+  isPdf = false,
+): string => {
+  const rendered = [
+    sections.report ? renderReportSection(snapshot, isPdf) : '',
     sections.argumentMap ? renderArgumentMapSection(snapshot) : '',
     sections.riskMatrix ? renderRiskMatrixSection(snapshot) : '',
     sections.atlas ? renderAtlasSection(snapshot) : '',
@@ -571,22 +673,29 @@ const renderSelectedReportSections = (
       ? `
     <section id="snapshot-json" class="ce-report-section">
       <h2>Embedded Snapshot JSON</h2>
-      <p class="ce-report-muted">This JSON is embedded as inert application data for reproducibility.</p>
-      <pre>${escapeHtml(JSON.stringify(snapshot, null, 2))}</pre>
+      ${
+        isPdf
+          ? '<p class="ce-report-muted">The HTML report carries this data as JSON; the PDF shows it above.</p>'
+          : `<p class="ce-report-muted">This JSON is embedded as inert application data for reproducibility.</p>
+      <pre>${escapeHtml(JSON.stringify(snapshot, null, 2))}</pre>`
+      }
     </section>`
       : '',
   ]
     .filter(Boolean)
     .join('\n');
+  // A PDF is a picture of the page, so nothing in it can be opened later.
+  return isPdf ? rendered.replace(/<details\b/g, '<details open') : rendered;
+};
 
 export const renderSessionResultsHtmlReport = (
   inputSnapshot: SessionResultsHtmlSnapshot,
   options: SessionResultsHtmlReportRenderOptions = {},
 ): string => {
-  const snapshot = buildRedactedSessionResultsSnapshot(inputSnapshot);
+  const sections = resolveRenderSections(options.sections);
+  const snapshot = projectSelectedSnapshot(buildSessionResultsSnapshot(inputSnapshot), sections);
   const sessionTitle = snapshot.session.name || snapshot.session.slug || 'Session';
   const format = options.format || SESSION_RESULTS_EXPORT_FORMAT_VIEWER;
-  const sections = resolveRenderSections(options.sections);
   const snapshotJson = serializeJsonForHtmlScript(snapshot);
   const isViewer = format === SESSION_RESULTS_EXPORT_FORMAT_VIEWER;
   const isPdf = format === SESSION_RESULTS_EXPORT_FORMAT_PDF;
@@ -616,24 +725,36 @@ export const renderSessionResultsHtmlReport = (
     pre { overflow: auto; background: #101828; color: #f4f7fb; border-radius: 8px; padding: 14px; }
     details { border: 1px solid #d9dee8; border-radius: 8px; background: #ffffff; padding: 10px 12px; margin: 10px 0; }
     summary { cursor: pointer; font-weight: 700; }
-    .ce-report-meta { display: flex; flex-wrap: wrap; gap: 10px 18px; color: #4b5563; }
-    .ce-report-section { background: #ffffff; border: 1px solid #d9dee8; border-radius: 8px; padding: 20px; margin: 18px 0; }
+    .ce-report-meta { display: flex; flex-wrap: wrap; gap: 10px 18px; color: #4b5563; overflow-wrap: anywhere; }
+    .ce-report-section { background: #ffffff; border: 1px solid #d9dee8; border-radius: 8px; padding: 20px; margin: 18px 0; overflow-x: auto; }
     .ce-report-section--unavailable { background: #fbfcfe; color: #5b6472; }
     .ce-report-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin: 18px 0; }
     .ce-report-stats div { border: 1px solid #d9dee8; border-radius: 8px; padding: 12px; background: #fbfcfe; }
     .ce-report-stats dt { color: #5b6472; font-size: 0.86rem; }
     .ce-report-stats dd { margin: 4px 0 0; font-size: 1.35rem; font-weight: 800; }
     .ce-report-muted { color: #6b7280; font-size: 0.86rem; margin-top: 4px; overflow-wrap: anywhere; }
+    .ce-report-answers { table-layout: fixed; }
+    .ce-report-answers th:first-child { width: 37%; }
+    .ce-report-answers td { overflow-wrap: anywhere; }
+    .ce-report-answers td:first-child { font-size: 0.85rem; }
     .ce-report-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-top: 20px; }
-    .ce-export-watermark { position: fixed; right: 14px; bottom: 10px; z-index: 50; border: 1px solid #cbd5e1; border-radius: 999px; background: rgba(255, 255, 255, 0.92); color: #334155; padding: 6px 10px; font-size: 0.78rem; font-weight: 800; box-shadow: 0 10px 24px rgba(15, 23, 42, 0.14); }
+    .ce-export-watermark { position: fixed; right: 14px; bottom: 10px; z-index: 50; max-width: calc(100vw - 28px); box-sizing: border-box; overflow-wrap: anywhere; border: 1px solid #cbd5e1; border-radius: 12px; background: rgba(255, 255, 255, 0.92); color: #334155; padding: 6px 10px; font-size: 0.78rem; font-weight: 800; box-shadow: 0 10px 24px rgba(15, 23, 42, 0.14); }
     .ce-integrity-warning { border: 2px solid #f97316; background: #fff7ed; color: #7c2d12; padding: 14px 18px; font-weight: 800; }
     .ce-report-integrity-failed header, .ce-report-integrity-failed main { filter: grayscale(1) blur(1px); opacity: 0.55; pointer-events: none; }
-    body.ce-report-pdf { background: #ffffff; }
+    /* A capture stops at its block's edge, so nothing may be wider than the block: long text wraps in fixed columns. */
+    body.ce-report-pdf { background: #ffffff; overflow-wrap: anywhere; }
+    body.ce-report-pdf table { table-layout: fixed; }
+    body.ce-report-pdf .ce-report-questions th:nth-child(1) { width: 37%; }
+    body.ce-report-pdf .ce-report-questions th:nth-child(2) { width: 12%; }
+    body.ce-report-pdf .ce-report-questions th:nth-child(3) { width: 11%; }
+    body.ce-report-pdf .ce-report-questions th:nth-child(4) { width: 15%; }
     body.ce-report-pdf header { padding: 18px 24px; }
     body.ce-report-pdf main { max-width: none; padding: 16px 24px 52px; }
-    body.ce-report-pdf h1 { font-size: 2rem; }
+    /* A little letter spacing makes html2canvas place each letter itself; otherwise large system-font titles run together. */
+    body.ce-report-pdf h1 { font-size: 2rem; letter-spacing: 0.01em; }
     body.ce-report-pdf .ce-report-section { break-inside: avoid; page-break-inside: avoid; margin: 12px 0; padding: 14px; }
-    body.ce-report-pdf pre { max-height: 220px; white-space: pre-wrap; }
+    body.ce-report-pdf pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+    body.ce-report-pdf .ce-report-answers td, body.ce-report-pdf .ce-report-answers th { padding: 5px 10px; }
     body.ce-report-static nav, body.ce-report-pdf nav, body.ce-report-static .ce-report-toolbar, body.ce-report-pdf .ce-report-toolbar { display: none; }
     @page { margin: 0.45in; size: A4 portrait; }
     @media print {
@@ -656,7 +777,7 @@ export const renderSessionResultsHtmlReport = (
     <h1>${escapeHtml(sessionTitle)}</h1>
     <div class="ce-report-meta">
       <span>Exported ${escapeHtml(snapshot.exportedAt)}</span>
-      <span>Privacy: ${escapeHtml(snapshot.privacyMode)}</span>
+      <span>Contents: what this account could see</span>
       <span>Session: ${escapeHtml(snapshot.session.slug || 'Unknown')}</span>
       <span>Network: ${escapeHtml(snapshot.session.networkLabel || snapshot.session.chainId || 'Unknown')}</span>
       <span>Downloaded by: ${escapeHtml(exporterLabel)}</span>
@@ -671,18 +792,21 @@ export const renderSessionResultsHtmlReport = (
         <span class="ce-report-muted">Search captured rows</span><br>
         <input type="search" data-ce-report-search placeholder="Search questions, argument items, and atlas data">
       </label>
-      <button type="button" data-ce-download-snapshot>Download Snapshot JSON</button>
+      ${sections.snapshotJson ? '<button type="button" data-ce-download-snapshot>Download Snapshot JSON</button>' : ''}
     </div>`
         : ''
     }
   </header>
   <main>
-    ${renderSelectedReportSections(snapshot, sections)}
+    ${renderSelectedReportSections(snapshot, sections, isPdf)}
   </main>
   <div class="ce-export-watermark" data-ce-exporter-address="${escapeHtml(exporterAddress)}">
     Downloaded by ${escapeHtml(exporterLabel)}
   </div>
-  <script type="application/json" id="ce-session-results-snapshot">${snapshotJson}</script>
+  ${
+    isPdf
+      ? ''
+      : `<script type="application/json" id="ce-session-results-snapshot">${snapshotJson}</script>
   <script>
     (function () {
       var snapshotEl = document.getElementById('ce-session-results-snapshot');
@@ -721,7 +845,8 @@ export const renderSessionResultsHtmlReport = (
         });
       }
     }());
-  </script>
+  </script>`
+  }
 </body>
 </html>`;
 };
@@ -805,63 +930,4 @@ export const downloadSessionResultsHtmlReport = (
     filename,
     mimeType: 'text/html;charset=utf-8;',
   });
-};
-
-export const downloadSessionResultsPdfReport = async ({
-  documentRef = document,
-  filename,
-  html,
-  html2canvasLoader = () => import('html2canvas'),
-  jsPdfLoader = () => import('jspdf'),
-}: SessionResultsPdfDownloadOptions): Promise<void> => {
-  if (!documentRef || !documentRef.body) {
-    throw new Error('Document is not available for PDF export.');
-  }
-
-  const iframe = documentRef.createElement('iframe');
-  iframe.setAttribute('title', 'Context Engine PDF export');
-  iframe.setAttribute('aria-hidden', 'true');
-  iframe.style.position = 'fixed';
-  iframe.style.left = '-10000px';
-  iframe.style.top = '0';
-  iframe.style.width = '1122px';
-  iframe.style.height = '1588px';
-  iframe.style.border = '0';
-  documentRef.body.appendChild(iframe);
-
-  try {
-    const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
-    if (!iframeDoc || !iframeDoc.body) {
-      throw new Error('Unable to create a PDF export document.');
-    }
-    iframeDoc.open();
-    iframeDoc.write(html);
-    iframeDoc.close();
-
-    await new Promise((resolve) => setTimeout(resolve, 80));
-
-    const [html2canvasModule, jsPdfModule] = await Promise.all([
-      loadBrowserModuleWithRetry(html2canvasLoader),
-      loadBrowserModuleWithRetry(jsPdfLoader),
-    ]);
-    const html2canvas =
-      resolveDefaultExport<(element: HTMLElement, options?: Record<string, unknown>) => Promise<HTMLCanvasElement>>(
-        html2canvasModule,
-      );
-    const JsPdf = resolveJsPdfConstructor(jsPdfModule);
-    const captureTarget = iframeDoc.body;
-    const canvas = await html2canvas(captureTarget, {
-      backgroundColor: '#ffffff',
-      scale: 2,
-      scrollX: 0,
-      scrollY: 0,
-      useCORS: true,
-      windowHeight: captureTarget.scrollHeight,
-      windowWidth: captureTarget.scrollWidth,
-    });
-
-    saveCanvasAsPagedPdf({ canvas, filename, JsPdf });
-  } finally {
-    if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
-  }
 };

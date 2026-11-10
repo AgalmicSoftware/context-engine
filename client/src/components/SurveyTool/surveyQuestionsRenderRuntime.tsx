@@ -24,7 +24,6 @@ export const createSurveyQuestionsRenderRuntime = (
     renderFullQuestionResponseInput,
     renderFullQuestionSliderSection,
     renderQuestionAdditionalLockControl,
-    renderQuestionAnswerLockControl,
     renderQuestionFieldDecryptControl,
     renderQuestionMaskedPromptCard,
     renderSurveyQuestionsFullQuestionDisplay,

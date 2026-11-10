@@ -1,5 +1,7 @@
 import {
   hashInterviewQuestions,
+  isSupportedInterviewPromptVersion,
+  KICKOFF_CATALOG_VERSIONS,
   normalizeInterviewQuestions,
   type InterviewPrefillPacket,
   type InterviewQuestion,
@@ -30,7 +32,7 @@ export const resolveInterviewPrefillQuestions = async ({
   if (signal?.aborted) throw new Error('Catalog validation cancelled.');
   if (packet.sessionSlug.toLowerCase() !== sessionSlug.toLowerCase()) throw stale();
   const version = packet.promptVersion || 'ce-interview-brief-v1';
-  if (!/^ce-interview-brief-v[1-5]$/.test(version)) throw stale();
+  if (!isSupportedInterviewPromptVersion(version)) throw stale();
   const localHash = await hashInterviewQuestions(questions, version);
   if (signal?.aborted) throw new Error('Catalog validation cancelled.');
   if (localHash === packet.questionSetHash) return questions;
@@ -88,7 +90,7 @@ export const resolveInterviewPrefillQuestions = async ({
   const publicQuestions = normalizeInterviewQuestions(catalog.questions);
   if (publicQuestions.length !== catalog.questions.length) throw stale();
   const catalogVersion = String(catalog.prefillPromptVersion || '');
-  if (!/^ce-interview-brief-v[1-5]$/.test(catalogVersion)) throw stale();
+  if (!isSupportedInterviewPromptVersion(catalogVersion)) throw stale();
   if ((await hashInterviewQuestions(publicQuestions, catalogVersion)) !== catalog.questionSetHash) throw stale();
   if ((await hashInterviewQuestions(publicQuestions, version)) !== packet.questionSetHash) throw stale();
   const localById = new Map(questions.map((question) => [question.id, question]));
@@ -154,7 +156,7 @@ export const verifyInterviewKickoffCatalog = async ({
     catalog.type !== 'context-engine.interview-question-catalog' ||
     catalog.version !== 1 ||
     catalog.sessionSlug !== sessionSlug ||
-    !['ce-interview-brief-v4', 'ce-interview-brief-v5'].includes(String(catalog.prefillPromptVersion))
+    !KICKOFF_CATALOG_VERSIONS.includes(String(catalog.prefillPromptVersion))
   ) {
     throw new Error(
       'This page and the session’s Worker use incompatible interview versions; ask the organizer to update them, then reload.',

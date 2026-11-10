@@ -19,7 +19,6 @@ import SessionHeaderField, { type SessionHeaderFieldProps } from './SessionHeade
 import FeaturedSbtField, { type FeaturedSbtFieldProps } from './FeaturedSbtField';
 import CollapsibleFieldGroup from './CollapsibleFieldGroup';
 import SessionWizardContractsField from './SessionWizardContractsField';
-import SessionWizardStorageProfileMetadataField from './SessionWizardStorageProfileMetadataField';
 import SessionColorSchemeField from './SessionColorSchemeField';
 import SessionGroupCreationPolicyField from './SessionGroupCreationPolicyField';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
@@ -36,7 +35,6 @@ import {
   type SessionWizardRenderFieldOptions,
 } from './sessionWizardFieldDescriptors';
 import type { SessionWizardModeFieldPolicy } from './sessionWizardModeFieldPolicy';
-import { applyStorageProfileChangeToModeDraft } from './sessionWizardModeProfileDraftController';
 import { normalizeSbtSelection, serializeDefaultFeaturedSbtSelections } from './sessionWizardSbtSelections';
 import { getChainName } from './sessionWizardCoreUtils';
 import {
@@ -82,7 +80,6 @@ type SessionWizardDraftFieldRendererOptions = {
   compactSessionHeaderMode: SessionHeaderFieldProps['compactSessionHeaderMode'];
   defaultGateId: string;
   draft: DraftState;
-  draftRef: MutableRefObject<DraftState>;
   encryptedFieldGates: UnknownRecord;
   encryptionGates: EncryptionGateState[];
   ensureLightSbtUniverse: FeaturedSbtFieldProps['ensureLightSbtUniverse'];
@@ -127,19 +124,16 @@ type SessionWizardDraftFieldRendererOptions = {
   updateArrayValue: (path: string[], raw: string, asJson?: boolean) => void;
   updateDraftValue: (path: string[], value: unknown) => void;
   workerSecretsEnabled: boolean;
-  wizardMode: string;
   normalizeGateIds: (value: unknown) => string[];
   setBlockLimitDuration: (value: string) => void;
   setBlockLimitUnit: (value: string) => void;
   setCompactSessionHeaderMode: StateUpdater<string>;
   setDefaultGateId: (gateId: string) => void;
-  setDraft: (updater: (prev: DraftState) => DraftState) => void;
   setEncryptedFieldGates: StateUpdater<UnknownRecord>;
   setMetadataObjectCollapsed: (updater: (prev: MetadataObjectCollapsedState) => MetadataObjectCollapsedState) => void;
   setOpenLockKey: StateUpdater<string>;
   setSessionHeaderFile: (file: File | null) => boolean;
   setSessionHeaderMode: StateUpdater<string>;
-  setSessionHeaderPreviewModalOpen: (open: boolean) => void;
   setSessionHeaderStatus: (message: string) => void;
   setShowPromptPreview: StateUpdater<boolean>;
   setWorkerUrlAutoFilled: (value: boolean) => void;
@@ -155,7 +149,6 @@ export const buildSessionWizardDraftFieldRenderer = ({
   compactSessionHeaderMode,
   defaultGateId,
   draft,
-  draftRef,
   encryptedFieldGates,
   encryptionGates,
   ensureLightSbtUniverse,
@@ -192,13 +185,11 @@ export const buildSessionWizardDraftFieldRenderer = ({
   setBlockLimitUnit,
   setCompactSessionHeaderMode,
   setDefaultGateId,
-  setDraft,
   setEncryptedFieldGates,
   setMetadataObjectCollapsed,
   setOpenLockKey,
   setSessionHeaderFile,
   setSessionHeaderMode,
-  setSessionHeaderPreviewModalOpen,
   setSessionHeaderStatus,
   setShowPromptPreview,
   setWorkerUrlAutoFilled,
@@ -209,7 +200,6 @@ export const buildSessionWizardDraftFieldRenderer = ({
   updateArrayValue,
   updateDraftValue,
   workerSecretsEnabled,
-  wizardMode,
 }: SessionWizardDraftFieldRendererOptions): SessionWizardDraftFieldRenderer => {
   const renderField: SessionWizardDraftFieldRenderer = (
     key,
@@ -225,7 +215,6 @@ export const buildSessionWizardDraftFieldRenderer = ({
         key,
         path,
         currentPath,
-        wizardMode,
         modeFieldPolicy,
       })
     ) {
@@ -233,7 +222,6 @@ export const buildSessionWizardDraftFieldRenderer = ({
     }
     const keyString = pathKey(currentPath);
     const isSlugField = keyString === 'slug';
-    const isNormalMode = wizardMode !== 'advanced';
     const displayLabel =
       keyString === 'contracts' && modeFieldPolicy?.visibleContractKeys.join(',') === 'sbtFactory'
         ? 'On-chain Group Factory'
@@ -454,46 +442,9 @@ export const buildSessionWizardDraftFieldRenderer = ({
       );
     }
 
-    if (path.length === 0 && key === 'lit') {
-      if (wizardMode !== 'advanced') return null;
-      const lit = value && typeof value === 'object' ? value : {};
-      const isCollapsed = metadataObjectCollapsed.lit;
-      return (
-        <CollapsibleFieldGroup
-          key={keyString}
-          title={displayLabel}
-          isCollapsed={isCollapsed}
-          toggleAriaLabel={`${displayLabel} ${isCollapsed ? 'expand' : 'collapse'}`}
-          onToggleCollapsed={() => setMetadataObjectCollapsed((prev) => ({ ...prev, lit: !prev.lit }))}
-        >
-          {!isCollapsed &&
-            Object.entries(lit).map(([childKey, childValue]) => renderField(childKey, childValue, currentPath))}
-        </CollapsibleFieldGroup>
-      );
-    }
+    if (path.length === 0 && key === 'lit') return null;
 
-    if (path.length === 0 && key === 'storageProfile') {
-      if (wizardMode !== 'advanced') return null;
-      const isCollapsed = metadataObjectCollapsed.storageProfile;
-      return (
-        <SessionWizardStorageProfileMetadataField
-          key={keyString}
-          title={displayLabel}
-          value={value}
-          isCollapsed={isCollapsed}
-          onToggleCollapsed={() =>
-            setMetadataObjectCollapsed((prev) => ({ ...prev, storageProfile: !prev.storageProfile }))
-          }
-          onStorageProfileChange={(nextProfile) => {
-            setDraft((prev) => {
-              const next = applyStorageProfileChangeToModeDraft(prev, nextProfile);
-              draftRef.current = next;
-              return next;
-            });
-          }}
-        />
-      );
-    }
+    if (path.length === 0 && key === 'storageProfile') return null;
 
     if (path.length === 0 && key === 'appearance') {
       const appearanceValue = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
@@ -667,81 +618,50 @@ export const buildSessionWizardDraftFieldRenderer = ({
       );
     }
     if (isSessionHeaderField) {
-      if (isNormalMode) {
-        return (
-          <LockableFieldFrame
-            key={keyString}
-            {...fieldFrameProps}
-            label="Image"
-            labelPrefix={<FontAwesomeIcon icon={faImage} className={styles.compactSessionHeaderIcon} />}
-          >
-            <SessionHeaderField
-              allowFileUpload={allowSessionHeaderFileUpload}
-              compact
-              value={draft?.sessionHeader}
-              sessionHeaderMode={sessionHeaderMode}
-              compactSessionHeaderMode={compactSessionHeaderMode}
-              sessionHeaderPreviewSrc={sessionHeaderPreviewSrc}
-              sessionHeaderUploadStatus={sessionHeaderUploadStatus}
-              sessionHeaderUploadStatusTone={sessionHeaderUploadStatusTone}
-              compactSessionHeaderInputRef={compactSessionHeaderInputRef}
-              onCompactUrlChange={(event) => {
-                updateDraftValue(['sessionHeader'], event.target.value);
-                setSessionHeaderStatus('');
-              }}
-              onToggleCompactUrlMode={() => {
-                setCompactSessionHeaderMode((prev) => (prev === 'url' ? 'idle' : 'url'));
-                setSessionHeaderMode('url');
-                setSessionHeaderFile(null);
-                setSessionHeaderStatus('');
-              }}
-              onPaste={handlePasteSessionHeaderFromClipboard}
-              onCompactUploadClick={() => {
-                setCompactSessionHeaderMode('idle');
-                setSessionHeaderMode('upload');
-                setSessionHeaderStatus('');
-                if (compactSessionHeaderInputRef.current) {
-                  compactSessionHeaderInputRef.current.click();
-                }
-              }}
-              onCompactFileChange={(event) => {
-                if (!setSessionHeaderFile(event.target.files?.[0] || null)) {
-                  event.target.value = '';
-                  return;
-                }
-                setSessionHeaderMode('upload');
-                setSessionHeaderStatus('');
-              }}
-              onClear={handleClearSessionHeaderPreview}
-            />
-          </LockableFieldFrame>
-        );
-      }
       return (
-        <LockableFieldFrame key={keyString} {...fieldFrameProps}>
+        <LockableFieldFrame
+          key={keyString}
+          {...fieldFrameProps}
+          label="Image"
+          labelPrefix={<FontAwesomeIcon icon={faImage} className={styles.compactSessionHeaderIcon} />}
+        >
           <SessionHeaderField
             allowFileUpload={allowSessionHeaderFileUpload}
-            value={value == null ? null : toStr(value)}
+            value={draft?.sessionHeader}
             sessionHeaderMode={sessionHeaderMode}
             compactSessionHeaderMode={compactSessionHeaderMode}
             sessionHeaderPreviewSrc={sessionHeaderPreviewSrc}
             sessionHeaderUploadStatus={sessionHeaderUploadStatus}
             sessionHeaderUploadStatusTone={sessionHeaderUploadStatusTone}
-            onUrlChange={(e) => updateDraftValue(currentPath, e.target.value)}
-            onUseUrlMode={() => {
+            compactSessionHeaderInputRef={compactSessionHeaderInputRef}
+            onCompactUrlChange={(event) => {
+              updateDraftValue(['sessionHeader'], event.target.value);
+              setSessionHeaderStatus('');
+            }}
+            onToggleCompactUrlMode={() => {
+              setCompactSessionHeaderMode((prev) => (prev === 'url' ? 'idle' : 'url'));
               setSessionHeaderMode('url');
               setSessionHeaderFile(null);
               setSessionHeaderStatus('');
             }}
-            onUseUploadMode={() => {
+            onPaste={handlePasteSessionHeaderFromClipboard}
+            onCompactUploadClick={() => {
+              setCompactSessionHeaderMode('idle');
+              setSessionHeaderMode('upload');
+              setSessionHeaderStatus('');
+              if (compactSessionHeaderInputRef.current) {
+                compactSessionHeaderInputRef.current.click();
+              }
+            }}
+            onCompactFileChange={(event) => {
+              if (!setSessionHeaderFile(event.target.files?.[0] || null)) {
+                event.target.value = '';
+                return;
+              }
               setSessionHeaderMode('upload');
               setSessionHeaderStatus('');
             }}
-            onAdvancedFileChange={(e) => {
-              if (!setSessionHeaderFile(e.target.files?.[0] || null)) e.target.value = '';
-            }}
             onClear={handleClearSessionHeaderPreview}
-            onExpandPreview={() => setSessionHeaderPreviewModalOpen(true)}
           />
         </LockableFieldFrame>
       );

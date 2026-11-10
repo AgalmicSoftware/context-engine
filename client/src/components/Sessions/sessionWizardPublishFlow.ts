@@ -82,18 +82,12 @@ export const buildSessionWizardPublishPlan = ({
 };
 
 export const resolveSessionWizardBundleUrlForMode = ({
-  wizardMode = 'advanced',
-  bundleUrl = '',
   normalModeBundleUrlOverride = '',
   normalModeDefaultBundleUrl = CLOUDFLARE_WORKER_BUNDLE_URL,
 }: {
-  wizardMode?: string;
-  bundleUrl?: unknown;
   normalModeBundleUrlOverride?: unknown;
   normalModeDefaultBundleUrl?: unknown;
 } = {}) => {
-  const normalizedBundleUrl = toStr(bundleUrl).trim();
-  if (wizardMode !== 'normal') return normalizedBundleUrl;
   const normalizedNormalModeBundleUrlOverride =
     getValidSessionWizardNormalModeBundleUrlOverride(normalModeBundleUrlOverride);
   return normalizedNormalModeBundleUrlOverride || toStr(normalModeDefaultBundleUrl).trim();
@@ -278,9 +272,6 @@ export const readSessionWizardBundleFileText = async (
 };
 
 export const resolveSessionWizardDeployBundleMode = ({
-  wizardMode = 'normal',
-  bundleMode = 'upload',
-  bundleUrl = '',
   sponsoredAutoDeployReady = false,
   forceSponsoredAutoDeploy = false,
   forceManualBundleFile = false,
@@ -288,9 +279,6 @@ export const resolveSessionWizardDeployBundleMode = ({
   normalModeBundleUrlOverride = '',
   normalModeDefaultBundleUrl = CLOUDFLARE_WORKER_BUNDLE_URL,
 }: {
-  wizardMode?: string;
-  bundleMode?: string;
-  bundleUrl?: unknown;
   sponsoredAutoDeployReady?: boolean;
   forceSponsoredAutoDeploy?: boolean;
   forceManualBundleFile?: boolean;
@@ -300,22 +288,12 @@ export const resolveSessionWizardDeployBundleMode = ({
 } = {}) => {
   const hasHostedNormalModeBundleUrl = !!toStr(normalModeDefaultBundleUrl).trim();
   const hasResolvedNormalModeBundleUrl = !!resolveSessionWizardBundleUrlForMode({
-    wizardMode: 'normal',
-    bundleUrl,
     normalModeBundleUrlOverride,
     normalModeDefaultBundleUrl,
   });
-  return wizardMode === 'normal' && hasBundleFile && (forceManualBundleFile || !hasHostedNormalModeBundleUrl)
-    ? 'upload'
-    : wizardMode === 'normal' && forceSponsoredAutoDeploy
-      ? 'url'
-      : wizardMode === 'normal' && sponsoredAutoDeployReady
-        ? 'url'
-        : wizardMode === 'normal'
-          ? hasResolvedNormalModeBundleUrl
-            ? 'url'
-            : 'upload'
-          : bundleMode;
+  if (hasBundleFile && (forceManualBundleFile || !hasHostedNormalModeBundleUrl)) return 'upload';
+  if (forceSponsoredAutoDeploy || sponsoredAutoDeployReady) return 'url';
+  return hasResolvedNormalModeBundleUrl ? 'url' : 'upload';
 };
 
 export type SessionWizardSponsoredAutoDeployStateLike = {
@@ -336,7 +314,6 @@ export type SessionWizardSponsoredPublishSurfaceState = {
 };
 
 export const resolveSessionWizardSponsoredPublishSurfaceState = ({
-  isNormalMode = false,
   workerMode = 'default',
   sponsoredAutoDeployState = {},
   forceManualBundleFile = false,
@@ -346,7 +323,6 @@ export const resolveSessionWizardSponsoredPublishSurfaceState = ({
   manualBundleRetryMessage = '',
   missingHostedBundleMessage = '',
 }: {
-  isNormalMode?: boolean;
   workerMode?: unknown;
   sponsoredAutoDeployState?: SessionWizardSponsoredAutoDeployStateLike;
   forceManualBundleFile?: boolean;
@@ -363,8 +339,7 @@ export const resolveSessionWizardSponsoredPublishSurfaceState = ({
   const canUseSponsoredAutoDeployNow = shouldUseSponsoredAutoDeployFlow;
   const hasNormalModeBundleUrlOverride = !!toStr(normalModeBundleUrlOverride).trim();
   const normalModeHostedBundleConfigured = !!toStr(normalModeDefaultBundleUrl).trim();
-  const showNormalModeManualBundleControls =
-    !!isNormalMode && (!!forceManualBundleFile || !normalModeHostedBundleConfigured);
+  const showNormalModeManualBundleControls = !!forceManualBundleFile || !normalModeHostedBundleConfigured;
   const normalModeBundleHelpText = normalModeHostedBundleConfigured
     ? hostedBundleHelpMessage
     : missingHostedBundleMessage;
@@ -504,16 +479,13 @@ const isSessionWizardRemoteBundleUrlMissingHandlerFailure = ({
 
 export const shouldForceSessionWizardNormalModeManualBundleRetry = ({
   err,
-  wizardMode = 'normal',
   effectiveBundleMode = 'upload',
   hasBundleFile = false,
 }: {
   err?: unknown;
-  wizardMode?: string;
   effectiveBundleMode?: string;
   hasBundleFile?: boolean;
 } = {}) =>
-  wizardMode === 'normal' &&
   !hasBundleFile &&
   (isSessionWizardRemoteBundleUrlFetchFailure({
     err,

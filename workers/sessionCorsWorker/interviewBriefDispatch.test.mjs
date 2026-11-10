@@ -36,7 +36,7 @@ test('buildInterviewBriefDocument returns only an inert question catalog', () =>
     answerContract: {
       binary: ['Agree', 'Unsure', 'Disagree'],
       rating: { min: 0, max: 10, step: 1 },
-      ratingScaleOverrides: 'Use a question.scale object when present; otherwise use the default rating contract.',
+      ratingScaleOverrides: 'Use a question.scale object when present: answer min plus a whole number of steps (1 when no step is given), at most max. Otherwise use the default rating contract.',
       multichoice: 'When singleSelect is true, use one exact question option. Otherwise use an array of one or more exact question options.',
       quadratic: 'Signed integer array in option order; sum(vote²) <= voiceCredits (99 default). Zero is neutral; unused credits are allowed.',
     },
@@ -85,7 +85,7 @@ test('safeSessionUrl preserves only bounded recruitment and group auto-join stat
   const safe = __test__interviewBriefDispatch.safeSessionUrl;
   const options = { slug: 'demo', allowOrigins: ['https://app.example'] };
   assert.equal(
-    safe('https://app.example/session/demo?src=partner launch&joinGroup=EDDY-2026&worker=https%3A%2F%2Fattacker.example&mode=recordGroup#prefill=private', options),
+    safe('https://app.example/session/demo?src=partner launch&joinGroup=EDDY-2026&worker=https%3A%2F%2Fattacker.example&mode=groupRecording#prefill=private', options),
     'https://app.example/session/demo?src=partner-launch&joinGroup=eddy-2026',
   );
   assert.equal(
@@ -121,7 +121,7 @@ test('dispatchInterviewBriefRequest returns public questions and a stable revisi
         interviewMode: { enabled: true },
       }),
       getCorsContext: async () => ({ ok: true, headers: { 'access-control-allow-origin': '*' } }),
-      loadPublicInterviewQuestions: async () => [
+      loadPublicInterviewQuestions: async () => ({ questions: [
         {
           id: 'rating-q1',
           type: 'rating',
@@ -129,7 +129,7 @@ test('dispatchInterviewBriefRequest returns public questions and a stable revisi
           options: [],
           scale: { min: 1, max: 10, minLabel: 'Strongly oppose', maxLabel: 'Strongly support' },
         },
-      ],
+      ], incomplete: false }),
       sha256: async () => 'question-hash',
       json,
     },
@@ -145,7 +145,7 @@ test('dispatchInterviewBriefRequest returns public questions and a stable revisi
   assert.deepEqual(body.answerContract.rating, { min: 0, max: 10, step: 1 });
   assert.equal(
     body.answerContract.ratingScaleOverrides,
-    'Use a question.scale object when present; otherwise use the default rating contract.',
+    'Use a question.scale object when present: answer min plus a whole number of steps (1 when no step is given), at most max. Otherwise use the default rating contract.',
   );
   assert.deepEqual(body.questions, [
     {
@@ -165,7 +165,7 @@ test('dispatchInterviewBriefRequest honors per-session disablement and requires 
   const baseDeps = {
     resolveRequestSlugWithoutToken: () => ({ ok: true, explicitSlugProvided: true, slug: 'demo' }),
     getCorsContext: async () => ({ ok: true, headers: {} }),
-    loadPublicInterviewQuestions: async () => [{ id: 'q1', type: 'freeform', prompt: 'Question?', options: [] }],
+    loadPublicInterviewQuestions: async () => ({ questions: [{ id: 'q1', type: 'freeform', prompt: 'Question?', options: [] }], incomplete: false }),
     json,
   };
   const disabled = await dispatchInterviewBriefRequest({
@@ -204,12 +204,12 @@ test('dispatchInterviewBriefRequest honors per-session disablement and requires 
 
 test('dispatchInterviewBriefRequest preserves only safe source and auto-join state from the supplied return URL', async () => {
   const response = await dispatchInterviewBriefRequest({
-    request: new Request('https://worker.example/agent/interview-brief?slug=demo&format=json&sessionUrl=https%3A%2F%2Fapp.example%2Fsession%2Fdemo%3Fsrc%3Dpartner%2520launch%26joinGroup%3DEDDY-2026%26worker%3Dhttps%253A%252F%252Fattacker.example%26mode%3DrecordGroup%23private'),
+    request: new Request('https://worker.example/agent/interview-brief?slug=demo&format=json&sessionUrl=https%3A%2F%2Fapp.example%2Fsession%2Fdemo%3Fsrc%3Dpartner%2520launch%26joinGroup%3DEDDY-2026%26worker%3Dhttps%253A%252F%252Fattacker.example%26mode%3DgroupRecording%23private'),
     deps: {
       resolveRequestSlugWithoutToken: () => ({ ok: true, explicitSlugProvided: true, slug: 'demo' }),
       getSessionConfig: async () => ({ allowOrigins: ['https://app.example'] }),
       getCorsContext: async () => ({ ok: true, headers: {} }),
-      loadPublicInterviewQuestions: async () => [{ id: 'q1', type: 'freeform', prompt: 'Question?', options: [] }],
+      loadPublicInterviewQuestions: async () => ({ questions: [{ id: 'q1', type: 'freeform', prompt: 'Question?', options: [] }], incomplete: false }),
       sha256: async () => 'question-hash',
       json,
     },
@@ -220,7 +220,7 @@ test('dispatchInterviewBriefRequest preserves only safe source and auto-join sta
     'https://app.example/session/demo?src=partner-launch&joinGroup=eddy-2026&worker=https%3A%2F%2Fworker.example&mode=interview',
   );
   assert.equal(body.reviewUrl.includes('attacker.example'), false);
-  assert.equal(body.reviewUrl.includes('recordGroup'), false);
+  assert.equal(body.reviewUrl.includes('groupRecording'), false);
   assert.equal(body.reviewUrl.includes('private'), false);
   assert.equal('instructions' in body, false);
 });
@@ -233,9 +233,9 @@ test('dispatchInterviewBriefRequest applies anonymous IP daily budgets before lo
       expectedLimit: 4,
     },
     {
-      name: 'absent anonymous limit keeps legacy wallet fallback',
+      name: 'absent anonymous limit leaves anonymous routes unlimited',
       limits: { perWalletPerDay: 10 },
-      expectedLimit: 10,
+      expectedLimit: 0,
     },
   ];
 
@@ -257,7 +257,7 @@ test('dispatchInterviewBriefRequest applies anonymous IP daily budgets before lo
         },
         loadPublicInterviewQuestions: async () => {
           questionsLoaded = true;
-          return [];
+          return ({ questions: [], incomplete: false });
         },
         json,
       },
@@ -282,4 +282,30 @@ test('catalog accepts approved loopback HTTP URLs but rejects other protocols', 
   assert.equal(safe('http://[::1]:3000/session/demo', options), 'http://[::1]:3000/session/demo');
   assert.equal(safe('ftp://127.0.0.1/session/demo', options), '');
   assert.equal(safe('http://unapproved.example/session/demo', options), '');
+});
+
+for (const failure of ['pointer', 'payload']) test(`unreadable only-question ${failure} asks interview clients to retry`, async () => {
+  const qid = `0x${'11'.repeat(32)}`;
+  const eventData = `0x${(32n).toString(16).padStart(64, '0')}${(1n).toString(16).padStart(64, '0')}${qid.slice(2)}`;
+  const response = await dispatchInterviewBriefRequest({
+    request: new Request('https://worker.example/agent/interview-brief?slug=fixture'), env: {}, baseHeaders: {},
+    deps: {
+      resolveRequestSlugWithoutToken: () => ({ ok: true, explicitSlugProvided: true, slug: 'fixture' }),
+      getSessionConfig: async () => ({ interviewMode: { enabled: true },
+        contracts: { surveys: '0x1111111111111111111111111111111111111111' },
+        rpcUrl: 'https://rpc.example', blockLimits: { start: 1, end: 1 } }),
+      getCorsContext: async () => ({ ok: true, headers: {} }), json,
+      fetch: async (url, init) => {
+        if (String(url) !== 'https://rpc.example') return new Response('Unavailable', { status: 503 });
+        const body = JSON.parse(init.body);
+        if (body.method === 'eth_call' && failure === 'pointer') throw new Error('Unavailable');
+        const result = body.method === 'eth_blockNumber' ? '0x1' : body.method === 'eth_getLogs'
+          ? [{ data: eventData }] : `0x${'01'.repeat(32)}`;
+        return new Response(JSON.stringify({ jsonrpc: '2.0', id: 1, result }));
+      },
+    },
+  });
+  assert.equal(response.status, 503);
+  assert.equal(response.headers.get('retry-after'), '5');
+  assert.match((await response.json()).error, /Retry/);
 });

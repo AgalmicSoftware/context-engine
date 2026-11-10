@@ -93,7 +93,7 @@ describe('SurveyQuestionsFullQuestionResponseInput', () => {
       kind: 'rating',
       questionId: 'q2',
       ratingValue: 7,
-      ratingScale: { min: 0, max: 10, minLabel: '0', maxLabel: '10' },
+      ratingScale: { min: 0, max: 10, minLabel: '0', maxLabel: '10', step: 1 },
       answered: true,
       disabled: false,
     });
@@ -131,7 +131,7 @@ describe('SurveyQuestionsFullQuestionResponseInput', () => {
       kind: 'rating',
       questionId: 'q-rating',
       ratingValue: 1,
-      ratingScale: { min: 1, max: 10, minLabel: 'Almost none of it', maxLabel: 'All of it' },
+      ratingScale: { min: 1, max: 10, minLabel: 'Almost none of it', maxLabel: 'All of it', step: 1 },
       answered: true,
       disabled: false,
     });

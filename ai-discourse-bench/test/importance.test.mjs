@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { execFileSync } from 'node:child_process';
 
 import {
   buildImportanceJsonSchema,
@@ -83,6 +84,64 @@ test('quadratic importance parser skips unrelated JSON with braces inside string
   assert.deepEqual(parsed.allocations, [
     { questionId: 'q1', votes: 2, cost: 4 },
   ]);
+});
+
+test('quadratic importance parser never reads a reasoning draft as the allocation', () => {
+  const options = {
+    questionIds: new Set(['q1', 'q2']),
+    budget: 10,
+    maxAllocations: 2,
+    maxVotesPerQuestion: 4,
+  };
+  const draft = '{"allocations":[{"questionId":"q1","votes":3}],"rationale":"draft"}';
+  const parsed = parseImportanceAllocation(
+    `<think>${draft}</think>{"allocations":[{"questionId":"q2","votes":1}],"rationale":"final"}`,
+    options,
+  );
+
+  assert.equal(parsed.parseError, '');
+  assert.deepEqual(parsed.allocations, [{ questionId: 'q2', votes: 1, cost: 1 }]);
+  assert.equal(parseImportanceAllocation(`<think>${draft}`, options).parseError, 'truncated reasoning region');
+});
+
+test('quadratic importance parser refuses conflicting or cut-off allocations, and the runner retries them', async () => {
+  const options = {
+    questionIds: new Set(['q1', 'q2']),
+    budget: 10,
+    maxAllocations: 2,
+    maxVotesPerQuestion: 4,
+  };
+  const first = '{"allocations":[{"questionId":"q1","votes":3}],"rationale":"first"}';
+  const corrected = '{"allocations":[{"questionId":"q2","votes":3}],"rationale":"corrected"}';
+  assert.equal(parseImportanceAllocation(`${first}\nCorrection: ${corrected}`, options).parseError, 'conflicting allocation objects');
+  assert.equal(
+    parseImportanceAllocation(`${first}\nCorrection: {"allocations":[{"questionId":"q2"`, options).parseError,
+    'truncated JSON response',
+  );
+  const repeated = parseImportanceAllocation(`${first}\n${first.replace('first', 'again')}`, options);
+  assert.equal(repeated.parseError, '', 'the same allocation twice is not a conflict');
+  assert.deepEqual(repeated.allocations, [{ questionId: 'q1', votes: 3, cost: 9 }]);
+
+  // At this budget the runner allows at most 2 votes per question.
+  const draft = first.replace('"votes":3', '"votes":2');
+  const final = corrected.replace('"votes":3', '"votes":2');
+  let calls = 0;
+  const result = await runImportanceBenchmark({
+    questionBank,
+    modelRoster: { models: modelRoster.models.slice(0, 1) },
+    budget: 10,
+    maxAllocations: 2,
+    repeats: 1,
+    maxAttempts: 2,
+    retryBaseDelayMs: 0,
+    sleepImpl: async () => {},
+    callModelImpl: async ({ modelEntry }) => {
+      calls += 1;
+      return { content: calls === 1 ? `${draft}\nCorrection: ${final}` : final, metadata: { resolvedModel: modelEntry.model } };
+    },
+  });
+  assert.equal(calls, 2);
+  assert.deepEqual(result.runs[0].allocations, [{ questionId: 'q2', votes: 2, cost: 4 }]);
 });
 
 test('quadratic importance parser enforces known ids, integer votes, and squared budget cost', () => {
@@ -341,4 +400,102 @@ test('release importance validation enforces policy repeats and pinned model ide
     modelRoster: releaseRoster,
     requiredRepeats: 1,
   }).some((error) => error.includes('resolved model does not match')));
+});
+
+for (const repeats of [1, 10]) {
+  test(`importance prompt hashes validate unsorted rosters with ${repeats} repeats`, async () => {
+    const roster = { models: [...modelRoster.models].reverse() };
+    const run = (models) => runImportanceBenchmark({ questionBank, modelRoster: { models }, budget: 10, maxAllocations: 2, repeats,
+      callModelImpl: async () => ({ content: '{"allocations":[{"questionId":"q1","votes":2}]}', metadata: {} }),
+    });
+    const artifact = await run(roster.models);
+    artifact.manifest.harnessCommit = 'a'.repeat(40);
+    const validate = (value) => validateReleaseImportanceFile(value, { questionBank, modelRoster: roster, requiredRepeats: repeats });
+    assert.deepEqual(validate(artifact), []);
+    assert.equal(artifact.manifest.promptHash, (await run(modelRoster.models)).manifest.promptHash);
+    const changedPrompt = structuredClone(artifact);
+    changedPrompt.runs[0].promptHash = 'b'.repeat(64);
+    assert.ok(validate(changedPrompt).some((error) => error.includes('promptHash')));
+    const changedCoordinate = structuredClone(artifact);
+    changedCoordinate.runs[0].repeatIndex += 1;
+    assert.ok(validate(changedCoordinate).some((error) => error.includes('run coordinates')));
+  });
+}
+
+test('importance resume binds saved rows to the current endpoint and records it', async () => {
+  const original = process.env.AIDB_LOCAL_BASE_URL;
+  try {
+    const roster = { models: [modelRoster.models[0]] };
+    let calls = 0;
+    const run = (existingRuns = []) => runImportanceBenchmark({ questionBank, modelRoster: roster, budget: 10,
+      maxAllocations: 2, repeats: 2, existingRuns,
+      callModelImpl: async () => { calls += 1; return { content: '{"allocations":[{"questionId":"q1","votes":2}]}', metadata: {} }; },
+    });
+    process.env.AIDB_LOCAL_BASE_URL = 'http://127.0.0.1:8001/v1';
+    const first = await run();
+    assert.ok(first.runs.every((row) => row.responseMetadata.endpoint === process.env.AIDB_LOCAL_BASE_URL));
+    const partial = [first.runs[0]];
+    calls = 0;
+    const unchanged = await run(partial);
+    assert.equal(unchanged.resumedRuns, 1);
+    assert.equal(calls, 1);
+    process.env.AIDB_LOCAL_BASE_URL = 'http://127.0.0.1:8002/v1';
+    calls = 0;
+    const changed = await run(partial);
+    assert.equal(changed.resumedRuns, 0);
+    assert.equal(calls, 2);
+    const mixed = structuredClone(changed);
+    mixed.manifest.harnessCommit = 'a'.repeat(40);
+    mixed.runs[0] = partial[0];
+    assert.ok(validateReleaseImportanceFile(mixed, { questionBank, modelRoster: roster, requiredRepeats: 2 })
+      .some((error) => error.includes('multiple deployment identities')));
+  } finally {
+    if (original === undefined) delete process.env.AIDB_LOCAL_BASE_URL;
+    else process.env.AIDB_LOCAL_BASE_URL = original;
+  }
+});
+
+test('importance rejects endpoints mixed within one run artifact', async () => {
+  let calls = 0;
+  await assert.rejects(runImportanceBenchmark({ questionBank, modelRoster: { models: [modelRoster.models[0]] },
+    budget: 10, maxAllocations: 2, repeats: 2,
+    callModelImpl: async () => ({ content: '{"allocations":[{"questionId":"q1","votes":2}]}',
+      metadata: { endpoint: `http://127.0.0.1:${8000 + ++calls}/v1` } }),
+  }), /multiple deployment identities/);
+});
+
+
+test('importance manifest fingerprints do not depend on the host locale', () => {
+  const moduleUrl = new URL('../src/importance.mjs', import.meta.url).href;
+  const roster = { models: ['model-z', 'model-ä'].map((id) => ({ id, model: id, provider: 'mock', traits: {} })) };
+  const script = `import { runImportanceBenchmark } from ${JSON.stringify(moduleUrl)};
+    const result = await runImportanceBenchmark({ questionBank: ${JSON.stringify(questionBank)},
+      modelRoster: ${JSON.stringify(roster)}, providerOverride: 'mock', budget: 10, maxAllocations: 2 });
+    process.stdout.write(result.manifest.promptHash);`;
+  const fingerprint = (locale) => execFileSync(process.execPath, ['--input-type=module', '-e', script], {
+    env: { ...process.env, LANG: locale, LC_ALL: locale }, encoding: 'utf8',
+  });
+  assert.equal(fingerprint('en_US.UTF-8'), fingerprint('sv_SE.UTF-8'));
+});
+
+test('question shuffles and mock allocations use code-point hash order', async () => {
+  const bank = { ...questionBank, questions: Array.from({ length: 20 }, (_, index) => ({
+    id: `q${index}`, canonicalPrompt: `Question ${index}`, topic: 'fixture',
+  })) };
+  const order = () => orderImportanceQuestionBank({ questionBank: bank, modelId: 'mock-model', repeatIndex: 1 }).questions.map(row => row.id);
+  const run = async () => (await runImportanceBenchmark({ questionBank: bank,
+    modelRoster: { models: [{ id: 'mock-model', model: 'mock-model', provider: 'mock', traits: {} }] },
+    budget: 10, maxAllocations: 2, repeats: 1,
+  })).runs[0].allocations;
+  const expectedOrder = order();
+  const expectedAllocations = await run();
+  const original = String.prototype.localeCompare;
+  try {
+    String.prototype.localeCompare = function (other, ...args) {
+      const result = original.call(this, other, ...args);
+      return /^[0-9a-f]{64}$/.test(String(this)) ? -result : result;
+    };
+    assert.deepEqual(order(), expectedOrder);
+    assert.deepEqual(await run(), expectedAllocations);
+  } finally { String.prototype.localeCompare = original; }
 });

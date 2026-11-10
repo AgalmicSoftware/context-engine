@@ -1,13 +1,17 @@
 import { ethers } from 'ethers';
+import { LIT_PROVISIONING_CREDENTIALS_CONFLICT } from './chipotleClient.js';
 import { LIT_AUTHORIZATION_VERSION as VERSION } from '../../shared/litChipotleAction.mjs';
 import { sha256Hex } from '../shared/deployHelperCore.mjs';
 import { buildEncryptedSessionSecretsEnvelope, decryptSessionSecretsEnvelope } from '../shared/sessionSecretsEnvelope.mjs';
-import { getSessionSecrets, putSessionSecrets } from './sessionConfigSecretsStore.js';
-import { putKvJson } from './responseKvHelpers.js';
-import { normalizeWorkerSessionSlug, resolveCoordinatorSessionSlugStorageKey } from './sessionSlugResolution.js';
+import { readCommittedSessionSecrets, commitSessionSecrets, repairPendingSessionSecretsProjection } from './sessionSecretsAuthority.js';
+import { resolveCoordinatorSessionSlugStorageKey } from './sessionSlugResolution.js';
 
 const SIGNER_RECORD = 'session-lit-authorization-signer-v1';
 const SETUP_RECORD = 'session-lit-authorization-pending-v1';
+const PROVISIONING_RECORD = 'session-lit-provisioning-v1';
+const PROVISIONING_LEASE_MS = 5 * 60_000;
+const PROVISIONING_FIELDS = new Set(['litApiBase', 'litAccountApiKey', 'accountSecretOutput', 'accountWalletAddress', 'litGroupId', 'litPkpId', 'litActionCid', 'litUsageApiKey', 'registeredAction', 'addedActionToGroup', 'addedPkpToGroup']);
+const ACCOUNT_FIELDS = ['litApiBase', 'litAccountApiKey', 'accountSecretOutput', 'accountWalletAddress'];
 export const hasPendingLitAuthorizationSetup = async (storage) => (await storage.get(SETUP_RECORD)) != null;
 const CONFIG_RECORD = 'session-config-authority';
 const PRIVATE_KEY = 'litAuthorizationPrivateKey';
@@ -67,7 +71,7 @@ export const executeLitAuthorizationSignerEnsure = async (coordinator, payload) 
       const config = authorityConfig(await transaction.get(CONFIG_RECORD), payload.baseConfig, slug);
       const secrets = record != null
         ? await readSignerSecrets(record, coordinator.env, slug)
-        : (await getSessionSecrets(coordinator.env, normalizeWorkerSessionSlug(slug))) || {};
+        : await readCommittedSessionSecrets(coordinator, transaction, slug);
       const hasExistingKey = hasOwn(secrets, PRIVATE_KEY);
       const chosen = hasExistingKey ? walletFor(secrets[PRIVATE_KEY]) : proposed;
       assertConfiguredSigner(config, chosen, hasExistingKey);
@@ -95,12 +99,104 @@ export const repairPendingLitAuthorizationSetup = async (coordinator) => {
   await decryptSessionSecretsEnvelope(pending.envelope, { env: coordinator.env, slug });
   // Keep the encrypted journal until both projections finish. A restart or
   // later config mutation repairs the same pair before accepting another one.
-  await putKvJson(coordinator.env, `session:${normalizeWorkerSessionSlug(slug)}:secrets`, pending.envelope);
+  await repairPendingSessionSecretsProjection(coordinator);
   await coordinator.projectSessionConfigAuthority(authority);
   await coordinator.state.storage.transaction(async (transaction) => {
     const current = await transaction.get(SETUP_RECORD);
     if (current?.revision === pending.revision) await transaction.delete(SETUP_RECORD);
   });
+};
+
+const readProvisioning = async (record, env, slug) => {
+  if (!isRecord(record) || record.version !== 1 || record.slug !== slug) fail();
+  const checkpoint = await decryptSessionSecretsEnvelope(record.envelope, { env, slug });
+  if (!isRecord(checkpoint) || Object.keys(checkpoint).some(key => !PROVISIONING_FIELDS.has(key)) ||
+    Object.values(checkpoint).some(value => typeof value !== 'string' && typeof value !== 'boolean')) fail();
+  return checkpoint;
+};
+
+export const executeLitProvisioning = async (coordinator, payload, operation) => {
+  const slug = resolveCoordinatorSessionSlugStorageKey(payload?.slug);
+  if (!slug) return json({ error: COORDINATION_ERROR }, 400);
+  try {
+    if (operation !== 'release') {
+      await coordinator.assertSessionAuthority(payload, { requireRevision: !['checkpoint', 'discard'].includes(operation) });
+      await coordinator.repairPendingSessionConfigProjection();
+    }
+    const result = await coordinator.state.storage.transaction(async transaction => {
+      const record = await transaction.get(PROVISIONING_RECORD);
+      const now = coordinator.now();
+      if (operation === 'begin' || operation === 'preflight') {
+        if (record?.leaseUntilMs > now) fail();
+        const saved = record ? await readProvisioning(record, coordinator.env, slug) : {};
+        const resourceIds = Object.fromEntries(['litGroupId', 'litPkpId', 'litActionCid']
+          .filter(key => typeof saved[key] === 'string' && saved[key].trim()).map(key => [key, saved[key]]));
+        // An admin-entered key is unverified until an account or remote resource
+        // exists. A created account must survive fresh-authority switches.
+        const hasResources = !!saved.accountWalletAddress || Object.keys(resourceIds).length > 0;
+        const suppliedKeys = Array.isArray(payload.accountApiKeys) ? payload.accountApiKeys : [];
+        if (hasResources && saved.litAccountApiKey && suppliedKeys.some(key => typeof key === 'string' && key.trim() && key.trim() !== saved.litAccountApiKey)) {
+          throw Object.assign(new Error(LIT_PROVISIONING_CREDENTIALS_CONFLICT), { status: 409, code: 'lit_provisioning_credentials_conflict' });
+        }
+        if (record && record.freshAuthority !== (payload.freshAuthority === true) && Object.keys(resourceIds).length) {
+          const names = { litGroupId: 'group', litPkpId: 'PKP', litActionCid: 'action' };
+          const resources = Object.entries(resourceIds).map(([key, id]) => `${names[key]} ${id}`).join(', ');
+          throw Object.assign(new Error(`Saved Lit resources: ${resources}. Resume the previous setup before changing the authority choice.`),
+            { status: 409, code: 'lit_provisioning_resources_pending' });
+        }
+        if (operation === 'preflight') return {};
+        const checkpoint = hasResources ? saved : {};
+        const attemptId = crypto.randomUUID();
+        const envelope = await buildEncryptedSessionSecretsEnvelope(checkpoint, { env: coordinator.env, slug });
+        await transaction.put(PROVISIONING_RECORD, { version: 1, slug, attemptId, freshAuthority: payload.freshAuthority === true,
+          leaseUntilMs: now + PROVISIONING_LEASE_MS, envelope });
+        return { attemptId, checkpoint };
+      }
+      // A key conflict refuses begin before Lit is asked. Lease the saved setup
+      // unchanged so the route can ask; only discard or release may follow.
+      if (operation === 'check') {
+        if (!record || record.leaseUntilMs > now) fail();
+        const checkpoint = await readProvisioning(record, coordinator.env, slug);
+        const attemptId = crypto.randomUUID();
+        await transaction.put(PROVISIONING_RECORD, { ...record, attemptId, leaseUntilMs: now + PROVISIONING_LEASE_MS });
+        return { attemptId, checkpoint };
+      }
+      // A delayed failure must not release a newer attempt's lease.
+      if (operation === 'release') {
+        if (record?.slug === slug && record.attemptId === payload.attemptId)
+          await transaction.put(PROVISIONING_RECORD, { ...record, leaseUntilMs: 0 });
+        return {};
+      }
+      if (!['checkpoint', 'discard'].includes(operation) || !record || !payload.attemptId || record.attemptId !== payload.attemptId) fail();
+      const previous = await readProvisioning(record, coordinator.env, slug);
+      // Lit confirmed that saved resources are gone, so the next attempt starts
+      // over. An account Lit still accepts is kept: a created one has no other copy.
+      if (operation === 'discard') {
+        const kept = payload.keepAccount === true
+          ? Object.fromEntries(ACCOUNT_FIELDS.filter(key => hasOwn(previous, key)).map(key => [key, previous[key]])) : {};
+        const envelope = await buildEncryptedSessionSecretsEnvelope(kept, { env: coordinator.env, slug });
+        await transaction.put(PROVISIONING_RECORD, { ...record, envelope });
+        return {};
+      }
+      const checkpoint = payload.checkpoint;
+      if (!isRecord(checkpoint) || Object.keys(checkpoint).some(key => !PROVISIONING_FIELDS.has(key)) ||
+        Object.values(checkpoint).some(value => typeof value !== 'string' && typeof value !== 'boolean')) fail(400);
+      // Already-created resources are immutable within an attempt. Wallet
+      // lookup alone can refine its returned address to the provider's PKP id.
+      for (const [key, value] of Object.entries(previous)) {
+        if (key !== 'litPkpId' && hasOwn(checkpoint, key) && checkpoint[key] !== value) fail();
+      }
+      const envelope = await buildEncryptedSessionSecretsEnvelope({ ...previous, ...checkpoint }, { env: coordinator.env, slug });
+      await transaction.put(PROVISIONING_RECORD, { ...record, leaseUntilMs: now + PROVISIONING_LEASE_MS, envelope });
+      return {};
+    });
+    return json({ ok: true, ...result });
+  } catch (error) {
+    if (['lit_provisioning_credentials_conflict', 'lit_provisioning_resources_pending'].includes(error?.code)) {
+      return json({ error: error.message, code: error.code }, error.status);
+    }
+    return json({ error: 'Lit provisioning is pending or in progress; retry.' }, error?.status || 503);
+  }
 };
 
 export const executeLitAuthorizationFinalize = async (coordinator, payload) => {
@@ -115,6 +211,16 @@ export const executeLitAuthorizationFinalize = async (coordinator, payload) => {
     await coordinator.assertSessionAuthority(payload);
     await coordinator.repairPendingSessionConfigProjection();
     await coordinator.state.storage.transaction(async (transaction) => {
+      const provisioning = await transaction.get(PROVISIONING_RECORD);
+      if (!payload.attemptId || provisioning?.attemptId !== payload.attemptId) fail();
+      const checkpoint = await readProvisioning(provisioning, coordinator.env, slug);
+      if (['litGroupId', 'litPkpId', 'litActionCid', 'litUsageApiKey'].some(key => typeof checkpoint[key] !== 'string' || !checkpoint[key].trim()) ||
+        ['registeredAction', 'addedActionToGroup', 'addedPkpToGroup'].some(key => checkpoint[key] !== true)) fail();
+      for (const key of ['litApiBase', 'litGroupId', 'litPkpId', 'litActionCid']) {
+        if (hasOwn(checkpoint, key) && checkpoint[key] !== payload.litCredentials[key]) fail();
+      }
+      if (hasOwn(checkpoint, 'litUsageApiKey') && checkpoint.litUsageApiKey !== outputs.litUsageApiKey) fail();
+      if (hasOwn(checkpoint, 'accountSecretOutput') && checkpoint.accountSecretOutput !== outputs.litAccountApiKey) fail();
       const record = await transaction.get(SIGNER_RECORD);
       const signerSecrets = await readSignerSecrets(record, coordinator.env, slug);
       const wallet = walletFor(signerSecrets[PRIVATE_KEY]);
@@ -129,17 +235,15 @@ export const executeLitAuthorizationFinalize = async (coordinator, payload) => {
         mutation: { kind: 'merge-lit-credentials', litCredentials: payload.litCredentials },
       });
       if (!mutation?.ok) fail(mutation?.status || 400);
-      const secrets = { ...((await getSessionSecrets(coordinator.env, normalizeWorkerSessionSlug(slug))) || {}), ...signerSecrets };
+      const secrets = { ...(await readCommittedSessionSecrets(coordinator, transaction, slug)), ...signerSecrets };
       for (const [key, value] of Object.entries(outputs)) {
         if (value.trim()) secrets[key] = value.trim();
         else delete secrets[key];
       }
       secrets[PRIVATE_KEY] = wallet.privateKey;
       for (const key of SECRET_KEYS) if (secrets[key] === '') delete secrets[key];
-      const envelope = await buildEncryptedSessionSecretsEnvelope(secrets, { env: coordinator.env, slug });
-      // Empty values in the encrypted authority remember explicit removals;
-      // an eventually consistent KV read must not resurrect an old account key.
-      const litSecrets = Object.fromEntries(SECRET_KEYS.map((key) => [key, secrets[key] ?? '']));
+      const envelope = await commitSessionSecrets(coordinator, transaction, slug, secrets);
+      const litSecrets = Object.fromEntries(SECRET_KEYS.filter((key) => hasOwn(secrets, key)).map((key) => [key, secrets[key]]));
       const signerEnvelope = await buildEncryptedSessionSecretsEnvelope(litSecrets, { env: coordinator.env, slug });
       const revision = Number(existing?.revision || 0) + 1;
       // Commit the selected signer, usage keys and public Lit descriptor as one
@@ -150,6 +254,7 @@ export const executeLitAuthorizationFinalize = async (coordinator, payload) => {
         projectionPendingSinceMs: coordinator.now(),
       });
       await transaction.put(SETUP_RECORD, { version: 1, slug, revision, envelope });
+      await transaction.delete(PROVISIONING_RECORD);
     });
   } catch (error) {
     return json({ error: error?.status ? COORDINATION_ERROR : PENDING_ERROR }, error?.status || 503);
@@ -174,22 +279,23 @@ export const executeSessionSecretsAfterLitRepair = async (coordinator, payload) 
     // that older full-secret journal could silently undo the accepted edit.
     await coordinator.assertSessionAuthority(payload);
     await coordinator.repairPendingSessionConfigProjection();
-    const existing = (await getSessionSecrets(coordinator.env, normalizeWorkerSessionSlug(slug))) || {};
-    const litPatch = Object.fromEntries(Object.entries(patch).filter(([key]) => SECRET_KEYS.includes(key)));
-    const record = await coordinator.state.storage.get(SIGNER_RECORD);
-    const litSecrets = record == null ? null : await readSignerSecrets(record, coordinator.env, slug);
-    const envelope = litSecrets && Object.keys(litPatch).length
-      ? await buildEncryptedSessionSecretsEnvelope({ ...litSecrets, ...litPatch }, { env: coordinator.env, slug }) : null;
-    // Even an unrelated edit must overlay canonical Lit values and deletions;
-    // a stale KV snapshot may predate the active signer and usage credential.
-    const nextSecrets = { ...existing, ...litSecrets, ...patch };
-    for (const key of SECRET_KEYS) if (litSecrets?.[key] === '' && !hasOwn(patch, key)) delete nextSecrets[key];
-    await putSessionSecrets(coordinator.env, normalizeWorkerSessionSlug(slug), nextSecrets);
-    if (envelope) {
-      await coordinator.state.storage.transaction(async (transaction) => {
+    await coordinator.state.storage.transaction(async (transaction) => {
+      const existing = await readCommittedSessionSecrets(coordinator, transaction, slug);
+      const record = await transaction.get(SIGNER_RECORD);
+      const litSecrets = record == null ? null : await readSignerSecrets(record, coordinator.env, slug);
+      const nextSecrets = { ...existing, ...litSecrets };
+      for (const [key, value] of Object.entries(patch)) {
+        if (value.trim()) nextSecrets[key] = value.trim();
+        else delete nextSecrets[key];
+      }
+      await commitSessionSecrets(coordinator, transaction, slug, nextSecrets);
+      if (record && Object.keys(patch).some((key) => SECRET_KEYS.includes(key))) {
+        const nextLitSecrets = Object.fromEntries(SECRET_KEYS.filter((key) => hasOwn(nextSecrets, key)).map((key) => [key, nextSecrets[key]]));
+        const envelope = await buildEncryptedSessionSecretsEnvelope(nextLitSecrets, { env: coordinator.env, slug });
         await transaction.put(SIGNER_RECORD, { version: 1, slug, envelope });
-      });
-    }
+      }
+    });
+    await repairPendingSessionSecretsProjection(coordinator);
     return json({ ok: true });
   } catch (error) {
     return json({ error: error.status === 409 ? error.message : 'Session secrets update is pending; retry after setup repair.' }, error.status || 503);
@@ -230,3 +336,18 @@ export const updateSessionSecretsAfterLitRepair = async (args) => {
   const result = await callCoordinator({ ...args, path: 'update-secrets' });
   return { ok: result.ok, status: result.status, body: result.ok ? { ok: true } : { error: 'Session secrets update failed; retry after setup repair.' } };
 };
+
+const provisionCall = async (args, operation) => {
+  const result = await callCoordinator({ ...args, path: `provisioning/${operation}` });
+  if (!result.ok) {
+    const code = ['lit_provisioning_credentials_conflict', 'lit_provisioning_resources_pending'].includes(result.body?.code) ? result.body.code : '';
+    throw Object.assign(new Error(code ? result.body.error : 'Lit provisioning is pending or in progress; retry.'), { status: result.status, code });
+  }
+  return result.body;
+};
+export const preflightSessionLitProvisioning = args => provisionCall(args, 'preflight');
+export const beginSessionLitProvisioning = args => provisionCall(args, 'begin');
+export const checkpointSessionLitProvisioning = args => provisionCall(args, 'checkpoint');
+export const releaseSessionLitProvisioning = args => provisionCall(args, 'release');
+export const checkSessionLitProvisioning = args => provisionCall(args, 'check');
+export const discardSessionLitProvisioning = args => provisionCall(args, 'discard');

@@ -13,7 +13,7 @@ test.each([false, true])(
     const records = [...fixture.records, ...(upgraded ? fixture.upgradedRecords : [])].filter(
       (row) => row.metadata.resource === 'questions',
     );
-    const rows = await loadWorkerCanonicalQuestions(
+    const { rows } = await loadWorkerCanonicalQuestions(
       { sessionConfig: config, sessionSlug: config.slug },
       {
         listSessionStorageRefsPage: async () => ({

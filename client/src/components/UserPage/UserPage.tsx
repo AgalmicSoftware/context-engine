@@ -1,11 +1,13 @@
+import {
+  analyzeUser,
+  analysisProfileKey,
+  analysisInputSignature,
+  invalidateUserAnalysis,
+} from './userPageAnalysisActions';
 /** @file UserPage.tsx */
 import React, { Component } from 'react';
 import styles from './UserPage.module.scss';
 import {
-  buildUserPageAnalysisAiOptions,
-  buildUserPageAnalysisErrorStatePatch,
-  buildUserPageAnalysisErrorPresentation,
-  buildUserPageAnalysisCacheReadDescriptor,
   buildUserPageAnalysisFingerprint,
   applyUserPageBookmarkToggle,
   applyUserPageBookmarkNicknameSave,
@@ -13,17 +15,11 @@ import {
   buildUserPageCacheRefreshRequestDescriptor,
   buildUserPageRefreshTelemetrySignature,
   buildUserPageRefreshTelemetrySnapshot,
-  buildUserPageAnalysisCreatedQuestions,
-  buildUserPageAnalysisCreatedSurveys,
   buildUserPageAnalysisCandidateLogRows,
   buildUserPageAnalysisExcludeSlugSet,
   buildUserPageAnalysisElapsedStatePatch,
   buildUserPageAnalysisModalStatePatch,
-  buildUserPageAnalysisQuestions,
-  buildUserPageAnalysisResetStatePatch,
   buildUserPageAnalysisResultStatePatch,
-  buildUserPageAnalysisSbts,
-  buildUserPageAnalysisSurveys,
   buildUserPageAddressContextResetStatePatch,
   buildUserPageAiAvailabilityStatePatch,
   buildUserPageAiSessionSlugCandidates,
@@ -44,6 +40,7 @@ import {
   buildUserPageDeepScanTooltipInputSignature,
   buildUserPageDeriveTelemetrySnapshot,
   buildUserPageDecryptedResponseStatePatch,
+  getUserPageResponseImmutableIdentity,
   buildUserPageDecryptedResponsePatch,
   buildUserPageEncryptedVisibilityDisplayState,
   buildUserPageEncryptedVisibilityStatusRequestPlan,
@@ -105,7 +102,6 @@ import {
   buildUserPageRootClassName,
   normalizeUserPageDeepScanProgressRows,
   normalizeUserPageDeepScanTooltipLines,
-  normalizeUserAnalysisResult,
   normalizeUserPageBookmarksCache,
   normalizeUserPageQuestionResponseInfoOrder,
   normalizeUserPageSingleQuestionResponsePayload,
@@ -114,7 +110,6 @@ import {
   readUserPageCacheSourceSnapshot,
   readUserPageNamespaceSourceEntries,
   readBoolishUserPageTelemetryFlag,
-  readUserPageAnalysisCreatedSurveyCachesThroughPort,
   readUserPageAnalysisCacheThroughPort,
   dispatchUserPageGateAccessCheckThroughPort,
   resolveUserPageAnalysisAiContext,
@@ -178,7 +173,6 @@ import {
   runUserPageCacheRefreshActionController,
 } from './userPageActionController';
 
-import { analyzeUserOpinions } from 'utilities/ai/aiClient.js';
 import { getEffectiveAiConfig } from 'utilities/ai/aiSettings.js';
 
 import { generateBlockieDataUrl } from 'utilities/ui/blockieAvatars.js';
@@ -1344,6 +1338,10 @@ class UserPage extends Component<any, any> {
   }
 
   componentDidUpdate(prevProps: UserPagePreviousProps, prevState: UnknownRecord) {
+    const analysisProfileChanged = analysisProfileKey(prevProps) !== analysisProfileKey(this.props);
+    if (analysisProfileChanged || analysisInputSignature(prevState) !== analysisInputSignature(this.state)) {
+      invalidateUserAnalysis(this, analysisProfileChanged);
+    }
     // Fast-path: nonce changed → force immediate cache re-read (bypasses signature dedup)
     const responseNonceRefresh = resolveUserPageResponseNonceRefresh({
       account: this.props.account,
@@ -1823,17 +1821,39 @@ class UserPage extends Component<any, any> {
     // against its source session's verified config, never the profile's active
     // session or a URL supplied inside the encrypted response.
     const surveyId = String(decryptRequestPlan.cryptoOptions.surveyId || '');
-    const sourceInfo =
-      this.state.questionResponseInfo.find((entry: UnknownRecord) => String(entry.id || '').toLowerCase() === qid) ||
-      this.state.surveyResponseInfo.find((entry: UnknownRecord) => String(entry.id || '') === surveyId);
-    const sourceSlug = normalizeSessionSlug(
-      sourceInfo?.sessionSlug ??
-        sourceInfo?.slug ??
-        this.props.activeSessionSlug ??
-        this.props.sessionSlug ??
-        resolveActiveSessionSlug(this.props.sessionConfig || {}) ??
-        '',
-    );
+    const resolveSourceSlug = (state: UnknownRecord): string => {
+      const sourceInfo =
+        (Array.isArray(state.questionResponseInfo) ? state.questionResponseInfo : []).find(
+          (entry: UnknownRecord) => String(entry.id || '').toLowerCase() === qid,
+        ) ||
+        (Array.isArray(state.surveyResponseInfo) ? state.surveyResponseInfo : []).find(
+          (entry: UnknownRecord) => String(entry.id || '') === surveyId,
+        );
+      return normalizeSessionSlug(
+        sourceInfo?.sessionSlug ??
+          sourceInfo?.slug ??
+          this.props.activeSessionSlug ??
+          this.props.sessionSlug ??
+          resolveActiveSessionSlug(this.props.sessionConfig || {}) ??
+          '',
+      );
+    };
+    const sourceSlug = resolveSourceSlug(this.state);
+    const responseIdentity = getUserPageResponseImmutableIdentity(responseOverride);
+    const contextKey = (state: UnknownRecord) =>
+      JSON.stringify([
+        this.props.viewAddress,
+        state.viewAddress,
+        this.props.account,
+        this.props.network?.id ?? this.props.networkChainId,
+        resolveSourceSlug(state),
+        this._responseGateAccessGeneration,
+      ]);
+    const startingContext = contextKey(this.state);
+    const isCurrent = (state: UnknownRecord) =>
+      this._isMounted &&
+      contextKey(state) === startingContext &&
+      getUserPageResponseImmutableIdentity(responseOverride) === responseIdentity;
     const sourceConfig = this._getSessionConfigForSlugExact(sourceSlug);
 
     let decryptedResult: unknown = null;
@@ -1853,6 +1873,7 @@ class UserPage extends Component<any, any> {
       return false;
     }
 
+    if (!isCurrent(this.state)) return false;
     const patchedResponse = buildUserPageDecryptedResponsePatch({
       responseObj: responseOverride,
       questionId: qid,
@@ -1863,7 +1884,9 @@ class UserPage extends Component<any, any> {
 
     let didUpdate = false;
     this.setState((prevState: UnknownRecord) => {
+      if (!isCurrent(prevState)) return null;
       const patchResult = buildUserPageDecryptedResponseStatePatch({
+        responseIdentity,
         patchedResponse,
         previousState: prevState,
         questionId: qid,
@@ -2009,10 +2032,11 @@ class UserPage extends Component<any, any> {
 
       sbtCaches.forEach(({ slug, data: cacheObj }: NamespaceCacheSourceEntry) => {
         const netEntries = getPrioritizedUserPageNetworkCacheNodes(cacheObj, networkID) as PrioritizedCacheNode[];
-        netEntries.forEach(({ value: netObj }) => {
+        netEntries.forEach(({ key: chain, value: netObj }) => {
           const sbtList = toAnalysisRecord(netObj.sbtList);
           Object.keys(sbtList).forEach((addrLowerKey: string) => {
             mergeUserPageSbtCacheEntryIntoAggregate({
+              chain,
               sbtAggregate,
               entry: sbtList[addrLowerKey],
               key: addrLowerKey,
@@ -2088,18 +2112,21 @@ class UserPage extends Component<any, any> {
           });
         });
 
-        (getPrioritizedUserPageChainNodes(userNode, networkID) as PrioritizedUserChainNode[]).forEach(({ node }) => {
-          const chainPayload = isPlainAnalysisObject(node.data) ? (node.data as UserCachePayload) : null;
-          if (!chainPayload) return;
-          (Array.isArray(chainPayload.sbts) ? chainPayload.sbts : []).forEach((item: unknown) => {
-            mergeUserPageUserCacheSbtIntoAggregate({
-              sbtAggregate,
-              item,
-              slug,
-              viewAddressKey,
+        (getPrioritizedUserPageChainNodes(userNode, networkID) as PrioritizedUserChainNode[]).forEach(
+          ({ chainKey, node }) => {
+            const chainPayload = isPlainAnalysisObject(node.data) ? (node.data as UserCachePayload) : null;
+            if (!chainPayload) return;
+            (Array.isArray(chainPayload.sbts) ? chainPayload.sbts : []).forEach((item: unknown) => {
+              mergeUserPageUserCacheSbtIntoAggregate({
+                chain: chainKey,
+                sbtAggregate,
+                item,
+                slug,
+                viewAddressKey,
+              });
             });
-          });
-        });
+          },
+        );
       });
 
       return {
@@ -2903,16 +2930,18 @@ class UserPage extends Component<any, any> {
   };
 
   // ---- Analyze helpers (timer management) ----
-  startAnalysisTimer = (): void => {
+  startAnalysisTimer = (isCurrent = () => this._isMounted): void => {
     this.clearAnalysisTimer();
     const startedAt = Date.now();
     this.analysisTimer = setInterval(() => {
-      if (!this._isMounted) return;
-      this.setState(
-        buildUserPageAnalysisElapsedStatePatch({
-          nowMs: Date.now(),
-          startedAt,
-        }),
+      if (!isCurrent()) return;
+      this.setState(() =>
+        isCurrent()
+          ? buildUserPageAnalysisElapsedStatePatch({
+              nowMs: Date.now(),
+              startedAt,
+            })
+          : null,
       );
     }, 250);
   };
@@ -3093,17 +3122,20 @@ class UserPage extends Component<any, any> {
     return cacheRead.entry as UserAnalysisCacheEntry | null;
   };
 
-  _hydrateAnalysisFromCache = (entry: UserAnalysisCacheEntry): void => {
+  _hydrateAnalysisFromCache = (entry: UserAnalysisCacheEntry, isCurrent = () => this._isMounted): void => {
+    if (!isCurrent()) return;
     this.clearAnalysisTimer();
-    this.setState(
-      buildUserPageAnalysisResultStatePatch({
-        cachedAt: entry?.cachedAt,
-        includeElapsed: true,
-        includeError: true,
-        includeModal: true,
-        result: entry?.result || {},
-        servedFromCache: true,
-      }),
+    this.setState(() =>
+      isCurrent()
+        ? buildUserPageAnalysisResultStatePatch({
+            cachedAt: entry?.cachedAt,
+            includeElapsed: true,
+            includeError: true,
+            includeModal: true,
+            result: entry?.result || {},
+            servedFromCache: true,
+          })
+        : null,
     );
   };
 
@@ -3133,182 +3165,7 @@ class UserPage extends Component<any, any> {
     return cacheWrite.entry as UserAnalysisCacheEntry;
   };
 
-  analyzeUser = async (forceRefresh = false): Promise<void> => {
-    if (!this._isMounted) return;
-
-    // --- Assemble inputs strictly from current state (already hydrated from other caches) ---
-    const sbts = buildUserPageAnalysisSbts({
-      getSbtDisplayName,
-      sbtList: this.state.sbtList,
-    });
-
-    // Question-level responses (all types; only visible)
-    const questions = buildUserPageAnalysisQuestions({
-      detailedQuestionResponses: this.state.detailedQuestionResponses,
-      questionResponseInfo: this.state.questionResponseInfo,
-    });
-
-    // Survey-level summaries + samples of answered items (with types & additional comments)
-    const surveys = buildUserPageAnalysisSurveys({
-      detailedSurveyResponses: this.state.detailedSurveyResponses,
-      surveyResponseInfo: this.state.surveyResponseInfo,
-    });
-
-    // Created content (counts + actual items)
-    const questionsCreated = buildUserPageAnalysisCreatedQuestions(this.state.questionCreationInfo);
-
-    // For surveys the user created, include title + a small sample of question prompts/types
-    let surveysCreated: unknown[] = [];
-    try {
-      const networkID = this.props.network?.id?.toString();
-      const slug = this.props.activeSessionSlug == null ? '' : this.props.activeSessionSlug;
-      const createdSurveyCacheRead = readUserPageAnalysisCreatedSurveyCachesThroughPort({
-        networkID,
-        peekCache: peekCacheSync,
-        sessionSlug: slug,
-      });
-      if (createdSurveyCacheRead.status === 'error') {
-        throw createdSurveyCacheRead.error;
-      }
-      surveysCreated = buildUserPageAnalysisCreatedSurveys({
-        networkID: createdSurveyCacheRead.networkID,
-        questionsCache: createdSurveyCacheRead.questionsCache,
-        surveyCreationInfo: this.state.surveyCreationInfo,
-        surveysCache: createdSurveyCacheRead.surveysCache,
-      });
-    } catch (e) {
-      accountLog.warn('UserPage: fallback', e);
-    }
-
-    const createdCounts = {
-      questionsCreated: questionsCreated.length,
-      surveysCreated: surveysCreated.length,
-    };
-
-    const userData = {
-      address: this.props.viewAddress,
-      username: this.state.username || null,
-      sbts,
-      questions,
-      surveys,
-      // NEW: created content + explicit counts
-      questionsCreated,
-      surveysCreated,
-      createdCounts,
-    };
-    const addressLower = String(this.props.viewAddress || '')
-      .trim()
-      .toLowerCase();
-    // Hosted profiles have no chain ID; keep their cache independent of the connected wallet's network.
-    const networkId =
-      this.props.onChainProfileEnabled === false
-        ? 'worker'
-        : String(this.props.network?.id ?? this.props.network?.chainId ?? '');
-    const hydrateAnalysisCacheIfPresent = (cacheContextToRead: UserAnalysisCacheContext): boolean => {
-      const cacheReadDescriptor = buildUserPageAnalysisCacheReadDescriptor({
-        sessionSlug: cacheContextToRead.sessionSlug,
-        networkId,
-        addressLower,
-        fingerprint: cacheContextToRead.fingerprint,
-        forceRefresh,
-      });
-      if (cacheReadDescriptor.action !== 'read') return false;
-      const cachedEntry = this._readAnalysisCacheEntry(cacheReadDescriptor);
-      if (!cachedEntry) return false;
-      if (!this._isMounted) return true;
-      this._hydrateAnalysisFromCache(cachedEntry);
-      return true;
-    };
-
-    try {
-      this.setState(buildUserPageAnalysisResetStatePatch());
-
-      const analysisSession = await this.resolveAnalysisSessionContext();
-      if (!analysisSession?.sessionConfig) {
-        throw new Error('No valid AI session configuration available for this profile context.');
-      }
-      let cacheContext = await this._buildAnalysisCacheContext({
-        userData,
-        analysisSession,
-        addressLower,
-        networkId,
-      });
-      if (hydrateAnalysisCacheIfPresent(cacheContext)) return;
-
-      if (!this._isMounted) return;
-      this.setState(buildUserPageAnalysisResetStatePatch({ analyzing: true }));
-      this.startAnalysisTimer();
-
-      const analysisAiContext = {
-        account: String(this.props.account || ''),
-        providerLike: this.props.provider,
-        chainId: this.props.network?.id ?? this.props.networkChainId ?? null,
-        lit: getGlobalLitHooks(),
-      };
-      const aiOptions = buildUserPageAnalysisAiOptions({
-        analysisSession,
-        context: analysisAiContext,
-      });
-      let result;
-      try {
-        result = await analyzeUserOpinions(userData, aiOptions);
-      } catch (err: unknown) {
-        const isGateUnavailable = /on-chain gate data unavailable/i.test(getUserPageErrorMessage(err, ''));
-        if (!isGateUnavailable) throw err;
-        accountLog.warn('[UserPage] gate data unavailable for session, trying fallback', {
-          failedSlug: analysisSession.slug,
-          gateStatus: analysisSession.status,
-        });
-        const fallbackSession = await this.resolveAnalysisSessionContext([analysisSession.slug]);
-        if (!fallbackSession?.sessionConfig) throw err;
-        cacheContext = await this._buildAnalysisCacheContext({
-          userData,
-          analysisSession: fallbackSession,
-          addressLower,
-          networkId,
-        });
-        if (hydrateAnalysisCacheIfPresent(cacheContext)) return;
-        const fallbackOpts = buildUserPageAnalysisAiOptions({
-          analysisSession: fallbackSession,
-          context: analysisAiContext,
-          defaultReason: 'fallback-gate-unavailable',
-        });
-        result = await analyzeUserOpinions(userData, fallbackOpts);
-      }
-      if (!this._isMounted) return;
-
-      // Update UI
-      const normalizedResult = normalizeUserAnalysisResult(result);
-      this.setState(
-        buildUserPageAnalysisResultStatePatch({
-          result: normalizedResult,
-          servedFromCache: false,
-        }),
-      );
-      this.clearAnalysisTimer();
-      try {
-        await this._writeAnalysisCacheEntry({
-          sessionSlug: cacheContext.sessionSlug,
-          networkId,
-          addressLower,
-          fingerprint: cacheContext.fingerprint,
-          aiContext: cacheContext.aiContext,
-          result: normalizedResult,
-        });
-      } catch (cacheError) {
-        accountLog.warn('[UserPage] analysis cache write failed:', cacheError);
-      }
-    } catch (e) {
-      accountLog.error('[UserPage] analyzeUser failed:', e);
-      if (!this._isMounted) return;
-      this.setState(
-        buildUserPageAnalysisErrorStatePatch({
-          ...buildUserPageAnalysisErrorPresentation(e),
-        }),
-      );
-      this.clearAnalysisTimer();
-    }
-  };
+  analyzeUser = analyzeUser.bind(this);
 
   openAiSettings = (): void => {
     if (this._isMounted) {
@@ -3608,15 +3465,8 @@ class UserPage extends Component<any, any> {
     // Unique tooltip targets (wrapping spans) for disabled buttons.
     // Sanitize route-derived values to avoid invalid selector chars (e.g. "/")
     // in reactstrap tooltip `target` selectors.
-    const {
-      analyzeBtnWrapId,
-      compareBtnWrapId,
-      questionSpinnerId,
-      questionsCreatedSpinnerId,
-      sbtSpinnerId,
-      surveySpinnerId,
-      surveysCreatedSpinnerId,
-    } = buildUserPageTooltipTargetIds(propViewAddress);
+    const { questionSpinnerId, questionsCreatedSpinnerId, sbtSpinnerId, surveySpinnerId, surveysCreatedSpinnerId } =
+      buildUserPageTooltipTargetIds(propViewAddress);
     const deepScanTooltipLines = this.buildDeepScanProgressTooltip();
     const deepScanProgressRows = this.buildDeepScanProgressRows();
     const { deepScanTooltipContent, deepScanTooltipTitle } = buildUserPageDeepScanTooltipDisplayState({

@@ -102,7 +102,6 @@ const buildPublicSessionConfig = ({ admin, overrides = {} }) => ({
 		version: 'session-storage-profile-v1',
 		backend: 'cloudflare',
 		sessionOwned: true,
-		telegramOwned: false,
 		resources: {
 			docsContext: 'active',
 			questions: 'active',

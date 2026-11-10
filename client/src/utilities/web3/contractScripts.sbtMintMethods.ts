@@ -62,11 +62,10 @@ export const createContractScriptsSbtMintMethods = (deps: ContractScriptsRuntime
     resolveTxGasOverrides,
     rpcLog,
     sendContractWriteViaProvider,
-    utils,
   } = deps;
 
   return {
-    startClaim: async function (providerName: any, SBTAddress: any, userCommit: any) {
+    startClaim: async function (providerName: any, SBTAddress: any, userCommit: any, expectedChainId: string | number) {
       if (providerName === 'none') throw new Error('startClaim requires a signer-capable provider (not read-only).');
       const providerLocation = this.getProviderLocation(providerName);
       const ethersProvider = new ethers.providers.Web3Provider(providerLocation as any, 'any');
@@ -87,6 +86,7 @@ export const createContractScriptsSbtMintMethods = (deps: ContractScriptsRuntime
         params: { userCommitLength: userCommit?.length || 0 },
       });
       const { receipt } = await sendContractWriteViaProvider({
+        expectedChainId,
         signingProvider: providerLocation,
         ethersProvider,
         signer,
@@ -101,7 +101,12 @@ export const createContractScriptsSbtMintMethods = (deps: ContractScriptsRuntime
       return receipt;
     },
 
-    claimWithPassword: async function (providerName: any, SBTAddress: any, password: any) {
+    claimWithPassword: async function (
+      providerName: any,
+      SBTAddress: any,
+      password: any,
+      expectedChainId: string | number,
+    ) {
       if (providerName === 'none')
         throw new Error('claimWithPassword requires a signer-capable provider (not read-only).');
       const providerLocation = this.getProviderLocation(providerName);
@@ -123,6 +128,7 @@ export const createContractScriptsSbtMintMethods = (deps: ContractScriptsRuntime
         params: { passwordProvided: !!password },
       });
       const { receipt } = await sendContractWriteViaProvider({
+        expectedChainId,
         signingProvider: providerLocation,
         ethersProvider,
         signer,
@@ -138,7 +144,13 @@ export const createContractScriptsSbtMintMethods = (deps: ContractScriptsRuntime
       return receipt;
     },
 
-    claimWithInvite: async function (providerName: any, SBTAddress: any, nonce: any, signature: any) {
+    claimWithInvite: async function (
+      providerName: any,
+      SBTAddress: any,
+      nonce: any,
+      signature: any,
+      expectedChainId: string | number,
+    ) {
       if (providerName === 'none')
         throw new Error('claimWithInvite requires a signer-capable provider (not read-only).');
       if (!SBTAddress || !ethers.utils.isAddress(SBTAddress)) {
@@ -171,6 +183,7 @@ export const createContractScriptsSbtMintMethods = (deps: ContractScriptsRuntime
         },
       });
       const { receipt } = await sendContractWriteViaProvider({
+        expectedChainId,
         signingProvider: providerLocation,
         ethersProvider,
         signer,
@@ -193,11 +206,6 @@ export const createContractScriptsSbtMintMethods = (deps: ContractScriptsRuntime
       groupKeyOrCfg: any = null,
     ) {
       try {
-        const cfg = memoizedResolveSession(groupKeyOrCfg === undefined ? '' : groupKeyOrCfg);
-        const chId =
-          Number(cfg?.networkChainId || cfg?.contracts?.sbtFactory?.chainId || cfg?.contracts?.surveys?.chainId || 0) ||
-          undefined;
-
         const provider = getLocalAwareReadProviderForGroup(groupKeyOrCfg, SBT_READ_PROVIDER_OPTIONS);
 
         let ok = false;
@@ -392,21 +400,6 @@ export const createContractScriptsSbtMintMethods = (deps: ContractScriptsRuntime
         const summary = await callWithRetry(() => CustomSBT.getHistorySummary(), 'CustomSBT.getHistorySummary');
         return normalizeSbtHistorySummary(summary);
       } catch {
-        try {
-          if (typeof window !== 'undefined' && window.ethereum) {
-            const provider = new ethers.providers.Web3Provider(window.ethereum as any, 'any');
-            const CustomSBT = new ethers.Contract(
-              SBTAddress,
-              [
-                'function getHistorySummary() view returns (uint256 totalMinted,uint256 totalBurned,uint256 activeSupply,uint256 currentHolderCount,uint256 historicalHolderCount)',
-              ],
-              provider as any,
-            );
-            inviteLog.warn('[INVITE_DEBUG v2] getSbtHistorySummary falling back to injected provider');
-            const summary = await CustomSBT.getHistorySummary();
-            return normalizeSbtHistorySummary(summary);
-          }
-        } catch {}
         return null;
       }
     },
@@ -415,7 +408,12 @@ export const createContractScriptsSbtMintMethods = (deps: ContractScriptsRuntime
       return cryptoUtils.computeGroupMintMessageHash(sbtAddress, userAddress, chainId);
     },
 
-    mintWithGroupSignature: async function (providerName: any, SBTAddress: any, signature: any) {
+    mintWithGroupSignature: async function (
+      providerName: any,
+      SBTAddress: any,
+      signature: any,
+      expectedChainId: string | number,
+    ) {
       if (providerName === 'none')
         throw new Error('mintWithGroupSignature requires a signer-capable provider (not read-only).');
       const providerLocation = this.getProviderLocation(providerName);
@@ -437,6 +435,7 @@ export const createContractScriptsSbtMintMethods = (deps: ContractScriptsRuntime
         params: { signatureLength: signature ? signature.length : 0 },
       });
       const { receipt } = await sendContractWriteViaProvider({
+        expectedChainId,
         signingProvider: providerLocation,
         ethersProvider,
         signer,
@@ -452,7 +451,7 @@ export const createContractScriptsSbtMintMethods = (deps: ContractScriptsRuntime
       return receipt;
     },
 
-    claim: async function (providerName: any, SBTAddress: any) {
+    claim: async function (providerName: any, SBTAddress: any, expectedChainId: string | number) {
       if (providerName === 'none') throw new Error('claim requires a signer-capable provider (not read-only).');
       const providerLocation = this.getProviderLocation(providerName);
       const ethersProvider = new ethers.providers.Web3Provider(providerLocation as any, 'any');
@@ -469,6 +468,7 @@ export const createContractScriptsSbtMintMethods = (deps: ContractScriptsRuntime
       });
       rpcLog('RPC Call (Tx):', { function: 'claim', method: 'CustomSBT.claim', params: {} });
       const { receipt } = await sendContractWriteViaProvider({
+        expectedChainId,
         signingProvider: providerLocation,
         ethersProvider,
         signer,
@@ -483,7 +483,12 @@ export const createContractScriptsSbtMintMethods = (deps: ContractScriptsRuntime
       return receipt;
     },
 
-    addHashedPasswords: async function (providerName: any, SBTAddress: any, hashedPasswords: any) {
+    addHashedPasswords: async function (
+      providerName: any,
+      SBTAddress: any,
+      hashedPasswords: any,
+      expectedChainId: string | number,
+    ) {
       if (providerName === 'none')
         throw new Error('addHashedPasswords requires a signer-capable provider (not read-only).');
       const providerLocation = this.getProviderLocation(providerName);
@@ -505,6 +510,7 @@ export const createContractScriptsSbtMintMethods = (deps: ContractScriptsRuntime
         params: { hashedPasswordsCount: hashedPasswords.length },
       });
       const { receipt } = await sendContractWriteViaProvider({
+        expectedChainId,
         signingProvider: providerLocation,
         ethersProvider,
         signer,
@@ -519,7 +525,7 @@ export const createContractScriptsSbtMintMethods = (deps: ContractScriptsRuntime
       return receipt;
     },
 
-    burnToken: async function (providerName: any, SBTAddress: any, tokenId: any) {
+    burnToken: async function (providerName: any, SBTAddress: any, tokenId: any, expectedChainId: string | number) {
       if (providerName === 'none') throw new Error('burnToken requires a signer-capable provider (not read-only).');
       const providerLocation = this.getProviderLocation(providerName);
       const ethersProvider = new ethers.providers.Web3Provider(providerLocation as any, 'any');
@@ -541,6 +547,7 @@ export const createContractScriptsSbtMintMethods = (deps: ContractScriptsRuntime
         params: { tokenId: tokenIdFormatted.toString() },
       });
       const { receipt } = await sendContractWriteViaProvider({
+        expectedChainId,
         signingProvider: providerLocation,
         ethersProvider,
         signer,
@@ -592,27 +599,6 @@ export const createContractScriptsSbtMintMethods = (deps: ContractScriptsRuntime
         // Fall through to false when neither direct ownership helper succeeds.
       }
 
-      return false;
-    },
-
-    userCanBurnSBTs: async function (providerName: any, SBTAddress: any, userAddress: any, groupKeyOrCfg: any = null) {
-      const provider = getLocalAwareReadProviderForGroup(groupKeyOrCfg, SBT_READ_PROVIDER_OPTIONS);
-      const CustomSBT = new ethers.Contract(SBTAddress, CUSTOM_SBT_ABI, provider as any);
-
-      const admin = await callWithRetry(() => CustomSBT.admin(), 'CustomSBT.admin (userCanBurnSBTs)');
-      const burnAuth = await callWithRetry(
-        () => CustomSBT.collectionBurnAuth(),
-        'CustomSBT.collectionBurnAuth (userCanBurnSBTs)',
-      );
-      const burnAuthNum = ethers.BigNumber.isBigNumber(burnAuth) ? burnAuth.toNumber() : Number(burnAuth);
-      const hasSBT = await this.userHasSBT('none', SBTAddress, userAddress, 0, 'latest', groupKeyOrCfg);
-      const isAdmin =
-        normalizeAddress(admin) !== ethers.constants.AddressZero &&
-        normalizeAddress(admin) === normalizeAddress(userAddress);
-
-      if (burnAuthNum === 0) return isAdmin;
-      if (burnAuthNum === 1) return hasSBT;
-      if (burnAuthNum === 2) return isAdmin || hasSBT;
       return false;
     },
 

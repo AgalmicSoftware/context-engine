@@ -156,7 +156,9 @@ jobs:
         with:
           node-version: 20
           cache: npm
-          cache-dependency-path: package-lock.json
+          cache-dependency-path: |
+            package-lock.json
+            workers/sessionCorsWorker/package-lock.json
 
       - name: Setup Foundry
         uses: foundry-rs/foundry-toolchain@b00af27efadbc7b4ca8b82abbd903b17cc874d2a # v1
@@ -165,6 +167,9 @@ jobs:
 
       - name: Install root dependencies
         run: npm ci
+
+      - name: Install Session Worker dependencies
+        run: npm --prefix workers/sessionCorsWorker ci
 
       - name: Run contracts gate
         run: npm run ci:gate -- contracts

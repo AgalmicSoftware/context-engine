@@ -2930,25 +2930,25 @@ input[type='button'].btn-block {
   background-image: -webkit-linear-gradient(
     to bottom left,
     var(--ce-action-primary),
-    var(--ce-compat-purple),
+    var(--ce-action-primary-hover),
     var(--ce-action-primary)
   );
   background-image: -o-linear-gradient(
     to bottom left,
     var(--ce-action-primary),
-    var(--ce-compat-purple),
+    var(--ce-action-primary-hover),
     var(--ce-action-primary)
   );
   background-image: -moz-linear-gradient(
     to bottom left,
     var(--ce-action-primary),
-    var(--ce-compat-purple),
+    var(--ce-action-primary-hover),
     var(--ce-action-primary)
   );
   background-image: linear-gradient(
     to bottom left,
     var(--ce-action-primary),
-    var(--ce-compat-purple),
+    var(--ce-action-primary-hover),
     var(--ce-action-primary)
   );
   background-size: 210% 210%;
@@ -2970,29 +2970,29 @@ input[type='button'].btn-block {
 .btn-primary:active:hover,
 .btn-primary.active:focus,
 .btn-primary.active:hover {
-  background-color: var(--ce-compat-purple) !important;
+  background-color: var(--ce-action-primary-hover) !important;
   background-image: linear-gradient(
     to bottom left,
     var(--ce-action-primary),
-    var(--ce-compat-purple),
+    var(--ce-action-primary-hover),
     var(--ce-action-primary)
   ) !important;
   background-image: -webkit-linear-gradient(
     to bottom left,
     var(--ce-action-primary),
-    var(--ce-compat-purple),
+    var(--ce-action-primary-hover),
     var(--ce-action-primary)
   ) !important;
   background-image: -o-linear-gradient(
     to bottom left,
     var(--ce-action-primary),
-    var(--ce-compat-purple),
+    var(--ce-action-primary-hover),
     var(--ce-action-primary)
   ) !important;
   background-image: -moz-linear-gradient(
     to bottom left,
     var(--ce-action-primary),
-    var(--ce-compat-purple),
+    var(--ce-action-primary-hover),
     var(--ce-action-primary)
   ) !important;
   color: var(--ce-text-inverse);
@@ -3062,28 +3062,28 @@ fieldset[disabled] .btn-primary.active {
   background-image: linear-gradient(
     to bottom left,
     var(--ce-action-primary),
-    var(--ce-compat-purple),
+    var(--ce-action-primary-hover),
     var(--ce-action-primary)
   ) !important;
   background-image: -webkit-linear-gradient(
     to bottom left,
     var(--ce-action-primary),
-    var(--ce-compat-purple),
+    var(--ce-action-primary-hover),
     var(--ce-action-primary)
   ) !important;
   background-image: -o-linear-gradient(
     to bottom left,
     var(--ce-action-primary),
-    var(--ce-compat-purple),
+    var(--ce-action-primary-hover),
     var(--ce-action-primary)
   ) !important;
   background-image: -moz-linear-gradient(
     to bottom left,
     var(--ce-action-primary),
-    var(--ce-compat-purple),
+    var(--ce-action-primary-hover),
     var(--ce-action-primary)
   ) !important;
-  background-color: var(--ce-compat-purple) !important;
+  background-color: var(--ce-action-primary-hover) !important;
   box-shadow: none;
 }
 .btn-primary.btn-link {
@@ -4555,6 +4555,20 @@ textarea.form-control {
 .btn:active:hover {
   background-color: unset !important;
   background-image: none !important;
+}
+
+// Those resets also cleared .btn-primary's fill, leaving its light label on whatever is behind the button: blank on
+// Minimal's white. It keeps a fill on the action colours the contrast test holds to 4.5:1. Same specificity, later in
+// the file, so a module's own rule for its button still wins; `:where` keeps the disabled rule at that specificity too.
+.btn-primary:hover,
+.btn-primary:active,
+.btn-primary:active:hover {
+  background-color: var(--ce-action-primary-hover) !important;
+  color: var(--ce-action-primary-text);
+}
+
+.btn-primary:where(:disabled, .disabled):hover {
+  background-color: var(--ce-action-primary) !important;
 }
 
 .footer:after {

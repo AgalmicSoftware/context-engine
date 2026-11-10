@@ -1,5 +1,6 @@
 import {
   buildSurveyResultsFilterSummaryDisplayPlan,
+  isSurveyResultsCountLoading,
   buildSurveyResultsStatusMessagesDisplayPlan,
 } from './surveyResultsFilterStatusController';
 
@@ -61,6 +62,8 @@ describe('surveyResultsFilterStatusController', () => {
         normalizedFilteredQuestionsCount: 3,
         normalizedFilteredResponsesCount: 5,
         showFilteredCountSpinner: false,
+        questionTotalsLoading: false,
+        responseTotalsLoading: false,
       });
     });
 
@@ -81,6 +84,8 @@ describe('surveyResultsFilterStatusController', () => {
         normalizedFilteredQuestionsCount: 6,
         normalizedFilteredResponsesCount: 4,
         showFilteredCountSpinner: false,
+        questionTotalsLoading: false,
+        responseTotalsLoading: false,
       });
     });
 
@@ -101,6 +106,8 @@ describe('surveyResultsFilterStatusController', () => {
         normalizedFilteredQuestionsCount: 9,
         normalizedFilteredResponsesCount: 3,
         showFilteredCountSpinner: false,
+        questionTotalsLoading: false,
+        responseTotalsLoading: false,
       });
 
       expect(
@@ -134,6 +141,8 @@ describe('surveyResultsFilterStatusController', () => {
         normalizedFilteredQuestionsCount: 7,
         normalizedFilteredResponsesCount: 2,
         showFilteredCountSpinner: false,
+        questionTotalsLoading: false,
+        responseTotalsLoading: false,
       });
     });
 
@@ -163,6 +172,17 @@ describe('surveyResultsFilterStatusController', () => {
       ).toBe(true);
     });
 
+    it('passes the counts still loading through to the summary', () => {
+      expect(
+        buildSurveyResultsFilterSummaryDisplayPlan({
+          viewMode: 'questions',
+          totalQuestionsCount: 28,
+          areSummaryCountsHydrated: true,
+          responseCountsLoading: true,
+        }),
+      ).toMatchObject({ questionTotalsLoading: false, responseTotalsLoading: true });
+    });
+
     it('normalizes invalid and negative totals to zero', () => {
       expect(
         buildSurveyResultsFilterSummaryDisplayPlan({
@@ -180,7 +200,22 @@ describe('surveyResultsFilterStatusController', () => {
         normalizedFilteredQuestionsCount: 0,
         normalizedFilteredResponsesCount: 0,
         showFilteredCountSpinner: false,
+        questionTotalsLoading: false,
+        responseTotalsLoading: false,
       });
+    });
+  });
+
+  describe('isSurveyResultsCountLoading', () => {
+    it('reads a 0 in Question Results as loading only while its first load is on its way', () => {
+      // The responses have not arrived: their 0 is "not here yet".
+      expect(isSurveyResultsCountLoading({ viewMode: 'questions', ready: false, total: 0 })).toBe(true);
+      // A refresh keeps the counts it has, and a ready cache's 0 means none.
+      expect(isSurveyResultsCountLoading({ viewMode: 'questions', ready: false, total: 224 })).toBe(false);
+      expect(isSurveyResultsCountLoading({ viewMode: 'questions', ready: true, total: 0 })).toBe(false);
+      // Readiness the caller never gave, and survey results, never spin.
+      expect(isSurveyResultsCountLoading({ viewMode: 'questions', ready: undefined, total: 0 })).toBe(false);
+      expect(isSurveyResultsCountLoading({ viewMode: 'survey', ready: false, total: 0 })).toBe(false);
     });
   });
 });

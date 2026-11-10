@@ -164,13 +164,13 @@ describe('contractScriptsCache helpers', () => {
       subject.runArweaveTxFetchCoalesced({
         chainId: 84532,
         txId: 'tx-force-1',
-        forceFetch: false,
+        cacheBypass: false,
         task,
       }),
       subject.runArweaveTxFetchCoalesced({
         chainId: 84532,
         txId: 'tx-force-1',
-        forceFetch: true,
+        cacheBypass: true,
         task,
       }),
     ]);

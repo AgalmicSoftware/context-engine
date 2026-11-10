@@ -15,8 +15,6 @@ import {
   sumSbtCountMap,
   mergeSbtCountMaps,
   mergeSbtCountsPayload,
-  seedSbtCountMapFromLegacyAddresses,
-  hydrateLegacySbtCountState,
   getCurrentHolderAddressesFromCounts,
 } from './sbtCountHelpers.js';
 import { buildSbtCountsResumePlan, normalizeSbtCountsScanCheckpoint } from './sbtCountsCheckpointContract.js';
@@ -781,7 +779,7 @@ export const createSessionSbtCacheController = (host = {}) => {
             } else {
               sbtInfoToUse = cachedSBT.sbtInfo;
             }
-            return hydrateSbtActivityCacheEntry({
+            return mergeSbtActivityCacheEntryMetadata(cachedSBT, {
               sbtAddress: originalCaseAddress,
               sbtInfo: sbtInfoToUse,
               mintedAddresses: (cachedSBT?.mintedAddresses || []).map((a) => (a || '').toLowerCase()),
@@ -996,10 +994,10 @@ export const createSessionSbtCacheController = (host = {}) => {
               : sbtHistoryFromBlock;
 
             const existingCounts = {
-              mintedCountByAddress: sbtAlreadyInMap?.mintedCountByAddress || {},
-              burnedCountByAddress: sbtAlreadyInMap?.burnedCountByAddress || {},
-              mintedEventCount: sbtAlreadyInMap?.mintedEventCount || 0,
-              burnedEventCount: sbtAlreadyInMap?.burnedEventCount || 0,
+              mintedCountByAddress: sbtAlreadyInMap?.coveredCounts?.mintedCountByAddress || {},
+              burnedCountByAddress: sbtAlreadyInMap?.coveredCounts?.burnedCountByAddress || {},
+              mintedEventCount: sbtAlreadyInMap?.coveredCounts?.mintedEventCount || 0,
+              burnedEventCount: sbtAlreadyInMap?.coveredCounts?.burnedEventCount || 0,
             };
 
             const existingBlock = Number(sbtAlreadyInMap?.blockNumber);
@@ -1020,7 +1018,7 @@ export const createSessionSbtCacheController = (host = {}) => {
               const burnedAddresses = (sbtAlreadyInMap?.burnedAddresses || []).map((a) => (a || '').toLowerCase());
               updateBatchProgress(batchIndex, 1, true);
 
-              return hydrateSbtActivityCacheEntry({
+              return mergeSbtActivityCacheEntryMetadata(sbtAlreadyInMap, {
                 sbtAddress: originalCaseAddress,
                 sbtInfo: sbtInfoToUse,
                 mintedAddresses,
@@ -1112,13 +1110,14 @@ export const createSessionSbtCacheController = (host = {}) => {
                 : countsBlock;
             updateBatchProgress(batchIndex, 1, true);
 
-            return hydrateSbtActivityCacheEntry({
+            return mergeSbtActivityCacheEntryCounts(sbtAlreadyInMap, {
               sbtAddress: originalCaseAddress,
               sbtInfo: sbtInfoToUse,
               mintedAddresses,
               burnedAddresses,
               creationBlock: Number.isFinite(creationBlock) ? creationBlock : null,
               countsLoaded: countsLoadedFlag,
+              coveredCounts: countsOk ? countsResult : sbtAlreadyInMap?.coveredCounts,
               mintedCountByAddress: mintedMap,
               burnedCountByAddress: burnedMap,
               mintedEventCount,
@@ -1317,7 +1316,7 @@ export const createSessionSbtCacheController = (host = {}) => {
         const historySummary = !forceCounts
           ? (await loadHistorySummary()) || existingHistorySummary
           : existingHistorySummary;
-        const metadataEntry = hydrateSbtActivityCacheEntry({
+        const metadataEntry = mergeSbtActivityCacheEntryMetadata(existing, {
           sbtAddress: sbtAddressOriginalCase,
           sbtInfo,
           slug,
@@ -1359,7 +1358,7 @@ export const createSessionSbtCacheController = (host = {}) => {
           sbtInfo?.creationBlock,
         );
         const historySummary = (await loadHistorySummary()) || existingHistorySummary;
-        const metadataEntry = hydrateSbtActivityCacheEntry({
+        const metadataEntry = mergeSbtActivityCacheEntryMetadata(existing, {
           sbtAddress: sbtAddressOriginalCase,
           sbtInfo,
           slug,
@@ -1445,10 +1444,10 @@ export const createSessionSbtCacheController = (host = {}) => {
 
       // Original behavior (metadata + counts) when metadata is already complete
       const existingCounts = {
-        mintedCountByAddress: existing?.mintedCountByAddress || {},
-        burnedCountByAddress: existing?.burnedCountByAddress || {},
-        mintedEventCount: existing?.mintedEventCount || 0,
-        burnedEventCount: existing?.burnedEventCount || 0,
+        mintedCountByAddress: existing?.coveredCounts?.mintedCountByAddress || {},
+        burnedCountByAddress: existing?.coveredCounts?.burnedCountByAddress || {},
+        mintedEventCount: existing?.coveredCounts?.mintedEventCount || 0,
+        burnedEventCount: existing?.coveredCounts?.burnedEventCount || 0,
       };
 
       // Regression guard: once a scan is finalized, resume watermarks must come from
@@ -1594,13 +1593,14 @@ export const createSessionSbtCacheController = (host = {}) => {
         sbtInfo?.creationBlock,
       );
 
-      const scannedEntry = hydrateSbtActivityCacheEntry({
+      const scannedEntry = mergeSbtActivityCacheEntryCounts(existing, {
         sbtAddress: sbtAddressOriginalCase,
         sbtInfo,
         mintedAddresses,
         burnedAddresses,
         creationBlock: creationBlock != null ? creationBlock : null,
         countsLoaded: countsLoadedFlag,
+        coveredCounts: countsOk ? counts : existing?.coveredCounts,
         mintedCountByAddress: mintedMap || {},
         burnedCountByAddress: burnedMap || {},
         mintedEventCount,
@@ -1962,6 +1962,7 @@ export const createSessionSbtCacheController = (host = {}) => {
         account: accountLower,
         burned,
         eventBlockNumber,
+        eventId: `${eventBlockNumber}:${eventCursor?.transactionIndex ?? 0}:${eventCursor?.logIndex ?? 0}:${accountLower}:${burned}`,
       });
       freshNetwork.sbtList[sbtAddressLower] = freshEntry;
       updateSbtRealtimeCursorForNetworkCache(freshNetwork, eventCursor);
@@ -2022,8 +2023,6 @@ export const createSessionSbtCacheController = (host = {}) => {
     normalizeSbtHistorySummary,
     normalizeSbtCountMap,
     sumSbtCountMap,
-    seedSbtCountMapFromLegacyAddresses,
-    hydrateLegacySbtCountState,
     buildSbtHistorySummaryFromCounts,
     getCurrentHolderAddressesFromCounts,
     initializeSbtCache,

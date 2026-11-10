@@ -1,3 +1,4 @@
+import { responseEnvelopeFixture } from '../../testUtils/responseEnvelopeFixture';
 import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 
 import { renderSurveyPileViewMode } from './surveyQuestionsTestHarness';
@@ -89,12 +90,7 @@ let envSeq = 0;
 const makeEnvelope = (plaintext, audience, kind) => {
   envSeq += 1;
   const recipients = audience === 'self_admin' ? ADMIN_RECIPIENTS : [{ type: 'self-eip712-v1' }];
-  const env = JSON.stringify({
-    v: 1,
-    aad: { context: `0x${'aa'.repeat(32)}` },
-    recipients,
-    ciphertext: `${kind}-${envSeq}`,
-  });
+  const env = responseEnvelopeFixture(`${kind}-${envSeq}`, recipients);
   registry.set(env, plaintext);
   return env;
 };
@@ -433,7 +429,7 @@ describe('saved Worker audience changes', () => {
       const upload = h.uploads.at(-1);
       const row = upload.questionResponses.find((r) => r.questionID === qid(2));
       expect(row.answer).toMatchObject({ value: '*', encrypted: true, encryptionAudience: 'self' });
-      expect(JSON.parse(row.answer.encryptedPortion).recipients).toEqual([{ type: 'self-eip712-v1' }]);
+      expect(JSON.parse(row.answer.encryptedPortion).recipients.map(({ type }) => type)).toEqual(['self-eip712-v1']);
       expect(registry.get(row.answer.encryptedPortion)).toBe('secret two');
       expect(guard(upload)).toBe('passed');
       expect(plaintextLeak(h.uploads)).toBe(false);
@@ -550,7 +546,7 @@ it.each(['first', 'after another submit', 'with an answer edit', 'with a comment
     expect(registry.get(row.importanceEncrypted)).toBe(6);
     expect(registry.get(row.convictionEncrypted)).toBe(5);
     for (const envelope of [row.answer.encryptedPortion, row.importanceEncrypted, row.convictionEncrypted]) {
-      expect(JSON.parse(envelope).recipients).toEqual([{ type: 'self-eip712-v1' }]);
+      expect(JSON.parse(envelope).recipients.map(({ type }) => type)).toEqual(['self-eip712-v1']);
     }
     expect(row.importance == null).toBe(true);
     expect(row.conviction == null).toBe(true);

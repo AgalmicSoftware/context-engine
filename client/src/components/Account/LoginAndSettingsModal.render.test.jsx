@@ -1,5 +1,7 @@
+jest.mock('wagmi/actions', () => ({ disconnect: jest.fn(async () => {}) }));
 import React, { act } from 'react';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { Modal } from 'reactstrap';
 import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';
 import { resolveSessionCapabilityProjection } from '../../utilities/session/sessionCapabilityProjection';
 import { clearAgentClientLoginEnvelope } from '../../utilities/session/agentClientLogin';
@@ -88,13 +90,7 @@ jest.mock('../../utilities/ai/aiSettings.js', () => {
     })),
     saveLocalAiSettings: jest.fn((next) => next),
     clearLocalAiSettings: jest.fn(),
-    deriveAiPreset: jest.fn(() => 'gpt-5'),
-    toModelLeaf: jest.fn((m) =>
-      String(m || '')
-        .toLowerCase()
-        .split('/')
-        .pop(),
-    ),
+    deriveAiPreset: jest.fn(() => 'gpt-6-astra'),
   };
 });
 
@@ -137,6 +133,7 @@ jest.mock('../../utilities/cache/cacheScripts.js', () => ({
   initCacheManager: jest.fn(async () => undefined),
   listNamespaceEntriesSync: jest.fn(() => []),
   removeCache: jest.fn(async () => true),
+  clearCacheNamespace: jest.fn(async () => true),
 }));
 
 import { LoginAndSettingsModal, buildBookmarksRoutePath } from './LoginAndSettingsModal';
@@ -565,6 +562,45 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     await waitFor(() => {
       expect(screen.getAllByRole('button', { name: 'Close' })).toHaveLength(1);
     });
+  });
+
+  it('leaves a dialog still open beneath it able to scroll when it closes', async () => {
+    const toggleLoginModal = jest.fn();
+    const props = buildProps({ toggleLoginModal });
+    const view = render(
+      <>
+        <Modal isOpen>Raw Results underneath</Modal>
+        <LoginAndSettingsModal {...props} />
+      </>,
+    );
+    await screen.findByText('Raw Results underneath');
+    expect(document.body).toHaveClass('modal-open');
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Close' }));
+    expect(toggleLoginModal).toHaveBeenCalledWith(false);
+    expect(document.body).toHaveClass('modal-open');
+
+    view.rerender(
+      <>
+        <Modal isOpen>Raw Results underneath</Modal>
+        <LoginAndSettingsModal {...props} loginModalToggled={false} />
+      </>,
+    );
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Close' })).not.toBeInTheDocument());
+    expect(document.body).toHaveClass('modal-open');
+
+    view.unmount();
+    expect(document.body).not.toHaveClass('modal-open');
+  });
+
+  it('releases the page when it was the only dialog open', async () => {
+    const props = buildProps();
+    const view = render(<LoginAndSettingsModal {...props} />);
+    await screen.findByRole('button', { name: 'Close' });
+    expect(document.body).toHaveClass('modal-open');
+
+    view.rerender(<LoginAndSettingsModal {...props} loginModalToggled={false} />);
+    await waitFor(() => expect(document.body).not.toHaveClass('modal-open'));
   });
 
   it('shows the shared session dropdown above Config and keeps network details out of the collapsed row in plain mode', () => {
@@ -1075,11 +1111,11 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
       expect(saveLocalAiSettings).toHaveBeenCalledWith(
         expect.objectContaining({
           useLocal: true,
-          preset: 'gpt-5.6-terra',
+          preset: 'gpt-6.1-terra',
           mode: 'openai',
           models: expect.objectContaining({
-            fast: 'gpt-5.6-terra',
-            thinking: 'gpt-5.6-terra',
+            fast: 'gpt-6.1-terra',
+            thinking: 'gpt-6.1-sol',
           }),
           providers: expect.objectContaining({
             openai: expect.objectContaining({
@@ -1107,8 +1143,8 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
           preset: 'claude-sonnet',
           mode: 'anthropic',
           models: expect.objectContaining({
-            fast: 'claude-sonnet-4-6',
-            thinking: 'claude-sonnet-4-6',
+            fast: 'claude-sonnet-5-5',
+            thinking: 'claude-sonnet-5-5',
           }),
           providers: expect.objectContaining({
             anthropic: expect.objectContaining({
@@ -1843,7 +1879,7 @@ describe('LoginAndSettingsModal agent token login', () => {
               workerUrl: 'https://session-worker.example',
               agentCredential: {
                 kind: 'session_agent_browser_token',
-                token: 'bridge-browser-token',
+                token: 'agent-browser-token',
                 expiresAt: '2027-07-05T00:00:00.000Z',
               },
               workerCredential: {
@@ -1866,20 +1902,17 @@ describe('LoginAndSettingsModal agent token login', () => {
     delete global.__CE_AGENT_CLIENT_LOGIN_ENVELOPES__;
   });
 
-  it.each(['hosted HTTP'])('supports %s agent-token login and clears raw tokens after exchange', async (kind) => {
+  it('supports hosted HTTP agent-token login and clears raw tokens after exchange', async () => {
     const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
     profile.surfaces.agentHttp = true;
     const props = buildProps({
       activeSessionSlug: 'alpha',
-      sessionConfig:
-        kind === 'legacy'
-          ? { slug: 'alpha', telegramOnly: true, sessionMode: 'telegram_only' }
-          : {
-              slug: 'alpha',
-              sessionId: '0x00112233445566778899aabbccddeeff',
-              corsWorkerUrl: 'https://session-worker.example',
-              sessionModeProfile: profile,
-            },
+      sessionConfig: {
+        slug: 'alpha',
+        sessionId: '0x00112233445566778899aabbccddeeff',
+        corsWorkerUrl: 'https://session-worker.example',
+        sessionModeProfile: profile,
+      },
     });
     render(<LoginAndSettingsModal {...props} />);
 
@@ -1906,7 +1939,7 @@ describe('LoginAndSettingsModal agent token login', () => {
     expect(window.location.href).not.toContain(RAW_AGENT_TOKEN);
     expect(JSON.stringify(window.localStorage)).not.toContain(RAW_AGENT_TOKEN);
     expect(Object.values(window.sessionStorage).join('\n')).not.toContain(RAW_AGENT_TOKEN);
-    expect(Object.values(window.sessionStorage).join('\n')).not.toContain('bridge-browser-token');
+    expect(Object.values(window.sessionStorage).join('\n')).not.toContain('agent-browser-token');
     expect(Object.values(window.sessionStorage).join('\n')).not.toContain('jwt-session-token');
     expect(JSON.stringify(props.changeAccount.mock.calls)).not.toContain(RAW_AGENT_TOKEN);
     expect(JSON.stringify(props.updateLoginInfo.mock.calls)).not.toContain(RAW_AGENT_TOKEN);
@@ -1918,7 +1951,7 @@ describe('LoginAndSettingsModal agent token login', () => {
       <LoginAndSettingsModal
         {...buildProps({
           activeSessionSlug: 'alpha',
-          sessionConfig: { slug: 'alpha', sessionModeProfile: profile, telegramOnly: true },
+          sessionConfig: { slug: 'alpha', sessionModeProfile: profile },
         })}
       />,
     );

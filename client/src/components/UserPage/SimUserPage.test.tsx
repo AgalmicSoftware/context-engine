@@ -147,7 +147,9 @@ describe('SimUserPage', () => {
       const compareLinks = screen.getAllByRole('link', { name: /^Compare Benjamin Franklin with / });
       expect(compareLinks.length).toBeGreaterThan(0);
       compareLinks.forEach((link) => {
-        expect(link.getAttribute('href')).toMatch(/^\/ce\/compare\?subject=sim%3AFranklin&subject=sim%3A[^&]+$/);
+        expect(link.getAttribute('href')).toMatch(
+          /^\/ce\/compare\?subject=sim%3AFranklin&subject=sim%3A[^&]+&session=general$/,
+        );
       });
     } finally {
       window.history.replaceState({}, '', priorUrl);

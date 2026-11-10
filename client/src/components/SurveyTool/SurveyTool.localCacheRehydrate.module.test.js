@@ -693,11 +693,7 @@ describe('SurveyTool local-cache response rehydrate', () => {
         setState,
         ensurePriorResponses,
         callback,
-        buildRehydrationUpdatePlan: (args) =>
-          buildLocalCacheRehydrationUpdatePlan({
-            ...args,
-            debugLabel: '[Survey][rehydrateLocal]',
-          }),
+        buildRehydrationUpdatePlan: (args) => buildLocalCacheRehydrationUpdatePlan(args),
       }),
     ).resolves.toEqual({
       reason: 'no-change',

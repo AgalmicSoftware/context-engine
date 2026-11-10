@@ -41,10 +41,7 @@ export type SessionWizardPublishUiPlanInput = SessionWizardPublishReadinessInput
   effectiveMetadataTxId?: string;
   hasPendingDrafts?: boolean;
   hasPendingWorkerGroupDrafts?: boolean;
-  isNormalMode?: boolean;
-  publishAdvancedOpen?: boolean;
   publishBusy?: boolean;
-  publishCompleted?: boolean;
   publishStep?: number;
   publishStepElapsedMs?: number;
   sbtsLabel?: unknown;
@@ -69,20 +66,7 @@ export type SessionWizardPublishMetadataIdentityState = {
   effectiveMetadataUri: string;
 };
 
-export type SessionWizardPublishActionDisplayMode = 'advanced' | 'normal';
-
-export type SessionWizardPublishActionDisplayState = {
-  canPublishNow: boolean;
-  displayMode: SessionWizardPublishActionDisplayMode;
-  publishAdvancedOpen: boolean;
-  publishBusy: boolean;
-  publishButtonDisabled: boolean;
-  publishButtonLabel: 'Deploy Session' | 'Publish' | 'Session Created';
-  settingsButtonActive: boolean;
-};
-
 export type SessionWizardPublishUiPlan = {
-  publishActionDisplayState: SessionWizardPublishActionDisplayState;
   publishReadiness: SessionWizardPublishReadinessDescriptor;
   publishExecutionPlan: ReturnType<typeof buildSessionWizardPublishExecutionPlan>;
   publishMetadataDisplayState: SessionWizardPublishMetadataDisplayState;
@@ -269,30 +253,6 @@ export function resolveSessionWizardPublishMetadataDisplayState({
   };
 }
 
-export function resolveSessionWizardPublishActionDisplayState({
-  canPublishNow = false,
-  isNormalMode = false,
-  publishAdvancedOpen = false,
-  publishBusy = false,
-  publishCompleted = false,
-}: {
-  canPublishNow?: boolean;
-  isNormalMode?: boolean;
-  publishAdvancedOpen?: boolean;
-  publishBusy?: boolean;
-  publishCompleted?: boolean;
-} = {}): SessionWizardPublishActionDisplayState {
-  return {
-    canPublishNow,
-    displayMode: isNormalMode ? 'normal' : 'advanced',
-    publishAdvancedOpen,
-    publishBusy,
-    publishButtonDisabled: publishCompleted || publishBusy || !canPublishNow,
-    publishButtonLabel: publishCompleted ? 'Session Created' : isNormalMode ? 'Deploy Session' : 'Publish',
-    settingsButtonActive: publishAdvancedOpen,
-  };
-}
-
 export function resolveSessionWizardPublishUiPlan({
   buildMetadataGatewayUrl,
   deployComplete = false,
@@ -300,10 +260,7 @@ export function resolveSessionWizardPublishUiPlan({
   effectiveMetadataTxId: effectiveMetadataTxIdOverride = '',
   hasPendingDrafts = false,
   hasPendingWorkerGroupDrafts = false,
-  isNormalMode = false,
-  publishAdvancedOpen = false,
   publishBusy = false,
-  publishCompleted = false,
   publishStep = 0,
   publishStepElapsedMs = 0,
   sbtsLabel = 'SBTs',
@@ -339,16 +296,8 @@ export function resolveSessionWizardPublishUiPlan({
     manualMetadataUrl: readinessInput.manualMetadataUrl,
     metadataUrl: readinessInput.metadataUrl,
   });
-  const publishActionDisplayState = resolveSessionWizardPublishActionDisplayState({
-    canPublishNow: publishReadiness.canPublishNow,
-    isNormalMode,
-    publishAdvancedOpen,
-    publishBusy,
-    publishCompleted,
-  });
 
   return {
-    publishActionDisplayState,
     publishReadiness,
     publishExecutionPlan,
     publishMetadataDisplayState,

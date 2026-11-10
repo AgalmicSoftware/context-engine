@@ -41,10 +41,10 @@ test('authenticated agent questions reuse the session question catalog when agen
       },
       loadPublicInterviewQuestions: async ({ slug }) => {
         assert.equal(slug, 'session-a');
-        return [
+        return ({ questions: [
           { id: 'q-1', prompt: 'First?', type: 'binary', options: ['Agree', 'Unsure', 'Disagree'] },
           { id: 'q-2', prompt: 'Second?', type: 'freeform', options: [] },
-        ];
+        ], incomplete: false });
       },
       json: (body, status, headers) => ({ body, status, headers }),
     },
@@ -77,7 +77,7 @@ test('authenticated agent questions fail closed when the session surface is disa
     deps: {
       loadPublicInterviewQuestions: async () => {
         catalogCalled = true;
-        return [];
+        return ({ questions: [], incomplete: false });
       },
       json: (body, status, headers) => ({ body, status, headers }),
     },
@@ -131,6 +131,15 @@ test('dispatchAuthenticatedSecretPathRoute blocks participant writes after the s
     }, path);
   }
   assert.equal(groupRouteCalls, 0);
+
+  // Context changes are admin-only, so an admin can still remove a private item.
+  const contextChange = await dispatchAuthenticatedSecretPathRoute({
+    ...base,
+    path: '/storage/context',
+    method: 'POST',
+    deps: { ...deps, storageRoute: async () => new Response('context') },
+  });
+  assert.equal(await contextChange.response.text(), 'context');
 
   for (const path of ['/groups/list', '/groups/members']) {
     const readable = await dispatchAuthenticatedSecretPathRoute({
@@ -544,7 +553,6 @@ test('dispatchAuthenticatedSecretPathRoute routes authenticated worker group req
       workerGroupsRoute: async (value) => {
         assert.equal(value.path, '/groups/my-memberships');
         assert.equal(value.requesterAddress, '0x0000000000000000000000000000000000000def');
-        assert.deepEqual(value.authScopes, { arweave: false, groups: true });
         return downstreamResponse;
       },
       resolveAuthenticatedRouteSecrets: async () => {

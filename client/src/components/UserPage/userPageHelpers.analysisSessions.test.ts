@@ -225,10 +225,11 @@ describe('userPageHelpers analysis session helpers', () => {
       model: 'gpt-5.2',
     });
 
+    // A session that stores no models uses the shared fallback, as its Worker does.
     expect(deriveAnalysisAiContextFromSessionConfig('', {})).toEqual({
       sessionSlug: '',
       provider: 'openai',
-      model: 'gpt-5.6-terra',
+      model: 'gpt-6.1-terra',
     });
   });
 

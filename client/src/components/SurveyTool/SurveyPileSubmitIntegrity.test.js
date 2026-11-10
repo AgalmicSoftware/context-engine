@@ -1,3 +1,4 @@
+import { responseEnvelopeFixture } from '../../testUtils/responseEnvelopeFixture';
 import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import { renderSurveyPileViewMode, renderSurveyQuestions } from './surveyQuestionsTestHarness';
 import {
@@ -399,7 +400,7 @@ it('names an interview answer held back from the upload and undoes only its draf
 });
 
 it('holds back only a question whose locked value cannot be sent and names it', async () => {
-  const envelope = JSON.stringify({ v: 1, recipients: [{ type: 'self-eip712-v1' }], ciphertext: 'old-secret' });
+  const envelope = responseEnvelopeFixture('old-secret');
   const h = await fixture();
   await act(async () => h.sync());
   await h.mount();
@@ -495,7 +496,7 @@ it('uploads a cleared saved answer as an explicit blank', async () => {
 
 it('never re-sends the envelope of a cleared locked answer', async () => {
   const { buildSelfQuestionDecryptSuccessState } = require('./surveyToolDecryptFlow');
-  const envelope = JSON.stringify({ v: 1, recipients: [{ type: 'self-eip712-v1' }], ciphertext: 'old-secret' });
+  const envelope = responseEnvelopeFixture('old-secret');
   const h = await fixture();
   h.add(
     'responses',
@@ -542,7 +543,7 @@ it('never re-sends the envelope of a cleared locked answer', async () => {
 
 it('keeps the lock when a decrypted answer would publish its still-masked Match Answer comment', async () => {
   const { buildSelfQuestionDecryptSuccessState } = require('./surveyToolDecryptFlow');
-  const envelope = (tag) => JSON.stringify({ v: 1, recipients: [{ type: 'self-eip712-v1' }], ciphertext: tag });
+  const envelope = responseEnvelopeFixture;
   const h = await fixture();
   h.add(
     'responses',
@@ -629,7 +630,7 @@ it.each([
   ['an answer', { value: 'Public note', encrypted: false, audienceMode: 'explicit' }],
   ['an answer and its Match Answer comment', 'locked comment'],
 ])('keeps %s unlocked after Decrypt locked after a reload, without blocking other edits', async (_label, comment) => {
-  const envelope = (tag) => JSON.stringify({ v: 1, recipients: [{ type: 'self-eip712-v1' }], ciphertext: tag });
+  const envelope = responseEnvelopeFixture;
   const lockedComment =
     comment === 'locked comment'
       ? {
@@ -695,7 +696,7 @@ it.each([
 });
 
 it('holds back a question whose new audience needs its decrypted text, and names it', async () => {
-  const envelope = JSON.stringify({ v: 1, recipients: [{ type: 'self-eip712-v1' }], ciphertext: 'answer' });
+  const envelope = responseEnvelopeFixture('answer');
   const h = await fixture();
   h.add(
     'responses',
@@ -1036,7 +1037,7 @@ describe('View all editor after a reload', () => {
   });
 
   it('says when a reload could not keep an unlock', async () => {
-    const envelope = JSON.stringify({ v: 1, recipients: [{ type: 'self-eip712-v1' }], ciphertext: 'answer' });
+    const envelope = responseEnvelopeFixture('answer');
     const h = await fixture();
     h.add(
       'responses',
@@ -1151,7 +1152,7 @@ describe('an answer held back for size', () => {
     expect(row.interviewProvenance?.source).toBeUndefined();
   });
 
-  it('keeps a withdrawal made in the interview window when the other edits upload', async () => {
+  it('keeps a withdrawal made in the interview window and leaves other edits pending', async () => {
     const h = await mountWithSavedConsent();
     const engine = () => h.engine();
     await act(async () => engine().handleAnswerPile(BINARY_QID, 'Yes'));
@@ -1176,9 +1177,11 @@ describe('an answer held back for size', () => {
     await settle();
 
     expect(outcome.status).toBe('failed');
-    expect(h.savedRows(BINARY_QID)).toHaveLength(1);
+    expect(h.savedRows(BINARY_QID)).toHaveLength(0);
     expect(consentOf(engine)).toEqual({ name: '', ai: false });
-    expect(Array.from(engine().getChangedQidsAndFields(0).changedQids)).toEqual([FREEFORM_QID]);
+    expect(Array.from(engine().getChangedQidsAndFields(0).changedQids).sort()).toEqual(
+      [BINARY_QID, FREEFORM_QID].sort(),
+    );
 
     const row = await submitShortened(h);
     expect(row.responderName).toBeUndefined();
@@ -1234,4 +1237,67 @@ it('keeps a late account A receipt out of account B and starts B with a new oper
   expect(operationB).toEqual(expect.any(String));
   expect(operationB).not.toBe(operationA);
   expect(h.submitResponses.mock.calls[1][2][0].responder).toBe(nextAccount);
+});
+
+it.each([
+  ['interview with a manual draft', true, true, false],
+  ['interview after loading own answers', true, true, true],
+  ['interview without another draft', true, false, false],
+  ['ordinary Submit with both drafts', false, true, false],
+])(
+  '%s submits only its scope and preserves every unselected draft',
+  async (_label, interview, otherDraft, pendingOwnRead) => {
+    const h = await fixture();
+    if (!pendingOwnRead) await act(async () => h.sync());
+    await h.mount();
+    await act(async () => h.engine().handleAnswerPile(BINARY_QID, 'Yes'));
+    if (otherDraft) await act(async () => h.engine().handleAnswerPile(FREEFORM_QID, 'Unselected manual draft'));
+    await settle();
+    expect(screen.queryByText(/answers? on the page .*submitted yet/)).not.toBeInTheDocument();
+    const untouched = JSON.parse(JSON.stringify(h.engine().state.surveysResponseState[0].answers[FREEFORM_QID]));
+    if (interview)
+      expect(await run(() => submitSessionInterviewResponses(h.engine(), [BINARY_QID]))).toEqual({
+        status: 'submitted',
+      });
+    else await h.click();
+    await settle();
+    expect(h.submitResponses).toHaveBeenCalledTimes(1);
+    expect(h.submitResponses.mock.calls[0][1].sort()).toEqual(
+      (!interview && otherDraft ? [BINARY_QID, FREEFORM_QID] : [BINARY_QID]).sort(),
+    );
+    expect(h.savedRows(FREEFORM_QID)).toHaveLength(!interview && otherDraft ? 1 : 0);
+    if (interview && otherDraft) {
+      expect(h.engine().state.surveysResponseState[0].answers[FREEFORM_QID]).toEqual(untouched);
+      expect(draftHolds(FREEFORM_QID)).toBe(true);
+      expect(Array.from(h.engine().getChangedQidsAndFields(0).changedQids)).toEqual([FREEFORM_QID]);
+      const notice = screen.getByText("1 answer on the page isn't submitted yet.");
+      expect(notice.closest('button')).toBeNull();
+      await h.click();
+      await settle();
+      expect(screen.queryByText(/answer on the page/)).not.toBeInTheDocument();
+      await act(async () => h.engine().handleAnswerPile(FREEFORM_QID, 'New ordinary edit'));
+      await settle();
+      expect(screen.queryByText(/answer on the page/)).not.toBeInTheDocument();
+    }
+  },
+);
+
+it('keeps the interview notice away after Clear discards the unsaved answers', async () => {
+  const h = await fixture();
+  await act(async () => h.sync());
+  await h.mount();
+  await act(async () => h.engine().handleAnswerPile(BINARY_QID, 'Yes'));
+  await act(async () => h.engine().handleAnswerPile(FREEFORM_QID, 'Unselected manual draft'));
+  await settle();
+  expect(await run(() => submitSessionInterviewResponses(h.engine(), [BINARY_QID]))).toEqual({ status: 'submitted' });
+  await settle();
+  expect(screen.getByText("1 answer on the page isn't submitted yet.")).toBeInTheDocument();
+
+  await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Clear pending changes' })));
+  await settle();
+  expect(h.engine().getPendingEditStats().total).toBe(0);
+  await act(async () => h.engine().handleAnswerPile(FREEFORM_QID, 'New ordinary edit'));
+  await settle();
+  expect(h.engine().getPendingEditStats().total).toBe(1);
+  expect(screen.queryByText(/answer on the page/)).not.toBeInTheDocument();
 });

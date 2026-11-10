@@ -15,7 +15,7 @@ test('reads the kickoff requirement without treating legacy import versions as s
 
 test('checks a served client against the real local Worker catalog handler using GET only', async (t) => {
   let origin;
-  let clientVersion = 'ce-interview-brief-v5';
+  let clientVersion = 'ce-interview-brief-v6';
   const kv = new Map();
   const env = installSessionCoordinatorBinding({ GROUP_KV: {
     get: async (key) => kv.get(key) ?? null,
@@ -31,7 +31,10 @@ test('checks a served client against the real local Worker catalog handler using
       deps: {
         resolveRequestSlugWithoutToken: () => ({ ok: true, explicitSlugProvided: true, slug: 'demo' }),
         getCorsContext: async () => ({ ok: true, headers: {} }),
-        loadPublicInterviewQuestions: async () => [{ id: 'q1', prompt: 'Example?', type: 'freeform' }],
+        loadPublicInterviewQuestions: async () => ({
+          questions: [{ id: 'q1', prompt: 'Example?', type: 'freeform' }],
+          incomplete: false,
+        }),
         json: (body, status, headers) => new Response(JSON.stringify(body), { status, headers }),
       },
     });

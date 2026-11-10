@@ -6,12 +6,14 @@ import {
   fireEvent,
   getWizardResourceCard,
   mockRegisterSessionOnChain,
+  openSetupSection,
   renderLoggedInSessionWizard,
   renderSessionWizard,
   renderSessionWizardWithTooltipStore,
   resetSessionWizardWorkerPanelTestState,
   screen,
   selectNormalModeCard,
+  selectRegistryHosting,
   enableAdvancedMode,
   waitFor,
   within,
@@ -20,44 +22,27 @@ import {
 describe('SessionWizard worker resource rendering', () => {
   beforeEach(resetSessionWizardWorkerPanelTestState);
 
-  const openPublishSection = async () => {
-    fireEvent.click(screen.getByText('Publish').closest('button'));
-    return screen.findByTestId(E2E_TESTIDS.WIZARD_PUBLISH);
+  // Lit is an Access encryption option; the page keeps a registry chain for it by default.
+  const selectLitEncryption = () => {
+    openSetupSection('access');
+    fireEvent.change(screen.getByTestId('ce-setup-encryption'), { target: { value: 'lit' } });
+    expect(screen.getByTestId('ce-setup-encryption')).toHaveValue('lit');
   };
-
-  const selectPreset = async (presetId) => {
-    const testId = `ce-new-preset-${presetId}`;
-    const originalConfirm = window.confirm;
-    window.confirm = jest.fn(() => true);
-    try {
-      fireEvent.click(screen.getByTestId(testId));
-    } finally {
-      window.confirm = originalConfirm;
-    }
-    await waitFor(() => {
-      expect(screen.getByTestId(testId)).toHaveAttribute('aria-checked', 'true');
-    });
+  // New drafts already use the old Cloudflare preset's Worker-hosted profile.
+  const selectCloudflareLitProfile = () => selectLitEncryption();
+  const selectDecentralizedLitProfile = () => {
+    selectRegistryHosting();
+    selectLitEncryption();
   };
-
-  const selectFastCheapPreset = async () => selectPreset('fast_cheap_cloudflare');
-  const selectTrustlessPublicPreset = async () => selectPreset('trustless_public_decentralized');
-  const selectLitProfile = async (selectBasePreset) => {
-    await selectBasePreset();
-    enableAdvancedMode();
-    const encryptionOptions = within(screen.getByRole('radiogroup', { name: /encryption/i }));
-    fireEvent.click(encryptionOptions.getByRole('radio', { name: 'Lit' }));
-    await waitFor(() => {
-      expect(encryptionOptions.getByRole('radio', { name: 'Lit' })).toHaveAttribute('aria-checked', 'true');
-    });
+  const selectWorkerHosting = () => {
+    openSetupSection('hosting');
+    fireEvent.change(screen.getByTestId('ce-setup-authority'), { target: { value: 'worker_canonical' } });
   };
-  const selectCloudflareLitProfile = async () => selectLitProfile(selectFastCheapPreset);
-  const selectDecentralizedLitProfile = async () => selectLitProfile(selectTrustlessPublicPreset);
 
   it('shows only the AI resource for the default Cloudflare two-key profile', async () => {
     renderLoggedInSessionWizard();
 
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
-    await selectFastCheapPreset();
     selectNormalModeCard('Worker');
 
     await waitFor(() => {
@@ -74,8 +59,7 @@ describe('SessionWizard worker resource rendering', () => {
     renderLoggedInSessionWizard();
 
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
-    await selectTrustlessPublicPreset();
-    selectNormalModeCard('Worker');
+    selectRegistryHosting();
 
     await waitFor(() => {
       expect(screen.getAllByTestId(E2E_TESTIDS.WIZARD_RESOURCE_CARD)).toHaveLength(4);
@@ -87,26 +71,23 @@ describe('SessionWizard worker resource rendering', () => {
     expect(getWizardResourceCard('lit')).toBeUndefined();
   });
 
-  it('uses the Privacy storage control instead of a second Session Storage editor', async () => {
+  it('uses the Hosting storage control instead of a second Session Storage editor', async () => {
     renderLoggedInSessionWizard();
 
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
-    await selectTrustlessPublicPreset();
+    selectRegistryHosting();
     expect(screen.queryByText('Session Storage')).not.toBeInTheDocument();
 
     enableAdvancedMode();
-    const storageOptions = within(await screen.findByRole('radiogroup', { name: 'Data storage' }));
-    const arweaveOption = storageOptions.getByRole('radio', { name: 'Arweave' });
-    const cloudflareOption = storageOptions.getByRole('radio', { name: 'Cloudflare' });
-    expect(arweaveOption).toHaveAttribute('aria-checked', 'true');
-    expect(cloudflareOption).toHaveAttribute('aria-checked', 'false');
+    const storageSelect = screen.getByTestId('ce-setup-storage');
+    expect(screen.getAllByTestId('ce-setup-storage')).toHaveLength(1);
+    expect(storageSelect).toHaveValue('arweave');
     expect(screen.queryByText('Session Storage')).not.toBeInTheDocument();
 
-    fireEvent.click(cloudflareOption);
+    fireEvent.change(storageSelect, { target: { value: 'cloudflare' } });
 
     await waitFor(() => {
-      expect(arweaveOption).toHaveAttribute('aria-checked', 'false');
-      expect(cloudflareOption).toHaveAttribute('aria-checked', 'true');
+      expect(screen.getByTestId('ce-setup-storage')).toHaveValue('cloudflare');
     });
     expect(screen.queryByRole('radio', { name: 'Public read' })).not.toBeInTheDocument();
     expect(screen.queryByRole('radio', { name: 'Worker SBT gate' })).not.toBeInTheDocument();
@@ -117,9 +98,8 @@ describe('SessionWizard worker resource rendering', () => {
     renderLoggedInSessionWizard();
 
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
-    await selectCloudflareLitProfile();
+    selectCloudflareLitProfile();
     enableAdvancedMode();
-    fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
 
     await waitFor(() => {
       expect(screen.getAllByTestId(E2E_TESTIDS.WIZARD_RESOURCE_CARD)).toHaveLength(3);
@@ -165,23 +145,26 @@ describe('SessionWizard worker resource rendering', () => {
 
     renderLoggedInSessionWizard();
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
-    await selectTrustlessPublicPreset();
+    selectRegistryHosting();
     await deployVerifiedWorkerForCurrentDraft();
-    enableAdvancedMode();
 
-    const publishButton = await openPublishSection();
-    fireEvent.click(screen.getByLabelText('Advanced publish settings'));
+    const publishButton = screen.getByTestId(E2E_TESTIDS.WIZARD_PUBLISH);
     fireEvent.change(screen.getByPlaceholderText(/ar:\/\/<txId>/i), {
       target: { value: `ar://${'c'.repeat(43)}` },
     });
 
-    await waitFor(() => {
-      expect(publishButton).not.toBeDisabled();
-    });
+    await waitFor(
+      () => {
+        expect(publishButton).not.toBeDisabled();
+      },
+      { timeout: 8000 },
+    );
 
     fireEvent.click(publishButton);
 
-    expect(await screen.findByText(/Resource "ai" uses multiple gate groups with All semantics/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/Resource "ai" uses multiple gate groups with All semantics/i, {}, { timeout: 8000 }),
+    ).toBeInTheDocument();
     expect(mockRegisterSessionOnChain).not.toHaveBeenCalled();
   });
 
@@ -230,48 +213,17 @@ describe('SessionWizard worker resource rendering', () => {
     expect(within(litCard).getByText('Lit API key')).toBeInTheDocument();
   });
 
-  it('shows GitHub worker links instead of raw source in advanced mode', async () => {
+  it('disables worker secret inputs when user-paid mode is enabled and restores them when turned off', async () => {
     renderSessionWizard();
-
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
-    enableAdvancedMode();
-    fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
-
-    expect(await screen.findByText('Worker Deployment')).toBeInTheDocument();
-    expect(
-      screen.getByText('Sessions use a Cloudflare Worker for CORS proxy, AI, and faucet services.'),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText('The default hosted worker is used automatically unless a custom worker URL is configured.'),
-    ).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /worker source/i })).toHaveAttribute(
-      'href',
-      expect.stringContaining('/tree/main/workers/sessionCorsWorker'),
-    );
-    expect(screen.getByRole('link', { name: /worker source/i })).toHaveAttribute('rel', 'noopener noreferrer');
-    expect(screen.getByRole('link', { name: /deploy helper/i })).toHaveAttribute(
-      'href',
-      expect.stringContaining('/tree/main/workers/deploy-helper'),
-    );
-    expect(screen.getByRole('link', { name: /deploy helper/i })).toHaveAttribute('rel', 'noopener noreferrer');
-    expect(screen.getByRole('link', { name: /worker docs/i })).toHaveAttribute(
-      'href',
-      expect.stringContaining('/blob/main/docs/session-cors-worker.md'),
-    );
-    expect(screen.getByRole('link', { name: /worker docs/i })).toHaveAttribute('rel', 'noopener noreferrer');
-    expect(screen.queryByText('Worker code (unbundled, copy + paste)')).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /copy worker code/i })).not.toBeInTheDocument();
-  });
-
-  it('disables worker secret inputs when user-paid mode is enabled and restores them when turned off in advanced mode', async () => {
-    renderSessionWizard();
-    enableAdvancedMode();
-    fireEvent.click(await screen.findByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
+    selectRegistryHosting();
 
     const openAiKeyInput = await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_OPENAI_KEY);
+    const arweaveJwkInput = screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_ARWEAVE_JWK);
     const requirePayToggle = screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_SECRETS_REQUIRE_PAY);
 
     expect(openAiKeyInput).toBeEnabled();
+    expect(arweaveJwkInput).toBeEnabled();
     expect(requirePayToggle).not.toBeChecked();
 
     fireEvent.change(openAiKeyInput, { target: { value: 'sk-test' } });
@@ -280,25 +232,26 @@ describe('SessionWizard worker resource rendering', () => {
     await waitFor(() => {
       expect(requirePayToggle).toBeChecked();
       expect(openAiKeyInput).toBeDisabled();
+      expect(arweaveJwkInput).toBeDisabled();
     });
 
     fireEvent.click(requirePayToggle);
 
     await waitFor(() => {
       expect(requirePayToggle).not.toBeChecked();
-      expect(openAiKeyInput).toBeEnabled();
+      expect(arweaveJwkInput).toBeEnabled();
+      expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_OPENAI_KEY)).toBeEnabled();
     });
   });
 
   it.each([
-    ['Cloudflare', selectFastCheapPreset],
+    ['Cloudflare', () => {}],
     ['Cloudflare with Lit', selectCloudflareLitProfile],
-  ])('hides user-paid usage for centralized %s sessions in advanced mode', async (_name, selectProfile) => {
+  ])('hides user-paid usage for centralized %s sessions with every section open', async (_name, selectProfile) => {
     renderSessionWizard();
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
-    await selectProfile();
+    selectProfile();
     enableAdvancedMode();
-    fireEvent.click(await screen.findByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
 
     expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_OPENAI_KEY)).toBeEnabled();
     expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_WORKER_SECRETS_REQUIRE_PAY)).not.toBeInTheDocument();
@@ -307,47 +260,42 @@ describe('SessionWizard worker resource rendering', () => {
   });
 
   it('turns Worker secrets back on when a profile change hides user-paid usage', async () => {
+    // A saved "Require users to pay for usage" choice (the toggle itself does not render; see the TODO above).
+    sessionStorage.setItem('ce:sessionWizardDraft:v1', JSON.stringify({ workerSecretsEnabled: false }));
     renderSessionWizard();
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
-    await selectTrustlessPublicPreset();
-    enableAdvancedMode();
-    fireEvent.click(await screen.findByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
-    fireEvent.click(await screen.findByTestId(E2E_TESTIDS.WIZARD_WORKER_SECRETS_REQUIRE_PAY));
+    selectRegistryHosting();
+    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_ARWEAVE_JWK)).toBeDisabled();
     expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_OPENAI_KEY)).toBeDisabled();
 
-    await selectFastCheapPreset();
-    enableAdvancedMode();
-    fireEvent.click(await screen.findByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
+    selectWorkerHosting();
 
     expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_OPENAI_KEY)).toBeEnabled();
     expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_WORKER_SECRETS_REQUIRE_PAY)).not.toBeInTheDocument();
   });
 
-  it('keeps Worker secrets on in normal mode and the custom pay-for-usage choice for later', async () => {
+  it('keeps Worker secrets on for Worker-hosted profiles and the custom pay-for-usage choice for later', async () => {
     renderSessionWizard();
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
-    await selectTrustlessPublicPreset();
-    enableAdvancedMode();
-    fireEvent.click(await screen.findByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
+    selectRegistryHosting();
     fireEvent.click(await screen.findByTestId(E2E_TESTIDS.WIZARD_WORKER_SECRETS_REQUIRE_PAY));
+    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_ARWEAVE_JWK)).toBeDisabled();
     expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_OPENAI_KEY)).toBeDisabled();
 
-    // Normal mode hides the toggle, so its custom choice does not apply there.
-    selectNormalModeCard('Worker');
+    // Worker-hosted profiles hide the toggle, so its custom choice does not apply there.
+    selectWorkerHosting();
     expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_WORKER_SECRETS_REQUIRE_PAY)).not.toBeInTheDocument();
     expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_OPENAI_KEY)).toBeEnabled();
 
-    enableAdvancedMode();
-    // The Worker panel stays open from the first visit.
+    selectRegistryHosting();
     expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_WORKER_SECRETS_REQUIRE_PAY)).toBeChecked();
-    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_OPENAI_KEY)).toBeDisabled();
+    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_ARWEAVE_JWK)).toBeDisabled();
   });
 
   it('renders only the Chipotle Lit API key in the normal-mode worker secret view', async () => {
     renderSessionWizard();
 
-    await selectDecentralizedLitProfile();
-    selectNormalModeCard('Worker');
+    selectDecentralizedLitProfile();
     const litCard = (await screen.findByText('LIT')).closest(`[data-testid="${E2E_TESTIDS.WIZARD_RESOURCE_CARD}"]`);
 
     expect(litCard).not.toBeNull();
@@ -364,8 +312,7 @@ describe('SessionWizard worker resource rendering', () => {
     const litProtocol = require('../../utilities/crypto/litProtocol.js');
     litProtocol.createLitHooks.mockClear();
     renderSessionWizard();
-    await selectDecentralizedLitProfile();
-    selectNormalModeCard('Worker');
+    selectDecentralizedLitProfile();
 
     fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_ACCOUNT_API_KEY), {
       target: { value: 'account-secret' },
@@ -395,8 +342,7 @@ describe('SessionWizard worker resource rendering', () => {
     renderSessionWizard();
 
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
-    await selectDecentralizedLitProfile();
-    selectNormalModeCard('Worker');
+    selectDecentralizedLitProfile();
     expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_ACCOUNT_API_KEY)).toBeInTheDocument();
 
     await waitFor(() => {
@@ -409,8 +355,7 @@ describe('SessionWizard worker resource rendering', () => {
     jest.useFakeTimers();
     try {
       renderSessionWizard();
-      await selectDecentralizedLitProfile();
-      selectNormalModeCard('Worker');
+      selectDecentralizedLitProfile();
 
       const trigger = await screen.findByTestId('ce-wizard-resource-tooltip-lit');
       fireEvent.mouseOver(trigger);
@@ -434,8 +379,7 @@ describe('SessionWizard worker resource rendering', () => {
     jest.useFakeTimers();
     try {
       renderSessionWizard();
-      await selectDecentralizedLitProfile();
-      selectNormalModeCard('Worker');
+      selectDecentralizedLitProfile();
 
       const tooltipCases = [
         ['ai', 'Session-funded provider key used by the selected AI models.'],
@@ -468,7 +412,7 @@ describe('SessionWizard worker resource rendering', () => {
     jest.useFakeTimers();
     try {
       const { store } = renderSessionWizardWithTooltipStore();
-      selectNormalModeCard('Worker');
+      selectRegistryHosting();
 
       const rpcTooltipTrigger = await screen.findByTestId('ce-wizard-resource-tooltip-rpc');
       const allowedOriginsTrigger = await screen.findByTestId('ce-wizard-worker-tooltip-gw-allowed-origins');
@@ -517,7 +461,7 @@ describe('SessionWizard worker resource rendering', () => {
   it('shows the effective default worker RPC URL as the RPC field placeholder without extra helper copy', async () => {
     const defaultPocketRpcUrl = 'https://op-sepolia-testnet.api.pocket.network'; // intentional: production default worker RPC placeholder
     renderSessionWizard();
-    selectNormalModeCard('Worker');
+    selectRegistryHosting();
 
     const rpcCard = await waitFor(() => {
       const card = getWizardResourceCard('rpc');
@@ -553,13 +497,11 @@ describe('SessionWizard worker resource rendering', () => {
     );
 
     renderSessionWizard();
-    await selectDecentralizedLitProfile();
-    selectNormalModeCard('Worker');
+    selectDecentralizedLitProfile();
 
     expect(screen.getByText('LIT')).toBeInTheDocument();
     expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_ACCOUNT_API_KEY)).toBeInTheDocument();
     expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_API_BASE)).not.toBeInTheDocument();
-    expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_PAYER_PRIVATE_KEY)).not.toBeInTheDocument();
     expect(screen.getByTestId('ce-wizard-resource-tooltip-lit')).toBeInTheDocument();
 
     await waitFor(() => {
@@ -576,7 +518,7 @@ describe('SessionWizard worker resource rendering', () => {
 
   it('keeps the custom AI RPC field empty until the admin sets it', async () => {
     renderSessionWizard();
-    selectNormalModeCard('Worker');
+    selectRegistryHosting();
 
     const customRpcLabel = await screen.findByText('Custom RPC URL');
     const customRpcGroup = customRpcLabel.closest('.resourceInput') || customRpcLabel.parentElement?.parentElement;

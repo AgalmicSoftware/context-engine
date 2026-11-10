@@ -557,7 +557,8 @@ describe('sessionCorsWorker gate authority', () => {
         registryAddress,
         registryChainId: 84532,
         rpcUrl,
-        limits: { perWalletPerDay: 1 },
+        // Anonymous requests have their own budget; the wallet limit no longer stands in for it.
+        limits: { perWalletPerDay: 1, perAnonymousIpPerDay: 1 },
       }),
     });
     const env = installSessionCoordinatorBinding({

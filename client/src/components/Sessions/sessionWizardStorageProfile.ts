@@ -144,7 +144,6 @@ export const buildDefaultSessionStorageProfile = (): AnyRecord => ({
   version: 'session-storage-profile-v1',
   backend: SESSION_STORAGE_BACKENDS.ARWEAVE,
   sessionOwned: true,
-  telegramOwned: false,
   resources: {
     docsContext: SESSION_STORAGE_RESOURCE_STAGES.ACTIVE,
     questions: SESSION_STORAGE_RESOURCE_STAGES.STAGED,
@@ -184,7 +183,6 @@ export const normalizeSessionStorageProfileConfig = (input: unknown = {}): AnyRe
     ...base,
     backend,
     sessionOwned: true,
-    telegramOwned: false,
     resources: {
       ...base.resources,
       docsContext:

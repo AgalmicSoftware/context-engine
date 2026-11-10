@@ -41,6 +41,8 @@ export type SurveyResultsCacheControllerSnapshotArgs = {
   questionResponsesNonce?: unknown;
   questionsCacheNonce?: unknown;
   questionResultsHydrated?: unknown;
+  questionCountsLoading?: boolean;
+  responseCountsLoading?: boolean;
   refreshTargetQuestionBlock?: unknown;
   refreshTargetResponseBlock?: unknown;
   refreshTargetSurveyBlock?: unknown;
@@ -114,6 +116,8 @@ export const buildSurveyResultsCacheControllerSnapshot = ({
   questionResponsesNonce = undefined,
   questionsCacheNonce = undefined,
   questionResultsHydrated = false,
+  questionCountsLoading,
+  responseCountsLoading,
   refreshTargetQuestionBlock = 0,
   refreshTargetResponseBlock = 0,
   refreshTargetSurveyBlock = 0,
@@ -157,6 +161,8 @@ export const buildSurveyResultsCacheControllerSnapshot = ({
       nowMs,
       questionLocalBlock,
       questionResultsHydrated,
+      questionCountsLoading,
+      responseCountsLoading,
       refreshTargetQuestionBlock,
       refreshTargetResponseBlock,
       refreshTargetSurveyBlock,

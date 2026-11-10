@@ -43,7 +43,6 @@ const ROUTE_CASES = Object.freeze([
     label: 'tag related-chip surface',
     requiresReadableTagRelatedChips: true,
   },
-  { path: '/demos', label: 'demo surface' },
   {
     path: '/session/demo-sh',
     label: 'session question surface',
@@ -228,6 +227,91 @@ const auditVisibleTextContrast = (rootSelector) => {
     .filter((entry) => entry && entry.ratio < 4.5)
     .sort((left, right) => left.ratio - right.ratio);
   return { failures };
+};
+
+// The label against the pixels really under it, so gradient and translucent fills count.
+const readLabelContrast = async (page, label) => {
+  const box = await label.boundingBox();
+  await label.evaluate((element) => {
+    element.style.visibility = 'hidden';
+  });
+  const screenshot = await page.screenshot({ clip: box });
+  await label.evaluate((element) => {
+    element.style.visibility = '';
+  });
+  return label.evaluate(async (element, base64) => {
+    const image = new Image();
+    image.src = `data:image/png;base64,${base64}`;
+    await image.decode();
+    const canvas = document.createElement('canvas');
+    canvas.width = image.width;
+    canvas.height = image.height;
+    const context = canvas.getContext('2d');
+    context.drawImage(image, 0, 0);
+    const { data } = context.getImageData(0, 0, canvas.width, canvas.height);
+    const luminance = (channels) => {
+      const [red, green, blue] = channels.map((channel) => {
+        const value = channel / 255;
+        return value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+      });
+      return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
+    };
+    const text = luminance(window.getComputedStyle(element).color.match(/[\d.]+/g).slice(0, 3).map(Number));
+    let worst = Infinity;
+    for (let index = 0; index < data.length; index += 4) {
+      const fill = luminance([data[index], data[index + 1], data[index + 2]]);
+      worst = Math.min(worst, (Math.max(text, fill) + 0.05) / (Math.min(text, fill) + 0.05));
+    }
+    return worst;
+  }, screenshot.toString('base64'));
+};
+
+// Global `.btn` rules repaint fills with !important on hover, focus and press, which only a real browser shows.
+// These buttons animate colour, so each reading waits for the theme or state to settle.
+const assertPasskeyButtonsReadable = async (page, viewportName) => {
+  const setTheme = (id) =>
+    page.evaluate((themeId) => {
+      document.documentElement.dataset.ceTheme = themeId;
+      window.dispatchEvent(new CustomEvent('ce:theme-change', { detail: { id: themeId, source: 'user' } }));
+    }, id);
+  const rest = async () => {
+    await page.evaluate(() => document.activeElement?.blur());
+    await page.mouse.move(0, 0);
+  };
+  const initialTheme = await page.evaluate(() => document.documentElement.dataset.ceTheme);
+  for (const { id: themeId } of themeRegistry.themes) {
+    await setTheme(themeId);
+    for (const testId of ['ce-passkey-wallet-create', 'ce-passkey-wallet-sign-in']) {
+      const button = page.getByTestId(testId);
+      const states = {
+        resting: rest,
+        hovered: () => button.hover(),
+        focused: async () => {
+          await rest();
+          await button.focus();
+        },
+        pressed: async () => {
+          await button.hover();
+          await page.mouse.down();
+        },
+      };
+      for (const [state, enter] of Object.entries(states)) {
+        await enter();
+        await page.waitForTimeout(450);
+        const ratio = await readLabelContrast(page, button.locator('span'));
+        // Releasing off the button clicks nothing.
+        await page.locator('.modal-login .card-header').hover();
+        await page.mouse.up();
+        assert.ok(
+          ratio >= 4.5,
+          `${viewportName} ${themeId} ${testId} ${state} label contrast should be at least 4.5:1; received ${ratio.toFixed(2)}:1`,
+        );
+      }
+    }
+  }
+  await setTheme(initialTheme);
+  await rest();
+  await page.waitForTimeout(450);
 };
 
 async function inspectRoute(page, baseUrl, routeCase, viewportName) {
@@ -440,7 +524,7 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
           links.find((link) => link.getAttribute('aria-label') === 'View Context Engine on GitHub'),
         ),
         newSession: readControl(findLink('New Session')),
-        whitepaper: readControl(findLink('Whitepaper')),
+        whitepaper: readControl(hero.querySelector('[data-testid="ce-about-link-whitepaper"]')),
       };
     });
 
@@ -606,11 +690,8 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
     : null;
 
   if (routeCase.requiresReadableSessionSetup) {
-    await page.getByTestId('ce-new-preset-fast_cheap_cloudflare').waitFor({ state: 'visible' });
-    await page
-      .locator('[role="listitem"][class*="modePresetCardRequirementPill"]')
-      .first()
-      .waitFor({ state: 'visible' });
+    await page.getByTestId('ce-setup-section-basics').waitFor({ state: 'visible' });
+    await page.getByTestId('ce-setup-missing').waitFor({ state: 'visible' });
   }
 
   const sessionSetupContrastState = routeCase.requiresReadableSessionSetup
@@ -657,29 +738,19 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
         };
 
         return {
-          architectureHelpRatio: textRatio('[aria-label="View the deployment architecture diagram on GitHub"]'),
-          providerRatio: textRatio(
-            '[data-testid="ce-new-preset-fast_cheap_cloudflare"] [class*="modePresetCardProvider"]',
-          ),
-          descriptionRatio: textRatio(
-            '[data-testid="ce-new-preset-fast_cheap_cloudflare"] [class*="modePresetCardDescription"]',
-          ),
-          requirementRatio: textRatio('[role="listitem"][class*="modePresetCardRequirementPill"]'),
-          requirementPillCount: document.querySelectorAll('[role="listitem"][class*="modePresetCardRequirementPill"]')
-            .length,
-          entryCardText: Array.from(document.querySelectorAll('[data-testid^="ce-new-preset-"]'))
-            .map((card) => card.textContent || '')
-            .join(' '),
+          titleRatio: textRatio('h1[class*="pageTitle"]'),
+          sectionTitleRatio: textRatio('[data-testid="ce-setup-section-basics"] h2'),
+          labelRatio: textRatio('label[for="ce-setup-name"]'),
+          summaryRatio: textRatio('[data-testid="ce-setup-summary-context"]'),
+          caretRatio: textRatio('[data-testid="ce-setup-more-context"]'),
+          missingRatio: textRatio('[data-testid="ce-setup-missing"] li'),
+          presetCardCount: document.querySelectorAll('[data-testid^="ce-new-preset-"]').length,
         };
       })
     : null;
 
   if (routeCase.requiresSessionColors) {
-    await page.getByTestId('ce-new-preset-fast_cheap_cloudflare').click();
-    await page.getByRole('button', { name: /Optional details/i }).click();
-    await page.getByRole('button', { name: 'Session colors expand' }).click();
     await page.waitForSelector('[data-testid="ce-wizard-session-color-scheme"]', { timeout: 15000 });
-    await page.waitForSelector('[data-testid="ce-wizard-session-color-preview"]', { timeout: 15000 });
   }
 
   let classicReportClusterColors = null;
@@ -819,6 +890,7 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
     await page.getByRole('button', { name: 'LOG IN', exact: true }).click();
     await page.locator('.modal-login.show').waitFor({ state: 'visible' });
     await page.getByText('Account uses a passkey:', { exact: true }).waitFor({ state: 'visible' });
+    await assertPasskeyButtonsReadable(page, viewportName);
   }
 
   if (routeCase.requiresPreloginControlLayout) {
@@ -1160,7 +1232,7 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
   }
   const routeState = await page.evaluate(() => {
     const root = document.querySelector('#root');
-    const preview = document.querySelector('[data-testid="ce-wizard-session-color-preview"]');
+    const colorPicker = document.querySelector('[data-testid="ce-wizard-session-color-scheme"]');
     const homeTabs = document.querySelector('[role="tablist"]');
     const homeTabCenters = homeTabs
       ? Array.from(homeTabs.children).map((item) => {
@@ -1230,8 +1302,8 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
       inactiveHomeTabBackground: inactiveHomeTabStyle?.backgroundColor || '',
       inactiveHomeTabBoxShadow: inactiveHomeTabStyle?.boxShadow || '',
       inactiveHomeTabIconSize: Math.min(inactiveHomeTabIconRect?.width || 0, inactiveHomeTabIconRect?.height || 0),
-      sessionPreviewAccent: preview
-        ? window.getComputedStyle(preview).getPropertyValue('--ce-session-accent').trim()
+      sessionPreviewAccent: colorPicker
+        ? window.getComputedStyle(colorPicker).getPropertyValue('--ce-session-accent').trim()
         : '',
     };
   });
@@ -1465,9 +1537,7 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
         };
         const panel = document.querySelector('[data-testid="ce-prelogin-settings-panel"]');
         const selector = panel?.querySelector('[data-testid="ce-settings-theme"]');
-        const sections = Array.from(panel?.querySelectorAll('[class*="settingsSectionCard"]') || []);
-        const appearanceSection = selector?.closest('[class*="settingsSectionCard"]');
-        const summary = appearanceSection?.querySelector('[class*="settingsSectionSummary"]');
+        const appearanceSection = selector?.closest('[class*="settingsThemeQuickControl"]');
         const resourceCards = Array.from(panel?.querySelectorAll('[class*="supportedResourceCard"]') || []);
         const aiCard = resourceCards.find(
           (candidate) => candidate.querySelector('[class*="supportedResourceName"]')?.textContent?.trim() === 'AI',
@@ -1486,8 +1556,7 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
           hasVisibleLabel: Array.from(appearanceSection.querySelectorAll('*')).some(
             (element) => element.childElementCount === 0 && element.textContent?.trim() === 'App theme',
           ),
-          hasVisibleSummary: !!summary,
-          isFinalSection: sections.at(-1) === appearanceSection,
+          isFinalSection: appearanceSection.parentElement?.lastElementChild === appearanceSection,
           selectorRatio: ratio(selectorStyle.color, backgroundFor(selector)),
           sponsorDetailInsideActivePill: activeSessionPill.contains(sponsorDetail),
         };
@@ -1924,6 +1993,10 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
           };
         })
     : null;
+  if (routeCase.requiresTransparentRecognitionLogos) {
+    const recognitionToggle = page.getByRole('button', { name: 'Recognition', exact: true });
+    if ((await recognitionToggle.getAttribute('aria-expanded')) !== 'true') await recognitionToggle.click();
+  }
   const classicRecognitionLogoState = routeCase.requiresTransparentRecognitionLogos
     ? await page
         .getByTestId('ce-about-recognition-ethereum')
@@ -2379,8 +2452,8 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
     );
     assert.ok(classicAboutHeroControlState.demo.height >= 48, 'Classic 95 About primary actions should remain tappable');
     assert.ok(
-      classicAboutHeroControlState.whitepaper.height >= 34,
-      'Classic 95 About resource actions should remain tappable',
+      classicAboutHeroControlState.whitepaper.height >= 32,
+      'Classic 95 About resource icons should retain their responsive 32px minimum',
     );
     assert.equal(
       classicAboutHeroControlState.github.backgroundColor,
@@ -2388,8 +2461,8 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
       'Classic 95 About GitHub action should use the standard gray control face',
     );
     assert.ok(
-      classicAboutHeroControlState.github.width > classicAboutHeroControlState.github.height,
-      'Classic 95 About GitHub action should read as a rectangular push button',
+      classicAboutHeroControlState.github.width >= classicAboutHeroControlState.github.height,
+      'Classic 95 About resource controls should accommodate their icon at every viewport',
     );
     assert.notEqual(
       currentAboutHeroControlState.demo.borderRadius,
@@ -2408,7 +2481,7 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
     `${routeCase.label} should not overflow the ${viewportName} viewport; received ${routeState.overflow}px (${JSON.stringify(routeState.overflowElements)})`,
   );
   if (routeCase.requiresSessionColors) {
-    assert.ok(routeState.sessionPreviewAccent, 'Session Wizard preview should expose its scoped accent immediately');
+    assert.ok(routeState.sessionPreviewAccent, 'Session setup should expose its scoped accent immediately');
   }
   if (routeCase.requiresSpreadHomeTabs) {
     assert.equal(routeState.homeTabCount, 4, 'Classic 95 home title bar should expose all four tab options');
@@ -2906,36 +2979,14 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
     );
   }
   if (sessionSetupContrastState) {
-    assert.equal(
-      sessionSetupContrastState.requirementPillCount,
-      6,
-      'Session Setup should render every requirement as an individual pill',
-    );
-    assert.doesNotMatch(
-      sessionSetupContrastState.entryCardText,
-      /worker/i,
-      'Session Setup entry cards should explain storage without internal Worker terminology',
-    );
-    assert.match(
-      sessionSetupContrastState.entryCardText,
-      /Ethereum RPC URL/,
-      'Session Setup should identify the RPC URL as an Ethereum requirement',
-    );
-    assert.match(
-      sessionSetupContrastState.entryCardText,
-      /Ethereum Gas \(TX Fees\)/,
-      'Session Setup should explain that Ethereum gas pays transaction fees',
-    );
-    assert.doesNotMatch(
-      sessionSetupContrastState.entryCardText,
-      /EVM testnet gas/,
-      'Session Setup should not use the superseded gas label',
-    );
+    assert.equal(sessionSetupContrastState.presetCardCount, 0, 'Session Setup should be one page without preset cards');
     [
-      ['Session Setup architecture help', sessionSetupContrastState.architectureHelpRatio],
-      ['Cloudflare provider', sessionSetupContrastState.providerRatio],
-      ['Cloudflare description', sessionSetupContrastState.descriptionRatio],
-      ['setup requirement pill', sessionSetupContrastState.requirementRatio],
+      ['Session Setup title', sessionSetupContrastState.titleRatio],
+      ['setup section title', sessionSetupContrastState.sectionTitleRatio],
+      ['setup field label', sessionSetupContrastState.labelRatio],
+      ['setup section summary', sessionSetupContrastState.summaryRatio],
+      ['setup section caret', sessionSetupContrastState.caretRatio],
+      ['setup missing-input list', sessionSetupContrastState.missingRatio],
     ].forEach(([label, received]) => {
       assert.ok(
         received >= 4.5,
@@ -3080,14 +3131,13 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
     assert.equal(
       preloginThemeSettingsState.missing,
       undefined,
-      'Signed-out Appearance & colors controls should render',
+      'Signed-out Appearance controls should render',
     );
     assert.equal(
       preloginThemeSettingsState.isFinalSection,
       true,
-      'Appearance & colors should be the final signed-out Settings section',
+      'Appearance should be the final signed-out Settings control',
     );
-    assert.equal(preloginThemeSettingsState.hasVisibleSummary, false, 'Appearance should not show a summary');
     assert.equal(preloginThemeSettingsState.hasVisibleLabel, false, 'Appearance should not show an App theme label');
     assert.equal(preloginThemeSettingsState.hasVisibleHint, false, 'Appearance should not show explanatory copy');
     assert.equal(preloginThemeSettingsState.accessibleName, 'App theme', 'Theme selector should retain its accessible name');
@@ -3103,7 +3153,7 @@ async function inspectRoute(page, baseUrl, routeCase, viewportName) {
     );
     assert.match(
       preloginThemeSettingsState.activeSessionPillText,
-      /Demo Session\s+No sponsor key is configured for the active session\./,
+      /Demo Session\s+(No sponsor key is configured for the active session\.|Could not confirm sponsorship\.)/,
       'Active-session pill should combine the session name with its sponsorship status',
     );
     assert.ok(

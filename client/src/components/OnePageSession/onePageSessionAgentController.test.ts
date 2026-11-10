@@ -22,7 +22,7 @@ const buildEnvelope = (sessionSlug: string): AgentClientLoginEnvelope => ({
   address: '0x0000000000000000000000000000000000000001',
   agentCredential: {
     kind: 'session_agent_browser_token',
-    token: 'ceagt_bridge_test',
+    token: 'ceagt_agent_test',
     expiresAt: '2099-01-01T00:00:00.000Z',
   },
   workerCredential: { kind: 'session_worker_jwt', token: 'jwt-worker-test', expiresAt: '2099-01-01T00:00:00.000Z' },
@@ -111,13 +111,10 @@ describe('onePageSessionAgentController', () => {
     });
   });
 
-  it('uses only the canonical Worker URL and ignores retired Bridge settings', () => {
-    expect(
-      resolveSessionAgentWorkerUrl({
-        corsWorkerUrl: 'https://session.example///',
-        agentBridgeUrl: 'https://old.example',
-      }),
-    ).toBe('https://session.example');
+  it('uses only the canonical Worker URL', () => {
+    expect(resolveSessionAgentWorkerUrl({ corsWorkerUrl: 'https://session.example///' })).toBe(
+      'https://session.example',
+    );
     expect(resolveSessionAgentWorkerUrl({ telegram: { workerUrl: 'https://old.example' } })).toBe('');
     expect(resolveSessionAgentWorkerUrl({})).toBe('');
   });
@@ -138,7 +135,7 @@ describe('onePageSessionAgentController', () => {
     };
 
     expect(getAgentClientLoginEnvelopeMemoryKey(' General ')).toBe(
-      'general\nno-session-id\nno-worker-origin\nno-bridge-origin',
+      'general\nno-session-id\nno-worker-origin\nno-agent-origin',
     );
     const betaKey = cacheAgentClientLoginEnvelope(buildEnvelope(' Beta '), globalTarget);
     expect(betaKey).toContain('beta\n0x11111111111111111111111111111111');

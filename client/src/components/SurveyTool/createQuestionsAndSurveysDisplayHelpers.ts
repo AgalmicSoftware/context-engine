@@ -77,8 +77,9 @@ export const resolveCreateSurveyProgressFillStyle = (progress: unknown): CSSProp
   width: `${Math.max(0, Math.min(100, Number(progress) || 0))}%`,
 });
 
+// The warning text colour, like a bookmarked survey's: Classic 95's warning fill is yellow (1.1:1 on a light card).
 export const resolveCreateSurveyQuestionBookmarkStyle = (bookmarked: unknown): CSSProperties => ({
-  color: bookmarked ? 'var(--ce-status-warning)' : undefined,
+  color: bookmarked ? 'var(--ce-status-warning-text)' : undefined,
 });
 
 export const resolveCreateSurveyBookmarkSurveyStyle = (bookmarked: unknown): CSSProperties => ({

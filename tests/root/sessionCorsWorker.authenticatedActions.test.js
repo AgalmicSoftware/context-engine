@@ -407,7 +407,7 @@ describe('sessionCorsWorker authenticated fetch/faucet actions', () => {
       makeActionRequest({
         token,
         sessionSlug,
-        body: { action: 'fetch_url', url: 'http://[::ffff:127.0.0.1]/private' },
+        body: { action: 'fetch_url', url: 'https://[::ffff:127.0.0.1]/private' },
       }),
       env,
       {}
@@ -745,11 +745,18 @@ describe('sessionCorsWorker authenticated fetch/faucet actions', () => {
       {}
     );
     const payload = await response.json();
-    const rpcMethods = fetchMock.mock.calls.map(([, options]) => JSON.parse(options?.body || '{}').method);
+    const broadcasts = fetchMock.mock.calls
+      .map(([, options]) => JSON.parse(options?.body || '{}'))
+      .filter(({ method }) => method === 'eth_sendRawTransaction');
 
     expect(response.status).toBe(200);
-    expect(payload?.txHash).toBe('0xgeneric123');
-    expect(rpcMethods).toContain('eth_sendRawTransaction');
+    expect(broadcasts).toHaveLength(1);
+    const signedTransaction = broadcasts[0].params[0];
+    expect(payload?.txHash).toBe(ethers.utils.keccak256(signedTransaction));
+    const transaction = ethers.utils.parseTransaction(signedTransaction);
+    expect(transaction.from).toBe(faucetWallet.address);
+    expect(transaction.to).toBe(wallet.address);
+    expect(transaction.value.eq(ethers.utils.parseEther('0.0000001'))).toBe(true);
   });
 
   it('rejects request_test_eth when a consumed-password claim code is invalid', async () => {

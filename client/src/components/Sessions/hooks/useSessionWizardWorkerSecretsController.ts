@@ -57,17 +57,13 @@ type UseSessionWizardWorkerSecretsControllerOptions = {
   provider?: unknown;
   network?: NetworkLike;
   draft: AnyRecord;
-  wizardMode: string;
   deployComplete: boolean;
   deployWorkerUrl: string;
-  workerMode: string;
   workerSecrets: WorkerSecretsLike;
   workerSecretsEnabled: boolean;
   workerAllowOrigins: string;
   provisionedSponsoredContext?: AnyRecord | null;
-  effectivePersistWorkerSecrets: boolean;
   registryChainId?: ChainIdLike;
-  allowNormalModeSharedHostedWorker: boolean;
   getCurrentWorkerSecrets: () => WorkerSecretsLike;
   getCurrentEnabledWorkerSecrets: () => WorkerSecretsLike;
   applyWorkerSecretsUpdate: (nextValueOrUpdater: unknown) => unknown;
@@ -86,17 +82,13 @@ const useSessionWizardWorkerSecretsController = ({
   provider,
   network,
   draft,
-  wizardMode,
   deployComplete,
   deployWorkerUrl,
-  workerMode,
   workerSecrets,
   workerSecretsEnabled,
   workerAllowOrigins,
   provisionedSponsoredContext,
-  effectivePersistWorkerSecrets,
   registryChainId,
-  allowNormalModeSharedHostedWorker,
   getCurrentWorkerSecrets,
   getCurrentEnabledWorkerSecrets,
   applyWorkerSecretsUpdate,
@@ -108,13 +100,10 @@ const useSessionWizardWorkerSecretsController = ({
     () =>
       resolveSessionWizardWorkerBaseUrlFromDraft({
         draft,
-        wizardMode,
         deployComplete,
         deployWorkerUrl,
-        workerMode,
-        allowNormalModeSharedHostedWorker,
       }),
-    [allowNormalModeSharedHostedWorker, deployComplete, deployWorkerUrl, draft, wizardMode, workerMode],
+    [deployComplete, deployWorkerUrl, draft],
   );
 
   const resolveWorkerRpcUrl = useCallback(
@@ -332,14 +321,9 @@ const useSessionWizardWorkerSecretsController = ({
     updateDraftValue(['faucet', 'encryptedPrivateKey'], '');
   }, [draft?.ai, draft?.rpc, updateDraftValue]);
 
-  const clearCachedWorkerSecretsAfterDeploy = useCallback(() => {
-    if (effectivePersistWorkerSecrets) return;
-  }, [effectivePersistWorkerSecrets]);
-
   const clearCachedArweaveJwkAfterUpload = useCallback(() => {
-    if (effectivePersistWorkerSecrets) return;
     applyWorkerSecretsUpdate((prev: WorkerSecretsLike) => ({ ...prev, arweaveJwk: '' }));
-  }, [applyWorkerSecretsUpdate, effectivePersistWorkerSecrets]);
+  }, [applyWorkerSecretsUpdate]);
 
   const signBootstrapAdminAction = useCallback(
     async ({
@@ -447,7 +431,6 @@ const useSessionWizardWorkerSecretsController = ({
     buildSessionWizardPublishArweaveUploadOptions,
     buildSponsoredFlagFields,
     clearCachedArweaveJwkAfterUpload,
-    clearCachedWorkerSecretsAfterDeploy,
     clearWorkerSecretFields,
     effectiveDefaultWorkerRpcUrl,
     getMissingWorkerSecretsForDeploy,

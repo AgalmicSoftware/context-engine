@@ -12,7 +12,6 @@ describe('MainSite route table', () => {
       'wizard',
       'surveyId',
       'home',
-      'debate',
       'atlas',
       'tag',
       'bookmarks',
@@ -26,9 +25,7 @@ describe('MainSite route table', () => {
       'userProfile',
       'about',
       'posts',
-      'demos',
       'benchmarks',
-      'matrix',
       'docs',
       'admin',
       'sponsor',
@@ -38,6 +35,15 @@ describe('MainSite route table', () => {
   });
 
   it.each([
+    ['/atlas', 'atlas', {}],
+    ['/atlas/scenario?demo=1', 'atlas', {}],
+    ['/su/ExampleProfile', 'simUser', {}],
+    ['/session/demo', 'session', { sessionToken: 'demo' }],
+    ['/session/demo/questions/results', 'session', { sessionToken: 'demo' }],
+    ['/session/demo-sh', 'session', { sessionToken: 'demo-sh' }],
+    ['/session/debate', 'session', { sessionToken: 'debate' }],
+    ['/session/beta', 'session', { sessionToken: 'beta' }],
+    ['/about', 'about', {}],
     ['/session/edge', 'session', { sessionToken: 'edge' }],
     ['/session/edge/questions', 'session', { sessionToken: 'edge' }],
     ['/session/edge/docs', 'session', { sessionToken: 'edge' }],
@@ -67,6 +73,19 @@ describe('MainSite route table', () => {
         ...expected,
       }),
     );
+  });
+
+  it.each(
+    ['/debate', '/beta', '/contributors', '/matrix', '/demos'].flatMap((path) =>
+      ['', '/', '?demo=1', '#details', '/nested'].map((suffix) => `${path}${suffix}`),
+    ),
+  )('treats removed standalone path %s like any unknown route', (fullPath) => {
+    expect(resolveMainSiteRouteMatch({ fullPath, isAddress })).toMatchObject({
+      key: 'notFound',
+      isKnownRoutePrefix: false,
+      shouldBypassCacheHydrationWait: false,
+      canonicalPath: undefined,
+    });
   });
 
   it('keeps alias and canonicalization decisions visible to the caller', () => {

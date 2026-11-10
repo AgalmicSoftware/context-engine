@@ -1,3 +1,4 @@
+import { hydrateSbtActivityCacheEntry, buildSbtActivityCacheEntry } from './sbtActivityCacheEntry.js';
 type CacheRecord = Record<string, unknown>;
 type CacheUpdater = (current: CacheRecord | null) => CacheRecord | Promise<CacheRecord>;
 type AtomicPort = (slug: string, updater: CacheUpdater) => Promise<unknown>;
@@ -156,7 +157,7 @@ export const mergeSessionSbtCountsCheckpointEntry = (
   currentIn: unknown,
   { checkpoint, metadata, normalizeCheckpoint, sbtAddress }: MergeCountsCheckpointOptions,
 ): CacheRecord | null => {
-  const current = isCacheRecord(currentIn) ? currentIn : {};
+  const current = hydrateSbtActivityCacheEntry(currentIn) || buildSbtActivityCacheEntry({ sbtAddress });
   const checkpointBlock = Number(checkpoint.blockNumber);
   if (
     current.countsLoaded === true &&

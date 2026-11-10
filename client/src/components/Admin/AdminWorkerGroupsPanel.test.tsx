@@ -1,5 +1,6 @@
 import React from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { createWorkerAuthRemoteError } from '../../utilities/worker/workerAuthRemoteError';
 import AdminWorkerGroupsPanel from './AdminWorkerGroupsPanel';
 
 const ADDRESS = '0x00000000000000000000000000000000000000aa';
@@ -25,6 +26,71 @@ describe('AdminWorkerGroupsPanel', () => {
 
     expect(screen.getByRole('button', { name: 'Remove facilitators' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Remove reviewers' })).toBeInTheDocument();
+  });
+
+  it('says when signing is rate limited instead of showing an internal code', async () => {
+    const postSignedRequest = jest.fn(async () => {
+      throw createWorkerAuthRemoteError({ kind: 'admin_nonce', payload: {}, status: 429 });
+    });
+    render(
+      <AdminWorkerGroupsPanel
+        canAdminWorker={true}
+        sessionId={SESSION_ID}
+        sessionSlug="alpha"
+        workerUrl="https://session-worker.example"
+        postSignedRequest={postSignedRequest}
+      />,
+    );
+    fireEvent.change(screen.getByTestId('ce-admin-worker-group-create-label'), { target: { value: 'Salon' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create Group' }));
+    expect(await screen.findByText('Too many sign-in attempts. Wait a minute and try again.')).toBeInTheDocument();
+    expect(screen.queryByText('worker_group_admin_request_failed')).not.toBeInTheDocument();
+  });
+
+  it('starts a new group open to anyone who can see the session', async () => {
+    const postSignedRequest = jest.fn().mockResolvedValue({
+      ok: true,
+      data: {
+        group: {
+          groupId: 'salon',
+          sessionSlug: 'alpha',
+          label: 'Salon',
+          joinMode: 'open',
+          memberVisibility: 'session',
+        },
+      },
+    });
+    render(
+      <AdminWorkerGroupsPanel
+        canAdminWorker={true}
+        createOnly
+        sessionId={SESSION_ID}
+        sessionSlug="alpha"
+        workerUrl="https://session-worker.example"
+        postSignedRequest={postSignedRequest}
+      />,
+    );
+    const mode = screen.getByTestId('ce-admin-worker-group-create-mode');
+    const visibility = screen.getByTestId('ce-admin-worker-group-create-visibility');
+    expect(mode).toHaveValue('open');
+    expect(visibility).toHaveValue('session');
+    // A roster that admins fill by hand doesn't stay visible to the session, and an open group doesn't stay hidden.
+    fireEvent.change(mode, { target: { value: 'admin_add' } });
+    expect(visibility).toHaveValue('admin_only');
+    fireEvent.change(mode, { target: { value: 'open' } });
+    expect(visibility).toHaveValue('session');
+    fireEvent.change(screen.getByTestId('ce-admin-worker-group-create-label'), { target: { value: 'Salon' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create Group' }));
+    await waitFor(() =>
+      expect(postSignedRequest).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'groups/create',
+          body: expect.objectContaining({
+            group: expect.objectContaining({ label: 'Salon', joinMode: 'open', memberVisibility: 'session' }),
+          }),
+        }),
+      ),
+    );
   });
 
   it('manages the supported group and membership operations through signed worker requests', async () => {
@@ -120,8 +186,13 @@ describe('AdminWorkerGroupsPanel', () => {
       />,
     );
 
+    // The theme's plain outline-secondary label is its button fill: 1.1:1 in Minimal, and 1:1 in Classic 95.
+    expect(screen.getByRole('button', { name: 'Refresh' })).toHaveClass('subtleActionButton');
     fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
     expect(await screen.findByText('Reviewers')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Edit Reviewers' })).toHaveClass('subtleActionButton');
+    expect(screen.getByRole('button', { name: 'Manage Reviewers members' })).toHaveClass('subtleActionButton');
+    expect(screen.getByRole('button', { name: 'Delete Reviewers' })).toHaveClass('dangerActionButton');
     expect(postSignedRequest).toHaveBeenCalledWith(
       expect.objectContaining({
         action: 'groups/list',

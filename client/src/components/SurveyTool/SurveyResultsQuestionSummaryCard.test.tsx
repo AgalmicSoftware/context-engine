@@ -59,9 +59,10 @@ describe('SurveyResultsQuestionSummaryCard', () => {
     expect(renderDefaultSummary).not.toHaveBeenCalled();
 
     const bookmark = container.querySelector('svg[data-icon="bookmark"]') as SVGSVGElement;
-    expect(bookmark).toHaveAttribute('color', 'gold');
+    expect(bookmark).toHaveAttribute('color', 'currentColor');
     const bookmarkButton = screen.getByRole('button', { name: 'Remove bookmark' });
     expect(bookmarkButton).toHaveClass('questionBookmarkButton');
+    expect(bookmarkButton).toHaveAttribute('aria-pressed', 'true');
     expect(bookmarkButton).toHaveAttribute('data-ce-control-appearance', 'frameless');
     fireEvent.click(bookmarkButton);
     expect(onToggleBookmark).toHaveBeenCalledTimes(1);
@@ -111,5 +112,26 @@ describe('SurveyResultsQuestionSummaryCard', () => {
 
     expect(screen.getByText('Default summary')).toBeInTheDocument();
     expect(renderDefaultSummary).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows a loading count instead of 0 while the responses are on their way', () => {
+    const props = {
+      domId: 'question-card-q2',
+      onToggleBookmark: jest.fn(),
+      onToggleSummary: jest.fn(),
+      questionPrompt: 'Loading prompt',
+      renderDefaultSummary: () => null,
+      renderFreeformSummary: () => null,
+      renderMultichoiceSummary: () => null,
+      styleMap,
+      viewableResponsesCount: 0,
+    };
+    const { container, rerender } = render(<SurveyResultsQuestionSummaryCard {...props} responsesLoading />);
+    const count = container.querySelector('.responseCountNumber');
+    expect(count).not.toHaveTextContent('0');
+    expect(count?.querySelector('svg[data-icon="spinner"]')).not.toBeNull();
+
+    rerender(<SurveyResultsQuestionSummaryCard {...props} />);
+    expect(container.querySelector('.responseCountNumber')).toHaveTextContent('0');
   });
 });

@@ -291,6 +291,19 @@ const issueWorkerLoginToken = async ({
   return payload.token;
 };
 
+const assertFaucetPayment = (payload, calls, { from, to, amountEth }) => {
+  const broadcasts = calls
+    .map(([, options]) => JSON.parse(options?.body || '{}'))
+    .filter(({ method }) => method === 'eth_sendRawTransaction');
+  assert.equal(broadcasts.length, 1);
+  const signedTransaction = broadcasts[0].params[0];
+  assert.equal(payload?.txHash, ethers.utils.keccak256(signedTransaction));
+  const transaction = ethers.utils.parseTransaction(signedTransaction);
+  assert.equal(transaction.from, from);
+  assert.equal(transaction.to, to);
+  assert.equal(transaction.value.eq(ethers.utils.parseEther(amountEth)), true);
+};
+
 test('proof-backed faucet requests succeed even when the auth token lacks faucet scope', async () => {
   const originalFetch = global.fetch;
   const originalCrypto = global.crypto;
@@ -362,11 +375,11 @@ test('proof-backed faucet requests succeed even when the auth token lacks faucet
       {}
     );
     const payload = await response.json();
-    const rpcMethods = global.fetch.calls.map(([, options]) => JSON.parse(options?.body || '{}').method);
 
     assert.equal(response.status, 200);
-    assert.equal(payload?.txHash, '0xproofscope123');
-    assert.ok(rpcMethods.includes('eth_sendRawTransaction'));
+    assertFaucetPayment(payload, global.fetch.calls, {
+      from: faucetWallet.address, to: wallet.address, amountEth: '0.0000001',
+    });
   } finally {
     global.fetch = originalFetch;
     Object.defineProperty(global, 'crypto', {
@@ -440,7 +453,9 @@ test('worker-canonical faucet transactions use the authenticated session-secret 
     const rpcUrls = global.fetch.calls.map(([url]) => url);
 
     assert.equal(response.status, 200);
-    assert.equal(payload?.txHash, '0xworkercanonicalrpc123');
+    assertFaucetPayment(payload, global.fetch.calls, {
+      from: faucetWallet.address, to: wallet.address, amountEth: '0.0000001',
+    });
     assert.ok(rpcUrls.length > 0);
     assert.deepEqual([...new Set(rpcUrls)], [secretRpcUrl]);
 
@@ -703,11 +718,11 @@ test('group-password faucet proofs accept a valid group mint signature', async (
       {}
     );
     const payload = await response.json();
-    const rpcMethods = global.fetch.calls.map(([, options]) => JSON.parse(options?.body || '{}').method);
 
     assert.equal(response.status, 200);
-    assert.equal(payload?.txHash, '0xgroupproof123');
-    assert.ok(rpcMethods.includes('eth_sendRawTransaction'));
+    assertFaucetPayment(payload, global.fetch.calls, {
+      from: faucetWallet.address, to: wallet.address, amountEth: '0.0000001',
+    });
   } finally {
     global.fetch = originalFetch;
     Object.defineProperty(global, 'crypto', {

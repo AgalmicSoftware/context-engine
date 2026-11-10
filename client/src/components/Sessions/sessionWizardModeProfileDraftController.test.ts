@@ -3,56 +3,16 @@ import {
   cloneSessionModePreset,
   compileSessionModeProfile,
 } from '../../utilities/session/sessionModeProfile';
-import {
-  applySessionModeProfileSelectionToDraft,
-  applyStorageProfileChangeToModeDraft,
-} from './sessionWizardModeProfileDraftController';
+import { applySessionModeProfileSelectionToDraft } from './sessionWizardModeProfileDraftController';
 
 describe('sessionWizardModeProfileDraftController', () => {
-  it('changes only the storage profile', () => {
-    const sessionModeProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED);
-    const prev = {
-      sessionModeProfile,
-      storageProfile: { backend: 'arweave' },
-    };
-
-    const next = applyStorageProfileChangeToModeDraft(prev, {
-      backend: 'cloudflare',
-      payloadAccessControl: { mode: 'lit_encrypted' },
-    });
-
-    expect(next.storageProfile).toMatchObject({
-      backend: 'cloudflare',
-      payloadAccessControl: { mode: 'lit_encrypted' },
-    });
-    expect(next.sessionModeProfile).toEqual(sessionModeProfile);
-    expect(prev.storageProfile).toEqual({ backend: 'arweave' });
-  });
-
-  it('stores selected mode profiles and clears legacy telegram flags', () => {
+  it('stores selected mode profiles', () => {
     const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
     const compiled = compileSessionModeProfile(profile);
-    const next = applySessionModeProfileSelectionToDraft(
-      {
-        telegramOnly: true,
-        telegram_only: true,
-        telegramMode: true,
-        sessionMode: 'telegram',
-        telegramBridgeEnabled: true,
-        telegram: { only: true, mode: 'client', keep: 'value' },
-      },
-      profile,
-      compiled,
-    );
+    const next = applySessionModeProfileSelectionToDraft({}, profile, compiled);
 
     expect(next.sessionModeProfile).toMatchObject({ preset: profile.preset });
     expect(next.storageProfile).toMatchObject(compiled.storageProfile);
-    expect(next.telegramOnly).toBeUndefined();
-    expect(next.telegram_only).toBeUndefined();
-    expect(next.telegramMode).toBeUndefined();
-    expect(next.sessionMode).toBeUndefined();
-    expect(next.telegramBridgeEnabled).toBeUndefined();
-    expect(next.telegram).toEqual({ keep: 'value' });
     expect(next.groupCreationPolicy).toBe('participants');
   });
 
@@ -89,7 +49,7 @@ describe('sessionWizardModeProfileDraftController', () => {
       {
         agentSessionWrapped: {
           enabled: true,
-          bridgeUrl: 'https://wrapped.example.test',
+          agentUrl: 'https://wrapped.example.test',
         },
       },
       profile,

@@ -87,7 +87,7 @@ export const buildTools = (participant) => [
     name: 'list_questions',
     title: 'List questions',
     description:
-      'List the session’s statements and questions with their type, options or scale, and your latest answer. Unanswered ones come first by default.',
+      'List the session’s statements and questions with their type, options or scale, and your latest answer. Unanswered ones come first by default. questionsComplete or myAnswersComplete is false when listing or payload reads are unfinished; unreadQuestions and unreadMyAnswers count listed payloads that could not be read.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -104,7 +104,7 @@ export const buildTools = (participant) => [
     name: 'answer',
     title: 'Answer questions',
     description:
-      'Submit answers. Values by type: binary "Agree" | "Unsure" | "Disagree"; rating a whole number on the question’s scale; multichoice the option text (an array when several are allowed); quadratic one signed whole-number vote per option whose squares sum within the credit budget; freeform text. Answering again replaces your previous answer.',
+      'Submit answers. Values by type: binary "Agree" | "Unsure" | "Disagree"; rating a number on the question’s scale and step grid (default step 1); multichoice the option text (an array when several are allowed); quadratic one signed whole-number vote per option whose squares sum within the credit budget; freeform text. Answering again replaces your previous answer.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -159,7 +159,7 @@ export const buildTools = (participant) => [
     name: 'get_results',
     title: 'Get results',
     description:
-      'Summarize everyone’s latest answers per question when the session publishes results: agree/unsure/disagree counts, rating means, option counts, and how many answers came from self-declared agents.',
+      'Summarize everyone’s latest answers per question when the session publishes results: agree/unsure/disagree counts, rating means, option counts, and how many answers came from self-declared agents. partial is true when a scan is unfinished, capped, or any listed question or answer payload could not be read. unreadAnswers counts the selected listed answer records that could not be read; readable older answers may still appear until those records recover.',
     inputSchema: {
       type: 'object',
       properties: {

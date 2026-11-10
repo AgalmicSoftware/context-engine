@@ -1,7 +1,7 @@
 # Session Worker Agent HTTP
 
-New sessions serve `/api/agent/*`, ordinary participant routes and optional
-Session Wrapped from one Session Worker origin. The implementation lives in
+A session's Worker serves `/api/agent/*`, ordinary participant routes and
+optional Session Wrapped from one origin. The implementation lives in
 `workers/sessionCorsWorker/agent/`; the existing Worker owns session identity,
 configuration, membership, storage, gates, rate limits and admin authority.
 
@@ -20,10 +20,10 @@ access; the wizard checks readiness after saving the canonical configuration.
 No extra KV namespace, coordinator class or migration is needed for agents.
 
 Managed accounts derive from this fresh secret, the canonical session ID and
-an opaque principal. Never reuse an old Bridge root or deployment identity.
+an opaque principal. Never reuse a root secret or identity from another deployment.
 Signing supports configured OP Sepolia and best-effort Base Sepolia testnet
-sessions only. Root, client, MCP and CE-CC remain on ethers v5; this Worker uses
-its isolated ethers v6 package.
+sessions only. Root, client, MCP and CE-CC use ethers v5; this Worker uses its
+isolated ethers v6 package.
 
 ## Credentials and authority
 
@@ -54,6 +54,15 @@ retains registry/Surveys authority and its configured storage backend (Arweave
 by default). Research buckets and Wrapped predictions do not grant membership
 or become ordinary responses.
 
+Registry question indexes retain their `indexedToBlock` watermark while an expired
+index refreshes in the background. A completed scan still refreshes after its
+five-minute TTL; a fresh completed index does not. Concurrent cached reads share
+one background refresh per session, revision and caller within an isolate.
+Unfinished scans continue separately from freshness checks. Failed log chunks are
+saved as merged `unresolvedRanges` and retried on each refresh, including after
+a restart. Index bounds alone do not imply completion: the whole session window
+must be covered, with no failed ranges or unread question payloads remaining.
+
 Question reads are bounded and paginated. Follow `nextCursor` until `hasMore`
 is false; cursors bind the caller, session, revision and current question set.
 Locked or unavailable questions cannot be answered. Partial source reads fail
@@ -62,9 +71,23 @@ proposals produce a capped question list with `complete: false` and
 `questionSourceReason: "agent_proposals_capped"`; aggregates reject that partial
 source with 503.
 
+Current agent results and the participant's answered state select one answer per
+session, participant and question: highest `answerRevision` (legacy records use
+zero), then `createdAt`, then `requestId`, with deterministic content tie-breaking.
+Selected answers are ordered chronologically by `createdAt`, then `requestId`;
+revisions do not order different participants or questions. Consensus, difference,
+groups, Polis and topic maps use this same selection; submission records retain history.
+Duplicate copies of one request prefer the later `createdAt`; on a timestamp tie,
+the canonical copy loaded after the submission index wins before status filtering.
+
 `/preferences` saves drafts unless an explicitly authorized submit is requested.
-Hosted submission uses canonical upload receipts; duplicate requests replay one
-stored response. Direct-submission admission and outcomes live in the coordinator. Finished
+The coordinator retains an answer head per session, principal and question.
+Resubmitting its current content reuses the same request; changing content claims
+the next revision, including when changing back to a previous answer. Claims
+serialize concurrent edits before direct or queued effects. Legacy answers have
+revision zero; the first new claim starts at one. Answer heads and submission
+journals are excluded from session backups, so restored sessions start fresh heads.
+Hosted submission uses canonical upload receipts; retries replay one stored response. Direct-submission admission and outcomes live in the coordinator. Finished
 outcomes project to KV once; a failed projection does not change a committed
 success. A durable alarm repairs it at least one second after the last attempt,
 without sleeping in the session lock. Reads consult the journal while KV is
@@ -121,15 +144,11 @@ normal backup coverage. Restore rejects targets containing agent or invite
 state. Reissue credentials and create new invites after restore; archives
 cannot recover managed signing keys.
 
-There is no Bridge URL fallback, forwarding, migration, identity transfer or
-invite transfer. Existing Bridge-backed sessions keep their old deployments
-until separately retired by their owner. Updating this source does not deploy
-code or delete existing resources.
+Updating this source does not deploy code or delete existing resources.
 
 ## Runtime instructions and verification
 
 Use [Agent access](skills/ce-agent-access/SKILL.md) or
 [Session Wrapped](skills/ce-session-wrapped/SKILL.md). The route inventory is
-[`routes.mjs`](routes.mjs). Agent tests run with `npm run test:worker:agent`;
-the former `test:worker:agent-bridge` command invokes the same maintained tests.
+[`routes.mjs`](routes.mjs). Agent tests run with `npm run test:worker:agent`.
 See [the coverage map](testing.md) and the [Worker guide](../../../docs/session-cors-worker.md).

@@ -1,4 +1,7 @@
 import { resolveSessionCapabilityProjection } from '../../utilities/session/sessionCapabilityProjection';
+import { createLogger } from 'utilities/logging.js';
+
+const log = createLogger('mainSite');
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -41,7 +44,11 @@ export const initializeMainSiteWorkerCanonicalCaches = async ({
   }
   if (!isCurrent()) return true;
 
-  await host.fetchQuestionResponsesChunkedForGroup(sessionSlug);
+  // Others' answers can be refused, as on a private session before sign-in. That says nothing about the questions
+  // or surveys, so it doesn't stop them loading or show as their error; response readiness stays with its own controller.
+  await host.fetchQuestionResponsesChunkedForGroup(sessionSlug).catch((error: unknown) => {
+    log.warn('Responses did not load:', error);
+  });
   if (!isCurrent()) return true;
 
   await host.initializeSurveyCacheForGroup(sessionSlug);

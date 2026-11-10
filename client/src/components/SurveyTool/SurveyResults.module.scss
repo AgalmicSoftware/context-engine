@@ -94,7 +94,8 @@
   display: flex;
   flex-direction: row;
   flex-wrap: wrap;
-  flex-grow: 1;
+  flex: 1 1 14rem;
+  min-width: 0;
   margin-right: 1rem;
   gap: 10px;
 }
@@ -119,6 +120,8 @@
   font-size: 2.5rem;
   font-weight: bold;
   margin: 0;
+  overflow-wrap: normal;
+  word-break: normal;
   color: var(--ce-overlay-text);
 }
 
@@ -202,17 +205,6 @@
     color-mix(in srgb, var(--ce-overlay-surface) 98.5%, transparent) 46%,
     color-mix(in srgb, var(--ce-overlay-base) 99.5%, transparent) 100%
   );
-}
-
-.closeButton {
-  background: none;
-  border: none;
-  font-size: 1.5rem;
-  cursor: pointer;
-  color: var(--ce-color-text-muted);
-  &:hover {
-    color: var(--ce-color-dark);
-  }
 }
 
 .modalSubtitle {
@@ -303,41 +295,6 @@
 /* --------------------------------------
  Filter / Search UI
 --------------------------------------- */
-.filterContainer {
-  display: flex;
-  align-items: center;
-  margin-bottom: 1.5rem;
-}
-
-.filterInput {
-  flex-grow: 1;
-  margin-right: 0.5rem;
-  color: var(--ce-color-black) !important;
-  font-weight: 600;
-}
-
-.searchIcon {
-  font-size: 1.25rem;
-  color: var(--ce-color-text-muted);
-}
-
-.filterModalOption {
-  color: var(--ce-color-black) !important;
-  font-size: 1.5em;
-  font-weight: 600;
-}
-
-.cumulativeCheckLabel {
-  color: var(--ce-color-black) !important;
-  font-size: 1.5em;
-}
-
-.filterModalCheckbox {
-  color: var(--ce-color-black) !important;
-  font-size: 1.5em;
-  visibility: initial !important;
-  opacity: 1 !important;
-}
 
 .htmlReportModal {
   :global(.modal-content) {
@@ -495,18 +452,21 @@
   }
 }
 
-.htmlReportWarning {
-  background: var(--ce-status-warning-text) !important;
-  border-color: var(--ce-status-warning) !important;
-  color: var(--ce-overlay-surface) !important;
+// The modal's own text and background, which pass in every theme; the status color is the border.
+.htmlReportWarning,
+.htmlReportInfo {
+  background: var(--ce-text-inverse) !important;
+  color: var(--ce-document-border-strong) !important;
+  border-width: 2px !important;
   font-weight: 600;
 }
 
+.htmlReportWarning {
+  border-color: var(--ce-status-warning) !important;
+}
+
 .htmlReportInfo {
-  background: var(--ce-status-info-text) !important;
-  border-color: var(--ce-status-info-text) !important;
-  color: var(--ce-status-info) !important;
-  font-weight: 600;
+  border-color: var(--ce-status-info) !important;
 }
 
 .htmlReportModalFooter {
@@ -530,28 +490,34 @@
   color: var(--ce-document-text) !important;
 
   &:hover,
-  &:focus {
-    background: var(--ce-status-info-text) !important;
+  &:focus,
+  &:active,
+  &:active:hover {
+    background: color-mix(in srgb, var(--ce-document-text) 10%, var(--ce-text-inverse)) !important;
     border-color: var(--ce-document-text-muted) !important;
-    color: var(--ce-overlay-base) !important;
+    color: var(--ce-document-text) !important;
   }
 }
 
 .htmlReportDownloadButton {
-  background: var(--ce-status-info) !important;
-  border: 1px solid var(--ce-status-info) !important;
-  color: var(--ce-text-inverse) !important;
+  background: var(--ce-action-primary) !important;
+  border: 1px solid var(--ce-action-primary) !important;
+  color: var(--ce-action-primary-text) !important;
 
   &:hover,
-  &:focus {
-    background: var(--ce-status-info) !important;
-    border-color: var(--ce-status-info) !important;
-    color: var(--ce-text-inverse) !important;
+  &:focus,
+  &:active,
+  &:active:hover {
+    background: var(--ce-action-primary-hover) !important;
+    border-color: var(--ce-action-primary-hover) !important;
+    color: var(--ce-action-primary-text) !important;
   }
 
-  &:disabled {
-    background: var(--ce-status-info-text) !important;
-    border-color: var(--ce-status-info-text) !important;
+  // This dialog is a light document in every theme, so the app's disabled colours, translucent on dark themes, vanish.
+  &:disabled,
+  &:disabled:hover {
+    background: var(--ce-document-surface) !important;
+    border-color: var(--ce-document-text-muted) !important;
     color: var(--ce-document-text-muted) !important;
     opacity: 1 !important;
   }
@@ -559,60 +525,26 @@
 
 .htmlReportGenerateButton {
   background: var(--ce-text-inverse) !important;
-  border: 1px solid var(--ce-status-info) !important;
-  color: var(--ce-status-info) !important;
+  border: 1px solid var(--ce-document-text-muted) !important;
+  color: var(--ce-document-text) !important;
   margin-top: 0.65rem;
 
   &:hover,
-  &:focus {
-    background: var(--ce-status-info-text) !important;
-    border-color: var(--ce-status-info) !important;
-    color: var(--ce-status-info) !important;
+  &:focus,
+  &:active,
+  &:active:hover {
+    background: color-mix(in srgb, var(--ce-document-text) 10%, var(--ce-text-inverse)) !important;
+    border-color: var(--ce-document-text-muted) !important;
+    color: var(--ce-document-text) !important;
   }
 
-  &:disabled {
-    background: var(--ce-status-info-text) !important;
-    border-color: var(--ce-document-border) !important;
+  &:disabled,
+  &:disabled:hover {
+    background: var(--ce-document-surface) !important;
+    border-color: var(--ce-document-text-muted) !important;
     color: var(--ce-document-text-muted) !important;
     opacity: 1 !important;
   }
-}
-
-.filterSection {
-  margin-bottom: 1rem;
-}
-
-.filterOptions {
-  padding: 1rem;
-  background: var(--ce-color-surface-light);
-  border-radius: var(--ce-radius-4);
-  margin-top: 1rem;
-}
-
-.sbtOptions {
-  margin-top: 1rem;
-  padding: 1rem;
-  background: var(--ce-color-white);
-  border-radius: var(--ce-radius-4);
-}
-
-/* Boundary box for top filter & export actions */
-.topActionsContainer {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 1rem;
-  padding: 15px;
-  border: 2px solid var(--ce-document-border);
-  border-radius: var(--ce-radius-12);
-  background-color: var(--ce-document-surface);
-}
-
-.sbtFilterContainer {
-  display: flex;
-  flex-direction: column;
-  min-width: 300px;
-  margin-right: 20px;
 }
 
 .filterBoxLabel {
@@ -670,7 +602,7 @@
   border: 1px solid color-mix(in srgb, var(--ce-action-accent) 32%, transparent);
   border-radius: var(--ce-radius-pill);
   background: color-mix(in srgb, var(--ce-action-accent) 12%, transparent);
-  color: var(--ce-document-text);
+  color: var(--ce-overlay-text);
   font-size: 0.95rem;
   font-weight: 700;
   line-height: 1;
@@ -685,7 +617,7 @@
   &:focus {
     background: color-mix(in srgb, var(--ce-action-accent) 18%, transparent);
     border-color: color-mix(in srgb, var(--ce-action-accent) 52%, transparent);
-    color: var(--ce-document-text);
+    color: var(--ce-overlay-text);
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--ce-action-accent) 14%, transparent);
     outline: none;
   }
@@ -694,7 +626,7 @@
 .lockedSummaryToggleOpen {
   background: color-mix(in srgb, var(--ce-overlay-surface) 95%, transparent);
   border-color: color-mix(in srgb, var(--ce-action-accent) 45%, transparent);
-  color: var(--ce-color-panel-text);
+  color: var(--ce-overlay-text);
 }
 
 .lockedSummaryCount {
@@ -719,7 +651,7 @@
   border: 1px solid color-mix(in srgb, var(--ce-action-accent) 20%, transparent);
   border-left: 4px solid color-mix(in srgb, var(--ce-action-accent) 70%, transparent);
   box-shadow: 0 10px 28px color-mix(in srgb, var(--ce-overlay-base) 28%, transparent);
-  color: var(--ce-color-panel-text);
+  color: var(--ce-overlay-text);
 }
 
 .lockedBannerTop {
@@ -748,19 +680,20 @@
   margin: 0;
   font-size: 1rem;
   font-weight: 700;
-  color: var(--ce-color-white);
+  color: var(--ce-overlay-text);
 }
 
 .lockedBannerSubtext {
   margin: 4px 0 0;
   font-size: 0.84rem;
-  color: color-mix(in srgb, var(--ce-control-text) 72%, transparent);
+  color: var(--ce-overlay-text-muted);
 }
 
+// The accent is only 3.35:1 on Classic 95's navy. The surface's own text colour is readable in every theme.
 %decryptCtaOutline {
   background: transparent !important;
-  border: 1px solid var(--ce-color-accent) !important;
-  color: var(--ce-color-accent) !important;
+  border: 1px solid var(--ce-overlay-text) !important;
+  color: var(--ce-overlay-text) !important;
   box-shadow: none;
   transition:
     background-color 0.18s ease,
@@ -771,8 +704,8 @@
   &:hover:not(:disabled),
   &:focus:not(:disabled) {
     background: color-mix(in srgb, var(--ce-action-accent) 15%, transparent) !important;
-    border-color: var(--ce-color-accent) !important;
-    color: var(--ce-color-accent) !important;
+    border-color: var(--ce-overlay-text) !important;
+    color: var(--ce-overlay-text) !important;
     box-shadow: 0 0 8px color-mix(in srgb, var(--ce-action-accent) 35%, transparent);
   }
 
@@ -782,7 +715,7 @@
   }
 
   &:disabled {
-    opacity: 0.55;
+    opacity: 0.7;
     cursor: default;
     box-shadow: none;
   }
@@ -804,35 +737,17 @@
   font-size: 0.85rem;
 }
 
-.lockedBannerCaret {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  margin: 8px 0 0 auto;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: color-mix(in srgb, var(--ce-control-text) 72%, transparent);
-  font-size: 0.9rem;
-  cursor: pointer;
-
-  &:hover,
-  &:focus {
-    color: var(--ce-color-white);
-  }
-}
-
 .lockedBannerDetails {
   margin-top: 10px;
   padding-top: 10px;
   border-top: 1px solid color-mix(in srgb, var(--ce-text-inverse) 12%, transparent);
   font-size: 0.85rem;
-  color: color-mix(in srgb, var(--ce-control-text) 68%, transparent);
+  color: var(--ce-overlay-text-muted);
 }
 
 .lockedBannerGateIntro {
   margin: 0 0 10px;
-  color: color-mix(in srgb, var(--ce-control-text) 80%, transparent);
+  color: var(--ce-overlay-text-muted);
   font-size: 0.82rem;
   font-weight: 600;
 }
@@ -850,7 +765,7 @@
   border-radius: var(--ce-radius-pill);
   border: 1px solid color-mix(in srgb, var(--ce-action-accent) 24%, transparent);
   background: color-mix(in srgb, var(--ce-action-accent) 12%, transparent);
-  color: var(--ce-color-accent);
+  color: var(--ce-overlay-text);
   font-weight: 600;
   text-decoration: none;
 
@@ -858,17 +773,20 @@
   &:focus {
     border-color: color-mix(in srgb, var(--ce-action-accent) 42%, transparent);
     background: color-mix(in srgb, var(--ce-action-accent) 18%, transparent);
+    color: var(--ce-overlay-text);
     text-decoration: underline;
   }
 }
 
-.lockedBannerGenericMessage {
-  margin: 0;
-  color: color-mix(in srgb, var(--ce-control-text) 68%, transparent);
+// The theme's focus ring can match these surfaces (black on Classic 95's navy).
+.lockedBanner :is(a, button):focus-visible,
+.lockedSummaryToggle:focus-visible {
+  outline-color: var(--ce-overlay-text) !important;
 }
 
-.responseItem {
-  margin-bottom: 1rem;
+.lockedBannerGenericMessage {
+  margin: 0;
+  color: var(--ce-overlay-text-muted);
 }
 
 @media (max-width: 767px) {
@@ -920,7 +838,7 @@
 
 .singleResponseCard {
   margin-bottom: 10px !important;
-  background-color: var(--ce-status-info);
+  background-color: var(--ce-overlay-surface-alt);
   border-radius: var(--ce-radius-8) !important;
   padding: 5px !important;
 }
@@ -929,14 +847,14 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background-color: var(--ce-status-info);
-  color: var(--ce-color-white);
+  background-color: var(--ce-overlay-surface-alt);
+  color: var(--ce-overlay-text);
   padding: 15px 15px 15px 15px !important;
   font-size: 1.1rem;
   border-radius: var(--ce-radius-8) var(--ce-radius-8) var(--ce-radius-0) var(--ce-radius-0);
   cursor: pointer;
   &:hover {
-    background-color: var(--ce-status-info);
+    background-color: var(--ce-overlay-surface-alt);
   }
 }
 
@@ -947,7 +865,7 @@
 }
 
 .responderLink {
-  color: var(--ce-color-white);
+  color: var(--ce-overlay-text);
   text-decoration: none;
   &:hover {
     text-decoration: underline;
@@ -957,11 +875,11 @@
 .externalLink {
   display: inline-flex;
   margin-left: 0.5rem;
-  color: var(--ce-color-white);
+  color: var(--ce-overlay-text);
   font-size: 1.1rem;
   /* bigger icon */
   &:hover {
-    color: var(--ce-color-surface-light);
+    color: var(--ce-action-accent);
   }
 }
 
@@ -971,22 +889,11 @@
   /* bigger lock icon */
 }
 
-.caretIcon {
-  font-size: 1.5rem;
-  /* bigger caret */
-  transition: transform 0.2s ease;
-}
-
 .responseCard {
-  background-color: var(--ce-color-surface-light);
+  background-color: var(--ce-overlay-surface-alt);
+  color: var(--ce-overlay-text);
   border-radius: var(--ce-radius-0) var(--ce-radius-0) var(--ce-radius-8) var(--ce-radius-8);
   padding: 1rem;
-}
-
-/* For toggling question expansions in aggregator mode */
-.questionSummaryCard {
-  background-color: var(--ce-control-disabled-bg) !important;
-  margin-bottom: 5px !important;
 }
 
 /* For the Polis Report container */
@@ -1000,6 +907,7 @@
 
 .questionSummaryHeader {
   cursor: pointer;
+  color: var(--ce-overlay-text);
   display: flex;
   flex-direction: row;
   justify-content: space-between;
@@ -1020,11 +928,6 @@
 
 #surveyResultsCollapse {
   box-shadow: none !important;
-}
-
-.darkCardBody {
-  padding: 1rem;
-  background-color: var(--ce-control-disabled-bg) !important;
 }
 
 /* Aggregator improvements */
@@ -1050,8 +953,9 @@
 
 .surveyResultsResponseCard {
   margin: 0 !important;
-  background: color-mix(in srgb, var(--ce-status-info) 98%, transparent) !important;
-  border: 1px solid color-mix(in srgb, var(--ce-status-info) 34%, transparent) !important;
+  background: var(--ce-overlay-surface-alt) !important;
+  color: var(--ce-overlay-text) !important;
+  border: 1px solid color-mix(in srgb, var(--ce-overlay-text) 20%, transparent) !important;
   border-top: 0 !important;
   border-radius: var(--ce-radius-0) var(--ce-radius-0) var(--ce-radius-12) var(--ce-radius-12) !important;
   box-shadow: 0 8px 18px color-mix(in srgb, var(--ce-overlay-base) 16%, transparent) !important;
@@ -1068,12 +972,12 @@
 }
 
 .surveyResultsResponseCardLinkButton {
-  color: color-mix(in srgb, var(--ce-control-text) 90%, transparent);
-  opacity: 0.82;
+  color: var(--ce-overlay-text);
+  opacity: 1;
 
   &:hover,
   &:focus {
-    color: var(--ce-color-white);
+    color: var(--ce-overlay-text);
     opacity: 1;
   }
 }
@@ -1089,7 +993,7 @@
 }
 
 .surveyResultsAggregatorText {
-  color: var(--ce-color-white);
+  color: var(--ce-overlay-text);
   font-size: 1.08rem;
   font-weight: 700;
   line-height: 1.45;
@@ -1097,7 +1001,7 @@
 
 .surveyResultsAggregatorParagraph {
   margin-bottom: 0.85rem;
-  color: var(--ce-color-white) !important;
+  color: var(--ce-overlay-text) !important;
   font-size: 1.15em;
 
   &:last-child {
@@ -1111,7 +1015,7 @@
   border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
   border-radius: var(--ce-radius-12);
   padding: 18px 20px;
-  color: var(--ce-color-white);
+  color: var(--ce-overlay-text);
   font-weight: 600;
   margin-top: 12px;
   margin-bottom: 0;
@@ -1123,7 +1027,7 @@
   border-top: 1px solid color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
   padding-left: 0;
   font-size: 0.95em;
-  color: color-mix(in srgb, var(--ce-control-text) 72%, transparent);
+  color: var(--ce-overlay-text-muted);
   font-style: normal;
 }
 
@@ -1141,7 +1045,7 @@
 
 .surveyResultsMultichoiceOptionStats {
   flex: 0 0 auto;
-  color: color-mix(in srgb, var(--ce-control-text) 72%, transparent);
+  color: var(--ce-overlay-text-muted);
   font-size: 0.95em;
 }
 
@@ -1149,24 +1053,17 @@
   margin-top: 1rem;
 }
 
-.bookmarkIcon {
-  margin-left: 10px;
-  cursor: pointer;
-  font-size: 1rem;
-  /* bigger bookmark icon */
-}
-
 /* Additional styling for question titles displayed */
 .questionTitle {
   font-size: 1.2rem;
   font-weight: bold;
-  color: var(--ce-color-white) !important;
+  color: var(--ce-overlay-text) !important;
   /* Used in some headers */
 }
 
 .clickableQuestionId {
-  color: var(--ce-status-info);
-  text-decoration: none;
+  color: var(--ce-overlay-text);
+  text-decoration: underline;
   font-weight: 600;
   &:hover {
     text-decoration: underline;
@@ -1205,7 +1102,7 @@ grey background, white text, bigger icons, etc.
 
   tbody tr td {
     background-color: var(--ce-overlay-surface);
-    color: var(--ce-color-white);
+    color: var(--ce-overlay-text);
     text-align: center;
     vertical-align: middle;
     padding: 10px;
@@ -1220,15 +1117,15 @@ grey background, white text, bigger icons, etc.
 
 /* Actions column button styling */
 .tableActionButton {
-  background-color: var(--ce-document-text-muted);
+  background-color: var(--ce-control-face) !important;
   border: none;
-  color: var(--ce-color-white);
+  color: var(--ce-control-text) !important;
   margin-right: 5px;
   font-size: 0.9rem;
   border-radius: var(--ce-radius-6);
   &:hover {
-    background-color: var(--ce-text-muted);
-    color: var(--ce-color-white);
+    background-color: var(--ce-control-face) !important;
+    color: var(--ce-control-text) !important;
   }
 }
 
@@ -1265,18 +1162,24 @@ grey background, white text, bigger icons, etc.
   border: 0;
   border-radius: var(--ce-radius-6);
   background: transparent !important;
-  color: var(--ce-color-white);
+  color: var(--ce-overlay-text);
   cursor: pointer;
 
   &:hover {
-    opacity: 0.8;
+    color: var(--ce-overlay-text);
+    box-shadow: inset 0 0 0 1px var(--ce-overlay-text);
   }
 
   &:focus-visible {
     background: transparent !important;
-    outline: 2px solid color-mix(in srgb, var(--ce-text-inverse) 42%, transparent);
+    outline: 2px solid var(--ce-overlay-text);
     outline-offset: 2px;
   }
+}
+
+.questionBookmarkButton[aria-pressed='true'] {
+  background: var(--ce-control-face) !important;
+  color: var(--ce-control-text);
 }
 
 .questionBookmarkIcon {
@@ -1285,33 +1188,15 @@ grey background, white text, bigger icons, etc.
 }
 
 .questionExpandIcon {
-  color: color-mix(in srgb, var(--ce-text-inverse) 86%, transparent);
+  color: var(--ce-overlay-text-muted);
   font-size: 1.15rem;
   line-height: 1;
   pointer-events: none;
 }
 
-/* NEW: Smaller, half-opacity refresh icon for "Refresh" actions */
-.refreshIcon {
-  font-size: 1rem;
-  opacity: 0.5;
-  margin-left: 10px;
-  cursor: pointer;
-  transition: opacity 0.2s ease;
-}
-
-.refreshIcon:hover {
-  opacity: 0.7;
-}
-
 /* --------------------------------------
  Export / Download / CSV section
 --------------------------------------- */
-.exportContainer {
-  display: flex;
-  flex-direction: column;
-  margin-top: 0;
-}
 
 .exportLabel {
   font-size: 1rem;
@@ -1328,10 +1213,10 @@ grey background, white text, bigger icons, etc.
 }
 
 .exportDropdown {
-  background-color: var(--ce-color-white) !important;
+  background-color: var(--ce-control-face) !important;
   background-image: none !important;
   border: 1px solid var(--ce-document-border) !important;
-  color: var(--ce-color-surface) !important;
+  color: var(--ce-control-text) !important;
   font-weight: bold;
   margin-right: 10px;
   border-radius: var(--ce-radius-8);
@@ -1339,94 +1224,36 @@ grey background, white text, bigger icons, etc.
   padding: 6px 12px;
   &:hover,
   &:focus {
-    background-color: var(--ce-color-surface-light) !important;
+    background-color: var(--ce-control-face) !important;
     border-color: var(--ce-document-border) !important;
-    color: var(--ce-color-surface) !important;
+    color: var(--ce-control-text) !important;
   }
 }
 
 .downloadButton {
-  background-color: var(--ce-color-bg) !important;
+  background-color: var(--ce-action-primary) !important;
   background-image: none !important;
-  border: 1px solid var(--ce-color-bg) !important;
-  color: var(--ce-color-white) !important;
+  border: 1px solid var(--ce-action-primary) !important;
+  color: var(--ce-action-primary-text) !important;
   font-weight: bold;
   border-radius: var(--ce-radius-8);
   /* rounder corners */
   padding: 6px 12px;
   &:hover,
   &:focus {
-    background-color: var(--ce-color-surface) !important;
-    border-color: var(--ce-color-surface) !important;
-    color: var(--ce-color-white) !important;
-  }
-}
-
-/* Additional styling for custom dropdown items (used in some exports) */
-.dropdownItem {
-  color: var(--ce-color-black) !important;
-  text-transform: uppercase;
-  font-size: 1.5em !important;
-  font-weight: 600 !important;
-  &.questionsItem {
-    background-color: var(--ce-status-danger-text) !important;
-    /* pastel pink */
-    font-style: italic;
-    &:hover {
-      background-color: var(--ce-status-danger-text) !important;
-      /* darker pastel pink */
-    }
-  }
-
-  &.surveyItem {
-    background-color: var(--ce-data-series-6) !important;
-    /* pastel yellow */
-    &:hover {
-      background-color: var(--ce-data-series-6) !important;
-      /* darker pastel yellow */
-    }
+    background-color: var(--ce-action-primary-hover) !important;
+    border-color: var(--ce-action-primary-hover) !important;
+    color: var(--ce-action-primary-text) !important;
   }
 }
 
 /* --------------------------------------
  Show / Hide Results Buttons
 --------------------------------------- */
-#filterButton,
-#showResultsButton {
-  background: transparent;
-  font-weight: 600;
-  padding: 10px;
-  font-size: 1.5em;
-  color: var(--ce-color-white);
-  text-transform: uppercase;
-  border: var(--ce-color-white) 1px solid;
-  border-radius: var(--ce-radius-10);
-  opacity: 0.9;
-  margin-right: 10px;
-}
-
-#showResultsButton {
-  opacity: 0.5;
-}
-
-/* If you have top-level container for results (optional) */
-.topButtonsContainer {
-  display: flex;
-  justify-content: center;
-  gap: 10px;
-  margin-bottom: 20px;
-}
 
 /* --------------------------------------
  Sizing & layout for the encryption / uploading text
 --------------------------------------- */
-#uploadingEncryptingText {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  justify-content: center;
-  color: var(--ce-color-white);
-}
 
 /* --------------------------------------
  Reused button styles
@@ -1468,353 +1295,39 @@ grey background, white text, bigger icons, etc.
 /* --------------------------------------
  Survey submission progress bars
 --------------------------------------- */
-.progressBarContainer {
-  margin-top: 20px;
-  background-color: var(--ce-color-light);
-  border-radius: var(--ce-radius-8);
-  overflow: hidden;
-}
-
-.progressBar {
-  height: 10px;
-  background-color: var(--ce-status-success);
-  transition: width 0.5s ease;
-}
 
 /* --------------------------------------
  Survey submission confirmation
 --------------------------------------- */
-.surveySubmissionConfirmation {
-  margin-top: 30px;
-  padding: 20px;
-  background-color: var(--ce-color-success-soft);
-  border-radius: var(--ce-radius-8);
-  border: 1px solid var(--ce-color-success-soft-hover);
-  h3 {
-    color: var(--ce-overlay-surface);
-    margin-bottom: 15px;
-  }
-
-  p {
-    font-size: 1.1em;
-    color: var(--ce-status-success);
-  }
-}
-
-.surveyActions {
-  display: flex;
-  flex-direction: row;
-  justify-content: space-between;
-  margin-top: 20px;
-}
-
-.copySurveyLinkButton,
-.viewSurveyLink {
-  flex: 1;
-  padding: 10px;
-  text-align: center;
-  border-radius: var(--ce-radius-5);
-  font-weight: 600;
-  transition: background-color 0.3s ease;
-}
-
-.copySurveyLinkButton {
-  background-color: var(--ce-status-success);
-  color: var(--ce-color-white);
-  border: none;
-  margin-right: 10px;
-  &:hover {
-    background-color: var(--ce-status-success);
-  }
-}
-
-.viewSurveyLink {
-  background-color: var(--ce-status-info);
-  color: var(--ce-color-white);
-  text-decoration: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  &:hover {
-    background-color: var(--ce-data-series-8);
-    color: var(--ce-color-white);
-    text-decoration: none;
-  }
-}
 
 /* --------------------------------------
  Handling multiple responses
 --------------------------------------- */
-.multipleResponsesContainer {
-  margin-top: 30px;
-  padding: 20px;
-  background-color: var(--ce-color-light);
-  border-radius: var(--ce-radius-8);
-  h4 {
-    margin-bottom: 15px;
-    color: var(--ce-document-text-muted);
-  }
-}
-
-.responseNavigation {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 15px;
-  button {
-    background-color: var(--ce-color-text-muted);
-    color: var(--ce-color-white);
-    border: none;
-    padding: 5px 10px;
-    border-radius: var(--ce-radius-4);
-    transition: background-color 0.3s ease;
-    &:hover:not(:disabled) {
-      background-color: var(--ce-document-text-muted);
-    }
-
-    &:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-  }
-
-  span {
-    font-size: 1.1em;
-    font-weight: 600;
-  }
-}
 
 /* --------------------------------------
  Toggling JSON or additional data
 --------------------------------------- */
-.toggleJsonButton {
-  margin-top: 20px;
-  background-color: var(--ce-color-text-muted);
-  color: var(--ce-color-white);
-  border: none;
-  padding: 10px 15px;
-  border-radius: var(--ce-radius-5);
-  font-weight: 600;
-  transition: background-color 0.3s ease;
-  &:hover {
-    background-color: var(--ce-document-text-muted);
-  }
-}
-
-.jsonDisplay {
-  margin-top: 20px;
-  background-color: var(--ce-status-info);
-  padding: 15px;
-  border-radius: var(--ce-radius-5);
-  border: 1px solid var(--ce-document-border);
-  white-space: pre-wrap;
-  word-break: break-all;
-  font-size: 0.9em;
-}
-
-.jsonContainer {
-  position: relative;
-}
-
-.copyJsonButton {
-  position: absolute !important;
-  top: 10px !important;
-  right: 10px !important;
-  background: transparent !important;
-  border: none !important;
-  cursor: pointer !important;
-  transition: none !important;
-  &:hover,
-  &:active,
-  &:focus {
-    background-color: transparent !important;
-    outline: none !important;
-    box-shadow: none !important;
-    color: inherit !important;
-    transform: none !important;
-  }
-}
-
-.copyJsonButton:hover {
-  color: var(--ce-status-success-text);
-}
 
 /* --------------------------------------
  Existing user response notice
 --------------------------------------- */
-.userResponseNotice {
-  margin-bottom: 20px;
-  background-color: var(--ce-color-light);
-  border-radius: var(--ce-radius-8);
-  border: 1px solid var(--ce-document-border);
-  padding: 20px;
-  margin-left: 15px;
-  margin-right: 15px;
-  font-size: 1.25em;
-  p {
-    font-size: 1.5em;
-    color: var(--ce-document-text-muted);
-    margin-bottom: 10px;
-    font-weight: 600;
-    margin-top: 10px;
-  }
-}
-
-.viewAddressHeading {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-top: 10px;
-  margin-bottom: 10px;
-  font-weight: 600;
-}
-
-#startFreshButton,
-#decryptEditButton,
-#editButton,
-#viewAnswersButton {
-  margin-right: 10px;
-  font-size: 1em;
-  font-weight: 600;
-  padding: 8px 15px;
-  border-radius: var(--ce-radius-5);
-  transition:
-    background-color 0.3s ease,
-    border-color 0.3s ease,
-    color 0.3s ease;
-}
-
-#startFreshButton {
-  // background-color: var(--ce-status-success);
-  // border-color: var(--ce-status-success);
-  color: color-mix(in srgb, var(--ce-document-text-muted) 52.3%, transparent);
-  &:hover {
-    background-color: var(--ce-status-success);
-    border-color: var(--ce-status-success);
-  }
-}
-
-#editButton {
-  background-color: var(--ce-status-warning);
-  border-color: var(--ce-status-warning);
-  color: var(--ce-color-dark);
-  &:hover {
-    background-color: var(--ce-status-warning);
-    border-color: var(--ce-status-warning);
-  }
-}
-
-#decryptEditButton {
-  @extend %decryptCtaOutline;
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
-}
-
-#viewAnswersButton {
-  background-color: var(--ce-status-info);
-  border-color: var(--ce-status-info);
-  color: var(--ce-color-white);
-  &:hover {
-    background-color: var(--ce-data-series-8);
-    border-color: var(--ce-data-series-8);
-  }
-}
 
 /* --------------------------------------
  Misc. binary / rating / freeform styling
 --------------------------------------- */
-.freeformAnswer {
-  font-style: italic;
-  background-color: color-mix(in srgb, var(--ce-text-inverse) 15%, transparent);
-  border-radius: var(--ce-radius-5);
-  padding: 15px;
-  color: var(--ce-color-white);
-  font-weight: bold;
-  margin-bottom: 5px;
-  margin-top: 5px;
-}
-
-.additionalComment {
-  margin-top: 4px;
-  padding-left: 12px;
-  font-size: 0.9em;
-  color: color-mix(in srgb, var(--ce-control-text) 65%, transparent);
-  font-style: italic;
-}
-
-.ratingAnswer {
-  display: flex;
-  align-items: center;
-  background-color: color-mix(in srgb, var(--ce-text-inverse) 15%, transparent);
-  border-radius: var(--ce-radius-5);
-  padding: 10px;
-  color: var(--ce-color-white);
-  font-weight: bold;
-  .ratingBar {
-    height: 10px;
-    background-color: var(--ce-color-accent);
-    border-radius: var(--ce-radius-5);
-    margin-right: 10px;
-  }
-
-  span {
-    font-size: 1em;
-  }
-}
-
-.multichoiceAnswer {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
-  background-color: color-mix(in srgb, var(--ce-text-inverse) 15%, transparent);
-  border-radius: var(--ce-radius-5);
-  padding: 10px;
-  color: var(--ce-color-white);
-  font-weight: bold;
-  .choiceItem {
-    background-color: var(--ce-color-accent);
-    color: var(--ce-color-bg);
-    padding: 5px 10px;
-    border-radius: var(--ce-radius-15);
-    font-size: 0.9em;
-  }
-}
-
-.binaryAnswer {
-  background-color: color-mix(in srgb, var(--ce-text-inverse) 15%, transparent);
-  border-radius: var(--ce-radius-5);
-  padding: 10px;
-  color: var(--ce-color-white);
-  font-weight: bold;
-}
-
-/* For aggregator binary results */
-.binaryOptionResults {
-  display: flex;
-  flex-direction: column;
-}
-
-.binaryOptionResponse {
-  margin-left: 5px;
-  font-weight: 600;
-  font-size: 1.25em;
-}
 
 /* --------------------------------------
  (Optional) Mini-Create-Survey references
 --------------------------------------- */
-#miniCreateSurveyLabel {
-  font-weight: 600;
-  font-size: 1.5em;
-  color: var(--ce-color-black) !important;
-}
 
-.tagsInput {
-  color: var(--ce-color-black) !important;
+.modalBody,
+.surveyResultsOverride,
+.surveyResultsResponseCard {
+  --decrypt-cta-text: var(--ce-overlay-text);
 }
 
 .surveyResultsOverride {
-  color: var(--ce-color-white) !important;
+  color: var(--ce-overlay-text) !important;
   font-size: 1.2em !important;
   margin-bottom: 5px;
 }
@@ -1947,14 +1460,14 @@ grey background, white text, bigger icons, etc.
   box-shadow: none !important;
   color: var(--ce-document-text) !important;
   font-weight: 600;
+}
 
-  &:hover,
-  &:focus,
-  &:active {
-    background: var(--ce-text-inverse) !important;
-    border-color: color-mix(in srgb, var(--ce-action-accent) 34%, transparent) !important;
-    color: var(--ce-document-text) !important;
-  }
+// The element selector outranks the global `.btn:active:hover`, whose cleared fill left this dark label on the
+// locked-answers banner when pressed.
+button.exportToggleButton:is(:hover, :focus, :active):not(:disabled) {
+  background: var(--ce-text-inverse) !important;
+  border-color: color-mix(in srgb, var(--ce-action-accent) 34%, transparent) !important;
+  color: var(--ce-document-text) !important;
 }
 
 .exportCollapseButton {
@@ -1991,11 +1504,11 @@ grey background, white text, bigger icons, etc.
   padding: 6px 12px;
   border: 1px solid var(--ce-document-border);
   border-radius: var(--ce-radius-6);
-  background-color: var(--ce-surface-subtle);
+  background-color: var(--ce-overlay-surface-alt);
   cursor: pointer;
   font-size: 0.9rem;
   font-family: inherit;
-  color: var(--ce-color-border);
+  color: var(--ce-overlay-text-muted);
   white-space: nowrap;
   overflow: scroll;
   .syncStatus__indicator_synced {
@@ -2014,6 +1527,7 @@ grey background, white text, bigger icons, etc.
   top: calc(100% + 5px);
   right: 0;
   background-color: var(--ce-document-surface);
+  color: var(--ce-document-text);
   border: 1px solid color-mix(in srgb, var(--ce-document-text) 12%, transparent);
   border-radius: var(--ce-radius-6);
   box-shadow: 0 12px 28px color-mix(in srgb, var(--ce-document-text) 14%, transparent);
@@ -2029,10 +1543,10 @@ grey background, white text, bigger icons, etc.
 
 .syncStatus__quickRefresh {
   cursor: pointer;
-  color: var(--ce-status-info);
+  color: var(--ce-action-accent);
   margin-left: 8px;
   font-size: 0.85rem;
-  opacity: 0.7;
+  opacity: 1;
   background: none;
   border: none;
   padding: 0;
@@ -2153,7 +1667,7 @@ grey background, white text, bigger icons, etc.
     // Keep header items on a single row, but allow wrapping if needed and add a gap.
     flex-wrap: wrap;
     gap: 10px;
-    padding-right: 7rem;
+    padding-right: 3.5rem;
   }
 
   .modalHeaderContent {
@@ -2297,7 +1811,7 @@ grey background, white text, bigger icons, etc.
   }
 
   p > strong {
-    color: var(--ce-action-accent) !important;
+    color: var(--ce-overlay-text) !important;
     font-weight: 700 !important;
     opacity: 1;
   }
@@ -2309,6 +1823,11 @@ grey background, white text, bigger icons, etc.
 
 .modalHeader > h5 {
   display: flex;
+  flex: 1 1 100%;
+  flex-wrap: wrap;
+  min-width: 0;
+  max-width: 100%;
+  gap: 12px;
   flex-direction: row;
   align-items: center;
 }
@@ -2316,21 +1835,12 @@ grey background, white text, bigger icons, etc.
 .responseCountIcon {
   font-weight: 600;
   font-size: 1em;
-  opacity: 0.75;
+  opacity: 1;
 }
 
 .responseCountNumber {
   font-weight: 600;
   font-size: 1em;
-  opacity: 0.75;
+  opacity: 1;
   margin-left: 5px;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  #startFreshButton,
-  #decryptEditButton,
-  #editButton,
-  #viewAnswersButton {
-    transition-duration: 0.01ms !important;
-  }
 }

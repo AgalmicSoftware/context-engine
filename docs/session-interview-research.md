@@ -12,27 +12,27 @@ When a session URL includes a valid `src` query parameter, the browser keeps the
 
 Encrypted answer or comment fields are redacted before this metadata is written, and the full interview transcript or imported conversation history is not attached. Saved AI draft changes appear in exportable data only after a selected draft is submitted and the relevant research controls allow the metadata; in-memory review state that is closed or discarded without submission is not a stored research record.
 
-For a visual overview, see the [interview research diagrams](assets/interview-research/README.md). Click either diagram there to open the full-size PNG.
+For a visual overview, see the [interview research diagrams](assets/interview-research/README.md). Click either diagram there to open the full-size image.
 
 ## Consent Controls
+
+The **Measure how well AI represents participants** switch in Interview
+settings turns on the sharing default, hidden drafts and the score screen
+described below in one step; see
+[session-creation-guide.md](session-creation-guide.md#measure-how-well-ai-represents-participants).
 
 Interview review exposes two independent choices under the initially collapsed
 **AI submission info** dropdown. It also contains the metadata disclosure and,
 when available, the optional responder-name checkbox. Expanding it does not
-change consent. Its muted green toggle shares one bordered, lighter-blue footer
-with **Submit responses**; the options open above that compact footer. The
-**Review proposed responses** heading uses bold weight to separate drafts clearly.
-Freeform answers and comments use a tinted, bordered surface in both reading
-and editing modes. Inactive conviction, comment, and encryption icons share the
-same neutral color and opacity; active controls remain more prominent.
+change consent.
 
 | Control | Initial default | Submitted effect |
 | --- | --- | --- |
 | Include platform/model provenance | On when AI prefill provenance is available | Adds `source`, `promptVersion`, `questionSetHash`, and available `source.researchCoverage` details to `interviewProvenance`. |
-| Share AI draft changes for research | Session default; off when unset | Adds draft-comparison fields such as `originalPrediction`, `predictionRevisions`, `finalSubmitted`, `changedFields`, `userEditedFields`, `redactedFields`, `predictionComparison`, and `unselectedPredictions`. |
+| Share AI draft changes for research | Session default; off when unset | Adds the draft comparison, at the session's research detail (below): `originalPrediction`, `predictionRevisions`, `finalSubmitted`, `changedFields`, `userEditedFields`, `redactedFields`, `predictionComparison`, and, at full detail only, `unselectedPredictions`. |
 
 Owners set **Share AI draft changes for research by default** under **Interview
-settings** in the session wizard or admin metadata editor. The boolean
+settings** on the setup page or the session's settings page. The boolean
 `interviewMode.shareDraftChangesByDefault` defaults to `false` and sets the
 initial checkbox for new responses, including imported and voice-generated
 drafts. Participants can change it before submitting. When sharing starts on,
@@ -43,6 +43,73 @@ an explicit choice made during review, including while logging in to submit.
 Settings save the key only while it is on: Session Workers before 0.7.0 reject
 interview keys they do not know, so they keep accepting interview settings with
 the default off, and turning it on needs a 0.7.0 or later Session Worker.
+
+Owners also choose the **AI draft research detail**, `interviewMode.researchDetail`:
+
+- `minimal` (the default) keeps the AI's predicted answers, importance,
+  conviction and confidence, its revisions, and which fields changed. It keeps
+  none of the AI's notes (`evidence`), drafted comments, drafted freeform
+  answers or drafts for questions the person skipped. A freeform prediction or
+  final value is recorded as `null`.
+- `full` keeps everything described in the field reference below.
+
+Settings save `researchDetail` only when it is `full`, for the same reason as
+the sharing default: choosing `full` needs a Session Worker newer than 0.8.0.
+
+Either way the record carries `version: 2`, `researchTier` and `draftOrigin`.
+Records submitted before research detail existed keep `version: 1` and their
+original shape. When a minimal record is resubmitted later, its drafted text is
+no longer known, so text fields keep the changed-or-not decision made at review.
+While sharing is on, a line beside the submit button says so without opening
+the panel.
+
+### Hidden drafts
+
+`interviewMode.hiddenDraftShare` (0 to 0.5; 0, off, by default) hides that
+share of each person's AI-prefill drafts, so a session can measure how much
+seeing a draft sways answers. Settings save it only above 0, which needs a
+Session Worker newer than 0.8.0. Only drafts from a ChatGPT or Claude prefill
+packet can be hidden, on agree/disagree, choice, rating and quadratic
+questions the person hasn't already answered. Voice and typed-context drafts,
+freeform questions and anything shown with research sharing off are never
+hidden.
+
+- **Choice.** When review starts with research sharing on, the drafts are
+  ranked by a hash of `sessionSlug|participant|questionId` and the first
+  `round(count × share)` are hidden, at least one of three or more.
+  Participant is the signed-in account, or this browser's local id before
+  login, so a reload hides the same drafts.
+- **Hidden.** A grey answer area says "AI guess hidden", with a keyboard-accessible
+  question-mark tooltip explaining why. Your answer controls remain available
+  below it. The AI answer, comment, ratings and notes are absent from the
+  rendered markup and accessible text; the grey area contains only placeholders.
+- **Reveal.** Agree/disagree and single-choice questions show "Your AI guessed:
+  Agree · 70% sure" right after the answer. Ratings, multi-select and
+  quadratic questions show it once the person edits another card or submits,
+  so a slider isn't revealed mid-drag. The answer at that moment is the blind
+  answer; later changes are submitted but not scored.
+- **Opting out.** Unticking research sharing reveals every answered guess and
+  turns unanswered hidden drafts back into ordinary drafts. They are never
+  hidden again.
+- **Unanswered.** A hidden draft the person leaves blank isn't submitted, and
+  full-detail records don't list it among skipped-question drafts.
+- **Elsewhere.** Until its guess is shown, a hidden draft is left out of what
+  the voice interviewer, the drafting request and group suggestions see. If a
+  saved answer for its question loads after review starts, it becomes an
+  ordinary draft.
+
+### Score screen
+
+With `interviewMode.showFidelityScore` (off by default), a successful submit
+that included the person's own AI-prefill drafts replaces the review list with
+a private score: how many choice answers their AI matched, its Mirror Score,
+how many hidden drafts it guessed, and up to three of its most confident
+misses. It is worked out in the browser from the submitted drafts and answers
+(`summarizeParticipantFidelity` in `shared/agentFidelity.mjs`); nothing new is
+stored or sent. Voice drafts restate what the person just said, so they aren't
+scored. The modal keeps its height while the score shows, so the button that
+becomes **View results** stays in place, and folds the AI submission info away
+to give the score room.
 
 The disclosure panel stays within the interview footer width and wraps its text,
 including long model identifiers and question-set hashes.
@@ -66,14 +133,20 @@ Cloudflare encrypted-envelope export is a different route: `/storage/export-enve
 | Field | Included when | Meaning |
 | --- | --- | --- |
 | `recruitment.source` | A valid first `src` URL token was captured for the session before submission | Session recruitment source attached to the submitted response entry. It is separate from `interviewProvenance`, does not depend on AI research consent, and is normalized to a bounded token rather than a URL. |
-| `version` | AI provenance or draft-comparison sharing is included | Schema version for the submitted `interviewProvenance` object. The current value is `1`. |
+| `version` | AI provenance or draft-comparison sharing is included | Schema version for the submitted `interviewProvenance` object: `2` for draft comparisons that record `researchTier`, `1` otherwise and for older records. |
+| `researchTier` | Draft-comparison sharing is included (version 2) | `minimal` or `full`, from the session's `interviewMode.researchDetail` at review time. |
+| `draftOrigin` | Draft-comparison sharing is included (version 2) | Where the first prediction came from: `external_prefill` (a ChatGPT or Claude prefill packet), `voice_interview` or `typed_context`. |
+| `confidenceMeaning` | Draft-comparison sharing is included (version 2) | What the AI's `confidence` means: `keep`, the chance the person keeps the answer unchanged (prompt `ce-interview-brief-v6` and in-app drafting), or `support`, strength of support (earlier prompts). Kept with the research data, so calibration doesn't depend on the AI provenance choice. |
+| `predictionCondition` | Draft-comparison sharing is included (version 2) | `shown` when the AI's draft was in review, `blind` when it was hidden until the person answered ([Hidden drafts](#hidden-drafts)). |
+| `blindAnswer` | A hidden draft was answered (version 2) | The answer given before the AI's guess was shown; redacted like the answer when the answer is encrypted. |
+| `revealedAt` | A hidden draft was answered (version 2) | When the AI's guess was shown, in milliseconds since 1970. |
 | `source.platform` | AI provenance is included | Self-reported platform label from the import or voice workflow, normalized to a short string such as `chatgpt`, `claude`, or `other`. |
 | `source.modelId` | AI provenance is included | Self-reported model identifier, capped before submission. |
 | `source.verification` | AI provenance is included | Always written as `self_reported`; the app does not independently verify provider/model identity. |
 | `source.researchCoverage` | AI provenance is included and coverage details exist | Optional counts for searched/used chat history, memory items, connected sources, and user statements. Counts are normalized and capped; an optional search-scope note is trimmed. |
 | `promptVersion` | AI provenance is included | Interview prompt/schema version supplied by the prefill packet. |
 | `questionSetHash` | AI provenance is included | Hash of the question set shown to the model, when available. |
-| `originalPrediction` | Draft-comparison sharing is included | Redacted-safe snapshot of the selected AI draft before review: answer, additional comments, importance, conviction, confidence, and evidence. |
+| `originalPrediction` | Draft-comparison sharing is included | Redacted-safe snapshot of the selected AI draft before review: answer, additional comments, importance, conviction, confidence, and evidence. At minimal detail, only the answer (or `null` for freeform), importance, conviction and confidence. |
 | `predictionRevisions` | Draft-comparison sharing is included and saved revisions exist | Up to 100 saved AI draft versions with revision number, model ID, answer/comment text when unencrypted, ratings, confidence, and evidence. This is record truncation for saved AI versions, not a complete history of every human edit. |
 | `finalSubmitted` | Draft-comparison sharing is included | Redacted-safe final values submitted for the selected question. |
 | `changedFields` | Draft-comparison sharing is included | Net fields whose final submitted value differs from the original AI prediction. Possible values are `answer`, `additionalComments`, `importance`, and `conviction`. |
@@ -94,18 +167,19 @@ The reverse can also happen: `changedFields` can list a field while `userEditedF
 The nested `predictionComparison` object repeats the top-level comparison snapshot in a versioned shape for downstream consumers. Treat it as the same observation represented in a second schema shape, not as a second independent measurement.
 
 For external imports, `promptVersion` records the catalog version used to make
-that packet, not the current frontend version. New requests negotiate v4 or v5;
-older v1–v5 imports keep their original fingerprints. V5 binds selection mode to
-the question hash; v4 does not and its generation contract allows only one
-choice string. A missing v4 draft may reflect an unrepresentable multiple-choice
-answer, not lack of evidence. Ratings follow each question's scale; importance
-and conviction are separate 0–100 fields in AI requests and imported packets.
-The client converts them once into 0–10 review and stored response values, and
-converts local predictions back to 0–100 when continuing an AI interview.
-Existing stored responses are not migrated. Instead, readers map a stored
-rating above 10 and at most 100 onto 0–10 by dividing it by 10, then clamp the
-result to 0–10 (`readStoredRating` in the client; the Worker results analysis
-does the same). A legacy rating of 10 or less cannot be told apart from a 0–10
+that packet, not the current frontend version. New requests accept v4, v5 or v6
+catalogs; older v1–v5 imports keep their original fingerprints. V5 and v6 bind
+selection mode to the question hash; v4 does not and its generation contract
+allows only one choice string. A missing v4 draft may reflect an
+unrepresentable multiple-choice answer, not lack of evidence. Ratings follow
+each question's scale; importance and conviction are separate 0–100 fields in AI
+requests and imported packets. The client converts them once into 0–10 review
+and stored response values, and converts local predictions back to 0–100 when
+continuing an AI interview. Readers map a stored rating above 10 and at most 100
+onto 0–10 by dividing it by 10, then clamp the result to 0–10
+(`readStoredRating` in `shared/questions/storedRating.mjs`, used by the client,
+the Worker results analysis and the agent fidelity report). A
+legacy rating of 10 or less cannot be told apart from a 0–10
 rating, so it reads as given. See [the interview contract](session-listening-mode.md).
 
 Voice context can omit whole question/history/background/review rows to fit the
@@ -129,7 +203,7 @@ The most direct read-only procedure for Cloudflare response storage is:
 2. For each returned `storageRef.id`, read the raw payload with `GET <session-worker>/storage/read?id=<storageRef.id>`. The browser storage client calls this through `readSessionStorageBlob()`.
 3. Parse the returned JSON. If the payload has a `responses` array, inspect `responses[].interviewProvenance` on each response entry. If the payload is a single response object, inspect its top-level `interviewProvenance`.
 
-Access depends on the session's storage and results policy. Public-result sessions may allow anonymous reads. In nonpublic Worker-canonical sessions, authentication alone does not grant access to other participants' raw responses: ownership, current admin authority, or a dedicated delegated grant is required, and per-item conditions still apply. In the browser client, `fetchWorkerWithAuth()` first tries anonymous read/list when requested, then retries with `Authorization: Bearer <worker-token>` and `X-Group-Slug: <slug>` if the Worker requires authentication.
+Access depends on the session's storage and results policy. Public-result sessions may allow anonymous reads. In nonpublic Worker-canonical sessions, authentication alone does not grant access to other participants' raw responses: ownership or current admin authority is required, and per-item conditions still apply. In the browser client, `fetchWorkerWithAuth()` first tries anonymous read/list when requested, then retries with `Authorization: Bearer <worker-token>` and `X-Group-Slug: <slug>` if the Worker requires authentication.
 
 The Results screen has separate browser downloads for `CSV: Questions`, `CSV: Questions + Responses`, `JSON: Questions`, and `JSON: Questions + Responses`. The CSV response export intentionally flattens response rows to question id, prompt, type, options, responder address, importance, answer value/hash, additional value/hash, encryption flags, timestamp, voice credits, and a raw conviction column after voice credits; it does not include `interviewProvenance`. The JSON questions-and-responses export includes the filtered response rows as held by the results view. Depending on the view and hydration path, each row's raw `response` can be an object or a JSON string; inspect and parse that nested `response` value, then check either `response.interviewProvenance` or `response.responses[].interviewProvenance`. For full-fidelity research review, use the raw storage read path above.
 
@@ -144,13 +218,17 @@ In browser CSV exports, `options` cells contain JSON arrays, and array-valued `a
       "answer": { "value": "I worry that evaluations can miss deployment risks." },
       "additional": { "value": "The strongest evidence was about monitoring after launch." },
       "interviewProvenance": {
-        "version": 1,
+        "version": 2,
+        "researchTier": "full",
+        "draftOrigin": "external_prefill",
+        "predictionCondition": "shown",
+        "confidenceMeaning": "keep",
         "source": {
           "platform": "chatgpt",
           "modelId": "gpt-example",
           "verification": "self_reported"
         },
-        "promptVersion": "ce-interview-brief-v5",
+        "promptVersion": "ce-interview-brief-v6",
         "questionSetHash": "8b7f...",
         "originalPrediction": {
           "answer": "I expect model evaluations to miss deployment risks.",
@@ -221,21 +299,21 @@ In browser CSV exports, `options` cells contain JSON arrays, and array-valued `a
             "original": {
               "answer": { "redacted": true, "reason": "encrypted_field" },
               "additionalComments": { "redacted": true, "reason": "encrypted_field" },
-              "importance": null,
-              "conviction": null,
+              "importance": { "redacted": true, "reason": "encrypted_field" },
+              "conviction": { "redacted": true, "reason": "encrypted_field" },
               "confidence": 0.52,
               "evidence": ""
             },
             "reviewed": {
               "answer": { "redacted": true, "reason": "encrypted_field" },
               "additionalComments": { "redacted": true, "reason": "encrypted_field" },
-              "importance": null,
-              "conviction": null
+              "importance": { "redacted": true, "reason": "encrypted_field" },
+              "conviction": { "redacted": true, "reason": "encrypted_field" }
             },
             "submitted": null,
             "changedFields": [],
             "userEditedFields": [],
-            "redactedFields": ["answer", "additionalComments"]
+            "redactedFields": ["answer", "additionalComments", "importance", "conviction"]
           }
         ],
         "appliedAt": 1789776000000
@@ -255,13 +333,30 @@ The record is compatible with an agent-mirror or model-quality evaluation only a
 
 It is not automatically in the Edge2026 agent-only export schema, and it does not by itself provide an explicit human confirm/edit event, semantic fingerprint, calibration bucket, edit timing, or agent run/request lifecycle. A downstream mirror eval must treat `changedFields` and `userEditedFields` as field-level review signals, not as a direct agree/disagree label.
 
+`scripts/agent-fidelity-report.mjs` is that evaluator. It compares `originalPrediction` with the submitted answer and can add Session Wrapped export rows; see [agent-fidelity.md](agent-fidelity.md).
+
 ## Comparison with Edge2026 agent-village agent-only research
 
 The Edge2026 agent-village experiment is implemented by `workers/sessionCorsWorker/agent/agentOnlyMode.mjs`. It stores a separate agent-only event/state stream under retained legacy agent-only KV prefixes and can export dedicated research views through `exportAgentOnlyData()`.
 
 Agent-only records include agent answer events with `source: "agent_autofill"`, `eventKind`, answer payload, required confidence, optional rationale, model/scaffold/instructions metadata, run/request ids, token-usage metadata when available, privacy-protective skips, and a semantic fingerprint produced by `semanticFingerprintForAgentOnlyAnswer()`. Historical verified Mini App human review is preserved as separate explicit `confirm` or `edit` sidecars. Current HTTP routes cannot create those review records; `humanApproved` is a caller assertion authorizing a normal response submission, not verified review evidence. The export path derives `review_status` values such as `human_confirm`, `human_edit`, or `human_stale_confirm`; calibration exports bucket agent confidence into 10-point bands and count predictions, confirms, edits, and edit rate. Wide/gold exports can join current normal answers, prior submitted answers, agent predictions, confidence, eval type, and review status.
 
+Gold and wide exports load the canonical submitted-answer history once per export,
+so expired operational indexes do not remove human answers. Current answers use
+revision order, then timestamp; gold applies that order only to answers saved
+before the prediction.
+
+Research summaries count distinct stored answers and privacy-protective skips for
+each run using the same coverage rule as the Wrapped image gate. Attempts remain
+operational records, with replays marked explicitly; retries and edits add no
+coverage. A successful run has full coverage or a successful Wrapped image.
+
 Session interview research is narrower and persists with ordinary submitted response data. When the responder opts in, `interviewProvenance` records the original AI draft, saved draft revisions, reviewed final values, net changed fields, sparse touched-field markers, redacted fields, and rejected draft metadata for that submitted response. It does not create the agent-only KV event stream, does not feed `exportAgentOnlyData()`, and is not automatically exported to the Edge2026 calibration/gold/wide files.
+
+An interview submission sends only the selected questions that actually changed.
+The same set limits preflight checks, encryption, uploaded rows and draft cleanup;
+unselected manual drafts remain pending. The ordinary Submit button still sends
+every changed answer.
 
 The semantics are also different. Edge2026 distinguishes explicit confirm, edit, stale confirm, skips, agent reruns, and prior human answers with semantic fingerprints. Interview research distinguishes selected versus unselected drafts, final submitted values, fields whose final values changed, and instrumented fields the reviewer touched. It does not record keystrokes, edit timing, time-to-review, cursor history, or a semantic agreement score. A no-change submitted value is documented as unchanged, not as scientific agreement with the AI. When a touched marker is captured for a field that is later restored to the original, that field remains in `userEditedFields` but drops out of `changedFields`.
 
@@ -285,8 +380,9 @@ as a change from an empty response. Interview comparison metadata retains exact
 JSON value equality, while the form accepts equivalent numeric strings.
 
 Closing an unsubmitted interview review through its close button, backdrop, or
-Escape asks before discarding the transcript, prefill, and review edits. Choosing
-“Keep reviewing” retains them in memory; no transcript is persisted for reload.
+Escape keeps the transcript, prefill, and review edits in memory; no transcript is
+persisted for reload. The trash button beside the microphone discards them after
+a confirmation, and its tooltip says what is cleared.
 
 Quadratic comment-only responses do not count as invalid allocations. An explicit
 all-zero allocation counts as an allocation; undecrypted or invalid vote vectors
@@ -297,7 +393,7 @@ Cluster-summary caches include the filtered participant roster in assignment ord
 
 Report refreshes preserve expanded clusters while those cluster identifiers remain present. A two-participant report uses its existing PCA coordinates for the graph because UMAP cannot fit that cohort size.
 
-Before displaying or copying an external-interview kickoff, the browser checks that the session’s public catalog uses a supported v4 or v5 contract. Incompatible catalogs show an update message; unavailable catalogs show a retry message. This check does not change v1–v4 packet import validation or relabel catalog hashes.
+Before displaying or copying an external-interview kickoff, the browser checks that the session’s public catalog uses a supported v4, v5 or v6 contract. Incompatible catalogs show an update message; unavailable catalogs show a retry message. This check does not change packet import validation or relabel catalog hashes.
 
 
 Saved-answer checks are scoped to the signed-in participant and the current

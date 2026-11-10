@@ -207,7 +207,6 @@ describe('useSessionHeaderPreview', () => {
       result.current.setSessionHeaderMode('upload');
       result.current.setCompactSessionHeaderMode('url');
       result.current.setSessionHeaderFile(new File(['image'], 'header.png', { type: 'image/png' }));
-      result.current.setSessionHeaderPreviewModalOpen(true);
       result.current.setSessionHeaderStatus('Uploading header image...', 'loading');
     });
 
@@ -218,7 +217,6 @@ describe('useSessionHeaderPreview', () => {
     expect(result.current.sessionHeaderMode).toBe('url');
     expect(result.current.compactSessionHeaderMode).toBe('idle');
     expect(result.current.sessionHeaderFile).toBeNull();
-    expect(result.current.sessionHeaderPreviewModalOpen).toBe(false);
     expect(result.current.sessionHeaderUploadStatus).toBe('');
     expect(result.current.sessionHeaderUploadStatusTone).toBe('default');
     expect(updateDraftSessionHeader).toHaveBeenCalledWith('');
@@ -240,7 +238,6 @@ describe('useSessionHeaderPreview', () => {
     act(() => {
       result.current.setSessionHeaderMode('upload');
       result.current.setSessionHeaderFile(file);
-      result.current.setSessionHeaderPreviewModalOpen(true);
       result.current.setSessionHeaderStatus('Uploading header image...', 'loading');
     });
     expect(result.current.sessionHeaderPreviewSrc).toBe('blob:session-header-1');
@@ -250,7 +247,6 @@ describe('useSessionHeaderPreview', () => {
     expect(result.current.sessionHeaderMode).toBe('url');
     expect(result.current.sessionHeaderFile).toBeNull();
     expect(result.current.sessionHeaderPreviewSrc).toBe('https://example.test/persisted.png');
-    expect(result.current.sessionHeaderPreviewModalOpen).toBe(false);
     expect(result.current.sessionHeaderUploadStatus).toBe('');
     expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:session-header-1');
     expect(updateDraftSessionHeader).not.toHaveBeenCalled();

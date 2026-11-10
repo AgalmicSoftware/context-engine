@@ -1,6 +1,6 @@
 const fetchPonyfill = require('node-fetch');
 const { Readable } = require('node:stream');
-const { ReadableStream } = require('node:stream/web');
+const { CompressionStream, DecompressionStream, ReadableStream } = require('node:stream/web');
 const { TextEncoder } = require('node:util');
 const { webcrypto: nodeWebCrypto } = require('crypto');
 
@@ -200,6 +200,15 @@ if (typeof globalThis.Request !== 'function') {
 }
 
 globalThis.Response = JestResponse;
+
+// jsdom lacks the compression streams that session template links use.
+if (typeof globalThis.CompressionStream !== 'function') {
+  globalThis.CompressionStream = CompressionStream;
+}
+
+if (typeof globalThis.DecompressionStream !== 'function') {
+  globalThis.DecompressionStream = DecompressionStream;
+}
 
 if (typeof window !== 'undefined') {
   installWebCrypto(window);

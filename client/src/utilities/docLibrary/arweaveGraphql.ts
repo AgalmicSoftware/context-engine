@@ -160,7 +160,7 @@ export const listArweaveTransactionsByTags = async ({
         body: requestBody,
       });
 
-      const payload = (await res.json().catch(() => null)) as GraphqlPayload;
+      const payload = (await res.json()) as GraphqlPayload;
       if (!res.ok) {
         throw new Error(payload?.errors?.[0]?.message || payload?.error || `Arweave GraphQL error (${res.status})`);
       }
@@ -168,7 +168,10 @@ export const listArweaveTransactionsByTags = async ({
         throw new Error(payload.errors[0]?.message || 'Arweave GraphQL error.');
       }
 
-      edges = Array.isArray(payload?.data?.transactions?.edges) ? payload.data.transactions.edges : [];
+      if (!Array.isArray(payload?.data?.transactions?.edges)) {
+        throw new Error('Invalid Arweave GraphQL response: expected transaction edges.');
+      }
+      edges = payload.data.transactions.edges;
       lastErr = null;
       break;
     } catch (err) {

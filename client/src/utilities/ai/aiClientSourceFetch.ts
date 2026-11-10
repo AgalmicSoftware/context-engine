@@ -3,7 +3,7 @@ import { getCorsProxyUrlOrThrow } from '../worker/corsProxy';
 import { fetchWorkerWithAuth } from '../worker/workerAuth.js';
 import { defaultStrictAllowDemoFallback } from '../worker/workerSessionResolution.js';
 import { createLogger } from '../logging';
-import { extractMainContent, readFileContent } from './aiClientSourceReaders';
+import { extractMainContent, readFileContent, type SourceExtractionOutcome } from './aiClientSourceReaders';
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -108,33 +108,50 @@ export const fetchContentFromURL = async (url: unknown, opts: unknown = {}): Pro
   }
 };
 
-/**
- * processAdditionalSources(sources)
- * Iterates through the list of additional sources (files/URLs),
- * fetches or reads their content, and returns a single concatenated string
- * with delimiters.
- */
-export async function processAdditionalSources(sources: unknown, opts: unknown = {}): Promise<string> {
-  if (!Array.isArray(sources) || sources.length === 0) return '';
+export type AdditionalSourcesResult = {
+  text: string;
+  extractedCharacters: number;
+  skipped: Array<{ name: string; status: 'unsupported' | 'failed'; reason: string }>;
+};
 
+// Delimiters and error messages are not source material and cannot satisfy readiness.
+export async function processAdditionalSources(sources: unknown, opts: unknown = {}): Promise<AdditionalSourcesResult> {
   const results = await Promise.all(
-    sources.map(async (sourceInput: AdditionalSource) => {
+    (Array.isArray(sources) ? sources : []).map(async (sourceInput: AdditionalSource) => {
       const src = asRecord(sourceInput);
-      let content: unknown = '';
+      const name = String(src.name || 'Unnamed source');
+      let outcome: SourceExtractionOutcome;
       try {
         if (src.type === 'url') {
-          content = await fetchContentFromURL(src.value, opts);
+          const text = (await fetchContentFromURL(src.value, opts)).trim();
+          outcome = text
+            ? { status: 'text', text }
+            : { status: 'failed', reason: 'No text was extracted. Paste the source text instead.' };
         } else if (src.type === 'file') {
-          content = await readFileContent(src.value as File);
-        } else if (src.type === 'photo') {
-          throw new Error('Photo sources must be analyzed before text extraction.');
+          outcome = await readFileContent(src.value as File);
+        } else {
+          outcome = {
+            status: 'unsupported',
+            reason:
+              src.type === 'photo'
+                ? 'Photo sources must be analyzed before text extraction.'
+                : 'Unsupported source type.',
+          };
         }
       } catch (error) {
-        content = `[Error reading source '${String(src.name)}': ${String(asRecord(error).message || '')}]`;
+        outcome = { status: 'failed', reason: String(asRecord(error).message || 'Could not read this source.') };
       }
-      return `\n\n--- Source: ${String(src.name)} ---\n\n${content}`;
+      return { name, outcome };
     }),
   );
-
-  return results.join('');
+  const result: AdditionalSourcesResult = { text: '', extractedCharacters: 0, skipped: [] };
+  for (const { name, outcome } of results) {
+    if (outcome.status === 'text') {
+      result.text += `\n\n--- Source: ${name} ---\n\n${outcome.text}`;
+      result.extractedCharacters += outcome.text.length;
+    } else {
+      result.skipped.push({ name, ...outcome });
+    }
+  }
+  return result;
 }

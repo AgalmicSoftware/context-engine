@@ -307,8 +307,12 @@ const dispatchAdminConfigWriter = async ({ writer, env, snapshot, persist }) => 
       }),
       getSessionSecrets: async () => ({}),
       putSessionSecrets: async () => undefined,
-      bootstrapLitChipotleSession: async ({ persistAuthorizationSecret }) => {
+      bootstrapLitChipotleSession: async ({ persistAuthorizationSecret, checkpointProvisioning }) => {
         const privateKey = await persistAuthorizationSecret(`0x${'11'.repeat(32)}`);
+        await checkpointProvisioning({
+          litActionCid: 'bafy-atomic-lit-action', litPkpId: 'atomic-test-pkp', litGroupId: 'atomic-test-group',
+          litUsageApiKey: 'atomic-test-usage', registeredAction: true, addedActionToGroup: true, addedPkpToGroup: true,
+        });
         return {
           ok: true,
           litCredentials: {

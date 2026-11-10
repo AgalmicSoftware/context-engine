@@ -199,7 +199,6 @@ export const resolveSurveyMissingRenderedResponseLookup = ({
 };
 
 export const executeSurveyResponsePrefill = ({
-  state = {},
   surveyIndex = 0,
   userAnswers = null,
   buildSliceFromUserAnswers = null,
@@ -209,7 +208,6 @@ export const executeSurveyResponsePrefill = ({
   recalculateEditStats = () => {},
   buildUpdatePlan = buildPrefilledSurveyUpdatePlan,
 }: {
-  state?: SurveyToolLikeState | null;
   surveyIndex?: number;
   userAnswers?: unknown;
   buildSliceFromUserAnswers?: ((userAnswers: unknown, prevSlice?: unknown) => unknown) | null;
@@ -247,7 +245,6 @@ export const executeSurveyResponsePrefill = ({
 };
 
 export const executeSurveySingleQuestionPrefill = ({
-  state = {},
   questionId = '',
   userAnswer = null,
   buildSliceFromUserAnswers = null,
@@ -257,7 +254,6 @@ export const executeSurveySingleQuestionPrefill = ({
   recalculateEditStats = () => {},
   buildUpdatePlan = buildPrefilledSingleQuestionUpdatePlan,
 }: {
-  state?: SurveyToolLikeState | null;
   questionId?: unknown;
   userAnswer?: unknown;
   buildSliceFromUserAnswers?: ((userAnswers: unknown, prevSlice?: unknown) => unknown) | null;
@@ -303,7 +299,6 @@ export const executeSurveyPriorResponseBackfill = ({
   getMissingRenderedResponseIdsForAccount = async () => ({ missingIds: [], slug: '', netId: '' }),
   setHydratingState = () => {},
   isMounted = false,
-  refreshQuestionResponses = null,
   readQuestionsCacheAsync = null,
   resetLocalCacheMemo = () => {},
   triggerRehydrate = () => {},
@@ -320,7 +315,6 @@ export const executeSurveyPriorResponseBackfill = ({
   getMissingRenderedResponseIdsForAccount?: (args: { responder: string; slug?: string | null }) => Promise<unknown>;
   setHydratingState?: (active: boolean) => void;
   isMounted?: boolean;
-  refreshQuestionResponses?: unknown;
   readQuestionsCacheAsync?: unknown;
   resetLocalCacheMemo?: () => void;
   triggerRehydrate?: () => void;
@@ -454,7 +448,7 @@ export const executeSurveyDraftHydration = ({
       surveyIndex,
       draft,
       prevSlice,
-      prevBaseline: nextState.editBaseline,
+      prevBaseline: nextProps.isResponsesCacheReady ? nextState.editBaseline : null,
       applyDraftEntryToSlice: applyDraftHydrationEntryToSlice,
     });
     const renderedQuestionIds = Array.isArray(draftRunPlan.renderedQuestionIds) ? draftRunPlan.renderedQuestionIds : [];
@@ -627,7 +621,6 @@ export const executeSurveyLocalCacheRehydrate = async ({
       cloneBaseline,
       buildDraftAwareCacheHydrationState,
       applyLocalCacheHydrationEntryToSlice,
-      debugLabel: '[Survey][rehydrateLocal]',
     };
     const rehydrationUpdatePlan = buildRehydrationUpdatePlan({
       ...planArgs,

@@ -17,7 +17,6 @@ export const createSurveyQuestionsRuntimeStateRuntime = (
     buildCanDecryptOtherResponsesState,
     buildQuestionIdScopeSignature,
     checkSponsoredAccess,
-    engine,
     evaluateCanDecryptPreCheck,
     getPendingStatsSnapshotFromState,
     getSessionSlugHintFromProps,
@@ -30,7 +29,6 @@ export const createSurveyQuestionsRuntimeStateRuntime = (
     setState,
     stateRef,
     surveyLog,
-    t,
   } = context;
   const {
     clearAutoDecryptSweepScheduling,

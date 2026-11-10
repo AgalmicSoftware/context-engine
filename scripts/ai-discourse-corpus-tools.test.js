@@ -1,6 +1,9 @@
 'use strict';
 
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
 const { test } = require('node:test');
 
 const {
@@ -92,6 +95,29 @@ test('freshness reports newest dated entry and staleness per sub-corpus', () => 
   later.corpuses.forEach((entry) => {
     assert.equal(entry.count >= entry.verified + entry.partiallyVerified, true);
   });
+});
+
+test('freshness at a past date ignores entries published after it', () => {
+  const rootDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ce-corpus-freshness-'));
+  try {
+    loadCorpusFiles().forEach((file) => {
+      const target = path.join(rootDir, file.relativePath);
+      fs.mkdirSync(path.dirname(target), { recursive: true });
+      fs.writeFileSync(target, JSON.stringify(file.corpusKey === 'tweets'
+        ? [{ id: 'past', date: '2026-09-20' }, { id: 'future', date: '2026-10-15' }]
+        : []));
+    });
+
+    const tweets = collectFreshness(rootDir, '2026-10-01').corpuses
+      .find((entry) => entry.corpus === 'tweets');
+
+    assert.equal(tweets.newest, '2026-09-20');
+    assert.equal(tweets.daysSinceNewest, 11);
+    assert.equal(tweets.last30Days, 1);
+    assert.equal(tweets.count, 2);
+  } finally {
+    fs.rmSync(rootDir, { recursive: true, force: true });
+  }
 });
 
 test('entry ids are globally unique across corpuses', () => {

@@ -45,7 +45,8 @@ describe('cryptoUtils poseidon helpers', () => {
       hasher,
     });
 
-    expect(hasher).toHaveBeenCalledTimes(1);
+    // Each input's limbs are folded in first; the last call hashes the two inputs.
+    expect(hasher.mock.calls.at(-1)[0]).toHaveLength(2);
     expect(field.poseidon).toBe(EXPECTED_POSEIDON_HEX);
   });
 
@@ -82,7 +83,7 @@ describe('cryptoUtils poseidon helpers', () => {
         hasher,
       });
 
-      expect(hasher).toHaveBeenCalledTimes(1);
+      expect(hasher).toHaveBeenCalled();
       expect(field.poseidon).toBe(EXPECTED_POSEIDON_HEX);
     }
   });

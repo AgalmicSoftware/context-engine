@@ -35,6 +35,10 @@ export interface DebateComment {
   id?: string;
   comment?: string;
   username?: string;
+  // A session atlas position: its name, and how many of those who answered hold it.
+  label?: string;
+  participantCount?: number;
+  participantTotal?: number;
   [key: string]: unknown;
 }
 
@@ -259,6 +263,12 @@ export interface DebateMapProps {
   onModalClose?: (() => void) | null;
   atlasLayoutMode?: AtlasLayoutMode;
   treeData?: DebateNode[] | null;
+  /** The link a node's copy button shares, when it is not the demo atlas's /atlas/<id>. */
+  buildNodeLink?: ((nodeId: string) => string) | null;
+  /** A question's own page, where it can be answered; its card in a node's panel opens it. */
+  buildQuestionLink?: ((questionId: string) => string) | null;
+  /** What each level of the tree is called, from the top; the demo atlas has four. */
+  levelLabels?: string[];
 }
 
 export interface AtlasChromeProps {
@@ -303,6 +313,8 @@ export interface ModalProps {
   copied: boolean;
   onCopy: () => void;
   onTagClick?: ((tag: string) => void) | null;
+  buildQuestionLink?: ((questionId: string) => string) | null;
+  levelLabels?: string[];
 }
 
 export interface SuggestNodeModalProps {

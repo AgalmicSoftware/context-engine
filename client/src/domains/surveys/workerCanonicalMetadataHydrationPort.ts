@@ -1,3 +1,9 @@
+import { optionsOf } from '../../../../shared/questions/answerValue.mjs';
+import {
+  DEFAULT_RATING_SCALE,
+  normalizeRatingScale,
+  ratingStepFor,
+} from '../../../../shared/questions/ratingScale.mjs';
 import { peekCacheSync } from '../../utilities/cache/cacheScripts';
 import { questionIdMatchesContent } from '../../utilities/shared/questionUtils.mjs';
 import { canonicalizeSessionSlug } from '../../utilities/session/canonicalSessionContext';
@@ -51,7 +57,7 @@ export type WorkerCanonicalMetadataRow = {
   uploadAuthority?: string | null;
 };
 
-// An admin hid this id on the Worker; merges drop any cached copy.
+// An admin hid this id on the Worker; merges retain a tombstone.
 export type WorkerCanonicalHiddenMetadataRow = {
   hidden: true;
   id: string;
@@ -59,15 +65,22 @@ export type WorkerCanonicalHiddenMetadataRow = {
 
 export type WorkerCanonicalMetadataEntry = WorkerCanonicalMetadataRow | WorkerCanonicalHiddenMetadataRow;
 
+export type WorkerCanonicalMetadataListing = {
+  rows: WorkerCanonicalMetadataEntry[];
+  listedStorageRefIds: ReadonlySet<string>;
+};
+
+type WorkerCanonicalMetadataMergeInput = WorkerCanonicalMetadataEntry[] | WorkerCanonicalMetadataListing;
+
 export type WorkerCanonicalMetadataHydrationPort = {
   loadQuestions: (
     input?: WorkerCanonicalMetadataHydrationInput,
     deps?: WorkerCanonicalMetadataHydrationDeps,
-  ) => Promise<WorkerCanonicalMetadataEntry[]>;
+  ) => Promise<WorkerCanonicalMetadataListing>;
   loadSurveys: (
     input?: WorkerCanonicalMetadataHydrationInput,
     deps?: WorkerCanonicalMetadataHydrationDeps,
-  ) => Promise<WorkerCanonicalMetadataEntry[]>;
+  ) => Promise<WorkerCanonicalMetadataListing>;
 };
 
 type CachedVersion = {
@@ -83,6 +96,7 @@ const MAX_METADATA_LIST_PAGES = 50;
 const METADATA_LIST_PAGE_SIZE = 100;
 const MAX_METADATA_ITEMS = MAX_METADATA_LIST_PAGES * METADATA_LIST_PAGE_SIZE;
 const METADATA_READ_CONCURRENCY = 8;
+const METADATA_LISTING_GRACE_MS = 10 * 60 * 1000;
 
 const isRecord = (value: unknown): value is UnknownRecord =>
   !!value && typeof value === 'object' && !Array.isArray(value);
@@ -259,7 +273,7 @@ const loadWorkerCanonicalMetadata = async (
   resource: WorkerCanonicalMetadataResource,
   input: WorkerCanonicalMetadataHydrationInput = {},
   deps: WorkerCanonicalMetadataHydrationDeps = {},
-): Promise<WorkerCanonicalMetadataEntry[]> => {
+): Promise<WorkerCanonicalMetadataListing> => {
   const target = resolveWorkerCanonicalStorageTarget({
     sessionConfig: input.sessionConfig,
     sessionSlug: input.sessionSlug,
@@ -304,7 +318,11 @@ const loadWorkerCanonicalMetadata = async (
   const cachedStorageRefIds = readCachedStorageRefIds(
     resource,
     input.sessionSlug,
-    resolveWorkerCanonicalCacheIdentity({ sessionConfig: target.sessionConfig, sessionSlug: target.sessionSlug }),
+    resolveWorkerCanonicalCacheIdentity({
+      sessionConfig: target.sessionConfig,
+      sessionSlug: target.sessionSlug,
+      reader: input.account,
+    }),
   );
   const hiddenIds = new Set<string>();
   const uniqueItems: ListedStorageRef[] = [];
@@ -378,7 +396,10 @@ const loadWorkerCanonicalMetadata = async (
         compareStorageIds(left.storageRefId, right.storageRefId) ||
         compareStorageIds(left.id, right.id),
     );
-  return [...[...hiddenIds].map((id): WorkerCanonicalHiddenMetadataRow => ({ hidden: true, id })), ...rows];
+  return {
+    rows: [...[...hiddenIds].map((id): WorkerCanonicalHiddenMetadataRow => ({ hidden: true, id })), ...rows],
+    listedStorageRefIds: seenStorageRefs,
+  };
 };
 
 const createWorkerQuestionCacheNode = (): UnknownRecord => ({
@@ -393,6 +414,7 @@ const createWorkerQuestionCacheNode = (): UnknownRecord => ({
   arweaveTxFailureCache: {},
   questionHydrationMeta: {},
   workerQuestionMetadataRefs: {},
+  workerQuestionMetadataTombstones: {},
 });
 
 const createWorkerSurveyCacheNode = (): UnknownRecord => ({
@@ -402,6 +424,7 @@ const createWorkerSurveyCacheNode = (): UnknownRecord => ({
   surveyResponsesLatestBlock: {},
   pendingSurveyMetadata: {},
   workerSurveyMetadataRefs: {},
+  workerSurveyMetadataTombstones: {},
 });
 
 const readCachedVersion = (ref: unknown, verifyCachedItem: () => boolean | null): CachedVersion | null => {
@@ -418,28 +441,57 @@ const readCachedVersion = (ref: unknown, verifyCachedItem: () => boolean | null)
 };
 
 const mergeMetadataEntries = ({
-  entries,
+  listing,
+  tombstones,
   items,
   pending,
   refs,
   toItem,
   verify,
 }: {
-  entries: WorkerCanonicalMetadataEntry[];
+  listing: WorkerCanonicalMetadataMergeInput;
+  tombstones: UnknownRecord;
   items: UnknownRecord;
   pending: UnknownRecord;
   refs: UnknownRecord;
   toItem: (row: WorkerCanonicalMetadataRow, base: UnknownRecord) => UnknownRecord;
   verify: (id: string, payload: UnknownRecord) => boolean | null;
 }): void => {
+  const entries = Array.isArray(listing) ? listing : listing.rows;
   const hiddenIds = new Set(entries.filter(isHiddenEntry).map((entry) => entry.id));
+  // Only a complete catalog can undo a hide; empty local merges preserve it.
+  if (!Array.isArray(listing)) {
+    Object.keys(tombstones).forEach((id) => {
+      if (!hiddenIds.has(id)) delete tombstones[id];
+    });
+    const oldestRecentWrite = Date.now() - METADATA_LISTING_GRACE_MS;
+    // Remove inaccessible winners before comparing incoming versions, so an
+    // older accessible upload can become current. KV may lag recent writes.
+    new Set([...Object.keys(items), ...Object.keys(refs)]).forEach((id) => {
+      const ref = isRecord(refs[id]) ? refs[id] : {};
+      const item = isRecord(items[id]) ? items[id] : {};
+      const storageRef = isRecord(item.storageRef) ? item.storageRef : {};
+      const storageRefId = readString(ref.storageRefId || storageRef.id);
+      const createdAtMs = Number(ref.createdAtMs || item.createdAtMs || Date.parse(readString(storageRef.createdAt)));
+      if (
+        !storageRefId ||
+        listing.listedStorageRefIds.has(storageRefId) ||
+        Object.prototype.hasOwnProperty.call(pending, id) ||
+        createdAtMs >= oldestRecentWrite
+      )
+        return;
+      delete items[id];
+      delete refs[id];
+    });
+  }
   hiddenIds.forEach((id) => {
+    tombstones[id] = true;
     delete items[id];
     delete refs[id];
     delete pending[id];
   });
   entries.forEach((entry) => {
-    if (isHiddenEntry(entry) || hiddenIds.has(entry.id)) return;
+    if (isHiddenEntry(entry) || tombstones[entry.id] === true) return;
     const existing = isRecord(items[entry.id]) ? (items[entry.id] as UnknownRecord) : null;
     const current = readCachedVersion(refs[entry.id], () => (existing ? verify(entry.id, existing) : null));
     const candidate: CachedVersion = {
@@ -461,7 +513,7 @@ const mergeMetadataEntries = ({
 
 export const mergeWorkerCanonicalQuestionMetadata = (
   current: unknown,
-  rows: WorkerCanonicalMetadataEntry[],
+  rows: WorkerCanonicalMetadataMergeInput,
   identity: WorkerCanonicalCacheIdentity,
 ): UnknownRecord => {
   const next = isRecord(current) ? { ...current } : {};
@@ -475,13 +527,22 @@ export const mergeWorkerCanonicalQuestionMetadata = (
   const questions = isRecord(network.questions) ? { ...network.questions } : {};
   const pending = isRecord(network.pendingQuestionMetadata) ? { ...network.pendingQuestionMetadata } : {};
   const refs = isRecord(network.workerQuestionMetadataRefs) ? { ...network.workerQuestionMetadataRefs } : {};
+  const tombstones = isRecord(network.workerQuestionMetadataTombstones)
+    ? { ...network.workerQuestionMetadataTombstones }
+    : {};
 
   mergeMetadataEntries({
-    entries: rows,
+    listing: rows,
+    tombstones,
     items: questions,
     pending,
     refs,
-    toItem: (row, base) => ({ ...base, ...row.payload, id: row.id }),
+    toItem: (row, base) => ({
+      ...base,
+      ...row.payload,
+      id: row.id,
+      ...(Object.hasOwn(row.payload, 'options') ? { options: optionsOf(row.payload) } : {}),
+    }),
     verify: questionPayloadMatchesId,
   });
 
@@ -492,6 +553,7 @@ export const mergeWorkerCanonicalQuestionMetadata = (
       questions,
       pendingQuestionMetadata: pending,
       workerQuestionMetadataRefs: refs,
+      workerQuestionMetadataTombstones: tombstones,
     },
     identity,
   );
@@ -500,7 +562,7 @@ export const mergeWorkerCanonicalQuestionMetadata = (
 
 export const mergeWorkerCanonicalSurveyMetadata = (
   current: unknown,
-  rows: WorkerCanonicalMetadataEntry[],
+  rows: WorkerCanonicalMetadataMergeInput,
   identity: WorkerCanonicalCacheIdentity,
 ): UnknownRecord => {
   const next = isRecord(current) ? { ...current } : {};
@@ -514,9 +576,13 @@ export const mergeWorkerCanonicalSurveyMetadata = (
   const surveys = isRecord(network.surveys) ? { ...network.surveys } : {};
   const pending = isRecord(network.pendingSurveyMetadata) ? { ...network.pendingSurveyMetadata } : {};
   const refs = isRecord(network.workerSurveyMetadataRefs) ? { ...network.workerSurveyMetadataRefs } : {};
+  const tombstones = isRecord(network.workerSurveyMetadataTombstones)
+    ? { ...network.workerSurveyMetadataTombstones }
+    : {};
 
   mergeMetadataEntries({
-    entries: rows,
+    listing: rows,
+    tombstones,
     items: surveys,
     pending,
     refs,
@@ -531,6 +597,7 @@ export const mergeWorkerCanonicalSurveyMetadata = (
       surveys,
       pendingSurveyMetadata: pending,
       workerSurveyMetadataRefs: refs,
+      workerSurveyMetadataTombstones: tombstones,
     },
     identity,
   );
@@ -540,22 +607,28 @@ export const mergeWorkerCanonicalSurveyMetadata = (
 export const loadWorkerCanonicalQuestions = (
   input: WorkerCanonicalMetadataHydrationInput = {},
   deps: WorkerCanonicalMetadataHydrationDeps = {},
-): Promise<WorkerCanonicalMetadataEntry[]> => loadWorkerCanonicalMetadata(STORAGE_RESOURCE_KEYS.QUESTIONS, input, deps);
+): Promise<WorkerCanonicalMetadataListing> => loadWorkerCanonicalMetadata(STORAGE_RESOURCE_KEYS.QUESTIONS, input, deps);
 
 export const loadWorkerCanonicalSurveys = (
   input: WorkerCanonicalMetadataHydrationInput = {},
   deps: WorkerCanonicalMetadataHydrationDeps = {},
-): Promise<WorkerCanonicalMetadataEntry[]> => loadWorkerCanonicalMetadata(STORAGE_RESOURCE_KEYS.SURVEYS, input, deps);
+): Promise<WorkerCanonicalMetadataListing> => loadWorkerCanonicalMetadata(STORAGE_RESOURCE_KEYS.SURVEYS, input, deps);
 
 // The authoring inputs a question id is hashed from, compared exactly: the
 // hash trims and lowercases the prompt, skips options for most types and joins
 // multichoice options with commas, so equal ids can hide different questions.
 // Surrounding spaces in the prompt or options are ignored, as the hash ignores
 // them, and voice credits may be stored as text ("120"); everything else,
-// including case, must match.
+// including case, must match. The id leaves out a rating's scale, so the scale
+// is compared here: a different scale is a different question.
 const trimText = (value: unknown): unknown => (typeof value === 'string' ? value.trim() : value);
 const readVoiceCredits = (value: unknown): number =>
   value == null ? 99 : typeof value === 'number' || typeof value === 'string' ? Number(value) : NaN;
+const readRatingMeaning = (payload: UnknownRecord): unknown[] | null => {
+  if (payload.type !== 'rating') return null;
+  const { min, max, minLabel, maxLabel } = normalizeRatingScale(payload) || DEFAULT_RATING_SCALE;
+  return [min, max, ratingStepFor(payload), minLabel, maxLabel];
+};
 const readQuestionAuthoringInputs = (payload: UnknownRecord): string =>
   JSON.stringify([
     payload.type,
@@ -563,6 +636,7 @@ const readQuestionAuthoringInputs = (payload: UnknownRecord): string =>
     Array.isArray(payload.options) ? payload.options.map(trimText) : [],
     !!(payload.singleSelect || payload.oneSelectionOnly),
     readVoiceCredits(payload.voiceCredits),
+    readRatingMeaning(payload),
   ]);
 
 // Loads the session's questions once and returns a check for whether readers
@@ -587,6 +661,7 @@ export const loadWorkerCanonicalQuestionMatcher = async (
   const identity = resolveWorkerCanonicalCacheIdentity({
     sessionConfig: target.sessionConfig,
     sessionSlug: target.sessionSlug,
+    reader: input.account,
   });
   const node = mergeWorkerCanonicalQuestionMetadata(cache, rows, identity)[WORKER_CANONICAL_CACHE_SCOPE_KEY];
   const questions = isRecord(node) && isRecord(node.questions) ? node.questions : {};

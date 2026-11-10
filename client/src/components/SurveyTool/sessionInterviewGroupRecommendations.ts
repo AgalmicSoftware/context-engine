@@ -10,7 +10,7 @@ import {
   type WorkerGroup,
   type WorkerGroupMembership,
 } from '../../domains/worker/workerGroupPorts';
-import type { InterviewDraftResponse, InterviewPrefillPacket } from './sessionInterview';
+import type { InterviewDraftResponse, InterviewPrefillPacket, InterviewQuestion } from './sessionInterview';
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -104,6 +104,8 @@ const MAX_PROMPT_CONTEXT_CHARS = 1600;
 const MAX_PROMPT_DRAFTS = 12;
 const MAX_PROMPT_GROUPS = 100;
 const MAX_RECOMMENDATIONS = 4;
+// callAI has no timeout of its own; a stalled call must not hold back the exact-name matches.
+export const INTERVIEW_GROUP_AI_TIMEOUT_MS = 30_000;
 
 const chunkCandidates = <T>(items: T[], size: number): T[][] => {
   const chunks: T[][] = [];
@@ -509,6 +511,39 @@ const classifyRecommendationError = (error: unknown): InterviewGroupRecommendati
   return 'ai_recommendation_failed';
 };
 
+// Group names and options compare without case or extra spacing: "D/acc " names group "d/acc".
+const nameKey = (value: unknown): string => lower(value).replace(/\s+/g, ' ');
+
+/**
+ * Open groups named exactly like an option the person chose, or their AI drafted, on a
+ * single-choice question. These need no AI call: choosing "d/acc" suggests group "d/acc".
+ */
+export const matchInterviewGroupsByAnswer = ({
+  candidates,
+  draftResponses = [],
+  questions = [],
+}: {
+  candidates: InterviewGroupCandidate[];
+  draftResponses?: InterviewDraftResponse[];
+  questions?: InterviewQuestion[];
+}): InterviewGroupRecommendation[] => {
+  const singleChoice = new Set(
+    questions
+      .filter((question) => question.type === 'multichoice' && question.singleSelect === true)
+      .map((question) => lower(question.id)),
+  );
+  const groups = new Map(candidates.map((group) => [nameKey(group.label), group]));
+  const matches: InterviewGroupRecommendation[] = [];
+  for (const draft of draftResponses) {
+    if (!singleChoice.has(lower(draft.questionId))) continue;
+    const choice = toText(Array.isArray(draft.answer) && draft.answer.length === 1 ? draft.answer[0] : draft.answer);
+    const group = choice ? groups.get(nameKey(choice)) : undefined;
+    if (!group || matches.some((match) => match.groupId === group.groupId)) continue;
+    matches.push({ groupId: group.groupId, reason: `You chose “${choice}”.`, evidence: '' });
+  }
+  return matches;
+};
+
 export const recommendInterviewGroups = async ({
   candidates,
   transcript,
@@ -527,8 +562,17 @@ export const recommendInterviewGroups = async ({
   });
   const recommendations: InterviewGroupRecommendation[] = [];
   const seen = new Set<string>();
-  try {
+  let timedOut = false;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      timedOut = true;
+      reject(new Error('Group suggestions timed out.'));
+    }, INTERVIEW_GROUP_AI_TIMEOUT_MS);
+  });
+  const collect = async () => {
     for (const candidateChunk of chunkCandidates(eligible, MAX_PROMPT_GROUPS)) {
+      if (timedOut) return;
       const raw = await callAI(
         buildInterviewGroupRecommendationPrompt({
           candidates: candidateChunk,
@@ -553,11 +597,16 @@ export const recommendInterviewGroups = async ({
         recommendations.push(recommendation);
       });
     }
+  };
+  try {
+    await Promise.race([timeout, collect()]);
     return {
       status: 'ready',
       recommendations: recommendations.slice(0, MAX_RECOMMENDATIONS),
     };
   } catch (error) {
     return { status: 'unavailable', recommendations: [], reason: classifyRecommendationError(error) };
+  } finally {
+    clearTimeout(timer);
   }
 };

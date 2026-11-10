@@ -9,7 +9,6 @@ import {
 } from '../../domains/sessions/publish/sessionPublishDispatch.js';
 import type { SessionPublishEffect } from '../../domains/sessions/publish/sessionPublishReducer.js';
 import type { AnyRecord } from '../shellTypes';
-import type { SessionWizardWorkerDeployRuntime } from './hooks/useSessionWizardWorkerDeploy';
 import {
   resolveSessionWizardRegisterStepRequest,
   resolveSessionWizardWorkerPublishSuccessSettlementDescriptor,
@@ -33,10 +32,6 @@ import {
 import { canonicalizeSessionWizardJson, fingerprintSessionWizardJson } from './sessionWizardCanonicalJson';
 import { buildSessionWizardWorkerLimits, validateSessionWizardWorkerLimits } from './sessionWizardWorkerRuntimeSupport';
 
-type RuntimeRef = {
-  current: SessionWizardWorkerDeployRuntime | null;
-};
-
 type PublishExecutionPlan = SessionWizardPublishExecutionPlanLike & {
   shouldRegisterSession?: boolean;
   shouldRefreshRegistryCache?: boolean;
@@ -55,7 +50,6 @@ type PublishRuntimeCallbacks = {
   }) => unknown;
   writeSessionWizardWorkerSettlement: (input: SessionWizardWorkerSettlementInput) => unknown;
   setSessionId: (value: string) => unknown;
-  setSessionIdStatus: (value: string) => unknown;
 };
 
 const requireSuccessfulDurableStorageOperation = (result: unknown, message: string): void => {
@@ -74,7 +68,6 @@ const fingerprintCanonicalValue = (value: unknown): string =>
   fingerprintSessionWizardJson('context-engine:worker-publish-config:v1', value);
 
 type PublishRuntimeControllerOptions = {
-  runtimeRef: RuntimeRef;
   dispatch: SessionPublishDispatch;
   getErrorMessage: SessionPublishErrorMessageReader;
   deployWorker: SessionWizardPublishControllerPorts['deployWorker'];
@@ -140,7 +133,6 @@ const createEffectRunner =
     });
 
 export const createSessionWizardPublishRuntimeController = ({
-  runtimeRef,
   dispatch,
   getErrorMessage,
   deployWorker,
@@ -411,7 +403,6 @@ export const createSessionWizardPublishRuntimeController = ({
       'Could not durably clear the published session draft',
     );
     callbacks.setSessionId(generateSessionId());
-    callbacks.setSessionIdStatus(workerSettlement.nextSessionIdStatus);
   };
 
   return { runPreparation, settleRegistration };

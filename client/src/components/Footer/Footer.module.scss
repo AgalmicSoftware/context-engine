@@ -157,7 +157,6 @@
       justify-self: flex-end;
       font-family: inherit;
       font-size: var(--ce-footer-copyright-font-size-wide);
-      color: color-mix(in srgb, var(--ce-text-inverse) 37%, transparent);
     }
     nav {
       ul {
@@ -188,6 +187,7 @@
   background: var(--ce-footer-bar-bg);
   .copyright {
     font-size: var(--ce-footer-copyright-font-size);
+    color: var(--ce-panel-text-muted);
   }
 }
 
@@ -245,7 +245,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: color-mix(in srgb, var(--ce-text-inverse) 62%, transparent);
+  color: var(--ce-panel-text);
   background: transparent;
   border: 0;
   border-radius: var(--ce-radius-pill);
@@ -261,7 +261,7 @@
 
 .githubLink:hover,
 .githubLink:focus {
-  color: var(--ce-color-info);
+  color: var(--ce-link);
   opacity: 1;
   transform: translateY(-1px);
 }

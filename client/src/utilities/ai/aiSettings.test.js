@@ -52,9 +52,10 @@ describe('aiSettings secret resolution', () => {
     );
   };
 
-  it('defaults both interactive and group-analysis model lanes to Terra with low effort', async () => {
+  it('defaults local settings to Terra and Sol, and a session that stores no models to Terra', async () => {
     seedSessionAiSettings({});
-    expect(getLocalAiSettings().models).toEqual({ fast: 'gpt-5.6-terra', thinking: 'gpt-5.6-terra' });
+    expect(getLocalAiSettings().models).toEqual({ fast: 'gpt-6.1-terra', thinking: 'gpt-6.1-sol' });
+    // The Worker allows its fallback model, Terra, on both lanes of such a session.
     for (const thinking of [false, true]) {
       const config = await getEffectiveAiConfig({
         sessionSlug: '',
@@ -62,8 +63,61 @@ describe('aiSettings secret resolution', () => {
         thinking,
         resolveSecrets: false,
       });
-      expect(config).toMatchObject({ model: 'gpt-5.6-terra', provider: 'openai', reasoningEffort: 'low' });
+      expect(config).toMatchObject({ model: 'gpt-6.1-terra', provider: 'openai', reasoningEffort: 'low' });
     }
+  });
+
+  it('names no model for a lane the session leaves empty, so each Worker applies its own fallback', async () => {
+    const requestModels = async (ai) => {
+      seedSessionAiSettings(ai);
+      const config = (thinking) =>
+        getEffectiveAiConfig({ sessionSlug: '', preferLocal: false, thinking, resolveSecrets: false });
+      return [(await config(false)).requestModel, (await config(true)).requestModel];
+    };
+    // An older Worker refuses today's default, so a session that stores no model sends none.
+    expect(await requestModels({})).toEqual(['', '']);
+    expect(await requestModels({ models: { fast: { provider: 'openai', model: 'gpt-5.6-terra' } } })).toEqual([
+      'gpt-5.6-terra',
+      '',
+    ]);
+    expect(await requestModels({ model: 'gpt-5.6-terra' })).toEqual(['gpt-5.6-terra', 'gpt-5.6-terra']);
+    const explicit = await getEffectiveAiConfig({
+      sessionSlug: '',
+      preferLocal: false,
+      model: 'gpt-6-luna',
+      resolveSecrets: false,
+    });
+    expect(explicit.requestModel).toBe('gpt-6-luna');
+  });
+
+  it('moves a saved preset to its current models, and a removed preset to the default', () => {
+    const save = (settings) =>
+      localStorage.setItem(
+        AI_SETTINGS_STORAGE_KEY,
+        JSON.stringify({ v: 1, kind: AI_SETTINGS_ENVELOPE_KIND, settings }),
+      );
+    save({
+      useLocal: true,
+      preset: 'claude-sonnet',
+      mode: 'anthropic',
+      models: { fast: 'claude-sonnet-4-6', thinking: 'claude-sonnet-4-6' },
+    });
+    expect(getLocalAiSettings()).toMatchObject({
+      preset: 'claude-sonnet',
+      mode: 'anthropic',
+      models: { fast: 'claude-sonnet-5-5', thinking: 'claude-sonnet-5-5' },
+    });
+    for (const preset of ['gpt-5', 'gpt-4o', 'gpt-5.6-terra']) {
+      save({ useLocal: true, preset, mode: 'openai', models: { fast: preset, thinking: preset } });
+      expect(getLocalAiSettings()).toMatchObject({
+        preset: 'gpt-6.1-terra',
+        mode: 'openai',
+        models: { fast: 'gpt-6.1-terra', thinking: 'gpt-6.1-sol' },
+      });
+    }
+    // Custom choices keep their models.
+    save({ useLocal: true, preset: 'custom', mode: 'openai', models: { fast: 'gpt-5', thinking: 'gpt-5' } });
+    expect(getLocalAiSettings()).toMatchObject({ preset: 'custom', models: { fast: 'gpt-5', thinking: 'gpt-5' } });
   });
 
   const seedEncryptedLocalOpenAiSettings = ({ useLocal = true } = {}) => {
@@ -246,7 +300,7 @@ describe('aiSettings secret resolution', () => {
     expect(getLocalAiSettings()).toEqual(
       expect.objectContaining({
         useLocal: true,
-        preset: 'gpt-5.6-terra',
+        preset: 'gpt-6.1-terra',
         mode: 'openai',
         providers: expect.objectContaining({
           openai: expect.objectContaining({
@@ -256,7 +310,7 @@ describe('aiSettings secret resolution', () => {
       }),
     );
     expect(cfg.provider).toBe('openai');
-    expect(cfg.model).toBe('gpt-5.6-terra');
+    expect(cfg.model).toBe('gpt-6.1-terra');
     expect(cfg.apiKey).toBe('sk-open-test');
     expect(cfg.apiKeySource).toBe('local');
   });
@@ -287,7 +341,7 @@ describe('aiSettings secret resolution', () => {
       }),
     );
     expect(cfg.provider).toBe('anthropic');
-    expect(cfg.model).toBe('claude-sonnet-4-6');
+    expect(cfg.model).toBe('claude-sonnet-5-5');
     expect(cfg.apiKey).toBe('sk-ant-test');
     expect(cfg.apiKeySource).toBe('local');
   });

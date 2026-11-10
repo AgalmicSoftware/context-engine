@@ -15,7 +15,6 @@ type ResolveSbtListRegistryRetryPlanArgs = {
   delayStepMs?: unknown;
   maxAttempts?: unknown;
   maxDelayMs?: unknown;
-  shouldExpectRegistryUniverse?: unknown;
   snapshot?: SbtListRegistryRetrySnapshot | null;
 };
 
@@ -32,18 +31,13 @@ export const resolveSbtListRegistryRetryPlan = ({
   delayStepMs = 1500,
   maxAttempts = 4,
   maxDelayMs = 8000,
-  shouldExpectRegistryUniverse = false,
   snapshot = null,
 }: ResolveSbtListRegistryRetryPlanArgs = {}): SbtListRegistryRetryPlan => {
   const currentAttempt = Math.max(0, Math.floor(Number(attempt || 0)));
   const normalizedMaxAttempts = normalizePositiveInteger(maxAttempts, 4);
   const normalizedDelayStepMs = normalizePositiveInteger(delayStepMs, 1500);
   const normalizedMaxDelayMs = normalizePositiveInteger(maxDelayMs, 8000);
-  const pending = !!(
-    shouldExpectRegistryUniverse &&
-    Number(snapshot?.registryEntryCount || 0) <= 0 &&
-    !snapshot?.registryHydrated
-  );
+  const pending = Number(snapshot?.registryEntryCount || 0) <= 0 && !snapshot?.registryHydrated;
 
   if (!pending || currentAttempt >= normalizedMaxAttempts) {
     return {

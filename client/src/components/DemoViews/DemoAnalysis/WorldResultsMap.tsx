@@ -1,4 +1,4 @@
-import React, { memo, useMemo } from 'react';
+import { memo, useMemo } from 'react';
 import { ComposableMap, Geographies, Geography, Graticule, Sphere } from 'react-simple-maps';
 import styles from './DemoAnalysisWorkspace.module.scss';
 

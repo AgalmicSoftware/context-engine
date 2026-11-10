@@ -176,8 +176,9 @@ export const buildQuestionRoutePath = (questionId: unknown, opts: QuestionRouteO
   const sessionSlug = normalizeSlug(opts.sessionSlug ?? '');
   const base = `/question/${qid}`;
   const params = new URLSearchParams();
-  if (sessionSlug) {
-    params.set('session', sessionSlug);
+  // Empty is an explicit General pin; null and undefined leave discovery available.
+  if (opts.sessionSlug != null) {
+    params.set('session', sessionSlug || 'general');
   } else if (sessionId) {
     params.set('sessionId', sessionId);
   }

@@ -67,6 +67,8 @@ export const benchmarkFamilyId = (value) => String(value || '')
   .trim();
 
 export const mergeRunsFiles = (runsFiles) => {
+  // Completed runs share measurement semantics, not execution schedules.
+  // Resume still binds the seed and repeat depth in hashRunResumeContract.
   assertCompatibleManifestFields(runsFiles, 'run', [
     'harnessVersion',
     'harnessCommit',
@@ -76,7 +78,6 @@ export const mergeRunsFiles = (runsFiles) => {
     'mode',
     'personaId',
     'personaProfileHash',
-    'scheduleSeed',
   ]);
   const runs = (runsFiles || []).flatMap((runsFile) => runsFile.runs || []);
   (runsFiles || []).forEach((runsFile, index) => {

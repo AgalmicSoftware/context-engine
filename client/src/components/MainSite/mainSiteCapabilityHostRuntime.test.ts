@@ -56,10 +56,33 @@ describe('initializeMainSiteWorkerCanonicalCachesForGroup', () => {
     await expect(initialization).resolves.toBe(true);
   });
 
-  it('leaves saved answers unready with error flags when the Worker response load fails', async () => {
+  it('leaves saved answers unready without blaming the questions when the Worker response load fails', async () => {
     const host = createHost(async () => {
       throw new Error('Response listing failed');
     });
+    const logError = jest.fn();
+
+    await initializeMainSiteWorkerCanonicalCachesForGroup(
+      host as unknown as AppShell,
+      'worker-init',
+      { resetReadiness: true },
+      logError,
+    );
+
+    expect(logError).not.toHaveBeenCalled();
+    expect(host.initializeSurveyCacheForGroup).toHaveBeenCalledTimes(1);
+    expect(host.state).toMatchObject({
+      isSurveyCacheReady: true,
+      isSBTCacheReady: true,
+      isResponsesCacheReady: false,
+      questionCacheInitializationError: false,
+      surveyCacheInitializationError: false,
+    });
+  });
+
+  it('leaves saved answers unready with error flags when the Worker question load fails', async () => {
+    const host = createHost(async () => {});
+    host.initializeQuestionCacheForGroup.mockRejectedValueOnce(new Error('Question listing failed'));
     const logError = jest.fn();
 
     await initializeMainSiteWorkerCanonicalCachesForGroup(

@@ -247,10 +247,7 @@ const getParticipantIdentityKey = (participant: DemoAnalysisParticipant = {}, fa
   return String(fallbackKey || '').trim();
 };
 
-const getParticipantSegments = (
-  participant: DemoAnalysisParticipant = {},
-  metadata: DemoAnalysisMetadata = {},
-): ParticipantSegment[] => {
+const getParticipantSegments = (metadata: DemoAnalysisMetadata = {}): ParticipantSegment[] => {
   const segments: ParticipantSegment[] = [{ segmentKey: 'All', category: 'All', value: 'All' }];
   DEMO_ANALYSIS_DEMOGRAPHIC_DIMENSIONS.forEach(({ label, field }) => {
     const value = String(metadata?.[field] || '').trim();
@@ -364,7 +361,7 @@ export const buildDemoAnalysisData = (
 
       const participantKey = getParticipantIdentityKey(participant, `row:${participantIndex}`);
       const profileDescriptor = buildParticipantProfileDescriptor(participant);
-      const segments = getParticipantSegments(participant, metadata);
+      const segments = getParticipantSegments(metadata);
       segments.forEach(({ segmentKey }) => {
         incrementMapCount(denominatorsBySegment, segmentKey);
         if (!responseCountsBySegment.has(segmentKey)) {

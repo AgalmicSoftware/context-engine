@@ -1,18 +1,5 @@
 import type { ContractScriptsMethodMap, ContractScriptsRuntimeDeps } from './contractScripts.runtimeDeps.js';
 
-type SbtReadProviderRef = string | Record<string, unknown>;
-type SbtReadGroupKeyOrConfig = string | Record<string, unknown> | null | undefined;
-type SbtReadOptions = { allowInjectedReadFallback?: boolean; [key: string]: unknown };
-type SbtMintBurnCountsByAddressResult = {
-  mintedCountByAddress: Record<string, number>;
-  burnedCountByAddress: Record<string, number>;
-  mintedEventCount?: number;
-  burnedEventCount?: number;
-  scannedToBlock?: number | null;
-  ok?: boolean;
-  [key: string]: unknown;
-};
-
 export const createContractScriptsSbtRegistryMethods = (deps: ContractScriptsRuntimeDeps): ContractScriptsMethodMap => {
   const {
     CUSTOM_SBT_ABI,
@@ -53,7 +40,6 @@ export const createContractScriptsSbtRegistryMethods = (deps: ContractScriptsRun
     rpcLog,
     runWithSoftTimeout,
     sendContractWriteViaProvider,
-    utils,
   } = deps;
 
   return {
@@ -320,6 +306,12 @@ export const createContractScriptsSbtRegistryMethods = (deps: ContractScriptsRun
         });
         return receipt;
       } catch (error: any) {
+        // A sent deploy whose result is unknown may have succeeded, so a retry could
+        // deploy a second SBT: keep its hash and its fixed, cause-free wording.
+        if (error?.receiptUnknown === true) {
+          notify.error(error.message);
+          throw error;
+        }
         const normalizedError = useConfiguredDeterministic
           ? maybeWrapUnsupportedConfiguredDeterministicFactoryError(error, addr)
           : error;
@@ -750,79 +742,6 @@ export const createContractScriptsSbtRegistryMethods = (deps: ContractScriptsRun
       }
     },
 
-    getSBTsByUserAddress: async function (
-      providerName: any,
-      userAddress: any,
-      fromBlock: any = null,
-      groupKeyOrCfg: any = null,
-    ) {
-      // Per-group base window + clamp caller override (fromBlock only)
-      const { fromBlock: baseFrom } = await this.getRelevantBlockWindowForFilter(
-        groupKeyOrCfg,
-        SBT_READ_PROVIDER_OPTIONS,
-      );
-      const fromBlockNum = Number.isFinite(Number(fromBlock)) ? Math.max(Number(fromBlock), baseFrom) : baseFrom;
-
-      const sbts = await this.getSbtsCreated('none', fromBlockNum, 'latest', groupKeyOrCfg);
-      try {
-        const holdings = await this.getUserSbtNetHoldings(
-          'none',
-          userAddress,
-          { fromBlock: fromBlockNum },
-          groupKeyOrCfg,
-        );
-        const heldSet = new Set(
-          (Array.isArray(holdings?.addresses) ? holdings.addresses : [])
-            .map((address: any) => normalizeAddress(address))
-            .filter(Boolean),
-        );
-        if (heldSet.size > 0) {
-          return sbts.filter((sbt: any) => heldSet.has(normalizeAddress(sbt?.sbtAddress || '')));
-        }
-        return [];
-      } catch (error: any) {
-        contractsLog.warn(
-          '[getSBTsByUserAddress] holdings lookup failed; falling back to per-SBT checks:',
-          error?.message || error,
-        );
-      }
-
-      let claimedSBTs: any[] = [];
-      for (let sbt of sbts) {
-        const userHasClaimed = await this.userHasSBT(
-          'none',
-          sbt.sbtAddress,
-          userAddress,
-          fromBlockNum,
-          'latest',
-          groupKeyOrCfg,
-        );
-        if (userHasClaimed) {
-          const addressesWhoMinted = await this.getAddressesWhoMintedSBT(
-            'none',
-            sbt.sbtAddress,
-            fromBlockNum,
-            'latest',
-            groupKeyOrCfg,
-          );
-          const addressesWhoBurned = await this.getAddressesWhoBurnedSBT(
-            'none',
-            sbt.sbtAddress,
-            fromBlockNum,
-            'latest',
-            groupKeyOrCfg,
-          );
-          if (
-            addressesWhoMinted.map((a: any) => a.toLowerCase()).includes(userAddress.toLowerCase()) &&
-            !addressesWhoBurned.map((a: any) => a.toLowerCase()).includes(userAddress.toLowerCase())
-          ) {
-            claimedSBTs.push(sbt);
-          }
-        }
-      }
-      return claimedSBTs;
-    },
-
     async getSbtMetadata(providerName: any, sbtAddress: any, groupKeyOrCfg: any = null) {
       try {
         if (!sbtAddress || !ethers.utils.isAddress(sbtAddress)) {
@@ -902,13 +821,9 @@ export const createContractScriptsSbtRegistryMethods = (deps: ContractScriptsRun
           }
 
           try {
-            return await callWithRetry(() => sbt.tokenURI(), 'SBT.tokenURI()');
+            return await callWithRetry(() => sbt.tokenURI(0), 'SBT.tokenURI(0)');
           } catch {
-            try {
-              return await callWithRetry(() => sbt.tokenURI(0), 'SBT.tokenURI(0)');
-            } catch {
-              return null;
-            }
+            return null;
           }
         };
 
@@ -952,7 +867,6 @@ export const createContractScriptsSbtRegistryMethods = (deps: ContractScriptsRun
                   arweaveOpts: {
                     // Honor the deployment-wide AR.IO-only toggle. Per-call
                     // fanout here previously made SBT names intermittently blank.
-                    bypassFailureCache: true,
                     shortCircuitNotFound: true,
                     retries: 0,
                     gatewayTimeoutMs: Math.max(1000, SBT_TOKENURI_METADATA_TIMEOUT_MS - 500),

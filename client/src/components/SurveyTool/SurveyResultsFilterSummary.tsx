@@ -10,7 +10,11 @@ export type SurveyResultsFilterSummaryProps = {
   normalizedFilteredQuestionsCount: React.ReactNode;
   normalizedFilteredResponsesCount: React.ReactNode;
   showFilteredCountSpinner: boolean;
+  questionTotalsLoading?: boolean;
+  responseTotalsLoading?: boolean;
 };
+
+const Loading = () => <FontAwesomeIcon icon={faSpinner} spin title="Loading" />;
 
 const SurveyResultsFilterSummary = ({
   displayedTotalQuestionsCount,
@@ -18,21 +22,23 @@ const SurveyResultsFilterSummary = ({
   normalizedFilteredQuestionsCount,
   normalizedFilteredResponsesCount,
   showFilteredCountSpinner,
+  questionTotalsLoading = false,
+  responseTotalsLoading = false,
 }: SurveyResultsFilterSummaryProps): React.ReactElement => (
   <div className={styles.filterSummaryBox}>
     <p className={styles.filterSummaryText}>
-      Questions: <strong>{displayedTotalQuestionsCount}</strong>
-      {' \u200e  '}
+      Questions: <strong>{questionTotalsLoading ? <Loading /> : displayedTotalQuestionsCount}</strong>
+      {' ‎  '}
       Filtered:{' '}
       <strong>
-        {showFilteredCountSpinner ? <FontAwesomeIcon icon={faSpinner} spin /> : normalizedFilteredQuestionsCount}
+        {showFilteredCountSpinner || questionTotalsLoading ? <Loading /> : normalizedFilteredQuestionsCount}
       </strong>
       <br />
-      Responses: <strong>{displayedTotalResponsesCount}</strong>
-      {' \u200e  '}
+      Responses: <strong>{responseTotalsLoading ? <Loading /> : displayedTotalResponsesCount}</strong>
+      {' ‎  '}
       Filtered:{' '}
       <strong>
-        {showFilteredCountSpinner ? <FontAwesomeIcon icon={faSpinner} spin /> : normalizedFilteredResponsesCount}
+        {showFilteredCountSpinner || responseTotalsLoading ? <Loading /> : normalizedFilteredResponsesCount}
       </strong>
     </p>
   </div>

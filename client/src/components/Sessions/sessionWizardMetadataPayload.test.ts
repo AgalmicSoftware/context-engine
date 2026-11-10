@@ -65,6 +65,22 @@ describe('resolveSessionWizardMetadataPayloadBase', () => {
     );
   });
 
+  it('leaves the setup template’s own fields out of published metadata', () => {
+    const metadata = resolveSessionWizardMetadataPayloadBase({
+      draft: {
+        slug: 'template-session',
+        sessionName: 'Template session',
+        draftId: 'draft-1',
+        contextFiles: [{ name: 'deck.pdf' }],
+        questions: [{ prompt: 'Added after creation.', type: 'binary' }],
+      },
+    });
+    expect(metadata.sessionName).toBe('Template session');
+    expect(metadata).not.toHaveProperty('draftId');
+    expect(metadata).not.toHaveProperty('contextFiles');
+    expect(metadata).not.toHaveProperty('questions');
+  });
+
   it('clears stale session hex when no valid session id is available', () => {
     expect(
       resolveSessionWizardMetadataPayloadBase({

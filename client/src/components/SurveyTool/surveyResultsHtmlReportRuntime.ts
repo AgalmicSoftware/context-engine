@@ -4,7 +4,6 @@ import {
   buildSessionResultsAnalysisInputSignature,
   evaluateSessionResultsAnalysisEligibility,
   SESSION_RESULTS_ANALYSIS_SECTION_KEYS,
-  shortenSessionResultsAddress,
   type SessionResultsAnalysisSectionKey,
   type SessionResultsGeneratedAnalysisArtifact,
   type SessionResultsHtmlSnapshot,
@@ -20,6 +19,7 @@ import {
 } from './surveyResultsAnalysisDataModel';
 import {
   buildSurveyResultsHtmlReportParticipantCount,
+  buildSurveyResultsHtmlReportAnswersForExport,
   buildSurveyResultsHtmlReportQuestionsForExport,
   buildSurveyResultsHtmlReportResponseCountsByQuestion,
 } from './surveyResultsHtmlReportDataModel';
@@ -38,6 +38,7 @@ import { runSurveyResultsAnalysisArtifactReadController } from './surveyResultsA
 import { runSurveyResultsAnalysisArtifactWriteController } from './surveyResultsAnalysisArtifactWriteController';
 import type { SurveyResultsGateRecord, SurveyResultsResponseRecord } from './surveyResultsLockedFieldHelpers';
 import type { SurveyResultsQuestionExportRecord } from './surveyResultsExportRows';
+import { hasAuthorEncryptedText } from '../../utilities/survey/authorEncryptedQuestion';
 
 type SurveyResultsHtmlReportRecord = Record<string, unknown>;
 
@@ -89,7 +90,11 @@ export type SurveyResultsHtmlReportExporterMetadata = {
 export type SurveyResultsHtmlReportRuntime = {
   buildHtmlReportDemoAnalysisArtifact: () => SessionResultsGeneratedAnalysisArtifact;
   buildSessionResultsAnalysisPayloadForAi: () => SurveyResultsHtmlReportAnalysisPayloadForAi;
-  buildSessionResultsHtmlReportSnapshot: (exportedAt?: unknown) => SessionResultsHtmlSnapshot;
+  // Answers are read only for a download: the modal renders on every state change and shows none of them.
+  buildSessionResultsHtmlReportSnapshot: (
+    exportedAt?: unknown,
+    options?: { withAnswers?: boolean },
+  ) => SessionResultsHtmlSnapshot;
   getHtmlReportAnalysisArtifact: () => SessionResultsGeneratedAnalysisArtifact | null;
   getHtmlReportAnalysisSectionsToGenerate: (
     sections?: Required<SessionResultsSectionSelection>,
@@ -108,10 +113,17 @@ export type SurveyResultsHtmlReportRuntime = {
   ) => SessionResultsGeneratedAnalysisArtifact | null;
   writeSessionResultsAnalysisArtifactToCache: (
     artifact: SessionResultsGeneratedAnalysisArtifact | null,
+    target?: { slug: string; cacheKey: string },
   ) => Promise<void>;
 };
 
 export type SurveyResultsHtmlReportRuntimeArgs = {
+  applyDecryptedOverride: (
+    response: SurveyResultsResponseRecord,
+    responder: unknown,
+    questionId: string,
+    surveyId?: unknown,
+  ) => unknown;
   getEffectiveSlug: () => string;
   getFilteredQuestionsForExport: () => SurveyResultsQuestionExportRecord[];
   getNetworkQuestionsForCurrentContext: () => unknown;
@@ -148,7 +160,21 @@ const HTML_REPORT_SECTION_TO_ANALYSIS_SECTION: Partial<
 const toRecord = (value: unknown): SurveyResultsHtmlReportRecord =>
   value && typeof value === 'object' ? (value as SurveyResultsHtmlReportRecord) : {};
 
+// Questions whose author encrypted their text: the report shows what this reader decrypted, but its AI analysis,
+// which goes to the session's AI provider, never sees them.
+const listAuthorEncryptedQuestionIds = (networkQuestions: unknown): Set<string> => {
+  const ids = new Set<string>();
+  Object.entries(toRecord(networkQuestions)).forEach(([key, question]) => {
+    if (!hasAuthorEncryptedText(question)) return;
+    ids.add(key.toLowerCase());
+    const { id } = toRecord(question);
+    if (id) ids.add(String(id).toLowerCase());
+  });
+  return ids;
+};
+
 export const createSurveyResultsHtmlReportRuntime = ({
+  applyDecryptedOverride,
   getEffectiveSlug,
   getFilteredQuestionsForExport,
   getNetworkQuestionsForCurrentContext,
@@ -210,6 +236,26 @@ export const createSurveyResultsHtmlReportRuntime = ({
       responseCountsByQuestion: getHtmlReportResponseCountsByQuestion(),
     });
 
+  const getHtmlReportAnswersForExport = () => {
+    const state = getState();
+    return buildSurveyResultsHtmlReportAnswersForExport({
+      aggregatorQuestionResponses: state.sbtFilteredAggregatorQuestionResponses,
+      applyDecryptedOverride: (response, responder, questionId, surveyId) =>
+        applyDecryptedOverride(response as SurveyResultsResponseRecord, responder, questionId, surveyId),
+      filteredResponses: state.sbtFilteredResponses,
+      getResponseQuestionId: (response) => getResponseQuestionId(toRecord(response) as SurveyResultsResponseRecord),
+      networkQuestions: getNetworkQuestionsForCurrentContext(),
+      parseResponse,
+      surveyViewMode: state.surveyViewMode,
+      viewMode: state.viewMode,
+    });
+  };
+
+  const getHtmlReportAnalysisQuestions = () => {
+    const encrypted = listAuthorEncryptedQuestionIds(getNetworkQuestionsForCurrentContext());
+    return getHtmlReportQuestionsForExport().filter((question) => !encrypted.has(question.id.toLowerCase()));
+  };
+
   const isHtmlReportDemoSession = (): boolean => {
     const props = getProps();
     const state = getState();
@@ -238,7 +284,7 @@ export const createSurveyResultsHtmlReportRuntime = ({
     return {
       address: account,
       chainId: getHtmlReportChainId(),
-      displayAddress: shortenSessionResultsAddress(account),
+      displayAddress: account,
     };
   };
 
@@ -251,7 +297,9 @@ export const createSurveyResultsHtmlReportRuntime = ({
 
   const getHtmlReportAnalysisArtifact = (): SessionResultsGeneratedAnalysisArtifact | null => {
     const artifact = getState().htmlReportAnalysisArtifact || null;
-    return artifact && artifact.kind ? artifact : null;
+    return artifact?.kind && artifact.inputSignature === buildSessionResultsAnalysisPayloadForAi().inputSignature
+      ? artifact
+      : null;
   };
 
   const buildSessionResultsAnalysisPayloadForAi = (): SurveyResultsHtmlReportAnalysisPayloadForAi => {
@@ -259,8 +307,9 @@ export const createSurveyResultsHtmlReportRuntime = ({
     const props = getProps();
     const sessionSlug = getEffectiveSlug() || '';
     const sessionName = String(props.sessionName || state.surveyTitle || sessionSlug || 'Session').trim();
+    const encrypted = listAuthorEncryptedQuestionIds(getNetworkQuestionsForCurrentContext());
     const built = buildSessionResultsAnalysisAiPayload({
-      questions: getHtmlReportQuestionsForExport(),
+      questions: getHtmlReportAnalysisQuestions(),
       responses: buildSurveyResultsAnalysisResponsesForExport({
         aggregatorQuestionResponses: state.sbtFilteredAggregatorQuestionResponses,
         filteredResponses: state.sbtFilteredResponses,
@@ -273,7 +322,7 @@ export const createSurveyResultsHtmlReportRuntime = ({
         parseResponse,
         surveyViewMode: state.surveyViewMode,
         viewMode: state.viewMode,
-      }),
+      }).filter((response) => !encrypted.has(String(response.questionId).toLowerCase())),
       segmentDimensions: buildSurveyResultsAnalysisSegmentDimensionsForExport({
         filterState: state.filterState,
         getQuestionEncryptionGates: (question) => getQuestionEncryptionGates(toRecord(question)),
@@ -298,7 +347,7 @@ export const createSurveyResultsHtmlReportRuntime = ({
         networkQuestions: getNetworkQuestionsForCurrentContext(),
         normalizeGateSbtEntries: (gate) => normalizeGateSbtEntries(toRecord(gate) as SurveyResultsGateRecord),
         participantCount: getHtmlReportParticipantCount(),
-        questions: getHtmlReportQuestionsForExport(),
+        questions: getHtmlReportAnalysisQuestions(),
       }),
       session: {
         name: sessionName,
@@ -314,27 +363,36 @@ export const createSurveyResultsHtmlReportRuntime = ({
 
   const buildHtmlReportDemoAnalysisArtifact = (): SessionResultsGeneratedAnalysisArtifact => {
     const built = buildSessionResultsAnalysisPayloadForAi();
-    return buildSurveyResultsDemoAnalysisArtifact({
-      analysisPayload: built,
-      generatedAt: nowIso(),
+    return {
+      ...buildSurveyResultsDemoAnalysisArtifact({
+        analysisPayload: built,
+        generatedAt: nowIso(),
+        inputSignature: built.inputSignature,
+      }),
       inputSignature: built.inputSignature,
-    });
+    };
   };
 
-  const buildSessionResultsHtmlReportSnapshot = (exportedAt: unknown = nowIso()): SessionResultsHtmlSnapshot => {
+  const buildSessionResultsHtmlReportSnapshot = (
+    exportedAt: unknown = nowIso(),
+    { withAnswers = false }: { withAnswers?: boolean } = {},
+  ): SessionResultsHtmlSnapshot => {
     const state = getState();
     const props = getProps();
     const sessionSlug = getEffectiveSlug() || '';
     const sessionName = String(props.sessionName || state.surveyTitle || sessionSlug || 'Session').trim();
     return buildSurveyResultsHtmlReportSnapshot({
       analysisArtifact: getHtmlReportAnalysisArtifact(),
+      answers: withAnswers ? getHtmlReportAnswersForExport() : [],
       chainId: getHtmlReportChainId(),
       countsByQuestion: getHtmlReportResponseCountsByQuestion(),
       exportedAt,
       exporterMetadata: getHtmlReportExporterMetadata(),
       filterState: state.filterState,
       filteredQuestionsCount: state.filteredQuestionsCount,
-      filteredResponsesCount: state.filteredResponsesCount,
+      // The initial response count is zero even before filters hydrate; the
+      // nullable question count is the completion signal shared by both counts.
+      filteredResponsesCount: state.filteredQuestionsCount == null ? null : state.filteredResponsesCount,
       latestKnownBlock: state.networkLatestBlock,
       networkLabel: getHtmlReportNetworkLabel(),
       participantCount: getHtmlReportParticipantCount(),
@@ -392,9 +450,10 @@ export const createSurveyResultsHtmlReportRuntime = ({
 
   const writeSessionResultsAnalysisArtifactToCache = async (
     artifact: SessionResultsGeneratedAnalysisArtifact | null,
+    target?: { slug: string; cacheKey: string },
   ): Promise<void> => {
-    const slug = getSessionResultsAnalysisCacheSlug();
-    const cacheKey = artifact ? getSessionResultsAnalysisCacheKey(artifact.inputSignature) : '';
+    const slug = target?.slug ?? getSessionResultsAnalysisCacheSlug();
+    const cacheKey = target?.cacheKey ?? (artifact ? getSessionResultsAnalysisCacheKey(artifact.inputSignature) : '');
     const writeReadinessPlan = buildSurveyResultsAnalysisArtifactWriteReadinessPlan({
       artifact,
       cacheKey,

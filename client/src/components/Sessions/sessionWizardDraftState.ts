@@ -1,5 +1,6 @@
 import { normalizeInterviewSettings } from '../../../../shared/interviewSettings.mjs';
 import { normalizeResultsAnalysisSettings } from '../../../../shared/resultsAnalysisSettings.mjs';
+import type { SessionTemplate } from '../../../../shared/sessionTemplate.mjs';
 import { getDefaultHttpRpc } from '../../variables/chains.js';
 import {
   CE_DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED,
@@ -29,13 +30,13 @@ import { normalizeSessionAppearance } from '../../utilities/ui/sessionColorSchem
 import {
   classifySessionModeProfileSupport,
   compileSessionModeProfile,
-  hasLegacyHostedAgentFlags,
   normalizeSessionModeProfileForWrite,
   mergeSessionModeProfileStorageAccess,
   profileFromLegacyConfig,
   type SessionModeProfile,
 } from '../../utilities/session/sessionModeProfile';
 import type { AnyRecord } from '../shellTypes';
+import { applySessionModeProfileSelectionToDraft } from './sessionWizardModeProfileDraftController';
 import { serializePendingWorkerGroupDrafts } from './sessionWizardPendingWorkerGroups';
 
 const { getPathRpcUrl } = rpcDefaults;
@@ -117,19 +118,6 @@ export const normalizeSessionWizardDraftShape = (draftIn: AnyRecord = {}): AnyRe
   const chainId = Number(draft.networkChainId || DEFAULT_CHAIN_ID || 0) || DEFAULT_CHAIN_ID;
   draft.sessionName = toStr(draft.sessionName || '').trim();
   draft.sessionInfo = toStr(draft.sessionInfo || '').trim();
-  delete draft.telegram_only;
-  delete draft.telegramOnly;
-  delete draft.telegramMode;
-  delete draft.sessionMode;
-  delete draft.telegramBridgeEnabled;
-  if (draft.telegram && typeof draft.telegram === 'object') {
-    delete draft.telegram.only;
-    delete draft.telegram.mode;
-    if (!Object.keys(draft.telegram).length) delete draft.telegram;
-  }
-  if (!draft.sessionModeProfile && hasLegacyHostedAgentFlags(draftIn)) {
-    draft.sessionModeProfile = profileFromLegacyConfig(draftIn);
-  }
   if (draft.sessionModeProfile && typeof draft.sessionModeProfile === 'object') {
     draft.sessionModeProfile = normalizeSessionModeProfileForWrite(draft.sessionModeProfile);
   }
@@ -252,12 +240,6 @@ export const buildSessionWizardDefaultTemplate = (): AnyRecord => {
   draft.sessionEndsAt = '';
   draft.appearance = { colorSchemeId: 'context-engine' };
   delete draft.sessionModeProfile;
-  delete draft.telegramOnly;
-  delete draft.telegram_only;
-  delete draft.telegramMode;
-  delete draft.sessionMode;
-  delete draft.telegramBridgeEnabled;
-  delete draft.telegram;
   delete draft.sessionHeaderImg;
   delete draft.sessionInfoEncrypted;
   draft.corsWorkerUrl = '';
@@ -321,15 +303,38 @@ export const buildSessionWizardDefaultTemplate = (): AnyRecord => {
   return normalizeSessionWizardDraftShape(draft);
 };
 
+// Replaces a draft's portable fields with a validated template's; deployment
+// fields such as the Worker, slug and session ID stay. A template without a
+// mode profile keeps the base draft's profile.
+export const applySessionTemplateToDraft = (
+  template: SessionTemplate,
+  baseDraft = buildSessionWizardDefaultTemplate(),
+) => {
+  const { format: _format, draftId, sessionModeProfile, ...fields } = template;
+  let next = mergeSessionWizardDraftDeep(deepClone(baseDraft), deepClone(fields));
+  if (draftId) next.draftId = draftId;
+  else delete next.draftId;
+  if (sessionModeProfile) {
+    const profile = deepClone(sessionModeProfile) as SessionModeProfile;
+    if (classifySessionModeProfileSupport(profile).status === 'reachable') {
+      next = applySessionModeProfileSelectionToDraft(next, profile, compileSessionModeProfile(profile));
+    } else {
+      next.sessionModeProfile = profile;
+      // A conflicting profile cannot be compiled. Every normalization merges
+      // the draft's storage side into the profile, so give it the profile's own.
+      next.storageProfile = normalizeSessionStorageProfileConfig(profile.storage);
+    }
+  }
+  return normalizeSessionWizardDraftShape(next);
+};
+
 export const buildSessionWizardInitialDraftFromCache = ({
   cachedWizard = null,
   defaultTemplate = buildSessionWizardDefaultTemplate(),
-  normalModeSharedHostedWorkerEnabled = true,
   sourceEmbeddedDeployHelperDefault = null,
 }: {
   cachedWizard?: AnyRecord | null;
   defaultTemplate?: AnyRecord;
-  normalModeSharedHostedWorkerEnabled?: unknown;
   sourceEmbeddedDeployHelperDefault?: unknown;
 } = {}): AnyRecord => {
   const cachedDraft =
@@ -355,7 +360,7 @@ export const buildSessionWizardInitialDraftFromCache = ({
       normalized.storageProfile = normalizeSessionStorageProfileConfig(compiled.storageProfile);
     }
   }
-  if (normalModeSharedHostedWorkerEnabled === false && !cachedWizard?.deployComplete) {
+  if (!cachedWizard?.deployComplete) {
     normalized.corsWorkerUrl = '';
   }
   return normalized;
@@ -506,7 +511,6 @@ export const buildSessionWizardCacheWritePayload = ({
   const durableDeployForm = {
     workerName: toStr(deployFormRecord.workerName || '').trim(),
     adminAddress: toStr(deployFormRecord.adminAddress || '').trim() || undefined,
-    bundleUrl: toStr(deployFormRecord.bundleUrl || '').trim(),
   };
 
   return {

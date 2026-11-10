@@ -3,6 +3,7 @@ import {
   buildAdminChainRegistryDisplay,
   buildAdminEncryptedEntrySignature,
   buildAdminPageSessionIdentityKey,
+  buildSessionSettingsUrl,
   buildSessionUrl,
   collectEncryptedEntries,
   getAdminSessionDisplayUrl,
@@ -99,6 +100,23 @@ describe('adminPageSessionDisplayHelpers', () => {
     expect(buildSessionUrl('general')).toBe('');
     expect(buildSessionUrl('general', { allowGeneral: true })).toBe(`${window.location.origin}/session`);
     expect(buildSessionUrl(null, { allowGeneral: true })).toBe('');
+  });
+
+  it('builds settings URLs that keep only a valid Session Worker origin', () => {
+    const base = `${window.location.origin}/session/edgesession/settings`;
+    expect(buildSessionSettingsUrl(' Edge Session ', 'https://worker.example.test')).toBe(
+      `${base}?worker=https%3A%2F%2Fworker.example.test`,
+    );
+    expect(buildSessionSettingsUrl('edgesession', 'https://WORKER.example.test:8443')).toBe(
+      `${base}?worker=https%3A%2F%2Fworker.example.test%3A8443`,
+    );
+    // The settings route rejects a worker value with a path, query, or credentials, so the link drops it.
+    expect(buildSessionSettingsUrl('edgesession', 'https://worker.example.test/admin')).toBe(base);
+    expect(buildSessionSettingsUrl('edgesession', `https://user:pass${'@'}worker.example.test`)).toBe(base);
+    expect(buildSessionSettingsUrl('edgesession', '')).toBe(base);
+    expect(buildSessionSettingsUrl('edgesession')).toBe(base);
+    expect(buildSessionSettingsUrl('general', 'https://worker.example.test')).toBe('');
+    expect(buildSessionSettingsUrl('', 'https://worker.example.test')).toBe('');
   });
 
   it('resolves admin session display URLs by config, metadata, then selected slug', () => {

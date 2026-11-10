@@ -17,6 +17,8 @@ jest.mock('../crypto/cryptography.js', () => ({
 import {
   __sessionRegistryTestUtils,
   parseSessionRegistryMetadataUri,
+  fetchSessionFromRegistry,
+  loadSessionRegistryCache,
   registerSessionOnChain,
   refreshSessionRegistryFieldsCache,
   setResourceGatesOnChain,
@@ -474,6 +476,9 @@ describe('refreshSessionRegistryFieldsCache', () => {
         __registry: {
           registryChainId: CONFIGURED_REGISTRY_CHAIN_ID,
           sessionIdHex,
+          metadata: { sessionName: 'Demo Session' },
+          metadataURI: 'ar://metadata-tx',
+          encryptedMetadataURI: '',
           gatesByResource: {
             txGas: txGasGate,
           },
@@ -552,6 +557,265 @@ describe('refreshSessionRegistryFieldsCache', () => {
         sessionName: 'Demo Session',
       }),
     );
+  });
+});
+
+describe('targeted registry field clear semantics', () => {
+  afterEach(() => {
+    localStorage.removeItem('dg:sessionRegistryCache:v1');
+    jest.restoreAllMocks();
+    arweaveClient.downloadDataFromArweave.mockReset();
+  });
+
+  const fixture = async ({ batch = true, fallback = false, cacheMetadata = true } = {}) => {
+    const metadata = {
+      sessionName: 'Synthetic field refresh',
+      sessionInfo: 'Retain metadata and gate context.',
+      ...(fallback
+        ? {
+            corsWorkerUrl: 'https://metadata-worker.example',
+            rpc: { providers: { path: { rpcUrl: 'https://metadata-rpc.example' } } },
+            sponsoredKeys: { faucet: false },
+          }
+        : {}),
+    };
+    const fields = {
+      corsWorkerUrl: 'https://field-worker.example',
+      rpcUrl: 'https://field-rpc.example',
+      sponsored_faucet: 'true',
+      sponsored_ai: 'false',
+    };
+    const failures = new Set();
+    const tx = 'M'.repeat(43);
+    arweaveClient.downloadDataFromArweave.mockResolvedValue(JSON.stringify(metadata));
+    installPublicRpcFeeMocks();
+    const contract = {
+      getSessionBySlug: jest
+        .fn()
+        .mockResolvedValue([
+          'field-refresh',
+          CONFIGURED_REGISTRY_CHAIN_ID,
+          `ar://${tx}`,
+          '',
+          TEST_SIGNER_ADDRESS,
+          1,
+          2,
+          '0x' + '34'.repeat(16),
+        ]),
+      getResourceGate: jest.fn().mockResolvedValue([[], 0, 0, 0]),
+      ...(batch ? { getSessionFields: jest.fn(async (_slug, keys) => keys.map((key) => fields[key] || '')) } : {}),
+      getSessionField: jest.fn(async (_slug, key) => {
+        if (failures.has(key)) throw new Error('Synthetic field read failure');
+        return fields[key] || '';
+      }),
+    };
+    jest.spyOn(ethers, 'Contract').mockImplementation(function MockContract() {
+      return contract;
+    });
+    const full = () => fetchSessionFromRegistry({ chainId: CONFIGURED_REGISTRY_CHAIN_ID, slug: 'field-refresh' });
+    const initial = await full();
+    if (!cacheMetadata) delete initial.__registry.metadata;
+    upsertSessionRegistryCache({ config: initial });
+    arweaveClient.downloadDataFromArweave.mockClear();
+    return {
+      fields,
+      failures,
+      contract,
+      full,
+      initial,
+      refresh: (fieldKeys) =>
+        refreshSessionRegistryFieldsCache({ chainId: CONFIGURED_REGISTRY_CHAIN_ID, slug: 'field-refresh', fieldKeys }),
+    };
+  };
+
+  it.each([true, false])(
+    'cleared Worker, RPC and sponsorship overrides equal a full fetch (batch=%s)',
+    async (batch) => {
+      const f = await fixture({ batch });
+      for (const key of ['corsWorkerUrl', 'rpcUrl', 'sponsored_faucet']) f.fields[key] = '';
+      const refreshed = await f.refresh();
+      expect(refreshed.corsWorkerUrl).toBeUndefined();
+      expect(refreshed.rpc?.providers?.path?.rpcUrl).toBeUndefined();
+      expect(refreshed.sponsoredKeys?.faucet).toBeUndefined();
+      for (const key of ['corsWorkerUrl', 'rpcUrl', 'sponsored_faucet'])
+        expect(refreshed.__registry.fields).not.toHaveProperty(key);
+      expect(refreshed).toEqual(await f.full());
+    },
+  );
+
+  it.each([true, false])(
+    'a cleared override restores metadata without retaining stale nested values (cached metadata=%s)',
+    async (cacheMetadata) => {
+      const f = await fixture({ fallback: true, cacheMetadata });
+      for (const key of ['corsWorkerUrl', 'rpcUrl', 'sponsored_faucet']) f.fields[key] = '';
+      const refreshed = await f.refresh();
+      expect(refreshed.corsWorkerUrl).toBe('https://metadata-worker.example');
+      expect(refreshed.rpc.providers.path.rpcUrl).toBe('https://metadata-rpc.example');
+      expect(refreshed.sponsoredKeys.faucet).toBe(false);
+      expect(arweaveClient.downloadDataFromArweave).toHaveBeenCalledTimes(cacheMetadata ? 0 : 1);
+      expect(refreshed).toEqual(await f.full());
+    },
+  );
+
+  it('leaves unrequested fields alone and keeps a previous value after a failed read', async () => {
+    const f = await fixture({ batch: false });
+    f.fields.corsWorkerUrl = '';
+    f.fields.rpcUrl = 'https://unrequested-rpc.example';
+    f.fields.sponsored_faucet = '';
+    f.failures.add('sponsored_faucet');
+    const refreshed = await f.refresh(['corsWorkerUrl', 'sponsored_faucet']);
+    expect(refreshed.corsWorkerUrl).toBeUndefined();
+    expect(refreshed.rpc.providers.path.rpcUrl).toBe('https://field-rpc.example');
+    expect(refreshed.sponsoredKeys.faucet).toBe(true);
+    expect(refreshed.__registry.fields).toEqual({
+      rpcUrl: 'https://field-rpc.example',
+      sponsored_faucet: 'true',
+      sponsored_ai: 'false',
+    });
+    expect(refreshed.sessionName).toBe(f.initial.sessionName);
+    expect(refreshed.__registry.gatesByResource).toEqual(f.initial.__registry.gatesByResource);
+  });
+
+  it('keeps missing batch results distinct from successful empty field reads', async () => {
+    const f = await fixture();
+    f.contract.getSessionFields.mockResolvedValue(['']);
+    const refreshed = await f.refresh(['corsWorkerUrl', 'rpcUrl']);
+    expect(refreshed.corsWorkerUrl).toBeUndefined();
+    expect(refreshed.rpc.providers.path.rpcUrl).toBe('https://field-rpc.example');
+    expect(refreshed.__registry.fields.rpcUrl).toBe('https://field-rpc.example');
+  });
+});
+
+describe('targeted registry refresh when the metadata cannot load', () => {
+  const CUSTOM_SURVEYS = '0x' + '5'.repeat(40);
+  const metadata = {
+    sessionName: 'Synthetic outage session',
+    corsWorkerUrl: 'https://metadata-worker.example',
+    interviewMode: true,
+    contracts: { surveys: { address: CUSTOM_SURVEYS, chainId: CONFIGURED_REGISTRY_CHAIN_ID } },
+  };
+
+  afterEach(() => {
+    localStorage.removeItem('dg:sessionRegistryCache:v1');
+    localStorage.removeItem('ce:sessionWorkerConfigCache:v1');
+    jest.restoreAllMocks();
+    arweaveClient.downloadDataFromArweave.mockReset();
+  });
+
+  const fixture = async ({ keepDocument }) => {
+    const record = { metadataURI: `ar://${'M'.repeat(43)}`, encryptedMetadataURI: '' };
+    const fields = { rpcUrl: 'https://old-rpc.example' };
+    arweaveClient.downloadDataFromArweave.mockResolvedValue(JSON.stringify(metadata));
+    installPublicRpcFeeMocks();
+    const contract = {
+      getSessionBySlug: jest.fn(async () => [
+        'outage',
+        CONFIGURED_REGISTRY_CHAIN_ID,
+        record.metadataURI,
+        record.encryptedMetadataURI,
+        TEST_SIGNER_ADDRESS,
+        1,
+        2,
+        '0x' + '36'.repeat(16),
+      ]),
+      getResourceGate: jest.fn().mockResolvedValue([[], 0, 0, 0]),
+      getSessionFields: jest.fn(async (_slug, keys) => keys.map((key) => fields[key] || '')),
+    };
+    jest.spyOn(ethers, 'Contract').mockImplementation(function MockContract() {
+      return contract;
+    });
+    const full = () => fetchSessionFromRegistry({ chainId: CONFIGURED_REGISTRY_CHAIN_ID, slug: 'outage' });
+    const initial = await full();
+    // An entry saved before cached entries kept their metadata document.
+    if (!keepDocument) delete initial.__registry.metadata;
+    upsertSessionRegistryCache({ config: initial });
+    fields.rpcUrl = 'https://new-rpc.example';
+    arweaveClient.downloadDataFromArweave.mockReset();
+    arweaveClient.downloadDataFromArweave.mockRejectedValue(new Error('Synthetic gateway outage'));
+    return {
+      record,
+      full,
+      refresh: () =>
+        refreshSessionRegistryFieldsCache({
+          chainId: CONFIGURED_REGISTRY_CHAIN_ID,
+          slug: 'outage',
+          fieldKeys: ['rpcUrl'],
+        }),
+    };
+  };
+
+  const expectLastUsableCopy = (config) => {
+    expect(config.rpc.providers.path.rpcUrl).toBe('https://new-rpc.example');
+    expect(config).toMatchObject({
+      sessionName: 'Synthetic outage session',
+      corsWorkerUrl: 'https://metadata-worker.example',
+      interviewMode: true,
+    });
+    expect(config.contracts.surveys.address).toBe(CUSTOM_SURVEYS);
+    // The copy isn't the record's document, so the next refresh loads that again.
+    expect(config.__registry).toMatchObject({ metadata: null, metadataLoadState: 'unavailable' });
+  };
+
+  it.each([
+    ['an outage, for an entry saved without its document', { keepDocument: false }, () => {}],
+    [
+      'an outage, after the record moved to new metadata',
+      { keepDocument: true },
+      (f) => {
+        f.record.metadataURI = `ar://${'N'.repeat(43)}`;
+      },
+    ],
+    [
+      'encrypted metadata without a key',
+      { keepDocument: true },
+      (f) => {
+        f.record.metadataURI = '';
+        f.record.encryptedMetadataURI = `ar://${'E'.repeat(43)}`;
+        arweaveClient.downloadDataFromArweave.mockResolvedValue(JSON.stringify({ ciphertext: 'synthetic' }));
+      },
+    ],
+  ])('keeps the last usable copy after %s', async (_label, options, change) => {
+    const f = await fixture(options);
+    change(f);
+    const refreshed = await f.refresh();
+    expectLastUsableCopy(refreshed);
+    expectLastUsableCopy(sessionRegistryStore.readCache().sessions.outage);
+  });
+
+  it('rebuilds from the cached entry, not its Worker config overlay, then reloads the document', async () => {
+    const f = await fixture({ keepDocument: false });
+    upsertCachedSessionWorkerConfig({ slug: 'outage', config: { corsWorkerUrl: 'https://worker-kv-cache.example' } });
+    expect(sessionRegistryStore.getSessionConfig('outage').corsWorkerUrl).toBe('https://worker-kv-cache.example');
+    await f.refresh();
+    expectLastUsableCopy(sessionRegistryStore.readCache().sessions.outage);
+    arweaveClient.downloadDataFromArweave.mockReset();
+    arweaveClient.downloadDataFromArweave.mockResolvedValue(JSON.stringify(metadata));
+    const recovered = await f.refresh();
+    expect(arweaveClient.downloadDataFromArweave).toHaveBeenCalledTimes(1);
+    expect(recovered.__registry).toMatchObject({ metadata, metadataLoadState: 'loaded' });
+    expect(recovered).toEqual(await f.full());
+  });
+
+  const listOutage = () =>
+    loadSessionRegistryCache({ chainIds: [CONFIGURED_REGISTRY_CHAIN_ID], slugs: ['outage'], force: true });
+
+  it.each([
+    ['a single-session read', (f) => f.full()],
+    ['a registry listing', async () => (await listOutage()).sessions.outage],
+  ])('keeps the last usable copy through repeated failures of %s', async (_label, load) => {
+    const f = await fixture({ keepDocument: true });
+    const first = await load(f);
+    expectLastUsableCopy(first);
+    upsertSessionRegistryCache({ config: first });
+    expectLastUsableCopy(await load(f));
+  });
+
+  it('reports an unreadable document on its row, not as a listing error', async () => {
+    await fixture({ keepDocument: true });
+    const listing = await listOutage();
+    expect(listing.__loadMeta.hadLoadErrors).toBe(false);
+    expect(sessionRegistryStore.readCache().__hadLoadErrors).toBe(false);
+    expectLastUsableCopy(listing.sessions.outage);
   });
 });
 
@@ -1935,6 +2199,27 @@ describe('registry listing pages', () => {
     contract.getSessionSlugByIndex.mockClear();
     await load({ pageSize: 2, loadOlder: true });
     expect(contract.getSessionSlugByIndex).not.toHaveBeenCalled();
+  });
+
+  it('moves past a row whose metadata document never loads', async () => {
+    contract.getSessionCount.mockResolvedValue(5);
+    contract.getSessionBySlug.mockImplementation(async (slug) => [
+      slug,
+      CONFIGURED_REGISTRY_CHAIN_ID,
+      slug === 'fixture-2' ? 'not-a-metadata-uri' : '',
+      '',
+      TEST_SIGNER_ADDRESS,
+      1,
+      2,
+      '0x00000000000000000000000000000055',
+    ]);
+    await load({ pageSize: 2 });
+    const older = await load({ pageSize: 2, loadOlder: true });
+    expect(older.__loadMeta.hadLoadErrors).toBe(false);
+    expect(older.sessions['fixture-2'].__registry.metadataLoadState).toBe('unavailable');
+    contract.getSessionSlugByIndex.mockClear();
+    await load({ pageSize: 2, loadOlder: true });
+    expect(contract.getSessionSlugByIndex.mock.calls.map(([index]) => index)).toEqual([0]);
   });
 
   it('keeps direct slug lookups direct and preserves the listing cursor', async () => {

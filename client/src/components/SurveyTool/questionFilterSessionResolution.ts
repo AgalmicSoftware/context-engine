@@ -12,6 +12,7 @@ type QuestionFilterSessionInput = {
   pathname?: unknown;
   activeSessionSlug?: unknown;
   sessionSlug?: unknown;
+  sessionSlugPinned?: boolean;
 };
 
 type ResolveQuestionFilterSessionContextInput = QuestionFilterSessionInput & {
@@ -32,7 +33,13 @@ const buildQuestionFilterSessionSource = ({
   pathname,
   activeSessionSlug,
   sessionSlug,
+  sessionSlugPinned,
 }: QuestionFilterSessionInput = {}): QuestionFilterSessionSource => {
+  // A route alias may differ from the canonical Worker slug supplied by the session shell.
+  if (sessionSlugPinned === true) {
+    return { sessionSlug: readPrioritizedPropSlug(sessionSlug ?? activeSessionSlug ?? '') };
+  }
+
   const routeSlug = resolveSessionSlugFromPathname(pathname);
   if (routeSlug !== null) {
     return { sessionSlug: routeSlug };
@@ -71,7 +78,7 @@ export const resolveQuestionFilterSessionContext = ({
     source: { sessionSlug: config?.slug ?? config?.sessionSlug ?? '' },
   }).sessionSlug;
   // Worker bootstrap configs arrive through props, outside the registry cache.
-  // Only reuse them for the selected route; stale props must not route AI elsewhere.
+  // Only reuse them for the selected session; stale props must not route AI elsewhere.
   return resolveCanonicalSessionConfig({
     source: { ...source, ...(config && configSlug === requestedSlug ? { sessionConfig: config } : {}) },
     resolveBySlug,

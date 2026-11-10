@@ -26,17 +26,20 @@ const {
   normalizeLayoutProbeSelectors,
   normalizeRoutes,
   probeBenchmarkReportFrame,
-  probeSessionModePresets,
+  probeSessionSetup,
   resolveViewport,
   routeUrl,
   runRouteProbe,
   summarizeFailures,
 } = require('./vite-navigation-smoke');
 
-test('default navigation smoke covers session modes, Docs, its legacy contracts alias, and benchmarks', () => {
+test('default navigation smoke covers session setup, Docs, its legacy contracts alias, and benchmarks', () => {
   assert.ok(DEFAULT_ROUTES.includes('/new'));
-  assert.equal(DEFAULT_ROUTE_PROBES['/new'], probeSessionModePresets);
+  assert.equal(DEFAULT_ROUTE_PROBES['/new'], probeSessionSetup);
+  assert.deepEqual(DEFAULT_ROUTE_TEXT['/session/new'], ['New session']);
   assert.equal(DEFAULT_ROUTE_PROBES['/benchmarks'], probeBenchmarkReportFrame);
+  assert.ok(DEFAULT_ROUTES.includes('/session/demo/questions'));
+  assert.deepEqual(DEFAULT_ROUTE_TEXT['/session/demo/questions'], ['Questions', 'Results', 'Existential risk from AI justifies extraordinary precautions.']);
   assert.ok(DEFAULT_ROUTES.includes('/docs'));
   assert.ok(DEFAULT_ROUTES.includes('/contracts'));
   assert.ok(DEFAULT_ROUTES.includes('/benchmarks'));
@@ -45,38 +48,67 @@ test('default navigation smoke covers session modes, Docs, its legacy contracts 
   assert.equal(DEFAULT_ROUTE_TEXT['/benchmarks'], undefined);
 });
 
-test('session mode probe selects both supported presets', async () => {
-  const selected = new Map();
-  const presetIds = ['fast_cheap_cloudflare', 'trustless_public_decentralized'];
+test('default navigation smoke checks removed standalone pages use the normal not-found view', () => {
+  for (const route of ['/debate', '/beta', '/contributors', '/matrix', '/demos']) {
+    assert.ok(DEFAULT_ROUTES.includes(route));
+    assert.deepEqual(DEFAULT_ROUTE_TEXT[route], ['Page not found', `Path: ${route}`]);
+  }
+});
+
+test('session setup probe finds every section and opens one from its caret', async () => {
+  const expanded = new Map();
+  const seen = [];
   const page = {
     getByTestId: (testId) => {
       if (testId === 'ce-onboarding-overlay') {
         return { count: async () => 0 };
       }
-      const presetId = testId.replace('ce-new-preset-', '');
-      assert.ok(presetIds.includes(presetId));
+      seen.push(testId);
       return {
         waitFor: async ({ state, timeout }) => {
           assert.equal(state, 'visible');
           assert.equal(timeout, 1234);
         },
         click: async () => {
-          presetIds.forEach((id) => selected.set(id, id === presetId));
+          expanded.set(testId, 'true');
         },
         getAttribute: async (name) => {
-          assert.equal(name, 'aria-checked');
-          return selected.get(presetId) ? 'true' : 'false';
+          assert.equal(name, 'aria-expanded');
+          return expanded.get(testId) || 'false';
         },
       };
     },
-    once: (eventName, handler) => {
-      assert.equal(eventName, 'dialog');
-      handler({ accept: async () => {} });
-    },
   };
 
-  assert.deepEqual(await probeSessionModePresets(page, { timeoutMs: 1234 }), []);
-  assert.equal(selected.get('trustless_public_decentralized'), true);
+  assert.deepEqual(await probeSessionSetup(page, { timeoutMs: 1234 }), []);
+  assert.deepEqual(seen, [
+    'ce-setup-section-basics',
+    'ce-setup-section-context',
+    'ce-setup-section-questions',
+    'ce-setup-section-participation',
+    'ce-setup-section-results',
+    'ce-setup-section-access',
+    'ce-setup-section-hosting',
+    'ce-setup-section-ai',
+    'ce-wizard-publish',
+    'ce-setup-more-hosting',
+  ]);
+  assert.equal(expanded.get('ce-setup-more-hosting'), 'true');
+});
+
+test('session setup probe reports a section that does not render', async () => {
+  const page = {
+    getByTestId: (testId) => ({
+      count: async () => 0,
+      waitFor: async () => {
+        if (testId === 'ce-setup-section-access') throw new Error('timeout');
+      },
+      click: async () => {},
+      getAttribute: async () => 'true',
+    }),
+  };
+
+  assert.deepEqual(await probeSessionSetup(page, { timeoutMs: 5 }), ['setup section access did not render']);
 });
 
 test('normalizeBaseUrl keeps the app origin and removes path/search/hash drift', () => {
@@ -125,11 +157,11 @@ test('demo interview ready fixture requires the explicit Worker discovery route'
   const worker = encodeURIComponent('https://ce-demo-sh-481bb6cd0a81.agalmic.workers.dev');
   assert.equal(isDemoReadyInterviewRoute(`/session/demo?mode=interview&worker=${worker}`), true);
   assert.equal(isDemoReadyInterviewRoute('/session/demo?mode=interview'), false);
-  assert.equal(isDemoReadyInterviewRoute(`/session/demo?mode=recordGroup&worker=${worker}`), false);
+  assert.equal(isDemoReadyInterviewRoute(`/session/demo?mode=groupRecording&worker=${worker}`), false);
 });
 
-test('both session setup aliases receive the pinned demo cache fixture in local smoke', async () => {
-  for (const route of ['/new', '/session/new', '/session/new?mode=interview']) {
+test('setup, removed standalone pages, and shared demo views receive the pinned default-cache fixture locally', async () => {
+  for (const route of ['/new', '/session/new', '/session/new?mode=interview', '/debate', '/beta', '/contributors', '/matrix', '/demos', '/atlas', '/atlas/scenario', '/su/Franklin']) {
     const handlers = [];
     await installDemoWorkerFixtureRoutes({ route: async (pattern, handler) => handlers.push({ pattern, handler }) },
       'http://127.0.0.1:4173', route);
@@ -137,20 +169,27 @@ test('both session setup aliases receive the pinned demo cache fixture in local 
     assert.equal(handlers[0].pattern, 'https://ce-demo-sh-481bb6cd0a81.agalmic.workers.dev/storage/list?*');
     let response;
     await handlers[0].handler({
-      request: () => ({ url: () => 'https://ce-demo-sh-481bb6cd0a81.agalmic.workers.dev/storage/list?resource=questions&limit=100' }),
+      request: () => ({ method: () => 'GET', url: () => 'https://ce-demo-sh-481bb6cd0a81.agalmic.workers.dev/storage/list?resource=questions&limit=100' }),
       fulfill: async (value) => { response = value; },
       fallback: async () => assert.fail('the pinned question list should use the fixture'),
     });
     assert.equal(response.status, 200);
     assert.deepEqual(JSON.parse(response.body), { items: [], listComplete: true });
+    let fellBack = false;
+    await handlers[0].handler({
+      request: () => ({ method: () => 'POST', url: () => 'https://ce-demo-sh-481bb6cd0a81.agalmic.workers.dev/storage/list?resource=questions' }),
+      fulfill: async () => assert.fail('the default-cache fixture must not intercept writes'),
+      fallback: async () => { fellBack = true; },
+    });
+    assert.equal(fellBack, true);
   }
-  assert.equal(DEFAULT_ROUTE_PROBES['/session/new'], probeSessionModePresets);
+  assert.equal(DEFAULT_ROUTE_PROBES['/session/new'], probeSessionSetup);
 });
 
 test('local demo presence fixtures cover queryless reads and keep interview readiness scoped', async () => {
   const origin = 'https://ce-demo-sh-481bb6cd0a81.agalmic.workers.dev';
   const interviewRoute = `/session/demo?mode=interview&worker=${encodeURIComponent(origin)}`;
-  for (const route of ['/session/demo', '/session/demo?mode=recordGroup', '/session/demo-2', interviewRoute]) {
+  for (const route of ['/session/demo', '/session/demo?mode=groupRecording', '/session/demo-2', interviewRoute]) {
     const handlers = [];
     await installDemoWorkerFixtureRoutes({ route: async (pattern, handler) => handlers.push({ pattern, handler }) },
       'http://127.0.0.1:4173', route);
@@ -206,6 +245,55 @@ test('local navigation fixtures allow app assets and fail unmatched external req
     assert.equal(action, expected, url);
   }
   await installLocalSmokeFixtureRoutes({ route: async () => assert.fail('remote smoke remains live') }, 'https://app.example.test');
+});
+
+test('the pinned worker route renders from read-only local smoke fixtures', async () => {
+  const sessions = require('../client/src/variables/demo/demo_sessions.json');
+  const origin = new URL(sessions['rxc-ra-test'].corsWorkerUrl).origin;
+  for (const route of ['/rxc-ra-test', '/session/rxc-ra-test?mode=questions']) {
+    let handler;
+    await installLocalSmokeFixtureRoutes({ addInitScript: async () => {}, route: async (_pattern, callback) => { handler = callback; } },
+      'http://127.0.0.1:4173', route);
+    const request = async (pathname, method = 'GET') => {
+      let result;
+      await handler({
+        request: () => ({ url: () => origin + pathname, method: () => method }),
+        continue: async () => assert.fail('the fixture must not read a deployed Worker'),
+        abort: async (reason) => { result = { aborted: reason }; },
+        fulfill: async (response) => { result = response.json; },
+      });
+      return result;
+    };
+    const bootstrap = await request('/session-config?slug=rxc-ra-test');
+    assert.equal(bootstrap.ok, true);
+    assert.equal(bootstrap.sessionSlug, 'rxc-ra-test');
+    assert.equal(bootstrap.config.slug, 'rxc-ra-test');
+    assert.equal(bootstrap.config.corsWorkerUrl, origin + '/');
+    assert.deepEqual(bootstrap.config.sessionModeProfile, sessions['demo-sh'].sessionModeProfile);
+    assert.deepEqual(await request('/storage/list?resource=questions'), { items: [], listComplete: true });
+    assert.deepEqual(await request('/resource-presence'), { ok: true, interview: { ready: false } });
+    assert.deepEqual(await request('/session-config?slug=another-session'), { aborted: 'blockedbyclient' });
+    assert.deepEqual(await request('/storage/list?resource=private'), { aborted: 'blockedbyclient' });
+    assert.deepEqual(await request('/session-config?slug=rxc-ra-test', 'POST'), { aborted: 'blockedbyclient' });
+  }
+  assert.deepEqual(DEFAULT_ROUTE_TEXT['/rxc-ra-test'], ['Groups', 'Results']);
+});
+
+test('pinned Worker fixtures do not mask reads from unrelated routes', async () => {
+  const origin = new URL(require('../client/src/variables/demo/demo_sessions.json')['rxc-ra-test'].corsWorkerUrl).origin;
+  for (const route of ['/about', '/rxc-ra-test-2']) {
+    let handler;
+    await installLocalSmokeFixtureRoutes({ addInitScript: async () => {}, route: async (_pattern, callback) => { handler = callback; } },
+      'http://127.0.0.1:4173', route);
+    let aborted;
+    await handler({
+      request: () => ({ url: () => origin + '/session-config?slug=rxc-ra-test', method: () => 'GET' }),
+      continue: async () => assert.fail('external requests remain isolated'),
+      abort: async (reason) => { aborted = reason; },
+      fulfill: async () => assert.fail('unrelated routes must not use the fixture'),
+    });
+    assert.equal(aborted, 'blockedbyclient');
+  }
 });
 
 test('local navigation uses explicit asset fixtures and ABI-valid registry reads', async () => {

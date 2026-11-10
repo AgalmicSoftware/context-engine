@@ -35,17 +35,6 @@ $glass-shadow: 0 8px 32px 0 color-mix(in srgb, var(--ce-compat-dark) 37%, transp
     transform: scale(1);
   }
 }
-@keyframes pulse-glow {
-  0% {
-    box-shadow: 0 0 0 0 color-mix(in srgb, var(--ce-status-info) 40%, transparent);
-  }
-  70% {
-    box-shadow: 0 0 0 10px transparent;
-  }
-  100% {
-    box-shadow: 0 0 0 0 transparent;
-  }
-}
 
 .debateMapWrapper {
   display: block;
@@ -68,6 +57,43 @@ $glass-shadow: 0 8px 32px 0 color-mix(in srgb, var(--ce-compat-dark) 37%, transp
   &.embeddedAtlas {
     background: transparent;
     min-height: unset;
+  }
+
+  // Embedded in Results the map sits on the theme's panel, not the dark atlas
+  // page, so its view switch takes the panel's control colours: white text at
+  // half strength fell to 1.05:1 on light themes.
+  &.embeddedAtlas .debateMap .controls .viewModeSwitch {
+    background: var(--ce-control-face);
+    border: 1px solid var(--ce-card-border);
+
+    button {
+      color: var(--ce-panel-text);
+
+      &:hover,
+      &:active {
+        color: var(--ce-panel-text);
+        background: color-mix(in srgb, var(--ce-panel-text) 12%, var(--ce-control-face));
+      }
+
+      &:focus-visible {
+        outline: 2px solid var(--ce-focus-ring);
+        outline-offset: 2px;
+      }
+
+      &.active {
+        background: var(--ce-action-accent);
+        color: var(--ce-action-accent-text);
+        box-shadow: none;
+      }
+    }
+
+    .inlineLegendItem {
+      color: var(--ce-panel-text);
+    }
+
+    .viewModeSeparator {
+      background: var(--ce-card-border);
+    }
   }
 }
 
@@ -177,8 +203,7 @@ $glass-shadow: 0 8px 32px 0 color-mix(in srgb, var(--ce-compat-dark) 37%, transp
       margin-left: auto;
     }
 
-    .viewModeSwitch,
-    .atlasLayoutSwitch {
+    .viewModeSwitch {
       display: flex;
       align-items: center;
       background: color-mix(in srgb, var(--ce-compat-dark) 30%, transparent);
@@ -1694,16 +1719,17 @@ $glass-shadow: 0 8px 32px 0 color-mix(in srgb, var(--ce-compat-dark) 37%, transp
       }
     }
 
+    // At 35-40% these read at 3.2:1 on the dark panel; 70% reads above 4.5:1.
     .collapseCount {
       font-size: 0.8rem;
-      color: color-mix(in srgb, var(--ce-text-inverse) 40%, transparent);
+      color: color-mix(in srgb, var(--ce-text-inverse) 70%, transparent);
       margin-left: 6px;
     }
 
     .collapseToggle {
       margin-left: auto;
       font-size: 0.75rem;
-      color: color-mix(in srgb, var(--ce-text-inverse) 35%, transparent);
+      color: color-mix(in srgb, var(--ce-text-inverse) 70%, transparent);
       text-transform: uppercase;
       letter-spacing: 0.05em;
     }
@@ -1818,11 +1844,93 @@ $glass-shadow: 0 8px 32px 0 color-mix(in srgb, var(--ce-compat-dark) 37%, transp
     }
 
     .generatedSummaryEyebrow {
-      color: color-mix(in srgb, var(--ce-status-info) 88%, transparent);
+      // Lightened, so the info colour reads on the dark panel.
+      color: color-mix(in srgb, var(--ce-status-info) 50%, var(--ce-text-inverse));
       font-size: 0.72rem;
       font-weight: 800;
       letter-spacing: 0.08em;
       text-transform: uppercase;
+    }
+
+    .generatedSummarySection .generatedSummaryLead {
+      font-size: 1rem;
+      font-weight: 600;
+    }
+
+    .generatedSummaryToggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 10px;
+      padding: 2px 0;
+      border: 0;
+      background: none;
+      color: color-mix(in srgb, var(--ce-status-info) 50%, var(--ce-text-inverse));
+      font-size: 0.75rem;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      cursor: pointer;
+    }
+
+    .generatedSummaryPositions {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin: 14px 0 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .generatedSummaryPosition {
+      padding: 10px 12px;
+      border-left: 3px solid var(--ce-status-info);
+      border-radius: var(--ce-radius-6);
+      background: color-mix(in srgb, var(--ce-text-inverse) 5%, transparent);
+
+      p {
+        font-size: 0.9rem;
+      }
+    }
+
+    .generatedSummaryPositionHeader {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 4px 12px;
+      color: $text-main;
+      line-height: 1.4;
+
+      strong {
+        font-weight: 800;
+      }
+    }
+
+    .generatedSummaryCount {
+      flex-shrink: 0;
+      padding: 2px 8px;
+      border-radius: var(--ce-radius-pill);
+      background: color-mix(in srgb, var(--ce-text-inverse) 10%, transparent);
+      color: $text-main;
+      font-size: 0.75rem;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    // How much of the compass holds the position, beside its count.
+    .generatedSummaryShare {
+      height: 4px;
+      margin-top: 6px;
+      overflow: hidden;
+      border-radius: var(--ce-radius-pill);
+      background: color-mix(in srgb, var(--ce-text-inverse) 12%, transparent);
+
+      span {
+        display: block;
+        height: 100%;
+        background: var(--ce-status-info);
+      }
     }
 
     .argumentClaim {
@@ -1964,6 +2072,36 @@ $glass-shadow: 0 8px 32px 0 color-mix(in srgb, var(--ce-compat-dark) 37%, transp
         min-height: 48px;
       }
 
+      .pileCardLink {
+        display: block;
+        color: inherit;
+        text-decoration: none;
+        cursor: pointer;
+
+        &:hover,
+        &:focus-visible {
+          border-color: var(--ce-status-info);
+        }
+
+        &:focus-visible {
+          outline: 2px solid var(--ce-focus-ring);
+          outline-offset: 2px;
+        }
+      }
+
+      .pileCardAction {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 6px;
+        margin-top: 10px;
+        color: color-mix(in srgb, var(--ce-status-info) 50%, var(--ce-text-inverse));
+        font-size: 0.75rem;
+        font-weight: 800;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+
       .typeBadge {
         display: inline-flex;
         align-items: center;
@@ -2013,38 +2151,33 @@ $glass-shadow: 0 8px 32px 0 color-mix(in srgb, var(--ce-compat-dark) 37%, transp
         pointer-events: none;
         user-select: none;
 
+        // The session's own answer buttons' colours and shape.
         > span {
           display: inline-flex;
           align-items: center;
           justify-content: center;
           flex: 1 1 0;
           min-width: 110px;
-          padding: 6px 14px;
-          border-radius: var(--ce-radius-pill);
-          border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 12%, transparent);
-          font-size: 0.8rem;
-          font-weight: 700;
-          color: var(--ce-color-white);
-          letter-spacing: 0.02em;
-          background: color-mix(in srgb, var(--ce-text-inverse) 5%, transparent);
+          padding: 8px 14px;
+          border-radius: var(--ce-radius-4);
+          border: 0;
+          font-size: 1rem;
+          font-weight: 600;
         }
 
         > span:nth-child(1) {
-          background: color-mix(in srgb, var(--ce-status-success-text) 16%, transparent);
-          border-color: color-mix(in srgb, var(--ce-status-success-text) 30%, transparent);
-          color: color-mix(in srgb, var(--ce-status-success-text) 92%, var(--ce-text-inverse));
+          background: var(--ce-binary-choice-agree-bg);
+          color: var(--ce-binary-choice-agree-text);
         }
 
         > span:nth-child(2) {
-          background: color-mix(in srgb, var(--ce-status-warning) 16%, transparent);
-          border-color: color-mix(in srgb, var(--ce-status-warning) 28%, transparent);
-          color: color-mix(in srgb, var(--ce-status-warning) 94%, var(--ce-text-inverse));
+          background: var(--ce-binary-choice-unsure-bg);
+          color: var(--ce-color-black);
         }
 
         > span:nth-child(3) {
-          background: color-mix(in srgb, var(--ce-status-error) 15%, transparent);
-          border-color: color-mix(in srgb, var(--ce-status-error) 28%, transparent);
-          color: var(--ce-status-danger-text);
+          background: var(--ce-binary-choice-disagree-bg);
+          color: var(--ce-binary-choice-disagree-text);
         }
       }
 
@@ -2161,7 +2294,8 @@ $glass-shadow: 0 8px 32px 0 color-mix(in srgb, var(--ce-compat-dark) 37%, transp
           color-mix(in srgb, var(--ce-text-inverse) 3.5%, transparent) 0%,
           color-mix(in srgb, var(--ce-text-inverse) 1.5%, transparent) 100%
         );
-        color: color-mix(in srgb, var(--ce-status-info-text) 42%, transparent);
+        // Muted, not faded: the card opens the question, so its preview must stay readable.
+        color: $text-muted;
         font-size: 0.95rem;
         font-style: italic;
         line-height: 1.5;
@@ -2671,6 +2805,13 @@ $glass-shadow: 0 8px 32px 0 color-mix(in srgb, var(--ce-compat-dark) 37%, transp
         width: 100%;
         padding: 4px 0 8px;
       }
+
+      .compassEmpty {
+        margin: 0 0 8px;
+        color: $text-main;
+        font-size: 0.9rem;
+        text-align: center;
+      }
     }
 
     @media (max-width: 640px) {
@@ -2703,91 +2844,6 @@ $glass-shadow: 0 8px 32px 0 color-mix(in srgb, var(--ce-compat-dark) 37%, transp
 
       .argumentColumns {
         flex-direction: column;
-      }
-    }
-
-    .commentsSection {
-      .comment {
-        display: flex;
-        gap: 15px;
-        margin-bottom: 20px;
-        background: color-mix(in srgb, var(--ce-text-inverse) 2%, transparent);
-        padding: 15px;
-        border-radius: var(--ce-radius-8);
-        .avatar {
-          width: 40px;
-          height: 40px;
-          border-radius: var(--ce-radius-round);
-          background: var(--ce-color-border);
-          flex-shrink: 0;
-          border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 20%, transparent);
-          object-fit: cover;
-        }
-        .commentContent {
-          .commentUser {
-            color: $primary-glow;
-            font-size: 0.9rem;
-            font-weight: bold;
-            display: block;
-            margin-bottom: 4px;
-          }
-          .commentText {
-            color: var(--ce-document-border);
-            font-size: 0.95rem;
-            line-height: 1.5;
-          }
-        }
-      }
-    }
-
-    .addCommentSection {
-      margin-top: 30px;
-      border-top: 1px solid color-mix(in srgb, var(--ce-text-inverse) 10%, transparent);
-      padding-top: 20px;
-      .toggleCommentBtn {
-        background: transparent;
-        color: $text-muted;
-        border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 20%, transparent);
-        padding: 8px 16px;
-        border-radius: var(--ce-radius-6);
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        &:hover {
-          color: var(--ce-color-white);
-          border-color: var(--ce-color-white);
-        }
-      }
-      .commentInputContainer {
-        margin-top: 15px;
-        textarea {
-          width: 100%;
-          background: var(--ce-color-black);
-          border: 1px solid var(--ce-color-border);
-          color: var(--ce-color-white);
-          padding: 15px;
-          border-radius: var(--ce-radius-8);
-          min-height: 100px;
-          font-family: inherit;
-          margin-bottom: 10px;
-          &:focus {
-            outline: none;
-            border-color: $primary-glow;
-          }
-        }
-        .submitBtn {
-          background: $primary-glow;
-          color: var(--ce-color-black);
-          border: none;
-          padding: 10px 20px;
-          border-radius: var(--ce-radius-6);
-          font-weight: bold;
-          cursor: pointer;
-          &:hover {
-            opacity: 0.9;
-          }
-        }
       }
     }
   }
@@ -2853,10 +2909,6 @@ $glass-shadow: 0 8px 32px 0 color-mix(in srgb, var(--ce-compat-dark) 37%, transp
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
   }
-
-  .debateMap .voteInputGroup {
-    animation: none !important;
-  }
 }
 
 @container ce-theme style(--ce-layout-profile: minimal-app) {
@@ -2868,46 +2920,12 @@ $glass-shadow: 0 8px 32px 0 color-mix(in srgb, var(--ce-compat-dark) 37%, transp
       text-shadow: none;
     }
 
-    .emptyState {
-      opacity: 1;
-      color: var(--ce-document-text-muted);
-    }
-
-    .categorySelector .categoryButton,
-    .categorySelector .categoryButton:hover {
-      color: var(--ce-control-text);
-      background: var(--ce-control-face);
-    }
-
-    .categorySelector .categoryButton.active {
-      color: var(--ce-selection-text);
-      background: var(--ce-selection-bg);
-      box-shadow: none;
-    }
-
-    .orgChartContainer {
-      background: var(--ce-document-surface);
-    }
-
-    .orgCard,
-    .orgCard:hover,
-    .orgCard.collapsed {
-      background: var(--ce-surface);
-      opacity: 1;
-
-      .cardHeader .nodeTitle,
-      .collapseBtn {
-        color: var(--ce-document-text);
-      }
-    }
-
     .flatNodeContainer .pathContainer .pathButton.pathButton {
       color: var(--ce-document-text);
       background: var(--ce-document-surface);
     }
 
-    .controls .viewModeSwitch,
-    .controls .atlasLayoutSwitch {
+    .controls .viewModeSwitch {
       background: var(--ce-control-face);
 
       button,
@@ -2924,9 +2942,7 @@ $glass-shadow: 0 8px 32px 0 color-mix(in srgb, var(--ce-compat-dark) 37%, transp
 
     .atlasViewContainer {
       .hotDebatesBtn,
-      .hotDebatesBtn:hover,
-      .backBtn,
-      .backBtn:hover {
+      .hotDebatesBtn:hover {
         background: var(--ce-control-face);
         color: var(--ce-control-text);
         box-shadow: none;
@@ -2999,7 +3015,8 @@ $glass-shadow: 0 8px 32px 0 color-mix(in srgb, var(--ce-compat-dark) 37%, transp
   }
 }
 
-@container ce-theme style(--ce-layout-profile: minimal-app) {
+// Classic's panel uses these readable pairs too, on the document surface below.
+@container ce-theme style(--ce-layout-profile: minimal-app) or style(--ce-layout-profile: desktop-window) {
   .debateMap .modalContent {
     background: var(--ce-overlay-surface);
     color: var(--ce-overlay-text);
@@ -3011,6 +3028,7 @@ $glass-shadow: 0 8px 32px 0 color-mix(in srgb, var(--ce-compat-dark) 37%, transp
     .collapseHeader > svg,
     .argumentClaim,
     .generatedSummarySection p,
+    .compassSection .compassEmpty,
     .historicalCaseTitle,
     .historicalCaseSummary,
     .historicalCaseDetailBlock p,
@@ -3055,8 +3073,27 @@ $glass-shadow: 0 8px 32px 0 color-mix(in srgb, var(--ce-compat-dark) 37%, transp
     .historicalCaseCard .historicalCaseDetailLabel,
     .historicalCaseExploitHeading,
     .generatedSummaryEyebrow,
+    .generatedSummaryToggle,
+    .questionsSection .pileCardAction,
     .argumentSource {
       color: var(--ce-link);
+    }
+
+    .generatedSummaryPositionHeader,
+    .generatedSummaryCount {
+      color: var(--ce-document-text);
+    }
+
+    .generatedSummaryPosition {
+      background: var(--ce-document-surface);
+    }
+
+    .generatedSummaryCount {
+      background: var(--ce-control-face);
+    }
+
+    .generatedSummaryShare {
+      background: var(--ce-document-border);
     }
 
     .historicalCaseTags span,
@@ -3089,7 +3126,14 @@ $glass-shadow: 0 8px 32px 0 color-mix(in srgb, var(--ce-compat-dark) 37%, transp
   }
 }
 
-@container ce-theme style(--ce-layout-profile: minimal-app) {
+@container ce-theme style(--ce-layout-profile: desktop-window) {
+  // Classic's overlay surface is dark, under the dark text these rules use.
+  .debateMap .modalContent {
+    background: var(--ce-document-surface);
+  }
+}
+
+@container ce-theme style(--ce-layout-profile: minimal-app) or style(--ce-layout-profile: desktop-window) {
   .debateMap .modalContent .questionsSection {
     .pileCard {
       background: var(--ce-document-surface);
@@ -3108,20 +3152,108 @@ $glass-shadow: 0 8px 32px 0 color-mix(in srgb, var(--ce-compat-dark) 37%, transp
       color: var(--ce-control-text);
       border-color: var(--ce-document-border);
     }
+  }
+}
 
-    .binaryPills > span:nth-child(1) {
-      background: var(--ce-response-agree-bg);
-      color: var(--ce-response-agree-text);
+// Classic draws the session's answers as raised buttons, so these are too.
+@container ce-theme style(--ce-layout-profile: desktop-window) {
+  .debateMap .modalContent .questionsSection .binaryPills > span:nth-child(n) {
+    border: 2px solid;
+    border-color: var(--ce-border-raised);
+    border-radius: 0;
+    background: var(--ce-control-face);
+    box-shadow: var(--ce-shadow-raised);
+    color: var(--ce-control-text);
+    font-weight: 400;
+  }
+}
+
+// On the light document surface each level's chip keeps its colour as a tint
+// behind dark text, and the tree's chart, cards and connectors and the list's
+// muted text take the document's own colours: the base draws them for the dark panel.
+@container ce-theme style(--ce-layout-profile: minimal-app) or style(--ce-layout-profile: desktop-window) {
+  .debateMap {
+    .flatNodeContainer .pathContainer .pathButton.pathButton {
+      color: var(--ce-document-text);
+
+      &.depth0 {
+        background: color-mix(in srgb, var(--ce-status-info) 14%, var(--ce-document-surface));
+        border-color: var(--ce-status-info);
+      }
+
+      &.depth1 {
+        background: color-mix(in srgb, var(--ce-data-series-8) 18%, var(--ce-document-surface));
+        border-color: var(--ce-data-series-8);
+      }
+
+      &.depth2 {
+        background: color-mix(in srgb, var(--ce-status-success-text) 14%, var(--ce-document-surface));
+        border-color: var(--ce-status-success-text);
+      }
+
+      &.depth3 {
+        background: color-mix(in srgb, var(--ce-status-warning) 18%, var(--ce-document-surface));
+        border-color: var(--ce-status-warning-text);
+      }
     }
 
-    .binaryPills > span:nth-child(2) {
-      background: var(--ce-response-unsure-bg);
-      color: var(--ce-response-unsure-text);
+    .flatNodeContainer .pathContainer .pathSeparator,
+    .flatNodeContainer .metaInfo,
+    .flatNodeContainer .metaInfo .expandIcon,
+    .controls .secondaryControls .filterGroup .filterLabel {
+      color: var(--ce-document-text-muted);
+      opacity: 1;
     }
 
-    .binaryPills > span:nth-child(3) {
-      background: var(--ce-response-disagree-bg);
-      color: var(--ce-response-disagree-text);
+    .emptyState {
+      opacity: 1;
+      color: var(--ce-document-text-muted);
+    }
+
+    .categorySelector .categoryButton,
+    .categorySelector .categoryButton:hover {
+      color: var(--ce-control-text);
+      background: var(--ce-control-face);
+    }
+
+    .categorySelector .categoryButton.active {
+      color: var(--ce-selection-text);
+      background: var(--ce-selection-bg);
+      box-shadow: none;
+    }
+
+    .orgChartContainer {
+      background: var(--ce-document-surface);
+    }
+
+    .orgCard,
+    .orgCard:hover,
+    .orgCard.collapsed {
+      background: var(--ce-surface);
+      opacity: 1;
+
+      .cardHeader .nodeTitle,
+      .collapseBtn {
+        color: var(--ce-document-text);
+      }
+    }
+
+    // A card's counts and icons, light on the dark panel, take the document's muted text.
+    .orgCard .cardStats,
+    .orgCard .cardStats svg,
+    .orgCard .cardStats .bookmark:hover {
+      color: var(--ce-document-text-muted);
+    }
+
+    .orgCard .cardStats .bookmark.bookmarked {
+      color: var(--ce-status-warning-text);
+      filter: none;
+    }
+
+    .orgChildrenContainer::before,
+    .orgChildrenRow::before,
+    .orgChildrenRow > .orgNodeWrapper::before {
+      background: var(--ce-document-border-strong);
     }
   }
 }

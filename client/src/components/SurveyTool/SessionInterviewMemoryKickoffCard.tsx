@@ -98,17 +98,14 @@ export default function SessionInterviewMemoryKickoffCard({
               <FontAwesomeIcon icon={promptCopied ? faCheck : faCopy} />
               <span>{promptCopied ? 'Copied' : 'Copy'}</span>
             </span>
-            <span>
-              {promptCopied
-                ? ' prompt to clipboard'
-                : ' and paste this prompt into ChatGPT or Claude to augment your interview and draft responses.'}
-            </span>
+            <span>{promptCopied ? ' prompt to clipboard' : ' and paste this prompt into ChatGPT or Claude.'}</span>
           </span>
         </div>
         <div className={styles.sessionAgentKickoffActions}>
           <button
             type="button"
             className={styles.sessionAgentKickoffToggle}
+            data-ce-control-appearance="frameless"
             onClick={() => {
               if (showAgentPrompt || compatible) onTogglePrompt();
             }}

@@ -39,7 +39,7 @@
 }
 
 .sessionContextLabel {
-  color: color-mix(in srgb, var(--ce-control-text) 62%, transparent);
+  color: var(--ce-control-text);
   font-size: 0.7rem;
   font-weight: 700;
   letter-spacing: 0.12em;
@@ -47,7 +47,7 @@
 }
 
 .sessionContextName {
-  color: var(--ce-color-white);
+  color: var(--ce-control-text);
   font-size: 1rem;
   font-weight: 700;
   overflow-wrap: anywhere;
@@ -59,13 +59,13 @@
   border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 14%, transparent);
   border-radius: var(--ce-radius-pill);
   background: color-mix(in srgb, var(--ce-compat-dark) 22%, transparent);
-  color: var(--ce-action-accent);
+  color: var(--ce-control-text);
   font-size: 0.82rem;
 }
 
 .sectionHeading {
   margin: 0 0 14px;
-  color: color-mix(in srgb, var(--ce-text-inverse) 50%, transparent);
+  color: var(--ce-control-text);
   font-size: 1.3rem;
   font-weight: 700;
 }
@@ -91,7 +91,7 @@
 
 .field label {
   margin: 0;
-  color: color-mix(in srgb, var(--ce-control-text) 72%, transparent);
+  color: var(--ce-control-text);
   font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -106,11 +106,8 @@
   width: 100%;
   min-height: 46px;
   padding: 12px 14px;
-  border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 20%, transparent);
   border-radius: var(--ce-radius-10);
   outline: none;
-  background: color-mix(in srgb, var(--ce-text-inverse) 8%, transparent);
-  color: var(--ce-color-white);
   font-family: var(--ce-font-mono);
   font-size: 1rem;
   transition:
@@ -124,19 +121,34 @@
   resize: vertical;
 }
 
+// The theme's own input colours outrank these otherwise, as in SessionSetup's .page.
+.field input,
+.field textarea,
+.accessSelect,
+.accessInput,
+.inlineInputRow input {
+  border: 1px solid var(--ce-input-border-strong) !important;
+  // Over an opaque surface, since a translucent input fill would otherwise add up with every layer under it.
+  background: linear-gradient(var(--ce-input-bg), var(--ce-input-bg)), var(--ce-surface) !important;
+  color: var(--ce-control-text) !important;
+  -webkit-text-fill-color: var(--ce-control-text);
+}
+
 .field input:focus,
 .field textarea:focus,
 .accessSelect:focus,
 .accessInput:focus,
 .inlineInputRow input:focus {
-  border-color: var(--ce-action-accent);
-  background: color-mix(in srgb, var(--ce-text-inverse) 12%, transparent);
+  border-color: var(--ce-action-accent) !important;
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--ce-action-accent) 15%, transparent);
 }
 
 .field input::placeholder,
-.field textarea::placeholder {
-  color: color-mix(in srgb, var(--ce-text-inverse) 48%, transparent);
+.field textarea::placeholder,
+.accessInput::placeholder,
+.inlineInputRow input::placeholder {
+  color: color-mix(in srgb, var(--ce-control-text) 78%, transparent) !important;
+  -webkit-text-fill-color: color-mix(in srgb, var(--ce-control-text) 78%, transparent);
 }
 
 .imageColumn {
@@ -165,7 +177,7 @@
 
 .metadataCard > label {
   margin: 0;
-  color: color-mix(in srgb, var(--ce-control-text) 72%, transparent);
+  color: var(--ce-control-text);
   font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -184,7 +196,7 @@
   border: 1px solid color-mix(in srgb, var(--ce-action-accent) 35%, transparent);
   border-radius: var(--ce-radius-8);
   background: color-mix(in srgb, var(--ce-action-accent) 10%, transparent);
-  color: var(--ce-action-accent);
+  color: var(--ce-control-text);
   cursor: pointer;
 }
 
@@ -209,7 +221,7 @@
   border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 14%, transparent);
   border-radius: var(--ce-radius-pill);
   background: color-mix(in srgb, var(--ce-text-inverse) 7%, transparent);
-  color: color-mix(in srgb, var(--ce-control-text) 80%, transparent);
+  color: var(--ce-control-text);
   font-size: 0.78rem;
 }
 
@@ -231,7 +243,7 @@
 }
 
 .imageLabel {
-  color: color-mix(in srgb, var(--ce-control-text) 72%, transparent);
+  color: var(--ce-control-text);
   font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -262,14 +274,14 @@
 }
 
 .accessLabel {
-  color: var(--ce-color-white);
+  color: var(--ce-control-text);
   font-size: 0.98rem;
   font-weight: 700;
 }
 
 .accessHelp,
 .formHelp {
-  color: color-mix(in srgb, var(--ce-control-text) 68%, transparent);
+  color: var(--ce-control-text);
   font-size: 0.86rem;
   line-height: 1.45;
 }
@@ -280,7 +292,7 @@
   border: 1px solid color-mix(in srgb, var(--ce-action-accent) 28%, transparent);
   border-radius: var(--ce-radius-pill);
   background: color-mix(in srgb, var(--ce-action-accent) 8%, transparent);
-  color: var(--ce-action-accent);
+  color: var(--ce-control-text);
   font-size: 0.82rem;
   white-space: nowrap;
 }
@@ -295,7 +307,7 @@
   border: 1px solid color-mix(in srgb, var(--ce-text-inverse) 14%, transparent);
   border-radius: var(--ce-radius-10);
   background: color-mix(in srgb, var(--ce-text-inverse) 5%, transparent);
-  color: color-mix(in srgb, var(--ce-control-text) 82%, transparent);
+  color: var(--ce-control-text);
   line-height: 1.45;
 }
 
@@ -312,7 +324,7 @@
 
 .messageBody p {
   margin: 0;
-  color: color-mix(in srgb, var(--ce-control-text) 78%, transparent);
+  color: var(--ce-control-text);
   line-height: 1.5;
 }
 
@@ -321,7 +333,7 @@
   border: 1px solid color-mix(in srgb, var(--ce-action-accent) 55%, transparent);
   border-radius: var(--ce-radius-pill);
   background: color-mix(in srgb, var(--ce-action-accent) 12%, transparent);
-  color: var(--ce-action-accent);
+  color: var(--ce-control-text);
   cursor: pointer;
   font-family: var(--ce-font-mono);
   font-weight: 700;
@@ -347,25 +359,5 @@
 @container ce-theme style(--ce-layout-profile: minimal-app) {
   .sessionContextLabel {
     color: var(--ce-panel-text-muted);
-  }
-
-  .sessionContextName,
-  .sectionHeading,
-  .accessLabel {
-    color: var(--ce-control-text);
-  }
-
-  .field input[type],
-  .field textarea,
-  .accessSelect,
-  .accessInput,
-  .inlineInputRow input[type] {
-    background: var(--ce-input-bg);
-    color: var(--ce-control-text);
-    border-color: var(--ce-input-border-strong);
-
-    &:focus {
-      background: var(--ce-input-bg);
-    }
   }
 }

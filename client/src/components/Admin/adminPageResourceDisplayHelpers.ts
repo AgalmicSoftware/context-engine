@@ -20,6 +20,25 @@ const LIT_CHIPOTLE_NOT_CONFIGURED_META =
 const asRecord = (value: unknown): Record<string, unknown> =>
   value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
 
+const parseResourceDisplayAmount = (display: unknown): number | null => {
+  const match = toStr(display)
+    .trim()
+    .match(/^([0-9]+(?:\.[0-9]+)?)\s+(AR|ETH)$/i);
+  if (!match) return null;
+  const amount = Number(match[1]);
+  return Number.isFinite(amount) ? amount : null;
+};
+
+export const shouldShowInlineResourceSummary = (resource: Partial<AdminResourceDisplayState> = {}): boolean => {
+  if (resource?.manualRefreshAvailable === true) return true;
+  const display = toStr(resource?.display).trim();
+  if (!display) return false;
+  if (resource?.loading || display === 'Loading...') return true;
+  if (['Invalid JWK', 'Invalid key', 'Unable to load balance', 'RPC unavailable'].includes(display)) return true;
+  const amount = parseResourceDisplayAmount(display);
+  return amount != null && amount > 0;
+};
+
 export const buildAdminArweaveEmptyResource = (): AdminResourceDisplayState => ({
   address: '',
   display: 'No JWK entered',

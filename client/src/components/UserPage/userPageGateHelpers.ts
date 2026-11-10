@@ -33,6 +33,7 @@ type BuildUserPageResponseDecryptRequestPlanInput = BuildUserPageResponseDecrypt
   provider?: unknown;
 };
 type BuildUserPageDecryptedResponseStatePatchInput = {
+  responseIdentity?: string;
   patchedResponse?: unknown;
   previousState?: unknown;
   questionId?: unknown;
@@ -1037,7 +1038,20 @@ export const buildUserPageResponseDecryptRequestPlan = ({
   };
 };
 
+export const getUserPageResponseImmutableIdentity = (value: unknown): string => {
+  const response = toAnalysisRecord(value);
+  const storageRef = toAnalysisRecord(response.storageRef ?? response.responseStorageRef);
+  if (typeof storageRef.id === 'string' && storageRef.id)
+    return `storage:${String(storageRef.backend || '')}:${storageRef.id}`;
+  if (typeof response.arweaveTxId === 'string' && response.arweaveTxId) return `arweave:${response.arweaveTxId}`;
+  const transactionHash = response.transactionHash || response.txHash;
+  return typeof transactionHash === 'string' && transactionHash
+    ? `transaction:${transactionHash.toLowerCase()}:${String(response.logIndex ?? '')}`
+    : '';
+};
+
 export const buildUserPageDecryptedResponseStatePatch = ({
+  responseIdentity,
   patchedResponse = null,
   previousState = null,
   questionId = '',
@@ -1055,18 +1069,27 @@ export const buildUserPageDecryptedResponseStatePatch = ({
   const nextDetailedQuestionResponses: UserPageUnknownRecord = { ...prevDetailedQuestionResponses };
   const nextDetailedSurveyResponses: UserPageUnknownRecord = { ...prevDetailedSurveyResponses };
   let didUpdate = false;
+  const immutableIdentity = responseIdentity ?? getUserPageResponseImmutableIdentity(responseOverride);
+  const matches = (current: unknown) =>
+    current === responseOverride ||
+    (!!immutableIdentity && getUserPageResponseImmutableIdentity(current) === immutableIdentity);
+  const patchCurrent = (current: unknown) => {
+    const original = toAnalysisRecord(responseOverride);
+    const patch = toAnalysisRecord(patchedResponse);
+    // Preserve a different field decrypted while this request was pending.
+    return {
+      ...toAnalysisRecord(current),
+      ...(patch.answer !== original.answer ? { answer: patch.answer } : {}),
+      ...(patch.additional !== original.additional ? { additional: patch.additional } : {}),
+    };
+  };
 
   Object.keys(nextDetailedQuestionResponses).forEach((questionKey: string) => {
-    if (nextDetailedQuestionResponses[questionKey] === responseOverride) {
-      nextDetailedQuestionResponses[questionKey] = patchedResponse;
+    if (questionKey.toLowerCase() === qid && matches(nextDetailedQuestionResponses[questionKey])) {
+      nextDetailedQuestionResponses[questionKey] = patchCurrent(nextDetailedQuestionResponses[questionKey]);
       didUpdate = true;
     }
   });
-
-  if (!didUpdate && Object.prototype.hasOwnProperty.call(nextDetailedQuestionResponses, qid)) {
-    nextDetailedQuestionResponses[qid] = patchedResponse;
-    didUpdate = true;
-  }
 
   Object.keys(nextDetailedSurveyResponses).forEach((surveyId: string) => {
     const surveyEntries = nextDetailedSurveyResponses[surveyId];
@@ -1075,11 +1098,16 @@ export const buildUserPageDecryptedResponseStatePatch = ({
     const updatedEntries = surveyEntries.map((entry: unknown) => {
       const entryRecord = toAnalysisRecord(entry);
       if (!Object.keys(entryRecord).length) return entry;
-      if (entryRecord.responseData !== responseOverride) return entry;
+      const questionData = toAnalysisRecord(entryRecord.questionData);
+      if (
+        String(questionData.id || questionData.questionID || '').toLowerCase() !== qid ||
+        !matches(entryRecord.responseData)
+      )
+        return entry;
       surveyEntriesChanged = true;
       return {
         ...entryRecord,
-        responseData: patchedResponse,
+        responseData: patchCurrent(entryRecord.responseData),
       };
     });
     if (surveyEntriesChanged) {

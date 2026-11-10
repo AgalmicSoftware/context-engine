@@ -149,6 +149,29 @@ describe('buildUsersFromCaches', () => {
     expect(users[1].surveys).toEqual([]);
   });
 
+  it('prefers the canonical public comment over aliases', () => {
+    const [user] = buildUsersFromCaches(
+      [ADDRESS_A],
+      [],
+      [
+        {
+          1: {
+            questionResponses: {
+              q1: {
+                [ADDRESS_A]: {
+                  answer: { value: 'Agree' },
+                  additional: { value: 'Canonical explanation' },
+                  additionalComment: 'Alias',
+                },
+              },
+            },
+          },
+        },
+      ],
+    );
+    expect(user.questions[0].additionalComment).toBe('Canonical explanation');
+  });
+
   it('keeps locked-name SBTs visible with masked display labels', () => {
     const users = buildUsersFromCaches(
       ['0xUser1'],

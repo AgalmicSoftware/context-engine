@@ -4,6 +4,7 @@ import { toStr } from '../../utilities/shared/primitives.js';
 import { sessionRegistryUtils } from '../../utilities/web3/sessionRegistry.js';
 import { normalizeWorkerUrl as normalizeWorkerAuthUrl } from '../../utilities/worker/workerAuth.js';
 import type { ChainIdLike } from '../shellTypes';
+import { GROUP_CONVERSATION_MODE_QUERY_VALUE } from '../SurveyTool/sessionVoiceModeQuery';
 
 const log = createLogger('general');
 
@@ -58,7 +59,7 @@ export const normalizeSessionWizardWorkerUrl = (url: unknown): string => normali
 const resolveBrowserOrigin = (): string =>
   typeof window !== 'undefined' && window.location ? toStr(window.location.origin).trim() : '';
 
-const normalizeShareableWorkerOrigin = (value: unknown): string => {
+export const normalizeShareableWorkerOrigin = (value: unknown): string => {
   try {
     const parsed = new URL(toStr(value).trim());
     if (!/^https?:$/.test(parsed.protocol) || parsed.username || parsed.password) return '';
@@ -86,6 +87,18 @@ export const buildSessionWizardSessionUrl = ({
   if (normalizedWorkerOrigin) params.set('worker', normalizedWorkerOrigin);
   const query = params.toString();
   return `${base}/session/${encodeURIComponent(normalizedSlug)}${query ? `?${query}` : ''}`;
+};
+
+/**
+ * A session link, keeping any Worker pin, with ?mode=groupRecording: it opens
+ * the Group Conversation recorder, which records only once Record is pressed.
+ */
+export const buildGroupRecorderLink = (sessionUrl: string): string => {
+  const [base, query = ''] = toStr(sessionUrl).split('#')[0].split('?');
+  if (!base) return '';
+  const params = new URLSearchParams(query);
+  params.set('mode', GROUP_CONVERSATION_MODE_QUERY_VALUE);
+  return `${base}?${params}`;
 };
 
 export const buildSessionWizardAdminUrl = ({

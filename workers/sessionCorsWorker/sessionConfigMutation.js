@@ -1,3 +1,13 @@
+import {
+  CURATED_ID_LIST_KEYS,
+  MAX_CURATED_IDS,
+  MAX_RESULTS_ADMINS,
+  WORKER_CANONICAL_SET_CONFIG_KEYS,
+  mergeSetConfigAi,
+  sessionConfigRequiresReauthorization,
+  validCuratedIdList,
+  validResultsAdminAddresses,
+} from '../../shared/sessionConfigEdits.mjs';
 import { validSessionAgentConfig } from '../../shared/sessionAgentConfig.mjs';
 import { DEFAULT_INTERVIEW_SETTINGS, validInterviewSettings } from '../../shared/interviewSettings.mjs';
 import { normalizeSessionIdHex } from '../../shared/auth/siweMessage.mjs';
@@ -10,6 +20,7 @@ import {
 import { validateWorkerConfigModeValues } from '../shared/workerConfigModeValidation.mjs';
 import { normalizeWorkerSessionAppearance } from '../shared/sessionColorSchemeConfig.mjs';
 import { validResultsAnalysisSettings } from '../../shared/resultsAnalysisSettings.mjs';
+import { validateSessionContext } from '../../shared/sessionContext.mjs';
 import {
   mergeWorkerConfigRecords,
   mergeWorkerLimitRecords,
@@ -23,54 +34,7 @@ import {
 const WORKER_CANONICAL_PUBLICATION_REVISION_KEY = 'workerCanonicalPublicationRevision';
 const WORKER_GROUPS_BOOTSTRAP_KEY = 'workerGroupsBootstrap';
 const REGISTRY_CANONICAL_AUTHORITY_MODES = new Set(['evm_registry_canonical', 'registry_canonical']);
-const WORKER_CANONICAL_SET_CONFIG_KEYS = new Set([
-  'slug',
-  'sessionId',
-  'sessionIdHex',
-  'configRevision',
-  'sessionName',
-  'sessionInfo',
-  'sessionContext',
-  'appearance',
-  'sessionHeaderImg',
-  'sessionEndsAt',
-  'defaultTags',
-  'defaultGroupTags',
-  'defaultSbtTags',
-  'questionsGenPrompt',
-  'interviewMode',
-  'interviewModeEnabled',
-  'pileAutoAdvanceEnabled',
-  'defaultFilterState',
-  'defaultFeaturedSBTs',
-  'autoFeatureSBTsBySessionSlug',
-  'adminAddress',
-  'adminAddresses',
-  'corsWorkerUrl',
-  'allowOrigins',
-  'sessionModeProfile',
-  'agentSessionWrapped',
-  'agentHttp',
-  'resultsExposure',
-  'workerAuthority',
-  'workerRoles',
-  'roles',
-  'authorization',
-  'groupCreationPolicy',
-  'storageProfile',
-  'storageEnvelope',
-  'ai',
-  'limits',
-  'scopes',
-  'networkChainId',
-  'contracts',
-  'embeddedDeployHelperEnabled',
-  'litCredentials',
-  'resultsAnalysis',
-  'responseFieldEncryption',
-  'linkedWorkerGroups',
-  WORKER_GROUPS_BOOTSTRAP_KEY,
-]);
+const WORKER_CANONICAL_SET_CONFIG_KEY_SET = new Set(WORKER_CANONICAL_SET_CONFIG_KEYS);
 
 const toTrimmedString = (value) => (
   typeof value === 'string'
@@ -85,6 +49,10 @@ const validGroupCreationPolicy = (config) =>
   !hasOwn(config, 'groupCreationPolicy') ||
   config?.groupCreationPolicy === 'admin_only' ||
   config?.groupCreationPolicy === 'participants';
+const validContextAdditionPolicy = (config) =>
+  !hasOwn(config, 'contextAdditionPolicy') ||
+  config?.contextAdditionPolicy === 'admin_only' ||
+  config?.contextAdditionPolicy === 'participants';
 const validAllowOrigins = (config) =>
   !hasOwn(config, 'allowOrigins') ||
   !Array.isArray(config?.allowOrigins) ||
@@ -138,7 +106,7 @@ const workerCanonicalUsesChain = (config) => (
 const validateWorkerCanonicalIncomingFields = ({ incomingConfig, mergedConfig } = {}) => {
   if (getWorkerAuthorityMode(mergedConfig) !== 'worker_canonical') return { ok: true };
   const unsupportedKey = Object.keys(incomingConfig || {}).find(
-    (key) => !WORKER_CANONICAL_SET_CONFIG_KEYS.has(key),
+    (key) => !WORKER_CANONICAL_SET_CONFIG_KEY_SET.has(key),
   );
   if (unsupportedKey) {
     return {
@@ -338,6 +306,9 @@ export const applySessionConfigMutation = ({ existingConfig, mutation, slug } = 
     if (!validGroupCreationPolicy(incomingConfig)) {
       return { ok: false, status: 400, error: 'Invalid group creation policy.' };
     }
+    if (!validContextAdditionPolicy(incomingConfig)) {
+      return { ok: false, status: 400, error: 'Invalid context addition policy.' };
+    }
     if (!validAppearanceConfig(incomingConfig)) {
       return { ok: false, status: 400, error: 'Invalid session appearance config.' };
     }
@@ -349,6 +320,30 @@ export const applySessionConfigMutation = ({ existingConfig, mutation, slug } = 
     }
     if (!validResultsAnalysisSettingsConfig(incomingConfig)) {
       return { ok: false, status: 400, error: 'Invalid results analysis settings config.' };
+    }
+    const invalidIdList = CURATED_ID_LIST_KEYS.find(
+      (key) => hasOwn(incomingConfig, key) && !validCuratedIdList(incomingConfig[key]),
+    );
+    if (invalidIdList) {
+      return {
+        ok: false,
+        status: 400,
+        error: `${invalidIdList} must be a list of at most ${MAX_CURATED_IDS} IDs.`,
+      };
+    }
+    if (hasOwn(incomingConfig, 'resultsAdminAddresses') && !validResultsAdminAddresses(incomingConfig.resultsAdminAddresses)) {
+      return {
+        ok: false,
+        status: 400,
+        error: `resultsAdminAddresses must list at most ${MAX_RESULTS_ADMINS} different addresses.`,
+      };
+    }
+    // Only a sent context is checked, so a stored one from before these limits
+    // never blocks an unrelated edit. The stored form is the writer's output.
+    if (hasOwn(incomingConfig, 'sessionContext')) {
+      const context = validateSessionContext(incomingConfig.sessionContext);
+      if (!context.ok) return { ok: false, status: 400, error: `Invalid session context: ${context.errors[0].message}` };
+      incomingConfig = { ...incomingConfig, sessionContext: context.value };
     }
     // A patch may update the profile without resending the already-persisted
     // canonical storage object. The complete merged record below remains
@@ -362,6 +357,11 @@ export const applySessionConfigMutation = ({ existingConfig, mutation, slug } = 
         status: 400,
         error: `Invalid session config mode at ${incomingModeValidation.path}.`,
       };
+    }
+    // Merged after the checks above, so they judge only what was sent; the
+    // complete record is checked again below.
+    if (hasOwn(incomingConfig, 'ai')) {
+      incomingConfig = { ...incomingConfig, ai: mergeSetConfigAi(existing.ai, incomingConfig.ai) };
     }
     mergedConfig = mergeWorkerConfigRecords({ existingConfig: existing, incomingConfig, slug });
   } else if (kind === 'set-limits') {
@@ -404,6 +404,9 @@ export const applySessionConfigMutation = ({ existingConfig, mutation, slug } = 
   }
   if (!validGroupCreationPolicy(mergedConfig)) {
     return { ok: false, status: 400, error: 'Invalid group creation policy.' };
+  }
+  if (!validContextAdditionPolicy(mergedConfig)) {
+    return { ok: false, status: 400, error: 'Invalid context addition policy.' };
   }
   if (!validAppearanceConfig(mergedConfig)) {
     return { ok: false, status: 400, error: 'Invalid session appearance config.' };
@@ -471,6 +474,8 @@ export const applySessionConfigMutation = ({ existingConfig, mutation, slug } = 
   if (nextEpoch === null) {
     return { ok: false, status: 409, error: 'Authorization epoch is invalid.' };
   }
+  if (Object.keys(authorityExisting).length &&
+      !sessionConfigRequiresReauthorization(comparisonExisting, publicationWrite.config)) return publicationWrite;
   return {
     ...publicationWrite,
     config: {

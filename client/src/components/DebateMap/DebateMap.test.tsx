@@ -1386,6 +1386,121 @@ describe('DebateMap', () => {
     expect(mockNavigate).toHaveBeenCalledWith('/tag/AI%20Safety?session=edge');
   });
 
+  describe('a session page atlas', () => {
+    const sessionTree = [
+      {
+        id: 'b1',
+        name: 'Organizing',
+        compass: {
+          xAxis: { label: 'Pace', left: 'Slow', right: 'Fast' },
+          yAxis: { label: 'Scope', top: 'Local', bottom: 'Global' },
+          points: [{ name: 'Go slow', x: 0.2, y: 0.8, type: 'debater' }],
+        },
+        children: [
+          {
+            id: 't1',
+            name: 'Pilots',
+            depth: 1,
+            compass: {
+              xAxis: { label: 'Risk', left: 'Careful', right: 'Bold' },
+              yAxis: { label: 'Who', top: 'Locals', bottom: 'Experts' },
+              points: [],
+            },
+            questions: [{ id: '0xq1', question: 'Should pilots start local?', questionType: 'binary' }],
+          },
+        ],
+      },
+    ];
+    const renderSessionAtlas = (props: Record<string, unknown> = {}) =>
+      render(
+        <MemoryRouter>
+          <DebateMapComponent readOnly hideDemoModeToggle embedded treeData={sessionTree} {...props} />
+        </MemoryRouter>,
+      );
+
+    it('closes a node without leaving the session page', async () => {
+      mockNavigate.mockClear();
+      renderSessionAtlas({ requestedModalNodeId: 'b1' });
+      expect(await screen.findByRole('heading', { name: 'Organizing' })).toBeInTheDocument();
+      fireEvent.click(screen.getByTitle('Close'));
+      await waitFor(() => expect(screen.queryByRole('heading', { name: 'Organizing' })).not.toBeInTheDocument());
+      expect(mockNavigate).not.toHaveBeenCalled();
+    });
+
+    it("copies the session's own link for a node", async () => {
+      const writeText = jest.fn(async (_text: string) => undefined);
+      Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+      renderSessionAtlas({
+        requestedModalNodeId: 't1',
+        buildNodeLink: (nodeId: string) => `/atlas/${nodeId}?session=salon`,
+      });
+      fireEvent.click(await screen.findByTitle('Copy Deep Link URL'));
+      await waitFor(() => expect(writeText).toHaveBeenCalledWith('http://localhost/atlas/t1?session=salon'));
+    });
+
+    it('keeps the demo atlas four levels when none are named', () => {
+      render(
+        <MemoryRouter>
+          <DebateMapComponent hideDemoModeToggle embedded treeData={sessionTree} />
+        </MemoryRouter>,
+      );
+      const legend = screen.getAllByTestId(E2E_TESTIDS.DEBATE_VIEW_MODE)[0].parentElement as HTMLElement;
+      for (const level of ['Category', 'Sub-Category', 'Topic', 'Instance']) {
+        expect(within(legend).getByText(level)).toBeInTheDocument();
+      }
+    });
+
+    it('names the levels it has, in a panel and in the legend', async () => {
+      renderSessionAtlas({ requestedModalNodeId: 't1', levelLabels: ['Category', 'Topic'] });
+      const modal = (await screen.findByRole('heading', { name: 'Pilots' })).closest(
+        '[class*="modalContent"]',
+      ) as HTMLElement;
+      expect(within(modal).getByText('Topic')).toBeInTheDocument();
+      expect(within(modal).queryByText('Sub-Category')).not.toBeInTheDocument();
+      // The view switch carries the legend of levels.
+      const legend = screen.getAllByTestId(E2E_TESTIDS.DEBATE_VIEW_MODE)[0].parentElement as HTMLElement;
+      expect(within(legend).getByText('Category')).toBeInTheDocument();
+      expect(within(legend).getByText('Topic')).toBeInTheDocument();
+      expect(within(legend).queryByText('Sub-Category')).not.toBeInTheDocument();
+      expect(within(legend).queryByText('Instance')).not.toBeInTheDocument();
+    });
+
+    it('opens each question on its own page to answer', async () => {
+      renderSessionAtlas({
+        requestedModalNodeId: 't1',
+        buildQuestionLink: (questionId: string) => `/question/${questionId}?session=salon`,
+      });
+      const modal = (await screen.findByRole('heading', { name: 'Pilots' })).closest(
+        '[class*="modalContent"]',
+      ) as HTMLElement;
+      fireEvent.click(within(modal).getByText('Questions'));
+      const card = within(modal).getByRole('link', {
+        name: 'Answer: Should pilots start local? (opens in a new tab)',
+      });
+      expect(card).toHaveAttribute('href', '/question/0xq1?session=salon');
+      expect(card).toHaveAttribute('target', '_blank');
+      expect(card).toHaveAttribute('rel', expect.stringContaining('noopener'));
+      // The answers look like the session's buttons but stay out of the reading order.
+      expect(within(card).getByText('Agree').closest('[aria-hidden="true"]')).not.toBeNull();
+    });
+
+    it('asks for a category before drawing the tree chart', () => {
+      renderSessionAtlas();
+      fireEvent.click(getDebateViewModeButton('tree'));
+      expect(screen.getByText('Select a category above to view the Tree Chart')).toBeInTheDocument();
+    });
+
+    it('gives a category its compass and says when no one is placed on one', async () => {
+      const { unmount } = renderSessionAtlas({ requestedModalNodeId: 'b1' });
+      expect(await screen.findByTestId('atlas-compass')).toHaveTextContent('Pace');
+      expect(screen.queryByText('No one is placed on this compass yet.')).not.toBeInTheDocument();
+      unmount();
+      renderSessionAtlas({ requestedModalNodeId: 't1' });
+      expect(await screen.findByTestId('atlas-compass')).toHaveTextContent('Risk');
+      expect(screen.getByText('No one is placed on this compass yet.')).toBeInTheDocument();
+    });
+  });
+
   it('opens a requested atlas node modal and notifies the parent when it closes', async () => {
     mockNavigate.mockClear();
     const onModalClose = jest.fn();

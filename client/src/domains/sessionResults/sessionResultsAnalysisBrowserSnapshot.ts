@@ -1,3 +1,5 @@
+import { optionsOf } from '../../../../shared/questions/answerValue.mjs';
+import { hasAuthorEncryptedText } from '../../utilities/survey/authorEncryptedQuestion';
 import { normalizeRatingScale } from '../../utilities/survey/ratingValue';
 import { isResponseAllowedForSessionSlug } from '../../utilities/session/responseSessionScope';
 
@@ -62,9 +64,11 @@ const questionIsHydratedForSession = (question: RecordLike, sessionSlug: string)
 };
 
 export const buildResultsAnalysisBrowserSnapshotFromCacheNode = ({
+  hiddenQuestionIds,
   networkNode,
   sessionSlug = '',
 }: {
+  hiddenQuestionIds?: Set<string>;
   networkNode?: unknown;
   sessionSlug?: unknown;
 } = {}): ResultsAnalysisBrowserSnapshotResult => {
@@ -81,12 +85,18 @@ export const buildResultsAnalysisBrowserSnapshotFromCacheNode = ({
   Object.entries(questionsById).forEach(([questionId, questionRaw]) => {
     const question = toRecord(questionRaw);
     if (!questionIsHydratedForSession(question, normalizedSlug)) return;
+    if (hiddenQuestionIds?.has(questionId.toLowerCase())) return;
+    // The Worker stores this snapshot for every Results viewer, so encrypted questions and their answers stay out.
+    if (hasAuthorEncryptedText(question)) return;
     const type = toText(question.type || question.questionType);
     questions.push({
       id: toText(question.id || questionId),
       prompt: toText(question.prompt || question.text || question.title || question.question),
       type,
-      options: toArray(question.options).map(toText).filter(Boolean),
+      // Trimmed only, as the Worker does: answers must still match their option exactly.
+      options: optionsOf(question)
+        .map((option) => option.trim())
+        .filter(Boolean),
       tags: toArray(question.tags).map(toText).filter(Boolean),
       ...(type === 'rating' ? { scale: normalizeRatingScale(question) } : {}),
       ...(type === 'multichoice'

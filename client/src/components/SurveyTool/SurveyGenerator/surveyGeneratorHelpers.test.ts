@@ -144,7 +144,9 @@ describe('surveyGeneratorHelpers', () => {
   });
 
   it('recognizes supported additional files by mime type or extension', () => {
-    expect(isSupportedAdditionalFile({ name: 'deck.bin', type: 'application/vnd.ms-powerpoint' })).toBe(true);
+    expect(isSupportedAdditionalFile({ name: 'deck.bin', type: 'application/vnd.ms-powerpoint' })).toBe(false);
+    expect(isSupportedAdditionalFile({ name: 'memo.pdf', type: 'application/pdf' })).toBe(false);
+    expect(isSupportedAdditionalFile({ name: 'memo.txt', type: 'text/plain' })).toBe(true);
     expect(isSupportedAdditionalFile({ name: 'dataset.json', type: '' })).toBe(true);
     expect(isSupportedAdditionalFile({ name: 'photo.png', type: 'image/png' })).toBe(false);
   });
@@ -391,11 +393,7 @@ describe('surveyGeneratorHelpers', () => {
 
     const result = buildGeneratedSurveyStatements({
       aiData,
-      questionTypes: {
-        binary: true,
-        rating: false,
-        multichoice: true,
-      },
+      selectedTypes: ['binary', 'multichoice'],
       count: 5,
       fallbackTitle: 'Fallback Title',
     });
@@ -426,7 +424,7 @@ describe('surveyGeneratorHelpers', () => {
           { questionType: 'binary', prompt: 'Second' },
         ],
       },
-      questionTypes: { binary: true },
+      selectedTypes: ['binary'],
       count: 1,
       fallbackTitle: ' Fallback Title ',
     });
@@ -449,7 +447,7 @@ describe('surveyGeneratorHelpers', () => {
           { questionType: 'binary', prompt: 'Keep this?' },
         ],
       } as unknown as Parameters<typeof buildGeneratedSurveyStatements>[0]['aiData'],
-      questionTypes: { binary: true, freeform: true, multichoice: true, quadratic: true },
+      selectedTypes: ['binary', 'freeform', 'multichoice', 'quadratic'],
       count: 2,
     });
 
@@ -462,7 +460,7 @@ describe('surveyGeneratorHelpers', () => {
   it('returns no statements when the AI payload has no question array', () => {
     const result = buildGeneratedSurveyStatements({
       aiData: { questions: null } as unknown as Parameters<typeof buildGeneratedSurveyStatements>[0]['aiData'],
-      questionTypes: { binary: true },
+      selectedTypes: ['binary'],
       count: 3,
     });
 
@@ -479,15 +477,10 @@ describe('surveyGeneratorHelpers', () => {
         '<SourceType>',
         '<MultiSpeakerHint>',
         '<GroupCustomInstructions>',
-        '<ClipDurationMinutes>',
       ].join('\n'),
       sourceDocContent: 'Source body',
       count: 15,
-      questionTypes: {
-        binary: true,
-        rating: false,
-        freeform: true,
-      },
+      selectedTypes: ['binary', 'freeform'],
       defaultTags: 'alpha, beta',
       transcriptMode: true,
       overrides: {
@@ -506,7 +499,6 @@ describe('surveyGeneratorHelpers', () => {
         'document',
         'likely_multiple_speakers',
         'Keep prompts concise.',
-        '',
       ].join('\n'),
     );
   });
@@ -516,9 +508,7 @@ describe('surveyGeneratorHelpers', () => {
       promptTemplate: ['<SourceDocContent>', '<DefaultTags>', '<GroupCustomInstructions>'].join('\n'),
       sourceDocContent: "source $& $$ $` $'",
       count: 3,
-      questionTypes: {
-        binary: true,
-      },
+      selectedTypes: ['binary'],
       defaultTags: ['$& default', '$$ tag'],
       sessionInstructions: "instructions $& $$ $` $'",
     });
@@ -531,9 +521,7 @@ describe('surveyGeneratorHelpers', () => {
       promptTemplate: 'source=<SourceType>\nconditional=<SourceType>',
       sourceDocContent: '',
       count: 2,
-      questionTypes: {
-        freeform: true,
-      },
+      selectedTypes: ['freeform'],
       defaultTags: [],
       transcriptMode: true,
     });
@@ -542,16 +530,16 @@ describe('surveyGeneratorHelpers', () => {
     expect(prompt).not.toContain('<SourceType>');
   });
 
-  it('uses prompt defaults when no question types or overrides are selected', () => {
-    const prompt = buildSingleGenerationPrompt({
-      promptTemplate: '<Types>|<SourceType>|<MultiSpeakerHint>|<DefaultTags>',
-      sourceDocContent: '',
-      count: 10,
-      questionTypes: {},
-      defaultTags: null,
-      transcriptMode: false,
-    });
-
-    expect(prompt).toBe('binary,rating,freeform,multichoice,quadratic|text|unknown|');
+  it('refuses to build a generation prompt without selected question types', () => {
+    expect(() =>
+      buildSingleGenerationPrompt({
+        promptTemplate: '<Types>|<SourceType>|<MultiSpeakerHint>|<DefaultTags>',
+        sourceDocContent: '',
+        count: 10,
+        selectedTypes: [],
+        defaultTags: null,
+        transcriptMode: false,
+      }),
+    ).toThrow('Select at least one question type before generating.');
   });
 });

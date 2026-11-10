@@ -1,13 +1,15 @@
 import {
-  buildRedactedSessionResultsSnapshot,
+  buildSessionResultsSnapshot,
   type SessionResultsExporterMetadata,
   type SessionResultsGeneratedAnalysisArtifact,
   type SessionResultsHtmlSnapshot,
+  type SessionResultsReportAnswer,
   type SessionResultsReportQuestion,
 } from '../../utilities/sessionResultsExport';
 
 export type BuildSurveyResultsHtmlReportSnapshotArgs = {
   analysisArtifact?: SessionResultsGeneratedAnalysisArtifact | null;
+  answers?: SessionResultsReportAnswer[] | null;
   chainId?: number | null;
   countsByQuestion?: Map<string, number> | null;
   exportedAt?: unknown;
@@ -31,13 +33,14 @@ export type BuildSurveyResultsHtmlReportSnapshotArgs = {
 
 export const buildSurveyResultsHtmlReportSnapshot = ({
   analysisArtifact = null,
+  answers = [],
   chainId = null,
   countsByQuestion = new Map<string, number>(),
   exportedAt = new Date().toISOString(),
   exporterMetadata = null,
   filterState = {},
-  filteredQuestionsCount = 0,
-  filteredResponsesCount = 0,
+  filteredQuestionsCount = null,
+  filteredResponsesCount = null,
   latestKnownBlock = null,
   networkLabel = '',
   participantCount = 0,
@@ -56,14 +59,14 @@ export const buildSurveyResultsHtmlReportSnapshot = ({
     (sum, count) => sum + Number(count || 0),
     0,
   );
-  const responsesCount = responseCountFromRows || Number(filteredResponsesCount) || Number(totalResponsesCount) || 0;
-  const questionsCount = reportQuestions.length || Number(filteredQuestionsCount) || Number(totalQuestionsCount) || 0;
+  const responsesCount = responseCountFromRows || Number(filteredResponsesCount ?? totalResponsesCount) || 0;
+  const questionsCount = reportQuestions.length || Number(filteredQuestionsCount ?? totalQuestionsCount) || 0;
   const slug = String(sessionSlug || '').trim();
   const name = String(sessionName || slug || 'Session').trim();
-  const hasReportContent = reportQuestions.length > 0 || responsesCount > 0;
+  const hasReportContent = questionsCount > 0 || responsesCount > 0;
   const latestBlock = Number(latestKnownBlock);
 
-  return buildRedactedSessionResultsSnapshot({
+  return buildSessionResultsSnapshot({
     exportedAt,
     session: {
       slug,
@@ -102,6 +105,7 @@ export const buildSurveyResultsHtmlReportSnapshot = ({
         groups: analysisArtifact?.sections.breakdown.groups || [],
         representativeQuestions: [],
         questions: reportQuestions,
+        answers: answers || [],
         reason: hasReportContent ? undefined : 'No filtered questions or responses are hydrated yet.',
       },
       argumentMap: {

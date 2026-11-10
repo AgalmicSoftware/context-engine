@@ -207,3 +207,34 @@ test('OpenAI-compatible requests time out instead of hanging indefinitely', asyn
     (error) => error.code === 'AIDB_REQUEST_TIMEOUT'
   );
 });
+
+for (const kind of ['success', 'error', 'capability-error', 'fallback']) {
+  test(`the request deadline cancels a stalled ${kind} response body`, async () => {
+    let cancelled = false;
+    let signal;
+    let calls = 0;
+    const stream = new ReadableStream({ cancel() { cancelled = true; } });
+    const status = kind === 'error' ? 503 : kind === 'capability-error' ? 400 : 200;
+    const response = new Response(stream, { status });
+    let guard;
+    try {
+      const result = await Promise.race([
+        callOpenAiCompatibleChat({ provider: 'local', model: `stalled-${kind}`, prompt: 'Answer.', timeoutMs: 10,
+          env: { AIDB_LOCAL_BASE_URL: 'http://127.0.0.1:11434/v1' },
+          fetchImpl: async (_url, options) => {
+            signal = options.signal;
+            calls += 1;
+            if (kind === 'fallback' && calls === 1) return new Response('response_format is unsupported', { status: 400 });
+            return response;
+          },
+        }).catch((error) => error),
+        new Promise((resolve) => { guard = setTimeout(() => resolve(new Error('deadline did not release task')), 200); }),
+      ]);
+      assert.equal(result.code, 'AIDB_REQUEST_TIMEOUT');
+      assert.equal(result.retryable, true);
+      assert.equal(cancelled, true);
+      assert.equal(signal.aborted, true);
+      assert.equal(calls, kind === 'fallback' ? 2 : 1);
+    } finally { clearTimeout(guard); }
+  });
+}

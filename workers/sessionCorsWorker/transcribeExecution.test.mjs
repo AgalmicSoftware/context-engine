@@ -347,3 +347,66 @@ test('transcribe preserves upstream error message precedence for string and obje
     headers: baseHeaders,
   });
 });
+
+test('group speaker labels use the bounded diarization model and normalize turns', async () => {
+  const wav = new Uint8Array(48);
+  wav.set(new TextEncoder().encode('RIFF'), 0);
+  wav.set(new TextEncoder().encode('WAVE'), 8);
+  const sample = `data:audio/wav;base64,${Buffer.from(wav).toString('base64')}`;
+  const run = async (reply, { label = true, status = 200 } = {}) => {
+    const form = new FormData();
+    form.append('file', new File(['synthetic'], 'room.webm', { type: 'audio/webm' }));
+    form.append('model', label ? 'gpt-4o-transcribe-diarize' : 'whisper-1');
+    if (label) { form.append('purpose', 'group-conversation'); form.append('labelSpeakers', 'true'); }
+    form.append('known_speaker_names[]', 'Person 1');
+    form.append('known_speaker_references[]', sample);
+    return transcribe({
+      request: { formData: async () => form }, secrets: { openaiKey: crypto.randomUUID() },
+      deps: {
+        json: createJsonStub(),
+        safeFetch: async (_url, options) => {
+          assert.equal(options.body.get('response_format'), label ? 'diarized_json' : 'json');
+          assert.equal(options.body.get('chunking_strategy'), label ? 'auto' : null);
+          assert.equal(options.body.get('purpose'), null);
+          assert.deepEqual(options.body.getAll('known_speaker_names[]'), label ? ['Person 1'] : []);
+          assert.deepEqual(options.body.getAll('known_speaker_references[]'), label ? [sample] : []);
+          return Response.json(reply, { status });
+        },
+      },
+    });
+  };
+  const reply = { text: ' A room question. ', segments: [
+    { speaker: ' A ', start: 0, end: 2, text: ' A room question. ', id: 'ignored' },
+    { speaker: 'B', start: 2, end: 3, text: '   ' },
+    { speaker: 'C', start: -1, end: 2, text: 'invalid' },
+    { speaker: 'D', start: 3, end: 1, text: 'invalid' },
+  ] };
+  assert.deepEqual((await run(reply)).body, { text: reply.text, segments: [{ speaker: 'A', start: 0, end: 2, text: 'A room question.' }] });
+  assert.deepEqual((await run({ text: '', segments: [] })).body, { text: '', segments: [] });
+  assert.deepEqual((await run(reply, { label: false })).body, { text: reply.text });
+  const failed = await run({ error: { message: 'Synthetic provider error' } }, { status: 429 });
+  assert.equal(failed.status, 429);
+  assert.equal(failed.body.error, 'Synthetic provider error');
+});
+
+test('transcribe reports a success reply it cannot read as a failure, not as silence', async () => {
+  const run = (reply) => {
+    const upstreamFormData = new FormData();
+    upstreamFormData.append('file', new File(['audio'], 'clip.mp3', { type: 'audio/mpeg' }));
+    return transcribe({
+      request: { headers: new Headers() },
+      secrets: { openaiKey: crypto.randomUUID() },
+      transcribeRequest: { ok: true, payload: { provider: 'openai', requestApiKey: '', requestRpcUrl: '', upstreamFormData } },
+      deps: { json: createJsonStub(), safeFetch: async () => new Response(reply, { status: 200 }) },
+    });
+  };
+  for (const reply of ['not json', '{"text"', '{}', '{"transcript":"Elsewhere."}', '{"text":null}', '{"text":{"value":"Spoken."}}']) {
+    const result = await run(reply);
+    assert.equal(result.status, 502, reply);
+    assert.equal(typeof result.body.error, 'string', reply);
+    assert.equal(Object.hasOwn(result.body, 'text'), false, reply);
+  }
+  // Real silence and real speech are unchanged.
+  assert.deepEqual((await run('{"text":""}')).body, { text: '' });
+  assert.deepEqual((await run('{"text":"Spoken."}')).body, { text: 'Spoken.' });
+});

@@ -22,6 +22,55 @@ describe('computePolisStats', () => {
       votesPerVoterAvg: 4 / 3,
     });
   });
+
+  it('uses the widest row so ragged matrices keep every participant', () => {
+    const ratingMatrix = [[], [1, -1]];
+
+    expect(computePolisStats(ratingMatrix)).toEqual({
+      nComments: 2,
+      nParticipants: 2,
+      totalVotes: 2,
+      voters: 2,
+      votesPerVoterAvg: 1,
+    });
+    expect(computePolisPcaBundle(ratingMatrix).participantMatrix).toEqual([
+      [null, 1],
+      [null, -1],
+    ]);
+    expect(computePolisCommentStats(ratingMatrix)).toEqual([
+      expect.objectContaining({ commentIndex: 0, agrees: 0, disagrees: 0, unsure: 0, total: 0 }),
+      expect.objectContaining({ commentIndex: 1, agrees: 1, disagrees: 1, unsure: 0, total: 2 }),
+    ]);
+  });
+
+  it('preserves rectangular finite invariants across bounded deterministic ragged matrices', () => {
+    const voteValues = [-1, 0, 1, null];
+
+    for (let seed = 0; seed < 32; seed += 1) {
+      const nComments = 1 + (seed % 5);
+      const ratingMatrix = Array.from({ length: nComments }, (_, commentIndex) =>
+        Array.from(
+          { length: (seed * 3 + commentIndex * 5) % 7 },
+          (_, participantIndex) => voteValues[(seed + commentIndex + participantIndex) % voteValues.length],
+        ),
+      );
+      const expectedParticipants = ratingMatrix.reduce((max, row) => Math.max(max, row.length), 0);
+      const expectedVotes = ratingMatrix.flat().filter((vote) => vote === -1 || vote === 0 || vote === 1).length;
+      const stats = computePolisStats(ratingMatrix);
+      const bundle = computePolisPcaBundle(ratingMatrix, { randomSeed: seed });
+
+      expect(stats.nParticipants).toBe(expectedParticipants);
+      expect(stats.totalVotes).toBe(expectedVotes);
+      expect(bundle.participantMatrix).toHaveLength(expectedParticipants);
+      bundle.participantMatrix.forEach((participantVotes, participantIndex) => {
+        expect(participantVotes).toHaveLength(nComments);
+        participantVotes.forEach((vote, commentIndex) => {
+          expect(vote).toBe(ratingMatrix[commentIndex][participantIndex] ?? null);
+        });
+      });
+      expect(bundle.participantCoords.flatMap(({ x, y }) => [x, y]).every(Number.isFinite)).toBe(true);
+    }
+  });
 });
 
 describe('computePolisCommentStats', () => {
@@ -104,9 +153,6 @@ describe('computePolisConversationMath', () => {
     expect(result.clusterAssignments[3]).toBe(result.clusterAssignments[4]);
     expect(result.clusterAssignments[0]).not.toBe(result.clusterAssignments[3]);
     expect(Number.isInteger(result.clusterAssignments[5])).toBe(true);
-    expect(result.groupVotes).toBeUndefined();
-    expect(result.groupAwareConsensus).toBeUndefined();
-    expect(result.consensus).toBeUndefined();
   });
 
   it('builds base clusters by participant index, not participantCoords array position', () => {
@@ -130,9 +176,92 @@ describe('computePolisConversationMath', () => {
       { id: 2, center: [-3, 5], members: [2] },
     ]);
   });
+
+  it('keeps low-participation display assignments out of representative-question inference', () => {
+    // Twelve people split into two groups across six questions; the thirteenth answers only the first.
+    const matrix = [
+      [1, 1, 1, 1, 1, 1, -1, -1, -1, -1, -1, -1, 1],
+      [1, 1, 1, 1, 1, 1, -1, -1, -1, -1, -1, -1, null],
+      [1, 1, 1, 1, 1, 1, -1, -1, -1, -1, -1, -1, null],
+      [-1, -1, -1, -1, -1, -1, 1, 1, 1, 1, 1, 1, null],
+      [-1, -1, -1, -1, -1, -1, 1, 1, 1, 1, 1, 1, null],
+      [-1, -1, -1, -1, -1, -1, 1, 1, 1, 1, 1, 1, null],
+    ];
+    const options = { randomSeed: 42, inConversationFloor: 12, inConversationThresholdCap: 2 };
+
+    const result = computePolisConversationMath(matrix, {}, [], options);
+
+    expect(result.inConversationParticipantIndices).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
+    expect(result.clusterAssignments[12]).toBe(result.clusterAssignments[0]);
+    expect(result.analyticalClusterAssignments[12]).toBe(-1);
+    expect(result.analyticalClusterAssignments.slice(0, 12)).toEqual(result.clusterAssignments.slice(0, 12));
+    const group = result.repQuestions[result.clusterAssignments[0]];
+    expect(group.find((question) => question.questionIndex === 0)).toMatchObject({ nSuccess: 6, nTrials: 6 });
+
+    const changedVote = matrix.map((row) => [...row]);
+    changedVote[0][12] = -1;
+    expect(computePolisConversationMath(changedVote, {}, [], options).repQuestions).toEqual(result.repQuestions);
+  });
+});
+
+describe('in-conversation membership defaults', () => {
+  // One row per question, from how many questions each person answered.
+  const answersByPerson = (nQuestions, answeredCounts) =>
+    Array.from({ length: nQuestions }, (_, question) =>
+      answeredCounts.map((answered) => (question < answered ? 1 : null)),
+    );
+  const inConversation = (nQuestions, answeredCounts) =>
+    computePolisConversationMath(answersByPerson(nQuestions, answeredCounts), {}, [], { randomSeed: 42 })
+      .inConversationParticipantIndices;
+
+  it('admits people at seven answers once fifteen qualify', () => {
+    const counts = [...new Array(16).fill(7), 6];
+    expect(inConversation(20, counts)).toEqual(Array.from({ length: 16 }, (_, person) => person));
+  });
+
+  it('fills to fifteen with the most active people', () => {
+    expect(inConversation(20, [...new Array(10).fill(7), 6, 5, 4, 3, 2, 1])).toEqual(
+      Array.from({ length: 15 }, (_, person) => person),
+    );
+  });
+
+  it('asks for no more answers than there are questions', () => {
+    const counts = [...new Array(15).fill(3), 2];
+    expect(inConversation(3, counts)).toEqual(Array.from({ length: 15 }, (_, person) => person));
+  });
 });
 
 describe('findRepresentativeQuestions', () => {
+  // Two groups of `size`: a question's row, from how many in each agree (everyone else disagrees).
+  const row = (size, agreeInFirst, agreeInSecond) => [
+    ...Array.from({ length: size }, (_, member) => (member < agreeInFirst ? 1 : -1)),
+    ...Array.from({ length: size }, (_, member) => (member < agreeInSecond ? 1 : -1)),
+  ];
+  const twoGroups = (size) => Array.from({ length: size * 2 }, (_, participant) => (participant < size ? 0 : 1));
+
+  it('takes the top five before moving agrees ahead of disagrees', () => {
+    const mildAgrees = Array.from({ length: 6 }, () => row(20, 14, 8));
+    const strongDisagrees = Array.from({ length: 6 }, () => row(20, 0, 20));
+
+    const group = findRepresentativeQuestions([...mildAgrees, ...strongDisagrees], twoGroups(20))[0];
+
+    expect(group.map((question) => question.repfulFor)).toEqual([
+      'agree',
+      'disagree',
+      'disagree',
+      'disagree',
+      'disagree',
+    ]);
+    expect(group[0]).toMatchObject({ bestAgree: true });
+  });
+
+  it('applies the 90% one-tailed significance threshold', () => {
+    // Question 0 is the best agree. For fifteen people, ten agreeing tests at 1.5 and nine at 1.0, against 1.2816.
+    const group = findRepresentativeQuestions([row(15, 15, 0), row(15, 10, 0), row(15, 9, 0)], twoGroups(15))[0];
+
+    expect(group.map((question) => question.questionIndex)).toEqual([0, 1]);
+  });
+
   it('returns agree and disagree representative metadata instead of raw average deltas only', () => {
     const ratingMatrix = [
       [1, 1, 1, -1, -1, -1],

@@ -54,7 +54,7 @@ async function setup(promptVersion = 'ce-interview-brief-v5') {
   return { args, catalog, fetchImpl };
 }
 
-it.each(['ce-interview-brief-v4', 'ce-interview-brief-v5'])(
+it.each(['ce-interview-brief-v4', 'ce-interview-brief-v5', 'ce-interview-brief-v6'])(
   'accepts real %s hashes at the Worker 100/local 101 boundary',
   async (version) => {
     const { args, fetchImpl } = await setup(version);
@@ -132,6 +132,14 @@ it('cancels catalog work when its modal is disposed', async () => {
     return new Response(JSON.stringify(catalog));
   };
   await expect(resolveInterviewPrefillQuestions({ ...args, fetchImpl, signal: controller.signal })).rejects.toThrow();
+});
+
+it('accepts a v5 link once the Worker serves v6 catalogs', async () => {
+  const { args, catalog } = await setup('ce-interview-brief-v5');
+  const fetchImpl = jest.fn(
+    async () => new Response(JSON.stringify({ ...catalog, prefillPromptVersion: 'ce-interview-brief-v6' })),
+  );
+  expect(await resolveInterviewPrefillQuestions({ ...args, fetchImpl })).toEqual(publicQuestions);
 });
 
 it('does not relabel a v4 selection hash as v5', async () => {

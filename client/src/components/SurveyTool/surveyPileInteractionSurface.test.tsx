@@ -1,16 +1,15 @@
 import React from 'react';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 
-import PileHologramAssistant from './PileHologramAssistant';
 import {
   PILE_LOADING_ICON_WRAP_STYLE,
   PILE_SCAN_ERROR_DETAIL_STYLE,
   buildPileCardClassName,
   buildPileFilterButtonClassName,
   buildPileFooterClassName,
-  buildPileHologramToggleClassName,
   buildPileSubmitButtonClassName,
   renderPileInteractionSurface,
+  requiresQuestionStorageLogin,
   resolvePileCardStatusClassName,
   resolvePileFilterButtonStyle,
   resolvePileFilterIconStyle,
@@ -113,8 +112,6 @@ const getElementChildren = (node: TestTreeNode): TestElementNode[] => {
 };
 
 const buildBaseProps = (): PileInteractionSurfaceProps => ({
-  showHologramAssistant: false,
-  toggleHologramAssistant: jest.fn(),
   showMiniBackgroundSpinner: false,
   priorResponsesHydrating: false,
   showLongLoading: false,
@@ -211,9 +208,6 @@ describe('surveyPileInteractionSurface', () => {
         scanPercent: 72,
       }),
     ).toEqual({ width: '72%' });
-    expect(buildPileHologramToggleClassName(styles, true)).toBe(
-      `${styles.pileHologramToggle} ${styles.pileHologramToggleActive}`,
-    );
     expect(resolvePileMiniLoaderStyle(true)).toEqual({ opacity: 0.5 });
     expect(resolvePileMiniLoaderStyle(false)).toEqual({ opacity: 1 });
   });
@@ -446,6 +440,15 @@ describe('surveyPileInteractionSurface', () => {
     expect(framelessIconButtonCount).toBe(iconButtonCount);
   });
 
+  it('counts pending page answers beside their submit action', () => {
+    const { rerender } = render(renderPileInteractionSurface({ ...buildBaseProps(), pendingAnswerCount: 2 }));
+    const notice = screen.getByText("2 answers on the page aren't submitted yet.");
+    expect(notice).toHaveAttribute('role', 'status');
+    expect(notice.closest('button')).toBeNull();
+    rerender(renderPileInteractionSurface({ ...buildBaseProps(), pendingAnswerCount: 0 }));
+    expect(screen.queryByText(/answers on the page/)).not.toBeInTheDocument();
+  });
+
   it('makes the mobile action menu available before there are pending answers', () => {
     const tree = renderPileInteractionSurface({
       ...buildBaseProps(),
@@ -461,22 +464,6 @@ describe('surveyPileInteractionSurface', () => {
     expect(nodeHasClassName(actionsNode, 'pileActionsMenuEligible')).toBe(true);
     expect(findNodeByClassName(tree, 'pileActionMenuToggle')).not.toBeNull();
     expect(findNodeByClassName(tree, 'pileActionButtonGroup')).not.toBeNull();
-  });
-
-  it('renders the hologram takeover instead of the pile controls when active', () => {
-    const renderActiveQuestion = jest.fn(() => <div data-testid="active-question" />);
-    const tree = renderPileInteractionSurface({
-      ...buildBaseProps(),
-      showHologramAssistant: true,
-      showMiniBackgroundSpinner: true,
-      pileQuestions: [{ id: 'q1', prompt: 'Q1' }],
-      renderActiveQuestion,
-    });
-
-    expect(findElement(tree, (node) => isElementNode(node) && node.type === PileHologramAssistant)).not.toBeNull();
-    expect(findNodeByClassName(tree, 'pileControls')).toBeNull();
-    expect(findNodeByClassName(tree, 'miniSpinnerWrapper')).toBeNull();
-    expect(renderActiveQuestion).not.toHaveBeenCalled();
   });
 });
 
@@ -494,4 +481,24 @@ it('announces a draft storage failure without hiding the submit error', () => {
   expect(screen.getByRole('status')).toHaveTextContent('Draft changes are only in memory.');
   expect(screen.getByRole('status')).toBe(status);
   expect(screen.getByRole('alert')).toHaveTextContent('The response was not submitted.');
+});
+
+it('explains protected question storage when signed out without replacing genuine public errors', () => {
+  const config = { storageProfile: { backend: 'cloudflare', payloadAccessControl: { gate: 'role_gate' } } };
+  expect(requiresQuestionStorageLogin(config, false)).toBe(true);
+  expect(requiresQuestionStorageLogin(config, true)).toBe(false);
+  expect(requiresQuestionStorageLogin({}, false)).toBe(false);
+  expect(
+    requiresQuestionStorageLogin(
+      { storageProfile: { backend: 'cloudflare', payloadAccessControl: { gate: 'none' } } },
+      false,
+    ),
+  ).toBe(false);
+  const { rerender } = render(
+    renderPileInteractionSurface({ ...buildBaseProps(), hasError: true, requiresStorageLogin: true }),
+  );
+  expect(screen.getByText('Sign in to view this session’s questions.')).toBeVisible();
+  expect(screen.queryByText(/Cache initialization error/)).not.toBeInTheDocument();
+  rerender(renderPileInteractionSurface({ ...buildBaseProps(), hasError: true, requiresStorageLogin: false }));
+  expect(screen.getByText(/Cache initialization error/)).toBeVisible();
 });

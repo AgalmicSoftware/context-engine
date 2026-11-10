@@ -27,7 +27,7 @@ export function questionPayloadRoot(payload = {}) {
 export function normalizePreloadedQuestionRecord(entry = {}, {
   index = 0,
   fallbackSessionSlug = '',
-  source = 'telegram_only_preloaded_questions',
+  source = 'hosted_preloaded_questions',
 } = {}) {
   const root = questionPayloadRoot(entry);
   if (!root) return null;
@@ -41,7 +41,7 @@ export function normalizePreloadedQuestionRecord(entry = {}, {
     entry.questionId ||
     entry.id ||
     storageRef?.id ||
-      `telegram-only-${sessionSlug || 'session'}-${index + 1}`,
+      `hosted-${sessionSlug || 'session'}-${index + 1}`,
   );
   if (!id) return null;
   const visibility = lower(root.visibility || root.accessMode || entry.visibility || 'public') || 'public';
@@ -72,7 +72,7 @@ export function normalizePreloadedQuestionRecord(entry = {}, {
   };
   if (payloadUnavailable) {
     normalized.payloadUnavailable = true;
-    normalized.payloadUnavailableReason = 'telegram_only_question_payload_missing_prompt';
+    normalized.payloadUnavailableReason = 'hosted_question_payload_missing_prompt';
   }
   return normalized;
 }
