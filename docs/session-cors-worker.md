@@ -2430,9 +2430,11 @@ Never return secrets in responses.
 
 - Content-only edits keep web and agent sessions signed in: `sessionName`,
   `sessionInfo`, `sessionContext`, `questionsGenPrompt`, `agentInstructions`,
-  `appearance`, `sessionHeaderImg`, `interviewMode.openingPrompt` /
-  `steeringPrompt`, and the curated lists `HIGHLIGHTED_QUESTION_IDS`,
-  `BLOCKED_QUESTION_IDS`, `HIGHLIGHTED_SURVEY_IDS` and `BLOCKED_SURVEY_IDS`.
+  `appearance`, `sessionHeaderImg`, `contextAdditionPolicy`,
+  `resultsAdminAddresses`, every interview setting (`interviewModeEnabled` and
+  all of `interviewMode`, which each interview request reads afresh), and the
+  curated lists `HIGHLIGHTED_QUESTION_IDS`, `BLOCKED_QUESTION_IDS`,
+  `HIGHLIGHTED_SURVEY_IDS` and `BLOCKED_SURVEY_IDS`.
   Adding unique `agentHttp.invites` also preserves authorization when all prior
   invite records remain unchanged. Removing, disabling, re-enabling or editing
   an existing invite revokes authorization. Other fields, including permissions,

@@ -31,19 +31,24 @@ test('limiting who adds context signs no one out: each file is checked as it pub
   assert.equal(revokes({ contextAdditionPolicy: 'admin_only' }, { contextAdditionPolicy: 'participants' }), false);
 });
 
-test('only prompt text is content within interview settings', () => {
-  const before = { interviewMode: { enabled: true, openingPrompt: 'Earlier', steeringPrompt: 'Earlier' } };
-  assert.equal(revokes(before, { interviewMode: { ...before.interviewMode, openingPrompt: 'Updated', steeringPrompt: '' } }), false);
-  assert.equal(revokes(before, { interviewMode: { openingPrompt: 'Updated' } }), true);
-  assert.equal(revokes(before, { interviewMode: { ...before.interviewMode, hiddenDraftShare: 0.5 } }), true);
-  assert.equal(revokes(before, { interviewMode: { ...before.interviewMode, futureSetting: 'unknown' } }), true);
+test('interview settings are content: each interview request reads them afresh', () => {
+  const before = { interviewModeEnabled: true, interviewMode: { enabled: true, openingPrompt: 'Earlier', steeringPrompt: 'Earlier' } };
+  for (const interviewMode of [
+    { ...before.interviewMode, openingPrompt: 'Updated', steeringPrompt: '' },
+    { openingPrompt: 'Updated' },
+    { ...before.interviewMode, hiddenDraftShare: 0.5 },
+    { ...before.interviewMode, joinMatchingGroups: true, groupSuggestionData: ['country', 'town'] },
+    { ...before.interviewMode, enabled: false },
+  ]) assert.equal(revokes(before, { ...before, interviewMode }), false, JSON.stringify(interviewMode));
+  assert.equal(revokes(before, { interviewModeEnabled: false }), false);
+  assert.equal(revokes(before, { ...before, defaultTags: 'x' }), true);
 });
 
 for (const field of ['slug', 'sessionId', 'sessionIdHex', 'configRevision', 'adminAddress', 'adminAddresses',
   'corsWorkerUrl', 'allowOrigins', 'sessionModeProfile', 'workerAuthority', 'workerRoles', 'roles', 'authorization',
   'groupCreationPolicy', 'linkedWorkerGroups', 'workerGroupsBootstrap', 'resultsExposure', 'storageProfile',
   'storageEnvelope', 'responseFieldEncryption', 'agentSessionWrapped', 'scopes', 'limits', 'litCredentials',
-  'sessionEndsAt', 'defaultTags', 'defaultGroupTags', 'defaultSbtTags', 'interviewModeEnabled', 'pileAutoAdvanceEnabled',
+  'sessionEndsAt', 'defaultTags', 'defaultGroupTags', 'defaultSbtTags', 'pileAutoAdvanceEnabled',
   'defaultFilterState', 'defaultFeaturedSBTs', 'autoFeatureSBTsBySessionSlug', 'ai', 'networkChainId', 'contracts',
   'embeddedDeployHelperEnabled', 'resultsAnalysis', 'futureUnclassifiedSetting']) {
   test(`${field} remains authority-sensitive even alongside a content edit`, () => {
@@ -178,8 +183,8 @@ test('lists each edited path as content or as a sign-out', () => {
     agentHttp: { enabled: true, invites: [invite, second] },
   };
   assert.deepEqual(classify(before, after), {
-    content: ['sessionName', 'interviewMode.openingPrompt', 'agentHttp.invites'],
-    authority: ['defaultTags', 'interviewMode.hiddenDraftShare'],
+    content: ['sessionName', 'interviewMode.openingPrompt', 'interviewMode.hiddenDraftShare', 'agentHttp.invites'],
+    authority: ['defaultTags'],
     signsParticipantsOut: true,
   });
   assert.deepEqual(classify(before, { ...before, sessionName: 'B' }),
@@ -188,7 +193,7 @@ test('lists each edited path as content or as a sign-out', () => {
   assert.deepEqual(classify(withInvites([invite]), withInvites([])),
     { content: [], authority: ['agentHttp.invites'], signsParticipantsOut: true });
   assert.deepEqual(classify({ interviewMode: 'legacy' }, { interviewMode: { openingPrompt: 'Hi' } }),
-    { content: ['interviewMode.openingPrompt'], authority: ['interviewMode'], signsParticipantsOut: true });
+    { content: ['interviewMode'], authority: [], signsParticipantsOut: false });
   assert.deepEqual(classify({}, { sessionModeProfile: { preset: 'custom' } }),
     { content: [], authority: ['sessionModeProfile'], signsParticipantsOut: true });
 });
@@ -239,8 +244,10 @@ test('the preview matches the authorization epoch the Worker assigns on save', (
       agentInstructions: 'Join the Reviewers group.',
     }, false],
     [{ interviewMode: { ...stored.interviewMode, openingPrompt: 'Welcome', steeringPrompt: 'Stay on topic' } }, false],
-    [{ interviewMode: { ...stored.interviewMode, hiddenDraftShare: 0.5 } }, true],
-    [{ interviewModeEnabled: false, interviewMode: { ...stored.interviewMode, enabled: false } }, true],
+    [{ interviewMode: { ...stored.interviewMode, hiddenDraftShare: 0.5 } }, false],
+    [{ interviewMode: { ...stored.interviewMode, joinMatchingGroups: true, groupSuggestionData: ['town'] } }, false],
+    [{ interviewModeEnabled: false, interviewMode: { ...stored.interviewMode, enabled: false } }, false],
+    [{ interviewMode: { ...stored.interviewMode, hiddenDraftShare: 0.2 }, defaultTags: 'a, b, c' }, true],
     [{ defaultTags: 'a, b, c' }, true],
     [{ groupCreationPolicy: 'admin_only' }, true],
     [{ sessionName: 'Renamed', defaultTags: 'a, b, c' }, true],

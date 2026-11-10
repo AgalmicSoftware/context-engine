@@ -118,6 +118,36 @@ describe('saving the edit page through the Session Worker', () => {
     expect(result.config.authzEpoch).toBe(stored.authzEpoch);
   });
 
+  it('keeps every interview setting edit as content, even turning interviews off', () => {
+    const stored = publishedSession();
+    const groups = editAndSave(stored, (draft) => {
+      draft.interviewMode = {
+        ...draft.interviewMode,
+        ...normalizeInterviewSettings(draft.interviewMode),
+        followNewQuestions: true,
+        joinMatchingGroups: true,
+        groupSuggestionData: ['country', 'town'],
+      };
+    });
+    expect(groups.save.classification).toEqual({
+      content: expect.arrayContaining([
+        'interviewMode.followNewQuestions',
+        'interviewMode.joinMatchingGroups',
+        'interviewMode.groupSuggestionData',
+      ]),
+      authority: [],
+      signsParticipantsOut: false,
+    });
+    expect(groups.result.config.authzEpoch).toBe(stored.authzEpoch);
+
+    const off = editAndSave(stored, (draft) => {
+      draft.interviewModeEnabled = false;
+    });
+    expect(off.save.patch).toMatchObject({ interviewModeEnabled: false });
+    expect(off.save.classification).toMatchObject({ authority: [], signsParticipantsOut: false });
+    expect(off.result.config.authzEpoch).toBe(stored.authzEpoch);
+  });
+
   it('previews the sign-out the Worker applies for authority edits', () => {
     const stored = publishedSession();
     const { save, result } = editAndSave(stored, (draft) => {
@@ -127,8 +157,8 @@ describe('saving the edit page through the Session Worker', () => {
     });
 
     expect(save.classification).toEqual({
-      content: [],
-      authority: expect.arrayContaining(['groupCreationPolicy', 'interviewMode.followNewQuestions', 'defaultTags']),
+      content: ['interviewMode.followNewQuestions'],
+      authority: expect.arrayContaining(['groupCreationPolicy', 'defaultTags']),
       signsParticipantsOut: true,
     });
     expect(result).toMatchObject({ ok: true });

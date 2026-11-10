@@ -25251,7 +25251,7 @@ var init_canonicalJson = __esm({
 });
 
 // shared/sessionConfigEdits.mjs
-var WORKER_CANONICAL_SET_CONFIG_KEYS, CURATED_ID_LIST_KEYS, MAX_CURATED_IDS, CURATED_ID, validCuratedIdList, MAX_RESULTS_ADMINS, ADDRESS, validResultsAdminAddresses, MAX_AGENT_INSTRUCTIONS_CHARS, validAgentInstructions, CONTENT_FIELDS, INTERVIEW_CONTENT_FIELDS, record2, same, mergeSetConfigAi, without, onlyAddsInvites, authorityView, sessionConfigRequiresReauthorization;
+var WORKER_CANONICAL_SET_CONFIG_KEYS, CURATED_ID_LIST_KEYS, MAX_CURATED_IDS, CURATED_ID, validCuratedIdList, MAX_RESULTS_ADMINS, ADDRESS, validResultsAdminAddresses, MAX_AGENT_INSTRUCTIONS_CHARS, validAgentInstructions, CONTENT_FIELDS, record2, same, mergeSetConfigAi, without, onlyAddsInvites, authorityView, sessionConfigRequiresReauthorization;
 var init_sessionConfigEdits = __esm({
   "shared/sessionConfigEdits.mjs"() {
     init_canonicalJson();
@@ -25337,9 +25337,12 @@ var init_sessionConfigEdits = __esm({
       // Checked on each atlas build and read and never held in a sign-in, so
       // changing it signs no one out either.
       "resultsAdminAddresses",
+      // Read on each interview request and never held in a sign-in, so changing
+      // any interview setting, even turning interviews off, signs no one out.
+      "interviewModeEnabled",
+      "interviewMode",
       ...CURATED_ID_LIST_KEYS
     ]);
-    INTERVIEW_CONTENT_FIELDS = /* @__PURE__ */ new Set(["openingPrompt", "steeringPrompt"]);
     record2 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
     same = (left, right) => stableCanonicalSerialize(left) === stableCanonicalSerialize(right);
     mergeSetConfigAi = (stored, sent) => record2(stored) && record2(sent) ? { ...stored, ...sent } : sent;
@@ -25355,10 +25358,6 @@ var init_sessionConfigEdits = __esm({
     };
     authorityView = (config, additiveInvites) => {
       const result = without(config, CONTENT_FIELDS);
-      if (record2(result.interviewMode)) {
-        result.interviewMode = without(result.interviewMode, INTERVIEW_CONTENT_FIELDS);
-        if (!Object.keys(result.interviewMode).length) delete result.interviewMode;
-      }
       if (record2(result.agentHttp) && additiveInvites) {
         result.agentHttp = without(result.agentHttp, /* @__PURE__ */ new Set(["invites"]));
         if (!Object.keys(result.agentHttp).length) delete result.agentHttp;
