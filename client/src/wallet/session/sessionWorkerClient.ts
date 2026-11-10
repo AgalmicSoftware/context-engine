@@ -1,5 +1,6 @@
 import { ethers } from 'ethers';
 import type { HexString, SoftSessionPolicy } from '../types.js';
+import { extendSoftSessionPolicy } from './sessionPolicy.js';
 import { handleSoftSessionRequest } from './sessionRequest.js';
 import { normalizeSessionTransaction } from './sessionTransaction.js';
 
@@ -13,6 +14,8 @@ type InitOptions = {
 export interface SoftSessionClient {
   init(options: InitOptions): Promise<string>;
   request(args: { method: string; params?: unknown[] }): Promise<unknown>;
+  // Keeps an unlocked session open until `until`, within its policy's cap.
+  extend(until: number): Promise<void>;
   lock(): Promise<void>;
 }
 
@@ -34,6 +37,10 @@ export const createInMemorySoftSessionClient = (): SoftSessionClient => {
     async request({ method, params = [] }) {
       if (!wallet || !provider || !policy) throw new Error('Passkey wallet is locked.');
       return handleSoftSessionRequest({ wallet, policy, activeChainId: chainId, message: { method, params } });
+    },
+
+    async extend(until) {
+      if (policy) policy = extendSoftSessionPolicy(policy, until);
     },
 
     async lock() {
@@ -112,6 +119,10 @@ export const createWorkerSoftSessionClient = (): SoftSessionClient => {
       } catch (error) {
         return Promise.reject(error);
       }
+    },
+    async extend(until) {
+      // Only a running worker holds a key; extending must never start one.
+      if (worker) await callWorker({ type: 'extend', until });
     },
     async lock() {
       // Termination discards the signer without waiting for a busy worker to acknowledge a lock.

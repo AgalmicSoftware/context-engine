@@ -75,6 +75,8 @@ export interface SoftSessionPolicy {
   address: HexString;
   createdAt: number;
   expiresAt: number;
+  // The latest expiresAt that use can push it to; without it, use never extends the session.
+  maxExpiresAt?: number;
   allowedMethods: Array<'personal_sign' | 'eth_signTypedData_v4' | 'eth_sendTransaction' | 'eth_signTransaction'>;
   allowedChainIds?: number[];
   allowedTargets?: HexString[];

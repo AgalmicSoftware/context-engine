@@ -5,6 +5,7 @@ import type { HexString, SoftSessionPolicy } from '../types.js';
 export const createSoftSessionPolicy = ({
   address,
   ttlSeconds,
+  maxTtlSeconds = ttlSeconds,
   now = Date.now(),
   allowedMethods,
   allowedChainIds,
@@ -13,6 +14,7 @@ export const createSoftSessionPolicy = ({
 }: {
   address: HexString;
   ttlSeconds: number;
+  maxTtlSeconds?: number;
   now?: number;
   allowedMethods?: SoftSessionPolicy['allowedMethods'];
   allowedChainIds?: number[];
@@ -23,10 +25,17 @@ export const createSoftSessionPolicy = ({
   address,
   createdAt: now,
   expiresAt: now + Math.max(1, ttlSeconds) * 1000,
+  maxExpiresAt: now + Math.max(1, ttlSeconds, maxTtlSeconds) * 1000,
   allowedMethods: allowedMethods || ['personal_sign', 'eth_signTypedData_v4', 'eth_sendTransaction'],
   allowedChainIds,
   allowedTargets,
   maxTransactionValueWei,
+});
+
+/** The session kept open until `until`: never shorter than now, and never past its cap. */
+export const extendSoftSessionPolicy = (policy: SoftSessionPolicy, until: number): SoftSessionPolicy => ({
+  ...policy,
+  expiresAt: Math.max(policy.expiresAt, Math.min(Number(until) || 0, policy.maxExpiresAt ?? policy.expiresAt)),
 });
 
 export const isSoftSessionExpired = (policy: SoftSessionPolicy, now = Date.now()): boolean =>
