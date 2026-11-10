@@ -51,13 +51,15 @@ export function useWorkerGroupResultsFilter({
     .toLowerCase();
   const active = enabled && hasWorkerGroupSelection(input);
   const key = JSON.stringify([enabled, scopeKey, viewer, inputKey, discover]);
+  // Whether the filter is open only adds the Groups to choose from, so it is left out of what a load is for.
+  const loadFor = JSON.stringify([enabled, scopeKey, viewer, inputKey]);
   const inputs = useRef({ sessionConfig, scope, input });
   inputs.current = { sessionConfig, scope, input };
-  // Refreshes on focus, every minute, or after a group change or a sign-in elsewhere never ask. Any other load,
-  // a Group filter saved or in a link included, asks someone signed in to sign in if it must.
+  // The first load for a viewer, session and filter, a Group filter saved or in a link included, asks someone signed
+  // in to sign in if it must, as does Refresh. Refreshes on focus, every minute, or after a group change or a sign-in
+  // elsewhere never ask, and neither does closing or opening the filter again.
   const asked = useRef(false);
-  const quiet = useRef(false);
-  const loadedKey = useRef('');
+  const loadedFor = useRef('');
   const [revision, setRevision] = useState(0);
   const [snapshot, setSnapshot] = useState<{
     key: string;
@@ -72,10 +74,7 @@ export function useWorkerGroupResultsFilter({
   }, []);
   useEffect(() => {
     if (!enabled || (!active && !discover)) return undefined;
-    const refreshQuietly = () => {
-      quiet.current = true;
-      setRevision((value) => value + 1);
-    };
+    const refreshQuietly = () => setRevision((value) => value + 1);
     const unsubscribe = subscribeWorkerGroupsChanged((detail) => {
       const current = inputs.current.scope;
       if (current && current.sessionSlug === detail.sessionSlug && current.sessionId === detail.sessionId)
@@ -93,11 +92,10 @@ export function useWorkerGroupResultsFilter({
     };
   }, [enabled, active, discover]);
   useEffect(() => {
-    const prompt = asked.current || !quiet.current || loadedKey.current !== key;
+    const prompt = asked.current || loadedFor.current !== loadFor;
     asked.current = false;
-    quiet.current = false;
-    loadedKey.current = key;
     if (!enabled || (!active && !discover)) return undefined;
+    loadedFor.current = loadFor;
     let current = true;
     const { scope: target, input: selectionInput, sessionConfig: config } = inputs.current;
     const publish = (cohort: WorkerGroupCohort, groups: WorkerGroup[] = []) => {
@@ -143,7 +141,7 @@ export function useWorkerGroupResultsFilter({
     return () => {
       current = false;
     };
-  }, [key, provider, revision, enabled, active, discover, viewer]);
+  }, [key, loadFor, provider, revision, enabled, active, discover, viewer]);
   const value = useMemo(() => {
     if (!enabled || (!active && !discover))
       return {

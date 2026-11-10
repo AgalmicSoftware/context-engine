@@ -287,10 +287,10 @@ shown what a signed-out visitor sees on a session page. Opening its Groups
 panel, its context files, or the Results group filter (a filter saved or in a
 link included) asks if that session needs a new sign-in, and those requests
 share one prompt. Declining keeps the signed-out view, with a button to try
-again, until anything else on the page signs in. Before the first sign-in, a
-private session shows a **Sign in** button there instead. Worker sign-ins live
-in page memory, so a reload, a new tab, or a sign-in's four hours ending asks
-once more.
+again, until anything else on the page signs in; closing and opening the filter
+again doesn't ask. Before the first sign-in, a private session shows a
+**Sign in** button there instead. Worker sign-ins live in page memory, so a
+reload, a new tab, or a sign-in's four hours ending asks once more.
 
 Capabilities report only what this wallet supports:
 

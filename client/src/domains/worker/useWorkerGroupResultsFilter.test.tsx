@@ -190,6 +190,35 @@ it('asks someone signed in for a Group filter saved or in a link, and keeps its 
   expect([...result.current.cohort.members[group.groupId]]).toEqual([a]);
 });
 
+it('never asks again as the filter is closed and opened after a declined sign-in, while Retry does', async () => {
+  token.mockRejectedValue(new Error('The passkey prompt was dismissed.'));
+  const { result, rerender } = renderHook((props) => useWorkerGroupResultsFilter(props), {
+    initialProps: { ...input, discover: true },
+  });
+  await waitFor(() => expect(result.current.cohort.status).toBe('error'));
+  expect(prompts()).toEqual([true]);
+  token.mockRejectedValue(new WorkerSignInNeededError());
+  // Closing the filter hides its controls without unmounting them, so the saved Group's members load again.
+  rerender({ ...input, discover: false });
+  await waitFor(() => expect(prompts()).toEqual([true, false]));
+  rerender({ ...input, discover: true });
+  await waitFor(() => expect(prompts()).toEqual([true, false, false]));
+  expect(result.current.cohort.status).toBe('error');
+  token.mockResolvedValue('synthetic-token');
+  act(() => result.current.refresh());
+  await waitFor(() => expect(result.current.cohort.status).toBe('ready'));
+  expect(prompts()).toEqual([true, false, false, true]);
+});
+
+it('asks when the filter first opens on a page that loaded with it closed', async () => {
+  const closed = { ...input, selection: null, discover: false };
+  const { result, rerender } = renderHook((props) => useWorkerGroupResultsFilter(props), { initialProps: closed });
+  expect(token).not.toHaveBeenCalled();
+  rerender({ ...closed, discover: true });
+  await waitFor(() => expect(result.current.groups).toEqual([group]));
+  expect(prompts()).toEqual([true]);
+});
+
 it('asks again for a new account, and never shows the last account’s members when that is declined', async () => {
   const { result, rerender } = renderHook((props) => useWorkerGroupResultsFilter(props), { initialProps: input });
   await waitFor(() => expect(result.current.cohort.status).toBe('ready'));
