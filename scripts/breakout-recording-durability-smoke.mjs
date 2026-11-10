@@ -284,7 +284,7 @@ const probeHtml = (fake) => `<!doctype html><html lang="en"><head><meta charset=
   (ReactDOM.createRoot || ReactDOM.default.createRoot)(document.getElementById('probe')).render(React.createElement(Probe));
 </script></body></html>`;
 
-// Every record in the recorder's device store, read with IndexedDB directly.
+// Every record in the recorder's device store, read with IndexedDB directly. Audio is stored as its bytes.
 const readStore = (page, { hashes = false } = {}) => page.evaluate(async (withHashes) => {
   if (!(await indexedDB.databases()).some((database) => database.name === 'ce-recording-chunks')) return [];
   const database = await new Promise((resolve, reject) => {
@@ -298,10 +298,10 @@ const readStore = (page, { hashes = false } = {}) => page.evaluate(async (withHa
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);
     });
-    const hex = async (blob) => [...new Uint8Array(await crypto.subtle.digest('SHA-256', await blob.arrayBuffer()))].map((byte) => byte.toString(16).padStart(2, '0')).join('');
-    return Promise.all(records.map(async ({ segment, audio, knownSpeakers }) => ({
-      id: segment.id, index: segment.index, status: segment.status, text: segment.text, audioSize: audio?.size || 0,
-      audioSha256: withHashes && audio ? await hex(audio) : undefined,
+    const hex = async (bytes) => [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+    return Promise.all(records.map(async ({ segment, audioBytes, knownSpeakers }) => ({
+      id: segment.id, index: segment.index, status: segment.status, text: segment.text, audioSize: audioBytes?.byteLength || 0,
+      audioSha256: withHashes && audioBytes ? await hex(audioBytes) : undefined,
       voiceSamples: (knownSpeakers || []).filter((speaker) => speaker.sample).map((speaker) => speaker.name),
     })));
   } finally {

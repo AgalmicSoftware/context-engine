@@ -165,7 +165,7 @@ try {
             });
             db.close();
             const parts = records.filter((r) => r.segment.index >= 0 && r.segment.source !== 'text');
-            return parts.length === 2 && parts.every((r) => r.segment.status === wanted && Boolean(r.audio) === audio);
+            return parts.length === 2 && parts.every((r) => r.segment.status === wanted && Boolean(r.audioBytes) === audio);
           },
           [status, withAudio],
         );
