@@ -707,7 +707,7 @@ describe('SurveyResults selected result display wiring', () => {
     await waitForText('Aggregate prompt');
 
     fireEvent.click(screen.getByRole('switch', { name: VIEW_MODE_SWITCH_NAME }));
-    await findLinkByHref(`/u/${RESPONDER_TWO.toLowerCase()}`);
+    await findLinkByHref(`/u/${RESPONDER_TWO.toLowerCase()}?session=demo`);
     expectTextAbsent('Aggregate prompt');
   });
 });
@@ -1109,8 +1109,8 @@ describe('SurveyResults survey/response links', () => {
 
     renderSurveyModeResults({ sessionSlug: 'demo', surveyId });
     await switchToIndividualsView();
-    const userLink = await findLinkByHref(`/u/${encodeURIComponent(responder.toLowerCase())}`);
-    expect(userLink).toHaveAttribute('href', `/u/${encodeURIComponent(responder.toLowerCase())}`);
+    const href = `/u/${encodeURIComponent(responder.toLowerCase())}?session=demo`;
+    expect(await findLinkByHref(href)).toHaveAttribute('href', href);
   });
 
   it('renders only the latest answer row in expanded survey individual view for duplicate question updates', async () => {
@@ -1150,7 +1150,7 @@ describe('SurveyResults survey/response links', () => {
 
     renderSurveyModeResults({ sessionSlug: 'session-slug', surveyId });
     await switchToIndividualsView();
-    const responderLink = await findLinkByHref(`/u/${RESPONDER_ONE.toLowerCase()}`);
+    const responderLink = await findLinkByHref(`/u/${RESPONDER_ONE.toLowerCase()}?session=session-slug`);
     const responseHeader = responderLink.closest('[class*="responseHeader"]') as HTMLElement;
     expect(responseHeader).toBeTruthy();
     fireEvent.click(responseHeader);
