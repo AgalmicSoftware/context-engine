@@ -93,6 +93,7 @@ describe('SurveyQuestionsResponseView', () => {
           renderQuestionAnswer={renderQuestionAnswer}
           renderSurveyAnswers={renderSurveyAnswers}
           routeViewDisplayState={{
+            isOwnResponse: undefined,
             shortenedViewAddress: '0xabc...1234',
             viewedAddressLower: '0xabc1234',
             viewedAddressRaw: '0xABC1234',
