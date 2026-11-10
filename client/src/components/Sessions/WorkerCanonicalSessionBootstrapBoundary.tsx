@@ -23,6 +23,7 @@ import setupStyles from './setup/SessionSetup.module.scss';
 type WorkerCanonicalSessionBootstrapBoundaryProps = {
   sessionSlug: string;
   workerQueryValue: unknown;
+  expectedSessionId?: string;
   onResolved: (bootstrap: WorkerCanonicalSessionBootstrap) => void;
   environment?: DiscoveryEnvironment;
   fetchImpl?: typeof fetch;
@@ -83,6 +84,7 @@ const confirmWorkerOriginChange = async (
 const WorkerCanonicalSessionBootstrapBoundary = ({
   sessionSlug,
   workerQueryValue,
+  expectedSessionId,
   onResolved,
   environment,
   fetchImpl,
@@ -111,6 +113,7 @@ const WorkerCanonicalSessionBootstrapBoundary = ({
             bootstrap = await fetchWorkerCanonicalSessionBootstrap({
               sessionSlug,
               workerQueryValue,
+              expectedSessionId,
               environment,
               fetchImpl,
               signal: abortController.signal,
@@ -222,6 +225,7 @@ const WorkerCanonicalSessionBootstrapBoundary = ({
   }, [
     confirmRepin,
     environment,
+    expectedSessionId,
     fetchImpl,
     onResolved,
     retryDelaysMs,

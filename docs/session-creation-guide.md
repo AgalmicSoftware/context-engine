@@ -584,10 +584,9 @@ What gets stored where:
 Important:
 
 - A newly deployed Worker-canonical session needs the `worker=` URL parameter
-  for first-time visitors unless its slug and Worker origin are included in
-  the site's bundled discovery map. Deployment alone does not register a
-  slug-only URL. Bundled entries take effect when the website deploys; the
-  Worker still supplies the session's verified settings and permissions.
+  for first-time visitors unless the repo's `known-sessions.json` lists it (see
+  [Normal links on the hosted site](#normal-links-on-the-hosted-site)).
+  Deployment alone does not register a slug-only URL.
 - `blockLimits.start` is required for chain-scanned profiles. The default
   worker-canonical profile does not require a chain scan window. After its
   canonical worker config is verified, reloads keep that session out of EVM
@@ -1304,6 +1303,32 @@ credential. The client rejects unsafe production targets (non-HTTPS origins,
 URL credentials, paths, and private-network hosts), binds the worker origin to
 the exact slug/session identity, and prompts before replacing a conflicting
 trust-on-first-use pin.
+
+### Normal links on the hosted site
+
+The hosted site opens a session from a normal link, `/session/<slug>` with no
+`worker=`, only when the repo's `known-sessions.json` lists it. Each entry says
+where the session's Worker is:
+
+```json
+{
+  "<slug>": {
+    "worker": "https://<worker-origin>",
+    "sessionId": "0x<32 hex digits>",
+    "name": "<session name>"
+  }
+}
+```
+
+- `worker` is the Worker's HTTPS origin, with no path or trailing slash.
+- `sessionId` is the ID the Worker reports: `0x` and 32 lowercase hex digits.
+  The session opens only when the Worker's verified config carries this ID.
+- `name` is optional; the Worker's config supplies every setting.
+
+Add the entry with a pull request. Normal links work once it's on `main` and the
+site has deployed; until then, share the `worker=` link. Any other session opens
+only from its `worker=` link. The site also serves the file at
+`/known-sessions.json`, so agents can find a session's Worker from its slug.
 
 ## Troubleshooting
 

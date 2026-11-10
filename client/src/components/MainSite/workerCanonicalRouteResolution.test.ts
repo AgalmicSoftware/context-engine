@@ -1,4 +1,5 @@
 import {
+  renderWorkerCanonicalRouteBootstrap,
   resolveMainSiteAdminWorkerRoute,
   resolveMainSiteGroupWorkerRoute,
   resolveMainSiteSessionRouteForRender,
@@ -7,8 +8,19 @@ import { sessionRegistryReadsPort } from '../../domains/sessions/registry/sessio
 import type { WorkerCanonicalRouteController } from './workerCanonicalRouteController';
 import { upsertWorkerCanonicalSessionBootstrap } from '../../utilities/session/sessionWorkerConfigCache';
 import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../../utilities/session/sessionModeProfile';
-import { listSessionModeConflicts } from '../../utilities/session/sessionModeRuleMessages';
-import demoSessions from '../../variables/demo/demo_sessions.json';
+
+const FIXTURE_SLUG = 'fixture-session';
+const FIXTURE_WORKER = 'https://ce-fixture-session.example.workers.dev';
+const FIXTURE_SESSION_ID = '0x0123456789abcdef0123456789abcdef';
+
+// A session listed only in known-sessions.json, with no other source change.
+jest.mock('../../../../known-sessions.json', () => ({
+  ...(jest.requireActual('../../../../known-sessions.json') as object),
+  'fixture-session': {
+    worker: 'https://ce-fixture-session.example.workers.dev',
+    sessionId: '0x0123456789abcdef0123456789abcdef',
+  },
+}));
 
 const controller: WorkerCanonicalRouteController = {
   getActiveVerifiedConfig: () => null,
@@ -123,11 +135,11 @@ describe('workerCanonicalRouteResolution', () => {
     expect(resolveStandardSessionRoute).toHaveBeenCalledTimes(1);
   });
 
-  it('bootstraps bundled demo-interview-5 clean routes from the pinned Worker', () => {
+  it('opens a session added only to known-sessions.json from its normal link', () => {
     const resolveStandardSessionRoute = jest.fn();
 
     const result = resolveMainSiteSessionRouteForRender({
-      sessionTokenRaw: 'demo-interview-5',
+      sessionTokenRaw: FIXTURE_SLUG,
       searchStr: '?mode=interview',
       controller,
       resolveSessionSlugFromPathToken: (token) => token,
@@ -136,13 +148,11 @@ describe('workerCanonicalRouteResolution', () => {
 
     expect(result).toMatchObject({
       kind: 'bootstrap',
-      workerOrigin: 'https://ce-demo-interview-5-c1cde84edac7.agalmic.workers.dev',
-      workerOnlySearch: '?worker=https%3A%2F%2Fce-demo-interview-5-c1cde84edac7.agalmic.workers.dev',
-      workerSessionSlug: 'demo-interview-5',
-      sessionRoute: {
-        sessionSlug: 'demo-interview-5',
-        sessionConfig: null,
-      },
+      workerOrigin: FIXTURE_WORKER,
+      workerOnlySearch: `?worker=${encodeURIComponent(FIXTURE_WORKER)}`,
+      workerSessionSlug: FIXTURE_SLUG,
+      expectedSessionId: FIXTURE_SESSION_ID,
+      sessionRoute: { sessionSlug: FIXTURE_SLUG, sessionConfig: null },
     });
     expect(resolveStandardSessionRoute).not.toHaveBeenCalled();
   });
@@ -160,44 +170,16 @@ describe('workerCanonicalRouteResolution', () => {
       kind: 'bootstrap',
       workerOrigin: 'https://ce-eddy26-d9702b0d3c41.agalmic.workers.dev',
       workerSessionSlug: 'eddy26',
+      expectedSessionId: '0x864a48dfbde5a8ef4b5ac60a2980d842',
       sessionRoute: { sessionSlug: 'eddy26', sessionConfig: null },
     });
     expect(resolveStandardSessionRoute).not.toHaveBeenCalled();
   });
 
-  it.each(['rxc-ra-test-5', 'rxc-ra-test-6'] as const)(
-    'bundles %s with the public Results it runs, so a fresh browser starts from the right profile',
-    (slug) => {
-      const profile = demoSessions[slug].sessionModeProfile;
-      expect(profile.results.visibility).toBe('public_full_if_storage_public');
-      expect(profile.encryption).toEqual({ mode: 'none' });
-      expect(profile.storage.payloadAccessControl).toEqual({ gate: 'none', encryption: 'none' });
-      expect(listSessionModeConflicts(profile)).toEqual([]);
-    },
-  );
-
-  it.each([
-    ['rxc-test', 'https://ce-rxc-test-96862a1dc78f.agalmic.workers.dev'],
-    ['rxc-ra-test', 'https://ce-rxc-ra-test-784bb9e31813.agalmic.workers.dev'],
-    ['rxc-ra-test-2', 'https://ce-rxc-ra-test-2-e14873da7c8f.agalmic.workers.dev'],
-    ['rxc-ra-test-3', 'https://ce-rxc-ra-test-3.agalmic.workers.dev'],
-    ['rxc-ra-test-5', 'https://ce-rxc-ra-test-5.agalmic.workers.dev'],
-    ['rxc-ra-test-6', 'https://ce-rxc-ra-test-6.agalmic.workers.dev'],
-  ])('bootstraps the %s clean route from bundled discovery', (slug, workerOrigin) => {
-    const result = resolveMainSiteSessionRouteForRender({
-      sessionTokenRaw: slug,
-      searchStr: '',
-      controller,
-      resolveSessionSlugFromPathToken: (token) => token,
-      resolveStandardSessionRoute: jest.fn(),
-    });
-    expect(result).toMatchObject({ kind: 'bootstrap', workerOrigin, workerSessionSlug: slug });
-  });
-
   it('opens the group-recording QR link on a device that has never seen the session', () => {
     const resolveStandardSessionRoute = jest.fn();
     const result = resolveMainSiteSessionRouteForRender({
-      sessionTokenRaw: 'rxc-ra-test-6',
+      sessionTokenRaw: FIXTURE_SLUG,
       searchStr: '?mode=groupRecording&joinGroup=bc96eee1-192b-4b18-b36b-1bf7fc00bd9a',
       controller,
       resolveSessionSlugFromPathToken: (token) => token,
@@ -205,22 +187,32 @@ describe('workerCanonicalRouteResolution', () => {
     });
     expect(result).toMatchObject({
       kind: 'bootstrap',
-      workerOrigin: 'https://ce-rxc-ra-test-6.agalmic.workers.dev',
-      workerSessionSlug: 'rxc-ra-test-6',
-      sessionRoute: { sessionSlug: 'rxc-ra-test-6', sessionConfig: null },
+      workerOrigin: FIXTURE_WORKER,
+      workerSessionSlug: FIXTURE_SLUG,
+      sessionRoute: { sessionSlug: FIXTURE_SLUG, sessionConfig: null },
     });
     expect(resolveStandardSessionRoute).not.toHaveBeenCalled();
   });
 
-  it('keeps registry-resolved demo-interview-5 routes on the standard path', () => {
-    const registryConfig = {
-      slug: 'demo-interview-5',
-      sessionName: 'Registry Demo Interview 5',
-    };
+  it('looks up a session that is not in the file like any other slug', () => {
+    const resolveStandardSessionRoute = jest.fn();
+    const result = resolveMainSiteSessionRouteForRender({
+      sessionTokenRaw: 'rxc-ra-test-5',
+      searchStr: '',
+      controller,
+      resolveSessionSlugFromPathToken: (token) => token,
+      resolveStandardSessionRoute,
+    });
+    expect(result.kind).toBe('standard');
+    expect(resolveStandardSessionRoute).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps registry-resolved routes on the standard path', () => {
+    const registryConfig = { slug: FIXTURE_SLUG, sessionName: 'Registry fixture' };
     const standardResult = {
       sessionIdFromPath: null,
       configBySessionId: null,
-      sessionSlug: 'demo-interview-5',
+      sessionSlug: FIXTURE_SLUG,
       sessionConfig: registryConfig,
       hasUnresolvedSessionId: false,
     };
@@ -228,7 +220,7 @@ describe('workerCanonicalRouteResolution', () => {
     jest.spyOn(sessionRegistryReadsPort, 'getSessionConfig').mockReturnValue(registryConfig);
 
     const result = resolveMainSiteSessionRouteForRender({
-      sessionTokenRaw: 'demo-interview-5',
+      sessionTokenRaw: FIXTURE_SLUG,
       searchStr: '?mode=interview',
       controller,
       resolveSessionSlugFromPathToken: (token) => token,
@@ -240,43 +232,55 @@ describe('workerCanonicalRouteResolution', () => {
     expect(resolveStandardSessionRoute).toHaveBeenCalledTimes(1);
   });
 
-  it('uses verified live Worker config after bundled demo-interview-5 bootstrap', () => {
-    const liveConfig = {
-      slug: 'demo-interview-5',
-      sessionId: '0xa0dfc46736b8288854ae2c4156877879',
-      corsWorkerUrl: 'https://ce-demo-interview-5-c1cde84edac7.agalmic.workers.dev/',
-      interviewMode: {
-        openingMode: 'owner',
-        followNewQuestions: true,
-      },
-      liveQuestionCount: 47,
-    };
+  describe('after a known session has bootstrapped', () => {
     const verifiedController: WorkerCanonicalRouteController = {
       ...controller,
-      hasVerifiedRoute: (slug, origin) =>
-        slug === 'demo-interview-5' && origin === 'https://ce-demo-interview-5-c1cde84edac7.agalmic.workers.dev',
+      hasVerifiedRoute: (slug, origin) => slug === FIXTURE_SLUG && origin === FIXTURE_WORKER,
     };
+    const resolveWithCachedConfig = (cachedConfig: Record<string, unknown>) =>
+      resolveMainSiteSessionRouteForRender({
+        sessionTokenRaw: FIXTURE_SLUG,
+        searchStr: '?mode=interview',
+        controller: verifiedController,
+        resolveSessionSlugFromPathToken: (token) => token,
+        getVerifiedConfig: (input) =>
+          input?.slug === FIXTURE_SLUG && input.workerOrigin === FIXTURE_WORKER ? cachedConfig : null,
+      });
 
-    const result = resolveMainSiteSessionRouteForRender({
-      sessionTokenRaw: 'demo-interview-5',
-      searchStr: '?mode=interview',
-      controller: verifiedController,
-      resolveSessionSlugFromPathToken: (token) => token,
-      getVerifiedConfig: (input) =>
-        input?.slug === 'demo-interview-5' &&
-        input.workerOrigin === 'https://ce-demo-interview-5-c1cde84edac7.agalmic.workers.dev'
-          ? liveConfig
-          : null,
+    it('uses the verified live Worker config', () => {
+      const liveConfig = {
+        slug: FIXTURE_SLUG,
+        sessionId: FIXTURE_SESSION_ID,
+        corsWorkerUrl: `${FIXTURE_WORKER}/`,
+        interviewMode: { openingMode: 'owner', followNewQuestions: true },
+        liveQuestionCount: 47,
+      };
+
+      const result = resolveWithCachedConfig(liveConfig);
+
+      expect(result.kind).toBe('verified');
+      expect(result.sessionRoute?.sessionConfig).toBe(liveConfig);
     });
 
-    expect(result.kind).toBe('verified');
-    expect(result.sessionRoute?.sessionConfig).toBe(liveConfig);
-    expect(result.sessionRoute?.sessionConfig).toMatchObject({
-      interviewMode: {
-        openingMode: 'owner',
-        followNewQuestions: true,
-      },
-      liveQuestionCount: 47,
+    it('checks a verified config for another session with the Worker again', () => {
+      const result = resolveWithCachedConfig({
+        slug: FIXTURE_SLUG,
+        sessionId: '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+        corsWorkerUrl: FIXTURE_WORKER,
+      });
+
+      expect(result).toMatchObject({
+        kind: 'bootstrap',
+        sessionConfig: null,
+        expectedSessionId: FIXTURE_SESSION_ID,
+        sessionRoute: { sessionSlug: FIXTURE_SLUG, sessionConfig: null },
+      });
+      // The bootstrap it renders refuses a Worker that still reports another ID.
+      expect(renderWorkerCanonicalRouteBootstrap(result, controller)?.props).toMatchObject({
+        sessionSlug: FIXTURE_SLUG,
+        workerQueryValue: FIXTURE_WORKER,
+        expectedSessionId: FIXTURE_SESSION_ID,
+      });
     });
   });
 

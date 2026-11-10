@@ -1,5 +1,6 @@
 import demoSessions from '../../variables/demo/demo_sessions.json';
 import { toStr, normalizeSlug as normalizeBaseSlug } from '../shared/primitives.js';
+import { KNOWN_SESSION_CONFIGS } from './knownSessionsFile';
 
 type DemoSessionConfig = Record<string, unknown>;
 type DemoSessionMap = Record<string, DemoSessionConfig>;
@@ -15,6 +16,8 @@ export const SESSION_TEMPLATE_SEED_KEYS = Object.freeze({
 
 const isObj = (value: unknown): value is DemoSessionConfig =>
   !!value && typeof value === 'object' && !Array.isArray(value);
+// The demo data, plus the sessions the hosted site opens from a normal link.
+const bundledSessions: DemoSessionMap = { ...(demoSessions as DemoSessionMap), ...KNOWN_SESSION_CONFIGS };
 const readTrimmedSessionSlug = (raw: unknown): string => toStr(raw).trim();
 const normalizeLegacyAliasToken = (raw: unknown): string => normalizeBaseSlug(readTrimmedSessionSlug(raw));
 const cloneValue = <T>(value: T): T => {
@@ -38,8 +41,7 @@ const mergeDeep = (target: unknown, source: unknown): DemoSessionConfig => {
   });
   return out;
 };
-const getBaselineDemoSessionKeys = (): string[] =>
-  isObj(demoSessions) ? Object.keys(demoSessions as DemoSessionMap) : [];
+const getBaselineDemoSessionKeys = (): string[] => Object.keys(bundledSessions);
 const readDemoSessionSlugByKey = (key: string): string => {
   const sessionConfig = getDemoSessionConfigByKey(key);
   if (key === 'general') return readTrimmedSessionSlug(sessionConfig?.slug || '');
@@ -73,9 +75,9 @@ export const getDemoTemplateSeed = (name: string): DemoSessionConfig => {
 
 export const getDemoSessionConfigByKey = (key: unknown): DemoSessionConfig | null => {
   const normalizedKey = toStr(key).trim();
-  if (!normalizedKey || !isObj(demoSessions)) return null;
-  const entry = (demoSessions as DemoSessionMap)[normalizedKey];
+  if (!normalizedKey) return null;
+  const entry = bundledSessions[normalizedKey];
   return isObj(entry) ? entry : null;
 };
 
-export const getDemoSessionMap = () => demoSessions;
+export const getDemoSessionMap = () => bundledSessions;

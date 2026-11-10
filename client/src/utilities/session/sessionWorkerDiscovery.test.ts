@@ -199,6 +199,26 @@ describe('sessionWorkerDiscovery bootstrap validation', () => {
     ).toThrow(/conflicting session IDs/);
   });
 
+  it('opens only the session a session list names, in either ID form', () => {
+    const validate = (payload: unknown, expectedSessionId?: string) =>
+      validateWorkerCanonicalSessionBootstrap(payload, {
+        expectedSlug: 'session-a',
+        workerOrigin: 'https://session-a.example.workers.dev',
+        expectedSessionId,
+        environment: 'production',
+      });
+    expect(validate(buildPayload(), SESSION_ID).sessionId).toBe(SESSION_ID);
+    expect(
+      validate(buildPayload({ sessionId: SESSION_ID.toUpperCase().replace('0X', '0x') }), SESSION_ID).sessionId,
+    ).toBe(SESSION_ID);
+    expect(() => validate(buildPayload(), '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb')).toThrow(
+      'Worker bootstrap session ID does not match the requested session.',
+    );
+    // A malformed expected ID matches nothing.
+    expect(() => validate(buildPayload(), 'not-an-id')).toThrow(/session ID does not match/);
+    expect(() => validate(buildPayload(), '')).toThrow(/session ID does not match/);
+  });
+
   it('normalizes only non-zero bytes16 or UUID session identities', () => {
     expect(normalizeWorkerCanonicalSessionIdHex(SESSION_ID)).toBe(SESSION_ID);
     expect(normalizeWorkerCanonicalSessionIdHex('3b241101-e2bb-4255-8caf-4136c566a962')).toBe(
@@ -443,6 +463,23 @@ describe('sessionWorkerDiscovery bootstrap fetch', () => {
       environment: 'production',
     }).catch((error) => error);
     expect(describeWorkerSessionBootstrapError(identityError)).toEqual(
+      expect.objectContaining({ kind: 'identity_mismatch', title: 'Worker identity mismatch', canRetry: false }),
+    );
+
+    const otherSessionError = await fetchWorkerCanonicalSessionBootstrap({
+      fetchImpl: jest.fn(
+        async () =>
+          new Response(JSON.stringify(buildPayload()), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          }),
+      ),
+      sessionSlug: 'session-a',
+      workerQueryValue: 'https://session-a.example.workers.dev',
+      expectedSessionId: '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+      environment: 'production',
+    }).catch((error) => error);
+    expect(describeWorkerSessionBootstrapError(otherSessionError)).toEqual(
       expect.objectContaining({ kind: 'identity_mismatch', title: 'Worker identity mismatch', canRetry: false }),
     );
   });

@@ -1,8 +1,11 @@
 import demoSessions from '../../variables/demo/demo_sessions.json';
+import { KNOWN_SESSION_CONFIGS, KNOWN_SESSIONS } from './knownSessionsFile';
 import {
   canonicalizeLegacySessionAlias,
   getBaselineDemoPlaceholderSlugs,
   getBaselineDemoSessionSlugs,
+  getDemoSessionConfigByKey,
+  getDemoSessionMap,
   getDemoTemplateSeed,
   getReservedLegacySessionSlugs,
 } from './sessionDemoCompat.js';
@@ -21,11 +24,19 @@ describe('sessionDemoCompat', () => {
     expect([...reserved]).toEqual(['general']);
   });
 
-  it('returns baseline demo session slugs for every demo session entry', () => {
+  it('returns baseline demo session slugs for every demo session entry and known session', () => {
     const slugs = getBaselineDemoSessionSlugs();
 
-    expect(slugs).toHaveLength(Object.keys(demoSessions).length);
+    expect(slugs).toHaveLength(Object.keys({ ...demoSessions, ...KNOWN_SESSIONS }).length);
+    expect(slugs).toEqual(expect.arrayContaining(Object.keys(KNOWN_SESSIONS)));
     expect(slugs.every((slug) => typeof slug === 'string')).toBe(true);
+  });
+
+  it('bundles each known session as its clean-route config', () => {
+    for (const slug of Object.keys(KNOWN_SESSIONS)) {
+      expect(getDemoSessionConfigByKey(slug)).toBe(KNOWN_SESSION_CONFIGS[slug]);
+      expect(getDemoSessionMap()[slug]).toBe(KNOWN_SESSION_CONFIGS[slug]);
+    }
   });
 
   it('returns baseline demo placeholder slugs without the default session alias', () => {

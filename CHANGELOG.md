@@ -12,6 +12,8 @@ All notable changes to this project will be documented in this file.
 - In Safari, Group Conversation keeps its audio on the device, so a reload can recover the recording. Safari refused to store it, and as soon as recording began the page warned that the recording couldn't be recovered after a reload ("Error preparing Blob/File data to be stored in object store").
 - On a session page, the check after you submit answers opens your profile in that session, as do a group's admin and member links, the addresses on Results' response cards and their answer pages, and an SBT page's addresses. They opened it in the default session, which doesn't hold those answers, or showed "Browser origin not allowed" on a site whose address that session's Worker doesn't accept.
 - The green check after you submit answers on a session page goes away after 10 seconds, keeping its place so nothing moves; it waits while pointed at or focused. Each new submit shows it again.
+- The site opens a session from a normal link, with no `worker=`, only when the repo's `known-sessions.json` lists it, and only when its Worker reports the session ID listed there. The list holds EDDY 2026; other sessions open from their `worker=` links. The site also serves the list at `/known-sessions.json`.
+- The short links such as `/rxc-ra-test-6` are gone, and the RxC test sessions no longer open from a normal link.
 
 ## [0.9.0] - 2026-11-02
 

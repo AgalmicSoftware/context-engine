@@ -2121,7 +2121,7 @@ describe('AppShell route render smoke', () => {
     );
     await waitFor(() =>
       expect(screen.getByTestId('entry-location')).toHaveTextContent(
-        'REPLACE /session/eddy26?worker=https%3A%2F%2Fce-eddy26-d9702b0d3c41.agalmic.workers.dev%2F&joinGroup=eddy-2026&mode=interview',
+        'REPLACE /session/eddy26?worker=https%3A%2F%2Fce-eddy26-d9702b0d3c41.agalmic.workers.dev&joinGroup=eddy-2026&mode=interview',
       ),
     );
     expect(mockOnePageSession).not.toHaveBeenCalled();

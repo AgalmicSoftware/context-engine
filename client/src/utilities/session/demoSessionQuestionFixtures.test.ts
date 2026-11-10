@@ -9,6 +9,7 @@ import {
   getDemoFixtureQuestionIdsByIndex,
   getTemporaryDemoSessionQuestionFixtures,
 } from './demoSessionQuestionFixtures.js';
+import { KNOWN_SESSION_CONFIGS } from './knownSessionsFile';
 import { classifySessionModeProfileSupport } from './sessionModeProfile';
 
 describe('getTemporaryDemoSessionQuestionFixtures', () => {
@@ -194,39 +195,12 @@ describe('getTemporaryDemoSessionQuestionFixtures', () => {
     expect(classifySessionModeProfileSupport(config.sessionModeProfile).status).toBe('reachable');
   });
 
-  it.each(['rxc-test', 'rxc-ra-test', 'rxc-ra-test-2', 'rxc-ra-test-3', 'rxc-ra-test-5', 'rxc-ra-test-6'])(
-    'discovers %s without seeding demo questions',
-    (slug) => {
-      const config = (demoSessions as Record<string, any>)[slug];
+  it.each(Object.entries(KNOWN_SESSION_CONFIGS))(
+    'discovers known session %s without seeding demo questions',
+    (slug, config) => {
       expect(getTemporaryDemoSessionQuestionFixtures(slug, config)).toEqual([]);
-      expect(config).toMatchObject({
-        slug,
-        sessionId: expect.stringMatching(/^0x[0-9a-f]{32}$/),
-        // Older deploys add a random suffix to the Worker name.
-        corsWorkerUrl: expect.stringMatching(
-          new RegExp(`^https://ce-${slug}(-[0-9a-f]{12})?\\.agalmic\\.workers\\.dev/$`),
-        ),
-        workerCanonicalCleanRoute: true,
-        // Bundled discovery trusts only a Worker-canonical entry.
-        sessionModeProfile: { authority: { mode: 'worker_canonical' } },
-      });
     },
   );
-
-  it('does not seed fallback questions for the fifth realtime demo route', () => {
-    const config = (demoSessions as Record<string, any>)['demo-interview-5'];
-
-    expect(getTemporaryDemoSessionQuestionFixtures('demo-interview-5', config)).toEqual([]);
-    expect(config).toMatchObject({
-      sessionId: '0xa0dfc46736b8288854ae2c4156877879',
-      corsWorkerUrl: 'https://ce-demo-interview-5-c1cde84edac7.agalmic.workers.dev/',
-      workerCanonicalCleanRoute: true,
-      sessionModeProfile: {
-        authority: { mode: 'worker_canonical' },
-        evm: { registryChainId: null },
-      },
-    });
-  });
 
   it('uses question-specific poll choices for demo-interview without changing legacy demo sessions', () => {
     const interviewPolls = getTemporaryDemoSessionQuestionFixtures(

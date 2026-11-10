@@ -86,12 +86,12 @@ greeting through `session.instructions.append`; it does not send
 a client delegation receives a factual notice that drafting happens after Stop.
 
 The shipped `demo-interview` client record pins its deployed Worker and enables question suggestions.
-The shipped `demo-interview-5` record is a trusted clean-route discovery stub:
-`/session/demo-interview-5?mode=interview` bootstraps and verifies the live config from its pinned
-Worker, so the public URL does not require a visible `worker=` parameter. Registry-backed sessions
-likewise read `corsWorkerUrl` from registered session metadata. A newly shared,
-Worker-canonical session needs a `worker=<origin>` link for first-time visitors
-unless the site's bundled discovery map lists its slug and Worker origin.
+A session listed in the repo's `known-sessions.json` opens from its normal link:
+`/session/<slug>?mode=interview` bootstraps and verifies the live config from the listed
+Worker, and opens only when that config carries the listed session ID, so the public URL needs
+no visible `worker=` parameter. Registry-backed sessions likewise read `corsWorkerUrl` from
+registered session metadata. Any other Worker-canonical session needs a `worker=<origin>` link
+for first-time visitors.
 
 The interviewer starts directly with a topic-relevant question, without a
 greeting or preamble. It follows the responder's direction, chooses relevant

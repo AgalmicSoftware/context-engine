@@ -1,17 +1,13 @@
-import demoSessions from '../../variables/demo/demo_sessions.json';
-import { isRxcSessionEntryPath } from '../../utilities/session/rxcSessionSlugs';
+import { KNOWN_SESSIONS } from '../../utilities/session/knownSessionsFile';
 import { buildPublicUrl } from './urlUtils';
 
 export const getSessionEntryRedirect = (pathname: string, search = '', hash = ''): string | null => {
-  if (isRxcSessionEntryPath(pathname)) {
-    return buildPublicUrl(`/session${pathname.replace(/\/$/, '')}`, search, hash);
-  }
   // Only the bare event link implies interview/join intent. Preserve explicit
   // links and the Worker parameter left behind after those intents are consumed.
-  if (!/^\/session\/eddy26\/?$/.test(pathname) || search || hash) return null;
+  if (!/^\/session\/eddy26\/?$/.test(pathname) || search || hash || !KNOWN_SESSIONS.eddy26) return null;
 
   const params = new URLSearchParams({
-    worker: demoSessions.eddy26.corsWorkerUrl,
+    worker: KNOWN_SESSIONS.eddy26.worker,
     joinGroup: 'eddy-2026',
     mode: 'interview',
   });
