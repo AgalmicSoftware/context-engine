@@ -259,6 +259,37 @@ describe('verifyInterviewKickoffCatalog', () => {
     expect(refusedTwice).toHaveBeenCalledTimes(2);
   });
 
+  it('times only the Worker, never someone signing in for a ticket', async () => {
+    jest.useFakeTimers();
+    try {
+      // As a real fetch does, it fails at once on an aborted signal.
+      const fetchImpl = jest.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+        if (init?.signal?.aborted) throw new Error('aborted');
+        return new Response(JSON.stringify(catalog));
+      });
+      let issue: (ticket: string) => void = () => {};
+      const signingIn = verify(fetchImpl, () => new Promise<string>((resolve) => (issue = resolve)));
+      await jest.advanceTimersByTimeAsync(30_000);
+      issue('ic1.slow');
+      await expect(signingIn).resolves.toBe('ic1.slow');
+      // The Worker itself still gets ten seconds.
+      const stalled = verify(
+        jest.fn(
+          (_input: RequestInfo | URL, init?: RequestInit) =>
+            new Promise<Response>((_resolve, reject) => {
+              init?.signal?.addEventListener('abort', () => reject(new Error('aborted')));
+            }),
+        ),
+        async () => 'ic1.mine',
+      );
+      const outcome = expect(stalled).rejects.toThrow('Could not check this session’s Worker');
+      await jest.advanceTimersByTimeAsync(10_000);
+      await outcome;
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it('says a session closed to signed-out visitors needs a sign-in, and only then', async () => {
     await expect(verify(jest.fn(async () => refusal(401, 'sign_in_required')))).rejects.toBeInstanceOf(
       InterviewCatalogSignInError,

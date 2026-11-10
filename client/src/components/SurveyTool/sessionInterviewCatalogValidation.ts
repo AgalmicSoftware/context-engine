@@ -189,12 +189,28 @@ export const verifyInterviewKickoffCatalog = async ({
   url.searchParams.set('slug', sessionSlug);
   url.searchParams.set('sessionUrl', sessionUrl);
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 10_000);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const startTimer = () => {
+    clearTimeout(timer);
+    timer = setTimeout(() => controller.abort(), 10_000);
+  };
+  // Only the Worker's reply is timed: getting a ticket may wait for the person to sign in.
+  const timedTicket: InterviewCatalogTicketSource | undefined =
+    ticket &&
+    (async (request) => {
+      clearTimeout(timer);
+      try {
+        return await ticket(request);
+      } finally {
+        startTimer();
+      }
+    });
+  startTimer();
   let catalog: Record<string, unknown>;
   let usedTicket = '';
   let signInNeeded = false;
   try {
-    const read = await fetchInterviewCatalog(url, { fetchImpl, signal: controller.signal, ticket });
+    const read = await fetchInterviewCatalog(url, { fetchImpl, signal: controller.signal, ticket: timedTicket });
     if (!read.response.ok) {
       signInNeeded = !read.ticket && (await readRefusalReason(read.response)) === 'sign_in_required';
       throw new Error('Catalog unavailable');
