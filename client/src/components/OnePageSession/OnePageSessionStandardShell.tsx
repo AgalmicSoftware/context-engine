@@ -477,7 +477,7 @@ export default function OnePageSessionStandardShell({
   const canEditContext = (contextSources.isAdmin && contextSources.supported) || contextSources.participantsCanAdd;
   // Everyone signed in sees the Group Agent once an admin turns it on: the
   // dialog says whether it answers them, and lets them keep their answers and
-  // files out of it. The title's "?" tells everyone else it is on.
+  // files out of it. The robot by the title tells everyone else it is on.
   const groupAgentOn =
     !isDemoSlug && !!groupAgentSettingOf((resolvedSessionConfig as UnknownRecord | null)?.groupAgent);
   const viewerAccount = loginComplete && typeof account === 'string' ? account : '';

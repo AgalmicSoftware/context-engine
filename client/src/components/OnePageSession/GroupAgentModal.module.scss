@@ -100,11 +100,6 @@
   &:active {
     color: inherit;
   }
-
-  &:focus-visible {
-    outline: 2px solid currentColor;
-    outline-offset: 2px;
-  }
 }
 
 .form {
@@ -135,6 +130,11 @@
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 10px;
+
+  // The hint takes the room the Ask button leaves, so they share a line.
+  .hint {
+    flex: 1 1 200px;
+  }
 }
 
 // The accent pair, which every theme keeps readable, in each state.
@@ -150,11 +150,6 @@
   &:active:not(:disabled) {
     background: var(--ce-action-accent-hover);
     color: var(--ce-action-accent-text);
-  }
-
-  &:focus-visible {
-    outline: 2px solid var(--ce-action-accent);
-    outline-offset: 2px;
   }
 
   // Muted text rather than opacity, so the label stays readable.
