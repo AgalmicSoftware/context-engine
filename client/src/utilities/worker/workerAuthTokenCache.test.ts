@@ -118,9 +118,11 @@ describe('workerAuthTokenCache', () => {
     const blocked = () => {
       throw new DOMException('Storage is blocked.', 'SecurityError');
     };
+    // Typed as just its storage: jest's types can't spy on getters of the whole window.
+    const storageHost: { localStorage: Storage; sessionStorage: Storage } = window;
     const spies = [
-      jest.spyOn(window, 'localStorage', 'get').mockImplementation(blocked),
-      jest.spyOn(window, 'sessionStorage', 'get').mockImplementation(blocked),
+      jest.spyOn(storageHost, 'localStorage', 'get').mockImplementation(blocked),
+      jest.spyOn(storageHost, 'sessionStorage', 'get').mockImplementation(blocked),
     ];
     try {
       adoptTokenCaches(ADDRESS);
