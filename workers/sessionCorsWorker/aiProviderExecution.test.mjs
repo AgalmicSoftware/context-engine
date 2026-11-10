@@ -184,6 +184,16 @@ test('proxyAnthropic sends the effort and a JSON schema in output_config', async
   assert.equal('output_config' in older.sent, false);
 });
 
+test('proxyAnthropic sends a system message as its system field', async () => {
+  const { sent, result } = await claudeRequest(
+    { model: 'claude-opus-5-5', messages: [{ role: 'system', content: 'Rules.' }, { role: 'user', content: 'Map this.' }] },
+    { content: [{ type: 'text', text: 'Mapped.' }] },
+  );
+  assert.equal(sent.system, 'Rules.');
+  assert.deepEqual(sent.messages, [{ role: 'user', content: 'Map this.' }]);
+  assert.equal(result.body.completion, 'Mapped.');
+});
+
 test('proxyAnthropic reports a refusal and an empty answer as errors', async () => {
   const refused = await claudeRequest({ model: 'claude-opus-5-5' }, { content: [], stop_reason: 'refusal' });
   assert.equal(refused.result.status, 422);
