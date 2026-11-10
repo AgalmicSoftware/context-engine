@@ -78,8 +78,13 @@ describe('setup content sections', () => {
       links: [],
       html: '<h2>Atlas</h2><p style="color:red">Who decides?</p>',
     });
-    const shown = readContextHtmlPage(await screen.findByTestId('ce-setup-context-html-shown'));
-    expect(shown?.textContent).toContain('Who decides?');
+    // The preview renders once its sanitizer has loaded.
+    await waitFor(() =>
+      expect(readContextHtmlPage(screen.getByTestId('ce-setup-context-html-shown'))?.textContent).toContain(
+        'Who decides?',
+      ),
+    );
+    const shown = readContextHtmlPage(screen.getByTestId('ce-setup-context-html-shown'));
     expect(shown?.querySelector('script')).toBeNull();
     expect(screen.getByTestId('ce-setup-summary-context')).toHaveTextContent('HTML file');
 
