@@ -70,7 +70,7 @@ Wallet material is locked on:
 - explicit logout/disconnect
 - account switch
 - unlock TTL expiry, counted from the person's last click, tap or key press,
-  and never later than 8 hours after the passkey prompt
+  and never later than 8 hours after the passkey prompt (or one TTL, if longer)
 - worker lock
 - tab close by normal browser memory cleanup
 

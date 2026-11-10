@@ -224,10 +224,10 @@ Sensitive material is cleared on disconnect/logout, timeout, account switch, and
 worker lock. The default unlock TTL is 3600 seconds (60 minutes), counted from
 the person's last click, tap or key press on the page. Events a script
 dispatches and background signing don't count, and however much the page is
-used, the wallet locks 8 hours after its passkey prompt. The key's worker
-enforces both: each use moves its expiry forward too, at most about once a
-minute, and never past the 8 hours set when it got the key. Configure the TTL
-with:
+used, the wallet locks 8 hours after its passkey prompt, or one TTL after it if
+the TTL is set longer. The key's worker enforces both: each use moves its expiry
+forward too, at most about once a minute, and never past the limit set when it
+got the key. Configure the TTL with:
 
 ```bash
 NEXT_PUBLIC_WALLET_UNLOCK_TTL_SECONDS=3600
