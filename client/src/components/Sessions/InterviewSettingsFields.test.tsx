@@ -131,11 +131,11 @@ it('asks what the AI may use to suggest groups only while suggesting them', () =
   rerender(<InterviewSettingsFields value={{ joinMatchingGroups: true }} onChange={onChange} />);
   const group = screen.getByRole('group', { name: 'The AI may use' });
   expect(group).toHaveAccessibleDescription(
-    /with none ticked, neither suggests any.*Town or city means anywhere smaller than a country.*suggested either way/,
+    /with none ticked, neither suggests any.*Town or city means anywhere smaller than a country.*No AI ever goes on health.*suggested either way/,
   );
   fireEvent.click(within(group).getByRole('button', { name: 'About what the AI may use' }));
   expect(onChange).not.toHaveBeenCalled();
-  // Country, work and interests by default; never where in a country, or sensitive details.
+  // Country, work and interests by default; where in a country only when ticked, and nothing more personal.
   expect(
     within(group)
       .getAllByRole('checkbox')
@@ -145,7 +145,6 @@ it('asks what the AI may use to suggest groups only while suggesting them', () =
     ['Town or city', false],
     ['Work', true],
     ['Interests and causes', true],
-    ['Sensitive details', false],
   ]);
   fireEvent.click(within(group).getByLabelText('Town or city'));
   expect(latest()).toEqual(

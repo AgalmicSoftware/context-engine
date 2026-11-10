@@ -271,10 +271,10 @@ test('the catalog lists groups to join only when the session joins matching grou
     'their work, studies and roles',
     'their interests, causes and communities',
   ]);
+  // A kind no longer offered, such as sensitive details, is never passed on.
   const chosen = await run({ joinMatchingGroups: true, groupSuggestionData: ['sensitive', 'town'] }, groups);
   assert.deepEqual(chosen.groupSuggestionData, [
     'where in their country they live (region, town, city or neighbourhood)',
-    'their health, disability, religion, ethnicity, sexuality, gender identity, or party or union membership',
   ]);
   assert.equal(on.questionSetHash, 'question-hash');
   assert.equal(listed.length, 2);

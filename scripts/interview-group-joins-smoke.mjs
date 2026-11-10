@@ -433,7 +433,6 @@ try {
             ['Town or city', false],
             ['Work', true],
             ['Interests and causes', true],
-            ['Sensitive details', false],
           ],
         );
         const town = data.getByLabel('Town or city');

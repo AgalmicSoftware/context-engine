@@ -104,11 +104,13 @@ test('defaults are stable and settings reject invalid values', () => {
     [null, []],
     [{ country: true }, []],
     [[], []],
-    [['sensitive', 'country', 'address', 'country'], ['country', 'sensitive']],
+    [['sensitive', 'country', 'address', 'country'], ['country']],
   ])
     assert.deepEqual(normalizeInterviewSettings({ groupSuggestionData }).groupSuggestionData, expected);
   for (const groupSuggestionData of [undefined, [], ['town'], ['interests', 'country']])
     assert.equal(validInterviewSettings({ groupSuggestionData }), true);
+  // Sensitive details are not a kind any session can allow.
+  assert.equal(validInterviewSettings({ groupSuggestionData: ['country', 'sensitive'] }), false);
   assert.equal(normalizeInterviewSettings().showFidelityResults, false);
   assert.equal(normalizeInterviewSettings({ showFidelityResults: true }).showFidelityResults, true);
   assert.equal(normalizeInterviewSettings({ showFidelityResults: 'true' }).showFidelityResults, false);

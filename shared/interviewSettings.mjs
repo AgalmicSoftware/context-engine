@@ -5,8 +5,10 @@ export const GROUP_SUGGESTION_DATA = Object.freeze({
   town: 'where in their country they live (region, town, city or neighbourhood)',
   work: 'their work, studies and roles',
   interests: 'their interests, causes and communities',
-  sensitive: 'their health, disability, religion, ethnicity, sexuality, gender identity, or party or union membership',
 });
+// What no AI may base a group suggestion on, whatever the session allows.
+export const GROUP_SUGGESTION_NEVER =
+  'their health, disability, religion, ethnicity, sexuality, gender identity, age, family life, or party or union membership';
 const GROUP_SUGGESTION_DATA_KINDS = Object.keys(GROUP_SUGGESTION_DATA);
 export const DEFAULT_INTERVIEW_SETTINGS = Object.freeze({
   openingMode: 'auto',

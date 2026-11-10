@@ -30177,8 +30177,7 @@ var init_interviewSettings = __esm({
       country: "the country they live in",
       town: "where in their country they live (region, town, city or neighbourhood)",
       work: "their work, studies and roles",
-      interests: "their interests, causes and communities",
-      sensitive: "their health, disability, religion, ethnicity, sexuality, gender identity, or party or union membership"
+      interests: "their interests, causes and communities"
     });
     GROUP_SUGGESTION_DATA_KINDS = Object.keys(GROUP_SUGGESTION_DATA);
     DEFAULT_INTERVIEW_SETTINGS = Object.freeze({

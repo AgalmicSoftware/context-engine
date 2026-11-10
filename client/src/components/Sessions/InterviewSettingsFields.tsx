@@ -38,11 +38,10 @@ const GROUP_DATA_LABELS: Record<GroupSuggestionDataKind, string> = {
   town: 'Town or city',
   work: 'Work',
   interests: 'Interests and causes',
-  sensitive: 'Sensitive details',
 };
 const GROUP_DATA_KINDS = Object.keys(GROUP_DATA_LABELS) as GroupSuggestionDataKind[];
 const GROUP_DATA_ABOUT =
-  'What the session’s AI and each participant’s own AI may go on when suggesting groups; with none ticked, neither suggests any. Town or city means anywhere smaller than a country. Sensitive details are health, disability, religion, ethnicity, sexuality, gender identity, and party or union membership. Groups named like an answer someone chose are suggested either way.';
+  'What the session’s AI and each participant’s own AI may go on when suggesting groups; with none ticked, neither suggests any. Town or city means anywhere smaller than a country. No AI ever goes on health, disability, religion, ethnicity, sexuality, gender identity, age, family life, or party or union membership. Groups named like an answer someone chose are suggested either way.';
 
 // The smallest group "How well AIs predicted people" reports on; 1 shows every figure.
 const FIDELITY_MINIMUMS = [1, 3, 5, 10];

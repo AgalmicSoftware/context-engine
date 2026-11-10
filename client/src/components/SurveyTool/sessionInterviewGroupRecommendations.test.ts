@@ -362,16 +362,15 @@ describe('session interview group recommendations', () => {
     const town = 'where in their country they live (region, town, city or neighbourhood)';
     const work = 'their work, studies and roles';
     const interests = 'their interests, causes and communities';
-    const sensitive =
-      'their health, disability, religion, ethnicity, sexuality, gender identity, or party or union membership';
+    // Never allowed, whatever the session ticks, and a stored kind no longer offered is ignored.
+    const never =
+      'their health, disability, religion, ethnicity, sexuality, gender identity, age, family life, or party or union membership';
     const rule = (allowed: string[], excluded: string[]) =>
       `\n- Judge whether the respondent fits a group only on what the evidence shows about ${allowed.join('; ')}. ` +
-      `Nothing else about them counts${excluded.length ? `, such as ${excluded.join('; ')}` : ''}.\n`;
-    expect(promptFor()).toContain(rule([country, work, interests], [town, sensitive]));
-    expect(promptFor(['sensitive', 'town'])).toContain(rule([town, sensitive], [country, work, interests]));
-    expect(promptFor(['country', 'town', 'work', 'interests', 'sensitive'])).toContain(
-      rule([country, town, work, interests, sensitive], []),
-    );
+      `Nothing else about them counts, such as ${[...excluded, never].join('; ')}.\n`;
+    expect(promptFor()).toContain(rule([country, work, interests], [town]));
+    expect(promptFor(['sensitive', 'town'])).toContain(rule([town], [country, work, interests]));
+    expect(promptFor(['country', 'town', 'work', 'interests'])).toContain(rule([country, town, work, interests], []));
   });
 
   it('keeps every fitting group and each one’s confidence, clamped to 0-1', () => {
