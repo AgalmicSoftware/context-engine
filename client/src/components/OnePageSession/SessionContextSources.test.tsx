@@ -90,9 +90,15 @@ describe('the Context section for participants', () => {
     expect(list.reload).toHaveBeenCalled();
   });
 
-  it('adds a file, locked to the groups chosen', async () => {
+  it('adds a file, locked to the groups chosen, from a form that Add opens and closes', async () => {
     const list = state();
     renderList(list);
+    const add = screen.getByRole('button', { name: 'Add' });
+    expect(add).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.getByTestId('ce-session-context-participant')).not.toBeVisible();
+    fireEvent.click(add);
+    expect(add).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByTestId('ce-session-context-participant')).toBeVisible();
     const notes = new File(['notes'], 'notes.txt', { type: 'text/plain' });
     fireEvent.change(screen.getByLabelText('File'), { target: { files: [notes] } });
     fireEvent.click(screen.getByLabelText('Visible to'));
@@ -106,14 +112,40 @@ describe('the Context section for participants', () => {
     );
     expect(list.reload).toHaveBeenCalled();
     expect(screen.getByRole('status')).toHaveTextContent('File added.');
+    // Closing keeps what the form says, as a closed disclosure did.
+    fireEvent.click(add);
+    expect(screen.getByTestId('ce-session-context-participant')).not.toBeVisible();
+    fireEvent.click(add);
+    expect(screen.getByRole('status')).toHaveTextContent('File added.');
+  });
+
+  it('puts Add and View in the header the page gives it', () => {
+    const header = document.createElement('div');
+    document.body.appendChild(header);
+    render(
+      <SessionContextSources
+        sessionSlug="salon"
+        sessionConfig={{ slug: 'salon' }}
+        account={ME}
+        list={state({ groupFilesHidden: true })}
+        pageLinks={[]}
+        headerActionsSlot={header}
+      />,
+    );
+    expect(header).toContainElement(screen.getByRole('button', { name: 'Add' }));
+    expect(header).toContainElement(screen.getByRole('button', { name: 'View my groups’ files' }));
+    header.remove();
   });
 
   it('lets someone ask for their groups’ files, which signs them in, only when it would help', async () => {
     const { unmount } = renderList(state());
-    expect(screen.queryByRole('button', { name: 'Show my groups’ files' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'View my groups’ files' })).toBeNull();
     unmount();
     renderList(state({ groupFilesHidden: true }));
-    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Show my groups’ files' })));
+    const view = screen.getByRole('button', { name: 'View my groups’ files' });
+    expect(view).toHaveTextContent('View');
+    expect(view).toHaveAccessibleDescription(/files locked to your groups/);
+    await act(async () => fireEvent.click(view));
     expect(getWorkerSessionToken).toHaveBeenCalledWith(
       expect.objectContaining({ sessionSlug: 'salon', context: { account: ME } }),
     );
@@ -122,5 +154,6 @@ describe('the Context section for participants', () => {
   it('offers no form where the session limits adding to admins', () => {
     renderList(state({ participantsCanAdd: false }));
     expect(screen.queryByTestId('ce-session-context-add-file')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Add' })).toBeNull();
   });
 });

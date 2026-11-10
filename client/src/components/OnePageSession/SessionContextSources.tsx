@@ -1,7 +1,8 @@
 import { useId, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { UncontrolledTooltip } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faExternalLinkAlt, faFileAlt, faQuestionCircle } from '@fortawesome/free-solid-svg-icons';
+import { faExternalLinkAlt, faEye, faFileAlt, faPlus } from '@fortawesome/free-solid-svg-icons';
 
 import { contextGroupsLabel } from '../Sessions/setup/ContextAccessPicker';
 import ContextSourcesPanel from '../Sessions/setup/ContextSourcesPanel';
@@ -22,6 +23,8 @@ type Props = {
   list: SessionContextSourcesState;
   /** The session's page links, which already show above. */
   pageLinks: Array<{ label: string; url: string }>;
+  /** The section header's spot for Add and View, as the Tool Explorer has them; without it they show here. */
+  headerActionsSlot?: HTMLElement | null;
 };
 
 const MY_GROUPS_HELP = 'Signs you in to this session, so it can show files locked to your groups, and your own.';
@@ -29,7 +32,9 @@ const MY_GROUPS_HELP = 'Signs you in to this session, so it can show files locke
 // The Context section's files and links: the ones this reader may open, who
 // added each, and for admins the controls that add, refresh and remove them.
 // Others may add files and remove their own, unless the session limits that.
-const SessionContextSources = ({ sessionSlug, sessionConfig, account, list, pageLinks }: Props) => {
+// Add opens the form, or an admin's controls; View shows a signed-out
+// member their groups' files.
+const SessionContextSources = ({ sessionSlug, sessionConfig, account, list, pageLinks, headerActionsSlot }: Props) => {
   const isAdmin = list.isAdmin && list.supported;
   const canAddFile = !isAdmin && list.participantsCanAdd;
   const groups = useContextGroups({
@@ -39,12 +44,66 @@ const SessionContextSources = ({ sessionSlug, sessionConfig, account, list, page
     enabled: canAddFile || list.groupFilesHidden || list.sources.length > 0,
   });
   const [removeError, setRemoveError] = useState('');
-  const myGroupsHelpId = `ce-context-my-groups-help-${useId().replace(/:/g, '')}`;
+  const [adding, setAdding] = useState(false);
+  const idBase = useId().replace(/:/g, '');
+  const myGroupsHelpId = `ce-context-my-groups-help-${idBase}`;
+  const addPanelId = `ce-context-add-${idBase}`;
+  const actions = (
+    <>
+      {canAddFile || isAdmin ? (
+        <button
+          type="button"
+          className={`${setupStyles.button} ${adding ? setupStyles.primaryButton : ''} ${styles.contextHeaderButton}`}
+          aria-expanded={adding}
+          aria-controls={addPanelId}
+          data-testid="ce-session-context-add"
+          onClick={() => setAdding((open) => !open)}
+        >
+          <FontAwesomeIcon icon={faPlus} aria-hidden="true" />
+          Add
+        </button>
+      ) : null}
+      {list.groupFilesHidden && groups.length > 0 ? (
+        <>
+          <button
+            type="button"
+            id={myGroupsHelpId}
+            className={`${setupStyles.button} ${styles.contextHeaderButton}`}
+            aria-label="View my groups’ files"
+            aria-describedby={`${myGroupsHelpId}-about`}
+            data-testid="ce-session-context-view"
+            onClick={() => {
+              setRemoveError('');
+              // The token's arrival lists again.
+              void getWorkerSessionToken({ sessionSlug, sessionConfig, context: { account } }).catch(
+                (failure: unknown) =>
+                  setRemoveError(failure instanceof Error ? failure.message : 'That did not work. Try again.'),
+              );
+            }}
+          >
+            <FontAwesomeIcon icon={faEye} aria-hidden="true" />
+            View
+          </button>
+          <span id={`${myGroupsHelpId}-about`} hidden>
+            {MY_GROUPS_HELP}
+          </span>
+          <UncontrolledTooltip target={myGroupsHelpId} trigger="hover focus" autohide={false}>
+            {MY_GROUPS_HELP}
+          </UncontrolledTooltip>
+        </>
+      ) : null}
+    </>
+  );
   const shown = list.sources.filter(
     (source) => !(source.kind === 'link' && pageLinks.some((link) => link.url === source.url)),
   );
   return (
     <>
+      {headerActionsSlot ? (
+        createPortal(actions, headerActionsSlot)
+      ) : (
+        <div className={styles.sessionContextActions}>{actions}</div>
+      )}
       {shown.length ? (
         <section
           className={styles.sessionContextSection}
@@ -104,47 +163,15 @@ const SessionContextSources = ({ sessionSlug, sessionConfig, account, list, page
         </section>
       ) : null}
       {removeError ? <p role="alert">{removeError}</p> : null}
-      {list.groupFilesHidden && groups.length > 0 ? (
-        <div className={`${setupStyles.page} ${styles.sessionContextManage}`}>
-          <div className={setupStyles.buttonRow}>
-            <button
-              type="button"
-              className={setupStyles.button}
-              onClick={() => {
-                setRemoveError('');
-                // The token's arrival lists again.
-                void getWorkerSessionToken({ sessionSlug, sessionConfig, context: { account } }).catch(
-                  (failure: unknown) =>
-                    setRemoveError(failure instanceof Error ? failure.message : 'That did not work. Try again.'),
-                );
-              }}
-            >
-              Show my groups’ files
-            </button>
-            <button
-              type="button"
-              id={myGroupsHelpId}
-              className={styles.sessionContextHelp}
-              aria-label="About showing your groups’ files"
-              aria-describedby={`${myGroupsHelpId}-about`}
-            >
-              <FontAwesomeIcon icon={faQuestionCircle} />
-            </button>
-            <span id={`${myGroupsHelpId}-about`} hidden>
-              {MY_GROUPS_HELP}
-            </span>
-            <UncontrolledTooltip target={myGroupsHelpId} trigger="hover focus" autohide={false}>
-              {MY_GROUPS_HELP}
-            </UncontrolledTooltip>
-          </div>
-        </div>
-      ) : null}
+      {/* Kept mounted while closed, as a disclosure is, so a half-filled form survives closing it. */}
       {canAddFile ? (
-        <details
+        <div
+          id={addPanelId}
           className={`${setupStyles.page} ${styles.sessionContextManage}`}
+          hidden={!adding}
           data-testid="ce-session-context-participant"
         >
-          <summary className={setupStyles.fieldLabel}>Add a file</summary>
+          <h3 className={setupStyles.fieldLabel}>Add a file</h3>
           <SessionContextAddFile
             sessionSlug={sessionSlug}
             sessionConfig={sessionConfig}
@@ -152,14 +179,16 @@ const SessionContextSources = ({ sessionSlug, sessionConfig, account, list, page
             groups={groups}
             onAdded={list.reload}
           />
-        </details>
+        </div>
       ) : null}
       {isAdmin ? (
-        <details
+        <div
+          id={addPanelId}
           className={`${setupStyles.page} ${styles.sessionContextManage}`}
+          hidden={!adding}
           data-testid="ce-session-context-manage"
         >
-          <summary className={setupStyles.fieldLabel}>Manage files and links</summary>
+          <h3 className={setupStyles.fieldLabel}>Manage files and links</h3>
           <ContextSourcesPanel
             sessionSlug={sessionSlug}
             sessionConfig={sessionConfig}
@@ -167,7 +196,7 @@ const SessionContextSources = ({ sessionSlug, sessionConfig, account, list, page
             pageLinks={pageLinks}
             list={list}
           />
-        </details>
+        </div>
       ) : null}
     </>
   );
