@@ -41,11 +41,15 @@ export const buildSessionContextPrompt = ({
   totalChars = SESSION_CONTEXT_TEXT_LIMITS.totalChars,
 } = {}) => {
   const { title, html, paragraphs, links } = normalizeSessionContext(sessionContext);
-  // An HTML page replaces the paragraphs, so its words are the notes.
-  const notes = html ? chunkLines(sessionContextHtmlText(sessionContext), SESSION_CONTEXT_LIMITS.paragraphChars) : paragraphs;
+  // An HTML page replaces the paragraphs, so its words are the notes, in no
+  // more room than typed paragraphs get, which leaves the rest for files.
+  const pageNotes = html
+    ? chunkLines(sessionContextHtmlText(sessionContext), SESSION_CONTEXT_LIMITS.paragraphChars).filter((chunk) => chunk.trim())
+    : null;
+  const notes = pageNotes ? pageNotes.slice(0, SESSION_CONTEXT_LIMITS.paragraphs) : paragraphs;
   const data = title ? { title } : {};
   let included = 0;
-  let omitted = 0;
+  let omitted = pageNotes ? pageNotes.length - notes.length : 0;
   const tryAdd = (key, entry) => {
     const next = { ...data, [key]: [...(data[key] || []), entry] };
     if (blockLength(next) > totalChars) return false;

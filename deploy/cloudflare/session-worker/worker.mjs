@@ -75625,10 +75625,11 @@ ${line}`;
       totalChars = SESSION_CONTEXT_TEXT_LIMITS.totalChars
     } = {}) => {
       const { title, html, paragraphs, links } = normalizeSessionContext(sessionContext);
-      const notes = html ? chunkLines(sessionContextHtmlText(sessionContext), SESSION_CONTEXT_LIMITS.paragraphChars) : paragraphs;
+      const pageNotes = html ? chunkLines(sessionContextHtmlText(sessionContext), SESSION_CONTEXT_LIMITS.paragraphChars).filter((chunk2) => chunk2.trim()) : null;
+      const notes = pageNotes ? pageNotes.slice(0, SESSION_CONTEXT_LIMITS.paragraphs) : paragraphs;
       const data = title ? { title } : {};
       let included = 0;
-      let omitted = 0;
+      let omitted = pageNotes ? pageNotes.length - notes.length : 0;
       const tryAdd = (key, entry2) => {
         const next = { ...data, [key]: [...data[key] || [], entry2] };
         if (blockLength(next) > totalChars) return false;

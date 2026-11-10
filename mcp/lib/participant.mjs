@@ -57,7 +57,9 @@ const mapLimit = async (items, limit, task) => {
 // An uploaded HTML page reaches agents as its words, in place of the paragraphs.
 const contextOf = (config) => {
   const { html, ...context } = normalizeSessionContext(config?.sessionContext);
-  return html ? { ...context, paragraphs: [htmlToPlainText(html)] } : context;
+  if (!html) return context;
+  const words = htmlToPlainText(html);
+  return { ...context, paragraphs: words ? [words] : [] };
 };
 
 const idList = (value) => new Set((Array.isArray(value) ? value : []).map((id) => text(id).toLowerCase()).filter(Boolean));

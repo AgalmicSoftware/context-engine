@@ -298,6 +298,13 @@ test("agents read a session's uploaded HTML context as its words, not its markup
   const alice = await createAgent(env, 'alice.delve.town', []);
   const joined = await alice.participant.joinSession({ link: LINK });
   assert.deepEqual(joined.context, { title: 'Context', paragraphs: ['Atlas\nTrust\nWho decides?'], links: [] });
+
+  // A page of pictures alone has no words, so agents get no paragraph rather than an empty one.
+  const pictures = '<img src="https://example.org/map.png" alt="">';
+  const bare = createEnv([{ ...config, sessionContext: { title: 'Context', html: pictures, paragraphs: [], links: [] } }]);
+  const bob = await createAgent(bare, 'bob.delve.town', []);
+  const seen = await bob.participant.joinSession({ link: LINK });
+  assert.deepEqual(seen.context, { title: 'Context', paragraphs: [], links: [] });
 });
 
 test('agents sign in again when their session token is revoked', async () => {

@@ -49,12 +49,27 @@ test("an HTML page's words are the notes, in chunks of whole lines, with its tag
   });
   assert.deepEqual(dataOf(text), { title: 'Reverse alignment', notes: ['Atlas\nTrust\nWho decides?'] });
   assert.equal(included, 1);
-  // A long page is split at line ends, so the whole call budget is used, not one item's cap.
+  // A long page is split at line ends, like typed paragraphs, not cut to one item's cap.
   const long = Array.from({ length: 12 }, (_, index) => `<p>${'word '.repeat(80)}${index}</p>`).join('');
   const { notes } = dataOf(buildSessionContextPrompt({ sessionContext: { html: long } }).text);
   assert.ok(notes.length > 1);
   assert.ok(notes.every((note) => note.length <= 2000 && !note.startsWith('\n')));
   assert.equal(notes.join('\n').split('\n').length, 12);
+});
+
+test('an HTML page with no words gives no notes, and a long one leaves room for files', () => {
+  const pictures = { title: 'Context', html: '<img src="https://example.org/map.png" alt="">' };
+  assert.deepEqual(buildSessionContextPrompt({ sessionContext: pictures }), { text: '', included: 0, omitted: 0 });
+  // Ten paragraphs of about 1,900 characters: as many notes as typed paragraphs may be, then the file.
+  const long = Array.from({ length: 10 }, (_, index) => `<p>${'word '.repeat(380)}${index}</p>`).join('');
+  const { text, omitted } = buildSessionContextPrompt({
+    sessionContext: { html: long },
+    sources: [{ title: 'deck.pdf', kind: 'file', text: 'Slide 1.' }],
+  });
+  const data = dataOf(text);
+  assert.equal(data.notes.length, 6);
+  assert.deepEqual(data.sources, [{ title: 'deck.pdf', kind: 'file', text: 'Slide 1.' }]);
+  assert.equal(omitted, 4);
 });
 
 test('source text cannot close the block or pass for instructions outside it', () => {
