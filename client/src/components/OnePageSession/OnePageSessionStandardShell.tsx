@@ -35,7 +35,9 @@ import type {
 import styles from './OnePageSession.module.scss';
 import OnePageSessionAutoMintAlerts, { type OnePageSessionAutoMintAlertsProps } from './OnePageSessionAutoMintAlerts';
 import SessionContextSources from './SessionContextSources';
+import GroupAgentNotice from './GroupAgentNotice';
 import { useSessionContextSources } from '../../utilities/docLibrary/useSessionContextSources';
+import { groupAgentSettingOf } from '@ce-shared/groupAgent.mjs';
 
 const SurveyPage = React.lazy(() => import('../SurveyTool/SurveyPage'));
 const MemoSurveyPage = React.memo((props: Record<string, unknown>) => <SurveyPage {...props} />);
@@ -473,12 +475,18 @@ export default function OnePageSessionStandardShell({
     account: typeof account === 'string' ? account : '',
   });
   const canEditContext = (contextSources.isAdmin && contextSources.supported) || contextSources.participantsCanAdd;
-  // The Group Agent is a placeholder for now, so only admins see its launcher.
-  const showGroupAgent = contextSources.isAdmin && !isDemoSlug;
+  // Everyone signed in sees the Group Agent once an admin turns it on: the
+  // dialog says whether it answers them, and lets them keep their answers and
+  // files out of it. The title's "?" tells everyone else it is on.
+  const groupAgentOn =
+    !isDemoSlug && !!groupAgentSettingOf((resolvedSessionConfig as UnknownRecord | null)?.groupAgent);
+  const viewerAccount = loginComplete && typeof account === 'string' ? account : '';
+  const showGroupAgent = groupAgentOn && !!viewerAccount;
   const [groupAgentOpen, setGroupAgentOpen] = React.useState(false);
   // Where the Context section's Add and View go, in its header beside the title.
   const [contextActions, setContextActions] = React.useState<HTMLDivElement | null>(null);
-  const showContextSection = isDemoSlug || !!sessionContext || contextSources.sources.length > 0 || canEditContext;
+  const showContextSection =
+    isDemoSlug || !!sessionContext || contextSources.sources.length > 0 || canEditContext || showGroupAgent;
   const sectionsGridClassName = [styles.sectionsGrid, !showContextSection ? styles.sectionsGridTwoUp : '']
     .filter(Boolean)
     .join(' ');
@@ -543,6 +551,9 @@ export default function OnePageSessionStandardShell({
           <CETooltip target={sessionInfoTooltipId} placement="bottom" trigger="hover focus" autohide={false}>
             {sessionInfoTooltip || 'Share input; your responses help generate a collective intelligence map.'}
           </CETooltip>
+          {groupAgentOn ? (
+            <GroupAgentNotice id={`${sessionInfoTooltipId}-agent`} where="page" className={styles.sessionInfoButton} />
+          ) : null}
         </div>
 
         {showQuestions ? (
@@ -778,7 +789,12 @@ export default function OnePageSessionStandardShell({
                     </button>
                     {groupAgentOpen ? (
                       <Suspense fallback={null}>
-                        <GroupAgentModal onClose={() => setGroupAgentOpen(false)} />
+                        <GroupAgentModal
+                          sessionSlug={effectiveSlug}
+                          sessionConfig={resolvedSessionConfig}
+                          account={viewerAccount}
+                          onClose={() => setGroupAgentOpen(false)}
+                        />
                       </Suspense>
                     ) : null}
                   </div>

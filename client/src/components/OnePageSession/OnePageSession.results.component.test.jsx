@@ -103,6 +103,13 @@ jest.mock('../../utilities/docLibrary/useSessionContextSources', () => ({
   useSessionContextSources: () => mockContextSources.current || emptyContextSources(),
 }));
 jest.mock('../Sessions/setup/ContextSourcesPanel', () => () => <div data-testid="mock-context-sources-panel" />);
+// The Group Agent's dialog asks the Worker how it would answer; tests answer for it.
+const mockGroupAgentStatus = jest.fn();
+jest.mock('./groupAgentRequests', () => ({
+  readGroupAgentStatus: (...args) => mockGroupAgentStatus(...args),
+  askGroupAgent: jest.fn(),
+  setGroupAgentOptOut: jest.fn(),
+}));
 
 jest.mock('../SurveyTool/SurveyPage', () => (props) => {
   mockSurveyPage(props);
@@ -1636,9 +1643,9 @@ describe('OnePageSession results routing', () => {
       url: 'https://example.org/essay',
       adminsOnly: false,
     };
-    const renderSession = async (sources, isAdmin) => {
+    const renderSession = async (sources, isAdmin, overrides = {}) => {
       mockContextSources.current = { ...emptyContextSources(), supported: true, isAdmin, sources };
-      const props = buildProps();
+      const props = { ...buildProps(), ...overrides };
       render(
         <MemoryRouter initialEntries={['/session/edge']}>
           <OnePageSession {...props} slug="edge" />
@@ -1678,21 +1685,51 @@ describe('OnePageSession results routing', () => {
       expect(screen.queryByTestId('ce-session-context-sources')).not.toBeInTheDocument();
     });
 
-    it('gives admins a Group Agent placeholder that says it is coming', async () => {
-      await renderSession([], true);
+    const groupAgent = {
+      audiences: [
+        { who: { match: 'any', conditions: [{ kind: 'agent_grant_scope', scope: 'ai' }] }, answers: 'general' },
+      ],
+    };
+    const withGroupAgent = (overrides = {}) => ({
+      sessionConfig: { ...buildProps().sessionConfig, groupAgent },
+      ...overrides,
+    });
+
+    it('lets anyone signed in ask the Group Agent once an admin turns it on', async () => {
+      mockGroupAgentStatus.mockResolvedValue({ on: true, answers: 'general', audience: 0, optedOut: false });
+      // A participant with nothing to read still gets the Context section, for the Group Agent.
+      await renderSession([], false, withGroupAgent({ account: '0xabc', loginComplete: true }));
       fireEvent.click(screen.getByTestId('ce-demo-documents-toggle'));
       fireEvent.click(screen.getByTestId('ce-group-agent-open'));
       const dialog = await screen.findByRole('dialog', { name: 'Group Agent' });
-      expect(dialog).toHaveTextContent('Coming soon');
+      expect(await within(dialog).findByText('You get General answers.')).toBeInTheDocument();
+      expect(mockGroupAgentStatus).toHaveBeenCalledWith({
+        sessionSlug: 'edge',
+        sessionConfig: expect.objectContaining({ groupAgent }),
+        account: '0xabc',
+      });
       fireEvent.click(within(dialog).getByRole('button', { name: 'Close' }));
       await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     });
 
-    it('keeps the Group Agent placeholder from participants', async () => {
-      await renderSession([file, link], false);
+    it('says by the title that the Group Agent is on, even to someone signed out', async () => {
+      await renderSession([file, link], false, withGroupAgent());
+      expect(screen.getByTestId('ce-group-agent-notice-page')).toHaveAttribute(
+        'href',
+        expect.stringMatching(/README\.md#group-agent$/),
+      );
       fireEvent.click(screen.getByTestId('ce-demo-documents-toggle'));
       expect(screen.getByTestId('ce-session-context-sources')).toBeInTheDocument();
       expect(screen.queryByTestId('ce-group-agent-open')).not.toBeInTheDocument();
+      expect(mockGroupAgentStatus).not.toHaveBeenCalled();
+    });
+
+    it('shows no Group Agent while it is off, even to admins', async () => {
+      await renderSession([], true, { account: '0xabc', loginComplete: true });
+      fireEvent.click(screen.getByTestId('ce-demo-documents-toggle'));
+      expect(screen.getByTestId('ce-session-context-manage')).toBeInTheDocument();
+      expect(screen.queryByTestId('ce-group-agent-open')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('ce-group-agent-notice-page')).not.toBeInTheDocument();
     });
   });
 

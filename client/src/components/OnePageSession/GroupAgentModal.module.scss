@@ -15,6 +15,10 @@
   padding: 14px 16px;
 
   :global(.modal-title) {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
     color: inherit;
     font-size: 1.05rem;
     font-weight: 700;
@@ -46,5 +50,152 @@
 
   p {
     margin: 0;
+  }
+}
+
+// An outline in the bar's own text colour, so it reads wherever the title does.
+.badge {
+  padding: 1px 8px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  color: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.hint {
+  color: var(--ce-panel-text-muted);
+  font-size: 0.82rem;
+}
+
+.error {
+  color: var(--ce-status-danger-text);
+  font-size: 0.88rem;
+  overflow-wrap: anywhere;
+}
+
+.styleRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+// The "?"s keep the dialog's text colour in every state: as links they
+// would otherwise take the global link and hover colours.
+.helpLink {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  min-height: 28px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+
+  &:hover,
+  &:focus,
+  &:active {
+    color: inherit;
+  }
+
+  &:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 2px;
+  }
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.label {
+  margin: 0;
+  font-weight: 600;
+}
+
+// The setup page's field colours, which outrank the theme's: its text
+// colour is for the page, and fails on the field's fill in dark themes.
+.question {
+  min-height: 84px;
+  resize: vertical;
+  background: var(--ce-input-bg) !important;
+  border-color: var(--ce-input-border-strong) !important;
+  color: var(--ce-panel-text) !important;
+  -webkit-text-fill-color: var(--ce-panel-text);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+// The accent pair, which every theme keeps readable, in each state.
+.ask {
+  padding: 6px 16px;
+  background: var(--ce-action-accent);
+  color: var(--ce-action-accent-text);
+  font-weight: 600;
+  cursor: pointer;
+
+  &:hover:not(:disabled),
+  &:focus-visible,
+  &:active:not(:disabled) {
+    background: var(--ce-action-accent-hover);
+    color: var(--ce-action-accent-text);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--ce-action-accent);
+    outline-offset: 2px;
+  }
+
+  // Muted text rather than opacity, so the label stays readable.
+  &:disabled {
+    border-style: dashed;
+    background: transparent;
+    color: var(--ce-panel-text-muted);
+    cursor: not-allowed;
+  }
+}
+
+.answer {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--ce-card-border);
+  border-radius: var(--ce-radius-8, 8px);
+}
+
+.answerText {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.switchRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding-top: 10px;
+  border-top: 1px solid var(--ce-card-border);
+
+  label {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+  }
+
+  .error {
+    flex-basis: 100%;
   }
 }
