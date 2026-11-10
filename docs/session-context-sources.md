@@ -74,10 +74,10 @@ AI key; the Worker refuses anyone else.
   who can read it, for someone signed in, or **Manage files and links** for an
   admin; **Remove** sits beside their own files. Its first list asks someone
   signed in to sign in to the session if their browser holds no Worker token
-  yet, as in a new tab. Declined, it shows what a signed-out visitor sees,
-  and **View** signs them in to show their groups' files. It refreshes without
-  asking when a token or a new group membership arrives, and reading the files'
-  text for an AI never asks.
+  yet, as in a new tab. Declined, it shows what a signed-out visitor sees.
+  Where visitors can see the session's groups, **View** then signs them in to
+  show their groups' files. It refreshes without asking when a token or a new
+  group membership arrives, and reading the files' text for an AI never asks.
 - **A Group Conversation's** **Add transcript to context** box, beside **Submit
   questions**, uploads the transcript as a text file when the questions submit.
 - **Settings (`/session/<slug>/settings`)** and **the session page's Context
