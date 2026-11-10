@@ -143,12 +143,45 @@ describe('SessionInterviewRecommendedGroups', () => {
     expect(box(/AI Optimists/)).not.toBeChecked();
     expect(box(/Maybe/)).not.toBeChecked();
     const row = within(box(/AI Optimists/).closest('label')!);
-    expect(row.getByText('Your reviewed answer explicitly supported optimistic AI governance.')).toBeInTheDocument();
+    expect(
+      row.getByText('Strong fit · Your reviewed answer explicitly supported optimistic AI governance.'),
+    ).toBeInTheDocument();
     // A quote only grounds the match: it may name a place smaller than a country, so it never shows.
     expect(screen.queryByText(/I support open AI development/)).toBeNull();
     for (const hidden of ['Restricted', 'Expired', 'Unrecommended']) expect(screen.queryByText(hidden)).toBeNull();
     expect(getWorkerSessionToken).not.toHaveBeenCalled();
     expect(joinWorkerGroup).not.toHaveBeenCalled();
+  });
+
+  it('marks each suggestion a strong, moderate or weak fit, on its reason line', async () => {
+    jest
+      .mocked(loadPublicWorkerGroups)
+      .mockResolvedValue([
+        group(),
+        group({ groupId: 'maybe', label: 'Maybe' }),
+        group({ groupId: 'faint', label: 'Faint' }),
+        group({ groupId: 'unrated', label: 'Unrated' }),
+      ]);
+    render(
+      element({
+        recommendations: [
+          recommendation({ confidence: 0.7 }),
+          // Rounded as the drafts' percentages are: 0.396 shows there as 40%, moderate.
+          recommendation({ groupId: 'maybe', reason: 'Your AI: Works on AI policy', confidence: 0.396 }),
+          recommendation({ groupId: 'faint', reason: '', confidence: 0.394 }),
+          recommendation({ groupId: 'unrated', reason: 'Your AI suggested this group.', confidence: undefined }),
+        ],
+      }),
+    );
+
+    await screen.findByRole('heading', { name: 'Groups (4)' });
+    const row = (name: RegExp) => within(box(name).closest('label')!);
+    expect(
+      row(/AI Optimists/).getByText('Strong fit · Your reviewed answer explicitly supported optimistic AI governance.'),
+    ).toBeInTheDocument();
+    expect(row(/Maybe/).getByText('Moderate fit · Your AI: Works on AI policy')).toBeInTheDocument();
+    expect(row(/Faint/).getByText('Weak fit · Suggested from your answers.')).toBeInTheDocument();
+    expect(row(/Unrated/).getByText('Your AI suggested this group.')).toBeInTheDocument();
   });
 
   it('keeps suggestion order, so a group named like a chosen answer stays first, and shows every match', async () => {

@@ -80,6 +80,8 @@ type GroupChoice = {
   description?: string;
   imageUrl?: string;
   reason: string;
+  /** How surely the AI thinks the group fits, in a word; a link's group has none. */
+  fit?: string;
   /** Only a link's group starts ticked; every match waits for the person to tick it. */
   fromLink: boolean;
 };
@@ -118,6 +120,13 @@ const formatJoinError = (error: unknown): string => {
   if (message.includes('worker_group_authorization_invalid') || message.includes('worker_group_credential_missing'))
     return 'log in again to join it.';
   return 'please try again.';
+};
+
+// The drafts' bands: 70% and up is direct or repeated evidence, under 40% is weak.
+const describeFit = (confidence: unknown): string => {
+  if (typeof confidence !== 'number' || !Number.isFinite(confidence)) return '';
+  const percent = Math.round(confidence * 100);
+  return percent >= 70 ? 'Strong fit' : percent >= 40 ? 'Moderate fit' : 'Weak fit';
 };
 
 // "A", "A and B", "A, B and C".
@@ -293,6 +302,7 @@ export function SessionInterviewRecommendedGroups({
         const group = overview.groups.find((candidate) => candidate.groupId === recommendation.groupId);
         if (!group || !joinable.has(group.groupId) || hidden(group.groupId) || group.groupId === invite?.groupId)
           return [];
+        const fit = describeFit(recommendation.confidence);
         return [
           {
             groupId: group.groupId,
@@ -300,6 +310,7 @@ export function SessionInterviewRecommendedGroups({
             ...(group.description ? { description: group.description } : {}),
             ...(group.imageUrl ? { imageUrl: group.imageUrl } : {}),
             reason: recommendation.reason || 'Suggested from your answers.',
+            ...(fit ? { fit } : {}),
             fromLink: false,
           },
         ];
@@ -409,7 +420,7 @@ export function SessionInterviewRecommendedGroups({
     <SessionInterviewReviewSection
       hidden={hidden}
       title={`Groups (${choices.length})`}
-      help="Groups that may fit your answers, and any your link joins. Tick the ones you want; ticked groups are joined when you submit."
+      help="Groups that may fit your answers, and any your link joins. Each suggestion is marked a strong, moderate or weak fit. Tick the ones you want; ticked groups are joined when you submit."
       helpId={helpId}
       summaryRef={summaryRef}
     >
@@ -442,7 +453,10 @@ export function SessionInterviewRecommendedGroups({
             <span>
               <strong>{choice.label}</strong>
               {choice.description ? <small>{choice.description}</small> : null}
-              <small>{choice.reason}</small>
+              <small>
+                {choice.fit ? `${choice.fit} · ` : ''}
+                {choice.reason}
+              </small>
             </span>
           </label>
         ))}
