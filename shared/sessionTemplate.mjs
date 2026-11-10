@@ -91,7 +91,7 @@ const DEFAULTS = Object.freeze({
   sessionHeader: '',
   sessionEndsAt: '',
   appearance: { colorSchemeId: 'context-engine' },
-  sessionContext: { title: '', paragraphs: [], links: [] },
+  sessionContext: { title: '', paragraphs: [], links: [], html: '' },
   contextFiles: [],
   questionsGenPrompt: '',
   questions: [],
@@ -114,7 +114,7 @@ const DEFAULTS = Object.freeze({
 });
 const SHAPE = {
   ...shapeOf(DEFAULTS),
-  sessionContext: { title: TEXT, paragraphs: [TEXT], links: [{ label: TEXT, url: TEXT }] },
+  sessionContext: { title: TEXT, paragraphs: [TEXT], links: [{ label: TEXT, url: TEXT }], html: TEXT },
   // A file's name and privacy; its bytes never travel, so it is attached again.
   contextFiles: [{ name: TEXT, adminsOnly: FLAG }],
   questions: [QUESTION],

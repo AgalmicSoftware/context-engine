@@ -151,6 +151,7 @@ describe('SessionSettingsPage', () => {
       title: 'Context',
       paragraphs: ['Notes.'],
       links: [{ label: 'Site', url: 'https://example.org/' }],
+      html: '',
     });
     click.mockRestore();
   });

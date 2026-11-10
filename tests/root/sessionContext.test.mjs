@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 import {
   SESSION_CONTEXT_LIMITS as L,
   hasSessionContext,
+  htmlToPlainText,
   normalizeSessionContext,
+  sessionContextHtmlText,
   sessionContextPlainText,
   validateSessionContext,
 } from '../../shared/sessionContext.mjs';
@@ -152,4 +154,58 @@ test('bot tokens, keyed RPC links, and Stripe and Hugging Face keys look like se
   ]) {
     assert.equal(looksSecret(text), false, text);
   }
+});
+
+test('context is typed text or HTML: HTML keeps the title and replaces paragraphs and links', () => {
+  const html = ' <h2>Topics</h2><p>One</p> ';
+  const stored = { title: 'T', html: '<h2>Topics</h2><p>One</p>', paragraphs: [], links: [] };
+  assert.deepEqual(validateSessionContext({ title: 'T', html, paragraphs: ['  '], links: [{ label: 'x', url: '' }] }).value, stored);
+  assert.deepEqual(normalizeSessionContext({ title: 'T', html }), stored);
+  // A fresh draft carries an empty html; neither form keeps it.
+  const blank = { title: '', paragraphs: [], links: [], html: '  ' };
+  assert.deepEqual(validateSessionContext(blank).value, { title: '', paragraphs: [], links: [] });
+  assert.deepEqual(normalizeSessionContext(blank), { title: '', paragraphs: [], links: [] });
+  assert.equal(hasSessionContext({ html: '<p>Only this</p>' }), true);
+  assert.equal(hasSessionContext({ title: 'Heading', html: ' ' }), false);
+  // A reader shows stored HTML in place of any paragraphs and links stored beside it.
+  assert.deepEqual(normalizeSessionContext({ html: '<p>Page</p>', paragraphs: ['Old'], links: [link(1)] }), {
+    title: '',
+    html: '<p>Page</p>',
+    paragraphs: [],
+    links: [],
+  });
+});
+
+test('writers refuse text and HTML together, HTML that is not text, and HTML over its limit', () => {
+  const pathsOf = (context) => validateSessionContext(context).errors.map((error) => error.path);
+  assert.deepEqual(pathsOf({ html: '<p>Page</p>', paragraphs: ['Typed'] }), ['sessionContext.html']);
+  assert.deepEqual(pathsOf({ html: '<p>Page</p>', links: [link(1)] }), ['sessionContext.html']);
+  assert.deepEqual(pathsOf({ html: { body: '<p>x</p>' } }), ['sessionContext.html']);
+  assert.deepEqual(pathsOf({ html: 'x'.repeat(L.htmlChars + 1) }), ['sessionContext.html']);
+  assert.equal(validateSessionContext({ html: 'x'.repeat(L.htmlChars) }).ok, true);
+  // Readers clamp stored HTML instead of dropping it.
+  assert.equal(normalizeSessionContext({ html: 'y'.repeat(L.htmlChars + 9) }).html.length, L.htmlChars);
+});
+
+test('writers refuse HTML that looks like a key, in its words or inside an attribute', () => {
+  const token = `https://mainnet.infura.io/v3/${'a'.repeat(32)}`;
+  for (const html of [`<a href="${token}">RPC</a>`, `<p>Our node: ${token}</p>`]) {
+    const result = validateSessionContext({ html });
+    assert.equal(result.ok, false, html);
+    assert.equal(result.errors[0].path, 'sessionContext.html');
+  }
+  // A key spelled with character references is still caught in the words the AI reads.
+  const hex = `0x${'ab'.repeat(32)}`;
+  const spelled = [...hex].map((char) => `&#${char.charCodeAt(0)};`).join('');
+  assert.equal(validateSessionContext({ html: `<p>${spelled}</p>` }).ok, false);
+});
+
+test("HTML's words reach plain text, without its tags, scripts or styles", () => {
+  const html =
+    '<h2>Branch &amp; topics</h2><details><summary>First</summary><p>Line one<br>line &#x27;two&#39;</p></details>' +
+    '<script>alert("no")</script><style>p{color:red}</style><!-- hidden --><ul><li>A</li><li>B&nbsp;C</li></ul>';
+  assert.equal(htmlToPlainText(html), "Branch & topics\nFirst\nLine one\nline 'two'\nA\nB C");
+  assert.equal(sessionContextHtmlText({ html }).includes('alert'), false);
+  assert.equal(sessionContextHtmlText({ paragraphs: ['Typed'] }), '');
+  assert.equal(sessionContextPlainText({ title: 'T', html: '<p>One</p><p>Two</p>' }), 'T One Two');
 });

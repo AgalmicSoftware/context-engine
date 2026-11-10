@@ -30305,7 +30305,7 @@ var init_secretText = __esm({
 });
 
 // shared/sessionContext.mjs
-var SESSION_CONTEXT_LIMITS, L, KEYS, LINK_KEYS, isRecord3, text, isHttpsUrl, normalizeSessionContext, fail, validateSessionContext, sessionContextPlainText;
+var SESSION_CONTEXT_LIMITS, L, KEYS, LINK_KEYS, isRecord3, text, NAMED_ENTITIES, decodeEntity, htmlToPlainText, isHttpsUrl, normalizeSessionContext, sessionContextHtmlText, fail, validateSessionContext, sessionContextPlainText;
 var init_sessionContext = __esm({
   "shared/sessionContext.mjs"() {
     init_secretText();
@@ -30315,13 +30315,21 @@ var init_sessionContext = __esm({
       paragraphChars: 2e3,
       links: 8,
       labelChars: 120,
-      urlChars: 2e3
+      urlChars: 2e3,
+      htmlChars: 2e4
     });
     L = SESSION_CONTEXT_LIMITS;
-    KEYS = /* @__PURE__ */ new Set(["title", "paragraphs", "links"]);
+    KEYS = /* @__PURE__ */ new Set(["title", "paragraphs", "links", "html"]);
     LINK_KEYS = /* @__PURE__ */ new Set(["label", "url"]);
     isRecord3 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
     text = (value) => typeof value === "string" ? value.trim() : "";
+    NAMED_ENTITIES = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " " };
+    decodeEntity = (match, entity) => {
+      const code = /^#x/i.test(entity) ? parseInt(entity.slice(2), 16) : /^#/.test(entity) ? parseInt(entity.slice(1), 10) : NaN;
+      if (Number.isInteger(code)) return code > 0 && code <= 1114111 ? String.fromCodePoint(code) : " ";
+      return NAMED_ENTITIES[entity.toLowerCase()] ?? match;
+    };
+    htmlToPlainText = (html) => String(html ?? "").replace(/<(script|style|template)\b[\s\S]*?<\/\1\s*>/gi, " ").replace(/<!--[\s\S]*?-->/g, " ").replace(/<br\s*\/?>|<\/(?:p|div|li|h[1-6]|tr|summary|details|blockquote|pre|table|ul|ol|dt|dd)>/gi, "\n").replace(/<[^>]*>/g, " ").replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, decodeEntity).split("\n").map((line) => line.replace(/\s+/g, " ").trim()).filter(Boolean).join("\n");
     isHttpsUrl = (value) => {
       if (typeof value !== "string" || !value || value.length > L.urlChars) return false;
       try {
@@ -30332,16 +30340,20 @@ var init_sessionContext = __esm({
     };
     normalizeSessionContext = (value) => {
       const context = isRecord3(value) ? value : {};
+      const title = text(context.title).slice(0, L.titleChars);
+      const html = text(context.html).slice(0, L.htmlChars);
+      if (html) return { title, html, paragraphs: [], links: [] };
       const paragraphs = (Array.isArray(context.paragraphs) ? context.paragraphs : [context.body]).map(text).filter(Boolean).slice(0, L.paragraphs).map((paragraph) => paragraph.slice(0, L.paragraphChars));
       const links = (Array.isArray(context.links) ? context.links : []).filter(isRecord3).map((link) => ({ label: text(link.label).slice(0, L.labelChars), url: text(link.url) })).filter((link) => isHttpsUrl(link.url)).slice(0, L.links).map((link) => ({ label: link.label || link.url, url: link.url }));
-      return { title: text(context.title).slice(0, L.titleChars), paragraphs, links };
+      return { title, paragraphs, links };
     };
+    sessionContextHtmlText = (value) => htmlToPlainText(normalizeSessionContext(value).html);
     fail = (errors, path, message) => errors.push({ path, message });
     validateSessionContext = (value) => {
       if (value === null) return { ok: true, value: null, errors: [] };
       const errors = [];
       if (!isRecord3(value)) {
-        fail(errors, "sessionContext", "Context must be an object with a title, paragraphs and links.");
+        fail(errors, "sessionContext", "Context must be an object with a title, and paragraphs and links or HTML.");
         return { ok: false, errors };
       }
       Object.keys(value).filter((key) => !KEYS.has(key)).forEach((key) => fail(errors, `sessionContext.${key}`, `Context has an unknown field: ${key}.`));
@@ -30351,6 +30363,13 @@ var init_sessionContext = __esm({
       const title = text(value.title);
       if (title.length > L.titleChars) {
         fail(errors, "sessionContext.title", `The context title is longer than ${L.titleChars} characters.`);
+      }
+      if (value.html !== void 0 && typeof value.html !== "string") {
+        fail(errors, "sessionContext.html", "The context HTML must be text.");
+      }
+      const html = text(value.html);
+      if (html.length > L.htmlChars) {
+        fail(errors, "sessionContext.html", `The context HTML is longer than ${L.htmlChars.toLocaleString("en-US")} characters.`);
       }
       const rawParagraphs = value.paragraphs === void 0 ? [] : value.paragraphs;
       const paragraphs = [];
@@ -30396,20 +30415,25 @@ var init_sessionContext = __esm({
         });
         if (links.length > L.links) fail(errors, "sessionContext.links", `Context holds at most ${L.links} links.`);
       }
+      if (html && (paragraphs.length || links.length)) {
+        fail(errors, "sessionContext.html", "Context is typed text or an HTML file, not both. Remove one of them.");
+      }
       const SECRET = "looks like a key, token or password. Remove it: secrets never go in context.";
       const refuse = (path, subject, ...texts) => {
         if (texts.some(hasHexKey)) fail(errors, path, `${subject} ${HEX_KEY_HINT}`);
         else if (texts.some(looksSecret)) fail(errors, path, `${subject} ${SECRET}`);
       };
       refuse("sessionContext.title", "The title", title);
+      if (html) refuse("sessionContext.html", "The HTML", html, htmlToPlainText(html));
       paragraphs.forEach((paragraph, index) => refuse(`sessionContext.paragraphs.${index}`, `Paragraph ${index + 1}`, paragraph));
       links.forEach(({ label, url }, index) => refuse(`sessionContext.links.${index}`, `Link ${index + 1}`, label, url));
-      return errors.length ? { ok: false, errors } : { ok: true, value: { title, paragraphs, links }, errors };
+      if (errors.length) return { ok: false, errors };
+      return { ok: true, value: html ? { title, html, paragraphs: [], links: [] } : { title, paragraphs, links }, errors };
     };
     sessionContextPlainText = (value) => {
       if (typeof value === "string") return value.trim();
-      const { title, paragraphs, links } = normalizeSessionContext(value);
-      return [title, ...paragraphs, ...links.map((link) => link.label)].filter(Boolean).join(" ");
+      const { title, html, paragraphs, links } = normalizeSessionContext(value);
+      return [title, htmlToPlainText(html).replace(/\s+/g, " "), ...paragraphs, ...links.map((link) => link.label)].filter(Boolean).join(" ");
     };
   }
 });
@@ -75574,7 +75598,7 @@ var init_storageAudience = __esm({
 });
 
 // shared/sessionContextText.mjs
-var SESSION_CONTEXT_TEXT_LIMITS, OPEN, CLOSE, PREAMBLE, MIN_FITTED_CHARS, text3, clip2, encode, blockLength, buildSessionContextPrompt;
+var SESSION_CONTEXT_TEXT_LIMITS, OPEN, CLOSE, PREAMBLE, MIN_FITTED_CHARS, text3, clip2, encode, blockLength, chunkLines, buildSessionContextPrompt;
 var init_sessionContextText = __esm({
   "shared/sessionContextText.mjs"() {
     init_sessionContext();
@@ -75587,13 +75611,21 @@ var init_sessionContextText = __esm({
     clip2 = (value, max) => value.length <= max ? value : `${value.slice(0, Math.max(0, max - 1)).trimEnd()}\u2026`;
     encode = (value) => JSON.stringify(value).replace(/</g, "\\u003c").replace(/>/g, "\\u003e");
     blockLength = (data) => PREAMBLE.length + OPEN.length + CLOSE.length + 3 + encode(data).length;
+    chunkLines = (value, max) => value.split("\n").reduce((chunks, line) => {
+      const last = chunks[chunks.length - 1];
+      if (last !== void 0 && last.length + 1 + line.length <= max) chunks[chunks.length - 1] = `${last}
+${line}`;
+      else chunks.push(line);
+      return chunks;
+    }, []);
     buildSessionContextPrompt = ({
       sessionContext,
       sources = [],
       itemChars = SESSION_CONTEXT_TEXT_LIMITS.itemChars,
       totalChars = SESSION_CONTEXT_TEXT_LIMITS.totalChars
     } = {}) => {
-      const { title, paragraphs, links } = normalizeSessionContext(sessionContext);
+      const { title, html, paragraphs, links } = normalizeSessionContext(sessionContext);
+      const notes = html ? chunkLines(sessionContextHtmlText(sessionContext), SESSION_CONTEXT_LIMITS.paragraphChars) : paragraphs;
       const data = title ? { title } : {};
       let included = 0;
       let omitted = 0;
@@ -75620,7 +75652,7 @@ var init_sessionContextText = __esm({
       links.forEach((link) => {
         if (!tryAdd("links", link)) omitted += 1;
       });
-      paragraphs.forEach((paragraph) => addText("notes", clip2(paragraph, itemChars), (note) => note));
+      notes.forEach((note) => addText("notes", clip2(note, itemChars), (fitted) => fitted));
       (Array.isArray(sources) ? sources : []).forEach((source) => {
         const body = clip2(text3(source?.text), itemChars);
         if (!body) return;

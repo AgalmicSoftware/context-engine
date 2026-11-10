@@ -1,4 +1,4 @@
-import { normalizeSessionContext } from './sessionContext.mjs';
+import { SESSION_CONTEXT_LIMITS, normalizeSessionContext, sessionContextHtmlText } from './sessionContext.mjs';
 
 // The one context block every AI feature uses: question generation, the
 // interviewer's opening and voice instructions, and results analysis.
@@ -17,11 +17,20 @@ const clip = (value, max) => (value.length <= max ? value : `${value.slice(0, Ma
 // JSON with < and > escaped, so nothing inside can close the tag around it.
 const encode = (value) => JSON.stringify(value).replace(/</g, '\\u003c').replace(/>/g, '\\u003e');
 const blockLength = (data) => PREAMBLE.length + OPEN.length + CLOSE.length + 3 + encode(data).length;
+// An HTML page's words in chunks of whole lines, each about a typed paragraph long.
+const chunkLines = (value, max) =>
+  value.split('\n').reduce((chunks, line) => {
+    const last = chunks[chunks.length - 1];
+    if (last !== undefined && last.length + 1 + line.length <= max) chunks[chunks.length - 1] = `${last}\n${line}`;
+    else chunks.push(line);
+    return chunks;
+  }, []);
 
 /**
- * The session's notes and links, then its sources, as one delimited block of
- * untrusted data for a prompt. `sources` must already be only the items the
- * person the AI acts for may read: { title, kind, url?, text, readByAi? }.
+ * The session's notes (its paragraphs, or its HTML's words) and links, then
+ * its sources, as one delimited block of untrusted data for a prompt.
+ * `sources` must already be only the items the person the AI acts for may
+ * read: { title, kind, url?, text, readByAi? }.
  * Each text is cut to `itemChars`, and items stop at `totalChars` for the
  * whole block. `text` is '' when there is nothing to give.
  */
@@ -31,7 +40,9 @@ export const buildSessionContextPrompt = ({
   itemChars = SESSION_CONTEXT_TEXT_LIMITS.itemChars,
   totalChars = SESSION_CONTEXT_TEXT_LIMITS.totalChars,
 } = {}) => {
-  const { title, paragraphs, links } = normalizeSessionContext(sessionContext);
+  const { title, html, paragraphs, links } = normalizeSessionContext(sessionContext);
+  // An HTML page replaces the paragraphs, so its words are the notes.
+  const notes = html ? chunkLines(sessionContextHtmlText(sessionContext), SESSION_CONTEXT_LIMITS.paragraphChars) : paragraphs;
   const data = title ? { title } : {};
   let included = 0;
   let omitted = 0;
@@ -61,7 +72,7 @@ export const buildSessionContextPrompt = ({
   links.forEach((link) => {
     if (!tryAdd('links', link)) omitted += 1;
   });
-  paragraphs.forEach((paragraph) => addText('notes', clip(paragraph, itemChars), (note) => note));
+  notes.forEach((note) => addText('notes', clip(note, itemChars), (fitted) => fitted));
   (Array.isArray(sources) ? sources : []).forEach((source) => {
     const body = clip(text(source?.text), itemChars);
     if (!body) return;

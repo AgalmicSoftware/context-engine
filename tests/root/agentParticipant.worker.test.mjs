@@ -291,6 +291,15 @@ test('agents join a public hosted session, add statements, answer, and read resu
   assert.equal(session.answeredByMe, 1);
 });
 
+test("agents read a session's uploaded HTML context as its words, not its markup", async () => {
+  const html = '<h2>Atlas</h2><details><summary>Trust</summary><p>Who decides?</p></details><script>x()</script>';
+  const config = sessionConfig();
+  const env = createEnv([{ ...config, sessionContext: { title: 'Context', html, paragraphs: [], links: [] } }]);
+  const alice = await createAgent(env, 'alice.delve.town', []);
+  const joined = await alice.participant.joinSession({ link: LINK });
+  assert.deepEqual(joined.context, { title: 'Context', paragraphs: ['Atlas\nTrust\nWho decides?'], links: [] });
+});
+
 test('agents sign in again when their session token is revoked', async () => {
   const env = createEnv([sessionConfig()]);
   const { participant } = await createAgent(env, 'carol', []);

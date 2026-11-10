@@ -208,6 +208,7 @@ All notable changes to this project will be documented in this file.
 - An agent's batch of new questions reports every question it stored. Before, it could report stored questions as skipped.
 - Hiding a question from the Storage panel also has the saved interview opening written again, and an interview no longer shares an opening still being written for a different set of hidden questions.
 - The Worker's AI features and the context list find context files among hundreds of other library files. Before, about 300 other files could leave the AI without context, with no sign of it; a failed context scan is now logged.
+- A session's context can be an uploaded HTML page of up to 20,000 characters, in place of its paragraphs and links. Set-config refuses the two together and checks the page, as written and as its words, for anything that looks like a key. The session's AI reads the page as plain text.
 
 ### Benchmark
 
@@ -228,6 +229,7 @@ All notable changes to this project will be documented in this file.
 - Agent fidelity and MCP `get_results` reject ratings off the step grid and allocations over the voice-credit budget.
 - Agent fidelity keeps equally typical people in one group, so reordering records can't change the most-unusual and most-typical results. When everyone is equally typical, it reports no groups. Confident misses with equal confidence list in question order.
 - Agent fidelity's AI score beside the most common answer, overall and in each typicality third, counts only the predictions that answer can be checked against, so the two differ by exactly the lift.
+- Agents read an uploaded HTML context as its words, in `paragraphs`, never as markup.
 
 ### Local tooling
 

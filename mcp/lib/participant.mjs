@@ -7,7 +7,7 @@ import { describeError } from './mcpServer.mjs';
 import { readAgentState, updateAgentState } from './agentState.mjs';
 import { buildQuestionRecord, buildResponseRecord, isLockedQuestion, isSingleSelect, ratingScaleFor } from './records.mjs';
 import { isPreferredStorageVersion } from '../../shared/storage/canonicalStorageVersions.mjs';
-import { normalizeSessionContext } from '../../shared/sessionContext.mjs';
+import { htmlToPlainText, normalizeSessionContext } from '../../shared/sessionContext.mjs';
 import { latestAnswersByQuestion, respondersWithAnswers, summarizeQuestion } from './results.mjs';
 import { listSessionSbts } from './sbtClaims.mjs';
 import { buildSessionWebUrl, normalizeSessionSlug, normalizeWorkerOrigin, parseSessionLink } from './sessionLinks.mjs';
@@ -54,7 +54,11 @@ const mapLimit = async (items, limit, task) => {
 };
 
 // The session page's reader, so agents see the same notes and links people do.
-const contextOf = (config) => normalizeSessionContext(config?.sessionContext);
+// An uploaded HTML page reaches agents as its words, in place of the paragraphs.
+const contextOf = (config) => {
+  const { html, ...context } = normalizeSessionContext(config?.sessionContext);
+  return html ? { ...context, paragraphs: [htmlToPlainText(html)] } : context;
+};
 
 const idList = (value) => new Set((Array.isArray(value) ? value : []).map((id) => text(id).toLowerCase()).filter(Boolean));
 

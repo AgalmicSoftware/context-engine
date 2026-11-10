@@ -393,6 +393,8 @@ test('set-config checks a sent session context and stores its trimmed form', () 
     [{ title: 'x'.repeat(81) }, /title is longer than 80/],
     [{ paragraphs: [], extra: true }, /unknown field: extra/],
     [{ paragraphs: ['Key: sk-live-0123456789abcdefghij'] }, /secrets never go in context/],
+    [{ html: '<p>Page</p>', paragraphs: ['Typed'] }, /typed text or an HTML file, not both/],
+    [{ html: 'x'.repeat(20001) }, /HTML is longer than 20,000 characters/],
   ]) {
     const refused = setContext(sessionContext);
     assert.equal(refused.ok, false, JSON.stringify(sessionContext));
@@ -401,6 +403,15 @@ test('set-config checks a sent session context and stores its trimmed form', () 
     assert.match(refused.error, message);
   }
   assert.equal(setContext(null).ok, true);
+  // Uploaded HTML is stored as sent, trimmed; only the page's sanitizer renders it.
+  const page = setContext({ title: 'Atlas', html: ' <h2>Areas</h2><script>x()</script> ' });
+  assert.equal(page.ok, true, JSON.stringify(page));
+  assert.deepEqual(page.config.sessionContext, {
+    title: 'Atlas',
+    html: '<h2>Areas</h2><script>x()</script>',
+    paragraphs: [],
+    links: [],
+  });
   // A stored context from before these limits does not block other edits.
   const legacy = { ...cloneJson(profileBearingConfig), sessionContext: { links: [{ label: 'Plain', url: 'http://example.org' }] } };
   const renamed = applySessionConfigMutation({

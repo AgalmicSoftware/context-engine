@@ -94,7 +94,7 @@ test('a template with only its format takes every default', () => {
   ]);
   assert.equal(template.format, format);
   assert.equal(template.sessionName, '');
-  assert.deepEqual(template.sessionContext, { title: '', paragraphs: [], links: [] });
+  assert.deepEqual(template.sessionContext, { title: '', paragraphs: [], links: [], html: '' });
   assert.equal(template.groupCreationPolicy, 'participants');
   assert.equal(template.interviewModeEnabled, true);
   assert.deepEqual(template.interviewMode, { ...DEFAULT_INTERVIEW_SETTINGS, realtimeModel: 'gpt-live-1' });
@@ -127,6 +127,7 @@ test('missing nested fields take defaults; a mode profile is taken whole', () =>
     title: '',
     paragraphs: [],
     links: [{ label: 'Essay', url: 'https://example.com/essay' }],
+    html: '',
   });
   assert.deepEqual(template.sessionModeProfile, { preset: 'custom' });
 });
@@ -196,6 +197,18 @@ test('settings with fixed vocabularies or limits are checked', () => {
   ]);
 });
 
+test('a template carries uploaded HTML in place of notes and links, and refuses both together', () => {
+  const html = '<h2>Atlas</h2><details><summary>Trust</summary><p>Who decides?</p></details>';
+  const exported = sessionTemplateFromDraft({ sessionContext: { title: 'Read first', paragraphs: [], links: [], html } });
+  assert.equal(exported.ok, true, JSON.stringify(exported.errors));
+  assert.deepEqual(exported.template.sessionContext, { title: 'Read first', paragraphs: [], links: [], html });
+  assert.deepEqual(parseSessionTemplateJson(JSON.stringify(exported.template)).template, exported.template);
+  assert.deepEqual(
+    errorsOf({ format, sessionContext: { paragraphs: ['Typed'], html } }).map((error) => error.path),
+    ['sessionContext.html'],
+  );
+});
+
 test('a template carries links, notes and file names with their privacy, never file contents', () => {
   const draft = {
     sessionContext: {
@@ -207,7 +220,7 @@ test('a template carries links, notes and file names with their privacy, never f
   };
   const exported = sessionTemplateFromDraft(draft);
   assert.equal(exported.ok, true, JSON.stringify(exported.errors));
-  assert.deepEqual(exported.template.sessionContext, draft.sessionContext);
+  assert.deepEqual(exported.template.sessionContext, { ...draft.sessionContext, html: '' });
   assert.deepEqual(exported.template.contextFiles, [{ name: 'deck.pdf', adminsOnly: true }, { name: 'notes.md' }]);
   const reimported = parseSessionTemplateJson(JSON.stringify(exported.template));
   assert.deepEqual(reimported.template, exported.template);
