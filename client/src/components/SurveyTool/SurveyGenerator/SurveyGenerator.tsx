@@ -369,8 +369,8 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
   } = rawProps;
   // UI Modes
   const [transcriptMode, setTranscriptMode] = useState(false);
-  // NEW: Toggle for Arweave upload
-  const [uploadSummaryToArweave, setUploadSummaryToArweave] = useState(true);
+  // Off by default: an Arweave upload is public and permanent.
+  const [uploadSummaryToArweave, setUploadSummaryToArweave] = useState(false);
   const [encryptSummary, setEncryptSummary] = useState(false);
 
   // Input States
@@ -1367,8 +1367,9 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
 
         sourceForQuestions = md;
 
-        // B. Upload to Arweave (if toggled)
-        if (uploadSummaryToArweave) {
+        // B. Upload to Arweave (if toggled). The upload can't encrypt yet, so a
+        // summary marked for encryption stays off Arweave rather than going up as plain text.
+        if (uploadSummaryToArweave && !encryptSummary) {
           try {
             // We do NOT block on loginComplete here; the worker handles the upload wallet.
             const arweaveKey = await getEffectiveArweaveKey({
@@ -1774,7 +1775,7 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
                   <div
                     className={buildSurveyGeneratorTranscriptToggleClassName(styles, transcriptMode)}
                     onClick={handleTranscriptModeToggle}
-                    title="Enable Transcript Mode (Summary + Arweave Upload)"
+                    title="Summarize the transcript before drafting questions from it."
                     data-testid="transcript-mode-toggle"
                   >
                     <FontAwesomeIcon icon={transcriptMode ? faCheckSquare : faSquare} className={styles.checkboxIcon} />
@@ -1786,7 +1787,7 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
                   <div
                     className={buildSurveyGeneratorTranscriptToggleClassName(styles, uploadSummaryToArweave)}
                     onClick={() => setUploadSummaryToArweave(!uploadSummaryToArweave)}
-                    title="If checked, the summary is uploaded to Arweave and attached as a permanent document. If unchecked, the summary is passed directly to AI for question generation without permanent storage."
+                    title="If checked, the summary is uploaded to Arweave, where it is public and permanent, and attached as a document. If unchecked, it goes only to the AI that drafts the questions."
                   >
                     <FontAwesomeIcon
                       icon={uploadSummaryToArweave ? faCheckSquare : faSquare}
@@ -1800,7 +1801,7 @@ export default function AudioSurveyGenerator(rawProps: SurveyGeneratorProps = {}
                   <div
                     className={buildSurveyGeneratorTranscriptToggleClassName(styles, encryptSummary)}
                     onClick={() => setEncryptSummary(!encryptSummary)}
-                    title="Encrypt the summary before uploading to Arweave (Lit + SBT gate)."
+                    title="The upload can't encrypt yet, so while this is ticked the summary isn't uploaded."
                   >
                     <FontAwesomeIcon icon={encryptSummary ? faCheckSquare : faSquare} className={styles.checkboxIcon} />
                     <span>Encrypt Summary</span>

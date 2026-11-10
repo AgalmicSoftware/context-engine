@@ -157,6 +157,7 @@ All notable changes to this project will be documented in this file.
 - On `/new` and the settings page, the Context section's **Format** takes typed text or one HTML file. The file is cleaned before it's saved, losing its scripts, styles, classes, frames and forms, and a preview shows the result and what was removed. The session page shows the page in its context section, cleaned again each time.
 - The Reverse Alignment atlas is no longer built into the client. A session shows it as its HTML context page, where its areas and topics open in place, and the RxC session list only gives those sessions their short links. A session on an older Worker, such as `rxc-ra-test-3`, shows its typed context instead.
 - Links in a session's context, typed or in an HTML page, use the context panel's own text colour, so they read in every theme. In Classic 95 the typed links were about 3:1 against the panel.
+- The Tool Explorer's question generator uploads a transcript summary to Arweave, where it is public and permanent, only when **Upload Summary** is ticked, which it no longer is by default. A summary marked **Encrypt Summary** isn't uploaded at all, because the upload can't encrypt yet. Before, both went up as plain text.
 
 ### Workers — requires redeployment
 
