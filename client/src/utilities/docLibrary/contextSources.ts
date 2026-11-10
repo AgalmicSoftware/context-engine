@@ -167,6 +167,8 @@ const readText = async (id: string, options: ContextSourceOptions): Promise<stri
     ...workerOptions(options),
     storageRef: { backend: 'cloudflare', id },
     preferAnonymous: !(options.asAdmin || (await hasCachedWorkerSessionToken(workerOptions(options)))),
+    // Texts load for an AI by themselves; the list that showed them was the place to sign in.
+    prompt: false,
   });
   return response.text();
 };

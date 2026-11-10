@@ -273,14 +273,14 @@ createPasskeyEip1193Provider()
 The facade's `isUnlocked(forMs)` says whether a request would sign without a
 passkey prompt, now and for the next `forMs` milliseconds. Background requests
 use it: refreshes on focus, on a timer, or after a group change or a sign-in
-elsewhere, group images, and pages that cover many sessions, such as Community
-group counts and tag pages. They sign in to a session's Worker only with a
-sign-in this page already holds, or silently while the wallet stays unlocked
-for at least 30 more seconds (`getWorkerSessionToken` and `fetchWorkerWithAuth`
-with `prompt: false`), and otherwise keep what they show. Such a request also
-keeps a token the Worker refused for one newer scope, unless a new one signs in
-silently. A page that covers many sessions stays quiet because several passkey
-prompts at once would clash.
+elsewhere, group images, context files read for an AI, and pages that cover
+many sessions, such as Community group counts and tag pages. They sign in to a
+session's Worker only with a sign-in this page already holds, or silently while
+the wallet stays unlocked for at least 30 more seconds (`getWorkerSessionToken`
+and `fetchWorkerWithAuth` with `prompt: false`), and otherwise keep what they
+show. Such a request also keeps a token the Worker refused for one newer scope,
+unless a new one signs in silently. A page that covers many sessions stays
+quiet because several passkey prompts at once would clash.
 
 Someone signed in, whose address shows, is asked for the passkey rather than
 shown what a signed-out visitor sees on a session page. Opening its Groups

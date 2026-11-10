@@ -72,10 +72,12 @@ AI key; the Worker refuses anyone else.
 - **The session page's Context section**, when open, has **Add** and **View** in
   its header, as the Tool Explorer does. **Add** opens a form to add a file, with
   who can read it, for someone signed in, or **Manage files and links** for an
-  admin; **Remove** sits beside their own files. Listing never asks anyone to
-  sign, so someone whose browser holds no Worker token yet, as after a reload,
-  gets **View**, which signs them in to show their groups' files. The list
-  refreshes when a token or a new group membership arrives.
+  admin; **Remove** sits beside their own files. Its first list asks someone
+  signed in to sign in to the session if their browser holds no Worker token
+  yet, as after a reload. Declined, it shows what a signed-out visitor sees,
+  and **View** signs them in to show their groups' files. It refreshes without
+  asking when a token or a new group membership arrives, and reading the files'
+  text for an AI never asks.
 - **A Group Conversation's** **Add transcript to context** box, beside **Submit
   questions**, uploads the transcript as a text file when the questions submit.
 - **Settings (`/session/<slug>/settings`)** and **the session page's Context

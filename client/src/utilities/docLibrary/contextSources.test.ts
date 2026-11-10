@@ -119,7 +119,11 @@ describe('context sources on the client', () => {
     expect(await readContextSourceText(essay, options)).toBe('Institutions adapt.');
     expect(await readContextSourceText(deck, options)).toBe('Slide 1.');
     expect(readBlob).toHaveBeenLastCalledWith(
-      expect.objectContaining({ storageRef: { backend: 'cloudflare', id: 'text-1' }, preferAnonymous: true }),
+      expect.objectContaining({
+        storageRef: { backend: 'cloudflare', id: 'text-1' },
+        preferAnonymous: true,
+        prompt: false,
+      }),
     );
     expect(await readContextSourceText({ ...deck, reading: null } as ContextSource, options)).toBe('');
     readBlob.mockRejectedValueOnce(new Error('denied'));

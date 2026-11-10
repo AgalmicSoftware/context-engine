@@ -41,6 +41,8 @@ interface ReadSessionStorageBlobOptions extends StorageWorkerOptions {
   storageRef?: unknown;
   /** false reads as the signed-in person first, so their admins-only items are included. */
   preferAnonymous?: boolean;
+  /** false never asks the person to sign in, for reads the page makes by itself. */
+  prompt?: boolean;
 }
 
 interface ListSessionStorageRefsPageOptions extends StorageWorkerOptions {
@@ -365,6 +367,7 @@ export const readSessionStorageBlob = async ({
   workerUrl = '',
   signal,
   preferAnonymous = true,
+  prompt,
 }: ReadSessionStorageBlobOptions = {}): Promise<Response> => {
   const ref = normalizeStorageRef(storageRef, { fallbackBackend: STORAGE_BACKENDS.CLOUDFLARE });
   if (!ref || ref.backend !== STORAGE_BACKENDS.CLOUDFLARE) throw new Error('Cloudflare storageRef is required.');
@@ -380,6 +383,7 @@ export const readSessionStorageBlob = async ({
       workerUrl: baseUrl,
       allowDemoFallback: defaultStrictAllowDemoFallback(),
       preferAnonymous,
+      prompt,
     },
   );
   if (!response.ok) {

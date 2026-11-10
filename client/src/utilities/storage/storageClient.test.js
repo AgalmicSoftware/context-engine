@@ -469,6 +469,22 @@ describe('storageClient', () => {
     );
   });
 
+  test('lets a read the page makes by itself refuse to ask for a sign-in', async () => {
+    fetchWorkerWithAuth.mockResolvedValueOnce(new Response('payload', { status: 200 }));
+    await readSessionStorageBlob({
+      storageRef: { backend: 'cloudflare', id: 'cf_01j7safeopaqueid' },
+      sessionSlug: 'alpha',
+      sessionConfig: { storageProfile: { backend: 'cloudflare' } },
+      preferAnonymous: false,
+      prompt: false,
+    });
+    expect(fetchWorkerWithAuth).toHaveBeenCalledWith(
+      expect.stringContaining('/storage/read?'),
+      { method: 'GET' },
+      expect.objectContaining({ preferAnonymous: false, prompt: false }),
+    );
+  });
+
   test('tries anonymous-first Cloudflare lists and leaves gated fallback to worker auth', async () => {
     fetchWorkerWithAuth.mockResolvedValueOnce(
       new Response(
