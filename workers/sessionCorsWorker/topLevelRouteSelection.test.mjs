@@ -84,6 +84,12 @@ test('resolveTopLevelRouteSelection exposes the per-session interview brief with
     }),
     { kind: 'interview-brief' },
   );
+  // Only a signed-in POST gets a ticket for a private catalog link.
+  const route = (method) => resolveTopLevelRouteSelection({
+    path: '/agent/interview-catalog-ticket', method, request: createRequest(), deps: { toStr: String },
+  });
+  assert.deepEqual(route('POST'), { kind: 'interview-catalog-ticket' });
+  assert.deepEqual(route('GET'), { kind: 'authenticated' });
 });
 
 test('resolveTopLevelRouteSelection classifies realtime SDP exchange as anonymous AI work', () => {

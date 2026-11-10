@@ -177,3 +177,98 @@ test('protected hosted answers reach only their author and the admin on every re
   assert.equal(exported.status, 200);
   assert.match(exported.text, /ciphertextBase64url/);
 });
+
+test('a catalog ticket shows a person’s own AI only the questions that person may see', async () => {
+  const { sessionModeProfile, storageProfile } = compileHostedEnvelopePreset();
+  const admin = ethers.Wallet.createRandom();
+  const config = {
+    slug: SLUG,
+    sessionId: SESSION_ID,
+    sessionName: 'Members-only questions',
+    allowOrigins: [APP_ORIGIN],
+    adminAddress: admin.address,
+    workerAuthority: { version: 1, participantScopes: ['ai', 'transcribe', 'storage', 'groups', 'fetch'] },
+    sessionModeProfile,
+    storageProfile,
+    // A new session's groups start empty, and anyone signed in may start one,
+    // so no admin signature is needed here.
+    workerGroupsBootstrap: { version: 2, state: 'fresh_empty', bootstrapId: 'b0'.repeat(32) },
+    groupCreationPolicy: 'participants',
+    interviewMode: { joinMatchingGroups: true },
+  };
+  // Built at runtime so no secret-shaped string sits in the source.
+  const runtimeSecret = (label) => [label, globalThis.crypto.randomUUID()].join('-');
+  const env = installSessionCoordinatorBinding({
+    GROUP_KV: memoryKv({ [`session:${SLUG}:config`]: JSON.stringify(config) }),
+    CE_STORAGE_INDEX_KV: memoryKv(),
+    TOKEN_HMAC_SECRET: runtimeSecret('catalog-token'),
+    CE_STORAGE_ENVELOPE_KEK: runtimeSecret('catalog-envelope'),
+    BOOTSTRAP_ADMIN_ADDRESS: admin.address,
+    // A hosted Worker serves one session, so an AI's plain fetch names it.
+    DEFAULT_SESSION_SLUG: SLUG,
+  });
+  const person = (wallet) => createWorkerClient({
+    workerOrigin: WORKER_ORIGIN, slug: SLUG, trustedOrigins: [APP_ORIGIN], wallet, fetchImpl: workerFetch(env),
+  });
+  const host = person(admin);
+  const alice = person(ethers.Wallet.createRandom());
+  const bob = person(ethers.Wallet.createRandom());
+
+  const { group } = await host.request('/groups/create', {
+    method: 'POST', auth: true, body: { sessionId: SESSION_ID, group: { label: 'Salon' } },
+  });
+  await alice.request('/groups/join', { method: 'POST', auth: true, body: { sessionId: SESSION_ID, groupId: group.groupId } });
+  const ask = (id, prompt, access = {}) => host.request('/storage/upload', {
+    method: 'POST',
+    auth: true,
+    body: {
+      backend: 'cloudflare',
+      resource: 'questions',
+      contentType: 'application/json',
+      payloadEncrypted: false,
+      data: JSON.stringify({ id, type: 'freeform', prompt, options: [] }),
+      ...access,
+    },
+  });
+  await ask('q-everyone', 'What matters to everyone here?');
+  await ask('q-salon', 'What should the salon ask next?', { groupIds: [group.groupId] });
+
+  const sessionUrl = encodeURIComponent(`${APP_ORIGIN}/session/${SLUG}`);
+  const catalog = async (ticket = '') => {
+    const response = await workerFetch(env)(
+      `${WORKER_ORIGIN}/agent/interview-catalog?slug=${SLUG}&sessionUrl=${sessionUrl}${ticket ? `&ticket=${ticket}` : ''}`,
+    );
+    const body = await response.json();
+    return { status: response.status, body, ids: (body.questions || []).map(({ id }) => id).sort() };
+  };
+  const ticketFor = async (client) => {
+    const { ticket, expiresAt } = await client.request('/agent/interview-catalog-ticket', { method: 'POST', auth: true });
+    assert.ok(expiresAt * 1000 <= Date.now() + 60 * 60 * 1000 + 5000, 'a ticket lasts an hour at most');
+    return ticket;
+  };
+
+  // The hosted preset lets only signed-in people read questions, so a signed-out
+  // AI is told to have its person sign in, not to retry.
+  const signedOut = await catalog();
+  assert.equal(signedOut.status, 401);
+  assert.equal(signedOut.body.reason, 'sign_in_required');
+
+  const aliceTicket = await ticketFor(alice);
+  const aliceView = await catalog(aliceTicket);
+  assert.deepEqual(aliceView.ids, ['q-everyone', 'q-salon']);
+  // Alice is in the only group, so none is left to suggest.
+  assert.equal('groups' in aliceView.body, false);
+  assert.equal(JSON.stringify(aliceView.body).includes(aliceTicket), false);
+
+  const bobView = await catalog(await ticketFor(bob));
+  assert.deepEqual(bobView.ids, ['q-everyone']);
+  assert.deepEqual(bobView.body.groups.map(({ label }) => label), ['Salon']);
+
+  // Access is asked again at each read: once Alice leaves, her ticket no longer shows the salon's question.
+  await alice.request('/groups/leave', { method: 'POST', auth: true, body: { sessionId: SESSION_ID, groupId: group.groupId } });
+  assert.deepEqual((await catalog(aliceTicket)).ids, ['q-everyone']);
+
+  const altered = await catalog(`${aliceTicket.slice(0, -2)}AA`);
+  assert.equal(altered.status, 401);
+  assert.equal(altered.body.reason, 'catalog_ticket_invalid');
+});

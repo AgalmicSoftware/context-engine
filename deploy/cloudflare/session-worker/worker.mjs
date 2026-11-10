@@ -30861,7 +30861,7 @@ var init_sessionConfigMutation = __esm({
 });
 
 // workers/sessionCorsWorker/workerGroups.js
-var trim2, isObj7, WORKER_GROUP_JOIN_MODES, WORKER_GROUP_MEMBER_VISIBILITY, DEFAULT_WORKER_GROUP_MAX_GROUPS_PER_SESSION, DEFAULT_WORKER_GROUP_MAX_MEMBERS_PER_GROUP, MAX_WORKER_GROUP_IMAGE_URL_LENGTH, MAX_WORKER_GROUP_DOCUMENT_URLS, MAX_WORKER_GROUP_TAGS, MAX_WORKER_GROUP_TAG_LENGTH, MAX_WORKER_GROUP_MEMBER_LIMIT, MAX_WORKER_GROUP_ID_LENGTH, MAX_WORKER_GROUP_SESSION_SLUG_LENGTH, DEFAULT_WORKER_GROUP_MEMBER_PAGE_SIZE, MAX_WORKER_GROUP_MEMBER_PAGE_SIZE, WORKER_GROUPS_FRESH_BOOTSTRAP_SENTINEL, IMPLEMENTED_JOIN_MODES, normalizeWorkerGroupId, isAddressShapedWorkerGroupId, encodedPrincipalKeyPart, canonicalSessionIdKeyPart, canonicalWorkerGroupSessionSlug, nowIso, parsePositiveInt, resolveWorkerGroupMemberPageRequest, WORKER_GROUP_MEMBER_CURSOR_PREFIX, decodeWorkerGroupMemberCursor, encodeWorkerGroupMemberCursor, resolveWorkerGroupCaps, resolveWorkerGroupsKv, resolveWorkerGroupStore, workerGroupIdentityKeyPrefix, workerGroupBackupPrefixes, workerGroupRecordMatchesIdentity, groupKey, groupPrefix, groupIndexKey, groupIndexPrefix, memberKey, memberIndexKey, memberPrefix, principalPrefix, legacyGroupKey, legacyGroupPrefix, legacyGroupIndexKey, legacyGroupIndexPrefix, jsonResponse, normalizeJoinMode, normalizeMemberVisibility, normalizeImageUrl, normalizeGroupTags, normalizeGroupDocumentUrls, normalizeGroupMemberLimit, normalizeGroupJoinEndsAt, normalizeEvmAddress, normalizePrincipalId, principalKeyFor, normalizeWorkerGroupPrincipal, resolveWorkerGroupPrincipal, createWorkerGroupId, normalizeGroupPatch, kvGetJsonStrict, kvGetLegacyJson, resolveWorkerGroupBootstrap, kvListKeys, kvListKeyPage, readGroupRecord, writeGroupRecord, listGroupRecords, scanWorkerGroupRecordsForIdentity, writeMembershipRecord, canonicalizeMembershipRecord, readMembershipRecord, listMembershipRecords, listMembershipRecordPage, redactGroupForMember, normalizeWorkerGroupMembershipFailure, createWorkerGroup, updateWorkerGroup, deleteWorkerGroup, addWorkerGroupMember, removeWorkerGroupMember, listWorkerGroups, listWorkerGroupMembers, redactWorkerGroupMemberForViewer, listWorkerGroupMembersForPrincipal, listWorkerGroupMemberships, executeWorkerGroupMutation, workerGroupCoordinationUnavailable, callWorkerGroupCoordinator, coordinateWorkerGroupBackup, checkCoordinatedWorkerGroupReady, reconcileCoordinatedWorkerGroupCapacity, readCoordinatedWorkerGroupCatalog, readCoordinatedWorkerGroupMemberships, isWorkerGroupMember, forwardWorkerGroupMutation, executeCoordinatedWorkerGroupMutation, parseRouteBody, routeError, resolveWorkerGroupSessionIdentity, participantGroupCreationAllowed, isSelfJoinableWorkerGroup, listWorkerGroupsForVisitor, listSelfJoinableWorkerGroupsForVisitor, dispatchPublicWorkerGroupListRequest, dispatchAdminWorkerGroupRequest, workerGroupsRoute;
+var trim2, isObj7, WORKER_GROUP_JOIN_MODES, WORKER_GROUP_MEMBER_VISIBILITY, DEFAULT_WORKER_GROUP_MAX_GROUPS_PER_SESSION, DEFAULT_WORKER_GROUP_MAX_MEMBERS_PER_GROUP, MAX_WORKER_GROUP_IMAGE_URL_LENGTH, MAX_WORKER_GROUP_DOCUMENT_URLS, MAX_WORKER_GROUP_TAGS, MAX_WORKER_GROUP_TAG_LENGTH, MAX_WORKER_GROUP_MEMBER_LIMIT, MAX_WORKER_GROUP_ID_LENGTH, MAX_WORKER_GROUP_SESSION_SLUG_LENGTH, DEFAULT_WORKER_GROUP_MEMBER_PAGE_SIZE, MAX_WORKER_GROUP_MEMBER_PAGE_SIZE, WORKER_GROUPS_FRESH_BOOTSTRAP_SENTINEL, IMPLEMENTED_JOIN_MODES, normalizeWorkerGroupId, isAddressShapedWorkerGroupId, encodedPrincipalKeyPart, canonicalSessionIdKeyPart, canonicalWorkerGroupSessionSlug, nowIso, parsePositiveInt, resolveWorkerGroupMemberPageRequest, WORKER_GROUP_MEMBER_CURSOR_PREFIX, decodeWorkerGroupMemberCursor, encodeWorkerGroupMemberCursor, resolveWorkerGroupCaps, resolveWorkerGroupsKv, resolveWorkerGroupStore, workerGroupIdentityKeyPrefix, workerGroupBackupPrefixes, workerGroupRecordMatchesIdentity, groupKey, groupPrefix, groupIndexKey, groupIndexPrefix, memberKey, memberIndexKey, memberPrefix, principalPrefix, legacyGroupKey, legacyGroupPrefix, legacyGroupIndexKey, legacyGroupIndexPrefix, jsonResponse, normalizeJoinMode, normalizeMemberVisibility, normalizeImageUrl, normalizeGroupTags, normalizeGroupDocumentUrls, normalizeGroupMemberLimit, normalizeGroupJoinEndsAt, normalizeEvmAddress, normalizePrincipalId, principalKeyFor, normalizeWorkerGroupPrincipal, resolveWorkerGroupPrincipal, createWorkerGroupId, normalizeGroupPatch, kvGetJsonStrict, kvGetLegacyJson, resolveWorkerGroupBootstrap, kvListKeys, kvListKeyPage, readGroupRecord, writeGroupRecord, listGroupRecords, scanWorkerGroupRecordsForIdentity, writeMembershipRecord, canonicalizeMembershipRecord, readMembershipRecord, listMembershipRecords, listMembershipRecordPage, redactGroupForMember, normalizeWorkerGroupMembershipFailure, createWorkerGroup, updateWorkerGroup, deleteWorkerGroup, addWorkerGroupMember, removeWorkerGroupMember, listWorkerGroups, listWorkerGroupMembers, redactWorkerGroupMemberForViewer, listWorkerGroupMembersForPrincipal, listWorkerGroupMemberships, executeWorkerGroupMutation, workerGroupCoordinationUnavailable, callWorkerGroupCoordinator, coordinateWorkerGroupBackup, checkCoordinatedWorkerGroupReady, reconcileCoordinatedWorkerGroupCapacity, readCoordinatedWorkerGroupCatalog, readCoordinatedWorkerGroupMemberships, isWorkerGroupMember, forwardWorkerGroupMutation, executeCoordinatedWorkerGroupMutation, parseRouteBody, routeError, resolveWorkerGroupSessionIdentity, participantGroupCreationAllowed, isSelfJoinableWorkerGroup, listWorkerGroupsForVisitor, listSelfJoinableWorkerGroupsForVisitor, listSelfJoinableWorkerGroupsForMember, dispatchPublicWorkerGroupListRequest, dispatchAdminWorkerGroupRequest, workerGroupsRoute;
 var init_workerGroups = __esm({
   "workers/sessionCorsWorker/workerGroups.js"() {
     init_sessionConfigAuthority();
@@ -32362,6 +32362,41 @@ var init_workerGroups = __esm({
         const result = await listWorkerGroupsForVisitor(args);
         const nowMs = Number(args.deps?.now?.() || Date.now());
         return result.ok ? result.groups.filter((group) => isSelfJoinableWorkerGroup(group, nowMs)) : [];
+      } catch {
+        return [];
+      }
+    };
+    listSelfJoinableWorkerGroupsForMember = async ({ env, config, slug, address: address2, deps = {} } = {}) => {
+      try {
+        const sessionIdentity = resolveWorkerGroupSessionIdentity({ config, slug });
+        const actor = resolveWorkerGroupPrincipal({ requesterAddress: address2, deps });
+        if (!sessionIdentity.ok || !actor.ok) return [];
+        const { sessionId } = sessionIdentity;
+        const ready = await (deps?.checkCoordinatedWorkerGroupReady || checkCoordinatedWorkerGroupReady)({ env, slug, sessionId });
+        if (!ready.ok) return [];
+        const listed = await (deps?.listWorkerGroups || listWorkerGroups)({
+          env,
+          slug,
+          sessionId,
+          actorPrincipalResult: actor,
+          admin: false,
+          includeMemberCount: true,
+          expectedGroupCount: ready.meta?.groupCount
+        });
+        const joined = await (deps?.listWorkerGroupMemberships || listWorkerGroupMemberships)({
+          env,
+          slug,
+          sessionId,
+          principal: actor.principal,
+          deps
+        });
+        if (!listed.ok || !joined.ok) return [];
+        const joinedIds = new Set(joined.memberships.map((membership) => normalizeWorkerGroupId(membership?.group?.groupId)));
+        const nowMs = Number(deps.now?.() || Date.now());
+        return listed.groups.filter((group) => {
+          const full = Number.isSafeInteger(group.memberLimit) && group.memberLimit > 0 && group.memberCount >= group.memberLimit;
+          return isSelfJoinableWorkerGroup(group, nowMs) && !joinedIds.has(group.groupId) && !full;
+        });
       } catch {
         return [];
       }
@@ -83921,7 +83956,7 @@ var require_ar = __commonJS({
           return new instance(value);
         };
       }
-      winstonToAr(winstonString, { formatted = false, decimals = 12, trim: trim22 = true } = {}) {
+      winstonToAr(winstonString, { formatted = false, decimals = 12, trim: trim23 = true } = {}) {
         let number2 = this.stringToBigNum(winstonString, decimals).shiftedBy(-12);
         return formatted ? number2.toFormat(decimals) : number2.toFixed(decimals);
       }
@@ -102019,7 +102054,7 @@ var RPC_CHUNK_SIZE = 1e5;
 var MAX_LOG_CHUNKS = MAX_SCAN_BLOCKS / RPC_CHUNK_SIZE;
 var MAX_POINTER_READS = 200;
 var MAX_CANDIDATES = 2e3;
-var catalog = (questions = [], incomplete = false) => ({ questions, incomplete });
+var catalog = (questions = [], incomplete = false, refused = false) => ({ questions, incomplete, refused });
 var retryableReadStatus = (status) => !status || status === 408 || status === 429 || status >= 500;
 var trim18 = (value) => String(value == null ? "" : value).trim();
 var lower8 = (value) => trim18(value).toLowerCase();
@@ -102043,11 +102078,14 @@ var listQuestionRows = async (callStorage) => {
   const seenCursors = /* @__PURE__ */ new Set();
   let cursor = "";
   let complete = false;
+  let refused = false;
   for (let page = 0; page < MAX_CLOUDFLARE_LIST_PAGES; page += 1) {
     const query = new URLSearchParams({ resource: "questions", limit: String(MAX_QUESTIONS), ...cursor ? { cursor } : {} });
     let listing;
     try {
-      listing = await readJsonResponse(await callStorage("/storage/list", query.toString()));
+      const response2 = await callStorage("/storage/list", query.toString());
+      if (!page) refused = [401, 403].includes(Number(response2?.status));
+      listing = await readJsonResponse(response2);
     } catch {
       break;
     }
@@ -102061,9 +102099,9 @@ var listQuestionRows = async (callStorage) => {
     if (!cursor || seenCursors.has(cursor)) break;
     seenCursors.add(cursor);
   }
-  return { items, incomplete: !complete };
+  return { items, incomplete: !complete, refused };
 };
-var loadCloudflareQuestions = async ({ env, config, slug, storageRoute: storageRoute2 }) => {
+var loadCloudflareQuestions = async ({ env, config, slug, storageRoute: storageRoute2, reader }) => {
   if (typeof storageRoute2 !== "function") return catalog();
   const origin = "https://session-worker.invalid";
   const callStorage = (path, query) => storageRoute2({
@@ -102073,7 +102111,8 @@ var loadCloudflareQuestions = async ({ env, config, slug, storageRoute: storageR
     env,
     config,
     slug,
-    uploaderAddress: "",
+    uploaderAddress: reader?.address || "",
+    ...reader ? { authScopes: reader.scopes } : {},
     baseHeaders: {}
   });
   const listing = await listQuestionRows(callStorage);
@@ -102120,7 +102159,11 @@ var loadCloudflareQuestions = async ({ env, config, slug, storageRoute: storageR
     const payload = version2.payload || await readPayload(version2.storageRefId);
     if (payloadQuestionId(payload) === version2.resourceId && normalizeQuestion(payload)) questions.push(payload);
   }
-  return catalog(dedupeQuestions(questions), incomplete || legacyVersions.length > legacyReads.length || candidates.length > chosen.length);
+  return catalog(
+    dedupeQuestions(questions),
+    incomplete || legacyVersions.length > legacyReads.length || candidates.length > chosen.length,
+    listing.refused
+  );
 };
 var pickContractAddress = (config = {}) => {
   const contracts = isObj24(config.contracts) ? config.contracts : {};
@@ -102290,12 +102333,17 @@ var loadPublicInterviewQuestions = async ({
   config = {},
   slug = "",
   storageRoute: storageRoute2,
-  fetch: fetchImpl = globalThis.fetch
+  fetch: fetchImpl = globalThis.fetch,
+  reader
 } = {}) => {
-  const cloudflareQuestions = await loadCloudflareQuestions({ env, config, slug, storageRoute: storageRoute2 });
+  const cloudflareQuestions = await loadCloudflareQuestions({ env, config, slug, storageRoute: storageRoute2, reader });
   if (cloudflareQuestions.questions.length) return cloudflareQuestions;
   const onChain = await loadOnChainQuestions({ config, slug, fetchImpl });
-  return catalog(onChain.questions, cloudflareQuestions.incomplete || onChain.incomplete);
+  return catalog(
+    onChain.questions,
+    cloudflareQuestions.incomplete || onChain.incomplete,
+    cloudflareQuestions.refused && !onChain.questions.length
+  );
 };
 
 // workers/sessionCorsWorker/interviewStarter.js
@@ -105707,10 +105755,92 @@ var dispatchSessionAgentInstructionsRequest = async ({
 
 // workers/sessionCorsWorker/interviewBriefDispatch.js
 init_sessionConfigAuthority();
+
+// workers/sessionCorsWorker/interviewCatalogTicket.js
+init_authTokenClaims();
+init_authorizationScopeFreshness();
+init_sessionConfigMutation();
+init_tokenSigning();
+var INTERVIEW_CATALOG_TICKET_TTL_SECONDS = 60 * 60;
+var TICKET_VERSION = "ic1";
+var TICKET_KEY_LABEL = "interview-catalog-ticket-v1";
+var TICKET_PATTERN = /^ic1\.(0x[0-9a-f]{40})\.([A-Za-z0-9_-]{8,64})\.([1-9][0-9]{0,11})\.([A-Za-z0-9_-]{43})$/;
+var READ_SCOPES = ["storage", "arweave"];
+var REFUSED = Object.freeze({
+  ok: false,
+  status: 401,
+  reason: "catalog_ticket_invalid",
+  error: "This private catalog link has expired or no longer works. Copy the prompt again from the session page."
+});
+var UNAVAILABLE = Object.freeze({
+  ok: false,
+  status: 503,
+  reason: "catalog_ticket_unavailable",
+  error: "Could not check this catalog link. Retry shortly."
+});
+var trim21 = (value) => String(value == null ? "" : value).trim();
+var nowSeconds = (deps) => Math.floor((typeof deps?.now === "function" ? deps.now() : Date.now()) / 1e3);
+var signTicket = async ({ env, config, slug, sub, parent, exp, deps }) => {
+  const key = base64UrlEncode(await signHmac(TICKET_KEY_LABEL, env?.TOKEN_HMAC_SECRET, deps), deps);
+  const fields2 = [
+    TICKET_VERSION,
+    trim21(slug).toLowerCase(),
+    resolveCanonicalWorkerSessionIdHex(config) || "",
+    readAuthorizationEpoch(config),
+    sub,
+    parent,
+    exp
+  ];
+  return base64UrlEncode(await signHmac(fields2.join("\n"), key, deps), deps);
+};
+var issueInterviewCatalogTicket = async ({ env, config, slug, sub, parent, parentExp, deps } = {}) => {
+  const address2 = trim21(sub).toLowerCase();
+  const signIn = trim21(parent);
+  const now = nowSeconds(deps);
+  const exp = Math.min(now + INTERVIEW_CATALOG_TICKET_TTL_SECONDS, Math.floor(Number(parentExp) || 0));
+  if (!/^0x[0-9a-f]{40}$/.test(address2) || !/^[A-Za-z0-9_-]{8,64}$/.test(signIn)) {
+    throw new Error("Catalog tickets need a signed-in person.");
+  }
+  if (exp <= now || readAuthorizationEpoch(config) === null) throw new Error("Catalog tickets need a current sign-in.");
+  const mac = await signTicket({ env, config, slug, sub: address2, parent: signIn, exp, deps });
+  return { ticket: [TICKET_VERSION, address2, signIn, exp, mac].join("."), expiresAt: exp };
+};
+var verifyInterviewCatalogTicket = async ({ env, ticket, config, slug, deps } = {}) => {
+  const match = trim21(ticket).match(TICKET_PATTERN);
+  if (!match || readAuthorizationEpoch(config) === null) return REFUSED;
+  const [, sub, parent, expText, mac] = match;
+  const exp = Number(expText);
+  if (nowSeconds(deps) >= exp) return REFUSED;
+  let expected;
+  try {
+    expected = await signTicket({ env, config, slug, sub, parent, exp, deps });
+  } catch {
+    return UNAVAILABLE;
+  }
+  if (!timingSafeEqual(expected, mac)) return REFUSED;
+  try {
+    const record4 = await (deps?.validateAuthTokenRecord || validateAuthTokenRecord)({
+      env,
+      payload: { sub, jti: parent },
+      slug
+    });
+    if (!record4?.ok) return REFUSED;
+    const scopes = await deps?.computeScopesForLogin?.({ env, slug, address: sub, config, requestedScopes: READ_SCOPES });
+    if (scopes?.storage !== true && scopes?.arweave !== true) return REFUSED;
+    return {
+      ok: true,
+      reader: { address: sub, scopes: { storage: scopes.storage === true, arweave: scopes.arweave === true } }
+    };
+  } catch {
+    return UNAVAILABLE;
+  }
+};
+
+// workers/sessionCorsWorker/interviewBriefDispatch.js
 init_workerGroups();
 init_interviewSettings();
 var INTERVIEW_PROMPT_VERSION = "ce-interview-brief-v6";
-var trim21 = (value) => String(value == null ? "" : value).trim();
+var trim22 = (value) => String(value == null ? "" : value).trim();
 var isObj26 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
 var isInterviewEnabled = (config = {}) => {
   const interview = isObj26(config.interviewMode || config.interview) ? config.interviewMode || config.interview : {};
@@ -105718,18 +105848,18 @@ var isInterviewEnabled = (config = {}) => {
 };
 var normalizeAllowedOrigins = (raw) => (Array.isArray(raw) ? raw : [raw]).map((entry2) => {
   try {
-    return new URL(trim21(entry2)).origin;
+    return new URL(trim22(entry2)).origin;
   } catch {
     return "";
   }
 }).filter(Boolean);
 var isLocalHttpHostname = (hostname = "") => ["localhost", "127.0.0.1", "[::1]", "::1"].includes(String(hostname));
 var normalizeRecruitmentSource = (value) => {
-  const normalized = trim21(value).replace(/\s+/g, "-").slice(0, 128);
+  const normalized = trim22(value).replace(/\s+/g, "-").slice(0, 128);
   return /^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}$/.test(normalized) ? normalized : "";
 };
 var normalizeJoinGroup = (value) => {
-  const normalized = trim21(value).toLowerCase();
+  const normalized = trim22(value).toLowerCase();
   return /^[a-z0-9][a-z0-9._-]{0,79}$/.test(normalized) ? normalized : "";
 };
 var copySafeReturnParams = (sourceUrl, targetUrl) => {
@@ -105740,7 +105870,7 @@ var copySafeReturnParams = (sourceUrl, targetUrl) => {
 };
 var safeServedWorkerOrigin = (value) => {
   try {
-    const url = new URL(trim21(value));
+    const url = new URL(trim22(value));
     if (url.protocol === "https:" || url.protocol === "http:" && isLocalHttpHostname(url.hostname)) {
       return url.origin;
     }
@@ -105750,10 +105880,10 @@ var safeServedWorkerOrigin = (value) => {
 };
 var safeSessionUrl = (value, { slug = "", allowOrigins } = {}) => {
   try {
-    const url = new URL(trim21(value));
+    const url = new URL(trim22(value));
     if (url.protocol !== "https:" && !(url.protocol === "http:" && isLocalHttpHostname(url.hostname))) return "";
     const parts = url.pathname.split("/").filter(Boolean).map((part) => decodeURIComponent(part));
-    if (parts.length < 2 || parts.at(-2) !== "session" || parts.at(-1)?.toLowerCase() !== trim21(slug).toLowerCase()) {
+    if (parts.length < 2 || parts.at(-2) !== "session" || parts.at(-1)?.toLowerCase() !== trim22(slug).toLowerCase()) {
       return "";
     }
     const allowedOrigins = normalizeAllowedOrigins(allowOrigins);
@@ -105771,7 +105901,7 @@ var sha2563 = async (value) => {
   return [...new Uint8Array(digest2)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 };
 var canonicalizeQuestions = (questions = []) => [...questions].sort(
-  (left, right) => trim21(left?.id).localeCompare(trim21(right?.id)) || trim21(left?.prompt).localeCompare(trim21(right?.prompt)) || trim21(left?.type).localeCompare(trim21(right?.type))
+  (left, right) => trim22(left?.id).localeCompare(trim22(right?.id)) || trim22(left?.prompt).localeCompare(trim22(right?.prompt)) || trim22(left?.type).localeCompare(trim22(right?.type))
 );
 var buildReviewUrl = ({ sessionUrl, servedWorkerOrigin } = {}) => {
   const url = new URL(sessionUrl);
@@ -105856,6 +105986,7 @@ var dispatchInterviewBriefRequest = async ({
   if (!corsContext?.ok) return corsContext?.response;
   const headers2 = new Headers(corsContext.headers || baseHeaders || {});
   headers2.set("cache-control", "no-store");
+  headers2.set("referrer-policy", "no-referrer");
   if (!isInterviewEnabled(config)) {
     return deps?.json?.({ error: "Interview mode is disabled for this session." }, 404, headers2);
   }
@@ -105869,22 +106000,50 @@ var dispatchInterviewBriefRequest = async ({
     });
     if (!rateAllowed) return deps?.json?.({ error: "Rate limit exceeded." }, 429, headers2);
   }
+  const url = new URL(request.url);
+  const ticket = url.searchParams.get("ticket");
+  let reader = null;
+  if (ticket) {
+    const verified = await verifyInterviewCatalogTicket({
+      env,
+      ticket,
+      config,
+      slug,
+      deps: {
+        now: deps?.now,
+        computeScopesForLogin: deps?.computeScopesForLogin,
+        validateAuthTokenRecord: deps?.validateAuthTokenRecord
+      }
+    });
+    if (!verified.ok) return deps?.json?.({ error: verified.error, reason: verified.reason }, verified.status, headers2);
+    reader = verified.reader;
+  }
   const loadPublicInterviewQuestions2 = deps?.loadPublicInterviewQuestions || loadPublicInterviewQuestions;
-  const { questions, incomplete } = await loadPublicInterviewQuestions2({
+  const { questions, incomplete, refused } = await loadPublicInterviewQuestions2({
     env,
     config,
     slug,
     storageRoute: deps?.storageRoute,
-    fetch: deps?.fetch
+    fetch: deps?.fetch,
+    ...reader ? { reader } : {}
   });
+  if (!questions.length && refused && !reader) {
+    return deps?.json?.({
+      error: "This session\u2019s questions need a sign-in. Sign in on the session page, then copy the prompt again.",
+      reason: "sign_in_required"
+    }, 401, headers2);
+  }
   if (!questions.length && incomplete) {
     headers2.set("retry-after", "5");
     return deps?.json?.({ error: "Interview question discovery is incomplete. Retry shortly." }, 503, headers2);
   }
   if (!questions.length) {
-    return deps?.json?.({ error: "No public, accessible questions are available for interview prefill." }, 404, headers2);
+    return deps?.json?.(
+      reader ? { error: "No questions you can see are available for interview prefill." } : { error: "No public, accessible questions are available for interview prefill.", reason: "sign_in_required" },
+      404,
+      headers2
+    );
   }
-  const url = new URL(request.url);
   const configuredAllowedOrigins = [
     ...Array.isArray(config.allowOrigins) ? config.allowOrigins : [config.allowOrigins],
     config.sessionUrl,
@@ -105900,13 +106059,19 @@ var dispatchInterviewBriefRequest = async ({
   }
   const questionSetHash = await (deps?.sha256 || sha2563)(JSON.stringify(canonicalizeQuestions(questions)));
   const { joinMatchingGroups, groupSuggestionData } = normalizeInterviewSettings(config.interviewMode);
-  const groups = joinMatchingGroups && groupSuggestionData.length ? await (deps?.listSelfJoinableWorkerGroupsForVisitor || listSelfJoinableWorkerGroupsForVisitor)({
+  const groups = !joinMatchingGroups || !groupSuggestionData.length ? [] : reader ? await (deps?.listSelfJoinableWorkerGroupsForMember || listSelfJoinableWorkerGroupsForMember)({
+    env,
+    config,
+    slug,
+    address: reader.address,
+    deps: { now: deps?.now }
+  }) : await (deps?.listSelfJoinableWorkerGroupsForVisitor || listSelfJoinableWorkerGroupsForVisitor)({
     env,
     config,
     slug,
     inviteGroupId: new URL(sessionUrl).searchParams.get("joinGroup"),
     deps: { now: deps?.now }
-  }) : [];
+  });
   return deps?.json?.(
     buildInterviewBriefDocument({
       slug,
@@ -105920,6 +106085,46 @@ var dispatchInterviewBriefRequest = async ({
     200,
     headers2
   );
+};
+var dispatchInterviewCatalogTicketRequest = async ({ request, env, baseHeaders, slug, deps } = {}) => {
+  const auth = await deps?.requireAuth?.({ request, env, baseHeaders, slugHint: slug });
+  if (!auth?.ok) return auth?.response;
+  const context = await resolveAuthenticatedRouteContext({ request, env, auth, baseHeaders, deps });
+  if (!context?.ok) return context?.response;
+  const headers2 = new Headers(context.headers || {});
+  headers2.set("cache-control", "no-store");
+  if (!isInterviewEnabled(context.config)) {
+    return deps?.json?.({ error: "Interview mode is disabled for this session." }, 404, headers2);
+  }
+  if (auth.payload?.agentSource) {
+    return deps?.json?.({
+      error: "Catalog tickets are for people signed in on the session page.",
+      reason: "catalog_ticket_person_only"
+    }, 403, headers2);
+  }
+  const preflight = await (deps?.evaluateAuthenticatedRoutePreflight || evaluateAuthenticatedRoutePreflight)({
+    ...context,
+    env,
+    headers: headers2,
+    route: "interview-ticket",
+    scope: context.scopes?.storage === true ? "storage" : "arweave",
+    deps: { computeScopesForLogin: deps?.computeScopesForLogin, checkRateLimit: deps?.checkRateLimit, json: deps?.json }
+  });
+  if (!preflight?.ok) return preflight?.response;
+  try {
+    const issued = await issueInterviewCatalogTicket({
+      env,
+      config: context.config,
+      slug: context.slug,
+      sub: context.address,
+      parent: auth.payload?.jti,
+      parentExp: auth.payload?.exp,
+      deps: { now: deps?.now }
+    });
+    return deps?.json?.(issued, 200, headers2);
+  } catch {
+    return deps?.json?.({ error: "Could not issue a catalog ticket." }, 500, headers2);
+  }
 };
 
 // workers/sessionCorsWorker/workerRouteShellBinding.js
@@ -105962,6 +106167,7 @@ var resolveTopLevelRouteSelection = ({
   if ((path === "/agent/interview-catalog" || path === "/agent/interview-brief") && method === "GET") {
     return { kind: "interview-brief" };
   }
+  if (path === "/agent/interview-catalog-ticket" && method === "POST") return { kind: "interview-catalog-ticket" };
   if (path === "/sponsored/redeem-deploy" && method === "POST") {
     return {
       kind: "sponsored-bootstrap-redeem",
@@ -106030,6 +106236,7 @@ var createWorkerRouteShellWithWorkerDeps = ({
   const dispatchSessionConfigBootstrapRequest2 = deps?.dispatchSessionConfigBootstrapRequest || dispatchSessionConfigBootstrapRequest;
   const dispatchSessionAgentInstructionsRequest2 = deps?.dispatchSessionAgentInstructionsRequest || dispatchSessionAgentInstructionsRequest;
   const dispatchInterviewBriefRequest2 = deps?.dispatchInterviewBriefRequest || dispatchInterviewBriefRequest;
+  const dispatchInterviewCatalogTicketRequest2 = deps?.dispatchInterviewCatalogTicketRequest || dispatchInterviewCatalogTicketRequest;
   const dispatchAdminRequest2 = deps?.dispatchAdminRequest || dispatchAdminRequest;
   const dispatchAdminAbuseSummaryRequest2 = deps?.dispatchAdminAbuseSummaryRequest || dispatchAdminAbuseSummaryRequest;
   const dispatchAdminResultsAnalysisStatusRequest2 = deps?.dispatchAdminResultsAnalysisStatusRequest || dispatchAdminResultsAnalysisStatusRequest;
@@ -106121,11 +106328,33 @@ var createWorkerRouteShellWithWorkerDeps = ({
             checkRateLimit: deps?.checkRateLimit,
             storageRoute: deps?.storageRoute,
             fetch: deps?.fetch,
-            json: deps?.json
+            json: deps?.json,
+            // A catalog ticket is checked against the person's current access.
+            computeScopesForLogin: deps?.computeScopesForLogin,
+            now: deps?.now
           },
           constants: {
             missingSlugError: constants?.missingSlugError,
             sessionConfigNotFoundError: constants?.sessionConfigNotFoundError
+          }
+        });
+      }
+      if (routeSelection.kind === "interview-catalog-ticket") {
+        return await dispatchInterviewCatalogTicketRequest2({
+          request,
+          env,
+          baseHeaders: routeBaseHeaders,
+          slug: envSlug,
+          deps: {
+            json: deps?.json,
+            requireAuth: deps?.requireAuth,
+            readCurrentSessionConfig: deps?.readCurrentSessionConfig,
+            getCorsContext: deps?.getCorsContext,
+            computeScopesForLogin: deps?.computeScopesForLogin,
+            checkRateLimit: deps?.checkRateLimit,
+            toStr: deps?.toStr,
+            now: deps?.now,
+            SESSION_CONFIG_NOT_FOUND_ERROR: constants?.sessionConfigNotFoundError
           }
         });
       }

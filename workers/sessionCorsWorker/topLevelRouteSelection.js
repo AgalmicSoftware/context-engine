@@ -45,6 +45,8 @@ export const resolveTopLevelRouteSelection = ({
     return { kind: 'interview-brief' };
   }
 
+  if (path === '/agent/interview-catalog-ticket' && method === 'POST') return { kind: 'interview-catalog-ticket' };
+
   if (path === '/sponsored/redeem-deploy' && method === 'POST') {
     return {
       kind: 'sponsored-bootstrap-redeem',

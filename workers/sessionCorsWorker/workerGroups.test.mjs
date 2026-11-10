@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+	listSelfJoinableWorkerGroupsForMember,
 	listSelfJoinableWorkerGroupsForVisitor,
 	addWorkerGroupMember as addWorkerGroupMemberBoundary,
 	createWorkerGroup as createWorkerGroupBoundary,
@@ -396,6 +397,42 @@ test('only groups someone could join on their own count, for a link or for an AI
 		}),
 		[],
 	);
+});
+
+test('a signed-in person’s AI is offered only open groups they have not joined and that have room', async () => {
+	const nowMs = Date.parse('2026-02-03T04:05:06.000Z');
+	const address = `0x${'ab'.repeat(20)}`;
+	const open = { joinMode: 'open', memberVisibility: 'session', memberCount: 1 };
+	const listed = [
+		{ ...open, groupId: 'salon', label: 'Salon' },
+		{ ...open, groupId: 'joined', label: 'Joined' },
+		{ ...open, groupId: 'full', label: 'Full', memberLimit: 2, memberCount: 2 },
+		{ ...open, groupId: 'room', label: 'Room', memberLimit: 3, memberCount: 2 },
+		{ ...open, groupId: 'staff', label: 'Staff', joinMode: 'admin_add' },
+		{ ...open, groupId: 'closed', label: 'Closed', joinEndsAt: '2026-02-01T00:00:00.000Z' },
+	];
+	const listings = [];
+	const deps = {
+		now: () => nowMs,
+		checkCoordinatedWorkerGroupReady: async () => ({ ok: true, meta: { groupCount: listed.length } }),
+		listWorkerGroups: async (args) => {
+			listings.push(args);
+			return { ok: true, store: 'kv', groups: listed };
+		},
+		listWorkerGroupMemberships: async () => ({ ok: true, memberships: [{ group: { groupId: 'joined' } }] }),
+	};
+	const offer = (overrides = {}) => listSelfJoinableWorkerGroupsForMember({
+		env: {}, config: privateWorkerGroupConfig(), slug: 'session-a', address, deps, ...overrides,
+	});
+	assert.deepEqual((await offer()).map((group) => group.groupId), ['salon', 'room']);
+	// Listed as that person sees groups, never as an admin.
+	assert.equal(listings[0].admin, false);
+	assert.equal(listings[0].includeMemberCount, true);
+	assert.equal(listings[0].actorPrincipalResult.principal.address, address);
+	// No person, or a list that fails, offers nothing rather than an error.
+	assert.deepEqual(await offer({ address: '' }), []);
+	assert.deepEqual(await offer({ deps: { ...deps, listWorkerGroupMemberships: async () => ({ ok: false }) } }), []);
+	assert.deepEqual(await offer({ deps: { ...deps, listWorkerGroups: async () => { throw new Error('down'); } } }), []);
 });
 
 const createMockKv = () => {

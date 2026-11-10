@@ -2771,10 +2771,23 @@ Signed login/bootstrap requests:
   - Route scope disables fail before the request-`apiKey` bypass.
   - Provider inference:
     omitted/`default`/`auto` providers infer from `model` (`claude*` => Anthropic, slash models => OpenRouter, `gpt-*`/`o*`/`chatgpt` => OpenAI) before falling back to OpenAI. When both provider and model are omitted on a session-funded request, the Worker selects the saved fast model (or thinking model when `modelType: thinking`), including its provider.
-- `GET /agent/interview-catalog?slug=<slug>&sessionUrl=<https-session-url>`
+- `GET /agent/interview-catalog?slug=<slug>&sessionUrl=<https-session-url>[&ticket=<ticket>]`
   (`/agent/interview-brief` remains a compatibility alias)
   - Public, CORS-scoped, and disabled when `interviewModeEnabled=false` or
     `interviewMode.enabled=false`.
+  - Without `ticket`, it lists only questions a signed-out visitor may read.
+    A session that lets no signed-out visitor list its questions answers 401
+    with `reason: "sign_in_required"` instead of asking for a retry, and an
+    empty catalog carries that reason too, since questions shown only to
+    groups may appear after a sign-in.
+  - With a `ticket` from `POST /agent/interview-catalog-ticket`, it reads as
+    the ticket's person: each question passes the same checks as that
+    person's signed-in storage read, with their access as it is now, and
+    `groups` lists the groups they could join on their own and haven't, less
+    any that are full. An expired, altered or revoked ticket gets 401
+    `catalog_ticket_invalid`; a check that can't run gets 503
+    `catalog_ticket_unavailable`. Every catalog response sends
+    `referrer-policy: no-referrer`, and `reviewUrl` never carries a ticket.
   - Returns only an inert JSON question catalog: `type`, `version`,
     `sessionSlug`, `reviewUrl`, `questionSetHash`, `prefillPromptVersion`,
     `answerContract`, `researchCoverageContract`, and `questions`, plus `groups`
@@ -2848,6 +2861,19 @@ Signed login/bootstrap requests:
     Worker endpoint that served the catalog, followed by `mode=interview`. The
     Worker does not copy any `worker` query supplied in `sessionUrl`; the client
     still verifies the Worker-canonical session config before using that hint.
+- `POST /agent/interview-catalog-ticket` (signed in)
+  - Returns `{ ticket, expiresAt }` for the signed-in person, with
+    `cache-control: no-store`, for the session page to put in the catalog
+    link it gives that person's own AI. It needs interview mode on and the
+    `storage` or `arweave` scope, checked against current access, and counts
+    against `limits.perWalletPerDay` as its own route. A sign-in made with an
+    agent's own key is refused (`catalog_ticket_person_only`).
+  - A ticket lasts an hour at most, and never past the sign-in it came from.
+    It is signed with its own key derived from `TOKEN_HMAC_SECRET` and bound
+    to the session's slug, session ID and access version (`authzEpoch`), so
+    another session, a new session ID, an access edit or signing out ends
+    it. It names only its person's address, the sign-in's ID and its expiry,
+    and it is never accepted as a sign-in token.
 - `GET /api/agent/questions` with a session Worker bearer credential returns
   the same public, access-checked question catalog when
   `sessionModeProfile.surfaces.agentHttp=true`.

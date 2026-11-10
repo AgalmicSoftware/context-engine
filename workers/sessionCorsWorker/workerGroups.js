@@ -1741,6 +1741,43 @@ export const listSelfJoinableWorkerGroupsForVisitor = async (args = {}) => {
 	}
 };
 
+/** The groups a signed-in person could join on their own and hasn't yet, for their AI to match them to. */
+export const listSelfJoinableWorkerGroupsForMember = async ({ env, config, slug, address, deps = {} } = {}) => {
+	try {
+		const sessionIdentity = resolveWorkerGroupSessionIdentity({ config, slug });
+		const actor = resolveWorkerGroupPrincipal({ requesterAddress: address, deps });
+		if (!sessionIdentity.ok || !actor.ok) return [];
+		const { sessionId } = sessionIdentity;
+		const ready = await (deps?.checkCoordinatedWorkerGroupReady || checkCoordinatedWorkerGroupReady)({ env, slug, sessionId });
+		if (!ready.ok) return [];
+		const listed = await (deps?.listWorkerGroups || listWorkerGroups)({
+			env,
+			slug,
+			sessionId,
+			actorPrincipalResult: actor,
+			admin: false,
+			includeMemberCount: true,
+			expectedGroupCount: ready.meta?.groupCount,
+		});
+		const joined = await (deps?.listWorkerGroupMemberships || listWorkerGroupMemberships)({
+			env,
+			slug,
+			sessionId,
+			principal: actor.principal,
+			deps,
+		});
+		if (!listed.ok || !joined.ok) return [];
+		const joinedIds = new Set(joined.memberships.map((membership) => normalizeWorkerGroupId(membership?.group?.groupId)));
+		const nowMs = Number(deps.now?.() || Date.now());
+		return listed.groups.filter((group) => {
+			const full = Number.isSafeInteger(group.memberLimit) && group.memberLimit > 0 && group.memberCount >= group.memberLimit;
+			return isSelfJoinableWorkerGroup(group, nowMs) && !joinedIds.has(group.groupId) && !full;
+		});
+	} catch {
+		return [];
+	}
+};
+
 export const dispatchPublicWorkerGroupListRequest = async ({ request, config, env, slug, baseHeaders, deps = {} } = {}) => {
 	const sessionIdentity = resolveWorkerGroupSessionIdentity({ config, slug });
 	if (!sessionIdentity.ok) return routeError(deps, sessionIdentity, baseHeaders);

@@ -489,6 +489,9 @@ Worker API (selected endpoints):
   per-session question catalog for the client-authored, zero-install
   ChatGPT/Claude prefill handoff. It declares binary, rating, multichoice, and
   quadratic answer formats and is disabled by `interviewModeEnabled=false`.
+  With a `ticket`, it lists what that signed-in person may see.
+- `POST /agent/interview-catalog-ticket`: For a signed-in person, a ticket of
+  at most an hour that lets their own AI read the catalog as them.
 - `POST /interview/starter`: Returns the interview opening prompt, either the
   owner's or an AI-written one, plus the steering prompt.
 - `POST /realtime/call`: OpenAI Realtime WebRTC SDP exchange using the session Worker key and the session's anonymous AI eligibility policy.

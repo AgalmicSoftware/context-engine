@@ -289,10 +289,49 @@ test('createWorkerRouteShellWithWorkerDeps preserves interview brief branch wiri
           storageRoute: 'storageRoute',
           fetch: fetchImpl,
           json: 'json',
+          computeScopesForLogin: 'computeScopesForLogin',
+          now: 'now',
         });
         assert.deepEqual(value.constants, {
           missingSlugError: 'Missing sessionSlug.',
           sessionConfigNotFoundError: 'Session config not found.',
+        });
+        return response;
+      },
+    },
+    constants: createBaseConstants(),
+  });
+
+  assert.equal(await routeShell.fetch(request, env), response);
+});
+
+test('createWorkerRouteShellWithWorkerDeps preserves interview catalog ticket branch wiring', async () => {
+  const request = createRequest('/agent/interview-catalog-ticket', 'POST');
+  const env = { DEFAULT_SESSION_SLUG: 'demo-1' };
+  const baseHeaders = { 'Access-Control-Allow-Origin': 'https://allowed.example' };
+  const response = new Response('ticket');
+
+  const routeShell = createWorkerRouteShellWithWorkerDeps({
+    deps: {
+      ...createBaseDeps(),
+      resolveTopLevelRouteSelection: () => ({ kind: 'interview-catalog-ticket' }),
+      getRouteBaseHeaders: () => baseHeaders,
+      getDefaultWorkerSessionSlug: () => 'demo-1',
+      dispatchInterviewCatalogTicketRequest: async (value) => {
+        assert.equal(value.request, request);
+        assert.equal(value.env, env);
+        assert.equal(value.slug, 'demo-1');
+        assert.equal(value.baseHeaders, baseHeaders);
+        assert.deepEqual(value.deps, {
+          json: 'json',
+          requireAuth: 'requireAuth',
+          readCurrentSessionConfig: 'readCurrentSessionConfig',
+          getCorsContext: 'getCorsContext',
+          computeScopesForLogin: 'computeScopesForLogin',
+          checkRateLimit: 'checkRateLimit',
+          toStr: 'toStr',
+          now: 'now',
+          SESSION_CONFIG_NOT_FOUND_ERROR: 'Session config not found.',
         });
         return response;
       },
