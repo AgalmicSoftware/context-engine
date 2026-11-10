@@ -194,7 +194,7 @@ describe('getTemporaryDemoSessionQuestionFixtures', () => {
     expect(classifySessionModeProfileSupport(config.sessionModeProfile).status).toBe('reachable');
   });
 
-  it.each(['rxc-test', 'rxc-ra-test', 'rxc-ra-test-2', 'rxc-ra-test-3', 'rxc-ra-test-5'])(
+  it.each(['rxc-test', 'rxc-ra-test', 'rxc-ra-test-2', 'rxc-ra-test-3', 'rxc-ra-test-5', 'rxc-ra-test-6'])(
     'discovers %s without seeding demo questions',
     (slug) => {
       const config = (demoSessions as Record<string, any>)[slug];

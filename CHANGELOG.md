@@ -61,7 +61,7 @@ All notable changes to this project will be documented in this file.
 - Session settings shows **Sign in** as a clear button at the start of its sentence. The buttons on the Setup and Settings pages have a fill, so Minimal no longer shows them as plain words.
 - Session settings says which account you're signed in as when it isn't one of the session's admins.
 - New groups start open to anyone who can see the session, with their members visible to it. Admins can still choose to add members themselves.
-- `rxc-ra-test-5` opens from its clean link on a device that has never seen it.
+- `rxc-ra-test-5` and `rxc-ra-test-6` open from their clean links on a device that has never seen them.
 - The Groups panel, its create and edit forms, the session's Results and Groups headers, and the Session Admin page's heading, labels and cards are readable in every theme.
 - Group Conversation offers a compact Record button and an icon-only **+** menu for audio uploads, transcript files, and pasted text. Imported audio keeps the recorder’s retry/download recovery. Internal audio parts stay hidden; downloads combine the audio not yet transcribed into one local MP3. Typed draft cards include a top-right remove button and **Submit questions**. Input guidance sits in the title tooltip.
 - Protected question storage shows a sign-in requirement instead of a generic cache error while signed out. Standard session pages omit the interview sharing panel; **Interview & share** remains on admin and publish screens.

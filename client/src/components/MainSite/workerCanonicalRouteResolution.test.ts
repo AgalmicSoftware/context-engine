@@ -165,13 +165,16 @@ describe('workerCanonicalRouteResolution', () => {
     expect(resolveStandardSessionRoute).not.toHaveBeenCalled();
   });
 
-  it('bundles rxc-ra-test-5 with the public Results it runs, so a fresh browser starts from the right profile', () => {
-    const profile = demoSessions['rxc-ra-test-5'].sessionModeProfile;
-    expect(profile.results.visibility).toBe('public_full_if_storage_public');
-    expect(profile.encryption).toEqual({ mode: 'none' });
-    expect(profile.storage.payloadAccessControl).toEqual({ gate: 'none', encryption: 'none' });
-    expect(listSessionModeConflicts(profile)).toEqual([]);
-  });
+  it.each(['rxc-ra-test-5', 'rxc-ra-test-6'] as const)(
+    'bundles %s with the public Results it runs, so a fresh browser starts from the right profile',
+    (slug) => {
+      const profile = demoSessions[slug].sessionModeProfile;
+      expect(profile.results.visibility).toBe('public_full_if_storage_public');
+      expect(profile.encryption).toEqual({ mode: 'none' });
+      expect(profile.storage.payloadAccessControl).toEqual({ gate: 'none', encryption: 'none' });
+      expect(listSessionModeConflicts(profile)).toEqual([]);
+    },
+  );
 
   it.each([
     ['rxc-test', 'https://ce-rxc-test-96862a1dc78f.agalmic.workers.dev'],
@@ -179,6 +182,7 @@ describe('workerCanonicalRouteResolution', () => {
     ['rxc-ra-test-2', 'https://ce-rxc-ra-test-2-e14873da7c8f.agalmic.workers.dev'],
     ['rxc-ra-test-3', 'https://ce-rxc-ra-test-3.agalmic.workers.dev'],
     ['rxc-ra-test-5', 'https://ce-rxc-ra-test-5.agalmic.workers.dev'],
+    ['rxc-ra-test-6', 'https://ce-rxc-ra-test-6.agalmic.workers.dev'],
   ])('bootstraps the %s clean route from bundled discovery', (slug, workerOrigin) => {
     const result = resolveMainSiteSessionRouteForRender({
       sessionTokenRaw: slug,
@@ -193,17 +197,17 @@ describe('workerCanonicalRouteResolution', () => {
   it('opens the group-recording QR link on a device that has never seen the session', () => {
     const resolveStandardSessionRoute = jest.fn();
     const result = resolveMainSiteSessionRouteForRender({
-      sessionTokenRaw: 'rxc-ra-test-5',
-      searchStr: '?mode=groupRecording&joinGroup=7824a38f-6946-4351-b74b-81307b406180',
+      sessionTokenRaw: 'rxc-ra-test-6',
+      searchStr: '?mode=groupRecording&joinGroup=bc96eee1-192b-4b18-b36b-1bf7fc00bd9a',
       controller,
       resolveSessionSlugFromPathToken: (token) => token,
       resolveStandardSessionRoute,
     });
     expect(result).toMatchObject({
       kind: 'bootstrap',
-      workerOrigin: 'https://ce-rxc-ra-test-5.agalmic.workers.dev',
-      workerSessionSlug: 'rxc-ra-test-5',
-      sessionRoute: { sessionSlug: 'rxc-ra-test-5', sessionConfig: null },
+      workerOrigin: 'https://ce-rxc-ra-test-6.agalmic.workers.dev',
+      workerSessionSlug: 'rxc-ra-test-6',
+      sessionRoute: { sessionSlug: 'rxc-ra-test-6', sessionConfig: null },
     });
     expect(resolveStandardSessionRoute).not.toHaveBeenCalled();
   });

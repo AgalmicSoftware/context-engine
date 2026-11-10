@@ -46,12 +46,12 @@ populate those assignments. The Context atlas does not imply that classification
 has happened. Raw Results continues to open the detailed results view.
 
 The Context atlas applies to `rxc-test`, `rxc-ra-test`, `rxc-ra-test-2`,
-`rxc-ra-test-3` and `rxc-ra-test-5`; the Debate Map preview is enabled for all of them except
+`rxc-ra-test-3`, `rxc-ra-test-5` and `rxc-ra-test-6`; the Debate Map preview is enabled for all of them except
 `rxc-ra-test`. This is client
 presentation, not session provisioning: each session still needs its own valid
 Worker configuration and question bank. The bundled discovery entries support
 fresh visits to each of them, including the group-recording link
-`/session/rxc-ra-test-5?mode=groupRecording`; each fetches and validates the
+`/session/rxc-ra-test-6?mode=groupRecording`; each fetches and validates the
 Worker's live configuration before opening the session.
 
 See [interview research](session-interview-research.md)

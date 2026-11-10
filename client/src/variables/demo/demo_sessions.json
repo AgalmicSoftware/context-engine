@@ -668,5 +668,62 @@
         "scope": "admin_raw"
       }
     }
+  },
+  "rxc-ra-test-6": {
+    "slug": "rxc-ra-test-6",
+    "sessionId": "0x76ea87061c3633c0a6f070474e231eb5",
+    "sessionName": "Reverse Alignment",
+    "corsWorkerUrl": "https://ce-rxc-ra-test-6.agalmic.workers.dev/",
+    "workerCanonicalCleanRoute": true,
+    "sessionModeProfile": {
+      "profileVersion": 1,
+      "preset": "custom",
+      "authority": {
+        "mode": "worker_canonical"
+      },
+      "evm": {
+        "registryChainId": null
+      },
+      "storage": {
+        "backend": "cloudflare",
+        "payloadAccessControl": {
+          "gate": "none",
+          "encryption": "none"
+        }
+      },
+      "identity": {
+        "default": "passkey",
+        "enabled": [
+          "passkey"
+        ]
+      },
+      "authorization": {
+        "mechanisms": [
+          "worker_roles"
+        ]
+      },
+      "encryption": {
+        "mode": "none"
+      },
+      "surfaces": {
+        "web": true,
+        "telegram": false,
+        "miniApp": false,
+        "agentHttp": false,
+        "mcp": false,
+        "ceCc": false
+      },
+      "results": {
+        "visibility": "public_full_if_storage_public",
+        "exposure": {
+          "aggregateResultsEnabled": true,
+          "anonymizedGroupsEnabled": false,
+          "minGroupSize": 2
+        }
+      },
+      "export": {
+        "scope": "admin_raw"
+      }
+    }
   }
 }

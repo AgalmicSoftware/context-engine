@@ -5,7 +5,7 @@ import { resolveOnePageSessionNetworkRuntime } from './onePageSessionCapabilityR
 
 // SurveyPileViewMode keys the voice dialog on this token. If signing in changed it on a session
 // without network controls, the dialog would remount and silently end a Group Conversation recording.
-describe.each(['rxc-ra-test-2', 'rxc-ra-test-3', 'rxc-ra-test-5'])(
+describe.each(['rxc-ra-test-2', 'rxc-ra-test-3', 'rxc-ra-test-5', 'rxc-ra-test-6'])(
   'the voice dialog context on the Worker-hosted %s',
   (slug) => {
     const sessionConfig = (demoSessions as Record<string, Record<string, unknown>>)[slug];
