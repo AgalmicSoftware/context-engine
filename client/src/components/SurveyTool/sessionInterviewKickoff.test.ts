@@ -71,6 +71,28 @@ it('negotiates v4 to v6, binds the session and exact version/hash, and distingui
   expect(kickoff.length).toBeLessThan(4000);
 });
 
+it('puts a signed-in person’s ticket only in their catalog link, with a line saying it is private', () => {
+  const ticket = `ic1.0x${'ab'.repeat(20)}.b6a3c1f2-0d4e-4a8b-9c7d-1e2f3a4b5c6d.1800003600.${'A'.repeat(43)}`;
+  const options = {
+    workerUrl: 'https://worker.example',
+    sessionSlug: 'demo',
+    sessionUrl: 'https://client.example/session/demo?joinGroup=salon',
+  };
+  const plain = buildExternalInterviewKickoff(options);
+  const kickoff = buildExternalInterviewKickoff({ ...options, catalogTicket: ticket });
+  const fetchLine = kickoff.split('\n').find((line) => line.includes('/agent/interview-catalog')) || '';
+  expect(new URL(fetchLine).searchParams.get('ticket')).toBe(ticket);
+  expect(new URL(fetchLine).searchParams.get('sessionUrl')).toBe(options.sessionUrl);
+  expect(kickoff.split(ticket)).toHaveLength(2);
+  expect(kickoff).toContain(
+    'The link is private to me and expires within an hour; never repeat it or put it in the packet.',
+  );
+  // The rest of the request is the same, so the served-client check still reads its versions.
+  expect(kickoff.replace(`&ticket=${ticket}`, '').replace(/The link is private to me[^\n]*\n/, '')).toBe(plain);
+  expect(plain).not.toMatch(/ticket|private to me/);
+  expect(kickoff.length).toBeLessThan(4300);
+});
+
 it('reads the person’s AI’s group picks from a packet: listed IDs once each, reasons trimmed, confidence 0-1', () => {
   const picks = decodeInterviewPrefillPacket(
     encodeLinkJson({

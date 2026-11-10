@@ -7,14 +7,21 @@ import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import SessionInterviewPrompt from './SessionInterviewPrompt';
 import { shouldIgnorePromptCopyEvent } from './sessionInterviewModalState';
 
+/** The prompt a check approved, when it differs from `kickoff`, and when to check again before its link runs out. */
+export type ValidatedKickoff = { prompt: string; renewAtMs?: number };
+
 type SessionInterviewMemoryKickoffCardProps = {
   kickoff: string;
-  validateKickoff: () => Promise<void>;
+  /** `retry` is true when the person pressed Retry. */
+  validateKickoff: (request: { retry: boolean }) => Promise<ValidatedKickoff | void>;
   promptCopied: boolean;
   showAgentPrompt: boolean;
-  onCopyPrompt: () => Promise<void>;
+  onCopyPrompt: (prompt: string) => Promise<void>;
   onTogglePrompt: () => void;
 };
+
+// A renewal never runs sooner than this, so a link that can't be renewed isn't checked in a loop.
+const MIN_RENEW_DELAY_MS = 30 * 1000;
 
 export default function SessionInterviewMemoryKickoffCard({
   kickoff,
@@ -25,20 +32,30 @@ export default function SessionInterviewMemoryKickoffCard({
   onTogglePrompt,
 }: SessionInterviewMemoryKickoffCardProps) {
   const [attempt, setAttempt] = useState(0);
-  const [validation, setValidation] = useState({ kickoff: '', pending: true, error: '' });
+  const [validation, setValidation] = useState({ kickoff: '', pending: true, error: '', prompt: '', renewAtMs: 0 });
   const [copyError, setCopyError] = useState('');
   const validateRef = useRef(validateKickoff);
   validateRef.current = validateKickoff;
+  const retryRef = useRef(false);
   const activeKickoff = useRef(kickoff);
   activeKickoff.current = kickoff;
   useEffect(() => {
     let active = true;
-    setValidation({ kickoff, pending: true, error: '' });
+    const retry = retryRef.current;
+    retryRef.current = false;
+    setValidation({ kickoff, pending: true, error: '', prompt: '', renewAtMs: 0 });
     setCopyError('');
     void validateRef
-      .current()
-      .then(() => {
-        if (active) setValidation({ kickoff, pending: false, error: '' });
+      .current({ retry })
+      .then((validated) => {
+        if (active)
+          setValidation({
+            kickoff,
+            pending: false,
+            error: '',
+            prompt: validated?.prompt || kickoff,
+            renewAtMs: validated?.renewAtMs || 0,
+          });
       })
       .catch((error: unknown) => {
         if (active)
@@ -46,20 +63,33 @@ export default function SessionInterviewMemoryKickoffCard({
             kickoff,
             pending: false,
             error: error instanceof Error ? error.message : 'Could not check the session. Try again.',
+            prompt: '',
+            renewAtMs: 0,
           });
       });
     return () => {
       active = false;
     };
   }, [kickoff, attempt]);
+  const { renewAtMs } = validation;
+  useEffect(() => {
+    if (!renewAtMs) return undefined;
+    // A prompt whose private link runs out is checked again, and so renewed, before it does.
+    const timer = setTimeout(
+      () => setAttempt((value) => value + 1),
+      Math.max(MIN_RENEW_DELAY_MS, renewAtMs - Date.now()),
+    );
+    return () => clearTimeout(timer);
+  }, [renewAtMs]);
   const checking = validation.kickoff !== kickoff || validation.pending;
   const validationError = validation.kickoff === kickoff ? validation.error : '';
   const compatible = !checking && !validationError;
+  const prompt = compatible ? validation.prompt : kickoff;
   const copyPrompt = () => {
     if (!compatible) return;
     setCopyError('');
     // Safari requires writeText to begin in the tap stack; never await a catalog fetch here.
-    void onCopyPrompt().catch(() => {
+    void onCopyPrompt(prompt).catch(() => {
       if (activeKickoff.current !== kickoff) return;
       setCopyError('Could not copy to the clipboard. Copy the prompt below by hand.');
       if (!showAgentPrompt) onTogglePrompt();
@@ -127,7 +157,13 @@ export default function SessionInterviewMemoryKickoffCard({
       {validationError ? (
         <div role="alert">
           {validationError}{' '}
-          <button type="button" onClick={() => setAttempt((value) => value + 1)}>
+          <button
+            type="button"
+            onClick={() => {
+              retryRef.current = true;
+              setAttempt((value) => value + 1);
+            }}
+          >
             Retry
           </button>
         </div>
@@ -160,7 +196,7 @@ export default function SessionInterviewMemoryKickoffCard({
               Allows your agent to predict your responses and raise better interview questions.
             </UncontrolledTooltip>
           </div>
-          <SessionInterviewPrompt prompt={kickoff} />
+          <SessionInterviewPrompt prompt={prompt} />
         </div>
       ) : null}
     </div>

@@ -10,6 +10,56 @@ import {
 const stale = () =>
   new Error('This prefill link was created for an older or different question set. Ask the AI for a fresh link.');
 
+/** The session lets no signed-out visitor list its questions, so a prompt for it needs its person's sign-in. */
+export class InterviewCatalogSignInError extends Error {
+  constructor() {
+    super('This session’s questions need a sign-in. Use Log in at the top of the page, then copy the prompt.');
+    this.name = 'InterviewCatalogSignInError';
+  }
+}
+
+/** The signed-in person's catalog ticket, or '' when they have none. `fresh` skips one the Worker refused. */
+export type InterviewCatalogTicketSource = (request: { fresh: boolean }) => Promise<string>;
+
+const readRefusalReason = async (response: Response): Promise<string> => {
+  try {
+    const body = await response.clone().json();
+    return typeof body?.reason === 'string' ? body.reason : '';
+  } catch {
+    return '';
+  }
+};
+
+// Reads the catalog as the ticket's person when there is one. A held ticket the Worker no longer takes, as
+// after signing out and back in, is swapped for a fresh one once.
+const fetchInterviewCatalog = async (
+  url: URL,
+  {
+    fetchImpl,
+    signal,
+    ticket,
+  }: { fetchImpl: typeof fetch; signal: AbortSignal; ticket?: InterviewCatalogTicketSource },
+) => {
+  const read = async (fresh: boolean) => {
+    const value = ticket ? await ticket({ fresh }) : '';
+    const target = new URL(url);
+    if (value) target.searchParams.set('ticket', value);
+    const response = await fetchImpl(target.toString(), {
+      cache: 'no-store',
+      credentials: 'omit',
+      referrerPolicy: 'no-referrer',
+      signal,
+    });
+    return { response, ticket: value };
+  };
+  const first = await read(false);
+  const refused =
+    first.ticket &&
+    first.response.status === 401 &&
+    (await readRefusalReason(first.response)) === 'catalog_ticket_invalid';
+  return refused ? read(true) : first;
+};
+
 export const resolveInterviewPrefillQuestions = async ({
   packet,
   questions,
@@ -19,6 +69,7 @@ export const resolveInterviewPrefillQuestions = async ({
   fetchImpl = globalThis.fetch,
   signal,
   timeoutMs = 10_000,
+  ticket,
 }: {
   packet: InterviewPrefillPacket;
   questions: InterviewQuestion[];
@@ -28,6 +79,8 @@ export const resolveInterviewPrefillQuestions = async ({
   fetchImpl?: typeof fetch;
   signal?: AbortSignal;
   timeoutMs?: number;
+  /** A signed-in person's AI may have read questions a signed-out visitor can't. */
+  ticket?: InterviewCatalogTicketSource;
 }): Promise<InterviewQuestion[]> => {
   if (signal?.aborted) throw new Error('Catalog validation cancelled.');
   if (packet.sessionSlug.toLowerCase() !== sessionSlug.toLowerCase()) throw stale();
@@ -61,11 +114,7 @@ export const resolveInterviewPrefillQuestions = async ({
         if (!['https:', 'http:'].includes(url.protocol)) throw stale();
         url.searchParams.set('slug', sessionSlug);
         url.searchParams.set('sessionUrl', sessionUrl);
-        const response = await fetchImpl(url.toString(), {
-          cache: 'no-store',
-          credentials: 'omit',
-          signal: controller.signal,
-        });
+        const { response } = await fetchInterviewCatalog(url, { fetchImpl, signal: controller.signal, ticket });
         if (!response.ok) throw stale();
         return response.json();
       })(),
@@ -121,32 +170,39 @@ export const scopeInterviewPrefillToQuestions = (
   };
 };
 
+/** Checks the catalog a kickoff's AI will fetch, as the ticket's person when there is one, and resolves to the
+ *  ticket that worked, or '' without one. */
 export const verifyInterviewKickoffCatalog = async ({
   workerUrl,
   sessionSlug,
   sessionUrl,
   fetchImpl = globalThis.fetch,
+  ticket,
 }: {
   workerUrl: string;
   sessionSlug: string;
   sessionUrl: string;
   fetchImpl?: typeof fetch;
-}): Promise<void> => {
+  ticket?: InterviewCatalogTicketSource;
+}): Promise<string> => {
   const url = new URL(`${workerUrl.replace(/\/+$/, '')}/agent/interview-catalog`);
   url.searchParams.set('slug', sessionSlug);
   url.searchParams.set('sessionUrl', sessionUrl);
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 10_000);
   let catalog: Record<string, unknown>;
+  let usedTicket = '';
+  let signInNeeded = false;
   try {
-    const response = await fetchImpl(url.toString(), {
-      cache: 'no-store',
-      credentials: 'omit',
-      signal: controller.signal,
-    });
-    if (!response.ok) throw new Error('Catalog unavailable');
-    catalog = await response.json();
+    const read = await fetchInterviewCatalog(url, { fetchImpl, signal: controller.signal, ticket });
+    if (!read.response.ok) {
+      signInNeeded = !read.ticket && (await readRefusalReason(read.response)) === 'sign_in_required';
+      throw new Error('Catalog unavailable');
+    }
+    usedTicket = read.ticket;
+    catalog = await read.response.json();
   } catch {
+    if (signInNeeded) throw new InterviewCatalogSignInError();
     throw new Error('Could not check this session’s Worker. Check your connection and try again.');
   } finally {
     clearTimeout(timer);
@@ -162,4 +218,5 @@ export const verifyInterviewKickoffCatalog = async ({
       'This page and the session’s Worker use incompatible interview versions; ask the organizer to update them, then reload.',
     );
   }
+  return usedTicket;
 };

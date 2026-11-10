@@ -8,7 +8,10 @@ import { claimsWorkerCanonicalAuthority } from '../../utilities/session/sessionC
 import { buildGroupRecorderLink, normalizeShareableWorkerOrigin } from './sessionWizardUrlSupport';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { buildExternalInterviewKickoff } from '../SurveyTool/sessionInterview';
-import { verifyInterviewKickoffCatalog } from '../SurveyTool/sessionInterviewCatalogValidation';
+import {
+  InterviewCatalogSignInError,
+  verifyInterviewKickoffCatalog,
+} from '../SurveyTool/sessionInterviewCatalogValidation';
 import styles from './SessionJoinPanel.module.scss';
 
 type Props = {
@@ -57,6 +60,7 @@ export default function SessionJoinPanel({
   const voiceUrl = returnUrl ? `${returnUrl}${pinWorker ? '&' : '?'}mode=voice` : '';
   // One recorder link per breakout room; it keeps the voice link's Worker pin.
   const groupRecorderUrl = isAdmin ? buildGroupRecorderLink(returnUrl) : '';
+  // A prompt copied to share never carries anyone's catalog ticket.
   const kickoff = returnUrl
     ? buildExternalInterviewKickoff({ workerUrl: activeWorker, sessionSlug: slug, sessionUrl: returnUrl })
     : '';
@@ -79,7 +83,12 @@ export default function SessionJoinPanel({
       if (current)
         setValidation({
           key: kickoff,
-          error: error instanceof Error ? error.message : 'Could not check this session.',
+          error:
+            error instanceof InterviewCatalogSignInError
+              ? 'This session’s questions need a sign-in, so each person copies their own prompt from the session page once signed in.'
+              : error instanceof Error
+                ? error.message
+                : 'Could not check this session.',
         });
     });
     return () => {

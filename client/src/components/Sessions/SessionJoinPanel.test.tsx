@@ -2,9 +2,15 @@ import { getCorsProxyUrlOrThrow } from '../../utilities/worker/corsProxy';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import SessionJoinPanel from './SessionJoinPanel';
 import { buildExternalInterviewKickoff } from '../SurveyTool/sessionInterview';
-import { verifyInterviewKickoffCatalog } from '../SurveyTool/sessionInterviewCatalogValidation';
+import {
+  InterviewCatalogSignInError,
+  verifyInterviewKickoffCatalog,
+} from '../SurveyTool/sessionInterviewCatalogValidation';
 
-jest.mock('../SurveyTool/sessionInterviewCatalogValidation', () => ({ verifyInterviewKickoffCatalog: jest.fn() }));
+jest.mock('../SurveyTool/sessionInterviewCatalogValidation', () => ({
+  ...jest.requireActual<object>('../SurveyTool/sessionInterviewCatalogValidation'),
+  verifyInterviewKickoffCatalog: jest.fn(),
+}));
 jest.mock('../../utilities/worker/corsProxy.js', () => ({ getCorsProxyUrlOrThrow: jest.fn() }));
 jest.mock('qrcode.react', () => ({
   QRCodeSVG: ({ value }: { value: string }) => <svg data-testid="qr" data-value={value} />,
@@ -16,7 +22,7 @@ const cleanUrl = 'https://site.example/session/workshop?worker=https%3A%2F%2Fwor
 const writeText = jest.fn().mockResolvedValue(undefined);
 beforeEach(() => {
   jest.clearAllMocks();
-  verify.mockResolvedValue(undefined);
+  verify.mockResolvedValue('');
   Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
 });
 
@@ -53,6 +59,18 @@ it('keeps the prompt unavailable when the catalog is incompatible and supports r
   expect(screen.getByRole('button', { name: 'Copy AI prompt' })).toBeDisabled();
   fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
   await waitFor(() => expect(screen.getByRole('button', { name: 'Copy AI prompt' })).toBeEnabled());
+});
+
+it('says each person copies their own prompt when the session’s questions need a sign-in', async () => {
+  verify.mockRejectedValueOnce(new InterviewCatalogSignInError());
+  render(<SessionJoinPanel sessionUrl={sessionUrl} />);
+  fireEvent.click(screen.getByRole('button', { name: 'Interview & share' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent(
+    'each person copies their own prompt from the session page once signed in',
+  );
+  expect(screen.getByRole('button', { name: 'Copy AI prompt' })).toBeDisabled();
+  // A prompt copied to share is checked, and copied, without anyone's ticket.
+  expect(verify.mock.calls[0][0]).not.toHaveProperty('ticket');
 });
 
 it('offers selectable text if clipboard access fails', async () => {

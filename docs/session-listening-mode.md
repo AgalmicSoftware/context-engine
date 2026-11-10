@@ -283,8 +283,20 @@ The copied prompt tells the AI:
 
 > Search only conversation history, memory, and connected sources already available to you for evidence directly related to its questions; do not seek new access or invent a position.
 
-The catalog includes only questions the Worker can read through the session's
-existing public access checks. The Worker accepts a return URL only when its
+Without a sign-in, the catalog includes only questions the Worker can read
+through the session's existing public access checks. For someone signed in, the
+page first gets a catalog ticket from the Worker and adds it to the copied link
+as `&ticket=…`, so their AI reads the questions that person may see, those shown
+only to their groups included, and the groups they could join and haven't. A
+ticket lasts an hour at most and never past their sign-in; the page renews it
+quietly ten minutes before it ends, and the prompt tells the AI the link is
+private to them. Checking the prompt asks them once to sign in to the session if
+they haven't; declining still offers what a signed-out visitor's AI may read,
+and **Retry** asks again. A session that lets no signed-out visitor list its
+questions says so: signed out, the card asks the person to use **Log in** at the
+top of the page, and the **Interview & share** panel, whose prompt is for
+sharing and never carries a ticket, says each person copies their own prompt
+once signed in. The Worker accepts a return URL only when its
 origin is approved by that session and its `/session/<slug>` path matches. The
 external AI must first display a readable table and the exact single-line JSON
 that will be encoded. Provenance is deliberately coarse: a source

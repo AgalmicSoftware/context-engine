@@ -2,8 +2,10 @@ import { webcrypto } from 'crypto';
 import { __test__interviewQuestionCatalog as workerCatalog } from '../../../../workers/sessionCorsWorker/interviewQuestionCatalog';
 import { hashInterviewQuestions, normalizeInterviewQuestions, type InterviewPrefillPacket } from './sessionInterview';
 import {
+  InterviewCatalogSignInError,
   resolveInterviewPrefillQuestions,
   scopeInterviewPrefillToQuestions,
+  verifyInterviewKickoffCatalog,
 } from './sessionInterviewCatalogValidation';
 
 const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'crypto');
@@ -199,4 +201,74 @@ it('also binds local selection metadata to the current v5 catalog when importing
   expect(await resolveInterviewPrefillQuestions({ ...args, questions: refreshedLocal, fetchImpl })).toEqual(
     currentQuestions,
   );
+});
+
+it('checks an imported prefill against the catalog its AI read, as the signed-in person', async () => {
+  const { args, fetchImpl } = await setup();
+  const ticket = jest.fn(async (_request: { fresh: boolean }) => 'ic1.ticket');
+  expect(await resolveInterviewPrefillQuestions({ ...args, ticket })).toEqual(publicQuestions);
+  const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
+  expect(new URL(url).searchParams.get('ticket')).toBe('ic1.ticket');
+  // The ticket never leaves in a Referer.
+  expect(init).toMatchObject({ credentials: 'omit', referrerPolicy: 'no-referrer' });
+  expect(ticket).toHaveBeenCalledWith({ fresh: false });
+});
+
+describe('verifyInterviewKickoffCatalog', () => {
+  const catalog = {
+    type: 'context-engine.interview-question-catalog',
+    version: 1,
+    sessionSlug: 'demo',
+    prefillPromptVersion: 'ce-interview-brief-v6',
+  };
+  const verify = (fetchImpl: typeof fetch, ticket?: (request: { fresh: boolean }) => Promise<string>) =>
+    verifyInterviewKickoffCatalog({
+      workerUrl: 'https://worker.example.test/',
+      sessionSlug: 'demo',
+      sessionUrl: 'https://client.example.test/session/demo',
+      fetchImpl,
+      ticket,
+    });
+  const refusal = (status: number, reason: string) => new Response(JSON.stringify({ error: 'No', reason }), { status });
+  const ticketIn = (fetchImpl: jest.Mock, call: number) =>
+    new URL(String(fetchImpl.mock.calls[call][0])).searchParams.get('ticket');
+
+  it('resolves to the ticket the catalog took, or none without one', async () => {
+    const fetchImpl = jest.fn(async () => new Response(JSON.stringify(catalog)));
+    await expect(verify(fetchImpl, async () => 'ic1.mine')).resolves.toBe('ic1.mine');
+    expect(ticketIn(fetchImpl, 0)).toBe('ic1.mine');
+    await expect(verify(fetchImpl)).resolves.toBe('');
+    expect(ticketIn(fetchImpl, 1)).toBeNull();
+    // A person whose ticket couldn't be had is checked as a signed-out visitor.
+    await expect(verify(fetchImpl, async () => '')).resolves.toBe('');
+    expect(ticketIn(fetchImpl, 2)).toBeNull();
+  });
+
+  it('swaps a ticket the Worker refused for a fresh one, once', async () => {
+    const fetchImpl = jest
+      .fn()
+      .mockResolvedValueOnce(refusal(401, 'catalog_ticket_invalid'))
+      .mockResolvedValueOnce(new Response(JSON.stringify(catalog)));
+    const ticket = jest.fn(async ({ fresh }: { fresh: boolean }) => (fresh ? 'ic1.fresh' : 'ic1.held'));
+    await expect(verify(fetchImpl, ticket)).resolves.toBe('ic1.fresh');
+    expect(ticket.mock.calls).toEqual([[{ fresh: false }], [{ fresh: true }]]);
+    expect([ticketIn(fetchImpl, 0), ticketIn(fetchImpl, 1)]).toEqual(['ic1.held', 'ic1.fresh']);
+
+    const refusedTwice = jest.fn(async () => refusal(401, 'catalog_ticket_invalid'));
+    await expect(verify(refusedTwice, ticket)).rejects.toThrow('Could not check this session’s Worker');
+    expect(refusedTwice).toHaveBeenCalledTimes(2);
+  });
+
+  it('says a session closed to signed-out visitors needs a sign-in, and only then', async () => {
+    await expect(verify(jest.fn(async () => refusal(401, 'sign_in_required')))).rejects.toBeInstanceOf(
+      InterviewCatalogSignInError,
+    );
+    await expect(verify(jest.fn(async () => refusal(404, 'sign_in_required')))).rejects.toThrow(
+      'Use Log in at the top of the page',
+    );
+    await expect(verify(jest.fn(async () => refusal(503, '')))).rejects.not.toBeInstanceOf(InterviewCatalogSignInError);
+    // With a ticket, the refusal is about the ticket, not a missing sign-in.
+    const withTicket = jest.fn(async () => refusal(404, 'sign_in_required'));
+    await expect(verify(withTicket, async () => 'ic1.mine')).rejects.not.toBeInstanceOf(InterviewCatalogSignInError);
+  });
 });

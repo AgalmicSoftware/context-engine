@@ -50,6 +50,7 @@ import {
   scopeInterviewPrefillToQuestions,
 } from './sessionInterviewCatalogValidation';
 import { useSessionInterviewRecorder } from './useSessionInterviewRecorder';
+import { getInterviewCatalogTicket } from './interviewCatalogTicket';
 import {
   resolveSuggestedQuestionAuthoringState,
   shouldHideSuggestedQuestionSection,
@@ -578,6 +579,21 @@ export default function SessionInterviewPanel({
             loadWorkerUrl: resolveWorkerUrl,
             sessionUrl: buildInterviewReturnSessionUrl(),
             signal: catalogAbortRef.current.signal,
+            // Their AI may have read questions only their sign-in shows; checking never asks them to sign in.
+            ticket: String(account || '').trim()
+              ? async ({ fresh }) =>
+                  getInterviewCatalogTicket({
+                    workerUrl: await resolveWorkerUrl(),
+                    sessionSlug,
+                    sessionConfig,
+                    context: context || { account },
+                    prompt: false,
+                    fresh,
+                  }).then(
+                    (issued) => issued.ticket,
+                    () => '',
+                  )
+              : undefined,
           });
           if (disposedRef.current) return;
           // Validate imported evidence once; later additions must not block continued interviews.
@@ -795,6 +811,7 @@ export default function SessionInterviewPanel({
       account,
       assignHiddenDrafts,
       authenticatedForSubmit,
+      context,
       drafts,
       hasAiPrefill,
       includePredictionComparison,
