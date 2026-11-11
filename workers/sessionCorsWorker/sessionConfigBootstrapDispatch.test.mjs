@@ -257,7 +257,7 @@ test('projectPublicWorkerSessionConfig keeps worker-canonical editable text meta
     defaultGroupTags: 'facilitators,reviewers',
     defaultSbtTags: 'member',
     questionsGenPrompt: 'Ask a worker-owned question',
-    agentInstructions: '# Taking part\n\nJoin the group tagged `ai-agents`.',
+    agentInstructions: '# Taking part\n\nJoin the Reviewers group.',
     defaultFilterState: { sort: 'recent' },
     defaultFeaturedSBTs: ['0x0000000000000000000000000000000000000001'],
     autoFeatureSBTsBySessionSlug: true,
@@ -278,7 +278,7 @@ test('projectPublicWorkerSessionConfig keeps worker-canonical editable text meta
     defaultGroupTags: 'facilitators,reviewers',
     defaultSbtTags: 'member',
     questionsGenPrompt: 'Ask a worker-owned question',
-    agentInstructions: '# Taking part\n\nJoin the group tagged `ai-agents`.',
+    agentInstructions: '# Taking part\n\nJoin the Reviewers group.',
     defaultFilterState: { sort: 'recent' },
     defaultFeaturedSBTs: ['0x0000000000000000000000000000000000000001'],
     autoFeatureSBTsBySessionSlug: true,
@@ -669,7 +669,7 @@ test('dispatchSessionConfigBootstrapRequest rejects missing config, wrong author
 });
 
 test('GET /llms.txt serves the session\'s instructions for AI agents as text that never runs as a page', async () => {
-  const instructions = '# Taking part\n\nJoin the group tagged `ai-agents`.\n\n<script>alert(1)</script>';
+  const instructions = '# Taking part\n\nJoin the Reviewers group.\n\n<script>alert(1)</script>';
   const read = (config, cors = { ok: true, headers: {} }) => dispatchSessionAgentInstructionsRequest({
     request: new Request('https://worker.example/llms.txt'),
     env: {},

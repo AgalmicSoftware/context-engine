@@ -141,7 +141,7 @@ test('results admins save as a checked address list and sign no one out', () => 
 });
 
 test('instructions for AI agents save as text of at most 8,000 characters and sign no one out', () => {
-  const instructions = '# Taking part\n\nJoin the group tagged `ai-agents`.';
+  const instructions = '# Taking part\n\nJoin the Reviewers group.';
   const saved = setConfig({ agentInstructions: instructions });
   assert.equal(saved.ok, true);
   assert.equal(saved.config.agentInstructions, instructions);
@@ -236,7 +236,7 @@ test('the preview matches the authorization epoch the Worker assigns on save', (
       appearance: { colorSchemeId: 'ocean' },
       sessionHeaderImg: 'https://example.com/header.png',
       questionsGenPrompt: 'Ask about parks',
-      agentInstructions: 'Join the group tagged ai-agents.',
+      agentInstructions: 'Join the Reviewers group.',
     }, false],
     [{ interviewMode: { ...stored.interviewMode, openingPrompt: 'Welcome', steeringPrompt: 'Stay on topic' } }, false],
     [{ interviewMode: { ...stored.interviewMode, hiddenDraftShare: 0.5 } }, true],

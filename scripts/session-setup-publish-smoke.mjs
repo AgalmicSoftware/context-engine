@@ -14,7 +14,7 @@ import { DEFAULT_AI_MODELS } from '../shared/aiDefaults.mjs';
 const baseUrl = (process.env.BASE_URL || 'http://127.0.0.1:3000').replace(/\/$/, '');
 assert(['127.0.0.1', 'localhost', '[::1]'].includes(new URL(baseUrl).hostname), 'This smoke requires a local client');
 const workerOrigin = 'https://setup-smoke.example.test';
-const agentInstructions = 'Join the group tagged ai-agents.';
+const agentInstructions = 'Join the Reviewers group.';
 const outputDir = process.env.OUTPUT_DIR || 'artifacts/session-setup-smoke';
 const startedAt = performance.now();
 await mkdir(outputDir, { recursive: true });

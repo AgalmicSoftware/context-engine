@@ -426,7 +426,7 @@ describe('saving the edit page through the Session Worker', () => {
 
   it('saves instructions for AI agents as content, clears them, and refuses more than 8,000 characters', () => {
     const stored = publishedSession();
-    const instructions = '# Taking part\n\nJoin the group tagged `ai-agents`.';
+    const instructions = '# Taking part\n\nJoin the Reviewers group.';
     const { save, result } = editAndSave(stored, (draft) => {
       draft.agentInstructions = `  ${instructions}\n`;
     });

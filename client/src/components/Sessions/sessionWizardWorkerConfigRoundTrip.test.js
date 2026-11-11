@@ -188,11 +188,11 @@ it.each([
         sessionEndsAt: endsAt,
         perWalletPerDay: '100',
         perAnonymousIpPerDay: '5',
-        agentInstructions: ' Join the group tagged ai-agents.\n',
+        agentInstructions: ' Join the Reviewers group.\n',
       }),
     );
     expect(worker.stored.sessionEndsAt).toBe(endsAt);
-    expect(worker.stored.agentInstructions).toBe('Join the group tagged ai-agents.');
+    expect(worker.stored.agentInstructions).toBe('Join the Reviewers group.');
     expect(worker.stored.limits).toEqual({ perWalletPerDay: 100, perAnonymousIpPerDay: 5 });
 
     const edited = buildWizardConfig({ sessionEndsAt: '', perWalletPerDay: '100', perAnonymousIpPerDay: '' });

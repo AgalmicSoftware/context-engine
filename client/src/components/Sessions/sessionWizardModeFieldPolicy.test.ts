@@ -43,7 +43,7 @@ describe('sessionWizardModeFieldPolicy', () => {
     );
     const payload = {
       sessionEndsAt: '2099-01-02T03:04:00Z',
-      agentInstructions: 'Join the group tagged ai-agents.',
+      agentInstructions: 'Join the Reviewers group.',
       defaultGroupTags: 'worker-only-group-defaults',
       encryptedFields: {
         sessionEndsAt: { ciphertext: 'stale-session-end' },
