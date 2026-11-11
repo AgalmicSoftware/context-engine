@@ -38,6 +38,10 @@ const WorkerParticipation = (props: SetupSectionProps) => <SetupParticipationSec
 const ChainParticipation = (props: SetupSectionProps) => <SetupParticipationSection {...props} workerHosted={false} />;
 
 describe('setup content sections', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
   it('takes instructions for AI agents on Worker-hosted sessions, saying they add to the site’s guide and are public', () => {
     const { unmount } = render(<Harness Section={WorkerParticipation} initial={{ interviewModeEnabled: false }} />);
     const field = screen.getByLabelText('Instructions for AI agents');
@@ -79,6 +83,50 @@ describe('setup content sections', () => {
     choose('x'.repeat(8001), 'long.md', 'text/markdown');
     expect(await screen.findByRole('alert')).toHaveTextContent('The file is longer than 8,000 characters.');
     expect(latest.agentInstructions).toBe('Focus on the budget questions.');
+
+    // 8,001 characters as saved, and 8,000 once its CRLF is one line break, as in the box.
+    choose(`${'x'.repeat(3999)}\r\n${'x'.repeat(4000)}`, 'windows.txt', 'text/plain');
+    await waitFor(() => expect(latest.agentInstructions).toBe(`${'x'.repeat(3999)}\n${'x'.repeat(4000)}`));
+  });
+
+  it.each([
+    ['in another encoding', [0x63, 0x61, 0x66, 0xe9]],
+    ['binary', [0x50, 0x4b, 0x00, 0x03]],
+  ])('refuses an instructions file %s and keeps the box as it was', async (_label, bytes) => {
+    render(
+      <Harness Section={WorkerParticipation} initial={{ interviewModeEnabled: false, agentInstructions: 'Earlier' }} />,
+    );
+    fireEvent.change(screen.getByLabelText('Instructions file'), {
+      target: { files: [new File([new Uint8Array(bytes)], 'agents.txt', { type: 'text/plain' })] },
+    });
+    expect(await screen.findByRole('alert')).toHaveTextContent('This file isn’t plain text saved as UTF-8.');
+    expect(latest.agentInstructions).toBe('Earlier');
+  });
+
+  it('refuses an oversized or unreadable instructions file, and clears the picker after each try', async () => {
+    const reads = jest.spyOn(FileReader.prototype, 'readAsText');
+    render(
+      <Harness Section={WorkerParticipation} initial={{ interviewModeEnabled: false, agentInstructions: 'Earlier' }} />,
+    );
+    const picker = screen.getByLabelText('Instructions file');
+    // A cleared picker fires again when the same file is chosen.
+    const clears = jest.fn();
+    Object.defineProperty(picker, 'value', { configurable: true, get: () => '', set: clears });
+    const choose = (file: File) => fireEvent.change(picker, { target: { files: [file] } });
+
+    // No character takes more than 4 bytes, so a larger file is refused unread.
+    choose(new File(['x'.repeat(32001)], 'huge.md', { type: 'text/markdown' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('The file is longer than 8,000 characters.');
+    expect(reads).not.toHaveBeenCalled();
+    await waitFor(() => expect(clears).toHaveBeenCalledWith(''));
+
+    reads.mockImplementationOnce(function (this: FileReader) {
+      this.onerror?.call(this, new ProgressEvent('error') as ProgressEvent<FileReader>);
+    });
+    choose(new File(['Join the Reviewers group.'], 'agents.md', { type: 'text/markdown' }));
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('This file couldn’t be read.'));
+    await waitFor(() => expect(clears).toHaveBeenCalledTimes(2));
+    expect(latest.agentInstructions).toBe('Earlier');
   });
 
   it('edits the context title, paragraphs and https links, and asks for files again', () => {

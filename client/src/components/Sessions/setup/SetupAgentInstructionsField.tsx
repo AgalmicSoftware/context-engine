@@ -10,6 +10,7 @@ const HELP =
   'Optional Markdown that AI agents read before taking part, such as which group to join or what to focus on. It adds to the site’s guide for agents. Anyone can read it without signing in, at the Session Worker’s /session-config and /llms.txt, so put nothing private in it.';
 const FILE_HELP = `A .md or .txt file of up to ${MAX_CHARS} characters. Its text replaces the instructions above, where you can edit it.`;
 const TOO_LONG = `The file is longer than ${MAX_CHARS} characters.`;
+const NOT_TEXT = 'This file isn’t plain text saved as UTF-8.';
 
 // FileReader, as the client's other uploads use.
 const readFileText = (file: File) =>
@@ -43,11 +44,18 @@ const SetupAgentInstructionsField = ({ value, onChange }: Props): React.ReactEle
       setError('This file couldn’t be read.');
       return;
     }
-    if (loaded.length > MAX_AGENT_INSTRUCTIONS_CHARS) {
+    // One line break each, as in the box, so CRLF files aren't counted double.
+    const text = loaded.replace(/\r\n?/g, '\n');
+    // Reading as UTF-8 turns other encodings into U+FFFD; binary files hold NULs.
+    if (text.includes('\uFFFD') || text.includes('\u0000')) {
+      setError(NOT_TEXT);
+      return;
+    }
+    if (text.length > MAX_AGENT_INSTRUCTIONS_CHARS) {
       setError(TOO_LONG);
       return;
     }
-    onChange(loaded);
+    onChange(text);
   };
   return (
     <>
