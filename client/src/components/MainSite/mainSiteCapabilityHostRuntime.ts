@@ -1,8 +1,6 @@
 import { getDemoSessionConfigBySlug, normalizeSessionSlug } from '../../domains/sessions/sessionConfig.js';
-import { getPrimaryDemoSessionSlug } from '../../utilities/session/demoSessionSlugs.js';
 import type { MainSiteSessionConfigLike } from '../../utilities/session/mainSiteSessionConfig.js';
 import { resolveSessionCapabilityProjection } from '../../utilities/session/sessionCapabilityProjection';
-import { isBrowserOriginAllowedBySessionWorkerConfig } from '../../utilities/session/sessionWorkerCorsPolicy';
 import { getChainById } from '../../variables/chains.js';
 import type { SessionConfigLike } from '../shellTypes';
 import type { AppShell } from './AppShell';
@@ -11,7 +9,6 @@ import { mergeMainSiteSessionDisplayConfig } from './routeSessionResolution.js';
 import { getWorkerCanonicalRouteController } from './workerCanonicalRouteController.js';
 
 type LogError = (message: string, error: unknown) => void;
-type LogWarning = (message: string, details: Record<string, unknown>) => void;
 
 export const resolveMainSiteDisplaySessionConfig = (
   host: AppShell,
@@ -120,46 +117,4 @@ export const initializeMainSiteWorkerCanonicalCachesForGroup = async (
     }
   }
   return true;
-};
-
-export const preloadMainSiteAboutDemoSessionData = (
-  host: AppShell,
-  pathIn: unknown,
-  logWarning: LogWarning,
-): Promise<void> | null => {
-  if (!host.isAboutRoutePath(pathIn)) return null;
-
-  const slug = normalizeSessionSlug(getPrimaryDemoSessionSlug());
-  if (!slug) return null;
-  const sessionConfig = host.getDisplaySessionCfg(slug);
-  if (!isBrowserOriginAllowedBySessionWorkerConfig(sessionConfig)) return null;
-  if (host._aboutDemoSessionPreloadSlug === slug && host._aboutDemoSessionPreloadPromise) {
-    return host._aboutDemoSessionPreloadPromise;
-  }
-
-  const run = (async () => {
-    const projection = resolveSessionCapabilityProjection(sessionConfig);
-    const preloadTasks: Array<Promise<unknown>> = [
-      host.initializeQuestionCacheForGroup(slug, { background: true }),
-      host.initializeSurveyCacheForGroup(slug, { background: true }),
-    ];
-    if (projection.isRegistryCanonical || projection.usesOnChainSbt) {
-      preloadTasks.push(host.initializeSbtCacheForGroup(slug, { mode: 'partial', background: true }));
-    }
-    const results = await Promise.allSettled(preloadTasks);
-    const firstRejected = results.find((result) => result.status === 'rejected');
-    if (firstRejected?.status === 'rejected') throw firstRejected.reason;
-  })()
-    .catch((error: unknown) => {
-      logWarning('[About] Demo session preload failed', { slug, error });
-    })
-    .finally(() => {
-      if (host._aboutDemoSessionPreloadPromise === run) {
-        host._aboutDemoSessionPreloadPromise = null;
-      }
-    });
-
-  host._aboutDemoSessionPreloadSlug = slug;
-  host._aboutDemoSessionPreloadPromise = run;
-  return run;
 };

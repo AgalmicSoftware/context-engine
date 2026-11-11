@@ -2964,7 +2964,9 @@ describe('AppShell route render smoke', () => {
     subject.componentWillUnmount();
   });
 
-  it('preloads primary demo metadata without fetching responses when the about page mounts', async () => {
+  it('warms no session caches in the background on About', async () => {
+    // About's Demo button opens its own listed session, so About warms no
+    // session's caches, though demo-sh here would be a reachable Worker session.
     const demoConfig = buildSessionConfig({
       slug: 'demo-sh',
       sessionName: 'Demo Session',
@@ -3010,13 +3012,21 @@ describe('AppShell route render smoke', () => {
     await act(async () => {
       await subject.componentDidMount();
     });
+    subject.componentDidUpdate({ ...subject.props, path: '/' }, subject.state);
 
-    expect(subject.getDisplaySessionNetwork).not.toHaveBeenCalledWith('demo-sh');
-    expect(subject.initializeQuestionCacheForGroup).toHaveBeenCalledWith('demo-sh', { background: true });
-    expect(subject.fetchQuestionResponsesChunkedForGroup).not.toHaveBeenCalled();
-    expect(subject.initializeSurveyCacheForGroup).toHaveBeenCalledWith('demo-sh', { background: true });
-    expect(subject.initializeSbtCacheForGroup).not.toHaveBeenCalled();
-    expect(subject.initializeWorkerCanonicalCachesForGroup).not.toHaveBeenCalled();
+    for (const load of [
+      'initializeQuestionCacheForGroup',
+      'fetchQuestionResponsesChunkedForGroup',
+      'initializeSurveyCacheForGroup',
+      'initializeSbtCacheForGroup',
+      'initializeWorkerCanonicalCachesForGroup',
+      'initializeQuestionCache',
+      'initializeSbtCache',
+      'fetchQuestionResponsesChunked',
+      'initializeSurveyCache',
+    ]) {
+      expect(subject[load]).not.toHaveBeenCalled();
+    }
 
     subject.componentWillUnmount();
   });
@@ -3034,7 +3044,6 @@ describe('AppShell route render smoke', () => {
         sessionConfig: workerConfig,
       }),
     );
-    subject.preloadAboutDemoSessionData = jest.fn(() => null);
     subject.initializeWorkerCanonicalCachesForGroup = jest.fn(async () => true);
 
     await act(async () => {
@@ -3076,23 +3085,6 @@ describe('AppShell route render smoke', () => {
 
     expect(subject.initializeWorkerCanonicalCachesForGroup).not.toHaveBeenCalled();
     subject.componentWillUnmount();
-  });
-
-  it('skips about-page Worker preloads when the browser origin is not allowed', () => {
-    const demoConfig = buildSessionConfig({
-      slug: 'demo-sh',
-      allowOrigins: ['https://contextengine.sh'],
-      __registry: undefined,
-      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
-    });
-    const subject = createSubject({ path: '/about', activeSessionSlug: '', sessionConfig: null });
-    getDemoSessionConfigBySlug.mockImplementation((slug) => (slug === 'demo-sh' ? demoConfig : null));
-    subject.initializeQuestionCacheForGroup = jest.fn(async () => undefined);
-    subject.initializeSurveyCacheForGroup = jest.fn(async () => undefined);
-
-    expect(subject.preloadAboutDemoSessionData('/about')).toBeNull();
-    expect(subject.initializeQuestionCacheForGroup).not.toHaveBeenCalled();
-    expect(subject.initializeSurveyCacheForGroup).not.toHaveBeenCalled();
   });
 
   it('preserves session question-results subroutes and forwards route-open flags to OnePageSession', async () => {
@@ -5027,7 +5019,6 @@ describe('AppShell live pathname updates', () => {
         'refreshSessionInfo',
         'refreshSessionMetaFields',
         'handleDeepLinkScan',
-        'preloadAboutDemoSessionData',
         'checkAllCachesReady',
         'removeSbtRealtimeListenersForGroup',
       ])
