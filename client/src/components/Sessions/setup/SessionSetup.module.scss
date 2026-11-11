@@ -336,20 +336,6 @@ a.button {
   min-height: 96px;
 }
 
-// The browser paints a file input's button itself, and in dark themes its hover
-// shade is too light for the label; keep the theme's control colours throughout.
-.fileInput::file-selector-button {
-  margin-right: 8px;
-  padding: 1px 8px;
-  border-color: var(--ce-border-raised);
-  border-radius: var(--ce-radius-4);
-  border-style: solid;
-  border-width: var(--ce-border-control-width);
-  background: var(--ce-control-face);
-  color: var(--ce-control-text);
-  cursor: pointer;
-}
-
 // A heading inside a section; global heading colors would otherwise win.
 .subheading {
   color: inherit;

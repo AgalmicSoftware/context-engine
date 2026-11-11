@@ -33,6 +33,7 @@ All notable changes to this project will be documented in this file.
 - Switching networks and back no longer leaves the passkey wallet looking unlocked without its key, where a transaction then failed as if it might already have been sent. It asks for the passkey instead.
 - Answers submitted right after signing in, as when you sign in to submit an interview, keep their question's type and text. Sent while the questions reloaded, they were saved as free text with no question. The pile no longer stays empty after that submit, and the interview's drafts and score show the questions instead of their IDs.
 - On a session with no questions yet, the page settles on **No questions available.** after its usual 20-second check. It could show **Loading...** forever: when the page's question cache finished starting up after the questions were first read, or when a request had been rate-limited in the two minutes before.
+- Every file picker's button now uses the theme's control colours, at rest, pointed at and pressed. In the Context Engine theme the browser's own button had left its label at 3.95:1 when pointed at, and the chosen file's name was below 2.3:1 in admin **Backup & restore** and the **Session Doc Library**.
 
 ### Workers — requires redeployment
 

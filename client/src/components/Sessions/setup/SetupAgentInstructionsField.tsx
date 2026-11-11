@@ -75,7 +75,6 @@ const SetupAgentInstructionsField = ({ value, onChange }: Props): React.ReactEle
         <Input
           id="ce-setup-agent-instructions-file"
           type="file"
-          className={styles.fileInput}
           accept=".md,.txt,text/markdown,text/plain"
           aria-describedby={setupHelpId('ce-setup-agent-instructions-file')}
           data-testid="ce-setup-agent-instructions-file"

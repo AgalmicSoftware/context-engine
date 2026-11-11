@@ -336,6 +336,29 @@ describe('bundled app-theme contrast', () => {
     ).toEqual([]);
   });
 
+  // Unstyled, the browser paints a file input's button, and Context Engine's hover shade left its label at 3.95:1.
+  // The file name was 1.93:1 on a dark panel in the document text the theme gives other fields.
+  test.each(registry.themes.map(({ id }) => id))('%s keeps native file inputs readable', (themeId) => {
+    const values = themeValues(css, themeId);
+    const paint = painter(values);
+    const rule = (selector: string) => moduleRule(css, `:root[data-ce-theme] ${selector}`);
+    const field = composite(
+      parseColor(values['input-bg']),
+      composite(parseColor(values.surface), parseColor(values.canvas)),
+    );
+    const ratio = (color: string, fill: Rgba) => Number(contrastRatio(composite(paint(color), fill), fill).toFixed(2));
+    const resting = rule('::file-selector-button');
+    const pressed = { ...resting, ...rule('input:not(:disabled)::file-selector-button:active') };
+    // A field's own text fill, such as the setup page's, would otherwise paint the label.
+    expect(resting['-webkit-text-fill-color']).toBe('currentColor');
+    const ratios = [
+      ['label', ratio(resting.color, composite(paint(resting.background), field))],
+      ['pressed label', ratio(pressed.color, composite(paint(pressed.background), field))],
+      ['file name', ratio(rule('input[type=file]').color, field)],
+    ] as const;
+    expect(ratios.filter(([, value]) => value < 4.5)).toEqual([]);
+  });
+
   // Every pairing below paints over the global `.btn` rules, so each fill has to be !important in every state.
   const stateSelectors = (button: string) =>
     ['', ':hover', ':focus', ':active', ':active:hover'].map((state) => `${button}${state}`);
