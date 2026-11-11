@@ -48,7 +48,7 @@ const explainFailure = (status, error, path) => {
   return detail || `Worker request failed (${status}).`;
 };
 
-const readLimitedText = async (response, maxBytes = MAX_RESPONSE_BYTES) => {
+export const readLimitedText = async (response, maxBytes = MAX_RESPONSE_BYTES) => {
   const declared = Number(response.headers?.get?.('content-length'));
   if (Number.isFinite(declared) && declared > maxBytes) throw new WorkerRequestError('The Worker response is too large.');
   if (!response.body?.getReader) {
@@ -135,8 +135,11 @@ export const resolveLoginOrigin = (config, trustedOrigins) => {
   return origin;
 };
 
-export const createWorkerClient = ({ workerOrigin, slug, trustedOrigins, wallet, fetchImpl = globalThis.fetch, now = () => Date.now(), registryConfigLoader }) => {
-  let sessionId = '';
+export const createWorkerClient = ({
+  workerOrigin, slug, trustedOrigins, wallet, fetchImpl = globalThis.fetch, now = () => Date.now(), registryConfigLoader, sessionId: joinedSessionId = '',
+}) => {
+  // The session this client answers for: the one the agent joined, or else the first config it loads.
+  let sessionId = joinedSessionId;
   let config = null;
   let configLoadedAt = 0;
   let loginOrigin = '';
@@ -145,8 +148,11 @@ export const createWorkerClient = ({ workerOrigin, slug, trustedOrigins, wallet,
   let pendingLogin = null;
   let presence = null;
   let presenceLoadedAt = -Infinity;
+  let features = null;
+  let featuresLoadedAt = -Infinity;
 
-  const request = async (path, { method = 'GET', headers = {}, body, auth = false, retried = false, maxBytes = MAX_RESPONSE_BYTES, signal } = {}) => {
+  // `body` is sent as JSON; `form`, a FormData, as multipart.
+  const request = async (path, { method = 'GET', headers = {}, body, form, auth = false, retried = false, maxBytes = MAX_RESPONSE_BYTES, signal } = {}) => {
     const checkpoint = () => { if (signal?.aborted) throw new Error('Stopped before the Worker request was sent.'); };
     checkpoint();
     if (auth) await ensureToken();
@@ -162,7 +168,7 @@ export const createWorkerClient = ({ workerOrigin, slug, trustedOrigins, wallet,
           ...(auth ? { Authorization: `Bearer ${token}`, 'X-Group-Slug': slug } : {}),
           ...headers,
         },
-        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+        ...(form ? { body: form } : body === undefined ? {} : { body: JSON.stringify(body) }),
         signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       });
     } catch (error) {
@@ -181,7 +187,7 @@ export const createWorkerClient = ({ workerOrigin, slug, trustedOrigins, wallet,
     const error = isRecord(data) ? text(data.error) || text(data.message) : '';
     if (response.status === 401 && auth && !retried && (!error || TOKEN_ERROR_RE.test(error))) {
       token = '';
-      return request(path, { method, headers, body, auth, retried: true, maxBytes, signal });
+      return request(path, { method, headers, body, form, auth, retried: true, maxBytes, signal });
     }
     if (response.status === 401 && error && !TOKEN_ERROR_RE.test(error)) {
       throw new WorkerRequestError(error.slice(0, MAX_ERROR_DETAIL), { status: 401, code: error });
@@ -325,7 +331,39 @@ export const createWorkerClient = ({ workerOrigin, slug, trustedOrigins, wallet,
     return isRecord(result?.storageRef) ? result.storageRef : { id: text(result?.id) };
   };
 
+  /** Stores a context file (multipart: the file, its resource, tags and access rule). */
+  const uploadForm = async (form, { signal } = {}) => {
+    const result = await request('/storage/upload', { signal, method: 'POST', auth: true, form });
+    return isRecord(result?.storageRef) ? result.storageRef : { id: text(result?.id) };
+  };
+
+  const contextAction = (body, { signal } = {}) => request('/storage/context', { method: 'POST', auth: true, signal, body });
+
   const joinGroup = (groupId, { signal } = {}) => request('/groups/join', { method: 'POST', auth: true, signal, body: { sessionId, groupId } });
+  const leaveGroup = (groupId, { signal } = {}) => request('/groups/leave', { method: 'POST', auth: true, signal, body: { sessionId, groupId } });
+
+  /** The groups this agent may see, with their member counts. */
+  const listGroups = async () => {
+    const data = await request(`/groups/list?sessionId=${encodeURIComponent(sessionId)}`, { auth: true });
+    return Array.isArray(data?.groups) ? data.groups.filter(isRecord) : [];
+  };
+
+  /** This agent's memberships: { group, member, memberCount } each. */
+  const listMyMemberships = async () => {
+    const data = await request(`/groups/my-memberships?sessionId=${encodeURIComponent(sessionId)}`, { auth: true });
+    return Array.isArray(data?.memberships) ? data.memberships.filter(isRecord) : [];
+  };
+
+  /** What the Worker says it supports, or null when it can't be read. */
+  const readFeatures = async () => {
+    if (now() - featuresLoadedAt >= CONFIG_MAX_AGE_MS) {
+      features = await request('/capabilities')
+        .then((data) => (Array.isArray(data?.features) ? data.features.map(text).filter(Boolean) : null))
+        .catch(() => null);
+      featuresLoadedAt = now();
+    }
+    return features;
+  };
 
   const describeTestEth = async () => {
     await refreshConfig();
@@ -349,7 +387,13 @@ export const createWorkerClient = ({ workerOrigin, slug, trustedOrigins, wallet,
     listAll,
     read,
     upload,
+    uploadForm,
+    contextAction,
     joinGroup,
+    leaveGroup,
+    listGroups,
+    listMyMemberships,
+    readFeatures,
     request,
     get config() {
       return config;

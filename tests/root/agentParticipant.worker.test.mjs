@@ -6,6 +6,7 @@ import path from 'node:path';
 import { ethers } from 'ethers';
 import sessionCorsWorker from '../../workers/sessionCorsWorker/worker.js';
 import { installSessionCoordinatorBinding } from '../helpers/sessionCorsWorkerTestUtils.mjs';
+import { loadParticipantContextSources } from '../../workers/sessionCorsWorker/contextSourceLoader.js';
 import { createParticipant } from '../../mcp/lib/participant.mjs';
 import { createWorkerClient } from '../../mcp/lib/workerClient.mjs';
 
@@ -635,24 +636,42 @@ test('malformed question fields from another participant cannot break listing, r
   assert.equal(answered.submitted + answered.failed, 3);
 });
 
-test('a session that changes identity behind the same link does not reuse remembered answers', async () => {
-  const env = createEnv([sessionConfig()]);
-  const { participant } = await createAgent(env, 'mover', []);
-  await participant.joinSession({ link: LINK });
-  const { questionId } = await participant.addStatement({ prompt: 'Same words, new session.' });
-  await participant.answer({ answers: [{ questionId, value: 'Agree' }] });
-  // The Worker is reset and now serves a different session under the same slug.
+// The Worker is reset and now serves a different session under the same slug.
+const serveAnotherSession = (env) => {
   const fresh = createEnv([sessionConfig({ sessionId: '0xffeeddccbbaa99887766554433221100' })]);
   env.CE_SESSION_COORDINATOR = fresh.CE_SESSION_COORDINATOR;
   for (const kv of ['GROUP_KV', 'CE_STORAGE_INDEX_KV']) {
     env[kv].store.clear();
     for (const [key, value] of fresh[kv].store) env[kv].store.set(key, value);
   }
+};
+
+test('a session that changes identity behind the same link does not reuse remembered answers', async () => {
+  const env = createEnv([sessionConfig()]);
+  const { participant } = await createAgent(env, 'mover', []);
+  await participant.joinSession({ link: LINK });
+  const { questionId } = await participant.addStatement({ prompt: 'Same words, new session.' });
+  await participant.answer({ answers: [{ questionId, value: 'Agree' }] });
+  serveAnotherSession(env);
   await participant.joinSession({ link: LINK });
   const again = await participant.addStatement({ prompt: 'Same words, new session.' });
   assert.equal(again.created, true);
   const listed = await participant.listQuestions({ filter: 'all' });
   assert.equal(listed.answeredByMe, 0);
+});
+
+test('an agent restarted after its session changed identity is asked to join again', async (t) => {
+  const env = createEnv([sessionConfig()]);
+  const first = await createAgent(env, 'mover', []);
+  t.after(() => fs.rm(first.stateDir, { recursive: true, force: true }));
+  await first.participant.joinSession({ link: LINK });
+  serveAnotherSession(env);
+  const restarted = await createAgent(env, 'mover', [], null, { wallet: first.wallet, stateDir: first.stateDir });
+  for (const session of [undefined, SLUG, LINK]) {
+    await assert.rejects(restarted.participant.getSession({ session }), /The session behind this link changed identity; join it again\./);
+  }
+  await restarted.participant.joinSession({ link: LINK });
+  assert.equal((await restarted.participant.getSession()).session, SLUG);
 });
 
 test('a stopped answer call sends nothing', async () => {
@@ -858,4 +877,417 @@ test('cancellation while persisting an answer retry key prevents its upload', as
   assert.equal(result.submitted, 0);
   assert.match(result.results[0].error, /Stopped/);
   assert.equal(seen.filter(call => new URL(call.url).pathname === '/storage/upload').length, uploadsBefore);
+});
+
+// Normal links, context, groups and the session's own instructions.
+
+const SITE = 'https://contextengine.sh';
+const NORMAL_LINK = `${SITE}/session/${SLUG}`;
+const LIST_URL = `${SITE}/known-sessions.json`;
+
+// The agent's network: the site's /known-sessions.json from `list`, the Worker for the rest.
+const siteFetch = (env, list, seen = []) => {
+  const worker = workerFetch(env, seen);
+  return async (url, init = {}) => {
+    if (new URL(url).origin !== SITE) return worker(url, init);
+    seen.push({ url: String(url), method: init.method || 'GET', origin: '' });
+    return list(url, init);
+  };
+};
+const listing = (entries) => async (url) =>
+  new URL(url).pathname === '/known-sessions.json' ? Response.json(entries) : new Response('Not found', { status: 404 });
+
+// A session where anyone signed in may start a group, so no admin signature is needed.
+const groupSessionConfig = (overrides = {}) => ({
+  ...sessionConfig(),
+  workerGroupsBootstrap: { version: 2, state: 'fresh_empty', bootstrapId: 'b0'.repeat(32) },
+  groupCreationPolicy: 'participants',
+  ...overrides,
+});
+// Another participant, who starts groups as the session page would.
+const groupHost = (env) =>
+  createWorkerClient({ workerOrigin: WORKER_ORIGIN, slug: SLUG, trustedOrigins: [SITE], wallet: ethers.Wallet.createRandom(), fetchImpl: workerFetch(env) });
+const createGroup = async (host, group) =>
+  (await host.request('/groups/create', { method: 'POST', auth: true, body: { sessionId: SESSION_ID, group } })).group;
+
+test('a normal link reaches the Worker its site lists, only when that Worker serves the listed session', async (t) => {
+  const env = createEnv([sessionConfig()]);
+  const agent = async (...args) => {
+    const made = await createAgent(...args);
+    t.after(() => fs.rm(made.stateDir, { recursive: true, force: true }));
+    return made;
+  };
+  const seen = [];
+  const listed = listing({ [SLUG]: { worker: WORKER_ORIGIN, sessionId: SESSION_ID, name: 'Town Hall' } });
+  const { participant } = await agent(env, 'Test Kami', seen, siteFetch(env, listed, seen));
+  const joined = await participant.joinSession({ link: NORMAL_LINK });
+  assert.equal(joined.signedIn, true);
+  assert.equal(joined.session, SLUG);
+  // The same link later means the same session, from the list read a moment ago.
+  assert.equal((await participant.getSession({ session: NORMAL_LINK })).session, SLUG);
+  assert.equal(seen.filter((call) => call.url === LIST_URL).length, 1);
+
+  // A listed Worker serving another session is refused before any sign-in.
+  const other = [];
+  const wrongId = listing({ [SLUG]: { worker: WORKER_ORIGIN, sessionId: '0xffeeddccbbaa99887766554433221100' } });
+  const mismatched = await agent(env, 'Test Kami', other, siteFetch(env, wrongId, other));
+  await assert.rejects(mismatched.participant.joinSession({ link: NORMAL_LINK }), /answers for a different session, so it was not joined/);
+  assert.equal(other.some((call) => call.url.includes('/auth/')), false);
+  assert.deepEqual((await mismatched.participant.whoami()).sessions, []);
+
+  // A list that can't be read is reported, not taken for an on-chain session.
+  const torn = async () => new Response('{"town-hall":', { headers: { 'content-type': 'application/json' } });
+  const broken = await agent(env, 'Test Kami', [], siteFetch(env, torn));
+  await assert.rejects(broken.participant.joinSession({ link: NORMAL_LINK }), /known-sessions\.json could not be read \(the list is not valid JSON\)\..*worker=/s);
+
+  // A worker= in the link still wins, and no list is read.
+  const pinned = [];
+  const explicit = await agent(env, 'Test Kami', pinned, siteFetch(env, listed, pinned));
+  assert.equal((await explicit.participant.joinSession({ link: LINK })).signedIn, true);
+  assert.equal(pinned.some((call) => call.url === LIST_URL), false);
+});
+
+// What a second participant's context list shows: each item's name, kind, adder and agent mark.
+const contextList = async (env) => {
+  const reader = groupHost(env);
+  const data = await reader.request('/storage/list?resource=docsContext&role=context&limit=100', { auth: true });
+  const tag = (item, name) => item.metadata.tags.find((entry) => entry.name === name)?.value || '';
+  return data.items
+    .filter((item) => item.metadata?.contextSource === true)
+    .map((item) => ({
+      name: tag(item, 'CE-DocName'),
+      kind: tag(item, 'CE-DocKind'),
+      addedBy: item.metadata.addedBy,
+      adder: [tag(item, 'CE-AdderKind'), tag(item, 'CE-AdderName')],
+      adminsOnly: item.metadata.adminsOnly,
+    }))
+    .sort((left, right) => left.name.localeCompare(right.name));
+};
+
+test('an agent adds a file, a link and a note that everyone sees as its own, and the session’s AI reads', async (t) => {
+  const env = createEnv([sessionConfig()]);
+  // A control character in the agent's name is cleaned alike for files, links and notes.
+  const kami = await createAgent(env, 'Test\u0007Kami', []);
+  t.after(() => fs.rm(kami.stateDir, { recursive: true, force: true }));
+  const joined = await kami.participant.joinSession({ link: LINK });
+  assert.equal(joined.addingContext.invitation, 'You’re invited to add context to this session: a file, a link or text. Everyone in the session will see it.');
+  assert.deepEqual(Object.keys(joined.addingContext.limits), ['file', 'url', 'text']);
+  assert.deepEqual((await kami.participant.getSession()).addingContext, joined.addingContext);
+
+  const notes = path.join(kami.stateDir, '..', `kami-notes-${process.pid}.md`);
+  await fs.writeFile(notes, '# Notes\n\nResidents asked for evening sessions.');
+  t.after(() => fs.rm(notes, { force: true }));
+  const file = await kami.participant.addContext({ file: notes });
+  assert.deepEqual({ added: file.added, name: file.name, visibleTo: file.visibleTo }, { added: 'file', name: path.basename(notes), visibleTo: 'everyone in the session' });
+
+  t.mock.method(globalThis, 'fetch', async (url) => {
+    assert.equal(String(url), 'https://example.org/essay');
+    return new Response('<html><title>Essay</title><body><p>What neighbours owe each other.</p></body></html>', {
+      headers: { 'content-type': 'text/html; charset=utf-8' },
+    });
+  });
+  const link = await kami.participant.addContext({ url: 'https://example.org/essay' });
+  assert.deepEqual({ added: link.added, title: link.title }, { added: 'link', title: 'Essay' });
+  const note = await kami.participant.addContext({ text: 'Agents should say whose agent they are.', title: 'On names' });
+  assert.equal(note.name, 'On names.md');
+
+  const kamiAddress = kami.wallet.address.toLowerCase();
+  assert.deepEqual(await contextList(env), [
+    { name: 'Essay', kind: 'link', addedBy: kamiAddress, adder: ['agent', 'Test Kami'], adminsOnly: false },
+    { name: path.basename(notes), kind: 'file', addedBy: kamiAddress, adder: ['agent', 'Test Kami'], adminsOnly: false },
+    { name: 'On names.md', kind: 'file', addedBy: kamiAddress, adder: ['agent', 'Test Kami'], adminsOnly: false },
+  ]);
+  const forAi = await loadParticipantContextSources({ env, slug: SLUG, config: sessionConfig() });
+  assert.deepEqual(Object.fromEntries(forAi.map(({ title, text }) => [title, text])), {
+    Essay: 'Essay What neighbours owe each other.',
+    [path.basename(notes)]: '# Notes\n\nResidents asked for evening sessions.',
+    'On names.md': 'Agents should say whose agent they are.',
+  });
+
+  // Admins only: stored for them alone, and left out of what the AI reads for everyone.
+  const hidden = await kami.participant.addContext({ text: 'For the hosts.', adminsOnly: true });
+  assert.equal(hidden.visibleTo, 'the session’s admins');
+  assert.equal((await loadParticipantContextSources({ env, slug: SLUG, config: sessionConfig() })).length, 3);
+});
+
+// The agent's view of a session from before an admin's change, which the Worker already has.
+const staleView = (env, before, seen = []) => {
+  const worker = workerFetch(env, seen);
+  return async (url, init = {}) => {
+    const response = await worker(url, init);
+    if (new URL(url).pathname !== '/session-config') return response;
+    const body = await response.json();
+    return Response.json({ ...body, config: before(body.config) });
+  };
+};
+
+test('an agent is told why a session takes no context, and nothing is added', async (t) => {
+  const limited = { ...sessionConfig(), contextAdditionPolicy: 'admin_only' };
+  const ended = { ...sessionConfig(), sessionEndsAt: '2020-01-01T00:00:00.000Z' };
+  const cases = [
+    [limited, /^Error: This session limits context to its admins, so nothing was added\.$/, ({ contextAdditionPolicy, ...config }) => config],
+    [ended, /^Error: This session has ended, so it takes no more context\.$/, ({ sessionEndsAt, ...config }) => config],
+  ];
+  t.mock.method(globalThis, 'fetch', async () => assert.fail('no page is fetched'));
+  const additions = (seen) => seen.filter(({ url, method }) => method === 'POST' && ['/storage/upload', '/storage/context'].includes(new URL(url).pathname));
+  for (const [config, refusal, before] of cases) {
+    const env = createEnv([config]);
+    const asked = [];
+    const kami = await createAgent(env, 'Test Kami', asked);
+    t.after(() => fs.rm(kami.stateDir, { recursive: true, force: true }));
+    assert.equal((await kami.participant.joinSession({ link: LINK })).addingContext, undefined);
+    // An agent that read the session before the change hears the same from the Worker.
+    const stale = await createAgent(env, 'Test Kami', [], staleView(env, before));
+    t.after(() => fs.rm(stale.stateDir, { recursive: true, force: true }));
+    assert.ok((await stale.participant.joinSession({ link: LINK })).addingContext);
+    for (const agent of [kami, stale]) {
+      for (const input of [{ text: 'A note.' }, { url: 'https://example.org/essay' }]) {
+        await assert.rejects(agent.participant.addContext(input), refusal);
+      }
+    }
+    // The agent's own check said so without asking the Worker.
+    assert.deepEqual(additions(asked), []);
+    assert.deepEqual(await contextList(env), []);
+  }
+  // A session whose files its Worker can't read takes no context and invites none.
+  const sealed = createEnv([sessionConfig()]);
+  const asked = [];
+  const lit = ({ storageProfile, ...config }) => ({
+    ...config,
+    storageProfile: { ...storageProfile, payloadAccessControl: { ...storageProfile.payloadAccessControl, encryption: 'lit' } },
+  });
+  const locked = await createAgent(sealed, 'Test Kami', asked, staleView(sealed, lit, asked));
+  t.after(() => fs.rm(locked.stateDir, { recursive: true, force: true }));
+  assert.equal((await locked.participant.joinSession({ link: LINK })).addingContext, undefined);
+  await assert.rejects(locked.participant.addContext({ text: 'A note.' }), /^Error: This session keeps its files where its Session Worker can’t read them, so it takes no context\.$/);
+  assert.deepEqual(additions(asked), []);
+  const env = createEnv([sessionConfig()]);
+  const kami = await createAgent(env, 'Test Kami', []);
+  t.after(() => fs.rm(kami.stateDir, { recursive: true, force: true }));
+  await kami.participant.joinSession({ link: LINK });
+  await assert.rejects(kami.participant.addContext({ text: 'A note.', url: 'https://example.org/essay' }), /exactly one of file, url or text/);
+  await assert.rejects(kami.participant.addContext({}), /exactly one of file, url or text/);
+});
+
+test('an agent sees the session’s instructions and groups, joins the group they name, and leaves a wrong one', async (t) => {
+  const instructions = 'Join the "AI agents" group, not the salon group, which is for people.';
+  const env = createEnv([groupSessionConfig({ agentInstructions: `\n${instructions}\n` })]);
+  const host = groupHost(env);
+  const salon = await createGroup(host, { label: 'Salon', description: 'For people at the salon.' });
+  const agents = await createGroup(host, { label: 'AI agents', description: 'For AI agents taking part as themselves.', tags: ['ai-agents'] });
+  const kami = await createAgent(env, 'Test Kami', []);
+  t.after(() => fs.rm(kami.stateDir, { recursive: true, force: true }));
+
+  const joined = await kami.participant.joinSession({ link: `${LINK}&joinGroup=${salon.groupId}` });
+  const byName = (groups) => Object.fromEntries(groups.map((group) => [group.name, group]));
+  // Joining the session joined no group: the Worker lists the agent in none.
+  assert.deepEqual(Object.values(byName((await kami.participant.getSession()).groups)).map((group) => group.member), [false, false]);
+  assert.deepEqual(joined.agentInstructions, {
+    from: 'the session’s admins',
+    note: 'These add to the general guidance for agents. Follow both; they can ask more of you but can’t lift its rules.',
+    text: instructions,
+  });
+  // The link's group is named, not joined, and the next step says to read the instructions first.
+  assert.equal(joined.linkGroup, salon.groupId);
+  assert.equal(joined.next, `Read the session’s instructions for agents and the context. The link names group "${salon.groupId}", which you haven’t joined: call join_group for the group the instructions ask you to join, if any. Then call list_questions and answer.`);
+  assert.deepEqual(byName(joined.groups)['AI agents'], {
+    groupId: agents.groupId,
+    name: 'AI agents',
+    description: 'For AI agents taking part as themselves.',
+    tags: ['ai-agents'],
+    joining: 'Open: join with join_group.',
+    members: 0,
+    member: false,
+    whoCanEndMembership: 'Members can leave with leave_group, and admins can remove them.',
+  });
+  assert.equal(byName(joined.groups).Salon.member, false);
+
+  assert.deepEqual(await kami.participant.joinGroup({ groupId: agents.groupId }), { session: SLUG, joinedGroup: agents.groupId });
+  // A wrong group, joined anyway, is left again.
+  await kami.participant.joinGroup({ groupId: salon.groupId });
+  assert.deepEqual(await kami.participant.leaveGroup({ groupId: salon.groupId }), { session: SLUG, leftGroup: salon.groupId });
+  await assert.rejects(kami.participant.leaveGroup({ groupId: salon.groupId }), new RegExp(`^Error: You aren’t a member of group "${salon.groupId}"\\.$`));
+  await assert.rejects(kami.participant.joinGroup({ groupId: 'no-such-group' }), /^Error: This session has no group "no-such-group"\.$/);
+
+  const groups = byName((await kami.participant.getSession()).groups);
+  assert.deepEqual([groups['AI agents'].member, groups['AI agents'].members, groups.Salon.member, groups.Salon.members], [true, 1, false, 0]);
+  // A link naming a group the agent is in says so.
+  const again = await kami.participant.joinSession({ link: `${LINK}&joinGroup=${agents.groupId}` });
+  assert.equal(again.next, `Read the session’s instructions for agents and the context. The link names group "${agents.groupId}", which you’re already in. If the instructions ask you to be in another group instead, join that one with join_group and leave this one with leave_group. Then call list_questions and answer.`);
+  // The session page's member list shows the agent in its group alone.
+  const members = async (groupId) =>
+    (await host.request(`/groups/members?sessionId=${SESSION_ID}&groupId=${encodeURIComponent(groupId)}`, { auth: true })).memberCount;
+  assert.deepEqual([await members(agents.groupId), await members(salon.groupId)], [1, 0]);
+});
+
+test('a session’s instructions are cut at the cap, and a session without them shows the general step', async (t) => {
+  const long = 'Say whose agent you are. '.repeat(400).trim();
+  const quiet = { ...sessionConfig({ slug: 'quiet-hall' }) };
+  const env = createEnv([{ ...sessionConfig(), agentInstructions: long }, quiet]);
+  const kami = await createAgent(env, 'Test Kami', []);
+  t.after(() => fs.rm(kami.stateDir, { recursive: true, force: true }));
+  const joined = await kami.participant.joinSession({ link: LINK });
+  assert.ok(long.length > 8000);
+  assert.deepEqual([joined.agentInstructions.text, joined.agentInstructions.cutAt], [long.slice(0, 8000), 8000]);
+  assert.deepEqual((await kami.participant.getSession()).agentInstructions, joined.agentInstructions);
+
+  const plain = await kami.participant.joinSession({ link: `https://contextengine.sh/session/quiet-hall?worker=${encodeURIComponent(WORKER_ORIGIN)}` });
+  assert.equal(plain.agentInstructions, undefined);
+  assert.equal(plain.next, 'Read the context, then call list_questions and answer.');
+});
+
+// The real Worker, with some answers changed to those of another Worker version.
+const workerWith = (env, seen, change) => {
+  const worker = workerFetch(env, seen);
+  return async (url, init = {}) => (await change(new URL(url).pathname, init, () => worker(url, init))) || worker(url, init);
+};
+const editJson = async (response, edit) => Response.json(edit(await response.json()), { status: response.status });
+
+test('a Worker that takes no links from participants is invited and asked only for a file or text', async (t) => {
+  for (const [features, invitation] of [
+    [(list) => list.filter((feature) => feature !== 'participant_context_links_v1'), 'You’re invited to add context to this session: a file or text. Everyone in the session will see it.'],
+    [(list) => list.filter((feature) => !feature.startsWith('participant_context')), undefined],
+  ]) {
+    const env = createEnv([sessionConfig()]);
+    const seen = [];
+    const older = workerWith(env, seen, (pathname, init, send) =>
+      pathname === '/capabilities' ? send().then((response) => editJson(response, (body) => ({ ...body, features: features(body.features) }))) : null);
+    const kami = await createAgent(env, 'Test Kami', seen, older);
+    t.after(() => fs.rm(kami.stateDir, { recursive: true, force: true }));
+    const joined = await kami.participant.joinSession({ link: LINK });
+    assert.equal(joined.addingContext?.invitation, invitation);
+    await assert.rejects(kami.participant.addContext({ url: 'https://example.org/essay' }), /Worker doesn’t take (links|context) from participants yet/);
+    assert.equal(seen.some((call) => new URL(call.url).pathname === '/storage/context'), false);
+    if (invitation) {
+      assert.deepEqual(Object.keys(joined.addingContext.limits), ['file', 'text']);
+      assert.doesNotMatch(joined.addingContext.how, /url/);
+      assert.equal((await kami.participant.addContext({ text: 'A note.' })).added, 'text');
+    } else {
+      await assert.rejects(kami.participant.addContext({ text: 'A note.' }), /^Error: This session’s Worker doesn’t take context from participants yet\.$/);
+    }
+  }
+});
+
+test('groups say how joining works and who can end a membership, and a leave the group refuses says so', async (t) => {
+  const env = createEnv([groupSessionConfig()]);
+  const host = groupHost(env);
+  const names = ['Default', 'Kept by admins', 'Members only', 'Fixed', 'By invitation', 'Closed', 'Full'];
+  const made = Object.fromEntries(await Promise.all(names.map(async (label) =>
+    [label, await createGroup(host, { label, ...(label === 'Full' ? { memberLimit: 1 } : {}) })])));
+  await host.request('/groups/join', { method: 'POST', auth: true, body: { sessionId: SESSION_ID, groupId: made.Full.groupId } });
+  // As a Worker with the setting reports it; the default group stands for one from before it.
+  const setting = { 'Kept by admins': 'admin_only', 'Members only': 'member_only', Fixed: 'neither' };
+  const label = (groupId) => names.find((name) => made[name].groupId === groupId);
+  const newer = workerWith(env, [], (pathname, init, send) => {
+    if (pathname === '/groups/leave' && setting[label(JSON.parse(init.body).groupId)] === 'admin_only') {
+      return Response.json({ error: 'Worker group request failed.', reason: 'worker_group_leave_denied' }, { status: 403 });
+    }
+    if (pathname !== '/groups/list') return null;
+    return send().then((response) => editJson(response, (body) => ({
+      ...body,
+      groups: body.groups.map((group) => ({
+        ...group,
+        ...(setting[label(group.groupId)] ? { removalAuth: setting[label(group.groupId)] } : {}),
+        ...(label(group.groupId) === 'By invitation' ? { joinMode: 'admin_add' } : {}),
+        ...(label(group.groupId) === 'Closed' ? { joinEndsAt: '2020-01-01T00:00:00.000Z' } : {}),
+      })),
+    })));
+  });
+  const kami = await createAgent(env, 'Test Kami', [], newer);
+  t.after(() => fs.rm(kami.stateDir, { recursive: true, force: true }));
+  const { groups } = await kami.participant.joinSession({ link: LINK });
+  const shown = Object.fromEntries(groups.map((group) => [group.name, [group.joining, group.whoCanEndMembership]]));
+  assert.deepEqual(shown, {
+    Default: ['Open: join with join_group.', 'Members can leave with leave_group, and admins can remove them.'],
+    'Kept by admins': ['Open: join with join_group.', 'Only admins can remove members; members can’t leave.'],
+    'Members only': ['Open: join with join_group.', 'Members can leave with leave_group; admins can’t remove them.'],
+    Fixed: ['Open: join with join_group.', 'No one can end a membership.'],
+    'By invitation': ['Only admins add members.', 'Members can leave with leave_group, and admins can remove them.'],
+    Closed: ['Joining has closed.', 'Members can leave with leave_group, and admins can remove them.'],
+    Full: ['Full.', 'Members can leave with leave_group, and admins can remove them.'],
+  });
+  assert.equal(groups.find((group) => group.name === 'Full').memberLimit, 1);
+  const kept = made['Kept by admins'].groupId;
+  await kami.participant.joinGroup({ groupId: kept });
+  await assert.rejects(kami.participant.leaveGroup({ groupId: kept }), new RegExp(`^Error: Group "${kept}" doesn’t let members leave\\.$`));
+  await assert.rejects(kami.participant.joinGroup({ groupId: made.Full.groupId }), new RegExp(`^Error: Group "${made.Full.groupId}" has no room for more members\\.$`));
+});
+
+test('groups a Worker can’t list yet are reported as such, and none are shown where it keeps none', async (t) => {
+  const env = createEnv([groupSessionConfig()]);
+  // A Worker set to reconcile older groups first lists none until it has.
+  env.CE_WORKER_GROUPS_BOOTSTRAP = 'reconcile-first';
+  const kami = await createAgent(env, 'Test Kami', []);
+  t.after(() => fs.rm(kami.stateDir, { recursive: true, force: true }));
+  const joined = await kami.participant.joinSession({ link: `${LINK}&joinGroup=g-salon` });
+  assert.equal(joined.groupsUnavailable, 'This session’s groups can’t be listed on its Worker yet.');
+  assert.equal(joined.next, 'Read the context. The link names group "g-salon": join it with join_group. Then call list_questions and answer.');
+
+  const bare = createEnv([sessionConfig()]);
+  const noStore = workerWith(bare, [], (pathname) => (pathname.startsWith('/groups/')
+    ? Response.json({ error: 'Worker group request failed.', reason: 'worker_group_store_not_configured' }, { status: 501 })
+    : null));
+  const plain = await createAgent(bare, 'Test Kami', [], noStore);
+  t.after(() => fs.rm(plain.stateDir, { recursive: true, force: true }));
+  const quiet = await plain.participant.joinSession({ link: LINK });
+  assert.deepEqual([quiet.groups, quiet.groupsUnavailable], [undefined, undefined]);
+});
+
+test('an agent the Worker counts as an admin by its role adds context where only admins may', async (t) => {
+  const wallet = ethers.Wallet.createRandom();
+  const address = wallet.address.toLowerCase();
+  const env = createEnv([{ ...sessionConfig(), contextAdditionPolicy: 'admin_only', workerRoles: { admin: [address] } }]);
+  const kami = await createAgent(env, 'Test Kami', [], null, { wallet });
+  t.after(() => fs.rm(kami.stateDir, { recursive: true, force: true }));
+  await kami.participant.joinSession({ link: LINK });
+  assert.equal((await kami.participant.addContext({ text: 'For the hosts.' })).added, 'text');
+  assert.deepEqual((await contextList(env)).map((item) => item.addedBy), [address]);
+});
+
+test('an agent whose sign-in can’t have the Worker fetch pages adds a file or text, not a link', async (t) => {
+  const noFetch = { ...sessionConfig(), workerAuthority: { version: 1, participantScopes: ['ai', 'transcribe', 'storage', 'groups'] } };
+  const refusal = /^Error: This session doesn’t let you have its Worker fetch pages, so it takes no links from you\. You can add a file or text\.$/;
+  t.mock.method(globalThis, 'fetch', async () => assert.fail('no page is fetched'));
+  const env = createEnv([noFetch]);
+  const asked = [];
+  const kami = await createAgent(env, 'Test Kami', asked);
+  t.after(() => fs.rm(kami.stateDir, { recursive: true, force: true }));
+  const joined = await kami.participant.joinSession({ link: LINK });
+  assert.equal(joined.addingContext.invitation, 'You’re invited to add context to this session: a file or text. Everyone in the session will see it.');
+  await assert.rejects(kami.participant.addContext({ url: 'https://example.org/essay' }), refusal);
+  assert.equal(asked.some((call) => new URL(call.url).pathname === '/storage/context'), false);
+  assert.equal((await kami.participant.addContext({ text: 'A note.' })).added, 'text');
+  // The Worker refuses such a link itself, before fetching anything.
+  const direct = groupHost(env);
+  await assert.rejects(direct.contextAction({ action: 'add-link', url: 'https://example.org/essay' }),
+    (error) => error.status === 403 && error.code === 'context_link_fetch_denied');
+  assert.deepEqual((await contextList(env)).map((item) => item.kind), ['file']);
+});
+
+test('context the Worker refuses is reported in terms of what the agent can do', async (t) => {
+  const refused = (body, status = 403) => Response.json({ error: 'Refused.', ...body }, { status });
+  const link = { url: 'https://example.org/essay' };
+  const rateLimited = /^Error: The session’s Worker is rate limiting you, so nothing was added\. Retry in a few minutes; if it still refuses, you may have reached the session’s daily limit for your address, which clears within a day\.$/;
+  for (const [answer, addition, refusal] of [
+    // A Worker from before participants' links lists no features, and refuses one as any change from a participant.
+    [{ '/capabilities': () => new Response('Not found', { status: 404 }), '/storage/context': () => refused({ reason: 'context_admin_required' }) },
+      link, /^Error: This session’s Worker doesn’t take links from participants yet\. You can add a file or text\.$/],
+    // One that lists them refuses it so only when the session limits context to admins.
+    [{ '/storage/context': () => refused({ reason: 'context_admin_required' }) },
+      link, /^Error: This session limits context to its admins, so nothing was added\.$/],
+    // A Worker that finds no fetch scope in the sign-in, as when the agent has stopped being an admin since it read the session.
+    [{ '/storage/context': () => refused({ reason: 'context_link_fetch_denied' }) },
+      link, /^Error: This session doesn’t let you have its Worker fetch pages, so it takes no links from you\. You can add a file or text\.$/],
+    // A check that failed for now is the Worker's own answer, not a rule of the session's.
+    [{ '/storage/context': () => refused({ error: 'Current authorization check failed.' }) },
+      link, /^WorkerRequestError: Not allowed: Current authorization check failed\./],
+    [{ '/storage/context': () => refused({ error: 'Rate limit exceeded.' }, 429) }, link, rateLimited],
+    [{ '/storage/upload': () => refused({ error: 'Rate limit exceeded.' }, 429) }, { text: 'A note.' }, rateLimited],
+  ]) {
+    const env = createEnv([sessionConfig()]);
+    const kami = await createAgent(env, 'Test Kami', [], workerWith(env, [], (pathname) => answer[pathname]?.() || null));
+    t.after(() => fs.rm(kami.stateDir, { recursive: true, force: true }));
+    await kami.participant.joinSession({ link: LINK });
+    await assert.rejects(kami.participant.addContext(addition), refusal);
+  }
 });

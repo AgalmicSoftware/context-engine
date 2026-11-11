@@ -8,9 +8,13 @@ import { readAgentState, updateAgentState } from './agentState.mjs';
 import { buildQuestionRecord, buildResponseRecord, isLockedQuestion, isSingleSelect, ratingScaleFor } from './records.mjs';
 import { isPreferredStorageVersion } from '../../shared/storage/canonicalStorageVersions.mjs';
 import { htmlToPlainText, normalizeSessionContext } from '../../shared/sessionContext.mjs';
+import { MAX_AGENT_INSTRUCTIONS_CHARS } from '../../shared/sessionConfigEdits.mjs';
+import { CONTEXT_AGENT_ADDER, agentAdderName, participantsMayAddContext } from '../../shared/sessionContextSources.mjs';
+import { buildNote, checkContextLink, contextInvitation, contextUploadForm, readContextFile, workerReadsContext } from './contextAdditions.mjs';
+import { createKnownSessions } from './knownSessions.mjs';
 import { latestAnswersByQuestion, respondersWithAnswers, summarizeQuestion } from './results.mjs';
 import { listSessionSbts } from './sbtClaims.mjs';
-import { buildSessionWebUrl, normalizeSessionSlug, normalizeWorkerOrigin, parseSessionLink } from './sessionLinks.mjs';
+import { buildSessionWebUrl, GROUP_ID_RE, normalizeSessionSlug, normalizeWorkerOrigin, parseSessionLink } from './sessionLinks.mjs';
 import { createWorkerClient, normalizeSessionIdHex, text, WorkerRequestError } from './workerClient.mjs';
 
 const PUBLIC_RESULTS = 'public_full_if_storage_public';
@@ -33,6 +37,14 @@ const MISSING_RECORD_RETRY_MS = 60_000;
 const MAX_OWN_ANSWER_ITEMS = 5000;
 const MAX_TITLE_LENGTH = 120;
 const MAX_DESCRIPTION_LENGTH = 2000;
+const MAX_GROUPS = 100;
+const MAX_GROUP_TAGS = 20;
+const MAX_TAG_LENGTH = 80;
+const CONTEXT_ADMINS_ONLY = 'This session limits context to its admins, so nothing was added.';
+const CONTEXT_ENDED = 'This session has ended, so it takes no more context.';
+const CONTEXT_NO_LINKS = 'This session’s Worker doesn’t take links from participants yet. You can add a file or text.';
+const CONTEXT_NO_FETCH = 'This session doesn’t let you have its Worker fetch pages, so it takes no links from you. You can add a file or text.';
+const CONTEXT_RATE_LIMITED = 'The session’s Worker is rate limiting you, so nothing was added. Retry in a few minutes; if it still refuses, you may have reached the session’s daily limit for your address, which clears within a day.';
 
 // Agent-supplied arguments may be numbers or strings; Worker data uses text().
 const trim = (value) => (typeof value === 'string' ? value.trim() : typeof value === 'number' ? String(value) : '');
@@ -151,6 +163,68 @@ const sameAuthoringInputs = (stored, record) => {
   return inputs(stored) === inputs(record);
 };
 
+// The session's own instructions for agents: shown in full up to the cap
+// every Worker enforces, marked as the admins' and as adding to the general guidance.
+const instructionsOf = (config) => {
+  const raw = typeof config?.agentInstructions === 'string' ? config.agentInstructions.trim() : '';
+  if (!raw) return null;
+  const cut = raw.length > MAX_AGENT_INSTRUCTIONS_CHARS;
+  return {
+    from: 'the session’s admins',
+    note: 'These add to the general guidance for agents. Follow both; they can ask more of you but can’t lift its rules.',
+    text: cut ? raw.slice(0, MAX_AGENT_INSTRUCTIONS_CHARS) : raw,
+    ...(cut ? { cutAt: MAX_AGENT_INSTRUCTIONS_CHARS } : {}),
+  };
+};
+
+// `member` is whether the agent is in the link's group, or null when its groups couldn't be read.
+const nextStep = ({ instructions, linkGroup, member = null }) => {
+  const read = instructions ? 'Read the session’s instructions for agents and the context' : 'Read the context';
+  if (!linkGroup) return `${read}, then call list_questions and answer.`;
+  const named = `The link names group "${linkGroup}"`;
+  if (member) {
+    const other = instructions
+      ? ' If the instructions ask you to be in another group instead, join that one with join_group and leave this one with leave_group.'
+      : '';
+    return `${read}. ${named}, which you’re already in.${other} Then call list_questions and answer.`;
+  }
+  const join = instructions
+    ? 'call join_group for the group the instructions ask you to join, if any'
+    : 'join it with join_group';
+  return `${read}. ${named}${member === false ? ', which you haven’t joined' : ''}: ${join}. Then call list_questions and answer.`;
+};
+
+const WHO_CAN_END_MEMBERSHIP = {
+  both: 'Members can leave with leave_group, and admins can remove them.',
+  admin_only: 'Only admins can remove members; members can’t leave.',
+  member_only: 'Members can leave with leave_group; admins can’t remove them.',
+  neither: 'No one can end a membership.',
+};
+
+const GROUP_REFUSALS = {
+  worker_group_not_found: (id) => `This session has no group "${id}".`,
+  worker_group_join_denied: (id) => `Group "${id}" isn’t open to joining; its admins add members.`,
+  worker_group_join_ended: (id) => `Joining group "${id}" has closed.`,
+  worker_group_member_cap_exceeded: (id) => `Group "${id}" has no room for more members.`,
+  worker_group_member_not_found: (id) => `You aren’t a member of group "${id}".`,
+  worker_group_leave_denied: (id) => `Group "${id}" doesn’t let members leave.`,
+};
+
+const groupRefusal = (error, id) =>
+  error instanceof WorkerRequestError && Object.hasOwn(GROUP_REFUSALS, error.code) ? new Error(GROUP_REFUSALS[error.code](id)) : error;
+
+// `olderLink` is a link to a Worker whose features couldn't be read, which may be
+// one from before participants' links: it refuses one as any change from a participant.
+const contextRefusal = (error, { olderLink = false } = {}) => {
+  if (!(error instanceof WorkerRequestError)) return error;
+  if (error.code === 'context_admin_required') return new Error(olderLink ? CONTEXT_NO_LINKS : CONTEXT_ADMINS_ONLY);
+  if (error.code === 'context_link_fetch_denied') return new Error(CONTEXT_NO_FETCH);
+  if (error.status === 410) return new Error(CONTEXT_ENDED);
+  // A 429 may be the session's daily limit or a short one, such as signing in's: the Worker doesn't say which.
+  if (error.status === 429) return new Error(CONTEXT_RATE_LIMITED);
+  return error;
+};
+
 const progressNotes = (questions, mine) => ({
   ...(questions.locked ? { lockedQuestions: questions.locked } : {}),
   ...(questions.complete === false ? { questionsComplete: false } : {}),
@@ -214,13 +288,110 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
           wallet,
           fetchImpl,
           now,
-          ...(onchain ? { registryConfigLoader: onchain.loadConfig } : {}),
+          // A hosted session reopened from state must still be the one the agent joined.
+          ...(onchain ? { registryConfigLoader: onchain.loadConfig } : { sessionId: text(info.sessionId) }),
         }),
         records: new Map(),
         missing: new Map(),
       });
     }
     return sessions.get(key);
+  };
+
+  const knownSessions = createKnownSessions({ fetchImpl, now, allowLocalWorkers: config.allowLocalWorkers });
+
+  // A link without worker= reaches the Worker its site lists for the slug, as
+  // in the browser; an unlisted slug is an on-chain session. A list that can't
+  // be read stops here instead of guessing.
+  const resolveLink = async (link) => {
+    const parsed = parseSessionLink(link, { allowLocalWorkers: config.allowLocalWorkers });
+    if (parsed.kind !== 'registry') return parsed;
+    const found = await knownSessions.lookup(parsed.appOrigin, parsed.slug);
+    if (found.status === 'unlisted') return parsed;
+    if (found.status === 'unreadable') {
+      throw new Error(
+        `The list of known sessions at ${found.listUrl} could not be read (${found.reason}). ` +
+          'If this session is on a Session Worker, ask for its link with worker=, the Worker’s address; otherwise try again later.',
+      );
+    }
+    const hosted = { ...parsed, workerOrigin: found.workerOrigin, listedSessionId: found.sessionId };
+    delete hosted.kind;
+    delete hosted.chainId;
+    return hosted;
+  };
+
+  const hasEnded = (sessionConfig) => {
+    const endsAt = Date.parse(text(sessionConfig?.sessionEndsAt));
+    return Number.isFinite(endsAt) && endsAt <= now();
+  };
+
+  // An admin the session lists, or one its Worker counts as an admin another way, such as by role, as the token says.
+  const isSessionAdmin = (ctx, sessionConfig) => {
+    const self = wallet.address.toLowerCase();
+    const admins = [sessionConfig?.adminAddress, ...(Array.isArray(sessionConfig?.adminAddresses) ? sessionConfig.adminAddresses : [])];
+    return admins.some((address) => text(address).toLowerCase() === self) || ctx.client.tokenClaims?.scopes?.admin === true;
+  };
+  // The Worker fetches a participant's link only with their fetch scope.
+  const mayAddLinks = (ctx, sessionConfig) => isSessionAdmin(ctx, sessionConfig) || ctx.client.tokenClaims?.scopes?.fetch === true;
+
+  // The groups this agent may see, and whether it's in each. The MCP gives
+  // groups and their tags no meaning; the session's instructions do.
+  const describeGroups = async (ctx) => {
+    let listed;
+    let mine;
+    try {
+      [listed, mine] = await Promise.all([ctx.client.listGroups(), ctx.client.listMyMemberships()]);
+    } catch (error) {
+      // A Worker without group storage has no groups to show.
+      if (error instanceof WorkerRequestError && error.status === 501) return {};
+      if (error instanceof WorkerRequestError && error.code === 'worker_group_capacity_reconciliation_required') {
+        return { groupsUnavailable: 'This session’s groups can’t be listed on its Worker yet.' };
+      }
+      return { groupsUnavailable: describeError(error) };
+    }
+    const idOf = (group) => text(group?.groupId).toLowerCase();
+    const memberOf = new Map(mine.filter((entry) => idOf(entry.group)).map((entry) => [idOf(entry.group), entry]));
+    const entries = [
+      ...listed.filter((group) => idOf(group)).map((group) => ({ group, member: memberOf.has(idOf(group)), memberCount: group.memberCount })),
+      ...[...memberOf.values()]
+        .filter((entry) => !listed.some((group) => idOf(group) === idOf(entry.group)))
+        .map((entry) => ({ group: entry.group, member: true, memberCount: entry.memberCount })),
+    ];
+    const groups = entries.slice(0, MAX_GROUPS).map(({ group, member, memberCount }) => {
+      const tags = Array.isArray(group.tags) ? group.tags.map((tag) => text(tag).slice(0, MAX_TAG_LENGTH)).filter(Boolean).slice(0, MAX_GROUP_TAGS) : [];
+      const members = Number.isSafeInteger(memberCount) && memberCount >= 0 ? memberCount : null;
+      const limit = Number.isSafeInteger(group.memberLimit) && group.memberLimit > 0 ? group.memberLimit : 0;
+      const closesAt = text(group.joinEndsAt);
+      const open = text(group.joinMode).toLowerCase() === 'open';
+      let joining = open ? 'Open: join with join_group.' : 'Only admins add members.';
+      if (open && closesAt && Date.parse(closesAt) <= now()) joining = 'Joining has closed.';
+      else if (open && limit && members !== null && members >= limit) joining = 'Full.';
+      // A Worker from before the setting omits it, and works as 'both'.
+      const removalAuth = text(group.removalAuth).toLowerCase() || 'both';
+      return {
+        groupId: text(group.groupId),
+        name: text(group.label).slice(0, MAX_TITLE_LENGTH),
+        ...(text(group.description) ? { description: text(group.description).slice(0, MAX_DESCRIPTION_LENGTH) } : {}),
+        ...(tags.length ? { tags } : {}),
+        joining,
+        ...(open && closesAt ? { joinClosesAt: closesAt } : {}),
+        ...(members !== null ? { members } : {}),
+        ...(limit ? { memberLimit: limit } : {}),
+        member,
+        ...(Object.hasOwn(WHO_CAN_END_MEMBERSHIP, removalAuth) ? { whoCanEndMembership: WHO_CAN_END_MEMBERSHIP[removalAuth] } : {}),
+      };
+    });
+    return { groups };
+  };
+
+  // The invitation shows where adding would work: a hosted session that takes
+  // participants' context, hasn't ended, keeps context where its Worker reads
+  // it, and runs a Worker that says it takes it (links only where it says so).
+  const invitationFor = async (ctx, sessionConfig) => {
+    if (ctx.registry || !participantsMayAddContext(sessionConfig) || hasEnded(sessionConfig) || !workerReadsContext(sessionConfig)) return {};
+    const features = await ctx.client.readFeatures();
+    if (!features?.includes('participant_context_v1')) return {};
+    return { addingContext: contextInvitation({ links: features.includes('participant_context_links_v1') && mayAddLinks(ctx, sessionConfig) }) };
   };
 
   const remember = (ctx, title, recruitmentSource) =>
@@ -267,10 +438,11 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
     await loadState();
     const ref = trim(session);
     if (/^https?:\/\//i.test(ref)) {
-      const parsed = parseSessionLink(ref, { allowLocalWorkers: config.allowLocalWorkers });
+      // A link means here what join_session makes of it.
+      const parsed = await resolveLink(ref);
       const key = sessionKey(parsed);
-      if (!state.sessions[key]) throw new Error('Join this session first with join_session.');
-      return openSession(state.sessions[key]);
+      if (!isRecord(state.sessions[key])) throw new Error('Join this session first with join_session.');
+      return openEntry(state.sessions[key]);
     }
     let key = state.current;
     if (ref) {
@@ -282,13 +454,16 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
     }
     const entry = state.sessions[key];
     if (!key || !isRecord(entry)) throw new Error('No session joined yet. Call join_session with a session link.');
-    return openSession({
+    return openEntry(entry);
+  };
+
+  const openEntry = async (entry) =>
+    openSession({
       workerOrigin: normalizeWorkerOrigin(entry.workerOrigin, { allowLocalWorkers: config.allowLocalWorkers }),
       slug: normalizeSessionSlug(entry.slug),
       appOrigin: text(entry.appOrigin),
-      ...(entry.kind === 'registry' ? { kind: 'registry', chainId: entry.chainId } : {}),
+      ...(entry.kind === 'registry' ? { kind: 'registry', chainId: entry.chainId } : { sessionId: text(entry.sessionId) }),
     });
-  };
 
   // Re-reads the session config every 30 seconds so admin changes (blocked
   // questions, results visibility, end time) apply to a long-running agent.
@@ -520,7 +695,7 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
             title: entry.title || entry.slug,
             webUrl: buildSessionWebUrl(entry),
             joinedAt: entry.joinedAt,
-            testEth: await resolveSession(buildSessionWebUrl(entry)).then((ctx) => ctx.client.describeTestEth())
+            testEth: await openEntry(entry).then((ctx) => ctx.client.describeTestEth())
               .catch(() => ({ offered: false, reason: 'Session availability could not be checked.' })),
           })),
       };
@@ -540,7 +715,7 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
     async joinSession({ link, worker, session, inviteCode, groupPassword, claimPassword } = {}) {
       let parsed;
       if (trim(link)) {
-        parsed = parseSessionLink(link, { allowLocalWorkers: config.allowLocalWorkers });
+        parsed = await resolveLink(link);
       } else if (trim(worker) && trim(session)) {
         parsed = {
           appOrigin: config.appOrigin,
@@ -557,6 +732,14 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       sessions.delete(sessionKey(parsed));
       const ctx = await openSession(parsed);
       const sessionConfig = await ctx.client.loadConfig();
+      // A listed Worker must serve the session the list names, as the browser checks, before any sign-in.
+      if (parsed.listedSessionId && ctx.client.sessionId !== parsed.listedSessionId) {
+        sessions.delete(sessionKey(parsed));
+        throw new Error(
+          `The Session Worker listed for "${parsed.slug}" answers for a different session, so it was not joined. ` +
+            'Ask for the session’s link with worker=, the Worker’s address.',
+        );
+      }
       ctx.info.appOrigin = ctx.client.loginOrigin;
       const outcome = { ...sessionSummary(ctx, sessionConfig), address: wallet.address };
 
@@ -615,21 +798,23 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       }
       const scopes = isRecord(tokenClaims?.scopes) ? tokenClaims.scopes : {};
       outcome.scopes = Object.keys(scopes).filter((scope) => scopes[scope] === true);
-      if (parsed.joinGroupId) {
-        checkpoint();
-        try {
-          if (ctx.registry) throw new Error('Worker groups are not available in on-chain sessions.');
-          await ctx.client.joinGroup(parsed.joinGroupId, { signal });
-          outcome.joinedGroup = parsed.joinGroupId;
-        } catch (error) {
-          outcome.groupJoinError = describeError(error);
-        }
-      }
       outcome.description = text(sessionConfig.sessionInfo).slice(0, MAX_DESCRIPTION_LENGTH);
       outcome.context = contextOf(sessionConfig);
+      const instructions = instructionsOf(sessionConfig);
+      if (instructions) outcome.agentInstructions = instructions;
       const sessionSbts = listSessionSbts(sessionConfig);
       if (sessionSbts.length) outcome.sessionSbts = sessionSbts;
-      outcome.next = 'Read the context, then call list_questions and answer.';
+      // The link's group is named, not joined, so the agent can read the session's instructions first.
+      const linkGroup = ctx.registry ? '' : parsed.joinGroupId;
+      if (!ctx.registry) {
+        checkpoint();
+        Object.assign(outcome, await describeGroups(ctx), await invitationFor(ctx, sessionConfig));
+        if (linkGroup) outcome.linkGroup = linkGroup;
+      }
+      const member = outcome.groups
+        ? outcome.groups.some((group) => group.member && group.groupId.toLowerCase() === linkGroup.toLowerCase())
+        : null;
+      outcome.next = nextStep({ instructions, linkGroup, member });
       return outcome;
     },
 
@@ -644,13 +829,17 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       const [questions, mine] = await Promise.all([loadQuestions(ctx), loadMyAnswers(ctx)]);
       const endsAt = text(sessionConfig.sessionEndsAt);
       const sessionSbts = listSessionSbts(sessionConfig);
+      const instructions = instructionsOf(sessionConfig);
       return {
         ...sessionSummary(ctx, sessionConfig),
         testEth: await ctx.client.describeTestEth(),
         description: text(sessionConfig.sessionInfo).slice(0, MAX_DESCRIPTION_LENGTH),
         context: contextOf(sessionConfig),
+        ...(instructions ? { agentInstructions: instructions } : {}),
         ...(endsAt ? { endsAt } : {}),
         ...(sessionSbts.length ? { sessionSbts } : {}),
+        ...(ctx.registry ? {} : await describeGroups(ctx)),
+        ...(ctx.registry ? {} : await invitationFor(ctx, sessionConfig)),
         questions: questions.length,
         answeredByMe: questions.filter((question) => mine.has(question.id)).length,
         ...progressNotes(questions, mine),
@@ -916,10 +1105,78 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       if (ctx.registry) throw new Error('Worker groups are not available in on-chain sessions.');
       await ensureReady(ctx);
       const id = trim(groupId);
-      if (!/^[A-Za-z0-9._:-]{1,128}$/.test(id)) throw new Error('Pass a valid group id.');
+      if (!GROUP_ID_RE.test(id)) throw new Error('Pass a valid group id.');
       checkpoint();
-      await ctx.client.joinGroup(id, { signal });
+      await ctx.client.joinGroup(id, { signal }).catch((error) => {
+        throw groupRefusal(error, id);
+      });
       return { session: ctx.info.slug, joinedGroup: id };
+    },
+
+    async leaveGroup({ session, groupId } = {}) {
+      const ctx = await resolveSession(session);
+      if (ctx.registry) throw new Error('Worker groups are not available in on-chain sessions.');
+      await ensureReady(ctx);
+      const id = trim(groupId);
+      if (!GROUP_ID_RE.test(id)) throw new Error('Pass a valid group id.');
+      checkpoint();
+      await ctx.client.leaveGroup(id, { signal }).catch((error) => {
+        throw groupRefusal(error, id);
+      });
+      return { session: ctx.info.slug, leftGroup: id };
+    },
+
+    async addContext({ session, file, url, text: note, title, adminsOnly = false } = {}) {
+      const given = { file, url, text: note };
+      const chosen = Object.keys(given).filter((key) => given[key] !== undefined && given[key] !== '');
+      if (chosen.length !== 1) throw new Error('Pass exactly one of file, url or text.');
+      const [kind] = chosen;
+      if (kind === 'file' && title !== undefined) throw new Error('A file keeps its own name; pass title only with url or text.');
+      if (adminsOnly !== undefined && typeof adminsOnly !== 'boolean') throw new Error('adminsOnly must be true or false.');
+      const ctx = await resolveSession(session);
+      if (ctx.registry) throw new Error('Adding context isn’t available in on-chain sessions yet.');
+      const sessionConfig = await ensureReady(ctx);
+      if (!workerReadsContext(sessionConfig)) {
+        throw new Error('This session keeps its files where its Session Worker can’t read them, so it takes no context.');
+      }
+      // The Worker decides; these say why before a file is read or a page fetched.
+      let featuresUnread = false;
+      if (!isSessionAdmin(ctx, sessionConfig)) {
+        if (!participantsMayAddContext(sessionConfig)) throw new Error(CONTEXT_ADMINS_ONLY);
+        if (hasEnded(sessionConfig)) throw new Error(CONTEXT_ENDED);
+        const features = await ctx.client.readFeatures();
+        featuresUnread = !features;
+        if (features && !features.includes('participant_context_v1')) {
+          throw new Error('This session’s Worker doesn’t take context from participants yet.');
+        }
+        if (kind === 'url' && features && !features.includes('participant_context_links_v1')) throw new Error(CONTEXT_NO_LINKS);
+        if (kind === 'url' && !mayAddLinks(ctx, sessionConfig)) throw new Error(CONTEXT_NO_FETCH);
+      }
+      // Cleaned as the Worker requires, for links as for files and notes.
+      const adderName = agentAdderName(profile().displayName);
+      const visibleTo = adminsOnly ? 'the session’s admins' : 'everyone in the session';
+      try {
+        if (kind === 'url') {
+          const link = checkContextLink({ url, title });
+          checkpoint();
+          const result = await ctx.client.contextAction({
+            action: 'add-link',
+            url: link.url,
+            ...(link.title ? { title: link.title } : {}),
+            adminsOnly,
+            adder: CONTEXT_AGENT_ADDER,
+            ...(adderName ? { adderName } : {}),
+          }, { signal });
+          const source = isRecord(result?.source) ? result.source : {};
+          return { session: ctx.info.slug, added: 'link', id: text(source.id), url: link.url, title: text(source.title) || link.title, visibleTo };
+        }
+        const upload = kind === 'file' ? await readContextFile(file, { stateDir: config.stateDir }) : buildNote({ text: note, title });
+        checkpoint();
+        const storageRef = await ctx.client.uploadForm(contextUploadForm(upload, { adminsOnly, adderName }), { signal });
+        return { session: ctx.info.slug, added: kind, id: text(storageRef?.id), name: upload.name, visibleTo };
+      } catch (error) {
+        throw contextRefusal(error, { olderLink: kind === 'url' && featuresUnread });
+      }
     },
 
     async claimSbt({ session, sbt: sbtAddress, inviteCode, groupPassword, claimPassword } = {}) {

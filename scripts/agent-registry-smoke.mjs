@@ -104,6 +104,8 @@ const main = async () => {
       const url = new URL(typeof input === 'string' || input instanceof URL ? input : input.url);
       if (url.origin === workerRpcOrigin) return originalFetch(`${rpcUrl}${url.pathname}`, init);
       if (['ar-io.dev', 'arweave.net'].includes(url.hostname)) return originalFetch(`${arweaveOrigin}${url.pathname}`, init);
+      // The link's site lists no hosted sessions, so the link stays on-chain.
+      if (url.href === 'https://contextengine.sh/known-sessions.json') return new Response('Not found', { status: 404 });
       throw new Error(`Unexpected network destination in registry smoke: ${url.origin}`);
     };
     const metadata = {
