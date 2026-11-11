@@ -14,6 +14,7 @@ import {
   readSessionWorkerConfigCache,
 } from '../../utilities/session/sessionWorkerConfigCache.js';
 import { claimsWorkerCanonicalAuthority } from '../../utilities/session/sessionCapabilityProjection.js';
+import { KNOWN_SESSION_CONFIGS } from '../../utilities/session/knownSessionsFile';
 import {
   normalizeWorkerCanonicalSessionIdHex,
   parseSessionWorkerDiscoveryOrigin,
@@ -98,6 +99,13 @@ const requireBundledSessionId = (route: WorkerCanonicalRouteState, sessionId: st
   !route.sessionConfig || resolveWorkerCanonicalSessionIdHex(route.sessionConfig) === sessionId
     ? { ...route, expectedSessionId: sessionId }
     : { ...route, kind: 'bootstrap', sessionConfig: null, expectedSessionId: sessionId };
+
+// Any link that reaches a listed session's own Worker, such as the event
+// redirect's worker= link or a group page, opens only the listed session ID.
+const requireKnownSessionId = (route: WorkerCanonicalRouteState): WorkerCanonicalRouteState => {
+  const knownWorker = resolveTrustedBundledWorker(KNOWN_SESSION_CONFIGS[route.workerSessionSlug]);
+  return knownWorker?.origin === route.workerOrigin ? requireBundledSessionId(route, knownWorker.sessionId) : route;
+};
 
 const emptyWorkerRouteState = (): WorkerCanonicalRouteState => ({
   kind: 'standard',
@@ -231,14 +239,14 @@ const resolveWorkerRouteState = ({
     normalizedSlug && controller.hasVerifiedRoute(normalizedSlug, workerOrigin)
       ? getVerifiedConfig({ slug: normalizedSlug, workerOrigin })
       : null;
-  return {
+  return requireKnownSessionId({
     kind: sessionConfig ? 'verified' : 'bootstrap',
     error: '',
     workerOrigin,
     workerOnlySearch,
     workerSessionSlug: normalizedSlug,
     sessionConfig,
-  };
+  });
 };
 
 export const resolveMainSiteAdminWorkerRoute = ({

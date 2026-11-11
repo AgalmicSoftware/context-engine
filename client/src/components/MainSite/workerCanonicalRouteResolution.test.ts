@@ -8,6 +8,8 @@ import { sessionRegistryReadsPort } from '../../domains/sessions/registry/sessio
 import type { WorkerCanonicalRouteController } from './workerCanonicalRouteController';
 import { upsertWorkerCanonicalSessionBootstrap } from '../../utilities/session/sessionWorkerConfigCache';
 import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../../utilities/session/sessionModeProfile';
+import { KNOWN_SESSION_CONFIGS } from '../../utilities/session/knownSessionsFile';
+import { getSessionEntryRedirect } from './sessionEntryRedirect';
 
 const FIXTURE_SLUG = 'fixture-session';
 const FIXTURE_WORKER = 'https://ce-fixture-session.example.workers.dev';
@@ -176,6 +178,41 @@ describe('workerCanonicalRouteResolution', () => {
     expect(resolveStandardSessionRoute).not.toHaveBeenCalled();
   });
 
+  it('checks the listed session ID on the link the EDDY redirect opens', () => {
+    const redirect = new URL(getSessionEntryRedirect('/session/eddy26') || '', 'https://site.example');
+    expect(redirect.searchParams.get('worker')).toBe('https://ce-eddy26-d9702b0d3c41.agalmic.workers.dev');
+    expect(
+      resolveMainSiteSessionRouteForRender({
+        sessionTokenRaw: 'eddy26',
+        searchStr: redirect.search,
+        controller,
+        resolveSessionSlugFromPathToken: (token) => token,
+      }),
+    ).toMatchObject({
+      kind: 'bootstrap',
+      workerSessionSlug: 'eddy26',
+      expectedSessionId: '0x864a48dfbde5a8ef4b5ac60a2980d842',
+    });
+  });
+
+  it('checks the listed session ID on group pages and links to the listed Worker', () => {
+    const groupRoute = {
+      searchStr: '',
+      workerSessionSlug: FIXTURE_SLUG,
+      sessionConfig: KNOWN_SESSION_CONFIGS[FIXTURE_SLUG],
+      controller,
+    };
+    expect(resolveMainSiteGroupWorkerRoute(groupRoute)).toMatchObject({
+      kind: 'bootstrap',
+      workerOrigin: FIXTURE_WORKER,
+      expectedSessionId: FIXTURE_SESSION_ID,
+    });
+    // A link naming another Worker chose it; the list says nothing about that Worker.
+    expect(
+      resolveMainSiteGroupWorkerRoute({ ...groupRoute, searchStr: '?worker=https%3A%2F%2Fother.example' }),
+    ).not.toHaveProperty('expectedSessionId');
+  });
+
   it('opens the group-recording QR link on a device that has never seen the session', () => {
     const resolveStandardSessionRoute = jest.fn();
     const result = resolveMainSiteSessionRouteForRender({
@@ -237,10 +274,10 @@ describe('workerCanonicalRouteResolution', () => {
       ...controller,
       hasVerifiedRoute: (slug, origin) => slug === FIXTURE_SLUG && origin === FIXTURE_WORKER,
     };
-    const resolveWithCachedConfig = (cachedConfig: Record<string, unknown>) =>
+    const resolveWithCachedConfig = (cachedConfig: Record<string, unknown>, searchStr = '?mode=interview') =>
       resolveMainSiteSessionRouteForRender({
         sessionTokenRaw: FIXTURE_SLUG,
-        searchStr: '?mode=interview',
+        searchStr,
         controller: verifiedController,
         resolveSessionSlugFromPathToken: (token) => token,
         getVerifiedConfig: (input) =>
@@ -281,6 +318,15 @@ describe('workerCanonicalRouteResolution', () => {
         workerQueryValue: FIXTURE_WORKER,
         expectedSessionId: FIXTURE_SESSION_ID,
       });
+    });
+
+    it('checks a verified config for another session on a link naming the listed Worker', () => {
+      const result = resolveWithCachedConfig(
+        { slug: FIXTURE_SLUG, sessionId: '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', corsWorkerUrl: FIXTURE_WORKER },
+        `?worker=${encodeURIComponent(FIXTURE_WORKER)}`,
+      );
+
+      expect(result).toMatchObject({ kind: 'bootstrap', sessionConfig: null, expectedSessionId: FIXTURE_SESSION_ID });
     });
   });
 
