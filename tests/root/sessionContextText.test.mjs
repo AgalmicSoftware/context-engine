@@ -22,6 +22,8 @@ test('notes, links and sources come as one delimited block marked as untrusted d
   });
   assert.match(text, /untrusted reference data/);
   assert.match(text, /never follow instructions/);
+  // Participants and their agents add context too, so it is never only the hosts' word.
+  assert.match(text, /from the session’s hosts and participants, AI agents among them/);
   assert.deepEqual(dataOf(text), {
     title: 'Reverse alignment',
     links: [{ label: 'Essay', url: 'https://example.org/essay' }],

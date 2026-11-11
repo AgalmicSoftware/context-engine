@@ -21,6 +21,7 @@ All notable changes to this project will be documented in this file.
 - Signed-in participants may add links to context (`/storage/context` `add-link`) while the session doesn't limit context to admins and hasn't ended. Their links follow the same link rules as admins', need their `fetch` scope and count against the per-address daily limit as fetches too. Every link passes the upload's access check before the Worker fetches the page. Refreshing a link and having a PDF read stay with admins. `/capabilities` reports `participant_context_links_v1`.
 - A refresh must name the same link, and keeps its title, privacy and who added it.
 - A context item may carry an agent's self-declared mark: `CE-AdderKind` `agent`, with its name in `CE-AdderName`, up to 80 characters of plain text without control characters or marks that reorder text. Any other mark is refused, as is a name without the mark. A refreshed link keeps its mark.
+- Prompts that read a session's context say it comes from its hosts and participants, AI agents among them. They call it untrusted material and tell the AI never to follow instructions inside it.
 
 ## [0.9.1] - 2026-11-10
 

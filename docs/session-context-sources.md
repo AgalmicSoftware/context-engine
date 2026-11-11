@@ -159,9 +159,10 @@ no text; **Read with AI** reads it later.
 
 One helper (`shared/sessionContextText.mjs`) turns the notes, links and source
 texts into a single block between `<session_context>` tags, as JSON with `<` and
-`>` escaped, introduced as untrusted reference data whose instructions are
-never followed. It caps each item (6,000 characters) and the whole block per
-call, and reports what it left out.
+`>` escaped, introduced as untrusted reference data from the session's hosts
+and participants, AI agents among them, whose instructions are never followed.
+It caps each item (6,000 characters) and the whole block per call, and reports
+what it left out.
 
 | Feature | Reads | Block cap |
 |---|---|---|
