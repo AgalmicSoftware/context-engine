@@ -206,8 +206,8 @@ they choose the AI's or write in the box. No answer or comment someone
 encrypted, nor anything they type into an encrypted field, goes to the voice interviewer or the
 next round of drafting. A comment that loads after the drafts joins them the same way, and a
 submit pressed before it loaded waits, with **Saved answers loaded. Check drafts that change an
-earlier answer, then submit.**, while any chosen card doesn't match it, so no earlier comment is
-replaced unseen. A single glowing robot icon
+earlier answer or comment, then submit.**, while any chosen card doesn't match it, so no earlier
+comment is replaced unseen. A single glowing robot icon
 beside the footer/comment controls marks an untouched AI-proposed response; it
 stays through focus-only review and disappears after any real answer, comment,
 importance, or conviction edit. The responder selects which drafts to submit and

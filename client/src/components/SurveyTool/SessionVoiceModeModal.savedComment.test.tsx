@@ -256,7 +256,7 @@ describe('a submit pressed before saved answers load', () => {
     view.rerender(saved.element(slice));
     await saved.finish(slice);
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveTextContent(
-      'Saved answers loaded. Check drafts that change an earlier answer, then submit.',
+      'Saved answers loaded. Check drafts that change an earlier answer or comment, then submit.',
     );
     expect(onSubmitResponses).not.toHaveBeenCalled();
     expect(onApplyAdditional).not.toHaveBeenCalled();

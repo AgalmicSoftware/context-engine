@@ -408,7 +408,7 @@ export default function SessionInterviewPanel({
               questions.find((question) => question.id === draft.questionId)?.type,
             ),
           )
-          ? 'Saved answers loaded. Check drafts that change an earlier answer, then submit.'
+          ? 'Saved answers loaded. Check drafts that change an earlier answer or comment, then submit.'
           : drafts.length > dropped.length || suggestedQuestions.length
             ? 'Review drafts'
             : 'Ready',

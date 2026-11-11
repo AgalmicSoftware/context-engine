@@ -950,7 +950,7 @@ describe('SessionVoiceModeModal', () => {
         // The person's own words give a new answer: it stays chosen, says what it changes,
         // and the queued submit waits for them to check it.
         expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveTextContent(
-          'Saved answers loaded. Check drafts that change an earlier answer, then submit.',
+          'Saved answers loaded. Check drafts that change an earlier answer or comment, then submit.',
         );
         await expectReadableDraftText('Draft answer for What matters?', 'New answer');
         expect(screen.getByText('Changes your earlier answer: Already saved')).toBeInTheDocument();
@@ -1026,7 +1026,7 @@ describe('SessionVoiceModeModal', () => {
     expect(screen.getByText('Changes your earlier answer: Saved two')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Replace with draft' })).not.toBeInTheDocument();
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveTextContent(
-      'Saved answers loaded. Check drafts that change an earlier answer, then submit.',
+      'Saved answers loaded. Check drafts that change an earlier answer or comment, then submit.',
     );
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_MAPPING_NOTICE)).toHaveTextContent(
       'Left out 1 draft for a question you’ve already answered.',
@@ -1347,7 +1347,7 @@ describe('SessionVoiceModeModal', () => {
     view.rerender(<SessionVoiceModeModal {...props} />);
     await waitFor(() =>
       expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveTextContent(
-        'Saved answers loaded. Check drafts that change an earlier answer, then submit.',
+        'Saved answers loaded. Check drafts that change an earlier answer or comment, then submit.',
       ),
     );
     await expectReadableDraftText('Draft answer for What matters?', 'Disagree');
