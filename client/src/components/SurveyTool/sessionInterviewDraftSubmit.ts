@@ -1,6 +1,8 @@
 import type { InterviewConsentOverrides } from './sessionInterviewConsent';
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
 import type { InterviewDraftResponse, InterviewPrefillPacket } from './sessionInterview';
+import { startingInterviewComment } from './sessionInterviewComments';
+import { responseFieldValue, type SessionInterviewModalRecord } from './sessionInterviewModalState';
 
 export type InterviewSubmitResult =
   | { status: 'submitted' | 'already-saved' }
@@ -15,8 +17,8 @@ type RunInterviewDraftSubmitInput = {
   baseSubmitContextToken: string;
   drafts: InterviewDraftResponse[];
   editedDrafts: Record<string, InterviewDraftResponse>;
-  // The comment the form holds for a question, as review shows it ('' when locked).
-  earlierComment: (questionId: string) => string;
+  // The person's answers and comments as review reads them now, a locked comment as "*".
+  earlierResponses: () => SessionInterviewModalRecord | null | undefined;
   hasAiPrefill: boolean;
   includePredictionComparison: boolean;
   includeProvenance: boolean;
@@ -78,7 +80,7 @@ export const runInterviewDraftSubmit = async ({
   baseSubmitContextToken,
   drafts,
   editedDrafts,
-  earlierComment,
+  earlierResponses,
   hasAiPrefill,
   includePredictionComparison,
   includeProvenance,
@@ -165,10 +167,14 @@ export const runInterviewDraftSubmit = async ({
       const draft = editedDrafts[original.questionId] || original;
       await onApplyAnswer(draft.questionId, draft.answer);
       if (!isSubmitContextCurrent(attemptToken)) return;
-      // The comment the card ends with goes in unless the form already holds it. An untouched card shows the
-      // form's comment joined with the AI's, a hidden draft's only the form's, and a locked one stays as it is.
-      const comment = String(draft.additionalComments || '');
-      if (comment !== earlierComment(draft.questionId)) {
+      // The comment the card ends with goes in unless the form already holds it. One the person touched is as they
+      // left it. An untouched one is worked out now, since a comment that loads late reaches the card only after
+      // a render: theirs joined with the AI's, a hidden draft's theirs alone, and a locked one kept as it is.
+      const earlier = responseFieldValue(earlierResponses(), 'additionalComments', draft.questionId);
+      const comment = draft.userEditedFields?.includes('additionalComments')
+        ? String(draft.additionalComments || '')
+        : startingInterviewComment(draft.predictionCondition === 'blind' ? '' : original.additionalComments, earlier);
+      if (comment !== startingInterviewComment('', earlier)) {
         await onApplyAdditional(draft.questionId, comment);
         if (!isSubmitContextCurrent(attemptToken)) return;
       }

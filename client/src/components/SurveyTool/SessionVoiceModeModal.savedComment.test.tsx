@@ -4,6 +4,8 @@ import SessionVoiceModeModal from './SessionVoiceModeModal';
 import { mapInterviewEvidenceToResponses } from './sessionInterview';
 import { startSessionRealtimeInterview } from '../../utilities/audio/realtimeInterviewClient';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
+import type { InterviewSavedSlice } from './sessionInterviewSavedAnswers';
+import type { InterviewSavedAnswerLoader } from './useInterviewSavedAnswers';
 
 jest.mock('./SessionInterviewRecommendedGroups', () => ({ __esModule: true, default: () => null }));
 jest.mock('./useSessionInterviewGroupRecommendations', () => ({
@@ -40,6 +42,7 @@ const modal = (
   existingResponseSlice: Record<string, unknown> | null,
   aiComment = '',
   onApplyAdditional = jest.fn(),
+  extra: Partial<React.ComponentProps<typeof SessionVoiceModeModal>> = {},
 ) => (
   <SessionVoiceModeModal
     isOpen
@@ -75,6 +78,7 @@ const modal = (
     onApplyConviction={jest.fn()}
     onRecordProvenance={jest.fn()}
     onSubmitResponses={jest.fn(async () => ({ status: 'submitted' as const }))}
+    {...extra}
   />
 );
 const renderDraftWithoutAiComment = (existingResponseSlice: Record<string, unknown> | null) =>
@@ -202,6 +206,74 @@ describe('an AI comment beside the person’s own', () => {
       expect(screen.getByRole('button', { name: /Additional comments for Why\?/ })).toHaveTextContent(
         'Saved note From my AI',
       ),
+    );
+    await submit();
+    expect(onApplyAdditional).toHaveBeenCalledWith('q-text', 'Saved note\n\nFrom my AI');
+  });
+});
+
+describe('a submit pressed before saved answers load', () => {
+  // Saved answers that load only when the test says, with the session's response cache not ready either.
+  // Rerenders change only the form's answers, as the pile's do.
+  const later = (
+    onApplyAdditional: jest.Mock,
+    onSubmitResponses: NonNullable<React.ComponentProps<typeof SessionVoiceModeModal>['onSubmitResponses']>,
+  ) => {
+    let finish: (slice: InterviewSavedSlice) => void = () => {};
+    const onLoadSavedResponses: InterviewSavedAnswerLoader = () => new Promise((resolve) => (finish = resolve));
+    const base = modal(null, 'From my AI', onApplyAdditional, {
+      onLoadSavedResponses,
+      isResponsesCacheReady: false,
+      onSubmitResponses,
+    });
+    return {
+      element: (slice: Record<string, unknown> | null) => React.cloneElement(base, { existingResponseSlice: slice }),
+      finish: (slice: InterviewSavedSlice) => act(async () => finish(slice)),
+    };
+  };
+  const savedComment = (comment: Record<string, unknown>) => ({
+    answers: {},
+    importance: {},
+    conviction: {},
+    additionalComments: { 'q-text': comment },
+  });
+  const press = () => act(async () => fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY)));
+
+  it.each([
+    ['an untouched card', '', { value: 'Saved note' }],
+    ['an edited card', 'Typed in review', { value: 'Saved note' }],
+    ['a card beside a locked comment', '', { value: '*', encrypted: true }],
+  ])('waits for the person to check %s when a comment loads first', async (_label, typed, loaded) => {
+    const onApplyAdditional = jest.fn();
+    const onSubmitResponses = jest.fn(async () => ({ status: 'submitted' as const }));
+    const saved = later(onApplyAdditional, onSubmitResponses);
+    const view = render(saved.element(null));
+    fireEvent.click(await screen.findByRole('button', { name: /Additional comments for Why\?/ }));
+    if (typed) editComment(typed);
+    await press();
+    // As in the pile, the form takes the saved comment before the read finishes.
+    const slice = savedComment(loaded);
+    view.rerender(saved.element(slice));
+    await saved.finish(slice);
+    expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveTextContent(
+      'Saved answers loaded. Check drafts that change an earlier answer, then submit.',
+    );
+    expect(onSubmitResponses).not.toHaveBeenCalled();
+    expect(onApplyAdditional).not.toHaveBeenCalled();
+  });
+
+  it('submits an untouched card with the comment that loaded, once checked', async () => {
+    const onApplyAdditional = jest.fn();
+    const onSubmitResponses = jest.fn(async () => ({ status: 'submitted' as const }));
+    const saved = later(onApplyAdditional, onSubmitResponses);
+    // Without a form, review reads the saved answers themselves.
+    render(saved.element(null));
+    await screen.findByRole('button', { name: /Additional comments for Why\?/ });
+    await press();
+    await saved.finish(savedComment({ value: 'Saved note' }));
+    expect(onSubmitResponses).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: /Additional comments for Why\?/ })).toHaveTextContent(
+      'Saved note From my AI',
     );
     await submit();
     expect(onApplyAdditional).toHaveBeenCalledWith('q-text', 'Saved note\n\nFrom my AI');

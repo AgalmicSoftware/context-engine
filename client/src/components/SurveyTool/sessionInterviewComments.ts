@@ -1,6 +1,7 @@
 import { useEffect, useRef, type Dispatch, type SetStateAction } from 'react';
 import type { InterviewDraftResponse } from './sessionInterview';
 import {
+  hasDraftValue,
   includesWholePhrase,
   responseFieldValue,
   type SessionInterviewModalRecord,
@@ -51,6 +52,25 @@ export const interviewCommentChoices = (proposed: unknown, earlier: unknown): In
   ];
   return choices.filter(({ value }, index) => choices.findIndex((choice) => choice.value === value) === index);
 };
+
+/**
+ * Chosen drafts whose card doesn't hold a comment that has just loaded (`loaded`, saved or "*" when locked). A submit
+ * pressed before it loaded waits, so no card replaces a comment the person hasn't seen.
+ */
+export const draftsWithUnseenComments = (
+  drafts: InterviewDraftResponse[],
+  selected: Record<string, boolean>,
+  edited: Record<string, InterviewDraftResponse>,
+  loaded: SessionInterviewModalRecord | null | undefined,
+) =>
+  drafts.filter(({ questionId }) => {
+    const comment = responseFieldValue(loaded, 'additionalComments', questionId);
+    return (
+      !!selected[questionId] &&
+      hasDraftValue(comment) &&
+      comment !== String(edited[questionId]?.additionalComments ?? '')
+    );
+  });
 
 /**
  * Keeps each untouched draft comment at its starting value while the person's own comments (`responses`, as

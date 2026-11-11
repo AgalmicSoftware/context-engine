@@ -201,8 +201,10 @@ stays unless they choose the AI's. An encrypted comment counts as locked even on
 on the page: review shows **Your locked comment stays.** in its place, never joins its text, and
 submitting leaves it as it was unless they choose the AI's. No answer or comment someone
 encrypted, nor anything they type into an encrypted field, goes to the voice interviewer or the
-next round of drafting. A comment that loads after the drafts joins them the same way,
-so no earlier comment is replaced unseen. A single glowing robot icon
+next round of drafting. A comment that loads after the drafts joins them the same way, and a
+submit pressed before it loaded waits, with **Saved answers loaded. Check drafts that change an
+earlier answer, then submit.**, while any chosen card doesn't match it, so no earlier comment is
+replaced unseen. A single glowing robot icon
 beside the footer/comment controls marks an untouched AI-proposed response; it
 stays through focus-only review and disappears after any real answer, comment,
 importance, or conviction edit. The responder selects which drafts to submit and
@@ -554,8 +556,9 @@ answer shows for review, saying which answer it changes. One that repeats an ans
 was given adds nothing and is counted in a note as still fitting, unless it adds to the
 comment. A locked answer stands and goes to no AI, even after it's been unlocked on the page,
 so a draft left out beside one is counted only as left out, never as still fitting.
-Someone signed out gets drafts from their part alone; if they sign in to submit, the usual
-check of drafts against saved answers applies.
+Someone signed out gets drafts from their part alone; if they sign in to submit, their saved
+answers load first, and the submit waits while a card would change an earlier answer or
+doesn't match a comment that loaded.
 
 ## Access and failure behavior
 

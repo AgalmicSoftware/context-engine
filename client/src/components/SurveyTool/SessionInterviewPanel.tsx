@@ -72,7 +72,6 @@ import {
   displayResponderContext,
   omitConcealedInterviewFacts,
   hasDraftValue,
-  responseCommentValue,
   responseFieldValue,
   type SessionInterviewModalRecord,
 } from './sessionInterviewModalState';
@@ -85,7 +84,7 @@ import {
   readAnswersThatStillFit,
   readAnswersToReconsider,
 } from './sessionInterviewReconsideration';
-import { useStartingInterviewComments } from './sessionInterviewComments';
+import { draftsWithUnseenComments, useStartingInterviewComments } from './sessionInterviewComments';
 import { lockEncryptedComments } from './sessionInterviewResearch';
 import type { TranscriptClaim } from './sessionTranscriptClaim';
 
@@ -377,12 +376,13 @@ export default function SessionInterviewPanel({
   // Saved answers can load after drafts entered review. An answered question gets no suggestion,
   // so untouched drafts go. The person's own drafts, and their own words in this interview giving
   // a different answer, stay as they are; their cards say which answer they change. A queued
-  // submit waits for the person to check them.
+  // submit waits for the person to check them, and any card a loaded comment doesn't match.
   const reviewSavedConflicts = useCallback(
     (slice: SessionInterviewModalRecord | null | undefined) => {
       const saved = (draft: InterviewDraftResponse) => responseFieldValue(slice, 'answers', draft.questionId);
       const conflicts = drafts.filter((draft) => hasDraftValue(saved(draft)));
-      if (!conflicts.length) return false;
+      const unseen = draftsWithUnseenComments(drafts, selected, editedDrafts, lockEncryptedComments(slice)).length;
+      if (!conflicts.length && !unseen) return false;
       const kept = conflicts.filter(
         (draft) =>
           participantOwned(draft.questionId) ||
@@ -399,13 +399,14 @@ export default function SessionInterviewPanel({
       pendingSubmitActiveContextRef.current = '';
       setPendingSubmitAfterLogin(false);
       setStatus(
-        kept.some((draft) =>
-          changesEarlierAnswer(
-            editedDrafts[draft.questionId]?.answer ?? draft.answer,
-            saved(draft),
-            questions.find((question) => question.id === draft.questionId)?.type,
-          ),
-        )
+        unseen ||
+          kept.some((draft) =>
+            changesEarlierAnswer(
+              editedDrafts[draft.questionId]?.answer ?? draft.answer,
+              saved(draft),
+              questions.find((question) => question.id === draft.questionId)?.type,
+            ),
+          )
           ? 'Saved answers loaded. Check drafts that change an earlier answer, then submit.'
           : drafts.length > dropped.length || suggestedQuestions.length
             ? 'Review drafts'
@@ -413,7 +414,7 @@ export default function SessionInterviewPanel({
       );
       return true;
     },
-    [drafts, dropDrafts, editedDrafts, participantOwned, questions, suggestedQuestions.length],
+    [drafts, dropDrafts, editedDrafts, participantOwned, questions, selected, suggestedQuestions.length],
   );
   const ownAnswers = useInterviewSavedAnswers({
     load: onLoadSavedResponses,
@@ -1009,7 +1010,7 @@ export default function SessionInterviewPanel({
       baseSubmitContextToken,
       drafts,
       editedDrafts: review.editedDrafts,
-      earlierComment: (id) => responseCommentValue(existingResponsesRef.current, id),
+      earlierResponses: () => existingResponsesRef.current,
       hasAiPrefill,
       includePredictionComparison,
       includeProvenance,

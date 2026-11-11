@@ -6,7 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
-- When the AI proposes a comment for a question you've already commented on, the review card keeps your comment and puts the AI's after it. **Both**, **Mine** and **AI’s** switch between them, the text stays editable, and a locked comment stays unless you choose the AI's.
+- When the AI proposes a comment for a question you've already commented on, the review card keeps your comment and puts the AI's after it. **Both**, **Mine** and **AI’s** switch between them, the text stays editable, and a locked comment stays unless you choose the AI's. A submit pressed before your saved answers load waits for you to check any card whose comment doesn't match one that loaded.
 - A review card that would change your earlier answer now quotes free-text answers and quadratic votes too, so you can compare them; a long answer is cut short with **Show all**.
 - After you claim your part of a conversation, "still fit" counts only the answers the AI compared. A locked or encrypted answer, which the AI never sees, is no longer said to fit.
 - If your saved answers can't be read when you claim your part while signed in, drafting now waits until **Retry saved answers** reads them, instead of drafting without them.
