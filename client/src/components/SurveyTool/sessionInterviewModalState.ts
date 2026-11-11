@@ -12,6 +12,13 @@ export const responseFieldValue = (
   questionId: string,
 ): unknown => asRecord(asRecord(asRecord(slice)[field])[questionId]).value;
 
+/** Whether the person has this field on the page without having submitted it. */
+export const isResponseFieldUnsubmitted = (
+  slice: SessionInterviewModalRecord | null | undefined,
+  field: string,
+  questionId: string,
+): boolean => asRecord(asRecord(asRecord(slice)[field])[questionId]).unsubmitted === true;
+
 // A masked ("*") comment is locked: review neither shows it as text nor sends it back.
 export const responseCommentValue = (slice: SessionInterviewModalRecord | null | undefined, questionId: string) => {
   const value = responseFieldValue(slice, 'additionalComments', questionId);

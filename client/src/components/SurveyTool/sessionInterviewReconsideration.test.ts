@@ -43,6 +43,22 @@ describe('what a claim reconsiders', () => {
     ]);
   });
 
+  it('lists the fields someone has on the page but hasn’t submitted', () => {
+    const slice = {
+      answers: { q1: { value: 'No', unsubmitted: true }, q2: { value: 'Yes' }, q3: { value: 'Yes' } },
+      additionalComments: {
+        q2: { value: 'Typed just now', unsubmitted: true },
+        // A comment that doesn't go to the AI isn't listed either.
+        q3: { value: 'Secret', encrypted: true, unsubmitted: true },
+      },
+    };
+    expect(readAnswersToReconsider([question('q1'), question('q2'), question('q3')], slice)).toEqual([
+      { questionId: 'q1', answer: 'No', unsubmitted: ['answer'] },
+      { questionId: 'q2', answer: 'Yes', additionalComments: 'Typed just now', unsubmitted: ['additionalComments'] },
+      { questionId: 'q3', answer: 'Yes' },
+    ]);
+  });
+
   it('notices a comment that adds to a saved answer, but not a repeat or a locked answer', () => {
     const slice = {
       answers: { q1: { value: 'Yes' }, q2: { value: '*' }, q3: { value: 'Yes' }, q4: { value: 'Yes' } },

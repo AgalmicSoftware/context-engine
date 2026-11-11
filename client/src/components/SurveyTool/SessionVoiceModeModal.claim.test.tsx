@@ -193,7 +193,7 @@ describe('drafting from a claimed part', () => {
     await waitFor(() => expect(mapped).toHaveBeenCalledTimes(1));
     expect(mapped.mock.calls[0][0]).toMatchObject({
       transcript: claim.transcript,
-      reconsideration: { savedAnswers: [], ownContext: '' },
+      reconsideration: { earlierAnswers: [], ownContext: '' },
     });
     expect(screen.getByTestId('ce-session-interview-claim')).toHaveTextContent('Person 2');
   });
@@ -210,7 +210,7 @@ describe('drafting from a claimed part', () => {
     await act(async () => finishLoad(slice));
     await waitFor(() => expect(mapped).toHaveBeenCalledTimes(1));
     expect(mapped.mock.calls[0][0].reconsideration).toEqual({
-      savedAnswers: [{ questionId: 'q1', answer: 'Yes, fund it' }],
+      earlierAnswers: [{ questionId: 'q1', answer: 'Yes, fund it' }],
       ownContext: '',
     });
   });
@@ -227,7 +227,7 @@ describe('drafting from a claimed part', () => {
     fireEvent.click(retry);
     await waitFor(() => expect(mapped).toHaveBeenCalledTimes(1));
     expect(onLoadSavedResponses).toHaveBeenCalledTimes(2);
-    expect(mapped.mock.calls[0][0].reconsideration?.savedAnswers).toEqual([
+    expect(mapped.mock.calls[0][0].reconsideration?.earlierAnswers).toEqual([
       { questionId: 'q1', answer: 'Yes, fund it' },
     ]);
   });
@@ -268,7 +268,7 @@ describe('drafting from a claimed part', () => {
         'One of your answers still fits, so it stays as it is. Left out 2 drafts for questions you’ve already answered.',
       ),
     ).toBeInTheDocument();
-    expect(mapped.mock.calls[0][0].reconsideration?.savedAnswers).toEqual([{ questionId: 'q1', answer: 'Yes' }]);
+    expect(mapped.mock.calls[0][0].reconsideration?.earlierAnswers).toEqual([{ questionId: 'q1', answer: 'Yes' }]);
   });
 
   it('keeps a kept answer’s new comment for review', async () => {

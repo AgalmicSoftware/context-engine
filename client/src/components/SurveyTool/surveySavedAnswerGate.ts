@@ -148,19 +148,34 @@ const readSavedInterviewAnswers = (engine: SurveyQuestionsRuntimeEngine, questio
 /**
  * The person's answers as the interview reads them. The form holds only the pile's card window,
  * so a question with no answer there takes the saved one. Comments are only shown, so one the
- * person cleared stays cleared.
+ * person cleared stays cleared. A value they haven't submitted, typed here or an unsent draft
+ * restored on load, is marked `unsubmitted`.
  */
 export const buildSessionInterviewResponseSlice = (engine: SurveyQuestionsRuntimeEngine, questionIds: string[]) => {
   const form = readPlainRecord(engine.state.surveysResponseState?.[0]);
   const saved = readSavedInterviewAnswers(engine, questionIds);
-  const answers = { ...readPlainRecord(form.answers) };
+  const pending = readPlainRecord(engine.getChangedQidsAndFields?.(0)?.changedMap);
+  // Only a changed value counts: a lock changed on its own leaves the submitted value standing.
+  const marked = (entries: unknown, flag: 'answer' | 'additional') =>
+    Object.fromEntries(
+      Object.entries(readPlainRecord(entries)).map(([id, entry]) => [
+        id,
+        readPlainRecord(pending[normalizeQuestionIdKey(id)])[flag]
+          ? { ...readPlainRecord(entry), unsubmitted: true }
+          : entry,
+      ]),
+    );
+  const answers = marked(form.answers, 'answer');
   for (const [id, entry] of Object.entries(readPlainRecord(saved.answers))) {
     if (!hasMeaningfulFieldValue(readPlainRecord(answers[id]))) answers[id] = entry;
   }
   return {
     ...form,
     answers,
-    additionalComments: { ...readPlainRecord(saved.additionalComments), ...readPlainRecord(form.additionalComments) },
+    additionalComments: {
+      ...readPlainRecord(saved.additionalComments),
+      ...marked(form.additionalComments, 'additional'),
+    },
   };
 };
 

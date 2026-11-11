@@ -10,6 +10,7 @@ import { resolveFieldProtection } from './sessionInterviewResearch';
 import { sameInterviewAnswer } from './sessionInterviewReviewState';
 import {
   hasDraftValue,
+  isResponseFieldUnsubmitted,
   responseCommentValue,
   responseFieldValue,
   type SessionInterviewModalRecord,
@@ -18,19 +19,34 @@ import {
 const OWN_CONTEXT_CHARS = 12_000;
 
 /**
- * The person's saved answers. A locked answer stands and isn't offered, whether it still shows as "*" or they
- * unlocked it on this page: what they encrypted doesn't go to the session's AI, as research sharing redacts it too.
+ * The person's answers as the page holds them. One they changed without submitting, or an unsent draft restored on
+ * load, replaces their submitted one there, so the fields not yet submitted are listed. A locked answer stands and
+ * isn't offered, whether it still shows as "*" or they unlocked it on this page: what they encrypted doesn't go to the
+ * session's AI, as research sharing redacts it too.
  */
 export const readAnswersToReconsider = (
   questions: InterviewQuestion[],
   slice: SessionInterviewModalRecord | null | undefined,
-): InterviewReconsideration['savedAnswers'] =>
+): InterviewReconsideration['earlierAnswers'] =>
   questions.flatMap(({ id }) => {
     const answer = responseFieldValue(slice, 'answers', id);
     const { encryptedAnswer, encryptedComments } = resolveFieldProtection(id, slice || {});
     if (!hasDraftValue(answer) || answer === '*' || encryptedAnswer) return [];
     const additionalComments = encryptedComments ? '' : responseCommentValue(slice, id);
-    return [{ questionId: id, answer, ...(additionalComments ? { additionalComments } : {}) }];
+    const unsubmitted = [
+      ...(isResponseFieldUnsubmitted(slice, 'answers', id) ? (['answer'] as const) : []),
+      ...(additionalComments && isResponseFieldUnsubmitted(slice, 'additionalComments', id)
+        ? (['additionalComments'] as const)
+        : []),
+    ];
+    return [
+      {
+        questionId: id,
+        answer,
+        ...(additionalComments ? { additionalComments } : {}),
+        ...(unsubmitted.length ? { unsubmitted } : {}),
+      },
+    ];
   });
 
 /** A draft that keeps a saved answer but says something its comment doesn't. A locked answer or comment stands. */
@@ -50,7 +66,7 @@ export const addsToSavedAnswer = (
 export const readAnswersThatStillFit = (
   leftOut: string[],
   drafts: InterviewDraftResponse[],
-  reconsidered: InterviewReconsideration['savedAnswers'],
+  reconsidered: InterviewReconsideration['earlierAnswers'],
   questions: InterviewQuestion[],
 ): string[] =>
   leftOut.filter((id) => {

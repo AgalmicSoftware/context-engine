@@ -685,7 +685,7 @@ export default function SessionInterviewPanel({
             },
             reconsideration: usedClaimRef.current
               ? {
-                  savedAnswers: reconsidered,
+                  earlierAnswers: reconsidered,
                   ownContext: await loadOwnContextForMapping(sessionContextPrompt.sources, {
                     sessionSlug,
                     sessionConfig,

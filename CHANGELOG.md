@@ -10,6 +10,7 @@ All notable changes to this project will be documented in this file.
 - A review card that would change your earlier answer now quotes free-text answers and quadratic votes too, so you can compare them; a long answer is cut short with **Show all**.
 - After you claim your part of a conversation, "still fit" counts only the answers the AI compared. A locked or encrypted answer, which the AI never sees, is no longer said to fit.
 - If your saved answers can't be read when you claim your part while signed in, drafting now waits until **Retry saved answers** reads them, instead of drafting without them.
+- When you claim your part, answers and comments you've changed on the page but not submitted, including an unsent draft restored after a reload, reach the AI marked as unsubmitted instead of as saved answers.
 
 ## [0.9.1] - 2026-11-10
 
