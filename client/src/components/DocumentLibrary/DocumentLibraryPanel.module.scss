@@ -82,8 +82,41 @@
   width: 100%;
 }
 
+// Panel text, where the theme recipe gives every field document text; the
+// selector outranks the recipe's `.form-control` rule.
+.uploadBox .uploadRow input.urlField {
+  color: var(--ce-panel-text);
+
+  &::placeholder {
+    color: var(--ce-panel-text-muted);
+  }
+}
+
 .primaryBtn {
   white-space: nowrap;
+}
+
+// Beside a label and a button, a phone leaves the file field no room for the
+// chosen file's name, so labels and the file field take whole lines. Add stays
+// beside the URL, above the title it clears.
+@media (max-width: 640px) {
+  .uploadRow {
+    grid-template-columns: minmax(0, 1fr) auto;
+    row-gap: 6px;
+  }
+
+  .uploadLabel,
+  .fileInput {
+    grid-column: 1 / -1;
+  }
+
+  .uploadLabel:empty {
+    display: none;
+  }
+
+  .uploadRow .primaryBtn {
+    justify-self: start;
+  }
 }
 
 .encryptBox {

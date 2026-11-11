@@ -17,6 +17,7 @@ All notable changes to this project will be documented in this file.
 - The context list marks what an AI agent added: "<its name> (agent)", or its short address with "(agent)" when it gave no name. The agent sets the mark itself, as with its answers' agent marker, and the mark grants nothing.
 - `/skill.md`, the guide for AI agents, names `leave_group` and `add_context` and says the MCP shows a session's instructions when an agent joins. It and `/llms.txt` say a session may invite agents to add context.
 - In Classic 95 the Debate Map is drawn as a Windows 95 program rather than dark glass: the theme's font, square raised buttons with the chosen view pressed in, and sunken white canvases. `/atlas` and a topic's panel have navy title bars, the panel's staying in view as it scrolls, and **Top Debates** opens as a gray window. On a phone its toolbar wraps, so the legend and **Filter Depth** stay on screen. **Suggest New Topic** opens as a gray dialog; its path, field label and **Cancel** were white on white.
+- The **Session Doc Library**'s link and title fields are readable in the Context Engine theme, where typed text was 1.93:1, and their hint text is readable in Classic 95, where it was 1.82:1. On phones the file field takes a whole line, so the chosen file's name shows.
 
 ### Workers — requires redeployment
 
