@@ -1,6 +1,10 @@
 import { useEffect, useRef, type Dispatch, type SetStateAction } from 'react';
 import type { InterviewDraftResponse } from './sessionInterview';
-import { responseFieldValue, type SessionInterviewModalRecord } from './sessionInterviewModalState';
+import {
+  includesWholePhrase,
+  responseFieldValue,
+  type SessionInterviewModalRecord,
+} from './sessionInterviewModalState';
 
 // Comments compared as people read them: case and spacing don't count.
 const comparable = (text: unknown) =>
@@ -9,16 +13,17 @@ const comparable = (text: unknown) =>
     .trim()
     .toLowerCase();
 
+// Whether one comment already says another, as whole words: "I disagree" doesn't say "Agree".
+const alreadySays = (text: unknown, part: unknown) => includesWholePhrase(comparable(text), comparable(part));
+
 /** Whether a proposed comment says something the person's own comment doesn't already. */
-export const addsToInterviewComment = (own: unknown, proposed: unknown): boolean => {
-  const added = comparable(proposed);
-  return !!added && !comparable(own).includes(added);
-};
+export const addsToInterviewComment = (own: unknown, proposed: unknown): boolean =>
+  !!comparable(proposed) && !alreadySays(own, proposed);
 
 // Their comment, then what the proposal adds. A proposal that already holds theirs stands alone.
 const joinInterviewComments = (own: string, proposed: string): string => {
   if (!addsToInterviewComment(own, proposed)) return own;
-  if (comparable(proposed).includes(comparable(own))) return proposed;
+  if (!comparable(own) || alreadySays(proposed, own)) return proposed;
   return `${own.trimEnd()}\n\n${proposed.trim()}`;
 };
 

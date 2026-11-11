@@ -27,6 +27,24 @@ describe('a draft comment beside the person’s own', () => {
     expect(startingInterviewComment('AI only', '*')).toBe('');
   });
 
+  it.each([
+    ['Agree', 'I disagree with the cost.'],
+    ['No', 'Not sure the budget covers it.'],
+    ['Yes', 'My eyes are on transit.'],
+    ['ok', 'Look at the housing numbers.'],
+  ])('keeps "%s" when the AI’s comment holds it only inside a word: %s', (own, proposed) => {
+    const joined = `${own}\n\n${proposed}`;
+    expect(addsToInterviewComment(own, proposed)).toBe(true);
+    expect(startingInterviewComment(proposed, own)).toBe(joined);
+    expect(interviewCommentChoices(proposed, own)).toEqual([
+      { label: 'Both', value: joined },
+      { label: 'Mine', value: own },
+      { label: 'AI’s', value: proposed },
+    ]);
+    // Their own comment holding the AI's only inside a word still gets it added.
+    expect(addsToInterviewComment(proposed, own)).toBe(true);
+  });
+
   it('offers distinct quick choices only when both comments exist and differ', () => {
     expect(interviewCommentChoices('With a rota', 'Mine')).toEqual([
       { label: 'Both', value: 'Mine\n\nWith a rota' },

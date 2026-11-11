@@ -57,6 +57,10 @@ const findWholePhrase = (text: string, phrase: string): Array<[number, number]> 
   return spans;
 };
 
+/** Whether a phrase appears in text as whole words, ignoring case: "agree" isn't in "I disagree". */
+export const includesWholePhrase = (text: string, phrase: string): boolean =>
+  !!phrase.trim() && findWholePhrase(text, phrase).length > 0;
+
 // Where a fact was cut, drop the punctuation left standing alone and spare spaces.
 const tidyCutLine = (line: string): string =>
   line
