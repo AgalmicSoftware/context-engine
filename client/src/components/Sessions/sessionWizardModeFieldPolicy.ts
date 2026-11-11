@@ -6,6 +6,7 @@ export type SessionWizardModeFieldPolicy = {
   showBlockLimits: boolean;
   showFaucet: boolean;
   showSessionEndsAt: boolean;
+  showAgentInstructions: boolean;
   showWorkerGroupDefaults: boolean;
   showSbtDefaults: boolean;
   showAgentSessionWrapped: boolean;
@@ -16,6 +17,7 @@ export const SESSION_WIZARD_MODE_POLICY_FIELD_KEYS = Object.freeze([
   'blockLimits',
   'faucet',
   'sessionEndsAt',
+  'agentInstructions',
   'contracts',
   'defaultGroupTags',
   'defaultSbtTags',
@@ -30,6 +32,7 @@ const LEGACY_FIELD_POLICY: SessionWizardModeFieldPolicy = {
   showBlockLimits: true,
   showFaucet: true,
   showSessionEndsAt: false,
+  showAgentInstructions: false,
   showWorkerGroupDefaults: false,
   showSbtDefaults: true,
   showAgentSessionWrapped: true,
@@ -47,6 +50,7 @@ export const resolveSessionWizardModeFieldPolicy = (
       showBlockLimits: false,
       showFaucet: false,
       showSessionEndsAt: true,
+      showAgentInstructions: true,
       showWorkerGroupDefaults: true,
       showSbtDefaults: usesOnChainSbt,
       showAgentSessionWrapped: requirements.usesAgentSessionWrapped,
@@ -66,6 +70,7 @@ export const isSessionWizardModeHiddenTopLevelField = (key: string, policy?: Ses
   if (key === 'blockLimits') return !policy.showBlockLimits;
   if (key === 'faucet') return !policy.showFaucet;
   if (key === 'sessionEndsAt') return !policy.showSessionEndsAt;
+  if (key === 'agentInstructions') return !policy.showAgentInstructions;
   if (key === 'contracts') return policy.visibleContractKeys.length === 0;
   if (key === 'defaultGroupTags') return !policy.showWorkerGroupDefaults;
   if (key === 'agentSessionWrapped') return !policy.showAgentSessionWrapped;

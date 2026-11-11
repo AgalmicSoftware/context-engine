@@ -223,6 +223,44 @@ test('createWorkerRouteShellWithWorkerDeps preserves session-config bootstrap br
   assert.equal(await routeShell.fetch(request, env), response);
 });
 
+test('createWorkerRouteShellWithWorkerDeps sends GET /llms.txt to the agent instructions read for this Worker\'s session', async () => {
+  const request = createRequest('/llms.txt', 'GET');
+  const env = { GROUP_KV: { id: 'kv' }, DEFAULT_SESSION_SLUG: 'demo-1' };
+  const baseHeaders = { 'Access-Control-Allow-Origin': 'https://allowed.example' };
+  const response = new Response('# Taking part');
+
+  const routeShell = createWorkerRouteShellWithWorkerDeps({
+    deps: {
+      ...createBaseDeps(),
+      // The real route selection, so the path itself is what's checked.
+      toStr: String,
+      getRouteBaseHeaders: () => baseHeaders,
+      getDefaultWorkerSessionSlug: () => 'demo-1',
+      dispatchSessionConfigBootstrapRequest: async () => assert.fail('/llms.txt is not the session config'),
+      dispatchSessionAgentInstructionsRequest: async (value) => {
+        assert.equal(value.request, request);
+        assert.equal(value.env, env);
+        assert.equal(value.slugHint, 'demo-1');
+        assert.equal(value.baseHeaders, baseHeaders);
+        assert.deepEqual(value.deps, {
+          resolveRequestSlugWithoutToken: 'resolveRequestSlugWithoutToken',
+          getSessionConfig: 'getSessionConfig',
+          getCorsContext: 'getCorsContext',
+          json: 'json',
+        });
+        assert.deepEqual(value.constants, {
+          missingSlugError: 'Missing sessionSlug.',
+          sessionConfigNotFoundError: 'Session config not found.',
+        });
+        return response;
+      },
+    },
+    constants: createBaseConstants(),
+  });
+
+  assert.equal(await routeShell.fetch(request, env), response);
+});
+
 test('createWorkerRouteShellWithWorkerDeps preserves interview brief branch wiring', async () => {
   const request = createRequest('/agent/interview-brief?slug=demo-1', 'GET');
   const env = { SESSION_CONFIGS: { id: 'kv' }, DEFAULT_SESSION_SLUG: 'demo-1' };

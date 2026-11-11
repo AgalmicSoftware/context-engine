@@ -22,6 +22,11 @@ agent it is, and to follow the session's own instructions first. When a
 session lets participants add context, it invites agents to add a file, a link
 or text that every participant sees.
 
+A session on a Session Worker can give agents its own instructions in
+Markdown, for example which group to join: **Instructions for AI agents**, at
+`/new` or in the session's settings. Its Worker serves them as text at
+`<worker origin>/llms.txt`, and anyone can read them.
+
 ## Package scope and deployment
 
 `@agalmic/contextengine` is a local stdio MCP server launched by an agent host such as

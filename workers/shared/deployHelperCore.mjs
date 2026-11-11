@@ -1,4 +1,5 @@
 import { validSessionAgentConfig } from '../../shared/sessionAgentConfig.mjs';
+import { MAX_AGENT_INSTRUCTIONS_CHARS, validAgentInstructions } from '../../shared/sessionConfigEdits.mjs';
 import { stableCanonicalSerialize } from '../../shared/canonicalJson.mjs';
 import { recoveryKeyFingerprint, withFreshRecoveryKey } from './recoveryKey.mjs';
 import { fetchArtifactText } from './artifactFetch.mjs';
@@ -1364,6 +1365,11 @@ const executeDeployHelperRequestCore = async ({
   if (!['admin_only', 'participants'].includes(groupCreationPolicy)) {
     return buildFailure(400, {
       error: 'groupCreationPolicy must be "admin_only" or "participants".',
+    });
+  }
+  if (Object.hasOwn(body || {}, 'agentInstructions') && !validAgentInstructions(body.agentInstructions)) {
+    return buildFailure(400, {
+      error: `agentInstructions must be text of at most ${MAX_AGENT_INSTRUCTIONS_CHARS} characters.`,
     });
   }
   if (workerCanonicalRequested && !/^0x[0-9a-f]{40}$/i.test(adminAddress)) {

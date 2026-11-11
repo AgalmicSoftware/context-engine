@@ -136,3 +136,9 @@ test('public config shows the AI models and effort, hides the rest of ai, and sa
     debateAtlas: true,
   });
 });
+
+test('instructions for AI agents are public and kept at deploy', () => {
+  const agentInstructions = '# Taking part\n\nJoin the group tagged `ai-agents`.';
+  assert.equal(projectPublicWorkerSessionConfig({ agentInstructions }).agentInstructions, agentInstructions);
+  assert.deepEqual(selectDeployWorkerSessionConfigFields({ agentInstructions }), { agentInstructions });
+});

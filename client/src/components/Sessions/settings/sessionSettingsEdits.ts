@@ -4,11 +4,13 @@ import { normalizeResultsAnalysisSettings } from '@ce-shared/resultsAnalysisSett
 import { normalizeSessionContext } from '@ce-shared/sessionContext.mjs';
 import {
   CURATED_ID_LIST_KEYS,
+  MAX_AGENT_INSTRUCTIONS_CHARS,
   MAX_CURATED_IDS,
   MAX_RESULTS_ADMINS,
   WORKER_CANONICAL_SET_CONFIG_KEYS,
   classifySessionConfigEdits,
   mergeSetConfigAi,
+  validAgentInstructions,
   validCuratedIdList,
   validResultsAdminAddresses,
   type SessionConfigEditClassification,
@@ -106,6 +108,7 @@ export const buildSessionSettingsDraft = (config: unknown): SetupDraft => {
     defaultTags: text(source.defaultTags),
     defaultGroupTags: text(source.defaultGroupTags),
     questionsGenPrompt: text(source.questionsGenPrompt),
+    agentInstructions: text(source.agentInstructions),
     groupCreationPolicy: source.groupCreationPolicy,
     contextAdditionPolicy: source.contextAdditionPolicy,
     interviewModeEnabled: source.interviewModeEnabled !== false,
@@ -244,6 +247,15 @@ const editedValues = (before: Config, draft: SetupDraft, { nowMs, onChain }: Edi
       throw new Error(`Results admins: up to ${MAX_RESULTS_ADMINS} different addresses (0x and 40 hex digits).`);
     }
     values.resultsAdminAddresses = resultsAdmins;
+  }
+  // Worker sessions only, for now: the Worker serves them at /llms.txt.
+  if (!onChain) {
+    values.agentInstructions = trimmed(draft.agentInstructions);
+    if (!validAgentInstructions(values.agentInstructions)) {
+      throw new Error(
+        `Instructions for AI agents: up to ${MAX_AGENT_INSTRUCTIONS_CHARS.toLocaleString('en-US')} characters.`,
+      );
+    }
   }
   // Pile navigation has a deployment default; only a changed choice is stored.
   if (draft.pileAutoAdvanceEnabled !== resolvePileAutoAdvanceEnabled(before)) {
@@ -406,6 +418,7 @@ const LABELS: Record<string, string> = {
   defaultTags: 'Tag suggestions',
   defaultGroupTags: 'Group tags',
   questionsGenPrompt: 'Question prompt',
+  agentInstructions: 'Instructions for AI agents',
   interviewModeEnabled: 'Voice interviews',
   interviewMode: 'Interview settings',
   'interviewMode.openingPrompt': 'Opening question',

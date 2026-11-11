@@ -2,9 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  dispatchSessionAgentInstructionsRequest,
   dispatchSessionConfigBootstrapRequest,
   projectPublicWorkerSessionConfig,
 } from './sessionConfigBootstrapDispatch.js';
+import { json as jsonResponse } from './responseKvHelpers.js';
 import {
   findForbiddenCloudflareDeploymentTokenPath,
   findForbiddenWorkerConfigSecretPath,
@@ -255,6 +257,7 @@ test('projectPublicWorkerSessionConfig keeps worker-canonical editable text meta
     defaultGroupTags: 'facilitators,reviewers',
     defaultSbtTags: 'member',
     questionsGenPrompt: 'Ask a worker-owned question',
+    agentInstructions: '# Taking part\n\nJoin the group tagged `ai-agents`.',
     defaultFilterState: { sort: 'recent' },
     defaultFeaturedSBTs: ['0x0000000000000000000000000000000000000001'],
     autoFeatureSBTsBySessionSlug: true,
@@ -275,6 +278,7 @@ test('projectPublicWorkerSessionConfig keeps worker-canonical editable text meta
     defaultGroupTags: 'facilitators,reviewers',
     defaultSbtTags: 'member',
     questionsGenPrompt: 'Ask a worker-owned question',
+    agentInstructions: '# Taking part\n\nJoin the group tagged `ai-agents`.',
     defaultFilterState: { sort: 'recent' },
     defaultFeaturedSBTs: ['0x0000000000000000000000000000000000000001'],
     autoFeatureSBTsBySessionSlug: true,
@@ -662,6 +666,57 @@ test('dispatchSessionConfigBootstrapRequest rejects missing config, wrong author
   assert.equal(blockedCorsResponse.status, 403);
   assert.equal(blockedCorsResponse.headers.get('Cache-Control'), 'no-store');
   assert.equal(blockedCorsResponse.headers.get('Vary'), 'Origin, X-Session-Slug');
+});
+
+test('GET /llms.txt serves the session\'s instructions for AI agents as text that never runs as a page', async () => {
+  const instructions = '# Taking part\n\nJoin the group tagged `ai-agents`.\n\n<script>alert(1)</script>';
+  const read = (config, cors = { ok: true, headers: {} }) => dispatchSessionAgentInstructionsRequest({
+    request: new Request('https://worker.example/llms.txt'),
+    env: {},
+    slugHint: 'session-a',
+    baseHeaders: {},
+    deps: {
+      resolveRequestSlugWithoutToken: () => ({ ok: true, slug: 'session-a', explicitSlugProvided: true }),
+      getSessionConfig: async () => config,
+      getCorsContext: async () => cors,
+      json: jsonResponse,
+    },
+    constants: {
+      missingSlugError: 'Session slug is required.',
+      sessionConfigNotFoundError: 'Session config not found.',
+    },
+  });
+
+  const response = await read({ ...buildWorkerCanonicalConfig(), agentInstructions: instructions });
+  assert.equal(response.status, 200);
+  assert.equal(await response.text(), instructions);
+  assert.deepEqual(Object.fromEntries(response.headers.entries()), {
+    'cache-control': 'no-store',
+    'content-security-policy': "sandbox; default-src 'none'",
+    'content-type': 'text/markdown; charset=utf-8',
+    vary: 'Origin, X-Session-Slug',
+    'x-content-type-options': 'nosniff',
+  });
+
+  for (const empty of [{}, { agentInstructions: '' }, { agentInstructions: ' \n ' }]) {
+    const none = await read({ ...buildWorkerCanonicalConfig(), ...empty });
+    assert.equal(none.status, 404, JSON.stringify(empty));
+    assert.deepEqual(await none.json(), { error: 'This session has no instructions for AI agents.' });
+    assert.equal(none.headers.get('Cache-Control'), 'no-store');
+  }
+  // The same refusals as /session-config: a session this Worker doesn't hold,
+  // one it holds for the chain, and a browser origin it doesn't accept.
+  assert.equal((await read(null)).status, 404);
+  assert.equal((await read({
+    sessionModeProfile: { authority: { mode: 'evm_registry_canonical' } },
+    agentInstructions: instructions,
+  })).status, 404);
+  const blocked = await read(
+    { ...buildWorkerCanonicalConfig(), agentInstructions: instructions },
+    { ok: false, response: jsonResponse({ error: 'Origin not allowed.' }, 403, {}) },
+  );
+  assert.equal(blocked.status, 403);
+  assert.equal((await blocked.text()).includes(instructions), false);
 });
 
 test('field-key capability requires the deployed KEK and audit binding, not a persisted advertisement', async () => {

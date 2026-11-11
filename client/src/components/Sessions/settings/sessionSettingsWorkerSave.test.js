@@ -12,6 +12,7 @@ import {
   applyTemplateToSessionSettingsDraft,
   buildSessionSettingsDraft,
   buildSessionSettingsSave,
+  describeSessionSettingsPath,
   rebaseSessionSettingsDraft,
 } from './sessionSettingsEdits';
 
@@ -421,6 +422,32 @@ describe('saving the edit page through the Session Worker', () => {
       sessionName: 'Typed name',
       ai: { reasoningEffort: 'high' },
     });
+  });
+
+  it('saves instructions for AI agents as content, clears them, and refuses more than 8,000 characters', () => {
+    const stored = publishedSession();
+    const instructions = '# Taking part\n\nJoin the group tagged `ai-agents`.';
+    const { save, result } = editAndSave(stored, (draft) => {
+      draft.agentInstructions = `  ${instructions}\n`;
+    });
+    expect(save.patch).toEqual({ agentInstructions: instructions });
+    expect(save.classification).toEqual({ content: ['agentInstructions'], authority: [], signsParticipantsOut: false });
+    expect(describeSessionSettingsPath('agentInstructions')).toBe('Instructions for AI agents');
+    expect(result).toMatchObject({ ok: true, config: { agentInstructions: instructions } });
+    expect(result.config.authzEpoch).toBe(stored.authzEpoch);
+
+    const cleared = editAndSave(result.config, (draft) => {
+      expect(draft.agentInstructions).toBe(instructions);
+      draft.agentInstructions = '';
+    });
+    expect(cleared.save.patch).toEqual({ agentInstructions: '' });
+    expect(cleared.result).toMatchObject({ ok: true, config: { agentInstructions: '' } });
+
+    const before = projectPublicWorkerSessionConfig(stored);
+    const draft = { ...buildSessionSettingsDraft(before), agentInstructions: 'x'.repeat(8001) };
+    expect(() => buildSessionSettingsSave(before, draft)).toThrow(
+      'Instructions for AI agents: up to 8,000 characters.',
+    );
   });
 
   it('saves nothing when nothing changed', () => {

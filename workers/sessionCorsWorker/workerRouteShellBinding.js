@@ -53,6 +53,7 @@ import {
   dispatchResourcePresenceRequest as dispatchResourcePresenceRequestBoundary,
 } from './resourcePresenceDispatch.js';
 import {
+  dispatchSessionAgentInstructionsRequest as dispatchSessionAgentInstructionsRequestBoundary,
   dispatchSessionConfigBootstrapRequest as dispatchSessionConfigBootstrapRequestBoundary,
 } from './sessionConfigBootstrapDispatch.js';
 import {
@@ -92,6 +93,9 @@ export const createWorkerRouteShellWithWorkerDeps = ({
   );
   const dispatchSessionConfigBootstrapRequest = (
     deps?.dispatchSessionConfigBootstrapRequest || dispatchSessionConfigBootstrapRequestBoundary
+  );
+  const dispatchSessionAgentInstructionsRequest = (
+    deps?.dispatchSessionAgentInstructionsRequest || dispatchSessionAgentInstructionsRequestBoundary
   );
   const dispatchInterviewBriefRequest = (
     deps?.dispatchInterviewBriefRequest || dispatchInterviewBriefRequestBoundary
@@ -164,8 +168,10 @@ export const createWorkerRouteShellWithWorkerDeps = ({
         });
       }
 
-      if (routeSelection.kind === 'session-config') {
-        return await dispatchSessionConfigBootstrapRequest({
+      if (routeSelection.kind === 'session-config' || routeSelection.kind === 'agent-instructions') {
+        return await (routeSelection.kind === 'agent-instructions'
+          ? dispatchSessionAgentInstructionsRequest
+          : dispatchSessionConfigBootstrapRequest)({
           request,
           env,
           slugHint: envSlug,

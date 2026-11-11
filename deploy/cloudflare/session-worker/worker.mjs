@@ -25250,6 +25250,128 @@ var init_canonicalJson = __esm({
   }
 });
 
+// shared/sessionConfigEdits.mjs
+var WORKER_CANONICAL_SET_CONFIG_KEYS, CURATED_ID_LIST_KEYS, MAX_CURATED_IDS, CURATED_ID, validCuratedIdList, MAX_RESULTS_ADMINS, ADDRESS, validResultsAdminAddresses, MAX_AGENT_INSTRUCTIONS_CHARS, validAgentInstructions, CONTENT_FIELDS, INTERVIEW_CONTENT_FIELDS, record2, same, mergeSetConfigAi, without, onlyAddsInvites, authorityView, sessionConfigRequiresReauthorization;
+var init_sessionConfigEdits = __esm({
+  "shared/sessionConfigEdits.mjs"() {
+    init_canonicalJson();
+    WORKER_CANONICAL_SET_CONFIG_KEYS = Object.freeze([
+      "slug",
+      "sessionId",
+      "sessionIdHex",
+      "configRevision",
+      "sessionName",
+      "sessionInfo",
+      "sessionContext",
+      "appearance",
+      "sessionHeaderImg",
+      "sessionEndsAt",
+      "defaultTags",
+      "defaultGroupTags",
+      "defaultSbtTags",
+      "questionsGenPrompt",
+      "agentInstructions",
+      "interviewMode",
+      "interviewModeEnabled",
+      "pileAutoAdvanceEnabled",
+      "defaultFilterState",
+      "defaultFeaturedSBTs",
+      "autoFeatureSBTsBySessionSlug",
+      "HIGHLIGHTED_QUESTION_IDS",
+      "BLOCKED_QUESTION_IDS",
+      "HIGHLIGHTED_SURVEY_IDS",
+      "BLOCKED_SURVEY_IDS",
+      "adminAddress",
+      "adminAddresses",
+      "resultsAdminAddresses",
+      "corsWorkerUrl",
+      "allowOrigins",
+      "sessionModeProfile",
+      "agentSessionWrapped",
+      "agentHttp",
+      "resultsExposure",
+      "workerAuthority",
+      "workerRoles",
+      "roles",
+      "authorization",
+      "groupCreationPolicy",
+      "contextAdditionPolicy",
+      "storageProfile",
+      "storageEnvelope",
+      "ai",
+      "limits",
+      "scopes",
+      "networkChainId",
+      "contracts",
+      "embeddedDeployHelperEnabled",
+      "litCredentials",
+      "resultsAnalysis",
+      "responseFieldEncryption",
+      "linkedWorkerGroups",
+      "workerGroupsBootstrap"
+    ]);
+    CURATED_ID_LIST_KEYS = Object.freeze([
+      "HIGHLIGHTED_QUESTION_IDS",
+      "BLOCKED_QUESTION_IDS",
+      "HIGHLIGHTED_SURVEY_IDS",
+      "BLOCKED_SURVEY_IDS"
+    ]);
+    MAX_CURATED_IDS = 500;
+    CURATED_ID = /^[A-Za-z0-9._:-]{1,128}$/;
+    validCuratedIdList = (value) => Array.isArray(value) && value.length <= MAX_CURATED_IDS && value.every((id2) => typeof id2 === "string" && CURATED_ID.test(id2));
+    MAX_RESULTS_ADMINS = 20;
+    ADDRESS = /^0x[0-9a-fA-F]{40}$/;
+    validResultsAdminAddresses = (value) => Array.isArray(value) && value.length <= MAX_RESULTS_ADMINS && value.every((address2) => typeof address2 === "string" && ADDRESS.test(address2)) && new Set(value.map((address2) => address2.toLowerCase())).size === value.length;
+    MAX_AGENT_INSTRUCTIONS_CHARS = 8e3;
+    validAgentInstructions = (value) => typeof value === "string" && value.length <= MAX_AGENT_INSTRUCTIONS_CHARS;
+    CONTENT_FIELDS = /* @__PURE__ */ new Set([
+      "sessionName",
+      "sessionInfo",
+      "sessionContext",
+      "questionsGenPrompt",
+      "appearance",
+      "sessionHeaderImg",
+      "agentInstructions",
+      // Checked again when each file publishes, so changing it signs no one out.
+      "contextAdditionPolicy",
+      // Checked on each atlas build and read and never held in a sign-in, so
+      // changing it signs no one out either.
+      "resultsAdminAddresses",
+      ...CURATED_ID_LIST_KEYS
+    ]);
+    INTERVIEW_CONTENT_FIELDS = /* @__PURE__ */ new Set(["openingPrompt", "steeringPrompt"]);
+    record2 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+    same = (left, right) => stableCanonicalSerialize(left) === stableCanonicalSerialize(right);
+    mergeSetConfigAi = (stored, sent) => record2(stored) && record2(sent) ? { ...stored, ...sent } : sent;
+    without = (value, keys) => Object.fromEntries(Object.entries(value).filter(([key]) => !keys.has(key)));
+    onlyAddsInvites = (before, after) => {
+      const prior = before === void 0 ? [] : before;
+      const next = after === void 0 ? [] : after;
+      if (!Array.isArray(prior) || !Array.isArray(next)) return false;
+      const unique2 = (rows) => rows.every((row) => record2(row) && typeof row.tokenHash === "string") && new Set(rows.map((row) => row.tokenHash)).size === rows.length;
+      if (!unique2(prior) || !unique2(next)) return false;
+      const byHash = new Map(next.map((row) => [row.tokenHash, row]));
+      return prior.every((row) => byHash.has(row.tokenHash) && same(row, byHash.get(row.tokenHash)));
+    };
+    authorityView = (config, additiveInvites) => {
+      const result = without(config, CONTENT_FIELDS);
+      if (record2(result.interviewMode)) {
+        result.interviewMode = without(result.interviewMode, INTERVIEW_CONTENT_FIELDS);
+        if (!Object.keys(result.interviewMode).length) delete result.interviewMode;
+      }
+      if (record2(result.agentHttp) && additiveInvites) {
+        result.agentHttp = without(result.agentHttp, /* @__PURE__ */ new Set(["invites"]));
+        if (!Object.keys(result.agentHttp).length) delete result.agentHttp;
+      }
+      return result;
+    };
+    sessionConfigRequiresReauthorization = (before, after) => {
+      const additiveInvites = onlyAddsInvites(before?.agentHttp?.invites, after?.agentHttp?.invites);
+      return !same(authorityView(before, additiveInvites), authorityView(after, additiveInvites));
+    };
+  }
+});
+
 // shared/crypto/recoveryKeyFingerprint.mjs
 var encoder, recoveryKeyFingerprint;
 var init_recoveryKeyFingerprint = __esm({
@@ -25847,6 +25969,7 @@ var init_workerSessionPublicConfig = __esm({
       "defaultGroupTags",
       "defaultSbtTags",
       "questionsGenPrompt",
+      "agentInstructions",
       "defaultFilterState",
       "defaultFeaturedSBTs",
       "autoFeatureSBTsBySessionSlug",
@@ -25911,6 +26034,7 @@ var init_workerSessionConfig = __esm({
       "defaultGroupTags",
       "defaultSbtTags",
       "questionsGenPrompt",
+      "agentInstructions",
       "defaultFilterState",
       "defaultFeaturedSBTs",
       "autoFeatureSBTsBySessionSlug",
@@ -26957,6 +27081,7 @@ var import_rpcDefaults3, getPathRpcUrl, DEFAULT_COMPAT_DATE, DEFAULT_FAUCET_RPC_
 var init_deployHelperCore = __esm({
   "workers/shared/deployHelperCore.mjs"() {
     init_sessionAgentConfig();
+    init_sessionConfigEdits();
     init_canonicalJson();
     init_recoveryKey();
     init_artifactFetch();
@@ -28100,6 +28225,11 @@ var init_deployHelperCore = __esm({
       if (!["admin_only", "participants"].includes(groupCreationPolicy)) {
         return buildFailure(400, {
           error: 'groupCreationPolicy must be "admin_only" or "participants".'
+        });
+      }
+      if (Object.hasOwn(body || {}, "agentInstructions") && !validAgentInstructions(body.agentInstructions)) {
+        return buildFailure(400, {
+          error: `agentInstructions must be text of at most ${MAX_AGENT_INSTRUCTIONS_CHARS} characters.`
         });
       }
       if (workerCanonicalRequested && !/^0x[0-9a-f]{40}$/i.test(adminAddress)) {
@@ -30042,124 +30172,6 @@ var init_workerGroupUrl = __esm({
   }
 });
 
-// shared/sessionConfigEdits.mjs
-var WORKER_CANONICAL_SET_CONFIG_KEYS, CURATED_ID_LIST_KEYS, MAX_CURATED_IDS, CURATED_ID, validCuratedIdList, MAX_RESULTS_ADMINS, ADDRESS, validResultsAdminAddresses, CONTENT_FIELDS, INTERVIEW_CONTENT_FIELDS, record2, same, mergeSetConfigAi, without, onlyAddsInvites, authorityView, sessionConfigRequiresReauthorization;
-var init_sessionConfigEdits = __esm({
-  "shared/sessionConfigEdits.mjs"() {
-    init_canonicalJson();
-    WORKER_CANONICAL_SET_CONFIG_KEYS = Object.freeze([
-      "slug",
-      "sessionId",
-      "sessionIdHex",
-      "configRevision",
-      "sessionName",
-      "sessionInfo",
-      "sessionContext",
-      "appearance",
-      "sessionHeaderImg",
-      "sessionEndsAt",
-      "defaultTags",
-      "defaultGroupTags",
-      "defaultSbtTags",
-      "questionsGenPrompt",
-      "interviewMode",
-      "interviewModeEnabled",
-      "pileAutoAdvanceEnabled",
-      "defaultFilterState",
-      "defaultFeaturedSBTs",
-      "autoFeatureSBTsBySessionSlug",
-      "HIGHLIGHTED_QUESTION_IDS",
-      "BLOCKED_QUESTION_IDS",
-      "HIGHLIGHTED_SURVEY_IDS",
-      "BLOCKED_SURVEY_IDS",
-      "adminAddress",
-      "adminAddresses",
-      "resultsAdminAddresses",
-      "corsWorkerUrl",
-      "allowOrigins",
-      "sessionModeProfile",
-      "agentSessionWrapped",
-      "agentHttp",
-      "resultsExposure",
-      "workerAuthority",
-      "workerRoles",
-      "roles",
-      "authorization",
-      "groupCreationPolicy",
-      "contextAdditionPolicy",
-      "storageProfile",
-      "storageEnvelope",
-      "ai",
-      "limits",
-      "scopes",
-      "networkChainId",
-      "contracts",
-      "embeddedDeployHelperEnabled",
-      "litCredentials",
-      "resultsAnalysis",
-      "responseFieldEncryption",
-      "linkedWorkerGroups",
-      "workerGroupsBootstrap"
-    ]);
-    CURATED_ID_LIST_KEYS = Object.freeze([
-      "HIGHLIGHTED_QUESTION_IDS",
-      "BLOCKED_QUESTION_IDS",
-      "HIGHLIGHTED_SURVEY_IDS",
-      "BLOCKED_SURVEY_IDS"
-    ]);
-    MAX_CURATED_IDS = 500;
-    CURATED_ID = /^[A-Za-z0-9._:-]{1,128}$/;
-    validCuratedIdList = (value) => Array.isArray(value) && value.length <= MAX_CURATED_IDS && value.every((id2) => typeof id2 === "string" && CURATED_ID.test(id2));
-    MAX_RESULTS_ADMINS = 20;
-    ADDRESS = /^0x[0-9a-fA-F]{40}$/;
-    validResultsAdminAddresses = (value) => Array.isArray(value) && value.length <= MAX_RESULTS_ADMINS && value.every((address2) => typeof address2 === "string" && ADDRESS.test(address2)) && new Set(value.map((address2) => address2.toLowerCase())).size === value.length;
-    CONTENT_FIELDS = /* @__PURE__ */ new Set([
-      "sessionName",
-      "sessionInfo",
-      "sessionContext",
-      "questionsGenPrompt",
-      "appearance",
-      "sessionHeaderImg",
-      // Checked again when each file publishes, so changing it signs no one out.
-      "contextAdditionPolicy",
-      // Checked on each atlas build and read and never held in a sign-in, so
-      // changing it signs no one out either.
-      "resultsAdminAddresses",
-      ...CURATED_ID_LIST_KEYS
-    ]);
-    INTERVIEW_CONTENT_FIELDS = /* @__PURE__ */ new Set(["openingPrompt", "steeringPrompt"]);
-    record2 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
-    same = (left, right) => stableCanonicalSerialize(left) === stableCanonicalSerialize(right);
-    mergeSetConfigAi = (stored, sent) => record2(stored) && record2(sent) ? { ...stored, ...sent } : sent;
-    without = (value, keys) => Object.fromEntries(Object.entries(value).filter(([key]) => !keys.has(key)));
-    onlyAddsInvites = (before, after) => {
-      const prior = before === void 0 ? [] : before;
-      const next = after === void 0 ? [] : after;
-      if (!Array.isArray(prior) || !Array.isArray(next)) return false;
-      const unique2 = (rows) => rows.every((row) => record2(row) && typeof row.tokenHash === "string") && new Set(rows.map((row) => row.tokenHash)).size === rows.length;
-      if (!unique2(prior) || !unique2(next)) return false;
-      const byHash = new Map(next.map((row) => [row.tokenHash, row]));
-      return prior.every((row) => byHash.has(row.tokenHash) && same(row, byHash.get(row.tokenHash)));
-    };
-    authorityView = (config, additiveInvites) => {
-      const result = without(config, CONTENT_FIELDS);
-      if (record2(result.interviewMode)) {
-        result.interviewMode = without(result.interviewMode, INTERVIEW_CONTENT_FIELDS);
-        if (!Object.keys(result.interviewMode).length) delete result.interviewMode;
-      }
-      if (record2(result.agentHttp) && additiveInvites) {
-        result.agentHttp = without(result.agentHttp, /* @__PURE__ */ new Set(["invites"]));
-        if (!Object.keys(result.agentHttp).length) delete result.agentHttp;
-      }
-      return result;
-    };
-    sessionConfigRequiresReauthorization = (before, after) => {
-      const additiveInvites = onlyAddsInvites(before?.agentHttp?.invites, after?.agentHttp?.invites);
-      return !same(authorityView(before, additiveInvites), authorityView(after, additiveInvites));
-    };
-  }
-});
-
 // shared/interviewSettings.mjs
 var DEFAULT_INTERVIEW_SETTINGS, MAX_HIDDEN_DRAFT_SHARE, MAX_FIDELITY_MINIMUM_PEOPLE, normalizeInterviewSettings, validInterviewSettings, hasInterviewQuestionGrowth;
 var init_interviewSettings = __esm({
@@ -30695,6 +30707,13 @@ var init_sessionConfigMutation = __esm({
             ok: false,
             status: 400,
             error: `resultsAdminAddresses must list at most ${MAX_RESULTS_ADMINS} different addresses.`
+          };
+        }
+        if (hasOwn4(incomingConfig, "agentInstructions") && !validAgentInstructions(incomingConfig.agentInstructions)) {
+          return {
+            ok: false,
+            status: 400,
+            error: `agentInstructions must be text of at most ${MAX_AGENT_INSTRUCTIONS_CHARS} characters.`
           };
         }
         if (hasOwn4(incomingConfig, "sessionContext")) {
@@ -105552,25 +105571,14 @@ var protectBootstrapResponse = (response2, baseHeaders) => {
   }
   return { ...response2, headers: headers2 };
 };
-var dispatchSessionConfigBootstrapRequest = async ({
-  request,
-  env,
-  slugHint,
-  baseHeaders,
-  deps,
-  constants
-} = {}) => {
-  const protectedBaseHeaders = buildBootstrapHeaders(baseHeaders);
+var readWorkerSessionConfig = async ({ request, env, slugHint, headers: headers2, deps, constants } = {}) => {
+  const refuse = (error, status) => ({ response: deps?.json?.({ error }, status, headers2) });
   const slugResolution = deps?.resolveRequestSlugWithoutToken?.({ request, env, slugHint }) || {
     ok: false,
     error: "Invalid session slug."
   };
-  if (!slugResolution.ok) {
-    return deps?.json?.({ error: slugResolution.error }, 400, protectedBaseHeaders);
-  }
-  if (!slugResolution.explicitSlugProvided) {
-    return deps?.json?.({ error: constants?.missingSlugError }, 400, protectedBaseHeaders);
-  }
+  if (!slugResolution.ok) return refuse(slugResolution.error, 400);
+  if (!slugResolution.explicitSlugProvided) return refuse(constants?.missingSlugError, 400);
   const slug = slugResolution.slug;
   let querySlugRaw = null;
   try {
@@ -105579,23 +105587,35 @@ var dispatchSessionConfigBootstrapRequest = async ({
   }
   if (querySlugRaw != null) {
     const querySlug = validateInboundWorkerSessionSlug(querySlugRaw);
-    if (!querySlug.ok) {
-      return deps?.json?.({ error: querySlug.error }, 400, protectedBaseHeaders);
-    }
-    if (querySlug.slug !== slug) {
-      return deps?.json?.({ error: "Session config slug query does not match X-Session-Slug." }, 400, protectedBaseHeaders);
-    }
+    if (!querySlug.ok) return refuse(querySlug.error, 400);
+    if (querySlug.slug !== slug) return refuse("Session config slug query does not match X-Session-Slug.", 400);
   }
   const config = await deps?.getSessionConfig?.(env, slug);
-  if (!config || !isWorkerCanonicalSessionConfig(config)) {
-    return deps?.json?.({ error: constants?.sessionConfigNotFoundError }, 404, protectedBaseHeaders);
-  }
+  if (!config || !isWorkerCanonicalSessionConfig(config)) return refuse(constants?.sessionConfigNotFoundError, 404);
   const modeValidation = validateWorkerConfigModeValues(config);
-  if (!modeValidation.ok) {
-    return deps?.json?.({ error: constants?.sessionConfigNotFoundError }, 404, protectedBaseHeaders);
-  }
+  if (!modeValidation.ok) return refuse(constants?.sessionConfigNotFoundError, 404);
   const corsContext = await deps?.getCorsContext?.({ request, config });
-  if (!corsContext?.ok) return protectBootstrapResponse(corsContext?.response, protectedBaseHeaders);
+  if (!corsContext?.ok) return { response: protectBootstrapResponse(corsContext?.response, headers2) };
+  return { slug, config, headers: buildBootstrapHeaders(corsContext.headers) };
+};
+var dispatchSessionConfigBootstrapRequest = async ({
+  request,
+  env,
+  slugHint,
+  baseHeaders,
+  deps,
+  constants
+} = {}) => {
+  const read = await readWorkerSessionConfig({
+    request,
+    env,
+    slugHint,
+    headers: buildBootstrapHeaders(baseHeaders),
+    deps,
+    constants
+  });
+  if ("response" in read) return read.response;
+  const { slug, config } = read;
   return deps?.json?.({
     ok: true,
     sessionSlug: slug,
@@ -105607,7 +105627,34 @@ var dispatchSessionConfigBootstrapRequest = async ({
         version: resolveResponseFieldPolicy(config, { workerAvailable: true }).admin && !!env?.CE_STORAGE_ENVELOPE_KEK && typeof getStorageAuditBinding(env)?.put === "function" ? 1 : 0
       }
     }
-  }, 200, buildBootstrapHeaders(corsContext.headers));
+  }, 200, read.headers);
+};
+var dispatchSessionAgentInstructionsRequest = async ({
+  request,
+  env,
+  slugHint,
+  baseHeaders,
+  deps,
+  constants
+} = {}) => {
+  const read = await readWorkerSessionConfig({
+    request,
+    env,
+    slugHint,
+    headers: buildBootstrapHeaders(baseHeaders),
+    deps,
+    constants
+  });
+  if ("response" in read) return read.response;
+  const { agentInstructions } = projectPublicWorkerSessionConfig(read.config);
+  if (typeof agentInstructions !== "string" || !agentInstructions.trim()) {
+    return deps?.json?.({ error: "This session has no instructions for AI agents." }, 404, read.headers);
+  }
+  const headers2 = new Headers(read.headers);
+  headers2.set("Content-Type", "text/markdown; charset=utf-8");
+  headers2.set("X-Content-Type-Options", "nosniff");
+  headers2.set("Content-Security-Policy", "sandbox; default-src 'none'");
+  return new Response(agentInstructions, { status: 200, headers: headers2 });
 };
 
 // workers/sessionCorsWorker/interviewBriefDispatch.js
@@ -105837,6 +105884,7 @@ var resolveTopLevelRouteSelection = ({
   if (path === "/session-config" && method === "GET") {
     return { kind: "session-config" };
   }
+  if (path === "/llms.txt" && method === "GET") return { kind: "agent-instructions" };
   if ((path === "/agent/interview-catalog" || path === "/agent/interview-brief") && method === "GET") {
     return { kind: "interview-brief" };
   }
@@ -105906,6 +105954,7 @@ var createWorkerRouteShellWithWorkerDeps = ({
   const dispatchSponsoredBootstrapRedeem2 = deps?.dispatchSponsoredBootstrapRedeem || dispatchSponsoredBootstrapRedeem;
   const dispatchResourcePresenceRequest2 = deps?.dispatchResourcePresenceRequest || dispatchResourcePresenceRequest;
   const dispatchSessionConfigBootstrapRequest2 = deps?.dispatchSessionConfigBootstrapRequest || dispatchSessionConfigBootstrapRequest;
+  const dispatchSessionAgentInstructionsRequest2 = deps?.dispatchSessionAgentInstructionsRequest || dispatchSessionAgentInstructionsRequest;
   const dispatchInterviewBriefRequest2 = deps?.dispatchInterviewBriefRequest || dispatchInterviewBriefRequest;
   const dispatchAdminRequest2 = deps?.dispatchAdminRequest || dispatchAdminRequest;
   const dispatchAdminAbuseSummaryRequest2 = deps?.dispatchAdminAbuseSummaryRequest || dispatchAdminAbuseSummaryRequest;
@@ -105959,8 +106008,8 @@ var createWorkerRouteShellWithWorkerDeps = ({
           anonymousContext: { env, headers: routeBaseHeaders }
         });
       }
-      if (routeSelection.kind === "session-config") {
-        return await dispatchSessionConfigBootstrapRequest2({
+      if (routeSelection.kind === "session-config" || routeSelection.kind === "agent-instructions") {
+        return await (routeSelection.kind === "agent-instructions" ? dispatchSessionAgentInstructionsRequest2 : dispatchSessionConfigBootstrapRequest2)({
           request,
           env,
           slugHint: envSlug,

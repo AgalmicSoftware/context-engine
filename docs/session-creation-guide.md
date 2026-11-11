@@ -113,7 +113,7 @@ Each section shows only the settings the chosen hosting supports:
 
 | Hosting | Settings shown |
 | --- | --- |
-| Session Worker on Cloudflare | End time, question defaults, Worker Group tag defaults, and Worker-backed privacy and results controls |
+| Session Worker on Cloudflare | End time, instructions for AI agents, question defaults, Worker Group tag defaults, and Worker-backed privacy and results controls |
 | Session Worker with on-chain SBT access | The Cloudflare settings plus SBT curation and the network controls that access needs |
 | On-chain registry (Arweave) | Registry network, SBT gates and SBT curation. Contracts, block range and faucet amounts use chain defaults; edit them on the session's settings page after creation |
 
@@ -229,6 +229,12 @@ Session Worker stops participant AI, transcription, fetch, upload, Group
 creation, and Group join work. Existing public or authorized Groups, stored
 payloads, and results remain readable, and signed admin recovery/configuration
 routes remain available.
+
+The optional **Instructions for AI agents**, also for Worker-canonical
+sessions, tell agents what to know before taking part, such as which group to
+join: Markdown of up to 8,000 characters. The Session Worker serves them as
+text at `<worker origin>/llms.txt`, never as a page, and anyone can read them.
+Editing them signs no one out.
 
 **Group tags** in Participation seeds the tags in both participant and admin
 Worker Group creation. Worker sessions that carry only `defaultSbtTags` fall back
@@ -1358,9 +1364,9 @@ configuration without finalizing publication. You can edit and verify again;
 **Create** writes the final publication revision. Verifying an edited session
 description preserves existing sign-ins; authority changes still revoke them.
 
-Edits replace what an earlier verification stored: a blank end time is sent as
-`""` and blank request limits as `null`, so a cleared value does not stay on the
-Worker. The browser compares the shared public fields, including session
+Edits replace what an earlier verification stored: a blank end time or blank
+instructions for AI agents are sent as `""` and blank request limits as `null`,
+so a cleared value does not stay on the Worker. The browser compares the shared public fields, including session
 appearance and the Worker URL's origin. It skips fields the Worker sets itself:
 the authorization epoch, the publication marker, the response field encryption
 it reports on every read, and, before publication, a revision the deploy helper

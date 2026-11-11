@@ -10,6 +10,7 @@ const pureWorkerPolicy: SessionWizardModeFieldPolicy = {
   showBlockLimits: false,
   showFaucet: false,
   showSessionEndsAt: true,
+  showAgentInstructions: true,
   showWorkerGroupDefaults: true,
   showSbtDefaults: false,
   showAgentSessionWrapped: false,

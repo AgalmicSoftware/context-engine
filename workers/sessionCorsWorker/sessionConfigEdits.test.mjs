@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   CURATED_ID_LIST_KEYS,
+  MAX_AGENT_INSTRUCTIONS_CHARS,
   MAX_CURATED_IDS,
   MAX_RESULTS_ADMINS,
   WORKER_CANONICAL_SET_CONFIG_KEYS,
@@ -139,6 +140,20 @@ test('results admins save as a checked address list and sign no one out', () => 
   assert.equal(setConfig({ resultsAdminAddresses: tooMany.slice(1) }).ok, true);
 });
 
+test('instructions for AI agents save as text of at most 8,000 characters and sign no one out', () => {
+  const instructions = '# Taking part\n\nJoin the group tagged `ai-agents`.';
+  const saved = setConfig({ agentInstructions: instructions });
+  assert.equal(saved.ok, true);
+  assert.equal(saved.config.agentInstructions, instructions);
+  assert.deepEqual(classify({}, { agentInstructions: instructions }), { content: ['agentInstructions'], authority: [], signsParticipantsOut: false });
+  assert.equal(MAX_AGENT_INSTRUCTIONS_CHARS, 8000);
+  for (const valid of ['', 'x'.repeat(MAX_AGENT_INSTRUCTIONS_CHARS)]) assert.equal(setConfig({ agentInstructions: valid }).ok, true);
+  const error = `agentInstructions must be text of at most ${MAX_AGENT_INSTRUCTIONS_CHARS} characters.`;
+  for (const invalid of ['x'.repeat(MAX_AGENT_INSTRUCTIONS_CHARS + 1), 7, null, ['text'], { text: 'x' }]) {
+    assert.deepEqual(setConfig({ agentInstructions: invalid }), { ok: false, status: 400, error }, JSON.stringify(invalid).slice(0, 40));
+  }
+});
+
 test('lists each edited path as content or as a sign-out', () => {
   const before = {
     sessionName: 'A',
@@ -211,6 +226,7 @@ test('the preview matches the authorization epoch the Worker assigns on save', (
       appearance: { colorSchemeId: 'ocean' },
       sessionHeaderImg: 'https://example.com/header.png',
       questionsGenPrompt: 'Ask about parks',
+      agentInstructions: 'Join the group tagged ai-agents.',
     }, false],
     [{ interviewMode: { ...stored.interviewMode, openingPrompt: 'Welcome', steeringPrompt: 'Stay on topic' } }, false],
     [{ interviewMode: { ...stored.interviewMode, hiddenDraftShare: 0.5 } }, true],

@@ -1727,6 +1727,28 @@ describe('deploy-helper worker', () => {
     expect(fetchMock.workerNamePreflightCalls).toHaveLength(0);
   });
 
+  it('rejects instructions for AI agents over 8,000 characters before Cloudflare mutation', async () => {
+    for (const agentInstructions of ['x'.repeat(8001), 7]) {
+      const fetchMock = makeFetchSequence([]);
+      global.fetch = fetchMock;
+
+      const response = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {
+        apiToken: 'cf-token',
+        accountId: 'acc-123',
+        workerName: 'test-worker',
+        sessionSlug: 'alpha-session',
+        agentInstructions,
+        bundleUrl: 'https://bundles.example.test/sessionCorsWorker.bundle.js',
+      }), {}, {});
+      const payload = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(payload?.error).toBe('agentInstructions must be text of at most 8000 characters.');
+      expect(fetchMock.calls).toHaveLength(0);
+      expect(fetchMock.workerNamePreflightCalls).toHaveLength(0);
+    }
+  });
+
   it('rejects an existing worker-canonical name before creating KV or overwriting a script', async () => {
     const fetchMock = makeFetchSequence([]);
     fetchMock.workerNamePreflightOverride = cfSuccess({ compatibility_date: '2024-09-02' });

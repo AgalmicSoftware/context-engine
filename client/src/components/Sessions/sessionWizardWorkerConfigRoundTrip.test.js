@@ -144,13 +144,14 @@ it('verifies and publishes over the config a deploy helper staged', async () => 
   expect(worker.stored.configRevision).toBe(published.configRevision);
 });
 
-const buildWizardConfig = ({ sessionEndsAt, perWalletPerDay, perAnonymousIpPerDay }) => {
+const buildWizardConfig = ({ sessionEndsAt, perWalletPerDay, perAnonymousIpPerDay, agentInstructions = '' }) => {
   const draft = buildSessionWizardDefaultTemplate();
   draft.slug = slug;
   draft.sessionName = 'Edited session';
   draft.sessionModeProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
   draft.storageProfile = draft.sessionModeProfile.storage;
   draft.sessionEndsAt = sessionEndsAt;
+  draft.agentInstructions = agentInstructions;
   return buildSessionWizardWorkerVerificationConfig({
     runtime: {
       draft,
@@ -175,23 +176,35 @@ it.each([
     'an older Worker that merges limit keys',
     (incoming, stored) => ({ ...incoming, limits: { ...stored.limits, ...incoming.limits } }),
   ],
-])('clears an end time and a limit when editing and verifying again on %s', async (_label, adaptIncoming) => {
-  const endsAt = '2099-01-02T03:04:00.000Z';
-  const worker = createWorker({ adaptIncoming });
-  const verify = (config) => verifySessionWizardWorkerPublicDeployment(buildInput(config, worker));
+])(
+  'clears an end time, a limit and agent instructions when editing and verifying again on %s',
+  async (_label, adaptIncoming) => {
+    const endsAt = '2099-01-02T03:04:00.000Z';
+    const worker = createWorker({ adaptIncoming });
+    const verify = (config) => verifySessionWizardWorkerPublicDeployment(buildInput(config, worker));
 
-  await verify(buildWizardConfig({ sessionEndsAt: endsAt, perWalletPerDay: '100', perAnonymousIpPerDay: '5' }));
-  expect(worker.stored.sessionEndsAt).toBe(endsAt);
-  expect(worker.stored.limits).toEqual({ perWalletPerDay: 100, perAnonymousIpPerDay: 5 });
+    await verify(
+      buildWizardConfig({
+        sessionEndsAt: endsAt,
+        perWalletPerDay: '100',
+        perAnonymousIpPerDay: '5',
+        agentInstructions: ' Join the group tagged ai-agents.\n',
+      }),
+    );
+    expect(worker.stored.sessionEndsAt).toBe(endsAt);
+    expect(worker.stored.agentInstructions).toBe('Join the group tagged ai-agents.');
+    expect(worker.stored.limits).toEqual({ perWalletPerDay: 100, perAnonymousIpPerDay: 5 });
 
-  const edited = buildWizardConfig({ sessionEndsAt: '', perWalletPerDay: '100', perAnonymousIpPerDay: '' });
-  await verify(edited);
-  expect(worker.stored.sessionEndsAt).toBe('');
-  expect(worker.stored.limits).toEqual({ perWalletPerDay: 100, perAnonymousIpPerDay: null });
+    const edited = buildWizardConfig({ sessionEndsAt: '', perWalletPerDay: '100', perAnonymousIpPerDay: '' });
+    await verify(edited);
+    expect(worker.stored.sessionEndsAt).toBe('');
+    expect(worker.stored.agentInstructions).toBe('');
+    expect(worker.stored.limits).toEqual({ perWalletPerDay: 100, perAnonymousIpPerDay: null });
 
-  const published = await persistAndVerifySessionWizardWorkerConfig({
-    ...buildInput(edited, worker),
-    retryDelaysMs: [],
-  });
-  expect(worker.stored.workerCanonicalPublicationRevision).toBe(published.configRevision);
-});
+    const published = await persistAndVerifySessionWizardWorkerConfig({
+      ...buildInput(edited, worker),
+      retryDelaysMs: [],
+    });
+    expect(worker.stored.workerCanonicalPublicationRevision).toBe(published.configRevision);
+  },
+);

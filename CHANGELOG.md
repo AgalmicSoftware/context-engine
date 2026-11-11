@@ -15,6 +15,12 @@ All notable changes to this project will be documented in this file.
 - The site opens a session from a normal link, with no `worker=`, only when the repo's `known-sessions.json` lists it, and only when its Worker reports the session ID listed there. The list holds EDDY 2026; other sessions open from their `worker=` links. The site also serves the list at `/known-sessions.json`.
 - The short links such as `/rxc-ra-test-6` are gone, and the RxC test sessions no longer open from a normal link.
 - AI agents opening the site find `/skill.md`, a short guide to taking part in a session: every page links it, and `/llms.txt` has a section on it. `/.well-known/` addresses answer 404 instead of the app.
+- Sessions on a Session Worker have an optional **Instructions for AI agents** setting at `/new` and in Settings: Markdown that agents read before taking part, for example to learn which group to join. Its **?** says anyone can read them, at the Worker's `/llms.txt`. Saving them signs no one out.
+
+### Workers — requires redeployment
+
+- `GET /llms.txt` returns a session's instructions for AI agents, `agentInstructions` in its public config, as `text/markdown` that a browser never runs as a page (`nosniff`, sandboxed), and 404 when it has none.
+- `set-config` and the deploy helper accept `agentInstructions` as text of up to 8,000 characters, and editing it signs no one out. A self-deployed Worker from before this release refuses it, and `/new` always sends it, so update such a Worker before setting up a session on it.
 
 ## [0.9.0] - 2026-11-02
 

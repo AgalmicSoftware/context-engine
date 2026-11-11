@@ -3,6 +3,7 @@ import { Input } from 'reactstrap';
 
 import InterviewSettingsFields from '../InterviewSettingsFields';
 import { SESSION_CONTEXT_LIMITS, isHttpsUrl, validateSessionContext } from '@ce-shared/sessionContext.mjs';
+import { MAX_AGENT_INSTRUCTIONS_CHARS } from '@ce-shared/sessionConfigEdits.mjs';
 import { E2E_TESTIDS } from '../../../utilities/e2eTestIds.js';
 import {
   SESSION_COLOR_SCHEME_REGISTRY,
@@ -491,11 +492,14 @@ export const summarizeParticipation = (draft: SetupSectionProps['draft']): strin
 };
 
 type ParticipationProps = SetupSectionProps & {
-  /** End times apply only to Worker-hosted sessions. */
-  supportsEndTime: boolean;
+  /** End times and instructions for AI agents apply only to Worker-hosted sessions. */
+  workerHosted: boolean;
 };
 
-export const SetupParticipationSection = ({ draft, onChange, open, onToggle, supportsEndTime }: ParticipationProps) => (
+const AGENT_INSTRUCTIONS_HELP =
+  'Optional, in Markdown. AI agents read these before taking part, for example to learn which group to join. Anyone can read them, at the Session Worker’s /llms.txt.';
+
+export const SetupParticipationSection = ({ draft, onChange, open, onToggle, workerHosted }: ParticipationProps) => (
   <SetupSection
     sectionKey="participation"
     title="Participation"
@@ -542,21 +546,35 @@ export const SetupParticipationSection = ({ draft, onChange, open, onToggle, sup
         onChange={(event) => onChange(['defaultGroupTags'], event.target.value)}
       />
     </SetupField>
-    {supportsEndTime ? (
-      <SetupField
-        id="ce-setup-ends-at"
-        label="End time"
-        help="Optional. Answers and group changes stop at this time; results stay readable."
-      >
-        <Input
+    {workerHosted ? (
+      <>
+        <SetupField
           id="ce-setup-ends-at"
-          type="datetime-local"
-          value={toLocalDateTime(draft.sessionEndsAt)}
-          aria-describedby={setupHelpId('ce-setup-ends-at')}
-          data-testid={E2E_TESTIDS.WIZARD_SESSION_ENDS_AT}
-          onChange={(event) => onChange(['sessionEndsAt'], event.target.value)}
-        />
-      </SetupField>
+          label="End time"
+          help="Optional. Answers and group changes stop at this time; results stay readable."
+        >
+          <Input
+            id="ce-setup-ends-at"
+            type="datetime-local"
+            value={toLocalDateTime(draft.sessionEndsAt)}
+            aria-describedby={setupHelpId('ce-setup-ends-at')}
+            data-testid={E2E_TESTIDS.WIZARD_SESSION_ENDS_AT}
+            onChange={(event) => onChange(['sessionEndsAt'], event.target.value)}
+          />
+        </SetupField>
+        <SetupField id="ce-setup-agent-instructions" label="Instructions for AI agents" help={AGENT_INSTRUCTIONS_HELP}>
+          <Input
+            id="ce-setup-agent-instructions"
+            type="textarea"
+            className={styles.textarea}
+            value={text(draft.agentInstructions)}
+            maxLength={MAX_AGENT_INSTRUCTIONS_CHARS}
+            aria-describedby={setupHelpId('ce-setup-agent-instructions')}
+            data-testid="ce-setup-agent-instructions"
+            onChange={(event) => onChange(['agentInstructions'], event.target.value)}
+          />
+        </SetupField>
+      </>
     ) : null}
   </SetupSection>
 );

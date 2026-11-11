@@ -11,6 +11,10 @@ export function validCuratedIdList(value: unknown): value is string[];
 export const MAX_RESULTS_ADMINS: number;
 /** True for at most MAX_RESULTS_ADMINS distinct addresses; results admins build debate atlases and nothing else. */
 export function validResultsAdminAddresses(value: unknown): value is string[];
+/** The most characters a session's instructions for AI agents hold. */
+export const MAX_AGENT_INSTRUCTIONS_CHARS: number;
+/** True for text of at most MAX_AGENT_INSTRUCTIONS_CHARS; the Worker serves it at /llms.txt. */
+export function validAgentInstructions(value: unknown): value is string;
 
 export type SessionConfigEditClassification = {
   /** Edited paths that keep participants signed in, such as `sessionName`. */

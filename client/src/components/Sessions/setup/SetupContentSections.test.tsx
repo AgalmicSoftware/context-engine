@@ -1,7 +1,12 @@
 import React, { useState } from 'react';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 
-import { SetupContextSection, SetupQuestionsSection, describeContextProblem } from './SetupContentSections';
+import {
+  SetupContextSection,
+  SetupParticipationSection,
+  SetupQuestionsSection,
+  describeContextProblem,
+} from './SetupContentSections';
 import type { SetupDraft, SetupSectionProps } from './setupSectionTypes';
 import { readContextHtmlPage } from '../../OnePageSession/SessionContextHtml';
 
@@ -29,7 +34,26 @@ const Harness = ({
   );
 };
 
+const WorkerParticipation = (props: SetupSectionProps) => <SetupParticipationSection {...props} workerHosted />;
+const ChainParticipation = (props: SetupSectionProps) => <SetupParticipationSection {...props} workerHosted={false} />;
+
 describe('setup content sections', () => {
+  it('takes instructions for AI agents on Worker-hosted sessions, saying agents read them and anyone can', () => {
+    const { unmount } = render(<Harness Section={WorkerParticipation} initial={{ interviewModeEnabled: false }} />);
+    const field = screen.getByLabelText('Instructions for AI agents');
+    expect(field).toHaveAttribute('maxlength', '8000');
+    expect(field).toHaveAccessibleDescription(
+      'Optional, in Markdown. AI agents read these before taking part, for example to learn which group to join. Anyone can read them, at the Session Worker’s /llms.txt.',
+    );
+    expect(screen.getByRole('button', { name: 'About Instructions for AI agents' })).toBeInTheDocument();
+    fireEvent.change(field, { target: { value: '# Taking part\n\nJoin the group tagged ai-agents.' } });
+    expect(latest.agentInstructions).toBe('# Taking part\n\nJoin the group tagged ai-agents.');
+    unmount();
+
+    render(<Harness Section={ChainParticipation} initial={{ interviewModeEnabled: false, agentInstructions: 'x' }} />);
+    expect(screen.queryByLabelText('Instructions for AI agents')).not.toBeInTheDocument();
+  });
+
   it('edits the context title, paragraphs and https links, and asks for files again', () => {
     render(<Harness Section={SetupContextSection} initial={{ contextFiles: [{ name: 'brief.pdf' }] }} />);
     expect(screen.getByTestId('ce-setup-summary-context')).toHaveTextContent('No context yet');

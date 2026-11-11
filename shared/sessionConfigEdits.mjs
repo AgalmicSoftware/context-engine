@@ -16,6 +16,7 @@ export const WORKER_CANONICAL_SET_CONFIG_KEYS = Object.freeze([
   'defaultGroupTags',
   'defaultSbtTags',
   'questionsGenPrompt',
+  'agentInstructions',
   'interviewMode',
   'interviewModeEnabled',
   'pileAutoAdvanceEnabled',
@@ -75,8 +76,15 @@ export const validResultsAdminAddresses = value =>
   value.every(address => typeof address === 'string' && ADDRESS.test(address)) &&
   new Set(value.map(address => address.toLowerCase())).size === value.length;
 
+// A session's instructions for AI agents, in Markdown. Its Worker serves them
+// as text at /llms.txt.
+export const MAX_AGENT_INSTRUCTIONS_CHARS = 8000;
+export const validAgentInstructions = value =>
+  typeof value === 'string' && value.length <= MAX_AGENT_INSTRUCTIONS_CHARS;
+
 const CONTENT_FIELDS = new Set([
   'sessionName', 'sessionInfo', 'sessionContext', 'questionsGenPrompt', 'appearance', 'sessionHeaderImg',
+  'agentInstructions',
   // Checked again when each file publishes, so changing it signs no one out.
   'contextAdditionPolicy',
   // Checked on each atlas build and read and never held in a sign-in, so

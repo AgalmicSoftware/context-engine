@@ -520,7 +520,7 @@ const SessionSettingsPage = ({
             </>
           }
         />
-        <SetupParticipationSection {...section('participation')} supportsEndTime={!onChain} />
+        <SetupParticipationSection {...section('participation')} workerHosted={!onChain} />
         <SetupResultsSection
           {...section('results')}
           editProfile={editProfile}

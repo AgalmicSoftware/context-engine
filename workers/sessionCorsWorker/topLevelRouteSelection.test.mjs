@@ -166,6 +166,18 @@ test('resolveTopLevelRouteSelection exposes worker-canonical config bootstrap wi
   );
 });
 
+test('resolveTopLevelRouteSelection serves a session\'s instructions for AI agents at GET /llms.txt without sign-in', () => {
+  const select = (method, headers) => resolveTopLevelRouteSelection({
+    path: '/llms.txt',
+    method,
+    request: createRequest(headers),
+    deps: { toStr: String },
+  });
+  assert.deepEqual(select('GET'), { kind: 'agent-instructions' });
+  assert.deepEqual(select('GET', { Authorization: 'Bearer token' }), { kind: 'agent-instructions' });
+  assert.deepEqual(select('POST'), { kind: 'authenticated' });
+});
+
 test('resolveTopLevelRouteSelection preserves trimmed authorization behavior for anonymous ai/transcribe classification', () => {
   assert.deepEqual(
     resolveTopLevelRouteSelection({

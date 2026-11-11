@@ -391,6 +391,7 @@ const useSessionWizardWorkerDeploy = ({
           'defaultTags',
           'defaultGroupTags',
           'questionsGenPrompt',
+          'agentInstructions',
           'defaultFilterState',
           'defaultSbtTags',
           'defaultFeaturedSBTs',

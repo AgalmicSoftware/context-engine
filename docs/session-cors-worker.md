@@ -173,8 +173,8 @@ identity nominations.
 The initial and signed follow-up config writes use the selected capability
 profile as an allowlist. Pure Worker-canonical sessions keep generic session
 defaults (`defaultTags`, `defaultGroupTags`, `questionsGenPrompt`, and
-`defaultFilterState`) and may set `sessionEndsAt`, but reject `blockLimits`,
-faucet/registry fields, and contract maps. A Worker profile that explicitly
+`defaultFilterState`) and may set `sessionEndsAt` and `agentInstructions`, but
+reject `blockLimits`, faucet/registry fields, and contract maps. A Worker profile that explicitly
 uses on-chain SBT authorization may additionally persist its network and only
 the `sbtFactory` contract; it does not inherit Surveys or Session Registry
 controls. Registry-canonical deployments preserve their existing chain fields.
@@ -2419,10 +2419,10 @@ Never return secrets in responses.
 `/admin/set-config` notes:
 
 - Content-only edits keep web and agent sessions signed in: `sessionName`,
-  `sessionInfo`, `sessionContext`, `questionsGenPrompt`, `appearance`,
-  `sessionHeaderImg`, `interviewMode.openingPrompt` / `steeringPrompt`, and the
-  curated lists `HIGHLIGHTED_QUESTION_IDS`, `BLOCKED_QUESTION_IDS`,
-  `HIGHLIGHTED_SURVEY_IDS` and `BLOCKED_SURVEY_IDS`.
+  `sessionInfo`, `sessionContext`, `questionsGenPrompt`, `agentInstructions`,
+  `appearance`, `sessionHeaderImg`, `interviewMode.openingPrompt` /
+  `steeringPrompt`, and the curated lists `HIGHLIGHTED_QUESTION_IDS`,
+  `BLOCKED_QUESTION_IDS`, `HIGHLIGHTED_SURVEY_IDS` and `BLOCKED_SURVEY_IDS`.
   Adding unique `agentHttp.invites` also preserves authorization when all prior
   invite records remain unchanged. Removing, disabling, re-enabling or editing
   an existing invite revokes authorization. Other fields, including permissions,
@@ -2446,6 +2446,9 @@ Never return secrets in responses.
 - The curated lists `HIGHLIGHTED_QUESTION_IDS`, `BLOCKED_QUESTION_IDS`,
   `HIGHLIGHTED_SURVEY_IDS` and `BLOCKED_SURVEY_IDS` are accepted as lists of at
   most 500 IDs of 1-128 letters, digits or `._:-`; anything else returns `400`.
+- `agentInstructions`, the Markdown served at `GET /llms.txt`, is text of at
+  most 8,000 characters; anything else returns `400`, and `""` clears it. The
+  deploy helper refuses the same values before any Cloudflare call.
 
 - `pileAutoAdvanceEnabled` is an optional boolean controlling question pile
   navigation. Both `true` and `false` survive deployment, config patches, and
@@ -2632,6 +2635,13 @@ Signed login/bootstrap requests:
     JWKs, passwords, private keys, authorization headers, or URL credentials.
   - Success and error responses are `Cache-Control: no-store` and vary on both
     `Origin` and `X-Session-Slug`.
+- `GET /llms.txt` is public and returns the session's instructions for AI
+  agents, its `agentInstructions`, as `text/markdown; charset=utf-8` with
+  `X-Content-Type-Options: nosniff` and `Content-Security-Policy: sandbox;
+  default-src 'none'`, so a browser never runs them as a page. It picks the
+  session, applies CORS and sets caching as `GET /session-config` does; a
+  session's own Worker needs no `X-Session-Slug`. A session without
+  instructions, or a config that isn't Worker-canonical, returns `404`.
 - `GET /health` (requires Authorization token; does not require session KV config, so it works for newly registered sessions during bootstrap)
 - `GET /capabilities` is public and returns the code-defined feature list, API
   version and optional bundle hash, cached for 30 seconds. With `?slug=<slug>`,
