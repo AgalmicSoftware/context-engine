@@ -5,6 +5,7 @@ import {
   CONTEXT_SOURCE_LIMITS as LIMITS,
   CONTEXT_TAGS as TAGS,
   CONTEXT_TEXT_ROLE,
+  contextAdderProblem,
   contextRoleOf,
   contextTagValue,
   isAdminsOnlyAccess,
@@ -65,6 +66,12 @@ const storeRecord = async (store, payload) => {
   return trim(body?.id) ? { id: trim(body.id) } : { response };
 };
 
+// An agent's self-declared mark and name for a link it adds, as the tags a file carries.
+const adderTagsOf = (body) => [
+  { name: TAGS.adderKind, value: trim(body.adder) },
+  { name: TAGS.adderName, value: trim(body.adderName) },
+].filter((tag) => tag.value);
+
 // A link: the Worker fetches the page under the strict link policy and stores
 // its text with the link. With `replaces`, a refresh of that link: the same
 // page read again, whose snapshot keeps the link's title, privacy and adder,
@@ -86,6 +93,12 @@ const addLink = async ({ body, env, slug, deps, store, json, now }) => {
   if (replaces && contextTagValue(replaces.tags, TAGS.url) !== parsed.toString()) {
     return json({ error: 'A refresh reads the same link again; add another link as a new item.' }, 400);
   }
+  // A refresh keeps the link's agent mark, as the store keeps its adder.
+  const adderTags = adderTagsOf(replaces
+    ? { adder: contextTagValue(replaces.tags, TAGS.adderKind), adderName: contextTagValue(replaces.tags, TAGS.adderName) }
+    : body);
+  const adderProblem = contextAdderProblem(adderTags);
+  if (adderProblem) return json({ error: adderProblem, reason: 'context_adder_invalid' }, 400);
   const fetched = await fetchContextSnapshotText({
     url: parsed.toString(),
     deps: { safeFetch: deps?.safeFetch, isBlockedOutboundUrl: deps?.isBlockedOutboundUrl, fetchTimeoutMs: deps?.fetchTimeoutMs },
@@ -122,6 +135,7 @@ const addLink = async ({ body, env, slug, deps, store, json, now }) => {
       { name: TAGS.mime, value: 'application/json' },
       { name: TAGS.url, value: record.url },
       { name: TAGS.fetchedAt, value: fetchedAt },
+      ...adderTags,
     ],
   });
   if (stored.response) return stored.response;

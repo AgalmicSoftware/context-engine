@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { buildPdfReadRequest, PDF_READ_PROMPT } from './contextDocumentRead.js';
-import { groupLockedAccess } from '../../shared/sessionContextSources.mjs';
+import { agentAdderTags, groupLockedAccess } from '../../shared/sessionContextSources.mjs';
 import { ADMIN, PARTICIPANT, PDF_BYTES, harness, idOf, json, pageResponse } from './contextSourceTestFixture.mjs';
 import { publishCloudflareOwnedStorageMetadata } from './storageRouteExecution.js';
 
@@ -274,6 +274,47 @@ test('only an admin publishing a link the context route stored may record its ea
   await assert.rejects(publish(ADMIN, {}), superseded, 'not for an upload');
   await publish(ADMIN, { contextOrigin: 'worker' });
   assert.equal(JSON.parse(h.kv.store.get('ce-storage:salon:docsContext:ctx-recorded-adder')).uploader, other);
+});
+
+test("an agent's self-declared mark is the one adder mark, with one plain name", async () => {
+  const h = harness({ pages: { 'https://example.org/essay': pageResponse('<p>Institutions adapt.</p>') } });
+  const note = { address: PARTICIPANT, name: 'note.md', type: 'text/markdown', bytes: new TextEncoder().encode('# Note') };
+  await idOf(await h.uploadFile({ ...note, extraTags: agentAdderTags('Test Kami') }));
+  await idOf(await h.context({ action: 'add-link', url: 'https://example.org/essay', adder: 'agent', adderName: 'Test Kami' }, PARTICIPANT));
+  const items = await h.list(PARTICIPANT);
+  assert.deepEqual(items.map((item) => [tagOf(item, 'CE-DocKind'), tagOf(item, 'CE-AdderKind'), tagOf(item, 'CE-AdderName')]),
+    [['file', 'agent', 'Test Kami'], ['link', 'agent', 'Test Kami']]);
+
+  const kind = (value) => ({ name: 'CE-AdderKind', value });
+  const name = (value) => ({ name: 'CE-AdderName', value });
+  for (const extraTags of [
+    [kind('human')],
+    [name('Test Kami')],
+    [kind('agent'), kind('agent')],
+    [kind('agent'), name('Test Kami'), name('Other')],
+    [kind('agent'), name('K'.repeat(81))],
+    [kind('agent'), name('Test\u0007Kami')],
+    [kind('agent'), name('Kami\u202Egnp.exe')],
+  ]) {
+    const response = await h.uploadFile({ ...note, extraTags });
+    assert.deepEqual([response.status, (await response.json()).reason], [400, 'context_adder_invalid'], JSON.stringify(extraTags));
+  }
+  for (const marks of [
+    { adder: 'admin' }, { adderName: 'Test Kami' }, { adder: 'agent', adderName: 'K'.repeat(81) },
+    { adder: 'agent', adderName: 'Kami\u2066gnp.exe' },
+  ]) {
+    const response = await h.context({ action: 'add-link', url: 'https://example.org/essay', ...marks }, PARTICIPANT);
+    assert.deepEqual([response.status, (await response.json()).reason], [400, 'context_adder_invalid'], JSON.stringify(marks));
+  }
+  assert.equal(h.pageCalls.length, 1, 'a refused mark fetches nothing');
+});
+
+test("a refresh keeps an agent's mark, whatever the refresh says", async () => {
+  const h = harness({ pages: { 'https://example.org/essay': () => pageResponse('<p>Institutions adapt.</p>') } });
+  const first = await idOf(await h.context({ action: 'add-link', url: 'https://example.org/essay', adder: 'agent', adderName: 'Test Kami' }, PARTICIPANT));
+  await idOf(await h.context({ action: 'add-link', url: 'https://example.org/essay', replaces: first, adderName: 'Other' }));
+  const [item] = await h.list(ADMIN);
+  assert.deepEqual([tagOf(item, 'CE-AdderKind'), tagOf(item, 'CE-AdderName'), item.metadata.addedBy], ['agent', 'Test Kami', PARTICIPANT]);
 });
 
 test('a link is fetched by the Worker under the strict policy and stored with its snapshot', async () => {

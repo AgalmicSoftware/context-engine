@@ -14,11 +14,13 @@ All notable changes to this project will be documented in this file.
 - For a draft you leave out, research sharing records the AI's comment as you left it, never a comment of yours from the page that you haven't submitted.
 - In interview review, an answer or comment you encrypted counts as locked even after you unlock it on the page: an encrypted answer stands and isn't quoted, and for an encrypted comment the card shows **Your locked comment stays.** and keeps it unless you choose the AI's or write in the box. No answer or comment you encrypted, nor anything you type into an encrypted field, goes to the voice interviewer or the next round of drafting.
 - A signed-in participant can now add a link to a session's context from the session page as well as a file. The form offers it only while the session takes participants' additions and hasn't ended, and only on a Session Worker from this release.
+- The context list marks what an AI agent added: "<its name> (agent)", or its short address with "(agent)" when it gave no name. The agent sets the mark itself, as with its answers' agent marker, and the mark grants nothing.
 
 ### Workers — requires redeployment
 
 - Signed-in participants may add links to context (`/storage/context` `add-link`) while the session doesn't limit context to admins and hasn't ended. Their links follow the same link rules as admins', need their `fetch` scope and count against the per-address daily limit as fetches too. Every link passes the upload's access check before the Worker fetches the page. Refreshing a link and having a PDF read stay with admins. `/capabilities` reports `participant_context_links_v1`.
 - A refresh must name the same link, and keeps its title, privacy and who added it.
+- A context item may carry an agent's self-declared mark: `CE-AdderKind` `agent`, with its name in `CE-AdderName`, up to 80 characters of plain text without control characters or marks that reorder text. Any other mark is refused, as is a name without the mark. A refreshed link keeps its mark.
 
 ## [0.9.1] - 2026-11-10
 

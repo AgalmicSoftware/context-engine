@@ -246,6 +246,41 @@ describe('context sources on the client', () => {
     expect(contextAdderLabel({ addedBy: '' }, config, '')).toBe('');
   });
 
+  it('names an agent’s item by the name the agent goes by, marked as an agent’s', async () => {
+    const agent = `0x${'2'.repeat(40)}`;
+    const base = [tag('CE-DocRole', 'context'), tag('CE-DocKind', 'file')];
+    listPage.mockResolvedValueOnce({
+      items: [
+        item('named', [...base, tag('CE-AdderKind', 'agent'), tag('CE-AdderName', 'Test Kami')], { addedBy: agent }),
+        item('unnamed', [...base, tag('CE-AdderKind', 'agent')], { addedBy: agent }),
+        // A name counts only beside the agent's mark, and no other mark counts.
+        item('unmarked', [...base, tag('CE-AdderName', 'an admin')], { addedBy: agent }),
+        item('other mark', [...base, tag('CE-AdderKind', 'person'), tag('CE-AdderName', 'Someone')], {
+          addedBy: agent,
+        }),
+      ],
+      cursor: null,
+      listComplete: true,
+    });
+    const sources = await listContextSources(options);
+    expect(sources.map(({ addedByAgent, adderName }) => [addedByAgent, adderName])).toEqual([
+      [true, 'Test Kami'],
+      [true, ''],
+      [false, ''],
+      [false, ''],
+    ]);
+    const config = { adminAddress: `0x${'1'.repeat(40)}` };
+    expect(sources.map((source) => contextAdderLabel(source, config, ''))).toEqual([
+      'Test Kami (agent)',
+      '0x2222…2222 (agent)',
+      '0x2222…2222',
+      '0x2222…2222',
+    ]);
+    // Even an admin's agent shows as the agent, and the reader's own item stays "you".
+    expect(contextAdderLabel(sources[0], { adminAddress: agent }, '')).toBe('Test Kami (agent)');
+    expect(contextAdderLabel(sources[0], config, agent)).toBe('you');
+  });
+
   it('asks the Worker to read links and PDFs and to remove items, with the person’s sign-in', async () => {
     const respond = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
     workerFetch

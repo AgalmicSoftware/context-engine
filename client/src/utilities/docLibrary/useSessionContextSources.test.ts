@@ -60,6 +60,8 @@ const source = (id: string, adminsOnly = false): ContextSource => ({
   adminsOnly,
   lockedGroupIds: [],
   addedBy: '',
+  addedByAgent: false,
+  adderName: '',
   fetchedAt: '',
   reading: null,
 });

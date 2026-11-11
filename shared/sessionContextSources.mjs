@@ -17,6 +17,9 @@ export const CONTEXT_TAGS = Object.freeze({
   readBy: 'CE-ReadBy',
   readModel: 'CE-ReadModel',
   readAt: 'CE-ReadAt',
+  // Self-declared by an agent on what it adds: a label in the list, never a reason for access.
+  adderKind: 'CE-AdderKind',
+  adderName: 'CE-AdderName',
 });
 
 export const CONTEXT_SOURCE_LIMITS = Object.freeze({
@@ -32,6 +35,8 @@ export const CONTEXT_SOURCE_LIMITS = Object.freeze({
   urlChars: 1000,
   // The groups one item may be locked to; reading it checks each in turn.
   lockedGroups: 20,
+  // An agent's display name, as long as its profile allows.
+  adderNameChars: 80,
 });
 
 // File types a context source may have; others (Office files, images) are refused.
@@ -55,6 +60,42 @@ const isRecord = (value) => !!value && typeof value === 'object' && !Array.isArr
 
 /** Everyone the session admits may add files and links, unless an admin limits it to admins. */
 export const participantsMayAddContext = (config) => config?.contextAdditionPolicy !== 'admin_only';
+
+/** The one adder mark an item may carry: an agent's. */
+export const CONTEXT_AGENT_ADDER = 'agent';
+
+// Control characters, and the marks that reorder text, which could make a name read as another.
+const NAME_CONTROLS = /[\p{Cc}\u061C\u200E\u200F\u202A-\u202E\u2066-\u2069]/gu;
+
+/** An agent's name as an item carries it: one line of plain text, cut to fit. */
+export const agentAdderName = (name = '') =>
+  text(text(name).replace(NAME_CONTROLS, ' ').replace(/\s+/g, ' ').slice(0, CONTEXT_SOURCE_LIMITS.adderNameChars));
+
+/** The tags that mark an item an agent added, with the name it goes by when it has one. */
+export const agentAdderTags = (name = '') => {
+  const clean = agentAdderName(name);
+  return [
+    { name: CONTEXT_TAGS.adderKind, value: CONTEXT_AGENT_ADDER },
+    ...(clean ? [{ name: CONTEXT_TAGS.adderName, value: clean }] : []),
+  ];
+};
+
+/**
+ * Why an item's adder tags are refused, or '' when it has none or the agent's
+ * mark once, with at most one plain name.
+ */
+export const contextAdderProblem = (tags) => {
+  const list = Array.isArray(tags) ? tags.filter(isRecord) : [];
+  const values = (name) => list.filter((tag) => text(tag.name) === name).map((tag) => text(tag.value));
+  const [kinds, names] = [values(CONTEXT_TAGS.adderKind), values(CONTEXT_TAGS.adderName)];
+  if (kinds.length > 1 || names.length > 1) return 'An item names who added it once at most.';
+  if (kinds.length && kinds[0] !== CONTEXT_AGENT_ADDER) return 'The only mark for who added an item is "agent".';
+  if (names.length && !kinds.length) return 'Only an item an agent added carries its name.';
+  if (names.length && (names[0].length > CONTEXT_SOURCE_LIMITS.adderNameChars || names[0].search(NAME_CONTROLS) >= 0)) {
+    return `An agent's name is plain text of at most ${CONTEXT_SOURCE_LIMITS.adderNameChars} characters.`;
+  }
+  return '';
+};
 
 const groupIdList = (groupIds) =>
   [...new Set((Array.isArray(groupIds) ? groupIds : []).map((id) => text(id).toLowerCase()).filter(Boolean))].sort();

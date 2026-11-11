@@ -144,12 +144,12 @@ export const harness = ({ encryption = 'none', pages = {}, ai = { mode: 'anthrop
     { name: 'CE-DocRole', value: role },
     ...extra,
   ];
-  const uploadFile = ({ address = ADMIN, name = 'deck.pdf', type = 'application/pdf', bytes = PDF_BYTES, adminsOnly = false, role = 'context', extra = {} } = {}) => {
+  const uploadFile = ({ address = ADMIN, name = 'deck.pdf', type = 'application/pdf', bytes = PDF_BYTES, adminsOnly = false, role = 'context', extra = {}, extraTags = [] } = {}) => {
     const form = new FormData();
     form.append('file', new Blob([bytes], { type }), name);
     form.append('resource', 'docsContext');
     form.append('contentType', type);
-    form.append('tags', JSON.stringify(tags(role, 'file', [{ name: 'CE-DocName', value: name }])));
+    form.append('tags', JSON.stringify(tags(role, 'file', [{ name: 'CE-DocName', value: name }, ...extraTags])));
     if (adminsOnly) form.append('accessConditions', JSON.stringify(ADMINS_ONLY));
     Object.entries(extra).forEach(([key, value]) => form.append(key, value));
     return call('/storage/upload', { method: 'POST', body: form, address });

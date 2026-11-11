@@ -1,6 +1,7 @@
 import {
   CONTEXT_TAGS,
   CONTEXT_TEXT_ROLE,
+  contextAdderProblem,
   contextFileByteLimit,
   contextRoleOf,
   contextTagValue,
@@ -16,9 +17,9 @@ const MIB = 1024 * 1024;
 
 // Checks a doc-library upload that carries a context role. Signed-in people add
 // files unless the session limits context to admins; the Worker must be able to
-// read them; and links and AI-read text are written only by the context route
-// (contextOrigin 'worker', set server-side), so a link's snapshot is always one
-// the Worker fetched.
+// read them; an agent's self-declared mark is the only adder mark; and links and
+// AI-read text are written only by the context route (contextOrigin 'worker',
+// set server-side), so a link's snapshot is always one the Worker fetched.
 export const checkContextSourceUpload = ({ payload = {}, config, uploader = '', isAdmin = false, litEncrypted = false } = {}) => {
   const role = contextRoleOf(payload.tags);
   if (!role) return { ok: true, role: '' };
@@ -34,6 +35,8 @@ export const checkContextSourceUpload = ({ payload = {}, config, uploader = '', 
     !isAdminsOnlyAccess(payload.accessConditions) && !lockedGroupsOf(payload.accessConditions).length) {
     return fail(400, POLICY_ERROR, 'context_policy_unsupported');
   }
+  const adderProblem = contextAdderProblem(payload.tags);
+  if (adderProblem) return fail(400, adderProblem, 'context_adder_invalid');
   const kind = contextTagValue(payload.tags, CONTEXT_TAGS.kind);
   if (role === CONTEXT_TEXT_ROLE || kind === 'link') {
     return payload.contextOrigin === 'worker'

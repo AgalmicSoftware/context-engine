@@ -39,6 +39,8 @@ const file = (overrides: Partial<ContextSource>): ContextSource => ({
   adminsOnly: false,
   lockedGroupIds: [],
   addedBy: '',
+  addedByAgent: false,
+  adderName: '',
   fetchedAt: '',
   reading: null,
   ...overrides,
@@ -95,6 +97,21 @@ describe('the Context section for participants', () => {
       expect.objectContaining({ sessionSlug: 'salon', context: { account: ME } }),
     );
     expect(list.reload).toHaveBeenCalled();
+  });
+
+  it('names what an agent added by the name it goes by, marked as an agent’s', () => {
+    renderList(
+      state({
+        sources: [
+          file({ id: 'kami', title: 'kami.md', addedBy: THEM, addedByAgent: true, adderName: 'Test Kami' }),
+          file({ id: 'agent', title: 'agent.md', addedBy: THEM, addedByAgent: true }),
+        ],
+      }),
+    );
+    const kami = screen.getByRole('link', { name: /kami\.md/ }).parentElement as HTMLElement;
+    expect(within(kami).getByText('Added by Test Kami (agent)')).toBeInTheDocument();
+    const agent = screen.getByRole('link', { name: /agent\.md/ }).parentElement as HTMLElement;
+    expect(within(agent).getByText('Added by 0xbbbb…0002 (agent)')).toBeInTheDocument();
   });
 
   it('adds a link beside the file form where the Worker takes participants’ links', async () => {

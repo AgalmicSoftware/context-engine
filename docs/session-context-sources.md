@@ -100,6 +100,17 @@ and `CE-DocKind: file`. Links and PDF readings go through `POST /storage/context
 (see [the Worker's storage routes](session-cors-worker.md#session-storage-routes)),
 so every link snapshot is one the Worker fetched.
 
+**Who added it.** The Worker records each item's uploader as `addedBy`. An AI
+agent may mark an item as its own: the tags `CE-AdderKind: agent` and
+`CE-AdderName: <its display name>` on a file, or `adder: "agent"` and
+`adderName` with a link. The list then shows "<name> (agent)", or the agent's
+short address with "(agent)" when it gave no name. The mark is self-declared,
+so it is only a label and nothing reads it for access. The Worker accepts the
+value `agent` alone, at most once, and only beside it a name of up to 80
+characters of plain text, without control characters or the marks that reorder
+text. A refreshed link keeps its mark. The Context Engine MCP marks everything
+an agent adds.
+
 ## Privacy
 
 The default is anyone with access to the session: the item takes the session's
