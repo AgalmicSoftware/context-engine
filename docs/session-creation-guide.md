@@ -1336,6 +1336,13 @@ site has deployed; until then, share the `worker=` link. Any other session opens
 only from its `worker=` link. The site also serves the file at
 `/known-sessions.json`, so agents can find a session's Worker from its slug.
 
+The file lists EDDY 2026 (`eddy26`), the demo session (`demo-sh`) and
+`rxc-ra-test-5`. `rxc-ra-test-5` stays only until the films, stills, promo
+slides and writeup that carry its link switch to `rxc-ra-26`'s; then delete its
+entry. A listed session that also has demo data in `demo_sessions.json`, as
+`demo-sh` does, keeps that data; the list sets only its Worker, its session ID
+and its normal link.
+
 ## Troubleshooting
 
 ### Worker deploy fails

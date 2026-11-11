@@ -32,11 +32,23 @@ describe('sessionDemoCompat', () => {
     expect(slugs.every((slug) => typeof slug === 'string')).toBe(true);
   });
 
-  it('bundles each known session as its clean-route config', () => {
-    for (const slug of Object.keys(KNOWN_SESSIONS)) {
+  it('bundles each known session without demo data as its clean-route config', () => {
+    const slugs = Object.keys(KNOWN_SESSIONS).filter((slug) => !(slug in demoSessions));
+    expect(slugs.length).toBeGreaterThan(0);
+    for (const slug of slugs) {
       expect(getDemoSessionConfigByKey(slug)).toBe(KNOWN_SESSION_CONFIGS[slug]);
       expect(getDemoSessionMap()[slug]).toBe(KNOWN_SESSION_CONFIGS[slug]);
     }
+  });
+
+  it('keeps the demo data of a listed demo session and takes its Worker from the list', () => {
+    const { worker, sessionId } = KNOWN_SESSIONS['demo-sh'];
+    const config = getDemoSessionConfigByKey('demo-sh');
+
+    // /about checks the allowed origins before preloading it; fixtures read its seed.
+    expect(config.allowOrigins).toEqual(demoSessions['demo-sh'].allowOrigins);
+    expect(config.demoCompatibilitySeed).toEqual(demoSessions['demo-sh'].demoCompatibilitySeed);
+    expect(config).toMatchObject({ corsWorkerUrl: worker, sessionId, workerCanonicalCleanRoute: true });
   });
 
   it('returns baseline demo placeholder slugs without the default session alias', () => {

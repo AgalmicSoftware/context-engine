@@ -231,10 +231,70 @@ describe('workerCanonicalRouteResolution', () => {
     expect(resolveStandardSessionRoute).not.toHaveBeenCalled();
   });
 
+  it('opens each listed session from its normal link and checks the listed session ID', () => {
+    const listed: Record<string, { worker: string; sessionId: string }> = jest.requireActual(
+      '../../../../known-sessions.json',
+    );
+    expect(Object.keys(listed).length).toBeGreaterThan(0);
+    for (const [slug, { worker, sessionId }] of Object.entries(listed)) {
+      expect(
+        resolveMainSiteSessionRouteForRender({
+          sessionTokenRaw: slug,
+          searchStr: '',
+          controller,
+          resolveSessionSlugFromPathToken: (token) => token,
+        }),
+      ).toMatchObject({
+        kind: 'bootstrap',
+        workerOrigin: worker,
+        workerSessionSlug: slug,
+        expectedSessionId: sessionId,
+      });
+    }
+  });
+
+  it('opens demo-sh from its own Worker instead of its bundled demo entry', () => {
+    const resolveStandardSessionRoute = jest.fn();
+    expect(
+      resolveMainSiteSessionRouteForRender({
+        sessionTokenRaw: 'demo-sh',
+        searchStr: '',
+        controller,
+        resolveSessionSlugFromPathToken: (token) => token,
+        resolveStandardSessionRoute,
+      }),
+    ).toMatchObject({
+      kind: 'bootstrap',
+      workerOrigin: 'https://ce-demo-sh-481bb6cd0a81.agalmic.workers.dev',
+      expectedSessionId: '0xb822b3eca85bdc35cf83cb947bceb6b2',
+      sessionRoute: { sessionSlug: 'demo-sh', sessionConfig: null },
+    });
+    expect(resolveStandardSessionRoute).not.toHaveBeenCalled();
+  });
+
+  it("opens the films' rxc-ra-test-5 interview link, which names its group", () => {
+    const resolveStandardSessionRoute = jest.fn();
+    expect(
+      resolveMainSiteSessionRouteForRender({
+        sessionTokenRaw: 'rxc-ra-test-5',
+        searchStr: '?mode=interview&joinGroup=7824a38f-6946-4351-b74b-81307b406180',
+        controller,
+        resolveSessionSlugFromPathToken: (token) => token,
+        resolveStandardSessionRoute,
+      }),
+    ).toMatchObject({
+      kind: 'bootstrap',
+      workerOrigin: 'https://ce-rxc-ra-test-5.agalmic.workers.dev',
+      expectedSessionId: '0xb55d194c42422fd61bedc21fda1c7cdc',
+      sessionRoute: { sessionSlug: 'rxc-ra-test-5', sessionConfig: null },
+    });
+    expect(resolveStandardSessionRoute).not.toHaveBeenCalled();
+  });
+
   it('looks up a session that is not in the file like any other slug', () => {
     const resolveStandardSessionRoute = jest.fn();
     const result = resolveMainSiteSessionRouteForRender({
-      sessionTokenRaw: 'rxc-ra-test-5',
+      sessionTokenRaw: 'rxc-ra-test-3',
       searchStr: '',
       controller,
       resolveSessionSlugFromPathToken: (token) => token,

@@ -16,8 +16,16 @@ export const SESSION_TEMPLATE_SEED_KEYS = Object.freeze({
 
 const isObj = (value: unknown): value is DemoSessionConfig =>
   !!value && typeof value === 'object' && !Array.isArray(value);
-// The demo data, plus the sessions the hosted site opens from a normal link.
-const bundledSessions: DemoSessionMap = { ...(demoSessions as DemoSessionMap), ...KNOWN_SESSION_CONFIGS };
+// The demo data, plus the sessions the hosted site opens from a normal link. A
+// listed session with demo data, such as demo-sh, keeps it; the list sets its
+// Worker, its session ID and its clean route.
+const bundledSessions: DemoSessionMap = { ...(demoSessions as DemoSessionMap) };
+Object.entries(KNOWN_SESSION_CONFIGS).forEach(([slug, known]) => {
+  const demo = bundledSessions[slug];
+  bundledSessions[slug] = isObj(demo)
+    ? { ...demo, sessionId: known.sessionId, corsWorkerUrl: known.corsWorkerUrl, workerCanonicalCleanRoute: true }
+    : known;
+});
 const readTrimmedSessionSlug = (raw: unknown): string => toStr(raw).trim();
 const normalizeLegacyAliasToken = (raw: unknown): string => normalizeBaseSlug(readTrimmedSessionSlug(raw));
 const cloneValue = <T>(value: T): T => {

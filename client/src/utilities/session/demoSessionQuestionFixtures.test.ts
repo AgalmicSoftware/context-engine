@@ -4,12 +4,14 @@ import { DEFAULT_AI_MODELS, DEFAULT_TRANSCRIPTION_MODEL } from '../../../../shar
 import demoSessions from '../../variables/demo/demo_sessions.json';
 import demo1OnchainQuestionIds from '../../variables/demo/demo_1_onchain_question_ids.json';
 import demo2QuestionSeed from '../../variables/demo/demo_2_question_seed.json';
+import { hasDemoQuestionFixtures } from '../demo/demoFixtureSessionSlugs';
 import { LEGACY_DEMO_POLL_OPTIONS } from '../demo/demoQuestionSemantics';
 import {
   getDemoFixtureQuestionIdsByIndex,
   getTemporaryDemoSessionQuestionFixtures,
 } from './demoSessionQuestionFixtures.js';
 import { KNOWN_SESSION_CONFIGS } from './knownSessionsFile';
+import { getDemoSessionConfigByKey } from './sessionDemoCompat';
 import { classifySessionModeProfileSupport } from './sessionModeProfile';
 
 describe('getTemporaryDemoSessionQuestionFixtures', () => {
@@ -195,12 +197,19 @@ describe('getTemporaryDemoSessionQuestionFixtures', () => {
     expect(classifySessionModeProfileSupport(config.sessionModeProfile).status).toBe('reachable');
   });
 
-  it.each(Object.entries(KNOWN_SESSION_CONFIGS))(
+  it.each(Object.entries(KNOWN_SESSION_CONFIGS).filter(([slug]) => !hasDemoQuestionFixtures(slug)))(
     'discovers known session %s without seeding demo questions',
     (slug, config) => {
       expect(getTemporaryDemoSessionQuestionFixtures(slug, config)).toEqual([]);
     },
   );
+
+  it('keeps the Worker-seeded questions of demo-sh, which the list also names', () => {
+    const questions = getTemporaryDemoSessionQuestionFixtures('demo-sh', getDemoSessionConfigByKey('demo-sh') || {});
+
+    expect(questions).toHaveLength(42);
+    expect(questions[0]).toMatchObject({ temporaryDemoSeed: false, cloudflareDemoSeed: true });
+  });
 
   it('uses question-specific poll choices for demo-interview without changing legacy demo sessions', () => {
     const interviewPolls = getTemporaryDemoSessionQuestionFixtures(
