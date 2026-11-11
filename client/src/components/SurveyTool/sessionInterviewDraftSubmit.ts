@@ -2,7 +2,12 @@ import type { InterviewConsentOverrides } from './sessionInterviewConsent';
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
 import type { InterviewDraftResponse, InterviewPrefillPacket } from './sessionInterview';
 import { startingInterviewComment } from './sessionInterviewComments';
-import { responseFieldValue, type SessionInterviewModalRecord } from './sessionInterviewModalState';
+import {
+  isResponseFieldUnsubmitted,
+  responseFieldValue,
+  withoutWholePhrase,
+  type SessionInterviewModalRecord,
+} from './sessionInterviewModalState';
 
 export type InterviewSubmitResult =
   | { status: 'submitted' | 'already-saved' }
@@ -59,6 +64,25 @@ type RunInterviewDraftSubmitInput = {
   setError: Dispatch<SetStateAction<string>>;
   setPendingSubmitAfterLogin: Dispatch<SetStateAction<boolean>>;
   setStatus: SubmitStatusSetter;
+};
+
+// What research records of a comment on a card left out, where nothing is submitted: what the person did with the
+// AI's. An untouched one is the AI's own (none for a hidden draft); one they touched is as they left it, less their
+// own comment from the page if they haven't submitted it.
+const leftOutComment = (
+  original: InterviewDraftResponse,
+  draft: InterviewDraftResponse,
+  responses: SessionInterviewModalRecord | null | undefined,
+): string => {
+  if (!draft.userEditedFields?.includes('additionalComments')) {
+    return draft.predictionCondition === 'blind' ? '' : String(original.additionalComments || '');
+  }
+  const comment = String(draft.additionalComments || '');
+  if (!isResponseFieldUnsubmitted(responses, 'additionalComments', draft.questionId)) return comment;
+  return withoutWholePhrase(
+    comment,
+    String(responseFieldValue(responses, 'additionalComments', draft.questionId) ?? ''),
+  );
 };
 
 const clearPendingSubmit = ({
@@ -198,12 +222,15 @@ export const runInterviewDraftSubmit = async ({
       includeResponderName ? String(prefillPacket?.responderContext?.name || '').trim() : '',
       drafts.map((draft) => {
         const reviewed = editedDrafts[draft.questionId] || draft;
+        const chosen = Boolean(selected[draft.questionId]);
         return {
           ...reviewed,
           answer: reviewed.answer,
-          additionalComments: String(reviewed.additionalComments || ''),
+          additionalComments: chosen
+            ? String(reviewed.additionalComments || '')
+            : leftOutComment(draft, reviewed, earlierResponses()),
           original: draft,
-          selected: Boolean(selected[draft.questionId]),
+          selected: chosen,
         };
       }),
       consentOverrides,

@@ -280,6 +280,37 @@ describe('a submit pressed before saved answers load', () => {
   });
 });
 
+describe('research on a card left out', () => {
+  it('records the AI’s comment, never a comment of theirs from the page they haven’t submitted', async () => {
+    const onRecordProvenance = jest.fn();
+    const base = modal(
+      { additionalComments: { 'q-two': { value: 'My private note', unsubmitted: true } } },
+      '',
+      jest.fn(),
+      { onRecordProvenance },
+    );
+    const packet = base.props.prefillPacket;
+    const second = { questionId: 'q-two', answer: 'The neighbours', additionalComments: 'AI note', confidence: 0.6 };
+    render(
+      React.cloneElement(base, {
+        questionPool: [...base.props.questionPool, { id: 'q-two', prompt: 'Who?', type: 'freeform' }],
+        prefillPacket: { ...packet, responses: [...packet.responses, second] },
+      }),
+    );
+    expect(await screen.findByRole('button', { name: /Additional comments for Who\?/ })).toHaveTextContent(
+      'My private note AI note',
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Remove draft for Who?' }));
+    await submit();
+    const review = onRecordProvenance.mock.calls[0][6] as Array<{ questionId: string }>;
+    expect(review.find(({ questionId }) => questionId === 'q-two')).toMatchObject({
+      selected: false,
+      additionalComments: 'AI note',
+    });
+    expect(JSON.stringify(onRecordProvenance.mock.calls)).not.toContain('My private note');
+  });
+});
+
 describe('what someone encrypted stays out of review and every AI', () => {
   beforeEach(() => {
     jest.clearAllMocks();

@@ -61,6 +61,20 @@ const findWholePhrase = (text: string, phrase: string): Array<[number, number]> 
 export const includesWholePhrase = (text: string, phrase: string): boolean =>
   !!phrase.trim() && findWholePhrase(text, phrase).length > 0;
 
+/** Text with a phrase taken out wherever it appears as whole words, closing up the lines it leaves. */
+export const withoutWholePhrase = (text: string, phrase: string): string => {
+  const cut = new Uint8Array(text.length);
+  if (phrase.trim()) for (const [start, end] of findWholePhrase(text, phrase.trim())) cut.fill(1, start, end);
+  if (!cut.includes(1)) return text;
+  return text
+    .split('')
+    .filter((_character, index) => !cut[index])
+    .join('')
+    .replace(/[ \t]+$/gm, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+};
+
 // Where a fact was cut, drop the punctuation left standing alone and spare spaces.
 const tidyCutLine = (line: string): string =>
   line
