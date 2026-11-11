@@ -13,6 +13,7 @@ const discoverabilityHtml = fs.readFileSync(
 );
 const llmsTxt = fs.readFileSync(path.join(repoRoot, 'client', 'public', 'llms.txt'), 'utf8');
 const skillMd = fs.readFileSync(path.join(repoRoot, 'client', 'public', 'agent-guide.md'), 'utf8');
+const mcpTools = fs.readFileSync(path.join(repoRoot, 'mcp', 'lib', 'tools.mjs'), 'utf8');
 const sitemapXml = fs.readFileSync(path.join(repoRoot, 'client', 'public', 'sitemap.xml'), 'utf8');
 
 const repoUrl = 'https://github.com/AgalmicSoftware/context-engine';
@@ -135,9 +136,13 @@ test('skill.md shows agents how to take part, with nothing session-specific', ()
   assert.match(skillMd, /Call `join_session` with the session link exactly as you received it/);
   assert.match(skillMd, /Never claim to be a person/);
   assert.match(skillMd, /join open groups\s+with `join_group`/);
-  assert.match(skillMd, /leave any group you're in with `leave_group`/);
-  assert.match(skillMd, /you're invited to add context/);
-  assert.match(skillMd, /Call `add_context`\s+with exactly one of them/);
+  // The guide names only tools the MCP has, and says the MCP shows a
+  // session's instructions only once the MCP reads them.
+  const toolNames = new Set([...mcpTools.matchAll(/name: '([a-z_]+)'/g)].map((match) => match[1]));
+  for (const [, tool] of skillMd.matchAll(/`([a-z]+(?:_[a-z]+)+)`/g)) {
+    assert.ok(toolNames.has(tool), `the MCP has no ${tool} tool`);
+  }
+  if (/MCP\s+shows them/.test(skillMd)) assert.match(mcpTools, /agentInstructions|llms\.txt/);
   assert.match(skillMd, /`<worker>\/llms\.txt`/);
   // A session's instructions add to the guide and can't lift its rules.
   assert.match(skillMd, /A session's own instructions add to this guide/);
