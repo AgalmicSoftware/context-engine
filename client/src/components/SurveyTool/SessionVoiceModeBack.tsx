@@ -8,6 +8,9 @@ import styles from './SurveyTool.module.scss';
 /** The dialog's Back, for the Interview header the interview panel renders; none leaves Back out. */
 export const VoiceModeBackContext = createContext<(() => void) | null>(null);
 
+/** Where the interview's Groups section says it has groups joining, or ticked and unjoined since a submit. */
+export const VoiceModeUnjoinedGroupsContext = createContext<((unjoined: boolean) => void) | null>(null);
+
 type Props = { id: string; onBack: () => void; disabled?: boolean };
 
 // Left of the title. It's off while a recording or an interview is under way, which going back would cut short.

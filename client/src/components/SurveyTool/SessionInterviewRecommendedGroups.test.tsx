@@ -10,6 +10,7 @@ import {
   type WorkerGroupOverview,
 } from '../../domains/worker/workerGroupPorts';
 import { dispatchWorkerGroupsChanged } from '../../utilities/worker/workerGroupChangeEvents';
+import { VoiceModeUnjoinedGroupsContext } from './SessionVoiceModeBack';
 import { AUTO_JOIN_STORAGE_KEY, readPendingAutoJoin } from '../../domains/worker/workerGroupAutoJoinIntent';
 import { isWorkerGroupAutoJoinCancelled } from '../../domains/worker/workerGroupAutoJoinPreference';
 import {
@@ -502,6 +503,52 @@ describe('SessionInterviewRecommendedGroups', () => {
     expect(box(/Maybe/)).not.toBeChecked();
     expect(box(/Salon/)).not.toBeChecked();
     expect(isWorkerGroupAutoJoinCancelled(linkScope)).toBe(true);
+  });
+
+  it('tells the dialog while groups join or stay ticked after a submit, but not for the next account', async () => {
+    pendingLink();
+    const groups = [group(), group({ groupId: 'salon', label: 'Salon' })];
+    jest.mocked(loadPublicWorkerGroups).mockResolvedValue(groups);
+    jest.mocked(loadWorkerGroupOverview).mockResolvedValue(overview(groups));
+    let failJoin = () => {};
+    jest.mocked(joinWorkerGroup).mockImplementationOnce(
+      () =>
+        new Promise((_resolve, reject) => {
+          failJoin = () => reject(new Error('worker_group_member_cap_exceeded'));
+        }),
+    );
+    const reportUnjoined = jest.fn();
+    const inDialog = (props: Props) => (
+      <VoiceModeUnjoinedGroupsContext.Provider value={reportUnjoined}>
+        {element(props)}
+      </VoiceModeUnjoinedGroupsContext.Provider>
+    );
+    const view = render(inDialog(signedIn));
+    await screen.findByRole('heading', { name: 'Groups (2)' });
+    // The link's group is ticked, but nothing is submitted yet.
+    expect(reportUnjoined).toHaveBeenLastCalledWith(false);
+
+    view.rerender(inDialog({ ...signedIn, joinRequest: 1 }));
+    expect(await screen.findByText('Joining groups…')).toBeInTheDocument();
+    expect(reportUnjoined).toHaveBeenLastCalledWith(true);
+    await act(async () => failJoin());
+    expect(await screen.findByRole('alert')).toHaveTextContent('Couldn’t join Salon: it is full.');
+    expect(reportUnjoined).toHaveBeenLastCalledWith(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Join ticked groups' }));
+    expect(await screen.findByText('Joined Salon.')).toBeInTheDocument();
+    expect(reportUnjoined).toHaveBeenLastCalledWith(false);
+
+    // On a shared phone the link's group is ticked again for the next person, whose answers aren't submitted yet.
+    const other = { account: '0x0000000000000000000000000000000000000002', loginComplete: true };
+    view.rerender(inDialog({ ...other, joinRequest: 1 }));
+    expect(await screen.findByRole('checkbox', { name: /Salon/ })).toBeChecked();
+    expect(screen.queryByRole('button', { name: 'Join ticked groups' })).toBeNull();
+    expect(reportUnjoined).toHaveBeenLastCalledWith(false);
+    // Their own submit joins it.
+    view.rerender(inDialog({ ...other, joinRequest: 2 }));
+    expect(await screen.findByText('Joined Salon.')).toBeInTheDocument();
+    view.unmount();
+    expect(reportUnjoined).toHaveBeenLastCalledWith(false);
   });
 
   it('shows each group’s image beside its name, only from a safe address', async () => {

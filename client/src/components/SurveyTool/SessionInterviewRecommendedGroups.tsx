@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useCallback, useContext, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Button } from 'reactstrap';
 import { canonicalizeSessionSlug } from '../../utilities/session/canonicalSessionContext.js';
 import {
@@ -35,6 +35,7 @@ import {
   resumeInterviewInvite,
 } from './sessionInterviewGroupInvite';
 import SessionInterviewReviewSection from './SessionInterviewReviewSection';
+import { VoiceModeUnjoinedGroupsContext } from './SessionVoiceModeBack';
 import styles from './SurveyTool.module.scss';
 
 type UnknownRecord = Record<string, unknown>;
@@ -213,17 +214,20 @@ export function SessionInterviewRecommendedGroups({
   const [ticks, setTicks] = useState<Record<string, boolean>>({});
   const [joinedIds, setJoinedIds] = useState<string[]>([]);
   const [outcome, setOutcome] = useState<JoinOutcome>(idleOutcome);
-  // Another account hasn't joined what this one did, or ticked its groups, as on a shared phone.
+  // The last submit before another account signed in, which leaves that account nothing to join for.
+  const [staleJoinRequest, setStaleJoinRequest] = useState(0);
+  // Another account hasn't joined what this one did, submitted, or ticked its groups, as on a shared phone.
   // A link's tick stays: cancelling its join is the browser's, not the account's.
   const accountRef = useRef(normalizedAccount);
   useEffect(() => {
     if (accountRef.current && accountRef.current !== normalizedAccount) {
       setJoinedIds([]);
       setOutcome(idleOutcome);
+      setStaleJoinRequest(joinRequest);
       setTicks((current) => (invite && invite.groupId in current ? { [invite.groupId]: current[invite.groupId] } : {}));
     }
     accountRef.current = normalizedAccount;
-  }, [invite, normalizedAccount]);
+  }, [invite, joinRequest, normalizedAccount]);
   const canLoadCatalog = Boolean(workerUrl && sessionId && sessionSlug && (normalizedRecommendations.length || invite));
 
   const loadCatalog = useCallback(async () => {
@@ -324,6 +328,14 @@ export function SessionInterviewRecommendedGroups({
     onTickedChange?.(anyTicked);
   }, [anyTicked, onTickedChange]);
   useEffect(() => () => onTickedChange?.(false), [onTickedChange]);
+  // Joining, or ticked and unjoined since this account's submit, which going back would drop: the dialog asks first.
+  const submitted = Boolean(joinRequest) && joinRequest !== staleJoinRequest;
+  const reportUnjoined = useContext(VoiceModeUnjoinedGroupsContext);
+  const unjoined = outcome.status === 'joining' || (submitted && anyTicked);
+  useEffect(() => {
+    reportUnjoined?.(unjoined);
+  }, [reportUnjoined, unjoined]);
+  useEffect(() => () => reportUnjoined?.(false), [reportUnjoined]);
 
   const toggle = (choice: GroupChoice, ticked: boolean) => {
     if (choice.fromLink && invite) {
@@ -467,7 +479,7 @@ export function SessionInterviewRecommendedGroups({
             {message}
           </p>
         ))}
-        {joinRequest && anyTicked && outcome.status !== 'joining' ? (
+        {submitted && anyTicked && outcome.status !== 'joining' ? (
           <Button color="primary" onClick={() => void joinTicked()}>
             Join ticked groups
           </Button>
