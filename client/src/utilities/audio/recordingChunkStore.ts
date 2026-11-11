@@ -31,6 +31,13 @@ export type RecordingChunk = {
 
 const DATABASE = 'ce-recording-chunks';
 const STORE = 'chunks';
+// Safari can refuse to store a Blob ("Error preparing Blob/File data to be stored in object store"), so a
+// chunk's audio is stored as its bytes and type, and read back as a Blob.
+type StoredChunk = Omit<RecordingChunk, 'audio'> & { audioBytes?: ArrayBuffer; audioType?: string };
+const toStored = async ({ audio, ...record }: RecordingChunk): Promise<StoredChunk> =>
+  audio ? { ...record, audioBytes: await audio.arrayBuffer(), audioType: audio.type } : record;
+const fromStored = ({ audioBytes, audioType, ...record }: StoredChunk): RecordingChunk =>
+  audioBytes ? { ...record, audio: new Blob([audioBytes], { type: audioType }) } : record;
 
 async function openStore(): Promise<IDBDatabase> {
   if (typeof indexedDB === 'undefined') throw new Error('Audio storage is unavailable in this browser.');
@@ -71,8 +78,10 @@ async function transact<T>(mode: IDBTransactionMode, action: (store: IDBObjectSt
   });
 }
 
-export const listRecordingChunks = (scope: string): Promise<RecordingChunk[]> =>
-  transact('readonly', (store) => store.index('scope').getAll(IDBKeyRange.only(scope)));
+export const listRecordingChunks = async (scope: string): Promise<RecordingChunk[]> =>
+  (await transact<StoredChunk[]>('readonly', (store) => store.index('scope').getAll(IDBKeyRange.only(scope)))).map(
+    fromStored,
+  );
 
 /**
  * Whether this device keeps audio to upload for a session's recording, made by any account (Failed chunks wait
@@ -80,14 +89,15 @@ export const listRecordingChunks = (scope: string): Promise<RecordingChunk[]> =>
  */
 export async function hasKeptRecordingAudio(identity: string): Promise<boolean> {
   const prefix = `${identity.slice(0, -1)},`;
-  const records = await transact<RecordingChunk[]>('readonly', (store) =>
+  const records = await transact<StoredChunk[]>('readonly', (store) =>
     store.index('scope').getAll(IDBKeyRange.bound(prefix, `${prefix}￿`)),
   );
-  return records.some((record) => record.audio && !['failed', 'complete'].includes(record.segment.status));
+  return records.some((record) => record.audioBytes && !['failed', 'complete'].includes(record.segment.status));
 }
 
 export async function putRecordingChunk(record: RecordingChunk): Promise<void> {
-  await transact('readwrite', (store) => store.put(record));
+  const stored = await toStored(record);
+  await transact('readwrite', (store) => store.put(stored));
 }
 
 /** Deletes one record of a recording, such as its voice samples. */
@@ -97,7 +107,8 @@ export async function deleteRecordingChunk(scope: string, id: string): Promise<v
 
 /** Saves several records in one transaction, so a reload finds all of them or none. */
 export async function putRecordingChunks(records: RecordingChunk[]): Promise<void> {
-  await transact('readwrite', (store) => records.map((record) => store.put(record))[records.length - 1]);
+  const stored = await Promise.all(records.map(toStored));
+  await transact('readwrite', (store) => stored.map((record) => store.put(record))[stored.length - 1]);
 }
 
 export async function clearRecordingChunks(scope: string): Promise<void> {

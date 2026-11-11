@@ -755,6 +755,22 @@ describe('sessionWizardWriteNormalization', () => {
     expect(payload).toHaveProperty('sessionEndsAt', '');
   });
 
+  test('buildSessionWizardWorkerConfigPayload leaves blank instructions for AI agents out and trims set ones', () => {
+    const build = (agentInstructions: string) =>
+      buildSessionWizardWorkerConfigPayload({
+        slug: 'agent-instructions',
+        draft: {
+          agentInstructions,
+          sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+        },
+        workerUrl: 'https://worker.example',
+      });
+
+    // Older Workers refuse the field; the config writers clear stored instructions.
+    expect(build(' \n ')).not.toHaveProperty('agentInstructions');
+    expect(build(' Join the open group.\n')).toHaveProperty('agentInstructions', 'Join the open group.');
+  });
+
   test('buildSessionWizardWorkerConfigPayload keeps only SBT defaults and Group Factory for explicit hybrid mode', () => {
     const sessionModeProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
     sessionModeProfile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
@@ -871,9 +887,9 @@ describe('sessionWizardWriteNormalization', () => {
       sessionId: '123e4567-e89b-12d3-a456-426614174000',
       workerUrl: 'https://worker.example',
     });
-    // An off default is left out so Workers before 0.7.0, which reject unknown keys, still accept it.
-    expect(Object.hasOwn(payload.interviewMode, 'shareDraftChangesByDefault')).toBe(shareDraftChangesByDefault);
-    if (shareDraftChangesByDefault) expect(payload.interviewMode.shareDraftChangesByDefault).toBe(true);
+    // The on default is left out so Workers before 0.7.0, which reject unknown keys, still accept it.
+    expect(Object.hasOwn(payload.interviewMode, 'shareDraftChangesByDefault')).toBe(!shareDraftChangesByDefault);
+    if (!shareDraftChangesByDefault) expect(payload.interviewMode.shareDraftChangesByDefault).toBe(false);
   });
 
   test.each(['minimal', 'full'] as const)('publishes the interview research detail (%s)', (researchDetail) => {
@@ -918,6 +934,54 @@ describe('sessionWizardWriteNormalization', () => {
     });
     // Off is the default, left out so older Session Workers still accept the save.
     expect(payload.interviewMode.suggestGroups).toBe(suggestGroups || undefined);
+  });
+
+  test.each([true, false])('publishes group suggestions only when on (%s)', (joinMatchingGroups) => {
+    const payload = buildSessionWizardWorkerConfigPayload({
+      slug: 'group-joins',
+      draft: {
+        sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+        interviewMode: { joinMatchingGroups },
+      },
+      account: '0x00000000000000000000000000000000000000aa',
+      sessionId: '123e4567-e89b-12d3-a456-426614174000',
+      workerUrl: 'https://worker.example',
+    });
+    // Off is the default, left out so older Session Workers still accept the save.
+    expect(payload.interviewMode.joinMatchingGroups).toBe(joinMatchingGroups || undefined);
+  });
+
+  test.each([
+    [['country', 'work', 'interests'], undefined],
+    [['country'], ['country']],
+    [[], []],
+  ])('publishes what the AI may use to suggest groups only when not the default (%j)', (groupSuggestionData, saved) => {
+    const payload = buildSessionWizardWorkerConfigPayload({
+      slug: 'group-data',
+      draft: {
+        sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+        interviewMode: { joinMatchingGroups: true, groupSuggestionData },
+      },
+      account: '0x00000000000000000000000000000000000000aa',
+      sessionId: '123e4567-e89b-12d3-a456-426614174000',
+      workerUrl: 'https://worker.example',
+    });
+    // The default is left out so older Session Workers still accept the save.
+    expect(payload.interviewMode.groupSuggestionData).toEqual(saved);
+  });
+
+  test('leaves out what the AI may use while group suggestions are off', () => {
+    const payload = buildSessionWizardWorkerConfigPayload({
+      slug: 'group-data-off',
+      draft: {
+        sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+        interviewMode: { joinMatchingGroups: false, groupSuggestionData: ['town'] },
+      },
+      account: '0x00000000000000000000000000000000000000aa',
+      sessionId: '123e4567-e89b-12d3-a456-426614174000',
+      workerUrl: 'https://worker.example',
+    });
+    expect(payload.interviewMode).not.toHaveProperty('groupSuggestionData');
   });
 
   test.each([true, false])('publishes the fidelity section of Results only when on (%s)', (showFidelityResults) => {

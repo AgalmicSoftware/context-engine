@@ -269,6 +269,7 @@ export const buildPileSubmitViewState = ({
   pileSubmitLabel = '',
   account = '',
   isAddress = () => false,
+  sessionSlug = '',
 }: {
   pendingStats?: PilePendingStatsLike | null;
   isSubmitting?: boolean;
@@ -278,6 +279,7 @@ export const buildPileSubmitViewState = ({
   pileSubmitLabel?: string | null;
   account?: string | null;
   isAddress?: (value: string) => boolean;
+  sessionSlug?: string | null;
 } = {}): PileSubmitViewState => {
   const hasPendingPileChanges = Number(pendingStats?.total || 0) > 0;
   const pileSubmittedStateActive = !hasPendingPileChanges && !!(submittedSinceLastEdit || submissionComplete);
@@ -288,6 +290,9 @@ export const buildPileSubmitViewState = ({
   const pileSubmitResponderAddress = String(account || '').trim();
   const pileSubmitResponderAddressLower =
     pileSubmitResponderAddress && isAddress(pileSubmitResponderAddress) ? pileSubmitResponderAddress.toLowerCase() : '';
+  // The profile opens in this session: without one, it reads the default session's Worker instead.
+  const slug = String(sessionSlug || '').trim();
+  const sessionQuery = slug ? `?session=${encodeURIComponent(slug)}` : '';
 
   return {
     hasPendingPileChanges,
@@ -295,7 +300,9 @@ export const buildPileSubmitViewState = ({
     showPileSubmitSuccessBadge,
     shouldHidePileSubmitButton,
     finalSubmitText,
-    pileSubmitResponderHref: pileSubmitResponderAddressLower ? `/u/${pileSubmitResponderAddressLower}` : '',
+    pileSubmitResponderHref: pileSubmitResponderAddressLower
+      ? `/u/${pileSubmitResponderAddressLower}${sessionQuery}`
+      : '',
   };
 };
 
@@ -311,6 +318,7 @@ export const buildPileSubmitRailViewState = ({
   pileSubmitLabel?: string | null;
   account?: string | null;
   isAddress?: (value: string) => boolean;
+  sessionSlug?: string | null;
 } = {}): PileSubmitRailViewState => {
   const submitViewState = buildPileSubmitViewState({
     ...rest,

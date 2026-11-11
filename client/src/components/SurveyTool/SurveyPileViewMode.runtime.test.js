@@ -19,7 +19,7 @@ import {
   buildPileSubmitViewState,
 } from './surveyPileViewState.js';
 import { renderPileGatedPromptCard } from './surveyPileActiveQuestionCard';
-import { renderPileInteractionSurface } from './surveyPileInteractionSurface';
+import { PileSubmittedCheck, renderPileInteractionSurface } from './surveyPileInteractionSurface';
 import {
   buildClearedTransientSubmitFeedbackState,
   buildQuestionPoolPendingSubmitFeedbackMessage,
@@ -655,6 +655,10 @@ describe('SurveyPileViewMode runtime surface', () => {
     expect(await screen.findByTestId('mock-voice-mode-modal')).toHaveAttribute('data-mode', 'chooser');
     await act(async () => mockVoiceModeProps.onSelectMode('interview'));
     expect(window.location.search).toBe('?foo=1&mode=interview');
+    // Back to the choices keeps them in the address, so a reload reopens them.
+    await act(async () => mockVoiceModeProps.onSelectMode(null));
+    expect(screen.getByTestId('mock-voice-mode-modal')).toHaveAttribute('data-mode', 'chooser');
+    expect(window.location.search).toBe('?foo=1&mode=voice');
     await act(async () => mockVoiceModeProps.onClose());
     expect(window.location.search).toBe('?foo=1');
   });
@@ -1520,6 +1524,7 @@ describe('SurveyPileViewMode runtime surface', () => {
           submittedSinceLastEdit: true,
           account: responderAddress,
           isAddress: (value) => value === responderAddress,
+          sessionSlug: 'alpha',
         }),
       }),
     );
@@ -1527,18 +1532,11 @@ describe('SurveyPileViewMode runtime surface', () => {
       tree,
       (node) => isElementNode(node) && node.props['data-testid'] === E2E_TESTIDS.SURVEY_SUBMIT,
     );
-    const successBadge = findNodeByClassName(tree, 'pileSubmitSuccessBadge');
-    const successIcon = findNodeByClassName(tree, 'pileSubmitSuccessIcon');
+    const successCheck = findElement(tree, (node) => isElementNode(node) && node.type === PileSubmittedCheck);
     const hiddenFooter = findNodeByClassName(tree, 'pileFooterHidden');
 
     expect(submitButton).toBeNull();
-    expect(successBadge).not.toBeNull();
-    expect(successBadge.type).toBe('a');
-    expect(successBadge.props.href).toBe(`/u/${responderAddress.toLowerCase()}`);
-    expect(successBadge.props['data-testid']).toBe(E2E_TESTIDS.SURVEY_SUBMITTED_INDICATOR);
-    expect(successBadge.props['aria-label']).toBe('View your submitted responses');
-    expect(successBadge.props.title).toBe('View your submitted responses');
-    expect(successIcon).not.toBeNull();
+    expect(successCheck.props.href).toBe(`/u/${responderAddress.toLowerCase()}?session=alpha`);
     expect(hiddenFooter).toBeNull();
   });
 
@@ -1552,16 +1550,9 @@ describe('SurveyPileViewMode runtime surface', () => {
         }),
       }),
     );
-    const successBadge = findNodeByClassName(tree, 'pileSubmitSuccessBadge');
-    const successIcon = findNodeByClassName(tree, 'pileSubmitSuccessIcon');
+    const successCheck = findElement(tree, (node) => isElementNode(node) && node.type === PileSubmittedCheck);
 
-    expect(successBadge).not.toBeNull();
-    expect(successBadge.type).toBe('div');
-    expect(successBadge.props.href).toBeUndefined();
-    expect(successBadge.props['data-testid']).toBe(E2E_TESTIDS.SURVEY_SUBMITTED_INDICATOR);
-    expect(successBadge.props.role).toBe('status');
-    expect(successBadge.props['aria-label']).toBe('Submitted');
-    expect(successIcon).not.toBeNull();
+    expect(successCheck.props.href).toBe('');
   });
 
   it('does not call getPendingEditStats during PileViewMode.render', () => {

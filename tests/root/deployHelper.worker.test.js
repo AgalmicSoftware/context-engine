@@ -2,6 +2,7 @@ const { createHash, createHmac, webcrypto } = require('crypto');
 const deployHelperWorker = require('../../workers/deploy-helper/worker.js').default;
 const { SessionWriteCoordinator } = require('../../workers/sessionCorsWorker/sessionWriteCoordinator.js');
 const { dispatchSponsoredBootstrapRedeem } = require('../../workers/sessionCorsWorker/sponsoredBootstrapRedeemDispatch.js');
+const { validateDeployHelperPublicConfigInputs } = require('../../workers/shared/deployHelperCore.mjs');
 
 const makeJsonRequest = (path, body, init = {}) => new Request(`https://helper.example.test${path}`, {
   method: init.method || 'POST',
@@ -99,6 +100,7 @@ const cfFailure = (status, message, errors = [{ message }]) => new Response(JSON
 const makeFetchSequence = (responses = []) => {
   const queue = [...responses];
   const calls = [];
+  const accountLookupCalls = [];
   const workerNamePreflightCalls = [];
   let scriptUploadAttempted = false;
   let scriptUploadSucceeded = false;
@@ -108,6 +110,7 @@ const makeFetchSequence = (responses = []) => {
     const normalizedUrl = String(url);
     const method = String(init.method || 'GET').toUpperCase();
     if (method === 'GET' && /\/accounts\?per_page=5$/.test(normalizedUrl)) {
+      accountLookupCalls.push(args);
       return fetchMock.accountLookupOverride || cfSuccess([
         { id: 'acc-123', name: 'Derived test account' },
       ]);
@@ -203,6 +206,7 @@ const makeFetchSequence = (responses = []) => {
     return response;
   };
   fetchMock.calls = calls;
+  fetchMock.accountLookupCalls = accountLookupCalls;
   fetchMock.workerNamePreflightCalls = workerNamePreflightCalls;
   return fetchMock;
 };
@@ -1725,6 +1729,37 @@ describe('deploy-helper worker', () => {
     expect(payload?.error).toBe('groupCreationPolicy must be "admin_only" or "participants".');
     expect(fetchMock.calls).toHaveLength(0);
     expect(fetchMock.workerNamePreflightCalls).toHaveLength(0);
+  });
+
+  it('rejects instructions for AI agents over 8,000 characters before Cloudflare mutation', async () => {
+    for (const agentInstructions of ['x'.repeat(8001), 7]) {
+      const fetchMock = makeFetchSequence([]);
+      global.fetch = fetchMock;
+
+      const response = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {
+        apiToken: 'cf-token',
+        accountId: 'acc-123',
+        workerName: 'test-worker',
+        sessionSlug: 'alpha-session',
+        agentInstructions,
+        bundleUrl: 'https://bundles.example.test/sessionCorsWorker.bundle.js',
+      }), {}, {});
+      const payload = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(payload?.error).toBe('agentInstructions must be text of at most 8000 characters.');
+      expect(fetchMock.accountLookupCalls).toHaveLength(0);
+      expect(fetchMock.calls).toHaveLength(0);
+      expect(fetchMock.workerNamePreflightCalls).toHaveLength(0);
+    }
+  });
+
+  it('refuses instructions for AI agents in the check a sponsored deploy runs first', () => {
+    expect(validateDeployHelperPublicConfigInputs({ agentInstructions: 'x'.repeat(8001) }))
+      .toBe('agentInstructions must be text of at most 8000 characters.');
+    expect(validateDeployHelperPublicConfigInputs({ agentInstructions: 7 }))
+      .toBe('agentInstructions must be text of at most 8000 characters.');
+    expect(validateDeployHelperPublicConfigInputs({ agentInstructions: 'x'.repeat(8000) })).toBe('');
   });
 
   it('rejects an existing worker-canonical name before creating KV or overwriting a script', async () => {

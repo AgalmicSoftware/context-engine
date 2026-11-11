@@ -204,6 +204,8 @@ manual deploys; keep the two files identical:
 /demo/dacc /about 301
 /assets/img/context-engine-social-preview-square.png /context-engine-social-preview-square.png 301
 /assets/* /404.html 404
+/.well-known/* /404.html 404
+/skill.md /agent-guide.md 200
 /* /index.html 200
 ```
 
@@ -226,6 +228,16 @@ The connected-build equivalent is:
   status = 404
 
 [[redirects]]
+  from = "/.well-known/*"
+  to = "/404.html"
+  status = 404
+
+[[redirects]]
+  from = "/skill.md"
+  to = "/agent-guide.md"
+  status = 200
+
+[[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
@@ -234,7 +246,9 @@ The connected-build equivalent is:
 Keep specific legacy redirects above the SPA fallback rule in both files. The
 `/assets/*` rule makes a missing hashed file return 404 (with
 `client/public/404.html`) instead of the SPA HTML. It is not forced, so files
-that exist are still served.
+that exist are still served. `/.well-known/` addresses also return 404, and
+`/skill.md`, the guide for AI agents, serves `client/public/agent-guide.md`; the
+dev and preview servers follow that rewrite too.
 
 For rollback, use Netlify's deploy history to republish the previous known-good
 production deploy, then correct `main` normally. A frontend rollback does not
@@ -462,7 +476,8 @@ not returned by these configuration or presence reads.
 
 - `REACT_APP_CE_DEMO_SESSION_SLUGS=demo-sh,demo-1,demo-3,demo-2,demo`
   - Sets the ordered list of session slugs that receive public demo-session affordances.
-  - The first slug is used by the About-page Demo CTA when no explicit list-scoped session is selected.
+  - The About page's Demo button doesn't use this list: unless a list-scoped session is selected,
+    it opens `rxc-ra-test-5`, a session in `known-sessions.json` whose Worker runs every voice mode.
   - `demo`, `demo-1`, `demo-3`, and `demo-sh` reuse the bundled legacy Context
     Polis fixture. `demo-2` uses its own 40-question generated dataset.
   - `demo-sh` is the current first/default public demo and has a dedicated

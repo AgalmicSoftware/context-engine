@@ -113,7 +113,7 @@ Each section shows only the settings the chosen hosting supports:
 
 | Hosting | Settings shown |
 | --- | --- |
-| Session Worker on Cloudflare | End time, question defaults, Worker Group tag defaults, and Worker-backed privacy and results controls |
+| Session Worker on Cloudflare | End time, instructions for AI agents, question defaults, Worker Group tag defaults, and Worker-backed privacy and results controls |
 | Session Worker with on-chain SBT access | The Cloudflare settings plus SBT curation and the network controls that access needs |
 | On-chain registry (Arweave) | Registry network, SBT gates and SBT curation. Contracts, block range and faucet amounts use chain defaults; edit them on the session's settings page after creation |
 
@@ -140,9 +140,16 @@ Interview settings for the call:
   default; when enabled, their default addition threshold is 20%. Question
   suggestions are optional and off by default. Admin refresh is on by default.
 
-- **Suggest open groups that fit participants’ answers**
-  (`interviewMode.suggestGroups`, off by default) offers the session's open
-  groups after an interview or AI prefill, without joining for anyone.
+- **Suggest groups to join** (`interviewMode.joinMatchingGroups`, off by
+  default) suggests the session's open groups that fit each participant after
+  an interview or AI prefill: the ones they tick join when they submit, and
+  their own AI can suggest groups too. Off, no groups are matched. The older
+  `interviewMode.suggestGroups` is no longer read. While it is on, **The AI may
+  use** (`interviewMode.groupSuggestionData`) sets what an AI may base a
+  suggestion on: Country, Work, and Interests and causes by default; Town or
+  city only when ticked. No AI ever goes on health, disability, religion,
+  ethnicity, sexuality, gender identity, age, family life, or party or union
+  membership.
 
 Interview settings for research:
 
@@ -154,9 +161,9 @@ Interview settings for research:
   participants](#measure-how-well-ai-represents-participants).
 
 - **Share AI draft changes for research by default**
-  (`interviewMode.shareDraftChangesByDefault`, off when unset) sets the initial
-  review checkbox. Participants can change it before submitting, and their saved
-  choices are retained.
+  (`interviewMode.shareDraftChangesByDefault`, on when unset) sets the initial
+  **Share for research** checkbox beside **AI submission info**. Participants can
+  change it before submitting, and their saved choices are retained.
 
 - **AI draft research detail** (`interviewMode.researchDetail`) decides what a
   shared comparison keeps: `minimal` (the default) has no AI notes or drafted
@@ -181,7 +188,8 @@ Interview settings for research:
 Older Session Workers reject settings they don't know, so each is saved only
 when changed from its default. The sharing default needs a 0.7.0 or later
 Session Worker; `full` detail, hidden drafts, the score, group suggestions, the
-Results section and its smallest group need one newer than 0.8.0. See
+Results section and its smallest group need one newer than 0.8.0, and
+suggesting groups to join needs 0.9.1 or later. See
 [session-interview-research.md](session-interview-research.md),
 [session-listening-mode.md](session-listening-mode.md) and [Interview settings
 and lifecycle](session-listening-mode.md#interview).
@@ -229,6 +237,15 @@ Session Worker stops participant AI, transcription, fetch, upload, Group
 creation, and Group join work. Existing public or authorized Groups, stored
 payloads, and results remain readable, and signed admin recovery/configuration
 routes remain available.
+
+The optional **Instructions for AI agents**, also for Worker-canonical
+sessions, add to the site's guide for agents at `/skill.md`: what to know
+before taking part, such as which group to join or what to focus on. They are
+Markdown of up to 8,000 characters, typed or loaded from a .md or .txt file,
+and can ask more of agents but not lift the guide's rules. The Session Worker
+serves them as text at `<worker origin>/llms.txt`, never as a page; anyone can
+read them there and in its public `/session-config`. Editing them signs no one
+out.
 
 **Group tags** in Participation seeds the tags in both participant and admin
 Worker Group creation. Worker sessions that carry only `defaultSbtTags` fall back
@@ -584,10 +601,9 @@ What gets stored where:
 Important:
 
 - A newly deployed Worker-canonical session needs the `worker=` URL parameter
-  for first-time visitors unless its slug and Worker origin are included in
-  the site's bundled discovery map. Deployment alone does not register a
-  slug-only URL. Bundled entries take effect when the website deploys; the
-  Worker still supplies the session's verified settings and permissions.
+  for first-time visitors unless the repo's `known-sessions.json` lists it (see
+  [Normal links on the hosted site](#normal-links-on-the-hosted-site)).
+  Deployment alone does not register a slug-only URL.
 - `blockLimits.start` is required for chain-scanned profiles. The default
   worker-canonical profile does not require a chain scan window. After its
   canonical worker config is verified, reloads keep that session out of EVM
@@ -1305,6 +1321,42 @@ URL credentials, paths, and private-network hosts), binds the worker origin to
 the exact slug/session identity, and prompts before replacing a conflicting
 trust-on-first-use pin.
 
+### Normal links on the hosted site
+
+The hosted site opens a session from a normal link, `/session/<slug>` with no
+`worker=`, only when the repo's `known-sessions.json` lists it. Each entry says
+where the session's Worker is:
+
+```json
+{
+  "<slug>": {
+    "worker": "https://<worker-origin>",
+    "sessionId": "0x<32 hex digits>",
+    "name": "<session name>"
+  }
+}
+```
+
+- `worker` is the Worker's HTTPS origin, with no path or trailing slash.
+- `sessionId` is the ID the Worker reports: `0x` and 32 lowercase hex digits.
+  The session opens only when the Worker's verified config carries this ID.
+- `name` is optional; the Worker's config supplies every setting.
+
+Add the entry with a pull request. Normal links work once it's on `main` and the
+site has deployed; until then, share the `worker=` link. Any other session opens
+only from its `worker=` link, except the site's built-in demos, such as
+`demo-interview`, which open from the demo data bundled with the site. The site
+also serves the file at `/known-sessions.json`, so agents can find a session's
+Worker from its slug.
+
+The file lists EDDY 2026 (`eddy26`), the demo session (`demo-sh`), the Reverse
+Alignment salon (`rxc-ra-26`) and `rxc-ra-test-5`. The About page's **Demo**
+button opens `rxc-ra-test-5`, and the films, stills, promo slides and writeup
+carry its link. Delete its entry only once those links switch to `rxc-ra-26`'s
+and the button opens another listed session. A listed session that also has
+demo data in `demo_sessions.json`, as `demo-sh` does, keeps that data; the list
+sets only its Worker, its session ID and its normal link.
+
 ## Troubleshooting
 
 ### Worker deploy fails
@@ -1335,7 +1387,10 @@ description preserves existing sign-ins; authority changes still revoke them.
 
 Edits replace what an earlier verification stored: a blank end time is sent as
 `""` and blank request limits as `null`, so a cleared value does not stay on the
-Worker. The browser compares the shared public fields, including session
+Worker. Blank instructions for AI agents are sent as `""` only when the Worker's
+config already has the field, which a Worker from before it refuses; the browser
+reads the config first. If that read fails, nothing is signed or saved, so you
+can try again. The browser compares the shared public fields, including session
 appearance and the Worker URL's origin. It skips fields the Worker sets itself:
 the authorization epoch, the publication marker, the response field encryption
 it reports on every read, and, before publication, a revision the deploy helper

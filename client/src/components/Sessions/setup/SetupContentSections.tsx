@@ -14,6 +14,7 @@ import {
 } from '../../../utilities/session/groupCreationPolicy';
 import { SetupCheck, SetupField, SetupSection, setupHelpId } from './SetupPrimitives';
 import SetupContextHtmlField from './SetupContextHtmlField';
+import SetupAgentInstructionsField from './SetupAgentInstructionsField';
 import {
   SETUP_QUESTION_TYPES,
   asList,
@@ -491,11 +492,11 @@ export const summarizeParticipation = (draft: SetupSectionProps['draft']): strin
 };
 
 type ParticipationProps = SetupSectionProps & {
-  /** End times apply only to Worker-hosted sessions. */
-  supportsEndTime: boolean;
+  /** End times and instructions for AI agents apply only to Worker-hosted sessions. */
+  workerHosted: boolean;
 };
 
-export const SetupParticipationSection = ({ draft, onChange, open, onToggle, supportsEndTime }: ParticipationProps) => (
+export const SetupParticipationSection = ({ draft, onChange, open, onToggle, workerHosted }: ParticipationProps) => (
   <SetupSection
     sectionKey="participation"
     title="Participation"
@@ -542,21 +543,27 @@ export const SetupParticipationSection = ({ draft, onChange, open, onToggle, sup
         onChange={(event) => onChange(['defaultGroupTags'], event.target.value)}
       />
     </SetupField>
-    {supportsEndTime ? (
-      <SetupField
-        id="ce-setup-ends-at"
-        label="End time"
-        help="Optional. Answers and group changes stop at this time; results stay readable."
-      >
-        <Input
+    {workerHosted ? (
+      <>
+        <SetupField
           id="ce-setup-ends-at"
-          type="datetime-local"
-          value={toLocalDateTime(draft.sessionEndsAt)}
-          aria-describedby={setupHelpId('ce-setup-ends-at')}
-          data-testid={E2E_TESTIDS.WIZARD_SESSION_ENDS_AT}
-          onChange={(event) => onChange(['sessionEndsAt'], event.target.value)}
+          label="End time"
+          help="Optional. Answers and group changes stop at this time; results stay readable."
+        >
+          <Input
+            id="ce-setup-ends-at"
+            type="datetime-local"
+            value={toLocalDateTime(draft.sessionEndsAt)}
+            aria-describedby={setupHelpId('ce-setup-ends-at')}
+            data-testid={E2E_TESTIDS.WIZARD_SESSION_ENDS_AT}
+            onChange={(event) => onChange(['sessionEndsAt'], event.target.value)}
+          />
+        </SetupField>
+        <SetupAgentInstructionsField
+          value={text(draft.agentInstructions)}
+          onChange={(value) => onChange(['agentInstructions'], value)}
         />
-      </SetupField>
+      </>
     ) : null}
   </SetupSection>
 );

@@ -336,6 +336,29 @@ describe('bundled app-theme contrast', () => {
     ).toEqual([]);
   });
 
+  // Unstyled, the browser paints a file input's button, and Context Engine's hover shade left its label at 3.95:1.
+  // The file name was 1.93:1 on a dark panel in the document text the theme gives other fields.
+  test.each(registry.themes.map(({ id }) => id))('%s keeps native file inputs readable', (themeId) => {
+    const values = themeValues(css, themeId);
+    const paint = painter(values);
+    const rule = (selector: string) => moduleRule(css, `:root[data-ce-theme] ${selector}`);
+    const field = composite(
+      parseColor(values['input-bg']),
+      composite(parseColor(values.surface), parseColor(values.canvas)),
+    );
+    const ratio = (color: string, fill: Rgba) => Number(contrastRatio(composite(paint(color), fill), fill).toFixed(2));
+    const resting = rule('::file-selector-button');
+    const pressed = { ...resting, ...rule('input:not(:disabled)::file-selector-button:active') };
+    // A field's own text fill, such as the setup page's, would otherwise paint the label.
+    expect(resting['-webkit-text-fill-color']).toBe('currentColor');
+    const ratios = [
+      ['label', ratio(resting.color, composite(paint(resting.background), field))],
+      ['pressed label', ratio(pressed.color, composite(paint(pressed.background), field))],
+      ['file name', ratio(rule('input[type=file]').color, field)],
+    ] as const;
+    expect(ratios.filter(([, value]) => value < 4.5)).toEqual([]);
+  });
+
   // Every pairing below paints over the global `.btn` rules, so each fill has to be !important in every state.
   const stateSelectors = (button: string) =>
     ['', ':hover', ':focus', ':active', ':active:hover'].map((state) => `${button}${state}`);
@@ -527,6 +550,25 @@ describe('bundled app-theme contrast', () => {
       expect([selector, rule.background]).toEqual([selector, 'transparent']);
       expect(contrastRatio(paint(rule.color), groupCard)).toBeGreaterThanOrEqual(4.5);
     });
+  });
+
+  // A group's Joined, Join period ended and Admin add required share this chip, which is translucent over the card.
+  test.each(registry.themes.map(({ id }) => id))('%s keeps the group status chip readable', (themeId) => {
+    const values = themeValues(css, themeId);
+    const paint = painter(values);
+    const chip = moduleRule(
+      compileModule('components/OnePageSession/OnePageSession.module.scss'),
+      '.workerGroupCardInactiveStatus',
+    );
+    const card = composite(
+      parseColor(values['card-bg']),
+      composite(parseColor(values.surface), parseColor(values.canvas)),
+    );
+    const ratios = [card, parseColor(values['document-canvas'])].map((backdrop) => {
+      const fill = composite(paint(chip.background), backdrop);
+      return Number(contrastRatio(composite(paint(chip.color), fill), fill).toFixed(2));
+    });
+    expect(ratios.filter((value) => value < 4.5)).toEqual([]);
   });
 
   test.each(registry.themes.map(({ id }) => id))('%s keeps the session section headers readable', (themeId) => {
@@ -769,6 +811,48 @@ describe('bundled app-theme contrast', () => {
       },
     );
     expect(ratios.filter(([, , value]) => value < 4.5)).toEqual([]);
+  });
+
+  // Sharing for research sits on the AI submission info summary, hovered or not, or under it where the bar is narrow,
+  // and its ? takes the label's colour.
+  test.each(registry.themes.map(({ id }) => id))('%s keeps sharing for research readable on its bar', (themeId) => {
+    const values = themeValues(css, themeId);
+    const paint = painter(values);
+    const surveyCss = compileModule('components/SurveyTool/SurveyTool.module.scss');
+    const consentCss = compileModule('components/SurveyTool/SessionInterviewResearchConsent.module.scss');
+    const canvas = parseColor(values.canvas);
+    const bar = composite(paint(moduleRule(surveyCss, '.sessionInterviewReviewActions').background), canvas);
+    const behind = {
+      summary: composite(paint(moduleRule(surveyCss, '.sessionInterviewConsentOptions > summary').background), bar),
+      hoveredSummary: composite(
+        paint(moduleRule(surveyCss, '.sessionInterviewConsentOptions > summary:hover').background),
+        bar,
+      ),
+      bar,
+    };
+    const label = paint(moduleRule(consentCss, '.provenanceOption').color);
+    const help = moduleRule(consentCss, '.researchHelp');
+    const helpHover = moduleRule(consentCss, '.researchHelp:hover');
+    const ratios = Object.entries(behind).flatMap(([place, under]) => {
+      const hoverFill = composite(paint(helpHover.background), under);
+      return [
+        [place, 'label', contrastRatio(composite(label, under), under)],
+        [place, '?', contrastRatio(composite(paint(help.color), under), under)],
+        [place, '? hovered', contrastRatio(composite(paint(help.color), hoverFill), hoverFill)],
+      ] as const;
+    });
+    expect(ratios.filter(([, , value]) => value < 4.5)).toEqual([]);
+  });
+
+  test.each(registry.themes.map(({ id }) => id))('%s keeps the Context panels’ headings readable', (themeId) => {
+    const values = themeValues(css, themeId);
+    const paint = painter(values);
+    // The headings take the panel's text colour rather than the site-wide heading colour.
+    const shellCss = compileModule('components/OnePageSession/OnePageSession.module.scss');
+    expect(moduleRule(shellCss, '.sessionContextManage h3').color).toBe('inherit');
+    const panel = moduleRule(compileModule('components/Sessions/setup/SessionSetup.module.scss'), '.page');
+    const fill = composite(paint(panel.background), parseColor(values.canvas));
+    expect(contrastRatio(composite(paint(panel.color), fill), fill)).toBeGreaterThanOrEqual(4.5);
   });
 
   test.each(registry.themes.map(({ id }) => id))('%s keeps small binary answer labels readable', (themeId) => {

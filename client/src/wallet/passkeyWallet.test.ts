@@ -3,9 +3,10 @@ import {
   MissingPasskeyWalletRecordError,
   PasskeyEoaWalletClient,
   isMissingPasskeyWalletRecordError,
+  watchPasskeyWalletActivity,
 } from './passkeyWallet.js';
 import { createMemoryWalletStorage } from './keystore/storage.js';
-import { assertSoftSessionAllowed, createSoftSessionPolicy } from './session/sessionPolicy.js';
+import { assertSoftSessionAllowed, createSoftSessionPolicy, extendSoftSessionPolicy } from './session/sessionPolicy.js';
 import type { PasskeyCredentialClient, PasskeyWalletConfig } from './types.js';
 import { createInMemorySoftSessionClient, type SoftSessionClient } from './session/sessionWorkerClient.js';
 import { bufferToBase64URL } from './passkey/encoding.js';
@@ -71,8 +72,10 @@ const makeCredentials = ({
 
 const makeSessionClient = () => {
   const calls: Array<{ privateKey: string; rpcUrl: string; chainId: number }> = [];
-  const client: SoftSessionClient & { calls: typeof calls; locked: boolean } = {
+  const extensions: number[] = [];
+  const client: SoftSessionClient & { calls: typeof calls; extensions: typeof extensions; locked: boolean } = {
     calls,
+    extensions,
     locked: false,
     async init(options) {
       calls.push({
@@ -90,6 +93,9 @@ const makeSessionClient = () => {
       if (method === 'eth_signTransaction') return '0x' + '44'.repeat(64);
       if (method === 'eth_accounts') return [ADDRESS];
       return null;
+    },
+    async extend(until) {
+      extensions.push(until);
     },
     async lock() {
       this.locked = true;
@@ -327,6 +333,122 @@ describe('PasskeyEoaWalletClient', () => {
     expect(credentials.get).toHaveBeenCalledTimes(1);
     expect(session.calls).toHaveLength(2);
     await client.lock();
+  });
+
+  it('stays unlocked while in use, but never past 8 hours from the passkey prompt', async () => {
+    const start = Date.now();
+    let now = start;
+    const credentials = makeCredentials();
+    const session = makeSessionClient();
+    const client = new PasskeyEoaWalletClient({
+      config: derivedConfig,
+      storage: createMemoryWalletStorage(),
+      credentials,
+      sessionClient: session,
+      sessionClientFactory: () => session,
+      now: () => now,
+    });
+    const address = await client.createWallet();
+    const cap = start + 8 * 60 * 60 * 1000;
+    // Use seconds apart is one extension, not one message to the key worker per key press.
+    now = start + 1_000;
+    client.noteActivity();
+    expect(session.extensions).toEqual([]);
+    for (now = start + 50_000; now < cap; now += 50_000) {
+      client.noteActivity();
+      expect(client.isUnlocked()).toBe(true);
+    }
+    expect(session.extensions.at(-1)).toBe(cap);
+    now = cap;
+    client.noteActivity();
+    expect(client.isUnlocked()).toBe(false);
+    await expect(client.signMessage('after the cap', address)).resolves.toMatch(/^0x11/);
+    expect(credentials.get).toHaveBeenCalledTimes(1);
+    await client.lock();
+  });
+
+  it('locks a full TTL after the passkey prompt or the last use', async () => {
+    jest.useFakeTimers({ doNotFake: ['nextTick', 'queueMicrotask'] });
+    try {
+      const session = makeSessionClient();
+      const client = new PasskeyEoaWalletClient({
+        config: derivedConfig,
+        storage: createMemoryWalletStorage(),
+        credentials: makeCredentials(),
+        sessionClient: session,
+        sessionClientFactory: () => session,
+      });
+      await client.createWallet();
+      jest.advanceTimersByTime(30_000);
+      client.noteActivity();
+      jest.advanceTimersByTime(59_000);
+      expect(session.locked).toBe(false);
+      expect(client.isUnlocked()).toBe(true);
+      jest.advanceTimersByTime(1_000);
+      expect(session.locked).toBe(true);
+      expect(client.isUnlocked()).toBe(false);
+      // Unused, it locks a full TTL after the passkey prompt.
+      await client.unlockWallet();
+      jest.advanceTimersByTime(59_999);
+      expect(session.locked).toBe(false);
+      jest.advanceTimersByTime(1);
+      expect(session.locked).toBe(true);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('never extends a locked wallet', async () => {
+    const session = makeSessionClient();
+    const client = new PasskeyEoaWalletClient({
+      config: derivedConfig,
+      storage: createMemoryWalletStorage(),
+      credentials: makeCredentials(),
+      sessionClient: session,
+      sessionClientFactory: () => session,
+    });
+    client.noteActivity();
+    await client.createWallet();
+    await client.lock();
+    client.noteActivity();
+    expect(session.extensions).toEqual([]);
+    expect(client.isUnlocked()).toBe(false);
+  });
+
+  it('counts only the clicks and key presses the person makes', () => {
+    const handlers = new Map<string, (event: Partial<Event>) => void>();
+    const target = {
+      addEventListener: jest.fn(
+        (type: string, handler: (event: Partial<Event>) => void, _options?: AddEventListenerOptions) =>
+          handlers.set(type, handler),
+      ),
+    };
+    const client = { noteActivity: jest.fn() };
+    watchPasskeyWalletActivity(client, target as unknown as EventTarget);
+    // Captured, so a component that stops an event still counts as use.
+    expect(target.addEventListener.mock.calls.map(([type, , options]) => [type, options])).toEqual([
+      ['pointerdown', expect.objectContaining({ capture: true })],
+      ['keydown', expect.objectContaining({ capture: true })],
+      ['click', expect.objectContaining({ capture: true })],
+    ]);
+    handlers.forEach((handler) => handler({ isTrusted: false }));
+    expect(client.noteActivity).not.toHaveBeenCalled();
+    handlers.forEach((handler) => handler({ isTrusted: true }));
+    expect(client.noteActivity).toHaveBeenCalledTimes(3);
+  });
+
+  it('watches the page for use as soon as the wallet loads', () => {
+    const listen = jest.spyOn(window, 'addEventListener');
+    try {
+      jest.isolateModules(() => {
+        require('./passkeyWallet.js');
+      });
+      for (const type of ['pointerdown', 'keydown', 'click']) {
+        expect(listen).toHaveBeenCalledWith(type, expect.any(Function), expect.objectContaining({ capture: true }));
+      }
+    } finally {
+      listen.mockRestore();
+    }
   });
 
   it.each([
@@ -851,13 +973,19 @@ describe('PasskeyEoaWalletClient', () => {
     });
 
     await client.createWallet();
+    // The provider says whether a request would sign without a passkey prompt, now or after a wait.
+    const provider = client.createProvider();
     expect(client.isUnlocked()).toBe(true);
     expect(client.hasSigner()).toBe(true);
+    expect(provider.isUnlocked()).toBe(true);
+    expect(provider.isUnlocked(config.unlockTtlSeconds * 1000 - 1000)).toBe(true);
+    expect(provider.isUnlocked(config.unlockTtlSeconds * 1000 + 1000)).toBe(false);
 
     await client.lock();
     expect(client.getAddress()).toBe(ADDRESS);
     expect(client.isUnlocked()).toBe(false);
     expect(client.hasSigner()).toBe(false);
+    expect(provider.isUnlocked()).toBe(false);
     expect(await storage.read()).toEqual(expect.objectContaining({ evmAddress: ADDRESS }));
 
     const returning = new PasskeyEoaWalletClient({
@@ -1000,6 +1128,36 @@ describe('PasskeyEoaWalletClient account binding', () => {
     await client.lock();
   });
 
+  it('needs the passkey again after a chain switch, even back to its own chain', async () => {
+    const hash = `0x${'ab'.repeat(32)}`;
+    const send = jest
+      .spyOn(ethers.Wallet.prototype, 'sendTransaction')
+      .mockResolvedValue({ hash } as ethers.providers.TransactionResponse);
+    const credentials = makeCredentials();
+    const client = new PasskeyEoaWalletClient({
+      config: derivedConfig,
+      storage: createMemoryWalletStorage(),
+      credentials,
+      // Real sessions, so the one after a switch holds no key until the next unlock.
+      sessionClientFactory: createInMemorySoftSessionClient,
+    });
+    try {
+      const address = await client.createWallet();
+      client.setChain(84532);
+      client.setChain(11155420);
+      expect(client.isUnlocked()).toBe(false);
+      client.noteActivity();
+      expect(client.isUnlocked()).toBe(false);
+      // A transaction asks for the passkey, rather than failing as if it may have been sent.
+      await expect(client.sendTransaction({ from: address, to: address, value: '0x0' })).resolves.toBe(hash);
+      expect(credentials.get).toHaveBeenCalledTimes(1);
+      expect(send).toHaveBeenCalledTimes(1);
+    } finally {
+      await client.lock();
+      send.mockRestore();
+    }
+  });
+
   it('unlocks only the requested account when the app has no active wallet yet', async () => {
     const storage = createMemoryWalletStorage();
     const creator = new PasskeyEoaWalletClient({
@@ -1059,6 +1217,7 @@ const makeFakeSessions = (broadcasts: number[]) => {
           pending.push({ resolve: () => resolve(`${method}-on-${chainId}`), reject }),
         );
       },
+      async extend() {},
       async lock() {
         session.locked = true;
         pending.splice(0).forEach(({ reject }) => reject(new Error('Passkey wallet is locked.')));
@@ -1160,6 +1319,24 @@ describe('PasskeyEoaWalletClient requests in flight', () => {
 });
 
 describe('soft session policy', () => {
+  it('extends a session only forward, and only up to its cap', () => {
+    const policy = createSoftSessionPolicy({ address: ADDRESS, ttlSeconds: 60, maxTtlSeconds: 600, now: 1000 });
+    expect(policy).toMatchObject({ expiresAt: 61_000, maxExpiresAt: 601_000 });
+    expect(extendSoftSessionPolicy(policy, 90_000).expiresAt).toBe(90_000);
+    expect(extendSoftSessionPolicy(policy, 30_000).expiresAt).toBe(61_000);
+    expect(extendSoftSessionPolicy(policy, 900_000).expiresAt).toBe(601_000);
+    expect(extendSoftSessionPolicy(policy, Number.NaN).expiresAt).toBe(61_000);
+    // A policy without a cap, or with the default one, is never extended.
+    const { maxExpiresAt: _cap, ...uncapped } = policy;
+    expect(extendSoftSessionPolicy(uncapped, 90_000).expiresAt).toBe(61_000);
+    const fixed = createSoftSessionPolicy({ address: ADDRESS, ttlSeconds: 60, now: 1000 });
+    expect(extendSoftSessionPolicy(fixed, 90_000).expiresAt).toBe(61_000);
+    // The cap is never before the TTL.
+    expect(createSoftSessionPolicy({ address: ADDRESS, ttlSeconds: 60, maxTtlSeconds: 30, now: 1000 })).toMatchObject({
+      maxExpiresAt: 61_000,
+    });
+  });
+
   it('expires sessions and rejects value-bearing transactions by default', () => {
     const policy = createSoftSessionPolicy({
       address: ADDRESS,

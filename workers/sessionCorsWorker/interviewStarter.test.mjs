@@ -78,9 +78,10 @@ test('defaults are stable and settings reject invalid values', () => {
   assert.equal(normalizeInterviewSettings().followNewQuestions, false);
   assert.equal(normalizeInterviewSettings().questionGrowthPercent, 20);
   assert.equal(normalizeInterviewSettings().allowManualRefresh, true);
-  assert.equal(normalizeInterviewSettings().shareDraftChangesByDefault, false);
-  assert.equal(normalizeInterviewSettings({ shareDraftChangesByDefault: true }).shareDraftChangesByDefault, true);
-  assert.equal(normalizeInterviewSettings({ shareDraftChangesByDefault: 'true' }).shareDraftChangesByDefault, false);
+  // Research sharing starts on unless a session turns it off; a value that isn't a boolean keeps the default.
+  assert.equal(normalizeInterviewSettings().shareDraftChangesByDefault, true);
+  assert.equal(normalizeInterviewSettings({ shareDraftChangesByDefault: false }).shareDraftChangesByDefault, false);
+  assert.equal(normalizeInterviewSettings({ shareDraftChangesByDefault: 'false' }).shareDraftChangesByDefault, true);
   assert.equal(normalizeInterviewSettings().researchDetail, 'minimal');
   assert.equal(normalizeInterviewSettings({ researchDetail: 'full' }).researchDetail, 'full');
   assert.equal(normalizeInterviewSettings({ researchDetail: 'FULL' }).researchDetail, 'minimal');
@@ -92,6 +93,24 @@ test('defaults are stable and settings reject invalid values', () => {
   assert.equal(normalizeInterviewSettings({ showFidelityScore: true }).showFidelityScore, true);
   assert.equal(normalizeInterviewSettings().suggestGroups, false);
   assert.equal(normalizeInterviewSettings({ suggestGroups: true }).suggestGroups, true);
+  assert.equal(normalizeInterviewSettings().joinMatchingGroups, false);
+  assert.equal(normalizeInterviewSettings({ joinMatchingGroups: true }).joinMatchingGroups, true);
+  assert.equal(normalizeInterviewSettings({ joinMatchingGroups: 'true' }).joinMatchingGroups, false);
+  // What an AI may base a group suggestion on: known kinds in a fixed order, the default when
+  // unset, and nothing for a value that isn't a list.
+  for (const [groupSuggestionData, expected] of [
+    [undefined, ['country', 'work', 'interests']],
+    ['country', []],
+    [null, []],
+    [{ country: true }, []],
+    [[], []],
+    [['sensitive', 'country', 'address', 'country'], ['country']],
+  ])
+    assert.deepEqual(normalizeInterviewSettings({ groupSuggestionData }).groupSuggestionData, expected);
+  for (const groupSuggestionData of [undefined, [], ['town'], ['interests', 'country']])
+    assert.equal(validInterviewSettings({ groupSuggestionData }), true);
+  // Sensitive details are not a kind any session can allow.
+  assert.equal(validInterviewSettings({ groupSuggestionData: ['country', 'sensitive'] }), false);
   assert.equal(normalizeInterviewSettings().showFidelityResults, false);
   assert.equal(normalizeInterviewSettings({ showFidelityResults: true }).showFidelityResults, true);
   assert.equal(normalizeInterviewSettings({ showFidelityResults: 'true' }).showFidelityResults, false);
@@ -129,6 +148,13 @@ test('defaults are stable and settings reject invalid values', () => {
     { hiddenDraftShare: '0.2' },
     { showFidelityScore: 'true' },
     { suggestGroups: 'true' },
+    { joinMatchingGroups: 'true' },
+    { joinMatchingGroups: 1 },
+    { groupSuggestionData: 'country' },
+    { groupSuggestionData: ['address'] },
+    { groupSuggestionData: ['work', 'work'] },
+    { groupSuggestionData: [1] },
+    { groupSuggestionData: null },
     { showFidelityResults: 'true' },
     { showFidelityResults: 1 },
     { fidelityMinimumPeople: 0 },

@@ -45,8 +45,9 @@ type SessionListeningPanelProps = Record<string, unknown> & {
   // The dialog header's spot for the + that adds audio or a transcript.
   headerActionsSlot?: HTMLElement | null;
   closeActionRef?: React.MutableRefObject<(() => Promise<void>) | null>;
-  // Lets the dialog ignore backdrop taps and Escape while the microphone is capturing.
-  onCaptureChange?: (capturing: boolean) => void;
+  // Lets the dialog ignore backdrop taps and Escape, and turn Back off, while the microphone is capturing or a
+  // close is finishing.
+  onBusyChange?: (busy: boolean) => void;
 };
 type CreateQuestionsAndSurveysPanelProps = React.ComponentProps<typeof CreateQuestionsAndSurveys>;
 type GeneratedQuestionDraft = {
@@ -111,7 +112,7 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
     embeddedInModal = false,
     headerActionsSlot = null,
     closeActionRef,
-    onCaptureChange,
+    onBusyChange,
   } = props;
   const [labelSpeakers, setLabelSpeakers] = useState(true);
   const [speakerLabelsSupported, setSpeakerLabelsSupported] = useState<boolean | null>(null);
@@ -304,11 +305,12 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
     Boolean(recorder.errorMessage || generationError);
   const isRecorderSessionActive = recorder.isRecording || recorder.isPaused || recorder.isStopping;
   const isCapturing = isRecorderSessionActive || recorder.isBusy;
+  const isBusy = isCapturing || isClosing;
   useEffect(() => {
-    if (!isCapturing || !onCaptureChange) return undefined;
-    onCaptureChange(true);
-    return () => onCaptureChange(false);
-  }, [isCapturing, onCaptureChange]);
+    if (!isBusy || !onBusyChange) return undefined;
+    onBusyChange(true);
+    return () => onBusyChange(false);
+  }, [isBusy, onBusyChange]);
   const hasPendingTranscription = Number(recorder.pendingSegmentCount || 0) > 0;
   useEffect(() => {
     // Switching Record/Stop removes the focused button; keep Escape inside the modal.
@@ -391,7 +393,7 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
       if (isMountedRef.current) onClose?.();
     } catch (error) {
       if (isMountedRef.current)
-        setCloseError(error instanceof Error ? error.message : 'Could not finish recording. Close again to retry.');
+        setCloseError(error instanceof Error ? error.message : 'Could not finish recording. Try again.');
     } finally {
       closingRef.current = false;
       if (isMountedRef.current) setIsClosing(false);

@@ -1,11 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { uploadWorkerGroupImage } from '../../domains/worker/workerGroupImageUpload';
-import { createWorkerGroupAsParticipant, normalizeWorkerGroupDefaultTags } from '../../domains/worker/workerGroupPorts';
+import {
+  createWorkerGroupAsParticipant,
+  normalizeWorkerGroupDefaultTags,
+  type WorkerGroup,
+  type WorkerGroupRemovalAuth,
+} from '../../domains/worker/workerGroupPorts';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { canonicalizeSessionSlug } from '../../utilities/session/canonicalSessionContext.js';
 import { normalizeWorkerCanonicalSessionIdHex } from '../../utilities/session/sessionWorkerDiscovery.js';
 import { normalizeWorkerUrl } from '../../utilities/worker/workerUrl.js';
 import WorkerGroupCreateForm from '../Shared/WorkerGroupCreateForm';
+import { withRemovalAuthNotice } from '../Shared/WorkerGroupRemovalAuthHelp';
 
 export type WorkerParticipantGroupCreatePanelProps = {
   sessionId: string;
@@ -56,6 +62,7 @@ const WorkerParticipantGroupCreatePanel = ({
   const [documentURLs, setDocumentURLs] = useState<string[]>([]);
   const [memberLimit, setMemberLimit] = useState('');
   const [joinEndsAt, setJoinEndsAt] = useState('');
+  const [removalAuth, setRemovalAuth] = useState<WorkerGroupRemovalAuth>('both');
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState('');
 
@@ -69,6 +76,7 @@ const WorkerParticipantGroupCreatePanel = ({
     setDocumentURLs([]);
     setMemberLimit('');
     setJoinEndsAt('');
+    setRemovalAuth('both');
     setBusy(false);
     setStatus('');
   }, [draftTargetKey]); // The draft survives config and authentication changes within one session.
@@ -100,7 +108,7 @@ const WorkerParticipantGroupCreatePanel = ({
     setBusy(true);
     setStatus('');
     try {
-      await createWorkerGroupAsParticipant({
+      const result = await createWorkerGroupAsParticipant({
         workerUrl: normalizedWorkerUrl,
         credentialToken: workerToken,
         sessionId: normalizedSessionId,
@@ -114,6 +122,7 @@ const WorkerParticipantGroupCreatePanel = ({
           memberLimit: memberLimit.trim() ? Number(memberLimit) : undefined,
           joinEndsAt: joinEndsAt ? new Date(joinEndsAt).toISOString() : undefined,
           adminAddress: participantAddress.trim() || undefined,
+          removalAuth,
         },
         fetchImpl,
       });
@@ -126,7 +135,14 @@ const WorkerParticipantGroupCreatePanel = ({
       setDocumentURLs([]);
       setMemberLimit('');
       setJoinEndsAt('');
-      setStatus('Group created. It is open to session participants.');
+      setRemovalAuth('both');
+      setStatus(
+        withRemovalAuthNotice(
+          'Group created. It is open to session participants.',
+          removalAuth,
+          (result.group as WorkerGroup).removalAuth,
+        ),
+      );
       onGroupsChanged?.();
     } catch (error) {
       if (requestTargetKeyRef.current !== activeRequestTargetKey || requestIdRef.current !== requestId) return;
@@ -153,6 +169,8 @@ const WorkerParticipantGroupCreatePanel = ({
         label={label}
         labelTestId={E2E_TESTIDS.SESSION_WORKER_PARTICIPANT_GROUP_LABEL}
         participantDefaults={true}
+        removalAuth={removalAuth}
+        removalAuthTestId="ce-session-worker-participant-group-removal-auth"
         sessionName={sessionName}
         sessionSlug={normalizedSessionSlug}
         status={status}
@@ -181,6 +199,7 @@ const WorkerParticipantGroupCreatePanel = ({
         onJoinEndsAtChange={setJoinEndsAt}
         onLabelChange={setLabel}
         onMemberLimitChange={setMemberLimit}
+        onRemovalAuthChange={setRemovalAuth}
         onAdminAddressChange={() => {}}
         onTagsChange={(nextTags) => {
           tagsEditedRef.current = true;
@@ -195,6 +214,7 @@ const WorkerParticipantGroupCreatePanel = ({
           setDocumentURLs([]);
           setMemberLimit('');
           setJoinEndsAt('');
+          setRemovalAuth('both');
           setStatus('');
         }}
         onSubmit={(preparedImageUrl) => void createGroup(preparedImageUrl)}

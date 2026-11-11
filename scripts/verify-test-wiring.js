@@ -255,6 +255,7 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectGateContains('contracts', 'npm run abi:check');
   expectGateOmits('contracts', 'npm run verify:abi-sync');
   [
+     'npm run docs:maps:check',
      'npm run lint',
      'npm run typecheck:client',
      'npm run verify:release-version',

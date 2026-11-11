@@ -1,5 +1,6 @@
 import {
   persistAndVerifySessionWizardWorkerConfig,
+  type SessionWizardWorkerConfigFetchPort,
   type SessionWizardWorkerConfigSignInput,
 } from './sessionWizardWorkerConfigPersistence';
 import { buildSessionWizardWorkerConfigPayload } from './sessionWizardWriteNormalization';
@@ -24,7 +25,15 @@ const baseConfig = () => ({
   sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
   storageProfile: { backend: 'cloudflare' },
   ai: { models: { fast: { provider: 'openai', model: 'gpt-test' } } },
+  // A config with instructions for AI agents is written without first reading the stored one.
+  agentInstructions: 'Join the open group.',
 });
+
+const withoutInstructions = (config: Record<string, unknown>) => {
+  const rest = { ...config };
+  delete rest.agentInstructions;
+  return rest;
+};
 
 const jsonResponse = (status: number, body: unknown) =>
   ({
@@ -224,8 +233,10 @@ describe('persistAndVerifySessionWizardWorkerConfig', () => {
       configRevision: revision,
     };
     const signAdminAction = jest.fn(async () => ({ signature: '0xsigned' }));
+    // The default draft has no instructions for AI agents, so the stored config is read first.
     const fetchImpl = jest
       .fn()
+      .mockResolvedValueOnce(jsonResponse(404, { error: 'Session not found.' }))
       .mockResolvedValueOnce(jsonResponse(200, { ok: true }))
       .mockResolvedValueOnce(jsonResponse(200, { config: persistedConfig }));
 
@@ -259,6 +270,81 @@ describe('persistAndVerifySessionWizardWorkerConfig', () => {
       }),
     );
     expect(signAdminAction).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(fetchImpl.mock.calls[1][1].body).config).not.toHaveProperty('agentInstructions');
+  });
+
+  // Serves reads from a stored config that each write replaces.
+  const createWorkerFetch = (firstRead: () => Promise<Response>) => {
+    let stored: Record<string, unknown> | null = null;
+    const fetchImpl = jest.fn(async (_url: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.method !== 'POST') return stored ? jsonResponse(200, { config: stored }) : firstRead();
+      stored = JSON.parse(String(init.body)).config;
+      return jsonResponse(200, { ok: true });
+    });
+    return { fetchImpl, written: () => stored };
+  };
+  const persistWithoutInstructions = (
+    fetchImpl: SessionWizardWorkerConfigFetchPort,
+    signAdminAction = async (_input: SessionWizardWorkerConfigSignInput) => ({ signature: '0xsigned' }),
+  ) =>
+    persistAndVerifySessionWizardWorkerConfig({
+      workerUrl: WORKER_ORIGIN,
+      slug: 'worker-session',
+      sessionId: SESSION_ID,
+      adminAddress: ADMIN_ADDRESS,
+      config: withoutInstructions(baseConfig()),
+      signAdminAction,
+      fetchImpl,
+      retryDelaysMs: [],
+    });
+
+  // A config that once had instructions keeps the field, so even an earlier clear must be resent.
+  it.each(['Join the open group.', ''])(
+    'clears stored instructions for AI agents (%p) that the config leaves out',
+    async (stored) => {
+      const worker = createWorkerFetch(async () =>
+        jsonResponse(200, { config: verifiedConfig('earlier', { agentInstructions: stored }) }),
+      );
+
+      await persistWithoutInstructions(worker.fetchImpl);
+
+      expect(worker.fetchImpl.mock.calls[0]).toEqual([
+        `${WORKER_ORIGIN}/session-config`,
+        expect.objectContaining({
+          method: 'GET',
+          headers: expect.objectContaining({ 'X-Session-Slug': 'worker-session' }),
+        }),
+      ]);
+      expect(worker.written()).toHaveProperty('agentInstructions', '');
+    },
+  );
+
+  // Older Workers refuse the field, and none of them has stored it.
+  it.each([
+    ['has none', async () => jsonResponse(200, { config: withoutInstructions(verifiedConfig('earlier')) })],
+    ['is not found', async () => jsonResponse(404, { error: 'Session not found.' })],
+  ])('leaves instructions for AI agents out when the stored config %s', async (_label, firstRead) => {
+    const worker = createWorkerFetch(firstRead);
+
+    await persistWithoutInstructions(worker.fetchImpl);
+
+    expect(worker.written()).not.toHaveProperty('agentInstructions');
+  });
+
+  // An unread config may hold instructions the admin removed, and a retry must sign the same revision.
+  it.each([
+    ['cannot be reached', async (): Promise<Response> => Promise.reject(new Error('offline')), "couldn't be reached"],
+    ['answers 503', async () => jsonResponse(503, { error: 'Unavailable.' }), "couldn't be read (503)"],
+  ])('stops before signing when the stored config %s', async (_label, firstRead, message) => {
+    const worker = createWorkerFetch(firstRead);
+    const signAdminAction = jest.fn(async (_input: SessionWizardWorkerConfigSignInput) => ({
+      signature: '0xsigned',
+    }));
+
+    await expect(persistWithoutInstructions(worker.fetchImpl, signAdminAction)).rejects.toThrow(message);
+
+    expect(signAdminAction).not.toHaveBeenCalled();
+    expect(worker.fetchImpl).toHaveBeenCalledTimes(1);
   });
 
   it('retries a stale successful read until the requested config revision is visible', async () => {

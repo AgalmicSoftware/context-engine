@@ -21,11 +21,11 @@ jest.mock('./SessionListeningPanel', () => {
   const { createPortal } = jest.requireActual<typeof import('react-dom')>('react-dom');
   const MockListeningPanel = ({
     closeActionRef,
-    onCaptureChange,
+    onBusyChange,
     headerActionsSlot,
   }: {
     closeActionRef: { current: unknown };
-    onCaptureChange: (capturing: boolean) => void;
+    onBusyChange: (busy: boolean) => void;
     headerActionsSlot?: HTMLElement | null;
   }) => {
     useEffect(() => {
@@ -33,10 +33,10 @@ jest.mock('./SessionListeningPanel', () => {
     }, [closeActionRef]);
     return (
       <>
-        <button type="button" onClick={() => onCaptureChange(true)}>
+        <button type="button" onClick={() => onBusyChange(true)}>
           Start capturing
         </button>
-        <button type="button" onClick={() => onCaptureChange(false)}>
+        <button type="button" onClick={() => onBusyChange(false)}>
           Stop capturing
         </button>
         {headerActionsSlot ? createPortal(<button type="button">Add input</button>, headerActionsSlot) : null}

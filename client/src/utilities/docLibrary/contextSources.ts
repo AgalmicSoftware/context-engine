@@ -52,6 +52,8 @@ export type ContextSourceOptions = {
   context?: unknown;
   /** Admins read as themselves first, so their admins-only items are included. */
   asAdmin?: boolean;
+  /** Listing may ask someone signed in to sign in to the session, so their groups' items are included. */
+  prompt?: boolean;
 };
 
 const MAX_LIST_PAGES = 5;
@@ -121,25 +123,35 @@ const toSource = (item: unknown): (ContextSource & { role: string; derivedFrom: 
 
 /** The context sources this reader may see, oldest first, each PDF with its AI reading. */
 export const listContextSources = async (options: ContextSourceOptions): Promise<ContextSource[]> => {
-  const rows: NonNullable<ReturnType<typeof toSource>>[] = [];
-  let cursor: string | null = null;
-  // Someone already signed in to this session sees their groups' items too; listing never asks them to sign.
-  const asThemselves = options.asAdmin || (await hasCachedWorkerSessionToken(workerOptions(options)));
-  for (let page = 0; page < MAX_LIST_PAGES; page += 1) {
-    const result = await listSessionStorageRefsPage({
-      ...workerOptions(options),
-      resource: 'docsContext',
-      role: 'context',
-      cursor,
-      preferAnonymous: !asThemselves,
-    });
-    result.items.forEach((item) => {
-      const source = toSource(item);
-      if (source) rows.push(source);
-    });
-    if (result.listComplete || !result.cursor) break;
-    cursor = result.cursor;
-  }
+  const listRows = async (preferAnonymous: boolean, prompt: boolean) => {
+    const rows: NonNullable<ReturnType<typeof toSource>>[] = [];
+    let cursor: string | null = null;
+    for (let page = 0; page < MAX_LIST_PAGES; page += 1) {
+      const result = await listSessionStorageRefsPage({
+        ...workerOptions(options),
+        resource: 'docsContext',
+        role: 'context',
+        cursor,
+        preferAnonymous,
+        prompt,
+      });
+      result.items.forEach((item) => {
+        const source = toSource(item);
+        if (source) rows.push(source);
+      });
+      if (result.listComplete || !result.cursor) break;
+      cursor = result.cursor;
+    }
+    return rows;
+  };
+  // Someone signed in sees their groups' items too, asked to sign in only where the caller allows it.
+  const prompt = !!options.asAdmin || (!!options.prompt && !!toStr(asRecord(options.context).account).trim());
+  const asThemselves = prompt || (await hasCachedWorkerSessionToken(workerOptions(options)));
+  const rows = await listRows(!asThemselves, prompt).catch((error: unknown) => {
+    // A declined or refused sign-in, as after an access change, shows what a signed-out visitor sees.
+    if (options.asAdmin || !asThemselves) throw error;
+    return listRows(true, false);
+  });
   const readings = new Map(rows.filter((row) => row.role === CONTEXT_TEXT_ROLE).map((row) => [row.derivedFrom, row]));
   return rows
     .filter((row) => row.role === CONTEXT_ROLE)
@@ -155,6 +167,8 @@ const readText = async (id: string, options: ContextSourceOptions): Promise<stri
     ...workerOptions(options),
     storageRef: { backend: 'cloudflare', id },
     preferAnonymous: !(options.asAdmin || (await hasCachedWorkerSessionToken(workerOptions(options)))),
+    // Texts load for an AI by themselves; the list that showed them was the place to sign in.
+    prompt: false,
   });
   return response.text();
 };

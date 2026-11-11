@@ -1530,6 +1530,9 @@ describe('OnePageSession results routing', () => {
     it('gives admins the Context section with its controls, even before the first item', async () => {
       await renderSession([], true);
       fireEvent.click(screen.getByTestId('ce-demo-documents-toggle'));
+      // Add sits in the section's header, beside its title, as in the Tool Explorer.
+      const header = screen.getByTestId('ce-demo-documents-toggle').parentElement;
+      expect(header).toContainElement(await screen.findByRole('button', { name: 'Add' }));
       expect(screen.getByTestId('ce-session-context-manage')).toContainElement(
         screen.getByTestId('mock-context-sources-panel'),
       );

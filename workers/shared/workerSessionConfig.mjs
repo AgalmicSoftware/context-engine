@@ -27,6 +27,7 @@ const DEPLOY_CANONICAL_CONFIG_KEYS = Object.freeze([
   'defaultGroupTags',
   'defaultSbtTags',
   'questionsGenPrompt',
+  'agentInstructions',
   'defaultFilterState',
   'defaultFeaturedSBTs',
   'autoFeatureSBTsBySessionSlug',

@@ -61,7 +61,8 @@ export type SessionVoiceModeModalProps = SessionInterviewPanelBaseProps & {
   isOpen: boolean;
   onInterviewProgressChange?: (inProgress: boolean) => void;
   mode: SessionVoiceMode | null;
-  onSelectMode: (mode: SessionVoiceMode) => void;
+  /** null goes back to the two choices. */
+  onSelectMode: (mode: SessionVoiceMode | null) => void;
   questionPool?: unknown[];
   /** The code a camera opened this page with, so scanning carries on from it. */
   claimFrame?: ClaimFrame | null;

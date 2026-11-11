@@ -5,7 +5,11 @@ import { chromium } from 'playwright';
 
 const require = createRequire(import.meta.url);
 const sessions = require('../client/src/variables/demo/demo_sessions.json');
-const voiceSlugs = ['demo-sh', 'rxc-test', 'rxc-ra-test'];
+const demoSlugs = Object.keys(sessions);
+// A known session takes every setting from its Worker, whose replies are mocked below.
+const { eddy26 } = require('../known-sessions.json');
+sessions.eddy26 = { slug: 'eddy26', sessionId: eddy26.sessionId, sessionName: eddy26.name, corsWorkerUrl: `${eddy26.worker}/` };
+const voiceSlugs = ['demo-sh', 'demo-interview', 'eddy26'];
 for (const slug of voiceSlugs) {
   const config = sessions[slug];
   sessions[slug] = {
@@ -36,10 +40,11 @@ try {
     localStorage.setItem('ce:selectedSessionScope', 'active');
   });
   // Keep all model fixtures inside this browser; no deployed session is changed.
-  const moduleLines = Object.entries(sessions)
+  const demoData = Object.fromEntries(demoSlugs.map((slug) => [slug, sessions[slug]]));
+  const moduleLines = Object.entries(demoData)
     .filter(([key]) => /^[A-Za-z_$][\w$]*$/.test(key))
     .map(([key, value]) => `export const ${key} = ${JSON.stringify(value)};`);
-  moduleLines.push(`export default ${JSON.stringify(sessions)};`);
+  moduleLines.push(`export default ${JSON.stringify(demoData)};`);
   await context.route('**/src/variables/demo/demo_sessions.json?import*', route => route.fulfill({
     contentType: 'application/javascript', body: moduleLines.join('\n'),
   }));
@@ -107,7 +112,7 @@ try {
     assert.equal(await page.getByText('Worker URL is not configured.', { exact: true }).count(), 0);
   };
 
-  for (const slug of ['rxc-test', 'rxc-ra-test']) {
+  for (const slug of ['demo-interview', 'eddy26']) {
     await selector.selectOption(slug);
     await record(slug);
   }
@@ -115,7 +120,7 @@ try {
   await selector.selectOption(inheritValue);
   assert.equal(await selector.inputValue(), inherited);
   await record(inherited);
-  console.log('Context voice session smoke passed: configured models on both RxC Workers and inherited default, draft preserved.');
+  console.log('Context voice session smoke passed: configured models on a demo and a known session Worker and inherited default, draft preserved.');
 } finally {
   await browser.close();
 }

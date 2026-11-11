@@ -221,7 +221,7 @@ const switchToAggregateView = async (_responder: string = RESPONDER_ONE): Promis
 };
 
 const getResponderUserLink = (responder: string): HTMLAnchorElement | null => {
-  const expectedHref = `/u/${encodeURIComponent(lower(responder))}`;
+  const expectedHref = `/u/${encodeURIComponent(lower(responder))}?session=${SESSION_SLUG}`;
   return (
     (Array.from(document.querySelectorAll('a')).find((link) => link.getAttribute('href') === expectedHref) as
       HTMLAnchorElement | undefined) || null

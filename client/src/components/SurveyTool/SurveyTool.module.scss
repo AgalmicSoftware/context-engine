@@ -3824,6 +3824,11 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   gap: 10px 12px;
 }
 
+// The prompt card under an interview that hasn't started, flush with the interview above it.
+.sessionInterviewPrefill {
+  padding-top: 0;
+}
+
 .sessionInterviewHeader {
   display: inline-flex;
   align-items: center;
@@ -4449,6 +4454,70 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   justify-content: flex-end;
 }
 
+.sessionInterviewGroupChoices {
+  display: grid;
+  gap: 8px;
+
+  > p {
+    margin: 0;
+    color: var(--ce-panel-text);
+  }
+
+  > button {
+    justify-self: start;
+  }
+}
+
+// A group the person can tick, to join it when they submit.
+.sessionInterviewGroupChoice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--ce-card-border);
+  border-radius: var(--ce-radius-8);
+  background: var(--ce-card-bg);
+  color: var(--ce-panel-text);
+  cursor: pointer;
+
+  &:focus-within {
+    outline: 2px solid var(--ce-focus-ring);
+    outline-offset: 2px;
+  }
+
+  input {
+    position: static;
+    flex-shrink: 0;
+    width: 18px;
+    height: 18px;
+    margin: 2px 0 0 !important;
+    cursor: pointer;
+  }
+
+  > span {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .sessionInterviewGroupChoiceImage {
+    flex-shrink: 0;
+    width: 44px;
+    height: 44px;
+    border: 1px solid var(--ce-card-border);
+    border-radius: var(--ce-radius-6);
+    object-fit: cover;
+  }
+
+  small {
+    color: inherit;
+    font-size: 0.82rem;
+    line-height: 1.35;
+  }
+}
+
 .sessionInterviewPanel .sessionInterviewSubmitButton {
   @include finalSubmitCta.final-submit-cta-shell(
     $padding: 12px 24px,
@@ -4535,7 +4604,14 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   min-width: 0;
   max-width: 620px;
   display: grid;
+  // No wider than the summary, so sharing for research stays on its bar when the open group widens.
+  grid-template-columns: minmax(0, 620px);
   gap: 4px;
+  container-type: inline-size;
+
+  > details {
+    grid-area: 1 / 1;
+  }
 }
 
 // Open, the choices take the whole footer row and Submit wraps below, still at the bottom.
@@ -4544,10 +4620,21 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   max-width: none;
 }
 
-.sessionInterviewSharingStatus {
-  color: var(--ce-panel-text-muted);
-  font-size: 0.78rem;
-  line-height: 1.3;
+// Sharing for research sits at the end of the summary's row, open or closed, and drops
+// under it where the row has no room for both. The group's selector outranks the label's own margin.
+.sessionInterviewConsentGroup > .sessionInterviewResearchShare {
+  grid-area: 1 / 1;
+  justify-self: end;
+  align-self: start;
+  margin: 6px 12px 0 0;
+}
+
+@container (max-width: 440px) {
+  .sessionInterviewConsentGroup > .sessionInterviewResearchShare {
+    grid-area: 2 / 1;
+    justify-self: start;
+    margin: 0 0 0 4px;
+  }
 }
 
 // The choices open inside the dropdown, under its summary, and scroll within it.
@@ -6184,6 +6271,11 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
     outline: 2px solid color-mix(in srgb, var(--ce-text-inverse) 86%, transparent);
     outline-offset: 3px;
   }
+}
+
+// Ten seconds after a submit (see PileSubmittedCheck): hidden, still holding its place.
+.pileSubmitSuccessBadgeGone {
+  visibility: hidden;
 }
 
 .pileSubmitSuccessIcon {

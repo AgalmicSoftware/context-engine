@@ -1,10 +1,12 @@
 'use strict';
 
 const { URL } = require('node:url');
+const fs = require('node:fs');
 const path = require('node:path');
 const { installClientSecurityHeaders, verifyBlockedScriptInjection } = require('./lib/client-security-headers');
 const { ethers } = require('ethers');
 const demoSessions = require('../client/src/variables/demo/demo_sessions.json');
+const knownSessions = require('../known-sessions.json');
 const registryAbi = require('../client/src/contractsABI/SESSION_REGISTRY_ABI.json');
 const contracts = require('../client/src/variables/contracts.json');
 const publicSocialPreview = require('../client/src/variables/publicSocialPreview.json');
@@ -32,8 +34,6 @@ const DEFAULT_ROUTE_TEXT = Object.freeze({
   '/session/demo': ['Session'],
   '/session/demo/questions': ['Questions', 'Results', 'Existential risk from AI justifies extraordinary precautions.'],
   '/session/pe4': ['Groups', 'Results'],
-  '/rxc-ra-test': ['Groups', 'Results'],
-  '/session/rxc-ra-test': ['Groups', 'Results'],
   '/admin': ['Session Admin'],
   '/about': ['Context Engine'],
   '/docs': ['Docs'],
@@ -110,10 +110,9 @@ function shouldInstallDemoWorkerFixture(baseUrl, route) {
 async function installLocalSmokeFixtureRoutes(page, baseUrl, route = '') {
   if (!isLocalSmokeBaseUrl(baseUrl)) return;
   const appOrigin = new URL(baseUrl).origin;
-  const pinnedSlug = 'rxc-ra-test';
-  const pinnedSession = demoSessions[pinnedSlug];
-  const pinnedOrigin = new URL(pinnedSession.corsWorkerUrl).origin;
-  const pinnedRoute = [`/${pinnedSlug}`, `/session/${pinnedSlug}`].includes(String(route).split(/[?#]/, 1)[0]);
+  // A session in known-sessions.json opens from its normal link; its Worker reads come from fixtures.
+  const pinnedSlug = (String(route).split(/[?#]/, 1)[0].match(/^\/session\/([^/]+)$/) || [])[1] || '';
+  const pinned = Object.hasOwn(knownSessions, pinnedSlug) ? knownSessions[pinnedSlug] : null;
   await page.addInitScript(() => {
     let serviceWorker;
     // Sandboxed report frames throw when this property is read.
@@ -128,11 +127,14 @@ async function installLocalSmokeFixtureRoutes(page, baseUrl, route = '') {
     const request = requestRoute.request();
     const url = new URL(request.url());
     if (url.origin === appOrigin) return requestRoute.continue();
-    if (pinnedRoute && request.method() === 'GET' && url.origin === pinnedOrigin) {
+    if (pinned && request.method() === 'GET' && url.origin === pinned.worker) {
       if (url.pathname === '/session-config' && url.searchParams.get('slug') === pinnedSlug) {
         return requestRoute.fulfill({ json: {
           ok: true, sessionSlug: pinnedSlug,
-          config: { ...pinnedSession, configRevision: 'local-navigation-smoke', sessionModeProfile: DEMO_READY_WORKER_CONFIG.sessionModeProfile },
+          config: {
+            slug: pinnedSlug, sessionId: pinned.sessionId, sessionName: pinned.name, corsWorkerUrl: `${pinned.worker}/`,
+            configRevision: 'local-navigation-smoke', sessionModeProfile: DEMO_READY_WORKER_CONFIG.sessionModeProfile,
+          },
         } });
       }
       if (url.pathname === '/storage/list' && DEMO_STORAGE_LIST_FIXTURE_RESOURCES.has(url.searchParams.get('resource'))) {
@@ -615,6 +617,24 @@ async function inspectRoute(browser, baseUrl, route, options = {}) {
   };
 }
 
+// Files the site serves exactly as they are in the repo, not the app shell.
+const STATIC_FILES = Object.freeze({
+  '/known-sessions.json': path.join(__dirname, '../known-sessions.json'),
+  '/skill.md': path.join(__dirname, '../client/public/agent-guide.md'),
+});
+
+async function checkStaticFiles(baseUrl, fetchFile = fetch) {
+  const failures = [];
+  for (const [route, file] of Object.entries(STATIC_FILES)) {
+    const response = await fetchFile(`${baseUrl}${route}`);
+    const body = response.ok ? await response.text() : '';
+    if (body !== fs.readFileSync(file, 'utf8')) {
+      failures.push(`${route}: not served as ${path.relative(path.join(__dirname, '..'), file)} (status ${response.status})`);
+    }
+  }
+  return failures;
+}
+
 function summarizeFailures(results) {
   const failures = [];
 
@@ -721,7 +741,7 @@ async function runSmoke(options = {}) {
       browserName,
       viewport,
       results,
-      failures: summarizeFailures(results),
+      failures: [...summarizeFailures(results), ...(isLocalSmokeBaseUrl(baseUrl) ? await checkStaticFiles(baseUrl) : [])],
       scriptInjection: isLocalSmokeBaseUrl(baseUrl) ? await verifyBlockedScriptInjection(browser, baseUrl) : null,
     };
   } finally {
@@ -747,6 +767,8 @@ if (require.main === module) {
 }
 
 module.exports = {
+  STATIC_FILES,
+  checkStaticFiles,
   DEFAULT_BASE_URL,
   DEFAULT_LAYOUT_PROBE_SELECTORS,
   DEFAULT_ROUTE_PROBES,

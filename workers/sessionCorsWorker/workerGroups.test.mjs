@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+	listSelfJoinableWorkerGroupsForMember,
+	listSelfJoinableWorkerGroupsForVisitor,
 	addWorkerGroupMember as addWorkerGroupMemberBoundary,
 	createWorkerGroup as createWorkerGroupBoundary,
 	deleteWorkerGroup as deleteWorkerGroupBoundary,
@@ -249,6 +251,188 @@ test('public Worker Group discovery follows the public ungated mode independentl
 	assert.equal(mismatched.status, 409);
 	assert.equal(mismatched.body.reason, 'worker_group_session_identity_mismatch');
 	assert.equal(listCalls, 2);
+});
+
+test('a join link shows a private session only what members of its group see', async () => {
+	const env = installCoordinatorBinding({ CE_WORKER_GROUPS_KV: createMockKv() });
+	const create = (groupId, input) =>
+		executeCoordinatedWorkerGroupMutation({
+			env,
+			slug: 'session-a',
+			operation: 'create',
+			input: { groupId, label: `Label ${groupId}`, ...input },
+			actorPrincipal: actor,
+		});
+	await create('salon', { joinMode: 'open', memberVisibility: 'session' });
+	await create('staff', { joinMode: 'admin_add', memberVisibility: 'session' });
+	await create('closing', {
+		joinMode: 'open',
+		memberVisibility: 'session',
+		joinEndsAt: new Date(Date.now() + 60_000).toISOString(),
+	});
+	await create('circle', { joinMode: 'open', memberVisibility: 'members' });
+	await create('admins', { joinMode: 'open', memberVisibility: 'admin_only' });
+	// Listed after the closing group's deadline.
+	const now = () => Date.now() + 120_000;
+	const list = (query) =>
+		dispatchPublicWorkerGroupListRequest({
+			request: new Request(`https://worker.example/groups/list?sessionId=${sessionId}${query}`),
+			config: privateWorkerGroupConfig(),
+			env,
+			slug: 'session-a',
+			baseHeaders: {},
+			deps: { json, now },
+		});
+
+	const joined = await workerGroupsRoute({
+		path: '/groups/join',
+		method: 'POST',
+		request: new Request('https://worker.example/groups/join', {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ groupId: 'salon' }),
+		}),
+		env,
+		slug: 'session-a',
+		requesterAddress: member.address,
+		baseHeaders: {},
+		deps: { json },
+	});
+	assert.equal(joined.status, 200);
+	const memberView = await workerGroupsRoute({
+		path: '/groups/list',
+		method: 'GET',
+		request: new Request('https://worker.example/groups/list'),
+		env,
+		slug: 'session-a',
+		requesterAddress: member.address,
+		baseHeaders: {},
+		deps: { json },
+	});
+	const ids = (response) => response.body.groups.map((group) => group.groupId).sort();
+
+	for (const query of ['&joinGroup=salon', '&joinGroup=%20SALON%20']) {
+		const invited = await list(query);
+		assert.equal(invited.status, 200);
+		assert.deepEqual(ids(invited), ['closing', 'salon', 'staff']);
+		assert.deepEqual(ids(invited), ids(memberView));
+		assert.equal(invited.body.sessionId, sessionId);
+		// Never counts, and never who runs a group, which for a participant's group is a participant.
+		assert.ok(invited.body.groups.every((group) => !('memberCount' in group) && !('adminAddress' in group)));
+	}
+	assert.ok(memberView.body.groups.some((group) => group.adminAddress === actor.address.toLowerCase() || group.adminAddress === actor.address));
+	// Only a link to a group someone could join on their own, still open, counts.
+	for (const query of [
+		'',
+		'&joinGroup=staff',
+		'&joinGroup=closing',
+		'&joinGroup=circle',
+		'&joinGroup=admins',
+		'&joinGroup=missing',
+		'&joinGroup=salon&joinGroup=staff',
+		'&joinGroup=sal%2Fon',
+	]) {
+		const denied = await list(query);
+		assert.equal(denied.status, 403, query);
+		assert.equal(denied.body.reason, 'worker_group_discovery_not_public');
+		assert.equal('groups' in denied.body, false);
+	}
+	const mismatched = await dispatchPublicWorkerGroupListRequest({
+		request: new Request(`https://worker.example/groups/list?sessionId=${replacementSessionId}&joinGroup=salon`),
+		config: privateWorkerGroupConfig(),
+		env,
+		slug: 'session-a',
+		baseHeaders: {},
+		deps: { json, now },
+	});
+	assert.equal(mismatched.status, 409);
+	// A public session lists the same groups with or without a link.
+	const publicList = await dispatchPublicWorkerGroupListRequest({
+		request: new Request(`https://worker.example/groups/list?sessionId=${sessionId}&joinGroup=missing`),
+		config: publicWorkerGroupConfig(),
+		env,
+		slug: 'session-a',
+		baseHeaders: {},
+		deps: { json, now },
+	});
+	assert.equal(publicList.status, 200);
+	assert.deepEqual(ids(publicList), ['closing', 'salon', 'staff']);
+});
+
+test('only groups someone could join on their own count, for a link or for an AI to suggest', async () => {
+	const nowMs = Date.parse('2026-02-03T04:05:06.000Z');
+	const listed = [
+		{ groupId: 'salon', label: 'Salon', joinMode: 'open', memberVisibility: 'session' },
+		{ groupId: 'staff', label: 'Staff', joinMode: 'admin_add', memberVisibility: 'session' },
+		{ groupId: 'circle', label: 'Circle', joinMode: 'open', memberVisibility: 'members' },
+		{ groupId: 'closed', label: 'Closed', joinMode: 'open', memberVisibility: 'session', joinEndsAt: '2026-02-01T00:00:00.000Z' },
+		{ groupId: 'open-later', label: 'Open later', joinMode: 'open', memberVisibility: 'session', joinEndsAt: '2026-03-01T00:00:00.000Z' },
+	];
+	// Even a list that held more than members see could not widen what counts.
+	const deps = {
+		now: () => nowMs,
+		checkCoordinatedWorkerGroupReady: async () => ({ ok: true, meta: { groupCount: listed.length } }),
+		listWorkerGroups: async () => ({ ok: true, store: 'kv', groups: listed }),
+	};
+	const joinable = await listSelfJoinableWorkerGroupsForVisitor({ env: {}, config: publicWorkerGroupConfig(), slug: 'session-a', deps });
+	assert.deepEqual(joinable.map((group) => group.groupId), ['salon', 'open-later']);
+	for (const inviteGroupId of ['circle', 'staff', 'closed']) {
+		assert.deepEqual(
+			await listSelfJoinableWorkerGroupsForVisitor({ env: {}, config: privateWorkerGroupConfig(), slug: 'session-a', inviteGroupId, deps }),
+			[],
+			inviteGroupId,
+		);
+	}
+	assert.equal(
+		(await listSelfJoinableWorkerGroupsForVisitor({ env: {}, config: privateWorkerGroupConfig(), slug: 'session-a', inviteGroupId: 'salon', deps })).length,
+		2,
+	);
+	// A failing list shows nothing rather than an error.
+	assert.deepEqual(
+		await listSelfJoinableWorkerGroupsForVisitor({
+			env: {},
+			config: publicWorkerGroupConfig(),
+			slug: 'session-a',
+			deps: { ...deps, listWorkerGroups: async () => { throw new Error('down'); } },
+		}),
+		[],
+	);
+});
+
+test('a signed-in person’s AI is offered only open groups they have not joined and that have room', async () => {
+	const nowMs = Date.parse('2026-02-03T04:05:06.000Z');
+	const address = `0x${'ab'.repeat(20)}`;
+	const open = { joinMode: 'open', memberVisibility: 'session', memberCount: 1 };
+	const listed = [
+		{ ...open, groupId: 'salon', label: 'Salon' },
+		{ ...open, groupId: 'joined', label: 'Joined' },
+		{ ...open, groupId: 'full', label: 'Full', memberLimit: 2, memberCount: 2 },
+		{ ...open, groupId: 'room', label: 'Room', memberLimit: 3, memberCount: 2 },
+		{ ...open, groupId: 'staff', label: 'Staff', joinMode: 'admin_add' },
+		{ ...open, groupId: 'closed', label: 'Closed', joinEndsAt: '2026-02-01T00:00:00.000Z' },
+	];
+	const listings = [];
+	const deps = {
+		now: () => nowMs,
+		checkCoordinatedWorkerGroupReady: async () => ({ ok: true, meta: { groupCount: listed.length } }),
+		listWorkerGroups: async (args) => {
+			listings.push(args);
+			return { ok: true, store: 'kv', groups: listed };
+		},
+		listWorkerGroupMemberships: async () => ({ ok: true, memberships: [{ group: { groupId: 'joined' } }] }),
+	};
+	const offer = (overrides = {}) => listSelfJoinableWorkerGroupsForMember({
+		env: {}, config: privateWorkerGroupConfig(), slug: 'session-a', address, deps, ...overrides,
+	});
+	assert.deepEqual((await offer()).map((group) => group.groupId), ['salon', 'room']);
+	// Listed as that person sees groups, never as an admin.
+	assert.equal(listings[0].admin, false);
+	assert.equal(listings[0].includeMemberCount, true);
+	assert.equal(listings[0].actorPrincipalResult.principal.address, address);
+	// No person, or a list that fails, offers nothing rather than an error.
+	assert.deepEqual(await offer({ address: '' }), []);
+	assert.deepEqual(await offer({ deps: { ...deps, listWorkerGroupMemberships: async () => ({ ok: false }) } }), []);
+	assert.deepEqual(await offer({ deps: { ...deps, listWorkerGroups: async () => { throw new Error('down'); } } }), []);
 });
 
 const createMockKv = () => {
@@ -1171,6 +1355,7 @@ test('stale positive KV rows cannot resurrect a removed membership', async () =>
 		groupId: 'stale-positive',
 		principal: member,
 		actorPrincipal: actor,
+		remover: 'admin',
 	});
 	assert.equal(removed.ok, true);
 	await kv.put(memberKey, staleMember);
@@ -1809,6 +1994,7 @@ test('participant group creation requires the explicit policy and forces an open
 					adminAddress: actor.address,
 					joinMode: 'admin_add',
 					memberVisibility: 'admin_only',
+					removalAuth: 'member_only',
 				},
 			}),
 		});
@@ -1866,6 +2052,8 @@ test('participant group creation requires the explicit policy and forces an open
 	assert.equal(mutation.input.memberLimit, 12);
 	assert.equal(mutation.input.joinEndsAt, '2030-02-03T04:05:06.000Z');
 	assert.equal(mutation.input.adminAddress, member.address);
+	// Who can remove members is the participant's own choice.
+	assert.equal(mutation.input.removalAuth, 'member_only');
 	assert.deepEqual(mutation.actorPrincipal, member);
 });
 
@@ -2417,6 +2605,7 @@ test('member listings preserve removals across pages and never import legacy-onl
 				groupId,
 				principal: member,
 				actorPrincipal: actor,
+				remover: 'admin',
 			})
 		).ok,
 		true,
@@ -2481,6 +2670,7 @@ test('explicit removal and deletion prune list indexes while retaining tombstone
 		groupId: 'indexed',
 		principal: member,
 		actorPrincipal: actor,
+		remover: 'admin',
 	});
 	assert.equal(removed.ok, true);
 	assert.equal(kv.store.has(principalIndex), false);
@@ -2610,4 +2800,114 @@ test('worker group updates keep join mode implementation fail-closed', async () 
 	});
 	assert.equal(invite.ok, false);
 	assert.equal(invite.reason, 'join_mode_not_implemented');
+});
+
+test('leave and admin removal follow each group\'s removal setting, and every list reports it', async () => {
+	const kv = createMockKv();
+	const env = installCoordinatorBinding({ CE_WORKER_GROUPS_KV: kv });
+	const memberRoute = (path, groupId) =>
+		workerGroupsRoute({
+			path,
+			method: 'POST',
+			request: new Request(`https://worker.example${path}`, {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ groupId }),
+			}),
+			env,
+			slug: 'session-a',
+			requesterAddress: member.address,
+			baseHeaders: {},
+			deps: { json },
+		});
+	const adminRemove = (groupId) =>
+		dispatchAdminWorkerGroupRequest({
+			action: 'groups/remove-member',
+			body: { groupId, principal: member },
+			env,
+			slug: 'session-a',
+			adminAddress: actor.address,
+			headers: {},
+			deps: { json },
+		});
+	const settings = { kept: 'admin_only', owned: 'member_only', unset: undefined };
+	for (const [groupId, removalAuth] of Object.entries(settings)) {
+		const created = await executeCoordinatedWorkerGroupMutation({
+			env,
+			slug: 'session-a',
+			operation: 'create',
+			input: { groupId, label: groupId, joinMode: 'open', memberVisibility: 'session', ...(removalAuth ? { removalAuth } : {}) },
+			actorPrincipal: actor,
+		});
+		assert.equal(created.ok, true);
+		assert.equal((await memberRoute('/groups/join', groupId)).status, 200);
+	}
+	const expected = { kept: 'admin_only', owned: 'member_only', unset: 'both' };
+	const reported = (response) => Object.fromEntries(response.body.groups.map((group) => [group.groupId, group.removalAuth]));
+	const memberList = await workerGroupsRoute({
+		path: '/groups/list',
+		method: 'GET',
+		request: new Request('https://worker.example/groups/list'),
+		env,
+		slug: 'session-a',
+		requesterAddress: member.address,
+		baseHeaders: {},
+		deps: { json },
+	});
+	assert.deepEqual(reported(memberList), expected);
+	const publicList = await dispatchPublicWorkerGroupListRequest({
+		request: new Request(`https://worker.example/groups/list?sessionId=${sessionId}`),
+		config: publicWorkerGroupConfig(),
+		env,
+		slug: 'session-a',
+		baseHeaders: {},
+		deps: { json },
+	});
+	assert.deepEqual(reported(publicList), expected);
+	const adminList = await dispatchAdminWorkerGroupRequest({
+		action: 'groups/list',
+		env,
+		slug: 'session-a',
+		adminAddress: actor.address,
+		headers: {},
+		deps: { json },
+	});
+	assert.deepEqual(reported(adminList), expected);
+
+	// Admins only: the member can't leave, and an admin can remove them.
+	const keptLeave = await memberRoute('/groups/leave', 'kept');
+	assert.equal(keptLeave.status, 403);
+	assert.equal(keptLeave.body.reason, 'worker_group_leave_denied');
+	assert.equal((await adminRemove('kept')).status, 200);
+	// The member only: an admin can't remove them, and they can leave.
+	const ownedRemoval = await adminRemove('owned');
+	assert.equal(ownedRemoval.status, 403);
+	assert.equal(ownedRemoval.body.reason, 'worker_group_removal_denied');
+	assert.equal((await memberRoute('/groups/leave', 'owned')).status, 200);
+	// No setting acts as both.
+	assert.equal((await memberRoute('/groups/leave', 'unset')).status, 200);
+	const memberships = await listWorkerGroupMemberships({ env, slug: 'session-a', sessionId, principal: member });
+	assert.deepEqual(memberships.memberships, []);
+});
+
+test('the KV removal checks the setting on a fresh request and finishes a replay the coordinator allowed', async () => {
+	const kv = createMockKv();
+	const env = { CE_WORKER_GROUPS_KV: kv };
+	await createWorkerGroup({
+		env,
+		slug: 'session-a',
+		input: { groupId: 'kept', label: 'Kept', joinMode: 'admin_add', memberVisibility: 'members', removalAuth: 'admin_only' },
+		actorPrincipal: actor,
+	});
+	const leave = { env, slug: 'session-a', operation: 'remove-member', groupId: 'kept', principal: member, actorPrincipal: member, remover: 'member' };
+	// Only a member learns the setting from a refusal.
+	assert.equal((await executeWorkerGroupMutation(leave)).reason, 'worker_group_member_not_found');
+	await addWorkerGroupMember({ env, slug: 'session-a', groupId: 'kept', principal: member, actorPrincipal: actor });
+	assert.equal((await executeWorkerGroupMutation(leave)).reason, 'worker_group_leave_denied');
+	// Without a remover, a fresh removal is refused.
+	assert.equal((await executeWorkerGroupMutation({ ...leave, remover: undefined })).reason, 'worker_group_removal_denied');
+	const memberRecord = [...kv.store.keys()].find((key) => key.startsWith('ce-worker-group-member:session-a:') && key.includes(':kept:'));
+	assert.doesNotMatch(kv.store.get(memberRecord), /"removedAt"/);
+	assert.equal((await executeWorkerGroupMutation({ ...leave, resume: true })).ok, true);
+	assert.match(kv.store.get(memberRecord), /"removedAt"/);
 });

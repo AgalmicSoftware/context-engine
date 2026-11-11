@@ -339,6 +339,7 @@ export const buildPileRuntimeInitialState = (engine: SurveyQuestionsRuntimeEngin
   engine._loadingElapsedTimer = null;
   engine._loadingStartedAtMs = nextState.loading ? Date.now() : null;
   engine._loadAndSortDebounceTimer = null;
+  engine._rateLimitRecheckTimer = null;
   engine._lastLoadAndSortResultSignature = '';
   engine._lastInitializeResponseSig = '';
   engine._lastNotifiedPileSubmitRailVisible = null;
@@ -811,14 +812,31 @@ const areQuestionListsEquivalent = (engine: PileViewModeEngine, left: any = [], 
     right,
   });
 
-const isRecentRateLimit = () => {
+const RATE_LIMIT_HOLD_MS = 2 * 60 * 1000;
+
+// Capped at one hold, so a clock set back can't overflow the recheck's timer.
+const rateLimitHoldRemainingMs = () => {
   try {
     const info = typeof window !== 'undefined' ? window.__LAST_RPC_RATE_LIMIT_ERROR__ : null;
-    if (!info || !info.ts) return false;
-    return Date.now() - info.ts < 2 * 60 * 1000;
+    if (!info || !info.ts) return 0;
+    return Math.min(RATE_LIMIT_HOLD_MS, Math.max(0, Number(info.ts) + RATE_LIMIT_HOLD_MS - Date.now()) || 0);
   } catch (_) {
-    return false;
+    return 0;
   }
+};
+
+const isRecentRateLimit = () => rateLimitHoldRemainingMs() > 0;
+
+// A read during a recent rate limit holds the pile loading, and a session with no questions
+// gets no later cache tick, so read once more when the hold ends. Its own timer, so it never
+// postpones the debounced read that new questions schedule.
+const scheduleRateLimitRecheck = (engine: PileViewModeEngine) => {
+  const remainingMs = rateLimitHoldRemainingMs();
+  if (!remainingMs || engine._rateLimitRecheckTimer) return;
+  engine._rateLimitRecheckTimer = setTimeout(() => {
+    engine._rateLimitRecheckTimer = null;
+    engine.scheduleLoadAndSortQuestions(0);
+  }, remainingMs);
 };
 
 const getEffectivePileSessionConfig = (engine: PileViewModeEngine, propsIn: any = engine.props) => {
@@ -1249,9 +1267,12 @@ const runPileComponentDidUpdate = (engine: PileViewModeEngine, prevProps: any, p
     normalizeSessionSlugValue(previousEffectiveSlug) !== normalizeSessionSlugValue(nextEffectiveSlug) ||
     previousWorkerTarget.key !== nextWorkerTarget.key;
 
+  // The empty-question probe keeps loading during the cache's cold boot, and a session with no
+  // questions gets no later nonce tick, so the end of the cold boot must re-read too.
   const cacheReadyTick =
     (prevProps.isQuestionCacheReady !== engine.props.isQuestionCacheReady && engine.props.isQuestionCacheReady) ||
-    (prevProps.isResponsesCacheReady !== engine.props.isResponsesCacheReady && engine.props.isResponsesCacheReady);
+    (prevProps.isResponsesCacheReady !== engine.props.isResponsesCacheReady && engine.props.isResponsesCacheReady) ||
+    (prevProps.cacheHasLoaded === false && engine.props.cacheHasLoaded !== false);
   const cacheJustBecameReady = !prevProps.isResponsesCacheReady && engine.props.isResponsesCacheReady;
   const nonceTick = prevProps.questionsCacheNonce !== engine.props.questionsCacheNonce;
   const responseNonceTick = prevProps.questionResponsesNonce !== engine.props.questionResponsesNonce;
@@ -1334,6 +1355,7 @@ const runPileComponentDidUpdate = (engine: PileViewModeEngine, prevProps: any, p
       {
         ...buildPileContextResetState({
           submittedSinceLastEdit: engine.state.submittedSinceLastEdit,
+          clearQuestionList: networkChanged || sessionIdentityChanged,
         }),
         draftPersistenceError: '',
       },
@@ -1423,6 +1445,10 @@ const runPileComponentWillUnmount = (engine: PileViewModeEngine) => {
   if (engine._loadAndSortDebounceTimer) {
     clearTimeout(engine._loadAndSortDebounceTimer);
     engine._loadAndSortDebounceTimer = null;
+  }
+  if (engine._rateLimitRecheckTimer) {
+    clearTimeout(engine._rateLimitRecheckTimer);
+    engine._rateLimitRecheckTimer = null;
   }
   engine._lastLoadAndSortResultSignature = '';
   engine._lastInitializeResponseSig = '';
@@ -1545,7 +1571,7 @@ const syncListeningModeQuery = (enabled: any) => {
   }
 };
 
-const syncSessionVoiceModeQuery = (mode: SessionVoiceMode | null) => {
+const syncSessionVoiceModeQuery = (mode: SessionVoiceMode | 'voice' | null) => {
   if (typeof window === 'undefined' || !window.history?.replaceState) return;
   try {
     const nextSearch = buildSessionVoiceModeSearch(window.location.search || '', mode);
@@ -1577,9 +1603,10 @@ export const toggleSessionVoiceModeModal = (engine: PileViewModeEngine) => {
   });
 };
 
-const selectSessionVoiceMode = (engine: PileViewModeEngine, mode: SessionVoiceMode) => {
+const selectSessionVoiceMode = (engine: PileViewModeEngine, mode: SessionVoiceMode | null) => {
   engine.setState({ showVoiceModeModal: true, sessionVoiceMode: mode }, () => {
-    engine.syncSessionVoiceModeQuery(mode);
+    // Back to the two choices keeps them in the address, so a reload reopens them.
+    engine.syncSessionVoiceModeQuery(mode ?? 'voice');
   });
 };
 
@@ -1884,6 +1911,7 @@ const loadAndSortQuestions = async (engine: PileViewModeEngine) => {
       ? engine.props.questionScanProgress
       : null;
   const recentRateLimit = engine.isRecentRateLimit();
+  if (recentRateLimit) scheduleRateLimitRecheck(engine);
   const {
     scanTotalBlocks: scopedScanTotalBlocks,
     scanRemainingBlocks: scopedScanRemainingBlocks,
@@ -1989,7 +2017,6 @@ const loadAndSortQuestions = async (engine: PileViewModeEngine) => {
         nextProbeStartedAtMs: emptyProbePlan.nextProbeStartedAtMs,
         nextProbeDelayMs: emptyProbePlan.nextProbeDelayMs,
         previousPileQuestions: engine.state.pileQuestions,
-        previousAllQuestionsForFilter: engine.state.allQuestionsForFilter,
         previousLoading: engine.state.loading,
         areQuestionListsEquivalent: engine.areQuestionListsEquivalent,
       });
@@ -3354,6 +3381,7 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
     pileSubmitLabel,
     account: engine.props.account,
     isAddress: utils.isAddress,
+    sessionSlug: resolveEffectiveSlug(engine.props),
   });
 
   const gatedEmptyHasDetails = lockedGateDetails.length > 0;

@@ -29,15 +29,15 @@ change consent.
 | Control | Initial default | Submitted effect |
 | --- | --- | --- |
 | Include platform/model provenance | On when AI prefill provenance is available | Adds `source`, `promptVersion`, `questionSetHash`, and available `source.researchCoverage` details to `interviewProvenance`. |
-| Share AI draft changes for research | Session default; off when unset | Adds the draft comparison, at the session's research detail (below): `originalPrediction`, `predictionRevisions`, `finalSubmitted`, `changedFields`, `userEditedFields`, `redactedFields`, `predictionComparison`, and, at full detail only, `unselectedPredictions`. |
+| Share for research | Session default; on when unset | Adds the draft comparison, at the session's research detail (below): `originalPrediction`, `predictionRevisions`, `finalSubmitted`, `changedFields`, `userEditedFields`, `redactedFields`, `predictionComparison`, and, at full detail only, `unselectedPredictions`. |
 
 Owners set **Share AI draft changes for research by default** under **Interview
 settings** on the setup page or the session's settings page. The boolean
-`interviewMode.shareDraftChangesByDefault` defaults to `false` and sets the
-initial checkbox for new responses, including imported and voice-generated
-drafts. Participants can change it before submitting. When sharing starts on,
-the review opens **AI submission info** so the choice is visible before
-submitting; participants can still collapse it. Saved per-question choices
+`interviewMode.shareDraftChangesByDefault` defaults to `true` and sets the
+initial **Share for research** checkbox for new responses, including imported
+and voice-generated drafts. The checkbox sits beside **AI submission info**, so
+the choice is visible before submitting without opening it, and its **?** says
+what sharing keeps. Participants can untick it before submitting. Saved per-question choices
 take precedence over this default; a session-config refresh does not overwrite
 an explicit choice made during review, including while logging in to submit.
 Settings save the key only while it is on: Session Workers before 0.7.0 reject

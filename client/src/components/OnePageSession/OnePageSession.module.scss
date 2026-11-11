@@ -421,13 +421,6 @@
   font-size: 0.75rem;
 }
 
-.sessionContextHelp {
-  border: 0;
-  background: transparent;
-  color: inherit;
-  cursor: help;
-}
-
 .sessionContextRemove {
   border: 1px solid currentColor;
   border-radius: var(--ce-radius-6);
@@ -454,9 +447,37 @@
   margin: 0 auto 1rem;
   text-align: left;
 
+  // The panel's own text colour, not the site-wide heading colour, which is dark on dark in Context Engine.
+  h3 {
+    color: inherit;
+  }
+
   summary {
     cursor: pointer;
   }
+}
+
+// The Context section's Add and View, in its header beside the title, as the Tool
+// Explorer has them. They keep .button's fill and text, which read on any section.
+.sectionHeaderActions .contextHeaderButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 8px 16px;
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+// Without a header to sit in, they lead the section's files.
+.sessionContextActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.sessionContextActions:empty {
+  display: none;
 }
 
 .groupAgentBar {
@@ -613,7 +634,7 @@
 .workerGroupCardInactiveStatus {
   border: 1px solid color-mix(in srgb, var(--ce-status-info) 32%, transparent);
   background: color-mix(in srgb, var(--ce-document-text) 72%, transparent);
-  color: var(--ce-document-border);
+  color: var(--ce-text-inverse);
 }
 
 .workerGroupDetailCard {
@@ -1496,6 +1517,8 @@
     flex: 0 1 auto;
     width: auto;
     padding: 0;
+    // Its few buttons fit without scrolling, and a scroller would clip their focus rings.
+    overflow: visible;
   }
 
   .sectionHeaderActions {

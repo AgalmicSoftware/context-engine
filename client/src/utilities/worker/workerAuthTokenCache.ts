@@ -5,9 +5,13 @@ import { normalizeAddress } from '../web3/addressNormalization.js';
 import { normalizeWorkerUrl } from './workerUrl.js';
 
 const STORAGE_PREFIX = 'ce:workerToken:v1';
+// Changes with every sign-out or account switch in any tab of this browser.
+const SIGN_IN_GENERATION_KEY = 'ce:workerSignIns:v1';
 const TOKEN_SKEW_SECONDS = 30;
 const MAX_TOKEN_CACHE_TTL_SECONDS = 24 * 60 * 60;
 const tokenMemoryCache = new Map<string, string>();
+// The sign-in generation this page saves under, from when it learned who is signed in.
+let tabGeneration = '';
 
 type TokenCacheScope = {
   address?: unknown;
@@ -45,16 +49,69 @@ export const purgePersistedTokenCache = (): void => {
 };
 
 // Worker bearer credentials used to be written to localStorage. Purge those
-// records at startup and keep all newly issued credentials page-memory-only.
+// records at startup; no tab reads them.
 purgePersistedTokenCache();
 
-// Reads come only from page memory, so a record an older tab persists can never
-// authenticate. Startup, writes, and clears purge those records without a
-// synchronous storage call on every token read.
+// This tab's sessionStorage keeps its sign-ins across a reload. No other tab reads it, and a record
+// saved before any tab's last sign-out or account switch is never used.
+const tabStorage = (): Storage | null => {
+  try {
+    return window.sessionStorage;
+  } catch {
+    return null;
+  }
+};
+
+const currentGeneration = (): string => {
+  try {
+    return window.localStorage.getItem(SIGN_IN_GENERATION_KEY) || '';
+  } catch {
+    return '';
+  }
+};
+
+const startGeneration = (): string => {
+  const generation = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+  try {
+    // Removing needs no space, so a full localStorage leaves no generation and no saved sign-in counts.
+    window.localStorage.removeItem(SIGN_IN_GENERATION_KEY);
+    window.localStorage.setItem(SIGN_IN_GENERATION_KEY, generation);
+    return generation;
+  } catch {
+    return '';
+  }
+};
+
+const readSavedRecord = (key: string): unknown | null => {
+  try {
+    const saved = JSON.parse(tabStorage()?.getItem(key) || 'null');
+    const generation = currentGeneration();
+    return generation && saved?.generation === generation && saved.record ? saved.record : null;
+  } catch {
+    return null;
+  }
+};
+
+const forEachTabTokenKey = (visit: (key: string) => void): void => {
+  const storage = tabStorage();
+  if (!storage) return;
+  try {
+    for (let index = storage.length - 1; index >= 0; index -= 1) {
+      const key = storage.key(index);
+      if (isWorkerTokenCacheKey(key)) visit(String(key));
+    }
+  } catch (_) {}
+};
+
+// Page memory first; a miss reads this tab's saved record once, as after a reload.
 export const readTokenCache = (key: string): unknown | null => {
   if (typeof window === 'undefined') return null;
   try {
-    return JSON.parse(tokenMemoryCache.get(key) || 'null');
+    const held = tokenMemoryCache.get(key);
+    if (held) return JSON.parse(held);
+    const saved = readSavedRecord(key);
+    if (saved) tokenMemoryCache.set(key, JSON.stringify(saved));
+    return saved;
   } catch {
     return null;
   }
@@ -130,9 +187,7 @@ export const readScopedTokenCache = (
   const parsed = readTokenCache(key);
   const normalized = normalizeTokenCacheEntry(parsed, scope);
   if (normalized.ok) return normalized;
-  if (parsed) {
-    tokenMemoryCache.delete(key);
-  }
+  if (parsed) clearTokenCache(key);
   return null;
 };
 
@@ -171,7 +226,10 @@ export const writeTokenCache = (key: string, payload: unknown): void => {
   } catch (_) {}
   try {
     const serialized = JSON.stringify(payload);
-    if (typeof serialized === 'string') tokenMemoryCache.set(key, serialized);
+    if (typeof serialized !== 'string') return;
+    tokenMemoryCache.set(key, serialized);
+    // Until the page knows who is signed in, a sign-in stays in page memory.
+    if (tabGeneration) tabStorage()?.setItem(key, JSON.stringify({ generation: tabGeneration, record: payload }));
   } catch (_) {}
 };
 
@@ -181,11 +239,33 @@ export const clearTokenCache = (key: string): void => {
   try {
     window.localStorage.removeItem(key);
   } catch (_) {}
+  try {
+    tabStorage()?.removeItem(key);
+  } catch (_) {}
 };
 
 export const clearAllTokenCaches = (): void => {
   tokenMemoryCache.clear();
   purgePersistedTokenCache();
+  forEachTabTokenKey((key) => tabStorage()?.removeItem(key));
+};
+
+/** The page has learned who is signed in, as after a reload: this tab's saved sign-ins for them still count. */
+export const adoptTokenCaches = (address: unknown): void => {
+  if (typeof window === 'undefined') return;
+  tabGeneration = currentGeneration() || startGeneration();
+  const suffix = `:${normalizeAddress(address)}`;
+  forEachTabTokenKey((key) => {
+    if (!key.endsWith(suffix) || !readSavedRecord(key)) tabStorage()?.removeItem(key);
+  });
+};
+
+/** A sign-out or account switch ends every sign-in, and other tabs' saved ones once they reload. */
+export const resetTokenCaches = (nextAddress: unknown): void => {
+  clearAllTokenCaches();
+  if (typeof window === 'undefined') return;
+  const generation = startGeneration();
+  tabGeneration = normalizeAddress(nextAddress) ? generation : '';
 };
 
 export const buildTokenCacheKey = ({

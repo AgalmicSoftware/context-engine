@@ -3,7 +3,7 @@ import React from 'react';
 import fs from 'fs';
 import path from 'path';
 import { fireEvent, render, screen } from '@testing-library/react';
-import SessionInterviewResearchConsent from './SessionInterviewResearchConsent';
+import SessionInterviewResearchConsent, { SessionInterviewResearchShare } from './SessionInterviewResearchConsent';
 import type { InterviewPrefillPacket } from './sessionInterview';
 
 const readConsentScss = () =>
@@ -29,7 +29,6 @@ const renderConsent = (props = {}) =>
       includeProvenance
       includeComparison={false}
       onProvenanceChange={jest.fn()}
-      onComparisonChange={jest.fn()}
       coverageDetails={[]}
       selectedCount={1}
       unselectedCount={2}
@@ -41,6 +40,9 @@ const renderConsent = (props = {}) =>
 describe('SessionInterviewResearchConsent', () => {
   it('describes opt-in research metadata without claiming edits are agreement', () => {
     renderConsent({ researchDetail: 'full' });
+    render(
+      <SessionInterviewResearchShare included={false} disabled={false} researchDetail="full" onChange={jest.fn()} />,
+    );
     expect(screen.getByText(/Edits are not treated as agreement/i)).toBeInTheDocument();
     expect(screen.getByText(/full interview transcript and imported conversation history/i)).toBeInTheDocument();
     // An unticked box says what is left out, so the metadata doesn't repeat it.
@@ -98,13 +100,37 @@ describe('SessionInterviewResearchConsent', () => {
 
 it('shows mixed saved consent and lets an explicit click choose for all selected questions', () => {
   const change = jest.fn();
-  renderConsent({ provenanceMixed: true, comparisonMixed: true, onProvenanceChange: change });
+  const share = jest.fn();
+  renderConsent({ provenanceMixed: true, onProvenanceChange: change });
+  render(<SessionInterviewResearchShare included mixed disabled={false} onChange={share} />);
   const provenance = screen.getByLabelText(/Include platform\/model provenance/i);
   const comparison = screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_PREDICTION_COMPARISON);
   expect(provenance).toHaveAttribute('aria-checked', 'mixed');
   expect(comparison).toHaveAttribute('aria-checked', 'mixed');
+  expect(comparison).not.toBeChecked();
   fireEvent.click(provenance);
   expect(change).toHaveBeenCalledWith(true);
+  fireEvent.click(comparison);
+  expect(share).toHaveBeenCalledWith(true);
+});
+
+describe('SessionInterviewResearchShare', () => {
+  it('names itself shortly, with what it shares behind its ?', () => {
+    render(<SessionInterviewResearchShare included disabled={false} onChange={jest.fn()} />);
+    expect(screen.getByLabelText('Share for research')).toBeChecked();
+    expect(screen.getByRole('button', { name: 'About sharing for research' })).toHaveAccessibleDescription(
+      /predicted answers, ratings and confidence/,
+    );
+  });
+
+  it('reports a change and stays put while disabled', () => {
+    const change = jest.fn();
+    const { rerender } = render(<SessionInterviewResearchShare included disabled={false} onChange={change} />);
+    fireEvent.click(screen.getByLabelText('Share for research'));
+    expect(change).toHaveBeenCalledWith(false);
+    rerender(<SessionInterviewResearchShare included disabled onChange={change} />);
+    expect(screen.getByLabelText('Share for research')).toBeDisabled();
+  });
 });
 
 it('explains that current drafts use current attribution while preserving consent', () => {
@@ -119,7 +145,6 @@ describe('research detail wording', () => {
     includeProvenance: true,
     includeComparison: true,
     onProvenanceChange: () => undefined,
-    onComparisonChange: () => undefined,
     coverageDetails: [],
     selectedCount: 2,
     unselectedCount: 1,

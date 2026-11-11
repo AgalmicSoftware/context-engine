@@ -1827,9 +1827,15 @@ class SBTPage extends Component<any, any> {
       copiedAddress: this.state.copiedAddress,
       targetKey: key,
     });
+    // Profiles open in this page's session.
+    const slug = this.getEffectiveSessionSlug();
     return (
       <>
-        <a href={buildPublicRoute(`/u/${normalized}`)} target="_blank" rel="noopener noreferrer">
+        <a
+          href={buildPublicRoute(`/u/${normalized}${slug ? `?session=${encodeURIComponent(slug)}` : ''}`)}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
           {shortenedAddress}
         </a>
         <button onClick={() => this.copyToClipboard(normalized, key)} className={styles.copyButton}>

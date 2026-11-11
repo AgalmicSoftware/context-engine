@@ -3,6 +3,8 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import SessionVoiceModeModal from './SessionVoiceModeModal';
 import { transcribeAudio } from '../../utilities/ai/aiClient.js';
 import { putRecordingChunk, type RecordingChunk } from '../../utilities/audio/recordingChunkStore';
+import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
+import type { SessionVoiceMode } from './sessionInterview';
 const mockRecords = new Map<string, RecordingChunk>();
 const savedSegments = () => [...mockRecords.values()].map((record) => record.segment);
 const savedTranscript = () =>
@@ -31,6 +33,7 @@ jest.mock('./sessionListeningQuestions', () => ({
 jest.mock('./CreateQuestionsAndSurveys', () => ({ __esModule: true, default: () => null }));
 jest.mock('./useInterviewReadiness', () => ({ useInterviewReadiness: jest.fn() }));
 jest.mock('./useInterviewOpening', () => ({ useInterviewOpening: jest.fn() }));
+jest.mock('./SessionVoicePrefillCard', () => ({ __esModule: true, default: () => null }));
 
 const transcript = 'The last words are saved.';
 const mockStopTrack = jest.fn();
@@ -344,3 +347,53 @@ it.each(['a transcribed recording', 'a pasted transcript'])(
     }
   },
 );
+
+// The dialog with its two choices, so Back from Group Conversation can return to them.
+const onBackToChoices = jest.fn();
+const onDialogClose = jest.fn();
+function ChoicesHarness() {
+  const [mode, setMode] = useState<SessionVoiceMode | null>('recordGroup');
+  return (
+    <SessionVoiceModeModal
+      isOpen
+      mode={mode}
+      sessionSlug="recording-fixture"
+      onClose={onDialogClose}
+      onSelectMode={(next) => {
+        if (next === null) onBackToChoices();
+        setMode(next);
+      }}
+      questionPool={[]}
+      onApplyAnswer={() => {}}
+      onApplyAdditional={() => {}}
+      onApplyImportance={() => {}}
+      onApplyConviction={() => {}}
+    />
+  );
+}
+
+it('goes back once Group Conversation has saved the last speech, with Back off meanwhile', async () => {
+  let finish = (_text: string) => {};
+  jest.mocked(transcribeAudio).mockImplementation(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+  );
+  render(<ChoicesHarness />);
+  await waitFor(() => expect(screen.getByTestId('ce-session-listening-start')).toBeEnabled());
+  fireEvent.click(screen.getByTestId('ce-session-listening-start'));
+  fireEvent.click(await screen.findByRole('button', { name: 'Stop recording' }));
+  // Capture is over, and the last chunk is still being transcribed.
+  const back = screen.getByRole('button', { name: 'Back to Voice mode' });
+  await waitFor(() => expect(back).toBeEnabled());
+  fireEvent.click(back);
+  expect(await screen.findByText('Finalizing recording…')).toBeInTheDocument();
+  expect(back).toBeDisabled();
+  await act(async () => finish(transcript));
+  await screen.findByTestId(E2E_TESTIDS.SESSION_VOICE_MODE_CHOOSER);
+  expect(onBackToChoices).toHaveBeenCalledTimes(1);
+  expect(onDialogClose).not.toHaveBeenCalled();
+  expect(savedTranscript()).toBe(transcript);
+  expect(screen.getByTestId(E2E_TESTIDS.SESSION_VOICE_MODE_GROUP)).toHaveFocus();
+});

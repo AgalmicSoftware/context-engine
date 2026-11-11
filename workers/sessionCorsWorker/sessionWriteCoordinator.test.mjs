@@ -729,6 +729,7 @@ test('coordinated Worker Group CRUD keeps capacity authoritative across release 
 			await mutate('remove-member', {
 				groupId: 'reviewers',
 				principal: memberA,
+				remover: 'admin',
 			})
 		).ok,
 		true,
@@ -968,7 +969,7 @@ test('stale duplicate member removal cannot release the same durable capacity tw
 	);
 	assert.ok(memberAKey);
 	const staleActiveMemberA = kv.values.get(memberAKey);
-	assert.equal((await mutate('remove-member', members.a)).status, 200);
+	assert.equal((await mutate('remove-member', members.a, { remover: 'admin' })).status, 200);
 	const currentGet = kv.get.bind(kv);
 	let serveStaleMemberA = true;
 	kv.get = async (key) => {
@@ -978,7 +979,7 @@ test('stale duplicate member removal cannot release the same durable capacity tw
 		}
 		return currentGet(key);
 	};
-	assert.equal((await mutate('remove-member', members.a)).status, 404);
+	assert.equal((await mutate('remove-member', members.a, { remover: 'admin' })).status, 404);
 	assert.equal((await mutate('add-member', members.c)).status, 200);
 	const overflow = await mutate('add-member', members.d);
 	assert.equal(overflow.status, 409);
@@ -1029,7 +1030,7 @@ test('failed member removal restores durable membership for retry', async () => 
 	const memberProjection = kv.values.get(memberKey);
 	kv.values.delete(memberKey);
 
-	const failedRemoval = await mutate('remove-member', { principal: member });
+	const failedRemoval = await mutate('remove-member', { principal: member, remover: 'admin' });
 	assert.equal(failedRemoval.status, 404);
 	assert.equal((await failedRemoval.json()).reason, 'worker_group_member_not_found');
 
@@ -1043,7 +1044,7 @@ test('failed member removal restores durable membership for retry', async () => 
 	assert.deepEqual((await memberships.json()).groups.map(({ groupId }) => groupId), ['reviewers']);
 
 	kv.values.set(memberKey, memberProjection);
-	assert.equal((await mutate('remove-member', { principal: member })).status, 200);
+	assert.equal((await mutate('remove-member', { principal: member, remover: 'admin' })).status, 200);
 });
 
 test('failed group delete restores durable capacity for retry', async () => {
@@ -1175,6 +1176,7 @@ test('Durable Object authorization denies stale KV membership after remove and d
 			await mutate('remove-member', {
 				groupId: 'reviewers',
 				principal: groupMember,
+				remover: 'admin',
 			})
 		).ok,
 		true,
@@ -2817,8 +2819,8 @@ test('SessionWriteCoordinator settles creates, deletes, and member changes whose
 	assert.equal((await removal.create()).status, 200);
 	assert.equal((await removal.mutate('add-member', { principal: removal.member })).status, 200);
 	removal.failNext('delete', (key) => key.startsWith('ce-worker-group-principal:'));
-	assert.equal((await removal.mutate('remove-member', { principal: removal.member })).status, 503);
-	const removalRetry = await removal.mutate('remove-member', { principal: removal.member });
+	assert.equal((await removal.mutate('remove-member', { principal: removal.member, remover: 'admin' })).status, 503);
+	const removalRetry = await removal.mutate('remove-member', { principal: removal.member, remover: 'admin' });
 	assert.equal(removalRetry.status, 200, JSON.stringify(removalRetry.body));
 	assert.equal(removalRetry.body.memberCount, 0);
 	assert.equal((await removal.authorize()).status, 403);
@@ -3129,4 +3131,125 @@ test('receipt cap counts retained pending records and never evicts a live lease'
   for (let index = 0; index < 2000; index++) store.set(`upload-receipt-v1:live-${index}`, { state: 'pending', storageId: receiptRef.id, createdAt: new Date(now).toISOString(), reservedAt: now, leaseUntil: now + 120000 });
   const response = await coordinator.fetch(receiptRequest('reserve', { requestId: 'full', payloadDigest: 'a'.repeat(64), storageId: receiptRef.id, createdAt: new Date(now).toISOString() }));
   assert.equal(response.status, 503); assert.equal(store.size, 2000);
+});
+
+const createGroupWithRemovalAuth = (h, removalAuth) =>
+	h.mutate('create', {
+		input: { groupId: 'group-alpha', label: 'Alpha', joinMode: 'admin_add', memberVisibility: 'members', removalAuth },
+	});
+const memberLeave = (h) => ({ principal: h.member, actorPrincipal: h.member, remover: 'member' });
+
+test('a group\'s removal setting lets only its removers end a membership, and delete still works', async () => {
+	const refusals = {
+		both: { member: '', admin: '' },
+		admin_only: { member: 'worker_group_leave_denied', admin: '' },
+		member_only: { member: '', admin: 'worker_group_removal_denied' },
+		neither: { member: 'worker_group_leave_denied', admin: 'worker_group_removal_denied' },
+	};
+	for (const [removalAuth, byRemover] of Object.entries(refusals)) {
+		for (const [remover, reason] of Object.entries(byRemover)) {
+			const label = `${removalAuth}, ${remover}`;
+			const h = createGroupRecoveryHarness();
+			const created = await createGroupWithRemovalAuth(h, removalAuth);
+			assert.equal(created.body.group.removalAuth, removalAuth, label);
+			assert.equal((await h.mutate('add-member', { principal: h.member })).status, 200, label);
+			const removal = await h.mutate('remove-member', remover === 'member' ? memberLeave(h) : { principal: h.member, remover });
+			assert.equal(removal.status, reason ? 403 : 200, label);
+			assert.equal(removal.body.reason, reason || undefined, label);
+			assert.equal((await h.authorize()).status, reason ? 200 : 403, label);
+			assert.equal((await h.mutate('delete')).status, 200, label);
+		}
+	}
+});
+
+test('only a group\'s members learn its removal setting from a refusal', async () => {
+	for (const [removalAuth, remover] of [['admin_only', 'member'], ['neither', 'member'], ['member_only', 'admin'], ['neither', 'admin']]) {
+		const label = `${removalAuth}, ${remover}`;
+		const h = createGroupRecoveryHarness();
+		assert.equal((await createGroupWithRemovalAuth(h, removalAuth)).status, 200, label);
+		const removal = await h.mutate('remove-member', remover === 'member' ? memberLeave(h) : { principal: h.member, remover });
+		assert.equal(removal.status, 404, label);
+		assert.equal(removal.body.reason, 'worker_group_member_not_found', label);
+	}
+});
+
+test('a group stored before the removal setting acts as Admins and the member', async () => {
+	for (const remover of ['member', 'admin']) {
+		const h = createGroupRecoveryHarness();
+		assert.equal((await h.create()).status, 200);
+		assert.equal((await h.mutate('add-member', { principal: h.member })).status, 200);
+		// Both stores as a Worker without the setting left them.
+		const groupKey = [...h.kv.values.keys()].find((key) => key.startsWith('ce-worker-group:') && key.endsWith(':group-alpha'));
+		const { removalAuth: _storedAuth, ...record } = JSON.parse(h.kv.values.get(groupKey));
+		h.kv.values.set(groupKey, JSON.stringify(record));
+		const capacityKey = 'worker-group-capacity-group-v3:group-alpha';
+		const { removalAuth: _capacityAuth, ...capacity } = h.store.get(capacityKey);
+		h.store.set(capacityKey, capacity);
+
+		const removal = await h.mutate('remove-member', remover === 'member' ? memberLeave(h) : { principal: h.member, remover });
+		assert.equal(removal.status, 200, `${remover}: ${JSON.stringify(removal.body)}`);
+		assert.equal(removal.body.group.removalAuth, 'both');
+		assert.equal((await h.authorize()).status, 403);
+	}
+});
+
+test('a removal allowed when it began finishes on replay after an admin changes the setting', async () => {
+	const h = createGroupRecoveryHarness();
+	assert.equal((await createGroupWithRemovalAuth(h, 'both')).status, 200);
+	assert.equal((await h.mutate('add-member', { principal: h.member })).status, 200);
+	h.failNext('delete', (key) => key.startsWith('ce-worker-group-principal:'));
+	assert.equal((await h.mutate('remove-member', memberLeave(h))).status, 503);
+	const update = await h.mutate('update', { input: { removalAuth: 'admin_only' } });
+	assert.equal(update.status, 200, JSON.stringify(update.body));
+	assert.equal(update.body.group.removalAuth, 'admin_only');
+
+	const retry = await h.mutate('remove-member', memberLeave(h));
+	assert.equal(retry.status, 200, JSON.stringify(retry.body));
+	assert.equal(retry.body.memberCount, 0);
+	assert.equal((await h.authorize()).status, 403);
+	// A new leave meets the new setting.
+	assert.equal((await h.mutate('add-member', { principal: h.member })).status, 200);
+	const refused = await h.mutate('remove-member', memberLeave(h));
+	assert.equal(refused.status, 403);
+	assert.equal(refused.body.reason, 'worker_group_leave_denied');
+});
+
+test('a refused leave is refused before it reserves, so a failed read cannot let it through later', async () => {
+	const h = createGroupRecoveryHarness();
+	assert.equal((await createGroupWithRemovalAuth(h, 'admin_only')).status, 200);
+	assert.equal((await h.mutate('add-member', { principal: h.member })).status, 200);
+	h.failNext('get', (key) => key.startsWith('ce-worker-group:') && key.endsWith(':group-alpha'));
+	const leave = await h.mutate('remove-member', memberLeave(h));
+	assert.equal(leave.status, 403, JSON.stringify(leave.body));
+	assert.equal(leave.body.reason, 'worker_group_leave_denied');
+	// Authorizing replays any pending removal first; there must be none.
+	assert.equal((await h.authorize()).status, 200);
+});
+
+test('the Worker refuses any other removal setting and keeps the chosen one through updates and replays', async () => {
+	const h = createGroupRecoveryHarness();
+	// A removal must say whether the member or an admin ends the membership.
+	assert.equal((await h.mutate('remove-member', { principal: h.member })).body.reason, 'worker_group_mutation_invalid');
+	const refused = await createGroupWithRemovalAuth(h, 'owner_only');
+	assert.equal(refused.status, 400);
+	assert.equal(refused.body.reason, 'invalid_removal_auth');
+	assert.equal(h.store.get('worker-group-capacity-meta-v3').groupCount, 0);
+	assert.equal(h.groupPhase(), undefined);
+
+	// A create whose KV write fails replays from its journaled input.
+	h.failNext('put', (key) => key.startsWith('ce-worker-group:') && key.endsWith(':group-alpha'));
+	assert.equal((await createGroupWithRemovalAuth(h, 'neither')).status, 503);
+	const created = await createGroupWithRemovalAuth(h, 'neither');
+	assert.equal(created.status, 200, JSON.stringify(created.body));
+	assert.equal(created.body.group.removalAuth, 'neither');
+
+	const badUpdate = await h.mutate('update', { input: { removalAuth: 'everyone' } });
+	assert.equal(badUpdate.status, 400);
+	assert.equal(badUpdate.body.reason, 'invalid_removal_auth');
+	assert.equal(h.store.get('worker-group-capacity-group-v3:group-alpha').removalAuth, 'neither');
+	const update = await h.mutate('update', { input: { removalAuth: 'member_only' } });
+	assert.equal(update.body.group.removalAuth, 'member_only');
+	assert.equal(h.store.get('worker-group-capacity-group-v3:group-alpha').removalAuth, 'member_only');
+	// An update that leaves the setting out keeps it.
+	assert.equal((await h.mutate('update', { input: { label: 'Renamed' } })).body.group.removalAuth, 'member_only');
 });

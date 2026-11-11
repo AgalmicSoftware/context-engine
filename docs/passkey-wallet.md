@@ -61,7 +61,7 @@ NEXT_PUBLIC_WALLET_MODE=passkey-eoa
 NEXT_PUBLIC_WALLET_KEY_MODE=passkey-derived
 NEXT_PUBLIC_WALLET_DERIVATION_NAMESPACE=context-engine
 NEXT_PUBLIC_SESSION_MODE=soft
-NEXT_PUBLIC_WALLET_UNLOCK_TTL_SECONDS=900
+NEXT_PUBLIC_WALLET_UNLOCK_TTL_SECONDS=3600
 ```
 
 Local loopback development may use:
@@ -221,10 +221,16 @@ These values must never be sent to a server or persisted in logs:
 7. The EIP-1193 provider and wallet client expose the account to the app.
 
 Sensitive material is cleared on disconnect/logout, timeout, account switch, and
-worker lock. The default unlock TTL is 900 seconds and can be configured with:
+worker lock. The default unlock TTL is 3600 seconds (60 minutes), counted from
+the person's last click, tap or key press on the page. Events a script
+dispatches and background signing don't count, and however much the page is
+used, the wallet locks 8 hours after its passkey prompt, or one TTL after it if
+the TTL is set longer. The key's worker enforces both: each use moves its expiry
+forward too, at most about once a minute, and never past the limit set when it
+got the key. Configure the TTL with:
 
 ```bash
-NEXT_PUBLIC_WALLET_UNLOCK_TTL_SECONDS=900
+NEXT_PUBLIC_WALLET_UNLOCK_TTL_SECONDS=3600
 ```
 
 ## PRF Support
@@ -268,6 +274,32 @@ The EIP-1193 facade is available through:
 ```ts
 createPasskeyEip1193Provider()
 ```
+
+The facade's `isUnlocked(forMs)` says whether a request would sign without a
+passkey prompt, now and for the next `forMs` milliseconds. Background requests
+use it: refreshes on focus, on a timer, or after a group change or a sign-in
+elsewhere, group images, context files read for an AI, and pages that cover
+many sessions, such as Community group counts and tag pages. They sign in to a
+session's Worker only with a sign-in this page already holds, or silently while
+the wallet stays unlocked for at least 30 more seconds (`getWorkerSessionToken`
+and `fetchWorkerWithAuth` with `prompt: false`), and otherwise keep what they
+show. Such a request also keeps a token the Worker refused for one newer scope,
+unless a new one signs in silently. A page that covers many sessions stays
+quiet because several passkey prompts at once would clash.
+
+Someone signed in, whose address shows, is asked for the passkey rather than
+shown what a signed-out visitor sees on a session page. Opening its Groups
+panel, its context files, or the Results group filter (a filter saved or in a
+link included) asks if that session needs a new sign-in, and those requests
+share one prompt. Declining keeps the signed-out view, with a button to try
+again, until anything else on the page signs in; closing and opening the filter
+again doesn't ask. Before the first sign-in, a private session shows a
+**Sign in** button there instead. A Worker sign-in lasts four hours and is kept
+for the tab that made it, in that tab's sessionStorage and never localStorage,
+so after a reload these don't ask again. The wallet itself still locks on a
+reload, so anything it signs, such as an encrypted answer, asks for the passkey
+once. A new tab needs a new sign-in, and a sign-out or account switch in any
+tab ends every saved sign-in, in other tabs once they reload.
 
 Capabilities report only what this wallet supports:
 

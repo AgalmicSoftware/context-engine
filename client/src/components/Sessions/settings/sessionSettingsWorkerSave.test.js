@@ -6,12 +6,14 @@ import { buildSessionWizardDefaultTemplate } from '../sessionWizardDraftState';
 import { applySessionModeProfileSelectionToDraft } from '../sessionWizardModeProfileDraftController';
 import { buildSessionWizardWorkerConfigPayload } from '../sessionWizardWriteNormalization';
 import { editSessionSetupProfile, setEncryptionMode, setResultsVisibility } from '../setup/sessionSetupProfile';
+import { normalizeInterviewSettings } from '@ce-shared/interviewSettings.mjs';
 import { normalizeResultsAnalysisSettings } from '@ce-shared/resultsAnalysisSettings.mjs';
 import { SESSION_TEMPLATE_FORMAT, sessionTemplateFromDraft } from '@ce-shared/sessionTemplate.mjs';
 import {
   applyTemplateToSessionSettingsDraft,
   buildSessionSettingsDraft,
   buildSessionSettingsSave,
+  describeSessionSettingsPath,
   rebaseSessionSettingsDraft,
 } from './sessionSettingsEdits';
 
@@ -116,6 +118,36 @@ describe('saving the edit page through the Session Worker', () => {
     expect(result.config.authzEpoch).toBe(stored.authzEpoch);
   });
 
+  it('keeps every interview setting edit as content, even turning interviews off', () => {
+    const stored = publishedSession();
+    const groups = editAndSave(stored, (draft) => {
+      draft.interviewMode = {
+        ...draft.interviewMode,
+        ...normalizeInterviewSettings(draft.interviewMode),
+        followNewQuestions: true,
+        joinMatchingGroups: true,
+        groupSuggestionData: ['country', 'town'],
+      };
+    });
+    expect(groups.save.classification).toEqual({
+      content: expect.arrayContaining([
+        'interviewMode.followNewQuestions',
+        'interviewMode.joinMatchingGroups',
+        'interviewMode.groupSuggestionData',
+      ]),
+      authority: [],
+      signsParticipantsOut: false,
+    });
+    expect(groups.result.config.authzEpoch).toBe(stored.authzEpoch);
+
+    const off = editAndSave(stored, (draft) => {
+      draft.interviewModeEnabled = false;
+    });
+    expect(off.save.patch).toMatchObject({ interviewModeEnabled: false });
+    expect(off.save.classification).toMatchObject({ authority: [], signsParticipantsOut: false });
+    expect(off.result.config.authzEpoch).toBe(stored.authzEpoch);
+  });
+
   it('previews the sign-out the Worker applies for authority edits', () => {
     const stored = publishedSession();
     const { save, result } = editAndSave(stored, (draft) => {
@@ -125,8 +157,8 @@ describe('saving the edit page through the Session Worker', () => {
     });
 
     expect(save.classification).toEqual({
-      content: [],
-      authority: expect.arrayContaining(['groupCreationPolicy', 'interviewMode.followNewQuestions', 'defaultTags']),
+      content: ['interviewMode.followNewQuestions'],
+      authority: expect.arrayContaining(['groupCreationPolicy', 'defaultTags']),
       signsParticipantsOut: true,
     });
     expect(result).toMatchObject({ ok: true });
@@ -421,6 +453,73 @@ describe('saving the edit page through the Session Worker', () => {
       sessionName: 'Typed name',
       ai: { reasoningEffort: 'high' },
     });
+  });
+
+  it('saves instructions for AI agents as content, clears them, and refuses more than 8,000 characters', () => {
+    const stored = publishedSession();
+    const instructions = '# Taking part\n\nJoin the Reviewers group.';
+    const { save, result } = editAndSave(stored, (draft) => {
+      draft.agentInstructions = `  ${instructions}\n`;
+    });
+    expect(save.patch).toEqual({ agentInstructions: instructions });
+    expect(save.classification).toEqual({ content: ['agentInstructions'], authority: [], signsParticipantsOut: false });
+    expect(describeSessionSettingsPath('agentInstructions')).toBe('Instructions for AI agents');
+    expect(result).toMatchObject({ ok: true, config: { agentInstructions: instructions } });
+    expect(result.config.authzEpoch).toBe(stored.authzEpoch);
+
+    const cleared = editAndSave(result.config, (draft) => {
+      expect(draft.agentInstructions).toBe(instructions);
+      draft.agentInstructions = '';
+    });
+    expect(cleared.save.patch).toEqual({ agentInstructions: '' });
+    expect(cleared.result).toMatchObject({ ok: true, config: { agentInstructions: '' } });
+
+    const before = projectPublicWorkerSessionConfig(stored);
+    const draft = { ...buildSessionSettingsDraft(before), agentInstructions: 'x'.repeat(8001) };
+    expect(() => buildSessionSettingsSave(before, draft)).toThrow(
+      'Instructions for AI agents: up to 8,000 characters.',
+    );
+  });
+
+  it('keeps an interview setting changed elsewhere while another one is edited here', () => {
+    const before = projectPublicWorkerSessionConfig(publishedSession());
+    const draft = buildSessionSettingsDraft(before);
+    // As Interview settings writes an edit: every setting, then the one changed.
+    draft.interviewMode = {
+      ...draft.interviewMode,
+      ...normalizeInterviewSettings(draft.interviewMode),
+      steeringPrompt: 'Listen first.',
+    };
+    const fresh = { ...before, interviewMode: { ...before.interviewMode, hiddenDraftShare: 0.2 } };
+
+    const rebased = rebaseSessionSettingsDraft(draft, before, fresh);
+    expect(buildSessionSettingsSave(fresh, rebased).patch).toEqual({
+      interviewMode: { ...fresh.interviewMode, steeringPrompt: 'Listen first.' },
+    });
+  });
+
+  it('saves what the AI may use for group suggestions only while they are on and it is not the default', () => {
+    // As Interview settings writes an edit: every setting, then the ones changed.
+    const edit = (changes) => (draft) => {
+      draft.interviewMode = { ...draft.interviewMode, ...normalizeInterviewSettings(draft.interviewMode), ...changes };
+    };
+    const stored = publishedSession();
+    const on = editAndSave(stored, edit({ joinMatchingGroups: true }));
+    expect(on.save.patch.interviewMode).toMatchObject({ joinMatchingGroups: true });
+    expect(on.save.patch.interviewMode).not.toHaveProperty('groupSuggestionData');
+
+    const town = editAndSave(stored, edit({ joinMatchingGroups: true, groupSuggestionData: ['town'] }));
+    expect(town.save.patch.interviewMode.groupSuggestionData).toEqual(['town']);
+    expect(town.result).toMatchObject({ ok: true });
+    expect(editAndSave(stored, edit({ groupSuggestionData: ['town'] })).save.patch).toEqual({});
+
+    const back = editAndSave(town.result.config, edit({ groupSuggestionData: ['country', 'work', 'interests'] }));
+    expect(back.save.patch.interviewMode).not.toHaveProperty('groupSuggestionData');
+    expect(back.result.config.interviewMode).not.toHaveProperty('groupSuggestionData');
+
+    const off = editAndSave(town.result.config, edit({ joinMatchingGroups: false }));
+    expect(off.save.patch.interviewMode).not.toHaveProperty('groupSuggestionData');
+    expect(off.result.config.interviewMode).not.toHaveProperty('groupSuggestionData');
   });
 
   it('saves nothing when nothing changed', () => {

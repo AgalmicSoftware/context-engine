@@ -38,6 +38,7 @@
   min-width: 0;
 }
 
+// The label's colour in every state, so the ? reads wherever the label does.
 .researchHelp {
   appearance: none;
   display: inline-flex;
@@ -49,18 +50,17 @@
   border: 0;
   border-radius: 6px;
   background: transparent;
-  color: var(--ce-status-success-text);
+  color: var(--ce-panel-text);
   cursor: help;
 }
 
 .researchHelp:hover,
 .researchHelp:focus-visible {
-  background: color-mix(in srgb, var(--ce-action-accent) 12%, transparent);
-  color: var(--ce-text-inverse);
+  background: color-mix(in srgb, var(--ce-panel-text) 12%, transparent);
 }
 
 .researchHelp:focus-visible {
-  outline: 2px solid var(--ce-action-accent);
+  outline: 2px solid currentColor;
   outline-offset: 2px;
 }
 

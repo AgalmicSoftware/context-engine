@@ -75,11 +75,15 @@ const SurveyQuestionsResponseView = ({
     (!singleQuestionMode && questionPoolReady) ||
     (!singleQuestionMode && parsedViewAddressAnswers);
 
+  // The profile opens in the session this page was opened in.
+  const session = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('session') : null;
+  const profileHref = `/u/${viewedAddressLower}${session ? `?session=${encodeURIComponent(session)}` : ''}`;
+
   return (
     <div className={layoutDisplayState?.responseViewClassName}>
       {viewedAddressRaw && (
         <h2 className={styles.viewAddressHeading}>
-          <a href={`/u/${viewedAddressLower}`} className={styles.viewAddressLink}>
+          <a href={profileHref} className={styles.viewAddressLink}>
             {shortenedViewAddress}
           </a>
           <span className={styles.viewAddressHeadingSuffix}>Response:</span>

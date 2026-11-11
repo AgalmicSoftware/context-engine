@@ -4,14 +4,14 @@ import { buildPublicRoute } from '../../utilities/ui/publicUrl';
 import { dispatchWorkerGroupsChanged } from '../../utilities/worker/workerGroupChangeEvents';
 import type { WorkerGroup } from './workerGroupPorts';
 
-const normalizeGroupId = (value: string): string => {
+export const normalizeWorkerGroupId = (value: string): string => {
   const normalized = value.trim().toLowerCase();
   return /^[a-z0-9][a-z0-9._-]{0,79}$/.test(normalized) ? normalized : '';
 };
 
 export const readWorkerGroupAutoJoinId = (search: string): string => {
   const values = new URLSearchParams(search).getAll('joinGroup');
-  return values.length === 1 ? normalizeGroupId(values[0]) : '';
+  return values.length === 1 ? normalizeWorkerGroupId(values[0]) : '';
 };
 
 const copyableAutoJoinParams = new Set(['src', 'mode']);
@@ -51,7 +51,7 @@ export const buildWorkerGroupAutoJoinPath = (
   basePath?: string,
 ): string => {
   const slug = canonicalizeSessionSlug(sessionSlug);
-  const id = normalizeGroupId(groupId);
+  const id = normalizeWorkerGroupId(groupId);
   if (!slug || !id) throw new Error('A session and group are required.');
   const { url, workerHint } = buildAutoJoinBaseUrl(slug, basePath);
   url.searchParams.set('joinGroup', id);

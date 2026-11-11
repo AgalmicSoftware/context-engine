@@ -7,11 +7,18 @@ import {
   loadWorkerGroupOverview,
 } from '../../domains/worker/workerGroupPorts';
 import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../../utilities/session/sessionModeProfile';
-jest.mock('../../domains/worker/workerGroupPorts', () => ({
-  getWorkerSessionToken: jest.fn(),
-  loadWorkerGroupMembers: jest.fn(),
-  loadWorkerGroupOverview: jest.fn(),
-}));
+jest.mock('../../domains/worker/workerGroupPorts', () => {
+  const auth = jest.requireActual<typeof import('../../utilities/worker/workerAuth')>(
+    '../../utilities/worker/workerAuth',
+  );
+  return {
+    getWorkerSessionToken: jest.fn(),
+    isWorkerSignInNeededError: auth.isWorkerSignInNeededError,
+    subscribeWorkerSessionToken: auth.subscribeWorkerSessionToken,
+    loadWorkerGroupMembers: jest.fn(),
+    loadWorkerGroupOverview: jest.fn(),
+  };
+});
 const group = {
   groupId: 'eddy-2026',
   label: 'EDDY-2026',

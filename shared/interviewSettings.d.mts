@@ -1,3 +1,6 @@
+export type GroupSuggestionDataKind = 'country' | 'town' | 'work' | 'interests';
+export const GROUP_SUGGESTION_DATA: Readonly<Record<GroupSuggestionDataKind, string>>;
+export const GROUP_SUGGESTION_NEVER: string;
 export type InterviewSettings = {
   openingMode: 'auto' | 'owner';
   openingPrompt: string;
@@ -12,6 +15,8 @@ export type InterviewSettings = {
   hiddenDraftShare: number;
   showFidelityScore: boolean;
   suggestGroups: boolean;
+  joinMatchingGroups: boolean;
+  groupSuggestionData: GroupSuggestionDataKind[];
   showFidelityResults: boolean;
   fidelityMinimumPeople: number;
 };

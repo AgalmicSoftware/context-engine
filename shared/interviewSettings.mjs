@@ -1,3 +1,15 @@
+// The kinds of detail about a person that an AI may base a group suggestion on, the session's
+// AI and the person's own alike; these words go into both AIs' instructions.
+export const GROUP_SUGGESTION_DATA = Object.freeze({
+  country: 'the country they live in',
+  town: 'where in their country they live (region, town, city or neighbourhood)',
+  work: 'their work, studies and roles',
+  interests: 'their interests, causes and communities',
+});
+// What no AI may base a group suggestion on, whatever the session allows.
+export const GROUP_SUGGESTION_NEVER =
+  'their health, disability, religion, ethnicity, sexuality, gender identity, age, family life, or party or union membership';
+const GROUP_SUGGESTION_DATA_KINDS = Object.keys(GROUP_SUGGESTION_DATA);
 export const DEFAULT_INTERVIEW_SETTINGS = Object.freeze({
   openingMode: 'auto',
   openingPrompt: '',
@@ -7,11 +19,13 @@ export const DEFAULT_INTERVIEW_SETTINGS = Object.freeze({
   followNewQuestions: false,
   suggestQuestions: false,
   allowManualRefresh: true,
-  shareDraftChangesByDefault: false,
+  shareDraftChangesByDefault: true,
   researchDetail: 'minimal',
   hiddenDraftShare: 0,
   showFidelityScore: false,
   suggestGroups: false,
+  joinMatchingGroups: false,
+  groupSuggestionData: Object.freeze(['country', 'work', 'interests']),
   showFidelityResults: false,
   fidelityMinimumPeople: 5,
 });
@@ -35,7 +49,11 @@ export const normalizeInterviewSettings = (value = {}) => {
     followNewQuestions: source.followNewQuestions === true,
     suggestQuestions: source.suggestQuestions === true,
     allowManualRefresh: source.allowManualRefresh !== false,
-    shareDraftChangesByDefault: source.shareDraftChangesByDefault === true,
+    // Research sharing starts ticked unless the session turns it off; each person can untick it.
+    shareDraftChangesByDefault:
+      typeof source.shareDraftChangesByDefault === 'boolean'
+        ? source.shareDraftChangesByDefault
+        : DEFAULT_INTERVIEW_SETTINGS.shareDraftChangesByDefault,
     // How much an AI draft comparison saves: 'minimal' keeps no AI notes or drafted text.
     researchDetail: source.researchDetail === 'full' ? 'full' : 'minimal',
     // Share of a person's AI prefill drafts hidden until they answer, which measures anchoring.
@@ -44,8 +62,19 @@ export const normalizeInterviewSettings = (value = {}) => {
       : 0,
     // After submitting, show the person how well their AI predicted them (private, in the browser).
     showFidelityScore: source.showFidelityScore === true,
-    // After an interview or AI prefill, suggest the session's open groups that fit the answers.
+    // No longer read: group matching follows joinMatchingGroups. Still accepted, so configs that carry it save.
     suggestGroups: source.suggestGroups === true,
+    // After an interview or AI prefill, suggest open groups that fit the person; the ones
+    // they tick join when they submit. Off, nothing is matched.
+    joinMatchingGroups: source.joinMatchingGroups === true,
+    // What an AI may base those suggestions on: known kinds in a fixed order. Unset takes the
+    // default; anything else that isn't a list allows nothing, so a bad value never widens it.
+    groupSuggestionData:
+      source.groupSuggestionData === undefined
+        ? [...DEFAULT_INTERVIEW_SETTINGS.groupSuggestionData]
+        : GROUP_SUGGESTION_DATA_KINDS.filter(
+            (kind) => Array.isArray(source.groupSuggestionData) && source.groupSuggestionData.includes(kind),
+          ),
     // Add "How well AIs predicted people" to Results, scoring everyone's AI-prefill drafts together.
     showFidelityResults: source.showFidelityResults === true,
     // That section hides figures from fewer people than this; 1 shows all.
@@ -83,6 +112,13 @@ export const validInterviewSettings = (value = {}) => {
   )
     return false;
   if (
+    value.groupSuggestionData !== undefined &&
+    (!Array.isArray(value.groupSuggestionData) ||
+      new Set(value.groupSuggestionData).size !== value.groupSuggestionData.length ||
+      value.groupSuggestionData.some((kind) => !GROUP_SUGGESTION_DATA_KINDS.includes(kind)))
+  )
+    return false;
+  if (
     value.fidelityMinimumPeople !== undefined &&
     (!Number.isInteger(value.fidelityMinimumPeople) ||
       value.fidelityMinimumPeople < 1 ||
@@ -97,6 +133,7 @@ export const validInterviewSettings = (value = {}) => {
     'shareDraftChangesByDefault',
     'showFidelityScore',
     'suggestGroups',
+    'joinMatchingGroups',
     'showFidelityResults',
   ].every(
     (key) => value[key] === undefined || typeof value[key] === 'boolean',

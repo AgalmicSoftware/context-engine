@@ -1,11 +1,16 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faEraser, faPlus, faTimes } from '@fortawesome/free-solid-svg-icons';
-import type { WorkerGroupJoinMode, WorkerGroupMemberVisibility } from '../../domains/worker/workerGroupPorts';
+import type {
+  WorkerGroupJoinMode,
+  WorkerGroupMemberVisibility,
+  WorkerGroupRemovalAuth,
+} from '../../domains/worker/workerGroupPorts';
 import { validateWorkerGroupImageFile } from '../../domains/worker/workerGroupImageUpload';
 import createStyles from '../SBTs/CreateSBTGroup.module.scss';
 import CompactImageChooser from './CompactImageChooser';
 import { readCompactImageClipboard } from './compactImageClipboard';
+import WorkerGroupRemovalAuthHelp, { WorkerGroupRemovalAuthOptions } from './WorkerGroupRemovalAuthHelp';
 import styles from './WorkerGroupCreateForm.module.scss';
 
 type WorkerGroupCreateFormProps = {
@@ -33,6 +38,8 @@ type WorkerGroupCreateFormProps = {
   joinModeTestId?: string;
   memberVisibility?: WorkerGroupMemberVisibility;
   memberVisibilityTestId?: string;
+  removalAuth?: WorkerGroupRemovalAuth;
+  removalAuthTestId?: string;
   participantDefaults?: boolean;
   onDescriptionChange: (value: string) => void;
   onDocumentURLsChange?: (value: string[]) => void;
@@ -44,6 +51,7 @@ type WorkerGroupCreateFormProps = {
   onLabelChange: (value: string) => void;
   onMemberLimitChange?: (value: string) => void;
   onMemberVisibilityChange?: (value: WorkerGroupMemberVisibility) => void;
+  onRemovalAuthChange?: (value: WorkerGroupRemovalAuth) => void;
   onAdminAddressChange?: (value: string) => void;
   onTagsChange?: (value: string[]) => void;
   onReset: () => void;
@@ -121,6 +129,8 @@ const WorkerGroupCreateForm = ({
   labelTestId,
   memberVisibility = 'session',
   memberVisibilityTestId,
+  removalAuth = 'both',
+  removalAuthTestId,
   onDescriptionChange,
   onDocumentURLsChange,
   onImageFileChange,
@@ -131,6 +141,7 @@ const WorkerGroupCreateForm = ({
   onLabelChange,
   onMemberLimitChange,
   onMemberVisibilityChange,
+  onRemovalAuthChange,
   onAdminAddressChange,
   onTagsChange,
   onReset,
@@ -665,6 +676,24 @@ const WorkerGroupCreateForm = ({
                   <option value="session">All session members</option>
                 </select>
               )}
+            </div>
+
+            <div className={styles.accessRow}>
+              <div className={styles.accessCopy}>
+                <span className={styles.accessLabel}>
+                  Who can remove members
+                  <WorkerGroupRemovalAuthHelp />
+                </span>
+              </div>
+              <select
+                className={styles.accessSelect}
+                value={removalAuth}
+                aria-label="Who can remove members"
+                data-testid={removalAuthTestId}
+                onChange={(event) => onRemovalAuthChange?.(event.target.value as WorkerGroupRemovalAuth)}
+              >
+                <WorkerGroupRemovalAuthOptions />
+              </select>
             </div>
           </div>
         </div>

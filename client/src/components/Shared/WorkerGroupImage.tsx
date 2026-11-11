@@ -68,7 +68,6 @@ const WorkerGroupImage = ({
       setResolvedSrc(source);
       return undefined;
     }
-
     const abortController = new AbortController();
     let objectUrl = '';
     setResolvedSrc('');
@@ -82,7 +81,8 @@ const WorkerGroupImage = ({
             },
             signal: abortController.signal,
           })
-        : await fetchWorkerWithAuth(
+        : // An image never asks anyone to sign in: it shows through the page's sign-in or an unlocked wallet.
+          await fetchWorkerWithAuth(
             source,
             { signal: abortController.signal },
             {
@@ -90,6 +90,7 @@ const WorkerGroupImage = ({
               sessionConfig,
               context,
               workerUrl: normalizedWorkerUrl,
+              prompt: false,
             },
           );
       if (!response.ok) throw new Error(`Group image request failed (${response.status}).`);

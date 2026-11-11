@@ -15,6 +15,7 @@ describe('sessionWizardModeFieldPolicy', () => {
       'blockLimits',
       'faucet',
       'sessionEndsAt',
+      'agentInstructions',
       'contracts',
       'defaultGroupTags',
       'defaultSbtTags',
@@ -31,6 +32,7 @@ describe('sessionWizardModeFieldPolicy', () => {
       ),
     ).toEqual({
       sessionEndsAt: 'stale',
+      agentInstructions: 'stale',
       defaultGroupTags: 'stale',
     });
   });
@@ -41,6 +43,7 @@ describe('sessionWizardModeFieldPolicy', () => {
     );
     const payload = {
       sessionEndsAt: '2099-01-02T03:04:00Z',
+      agentInstructions: 'Join the Reviewers group.',
       defaultGroupTags: 'worker-only-group-defaults',
       encryptedFields: {
         sessionEndsAt: { ciphertext: 'stale-session-end' },
@@ -71,6 +74,7 @@ describe('sessionWizardModeFieldPolicy', () => {
       showBlockLimits: false,
       showFaucet: false,
       showSessionEndsAt: true,
+      showAgentInstructions: true,
       showWorkerGroupDefaults: true,
       showSbtDefaults: false,
       showAgentSessionWrapped: false,
@@ -99,6 +103,7 @@ describe('sessionWizardModeFieldPolicy', () => {
       showBlockLimits: false,
       showFaucet: false,
       showSessionEndsAt: true,
+      showAgentInstructions: true,
       showWorkerGroupDefaults: true,
       showSbtDefaults: true,
       showAgentSessionWrapped: false,
@@ -115,6 +120,7 @@ describe('sessionWizardModeFieldPolicy', () => {
       showBlockLimits: true,
       showFaucet: true,
       showSessionEndsAt: false,
+      showAgentInstructions: false,
       showWorkerGroupDefaults: false,
       showSbtDefaults: true,
       showAgentSessionWrapped: false,

@@ -25250,6 +25250,127 @@ var init_canonicalJson = __esm({
   }
 });
 
+// shared/sessionConfigEdits.mjs
+var WORKER_CANONICAL_SET_CONFIG_KEYS, CURATED_ID_LIST_KEYS, MAX_CURATED_IDS, CURATED_ID, validCuratedIdList, MAX_RESULTS_ADMINS, ADDRESS, validResultsAdminAddresses, MAX_AGENT_INSTRUCTIONS_CHARS, validAgentInstructions, CONTENT_FIELDS, record2, same, mergeSetConfigAi, without, onlyAddsInvites, authorityView, sessionConfigRequiresReauthorization;
+var init_sessionConfigEdits = __esm({
+  "shared/sessionConfigEdits.mjs"() {
+    init_canonicalJson();
+    WORKER_CANONICAL_SET_CONFIG_KEYS = Object.freeze([
+      "slug",
+      "sessionId",
+      "sessionIdHex",
+      "configRevision",
+      "sessionName",
+      "sessionInfo",
+      "sessionContext",
+      "appearance",
+      "sessionHeaderImg",
+      "sessionEndsAt",
+      "defaultTags",
+      "defaultGroupTags",
+      "defaultSbtTags",
+      "questionsGenPrompt",
+      "agentInstructions",
+      "interviewMode",
+      "interviewModeEnabled",
+      "pileAutoAdvanceEnabled",
+      "defaultFilterState",
+      "defaultFeaturedSBTs",
+      "autoFeatureSBTsBySessionSlug",
+      "HIGHLIGHTED_QUESTION_IDS",
+      "BLOCKED_QUESTION_IDS",
+      "HIGHLIGHTED_SURVEY_IDS",
+      "BLOCKED_SURVEY_IDS",
+      "adminAddress",
+      "adminAddresses",
+      "resultsAdminAddresses",
+      "corsWorkerUrl",
+      "allowOrigins",
+      "sessionModeProfile",
+      "agentSessionWrapped",
+      "agentHttp",
+      "resultsExposure",
+      "workerAuthority",
+      "workerRoles",
+      "roles",
+      "authorization",
+      "groupCreationPolicy",
+      "contextAdditionPolicy",
+      "storageProfile",
+      "storageEnvelope",
+      "ai",
+      "limits",
+      "scopes",
+      "networkChainId",
+      "contracts",
+      "embeddedDeployHelperEnabled",
+      "litCredentials",
+      "resultsAnalysis",
+      "responseFieldEncryption",
+      "linkedWorkerGroups",
+      "workerGroupsBootstrap"
+    ]);
+    CURATED_ID_LIST_KEYS = Object.freeze([
+      "HIGHLIGHTED_QUESTION_IDS",
+      "BLOCKED_QUESTION_IDS",
+      "HIGHLIGHTED_SURVEY_IDS",
+      "BLOCKED_SURVEY_IDS"
+    ]);
+    MAX_CURATED_IDS = 500;
+    CURATED_ID = /^[A-Za-z0-9._:-]{1,128}$/;
+    validCuratedIdList = (value) => Array.isArray(value) && value.length <= MAX_CURATED_IDS && value.every((id2) => typeof id2 === "string" && CURATED_ID.test(id2));
+    MAX_RESULTS_ADMINS = 20;
+    ADDRESS = /^0x[0-9a-fA-F]{40}$/;
+    validResultsAdminAddresses = (value) => Array.isArray(value) && value.length <= MAX_RESULTS_ADMINS && value.every((address2) => typeof address2 === "string" && ADDRESS.test(address2)) && new Set(value.map((address2) => address2.toLowerCase())).size === value.length;
+    MAX_AGENT_INSTRUCTIONS_CHARS = 8e3;
+    validAgentInstructions = (value) => typeof value === "string" && value.length <= MAX_AGENT_INSTRUCTIONS_CHARS;
+    CONTENT_FIELDS = /* @__PURE__ */ new Set([
+      "sessionName",
+      "sessionInfo",
+      "sessionContext",
+      "questionsGenPrompt",
+      "appearance",
+      "sessionHeaderImg",
+      "agentInstructions",
+      // Checked again when each file publishes, so changing it signs no one out.
+      "contextAdditionPolicy",
+      // Checked on each atlas build and read and never held in a sign-in, so
+      // changing it signs no one out either.
+      "resultsAdminAddresses",
+      // Read on each interview request and never held in a sign-in, so changing
+      // any interview setting, even turning interviews off, signs no one out.
+      "interviewModeEnabled",
+      "interviewMode",
+      ...CURATED_ID_LIST_KEYS
+    ]);
+    record2 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+    same = (left, right) => stableCanonicalSerialize(left) === stableCanonicalSerialize(right);
+    mergeSetConfigAi = (stored, sent) => record2(stored) && record2(sent) ? { ...stored, ...sent } : sent;
+    without = (value, keys) => Object.fromEntries(Object.entries(value).filter(([key]) => !keys.has(key)));
+    onlyAddsInvites = (before, after) => {
+      const prior = before === void 0 ? [] : before;
+      const next = after === void 0 ? [] : after;
+      if (!Array.isArray(prior) || !Array.isArray(next)) return false;
+      const unique2 = (rows) => rows.every((row) => record2(row) && typeof row.tokenHash === "string") && new Set(rows.map((row) => row.tokenHash)).size === rows.length;
+      if (!unique2(prior) || !unique2(next)) return false;
+      const byHash = new Map(next.map((row) => [row.tokenHash, row]));
+      return prior.every((row) => byHash.has(row.tokenHash) && same(row, byHash.get(row.tokenHash)));
+    };
+    authorityView = (config, additiveInvites) => {
+      const result = without(config, CONTENT_FIELDS);
+      if (record2(result.agentHttp) && additiveInvites) {
+        result.agentHttp = without(result.agentHttp, /* @__PURE__ */ new Set(["invites"]));
+        if (!Object.keys(result.agentHttp).length) delete result.agentHttp;
+      }
+      return result;
+    };
+    sessionConfigRequiresReauthorization = (before, after) => {
+      const additiveInvites = onlyAddsInvites(before?.agentHttp?.invites, after?.agentHttp?.invites);
+      return !same(authorityView(before, additiveInvites), authorityView(after, additiveInvites));
+    };
+  }
+});
+
 // shared/crypto/recoveryKeyFingerprint.mjs
 var encoder, recoveryKeyFingerprint;
 var init_recoveryKeyFingerprint = __esm({
@@ -25847,6 +25968,7 @@ var init_workerSessionPublicConfig = __esm({
       "defaultGroupTags",
       "defaultSbtTags",
       "questionsGenPrompt",
+      "agentInstructions",
       "defaultFilterState",
       "defaultFeaturedSBTs",
       "autoFeatureSBTsBySessionSlug",
@@ -25911,6 +26033,7 @@ var init_workerSessionConfig = __esm({
       "defaultGroupTags",
       "defaultSbtTags",
       "questionsGenPrompt",
+      "agentInstructions",
       "defaultFilterState",
       "defaultFeaturedSBTs",
       "autoFeatureSBTsBySessionSlug",
@@ -26957,6 +27080,7 @@ var import_rpcDefaults3, getPathRpcUrl, DEFAULT_COMPAT_DATE, DEFAULT_FAUCET_RPC_
 var init_deployHelperCore = __esm({
   "workers/shared/deployHelperCore.mjs"() {
     init_sessionAgentConfig();
+    init_sessionConfigEdits();
     init_canonicalJson();
     init_recoveryKey();
     init_artifactFetch();
@@ -28001,6 +28125,9 @@ var init_deployHelperCore = __esm({
     validateDeployHelperPublicConfigInputs = (body = {}) => {
       if (!validSessionAgentConfig(body)) return "Invalid agent configuration.";
       if (body?.deploymentKind) return "Separate agent deployments are no longer supported; configure the Session Worker.";
+      if (Object.hasOwn(body || {}, "agentInstructions") && !validAgentInstructions(body.agentInstructions)) {
+        return `agentInstructions must be text of at most ${MAX_AGENT_INSTRUCTIONS_CHARS} characters.`;
+      }
       const allowOriginsInput = Array.isArray(body?.allowOrigins) ? body.allowOrigins : [];
       if (allowOriginsInput.some((origin) => toStr9(origin).includes("*"))) {
         return "Worker CORS allowlists must contain exact origins.";
@@ -30042,128 +30169,18 @@ var init_workerGroupUrl = __esm({
   }
 });
 
-// shared/sessionConfigEdits.mjs
-var WORKER_CANONICAL_SET_CONFIG_KEYS, CURATED_ID_LIST_KEYS, MAX_CURATED_IDS, CURATED_ID, validCuratedIdList, MAX_RESULTS_ADMINS, ADDRESS, validResultsAdminAddresses, CONTENT_FIELDS, INTERVIEW_CONTENT_FIELDS, record2, same, mergeSetConfigAi, without, onlyAddsInvites, authorityView, sessionConfigRequiresReauthorization;
-var init_sessionConfigEdits = __esm({
-  "shared/sessionConfigEdits.mjs"() {
-    init_canonicalJson();
-    WORKER_CANONICAL_SET_CONFIG_KEYS = Object.freeze([
-      "slug",
-      "sessionId",
-      "sessionIdHex",
-      "configRevision",
-      "sessionName",
-      "sessionInfo",
-      "sessionContext",
-      "appearance",
-      "sessionHeaderImg",
-      "sessionEndsAt",
-      "defaultTags",
-      "defaultGroupTags",
-      "defaultSbtTags",
-      "questionsGenPrompt",
-      "interviewMode",
-      "interviewModeEnabled",
-      "pileAutoAdvanceEnabled",
-      "defaultFilterState",
-      "defaultFeaturedSBTs",
-      "autoFeatureSBTsBySessionSlug",
-      "HIGHLIGHTED_QUESTION_IDS",
-      "BLOCKED_QUESTION_IDS",
-      "HIGHLIGHTED_SURVEY_IDS",
-      "BLOCKED_SURVEY_IDS",
-      "adminAddress",
-      "adminAddresses",
-      "resultsAdminAddresses",
-      "corsWorkerUrl",
-      "allowOrigins",
-      "sessionModeProfile",
-      "agentSessionWrapped",
-      "agentHttp",
-      "resultsExposure",
-      "workerAuthority",
-      "workerRoles",
-      "roles",
-      "authorization",
-      "groupCreationPolicy",
-      "contextAdditionPolicy",
-      "storageProfile",
-      "storageEnvelope",
-      "ai",
-      "limits",
-      "scopes",
-      "networkChainId",
-      "contracts",
-      "embeddedDeployHelperEnabled",
-      "litCredentials",
-      "resultsAnalysis",
-      "responseFieldEncryption",
-      "linkedWorkerGroups",
-      "workerGroupsBootstrap"
-    ]);
-    CURATED_ID_LIST_KEYS = Object.freeze([
-      "HIGHLIGHTED_QUESTION_IDS",
-      "BLOCKED_QUESTION_IDS",
-      "HIGHLIGHTED_SURVEY_IDS",
-      "BLOCKED_SURVEY_IDS"
-    ]);
-    MAX_CURATED_IDS = 500;
-    CURATED_ID = /^[A-Za-z0-9._:-]{1,128}$/;
-    validCuratedIdList = (value) => Array.isArray(value) && value.length <= MAX_CURATED_IDS && value.every((id2) => typeof id2 === "string" && CURATED_ID.test(id2));
-    MAX_RESULTS_ADMINS = 20;
-    ADDRESS = /^0x[0-9a-fA-F]{40}$/;
-    validResultsAdminAddresses = (value) => Array.isArray(value) && value.length <= MAX_RESULTS_ADMINS && value.every((address2) => typeof address2 === "string" && ADDRESS.test(address2)) && new Set(value.map((address2) => address2.toLowerCase())).size === value.length;
-    CONTENT_FIELDS = /* @__PURE__ */ new Set([
-      "sessionName",
-      "sessionInfo",
-      "sessionContext",
-      "questionsGenPrompt",
-      "appearance",
-      "sessionHeaderImg",
-      // Checked again when each file publishes, so changing it signs no one out.
-      "contextAdditionPolicy",
-      // Checked on each atlas build and read and never held in a sign-in, so
-      // changing it signs no one out either.
-      "resultsAdminAddresses",
-      ...CURATED_ID_LIST_KEYS
-    ]);
-    INTERVIEW_CONTENT_FIELDS = /* @__PURE__ */ new Set(["openingPrompt", "steeringPrompt"]);
-    record2 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
-    same = (left, right) => stableCanonicalSerialize(left) === stableCanonicalSerialize(right);
-    mergeSetConfigAi = (stored, sent) => record2(stored) && record2(sent) ? { ...stored, ...sent } : sent;
-    without = (value, keys) => Object.fromEntries(Object.entries(value).filter(([key]) => !keys.has(key)));
-    onlyAddsInvites = (before, after) => {
-      const prior = before === void 0 ? [] : before;
-      const next = after === void 0 ? [] : after;
-      if (!Array.isArray(prior) || !Array.isArray(next)) return false;
-      const unique2 = (rows) => rows.every((row) => record2(row) && typeof row.tokenHash === "string") && new Set(rows.map((row) => row.tokenHash)).size === rows.length;
-      if (!unique2(prior) || !unique2(next)) return false;
-      const byHash = new Map(next.map((row) => [row.tokenHash, row]));
-      return prior.every((row) => byHash.has(row.tokenHash) && same(row, byHash.get(row.tokenHash)));
-    };
-    authorityView = (config, additiveInvites) => {
-      const result = without(config, CONTENT_FIELDS);
-      if (record2(result.interviewMode)) {
-        result.interviewMode = without(result.interviewMode, INTERVIEW_CONTENT_FIELDS);
-        if (!Object.keys(result.interviewMode).length) delete result.interviewMode;
-      }
-      if (record2(result.agentHttp) && additiveInvites) {
-        result.agentHttp = without(result.agentHttp, /* @__PURE__ */ new Set(["invites"]));
-        if (!Object.keys(result.agentHttp).length) delete result.agentHttp;
-      }
-      return result;
-    };
-    sessionConfigRequiresReauthorization = (before, after) => {
-      const additiveInvites = onlyAddsInvites(before?.agentHttp?.invites, after?.agentHttp?.invites);
-      return !same(authorityView(before, additiveInvites), authorityView(after, additiveInvites));
-    };
-  }
-});
-
 // shared/interviewSettings.mjs
-var DEFAULT_INTERVIEW_SETTINGS, MAX_HIDDEN_DRAFT_SHARE, MAX_FIDELITY_MINIMUM_PEOPLE, normalizeInterviewSettings, validInterviewSettings, hasInterviewQuestionGrowth;
+var GROUP_SUGGESTION_DATA, GROUP_SUGGESTION_NEVER, GROUP_SUGGESTION_DATA_KINDS, DEFAULT_INTERVIEW_SETTINGS, MAX_HIDDEN_DRAFT_SHARE, MAX_FIDELITY_MINIMUM_PEOPLE, normalizeInterviewSettings, validInterviewSettings, hasInterviewQuestionGrowth;
 var init_interviewSettings = __esm({
   "shared/interviewSettings.mjs"() {
+    GROUP_SUGGESTION_DATA = Object.freeze({
+      country: "the country they live in",
+      town: "where in their country they live (region, town, city or neighbourhood)",
+      work: "their work, studies and roles",
+      interests: "their interests, causes and communities"
+    });
+    GROUP_SUGGESTION_NEVER = "their health, disability, religion, ethnicity, sexuality, gender identity, age, family life, or party or union membership";
+    GROUP_SUGGESTION_DATA_KINDS = Object.keys(GROUP_SUGGESTION_DATA);
     DEFAULT_INTERVIEW_SETTINGS = Object.freeze({
       openingMode: "auto",
       openingPrompt: "",
@@ -30173,11 +30190,13 @@ var init_interviewSettings = __esm({
       followNewQuestions: false,
       suggestQuestions: false,
       allowManualRefresh: true,
-      shareDraftChangesByDefault: false,
+      shareDraftChangesByDefault: true,
       researchDetail: "minimal",
       hiddenDraftShare: 0,
       showFidelityScore: false,
       suggestGroups: false,
+      joinMatchingGroups: false,
+      groupSuggestionData: Object.freeze(["country", "work", "interests"]),
       showFidelityResults: false,
       fidelityMinimumPeople: 5
     });
@@ -30194,15 +30213,24 @@ var init_interviewSettings = __esm({
         followNewQuestions: source.followNewQuestions === true,
         suggestQuestions: source.suggestQuestions === true,
         allowManualRefresh: source.allowManualRefresh !== false,
-        shareDraftChangesByDefault: source.shareDraftChangesByDefault === true,
+        // Research sharing starts ticked unless the session turns it off; each person can untick it.
+        shareDraftChangesByDefault: typeof source.shareDraftChangesByDefault === "boolean" ? source.shareDraftChangesByDefault : DEFAULT_INTERVIEW_SETTINGS.shareDraftChangesByDefault,
         // How much an AI draft comparison saves: 'minimal' keeps no AI notes or drafted text.
         researchDetail: source.researchDetail === "full" ? "full" : "minimal",
         // Share of a person's AI prefill drafts hidden until they answer, which measures anchoring.
         hiddenDraftShare: Number.isFinite(source.hiddenDraftShare) ? Math.max(0, Math.min(MAX_HIDDEN_DRAFT_SHARE, source.hiddenDraftShare)) : 0,
         // After submitting, show the person how well their AI predicted them (private, in the browser).
         showFidelityScore: source.showFidelityScore === true,
-        // After an interview or AI prefill, suggest the session's open groups that fit the answers.
+        // No longer read: group matching follows joinMatchingGroups. Still accepted, so configs that carry it save.
         suggestGroups: source.suggestGroups === true,
+        // After an interview or AI prefill, suggest open groups that fit the person; the ones
+        // they tick join when they submit. Off, nothing is matched.
+        joinMatchingGroups: source.joinMatchingGroups === true,
+        // What an AI may base those suggestions on: known kinds in a fixed order. Unset takes the
+        // default; anything else that isn't a list allows nothing, so a bad value never widens it.
+        groupSuggestionData: source.groupSuggestionData === void 0 ? [...DEFAULT_INTERVIEW_SETTINGS.groupSuggestionData] : GROUP_SUGGESTION_DATA_KINDS.filter(
+          (kind) => Array.isArray(source.groupSuggestionData) && source.groupSuggestionData.includes(kind)
+        ),
         // Add "How well AIs predicted people" to Results, scoring everyone's AI-prefill drafts together.
         showFidelityResults: source.showFidelityResults === true,
         // That section hides figures from fewer people than this; 1 shows all.
@@ -30221,6 +30249,8 @@ var init_interviewSettings = __esm({
       if (value.researchDetail !== void 0 && !["minimal", "full"].includes(value.researchDetail)) return false;
       if (value.hiddenDraftShare !== void 0 && (!Number.isFinite(value.hiddenDraftShare) || value.hiddenDraftShare < 0 || value.hiddenDraftShare > MAX_HIDDEN_DRAFT_SHARE))
         return false;
+      if (value.groupSuggestionData !== void 0 && (!Array.isArray(value.groupSuggestionData) || new Set(value.groupSuggestionData).size !== value.groupSuggestionData.length || value.groupSuggestionData.some((kind) => !GROUP_SUGGESTION_DATA_KINDS.includes(kind))))
+        return false;
       if (value.fidelityMinimumPeople !== void 0 && (!Number.isInteger(value.fidelityMinimumPeople) || value.fidelityMinimumPeople < 1 || value.fidelityMinimumPeople > MAX_FIDELITY_MINIMUM_PEOPLE))
         return false;
       return [
@@ -30231,6 +30261,7 @@ var init_interviewSettings = __esm({
         "shareDraftChangesByDefault",
         "showFidelityScore",
         "suggestGroups",
+        "joinMatchingGroups",
         "showFidelityResults"
       ].every(
         (key) => value[key] === void 0 || typeof value[key] === "boolean"
@@ -30696,6 +30727,13 @@ var init_sessionConfigMutation = __esm({
             error: `resultsAdminAddresses must list at most ${MAX_RESULTS_ADMINS} different addresses.`
           };
         }
+        if (hasOwn4(incomingConfig, "agentInstructions") && !validAgentInstructions(incomingConfig.agentInstructions)) {
+          return {
+            ok: false,
+            status: 400,
+            error: `agentInstructions must be text of at most ${MAX_AGENT_INSTRUCTIONS_CHARS} characters.`
+          };
+        }
         if (hasOwn4(incomingConfig, "sessionContext")) {
           const context = validateSessionContext(incomingConfig.sessionContext);
           if (!context.ok) return { ok: false, status: 400, error: `Invalid session context: ${context.errors[0].message}` };
@@ -30823,7 +30861,7 @@ var init_sessionConfigMutation = __esm({
 });
 
 // workers/sessionCorsWorker/workerGroups.js
-var trim2, isObj7, WORKER_GROUP_JOIN_MODES, WORKER_GROUP_MEMBER_VISIBILITY, DEFAULT_WORKER_GROUP_MAX_GROUPS_PER_SESSION, DEFAULT_WORKER_GROUP_MAX_MEMBERS_PER_GROUP, MAX_WORKER_GROUP_IMAGE_URL_LENGTH, MAX_WORKER_GROUP_DOCUMENT_URLS, MAX_WORKER_GROUP_TAGS, MAX_WORKER_GROUP_TAG_LENGTH, MAX_WORKER_GROUP_MEMBER_LIMIT, MAX_WORKER_GROUP_ID_LENGTH, MAX_WORKER_GROUP_SESSION_SLUG_LENGTH, DEFAULT_WORKER_GROUP_MEMBER_PAGE_SIZE, MAX_WORKER_GROUP_MEMBER_PAGE_SIZE, WORKER_GROUPS_FRESH_BOOTSTRAP_SENTINEL, IMPLEMENTED_JOIN_MODES, normalizeWorkerGroupId, isAddressShapedWorkerGroupId, encodedPrincipalKeyPart, canonicalSessionIdKeyPart, canonicalWorkerGroupSessionSlug, nowIso, parsePositiveInt, resolveWorkerGroupMemberPageRequest, WORKER_GROUP_MEMBER_CURSOR_PREFIX, decodeWorkerGroupMemberCursor, encodeWorkerGroupMemberCursor, resolveWorkerGroupCaps, resolveWorkerGroupsKv, resolveWorkerGroupStore, workerGroupIdentityKeyPrefix, workerGroupBackupPrefixes, workerGroupRecordMatchesIdentity, groupKey, groupPrefix, groupIndexKey, groupIndexPrefix, memberKey, memberIndexKey, memberPrefix, principalPrefix, legacyGroupKey, legacyGroupPrefix, legacyGroupIndexKey, legacyGroupIndexPrefix, jsonResponse, normalizeJoinMode, normalizeMemberVisibility, normalizeImageUrl, normalizeGroupTags, normalizeGroupDocumentUrls, normalizeGroupMemberLimit, normalizeGroupJoinEndsAt, normalizeEvmAddress, normalizePrincipalId, principalKeyFor, normalizeWorkerGroupPrincipal, resolveWorkerGroupPrincipal, createWorkerGroupId, normalizeGroupPatch, kvGetJsonStrict, kvGetLegacyJson, resolveWorkerGroupBootstrap, kvListKeys, kvListKeyPage, readGroupRecord, writeGroupRecord, listGroupRecords, scanWorkerGroupRecordsForIdentity, writeMembershipRecord, canonicalizeMembershipRecord, readMembershipRecord, listMembershipRecords, listMembershipRecordPage, redactGroupForMember, normalizeWorkerGroupMembershipFailure, createWorkerGroup, updateWorkerGroup, deleteWorkerGroup, addWorkerGroupMember, removeWorkerGroupMember, listWorkerGroups, listWorkerGroupMembers, redactWorkerGroupMemberForViewer, listWorkerGroupMembersForPrincipal, listWorkerGroupMemberships, executeWorkerGroupMutation, workerGroupCoordinationUnavailable, callWorkerGroupCoordinator, coordinateWorkerGroupBackup, checkCoordinatedWorkerGroupReady, reconcileCoordinatedWorkerGroupCapacity, readCoordinatedWorkerGroupCatalog, readCoordinatedWorkerGroupMemberships, isWorkerGroupMember, forwardWorkerGroupMutation, executeCoordinatedWorkerGroupMutation, parseRouteBody, routeError, resolveWorkerGroupSessionIdentity, participantGroupCreationAllowed, dispatchPublicWorkerGroupListRequest, dispatchAdminWorkerGroupRequest, workerGroupsRoute;
+var trim2, isObj7, WORKER_GROUP_JOIN_MODES, WORKER_GROUP_MEMBER_VISIBILITY, WORKER_GROUP_REMOVAL_AUTH, DEFAULT_WORKER_GROUP_MAX_GROUPS_PER_SESSION, DEFAULT_WORKER_GROUP_MAX_MEMBERS_PER_GROUP, MAX_WORKER_GROUP_IMAGE_URL_LENGTH, MAX_WORKER_GROUP_DOCUMENT_URLS, MAX_WORKER_GROUP_TAGS, MAX_WORKER_GROUP_TAG_LENGTH, MAX_WORKER_GROUP_MEMBER_LIMIT, MAX_WORKER_GROUP_ID_LENGTH, MAX_WORKER_GROUP_SESSION_SLUG_LENGTH, DEFAULT_WORKER_GROUP_MEMBER_PAGE_SIZE, MAX_WORKER_GROUP_MEMBER_PAGE_SIZE, WORKER_GROUPS_FRESH_BOOTSTRAP_SENTINEL, IMPLEMENTED_JOIN_MODES, normalizeWorkerGroupId, isAddressShapedWorkerGroupId, encodedPrincipalKeyPart, canonicalSessionIdKeyPart, canonicalWorkerGroupSessionSlug, nowIso, parsePositiveInt, resolveWorkerGroupMemberPageRequest, WORKER_GROUP_MEMBER_CURSOR_PREFIX, decodeWorkerGroupMemberCursor, encodeWorkerGroupMemberCursor, resolveWorkerGroupCaps, resolveWorkerGroupsKv, resolveWorkerGroupStore, workerGroupIdentityKeyPrefix, workerGroupBackupPrefixes, workerGroupRecordMatchesIdentity, groupKey, groupPrefix, groupIndexKey, groupIndexPrefix, memberKey, memberIndexKey, memberPrefix, principalPrefix, legacyGroupKey, legacyGroupPrefix, legacyGroupIndexKey, legacyGroupIndexPrefix, jsonResponse, normalizeJoinMode, normalizeMemberVisibility, normalizeRemovalAuth, REMOVERS_BY_REMOVAL_AUTH, workerGroupRemovalRefusal, normalizeImageUrl, normalizeGroupTags, normalizeGroupDocumentUrls, normalizeGroupMemberLimit, normalizeGroupJoinEndsAt, normalizeEvmAddress, normalizePrincipalId, principalKeyFor, normalizeWorkerGroupPrincipal, resolveWorkerGroupPrincipal, createWorkerGroupId, normalizeGroupPatch, kvGetJsonStrict, kvGetLegacyJson, resolveWorkerGroupBootstrap, kvListKeys, kvListKeyPage, readGroupRecord, writeGroupRecord, listGroupRecords, scanWorkerGroupRecordsForIdentity, writeMembershipRecord, canonicalizeMembershipRecord, readMembershipRecord, listMembershipRecords, listMembershipRecordPage, redactGroupForMember, normalizeWorkerGroupMembershipFailure, createWorkerGroup, updateWorkerGroup, deleteWorkerGroup, addWorkerGroupMember, removeWorkerGroupMember, listWorkerGroups, listWorkerGroupMembers, redactWorkerGroupMemberForViewer, listWorkerGroupMembersForPrincipal, listWorkerGroupMemberships, executeWorkerGroupMutation, workerGroupCoordinationUnavailable, callWorkerGroupCoordinator, coordinateWorkerGroupBackup, checkCoordinatedWorkerGroupReady, reconcileCoordinatedWorkerGroupCapacity, readCoordinatedWorkerGroupCatalog, readCoordinatedWorkerGroupMemberships, isWorkerGroupMember, forwardWorkerGroupMutation, executeCoordinatedWorkerGroupMutation, parseRouteBody, routeError, resolveWorkerGroupSessionIdentity, participantGroupCreationAllowed, isSelfJoinableWorkerGroup, listWorkerGroupsForVisitor, listSelfJoinableWorkerGroupsForVisitor, listSelfJoinableWorkerGroupsForMember, dispatchPublicWorkerGroupListRequest, dispatchAdminWorkerGroupRequest, workerGroupsRoute;
 var init_workerGroups = __esm({
   "workers/sessionCorsWorker/workerGroups.js"() {
     init_sessionConfigAuthority();
@@ -30844,6 +30882,12 @@ var init_workerGroups = __esm({
       ADMIN_ONLY: "admin_only",
       MEMBERS: "members",
       SESSION: "session"
+    });
+    WORKER_GROUP_REMOVAL_AUTH = Object.freeze({
+      BOTH: "both",
+      ADMIN_ONLY: "admin_only",
+      MEMBER_ONLY: "member_only",
+      NEITHER: "neither"
     });
     DEFAULT_WORKER_GROUP_MAX_GROUPS_PER_SESSION = 100;
     DEFAULT_WORKER_GROUP_MAX_MEMBERS_PER_GROUP = 1e3;
@@ -30966,6 +31010,21 @@ var init_workerGroups = __esm({
       const visibility = trim2(value || WORKER_GROUP_MEMBER_VISIBILITY.ADMIN_ONLY).toLowerCase();
       if (Object.values(WORKER_GROUP_MEMBER_VISIBILITY).includes(visibility)) return visibility;
       return "";
+    };
+    normalizeRemovalAuth = (value) => {
+      const auth = trim2(value || WORKER_GROUP_REMOVAL_AUTH.BOTH).toLowerCase();
+      if (Object.values(WORKER_GROUP_REMOVAL_AUTH).includes(auth)) return auth;
+      return "";
+    };
+    REMOVERS_BY_REMOVAL_AUTH = Object.freeze({
+      [WORKER_GROUP_REMOVAL_AUTH.BOTH]: ["admin", "member"],
+      [WORKER_GROUP_REMOVAL_AUTH.ADMIN_ONLY]: ["admin"],
+      [WORKER_GROUP_REMOVAL_AUTH.MEMBER_ONLY]: ["member"],
+      [WORKER_GROUP_REMOVAL_AUTH.NEITHER]: []
+    });
+    workerGroupRemovalRefusal = (removalAuth, remover) => {
+      if ((REMOVERS_BY_REMOVAL_AUTH[normalizeRemovalAuth(removalAuth)] || []).includes(remover)) return "";
+      return remover === "member" ? "worker_group_leave_denied" : "worker_group_removal_denied";
     };
     normalizeImageUrl = (value) => {
       const raw = trim2(value);
@@ -31117,6 +31176,8 @@ var init_workerGroups = __esm({
       }
       const memberVisibility = normalizeMemberVisibility(input.memberVisibility || existing?.memberVisibility);
       if (!memberVisibility) return { ok: false, status: 400, reason: "invalid_member_visibility" };
+      const removalAuth = normalizeRemovalAuth(input.removalAuth || existing?.removalAuth);
+      if (!removalAuth) return { ok: false, status: 400, reason: "invalid_removal_auth" };
       const label = trim2(input.label || existing?.label);
       if (!label || label.length > 120) return { ok: false, status: 400, reason: "invalid_group_label" };
       const description = trim2(input.description ?? existing?.description);
@@ -31152,6 +31213,7 @@ var init_workerGroups = __esm({
           adminAddress: adminAddress || void 0,
           joinMode,
           memberVisibility,
+          removalAuth,
           updatedAt,
           ...existing ? {} : {
             createdBy: actorPrincipal,
@@ -31596,6 +31658,7 @@ var init_workerGroups = __esm({
       ...group.adminAddress ? { adminAddress: group.adminAddress } : {},
       joinMode: group.joinMode,
       memberVisibility: group.memberVisibility,
+      removalAuth: normalizeRemovalAuth(group.removalAuth),
       createdAt: group.createdAt,
       updatedAt: group.updatedAt
     });
@@ -31759,7 +31822,7 @@ var init_workerGroups = __esm({
         created: !existing
       };
     };
-    removeWorkerGroupMember = async ({ env, slug, sessionId, groupId, principal, actorPrincipal, resume = false, deps = {} } = {}) => {
+    removeWorkerGroupMember = async ({ env, slug, sessionId, groupId, principal, actorPrincipal, remover, resume = false, deps = {} } = {}) => {
       const store = resolveWorkerGroupStore(env);
       if (!store) return { ok: false, status: 501, reason: "worker_group_store_not_configured" };
       const group = await readGroupRecord({ store, slug, sessionId, groupId });
@@ -31775,6 +31838,8 @@ var init_workerGroups = __esm({
       });
       const removed = resume && !!existing?.removedAt;
       if (!removed && (!existing || existing.removedAt)) return { ok: false, status: 404, reason: "worker_group_member_not_found" };
+      const refusal = resume ? "" : workerGroupRemovalRefusal(group.removalAuth, remover);
+      if (refusal) return { ok: false, status: 403, reason: refusal };
       if (!removed) {
         const removedAt = nowIso(deps);
         const member = { ...existing, removedAt, removedBy: actorPrincipal };
@@ -32044,6 +32109,7 @@ var init_workerGroups = __esm({
       groupId,
       principal,
       actorPrincipal,
+      remover,
       capacityAuthorized = false,
       resume = false,
       deps = {}
@@ -32087,6 +32153,7 @@ var init_workerGroups = __esm({
           groupId,
           principal,
           actorPrincipal,
+          remover,
           capacityAuthorized,
           resume,
           deps
@@ -32219,7 +32286,8 @@ var init_workerGroups = __esm({
       input,
       groupId,
       principal,
-      actorPrincipal
+      actorPrincipal,
+      remover
     } = {}) => {
       return callWorkerGroupCoordinator({
         env,
@@ -32231,7 +32299,8 @@ var init_workerGroups = __esm({
           input,
           groupId,
           principal,
-          actorPrincipal
+          actorPrincipal,
+          remover
         }
       });
     };
@@ -32277,43 +32346,22 @@ var init_workerGroups = __esm({
       return { ok: true, sessionSlug, sessionId };
     };
     participantGroupCreationAllowed = (config) => config?.groupCreationPolicy === "participants";
-    dispatchPublicWorkerGroupListRequest = async ({ request, config, env, slug, baseHeaders, deps = {} } = {}) => {
+    isSelfJoinableWorkerGroup = (group, nowMs) => {
+      const joinEndsAt = Date.parse(trim2(group?.joinEndsAt));
+      return group?.joinMode === WORKER_GROUP_JOIN_MODES.OPEN && group?.memberVisibility === WORKER_GROUP_MEMBER_VISIBILITY.SESSION && !(Number.isFinite(joinEndsAt) && joinEndsAt <= nowMs);
+    };
+    listWorkerGroupsForVisitor = async ({ env, config, slug, inviteGroupId, deps = {} } = {}) => {
       const sessionIdentity = resolveWorkerGroupSessionIdentity({ config, slug });
-      if (!sessionIdentity.ok) return routeError(deps, sessionIdentity, baseHeaders);
-      if (!workerConfigAllowsAnonymousGroupDiscovery(config)) {
-        return routeError(
-          deps,
-          {
-            status: 403,
-            reason: "worker_group_discovery_not_public"
-          },
-          baseHeaders
-        );
-      }
-      let requestedSessionId = "";
-      try {
-        requestedSessionId = resolveCanonicalWorkerSessionIdHex({
-          sessionId: new URL(request?.url || "").searchParams.get("sessionId")
-        });
-      } catch {
-        requestedSessionId = "";
-      }
-      if (requestedSessionId !== sessionIdentity.sessionId) {
-        return routeError(
-          deps,
-          {
-            status: 409,
-            reason: "worker_group_session_identity_mismatch"
-          },
-          baseHeaders
-        );
-      }
+      if (!sessionIdentity.ok) return sessionIdentity;
+      const publicDiscovery = workerConfigAllowsAnonymousGroupDiscovery(config);
+      const invite = publicDiscovery ? "" : normalizeWorkerGroupId(inviteGroupId);
+      if (!publicDiscovery && !invite) return { ok: false, status: 403, reason: "worker_group_discovery_not_public" };
       const ready = await (deps?.checkCoordinatedWorkerGroupReady || checkCoordinatedWorkerGroupReady)({
         env,
         slug,
         sessionId: sessionIdentity.sessionId
       });
-      if (!ready.ok) return routeError(deps, ready, baseHeaders);
+      if (!ready.ok) return ready;
       let result;
       try {
         result = await (deps?.listWorkerGroups || listWorkerGroups)({
@@ -32331,6 +32379,92 @@ var init_workerGroups = __esm({
           reason: "worker_group_projection_unavailable"
         };
       }
+      if (!result.ok) return result;
+      const nowMs = Number(deps.now?.() || Date.now());
+      if (!invite) return { ok: true, sessionIdentity, store: result.store, groups: result.groups };
+      if (!result.groups.some((group) => group.groupId === invite && isSelfJoinableWorkerGroup(group, nowMs))) {
+        return { ok: false, status: 403, reason: "worker_group_discovery_not_public" };
+      }
+      const groups = result.groups.map(({ adminAddress: _adminAddress, ...group }) => group);
+      return { ok: true, sessionIdentity, store: result.store, groups };
+    };
+    listSelfJoinableWorkerGroupsForVisitor = async (args = {}) => {
+      try {
+        const result = await listWorkerGroupsForVisitor(args);
+        const nowMs = Number(args.deps?.now?.() || Date.now());
+        return result.ok ? result.groups.filter((group) => isSelfJoinableWorkerGroup(group, nowMs)) : [];
+      } catch {
+        return [];
+      }
+    };
+    listSelfJoinableWorkerGroupsForMember = async ({ env, config, slug, address: address2, deps = {} } = {}) => {
+      try {
+        const sessionIdentity = resolveWorkerGroupSessionIdentity({ config, slug });
+        const actor = resolveWorkerGroupPrincipal({ requesterAddress: address2, deps });
+        if (!sessionIdentity.ok || !actor.ok) return [];
+        const { sessionId } = sessionIdentity;
+        const ready = await (deps?.checkCoordinatedWorkerGroupReady || checkCoordinatedWorkerGroupReady)({ env, slug, sessionId });
+        if (!ready.ok) return [];
+        const listed = await (deps?.listWorkerGroups || listWorkerGroups)({
+          env,
+          slug,
+          sessionId,
+          actorPrincipalResult: actor,
+          admin: false,
+          includeMemberCount: true,
+          expectedGroupCount: ready.meta?.groupCount
+        });
+        const joined = await (deps?.listWorkerGroupMemberships || listWorkerGroupMemberships)({
+          env,
+          slug,
+          sessionId,
+          principal: actor.principal,
+          deps
+        });
+        if (!listed.ok || !joined.ok) return [];
+        const joinedIds = new Set(joined.memberships.map((membership) => normalizeWorkerGroupId(membership?.group?.groupId)));
+        const nowMs = Number(deps.now?.() || Date.now());
+        return listed.groups.filter((group) => {
+          const full = Number.isSafeInteger(group.memberLimit) && group.memberLimit > 0 && group.memberCount >= group.memberLimit;
+          return isSelfJoinableWorkerGroup(group, nowMs) && !joinedIds.has(group.groupId) && !full;
+        });
+      } catch {
+        return [];
+      }
+    };
+    dispatchPublicWorkerGroupListRequest = async ({ request, config, env, slug, baseHeaders, deps = {} } = {}) => {
+      const sessionIdentity = resolveWorkerGroupSessionIdentity({ config, slug });
+      if (!sessionIdentity.ok) return routeError(deps, sessionIdentity, baseHeaders);
+      let params = new URLSearchParams();
+      try {
+        params = new URL(request?.url || "").searchParams;
+      } catch {
+        params = new URLSearchParams();
+      }
+      const inviteGroupIds = params.getAll("joinGroup");
+      const inviteGroupId = inviteGroupIds.length === 1 ? normalizeWorkerGroupId(inviteGroupIds[0]) : "";
+      if (!inviteGroupId && !workerConfigAllowsAnonymousGroupDiscovery(config)) {
+        return routeError(
+          deps,
+          {
+            status: 403,
+            reason: "worker_group_discovery_not_public"
+          },
+          baseHeaders
+        );
+      }
+      const requestedSessionId = resolveCanonicalWorkerSessionIdHex({ sessionId: params.get("sessionId") });
+      if (requestedSessionId !== sessionIdentity.sessionId) {
+        return routeError(
+          deps,
+          {
+            status: 409,
+            reason: "worker_group_session_identity_mismatch"
+          },
+          baseHeaders
+        );
+      }
+      const result = await listWorkerGroupsForVisitor({ env, config, slug, inviteGroupId, deps });
       if (!result.ok) return routeError(deps, result, baseHeaders);
       return jsonResponse(deps, { ok: true, ...sessionIdentity, store: result.store, groups: result.groups }, 200, baseHeaders);
     };
@@ -32461,7 +32595,8 @@ var init_workerGroups = __esm({
           operation: "remove-member",
           groupId: body?.groupId,
           principal: body?.principal || body?.member,
-          actorPrincipal: actor.principal
+          actorPrincipal: actor.principal,
+          remover: "admin"
         });
         if (!result.ok) return routeError(deps, result, headers2);
         return jsonResponse(
@@ -32726,7 +32861,8 @@ var init_workerGroups = __esm({
             joinEndsAt: routeBody?.group?.joinEndsAt,
             adminAddress: actor.principal?.address,
             joinMode: WORKER_GROUP_JOIN_MODES.OPEN,
-            memberVisibility: WORKER_GROUP_MEMBER_VISIBILITY.SESSION
+            memberVisibility: WORKER_GROUP_MEMBER_VISIBILITY.SESSION,
+            removalAuth: routeBody?.group?.removalAuth
           },
           actorPrincipal: actor.principal
         });
@@ -32775,7 +32911,8 @@ var init_workerGroups = __esm({
           // A participant may only remove the principal authenticated by this
           // request. Never accept a caller-supplied principal on this route.
           principal: actor.principal,
-          actorPrincipal: actor.principal
+          actorPrincipal: actor.principal,
+          remover: "member"
         });
         if (!result.ok) return routeError(deps, result, baseHeaders);
         if (!Number.isSafeInteger(result.memberCount) || result.memberCount < 0) {
@@ -79402,6 +79539,7 @@ ${expiry}`);
       "invalid_join_mode",
       "join_mode_not_implemented",
       "invalid_member_visibility",
+      "invalid_removal_auth",
       "invalid_group_label",
       "invalid_group_description",
       "invalid_group_image_url",
@@ -79423,6 +79561,7 @@ ${expiry}`);
       "joinEndsAt",
       "joinMode",
       "memberVisibility",
+      "removalAuth",
       "adminAddress"
     ]);
     WORKER_GROUP_INTENT_MAX_BYTES = 32 * 1024;
@@ -79475,6 +79614,11 @@ ${expiry}`);
         if (!principal.ok) return null;
         normalized.principal = principal.principal;
         normalized.principalKey = principal.key;
+      }
+      if (operation === "remove-member") {
+        const remover = toTrimmedString10(payload?.remover).toLowerCase();
+        if (remover !== "admin" && remover !== "member") return null;
+        normalized.remover = remover;
       }
       return normalized;
     };
@@ -80357,6 +80501,7 @@ ${expiry}`);
             active: true,
             joinMode: toTrimmedString10(group?.joinMode).toLowerCase() || "admin_add",
             memberVisibility: toTrimmedString10(group?.memberVisibility).toLowerCase() || "admin_only",
+            removalAuth: toTrimmedString10(group?.removalAuth).toLowerCase() || "both",
             memberLimit: normalizePositiveSafeInteger(group?.memberLimit),
             joinEndsAt: toTrimmedString10(group?.joinEndsAt)
           });
@@ -80398,6 +80543,7 @@ ${expiry}`);
             active: true,
             joinMode: toTrimmedString10(group?.joinMode).toLowerCase() || "admin_add",
             memberVisibility: toTrimmedString10(group?.memberVisibility).toLowerCase() || "admin_only",
+            removalAuth: toTrimmedString10(group?.removalAuth).toLowerCase() || "both",
             memberLimit: normalizePositiveSafeInteger(group?.memberLimit),
             joinEndsAt: toTrimmedString10(group?.joinEndsAt)
           });
@@ -80507,7 +80653,7 @@ ${expiry}`);
           }
         });
       }
-      async beginWorkerGroupMemberRemoval({ groupId, principalDigest, intent }) {
+      async beginWorkerGroupMemberRemoval({ groupId, principalDigest, remover, intent }) {
         return this.state.storage.transaction(async (transaction) => {
           const groupKey2 = workerGroupCapacityGroupKey(groupId);
           const groupState = await transaction.get(groupKey2);
@@ -80528,6 +80674,8 @@ ${expiry}`);
               reason: memberState?.state === "reserved" || memberState?.state === "removing" ? "worker_group_membership_state_pending" : "worker_group_member_not_found"
             };
           }
+          const refusal = workerGroupRemovalRefusal(groupState.removalAuth, remover);
+          if (refusal) return { ok: false, status: 403, reason: refusal };
           await transaction.put(memberKey2, {
             version: 2,
             state: "removing",
@@ -81015,6 +81163,7 @@ ${expiry}`);
             removalReservation = await this.beginWorkerGroupMemberRemoval({
               groupId: mutation.groupId,
               principalDigest,
+              remover: mutation.remover,
               intent
             });
             if (!removalReservation.ok) {
@@ -83853,7 +84002,7 @@ var require_ar = __commonJS({
           return new instance(value);
         };
       }
-      winstonToAr(winstonString, { formatted = false, decimals = 12, trim: trim22 = true } = {}) {
+      winstonToAr(winstonString, { formatted = false, decimals = 12, trim: trim23 = true } = {}) {
         let number2 = this.stringToBigNum(winstonString, decimals).shiftedBy(-12);
         return formatted ? number2.toFormat(decimals) : number2.toFixed(decimals);
       }
@@ -101951,7 +102100,7 @@ var RPC_CHUNK_SIZE = 1e5;
 var MAX_LOG_CHUNKS = MAX_SCAN_BLOCKS / RPC_CHUNK_SIZE;
 var MAX_POINTER_READS = 200;
 var MAX_CANDIDATES = 2e3;
-var catalog = (questions = [], incomplete = false) => ({ questions, incomplete });
+var catalog = (questions = [], incomplete = false, refused = false) => ({ questions, incomplete, refused });
 var retryableReadStatus = (status) => !status || status === 408 || status === 429 || status >= 500;
 var trim18 = (value) => String(value == null ? "" : value).trim();
 var lower8 = (value) => trim18(value).toLowerCase();
@@ -101975,11 +102124,14 @@ var listQuestionRows = async (callStorage) => {
   const seenCursors = /* @__PURE__ */ new Set();
   let cursor = "";
   let complete = false;
+  let refused = false;
   for (let page = 0; page < MAX_CLOUDFLARE_LIST_PAGES; page += 1) {
     const query = new URLSearchParams({ resource: "questions", limit: String(MAX_QUESTIONS), ...cursor ? { cursor } : {} });
     let listing;
     try {
-      listing = await readJsonResponse(await callStorage("/storage/list", query.toString()));
+      const response2 = await callStorage("/storage/list", query.toString());
+      if (!page) refused = [401, 403].includes(Number(response2?.status));
+      listing = await readJsonResponse(response2);
     } catch {
       break;
     }
@@ -101993,9 +102145,9 @@ var listQuestionRows = async (callStorage) => {
     if (!cursor || seenCursors.has(cursor)) break;
     seenCursors.add(cursor);
   }
-  return { items, incomplete: !complete };
+  return { items, incomplete: !complete, refused };
 };
-var loadCloudflareQuestions = async ({ env, config, slug, storageRoute: storageRoute2 }) => {
+var loadCloudflareQuestions = async ({ env, config, slug, storageRoute: storageRoute2, reader }) => {
   if (typeof storageRoute2 !== "function") return catalog();
   const origin = "https://session-worker.invalid";
   const callStorage = (path, query) => storageRoute2({
@@ -102005,7 +102157,8 @@ var loadCloudflareQuestions = async ({ env, config, slug, storageRoute: storageR
     env,
     config,
     slug,
-    uploaderAddress: "",
+    uploaderAddress: reader?.address || "",
+    ...reader ? { authScopes: reader.scopes } : {},
     baseHeaders: {}
   });
   const listing = await listQuestionRows(callStorage);
@@ -102052,7 +102205,11 @@ var loadCloudflareQuestions = async ({ env, config, slug, storageRoute: storageR
     const payload = version2.payload || await readPayload(version2.storageRefId);
     if (payloadQuestionId(payload) === version2.resourceId && normalizeQuestion(payload)) questions.push(payload);
   }
-  return catalog(dedupeQuestions(questions), incomplete || legacyVersions.length > legacyReads.length || candidates.length > chosen.length);
+  return catalog(
+    dedupeQuestions(questions),
+    incomplete || legacyVersions.length > legacyReads.length || candidates.length > chosen.length,
+    listing.refused
+  );
 };
 var pickContractAddress = (config = {}) => {
   const contracts = isObj24(config.contracts) ? config.contracts : {};
@@ -102222,12 +102379,17 @@ var loadPublicInterviewQuestions = async ({
   config = {},
   slug = "",
   storageRoute: storageRoute2,
-  fetch: fetchImpl = globalThis.fetch
+  fetch: fetchImpl = globalThis.fetch,
+  reader
 } = {}) => {
-  const cloudflareQuestions = await loadCloudflareQuestions({ env, config, slug, storageRoute: storageRoute2 });
+  const cloudflareQuestions = await loadCloudflareQuestions({ env, config, slug, storageRoute: storageRoute2, reader });
   if (cloudflareQuestions.questions.length) return cloudflareQuestions;
   const onChain = await loadOnChainQuestions({ config, slug, fetchImpl });
-  return catalog(onChain.questions, cloudflareQuestions.incomplete || onChain.incomplete);
+  return catalog(
+    onChain.questions,
+    cloudflareQuestions.incomplete || onChain.incomplete,
+    cloudflareQuestions.refused && !onChain.questions.length
+  );
 };
 
 // workers/sessionCorsWorker/interviewStarter.js
@@ -105551,25 +105713,14 @@ var protectBootstrapResponse = (response2, baseHeaders) => {
   }
   return { ...response2, headers: headers2 };
 };
-var dispatchSessionConfigBootstrapRequest = async ({
-  request,
-  env,
-  slugHint,
-  baseHeaders,
-  deps,
-  constants
-} = {}) => {
-  const protectedBaseHeaders = buildBootstrapHeaders(baseHeaders);
+var readWorkerSessionConfig = async ({ request, env, slugHint, headers: headers2, deps, constants } = {}) => {
+  const refuse = (error, status) => ({ response: deps?.json?.({ error }, status, headers2) });
   const slugResolution = deps?.resolveRequestSlugWithoutToken?.({ request, env, slugHint }) || {
     ok: false,
     error: "Invalid session slug."
   };
-  if (!slugResolution.ok) {
-    return deps?.json?.({ error: slugResolution.error }, 400, protectedBaseHeaders);
-  }
-  if (!slugResolution.explicitSlugProvided) {
-    return deps?.json?.({ error: constants?.missingSlugError }, 400, protectedBaseHeaders);
-  }
+  if (!slugResolution.ok) return refuse(slugResolution.error, 400);
+  if (!slugResolution.explicitSlugProvided) return refuse(constants?.missingSlugError, 400);
   const slug = slugResolution.slug;
   let querySlugRaw = null;
   try {
@@ -105578,23 +105729,35 @@ var dispatchSessionConfigBootstrapRequest = async ({
   }
   if (querySlugRaw != null) {
     const querySlug = validateInboundWorkerSessionSlug(querySlugRaw);
-    if (!querySlug.ok) {
-      return deps?.json?.({ error: querySlug.error }, 400, protectedBaseHeaders);
-    }
-    if (querySlug.slug !== slug) {
-      return deps?.json?.({ error: "Session config slug query does not match X-Session-Slug." }, 400, protectedBaseHeaders);
-    }
+    if (!querySlug.ok) return refuse(querySlug.error, 400);
+    if (querySlug.slug !== slug) return refuse("Session config slug query does not match X-Session-Slug.", 400);
   }
   const config = await deps?.getSessionConfig?.(env, slug);
-  if (!config || !isWorkerCanonicalSessionConfig(config)) {
-    return deps?.json?.({ error: constants?.sessionConfigNotFoundError }, 404, protectedBaseHeaders);
-  }
+  if (!config || !isWorkerCanonicalSessionConfig(config)) return refuse(constants?.sessionConfigNotFoundError, 404);
   const modeValidation = validateWorkerConfigModeValues(config);
-  if (!modeValidation.ok) {
-    return deps?.json?.({ error: constants?.sessionConfigNotFoundError }, 404, protectedBaseHeaders);
-  }
+  if (!modeValidation.ok) return refuse(constants?.sessionConfigNotFoundError, 404);
   const corsContext = await deps?.getCorsContext?.({ request, config });
-  if (!corsContext?.ok) return protectBootstrapResponse(corsContext?.response, protectedBaseHeaders);
+  if (!corsContext?.ok) return { response: protectBootstrapResponse(corsContext?.response, headers2) };
+  return { slug, config, headers: buildBootstrapHeaders(corsContext.headers) };
+};
+var dispatchSessionConfigBootstrapRequest = async ({
+  request,
+  env,
+  slugHint,
+  baseHeaders,
+  deps,
+  constants
+} = {}) => {
+  const read = await readWorkerSessionConfig({
+    request,
+    env,
+    slugHint,
+    headers: buildBootstrapHeaders(baseHeaders),
+    deps,
+    constants
+  });
+  if ("response" in read) return read.response;
+  const { slug, config } = read;
   return deps?.json?.({
     ok: true,
     sessionSlug: slug,
@@ -105606,13 +105769,129 @@ var dispatchSessionConfigBootstrapRequest = async ({
         version: resolveResponseFieldPolicy(config, { workerAvailable: true }).admin && !!env?.CE_STORAGE_ENVELOPE_KEK && typeof getStorageAuditBinding(env)?.put === "function" ? 1 : 0
       }
     }
-  }, 200, buildBootstrapHeaders(corsContext.headers));
+  }, 200, read.headers);
+};
+var dispatchSessionAgentInstructionsRequest = async ({
+  request,
+  env,
+  slugHint,
+  baseHeaders,
+  deps,
+  constants
+} = {}) => {
+  const read = await readWorkerSessionConfig({
+    request,
+    env,
+    slugHint,
+    headers: buildBootstrapHeaders(baseHeaders),
+    deps,
+    constants
+  });
+  if ("response" in read) return read.response;
+  const { agentInstructions } = projectPublicWorkerSessionConfig(read.config);
+  if (typeof agentInstructions !== "string" || !agentInstructions.trim()) {
+    return deps?.json?.({ error: "This session has no instructions for AI agents." }, 404, read.headers);
+  }
+  const headers2 = new Headers(read.headers);
+  headers2.set("Content-Type", "text/markdown; charset=utf-8");
+  headers2.set("X-Content-Type-Options", "nosniff");
+  headers2.set("Content-Security-Policy", "sandbox; default-src 'none'");
+  return new Response(agentInstructions, { status: 200, headers: headers2 });
 };
 
 // workers/sessionCorsWorker/interviewBriefDispatch.js
 init_sessionConfigAuthority();
-var INTERVIEW_PROMPT_VERSION = "ce-interview-brief-v6";
+
+// workers/sessionCorsWorker/interviewCatalogTicket.js
+init_authTokenClaims();
+init_authorizationScopeFreshness();
+init_sessionConfigMutation();
+init_tokenSigning();
+var INTERVIEW_CATALOG_TICKET_TTL_SECONDS = 60 * 60;
+var TICKET_VERSION = "ic1";
+var TICKET_KEY_LABEL = "interview-catalog-ticket-v1";
+var TICKET_PATTERN = /^ic1\.(0x[0-9a-f]{40})\.([A-Za-z0-9_-]{8,64})\.([1-9][0-9]{0,11})\.([A-Za-z0-9_-]{43})$/;
+var READ_SCOPES = ["storage", "arweave"];
+var REFUSED = Object.freeze({
+  ok: false,
+  status: 401,
+  reason: "catalog_ticket_invalid",
+  error: "This private catalog link has expired or no longer works. Copy the prompt again from the session page."
+});
+var UNAVAILABLE = Object.freeze({
+  ok: false,
+  status: 503,
+  reason: "catalog_ticket_unavailable",
+  error: "Could not check this catalog link. Retry shortly."
+});
 var trim21 = (value) => String(value == null ? "" : value).trim();
+var nowSeconds = (deps) => Math.floor((typeof deps?.now === "function" ? deps.now() : Date.now()) / 1e3);
+var signTicket = async ({ env, config, slug, sub, parent, exp, deps }) => {
+  const key = base64UrlEncode(await signHmac(TICKET_KEY_LABEL, env?.TOKEN_HMAC_SECRET, deps), deps);
+  const fields2 = [
+    TICKET_VERSION,
+    trim21(slug).toLowerCase(),
+    resolveCanonicalWorkerSessionIdHex(config) || "",
+    readAuthorizationEpoch(config),
+    sub,
+    parent,
+    exp
+  ];
+  return base64UrlEncode(await signHmac(fields2.join("\n"), key, deps), deps);
+};
+var issueInterviewCatalogTicket = async ({ env, config, slug, sub, parent, parentExp, deps } = {}) => {
+  const address2 = trim21(sub).toLowerCase();
+  const signIn = trim21(parent);
+  const now = nowSeconds(deps);
+  const exp = Math.min(now + INTERVIEW_CATALOG_TICKET_TTL_SECONDS, Math.floor(Number(parentExp) || 0));
+  if (!/^0x[0-9a-f]{40}$/.test(address2) || !/^[A-Za-z0-9_-]{8,64}$/.test(signIn)) {
+    throw new Error("Catalog tickets need a signed-in person.");
+  }
+  if (exp <= now || readAuthorizationEpoch(config) === null) throw new Error("Catalog tickets need a current sign-in.");
+  const mac = await signTicket({ env, config, slug, sub: address2, parent: signIn, exp, deps });
+  return { ticket: [TICKET_VERSION, address2, signIn, exp, mac].join("."), expiresAt: exp };
+};
+var verifyInterviewCatalogTicket = async ({ env, ticket, config, slug, deps } = {}) => {
+  const match = trim21(ticket).match(TICKET_PATTERN);
+  if (!match || readAuthorizationEpoch(config) === null) return REFUSED;
+  const [, sub, parent, expText, mac] = match;
+  const exp = Number(expText);
+  if (nowSeconds(deps) >= exp) return REFUSED;
+  let expected;
+  try {
+    expected = await signTicket({ env, config, slug, sub, parent, exp, deps });
+  } catch {
+    return UNAVAILABLE;
+  }
+  if (!timingSafeEqual(expected, mac)) return REFUSED;
+  let record4;
+  try {
+    record4 = await (deps?.validateAuthTokenRecord || validateAuthTokenRecord)({
+      env,
+      payload: { sub, jti: parent },
+      slug
+    });
+  } catch {
+    return UNAVAILABLE;
+  }
+  if (!record4?.ok) return REFUSED;
+  let scopes = null;
+  try {
+    scopes = await deps?.computeScopesForLogin?.({ env, slug, address: sub, config, requestedScopes: READ_SCOPES });
+  } catch {
+  }
+  if (scopes?.storage !== true && scopes?.arweave !== true) return REFUSED;
+  return {
+    ok: true,
+    reader: { address: sub, scopes: { storage: scopes.storage === true, arweave: scopes.arweave === true } }
+  };
+};
+
+// workers/sessionCorsWorker/interviewBriefDispatch.js
+init_workerGroups();
+init_interviewSettings();
+var INTERVIEW_PROMPT_VERSION = "ce-interview-brief-v6";
+var trim22 = (value) => String(value == null ? "" : value).trim();
 var isObj26 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
 var isInterviewEnabled = (config = {}) => {
   const interview = isObj26(config.interviewMode || config.interview) ? config.interviewMode || config.interview : {};
@@ -105620,18 +105899,18 @@ var isInterviewEnabled = (config = {}) => {
 };
 var normalizeAllowedOrigins = (raw) => (Array.isArray(raw) ? raw : [raw]).map((entry2) => {
   try {
-    return new URL(trim21(entry2)).origin;
+    return new URL(trim22(entry2)).origin;
   } catch {
     return "";
   }
 }).filter(Boolean);
 var isLocalHttpHostname = (hostname = "") => ["localhost", "127.0.0.1", "[::1]", "::1"].includes(String(hostname));
 var normalizeRecruitmentSource = (value) => {
-  const normalized = trim21(value).replace(/\s+/g, "-").slice(0, 128);
+  const normalized = trim22(value).replace(/\s+/g, "-").slice(0, 128);
   return /^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}$/.test(normalized) ? normalized : "";
 };
 var normalizeJoinGroup = (value) => {
-  const normalized = trim21(value).toLowerCase();
+  const normalized = trim22(value).toLowerCase();
   return /^[a-z0-9][a-z0-9._-]{0,79}$/.test(normalized) ? normalized : "";
 };
 var copySafeReturnParams = (sourceUrl, targetUrl) => {
@@ -105642,7 +105921,7 @@ var copySafeReturnParams = (sourceUrl, targetUrl) => {
 };
 var safeServedWorkerOrigin = (value) => {
   try {
-    const url = new URL(trim21(value));
+    const url = new URL(trim22(value));
     if (url.protocol === "https:" || url.protocol === "http:" && isLocalHttpHostname(url.hostname)) {
       return url.origin;
     }
@@ -105652,10 +105931,10 @@ var safeServedWorkerOrigin = (value) => {
 };
 var safeSessionUrl = (value, { slug = "", allowOrigins } = {}) => {
   try {
-    const url = new URL(trim21(value));
+    const url = new URL(trim22(value));
     if (url.protocol !== "https:" && !(url.protocol === "http:" && isLocalHttpHostname(url.hostname))) return "";
     const parts = url.pathname.split("/").filter(Boolean).map((part) => decodeURIComponent(part));
-    if (parts.length < 2 || parts.at(-2) !== "session" || parts.at(-1)?.toLowerCase() !== trim21(slug).toLowerCase()) {
+    if (parts.length < 2 || parts.at(-2) !== "session" || parts.at(-1)?.toLowerCase() !== trim22(slug).toLowerCase()) {
       return "";
     }
     const allowedOrigins = normalizeAllowedOrigins(allowOrigins);
@@ -105673,7 +105952,7 @@ var sha2563 = async (value) => {
   return [...new Uint8Array(digest2)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 };
 var canonicalizeQuestions = (questions = []) => [...questions].sort(
-  (left, right) => trim21(left?.id).localeCompare(trim21(right?.id)) || trim21(left?.prompt).localeCompare(trim21(right?.prompt)) || trim21(left?.type).localeCompare(trim21(right?.type))
+  (left, right) => trim22(left?.id).localeCompare(trim22(right?.id)) || trim22(left?.prompt).localeCompare(trim22(right?.prompt)) || trim22(left?.type).localeCompare(trim22(right?.type))
 );
 var buildReviewUrl = ({ sessionUrl, servedWorkerOrigin } = {}) => {
   const url = new URL(sessionUrl);
@@ -105682,12 +105961,20 @@ var buildReviewUrl = ({ sessionUrl, servedWorkerOrigin } = {}) => {
   url.searchParams.set("mode", "interview");
   return url.toString();
 };
+var catalogGroup = (group) => ({
+  groupId: group.groupId,
+  label: group.label,
+  ...group.description ? { description: group.description } : {},
+  ...Array.isArray(group.tags) && group.tags.length ? { tags: group.tags } : {}
+});
 var buildInterviewBriefDocument = ({
   slug,
   sessionUrl,
   servedWorkerOrigin,
   questions,
-  questionSetHash
+  questionSetHash,
+  groups,
+  groupSuggestionData
 } = {}) => ({
   type: "context-engine.interview-question-catalog",
   version: 1,
@@ -105715,7 +106002,13 @@ var buildInterviewBriefDocument = ({
     unknownSearchedCount: null,
     verification: "self_reported"
   },
-  questions
+  questions,
+  ...groups?.length ? {
+    groups: groups.map(catalogGroup),
+    // What the session lets an AI base a suggestion on, in words, and what it never may.
+    groupSuggestionData: (groupSuggestionData || []).map((kind) => GROUP_SUGGESTION_DATA[kind]),
+    groupSuggestionNever: GROUP_SUGGESTION_NEVER
+  } : {}
 });
 var dispatchInterviewBriefRequest = async ({
   request,
@@ -105744,6 +106037,7 @@ var dispatchInterviewBriefRequest = async ({
   if (!corsContext?.ok) return corsContext?.response;
   const headers2 = new Headers(corsContext.headers || baseHeaders || {});
   headers2.set("cache-control", "no-store");
+  headers2.set("referrer-policy", "no-referrer");
   if (!isInterviewEnabled(config)) {
     return deps?.json?.({ error: "Interview mode is disabled for this session." }, 404, headers2);
   }
@@ -105757,22 +106051,50 @@ var dispatchInterviewBriefRequest = async ({
     });
     if (!rateAllowed) return deps?.json?.({ error: "Rate limit exceeded." }, 429, headers2);
   }
+  const url = new URL(request.url);
+  const ticket = url.searchParams.get("ticket");
+  let reader = null;
+  if (ticket) {
+    const verified = await verifyInterviewCatalogTicket({
+      env,
+      ticket,
+      config,
+      slug,
+      deps: {
+        now: deps?.now,
+        computeScopesForLogin: deps?.computeScopesForLogin,
+        validateAuthTokenRecord: deps?.validateAuthTokenRecord
+      }
+    });
+    if (!verified.ok) return deps?.json?.({ error: verified.error, reason: verified.reason }, verified.status, headers2);
+    reader = verified.reader;
+  }
   const loadPublicInterviewQuestions2 = deps?.loadPublicInterviewQuestions || loadPublicInterviewQuestions;
-  const { questions, incomplete } = await loadPublicInterviewQuestions2({
+  const { questions, incomplete, refused } = await loadPublicInterviewQuestions2({
     env,
     config,
     slug,
     storageRoute: deps?.storageRoute,
-    fetch: deps?.fetch
+    fetch: deps?.fetch,
+    ...reader ? { reader } : {}
   });
+  if (!questions.length && refused && !reader) {
+    return deps?.json?.({
+      error: "This session\u2019s questions need a sign-in. Sign in on the session page, then copy the prompt again.",
+      reason: "sign_in_required"
+    }, 401, headers2);
+  }
   if (!questions.length && incomplete) {
     headers2.set("retry-after", "5");
     return deps?.json?.({ error: "Interview question discovery is incomplete. Retry shortly." }, 503, headers2);
   }
   if (!questions.length) {
-    return deps?.json?.({ error: "No public, accessible questions are available for interview prefill." }, 404, headers2);
+    return deps?.json?.(
+      reader ? { error: "No questions you can see are available for interview prefill." } : { error: "No public, accessible questions are available for interview prefill.", reason: "sign_in_required" },
+      404,
+      headers2
+    );
   }
-  const url = new URL(request.url);
   const configuredAllowedOrigins = [
     ...Array.isArray(config.allowOrigins) ? config.allowOrigins : [config.allowOrigins],
     config.sessionUrl,
@@ -105787,17 +106109,73 @@ var dispatchInterviewBriefRequest = async ({
     return deps?.json?.({ error: "A session-approved HTTPS (or localhost) sessionUrl is required." }, 400, headers2);
   }
   const questionSetHash = await (deps?.sha256 || sha2563)(JSON.stringify(canonicalizeQuestions(questions)));
+  const { joinMatchingGroups, groupSuggestionData } = normalizeInterviewSettings(config.interviewMode);
+  const groups = !joinMatchingGroups || !groupSuggestionData.length ? [] : reader ? await (deps?.listSelfJoinableWorkerGroupsForMember || listSelfJoinableWorkerGroupsForMember)({
+    env,
+    config,
+    slug,
+    address: reader.address,
+    deps: { now: deps?.now }
+  }) : await (deps?.listSelfJoinableWorkerGroupsForVisitor || listSelfJoinableWorkerGroupsForVisitor)({
+    env,
+    config,
+    slug,
+    inviteGroupId: new URL(sessionUrl).searchParams.get("joinGroup"),
+    deps: { now: deps?.now }
+  });
   return deps?.json?.(
     buildInterviewBriefDocument({
       slug,
       sessionUrl,
       servedWorkerOrigin: safeServedWorkerOrigin(request.url),
       questions,
-      questionSetHash
+      questionSetHash,
+      groups,
+      groupSuggestionData
     }),
     200,
     headers2
   );
+};
+var dispatchInterviewCatalogTicketRequest = async ({ request, env, baseHeaders, slug, deps } = {}) => {
+  const auth = await deps?.requireAuth?.({ request, env, baseHeaders, slugHint: slug });
+  if (!auth?.ok) return auth?.response;
+  const context = await resolveAuthenticatedRouteContext({ request, env, auth, baseHeaders, deps });
+  if (!context?.ok) return context?.response;
+  const headers2 = new Headers(context.headers || {});
+  headers2.set("cache-control", "no-store");
+  if (!isInterviewEnabled(context.config)) {
+    return deps?.json?.({ error: "Interview mode is disabled for this session." }, 404, headers2);
+  }
+  if (auth.payload?.agentSource) {
+    return deps?.json?.({
+      error: "Catalog tickets are for people signed in on the session page.",
+      reason: "catalog_ticket_person_only"
+    }, 403, headers2);
+  }
+  const preflight = await (deps?.evaluateAuthenticatedRoutePreflight || evaluateAuthenticatedRoutePreflight)({
+    ...context,
+    env,
+    headers: headers2,
+    route: "interview-ticket",
+    scope: context.scopes?.storage === true ? "storage" : "arweave",
+    deps: { computeScopesForLogin: deps?.computeScopesForLogin, checkRateLimit: deps?.checkRateLimit, json: deps?.json }
+  });
+  if (!preflight?.ok) return preflight?.response;
+  try {
+    const issued = await issueInterviewCatalogTicket({
+      env,
+      config: context.config,
+      slug: context.slug,
+      sub: context.address,
+      parent: auth.payload?.jti,
+      parentExp: auth.payload?.exp,
+      deps: { now: deps?.now }
+    });
+    return deps?.json?.(issued, 200, headers2);
+  } catch {
+    return deps?.json?.({ error: "Could not issue a catalog ticket." }, 500, headers2);
+  }
 };
 
 // workers/sessionCorsWorker/workerRouteShellBinding.js
@@ -105836,9 +106214,11 @@ var resolveTopLevelRouteSelection = ({
   if (path === "/session-config" && method === "GET") {
     return { kind: "session-config" };
   }
+  if (path === "/llms.txt" && method === "GET") return { kind: "agent-instructions" };
   if ((path === "/agent/interview-catalog" || path === "/agent/interview-brief") && method === "GET") {
     return { kind: "interview-brief" };
   }
+  if (path === "/agent/interview-catalog-ticket" && method === "POST") return { kind: "interview-catalog-ticket" };
   if (path === "/sponsored/redeem-deploy" && method === "POST") {
     return {
       kind: "sponsored-bootstrap-redeem",
@@ -105905,7 +106285,9 @@ var createWorkerRouteShellWithWorkerDeps = ({
   const dispatchSponsoredBootstrapRedeem2 = deps?.dispatchSponsoredBootstrapRedeem || dispatchSponsoredBootstrapRedeem;
   const dispatchResourcePresenceRequest2 = deps?.dispatchResourcePresenceRequest || dispatchResourcePresenceRequest;
   const dispatchSessionConfigBootstrapRequest2 = deps?.dispatchSessionConfigBootstrapRequest || dispatchSessionConfigBootstrapRequest;
+  const dispatchSessionAgentInstructionsRequest2 = deps?.dispatchSessionAgentInstructionsRequest || dispatchSessionAgentInstructionsRequest;
   const dispatchInterviewBriefRequest2 = deps?.dispatchInterviewBriefRequest || dispatchInterviewBriefRequest;
+  const dispatchInterviewCatalogTicketRequest2 = deps?.dispatchInterviewCatalogTicketRequest || dispatchInterviewCatalogTicketRequest;
   const dispatchAdminRequest2 = deps?.dispatchAdminRequest || dispatchAdminRequest;
   const dispatchAdminAbuseSummaryRequest2 = deps?.dispatchAdminAbuseSummaryRequest || dispatchAdminAbuseSummaryRequest;
   const dispatchAdminResultsAnalysisStatusRequest2 = deps?.dispatchAdminResultsAnalysisStatusRequest || dispatchAdminResultsAnalysisStatusRequest;
@@ -105958,8 +106340,8 @@ var createWorkerRouteShellWithWorkerDeps = ({
           anonymousContext: { env, headers: routeBaseHeaders }
         });
       }
-      if (routeSelection.kind === "session-config") {
-        return await dispatchSessionConfigBootstrapRequest2({
+      if (routeSelection.kind === "session-config" || routeSelection.kind === "agent-instructions") {
+        return await (routeSelection.kind === "agent-instructions" ? dispatchSessionAgentInstructionsRequest2 : dispatchSessionConfigBootstrapRequest2)({
           request,
           env,
           slugHint: envSlug,
@@ -105997,11 +106379,33 @@ var createWorkerRouteShellWithWorkerDeps = ({
             checkRateLimit: deps?.checkRateLimit,
             storageRoute: deps?.storageRoute,
             fetch: deps?.fetch,
-            json: deps?.json
+            json: deps?.json,
+            // A catalog ticket is checked against the person's current access.
+            computeScopesForLogin: deps?.computeScopesForLogin,
+            now: deps?.now
           },
           constants: {
             missingSlugError: constants?.missingSlugError,
             sessionConfigNotFoundError: constants?.sessionConfigNotFoundError
+          }
+        });
+      }
+      if (routeSelection.kind === "interview-catalog-ticket") {
+        return await dispatchInterviewCatalogTicketRequest2({
+          request,
+          env,
+          baseHeaders: routeBaseHeaders,
+          slug: envSlug,
+          deps: {
+            json: deps?.json,
+            requireAuth: deps?.requireAuth,
+            readCurrentSessionConfig: deps?.readCurrentSessionConfig,
+            getCorsContext: deps?.getCorsContext,
+            computeScopesForLogin: deps?.computeScopesForLogin,
+            checkRateLimit: deps?.checkRateLimit,
+            toStr: deps?.toStr,
+            now: deps?.now,
+            SESSION_CONFIG_NOT_FOUND_ERROR: constants?.sessionConfigNotFoundError
           }
         });
       }

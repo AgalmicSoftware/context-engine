@@ -79,6 +79,17 @@ describe('surveyPileViewState', () => {
     });
   });
 
+  it('opens the profile behind the check in the session the answers were given in', () => {
+    const state = buildPileSubmitViewState({
+      pendingStats: { total: 0 },
+      submittedSinceLastEdit: true,
+      account: '0xABCD',
+      isAddress: () => true,
+      sessionSlug: 'rxc ra',
+    });
+    expect(state.pileSubmitResponderHref).toBe('/u/0xabcd?session=rxc%20ra');
+  });
+
   it('keeps Submit available when a successful partial submit leaves page answers pending', () => {
     expect(
       buildPileSubmitRailViewState({

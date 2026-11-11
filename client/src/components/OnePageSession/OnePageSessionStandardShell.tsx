@@ -432,6 +432,8 @@ export default function OnePageSessionStandardShell({
   // The Group Agent is a placeholder for now, so only admins see its launcher.
   const showGroupAgent = contextSources.isAdmin && !isDemoSlug;
   const [groupAgentOpen, setGroupAgentOpen] = React.useState(false);
+  // Where the Context section's Add and View go, in its header beside the title.
+  const [contextActions, setContextActions] = React.useState<HTMLDivElement | null>(null);
   const showContextSection = isDemoSlug || !!sessionContext || contextSources.sources.length > 0 || canEditContext;
   const sectionsGridClassName = [styles.sectionsGrid, !showContextSection ? styles.sectionsGridTwoUp : '']
     .filter(Boolean)
@@ -711,6 +713,11 @@ export default function OnePageSessionStandardShell({
                   </div>
                 </div>
               )}
+              {showDocuments && !isDemoSlug && (canEditContext || contextSources.groupFilesHidden) ? (
+                <div className={styles.sectionHeaderActionsScroller}>
+                  <div ref={setContextActions} className={styles.sectionHeaderActions} />
+                </div>
+              ) : null}
             </div>
             {showDocuments && (
               <div className={`${styles.miniSectionContent} ${styles.documentsSectionContent}`.trim()}>
@@ -740,6 +747,7 @@ export default function OnePageSessionStandardShell({
                     account={typeof account === 'string' ? account : ''}
                     list={contextSources}
                     pageLinks={sessionContext?.links || []}
+                    headerActionsSlot={contextActions}
                   />
                 ) : null}
                 {isDemoSlug && (

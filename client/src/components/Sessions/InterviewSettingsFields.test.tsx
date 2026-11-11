@@ -44,15 +44,16 @@ it('edits the research-sharing default while retaining other interview settings'
   const { rerender } = render(
     <InterviewSettingsFields value={{ steeringPrompt: 'Listen first.' }} onChange={onChange} />,
   );
-  expect(screen.getByLabelText(label)).toHaveValue('false');
-  fireEvent.change(screen.getByLabelText(label), { target: { value: 'true' } });
-  expect(onChange).toHaveBeenLastCalledWith(
-    expect.objectContaining({ shareDraftChangesByDefault: true, steeringPrompt: 'Listen first.' }),
-  );
-  rerender(<InterviewSettingsFields value={onChange.mock.calls[0][0]} onChange={onChange} />);
+  // On unless the session turns it off.
   expect(screen.getByLabelText(label)).toHaveValue('true');
   fireEvent.change(screen.getByLabelText(label), { target: { value: 'false' } });
-  expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ shareDraftChangesByDefault: false }));
+  expect(onChange).toHaveBeenLastCalledWith(
+    expect.objectContaining({ shareDraftChangesByDefault: false, steeringPrompt: 'Listen first.' }),
+  );
+  rerender(<InterviewSettingsFields value={onChange.mock.calls[0][0]} onChange={onChange} />);
+  expect(screen.getByLabelText(label)).toHaveValue('false');
+  fireEvent.change(screen.getByLabelText(label), { target: { value: 'true' } });
+  expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ shareDraftChangesByDefault: true }));
   rerender(<InterviewSettingsFields value={{ shareDraftChangesByDefault: true }} onChange={onChange} disabled />);
   expect(screen.getByLabelText(label)).toBeDisabled();
 });
@@ -90,13 +91,79 @@ it('edits the share of hidden AI drafts, defaulting to off', () => {
   expect(screen.getByLabelText(label)).toHaveDisplayValue('30%');
 });
 
-it('turns on group suggestions, off by default', () => {
+it('no longer offers the retired group suggestions box, and keeps a stored value as it is', () => {
   const onChange = jest.fn();
-  render(<InterviewSettingsFields value={{}} onChange={onChange} />);
-  const box = screen.getByLabelText('Suggest open groups that fit participants’ answers');
+  const { rerender } = render(<InterviewSettingsFields value={{}} onChange={onChange} />);
+  expect(screen.queryByLabelText('Suggest open groups that fit participants’ answers')).not.toBeInTheDocument();
+  // No box turns it on, whatever its label.
+  for (const box of screen.getAllByRole('checkbox')) fireEvent.click(box);
+  expect(onChange.mock.calls.some(([value]) => value.suggestGroups === true)).toBe(false);
+  rerender(<InterviewSettingsFields value={{ suggestGroups: true }} onChange={onChange} />);
+  fireEvent.click(screen.getByLabelText('Show participants how well their AI predicted them'));
+  expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ suggestGroups: true, showFidelityScore: true }));
+});
+
+it('turns on suggesting groups to join, off by default, with its explanation behind its help', () => {
+  const onChange = jest.fn();
+  const label = 'Suggest groups to join';
+  const { rerender } = render(<InterviewSettingsFields value={{}} onChange={onChange} />);
+  const box = screen.getByLabelText(label);
   expect(box).not.toBeChecked();
+  expect(box).toHaveAccessibleDescription(
+    /They tick any they want, and submitting joins them.*Off, no groups are matched/,
+  );
+  const helpButton = screen.getByRole('button', { name: 'About suggesting groups to join' });
+  fireEvent.click(helpButton);
+  expect(onChange).not.toHaveBeenCalled();
   fireEvent.click(box);
-  expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ suggestGroups: true }));
+  expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ joinMatchingGroups: true }));
+  rerender(<InterviewSettingsFields value={onChange.mock.calls.at(-1)?.[0]} onChange={onChange} />);
+  expect(screen.getByLabelText(label)).toBeChecked();
+  fireEvent.click(screen.getByLabelText(label));
+  expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ joinMatchingGroups: false }));
+});
+
+it('asks what the AI may use to suggest groups only while suggesting them', () => {
+  const onChange = jest.fn();
+  const latest = () => onChange.mock.calls.at(-1)?.[0];
+  const { rerender } = render(<InterviewSettingsFields value={{}} onChange={onChange} />);
+  expect(screen.queryByRole('group', { name: 'The AI may use' })).not.toBeInTheDocument();
+  rerender(<InterviewSettingsFields value={{ joinMatchingGroups: true }} onChange={onChange} />);
+  const group = screen.getByRole('group', { name: 'The AI may use' });
+  expect(group).toHaveAccessibleDescription(
+    /with none ticked, neither suggests any.*Town or city means anywhere smaller than a country.*No AI ever goes on health.*suggested either way/,
+  );
+  fireEvent.click(within(group).getByRole('button', { name: 'About what the AI may use' }));
+  expect(onChange).not.toHaveBeenCalled();
+  // Country, work and interests by default; where in a country only when ticked, and nothing more personal.
+  expect(
+    within(group)
+      .getAllByRole('checkbox')
+      .map((box) => [box.closest('label')?.textContent?.trim(), (box as HTMLInputElement).checked]),
+  ).toEqual([
+    ['Country', true],
+    ['Town or city', false],
+    ['Work', true],
+    ['Interests and causes', true],
+  ]);
+  fireEvent.click(within(group).getByLabelText('Town or city'));
+  expect(latest()).toEqual(
+    expect.objectContaining({
+      joinMatchingGroups: true,
+      groupSuggestionData: ['country', 'town', 'work', 'interests'],
+    }),
+  );
+  rerender(<InterviewSettingsFields value={latest()} onChange={onChange} />);
+  fireEvent.click(screen.getByLabelText('Country'));
+  expect(latest().groupSuggestionData).toEqual(['town', 'work', 'interests']);
+  rerender(<InterviewSettingsFields value={latest()} onChange={onChange} />);
+  // Off, the choice is hidden but kept in the draft; saves leave it out while it's off.
+  fireEvent.click(screen.getByLabelText('Suggest groups to join'));
+  expect(latest()).toEqual(
+    expect.objectContaining({ joinMatchingGroups: false, groupSuggestionData: ['town', 'work', 'interests'] }),
+  );
+  rerender(<InterviewSettingsFields value={latest()} onChange={onChange} />);
+  expect(screen.queryByRole('group', { name: 'The AI may use' })).not.toBeInTheDocument();
 });
 
 it('turns on the private fidelity score, off by default', () => {
@@ -149,9 +216,10 @@ it('turns on every setting that measures how well AI represents people, and back
   fireEvent.click(screen.getByLabelText(label));
   rerender(<InterviewSettingsFields value={latest()} onChange={onChange} />);
   fireEvent.click(screen.getByLabelText(label));
+  // Research sharing's own default is on, so turning measuring off leaves it on.
   expect(latest()).toEqual(
     expect.objectContaining({
-      shareDraftChangesByDefault: false,
+      shareDraftChangesByDefault: true,
       hiddenDraftShare: 0,
       showFidelityScore: false,
       researchDetail: 'full',

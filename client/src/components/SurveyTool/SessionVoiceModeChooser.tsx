@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { UncontrolledTooltip } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faComments, faMicrophone, faQuestionCircle } from '@fortawesome/free-solid-svg-icons';
@@ -25,17 +25,28 @@ const CHOICES = [
 
 type SessionVoiceModeChooserProps = {
   onSelectMode: (mode: SessionVoiceMode) => void;
+  // The choice to focus when the choices return from it, so focus doesn't drop to the page.
+  focusMode?: SessionVoiceMode | null;
   // Shown below the two choices, such as the AI-prefill option.
   children?: ReactNode;
 };
 
-export default function SessionVoiceModeChooser({ onSelectMode, children }: SessionVoiceModeChooserProps) {
+export default function SessionVoiceModeChooser({
+  onSelectMode,
+  focusMode = null,
+  children,
+}: SessionVoiceModeChooserProps) {
+  const focusRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    focusRef.current?.focus();
+  }, []);
   return (
     <div className={styles.sessionVoiceModeLauncher}>
       <div className={styles.sessionVoiceModeChooser} data-testid={E2E_TESTIDS.SESSION_VOICE_MODE_CHOOSER}>
         {CHOICES.map(({ mode, icon, title, about, testId }) => (
           <div key={mode} className={styles.sessionVoiceModeChoice}>
             <button
+              ref={mode === focusMode ? focusRef : undefined}
               type="button"
               className={styles.sessionVoiceModeChoiceButton}
               onClick={() => onSelectMode(mode)}

@@ -289,6 +289,111 @@ describe('AdminWorkerGroupsPanel', () => {
     );
   });
 
+  describe('who can remove members', () => {
+    const listed = [
+      { groupId: 'kept', sessionSlug: 'alpha', label: 'Kept', joinMode: 'open', memberVisibility: 'session' },
+      { groupId: 'legacy', sessionSlug: 'alpha', label: 'Legacy', joinMode: 'open', memberVisibility: 'session' },
+    ];
+    // A current Worker saves the setting it is sent; one deployed before the setting drops it.
+    const workerReplies = ({ keepsSetting }: { keepsSetting: boolean }) =>
+      jest.fn(async ({ action, body }) => {
+        const saved = (group: Record<string, unknown>) => {
+          const copy: Record<string, unknown> = { sessionSlug: 'alpha', ...group };
+          ['memberLimit', 'joinEndsAt', 'adminAddress'].forEach((field) => {
+            if (!copy[field]) delete copy[field];
+          });
+          if (!keepsSetting) delete copy.removalAuth;
+          return copy;
+        };
+        const reply = (data: Record<string, unknown>) => ({
+          data: { ok: true, sessionId: SESSION_ID, sessionSlug: 'alpha', ...data },
+        });
+        const groups = [{ ...listed[0], removalAuth: 'member_only' }, listed[1]];
+        if (action === 'groups/list') return reply({ groups });
+        if (action === 'groups/create') return reply({ group: saved({ groupId: 'salon', ...body?.group }) });
+        if (action === 'groups/update') return reply({ group: saved({ groupId: body?.groupId, ...body?.group }) });
+        if (action === 'groups/list-members') {
+          return reply({
+            group: groups.find((group) => group.groupId === body?.groupId),
+            members: [
+              { sessionSlug: 'alpha', principal: { kind: 'evm_address', address: ADDRESS }, principalKey: ADDRESS },
+            ],
+          });
+        }
+        return reply({});
+      });
+    const renderPanel = (postSignedRequest: ReturnType<typeof workerReplies>) =>
+      render(
+        <AdminWorkerGroupsPanel
+          canAdminWorker={true}
+          sessionId={SESSION_ID}
+          sessionSlug="alpha"
+          workerUrl="https://session-worker.example"
+          postSignedRequest={postSignedRequest}
+        />,
+      );
+    const sentGroup = (postSignedRequest: ReturnType<typeof workerReplies>, action: string) =>
+      postSignedRequest.mock.calls.filter(([request]) => request.action === action).at(-1)?.[0].body.group;
+
+    it('is set on create and edit, listed, and decides whether admins see Remove', async () => {
+      const postSignedRequest = workerReplies({ keepsSetting: true });
+      renderPanel(postSignedRequest);
+      fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+      expect(await screen.findByText('Who can remove members: The member only')).toBeInTheDocument();
+      expect(screen.getByText('Who can remove members: Admins and the member')).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Manage Kept members' }));
+      expect(await screen.findByText(ADDRESS)).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: `Remove ${ADDRESS}` })).not.toBeInTheDocument();
+      expect(screen.getByTestId('ce-admin-worker-group-members-removal-auth')).toHaveTextContent(
+        'Who can remove members: The member only',
+      );
+      fireEvent.click(screen.getByRole('button', { name: 'Manage Legacy members' }));
+      expect(await screen.findByRole('button', { name: `Remove ${ADDRESS}` })).toBeInTheDocument();
+      expect(screen.queryByTestId('ce-admin-worker-group-members-removal-auth')).not.toBeInTheDocument();
+
+      const createSetting = screen.getByTestId('ce-admin-worker-group-create-removal-auth');
+      expect(createSetting).toHaveValue('both');
+      fireEvent.change(screen.getByTestId('ce-admin-worker-group-create-label'), { target: { value: 'Salon' } });
+      fireEvent.change(createSetting, { target: { value: 'neither' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Create Group' }));
+      expect(await screen.findByText('Group created.')).toBeInTheDocument();
+      expect(sentGroup(postSignedRequest, 'groups/create')).toEqual(
+        expect.objectContaining({ removalAuth: 'neither' }),
+      );
+      expect(screen.getByTestId('ce-admin-worker-group-create-removal-auth')).toHaveValue('both');
+
+      fireEvent.click(screen.getByRole('button', { name: 'Edit Kept' }));
+      const editSetting = screen.getByTestId('ce-admin-worker-group-edit-removal-auth');
+      expect(editSetting).toHaveValue('member_only');
+      fireEvent.change(editSetting, { target: { value: 'admin_only' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Save group' }));
+      expect(await screen.findByText('Group updated.')).toBeInTheDocument();
+      expect(sentGroup(postSignedRequest, 'groups/update')).toEqual(
+        expect.objectContaining({ removalAuth: 'admin_only' }),
+      );
+      expect(screen.getByText('Who can remove members: Admins only')).toBeInTheDocument();
+    });
+
+    it('says when an older Worker ignores the setting', async () => {
+      const postSignedRequest = workerReplies({ keepsSetting: false });
+      renderPanel(postSignedRequest);
+      fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+      await screen.findByText('Who can remove members: The member only');
+
+      fireEvent.change(screen.getByTestId('ce-admin-worker-group-create-label'), { target: { value: 'Salon' } });
+      fireEvent.change(screen.getByTestId('ce-admin-worker-group-create-removal-auth'), {
+        target: { value: 'admin_only' },
+      });
+      fireEvent.click(screen.getByRole('button', { name: 'Create Group' }));
+      expect(await screen.findByText(/^Group created\. This session’s Worker doesn’t support/)).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Edit Legacy' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Save group' }));
+      expect(await screen.findByText('Group updated.')).toBeInTheDocument();
+    });
+  });
+
   it('loads additional signed member pages without presenting the first page as complete', async () => {
     const secondAddress = '0x00000000000000000000000000000000000000bb';
     const group = {

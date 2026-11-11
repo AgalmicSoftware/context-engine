@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   CURATED_ID_LIST_KEYS,
+  MAX_AGENT_INSTRUCTIONS_CHARS,
   MAX_CURATED_IDS,
   MAX_RESULTS_ADMINS,
   WORKER_CANONICAL_SET_CONFIG_KEYS,
@@ -30,19 +31,24 @@ test('limiting who adds context signs no one out: each file is checked as it pub
   assert.equal(revokes({ contextAdditionPolicy: 'admin_only' }, { contextAdditionPolicy: 'participants' }), false);
 });
 
-test('only prompt text is content within interview settings', () => {
-  const before = { interviewMode: { enabled: true, openingPrompt: 'Earlier', steeringPrompt: 'Earlier' } };
-  assert.equal(revokes(before, { interviewMode: { ...before.interviewMode, openingPrompt: 'Updated', steeringPrompt: '' } }), false);
-  assert.equal(revokes(before, { interviewMode: { openingPrompt: 'Updated' } }), true);
-  assert.equal(revokes(before, { interviewMode: { ...before.interviewMode, hiddenDraftShare: 0.5 } }), true);
-  assert.equal(revokes(before, { interviewMode: { ...before.interviewMode, futureSetting: 'unknown' } }), true);
+test('interview settings are content: each interview request reads them afresh', () => {
+  const before = { interviewModeEnabled: true, interviewMode: { enabled: true, openingPrompt: 'Earlier', steeringPrompt: 'Earlier' } };
+  for (const interviewMode of [
+    { ...before.interviewMode, openingPrompt: 'Updated', steeringPrompt: '' },
+    { openingPrompt: 'Updated' },
+    { ...before.interviewMode, hiddenDraftShare: 0.5 },
+    { ...before.interviewMode, joinMatchingGroups: true, groupSuggestionData: ['country', 'town'] },
+    { ...before.interviewMode, enabled: false },
+  ]) assert.equal(revokes(before, { ...before, interviewMode }), false, JSON.stringify(interviewMode));
+  assert.equal(revokes(before, { interviewModeEnabled: false }), false);
+  assert.equal(revokes(before, { ...before, defaultTags: 'x' }), true);
 });
 
 for (const field of ['slug', 'sessionId', 'sessionIdHex', 'configRevision', 'adminAddress', 'adminAddresses',
   'corsWorkerUrl', 'allowOrigins', 'sessionModeProfile', 'workerAuthority', 'workerRoles', 'roles', 'authorization',
   'groupCreationPolicy', 'linkedWorkerGroups', 'workerGroupsBootstrap', 'resultsExposure', 'storageProfile',
   'storageEnvelope', 'responseFieldEncryption', 'agentSessionWrapped', 'scopes', 'limits', 'litCredentials',
-  'sessionEndsAt', 'defaultTags', 'defaultGroupTags', 'defaultSbtTags', 'interviewModeEnabled', 'pileAutoAdvanceEnabled',
+  'sessionEndsAt', 'defaultTags', 'defaultGroupTags', 'defaultSbtTags', 'pileAutoAdvanceEnabled',
   'defaultFilterState', 'defaultFeaturedSBTs', 'autoFeatureSBTsBySessionSlug', 'ai', 'networkChainId', 'contracts',
   'embeddedDeployHelperEnabled', 'resultsAnalysis', 'futureUnclassifiedSetting']) {
   test(`${field} remains authority-sensitive even alongside a content edit`, () => {
@@ -139,6 +145,30 @@ test('results admins save as a checked address list and sign no one out', () => 
   assert.equal(setConfig({ resultsAdminAddresses: tooMany.slice(1) }).ok, true);
 });
 
+test('instructions for AI agents save as text of at most 8,000 characters and sign no one out', () => {
+  const instructions = '# Taking part\n\nJoin the Reviewers group.';
+  const saved = setConfig({ agentInstructions: instructions });
+  assert.equal(saved.ok, true);
+  assert.equal(saved.config.agentInstructions, instructions);
+  assert.deepEqual(classify({}, { agentInstructions: instructions }), { content: ['agentInstructions'], authority: [], signsParticipantsOut: false });
+  assert.equal(MAX_AGENT_INSTRUCTIONS_CHARS, 8000);
+  for (const valid of ['', 'x'.repeat(MAX_AGENT_INSTRUCTIONS_CHARS)]) assert.equal(setConfig({ agentInstructions: valid }).ok, true);
+  const error = `agentInstructions must be text of at most ${MAX_AGENT_INSTRUCTIONS_CHARS} characters.`;
+  for (const invalid of ['x'.repeat(MAX_AGENT_INSTRUCTIONS_CHARS + 1), 7, null, ['text'], { text: 'x' }]) {
+    assert.deepEqual(setConfig({ agentInstructions: invalid }), { ok: false, status: 400, error }, JSON.stringify(invalid).slice(0, 40));
+  }
+});
+
+test('set-config keeps stored instructions for AI agents it is not sent, and an empty value clears them', () => {
+  const save = incomingConfig => applySessionConfigMutation({
+    existingConfig: { ...workerCanonicalConfig(), agentInstructions: 'Join the open group.' },
+    mutation: { kind: 'set-config', incomingConfig },
+    slug: 'session-a',
+  });
+  assert.equal(save({ sessionName: 'Renamed' }).config.agentInstructions, 'Join the open group.');
+  assert.equal(save({ agentInstructions: '' }).config.agentInstructions, '');
+});
+
 test('lists each edited path as content or as a sign-out', () => {
   const before = {
     sessionName: 'A',
@@ -153,8 +183,8 @@ test('lists each edited path as content or as a sign-out', () => {
     agentHttp: { enabled: true, invites: [invite, second] },
   };
   assert.deepEqual(classify(before, after), {
-    content: ['sessionName', 'interviewMode.openingPrompt', 'agentHttp.invites'],
-    authority: ['defaultTags', 'interviewMode.hiddenDraftShare'],
+    content: ['sessionName', 'interviewMode.openingPrompt', 'interviewMode.hiddenDraftShare', 'agentHttp.invites'],
+    authority: ['defaultTags'],
     signsParticipantsOut: true,
   });
   assert.deepEqual(classify(before, { ...before, sessionName: 'B' }),
@@ -163,7 +193,7 @@ test('lists each edited path as content or as a sign-out', () => {
   assert.deepEqual(classify(withInvites([invite]), withInvites([])),
     { content: [], authority: ['agentHttp.invites'], signsParticipantsOut: true });
   assert.deepEqual(classify({ interviewMode: 'legacy' }, { interviewMode: { openingPrompt: 'Hi' } }),
-    { content: ['interviewMode.openingPrompt'], authority: ['interviewMode'], signsParticipantsOut: true });
+    { content: ['interviewMode'], authority: [], signsParticipantsOut: false });
   assert.deepEqual(classify({}, { sessionModeProfile: { preset: 'custom' } }),
     { content: [], authority: ['sessionModeProfile'], signsParticipantsOut: true });
 });
@@ -211,10 +241,13 @@ test('the preview matches the authorization epoch the Worker assigns on save', (
       appearance: { colorSchemeId: 'ocean' },
       sessionHeaderImg: 'https://example.com/header.png',
       questionsGenPrompt: 'Ask about parks',
+      agentInstructions: 'Join the Reviewers group.',
     }, false],
     [{ interviewMode: { ...stored.interviewMode, openingPrompt: 'Welcome', steeringPrompt: 'Stay on topic' } }, false],
-    [{ interviewMode: { ...stored.interviewMode, hiddenDraftShare: 0.5 } }, true],
-    [{ interviewModeEnabled: false, interviewMode: { ...stored.interviewMode, enabled: false } }, true],
+    [{ interviewMode: { ...stored.interviewMode, hiddenDraftShare: 0.5 } }, false],
+    [{ interviewMode: { ...stored.interviewMode, joinMatchingGroups: true, groupSuggestionData: ['town'] } }, false],
+    [{ interviewModeEnabled: false, interviewMode: { ...stored.interviewMode, enabled: false } }, false],
+    [{ interviewMode: { ...stored.interviewMode, hiddenDraftShare: 0.2 }, defaultTags: 'a, b, c' }, true],
     [{ defaultTags: 'a, b, c' }, true],
     [{ groupCreationPolicy: 'admin_only' }, true],
     [{ sessionName: 'Renamed', defaultTags: 'a, b, c' }, true],

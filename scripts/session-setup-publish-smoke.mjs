@@ -14,6 +14,7 @@ import { DEFAULT_AI_MODELS } from '../shared/aiDefaults.mjs';
 const baseUrl = (process.env.BASE_URL || 'http://127.0.0.1:3000').replace(/\/$/, '');
 assert(['127.0.0.1', 'localhost', '[::1]'].includes(new URL(baseUrl).hostname), 'This smoke requires a local client');
 const workerOrigin = 'https://setup-smoke.example.test';
+const agentInstructions = 'Join the Reviewers group.';
 const outputDir = process.env.OUTPUT_DIR || 'artifacts/session-setup-smoke';
 const startedAt = performance.now();
 await mkdir(outputDir, { recursive: true });
@@ -237,6 +238,8 @@ try {
   const encryption = page.getByTestId('ce-setup-encryption');
   assert.equal(await encryption.inputValue(), 'none', 'A new session starts unencrypted');
   await encryption.selectOption('worker_envelope');
+  await page.getByTestId('ce-setup-more-participation').click();
+  await page.getByTestId('ce-setup-agent-instructions').fill(agentInstructions);
   await page.getByTestId('ce-setup-more-hosting').click();
   await page.getByRole('checkbox', { name: 'Agents (HTTP API)', exact: true }).check();
   await page
@@ -262,6 +265,12 @@ try {
   const slug = decodeURIComponent(sessionUrl.pathname.split('/').at(-1));
   env.DEFAULT_SESSION_SLUG = slug;
   const workerFetch = (url, init = {}) => worker.fetch(new Request(url, init), env, { waitUntil: () => {} });
+  // The instructions written at /new reach the Worker, which serves them as Markdown text.
+  const agentGuide = await workerFetch(`${workerOrigin}/llms.txt`);
+  assert.equal(agentGuide.status, 200, 'The Worker serves the instructions for AI agents written at /new');
+  assert.equal(agentGuide.headers.get('content-type'), 'text/markdown; charset=utf-8');
+  assert.equal(agentGuide.headers.get('x-content-type-options'), 'nosniff');
+  assert.equal(await agentGuide.text(), agentInstructions);
   const adminClient = createWorkerClient({
     workerOrigin,
     slug,
@@ -779,7 +788,7 @@ try {
     ),
   );
   console.log(
-    `Session publication smoke passed in ${elapsedMs}ms: publication, saved answers, partial retry, lost reply, Results, permissions, two-tab bookmarks, backup/restore, and recovery-key custody.`,
+    `Session publication smoke passed in ${elapsedMs}ms: publication, instructions for AI agents, saved answers, partial retry, lost reply, Results, permissions, two-tab bookmarks, backup/restore, and recovery-key custody.`,
   );
 } catch (error) {
   if (page) {

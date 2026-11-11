@@ -1,7 +1,12 @@
 import React, { useState } from 'react';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 
-import { SetupContextSection, SetupQuestionsSection, describeContextProblem } from './SetupContentSections';
+import {
+  SetupContextSection,
+  SetupParticipationSection,
+  SetupQuestionsSection,
+  describeContextProblem,
+} from './SetupContentSections';
 import type { SetupDraft, SetupSectionProps } from './setupSectionTypes';
 import { readContextHtmlPage } from '../../OnePageSession/SessionContextHtml';
 
@@ -29,7 +34,101 @@ const Harness = ({
   );
 };
 
+const WorkerParticipation = (props: SetupSectionProps) => <SetupParticipationSection {...props} workerHosted />;
+const ChainParticipation = (props: SetupSectionProps) => <SetupParticipationSection {...props} workerHosted={false} />;
+
 describe('setup content sections', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('takes instructions for AI agents on Worker-hosted sessions, saying they add to the site’s guide and are public', () => {
+    const { unmount } = render(<Harness Section={WorkerParticipation} initial={{ interviewModeEnabled: false }} />);
+    const field = screen.getByLabelText('Instructions for AI agents');
+    expect(field).toHaveAttribute('maxlength', '8000');
+    expect(field).toHaveAccessibleDescription(
+      'Optional Markdown that AI agents read before taking part, such as which group to join or what to focus on. It adds to the site’s guide for agents. Anyone can read it without signing in, at the Session Worker’s /session-config and /llms.txt, so put nothing private in it.',
+    );
+    expect(screen.getByRole('button', { name: 'About Instructions for AI agents' })).toBeInTheDocument();
+    fireEvent.change(field, { target: { value: '# Taking part\n\nJoin the Reviewers group.' } });
+    expect(latest.agentInstructions).toBe('# Taking part\n\nJoin the Reviewers group.');
+    unmount();
+
+    render(<Harness Section={ChainParticipation} initial={{ interviewModeEnabled: false, agentInstructions: 'x' }} />);
+    expect(screen.queryByLabelText('Instructions for AI agents')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Instructions file')).not.toBeInTheDocument();
+  });
+
+  it('loads instructions for AI agents from a .md or .txt file into the box, up to 8,000 characters', async () => {
+    render(
+      <Harness Section={WorkerParticipation} initial={{ interviewModeEnabled: false, agentInstructions: 'Earlier' }} />,
+    );
+    const file = screen.getByLabelText('Instructions file');
+    const choose = (contents: string, name: string, type: string) =>
+      fireEvent.change(file, { target: { files: [new File([contents], name, { type })] } });
+    expect(file).toHaveAttribute('accept', '.md,.txt,text/markdown,text/plain');
+    expect(file).toHaveAccessibleDescription(
+      'A .md or .txt file of up to 8,000 characters. Its text replaces the instructions above, where you can edit it.',
+    );
+
+    choose('# Taking part\n\nJoin the Reviewers group.', 'agents.md', 'text/markdown');
+    await waitFor(() =>
+      expect(screen.getByLabelText('Instructions for AI agents')).toHaveValue(
+        '# Taking part\n\nJoin the Reviewers group.',
+      ),
+    );
+    choose('Focus on the budget questions.', 'agents.txt', 'text/plain');
+    await waitFor(() => expect(latest.agentInstructions).toBe('Focus on the budget questions.'));
+
+    choose('x'.repeat(8001), 'long.md', 'text/markdown');
+    expect(await screen.findByRole('alert')).toHaveTextContent('The file is longer than 8,000 characters.');
+    expect(latest.agentInstructions).toBe('Focus on the budget questions.');
+
+    // 8,001 characters as saved, and 8,000 once its CRLF is one line break, as in the box.
+    choose(`${'x'.repeat(3999)}\r\n${'x'.repeat(4000)}`, 'windows.txt', 'text/plain');
+    await waitFor(() => expect(latest.agentInstructions).toBe(`${'x'.repeat(3999)}\n${'x'.repeat(4000)}`));
+  });
+
+  it.each([
+    ['in another encoding', [0x63, 0x61, 0x66, 0xe9]],
+    ['binary', [0x50, 0x4b, 0x00, 0x03]],
+  ])('refuses an instructions file %s and keeps the box as it was', async (_label, bytes) => {
+    render(
+      <Harness Section={WorkerParticipation} initial={{ interviewModeEnabled: false, agentInstructions: 'Earlier' }} />,
+    );
+    fireEvent.change(screen.getByLabelText('Instructions file'), {
+      target: { files: [new File([new Uint8Array(bytes)], 'agents.txt', { type: 'text/plain' })] },
+    });
+    expect(await screen.findByRole('alert')).toHaveTextContent('This file isn’t plain text saved as UTF-8.');
+    expect(latest.agentInstructions).toBe('Earlier');
+  });
+
+  it('refuses an oversized or unreadable instructions file, and clears the picker after each try', async () => {
+    const reads = jest.spyOn(FileReader.prototype, 'readAsText');
+    render(
+      <Harness Section={WorkerParticipation} initial={{ interviewModeEnabled: false, agentInstructions: 'Earlier' }} />,
+    );
+    const picker = screen.getByLabelText('Instructions file');
+    // A cleared picker fires again when the same file is chosen.
+    const clears = jest.fn();
+    Object.defineProperty(picker, 'value', { configurable: true, get: () => '', set: clears });
+    const choose = (file: File) => fireEvent.change(picker, { target: { files: [file] } });
+
+    // No character takes more than 4 bytes, so a larger file is refused unread.
+    choose(new File(['x'.repeat(32001)], 'huge.md', { type: 'text/markdown' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('The file is longer than 8,000 characters.');
+    expect(reads).not.toHaveBeenCalled();
+    await waitFor(() => expect(clears).toHaveBeenCalledWith(''));
+
+    reads.mockImplementationOnce(function (this: FileReader) {
+      this.onerror?.call(this, new ProgressEvent('error') as ProgressEvent<FileReader>);
+    });
+    choose(new File(['Join the Reviewers group.'], 'agents.md', { type: 'text/markdown' }));
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('This file couldn’t be read.'));
+    await waitFor(() => expect(clears).toHaveBeenCalledTimes(2));
+    expect(latest.agentInstructions).toBe('Earlier');
+  });
+
   it('edits the context title, paragraphs and https links, and asks for files again', () => {
     render(<Harness Section={SetupContextSection} initial={{ contextFiles: [{ name: 'brief.pdf' }] }} />);
     expect(screen.getByTestId('ce-setup-summary-context')).toHaveTextContent('No context yet');
@@ -78,8 +177,13 @@ describe('setup content sections', () => {
       links: [],
       html: '<h2>Atlas</h2><p style="color:red">Who decides?</p>',
     });
-    const shown = readContextHtmlPage(await screen.findByTestId('ce-setup-context-html-shown'));
-    expect(shown?.textContent).toContain('Who decides?');
+    // The preview renders once its sanitizer has loaded.
+    await waitFor(() =>
+      expect(readContextHtmlPage(screen.getByTestId('ce-setup-context-html-shown'))?.textContent).toContain(
+        'Who decides?',
+      ),
+    );
+    const shown = readContextHtmlPage(screen.getByTestId('ce-setup-context-html-shown'));
     expect(shown?.querySelector('script')).toBeNull();
     expect(screen.getByTestId('ce-setup-summary-context')).toHaveTextContent('HTML file');
 

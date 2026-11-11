@@ -26,7 +26,7 @@ Top process row, four numbered cards with simple arrows:
 A short note below the first two steps: "AI services process the input to create drafts."
 A short note below the final step: "Normal responses follow the session's storage and visibility rules."
 
-Central branching flow from Submit to two destination cards; branch label "Share AI draft changes for research" with an UNCHECKED checkbox and a visible badge "OFF by default". The destination cards:
+Central branching flow from Submit to two destination cards; branch label "Share for research" with a CHECKED checkbox and a visible badge "ON by default". The destination cards:
 Left, muted neutral border: "Unchecked" / "Final responses" / "No draft-comparison record" / "AI source details are a separate option."
 Right, teal border: "Checked" / "Final responses + research record" and beneath this three horizontally aligned subcards:
 "AI proposed" / "Original draft + saved AI revisions" / "Answer, comments, importance, conviction, confidence and basis"
@@ -79,9 +79,9 @@ Layout and exact visible text:
 Large title: "Inside the optional research record"
 Subtitle: "What was proposed, what you reviewed, and what you submitted"
 
-Top thin consent ribbon with an unchecked checkbox:
-"Share AI draft changes for research"
-Small badge: "OFF by default"
+Top thin consent ribbon with a checked checkbox:
+"Share for research"
+Small badge: "ON by default"
 Under ribbon, centered:
 "Attached on submission at responses[].interviewProvenance"
 

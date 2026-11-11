@@ -15,11 +15,12 @@ import SessionInterviewSuggestions from './SessionInterviewSuggestions';
 import SessionInterviewRecommendedGroups from './SessionInterviewRecommendedGroups';
 import SessionInterviewReviewSection from './SessionInterviewReviewSection';
 import SessionInterviewModalHeader from './SessionInterviewModalHeader';
-import SessionInterviewResearchConsent from './SessionInterviewResearchConsent';
+import SessionInterviewResearchConsent, { SessionInterviewResearchShare } from './SessionInterviewResearchConsent';
 import {
   useSessionInterviewGroupRecommendations,
   type SessionInterviewGroupRecommendationRequest,
 } from './useSessionInterviewGroupRecommendations';
+import { buildGroupRecommendationRequest, loadDraftingGroupChoices } from './sessionInterviewGroupRecommendations';
 import type { GeneratedSurveyStatement } from './SurveyGenerator/surveyGeneratorHelpers';
 import { useInterviewOpening } from './useInterviewOpening';
 import { useSessionContextPrompt } from '../../utilities/docLibrary/useSessionContextSources';
@@ -41,6 +42,7 @@ import {
   mapInterviewEvidenceToResponses,
   readImportedInterviewDraftResponses,
   type InterviewDraftResponse,
+  type InterviewPrefillGroupPick,
   type InterviewPrefillPacket,
   type InterviewQuestion,
 } from './sessionInterview';
@@ -49,6 +51,7 @@ import {
   scopeInterviewPrefillToQuestions,
 } from './sessionInterviewCatalogValidation';
 import { useSessionInterviewRecorder } from './useSessionInterviewRecorder';
+import { silentCatalogTicketSource } from './interviewCatalogTicket';
 import {
   resolveSuggestedQuestionAuthoringState,
   shouldHideSuggestedQuestionSection,
@@ -151,6 +154,8 @@ export default function SessionInterviewPanel({
   const [resolvedWorkerUrl, setResolvedWorkerUrl] = useState(workerUrl);
   // The claimed part of a group conversation this review has taken in.
   const usedClaimRef = useRef<TranscriptClaim | null>(null);
+  // The groups the session's AI picked as it last drafted, which Refresh lists again.
+  const draftingPicksRef = useRef<InterviewPrefillGroupPick[]>([]);
   const readiness = useInterviewReadiness(resolvedWorkerUrl, sessionSlug);
   // What the interviewer may know: the context this participant may read.
   const sessionContextPrompt = useSessionContextPrompt({
@@ -242,11 +247,12 @@ export default function SessionInterviewPanel({
     null,
   );
   const panelRef = useRef<HTMLDivElement | null>(null);
-  const showFidelityScore = normalizeInterviewSettings(sessionConfig?.interviewMode).showFidelityScore;
-  // Off by default: the session's open groups that fit the person's answers, never joined for them.
-  const suggestGroups = normalizeInterviewSettings(sessionConfig?.interviewMode).suggestGroups;
+  // joinMatchingGroups is off by default. On, the AI suggests groups; the ones the person ticks join on submit.
+  const { showFidelityScore, joinMatchingGroups } = normalizeInterviewSettings(sessionConfig?.interviewMode);
   const [showViewResults, setShowViewResults] = useState(false);
   const [hasRefreshableGroups, setHasRefreshableGroups] = useState(false);
+  const [groupJoinRequest, setGroupJoinRequest] = useState(0);
+  const [groupsTicked, setGroupsTicked] = useState(false);
   useEffect(() => {
     if (workerUrl) setResolvedWorkerUrl(workerUrl);
   }, [workerUrl]);
@@ -462,15 +468,6 @@ export default function SessionInterviewPanel({
   const hasSavedAi = consentDrafts.some(
     (draft) => resolveConsentFlags(savedConsent[draft.questionId]).includeAiProvenance,
   );
-  // Research sharing that starts on, such as from the session default, must be
-  // seen before submitting, so open the submission info until the participant chooses.
-  const researchSharingStartsOn =
-    (researchAvailable || hasSavedAi) &&
-    consentOverrides.includePredictionComparison === undefined &&
-    (comparisonChoice.checked || comparisonChoice.mixed);
-  useEffect(() => {
-    if (researchSharingStartsOn) setSubmissionInfoOpen(true);
-  }, [researchSharingStartsOn]);
 
   const existingResponsesRef = useRef(existingResponseSlice);
   existingResponsesRef.current = existingResponseSlice;
@@ -486,14 +483,14 @@ export default function SessionInterviewPanel({
     sessionSlug,
   });
   const generatedGroupRecommendationState = useSessionInterviewGroupRecommendations({
-    active: suggestGroups && !isInterviewBusy && !mapping,
+    active: joinMatchingGroups && !isInterviewBusy && !mapping,
     request: groupRecommendationRequest,
     questions,
     sessionConfig,
     sessionSlug,
     workerUrl: resolvedWorkerUrl,
+    account: authenticatedForSubmit ? String(account) : '',
   });
-  const generatedGroupRecommendations = generatedGroupRecommendationState.recommendations;
 
   useEffect(() => {
     if (generatedGroupRecommendationState.availability === 'available') {
@@ -583,6 +580,8 @@ export default function SessionInterviewPanel({
             loadWorkerUrl: resolveWorkerUrl,
             sessionUrl: buildInterviewReturnSessionUrl(),
             signal: catalogAbortRef.current.signal,
+            // Their AI may have read questions only their sign-in shows; checking never asks them to sign in.
+            ticket: silentCatalogTicketSource({ account, context, sessionSlug, sessionConfig, resolveWorkerUrl }),
           });
           if (disposedRef.current) return;
           // Validate imported evidence once; later additions must not block continued interviews.
@@ -621,8 +620,17 @@ export default function SessionInterviewPanel({
             : null);
         let mapped = importedDrafts;
         let proposedQuestions: GeneratedSurveyStatement[] = [];
+        let draftingPicks: InterviewPrefillGroupPick[] = [];
         if (mapped === null) {
           const url = await resolveWorkerUrl();
+          if (disposedRef.current) return;
+          // The session's AI picks, as it drafts, from the groups this person could join.
+          const groups = await loadDraftingGroupChoices({
+            sessionConfig,
+            sessionSlug,
+            workerUrl: url,
+            account: authenticatedForSubmit ? String(account) : '',
+          });
           if (disposedRef.current) return;
           // The mapper hears no AI prediction for an answered question, so it can't hand one back
           // as new evidence. Drafts under review keep theirs.
@@ -662,6 +670,10 @@ export default function SessionInterviewPanel({
               })),
             onSuggestedQuestions: (next) => {
               proposedQuestions = next;
+            },
+            groups,
+            onGroupPicks: (picks) => {
+              draftingPicks = picks;
             },
             reconsideration: usedClaimRef.current
               ? {
@@ -761,22 +773,19 @@ export default function SessionInterviewPanel({
           );
         }
         setMappedTranscript(nextTranscript);
-        if (review.drafts.length) {
-          setGroupRecommendationRequest({
-            requestId: Date.now(),
-            transcript: nextTranscript,
-            prefillPacket: contextPacket,
-            // Only answers the person keeps count; a hidden draft's guess stays out until it is shown.
-            draftResponses: review.drafts
-              .filter(
-                ({ questionId }) =>
-                  review.selected[questionId] && !newlyHidden.includes(questionId) && !isDraftConcealed(questionId),
-              )
-              .map((draft) => ({ ...draft, ...(review.edited[draft.questionId] || {}) })),
-          });
-        } else {
-          setGroupRecommendationRequest(null);
-        }
+        draftingPicksRef.current = draftingPicks;
+        setGroupRecommendationRequest(
+          review.drafts.length
+            ? buildGroupRecommendationRequest({
+                prefillPacket: contextPacket,
+                draftingPicks,
+                drafts: review.drafts,
+                selected: review.selected,
+                edited: review.edited,
+                hidden: (questionId) => newlyHidden.includes(questionId) || isDraftConcealed(questionId),
+              })
+            : null,
+        );
         setMappingNotice(
           [
             ...importNotices,
@@ -804,6 +813,7 @@ export default function SessionInterviewPanel({
       account,
       assignHiddenDrafts,
       authenticatedForSubmit,
+      context,
       drafts,
       hasAiPrefill,
       includePredictionComparison,
@@ -827,20 +837,22 @@ export default function SessionInterviewPanel({
 
   const refreshGroupRecommendations = useCallback(() => {
     if (!drafts.length || isInterviewBusy || mapping) return;
-    setGroupRecommendationRequest({
-      requestId: Date.now(),
-      transcript,
-      prefillPacket: prefillPacket
-        ? scopeInterviewPrefillToQuestions(
-            prefillPacket,
-            validatedPrefillQuestionsRef.current || questions,
-            responderContext,
-          )
-        : null,
-      draftResponses: drafts
-        .filter(({ questionId }) => selected[questionId] && !isDraftConcealed(questionId))
-        .map((draft) => ({ ...draft, ...(editedDrafts[draft.questionId] || {}) })),
-    });
+    setGroupRecommendationRequest(
+      buildGroupRecommendationRequest({
+        prefillPacket: prefillPacket
+          ? scopeInterviewPrefillToQuestions(
+              prefillPacket,
+              validatedPrefillQuestionsRef.current || questions,
+              responderContext,
+            )
+          : null,
+        draftingPicks: draftingPicksRef.current,
+        drafts,
+        selected,
+        edited: editedDrafts,
+        hidden: isDraftConcealed,
+      }),
+    );
   }, [
     drafts,
     editedDrafts,
@@ -851,7 +863,6 @@ export default function SessionInterviewPanel({
     questions,
     responderContext,
     selected,
-    transcript,
   ]);
 
   useEffect(() => {
@@ -1030,6 +1041,7 @@ export default function SessionInterviewPanel({
           if (review.selected[draft.questionId]) submittedDraftIdsRef.current.add(draft.questionId);
         setFidelityScore(score ? { summary: score, height: visibleBodyHeight(panelRef.current) } : null);
         setSubmitSucceeded(true);
+        setGroupJoinRequest(Date.now());
         setShowViewResults(false);
         if (viewResultsRevealRef.current) clearTimeout(viewResultsRevealRef.current);
         viewResultsRevealRef.current = setTimeout(() => {
@@ -1137,7 +1149,8 @@ export default function SessionInterviewPanel({
   const researchCoverage = prefillPacket?.source?.researchCoverage;
   const researchCoverageDetails = describeResearchCoverage(researchCoverage);
   const hasImportedResponderContext = Boolean(importedContext?.summary?.trim() || importedContext?.facts?.length);
-  const canManuallyRefreshGroupRecommendations = hasRefreshableGroups && drafts.length > 0;
+  const canManuallyRefreshGroupRecommendations =
+    hasRefreshableGroups && drafts.length > 0 && !groupRecommendationRequest;
 
   const { guidance, idle, statusLabel, statusTone } = describeInterviewStatus({
     recordingState,
@@ -1394,41 +1407,28 @@ export default function SessionInterviewPanel({
               })}
             </SessionInterviewReviewSection>
           ) : null}
+          {joinMatchingGroups && drafts.length ? (
+            <SessionInterviewRecommendedGroups
+              hidden={isInterviewBusy || mapping}
+              recommendations={generatedGroupRecommendationState.recommendations}
+              availability={generatedGroupRecommendationState.availability}
+              joinRequest={groupJoinRequest}
+              onTickedChange={setGroupsTicked}
+              onRefresh={canManuallyRefreshGroupRecommendations ? refreshGroupRecommendations : undefined}
+              account={account}
+              provider={provider}
+              network={network}
+              loginComplete={loginComplete}
+              sessionConfig={sessionConfig}
+              sessionSlug={sessionSlug}
+              workerUrl={resolvedWorkerUrl}
+            />
+          ) : null}
           {suggestedQuestions.length > 0 ? (
             <SessionInterviewSuggestions
               questions={suggestedQuestions}
               creatorProps={questionCreatorProps || {}}
               hidden={isInterviewBusy || mapping || shouldHideSuggestedQuestionSection(suggestedQuestionAuthoringState)}
-            />
-          ) : null}
-          {suggestGroups &&
-          !isInterviewBusy &&
-          !mapping &&
-          canManuallyRefreshGroupRecommendations &&
-          !groupRecommendationRequest ? (
-            <Button
-              outline
-              onClick={() => {
-                refreshGroupRecommendations();
-                // The button goes away once clicked; keep keyboard focus on a control that stays.
-                (reviewRef.current || statusRef.current)?.focus({ preventScroll: true });
-              }}
-            >
-              Refresh group suggestions
-            </Button>
-          ) : null}
-          {suggestGroups && !isInterviewBusy && !mapping ? (
-            <SessionInterviewRecommendedGroups
-              recommendations={generatedGroupRecommendations}
-              account={account}
-              provider={provider}
-              network={network}
-              loginComplete={loginComplete}
-              loginModalToggled={loginModalToggled}
-              toggleLoginModal={toggleLoginModal}
-              sessionConfig={sessionConfig}
-              sessionSlug={sessionSlug}
-              workerUrl={resolvedWorkerUrl}
             />
           ) : null}
           {researchCoverage ? (
@@ -1463,15 +1463,10 @@ export default function SessionInterviewPanel({
                           includeProvenance={aiChoice.checked}
                           includeComparison={comparisonChoice.checked}
                           provenanceMixed={aiChoice.mixed}
-                          comparisonMixed={comparisonChoice.mixed}
                           preserveSavedProvenance={hasSavedAi && consentOverrides.includeAiProvenance === undefined}
                           onProvenanceChange={(included) => {
                             setIncludeProvenance(included);
                             setConsentOverrides((prev) => ({ ...prev, includeAiProvenance: included }));
-                          }}
-                          onComparisonChange={(included) => {
-                            setResearchSharingChoice({ contextToken: baseSubmitContextToken, included });
-                            setConsentOverrides((prev) => ({ ...prev, includePredictionComparison: included }));
                           }}
                           coverageDetails={researchCoverageDetails}
                           selectedCount={drafts.filter((draft) => submittableSelection[draft.questionId]).length}
@@ -1485,15 +1480,18 @@ export default function SessionInterviewPanel({
                       {researchAvailable || hasSavedAi ? null : nameOption}
                     </div>
                   </details>
-                  {/* Sharing can be on by default, so say so without opening the panel. */}
-                  {researchAvailable && (comparisonChoice.checked || comparisonChoice.mixed) ? (
-                    <small className={styles.sessionInterviewSharingStatus}>
-                      {comparisonChoice.mixed
-                        ? 'Sharing AI draft changes for research on some responses'
-                        : submitSucceeded
-                          ? 'Shared your AI’s predictions and your changes for research'
-                          : 'Sharing your AI’s predictions and your changes for research'}
-                    </small>
+                  {researchAvailable || hasSavedAi ? (
+                    <SessionInterviewResearchShare
+                      className={styles.sessionInterviewResearchShare}
+                      included={comparisonChoice.checked}
+                      mixed={comparisonChoice.mixed}
+                      disabled={applying}
+                      researchDetail={shownResearchDetail}
+                      onChange={(included) => {
+                        setResearchSharingChoice({ contextToken: baseSubmitContextToken, included });
+                        setConsentOverrides((prev) => ({ ...prev, includePredictionComparison: included }));
+                      }}
+                    />
                   ) : null}
                 </div>
               ) : null}
@@ -1530,6 +1528,8 @@ export default function SessionInterviewPanel({
                   'Preparing submission…'
                 ) : pendingSubmitAfterLogin && !authenticatedForSubmit ? (
                   'Submit after login'
+                ) : groupsTicked ? (
+                  'Submit and join'
                 ) : (
                   'Submit responses'
                 )}

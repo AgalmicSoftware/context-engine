@@ -1,4 +1,5 @@
 import { validSessionAgentConfig } from '../../shared/sessionAgentConfig.mjs';
+import { MAX_AGENT_INSTRUCTIONS_CHARS, validAgentInstructions } from '../../shared/sessionConfigEdits.mjs';
 import { stableCanonicalSerialize } from '../../shared/canonicalJson.mjs';
 import { recoveryKeyFingerprint, withFreshRecoveryKey } from './recoveryKey.mjs';
 import { fetchArtifactText } from './artifactFetch.mjs';
@@ -1235,6 +1236,9 @@ const resolveDeploymentAccountId = async ({
 export const validateDeployHelperPublicConfigInputs = (body = {}) => {
   if (!validSessionAgentConfig(body)) return 'Invalid agent configuration.';
   if (body?.deploymentKind) return 'Separate agent deployments are no longer supported; configure the Session Worker.';
+  if (Object.hasOwn(body || {}, 'agentInstructions') && !validAgentInstructions(body.agentInstructions)) {
+    return `agentInstructions must be text of at most ${MAX_AGENT_INSTRUCTIONS_CHARS} characters.`;
+  }
   const allowOriginsInput = Array.isArray(body?.allowOrigins) ? body.allowOrigins : [];
   if (allowOriginsInput.some((origin) => toStr(origin).includes('*'))) {
     return 'Worker CORS allowlists must contain exact origins.';

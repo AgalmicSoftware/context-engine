@@ -59,6 +59,39 @@
     font-family: var(--ce-font-ui);
   }
 
+  // The browser paints a file input's button itself, and a dark theme's hover
+  // shade left its label at 3.95:1, so it takes the theme's control colours.
+  // File inputs sit on panels, so the chosen file's name is panel text.
+  input[type='file'] {
+    color: var(--ce-panel-text);
+  }
+
+  ::file-selector-button {
+    margin-inline-end: 8px;
+    padding: 1px 8px;
+    border-color: var(--ce-border-raised);
+    border-radius: var(--ce-radius-4);
+    border-style: solid;
+    border-width: var(--ce-border-control-width);
+    background: var(--ce-control-face);
+    color: var(--ce-control-text);
+    // Otherwise it inherits a field's own text fill, as on the setup page.
+    -webkit-text-fill-color: currentColor;
+    cursor: pointer;
+  }
+
+  // Chromium marks a disabled input :active too, which would look pressable.
+  input:not(:disabled)::file-selector-button:active {
+    border-color: var(--ce-border-inset);
+    box-shadow: var(--ce-shadow-pressed);
+  }
+
+  input:disabled::file-selector-button {
+    background: var(--ce-control-disabled-bg);
+    color: var(--ce-control-disabled-text);
+    cursor: not-allowed;
+  }
+
   .card,
   .modal-content,
   .dropdown-menu,

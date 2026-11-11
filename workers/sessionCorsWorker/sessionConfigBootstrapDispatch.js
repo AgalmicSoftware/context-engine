@@ -43,25 +43,16 @@ const protectBootstrapResponse = (response, baseHeaders) => {
   return { ...response, headers };
 };
 
-export const dispatchSessionConfigBootstrapRequest = async ({
-  request,
-  env,
-  slugHint,
-  baseHeaders,
-  deps,
-  constants,
-} = {}) => {
-  const protectedBaseHeaders = buildBootstrapHeaders(baseHeaders);
+// The session a request names and its stored config, or the response that
+// refuses the read. /session-config and /llms.txt read the same way.
+const readWorkerSessionConfig = async ({ request, env, slugHint, headers, deps, constants } = {}) => {
+  const refuse = (error, status) => ({ response: deps?.json?.({ error }, status, headers) });
   const slugResolution = deps?.resolveRequestSlugWithoutToken?.({ request, env, slugHint }) || {
     ok: false,
     error: 'Invalid session slug.',
   };
-  if (!slugResolution.ok) {
-    return deps?.json?.({ error: slugResolution.error }, 400, protectedBaseHeaders);
-  }
-  if (!slugResolution.explicitSlugProvided) {
-    return deps?.json?.({ error: constants?.missingSlugError }, 400, protectedBaseHeaders);
-  }
+  if (!slugResolution.ok) return refuse(slugResolution.error, 400);
+  if (!slugResolution.explicitSlugProvided) return refuse(constants?.missingSlugError, 400);
 
   const slug = slugResolution.slug;
   let querySlugRaw = null;
@@ -70,27 +61,35 @@ export const dispatchSessionConfigBootstrapRequest = async ({
   } catch {}
   if (querySlugRaw != null) {
     const querySlug = validateInboundWorkerSessionSlug(querySlugRaw);
-    if (!querySlug.ok) {
-      return deps?.json?.({ error: querySlug.error }, 400, protectedBaseHeaders);
-    }
-    if (querySlug.slug !== slug) {
-      return deps?.json?.({ error: 'Session config slug query does not match X-Session-Slug.' }, 400, protectedBaseHeaders);
-    }
+    if (!querySlug.ok) return refuse(querySlug.error, 400);
+    if (querySlug.slug !== slug) return refuse('Session config slug query does not match X-Session-Slug.', 400);
   }
   const config = await deps?.getSessionConfig?.(env, slug);
   // Do not expose chain-canonical config through a caller-selected worker.
-  if (!config || !isWorkerCanonicalSessionConfig(config)) {
-    return deps?.json?.({ error: constants?.sessionConfigNotFoundError }, 404, protectedBaseHeaders);
-  }
+  if (!config || !isWorkerCanonicalSessionConfig(config)) return refuse(constants?.sessionConfigNotFoundError, 404);
   // The public readback is the client's authority for capability projection.
   // Refuse contradictory profile/storage records instead of advertising one
   // policy while storage routes enforce another.
   const modeValidation = validateWorkerConfigModeValues(config);
-  if (!modeValidation.ok) {
-    return deps?.json?.({ error: constants?.sessionConfigNotFoundError }, 404, protectedBaseHeaders);
-  }
+  if (!modeValidation.ok) return refuse(constants?.sessionConfigNotFoundError, 404);
   const corsContext = await deps?.getCorsContext?.({ request, config });
-  if (!corsContext?.ok) return protectBootstrapResponse(corsContext?.response, protectedBaseHeaders);
+  if (!corsContext?.ok) return { response: protectBootstrapResponse(corsContext?.response, headers) };
+  return { slug, config, headers: buildBootstrapHeaders(corsContext.headers) };
+};
+
+export const dispatchSessionConfigBootstrapRequest = async ({
+  request,
+  env,
+  slugHint,
+  baseHeaders,
+  deps,
+  constants,
+} = {}) => {
+  const read = await readWorkerSessionConfig({
+    request, env, slugHint, headers: buildBootstrapHeaders(baseHeaders), deps, constants,
+  });
+  if ('response' in read) return read.response;
+  const { slug, config } = read;
 
   return deps?.json?.({
     ok: true,
@@ -105,5 +104,30 @@ export const dispatchSessionConfigBootstrapRequest = async ({
           typeof getStorageAuditBinding(env)?.put === 'function' ? 1 : 0,
       },
     },
-  }, 200, buildBootstrapHeaders(corsContext.headers));
+  }, 200, read.headers);
+};
+
+// GET /llms.txt: the session's instructions for AI agents, from its public
+// config. Admins write them, so they're sent as text that never runs as a page.
+export const dispatchSessionAgentInstructionsRequest = async ({
+  request,
+  env,
+  slugHint,
+  baseHeaders,
+  deps,
+  constants,
+} = {}) => {
+  const read = await readWorkerSessionConfig({
+    request, env, slugHint, headers: buildBootstrapHeaders(baseHeaders), deps, constants,
+  });
+  if ('response' in read) return read.response;
+  const { agentInstructions } = projectPublicWorkerSessionConfig(read.config);
+  if (typeof agentInstructions !== 'string' || !agentInstructions.trim()) {
+    return deps?.json?.({ error: 'This session has no instructions for AI agents.' }, 404, read.headers);
+  }
+  const headers = new Headers(read.headers);
+  headers.set('Content-Type', 'text/markdown; charset=utf-8');
+  headers.set('X-Content-Type-Options', 'nosniff');
+  headers.set('Content-Security-Policy', "sandbox; default-src 'none'");
+  return new Response(agentInstructions, { status: 200, headers });
 };

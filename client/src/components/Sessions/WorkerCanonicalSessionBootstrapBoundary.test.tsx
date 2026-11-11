@@ -235,6 +235,30 @@ describe('WorkerCanonicalSessionBootstrapBoundary', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Worker session ready.');
   });
 
+  it('asks discovery for the session a known-sessions entry names, and stops when the Worker reports another', async () => {
+    const onResolved = jest.fn();
+    mockFetchBootstrap.mockRejectedValueOnce(
+      new WorkerSessionBootstrapRequestError('Worker bootstrap session ID does not match the requested session.', {
+        code: 'identity_mismatch',
+      }),
+    );
+
+    render(
+      <WorkerCanonicalSessionBootstrapBoundary
+        sessionSlug="worker-session"
+        workerQueryValue={WORKER_ORIGIN}
+        expectedSessionId={SESSION_ID}
+        environment="test"
+        onResolved={onResolved}
+      />,
+    );
+
+    expect(mockFetchBootstrap.mock.calls[0][0]).toEqual(expect.objectContaining({ expectedSessionId: SESSION_ID }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Worker identity mismatch');
+    expect(onResolved).not.toHaveBeenCalled();
+    expect(mockUpsertBootstrap).not.toHaveBeenCalled();
+  });
+
   it('composes a fresh validated Lit bootstrap into descriptor-free worker hooks config', async () => {
     const sessionModeProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
     sessionModeProfile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;

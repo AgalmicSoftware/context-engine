@@ -22,7 +22,6 @@ import {
   derivePrimarySessionSlugFromList,
   readStoredGlobalSessionSelection,
 } from '../../utilities/session/globalSessionState.js';
-import { getPrimaryDemoSessionSlug } from '../../utilities/session/demoSessionSlugs.js';
 import { buildPublicRoute } from '../MainSite/urlUtils.js';
 
 type RecognitionLink = {
@@ -395,6 +394,11 @@ export const USE_CASES = [
   },
 ];
 
+// The Demo button opens a listed session whose Worker runs voice interviews,
+// group recording and the prompt for a person's own AI. demo-sh's Worker
+// predates them.
+export const ABOUT_DEMO_SESSION_SLUG = 'rxc-ra-test-5';
+
 export const getAboutDemoSessionPath = (selection = readStoredGlobalSessionSelection()) => {
   const scopeMode = String(selection?.selectedSessionScope || '')
     .trim()
@@ -403,7 +407,7 @@ export const getAboutDemoSessionPath = (selection = readStoredGlobalSessionSelec
     const firstScopedSlug = derivePrimarySessionSlugFromList(selection?.selectedSessionSlugs || []);
     if (firstScopedSlug) return `/session/${encodeURIComponent(firstScopedSlug)}`;
   }
-  return `/session/${encodeURIComponent(getPrimaryDemoSessionSlug())}`;
+  return `/session/${encodeURIComponent(ABOUT_DEMO_SESSION_SLUG)}`;
 };
 
 export const getRecognitionSlug = (name: string) => name.toLowerCase().replace(/[^a-z0-9]+/g, '-');

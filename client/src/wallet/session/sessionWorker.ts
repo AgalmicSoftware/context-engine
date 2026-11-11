@@ -1,6 +1,7 @@
 /// <reference lib="webworker" />
 import { ethers } from 'ethers';
 import type { HexString, SoftSessionPolicy } from '../types.js';
+import { extendSoftSessionPolicy } from './sessionPolicy.js';
 import { handleSoftSessionRequest } from './sessionRequest.js';
 
 type InitMessage = {
@@ -19,12 +20,18 @@ type RequestMessage = {
   params?: unknown[];
 };
 
+type ExtendMessage = {
+  id: string;
+  type: 'extend';
+  until: number;
+};
+
 type LockMessage = {
   id: string;
   type: 'lock';
 };
 
-type WorkerMessage = InitMessage | RequestMessage | LockMessage;
+type WorkerMessage = InitMessage | RequestMessage | ExtendMessage | LockMessage;
 
 let wallet: ethers.Wallet | null = null;
 let provider: ethers.providers.JsonRpcProvider | null = null;
@@ -75,6 +82,14 @@ self.onmessage = (event: MessageEvent<WorkerMessage>) => {
         policy = message.policy;
         scheduleLock();
         postSuccess(message.id, { address: wallet.address });
+        return;
+      }
+      if (message.type === 'extend') {
+        if (policy) {
+          policy = extendSoftSessionPolicy(policy, message.until);
+          scheduleLock();
+        }
+        postSuccess(message.id, true);
         return;
       }
       if (message.type === 'lock') {

@@ -16,6 +16,7 @@ const draft: PendingWorkerGroupDraft = {
   adminAddress: ADMIN_ADDRESS,
   joinMode: 'admin_add',
   memberVisibility: 'members',
+  removalAuth: 'admin_only',
 };
 
 const payloadGroup = {
@@ -30,6 +31,7 @@ const payloadGroup = {
   adminAddress: ADMIN_ADDRESS,
   joinMode: draft.joinMode,
   memberVisibility: draft.memberVisibility,
+  removalAuth: draft.removalAuth,
   sessionSlug: 'test-session',
   sessionId: SESSION_ID,
 };
@@ -81,6 +83,7 @@ describe('publishPendingWorkerGroupDrafts', () => {
             tags: ['research', 'policy'],
             documentURLs: ['https://docs.example.test/brief'],
             memberLimit: 25,
+            removalAuth: 'admin_only',
           }),
         }),
       }),
@@ -119,6 +122,36 @@ describe('publishPendingWorkerGroupDrafts', () => {
       'groups/create',
       'groups/list',
     ]);
+  });
+
+  it('reuses a retried group when its removal setting matches or its Worker predates the setting', async () => {
+    const retryAgainst = (existing: Record<string, unknown>, queued: PendingWorkerGroupDraft) =>
+      publishPendingWorkerGroupDrafts({
+        drafts: [queued],
+        sessionConfig: { defaultGroupTags: ['research'] },
+        sessionId: SESSION_ID,
+        sessionSlug: 'test-session',
+        signerAccount: ADMIN_ADDRESS,
+        workerUrl: 'https://worker.example',
+        signTypedAdminAction: jest.fn(),
+        postSignedRequestImpl: jest
+          .fn()
+          .mockRejectedValueOnce(
+            Object.assign(new Error('already exists'), { reason: 'worker_group_exists', status: 409 }),
+          )
+          .mockResolvedValueOnce(
+            workerRequestResult({ sessionSlug: 'test-session', sessionId: SESSION_ID, groups: [existing] }),
+          ),
+      });
+    const { removalAuth: _removalAuth, ...unsetGroup } = payloadGroup;
+
+    await expect(retryAgainst({ ...payloadGroup, removalAuth: 'both' }, draft)).rejects.toThrow(
+      'Queued Group "Research team" conflicts with an existing Worker Group.',
+    );
+    // An older Worker omits the setting, and saved the queued group without it the first time too.
+    for (const removalAuth of ['admin_only', 'both'] as const) {
+      await expect(retryAgainst(unsetGroup, { ...draft, removalAuth })).resolves.toEqual({ created: 0, reused: 1 });
+    }
   });
 
   it('reuses a group when the Worker canonicalizes host-only URLs', async () => {

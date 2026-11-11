@@ -27,7 +27,7 @@ import {
   type WorkerGroup,
   type WorkerGroupOverview,
 } from '../../domains/worker/workerGroupPorts';
-import { getWorkerSessionToken } from '../../utilities/worker/workerAuth';
+import { getWorkerSessionToken, isWorkerSignInNeededError } from '../../utilities/worker/workerAuth';
 import type { WorkerGroupsChangedDetail } from '../../utilities/worker/workerGroupChangeEvents';
 
 export type CommunityWorkerGroupCountCacheEntry = {
@@ -279,9 +279,11 @@ export const loadCommunityWorkerGroupCount = async ({
     try {
       let groups: WorkerGroup[];
       let overviewMemberships: WorkerGroupOverview['memberships'] = [];
+      let credentialToken = '';
       if (account) {
         const projection = resolveSessionCapabilityProjection(sessionConfig);
-        const credentialToken = await getWorkerSessionToken({
+        // A viewer's own groups count only through a sign-in that asks them for nothing.
+        credentialToken = await getWorkerSessionToken({
           sessionSlug: slug,
           sessionConfig,
           workerUrl,
@@ -291,12 +293,29 @@ export const loadCommunityWorkerGroupCount = async ({
             chainId:
               runtime.networkChainId || runtime.network?.chainId || runtime.network?.id || projection.chainId || 1,
           },
+          prompt: false,
+        }).catch((error: unknown) => {
+          if (isWorkerSignInNeededError(error)) return '';
+          throw error;
         });
+      }
+      if (credentialToken) {
         const overview = await loadWorkerGroupOverview({ workerUrl, credentialToken, sessionId, sessionSlug: slug });
         overviewMemberships = overview.memberships || [];
         groups = [...(overview.groups || []), ...(overview.memberships || []).map((membership) => membership.group)];
-      } else {
+      } else if (sessionModeAllowsAnonymousWorkerGroupDiscovery(sessionConfig.sessionModeProfile)) {
         groups = await loadPublicWorkerGroups({ workerUrl, sessionId, sessionSlug: slug });
+      } else {
+        // A private session counts nothing for a viewer not signed in to it, as for a signed-out one.
+        if (requestIsCurrent())
+          cache.set(countCacheKey, {
+            count: existing?.count || 0,
+            groupIds: existing?.groupIds || [],
+            visibleUserIds: existing?.visibleUserIds || [],
+            status: 'unavailable',
+            updatedAtMs: Date.now(),
+          });
+        return;
       }
       const groupIds = Array.from(new Set(groups.map((group) => String(group?.groupId || '').trim()).filter(Boolean)));
       const visibleUserIds = new Set<string>();

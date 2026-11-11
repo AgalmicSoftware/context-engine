@@ -87,7 +87,7 @@ describe('giving each person their part', () => {
     };
     expect(await open('salon')).toContain('/session/salon?worker=https%3A%2F%2Fworker.example#claim=');
     // A session the site ships with opens from its clean link anywhere.
-    expect(await open('rxc-ra-test-5')).toContain('/session/salon#claim=');
+    expect(await open('eddy26')).toContain('/session/salon#claim=');
   });
 
   it('offers a button to every speaker, however little they said, and nothing for an unlabelled transcript', () => {

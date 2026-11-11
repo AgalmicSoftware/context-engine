@@ -119,7 +119,11 @@ describe('context sources on the client', () => {
     expect(await readContextSourceText(essay, options)).toBe('Institutions adapt.');
     expect(await readContextSourceText(deck, options)).toBe('Slide 1.');
     expect(readBlob).toHaveBeenLastCalledWith(
-      expect.objectContaining({ storageRef: { backend: 'cloudflare', id: 'text-1' }, preferAnonymous: true }),
+      expect.objectContaining({
+        storageRef: { backend: 'cloudflare', id: 'text-1' },
+        preferAnonymous: true,
+        prompt: false,
+      }),
     );
     expect(await readContextSourceText({ ...deck, reading: null } as ContextSource, options)).toBe('');
     readBlob.mockRejectedValueOnce(new Error('denied'));
@@ -169,13 +173,42 @@ describe('context sources on the client', () => {
     expect(upload).toHaveBeenCalledTimes(3);
   });
 
-  it('lists as the person only when their browser already holds a session token, so it never asks them to sign', async () => {
+  it('asks someone signed in to sign in only where the caller allows it, and otherwise uses a held token', async () => {
     listPage.mockResolvedValue({ items: [], cursor: null, listComplete: true });
+    const lastList = () => listPage.mock.calls[listPage.mock.calls.length - 1]?.[0];
     await listContextSources(options);
-    expect(listPage).toHaveBeenLastCalledWith(expect.objectContaining({ preferAnonymous: true }));
+    expect(lastList()).toEqual(expect.objectContaining({ preferAnonymous: true, prompt: false }));
     jest.mocked(hasCachedWorkerSessionToken).mockResolvedValueOnce(true);
     await listContextSources(options);
-    expect(listPage).toHaveBeenLastCalledWith(expect.objectContaining({ preferAnonymous: false }));
+    expect(lastList()).toEqual(expect.objectContaining({ preferAnonymous: false, prompt: false }));
+    await listContextSources({ ...options, prompt: true });
+    expect(lastList()).toEqual(expect.objectContaining({ preferAnonymous: false, prompt: true }));
+    // Nobody is signed in to ask.
+    await listContextSources({ ...options, context: { account: '' }, prompt: true });
+    expect(lastList()).toEqual(expect.objectContaining({ preferAnonymous: true, prompt: false }));
+    await listContextSources({ ...options, asAdmin: true });
+    expect(lastList()).toEqual(expect.objectContaining({ preferAnonymous: false, prompt: true }));
+  });
+
+  it('lists what a signed-out visitor sees once a sign-in is declined or the Worker refuses a held one', async () => {
+    jest.mocked(hasCachedWorkerSessionToken).mockResolvedValueOnce(true);
+    listPage
+      .mockRejectedValueOnce(new Error('Invalid token.'))
+      .mockResolvedValueOnce({ items: [pdf], cursor: null, listComplete: true });
+    expect((await listContextSources(options)).map(({ id }) => id)).toEqual(['pdf-1']);
+    expect(listPage.mock.calls.map(([call]) => call?.preferAnonymous)).toEqual([false, true]);
+    listPage
+      .mockReset()
+      .mockRejectedValueOnce(new Error('The passkey prompt was dismissed.'))
+      .mockResolvedValueOnce({ items: [pdf], cursor: null, listComplete: true });
+    expect((await listContextSources({ ...options, prompt: true })).map(({ id }) => id)).toEqual(['pdf-1']);
+    expect(listPage.mock.calls.map(([call]) => [call?.preferAnonymous, call?.prompt])).toEqual([
+      [false, true],
+      [true, false],
+    ]);
+    // An admin's own view reports the refusal instead.
+    listPage.mockReset().mockRejectedValueOnce(new Error('Invalid token.'));
+    await expect(listContextSources({ ...options, asAdmin: true })).rejects.toThrow('Invalid token.');
   });
 
   it('keeps a group’s file narrow in a template, since groups don’t travel between sessions', () => {

@@ -22,7 +22,6 @@ import {
   resolveWorkerResponseHydrationRun,
 } from '../../utilities/survey/workerResponseHydrationRuntime';
 import { loadWorkerResponses } from '../../utilities/survey/workerResponseHydration';
-import demoSessions from '../../variables/demo/demo_sessions.json';
 
 jest.mock('./CreateQuestionsAndSurveys', () => {
   const React = require('react');
@@ -52,10 +51,13 @@ afterAll(() => {
   expect(blockedNetwork).toEqual([]);
 });
 
-const SLUG = 'rxc-ra-test';
+const SLUG = 'worker-salon';
 const PUBLIC = { gate: 'none', encryption: 'none' };
 const SESSION_CONFIG = {
-  ...demoSessions[SLUG],
+  slug: SLUG,
+  sessionId: '0x5a1e5a1e5a1e5a1e5a1e5a1e5a1e5a1e',
+  corsWorkerUrl: 'https://ce-worker-salon.example.workers.dev/',
+  workerCanonicalCleanRoute: true,
   storageProfile: {
     backend: 'cloudflare',
     resources: { questions: 'active', surveys: 'active', responses: 'active' },

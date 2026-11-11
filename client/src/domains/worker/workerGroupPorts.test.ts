@@ -11,8 +11,11 @@ import {
   loadWorkerGroupMembers,
   loadWorkerGroupOverview,
   normalizeWorkerGroupDefaultTags,
+  normalizeWorkerGroupsAdminPayload,
   removeWorkerGroupMember,
   updateWorkerGroup,
+  workerGroupAdminsMayRemove,
+  workerGroupMembersMayLeave,
 } from './workerGroupPorts';
 import * as workerAuth from '../../utilities/worker/workerAuth.js';
 
@@ -31,6 +34,46 @@ describe('worker group ports', () => {
       }),
     ).toEqual(['Facilitators', 'reviewers']);
     expect(normalizeWorkerGroupDefaultTags({ defaultSbtTags: ['legacy', 'tags'] })).toEqual(['legacy', 'tags']);
+  });
+
+  it('reads who can remove members from each group, leaves an unset one for the helpers to read as both, and drops unknown settings', () => {
+    const group = (groupId: string, removalAuth?: unknown) => ({
+      groupId,
+      sessionSlug: SESSION_SLUG,
+      label: groupId,
+      joinMode: 'open',
+      memberVisibility: 'session',
+      ...(removalAuth === undefined ? {} : { removalAuth }),
+    });
+    const groups = normalizeWorkerGroupsAdminPayload(
+      {
+        groups: [
+          group('both', 'both'),
+          group('admins', 'admin_only'),
+          group('self', 'member_only'),
+          group('fixed', 'neither'),
+          group('legacy'),
+          group('unknown', 'owner_only'),
+        ],
+      },
+      SESSION_SLUG,
+    );
+
+    expect(groups.map(({ groupId, removalAuth }) => [groupId, removalAuth])).toEqual([
+      ['both', 'both'],
+      ['admins', 'admin_only'],
+      ['self', 'member_only'],
+      ['fixed', 'neither'],
+      ['legacy', undefined],
+    ]);
+    expect(groups.map((entry) => [workerGroupMembersMayLeave(entry), workerGroupAdminsMayRemove(entry)])).toEqual([
+      [true, true],
+      [false, true],
+      [true, false],
+      [false, false],
+      [true, true],
+    ]);
+    expect([workerGroupMembersMayLeave({}), workerGroupAdminsMayRemove({})]).toEqual([true, true]);
   });
 
   it('loads public session-visible groups without sending a credential', async () => {
@@ -78,6 +121,17 @@ describe('worker group ports', () => {
       },
     });
     expect(JSON.stringify(fetchImpl.mock.calls)).not.toContain('Authorization');
+
+    await loadPublicWorkerGroups({
+      workerUrl: WORKER_URL,
+      sessionId: SESSION_ID,
+      sessionSlug: SESSION_SLUG,
+      joinGroup: 'salon 2026',
+      fetchImpl,
+    }).catch(() => undefined);
+    expect((fetchImpl.mock.calls.at(-1) as unknown[] | undefined)?.[0]).toBe(
+      `${WORKER_URL}/groups/list?sessionId=${encodeURIComponent(SESSION_ID)}&joinGroup=salon%202026`,
+    );
   });
 
   it('loads visible groups and self-memberships directly with the session-worker credential', async () => {

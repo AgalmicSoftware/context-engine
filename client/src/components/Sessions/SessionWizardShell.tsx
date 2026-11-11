@@ -126,7 +126,7 @@ const SessionWizardShell = ({
         />
         <SetupContextSection {...section('context')} sources={contextSources} publisher={contextPublisher} />
         <SetupQuestionsSection {...section('questions')} publisher={questionsPublisher} />
-        <SetupParticipationSection {...section('participation')} supportsEndTime={isWorkerCanonical} />
+        <SetupParticipationSection {...section('participation')} workerHosted={isWorkerCanonical} />
         <SetupResultsSection {...section('results')} {...policy} />
         <SetupAccessSection
           {...section('access')}

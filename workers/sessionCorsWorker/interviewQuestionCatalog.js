@@ -16,7 +16,8 @@ const RPC_CHUNK_SIZE = 100_000;
 const MAX_LOG_CHUNKS = MAX_SCAN_BLOCKS / RPC_CHUNK_SIZE;
 const MAX_POINTER_READS = 200;
 const MAX_CANDIDATES = 2000;
-const catalog = (questions = [], incomplete = false) => ({ questions, incomplete });
+// `refused` marks a session whose questions a signed-out visitor may not list at all.
+const catalog = (questions = [], incomplete = false, refused = false) => ({ questions, incomplete, refused });
 const retryableReadStatus = status => !status || status === 408 || status === 429 || status >= 500;
 import { normalizePublicInterviewQuestions, hasRestrictedPrompt, hasRatingScaleMetadata, normalizeRatingScale, normalizeQuestion } from '../../shared/interviewQuestionCatalog.mjs';
 import { selectCanonicalStorageVersions } from './storageResourceOwnership.js';
@@ -49,10 +50,15 @@ const listQuestionRows = async (callStorage) => {
   const seenCursors = new Set();
   let cursor = '';
   let complete = false;
+  let refused = false;
   for (let page = 0; page < MAX_CLOUDFLARE_LIST_PAGES; page += 1) {
     const query = new URLSearchParams({ resource: 'questions', limit: String(MAX_QUESTIONS), ...(cursor ? { cursor } : {}) });
     let listing;
-    try { listing = await readJsonResponse(await callStorage('/storage/list', query.toString())); } catch { break; }
+    try {
+      const response = await callStorage('/storage/list', query.toString());
+      if (!page) refused = [401, 403].includes(Number(response?.status));
+      listing = await readJsonResponse(response);
+    } catch { break; }
     if (!Array.isArray(listing?.items)) break;
     items.push(...listing.items);
     if (listing.listComplete === true) { complete = true; break; }
@@ -61,12 +67,13 @@ const listQuestionRows = async (callStorage) => {
     if (!cursor || seenCursors.has(cursor)) break;
     seenCursors.add(cursor);
   }
-  return { items, incomplete: !complete };
+  return { items, incomplete: !complete, refused };
 };
 
-const loadCloudflareQuestions = async ({ env, config, slug, storageRoute }) => {
+const loadCloudflareQuestions = async ({ env, config, slug, storageRoute, reader }) => {
   if (typeof storageRoute !== 'function') return catalog();
   const origin = 'https://session-worker.invalid';
+  // A catalog ticket's reader sees what that person sees; otherwise this is a signed-out view.
   const callStorage = (path, query) => storageRoute({
     path,
     method: 'GET',
@@ -74,7 +81,8 @@ const loadCloudflareQuestions = async ({ env, config, slug, storageRoute }) => {
     env,
     config,
     slug,
-    uploaderAddress: '',
+    uploaderAddress: reader?.address || '',
+    ...(reader ? { authScopes: reader.scopes } : {}),
     baseHeaders: {},
   });
   const listing = await listQuestionRows(callStorage);
@@ -131,7 +139,11 @@ const loadCloudflareQuestions = async ({ env, config, slug, storageRoute }) => {
     // falling back to another version could serve someone else's copy.
     if (payloadQuestionId(payload) === version.resourceId && normalizeQuestion(payload)) questions.push(payload);
   }
-  return catalog(dedupeQuestions(questions), incomplete || legacyVersions.length > legacyReads.length || candidates.length > chosen.length);
+  return catalog(
+    dedupeQuestions(questions),
+    incomplete || legacyVersions.length > legacyReads.length || candidates.length > chosen.length,
+    listing.refused,
+  );
 };
 
 const pickContractAddress = (config = {}) => {
@@ -306,11 +318,16 @@ export const loadPublicInterviewQuestions = async ({
   slug = '',
   storageRoute,
   fetch: fetchImpl = globalThis.fetch,
+  reader,
 } = {}) => {
-  const cloudflareQuestions = await loadCloudflareQuestions({ env, config, slug, storageRoute });
+  const cloudflareQuestions = await loadCloudflareQuestions({ env, config, slug, storageRoute, reader });
   if (cloudflareQuestions.questions.length) return cloudflareQuestions;
   const onChain = await loadOnChainQuestions({ config, slug, fetchImpl });
-  return catalog(onChain.questions, cloudflareQuestions.incomplete || onChain.incomplete);
+  return catalog(
+    onChain.questions,
+    cloudflareQuestions.incomplete || onChain.incomplete,
+    cloudflareQuestions.refused && !onChain.questions.length,
+  );
 };
 
 export const __test__interviewQuestionCatalog = {

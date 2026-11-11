@@ -91,6 +91,11 @@ type PasskeyWalletClientDeps = {
 const walletLog = createLogger('wallet');
 const MISSING_WALLET_CODE = 'CE_PASSKEY_WALLET_RECORD_MISSING';
 const PASSKEY_WALLET_LOCKED_MESSAGE = 'Passkey wallet is locked.';
+// However much the page is used, the wallet locks this long after its passkey prompt.
+const MAX_UNLOCK_SECONDS = 8 * 60 * 60;
+// Input that keeps the wallet unlocked: clicks, taps and key presses. Screen readers often
+// activate a control with a click alone.
+const ACTIVITY_EVENTS = ['pointerdown', 'keydown', 'click'];
 
 export class MissingPasskeyWalletRecordError extends Error {
   code = MISSING_WALLET_CODE;
@@ -229,6 +234,7 @@ export class PasskeyEoaWalletClient {
   private sessionClient: SoftSessionClient;
   private activeAddress: HexString | null = null;
   private unlockExpiresAt = 0;
+  private unlockMaxExpiresAt = 0;
   private activeChain: ChainLike = defaultChain();
   private lockTimer: ReturnType<typeof setTimeout> | null = null;
   private transitionInProgress = false;
@@ -580,10 +586,16 @@ export class PasskeyEoaWalletClient {
     }
   }
 
-  createProvider(): Eip1193Provider & { isPasskeyEoa: true; isMetaMask: false } {
+  createProvider(): Eip1193Provider & {
+    isPasskeyEoa: true;
+    isMetaMask: false;
+    isUnlocked: (forMs?: number) => boolean;
+  } {
     return {
       isPasskeyEoa: true,
       isMetaMask: false,
+      // Whether a request signs without a passkey prompt, now and for the next forMs.
+      isUnlocked: (forMs = 0) => this.isUnlocked() && this.unlockExpiresAt > this.now() + forMs,
       request: (args) => this.request(args),
       on: (_event: unknown, _handler: unknown) => {},
       removeListener: (_event: unknown, _handler: unknown) => {},
@@ -657,6 +669,7 @@ export class PasskeyEoaWalletClient {
       const policy = createSoftSessionPolicy({
         address: record.evmAddress,
         ttlSeconds: this.config.unlockTtlSeconds,
+        maxTtlSeconds: MAX_UNLOCK_SECONDS,
         now: this.now(),
         allowedChainIds: chainId ? [chainId] : undefined,
         maxTransactionValueWei: '0',
@@ -679,16 +692,35 @@ export class PasskeyEoaWalletClient {
       }
       this.activeAddress = record.evmAddress;
       this.unlockExpiresAt = expiresAt;
+      this.unlockMaxExpiresAt = Number(policy.maxExpiresAt) || expiresAt;
       this.sessionChainId = chainId;
-      if (this.lockTimer) clearTimeout(this.lockTimer);
-      this.lockTimer = setTimeout(
-        () => {
-          void this.lock().catch((error) => walletLog.warn('Passkey wallet auto-lock failed:', error));
-        },
-        Math.max(0, expiresAt - this.now()),
-      );
+      this.scheduleLock();
     }, generation);
     this.assertCurrentOperation(generation);
+  }
+
+  private scheduleLock(): void {
+    if (this.lockTimer) clearTimeout(this.lockTimer);
+    this.lockTimer = setTimeout(
+      () => {
+        void this.lock().catch((error) => walletLog.warn('Passkey wallet auto-lock failed:', error));
+      },
+      Math.max(0, this.unlockExpiresAt - this.now()),
+    );
+  }
+
+  /** The person used the page: keep the wallet unlocked for a full TTL from now, never past its cap. */
+  noteActivity(): void {
+    if (!this.isUnlocked()) return;
+    const ttlMs = this.config.unlockTtlSeconds * 1000;
+    const until = Math.min(this.now() + ttlMs, this.unlockMaxExpiresAt);
+    // About once a minute at most: each extension restarts both lock timers.
+    if (until - this.unlockExpiresAt < Math.min(60_000, ttlMs / 10)) return;
+    this.unlockExpiresAt = until;
+    this.scheduleLock();
+    void this.sessionClient
+      .extend(until)
+      .catch((error) => walletLog.warn('Passkey wallet unlock extension failed:', error));
   }
 
   private assertRequestedAccount(requestedAccount: unknown): void {
@@ -708,6 +740,8 @@ export class PasskeyEoaWalletClient {
   private retireSession(): void {
     const session = this.sessionClient;
     this.sessionClient = this.sessionClientFactory();
+    // The key leaves with the retired session, so even switching back asks for the passkey.
+    this.unlockExpiresAt = 0;
     if (this.inFlightBySession.has(session)) this.retiringSessions.add(session);
     else void session.lock().catch((error) => walletLog.warn('Passkey wallet chain-change lock failed:', error));
   }
@@ -876,12 +910,24 @@ export const logoutPasskeyWallet = (): Promise<void> => getPasskeyWalletClient()
 export const isPasskeyWalletAutoSignReady = (): boolean => getPasskeyWalletClient().isUnlocked();
 export const createPasskeyEip1193Provider = (): Eip1193Provider => getPasskeyWalletClient().createProvider();
 
+/** Keeps the wallet unlocked while the person uses the page. Events a script dispatches don't count. */
+export const watchPasskeyWalletActivity = (
+  client: Pick<PasskeyEoaWalletClient, 'noteActivity'>,
+  target: EventTarget,
+) => {
+  const onActivity = (event: Event) => {
+    if (event.isTrusted) client.noteActivity();
+  };
+  ACTIVITY_EVENTS.forEach((type) => target.addEventListener(type, onActivity, { capture: true, passive: true }));
+};
+
 try {
   if (typeof window !== 'undefined') {
     Object.assign(window, {
       __ceCreatePasskeyEip1193Provider: createPasskeyEip1193Provider,
       __passkeyEoaProvider: createPasskeyEip1193Provider(),
     });
+    watchPasskeyWalletActivity(getPasskeyWalletClient(), window);
   }
 } catch (e) {
   walletLog.warn('passkeyWallet global provider registration failed:', e);

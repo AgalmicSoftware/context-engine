@@ -695,3 +695,27 @@ it.each([
   },
   40000,
 );
+
+it('submits each question’s type and prompt while the question cache refills, as after a sign-in', async () => {
+  const upload = mockSession();
+  const pile = await mountWithInterview(packet([{ questionId: 'q1', answer: 'Agree', confidence: 0.8 }]));
+  // The cache reads empty for a moment while it refills, so the pile clears its cards and keeps loading.
+  questionIds = [];
+  await act(async () => pile.view.rerenderSurveyQuestions({ isQuestionCacheReady: false, questionsCacheNonce: 3 }));
+  await waitFor(() => expect(pile.engine().state.pileQuestions).toEqual([]));
+  expect(pile.engine().state.loading).toBe(true);
+  expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_DRAFT_REMOVE).getAttribute('aria-label')).toBe(
+    'Remove draft for Q1',
+  );
+
+  await submitDrafts();
+  expect(upload).toHaveBeenCalledTimes(1);
+  expect(upload.mock.calls[0][2]).toEqual([
+    expect.objectContaining({ questionID: 'q1', type: 'binary', prompt: 'Q1' }),
+  ]);
+
+  // The questions show again once they load, though the submit has finished.
+  questionIds = DEFAULT_QUESTION_IDS;
+  await act(async () => pile.view.rerenderSurveyQuestions({ isQuestionCacheReady: true, questionsCacheNonce: 4 }));
+  await waitFor(() => expect(pile.engine().state.pileQuestions).toHaveLength(2));
+});

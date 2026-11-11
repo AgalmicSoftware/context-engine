@@ -359,6 +359,14 @@
           ]
         },
         {
+          "label": "Check runtime map docs",
+          "command": "npm",
+          "args": [
+            "run",
+            "docs:maps:check"
+          ]
+        },
+        {
           "label": "Lint client",
           "command": "npm",
           "args": [

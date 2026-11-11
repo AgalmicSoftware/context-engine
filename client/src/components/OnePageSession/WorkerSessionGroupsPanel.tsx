@@ -6,7 +6,12 @@ import { getUsableSessionWorkerUrl } from '../../utilities/session/sessionWorker
 import { resolveSessionCapabilityProjection } from '../../utilities/session/sessionCapabilityProjection.js';
 import { canonicalizeSessionSlug } from '../../utilities/session/canonicalSessionContext.js';
 import { resolveWorkerCanonicalSessionIdHex } from '../../utilities/session/sessionWorkerDiscovery.js';
-import { buildSignedAdminActionAuth, getWorkerSessionToken } from '../../utilities/worker/workerAuth';
+import {
+  buildSignedAdminActionAuth,
+  getWorkerSessionToken,
+  isWorkerSignInNeededError,
+  subscribeWorkerSessionToken,
+} from '../../utilities/worker/workerAuth';
 import {
   dispatchWorkerGroupsChanged,
   subscribeWorkerGroupsChanged,
@@ -151,55 +156,60 @@ const WorkerSessionGroupsPanel = ({
     (!normalizedAccount && !membershipsOnly && allowAnonymousGroupDiscovery) ||
     (!!normalizedAccount && authStatus === 'error' && !membershipsOnly && allowAnonymousGroupDiscovery);
 
-  const authenticate = useCallback(async () => {
-    const requestTargetKey = targetKey;
-    if (!hasExactWorkerProfile || !normalizedAccount || !workerUrl) {
-      setAuthState(emptyAuthState(requestTargetKey));
-      return;
-    }
-    const requestId = authRequestIdRef.current + 1;
-    authRequestIdRef.current = requestId;
-    setAuthState({
-      targetKey: requestTargetKey,
-      token: '',
-      status: 'loading',
-      error: '',
-    });
-    try {
-      const token = await getWorkerSessionToken({
-        sessionSlug: canonicalSessionSlug,
-        sessionConfig,
-        workerUrl,
-        context: { account, providerLike: provider, chainId },
-      });
-      if (authRequestIdRef.current !== requestId) return;
-      setAuthState({
-        targetKey: requestTargetKey,
-        token,
-        status: 'ready',
-        error: '',
-      });
-    } catch (error) {
-      setPendingJoin((pending) => (pending?.targetKey === requestTargetKey ? undefined : pending));
-      if (authRequestIdRef.current !== requestId) return;
-      setAuthState({
-        targetKey: requestTargetKey,
-        token: '',
-        status: 'error',
-        error: error instanceof Error ? error.message : 'Could not authenticate with the session worker.',
-      });
-    }
-  }, [
-    account,
-    canonicalSessionSlug,
-    chainId,
-    hasExactWorkerProfile,
-    normalizedAccount,
-    provider,
-    sessionConfig,
-    targetKey,
-    workerUrl,
-  ]);
+  const authenticate = useCallback(
+    async ({ prompt = true }: { prompt?: boolean } = {}) => {
+      const requestTargetKey = targetKey;
+      if (!hasExactWorkerProfile || !normalizedAccount || !workerUrl) {
+        setAuthState(emptyAuthState(requestTargetKey));
+        return;
+      }
+      const requestId = authRequestIdRef.current + 1;
+      authRequestIdRef.current = requestId;
+      // A quiet retry keeps the failed sign-in on screen until the person's groups load.
+      setAuthState((shown) =>
+        !prompt && shown.targetKey === requestTargetKey && shown.status === 'error'
+          ? shown
+          : { targetKey: requestTargetKey, token: '', status: 'loading', error: '' },
+      );
+      try {
+        const token = await getWorkerSessionToken({
+          sessionSlug: canonicalSessionSlug,
+          sessionConfig,
+          workerUrl,
+          context: { account, providerLike: provider, chainId },
+          prompt,
+        });
+        if (authRequestIdRef.current !== requestId) return;
+        setAuthState({
+          targetKey: requestTargetKey,
+          token,
+          status: 'ready',
+          error: '',
+        });
+      } catch (error) {
+        if (isWorkerSignInNeededError(error)) return;
+        setPendingJoin((pending) => (pending?.targetKey === requestTargetKey ? undefined : pending));
+        if (authRequestIdRef.current !== requestId) return;
+        setAuthState({
+          targetKey: requestTargetKey,
+          token: '',
+          status: 'error',
+          error: error instanceof Error ? error.message : 'Could not authenticate with the session worker.',
+        });
+      }
+    },
+    [
+      account,
+      canonicalSessionSlug,
+      chainId,
+      hasExactWorkerProfile,
+      normalizedAccount,
+      provider,
+      sessionConfig,
+      targetKey,
+      workerUrl,
+    ],
+  );
 
   useEffect(() => {
     // Config objects can refresh during the same wallet prompt; only a new
@@ -213,18 +223,28 @@ const WorkerSessionGroupsPanel = ({
     );
   }, [targetKey]);
 
+  const authenticateRef = useRef(authenticate);
+  authenticateRef.current = authenticate;
   useEffect(() => {
     setGroupsRevision(0);
     authRequestIdRef.current += 1;
-    if (shouldAuthenticateOnRender) {
-      void authenticate();
+    // Someone signed in is asked to sign in to the session rather than shown what a signed-out visitor sees.
+    // Once per session, Worker and account: an equal config passed afresh must not ask again after a decline.
+    if (shouldAuthenticateOnRender && hasExactWorkerProfile) {
+      void authenticateRef.current();
     } else {
       setAuthState(emptyAuthState(targetKey));
     }
     return () => {
       authRequestIdRef.current += 1;
     };
-  }, [authenticate, shouldAuthenticateOnRender, targetKey]);
+  }, [hasExactWorkerProfile, shouldAuthenticateOnRender, targetKey]);
+
+  useEffect(() => {
+    if (authStatus !== 'error') return undefined;
+    // After a declined or failed sign-in, one for something done elsewhere on the page shows the person's groups.
+    return subscribeWorkerSessionToken(() => void authenticate({ prompt: false }));
+  }, [authStatus, authenticate]);
 
   useEffect(() => {
     if (!showCreate || !participantGroupCreationEnabled) {

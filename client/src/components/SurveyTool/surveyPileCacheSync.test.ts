@@ -7,6 +7,7 @@ describe('surveyPileCacheSync', () => {
         responseNonceTick: true,
         isOptimistic: true,
         hasLiveEdits: false,
+        pileQuestionsLength: 2,
       }),
     ).toEqual({
       action: 'check-optimistic-baseline',
@@ -44,6 +45,20 @@ describe('surveyPileCacheSync', () => {
       }),
     ).toEqual({
       action: 'show-loading',
+      delayMs: 80,
+    });
+  });
+
+  it('reloads an optimistic pile left with no questions, whose catch-up check can never pass', () => {
+    // As when a sign-in empties the question cache for a moment while an interview submits.
+    expect(buildPileCacheUpdatePlan({ nonceTick: true, isOptimistic: true, pileQuestionsLength: 0 })).toEqual({
+      action: 'reload',
+      delayMs: 80,
+    });
+    expect(
+      buildPileCacheUpdatePlan({ nonceTick: true, isOptimistic: true, hasLiveEdits: true, pileQuestionsLength: 0 }),
+    ).toEqual({
+      action: 'skip-live-edits',
       delayMs: 80,
     });
   });

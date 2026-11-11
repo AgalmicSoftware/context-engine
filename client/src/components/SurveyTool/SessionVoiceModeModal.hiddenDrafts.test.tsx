@@ -7,7 +7,16 @@ import { startSessionRealtimeInterview } from '../../utilities/audio/realtimeInt
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { useSessionInterviewGroupRecommendations } from './useSessionInterviewGroupRecommendations';
 
-jest.mock('./SessionInterviewRecommendedGroups', () => ({ __esModule: true, default: () => null }));
+jest.mock('./SessionInterviewRecommendedGroups', () => ({
+  __esModule: true,
+  // The refresh control lives in the Groups section.
+  default: ({ onRefresh }: { onRefresh?: () => void }) =>
+    onRefresh ? (
+      <button type="button" onClick={onRefresh}>
+        Refresh group suggestions
+      </button>
+    ) : null,
+}));
 jest.mock('./useSessionInterviewGroupRecommendations', () => ({
   useSessionInterviewGroupRecommendations: jest.fn(() => ({ availability: 'idle', recommendations: [] })),
 }));
@@ -262,7 +271,7 @@ it('keeps hidden guesses out of group suggestions until they are shown', async (
   jest
     .mocked(useSessionInterviewGroupRecommendations)
     .mockReturnValue({ availability: 'available', recommendations: [] });
-  renderReview({ hiddenDraftShare: share, shareDraftChangesByDefault: true, suggestGroups: true });
+  renderReview({ hiddenDraftShare: share, shareDraftChangesByDefault: true, joinMatchingGroups: true });
   await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
   const sent = () =>
     (jest.mocked(useSessionInterviewGroupRecommendations).mock.calls.at(-1)?.[0].request?.draftResponses || []).map(

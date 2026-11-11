@@ -12,11 +12,14 @@ type WorkerOriginOptions = {
 type ValidateBootstrapOptions = WorkerOriginOptions & {
   expectedSlug: string;
   workerOrigin: string;
+  // Set when a session list names the session's ID: a Worker reporting any other refuses to open.
+  expectedSessionId?: string;
 };
 
 type FetchBootstrapOptions = WorkerOriginOptions & {
   fetchImpl?: typeof fetch;
   sessionSlug: string;
+  expectedSessionId?: string;
   signal?: AbortSignal;
   workerQueryValue: unknown;
 };
@@ -108,7 +111,11 @@ export const describeWorkerSessionBootstrapError = (error: unknown): WorkerSessi
     };
   }
   const message = error instanceof Error ? error.message : '';
-  if (/slug does not match|worker origin|different canonical worker identity|identity change/i.test(message)) {
+  if (
+    /slug does not match|session ID does not match|worker origin|different canonical worker identity|identity change/i.test(
+      message,
+    )
+  ) {
     return {
       kind: 'identity_mismatch',
       title: 'Worker identity mismatch',
@@ -444,7 +451,7 @@ const validateRepresentedWorkerOrigins = (
 
 export const validateWorkerCanonicalSessionBootstrap = (
   payload: unknown,
-  { expectedSlug, workerOrigin, environment = runtimeEnvironment() }: ValidateBootstrapOptions,
+  { expectedSlug, workerOrigin, expectedSessionId, environment = runtimeEnvironment() }: ValidateBootstrapOptions,
 ): WorkerCanonicalSessionBootstrap => {
   const canonicalExpectedSlug = validateExactSlug(expectedSlug, 'Expected slug');
   const canonicalWorkerOrigin = parseSessionWorkerDiscoveryOrigin(workerOrigin, { environment });
@@ -473,6 +480,9 @@ export const validateWorkerCanonicalSessionBootstrap = (
   const forbiddenPath = findSecretLikeSessionWorkerBootstrapPath(payload, 'response');
   if (forbiddenPath) throw new Error(`Worker bootstrap config contains a secret-like field at ${forbiddenPath}.`);
   const sessionId = validateConfigSessionId(payload.config);
+  if (expectedSessionId !== undefined && normalizeWorkerCanonicalSessionIdHex(expectedSessionId) !== sessionId) {
+    throw new Error('Worker bootstrap session ID does not match the requested session.');
+  }
   const configRevision = validateConfigRevision(payload.config.configRevision);
   validateRepresentedWorkerOrigins(payload.config, canonicalWorkerOrigin, environment);
 
@@ -500,6 +510,7 @@ export const buildSessionWorkerBootstrapUrl = (
 export const fetchWorkerCanonicalSessionBootstrap = async ({
   fetchImpl = globalThis.fetch,
   sessionSlug,
+  expectedSessionId,
   signal,
   workerQueryValue,
   environment = runtimeEnvironment(),
@@ -567,12 +578,15 @@ export const fetchWorkerCanonicalSessionBootstrap = async ({
     return validateWorkerCanonicalSessionBootstrap(payload, {
       expectedSlug: canonicalSlug,
       workerOrigin,
+      expectedSessionId,
       environment,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Worker bootstrap validation failed.';
     throw new WorkerSessionBootstrapRequestError(message, {
-      code: /slug does not match|worker origin/i.test(message) ? 'identity_mismatch' : 'response',
+      code: /slug does not match|session ID does not match|worker origin/i.test(message)
+        ? 'identity_mismatch'
+        : 'response',
     });
   }
 };

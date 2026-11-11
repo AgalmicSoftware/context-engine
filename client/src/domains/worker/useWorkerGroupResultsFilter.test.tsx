@@ -9,11 +9,18 @@ import {
 } from './workerGroupPorts';
 import { useWorkerGroupResultsFilter } from './useWorkerGroupResultsFilter';
 import { loadWorkerGroupCohort } from './workerGroupResultsAccess';
-jest.mock('./workerGroupPorts', () => ({
-  getWorkerSessionToken: jest.fn(),
-  loadWorkerGroupMembers: jest.fn(),
-  loadWorkerGroupOverview: jest.fn(),
-}));
+jest.mock('./workerGroupPorts', () => {
+  const auth = jest.requireActual<typeof import('../../utilities/worker/workerAuth')>(
+    '../../utilities/worker/workerAuth',
+  );
+  return {
+    getWorkerSessionToken: jest.fn(),
+    isWorkerSignInNeededError: auth.isWorkerSignInNeededError,
+    subscribeWorkerSessionToken: auth.subscribeWorkerSessionToken,
+    loadWorkerGroupMembers: jest.fn(),
+    loadWorkerGroupOverview: jest.fn(),
+  };
+});
 const token = jest.mocked(getWorkerSessionToken),
   members = jest.mocked(loadWorkerGroupMembers),
   overview = jest.mocked(loadWorkerGroupOverview);
@@ -131,4 +138,116 @@ it('keeps loaded members visible while a focus refresh is pending', async () => 
   expect([...result.current.cohort.members[group.groupId]]).toEqual([a]);
   await act(async () => finish(page(b)));
   expect([...result.current.cohort.members[group.groupId]]).toEqual([b]);
+});
+
+const { WorkerSignInNeededError } = jest.requireActual<typeof import('../../utilities/worker/workerAuth')>(
+  '../../utilities/worker/workerAuth',
+);
+const prompts = () => token.mock.calls.map(([options]) => (options as { prompt?: boolean }).prompt);
+
+it('never asks for a refresh on focus or the timer, while opening the filter and Refresh do', async () => {
+  jest.useFakeTimers();
+  try {
+    // The filter is open.
+    const { result } = renderHook(() => useWorkerGroupResultsFilter({ ...input, discover: true }));
+    await waitFor(() => expect(result.current.cohort.status).toBe('ready'));
+    token.mockRejectedValue(new WorkerSignInNeededError());
+    act(() => window.dispatchEvent(new Event('focus')));
+    await act(async () => jest.advanceTimersByTime(60000));
+    expect(prompts()).toEqual([true, false, false]);
+    // What the filter showed stays, rather than a sign-in error.
+    expect(result.current.cohort.status).toBe('ready');
+    expect([...result.current.cohort.members[group.groupId]]).toEqual([a]);
+    token.mockResolvedValue('synthetic-token');
+    act(() => result.current.refresh());
+    await waitFor(() => expect(prompts()).toEqual([true, false, false, true]));
+    // A Refresh click before a queued quiet refresh runs still counts as the person's.
+    act(() => {
+      dispatchWorkerGroupsChanged(scope);
+      result.current.refresh();
+    });
+    await waitFor(() => expect(prompts()).toEqual([true, false, false, true, true]));
+    // Only that load was the person's.
+    act(() => window.dispatchEvent(new Event('focus')));
+    await waitFor(() => expect(prompts()).toEqual([true, false, false, true, true, false]));
+  } finally {
+    jest.useRealTimers();
+  }
+});
+
+it('asks someone signed in for a Group filter saved or in a link, and keeps its refreshes quiet', async () => {
+  // Results opened with a Group filter from a link or an earlier visit.
+  const { result } = renderHook(() => useWorkerGroupResultsFilter(input));
+  await waitFor(() => expect(result.current.cohort.status).toBe('ready'));
+  expect(prompts()).toEqual([true]);
+  token.mockRejectedValue(new WorkerSignInNeededError());
+  act(() => window.dispatchEvent(new Event('focus')));
+  await waitFor(() => expect(prompts()).toEqual([true, false]));
+  act(() => window.dispatchEvent(new Event('ce:worker-session-token')));
+  await waitFor(() => expect(prompts()).toEqual([true, false, false]));
+  // What the filter showed stays, rather than a sign-in error.
+  expect(result.current.cohort.status).toBe('ready');
+  expect([...result.current.cohort.members[group.groupId]]).toEqual([a]);
+});
+
+it('never asks again as the filter is closed and opened after a declined sign-in, while Retry does', async () => {
+  token.mockRejectedValue(new Error('The passkey prompt was dismissed.'));
+  const { result, rerender } = renderHook((props) => useWorkerGroupResultsFilter(props), {
+    initialProps: { ...input, discover: true },
+  });
+  await waitFor(() => expect(result.current.cohort.status).toBe('error'));
+  expect(prompts()).toEqual([true]);
+  token.mockRejectedValue(new WorkerSignInNeededError());
+  // Closing the filter hides its controls without unmounting them, so the saved Group's members load again.
+  rerender({ ...input, discover: false });
+  await waitFor(() => expect(prompts()).toEqual([true, false]));
+  rerender({ ...input, discover: true });
+  await waitFor(() => expect(prompts()).toEqual([true, false, false]));
+  expect(result.current.cohort.status).toBe('error');
+  token.mockResolvedValue('synthetic-token');
+  act(() => result.current.refresh());
+  await waitFor(() => expect(result.current.cohort.status).toBe('ready'));
+  expect(prompts()).toEqual([true, false, false, true]);
+});
+
+it('asks when the filter first opens on a page that loaded with it closed', async () => {
+  const closed = { ...input, selection: null, discover: false };
+  const { result, rerender } = renderHook((props) => useWorkerGroupResultsFilter(props), { initialProps: closed });
+  expect(token).not.toHaveBeenCalled();
+  rerender({ ...closed, discover: true });
+  await waitFor(() => expect(result.current.groups).toEqual([group]));
+  expect(prompts()).toEqual([true]);
+});
+
+it('asks again for a new account, and never shows the last account’s members when that is declined', async () => {
+  const { result, rerender } = renderHook((props) => useWorkerGroupResultsFilter(props), { initialProps: input });
+  await waitFor(() => expect(result.current.cohort.status).toBe('ready'));
+  token
+    .mockRejectedValueOnce(new Error('The passkey prompt was dismissed.'))
+    .mockRejectedValue(new WorkerSignInNeededError());
+  // A refresh due at the same moment doesn't make the new account's first load a quiet one.
+  act(() => {
+    rerender({ ...input, account: b });
+    dispatchWorkerGroupsChanged(scope);
+  });
+  await waitFor(() => expect(result.current.cohort.status).toBe('error'));
+  expect(prompts()).toEqual([true, true]);
+  expect(result.current.cohort.members).toEqual({});
+  // A refresh that can't sign in quietly leaves the failure, and its Retry, on screen.
+  act(() => window.dispatchEvent(new Event('focus')));
+  await waitFor(() => expect(prompts()).toEqual([true, true, false]));
+  expect(result.current.cohort.message).toBe('The passkey prompt was dismissed.');
+  expect(result.current.cohort.members).toEqual({});
+});
+
+it('offers a sign-in, never the last account’s members, when a refresh can’t sign in before a new account’s list loads', async () => {
+  const { result, rerender } = renderHook((props) => useWorkerGroupResultsFilter(props), { initialProps: input });
+  await waitFor(() => expect(result.current.cohort.status).toBe('ready'));
+  token.mockImplementationOnce(() => new Promise(() => undefined)).mockRejectedValue(new WorkerSignInNeededError());
+  rerender({ ...input, account: b });
+  act(() => window.dispatchEvent(new Event('focus')));
+  await waitFor(() => expect(result.current.cohort.status).toBe('error'));
+  expect(prompts()).toEqual([true, true, false]);
+  expect(result.current.cohort.message).toBe('Sign in to filter results by Group.');
+  expect(result.current.cohort.members).toEqual({});
 });

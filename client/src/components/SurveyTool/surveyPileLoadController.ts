@@ -96,7 +96,6 @@ export const buildPileEmptyProbeStatePlan = ({
   nextProbeStartedAtMs = 0,
   nextProbeDelayMs = 0,
   previousPileQuestions = [],
-  previousAllQuestionsForFilter = [],
   previousLoading = false,
   areQuestionListsEquivalent = (left, right) => left === right,
 }: {
@@ -104,26 +103,23 @@ export const buildPileEmptyProbeStatePlan = ({
   nextProbeStartedAtMs?: number | null;
   nextProbeDelayMs?: number | null;
   previousPileQuestions?: PileQuestionLike[] | null;
-  previousAllQuestionsForFilter?: PileQuestionLike[] | null;
   previousLoading?: boolean;
   areQuestionListsEquivalent?: AreQuestionListsEquivalent;
 } = {}): PileEmptyProbeStatePlan => {
   const normalizedPreviousPileQuestions = Array.isArray(previousPileQuestions) ? previousPileQuestions : [];
-  const normalizedPreviousAllQuestions = Array.isArray(previousAllQuestionsForFilter)
-    ? previousAllQuestionsForFilter
-    : [];
 
   if (action === 'continue-loading-immediately') {
     const samePile = areQuestionListsEquivalent(normalizedPreviousPileQuestions, []);
-    const sameAll = areQuestionListsEquivalent(normalizedPreviousAllQuestions, []);
     const sameLoading = !!previousLoading === true;
-    const shouldBumpNoop = samePile && sameAll && sameLoading;
+    const shouldBumpNoop = samePile && sameLoading;
     return {
       action,
       shouldClearLastResultSignature: true,
       shouldIncrementPileQuestionsGeneration: !shouldBumpNoop,
       shouldBumpNoop,
-      nextState: shouldBumpNoop ? null : { pileQuestions: [], allQuestionsForFilter: [], loading: true },
+      // An unsettled empty read is the cache refilling, as after a sign-in, so the question list
+      // stays: answers submitted meanwhile need each question's type and prompt.
+      nextState: shouldBumpNoop ? null : { pileQuestions: [], loading: true },
       nextProbeStartedAtMs: 0,
       nextProbeDelayMs: 0,
     };

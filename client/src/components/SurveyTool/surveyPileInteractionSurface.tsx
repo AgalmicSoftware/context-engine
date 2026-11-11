@@ -351,6 +351,53 @@ const renderPileActionControls = ({
   );
 };
 
+// The check after a submit goes away after ten seconds, keeping its place so nothing below it moves. It waits
+// while pointed at or focused, so it never goes from under someone about to use it.
+const SUBMITTED_CHECK_MS = 10_000;
+
+/** The check after a submit: a link to the responder's profile, or a status when there's no address to open. */
+export const PileSubmittedCheck = ({ href }: { href: string }): React.ReactElement => {
+  const [expired, setExpired] = React.useState(false);
+  const [hovered, setHovered] = React.useState(false);
+  const [focused, setFocused] = React.useState(false);
+  React.useEffect(() => {
+    const timer = setTimeout(() => setExpired(true), SUBMITTED_CHECK_MS);
+    return () => clearTimeout(timer);
+  }, []);
+  const gone = expired && !hovered && !focused;
+  const className = `${styles.pileSubmitSuccessBadge}${gone ? ` ${styles.pileSubmitSuccessBadgeGone}` : ''}`;
+  const hold = {
+    onMouseEnter: () => setHovered(true),
+    onMouseLeave: () => setHovered(false),
+    onFocus: () => setFocused(true),
+    onBlur: () => setFocused(false),
+  };
+  const icon = <FontAwesomeIcon icon={faCheck} className={styles.pileSubmitSuccessIcon} />;
+  return href ? (
+    <a
+      href={href}
+      {...hold}
+      className={className}
+      data-testid={E2E_TESTIDS.SURVEY_SUBMITTED_INDICATOR}
+      aria-label="View your submitted responses"
+      title="View your submitted responses"
+    >
+      {icon}
+    </a>
+  ) : (
+    <div
+      {...hold}
+      className={className}
+      data-testid={E2E_TESTIDS.SURVEY_SUBMITTED_INDICATOR}
+      role="status"
+      aria-label="Submitted"
+      title="Submitted"
+    >
+      {icon}
+    </div>
+  );
+};
+
 const renderPileFooterControls = ({
   pileTopRailVisible,
   showSuccessBadgeLink,
@@ -368,26 +415,8 @@ const renderPileFooterControls = ({
   handleRevertPendingChanges,
 }: PileFooterControlsProps): React.ReactElement => (
   <div className={buildPileFooterClassName(styles, pileTopRailVisible)}>
-    {showSuccessBadgeLink ? (
-      <a
-        href={pileSubmitResponderHref}
-        className={styles.pileSubmitSuccessBadge}
-        data-testid={E2E_TESTIDS.SURVEY_SUBMITTED_INDICATOR}
-        aria-label="View your submitted responses"
-        title="View your submitted responses"
-      >
-        <FontAwesomeIcon icon={faCheck} className={styles.pileSubmitSuccessIcon} />
-      </a>
-    ) : showSuccessBadgeStatus ? (
-      <div
-        className={styles.pileSubmitSuccessBadge}
-        data-testid={E2E_TESTIDS.SURVEY_SUBMITTED_INDICATOR}
-        role="status"
-        aria-label="Submitted"
-        title="Submitted"
-      >
-        <FontAwesomeIcon icon={faCheck} className={styles.pileSubmitSuccessIcon} />
-      </div>
+    {showSuccessBadgeLink || showSuccessBadgeStatus ? (
+      <PileSubmittedCheck href={showSuccessBadgeLink ? pileSubmitResponderHref : ''} />
     ) : showSubmitButton ? (
       <>
         <Button

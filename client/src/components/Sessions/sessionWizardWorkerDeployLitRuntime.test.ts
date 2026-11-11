@@ -6,6 +6,7 @@ import {
   resolveCompleteSessionWizardLitRuntime,
   syncSessionWizardLitRuntimeConfigAfterDeploy,
 } from './sessionWizardWorkerDeployLitRuntime';
+import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../../utilities/session/sessionModeProfile';
 
 const litCredentials = {
   litApiBase: 'https://api.chipotle.litprotocol.com',
@@ -94,5 +95,31 @@ describe('sessionWizardWorkerDeployLitRuntime', () => {
       'https://worker.example.test/admin/set-config',
       expect.objectContaining({ body: expect.stringContaining('"revision":2') }),
     );
+    // Only a Worker-canonical session has instructions for AI agents to clear.
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ['clears the instructions for AI agents a Worker config has', { agentInstructions: 'Join the open group.' }, ''],
+    ['leaves out instructions for AI agents a Worker config lacks', {}, undefined],
+  ])('%s when the config leaves them blank', async (_label, stored, expected) => {
+    const fetchImpl = jest.fn(async (_url: RequestInfo | URL, init?: RequestInit) => ({
+      ok: true,
+      json: async () => (init?.method === 'POST' ? { ok: true } : { config: { slug: 'lit-session', ...stored } }),
+    }));
+    const ensureSessionConfig = createSessionWizardEnsureWorkerSessionConfig({
+      getWorkerConfig: () => ({
+        slug: 'lit-session',
+        sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+      }),
+      getAdminAddress: () => '0xadmin',
+      signTypedAdminAction: async () => ({ address: '0xadmin', signature: '0xsig' }),
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+    });
+
+    await ensureSessionConfig({ workerUrl: 'https://worker.example.test', slug: 'lit-session' });
+
+    expect(fetchImpl.mock.calls[0][0]).toBe('https://worker.example.test/session-config');
+    expect(JSON.parse(String(fetchImpl.mock.calls[1][1]?.body)).config.agentInstructions).toBe(expected);
   });
 });

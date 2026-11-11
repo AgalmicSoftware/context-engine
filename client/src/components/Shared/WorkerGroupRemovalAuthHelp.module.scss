@@ -1,0 +1,31 @@
+.button {
+  appearance: none;
+  border: 0;
+  border-radius: var(--ce-radius-6);
+  margin-left: 6px;
+  padding: 4px;
+  background: transparent;
+  color: inherit;
+  font-size: 0.95em;
+  line-height: 1;
+  vertical-align: middle;
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: 2px solid var(--ce-action-accent);
+    outline-offset: 2px;
+  }
+}
+
+.bubble {
+  max-width: 300px;
+  text-align: left;
+}
+
+.choice {
+  display: block;
+}
+
+.choice + .choice {
+  margin-top: 4px;
+}

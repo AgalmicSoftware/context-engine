@@ -4,7 +4,7 @@ import { createRequire } from 'node:module';
 import { chromium } from 'playwright';
 
 const require = createRequire(import.meta.url);
-const sessions = require('../client/src/variables/demo/demo_sessions.json');
+const knownSessions = require('../known-sessions.json');
 const browser = await chromium.launch({ headless: true });
 try {
   for (const [width, mode] of [[773, 'live'], [390, 'live'], [773, 'absent'], [773, 'unavailable']]) {
@@ -13,7 +13,7 @@ try {
     await context.addInitScript(() => {
       localStorage.setItem('ce_onboarding_complete', 'true');
       localStorage.setItem('ce:firstVisitRootAboutRedirectConsumed:v20260618b', 'true');
-      localStorage.setItem('ce:primarySessionSlug', 'rxc-ra-test');
+      localStorage.setItem('ce:primarySessionSlug', 'demo-sh');
       localStorage.setItem('ce:selectedSessionScope', 'active');
     });
     if (mode !== 'live') await context.route('**/resource-presence', route => route.fulfill({
@@ -35,14 +35,15 @@ try {
     const card = page.getByTestId('ce-settings-resource-ai');
     const label = mode === 'live' ? 'Sponsored' : mode === 'absent' ? 'Not sponsored' : 'Check unavailable';
     await card.getByText(label, { exact: true }).waitFor();
-    assert.match(await card.innerText(), /Reverse Alignment/);
+    assert.match(await card.innerText(), /Demo Session/);
     assert(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth));
     if (mode === 'live') {
       const selector = page.getByTestId('ce-prelogin-session-select');
-      for (const slug of ['rxc-test', 'rxc-ra-test']) {
+      // Only a known session's Worker supplies a verified config.
+      for (const slug of ['eddy26']) {
         await selector.selectOption(slug);
         await card.getByText('Sponsored', { exact: true }).waitFor();
-        const workerOrigin = sessions[slug].corsWorkerUrl.replace(/\/+$/, '');
+        const workerOrigin = knownSessions[slug].worker;
         const result = await page.evaluate(async ({ slug, workerOrigin }) => {
           const { getVerifiedWorkerCanonicalSessionBootstrap } = await import('/src/utilities/session/sessionWorkerConfigCache.ts');
           const { callAI, transcribeAudio } = await import('/src/utilities/ai/aiClient.ts');

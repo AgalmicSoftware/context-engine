@@ -18,6 +18,10 @@ const contentEdits = [
   ['question generation prompt', { questionsGenPrompt: 'Ask about shared priorities.' }],
   ['opening prompt', { interviewMode: { openingPrompt: 'Begin with a local question.' } }],
   ['steering prompt', { interviewMode: { steeringPrompt: 'Follow the participant priorities.' } }],
+  // Each interview request reads the interview settings afresh; no sign-in holds them.
+  ['interview enablement', { interviewMode: { enabled: true } }],
+  ['voice interviews off', { interviewModeEnabled: false }],
+  ['group suggestions', { interviewMode: { joinMatchingGroups: true, groupSuggestionData: ['country', 'town'] } }],
   ['appearance', { appearance: { colorSchemeId: 'ocean' } }],
   ['header image', { sessionHeaderImg: 'https://images.example.test/header.png' }],
   ['additional invite', { agentHttp: { invites: [invite, { tokenHash: 'b'.repeat(64), enabled: true }] } }],
@@ -37,7 +41,6 @@ const authorityEdits = [
   ['disabled invite', { agentHttp: { invites: [{ ...invite, enabled: false }] } }],
   ['Wrapped permissions', { agentHttp: { invites: [invite], wrapped: { posterEnabled: true } } }],
   ['submit permissions', { agentHttp: { invites: [invite], managedAccountSubmitAllowed: true } }],
-  ['interview enablement', { interviewMode: { enabled: true } }],
   ['AI settings', { ai: { provider: 'openai' } }],
   ['limits', { limits: { ai: { daily: 20 } } }],
   ['scopes', { scopes: { ai: false } }],

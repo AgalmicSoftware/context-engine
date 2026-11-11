@@ -33,6 +33,9 @@ const workerClient = (): SoftSessionClient => {
   return {
     init: async (options) => ((await call({ type: 'init', ...options })) as { address: string }).address,
     request: (args) => call({ type: 'request', ...args }),
+    extend: async (until) => {
+      await call({ type: 'extend', until });
+    },
     lock: async () => {
       await call({ type: 'lock' });
     },
@@ -197,5 +200,54 @@ for (const runtime of ['memory', 'worker'] as const)
         nonce: '0x0',
       });
       expect(send).toHaveBeenCalledTimes(1);
+    });
+  });
+
+for (const runtime of ['memory', 'worker'] as const)
+  describe(`${runtime} session extension`, () => {
+    const START = 1_000_000;
+    let client: SoftSessionClient;
+    const sign = () => client.request({ method: 'personal_sign', params: ['still here'] });
+    beforeEach(async () => {
+      // Fake timers so the worker's own lock timer fires as the clock moves.
+      jest.useFakeTimers({ now: START, doNotFake: ['nextTick', 'queueMicrotask'] });
+      client = runtime === 'memory' ? createInMemorySoftSessionClient() : workerClient();
+      await client.init({
+        privateKey: PRIVATE_KEY,
+        rpcUrl: 'http://127.0.0.1:1',
+        chainId: CHAIN_ID,
+        policy: createSoftSessionPolicy({
+          address: ADDRESS,
+          ttlSeconds: 60,
+          maxTtlSeconds: 120,
+          now: START,
+          allowedChainIds: [CHAIN_ID],
+          allowedMethods: ['personal_sign'],
+        }),
+      });
+    });
+    afterEach(async () => {
+      await client.lock();
+      jest.useRealTimers();
+    });
+
+    it('stays open while extended, never shorter and never past its cap', async () => {
+      await client.extend(START + 90_000);
+      await client.extend(START + 10_000);
+      jest.advanceTimersByTime(75_000);
+      await expect(sign()).resolves.toMatch(/^0x/);
+      await client.extend(START + 500_000);
+      jest.advanceTimersByTime(45_000 - 1);
+      await expect(sign()).resolves.toMatch(/^0x/);
+      jest.advanceTimersByTime(1);
+      await expect(sign()).rejects.toThrow(/expired|locked/i);
+    });
+
+    it('expires on time without an extension, and an extension cannot reopen a locked session', async () => {
+      jest.advanceTimersByTime(60_000);
+      await expect(sign()).rejects.toThrow(/expired|locked/i);
+      await client.lock();
+      await client.extend(START + 90_000);
+      await expect(sign()).rejects.toThrow(/locked/i);
     });
   });

@@ -10,7 +10,7 @@ beforeEach(() => {
   worker = {
     terminate: jest.fn(),
     postMessage: jest.fn((message) => {
-      if (message.type === 'init' || message.type === 'lock')
+      if (['init', 'extend', 'lock'].includes(message.type))
         queueMicrotask(() =>
           worker.onmessage({
             data: { id: message.id, ok: true, result: { address: '0x123' } },
@@ -35,6 +35,21 @@ it('rejects in-flight signatures when locked', async () => {
   await client.lock();
   expect(await Promise.race([result, Promise.resolve('still pending')])).toMatch(/locked/i);
   expect(worker.terminate).toHaveBeenCalledTimes(1);
+});
+
+it('extends only a running worker and never starts one', async () => {
+  const client = createWorkerSoftSessionClient();
+  await client.extend(1234);
+  expect(createSessionWorker).not.toHaveBeenCalled();
+  await client.init({});
+  worker.postMessage.mockClear();
+  await client.extend(5678);
+  expect(worker.postMessage).toHaveBeenCalledWith(expect.objectContaining({ type: 'extend', until: 5678 }));
+  await client.lock();
+  worker.postMessage.mockClear();
+  await client.extend(9999);
+  expect(worker.postMessage).not.toHaveBeenCalled();
+  expect(createSessionWorker).toHaveBeenCalledTimes(1);
 });
 
 it('rejects requests awaiting lazy worker creation and does not resurrect the worker', async () => {

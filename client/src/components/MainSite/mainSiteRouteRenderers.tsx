@@ -52,7 +52,6 @@ import {
 } from './routeSessionResolution.js';
 import { getWorkerCanonicalRouteController } from './workerCanonicalRouteController.js';
 import { getSessionAtlasRedirect, getSessionEntryRedirect } from './sessionEntryRedirect';
-import { isRxcSessionEntryPath } from '../../utilities/session/rxcSessionSlugs';
 import { resolveWorkerCanonicalSessionIdHex } from '../../utilities/session/sessionWorkerDiscovery';
 import {
   resolveExplicitWorkerSessionConfig,
@@ -1341,9 +1340,6 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
     const routeLocation = readRouteLocationSearch();
     const { searchStr, searchParams } = routeLocation;
     let { hashStr } = routeLocation;
-    if (isRxcSessionEntryPath(fullPath)) {
-      return <Navigate replace to={getSessionEntryRedirect(fullPath, searchStr, hashStr)!} />;
-    }
     const routeDemoMode = host.props.demoSurfaceMode !== false || searchParams.get('demo') === '1';
     const requestedSessionId = searchParams.get('sessionId') || searchParams.get('sessionID') || '';
     const requestedChainIdRaw = searchParams.get('chainId') || searchParams.get('chainID') || '';

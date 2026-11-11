@@ -2,12 +2,19 @@ import { normalizeWorkerUrl } from '../../utilities/worker/workerUrl.js';
 import { canonicalizeSessionSlug } from '../../utilities/session/canonicalSessionContext.js';
 import { normalizeWorkerCanonicalSessionIdHex } from '../../utilities/session/sessionWorkerDiscovery.js';
 import { noteWorkerAccessChanged } from '../../utilities/worker/workerAuth.js';
-export { getWorkerSessionToken } from '../../utilities/worker/workerAuth.js';
+export {
+  getWorkerSessionToken,
+  isWorkerSignInNeededError,
+  subscribeWorkerSessionToken,
+} from '../../utilities/worker/workerAuth.js';
 
 type UnknownRecord = Record<string, unknown>;
 
 export type WorkerGroupJoinMode = 'open' | 'admin_add';
 export type WorkerGroupMemberVisibility = 'admin_only' | 'members' | 'session';
+// Who can end a membership: admins, the member, both or neither, like an SBT's burn auth.
+export const WORKER_GROUP_REMOVAL_AUTHS = ['both', 'admin_only', 'member_only', 'neither'] as const;
+export type WorkerGroupRemovalAuth = (typeof WORKER_GROUP_REMOVAL_AUTHS)[number];
 
 export type WorkerGroup = {
   groupId: string;
@@ -22,10 +29,17 @@ export type WorkerGroup = {
   adminAddress?: string;
   joinMode: WorkerGroupJoinMode;
   memberVisibility: WorkerGroupMemberVisibility;
+  removalAuth?: WorkerGroupRemovalAuth;
   memberCount?: number;
   createdAt?: string;
   updatedAt?: string;
 };
+
+// A Worker deployed before the setting reports none, and every group there works as both.
+export const workerGroupMembersMayLeave = ({ removalAuth = 'both' }: Pick<WorkerGroup, 'removalAuth'>): boolean =>
+  removalAuth === 'both' || removalAuth === 'member_only';
+export const workerGroupAdminsMayRemove = ({ removalAuth = 'both' }: Pick<WorkerGroup, 'removalAuth'>): boolean =>
+  removalAuth === 'both' || removalAuth === 'admin_only';
 
 export type WorkerGroupPrincipal =
   | {
@@ -125,6 +139,7 @@ const SAFE_REMOTE_WORKER_GROUP_REASONS = new Set([
   'invalid_member_visibility',
   'invalid_principal',
   'invalid_principal_address',
+  'invalid_removal_auth',
   'invalid_telegram_principal',
   'invalid_worker_group_id',
   'join_mode_not_implemented',
@@ -144,6 +159,7 @@ const SAFE_REMOTE_WORKER_GROUP_REASONS = new Set([
   'worker_group_id_retired',
   'worker_group_join_denied',
   'worker_group_join_ended',
+  'worker_group_leave_denied',
   'worker_group_member_cap_exceeded',
   'worker_group_member_limit_below_current',
   'worker_group_member_list_forbidden',
@@ -155,6 +171,7 @@ const SAFE_REMOTE_WORKER_GROUP_REASONS = new Set([
   'worker_group_mutation_invalid',
   'worker_group_not_found',
   'worker_group_projection_unavailable',
+  'worker_group_removal_denied',
   'worker_group_session_cap_exceeded',
   'worker_group_session_identity_invalid',
   'worker_group_session_identity_mismatch',
@@ -286,6 +303,8 @@ const normalizeGroup = (
   const label = toStringValue(source.label);
   const joinMode = toStringValue(source.joinMode);
   const memberVisibility = toStringValue(source.memberVisibility);
+  // A Worker from before the setting omits it, and its groups work as both.
+  const removalAuth = source.removalAuth == null ? undefined : toStringValue(source.removalAuth);
   const tags = Array.isArray(source.tags) ? source.tags.map(toStringValue).filter(Boolean) : [];
   const documentURLs = Array.isArray(source.documentURLs) ? source.documentURLs.map(toStringValue).filter(Boolean) : [];
   const memberLimit = Number(source.memberLimit);
@@ -299,6 +318,7 @@ const normalizeGroup = (
     !label ||
     !['open', 'admin_add'].includes(joinMode) ||
     !['admin_only', 'members', 'session'].includes(memberVisibility) ||
+    (removalAuth !== undefined && !(WORKER_GROUP_REMOVAL_AUTHS as readonly string[]).includes(removalAuth)) ||
     (source.tags != null &&
       (!Array.isArray(source.tags) ||
         tags.length !== source.tags.length ||
@@ -332,6 +352,7 @@ const normalizeGroup = (
     adminAddress: adminAddress || undefined,
     joinMode: joinMode as WorkerGroupJoinMode,
     memberVisibility: memberVisibility as WorkerGroupMemberVisibility,
+    ...(removalAuth === undefined ? {} : { removalAuth: removalAuth as WorkerGroupRemovalAuth }),
     ...(memberCount === undefined ? {} : { memberCount }),
     createdAt: toStringValue(source.createdAt) || undefined,
     updatedAt: toStringValue(source.updatedAt) || undefined,
@@ -457,18 +478,22 @@ export const loadPublicWorkerGroups = async ({
   workerUrl,
   sessionId,
   sessionSlug,
+  joinGroup = '',
   fetchImpl = fetch,
 }: {
   workerUrl: unknown;
   sessionId: unknown;
   sessionSlug: unknown;
+  /** A join link's group: on a private session it shows what that group's members see. */
+  joinGroup?: string;
   fetchImpl?: typeof fetch;
 }): Promise<WorkerGroup[]> => {
   const base = normalizeWorkerUrl(workerUrl);
   const expectedSessionSlug = normalizeExpectedSessionSlug(sessionSlug);
   const expectedSessionId = normalizeExpectedSessionId(sessionId);
   if (!base) throw new WorkerGroupRequestError('worker_group_worker_url_missing');
-  const response = await fetchImpl(`${base}/groups/list?sessionId=${encodeURIComponent(expectedSessionId)}`, {
+  const invite = joinGroup ? `&joinGroup=${encodeURIComponent(joinGroup)}` : '';
+  const response = await fetchImpl(`${base}/groups/list?sessionId=${encodeURIComponent(expectedSessionId)}${invite}`, {
     method: 'GET',
     cache: 'no-store',
     headers: {
@@ -724,7 +749,14 @@ export const createWorkerGroupAsParticipant = async ({
     Partial<
       Pick<
         WorkerGroup,
-        'description' | 'imageUrl' | 'tags' | 'documentURLs' | 'memberLimit' | 'joinEndsAt' | 'adminAddress'
+        | 'description'
+        | 'imageUrl'
+        | 'tags'
+        | 'documentURLs'
+        | 'memberLimit'
+        | 'joinEndsAt'
+        | 'adminAddress'
+        | 'removalAuth'
       >
     >;
   fetchImpl?: typeof fetch;

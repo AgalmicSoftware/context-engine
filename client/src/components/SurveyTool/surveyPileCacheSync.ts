@@ -59,7 +59,8 @@ export const buildPileCacheUpdatePlan = ({
   const normalizedPileQuestionsLength = Math.max(0, Number(pileQuestionsLength || 0));
 
   if (hasCacheSignal) {
-    if (isOptimistic) {
+    // An emptied pile shows no answers to guard, and can never pass the catch-up check, so it reloads.
+    if (isOptimistic && normalizedPileQuestionsLength > 0) {
       return { action: 'check-optimistic-baseline', delayMs: normalizedReloadDelayMs };
     }
     if (!hasLiveEdits) {

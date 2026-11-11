@@ -1,6 +1,14 @@
 import { readCurrentSessionConfig } from './sessionConfigAuthority.js';
 import { resolveAnonymousIpDailyLimit } from './anonymousRateLimitPolicy.js';
+import { resolveAuthenticatedRouteContext } from './authenticatedRouteContextResolution.js';
+import { evaluateAuthenticatedRoutePreflight } from './authenticatedRoutePreflight.js';
+import { issueInterviewCatalogTicket, verifyInterviewCatalogTicket } from './interviewCatalogTicket.js';
 import { loadPublicInterviewQuestions as loadPublicInterviewQuestionsBoundary } from './interviewQuestionCatalog.js';
+import {
+  listSelfJoinableWorkerGroupsForMember as listSelfJoinableWorkerGroupsForMemberBoundary,
+  listSelfJoinableWorkerGroupsForVisitor as listSelfJoinableWorkerGroupsForVisitorBoundary,
+} from './workerGroups.js';
+import { GROUP_SUGGESTION_DATA, GROUP_SUGGESTION_NEVER, normalizeInterviewSettings } from '../../shared/interviewSettings.mjs';
 
 // v6 asks for confidence as the chance the person keeps the answer; hashes follow v5.
 export const INTERVIEW_PROMPT_VERSION = 'ce-interview-brief-v6';
@@ -86,12 +94,22 @@ const buildReviewUrl = ({ sessionUrl, servedWorkerOrigin } = {}) => {
   return url.toString();
 };
 
+// Groups an AI may suggest, as data; the clipboard prompt, not the catalog, says how to suggest them.
+const catalogGroup = (group) => ({
+  groupId: group.groupId,
+  label: group.label,
+  ...(group.description ? { description: group.description } : {}),
+  ...(Array.isArray(group.tags) && group.tags.length ? { tags: group.tags } : {}),
+});
+
 export const buildInterviewBriefDocument = ({
   slug,
   sessionUrl,
   servedWorkerOrigin,
   questions,
   questionSetHash,
+  groups,
+  groupSuggestionData,
 } = {}) => ({
   type: 'context-engine.interview-question-catalog',
   version: 1,
@@ -120,6 +138,14 @@ export const buildInterviewBriefDocument = ({
     verification: 'self_reported',
   },
   questions,
+  ...(groups?.length
+    ? {
+        groups: groups.map(catalogGroup),
+        // What the session lets an AI base a suggestion on, in words, and what it never may.
+        groupSuggestionData: (groupSuggestionData || []).map((kind) => GROUP_SUGGESTION_DATA[kind]),
+        groupSuggestionNever: GROUP_SUGGESTION_NEVER,
+      }
+    : {}),
 });
 
 export const dispatchInterviewBriefRequest = async ({
@@ -149,6 +175,8 @@ export const dispatchInterviewBriefRequest = async ({
   if (!corsContext?.ok) return corsContext?.response;
   const headers = new Headers(corsContext.headers || baseHeaders || {});
   headers.set('cache-control', 'no-store');
+  // A catalog link may carry a ticket; never pass it on in a Referer.
+  headers.set('referrer-policy', 'no-referrer');
   if (!isInterviewEnabled(config)) {
     return deps?.json?.({ error: 'Interview mode is disabled for this session.' }, 404, headers);
   }
@@ -163,22 +191,51 @@ export const dispatchInterviewBriefRequest = async ({
     if (!rateAllowed) return deps?.json?.({ error: 'Rate limit exceeded.' }, 429, headers);
   }
 
+  const url = new URL(request.url);
+  // A ticket lets one person's AI read what that person may see; without one, the catalog is public.
+  const ticket = url.searchParams.get('ticket');
+  let reader = null;
+  if (ticket) {
+    const verified = await verifyInterviewCatalogTicket({
+      env,
+      ticket,
+      config,
+      slug,
+      deps: {
+        now: deps?.now,
+        computeScopesForLogin: deps?.computeScopesForLogin,
+        validateAuthTokenRecord: deps?.validateAuthTokenRecord,
+      },
+    });
+    if (!verified.ok) return deps?.json?.({ error: verified.error, reason: verified.reason }, verified.status, headers);
+    reader = verified.reader;
+  }
   const loadPublicInterviewQuestions = deps?.loadPublicInterviewQuestions || loadPublicInterviewQuestionsBoundary;
-  const { questions, incomplete } = await loadPublicInterviewQuestions({
+  const { questions, incomplete, refused } = await loadPublicInterviewQuestions({
     env,
     config,
     slug,
     storageRoute: deps?.storageRoute,
     fetch: deps?.fetch,
+    ...(reader ? { reader } : {}),
   });
+  if (!questions.length && refused && !reader) {
+    return deps?.json?.({
+      error: 'This session’s questions need a sign-in. Sign in on the session page, then copy the prompt again.',
+      reason: 'sign_in_required',
+    }, 401, headers);
+  }
   if (!questions.length && incomplete) {
     headers.set('retry-after', '5');
     return deps?.json?.({ error: 'Interview question discovery is incomplete. Retry shortly.' }, 503, headers);
   }
   if (!questions.length) {
-    return deps?.json?.({ error: 'No public, accessible questions are available for interview prefill.' }, 404, headers);
+    return deps?.json?.(reader
+      ? { error: 'No questions you can see are available for interview prefill.' }
+      // Group-only questions may still show once the person signs in.
+      : { error: 'No public, accessible questions are available for interview prefill.', reason: 'sign_in_required' },
+    404, headers);
   }
-  const url = new URL(request.url);
   const configuredAllowedOrigins = [
     ...(Array.isArray(config.allowOrigins) ? config.allowOrigins : [config.allowOrigins]),
     config.sessionUrl,
@@ -193,6 +250,28 @@ export const dispatchInterviewBriefRequest = async ({
     return deps?.json?.({ error: 'A session-approved HTTPS (or localhost) sessionUrl is required.' }, 400, headers);
   }
   const questionSetHash = await (deps?.sha256 || sha256)(JSON.stringify(canonicalizeQuestions(questions)));
+  // With joining matching groups on, the person's own AI may suggest groups too: those a ticket's
+  // person could join and hasn't, or those a visitor could see, which is all of them on a public
+  // session or what a join link allows. A session that lets an AI use no kind of detail about
+  // people lists none.
+  const { joinMatchingGroups, groupSuggestionData } = normalizeInterviewSettings(config.interviewMode);
+  const groups = !joinMatchingGroups || !groupSuggestionData.length
+    ? []
+    : reader
+      ? await (deps?.listSelfJoinableWorkerGroupsForMember || listSelfJoinableWorkerGroupsForMemberBoundary)({
+          env,
+          config,
+          slug,
+          address: reader.address,
+          deps: { now: deps?.now },
+        })
+      : await (deps?.listSelfJoinableWorkerGroupsForVisitor || listSelfJoinableWorkerGroupsForVisitorBoundary)({
+          env,
+          config,
+          slug,
+          inviteGroupId: new URL(sessionUrl).searchParams.get('joinGroup'),
+          deps: { now: deps?.now },
+        });
   return deps?.json?.(
     buildInterviewBriefDocument({
       slug,
@@ -200,10 +279,56 @@ export const dispatchInterviewBriefRequest = async ({
       servedWorkerOrigin: safeServedWorkerOrigin(request.url),
       questions,
       questionSetHash,
+      groups,
+      groupSuggestionData,
     }),
     200,
     headers,
   );
+};
+
+/** A ticket a signed-in person's page puts in the catalog link it gives their AI. */
+export const dispatchInterviewCatalogTicketRequest = async ({ request, env, baseHeaders, slug, deps } = {}) => {
+  const auth = await deps?.requireAuth?.({ request, env, baseHeaders, slugHint: slug });
+  if (!auth?.ok) return auth?.response;
+  const context = await resolveAuthenticatedRouteContext({ request, env, auth, baseHeaders, deps });
+  if (!context?.ok) return context?.response;
+  const headers = new Headers(context.headers || {});
+  headers.set('cache-control', 'no-store');
+  if (!isInterviewEnabled(context.config)) {
+    return deps?.json?.({ error: 'Interview mode is disabled for this session.' }, 404, headers);
+  }
+  // An agent's own key reads the session directly, and a ticket would outlive revoking that key.
+  if (auth.payload?.agentSource) {
+    return deps?.json?.({
+      error: 'Catalog tickets are for people signed in on the session page.',
+      reason: 'catalog_ticket_person_only',
+    }, 403, headers);
+  }
+  // The ticket reads questions, so it needs what a signed-in storage read needs, checked now.
+  const preflight = await (deps?.evaluateAuthenticatedRoutePreflight || evaluateAuthenticatedRoutePreflight)({
+    ...context,
+    env,
+    headers,
+    route: 'interview-ticket',
+    scope: context.scopes?.storage === true ? 'storage' : 'arweave',
+    deps: { computeScopesForLogin: deps?.computeScopesForLogin, checkRateLimit: deps?.checkRateLimit, json: deps?.json },
+  });
+  if (!preflight?.ok) return preflight?.response;
+  try {
+    const issued = await issueInterviewCatalogTicket({
+      env,
+      config: context.config,
+      slug: context.slug,
+      sub: context.address,
+      parent: auth.payload?.jti,
+      parentExp: auth.payload?.exp,
+      deps: { now: deps?.now },
+    });
+    return deps?.json?.(issued, 200, headers);
+  } catch {
+    return deps?.json?.({ error: 'Could not issue a catalog ticket.' }, 500, headers);
+  }
 };
 
 export const __test__interviewBriefDispatch = {

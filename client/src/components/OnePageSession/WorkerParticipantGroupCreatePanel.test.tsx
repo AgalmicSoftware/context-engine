@@ -90,6 +90,51 @@ describe('WorkerParticipantGroupCreatePanel', () => {
     expect(screen.getByTestId('ce-session-worker-participant-group-label')).toHaveValue('');
   });
 
+  it.each([
+    ['saves the chosen removal setting', true, 'Group created. It is open to session participants.'],
+    ['says when an older Worker ignores the removal setting', false, /^Group created\. .*doesn’t support/],
+  ])('%s', async (_name, keepsSetting, status) => {
+    const fetchImpl = jest.fn(async (_input?: RequestInfo | URL, init?: RequestInit) => {
+      const { group } = JSON.parse(String(init?.body || '{}'));
+      return new Response(
+        JSON.stringify({
+          ok: true,
+          sessionId: SESSION_ID,
+          sessionSlug: 'demo-sh',
+          group: {
+            groupId: 'kept',
+            sessionSlug: 'demo-sh',
+            label: group.label,
+            joinMode: 'open',
+            memberVisibility: 'session',
+            ...(keepsSetting ? { removalAuth: group.removalAuth } : {}),
+          },
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      );
+    });
+    render(
+      <WorkerParticipantGroupCreatePanel
+        sessionId={SESSION_ID}
+        participantAddress={ADDRESS}
+        sessionSlug="demo-sh"
+        workerToken="participant-token"
+        workerUrl="https://demo-sh-worker.example/"
+        fetchImpl={fetchImpl}
+      />,
+    );
+
+    fireEvent.change(screen.getByTestId('ce-session-worker-participant-group-label'), { target: { value: 'Kept' } });
+    const setting = screen.getByTestId('ce-session-worker-participant-group-removal-auth');
+    expect(setting).toHaveValue('both');
+    fireEvent.change(setting, { target: { value: 'member_only' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create Group' }));
+
+    expect(await screen.findByText(status)).toBeInTheDocument();
+    expect(JSON.parse(String(fetchImpl.mock.calls[0]?.[1]?.body || '{}')).group.removalAuth).toBe('member_only');
+    expect(screen.getByTestId('ce-session-worker-participant-group-removal-auth')).toHaveValue('both');
+  });
+
   it.each([200, 500])('releases an old account create without losing the draft (status %s)', async (status) => {
     let finish!: (response: Response) => void;
     const fetchImpl = jest.fn(

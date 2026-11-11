@@ -350,7 +350,9 @@ describe('useSessionWizardWorkerDeploy', () => {
       }),
     );
     expect(fetchMock.mock.calls.some(([url]) => String(url).endsWith('/deploy'))).toBe(false);
-    expect(fetchMock.mock.calls.filter(([url]) => String(url).includes('/session-config'))).toHaveLength(1);
+    // One read finds no instructions for AI agents to clear, so none are sent; the other checks the write.
+    expect(fetchMock.mock.calls.filter(([url]) => String(url).includes('/session-config'))).toHaveLength(2);
+    expect(persistedConfig).not.toHaveProperty('agentInstructions');
     expect(bootstrap).toEqual(expect.objectContaining({ configRevision: '' }));
     expect(persistedConfig).not.toHaveProperty('configRevision');
     const secretsCall = fetchMock.mock.calls.find(([url]) => String(url).endsWith('/admin/set-secrets'));
@@ -1781,6 +1783,7 @@ describe('useSessionWizardWorkerDeploy', () => {
         slug: 'two-key-session',
         sessionName: 'Two Key Session',
         sessionInfo: 'Worker-canonical session.',
+        agentInstructions: 'Join the Reviewers group.',
         sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
       },
       workerSecretsEnabled: true,
@@ -1810,6 +1813,7 @@ describe('useSessionWizardWorkerDeploy', () => {
         sessionId: '0x123e4567e89b12d3a456426614174000',
         sessionName: 'Two Key Session',
         sessionInfo: 'Worker-canonical session.',
+        agentInstructions: 'Join the Reviewers group.',
         sessionModeProfile: expect.objectContaining({ authority: { mode: 'worker_canonical' } }),
         workerAuthority: expect.objectContaining({ version: 1 }),
         configRevision: expect.any(String),

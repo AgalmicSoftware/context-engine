@@ -1,8 +1,10 @@
 import {
   isSafeHttpsUrl,
+  WORKER_GROUP_REMOVAL_AUTHS,
   type WorkerGroup,
   type WorkerGroupJoinMode,
   type WorkerGroupMemberVisibility,
+  type WorkerGroupRemovalAuth,
 } from '../../domains/worker/workerGroupPorts';
 import { validateWorkerGroupImageFile } from '../../domains/worker/workerGroupImageUpload';
 import { generateSessionId } from './sessionWizardCoreUtils';
@@ -22,6 +24,7 @@ export type PendingWorkerGroupDraft = {
   adminAddress: string;
   joinMode: WorkerGroupJoinMode;
   memberVisibility: WorkerGroupMemberVisibility;
+  removalAuth: WorkerGroupRemovalAuth;
 };
 
 const toText = (value: unknown): string => String(value ?? '').trim();
@@ -61,6 +64,10 @@ const normalizeMemberVisibility = (value: unknown, joinMode: WorkerGroupJoinMode
   return 'session';
 };
 
+// Drafts saved before the setting existed keep the rule every group had then.
+const normalizeRemovalAuth = (value: unknown): WorkerGroupRemovalAuth =>
+  (WORKER_GROUP_REMOVAL_AUTHS as readonly unknown[]).includes(value) ? (value as WorkerGroupRemovalAuth) : 'both';
+
 export const createPendingWorkerGroupDraft = (
   label: unknown,
   overrides: Partial<PendingWorkerGroupDraft> = {},
@@ -79,6 +86,7 @@ export const createPendingWorkerGroupDraft = (
     adminAddress: toText(overrides.adminAddress),
     joinMode,
     memberVisibility: normalizeMemberVisibility(overrides.memberVisibility, joinMode),
+    removalAuth: normalizeRemovalAuth(overrides.removalAuth),
   };
 };
 
@@ -188,6 +196,7 @@ export const buildPendingWorkerGroupInput = ({
     joinMode: draft.joinMode,
     memberVisibility:
       draft.joinMode === 'open' && draft.memberVisibility === 'admin_only' ? 'session' : draft.memberVisibility,
+    removalAuth: draft.removalAuth,
   };
 };
 

@@ -259,6 +259,7 @@ describe('sessionWizardPublishRuntimeController', () => {
         adminAddress: '',
         joinMode: 'open' as const,
         memberVisibility: 'session' as const,
+        removalAuth: 'both' as const,
       },
     ];
 

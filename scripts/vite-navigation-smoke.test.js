@@ -8,6 +8,8 @@ const registryAbi = require('../client/src/contractsABI/SESSION_REGISTRY_ABI.jso
 const contracts = require('../client/src/variables/contracts.json');
 
 const {
+  STATIC_FILES,
+  checkStaticFiles,
   DEFAULT_ROUTE_PROBES,
   DEFAULT_ROUTES,
   DEFAULT_ROUTE_TEXT,
@@ -247,10 +249,10 @@ test('local navigation fixtures allow app assets and fail unmatched external req
   await installLocalSmokeFixtureRoutes({ route: async () => assert.fail('remote smoke remains live') }, 'https://app.example.test');
 });
 
-test('the pinned worker route renders from read-only local smoke fixtures', async () => {
+test('a known session renders from its normal link with read-only local smoke fixtures', async () => {
   const sessions = require('../client/src/variables/demo/demo_sessions.json');
-  const origin = new URL(sessions['rxc-ra-test'].corsWorkerUrl).origin;
-  for (const route of ['/rxc-ra-test', '/session/rxc-ra-test?mode=questions']) {
+  const { worker: origin, sessionId } = require('../known-sessions.json').eddy26;
+  for (const route of ['/session/eddy26', '/session/eddy26?mode=questions']) {
     let handler;
     await installLocalSmokeFixtureRoutes({ addInitScript: async () => {}, route: async (_pattern, callback) => { handler = callback; } },
       'http://127.0.0.1:4173', route);
@@ -264,30 +266,55 @@ test('the pinned worker route renders from read-only local smoke fixtures', asyn
       });
       return result;
     };
-    const bootstrap = await request('/session-config?slug=rxc-ra-test');
+    const bootstrap = await request('/session-config?slug=eddy26');
     assert.equal(bootstrap.ok, true);
-    assert.equal(bootstrap.sessionSlug, 'rxc-ra-test');
-    assert.equal(bootstrap.config.slug, 'rxc-ra-test');
+    assert.equal(bootstrap.sessionSlug, 'eddy26');
+    assert.equal(bootstrap.config.slug, 'eddy26');
+    assert.equal(bootstrap.config.sessionId, sessionId);
     assert.equal(bootstrap.config.corsWorkerUrl, origin + '/');
     assert.deepEqual(bootstrap.config.sessionModeProfile, sessions['demo-sh'].sessionModeProfile);
     assert.deepEqual(await request('/storage/list?resource=questions'), { items: [], listComplete: true });
     assert.deepEqual(await request('/resource-presence'), { ok: true, interview: { ready: false } });
     assert.deepEqual(await request('/session-config?slug=another-session'), { aborted: 'blockedbyclient' });
     assert.deepEqual(await request('/storage/list?resource=private'), { aborted: 'blockedbyclient' });
-    assert.deepEqual(await request('/session-config?slug=rxc-ra-test', 'POST'), { aborted: 'blockedbyclient' });
+    assert.deepEqual(await request('/session-config?slug=eddy26', 'POST'), { aborted: 'blockedbyclient' });
   }
-  assert.deepEqual(DEFAULT_ROUTE_TEXT['/rxc-ra-test'], ['Groups', 'Results']);
+});
+
+test('the built site serves known-sessions.json and skill.md unchanged', async () => {
+  const base = 'http://127.0.0.1:4173';
+  const files = Object.fromEntries(
+    Object.entries(STATIC_FILES).map(([route, file]) => [route, require('node:fs').readFileSync(file, 'utf8')]),
+  );
+  // Serves every file as it is, except one route given another body or status.
+  const serve = (changed, body, status = 200) => async (url) => {
+    const route = url.slice(base.length);
+    assert.ok(route in files, url);
+    if (route !== changed) return { ok: true, status: 200, text: async () => files[route] };
+    return { ok: status === 200, status, text: async () => body };
+  };
+  assert.deepEqual(Object.keys(files), ['/known-sessions.json', '/skill.md']);
+  assert.deepEqual(await checkStaticFiles(base, serve()), []);
+  const known = files['/known-sessions.json'];
+  for (const [body, status] of [['<!doctype html>', 200], [known.replace('eddy26', 'other'), 200], [known, 404]]) {
+    assert.deepEqual(await checkStaticFiles(base, serve('/known-sessions.json', body, status)), [
+      `/known-sessions.json: not served as known-sessions.json (status ${status})`,
+    ]);
+  }
+  assert.deepEqual(await checkStaticFiles(base, serve('/skill.md', '<!doctype html>')), [
+    '/skill.md: not served as client/public/agent-guide.md (status 200)',
+  ]);
 });
 
 test('pinned Worker fixtures do not mask reads from unrelated routes', async () => {
-  const origin = new URL(require('../client/src/variables/demo/demo_sessions.json')['rxc-ra-test'].corsWorkerUrl).origin;
-  for (const route of ['/about', '/rxc-ra-test-2']) {
+  const origin = require('../known-sessions.json').eddy26.worker;
+  for (const route of ['/about', '/eddy26', '/session/eddy26-2']) {
     let handler;
     await installLocalSmokeFixtureRoutes({ addInitScript: async () => {}, route: async (_pattern, callback) => { handler = callback; } },
       'http://127.0.0.1:4173', route);
     let aborted;
     await handler({
-      request: () => ({ url: () => origin + '/session-config?slug=rxc-ra-test', method: () => 'GET' }),
+      request: () => ({ url: () => origin + '/session-config?slug=eddy26', method: () => 'GET' }),
       continue: async () => assert.fail('external requests remain isolated'),
       abort: async (reason) => { aborted = reason; },
       fulfill: async () => assert.fail('unrelated routes must not use the fixture'),

@@ -12,8 +12,8 @@ with the changes noted below.
 
 - **Session responses.** AI prefill and interview drafts keep the AI's
   original draft in `interviewProvenance.originalPrediction` (answer and
-  confidence) when the participant leaves **Share AI draft changes for
-  research** on; see [session-interview-research.md](session-interview-research.md).
+  confidence) when the participant leaves **Share for research** on; see
+  [session-interview-research.md](session-interview-research.md).
   The scored answer is the ordinary submitted `answer`.
 - **Session Wrapped.** The Session Worker's agent-only export (admin route
   `/api/agent/admin/agent-only/export`, `wide` or `gold` view) pairs

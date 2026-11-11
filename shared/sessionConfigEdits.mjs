@@ -16,6 +16,7 @@ export const WORKER_CANONICAL_SET_CONFIG_KEYS = Object.freeze([
   'defaultGroupTags',
   'defaultSbtTags',
   'questionsGenPrompt',
+  'agentInstructions',
   'interviewMode',
   'interviewModeEnabled',
   'pileAutoAdvanceEnabled',
@@ -75,16 +76,25 @@ export const validResultsAdminAddresses = value =>
   value.every(address => typeof address === 'string' && ADDRESS.test(address)) &&
   new Set(value.map(address => address.toLowerCase())).size === value.length;
 
+// A session's instructions for AI agents, in Markdown. Its Worker serves them
+// as text at /llms.txt.
+export const MAX_AGENT_INSTRUCTIONS_CHARS = 8000;
+export const validAgentInstructions = value =>
+  typeof value === 'string' && value.length <= MAX_AGENT_INSTRUCTIONS_CHARS;
+
 const CONTENT_FIELDS = new Set([
   'sessionName', 'sessionInfo', 'sessionContext', 'questionsGenPrompt', 'appearance', 'sessionHeaderImg',
+  'agentInstructions',
   // Checked again when each file publishes, so changing it signs no one out.
   'contextAdditionPolicy',
   // Checked on each atlas build and read and never held in a sign-in, so
   // changing it signs no one out either.
   'resultsAdminAddresses',
+  // Read on each interview request and never held in a sign-in, so changing
+  // any interview setting, even turning interviews off, signs no one out.
+  'interviewModeEnabled', 'interviewMode',
   ...CURATED_ID_LIST_KEYS,
 ]);
-const INTERVIEW_CONTENT_FIELDS = new Set(['openingPrompt', 'steeringPrompt']);
 const record = value => !!value && typeof value === 'object' && !Array.isArray(value);
 const same = (left, right) => stableCanonicalSerialize(left) === stableCanonicalSerialize(right);
 
@@ -107,10 +117,6 @@ const onlyAddsInvites = (before, after) => {
 
 const authorityView = (config, additiveInvites) => {
   const result = without(config, CONTENT_FIELDS);
-  if (record(result.interviewMode)) {
-    result.interviewMode = without(result.interviewMode, INTERVIEW_CONTENT_FIELDS);
-    if (!Object.keys(result.interviewMode).length) delete result.interviewMode;
-  }
   if (record(result.agentHttp) && additiveInvites) {
     result.agentHttp = without(result.agentHttp, new Set(['invites']));
     if (!Object.keys(result.agentHttp).length) delete result.agentHttp;
@@ -133,6 +139,12 @@ const changedFields = (before, after) => {
   const next = fields(after);
   return prior && next ? keysOf(prior, next).filter(key => !same(prior[key], next[key])) : [];
 };
+// The changed sub-fields of interviewMode or agentHttp, each with its own
+// label on the Settings page; otherwise the key itself.
+const editedPaths = (key, before, after) => {
+  const nested = key === 'interviewMode' || key === 'agentHttp' ? changedFields(before, after) : [];
+  return nested.length ? nested.map(field => `${key}.${field}`) : [key];
+};
 
 // The edited paths in two effective records, split the way the Worker splits
 // them on save: an authority path raises authzEpoch, signing participants out.
@@ -145,19 +157,9 @@ export const classifySessionConfigEdits = (before, after) => {
   const nextAuthority = authorityView(next, additiveInvites);
   const authority = keysOf(priorAuthority, nextAuthority)
     .filter(key => !same(priorAuthority[key], nextAuthority[key]))
-    .flatMap((key) => {
-      const nested = key === 'interviewMode' || key === 'agentHttp'
-        ? changedFields(priorAuthority[key], nextAuthority[key])
-        : [];
-      return nested.length ? nested.map(field => `${key}.${field}`) : [key];
-    });
+    .flatMap(key => editedPaths(key, priorAuthority[key], nextAuthority[key]));
   const content = keysOf(prior, next).flatMap((key) => {
-    if (CONTENT_FIELDS.has(key)) return same(prior[key], next[key]) ? [] : [key];
-    if (key === 'interviewMode') {
-      return [...INTERVIEW_CONTENT_FIELDS]
-        .filter(field => !same(prior.interviewMode?.[field], next.interviewMode?.[field]))
-        .map(field => `interviewMode.${field}`);
-    }
+    if (CONTENT_FIELDS.has(key)) return same(prior[key], next[key]) ? [] : editedPaths(key, prior[key], next[key]);
     return key === 'agentHttp' && additiveInvites && !same(prior.agentHttp?.invites, next.agentHttp?.invites)
       ? ['agentHttp.invites']
       : [];

@@ -82,7 +82,6 @@ describe('surveyPileLoadController', () => {
       buildPileEmptyProbeStatePlan({
         action: 'continue-loading-immediately',
         previousPileQuestions: [],
-        previousAllQuestionsForFilter: [],
         previousLoading: true,
         areQuestionListsEquivalent: (left, right) => JSON.stringify(left) === JSON.stringify(right),
       }),
@@ -100,7 +99,6 @@ describe('surveyPileLoadController', () => {
       buildPileEmptyProbeStatePlan({
         action: 'continue-loading-immediately',
         previousPileQuestions: [{ id: 'q1' }],
-        previousAllQuestionsForFilter: [{ id: 'q1' }],
         previousLoading: false,
         areQuestionListsEquivalent: (left, right) => JSON.stringify(left) === JSON.stringify(right),
       }),
@@ -109,7 +107,8 @@ describe('surveyPileLoadController', () => {
       shouldClearLastResultSignature: true,
       shouldIncrementPileQuestionsGeneration: true,
       shouldBumpNoop: false,
-      nextState: { pileQuestions: [], allQuestionsForFilter: [], loading: true },
+      // The question list stays for answers submitted while the cache refills.
+      nextState: { pileQuestions: [], loading: true },
       nextProbeStartedAtMs: 0,
       nextProbeDelayMs: 0,
     });

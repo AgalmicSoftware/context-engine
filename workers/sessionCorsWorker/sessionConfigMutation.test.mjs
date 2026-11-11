@@ -534,6 +534,9 @@ test('set-config rejects malformed or unsupported interview mode config', () => 
     { interviewMode: { questionGrowthPercent: 0 } },
     { interviewMode: { steeringPrompt: 42 } },
     { interviewMode: { steeringPrompt: 'x'.repeat(3001) } },
+    { interviewMode: { groupSuggestionData: 'country' } },
+    { interviewMode: { groupSuggestionData: ['address'] } },
+    { interviewMode: { groupSuggestionData: ['work', 'work'] } },
   ]) {
     const result = applySessionConfigMutation({
       existingConfig: cloneJson(profileBearingConfig),
@@ -903,6 +906,8 @@ test('set-config preserves owner opening and optional interview features', () =>
     hiddenDraftShare: 0.2,
     showFidelityScore: true,
     suggestGroups: true,
+    joinMatchingGroups: true,
+    groupSuggestionData: ['country', 'town'],
   };
   const result = applySessionConfigMutation({
     existingConfig: cloneJson(profileBearingConfig),

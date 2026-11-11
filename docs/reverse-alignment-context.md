@@ -30,12 +30,12 @@ rewrite the saved Worker configuration.
 Like the other sessions here, it shows **Debate Map** only once a debate atlas
 has been built for it. Raw Results continues to open the detailed results view.
 
-The client's RxC list now only gives these sessions their short links:
-`/rxc-test`, `/rxc-ra-test`, `/rxc-ra-test-2`, `/rxc-ra-test-3`,
-`/rxc-ra-test-5` and `/rxc-ra-test-6` open their session pages. The bundled
-discovery entries support fresh visits to each of them, including the
-group-recording link `/session/rxc-ra-test-6?mode=groupRecording`; each fetches
-and validates the Worker's live configuration before opening the session.
+These test sessions open only from their Worker links,
+`/session/<slug>?worker=<origin>`; the hosted site no longer opens them from a
+normal or short link. Each link fetches and validates the Worker's live
+configuration before opening the session. A session opens from a normal link
+only when `known-sessions.json` lists it; see the
+[session creation guide](session-creation-guide.md#normal-links-on-the-hosted-site).
 
 See [interview research](session-interview-research.md)
 for submission controls and [Worker encryption](session-cors-worker.md) for

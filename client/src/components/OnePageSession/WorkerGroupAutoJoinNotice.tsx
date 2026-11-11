@@ -1,6 +1,6 @@
 import React, { useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
-import { VOICE_DIALOG_NOTICE_SLOT_ID } from '../../utilities/ui/voiceDialogNoticeSlot';
+import { isAutoJoinNoticeClaimed, VOICE_DIALOG_NOTICE_SLOT_ID } from '../../utilities/ui/voiceDialogNoticeSlot';
 import styles from './WorkerGroupAutoJoinNotice.module.scss';
 
 // A link can open the voice dialog over the page. The notice moves into it, so someone who signs in from the
@@ -13,17 +13,21 @@ const subscribeToDialogSlot = (notify: () => void) => {
 const readDialogSlot = () => document.getElementById(VOICE_DIALOG_NOTICE_SLOT_ID);
 
 export default function WorkerGroupAutoJoinNotice({
+  groupId = '',
   groupLabel,
   message,
   isError = false,
   children,
 }: {
+  groupId?: string;
   groupLabel?: string;
   message: string;
   isError?: boolean;
   children?: React.ReactNode;
 }) {
   const dialogSlot = useSyncExternalStore(subscribeToDialogSlot, readDialogSlot);
+  const claimed = useSyncExternalStore(subscribeToDialogSlot, () => isAutoJoinNoticeClaimed(groupId));
+  if (claimed) return null;
   const notice = (
     <section
       className={dialogSlot ? `${styles.notice} ${styles.noticeInDialog}` : styles.notice}

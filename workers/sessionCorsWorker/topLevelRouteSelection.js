@@ -39,9 +39,13 @@ export const resolveTopLevelRouteSelection = ({
     return { kind: 'session-config' };
   }
 
+  if (path === '/llms.txt' && method === 'GET') return { kind: 'agent-instructions' };
+
   if ((path === '/agent/interview-catalog' || path === '/agent/interview-brief') && method === 'GET') {
     return { kind: 'interview-brief' };
   }
+
+  if (path === '/agent/interview-catalog-ticket' && method === 'POST') return { kind: 'interview-catalog-ticket' };
 
   if (path === '/sponsored/redeem-deploy' && method === 'POST') {
     return {

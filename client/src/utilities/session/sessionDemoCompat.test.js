@@ -1,8 +1,11 @@
 import demoSessions from '../../variables/demo/demo_sessions.json';
+import { KNOWN_SESSION_CONFIGS, KNOWN_SESSIONS } from './knownSessionsFile';
 import {
   canonicalizeLegacySessionAlias,
   getBaselineDemoPlaceholderSlugs,
   getBaselineDemoSessionSlugs,
+  getDemoSessionConfigByKey,
+  getDemoSessionMap,
   getDemoTemplateSeed,
   getReservedLegacySessionSlugs,
 } from './sessionDemoCompat.js';
@@ -21,11 +24,31 @@ describe('sessionDemoCompat', () => {
     expect([...reserved]).toEqual(['general']);
   });
 
-  it('returns baseline demo session slugs for every demo session entry', () => {
+  it('returns baseline demo session slugs for every demo session entry and known session', () => {
     const slugs = getBaselineDemoSessionSlugs();
 
-    expect(slugs).toHaveLength(Object.keys(demoSessions).length);
+    expect(slugs).toHaveLength(Object.keys({ ...demoSessions, ...KNOWN_SESSIONS }).length);
+    expect(slugs).toEqual(expect.arrayContaining(Object.keys(KNOWN_SESSIONS)));
     expect(slugs.every((slug) => typeof slug === 'string')).toBe(true);
+  });
+
+  it('bundles each known session without demo data as its clean-route config', () => {
+    const slugs = Object.keys(KNOWN_SESSIONS).filter((slug) => !(slug in demoSessions));
+    expect(slugs.length).toBeGreaterThan(0);
+    for (const slug of slugs) {
+      expect(getDemoSessionConfigByKey(slug)).toBe(KNOWN_SESSION_CONFIGS[slug]);
+      expect(getDemoSessionMap()[slug]).toBe(KNOWN_SESSION_CONFIGS[slug]);
+    }
+  });
+
+  it('keeps the demo data of a listed demo session and takes its Worker from the list', () => {
+    const { worker, sessionId } = KNOWN_SESSIONS['demo-sh'];
+    const config = getDemoSessionConfigByKey('demo-sh');
+
+    // /about checks the allowed origins before preloading it; fixtures read its seed.
+    expect(config.allowOrigins).toEqual(demoSessions['demo-sh'].allowOrigins);
+    expect(config.demoCompatibilitySeed).toEqual(demoSessions['demo-sh'].demoCompatibilitySeed);
+    expect(config).toMatchObject({ corsWorkerUrl: worker, sessionId, workerCanonicalCleanRoute: true });
   });
 
   it('returns baseline demo placeholder slugs without the default session alias', () => {

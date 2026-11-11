@@ -6,13 +6,17 @@ import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { getCorsProxyUrlOrThrow } from '../../utilities/worker/corsProxy.js';
 import { sortInterviewQuestionPoolNewestFirst, buildInterviewQuestionPriority } from './sessionInterviewQuestionOrder';
 import { buildExternalInterviewKickoff, normalizeInterviewQuestions } from './sessionInterview';
-import { verifyInterviewKickoffCatalog } from './sessionInterviewCatalogValidation';
+import { InterviewCatalogSignInError, verifyInterviewKickoffCatalog } from './sessionInterviewCatalogValidation';
+import { getInterviewCatalogTicket, INTERVIEW_CATALOG_TICKET_RENEW_MS } from './interviewCatalogTicket';
 import { buildInterviewReturnSessionUrl } from './sessionInterviewReturnUrl';
 import SessionInterviewMemoryKickoffCard from './SessionInterviewMemoryKickoffCard';
 import styles from './SurveyTool.module.scss';
 
 const PREFILL_ABOUT =
   'Your AI drafts answers from what it knows about you, and you review them here before anything is submitted.';
+// Who has been asked to sign in for a private catalog link, so only Retry asks them again. It outlives the card,
+// which shows on the choices and on Interview and comes back after Back.
+const askedForTicket = new Set<string>();
 
 type Props = {
   sessionSlug?: string;
@@ -72,16 +76,64 @@ export default function SessionVoicePrefillCard({
         existingResponseSlice,
       )
     : undefined;
-  const kickoff = buildExternalInterviewKickoff({
-    workerUrl: activeWorkerUrl,
-    sessionSlug,
-    sessionUrl,
-    questionPriority,
-  });
-  const copyPrompt = async () => {
+  const buildKickoff = (catalogTicket = '') =>
+    buildExternalInterviewKickoff({
+      workerUrl: activeWorkerUrl,
+      sessionSlug,
+      sessionUrl,
+      questionPriority,
+      catalogTicket,
+    });
+  const kickoff = buildKickoff();
+  // Someone signed in gets a ticket in their prompt, so their AI reads the questions they may see. They're
+  // asked to sign in to the session once; declining still offers what a signed-out visitor's AI may read.
+  const validateKickoff = async ({ retry }: { retry: boolean }) => {
+    const askKey = [activeWorkerUrl, sessionSlug, String(account || '').toLowerCase()].join('\n');
+    const prompt = retry || !askedForTicket.has(askKey);
+    let ticketFailed = false;
+    let renewAtMs = 0;
+    const ticket = account
+      ? async ({ fresh }: { fresh: boolean }) => {
+          askedForTicket.add(askKey);
+          try {
+            const issued = await getInterviewCatalogTicket({
+              workerUrl: activeWorkerUrl,
+              sessionSlug,
+              sessionConfig,
+              context,
+              prompt,
+              fresh,
+            });
+            // A ticket cut short by the end of its sign-in is renewed as it runs out, by a new sign-in;
+            // renewing sooner would only get the same short ticket again.
+            const renewAt = issued.expiresAtMs - INTERVIEW_CATALOG_TICKET_RENEW_MS;
+            renewAtMs = renewAt > Date.now() ? renewAt : issued.expiresAtMs;
+            return issued.ticket;
+          } catch {
+            ticketFailed = true;
+            return '';
+          }
+        }
+      : undefined;
+    try {
+      const catalogTicket = await verifyInterviewKickoffCatalog({
+        workerUrl: activeWorkerUrl,
+        sessionSlug,
+        sessionUrl,
+        ticket,
+      });
+      return { prompt: buildKickoff(catalogTicket), renewAtMs: catalogTicket ? renewAtMs : 0 };
+    } catch (error) {
+      if (error instanceof InterviewCatalogSignInError && ticketFailed) {
+        throw new Error('This session’s questions need a sign-in. Press Retry to sign in, then copy the prompt.');
+      }
+      throw error;
+    }
+  };
+  const copyPrompt = async (prompt: string) => {
     setPromptCopied(false);
     if (!navigator.clipboard?.writeText) throw new Error('Clipboard unavailable');
-    await navigator.clipboard.writeText(kickoff);
+    await navigator.clipboard.writeText(prompt);
     setPromptCopied(true);
     if (copyResetRef.current) clearTimeout(copyResetRef.current);
     copyResetRef.current = setTimeout(() => setPromptCopied(false), 1800);
@@ -119,8 +171,10 @@ export default function SessionVoicePrefillCard({
         {PREFILL_ABOUT}
       </UncontrolledTooltip>
       <SessionInterviewMemoryKickoffCard
+        // Another account is checked afresh, for its own ticket.
+        key={String(account || '').toLowerCase()}
         kickoff={kickoff}
-        validateKickoff={() => verifyInterviewKickoffCatalog({ workerUrl: activeWorkerUrl, sessionSlug, sessionUrl })}
+        validateKickoff={validateKickoff}
         promptCopied={promptCopied}
         showAgentPrompt={showAgentPrompt}
         onCopyPrompt={copyPrompt}

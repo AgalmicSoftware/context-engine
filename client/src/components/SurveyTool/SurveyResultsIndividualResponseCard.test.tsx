@@ -32,7 +32,10 @@ describe('SurveyResultsIndividualResponseCard', () => {
       />,
     );
 
-    expect(screen.getAllByRole('link')[0]).toHaveAttribute('href', `/u/${encodeURIComponent('0xabc123/def456')}`);
+    expect(screen.getAllByRole('link')[0]).toHaveAttribute(
+      'href',
+      `/u/${encodeURIComponent('0xabc123/def456')}?session=${encodeURIComponent('alpha session')}`,
+    );
     expect(screen.getAllByRole('link')[1]).toHaveAttribute(
       'href',
       `/survey/${encodeURIComponent('survey id/with spaces')}/${encodeURIComponent('0xabc123/def456')}?session=${encodeURIComponent('alpha session')}`,

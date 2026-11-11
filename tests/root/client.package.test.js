@@ -70,9 +70,15 @@ test('Netlify builds the client from the repository-root deployment contract', (
     /from\s*=\s*"\/assets\/img\/context-engine-social-preview-square\.png"\s*to\s*=\s*"\/context-engine-social-preview-square\.png"\s*status\s*=\s*301/
   );
   const missingAssetRule = config.search(/from\s*=\s*"\/assets\/\*"\s*to\s*=\s*"\/404\.html"\s*status\s*=\s*404/);
+  const wellKnownRule = config.search(/from\s*=\s*"\/\.well-known\/\*"\s*to\s*=\s*"\/404\.html"\s*status\s*=\s*404/);
+  const agentGuideRule = config.search(/from\s*=\s*"\/skill\.md"\s*to\s*=\s*"\/agent-guide\.md"\s*status\s*=\s*200/);
   const spaFallback = config.search(/from\s*=\s*"\/\*"/);
   assert.ok(previewRedirect > 0 && previewRedirect < missingAssetRule, 'preview redirect precedes the asset 404');
   assert.ok(missingAssetRule > 0 && missingAssetRule < spaFallback, 'asset 404 precedes the SPA fallback');
+  // Agents probing /.well-known/ get a 404, not the app shell's 200.
+  assert.ok(wellKnownRule > 0 && wellKnownRule < spaFallback, '/.well-known/ 404 precedes the SPA fallback');
+  // Agents read the guide at /skill.md, which the SPA fallback would answer with the app.
+  assert.ok(agentGuideRule > 0 && agentGuideRule < spaFallback, '/skill.md rewrite precedes the SPA fallback');
   // A forced rule would shadow real hashed files.
   assert.doesNotMatch(config, /force\s*=/);
   // The 404 target must exist, and it stays a static page that the CSP allows.
@@ -86,6 +92,8 @@ test('Netlify builds the client from the repository-root deployment contract', (
       '/demo/dacc /about 301',
       '/assets/img/context-engine-social-preview-square.png /context-engine-social-preview-square.png 301',
       '/assets/* /404.html 404',
+      '/.well-known/* /404.html 404',
+      '/skill.md /agent-guide.md 200',
       '/* /index.html 200',
       '',
     ].join('\n'),
@@ -210,7 +218,7 @@ test('client static headers cache only existing versioned media and leave assets
     '/media/product-film/v1/context-engine-film-720p.mp4',
     '/media/product-film/v1/context-engine-og-1200x630.png',
   ];
-  assert.deepEqual(Object.keys(rules), ['/*', ...mediaPaths]);
+  assert.deepEqual(Object.keys(rules), ['/*', '/skill.md', '/agent-guide.md', ...mediaPaths]);
   for (const mediaPath of mediaPaths) {
     assert.ok(existsSync(resolve(rootDir, 'client/public', mediaPath.slice(1))));
     assert.equal(rules[mediaPath]['Cache-Control'], 'public, max-age=31536000, immutable');
@@ -218,6 +226,17 @@ test('client static headers cache only existing versioned media and leave assets
   }
   // Public files are copied unhashed, so none may be served from the /assets path.
   assert.equal(existsSync(resolve(rootDir, 'client/public/assets')), false);
+});
+
+test('client static headers serve the guide for AI agents as Markdown text', () => {
+  const rules = readHeaderRules();
+
+  assert.ok(existsSync(resolve(rootDir, 'client/public/agent-guide.md')));
+  // Set on the address agents use and on the file it rewrites to, whichever path Netlify matches.
+  for (const rulePath of ['/skill.md', '/agent-guide.md']) {
+    assert.equal(rules[rulePath]['Content-Type'], 'text/markdown; charset=utf-8', rulePath);
+    assert.equal(rules[rulePath]['X-Content-Type-Options'], 'nosniff', rulePath);
+  }
 });
 
 test('client social preview image uses versioned media and retains the earlier square image', () => {

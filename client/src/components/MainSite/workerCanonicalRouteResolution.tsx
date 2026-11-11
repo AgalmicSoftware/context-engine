@@ -14,9 +14,12 @@ import {
   readSessionWorkerConfigCache,
 } from '../../utilities/session/sessionWorkerConfigCache.js';
 import { claimsWorkerCanonicalAuthority } from '../../utilities/session/sessionCapabilityProjection.js';
+import { KNOWN_SESSION_CONFIGS } from '../../utilities/session/knownSessionsFile';
 import {
+  normalizeWorkerCanonicalSessionIdHex,
   parseSessionWorkerDiscoveryOrigin,
   parseSessionWorkerDiscoveryQuery,
+  resolveWorkerCanonicalSessionIdHex,
   validateWorkerCanonicalSessionBootstrap,
 } from '../../utilities/session/sessionWorkerDiscovery.js';
 import { DEFAULT_SESSION_SLUG } from '../../variables/appConfig.js';
@@ -37,6 +40,8 @@ type WorkerCanonicalRouteState = {
   workerOnlySearch: string;
   workerSessionSlug: string;
   sessionConfig: SessionConfig | null;
+  // A bundled entry's session ID: its Worker must report the same one.
+  expectedSessionId?: string;
 };
 
 export type MainSiteSessionRouteResolution = WorkerCanonicalRouteState & {
@@ -72,16 +77,34 @@ type ResolveSessionRouteOptions = {
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === 'object' && !Array.isArray(value);
 
-const resolveTrustedBundledWorkerOrigin = (sessionConfig: SessionConfig | null | undefined): string => {
-  if (!isRecord(sessionConfig) || sessionConfig.workerCanonicalCleanRoute !== true) return '';
+const resolveTrustedBundledWorker = (
+  sessionConfig: SessionConfig | null | undefined,
+): { origin: string; sessionId: string } | null => {
+  if (!isRecord(sessionConfig) || sessionConfig.workerCanonicalCleanRoute !== true) return null;
   const profile = isRecord(sessionConfig.sessionModeProfile) ? sessionConfig.sessionModeProfile : {};
   const authority = isRecord(profile.authority) ? profile.authority : {};
-  if (authority.mode !== 'worker_canonical') return '';
+  const sessionId = normalizeWorkerCanonicalSessionIdHex(sessionConfig.sessionId);
+  if (authority.mode !== 'worker_canonical' || !sessionId) return null;
   try {
-    return parseSessionWorkerDiscoveryOrigin(sessionConfig.corsWorkerUrl);
+    return { origin: parseSessionWorkerDiscoveryOrigin(sessionConfig.corsWorkerUrl), sessionId };
   } catch {
-    return '';
+    return null;
   }
+};
+
+// A bundled entry opens only the session it names. A cached config for
+// another session goes back through bootstrap, which refuses a Worker
+// reporting a different ID.
+const requireBundledSessionId = (route: WorkerCanonicalRouteState, sessionId: string): WorkerCanonicalRouteState =>
+  !route.sessionConfig || resolveWorkerCanonicalSessionIdHex(route.sessionConfig) === sessionId
+    ? { ...route, expectedSessionId: sessionId }
+    : { ...route, kind: 'bootstrap', sessionConfig: null, expectedSessionId: sessionId };
+
+// Any link that reaches a listed session's own Worker, such as the event
+// redirect's worker= link or a group page, opens only the listed session ID.
+const requireKnownSessionId = (route: WorkerCanonicalRouteState): WorkerCanonicalRouteState => {
+  const knownWorker = resolveTrustedBundledWorker(KNOWN_SESSION_CONFIGS[route.workerSessionSlug]);
+  return knownWorker?.origin === route.workerOrigin ? requireBundledSessionId(route, knownWorker.sessionId) : route;
 };
 
 const emptyWorkerRouteState = (): WorkerCanonicalRouteState => ({
@@ -216,14 +239,14 @@ const resolveWorkerRouteState = ({
     normalizedSlug && controller.hasVerifiedRoute(normalizedSlug, workerOrigin)
       ? getVerifiedConfig({ slug: normalizedSlug, workerOrigin })
       : null;
-  return {
+  return requireKnownSessionId({
     kind: sessionConfig ? 'verified' : 'bootstrap',
     error: '',
     workerOrigin,
     workerOnlySearch,
     workerSessionSlug: normalizedSlug,
     sessionConfig,
-  };
+  });
 };
 
 export const resolveMainSiteAdminWorkerRoute = ({
@@ -314,15 +337,17 @@ export const resolveMainSiteSessionRouteForRender = ({
   const bundledDisplayConfig = registrySessionConfig
     ? null
     : getDemoSessionConfigBySlug(routeSlug, { allowDemoFallback: true });
-  const bundledWorkerOrigin = resolveTrustedBundledWorkerOrigin(bundledDisplayConfig);
-  if (bundledWorkerOrigin) {
+  const bundledWorker = resolveTrustedBundledWorker(bundledDisplayConfig);
+  if (bundledWorker) {
     const trustedWorkerRoute = resolveWorkerRouteState({
-      searchStr: `?worker=${encodeURIComponent(bundledWorkerOrigin)}`,
+      searchStr: `?worker=${encodeURIComponent(bundledWorker.origin)}`,
       workerSessionSlug: routeSlug,
       controller,
       getVerifiedConfig,
     });
-    if (trustedWorkerRoute.kind !== 'standard') return buildWorkerSessionRoute(trustedWorkerRoute);
+    if (trustedWorkerRoute.kind !== 'standard') {
+      return buildWorkerSessionRoute(requireBundledSessionId(trustedWorkerRoute, bundledWorker.sessionId));
+    }
   }
 
   return {
@@ -372,6 +397,7 @@ export const renderWorkerCanonicalRouteBootstrap = (
     <WorkerCanonicalSessionBootstrapBoundary
       sessionSlug={route.workerSessionSlug}
       workerQueryValue={route.workerOrigin}
+      expectedSessionId={route.expectedSessionId}
       onResolved={controller.handleBootstrapResolved}
       missingConfigFallback={missingConfigFallback}
     />

@@ -1,18 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { InterviewDraftResponse, InterviewPrefillPacket, InterviewQuestion } from './sessionInterview';
+import type { InterviewQuestion } from './sessionInterview';
 import {
-  loadInterviewWorkerGroupCandidates,
+  groupSuggestionDataFor,
+  loadJoinableInterviewGroups,
   matchInterviewGroupsByAnswer,
-  recommendInterviewGroups,
+  matchInterviewGroupsFromPicks,
   type InterviewGroupRecommendation,
+  type SessionInterviewGroupRecommendationRequest,
 } from './sessionInterviewGroupRecommendations';
 
-export type SessionInterviewGroupRecommendationRequest = {
-  requestId: number;
-  transcript: string;
-  prefillPacket: InterviewPrefillPacket | null;
-  draftResponses: InterviewDraftResponse[];
-};
+export type { SessionInterviewGroupRecommendationRequest };
 
 type UseSessionInterviewGroupRecommendationsArgs = {
   active: boolean;
@@ -21,34 +18,13 @@ type UseSessionInterviewGroupRecommendationsArgs = {
   sessionConfig: unknown;
   sessionSlug?: string;
   workerUrl?: string;
+  /** The signed-in account, whose saved Worker sign-in lists the groups it may see. */
+  account?: string;
 };
 
 export type SessionInterviewGroupRecommendationState = {
   availability: 'idle' | 'loading' | 'available' | 'empty' | 'unsupported' | 'error';
   recommendations: InterviewGroupRecommendation[];
-};
-
-const questionPromptById = (questions: InterviewQuestion[]): Map<string, string> =>
-  new Map(
-    questions
-      .map((question) => [String(question.id || ''), String(question.prompt || '').trim()] as const)
-      .filter(([questionId, prompt]) => Boolean(questionId && prompt)),
-  );
-
-const withQuestionContext = (
-  draftResponses: InterviewDraftResponse[],
-  questions: InterviewQuestion[],
-): InterviewDraftResponse[] => {
-  const prompts = questionPromptById(questions);
-  return draftResponses.map((draft) => {
-    const prompt = prompts.get(draft.questionId);
-    if (!prompt) return draft;
-    const evidence = String(draft.evidence || '').trim();
-    return {
-      ...draft,
-      evidence: [`Question: ${prompt}`, evidence ? `Evidence: ${evidence}` : ''].filter(Boolean).join('\n'),
-    };
-  });
 };
 
 export function useSessionInterviewGroupRecommendations({
@@ -58,6 +34,7 @@ export function useSessionInterviewGroupRecommendations({
   sessionConfig,
   sessionSlug = '',
   workerUrl = '',
+  account = '',
 }: UseSessionInterviewGroupRecommendationsArgs): SessionInterviewGroupRecommendationState {
   const availabilityScopeKey = useMemo(
     () => (active ? [sessionSlug, workerUrl].map((value) => String(value || '')).join('\n') : ''),
@@ -76,9 +53,9 @@ export function useSessionInterviewGroupRecommendations({
   }>({ availability: 'idle', key: '', scopeKey: '', recommendations: [] });
   const requestRef = useRef(0);
   // The page can pass new sessionConfig and question objects on every render, so the effect
-  // reads the latest ones here; otherwise each re-render would restart the lookup and its AI call.
-  const inputsRef = useRef({ questions, sessionConfig });
-  inputsRef.current = { questions, sessionConfig };
+  // reads the latest ones here; otherwise each re-render would restart the lookup.
+  const inputsRef = useRef({ questions, sessionConfig, account });
+  inputsRef.current = { questions, sessionConfig, account };
 
   useEffect(() => {
     if (!active || !request || !requestKey) return undefined;
@@ -93,8 +70,8 @@ export function useSessionInterviewGroupRecommendations({
         scopeKey: availabilityScopeKey,
         recommendations: [],
       });
-      const { questions, sessionConfig } = inputsRef.current;
-      const catalog = await loadInterviewWorkerGroupCandidates({ sessionConfig, sessionSlug, workerUrl });
+      const { questions, sessionConfig, account } = inputsRef.current;
+      const catalog = await loadJoinableInterviewGroups({ sessionConfig, sessionSlug, workerUrl, account });
       if (canceled || requestRef.current !== requestId) return;
       if (catalog.status !== 'ready' || !catalog.candidates.length) {
         setRecommendationState({
@@ -106,30 +83,32 @@ export function useSessionInterviewGroupRecommendations({
         });
         return;
       }
-      // Groups named like a chosen option come first, without an AI call; the AI covers the rest.
+      // Groups named like a chosen option come first, then those the person's own AI picked in its
+      // prefill, then those the session's AI picked as it drafted their answers.
       const exact = matchInterviewGroupsByAnswer({
         candidates: catalog.candidates,
         draftResponses: request.draftResponses,
         questions,
       });
-      const others = catalog.candidates.filter((group) => !exact.some((match) => match.groupId === group.groupId));
-      const result = others.length
-        ? await recommendInterviewGroups({
-            candidates: others,
-            transcript: request.transcript,
-            prefillPacket: request.prefillPacket,
-            draftResponses: withQuestionContext(request.draftResponses, questions),
-            sessionSlug,
-            sessionConfig,
-            workerUrl,
+      const unmatched = (matches: InterviewGroupRecommendation[]) =>
+        catalog.candidates.filter((group) => !matches.some((match) => match.groupId === group.groupId));
+      // Where the session lets an AI use nothing about people, only groups named like an answer show.
+      const aiMaySuggest = groupSuggestionDataFor(sessionConfig).length > 0;
+      const own = aiMaySuggest
+        ? matchInterviewGroupsFromPicks({
+            candidates: unmatched(exact),
+            picks: request.prefillPacket?.groups,
+            ownAi: true,
           })
-        : null;
-      if (canceled || requestRef.current !== requestId) return;
+        : [];
+      const drafting = aiMaySuggest
+        ? matchInterviewGroupsFromPicks({ candidates: unmatched([...exact, ...own]), picks: request.draftingPicks })
+        : [];
       setRecommendationState({
         availability: 'available',
         key: requestKey,
         scopeKey: availabilityScopeKey,
-        recommendations: [...exact, ...(result?.status === 'ready' ? result.recommendations : [])],
+        recommendations: [...exact, ...own, ...drafting],
       });
     };
 

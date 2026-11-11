@@ -489,6 +489,10 @@ export const buildSessionWizardWorkerConfigPayload = ({
     // set-config merges fields, so a blank end time is sent as '' to clear one
     // an earlier verification stored. Omitting it would keep the old time.
     next.sessionEndsAt = normalizeSessionWizardEndsAt(resolvedDraft.sessionEndsAt);
+    // Blank instructions for AI agents are left out, as older Workers refuse the
+    // field; the config writers send '' when the Worker's config already has it.
+    const agentInstructions = trimString(resolvedDraft.agentInstructions);
+    if (agentInstructions) next.agentInstructions = agentInstructions;
     if (usesOnChainSbt) {
       next.defaultSbtTags = trimString(resolvedDraft.defaultSbtTags);
       next.defaultFeaturedSBTs = normalizeSessionWizardDefaultFeaturedSbtMetadata(resolvedDraft.defaultFeaturedSBTs);

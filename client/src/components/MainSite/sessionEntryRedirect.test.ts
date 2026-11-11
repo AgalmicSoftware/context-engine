@@ -1,27 +1,16 @@
+import { KNOWN_SESSIONS } from '../../utilities/session/knownSessionsFile';
 import { getSessionAtlasRedirect, getSessionEntryRedirect } from './sessionEntryRedirect';
 
 describe('EDDY session entry redirect', () => {
-  it.each(['rxc-test', 'rxc-ra-test', 'rxc-ra-test-2', 'rxc-ra-test-3', 'rxc-ra-test-5', 'rxc-ra-test-6'])(
-    'expands %s without adding interview or group-join intent',
-    (slug) => {
-      const target = new URL(getSessionEntryRedirect(`/${slug}`)!, 'https://contextengine.sh');
-      expect(target.pathname).toBe(`/session/${slug}`);
-      expect(target.search).toBe('');
-      const interview = new URL(
-        getSessionEntryRedirect(`/${slug}/`, '?mode=interview', '#context')!,
-        'https://contextengine.sh',
-      );
-      expect(interview.pathname).toBe(`/session/${slug}`);
-      expect(interview.search).toBe('?mode=interview');
-      expect(interview.searchParams.has('joinGroup')).toBe(false);
-      expect(interview.hash).toBe('#context');
-    },
-  );
+  it.each(['/rxc-test', '/rxc-ra-test-5', '/rxc-ra-test-6/'])('adds no short link for %s', (path) => {
+    expect(getSessionEntryRedirect(path)).toBeNull();
+  });
+
   it.each(['/session/eddy26', '/session/eddy26/'])('expands the bare event URL %s', (path) => {
     const target = new URL(getSessionEntryRedirect(path)!, 'https://contextengine.sh');
     expect(target.pathname).toBe('/session/eddy26');
     expect(Object.fromEntries(target.searchParams)).toEqual({
-      worker: 'https://ce-eddy26-d9702b0d3c41.agalmic.workers.dev/',
+      worker: KNOWN_SESSIONS.eddy26.worker,
       joinGroup: 'eddy-2026',
       mode: 'interview',
     });

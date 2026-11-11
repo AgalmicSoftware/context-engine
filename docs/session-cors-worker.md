@@ -173,8 +173,8 @@ identity nominations.
 The initial and signed follow-up config writes use the selected capability
 profile as an allowlist. Pure Worker-canonical sessions keep generic session
 defaults (`defaultTags`, `defaultGroupTags`, `questionsGenPrompt`, and
-`defaultFilterState`) and may set `sessionEndsAt`, but reject `blockLimits`,
-faucet/registry fields, and contract maps. A Worker profile that explicitly
+`defaultFilterState`) and may set `sessionEndsAt` and `agentInstructions`, but
+reject `blockLimits`, faucet/registry fields, and contract maps. A Worker profile that explicitly
 uses on-chain SBT authorization may additionally persist its network and only
 the `sbtFactory` contract; it does not inherit Surveys or Session Registry
 controls. Registry-canonical deployments preserve their existing chain fields.
@@ -1427,11 +1427,12 @@ identifiers and access modes, generates participant-created IDs, and forces
 those groups to open self-join with session visibility. The configured worker
 admin retains the signed create, edit, delete, and membership controls under
 either policy. Group discovery is independent: an unsigned `GET /groups/list`
-is accepted only when the validated session mode declares public stored results
-over unencrypted, ungated Cloudflare storage. It returns only `session`-visible
-group metadata, never memberships, member identities, member counts, or groups
-restricted to admins/members. Private, gated, and encrypted modes keep discovery
-authenticated. This flow never opens the
+is accepted when the validated session mode declares public stored results
+over unencrypted, ungated Cloudflare storage, or when it carries a join link's
+`joinGroup` for a group someone could join on their own. It returns only
+`session`-visible group metadata, never memberships, member identities, member
+counts, or groups restricted to admins/members. Private, gated, and encrypted
+modes otherwise keep discovery authenticated. This flow never opens the
 legacy SBT deployment form and does not request a contract address, chain, RPC,
 gas, or burn policy. A
 Worker/SBT or Worker/Lit hybrid keeps **Native Worker Groups** as its participant
@@ -1599,14 +1600,14 @@ Implemented routes:
 - `POST /admin/groups/create`: admin-signed create. Alongside label,
   description, and image, records accept `tags` (maximum 20),
   `documentURLs` (maximum 10 public HTTPS URLs), `memberLimit` (1–1,000),
-  future `joinEndsAt`, and `adminAddress`. `joinMode` supports `admin_add` and
-  `open`; `password` and `invite` are recognized but rejected with
-  `join_mode_not_implemented`.
+  future `joinEndsAt`, `adminAddress`, and `removalAuth` (below). `joinMode`
+  supports `admin_add` and `open`; `password` and `invite` are recognized but
+  rejected with `join_mode_not_implemented`.
 - `POST /admin/groups/update`: admin-signed update for group metadata,
-  membership limit/deadline, join mode, and member visibility. A limit cannot
-  be reduced below the current authoritative member count.
+  membership limit/deadline, join mode, member visibility, and `removalAuth`. A
+  limit cannot be reduced below the current authoritative member count.
 - `POST /admin/groups/delete`: admin-signed tombstone. Deletion revokes future `group_gate` and `worker_group` condition checks.
-- `POST /admin/groups/add-member` / `POST /admin/groups/remove-member`: admin-signed membership mutation. The verified authority proof is carried to the session config coordinator, which rechecks it and holds its serialization queue while the separate group coordinator commits. Stale proofs return 409 before any group write. Participant create/join/leave use the same check because their JWT admission depends on the session authorization epoch. Already committed group intents recover within the group coordinator without repeating admission or copying session authority into that object.
+- `POST /admin/groups/add-member` / `POST /admin/groups/remove-member`: admin-signed membership mutation. Remove answers 403 `worker_group_removal_denied` when the group's `removalAuth` is `member_only` or `neither`. The verified authority proof is carried to the session config coordinator, which rechecks it and holds its serialization queue while the separate group coordinator commits. Stale proofs return 409 before any group write. Participant create/join/leave use the same check because their JWT admission depends on the session authorization epoch. Already committed group intents recover within the group coordinator without repeating admission or copying session authority into that object.
 - `POST /admin/groups/reconcile-empty`: admin-signed, idempotent repair for a
   matching `legacy_locked` coordinator only when the server-managed bootstrap
   proof and an exhaustive zero-row scan both succeed.
@@ -1615,9 +1616,13 @@ Implemented routes:
   request; the response returns `nextCursor`, and Admin exposes an explicitly
   signed **Load more** action rather than exceeding the Worker KV operation
   budget.
-- `GET /groups/list`: anonymous discovery is allowed only when the validated
+- `GET /groups/list`: anonymous discovery is allowed when the validated
   Worker-canonical profile declares `public_full_if_storage_public` over
   unencrypted Cloudflare storage with `gate: "none"` and no access conditions.
+  On any other session it is allowed only with one `joinGroup=<groupId>` naming
+  an open, session-visible group whose joining hasn't closed, as a join link
+  does; the response is then what that group's members see, less each group's
+  `adminAddress`. Other requests get 403 `worker_group_discovery_not_public`.
   It returns only redacted, session-visible group metadata. The request must
   include the exact session slug header and canonical session ID. With a Worker
   credential, `GET` remains the authenticated member route and additionally
@@ -1639,19 +1644,36 @@ Implemented routes:
 - `POST /groups/create`: authenticated participant create, available only when
   `groupCreationPolicy: "participants"`. The Worker generates the group ID and
   forces `joinMode: "open"` plus `memberVisibility: "session"`. It accepts the
-  safe metadata and limit/deadline fields above, but derives `adminAddress`
-  from the authenticated principal.
+  safe metadata and limit/deadline fields above and `removalAuth`, but derives
+  `adminAddress` from the authenticated principal.
 - `POST /groups/join`: authenticated self-join for `joinMode: "open"` groups
   only, before `joinEndsAt` and while the per-group and deployment-wide member
   limits have capacity. Join returns the coordinator's post-mutation
   `memberCount` with the joined group so the client can reconcile that card
   without reloading the collection.
-- `POST /groups/leave`: authenticated self-removal from any current membership.
+- `POST /groups/leave`: authenticated self-removal from a current membership,
+  when the group's `removalAuth` is `both` or `member_only`; otherwise 403
+  `worker_group_leave_denied`.
   The Worker derives the principal from the bearer credential and ignores any
   caller-supplied principal, so a participant cannot remove another member. A
   session-visible leave returns the retained group and post-mutation count;
   restricted leave for `members` or `admin_only` visibility omits both group
   metadata and count once the caller is no longer permitted to see them.
+
+**Who can remove members.** Each group's `removalAuth` says who can end a
+membership, like an SBT's burn auth: `both` (the default) lets the member leave
+and admins remove them, `admin_only` lets only admins remove them,
+`member_only` lets only the member leave, and `neither` lets no one. The
+setting is checked once the membership is found, so someone who isn't a member
+gets 404 `worker_group_member_not_found` whatever it is. A refused leave or
+removal leaves the membership as it was, and deleting the group still works.
+Another value answers 400 `invalid_removal_auth`. Every group the Worker
+returns reports `removalAuth`, in the public listing, member and Admin lists,
+memberships, and mutation results. A group stored before the setting existed
+reports and works as `both`, and a Worker deployed before it omits the field,
+which means the same. The group coordinator checks the setting before it
+records a removal, so a removal it accepted still completes on a retry after an
+admin changes the setting.
 
 The client presents a selected Worker Group with the same high-level detail
 hierarchy as an on-chain SBT where the concepts apply: **Stats**, **Actions**,
@@ -1661,7 +1683,9 @@ current member count comes from an authenticated permission-visible group list,
 self-membership, or authorized member-list response. When the configured
 visibility permits it, a user icon opens the same style of member browser used
 for on-chain SBT holders.
-Actions use Join/Leave rather than Mint/Burn. More renders the group's
+Actions use Join/Leave rather than Mint/Burn; Leave shows only when the
+group's `removalAuth` lets members leave, and Stats say who can remove members.
+More renders the group's
 validated public document references and tags. Contract address, network, gas,
 transaction, and burn controls are never synthesized for a Worker-native
 group.
@@ -1695,9 +1719,10 @@ entry `/session/eddy26` is an explicit exception: the bare URL redirects to the
 pinned Worker with `joinGroup=eddy-2026&mode=interview`. Existing query parameters,
 hashes (including AI prefill), and subroutes bypass that redirect. Joining still
 requires sign-in; closing the interview or opening results does not relaunch it.
-The invitation notice displays the public Group name before sign-in using the
-exact session-bound discovery endpoint; it falls back to the Group ID when
-public discovery is unavailable. The compact notice reads “Group name: Will be
+The invitation notice displays the Group name before sign-in using the
+exact session-bound discovery endpoint with the link's Group, which on a private
+session lists what that Group's members see; it falls back to the Group ID when
+that lookup fails, as on an older Worker. The compact notice reads “Group name: Will be
 joined upon sign-in” with **Cancel**; sign-in uses the existing page login
 control. Visitors
 who follow the auto-join link sign in first; the client then calls the existing
@@ -1717,8 +1742,12 @@ pending authentication; failures retain the invitation for explicit retry.
 Cancel is remembered in this browser for the account, Worker/session, and Group,
 with no expiry. Following the same link again (including the bare EDDY entry)
 shows an explicit **Join** action instead of joining automatically; the interview
-redirect still works. An explicit Join in the notice, Group page, or interview
-recommendations clears that preference. Cancellation never leaves an existing
+redirect still works. An explicit Join in the notice or on the Group page, or
+ticking the Group in Interview review's **Groups** section, clears that
+preference. While the interview dialog is open on that section, it lists a
+link's Group still waiting for sign-in, ticked, and the notice stands aside;
+unticking cancels as the notice's **Cancel** does, even while sign-in is reading
+the groups. Joining at sign-in and its outcome show in the notice as usual. Cancellation never leaves an existing
 membership. Before sign-in the cancellation is stored for the signed-out visitor;
 when that invitation’s visitor signs in, it is assigned to that account.
 A changed canonical session identity does not inherit another session's choice.
@@ -2419,8 +2448,10 @@ Never return secrets in responses.
 `/admin/set-config` notes:
 
 - Content-only edits keep web and agent sessions signed in: `sessionName`,
-  `sessionInfo`, `sessionContext`, `questionsGenPrompt`, `appearance`,
-  `sessionHeaderImg`, `interviewMode.openingPrompt` / `steeringPrompt`, and the
+  `sessionInfo`, `sessionContext`, `questionsGenPrompt`, `agentInstructions`,
+  `appearance`, `sessionHeaderImg`, `contextAdditionPolicy`,
+  `resultsAdminAddresses`, every interview setting (`interviewModeEnabled` and
+  all of `interviewMode`, which each interview request reads afresh), and the
   curated lists `HIGHLIGHTED_QUESTION_IDS`, `BLOCKED_QUESTION_IDS`,
   `HIGHLIGHTED_SURVEY_IDS` and `BLOCKED_SURVEY_IDS`.
   Adding unique `agentHttp.invites` also preserves authorization when all prior
@@ -2446,6 +2477,9 @@ Never return secrets in responses.
 - The curated lists `HIGHLIGHTED_QUESTION_IDS`, `BLOCKED_QUESTION_IDS`,
   `HIGHLIGHTED_SURVEY_IDS` and `BLOCKED_SURVEY_IDS` are accepted as lists of at
   most 500 IDs of 1-128 letters, digits or `._:-`; anything else returns `400`.
+- `agentInstructions`, the Markdown served at `GET /llms.txt`, is text of at
+  most 8,000 characters; anything else returns `400`, and `""` clears it. The
+  deploy helper refuses the same values before any Cloudflare call.
 
 - `pileAutoAdvanceEnabled` is an optional boolean controlling question pile
   navigation. Both `true` and `false` survive deployment, config patches, and
@@ -2632,6 +2666,13 @@ Signed login/bootstrap requests:
     JWKs, passwords, private keys, authorization headers, or URL credentials.
   - Success and error responses are `Cache-Control: no-store` and vary on both
     `Origin` and `X-Session-Slug`.
+- `GET /llms.txt` is public and returns the session's instructions for AI
+  agents, its `agentInstructions`, as `text/markdown; charset=utf-8` with
+  `X-Content-Type-Options: nosniff` and `Content-Security-Policy: sandbox;
+  default-src 'none'`, so a browser never runs them as a page. It picks the
+  session, applies CORS and sets caching as `GET /session-config` does; a
+  session's own Worker needs no `X-Session-Slug`. A session without
+  instructions, or a config that isn't Worker-canonical, returns `404`.
 - `GET /health` (requires Authorization token; does not require session KV config, so it works for newly registered sessions during bootstrap)
 - `GET /capabilities` is public and returns the code-defined feature list, API
   version and optional bundle hash, cached for 30 seconds. With `?slug=<slug>`,
@@ -2749,13 +2790,35 @@ Signed login/bootstrap requests:
   - Route scope disables fail before the request-`apiKey` bypass.
   - Provider inference:
     omitted/`default`/`auto` providers infer from `model` (`claude*` => Anthropic, slash models => OpenRouter, `gpt-*`/`o*`/`chatgpt` => OpenAI) before falling back to OpenAI. When both provider and model are omitted on a session-funded request, the Worker selects the saved fast model (or thinking model when `modelType: thinking`), including its provider.
-- `GET /agent/interview-catalog?slug=<slug>&sessionUrl=<https-session-url>`
+- `GET /agent/interview-catalog?slug=<slug>&sessionUrl=<https-session-url>[&ticket=<ticket>]`
   (`/agent/interview-brief` remains a compatibility alias)
   - Public, CORS-scoped, and disabled when `interviewModeEnabled=false` or
     `interviewMode.enabled=false`.
+  - Without `ticket`, it lists only questions a signed-out visitor may read.
+    A session that lets no signed-out visitor list its questions answers 401
+    with `reason: "sign_in_required"` instead of asking for a retry, and an
+    empty catalog carries that reason too, since questions shown only to
+    groups may appear after a sign-in.
+  - With a `ticket` from `POST /agent/interview-catalog-ticket`, it reads as
+    the ticket's person: each question passes the same checks as that
+    person's signed-in storage read, with their access as it is now, and
+    `groups` lists the groups they could join on their own and haven't, less
+    any that are full. An expired, altered or revoked ticket, or one whose
+    person the session's gate now turns away or can't check, gets 401
+    `catalog_ticket_invalid`, as a signed-in read is refused; if the Worker
+    can't read its key or the sign-in record, it gets 503
+    `catalog_ticket_unavailable`. Every catalog response sends
+    `referrer-policy: no-referrer`, and `reviewUrl` never carries a ticket.
   - Returns only an inert JSON question catalog: `type`, `version`,
     `sessionSlug`, `reviewUrl`, `questionSetHash`, `prefillPromptVersion`,
-    `answerContract`, `researchCoverageContract`, and `questions`. Binary options,
+    `answerContract`, `researchCoverageContract`, and `questions`, plus `groups`
+    when `interviewMode.joinMatchingGroups` is on and the visitor may see groups:
+    on a public session, or with a join link's `joinGroup` in `sessionUrl`.
+    `groups` lists only those the visitor could join on their own, as `groupId`,
+    `label`, `description` and `tags`, and `groupSuggestionData` names, in
+    words, the kinds of detail the session lets an AI base a suggestion on
+    (`interviewMode.groupSuggestionData`); with none allowed, no groups are
+    listed. The clipboard prompt says how to suggest them. Binary options,
     the default 0–10 rating range, per-question scale overrides, and additive
     self-reported research-coverage count fields are explicit. It deliberately contains no agent instructions; the
     client-side clipboard prompt carries the user's request.
@@ -2819,6 +2882,21 @@ Signed login/bootstrap requests:
     Worker endpoint that served the catalog, followed by `mode=interview`. The
     Worker does not copy any `worker` query supplied in `sessionUrl`; the client
     still verifies the Worker-canonical session config before using that hint.
+- `POST /agent/interview-catalog-ticket` (signed in)
+  - Returns `{ ticket, expiresAt }` for the signed-in person, with
+    `cache-control: no-store`, for the session page to put in the catalog
+    link it gives that person's own AI. It needs interview mode on and the
+    `storage` or `arweave` scope, checked against current access, and counts
+    against `limits.perWalletPerDay` as its own route. A sign-in made with an
+    agent's own key is refused (`catalog_ticket_person_only`).
+  - A ticket lasts an hour at most, and never past the sign-in it came from.
+    It is signed with its own key derived from `TOKEN_HMAC_SECRET` and bound
+    to the session's slug, session ID and access version (`authzEpoch`), so
+    another session, a new session ID or an access edit ends it. Signing
+    out of the page doesn't: the Worker can't tell, so a ticket already
+    handed out runs until it expires. It names only its person's address,
+    the sign-in's ID and its expiry, and it is never accepted as a sign-in
+    token.
 - `GET /api/agent/questions` with a session Worker bearer credential returns
   the same public, access-checked question catalog when
   `sessionModeProfile.surfaces.agentHttp=true`.

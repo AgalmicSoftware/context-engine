@@ -12,11 +12,13 @@ import {
   removeWorkerGroupMember,
   sanitizeWorkerGroupRequestError,
   updateWorkerGroup,
+  workerGroupAdminsMayRemove,
   type PostSignedWorkerGroupRequest,
   type WorkerGroup,
   type WorkerGroupJoinMode,
   type WorkerGroupMember,
   type WorkerGroupMemberVisibility,
+  type WorkerGroupRemovalAuth,
 } from '../../domains/worker/workerGroupPorts';
 import { uploadWorkerGroupImage } from '../../domains/worker/workerGroupImageUpload';
 import { canonicalizeSessionSlug } from '../../utilities/session/canonicalSessionContext.js';
@@ -25,6 +27,11 @@ import { getWorkerAuthRemoteErrorMessage } from '../../utilities/worker/workerAu
 import { normalizeWorkerUrl } from '../../utilities/worker/workerUrl.js';
 import WorkerGroupCreateForm from '../Shared/WorkerGroupCreateForm';
 import WorkerGroupImage from '../Shared/WorkerGroupImage';
+import WorkerGroupRemovalAuthHelp, {
+  WORKER_GROUP_REMOVAL_AUTH_LABELS,
+  WorkerGroupRemovalAuthOptions,
+  withRemovalAuthNotice,
+} from '../Shared/WorkerGroupRemovalAuthHelp';
 import styles from './AdminPage.module.scss';
 
 type WorkerGroupDraft = {
@@ -38,6 +45,7 @@ type WorkerGroupDraft = {
   adminAddress: string;
   joinMode: WorkerGroupJoinMode;
   memberVisibility: WorkerGroupMemberVisibility;
+  removalAuth: WorkerGroupRemovalAuth;
 };
 
 export type AdminWorkerGroupsPanelProps = {
@@ -69,6 +77,7 @@ const emptyDraft = (adminAddress = '', tags: string[] = []): WorkerGroupDraft =>
   // Open to anyone who can see the session: everyone on a public session, participants on a private one.
   joinMode: 'open',
   memberVisibility: 'session',
+  removalAuth: 'both',
 });
 
 const toLocalDateTimeInput = (value: unknown): string => {
@@ -89,6 +98,7 @@ const buildGroupInput = (draft: WorkerGroupDraft, label: string) => ({
   adminAddress: draft.adminAddress.trim(),
   joinMode: draft.joinMode,
   memberVisibility: draft.memberVisibility,
+  removalAuth: draft.removalAuth,
 });
 
 // A group admins fill by hand keeps its roster with them, so choosing it never leaves the list open to the session.
@@ -115,6 +125,7 @@ const asRecord = (value: unknown): Record<string, unknown> =>
   value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
 
 type LocalGroupUpdater = (groups: WorkerGroup[], result: unknown) => WorkerGroup[];
+const savedGroup = (result: unknown): Partial<WorkerGroup> => asRecord(asRecord(result).group);
 
 const AdminWorkerGroupsPanel = ({
   canAdminWorker,
@@ -230,7 +241,7 @@ const AdminWorkerGroupsPanel = ({
 
   const runMutation = async (
     operation: () => Promise<unknown>,
-    success: string,
+    success: string | ((result: unknown) => string),
     updateLocalGroups?: LocalGroupUpdater,
   ): Promise<boolean> => {
     const requestTargetKey = targetKey;
@@ -243,7 +254,7 @@ const AdminWorkerGroupsPanel = ({
       if (updateLocalGroups) setGroups((current) => updateLocalGroups(current, result));
       else await loadGroups();
       if (!isCurrentTarget(requestTargetKey, requestGeneration)) return false;
-      setStatus(success);
+      setStatus(typeof success === 'function' ? success(result) : success);
       onGroupsChanged?.();
       return true;
     } catch (error) {
@@ -261,6 +272,7 @@ const AdminWorkerGroupsPanel = ({
       setStatus('Group label is required.');
       return;
     }
+    const { removalAuth } = createDraft;
     void runMutation(
       () =>
         createWorkerGroup({
@@ -269,7 +281,7 @@ const AdminWorkerGroupsPanel = ({
           sessionSlug: normalizedSessionSlug,
           postSignedRequest: postExactSignedRequest,
         }),
-      'Group created.',
+      (result) => withRemovalAuthNotice('Group created.', removalAuth, savedGroup(result).removalAuth),
       (current, result) => {
         const created = normalizeWorkerGroupsAdminPayload(
           { groups: [asRecord(result).group] },
@@ -295,6 +307,7 @@ const AdminWorkerGroupsPanel = ({
       adminAddress: group.adminAddress || '',
       joinMode: group.joinMode,
       memberVisibility: group.memberVisibility,
+      removalAuth: group.removalAuth || 'both',
     });
   };
 
@@ -304,6 +317,7 @@ const AdminWorkerGroupsPanel = ({
       setStatus('Group label is required.');
       return;
     }
+    const { removalAuth } = editDraft;
     void runMutation(
       () =>
         updateWorkerGroup({
@@ -313,7 +327,7 @@ const AdminWorkerGroupsPanel = ({
           sessionSlug: normalizedSessionSlug,
           postSignedRequest: postExactSignedRequest,
         }),
-      'Group updated.',
+      (result) => withRemovalAuthNotice('Group updated.', removalAuth, savedGroup(result).removalAuth),
       (current, result) => {
         const updated = normalizeWorkerGroupsAdminPayload(
           { groups: [asRecord(result).group] },
@@ -413,6 +427,9 @@ const AdminWorkerGroupsPanel = ({
     );
   }
 
+  const memberGroupRemovalAuth = groups.find((group) => group.groupId === memberGroupId)?.removalAuth || 'both';
+  const adminsMayRemoveMembers = workerGroupAdminsMayRemove({ removalAuth: memberGroupRemovalAuth });
+
   const createForm = (
     <WorkerGroupCreateForm
       busy={busy}
@@ -431,6 +448,8 @@ const AdminWorkerGroupsPanel = ({
       labelTestId="ce-admin-worker-group-create-label"
       memberVisibility={createDraft.memberVisibility}
       memberVisibilityTestId="ce-admin-worker-group-create-visibility"
+      removalAuth={createDraft.removalAuth}
+      removalAuthTestId="ce-admin-worker-group-create-removal-auth"
       sessionName={sessionName}
       sessionSlug={normalizedSessionSlug}
       status={createOnly ? status : ''}
@@ -458,6 +477,7 @@ const AdminWorkerGroupsPanel = ({
           memberVisibility: value,
         }))
       }
+      onRemovalAuthChange={(value) => setCreateDraft((draft) => ({ ...draft, removalAuth: value }))}
       onAdminAddressChange={(value) => setCreateDraft((draft) => ({ ...draft, adminAddress: value }))}
       onTagsChange={(value) => setCreateDraft((draft) => ({ ...draft, tags: value }))}
       onReset={() => {
@@ -511,6 +531,7 @@ const AdminWorkerGroupsPanel = ({
             <span>{group.description || group.groupId}</span>
             <span>{group.joinMode === 'open' ? 'Open self-join' : 'Admin adds members'}</span>
             <span>Visible to {group.memberVisibility.replace('_', ' ')}</span>
+            <span>Who can remove members: {WORKER_GROUP_REMOVAL_AUTH_LABELS[group.removalAuth || 'both']}</span>
             {group.tags?.length ? <span>Tags: {group.tags.join(', ')}</span> : null}
             {group.documentURLs?.map((url) => (
               <a key={url} href={url} target="_blank" rel="noreferrer">
@@ -702,6 +723,21 @@ const AdminWorkerGroupsPanel = ({
               <option value="session">All session members</option>
             </Input>
           </FormGroup>
+          <FormGroup>
+            <Label for="worker-group-edit-removal-auth">Who can remove members</Label>
+            <WorkerGroupRemovalAuthHelp />
+            <Input
+              id="worker-group-edit-removal-auth"
+              type="select"
+              data-testid="ce-admin-worker-group-edit-removal-auth"
+              value={editDraft.removalAuth}
+              onChange={(event) =>
+                setEditDraft((draft) => ({ ...draft, removalAuth: event.target.value as WorkerGroupRemovalAuth }))
+              }
+            >
+              <WorkerGroupRemovalAuthOptions />
+            </Input>
+          </FormGroup>
           <Button color="primary" disabled={busy} onClick={handleSave}>
             Save group
           </Button>
@@ -711,6 +747,11 @@ const AdminWorkerGroupsPanel = ({
       {memberGroupId ? (
         <div>
           <div className={styles.panelSubtitle}>Members of {memberGroupId}</div>
+          {adminsMayRemoveMembers ? null : (
+            <div className={styles.panelSubtitle} data-testid="ce-admin-worker-group-members-removal-auth">
+              Who can remove members: {WORKER_GROUP_REMOVAL_AUTH_LABELS[memberGroupRemovalAuth]}
+            </div>
+          )}
           <div className={styles.formRow}>
             <Input
               data-testid="ce-admin-worker-group-member-address"
@@ -727,7 +768,7 @@ const AdminWorkerGroupsPanel = ({
             return (
               <div key={member.principalKey || address} className={styles.statusItem}>
                 <span>{address || member.principalKey}</span>
-                {address ? (
+                {address && adminsMayRemoveMembers ? (
                   <Button
                     className={styles.dangerActionButton}
                     size="sm"

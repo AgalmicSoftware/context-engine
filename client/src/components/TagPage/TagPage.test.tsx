@@ -249,6 +249,25 @@ describe('Tag Explorer Worker groups', () => {
       }),
     ]);
     expect(loadPublicWorkerGroups).toHaveBeenCalledWith(expect.objectContaining({ sessionSlug: 'worker-session' }));
+
+    // Signed in, the page lists the person's own groups too, but never asks them to sign in for that.
+    const { WorkerSignInNeededError } = jest.requireActual<typeof import('../../utilities/worker/workerAuth')>(
+      '../../utilities/worker/workerAuth',
+    );
+    const getWorkerSessionToken = jest.fn().mockRejectedValue(new WorkerSignInNeededError());
+    const loadWorkerGroupOverview = jest.fn();
+    const signedIn = await loadTagPageWorkerGroupData(
+      { account: `0x${'a'.repeat(40)}`, selectedTags: ['research'], sessionSlugs: ['worker-session'] },
+      {
+        getSessionConfig: () => sessionConfig,
+        getWorkerSessionToken,
+        loadPublicWorkerGroups,
+        loadWorkerGroupOverview,
+      } as any,
+    );
+    expect(signedIn).toEqual(groups);
+    expect(getWorkerSessionToken).toHaveBeenCalledWith(expect.objectContaining({ prompt: false }));
+    expect(loadWorkerGroupOverview).not.toHaveBeenCalled();
   });
 });
 

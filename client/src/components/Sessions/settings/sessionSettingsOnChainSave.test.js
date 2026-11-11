@@ -101,6 +101,8 @@ describe('editing an on-chain session', () => {
       draft.faucet.amountEth = '0.0005';
       draft.lists.featured_SBTs_LIST = address('a1');
       draft.lists.HIGHLIGHTED_QUESTION_IDS = 'q1';
+      // Worker sessions only, for now: on-chain metadata never carries them.
+      draft.agentInstructions = 'Join the Reviewers group.';
     });
 
     expect(Object.keys(patch).sort()).toEqual([

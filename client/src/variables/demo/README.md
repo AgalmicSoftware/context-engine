@@ -62,14 +62,18 @@ The main consumers of this folder are:
 `demo-sh` is the first/default public demo slug. Its dedicated full Session
 Worker is worker-canonical, uses Cloudflare KV for all 42 question payloads,
 accepts `https://contextengine.sh` and `https://www.contextengine.sh`, and has
-embedded deploy-helper capability disabled. The checked-in entry contains the
-public bootstrap identity and Worker URL needed to discover `/session-config`;
-the live Worker KV remains authoritative for operational configuration.
+embedded deploy-helper capability disabled. The repo's `known-sessions.json`
+lists it, so `/session/demo-sh` opens from the Worker's own `/session-config`,
+and the list sets its Worker URL and session ID. The checked-in entry keeps the
+demo data used elsewhere, such as the allowed origins `/about` checks before
+preloading it; the live Worker KV remains authoritative for operational
+configuration.
 
 The question fixture supplies an immediate client rendering of the same
-stable IDs and prompts stored in `demo-sh` KV. These rows are marked
-`cloudflareDemoSeed`, not `temporaryDemoSeed`. The fixture also keeps `demo-1`,
-which has no Worker URL and uses `temporaryDemoSeed` rows.
+stable IDs and prompts stored in `demo-sh` KV. With the checked-in entry's seed,
+these rows are marked `cloudflareDemoSeed`, not `temporaryDemoSeed`; the
+Worker's own config carries no such seed. The fixture also keeps `demo-1`, which
+has no Worker URL and uses `temporaryDemoSeed` rows.
 
 ## Regenerating The Demo-2 Fixture
 

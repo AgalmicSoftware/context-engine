@@ -25,6 +25,14 @@ export const WORKER_GROUP_MEMBER_VISIBILITY = Object.freeze({
 	SESSION: 'session',
 });
 
+// Who may end a membership, like an SBT's burn auth: admins, the member, both or neither.
+export const WORKER_GROUP_REMOVAL_AUTH = Object.freeze({
+	BOTH: 'both',
+	ADMIN_ONLY: 'admin_only',
+	MEMBER_ONLY: 'member_only',
+	NEITHER: 'neither',
+});
+
 export const DEFAULT_WORKER_GROUP_MAX_GROUPS_PER_SESSION = 100;
 export const DEFAULT_WORKER_GROUP_MAX_MEMBERS_PER_GROUP = 1000;
 export const MAX_WORKER_GROUP_IMAGE_URL_LENGTH = 2048;
@@ -197,6 +205,26 @@ const normalizeMemberVisibility = (value) => {
 	return '';
 };
 
+// A group stored before the setting existed keeps the rule every group had then: both.
+const normalizeRemovalAuth = (value) => {
+	const auth = trim(value || WORKER_GROUP_REMOVAL_AUTH.BOTH).toLowerCase();
+	if (Object.values(WORKER_GROUP_REMOVAL_AUTH).includes(auth)) return auth;
+	return '';
+};
+
+const REMOVERS_BY_REMOVAL_AUTH = Object.freeze({
+	[WORKER_GROUP_REMOVAL_AUTH.BOTH]: ['admin', 'member'],
+	[WORKER_GROUP_REMOVAL_AUTH.ADMIN_ONLY]: ['admin'],
+	[WORKER_GROUP_REMOVAL_AUTH.MEMBER_ONLY]: ['member'],
+	[WORKER_GROUP_REMOVAL_AUTH.NEITHER]: [],
+});
+
+/** Why a group's setting stops this remover ('admin' or 'member') ending a membership, or '' if it doesn't. */
+export const workerGroupRemovalRefusal = (removalAuth, remover) => {
+	if ((REMOVERS_BY_REMOVAL_AUTH[normalizeRemovalAuth(removalAuth)] || []).includes(remover)) return '';
+	return remover === 'member' ? 'worker_group_leave_denied' : 'worker_group_removal_denied';
+};
+
 const normalizeImageUrl = (value) => {
 	const raw = trim(value);
 	if (!raw) return { ok: true, value: '' };
@@ -362,6 +390,8 @@ const normalizeGroupPatch = ({ input = {}, actorPrincipal, existing = null, deps
 	}
 	const memberVisibility = normalizeMemberVisibility(input.memberVisibility || existing?.memberVisibility);
 	if (!memberVisibility) return { ok: false, status: 400, reason: 'invalid_member_visibility' };
+	const removalAuth = normalizeRemovalAuth(input.removalAuth || existing?.removalAuth);
+	if (!removalAuth) return { ok: false, status: 400, reason: 'invalid_removal_auth' };
 	const label = trim(input.label || existing?.label);
 	if (!label || label.length > 120) return { ok: false, status: 400, reason: 'invalid_group_label' };
 	const description = trim(input.description ?? existing?.description);
@@ -401,6 +431,7 @@ const normalizeGroupPatch = ({ input = {}, actorPrincipal, existing = null, deps
 			adminAddress: adminAddress || undefined,
 			joinMode,
 			memberVisibility,
+			removalAuth,
 			updatedAt,
 			...(existing
 				? {}
@@ -919,6 +950,7 @@ const redactGroupForMember = (group) => ({
 	...(group.adminAddress ? { adminAddress: group.adminAddress } : {}),
 	joinMode: group.joinMode,
 	memberVisibility: group.memberVisibility,
+	removalAuth: normalizeRemovalAuth(group.removalAuth),
 	createdAt: group.createdAt,
 	updatedAt: group.updatedAt,
 });
@@ -1096,7 +1128,7 @@ export const addWorkerGroupMember = async ({
 	};
 };
 
-export const removeWorkerGroupMember = async ({ env, slug, sessionId, groupId, principal, actorPrincipal, resume = false, deps = {} } = {}) => {
+export const removeWorkerGroupMember = async ({ env, slug, sessionId, groupId, principal, actorPrincipal, remover, resume = false, deps = {} } = {}) => {
 	const store = resolveWorkerGroupStore(env);
 	if (!store) return { ok: false, status: 501, reason: 'worker_group_store_not_configured' };
 	const group = await readGroupRecord({ store, slug, sessionId, groupId });
@@ -1113,6 +1145,11 @@ export const removeWorkerGroupMember = async ({ env, slug, sessionId, groupId, p
 	// A replayed removal whose record already landed only finishes the index removal.
 	const removed = resume && !!existing?.removedAt;
 	if (!removed && (!existing || existing.removedAt)) return { ok: false, status: 404, reason: 'worker_group_member_not_found' };
+	// Checked once the membership is found, so only members learn the setting. The
+	// coordinator checks it before it reserves the removal; a replay finishes a removal it
+	// allowed then, even if an admin has since changed the setting.
+	const refusal = resume ? '' : workerGroupRemovalRefusal(group.removalAuth, remover);
+	if (refusal) return { ok: false, status: 403, reason: refusal };
 	if (!removed) {
 		const removedAt = nowIso(deps);
 		const member = { ...existing, removedAt, removedBy: actorPrincipal };
@@ -1427,6 +1464,7 @@ export const executeWorkerGroupMutation = async ({
 	groupId,
 	principal,
 	actorPrincipal,
+	remover,
 	capacityAuthorized = false,
 	resume = false,
 	deps = {},
@@ -1470,6 +1508,7 @@ export const executeWorkerGroupMutation = async ({
 			groupId,
 			principal,
 			actorPrincipal,
+			remover,
 			capacityAuthorized,
 			resume,
 			deps,
@@ -1619,6 +1658,7 @@ export const forwardWorkerGroupMutation = async ({
 	groupId,
 	principal,
 	actorPrincipal,
+	remover,
 } = {}) => {
 	return callWorkerGroupCoordinator({
 		env,
@@ -1631,6 +1671,7 @@ export const forwardWorkerGroupMutation = async ({
 			groupId,
 			principal,
 			actorPrincipal,
+			remover,
 		},
 	});
 };
@@ -1675,43 +1716,33 @@ const resolveWorkerGroupSessionIdentity = ({ config, slug } = {}) => {
 
 const participantGroupCreationAllowed = (config) => config?.groupCreationPolicy === 'participants';
 
-export const dispatchPublicWorkerGroupListRequest = async ({ request, config, env, slug, baseHeaders, deps = {} } = {}) => {
+// Whether someone could join this group on their own right now, as a join link does.
+const isSelfJoinableWorkerGroup = (group, nowMs) => {
+	const joinEndsAt = Date.parse(trim(group?.joinEndsAt));
+	return (
+		group?.joinMode === WORKER_GROUP_JOIN_MODES.OPEN &&
+		group?.memberVisibility === WORKER_GROUP_MEMBER_VISIBILITY.SESSION &&
+		!(Number.isFinite(joinEndsAt) && joinEndsAt <= nowMs)
+	);
+};
+
+/**
+ * The groups a signed-out visitor may see. A private session shows them only to someone holding a
+ * join link to a group they could join on their own, and then only what that group's members see:
+ * groups visible to the whole session. Groups shown to their members or admins stay hidden.
+ */
+export const listWorkerGroupsForVisitor = async ({ env, config, slug, inviteGroupId, deps = {} } = {}) => {
 	const sessionIdentity = resolveWorkerGroupSessionIdentity({ config, slug });
-	if (!sessionIdentity.ok) return routeError(deps, sessionIdentity, baseHeaders);
-	if (!workerConfigAllowsAnonymousGroupDiscovery(config)) {
-		return routeError(
-			deps,
-			{
-				status: 403,
-				reason: 'worker_group_discovery_not_public',
-			},
-			baseHeaders,
-		);
-	}
-	let requestedSessionId = '';
-	try {
-		requestedSessionId = resolveCanonicalWorkerSessionIdHex({
-			sessionId: new URL(request?.url || '').searchParams.get('sessionId'),
-		});
-	} catch {
-		requestedSessionId = '';
-	}
-	if (requestedSessionId !== sessionIdentity.sessionId) {
-		return routeError(
-			deps,
-			{
-				status: 409,
-				reason: 'worker_group_session_identity_mismatch',
-			},
-			baseHeaders,
-		);
-	}
+	if (!sessionIdentity.ok) return sessionIdentity;
+	const publicDiscovery = workerConfigAllowsAnonymousGroupDiscovery(config);
+	const invite = publicDiscovery ? '' : normalizeWorkerGroupId(inviteGroupId);
+	if (!publicDiscovery && !invite) return { ok: false, status: 403, reason: 'worker_group_discovery_not_public' };
 	const ready = await (deps?.checkCoordinatedWorkerGroupReady || checkCoordinatedWorkerGroupReady)({
 		env,
 		slug,
 		sessionId: sessionIdentity.sessionId,
 	});
-	if (!ready.ok) return routeError(deps, ready, baseHeaders);
+	if (!ready.ok) return ready;
 	let result;
 	try {
 		result = await (deps?.listWorkerGroups || listWorkerGroups)({
@@ -1729,6 +1760,98 @@ export const dispatchPublicWorkerGroupListRequest = async ({ request, config, en
 			reason: 'worker_group_projection_unavailable',
 		};
 	}
+	if (!result.ok) return result;
+	const nowMs = Number(deps.now?.() || Date.now());
+	if (!invite) return { ok: true, sessionIdentity, store: result.store, groups: result.groups };
+	if (!result.groups.some((group) => group.groupId === invite && isSelfJoinableWorkerGroup(group, nowMs))) {
+		return { ok: false, status: 403, reason: 'worker_group_discovery_not_public' };
+	}
+	// A link shows group names, not who runs each group: a participant's group names its creator.
+	const groups = result.groups.map(({ adminAddress: _adminAddress, ...group }) => group);
+	return { ok: true, sessionIdentity, store: result.store, groups };
+};
+
+/** The groups a visitor could join on their own, for an AI to match them to. Empty when none may be shown. */
+export const listSelfJoinableWorkerGroupsForVisitor = async (args = {}) => {
+	try {
+		const result = await listWorkerGroupsForVisitor(args);
+		const nowMs = Number(args.deps?.now?.() || Date.now());
+		return result.ok ? result.groups.filter((group) => isSelfJoinableWorkerGroup(group, nowMs)) : [];
+	} catch {
+		return [];
+	}
+};
+
+/** The groups a signed-in person could join on their own and hasn't yet, for their AI to match them to. */
+export const listSelfJoinableWorkerGroupsForMember = async ({ env, config, slug, address, deps = {} } = {}) => {
+	try {
+		const sessionIdentity = resolveWorkerGroupSessionIdentity({ config, slug });
+		const actor = resolveWorkerGroupPrincipal({ requesterAddress: address, deps });
+		if (!sessionIdentity.ok || !actor.ok) return [];
+		const { sessionId } = sessionIdentity;
+		const ready = await (deps?.checkCoordinatedWorkerGroupReady || checkCoordinatedWorkerGroupReady)({ env, slug, sessionId });
+		if (!ready.ok) return [];
+		const listed = await (deps?.listWorkerGroups || listWorkerGroups)({
+			env,
+			slug,
+			sessionId,
+			actorPrincipalResult: actor,
+			admin: false,
+			includeMemberCount: true,
+			expectedGroupCount: ready.meta?.groupCount,
+		});
+		const joined = await (deps?.listWorkerGroupMemberships || listWorkerGroupMemberships)({
+			env,
+			slug,
+			sessionId,
+			principal: actor.principal,
+			deps,
+		});
+		if (!listed.ok || !joined.ok) return [];
+		const joinedIds = new Set(joined.memberships.map((membership) => normalizeWorkerGroupId(membership?.group?.groupId)));
+		const nowMs = Number(deps.now?.() || Date.now());
+		return listed.groups.filter((group) => {
+			const full = Number.isSafeInteger(group.memberLimit) && group.memberLimit > 0 && group.memberCount >= group.memberLimit;
+			return isSelfJoinableWorkerGroup(group, nowMs) && !joinedIds.has(group.groupId) && !full;
+		});
+	} catch {
+		return [];
+	}
+};
+
+export const dispatchPublicWorkerGroupListRequest = async ({ request, config, env, slug, baseHeaders, deps = {} } = {}) => {
+	const sessionIdentity = resolveWorkerGroupSessionIdentity({ config, slug });
+	if (!sessionIdentity.ok) return routeError(deps, sessionIdentity, baseHeaders);
+	let params = new URLSearchParams();
+	try {
+		params = new URL(request?.url || '').searchParams;
+	} catch {
+		params = new URLSearchParams();
+	}
+	const inviteGroupIds = params.getAll('joinGroup');
+	const inviteGroupId = inviteGroupIds.length === 1 ? normalizeWorkerGroupId(inviteGroupIds[0]) : '';
+	if (!inviteGroupId && !workerConfigAllowsAnonymousGroupDiscovery(config)) {
+		return routeError(
+			deps,
+			{
+				status: 403,
+				reason: 'worker_group_discovery_not_public',
+			},
+			baseHeaders,
+		);
+	}
+	const requestedSessionId = resolveCanonicalWorkerSessionIdHex({ sessionId: params.get('sessionId') });
+	if (requestedSessionId !== sessionIdentity.sessionId) {
+		return routeError(
+			deps,
+			{
+				status: 409,
+				reason: 'worker_group_session_identity_mismatch',
+			},
+			baseHeaders,
+		);
+	}
+	const result = await listWorkerGroupsForVisitor({ env, config, slug, inviteGroupId, deps });
 	if (!result.ok) return routeError(deps, result, baseHeaders);
 	return jsonResponse(deps, { ok: true, ...sessionIdentity, store: result.store, groups: result.groups }, 200, baseHeaders);
 };
@@ -1861,6 +1984,7 @@ export const dispatchAdminWorkerGroupRequest = async ({ action, body, config, en
 			groupId: body?.groupId,
 			principal: body?.principal || body?.member,
 			actorPrincipal: actor.principal,
+			remover: 'admin',
 		});
 		if (!result.ok) return routeError(deps, result, headers);
 		return jsonResponse(
@@ -2127,6 +2251,7 @@ export const workerGroupsRoute = async ({
 				adminAddress: actor.principal?.address,
 				joinMode: WORKER_GROUP_JOIN_MODES.OPEN,
 				memberVisibility: WORKER_GROUP_MEMBER_VISIBILITY.SESSION,
+				removalAuth: routeBody?.group?.removalAuth,
 			},
 			actorPrincipal: actor.principal,
 		});
@@ -2176,6 +2301,7 @@ export const workerGroupsRoute = async ({
 			// request. Never accept a caller-supplied principal on this route.
 			principal: actor.principal,
 			actorPrincipal: actor.principal,
+			remover: 'member',
 		});
 		if (!result.ok) return routeError(deps, result, baseHeaders);
 		if (!Number.isSafeInteger(result.memberCount) || result.memberCount < 0) {

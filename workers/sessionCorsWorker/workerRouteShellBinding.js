@@ -53,10 +53,12 @@ import {
   dispatchResourcePresenceRequest as dispatchResourcePresenceRequestBoundary,
 } from './resourcePresenceDispatch.js';
 import {
+  dispatchSessionAgentInstructionsRequest as dispatchSessionAgentInstructionsRequestBoundary,
   dispatchSessionConfigBootstrapRequest as dispatchSessionConfigBootstrapRequestBoundary,
 } from './sessionConfigBootstrapDispatch.js';
 import {
   dispatchInterviewBriefRequest as dispatchInterviewBriefRequestBoundary,
+  dispatchInterviewCatalogTicketRequest as dispatchInterviewCatalogTicketRequestBoundary,
 } from './interviewBriefDispatch.js';
 import {
   getRouteBaseHeaders as getRouteBaseHeadersBoundary,
@@ -93,8 +95,14 @@ export const createWorkerRouteShellWithWorkerDeps = ({
   const dispatchSessionConfigBootstrapRequest = (
     deps?.dispatchSessionConfigBootstrapRequest || dispatchSessionConfigBootstrapRequestBoundary
   );
+  const dispatchSessionAgentInstructionsRequest = (
+    deps?.dispatchSessionAgentInstructionsRequest || dispatchSessionAgentInstructionsRequestBoundary
+  );
   const dispatchInterviewBriefRequest = (
     deps?.dispatchInterviewBriefRequest || dispatchInterviewBriefRequestBoundary
+  );
+  const dispatchInterviewCatalogTicketRequest = (
+    deps?.dispatchInterviewCatalogTicketRequest || dispatchInterviewCatalogTicketRequestBoundary
   );
   const dispatchAdminRequest = deps?.dispatchAdminRequest || dispatchAdminRequestBoundary;
   const dispatchAdminAbuseSummaryRequest = (
@@ -164,8 +172,10 @@ export const createWorkerRouteShellWithWorkerDeps = ({
         });
       }
 
-      if (routeSelection.kind === 'session-config') {
-        return await dispatchSessionConfigBootstrapRequest({
+      if (routeSelection.kind === 'session-config' || routeSelection.kind === 'agent-instructions') {
+        return await (routeSelection.kind === 'agent-instructions'
+          ? dispatchSessionAgentInstructionsRequest
+          : dispatchSessionConfigBootstrapRequest)({
           request,
           env,
           slugHint: envSlug,
@@ -205,10 +215,33 @@ export const createWorkerRouteShellWithWorkerDeps = ({
             storageRoute: deps?.storageRoute,
             fetch: deps?.fetch,
             json: deps?.json,
+            // A catalog ticket is checked against the person's current access.
+            computeScopesForLogin: deps?.computeScopesForLogin,
+            now: deps?.now,
           },
           constants: {
             missingSlugError: constants?.missingSlugError,
             sessionConfigNotFoundError: constants?.sessionConfigNotFoundError,
+          },
+        });
+      }
+
+      if (routeSelection.kind === 'interview-catalog-ticket') {
+        return await dispatchInterviewCatalogTicketRequest({
+          request,
+          env,
+          baseHeaders: routeBaseHeaders,
+          slug: envSlug,
+          deps: {
+            json: deps?.json,
+            requireAuth: deps?.requireAuth,
+            readCurrentSessionConfig: deps?.readCurrentSessionConfig,
+            getCorsContext: deps?.getCorsContext,
+            computeScopesForLogin: deps?.computeScopesForLogin,
+            checkRateLimit: deps?.checkRateLimit,
+            toStr: deps?.toStr,
+            now: deps?.now,
+            SESSION_CONFIG_NOT_FOUND_ERROR: constants?.sessionConfigNotFoundError,
           },
         });
       }

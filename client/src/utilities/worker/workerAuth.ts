@@ -28,10 +28,11 @@ import {
 import {
   buildTokenCacheEnvelope,
   buildTokenCacheKey,
-  clearAllTokenCaches,
+  adoptTokenCaches,
   clearTokenCache,
   normalizeTokenCacheEntry,
   readScopedTokenCache,
+  resetTokenCaches,
   writeTokenCache,
 } from './workerAuthTokenCache.js';
 import {
@@ -132,6 +133,8 @@ type BootstrapAdminAuthOptions = {
   workerUrl?: unknown;
 };
 type WorkerSessionTokenOptions = ResolveWorkerTokenRequestContextOptions & {
+  // false: sign in only if that asks the person for nothing, else throw WorkerSignInNeededError.
+  prompt?: boolean;
   requestContext?: WorkerTokenRequestContext;
 };
 type InFlightTokenRequest = {
@@ -147,6 +150,29 @@ const asWorkerAuthContext = (value: unknown): WorkerAuthContext =>
   value && typeof value === 'object' ? (value as WorkerAuthContext) : {};
 const getWorkerProvider = (providerLike: unknown): WorkerProvider =>
   cryptoUtils._getProvider((providerLike || resolveDefaultProviderLike()) as CryptoProviderLike) as WorkerProvider;
+/** A Worker sign-in left undone because it would have asked the person to unlock their wallet. */
+export class WorkerSignInNeededError extends Error {
+  constructor() {
+    super('Sign in to see this.');
+    this.name = 'WorkerSignInNeededError';
+  }
+}
+export const isWorkerSignInNeededError = (error: unknown): error is WorkerSignInNeededError =>
+  error instanceof WorkerSignInNeededError;
+// A quiet sign-in signs after a nonce round trip and any retries, so the unlock must outlast them.
+const QUIET_SIGN_IN_UNLOCK_MARGIN_MS = 30 * 1000;
+// Only an unlocked passkey wallet signs without asking; any other wallet opens a window of its own.
+const signsWithoutPrompt = ({ resolvedSigner, wallet }: WorkerTokenRequestContext): boolean => {
+  try {
+    const provider = getWorkerProvider(resolvedSigner?.provider || wallet.providerLike) as {
+      isPasskeyEoa?: unknown;
+      isUnlocked?: (forMs?: number) => unknown;
+    };
+    return provider.isPasskeyEoa === true && provider.isUnlocked?.(QUIET_SIGN_IN_UNLOCK_MARGIN_MS) === true;
+  } catch {
+    return false;
+  }
+};
 const getErrorMessage = (error: unknown): string =>
   toStr(error && typeof error === 'object' ? (error as { message?: unknown }).message : '');
 
@@ -251,6 +277,7 @@ const doesWorkerAuthAddressMatchStore = (address: unknown): boolean => {
 };
 
 let trackedWorkerAuthAddress = getCurrentWorkerAuthStoreAddress();
+if (trackedWorkerAuthAddress) adoptTokenCaches(trackedWorkerAuthAddress);
 
 const isNonceMismatchError = (message: unknown): boolean => toStr(message).toLowerCase().includes(NONCE_MISMATCH_ERROR);
 
@@ -281,7 +308,10 @@ const abortInFlightTokenRequests = () => {
 const invalidateWorkerAuthState = ({ nextAddress = '' } = {}) => {
   invalidateClientAuthGeneration();
   abortInFlightTokenRequests();
-  clearAllTokenCaches();
+  // Learning who is signed in, as after a reload, keeps the sign-ins this tab saved for them.
+  // A sign-out or account switch ends them all.
+  if (!trackedWorkerAuthAddress && normalizeAddress(nextAddress)) adoptTokenCaches(nextAddress);
+  else resetTokenCaches(nextAddress);
   // Access noted for the previous sign-in says nothing about the next one's tokens.
   workerAccessChangedAtMs = 0;
   tokensIssuedForCurrentAccess.clear();
@@ -300,6 +330,7 @@ const syncWorkerAuthAddress = (address: unknown): number => {
   if (trackedWorkerAuthAddress && trackedWorkerAuthAddress !== normalizedAddress) {
     return invalidateWorkerAuthState({ nextAddress: normalizedAddress });
   }
+  if (!trackedWorkerAuthAddress) adoptTokenCaches(normalizedAddress);
   trackedWorkerAuthAddress = normalizedAddress;
   return getClientAuthGeneration();
 };
@@ -743,6 +774,7 @@ export const getWorkerSessionToken = async ({
   workerUrl,
   allowDemoFallback,
   requestContext,
+  prompt = true,
 }: WorkerSessionTokenOptions = {}) => {
   const resolvedRequest =
     requestContext ||
@@ -780,6 +812,10 @@ export const getWorkerSessionToken = async ({
   const existingRequest = inFlightTokenRequests.get(storageKey);
   if (existingRequest?.promise) {
     return existingRequest.promise;
+  }
+  // Prompts are for what the person does: what the page does by itself signs in only silently.
+  if (!prompt && !signsWithoutPrompt(resolvedRequest)) {
+    throw new WorkerSignInNeededError();
   }
 
   const abortController =
@@ -974,7 +1010,8 @@ const getWorkerAuthHeadersWithMeta = async ({
   context,
   workerUrl,
   allowDemoFallback,
-}: ResolveWorkerTokenRequestContextOptions = {}) => {
+  prompt,
+}: ResolveWorkerTokenRequestContextOptions & { prompt?: boolean } = {}) => {
   const resolvedRequest = await resolveWorkerTokenRequestContext({
     sessionSlug,
     sessionConfig,
@@ -985,6 +1022,7 @@ const getWorkerAuthHeadersWithMeta = async ({
   });
   const token = await getWorkerSessionToken({
     requestContext: resolvedRequest,
+    prompt,
   });
   const headers = buildWorkerAuthHeadersForToken({ token, slug: resolvedRequest.slug });
   return { headers, requestContext: resolvedRequest, token };
@@ -1079,6 +1117,7 @@ export const fetchWorkerWithAuth = async (
       context: opts.context,
       workerUrl,
       allowDemoFallback: opts.allowDemoFallback,
+      prompt: opts.prompt,
     });
     authHeaders = authResult.headers;
     authRequestContext = authResult.requestContext;
@@ -1086,19 +1125,25 @@ export const fetchWorkerWithAuth = async (
   } catch (err) {
     // When anonymous-first is enabled and no wallet is connected, surface
     // the original anonymous worker denial instead of a wallet-auth error.
-    if (anonymousResponse && /authenticate with the worker/i.test(getErrorMessage(err))) {
+    if (
+      anonymousResponse &&
+      (isWorkerSignInNeededError(err) || /authenticate with the worker/i.test(getErrorMessage(err)))
+    ) {
       return anonymousResponse;
     }
     throw err;
   }
   const headers = mergeHeaders(options.headers, authHeaders);
   const response = await fetch(url, { ...options, headers });
-  if (
-    (response.status === 401 || response.status === 403) &&
-    opts.retry !== false &&
-    ((await shouldRetryAuthenticatedResponse(response)) ||
-      (!tokensIssuedForCurrentAccess.has(authToken) && (await isTokenScopeDenialResponse(response))))
-  ) {
+  if ((response.status !== 401 && response.status !== 403) || opts.retry === false) return response;
+  const tokenRefused = await shouldRetryAuthenticatedResponse(response);
+  const scopeOutdated =
+    !tokenRefused && !tokensIssuedForCurrentAccess.has(authToken) && (await isTokenScopeDenialResponse(response));
+  // A token refused one scope still serves the rest: the page's own request keeps it unless a new one signs unasked.
+  if (scopeOutdated && opts.prompt === false && !(authRequestContext && signsWithoutPrompt(authRequestContext))) {
+    return response;
+  }
+  if (tokenRefused || scopeOutdated) {
     // A concurrent retry may already have replaced this token; reuse its replacement.
     if (!authRequestContext || readCachedWorkerSessionToken(authRequestContext) === authToken) {
       await clearWorkerSessionToken({
@@ -1110,9 +1155,14 @@ export const fetchWorkerWithAuth = async (
         allowDemoFallback: opts.allowDemoFallback,
       });
     }
-    const retryToken = await getWorkerSessionToken({
-      requestContext: authRequestContext,
-    });
+    let retryToken: string;
+    try {
+      retryToken = await getWorkerSessionToken({ requestContext: authRequestContext, prompt: opts.prompt });
+    } catch (err) {
+      // The page's own request reports the refusal rather than asking the person to sign in again.
+      if (isWorkerSignInNeededError(err)) return response;
+      throw err;
+    }
     const retryAuth = buildWorkerAuthHeadersForToken({
       token: retryToken,
       slug: authRequestContext?.slug || slug,
