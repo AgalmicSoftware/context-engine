@@ -28126,6 +28126,9 @@ var init_deployHelperCore = __esm({
     validateDeployHelperPublicConfigInputs = (body = {}) => {
       if (!validSessionAgentConfig(body)) return "Invalid agent configuration.";
       if (body?.deploymentKind) return "Separate agent deployments are no longer supported; configure the Session Worker.";
+      if (Object.hasOwn(body || {}, "agentInstructions") && !validAgentInstructions(body.agentInstructions)) {
+        return `agentInstructions must be text of at most ${MAX_AGENT_INSTRUCTIONS_CHARS} characters.`;
+      }
       const allowOriginsInput = Array.isArray(body?.allowOrigins) ? body.allowOrigins : [];
       if (allowOriginsInput.some((origin) => toStr9(origin).includes("*"))) {
         return "Worker CORS allowlists must contain exact origins.";
@@ -28225,11 +28228,6 @@ var init_deployHelperCore = __esm({
       if (!["admin_only", "participants"].includes(groupCreationPolicy)) {
         return buildFailure(400, {
           error: 'groupCreationPolicy must be "admin_only" or "participants".'
-        });
-      }
-      if (Object.hasOwn(body || {}, "agentInstructions") && !validAgentInstructions(body.agentInstructions)) {
-        return buildFailure(400, {
-          error: `agentInstructions must be text of at most ${MAX_AGENT_INSTRUCTIONS_CHARS} characters.`
         });
       }
       if (workerCanonicalRequested && !/^0x[0-9a-f]{40}$/i.test(adminAddress)) {
