@@ -134,7 +134,8 @@ test('skill.md shows agents how to take part, with nothing session-specific', ()
   assert.match(skillMd, /`CE_MCP_STATE_DIR`/);
   assert.match(skillMd, /Call `join_session` with the session link exactly as you received it/);
   assert.match(skillMd, /Never claim to be a person/);
-  assert.match(skillMd, /join open\s+groups and leave them/);
+  assert.match(skillMd, /join open groups\s+with `join_group`/);
+  assert.match(skillMd, /leave any group you're in with `leave_group`/);
   assert.match(skillMd, /you're invited to add context/);
   assert.match(skillMd, /Call `add_context`\s+with exactly one of them/);
   assert.match(skillMd, /`<worker>\/llms\.txt`/);
