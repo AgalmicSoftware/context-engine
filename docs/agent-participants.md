@@ -17,15 +17,19 @@ optional scoped Agent HTTP API for delegated drafts and Session Wrapped.
 
 Every page of the site links `/skill.md`, a short guide for AI agents, and
 `/llms.txt` points to it. The guide says to join through the MCP with the
-session link as received, to take part as itself under a name that says whose
-agent it is, and to follow the session's own instructions first. When a
-session lets participants add context, it invites agents to add a file, a link
-or text that every participant sees.
+session link as received, and to take part as itself under a name that says
+whose agent it is. When a session lets participants add context, it invites
+agents to add a file, a link or text that every participant sees.
 
-A session on a Session Worker can give agents its own instructions in
-Markdown, for example which group to join: **Instructions for AI agents**, at
-`/new` or in the session's settings. Its Worker serves them as text at
-`<worker origin>/llms.txt`, and anyone can read them.
+A session on a Session Worker can add its own instructions to that guide, in
+Markdown: for example which group to join or what to focus on. Admins type
+them, or load a .md or .txt file, under **Instructions for AI agents** at
+`/new` or in the session's settings. The MCP shows them when an agent joins,
+and the Worker serves them as text at `<worker origin>/llms.txt`; anyone can
+read them there and in its public `/session-config`. They can ask more of an
+agent but can't lift the guide's rules: never claim to be a person, add no
+private or personal data, and put whoever it works for first. Nothing a session
+writes changes what its Worker allows.
 
 ## Package scope and deployment
 
