@@ -557,8 +557,10 @@ page but not yet submitted, including an unsent draft restored on load, stands i
 submitted one, so the mapper is told which fields are unsubmitted. A draft that gives a different
 answer shows for review, saying which answer it changes. One that repeats an answer the AI
 was given adds nothing and is counted in a note as still fitting, unless it adds to the
-comment. A locked answer stands and goes to no AI, even after it's been unlocked on the page,
-so a draft left out beside one is counted only as left out, never as still fitting.
+comment. A locked comment, or an encrypted one, can't be compared, so any comment the AI proposes
+beside it is offered with **Mine** chosen, keeping theirs unless they choose **AI’s**. A locked
+answer stands and goes to no AI, even after it's been unlocked on the page, so a draft left out
+beside one is counted only as left out, never as still fitting.
 Someone signed out gets drafts from their part alone; if they sign in to submit, their saved
 answers load first, and the submit waits while a card would change an earlier answer or
 doesn't match a comment that loaded.

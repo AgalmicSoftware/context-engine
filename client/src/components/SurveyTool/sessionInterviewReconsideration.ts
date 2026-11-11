@@ -49,14 +49,16 @@ export const readAnswersToReconsider = (
     ];
   });
 
-/** A draft that keeps a saved answer but says something its comment doesn't. A locked answer or comment stands. */
+/**
+ * A draft that keeps a saved answer but says something its comment doesn't. A locked answer stands. A locked comment
+ * can't be compared, so any comment the AI proposes beside it is offered, and theirs is kept unless they choose it.
+ */
 export const addsToSavedAnswer = (
   draft: InterviewDraftResponse | undefined,
   slice: SessionInterviewModalRecord | null | undefined,
 ): boolean =>
   !!draft &&
   responseFieldValue(slice, 'answers', draft.questionId) !== '*' &&
-  responseFieldValue(slice, 'additionalComments', draft.questionId) !== '*' &&
   addsToInterviewComment(responseCommentValue(slice, draft.questionId), draft.additionalComments);
 
 /**

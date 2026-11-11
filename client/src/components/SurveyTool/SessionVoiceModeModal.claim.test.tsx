@@ -1,5 +1,5 @@
 import React from 'react';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import SessionVoiceModeModal from './SessionVoiceModeModal';
 import { mapInterviewEvidenceToResponses } from './sessionInterview';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
@@ -287,6 +287,24 @@ describe('drafting from a claimed part', () => {
     const slice = saved({ q2: 'The neighbours' });
     render(interview({ onLoadSavedResponses: jest.fn(async () => slice), existingResponseSlice: slice }));
     expect(await screen.findByText('Who runs it?')).toBeInTheDocument();
+  });
+
+  it.each([
+    ['a locked comment', '*'],
+    ['an encrypted comment unlocked on the page', 'Secret reason'],
+  ])('offers a new comment beside %s, keeping theirs unless they choose the AI’s', async (_label, value) => {
+    mapped.mockResolvedValue([
+      { questionId: 'q2', answer: 'The neighbours', additionalComments: 'With a small rota', confidence: 0.8 },
+    ]);
+    const slice = { ...saved({ q2: 'The neighbours' }), additionalComments: { q2: { value, encrypted: true } } };
+    render(interview({ onLoadSavedResponses: jest.fn(async () => slice), existingResponseSlice: slice }));
+    expect(await screen.findByText('Who runs it?')).toBeInTheDocument();
+    const choices = screen.getByRole('group', { name: 'Comment to submit' });
+    expect(within(choices).getByRole('button', { name: 'Mine' })).toHaveAttribute('aria-pressed', 'true');
+    expect(within(choices).getByRole('button', { name: 'AI’s' })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.queryByText(/still fit/)).toBeNull();
+    expect(document.body).not.toHaveTextContent('Secret reason');
+    expect(JSON.stringify(mapped.mock.calls)).not.toContain('Secret reason');
   });
 
   it('adds to what they said here, keeps drafts in review, and takes a part in only once', async () => {
