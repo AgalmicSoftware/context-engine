@@ -197,7 +197,11 @@ Relevant interview explanations appear as editable additional comments. When the
 already has a comment, saved or typed on the page, the card holds theirs followed by what the
 AI adds; **Both**, **Mine** and **AI’s** switch between them, the text stays editable, and
 submitting sends exactly the comment the card ends with. A locked comment can't be shown, so it
-stays unless they choose the AI's. A comment that loads after the drafts joins them the same way,
+stays unless they choose the AI's. An encrypted comment counts as locked even once it's unlocked
+on the page: review shows **Your locked comment stays.** in its place, never joins its text, and
+submitting leaves it as it was unless they choose the AI's. No answer or comment someone
+encrypted, nor anything they type into an encrypted field, goes to the voice interviewer or the
+next round of drafting. A comment that loads after the drafts joins them the same way,
 so no earlier comment is replaced unseen. A single glowing robot icon
 beside the footer/comment controls marks an untouched AI-proposed response; it
 stays through focus-only review and disappears after any real answer, comment,

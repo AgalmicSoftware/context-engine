@@ -1,5 +1,6 @@
 import { responseValuesEqual as valuesEqual } from './responseValueEquality';
 import { interviewDraftFieldValue } from './sessionInterviewReviewState';
+import type { InterviewDraftResponse } from './sessionInterview';
 type RecordValue = Record<string, unknown>;
 const record = (value: unknown): RecordValue =>
   value && typeof value === 'object' && !Array.isArray(value) ? (value as RecordValue) : {};
@@ -58,6 +59,61 @@ export const resolveFieldProtection = (
     comments.encrypted === true ||
     (comments.audienceMode !== 'explicit' && encryptedAnswer);
   return { encryptedAnswer, encryptedComments };
+};
+
+/**
+ * Response fields as interview review reads them. What someone encrypted doesn't go to the session's AI, even once
+ * unlocked on this page, so their encrypted comment counts as locked ("*"): review never shows, joins or sends its
+ * text, and submitting leaves it as it was unless they choose the AI's comment.
+ */
+export const lockEncryptedComments = (fields: RecordValue | null | undefined): RecordValue | null | undefined => {
+  const comments = record(record(fields).additionalComments);
+  const locked = Object.keys(comments).filter((questionId) => {
+    const { value } = record(comments[questionId]);
+    return (
+      value !== undefined &&
+      value !== null &&
+      value !== '' &&
+      value !== '*' &&
+      resolveFieldProtection(questionId, record(fields)).encryptedComments
+    );
+  });
+  if (!locked.length) return fields;
+  const masked = locked.map((questionId) => [questionId, { ...record(comments[questionId]), value: '*' }]);
+  return { ...record(fields), additionalComments: { ...comments, ...Object.fromEntries(masked) } };
+};
+
+/**
+ * Reviewed values an AI may hear: an answer or comment someone encrypted stays out, even once unlocked on this page,
+ * and so do the ratings beside it, as research sharing redacts them.
+ */
+export const withoutEncryptedFields = (
+  questionId: string,
+  fields: RecordValue | null | undefined,
+  values: InterviewDraftResponse | undefined,
+): InterviewDraftResponse | undefined => {
+  if (!values) return values;
+  const { encryptedAnswer, encryptedComments } = resolveFieldProtection(questionId, record(fields));
+  if (!encryptedAnswer && !encryptedComments) return values;
+  const kept = (field: string) =>
+    !(field === 'answer' && encryptedAnswer) &&
+    !(field === 'additionalComments' && encryptedComments) &&
+    field !== 'importance' &&
+    field !== 'conviction';
+  const {
+    answer,
+    additionalComments,
+    importance: _importance,
+    conviction: _conviction,
+    userEditedFields,
+    ...rest
+  } = values;
+  return {
+    ...rest,
+    answer: kept('answer') ? answer : undefined,
+    ...(kept('additionalComments') ? { additionalComments } : {}),
+    ...(userEditedFields ? { userEditedFields: userEditedFields.filter(kept) } : {}),
+  };
 };
 
 const protectSnapshot = (values: unknown, encryptedAnswer: boolean, encryptedComments: boolean): RecordValue => {

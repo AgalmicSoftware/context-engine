@@ -1,6 +1,8 @@
 import React from 'react';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import SessionVoiceModeModal from './SessionVoiceModeModal';
+import { mapInterviewEvidenceToResponses } from './sessionInterview';
+import { startSessionRealtimeInterview } from '../../utilities/audio/realtimeInterviewClient';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 
 jest.mock('./SessionInterviewRecommendedGroups', () => ({ __esModule: true, default: () => null }));
@@ -88,6 +90,31 @@ const submit = async () => {
   await waitFor(() =>
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY)).toHaveTextContent('Responses submitted'),
   );
+};
+// One voice round: what the voice interviewer was told, then what the next mapping was given as reviewed.
+const talk = async () => {
+  let instructions = '';
+  jest.mocked(mapInterviewEvidenceToResponses).mockResolvedValue([]);
+  jest.mocked(startSessionRealtimeInterview).mockImplementation(async (options) => {
+    instructions = options.instructions;
+    options.onRecordingState?.('recording');
+    options.onTranscript?.('Responder: Tell me more.', []);
+    return {
+      mediaStream: {} as MediaStream,
+      stop: jest.fn(async () => ({ transcript: 'Responder: Tell me more.', turns: [] })),
+      pause: jest.fn(),
+      resume: jest.fn(),
+      getTranscript: () => 'Responder: Tell me more.',
+    };
+  });
+  fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_START));
+  await screen.findByLabelText('Pause interview');
+  fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STOP));
+  await waitFor(() => expect(mapInterviewEvidenceToResponses).toHaveBeenCalled());
+  return {
+    instructions,
+    reviewed: JSON.stringify(jest.mocked(mapInterviewEvidenceToResponses).mock.calls.at(-1)?.[0].previousResponses),
+  };
 };
 
 const editComment = (value: string) =>
@@ -178,5 +205,64 @@ describe('an AI comment beside the person’s own', () => {
     );
     await submit();
     expect(onApplyAdditional).toHaveBeenCalledWith('q-text', 'Saved note\n\nFrom my AI');
+  });
+});
+
+describe('what someone encrypted stays out of review and every AI', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it.each([
+    ['proposes a comment', 'From my AI'],
+    ['proposes none', ''],
+  ])(
+    'counts an encrypted comment unlocked on the page as locked when the AI %s, and tells no AI what it says',
+    async (_label, aiComment) => {
+      const onApplyAdditional = jest.fn();
+      render(modal(withComment('Secret reason', true), aiComment, onApplyAdditional));
+      await screen.findByRole('button', { name: /Draft answer for Why\?/ });
+      // With nothing to choose between, the comment row opens as for any locked comment.
+      if (!aiComment) fireEvent.click(screen.getByRole('button', { name: 'Additional comments' }));
+      expect(screen.getByRole('button', { name: /Additional comments for Why\?/ })).toHaveTextContent(
+        'Your locked comment stays.',
+      );
+      expect(document.body).not.toHaveTextContent('Secret reason');
+      if (aiComment) {
+        // It can't be joined, so Both isn't offered: theirs is kept unless they choose the AI's.
+        const choices = screen.getByRole('group', { name: 'Comment to submit' });
+        expect(within(choices).queryByRole('button', { name: 'Both' })).toBeNull();
+        expect(within(choices).getByRole('button', { name: 'Mine' })).toHaveAttribute('aria-pressed', 'true');
+        choose('Mine');
+      }
+
+      const heard = await talk();
+      expect(heard.instructions).toContain('Drafted answer');
+      expect(heard.instructions).not.toContain('Secret reason');
+      expect(heard.reviewed).toContain('"questionId":"q-text"');
+      expect(heard.reviewed).not.toContain('Secret reason');
+
+      // Kept, it is submitted exactly as it was.
+      await submit();
+      expect(onApplyAdditional).not.toHaveBeenCalled();
+    },
+  );
+
+  it('keeps what someone types into encrypted fields out of the voice context and the next mapping', async () => {
+    // The answer was locked before anything was typed, and the comment follows its lock.
+    render(modal({ answers: { 'q-text': { value: '', encrypted: true, audienceMode: 'explicit' } } }, 'From my AI'));
+    fireEvent.click(await screen.findByRole('button', { name: /Draft answer for Why\?/ }));
+    fireEvent.change(screen.getByRole('textbox', { name: /Draft answer for Why\?/ }), {
+      target: { value: 'My private answer' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Additional comments for Why\?/ }));
+    editComment('My private note');
+
+    const heard = await talk();
+    for (const typed of ['My private answer', 'My private note']) {
+      expect(heard.instructions).not.toContain(typed);
+      expect(heard.reviewed).not.toContain(typed);
+    }
+    expect(heard.reviewed).toContain('"questionId":"q-text"');
   });
 });

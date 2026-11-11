@@ -86,6 +86,7 @@ import {
   readAnswersToReconsider,
 } from './sessionInterviewReconsideration';
 import { useStartingInterviewComments } from './sessionInterviewComments';
+import { lockEncryptedComments } from './sessionInterviewResearch';
 import type { TranscriptClaim } from './sessionTranscriptClaim';
 
 type UnknownRecord = SessionInterviewModalRecord;
@@ -422,7 +423,8 @@ export default function SessionInterviewPanel({
     onLoaded: reviewSavedConflicts,
   });
   // Review starts from the form, unsaved edits included; the own-answer read merges saved answers into it.
-  const existingResponseSlice = formResponseSlice || ownAnswers.slice;
+  // An encrypted comment counts as locked there, even once unlocked on the page.
+  const existingResponseSlice = lockEncryptedComments(formResponseSlice || ownAnswers.slice);
   useStartingInterviewComments(drafts, existingResponseSlice, setEditedDrafts);
   const hiddenDrafts = useInterviewHiddenDrafts({
     questions,

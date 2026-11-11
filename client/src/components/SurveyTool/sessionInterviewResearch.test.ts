@@ -1,10 +1,60 @@
 import {
   buildInterviewChangedFields,
+  lockEncryptedComments,
   redactInterviewEncryptedRatings,
   buildSelectedInterviewResearch,
   buildUnselectedInterviewResearch,
   resolveInterviewDraftOrigin,
+  withoutEncryptedFields,
 } from './sessionInterviewResearch';
+
+describe('what someone encrypted, in interview review', () => {
+  const fields = {
+    answers: { open: { value: 'Yes' }, locked: { value: 'Private yes', encrypted: true } },
+    additionalComments: {
+      open: { value: 'Open note' },
+      unlocked: { value: 'Secret reason', encrypted: true, audienceMode: 'explicit' },
+      // A comment without its own audience follows its answer's lock.
+      locked: { value: 'Inherited secret', audienceMode: 'inherit' },
+      blank: { value: '', encrypted: true },
+    },
+  };
+
+  it('counts an encrypted comment as locked, even once unlocked on the page', () => {
+    const review = lockEncryptedComments(fields);
+    expect(review?.additionalComments).toEqual({
+      open: { value: 'Open note' },
+      unlocked: { value: '*', encrypted: true, audienceMode: 'explicit' },
+      locked: { value: '*', audienceMode: 'inherit' },
+      blank: { value: '', encrypted: true },
+    });
+    expect(review?.answers).toBe(fields.answers);
+    // Nothing to lock leaves the fields as they were.
+    const open = { additionalComments: { open: { value: 'Open note' } } };
+    expect(lockEncryptedComments(open)).toBe(open);
+    expect(lockEncryptedComments(null)).toBeNull();
+  });
+
+  it('keeps encrypted answers, comments and the ratings beside them from an AI', () => {
+    const reviewed = {
+      questionId: 'locked',
+      answer: 'Typed answer',
+      additionalComments: 'Typed note',
+      importance: 7,
+      conviction: 4,
+      userEditedFields: ['answer' as const, 'additionalComments' as const, 'importance' as const],
+    };
+    expect(withoutEncryptedFields('locked', fields, reviewed)).toEqual({ questionId: 'locked', userEditedFields: [] });
+    expect(withoutEncryptedFields('unlocked', fields, { ...reviewed, questionId: 'unlocked' })).toEqual({
+      questionId: 'unlocked',
+      answer: 'Typed answer',
+      userEditedFields: ['answer'],
+    });
+    const open = { ...reviewed, questionId: 'open' };
+    expect(withoutEncryptedFields('open', fields, open)).toBe(open);
+    expect(withoutEncryptedFields('open', fields, undefined)).toBeUndefined();
+  });
+});
 
 describe('selected interview research', () => {
   it('keeps net changed fields separate from fields the reviewer touched', () => {
