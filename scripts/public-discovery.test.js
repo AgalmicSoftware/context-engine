@@ -12,7 +12,7 @@ const discoverabilityHtml = fs.readFileSync(
   'utf8'
 );
 const llmsTxt = fs.readFileSync(path.join(repoRoot, 'client', 'public', 'llms.txt'), 'utf8');
-const skillMd = fs.readFileSync(path.join(repoRoot, 'client', 'public', 'agent-skill.md'), 'utf8');
+const skillMd = fs.readFileSync(path.join(repoRoot, 'client', 'public', 'agent-guide.md'), 'utf8');
 const sitemapXml = fs.readFileSync(path.join(repoRoot, 'client', 'public', 'sitemap.xml'), 'utf8');
 
 const repoUrl = 'https://github.com/AgalmicSoftware/context-engine';

@@ -302,7 +302,7 @@ test('the built site serves known-sessions.json and skill.md unchanged', async (
     ]);
   }
   assert.deepEqual(await checkStaticFiles(base, serve('/skill.md', '<!doctype html>')), [
-    '/skill.md: not served as client/public/agent-skill.md (status 200)',
+    '/skill.md: not served as client/public/agent-guide.md (status 200)',
   ]);
 });
 

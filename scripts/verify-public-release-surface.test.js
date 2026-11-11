@@ -184,8 +184,8 @@ test('the strip patterns publish the guide for AI agents and keep its old path p
   const repoRoot = path.resolve(__dirname, '..');
   const isStrippedPath = createStripMatcher(loadStripPatterns(repoRoot));
 
-  assert.equal(isStrippedPath('client/public/agent-skill.md'), null);
-  assert.ok(fs.existsSync(path.join(repoRoot, 'client', 'public', 'agent-skill.md')));
+  assert.equal(isStrippedPath('client/public/agent-guide.md'), null);
+  assert.ok(fs.existsSync(path.join(repoRoot, 'client', 'public', 'agent-guide.md')));
   // A file at the old path would be left out of public releases.
   assert.ok(isStrippedPath('client/public/skill.md'));
   assert.equal(fs.existsSync(path.join(repoRoot, 'client', 'public', 'skill.md')), false);

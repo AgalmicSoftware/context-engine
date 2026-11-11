@@ -71,7 +71,7 @@ test('Netlify builds the client from the repository-root deployment contract', (
   );
   const missingAssetRule = config.search(/from\s*=\s*"\/assets\/\*"\s*to\s*=\s*"\/404\.html"\s*status\s*=\s*404/);
   const wellKnownRule = config.search(/from\s*=\s*"\/\.well-known\/\*"\s*to\s*=\s*"\/404\.html"\s*status\s*=\s*404/);
-  const agentGuideRule = config.search(/from\s*=\s*"\/skill\.md"\s*to\s*=\s*"\/agent-skill\.md"\s*status\s*=\s*200/);
+  const agentGuideRule = config.search(/from\s*=\s*"\/skill\.md"\s*to\s*=\s*"\/agent-guide\.md"\s*status\s*=\s*200/);
   const spaFallback = config.search(/from\s*=\s*"\/\*"/);
   assert.ok(previewRedirect > 0 && previewRedirect < missingAssetRule, 'preview redirect precedes the asset 404');
   assert.ok(missingAssetRule > 0 && missingAssetRule < spaFallback, 'asset 404 precedes the SPA fallback');
@@ -93,7 +93,7 @@ test('Netlify builds the client from the repository-root deployment contract', (
       '/assets/img/context-engine-social-preview-square.png /context-engine-social-preview-square.png 301',
       '/assets/* /404.html 404',
       '/.well-known/* /404.html 404',
-      '/skill.md /agent-skill.md 200',
+      '/skill.md /agent-guide.md 200',
       '/* /index.html 200',
       '',
     ].join('\n'),
@@ -218,7 +218,7 @@ test('client static headers cache only existing versioned media and leave assets
     '/media/product-film/v1/context-engine-film-720p.mp4',
     '/media/product-film/v1/context-engine-og-1200x630.png',
   ];
-  assert.deepEqual(Object.keys(rules), ['/*', '/skill.md', '/agent-skill.md', ...mediaPaths]);
+  assert.deepEqual(Object.keys(rules), ['/*', '/skill.md', '/agent-guide.md', ...mediaPaths]);
   for (const mediaPath of mediaPaths) {
     assert.ok(existsSync(resolve(rootDir, 'client/public', mediaPath.slice(1))));
     assert.equal(rules[mediaPath]['Cache-Control'], 'public, max-age=31536000, immutable');
@@ -231,9 +231,9 @@ test('client static headers cache only existing versioned media and leave assets
 test('client static headers serve the guide for AI agents as Markdown text', () => {
   const rules = readHeaderRules();
 
-  assert.ok(existsSync(resolve(rootDir, 'client/public/agent-skill.md')));
+  assert.ok(existsSync(resolve(rootDir, 'client/public/agent-guide.md')));
   // Set on the address agents use and on the file it rewrites to, whichever path Netlify matches.
-  for (const rulePath of ['/skill.md', '/agent-skill.md']) {
+  for (const rulePath of ['/skill.md', '/agent-guide.md']) {
     assert.equal(rules[rulePath]['Content-Type'], 'text/markdown; charset=utf-8', rulePath);
     assert.equal(rules[rulePath]['X-Content-Type-Options'], 'nosniff', rulePath);
   }

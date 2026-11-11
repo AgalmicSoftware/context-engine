@@ -18,10 +18,10 @@ const rewrite = (hook, url) => {
 
 test('the dev and preview servers serve the guide for AI agents at /skill.md, as Netlify does', () => {
   for (const hook of ['configureServer', 'configurePreviewServer']) {
-    assert.equal(rewrite(hook, '/skill.md'), '/agent-skill.md');
-    assert.equal(rewrite(hook, '/skill.md?from=agent'), '/agent-skill.md?from=agent');
+    assert.equal(rewrite(hook, '/skill.md'), '/agent-guide.md');
+    assert.equal(rewrite(hook, '/skill.md?from=agent'), '/agent-guide.md?from=agent');
     // Wildcard rules, such as the SPA fallback, stay with each server's own handling.
-    for (const url of ['/agent-skill.md', '/skill.md/more', '/session/demo-sh', '/.well-known/x', '/']) {
+    for (const url of ['/agent-guide.md', '/skill.md/more', '/session/demo-sh', '/.well-known/x', '/']) {
       assert.equal(rewrite(hook, url), url);
     }
   }

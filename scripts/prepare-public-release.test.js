@@ -217,7 +217,7 @@ test('prepare-public-release strips private surfaces without publishing an inven
     writeFile(sourceDir, path.join('docs', 'agent-native-contract.md'), 'private agent contract\n');
     writeFile(sourceDir, path.join('docs', 'agent-native-bridge.md'), 'private agent notes\n');
     writeFile(sourceDir, path.join('client', 'public', 'skill.md'), 'private agent skill\n');
-    writeFile(sourceDir, path.join('client', 'public', 'agent-skill.md'), 'public guide for AI agents\n');
+    writeFile(sourceDir, path.join('client', 'public', 'agent-guide.md'), 'public guide for AI agents\n');
     writeFile(sourceDir, path.join('scripts', 'run-session-agent-tests.js'), 'session agent test runner\n');
     writeFile(sourceDir, path.join('workers', 'deploy-helper', '.dev.vars'), 'LOCAL_WORKER_VALUE=fixture\n');
     writeFile(sourceDir, path.join('workers', 'retiredWorker', 'dev.vars'), 'LOCAL_WORKER_VALUE=fixture\n');
@@ -386,7 +386,7 @@ test('prepare-public-release strips private surfaces without publishing an inven
     assert.equal(fs.existsSync(path.join(outputDir, 'docs', 'agent-native-contract.md')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'docs', 'agent-native-bridge.md')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'client', 'public', 'skill.md')), false);
-    assert.equal(fs.existsSync(path.join(outputDir, 'client', 'public', 'agent-skill.md')), true);
+    assert.equal(fs.existsSync(path.join(outputDir, 'client', 'public', 'agent-guide.md')), true);
     assert.equal(fs.existsSync(path.join(outputDir, 'scripts', 'run-session-agent-tests.js')), true);
     assert.equal(fs.existsSync(path.join(outputDir, 'scripts', 'run-contextengine-cc-tests.js')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'scripts', 'run-contextengine-cc-tests.test.js')), false);

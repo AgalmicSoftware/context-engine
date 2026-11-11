@@ -563,7 +563,7 @@ const knownSessionsFilePlugin = () => ({
 });
 
 // Netlify serves some public files at another address through exact-path 200
-// rewrites in _redirects, such as /skill.md for agent-skill.md. The dev and
+// rewrites in _redirects, such as /skill.md for agent-guide.md. The dev and
 // preview servers follow the same rewrites.
 const EXACT_PUBLIC_PATH = /^\/[^*:]*$/;
 const publicRewritesPlugin = () => {
