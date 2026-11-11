@@ -1246,7 +1246,10 @@ export default function SessionInterviewPanel({
 
           {claim ? (
             <p role="status" data-testid="ce-session-interview-claim">
-              Drafting from {claim.person}’s part of the conversation. Open the transcript to check it’s yours.
+              {usedClaimRef.current !== claim && authenticatedForSubmit && !responseStateReadyForSubmit
+                ? 'Waiting for your saved answers before drafting from '
+                : 'Drafting from '}
+              {claim.person}’s part of the conversation. Open the transcript to check it’s yours.
             </p>
           ) : null}
           {updates.notice ? <p role="status">{updates.notice}</p> : null}

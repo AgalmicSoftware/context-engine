@@ -204,11 +204,17 @@ describe('drafting from a claimed part', () => {
     const { rerender } = render(interview({ onLoadSavedResponses }));
     await waitFor(() => expect(onLoadSavedResponses).toHaveBeenCalled());
     expect(mapped).not.toHaveBeenCalled();
+    expect(screen.getByTestId('ce-session-interview-claim')).toHaveTextContent(
+      /^Waiting for your saved answers before drafting from Person 2’s part of the conversation\./,
+    );
 
     const slice = saved({ q1: 'Yes, fund it' });
     rerender(interview({ onLoadSavedResponses, existingResponseSlice: slice }));
     await act(async () => finishLoad(slice));
     await waitFor(() => expect(mapped).toHaveBeenCalledTimes(1));
+    expect(screen.getByTestId('ce-session-interview-claim')).toHaveTextContent(
+      /^Drafting from Person 2’s part of the conversation\./,
+    );
     expect(mapped.mock.calls[0][0].reconsideration).toEqual({
       earlierAnswers: [{ questionId: 'q1', answer: 'Yes, fund it' }],
       ownContext: '',
@@ -221,6 +227,7 @@ describe('drafting from a claimed part', () => {
     render(interview({ onLoadSavedResponses, existingResponseSlice: slice }));
     const retry = await screen.findByRole('button', { name: 'Retry saved answers' });
     expect(screen.getByText(/Could not load your saved answers: offline/)).toBeInTheDocument();
+    expect(screen.getByTestId('ce-session-interview-claim')).toHaveTextContent(/^Waiting for your saved answers/);
     await act(async () => undefined);
     expect(mapped).not.toHaveBeenCalled();
 

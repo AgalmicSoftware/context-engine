@@ -549,8 +549,9 @@ the recorder's link was for. Their lines join whatever they've said in this revi
 mapping treats `Responder:` lines as their words and `Other person:` lines as context only.
 
 What they already had is reconsidered against it. A signed-in person's saved answers load
-first; if they can't be read, drafting waits until **Retry saved answers** reads them, so no
-draft replaces an answer nobody compared. The mapper gets those
+first, and the review says **Waiting for your saved answers before drafting from** their part
+until they do; if they can't be read, drafting waits until **Retry saved answers** reads them,
+so no draft replaces an answer nobody compared. The mapper gets those
 answers and their comments, the drafts already in review and any responder context as
 usual, and the files they added to the session themselves. An answer or comment changed or
 cleared on the page but not yet submitted, including an unsent draft restored on load, stands in
