@@ -85,7 +85,7 @@ import {
   readAnswersToReconsider,
 } from './sessionInterviewReconsideration';
 import { draftsWithUnseenComments, useStartingInterviewComments } from './sessionInterviewComments';
-import { lockEncryptedComments } from './sessionInterviewResearch';
+import { lockEncryptedFields } from './sessionInterviewResearch';
 import type { TranscriptClaim } from './sessionTranscriptClaim';
 
 type UnknownRecord = SessionInterviewModalRecord;
@@ -379,9 +379,10 @@ export default function SessionInterviewPanel({
   // submit waits for the person to check them, and any card a loaded comment doesn't match.
   const reviewSavedConflicts = useCallback(
     (slice: SessionInterviewModalRecord | null | undefined) => {
-      const saved = (draft: InterviewDraftResponse) => responseFieldValue(slice, 'answers', draft.questionId);
+      const loaded = lockEncryptedFields(slice);
+      const saved = (draft: InterviewDraftResponse) => responseFieldValue(loaded, 'answers', draft.questionId);
       const conflicts = drafts.filter((draft) => hasDraftValue(saved(draft)));
-      const unseen = draftsWithUnseenComments(drafts, selected, editedDrafts, lockEncryptedComments(slice)).length;
+      const unseen = draftsWithUnseenComments(drafts, selected, editedDrafts, loaded).length;
       if (!conflicts.length && !unseen) return false;
       const kept = conflicts.filter(
         (draft) =>
@@ -424,8 +425,8 @@ export default function SessionInterviewPanel({
     onLoaded: reviewSavedConflicts,
   });
   // Review starts from the form, unsaved edits included; the own-answer read merges saved answers into it.
-  // An encrypted comment counts as locked there, even once unlocked on the page.
-  const existingResponseSlice = lockEncryptedComments(formResponseSlice || ownAnswers.slice);
+  // An encrypted answer or comment counts as locked there, even once unlocked on the page.
+  const existingResponseSlice = lockEncryptedFields(formResponseSlice || ownAnswers.slice);
   useStartingInterviewComments(drafts, existingResponseSlice, setEditedDrafts);
   const hiddenDrafts = useInterviewHiddenDrafts({
     questions,

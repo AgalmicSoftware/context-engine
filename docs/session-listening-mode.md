@@ -197,8 +197,9 @@ Relevant interview explanations appear as editable additional comments. When the
 already has a comment, saved or typed on the page, the card holds theirs followed by what the
 AI adds; **Both**, **Mine** and **AI’s** switch between them, the text stays editable, and
 submitting sends exactly the comment the card ends with. A locked comment can't be shown, so it
-stays unless they choose the AI's. An encrypted comment counts as locked even once it's unlocked
-on the page: review shows **Your locked comment stays.** in its place, never joins its text, and
+stays unless they choose the AI's. An encrypted answer or comment counts as locked even once it's
+unlocked on the page: an encrypted answer stands as a locked one does and is never quoted, and for
+an encrypted comment review shows **Your locked comment stays.**, never joins its text, and
 submitting leaves it as it was unless they choose the AI's. No answer or comment someone
 encrypted, nor anything they type into an encrypted field, goes to the voice interviewer or the
 next round of drafting. A comment that loads after the drafts joins them the same way, and a
@@ -214,8 +215,8 @@ submission. Removed cards stay hidden during continued interviews. Drafts that
 conflict with an existing local answer remain visible with **Replace with draft**
 until the responder explicitly selects them. A card whose draft would replace a different
 earlier answer quotes that answer under the question, free text and quadratic votes included;
-one longer than 120 characters is cut at a word with **Show all**, and a locked one is only
-mentioned. **Submit responses** saves reviewed values and enters the
+one longer than 120 characters is cut at a word with **Show all**, and a locked or encrypted one
+is only mentioned. **Submit responses** saves reviewed values and enters the
 normal submission flow, opening sign-in when necessary. Drafts survive sign-in,
 and the modal resumes the normal response upload after the authenticated
 response state has rehydrated. Canceling sign-in leaves the review open without

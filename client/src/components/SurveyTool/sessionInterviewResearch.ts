@@ -1,5 +1,6 @@
 import { responseValuesEqual as valuesEqual } from './responseValueEquality';
 import { interviewDraftFieldValue } from './sessionInterviewReviewState';
+import { hasDraftValue } from './sessionInterviewModalState';
 import type { InterviewDraftResponse } from './sessionInterview';
 type RecordValue = Record<string, unknown>;
 const record = (value: unknown): RecordValue =>
@@ -63,24 +64,24 @@ export const resolveFieldProtection = (
 
 /**
  * Response fields as interview review reads them. What someone encrypted doesn't go to the session's AI, even once
- * unlocked on this page, so their encrypted comment counts as locked ("*"): review never shows, joins or sends its
- * text, and submitting leaves it as it was unless they choose the AI's comment.
+ * unlocked on this page, so their encrypted answers and comments count as locked ("*"): review never shows, quotes,
+ * joins or sends their text, an encrypted answer stands as a locked one does, and submitting leaves an encrypted
+ * comment as it was unless they choose the AI's.
  */
-export const lockEncryptedComments = (fields: RecordValue | null | undefined): RecordValue | null | undefined => {
-  const comments = record(record(fields).additionalComments);
-  const locked = Object.keys(comments).filter((questionId) => {
-    const { value } = record(comments[questionId]);
-    return (
-      value !== undefined &&
-      value !== null &&
-      value !== '' &&
-      value !== '*' &&
-      resolveFieldProtection(questionId, record(fields)).encryptedComments
-    );
-  });
-  if (!locked.length) return fields;
-  const masked = locked.map((questionId) => [questionId, { ...record(comments[questionId]), value: '*' }]);
-  return { ...record(fields), additionalComments: { ...comments, ...Object.fromEntries(masked) } };
+export const lockEncryptedFields = (fields: RecordValue | null | undefined): RecordValue | null | undefined => {
+  const source = record(fields);
+  const lockIn = (field: 'answers' | 'additionalComments', protectedField: 'encryptedAnswer' | 'encryptedComments') => {
+    const entries = record(source[field]);
+    const locked = Object.keys(entries).filter((questionId) => {
+      const { value } = record(entries[questionId]);
+      return hasDraftValue(value) && value !== '*' && resolveFieldProtection(questionId, source)[protectedField];
+    });
+    const masked = locked.map((questionId) => [questionId, { ...record(entries[questionId]), value: '*' }]);
+    return locked.length ? { [field]: { ...entries, ...Object.fromEntries(masked) } } : null;
+  };
+  const answers = lockIn('answers', 'encryptedAnswer');
+  const comments = lockIn('additionalComments', 'encryptedComments');
+  return answers || comments ? { ...source, ...answers, ...comments } : fields;
 };
 
 /**

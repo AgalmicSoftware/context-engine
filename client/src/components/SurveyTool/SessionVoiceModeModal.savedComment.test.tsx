@@ -320,6 +320,21 @@ describe('what someone encrypted stays out of review and every AI', () => {
     },
   );
 
+  it('says a card changes an encrypted answer without quoting it, even once unlocked on the page', async () => {
+    let finish: (slice: InterviewSavedSlice) => void = () => {};
+    const onLoadSavedResponses: InterviewSavedAnswerLoader = () => new Promise((resolve) => (finish = resolve));
+    render(modal(null, '', jest.fn(), { onLoadSavedResponses }));
+    // Their own answer in review stays when the saved one loads.
+    fireEvent.click(await screen.findByRole('button', { name: /Draft answer for Why\?/ }));
+    fireEvent.change(screen.getByRole('textbox', { name: /Draft answer for Why\?/ }), {
+      target: { value: 'Typed answer' },
+    });
+    const answers = { 'q-text': { value: 'My private yes', encrypted: true } };
+    await act(async () => finish({ answers, additionalComments: {}, importance: {}, conviction: {} }));
+    expect(screen.getByText('Changes your earlier answer')).toBeInTheDocument();
+    expect(document.body).not.toHaveTextContent('My private yes');
+  });
+
   it('keeps what someone types into encrypted fields out of the voice context and the next mapping', async () => {
     // The answer was locked before anything was typed, and the comment follows its lock.
     render(modal({ answers: { 'q-text': { value: '', encrypted: true, audienceMode: 'explicit' } } }, 'From my AI'));

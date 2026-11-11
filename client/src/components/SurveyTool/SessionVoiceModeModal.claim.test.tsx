@@ -271,6 +271,15 @@ describe('drafting from a claimed part', () => {
     expect(mapped.mock.calls[0][0].reconsideration?.earlierAnswers).toEqual([{ questionId: 'q1', answer: 'Yes' }]);
   });
 
+  it('lets an encrypted answer stand, unquoted, even once unlocked on the page', async () => {
+    mapped.mockResolvedValue([{ questionId: 'q1', answer: 'No, not this year', evidence: 'said so', confidence: 0.8 }]);
+    const slice = { ...saved({}), answers: { q1: { value: 'My private yes', encrypted: true } } };
+    render(interview({ onLoadSavedResponses: jest.fn(async () => slice), existingResponseSlice: slice }));
+    expect(await screen.findByText('You’ve already answered the question this draft covers.')).toBeInTheDocument();
+    expect(screen.queryByText('Fund the garden?')).toBeNull();
+    expect(document.body).not.toHaveTextContent('My private yes');
+  });
+
   it('keeps a kept answer’s new comment for review', async () => {
     mapped.mockResolvedValue([
       { questionId: 'q2', answer: 'The neighbours', additionalComments: 'With a small rota', confidence: 0.8 },

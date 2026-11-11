@@ -1,6 +1,6 @@
 import {
   buildInterviewChangedFields,
-  lockEncryptedComments,
+  lockEncryptedFields,
   redactInterviewEncryptedRatings,
   buildSelectedInterviewResearch,
   buildUnselectedInterviewResearch,
@@ -20,19 +20,25 @@ describe('what someone encrypted, in interview review', () => {
     },
   };
 
-  it('counts an encrypted comment as locked, even once unlocked on the page', () => {
-    const review = lockEncryptedComments(fields);
+  it('counts an encrypted answer or comment as locked, even once unlocked on the page', () => {
+    const review = lockEncryptedFields(fields);
+    expect(review?.answers).toEqual({ open: { value: 'Yes' }, locked: { value: '*', encrypted: true } });
     expect(review?.additionalComments).toEqual({
       open: { value: 'Open note' },
       unlocked: { value: '*', encrypted: true, audienceMode: 'explicit' },
       locked: { value: '*', audienceMode: 'inherit' },
       blank: { value: '', encrypted: true },
     });
-    expect(review?.answers).toBe(fields.answers);
+    // Only an answer someone encrypted is locked, not one beside an encrypted comment.
+    const commentOnly = {
+      answers: { q: { value: 'Yes' } },
+      additionalComments: { q: { value: 'Why', encrypted: true } },
+    };
+    expect(lockEncryptedFields(commentOnly)?.answers).toBe(commentOnly.answers);
     // Nothing to lock leaves the fields as they were.
-    const open = { additionalComments: { open: { value: 'Open note' } } };
-    expect(lockEncryptedComments(open)).toBe(open);
-    expect(lockEncryptedComments(null)).toBeNull();
+    const open = { answers: { open: { value: 'Yes' } }, additionalComments: { open: { value: 'Open note' } } };
+    expect(lockEncryptedFields(open)).toBe(open);
+    expect(lockEncryptedFields(null)).toBeNull();
   });
 
   it('keeps encrypted answers, comments and the ratings beside them from an AI', () => {
