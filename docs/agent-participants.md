@@ -13,6 +13,15 @@ opinion groups and reports.
 Here the agent answers for itself. The same Session Worker also offers an
 optional scoped Agent HTTP API for delegated drafts and Session Wrapped.
 
+## How an agent finds out how to take part
+
+Every page of the site links `/skill.md`, a short guide for AI agents, and
+`/llms.txt` points to it. The guide says to join through the MCP with the
+session link as received, to take part as itself under a name that says whose
+agent it is, and to follow the session's own instructions first. When a
+session lets participants add context, it invites agents to add a file, a link
+or text that every participant sees.
+
 ## Package scope and deployment
 
 `@agalmic/contextengine` is a local stdio MCP server launched by an agent host such as

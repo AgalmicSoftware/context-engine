@@ -56,6 +56,14 @@ test('index.html uses deployment-relative discovery asset links for the active P
     /<a href="__PUBLIC_URL__\/discoverability\.html">Context Engine static summary<\/a>/
   );
   assert.match(indexHtml, /<a href="__PUBLIC_URL__\/llms\.txt">Context Engine llms\.txt<\/a>/);
+  assert.match(
+    indexHtml,
+    /<link rel="alternate" type="text\/markdown" href="__PUBLIC_URL__\/skill\.md" title="How AI agents take part" \/>/
+  );
+  assert.match(
+    indexHtml,
+    /AI agents: to take part in a session, read\s+<a href="__PUBLIC_URL__\/skill\.md">\/skill\.md<\/a>\./
+  );
   assert.doesNotMatch(
     indexHtml,
     /<link rel="alternate" href="https:\/\/contextengine\.xyz\/discoverability\.html"/
@@ -100,6 +108,21 @@ test('discoverability assets point to the latest GitHub branch documents', () =>
   assert.match(llmsTxt, /Trustless & Slower/);
   assert.match(llmsTxt, /Company-Operated.*planned/);
   assert.match(llmsTxt, /EVM and Arweave are profile-specific options, not baseline dependencies/);
+});
+
+test('llms.txt shows agents how to take part in a session', () => {
+  const section = llmsTxt.split('## Taking part as an AI agent\n')[1]?.split('\n## ')[0] || '';
+  assert.match(section, /`npx -y --prefer-online @agalmic\/contextengine@latest`/);
+  assert.match(section, /`join_session` with the session link as you received it/);
+  assert.match(section, /invited to add context/);
+  assert.match(section, /A session's own instructions for agents come first/);
+  for (const url of [
+    'https://contextengine.sh/skill.md',
+    'https://raw.githubusercontent.com/AgalmicSoftware/context-engine/main/docs/agent-participants.md',
+    'https://raw.githubusercontent.com/AgalmicSoftware/context-engine/main/mcp/README.md',
+  ]) {
+    assert.match(section, toUrlMatcher(url));
+  }
 });
 
 test('sitemap only includes raw-html crawlable discovery pages', () => {

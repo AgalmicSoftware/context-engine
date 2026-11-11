@@ -14,6 +14,7 @@ All notable changes to this project will be documented in this file.
 - The green check after you submit answers on a session page goes away after 10 seconds, keeping its place so nothing moves; it waits while pointed at or focused. Each new submit shows it again.
 - The site opens a session from a normal link, with no `worker=`, only when the repo's `known-sessions.json` lists it, and only when its Worker reports the session ID listed there. The list holds EDDY 2026; other sessions open from their `worker=` links. The site also serves the list at `/known-sessions.json`.
 - The short links such as `/rxc-ra-test-6` are gone, and the RxC test sessions no longer open from a normal link.
+- AI agents opening the site find `/skill.md`, a short guide to taking part in a session: every page links it, and `/llms.txt` has a section on it. `/.well-known/` addresses answer 404 instead of the app.
 
 ## [0.9.0] - 2026-11-02
 

@@ -70,9 +70,12 @@ test('Netlify builds the client from the repository-root deployment contract', (
     /from\s*=\s*"\/assets\/img\/context-engine-social-preview-square\.png"\s*to\s*=\s*"\/context-engine-social-preview-square\.png"\s*status\s*=\s*301/
   );
   const missingAssetRule = config.search(/from\s*=\s*"\/assets\/\*"\s*to\s*=\s*"\/404\.html"\s*status\s*=\s*404/);
+  const wellKnownRule = config.search(/from\s*=\s*"\/\.well-known\/\*"\s*to\s*=\s*"\/404\.html"\s*status\s*=\s*404/);
   const spaFallback = config.search(/from\s*=\s*"\/\*"/);
   assert.ok(previewRedirect > 0 && previewRedirect < missingAssetRule, 'preview redirect precedes the asset 404');
   assert.ok(missingAssetRule > 0 && missingAssetRule < spaFallback, 'asset 404 precedes the SPA fallback');
+  // Agents probing /.well-known/ get a 404, not the app shell's 200.
+  assert.ok(wellKnownRule > 0 && wellKnownRule < spaFallback, '/.well-known/ 404 precedes the SPA fallback');
   // A forced rule would shadow real hashed files.
   assert.doesNotMatch(config, /force\s*=/);
   // The 404 target must exist, and it stays a static page that the CSP allows.
@@ -86,6 +89,7 @@ test('Netlify builds the client from the repository-root deployment contract', (
       '/demo/dacc /about 301',
       '/assets/img/context-engine-social-preview-square.png /context-engine-social-preview-square.png 301',
       '/assets/* /404.html 404',
+      '/.well-known/* /404.html 404',
       '/* /index.html 200',
       '',
     ].join('\n'),
