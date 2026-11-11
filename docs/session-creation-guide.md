@@ -1378,8 +1378,8 @@ Edits replace what an earlier verification stored: a blank end time is sent as
 `""` and blank request limits as `null`, so a cleared value does not stay on the
 Worker. Blank instructions for AI agents are sent as `""` only when the Worker's
 config already has the field, which a Worker from before it refuses; the browser
-reads the config first, and leaves the field out if that read fails. The
-browser compares the shared public fields, including session
+reads the config first. If that read fails, nothing is signed or saved, so you
+can try again. The browser compares the shared public fields, including session
 appearance and the Worker URL's origin. It skips fields the Worker sets itself:
 the authorization epoch, the publication marker, the response field encryption
 it reports on every read, and, before publication, a revision the deploy helper

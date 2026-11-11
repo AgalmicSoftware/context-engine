@@ -283,14 +283,17 @@ describe('persistAndVerifySessionWizardWorkerConfig', () => {
     });
     return { fetchImpl, written: () => stored };
   };
-  const persistWithoutInstructions = (fetchImpl: SessionWizardWorkerConfigFetchPort) =>
+  const persistWithoutInstructions = (
+    fetchImpl: SessionWizardWorkerConfigFetchPort,
+    signAdminAction = async (_input: SessionWizardWorkerConfigSignInput) => ({ signature: '0xsigned' }),
+  ) =>
     persistAndVerifySessionWizardWorkerConfig({
       workerUrl: WORKER_ORIGIN,
       slug: 'worker-session',
       sessionId: SESSION_ID,
       adminAddress: ADMIN_ADDRESS,
       config: withoutInstructions(baseConfig()),
-      signAdminAction: async () => ({ signature: '0xsigned' }),
+      signAdminAction,
       fetchImpl,
       retryDelaysMs: [],
     });
@@ -320,13 +323,28 @@ describe('persistAndVerifySessionWizardWorkerConfig', () => {
   it.each([
     ['has none', async () => jsonResponse(200, { config: withoutInstructions(verifiedConfig('earlier')) })],
     ['is not found', async () => jsonResponse(404, { error: 'Session not found.' })],
-    ['cannot be read', async (): Promise<Response> => Promise.reject(new Error('offline'))],
   ])('leaves instructions for AI agents out when the stored config %s', async (_label, firstRead) => {
     const worker = createWorkerFetch(firstRead);
 
     await persistWithoutInstructions(worker.fetchImpl);
 
     expect(worker.written()).not.toHaveProperty('agentInstructions');
+  });
+
+  // An unread config may hold instructions the admin removed, and a retry must sign the same revision.
+  it.each([
+    ['cannot be reached', async (): Promise<Response> => Promise.reject(new Error('offline')), "couldn't be reached"],
+    ['answers 503', async () => jsonResponse(503, { error: 'Unavailable.' }), "couldn't be read (503)"],
+  ])('stops before signing when the stored config %s', async (_label, firstRead, message) => {
+    const worker = createWorkerFetch(firstRead);
+    const signAdminAction = jest.fn(async (_input: SessionWizardWorkerConfigSignInput) => ({
+      signature: '0xsigned',
+    }));
+
+    await expect(persistWithoutInstructions(worker.fetchImpl, signAdminAction)).rejects.toThrow(message);
+
+    expect(signAdminAction).not.toHaveBeenCalled();
+    expect(worker.fetchImpl).toHaveBeenCalledTimes(1);
   });
 
   it('retries a stale successful read until the requested config revision is visible', async () => {

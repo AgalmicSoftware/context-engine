@@ -319,7 +319,9 @@ const getPublicConfigFromResponse = (body: UnknownRecord): UnknownRecord => {
 
 // set-config merges fields, so blank instructions for AI agents are sent as ''
 // to clear stored ones. Older Workers refuse the field, so '' is sent only when
-// the Worker's config already has it; a failed read leaves the field out.
+// the Worker's config already has it. A Worker with no config answers 404. Any
+// other failed read stops before signing: leaving the field out could keep
+// stored instructions, and would change the revision a retry signs.
 export const withStoredAgentInstructionsCleared = async <T extends UnknownRecord>({
   config,
   workerOrigin,
@@ -338,21 +340,27 @@ export const withStoredAgentInstructionsCleared = async <T extends UnknownRecord
   ) {
     return config;
   }
+  let response: Response;
   try {
-    const response = await fetchImpl(`${workerOrigin}/session-config`, {
+    response = await fetchImpl(`${workerOrigin}/session-config`, {
       method: 'GET',
       credentials: 'omit',
       redirect: 'error',
       headers: { Accept: 'application/json', 'X-Session-Slug': slug },
     });
-    if (!response.ok) return config;
-    const stored = getPublicConfigFromResponse(await readResponseJson(response));
-    return Object.prototype.hasOwnProperty.call(stored, 'agentInstructions')
-      ? { ...config, agentInstructions: '' }
-      : config;
   } catch {
-    return config;
+    throw new Error("The Session Worker couldn't be reached, so the settings weren't saved. Try again.");
   }
+  if (response.status === 404) return config;
+  if (!response.ok) {
+    throw new Error(
+      `The Session Worker's settings couldn't be read (${response.status}), so the settings weren't saved. Try again.`,
+    );
+  }
+  const stored = getPublicConfigFromResponse(await readResponseJson(response));
+  return Object.prototype.hasOwnProperty.call(stored, 'agentInstructions')
+    ? { ...config, agentInstructions: '' }
+    : config;
 };
 
 const assertReachableWorkerCanonicalProfile = (profile: unknown, context: string): SessionModeProfile => {
