@@ -17,12 +17,14 @@ import {
   loadPublicWorkerGroups,
   loadWorkerGroupMembers,
   loadWorkerGroupOverview,
+  workerGroupMembersMayLeave,
   type WorkerGroup,
   type WorkerGroupMember,
   type WorkerGroupOverview,
 } from '../../domains/worker/workerGroupPorts';
 import WorkerGroupImage from '../Shared/WorkerGroupImage';
 import CETooltip from '../Shared/CETooltip';
+import WorkerGroupRemovalAuthHelp, { WORKER_GROUP_REMOVAL_AUTH_LABELS } from '../Shared/WorkerGroupRemovalAuthHelp';
 import sbtPageStyles from '../SBTs/SBTPage.module.scss';
 import SbtPageRelevantInfo from '../SBTs/SbtPageRelevantInfo';
 import sbtsPageStyles from '../SBTs/SBTsPage.module.scss';
@@ -320,6 +322,11 @@ const WorkerGroupDetailView = ({
                     ? `Session: ${sessionLabel}`
                     : group.memberVisibility.replace(/_/g, ' ')}
                 </span>
+              </p>
+              <p data-testid="ce-worker-group-removal-auth">
+                <span className={sbtPageStyles.label}>Who can remove members:</span>
+                <span>{WORKER_GROUP_REMOVAL_AUTH_LABELS[group.removalAuth || 'both']}</span>
+                <WorkerGroupRemovalAuthHelp removalAuth={group.removalAuth || 'both'} />
               </p>
               {group.adminAddress ? (
                 <p>
@@ -853,6 +860,9 @@ const WorkerGroupMembershipPanel = ({
   };
   const renderMembershipAction = (group: WorkerGroup, isMember: boolean) => {
     const membershipAction = membershipActions.get(group.groupId) || '';
+    if (isMember && !workerGroupMembersMayLeave(group)) {
+      return <span className={styles.workerGroupCardInactiveStatus}>Joined</span>;
+    }
     if (isMember) {
       const isLeaving = membershipAction === 'leave';
       return (

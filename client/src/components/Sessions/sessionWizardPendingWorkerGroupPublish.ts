@@ -55,10 +55,14 @@ const comparableGroup = (group: Partial<WorkerGroup>) => ({
     .toLowerCase(),
   joinMode: group.joinMode || 'open',
   memberVisibility: group.memberVisibility || 'session',
+  removalAuth: group.removalAuth || 'both',
 });
 
-const matchesQueuedGroup = (existing: WorkerGroup, expected: Partial<WorkerGroup>): boolean =>
-  JSON.stringify(comparableGroup(existing)) === JSON.stringify(comparableGroup(expected));
+const matchesQueuedGroup = (existing: WorkerGroup, expected: Partial<WorkerGroup>): boolean => {
+  // A Worker from before the setting omits it and saved the queued group without it.
+  const saved = existing.removalAuth ? expected : { ...expected, removalAuth: undefined };
+  return JSON.stringify(comparableGroup(existing)) === JSON.stringify(comparableGroup(saved));
+};
 
 const getErrorReason = (error: unknown): string =>
   error && typeof error === 'object' && 'reason' in error ? String((error as { reason?: unknown }).reason || '') : '';

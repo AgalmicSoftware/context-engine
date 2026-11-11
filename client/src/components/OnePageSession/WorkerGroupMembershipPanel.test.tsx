@@ -1847,4 +1847,74 @@ describe('WorkerGroupMembershipPanel', () => {
     expect(await screen.findByText(reason)).toBeInTheDocument();
     expect(screen.queryByText('No visible Groups are configured.')).not.toBeInTheDocument();
   });
+
+  describe('who can remove members', () => {
+    const groupWith = (groupId: string, label: string, removalAuth?: string) => ({
+      groupId,
+      sessionSlug: 'alpha',
+      label,
+      joinMode: 'open',
+      memberVisibility: 'session',
+      ...(removalAuth ? { removalAuth } : {}),
+    });
+    const memberOf = (...groups: ReturnType<typeof groupWith>[]) =>
+      jest.fn(async (input: RequestInfo | URL) => {
+        const pathname = new URL(String(input)).pathname;
+        const body = pathname.endsWith('/groups/my-memberships')
+          ? {
+              memberships: groups.map((group) => ({
+                group,
+                member: { sessionSlug: 'alpha', principalKey: 'evm:0xaa' },
+                memberCount: 3,
+              })),
+            }
+          : { groups: [] };
+        return new Response(JSON.stringify({ ok: true, sessionId: SESSION_ID, sessionSlug: 'alpha', ...body }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      });
+
+    it('offers Leave only on groups whose members may leave, and treats an unset group as both', async () => {
+      const fetchImpl = memberOf(
+        groupWith('both', 'Both reviewers', 'both'),
+        groupWith('admins', 'Admin reviewers', 'admin_only'),
+        groupWith('self', 'Member reviewers', 'member_only'),
+        groupWith('fixed', 'Fixed reviewers', 'neither'),
+        groupWith('legacy', 'Legacy reviewers'),
+      );
+
+      render(<WorkerGroupMembershipPanel envelope={envelope} fetchImpl={fetchImpl as typeof fetch} />);
+
+      expect(await screen.findByRole('button', { name: 'Leave Both reviewers' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Leave Member reviewers' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Leave Legacy reviewers' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Leave Admin reviewers' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Leave Fixed reviewers' })).not.toBeInTheDocument();
+      expect(screen.getByRole('article', { name: 'Admin reviewers' })).toHaveTextContent('Joined');
+      expect(screen.getByRole('article', { name: 'Fixed reviewers' })).toHaveTextContent('Joined');
+    });
+
+    it("says in a group's details who can remove members and what that means", async () => {
+      const fetchImpl = memberOf(groupWith('admins', 'Admin reviewers', 'admin_only'));
+
+      render(
+        <WorkerGroupMembershipPanel
+          envelope={envelope}
+          selectedGroupId="admins"
+          fetchImpl={fetchImpl as typeof fetch}
+        />,
+      );
+
+      const row = await screen.findByTestId('ce-worker-group-removal-auth');
+      expect(row).toHaveTextContent('Who can remove members:Admins only');
+      expect(screen.queryByRole('button', { name: 'Leave Admin reviewers' })).not.toBeInTheDocument();
+      expect(screen.getByRole('region', { name: 'Group actions' })).toHaveTextContent('Joined');
+      const help = screen.getByRole('button', { name: 'About who can remove members' });
+      expect(row).toContainElement(help);
+      fireEvent.click(help);
+      await waitFor(() => expect(help).toHaveFocus());
+      expect(await screen.findByRole('tooltip')).toHaveTextContent('Admins can remove members. Members can’t leave.');
+    });
+  });
 });

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import type { WorkerGroupRemovalAuth } from '../../domains/worker/workerGroupPorts';
 import { readCompactImageClipboard } from './compactImageClipboard';
 import WorkerGroupCreateForm from './WorkerGroupCreateForm';
 
@@ -179,5 +180,56 @@ describe('WorkerGroupCreateForm image chooser', () => {
     fireEvent.change(screen.getByLabelText('Member limit'), { target: { value: '25' } });
     fireEvent.change(screen.getByLabelText('Group admin address'), { target: { value: 'not-an-address' } });
     expect(screen.getByRole('button', { name: 'Create Group' })).toBeDisabled();
+  });
+
+  it('lets admins and participants choose who can remove members, explained behind a "?"', async () => {
+    const onRemovalAuthChange = jest.fn();
+    const renderForm = (participantDefaults: boolean, removalAuth?: WorkerGroupRemovalAuth) => (
+      <WorkerGroupCreateForm
+        busy={false}
+        description=""
+        descriptionTestId="description"
+        imageTestId="image"
+        imageUrl=""
+        label=""
+        labelTestId="label"
+        participantDefaults={participantDefaults}
+        removalAuth={removalAuth}
+        sessionSlug="demo-sh"
+        submitTestId="submit"
+        onDescriptionChange={() => {}}
+        onImageUrlChange={() => {}}
+        onLabelChange={() => {}}
+        onRemovalAuthChange={onRemovalAuthChange}
+        onReset={() => {}}
+        onSubmit={() => {}}
+      />
+    );
+    const { rerender } = render(renderForm(false));
+
+    const select = screen.getByLabelText('Who can remove members');
+    expect(select).toHaveValue('both');
+    expect(
+      within(select)
+        .getAllByRole('option')
+        .map((option) => option.textContent),
+    ).toEqual(['Admins and the member', 'Admins only', 'The member only', 'No one']);
+    fireEvent.change(select, { target: { value: 'neither' } });
+    expect(onRemovalAuthChange).toHaveBeenLastCalledWith('neither');
+
+    rerender(renderForm(true, 'member_only'));
+    expect(screen.getByText('Open to participants')).toBeInTheDocument();
+    expect(screen.getByLabelText('Who can remove members')).toHaveValue('member_only');
+    fireEvent.change(screen.getByLabelText('Who can remove members'), { target: { value: 'admin_only' } });
+    expect(onRemovalAuthChange).toHaveBeenLastCalledWith('admin_only');
+
+    const help = screen.getByRole('button', { name: 'About who can remove members' });
+    fireEvent.click(help);
+    await waitFor(() => expect(help).toHaveFocus());
+    const tooltip = await screen.findByRole('tooltip');
+    expect(tooltip).toHaveTextContent('Admins and the member: Members can leave, and admins can remove them.');
+    expect(tooltip).toHaveTextContent('Admins only: Admins can remove members. Members can’t leave.');
+    expect(tooltip).toHaveTextContent('The member only: Members can leave. Admins can’t remove them.');
+    expect(tooltip).toHaveTextContent('No one: Memberships last until the group is deleted.');
   });
 });

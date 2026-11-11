@@ -121,4 +121,26 @@ describe('SessionWorkerGroupDraftsPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Remove Beta team' }));
     expect(onRemove).toHaveBeenCalledWith('beta');
   });
+
+  it("sets each queued group's removal setting, with its own help for every draft", () => {
+    const drafts = [
+      createPendingWorkerGroupDraft('Research team', { groupId: 'research-team' }),
+      createPendingWorkerGroupDraft('Attendance', { groupId: 'attendance', removalAuth: 'neither' }),
+    ];
+    const onUpdate = jest.fn();
+    render(
+      <SessionWorkerGroupDraftsPanel drafts={drafts} onAdd={jest.fn()} onRemove={jest.fn()} onUpdate={onUpdate} />,
+    );
+
+    const selects = screen.getAllByLabelText('Who can remove members');
+    expect(selects.map((select) => (select as HTMLSelectElement).value)).toEqual(['both', 'neither']);
+    fireEvent.change(selects[0], { target: { value: 'admin_only' } });
+    expect(onUpdate).toHaveBeenCalledWith('research-team', { removalAuth: 'admin_only' });
+
+    const helpIds = screen
+      .getAllByRole('button', { name: 'About who can remove members' })
+      .map((button) => button.getAttribute('id'));
+    expect(helpIds).toHaveLength(2);
+    expect(new Set(helpIds).size).toBe(2);
+  });
 });

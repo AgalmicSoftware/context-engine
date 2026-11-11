@@ -25,6 +25,7 @@ describe('sessionWizardPendingWorkerGroups', () => {
       adminAddress: '',
       joinMode: 'open',
       memberVisibility: 'session',
+      removalAuth: 'both',
     });
     expect(buildPendingWorkerGroupInput({ defaultTags: ['research'], draft })).toEqual({
       groupId: 'Draft-1',
@@ -32,6 +33,7 @@ describe('sessionWizardPendingWorkerGroups', () => {
       tags: ['research'],
       joinMode: 'open',
       memberVisibility: 'session',
+      removalAuth: 'both',
     });
   });
 
@@ -55,8 +57,19 @@ describe('sessionWizardPendingWorkerGroups', () => {
         adminAddress: '',
         joinMode: 'open',
         memberVisibility: 'session',
+        removalAuth: 'both',
       },
     ]);
+  });
+
+  it('keeps a queued removal setting and restores older or unknown ones as both', () => {
+    expect(
+      normalizePendingWorkerGroupDrafts([
+        { groupId: 'kept', label: 'Kept', removalAuth: 'neither' },
+        { groupId: 'older', label: 'Older' },
+        { groupId: 'unknown', label: 'Unknown', removalAuth: 'owner_only' },
+      ]).map((draft) => draft.removalAuth),
+    ).toEqual(['neither', 'both', 'both']);
   });
 
   it('builds the complete Worker Group metadata contract and merges default tags', () => {
@@ -71,6 +84,7 @@ describe('sessionWizardPendingWorkerGroups', () => {
       adminAddress: `0x${'34'.repeat(20)}`,
       joinMode: 'admin_add',
       memberVisibility: 'members',
+      removalAuth: 'member_only',
     });
 
     expect(buildPendingWorkerGroupInput({ defaultTags: ['research', 'Session'], draft })).toEqual({
@@ -85,6 +99,7 @@ describe('sessionWizardPendingWorkerGroups', () => {
       adminAddress: `0x${'34'.repeat(20)}`,
       joinMode: 'admin_add',
       memberVisibility: 'members',
+      removalAuth: 'member_only',
     });
   });
 

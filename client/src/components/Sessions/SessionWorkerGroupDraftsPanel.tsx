@@ -157,6 +157,8 @@ const SessionWorkerGroupDraftsPanel = ({
                     labelTestId="ce-new-worker-group-draft-label"
                     memberVisibility={draft.memberVisibility}
                     memberVisibilityTestId="ce-new-worker-group-draft-visibility"
+                    removalAuth={draft.removalAuth}
+                    removalAuthTestId="ce-new-worker-group-draft-removal-auth"
                     rootTestId="ce-new-worker-group-draft-form"
                     sessionSlug="pending-session"
                     submitTestId="ce-new-worker-group-draft-submit"
@@ -171,6 +173,7 @@ const SessionWorkerGroupDraftsPanel = ({
                     onLabelChange={(label) => onUpdate(draft.groupId, { label })}
                     onMemberLimitChange={(memberLimit) => onUpdate(draft.groupId, { memberLimit })}
                     onMemberVisibilityChange={(memberVisibility) => onUpdate(draft.groupId, { memberVisibility })}
+                    onRemovalAuthChange={(removalAuth) => onUpdate(draft.groupId, { removalAuth })}
                     onAdminAddressChange={(adminAddress) => onUpdate(draft.groupId, { adminAddress })}
                     onTagsChange={(tags) => onUpdate(draft.groupId, { tags })}
                     onReset={() => undefined}
