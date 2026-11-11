@@ -38,20 +38,47 @@ const WorkerParticipation = (props: SetupSectionProps) => <SetupParticipationSec
 const ChainParticipation = (props: SetupSectionProps) => <SetupParticipationSection {...props} workerHosted={false} />;
 
 describe('setup content sections', () => {
-  it('takes instructions for AI agents on Worker-hosted sessions, saying agents read them and anyone can', () => {
+  it('takes instructions for AI agents on Worker-hosted sessions, saying they add to the site’s guide and are public', () => {
     const { unmount } = render(<Harness Section={WorkerParticipation} initial={{ interviewModeEnabled: false }} />);
     const field = screen.getByLabelText('Instructions for AI agents');
     expect(field).toHaveAttribute('maxlength', '8000');
     expect(field).toHaveAccessibleDescription(
-      'Optional, in Markdown. AI agents read these before taking part, for example to learn which group to join. Anyone can read them, at the Session Worker’s /llms.txt.',
+      'Optional Markdown that AI agents read before taking part, such as which group to join or what to focus on. It adds to the site’s guide for agents. Anyone can read it without signing in, at the Session Worker’s /session-config and /llms.txt, so put nothing private in it.',
     );
     expect(screen.getByRole('button', { name: 'About Instructions for AI agents' })).toBeInTheDocument();
-    fireEvent.change(field, { target: { value: '# Taking part\n\nJoin the group tagged ai-agents.' } });
-    expect(latest.agentInstructions).toBe('# Taking part\n\nJoin the group tagged ai-agents.');
+    fireEvent.change(field, { target: { value: '# Taking part\n\nJoin the Reviewers group.' } });
+    expect(latest.agentInstructions).toBe('# Taking part\n\nJoin the Reviewers group.');
     unmount();
 
     render(<Harness Section={ChainParticipation} initial={{ interviewModeEnabled: false, agentInstructions: 'x' }} />);
     expect(screen.queryByLabelText('Instructions for AI agents')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Instructions file')).not.toBeInTheDocument();
+  });
+
+  it('loads instructions for AI agents from a .md or .txt file into the box, up to 8,000 characters', async () => {
+    render(
+      <Harness Section={WorkerParticipation} initial={{ interviewModeEnabled: false, agentInstructions: 'Earlier' }} />,
+    );
+    const file = screen.getByLabelText('Instructions file');
+    const choose = (contents: string, name: string, type: string) =>
+      fireEvent.change(file, { target: { files: [new File([contents], name, { type })] } });
+    expect(file).toHaveAttribute('accept', '.md,.txt,text/markdown,text/plain');
+    expect(file).toHaveAccessibleDescription(
+      'A .md or .txt file of up to 8,000 characters. Its text replaces the instructions above, where you can edit it.',
+    );
+
+    choose('# Taking part\n\nJoin the Reviewers group.', 'agents.md', 'text/markdown');
+    await waitFor(() =>
+      expect(screen.getByLabelText('Instructions for AI agents')).toHaveValue(
+        '# Taking part\n\nJoin the Reviewers group.',
+      ),
+    );
+    choose('Focus on the budget questions.', 'agents.txt', 'text/plain');
+    await waitFor(() => expect(latest.agentInstructions).toBe('Focus on the budget questions.'));
+
+    choose('x'.repeat(8001), 'long.md', 'text/markdown');
+    expect(await screen.findByRole('alert')).toHaveTextContent('The file is longer than 8,000 characters.');
+    expect(latest.agentInstructions).toBe('Focus on the budget questions.');
   });
 
   it('edits the context title, paragraphs and https links, and asks for files again', () => {

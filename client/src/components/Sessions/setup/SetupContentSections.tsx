@@ -3,7 +3,6 @@ import { Input } from 'reactstrap';
 
 import InterviewSettingsFields from '../InterviewSettingsFields';
 import { SESSION_CONTEXT_LIMITS, isHttpsUrl, validateSessionContext } from '@ce-shared/sessionContext.mjs';
-import { MAX_AGENT_INSTRUCTIONS_CHARS } from '@ce-shared/sessionConfigEdits.mjs';
 import { E2E_TESTIDS } from '../../../utilities/e2eTestIds.js';
 import {
   SESSION_COLOR_SCHEME_REGISTRY,
@@ -15,6 +14,7 @@ import {
 } from '../../../utilities/session/groupCreationPolicy';
 import { SetupCheck, SetupField, SetupSection, setupHelpId } from './SetupPrimitives';
 import SetupContextHtmlField from './SetupContextHtmlField';
+import SetupAgentInstructionsField from './SetupAgentInstructionsField';
 import {
   SETUP_QUESTION_TYPES,
   asList,
@@ -496,9 +496,6 @@ type ParticipationProps = SetupSectionProps & {
   workerHosted: boolean;
 };
 
-const AGENT_INSTRUCTIONS_HELP =
-  'Optional, in Markdown. AI agents read these before taking part, for example to learn which group to join. Anyone can read them, at the Session Worker’s /llms.txt.';
-
 export const SetupParticipationSection = ({ draft, onChange, open, onToggle, workerHosted }: ParticipationProps) => (
   <SetupSection
     sectionKey="participation"
@@ -562,18 +559,10 @@ export const SetupParticipationSection = ({ draft, onChange, open, onToggle, wor
             onChange={(event) => onChange(['sessionEndsAt'], event.target.value)}
           />
         </SetupField>
-        <SetupField id="ce-setup-agent-instructions" label="Instructions for AI agents" help={AGENT_INSTRUCTIONS_HELP}>
-          <Input
-            id="ce-setup-agent-instructions"
-            type="textarea"
-            className={styles.textarea}
-            value={text(draft.agentInstructions)}
-            maxLength={MAX_AGENT_INSTRUCTIONS_CHARS}
-            aria-describedby={setupHelpId('ce-setup-agent-instructions')}
-            data-testid="ce-setup-agent-instructions"
-            onChange={(event) => onChange(['agentInstructions'], event.target.value)}
-          />
-        </SetupField>
+        <SetupAgentInstructionsField
+          value={text(draft.agentInstructions)}
+          onChange={(value) => onChange(['agentInstructions'], value)}
+        />
       </>
     ) : null}
   </SetupSection>

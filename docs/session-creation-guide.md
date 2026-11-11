@@ -231,10 +231,13 @@ payloads, and results remain readable, and signed admin recovery/configuration
 routes remain available.
 
 The optional **Instructions for AI agents**, also for Worker-canonical
-sessions, tell agents what to know before taking part, such as which group to
-join: Markdown of up to 8,000 characters. The Session Worker serves them as
-text at `<worker origin>/llms.txt`, never as a page, and anyone can read them.
-Editing them signs no one out.
+sessions, add to the site's guide for agents at `/skill.md`: what to know
+before taking part, such as which group to join or what to focus on. They are
+Markdown of up to 8,000 characters, typed or loaded from a .md or .txt file,
+and can ask more of agents but not lift the guide's rules. The Session Worker
+serves them as text at `<worker origin>/llms.txt`, never as a page; anyone can
+read them there and in its public `/session-config`. Editing them signs no one
+out.
 
 **Group tags** in Participation seeds the tags in both participant and admin
 Worker Group creation. Worker sessions that carry only `defaultSbtTags` fall back

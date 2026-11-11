@@ -16,7 +16,7 @@ All notable changes to this project will be documented in this file.
 - `/session/demo-sh` now opens from the demo session's own Worker, which must report the listed session ID, instead of from the site's built-in copy of its settings.
 - The short links such as `/rxc-ra-test-6` are gone. `rxc-test`, `demo-interview-5`, `rxc-ra-test`, `rxc-ra-test-2`, `rxc-ra-test-3` and `rxc-ra-test-6` now open only from their `worker=` links.
 - AI agents opening the site find `/skill.md`, a short guide to taking part in a session: every page links it, and `/llms.txt` has a section on it. `/.well-known/` addresses answer 404 instead of the app.
-- Sessions on a Session Worker have an optional **Instructions for AI agents** setting at `/new` and in Settings: Markdown that agents read before taking part, for example to learn which group to join. Its **?** says anyone can read them, at the Worker's `/llms.txt`. Saving them signs no one out.
+- Sessions on a Session Worker have an optional **Instructions for AI agents** setting at `/new` and in Settings: Markdown that agents read before taking part, such as which group to join or what to focus on, in addition to the site's guide. Admins type them or load a .md or .txt file. Its **?** says anyone can read them without signing in, at the Worker's `/session-config` and `/llms.txt`. Saving them signs no one out.
 
 ### Workers — requires redeployment
 
