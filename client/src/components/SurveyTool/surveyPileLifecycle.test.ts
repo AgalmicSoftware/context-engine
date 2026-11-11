@@ -77,6 +77,13 @@ describe('surveyPileLifecycle', () => {
     });
   });
 
+  it('keeps the question list for a new reader and clears it for another session or network', () => {
+    expect(buildPileContextResetState()).not.toHaveProperty('allQuestionsForFilter');
+    expect(buildPileContextResetState({ clearQuestionList: true })).toEqual(
+      expect.objectContaining({ allQuestionsForFilter: [], pileQuestions: [] }),
+    );
+  });
+
   it('builds auto-decrypt lifecycle plans for blocked resets and refresh sweeps', () => {
     expect(
       buildPileAutoDecryptUpdatePlan({

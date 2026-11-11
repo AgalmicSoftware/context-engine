@@ -1334,6 +1334,7 @@ const runPileComponentDidUpdate = (engine: PileViewModeEngine, prevProps: any, p
       {
         ...buildPileContextResetState({
           submittedSinceLastEdit: engine.state.submittedSinceLastEdit,
+          clearQuestionList: networkChanged || sessionIdentityChanged,
         }),
         draftPersistenceError: '',
       },
@@ -1990,7 +1991,6 @@ const loadAndSortQuestions = async (engine: PileViewModeEngine) => {
         nextProbeStartedAtMs: emptyProbePlan.nextProbeStartedAtMs,
         nextProbeDelayMs: emptyProbePlan.nextProbeDelayMs,
         previousPileQuestions: engine.state.pileQuestions,
-        previousAllQuestionsForFilter: engine.state.allQuestionsForFilter,
         previousLoading: engine.state.loading,
         areQuestionListsEquivalent: engine.areQuestionListsEquivalent,
       });

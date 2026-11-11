@@ -286,7 +286,6 @@ describe('SurveyTool pile hydration and loading', () => {
     const earlyState = buildPileEmptyProbeStatePlan({
       ...earlyProbe,
       previousPileQuestions: [],
-      previousAllQuestionsForFilter: [],
       previousLoading: false,
       areQuestionListsEquivalent: sameQuestionIds,
     });
@@ -313,7 +312,6 @@ describe('SurveyTool pile hydration and loading', () => {
     const statePlan = buildPileEmptyProbeStatePlan({
       ...probe,
       previousPileQuestions: [],
-      previousAllQuestionsForFilter: [],
       previousLoading: false,
       areQuestionListsEquivalent: sameQuestionIds,
     });
@@ -327,7 +325,6 @@ describe('SurveyTool pile hydration and loading', () => {
     );
     expect(statePlan.nextState).toEqual({
       pileQuestions: [],
-      allQuestionsForFilter: [],
       loading: true,
     });
   });

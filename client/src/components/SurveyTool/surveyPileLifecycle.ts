@@ -81,11 +81,16 @@ export const buildPileQuestionProgressSignals = ({
 // A new wallet, network or session owns none of the previous saved answers or edits.
 export const buildPileContextResetState = ({
   submittedSinceLastEdit = false,
+  clearQuestionList = false,
 }: {
   submittedSinceLastEdit?: boolean;
+  clearQuestionList?: boolean;
 } = {}) => ({
   loading: true,
   pileQuestions: [],
+  // A new reader of the same session keeps the question list until its own loads;
+  // another session or network starts without one.
+  ...(clearQuestionList ? { allQuestionsForFilter: [] } : {}),
   activePileIndex: 0,
   submissionComplete: false,
   submittedSinceLastEdit: updateSubmittedSinceLastEdit(submittedSinceLastEdit, 'reset'),
