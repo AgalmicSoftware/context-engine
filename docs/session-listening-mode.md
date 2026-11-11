@@ -193,7 +193,12 @@ readable answer and comment text is shown by default; tapping or pressing Enter
 opens editing. Prose draft editors keep microphone dictation and autosize to the
 full text, but hide the AI rewrite/cleanup action inside interview draft review.
 Icon tooltips explain the remaining actions on hover and keyboard focus.
-Relevant interview explanations appear as editable additional comments. A single glowing robot icon
+Relevant interview explanations appear as editable additional comments. When the responder
+already has a comment, saved or typed on the page, the card holds theirs followed by what the
+AI adds; **Both**, **Mine** and **AI’s** switch between them, the text stays editable, and
+submitting sends exactly the comment the card ends with. A locked comment can't be shown, so it
+stays unless they choose the AI's. A comment that loads after the drafts joins them the same way,
+so no earlier comment is replaced unseen. A single glowing robot icon
 beside the footer/comment controls marks an untouched AI-proposed response; it
 stays through focus-only review and disappears after any real answer, comment,
 importance, or conviction edit. The responder selects which drafts to submit and

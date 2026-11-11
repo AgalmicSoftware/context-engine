@@ -43,8 +43,8 @@ describe('what a claim reconsiders', () => {
 
   it('notices a comment that adds to a saved answer, but not a repeat or a locked answer', () => {
     const slice = {
-      answers: { q1: { value: 'Yes' }, q2: { value: '*' } },
-      additionalComments: { q1: { value: 'Cost' } },
+      answers: { q1: { value: 'Yes' }, q2: { value: '*' }, q3: { value: 'Yes' }, q4: { value: 'Yes' } },
+      additionalComments: { q1: { value: 'Cost' }, q3: { value: '*' }, q4: { value: 'Cost, and people' } },
     };
     const draft = (questionId: string, additionalComments?: string) => ({
       questionId,
@@ -56,6 +56,9 @@ describe('what a claim reconsiders', () => {
     expect(addsToSavedAnswer(draft('q1'), slice)).toBe(false);
     expect(addsToSavedAnswer(draft('q2', 'More'), slice)).toBe(false);
     expect(addsToSavedAnswer(undefined, slice)).toBe(false);
+    // A locked comment stands, and part of a comment adds nothing to it.
+    expect(addsToSavedAnswer(draft('q3', 'More'), slice)).toBe(false);
+    expect(addsToSavedAnswer(draft('q4', 'cost'), slice)).toBe(false);
   });
 
   it('reads only the files this person added', async () => {

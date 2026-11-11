@@ -16,6 +16,8 @@ import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import type { InterviewDraftResponse, InterviewQuestion } from './sessionInterview';
 import { describeInterviewAnswer } from './sessionInterviewHiddenDrafts';
 import { changesEarlierAnswer, interviewDraftFieldValue } from './sessionInterviewReviewState';
+import { interviewCommentChoices, startingInterviewComment } from './sessionInterviewComments';
+import SessionInterviewCommentChoices from './SessionInterviewCommentChoices';
 import styles from './SessionInterviewDraftCard.module.scss';
 
 export type InterviewQuestionControls = {
@@ -40,8 +42,8 @@ type Props = InterviewQuestionControls & {
   existing: boolean;
   // The responder's current answer to this question, saved or typed on the page, if any.
   earlierAnswer?: unknown;
-  // The responder's saved comment, which review shows when the AI proposed none.
-  savedComment?: string;
+  // Their comment the same way, '*' when locked. Review starts from it, with the AI's proposal after it.
+  earlierComment?: unknown;
   // A hidden draft's status line. The card then holds only the responder's own answer.
   blindNote?: string;
   concealed?: boolean;
@@ -242,7 +244,7 @@ function SessionInterviewDraftCardContent({
   selected,
   existing,
   earlierAnswer,
-  savedComment = '',
+  earlierComment,
   blindNote,
   concealed = false,
   disabled,
@@ -252,7 +254,14 @@ function SessionInterviewDraftCardContent({
   renderAdditionalInput,
   renderFieldLock,
 }: Props) {
-  const [showComments, setShowComments] = useState(Boolean(edited.additionalComments));
+  // A hidden draft holds only the person's own values, so it has nothing to choose between.
+  const commentChoices = blindNote ? [] : interviewCommentChoices(draft.additionalComments, earlierComment);
+  const hasCommentChoices = commentChoices.length > 0;
+  const [showComments, setShowComments] = useState(Boolean(edited.additionalComments) || hasCommentChoices);
+  // Their comment and the AI's are both shown once there is a choice between them.
+  useEffect(() => {
+    if (hasCommentChoices) setShowComments(true);
+  }, [hasCommentChoices]);
   const [showEvidence, setShowEvidence] = useState(false);
   const [sliderMode, setSliderMode] = useState<'conviction' | 'importance'>('conviction');
   const [sliderOpen, setSliderOpen] = useState(false);
@@ -269,9 +278,9 @@ function SessionInterviewDraftCardContent({
   // Chosen or not, a draft that would replace a different earlier answer says so.
   const changeNote = describeChangedAnswer(answerValue, earlierAnswer, question);
   const useNativeAnswer = isNativeAnswerType(question);
-  // Review shows the saved comment when the AI proposed none, so edits start from it.
+  // An untouched comment is the person's own followed by the AI's, so edits start from that.
   const startingValue = (field: EditableField) =>
-    field === 'additionalComments' ? draft.additionalComments || savedComment : draft[field];
+    field === 'additionalComments' ? startingInterviewComment(draft.additionalComments, earlierComment) : draft[field];
   const valuesEqual = (left: unknown, right: unknown, field: EditableField = 'answer') =>
     responseValuesEqual(
       left,
@@ -410,13 +419,22 @@ function SessionInterviewDraftCardContent({
           {showComments ? (
             <div className={styles.commentsRow}>
               <div className={styles.additionalEditor}>
+                {hasCommentChoices ? (
+                  <SessionInterviewCommentChoices
+                    choices={commentChoices}
+                    value={rawComments}
+                    locked={earlierComment === '*'}
+                    disabled={disabled}
+                    onChoose={onCommentsChange}
+                  />
+                ) : null}
                 <AdditionalCommentsInlineRow
                   lockControl={renderFieldLock?.(draft.questionId, 'additional')}
                   input={
                     <DraftEditableText
                       label={`Additional comments for ${prompt}`}
                       value={rawComments}
-                      placeholder="No additional comment."
+                      placeholder={earlierComment === '*' ? 'Your locked comment stays.' : 'No additional comment.'}
                       disabled={disabled}
                       onChange={onCommentsChange}
                       renderEditor={

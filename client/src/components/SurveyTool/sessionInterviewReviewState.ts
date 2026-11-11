@@ -1,6 +1,7 @@
 import { DEFAULT_AI_MODEL } from '../../../../shared/aiDefaults.mjs';
 import { responseValuesEqual, answerValueType } from './responseValueEquality';
 import { hasDraftValue } from './sessionInterviewModalState';
+import { startingInterviewComment } from './sessionInterviewComments';
 import type { InterviewDraftResponse } from './sessionInterview';
 
 // Review seeds '' for drafts that arrive without a comment, so an empty
@@ -29,7 +30,8 @@ export const changesEarlierAnswer = (answer: unknown, earlier: unknown, question
 // unless the person's own words in this interview (`ownEvidence`; an AI prefill's prediction
 // never counts) give a different answer: that draft joins like any other, and its card says
 // which answer it changes. A draft already under review keeps updating, including after the
-// person submits it. `leftOut` lists the drafts not added, so review can say why.
+// person submits it. `leftOut` lists the drafts not added, so review can say why. An untouched
+// comment starts from the person's own (`earlierComment`, the form's) followed by the AI's.
 export function mergeInterviewReview(
   previous: InterviewDraftResponse[],
   edited: Record<string, InterviewDraftResponse>,
@@ -37,7 +39,7 @@ export function mergeInterviewReview(
   incoming: InterviewDraftResponse[],
   currentAnswer: (id: string) => unknown,
   modelId: string = DEFAULT_AI_MODEL,
-  savedComment: (id: string) => string = () => '',
+  earlierComment: (id: string) => unknown = () => '',
   ownEvidence: (draft: InterviewDraftResponse) => boolean = () => false,
   questionKind: (id: string) => unknown = () => 'freeform',
 ) {
@@ -74,23 +76,21 @@ export function mergeInterviewReview(
       revisions.push({ ...snapshot(draft), revision: revisions.length + 1, modelId });
     }
     draft.revisions = revisions;
-    let reviewed = { ...draft };
+    const startingComment = (value?: InterviewDraftResponse) =>
+      startingInterviewComment(value?.additionalComments, earlierComment(draft.questionId));
+    let reviewed: InterviewDraftResponse = { ...draft, additionalComments: startingComment(draft) };
     const userEditedFields = new Set(edited[draft.questionId]?.userEditedFields || []);
     if (prior && edited[draft.questionId]) {
       // Refresh AI-owned fields, but keep every field the responder changed during review.
       for (const field of ['answer', 'additionalComments', 'importance', 'conviction'] as const) {
         const value = edited[draft.questionId][field];
+        const start = field === 'additionalComments' ? startingComment(prior) : prior[field];
         if (
           userEditedFields.has(field) ||
           JSON.stringify(interviewDraftFieldValue(field, value)) !==
-            JSON.stringify(interviewDraftFieldValue(field, prior[field]))
+            JSON.stringify(interviewDraftFieldValue(field, start))
         ) {
-          // Review seeds the saved comment when the AI proposed none; keep it without calling it an edit.
-          const seededSavedComment =
-            field === 'additionalComments' &&
-            !userEditedFields.has(field) &&
-            interviewDraftFieldValue(field, value) === savedComment(draft.questionId);
-          if (!seededSavedComment) userEditedFields.add(field);
+          userEditedFields.add(field);
           reviewed = { ...reviewed, [field]: value };
         }
       }

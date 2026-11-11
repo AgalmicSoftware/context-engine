@@ -551,7 +551,8 @@ export type InterviewReconsideration = {
 
 const RECONSIDERATION_RULES = `
 - The transcript includes a group conversation the responder took part in. "Responder:" lines are their words. "Other person:" lines are what others said, for context only; never treat them as the responder's beliefs, even when the responder was there.
-- The saved answers below came before this conversation. Reconsider each against what the responder said in it, and return a draft for one only when their words support a different answer or something to add; repeat the saved answer when they support it, and say why in evidence. Omit saved answers the conversation doesn't touch. Saved answers and their own files help interpret the responder's words but are not new evidence on their own.`;
+- The saved answers below came before this conversation. Reconsider each against what the responder said in it, and return a draft for one only when their words support a different answer or something to add; repeat the saved answer when they support it, and say why in evidence. Omit saved answers the conversation doesn't touch. Saved answers and their own files help interpret the responder's words but are not new evidence on their own.
+- When a saved answer has a comment, put only what the conversation adds to it in additionalComments: review shows that after their comment, and they choose what to keep.`;
 
 export const buildInterviewResponseMappingPrompt = ({
   questions,

@@ -83,6 +83,7 @@ import {
   loadOwnContextForMapping,
   readAnswersToReconsider,
 } from './sessionInterviewReconsideration';
+import { useStartingInterviewComments } from './sessionInterviewComments';
 import type { TranscriptClaim } from './sessionTranscriptClaim';
 
 type UnknownRecord = SessionInterviewModalRecord;
@@ -418,6 +419,7 @@ export default function SessionInterviewPanel({
   });
   // Review starts from the form, unsaved edits included; the own-answer read merges saved answers into it.
   const existingResponseSlice = formResponseSlice || ownAnswers.slice;
+  useStartingInterviewComments(drafts, existingResponseSlice, setEditedDrafts);
   const hiddenDrafts = useInterviewHiddenDrafts({
     questions,
     editedDrafts,
@@ -733,7 +735,7 @@ export default function SessionInterviewPanel({
               ? undefined
               : responseFieldValue(existingResponsesRef.current, 'answers', id),
           importedDrafts ? prefillPacket?.source.modelId : mappingModelId,
-          (id) => responseCommentValue(existingResponsesRef.current, id),
+          (id) => responseFieldValue(existingResponsesRef.current, 'additionalComments', id),
           ownEvidence,
           (id) => questions.find((question) => question.id === id)?.type,
         );
@@ -741,14 +743,6 @@ export default function SessionInterviewPanel({
           if (review.leftOut.includes(draft.questionId)) continue;
           if (ownEvidence(draft)) ownEvidenceIdsRef.current.add(draft.questionId);
           else ownEvidenceIdsRef.current.delete(draft.questionId);
-        }
-        for (const draft of review.drafts) {
-          if (!latest.editedDrafts[draft.questionId] && !review.edited[draft.questionId]?.additionalComments) {
-            review.edited[draft.questionId] = {
-              ...review.edited[draft.questionId],
-              additionalComments: responseCommentValue(existingResponsesRef.current, draft.questionId),
-            };
-          }
         }
         setDrafts(review.drafts);
         setEditedDrafts(review.edited);
@@ -1006,6 +1000,7 @@ export default function SessionInterviewPanel({
       baseSubmitContextToken,
       drafts,
       editedDrafts: review.editedDrafts,
+      earlierComment: (id) => responseCommentValue(existingResponsesRef.current, id),
       hasAiPrefill,
       includePredictionComparison,
       includeProvenance,
@@ -1367,7 +1362,7 @@ export default function SessionInterviewPanel({
                     selected={Boolean(selected[draft.questionId])}
                     existing={hasDraftValue(responseFieldValue(existingResponseSlice, 'answers', draft.questionId))}
                     earlierAnswer={responseFieldValue(existingResponseSlice, 'answers', draft.questionId)}
-                    savedComment={responseCommentValue(existingResponseSlice, draft.questionId)}
+                    earlierComment={responseFieldValue(existingResponseSlice, 'additionalComments', draft.questionId)}
                     disabled={applying}
                     onSelect={(value) => {
                       // Dismissing a draft that isn't chosen changes nothing to submit.

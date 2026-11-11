@@ -313,6 +313,21 @@ it('keeps an unsaved pile comment when the AI proposes no comment', async () => 
   expect(row.additional.value).toBe('My unsaved note');
 });
 
+it('uploads an unsaved pile comment with the AI’s comment after it', async () => {
+  const upload = mockSession();
+  await mountWithInterview(
+    packet([{ questionId: 'q1', answer: 'Agree', additionalComments: 'And keep it short', confidence: 0.8 }]),
+    typeInPile({ comment: 'My unsaved note' }),
+  );
+
+  await submitDrafts();
+
+  expect(upload).toHaveBeenCalledTimes(1);
+  const [row] = upload.mock.calls[0][2];
+  expect(row.answer.value).toBe('Agree');
+  expect(row.additional.value).toBe('My unsaved note\n\nAnd keep it short');
+});
+
 it('treats an unsaved pile answer as answered, so the interview leaves its draft out', async () => {
   const upload = mockSession();
   const pile = await mountWithInterview(

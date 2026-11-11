@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.9.2]
+
+### Client — available when the site deploys
+
+- When the AI proposes a comment for a question you've already commented on, the review card keeps your comment and puts the AI's after it. **Both**, **Mine** and **AI’s** switch between them, the text stays editable, and a locked comment stays unless you choose the AI's.
+
 ## [0.9.1] - 2026-11-10
 
 ### Client — available when the site deploys

@@ -15,6 +15,8 @@ type RunInterviewDraftSubmitInput = {
   baseSubmitContextToken: string;
   drafts: InterviewDraftResponse[];
   editedDrafts: Record<string, InterviewDraftResponse>;
+  // The comment the form holds for a question, as review shows it ('' when locked).
+  earlierComment: (questionId: string) => string;
   hasAiPrefill: boolean;
   includePredictionComparison: boolean;
   includeProvenance: boolean;
@@ -76,6 +78,7 @@ export const runInterviewDraftSubmit = async ({
   baseSubmitContextToken,
   drafts,
   editedDrafts,
+  earlierComment,
   hasAiPrefill,
   includePredictionComparison,
   includeProvenance,
@@ -162,11 +165,11 @@ export const runInterviewDraftSubmit = async ({
       const draft = editedDrafts[original.questionId] || original;
       await onApplyAnswer(draft.questionId, draft.answer);
       if (!isSubmitContextCurrent(attemptToken)) return;
-      // Review shows the form's comment when the AI proposed none; only a proposal or an edit replaces it.
-      // A hidden draft's proposal was never shown, so only an edit counts there.
-      const proposedComment = draft.predictionCondition !== 'blind' && String(original.additionalComments || '').trim();
-      if (proposedComment || draft.userEditedFields?.includes('additionalComments')) {
-        await onApplyAdditional(draft.questionId, String(draft.additionalComments || ''));
+      // The comment the card ends with goes in unless the form already holds it. An untouched card shows the
+      // form's comment joined with the AI's, a hidden draft's only the form's, and a locked one stays as it is.
+      const comment = String(draft.additionalComments || '');
+      if (comment !== earlierComment(draft.questionId)) {
+        await onApplyAdditional(draft.questionId, comment);
         if (!isSubmitContextCurrent(attemptToken)) return;
       }
       if (draft.importance !== undefined) await onApplyImportance(draft.questionId, draft.importance);

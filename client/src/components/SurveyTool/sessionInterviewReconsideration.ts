@@ -5,6 +5,7 @@ import {
   type ContextSourceOptions,
 } from '../../utilities/docLibrary/contextSources';
 import type { InterviewDraftResponse, InterviewQuestion, InterviewReconsideration } from './sessionInterview';
+import { addsToInterviewComment } from './sessionInterviewComments';
 import { resolveFieldProtection } from './sessionInterviewResearch';
 import {
   hasDraftValue,
@@ -31,19 +32,15 @@ export const readAnswersToReconsider = (
     return [{ questionId: id, answer, ...(additionalComments ? { additionalComments } : {}) }];
   });
 
-/** A draft that keeps a saved answer but says something its comment doesn't. A locked answer stands. */
+/** A draft that keeps a saved answer but says something its comment doesn't. A locked answer or comment stands. */
 export const addsToSavedAnswer = (
   draft: InterviewDraftResponse | undefined,
   slice: SessionInterviewModalRecord | null | undefined,
-): boolean => {
-  const comment = String(draft?.additionalComments || '').trim();
-  return (
-    !!draft &&
-    !!comment &&
-    responseFieldValue(slice, 'answers', draft.questionId) !== '*' &&
-    comment !== responseCommentValue(slice, draft.questionId).trim()
-  );
-};
+): boolean =>
+  !!draft &&
+  responseFieldValue(slice, 'answers', draft.questionId) !== '*' &&
+  responseFieldValue(slice, 'additionalComments', draft.questionId) !== '*' &&
+  addsToInterviewComment(responseCommentValue(slice, draft.questionId), draft.additionalComments);
 
 /** The files this person added themselves, as the shared prompt block; '' when none can be read. */
 export const loadOwnContextForMapping = async (
