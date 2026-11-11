@@ -634,7 +634,7 @@
 .workerGroupCardInactiveStatus {
   border: 1px solid color-mix(in srgb, var(--ce-status-info) 32%, transparent);
   background: color-mix(in srgb, var(--ce-document-text) 72%, transparent);
-  color: var(--ce-document-border);
+  color: var(--ce-text-inverse);
 }
 
 .workerGroupDetailCard {

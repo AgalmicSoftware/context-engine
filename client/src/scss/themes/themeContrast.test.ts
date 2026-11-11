@@ -552,6 +552,25 @@ describe('bundled app-theme contrast', () => {
     });
   });
 
+  // A group's Joined, Join period ended and Admin add required share this chip, which is translucent over the card.
+  test.each(registry.themes.map(({ id }) => id))('%s keeps the group status chip readable', (themeId) => {
+    const values = themeValues(css, themeId);
+    const paint = painter(values);
+    const chip = moduleRule(
+      compileModule('components/OnePageSession/OnePageSession.module.scss'),
+      '.workerGroupCardInactiveStatus',
+    );
+    const card = composite(
+      parseColor(values['card-bg']),
+      composite(parseColor(values.surface), parseColor(values.canvas)),
+    );
+    const ratios = [card, parseColor(values['document-canvas'])].map((backdrop) => {
+      const fill = composite(paint(chip.background), backdrop);
+      return Number(contrastRatio(composite(paint(chip.color), fill), fill).toFixed(2));
+    });
+    expect(ratios.filter((value) => value < 4.5)).toEqual([]);
+  });
+
   test.each(registry.themes.map(({ id }) => id))('%s keeps the session section headers readable', (themeId) => {
     const values = themeValues(css, themeId);
     const paint = painter(values);
