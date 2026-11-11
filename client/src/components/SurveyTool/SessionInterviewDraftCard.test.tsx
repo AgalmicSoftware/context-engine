@@ -624,13 +624,32 @@ describe('SessionInterviewDraftCard earlier answers', () => {
     ['multichoice', 'Transit', 'Parks', { singleSelect: true }, 'Changes your earlier answer: Parks'],
     ['multichoice', ['Housing'], ['Parks', 'Transit'], {}, 'Changes your earlier answer: Parks, Transit'],
     ['rating', 3, 7, { scale: { min: 0, max: 10 } }, 'Changes your earlier answer: 7 of 10'],
-    ['quadratic', [1, 0, -1], [0, 1, 0], {}, 'Changes your earlier answer'],
-    ['freeform', 'New view', 'Old view', {}, 'Changes your earlier answer'],
+    ['quadratic', [1, 0, -1], [0, 1, -2], {}, 'Changes your earlier answer: Housing -2, Transit +1'],
+    ['freeform', 'New view', 'Old view', {}, 'Changes your earlier answer: Old view'],
     // A locked earlier answer can't be read, so it is only mentioned.
     ['binary', 'Disagree', '*', {}, 'Changes your earlier answer'],
+    ['freeform', 'New view', '*', {}, 'Changes your earlier answer'],
   ])('says a %s draft changes the earlier answer', (type, answer, earlier, extra, note) => {
     renderCard(type, answer, earlier, extra);
     expect(screen.getByText(note, { exact: true })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Show all' })).toBeNull();
+  });
+
+  it('shortens a long earlier answer, with a way to read all of it', () => {
+    const earlier = `First line of what I said before.\nThen ${'a much longer explanation of my view '.repeat(4)}ending here.`;
+    renderCard('freeform', 'New view', earlier);
+    const note = screen.getByText(/^Changes your earlier answer: /);
+    // Cut at a word, on one line.
+    expect(note.firstChild?.textContent).toBe(
+      'Changes your earlier answer: First line of what I said before. Then a much longer explanation of my view a much longer explanation of my view a much…',
+    );
+    const toggle = within(note).getByRole('button', { name: 'Show all' });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(toggle);
+    expect(note.firstChild?.textContent).toBe(`Changes your earlier answer: ${earlier}`);
+    expect(within(note).getByRole('button', { name: 'Show less' })).toHaveAttribute('aria-expanded', 'true');
+    fireEvent.click(within(note).getByRole('button', { name: 'Show less' }));
+    expect(note.firstChild?.textContent).toMatch(/…$/);
   });
 
   it('says nothing when there is no earlier answer or the draft repeats it, and still says it when not chosen', () => {

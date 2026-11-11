@@ -63,6 +63,34 @@
   line-height: 1.45;
 }
 
+// A long earlier answer read in full keeps its line breaks.
+.earlierAnswerFull {
+  white-space: pre-line;
+}
+
+.draftCard .earlierAnswerToggle {
+  appearance: none;
+  margin-left: 6px;
+  padding: 0 3px;
+  border: 0;
+  background: transparent;
+  color: var(--ce-panel-text);
+  font: inherit;
+  font-weight: 850;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+
+  &:hover {
+    background: color-mix(in srgb, var(--ce-action-accent) 12%, var(--ce-card-bg));
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--ce-focus-ring);
+    outline-offset: 2px;
+  }
+}
+
 .editorStack {
   display: grid;
   gap: 10px;

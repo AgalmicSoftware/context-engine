@@ -160,6 +160,20 @@ try {
 
     await card('q1').scrollIntoViewIfNeeded();
     await card('q1').screenshot({ animations: 'disabled', path: path.join(output, `comment-${theme}-${width}.png`) });
+
+    // Earlier answers: a long free-text one is cut short with a way to read it all, and votes are quoted.
+    const note = card('q1').getByText(/^Changes your earlier answer: /);
+    assert.match(await note.evaluate((element) => element.firstChild.textContent), /…$/);
+    await measure('Earlier answer note', note);
+    await measureStates('Show all', note.getByRole('button', { name: 'Show all' }));
+    await note.getByRole('button', { name: 'Show all' }).click();
+    const showLess = note.getByRole('button', { name: 'Show less' });
+    assert.equal(await showLess.getAttribute('aria-expanded'), 'true');
+    assert.match(await note.innerText(), /who looks after what each week\./);
+    await measureStates('Show less', showLess);
+    assert.equal(await card('q3').getByText('Changes your earlier answer: Transit +1, Housing +1').count(), 1);
+    assert.equal(await card('q2').getByText('Changes your earlier answer: Agree').count(), 1);
+    await card('q1').screenshot({ animations: 'disabled', path: path.join(output, `earlier-${theme}-${width}.png`) });
     await locked.screenshot({ animations: 'disabled', path: path.join(output, `locked-${theme}-${width}.png`) });
     assert.equal(await tab.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1), false, 'No sideways scroll');
     assert.deepEqual(failures, []);

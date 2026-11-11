@@ -217,14 +217,38 @@ const DraftEditableText = ({
   );
 };
 
-// Earlier answers short enough to quote back; others, and locked ones, are only mentioned.
-const QUOTED_ANSWER_TYPES = new Set(['binary', 'multichoice', 'rating']);
-const describeChangedAnswer = (answer: unknown, earlier: unknown, question?: InterviewQuestion) => {
-  if (!changesEarlierAnswer(answer, earlier, question?.type)) return '';
-  return earlier !== '*' && QUOTED_ANSWER_TYPES.has(String(question?.type))
-    ? `Changes your earlier answer: ${describeInterviewAnswer(earlier, question)}`
-    : 'Changes your earlier answer';
+// Earlier answers longer than this are cut short, with a way to read all of it.
+const EARLIER_ANSWER_PREVIEW = 120;
+const shortenEarlierAnswer = (text: string) => {
+  const flat = text.replace(/\s+/g, ' ').trim();
+  if (flat.length <= EARLIER_ANSWER_PREVIEW) return '';
+  const space = flat.lastIndexOf(' ', EARLIER_ANSWER_PREVIEW);
+  return `${flat.slice(0, space > EARLIER_ANSWER_PREVIEW / 2 ? space : EARLIER_ANSWER_PREVIEW).trimEnd()}…`;
 };
+
+/** Under a draft that would replace a different earlier answer: that answer, so the two can be compared. */
+function EarlierAnswerNote({ earlier, question }: { earlier: unknown; question?: InterviewQuestion }) {
+  const [expanded, setExpanded] = useState(false);
+  // A locked answer can't be read, so it is only mentioned.
+  const text = earlier === '*' ? '' : describeInterviewAnswer(earlier, question);
+  const preview = shortenEarlierAnswer(text);
+  return (
+    <p className={`${styles.blindNote} ${expanded ? styles.earlierAnswerFull : ''}`}>
+      {text ? `Changes your earlier answer: ${preview && !expanded ? preview : text}` : 'Changes your earlier answer'}
+      {preview ? (
+        <button
+          type="button"
+          className={styles.earlierAnswerToggle}
+          data-ce-control-appearance="frameless"
+          aria-expanded={expanded}
+          onClick={() => setExpanded((value) => !value)}
+        >
+          {expanded ? 'Show less' : 'Show all'}
+        </button>
+      ) : null}
+    </p>
+  );
+}
 
 const isNativeAnswerType = (question?: InterviewQuestion): boolean => {
   const type = String(question?.type || '').toLowerCase();
@@ -276,7 +300,7 @@ function SessionInterviewDraftCardContent({
   const rawComments = String(edited.additionalComments || '');
   const answerValue = edited.answer;
   // Chosen or not, a draft that would replace a different earlier answer says so.
-  const changeNote = describeChangedAnswer(answerValue, earlierAnswer, question);
+  const changesAnswer = changesEarlierAnswer(answerValue, earlierAnswer, question?.type);
   const useNativeAnswer = isNativeAnswerType(question);
   // An untouched comment is the person's own followed by the AI's, so edits start from that.
   const startingValue = (field: EditableField) =>
@@ -332,7 +356,7 @@ function SessionInterviewDraftCardContent({
           {blindNote}
         </p>
       ) : null}
-      {changeNote ? <p className={styles.blindNote}>{changeNote}</p> : null}
+      {changesAnswer ? <EarlierAnswerNote earlier={earlierAnswer} question={question} /> : null}
       <div className={styles.editorStack}>
         {blindNote ? <strong>Your answer</strong> : null}
         {useNativeAnswer && renderAnswerInput ? (

@@ -953,7 +953,7 @@ describe('SessionVoiceModeModal', () => {
           'Saved answers loaded. Check drafts that change an earlier answer, then submit.',
         );
         await expectReadableDraftText('Draft answer for What matters?', 'New answer');
-        expect(screen.getByText('Changes your earlier answer')).toBeInTheDocument();
+        expect(screen.getByText('Changes your earlier answer: Already saved')).toBeInTheDocument();
         expect(screen.queryByRole('button', { name: 'Replace with draft' })).not.toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Remove draft for What matters?' })).toBeEnabled();
         expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY)).toBeEnabled();
@@ -1022,7 +1022,8 @@ describe('SessionVoiceModeModal', () => {
     expect(screen.queryByText('What matters?')).not.toBeInTheDocument();
     expect(screen.getAllByTestId(E2E_TESTIDS.SESSION_INTERVIEW_DRAFT)).toHaveLength(2);
     await expectReadableDraftText('Draft answer for Second question?', 'My own answer');
-    expect(screen.getAllByText('Changes your earlier answer')).toHaveLength(1);
+    expect(screen.getAllByText(/^Changes your earlier answer/)).toHaveLength(1);
+    expect(screen.getByText('Changes your earlier answer: Saved two')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Replace with draft' })).not.toBeInTheDocument();
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_STATUS)).toHaveTextContent(
       'Saved answers loaded. Check drafts that change an earlier answer, then submit.',
@@ -1122,7 +1123,7 @@ describe('SessionVoiceModeModal', () => {
     await waitFor(() => expect(mockedMapInterviewEvidenceToResponses).toHaveBeenCalled());
     await act(async () => resolveMapping([{ questionId: 'q1', answer: 'New', evidence: 'Context', confidence: 0.8 }]));
     await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
-    expect(screen.getByText('Changes your earlier answer')).toBeInTheDocument();
+    expect(screen.getByText('Changes your earlier answer: Saved')).toBeInTheDocument();
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY)).toBeEnabled();
     expect(baseProps.onSubmitResponses).not.toHaveBeenCalled();
   });
@@ -1350,7 +1351,7 @@ describe('SessionVoiceModeModal', () => {
       ),
     );
     await expectReadableDraftText('Draft answer for What matters?', 'Disagree');
-    expect(screen.getByText('Changes your earlier answer')).toBeInTheDocument();
+    expect(screen.getByText('Changes your earlier answer: Agree')).toBeInTheDocument();
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY)).toBeEnabled();
     expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_MAPPING_NOTICE)).not.toBeInTheDocument();
     expect(baseProps.onApplyAnswer).not.toHaveBeenCalled();
@@ -1483,7 +1484,8 @@ describe('SessionVoiceModeModal', () => {
       expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_MAPPING_NOTICE)).toHaveTextContent(
         /^Left out 1 draft for a question you’ve already answered\.$/,
       );
-      expect(screen.getAllByText('Changes your earlier answer')).toHaveLength(1);
+      expect(screen.getAllByText(/^Changes your earlier answer/)).toHaveLength(1);
+      expect(screen.getByText('Changes your earlier answer: Cost')).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Replace with draft' })).not.toBeInTheDocument();
       if (choice === 'dismissed')
         fireEvent.click(screen.getByRole('button', { name: 'Remove draft for Second question?' }));
@@ -2733,7 +2735,7 @@ describe('SessionVoiceModeModal', () => {
 
     expect(await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW)).toBeInTheDocument();
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_CONTEXT)).toHaveValue('Relevant context');
-    expect(screen.getByText('Changes your earlier answer')).toBeInTheDocument();
+    expect(screen.getByText('Changes your earlier answer: Existing local draft')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Replace with draft' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Remove draft for What matters?' })).toBeEnabled();
     expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY)).toBeEnabled();

@@ -7,6 +7,7 @@ All notable changes to this project will be documented in this file.
 ### Client — available when the site deploys
 
 - When the AI proposes a comment for a question you've already commented on, the review card keeps your comment and puts the AI's after it. **Both**, **Mine** and **AI’s** switch between them, the text stays editable, and a locked comment stays unless you choose the AI's.
+- A review card that would change your earlier answer now quotes free-text answers and quadratic votes too, so you can compare them; a long answer is cut short with **Show all**.
 
 ## [0.9.1] - 2026-11-10
 

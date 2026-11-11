@@ -206,7 +206,10 @@ must explicitly opt into replacing an existing local answer. Selected drafts hav
 an **X** that removes the whole card from review and excludes its answer from
 submission. Removed cards stay hidden during continued interviews. Drafts that
 conflict with an existing local answer remain visible with **Replace with draft**
-until the responder explicitly selects them. **Submit responses** saves reviewed values and enters the
+until the responder explicitly selects them. A card whose draft would replace a different
+earlier answer quotes that answer under the question, free text and quadratic votes included;
+one longer than 120 characters is cut at a word with **Show all**, and a locked one is only
+mentioned. **Submit responses** saves reviewed values and enters the
 normal submission flow, opening sign-in when necessary. Drafts survive sign-in,
 and the modal resumes the normal response upload after the authenticated
 response state has rehydrated. Canceling sign-in leaves the review open without
