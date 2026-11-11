@@ -68,6 +68,11 @@
   white-space: pre-line;
 }
 
+// Their earlier comment, quoted above the comment choices rather than tucked under the question.
+.earlierComment {
+  margin: 0;
+}
+
 .draftCard .earlierAnswerToggle {
   appearance: none;
   margin-left: 6px;

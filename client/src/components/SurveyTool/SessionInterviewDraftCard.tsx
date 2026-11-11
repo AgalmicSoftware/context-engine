@@ -217,24 +217,22 @@ const DraftEditableText = ({
   );
 };
 
-// Earlier answers longer than this are cut short, with a way to read all of it.
-const EARLIER_ANSWER_PREVIEW = 120;
-const shortenEarlierAnswer = (text: string) => {
+// Earlier answers and comments longer than this are cut short, with a way to read all of it.
+const EARLIER_PREVIEW = 120;
+const shortenEarlier = (text: string) => {
   const flat = text.replace(/\s+/g, ' ').trim();
-  if (flat.length <= EARLIER_ANSWER_PREVIEW) return '';
-  const space = flat.lastIndexOf(' ', EARLIER_ANSWER_PREVIEW);
-  return `${flat.slice(0, space > EARLIER_ANSWER_PREVIEW / 2 ? space : EARLIER_ANSWER_PREVIEW).trimEnd()}…`;
+  if (flat.length <= EARLIER_PREVIEW) return '';
+  const space = flat.lastIndexOf(' ', EARLIER_PREVIEW);
+  return `${flat.slice(0, space > EARLIER_PREVIEW / 2 ? space : EARLIER_PREVIEW).trimEnd()}…`;
 };
 
-/** Under a draft that would replace a different earlier answer: that answer, so the two can be compared. */
-function EarlierAnswerNote({ earlier, question }: { earlier: unknown; question?: InterviewQuestion }) {
+/** The person's earlier answer or comment after a label, or the label alone when it's locked and can't be read. */
+function EarlierNote({ label, text, className = '' }: { label: string; text: string; className?: string }) {
   const [expanded, setExpanded] = useState(false);
-  // A locked answer can't be read, so it is only mentioned.
-  const text = earlier === '*' ? '' : describeInterviewAnswer(earlier, question);
-  const preview = shortenEarlierAnswer(text);
+  const preview = shortenEarlier(text);
   return (
-    <p className={`${styles.blindNote} ${expanded ? styles.earlierAnswerFull : ''}`}>
-      {text ? `Changes your earlier answer: ${preview && !expanded ? preview : text}` : 'Changes your earlier answer'}
+    <p className={`${styles.blindNote} ${className} ${expanded ? styles.earlierAnswerFull : ''}`}>
+      {text ? `${label}: ${preview && !expanded ? preview : text}` : label}
       {preview ? (
         <button
           type="button"
@@ -356,7 +354,13 @@ function SessionInterviewDraftCardContent({
           {blindNote}
         </p>
       ) : null}
-      {changesAnswer ? <EarlierAnswerNote earlier={earlierAnswer} question={question} /> : null}
+      {/* Under a draft that would replace a different earlier answer: that answer, so the two can be compared. */}
+      {changesAnswer ? (
+        <EarlierNote
+          label="Changes your earlier answer"
+          text={earlierAnswer === '*' ? '' : describeInterviewAnswer(earlierAnswer, question)}
+        />
+      ) : null}
       <div className={styles.editorStack}>
         {blindNote ? <strong>Your answer</strong> : null}
         {useNativeAnswer && renderAnswerInput ? (
@@ -444,13 +448,21 @@ function SessionInterviewDraftCardContent({
             <div className={styles.commentsRow}>
               <div className={styles.additionalEditor}>
                 {hasCommentChoices ? (
-                  <SessionInterviewCommentChoices
-                    choices={commentChoices}
-                    value={rawComments}
-                    locked={earlierComment === '*'}
-                    disabled={disabled}
-                    onChoose={onCommentsChange}
-                  />
+                  <>
+                    {/* Their earlier comment stays in view whichever choice or edit the box holds. */}
+                    <EarlierNote
+                      className={styles.earlierComment}
+                      label={earlierComment === '*' ? 'Your earlier comment is locked' : 'Your earlier comment'}
+                      text={earlierComment === '*' ? '' : String(earlierComment ?? '')}
+                    />
+                    <SessionInterviewCommentChoices
+                      choices={commentChoices}
+                      value={rawComments}
+                      locked={earlierComment === '*'}
+                      disabled={disabled}
+                      onChoose={onCommentsChange}
+                    />
+                  </>
                 ) : null}
                 <AdditionalCommentsInlineRow
                   lockControl={renderFieldLock?.(draft.questionId, 'additional')}

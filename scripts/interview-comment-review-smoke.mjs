@@ -1,5 +1,5 @@
-// Interview review cards beside earlier answers: the comment choices, the earlier-answer note and their
-// contrast in every theme, at phone and desktop widths, at rest and when hovered, focused or pressed.
+// Interview review cards beside earlier answers: the comment choices, the notes quoting earlier comments and answers,
+// and their contrast in every theme, at phone and desktop widths, at rest and when hovered, focused or pressed.
 // Run against a local Vite server: BASE_URL=http://127.0.0.1:3031 node scripts/interview-comment-review-smoke.mjs
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
@@ -139,6 +139,8 @@ try {
       }
     }
     assert.equal(await comment.innerText(), 'Costs matter most to me.\n\nA small rota could share the watering.');
+    // Their earlier comment stays quoted above the choices.
+    await measure('Earlier comment quote', card('q1').getByText('Your earlier comment: Costs matter most to me.', { exact: true }));
     const help = choices.getByRole('button', { name: 'About these comment choices' });
     await measureStates('Choices help', help);
     // Let the hide that leaving the button scheduled run out, then open the tooltip and let it settle.
@@ -157,6 +159,7 @@ try {
     assert.equal(await locked.getByRole('group', { name: 'Comment to submit' }).getByRole('button').count(), 3);
     const placeholder = locked.getByText('Your locked comment stays.');
     await measure('Locked comment placeholder', placeholder);
+    await measure('Locked comment quote', locked.getByText('Your earlier comment is locked', { exact: true }));
 
     await card('q1').scrollIntoViewIfNeeded();
     await card('q1').screenshot({ animations: 'disabled', path: path.join(output, `comment-${theme}-${width}.png`) });

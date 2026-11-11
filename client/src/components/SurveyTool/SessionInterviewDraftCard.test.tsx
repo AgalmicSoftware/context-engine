@@ -505,9 +505,26 @@ describe('SessionInterviewDraftCard comments beside the person’s own', () => {
     ]);
   });
 
+  it('keeps their earlier comment in view above the choices, whatever the box holds', () => {
+    render(<Review earlierComment="Saved note" />);
+    const quoted = () => screen.getByText('Your earlier comment: Saved note', { exact: true });
+    expect(quoted().compareDocumentPosition(screen.getByRole('group', { name: 'Comment to submit' }))).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+    fireEvent.click(choice('AI’s'));
+    expect(comment()).toHaveTextContent(/^With a small rota$/);
+    expect(quoted()).toBeInTheDocument();
+    fireEvent.click(comment());
+    fireEvent.change(screen.getByRole('textbox', { name: /Additional comments for q1/ }), {
+      target: { value: 'A rota, in my words' },
+    });
+    expect(quoted()).toBeInTheDocument();
+  });
+
   it('keeps a locked comment until they choose the AI’s, and explains why', () => {
     const onEdit = jest.fn();
     render(<Review earlierComment="*" onEdit={onEdit} />);
+    expect(screen.getByText('Your earlier comment is locked', { exact: true })).toBeInTheDocument();
     expect(choice('Mine')).toHaveAttribute('aria-pressed', 'true');
     expect(within(screen.getByRole('group', { name: 'Comment to submit' })).queryByText('Both')).toBeNull();
     expect(comment()).toHaveTextContent('Your locked comment stays.');
@@ -528,6 +545,8 @@ describe('SessionInterviewDraftCard comments beside the person’s own', () => {
     render(<Review earlierComment="Saved note, with a small rota" />);
     expect(screen.queryByRole('group', { name: 'Comment to submit' })).toBeNull();
     expect(comment()).toHaveTextContent('Saved note, with a small rota');
+    // The box holds their comment alone, so it isn't quoted again.
+    expect(screen.queryByText(/Your earlier comment/)).toBeNull();
   });
 });
 

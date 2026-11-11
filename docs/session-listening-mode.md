@@ -195,12 +195,14 @@ full text, but hide the AI rewrite/cleanup action inside interview draft review.
 Icon tooltips explain the remaining actions on hover and keyboard focus.
 Relevant interview explanations appear as editable additional comments. When the responder
 already has a comment, saved or typed on the page, the card holds theirs followed by what the
-AI adds; **Both**, **Mine** and **AI’s** switch between them, the text stays editable, and
-submitting sends exactly the comment the card ends with. A locked comment can't be shown, so it
-stays unless they choose the AI's. An encrypted answer or comment counts as locked even once it's
-unlocked on the page: an encrypted answer stands as a locked one does and is never quoted, and for
-an encrypted comment review shows **Your locked comment stays.**, never joins its text, and
-submitting leaves it as it was unless they choose the AI's. No answer or comment someone
+AI adds; **Both**, **Mine** and **AI’s** switch between them, with their earlier comment quoted
+above, so it stays in view whatever the box holds. The text stays editable, and submitting sends
+exactly the comment the card ends with. A locked comment can't be shown, so the quote says **Your
+earlier comment is locked** and the comment stays unless they choose the AI's or write in the box.
+An encrypted answer or comment counts as locked even once it's unlocked on the page: an encrypted
+answer stands as a locked one does and is never quoted, and for an encrypted comment review shows
+**Your locked comment stays.**, never joins its text, and submitting leaves it as it was unless
+they choose the AI's or write in the box. No answer or comment someone
 encrypted, nor anything they type into an encrypted field, goes to the voice interviewer or the
 next round of drafting. A comment that loads after the drafts joins them the same way, and a
 submit pressed before it loaded waits, with **Saved answers loaded. Check drafts that change an
