@@ -24,6 +24,26 @@ $glass-shadow: 0 8px 32px 0 color-mix(in srgb, var(--ce-compat-dark) 37%, transp
   text-shadow: 0 0 10px color-mix(in srgb, var(--ce-status-info) 30%, transparent);
 }
 
+// Classic's Windows 95 edges: square and two-tone, raised ones with a hard shadow.
+@mixin raised-bevel {
+  border: 2px solid;
+  border-color: var(--ce-border-raised);
+  border-radius: 0;
+  box-shadow: var(--ce-shadow-raised);
+}
+
+@mixin raised-control {
+  @include raised-bevel;
+  background: var(--ce-control-face);
+  color: var(--ce-control-text);
+}
+
+@mixin sunken-bevel {
+  border: 2px solid;
+  border-color: var(--ce-border-inset);
+  border-radius: 0;
+}
+
 /* --- Animations --- */
 @keyframes fadeIn {
   from {
@@ -3254,6 +3274,557 @@ $glass-shadow: 0 8px 32px 0 color-mix(in srgb, var(--ce-compat-dark) 37%, transp
     .orgChildrenRow::before,
     .orgChildrenRow > .orgNodeWrapper::before {
       background: var(--ce-document-border-strong);
+    }
+  }
+}
+
+// Classic draws the atlas as a Windows 95 program, where the base draws dark
+// glass: the UI font as written, flat fills, bevelled controls, square corners
+// and navy title bars. Nesting under the wrapper outranks the rules above.
+@container ce-theme style(--ce-layout-profile: desktop-window) {
+  .debateMapWrapper.embeddedAtlas,
+  .debateMapWrapper.standaloneAtlas {
+    font-family: var(--ce-font-ui);
+
+    // Its labels keep the case they are written in, without the base's spacing.
+    * {
+      letter-spacing: normal !important;
+      text-transform: none !important;
+    }
+
+    .debateMap {
+      .legendDot {
+        box-shadow: none;
+      }
+
+      /* --- Toolbar --- */
+      .controls {
+        @include raised-bevel;
+        gap: 8px 16px;
+        margin-bottom: 8px;
+        padding: 4px;
+        background: var(--ce-control-face);
+        box-shadow: none;
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+        color: var(--ce-control-text);
+
+        // On a phone its legend wraps below the buttons instead of scrolling off.
+        .viewModeSwitch {
+          flex-wrap: wrap;
+          gap: 2px;
+          padding: 0;
+          border: 0;
+          background: none;
+
+          .inlineLegendItem {
+            color: var(--ce-control-text);
+          }
+
+          .viewModeSeparator {
+            width: 1px;
+            background: var(--ce-edge-shadow);
+            box-shadow: 1px 0 0 var(--ce-edge-highlight);
+          }
+        }
+
+        .controlGroup label,
+        .filterGroup .filterLabel {
+          color: var(--ce-control-text);
+        }
+
+        .filterGroup select {
+          @include sunken-bevel;
+          padding: 2px 4px;
+          background-color: var(--ce-input-bg);
+          color: var(--ce-control-text);
+
+          // The base removes the outline and marks focus by a border colour,
+          // which the inset border here replaces.
+          &:focus {
+            outline: 1px dotted var(--ce-focus-ring);
+            outline-offset: 1px;
+          }
+        }
+      }
+
+      // Toolbar and tree buttons are raised; the chosen one stays pressed, on
+      // the light dither Windows 95 used for a toggle that is on. A focused
+      // button shows Windows 95's dotted rectangle in place of the browser's ring.
+      .controls .viewModeSwitch button,
+      .categorySelector .categoryButton,
+      .atlasViewContainer .backArrow,
+      .atlasViewContainer .hotDebatesBtn,
+      .atlasViewContainer .packedAtlasTitleButton {
+        @include raised-control;
+        font-family: var(--ce-font-button);
+        font-weight: 400;
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+        transform: none;
+        transition: none;
+
+        &:hover,
+        &:focus {
+          @include raised-control;
+          transform: none;
+        }
+
+        &:focus {
+          outline: 1px dotted var(--ce-focus-ring);
+          outline-offset: -5px;
+        }
+
+        &:active,
+        &.active {
+          border-color: var(--ce-border-inset);
+          box-shadow: var(--ce-shadow-pressed);
+          color: var(--ce-control-text);
+        }
+
+        &.active {
+          background: repeating-conic-gradient(var(--ce-surface-light) 0 25%, var(--ce-control-face) 0 50%) 0 0 / 2px
+            2px;
+        }
+      }
+
+      .controls .viewModeSwitch button {
+        padding: 2px 10px;
+      }
+
+      .categorySelector .categoryButton {
+        padding: 3px 14px;
+      }
+
+      /* --- Atlas and circles --- */
+      .atlasViewContainer {
+        @include sunken-bevel;
+        background: var(--ce-document-surface);
+
+        .atlasSvgLayer line {
+          stroke: var(--ce-document-border);
+        }
+
+        .packedAtlasTitle,
+        .packedAtlasTitleIcon {
+          color: var(--ce-control-text);
+          text-shadow: none;
+        }
+
+        .hotDebatesBtn svg {
+          color: var(--ce-status-warning-text);
+        }
+
+        .topNodesOverlay {
+          @include raised-bevel;
+          background: var(--ce-surface);
+          color: var(--ce-panel-text);
+
+          h3,
+          .topNodeItem .nodeStats {
+            color: var(--ce-panel-text);
+          }
+
+          h3 {
+            border-bottom-color: var(--ce-edge-shadow);
+          }
+
+          h3 .minimizeBtn,
+          h3 .minimizeBtn:hover {
+            @include raised-control;
+            min-width: 20px;
+            padding: 0 4px;
+          }
+
+          .topNodeItem {
+            border: 1px solid var(--ce-document-border);
+            border-radius: 0;
+            background: var(--ce-document-surface);
+            color: var(--ce-document-text);
+
+            &:hover {
+              border-color: var(--ce-document-border-strong);
+              background: var(--ce-document-surface);
+              transform: none;
+            }
+
+            // The base's yellow icons vanish on the white item.
+            .nodeStats svg {
+              color: var(--ce-status-warning-text);
+            }
+          }
+        }
+
+        .atlasNode {
+          .nodeDot,
+          &:hover .nodeDot,
+          &.hovered .nodeDot {
+            box-shadow: none;
+          }
+
+          // A hot debate keeps a solid ring in place of its glow.
+          .nodeDot.hot {
+            box-shadow: 0 0 0 2px var(--ce-status-warning-text);
+          }
+
+          // Its sub-category and topic dots take their legend colours, not black.
+          &:not(.packedAtlasNode).depth1 .nodeDot {
+            background-color: var(--ce-data-series-8);
+          }
+
+          &:not(.packedAtlasNode).depth2 .nodeDot {
+            background-color: var(--ce-status-success-text);
+          }
+
+          .nodeLabel {
+            color: var(--ce-document-text);
+            font-family: inherit;
+            text-shadow: none;
+          }
+
+          .nodeLabel.alwaysVisible {
+            opacity: 1;
+          }
+
+          // On the atlas a pointed-at node's name reads as a Windows 95
+          // tooltip; a circle's name stays on its circle.
+          &:not(.packedAtlasNode):hover .nodeLabel,
+          &:not(.packedAtlasNode).hovered .nodeLabel {
+            padding: 1px 4px;
+            border: 1px solid var(--ce-tooltip-border);
+            border-radius: 0;
+            background: var(--ce-tooltip-bg);
+            color: var(--ce-tooltip-text);
+          }
+        }
+
+        .atlasNode.packedAtlasNode {
+          .nodeDot {
+            border-width: 1px;
+          }
+
+          .packedNodeLabel,
+          &:hover .packedNodeLabel,
+          &.hovered .packedNodeLabel {
+            color: var(--ce-document-text);
+            text-shadow: none;
+          }
+
+          &.depth1 .packedNodeDot {
+            border-color: var(--ce-data-series-8);
+          }
+
+          &.depth0 .packedNodeDot {
+            border-color: var(--ce-status-info);
+          }
+
+          &.depth2 .packedNodeDot {
+            border-color: var(--ce-status-success-text);
+          }
+
+          &.depth3 .packedNodeDot {
+            border-color: var(--ce-status-warning-text);
+          }
+        }
+      }
+
+      /* --- List --- */
+      .flatListContainer {
+        gap: 4px;
+      }
+
+      .flatNodeContainer {
+        padding: 6px 10px;
+        border: 1px solid var(--ce-document-border);
+        border-radius: 0;
+        background: var(--ce-document-surface);
+        box-shadow: none;
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+
+        &:hover {
+          background: var(--ce-document-surface);
+          transform: none;
+        }
+
+        .pathContainer .pathButton,
+        .pathContainer .pathButton:hover {
+          box-shadow: none;
+          transform: none;
+        }
+
+        // The base's white vote count and hover colours vanish on the white row.
+        .metaInfo .upvotes,
+        .metaInfo .bookmark:hover,
+        .metaInfo .expandIcon:hover {
+          color: var(--ce-document-text);
+        }
+
+        .metaInfo .bookmark.bookmarked {
+          color: var(--ce-status-warning-text);
+        }
+      }
+
+      /* --- Tree --- */
+      .orgChartContainer {
+        @include sunken-bevel;
+      }
+
+      .orgCard,
+      .orgCard:hover,
+      .orgCard.collapsed {
+        @include raised-bevel;
+        transform: none;
+      }
+
+      // Each level keeps its colour as a stripe along the card's top.
+      .orgCard.depth0 {
+        box-shadow:
+          inset 0 3px 0 var(--ce-status-info),
+          var(--ce-shadow-raised);
+      }
+
+      .orgCard.depth1 {
+        box-shadow:
+          inset 0 3px 0 var(--ce-data-series-8),
+          var(--ce-shadow-raised);
+      }
+
+      .orgCard.depth2 {
+        box-shadow:
+          inset 0 3px 0 var(--ce-status-success-text),
+          var(--ce-shadow-raised);
+      }
+
+      .orgCard.depth3 {
+        box-shadow:
+          inset 0 3px 0 var(--ce-status-warning-text),
+          var(--ce-shadow-raised);
+      }
+
+      .orgCard .collapseBtn,
+      .orgCard .suggestBtn {
+        @include raised-control;
+      }
+
+      /* --- Popup window --- */
+      .modalOverlay {
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+      }
+
+      .modalContent {
+        @include raised-bevel;
+        padding: 3px 16px 16px;
+        // Text it passes down is the document's: the shared light rules leave it white.
+        color: var(--ce-document-text);
+        // Focus scrolls a control clear of the sticky title bar below, even
+        // one wrapped to three lines on a phone.
+        scroll-padding-top: 4.5rem;
+
+        // A section's header is a plain rule, not the raised button its role draws.
+        .collapseHeader {
+          border: 0;
+          border-bottom: 1px solid var(--ce-document-border);
+          border-radius: 0;
+          box-shadow: none;
+        }
+
+        // The base's teal "For" reads 4.35:1 on its tinted column.
+        .argumentColumn[data-side='pro'] > h4 {
+          color: var(--ce-status-success-text);
+        }
+
+        // The title bar stays at the top while the window scrolls, so its
+        // close button stays in it on a phone too. Its shadow keeps the strip
+        // above it, inside the window's padding, clear of scrolled text.
+        .modalHeader {
+          position: sticky;
+          top: 0;
+          z-index: 20;
+          gap: 6px;
+          margin: 0 -13px 12px;
+          padding: 2px 2px 2px 6px;
+          border-bottom: 0;
+          box-shadow: 0 -3px 0 var(--ce-document-surface);
+          background: var(--ce-titlebar-bg);
+          color: var(--ce-titlebar-text);
+
+          .titleSection {
+            gap: 6px;
+          }
+
+          .modalTitle,
+          .headerVoteSection .netScoreContainer .netScoreValue {
+            margin: 0;
+            color: var(--ce-titlebar-text);
+            font-family: inherit;
+            font-size: 1rem;
+            font-weight: 700;
+          }
+
+          // The title bar's buttons are small and raised, as Windows 95's are,
+          // with the dotted rectangle inside them: a ring outside is lost on navy.
+          .titleSection .linkButton,
+          .closeIcon,
+          .headerVoteSection .voteArrow,
+          .headerVoteSection .confirmBtn,
+          .headerVoteSection .cancelBtn {
+            @include raised-control;
+            position: static;
+            z-index: auto;
+            width: auto;
+            height: auto;
+            min-width: 22px;
+            min-height: 20px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1px 3px;
+            font-size: 0.8rem;
+            opacity: 1;
+            transform: none;
+
+            &:focus {
+              outline: 1px dotted var(--ce-focus-ring);
+              outline-offset: -4px;
+            }
+
+            &:active {
+              border-color: var(--ce-border-inset);
+              box-shadow: var(--ce-shadow-pressed);
+            }
+          }
+
+          // The tick keeps its vote's colour.
+          .voteInputContainer.isUp .confirmBtn {
+            color: var(--ce-status-success-text);
+          }
+
+          .voteInputContainer.isDown .confirmBtn {
+            color: var(--ce-status-danger-text);
+          }
+
+          // Its field fits the bar, so the bar keeps its height when it opens.
+          .voteInputContainer .voteInput {
+            @include sunken-bevel;
+            height: 20px;
+            padding: 0 2px;
+            background: var(--ce-input-bg);
+            color: var(--ce-control-text);
+            font-size: 0.8rem;
+
+            &:focus {
+              outline: 1px dotted var(--ce-focus-ring);
+              outline-offset: -4px;
+            }
+          }
+        }
+
+        // The suggestion window, drawn for the dark overlay, is a gray Windows
+        // 95 dialog: the document's text, a sunken field and raised buttons.
+        &.suggestModalContainer {
+          background: var(--ce-surface);
+
+          .modalHeader {
+            box-shadow: 0 -3px 0 var(--ce-surface);
+          }
+        }
+
+        .lineageDisplay {
+          color: var(--ce-document-text);
+
+          // The base's teal reads 2.62:1 on the gray.
+          .lineageLabel {
+            color: var(--ce-status-info-text);
+          }
+        }
+
+        .glassInput {
+          @include sunken-bevel;
+          box-shadow: none;
+
+          // The site-wide placeholder gray reads 1.82:1 on this white field.
+          &::placeholder {
+            color: var(--ce-document-text-muted);
+          }
+
+          &:focus {
+            outline: 1px dotted var(--ce-focus-ring);
+            outline-offset: -4px;
+          }
+        }
+
+        .modalActions button {
+          @include raised-control;
+          padding: 4px 16px;
+          font-weight: 400;
+          opacity: 1;
+          transition: none;
+
+          &:focus {
+            outline: 1px dotted var(--ce-focus-ring);
+            outline-offset: -5px;
+          }
+
+          // Chromium marks a disabled button :active too.
+          &:active:not(:disabled) {
+            border-color: var(--ce-border-inset);
+            box-shadow: var(--ce-shadow-pressed);
+          }
+
+          &:disabled {
+            color: var(--ce-control-disabled-text);
+            text-shadow: 1px 1px 0 var(--ce-edge-highlight);
+          }
+        }
+      }
+
+      // Its scroll bars get a raised grey thumb: the base's faint white one vanishes here.
+      .modalContent,
+      .modalContent .historicalCaseDetail,
+      .categorySelector {
+        &::-webkit-scrollbar-thumb {
+          border: 1px solid;
+          border-color: var(--ce-border-raised);
+          border-radius: 0;
+          background: var(--ce-control-face);
+        }
+      }
+    }
+  }
+
+  // The standalone page is a maximised window: a grey frame and a navy title bar.
+  .debateMapWrapper.standaloneAtlas {
+    @include raised-bevel;
+    padding: 3px;
+    background: var(--ce-surface);
+    color: var(--ce-panel-text);
+
+    .debateMap {
+      padding: 0 9px 9px;
+
+      .headerRow {
+        gap: 6px 20px;
+        margin-bottom: 8px;
+      }
+
+      .title {
+        flex: 1 0 100%;
+        margin: 0 -9px;
+        padding: 3px 6px;
+        background: var(--ce-titlebar-bg);
+        -webkit-background-clip: border-box;
+        background-clip: border-box;
+        color: var(--ce-titlebar-text);
+        -webkit-text-fill-color: var(--ce-titlebar-text);
+        font-size: 1rem;
+        text-shadow: none;
+      }
+
+      .legendText {
+        color: var(--ce-panel-text);
+      }
     }
   }
 }

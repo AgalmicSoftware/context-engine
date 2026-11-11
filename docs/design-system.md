@@ -307,6 +307,14 @@ At compact widths, Classic 95 uses the same question-action overflow trigger
 as Context Engine when pending answers make room for Submit necessary. Its
 menu opens above the toolbar on a raised surface.
 
+The Debate Map keeps its dark-glass look in Context Engine. Under the
+desktop-window profile it is drawn as a Windows 95 program instead: the UI font
+in the case its labels are written, raised gray toolbar and tree controls with
+the chosen view pressed on a light dither, sunken white canvases, and navy title
+bars on `/atlas` and a topic's panel, whose bar stays in view as the panel
+scrolls. In Results the atlas card is gray, so the map's bevels show. At phone
+widths its toolbar wraps so the legend and depth filter stay on screen.
+
 ## Session Color Schemes
 
 App themes and session color schemes are separate contracts. An app theme may
