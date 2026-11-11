@@ -58,6 +58,7 @@ import {
   normalizeWorkerGroupPrincipal,
   resolveWorkerGroupBootstrap,
   resolveWorkerGroupCaps,
+  workerGroupRemovalRefusal,
 } from './workerGroups.js';
 
 const SPONSORED_DEPLOY_RECORD_KEY = 'sponsored-deploy';
@@ -326,6 +327,7 @@ const DEFINITELY_PREWRITE_WORKER_GROUP_CREATE_FAILURES = new Set([
   'invalid_join_mode',
   'join_mode_not_implemented',
   'invalid_member_visibility',
+  'invalid_removal_auth',
   'invalid_group_label',
   'invalid_group_description',
   'invalid_group_image_url',
@@ -341,7 +343,7 @@ const DEFINITELY_PREWRITE_WORKER_GROUP_CREATE_FAILURES = new Set([
 // there and must not inflate the durable intent past its storage limit.
 const WORKER_GROUP_INPUT_FIELDS = Object.freeze([
   'groupId', 'label', 'description', 'imageUrl', 'tags', 'documentURLs',
-  'memberLimit', 'joinEndsAt', 'joinMode', 'memberVisibility', 'adminAddress',
+  'memberLimit', 'joinEndsAt', 'joinMode', 'memberVisibility', 'removalAuth', 'adminAddress',
 ]);
 const WORKER_GROUP_INTENT_MAX_BYTES = 32 * 1024;
 
@@ -401,6 +403,12 @@ const normalizeWorkerGroupMutation = (payload) => {
     if (!principal.ok) return null;
     normalized.principal = principal.principal;
     normalized.principalKey = principal.key;
+  }
+  if (operation === 'remove-member') {
+    // A member leaving and an admin removing them are checked against different halves of the group's setting.
+    const remover = toTrimmedString(payload?.remover).toLowerCase();
+    if (remover !== 'admin' && remover !== 'member') return null;
+    normalized.remover = remover;
   }
   return normalized;
 };
@@ -1384,6 +1392,7 @@ export class SessionWriteCoordinator {
         active: true,
         joinMode: toTrimmedString(group?.joinMode).toLowerCase() || 'admin_add',
         memberVisibility: toTrimmedString(group?.memberVisibility).toLowerCase() || 'admin_only',
+        removalAuth: toTrimmedString(group?.removalAuth).toLowerCase() || 'both',
         memberLimit: normalizePositiveSafeInteger(group?.memberLimit),
         joinEndsAt: toTrimmedString(group?.joinEndsAt),
       });
@@ -1428,6 +1437,7 @@ export class SessionWriteCoordinator {
         active: true,
         joinMode: toTrimmedString(group?.joinMode).toLowerCase() || 'admin_add',
         memberVisibility: toTrimmedString(group?.memberVisibility).toLowerCase() || 'admin_only',
+        removalAuth: toTrimmedString(group?.removalAuth).toLowerCase() || 'both',
         memberLimit: normalizePositiveSafeInteger(group?.memberLimit),
         joinEndsAt: toTrimmedString(group?.joinEndsAt),
       });
@@ -1546,7 +1556,7 @@ export class SessionWriteCoordinator {
     });
   }
 
-  async beginWorkerGroupMemberRemoval({ groupId, principalDigest, intent }) {
+  async beginWorkerGroupMemberRemoval({ groupId, principalDigest, remover, intent }) {
     return this.state.storage.transaction(async (transaction) => {
       const groupKey = workerGroupCapacityGroupKey(groupId);
       const groupState = await transaction.get(groupKey);
@@ -1571,6 +1581,10 @@ export class SessionWriteCoordinator {
             : 'worker_group_member_not_found',
         };
       }
+      // Checked once the membership is found, so only members learn the setting, and
+      // before the reservation, so a replay never meets a setting changed since.
+      const refusal = workerGroupRemovalRefusal(groupState.removalAuth, remover);
+      if (refusal) return { ok: false, status: 403, reason: refusal };
       await transaction.put(memberKey, {
         version: 2,
         state: 'removing',
@@ -2117,6 +2131,7 @@ export class SessionWriteCoordinator {
         removalReservation = await this.beginWorkerGroupMemberRemoval({
           groupId: mutation.groupId,
           principalDigest,
+          remover: mutation.remover,
           intent,
         });
         if (!removalReservation.ok) {

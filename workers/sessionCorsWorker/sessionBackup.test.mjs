@@ -631,7 +631,7 @@ test('failed and repeated group requests preserve a running backup; successful c
   const revision = groupStore.get('storage-backup-revision');
   for (const [operation, groupId, extra, ok] of [
     ['join', 'missing', {}, false],
-    ['remove-member', 'missing', {}, false],
+    ['remove-member', 'missing', { remover: 'member' }, false],
     ['join', 'closed', {}, false],
     ['update', 'open', { input: { memberLimit: -1 } }, false],
     ['join', 'open', {}, true],
@@ -646,7 +646,7 @@ test('failed and repeated group requests preserve a running backup; successful c
   } while (page.nextCursor);
   assert.equal(page.manifest.complete, true);
   page = await exportSessionBackup({ env: source.env, slug, expectedAuthority });
-  assert.equal((await mutate('remove-member', 'open')).ok, true);
+  assert.equal((await mutate('remove-member', 'open', { remover: 'member' })).ok, true);
   assert.equal(groupStore.get('storage-backup-revision'), revision + 1);
   await assert.rejects(exportSessionBackup({ env: source.env, slug, expectedAuthority, cursor: page.nextCursor }), (error) => error.status === 409 && error.reason === 'backup_session_changed');
 });

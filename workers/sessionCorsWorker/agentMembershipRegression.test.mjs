@@ -36,7 +36,7 @@ test('session_member_aggregate reads canonical coordinator groups/memberCount fo
   await mutate('add-member', 'big', p(member.address));                               // big now has 4 members incl. caller
   for (const path of paths) assert.notEqual(await show(`member of big ${path}`, await w.request(path, { token: agent.token })), 403);
   assert.equal(await show('stranger still denied', await w.request(paths[0], { token: stranger.token })), 403);
-  await mutate('remove-member', 'big', p(member.address));                            // request-time recheck, no cache
+  await mutate('remove-member', 'big', { ...p(member.address), remover: 'admin' });                            // request-time recheck, no cache
   assert.equal(await show('removed from big', await w.request(paths[0], { token: agent.token })), 403);
 });
 

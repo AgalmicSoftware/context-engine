@@ -25,6 +25,14 @@ export const WORKER_GROUP_MEMBER_VISIBILITY = Object.freeze({
 	SESSION: 'session',
 });
 
+// Who may end a membership, like an SBT's burn auth: admins, the member, both or neither.
+export const WORKER_GROUP_REMOVAL_AUTH = Object.freeze({
+	BOTH: 'both',
+	ADMIN_ONLY: 'admin_only',
+	MEMBER_ONLY: 'member_only',
+	NEITHER: 'neither',
+});
+
 export const DEFAULT_WORKER_GROUP_MAX_GROUPS_PER_SESSION = 100;
 export const DEFAULT_WORKER_GROUP_MAX_MEMBERS_PER_GROUP = 1000;
 export const MAX_WORKER_GROUP_IMAGE_URL_LENGTH = 2048;
@@ -197,6 +205,26 @@ const normalizeMemberVisibility = (value) => {
 	return '';
 };
 
+// A group stored before the setting existed keeps the rule every group had then: both.
+const normalizeRemovalAuth = (value) => {
+	const auth = trim(value || WORKER_GROUP_REMOVAL_AUTH.BOTH).toLowerCase();
+	if (Object.values(WORKER_GROUP_REMOVAL_AUTH).includes(auth)) return auth;
+	return '';
+};
+
+const REMOVERS_BY_REMOVAL_AUTH = Object.freeze({
+	[WORKER_GROUP_REMOVAL_AUTH.BOTH]: ['admin', 'member'],
+	[WORKER_GROUP_REMOVAL_AUTH.ADMIN_ONLY]: ['admin'],
+	[WORKER_GROUP_REMOVAL_AUTH.MEMBER_ONLY]: ['member'],
+	[WORKER_GROUP_REMOVAL_AUTH.NEITHER]: [],
+});
+
+/** Why a group's setting stops this remover ('admin' or 'member') ending a membership, or '' if it doesn't. */
+export const workerGroupRemovalRefusal = (removalAuth, remover) => {
+	if ((REMOVERS_BY_REMOVAL_AUTH[normalizeRemovalAuth(removalAuth)] || []).includes(remover)) return '';
+	return remover === 'member' ? 'worker_group_leave_denied' : 'worker_group_removal_denied';
+};
+
 const normalizeImageUrl = (value) => {
 	const raw = trim(value);
 	if (!raw) return { ok: true, value: '' };
@@ -362,6 +390,8 @@ const normalizeGroupPatch = ({ input = {}, actorPrincipal, existing = null, deps
 	}
 	const memberVisibility = normalizeMemberVisibility(input.memberVisibility || existing?.memberVisibility);
 	if (!memberVisibility) return { ok: false, status: 400, reason: 'invalid_member_visibility' };
+	const removalAuth = normalizeRemovalAuth(input.removalAuth || existing?.removalAuth);
+	if (!removalAuth) return { ok: false, status: 400, reason: 'invalid_removal_auth' };
 	const label = trim(input.label || existing?.label);
 	if (!label || label.length > 120) return { ok: false, status: 400, reason: 'invalid_group_label' };
 	const description = trim(input.description ?? existing?.description);
@@ -401,6 +431,7 @@ const normalizeGroupPatch = ({ input = {}, actorPrincipal, existing = null, deps
 			adminAddress: adminAddress || undefined,
 			joinMode,
 			memberVisibility,
+			removalAuth,
 			updatedAt,
 			...(existing
 				? {}
@@ -919,6 +950,7 @@ const redactGroupForMember = (group) => ({
 	...(group.adminAddress ? { adminAddress: group.adminAddress } : {}),
 	joinMode: group.joinMode,
 	memberVisibility: group.memberVisibility,
+	removalAuth: normalizeRemovalAuth(group.removalAuth),
 	createdAt: group.createdAt,
 	updatedAt: group.updatedAt,
 });
@@ -1096,7 +1128,7 @@ export const addWorkerGroupMember = async ({
 	};
 };
 
-export const removeWorkerGroupMember = async ({ env, slug, sessionId, groupId, principal, actorPrincipal, resume = false, deps = {} } = {}) => {
+export const removeWorkerGroupMember = async ({ env, slug, sessionId, groupId, principal, actorPrincipal, remover, resume = false, deps = {} } = {}) => {
 	const store = resolveWorkerGroupStore(env);
 	if (!store) return { ok: false, status: 501, reason: 'worker_group_store_not_configured' };
 	const group = await readGroupRecord({ store, slug, sessionId, groupId });
@@ -1113,6 +1145,11 @@ export const removeWorkerGroupMember = async ({ env, slug, sessionId, groupId, p
 	// A replayed removal whose record already landed only finishes the index removal.
 	const removed = resume && !!existing?.removedAt;
 	if (!removed && (!existing || existing.removedAt)) return { ok: false, status: 404, reason: 'worker_group_member_not_found' };
+	// Checked once the membership is found, so only members learn the setting. The
+	// coordinator checks it before it reserves the removal; a replay finishes a removal it
+	// allowed then, even if an admin has since changed the setting.
+	const refusal = resume ? '' : workerGroupRemovalRefusal(group.removalAuth, remover);
+	if (refusal) return { ok: false, status: 403, reason: refusal };
 	if (!removed) {
 		const removedAt = nowIso(deps);
 		const member = { ...existing, removedAt, removedBy: actorPrincipal };
@@ -1427,6 +1464,7 @@ export const executeWorkerGroupMutation = async ({
 	groupId,
 	principal,
 	actorPrincipal,
+	remover,
 	capacityAuthorized = false,
 	resume = false,
 	deps = {},
@@ -1470,6 +1508,7 @@ export const executeWorkerGroupMutation = async ({
 			groupId,
 			principal,
 			actorPrincipal,
+			remover,
 			capacityAuthorized,
 			resume,
 			deps,
@@ -1619,6 +1658,7 @@ export const forwardWorkerGroupMutation = async ({
 	groupId,
 	principal,
 	actorPrincipal,
+	remover,
 } = {}) => {
 	return callWorkerGroupCoordinator({
 		env,
@@ -1631,6 +1671,7 @@ export const forwardWorkerGroupMutation = async ({
 			groupId,
 			principal,
 			actorPrincipal,
+			remover,
 		},
 	});
 };
@@ -1943,6 +1984,7 @@ export const dispatchAdminWorkerGroupRequest = async ({ action, body, config, en
 			groupId: body?.groupId,
 			principal: body?.principal || body?.member,
 			actorPrincipal: actor.principal,
+			remover: 'admin',
 		});
 		if (!result.ok) return routeError(deps, result, headers);
 		return jsonResponse(
@@ -2209,6 +2251,7 @@ export const workerGroupsRoute = async ({
 				adminAddress: actor.principal?.address,
 				joinMode: WORKER_GROUP_JOIN_MODES.OPEN,
 				memberVisibility: WORKER_GROUP_MEMBER_VISIBILITY.SESSION,
+				removalAuth: routeBody?.group?.removalAuth,
 			},
 			actorPrincipal: actor.principal,
 		});
@@ -2258,6 +2301,7 @@ export const workerGroupsRoute = async ({
 			// request. Never accept a caller-supplied principal on this route.
 			principal: actor.principal,
 			actorPrincipal: actor.principal,
+			remover: 'member',
 		});
 		if (!result.ok) return routeError(deps, result, baseHeaders);
 		if (!Number.isSafeInteger(result.memberCount) || result.memberCount < 0) {
