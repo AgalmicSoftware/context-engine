@@ -543,9 +543,10 @@ What they already had is reconsidered against it. A signed-in person's saved ans
 first (or drafting goes ahead without them if they can't be read). The mapper gets those
 answers and their comments, the drafts already in review and any responder context as
 usual, and the files they added to the session themselves. A draft that gives a different
-answer shows for review, saying which answer it changes. One that repeats the saved answer
-adds nothing and is counted in a note, unless it adds a new comment. A locked answer stands
-and goes to no AI, even after it's been unlocked on the page.
+answer shows for review, saying which answer it changes. One that repeats an answer the AI
+was given adds nothing and is counted in a note as still fitting, unless it adds to the
+comment. A locked answer stands and goes to no AI, even after it's been unlocked on the page,
+so a draft left out beside one is counted only as left out, never as still fitting.
 Someone signed out gets drafts from their part alone; if they sign in to submit, the usual
 check of drafts against saved answers applies.
 

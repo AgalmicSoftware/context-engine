@@ -233,6 +233,32 @@ describe('drafting from a claimed part', () => {
     expect(screen.queryByText('Who runs it?')).toBeNull();
   });
 
+  it('says only answers the AI compared still fit, never a locked one', async () => {
+    mapped.mockResolvedValue(
+      ['q1', 'q2', 'q3'].map((questionId) => ({ questionId, answer: 'Yes', evidence: 'as before', confidence: 0.8 })),
+    );
+    const slice = {
+      // q2 was unlocked on the page and q3 is still locked: neither goes to the AI.
+      answers: { q1: { value: 'Yes' }, q2: { value: 'Yes', encrypted: true }, q3: { value: '*', encrypted: true } },
+      additionalComments: {},
+      importance: {},
+      conviction: {},
+    };
+    render(
+      interview({
+        questionPool: [...(baseProps.questionPool as object[]), { id: 'q3', prompt: 'When?', type: 'freeform' }],
+        onLoadSavedResponses: jest.fn(async () => slice),
+        existingResponseSlice: slice,
+      }),
+    );
+    expect(
+      await screen.findByText(
+        'One of your answers still fits, so it stays as it is. Left out 2 drafts for questions you’ve already answered.',
+      ),
+    ).toBeInTheDocument();
+    expect(mapped.mock.calls[0][0].reconsideration?.savedAnswers).toEqual([{ questionId: 'q1', answer: 'Yes' }]);
+  });
+
   it('keeps a kept answer’s new comment for review', async () => {
     mapped.mockResolvedValue([
       { questionId: 'q2', answer: 'The neighbours', additionalComments: 'With a small rota', confidence: 0.8 },

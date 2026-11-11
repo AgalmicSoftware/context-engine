@@ -80,7 +80,9 @@ import {
 import type { SessionInterviewPanelBaseProps } from './sessionVoiceModeTypes';
 import {
   addsToSavedAnswer,
+  describeLeftOutDrafts,
   loadOwnContextForMapping,
+  readAnswersThatStillFit,
   readAnswersToReconsider,
 } from './sessionInterviewReconsideration';
 import { useStartingInterviewComments } from './sessionInterviewComments';
@@ -185,8 +187,10 @@ export default function SessionInterviewPanel({
   };
   const [mapping, setMapping] = useState(false);
   const [mappingNotice, setMappingNotice] = useState('');
-  // Drafts left out of review because the person already answered their questions.
+  // Drafts left out of review because the person already answered their questions, and of those,
+  // the answers a claim's AI reconsidered and repeated.
   const [leftOutIds, setLeftOutIds] = useState<string[]>([]);
+  const [stillFitIds, setStillFitIds] = useState<string[]>([]);
   const [applying, setApplying] = useState(false);
   const [pendingSubmitAfterLogin, setPendingSubmitAfterLogin] = useState(false);
   const pendingSubmitBaseContextRef = useRef('');
@@ -623,6 +627,7 @@ export default function SessionInterviewPanel({
         let mapped = importedDrafts;
         let proposedQuestions: GeneratedSurveyStatement[] = [];
         let draftingPicks: InterviewPrefillGroupPick[] = [];
+        let reconsidered: ReturnType<typeof readAnswersToReconsider> = [];
         if (mapped === null) {
           const url = await resolveWorkerUrl();
           if (disposedRef.current) return;
@@ -637,6 +642,7 @@ export default function SessionInterviewPanel({
           // The mapper hears no AI prediction for an answered question, so it can't hand one back
           // as new evidence. Drafts under review keep theirs.
           const inReview = new Set(latestReviewRef.current.drafts.map((draft) => draft.questionId));
+          if (usedClaimRef.current) reconsidered = readAnswersToReconsider(questions, existingResponsesRef.current);
           mapped = await mapInterviewEvidenceToResponses({
             questions:
               !nextTranscript.trim() && prefillPacket ? validatedPrefillQuestionsRef.current || questions : questions,
@@ -679,7 +685,7 @@ export default function SessionInterviewPanel({
             },
             reconsideration: usedClaimRef.current
               ? {
-                  savedAnswers: readAnswersToReconsider(questions, existingResponsesRef.current),
+                  savedAnswers: reconsidered,
                   ownContext: await loadOwnContextForMapping(sessionContextPrompt.sources, {
                     sessionSlug,
                     sessionConfig,
@@ -748,6 +754,7 @@ export default function SessionInterviewPanel({
         setEditedDrafts(review.edited);
         setSelected(review.selected);
         setLeftOutIds((current) => [...new Set([...current, ...review.leftOut])]);
+        setStillFitIds(readAnswersThatStillFit(review.leftOut, mapped, reconsidered, questions));
         if (importedDrafts) setPrefillDraftIds(importedDrafts.map((draft) => draft.questionId));
         let newlyHidden: string[] = [];
         if (review.drafts.length) {
@@ -1188,17 +1195,7 @@ export default function SessionInterviewPanel({
           ? 'Talk through your drafts'
           : 'Start voice interview';
   const leftOutCount = leftOutIds.length;
-  const leftOutNotice = !leftOutCount
-    ? ''
-    : claim
-      ? leftOutCount === 1
-        ? 'One of your answers still fits, so it stays as it is.'
-        : `${leftOutCount} of your answers still fit, so they stay as they are.`
-      : drafts.length
-        ? `Left out ${leftOutCount} ${leftOutCount === 1 ? 'draft for a question' : 'drafts for questions'} you’ve already answered.`
-        : leftOutCount === 1
-          ? 'You’ve already answered the question this draft covers.'
-          : 'You’ve already answered every question these drafts cover.';
+  const leftOutNotice = describeLeftOutDrafts(leftOutIds, stillFitIds, drafts.length > 0);
   // Drafts that were left out came from the evidence already mapped, so mapping it again won't help.
   const canGenerateDrafts = Boolean(
     !isInterviewBusy &&

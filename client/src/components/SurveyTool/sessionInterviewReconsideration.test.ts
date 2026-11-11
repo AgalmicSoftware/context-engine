@@ -1,6 +1,8 @@
 import {
   addsToSavedAnswer,
+  describeLeftOutDrafts,
   loadOwnContextForMapping,
+  readAnswersThatStillFit,
   readAnswersToReconsider,
 } from './sessionInterviewReconsideration';
 import { loadContextSourcesForAi, type ContextSource } from '../../utilities/docLibrary/contextSources';
@@ -59,6 +61,41 @@ describe('what a claim reconsiders', () => {
     // A locked comment stands, and part of a comment adds nothing to it.
     expect(addsToSavedAnswer(draft('q3', 'More'), slice)).toBe(false);
     expect(addsToSavedAnswer(draft('q4', 'cost'), slice)).toBe(false);
+  });
+
+  it('counts as still fitting only the answers the AI was given and repeated', () => {
+    const questions = [question('q1'), question('q2'), question('q3'), { ...question('q4'), type: 'rating' }];
+    const reconsidered = [
+      { questionId: 'q1', answer: 'Yes' },
+      { questionId: 'q2', answer: 'Yes' },
+      { questionId: 'q4', answer: '7' },
+    ];
+    const drafts = [
+      // Left out without repeating it: an AI prefill's prediction can't overrule an answer.
+      { questionId: 'q2', answer: 'No' },
+      // A locked answer never reached the AI.
+      { questionId: 'q3', answer: 'Yes' },
+      { questionId: 'q1', answer: 'Yes' },
+      { questionId: 'q4', answer: 7 },
+    ];
+    expect(readAnswersThatStillFit(['q1', 'q2', 'q3', 'q4'], drafts, reconsidered, questions)).toEqual(['q1', 'q4']);
+  });
+
+  it('says which answers still fit and which drafts were left out for answered questions', () => {
+    expect(describeLeftOutDrafts(['q1'], ['q1'], false)).toBe('One of your answers still fits, so it stays as it is.');
+    expect(describeLeftOutDrafts(['q1', 'q2', 'q3'], ['q1', 'q2'], false)).toBe(
+      '2 of your answers still fit, so they stay as they are. Left out 1 draft for a question you’ve already answered.',
+    );
+    expect(describeLeftOutDrafts(['q3'], ['q1'], false)).toBe(
+      'You’ve already answered the question this draft covers.',
+    );
+    expect(describeLeftOutDrafts(['q3', 'q4'], [], false)).toBe(
+      'You’ve already answered every question these drafts cover.',
+    );
+    expect(describeLeftOutDrafts(['q3', 'q4'], [], true)).toBe(
+      'Left out 2 drafts for questions you’ve already answered.',
+    );
+    expect(describeLeftOutDrafts([], ['q1'], true)).toBe('');
   });
 
   it('reads only the files this person added', async () => {
