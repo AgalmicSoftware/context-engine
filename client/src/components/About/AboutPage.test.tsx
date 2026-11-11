@@ -6,6 +6,8 @@ import { TestMemoryRouter as MemoryRouter } from 'testUtils/TestMemoryRouter';
 import { normalizeScssContract } from 'testUtils/scssContractAssertions';
 
 import AboutPage, { getAboutDemoSessionPath } from './AboutPage';
+import { ABOUT_DEMO_SESSION_SLUG } from './AboutPageContent';
+import { KNOWN_SESSIONS } from '../../utilities/session/knownSessionsFile';
 
 const mutableEnv = process.env as Record<string, string | undefined>;
 const ORIGINAL_PUBLIC_URL = process.env.PUBLIC_URL;
@@ -455,13 +457,17 @@ describe('AboutPage', () => {
     });
   });
 
-  it('uses the configured public demo route when list scope has no concrete session slug', () => {
+  it('opens the listed demo session when list scope has no concrete session slug', () => {
     expect(
       getAboutDemoSessionPath({
         selectedSessionScope: 'list',
         selectedSessionSlugs: ['general'],
       } as any),
-    ).toBe('/session/demo-sh');
+    ).toBe('/session/rxc-ra-test-5');
+  });
+
+  it('opens a demo session the site can open from a normal link', () => {
+    expect(KNOWN_SESSIONS[ABOUT_DEMO_SESSION_SLUG]).toBeDefined();
   });
 
   it.each([

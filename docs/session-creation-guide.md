@@ -1350,11 +1350,12 @@ also serves the file at `/known-sessions.json`, so agents can find a session's
 Worker from its slug.
 
 The file lists EDDY 2026 (`eddy26`), the demo session (`demo-sh`), the Reverse
-Alignment salon (`rxc-ra-26`) and `rxc-ra-test-5`. `rxc-ra-test-5` stays only
-until the films, stills, promo slides and writeup that carry its link switch to
-`rxc-ra-26`'s; then delete its entry. A listed session that also has demo data
-in `demo_sessions.json`, as `demo-sh` does, keeps that data; the list sets only
-its Worker, its session ID and its normal link.
+Alignment salon (`rxc-ra-26`) and `rxc-ra-test-5`. The About page's **Demo**
+button opens `rxc-ra-test-5`, and the films, stills, promo slides and writeup
+carry its link. Delete its entry only once those links switch to `rxc-ra-26`'s
+and the button opens another listed session. A listed session that also has
+demo data in `demo_sessions.json`, as `demo-sh` does, keeps that data; the list
+sets only its Worker, its session ID and its normal link.
 
 ## Troubleshooting
 
