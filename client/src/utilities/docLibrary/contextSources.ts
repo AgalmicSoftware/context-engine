@@ -89,6 +89,10 @@ export const workerSupportsContextSources = (options: ContextSourceOptions): Pro
 export const workerAcceptsParticipantContext = (options: ContextSourceOptions): Promise<boolean> =>
   workerHasFeature(options, 'participant_context_v1');
 
+/** True when this session's Worker lets participants add links too (Session Workers from 0.9.2). */
+export const workerAcceptsParticipantLinks = (options: ContextSourceOptions): Promise<boolean> =>
+  workerHasFeature(options, 'participant_context_links_v1');
+
 const toSource = (item: unknown): (ContextSource & { role: string; derivedFrom: string }) | null => {
   const record = asRecord(item);
   const metadata = asRecord(record.metadata);

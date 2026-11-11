@@ -53,7 +53,7 @@ export const ADMINS_ONLY_ACCESS = Object.freeze({
 const text = (value) => (typeof value === 'string' ? value.trim() : '');
 const isRecord = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
 
-/** Everyone the session admits may add files, unless an admin limits it to admins. */
+/** Everyone the session admits may add files and links, unless an admin limits it to admins. */
 export const participantsMayAddContext = (config) => config?.contextAdditionPolicy !== 'admin_only';
 
 const groupIdList = (groupIds) =>

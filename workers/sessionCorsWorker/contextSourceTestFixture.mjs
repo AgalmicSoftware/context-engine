@@ -5,9 +5,10 @@ import { installSessionCoordinatorBinding } from '../../tests/helpers/sessionCor
 // A Session Worker's storage for context-source tests: in-memory KV and R2, a
 // session coordinator, a session with the default access, pages from a scripted
 // network, and a scripted AI provider. Nothing here reaches a real network or service.
+// `state.scopes` are a signed-in caller's scopes, and `state.fetchAccess` is what
+// the dispatcher's fetch check answers.
 export const ADMIN = `0x${'1'.repeat(40)}`;
 export const PARTICIPANT = `0x${'2'.repeat(40)}`;
-const SCOPES = { storage: true };
 const ADMINS_ONLY = { match: 'all', conditions: [{ kind: 'worker_role', role: 'admin' }] };
 const SESSION_CONDITIONS = {
   match: 'any',
@@ -80,8 +81,11 @@ export const harness = ({ encryption = 'none', pages = {}, ai = { mode: 'anthrop
       storageProfile: { backend: 'cloudflare', payloadAccessControl: { gate: 'role_gate', encryption, accessConditions: SESSION_CONDITIONS } },
       ai: { mode: ai.mode, models: { fast: { provider: ai.mode, model: ai.model }, thinking: { provider: ai.mode, model: ai.model } } },
     },
+    scopes: { storage: true, fetch: true },
+    fetchAccess: { ok: true },
   };
   const pageCalls = [];
+  const fetchChecks = [];
   const network = async (url, init) => {
     pageCalls.push(String(url));
     const page = pages[String(url)];
@@ -124,9 +128,13 @@ export const harness = ({ encryption = 'none', pages = {}, ai = { mode: 'anthrop
     config: state.config,
     slug: 'salon',
     uploaderAddress: address,
-    authScopes: address ? SCOPES : {},
+    authScopes: address ? state.scopes : {},
     expectedAuthority: { actor: address },
     baseHeaders: {},
+    checkFetchAccess: async () => {
+      fetchChecks.push(address);
+      return state.fetchAccess;
+    },
     deps,
   });
   const tags = (role, kind, extra = []) => [
@@ -149,7 +157,7 @@ export const harness = ({ encryption = 'none', pages = {}, ai = { mode: 'anthrop
   const context = (body, address = ADMIN) => call('/storage/context', { method: 'POST', body, address });
   const list = async (address) => (await (await call('/storage/list?resource=docsContext&role=context', { address })).json()).items;
   const read = (id, address) => call(`/storage/read?id=${encodeURIComponent(id)}`, { address });
-  return { env, kv, r2, state, deps, call, uploadFile, context, list, read, tags, pageCalls, providerCalls };
+  return { env, kv, r2, state, deps, call, uploadFile, context, list, read, tags, pageCalls, fetchChecks, providerCalls };
 };
 
 export const idOf = async (response) => {

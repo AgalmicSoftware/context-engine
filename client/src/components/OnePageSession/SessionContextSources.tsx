@@ -7,6 +7,7 @@ import { faExternalLinkAlt, faEye, faFileAlt, faPlus, faQuestionCircle } from '@
 import { contextGroupsLabel } from '../Sessions/setup/ContextAccessPicker';
 import ContextSourcesPanel from '../Sessions/setup/ContextSourcesPanel';
 import SessionContextAddFile from './SessionContextAddFile';
+import SessionContextAddLink from './SessionContextAddLink';
 import setupStyles from '../Sessions/setup/SessionSetup.module.scss';
 import { contextAdderLabel, removeContextSource } from '../../utilities/docLibrary/contextSources';
 import { getWorkerSessionToken } from '../../utilities/worker/workerAuth.js';
@@ -31,7 +32,8 @@ const MY_GROUPS_HELP = 'Signs you in to this session, so it can show files locke
 
 // The Context section's files and links: the ones this reader may open, who
 // added each, and for admins the controls that add, refresh and remove them.
-// Others may add files and remove their own, unless the session limits that.
+// Others may add files, and links where their Worker takes them, and remove
+// their own, unless the session limits that or has ended.
 // Add opens the form, or an admin's controls; View shows a signed-out
 // member their groups' files.
 const SessionContextSources = ({ sessionSlug, sessionConfig, account, list, pageLinks, headerActionsSlot }: Props) => {
@@ -188,6 +190,17 @@ const SessionContextSources = ({ sessionSlug, sessionConfig, account, list, page
             groups={groups}
             onAdded={list.reload}
           />
+          {list.participantsCanAddLinks ? (
+            <>
+              <h3 className={setupStyles.fieldLabel}>Add a link</h3>
+              <SessionContextAddLink
+                sessionSlug={sessionSlug}
+                sessionConfig={sessionConfig}
+                account={account}
+                onAdded={list.reload}
+              />
+            </>
+          ) : null}
         </div>
       ) : null}
       {isAdmin ? (

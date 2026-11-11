@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { buildPdfReadRequest, PDF_READ_PROMPT } from './contextDocumentRead.js';
 import { groupLockedAccess } from '../../shared/sessionContextSources.mjs';
 import { ADMIN, PARTICIPANT, PDF_BYTES, harness, idOf, json, pageResponse } from './contextSourceTestFixture.mjs';
+import { publishCloudflareOwnedStorageMetadata } from './storageRouteExecution.js';
 
 const tagOf = (item, name) => item.metadata.tags.find((tag) => tag.name === name)?.value;
 
@@ -15,8 +16,7 @@ test('signed-in people add context files unless the session limits it, and only 
   assert.deepEqual([added.storageRef.id, added.metadata.addedBy, added.metadata.uploadAuthority], [id, PARTICIPANT, undefined]);
   const storedByParticipant = JSON.parse(h.kv.store.get([...h.kv.store.keys()].find((key) => key.endsWith(`:docsContext:${id}`))));
   assert.deepEqual([storedByParticipant.contextSource, storedByParticipant.uploadAuthority, storedByParticipant.uploader], [true, 'author', PARTICIPANT]);
-  // Links and AI readings stay with the admins: both make the Worker do work on someone's behalf.
-  assert.equal((await h.context({ action: 'add-link', url: 'https://example.org/' }, PARTICIPANT)).status, 403);
+  // An AI reading stays with the admins: it spends the session's AI on someone's behalf.
   assert.equal((await h.context({ action: 'read-pdf', id }, PARTICIPANT)).status, 403);
 
   h.state.config.contextAdditionPolicy = 'admin_only';
@@ -193,13 +193,95 @@ test('a file publishes only if its uploader may still add it when the upload fin
   assert.deepEqual(await h.list(ADMIN), []);
 });
 
+test('participants add links while the session takes additions and runs; refresh and AI reading stay with admins', async () => {
+  const h = harness({ pages: { 'https://example.org/essay': () => pageResponse('<title>Essay</title><p>Institutions adapt.</p>') } });
+  const added = await h.context({ action: 'add-link', url: 'https://example.org/essay' }, PARTICIPANT);
+  const source = (await added.clone().json()).source;
+  assert.equal(added.status, 200, JSON.stringify(source));
+  const [item] = await h.list(PARTICIPANT);
+  assert.deepEqual([item.storageRef.id, item.metadata.addedBy, tagOf(item, 'CE-DocKind')], [source.id, PARTICIPANT, 'link']);
+  assert.equal(h.pageCalls.length, 1);
+
+  // Refreshing a link and reading a PDF make the Worker work again for an item already there.
+  const refresh = await h.context({ action: 'add-link', url: 'https://example.org/essay', replaces: source.id }, PARTICIPANT);
+  assert.equal(refresh.status, 403);
+  const pdf = await idOf(await h.uploadFile({ address: PARTICIPANT }));
+  assert.equal((await h.context({ action: 'read-pdf', id: pdf }, PARTICIPANT)).status, 403);
+
+  // Nor while context is admins-only, or once the session has ended; neither fetches the page.
+  h.state.config.contextAdditionPolicy = 'admin_only';
+  const adminsOnly = await h.context({ action: 'add-link', url: 'https://example.org/essay' }, PARTICIPANT);
+  assert.deepEqual([adminsOnly.status, (await adminsOnly.json()).reason], [403, 'context_admin_required']);
+  delete h.state.config.contextAdditionPolicy;
+  h.state.config.sessionEndsAt = new Date(Date.now() - 60_000).toISOString();
+  const ended = await h.context({ action: 'add-link', url: 'https://example.org/essay' }, PARTICIPANT);
+  assert.deepEqual([ended.status, (await ended.json()).code], [410, 'session_ended']);
+  assert.equal(h.pageCalls.length, 1, 'refused links fetch nothing');
+  assert.equal((await h.context({ action: 'add-link', url: 'https://example.org/essay' })).status, 200, 'admins still add');
+  assert.equal((await h.context({ action: 'remove', id: source.id }, PARTICIPANT)).status, 200, 'its adder removes it');
+  assert.deepEqual(h.fetchChecks, [PARTICIPANT], "only a participant's link takes their fetch scope");
+});
+
+test("a participant's link passes the session's access and their fetch scope before the Worker fetches it", async () => {
+  const h = harness({ pages: { 'https://example.org/essay': () => pageResponse('<p>Institutions adapt.</p>') } });
+  const link = { action: 'add-link', url: 'https://example.org/essay' };
+  const sessionAccess = h.state.config.storageProfile.payloadAccessControl;
+  h.state.config.storageProfile.payloadAccessControl = {
+    ...sessionAccess, accessConditions: { match: 'all', conditions: [{ kind: 'worker_role', role: 'admin' }] },
+  };
+  assert.equal((await h.context(link, PARTICIPANT)).status, 403, 'someone the session keeps from adding files');
+  assert.deepEqual(h.fetchChecks, [], 'is refused before their fetch scope counts');
+  h.state.config.storageProfile.payloadAccessControl = sessionAccess;
+
+  h.state.scopes = { storage: true };
+  const noFetch = await h.context(link, PARTICIPANT);
+  assert.deepEqual([noFetch.status, (await noFetch.json()).reason], [403, 'context_link_fetch_denied'], 'a sign-in without the fetch scope');
+  h.state.scopes = { storage: true, fetch: true };
+  // A failed authorization check, or the daily limit, answers as /fetch does, not as the session's rule.
+  for (const [error, status] of [['Current authorization check failed.', 403], ['Rate limit exceeded.', 429]]) {
+    h.state.fetchAccess = { ok: false, response: json({ error }, status) };
+    const refused = await h.context(link, PARTICIPANT);
+    assert.deepEqual([refused.status, await refused.json()], [status, { error }]);
+  }
+  assert.deepEqual(h.pageCalls, [], 'refused links fetch nothing');
+  h.state.scopes = { storage: true };
+  assert.equal((await h.context(link)).status, 200, "an admin's link takes no fetch scope");
+  assert.deepEqual(h.fetchChecks, [PARTICIPANT, PARTICIPANT]);
+});
+
+test("a refresh reads the same link again and stays its adder's, who may still remove it", async () => {
+  let version = 0;
+  const h = harness({ pages: { 'https://example.org/post': () => pageResponse(`Post text, version ${++version}.`, 'text/plain') } });
+  const first = await idOf(await h.context({ action: 'add-link', url: 'https://example.org/post', title: 'Their post' }, PARTICIPANT));
+  const elsewhere = await h.context({ action: 'add-link', url: 'https://example.org/other', replaces: first });
+  assert.equal(elsewhere.status, 400, 'a refresh names the same link');
+  const refreshed = await idOf(await h.context({ action: 'add-link', url: 'https://example.org/post', replaces: first, title: 'Renamed' }));
+  const [item] = await h.list(ADMIN);
+  assert.deepEqual([item.storageRef.id, item.metadata.addedBy, tagOf(item, 'CE-DocName')], [refreshed, PARTICIPANT, 'Their post']);
+  assert.equal(h.pageCalls.length, 2);
+  assert.equal((await h.context({ action: 'remove', id: refreshed }, PARTICIPANT)).status, 200);
+});
+
+test('only an admin publishing a link the context route stored may record its earlier adder', async () => {
+  const h = harness();
+  const other = `0x${'3'.repeat(40)}`;
+  const publish = (actor, metadata) => publishCloudflareOwnedStorageMetadata({
+    env: h.env, config: h.state.config, slug: 'salon', actor,
+    metadata: { resource: 'docsContext', contextSource: true, id: 'ctx-recorded-adder', uploader: other, uploadAuthority: 'author', ...metadata },
+  });
+  const superseded = (error) => error.status === 409;
+  await assert.rejects(publish(PARTICIPANT, { contextOrigin: 'worker' }), superseded, 'not for a participant');
+  await assert.rejects(publish(ADMIN, {}), superseded, 'not for an upload');
+  await publish(ADMIN, { contextOrigin: 'worker' });
+  assert.equal(JSON.parse(h.kv.store.get('ce-storage:salon:docsContext:ctx-recorded-adder')).uploader, other);
+});
+
 test('a link is fetched by the Worker under the strict policy and stored with its snapshot', async () => {
   const h = harness({
     pages: {
       'https://example.org/essay': pageResponse('<html><head><title>On Reverse Alignment</title></head><body><nav>Menu</nav><p>Institutions adapt.</p></body></html>'),
     },
   });
-  assert.equal((await h.context({ action: 'add-link', url: 'https://example.org/essay' }, PARTICIPANT)).status, 403);
   const added = await h.context({ action: 'add-link', url: 'https://example.org/essay', adminsOnly: true });
   const { source } = await added.json();
   assert.equal(added.status, 200);
@@ -213,9 +295,12 @@ test('a link is fetched by the Worker under the strict policy and stored with it
   assert.equal(tagOf(item, 'CE-ContextUrl'), 'https://example.org/essay');
   assert.equal(item.metadata.adminsOnly, true);
 
+  // Participants' links follow the same strict policy.
   for (const url of ['http://example.org/essay', 'https://127.0.0.1/admin', `https://user:pw${'@'}example.org/`, 'https://intranet/']) {
-    const refused = await h.context({ action: 'add-link', url });
-    assert.ok([400, 422].includes(refused.status), `${url}: ${refused.status}`);
+    for (const address of [ADMIN, PARTICIPANT]) {
+      const refused = await h.context({ action: 'add-link', url }, address);
+      assert.ok([400, 422].includes(refused.status), `${url} from ${address}: ${refused.status}`);
+    }
   }
   assert.deepEqual(h.pageCalls, ['https://example.org/essay'], 'refused links never reach the network');
   assert.equal((await h.list(ADMIN)).length, 1);
@@ -501,11 +586,14 @@ test('unknown actions and a file name holding the body placeholder are handled',
 
 test('a link that looks like it holds a secret is refused before any fetch', async () => {
   const h = harness();
-  for (const url of ['https://example.org/doc?token=abc123', 'https://example.org/doc#k=abc123']) {
-    const response = await h.context({ action: 'add-link', url });
-    assert.equal(response.status, 400, url);
-    assert.match((await response.json()).error, /secrets never go in context/);
+  for (const address of [ADMIN, PARTICIPANT]) {
+    for (const url of ['https://example.org/doc?token=abc123', 'https://example.org/doc#k=abc123']) {
+      const response = await h.context({ action: 'add-link', url }, address);
+      assert.equal(response.status, 400, url);
+      assert.match((await response.json()).error, /secrets never go in context/);
+    }
+    const title = 'sk-proj-0123456789abcdefghij';
+    assert.equal((await h.context({ action: 'add-link', url: 'https://example.org/doc', title }, address)).status, 400);
   }
-  assert.equal((await h.context({ action: 'add-link', url: 'https://example.org/doc', title: 'sk-proj-0123456789abcdefghij' })).status, 400);
   assert.deepEqual(h.pageCalls, []);
 });
