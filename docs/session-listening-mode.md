@@ -540,7 +540,8 @@ the recorder's link was for. Their lines join whatever they've said in this revi
 mapping treats `Responder:` lines as their words and `Other person:` lines as context only.
 
 What they already had is reconsidered against it. A signed-in person's saved answers load
-first (or drafting goes ahead without them if they can't be read). The mapper gets those
+first; if they can't be read, drafting waits until **Retry saved answers** reads them, so no
+draft replaces an answer nobody compared. The mapper gets those
 answers and their comments, the drafts already in review and any responder context as
 usual, and the files they added to the session themselves. A draft that gives a different
 answer shows for review, saying which answer it changes. One that repeats an answer the AI

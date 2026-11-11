@@ -879,11 +879,12 @@ export default function SessionInterviewPanel({
   }, [mapping, prefillPacket, questions, runMapping]);
 
   // Someone's part of a group conversation joins whatever they've said here, and what they already had is
-  // reconsidered against it, so a signed-in person's saved answers load first.
+  // reconsidered against it, so a signed-in person's saved answers load first. A failed load holds drafting
+  // until its retry succeeds: drafts must not replace answers nobody compared.
   useEffect(() => {
     if (!claim || usedClaimRef.current === claim || !questions.length || mapping || sessionContextPrompt.loading)
       return;
-    if (authenticatedForSubmit && !responseStateReadyForSubmit && !ownAnswers.error) return;
+    if (authenticatedForSubmit && !responseStateReadyForSubmit) return;
     usedClaimRef.current = claim;
     const combined = appendInterviewTranscript(transcriptRef.current, claim.transcript);
     transcriptRef.current = combined;
@@ -893,7 +894,6 @@ export default function SessionInterviewPanel({
     authenticatedForSubmit,
     claim,
     mapping,
-    ownAnswers.error,
     questions.length,
     responseStateReadyForSubmit,
     runMapping,

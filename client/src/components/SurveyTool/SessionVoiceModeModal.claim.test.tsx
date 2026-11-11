@@ -215,9 +215,21 @@ describe('drafting from a claimed part', () => {
     });
   });
 
-  it('drafts anyway if saved answers can’t be loaded, rather than leaving them waiting', async () => {
-    render(interview({ onLoadSavedResponses: jest.fn(async () => Promise.reject(new Error('offline'))) }));
+  it('holds drafting while saved answers can’t be read, until a retry reads them', async () => {
+    const slice = saved({ q1: 'Yes, fund it' });
+    const onLoadSavedResponses = jest.fn().mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce(slice);
+    render(interview({ onLoadSavedResponses, existingResponseSlice: slice }));
+    const retry = await screen.findByRole('button', { name: 'Retry saved answers' });
+    expect(screen.getByText(/Could not load your saved answers: offline/)).toBeInTheDocument();
+    await act(async () => undefined);
+    expect(mapped).not.toHaveBeenCalled();
+
+    fireEvent.click(retry);
     await waitFor(() => expect(mapped).toHaveBeenCalledTimes(1));
+    expect(onLoadSavedResponses).toHaveBeenCalledTimes(2);
+    expect(mapped.mock.calls[0][0].reconsideration?.savedAnswers).toEqual([
+      { questionId: 'q1', answer: 'Yes, fund it' },
+    ]);
   });
 
   it('shows a change to a saved answer for review, and says when others still fit', async () => {
