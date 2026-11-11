@@ -543,7 +543,7 @@ export const buildExternalInterviewKickoff = ({
 
 /** What someone already had when their part of a group conversation arrives, for the mapper to reconsider. */
 export type InterviewReconsideration = {
-  /** Their answers and comments: submitted, or on the page unsubmitted, which lists those fields. */
+  /** Their answers and comments as the page holds them: submitted, or unsubmitted, which lists those fields. */
   earlierAnswers: Array<{
     questionId: string;
     answer: unknown;
@@ -556,7 +556,7 @@ export type InterviewReconsideration = {
 
 const RECONSIDERATION_RULES = `
 - The transcript includes a group conversation the responder took part in. "Responder:" lines are their words. "Other person:" lines are what others said, for context only; never treat them as the responder's beliefs, even when the responder was there.
-- The earlier answers below came before this conversation. They are submitted, except the fields an answer lists under "unsubmitted", which the responder has on their page but hasn't submitted. Reconsider each against what the responder said in it, and return a draft for one only when their words support a different answer or something to add; repeat the earlier answer when they support it, and say why in evidence. Omit earlier answers the conversation doesn't touch. Earlier answers and their own files help interpret the responder's words but are not new evidence on their own.
+- The earlier answers below are the responder's answers as their page holds them now. They are submitted, except the fields an answer lists under "unsubmitted", which the responder has on their page but hasn't submitted; an empty unsubmitted comment is one they cleared. Reconsider each against what the responder said in the conversation, and return a draft for one only when their words support a different answer or something to add; repeat the earlier answer when they support it, and say why in evidence. Omit earlier answers the conversation doesn't touch. Earlier answers and their own files help interpret the responder's words but are not new evidence on their own.
 - When an earlier answer has a comment, put only what the conversation adds to it in additionalComments: review shows that after their comment, and they choose what to keep.`;
 
 export const buildInterviewResponseMappingPrompt = ({

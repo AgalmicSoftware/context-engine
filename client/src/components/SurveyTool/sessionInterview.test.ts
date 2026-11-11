@@ -1043,8 +1043,10 @@ describe('reconsidering what someone already had', () => {
         ownContext: '',
       },
     });
+    expect(prompt).toContain("The earlier answers below are the responder's answers as their page holds them now.");
+    expect(prompt).not.toContain('came before this conversation');
     expect(prompt).toContain(
-      'except the fields an answer lists under "unsubmitted", which the responder has on their page but hasn\'t submitted',
+      'except the fields an answer lists under "unsubmitted", which the responder has on their page but hasn\'t submitted; an empty unsubmitted comment is one they cleared',
     );
     expect(prompt).toContain(
       'Earlier answers to reconsider:\n[{"questionId":"q1","answer":"No","unsubmitted":["answer"]}]',

@@ -43,19 +43,30 @@ describe('what a claim reconsiders', () => {
     ]);
   });
 
-  it('lists the fields someone has on the page but hasn’t submitted', () => {
+  it('lists the fields someone has on the page but hasn’t submitted, a cleared comment included', () => {
     const slice = {
-      answers: { q1: { value: 'No', unsubmitted: true }, q2: { value: 'Yes' }, q3: { value: 'Yes' } },
+      answers: {
+        q1: { value: 'No', unsubmitted: true },
+        q2: { value: 'Yes' },
+        q3: { value: 'Yes' },
+        q4: { value: 'Yes' },
+        q5: { value: 'Yes' },
+      },
       additionalComments: {
         q2: { value: 'Typed just now', unsubmitted: true },
         // A comment that doesn't go to the AI isn't listed either.
         q3: { value: 'Secret', encrypted: true, unsubmitted: true },
+        q4: { value: '', unsubmitted: true },
+        q5: { value: '*', unsubmitted: true },
       },
     };
-    expect(readAnswersToReconsider([question('q1'), question('q2'), question('q3')], slice)).toEqual([
+    const questions = ['q1', 'q2', 'q3', 'q4', 'q5'].map(question);
+    expect(readAnswersToReconsider(questions, slice)).toEqual([
       { questionId: 'q1', answer: 'No', unsubmitted: ['answer'] },
       { questionId: 'q2', answer: 'Yes', additionalComments: 'Typed just now', unsubmitted: ['additionalComments'] },
       { questionId: 'q3', answer: 'Yes' },
+      { questionId: 'q4', answer: 'Yes', additionalComments: '', unsubmitted: ['additionalComments'] },
+      { questionId: 'q5', answer: 'Yes' },
     ]);
   });
 

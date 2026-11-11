@@ -19,10 +19,10 @@ import {
 const OWN_CONTEXT_CHARS = 12_000;
 
 /**
- * The person's answers as the page holds them. One they changed without submitting, or an unsent draft restored on
- * load, replaces their submitted one there, so the fields not yet submitted are listed. A locked answer stands and
- * isn't offered, whether it still shows as "*" or they unlocked it on this page: what they encrypted doesn't go to the
- * session's AI, as research sharing redacts it too.
+ * The person's answers as the page holds them. One they changed or cleared without submitting, or an unsent draft
+ * restored on load, replaces their submitted one there, so the fields not yet submitted are listed. A locked answer
+ * stands and isn't offered, whether it still shows as "*" or they unlocked it on this page: what they encrypted
+ * doesn't go to the session's AI, as research sharing redacts it too.
  */
 export const readAnswersToReconsider = (
   questions: InterviewQuestion[],
@@ -33,17 +33,20 @@ export const readAnswersToReconsider = (
     const { encryptedAnswer, encryptedComments } = resolveFieldProtection(id, slice || {});
     if (!hasDraftValue(answer) || answer === '*' || encryptedAnswer) return [];
     const additionalComments = encryptedComments ? '' : responseCommentValue(slice, id);
+    // A comment cleared on the page isn't submitted either, so it goes as an empty unsubmitted one.
+    const commentUnsubmitted =
+      !encryptedComments &&
+      responseFieldValue(slice, 'additionalComments', id) !== '*' &&
+      isResponseFieldUnsubmitted(slice, 'additionalComments', id);
     const unsubmitted = [
       ...(isResponseFieldUnsubmitted(slice, 'answers', id) ? (['answer'] as const) : []),
-      ...(additionalComments && isResponseFieldUnsubmitted(slice, 'additionalComments', id)
-        ? (['additionalComments'] as const)
-        : []),
+      ...(commentUnsubmitted ? (['additionalComments'] as const) : []),
     ];
     return [
       {
         questionId: id,
         answer,
-        ...(additionalComments ? { additionalComments } : {}),
+        ...(additionalComments || commentUnsubmitted ? { additionalComments } : {}),
         ...(unsubmitted.length ? { unsubmitted } : {}),
       },
     ];

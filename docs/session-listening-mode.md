@@ -552,9 +552,9 @@ What they already had is reconsidered against it. A signed-in person's saved ans
 first; if they can't be read, drafting waits until **Retry saved answers** reads them, so no
 draft replaces an answer nobody compared. The mapper gets those
 answers and their comments, the drafts already in review and any responder context as
-usual, and the files they added to the session themselves. An answer or comment changed on the
-page but not yet submitted, including an unsent draft restored on load, stands in for the
-submitted one, so the mapper is told which fields are unsubmitted. A draft that gives a different
+usual, and the files they added to the session themselves. An answer or comment changed or
+cleared on the page but not yet submitted, including an unsent draft restored on load, stands in
+for the submitted one, so the mapper is told which fields are unsubmitted. A draft that gives a different
 answer shows for review, saying which answer it changes. One that repeats an answer the AI
 was given adds nothing and is counted in a note as still fitting, unless it adds to the
 comment. A locked comment, or an encrypted one, can't be compared, so any comment the AI proposes
