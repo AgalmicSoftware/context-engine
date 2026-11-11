@@ -1600,14 +1600,14 @@ Implemented routes:
 - `POST /admin/groups/create`: admin-signed create. Alongside label,
   description, and image, records accept `tags` (maximum 20),
   `documentURLs` (maximum 10 public HTTPS URLs), `memberLimit` (1–1,000),
-  future `joinEndsAt`, and `adminAddress`. `joinMode` supports `admin_add` and
-  `open`; `password` and `invite` are recognized but rejected with
-  `join_mode_not_implemented`.
+  future `joinEndsAt`, `adminAddress`, and `removalAuth` (below). `joinMode`
+  supports `admin_add` and `open`; `password` and `invite` are recognized but
+  rejected with `join_mode_not_implemented`.
 - `POST /admin/groups/update`: admin-signed update for group metadata,
-  membership limit/deadline, join mode, and member visibility. A limit cannot
-  be reduced below the current authoritative member count.
+  membership limit/deadline, join mode, member visibility, and `removalAuth`. A
+  limit cannot be reduced below the current authoritative member count.
 - `POST /admin/groups/delete`: admin-signed tombstone. Deletion revokes future `group_gate` and `worker_group` condition checks.
-- `POST /admin/groups/add-member` / `POST /admin/groups/remove-member`: admin-signed membership mutation. The verified authority proof is carried to the session config coordinator, which rechecks it and holds its serialization queue while the separate group coordinator commits. Stale proofs return 409 before any group write. Participant create/join/leave use the same check because their JWT admission depends on the session authorization epoch. Already committed group intents recover within the group coordinator without repeating admission or copying session authority into that object.
+- `POST /admin/groups/add-member` / `POST /admin/groups/remove-member`: admin-signed membership mutation. Remove answers 403 `worker_group_removal_denied` when the group's `removalAuth` is `member_only` or `neither`. The verified authority proof is carried to the session config coordinator, which rechecks it and holds its serialization queue while the separate group coordinator commits. Stale proofs return 409 before any group write. Participant create/join/leave use the same check because their JWT admission depends on the session authorization epoch. Already committed group intents recover within the group coordinator without repeating admission or copying session authority into that object.
 - `POST /admin/groups/reconcile-empty`: admin-signed, idempotent repair for a
   matching `legacy_locked` coordinator only when the server-managed bootstrap
   proof and an exhaustive zero-row scan both succeed.
@@ -1644,19 +1644,36 @@ Implemented routes:
 - `POST /groups/create`: authenticated participant create, available only when
   `groupCreationPolicy: "participants"`. The Worker generates the group ID and
   forces `joinMode: "open"` plus `memberVisibility: "session"`. It accepts the
-  safe metadata and limit/deadline fields above, but derives `adminAddress`
-  from the authenticated principal.
+  safe metadata and limit/deadline fields above and `removalAuth`, but derives
+  `adminAddress` from the authenticated principal.
 - `POST /groups/join`: authenticated self-join for `joinMode: "open"` groups
   only, before `joinEndsAt` and while the per-group and deployment-wide member
   limits have capacity. Join returns the coordinator's post-mutation
   `memberCount` with the joined group so the client can reconcile that card
   without reloading the collection.
-- `POST /groups/leave`: authenticated self-removal from any current membership.
+- `POST /groups/leave`: authenticated self-removal from a current membership,
+  when the group's `removalAuth` is `both` or `member_only`; otherwise 403
+  `worker_group_leave_denied`.
   The Worker derives the principal from the bearer credential and ignores any
   caller-supplied principal, so a participant cannot remove another member. A
   session-visible leave returns the retained group and post-mutation count;
   restricted leave for `members` or `admin_only` visibility omits both group
   metadata and count once the caller is no longer permitted to see them.
+
+**Who can remove members.** Each group's `removalAuth` says who can end a
+membership, like an SBT's burn auth: `both` (the default) lets the member leave
+and admins remove them, `admin_only` lets only admins remove them,
+`member_only` lets only the member leave, and `neither` lets no one. The
+setting is checked once the membership is found, so someone who isn't a member
+gets 404 `worker_group_member_not_found` whatever it is. A refused leave or
+removal leaves the membership as it was, and deleting the group still works.
+Another value answers 400 `invalid_removal_auth`. Every group the Worker
+returns reports `removalAuth`, in the public listing, member and Admin lists,
+memberships, and mutation results. A group stored before the setting existed
+reports and works as `both`, and a Worker deployed before it omits the field,
+which means the same. The group coordinator checks the setting before it
+records a removal, so a removal it accepted still completes on a retry after an
+admin changes the setting.
 
 The client presents a selected Worker Group with the same high-level detail
 hierarchy as an on-chain SBT where the concepts apply: **Stats**, **Actions**,
@@ -1666,7 +1683,9 @@ current member count comes from an authenticated permission-visible group list,
 self-membership, or authorized member-list response. When the configured
 visibility permits it, a user icon opens the same style of member browser used
 for on-chain SBT holders.
-Actions use Join/Leave rather than Mint/Burn. More renders the group's
+Actions use Join/Leave rather than Mint/Burn; Leave shows only when the
+group's `removalAuth` lets members leave, and Stats say who can remove members.
+More renders the group's
 validated public document references and tags. Contract address, network, gas,
 transaction, and burn controls are never synthesized for a Worker-native
 group.
