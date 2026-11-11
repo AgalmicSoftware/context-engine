@@ -222,7 +222,6 @@ function setupSourceRepo() {
     writeFile(sourceDir, path.join('contextEngine-cc', 'public', 'js', 'sessionSlugs.mjs'), 'export default [];\n');
     writeFile(sourceDir, path.join('docs', 'agent-native-contract.md'), 'private agent doc\n');
     writeFile(sourceDir, path.join('docs', 'telegram-response-export-scope-prd.md'), 'private release planning\n');
-    writeFile(sourceDir, path.join('client', 'public', 'skill.md'), 'private agent skill\n');
     writeFile(
       sourceDir,
       path.join('workers', 'agentBridgeWorker', 'worker.js'),
@@ -254,7 +253,7 @@ function setupSourceRepo() {
     writeFile(sourceDir, path.join('contextEngine-cc', 'secret.txt'), 'internal\n');
     writeFile(sourceDir, path.join('docs', 'agent-native-bridge.md'), 'private agent bridge\n');
     writeFile(sourceDir, path.join('docs', 'telegram-cloudflare-500-user-scale-prd.md'), 'private telegram planning\n');
-    writeFile(sourceDir, path.join('client', 'public', 'skill.md'), 'private agent skill v2\n');
+    writeFile(sourceDir, path.join('client', 'public', 'skill.md'), 'public guide for AI agents\n');
     writeFile(sourceDir, path.join('workers', 'agentBridgeWorker', 'worker.js'), 'public agent bridge worker\n');
     writeFile(sourceDir, path.join('workers', 'agentBridgeWorker', 'transportMock.mjs'), 'agent bridge mock\n');
     fs.rmSync(path.join(sourceDir, 'workers', 'agentBridgeWorker', 'retired-private-notes.txt'));
@@ -796,7 +795,7 @@ test('sync-public-history replays public commits, skips private-only commits, an
     assert.doesNotMatch(trackedPaths, /^contextEngine-cc\/public\/js\/sessionSlugs\.mjs$/m);
     assert.doesNotMatch(trackedPaths, /^docs\/agent-native.*\.md$/m);
     assert.doesNotMatch(trackedPaths, /^docs\/.*prd.*\.md$/mi);
-    assert.doesNotMatch(trackedPaths, /^client\/public\/skill\.md$/m);
+    assert.match(trackedPaths, /^client\/public\/skill\.md$/m);
     assert.match(trackedPaths, /^workers\/agentBridgeWorker\//m);
     assert.match(trackedPaths, /^scripts\/run-agent-bridge-worker-tests\.js$/m);
     assert.doesNotMatch(trackedPaths, /^scripts\/vendor-cecc-ethers-bundle\.js$/m);
@@ -1651,7 +1650,7 @@ test('sync-public-history refreshes an existing remote PR branch safely without 
     assert.doesNotMatch(trackedPaths, /^contextEngine-cc\/public\/js\/sessionSlugs\.mjs$/m);
     assert.doesNotMatch(trackedPaths, /^docs\/agent-native.*\.md$/m);
     assert.doesNotMatch(trackedPaths, /^docs\/.*prd.*\.md$/mi);
-    assert.doesNotMatch(trackedPaths, /^client\/public\/skill\.md$/m);
+    assert.match(trackedPaths, /^client\/public\/skill\.md$/m);
     assert.match(trackedPaths, /^workers\/agentBridgeWorker\//m);
     assert.match(trackedPaths, /^scripts\/run-agent-bridge-worker-tests\.js$/m);
     assert.doesNotMatch(trackedPaths, /^scripts\/vendor-cecc-ethers-bundle\.js$/m);
@@ -1805,7 +1804,7 @@ test('sync-public-history recreates a deleted remote branch from an existing loc
     assert.doesNotMatch(trackedPaths, /^contextEngine-cc\/public\/js\/sessionSlugs\.mjs$/m);
     assert.doesNotMatch(trackedPaths, /^docs\/agent-native.*\.md$/m);
     assert.doesNotMatch(trackedPaths, /^docs\/.*prd.*\.md$/mi);
-    assert.doesNotMatch(trackedPaths, /^client\/public\/skill\.md$/m);
+    assert.match(trackedPaths, /^client\/public\/skill\.md$/m);
     assert.match(trackedPaths, /^workers\/agentBridgeWorker\//m);
     assert.match(trackedPaths, /^scripts\/run-agent-bridge-worker-tests\.js$/m);
     assert.doesNotMatch(trackedPaths, /^scripts\/vendor-cecc-ethers-bundle\.js$/m);

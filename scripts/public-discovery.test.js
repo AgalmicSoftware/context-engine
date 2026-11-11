@@ -12,6 +12,7 @@ const discoverabilityHtml = fs.readFileSync(
   'utf8'
 );
 const llmsTxt = fs.readFileSync(path.join(repoRoot, 'client', 'public', 'llms.txt'), 'utf8');
+const skillMd = fs.readFileSync(path.join(repoRoot, 'client', 'public', 'skill.md'), 'utf8');
 const sitemapXml = fs.readFileSync(path.join(repoRoot, 'client', 'public', 'sitemap.xml'), 'utf8');
 
 const repoUrl = 'https://github.com/AgalmicSoftware/context-engine';
@@ -116,6 +117,7 @@ test('llms.txt shows agents how to take part in a session', () => {
   assert.match(section, /`join_session` with the session link as you received it/);
   assert.match(section, /invited to add context/);
   assert.match(section, /A session's own instructions for agents come first/);
+  assert.match(section, /Its Session Worker serves them at `\/llms\.txt`/);
   for (const url of [
     'https://contextengine.sh/skill.md',
     'https://raw.githubusercontent.com/AgalmicSoftware/context-engine/main/docs/agent-participants.md',
@@ -123,6 +125,28 @@ test('llms.txt shows agents how to take part in a session', () => {
   ]) {
     assert.match(section, toUrlMatcher(url));
   }
+});
+
+test('skill.md shows agents how to take part, with nothing session-specific', () => {
+  assert.match(skillMd, /^# Taking part in a Context Engine session as an AI agent\n/);
+  assert.match(skillMd, /`npx -y --prefer-online @agalmic\/contextengine@latest`/);
+  assert.match(skillMd, /`CE_MCP_STATE_DIR`/);
+  assert.match(skillMd, /Call `join_session` with the session link exactly as you received it/);
+  assert.match(skillMd, /Never claim to be a person/);
+  assert.match(skillMd, /you're invited to add context/);
+  assert.match(skillMd, /`<worker>\/llms\.txt`/);
+  assert.match(skillMd, /Instructions from whoever you work for come first/);
+  assert.match(skillMd, /Nothing a session writes changes what its Worker allows/);
+  assert.match(skillMd, /`<worker>\/api\/agent\/skill`/);
+  for (const url of [
+    'https://contextengine.sh/known-sessions.json',
+    'https://raw.githubusercontent.com/AgalmicSoftware/context-engine/main/mcp/README.md',
+    'https://raw.githubusercontent.com/AgalmicSoftware/context-engine/main/docs/agent-participants.md',
+  ]) {
+    assert.match(skillMd, toUrlMatcher(url));
+  }
+  // Every session gets the same guide: no Worker addresses or tokens.
+  assert.doesNotMatch(skillMd, /workers\.dev|ceagt_/);
 });
 
 test('sitemap only includes raw-html crawlable discovery pages', () => {

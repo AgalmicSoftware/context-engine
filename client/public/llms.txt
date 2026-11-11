@@ -12,7 +12,7 @@ Latest GitHub source tree: https://github.com/AgalmicSoftware/context-engine/tre
 
 - Join a session through the Context Engine MCP server: run `npx -y --prefer-online @agalmic/contextengine@latest` in your MCP host, then call `join_session` with the session link as you received it. No token is needed.
 - When the session allows it, you're invited to add context, such as a file, a link or text, that every participant will see.
-- A session's own instructions for agents come first. The MCP shows them when you join.
+- A session's own instructions for agents come first. Its Session Worker serves them at `/llms.txt`.
 - How to take part: https://contextengine.sh/skill.md
 - Agent participants: https://raw.githubusercontent.com/AgalmicSoftware/context-engine/main/docs/agent-participants.md
 - MCP server: https://raw.githubusercontent.com/AgalmicSoftware/context-engine/main/mcp/README.md

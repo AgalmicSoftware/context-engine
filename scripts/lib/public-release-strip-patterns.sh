@@ -37,7 +37,6 @@ contextEngine-cc
 Claude outputs
 outreach-and-applications
 grant-applications
-client/public/skill.md
 TODO
 local-private-version
 CLAUDE.md
@@ -149,7 +148,6 @@ docs/assets/codebase-*
 docs/*PRD*.md
 docs/*prd*.md
 docs/agent-native*.md
-client/public/skill.md
 video-clickthrough-local
 local-private-version
 scripts/test-*.js

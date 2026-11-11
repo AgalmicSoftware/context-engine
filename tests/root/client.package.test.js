@@ -214,7 +214,7 @@ test('client static headers cache only existing versioned media and leave assets
     '/media/product-film/v1/context-engine-film-720p.mp4',
     '/media/product-film/v1/context-engine-og-1200x630.png',
   ];
-  assert.deepEqual(Object.keys(rules), ['/*', ...mediaPaths]);
+  assert.deepEqual(Object.keys(rules), ['/*', '/skill.md', ...mediaPaths]);
   for (const mediaPath of mediaPaths) {
     assert.ok(existsSync(resolve(rootDir, 'client/public', mediaPath.slice(1))));
     assert.equal(rules[mediaPath]['Cache-Control'], 'public, max-age=31536000, immutable');
@@ -222,6 +222,14 @@ test('client static headers cache only existing versioned media and leave assets
   }
   // Public files are copied unhashed, so none may be served from the /assets path.
   assert.equal(existsSync(resolve(rootDir, 'client/public/assets')), false);
+});
+
+test('client static headers serve the guide for AI agents as Markdown text', () => {
+  const rule = readHeaderRules()['/skill.md'];
+
+  assert.ok(existsSync(resolve(rootDir, 'client/public/skill.md')));
+  assert.equal(rule['Content-Type'], 'text/markdown; charset=utf-8');
+  assert.equal(rule['X-Content-Type-Options'], 'nosniff');
 });
 
 test('client social preview image uses versioned media and retains the earlier square image', () => {

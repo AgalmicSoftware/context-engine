@@ -620,6 +620,7 @@ async function inspectRoute(browser, baseUrl, route, options = {}) {
 // Files the site serves exactly as they are in the repo, not the app shell.
 const STATIC_FILES = Object.freeze({
   '/known-sessions.json': path.join(__dirname, '../known-sessions.json'),
+  '/skill.md': path.join(__dirname, '../client/public/skill.md'),
 });
 
 async function checkStaticFiles(baseUrl, fetchFile = fetch) {

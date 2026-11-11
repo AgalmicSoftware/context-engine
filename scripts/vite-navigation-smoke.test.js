@@ -281,18 +281,29 @@ test('a known session renders from its normal link with read-only local smoke fi
   }
 });
 
-test('the built site serves known-sessions.json unchanged', async () => {
-  const file = require('node:fs').readFileSync(STATIC_FILES['/known-sessions.json'], 'utf8');
-  const serve = (body, status = 200) => async (url) => {
-    assert.equal(url, 'http://127.0.0.1:4173/known-sessions.json');
+test('the built site serves known-sessions.json and skill.md unchanged', async () => {
+  const base = 'http://127.0.0.1:4173';
+  const files = Object.fromEntries(
+    Object.entries(STATIC_FILES).map(([route, file]) => [route, require('node:fs').readFileSync(file, 'utf8')]),
+  );
+  // Serves every file as it is, except one route given another body or status.
+  const serve = (changed, body, status = 200) => async (url) => {
+    const route = url.slice(base.length);
+    assert.ok(route in files, url);
+    if (route !== changed) return { ok: true, status: 200, text: async () => files[route] };
     return { ok: status === 200, status, text: async () => body };
   };
-  assert.deepEqual(await checkStaticFiles('http://127.0.0.1:4173', serve(file)), []);
-  for (const [body, status] of [['<!doctype html>', 200], [file.replace('eddy26', 'other'), 200], [file, 404]]) {
-    assert.deepEqual(await checkStaticFiles('http://127.0.0.1:4173', serve(body, status)), [
+  assert.deepEqual(Object.keys(files), ['/known-sessions.json', '/skill.md']);
+  assert.deepEqual(await checkStaticFiles(base, serve()), []);
+  const known = files['/known-sessions.json'];
+  for (const [body, status] of [['<!doctype html>', 200], [known.replace('eddy26', 'other'), 200], [known, 404]]) {
+    assert.deepEqual(await checkStaticFiles(base, serve('/known-sessions.json', body, status)), [
       `/known-sessions.json: not served as known-sessions.json (status ${status})`,
     ]);
   }
+  assert.deepEqual(await checkStaticFiles(base, serve('/skill.md', '<!doctype html>')), [
+    '/skill.md: not served as client/public/skill.md (status 200)',
+  ]);
 });
 
 test('pinned Worker fixtures do not mask reads from unrelated routes', async () => {
