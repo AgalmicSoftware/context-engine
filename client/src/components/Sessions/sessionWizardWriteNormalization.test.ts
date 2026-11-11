@@ -755,6 +755,22 @@ describe('sessionWizardWriteNormalization', () => {
     expect(payload).toHaveProperty('sessionEndsAt', '');
   });
 
+  test('buildSessionWizardWorkerConfigPayload leaves blank instructions for AI agents out and trims set ones', () => {
+    const build = (agentInstructions: string) =>
+      buildSessionWizardWorkerConfigPayload({
+        slug: 'agent-instructions',
+        draft: {
+          agentInstructions,
+          sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+        },
+        workerUrl: 'https://worker.example',
+      });
+
+    // Older Workers refuse the field; the config writers clear stored instructions.
+    expect(build(' \n ')).not.toHaveProperty('agentInstructions');
+    expect(build(' Join the open group.\n')).toHaveProperty('agentInstructions', 'Join the open group.');
+  });
+
   test('buildSessionWizardWorkerConfigPayload keeps only SBT defaults and Group Factory for explicit hybrid mode', () => {
     const sessionModeProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
     sessionModeProfile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;

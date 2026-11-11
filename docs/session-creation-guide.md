@@ -1371,9 +1371,12 @@ configuration without finalizing publication. You can edit and verify again;
 **Create** writes the final publication revision. Verifying an edited session
 description preserves existing sign-ins; authority changes still revoke them.
 
-Edits replace what an earlier verification stored: a blank end time or blank
-instructions for AI agents are sent as `""` and blank request limits as `null`,
-so a cleared value does not stay on the Worker. The browser compares the shared public fields, including session
+Edits replace what an earlier verification stored: a blank end time is sent as
+`""` and blank request limits as `null`, so a cleared value does not stay on the
+Worker. Blank instructions for AI agents are sent as `""` only when the Worker's
+config already has the field, which a Worker from before it refuses; the browser
+reads the config first, and leaves the field out if that read fails. The
+browser compares the shared public fields, including session
 appearance and the Worker URL's origin. It skips fields the Worker sets itself:
 the authorization epoch, the publication marker, the response field encryption
 it reports on every read, and, before publication, a revision the deploy helper

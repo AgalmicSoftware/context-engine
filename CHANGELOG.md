@@ -21,7 +21,7 @@ All notable changes to this project will be documented in this file.
 ### Workers — requires redeployment
 
 - `GET /llms.txt` returns a session's instructions for AI agents, `agentInstructions` in its public config, as `text/markdown` that a browser never runs as a page (`nosniff`, sandboxed), and 404 when it has none.
-- `set-config` and the deploy helper accept `agentInstructions` as text of up to 8,000 characters, and editing it signs no one out. A self-deployed Worker from before this release refuses it, and `/new` always sends it, so update such a Worker before setting up a session on it.
+- `set-config` and the deploy helper accept `agentInstructions` as text of up to 8,000 characters, and editing it signs no one out. A self-deployed Worker from before this release refuses the field, so `/new` sends it only when instructions are set or the Worker already holds some; to give agents instructions on such a Worker, update it first.
 
 ## [0.9.0] - 2026-11-02
 

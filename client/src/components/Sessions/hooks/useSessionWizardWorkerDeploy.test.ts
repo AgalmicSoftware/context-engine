@@ -350,7 +350,9 @@ describe('useSessionWizardWorkerDeploy', () => {
       }),
     );
     expect(fetchMock.mock.calls.some(([url]) => String(url).endsWith('/deploy'))).toBe(false);
-    expect(fetchMock.mock.calls.filter(([url]) => String(url).includes('/session-config'))).toHaveLength(1);
+    // One read finds no instructions for AI agents to clear, so none are sent; the other checks the write.
+    expect(fetchMock.mock.calls.filter(([url]) => String(url).includes('/session-config'))).toHaveLength(2);
+    expect(persistedConfig).not.toHaveProperty('agentInstructions');
     expect(bootstrap).toEqual(expect.objectContaining({ configRevision: '' }));
     expect(persistedConfig).not.toHaveProperty('configRevision');
     const secretsCall = fetchMock.mock.calls.find(([url]) => String(url).endsWith('/admin/set-secrets'));

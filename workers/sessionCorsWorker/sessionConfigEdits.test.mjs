@@ -154,6 +154,16 @@ test('instructions for AI agents save as text of at most 8,000 characters and si
   }
 });
 
+test('set-config keeps stored instructions for AI agents it is not sent, and an empty value clears them', () => {
+  const save = incomingConfig => applySessionConfigMutation({
+    existingConfig: { ...workerCanonicalConfig(), agentInstructions: 'Join the open group.' },
+    mutation: { kind: 'set-config', incomingConfig },
+    slug: 'session-a',
+  });
+  assert.equal(save({ sessionName: 'Renamed' }).config.agentInstructions, 'Join the open group.');
+  assert.equal(save({ agentInstructions: '' }).config.agentInstructions, '');
+});
+
 test('lists each edited path as content or as a sign-out', () => {
   const before = {
     sessionName: 'A',

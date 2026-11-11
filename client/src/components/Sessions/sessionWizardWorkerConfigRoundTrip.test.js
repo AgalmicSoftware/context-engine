@@ -208,3 +208,22 @@ it.each([
     expect(worker.stored.workerCanonicalPublicationRevision).toBe(published.configRevision);
   },
 );
+
+it('verifies and publishes with no instructions for AI agents on an older Worker that refuses the field', async () => {
+  const worker = createWorker();
+  const serve = worker.fetchImpl;
+  worker.fetchImpl = async (url, init) =>
+    init?.method === 'POST' && Object.hasOwn(JSON.parse(init.body).config, 'agentInstructions')
+      ? response(400, { error: 'Unsupported worker-canonical session config field: agentInstructions.' })
+      : serve(url, init);
+  const config = buildWizardConfig({ sessionEndsAt: '', perWalletPerDay: '100', perAnonymousIpPerDay: '' });
+
+  await verifySessionWizardWorkerPublicDeployment(buildInput(config, worker));
+  const published = await persistAndVerifySessionWizardWorkerConfig({
+    ...buildInput(config, worker),
+    retryDelaysMs: [],
+  });
+
+  expect(worker.stored.workerCanonicalPublicationRevision).toBe(published.configRevision);
+  expect(worker.stored).not.toHaveProperty('agentInstructions');
+});

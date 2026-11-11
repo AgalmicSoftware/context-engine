@@ -317,6 +317,44 @@ const getPublicConfigFromResponse = (body: UnknownRecord): UnknownRecord => {
   return clonePublicConfig(candidate);
 };
 
+// set-config merges fields, so blank instructions for AI agents are sent as ''
+// to clear stored ones. Older Workers refuse the field, so '' is sent only when
+// the Worker's config already has it; a failed read leaves the field out.
+export const withStoredAgentInstructionsCleared = async <T extends UnknownRecord>({
+  config,
+  workerOrigin,
+  slug,
+  fetchImpl,
+}: {
+  config: T;
+  workerOrigin: string;
+  slug: string;
+  fetchImpl: SessionWizardWorkerConfigFetchPort;
+}): Promise<T> => {
+  const profile = config.sessionModeProfile as { authority?: { mode?: unknown } } | undefined;
+  if (
+    Object.prototype.hasOwnProperty.call(config, 'agentInstructions') ||
+    profile?.authority?.mode !== 'worker_canonical'
+  ) {
+    return config;
+  }
+  try {
+    const response = await fetchImpl(`${workerOrigin}/session-config`, {
+      method: 'GET',
+      credentials: 'omit',
+      redirect: 'error',
+      headers: { Accept: 'application/json', 'X-Session-Slug': slug },
+    });
+    if (!response.ok) return config;
+    const stored = getPublicConfigFromResponse(await readResponseJson(response));
+    return Object.prototype.hasOwnProperty.call(stored, 'agentInstructions')
+      ? { ...config, agentInstructions: '' }
+      : config;
+  } catch {
+    return config;
+  }
+};
+
 const assertReachableWorkerCanonicalProfile = (profile: unknown, context: string): SessionModeProfile => {
   const support = classifySessionModeProfileSupport(profile);
   if (support.status !== 'reachable') {
@@ -430,8 +468,14 @@ export const persistAndVerifySessionWizardWorkerConfig = async ({
   if (typeof signAdminAction !== 'function') throw new Error('Worker config signing is unavailable.');
   if (typeof fetchImpl !== 'function') throw new Error('Worker config transport is unavailable.');
 
-  const publicConfig = clonePublicConfig(config);
-  assertReachableWorkerCanonicalProfile(publicConfig.sessionModeProfile, 'Prepared worker config');
+  const preparedConfig = clonePublicConfig(config);
+  assertReachableWorkerCanonicalProfile(preparedConfig.sessionModeProfile, 'Prepared worker config');
+  const publicConfig = await withStoredAgentInstructionsCleared({
+    config: preparedConfig,
+    workerOrigin,
+    slug: normalizedSlug,
+    fetchImpl,
+  });
 
   const revisionConfig = { ...publicConfig };
   delete revisionConfig.configRevision;
