@@ -85,6 +85,11 @@ AGENT_BRIDGE_PUBLIC_CUTOVER_COMMIT=""
 AGENT_BRIDGE_PUBLIC_RETIREMENT_COMMIT=""
 AGENT_BRIDGE_RETIREMENT_REPLAYED=""
 
+# The guide for AI agents was private until its file was deleted and written
+# again for publication, so only commits from that deletion on publish it.
+AGENT_GUIDE_PATH="client/public/skill.md"
+AGENT_GUIDE_PUBLIC_FROM_COMMIT=""
+
 PRIVATE_REPLAY_MESSAGE_TOKENS=(
   "contextEngine-cc"
   "docs/agent-native"
@@ -194,6 +199,11 @@ agent_bridge_is_public_for_source_commit() {
     ! agent_bridge_is_retired_for_source_commit "$commit_sha"
 }
 
+agent_guide_is_public_for_source_commit() {
+  [ -n "$AGENT_GUIDE_PUBLIC_FROM_COMMIT" ] &&
+    git -C "$REPO_ROOT" merge-base --is-ancestor "$AGENT_GUIDE_PUBLIC_FROM_COMMIT" "$1"
+}
+
 path_matches_strip_pattern() {
   local relative_path="$1"
   local commit_sha="${2:-}"
@@ -213,6 +223,11 @@ path_matches_strip_pattern() {
         ;;
     esac
   done
+
+  if [ -n "$commit_sha" ] && [ "$relative_path" = "$AGENT_GUIDE_PATH" ] &&
+    ! agent_guide_is_public_for_source_commit "$commit_sha"; then
+    return 0
+  fi
 
   if [ -n "$commit_sha" ] && is_agent_bridge_public_history_path "$relative_path"; then
     # The retirement commit's own deletions change public files, so dry runs and
@@ -432,6 +447,15 @@ strip_private_paths_from_clone() {
     done
 
     apply_agent_bridge_public_history_policy "$commit_sha"
+    # An older commit's guide was private: keep the replay's own version.
+    if ! agent_guide_is_public_for_source_commit "$commit_sha"; then
+      if git cat-file -e "HEAD:$AGENT_GUIDE_PATH" 2>/dev/null; then
+        git checkout HEAD -- "$AGENT_GUIDE_PATH"
+      else
+        git rm -f --ignore-unmatch -- "$AGENT_GUIDE_PATH" >/dev/null 2>&1 || true
+        rm -f -- "$AGENT_GUIDE_PATH"
+      fi
+    fi
     git -C "$REPO_ROOT" show "${commit_sha}:package.json" > "$TMP_ROOT/public-package-source.json"
     node \
       "$REPO_ROOT/scripts/scrub-public-package-json.js" \
@@ -1030,6 +1054,10 @@ fi
 if ! git -C "$REPO_ROOT" show-ref --verify --quiet "refs/heads/$SOURCE_BRANCH"; then
   fail "Local source branch $SOURCE_BRANCH was not found." 1
 fi
+
+AGENT_GUIDE_PUBLIC_FROM_COMMIT=$(
+  git -C "$REPO_ROOT" log --diff-filter=D --format='%H' "$SOURCE_BRANCH" -- "$AGENT_GUIDE_PATH" | sed -n '1p'
+)
 
 AGENT_BRIDGE_PUBLIC_CUTOVER_COMMIT=$(
   git -C "$REPO_ROOT" log \

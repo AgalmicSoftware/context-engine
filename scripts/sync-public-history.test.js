@@ -222,6 +222,7 @@ function setupSourceRepo() {
     writeFile(sourceDir, path.join('contextEngine-cc', 'public', 'js', 'sessionSlugs.mjs'), 'export default [];\n');
     writeFile(sourceDir, path.join('docs', 'agent-native-contract.md'), 'private agent doc\n');
     writeFile(sourceDir, path.join('docs', 'telegram-response-export-scope-prd.md'), 'private release planning\n');
+    writeFile(sourceDir, path.join('client', 'public', 'skill.md'), 'private agent skill\n');
     writeFile(
       sourceDir,
       path.join('workers', 'agentBridgeWorker', 'worker.js'),
@@ -253,7 +254,7 @@ function setupSourceRepo() {
     writeFile(sourceDir, path.join('contextEngine-cc', 'secret.txt'), 'internal\n');
     writeFile(sourceDir, path.join('docs', 'agent-native-bridge.md'), 'private agent bridge\n');
     writeFile(sourceDir, path.join('docs', 'telegram-cloudflare-500-user-scale-prd.md'), 'private telegram planning\n');
-    writeFile(sourceDir, path.join('client', 'public', 'skill.md'), 'public guide for AI agents\n');
+    writeFile(sourceDir, path.join('client', 'public', 'skill.md'), 'private agent skill v2\n');
     writeFile(sourceDir, path.join('workers', 'agentBridgeWorker', 'worker.js'), 'public agent bridge worker\n');
     writeFile(sourceDir, path.join('workers', 'agentBridgeWorker', 'transportMock.mjs'), 'agent bridge mock\n');
     fs.rmSync(path.join(sourceDir, 'workers', 'agentBridgeWorker', 'retired-private-notes.txt'));
@@ -795,7 +796,7 @@ test('sync-public-history replays public commits, skips private-only commits, an
     assert.doesNotMatch(trackedPaths, /^contextEngine-cc\/public\/js\/sessionSlugs\.mjs$/m);
     assert.doesNotMatch(trackedPaths, /^docs\/agent-native.*\.md$/m);
     assert.doesNotMatch(trackedPaths, /^docs\/.*prd.*\.md$/mi);
-    assert.match(trackedPaths, /^client\/public\/skill\.md$/m);
+    assert.doesNotMatch(trackedPaths, /^client\/public\/skill\.md$/m);
     assert.match(trackedPaths, /^workers\/agentBridgeWorker\//m);
     assert.match(trackedPaths, /^scripts\/run-agent-bridge-worker-tests\.js$/m);
     assert.doesNotMatch(trackedPaths, /^scripts\/vendor-cecc-ethers-bundle\.js$/m);
@@ -1091,6 +1092,27 @@ test('sync-public-history replays across the Agent Bridge retirement commit', ()
       git(sourceDir, ['show', 'release-candidate:public.txt']),
       'public one\npublic two\npublic three\n',
     );
+  });
+});
+
+test('sync-public-history publishes the agent guide only from the deletion of its private file', () => {
+  withSourceRepo(({ sourceDir }) => {
+    // The fixture's earlier commits hold the guide's private versions.
+    const guide = path.join('client', 'public', 'skill.md');
+    removeFromSource(sourceDir, guide);
+    commitAt(sourceDir, 'Remove the private guide', 1);
+    writeFile(sourceDir, guide, 'public guide for AI agents\n');
+    commitAt(sourceDir, 'Publish the guide', 2);
+
+    const result = runSyncScript(sourceDir, ['release-candidate']);
+    assert.equal(result.status, 0, syncFailureMessage(result));
+
+    assert.equal(git(sourceDir, ['show', 'release-candidate:client/public/skill.md']), 'public guide for AI agents\n');
+    const guideHistory = git(sourceDir, ['log', '-p', 'origin/main..release-candidate', '--', 'client/public/skill.md']);
+    assert.doesNotMatch(guideHistory, /private agent skill/);
+    const subjects = git(sourceDir, ['log', '--format=%s', 'origin/main..release-candidate']);
+    assert.doesNotMatch(subjects, /^Remove the private guide$/m);
+    assert.match(subjects, /^Publish the guide$/m);
   });
 });
 
@@ -1650,7 +1672,7 @@ test('sync-public-history refreshes an existing remote PR branch safely without 
     assert.doesNotMatch(trackedPaths, /^contextEngine-cc\/public\/js\/sessionSlugs\.mjs$/m);
     assert.doesNotMatch(trackedPaths, /^docs\/agent-native.*\.md$/m);
     assert.doesNotMatch(trackedPaths, /^docs\/.*prd.*\.md$/mi);
-    assert.match(trackedPaths, /^client\/public\/skill\.md$/m);
+    assert.doesNotMatch(trackedPaths, /^client\/public\/skill\.md$/m);
     assert.match(trackedPaths, /^workers\/agentBridgeWorker\//m);
     assert.match(trackedPaths, /^scripts\/run-agent-bridge-worker-tests\.js$/m);
     assert.doesNotMatch(trackedPaths, /^scripts\/vendor-cecc-ethers-bundle\.js$/m);
@@ -1804,7 +1826,7 @@ test('sync-public-history recreates a deleted remote branch from an existing loc
     assert.doesNotMatch(trackedPaths, /^contextEngine-cc\/public\/js\/sessionSlugs\.mjs$/m);
     assert.doesNotMatch(trackedPaths, /^docs\/agent-native.*\.md$/m);
     assert.doesNotMatch(trackedPaths, /^docs\/.*prd.*\.md$/mi);
-    assert.match(trackedPaths, /^client\/public\/skill\.md$/m);
+    assert.doesNotMatch(trackedPaths, /^client\/public\/skill\.md$/m);
     assert.match(trackedPaths, /^workers\/agentBridgeWorker\//m);
     assert.match(trackedPaths, /^scripts\/run-agent-bridge-worker-tests\.js$/m);
     assert.doesNotMatch(trackedPaths, /^scripts\/vendor-cecc-ethers-bundle\.js$/m);
