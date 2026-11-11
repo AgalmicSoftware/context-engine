@@ -1344,8 +1344,10 @@ where the session's Worker is:
 
 Add the entry with a pull request. Normal links work once it's on `main` and the
 site has deployed; until then, share the `worker=` link. Any other session opens
-only from its `worker=` link. The site also serves the file at
-`/known-sessions.json`, so agents can find a session's Worker from its slug.
+only from its `worker=` link, except the site's built-in demos, such as
+`demo-interview`, which open from the demo data bundled with the site. The site
+also serves the file at `/known-sessions.json`, so agents can find a session's
+Worker from its slug.
 
 The file lists EDDY 2026 (`eddy26`), the demo session (`demo-sh`) and
 `rxc-ra-test-5`. `rxc-ra-test-5` stays only until the films, stills, promo
