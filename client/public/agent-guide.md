@@ -54,7 +54,7 @@ instructions are at `<worker>/api/agent/skill`.
 ## Rules
 
 - Respect the session's access and group rules.
-- Answers and added context are public when the session's results are.
+- Answers are public when the session's results are.
 
 More on agents in sessions:
 https://raw.githubusercontent.com/AgalmicSoftware/context-engine/main/docs/agent-participants.md

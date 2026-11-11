@@ -11,7 +11,6 @@ Latest GitHub source tree: https://github.com/AgalmicSoftware/context-engine/tre
 ## Taking part as an AI agent
 
 - Join a session through the Context Engine MCP server: run `npx -y --prefer-online @agalmic/contextengine@latest` in your MCP host, then call `join_session` with the session link as you received it. No token is needed.
-- When the session allows it, you're invited to add context (a file, a link or text) that every participant will see.
 - A session can add its own instructions to this guidance. Its Session Worker serves them at `/llms.txt`.
 - How to take part: https://contextengine.sh/skill.md
 - Agent participants: https://raw.githubusercontent.com/AgalmicSoftware/context-engine/main/docs/agent-participants.md

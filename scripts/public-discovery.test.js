@@ -14,6 +14,15 @@ const discoverabilityHtml = fs.readFileSync(
 const llmsTxt = fs.readFileSync(path.join(repoRoot, 'client', 'public', 'llms.txt'), 'utf8');
 const skillMd = fs.readFileSync(path.join(repoRoot, 'client', 'public', 'agent-guide.md'), 'utf8');
 const mcpTools = fs.readFileSync(path.join(repoRoot, 'mcp', 'lib', 'tools.mjs'), 'utf8');
+// The MCP's own code, without its tests.
+const mcpSource = ['bin', 'lib']
+  .flatMap((dir) =>
+    fs
+      .readdirSync(path.join(repoRoot, 'mcp', dir))
+      .filter((name) => name.endsWith('.mjs') && !name.endsWith('.test.mjs'))
+      .map((name) => fs.readFileSync(path.join(repoRoot, 'mcp', dir, name), 'utf8'))
+  )
+  .join('\n');
 const sitemapXml = fs.readFileSync(path.join(repoRoot, 'client', 'public', 'sitemap.xml'), 'utf8');
 
 const repoUrl = 'https://github.com/AgalmicSoftware/context-engine';
@@ -112,11 +121,25 @@ test('discoverability assets point to the latest GitHub branch documents', () =>
   assert.match(llmsTxt, /EVM and Arweave are profile-specific options, not baseline dependencies/);
 });
 
+// The agent docs offer only what the MCP does: each snake_case name they put in
+// backticks is one of its tools, adding context needs its add_context tool, and
+// "the MCP shows them" (a session's instructions) needs MCP code that reads them.
+const assertOffersOnlyWhatTheMcpDoes = (text) => {
+  const tools = new Set([...mcpTools.matchAll(/name: '([a-z_]+)'/g)].map((match) => match[1]));
+  for (const [, tool] of text.matchAll(/`([a-z]+(?:_[a-z]+)+)`/g)) {
+    assert.ok(tools.has(tool), `the MCP has no ${tool} tool`);
+  }
+  if (/\badd(?:ed|ing)? context\b/i.test(text)) {
+    assert.ok(tools.has('add_context'), 'the MCP has no add_context tool');
+  }
+  if (/MCP\s+shows\s+them/.test(text)) assert.match(mcpSource, /agentInstructions|llms\.txt/);
+};
+
 test('llms.txt shows agents how to take part in a session', () => {
   const section = llmsTxt.split('## Taking part as an AI agent\n')[1]?.split('\n## ')[0] || '';
   assert.match(section, /`npx -y --prefer-online @agalmic\/contextengine@latest`/);
   assert.match(section, /`join_session` with the session link as you received it/);
-  assert.match(section, /invited to add context/);
+  assertOffersOnlyWhatTheMcpDoes(section);
   assert.match(section, /A session can add its own instructions to this guidance/);
   assert.match(section, /Its Session Worker serves them at `\/llms\.txt`/);
   assert.doesNotMatch(section, /come first/);
@@ -136,13 +159,7 @@ test('skill.md shows agents how to take part, with nothing session-specific', ()
   assert.match(skillMd, /Call `join_session` with the session link exactly as you received it/);
   assert.match(skillMd, /Never claim to be a person/);
   assert.match(skillMd, /join open groups\s+with `join_group`/);
-  // The guide names only tools the MCP has, and says the MCP shows a
-  // session's instructions only once the MCP reads them.
-  const toolNames = new Set([...mcpTools.matchAll(/name: '([a-z_]+)'/g)].map((match) => match[1]));
-  for (const [, tool] of skillMd.matchAll(/`([a-z]+(?:_[a-z]+)+)`/g)) {
-    assert.ok(toolNames.has(tool), `the MCP has no ${tool} tool`);
-  }
-  if (/MCP\s+shows them/.test(skillMd)) assert.match(mcpTools, /agentInstructions|llms\.txt/);
+  assertOffersOnlyWhatTheMcpDoes(skillMd);
   assert.match(skillMd, /`<worker>\/llms\.txt`/);
   // A session's instructions add to the guide and can't lift its rules.
   assert.match(skillMd, /A session's own instructions add to this guide/);
