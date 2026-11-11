@@ -22,8 +22,29 @@ export async function readRegistry(fetchImpl = fetch) {
   return JSON.parse(text);
 }
 
+// npm can take a while to list a new version, so after publishing the registry
+// is read every ten seconds, for up to three minutes, until it lists this
+// version as latest with provenance. A failed read is tried again.
+const CONFIRM_FOR_MS = 180_000;
+const CONFIRM_EVERY_MS = 10_000;
+const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
+
+async function readAfterPublish(receipt, getRegistry, { wait, now }) {
+  const deadline = now() + CONFIRM_FOR_MS;
+  let after, readError;
+  for (;;) {
+    try { after = await getRegistry(); readError = undefined; } catch (error) { readError = error; }
+    const existing = after?.versions?.[receipt.version];
+    // Other contents under this version are a mismatch, not a delay.
+    const settled = existing && (existing.dist?.integrity !== receipt.integrity
+      || (after['dist-tags']?.latest === receipt.version && existing.dist?.attestations?.url));
+    if (settled || now() >= deadline) return { after, readError };
+    await wait(CONFIRM_EVERY_MS);
+  }
+}
+
 export async function publishVerified({ receipt, tarball, getRegistry = readRegistry,
-  checkSource, publish, dryRun = false }) {
+  checkSource, publish, dryRun = false, wait = sleep, now = Date.now }) {
   await checkSource();
   const decision = publicationDecision(receipt, await getRegistry());
   if (decision !== 'publish' || dryRun) return dryRun ? `dry-run:${decision}` : decision;
@@ -32,9 +53,12 @@ export async function publishVerified({ receipt, tarball, getRegistry = readRegi
   if (publicationDecision(receipt, await getRegistry()) !== 'publish') return 'already-published';
   let publishError;
   try { await publish(tarball); } catch (error) { publishError = error; }
-  const after = await getRegistry();
-  const existing = after.versions?.[receipt.version];
-  if (!existing) throw new Error('Publish was not confirmed. Inspect the registry before rerunning.', { cause: publishError });
+  const { after, readError } = await readAfterPublish(receipt, getRegistry, { wait, now });
+  const existing = after?.versions?.[receipt.version];
+  // A last read that failed leaves only an older answer, which confirms nothing.
+  if (!existing || readError) {
+    throw new Error('Publish was not confirmed. Inspect the registry before rerunning.', { cause: publishError ?? readError });
+  }
   assert.equal(existing.dist?.integrity, receipt.integrity, 'published package integrity mismatch');
   assert.equal(after['dist-tags']?.latest, receipt.version, 'published version is not latest');
   assert(existing.dist?.attestations?.url, 'published package is missing provenance attestations');

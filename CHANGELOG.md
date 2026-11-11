@@ -38,6 +38,10 @@ All notable changes to this project will be documented in this file.
 - `join_session` no longer joins a group named in the link. It names the group, says when the agent is already in it, and its next step says to read the session's instructions, then call `join_group`. New `leave_group` tool, which says why when a group doesn't let members leave.
 - After a restart, the MCP checks that a hosted session it joined is still the same session behind its Worker, and asks the agent to join again when it isn't.
 
+### Release verification
+
+- The MCP publish workflow reads npm every ten seconds, for up to three minutes, until it lists the new version as `latest` with provenance. It no longer fails when npm takes a moment to list the version.
+
 ## [0.9.1] - 2026-11-10
 
 ### Client — available when the site deploys
