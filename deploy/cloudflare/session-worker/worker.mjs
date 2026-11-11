@@ -30861,7 +30861,7 @@ var init_sessionConfigMutation = __esm({
 });
 
 // workers/sessionCorsWorker/workerGroups.js
-var trim2, isObj7, WORKER_GROUP_JOIN_MODES, WORKER_GROUP_MEMBER_VISIBILITY, DEFAULT_WORKER_GROUP_MAX_GROUPS_PER_SESSION, DEFAULT_WORKER_GROUP_MAX_MEMBERS_PER_GROUP, MAX_WORKER_GROUP_IMAGE_URL_LENGTH, MAX_WORKER_GROUP_DOCUMENT_URLS, MAX_WORKER_GROUP_TAGS, MAX_WORKER_GROUP_TAG_LENGTH, MAX_WORKER_GROUP_MEMBER_LIMIT, MAX_WORKER_GROUP_ID_LENGTH, MAX_WORKER_GROUP_SESSION_SLUG_LENGTH, DEFAULT_WORKER_GROUP_MEMBER_PAGE_SIZE, MAX_WORKER_GROUP_MEMBER_PAGE_SIZE, WORKER_GROUPS_FRESH_BOOTSTRAP_SENTINEL, IMPLEMENTED_JOIN_MODES, normalizeWorkerGroupId, isAddressShapedWorkerGroupId, encodedPrincipalKeyPart, canonicalSessionIdKeyPart, canonicalWorkerGroupSessionSlug, nowIso, parsePositiveInt, resolveWorkerGroupMemberPageRequest, WORKER_GROUP_MEMBER_CURSOR_PREFIX, decodeWorkerGroupMemberCursor, encodeWorkerGroupMemberCursor, resolveWorkerGroupCaps, resolveWorkerGroupsKv, resolveWorkerGroupStore, workerGroupIdentityKeyPrefix, workerGroupBackupPrefixes, workerGroupRecordMatchesIdentity, groupKey, groupPrefix, groupIndexKey, groupIndexPrefix, memberKey, memberIndexKey, memberPrefix, principalPrefix, legacyGroupKey, legacyGroupPrefix, legacyGroupIndexKey, legacyGroupIndexPrefix, jsonResponse, normalizeJoinMode, normalizeMemberVisibility, normalizeImageUrl, normalizeGroupTags, normalizeGroupDocumentUrls, normalizeGroupMemberLimit, normalizeGroupJoinEndsAt, normalizeEvmAddress, normalizePrincipalId, principalKeyFor, normalizeWorkerGroupPrincipal, resolveWorkerGroupPrincipal, createWorkerGroupId, normalizeGroupPatch, kvGetJsonStrict, kvGetLegacyJson, resolveWorkerGroupBootstrap, kvListKeys, kvListKeyPage, readGroupRecord, writeGroupRecord, listGroupRecords, scanWorkerGroupRecordsForIdentity, writeMembershipRecord, canonicalizeMembershipRecord, readMembershipRecord, listMembershipRecords, listMembershipRecordPage, redactGroupForMember, normalizeWorkerGroupMembershipFailure, createWorkerGroup, updateWorkerGroup, deleteWorkerGroup, addWorkerGroupMember, removeWorkerGroupMember, listWorkerGroups, listWorkerGroupMembers, redactWorkerGroupMemberForViewer, listWorkerGroupMembersForPrincipal, listWorkerGroupMemberships, executeWorkerGroupMutation, workerGroupCoordinationUnavailable, callWorkerGroupCoordinator, coordinateWorkerGroupBackup, checkCoordinatedWorkerGroupReady, reconcileCoordinatedWorkerGroupCapacity, readCoordinatedWorkerGroupCatalog, readCoordinatedWorkerGroupMemberships, isWorkerGroupMember, forwardWorkerGroupMutation, executeCoordinatedWorkerGroupMutation, parseRouteBody, routeError, resolveWorkerGroupSessionIdentity, participantGroupCreationAllowed, isSelfJoinableWorkerGroup, listWorkerGroupsForVisitor, listSelfJoinableWorkerGroupsForVisitor, listSelfJoinableWorkerGroupsForMember, dispatchPublicWorkerGroupListRequest, dispatchAdminWorkerGroupRequest, workerGroupsRoute;
+var trim2, isObj7, WORKER_GROUP_JOIN_MODES, WORKER_GROUP_MEMBER_VISIBILITY, WORKER_GROUP_REMOVAL_AUTH, DEFAULT_WORKER_GROUP_MAX_GROUPS_PER_SESSION, DEFAULT_WORKER_GROUP_MAX_MEMBERS_PER_GROUP, MAX_WORKER_GROUP_IMAGE_URL_LENGTH, MAX_WORKER_GROUP_DOCUMENT_URLS, MAX_WORKER_GROUP_TAGS, MAX_WORKER_GROUP_TAG_LENGTH, MAX_WORKER_GROUP_MEMBER_LIMIT, MAX_WORKER_GROUP_ID_LENGTH, MAX_WORKER_GROUP_SESSION_SLUG_LENGTH, DEFAULT_WORKER_GROUP_MEMBER_PAGE_SIZE, MAX_WORKER_GROUP_MEMBER_PAGE_SIZE, WORKER_GROUPS_FRESH_BOOTSTRAP_SENTINEL, IMPLEMENTED_JOIN_MODES, normalizeWorkerGroupId, isAddressShapedWorkerGroupId, encodedPrincipalKeyPart, canonicalSessionIdKeyPart, canonicalWorkerGroupSessionSlug, nowIso, parsePositiveInt, resolveWorkerGroupMemberPageRequest, WORKER_GROUP_MEMBER_CURSOR_PREFIX, decodeWorkerGroupMemberCursor, encodeWorkerGroupMemberCursor, resolveWorkerGroupCaps, resolveWorkerGroupsKv, resolveWorkerGroupStore, workerGroupIdentityKeyPrefix, workerGroupBackupPrefixes, workerGroupRecordMatchesIdentity, groupKey, groupPrefix, groupIndexKey, groupIndexPrefix, memberKey, memberIndexKey, memberPrefix, principalPrefix, legacyGroupKey, legacyGroupPrefix, legacyGroupIndexKey, legacyGroupIndexPrefix, jsonResponse, normalizeJoinMode, normalizeMemberVisibility, normalizeRemovalAuth, REMOVERS_BY_REMOVAL_AUTH, workerGroupRemovalRefusal, normalizeImageUrl, normalizeGroupTags, normalizeGroupDocumentUrls, normalizeGroupMemberLimit, normalizeGroupJoinEndsAt, normalizeEvmAddress, normalizePrincipalId, principalKeyFor, normalizeWorkerGroupPrincipal, resolveWorkerGroupPrincipal, createWorkerGroupId, normalizeGroupPatch, kvGetJsonStrict, kvGetLegacyJson, resolveWorkerGroupBootstrap, kvListKeys, kvListKeyPage, readGroupRecord, writeGroupRecord, listGroupRecords, scanWorkerGroupRecordsForIdentity, writeMembershipRecord, canonicalizeMembershipRecord, readMembershipRecord, listMembershipRecords, listMembershipRecordPage, redactGroupForMember, normalizeWorkerGroupMembershipFailure, createWorkerGroup, updateWorkerGroup, deleteWorkerGroup, addWorkerGroupMember, removeWorkerGroupMember, listWorkerGroups, listWorkerGroupMembers, redactWorkerGroupMemberForViewer, listWorkerGroupMembersForPrincipal, listWorkerGroupMemberships, executeWorkerGroupMutation, workerGroupCoordinationUnavailable, callWorkerGroupCoordinator, coordinateWorkerGroupBackup, checkCoordinatedWorkerGroupReady, reconcileCoordinatedWorkerGroupCapacity, readCoordinatedWorkerGroupCatalog, readCoordinatedWorkerGroupMemberships, isWorkerGroupMember, forwardWorkerGroupMutation, executeCoordinatedWorkerGroupMutation, parseRouteBody, routeError, resolveWorkerGroupSessionIdentity, participantGroupCreationAllowed, isSelfJoinableWorkerGroup, listWorkerGroupsForVisitor, listSelfJoinableWorkerGroupsForVisitor, listSelfJoinableWorkerGroupsForMember, dispatchPublicWorkerGroupListRequest, dispatchAdminWorkerGroupRequest, workerGroupsRoute;
 var init_workerGroups = __esm({
   "workers/sessionCorsWorker/workerGroups.js"() {
     init_sessionConfigAuthority();
@@ -30882,6 +30882,12 @@ var init_workerGroups = __esm({
       ADMIN_ONLY: "admin_only",
       MEMBERS: "members",
       SESSION: "session"
+    });
+    WORKER_GROUP_REMOVAL_AUTH = Object.freeze({
+      BOTH: "both",
+      ADMIN_ONLY: "admin_only",
+      MEMBER_ONLY: "member_only",
+      NEITHER: "neither"
     });
     DEFAULT_WORKER_GROUP_MAX_GROUPS_PER_SESSION = 100;
     DEFAULT_WORKER_GROUP_MAX_MEMBERS_PER_GROUP = 1e3;
@@ -31004,6 +31010,21 @@ var init_workerGroups = __esm({
       const visibility = trim2(value || WORKER_GROUP_MEMBER_VISIBILITY.ADMIN_ONLY).toLowerCase();
       if (Object.values(WORKER_GROUP_MEMBER_VISIBILITY).includes(visibility)) return visibility;
       return "";
+    };
+    normalizeRemovalAuth = (value) => {
+      const auth = trim2(value || WORKER_GROUP_REMOVAL_AUTH.BOTH).toLowerCase();
+      if (Object.values(WORKER_GROUP_REMOVAL_AUTH).includes(auth)) return auth;
+      return "";
+    };
+    REMOVERS_BY_REMOVAL_AUTH = Object.freeze({
+      [WORKER_GROUP_REMOVAL_AUTH.BOTH]: ["admin", "member"],
+      [WORKER_GROUP_REMOVAL_AUTH.ADMIN_ONLY]: ["admin"],
+      [WORKER_GROUP_REMOVAL_AUTH.MEMBER_ONLY]: ["member"],
+      [WORKER_GROUP_REMOVAL_AUTH.NEITHER]: []
+    });
+    workerGroupRemovalRefusal = (removalAuth, remover) => {
+      if ((REMOVERS_BY_REMOVAL_AUTH[normalizeRemovalAuth(removalAuth)] || []).includes(remover)) return "";
+      return remover === "member" ? "worker_group_leave_denied" : "worker_group_removal_denied";
     };
     normalizeImageUrl = (value) => {
       const raw = trim2(value);
@@ -31155,6 +31176,8 @@ var init_workerGroups = __esm({
       }
       const memberVisibility = normalizeMemberVisibility(input.memberVisibility || existing?.memberVisibility);
       if (!memberVisibility) return { ok: false, status: 400, reason: "invalid_member_visibility" };
+      const removalAuth = normalizeRemovalAuth(input.removalAuth || existing?.removalAuth);
+      if (!removalAuth) return { ok: false, status: 400, reason: "invalid_removal_auth" };
       const label = trim2(input.label || existing?.label);
       if (!label || label.length > 120) return { ok: false, status: 400, reason: "invalid_group_label" };
       const description = trim2(input.description ?? existing?.description);
@@ -31190,6 +31213,7 @@ var init_workerGroups = __esm({
           adminAddress: adminAddress || void 0,
           joinMode,
           memberVisibility,
+          removalAuth,
           updatedAt,
           ...existing ? {} : {
             createdBy: actorPrincipal,
@@ -31634,6 +31658,7 @@ var init_workerGroups = __esm({
       ...group.adminAddress ? { adminAddress: group.adminAddress } : {},
       joinMode: group.joinMode,
       memberVisibility: group.memberVisibility,
+      removalAuth: normalizeRemovalAuth(group.removalAuth),
       createdAt: group.createdAt,
       updatedAt: group.updatedAt
     });
@@ -31797,7 +31822,7 @@ var init_workerGroups = __esm({
         created: !existing
       };
     };
-    removeWorkerGroupMember = async ({ env, slug, sessionId, groupId, principal, actorPrincipal, resume = false, deps = {} } = {}) => {
+    removeWorkerGroupMember = async ({ env, slug, sessionId, groupId, principal, actorPrincipal, remover, resume = false, deps = {} } = {}) => {
       const store = resolveWorkerGroupStore(env);
       if (!store) return { ok: false, status: 501, reason: "worker_group_store_not_configured" };
       const group = await readGroupRecord({ store, slug, sessionId, groupId });
@@ -31813,6 +31838,8 @@ var init_workerGroups = __esm({
       });
       const removed = resume && !!existing?.removedAt;
       if (!removed && (!existing || existing.removedAt)) return { ok: false, status: 404, reason: "worker_group_member_not_found" };
+      const refusal = resume ? "" : workerGroupRemovalRefusal(group.removalAuth, remover);
+      if (refusal) return { ok: false, status: 403, reason: refusal };
       if (!removed) {
         const removedAt = nowIso(deps);
         const member = { ...existing, removedAt, removedBy: actorPrincipal };
@@ -32082,6 +32109,7 @@ var init_workerGroups = __esm({
       groupId,
       principal,
       actorPrincipal,
+      remover,
       capacityAuthorized = false,
       resume = false,
       deps = {}
@@ -32125,6 +32153,7 @@ var init_workerGroups = __esm({
           groupId,
           principal,
           actorPrincipal,
+          remover,
           capacityAuthorized,
           resume,
           deps
@@ -32257,7 +32286,8 @@ var init_workerGroups = __esm({
       input,
       groupId,
       principal,
-      actorPrincipal
+      actorPrincipal,
+      remover
     } = {}) => {
       return callWorkerGroupCoordinator({
         env,
@@ -32269,7 +32299,8 @@ var init_workerGroups = __esm({
           input,
           groupId,
           principal,
-          actorPrincipal
+          actorPrincipal,
+          remover
         }
       });
     };
@@ -32564,7 +32595,8 @@ var init_workerGroups = __esm({
           operation: "remove-member",
           groupId: body?.groupId,
           principal: body?.principal || body?.member,
-          actorPrincipal: actor.principal
+          actorPrincipal: actor.principal,
+          remover: "admin"
         });
         if (!result.ok) return routeError(deps, result, headers2);
         return jsonResponse(
@@ -32829,7 +32861,8 @@ var init_workerGroups = __esm({
             joinEndsAt: routeBody?.group?.joinEndsAt,
             adminAddress: actor.principal?.address,
             joinMode: WORKER_GROUP_JOIN_MODES.OPEN,
-            memberVisibility: WORKER_GROUP_MEMBER_VISIBILITY.SESSION
+            memberVisibility: WORKER_GROUP_MEMBER_VISIBILITY.SESSION,
+            removalAuth: routeBody?.group?.removalAuth
           },
           actorPrincipal: actor.principal
         });
@@ -32878,7 +32911,8 @@ var init_workerGroups = __esm({
           // A participant may only remove the principal authenticated by this
           // request. Never accept a caller-supplied principal on this route.
           principal: actor.principal,
-          actorPrincipal: actor.principal
+          actorPrincipal: actor.principal,
+          remover: "member"
         });
         if (!result.ok) return routeError(deps, result, baseHeaders);
         if (!Number.isSafeInteger(result.memberCount) || result.memberCount < 0) {
@@ -79505,6 +79539,7 @@ ${expiry}`);
       "invalid_join_mode",
       "join_mode_not_implemented",
       "invalid_member_visibility",
+      "invalid_removal_auth",
       "invalid_group_label",
       "invalid_group_description",
       "invalid_group_image_url",
@@ -79526,6 +79561,7 @@ ${expiry}`);
       "joinEndsAt",
       "joinMode",
       "memberVisibility",
+      "removalAuth",
       "adminAddress"
     ]);
     WORKER_GROUP_INTENT_MAX_BYTES = 32 * 1024;
@@ -79578,6 +79614,11 @@ ${expiry}`);
         if (!principal.ok) return null;
         normalized.principal = principal.principal;
         normalized.principalKey = principal.key;
+      }
+      if (operation === "remove-member") {
+        const remover = toTrimmedString10(payload?.remover).toLowerCase();
+        if (remover !== "admin" && remover !== "member") return null;
+        normalized.remover = remover;
       }
       return normalized;
     };
@@ -80460,6 +80501,7 @@ ${expiry}`);
             active: true,
             joinMode: toTrimmedString10(group?.joinMode).toLowerCase() || "admin_add",
             memberVisibility: toTrimmedString10(group?.memberVisibility).toLowerCase() || "admin_only",
+            removalAuth: toTrimmedString10(group?.removalAuth).toLowerCase() || "both",
             memberLimit: normalizePositiveSafeInteger(group?.memberLimit),
             joinEndsAt: toTrimmedString10(group?.joinEndsAt)
           });
@@ -80501,6 +80543,7 @@ ${expiry}`);
             active: true,
             joinMode: toTrimmedString10(group?.joinMode).toLowerCase() || "admin_add",
             memberVisibility: toTrimmedString10(group?.memberVisibility).toLowerCase() || "admin_only",
+            removalAuth: toTrimmedString10(group?.removalAuth).toLowerCase() || "both",
             memberLimit: normalizePositiveSafeInteger(group?.memberLimit),
             joinEndsAt: toTrimmedString10(group?.joinEndsAt)
           });
@@ -80610,7 +80653,7 @@ ${expiry}`);
           }
         });
       }
-      async beginWorkerGroupMemberRemoval({ groupId, principalDigest, intent }) {
+      async beginWorkerGroupMemberRemoval({ groupId, principalDigest, remover, intent }) {
         return this.state.storage.transaction(async (transaction) => {
           const groupKey2 = workerGroupCapacityGroupKey(groupId);
           const groupState = await transaction.get(groupKey2);
@@ -80631,6 +80674,8 @@ ${expiry}`);
               reason: memberState?.state === "reserved" || memberState?.state === "removing" ? "worker_group_membership_state_pending" : "worker_group_member_not_found"
             };
           }
+          const refusal = workerGroupRemovalRefusal(groupState.removalAuth, remover);
+          if (refusal) return { ok: false, status: 403, reason: refusal };
           await transaction.put(memberKey2, {
             version: 2,
             state: "removing",
@@ -81118,6 +81163,7 @@ ${expiry}`);
             removalReservation = await this.beginWorkerGroupMemberRemoval({
               groupId: mutation.groupId,
               principalDigest,
+              remover: mutation.remover,
               intent
             });
             if (!removalReservation.ok) {
