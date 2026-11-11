@@ -13,5 +13,10 @@
     "worker": "https://ce-demo-sh-481bb6cd0a81.agalmic.workers.dev",
     "sessionId": "0xb822b3eca85bdc35cf83cb947bceb6b2",
     "name": "Demo Session"
+  },
+  "rxc-ra-26": {
+    "worker": "https://ce-rxc-ra-26.agalmic.workers.dev",
+    "sessionId": "0x4321c17be79dd082234f34e3eafeca13",
+    "name": "Reverse Alignment"
   }
 }
