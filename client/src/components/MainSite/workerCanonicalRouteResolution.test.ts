@@ -272,6 +272,19 @@ describe('workerCanonicalRouteResolution', () => {
     expect(resolveStandardSessionRoute).not.toHaveBeenCalled();
   });
 
+  it("keeps /session/demo on the bundled demo, though it borrows demo-sh's entry", () => {
+    const resolveStandardSessionRoute = jest.fn();
+    const result = resolveMainSiteSessionRouteForRender({
+      sessionTokenRaw: 'demo',
+      searchStr: '',
+      controller,
+      resolveSessionSlugFromPathToken: (token) => token,
+      resolveStandardSessionRoute,
+    });
+    expect(result).toMatchObject({ kind: 'standard', workerOrigin: '' });
+    expect(resolveStandardSessionRoute).toHaveBeenCalledTimes(1);
+  });
+
   it("opens the films' rxc-ra-test-5 interview link, which names its group", () => {
     const resolveStandardSessionRoute = jest.fn();
     expect(

@@ -31,6 +31,11 @@ describe('sessionSourceResolver', () => {
     });
   });
 
+  it('opens the primary demo from its Worker at its own slug only, not at /session/demo', () => {
+    expect(getDemoSessionConfigForDisplay('demo-sh')).toMatchObject({ workerCanonicalCleanRoute: true });
+    expect(getDemoSessionConfigForDisplay('demo')).toMatchObject({ workerCanonicalCleanRoute: false });
+  });
+
   it.each(Object.entries(KNOWN_SESSIONS))(
     'exposes the known session %s with its Worker for clean links',
     (slug, entry) => {

@@ -20,7 +20,9 @@ const findDemoSessionConfigBySlug = (slugIn: unknown = ''): SessionConfigLike | 
   ) {
     const primaryDemoSlug = canonicalizeSessionSlug(getPrimaryDemoSessionSlug());
     const primaryDemoConfig = DEMO_SESSION_MAP[primaryDemoSlug];
-    if (isObj(primaryDemoConfig)) return primaryDemoConfig;
+    // The alias shows the primary demo's data; only the primary demo's own slug
+    // opens from its Worker.
+    if (isObj(primaryDemoConfig)) return { ...primaryDemoConfig, workerCanonicalCleanRoute: false };
     return isObj(DEMO_SESSION_MAP.general) ? DEMO_SESSION_MAP.general : null;
   }
 
