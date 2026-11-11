@@ -19,6 +19,7 @@ const FORBIDDEN_MARKERS = Object.freeze([
   { label: 'private planning path', re: /(?:^|[^\w])TODO\//gi },
   { label: 'private agent settings path', re: /(?:^|[^\w.-])\.(?:claude|codex)(?:\/|\b)|\bCLAUDE\.md\b/gi },
   { label: 'private companion path', re: /\bcontextEngine-cc(?:\/|\b)/gi },
+  { label: 'private skill path', re: /\bclient\/public\/skill\.md\b/gi },
   { label: 'private E2E path', re: /\bscripts\/(?:lib\/)?e2e(?:\/|\b)|\bscripts\/(?:test|seed)-[^\s`'")]+/gi },
   { label: 'private artifact path', re: /\bartifacts\//gi },
   { label: 'private release branch', re: /\brelease-staging(?:[-\w]*)?\b|\b(?:private|dev) branch\b/gi },

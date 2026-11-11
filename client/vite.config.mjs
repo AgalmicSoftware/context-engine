@@ -14,6 +14,7 @@ const srcDir = path.resolve(__dirname, 'src');
 const publicDir = path.resolve(__dirname, 'public');
 const postsDir = path.resolve(__dirname, '..', 'posts');
 const knownSessionsPath = path.resolve(__dirname, '..', 'known-sessions.json');
+const redirectsPath = path.resolve(publicDir, '_redirects');
 const groupPasswordDerivationCjsPath = path.resolve(__dirname, '..', 'shared', 'crypto', 'groupPasswordDerivation.cjs');
 const themeRegistry = JSON.parse(fs.readFileSync(path.resolve(srcDir, 'scss', 'themes', 'registry.json'), 'utf8'));
 const themeIds = Object.freeze(themeRegistry.themes.map(({ id }) => String(id)));
@@ -561,6 +562,30 @@ const knownSessionsFilePlugin = () => ({
   },
 });
 
+// Netlify serves some public files at another address through exact-path 200
+// rewrites in _redirects, such as /skill.md for agent-skill.md. The dev and
+// preview servers follow the same rewrites.
+const EXACT_PUBLIC_PATH = /^\/[^*:]*$/;
+const publicRewritesPlugin = () => {
+  const rewriteRequests = (server) => {
+    const rewrites = new Map(
+      fs
+        .readFileSync(redirectsPath, 'utf8')
+        .split('\n')
+        .map((line) => line.trim().split(/\s+/))
+        .filter(([from, to, status]) => status === '200' && EXACT_PUBLIC_PATH.test(from) && EXACT_PUBLIC_PATH.test(to))
+        .map(([from, to]) => [from, to]),
+    );
+    server.middlewares.use((req, _res, next) => {
+      const url = String(req.url || '');
+      const pathname = url.split(/[?#]/, 1)[0];
+      if (rewrites.has(pathname)) req.url = `${rewrites.get(pathname)}${url.slice(pathname.length)}`;
+      next();
+    });
+  };
+  return { name: 'ce-public-rewrites', configureServer: rewriteRequests, configurePreviewServer: rewriteRequests };
+};
+
 // Crawler-facing copies of selected SPA routes with their own canonical URL.
 const staticPageSocialPreviewPlugin = () => ({
   name: 'ce-static-page-social-preview',
@@ -599,6 +624,7 @@ export default defineConfig(({ mode }) => {
       ...(process.env.CE_BUNDLE_REPORT === '1'
         ? [createBundleReportPlugin({ rootDir: __dirname })]
         : []),
+      publicRewritesPlugin(),
       publicAssetsCompatibilityPlugin(),
       immutableAssetHeadersPlugin(),
       postsAssetsCompatibilityPlugin(),

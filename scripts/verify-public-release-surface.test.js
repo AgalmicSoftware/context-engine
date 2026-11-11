@@ -6,6 +6,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const {
+  createStripMatcher,
+  loadStripPatterns,
   verifyPublicReleaseSurface,
 } = require('./verify-public-release-surface');
 
@@ -176,4 +178,15 @@ test('verify-public-release-surface CLI exits nonzero for stripped imports', () 
     assert.match(result.stderr, /Public release surface verification failed/);
     assert.match(result.stderr, /contextEngine-cc\/lib\/litChipotleActionCatalog\.mjs/);
   });
+});
+
+test('the strip patterns publish the guide for AI agents and keep its old path private', () => {
+  const repoRoot = path.resolve(__dirname, '..');
+  const isStrippedPath = createStripMatcher(loadStripPatterns(repoRoot));
+
+  assert.equal(isStrippedPath('client/public/agent-skill.md'), null);
+  assert.ok(fs.existsSync(path.join(repoRoot, 'client', 'public', 'agent-skill.md')));
+  // A file at the old path would be left out of public releases.
+  assert.ok(isStrippedPath('client/public/skill.md'));
+  assert.equal(fs.existsSync(path.join(repoRoot, 'client', 'public', 'skill.md')), false);
 });

@@ -10,8 +10,12 @@
 
 # The build appends one immutable Cache-Control rule per hashed file under /assets.
 
-# The guide for AI agents is Markdown to read, never a page to run.
+# The guide for AI agents is Markdown to read, never a page to run. Agents
+# read it at /skill.md, which _redirects rewrites to the file's own path.
 /skill.md
+  Content-Type: text/markdown; charset=utf-8
+  X-Content-Type-Options: nosniff
+/agent-skill.md
   Content-Type: text/markdown; charset=utf-8
   X-Content-Type-Options: nosniff
 

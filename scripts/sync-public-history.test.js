@@ -1095,27 +1095,6 @@ test('sync-public-history replays across the Agent Bridge retirement commit', ()
   });
 });
 
-test('sync-public-history publishes the agent guide only from the deletion of its private file', () => {
-  withSourceRepo(({ sourceDir }) => {
-    // The fixture's earlier commits hold the guide's private versions.
-    const guide = path.join('client', 'public', 'skill.md');
-    removeFromSource(sourceDir, guide);
-    commitAt(sourceDir, 'Remove the private guide', 1);
-    writeFile(sourceDir, guide, 'public guide for AI agents\n');
-    commitAt(sourceDir, 'Publish the guide', 2);
-
-    const result = runSyncScript(sourceDir, ['release-candidate']);
-    assert.equal(result.status, 0, syncFailureMessage(result));
-
-    assert.equal(git(sourceDir, ['show', 'release-candidate:client/public/skill.md']), 'public guide for AI agents\n');
-    const guideHistory = git(sourceDir, ['log', '-p', 'origin/main..release-candidate', '--', 'client/public/skill.md']);
-    assert.doesNotMatch(guideHistory, /private agent skill/);
-    const subjects = git(sourceDir, ['log', '--format=%s', 'origin/main..release-candidate']);
-    assert.doesNotMatch(subjects, /^Remove the private guide$/m);
-    assert.match(subjects, /^Publish the guide$/m);
-  });
-});
-
 test('sync-public-history keeps the retired paths out after a later side-line commit', () => {
   withSourceRepo(({ sourceDir }) => {
     writeFile(sourceDir, path.join('workers', 'agentBridgeWorker', 'worker.js'), 'public agent bridge worker v2\n');

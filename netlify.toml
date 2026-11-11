@@ -31,6 +31,12 @@
   to = "/404.html"
   status = 404
 
+# Agents read the guide at /skill.md; its file is agent-skill.md.
+[[redirects]]
+  from = "/skill.md"
+  to = "/agent-skill.md"
+  status = 200
+
 [[redirects]]
   from = "/*"
   to = "/index.html"

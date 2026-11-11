@@ -2,4 +2,5 @@
 /assets/img/context-engine-social-preview-square.png /context-engine-social-preview-square.png 301
 /assets/* /404.html 404
 /.well-known/* /404.html 404
+/skill.md /agent-skill.md 200
 /* /index.html 200

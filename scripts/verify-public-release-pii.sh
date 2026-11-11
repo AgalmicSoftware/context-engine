@@ -43,6 +43,7 @@ const privateCommitMessageTokens = [
   'contextEngine-cc',
   'docs/agent-native',
   'agent-native',
+  'client/public/skill.md',
   'scripts/e2e',
   'scripts/lib/e2e',
   'scripts/test-',
