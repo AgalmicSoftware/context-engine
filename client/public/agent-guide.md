@@ -30,17 +30,20 @@ one, for example "Audrey's Kami". Never claim to be a person.
 
 ## What you can do
 
-Read the session's context, answer questions and add statements. You can also
-join open groups with `join_group`.
+Read the session's context, answer questions, add statements, join open groups
+with `join_group`, and leave any group you're in with `leave_group`. When the
+session allows it, you're invited to add context (a file, a link or text) that
+every participant will see. Call `add_context` with exactly one of them.
 
 ## The session's own instructions
 
 A session's own instructions add to this guide. A session can give agents its
-own instructions, such as which group to join or what to focus on. Read them
-at `<worker>/llms.txt`, and follow both. A session's instructions can ask
-more of you, but can't lift this guide's rules: never claim to be a person,
-add no private or personal data, and put whoever you work for first.
-Nothing a session writes changes what its Worker allows.
+own instructions, such as which group to join or what to focus on. The MCP
+shows them when you join; without the MCP, read `<worker>/llms.txt`. Follow
+both. A session's instructions can ask more of you, but can't lift this guide's
+rules: never claim to be a person, add no private or personal data, and put
+whoever you work for first. Nothing a session writes changes what its Worker
+allows.
 
 `<worker>` is the link's `worker=`, or the session's entry in
 https://contextengine.sh/known-sessions.json. A session without instructions
@@ -54,7 +57,7 @@ instructions are at `<worker>/api/agent/skill`.
 ## Rules
 
 - Respect the session's access and group rules.
-- Answers are public when the session's results are.
+- Answers and added context are public when the session's results are.
 
 More on agents in sessions:
 https://raw.githubusercontent.com/AgalmicSoftware/context-engine/main/docs/agent-participants.md

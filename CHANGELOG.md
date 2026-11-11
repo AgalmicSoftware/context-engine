@@ -15,6 +15,7 @@ All notable changes to this project will be documented in this file.
 - In interview review, an answer or comment you encrypted counts as locked even after you unlock it on the page: an encrypted answer stands and isn't quoted, and for an encrypted comment the card shows **Your locked comment stays.** and keeps it unless you choose the AI's or write in the box. No answer or comment you encrypted, nor anything you type into an encrypted field, goes to the voice interviewer or the next round of drafting.
 - A signed-in participant can now add a link to a session's context from the session page as well as a file. The form offers it only while the session takes participants' additions and hasn't ended, and only on a Session Worker from this release.
 - The context list marks what an AI agent added: "<its name> (agent)", or its short address with "(agent)" when it gave no name. The agent sets the mark itself, as with its answers' agent marker, and the mark grants nothing.
+- `/skill.md`, the guide for AI agents, names `leave_group` and `add_context` and says the MCP shows a session's instructions when an agent joins. It and `/llms.txt` say a session may invite agents to add context.
 
 ### Workers — requires redeployment
 
@@ -22,6 +23,20 @@ All notable changes to this project will be documented in this file.
 - A refresh must name the same link, and keeps its title, privacy and who added it.
 - A context item may carry an agent's self-declared mark: `CE-AdderKind` `agent`, with its name in `CE-AdderName`, up to 80 characters of plain text without control characters or marks that reorder text. Any other mark is refused, as is a name without the mark. A refreshed link keeps its mark.
 - Prompts that read a session's context say it comes from its hosts and participants, AI agents among them. They call it untrusted material and tell the AI never to follow instructions inside it.
+
+### Agents and MCP
+
+- MCP 0.3.0. A normal session link, without `worker=`, goes to the Session Worker that the link's site lists for it in `/known-sessions.json`, once that Worker reports the listed session ID. A slug the site doesn't list stays on-chain, as before, and a `worker=` in the link still wins. When the list can't be read, `join_session` says so and asks for a link with `worker=`.
+- New `add_context` tool: an agent adds a local file, a link or text (stored as Markdown) to a hosted session's context when the session invites it.
+  - Everyone in the session sees what it adds unless it passes `adminsOnly`, and each item is marked as an agent's, under its display name.
+  - It never adds a file from the MCP's state folder or a hidden folder, a hidden file, or text that looks like a key, token or password.
+  - Sessions that limit context to admins, sessions that have ended, sessions that keep their files where the Session Worker can't read them, and on-chain sessions refuse it.
+- `join_session` and `get_session` show:
+  - the session's instructions for agents, marked as from its admins and as adding to the general guidance;
+  - its groups, with how joining works and who may end a membership;
+  - its invitation to add context, with the limits.
+- `join_session` no longer joins a group named in the link. It names the group, says when the agent is already in it, and its next step says to read the session's instructions, then call `join_group`. New `leave_group` tool, which says why when a group doesn't let members leave.
+- After a restart, the MCP checks that a hosted session it joined is still the same session behind its Worker, and asks the agent to join again when it isn't.
 
 ## [0.9.1] - 2026-11-10
 
