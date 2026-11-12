@@ -86,7 +86,8 @@ for a question, the answer goes ahead without them and says so.
 One question reads at most 8,000 characters of context, 2,000 of results and
 24,000 of answers. For each question members answered, a Detailed answer is
 given how many answered and, where the question has set options (agree or
-disagree, a rating, a choice), how many chose each. These counts cover every member's answer, however large the
+disagree, a rating, a choice), how many chose each, with what a rating's
+numbers mean. These counts cover every member's answer, however large the
 session, so the agent can say how widely a view is held. What members wrote,
 comments included, is a sample: each piece is cut to 300 characters, in an
 order drawn afresh for every question asked, so a member's place among one

@@ -310,11 +310,13 @@ test('a Detailed answer counts every member’s choice, leaving out anyone who t
       { id: 'q1', prompt: 'Meet less?', type: 'binary' },
       { id: 'q2', prompt: 'Which days?', type: 'multichoice' },
       { id: 'q3', prompt: 'What should change?', type: 'text' },
+      { id: 'q4', prompt: 'Meetings run well.', type: 'rating', scale: { min: 1, max: 5, minLabel: 'Strongly agree', maxLabel: '5' } },
     ],
     responses: members.flatMap(([participantId], index) => [
       { questionId: 'q1', participantId, answer: index < 4 ? 'Agree' : 'Disagree', ...(index === 0 ? { additional: 'COMMENT too many' } : {}) },
       { questionId: 'q2', participantId, answer: index % 2 ? ['Monday'] : ['Monday', 'Friday'] },
       { questionId: 'q3', participantId, answer: `WRITTEN ${index}` },
+      { questionId: 'q4', participantId, answer: index < 5 ? '1' : '5' },
       { questionId: 'gone', participantId, answer: 'ORPHAN' },
     ]),
   };
@@ -324,14 +326,16 @@ test('a Detailed answer counts every member’s choice, leaving out anyone who t
   const answersIn = ({ prompt }) =>
     JSON.parse(prompt.slice(prompt.indexOf('<member_answers>') + '<member_answers>'.length, prompt.indexOf('</member_answers>')));
   const all = await ask(h, { address: ADMIN, deps });
-  const [meet, days, change] = answersIn(all);
+  const [meet, days, change, run] = answersIn(all);
   assert.deepEqual(meet, { question: 'Meet less?', answered: 6, counts: { Agree: 4, Disagree: 2 }, written: ['COMMENT too many'] });
   assert.deepEqual(days, { question: 'Which days?', answered: 6, counts: { Monday: 6, Friday: 3 } });
   // What members wrote comes in an order drawn for each question asked.
   assert.deepEqual({ ...change, written: [...change.written].sort() }, {
     question: 'What should change?', answered: 6, written: [0, 1, 2, 3, 4, 5].map((index) => `WRITTEN ${index}`),
   });
-  assert.equal(all.body.read.answers, 18);
+  // A rating's counts say what its numbers mean; a label that only repeats the number is left out.
+  assert.deepEqual(run, { question: 'Meetings run well.', scale: '1 (Strongly agree) to 5', answered: 6, counts: { 1: 5, 5: 1 } });
+  assert.equal(all.body.read.answers, 24);
   assert.doesNotMatch(all.prompt, /ORPHAN|participant_/);
 
   // The first member, who agreed and commented, turns it off.

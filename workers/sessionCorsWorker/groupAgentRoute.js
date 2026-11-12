@@ -100,11 +100,17 @@ const readVisibleResults = async ({ env, slug, config, address, scopes, deps }) 
 // question with set options is the options chosen, which the prompt counts;
 // any other answer is what the person wrote.
 const COUNTED_TYPES = new Set(['binary', 'rating', 'multichoice']);
+// What a rating's numbers mean, such as "1 (Strongly agree) to 5 (Strongly disagree)".
+const scaleText = ({ scale } = {}) => {
+  if (!scale) return '';
+  const end = (value, label) => (trim(label) && trim(label) !== String(value) ? `${value} (${trim(label)})` : `${value}`);
+  return `${end(scale.min, scale.minLabel)} to ${end(scale.max, scale.maxLabel)}`;
+};
 const readMemberAnswers = async ({ env, slug, config, optedOut, deps }) => {
   const source = await (deps.loadWorkerCanonicalResultsAnalysisSource || loadWorkerCanonicalResultsAnalysisSource)({ env, slug, config });
   if (!source?.ok) return null;
   const byQuestion = new Map(source.snapshot.questions.map((question) => [
-    question.id, { question: trim(question.prompt), counted: COUNTED_TYPES.has(question.type), answers: [] },
+    question.id, { question: trim(question.prompt), scale: scaleText(question), counted: COUNTED_TYPES.has(question.type), answers: [] },
   ]));
   source.snapshot.responses.forEach((response) => {
     const from = source.participantAddresses?.get(response.participantId);
@@ -117,7 +123,8 @@ const readMemberAnswers = async ({ env, slug, config, optedOut, deps }) => {
       : { choices: [], text: [given.join('; '), comment].filter(Boolean).join(' — ') };
     if (answer.choices.length || answer.text) group.answers.push(answer);
   });
-  return [...byQuestion.values()].filter((group) => group.answers.length).map(({ question, answers }) => ({ question, answers }));
+  return [...byQuestion.values()].filter((group) => group.answers.length)
+    .map(({ question, scale, answers }) => ({ question, ...(scale ? { scale } : {}), answers }));
 };
 
 // What each style reads, decided here and nowhere else. General: the

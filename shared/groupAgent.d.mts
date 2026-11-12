@@ -32,7 +32,8 @@ export type GroupAgentMaterial = {
   sessionContext?: unknown;
   sources?: SessionContextPromptSource[];
   results?: string;
-  answers?: Array<{ question: string; answers: GroupAgentMemberAnswer[] }>;
+  /** `scale` says what a rating question's numbers mean. */
+  answers?: Array<{ question: string; scale?: string; answers: GroupAgentMemberAnswer[] }>;
 };
 
 export const GROUP_AGENT_STYLES: readonly GroupAgentStyle[];
@@ -50,6 +51,7 @@ export const GROUP_AGENT_LIMITS: Readonly<{
   answerItemChars: number;
   countedChoices: number;
   choiceChars: number;
+  scaleChars: number;
 }>;
 export const GROUP_AGENT_DEFAULT_INSTRUCTIONS: Readonly<Record<GroupAgentStyle, string>>;
 /** Sent after the instructions on every question; no setting removes them. */

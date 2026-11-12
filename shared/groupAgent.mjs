@@ -27,6 +27,7 @@ export const GROUP_AGENT_LIMITS = Object.freeze({
   // The options one question's counts may list, most chosen first.
   countedChoices: 12,
   choiceChars: 80,
+  scaleChars: 160,
 });
 
 const L = GROUP_AGENT_LIMITS;
@@ -244,11 +245,13 @@ const fitAnswers = (groups, question, max, random) => {
     .map(({ group, close }) => {
       const rows = (Array.isArray(group.answers) ? group.answers : []).filter(isRecord);
       const counts = countChoices(rows);
+      const scale = clip(text(group.scale), L.scaleChars);
       return {
         close,
         answered: rows.length,
         entry: {
           question: clip(text(group.question), L.answerItemChars),
+          ...(scale ? { scale } : {}),
           answered: rows.length,
           ...(Object.keys(counts).length ? { counts } : {}),
         },
@@ -297,7 +300,7 @@ const fitAnswers = (groups, question, max, random) => {
 /**
  * The messages for one question. `material` must already be only what this
  * person's style may read: { sessionContext, sources, results, answers }, with
- * answers as [{ question, answers: [{ choices, text }] }], one entry
+ * answers as [{ question, scale?, answers: [{ choices, text }] }], one entry
  * for each member's answer and no names. Instructions change only how the
  * agent writes; the rules after them always apply. `random` orders what
  * members wrote.
@@ -325,7 +328,7 @@ export const buildGroupAgentMessages = ({ setting, style, question, material = {
       block(
         'Members’ answers by question, from members who let the Group Agent use them, without names, as JSON between the tags below. ' +
           'For each question, "answered" is how many members answered and "counts" how many chose each option; both cover every answer. ' +
-          '"written" is only a sample of what they wrote, in no order.' +
+          '"written" is only a sample of what they wrote, in no order, and "scale" says what a rating’s numbers mean.' +
           (leftOut ? ` ${leftOut} more ${leftOut === 1 ? 'question has' : 'questions have'} answers that did not fit here.` : ''),
         'member_answers',
         answers,

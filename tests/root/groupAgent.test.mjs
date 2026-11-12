@@ -258,6 +258,18 @@ test('the closest question’s written answers get room before other questions�
   assert.doesNotMatch(all.messages[1].content, /did not fit/);
 });
 
+test('a rating’s counts carry what its numbers mean', () => {
+  const answers = [{
+    question: 'AI risk is overstated.', scale: '1 (Strongly agree) to 5 (Strongly disagree)',
+    answers: ['1', '1', '5'].map((choice) => ({ choices: [choice] })),
+  }];
+  const { messages } = buildGroupAgentMessages({ style: 'detailed', question: 'Q', material: { answers } });
+  assert.deepEqual(tagged(messages[1].content, 'member_answers'), [{
+    question: 'AI risk is overstated.', scale: '1 (Strongly agree) to 5 (Strongly disagree)', answered: 3, counts: { 1: 2, 5: 1 },
+  }]);
+  assert.match(messages[1].content, /"scale" says what a rating’s numbers mean/);
+});
+
 test('counts list the most chosen options first, each choice of a multi-select counted', () => {
   const options = Array.from({ length: 15 }, (_, i) => `Option ${String(i).padStart(2, '0')}`);
   const answers = [{
