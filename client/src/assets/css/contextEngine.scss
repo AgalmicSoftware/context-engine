@@ -1,6 +1,7 @@
 /* @file contextEngine.scss */
 @use '../../scss/themes' as themes;
 @use '../../scss/session-color-schemes/schemes';
+@use 'webFonts';
 
 /* Locally bundled for deterministic Classic 95 rendering. The files and
  * license/provenance live together under assets/fonts/classic-95/. */

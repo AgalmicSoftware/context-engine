@@ -121,24 +121,33 @@ test('client HTML shell seeds structured data with the public GitHub repository'
   assert.doesNotMatch(html, /"@type":\s*"WebPage"/);
 });
 
-test('client HTML shell loads its fonts in one swap request after the preconnect hints', () => {
-  const html = readText('client/index.html');
-  const stylesheets = (html.match(/<link\b[^>]*>/g) || []).filter(
-    (tag) => tag.includes('rel="stylesheet"') && tag.includes('fonts.googleapis.com'),
+test('client serves its own fonts: Open Sans 300-800 with italics and Poppins 400-800', () => {
+  const css = readText('client/src/assets/css/_webFonts.scss');
+  const faces = [...css.matchAll(/@font-face \{([^}]*)\}/g)].map(([, body]) => ({
+    family: body.match(/font-family: '([^']+)'/)[1],
+    style: body.match(/font-style: (\w+)/)[1],
+    weight: body.match(/font-weight: ([^;]+);/)[1],
+    file: body.match(/url\('\.\.\/([^']+)'\)/)[1],
+    display: body.match(/font-display: (\w+)/)[1],
+  }));
+  const kinds = new Set(faces.map(({ family, style, weight }) => `${family} ${style} ${weight}`));
+  // Minimal uses Open Sans at 600-800, so the variable weight range comes instead of synthesized bold.
+  assert.deepEqual(
+    [...kinds].sort(),
+    [
+      'Open Sans italic 300 800',
+      'Open Sans normal 300 800',
+      'Poppins normal 400',
+      'Poppins normal 600',
+      'Poppins normal 700',
+      'Poppins normal 800',
+    ],
   );
-
-  assert.equal(stylesheets.length, 1);
-  const fontsUrl = new URL(stylesheets[0].match(/href="([^"]+)"/)[1].replace(/&amp;/g, '&'));
-  assert.equal(fontsUrl.pathname, '/css2');
-  // Minimal uses Open Sans at 600-800, so load the variable weight range instead of synthesizing bold.
-  assert.deepEqual(fontsUrl.searchParams.getAll('family'), [
-    'Open Sans:ital,wght@0,300..800;1,300..800',
-    'Poppins:wght@400;600;700;800',
-  ]);
-  assert.equal(fontsUrl.searchParams.get('display'), 'swap');
-  const stylesheetIndex = html.indexOf(stylesheets[0]);
-  assert.ok(html.indexOf('<link rel="preconnect" href="https://fonts.googleapis.com">') < stylesheetIndex);
-  assert.ok(html.indexOf('<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>') < stylesheetIndex);
+  for (const face of faces) {
+    assert.equal(face.display, 'swap');
+    assert.ok(existsSync(resolve(rootDir, 'client/src/assets', face.file)), face.file);
+  }
+  assert.match(readText('client/src/assets/css/contextEngine.scss'), /@use 'webFonts';/);
 });
 
 test('client HTML shell description stays aligned with the README framing', () => {
@@ -184,9 +193,9 @@ test('client static headers enforce script and wallet worker CSP with the exact 
   assert.deepEqual(reportOnly, {
     'default-src': "'self'",
     'script-src': scripts,
-    'style-src': "'self' 'unsafe-inline' https://fonts.googleapis.com",
+    'style-src': "'self' 'unsafe-inline'",
     'img-src': "'self' data: blob: https:",
-    'font-src': "'self' data: https://fonts.gstatic.com",
+    'font-src': "'self' data:",
     'connect-src': "'self' https: wss:",
     'worker-src': "'self' blob:",
     // Document Library previews PDFs in a blob: frame.
@@ -197,6 +206,19 @@ test('client static headers enforce script and wallet worker CSP with the exact 
     'form-action': "'self'",
     'frame-ancestors': "'none'",
   });
+});
+
+test('client static headers pin HTTPS, stop sniffing and allow only the site its microphone and camera', () => {
+  const headers = readHeaderRules()['/*'];
+
+  assert.equal(headers['Strict-Transport-Security'], 'max-age=31536000');
+  assert.equal(headers['X-Content-Type-Options'], 'nosniff');
+  assert.equal(
+    headers['Permissions-Policy'],
+    'camera=(self), microphone=(self), display-capture=(), geolocation=(), payment=(), usb=()',
+  );
+  // Fonts come from the site itself: no page asks a font service for them.
+  assert.doesNotMatch(readText('client/index.html'), /fonts\.(googleapis|gstatic)\.com/);
 });
 
 test('client isolation headers come from the host, not ignored meta tags', () => {
