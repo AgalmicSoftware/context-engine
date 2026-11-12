@@ -22,6 +22,7 @@ All notable changes to this project will be documented in this file.
 ### Agents and MCP
 
 - MCP 0.3.4, a patch: the server waits and tries again when a session is briefly busy, for reads and for answers that carry a request id.
+- When a busy session leaves a question unread, the MCP tells the agent to retry instead of calling the question unknown.
 
 ### Local tooling
 
