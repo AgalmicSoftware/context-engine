@@ -16,6 +16,7 @@ import {
   clearInterviewPrefillHash,
   hasInterviewPrefillHash,
   INTERVIEW_PROMPT_VERSION,
+  INTERVIEW_REPLY_UNREADABLE,
   isInterviewFeatureEnabled,
   normalizeInterviewQuestions,
   mapInterviewEvidenceToResponses,
@@ -706,6 +707,21 @@ it('maps a numeric reply using the session thinking model and keeps the rating v
   expect(options).not.toHaveProperty('maxTokens');
   expect(options).not.toHaveProperty('max_tokens');
   expect(result).toEqual([{ questionId: 'trust', answer: 4, confidence: 1 }]);
+});
+
+it('says a cut-off or unreadable reply made no drafts, in words a person can act on', async () => {
+  const questions = normalizeInterviewQuestions([{ id: 'trust', type: 'rating', prompt: 'Trust? (1-10)' }]);
+  const draft = { questionId: 'trust', answer: 4, confidence: 1, evidence: 'Four.' };
+  const whole = JSON.stringify({ responses: [draft, draft] });
+  // Cut inside the second draft (one draft is whole, so the text still holds a closing brace),
+  // cut before any brace closes, empty, and prose.
+  for (const reply of [whole.slice(0, -20), whole.slice(0, 20), '', 'I could not do that.']) {
+    jest.mocked(callAI).mockResolvedValue(reply);
+    await expect(mapInterviewEvidenceToResponses({ questions, transcript: 'Responder: Four.' })).rejects.toThrow(
+      INTERVIEW_REPLY_UNREADABLE,
+    );
+  }
+  expect(INTERVIEW_REPLY_UNREADABLE).toMatch(/cut off or unreadable.*no drafts.*again/i);
 });
 
 it('returns reviewable novel question drafts only when enabled', async () => {

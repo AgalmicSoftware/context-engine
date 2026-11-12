@@ -626,15 +626,26 @@ ${reconsideration.ownContext || '(none)'}`
     : ''
 }${extraData}`;
 
+// Shown in place of a JSON parser's message; the person can generate the drafts again.
+export const INTERVIEW_REPLY_UNREADABLE =
+  'The AI’s reply was cut off or unreadable, so no drafts were made. Try generating them again.';
+
 export const parseInterviewDraftResponses = (
   raw: unknown,
   questions: InterviewQuestion[],
 ): InterviewDraftResponse[] => {
   const text = toTrimmedString(raw);
   const json = text.match(/\{[\s\S]*\}/)?.[0] || '';
-  if (!json) throw new Error('AI response did not contain a JSON object.');
-  const parsed = asRecord(JSON.parse(json));
-  return normalizeDraftCandidates(parsed.responses, questions).filter((response) => response.confidence !== undefined);
+  let parsed: unknown = null;
+  try {
+    parsed = json ? JSON.parse(json) : null;
+  } catch {
+    // A reply that ran out of room stops mid-object.
+  }
+  if (!parsed) throw new Error(INTERVIEW_REPLY_UNREADABLE);
+  return normalizeDraftCandidates(asRecord(parsed).responses, questions).filter(
+    (response) => response.confidence !== undefined,
+  );
 };
 
 export const readImportedInterviewDraftResponses = (
