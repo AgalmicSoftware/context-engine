@@ -709,6 +709,19 @@ it('maps a numeric reply using the session thinking model and keeps the rating v
   expect(result).toEqual([{ questionId: 'trust', answer: 4, confidence: 1 }]);
 });
 
+it('marks drafts mapped from a claimed part of a group recording', async () => {
+  jest
+    .mocked(callAI)
+    .mockResolvedValue(JSON.stringify({ responses: [{ questionId: 'trust', answer: 4, confidence: 1 }] }));
+  const questions = normalizeInterviewQuestions([{ id: 'trust', type: 'rating', prompt: 'Trust? (1-10)' }]);
+  const result = await mapInterviewEvidenceToResponses({
+    questions,
+    transcript: 'Other person: Trust them?\nResponder: Four.',
+    reconsideration: { earlierAnswers: [], ownContext: '' },
+  });
+  expect(result).toEqual([{ questionId: 'trust', answer: 4, confidence: 1, origin: 'group_recording' }]);
+});
+
 it('says a cut-off or unreadable reply made no drafts, in words a person can act on', async () => {
   const questions = normalizeInterviewQuestions([{ id: 'trust', type: 'rating', prompt: 'Trust? (1-10)' }]);
   const draft = { questionId: 'trust', answer: 4, confidence: 1, evidence: 'Four.' };

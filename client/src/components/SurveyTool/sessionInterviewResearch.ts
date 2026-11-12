@@ -12,7 +12,13 @@ type ResearchField = (typeof FIELD_KEYS)[number];
 // How much a shared draft comparison keeps (interviewMode.researchDetail). Minimal keeps
 // predicted choices, ratings and confidence but no AI notes or drafted text.
 export type InterviewResearchTier = 'minimal' | 'full';
-export type InterviewDraftOrigin = 'external_prefill' | 'voice_interview' | 'typed_context';
+export type InterviewDraftOrigin = 'external_prefill' | 'voice_interview' | 'typed_context' | 'group_recording';
+export const INTERVIEW_DRAFT_ORIGINS: InterviewDraftOrigin[] = [
+  'external_prefill',
+  'voice_interview',
+  'typed_context',
+  'group_recording',
+];
 type ResearchOptions = { tier?: InterviewResearchTier | null; textAnswer?: boolean; changedFields?: string[] };
 
 // Drops drafted text: comments always, and the answer itself on freeform questions.
@@ -38,9 +44,11 @@ export const resolveInterviewDraftOrigin = (
   packet: { source?: { modelId?: unknown } } | null,
   source: { modelId?: unknown } | null,
 ): InterviewDraftOrigin => {
-  if (String(source?.modelId || '') === 'direct-user-context') return 'typed_context';
   const value = record(draft);
   const first = Array.isArray(value.revisions) && value.revisions.length ? record(value.revisions[0]) : value;
+  // A claimed part of a group recording goes through the same mapping as a voice interview.
+  if (first.origin === 'group_recording') return 'group_recording';
+  if (String(source?.modelId || '') === 'direct-user-context') return 'typed_context';
   const modelId = String(first.modelId || '');
   return packet && (!modelId || modelId === String(packet.source?.modelId || ''))
     ? 'external_prefill'

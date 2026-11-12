@@ -43,6 +43,25 @@ it('updates untouched AI fields, preserves edits and exclusions, and retains unm
   ).toBe('More complete answer');
 });
 
+it('marks only the versions a round adds after reading a claimed part of a group recording', () => {
+  const solo = mergeInterviewReview([], {}, {}, [{ questionId: 'q1', answer: 'Agree' }], noAnswers, 'gpt-x');
+  const claimed = mergeInterviewReview(
+    solo.drafts,
+    solo.edited,
+    solo.selected,
+    [
+      { questionId: 'q1', answer: 'Disagree', origin: 'group_recording' },
+      { questionId: 'q2', answer: 'Unsure', origin: 'group_recording' },
+    ],
+    noAnswers,
+    'gpt-x',
+  );
+  expect(claimed.drafts[0].revisions?.map((revision) => revision.origin)).toEqual([undefined, 'group_recording']);
+  expect(claimed.drafts[1].revisions?.[0]).toMatchObject({ revision: 1, origin: 'group_recording' });
+  // The origin belongs to the version, not to the draft under review.
+  expect(claimed.drafts.some((draft) => 'origin' in draft)).toBe(false);
+});
+
 it('leaves out new drafts for answered questions but keeps updating drafts already under review', () => {
   const submitted = { questionId: 'q1', answer: 'First prediction' };
   const answers: Record<string, unknown> = { q1: 'First prediction', q2: 'Already answered' };

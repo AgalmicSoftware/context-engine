@@ -60,7 +60,8 @@ export function mergeInterviewReview(
       leftOut.push(incomingDraft.questionId);
       continue;
     }
-    const draft = { ...incomingDraft };
+    // A draft's origin belongs to the version it adds, not to the draft.
+    const { origin, ...draft } = incomingDraft;
     const prior = drafts.get(draft.questionId);
     const snapshot = (value: InterviewDraftResponse) => ({
       answer: value.answer,
@@ -73,7 +74,12 @@ export function mergeInterviewReview(
     const revisions = [...(prior?.revisions || [])];
     if (prior && !revisions.length) revisions.push({ ...snapshot(prior), revision: 1, modelId });
     if (!prior || JSON.stringify(snapshot(prior)) !== JSON.stringify(snapshot(draft))) {
-      revisions.push({ ...snapshot(draft), revision: revisions.length + 1, modelId });
+      revisions.push({
+        ...snapshot(draft),
+        revision: revisions.length + 1,
+        modelId,
+        ...(origin ? { origin } : {}),
+      });
     }
     draft.revisions = revisions;
     const startingComment = (value?: InterviewDraftResponse) =>

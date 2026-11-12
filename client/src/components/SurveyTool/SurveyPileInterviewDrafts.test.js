@@ -9,7 +9,7 @@ import { startSessionRealtimeInterview } from '../../utilities/audio/realtimeInt
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { mapInterviewEvidenceToResponses } from './sessionInterview';
 import * as savedAnswersLoader from './sessionInterviewSavedAnswers';
-import { createPileViewRuntimeStrategy } from './SurveyPileViewMode';
+import { createPileViewRuntimeStrategy, receiveTranscriptClaim } from './SurveyPileViewMode';
 import { renderSurveyPileViewMode } from './surveyQuestionsTestHarness';
 
 // Each scenario drives the real pile and modal with real timers, close to Jest's 5s default.
@@ -710,6 +710,33 @@ it.each([
   },
   40000,
 );
+
+it('records drafts from a claimed part of a group recording apart from a solo voice interview', async () => {
+  sessionConfig = { ...SESSION_CONFIG, interviewMode: { shareDraftChangesByDefault: true } };
+  const upload = mockSession();
+  const pile = await mountWithInterview(null);
+  // As the real mapper does: a claim brings answers to reconsider, and its drafts say where they came from.
+  jest
+    .mocked(mapInterviewEvidenceToResponses)
+    .mockImplementation(async ({ reconsideration }) => [
+      { questionId: 'q1', answer: 'Agree', confidence: 0.7, ...(reconsideration ? { origin: 'group_recording' } : {}) },
+    ]);
+  await act(async () =>
+    receiveTranscriptClaim(pile.engine(), {
+      sessionSlug: 'edge',
+      person: 'Person 2',
+      transcript: 'Other person: Do you agree?\nResponder: I agree.',
+    }),
+  );
+  await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+  await settle();
+
+  await submitDrafts();
+
+  const rows = upload.mock.calls[0][2];
+  expect(rows.map((row) => [row.questionID, row.answer.value])).toEqual([['q1', 'Agree']]);
+  expect(rows[0].interviewProvenance).toMatchObject({ draftOrigin: 'group_recording', predictionCondition: 'shown' });
+}, 40000);
 
 it('submits each question’s type and prompt while the question cache refills, as after a sign-in', async () => {
   const upload = mockSession();

@@ -109,6 +109,8 @@ export type InterviewPredictionRevision = {
   conviction?: number;
   evidence?: string;
   confidence?: number;
+  // Set when the mapping that made this version read someone's claimed part of a group recording.
+  origin?: 'group_recording';
 };
 
 export type InterviewDraftResponse = {
@@ -125,6 +127,8 @@ export type InterviewDraftResponse = {
   predictionCondition?: 'shown' | 'blind';
   blindAnswer?: unknown;
   revealedAt?: number;
+  // From the mapping, when it read someone's claimed part of a group recording; review moves it into the version.
+  origin?: 'group_recording';
 };
 
 type UnknownRecord = Record<string, unknown>;
@@ -790,5 +794,8 @@ export const mapInterviewEvidenceToResponses = async ({
       }).statements,
     );
   }
-  return responses;
+  // Only a claimed part of a group recording brings answers to reconsider; research tells it from a solo interview.
+  return reconsideration
+    ? responses.map((response) => ({ ...response, origin: 'group_recording' as const }))
+    : responses;
 };

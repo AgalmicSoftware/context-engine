@@ -36,7 +36,9 @@ Sessions write blind records when `interviewMode.hiddenDraftShare` is set
 answer given before the draft was revealed, and `revealedAt`. Other version 2
 records say `"shown"`. Version 2 records also carry `draftOrigin`; for older records, origin is inferred from the self-reported
 source (`chatgpt` or `claude` means chat-assistant prefill; the app's default
-model with platform `other` means a voice interview). At minimal research
+model with platform `other` means a voice interview). Drafts made after
+someone claimed their part of a group recording say `group_recording`;
+before 0.9.5 they were recorded as `voice_interview`. At minimal research
 detail, freeform predictions are `null` and are not scored.
 
 ## Scores

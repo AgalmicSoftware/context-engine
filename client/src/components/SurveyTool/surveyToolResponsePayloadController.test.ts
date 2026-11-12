@@ -850,6 +850,13 @@ describe('research detail tiers', () => {
     expect(JSON.stringify(record)).not.toMatch(/nurse|hospital|Basis|Guess|My own note/);
   });
 
+  it('keeps a known draft origin and drops an unknown one', () => {
+    expect(submit(provenance({ researchTier: 'minimal', draftOrigin: 'group_recording' })).draftOrigin).toBe(
+      'group_recording',
+    );
+    expect(submit(provenance({ researchTier: 'minimal', draftOrigin: 'elsewhere' }))).not.toHaveProperty('draftOrigin');
+  });
+
   it('keeps the drafted answer out of minimal records on freeform questions', () => {
     const record = submit(
       provenance({ researchTier: 'minimal', originalPrediction: { answer: 'Draft text', confidence: 0.5 } }),
