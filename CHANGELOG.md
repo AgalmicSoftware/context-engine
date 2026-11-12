@@ -20,6 +20,7 @@ All notable changes to this project will be documented in this file.
 - Answers and reads may use a session's settings up to one second old, so a crowded session keeps answering. A sign-out everywhere, or making a session private, can take up to one second to reach every request. Admin actions and settings changes always use the current settings.
 - AI Views keeps builds about three times larger: 4.6 million characters, about 120 people answering 53 questions with long written answers and comments. A build over the limit says its size and how to bring it under. Rolling a Worker back past this release hides AI Views builds larger than the old limit, because an older Worker reads them as missing.
 - Many people opening AI Views at once share one read in each Worker instance, reused for up to a second, where each read the whole build from the session's coordinator. Admin reads stay fresh.
+- An answer sent while the session was too busy to mark its backup revision is retried automatically, where it failed with a `500`. The Worker now answers with the busy `503` before storing anything, and no longer refuses an answer that is already stored.
 - The Worker logs why a session's coordinator could not answer: Cloudflare's own error and its retry flags, never the session, addresses or content.
 
 ### Agents and MCP
