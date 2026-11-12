@@ -64,3 +64,19 @@ it('keeps one live region from the running build to its failure, so the failure 
   expect(screen.queryByText(/AI model/)).not.toBeInTheDocument();
   expect(screen.queryByRole('button')).not.toBeInTheDocument();
 });
+
+it("names a risk matrix build and shows its one prompt, leaving out the atlas's", () => {
+  render(
+    <ResultsBuildStatus
+      kind="risk-matrix"
+      busy
+      nextBuild={{ model: 'deep-model', prompts: { build: 'You are building <Responses>', plan: 'Stray' } }}
+      startedAtMs={Date.now()}
+    />,
+  );
+  expect(screen.getByTestId('ce-session-risk-matrix-status')).toBeVisible();
+  expect(screen.getByRole('status')).toHaveTextContent(/^\s*Building the risk matrix · 0s$/);
+  fireEvent.click(screen.getByRole('button', { name: /Show AI prompt/ }));
+  expect(screen.getByRole('region', { name: 'Building prompt' })).toHaveTextContent('You are building <Responses>');
+  expect(screen.getAllByRole('region')).toHaveLength(1);
+});

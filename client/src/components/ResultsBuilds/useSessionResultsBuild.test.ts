@@ -347,3 +347,57 @@ it("times someone else's running build from its start", async () => {
   await waitFor(() => expect(result.current.activeSinceMs).toBe(1234));
   expect(result.current.buildStartedAtMs).toBe(1234);
 });
+
+describe('a risk matrix', () => {
+  const renderRiskMatrix = (sessionConfig: Record<string, unknown>) =>
+    renderHook(() =>
+      useSessionResultsBuild({
+        account: address(1),
+        chainId: 1,
+        enabled: true,
+        kind: 'risk-matrix',
+        provider: 'wallet',
+        sessionConfig,
+        sessionSlug: 'salon',
+      }),
+    );
+  const riskBuild = (id: string) => ({ ...summary(id), areas: [{ name: 'Trust', subareas: ['Identity'] }], notes: [] });
+
+  it('is read where the Worker builds risk matrices, whatever it says of atlases', async () => {
+    read.mockResolvedValue({
+      ok: true,
+      status: 200,
+      builds: [summary('risk_k2_00000002')],
+      build: riskBuild('risk_k2_00000002'),
+    });
+    const { result } = renderRiskMatrix({ ...baseConfig, debateAtlas: undefined, riskMatrix: true });
+    await waitFor(() => expect(result.current.build?.id).toBe('risk_k2_00000002'));
+    expect(read).toHaveBeenCalledWith(expect.objectContaining({ kind: 'risk-matrix', sessionSlug: 'salon' }));
+    expect(result.current.canBuild).toBe(true);
+
+    read.mockClear();
+    const atlasOnly = renderRiskMatrix(baseConfig);
+    expect(atlasOnly.result.current.supported).toBe(false);
+    expect(atlasOnly.result.current.canBuild).toBe(false);
+    expect(read).not.toHaveBeenCalled();
+  });
+
+  it('lists a new build without its areas and notes, and says why one failed in its own words', async () => {
+    read.mockResolvedValue({ ok: true, status: 200, builds: [], build: null });
+    requestBuild.mockResolvedValueOnce({ ok: true, status: 200, build: riskBuild('risk_kz_0000000f') });
+    const { result } = renderRiskMatrix({ ...baseConfig, riskMatrix: true });
+    await waitFor(() => expect(read).toHaveBeenCalled());
+    await act(async () => {
+      expect(await result.current.startBuild()).toBe(true);
+    });
+    expect(requestBuild).toHaveBeenCalledWith(expect.objectContaining({ kind: 'risk-matrix' }));
+    expect(result.current.build?.id).toBe('risk_kz_0000000f');
+    expect(result.current.builds).toEqual([summary('risk_kz_0000000f')]);
+
+    requestBuild.mockResolvedValueOnce({ ok: false, status: 0 });
+    await act(async () => {
+      expect(await result.current.startBuild()).toBe(false);
+    });
+    expect(result.current.error).toBe('The risk matrix build failed.');
+  });
+});

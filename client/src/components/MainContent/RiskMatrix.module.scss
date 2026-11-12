@@ -972,6 +972,12 @@ button.cell {
   line-height: 1.55;
 }
 
+.commentHolders {
+  margin: 8px 0 0;
+  color: $muted-text;
+  font-size: 0.82rem;
+}
+
 .commentFigureRow {
   display: flex;
   align-items: center;

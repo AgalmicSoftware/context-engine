@@ -6,6 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ### Client — available when the site deploys
 
+- Admins, co-admins and results admins get **Build risk matrix** beside **Build atlas** in the open Results menu, with a "?" saying what it builds. While it runs, the status line counts the time, names the AI model and shows the prompt under **Show AI prompt**. The newest build opens as **Risk Matrix**, with a **Version** picker for earlier builds, in place of the demo's or AI Views' risk matrix; each note says how many participants hold it.
 - The Risk Matrix shows AI Views' notes as written: it no longer adds the demo's historical figures, sources and atlas scenarios when their areas share the demo's names. A cell between two areas now lists only their notes, where a note could also show up when one of its subareas had an area's name.
 
 ### Workers — requires redeployment

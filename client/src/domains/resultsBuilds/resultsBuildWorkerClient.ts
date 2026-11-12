@@ -1,4 +1,4 @@
-import { DEBATE_ATLAS_FIELD } from '@ce-shared/workerSessionPublicConfig.mjs';
+import { DEBATE_ATLAS_FIELD, RISK_MATRIX_FIELD } from '@ce-shared/workerSessionPublicConfig.mjs';
 
 import { postSignedAdminWorkerRequest } from '../../utilities/worker/signedAdminWorkerRequest';
 import { normalizeWorkerUrl } from '../../utilities/worker/workerUrl';
@@ -17,6 +17,15 @@ export const RESULTS_BUILD_KINDS = Object.freeze({
     body: ['branches'],
     name: 'atlas',
     plural: 'Atlases',
+  },
+  'risk-matrix': {
+    field: RISK_MATRIX_FIELD,
+    path: '/risk-matrix',
+    action: 'risk-matrix/build',
+    running: 'risk_matrix_build_running',
+    body: ['areas', 'notes'],
+    name: 'risk matrix',
+    plural: 'Risk matrices',
   },
 });
 export type ResultsBuildKind = keyof typeof RESULTS_BUILD_KINDS;

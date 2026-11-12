@@ -34,6 +34,8 @@ export type RiskCommentRecord = {
   intensity: number;
   historicalFigure?: RiskMatrixHistoricalFigure | null;
   corpusRefs?: RiskMatrixCorpusRef[];
+  /** How many participants hold the note, where the caller counted them. */
+  participantCount?: number;
 };
 
 export type RiskMatrixRestoreState = {
@@ -152,6 +154,7 @@ const normalizeCommentRecord = (entry: RiskCommentRecord): RiskCommentRecord => 
   intensity: Number(entry.intensity),
   historicalFigure: entry.historicalFigure || null,
   corpusRefs: Array.isArray(entry.corpusRefs) ? entry.corpusRefs : [],
+  ...(Number(entry.participantCount) > 0 ? { participantCount: Number(entry.participantCount) } : {}),
 });
 
 const isValidCommentRecord = (entry: unknown): entry is RiskCommentRecord => {
@@ -1147,6 +1150,11 @@ class RiskMatrix extends Component<RiskMatrixProps, RiskMatrixState> {
                       </div>
                     </div>
                     <p className={styles.commentText}>{entry.comment}</p>
+                    {entry.participantCount ? (
+                      <p className={styles.commentHolders}>
+                        From {entry.participantCount} participant{entry.participantCount === 1 ? '' : 's'}
+                      </p>
+                    ) : null}
 
                     {figureName && (
                       <div className={styles.commentFigureRow}>

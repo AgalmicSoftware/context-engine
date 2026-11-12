@@ -25,6 +25,7 @@ const PROMPT_SECTIONS: Record<ResultsBuildKind, Array<{ key: string; label: stri
     { key: 'plan', label: 'Planning prompt', heading: 'Planning, once' },
     { key: 'map', label: 'Mapping prompt', heading: 'Mapping, once per topic and per category of several topics' },
   ],
+  'risk-matrix': [{ key: 'build', label: 'Building prompt', heading: 'Building, in one call' }],
 };
 
 // A running build: how long it has run, the model it calls and, on request,

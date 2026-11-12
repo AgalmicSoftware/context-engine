@@ -33,6 +33,7 @@ const mockDebateMap = jest.fn();
 const mockTopicCircles = jest.fn();
 // The atlas hook has its own tests; here it stands in for a Worker's answer.
 let mockDebateAtlasState = null;
+let mockRiskMatrixState = null;
 const mockRiskMatrix = jest.fn();
 const mockDemoAnalysisWorkspace = jest.fn();
 const mockCorpusViewer = jest.fn();
@@ -196,7 +197,8 @@ jest.mock('../DemoViews/DemoAnalysis/DemoAnalysisWorkspace', () => ({
 }));
 jest.mock('../ResultsBuilds/useSessionResultsBuild', () => ({
   useSessionResultsBuild: ({ kind }) =>
-    (kind === 'debate-atlas' && mockDebateAtlasState) || {
+    (kind === 'debate-atlas' && mockDebateAtlasState) ||
+    (kind === 'risk-matrix' && mockRiskMatrixState) || {
       supported: false,
       builds: [],
       build: null,
@@ -281,6 +283,7 @@ describe('OnePageSession results routing', () => {
   afterEach(() => {
     mockRenderRealPolisReport = false;
     mockDebateAtlasState = null;
+    mockRiskMatrixState = null;
     jest.useRealTimers();
     jest.clearAllMocks();
     jest.restoreAllMocks();
@@ -1469,6 +1472,142 @@ describe('OnePageSession results routing', () => {
       act(() => onModalClose());
       expect(sessionRef.current.state.requestedAtlasNodeId).toBeNull();
       window.history.replaceState({}, '', '/');
+    });
+  });
+
+  describe('built risk matrices', () => {
+    const riskBuild = {
+      id: 'risk_k1_00000001',
+      builtAt: '2026-11-08T14:05:00.000Z',
+      title: 'Salon risks',
+      counts: { responses: 12, participants: 4, aiResponses: 12 },
+      areas: [
+        { name: 'Trust', subareas: ['Identity'] },
+        { name: 'Labor', subareas: ['Jobs'] },
+      ],
+      notes: [
+        {
+          cell: 'Trust.Identity.Labor.Jobs',
+          valence: 'risk',
+          intensity: 6,
+          comment: 'Weak identity checks invite hiring fraud.',
+          participantCount: 2,
+          questionIds: ['q1'],
+        },
+      ],
+    };
+    const riskState = (overrides = {}) => ({
+      supported: true,
+      builds: [riskBuild],
+      build: riskBuild,
+      canBuild: false,
+      building: false,
+      loading: false,
+      activeSinceMs: null,
+      error: '',
+      startBuild: jest.fn(async () => true),
+      selectBuild: jest.fn(),
+      ...overrides,
+    });
+    const renderSession = (slug, sessionRef) => {
+      const props = buildProps();
+      render(
+        <MemoryRouter initialEntries={[`/session/${slug}`]}>
+          <OnePageSession {...props} ref={sessionRef} slug={slug} sessionConfig={{ ...props.sessionConfig, slug }} />
+        </MemoryRouter>,
+      );
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
+    };
+    const viewButtons = () =>
+      within(screen.getByTestId('ce-session-results-view-nav'))
+        .getAllByRole('button')
+        .filter((button) => button.hasAttribute('aria-pressed'))
+        .map((button) => button.textContent.trim());
+    const expectBuiltMatrix = async () => {
+      const view = await screen.findByTestId('ce-session-risk-matrix');
+      expect(within(view).getByRole('heading', { name: 'Salon risks' })).toBeVisible();
+      expect(view).toHaveTextContent('12 responses · 4 participants');
+      expect(mockRiskMatrix).toHaveBeenLastCalledWith(
+        expect.objectContaining({ initialComments: riskBuild.notes, readOnly: true, commentEyebrow: 'AI note' }),
+      );
+    };
+
+    it('shows the built risk matrix as Risk Matrix', async () => {
+      mockRiskMatrixState = riskState();
+      renderSession('edge');
+      expect(viewButtons()).toEqual(['🧾Report', '⚠️Risk Matrix']);
+      fireEvent.click(screen.getByRole('button', { name: 'Risk Matrix' }));
+      await expectBuiltMatrix();
+      expect(screen.queryByTestId('polis-report')).not.toBeInTheDocument();
+    });
+
+    it("shows a built risk matrix in place of the demo's", async () => {
+      mockRiskMatrixState = riskState();
+      renderSession('demo');
+      fireEvent.click(await screen.findByRole('button', { name: /^Risk Matrix$/i }));
+      await expectBuiltMatrix();
+      expect(mockRiskMatrix.mock.calls.every(([props]) => typeof props.onOpenAtlasNode !== 'function')).toBe(true);
+    });
+
+    it("takes the place of AI Views' risk matrix and leaves its other views", async () => {
+      jest.spyOn(OnePageSession.prototype, 'loadGeneratedResultsArtifact').mockImplementation(() => Promise.resolve());
+      mockRiskMatrixState = riskState();
+      const sessionRef = React.createRef();
+      render(<OnePageSession {...buildProps()} ref={sessionRef} />);
+      act(() => {
+        sessionRef.current.setState({
+          showResults: true,
+          resultsViewMode: 'riskMatrix',
+          generatedResultsAnalysis: {
+            adminAuthorized: false,
+            viewerAuthorized: true,
+            artifact: { ok: true },
+            status: 'ready',
+            statusLabel: '',
+            viewOptions: [
+              { key: 'circles', label: 'Circles' },
+              { key: 'riskMatrix', label: 'Risk Matrix' },
+            ],
+          },
+        });
+      });
+      expect(viewButtons()).toEqual(['🧾Report', '⚠️Risk Matrix', '◎Circles']);
+      await expectBuiltMatrix();
+      expect(screen.queryByTestId('ce-session-generated-results-panel')).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'Circles' }));
+      expect(await screen.findByTestId('ce-session-generated-results-panel')).toBeVisible();
+    });
+
+    it('offers Build risk matrix beside Build atlas and opens Risk Matrix when it finishes', async () => {
+      const startBuild = jest.fn(async () => true);
+      mockRiskMatrixState = riskState({ builds: [], build: null, canBuild: true, startBuild });
+      mockDebateAtlasState = { ...riskState({ builds: [], build: null, canBuild: true }) };
+      const sessionRef = React.createRef();
+      renderSession('edge', sessionRef);
+      const button = screen.getByRole('button', { name: 'Build risk matrix' });
+      expect(button).toBe(screen.getByTestId('ce-session-risk-matrix-build'));
+      expect(screen.getByTestId('ce-session-debate-atlas-build')).toBeEnabled();
+      fireEvent.click(button);
+      await waitFor(() => expect(sessionRef.current.state.resultsViewMode).toBe('riskMatrix'));
+      expect(startBuild).toHaveBeenCalledTimes(1);
+      expect(mockDebateAtlasState.startBuild).not.toHaveBeenCalled();
+    });
+
+    it("times its own running build and offers that build's prompt", () => {
+      mockRiskMatrixState = riskState({
+        canBuild: true,
+        building: true,
+        buildStartedAtMs: Date.now() - 65_000,
+        nextBuild: { model: 'deep-model', prompts: { build: 'Build <Responses>' } },
+      });
+      renderSession('edge');
+      expect(screen.getByTestId('ce-session-risk-matrix-build')).toHaveTextContent('Building risk matrix…');
+      expect(screen.getByTestId('ce-session-risk-matrix-build')).toBeDisabled();
+      expect(screen.queryByTestId('ce-session-debate-atlas-status')).not.toBeInTheDocument();
+      const status = screen.getByTestId('ce-session-risk-matrix-status');
+      expect(within(status).getByRole('status')).toHaveTextContent(/Building the risk matrix · 6[5-7]s/);
+      fireEvent.click(within(status).getByRole('button', { name: /Show AI prompt/ }));
+      expect(within(status).getByRole('region', { name: 'Building prompt' })).toHaveTextContent('Build <Responses>');
     });
   });
 

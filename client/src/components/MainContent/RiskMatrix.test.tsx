@@ -475,12 +475,14 @@ describe('RiskMatrix', () => {
             comment: 'Several worry that scaling outpaces alignment checks.',
             intensity: 7,
             valence: 'risk',
+            participantCount: 3,
           },
           {
             cell: 'Safety.Evaluations.Capabilities.Scaling',
             comment: 'One sees evaluations steering what gets scaled.',
             intensity: 4,
             valence: 'opportunity',
+            participantCount: 1,
           },
         ]}
         readOnly
@@ -495,6 +497,8 @@ describe('RiskMatrix', () => {
     );
     fireEvent.click(cell);
     expect(screen.getByText('Several worry that scaling outpaces alignment checks.')).toBeInTheDocument();
+    expect(screen.getByText('From 3 participants')).toBeInTheDocument();
+    expect(screen.getByText('From 1 participant')).toBeInTheDocument();
     expect(screen.queryByTestId('ce-risk-matrix-atlas-scenario-card')).not.toBeInTheDocument();
     expect(screen.queryByText(/Sources?:/)).not.toBeInTheDocument();
     expect(screen.queryByText('Alan Turing')).not.toBeInTheDocument();
@@ -530,5 +534,12 @@ describe('RiskMatrix', () => {
     expect(within(screen.getByTestId('ce-risk-matrix-comment-list')).getAllByRole('listitem')).toHaveLength(1);
     expect(screen.getByText('Trusted hiring.')).toBeInTheDocument();
     expect(screen.queryByText('Strain on the grid.')).not.toBeInTheDocument();
+  });
+
+  it('says who holds a note only where the caller counted them', () => {
+    render(<RiskMatrix />);
+    fireEvent.click(screen.getByTestId('ce-risk-matrix-cell-capabilities-vs-labor'));
+    expect(screen.queryByText(/^From \d+ participants?$/)).not.toBeInTheDocument();
+    expect(screen.getByTestId('ce-risk-matrix-cell-safety-vs-capabilities')).toHaveClass('gridCellLinked');
   });
 });

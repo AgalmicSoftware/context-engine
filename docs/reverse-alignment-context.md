@@ -28,7 +28,7 @@ rewrite the saved Worker configuration.
 
 `rxc-test` offers **Report** and **Raw Results**, and Report opens by default.
 Like the other sessions here, it shows **Debate Map** only once a debate atlas
-has been built for it. Raw Results continues to open the detailed results view.
+has been built for it, and **Risk Matrix** only once a risk matrix has. Raw Results continues to open the detailed results view.
 
 These test sessions open only from their Worker links,
 `/session/<slug>?worker=<origin>`; the hosted site no longer opens them from a
