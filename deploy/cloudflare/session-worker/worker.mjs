@@ -25182,6 +25182,15 @@ var init_stringCoercion = __esm({
   }
 });
 
+// shared/sessionCoordinatorBusy.mjs
+var SESSION_COORDINATOR_UNAVAILABLE, COORDINATOR_RETRY_DELAYS_MS;
+var init_sessionCoordinatorBusy = __esm({
+  "shared/sessionCoordinatorBusy.mjs"() {
+    SESSION_COORDINATOR_UNAVAILABLE = "Session config coordination is unavailable; retry.";
+    COORDINATOR_RETRY_DELAYS_MS = Object.freeze([400, 1e3, 2e3]);
+  }
+});
+
 // shared/sessionAgentConfig.mjs
 var record, booleanFields, fields, validSessionAgentConfig, projectPublicAgentConfig;
 var init_sessionAgentConfig = __esm({
@@ -30120,33 +30129,87 @@ var init_sessionConfigSecretsStore = __esm({
 });
 
 // workers/sessionCorsWorker/sessionConfigAuthority.js
-var SESSION_CONFIG_COORDINATION_ERROR, SUPERSEDED_AUTHORITY_ERROR, assertExpectedSessionAuthority, callSessionConfigCoordinator, readCurrentSessionConfig, executeCoordinatedStorageVisibilityMutation, executeCoordinatedStoragePublication, executeCoordinatedContextSourceOperation;
+var SESSION_CONFIG_COORDINATION_ERROR, SUPERSEDED_AUTHORITY_ERROR, assertExpectedSessionAuthority, configReadsInFlight, SHARED_READ_JOIN_MS, STALLED, shareConfigRead, callSessionConfigCoordinator, lastFailureLogAt, heldFailureLogs, logCoordinatorFailure, callCoordinator, readCurrentSessionConfig, executeCoordinatedStorageVisibilityMutation, executeCoordinatedStoragePublication, executeCoordinatedContextSourceOperation;
 var init_sessionConfigAuthority = __esm({
   "workers/sessionCorsWorker/sessionConfigAuthority.js"() {
+    init_sessionCoordinatorBusy();
     init_deployHelperCore();
     init_sessionSlugResolution();
     init_authorizationScopeFreshness();
     init_sessionConfigSecretsStore();
-    SESSION_CONFIG_COORDINATION_ERROR = "Session config coordination is unavailable; retry.";
+    SESSION_CONFIG_COORDINATION_ERROR = SESSION_COORDINATOR_UNAVAILABLE;
     SUPERSEDED_AUTHORITY_ERROR = "Session authorization changed; retry with current authority.";
     assertExpectedSessionAuthority = (authority, expected, slug, { requireRevision = true } = {}) => {
       if (!slug || !expected || !/^0x[0-9a-f]{40}$/i.test(expected.actor || "") || !Number.isSafeInteger(expected.revision) || expected.revision < 0 || !Number.isSafeInteger(expected.authzEpoch) || expected.authzEpoch < 0 || authority != null && authority.slug !== slug || requireRevision && expected.revision !== (authority?.revision ?? 0) || expected.authzEpoch !== readAuthorizationEpoch(authority?.config)) {
         throw Object.assign(new Error(SUPERSEDED_AUTHORITY_ERROR), { status: 409 });
       }
     };
+    configReadsInFlight = /* @__PURE__ */ new WeakMap();
+    SHARED_READ_JOIN_MS = 1e4;
+    STALLED = Symbol("stalled");
+    shareConfigRead = (binding, slug, read) => {
+      let reads = configReadsInFlight.get(binding);
+      if (!reads) configReadsInFlight.set(binding, reads = /* @__PURE__ */ new Map());
+      const joined = reads.get(slug);
+      if (!joined) {
+        const pending = read().finally(() => {
+          if (reads.get(slug) === pending) reads.delete(slug);
+        });
+        reads.set(slug, pending);
+        return pending.then((result) => structuredClone(result));
+      }
+      let timer;
+      const stalled = new Promise((resolve) => {
+        timer = setTimeout(resolve, SHARED_READ_JOIN_MS, STALLED);
+      });
+      return Promise.race([joined, stalled]).finally(() => clearTimeout(timer)).then((result) => {
+        if (result !== STALLED) return structuredClone(result);
+        if (reads.get(slug) === joined) reads.delete(slug);
+        return shareConfigRead(binding, slug, read);
+      });
+    };
     callSessionConfigCoordinator = async ({ env, slug, path, ...payload }) => {
+      const binding = env?.CE_SESSION_COORDINATOR;
+      const normalizedSlug = resolveCoordinatorSessionSlugStorageKey(slug);
+      if (path === "current" && normalizedSlug && binding && !Object.keys(payload).length) {
+        return shareConfigRead(binding, normalizedSlug, () => callCoordinator({ env, slug, path }));
+      }
+      return callCoordinator({ env, slug, path, ...payload });
+    };
+    lastFailureLogAt = 0;
+    heldFailureLogs = 0;
+    logCoordinatorFailure = (where, error, extra = {}) => {
+      const now = Date.now();
+      if (now - lastFailureLogAt < 1e3) {
+        heldFailureLogs += 1;
+        return;
+      }
+      lastFailureLogAt = now;
+      console.warn("[session-coordinator] unavailable", JSON.stringify({
+        where,
+        error: `${error?.name || "Error"}: ${String(error?.message || "").slice(0, 200)}`,
+        ...typeof error?.retryable === "boolean" ? { retryable: error.retryable } : {},
+        ...typeof error?.overloaded === "boolean" ? { overloaded: error.overloaded } : {},
+        ...extra,
+        heldBack: heldFailureLogs
+      }));
+      heldFailureLogs = 0;
+    };
+    callCoordinator = async ({ env, slug, path, ...payload }) => {
       const normalizedSlug = resolveCoordinatorSessionSlugStorageKey(slug);
       const binding = env?.CE_SESSION_COORDINATOR;
+      let response3 = null;
       try {
-        if (!normalizedSlug || !binding?.idFromName || !binding?.get) throw new Error();
+        if (!normalizedSlug || !binding?.idFromName || !binding?.get) throw new Error("No session coordinator binding.");
         const name = await sha256Hex(`session-config:${normalizedSlug}`);
-        const response3 = await binding.get(binding.idFromName(name)).fetch(
+        response3 = await binding.get(binding.idFromName(name)).fetch(
           `https://session-coordinator.internal/session-config/${path}`,
           { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ slug: normalizedSlug, ...payload }) }
         );
         const body = await response3.json();
         return { ok: response3.ok && body?.ok === true, status: response3.status, body };
-      } catch {
+      } catch (error) {
+        logCoordinatorFailure(`session-config/${path}`, error, response3 ? { status: response3.status } : {});
         return { ok: false, status: 503, body: { error: SESSION_CONFIG_COORDINATION_ERROR } };
       }
     };
@@ -71866,11 +71929,12 @@ var init_contextSourceRoute = __esm({
 });
 
 // workers/sessionCorsWorker/storageRouteExecution.js
-var encoder7, decoder6, RESOLVE_STORAGE_GATE_RUNTIME_CONFIG, STORAGE_GROUP_MEMBERSHIP_CACHE, STORAGE_RPC_CHAIN_ATTESTATION_CACHE, trim14, isObj18, isJsonContentType, MEDIA_TYPE_RE, INLINE_MEDIA_TYPE_RE, resolveStorageReadContentType, getStorageR2Binding, DEFAULT_STORAGE_LIST_PAGE_SIZE, MAX_STORAGE_LIST_PAGE_SIZE, MAX_CONTEXT_LIST_KV_PAGES, DEFAULT_RESOURCE_GATES, isStorageResource, buildCloudflareStorageId, buildObjectKey, buildIndexKey, buildIndexPrefix, buildSessionIndexPrefix, buildPayloadKey, storageIndexPutOptions, safeGroupId, normalizeGroupIdList, readKvPayloadEnvelope, normalizeTagsForMetadata, normalizeAccessConditionDocument, invalidUploadPolicy, readUploadGroupIds, readUploadAccessConditions, normalizeUploadPolicy, readUploadPolicyFields, readJsonPayload, readMultipartPayload, readStorageUploadRequestPayload, readConfiguredStorageBackendCandidate, resolveConfiguredStorageBackend, resolvePayloadAccessControl, resolveStorageResourceGateKey, normalizeGateMode2, normalizeDirectGate, readStorageGate, normalizeAddress, listRoleAddresses, resolveRoleAddressSet2, resolveSessionAdminAddresses, isEnvelopeExportAuthorized, evaluateWorkerRoleCondition, evaluateAgentGrantScopeCondition, sbtUnavailable, evaluateSbtOnchainCondition, checkWorkerGroupMembership, evaluateWorkerGroupCondition, evaluateAccessCondition, resolvePayloadAccessConditions, evaluateAccessConditionDocument, resolveGroupGateIds, authorizeWorkerGroupAccess, resolveBareRoleGateCondition, authorizeWorkerRoleAccess, hasPrivateResponsePolicy, membersSeeAllResponses, canReadPrivateResponse, authorizeCloudflareStorageAccess, authorizeCloudflareStorageGate, authorizeCloudflareStorageResourceRead, createRequesterAccessChecks, enforceCloudflareUploadPolicy, responseJson, attachStorageGateRuntimeRpc, resolveStorageGateRuntimeConfig, createStorageRouteGateDeps, parseArweaveUploadResponse, handleArweaveStorageUpload, publishCloudflareOwnedStorageMetadata, RESPONSE_ROWS_PER_QUESTION, countQuestionsOnce, handleCloudflareUpload, readRequestId, normalizeStorageListLimit, readStorageListOptions, handleCloudflareRead, MAX_READ_BATCH_IDS, MAX_READ_BATCH_BYTES, READ_BATCH_CONCURRENCY, handleCloudflareReadBatch, handleCloudflareList, KV_BULK_GET_KEYS2, KV_BULK_REPLY_BYTES, listCloudflareMetadataRows, decodeBulkPayloadEnvelope, readStoredCloudflarePayloadsBulk, readStoredCloudflarePayloadBytes, readStoredPayloadJson, readIndexRowResourceId, readLegacyRowResourceId, scanLegacyStorageOwnerIds, LEGACY_OWNER, resolveLegacyStorageOwner, VISIBILITY_SCAN_PAGE_ROWS, readVisibilityMetadataPages, setCloudflareStorageResourceHidden, resolveEnvelopeExportKeyProvider, resolveEnvelopeExportManifestKeyProvider, exportCloudflareEncryptedPayloadEnvelopes, listContextSourceRows, readContextSourceRow, readContextSourceBytes, removeCloudflareStorageRecords, storageRoute;
+var encoder7, decoder6, RESOLVE_STORAGE_GATE_RUNTIME_CONFIG, STORAGE_GROUP_MEMBERSHIP_CACHE, STORAGE_RPC_CHAIN_ATTESTATION_CACHE, trim14, isObj18, isJsonContentType, MEDIA_TYPE_RE, INLINE_MEDIA_TYPE_RE, resolveStorageReadContentType, getStorageR2Binding, DEFAULT_STORAGE_LIST_PAGE_SIZE, MAX_STORAGE_LIST_PAGE_SIZE, MAX_CONTEXT_LIST_KV_PAGES, DEFAULT_RESOURCE_GATES, isStorageResource, buildCloudflareStorageId, buildObjectKey, buildIndexKey, buildIndexPrefix, buildSessionIndexPrefix, buildPayloadKey, storageIndexPutOptions, safeGroupId, normalizeGroupIdList, readKvPayloadEnvelope, normalizeTagsForMetadata, normalizeAccessConditionDocument, invalidUploadPolicy, readUploadGroupIds, readUploadAccessConditions, normalizeUploadPolicy, readUploadPolicyFields, readJsonPayload, readMultipartPayload, readStorageUploadRequestPayload, readConfiguredStorageBackendCandidate, resolveConfiguredStorageBackend, resolvePayloadAccessControl, resolveStorageResourceGateKey, normalizeGateMode2, normalizeDirectGate, readStorageGate, normalizeAddress, listRoleAddresses, resolveRoleAddressSet2, resolveSessionAdminAddresses, isEnvelopeExportAuthorized, evaluateWorkerRoleCondition, evaluateAgentGrantScopeCondition, sbtUnavailable, evaluateSbtOnchainCondition, checkWorkerGroupMembership, evaluateWorkerGroupCondition, evaluateAccessCondition, resolvePayloadAccessConditions, evaluateAccessConditionDocument, resolveGroupGateIds, authorizeWorkerGroupAccess, resolveBareRoleGateCondition, authorizeWorkerRoleAccess, hasPrivateResponsePolicy, membersSeeAllResponses, canReadPrivateResponse, authorizeCloudflareStorageAccess, authorizeCloudflareStorageGate, authorizeCloudflareStorageResourceRead, createRequesterAccessChecks, enforceCloudflareUploadPolicy, responseJson, attachStorageGateRuntimeRpc, resolveStorageGateRuntimeConfig, createStorageRouteGateDeps, parseArweaveUploadResponse, handleArweaveStorageUpload, publishCloudflareOwnedStorageMetadata, RESPONSE_ROWS_PER_QUESTION, AUTOMATIC_ANALYSIS_MODES, countQuestionsOnce, handleCloudflareUpload, readRequestId, normalizeStorageListLimit, readStorageListOptions, handleCloudflareRead, MAX_READ_BATCH_IDS, MAX_READ_BATCH_BYTES, READ_BATCH_CONCURRENCY, handleCloudflareReadBatch, handleCloudflareList, KV_BULK_GET_KEYS2, KV_BULK_REPLY_BYTES, listCloudflareMetadataRows, decodeBulkPayloadEnvelope, readStoredCloudflarePayloadsBulk, readStoredCloudflarePayloadBytes, readStoredPayloadJson, readIndexRowResourceId, readLegacyRowResourceId, scanLegacyStorageOwnerIds, LEGACY_OWNER, resolveLegacyStorageOwner, VISIBILITY_SCAN_PAGE_ROWS, readVisibilityMetadataPages, setCloudflareStorageResourceHidden, resolveEnvelopeExportKeyProvider, resolveEnvelopeExportManifestKeyProvider, exportCloudflareEncryptedPayloadEnvelopes, listContextSourceRows, readContextSourceRow, readContextSourceBytes, removeCloudflareStorageRecords, storageRoute;
 var init_storageRouteExecution = __esm({
   "workers/sessionCorsWorker/storageRouteExecution.js"() {
     init_sessionContextSources();
     init_storageBackupRevision();
+    init_resultsAnalysisSettings();
     init_storageRefNormalization();
     init_payloadAccessControl();
     init_storageEnvelopeEncryption();
@@ -73155,6 +73219,7 @@ var init_storageRouteExecution = __esm({
       await index.put(buildIndexKey({ slug, resource, id: metadata.id }), JSON.stringify(metadata), storageIndexPutOptions(metadata));
     };
     RESPONSE_ROWS_PER_QUESTION = 5;
+    AUTOMATIC_ANALYSIS_MODES = /* @__PURE__ */ new Set(["automatic", "both"]);
     countQuestionsOnce = async (memo, count) => {
       if (!isObj18(memo)) return count();
       memo.questionCount ?? (memo.questionCount = await count());
@@ -73262,6 +73327,7 @@ var init_storageRouteExecution = __esm({
       }
       const enqueueResponseAnalysis = async (id3, metadata2, bytesToStore2) => {
         if (resource !== "responses") return;
+        if (!AUTOMATIC_ANALYSIS_MODES.has(normalizeResultsAnalysisSettings(config?.resultsAnalysis).generationMode)) return;
         const enqueueAutomatic = deps?.enqueueResultsAnalysisAutoJob;
         if (typeof enqueueAutomatic === "function") {
           let committedPayload = null;
@@ -80123,7 +80189,7 @@ var init_chipotleClient = __esm({
 });
 
 // workers/sessionCorsWorker/sessionLitAuthorizationCoordinator.js
-var SIGNER_RECORD, SETUP_RECORD, PROVISIONING_RECORD, PROVISIONING_LEASE_MS, PROVISIONING_FIELDS, ACCOUNT_FIELDS, hasPendingLitAuthorizationSetup, CONFIG_RECORD, PRIVATE_KEY, SECRET_KEYS, ADMIN_SESSION_SECRET_KEYS, COORDINATION_ERROR, PENDING_ERROR, isRecord6, hasOwn7, json6, fail11, walletFor, authorityConfig, assertConfiguredSigner, readSignerSecrets, executeLitAuthorizationSignerEnsure, repairPendingLitAuthorizationSetup, readProvisioning, executeLitProvisioning, executeLitAuthorizationFinalize, executeSessionSecretsAfterLitRepair, callCoordinator, ensureSessionLitAuthorizationSigner, finalizeSessionLitAuthorization, updateSessionSecretsAfterLitRepair, provisionCall, preflightSessionLitProvisioning, beginSessionLitProvisioning, checkpointSessionLitProvisioning, releaseSessionLitProvisioning, checkSessionLitProvisioning, discardSessionLitProvisioning;
+var SIGNER_RECORD, SETUP_RECORD, PROVISIONING_RECORD, PROVISIONING_LEASE_MS, PROVISIONING_FIELDS, ACCOUNT_FIELDS, hasPendingLitAuthorizationSetup, CONFIG_RECORD, PRIVATE_KEY, SECRET_KEYS, ADMIN_SESSION_SECRET_KEYS, COORDINATION_ERROR, PENDING_ERROR, isRecord6, hasOwn7, json6, fail11, walletFor, authorityConfig, assertConfiguredSigner, readSignerSecrets, executeLitAuthorizationSignerEnsure, repairPendingLitAuthorizationSetup, readProvisioning, executeLitProvisioning, executeLitAuthorizationFinalize, executeSessionSecretsAfterLitRepair, callCoordinator2, ensureSessionLitAuthorizationSigner, finalizeSessionLitAuthorization, updateSessionSecretsAfterLitRepair, provisionCall, preflightSessionLitProvisioning, beginSessionLitProvisioning, checkpointSessionLitProvisioning, releaseSessionLitProvisioning, checkSessionLitProvisioning, discardSessionLitProvisioning;
 var init_sessionLitAuthorizationCoordinator = __esm({
   "workers/sessionCorsWorker/sessionLitAuthorizationCoordinator.js"() {
     init_lib2();
@@ -80417,7 +80483,7 @@ var init_sessionLitAuthorizationCoordinator = __esm({
         return json6({ error: error.status === 409 ? error.message : "Session secrets update is pending; retry after setup repair." }, error.status || 503);
       }
     };
-    callCoordinator = async ({ env, slug, path, ...payload }) => {
+    callCoordinator2 = async ({ env, slug, path, ...payload }) => {
       const normalizedSlug = resolveCoordinatorSessionSlugStorageKey(slug);
       const binding = env?.CE_SESSION_COORDINATOR;
       if (!normalizedSlug || !binding?.idFromName || !binding?.get) {
@@ -80436,20 +80502,20 @@ var init_sessionLitAuthorizationCoordinator = __esm({
       }
     };
     ensureSessionLitAuthorizationSigner = async (args) => {
-      const result = await callCoordinator({ ...args, path: "ensure" });
+      const result = await callCoordinator2({ ...args, path: "ensure" });
       if (!result.ok) throw Object.assign(new Error(result.body?.error || COORDINATION_ERROR), { status: result.status });
       return walletFor(result.body.privateKey).privateKey;
     };
     finalizeSessionLitAuthorization = async (args) => {
-      const result = await callCoordinator({ ...args, path: "finalize" });
+      const result = await callCoordinator2({ ...args, path: "finalize" });
       return { ok: result.ok, status: result.status, body: result.ok ? { ok: true } : { error: result.body?.error || COORDINATION_ERROR } };
     };
     updateSessionSecretsAfterLitRepair = async (args) => {
-      const result = await callCoordinator({ ...args, path: "update-secrets" });
+      const result = await callCoordinator2({ ...args, path: "update-secrets" });
       return { ok: result.ok, status: result.status, body: result.ok ? { ok: true } : { error: "Session secrets update failed; retry after setup repair." } };
     };
     provisionCall = async (args, operation) => {
-      const result = await callCoordinator({ ...args, path: `provisioning/${operation}` });
+      const result = await callCoordinator2({ ...args, path: `provisioning/${operation}` });
       if (!result.ok) {
         const code = ["lit_provisioning_credentials_conflict", "lit_provisioning_resources_pending"].includes(result.body?.code) ? result.body.code : "";
         throw Object.assign(new Error(code ? result.body.error : "Lit provisioning is pending or in progress; retry."), { status: result.status, code });
@@ -80489,7 +80555,7 @@ __export(sessionWriteCoordinator_exports, {
   reserveCoordinatedSponsoredFaucet: () => reserveCoordinatedSponsoredFaucet,
   withCoordinatedFaucetWalletTurn: () => withCoordinatedFaucetWalletTurn
 });
-var SPONSORED_DEPLOY_RECORD_KEY, STORAGE_LEGACY_SCAN_KEY_PREFIX, STORAGE_LEGACY_OWNER_KEY_PREFIX, LEGACY_SCAN_ROWS_PER_STEP, LEGACY_SCAN_STEPS_PER_UPLOAD, LEGACY_SCAN_PENDING_ERROR, LEGACY_SCAN_FAILED_ERROR, DIRECT_DEPLOY_RECORD_KEY, SPONSORED_FAUCET_RECORD_KEY, SESSION_CONFIG_AUTHORITY_KEY, AUTH_NONCE_ACTIVE_KEY, AUTH_NONCE_USED_KEY, AUTH_RATE_RECORD_KEY, HOSTED_FAUCET_QUOTA_KEY, FAUCET_WALLET_TURN_KEY, FAUCET_WALLET_TURN_MS, FAUCET_WALLET_RENEW_MS, FAUCET_WALLET_WAIT_MS, FAUCET_WALLET_POLL_MS, CONTEXT_PDF_READING_PREFIX, CONTEXT_PDF_READING_LEASE_MS, WORKER_GROUP_CAPACITY_META_KEY, WORKER_GROUP_CAPACITY_GROUP_PREFIX, WORKER_GROUP_CAPACITY_MEMBER_PREFIX, RESULTS_ANALYSIS_RECORD_KEY, RESULTS_ANALYSIS_DRAFT_KEY, RESULTS_ANALYSIS_DRAFT_CHUNK_PREFIX, RESULTS_ANALYSIS_AUTO_JOB_KEY, RESULTS_ANALYSIS_UPLOAD_PREFIX, UPLOAD_RECEIPT_PREFIX, UPLOAD_RECEIPT_LEASE_MS, UPLOAD_RECEIPT_RETENTION_MS, uploadReceiptExpiresAt, MAX_UPLOAD_RECEIPTS, uploadCountKey, MAX_ANSWER_VERSIONS, MAX_UPLOAD_QUESTION_IDS, MAX_PRIOR_UPLOAD_TARGETS, MAX_RESULTS_ANALYSIS_REQUESTS, RESULTS_ANALYSIS_VALUE_CHUNK_CHARS, RESULTS_ANALYSIS_MAX_DRAFT_CHUNKS, RESULTS_ANALYSIS_AUTO_JOB_MAX_BYTES, RESULTS_ANALYSIS_RUNNING_LEASE_MS, RESULTS_ANALYSIS_MAX_THRESHOLD_RECHECKS, RESULTS_ANALYSIS_AUTO_RETRY_DELAYS_MS, RESULTS_ANALYSIS_RETRYABLE_STATUSES, RUNNING_LEASE_MS, MAX_AUTH_NONCE_LIFETIME_MS, AUTH_NONCE_MAC_KEY, MAX_AUTH_RATE_WINDOW_MS, WRAPPED_SESSION_KEY_FIELDS, toTrimmedString10, isObjectRecord, byteLength, normalizePositiveSafeInteger, normalizeBoundedFutureTimestamp, readActiveAuthNonces, putActiveAuthNonces, SIGNED_AUTH_NONCE_RE, bytesToHex3, hexToBytes2, equalText, signAuthNonce, isBase64url, normalizeWrappedSessionKeyRecord, normalizePublicSessionConfig, withAuthoritativeSessionKey, jsonResponse2, normalizeDeployResult, isTerminalDeployResult, buildDirectDeployTerminalReplay, createAttemptId, workerGroupCapacityGroupKey, workerGroupCapacityMemberKey, WORKER_GROUP_MUTATIONS, workerGroupBackupPendingKey, PENDING_WORKER_GROUP_OPERATIONS, PENDING_WORKER_GROUP_MEMBER_OPERATIONS, DEFINITELY_PREWRITE_WORKER_GROUP_CREATE_FAILURES, WORKER_GROUP_INPUT_FIELDS, WORKER_GROUP_INTENT_MAX_BYTES, pickWorkerGroupInput, sameWorkerGroupInput, withoutPendingMutation, normalizeWorkerGroupMutation, resolveInitializedWorkerGroupCapacity, SessionWriteCoordinator, WorkerGroupWriteCoordinator, executeCoordinatedSponsoredDeploy, resolveCoordinatorStub, coordinateResponseUploadReceipt, AUTH_STATE_UNAVAILABLE, callAuthStateCoordinator, issueCoordinatedAuthNonce, consumeCoordinatedAuthNonce, callHostedFaucetQuota, reserveCoordinatedHostedFaucet, finalizeCoordinatedHostedFaucet, withCoordinatedFaucetWalletTurn, checkCoordinatedAuthRateLimit, getOrCreateCoordinatedStorageEnvelopeSessionKey, executeCoordinatedSessionConfigMutation, reserveCoordinatedSponsoredFaucet, finalizeCoordinatedSponsoredFaucet, checkCoordinatedLegacyStorageOwner, readCoordinatedResultsAnalysisStatus, reserveCoordinatedResultsAnalysis, finalizeCoordinatedResultsAnalysis, enqueueCoordinatedResultsAnalysisAutoJob;
+var SPONSORED_DEPLOY_RECORD_KEY, STORAGE_LEGACY_SCAN_KEY_PREFIX, STORAGE_LEGACY_OWNER_KEY_PREFIX, LEGACY_SCAN_ROWS_PER_STEP, LEGACY_SCAN_STEPS_PER_UPLOAD, LEGACY_SCAN_PENDING_ERROR, LEGACY_SCAN_FAILED_ERROR, DIRECT_DEPLOY_RECORD_KEY, SPONSORED_FAUCET_RECORD_KEY, SESSION_CONFIG_AUTHORITY_KEY, AUTH_NONCE_ACTIVE_KEY, AUTH_NONCE_USED_KEY, AUTH_RATE_RECORD_KEY, HOSTED_FAUCET_QUOTA_KEY, FAUCET_WALLET_TURN_KEY, FAUCET_WALLET_TURN_MS, FAUCET_WALLET_RENEW_MS, FAUCET_WALLET_WAIT_MS, FAUCET_WALLET_POLL_MS, CONTEXT_PDF_READING_PREFIX, CONTEXT_PDF_READING_LEASE_MS, WORKER_GROUP_CAPACITY_META_KEY, WORKER_GROUP_CAPACITY_GROUP_PREFIX, WORKER_GROUP_CAPACITY_MEMBER_PREFIX, RESULTS_ANALYSIS_RECORD_KEY, RESULTS_ANALYSIS_DRAFT_KEY, RESULTS_ANALYSIS_DRAFT_CHUNK_PREFIX, RESULTS_ANALYSIS_AUTO_JOB_KEY, RESULTS_ANALYSIS_UPLOAD_PREFIX, RESULTS_ANALYSIS_UPLOAD_CURSOR_KEY, RESULTS_ANALYSIS_UPLOAD_PRUNE_PAGE, UPLOAD_RECEIPT_PREFIX, UPLOAD_RECEIPT_LEASE_MS, UPLOAD_RECEIPT_RETENTION_MS, uploadReceiptExpiresAt, MAX_UPLOAD_RECEIPTS, uploadCountKey, MAX_ANSWER_VERSIONS, MAX_UPLOAD_QUESTION_IDS, MAX_PRIOR_UPLOAD_TARGETS, MAX_RESULTS_ANALYSIS_REQUESTS, RESULTS_ANALYSIS_VALUE_CHUNK_CHARS, RESULTS_ANALYSIS_MAX_DRAFT_CHUNKS, RESULTS_ANALYSIS_AUTO_JOB_MAX_BYTES, RESULTS_ANALYSIS_RUNNING_LEASE_MS, RESULTS_ANALYSIS_MAX_THRESHOLD_RECHECKS, RESULTS_ANALYSIS_AUTO_RETRY_DELAYS_MS, RESULTS_ANALYSIS_RETRYABLE_STATUSES, RUNNING_LEASE_MS, MAX_AUTH_NONCE_LIFETIME_MS, AUTH_NONCE_MAC_KEY, MAX_AUTH_RATE_WINDOW_MS, WRAPPED_SESSION_KEY_FIELDS, toTrimmedString10, isObjectRecord, byteLength, normalizePositiveSafeInteger, normalizeBoundedFutureTimestamp, readActiveAuthNonces, putActiveAuthNonces, SIGNED_AUTH_NONCE_RE, bytesToHex3, hexToBytes2, equalText, signAuthNonce, isBase64url, normalizeWrappedSessionKeyRecord, normalizePublicSessionConfig, withAuthoritativeSessionKey, jsonResponse2, normalizeDeployResult, isTerminalDeployResult, buildDirectDeployTerminalReplay, createAttemptId, workerGroupCapacityGroupKey, workerGroupCapacityMemberKey, WORKER_GROUP_MUTATIONS, workerGroupBackupPendingKey, PENDING_WORKER_GROUP_OPERATIONS, PENDING_WORKER_GROUP_MEMBER_OPERATIONS, DEFINITELY_PREWRITE_WORKER_GROUP_CREATE_FAILURES, WORKER_GROUP_INPUT_FIELDS, WORKER_GROUP_INTENT_MAX_BYTES, pickWorkerGroupInput, sameWorkerGroupInput, withoutPendingMutation, normalizeWorkerGroupMutation, resolveInitializedWorkerGroupCapacity, SessionWriteCoordinator, WorkerGroupWriteCoordinator, executeCoordinatedSponsoredDeploy, resolveCoordinatorStub, coordinateResponseUploadReceipt, AUTH_STATE_UNAVAILABLE, callAuthStateCoordinator, issueCoordinatedAuthNonce, consumeCoordinatedAuthNonce, callHostedFaucetQuota, reserveCoordinatedHostedFaucet, finalizeCoordinatedHostedFaucet, withCoordinatedFaucetWalletTurn, checkCoordinatedAuthRateLimit, getOrCreateCoordinatedStorageEnvelopeSessionKey, executeCoordinatedSessionConfigMutation, reserveCoordinatedSponsoredFaucet, finalizeCoordinatedSponsoredFaucet, checkCoordinatedLegacyStorageOwner, readCoordinatedResultsAnalysisStatus, reserveCoordinatedResultsAnalysis, finalizeCoordinatedResultsAnalysis, enqueueCoordinatedResultsAnalysisAutoJob;
 var init_sessionWriteCoordinator = __esm({
   "workers/sessionCorsWorker/sessionWriteCoordinator.js"() {
     init_lib2();
@@ -80550,6 +80616,8 @@ var init_sessionWriteCoordinator = __esm({
     RESULTS_ANALYSIS_DRAFT_CHUNK_PREFIX = "results-analysis-draft-v1:chunk:";
     RESULTS_ANALYSIS_AUTO_JOB_KEY = "results-analysis-auto-job-v1";
     RESULTS_ANALYSIS_UPLOAD_PREFIX = "results-analysis-upload-v1:";
+    RESULTS_ANALYSIS_UPLOAD_CURSOR_KEY = "results-analysis-upload-prune-cursor-v1";
+    RESULTS_ANALYSIS_UPLOAD_PRUNE_PAGE = 500;
     UPLOAD_RECEIPT_PREFIX = "upload-receipt-v1:";
     UPLOAD_RECEIPT_LEASE_MS = 12e4;
     UPLOAD_RECEIPT_RETENTION_MS = 7 * 24 * 60 * 60 * 1e3;
@@ -80855,7 +80923,10 @@ ${expiry}`);
       async scheduleUploadReceiptCleanup() {
         const nextExpiry = await this.state.storage.transaction((transaction) => this.pruneUploadReceipts(transaction, Number(this.now()) || Date.now()));
         const nextAlarm = Math.min(nextExpiry, await readUploadReceiptRegistrationRetryAt(this), await nextAgentSubmitProjectionAt(this));
-        if (Number.isFinite(nextAlarm) && typeof this.state.storage.setAlarm === "function") await this.state.storage.setAlarm(nextAlarm);
+        if (!Number.isFinite(nextAlarm) || typeof this.state.storage.setAlarm !== "function") return;
+        const scheduled = await this.state.storage.getAlarm?.();
+        if (scheduled > (Number(this.now()) || Date.now()) && scheduled <= nextAlarm) return;
+        await this.state.storage.setAlarm(nextAlarm);
       }
       async executeUploadReceipt(payload, operation = "reserve") {
         const reserve = operation === "reserve";
@@ -81268,19 +81339,32 @@ ${expiry}`);
         const scheduled = result.ok && result.queued ? await this.scheduleResultsAnalysisAlarm(1e3) : false;
         return { ...result, scheduled };
       }
+      // Each alarm checks one page of receipts and resumes after it next time, so
+      // a session holding thousands of answers never lists them all at once.
       async pruneResultsAnalysisUploadReceipts() {
         const nowMs = Number(this.now()) || Date.now();
-        const nextExpiry = await this.state.storage.transaction(async (transaction) => {
-          let next = Infinity;
-          for (const [key, record4] of await transaction.list({ prefix: RESULTS_ANALYSIS_UPLOAD_PREFIX })) {
+        const { nextExpiry, more } = await this.state.storage.transaction(async (transaction) => {
+          const cursor = await transaction.get(RESULTS_ANALYSIS_UPLOAD_CURSOR_KEY);
+          const page = await transaction.list({
+            prefix: RESULTS_ANALYSIS_UPLOAD_PREFIX,
+            ...cursor?.after ? { startAfter: cursor.after } : {},
+            limit: RESULTS_ANALYSIS_UPLOAD_PRUNE_PAGE
+          });
+          let next = Number(cursor?.next) || Infinity;
+          for (const [key, record4] of page) {
             if (record4.expiresAt <= nowMs) await transaction.delete(key);
             else next = Math.min(next, record4.expiresAt);
           }
-          return next;
+          if (page.size >= RESULTS_ANALYSIS_UPLOAD_PRUNE_PAGE) {
+            await transaction.put(RESULTS_ANALYSIS_UPLOAD_CURSOR_KEY, { after: [...page.keys()].at(-1), next });
+            return { nextExpiry: next, more: true };
+          }
+          if (cursor) await transaction.delete(RESULTS_ANALYSIS_UPLOAD_CURSOR_KEY);
+          return { nextExpiry: next, more: false };
         });
-        if (Number.isFinite(nextExpiry) && !await this.state.storage.get(RESULTS_ANALYSIS_AUTO_JOB_KEY)) {
-          await this.scheduleResultsAnalysisAlarm(nextExpiry - nowMs);
-        }
+        if (await this.state.storage.get(RESULTS_ANALYSIS_AUTO_JOB_KEY)) return;
+        if (more) await this.scheduleResultsAnalysisAlarm(1e3);
+        else if (Number.isFinite(nextExpiry)) await this.scheduleResultsAnalysisAlarm(nextExpiry - nowMs);
       }
       async recordResultsAnalysisQueueFailure(error, job) {
         const nowMs = Number(this.now()) || Date.now();
@@ -82477,7 +82561,8 @@ ${expiry}`);
             const safeError = legacySessionConfigMigrationError();
             return jsonResponse2({ error: safeError.message, reason: safeError.reason }, 503);
           }
-          return jsonResponse2({ error: "Session config coordination is unavailable; retry." }, 503);
+          logCoordinatorFailure("coordinator/session-config/current", error);
+          return jsonResponse2({ error: SESSION_CONFIG_COORDINATION_ERROR }, 503);
         }
       }
       async executeSessionDiagnostics(payload) {
