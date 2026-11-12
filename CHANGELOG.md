@@ -2,6 +2,28 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.9.5] - 2026-11-12
+
+### Client — available when the site deploys
+
+- `/new` and a session's Settings turn the **Group Agent** on and off under AI, for sessions on a Session Worker. Turned on, everyone signed in may ask and gets General answers. Admins add audiences, which go first, for members of chosen groups or SBT holders, reorder them, pick each one's answer style, and may rewrite each style's instructions; the fixed rules are listed behind the "?", which also says that anyone can read the instructions, as they can the session's other settings. A setting that can't be saved says why, and `/new` won't create the session until it's fixed. With no audiences, only admins may ask. Settings can also give the Group Agent its own reasoning effort.
+- Settings offers the Group Agent once the session's Worker runs this release. On an older Worker it says to update the Worker first, where saving would have failed with a field error. `/new` leaves an off Group Agent out of the settings it sends, so creating a session on a Worker from an earlier release still works.
+- Once an admin turns it on, everyone signed in can open the **Group Agent** from a session's Context. It says it's a preview and how they'll be answered, takes a question of up to 500 characters, and shows only the latest answer, of at most 150 words, with what it drew on; nothing is kept, and errors say what went wrong. Its switch lets anyone keep their answers and files out of it, even when it doesn't answer them. A robot by the session's title tells everyone, signed in or not, that it's on, and links to how it works.
+
+### Workers — requires redeployment
+
+- Session Workers accept a **Group Agent** setting: an ordered list of who may ask (everyone signed in, members of chosen groups, or SBT holders, matching any or all of their rules) and whether each gets General or Detailed answers, with optional instructions for each style. Admins always get Detailed answers, and with no setting the Group Agent is off. Saving it signs no one out. The public config sets `groupAgentReady: true`, so the site knows the Worker takes the setting.
+- Session Workers answer the Group Agent at `POST /group-agent/ask` through the session's own AI, under the `/ai` rate limit, and say how a person would be answered at `POST /group-agent/status`. The Worker checks who is asking on every question, including that they have the session's AI access, and gathers the material their answer style allows: General answers read the session's context, the files open to everyone and the results that person may see; Detailed answers read every file they may read and members' answers, without names. The page sends only the question, and replies hold the answer and how much it drew on, never the material itself.
+- A Detailed answer draws on every member's answer, however large the session. For each question it is given how many members answered and, where the question has set options, how many chose each, counted from all the answers, with what a rating's numbers mean. What members wrote is a sample in an order drawn afresh for each question asked, so one person's answers can't be followed from question to question. The questions closest to the one asked get room first, and the AI is told when some questions' answers did not fit. In a session of 50 people and 40 questions, one question reads all 2,000 answers in about 65 storage operations.
+- Results reach a Group Agent answer for the people the Results page shows them to: admins and results admins on any session, and others under the session's results setting, members-only results included.
+- Each person can turn off the Group Agent's use of their answers and the files they added at `POST /group-agent/opt-out`, and turn it back on; it starts on. The Worker keeps the choice in the session's coordinator and checks it on every question, leaving out the answers and files of everyone who turned it off, and answers that carry no address. The published results, which count everyone's answers, are still read.
+- A file's **Visible to** rule on SBTs that the chain can't answer, because its RPC isn't set up, the session's RPC secret can't be read or no endpoint answers, now gives a retryable `503`, as a group rule does, instead of refusing the read. The Group Agent then refuses the question rather than passing the person to a later audience.
+- The AI proxy sends Anthropic a request's system messages as its system prompt, as Anthropic requires, rather than as messages it refuses.
+
+### Agents and MCP
+
+- MCP 0.3.3. No change in what the tools do: the package is rebuilt with this release's shared session-settings code.
+
 ## [0.9.4] - 2026-11-12
 
 ### Client — available when the site deploys
