@@ -30129,7 +30129,7 @@ var init_sessionConfigSecretsStore = __esm({
 });
 
 // workers/sessionCorsWorker/sessionConfigAuthority.js
-var SESSION_CONFIG_COORDINATION_ERROR, SUPERSEDED_AUTHORITY_ERROR, assertExpectedSessionAuthority, SESSION_CONFIG_CACHE_MS, SHARED_READ_JOIN_MS, STALLED, configReads, readState, shareConfigRead, forgetSessionConfig, KEEPS_CONFIG, KEEPS_CONFIG_PREFIXES, keepsConfig, callSessionConfigCoordinator, lastFailureLogAt, heldFailureLogs, logCoordinatorFailure, callCoordinator, readCurrentSessionConfig, executeCoordinatedStorageVisibilityMutation, executeCoordinatedStoragePublication, executeCoordinatedContextSourceOperation;
+var SESSION_CONFIG_COORDINATION_ERROR, SUPERSEDED_AUTHORITY_ERROR, assertExpectedSessionAuthority, SESSION_CONFIG_CACHE_MS, SHARED_READ_JOIN_MS, STALLED, createReadShare, deepFreeze, configReads, resultsAnalysisStatusReads, sessionKey, shareResultsAnalysisStatusRead, forgetResultsAnalysisStatus, forgetSessionConfig, KEEPS_CONFIG, KEEPS_CONFIG_PREFIXES, keepsConfig, callSessionConfigCoordinator, lastFailureLogAt, heldFailureLogs, logCoordinatorFailure, callCoordinator, readCurrentSessionConfig, executeCoordinatedStorageVisibilityMutation, executeCoordinatedStoragePublication, executeCoordinatedContextSourceOperation;
 var init_sessionConfigAuthority = __esm({
   "workers/sessionCorsWorker/sessionConfigAuthority.js"() {
     init_sessionCoordinatorBusy();
@@ -30147,61 +30147,94 @@ var init_sessionConfigAuthority = __esm({
     SESSION_CONFIG_CACHE_MS = 1e3;
     SHARED_READ_JOIN_MS = 1e4;
     STALLED = Symbol("stalled");
-    configReads = /* @__PURE__ */ new WeakMap();
-    readState = (binding, slug) => {
-      let slugs = configReads.get(binding);
-      if (!slugs) configReads.set(binding, slugs = /* @__PURE__ */ new Map());
-      let state = slugs.get(slug);
-      if (!state) slugs.set(slug, state = { generation: 0, cached: null, inFlight: null });
-      return state;
-    };
-    shareConfigRead = (state, read) => {
-      const joined = state.inFlight;
-      if (!joined) {
-        const generation = state.generation;
-        const pending = read().then((result) => {
-          if (result.ok && state.generation === generation) {
-            state.cached = { result, expiresAt: Date.now() + SESSION_CONFIG_CACHE_MS };
-          }
-          return result;
-        }).finally(() => {
-          if (state.inFlight === pending) state.inFlight = null;
-        });
-        state.inFlight = pending;
-        return pending.then((result) => structuredClone(result));
-      }
-      let timer;
-      const stalled = new Promise((resolve) => {
-        timer = setTimeout(resolve, SHARED_READ_JOIN_MS, STALLED);
-      });
-      return Promise.race([joined, stalled]).finally(() => clearTimeout(timer)).then((result) => {
-        if (result !== STALLED) return structuredClone(result);
-        if (state.inFlight === joined) {
-          state.inFlight = null;
-          state.generation += 1;
+    createReadShare = (copy4) => {
+      const reads = /* @__PURE__ */ new WeakMap();
+      const stateFor = (binding, slug) => {
+        let slugs = reads.get(binding);
+        if (!slugs) reads.set(binding, slugs = /* @__PURE__ */ new Map());
+        let state = slugs.get(slug);
+        if (!state) slugs.set(slug, state = { generation: 0, cached: null, inFlight: null });
+        return state;
+      };
+      const share = (state, read) => {
+        const joined = state.inFlight;
+        if (!joined) {
+          const generation = state.generation;
+          const pending = read().then((result) => {
+            if (result?.ok && state.generation === generation) {
+              state.cached = { result, expiresAt: Date.now() + SESSION_CONFIG_CACHE_MS };
+            }
+            return result;
+          }).finally(() => {
+            if (state.inFlight === pending) state.inFlight = null;
+          });
+          state.inFlight = pending;
+          return pending.then(copy4);
         }
-        return shareConfigRead(state, read);
-      });
+        let timer;
+        const stalled = new Promise((resolve) => {
+          timer = setTimeout(resolve, SHARED_READ_JOIN_MS, STALLED);
+        });
+        return Promise.race([joined, stalled]).finally(() => clearTimeout(timer)).then((result) => {
+          if (result !== STALLED) return copy4(result);
+          if (state.inFlight === joined) {
+            state.inFlight = null;
+            state.generation += 1;
+          }
+          return share(state, read);
+        });
+      };
+      return {
+        read: ({ binding, slug, cache, read }) => {
+          const state = stateFor(binding, slug);
+          if (cache && state.cached && Date.now() < state.cached.expiresAt) return Promise.resolve(copy4(state.cached.result));
+          return share(state, read);
+        },
+        forget: (binding, slug) => {
+          const state = reads.get(binding)?.get(slug);
+          if (!state) return;
+          state.generation += 1;
+          state.cached = null;
+          state.inFlight = null;
+        }
+      };
     };
-    forgetSessionConfig = (env, slug) => {
+    deepFreeze = (value) => {
+      if (value && typeof value === "object" && !Object.isFrozen(value)) {
+        Object.freeze(value);
+        for (const key of Object.keys(value)) deepFreeze(value[key]);
+      }
+      return value;
+    };
+    configReads = createReadShare((result) => structuredClone(result));
+    resultsAnalysisStatusReads = createReadShare((result) => result);
+    sessionKey = (env, slug) => {
       const binding = env?.CE_SESSION_COORDINATOR;
       const normalizedSlug = resolveCoordinatorSessionSlugStorageKey(slug);
-      const state = binding && normalizedSlug ? configReads.get(binding)?.get(normalizedSlug) : null;
-      if (!state) return;
-      state.generation += 1;
-      state.cached = null;
-      state.inFlight = null;
+      return binding && normalizedSlug ? { binding, slug: normalizedSlug } : null;
+    };
+    shareResultsAnalysisStatusRead = ({ env, slug, cache = false, read }) => {
+      const key = sessionKey(env, slug);
+      if (!key) return read();
+      return resultsAnalysisStatusReads.read({ ...key, cache, read: () => read().then(deepFreeze) });
+    };
+    forgetResultsAnalysisStatus = (env, slug) => {
+      const key = sessionKey(env, slug);
+      if (key) resultsAnalysisStatusReads.forget(key.binding, key.slug);
+    };
+    forgetSessionConfig = (env, slug) => {
+      const key = sessionKey(env, slug);
+      if (!key) return;
+      configReads.forget(key.binding, key.slug);
+      resultsAnalysisStatusReads.forget(key.binding, key.slug);
     };
     KEEPS_CONFIG = /* @__PURE__ */ new Set(["current", "backup/write-revision", "backup/export", "diagnostics", "storage/publish"]);
     KEEPS_CONFIG_PREFIXES = ["agent-submit/", "debate-atlas/", "risk-matrix/"];
     keepsConfig = (path) => KEEPS_CONFIG.has(path) || KEEPS_CONFIG_PREFIXES.some((prefix) => String(path).startsWith(prefix));
     callSessionConfigCoordinator = async ({ env, slug, path, cache = false, ...payload }) => {
-      const binding = env?.CE_SESSION_COORDINATOR;
-      const normalizedSlug = resolveCoordinatorSessionSlugStorageKey(slug);
-      if (path === "current" && normalizedSlug && binding && !Object.keys(payload).length) {
-        const state = readState(binding, normalizedSlug);
-        if (cache && state.cached && Date.now() < state.cached.expiresAt) return structuredClone(state.cached.result);
-        return shareConfigRead(state, () => callCoordinator({ env, slug, path }));
+      const key = sessionKey(env, slug);
+      if (path === "current" && key && !Object.keys(payload).length) {
+        return configReads.read({ ...key, cache, read: () => callCoordinator({ env, slug, path }) });
       }
       try {
         return await callCoordinator({ env, slug, path, ...payload });
@@ -69568,7 +69601,7 @@ var init_storageEnvelopeEncryption = __esm({
       conditionRef,
       deps = {}
     }) => {
-      const sessionKey = await ensureStorageEnvelopeSessionKey({ env, config, slug, deps });
+      const sessionKey2 = await ensureStorageEnvelopeSessionKey({ env, config, slug, deps });
       const dekBytes = randomBytes5(32, deps);
       const aad = `ce-storage-envelope:payload:${safeSlugPart(slug)}:${payloadId}`;
       const encryptedPayload = await aesEncrypt({
@@ -69577,7 +69610,7 @@ var init_storageEnvelopeEncryption = __esm({
         aad,
         deps
       });
-      const sessionWrappingKey = await importAesKey(sessionKey.keyBytes, ["encrypt"], deps);
+      const sessionWrappingKey = await importAesKey(sessionKey2.keyBytes, ["encrypt"], deps);
       const wrappedDek = await wrapBytesWithKey({
         wrappingKey: sessionWrappingKey,
         plaintextBytes: dekBytes,
@@ -69586,7 +69619,7 @@ var init_storageEnvelopeEncryption = __esm({
       });
       return {
         ciphertextBytes: encryptedPayload.ciphertext,
-        config: sessionKey.config,
+        config: sessionKey2.config,
         envelope: {
           version: ENVELOPE_VERSION,
           encryption: "worker_envelope",
@@ -78144,7 +78177,7 @@ var init_resultsAnalysisGeneration = __esm({
     };
     readPublishedResultsAnalysisArtifact = async ({ env, slug, config, includeSnapshot = true, deps } = {}) => {
       const readStatus = deps?.readCoordinatedResultsAnalysisStatus || readCoordinatedResultsAnalysisStatusDefault;
-      const coordinatorState = await readStatus({ env, slug });
+      const coordinatorState = await readStatus({ env, slug, shared: true });
       const lastGood = publicDraft(coordinatorState?.state?.lastGood, config);
       if (!lastGood?.artifact) {
         return {
@@ -80572,6 +80605,7 @@ var init_sessionLitAuthorizationCoordinator = __esm({
 var sessionWriteCoordinator_exports = {};
 __export(sessionWriteCoordinator_exports, {
   MAX_ANSWER_VERSIONS: () => MAX_ANSWER_VERSIONS,
+  RESULTS_ANALYSIS_MAX_DRAFT_CHARS: () => RESULTS_ANALYSIS_MAX_DRAFT_CHARS,
   SessionWriteCoordinator: () => SessionWriteCoordinator,
   WorkerGroupWriteCoordinator: () => WorkerGroupWriteCoordinator,
   checkCoordinatedAuthRateLimit: () => checkCoordinatedAuthRateLimit,
@@ -80592,7 +80626,7 @@ __export(sessionWriteCoordinator_exports, {
   reserveCoordinatedSponsoredFaucet: () => reserveCoordinatedSponsoredFaucet,
   withCoordinatedFaucetWalletTurn: () => withCoordinatedFaucetWalletTurn
 });
-var SPONSORED_DEPLOY_RECORD_KEY, STORAGE_LEGACY_SCAN_KEY_PREFIX, STORAGE_LEGACY_OWNER_KEY_PREFIX, LEGACY_SCAN_ROWS_PER_STEP, LEGACY_SCAN_STEPS_PER_UPLOAD, LEGACY_SCAN_PENDING_ERROR, LEGACY_SCAN_FAILED_ERROR, DIRECT_DEPLOY_RECORD_KEY, SPONSORED_FAUCET_RECORD_KEY, SESSION_CONFIG_AUTHORITY_KEY, AUTH_NONCE_ACTIVE_KEY, AUTH_NONCE_USED_KEY, AUTH_RATE_RECORD_KEY, HOSTED_FAUCET_QUOTA_KEY, FAUCET_WALLET_TURN_KEY, FAUCET_WALLET_TURN_MS, FAUCET_WALLET_RENEW_MS, FAUCET_WALLET_WAIT_MS, FAUCET_WALLET_POLL_MS, CONTEXT_PDF_READING_PREFIX, CONTEXT_PDF_READING_LEASE_MS, WORKER_GROUP_CAPACITY_META_KEY, WORKER_GROUP_CAPACITY_GROUP_PREFIX, WORKER_GROUP_CAPACITY_MEMBER_PREFIX, RESULTS_ANALYSIS_RECORD_KEY, RESULTS_ANALYSIS_DRAFT_KEY, RESULTS_ANALYSIS_DRAFT_CHUNK_PREFIX, RESULTS_ANALYSIS_AUTO_JOB_KEY, RESULTS_ANALYSIS_UPLOAD_PREFIX, RESULTS_ANALYSIS_UPLOAD_CURSOR_KEY, RESULTS_ANALYSIS_UPLOAD_PRUNE_PAGE, UPLOAD_RECEIPT_PREFIX, UPLOAD_RECEIPT_LEASE_MS, UPLOAD_RECEIPT_RETENTION_MS, uploadReceiptExpiresAt, MAX_UPLOAD_RECEIPTS, uploadCountKey, MAX_ANSWER_VERSIONS, MAX_UPLOAD_QUESTION_IDS, MAX_PRIOR_UPLOAD_TARGETS, MAX_RESULTS_ANALYSIS_REQUESTS, RESULTS_ANALYSIS_VALUE_CHUNK_CHARS, RESULTS_ANALYSIS_MAX_DRAFT_CHUNKS, RESULTS_ANALYSIS_AUTO_JOB_MAX_BYTES, RESULTS_ANALYSIS_RUNNING_LEASE_MS, RESULTS_ANALYSIS_MAX_THRESHOLD_RECHECKS, RESULTS_ANALYSIS_AUTO_RETRY_DELAYS_MS, RESULTS_ANALYSIS_RETRYABLE_STATUSES, RUNNING_LEASE_MS, MAX_AUTH_NONCE_LIFETIME_MS, AUTH_NONCE_MAC_KEY, MAX_AUTH_RATE_WINDOW_MS, WRAPPED_SESSION_KEY_FIELDS, toTrimmedString10, isObjectRecord, byteLength, normalizePositiveSafeInteger, normalizeBoundedFutureTimestamp, readActiveAuthNonces, putActiveAuthNonces, SIGNED_AUTH_NONCE_RE, bytesToHex3, hexToBytes2, equalText, signAuthNonce, isBase64url, normalizeWrappedSessionKeyRecord, normalizePublicSessionConfig, withAuthoritativeSessionKey, jsonResponse2, normalizeDeployResult, isTerminalDeployResult, buildDirectDeployTerminalReplay, createAttemptId, workerGroupCapacityGroupKey, workerGroupCapacityMemberKey, WORKER_GROUP_MUTATIONS, workerGroupBackupPendingKey, PENDING_WORKER_GROUP_OPERATIONS, PENDING_WORKER_GROUP_MEMBER_OPERATIONS, DEFINITELY_PREWRITE_WORKER_GROUP_CREATE_FAILURES, WORKER_GROUP_INPUT_FIELDS, WORKER_GROUP_INTENT_MAX_BYTES, pickWorkerGroupInput, sameWorkerGroupInput, withoutPendingMutation, normalizeWorkerGroupMutation, resolveInitializedWorkerGroupCapacity, SessionWriteCoordinator, WorkerGroupWriteCoordinator, executeCoordinatedSponsoredDeploy, resolveCoordinatorStub, coordinateResponseUploadReceipt, AUTH_STATE_UNAVAILABLE, callAuthStateCoordinator, issueCoordinatedAuthNonce, consumeCoordinatedAuthNonce, callHostedFaucetQuota, reserveCoordinatedHostedFaucet, finalizeCoordinatedHostedFaucet, withCoordinatedFaucetWalletTurn, checkCoordinatedAuthRateLimit, getOrCreateCoordinatedStorageEnvelopeSessionKey, executeCoordinatedSessionConfigMutation, reserveCoordinatedSponsoredFaucet, finalizeCoordinatedSponsoredFaucet, checkCoordinatedLegacyStorageOwner, readCoordinatedResultsAnalysisStatus, reserveCoordinatedResultsAnalysis, finalizeCoordinatedResultsAnalysis, enqueueCoordinatedResultsAnalysisAutoJob;
+var SPONSORED_DEPLOY_RECORD_KEY, STORAGE_LEGACY_SCAN_KEY_PREFIX, STORAGE_LEGACY_OWNER_KEY_PREFIX, LEGACY_SCAN_ROWS_PER_STEP, LEGACY_SCAN_STEPS_PER_UPLOAD, LEGACY_SCAN_PENDING_ERROR, LEGACY_SCAN_FAILED_ERROR, DIRECT_DEPLOY_RECORD_KEY, SPONSORED_FAUCET_RECORD_KEY, SESSION_CONFIG_AUTHORITY_KEY, AUTH_NONCE_ACTIVE_KEY, AUTH_NONCE_USED_KEY, AUTH_RATE_RECORD_KEY, HOSTED_FAUCET_QUOTA_KEY, FAUCET_WALLET_TURN_KEY, FAUCET_WALLET_TURN_MS, FAUCET_WALLET_RENEW_MS, FAUCET_WALLET_WAIT_MS, FAUCET_WALLET_POLL_MS, CONTEXT_PDF_READING_PREFIX, CONTEXT_PDF_READING_LEASE_MS, WORKER_GROUP_CAPACITY_META_KEY, WORKER_GROUP_CAPACITY_GROUP_PREFIX, WORKER_GROUP_CAPACITY_MEMBER_PREFIX, RESULTS_ANALYSIS_RECORD_KEY, RESULTS_ANALYSIS_DRAFT_KEY, RESULTS_ANALYSIS_DRAFT_CHUNK_PREFIX, RESULTS_ANALYSIS_AUTO_JOB_KEY, RESULTS_ANALYSIS_UPLOAD_PREFIX, RESULTS_ANALYSIS_UPLOAD_CURSOR_KEY, RESULTS_ANALYSIS_UPLOAD_PRUNE_PAGE, UPLOAD_RECEIPT_PREFIX, UPLOAD_RECEIPT_LEASE_MS, UPLOAD_RECEIPT_RETENTION_MS, uploadReceiptExpiresAt, MAX_UPLOAD_RECEIPTS, uploadCountKey, MAX_ANSWER_VERSIONS, MAX_UPLOAD_QUESTION_IDS, MAX_PRIOR_UPLOAD_TARGETS, MAX_RESULTS_ANALYSIS_REQUESTS, RESULTS_ANALYSIS_VALUE_CHUNK_CHARS, RESULTS_ANALYSIS_MAX_DRAFT_CHUNKS, RESULTS_ANALYSIS_MAX_DRAFT_CHARS, millionChars, draftTooLargeError, RESULTS_ANALYSIS_AUTO_JOB_MAX_BYTES, RESULTS_ANALYSIS_RUNNING_LEASE_MS, RESULTS_ANALYSIS_MAX_THRESHOLD_RECHECKS, RESULTS_ANALYSIS_AUTO_RETRY_DELAYS_MS, RESULTS_ANALYSIS_RETRYABLE_STATUSES, RUNNING_LEASE_MS, MAX_AUTH_NONCE_LIFETIME_MS, AUTH_NONCE_MAC_KEY, MAX_AUTH_RATE_WINDOW_MS, WRAPPED_SESSION_KEY_FIELDS, toTrimmedString10, isObjectRecord, byteLength, normalizePositiveSafeInteger, normalizeBoundedFutureTimestamp, readActiveAuthNonces, putActiveAuthNonces, SIGNED_AUTH_NONCE_RE, bytesToHex3, hexToBytes2, equalText, signAuthNonce, isBase64url, normalizeWrappedSessionKeyRecord, normalizePublicSessionConfig, withAuthoritativeSessionKey, jsonResponse2, normalizeDeployResult, isTerminalDeployResult, buildDirectDeployTerminalReplay, createAttemptId, workerGroupCapacityGroupKey, workerGroupCapacityMemberKey, WORKER_GROUP_MUTATIONS, workerGroupBackupPendingKey, PENDING_WORKER_GROUP_OPERATIONS, PENDING_WORKER_GROUP_MEMBER_OPERATIONS, DEFINITELY_PREWRITE_WORKER_GROUP_CREATE_FAILURES, WORKER_GROUP_INPUT_FIELDS, WORKER_GROUP_INTENT_MAX_BYTES, pickWorkerGroupInput, sameWorkerGroupInput, withoutPendingMutation, normalizeWorkerGroupMutation, resolveInitializedWorkerGroupCapacity, SessionWriteCoordinator, WorkerGroupWriteCoordinator, executeCoordinatedSponsoredDeploy, resolveCoordinatorStub, coordinateResponseUploadReceipt, AUTH_STATE_UNAVAILABLE, callAuthStateCoordinator, issueCoordinatedAuthNonce, consumeCoordinatedAuthNonce, callHostedFaucetQuota, reserveCoordinatedHostedFaucet, finalizeCoordinatedHostedFaucet, withCoordinatedFaucetWalletTurn, checkCoordinatedAuthRateLimit, getOrCreateCoordinatedStorageEnvelopeSessionKey, executeCoordinatedSessionConfigMutation, reserveCoordinatedSponsoredFaucet, finalizeCoordinatedSponsoredFaucet, checkCoordinatedLegacyStorageOwner, readCoordinatedResultsAnalysisStatus, reserveResultsAnalysisCall, reserveCoordinatedResultsAnalysis, finalizeCoordinatedResultsAnalysis, finalizeResultsAnalysisCall, enqueueCoordinatedResultsAnalysisAutoJob;
 var init_sessionWriteCoordinator = __esm({
   "workers/sessionCorsWorker/sessionWriteCoordinator.js"() {
     init_lib2();
@@ -80666,7 +80700,12 @@ var init_sessionWriteCoordinator = __esm({
     MAX_PRIOR_UPLOAD_TARGETS = 8;
     MAX_RESULTS_ANALYSIS_REQUESTS = 24;
     RESULTS_ANALYSIS_VALUE_CHUNK_CHARS = 24e3;
-    RESULTS_ANALYSIS_MAX_DRAFT_CHUNKS = 64;
+    RESULTS_ANALYSIS_MAX_DRAFT_CHUNKS = 192;
+    RESULTS_ANALYSIS_MAX_DRAFT_CHARS = RESULTS_ANALYSIS_VALUE_CHUNK_CHARS * RESULTS_ANALYSIS_MAX_DRAFT_CHUNKS;
+    millionChars = (chars, round = Math.ceil) => (round(chars / 1e5) / 10).toFixed(1);
+    draftTooLargeError = (chars) => Object.assign(new Error(
+      `AI Views could not be saved: its answers and views come to ${millionChars(chars)} million characters, over its limit of ${millionChars(RESULTS_ANALYSIS_MAX_DRAFT_CHARS, Math.floor)} million (about 120 people answering 53 questions with long written answers and comments). Hidden questions are left out of AI Views, so hiding long written-answer questions it does not need, then building again, brings it under the limit. The last AI Views is unchanged.`
+    ), { status: 413 });
     RESULTS_ANALYSIS_AUTO_JOB_MAX_BYTES = 48e3;
     RESULTS_ANALYSIS_RUNNING_LEASE_MS = 14 * 60 * 1e3;
     RESULTS_ANALYSIS_MAX_THRESHOLD_RECHECKS = 2;
@@ -80750,15 +80789,15 @@ ${expiry}`);
       if (findForbiddenCloudflareDeploymentTokenPath(normalized) || findForbiddenWorkerConfigSecretPath(normalized)) return null;
       return normalized;
     };
-    withAuthoritativeSessionKey = (config, sessionKey) => {
-      if (!sessionKey) return config;
+    withAuthoritativeSessionKey = (config, sessionKey2) => {
+      if (!sessionKey2) return config;
       return {
         ...config,
         storageEnvelope: {
           ...isObjectRecord(config?.storageEnvelope) ? config.storageEnvelope : {},
           version: 1,
           keyProvider: "worker_secret",
-          sessionKey
+          sessionKey: sessionKey2
         }
       };
     };
@@ -81241,11 +81280,7 @@ ${expiry}`);
         for (let index = 0; index < serialized.length; index += RESULTS_ANALYSIS_VALUE_CHUNK_CHARS) {
           chunks.push(serialized.slice(index, index + RESULTS_ANALYSIS_VALUE_CHUNK_CHARS));
         }
-        if (chunks.length > RESULTS_ANALYSIS_MAX_DRAFT_CHUNKS) {
-          const error = new Error("Results analysis draft exceeds durable storage limits.");
-          error.status = 413;
-          throw error;
-        }
+        if (chunks.length > RESULTS_ANALYSIS_MAX_DRAFT_CHUNKS) throw draftTooLargeError(serialized.length);
         if (chunks.some((chunk2) => byteLength(chunk2) >= 12e4)) {
           const error = new Error("Results analysis draft chunk exceeds durable storage limits.");
           error.status = 413;
@@ -83900,7 +83935,8 @@ ${expiry}`);
         return unavailable3;
       }
     };
-    readCoordinatedResultsAnalysisStatus = async ({ env, slug } = {}) => {
+    readCoordinatedResultsAnalysisStatus = async ({ env, slug, shared = false } = {}) => {
+      if (shared) return shareResultsAnalysisStatusRead({ env, slug, cache: true, read: () => readCoordinatedResultsAnalysisStatus({ env, slug }) });
       const normalizedSlug = resolveCoordinatorSessionSlugStorageKey(slug);
       const stub = normalizedSlug ? await resolveCoordinatorStub(env, `session-config:${normalizedSlug}`) : null;
       if (!stub) return { ok: false, status: 503, error: "Results analysis coordination is unavailable." };
@@ -83916,7 +83952,7 @@ ${expiry}`);
         return { ok: false, status: 503, error: "Results analysis coordination failed; retry." };
       }
     };
-    reserveCoordinatedResultsAnalysis = async ({ env, slug, reservation } = {}) => {
+    reserveResultsAnalysisCall = async ({ env, slug, reservation } = {}) => {
       const normalizedSlug = resolveCoordinatorSessionSlugStorageKey(slug);
       const stub = normalizedSlug ? await resolveCoordinatorStub(env, `session-config:${normalizedSlug}`) : null;
       if (!stub) return { kind: "failed", status: 503, error: "Results analysis coordination is unavailable." };
@@ -83931,7 +83967,21 @@ ${expiry}`);
         return { kind: "failed", status: 503, error: "Results analysis coordination failed; retry." };
       }
     };
-    finalizeCoordinatedResultsAnalysis = async ({ env, slug, finalization } = {}) => {
+    reserveCoordinatedResultsAnalysis = async (args = {}) => {
+      try {
+        return await reserveResultsAnalysisCall(args);
+      } finally {
+        forgetResultsAnalysisStatus(args.env, args.slug);
+      }
+    };
+    finalizeCoordinatedResultsAnalysis = async (args = {}) => {
+      try {
+        return await finalizeResultsAnalysisCall(args);
+      } finally {
+        forgetResultsAnalysisStatus(args.env, args.slug);
+      }
+    };
+    finalizeResultsAnalysisCall = async ({ env, slug, finalization } = {}) => {
       const normalizedSlug = resolveCoordinatorSessionSlugStorageKey(slug);
       const stub = normalizedSlug ? await resolveCoordinatorStub(env, `session-config:${normalizedSlug}`) : null;
       if (!stub) return { ok: false, status: 503, error: "Results analysis coordination is unavailable." };
