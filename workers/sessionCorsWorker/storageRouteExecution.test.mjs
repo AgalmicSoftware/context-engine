@@ -5212,7 +5212,9 @@ const createResponseReceiptFixture = ({ binding = true, maxKvValueBytes, encrypt
   const kv = createMockKv();
   const env = { CE_STORAGE_INDEX_KV: kv, TOKEN_HMAC_SECRET: 'synthetic-receipt-secret', CE_STORAGE_ENVELOPE_KEK: 'fixture envelope key',
     ...(r2 ? { CE_STORAGE_R2: r2 } : {}) };
-  let config = encrypted ? createEnvelopeConfig() : { storageProfile: { backend: 'cloudflare', payloadAccessControl: { gate: 'none', encryption: 'none' } } };
+  // Answers queue an AI Views run only in sessions that run them automatically.
+  let config = { ...(encrypted ? createEnvelopeConfig() : { storageProfile: { backend: 'cloudflare', payloadAccessControl: { gate: 'none', encryption: 'none' } } }),
+    resultsAnalysis: { generationMode: 'automatic' } };
   let now = 1_000;
   if (binding) attachSessionCoordinator(env, next => { config = next; }, { now: () => now });
   const queued = [];

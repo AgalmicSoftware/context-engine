@@ -1,5 +1,6 @@
 import { participantsMayAddContext } from '../../shared/sessionContextSources.mjs';
 import { markStorageBackupWrite } from './storageBackupRevision.js';
+import { normalizeResultsAnalysisSettings } from '../../shared/resultsAnalysisSettings.mjs';
 import {
   STORAGE_BACKENDS,
   attachStorageRefCompatibilityFields,
@@ -1443,6 +1444,7 @@ export const publishCloudflareOwnedStorageMetadata = async ({ env, config, slug,
 };
 
 const RESPONSE_ROWS_PER_QUESTION = 5;
+const AUTOMATIC_ANALYSIS_MODES = new Set(['automatic', 'both']);
 
 // Agents pass one object per request as answersChecked, which keeps the count.
 const countQuestionsOnce = async (memo, count) => {
@@ -1568,8 +1570,11 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
     }
   }
 
+  // Only sessions that run AI Views automatically queue a run per answer: the
+  // queue lives in the session's one coordinator, on every request's path.
   const enqueueResponseAnalysis = async (id, metadata, bytesToStore) => {
     if (resource !== 'responses') return;
+    if (!AUTOMATIC_ANALYSIS_MODES.has(normalizeResultsAnalysisSettings(config?.resultsAnalysis).generationMode)) return;
     const enqueueAutomatic = deps?.enqueueResultsAnalysisAutoJob;
     if (typeof enqueueAutomatic === 'function') {
       let committedPayload = null;
