@@ -781,7 +781,7 @@ it('lets the drafting AI pick groups in the same reply, on the rules the personâ
     onGroupPicks,
   };
   await mapInterviewEvidenceToResponses(options);
-  const prompt = jest.mocked(callAI).mock.calls.at(-1)?.[0];
+  const prompt = String(jest.mocked(callAI).mock.calls.at(-1)?.[0]);
   expect(prompt).toContain(
     'judged only on what their own words show about the country they live in; their work, studies and roles; their interests, causes and communities, never on ' +
       GROUP_SUGGESTION_NEVER,

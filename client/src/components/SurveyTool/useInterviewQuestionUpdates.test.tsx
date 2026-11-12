@@ -137,7 +137,7 @@ it('reads a private session’s questions with the signed-in person’s ticket',
       ? { ok: true, json: async () => ({ questions: [...questions, { id: 'group', prompt: 'Group question?' }] }) }
       : { ok: false, status: 401, json: async () => ({}) },
   ) as unknown as typeof fetch;
-  const ticket = jest.fn(async () => 'ic1.fixture');
+  const ticket = jest.fn(async (_options: { fresh: boolean }) => 'ic1.fixture');
   const { result } = renderHook(() =>
     useInterviewQuestionUpdates({
       initialQuestions: questions,

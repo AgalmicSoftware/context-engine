@@ -900,7 +900,9 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
   });
 
   it('sends someone in a browser without passkeys to Safari or Chrome, with the link to copy', async () => {
-    const { PasskeysUnavailableError } = jest.requireActual('../../wallet/passkey/unavailable');
+    const { PasskeysUnavailableError } = jest.requireActual<typeof import('../../wallet/passkey/unavailable')>(
+      '../../wallet/passkey/unavailable',
+    );
     mockedPasskeyWallet.createPasskeyWallet.mockRejectedValueOnce(new PasskeysUnavailableError());
     const subject = mountClassSubject(new LoginAndSettingsModalSubject(buildProps()));
     await subject.handlePasskeyWalletCreate();
@@ -908,7 +910,7 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
     const status = screen.getByTestId('ce-passkey-wallet-status');
     expect(status).toHaveTextContent('Open this link in Safari or Chrome to sign in.');
     expect(status).not.toHaveTextContent('Create failed');
-    const writeText = jest.fn(async () => {});
+    const writeText = jest.fn(async (_text: string) => {});
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
     try {
       fireEvent.click(within(status).getByRole('button', { name: 'Copy link' }));

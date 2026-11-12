@@ -331,7 +331,6 @@ export default function SessionInterviewPanel({
     sessionSlug,
     active: isRecording,
     append: recorder.appendInstructions,
-    // Checking for new questions never asks the person to sign in.
     ticket: silentCatalogTicketSource({ account, context, sessionSlug, sessionConfig, resolveWorkerUrl }),
   });
   const questions = updates.questions;
