@@ -95,7 +95,7 @@ Setup, limits and routes: [docs/session-agent.md](docs/session-agent.md).
   from an MCP host: [mcp/README.md](mcp/README.md). Pin an exact published version
   for reproducible runs. This installs a local tool
   server; it does not deploy or upgrade the web app or Session Workers.
-- Optional Session Agent HTTP with scoped `/api/agent/*` credentials and
+- Optional Agent HTTP with scoped `/api/agent/*` credentials and
   versioned runtime instructions
 - Agent token login in the browser, one-time invites, and Session Wrapped over HTTPS
 - Delegated membership, gate, storage, and chain authority rather than a second
@@ -142,7 +142,7 @@ The default public deployment supports hundreds to low thousands of concurrent p
 - Session Agent: [docs/session-agent.md](docs/session-agent.md)
 - PATH / RPC behavior: [docs/path-rpc.md](docs/path-rpc.md)
 - Cloudflare worker docs: [docs/session-cors-worker.md](docs/session-cors-worker.md)
-- Session Agent HTTP docs: [workers/sessionCorsWorker/agent/README.md](workers/sessionCorsWorker/agent/README.md)
+- Agent HTTP docs: [workers/sessionCorsWorker/agent/README.md](workers/sessionCorsWorker/agent/README.md)
 - Agent participants (MCP server): [docs/agent-participants.md](docs/agent-participants.md)
 - Session registry and gate model: [docs/session-registry.md](docs/session-registry.md)
 - Scaling reference: [docs/scaling.md](docs/scaling.md)

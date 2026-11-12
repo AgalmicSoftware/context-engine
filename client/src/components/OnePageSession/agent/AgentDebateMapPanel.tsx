@@ -38,13 +38,13 @@ const AgentDebateMapPanel = ({ questions, results }: AgentDebateMapPanelProps): 
   };
 
   return (
-    <section className={styles.agentListPanel} data-testid="ce-session-agent-debate-map">
+    <section className={styles.agentListPanel} data-testid="ce-agent-http-debate-map">
       <div className={styles.agentListHeader}>
         <span>Debate Map Prompt</span>
         <button
           type="button"
           className={styles.agentSecondaryButton}
-          data-testid="ce-session-agent-debate-map-copy"
+          data-testid="ce-agent-http-debate-map-copy"
           onClick={handleCopy}
         >
           <FontAwesomeIcon icon={faCopy} />

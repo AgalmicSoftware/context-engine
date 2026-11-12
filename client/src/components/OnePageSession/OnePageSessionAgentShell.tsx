@@ -119,7 +119,7 @@ const OnePageSessionAgentShell = ({
           <Alert
             color="info"
             className={styles.agentOnlyNotice}
-            data-testid={E2E_TESTIDS.SESSION_AGENT_SIGN_IN_NOTICE}
+            data-testid={E2E_TESTIDS.AGENT_HTTP_SIGN_IN_NOTICE}
             fade={false}
           >
             <strong>Agent-enabled session</strong>
@@ -130,7 +130,7 @@ const OnePageSessionAgentShell = ({
             <button
               type="button"
               className={styles.agentPrimaryButton}
-              data-testid="ce-session-agent-login-open"
+              data-testid="ce-agent-http-login-open"
               onClick={onOpenLoginModal}
             >
               Log in with agent token
@@ -155,7 +155,7 @@ const OnePageSessionAgentShell = ({
             type="button"
             className={styles.agentSecondaryButton}
             onClick={onRefresh}
-            data-testid="ce-session-agent-refresh"
+            data-testid="ce-agent-http-refresh"
           >
             <FontAwesomeIcon icon={faSyncAlt} />
             <span>Refresh</span>
@@ -166,7 +166,7 @@ const OnePageSessionAgentShell = ({
           <button
             type="button"
             className={styles.agentLogoutButton}
-            data-testid="ce-session-agent-logout"
+            data-testid="ce-agent-http-logout"
             onClick={onLogout}
           >
             <FontAwesomeIcon icon={faSignOutAlt} />
@@ -201,7 +201,7 @@ const OnePageSessionAgentShell = ({
             id="report"
             ref={resultsSectionRef}
             className={styles.agentListPanel}
-            data-testid="ce-session-agent-results"
+            data-testid="ce-agent-http-results"
           >
             <div className={styles.agentListHeader}>
               <span>Results</span>
@@ -224,7 +224,7 @@ const OnePageSessionAgentShell = ({
                 </button>
               </div>
             </div>
-            <div className={styles.agentListEmpty} data-testid="ce-session-agent-generated-results-unsupported">
+            <div className={styles.agentListEmpty} data-testid="ce-agent-http-generated-results-unsupported">
               AI-generated Circles, Breakdown, and Risk Matrix views are not available in the agent web shell yet. Use a
               standard session page with admin Worker access to generate those private drafts.
             </div>
@@ -232,7 +232,7 @@ const OnePageSessionAgentShell = ({
             {mode === 'polis' && agentPolisDataset ? (
               <>
                 {agentPolisDataset.synthesized ? (
-                  <p className={styles.agentReportApprox} data-testid="ce-session-agent-report-approx">
+                  <p className={styles.agentReportApprox} data-testid="ce-agent-http-report-approx">
                     Approximate report: raw participant vectors are not available yet, so this view synthesizes a
                     deterministic aggregate dataset.
                   </p>

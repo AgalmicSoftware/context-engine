@@ -81,7 +81,7 @@ const AgentQuestionPile = ({
 
   if (status === 'loading') {
     return (
-      <div className={styles.agentListPanel} data-testid="ce-session-agent-questions">
+      <div className={styles.agentListPanel} data-testid="ce-agent-http-questions">
         Loading questions...
       </div>
     );
@@ -89,7 +89,7 @@ const AgentQuestionPile = ({
 
   if (!activeQuestion) {
     return (
-      <div className={styles.agentListPanel} data-testid="ce-session-agent-questions">
+      <div className={styles.agentListPanel} data-testid="ce-agent-http-questions">
         <div className={styles.agentListEmpty}>No answerable questions are available for this session.</div>
       </div>
     );
@@ -175,13 +175,13 @@ const AgentQuestionPile = ({
         forceGlow={false}
         disableEncryption={true}
         enableDownloads={false}
-        dataTestId="ce-session-agent-question-freeform-textarea"
+        dataTestId="ce-agent-http-question-freeform-textarea"
       />
     );
   }
 
   return (
-    <section className={styles.agentListPanel} data-testid="ce-session-agent-questions">
+    <section className={styles.agentListPanel} data-testid="ce-agent-http-questions">
       <div className={styles.agentListHeader}>
         <span>
           Question {activeIndex + 1} of {questions.length}
@@ -190,7 +190,7 @@ const AgentQuestionPile = ({
           <button
             type="button"
             className={styles.agentIconButton}
-            data-testid="ce-session-agent-question-prev"
+            data-testid="ce-agent-http-question-prev"
             onClick={() => onActiveIndexChange(Math.max(0, activeIndex - 1))}
             disabled={activeIndex <= 0}
             aria-label="Previous agent question"
@@ -200,7 +200,7 @@ const AgentQuestionPile = ({
           <button
             type="button"
             className={styles.agentIconButton}
-            data-testid="ce-session-agent-question-next"
+            data-testid="ce-agent-http-question-next"
             onClick={() => onActiveIndexChange(Math.min(questions.length - 1, activeIndex + 1))}
             disabled={activeIndex >= questions.length - 1}
             aria-label="Next agent question"
@@ -236,7 +236,7 @@ const AgentQuestionPile = ({
               <button
                 type="button"
                 className={styles.agentPrimaryButton}
-                data-testid="ce-session-agent-question-submit"
+                data-testid="ce-agent-http-question-submit"
                 disabled={submitDisabled}
                 onClick={() => onSubmitAnswer(activeQuestion, answer)}
               >

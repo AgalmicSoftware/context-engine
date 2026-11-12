@@ -9,7 +9,7 @@ function runSessionAgentTests(rootDir = path.resolve(__dirname, '..')) {
     .map(name => path.join(dir, name));
   files.push(...fs.readdirSync(path.join(dir, 'agent')).filter(name => name.endsWith('.test.mjs'))
     .map(name => path.join(dir, 'agent', name)));
-  if (!files.length) throw new Error('Session agent behavioral tests are missing.');
+  if (!files.length) throw new Error('Agent HTTP behavioral tests are missing.');
   const result = spawnSync(process.execPath, ['--test', ...files], { cwd: rootDir, stdio: 'inherit' });
   if (result.error) throw result.error;
   return typeof result.status === 'number' ? result.status : 1;

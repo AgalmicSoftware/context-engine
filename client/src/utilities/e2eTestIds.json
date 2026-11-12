@@ -51,7 +51,7 @@
   "PAGE_SESSION_DOCS_ROOT": "ce-page-session-docs-root",
   "PAGE_SESSION_SETTINGS_ROOT": "ce-page-session-settings-root",
   "PAGE_SESSION_WIZARD_ROOT": "ce-page-session-wizard-root",
-  "SESSION_AGENT_SIGN_IN_NOTICE": "ce-session-agent-sign-in-notice",
+  "AGENT_HTTP_SIGN_IN_NOTICE": "ce-agent-http-sign-in-notice",
   "SESSION_LOADING_SKELETON": "ce-session-loading-skeleton",
   "PAGE_ATLAS_ROOT": "ce-page-atlas-root",
   "PAGE_AGENT_ROOT": "ce-page-agent-root",

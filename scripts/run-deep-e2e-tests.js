@@ -81,7 +81,7 @@ function buildDeepE2eSteps(packageScripts = readPackageScripts()) {
   }
 
   if (Object.prototype.hasOwnProperty.call(packageScripts, 'test:worker:agent')) {
-    steps.push(['session agent', ['run', '-s', 'test:worker:agent']]);
+    steps.push(['agent http', ['run', '-s', 'test:worker:agent']]);
   }
 
   if (Object.prototype.hasOwnProperty.call(packageScripts, 'ai:test-cf-envelope:all')) {

@@ -55,7 +55,7 @@ flowchart LR
 |-------|-------------|--------------|-----------------|
 | **Client** | React SPA: survey authoring, response collection, SBT management, encryption gates, admin, session wizard | Shared across implemented profiles | `client/src/` |
 | **Session Worker** | Auth, canonical config, AI proxy, transcription, storage routes, controlled URL/image fetch, and profile-enabled chain/Arweave helpers | Canonical authority for Hosted & Fast; service boundary for decentralized/custom profiles | `workers/sessionCorsWorker/` |
-| **Session Agent HTTP** | Scoped Agent HTTP, submission queue, Session Wrapped, and atomically coordinated one-time invite exchange | Integrated domain modules using canonical Session Worker authority | `workers/sessionCorsWorker/agent/` |
+| **Agent HTTP** | Scoped `/api/agent/*` routes, submission queue, Session Wrapped, and atomically coordinated one-time invite exchange | Integrated domain modules using canonical Session Worker authority | `workers/sessionCorsWorker/agent/` |
 | **Cloudflare storage** | Worker KV config, secrets, payloads and indexes (Worker-encrypted when selected), and optional advanced R2 blobs | Hosted & Fast default | Worker bindings (external) |
 | **Contracts** | Session registry, surveys, SBTs, gates, and factory on supported EVM chains | Trustless & Slower and explicit chain-backed custom profiles | `contracts/` |
 | **Arweave** | Immutable metadata, survey/question payloads, SBT tokenURI, and document-library files | Trustless & Slower and explicit Arweave-backed custom profiles | External |
