@@ -1,4 +1,9 @@
-import { buildWorkerGroupAutoJoinPath, readWorkerGroupAutoJoinId } from './workerGroupAutoJoin';
+import {
+  buildWorkerGroupAutoJoinPath,
+  finishWorkerGroupAutoJoin,
+  readLinkedWorkerGroupId,
+  readWorkerGroupAutoJoinId,
+} from './workerGroupAutoJoin';
 
 it('normalizes exactly one valid Worker group ID and rejects malformed or ambiguous targets', () => {
   expect(readWorkerGroupAutoJoinId('?joinGroup=PARTICIPANTS-2026')).toBe('participants-2026');
@@ -88,4 +93,24 @@ it('reuses a valid same-session Worker hint from the base path when no explicit 
       '/session/alpha?mode=interview&worker=https%3A%2F%2Fworker.example%2Fprivate#prefill=abc',
     ),
   ).toBe('/session/alpha?mode=interview&joinGroup=participants');
+});
+
+it('remembers the group a link joined through a reload of that page, for that session only', async () => {
+  window.history.replaceState({}, '', '/session/salon?joinGroup=table-3');
+  expect(readLinkedWorkerGroupId('salon')).toBe('table-3');
+  finishWorkerGroupAutoJoin('salon', 'table-3');
+  expect(window.location.search).toBe('');
+  // A reload starts the page's memory afresh; the page's history entry still knows the group.
+  jest.resetModules();
+  const reloaded = await import('./workerGroupAutoJoin');
+  expect(reloaded.readLinkedWorkerGroupId('salon')).toBe('table-3');
+  expect(reloaded.readLinkedWorkerGroupId('other')).toBe('');
+  // A newer link in the address wins.
+  window.history.replaceState({ ...window.history.state }, '', '/session/salon?joinGroup=table-4');
+  expect(reloaded.readLinkedWorkerGroupId('salon')).toBe('table-4');
+  // Opening the plain session link, as for the plenary, carries no table's group.
+  window.history.pushState(null, '', '/session/salon');
+  jest.resetModules();
+  const plain = await import('./workerGroupAutoJoin');
+  expect(plain.readLinkedWorkerGroupId('salon')).toBe('');
 });

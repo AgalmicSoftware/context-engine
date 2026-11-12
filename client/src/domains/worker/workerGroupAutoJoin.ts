@@ -73,13 +73,25 @@ export const canAutoJoinWorkerGroup = (group: WorkerGroup): boolean =>
   group.memberVisibility === 'session' &&
   (!group.joinEndsAt || Date.parse(group.joinEndsAt) > Date.now());
 
-// The group this page's link joined, which leaves the address once joined.
-let joinedThroughLink: { sessionSlug: string; groupId: string } | null = null;
+// The group this page's link joined, which leaves the address once joined. The page's history entry keeps it, so a
+// recorder who reloads still hands out codes that join the table's group, while opening a plain link starts afresh.
+// Memory keeps it across the app's own navigation, as before.
+const LINKED_GROUP_STATE = 'ceLinkedWorkerGroup';
+type LinkedGroup = { sessionSlug: string; groupId: string };
+let joinedThroughLink: LinkedGroup | null = null;
+
+const linkedGroupFor = (held: unknown, sessionSlug: string): string => {
+  const value = held as Partial<LinkedGroup> | null | undefined;
+  return value?.sessionSlug === sessionSlug && typeof value.groupId === 'string'
+    ? normalizeWorkerGroupId(value.groupId)
+    : '';
+};
 
 /** The group this page's link is for, still in the address or already joined. '' without one. */
 export const readLinkedWorkerGroupId = (sessionSlug: string): string =>
   readWorkerGroupAutoJoinId(window.location.search) ||
-  (joinedThroughLink?.sessionSlug === sessionSlug ? joinedThroughLink.groupId : '');
+  linkedGroupFor(joinedThroughLink, sessionSlug) ||
+  linkedGroupFor(window.history.state?.[LINKED_GROUP_STATE], sessionSlug);
 
 export const finishWorkerGroupAutoJoin = (sessionSlug: string, groupId: string, sessionId?: string) => {
   joinedThroughLink = { sessionSlug, groupId };
@@ -91,7 +103,11 @@ export const finishWorkerGroupAutoJoin = (sessionSlug: string, groupId: string, 
     readWorkerGroupAutoJoinId(url.search) === groupId
   ) {
     url.searchParams.delete('joinGroup');
-    window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
+    window.history.replaceState(
+      { ...window.history.state, [LINKED_GROUP_STATE]: joinedThroughLink },
+      '',
+      `${url.pathname}${url.search}${url.hash}`,
+    );
     window.dispatchEvent(new PopStateEvent('popstate'));
   }
   if (sessionId) dispatchWorkerGroupsChanged({ sessionSlug, sessionId });
