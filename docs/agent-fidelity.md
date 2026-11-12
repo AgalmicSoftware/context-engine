@@ -59,6 +59,22 @@ Similarity between a prediction and an answer runs from 0 to 1:
 - **Correction rate:** the share of shown choice drafts the person changed.
   Ratings and vote allocations rarely come back exactly, so they count through
   similarity only.
+- **Where drafts came from:** the headline scores only predictions made before
+  the person spoke: AI prefill, and Session Wrapped when given. Voice
+  interview, typed-context and group-recording drafts restate what the person
+  said, so each gets its own row instead (`report.origins`, from
+  `scoreDraftOrigins`): its Mirror Score, its hidden-draft score, and the
+  share of shown drafts each person submitted with a different answer or
+  comment (`changedFields`, freeform answers included, so minimal records
+  count too). These rows measure how faithfully the interview and the mapping
+  captured what people said, not how well an AI knows them.
+- **By model and by context used:** the model is the one the draft's first
+  revision names, else the self-reported source's. Context used adds up the
+  past chats, memories and connected sources the person's AI said it drew on
+  (`source.researchCoverage`): none, 1–9, 10–49 or 50 or more. A count the AI
+  left out (`null`) adds nothing, and a draft with no counts at all, or no
+  coverage, is "not reported". Both are AI-prefill breakdowns, withheld like
+  platforms.
 - **Cohen's kappa:** exact agreement on choice predictions beyond what chance
   would give. Chance comes from each question's answer shares among the
   predictions and among the answers, and questions are pooled by their number
@@ -126,8 +142,8 @@ Similarity between a prediction and an answer runs from 0 to 1:
     running them.
   - Per-person rows, listed by pseudonym (`p001`…) and never by address, appear
     only when the whole report reaches the minimum.
-- Breakdowns that divide people (by platform, by where the draft came from,
-  and by group) also withhold a row when subtracting it from the total, or
+- Breakdowns that divide people (by platform, model, context used, where the
+  draft came from, and group) also withhold a row when subtracting it from the total, or
   from the other rows, would reveal a result for fewer people than the
   minimum: with six people, five on Claude and one on ChatGPT, a minimum of 5
   shows neither platform. The smallest row goes first. The benchmark's
@@ -177,6 +193,7 @@ This writes `agent-fidelity-report.json` and `agent-fidelity-report.md`.
 | `--exclude <file>` | Addresses to leave out (for example test accounts), one per line. |
 | `--bootstrap`, `--seed`, `--min-participants` | Interval samples, random seed, smallest reported cell. |
 | `--include-agents` | Keep self-declared agent participants. |
+| `--predictions <file.csv>` | Also write one row per scored prediction, for analysis elsewhere (below). |
 
 `--responses` takes a JSON array of rows as the Worker stores them:
 `{ "responder": "0x…", "createdAt": "2026-10-02T09:00:00Z", "response": … }`,
@@ -185,6 +202,16 @@ where `response` is the stored payload (one answer entry, or
 chain give `blockNumber`, `transactionIndex` and `logIndex` instead of
 `createdAt`. Bare payloads without a row are read too: their own `responder`
 then names the person, and for each question the later one in the file counts.
+
+`--predictions` writes every scored prediction of every origin as a CSV row:
+the person's pseudonym (the same one as in the report's per-person rows, in an
+order drawn afresh each run), origin, platform, model, context used, group
+(only groups the report names), condition, question, prediction, answer,
+similarity, exact match and confidence. It has no addresses, names or free
+text: freeform questions are left out, and choice answers keep only the
+question's own options. Excluded people and agents are left out, but no
+minimum applies, so it is de-identified rather than anonymous: keep it with
+the raw export.
 
 ## What participants see
 

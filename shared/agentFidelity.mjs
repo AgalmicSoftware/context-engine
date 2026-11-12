@@ -8,7 +8,9 @@ import { getVoiceCredits } from './questions/quadraticAllocation.mjs';
 import { normalizeRatingScale, ratingStepFor } from './questions/ratingScale.mjs';
 import { readStoredRating } from './questions/storedRating.mjs';
 
-export const FIDELITY_METHOD_VERSION = 'ce-agent-fidelity-v1';
+// v2: the report's headline scores only predictions made before the person spoke; other draft origins get rows of
+// their own.
+export const FIDELITY_METHOD_VERSION = 'ce-agent-fidelity-v2';
 
 // shown: the person reviewed the AI's draft before answering.
 // blind: the draft stayed hidden until the person answered (randomized).
@@ -260,6 +262,30 @@ const readPlatform = (value) => {
   const platform = lower(value);
   return platform === 'chatgpt' || platform === 'claude' ? platform : platform ? 'other' : 'unknown';
 };
+// The model that made the first draft: its own revision says so for every origin (a voice draft's provenance
+// source can be the person's prefill packet); the self-reported source is the fallback.
+const readModelId = (provenance, source) => {
+  const revisions = provenance.predictionRevisions ?? provenance.predictionComparison?.revisions;
+  const first = Array.isArray(revisions) && isRecord(revisions[0]) ? text(revisions[0].modelId) : '';
+  return (first && first !== 'unknown' ? first : text(source.modelId)).slice(0, 80) || 'unknown';
+};
+// How much of the person's own material their AI said it drew on: past chats, memories and connected sources
+// used. A count the AI left out (null) adds nothing; with none reported the draft is 'not reported'.
+const CONTEXT_COUNTS = ['historyChatsUsed', 'memoryItemsUsed', 'connectedSourcesUsed'];
+export const CONTEXT_BUCKETS = ['not reported', 'none', '1-9', '10-49', '50+'];
+export const contextUsedBucket = (coverage) => {
+  const counts = isRecord(coverage)
+    ? CONTEXT_COUNTS.map((key) => numberOrNull(coverage[key])).filter((count) => count !== null && count >= 0)
+    : [];
+  if (!counts.length) return 'not reported';
+  const total = counts.reduce((sum, count) => sum + count, 0);
+  return total === 0 ? 'none' : total < 10 ? '1-9' : total < 50 ? '10-49' : '50+';
+};
+// Whether the person's submitted answer or comment differs from the AI's draft, as recorded at submit.
+const changedField = (provenance, field) => {
+  const fields = provenance.changedFields ?? provenance.predictionComparison?.changedFields;
+  return Array.isArray(fields) ? fields.includes(field) : null;
+};
 const toMs = (value) => {
   const number = numberOrNull(value);
   if (number !== null) return number < 1e12 ? number * 1000 : number;
@@ -355,6 +381,7 @@ export const collectSessionFidelityData = ({ questions = [], payloads = [] } = {
   }
   const answers = [];
   const pairs = [];
+  const drafts = [];
   for (const { participantId, questionId, question, entry, payload } of latestByKey(records)) {
     const final = normalizeFidelityAnswer(question, entry.answer);
     if (final === null) {
@@ -366,6 +393,18 @@ export const collectSessionFidelityData = ({ questions = [], payloads = [] } = {
     const provenance = isRecord(entry.interviewProvenance) ? entry.interviewProvenance : null;
     const original = provenance && (provenance.originalPrediction ?? provenance.predictionComparison?.original);
     if (!isRecord(original)) continue;
+    const condition = CONDITIONS.includes(provenance.predictionCondition) ? provenance.predictionCondition : 'shown';
+    const origin = inferDraftOrigin(provenance);
+    // Every draft, freeform ones too, for how often people changed what the AI drafted.
+    drafts.push({
+      participantId,
+      questionId,
+      origin,
+      condition,
+      answerChanged: changedField(provenance, 'answer'),
+      commentChanged: changedField(provenance, 'additionalComments'),
+      isAgent,
+    });
     // Minimal research records keep no drafted text, so freeform predictions arrive empty.
     if (question.type === 'freeform' && original.answer === null) {
       skipped.freeformWithoutText += 1;
@@ -376,7 +415,6 @@ export const collectSessionFidelityData = ({ questions = [], payloads = [] } = {
       skipped.unreadablePrediction += 1;
       continue;
     }
-    const condition = CONDITIONS.includes(provenance.predictionCondition) ? provenance.predictionCondition : 'shown';
     // In the blind condition the measured answer is the one given before the
     // draft was revealed; a later change is recorded but not scored.
     const blindAnswer =
@@ -388,9 +426,10 @@ export const collectSessionFidelityData = ({ questions = [], payloads = [] } = {
       participantId,
       questionId,
       condition,
-      origin: inferDraftOrigin(provenance),
+      origin,
       platform: readPlatform(source.platform),
-      modelId: text(source.modelId) || 'unknown',
+      modelId: readModelId(provenance, source),
+      context: contextUsedBucket(source.researchCoverage),
       prediction,
       actual: blindAnswer ?? final,
       confidence: readDraftConfidence(original.confidence),
@@ -406,7 +445,7 @@ export const collectSessionFidelityData = ({ questions = [], payloads = [] } = {
       isAgent,
     });
   }
-  return { answers, pairs, skipped };
+  return { answers, pairs, drafts, skipped };
 };
 
 /**
@@ -433,6 +472,7 @@ export const collectWrappedFidelityPairs = ({ questions = [], rows = [] } = {}) 
       origin: 'wrapped_agent',
       platform: 'wrapped',
       modelId: text(row.model) || 'unknown',
+      context: 'not reported',
       prediction,
       actual,
       confidence: readPercentConfidence(row.agent_confidence),
@@ -877,6 +917,8 @@ const coreScores = (people, settings) => ({
     byType: breakdown(people, (pair) => pair.question.type, meanSimilarity, settings),
     byOrigin: peopleBreakdown(people, (pair) => pair.origin, meanSimilarity, settings),
     byPlatform: peopleBreakdown(people, (pair) => pair.platform, meanSimilarity, settings),
+    byModel: peopleBreakdown(people, (pair) => pair.modelId ?? 'unknown', meanSimilarity, settings),
+    byContext: peopleBreakdown(people, (pair) => pair.context ?? 'not reported', meanSimilarity, settings),
   },
   correctionRate: estimate(
     people.map((person) => {
@@ -895,7 +937,7 @@ const coreScores = (people, settings) => ({
  * baselines and typicality); `groups` maps participant ids to group ids (for
  * example position groups or the `src` link they arrived through).
  */
-export const scoreAgentFidelity = ({ questions = [], pairs = [], answers = [], groups = {}, options = {} } = {}) => {
+export const scoreAgentFidelity = ({ questions = [], pairs = [], answers = [], groups = {}, pseudonyms = null, options = {} } = {}) => {
   const settings = settingsFrom(options);
   const questionMap = mapQuestions(questions);
   const allowed = allowedBy(settings);
@@ -1077,7 +1119,7 @@ export const scoreAgentFidelity = ({ questions = [], pairs = [], answers = [], g
     // people; groups are listed only when they meet the minimum.
     participants: enough
       ? people.map((person, index) => ({
-          id: `p${String(index + 1).padStart(3, '0')}`,
+          id: pseudonyms?.get(person.participantId) ?? `p${String(index + 1).padStart(3, '0')}`,
           predictions: person.pairs.length,
           mirrorScore: meanSimilarity(person.pairs),
           exactMatchRate: matchRate(person.pairs),
@@ -1106,6 +1148,52 @@ export const scoreFidelityOverview = ({ questions = [], pairs = [], options = {}
     coverage: coverageOf({ pairs, scored, measured, people, settings }),
     ...coreScores(people, settings),
   };
+};
+
+// Where drafts come from, in report order.
+export const DRAFT_ORIGINS = ['external_prefill', 'voice_interview', 'typed_context', 'group_recording', 'wrapped_agent', 'unknown'];
+
+/**
+ * Each draft origin on its own row, never pooled: an AI prefill predicts the person from what their assistant
+ * knows, while interview, typed-context and recording drafts restate what the person just said, so they measure
+ * how faithfully it was captured. Per origin: the Mirror Score, the hidden-draft score, and how often people
+ * changed the answer (and comment) of a draft they were shown, freeform answers included. Rows that divide people
+ * are withheld like the platform rows.
+ */
+export const scoreDraftOrigins = ({ questions = [], pairs = [], drafts = [], options = {} } = {}) => {
+  const settings = settingsFrom(options);
+  const allowed = allowedBy(settings);
+  const people = peopleOf(scorePairs(pairs.filter(allowed), mapQuestions(questions)).filter((pair) => pair.similarity !== null));
+  const byOrigin = (list, valueOf) => peopleBreakdown(list, (item) => item.origin, valueOf, settings);
+  const mirror = byOrigin(people, meanSimilarity);
+  const hiddenPeople = people
+    .map((person) => ({ ...person, pairs: person.pairs.filter((pair) => pair.condition === 'blind') }))
+    .filter((person) => person.pairs.length);
+  const hidden = byOrigin(hiddenPeople, meanSimilarity);
+  const shownDrafts = drafts.filter(allowed).filter((draft) => draft.condition === 'shown');
+  const share = (field) => (list) => {
+    const known = list.filter((draft) => draft[field] !== null);
+    return known.length ? mean(known.map((draft) => (draft[field] ? 1 : 0))) : null;
+  };
+  const editors = peopleOf(shownDrafts);
+  const answersChanged = byOrigin(editors, share('answerChanged'));
+  const commentsChanged = byOrigin(editors, share('commentChanged'));
+  const scoredCount = (origin) => people.reduce((sum, person) => sum + person.pairs.filter((pair) => pair.origin === origin).length, 0);
+  const origins = new Set([...people.flatMap((person) => person.pairs), ...shownDrafts].map((item) => item.origin));
+  const order = [...DRAFT_ORIGINS.filter((origin) => origins.has(origin)), ...[...origins].filter((origin) => !DRAFT_ORIGINS.includes(origin)).sort()];
+  return Object.fromEntries(
+    order.map((origin) => [
+      origin,
+      {
+        predictions: scoredCount(origin),
+        shownDrafts: shownDrafts.filter((draft) => draft.origin === origin).length,
+        mirrorScore: mirror[origin] ?? withheld(0),
+        hiddenMirrorScore: hidden[origin] ?? null,
+        answersChanged: answersChanged[origin] ?? withheld(0),
+        commentsChanged: commentsChanged[origin] ?? withheld(0),
+      },
+    ]),
+  );
 };
 
 /**

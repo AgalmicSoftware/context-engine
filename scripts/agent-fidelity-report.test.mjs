@@ -170,6 +170,80 @@ test('rows that subtraction would reveal are marked withheld', () => {
   }
 });
 
+test('interview drafts get their own row, not the headline, and predictions export under pseudonyms', () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'agent-fidelity-'));
+  try {
+    // Four more people were interviewed by voice, and the interview drafted their answers exactly;
+    // one also wrote a freeform answer the AI drafted in full.
+    const survey = exportFixture();
+    survey.filteredQuestions.push({ id: 'qf', type: 'freeform', prompt: 'Why?' });
+    for (let index = 6; index < 10; index += 1) {
+      survey.filteredResponses.push({
+        responder: `0x${String(index + 1).padStart(40, '0')}`,
+        response: JSON.stringify({
+          timestamp: 2000 + index,
+          responses: [
+            ...['q1', 'q2'].map((questionID) => ({
+              questionID,
+              answer: { value: 'Disagree', encrypted: false },
+              interviewProvenance: {
+                version: 2,
+                draftOrigin: 'voice_interview',
+                source: { platform: 'other', modelId: 'interview-model' },
+                originalPrediction: { answer: 'Disagree', confidence: 0.9 },
+                changedFields: [],
+              },
+            })),
+            {
+              questionID: 'qf',
+              answer: { value: 'Private reasons', encrypted: false },
+              interviewProvenance: {
+                version: 2,
+                draftOrigin: 'voice_interview',
+                originalPrediction: { answer: 'Drafted reasons', confidence: 0.5 },
+                changedFields: ['answer'],
+              },
+            },
+          ],
+        }),
+      });
+    }
+    const input = path.join(dir, 'results.json');
+    const csv = path.join(dir, 'new', 'predictions.csv');
+    writeFileSync(input, JSON.stringify(survey));
+    const run = runReport(dir, ['--export', input, '--predictions', csv]);
+    assert.equal(run.status, 0, run.stderr);
+    assert.match(run.stdout, /AI prefill: 6 people, 12 predictions; Mirror Score 0\.67\. Other origins: voice_interview\./);
+    const report = JSON.parse(readFileSync(path.join(dir, 'agent-fidelity-report.json'), 'utf8'));
+    assert.deepEqual(report.coverage.byOrigin, { external_prefill: 12 }, 'the headline scores prefill only');
+    assert.equal(report.origins.voice_interview.mirrorScore.value, 1);
+    // One in three shown drafts changed for each interviewed person: the freeform answer.
+    assert.ok(Math.abs(report.origins.voice_interview.answersChanged.value - 1 / 3) < 1e-12);
+    const markdown = readFileSync(path.join(dir, 'agent-fidelity-report.md'), 'utf8');
+    // The prefill records predate the changed-fields list, so their shares are unknown, not zero.
+    assert.match(markdown, /\| AI prefill \| 6 \| 12 \| 0\.67 [^|]*\| – \| – \| – \|/);
+    assert.match(markdown, /\| AI interview \(voice\) \| 4 \| 8 \| 1\.00 [^|]*\| – \| 33% \| 0% \|/);
+    assert.match(markdown, /### By model\n\n[^#]*\| gpt-test \| 0\.67 \|/);
+    assert.match(markdown, /### By context used\n\n[^#]*\| Not reported \| 0\.67 \|/);
+
+    const [header, ...lines] = readFileSync(csv, 'utf8').trim().split('\n');
+    assert.match(header, /^"person","origin","platform","model","context_used","group","condition","question_id"/);
+    assert.equal(lines.length, 20, 'freeform drafts are left out');
+    const text = lines.join('\n');
+    assert.doesNotMatch(text, /0x0{30}|reasons/i, 'no addresses or free text');
+    // The report and the file name each person the same way.
+    const perPerson = new Map();
+    for (const line of lines) {
+      const person = line.split(',')[0].replaceAll('"', '');
+      perPerson.set(person, (perPerson.get(person) ?? 0) + 1);
+    }
+    assert.equal(perPerson.size, 10);
+    for (const row of report.participants) assert.equal(perPerson.get(row.id), row.predictions, row.id);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('the command exits non-zero with usage on bad input', () => {
   const run = spawnSync(process.execPath, [script], { encoding: 'utf8' });
   assert.equal(run.status, 1);

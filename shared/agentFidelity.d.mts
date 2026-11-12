@@ -71,6 +71,28 @@ export type SessionFidelityPair = FidelityPair & {
   origin: string;
   platform: string;
   modelId: string;
+  // Past chats, memories and connected sources the AI said it used, as one of CONTEXT_BUCKETS.
+  context: string;
+};
+
+// Every draft, freeform ones too; the changed flags are null when the record doesn't say.
+export type FidelityDraft = {
+  participantId: string;
+  questionId: string;
+  origin: string;
+  condition: FidelityCondition;
+  answerChanged: boolean | null;
+  commentChanged: boolean | null;
+  isAgent: boolean;
+};
+
+export type DraftOriginScore = {
+  predictions: number;
+  shownDrafts: number;
+  mirrorScore: FidelityEstimate;
+  hiddenMirrorScore: FidelityEstimate | null;
+  answersChanged: FidelityEstimate;
+  commentsChanged: FidelityEstimate;
 };
 
 export type FidelityOverview = {
@@ -88,6 +110,8 @@ export type FidelityOverview = {
     byType: Record<string, FidelityEstimate>;
     byOrigin: Record<string, FidelityEstimate>;
     byPlatform: Record<string, FidelityEstimate>;
+    byModel: Record<string, FidelityEstimate>;
+    byContext: Record<string, FidelityEstimate>;
   };
   correctionRate: FidelityEstimate;
   calibration: Partial<Record<FidelityCondition, FidelityCalibration>>;
@@ -97,8 +121,18 @@ export function resultsResponseRows(source: unknown): unknown[];
 export function collectSessionFidelityData(input: { questions?: unknown[]; payloads?: unknown[] }): {
   answers: unknown[];
   pairs: SessionFidelityPair[];
+  drafts: FidelityDraft[];
   skipped: Record<string, number>;
 };
+export const DRAFT_ORIGINS: string[];
+export const CONTEXT_BUCKETS: string[];
+export function contextUsedBucket(coverage: unknown): string;
+export function scoreDraftOrigins(input: {
+  questions?: unknown[];
+  pairs?: SessionFidelityPair[];
+  drafts?: FidelityDraft[];
+  options?: { bootstrapSamples?: number; seed?: number; minParticipants?: number };
+}): Record<string, DraftOriginScore>;
 export function scoreFidelityOverview(input: {
   questions?: unknown[];
   pairs?: SessionFidelityPair[];
