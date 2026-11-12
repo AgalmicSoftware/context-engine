@@ -93,7 +93,8 @@ Worker" on an older one, and save the key only while it is on.
   text for the rest. A consent change on saved answers is uploaded as a
   resubmission, so it deletes at that submit. Deleting works even after the
   setting is turned off or the session has ended, and it runs even if the
-  person moves to another session while the upload finishes. If a deletion
+  person moves to another session while the upload finishes (but not if
+  someone else signs in meanwhile: rows belong to the signer). If a deletion
   fails, the person is told their answers were saved but the text could not be
   updated; the text stays in the admin download until they next submit that
   question while the session keeps draft text. The report script's `--clio`

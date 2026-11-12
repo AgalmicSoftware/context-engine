@@ -608,10 +608,16 @@ export const createSurveyQuestionsSubmitRuntime = (
       // Await the receipt to ensure transaction is confirmed before optimistic update
       const receipt: SurveyQuestionsLegacyValue = await submitSurveyResponse(activeSlice, submitQids, submitContext);
       // AI draft text for admins follows the consent each uploaded response was saved with. It runs
-      // before the stale check, so a withdrawal that reached storage always sends its delete.
+      // before the stale check, so a withdrawal that reached storage sends its delete even after the
+      // person moves on. The Worker keys rows by the signer, so it is skipped if someone else signed in.
       const draftTextConfig = resolveEffectiveResponseGateConfig(submitContext.effectiveDraftSlug, submitContext.props);
+      const signer = (snapshot: SurveyQuestionsLegacyValue) =>
+        snapshot.loginComplete ? `${String(snapshot.account).toLowerCase()}|${snapshot.providerKind}` : '';
       let draftTextFailed = false;
       try {
+        if (!signer(submitContext) || signer(submitContext) !== signer(buildSubmitContextSnapshot())) {
+          throw new Error('The signed-in account changed during the upload.');
+        }
         const plan = planDraftTextSync({
           sessionConfig: draftTextConfig,
           uploaded: Array.isArray(receipt?.__ceQuestionResponses) ? receipt.__ceQuestionResponses : [],
