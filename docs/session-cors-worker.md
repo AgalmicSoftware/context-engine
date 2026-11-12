@@ -678,7 +678,9 @@ Admin test panel:
   and comment were as long as allowed, about 700 answers. A larger build fails with `413` and says how
   large it was; the last AI Views stays. Hidden questions are left out of AI
   Views, so hiding long written-answer questions it does not need brings a
-  build under the limit.
+  build under the limit. Each Worker instance shares one read of the stored
+  views among the people opening them and may reuse it for up to a second; a
+  new build shows at once through the instance that made it.
 - Generated-results AI calls inherit the session's existing AI provider/model
   routing, especially the analysis/thinking assignment. They do not hardcode a
   separate provider or model. Inputs are submitted responses only; Circles is

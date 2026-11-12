@@ -1,13 +1,15 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { Wallet } from 'ethers';
 import { loadAdminSnapshotResultsAnalysisSource } from './resultsAnalysisGeneration.js';
 import {
   RESULTS_ANALYSIS_MAX_DRAFT_CHARS, finalizeCoordinatedResultsAnalysis, readCoordinatedResultsAnalysisStatus,
   reserveCoordinatedResultsAnalysis,
 } from './sessionWriteCoordinator.js';
+import { SESSION_CONFIG_CACHE_MS } from './sessionConfigAuthority.js';
 import {
-  SESSION_ID, SLUG, createSessionEnv, fetchWorker, makeRequest, readJson,
+  SESSION_ID, SLUG, createSessionEnv, fetchWorker, login, makeRequest, readJson,
 } from './sessionWorkerRuntimeFixture.mjs';
 import { sha256Hex } from '../shared/deployHelperCore.mjs';
 
@@ -78,10 +80,11 @@ const setup = async () => {
       return stub.fetch(input, init);
     } };
   };
-  const build = async (draft, targetEnv = env) => {
+  const build = async (draft, { targetEnv = env, during } = {}) => {
     const reservation = { requestId: draft.draftId, reservationKey: `rk-${draft.draftId}`, sourceSignature: draft.draftId, viewSignature: 'views', refresh: true, trigger: 'manual' };
     const reserved = await reserveCoordinatedResultsAnalysis({ env: targetEnv, slug: SLUG, reservation });
     assert.equal(reserved.kind, 'execute', JSON.stringify(reserved));
+    await during?.();
     return finalizeCoordinatedResultsAnalysis({ env: targetEnv, slug: SLUG, finalization: {
       requestId: reservation.requestId, reservationKey: reservation.reservationKey, attemptId: reserved.attemptId,
       success: true, receipt: { ok: true, draft },
@@ -124,4 +127,55 @@ test('a draft at the ceiling is stored; one just past it is refused in plain wor
   const kept = await readCoordinatedResultsAnalysisStatus({ env: s.env, slug: SLUG });
   assert.equal(kept.state.lastGood.draftId, 'draft-ceiling');
   assert.equal(kept.state.jobState, 'failed');
+});
+
+test('many people opening AI Views at once share one read of the draft', async (t) => {
+  let now = Date.now();
+  t.mock.method(Date, 'now', () => now);
+  const s = await setup();
+  assert.equal((await s.build(await salonDraft({ config: s.config, people: 50, ...LONG }, 'salon'))).ok, true);
+  const tokens = await Promise.all(Array.from({ length: 20 }, () => login({ env: s.env, wallet: Wallet.createRandom() })));
+
+  const before = s.statusCalls();
+  const views = await Promise.all(Array.from({ length: 100 }, (_, index) => s.view({ token: index % 2 ? tokens[index % 20] : '' })));
+  assert.deepEqual([...new Set(views.map((read) => read.status))], [200]);
+  assert.equal(views[99].body.snapshot.responses.length, 50 * 53);
+  assert.equal(s.statusCalls() - before, 1, 'one read for a hundred views');
+
+  // Views within the second reuse it; after that the next view reads again.
+  now += SESSION_CONFIG_CACHE_MS - 1;
+  await s.view();
+  assert.equal(s.statusCalls() - before, 1);
+  now += 2;
+  await s.view();
+  assert.equal(s.statusCalls() - before, 2);
+  assert.equal(Object.isFrozen((await readCoordinatedResultsAnalysisStatus({ env: s.env, slug: SLUG, shared: true })).state.lastGood), true);
+});
+
+test('a new build shows at once where it was made and within a second elsewhere; admins read status fresh', async (t) => {
+  let now = Date.now();
+  t.mock.method(Date, 'now', () => now);
+  const s = await setup();
+  const binding = s.env.CE_SESSION_COORDINATOR;
+  const other = { ...s.env, CE_SESSION_COORDINATOR: { idFromName: binding.idFromName, get: (objectId) => binding.get(objectId) } };
+  const small = (id) => salonDraft({ config: s.config, people: 3, ...LONG }, id);
+  assert.equal((await s.build(await small('first'))).ok, true);
+  assert.equal((await s.view()).body.artifact.sections.breakdown.summary, prose(6_000, 'first'));
+  assert.equal((await s.view({ targetEnv: other })).body.artifact.sections.breakdown.summary, prose(6_000, 'first'));
+
+  // Someone opens AI Views while the new build runs, and so holds the old one.
+  const during = async () => assert.equal((await s.view()).body.artifact.sections.breakdown.summary, prose(6_000, 'first'));
+  assert.equal((await s.build(await small('second'), { during })).ok, true);
+  assert.equal((await s.view()).body.artifact.sections.breakdown.summary, prose(6_000, 'second'), 'the building instance shows it at once');
+  assert.equal((await s.view({ targetEnv: other })).body.artifact.sections.breakdown.summary, prose(6_000, 'first'));
+  now += SESSION_CONFIG_CACHE_MS + 1;
+  assert.equal((await s.view({ targetEnv: other })).body.artifact.sections.breakdown.summary, prose(6_000, 'second'));
+
+  const adminToken = await login({ env: s.env, wallet: s.admin });
+  const before = s.statusCalls();
+  for (let index = 0; index < 3; index += 1) {
+    const status = await readJson(await fetchWorker(makeRequest(`/admin/results-analysis/status?slug=${SLUG}`, { token: adminToken }), s.env));
+    assert.equal(status.status, 200, JSON.stringify(status.body).slice(0, 300));
+  }
+  assert.equal(s.statusCalls() - before, 3);
 });

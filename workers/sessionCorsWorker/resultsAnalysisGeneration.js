@@ -1126,7 +1126,8 @@ export const evaluateResultsAnalysisViewerEligibility = ({ config } = {}) => {
 
 export const readPublishedResultsAnalysisArtifact = async ({ env, slug, config, includeSnapshot = true, deps } = {}) => {
   const readStatus = deps?.readCoordinatedResultsAnalysisStatus || readCoordinatedResultsAnalysisStatusDefault;
-  const coordinatorState = await readStatus({ env, slug });
+  // Many people may open AI Views at once; they share one read of the draft.
+  const coordinatorState = await readStatus({ env, slug, shared: true });
   // Stored artifacts outlive their creation policy. Reapply current privacy and
   // visibility settings on every read, including artifacts created by older Workers.
   const lastGood = publicDraft(coordinatorState?.state?.lastGood, config);

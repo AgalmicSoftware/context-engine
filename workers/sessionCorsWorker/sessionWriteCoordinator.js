@@ -8,7 +8,10 @@ import { registerUploadReceiptStore, readUploadReceiptRegistrationRetryAt, dispa
 import { bumpStorageBackupRevision, WORKER_GROUP_BACKUP_PENDING_PREFIX } from './storageBackupRevision.js';
 import { exportCoordinatorRecoveryKey } from './recoveryKeyExport.js';
 import { withFreshRecoveryKey } from '../shared/recoveryKey.mjs';
-import { SESSION_CONFIG_COORDINATION_ERROR, assertExpectedSessionAuthority, forgetSessionConfig, logCoordinatorFailure } from './sessionConfigAuthority.js';
+import {
+  SESSION_CONFIG_COORDINATION_ERROR, assertExpectedSessionAuthority, forgetResultsAnalysisStatus, forgetSessionConfig,
+  logCoordinatorFailure, shareResultsAnalysisStatusRead,
+} from './sessionConfigAuthority.js';
 import { exportCoordinatorBackup, exportWorkerGroupBackup, importWorkerGroupBackup, controlWorkerGroupBackupImport, BACKUP_GROUP_IMPORT_ACTIVE_KEY } from './sessionBackupCoordinator.js';
 import { importCoordinatorBackupPage } from './sessionBackupImport.js';
 import { normalizeStorageRef, isSafeCloudflareStorageRefId } from './storageRefNormalization.js';
@@ -3718,7 +3721,11 @@ export const checkCoordinatedLegacyStorageOwner = async ({ env, config, slug, re
   }
 };
 
-export const readCoordinatedResultsAnalysisStatus = async ({ env, slug } = {}) => {
+// `shared`: an AI Views view, which joins this isolate's read in flight and may
+// reuse one up to a second old; a finished draft never changes, and a new one
+// built through this isolate shows at once. The result is frozen.
+export const readCoordinatedResultsAnalysisStatus = async ({ env, slug, shared = false } = {}) => {
+  if (shared) return shareResultsAnalysisStatusRead({ env, slug, cache: true, read: () => readCoordinatedResultsAnalysisStatus({ env, slug }) });
   const normalizedSlug = resolveCoordinatorSessionSlugStorageKey(slug);
   const stub = normalizedSlug ? await resolveCoordinatorStub(env, `session-config:${normalizedSlug}`) : null;
   if (!stub) return { ok: false, status: 503, error: 'Results analysis coordination is unavailable.' };
@@ -3735,7 +3742,9 @@ export const readCoordinatedResultsAnalysisStatus = async ({ env, slug } = {}) =
   }
 };
 
-export const reserveCoordinatedResultsAnalysis = async ({ env, slug, reservation } = {}) => {
+// A reservation or a finished run changes the status, so this isolate's
+// shared copy is dropped once the call returns.
+const reserveResultsAnalysisCall = async ({ env, slug, reservation } = {}) => {
   const normalizedSlug = resolveCoordinatorSessionSlugStorageKey(slug);
   const stub = normalizedSlug ? await resolveCoordinatorStub(env, `session-config:${normalizedSlug}`) : null;
   if (!stub) return { kind: 'failed', status: 503, error: 'Results analysis coordination is unavailable.' };
@@ -3751,7 +3760,15 @@ export const reserveCoordinatedResultsAnalysis = async ({ env, slug, reservation
   }
 };
 
-export const finalizeCoordinatedResultsAnalysis = async ({ env, slug, finalization } = {}) => {
+export const reserveCoordinatedResultsAnalysis = async (args = {}) => {
+  try { return await reserveResultsAnalysisCall(args); } finally { forgetResultsAnalysisStatus(args.env, args.slug); }
+};
+
+export const finalizeCoordinatedResultsAnalysis = async (args = {}) => {
+  try { return await finalizeResultsAnalysisCall(args); } finally { forgetResultsAnalysisStatus(args.env, args.slug); }
+};
+
+const finalizeResultsAnalysisCall = async ({ env, slug, finalization } = {}) => {
   const normalizedSlug = resolveCoordinatorSessionSlugStorageKey(slug);
   const stub = normalizedSlug ? await resolveCoordinatorStub(env, `session-config:${normalizedSlug}`) : null;
   if (!stub) return { ok: false, status: 503, error: 'Results analysis coordination is unavailable.' };

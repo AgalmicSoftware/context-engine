@@ -37,50 +37,96 @@ export const assertExpectedSessionAuthority = (authority, expected, slug, { requ
 export const SESSION_CONFIG_CACHE_MS = 1_000;
 const SHARED_READ_JOIN_MS = 10_000;
 const STALLED = Symbol('stalled');
-const configReads = new WeakMap();
 
-const readState = (binding, slug) => {
-  let slugs = configReads.get(binding);
-  if (!slugs) configReads.set(binding, slugs = new Map());
-  let state = slugs.get(slug);
-  if (!state) slugs.set(slug, state = { generation: 0, cached: null, inFlight: null });
-  return state;
+// One kind of coordinator read, shared per isolate by binding and session.
+// `copy` gives each caller its own result, or the shared one when it is frozen.
+const createReadShare = (copy) => {
+  const reads = new WeakMap();
+  const stateFor = (binding, slug) => {
+    let slugs = reads.get(binding);
+    if (!slugs) reads.set(binding, slugs = new Map());
+    let state = slugs.get(slug);
+    if (!state) slugs.set(slug, state = { generation: 0, cached: null, inFlight: null });
+    return state;
+  };
+  const share = (state, read) => {
+    const joined = state.inFlight;
+    if (!joined) {
+      const generation = state.generation;
+      const pending = read().then((result) => {
+        // A read that overlapped a change made here may predate it; never keep it.
+        if (result?.ok && state.generation === generation) {
+          state.cached = { result, expiresAt: Date.now() + SESSION_CONFIG_CACHE_MS };
+        }
+        return result;
+      }).finally(() => { if (state.inFlight === pending) state.inFlight = null; });
+      state.inFlight = pending;
+      return pending.then(copy);
+    }
+    let timer;
+    const stalled = new Promise((resolve) => { timer = setTimeout(resolve, SHARED_READ_JOIN_MS, STALLED); });
+    return Promise.race([joined, stalled]).finally(() => clearTimeout(timer)).then((result) => {
+      if (result !== STALLED) return copy(result);
+      // The stalled read may still finish; it must not replace a newer copy.
+      if (state.inFlight === joined) { state.inFlight = null; state.generation += 1; }
+      return share(state, read);
+    });
+  };
+  return {
+    read: ({ binding, slug, cache, read }) => {
+      const state = stateFor(binding, slug);
+      if (cache && state.cached && Date.now() < state.cached.expiresAt) return Promise.resolve(copy(state.cached.result));
+      return share(state, read);
+    },
+    forget: (binding, slug) => {
+      const state = reads.get(binding)?.get(slug);
+      if (!state) return;
+      state.generation += 1;
+      state.cached = null;
+      state.inFlight = null;
+    },
+  };
 };
 
-const shareConfigRead = (state, read) => {
-  const joined = state.inFlight;
-  if (!joined) {
-    const generation = state.generation;
-    const pending = read().then((result) => {
-      // A read that overlapped a change made here may predate it; never keep it.
-      if (result.ok && state.generation === generation) {
-        state.cached = { result, expiresAt: Date.now() + SESSION_CONFIG_CACHE_MS };
-      }
-      return result;
-    }).finally(() => { if (state.inFlight === pending) state.inFlight = null; });
-    state.inFlight = pending;
-    return pending.then((result) => structuredClone(result));
+const deepFreeze = (value) => {
+  if (value && typeof value === 'object' && !Object.isFrozen(value)) {
+    Object.freeze(value);
+    for (const key of Object.keys(value)) deepFreeze(value[key]);
   }
-  let timer;
-  const stalled = new Promise((resolve) => { timer = setTimeout(resolve, SHARED_READ_JOIN_MS, STALLED); });
-  return Promise.race([joined, stalled]).finally(() => clearTimeout(timer)).then((result) => {
-    if (result !== STALLED) return structuredClone(result);
-    // The stalled read may still finish; it must not replace a newer copy.
-    if (state.inFlight === joined) { state.inFlight = null; state.generation += 1; }
-    return shareConfigRead(state, read);
-  });
+  return value;
 };
 
-// Drops this isolate's copy of a session's config after a change, so the next
-// read, and any read already in flight, is not reused.
-export const forgetSessionConfig = (env, slug) => {
+const configReads = createReadShare((result) => structuredClone(result));
+// An AI Views draft can be megabytes, so its viewers share one frozen copy
+// rather than each holding their own.
+const resultsAnalysisStatusReads = createReadShare((result) => result);
+
+const sessionKey = (env, slug) => {
   const binding = env?.CE_SESSION_COORDINATOR;
   const normalizedSlug = resolveCoordinatorSessionSlugStorageKey(slug);
-  const state = binding && normalizedSlug ? configReads.get(binding)?.get(normalizedSlug) : null;
-  if (!state) return;
-  state.generation += 1;
-  state.cached = null;
-  state.inFlight = null;
+  return binding && normalizedSlug ? { binding, slug: normalizedSlug } : null;
+};
+
+// AI Views viewers share one status read per isolate, and may reuse it for up
+// to a second (`cache`); a new draft built through this isolate shows at once.
+export const shareResultsAnalysisStatusRead = ({ env, slug, cache = false, read }) => {
+  const key = sessionKey(env, slug);
+  if (!key) return read();
+  return resultsAnalysisStatusReads.read({ ...key, cache, read: () => read().then(deepFreeze) });
+};
+
+export const forgetResultsAnalysisStatus = (env, slug) => {
+  const key = sessionKey(env, slug);
+  if (key) resultsAnalysisStatusReads.forget(key.binding, key.slug);
+};
+
+// Drops this isolate's copies of a session's config and AI Views status after
+// a change, so the next read, and any read already in flight, is not reused.
+export const forgetSessionConfig = (env, slug) => {
+  const key = sessionKey(env, slug);
+  if (!key) return;
+  configReads.forget(key.binding, key.slug);
+  resultsAnalysisStatusReads.forget(key.binding, key.slug);
 };
 
 // Calls that leave the config as it was: reads, backup marks and exports, and
@@ -91,12 +137,9 @@ const KEEPS_CONFIG_PREFIXES = ['agent-submit/', 'debate-atlas/', 'risk-matrix/']
 const keepsConfig = (path) => KEEPS_CONFIG.has(path) || KEEPS_CONFIG_PREFIXES.some((prefix) => String(path).startsWith(prefix));
 
 export const callSessionConfigCoordinator = async ({ env, slug, path, cache = false, ...payload }) => {
-  const binding = env?.CE_SESSION_COORDINATOR;
-  const normalizedSlug = resolveCoordinatorSessionSlugStorageKey(slug);
-  if (path === 'current' && normalizedSlug && binding && !Object.keys(payload).length) {
-    const state = readState(binding, normalizedSlug);
-    if (cache && state.cached && Date.now() < state.cached.expiresAt) return structuredClone(state.cached.result);
-    return shareConfigRead(state, () => callCoordinator({ env, slug, path }));
+  const key = sessionKey(env, slug);
+  if (path === 'current' && key && !Object.keys(payload).length) {
+    return configReads.read({ ...key, cache, read: () => callCoordinator({ env, slug, path }) });
   }
   try {
     return await callCoordinator({ env, slug, path, ...payload });
