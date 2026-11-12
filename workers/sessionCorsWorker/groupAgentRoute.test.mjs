@@ -67,8 +67,9 @@ const ask = async (h, {
       }),
       loadWorkerCanonicalResultsAnalysisSource: async () => ({
         ok: true,
-        aiSnapshot: {
-          responses: [{ questionId: 'q1', questionPrompt: 'What should change?', answer: 'ANSWER meet less', participantId: 'participant_001' }],
+        snapshot: {
+          questions: [{ id: 'q1', prompt: 'What should change?', type: 'text' }],
+          responses: [{ questionId: 'q1', answer: 'ANSWER meet less', participantId: 'participant_001' }],
         },
         participantAddresses: new Map([['participant_001', MEMBER]]),
       }),
@@ -278,7 +279,10 @@ test('answers without an address stay out, and no question goes ahead when opt-o
     deps: {
       loadWorkerCanonicalResultsAnalysisSource: async () => ({
         ok: true,
-        aiSnapshot: { responses: [{ questionId: 'q1', questionPrompt: 'What should change?', answer: 'ANSWER from no one', participantId: 'participant_001' }] },
+        snapshot: {
+          questions: [{ id: 'q1', prompt: 'What should change?', type: 'text' }],
+          responses: [{ questionId: 'q1', answer: 'ANSWER from no one', participantId: 'participant_001' }],
+        },
         participantAddresses: new Map(),
       }),
     },
@@ -290,4 +294,43 @@ test('answers without an address stay out, and no question goes ahead when opt-o
   assert.deepEqual(refused.calls.ai, []);
   assert.equal((await ask(h, { path: '/group-agent/status', body: {}, deps: { callGroupAgentOptOutStore: down } })).status, 503);
   assert.equal((await ask(h, { path: '/group-agent/opt-out', body: { optedOut: true }, deps: { callGroupAgentOptOutStore: down } })).status, 503);
+});
+
+test('a Detailed answer counts every member’s choice, leaving out anyone who turned that off', async () => {
+  const h = await seeded();
+  const members = Array.from({ length: 6 }, (_, index) => [`participant_00${index + 1}`, `0x${String(index + 4).repeat(40)}`]);
+  const snapshot = {
+    questions: [
+      { id: 'q1', prompt: 'Meet less?', type: 'binary' },
+      { id: 'q2', prompt: 'Which days?', type: 'multichoice' },
+      { id: 'q3', prompt: 'What should change?', type: 'text' },
+    ],
+    responses: members.flatMap(([participantId], index) => [
+      { questionId: 'q1', participantId, answer: index < 4 ? 'Agree' : 'Disagree', ...(index === 0 ? { additional: 'COMMENT too many' } : {}) },
+      { questionId: 'q2', participantId, answer: index % 2 ? ['Monday'] : ['Monday', 'Friday'] },
+      { questionId: 'q3', participantId, answer: `WRITTEN ${index}` },
+      { questionId: 'gone', participantId, answer: 'ORPHAN' },
+    ]),
+  };
+  const deps = {
+    loadWorkerCanonicalResultsAnalysisSource: async () => ({ ok: true, snapshot, participantAddresses: new Map(members) }),
+  };
+  const answersIn = ({ prompt }) =>
+    JSON.parse(prompt.slice(prompt.indexOf('<member_answers>') + '<member_answers>'.length, prompt.indexOf('</member_answers>')));
+  const all = await ask(h, { address: ADMIN, deps });
+  assert.deepEqual(answersIn(all), [
+    { question: 'Meet less?', answered: 6, counts: { Agree: 4, Disagree: 2 }, written: ['COMMENT too many'] },
+    { question: 'Which days?', answered: 6, counts: { Monday: 6, Friday: 3 } },
+    // The third question's rounds start at its third member.
+    { question: 'What should change?', answered: 6, written: [2, 3, 4, 5, 0, 1].map((index) => `WRITTEN ${index}`) },
+  ]);
+  assert.equal(all.body.read.answers, 18);
+  assert.doesNotMatch(all.prompt, /ORPHAN|participant_/);
+
+  // The first member, who agreed and commented, turns it off.
+  await ask(h, { path: '/group-agent/opt-out', address: members[0][1], body: { optedOut: true } });
+  const without = answersIn(await ask(h, { address: ADMIN, deps }));
+  assert.deepEqual(without[0], { question: 'Meet less?', answered: 5, counts: { Agree: 3, Disagree: 2 } });
+  assert.deepEqual(without[1].counts, { Monday: 5, Friday: 2 });
+  assert.equal(without[2].written.includes('WRITTEN 0'), false);
 });

@@ -90,24 +90,31 @@ const readVisibleResults = async ({ env, slug, config, address, scopes, admin, d
   }
 };
 
-// Members' answers by question, as the session's own analysis reads them:
+// Every member's answer by question, as the session's own analysis reads them:
 // latest per person, withheld and locked answers left out, with no names.
 // Only answers from an address that hasn't opted out are used; one without an
-// address couldn't have said either way, so it stays out.
+// address couldn't have said either way, so it stays out. An answer to a
+// question with set options is the options chosen, which the prompt counts;
+// any other answer is what the person wrote.
+const COUNTED_TYPES = new Set(['binary', 'rating', 'multichoice']);
 const readMemberAnswers = async ({ env, slug, config, optedOut, deps }) => {
   const source = await (deps.loadWorkerCanonicalResultsAnalysisSource || loadWorkerCanonicalResultsAnalysisSource)({ env, slug, config });
   if (!source?.ok) return null;
-  const byQuestion = new Map();
-  source.aiSnapshot.responses.forEach((response) => {
+  const byQuestion = new Map(source.snapshot.questions.map((question) => [
+    question.id, { question: trim(question.prompt), counted: COUNTED_TYPES.has(question.type), answers: [] },
+  ]));
+  source.snapshot.responses.forEach((response) => {
     const from = source.participantAddresses?.get(response.participantId);
-    if (!from || optedOut.has(from)) return;
-    const answer = [trim(response.answer), trim(response.additional)].filter(Boolean).join(' — ');
-    if (!answer) return;
-    const group = byQuestion.get(response.questionId) || { question: trim(response.questionPrompt), answers: [] };
-    group.answers.push(answer);
-    byQuestion.set(response.questionId, group);
+    const group = byQuestion.get(response.questionId);
+    if (!group || !from || optedOut.has(from)) return;
+    const given = (Array.isArray(response.answer) ? response.answer : [response.answer]).map(trim).filter(Boolean);
+    const comment = trim(response.additional);
+    const answer = group.counted
+      ? { choices: given, text: comment }
+      : { choices: [], text: [given.join('; '), comment].filter(Boolean).join(' — ') };
+    if (answer.choices.length || answer.text) group.answers.push(answer);
   });
-  return [...byQuestion.values()];
+  return [...byQuestion.values()].filter((group) => group.answers.length).map(({ question, answers }) => ({ question, answers }));
 };
 
 // What each style reads, decided here and nowhere else. General: the

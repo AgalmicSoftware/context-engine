@@ -24,12 +24,15 @@ export type GroupAgentSetting = {
 
 export type GroupAgentError = { path: string; message: string };
 
+/** One member's answer to a question: the options they chose, and what they wrote. */
+export type GroupAgentMemberAnswer = { choices?: string[]; text?: string };
+
 /** Only what this person's style may read; answers carry no names. */
 export type GroupAgentMaterial = {
   sessionContext?: unknown;
   sources?: SessionContextPromptSource[];
   results?: string;
-  answers?: Array<{ question: string; answers: string[] }>;
+  answers?: Array<{ question: string; answers: GroupAgentMemberAnswer[] }>;
 };
 
 export const GROUP_AGENT_STYLES: readonly GroupAgentStyle[];
@@ -45,6 +48,8 @@ export const GROUP_AGENT_LIMITS: Readonly<{
   resultsChars: number;
   answersChars: number;
   answerItemChars: number;
+  countedChoices: number;
+  choiceChars: number;
 }>;
 export const GROUP_AGENT_DEFAULT_INSTRUCTIONS: Readonly<Record<GroupAgentStyle, string>>;
 /** Sent after the instructions on every question; no setting removes them. */

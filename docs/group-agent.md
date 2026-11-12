@@ -78,9 +78,16 @@ page shows them. If members' answers can't be read
 for a question, the answer goes ahead without them and says so.
 
 One question reads at most 8,000 characters of context, 2,000 of results and
-6,000 of answers. Each answer is cut to 300 characters, and answers are taken a
-round at a time across questions, so every question is heard before any one
-fills the room.
+16,000 of answers. For each question members answered, a Detailed answer is
+given how many answered and, where the question has set options (agree or
+disagree, a rating, a choice), how many chose each. These counts cover every
+member's answer, however large the session, so the agent can say how widely a
+view is held. What members wrote, comments included, is a sample: each piece is
+cut to 300 characters, and they are taken a round at a time, first across the
+questions that share topic words with the one asked and then across the rest,
+each question starting at a different member. In a session of 50 people and 40
+questions that is every count, the written answers to the closest questions,
+and one or two from each of the others.
 
 ## Instructions and rules
 
