@@ -16,6 +16,7 @@ const PLAIN_MESSAGES: Record<string, string> = {
   access_conditions_require_worker_envelope: 'Per-item access rules need Worker encryption.',
   sbt_conditions_require_worker_envelope: 'SBT access rules need Worker encryption.',
   public_results_require_public_storage: 'Public results need unencrypted, ungated storage.',
+  member_results_require_session_worker: 'Members-only results need a Session Worker.',
   payload_access_mode_mismatch: 'The storage access mode doesn’t match the chosen storage.',
   cloudflare_payload_access_required: 'Cloudflare storage needs an access mode.',
   payload_access_cloudflare_only: 'That access mode is available only on Cloudflare storage.',
@@ -39,6 +40,7 @@ const PLAIN_MESSAGES: Record<string, string> = {
 
 const SECTIONS: Record<string, string> = {
   public_results_require_public_storage: 'results',
+  member_results_require_session_worker: 'results',
   worker_secret_required: 'access',
   key_provider_requires_worker_envelope: 'access',
   access_conditions_require_worker_envelope: 'access',

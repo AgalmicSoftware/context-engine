@@ -1,6 +1,7 @@
 import { projectPublicAgentConfig } from '../../shared/sessionAgentConfig.mjs';
 import {
   DEBATE_ATLAS_FIELD,
+  MEMBER_RESULTS_FIELD,
   PUBLIC_WORKER_AI_FIELDS,
   PUBLIC_WORKER_CONFIG_FIELDS,
   RISK_MATRIX_FIELD,
@@ -316,6 +317,7 @@ export const projectPublicWorkerSessionConfig = (config) => {
   projected[SET_CONFIG_MERGES_AI_FIELD] = true;
   projected[DEBATE_ATLAS_FIELD] = true;
   projected[RISK_MATRIX_FIELD] = true;
+  projected[MEMBER_RESULTS_FIELD] = true;
   return projected;
 };
 

@@ -10,17 +10,19 @@ import {
 } from '../../../utilities/session/sessionModeProfile';
 
 // The quick path's profile: Worker-canonical, passkey-first, optional surfaces off,
-// and public results, which need unencrypted answers. Every option on the page edits
-// a copy of it.
+// unencrypted answers, and every answer shown to signed-in session members. Every
+// option on the page edits a copy of it.
 export const defaultSessionSetupProfile = (): SessionModeProfile => {
   const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
   profile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
   profile.encryption = { mode: 'none' };
-  setResultsVisibility(profile, PUBLIC_RESULTS);
+  profile.storage.payloadAccessControl = defaultCloudflarePayloadAccess(profile);
+  profile.results.visibility = MEMBER_RESULTS;
   return profile;
 };
 
 export const PUBLIC_RESULTS: SessionModeResultsVisibility = 'public_full_if_storage_public';
+export const MEMBER_RESULTS: SessionModeResultsVisibility = 'session_member_full';
 export const DEFAULT_REGISTRY_CHAIN_ID = 11155420;
 
 export const isSessionModeProfile = (value: unknown): value is SessionModeProfile =>
@@ -76,17 +78,28 @@ const hasSbtRule = (profile: SessionModeProfile): boolean =>
 // Public results are offered only for unencrypted answers.
 export const supportsPublicResults = (profile: SessionModeProfile): boolean => profile.encryption.mode === 'none';
 
+// Only the Session Worker can hold answers to signed-in members.
+export const supportsMemberResults = (profile: SessionModeProfile): boolean =>
+  profile.authority.mode === 'worker_canonical' && profile.storage.backend === 'cloudflare';
+
 const hasPublicReadStorage = (profile: SessionModeProfile): boolean =>
   profile.storage.backend === 'arweave' ||
   (profile.storage.payloadAccessControl?.gate === 'none' && !profile.storage.payloadAccessControl.accessConditions);
 
-// Keeps the page from leaving public results on storage that can't serve
-// them, and drops the public-read Cloudflare policy once they are off.
-const settlePublicResults = (profile: SessionModeProfile, previous: SessionModeProfile | null) => {
+// Keeps the page from leaving results visible in a way the hosting can't
+// serve, and drops the public-read Cloudflare policy once public results are off.
+const settleResultsVisibility = (profile: SessionModeProfile, previous: SessionModeProfile | null) => {
+  // On-chain answers sit on public Arweave, so members-only becomes public (or
+  // own answers below, when they're encrypted).
+  if (profile.results.visibility === MEMBER_RESULTS && !supportsMemberResults(profile)) {
+    profile.results.visibility = PUBLIC_RESULTS;
+  }
   const leavingPublic =
     profile.results.visibility === PUBLIC_RESULTS &&
     (!supportsPublicResults(profile) || !hasPublicReadStorage(profile));
-  if (leavingPublic) profile.results.visibility = 'participant_aggregate';
+  if (leavingPublic) {
+    profile.results.visibility = supportsMemberResults(profile) ? MEMBER_RESULTS : 'participant_aggregate';
+  }
   const access = profile.storage.payloadAccessControl;
   const keepsLitRules = profile.encryption.mode === 'lit' && previous?.encryption.mode === 'lit';
   if (
@@ -166,7 +179,7 @@ export const editSessionSetupProfile = (
   profile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
   mutate(profile);
   profile.surfaces.web = true;
-  settlePublicResults(profile, previous);
+  settleResultsVisibility(profile, previous);
   clearUnusedChain(profile);
   const source = validateSessionModeProfile(profile).valid
     ? profile

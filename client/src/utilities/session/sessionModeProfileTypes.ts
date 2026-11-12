@@ -24,6 +24,7 @@ export type SessionModeResultsVisibility =
   | 'private_admin'
   | 'participant_aggregate'
   | 'session_member_aggregate'
+  | 'session_member_full'
   | 'public_redacted_snapshot'
   | 'public_full_if_storage_public';
 export type SessionModeExportScope = 'admin_raw' | 'all_session' | 'selected_surfaces' | 'encrypted_envelopes_only';

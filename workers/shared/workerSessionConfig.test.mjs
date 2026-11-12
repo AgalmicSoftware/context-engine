@@ -123,6 +123,7 @@ test('public config shows the AI models and effort, hides the rest of ai, and sa
     setConfigMergesAi: false,
     debateAtlas: false,
     riskMatrix: false,
+    memberResults: false,
   });
 
   assert.deepEqual(projected, {
@@ -136,6 +137,7 @@ test('public config shows the AI models and effort, hides the rest of ai, and sa
     setConfigMergesAi: true,
     debateAtlas: true,
     riskMatrix: true,
+    memberResults: true,
   });
 });
 

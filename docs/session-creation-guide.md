@@ -17,8 +17,9 @@ Related docs:
 Context, Questions, Participation, Results visibility, Access and identity,
 Hosting and storage, and AI each show a one-line summary and open from their
 caret. A new draft starts on the default profile: a Session Worker on
-Cloudflare with public results, so anyone can read them and answers are stored
-unencrypted. Choosing encryption or other results visibility keeps them private.
+Cloudflare, with answers stored unencrypted, that every signed-in session member
+can read and signed-out visitors can't. Public results open them to everyone;
+own-answers visibility keeps each person to their own.
 Labels stay short; a "?" beside a label opens its explanation, which screen
 readers also get through `aria-describedby`.
 
@@ -212,7 +213,7 @@ entries; owners do not choose a separate generated-results model.
 
 Successful runs are immediately visible as the latest successful generated
 artifact. Viewer reads are available only when the session profile exposes
-`public_full_if_storage_public`, `aggregateResultsEnabled` is true, and the
+`public_full_if_storage_public` or `session_member_full`, `aggregateResultsEnabled` is true, and the
 caller can pass all three existing Cloudflare storage read gates for
 `generatedArtifacts`, `questions`, and `responses`. The viewer endpoint returns
 a safe `jobState` with the artifact and frozen submitted snapshot; it does not
@@ -417,9 +418,9 @@ switches between the two hosting models, and every other option adjusts that
 profile in place:
 
 - **Session Worker** (Hosted & Fast) compiles to a Cloudflare-backed,
-  worker-canonical session shape with public results and no encryption by default;
-  Cloudflare-internal worker encryption (`worker_envelope`) is an option in setup
-  that also makes results private. Create asks for a name, a Cloudflare API token
+  worker-canonical session shape whose signed-in members see every answer, with
+  no encryption by default; Cloudflare-internal worker encryption
+  (`worker_envelope`) is an option in setup. Create asks for a name, a Cloudflare API token
   (or a verified dashboard-deployed Worker) and the OpenAI key. It does not ask for
   Arweave, Lit, RPC, funding, faucet, or gas inputs.
 - **On-chain registry** (Trustless & Slower; this guide also says decentralized)
@@ -434,8 +435,8 @@ which capabilities are reachable:
 
 | Reachable `/new` profile                   | Canonical authority and storage                              | Identity and Groups                                                                                | Chain-dependent capabilities                                                          |
 | ------------------------------------------ | ------------------------------------------------------------ | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| Default (`/new` starts here)               | Session Worker + Cloudflare; `gate: "none"`, `encryption: "none"`, public results | Passkey + **Native Worker Groups**                                                                 | None; `evm.registryChainId` is `null`                                                 |
-| Cloudflare, no encryption, private results | Session Worker + Cloudflare; `gate: "role_gate"`, `encryption: "none"` | Passkey + **Native Worker Groups**                                                                 | None; `evm.registryChainId` is `null`                                                 |
+| Default (`/new` starts here)               | Session Worker + Cloudflare; `gate: "role_gate"`, `encryption: "none"`, members see all answers | Passkey + **Native Worker Groups**                                                                 | None; `evm.registryChainId` is `null`                                                 |
+| Cloudflare, no encryption, public results  | Session Worker + Cloudflare; `gate: "none"`, `encryption: "none"` | Passkey + **Native Worker Groups**                                                                 | None; `evm.registryChainId` is `null`                                                 |
 | Cloudflare, Worker envelope                | Session Worker + Cloudflare; `gate: "role_gate"`, `encryption: "worker_envelope"` (the `fast_cheap_cloudflare` preset) | Passkey + **Native Worker Groups**                                                                 | None unless an explicit `sbt_onchain` condition is added                              |
 | Cloudflare + explicit `sbt_onchain`        | Session Worker + Cloudflare; Worker envelope                 | Passkey + **Native Worker Groups**; SBT conditions are separate **Advanced on-chain access gates** | Positive chain ID and RPC; wallet/gas only when `/new` must create an SBT             |
 | Cloudflare + Lit                           | Session Worker + Cloudflare; `encryption: "lit"`             | Passkey + **Native Worker Groups**                                                                 | Positive chain ID, RPC, and Lit credential; this does not make the registry canonical |
@@ -586,12 +587,17 @@ What gets stored where:
   available only with Cloudflare storage. The operator and Cloudflare runtime
   can decrypt; it is not decentralized, not end-to-end, and not private from
   the session operator or Cloudflare runtime.
-- Public stored-results visibility requires unencrypted storage. New sessions
-  start with it; choosing encryption moves an incompatible selection to
-  participant aggregate. On Cloudflare, public results also need a payload gate
-  of `none` with no access conditions in either profile policy branch, and
-  signed-out visitors can then read them without any anonymous scope. On any
-  other visibility, a signed-out visitor who opens Results is asked to log in.
+- New sessions start with `session_member_full`: every signed-in member reads
+  every answer and the AI Views. It needs the Session Worker with Cloudflare
+  storage, so choosing on-chain hosting moves it to public results, or to
+  participant aggregate when answers are encrypted.
+- Public stored-results visibility requires unencrypted storage; choosing
+  encryption moves it to `session_member_full` on the Session Worker and to
+  participant aggregate on chain. On Cloudflare, public results also need a
+  payload gate of `none` with no access conditions in either profile policy
+  branch, and signed-out visitors can then read them without any anonymous
+  scope. On any other visibility, a signed-out visitor who opens Results is
+  asked to log in.
 - When `/new` deploys a custom worker for Cloudflare storage, the deploy helper receives the normalized storage profile before Worker upload so it can bind the storage index KV and any requested R2 bucket. For every Session Worker, the helper also generates the worker secret used as the deployment KEK, unless you supply your own recovery key; it is not written to session metadata.
 - Worker-envelope key provider is fixed to `worker_secret`. In a nonpublic Worker-canonical session, the normal participant storage scope permits submitting and reloading their own responses. Reading another participant's individual response additionally requires a current session admin; ordinary `storage: true` isn't enough. Existing item access conditions still apply. Aggregate-only visibility does not permit downloading everyone's raw answers to calculate a summary in the browser; combined summaries require an authorized server-generated aggregate. Turning off **Default access rules** lets you combine Session role (`worker_role`), SBT holders (`sbt_onchain`), or Authorized accounts (`agent_grant_scope`) rules with any/all matching; the wizard writes those conditions to `storageProfile.payloadAccessControl.accessConditions` for the worker.
 - `SessionRegistry` does not store long-form content directly. Decentralized

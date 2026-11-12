@@ -79,8 +79,10 @@ storage switches to **Trustless & Slower**. **Company-Operated** is planned.
 
 - A creator deploys a per-session Cloudflare Worker with Cloudflare-backed
   canonical config and payload storage, under `worker_canonical` authority.
-- New sessions start with public results and unencrypted answers. Choosing
-  `worker_envelope` encryption or another results visibility keeps them private.
+- New sessions start with unencrypted answers that every signed-in session
+  member can read and signed-out visitors can't. Choosing public results opens
+  them to everyone; choosing own-answers visibility keeps each person to their
+  own.
 - Setup needs a Cloudflare account, an AI-provider key (OpenAI by default), and
   either a Cloudflare API token, sent once through the deploy helper and never
   saved, or the token-free dashboard handoff.

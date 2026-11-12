@@ -46,6 +46,7 @@ import {
   rebaseSessionSettingsDraft,
   usesSbtDefaults,
   workerMergesAi,
+  workerShowsMemberResults,
   workerTakesResultsAdmins,
   type SessionSettingsSave,
 } from './sessionSettingsEdits';
@@ -525,6 +526,7 @@ const SessionSettingsPage = ({
           {...section('results')}
           editProfile={editProfile}
           registryChainId={facts.registryChainId || null}
+          memberResultsSupported={workerShowsMemberResults(saved)}
           admins={
             !onChain && workerTakesResultsAdmins(saved) ? (
               <SettingsResultsAdminsField

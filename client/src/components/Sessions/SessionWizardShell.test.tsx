@@ -6,6 +6,7 @@ import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities
 import { listSessionModeConflicts, type SessionSetupConflict } from '../../utilities/session/sessionModeRuleMessages';
 import { RULE_FIXTURES } from '../../utilities/session/sessionModeRuleFixtures.testUtils';
 import SessionWizardShell, { type SessionWizardShellProps } from './SessionWizardShell';
+import { defaultSessionSetupProfile, editSessionSetupProfile, setHosting } from './setup/sessionSetupProfile';
 
 jest.mock('./SessionWizardSponsoredStatus', () => (props: any) => (
   <div data-testid="shell-sponsored-status" data-tone={props.status?.tone || ''}>
@@ -244,6 +245,27 @@ describe('SessionWizardShell', () => {
     expect(screen.getByTestId('ce-setup-conflicts')).toHaveTextContent(conflict.message);
     fireEvent.click(createButton);
     expect(props.createPanelProps.onCreate).not.toHaveBeenCalled();
+  });
+
+  it('starts with every answer shown to members, a choice only the Session Worker offers', () => {
+    const draftWith = (sessionModeProfile: unknown) =>
+      baseProps({ draft: { ...baseProps().draft, sessionModeProfile } });
+    const { rerender } = render(<SessionWizardShell {...draftWith(defaultSessionSetupProfile())} />);
+    fireEvent.click(screen.getByTestId(`${E2E_TESTIDS.SETUP_MORE_PREFIX}results`));
+    const select = () => screen.getByTestId(E2E_TESTIDS.SETUP_RESULTS_VISIBILITY);
+    const members = () => within(select()).getByRole('option', { name: 'Session members see all answers' });
+    expect(select()).toHaveValue('session_member_full');
+    expect(members()).toBeEnabled();
+    expect(
+      screen.getByText(/Session members: everyone signed in to the session sees every answer/),
+    ).toBeInTheDocument();
+
+    const onChain = editSessionSetupProfile(defaultSessionSetupProfile(), (draft) =>
+      setHosting(draft, 'evm_registry_canonical', 84532),
+    ).profile;
+    rerender(<SessionWizardShell {...draftWith(onChain)} />);
+    expect(select()).toHaveValue('public_full_if_storage_public');
+    expect(members()).toBeDisabled();
   });
 
   it('routes registry network changes to the page and the profile', () => {

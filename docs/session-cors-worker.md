@@ -563,7 +563,7 @@ Admin test panel:
 - Admin-generated Results views split viewer reads from admin controls.
   `GET /results-analysis/artifact?sessionSlug=<slug>&includeSnapshot=true`
   returns the latest successful generated artifact plus a safe frozen submitted
-  snapshot only when the session profile has `results.visibility: "public_full_if_storage_public"`, `aggregateResultsEnabled: true`, and the
+  snapshot only when the session profile has `results.visibility` of `"public_full_if_storage_public"` or `"session_member_full"`, `aggregateResultsEnabled: true`, and the
   caller passes the existing Cloudflare read gates for all three resources:
   `generatedArtifacts`, `questions`, and `responses`. This prevents a broader
   generated-artifact gate from exposing raw snapshot source rows. The viewer
@@ -818,7 +818,11 @@ Authenticated clients can use the worker as the session storage boundary:
     `public_full_if_storage_public`, individual response reads also require
     that recorded author or a current session admin. A participant's ordinary
     `storage` route scope permits submission and own-response reload, not other
-    participants' raw answers. Lists apply the same restriction to each row, and
+    participants' raw answers. Under `session_member_full` it permits reading
+    every answer: any signed-in member holding the `storage` (or `arweave`)
+    scope reads them all, and a signed-out visitor reads none. The payload gate
+    and any per-answer access rules still apply on top. The public config sets
+    `memberResults: true` so the site knows the Worker offers this visibility. Lists apply the same restriction to each row, and
     older rows lacking trusted author metadata remain unavailable to ordinary
     participants.
     Existing per-item access conditions still apply to every permitted reader.
@@ -1006,10 +1010,11 @@ readers, but cannot replace or broaden that gate. Resource names are restricted
 to `docsContext`, `questions`, `surveys`, `responses`, `generatedArtifacts`,
 `media`, and `images`; list rows must match the exact resource namespace.
 
-- A new session from `/new` starts with public results: `gate: "none"` and
-  `encryption: "none"`. The `fast_cheap_cloudflare` preset, and a session that
-  chooses other results visibility, use `gate: "role_gate"`, with
-  `encryption: "worker_envelope"` or `encryption: "none"`. Pure Worker profiles
+- A new session from `/new` starts with `session_member_full` results:
+  `gate: "role_gate"` and `encryption: "none"`. Public results use
+  `gate: "none"` and `encryption: "none"`. The `fast_cheap_cloudflare` preset,
+  and a session that chooses other results visibility, use `gate: "role_gate"`,
+  with `encryption: "worker_envelope"` or `encryption: "none"`. Pure Worker profiles
   remain passkey/Worker-owned and require `evm.registryChainId: null`.
 - A current Worker/SBT hybrid expresses SBT authorization as an explicit
   `sbt_onchain` access condition and labels it **Advanced on-chain access**.

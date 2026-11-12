@@ -1111,12 +1111,14 @@ export const evaluateResultsAnalysisViewerEligibility = ({ config } = {}) => {
     return { ok: false, status: 403, reason: 'aggregate_results_disabled', error: 'Aggregate results are not enabled for this session.' };
   }
   const visibility = resolveResultsVisibility(config);
-  if (visibility !== 'public_full_if_storage_public') {
+  // Members-only results stay readable here: the storage reads that follow
+  // hold the viewer to a signed-in session member.
+  if (visibility !== 'public_full_if_storage_public' && visibility !== 'session_member_full') {
     return {
       ok: false,
       status: 403,
       reason: visibility === 'private_admin' ? 'private_admin_requires_admin_status' : 'results_visibility_unsupported',
-      error: 'Generated results analysis viewer access is only supported for public full results backed by storage gates.',
+      error: 'Generated results analysis viewer access is only supported for full results backed by storage gates.',
     };
   }
   return { ok: true, visibility };

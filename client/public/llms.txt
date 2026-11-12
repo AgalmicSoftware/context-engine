@@ -21,7 +21,7 @@ Latest GitHub source tree: https://github.com/AgalmicSoftware/context-engine/tre
 
 EVM and Arweave are profile-specific options, not baseline dependencies. App hosting, session privacy, and the session infrastructure profile are separate choices.
 
-- Hosted & Fast: implemented default, where `/new` starts; a creator-owned per-session Cloudflare Worker and Cloudflare storage are canonical. New sessions start with public results and unencrypted answers. It does not require EVM, RPC, gas, Arweave, or Lit by default.
+- Hosted & Fast: implemented default, where `/new` starts; a creator-owned per-session Cloudflare Worker and Cloudflare storage are canonical. New sessions show every answer to signed-in session members, unencrypted. It does not require EVM, RPC, gas, Arweave, or Lit by default.
 - Trustless & Slower: implemented opt-in path using public EVM contracts, wallet transactions, and Arweave, plus a Session Worker for services such as AI. Lit is required only when its encryption path is selected.
 - Company-Operated (planned): future adapters for organization-managed identity, keys, storage, AI, networking, and observability. It is not generally available and does not require a private EVM.
 

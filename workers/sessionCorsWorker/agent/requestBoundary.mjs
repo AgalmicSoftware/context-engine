@@ -127,6 +127,8 @@ export const dispatchSessionAgentRequest = async ({ request, env, deps, baseHead
       await agentEnv.AGENT_SERVICES.current();
       const visibility = config.sessionModeProfile?.results?.visibility;
       if (!aggregateResultsEnabledForAgent(context.session) || ['private_admin', 'public_redacted_snapshot'].includes(visibility)) throw authorityError('agent_results_hidden');
+      // Members-only results: the credential's account must pass the session's sign-in rules.
+      if (visibility === 'session_member_full' && ctx.scopes?.storage !== true && ctx.scopes?.arweave !== true) throw authorityError('agent_membership_denied');
       const membership = await authorizeSessionMemberAggregateResults({ env: agentEnv, context, input: {} });
       if (!membership.ok) throw authorityError(membership.reason, membership.status);
     }

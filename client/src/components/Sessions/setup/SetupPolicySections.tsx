@@ -17,6 +17,7 @@ import type {
 import { SetupCheck, SetupConflicts, SetupField, SetupSection, setupHelpId } from './SetupPrimitives';
 import {
   DEFAULT_REGISTRY_CHAIN_ID,
+  MEMBER_RESULTS,
   PUBLIC_RESULTS,
   defaultCloudflarePayloadAccess,
   effectiveEnvelopeConditions,
@@ -25,6 +26,7 @@ import {
   setEnvelopeConditions,
   setHosting,
   setResultsVisibility,
+  supportsMemberResults,
   supportsPublicResults,
   usesDefaultEnvelopeRules,
 } from './sessionSetupProfile';
@@ -40,10 +42,23 @@ const profileOf = (draft: SetupSectionProps['draft']): SessionModeProfile | null
   isSessionModeProfile(draft.sessionModeProfile) ? draft.sessionModeProfile : null;
 
 const VISIBILITY_LABELS: Partial<Record<SessionModeResultsVisibility, string>> = {
+  [MEMBER_RESULTS]: 'Session members see all answers',
   participant_aggregate: 'Each person sees their own answers',
-  session_member_aggregate: 'Session members see their own answers',
-  [PUBLIC_RESULTS]: 'Anyone can see the results',
+  session_member_aggregate: 'Own answers; agents need a group',
+  [PUBLIC_RESULTS]: 'Anyone can see all answers',
 };
+
+const VISIBILITY_HELP = [
+  'Session members: everyone signed in to the session sees every answer and the AI Views; signed-out visitors see none. Needs the Session Worker; an older one must be redeployed first.',
+  'Each person: people see only their own answers.',
+  'Own answers; agents need a group: as Each person, and agents get summaries only for accounts in a group at least the smallest group size.',
+  'Anyone: everyone sees every answer, signed in or not. Needs answers stored unencrypted.',
+  'Admins always see every answer.',
+].join(' ');
+
+const visibilityUnavailable = (profile: SessionModeProfile, value: string, memberResultsSupported: boolean): boolean =>
+  (value === PUBLIC_RESULTS && !supportsPublicResults(profile)) ||
+  (value === MEMBER_RESULTS && !(memberResultsSupported && supportsMemberResults(profile)));
 
 const EXPORT_LABELS: Partial<Record<SessionModeExportScope, string>> = {
   admin_raw: 'Raw results',
@@ -117,7 +132,12 @@ export const SetupResultsSection = ({
   conflicts,
   editProfile,
   admins = null,
-}: PolicyProps & { admins?: React.ReactNode }) => {
+  memberResultsSupported = true,
+}: PolicyProps & {
+  admins?: React.ReactNode;
+  /** False when the session's Worker predates members-only results. */
+  memberResultsSupported?: boolean;
+}) => {
   const profile = profileOf(draft);
   const sectionConflicts = conflicts.filter((conflict) => conflict.section === 'results');
   const visibilityConflicts = conflictsAt(sectionConflicts, ['results.visibility']);
@@ -132,11 +152,7 @@ export const SetupResultsSection = ({
     >
       {profile ? (
         <>
-          <SetupField
-            id="ce-setup-results-visibility"
-            label="Who sees results"
-            help="Public results need answers stored unencrypted."
-          >
+          <SetupField id="ce-setup-results-visibility" label="Who sees results" help={VISIBILITY_HELP}>
             <Input
               id="ce-setup-results-visibility"
               type="select"
@@ -151,7 +167,7 @@ export const SetupResultsSection = ({
                 <option
                   key={value}
                   value={value}
-                  disabled={value === PUBLIC_RESULTS && !supportsPublicResults(profile)}
+                  disabled={visibilityUnavailable(profile, value, memberResultsSupported)}
                 >
                   {label}
                 </option>

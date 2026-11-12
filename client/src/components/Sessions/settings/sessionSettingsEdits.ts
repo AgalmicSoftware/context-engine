@@ -17,6 +17,7 @@ import {
 } from '@ce-shared/sessionConfigEdits.mjs';
 import {
   DEBATE_ATLAS_FIELD,
+  MEMBER_RESULTS_FIELD,
   PUBLIC_WORKER_AI_FIELDS,
   SET_CONFIG_MERGES_AI_FIELD,
 } from '@ce-shared/workerSessionPublicConfig.mjs';
@@ -51,6 +52,9 @@ export const workerMergesAi = (config: unknown): boolean => asRecord(config)[SET
 
 /** True when the session's Worker builds debate atlases, so it takes a results admin list; older ones refuse it. */
 export const workerTakesResultsAdmins = (config: unknown): boolean => asRecord(config)[DEBATE_ATLAS_FIELD] === true;
+
+/** True when the session's Worker shows every answer to signed-in members; older ones refuse that visibility. */
+export const workerShowsMemberResults = (config: unknown): boolean => asRecord(config)[MEMBER_RESULTS_FIELD] === true;
 
 const storedResultsAdmins = (value: unknown): string[] =>
   Array.isArray(value) ? value.map((address) => text(address).trim().toLowerCase()).filter(Boolean) : [];

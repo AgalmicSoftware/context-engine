@@ -1,6 +1,6 @@
 import { encodeLinkJson } from '@ce-shared/linkPayload.mjs';
 import { SESSION_TEMPLATE_FORMAT, validateSessionTemplate } from '@ce-shared/sessionTemplate.mjs';
-import { encodeSessionTemplateLink } from '@ce-shared/sessionTemplateLink.mjs';
+import { decodeSessionTemplateLink, encodeSessionTemplateLink } from '@ce-shared/sessionTemplateLink.mjs';
 import { SESSION_SETUP_EXAMPLE } from './setup/sessionSetupKickoff';
 import {
   E2E_TESTIDS,
@@ -63,7 +63,10 @@ describe('SessionWizard template links', () => {
     await waitFor(() => expect(writeText).toHaveBeenCalled());
     const shared = String(writeText.mock.calls[0][0]);
     expect(shared).toContain('/new#template=');
-    expect(shared).not.toMatch(/cf-|sk-/);
+    // The link is compressed, so look for keys in what it carries.
+    const decoded = await decodeSessionTemplateLink(new URL(shared).hash);
+    expect(decoded.template.sessionName).toBe('Reverse Alignment II');
+    expect(JSON.stringify(decoded.template)).not.toMatch(/cf-|sk-/);
   });
 
   it('shows a link pasted into the open setup tab, where only the hash changes', async () => {

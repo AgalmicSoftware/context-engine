@@ -194,7 +194,7 @@ export const FAQ_ITEMS: readonly FaqItem[] = Object.freeze(
       id: 'private-answers',
       question: 'Can my answers be private?',
       answer:
-        'It depends on the session, and new sessions start with public results. When a session enables response encryption, answers and additional comments have independent locks, can be encrypted for you or for a gated audience, and only an authorized viewer can decrypt the protected fields. Comments follow the answer lock only when you explicitly choose that option. In on-chain sessions, which wallet answered which question stays public.',
+        'It depends on the session. New sessions show every answer to the session’s signed-in members, and some sessions show them to everyone. When a session enables response encryption, answers and additional comments have independent locks, can be encrypted for you or for a gated audience, and only an authorized viewer can decrypt the protected fields. Comments follow the answer lock only when you explicitly choose that option. In on-chain sessions, which wallet answered which question stays public.',
     },
     {
       id: 'active-chain',
@@ -211,7 +211,7 @@ export const FAQ_ITEMS: readonly FaqItem[] = Object.freeze(
       id: 'results-visibility',
       question: 'Who can see the results?',
       answer:
-        'The session’s result-visibility and access policy decides. New sessions start public, so anyone can see the results. A session can instead show each person only their own answers, with session admins and authorized agents able to read session-wide responses. Protected fields still require decryption access.',
+        'The session’s result-visibility and access policy decides. New sessions show every answer to the session’s signed-in members, and signed-out visitors see none. A session can instead make its results public, or show each person only their own answers, with session admins and authorized agents able to read session-wide responses. Protected fields still require decryption access.',
     },
   ].map(freezeFaqItem),
 );

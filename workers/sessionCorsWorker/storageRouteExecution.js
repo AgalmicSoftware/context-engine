@@ -957,6 +957,8 @@ const hasPrivateResponsePolicy = ({ config, resource }) => {
     !!profile?.results?.visibility && profile.results.visibility !== 'public_full_if_storage_public';
 };
 
+const membersSeeAllResponses = (config) => config?.sessionModeProfile?.results?.visibility === 'session_member_full';
+
 const canReadPrivateResponse = ({ config, resource, metadata, requesterAddress, authScopes, operation }) => {
   if (operation === 'upload' || !hasPrivateResponsePolicy({ config, resource })) return true;
 
@@ -965,9 +967,11 @@ const canReadPrivateResponse = ({ config, resource, metadata, requesterAddress, 
   if (address && resolveRoleAddressSet({ config, role: 'admin' }).has(address)) return true;
 
   // A participant's route scope permits submission, not reading everyone else's
-  // answers. List preflight permits scanning; each row still requires its owner.
+  // answers, unless the session shows every answer to its members. List
+  // preflight permits scanning; each row still requires its owner or a member.
+  // Either way the session gate is checked after this.
   if (!address || (scopes.storage !== true && scopes.arweave !== true)) return false;
-  if (operation === 'list') return true;
+  if (operation === 'list' || membersSeeAllResponses(config)) return true;
   return !!trim(metadata?.responder) && normalizeAddress(metadata.responder) === address;
 };
 
@@ -990,7 +994,9 @@ const authorizeCloudflareStorageAccess = async ({
     return {
       ok: false,
       response: responseJson(deps, {
-        error: 'Access denied: individual response access requires its author or a session admin.',
+        error: membersSeeAllResponses(config)
+          ? 'Access denied: answers are visible to signed-in session members.'
+          : 'Access denied: individual response access requires its author or a session admin.',
         reason: 'private_response_owner_required',
       }, 403, baseHeaders),
     };
