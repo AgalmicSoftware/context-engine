@@ -155,7 +155,7 @@ All notable changes to this project will be documented in this file.
 - The Debate Map's tree view asks for a category to draw the **Tree Chart**, as its button is named.
 - Question Results shows a spinner in place of its question and response counts, and each question's count, until they load, instead of 0.
 - The status line under Results, shown while AI Views or an atlas builds, is readable in Civic, where it measured 3.35:1.
-- The Results menu buttons, the Debate Map view switch and legend, a topic's panel and its compass are readable in Civic, Context Engine and Classic 95: some labels were as low as 1:1. `npm run ai:test-theme:atlas` checks them in each theme at phone and desktop widths.
+- The Results menu buttons, the Debate Map view switch and legend, a topic's panel and its compass are readable in Civic, Context Engine and Classic 95: some labels were as low as 1:1. `npm run ai:test-theme:results-builds` (named `ai:test-theme:atlas` until 0.9.3) checks them in each theme at phone and desktop widths.
 - The Agent Village post is readable in Classic 95, where its tags, chart labels and tooltips, List view and evaluation protocol measured as low as 1.1:1. A pinned tooltip's close button also stays visible on hover and focus there and in Civic. `npm run ai:test-theme:civic` now checks the post in Classic 95 too.
 - The About page says Soulbound Token groups instead of SBT groups, and names the Cloudflare Worker alternatives: Worker Groups for access control, and Worker encryption beside Lit for on-chain sessions.
 - The RxC sessions no longer show twelve pre-filled topic circles: Debate Map appears once an atlas is built, on rxc-ra-test too. On a demo session, a built atlas replaces the demo atlas.
