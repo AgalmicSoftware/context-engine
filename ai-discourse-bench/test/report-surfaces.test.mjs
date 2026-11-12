@@ -2405,7 +2405,11 @@ test('report renders models as participants in a OnePageSession-style results sh
   assert.match(html, /\.riskMatrixGridCell,\s*\.riskMatrixGridCell\.gridCell \{ min-height: 88px; align-items: center; justify-content: center; padding: 10px; background: #1f234f; \}/);
   assert.match(html, /\.riskMatrixGridCellLinked,\s*\.riskMatrixGridCellLinked\.gridCellLinked \{ border-color: rgba\(0, 197, 255, 0\.18\); box-shadow: inset 0 0 0 1px rgba\(0, 197, 255, 0\.08\), 0 12px 24px rgba\(0, 0, 0, 0\.14\); \}/);
   assert.match(html, /\.riskMatrixEmptyCell,\s*\.riskMatrixEmptyCell\.emptyCell \{ background: rgba\(255, 255, 255, 0\.04\); color: rgba\(244, 247, 255, 0\.35\); \}/);
-  assert.match(html, /\.riskMatrixDiagonalCell, \.diagonalCell \{ cursor: default; background: rgba\(255, 255, 255, 0\.03\); color: rgba\(244, 247, 255, 0\.35\); font-size: 1\.35rem; \}/);
+  assert.match(html, /\.riskMatrixDiagonalCell, \.diagonalCell \{ cursor: default; background: rgba\(255, 255, 255, 0\.03\); color: rgba\(190, 199, 230, 0\.82\); font-size: 1\.35rem; \}/);
+  // A figure sits on its own surface, readable on the strongest fill, and a
+  // disabled selector stays legible instead of fading.
+  assert.match(html, /\.riskMatrixCellValue \{ padding: 2px 8px; border-radius: var\(--ce-radius-pill\); background: #1f234f; color: rgba\(244, 247, 255, 0\.96\);/);
+  assert.match(html, /\.selectorButton:disabled \{ cursor: not-allowed; border-style: dashed; color: rgba\(190, 199, 230, 0\.82\); transform: none; \}/);
   assert.match(html, /\.riskMatrixContainer \.sectionTitle \{ color: rgba\(244, 247, 255, 0\.96\); \}/);
   assert.match(html, /\.selectorGrid \{ display: grid; grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/);
   assert.match(html, /\.subgridContainer \{ display: grid; gap: 8px; min-width: 100%; width: 100%; \}/);
