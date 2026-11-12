@@ -279,6 +279,10 @@ it('keeps a declined AI draft text choice through login', async () => {
   fireEvent.click(draftText);
   rerender(<SessionVoiceModeModal {...props} sessionConfig={sessionConfig} />);
   expect(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_DRAFT_TEXT)).not.toBeChecked();
+  // The decline reaches what is saved, not only the checkbox.
+  fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
+  await waitFor(() => expect(props.onRecordProvenance).toHaveBeenCalledTimes(1));
+  expect(props.onRecordProvenance.mock.calls[0][7]).toEqual({ includeDraftText: false });
 });
 
 it('keeps provenance and the name inside AI submission info, before its metadata, and sharing on its bar', async () => {

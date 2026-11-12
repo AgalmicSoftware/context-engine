@@ -92,10 +92,14 @@ Worker" on an older one, and save the key only while it is on.
   consent (unticked, research unticked, or now encrypted), then stores the
   text for the rest. A consent change on saved answers is uploaded as a
   resubmission, so it deletes at that submit. Deleting works even after the
-  setting is turned off or the session has ended. If a deletion fails, the
-  person is told their answers were saved but the text could not be updated,
-  and the report script ignores any stored text whose latest saved response no
-  longer carries `draftTextConsent`.
+  setting is turned off or the session has ended, and it runs even if the
+  person moves to another session while the upload finishes. If a deletion
+  fails, the person is told their answers were saved but the text could not be
+  updated; the text stays in the admin download until they next submit that
+  question while the session keeps draft text. The report script's `--clio`
+  output ignores any stored text whose latest saved response no longer carries
+  `draftTextConsent`, so check the raw download against the responses before
+  using it directly.
 - **Turning it off** stops collecting; stored text stays until each person
   withdraws it. Session backups leave the prefix out, so an admin must download
   it before deleting the session or restoring it from a backup.
