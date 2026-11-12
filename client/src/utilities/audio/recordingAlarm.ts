@@ -10,7 +10,7 @@ const audioContextConstructor = (): AudioContextConstructor | null =>
   typeof window === 'undefined'
     ? null
     : window.AudioContext ||
-      (window as unknown as { webkitAudioContext?: AudioContextConstructor }).webkitAudioContext ||
+      (window as Window & { webkitAudioContext?: AudioContextConstructor }).webkitAudioContext ||
       null;
 
 /** Call from the tap that starts recording, so the alarm may sound later without one. */
