@@ -21,6 +21,10 @@ All notable changes to this project will be documented in this file.
 - On such sessions the Agent HTTP results routes need a credential whose account passes the session's sign-in rules, and refuse others with `agent_membership_denied`.
 - The public config sets `memberResults: true`, so the site knows the Worker offers this visibility.
 
+### Agents and MCP
+
+- `get_results` reads a members-only session's results for an agent signed in to it. It reports `resultsPublic: false` with a note that the results are for signed-in members only.
+
 ### Local tooling
 
 - `npm run ai:test-theme:results-builds` checks the built debate atlas and risk matrix in each theme at phone and desktop widths; `ai:test-theme:atlas` is gone.

@@ -184,7 +184,7 @@ export const buildTools = (participant) => [
     name: 'get_results',
     title: 'Get results',
     description:
-      'Summarize everyone’s latest answers per question when the session publishes results: agree/unsure/disagree counts, rating means, option counts, and how many answers came from self-declared agents. partial is true when a scan is unfinished, capped, or any listed question or answer payload could not be read. unreadAnswers counts the selected listed answer records that could not be read; readable older answers may still appear until those records recover.',
+      'Summarize everyone’s latest answers per question when the session shows results to everyone or to its signed-in members: agree/unsure/disagree counts, rating means, option counts, and how many answers came from self-declared agents. partial is true when a scan is unfinished, capped, or any listed question or answer payload could not be read. unreadAnswers counts the selected listed answer records that could not be read; readable older answers may still appear until those records recover.',
     inputSchema: {
       type: 'object',
       properties: {

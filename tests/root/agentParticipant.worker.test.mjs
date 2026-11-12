@@ -328,6 +328,35 @@ test('sessions without public results only show an agent its own answers', async
   assert.equal(results.resultsPublic, false);
 });
 
+test('members-only sessions show signed-in agents everyone’s answers', async () => {
+  // The /new default: unencrypted answers behind the Session Worker's default rules.
+  const payloadAccessControl = {
+    gate: 'role_gate',
+    encryption: 'none',
+    accessConditions: { match: 'any', conditions: [{ kind: 'worker_role', role: 'admin' }, { kind: 'agent_grant_scope', scope: 'storage' }] },
+  };
+  const config = sessionConfig({ visibility: 'session_member_full' });
+  config.sessionModeProfile.storage.payloadAccessControl = payloadAccessControl;
+  config.sessionModeProfile.export.scope = 'admin_raw';
+  config.storageProfile = { ...config.storageProfile, payloadAccessControl };
+  const env = createEnv([config]);
+  const alice = await createAgent(env, 'alice', []);
+  const bob = await createAgent(env, 'bob', []);
+  await alice.participant.joinSession({ link: LINK });
+  await bob.participant.joinSession({ link: LINK });
+  const { questionId } = await alice.participant.addStatement({ prompt: 'Members read every answer.' });
+  await alice.participant.answer({ answers: [{ questionId, value: 'Agree' }] });
+  await bob.participant.answer({ answers: [{ questionId, value: 'Disagree' }] });
+  const results = await bob.participant.getResults();
+  assert.equal(results.resultsPublic, false);
+  assert.match(results.note, /signed-in members only/);
+  assert.equal(results.participants, 2);
+  assert.deepEqual(results.questions[0].counts, { Agree: 1, Unsure: 0, Disagree: 1 });
+  // A visitor without a sign-in reads nothing.
+  const anonymous = await workerFetch(env)(`${WORKER_ORIGIN}/storage/list?resource=responses`, { headers: { 'X-Session-Slug': SLUG } });
+  assert.equal(anonymous.status, 403);
+});
+
 test('joining checks the Worker’s session identity', async () => {
   const env = createEnv([sessionConfig()]);
   const { participant } = await createAgent(env, 'erin', []);

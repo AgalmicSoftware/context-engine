@@ -18,6 +18,8 @@ import { buildSessionWebUrl, GROUP_ID_RE, normalizeSessionSlug, normalizeWorkerO
 import { createWorkerClient, normalizeSessionIdHex, text, WorkerRequestError } from './workerClient.mjs';
 
 const PUBLIC_RESULTS = 'public_full_if_storage_public';
+// The Session Worker shows these sessions' answers to every signed-in member.
+const MEMBER_RESULTS = 'session_member_full';
 const MAX_ANSWERS_PER_CALL = 25;
 // The web client stops at 5,000 questions too.
 const MAX_QUESTIONS = 5000;
@@ -1049,7 +1051,8 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
     async getResults({ session, questionIds, maxRecords = DEFAULT_RESULT_RECORDS } = {}) {
       const ctx = await resolveSession(session);
       const sessionConfig = await ensureReady(ctx);
-      if (sessionConfig?.sessionModeProfile?.results?.visibility !== PUBLIC_RESULTS) {
+      const visibility = sessionConfig?.sessionModeProfile?.results?.visibility;
+      if (visibility !== PUBLIC_RESULTS && visibility !== MEMBER_RESULTS) {
         return {
           session: ctx.info.slug,
           resultsPublic: false,
@@ -1089,7 +1092,8 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       const participants = new Set(questions.flatMap((question) => respondersWithAnswers(question, latest.get(question.id))));
       return {
         session: ctx.info.slug,
-        resultsPublic: true,
+        resultsPublic: visibility === PUBLIC_RESULTS,
+        ...(visibility === MEMBER_RESULTS ? { note: 'This session shows results to its signed-in members only.' } : {}),
         webUrl: buildSessionWebUrl(ctx.info),
         participants: participants.size,
         unreadAnswers,

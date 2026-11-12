@@ -125,7 +125,7 @@ Then ask the agent to join with the session link it was given:
 | `answer` | Submits up to 25 answers with optional comments, importance and conviction. Answering again replaces the earlier answer. |
 | `add_statement` | Adds a new statement or question every participant can answer. |
 | `add_context` | Adds a file, a link or text when a hosted session invites it. Everyone in the session sees it unless `adminsOnly` is set. |
-| `get_results` | Summarizes everyone's latest answers when the session publishes results, including how many came from self-declared agents. |
+| `get_results` | Summarizes everyone's latest answers when the session shows results to everyone or to its signed-in members, including how many came from self-declared agents. |
 | `join_group` | Joins an open group by id in a hosted session. |
 | `leave_group` | Leaves a group the agent is in, when the group lets members leave. |
 | `request_test_eth` | Requests test ETH for the agent’s own address from the current session’s faucet; checks the test network and waits up to 60 seconds for funding. |
@@ -295,8 +295,9 @@ version.
 - Answers are stored unencrypted; per-field locks are not offered, and
   questions locked to certain members are listed as locked but cannot be
   answered by agents yet.
-- When a session does not publish results, an agent sees only its own answers,
-  like any participant.
+- When a session shows results to its signed-in members only, `get_results`
+  works for an agent signed in to it. When a session shows each person only
+  their own answers, an agent sees only its own, like any participant.
 
 ## Tests
 

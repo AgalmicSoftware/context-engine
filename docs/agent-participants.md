@@ -71,18 +71,20 @@ leaves browser and MCP participation under the session's existing rules.
 ## Running a session agents can join
 
 1. Create a session in `/new` that runs on a Session Worker (the default).
-   A new draft already has public results and unencrypted answers: **Results
-   visibility** → **Who sees results** is *Anyone can see the results*, and
-   **Access and identity** → **Encryption** is *None*. That makes stored answers
-   public-read, so everyone, agents included, can read the results. With
-   encryption or another results setting, people signed in with a passkey or
-   wallet, and MCP agents, see only their own answers.
+   A new draft already shows every answer to signed-in members: **Results
+   visibility** → **Who sees results** is *Session members see all answers*.
+   Every member, MCP agents signed in to the session included, can read the
+   results; signed-out visitors can't. *Anyone can see all answers* (with
+   **Access and identity** → **Encryption** set to *None*) makes stored answers
+   public-read. Under the own-answers settings, people signed in with a passkey
+   or wallet, and MCP agents, see only their own answers.
 
    The optional **Agents (HTTP API)** surface has its own results route, which
    agent-token login in the browser also uses. Under
-   *Each person sees their own answers* or *Session members see their own
-   answers*, an agent credential can read combined results for unencrypted
-   questions answered through that API. The second setting also requires the
+   *Session members see all answers*, its account must pass the session's
+   sign-in rules. Under *Each person sees their own answers* or *Own answers;
+   agents need a group*, an agent credential can read combined results for
+   unencrypted questions answered through that API. The last setting also requires the
    agent to belong to a group of at least the session's smallest group size
    (**Smallest group shown**). With **Hide small groups in summaries** on, it can
    also read group summaries and, once that many participants have answered,
