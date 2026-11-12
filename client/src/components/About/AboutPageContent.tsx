@@ -390,7 +390,7 @@ export const USE_CASES = [
       'Online communities rarely own the preference data, membership boundaries, or AI systems built from what they collectively know.',
     solutionTitle: 'Representative Models',
     detail:
-      'Codify group preferences over time, train representative AI models, and keep community data attributable, licensable, and revocable.',
+      'Codify group preferences over time and keep community data attributable, licensable, and revocable. Training representative AI models from it is planned.',
   },
 ];
 

@@ -252,7 +252,7 @@ describe('AboutPage', () => {
 
     expect(
       screen.getByText(
-        /train representative ai models, and keep community data attributable, licensable, and revocable/i,
+        /keep community data attributable, licensable, and revocable\. training representative ai models from it is planned\./i,
       ),
     ).toBeInTheDocument();
   });
