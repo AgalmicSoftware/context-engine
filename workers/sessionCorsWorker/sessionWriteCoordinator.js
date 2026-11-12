@@ -22,7 +22,7 @@ import { buildSafeSponsoredReceiptBody } from './sponsoredBootstrapGrantStore.js
 import { runQueuedAutomaticResultsAnalysisJob, valueLooksEncrypted } from './resultsAnalysisGeneration.js';
 import { publishCloudflareOwnedStorageMetadata, scanLegacyStorageOwnerIds, setCloudflareStorageResourceHidden } from './storageRouteExecution.js';
 import { finishContextPdfReading, removeContextSource } from './contextSourceRoute.js';
-import { dispatchDebateAtlasStore } from './debateAtlasStore.js';
+import { dispatchResultsBuildStore } from './resultsBuildStore.js';
 import {
   applySessionConfigMutation,
   resolveCanonicalWorkerSessionIdHex,
@@ -3106,7 +3106,7 @@ export class SessionWriteCoordinator {
       return this.executeContextSourceOperation(url.pathname.split('/').pop(), payload);
     }
     if (url.pathname.startsWith('/session-config/debate-atlas/')) {
-      return dispatchDebateAtlasStore(this, url.pathname.split('/').pop(), payload || {});
+      return dispatchResultsBuildStore(this, 'debate-atlas', url.pathname.split('/').pop(), payload || {});
     }
     if (['preflight', 'begin', 'check', 'checkpoint', 'release', 'discard'].some(operation => url.pathname === `/session-config/lit-authorization/provisioning/${operation}`)) {
       return this.serializeSessionConfigOperation(() => executeLitProvisioning(this, payload, url.pathname.split('/').at(-1)));

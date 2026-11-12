@@ -53,7 +53,8 @@ import {
 } from '../shared/workerSessionConfig.mjs';
 import { executeCoordinatedSessionConfigMutation } from './sessionWriteCoordinator.js';
 import { generateResultsAnalysisDraft } from './resultsAnalysisGeneration.js';
-import { buildDebateAtlas, canBuildDebateAtlas, DEBATE_ATLAS_BUILD_ACTION } from './debateAtlasBuild.js';
+import { buildDebateAtlas, DEBATE_ATLAS_BUILD_ACTION } from './debateAtlasBuild.js';
+import { canBuildResults } from './resultsBuild.js';
 
 const toTrimmedString = (value) => (
   typeof value === 'string'
@@ -177,7 +178,7 @@ export const dispatchAdminRequest = async ({
       validateBootstrapAdmin: deps?.validateBootstrapAdmin,
       // Co-admins and results admins may build atlases and do nothing else here.
       validateAdmin: action === DEBATE_ATLAS_BUILD_ACTION
-        ? (args) => canBuildDebateAtlas({ ...args, validateAdmin: deps?.validateAdmin })
+        ? (args) => canBuildResults({ ...args, validateAdmin: deps?.validateAdmin })
         : deps?.validateAdmin,
       MISSING_SLUG_ERROR: deps?.MISSING_SLUG_ERROR,
     },

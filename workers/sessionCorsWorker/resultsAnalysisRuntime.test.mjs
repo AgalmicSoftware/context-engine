@@ -160,7 +160,7 @@ const buildStore = (builds) => async (_env, _slug, operation, payload) => {
 const buildAtlas = ({ env, builds }) => buildDebateAtlas({
   env, slug: 'salon', config, builderAddress: address(1),
   deps: {
-    callAtlasStore: buildStore(builds),
+    callBuildStore: buildStore(builds),
     getSessionSecrets: async () => ({}),
     callProvider: async ({ prompt }) => ({ ok: true, value: prompt.startsWith('You are planning') ? atlasPlan : atlasMap }),
   },
