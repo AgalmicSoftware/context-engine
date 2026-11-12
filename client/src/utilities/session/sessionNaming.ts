@@ -152,9 +152,6 @@ export const resolveSessionSlugFromPathname = (pathname: unknown = ''): string |
 export const resolveActiveSessionSlug = (input: UnknownRecord = {}): string =>
   canonicalizeSessionSlug(input.activeSessionSlug ?? input.sessionSlug ?? input.slug);
 
-export const resolveSessionSlug = (input: UnknownRecord = {}): string =>
-  canonicalizeSessionSlug(input.sessionSlug ?? input.activeSessionSlug ?? input.slug);
-
 export const resolveSessionSlugPinned = (input: UnknownRecord = {}): boolean => !!input.sessionSlugPinned;
 
 export const resolveSessionName = (input: UnknownRecord = {}): string => toStr(input.sessionName ?? '').trim();
