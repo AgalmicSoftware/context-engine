@@ -63,8 +63,16 @@ test('on chain, where the answer would not be signed as the person, a key only d
     ...createRegistryLoginBootstrapAdaptersWithWorkerDeps(args), computeScopesForLogin: async () => ({ storage: true }) }) });
   f.config.sessionModeProfile.authority.mode = 'registry_canonical';
   f.config.agentHttp.managedAccountSubmitAllowed = true;
+  const author = await f.credential({ scopes: ['read_questions', 'pose_questions'] });
+  await jsonOk(await f.request('/api/agent/questions/create', { method: 'POST', token: author.token,
+    body: { questions: [{ prompt: 'Should a key answer on chain?', questionType: 'binary' }] } }));
   const key = await jsonOk(await makeKey(f, (await signIn(f, Wallet.createRandom().address)).token));
   assert.equal(key.submitAnswers, false);
+  // Asking to submit anyway saves a draft and submits nothing.
+  const [question] = (await jsonOk(await f.request('/api/agent/questions', { token: key.token }))).questions;
+  const sent = await jsonOk(await f.request('/api/agent/preferences', { method: 'POST', token: key.token,
+    body: { preferences: [{ questionId: question.questionId, value: 'Agree' }], submit: true, humanApproved: true } }));
+  assert.deepEqual([sent.draftCount, sent.submittedCount, sent.reviewRequired], [1, 0, true]);
 });
 
 test('a key stops when a new one is made or its sign-in ends', async () => {
