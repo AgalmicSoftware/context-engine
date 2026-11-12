@@ -57,8 +57,9 @@ Existing deployments of the retired Agent Bridge are not migrated.
 
 - The project hosts a worker for the `demo-sh` session with embedded deploy-helper capability disabled.
 - New sessions created via `/new` are bring-your-own-worker: each session's full
-  `sessionCorsWorker` runs in the creator's own free Cloudflare Workers account.
-  Both deploy paths need that account. A sponsored session runs in the sponsor's
+  `sessionCorsWorker` runs in the creator's own Cloudflare Workers account.
+  Both deploy paths need that account, and a real session needs its Workers
+  Paid plan ([why](session-creation-guide.md#1-cloudflare-account)). A sponsored session runs in the sponsor's
   account instead, which makes the sponsor its Worker operator.
 - [API token (default)](#default-wizard-flow-api-token-and-deploy-helper):
   **Create** deploys through the deploy helper.
