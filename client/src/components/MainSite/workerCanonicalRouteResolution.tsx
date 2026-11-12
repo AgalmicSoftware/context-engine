@@ -42,6 +42,8 @@ type WorkerCanonicalRouteState = {
   sessionConfig: SessionConfig | null;
   // A bundled entry's session ID: its Worker must report the same one.
   expectedSessionId?: string;
+  // A listed session's own Worker, when the link names another one.
+  listedWorkerOrigin?: string;
 };
 
 export type MainSiteSessionRouteResolution = WorkerCanonicalRouteState & {
@@ -102,9 +104,13 @@ const requireBundledSessionId = (route: WorkerCanonicalRouteState, sessionId: st
 
 // Any link that reaches a listed session's own Worker, such as the event
 // redirect's worker= link or a group page, opens only the listed session ID.
+// A link naming another Worker still opens, marked as not the listed session.
 const requireKnownSessionId = (route: WorkerCanonicalRouteState): WorkerCanonicalRouteState => {
   const knownWorker = resolveTrustedBundledWorker(KNOWN_SESSION_CONFIGS[route.workerSessionSlug]);
-  return knownWorker?.origin === route.workerOrigin ? requireBundledSessionId(route, knownWorker.sessionId) : route;
+  if (!knownWorker) return route;
+  return knownWorker.origin === route.workerOrigin
+    ? requireBundledSessionId(route, knownWorker.sessionId)
+    : { ...route, listedWorkerOrigin: knownWorker.origin };
 };
 
 const emptyWorkerRouteState = (): WorkerCanonicalRouteState => ({
@@ -386,6 +392,31 @@ export const renderWorkerCanonicalRouteError = (route: WorkerCanonicalRouteState
       </div>
       <BootRecoveryReady />
     </>
+  ) : null;
+
+// Anyone can run a Worker and link to this site with a listed session's name; say so plainly.
+export const renderListedWorkerNotice = (route: WorkerCanonicalRouteState): React.ReactElement | null =>
+  route.listedWorkerOrigin ? (
+    <div
+      className={`${setupStyles.banner} ${setupStyles.pageBanner}`}
+      role="status"
+      data-testid="ce-unlisted-worker-notice"
+    >
+      <h3 className={setupStyles.bannerTitle}>Not the listed session</h3>
+      <div>
+        This link opens “{route.workerSessionSlug}” from {new URL(route.workerOrigin).host}, not the Worker this site
+        lists for it. Its questions and answers are separate.
+      </div>
+      <div className={setupStyles.buttonRow}>
+        <a
+          className={setupStyles.button}
+          data-ce-control-appearance="raised"
+          href={buildPublicRoute(`/session/${encodeURIComponent(route.workerSessionSlug)}`)}
+        >
+          Open the listed session
+        </a>
+      </div>
+    </div>
   ) : null;
 
 export const renderWorkerCanonicalRouteBootstrap = (
