@@ -69384,6 +69384,9 @@ var init_storageUploadValidation = __esm({
       if (!isObj13(item) || !isText(item.questionID || item.questionId)) {
         return invalid2("responses", `${label} needs a questionID`);
       }
+      if (isText(item.questionID) && isText(item.questionId) && item.questionID.trim().toLowerCase() !== item.questionId.trim().toLowerCase()) {
+        return invalid2("responses", `${label} names two different questions`);
+      }
       if (jsonBytes(item) > MAX_RESPONSE_ITEM_BYTES) {
         return {
           ok: false,
@@ -69671,6 +69674,7 @@ var init_responseAnswerValidation = __esm({
   "workers/sessionCorsWorker/responseAnswerValidation.js"() {
     init_answerValue();
     init_storageRouteExecution();
+    init_storageEnvelopeEncryption();
     init_storageResourceOwnership();
     init_storageScanBudget();
     init_agentQuestionProposals();
@@ -69701,7 +69705,6 @@ var init_responseAnswerValidation = __esm({
     readQuestionVersions = async ({ env, index, slug }) => {
       const budget = createResultsAnalysisScanBudget();
       const rows = await listCloudflareMetadataRows({ index, slug, resource: "questions", budget, strict: true });
-      const hiddenIds = await listHiddenStorageResourceIds({ index, slug, resource: "questions", budget });
       const candidates = [];
       const untrusted = [];
       for (const { metadata } of rows) {
@@ -69720,16 +69723,30 @@ var init_responseAnswerValidation = __esm({
         });
       }
       const current = new Map(selectCanonicalStorageVersions(candidates).map((candidate) => [candidate.resourceId, candidate]));
-      const visible = [...current.keys()].filter((id2) => !hiddenIds.has(id2) && current.get(id2).metadata.hidden !== true);
-      return { budget, current, hiddenIds, untrusted, visibleCount: visible.length };
+      return { budget, current, untrusted, storedCount: current.size };
     };
-    readQuestionPayloads = async ({ env, index, slug, budget, metadataList }) => {
-      const readable = metadataList.filter((metadata) => metadata.encrypted !== true && metadata.payloadEncrypted !== true);
+    readQuestionPayloads = async ({ env, config, index, slug, budget, metadataList, deps }) => {
+      const readable = metadataList.filter((metadata) => metadata.payloadEncrypted !== true && (metadata.encrypted !== true || isObj15(metadata.envelope)));
       const bulk = await readStoredCloudflarePayloadsBulk({ env, index, slug, metadataList: readable, budget });
       const payloads = /* @__PURE__ */ new Map();
       for (const metadata of readable) {
         const id2 = trim10(metadata.id);
-        const bytes3 = bulk.has(id2) ? bulk.get(id2) : await readStoredCloudflarePayloadBytes({ env, index, slug, metadata, budget });
+        let bytes3 = bulk.has(id2) ? bulk.get(id2) : await readStoredCloudflarePayloadBytes({ env, index, slug, metadata, budget });
+        if (bytes3 && isObj15(metadata.envelope)) {
+          try {
+            bytes3 = await decryptPayloadWithStorageEnvelope({
+              env,
+              config,
+              slug,
+              payloadId: id2,
+              ciphertextBytes: bytes3,
+              envelope: metadata.envelope,
+              deps
+            });
+          } catch {
+            bytes3 = null;
+          }
+        }
         const payload = parseJson(bytes3);
         if (isObj15(payload)) payloads.set(id2, payload);
       }
@@ -69750,19 +69767,19 @@ var init_responseAnswerValidation = __esm({
       const kv = agentKv({ env, config });
       return kv ? countAgentProposedQuestions({ AGENT_ACTION_KV: kv }, slug) : 0;
     };
-    countSessionQuestions = async ({ env, config, index, slug }) => (await readQuestionVersions({ env, index, slug })).visibleCount + await countProposedQuestions({ env, config, slug });
-    checkUploadedAnswers = async ({ env, config, index, slug, payload }) => {
+    countSessionQuestions = async ({ env, config, index, slug }) => (await readQuestionVersions({ env, index, slug })).storedCount + await countProposedQuestions({ env, config, slug });
+    checkUploadedAnswers = async ({ env, config, index, slug, payload, deps }) => {
       const answers = listUploadedAnswers(payload);
-      const { budget, current, untrusted, visibleCount } = await readQuestionVersions({ env, index, slug });
+      const { budget, current, untrusted, storedCount } = await readQuestionVersions({ env, index, slug });
       const questions = /* @__PURE__ */ new Map();
       const wanted = answers.map((answer) => current.get(answer.questionId)?.metadata).filter(Boolean);
-      const wantedPayloads = await readQuestionPayloads({ env, index, slug, budget, metadataList: wanted });
+      const wantedPayloads = await readQuestionPayloads({ env, config, index, slug, budget, metadataList: wanted, deps });
       for (const answer of answers) {
         const candidate = current.get(answer.questionId);
         if (candidate) questions.set(answer.questionId, wantedPayloads.get(trim10(candidate.metadata.id)) || null);
       }
       if (answers.some((answer) => !questions.has(answer.questionId)) && untrusted.length) {
-        for (const [, question] of await readQuestionPayloads({ env, index, slug, budget, metadataList: untrusted })) {
+        for (const [, question] of await readQuestionPayloads({ env, config, index, slug, budget, metadataList: untrusted, deps })) {
           const id2 = lower6(question.id || question.questionId || question.questionID);
           if (id2 && !questions.has(id2)) questions.set(id2, question);
         }
@@ -69782,7 +69799,7 @@ var init_responseAnswerValidation = __esm({
         const checked = normalizeAnswerValue({ ...question, type }, answer.value, { maxFreeformLength: Infinity });
         if (!checked.ok) return refusal(422, `This answer can't be saved: ${checked.error}`, "response_answer_invalid");
       }
-      return { ok: true, questionCount: visibleCount + await countProposedQuestions({ env, config, slug }) };
+      return { ok: true, questionCount: storedCount + await countProposedQuestions({ env, config, slug }) };
     };
   }
 });
@@ -71262,7 +71279,7 @@ var init_contextSourceRoute = __esm({
 });
 
 // workers/sessionCorsWorker/storageRouteExecution.js
-var encoder7, decoder6, RESOLVE_STORAGE_GATE_RUNTIME_CONFIG, STORAGE_GROUP_MEMBERSHIP_CACHE, STORAGE_RPC_CHAIN_ATTESTATION_CACHE, trim14, isObj17, isJsonContentType, MEDIA_TYPE_RE, INLINE_MEDIA_TYPE_RE, resolveStorageReadContentType, getStorageR2Binding, DEFAULT_STORAGE_LIST_PAGE_SIZE, MAX_STORAGE_LIST_PAGE_SIZE, MAX_CONTEXT_LIST_KV_PAGES, DEFAULT_RESOURCE_GATES, isStorageResource, buildCloudflareStorageId, buildObjectKey, buildIndexKey, buildIndexPrefix, buildSessionIndexPrefix, buildPayloadKey, storageIndexPutOptions, safeGroupId, normalizeGroupIdList, readKvPayloadEnvelope, normalizeTagsForMetadata, normalizeAccessConditionDocument, invalidUploadPolicy, readUploadGroupIds, readUploadAccessConditions, normalizeUploadPolicy, readUploadPolicyFields, readJsonPayload, readMultipartPayload, readStorageUploadRequestPayload, readConfiguredStorageBackendCandidate, resolveConfiguredStorageBackend, resolvePayloadAccessControl, resolveStorageResourceGateKey, normalizeGateMode2, normalizeDirectGate, readStorageGate, normalizeAddress, listRoleAddresses, resolveRoleAddressSet2, resolveSessionAdminAddresses, isEnvelopeExportAuthorized, evaluateWorkerRoleCondition, evaluateAgentGrantScopeCondition, evaluateSbtOnchainCondition, checkWorkerGroupMembership, evaluateWorkerGroupCondition, evaluateAccessCondition, resolvePayloadAccessConditions, evaluateAccessConditionDocument, resolveGroupGateIds, authorizeWorkerGroupAccess, resolveBareRoleGateCondition, authorizeWorkerRoleAccess, hasPrivateResponsePolicy, membersSeeAllResponses, canReadPrivateResponse, authorizeCloudflareStorageAccess, authorizeCloudflareStorageGate, authorizeCloudflareStorageResourceRead, enforceCloudflareUploadPolicy, responseJson, attachStorageGateRuntimeRpc, resolveStorageGateRuntimeConfig, createStorageRouteGateDeps, parseArweaveUploadResponse, handleArweaveStorageUpload, publishCloudflareOwnedStorageMetadata, RESPONSE_ROWS_PER_QUESTION, countQuestionsOnce, handleCloudflareUpload, readRequestId, normalizeStorageListLimit, readStorageListOptions, handleCloudflareRead, MAX_READ_BATCH_IDS, handleCloudflareReadBatch, handleCloudflareList, KV_BULK_GET_KEYS, KV_BULK_REPLY_BYTES, listCloudflareMetadataRows, decodeBulkPayloadEnvelope, readStoredCloudflarePayloadsBulk, readStoredCloudflarePayloadBytes, readStoredPayloadJson, readIndexRowResourceId, readLegacyRowResourceId, scanLegacyStorageOwnerIds, LEGACY_OWNER, resolveLegacyStorageOwner, VISIBILITY_SCAN_PAGE_ROWS, readVisibilityMetadataPages, setCloudflareStorageResourceHidden, resolveEnvelopeExportKeyProvider, resolveEnvelopeExportManifestKeyProvider, exportCloudflareEncryptedPayloadEnvelopes, listContextSourceRows, readContextSourceRow, readContextSourceBytes, removeCloudflareStorageRecords, storageRoute;
+var encoder7, decoder6, RESOLVE_STORAGE_GATE_RUNTIME_CONFIG, STORAGE_GROUP_MEMBERSHIP_CACHE, STORAGE_RPC_CHAIN_ATTESTATION_CACHE, trim14, isObj17, isJsonContentType, MEDIA_TYPE_RE, INLINE_MEDIA_TYPE_RE, resolveStorageReadContentType, getStorageR2Binding, DEFAULT_STORAGE_LIST_PAGE_SIZE, MAX_STORAGE_LIST_PAGE_SIZE, MAX_CONTEXT_LIST_KV_PAGES, DEFAULT_RESOURCE_GATES, isStorageResource, buildCloudflareStorageId, buildObjectKey, buildIndexKey, buildIndexPrefix, buildSessionIndexPrefix, buildPayloadKey, storageIndexPutOptions, safeGroupId, normalizeGroupIdList, readKvPayloadEnvelope, normalizeTagsForMetadata, normalizeAccessConditionDocument, invalidUploadPolicy, readUploadGroupIds, readUploadAccessConditions, normalizeUploadPolicy, readUploadPolicyFields, readJsonPayload, readMultipartPayload, readStorageUploadRequestPayload, readConfiguredStorageBackendCandidate, resolveConfiguredStorageBackend, resolvePayloadAccessControl, resolveStorageResourceGateKey, normalizeGateMode2, normalizeDirectGate, readStorageGate, normalizeAddress, listRoleAddresses, resolveRoleAddressSet2, resolveSessionAdminAddresses, isEnvelopeExportAuthorized, evaluateWorkerRoleCondition, evaluateAgentGrantScopeCondition, evaluateSbtOnchainCondition, checkWorkerGroupMembership, evaluateWorkerGroupCondition, evaluateAccessCondition, resolvePayloadAccessConditions, evaluateAccessConditionDocument, resolveGroupGateIds, authorizeWorkerGroupAccess, resolveBareRoleGateCondition, authorizeWorkerRoleAccess, hasPrivateResponsePolicy, membersSeeAllResponses, canReadPrivateResponse, authorizeCloudflareStorageAccess, authorizeCloudflareStorageGate, authorizeCloudflareStorageResourceRead, enforceCloudflareUploadPolicy, responseJson, attachStorageGateRuntimeRpc, resolveStorageGateRuntimeConfig, createStorageRouteGateDeps, parseArweaveUploadResponse, handleArweaveStorageUpload, publishCloudflareOwnedStorageMetadata, RESPONSE_ROWS_PER_QUESTION, countQuestionsOnce, handleCloudflareUpload, readRequestId, normalizeStorageListLimit, readStorageListOptions, handleCloudflareRead, MAX_READ_BATCH_IDS, MAX_READ_BATCH_BYTES, READ_BATCH_CONCURRENCY, handleCloudflareReadBatch, handleCloudflareList, KV_BULK_GET_KEYS, KV_BULK_REPLY_BYTES, listCloudflareMetadataRows, decodeBulkPayloadEnvelope, readStoredCloudflarePayloadsBulk, readStoredCloudflarePayloadBytes, readStoredPayloadJson, readIndexRowResourceId, readLegacyRowResourceId, scanLegacyStorageOwnerIds, LEGACY_OWNER, resolveLegacyStorageOwner, VISIBILITY_SCAN_PAGE_ROWS, readVisibilityMetadataPages, setCloudflareStorageResourceHidden, resolveEnvelopeExportKeyProvider, resolveEnvelopeExportManifestKeyProvider, exportCloudflareEncryptedPayloadEnvelopes, listContextSourceRows, readContextSourceRow, readContextSourceBytes, removeCloudflareStorageRecords, storageRoute;
 var init_storageRouteExecution = __esm({
   "workers/sessionCorsWorker/storageRouteExecution.js"() {
     init_sessionContextSources();
@@ -72561,7 +72578,7 @@ var init_storageRouteExecution = __esm({
           reason: "response_unreadable"
         }, 422, baseHeaders);
       }
-      const answerCheck = !canonicalAnswers ? null : parsedPayload && !answersChecked ? await checkUploadedAnswers({ env, config, index, slug, payload: parsedPayload }) : { ok: true, questionCount: await countQuestionsOnce(answersChecked, () => countSessionQuestions({ env, config, index, slug })) };
+      const answerCheck = !canonicalAnswers ? null : parsedPayload && !answersChecked ? await checkUploadedAnswers({ env, config, index, slug, payload: parsedPayload, deps }) : { ok: true, questionCount: await countQuestionsOnce(answersChecked, () => countSessionQuestions({ env, config, index, slug })) };
       if (answerCheck && !answerCheck.ok) {
         return responseJson(deps, { error: answerCheck.error, reason: answerCheck.reason }, answerCheck.status, baseHeaders);
       }
@@ -72747,6 +72764,7 @@ var init_storageRouteExecution = __esm({
       if (resource === "responses" && uploader) {
         const digest2 = await (deps?.crypto || globalThis.crypto).subtle.digest("SHA-256", payload.bytes || new Uint8Array());
         const payloadDigest = Array.from(new Uint8Array(digest2), (byte) => byte.toString(16).padStart(2, "0")).join("");
+        const bundle = Array.isArray(parsedPayload?.responses) && !!trim14(parsedPayload.surveyID || parsedPayload.surveyId);
         const questionIds = answerCheck?.ok && parsedPayload ? [...new Set(listUploadedAnswers(parsedPayload).map((answer) => answer.questionId).filter(Boolean))] : [];
         const maxRows = answerCheck?.ok ? RESPONSE_ROWS_PER_QUESTION * Math.max(answerCheck.questionCount, 1) : 0;
         uploadReceipt = await coordinateResponseUploadReceipt({
@@ -72754,7 +72772,7 @@ var init_storageRouteExecution = __esm({
           slug,
           responder: uploader,
           operation: "reserve",
-          payload: { requestId, payloadDigest, storageId: id2, createdAt, questionIds, maxRows }
+          payload: { requestId, payloadDigest, storageId: id2, createdAt, questionIds, maxRows, bundle }
         });
         if (uploadReceipt?.kind === "replay") {
           await enqueueResponseAnalysis(uploadReceipt.storageRef.id);
@@ -73032,6 +73050,8 @@ var init_storageRouteExecution = __esm({
       });
     };
     MAX_READ_BATCH_IDS = 100;
+    MAX_READ_BATCH_BYTES = 8 * 1024 * 1024;
+    READ_BATCH_CONCURRENCY = 5;
     handleCloudflareReadBatch = async ({ request, baseHeaders, deps, ...read }) => {
       let ids = null;
       try {
@@ -73043,7 +73063,7 @@ var init_storageRouteExecution = __esm({
       }
       const origin = new URL(request.url).origin;
       let privateItem = false;
-      const items = await Promise.all(ids.map(async (id2) => {
+      const readItem = async (id2) => {
         const response2 = await handleCloudflareRead({
           ...read,
           baseHeaders: {},
@@ -73060,7 +73080,15 @@ var init_storageRouteExecution = __esm({
           return { id: id2, status: 415, error: "This item is not text; read it on its own." };
         }
         return { id: id2, status: 200, contentType, text: await response2.text() };
-      }));
+      };
+      const items = [];
+      let textBytes = 0;
+      for (let offset = 0; offset < ids.length; offset += READ_BATCH_CONCURRENCY) {
+        const chunk2 = ids.slice(offset, offset + READ_BATCH_CONCURRENCY);
+        const read2 = textBytes < MAX_READ_BATCH_BYTES ? await Promise.all(chunk2.map(readItem)) : chunk2.map((id2) => ({ id: id2, status: 413, error: "This batch is full; read this item on its own." }));
+        for (const item of read2) textBytes += item.text?.length || 0;
+        items.push(...read2);
+      }
       const headers2 = new Headers(baseHeaders || {});
       headers2.set("Content-Type", "application/json");
       headers2.set("X-Content-Type-Options", "nosniff");
@@ -79904,7 +79932,7 @@ var init_sessionWriteCoordinator = __esm({
     UPLOAD_RECEIPT_RETENTION_MS = 7 * 24 * 60 * 60 * 1e3;
     uploadReceiptExpiresAt = (record4) => record4.state === "settled" ? record4.settledAt + UPLOAD_RECEIPT_RETENTION_MS : record4.state === "pending" ? record4.reservedAt + UPLOAD_RECEIPT_RETENTION_MS : 0;
     MAX_UPLOAD_RECEIPTS = 2e3;
-    uploadCountKey = (person, questionKey = "") => `upload-count-v1:${person}:${questionKey ? `question:${questionKey}` : "total"}`;
+    uploadCountKey = (person, questionKey = "", bundle = false) => `upload-count-v1:${person}:${questionKey ? `question:${questionKey}` : bundle ? "bundles" : "total"}`;
     MAX_ANSWER_VERSIONS = 20;
     MAX_UPLOAD_QUESTION_IDS = 1e3;
     MAX_PRIOR_UPLOAD_TARGETS = 8;
@@ -80217,6 +80245,7 @@ ${expiry}`);
         }
         const questionIds = reserve ? payload?.questionIds ?? [] : [];
         const maxRows = reserve ? payload?.maxRows ?? 0 : 0;
+        const bundle = reserve && payload?.bundle === true;
         if (!Array.isArray(questionIds) || questionIds.length > MAX_UPLOAD_QUESTION_IDS || questionIds.some((id2) => typeof id2 !== "string" || !id2 || id2.length > 256) || !Number.isSafeInteger(maxRows) || maxRows < 0) {
           return jsonResponse2({ error: "Invalid upload receipt limits." }, 400);
         }
@@ -80276,7 +80305,10 @@ ${expiry}`);
               return { status: 409, error: "Upload target does not match this receipt.", reason: "upload_receipt_target_mismatch" };
             }
             await transaction.put(key, { state: "settled", payloadDigest: record4.payloadDigest, storageRef, settledAt: nowMs });
-            const countKeys = record4.person ? [uploadCountKey(record4.person), ...(record4.questionKeys || []).map((questionKey) => uploadCountKey(record4.person, questionKey))] : [];
+            const countKeys = record4.person ? [
+              uploadCountKey(record4.person, "", record4.bundle === true),
+              ...(record4.questionKeys || []).map((questionKey) => uploadCountKey(record4.person, questionKey))
+            ] : [];
             for (const countKey of countKeys) await transaction.put(countKey, (await transaction.get(countKey) || 0) + 1);
             await this.pruneUploadReceipts(transaction, nowMs);
             return { status: 200, ok: true };
@@ -80297,8 +80329,9 @@ ${expiry}`);
             return { status: 503, error: "Upload receipt capacity is busy; retry shortly.", reason: "upload_in_progress" };
           }
           const ownInFlight = inFlight3.filter((other) => other.person === person);
-          if (maxRows && (await transaction.get(uploadCountKey(person)) || 0) + ownInFlight.length >= maxRows) {
-            return { status: 422, error: `You have saved ${maxRows} answers in this session, the most one person can.`, reason: "response_limit_rows" };
+          const sameKindInFlight = ownInFlight.filter((other) => other.bundle === true === bundle).length;
+          if (maxRows && (await transaction.get(uploadCountKey(person, "", bundle)) || 0) + sameKindInFlight >= maxRows) {
+            return { status: 422, error: bundle ? `You have submitted surveys in this session ${maxRows} times, the most one person can.` : `You have saved ${maxRows} answers in this session, the most one person can.`, reason: "response_limit_rows" };
           }
           for (const questionKey of questionKeys) {
             const stored = await transaction.get(uploadCountKey(person, questionKey)) || 0;
@@ -80313,7 +80346,15 @@ ${expiry}`);
             priorStorageIds: [...record4.priorStorageIds || [], record4.storageId].slice(-MAX_PRIOR_UPLOAD_TARGETS)
           } : { storageId, createdAt, reservedAt: nowMs };
           const attemptId = createAttemptId(this.crypto);
-          await transaction.put(key, { state: "pending", attemptId, payloadDigest, leaseUntil: nowMs + UPLOAD_RECEIPT_LEASE_MS, person, questionKeys, ...target });
+          await transaction.put(key, {
+            state: "pending",
+            attemptId,
+            payloadDigest,
+            leaseUntil: nowMs + UPLOAD_RECEIPT_LEASE_MS,
+            person,
+            ...bundle ? { bundle, questionKeys: [] } : { questionKeys },
+            ...target
+          });
           await this.pruneUploadReceipts(transaction, nowMs);
           return {
             status: 200,
