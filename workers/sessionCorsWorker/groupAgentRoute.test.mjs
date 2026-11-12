@@ -167,16 +167,37 @@ test('General answers read the context, open files and visible results, never an
   assert.equal(member.body.answers, 'general');
   assert.match(member.prompt, /OPEN agenda/);
   for (const piece of ['GROUP notes', 'ANSWER']) assert.doesNotMatch(member.prompt, new RegExp(piece));
+  // "Open to everyone" means everyone the session's own file gate admits:
+  // someone it does not admit gets the session's context and no files.
+  const outsider = await ask(await seeded(), { scopes: { ai: true } });
+  assert.equal(outsider.status, 200);
+  assert.match(outsider.prompt, /CONTEXT/);
+  assert.doesNotMatch(outsider.prompt, /OPEN agenda/);
 });
 
 test('Detailed answers add what the asker may read and members’ answers, and never a participant’s label or address', async () => {
   const h = await seeded();
-  const member = await ask(h, { address: MEMBER });
-  for (const piece of ['OPEN agenda', 'GROUP notes', 'RESULTS', 'ANSWER meet less', 'What should change?']) {
+  // Three members answered the question; the fixture's default has one.
+  const three = { loadWorkerCanonicalResultsAnalysisSource: async () => ({
+    ok: true,
+    snapshot: {
+      questions: [{ id: 'q1', prompt: 'What should change?', type: 'text' }],
+      responses: ['meet less', 'meet later', 'meet outside'].map((answer, index) => (
+        { questionId: 'q1', answer: `ANSWER ${answer}`, participantId: `participant_00${index + 1}` })),
+    },
+    participantAddresses: new Map([MEMBER, `0x${'7'.repeat(40)}`, `0x${'8'.repeat(40)}`].map((address, index) => [`participant_00${index + 1}`, address])),
+  }) };
+  const member = await ask(h, { address: MEMBER, deps: three });
+  for (const piece of ['OPEN agenda', 'GROUP notes', 'RESULTS', 'ANSWER meet less', 'ANSWER meet outside', 'What should change?']) {
     assert.match(member.prompt, new RegExp(piece));
   }
   for (const piece of ['ADMINS plan', 'participant_001', MEMBER]) assert.doesNotMatch(member.prompt, new RegExp(piece));
-  assert.equal(member.body.read.answers, 1);
+  assert.equal(member.body.read.answers, 3);
+  // A question fewer than three members answered gives someone who is not an
+  // admin neither its count nor its text: it would be one person's answer.
+  const few = await ask(h, { address: MEMBER });
+  assert.doesNotMatch(few.prompt, /ANSWER/);
+  assert.equal(few.body.read.answers, 0);
   const admin = await ask(h, { address: ADMIN });
   for (const piece of ['ADMINS plan', 'GROUP notes', 'ANSWER meet less']) assert.match(admin.prompt, new RegExp(piece));
   // Answers that can't be read leave them out, and the reply says so.

@@ -2,7 +2,7 @@ import { GROUP_AGENT_LIMITS, buildGroupAgentMessages, groupAgentSettingOf } from
 import { buildSessionEndedResponse } from '../shared/sessionLifecycle.mjs';
 import { AI_MODEL_NOT_ALLOWED } from './aiRequestPolicy.js';
 import { isModelAllowed, normalizeAiRequestPayload } from './aiRequestNormalization.js';
-import { loadParticipantContextSources } from './contextSourceLoader.js';
+import { forEveryone, loadParticipantContextSources } from './contextSourceLoader.js';
 import {
   evaluateResultsAnalysisViewerEligibility,
   loadWorkerCanonicalResultsAnalysisSource,
@@ -106,7 +106,11 @@ const scaleText = ({ scale } = {}) => {
   const end = (value, label) => (trim(label) && trim(label) !== String(value) ? `${value} (${trim(label)})` : `${value}`);
   return `${end(scale.min, scale.minLabel)} to ${end(scale.max, scale.maxLabel)}`;
 };
-const readMemberAnswers = async ({ env, slug, config, optedOut, deps }) => {
+// Someone who is not an admin gets nothing from a question fewer than this
+// many members answered: a count of one, or the one answer left when the
+// asker keeps their own out, would be a single person's answer.
+export const GROUP_AGENT_MIN_ANSWERS = 3;
+const readMemberAnswers = async ({ env, slug, config, optedOut, minAnswers = 1, deps }) => {
   const source = await (deps.loadWorkerCanonicalResultsAnalysisSource || loadWorkerCanonicalResultsAnalysisSource)({ env, slug, config });
   if (!source?.ok) return null;
   const byQuestion = new Map(source.snapshot.questions.map((question) => [
@@ -123,7 +127,7 @@ const readMemberAnswers = async ({ env, slug, config, optedOut, deps }) => {
       : { choices: [], text: [given.join('; '), comment].filter(Boolean).join(' — ') };
     if (answer.choices.length || answer.text) group.answers.push(answer);
   });
-  return [...byQuestion.values()].filter((group) => group.answers.length)
+  return [...byQuestion.values()].filter((group) => group.answers.length >= minAnswers)
     .map(({ question, scale, answers }) => ({ question, ...(scale ? { scale } : {}), answers }));
 };
 
@@ -137,10 +141,14 @@ const gatherMaterial = async ({ env, slug, config, address, scopes, asker, acces
   const [sources, results, answers] = await Promise.all([
     loadParticipantContextSources({
       env, slug, config, deps, principal: lower(address), leaveOutUploaders: optedOut,
-      ...(detailed ? { readable: access.canRead } : {}),
+      // A General asker reads the files open to everyone the session admits,
+      // and must be someone it admits: the session's own gate is checked too.
+      readable: detailed ? access.canRead : async (row) => forEveryone(row, config) && access.canRead(row),
     }),
     readVisibleResults({ env, slug, config, address, scopes, deps }),
-    detailed ? readMemberAnswers({ env, slug, config, optedOut, deps }) : [],
+    detailed ? readMemberAnswers({
+      env, slug, config, optedOut, deps, minAnswers: asker.audience === 'admin' ? 1 : GROUP_AGENT_MIN_ANSWERS,
+    }) : [],
   ]);
   return { material: { sessionContext: config?.sessionContext, sources, results, answers: answers || [] }, answersUnavailable: answers === null };
 };

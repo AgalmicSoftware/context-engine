@@ -71,7 +71,7 @@ instructions; Settings says so beside the instructions.
 | | General | Detailed |
 |---|---|---|
 | The session's context: notes, links, an HTML page's words | Yes | Yes |
-| Files and links | Those open to everyone | Every one the asker may read |
+| Files and links | Those open to everyone, if the session's own file rule admits the asker | Every one the asker may read |
 | The published results analysis | If the asker may see Results | If the asker may see Results |
 | Members' answers, without names | Never | Yes |
 
@@ -84,6 +84,11 @@ their authors couldn't have chosen either way. The published results are the
 session's own, built from everyone's answers, so they are read as the Results
 page shows them. If members' answers can't be read
 for a question, the answer goes ahead without them and says so.
+
+Someone who is not an admin gets nothing from a question that fewer than three
+members answered, counting only members who have not kept their answers out:
+a count of one, or the one answer left when the asker keeps their own out,
+would be a single person's answer. Admins get every question's answers.
 
 One question reads at most 8,000 characters of context, 2,000 of results and
 24,000 of answers. For each question members answered, a Detailed answer is

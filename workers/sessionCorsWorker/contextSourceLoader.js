@@ -32,7 +32,7 @@ const scanBudget = () => {
 
 // Readable by everyone the session admits: its own access exactly, with no
 // admins-only or group rule. Anything narrower, or unreadable here, is left out.
-const forEveryone = (row, config) =>
+export const forEveryone = (row, config) =>
   row.payloadEncrypted !== true &&
   !(Array.isArray(row.groupIds) && row.groupIds.length) &&
   !isAdminsOnlyAccess(row.accessConditions) &&
