@@ -132,6 +132,37 @@ describe('giving each person their part', () => {
     expect(await screen.findByTestId('code')).toBeInTheDocument();
   });
 
+  it('names voices heard in one part only until they are joined to someone', () => {
+    const { rerender } = render(<Share transcript={TRANSCRIPT} sessionSlug="salon" onePartSpeakers={['Person 3']} />);
+    expect(screen.getByText(/Heard in one part only: Person 3/)).toBeInTheDocument();
+    // Merged into Person 1, the voice has no button of its own, so nothing is left to check.
+    rerender(
+      <SessionTranscriptClaimShare
+        transcript={applySpeakerMerges(TRANSCRIPT, { 'Person 3': 'Person 1' })}
+        sessionSlug="salon"
+        person=""
+        onPersonChange={jest.fn()}
+        speakerMerges={{ 'Person 3': 'Person 1' }}
+        onSpeakerMergesChange={jest.fn()}
+        onePartSpeakers={['Person 3']}
+      />,
+    );
+    expect(screen.queryByText(/Heard in one part only/)).toBeNull();
+    // Someone joined to the voice instead also settles it.
+    rerender(
+      <SessionTranscriptClaimShare
+        transcript={applySpeakerMerges(TRANSCRIPT, { 'Person 1': 'Person 3' })}
+        sessionSlug="salon"
+        person=""
+        onPersonChange={jest.fn()}
+        speakerMerges={{ 'Person 1': 'Person 3' }}
+        onSpeakerMergesChange={jest.fn()}
+        onePartSpeakers={['Person 3']}
+      />,
+    );
+    expect(screen.queryByText(/Heard in one part only/)).toBeNull();
+  });
+
   it('closes a speaker chosen from the transcript while audio is still waiting', () => {
     const onPersonChange = jest.fn();
     render(

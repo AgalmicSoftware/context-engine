@@ -1104,20 +1104,50 @@ describe('speaker labels across chunks', () => {
     expect(saved.get('known-speakers')?.knownSpeakers?.map((speaker) => speaker.name)).toEqual(['Person 1']);
   });
 
-  it('keeps at most four voices, numbering a fifth within its chunk', async () => {
+  it('keeps at most four voices, and never gives a fifth voice’s number to anyone else', async () => {
     const transcribe = replies(
       [turn('A', 0, 3), turn('B', 3, 6), turn('C', 6, 9)],
       [turn('Person 1', 0, 3), turn('A', 3, 6), turn('B', 6, 9)],
+      // Two more voices without samples, in later chunks: each is a new number, not chunk 2's Person 5 again.
       [turn('Person 4', 0, 3), turn('A', 3, 6)],
+      [turn('Person 2', 0, 3), turn('A', 3, 6)],
     );
     const queue = create(transcribe, 'voices-2');
     await queue.ready;
-    for (let index = 0; index < 3; index += 1) await record(queue);
-    expect(sentNames(transcribe).map((names) => names.length)).toEqual([0, 3, 4]);
+    for (let index = 0; index < 4; index += 1) await record(queue);
+    expect(sentNames(transcribe).map((names) => names.length)).toEqual([0, 3, 4, 4]);
     expect(voices(queue)).toEqual([
       ['Person 1', 'Person 2', 'Person 3'],
       ['Person 1', 'Person 4', 'Person 5'],
-      ['Person 4', 'Person 5'],
+      ['Person 4', 'Person 6'],
+      ['Person 2', 'Person 7'],
+    ]);
+    expect(queue.segments.map((segment) => segment.oneOffSpeakers)).toEqual([
+      undefined,
+      ['Person 5'],
+      ['Person 6'],
+      ['Person 7'],
+    ]);
+  });
+
+  it('numbers new voices after everyone already heard when Record more starts without samples', async () => {
+    const transcribe = replies(
+      [turn('A', 0, 4), turn('B', 4, 8)],
+      // After a close and reopen the samples are gone, so the model labels the voices A and B again.
+      [turn('A', 0, 4), turn('B', 4, 8)],
+    );
+    const first = create(transcribe, 'voices-record-more');
+    await first.ready;
+    await record(first);
+    first.dispose();
+    await first.settled();
+    const second = create(transcribe, 'voices-record-more');
+    await second.ready;
+    await record(second);
+    expect(sentNames(transcribe)).toEqual([[], []]);
+    expect(voices(second)).toEqual([
+      ['Person 1', 'Person 2'],
+      ['Person 3', 'Person 4'],
     ]);
   });
 
@@ -1131,8 +1161,9 @@ describe('speaker labels across chunks', () => {
     const queue = create(transcribe, 'voices-3');
     await queue.ready;
     for (let index = 0; index < 3; index += 1) await record(queue);
-    expect(voices(queue)).toEqual([['Person 1', 'Person 2'], ['Person 1', 'Person 2', 'Person 3'], ['Person 2']]);
+    expect(voices(queue)).toEqual([['Person 1', 'Person 2'], ['Person 3', 'Person 4', 'Person 5'], ['Person 2']]);
     expect(queue.segments.map((segment) => Boolean(segment.speakersRenumbered))).toEqual([false, true, false]);
+    expect(queue.segments[1].oneOffSpeakers).toEqual(['Person 3', 'Person 4', 'Person 5']);
     // Its voices did not join the known people.
     expect(sentNames(transcribe)[2]).toEqual(['Person 1', 'Person 2']);
     expect(sampleVoices).toHaveBeenCalledTimes(1);
@@ -1144,7 +1175,8 @@ describe('speaker labels across chunks', () => {
     await queue.ready;
     for (let index = 0; index < 3; index += 1) await record(queue);
     expect(sentNames(transcribe)).toEqual([[], ['Person 1'], []]);
-    expect(voices(queue)).toEqual([['Person 1'], ['Person 1'], ['Person 1']]);
+    // Without samples the model can't say who is who, so each chunk's voice is new.
+    expect(voices(queue)).toEqual([['Person 1'], ['Person 2'], ['Person 3']]);
     expect(saved.get('known-speakers')?.speakerSamplesRefused).toBe(true);
   });
 
@@ -1160,9 +1192,11 @@ describe('speaker labels across chunks', () => {
     await jest.advanceTimersByTimeAsync(10_000);
     await queue.finish();
     expect(transcribe).toHaveBeenCalledTimes(2);
-    // Without a sample, the voice is numbered within each chunk.
+    // Without a sample, the first chunk's voice is marked as heard there only; the second chunk's voice, sampled
+    // in time, gets a new number rather than that one.
     expect(sentNames(transcribe)).toEqual([[], []]);
-    expect(voices(queue)).toEqual([['Person 1'], ['Person 1']]);
+    expect(voices(queue)).toEqual([['Person 1'], ['Person 2']]);
+    expect(queue.segments.map((segment) => segment.oneOffSpeakers)).toEqual([['Person 1'], undefined]);
   });
 });
 

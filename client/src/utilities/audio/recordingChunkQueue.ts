@@ -14,6 +14,7 @@ import { cutSpeakerSamples } from './speakerSamples';
 import {
   MAX_KNOWN_SPEAKERS,
   nameSpeakerTurns,
+  personNumber,
   planSpeakerTurns,
   type KnownSpeaker,
   type SpeakerTranscriptTurn,
@@ -509,6 +510,7 @@ export class RecordingChunkQueue {
           text: String(result.text || '').trim(),
           speakerTurns: named?.turns ?? result.speakerTurns,
           ...(named?.renumbered ? { speakersRenumbered: true } : {}),
+          ...(named?.oneOff.length ? { oneOffSpeakers: named.oneOff } : {}),
           ...(speakersDropped ? { speakersDropped: true } : {}),
           error: undefined,
           completedAt: Date.now(),
@@ -545,7 +547,9 @@ export class RecordingChunkQueue {
   }
   /**
    * Names a chunk's voices Person 1, Person 2… Up to four voices first heard here join the known speakers with
-   * a sample of their longest turn, which later chunks send so the model gives them the same names.
+   * a sample of their longest turn, which later chunks send so the model gives them the same names. A number is
+   * never reused, even after the samples are forgotten: new voices are numbered after every Person in the
+   * transcript, so one label never holds two people's words.
    */
   private async nameSpeakers(audio: Blob, { speakerTurns = [], speakerSamplesRefused }: Transcription) {
     if (speakerSamplesRefused) this.saveSpeakers({ ...this.speakers, speakerSamplesRefused: true });
@@ -560,10 +564,15 @@ export class RecordingChunkQueue {
         return sample ? [{ label, sample }] : [];
       })
       .slice(0, room);
-    const { turns, added } = nameSpeakerTurns(
+    const highest = Math.max(
+      0,
+      ...this.segments.flatMap((segment) => (segment.speakerTurns || []).map((turn) => personNumber(turn.speaker))),
+    );
+    const { turns, added, oneOff } = nameSpeakerTurns(
       plan,
       known,
       sampled.map(({ label }) => label),
+      highest + 1,
     );
     // A closed recorder leaves this chunk to upload again when it reopens, sampling its voices then.
     if (added.length && !this.disposed)
@@ -571,7 +580,12 @@ export class RecordingChunkQueue {
         ...this.speakers,
         knownSpeakers: [...knownSpeakers, ...added.map((name, index) => ({ name, sample: sampled[index].sample }))],
       });
-    return { turns, renumbered: plan.isolated };
+    // Only the names that still label a line after odd labels joined their neighbours.
+    return {
+      turns,
+      renumbered: plan.isolated,
+      oneOff: oneOff.filter((name) => turns.some((turn) => turn.speaker === name)),
+    };
   }
   private sampleVoices(audio: Blob, voices: Array<{ start: number; end: number }>) {
     let timer: ReturnType<typeof setTimeout> | undefined;

@@ -19,8 +19,10 @@ export type RollingTranscriptSegment = {
   startedAt: number;
   completedAt?: number;
   speakerTurns?: SpeakerTranscriptTurn[];
-  // No voice matched the samples sent, so this chunk numbers its voices on its own.
+  // No voice matched the samples sent, so this chunk's voices have new numbers.
   speakersRenumbered?: boolean;
+  // Voices heard in this chunk only, with no sample to find them again: one may be someone with another number.
+  oneOffSpeakers?: string[];
   // Its labelled uploads kept stalling, so it was transcribed without labels: its speech is in nobody's part.
   speakersDropped?: boolean;
   gapBefore?: CaptureGap;

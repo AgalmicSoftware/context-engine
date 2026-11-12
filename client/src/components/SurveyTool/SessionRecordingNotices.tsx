@@ -6,7 +6,7 @@ import styles from './SurveyTool.module.scss';
 import type { useRollingTranscriptionRecorder } from '../../utilities/audio/useRollingTranscriptionRecorder';
 
 const RENUMBERED_HELP =
-  'Some voices could not be matched to earlier speech. A Person number may refer to someone different later in the conversation.';
+  'Some voices could not be matched to earlier speech, so they have new numbers. One person may have two: drag one onto the other under Give each person their part.';
 
 type SessionRecordingNoticesProps = {
   recorder: Pick<
@@ -50,7 +50,7 @@ export function SessionRecordingNotices({ recorder, capturing, labelCheckTimedOu
       ) : null}
       {renumberedChunks.length ? (
         <span className={styles.sessionRecordingOption}>
-          <span role="status">Some speaker numbers may change during the conversation.</span>
+          <span role="status">Some people may have two numbers.</span>
           <button
             type="button"
             id={renumberedHelpId}

@@ -585,9 +585,22 @@ it('imports a ten-minute file as three-minute parts that each upload alone, thro
   expect(mockWorker.uploads[1].settledAt! - mockWorker.uploads[1].sentAt).toBeLessThanOrEqual(120_000);
   // Decoded once, when added: nothing decoded or sent the whole file again.
   expect(FakeOfflineAudioContext.decoded).toBe(1);
+  // These parts give no voice sample, so nothing ties one part's voice to the next: each part's voice gets a new
+  // number, never one already used, for the host to join up.
   expect(view.result.current.transcript).toBe(
-    ['Person 1: Chunk 101 speech.', 'Chunk 102 speech.', 'Chunk 103 speech.', 'Chunk 104 speech.'].join(' '),
+    [
+      'Person 1: Chunk 101 speech.',
+      'Person 2: Chunk 102 speech.',
+      'Person 3: Chunk 103 speech.',
+      'Person 4: Chunk 104 speech.',
+    ].join('\n'),
   );
+  expect(view.result.current.segments.map((segment) => segment.oneOffSpeakers)).toEqual([
+    ['Person 1'],
+    ['Person 2'],
+    ['Person 3'],
+    ['Person 4'],
+  ]);
   // Each part's transcript replaced its audio, on the device and on the page.
   const stored = [...mockStore.records.values()].filter((record) => record.segment.index >= 0);
   expect(stored.map((record) => [record.segment.status, record.audio])).toEqual(Array(4).fill(['complete', undefined]));

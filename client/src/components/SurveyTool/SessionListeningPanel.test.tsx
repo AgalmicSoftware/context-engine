@@ -1056,6 +1056,31 @@ describe('SessionListeningPanel', () => {
       expect(await screen.findByRole('dialog')).toHaveTextContent('Person 2');
     });
 
+    it('warns beside the codes about voices heard in one part only, and parts with no labels', () => {
+      const labelled =
+        'Person 1: Enough words here for a whole part of the talk.\nPerson 5: And quite a lot more from another person.';
+      const done = (index: number, extra: Record<string, unknown>) => ({
+        id: `chunk-${index}`,
+        index,
+        status: 'complete',
+        text: 'Speech.',
+        startedAt: index,
+        ...extra,
+      });
+      (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+        buildRecorder({
+          transcript: labelled,
+          segments: [done(0, {}), done(1, { oneOffSpeakers: ['Person 5'] }), done(2, { speakersDropped: true })],
+        }),
+      );
+      render(<SessionListeningPanel sessionSlug="demo" panelMode="recordGroup" embeddedInModal />);
+      expect(screen.getByText(/Heard in one part only: Person 5/)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'About voices heard in one part only' })).toHaveAccessibleDescription(
+        /may be someone listed under another number/,
+      );
+      expect(screen.getByText('1 part has no speaker labels, so no code holds those words.')).toBeInTheDocument();
+    });
+
     it('shows merged speakers under the label they joined, and keeps a split with the recording', () => {
       const labelled =
         'Person 1: Enough words here for a whole part of the talk.\nPerson 3: And a little more from the same voice.';
@@ -1575,9 +1600,9 @@ it('explains speaker numbering without exposing audio parts, with the reason beh
     buildRecorder({ transcript: 'Person 1: Speech.', segments: [chunk(0), chunk(1, true), chunk(2, true)] }),
   );
   render(<SessionListeningPanel sessionSlug="room" panelMode="recordGroup" />);
-  expect(await screen.findByText('Some speaker numbers may change during the conversation.')).toBeInTheDocument();
+  expect(await screen.findByText('Some people may have two numbers.')).toBeInTheDocument();
   const help = screen.getByRole('button', { name: 'About restarted Person numbers' });
-  expect(help).toHaveAccessibleDescription(/Person number may refer to someone different/);
+  expect(help).toHaveAccessibleDescription(/One person may have two/);
 });
 
 it('stays busy while a close finishes, so the dialog keeps Back off until it has', async () => {
