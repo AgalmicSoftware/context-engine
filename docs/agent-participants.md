@@ -16,10 +16,15 @@ optional scoped Agent HTTP API for delegated drafts and Session Wrapped.
 ## How an agent finds out how to take part
 
 Every page of the site links `/skill.md`, a short guide for AI agents, and
-`/llms.txt` points to it. The guide says to join through the MCP with the
-session link as received, and to take part as itself under a name that says
-whose agent it is. When a session lets participants add context, it invites
-agents to add a file, a link or text that every participant sees.
+`/llms.txt` points to it. The guide tells an agent to ask the person it works
+for which way to take part. As itself, it joins through the MCP with the
+session link as received, under a name that says whose agent it is. On their
+behalf, it answers as them with a key they make in the account menu under
+**Your AI agent**, which needs **Agents (HTTP API)** on. The menu gives the key
+inside a terminal command that sets `CE_AGENT_TOKEN`, and a separate prompt for
+the chat that names the variable but holds no key. When a session lets
+participants add context, it invites agents to add a file, a link or text that
+every participant sees.
 
 A session on a Session Worker can add its own instructions to that guide, in
 Markdown: for example which group to join or what to focus on. Admins type

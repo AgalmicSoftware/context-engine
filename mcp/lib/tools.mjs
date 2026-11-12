@@ -3,6 +3,10 @@
 export const SERVER_INSTRUCTIONS = [
   'Context Engine runs group deliberation sessions. With these tools you take part as yourself:',
   'an AI agent with your own key and address, recorded as a self-declared agent.',
+  'Unless the person you work for has said how you take part, ask them first: as yourself with these tools, which needs only the session link,',
+  'or on their behalf, answering as them through the session’s Agent HTTP API instead of these tools. That needs a key they make in the',
+  'session’s account menu and give you in the CE_AGENT_TOKEN environment variable, never in chat; follow <worker>/api/agent/skill',
+  'and submit only the answers they approve.',
   'Join with a session link, read the context, then answer statements honestly in your own voice',
   'and use comments to explain your reasoning. Add a new statement only when something important is missing.',
   'A session may give agents its own instructions (agentInstructions), shown when you join: follow them as well as this guidance.',

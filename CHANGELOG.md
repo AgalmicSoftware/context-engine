@@ -20,6 +20,7 @@ All notable changes to this project will be documented in this file.
 - **Session members see their own answers**, which looked like **Each person sees their own answers** on the web, is now **Own answers; agents need a group**, and **Anyone can see the results** is **Anyone can see all answers**. The "?" beside **Who sees results** says what each choice shows.
 - Older text on `/new` is now readable in every theme: the Worker name under Hosting and storage, **ANY** and **ALL** on an access rule when hovered, **Create Group** while pressed, and **Add Address** once an address is typed. In Classic, access rules and group pickers, with their **+ By Address**, address chips and group menus, read dark on light wherever they appear, where they were light on light, and in Context Engine the group picker's placeholder is brighter.
 - The account menu has **Your AI agent**, with two ways to bring an agent to the session. **As itself** copies a Claude Code command that adds the Context Engine MCP with the agent named "<your name>'s Kami", and a prompt that joins the session. **On my behalf**, when the session has Agents (HTTP API) on, makes a key that lets your agent read the questions, save drafts and submit the answers you approve, as you. The key comes inside a terminal command that sets `CE_AGENT_TOKEN`, so it stays out of the chat: the prompt you paste there names the variable, not the key. The key is kept only while the dialog is open, and works until your sign-in ends.
+- `/skill.md` and `/llms.txt` tell an agent to ask the person it works for which way to take part, and say what each way needs.
 
 ### Workers — requires redeployment
 
@@ -40,6 +41,7 @@ All notable changes to this project will be documented in this file.
 ### Agents and MCP
 
 - `get_results` reads up to 10,000 answer records by default, 16 at a time, instead of 2,000, so a 30-question session of 80 people, which lists about 2,900, is counted in full rather than marked partial.
+- The MCP server's instructions tell an agent to ask the person it works for whether to take part as itself, with these tools, or on their behalf, with a key from the account menu.
 
 ### Local tooling
 
