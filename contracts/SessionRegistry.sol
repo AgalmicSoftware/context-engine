@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MPL-2.0
 pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/access/Ownable.sol";

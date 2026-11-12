@@ -154,7 +154,7 @@ The default public deployment supports hundreds to low thousands of concurrent p
 
 ## Licensing
 
-Project-authored code is licensed under `MPL-2.0`, including the client, Workers, contracts, deploy package and add-ons. Earlier releases keep the licenses they shipped with. Project-authored annotations in [`ai-discourse-corpus/`](ai-discourse-corpus/) remain `CC0-1.0`; upstream material and third-party dependencies, fonts and assets keep their own rights and notices. See [LICENSING.md](LICENSING.md).
+Project-authored code is licensed under `MPL-2.0`, including the client, Workers, contracts and deploy package. Earlier releases keep the licenses they shipped with. The exceptions keep their own licenses: the MP3 encoder and Classic 95 fonts (LGPL), the `hark` and `recordrtc` audio libraries (MIT), project-authored annotations in [`ai-discourse-corpus/`](ai-discourse-corpus/) (`CC0-1.0`), and other third-party dependencies, fonts and assets. See [LICENSING.md](LICENSING.md).
 
 ## Roadmap
 

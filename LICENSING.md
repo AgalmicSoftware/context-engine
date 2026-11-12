@@ -1,18 +1,34 @@
 # Project license
 
 Project-authored code is licensed under **MPL-2.0** throughout: the browser
-client, Workers, deployment package, contracts, tools, shared modules and
-repository add-ons. The root [LICENSE](LICENSE) contains the complete Mozilla
-Public License Version 2.0. Contributions to project code use MPL-2.0.
+client, Workers, deployment package, contracts, tools and shared modules. The
+root [LICENSE](LICENSE) contains the complete Mozilla Public License Version
+2.0. Contributions to project code use MPL-2.0.
 
 Earlier releases keep the licenses they shipped with. Deployed contracts keep
 their verified source notices; newly distributed source uses MPL-2.0.
+
+## Exceptions
+
+These are not MPL-2.0. Each keeps its own license and notices, described below.
+
+| Material | License | Where |
+| --- | --- | --- |
+| `@breezystack/lamejs` (MP3 export) | LGPL-3.0 | Client dependency, run in its own Web Worker; source and texts in `client/public/licenses/lamejs/` |
+| Wine Tahoma fonts (Classic 95 theme) | LGPL-2.1-or-later | `client/src/assets/fonts/classic-95/` |
+| `hark` and `recordrtc` (audio capture) | MIT | Client dependencies, unmodified |
+| Font Awesome Free icons | CC-BY-4.0 icons, SIL OFL 1.1 fonts, MIT code | Client dependencies (`@fortawesome/*`) |
+| `ai-discourse-corpus/` annotations | CC0-1.0 | [The corpus notice](ai-discourse-corpus/LICENSE.md) |
+| Other third-party dependencies, images and logos | Their own licenses | See below |
+
+MIT and CC0 material combines with MPL-2.0 code. The LGPL libraries stay
+replaceable as their licenses require.
 
 ## Package and material map
 
 | Material | License | Notes |
 | --- | --- | --- |
-| Root tools, `client/`, `mcp/`, `ai-discourse-bench/`, `shared/` and add-ons | MPL-2.0 | The root license applies to project code. |
+| Root tools, `client/`, `mcp/`, `ai-discourse-bench/` and `shared/` | MPL-2.0 | The root license applies to project code. |
 | `workers/` | MPL-2.0 | Includes the Session Worker, deploy helper and shared Worker modules. |
 | `deploy/cloudflare/session-worker/` | MPL-2.0 for project code | The standalone package includes the project license and bundled dependency notices in `THIRD_PARTY_NOTICES.md`. |
 | `contracts/` and `foundry/` | MPL-2.0 | Source files carry matching SPDX identifiers. |
@@ -44,9 +60,6 @@ and copies retain them. Inputs with no local license file must have a full
 license grant in their README, or be an ethers v5 subpackage whose exact version
 and repository match the installed umbrella package's shared license. Missing
 license evidence fails the build.
-The add-on's vendored `ethers.umd.min.js` is ethers 5.7.2 under MIT; its notice
-is kept beside it in `ethers.LICENSE.md`. The add-on's MPL-2.0
-license applies to project-authored code.
 
 The browser's on-demand MP3 export links **@breezystack/lamejs 1.2.7** under
 LGPL-3.0 in a dedicated Web Worker. Project source remains MPL-2.0. Full GPL
