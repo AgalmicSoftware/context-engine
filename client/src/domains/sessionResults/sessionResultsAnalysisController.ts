@@ -4,6 +4,7 @@ import {
   type SessionGeneratedResultsViewKey,
 } from './sessionResultsGeneratedViewTypes';
 import { mayStartResultsBuilds } from './resultsBuilders';
+import { resolveSessionCapabilityProjection } from '../../utilities/session/sessionCapabilityProjection';
 import type { SessionResultsGeneratedAnalysisArtifact } from '../../utilities/sessionResultsExport/sessionResultsAnalysisArtifacts';
 
 export type GeneratedResultsViewOption = {
@@ -157,10 +158,13 @@ export const shouldOfferGeneratedResultsAuthorization = ({
   sessionConfig?: unknown;
 } = {}): boolean => {
   const config = toRecord(sessionConfig);
-  return (
-    Object.values(normalizeResultsAnalysisSettings(config.resultsAnalysis).views).some(Boolean) &&
-    mayStartResultsBuilds(config, account)
-  );
+  if (!Object.values(normalizeResultsAnalysisSettings(config.resultsAnalysis).views).some(Boolean)) return false;
+  // Elsewhere the browser supplies the answers, which only the admin may do.
+  if (resolveSessionCapabilityProjection(config).isWorkerCanonical === true) return mayStartResultsBuilds(config, account);
+  const accountLower = toText(account).toLowerCase();
+  const adminAddress = toText(config.adminAddress || toRecord(config.__registry).adminAddress).toLowerCase();
+  const hasHatAuthority = !!toText(config.adminHatId) && !!toText(config.hatsAddress);
+  return !!accountLower && (hasHatAuthority || adminAddress === accountLower);
 };
 
 export const resolveGeneratedResultsControllerState = ({

@@ -229,6 +229,15 @@ export const dispatchAdminRequest = async ({
 
   if (action === 'results-analysis/generate') {
     const privateHeaders = withPrivateNoStoreHeaders(headers);
+    // Only the admin may supply the rows: a results admin's AI Views read the Worker's own.
+    const suppliesRows = (body?.source?.kind || body?.sourceKind || 'worker-canonical') !== 'worker-canonical' ||
+      body?.committedResponses !== undefined;
+    if (suppliesRows && await deps?.validateAdmin?.({
+      env, slug: targetSlug, address: toTrimmedString(authorityResult.address).toLowerCase(), config: existingConfig, body: {},
+    }) !== true) {
+      await recordAuthFailure({ env, deps });
+      return deps?.json?.({ error: 'Only the session admin can build AI Views from supplied answers.' }, 403, privateHeaders);
+    }
     try {
       const result = await (deps?.generateResultsAnalysisDraft || generateResultsAnalysisDraft)({
         env,

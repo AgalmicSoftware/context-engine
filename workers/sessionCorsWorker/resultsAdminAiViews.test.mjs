@@ -57,3 +57,20 @@ test('a results admin starts AI Views as the admin does, and gets nothing else a
     assert.equal(refused.status, 403, `${action}: ${JSON.stringify(refused.body)}`);
   }
 });
+
+test('only the admin may build AI Views from answers the request supplies', async () => {
+  const supplied = [
+    { source: { kind: 'admin-snapshot', snapshot: { sessionSlug: SLUG, questions: [], responses: [] } } },
+    { sourceKind: 'admin-snapshot' },
+    { committedResponses: [{ metadata: { responder: '0x00000000000000000000000000000000000000ee' }, payload: { questionID: 'q1', answer: 'Agree' } }] },
+  ];
+  for (const body of supplied) {
+    const { env, resultsAdmin } = setup();
+    const refused = await signedAdminRequest({ env, wallet: resultsAdmin, action: 'results-analysis/generate', body });
+    assert.equal(refused.status, 403, JSON.stringify(body));
+    assert.match(refused.body.error, /Only the session admin can build AI Views from supplied answers/);
+    const { admin, env: adminEnv } = setup();
+    const asAdmin = await signedAdminRequest({ env: adminEnv, wallet: admin, action: 'results-analysis/generate', body });
+    assert.doesNotMatch(String(asAdmin.body.error), /supplied answers|Admin authorization failed/);
+  }
+});

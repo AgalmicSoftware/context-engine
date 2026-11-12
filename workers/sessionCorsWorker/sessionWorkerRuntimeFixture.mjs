@@ -18,6 +18,8 @@ export const createMemoryKv = (seed = {}) => {
   return {
     values,
     async get(key, typeOrOptions) {
+      // Cloudflare's bulk get: up to 100 keys in one call, answered as a Map.
+      if (Array.isArray(key)) return new Map(await Promise.all(key.map(async (name) => [name, await this.get(name, typeOrOptions)])));
       const value = values.has(key) ? values.get(key) : null;
       const type = typeof typeOrOptions === 'string' ? typeOrOptions : typeOrOptions?.type;
       if (value == null || !type || type === 'text') return value;
