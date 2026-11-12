@@ -1716,6 +1716,15 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
   if (prepared.response) return prepared.response;
 
   // Validation, encryption and serialized KV limits must pass before a retry lease starts.
+  // So must the backup mark before the write: a coordinator too busy for it
+  // gets the busy reply, which clients retry, with no lease left to wait out.
+  // Replays and refused answers mark too, which can only restart an export.
+  try {
+    await markStorageBackupWrite(env, slug);
+  } catch (error) {
+    if (error?.status === 503) return responseJson(deps, { error: error.message }, 503, baseHeaders);
+    throw error;
+  }
   // Every answer takes a receipt, which also counts it against the person's limits;
   // without a usable request id it gets one of its own and is never replayed.
   const callerRequestId = trim(payload.requestId);
@@ -1796,7 +1805,6 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
     return finishUpload(storageRef, undefined, undefined, true);
   }
 
-  await markStorageBackupWrite(env, slug);
   if (canWriteR2) {
     await r2.put(objectKey, bytesToStore, {
       httpMetadata: { contentType: metadata.contentType },
@@ -1821,7 +1829,10 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
     await index.put(buildIndexKey({ slug, resource, id }), serializedMetadata, storageIndexPutOptions(metadata));
   }
 
-  await markStorageBackupWrite(env, slug);
+  // The write is done, so a failed mark cannot undo it, and refusing the answer
+  // would only send its retry into this attempt's lease. Unlike other writes,
+  // an export spanning this one may then miss it.
+  await markStorageBackupWrite(env, slug).catch(() => {});
   return finishUpload(normalizeStorageRef(metadata), metadata, bytesToStore);
 };
 

@@ -1,4 +1,4 @@
-import { callSessionConfigCoordinator } from './sessionConfigAuthority.js';
+import { SESSION_CONFIG_COORDINATION_ERROR, callSessionConfigCoordinator } from './sessionConfigAuthority.js';
 
 export const STORAGE_BACKUP_REVISION_KEY = 'storage-backup-revision';
 export const WORKER_GROUP_BACKUP_PENDING_PREFIX = 'worker-group-backup-pending:';
@@ -13,5 +13,11 @@ export const bumpStorageBackupRevision = (storage) => storage.transaction(async 
 export const markStorageBackupWrite = async (env, slug) => {
   if (!env?.CE_SESSION_COORDINATOR) return;
   const result = await callSessionConfigCoordinator({ env, slug, path: 'backup/write-revision' });
-  if (!result.ok) throw new Error('Storage write tracking is unavailable; retry.');
+  if (result.ok) return;
+  // A busy coordinator gets the busy answer every client retries; an upload
+  // marks before it reserves anything, so the retry goes straight through.
+  if (result.status === 503 && result.body?.error === SESSION_CONFIG_COORDINATION_ERROR) {
+    throw Object.assign(new Error(SESSION_CONFIG_COORDINATION_ERROR), { status: 503 });
+  }
+  throw new Error('Storage write tracking is unavailable; retry.');
 };
