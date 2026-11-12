@@ -119,3 +119,32 @@ test('refuses a malformed or oversized build, keeps nothing, and frees the next 
   assert.deepEqual((await call(coordinator, 'read', {})).body.builds, []);
 });
 
+test('a risk matrix keeps its own builds and lease beside the atlas', async () => {
+  const coordinator = createCoordinator();
+  assert.equal((await call(coordinator, 'reserve', {})).status, 200);
+  const reserved = await call(coordinator, 'reserve', {}, 'risk-matrix');
+  assert.equal(reserved.status, 200);
+  const running = await call(coordinator, 'reserve', {}, 'risk-matrix');
+  assert.equal(running.status, 409);
+  assert.equal(running.body.reason, 'risk_matrix_build_running');
+  assert.equal(running.body.error, 'A risk matrix is already being built for this session. Try again when it finishes.');
+
+  const matrix = {
+    id: 'risk_k1_00000001',
+    builtAt: '2026-11-08T12:00:00.000Z',
+    title: 'Risks',
+    areas: [{ name: 'Trust', subareas: ['Media'] }],
+    notes: [{ cell: 'Trust.Media.Labor.Jobs', valence: 'risk', intensity: 4, comment: 'A risk.' }],
+  };
+  // An atlas id is not a risk matrix's, and the refusal still frees the next press.
+  assert.equal((await call(coordinator, 'finalize', { attemptId: reserved.body.attemptId, build: buildRecord() }, 'risk-matrix')).status, 400);
+  const again = await call(coordinator, 'reserve', {}, 'risk-matrix');
+  assert.equal((await call(coordinator, 'finalize', { attemptId: again.body.attemptId, build: matrix }, 'risk-matrix')).status, 200);
+
+  const read = await call(coordinator, 'read', {}, 'risk-matrix');
+  assert.deepEqual(read.body.build, matrix);
+  assert.deepEqual(read.body.builds, [{ id: matrix.id, builtAt: matrix.builtAt, title: 'Risks' }]);
+  assert.equal((await call(coordinator, 'read', {})).body.build, null);
+  assert.equal((await call(coordinator, 'read', { id: 'atlas_k1_00000001' }, 'risk-matrix')).status, 400);
+  assert.equal((await call(coordinator, 'read', {}, 'config')).status, 404);
+});

@@ -19,6 +19,15 @@ export const RESULTS_BUILD_KINDS = Object.freeze({
     running: 'debate_atlas_build_running',
     body: ['branches'],
   },
+  'risk-matrix': {
+    key: 'risk-matrix-v1',
+    prefix: 'risk',
+    name: 'risk matrix',
+    aName: 'A risk matrix',
+    plural: 'Risk matrices',
+    running: 'risk_matrix_build_running',
+    body: ['areas', 'notes'],
+  },
 });
 
 const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });

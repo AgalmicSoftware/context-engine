@@ -3,6 +3,7 @@ import {
   DEBATE_ATLAS_FIELD,
   PUBLIC_WORKER_AI_FIELDS,
   PUBLIC_WORKER_CONFIG_FIELDS,
+  RISK_MATRIX_FIELD,
   SET_CONFIG_MERGES_AI_FIELD,
 } from '../../shared/workerSessionPublicConfig.mjs';
 
@@ -314,6 +315,7 @@ export const projectPublicWorkerSessionConfig = (config) => {
   // This code's set-config merges `ai` (mergeSetConfigAi); older Workers lack the field.
   projected[SET_CONFIG_MERGES_AI_FIELD] = true;
   projected[DEBATE_ATLAS_FIELD] = true;
+  projected[RISK_MATRIX_FIELD] = true;
   return projected;
 };
 

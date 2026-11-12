@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { getPlatformProxy } from 'wrangler';
 import { buildDebateAtlas } from './debateAtlasBuild.js';
+import { buildRiskMatrix } from './riskMatrixBuild.js';
 import {
   generateResultsAnalysisDraft,
   loadWorkerCanonicalResultsAnalysisSource,
@@ -174,6 +175,29 @@ test('the atlas build reads every answer of a salon-sized session', async () => 
   const result = await buildAtlas({ env, builds });
   assert.equal(result.ok, true, result.error);
   assert.deepEqual([builds[0].counts.responses, builds[0].counts.participants, builds[0].counts.aiQuestions], [2400, 80, 30]);
+  assertFewOperations(kv);
+});
+
+const riskMatrix = {
+  title: 'Salon risks',
+  areas: [{ name: 'Trust', subareas: ['Media'] }, { name: 'Labor', subareas: ['Jobs'] }],
+  notes: [{
+    from: { area: 'Trust', subarea: 'Media' }, to: { area: 'Labor', subarea: 'Jobs' }, valence: 'risk', intensity: 6,
+    note: 'Distrust slows retraining.', participantIds: ['participant_001'], questionIds: ['q1'],
+  }],
+};
+
+test('the risk matrix build reads every answer of a salon-sized session', async () => {
+  const { kv, env } = salonEnv();
+  const builds = [];
+  const result = await buildRiskMatrix({ env, slug: 'salon', config, builderAddress: address(1), deps: {
+    callBuildStore: buildStore(builds),
+    getSessionSecrets: async () => ({}),
+    callProvider: async () => ({ ok: true, value: riskMatrix }),
+  } });
+  assert.equal(result.ok, true, result.error);
+  assert.deepEqual([builds[0].counts.responses, builds[0].counts.participants, builds[0].counts.aiQuestions], [2400, 80, 30]);
+  assert.equal(builds[0].notes.length, 1);
   assertFewOperations(kv);
 });
 

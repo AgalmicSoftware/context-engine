@@ -6,6 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ### Workers — requires redeployment
 
+- Admins, co-admins and results admins can build a session's risk matrix with AI, as they build its debate atlas (`POST /admin/risk-matrix/build`, read at `GET /risk-matrix`). One call names the areas the responses discuss, each with a few subareas, and writes notes on where two areas meet, each an opportunity or a risk with an intensity from 1 to 10. A note is kept only when it cites someone who answered a question it cites. The session's context reaches the AI as untrusted material. Builds are kept and read like atlas builds: the newest 8, each stamped with its time and response count, under the same viewer rule. The public config reports `riskMatrix: true`.
 - AI Views and the debate atlas read a session's answers 100 at a time, so about 80 people answering 30 questions now fit the Worker's read limit. Before, a session was refused from about 400 answers. An answer that can't be read now stops the build with a message to retry, instead of being left out.
 
 ## [0.9.2] - 2026-11-11

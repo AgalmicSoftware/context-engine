@@ -610,6 +610,7 @@ describe('persistAndVerifySessionWizardWorkerConfig', () => {
             workerCanonicalPublicationRevision: revision,
             responseFieldEncryption: { version: 1 },
             setConfigMergesAi: true,
+            riskMatrix: true,
             corsWorkerUrl: `${WORKER_ORIGIN.toUpperCase()}/`,
           }),
         }),

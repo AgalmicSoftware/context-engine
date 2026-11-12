@@ -54,6 +54,7 @@ import {
 import { executeCoordinatedSessionConfigMutation } from './sessionWriteCoordinator.js';
 import { generateResultsAnalysisDraft } from './resultsAnalysisGeneration.js';
 import { buildDebateAtlas, DEBATE_ATLAS_BUILD_ACTION } from './debateAtlasBuild.js';
+import { buildRiskMatrix, RISK_MATRIX_BUILD_ACTION } from './riskMatrixBuild.js';
 import { canBuildResults } from './resultsBuild.js';
 
 const toTrimmedString = (value) => (
@@ -176,8 +177,8 @@ export const dispatchAdminRequest = async ({
       validateSiweAddressMatchesRequest: deps?.validateSiweAddressMatchesRequest,
       consumeNonce: deps?.consumeNonce,
       validateBootstrapAdmin: deps?.validateBootstrapAdmin,
-      // Co-admins and results admins may build atlases and do nothing else here.
-      validateAdmin: action === DEBATE_ATLAS_BUILD_ACTION
+      // Co-admins and results admins may build atlases and risk matrices and do nothing else here.
+      validateAdmin: action === DEBATE_ATLAS_BUILD_ACTION || action === RISK_MATRIX_BUILD_ACTION
         ? (args) => canBuildResults({ ...args, validateAdmin: deps?.validateAdmin })
         : deps?.validateAdmin,
       MISSING_SLUG_ERROR: deps?.MISSING_SLUG_ERROR,
@@ -241,9 +242,12 @@ export const dispatchAdminRequest = async ({
     }
   }
 
-  if (action === DEBATE_ATLAS_BUILD_ACTION) {
+  if (action === DEBATE_ATLAS_BUILD_ACTION || action === RISK_MATRIX_BUILD_ACTION) {
     const privateHeaders = withPrivateNoStoreHeaders(headers);
-    const result = await (deps?.buildDebateAtlas || buildDebateAtlas)({
+    const build = action === DEBATE_ATLAS_BUILD_ACTION
+      ? deps?.buildDebateAtlas || buildDebateAtlas
+      : deps?.buildRiskMatrix || buildRiskMatrix;
+    const result = await build({
       env,
       slug: targetSlug,
       config: existingConfig,

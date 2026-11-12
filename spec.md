@@ -548,6 +548,8 @@ Worker API (selected endpoints):
 - `POST /admin/debate-atlas/build` and `GET /debate-atlas`: Build a debate atlas
   from the stored responses (admins, co-admins and `resultsAdminAddresses`), and
   read the newest build or one by `id` under the same viewer rule.
+- `POST /admin/risk-matrix/build` and `GET /risk-matrix`: The same for a risk
+  matrix of areas and the opportunities and risks where two of them meet.
 - `POST /`: Authenticated action-style requests using an `action` field: `request_test_eth` (testnet faucet), `fetch_url`, `fetch_image`.
 
 Agent HTTP API families (selected):

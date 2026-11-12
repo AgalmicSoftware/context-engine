@@ -3105,9 +3105,8 @@ export class SessionWriteCoordinator {
     if (url.pathname.startsWith('/session-config/context-source/')) {
       return this.executeContextSourceOperation(url.pathname.split('/').pop(), payload);
     }
-    if (url.pathname.startsWith('/session-config/debate-atlas/')) {
-      return dispatchResultsBuildStore(this, 'debate-atlas', url.pathname.split('/').pop(), payload || {});
-    }
+    const resultsBuild = url.pathname.match(/^\/session-config\/(debate-atlas|risk-matrix)\/([a-z]+)$/);
+    if (resultsBuild) return dispatchResultsBuildStore(this, resultsBuild[1], resultsBuild[2], payload || {});
     if (['preflight', 'begin', 'check', 'checkpoint', 'release', 'discard'].some(operation => url.pathname === `/session-config/lit-authorization/provisioning/${operation}`)) {
       return this.serializeSessionConfigOperation(() => executeLitProvisioning(this, payload, url.pathname.split('/').at(-1)));
     }

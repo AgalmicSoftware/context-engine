@@ -610,6 +610,23 @@ Admin test panel:
   templates, with the session's data as placeholders, which the site shows
   while a build runs. The public config sets `debateAtlas: true` so the site
   knows the Worker builds atlases.
+- Risk matrices are built the same way, apart from the generated Results views'
+  Risk Matrix. `POST /admin/risk-matrix/build` (signed admin action
+  `risk-matrix/build`) accepts the same builders and reads the same stored
+  responses. One call names up to 8 areas the responses discuss, each with up to
+  4 subareas, and writes up to 20 notes on where two areas meet: what a subarea
+  of one means for a subarea of another, as an opportunity or a risk with an
+  intensity from 1 to 10. The Worker keeps a note only when it joins two areas
+  the reply named and cites a participant who answered a question it cites. Each
+  note stores its cell (`Area.Subarea.Area.Subarea`, so names lose dots and
+  underscores), how many cited participants hold it and the questions it rests
+  on, by their stored ids (the prompt calls them `q1`, `q2`…), and the matrix
+  keeps only areas a note joins. The session context reaches
+  the prompt as untrusted data, as in every AI prompt. The coordinator keeps a
+  risk matrix's lease and its newest 8 builds apart from atlases. `GET
+  /risk-matrix?sessionSlug=<slug>&id=` reads them under the atlas rule, with
+  `canBuild` and, for builders, `nextBuild`, and the public config sets
+  `riskMatrix: true`.
 - Manual generation uses signed admin action
   `POST /admin/results-analysis/generate` with action
   `results-analysis/generate`. Worker-canonical Cloudflare sessions can request
