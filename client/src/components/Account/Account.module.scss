@@ -2112,6 +2112,13 @@ button.passkeyButtonOutline:is(:hover, :focus, :active):not(:disabled) {
   color: var(--ce-document-surface) !important;
 }
 
+// Beside the status text on its own line, so a phone's narrow screen keeps both readable.
+.passkeyCopyLink {
+  display: block;
+  min-height: 44px;
+  margin: 8px auto 0;
+}
+
 .passkeyWalletStatus {
   max-width: min(520px, 100%);
   margin: 14px auto 0;

@@ -1,4 +1,4 @@
-import React, { Suspense } from 'react';
+import React, { Suspense, useState } from 'react';
 import { Button, CardBody, UncontrolledTooltip } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
@@ -10,7 +10,32 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import { MetaMaskLoginButton } from '../../app/runtime/walletUiRuntime.js';
 import styles from './Account.module.scss';
-import type { PasskeyWalletActionMode } from './loginAndSettingsPasskeyActions';
+import { PASSKEYS_UNAVAILABLE_MESSAGE, type PasskeyWalletActionMode } from './loginAndSettingsPasskeyActions';
+
+// For a browser without passkeys: the same page, to paste into one that has them.
+const CopyPageLink = () => {
+  const [copied, setCopied] = useState(false);
+  return (
+    <Button
+      type="button"
+      size="sm"
+      color="primary"
+      className={styles.passkeyCopyLink}
+      data-testid="ce-passkey-copy-link"
+      onClick={async () => {
+        try {
+          await navigator.clipboard.writeText(window.location.href);
+          setCopied(true);
+        } catch {
+          // Without clipboard access the address bar still holds the link.
+          window.prompt('Copy this link', window.location.href);
+        }
+      }}
+    >
+      {copied ? 'Link copied' : 'Copy link'}
+    </Button>
+  );
+};
 
 type AccountUserPageProps = {
   viewAddress?: string;
@@ -137,6 +162,7 @@ const LoginModalDisplayBody = ({
               data-testid="ce-passkey-wallet-status"
             >
               {passkeyWalletStatusMessage}
+              {passkeyWalletStatusMessage === PASSKEYS_UNAVAILABLE_MESSAGE ? <CopyPageLink /> : null}
               {passkeyWalletStatusHelp ? (
                 <>
                   <button

@@ -1,11 +1,12 @@
 import type { PasskeyWalletConfig } from '../types.js';
 import type { PasskeyCredentialClient } from '../types.js';
 import { buildPrfExtension, getCredentialPrfEnabled } from './prf.js';
+import { PasskeysUnavailableError } from './unavailable.js';
 import { base64URLToBuffer, randomBytes } from './encoding.js';
 
 const credentialClient = (): PasskeyCredentialClient => {
   if (typeof navigator === 'undefined' || !navigator.credentials) {
-    throw new Error('WebAuthn credentials API is not available.');
+    throw new PasskeysUnavailableError();
   }
   return navigator.credentials;
 };
@@ -35,7 +36,7 @@ export const createPasskeyCredential = async ({
   excludeCredentialIds?: string[];
 }): Promise<PublicKeyCredential> => {
   if (typeof PublicKeyCredential === 'undefined') {
-    throw new Error('WebAuthn is not supported in this browser.');
+    throw new PasskeysUnavailableError();
   }
   const userName = formatPasskeyCredentialUserName();
   const excludeCredentials = excludeCredentialIds.map((id) => ({

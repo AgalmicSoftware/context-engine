@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 jest.mock('wagmi/actions', () => ({ disconnect: jest.fn(async () => {}) }));
 import {
   clearAgentClientLoginEnvelope,
@@ -897,6 +897,26 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
     view.rerender(subject.getModalDisplay());
     expect(screen.getByTestId('ce-passkey-wallet-status')).toHaveTextContent('Login failed: No credential chosen');
     expect(screen.queryByRole('button', { name: 'What does this mean?' })).not.toBeInTheDocument();
+  });
+
+  it('sends someone in a browser without passkeys to Safari or Chrome, with the link to copy', async () => {
+    const { PasskeysUnavailableError } = jest.requireActual('../../wallet/passkey/unavailable');
+    mockedPasskeyWallet.createPasskeyWallet.mockRejectedValueOnce(new PasskeysUnavailableError());
+    const subject = mountClassSubject(new LoginAndSettingsModalSubject(buildProps()));
+    await subject.handlePasskeyWalletCreate();
+    render(subject.getModalDisplay());
+    const status = screen.getByTestId('ce-passkey-wallet-status');
+    expect(status).toHaveTextContent('Open this link in Safari or Chrome to sign in.');
+    expect(status).not.toHaveTextContent('Create failed');
+    const writeText = jest.fn(async () => {});
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+    try {
+      fireEvent.click(within(status).getByRole('button', { name: 'Copy link' }));
+      expect(await within(status).findByRole('button', { name: 'Link copied' })).toBeInTheDocument();
+      expect(writeText).toHaveBeenCalledWith(window.location.href);
+    } finally {
+      Reflect.deleteProperty(navigator, 'clipboard');
+    }
   });
 
   it('sets persistent wagmi disconnect flag on wagmi logout', async () => {

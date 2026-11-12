@@ -1,5 +1,7 @@
 import { createPasskeyCredential, formatPasskeyCredentialUserName } from './createCredential.js';
 import type { PasskeyCredentialClient, PasskeyWalletConfig } from '../types.js';
+import { authenticatePasskeyCredential } from './authenticateCredential.js';
+import { PasskeysUnavailableError } from './unavailable.js';
 
 const config: PasskeyWalletConfig = {
   rpId: 'contextengine.sh',
@@ -98,5 +100,28 @@ describe('createPasskeyCredential', () => {
     const excludeCredentials = createOptions(credentials).excludeCredentials || [];
     expect(excludeCredentials).toEqual([{ id: expect.any(ArrayBuffer), type: 'public-key' }]);
     expect([...new Uint8Array(excludeCredentials[0].id as ArrayBuffer)]).toEqual([1, 2, 3]);
+  });
+});
+
+describe('a browser without passkeys', () => {
+  it('says so with an error the login can recognise, for creating and for signing in', async () => {
+    delete (globalThis as any).PublicKeyCredential;
+    const credentials = { create: jest.fn(), get: jest.fn() } as unknown as PasskeyCredentialClient;
+    const salt = new Uint8Array(32);
+    await expect(createPasskeyCredential({ config, salt, credentials })).rejects.toBeInstanceOf(
+      PasskeysUnavailableError,
+    );
+    await expect(authenticatePasskeyCredential({ config, salt, credentials })).rejects.toBeInstanceOf(
+      PasskeysUnavailableError,
+    );
+    // Some apps' browsers have no credentials API at all.
+    const original = Object.getOwnPropertyDescriptor(navigator, 'credentials');
+    Object.defineProperty(navigator, 'credentials', { configurable: true, value: undefined });
+    try {
+      await expect(createPasskeyCredential({ config, salt })).rejects.toBeInstanceOf(PasskeysUnavailableError);
+    } finally {
+      if (original) Object.defineProperty(navigator, 'credentials', original);
+      else Reflect.deleteProperty(navigator, 'credentials');
+    }
   });
 });
