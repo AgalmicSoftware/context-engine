@@ -131,7 +131,7 @@ it('asks what the AI may use to suggest groups only while suggesting them', () =
   rerender(<InterviewSettingsFields value={{ joinMatchingGroups: true }} onChange={onChange} />);
   const group = screen.getByRole('group', { name: 'The AI may use' });
   expect(group).toHaveAccessibleDescription(
-    /with none ticked, neither suggests any.*Town or city means anywhere smaller than a country.*No AI ever goes on health.*suggested either way/,
+    /with none ticked, neither suggests any.*Town or city means anywhere smaller than a country.*Every AI is instructed never to go on health.*suggested either way/,
   );
   fireEvent.click(within(group).getByRole('button', { name: 'About what the AI may use' }));
   expect(onChange).not.toHaveBeenCalled();
