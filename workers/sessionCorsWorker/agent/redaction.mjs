@@ -25,11 +25,13 @@ const SAFE_AUTHORITY_METADATA_KEYS = new Set([
   'signingauthority',
 ]);
 
+// Question ids are public bytes32 hashes, the same shape as a private key, so
+// fields named for them (lastQuestionId, servedQuestionIds) may hold that shape.
 function isSafeHashValuePath(path = []) {
   const key = lower(path[path.length - 1]);
-  if (SAFE_HASH_VALUE_KEYS.has(key)) return true;
+  if (SAFE_HASH_VALUE_KEYS.has(key) || key.endsWith('questionid')) return true;
   const parentKey = lower(path[path.length - 2]);
-  return SAFE_HASH_VALUE_CONTAINER_KEYS.has(parentKey);
+  return SAFE_HASH_VALUE_CONTAINER_KEYS.has(parentKey) || parentKey.endsWith('questionids');
 }
 
 export function hasSecretShape(value, path = []) {

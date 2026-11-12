@@ -27,6 +27,7 @@ All notable changes to this project will be documented in this file.
 - New results visibility `session_member_full`. `/storage/list` and `/storage/read` give a signed-in participant who holds the `storage` (or `arweave`) scope every answer, and the AI Views and Debate Atlas reads follow; a signed-out visitor, or a sign-in without that scope, reads none. Per-answer access rules still apply. Only Worker-hosted sessions with Cloudflare storage can choose it.
 - On such sessions the Agent HTTP results routes need a credential whose account passes the session's sign-in rules, and refuse others with `agent_membership_denied`.
 - The public config sets `memberResults: true`, so the site knows the Worker offers this visibility.
+- `/api/agent/questions/next` no longer fails with `question_queue_unavailable` in sessions whose questions were added on the website. Their IDs have the same shape as a private key, so the secret check refused to save which questions an agent had been served.
 
 ### Agents and MCP
 
