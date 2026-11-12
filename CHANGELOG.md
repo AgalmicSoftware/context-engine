@@ -9,11 +9,18 @@ All notable changes to this project will be documented in this file.
 - A session's interview settings can turn on **Keep AI draft text for admins**, off by default. With it on, the text of the AI's drafted freeform answers and drafted comments is kept where only the session's config admins can read it, for research into how people change what an AI drafted for them. It needs the session's Worker on this release; on an older Worker the setting says "Needs a newer Session Worker".
 - People see their own choice for it inside **AI submission info**, under the research details: **Let admins read the AI's draft text**, ticked for new drafts, which they can turn off while still sharing the rest. Unticking it, or unticking **Share for research**, deletes their stored text at the next submit. If the text can't be updated, they are told their answers were saved and the text was not.
 - The Admin page gives a session's config admin **Download AI draft text**. Co-admins without config rights, results admins and members are not offered it.
+- The site waits and tries again when a session is briefly busy, for reads, voice interview starts and answers that can be sent again safely, where it showed "Session config coordination is unavailable; retry."
 - The API that outside AI agents use to take part is called Agent HTTP throughout the docs; four places said "Session Agent HTTP". The agent page's test ids now start `ce-agent-http-`. Routes, credentials and stored values are unchanged.
 
 ### Workers — requires redeployment
 
 - Session Workers keep AI draft text at `/storage/draft-text/put`, `/storage/draft-text/delete` and `/storage/draft-text/export`, and report `draft_text_v1` in `/capabilities`. A person writes only their own row, only while the setting is on, only for a question the session has, with each field capped at 8,000 characters; deleting works after the setting is turned off or the session has ended. Only the session's admin address or admin hat can export. No response list or read, backup, AI feature, Session Agent, MCP tool or Results view reads it, and the public record carries only that the person agreed.
+- Session Workers put less load on a session's coordinator. With about 75 or more people answering at once, or 50 voice interviews starting together, it stopped answering, and the Worker gave `503` to answers and to signed-out reads alike. An answer no longer queues an AI Views run unless the session runs them automatically, requests arriving together share one read of the session's settings, and AI Views receipts are cleaned up a page at a time.
+- The Worker logs why a session's coordinator could not answer: Cloudflare's own error and its retry flags, never the session, addresses or content.
+
+### Agents and MCP
+
+- MCP 0.3.4, a patch: the server waits and tries again when a session is briefly busy, for reads and for answers that carry a request id.
 
 ### Local tooling
 
