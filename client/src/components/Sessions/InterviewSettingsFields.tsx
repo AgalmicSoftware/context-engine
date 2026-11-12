@@ -1,4 +1,4 @@
-import { useContext, useId } from 'react';
+import React, { useContext, useId } from 'react';
 import { ReactReduxContext } from 'react-redux';
 import { getSessionWizardInterviewValidationError } from './sessionWizardInterviewValidation';
 import useSessionWizardTooltipPreference from './hooks/useSessionWizardTooltipPreference';
@@ -11,6 +11,7 @@ import {
 } from '../../../../shared/interviewSettings.mjs';
 import { DEFAULT_REALTIME_INTERVIEW_MODEL } from '../../utilities/audio/realtimeInterviewConfig';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
+import { SetupHelp, setupHelpId } from './setup/SetupPrimitives';
 
 const HIDDEN_DRAFT_SHARES = [0, 1 / 10, 1 / 5, 1 / 4, 1 / 3, 1 / 2];
 const hiddenDraftShareLabel = (share: number) => {
@@ -48,6 +49,65 @@ const FIDELITY_MINIMUMS = [1, 3, 5, 10];
 const fidelityMinimumLabel = (people: number) => (people === 1 ? 'Off: show every result' : `${people} people`);
 const FIDELITY_MINIMUM_ABOUT =
   'That Results section hides any figure based on fewer people than this, so no one’s AI score can be singled out. Turn it off only where everyone knows small groups’ figures are visible.';
+
+const RESEARCH_SHARING_HELP =
+  'Whether the box that shares someone’s AI draft changes for research starts ticked on new answers. Each person can change it before submitting, and choices already saved stay as they are.';
+const RESEARCH_DETAIL_HELP =
+  'What a shared draft comparison saves. Minimal keeps none of the AI’s notes or drafted text, which suits public sessions; Full also keeps them and drafts for skipped questions.';
+const HIDDEN_DRAFTS_HELP =
+  'Hides this share of each participant’s AI prefill drafts until they answer, to measure how much seeing a draft sways answers. Only for participants sharing draft changes for research.';
+const VOICE_MODEL_HELP = `The OpenAI live model that holds voice interviews. Keep ${DEFAULT_REALTIME_INTERVIEW_MODEL} unless you need another; the session’s OpenAI key must have access to it.`;
+const OPENING_HELP =
+  'How each voice interview starts. Generate: the AI writes an opening from the session’s information and questions once there are questions it can use, and reuses it until it is regenerated. Owner-written: every interview opens with your question.';
+const OWNER_OPENING_HELP = 'The question every voice interview opens with, up to 1,200 characters.';
+const STEERING_HELP =
+  'Extra instructions for the AI interviewer, such as what to explore or how to speak, up to 3,000 characters. They are saved in the session’s public settings, so anyone can read them.';
+const GROWTH_HELP =
+  'How many questions must be added, as a share of those there were, counted since the last opening or interview update and rounded up; at 20%, 42 questions need nine more.';
+
+// The plain switches, in their order on the page.
+const SWITCHES = {
+  autoRegenerate: {
+    label: 'Regenerate opening when the question bank grows',
+    help: 'Once enough questions have been added, by the threshold below, the next interview gets a newly written opening. Off while the opening is owner-written.',
+  },
+  followNewQuestions: {
+    label: 'Check for new session questions during interviews',
+    help: 'While someone records, the interviewer checks the session’s public questions every 30 seconds and brings in new ones.',
+  },
+  suggestQuestions: {
+    label: 'Suggest new question drafts from interview evidence',
+    help: 'When someone’s answers are drafted from their interview, the AI also drafts up to three new questions from what they said. They review them, and only people allowed to add questions can.',
+  },
+  allowManualRefresh: {
+    label: 'Allow admins to regenerate the opening',
+    help: 'Admins get Regenerate interview opening, which writes a new generated opening when they choose.',
+  },
+  showFidelityScore: {
+    label: 'Show participants how well their AI predicted them',
+    help: 'After someone submits AI prefill drafts, they see privately how closely their AI predicted their answers.',
+  },
+} as const;
+const FIDELITY_RESULTS_LABEL = 'Show “How well AIs predicted people” in Results';
+const FIDELITY_RESULTS_HELP =
+  'Adds How well AIs predicted people to Results, once AI prefill drafts come from at least the smallest group set below.';
+
+const ROW = { display: 'flex', alignItems: 'center', gap: 8 } as const;
+
+type HelpFieldProps = { htmlFor: string; label: string; help: string; children: React.ReactNode };
+
+// A label and its "?" above the control, which names setupHelpId(htmlFor) in aria-describedby.
+const HelpField = ({ htmlFor, label, help, children }: HelpFieldProps) => (
+  <div>
+    <div style={{ ...ROW, marginBottom: '0.5rem' }}>
+      <Label for={htmlFor} style={{ marginBottom: 0 }}>
+        {label}
+      </Label>
+      <SetupHelp id={htmlFor} label={label} help={help} />
+    </div>
+    {children}
+  </div>
+);
 
 type Props = {
   value: unknown;
@@ -99,101 +159,103 @@ export default function InterviewSettingsFields({ value, onChange, disabled = fa
       <span id={`${fidelityId}-about`} hidden>
         {FIDELITY_ABOUT}
       </span>
-      <Label for={`${id}-research-sharing`}>Share AI draft changes for research by default</Label>
-      <Input
-        id={`${id}-research-sharing`}
-        type="select"
-        value={String(settings.shareDraftChangesByDefault)}
-        onChange={(e) => change('shareDraftChangesByDefault', e.target.value === 'true')}
-        aria-describedby={`${id}-research-sharing-help`}
+      <HelpField
+        htmlFor={`${id}-research-sharing`}
+        label="Share AI draft changes for research by default"
+        help={RESEARCH_SHARING_HELP}
       >
-        <option value="false">Off</option>
-        <option value="true">On</option>
-      </Input>
-      <p id={`${id}-research-sharing-help`}>
-        Sets the initial research-sharing checkbox for new responses. Participants can change it before submitting;
-        their saved choices are preserved.
-      </p>
-      <Label for={`${id}-research-detail`}>AI draft research detail</Label>
-      <Input
-        id={`${id}-research-detail`}
-        type="select"
-        value={settings.researchDetail}
-        onChange={(e) => change('researchDetail', e.target.value === 'full' ? 'full' : 'minimal')}
-        aria-describedby={`${id}-research-detail-help`}
-      >
-        <option value="minimal">Minimal: predicted answers, confidence and changes</option>
-        <option value="full">Full: also the AI&apos;s notes, drafted text and drafts for skipped questions</option>
-      </Input>
-      <p id={`${id}-research-detail-help`}>
-        What a shared draft comparison saves. Minimal keeps none of the AI&apos;s notes or drafted text, which suits
-        public sessions.
-      </p>
-      <Label for={`${id}-hidden-drafts`}>Hidden AI drafts</Label>
-      <Input
-        id={`${id}-hidden-drafts`}
-        type="select"
-        value={String(settings.hiddenDraftShare)}
-        onChange={(e) => change('hiddenDraftShare', Number(e.target.value))}
-        aria-describedby={`${id}-hidden-drafts-help`}
-      >
-        {[...new Set([...HIDDEN_DRAFT_SHARES, settings.hiddenDraftShare])].map((share) => (
-          <option key={share} value={String(share)}>
-            {hiddenDraftShareLabel(share)}
-          </option>
-        ))}
-      </Input>
-      <p id={`${id}-hidden-drafts-help`}>
-        Hides this share of each participant&apos;s AI prefill drafts until they answer, to measure how much seeing a
-        draft sways answers. Only for participants sharing draft changes for research.
-      </p>
-      <Label for={`${id}-model`}>Interview voice model</Label>
-      <Input
-        id={`${id}-model`}
-        data-testid={E2E_TESTIDS.WIZARD_INTERVIEW_REALTIME_MODEL}
-        value={String(raw.realtimeModel || DEFAULT_REALTIME_INTERVIEW_MODEL)}
-        onChange={(e) => change('realtimeModel', e.target.value)}
-      />
-      <Label for={`${id}-mode`}>Opening question</Label>
-      <Input
-        id={`${id}-mode`}
-        type="select"
-        value={settings.openingMode}
-        onChange={(e) => change('openingMode', e.target.value)}
-      >
-        <option value="auto">Generate from session information and questions</option>
-        <option value="owner">Use an owner-written opening</option>
-      </Input>
+        <Input
+          id={`${id}-research-sharing`}
+          type="select"
+          value={String(settings.shareDraftChangesByDefault)}
+          onChange={(e) => change('shareDraftChangesByDefault', e.target.value === 'true')}
+          aria-describedby={setupHelpId(`${id}-research-sharing`)}
+        >
+          <option value="false">Off</option>
+          <option value="true">On</option>
+        </Input>
+      </HelpField>
+      <HelpField htmlFor={`${id}-research-detail`} label="AI draft research detail" help={RESEARCH_DETAIL_HELP}>
+        <Input
+          id={`${id}-research-detail`}
+          type="select"
+          value={settings.researchDetail}
+          onChange={(e) => change('researchDetail', e.target.value === 'full' ? 'full' : 'minimal')}
+          aria-describedby={setupHelpId(`${id}-research-detail`)}
+        >
+          <option value="minimal">Minimal: predicted answers, confidence and changes</option>
+          <option value="full">Full: also the AI&apos;s notes, drafted text and drafts for skipped questions</option>
+        </Input>
+      </HelpField>
+      <HelpField htmlFor={`${id}-hidden-drafts`} label="Hidden AI drafts" help={HIDDEN_DRAFTS_HELP}>
+        <Input
+          id={`${id}-hidden-drafts`}
+          type="select"
+          value={String(settings.hiddenDraftShare)}
+          onChange={(e) => change('hiddenDraftShare', Number(e.target.value))}
+          aria-describedby={setupHelpId(`${id}-hidden-drafts`)}
+        >
+          {[...new Set([...HIDDEN_DRAFT_SHARES, settings.hiddenDraftShare])].map((share) => (
+            <option key={share} value={String(share)}>
+              {hiddenDraftShareLabel(share)}
+            </option>
+          ))}
+        </Input>
+      </HelpField>
+      <HelpField htmlFor={`${id}-model`} label="Interview voice model" help={VOICE_MODEL_HELP}>
+        <Input
+          id={`${id}-model`}
+          data-testid={E2E_TESTIDS.WIZARD_INTERVIEW_REALTIME_MODEL}
+          value={String(raw.realtimeModel || DEFAULT_REALTIME_INTERVIEW_MODEL)}
+          aria-describedby={setupHelpId(`${id}-model`)}
+          onChange={(e) => change('realtimeModel', e.target.value)}
+        />
+      </HelpField>
+      <HelpField htmlFor={`${id}-mode`} label="Opening question" help={OPENING_HELP}>
+        <Input
+          id={`${id}-mode`}
+          type="select"
+          value={settings.openingMode}
+          aria-describedby={setupHelpId(`${id}-mode`)}
+          onChange={(e) => change('openingMode', e.target.value)}
+        >
+          <option value="auto">Generate from session information and questions</option>
+          <option value="owner">Use an owner-written opening</option>
+        </Input>
+      </HelpField>
       {settings.openingMode === 'owner' ? (
         <>
-          <Label for={`${id}-prompt`}>Owner opening question</Label>
-          <Input
-            id={`${id}-prompt`}
-            type="textarea"
-            maxLength={1200}
-            required
-            invalid={!!validationError}
-            aria-describedby={validationError ? `${id}-error` : undefined}
-            value={settings.openingPrompt}
-            onChange={(e) => change('openingPrompt', e.target.value)}
-          />
+          <HelpField htmlFor={`${id}-prompt`} label="Owner opening question" help={OWNER_OPENING_HELP}>
+            <Input
+              id={`${id}-prompt`}
+              type="textarea"
+              maxLength={1200}
+              required
+              invalid={!!validationError}
+              aria-describedby={[setupHelpId(`${id}-prompt`), validationError ? `${id}-error` : '']
+                .filter(Boolean)
+                .join(' ')}
+              value={settings.openingPrompt}
+              onChange={(e) => change('openingPrompt', e.target.value)}
+            />
+          </HelpField>
         </>
-      ) : (
-        <p>Generated when an interview first has accessible questions. Reused until refreshed.</p>
-      )}
+      ) : null}
       {validationError ? (
         <p id={`${id}-error`} role="alert">
           {validationError}
         </p>
       ) : null}
-      <Label for={`${id}-steering`}>Interview steering prompt</Label>
-      <Input
-        id={`${id}-steering`}
-        type="textarea"
-        maxLength={3000}
-        value={settings.steeringPrompt}
-        onChange={(e) => change('steeringPrompt', e.target.value)}
-      />
+      <HelpField htmlFor={`${id}-steering`} label="Interview steering prompt" help={STEERING_HELP}>
+        <Input
+          id={`${id}-steering`}
+          type="textarea"
+          maxLength={3000}
+          value={settings.steeringPrompt}
+          aria-describedby={setupHelpId(`${id}-steering`)}
+          onChange={(e) => change('steeringPrompt', e.target.value)}
+        />
+      </HelpField>
       {(
         [
           'autoRegenerate',
@@ -268,44 +330,46 @@ export default function InterviewSettingsFields({ value, onChange, disabled = fa
             ) : null}
           </div>
         ) : (
-          <Label key={key} style={{ display: 'block', marginTop: 12 }}>
-            <input
-              type="checkbox"
-              checked={settings[key]}
-              onChange={(e) => change(key, e.target.checked)}
-              disabled={key === 'autoRegenerate' && settings.openingMode === 'owner'}
-            />{' '}
-            {
-              {
-                autoRegenerate: 'Regenerate opening when the question bank grows',
-                followNewQuestions: 'Check for new session questions during interviews',
-                suggestQuestions: 'Suggest new question drafts from interview evidence',
-                allowManualRefresh: 'Allow admins to regenerate the opening',
-                showFidelityScore: 'Show participants how well their AI predicted them',
-              }[key]
-            }
-          </Label>
+          <div key={key} style={{ ...ROW, marginTop: 12 }}>
+            <Label style={{ marginBottom: 0 }}>
+              <input
+                type="checkbox"
+                checked={settings[key]}
+                aria-describedby={setupHelpId(`${id}-${key}`)}
+                onChange={(e) => change(key, e.target.checked)}
+                disabled={key === 'autoRegenerate' && settings.openingMode === 'owner'}
+              />{' '}
+              {SWITCHES[key].label}
+            </Label>
+            <SetupHelp id={`${id}-${key}`} label={SWITCHES[key].label} help={SWITCHES[key].help} />
+          </div>
         ),
       )}
-      <Label style={{ display: 'block', marginTop: 12 }}>
-        <input
-          type="checkbox"
-          checked={settings.showFidelityResults}
-          data-testid={E2E_TESTIDS.WIZARD_INTERVIEW_FIDELITY_RESULTS}
-          // Turning it off also resets the minimum it hides, so no unseen setting is saved.
-          onChange={(e) =>
-            onChange({
-              ...raw,
-              ...settings,
-              showFidelityResults: e.target.checked,
-              ...(e.target.checked ? {} : { fidelityMinimumPeople: DEFAULT_INTERVIEW_SETTINGS.fidelityMinimumPeople }),
-            })
-          }
-        />{' '}
-        Show “How well AIs predicted people” in Results
-      </Label>
+      <div style={{ ...ROW, marginTop: 12 }}>
+        <Label style={{ marginBottom: 0 }}>
+          <input
+            type="checkbox"
+            checked={settings.showFidelityResults}
+            aria-describedby={setupHelpId(`${id}-fidelity-results`)}
+            data-testid={E2E_TESTIDS.WIZARD_INTERVIEW_FIDELITY_RESULTS}
+            // Turning it off also resets the minimum it hides, so no unseen setting is saved.
+            onChange={(e) =>
+              onChange({
+                ...raw,
+                ...settings,
+                showFidelityResults: e.target.checked,
+                ...(e.target.checked
+                  ? {}
+                  : { fidelityMinimumPeople: DEFAULT_INTERVIEW_SETTINGS.fidelityMinimumPeople }),
+              })
+            }
+          />{' '}
+          {FIDELITY_RESULTS_LABEL}
+        </Label>
+        <SetupHelp id={`${id}-fidelity-results`} label={FIDELITY_RESULTS_LABEL} help={FIDELITY_RESULTS_HELP} />
+      </div>
       {settings.showFidelityResults ? (
-        <>
+        <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: '0.5rem' }}>
             <Label for={minimumId} style={{ marginBottom: 0 }}>
               Smallest group shown in “How well AIs predicted people”
@@ -337,22 +401,21 @@ export default function InterviewSettingsFields({ value, onChange, disabled = fa
           <span id={`${minimumId}-about`} hidden>
             {FIDELITY_MINIMUM_ABOUT}
           </span>
-        </>
+        </div>
       ) : null}
       {(settings.autoRegenerate || settings.followNewQuestions) && (
         <>
-          <Label for={`${id}-growth`}>Question growth threshold (%)</Label>
-          <Input
-            id={`${id}-growth`}
-            type="number"
-            min={1}
-            max={100}
-            value={settings.questionGrowthPercent}
-            onChange={(e) => change('questionGrowthPercent', Number(e.target.value))}
-          />
-          <p>
-            Additions accumulate since the last opening generation or conversation update. Follow-ups remain enabled.
-          </p>
+          <HelpField htmlFor={`${id}-growth`} label="Question growth threshold (%)" help={GROWTH_HELP}>
+            <Input
+              id={`${id}-growth`}
+              type="number"
+              min={1}
+              max={100}
+              value={settings.questionGrowthPercent}
+              aria-describedby={setupHelpId(`${id}-growth`)}
+              onChange={(e) => change('questionGrowthPercent', Number(e.target.value))}
+            />
+          </HelpField>
         </>
       )}
     </fieldset>

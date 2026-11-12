@@ -3,6 +3,7 @@ import React from 'react';
 import { faucetAddressFromKey } from './sessionWizardHostedFaucet';
 import { FormGroup, Input, Label } from 'reactstrap';
 import styles from './SessionWizard.module.scss';
+import { SetupHelp, setupHelpId } from './setup/SetupPrimitives';
 import { toStr } from '../../utilities/shared/primitives.js';
 
 type ResourceSecretField = {
@@ -13,6 +14,7 @@ type ResourceSecretField = {
   placeholder?: string;
   rows?: number;
   readOnly?: boolean;
+  help?: string;
 };
 
 type WorkerSecrets = Record<string, unknown>;
@@ -42,6 +44,7 @@ const WorkerResourceInputs = ({
     const value = toStr(workerSecrets[field.key]);
     const faucetAddress = field.key === 'faucetPrivateKey' ? faucetAddressFromKey(value) : null;
     const label = `${field.label}${field.required ? ' *' : ''}`;
+    const id = `ce-resource-${resourceKey}-${field.key}`;
     const isTextarea = field.type === 'textarea';
     const placeholder =
       resourceKey === 'rpc' && field.key === 'customRpcUrl' && !toStr(value).trim()
@@ -50,8 +53,11 @@ const WorkerResourceInputs = ({
 
     return (
       <FormGroup key={field.key} className={`${styles.resourceInput} ${!isTextarea ? styles.inlineLabelInput : ''}`}>
-        <Label>{label}</Label>
+        <Label for={id}>{label}</Label>
+        {field.help ? <SetupHelp id={id} label={field.label} help={field.help} /> : null}
         <Input
+          id={id}
+          aria-describedby={field.help ? setupHelpId(id) : undefined}
           type={isTextarea ? 'textarea' : field.type}
           rows={isTextarea ? field.rows || 3 : undefined}
           value={value}
@@ -83,6 +89,7 @@ const WorkerResourceInputs = ({
       label: 'Lit API key',
       type: 'password',
       placeholder: 'Paste LIT_USAGE_API_KEY',
+      help: fields[0]?.help,
     };
 
     return (

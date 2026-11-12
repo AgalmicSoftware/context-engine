@@ -78,11 +78,16 @@ export const SetupAiSection = ({ draft, onChange, open, onToggle, keys = null }:
   };
   return (
     <SetupSection sectionKey="ai" title="AI" summary={summarizeAi(draft)} open={open} onToggle={onToggle} quick={keys}>
-      <SetupField id="ce-setup-ai-provider" label="Provider">
+      <SetupField
+        id="ce-setup-ai-provider"
+        label="Provider"
+        help={`The AI company whose models the session uses, with its key above. Transcription always uses OpenAI ${DEFAULT_TRANSCRIPTION_MODEL}, so voice interviews and group recordings need an OpenAI key too.`}
+      >
         <Input
           id="ce-setup-ai-provider"
           type="select"
           value={provider}
+          aria-describedby={setupHelpId('ce-setup-ai-provider')}
           data-testid={E2E_TESTIDS.SETUP_AI_PROVIDER}
           onChange={(event) => setProvider(event.target.value)}
         >
@@ -95,11 +100,16 @@ export const SetupAiSection = ({ draft, onChange, open, onToggle, keys = null }:
       </SetupField>
       {modelSelect('fast', 'Everyday model', fast, 'Used for quick tasks such as tagging and drafts.')}
       {modelSelect('thinking', 'Thinking model', thinking, 'Used for harder tasks such as analysis.')}
-      <SetupField id="ce-setup-ai-effort" label="Reasoning effort">
+      <SetupField
+        id="ce-setup-ai-effort"
+        label="Reasoning effort"
+        help="How long a model that reasons thinks before it answers. Higher can give better questions and analysis, but is slower and costs more; low suits most sessions."
+      >
         <Input
           id="ce-setup-ai-effort"
           type="select"
           value={text(ai.reasoningEffort) || 'low'}
+          aria-describedby={setupHelpId('ce-setup-ai-effort')}
           onChange={(event) => onChange(['ai', 'reasoningEffort'], event.target.value)}
         >
           {REASONING_EFFORTS.map((effort) => (
@@ -109,7 +119,6 @@ export const SetupAiSection = ({ draft, onChange, open, onToggle, keys = null }:
           ))}
         </Input>
       </SetupField>
-      <p className={styles.hint}>Transcription uses OpenAI {DEFAULT_TRANSCRIPTION_MODEL}.</p>
       <SetupField
         id="ce-setup-questions-prompt"
         label="Question prompt"

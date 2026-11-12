@@ -19,6 +19,7 @@ import {
   SetupConflicts,
   SetupFact,
   SetupField,
+  SetupHelp,
   SetupSection,
   SetupToggle,
   setupHelpId,
@@ -106,13 +107,18 @@ const MinGroupSizeInput = ({
   const [value, setValue] = useState(String(committed));
   useEffect(() => setValue(String(committed)), [committed]);
   return (
-    <SetupField id="ce-setup-min-group" label="Smallest group shown">
+    <SetupField
+      id="ce-setup-min-group"
+      label="Smallest group shown"
+      help="Group summaries leave out any group with fewer people than this, so no one can be picked out. At least 2."
+    >
       <Input
         id="ce-setup-min-group"
         type="number"
         min={2}
         inputMode="numeric"
         value={value}
+        aria-describedby={setupHelpId('ce-setup-min-group')}
         onChange={(event) => {
           setValue(event.target.value);
           const next = Number(event.target.value);
@@ -266,6 +272,9 @@ const RULE_LABELS: Record<SessionModeAccessConditionDocument['conditions'][numbe
   agent_grant_scope: 'Authorized accounts',
 };
 
+const RULES_HELP =
+  'Who can read encrypted answers. Session role: accounts with that role, such as admin. Authorized accounts: accounts granted that permission scope, such as storage, which participants and agents get. SBT holders: accounts holding SBTs from that contract on the registry network.';
+
 const EnvelopeRules = ({
   profile,
   registryChainId,
@@ -306,87 +315,105 @@ const EnvelopeRules = ({
   };
   return (
     <>
-      <SetupField id="ce-setup-rule-match" label="Give access when">
+      <SetupField
+        id="ce-setup-rule-match"
+        label="Give access when"
+        help="Any rule matches: meeting one rule below is enough. All rules match: a reader must meet every rule."
+      >
         <Input
           id="ce-setup-rule-match"
           type="select"
           value={conditions.match}
+          aria-describedby={setupHelpId('ce-setup-rule-match')}
           onChange={(event) => commit({ ...conditions, match: event.target.value === 'all' ? 'all' : 'any' })}
         >
           <option value="any">Any rule matches</option>
           <option value="all">All rules match</option>
         </Input>
       </SetupField>
-      {conditions.conditions.map((rule, index) => (
-        <div key={`${rule.kind}-${index}`} className={styles.listRow}>
-          <div className={styles.listRowBody}>
-            <span className={styles.questionType}>{RULE_LABELS[rule.kind]}</span>
-            {rule.kind === 'worker_role' ? (
-              <Input
-                aria-label="Session role"
-                value={rule.role}
-                onChange={(event) => updateRule(index, () => ({ kind: 'worker_role', role: event.target.value }))}
-              />
-            ) : null}
-            {rule.kind === 'agent_grant_scope' ? (
-              <Input
-                aria-label="Permission scope"
-                value={rule.scope}
-                onChange={(event) =>
-                  updateRule(index, () => ({ kind: 'agent_grant_scope', scope: event.target.value }))
-                }
-              />
-            ) : null}
-            {rule.kind === 'sbt_onchain' ? (
-              <>
+      <div
+        role="group"
+        aria-labelledby="ce-setup-rules-label"
+        aria-describedby={setupHelpId('ce-setup-rules')}
+        className={styles.field}
+      >
+        <div className={styles.fieldLabelRow}>
+          <span id="ce-setup-rules-label" className={styles.fieldLabel}>
+            Access rules
+          </span>
+          <SetupHelp id="ce-setup-rules" label="Access rules" help={RULES_HELP} />
+        </div>
+        {conditions.conditions.map((rule, index) => (
+          <div key={`${rule.kind}-${index}`} className={styles.listRow}>
+            <div className={styles.listRowBody}>
+              <span className={styles.questionType}>{RULE_LABELS[rule.kind]}</span>
+              {rule.kind === 'worker_role' ? (
                 <Input
-                  aria-label="SBT contract address"
-                  placeholder="0x…"
-                  value={rule.contract}
+                  aria-label="Session role"
+                  value={rule.role}
+                  onChange={(event) => updateRule(index, () => ({ kind: 'worker_role', role: event.target.value }))}
+                />
+              ) : null}
+              {rule.kind === 'agent_grant_scope' ? (
+                <Input
+                  aria-label="Permission scope"
+                  value={rule.scope}
                   onChange={(event) =>
-                    updateRule(index, (current) => ({ ...current, contract: event.target.value }) as typeof current)
+                    updateRule(index, () => ({ kind: 'agent_grant_scope', scope: event.target.value }))
                   }
                 />
-                <Input
-                  type="select"
-                  aria-label="SBT requirement"
-                  value={rule.anyOrAll}
-                  onChange={(event) =>
-                    updateRule(
-                      index,
-                      (current) =>
-                        ({ ...current, anyOrAll: event.target.value === 'all' ? 'all' : 'any' }) as typeof current,
-                    )
-                  }
-                >
-                  <option value="any">Any SBT from this contract</option>
-                  <option value="all">All SBTs from this contract</option>
-                </Input>
-              </>
-            ) : null}
+              ) : null}
+              {rule.kind === 'sbt_onchain' ? (
+                <>
+                  <Input
+                    aria-label="SBT contract address"
+                    placeholder="0x…"
+                    value={rule.contract}
+                    onChange={(event) =>
+                      updateRule(index, (current) => ({ ...current, contract: event.target.value }) as typeof current)
+                    }
+                  />
+                  <Input
+                    type="select"
+                    aria-label="SBT requirement"
+                    value={rule.anyOrAll}
+                    onChange={(event) =>
+                      updateRule(
+                        index,
+                        (current) =>
+                          ({ ...current, anyOrAll: event.target.value === 'all' ? 'all' : 'any' }) as typeof current,
+                      )
+                    }
+                  >
+                    <option value="any">Any SBT from this contract</option>
+                    <option value="all">All SBTs from this contract</option>
+                  </Input>
+                </>
+              ) : null}
+            </div>
+            <button
+              type="button"
+              className={styles.button}
+              aria-label={`Remove ${RULE_LABELS[rule.kind]} rule`}
+              onClick={() =>
+                commit({ ...conditions, conditions: conditions.conditions.filter((_rule, at) => at !== index) })
+              }
+            >
+              Remove
+            </button>
           </div>
-          <button
-            type="button"
-            className={styles.button}
-            aria-label={`Remove ${RULE_LABELS[rule.kind]} rule`}
-            onClick={() =>
-              commit({ ...conditions, conditions: conditions.conditions.filter((_rule, at) => at !== index) })
-            }
-          >
-            Remove
+        ))}
+        <div className={styles.buttonRow}>
+          <button type="button" className={styles.button} onClick={() => add('worker_role')}>
+            Add session role
+          </button>
+          <button type="button" className={styles.button} onClick={() => add('agent_grant_scope')}>
+            Add authorized accounts
+          </button>
+          <button type="button" className={styles.button} onClick={() => add('sbt_onchain')}>
+            Add SBT holders
           </button>
         </div>
-      ))}
-      <div className={styles.buttonRow}>
-        <button type="button" className={styles.button} onClick={() => add('worker_role')}>
-          Add session role
-        </button>
-        <button type="button" className={styles.button} onClick={() => add('agent_grant_scope')}>
-          Add authorized accounts
-        </button>
-        <button type="button" className={styles.button} onClick={() => add('sbt_onchain')}>
-          Add SBT holders
-        </button>
       </div>
     </>
   );
@@ -610,11 +637,16 @@ export const SetupHostingSection = ({
         <MatchRunsOn editProfile={editProfile} registryChainId={registryChainId} />
       ) : null}
       {chainRelevant && mode === 'create' ? (
-        <SetupField id="ce-setup-chain" label="Registry network">
+        <SetupField
+          id="ce-setup-chain"
+          label="Registry network"
+          help="The test network whose contracts this session uses: its registry entry when Decentralized, and its SBTs and Lit rules. Transactions on it are paid in its test gas."
+        >
           <Input
             id="ce-setup-chain"
             type="select"
             value={String(profile.evm.registryChainId || registryChainId || DEFAULT_REGISTRY_CHAIN_ID)}
+            aria-describedby={setupHelpId('ce-setup-chain')}
             onChange={(event) => {
               const chainId = Number(event.target.value);
               onRegistryChainChange?.(chainId);

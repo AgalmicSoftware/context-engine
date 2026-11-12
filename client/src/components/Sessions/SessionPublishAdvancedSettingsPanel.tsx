@@ -48,8 +48,19 @@ const SessionPublishAdvancedSettingsPanel = ({
             Arweave upload worker: {resolvedWorkerBaseUrl || 'Not set'} ({workerUrlSource})
           </div>
           <FormGroup className={styles.fieldGroup}>
-            <Label>Manual metadata URI (optional)</Label>
+            <Label for="ce-wizard-manual-metadata-uri" className={styles.fieldLabelRow}>
+              <span>Manual metadata URI (optional)</span>
+              {renderInfoTooltip({
+                id: 'gw-tip-manual-metadata-uri',
+                content:
+                  'The ar:// or arweave.net address of this session’s metadata, if it is already on Arweave. The registry entry then points to it instead of the metadata Create uploads.',
+                placement: 'right',
+                testId: 'ce-wizard-worker-tooltip-gw-tip-manual-metadata-uri',
+                ariaLabel: 'Manual metadata URI info',
+              })}
+            </Label>
             <Input
+              id="ce-wizard-manual-metadata-uri"
               type="text"
               value={manualMetadataUrl}
               placeholder="ar://<txId> or https://arweave.net/<txId>"

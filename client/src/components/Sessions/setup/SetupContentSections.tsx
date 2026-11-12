@@ -39,6 +39,8 @@ type BasicsProps = Pick<SetupSectionProps, 'draft' | 'onChange'> & {
   headerImage?: React.ReactNode;
 };
 
+const NAME_HELP =
+  'The session’s title on its page and in lists of sessions. Until the session is created, its link is made from the name.';
 const COLORS_HELP =
   'Accent colours on this session’s pages, the same for everyone who opens it. Each person’s site theme stays as they set it.';
 
@@ -55,13 +57,14 @@ export const SetupBasicsSection = ({
   return (
     <SetupSection sectionKey="basics" title="Basics" alwaysOpen>
       {runsOn}
-      <SetupField id="ce-setup-name" label="Name">
+      <SetupField id="ce-setup-name" label="Name" help={NAME_HELP}>
         <Input
           id="ce-setup-name"
           value={text(draft.sessionName)}
           required
           aria-required="true"
           autoComplete="off"
+          aria-describedby={setupHelpId('ce-setup-name')}
           data-testid={E2E_TESTIDS.WIZARD_SESSION_NAME}
           onChange={(event) => onChange(['sessionName'], event.target.value)}
         />
@@ -173,6 +176,10 @@ const CONTEXT_HELP =
   'Paragraphs and links show on the session page to everyone who can open it, and the session’s AI reads them. Files and admins-only links go below.';
 const FORMAT_HELP =
   'Text shows the paragraphs and links below. An HTML file replaces them, under the same title. Switching discards the other one, after asking.';
+const PARAGRAPH_HELP = `Plain text, up to ${SESSION_CONTEXT_LIMITS.paragraphChars.toLocaleString('en-US')} characters, shown on the session page in this order. The session’s AI reads it too.`;
+const LINK_LABEL_HELP = `The words the session page shows for this link, up to ${SESSION_CONTEXT_LIMITS.labelChars} characters.`;
+const LINK_URL_HELP =
+  'An https:// address, for everyone who can open the session. Its page is read for the AI only if you choose that after Create.';
 const LEAVE_TEXT = 'Use an HTML file instead? The paragraphs and links will be removed.';
 const LEAVE_HTML = 'Use typed text instead? The HTML file will be removed.';
 
@@ -256,12 +263,14 @@ export const SetupContextSection = ({
             key={`paragraph-${index}`}
             id={`ce-setup-context-paragraph-${index}`}
             label={`Paragraph ${index + 1}`}
+            help={PARAGRAPH_HELP}
           >
             <Input
               id={`ce-setup-context-paragraph-${index}`}
               type="textarea"
               className={styles.textarea}
               value={paragraph}
+              aria-describedby={setupHelpId(`ce-setup-context-paragraph-${index}`)}
               maxLength={SESSION_CONTEXT_LIMITS.paragraphChars}
               onChange={(event) =>
                 save({ paragraphs: context.paragraphs.map((entry, at) => (at === index ? event.target.value : entry)) })
@@ -282,19 +291,21 @@ export const SetupContextSection = ({
         context.links.map((link, index) => (
           <div key={`link-${index}`} className={styles.listRow}>
             <div className={styles.listRowBody}>
-              <SetupField id={`ce-setup-context-link-label-${index}`} label="Link label">
+              <SetupField id={`ce-setup-context-link-label-${index}`} label="Link label" help={LINK_LABEL_HELP}>
                 <Input
                   id={`ce-setup-context-link-label-${index}`}
                   value={link.label}
+                  aria-describedby={setupHelpId(`ce-setup-context-link-label-${index}`)}
                   maxLength={SESSION_CONTEXT_LIMITS.labelChars}
                   onChange={(event) => setLink(index, { label: event.target.value })}
                 />
               </SetupField>
-              <SetupField id={`ce-setup-context-link-url-${index}`} label="Link">
+              <SetupField id={`ce-setup-context-link-url-${index}`} label="Link" help={LINK_URL_HELP}>
                 <Input
                   id={`ce-setup-context-link-url-${index}`}
                   type="url"
                   value={link.url}
+                  aria-describedby={setupHelpId(`ce-setup-context-link-url-${index}`)}
                   maxLength={SESSION_CONTEXT_LIMITS.urlChars}
                   invalid={!!link.url && !isHttpsUrl(link.url.trim())}
                   onChange={(event) => setLink(index, { url: event.target.value })}
@@ -394,6 +405,12 @@ type QuestionsProps = SetupSectionProps & {
   suggest?: React.ReactNode;
 };
 
+const QUESTION_TYPE_HELP =
+  'How people answer: Agree or disagree, an open answer in their own words, a rating, one of several options, or a quadratic vote, where they spread a budget of votes across options.';
+const QUESTION_PROMPT_HELP =
+  'One statement or question, in plain words. Add question puts it in the list above, where you can still edit it; it reaches the session after Create.';
+const QUESTION_OPTIONS_HELP = 'The choices people pick from, at least two, one per line.';
+
 // Questions travel with a template. They're added to the session once it
 // exists, as the question editor adds them, so a draft only lists them.
 export const SetupQuestionsSection = ({
@@ -469,11 +486,12 @@ export const SetupQuestionsSection = ({
           </button>
         </div>
       ))}
-      <SetupField id="ce-setup-question-type" label="New question type">
+      <SetupField id="ce-setup-question-type" label="New question type" help={QUESTION_TYPE_HELP}>
         <Input
           id="ce-setup-question-type"
           type="select"
           value={newType}
+          aria-describedby={setupHelpId('ce-setup-question-type')}
           onChange={(event) => setNewType(event.target.value)}
         >
           {SETUP_QUESTION_TYPES.map((entry) => (
@@ -483,21 +501,23 @@ export const SetupQuestionsSection = ({
           ))}
         </Input>
       </SetupField>
-      <SetupField id="ce-setup-question-prompt" label="New question">
+      <SetupField id="ce-setup-question-prompt" label="New question" help={QUESTION_PROMPT_HELP}>
         <Input
           id="ce-setup-question-prompt"
           type="textarea"
           value={newPrompt}
+          aria-describedby={setupHelpId('ce-setup-question-prompt')}
           data-testid="ce-setup-question-prompt"
           onChange={(event) => setNewPrompt(event.target.value)}
         />
       </SetupField>
       {setupQuestionUsesOptions(newType) ? (
-        <SetupField id="ce-setup-question-options" label="Options, one per line">
+        <SetupField id="ce-setup-question-options" label="Options, one per line" help={QUESTION_OPTIONS_HELP}>
           <Input
             id="ce-setup-question-options"
             type="textarea"
             value={newOptions}
+            aria-describedby={setupHelpId('ce-setup-question-options')}
             onChange={(event) => setNewOptions(event.target.value)}
           />
         </SetupField>
@@ -525,6 +545,9 @@ const toLocalDateTime = (value: unknown): string => {
     ? new Date(parsed.getTime() - parsed.getTimezoneOffset() * 60_000).toISOString().slice(0, 16)
     : raw;
 };
+
+const GROUP_CREATION_HELP =
+  'Anyone in the session: every signed-in participant can start a group for others to join. Admins only: only admins start groups, and participants join them.';
 
 export const summarizeParticipation = (draft: SetupSectionProps['draft']): string => {
   const interview = draft.interviewModeEnabled !== false;
@@ -567,11 +590,12 @@ export const SetupParticipationSection = ({ draft, onChange, open, onToggle, wor
         onTurnOnInterviews={() => onChange(['interviewModeEnabled'], true)}
       />
     ) : null}
-    <SetupField id="ce-setup-group-creation" label="Who can create groups">
+    <SetupField id="ce-setup-group-creation" label="Who can create groups" help={GROUP_CREATION_HELP}>
       <Input
         id="ce-setup-group-creation"
         type="select"
         value={normalizeGroupCreationPolicy(draft.groupCreationPolicy, DEFAULT_NEW_SESSION_GROUP_CREATION_POLICY)}
+        aria-describedby={setupHelpId('ce-setup-group-creation')}
         data-testid={E2E_TESTIDS.WIZARD_GROUP_CREATION_POLICY}
         onChange={(event) => onChange(['groupCreationPolicy'], event.target.value)}
       >
