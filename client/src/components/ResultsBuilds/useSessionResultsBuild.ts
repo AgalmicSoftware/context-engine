@@ -1,24 +1,25 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { DEBATE_ATLAS_FIELD } from '@ce-shared/workerSessionPublicConfig.mjs';
 
 import { adminWorkerPorts } from '../../domains/worker/adminWorkerPorts';
-import { readDebateAtlas, requestDebateAtlasBuild } from '../../domains/debateAtlas/debateAtlasWorkerClient';
-import type {
-  DebateAtlasBuild,
-  DebateAtlasBuildSummary,
-  DebateAtlasNextBuild,
-} from '../../domains/debateAtlas/debateAtlasTypes';
+import {
+  RESULTS_BUILD_KINDS,
+  readResultsBuild,
+  requestResultsBuild,
+  type ResultsBuildKind,
+  type ResultsBuildNextBuild,
+  type ResultsBuildSummary,
+} from '../../domains/resultsBuilds/resultsBuildWorkerClient';
 import { isConfiguredAdmin } from '../../utilities/storage/storageClient';
 import { getUsableSessionWorkerUrl } from '../../utilities/session/sessionWorkerAvailability';
 import { resolveWorkerCanonicalSessionIdHex } from '../../utilities/session/sessionWorkerDiscovery';
 
 type UnknownRecord = Record<string, unknown>;
 
-export type SessionDebateAtlas = {
-  /** This session's Worker builds atlases. */
+export type SessionResultsBuild<TBuild extends ResultsBuildSummary> = {
+  /** This session's Worker builds this kind. */
   supported: boolean;
-  builds: DebateAtlasBuildSummary[];
-  build: DebateAtlasBuild | null;
+  builds: ResultsBuildSummary[];
+  build: TBuild | null;
   /** This account may press Build; the Worker checks again when it is pressed. */
   canBuild: boolean;
   building: boolean;
@@ -28,30 +29,30 @@ export type SessionDebateAtlas = {
   /** When the running build, this reader's or someone else's, started. */
   buildStartedAtMs: number | null;
   /** The model and prompts a build would use, for those who may build. */
-  nextBuild: DebateAtlasNextBuild | null;
-  /** The Worker that keeps this session's atlases. */
+  nextBuild: ResultsBuildNextBuild | null;
+  /** The Worker that keeps this session's builds. */
   workerUrl: string;
   error: string;
-  buildAtlas: () => Promise<boolean>;
+  startBuild: () => Promise<boolean>;
   selectBuild: (id: string) => void;
 };
 
 // While someone else's build runs, the open Results check back this often.
-export const DEBATE_ATLAS_ACTIVE_POLL_MS = 20_000;
-// The Worker keeps this many builds; the list never offers one it dropped.
-export const DEBATE_ATLAS_KEPT_BUILDS = 8;
+export const RESULTS_BUILD_ACTIVE_POLL_MS = 20_000;
+// The Worker keeps this many builds of a kind; the list never offers one it dropped.
+export const RESULTS_BUILD_KEPT_BUILDS = 8;
 
-type AtlasData = {
-  builds: DebateAtlasBuildSummary[];
-  build: DebateAtlasBuild | null;
+type BuildData<TBuild> = {
+  builds: ResultsBuildSummary[];
+  build: TBuild | null;
   serverCanBuild: boolean;
   activeSinceMs: number | null;
   // Bumped by each read that finds a build running, so the check-back re-arms.
   activeReads: number;
-  nextBuild: DebateAtlasNextBuild | null;
+  nextBuild: ResultsBuildNextBuild | null;
 };
 
-const EMPTY: AtlasData = {
+const EMPTY: BuildData<never> = {
   builds: [],
   build: null,
   serverCanBuild: false,
@@ -77,10 +78,13 @@ const mayOfferBuild = (config: UnknownRecord, account: unknown): boolean => {
   );
 };
 
-export const useSessionDebateAtlas = ({
+// A session's builds of one kind, as the open Results show them: the newest or
+// a picked one, the list of those kept, and a build this reader starts.
+export const useSessionResultsBuild = <TBuild extends ResultsBuildSummary>({
   account,
   chainId,
   enabled,
+  kind,
   provider,
   sessionConfig,
   sessionSlug,
@@ -88,10 +92,12 @@ export const useSessionDebateAtlas = ({
   account: unknown;
   chainId: unknown;
   enabled: boolean;
+  kind: ResultsBuildKind;
   provider: unknown;
   sessionConfig: unknown;
   sessionSlug: string;
-}): SessionDebateAtlas => {
+}): SessionResultsBuild<TBuild> => {
+  const { body, field, name, plural } = RESULTS_BUILD_KINDS[kind];
   const config = toRecord(sessionConfig);
   const workerUrl = useMemo(
     () =>
@@ -104,12 +110,12 @@ export const useSessionDebateAtlas = ({
     [sessionConfig, sessionSlug],
   );
   const sessionId = resolveWorkerCanonicalSessionIdHex(config);
-  const supported = config[DEBATE_ATLAS_FIELD] === true && !!workerUrl;
-  // Whose atlases these are. A new session, Worker or account starts empty, so
+  const supported = config[field] === true && !!workerUrl;
+  // Whose builds these are. A new session, Worker or account starts empty, so
   // nothing read for one reader or session is shown for another.
   const identity = supported ? [workerUrl, sessionSlug, sessionId, lower(account)].join('|') : '';
   const [shownFor, setShownFor] = useState(identity);
-  const [data, setData] = useState<AtlasData>(EMPTY);
+  const [data, setData] = useState<BuildData<TBuild>>(EMPTY);
   const [building, setBuilding] = useState(false);
   const [pressedAtMs, setPressedAtMs] = useState<number | null>(null);
   // The build the reader picked; '' follows the newest.
@@ -137,7 +143,7 @@ export const useSessionDebateAtlas = ({
       if (!supported) return;
       const seq = (requestSeq.current += 1);
       setLoading(true);
-      const result = await readDebateAtlas({ account, id, sessionId, sessionSlug, workerUrl });
+      const result = await readResultsBuild<TBuild>({ account, id, kind, sessionId, sessionSlug, workerUrl });
       if (seq !== requestSeq.current) return;
       setLoading(false);
       if (!result.ok) {
@@ -146,13 +152,13 @@ export const useSessionDebateAtlas = ({
           setSelectedId('');
           return load('');
         }
-        // Refused: this reader may not see atlases here, so none stay on screen.
+        // Refused: this reader may not see this kind here, so none stay on screen.
         if (result.status === 401 || result.status === 403) {
           setData(EMPTY);
           setError('');
           return;
         }
-        setError(result.error || 'Atlases are unavailable.');
+        setError(result.error || `${plural} are unavailable.`);
         return;
       }
       setError('');
@@ -166,7 +172,7 @@ export const useSessionDebateAtlas = ({
         nextBuild: result.nextBuild || null,
       }));
     },
-    [account, sessionId, sessionSlug, supported, workerUrl],
+    [account, kind, plural, sessionId, sessionSlug, supported, workerUrl],
   );
 
   useEffect(() => {
@@ -176,11 +182,11 @@ export const useSessionDebateAtlas = ({
   useEffect(() => {
     if (!enabled || !data.activeSinceMs || building) return undefined;
     // Checking back keeps the build the reader is looking at.
-    const timer = globalThis.setTimeout(() => void load(selectedId), DEBATE_ATLAS_ACTIVE_POLL_MS);
+    const timer = globalThis.setTimeout(() => void load(selectedId), RESULTS_BUILD_ACTIVE_POLL_MS);
     return () => globalThis.clearTimeout(timer);
   }, [data.activeSinceMs, data.activeReads, building, enabled, load, selectedId]);
 
-  const buildAtlas = useCallback(async () => {
+  const startBuild = useCallback(async () => {
     if (!supported || building) return false;
     const startedFor = identity;
     setBuilding(true);
@@ -188,47 +194,66 @@ export const useSessionDebateAtlas = ({
     setError('');
     const signingChainId = Number(config.networkChainId || chainId || 1) || 1;
     const authorityMode = toRecord(toRecord(config.sessionModeProfile).authority).mode;
-    const result = await requestDebateAtlasBuild({
+    const result = await requestResultsBuild<TBuild>({
       chainId: signingChainId,
+      kind,
       sessionSlug,
       workerUrl,
-      signAdminAction: ({ action, body, workerUrl: signedWorkerUrl }) =>
+      signAdminAction: ({ action, body: signedBody, workerUrl: signedWorkerUrl }) =>
         adminWorkerPorts.adminAuth.buildSignedAdminActionAuth({
           action,
           slug: sessionSlug,
           sessionId: sessionId || undefined,
           sessionAuthorityMode: typeof authorityMode === 'string' && authorityMode ? authorityMode : undefined,
-          body,
+          body: signedBody,
           workerUrl: signedWorkerUrl,
           context: { account, chainId: signingChainId, providerLike: provider },
         }),
     });
-    // The reader or session changed while it built: its atlas belongs to the old one.
+    // The reader or session changed while it built: its build belongs to the old one.
     if (identityRef.current !== startedFor) return false;
     setBuilding(false);
     setPressedAtMs(null);
-    if (!result.ok || !result.build) {
-      setError(result.error || 'The atlas build failed.');
-      // Someone else's build is running: show it, and check back for its atlas.
+    const built = result.build;
+    if (!result.ok || !built) {
+      setError(result.error || `The ${name} build failed.`);
+      // Someone else's build is running: show it, and check back for its build.
       const startedAtMs = result.active?.startedAtMs;
       if (startedAtMs) setData((previous) => ({ ...previous, activeSinceMs: startedAtMs }));
       return false;
     }
-    const { branches, ...summary } = result.build;
+    // The list entry is the build's stamp, without the kind's body.
+    const summary = Object.fromEntries(
+      Object.entries(built).filter(([key]) => !body.includes(key)),
+    ) as ResultsBuildSummary;
     setSelectedId('');
     // A read that started before this build must not replace it.
     requestSeq.current += 1;
     setData((previous) => ({
       ...previous,
-      build: result.build || null,
+      build: built,
       builds: [summary, ...previous.builds.filter((entry) => entry.id !== summary.id)].slice(
         0,
-        DEBATE_ATLAS_KEPT_BUILDS,
+        RESULTS_BUILD_KEPT_BUILDS,
       ),
       activeSinceMs: null,
     }));
     return true;
-  }, [account, building, chainId, config, identity, provider, sessionId, sessionSlug, supported, workerUrl]);
+  }, [
+    account,
+    body,
+    building,
+    chainId,
+    config,
+    identity,
+    kind,
+    name,
+    provider,
+    sessionId,
+    sessionSlug,
+    supported,
+    workerUrl,
+  ]);
 
   const selectBuild = useCallback(
     (id: string) => {
@@ -250,7 +275,7 @@ export const useSessionDebateAtlas = ({
     nextBuild: data.nextBuild,
     workerUrl: supported ? String(workerUrl || '') : '',
     error,
-    buildAtlas,
+    startBuild,
     selectBuild,
   };
 };

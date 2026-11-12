@@ -1,8 +1,8 @@
 import React, { Suspense } from 'react';
 import CETooltip from '../Shared/CETooltip';
 import SessionTestEthBadge from '../Shared/SessionTestEthBadge';
-import { useSessionDebateAtlas } from '../DebateAtlas/useSessionDebateAtlas';
-import DebateAtlasBuildStatus from '../DebateAtlas/DebateAtlasBuildStatus';
+import { useSessionResultsBuild } from '../ResultsBuilds/useSessionResultsBuild';
+import ResultsBuildStatus from '../ResultsBuilds/ResultsBuildStatus';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faArrowLeft,
@@ -24,6 +24,7 @@ import { PUBLIC_AI_DISCOURSE_CORPUS_URL } from '../../variables/publicRepoMetada
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { hasDemoAnalysisFixture } from '../../utilities/demo/demoFixtureSessionSlugs';
 import type { RiskMatrixRestoreState } from '../MainContent/RiskMatrix';
+import type { DebateAtlasBuild } from '../../domains/debateAtlas/debateAtlasTypes';
 import type { SessionGeneratedResultsViewKey } from '../../domains/sessionResults/sessionResultsGeneratedViewTypes';
 import type { SessionResultsGeneratedAnalysisArtifact } from '../../utilities/sessionResultsExport/sessionResultsAnalysisArtifacts';
 import type {
@@ -349,10 +350,11 @@ export default function OnePageSessionStandardShell({
   onViewAllQuestionsClick,
 }: OnePageSessionStandardShellProps) {
   const basePath = readPublicUrlBasePath();
-  const atlas = useSessionDebateAtlas({
+  const atlas = useSessionResultsBuild<DebateAtlasBuild>({
     account,
     chainId: networkChainId,
     enabled: showResults,
+    kind: 'debate-atlas',
     provider,
     sessionConfig: resolvedSessionConfig,
     sessionSlug: effectiveSlug,
@@ -841,7 +843,7 @@ export default function OnePageSessionStandardShell({
                         onClick={async (event: React.MouseEvent<HTMLElement>) => {
                           event.preventDefault();
                           event.stopPropagation();
-                          if (await atlas.buildAtlas()) onResultsModeChange('debateAtlas');
+                          if (await atlas.startBuild()) onResultsModeChange('debateAtlas');
                         }}
                         className={styles.sectionHeaderViewModeButton}
                         disabled={atlasBusy}
@@ -903,7 +905,8 @@ export default function OnePageSessionStandardShell({
                 </div>
               ) : null}
               {atlas.canBuild && (atlasBusy || atlas.error) ? (
-                <DebateAtlasBuildStatus
+                <ResultsBuildStatus
+                  kind="debate-atlas"
                   className={styles.generatedResultsStatus}
                   busy={atlasBusy}
                   error={atlas.error}

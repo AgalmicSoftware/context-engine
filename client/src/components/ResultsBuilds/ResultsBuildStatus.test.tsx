@@ -1,7 +1,7 @@
 import React from 'react';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 
-import DebateAtlasBuildStatus from './DebateAtlasBuildStatus';
+import ResultsBuildStatus from './ResultsBuildStatus';
 
 const nextBuild = {
   model: 'deep-model',
@@ -15,7 +15,7 @@ afterEach(() => {
 it('counts the seconds since the build started and names the model', () => {
   jest.useFakeTimers();
   jest.setSystemTime(100_000);
-  render(<DebateAtlasBuildStatus busy nextBuild={nextBuild} startedAtMs={58_000} />);
+  render(<ResultsBuildStatus kind="debate-atlas" busy nextBuild={nextBuild} startedAtMs={58_000} />);
   // The live region announces the task, not each tick.
   expect(screen.getByRole('status')).toHaveTextContent('Building the atlas · 42s');
   expect(screen.getByRole('status')).toHaveAccessibleName('');
@@ -27,7 +27,7 @@ it('counts the seconds since the build started and names the model', () => {
 });
 
 it('shows the prompts only when asked', () => {
-  render(<DebateAtlasBuildStatus busy nextBuild={nextBuild} startedAtMs={Date.now()} />);
+  render(<ResultsBuildStatus kind="debate-atlas" busy nextBuild={nextBuild} startedAtMs={Date.now()} />);
   const toggle = screen.getByRole('button', { name: /Show AI prompt/ });
   expect(toggle).toHaveAttribute('aria-expanded', 'false');
   expect(screen.queryByText('You are planning <Questions>')).not.toBeInTheDocument();
@@ -38,17 +38,25 @@ it('shows the prompts only when asked', () => {
 });
 
 it('still times a build when the Worker gave no model or prompts', () => {
-  render(<DebateAtlasBuildStatus busy nextBuild={null} startedAtMs={null} />);
+  render(<ResultsBuildStatus kind="debate-atlas" busy nextBuild={null} startedAtMs={null} />);
   expect(screen.getByRole('status')).toHaveTextContent(/^\s*Building the atlas · 0s$/);
   expect(screen.queryByRole('button')).not.toBeInTheDocument();
   expect(screen.queryByText(/AI model/)).not.toBeInTheDocument();
 });
 
 it('keeps one live region from the running build to its failure, so the failure is read out', () => {
-  const { rerender } = render(<DebateAtlasBuildStatus busy nextBuild={nextBuild} startedAtMs={Date.now()} />);
+  const { rerender } = render(
+    <ResultsBuildStatus kind="debate-atlas" busy nextBuild={nextBuild} startedAtMs={Date.now()} />,
+  );
   const region = screen.getByRole('status');
   rerender(
-    <DebateAtlasBuildStatus busy={false} error="Planning the atlas failed." nextBuild={nextBuild} startedAtMs={null} />,
+    <ResultsBuildStatus
+      kind="debate-atlas"
+      busy={false}
+      error="Planning the atlas failed."
+      nextBuild={nextBuild}
+      startedAtMs={null}
+    />,
   );
   expect(screen.getByRole('status')).toBe(region);
   expect(region).toHaveTextContent('Planning the atlas failed.');

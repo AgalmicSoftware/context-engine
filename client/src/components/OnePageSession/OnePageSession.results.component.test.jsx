@@ -194,9 +194,9 @@ jest.mock('../DemoViews/DemoAnalysis/DemoAnalysisWorkspace', () => ({
     return <div data-testid="demo-analysis-workspace-view">Demo Analysis</div>;
   },
 }));
-jest.mock('../DebateAtlas/useSessionDebateAtlas', () => ({
-  useSessionDebateAtlas: () =>
-    mockDebateAtlasState || {
+jest.mock('../ResultsBuilds/useSessionResultsBuild', () => ({
+  useSessionResultsBuild: ({ kind }) =>
+    (kind === 'debate-atlas' && mockDebateAtlasState) || {
       supported: false,
       builds: [],
       build: null,
@@ -205,7 +205,7 @@ jest.mock('../DebateAtlas/useSessionDebateAtlas', () => ({
       loading: false,
       activeSinceMs: null,
       error: '',
-      buildAtlas: async () => false,
+      startBuild: async () => false,
       selectBuild: () => {},
     },
 }));
@@ -1345,7 +1345,7 @@ describe('OnePageSession results routing', () => {
       loading: false,
       activeSinceMs: null,
       error: '',
-      buildAtlas: jest.fn(async () => true),
+      startBuild: jest.fn(async () => true),
       selectBuild: jest.fn(),
       ...overrides,
     });
@@ -1394,8 +1394,8 @@ describe('OnePageSession results routing', () => {
     });
 
     it('offers Build atlas to those who may build and opens Debate Map when it finishes', async () => {
-      const buildAtlas = jest.fn(async () => true);
-      mockDebateAtlasState = atlasState({ builds: [], build: null, canBuild: true, buildAtlas });
+      const startBuild = jest.fn(async () => true);
+      mockDebateAtlasState = atlasState({ builds: [], build: null, canBuild: true, startBuild });
       const sessionRef = React.createRef();
       renderSession('edge', sessionRef);
       const button = screen.getByRole('button', { name: 'Build atlas' });
@@ -1403,7 +1403,7 @@ describe('OnePageSession results routing', () => {
       expect(button.querySelector('svg[aria-hidden="true"]')).not.toBeNull();
       fireEvent.click(button);
       await waitFor(() => expect(sessionRef.current.state.resultsViewMode).toBe('debateAtlas'));
-      expect(buildAtlas).toHaveBeenCalledTimes(1);
+      expect(startBuild).toHaveBeenCalledTimes(1);
     });
 
     it.each([
@@ -1922,7 +1922,7 @@ describe('OnePageSession results routing', () => {
           loading: false,
           activeSinceMs: null,
           error: '',
-          buildAtlas: async () => false,
+          startBuild: async () => false,
           selectBuild: () => {},
         };
       }

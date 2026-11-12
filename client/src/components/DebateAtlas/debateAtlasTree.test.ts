@@ -3,7 +3,6 @@ import {
   buildSessionAtlasLink,
   buildSessionQuestionLink,
   debateAtlasBuildIdOf,
-  describeDebateAtlasBuild,
 } from './debateAtlasTree';
 import type { DebateAtlasBuild } from '../../domains/debateAtlas/debateAtlasTypes';
 
@@ -205,13 +204,6 @@ it('turns the half ring upwards at the bottom edge', () => {
   points.slice(1).forEach((point) => expect(point.y).toBeGreaterThanOrEqual(0.02 - 1e-9));
   expect(Math.max(...points.slice(1).map((point) => point.y))).toBeGreaterThan(0.06);
   expect(closest(points)).toBeGreaterThanOrEqual(0.0499);
-});
-
-it('stamps a build with its time and counts', () => {
-  const stamp = describeDebateAtlasBuild(build);
-  expect(stamp).toMatch(/2026/);
-  expect(stamp).toMatch(/ · 12 responses · 1 participant$/);
-  expect(describeDebateAtlasBuild({ id: 'x', builtAt: 'not a date' })).toBe('');
 });
 
 it('gives a category its own compass, and each compass a legend of the kinds of point it shows', () => {

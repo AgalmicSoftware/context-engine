@@ -3,40 +3,54 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCaretDown, faCaretUp, faSpinner } from '@fortawesome/free-solid-svg-icons';
 
 import ElapsedLoadingLabel from '../Shared/ElapsedLoadingLabel';
-import type { DebateAtlasNextBuild } from '../../domains/debateAtlas/debateAtlasTypes';
-import styles from './DebateAtlasBuildStatus.module.scss';
+import {
+  RESULTS_BUILD_KINDS,
+  type ResultsBuildKind,
+  type ResultsBuildNextBuild,
+} from '../../domains/resultsBuilds/resultsBuildWorkerClient';
+import styles from './ResultsBuildStatus.module.scss';
 
 type Props = {
   busy: boolean;
   className?: string;
   error?: string;
-  nextBuild: DebateAtlasNextBuild | null;
+  kind: ResultsBuildKind;
+  nextBuild: ResultsBuildNextBuild | null;
   startedAtMs: number | null;
+};
+
+// Each kind's prompts, in the order a build sends them.
+const PROMPT_SECTIONS: Record<ResultsBuildKind, Array<{ key: string; label: string; heading: string }>> = {
+  'debate-atlas': [
+    { key: 'plan', label: 'Planning prompt', heading: 'Planning, once' },
+    { key: 'map', label: 'Mapping prompt', heading: 'Mapping, once per topic and per category of several topics' },
+  ],
 };
 
 // A running build: how long it has run, the model it calls and, on request,
 // the prompts it sends, as the question generator shows its own. One live
 // region carries the running build and then its failure, so the failure is read out.
-export default function DebateAtlasBuildStatus({ busy, className = '', error = '', nextBuild, startedAtMs }: Props) {
+export default function ResultsBuildStatus({ busy, className = '', error = '', kind, nextBuild, startedAtMs }: Props) {
   const [showPrompt, setShowPrompt] = useState(false);
-  const promptId = `debate-atlas-prompt-${useId().replace(/:/g, '')}`;
+  const promptId = `${kind}-prompt-${useId().replace(/:/g, '')}`;
   const model = busy ? nextBuild?.model || '' : '';
-  const { plan = '', map = '' } = (busy && nextBuild?.prompts) || {};
+  const prompts = (busy && nextBuild?.prompts) || {};
+  const sections = PROMPT_SECTIONS[kind].filter(({ key }) => prompts[key]);
 
   return (
-    <div className={`${className} ${styles.status}`} data-testid="ce-session-debate-atlas-status">
+    <div className={`${className} ${styles.status}`} data-testid={`ce-session-${kind}-status`}>
       <p role="status">
         {busy ? (
           <>
             <FontAwesomeIcon icon={faSpinner} spin aria-hidden="true" />{' '}
-            <ElapsedLoadingLabel label="Building the atlas" since={startedAtMs} />
+            <ElapsedLoadingLabel label={`Building the ${RESULTS_BUILD_KINDS[kind].name}`} since={startedAtMs} />
           </>
         ) : (
           error
         )}
       </p>
       {model && <p>AI model: {model}</p>}
-      {(plan || map) && (
+      {sections.length > 0 && (
         <>
           <button
             type="button"
@@ -51,18 +65,12 @@ export default function DebateAtlasBuildStatus({ busy, className = '', error = '
           </button>
           {showPrompt && (
             <div id={promptId} className={styles.prompts}>
-              {plan && (
-                <section aria-label="Planning prompt">
-                  <h4>Planning, once</h4>
-                  <pre>{plan}</pre>
+              {sections.map(({ key, label, heading }) => (
+                <section key={key} aria-label={label}>
+                  <h4>{heading}</h4>
+                  <pre>{prompts[key]}</pre>
                 </section>
-              )}
-              {map && (
-                <section aria-label="Mapping prompt">
-                  <h4>Mapping, once per topic and per category of several topics</h4>
-                  <pre>{map}</pre>
-                </section>
-              )}
+              ))}
             </div>
           )}
         </>

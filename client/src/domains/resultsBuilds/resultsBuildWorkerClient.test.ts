@@ -1,4 +1,4 @@
-import { readDebateAtlas, requestDebateAtlasBuild } from './debateAtlasWorkerClient';
+import { readResultsBuild, requestResultsBuild } from './resultsBuildWorkerClient';
 import { getCachedWorkerAuthHeaders } from '../sessionResults/sessionResultsAnalysisWorkerClient';
 
 jest.mock('../sessionResults/sessionResultsAnalysisWorkerClient', () => ({
@@ -10,7 +10,8 @@ const respond = (body: unknown, status = 200) =>
 
 it('reads one build by id with the cached sign-in, and only on this Worker', async () => {
   const fetchImpl = respond({ ok: true, builds: [], build: null, canBuild: true });
-  const result = await readDebateAtlas({
+  const result = await readResultsBuild({
+    kind: 'debate-atlas',
     account: '0xabc',
     fetchImpl: fetchImpl as unknown as typeof fetch,
     id: 'atlas_k1_00000001',
@@ -25,11 +26,15 @@ it('reads one build by id with the cached sign-in, and only on this Worker', asy
   expect(getCachedWorkerAuthHeaders).toHaveBeenCalledWith(
     expect.objectContaining({ account: '0xabc', sessionSlug: 'salon', workerUrl: 'https://worker.example' }),
   );
-  expect(await readDebateAtlas({ sessionSlug: 'salon', workerUrl: '' })).toMatchObject({ ok: false, status: 0 });
+  expect(await readResultsBuild({ kind: 'debate-atlas', sessionSlug: 'salon', workerUrl: '' })).toMatchObject({
+    ok: false,
+    status: 0,
+  });
 });
 
 it('turns refusals into a status and a reason', async () => {
-  const refused = await readDebateAtlas({
+  const refused = await readResultsBuild({
+    kind: 'debate-atlas',
     fetchImpl: respond({ ok: false, error: 'Not visible.' }, 403) as unknown as typeof fetch,
     sessionSlug: 'salon',
     workerUrl: 'https://worker.example',
@@ -44,7 +49,8 @@ it('posts a signed build of the stored responses and returns the new atlas', asy
     message: 'signed',
     signature: '0xsig',
   }));
-  const result = await requestDebateAtlasBuild({
+  const result = await requestResultsBuild({
+    kind: 'debate-atlas',
     chainId: 84532,
     fetchImpl: fetchImpl as unknown as typeof fetch,
     sessionSlug: 'salon',
@@ -76,7 +82,8 @@ it.each([
   ],
   [{ ok: false, error: 'Needs at least 2 participants.' }, 422, {}],
 ])('passes on the status of a refused build, and when another build started', async (body, status, extra) => {
-  const result = await requestDebateAtlasBuild({
+  const result = await requestResultsBuild({
+    kind: 'debate-atlas',
     chainId: 1,
     fetchImpl: respond(body, status) as unknown as typeof fetch,
     now: () => 9,

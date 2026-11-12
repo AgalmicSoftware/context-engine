@@ -1,0 +1,81 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: clamp(12px, 2vw, 20px);
+  border: 1px solid var(--ce-card-border);
+  border-radius: 14px;
+  background: var(--ce-surface-sunken);
+  color: var(--ce-panel-text);
+}
+
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  h3 {
+    margin: 0;
+    color: inherit;
+    font-size: 1.1rem;
+  }
+}
+
+.titleRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.help {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  line-height: 1;
+  &:focus-visible {
+    outline: 2px solid var(--ce-focus-ring);
+    outline-offset: 2px;
+  }
+}
+
+.meta {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.picker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+  select {
+    // A select is as wide as its longest option unless it may shrink.
+    min-width: 0;
+    max-width: min(100%, 22rem);
+    padding: 4px 8px;
+    border: 1px solid var(--ce-card-border);
+    border-radius: 8px;
+    background: var(--ce-surface-sunken);
+    color: var(--ce-panel-text);
+  }
+}
+
+@media (max-width: 480px) {
+  .picker {
+    width: 100%;
+    select {
+      flex: 1;
+    }
+  }
+}
+
+// Classic's corners are square, as Windows 95's are, and the view sits on its
+// gray face, where the map's white bevel edges show.
+@container ce-theme style(--ce-layout-profile: desktop-window) {
+  .panel {
+    border-radius: 0;
+    background: var(--ce-surface);
+  }
+}
