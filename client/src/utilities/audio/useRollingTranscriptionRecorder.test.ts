@@ -9,10 +9,16 @@ import {
 } from './recordingChunkStore';
 import { cutSpeakerSamples } from './speakerSamples';
 import { installFakeWebLocks } from './webLocks.testUtils';
+import { primeRecordingAlarm, soundRecordingAlarm } from './recordingAlarm';
 
 // The longest scenario replays a 45-minute recording, close to Jest's 5s default.
 jest.setTimeout(20_000);
 
+jest.mock('./recordingAlarm', () => ({
+  primeRecordingAlarm: jest.fn(),
+  releaseRecordingAlarm: jest.fn(),
+  soundRecordingAlarm: jest.fn(),
+}));
 jest.mock('../ai/aiClient.js', () => ({
   transcribeAudio: jest.fn(),
   transcribeGroupAudio: jest.fn(),
@@ -133,6 +139,8 @@ describe('useRollingTranscriptionRecorder', () => {
   }
 
   beforeEach(() => {
+    jest.mocked(soundRecordingAlarm).mockClear();
+    jest.mocked(primeRecordingAlarm).mockClear();
     jest.useFakeTimers();
     window.localStorage.clear();
     window.sessionStorage.clear();
@@ -1048,6 +1056,8 @@ describe('useRollingTranscriptionRecorder', () => {
     await act(async () => {
       await result.current.startRecording();
     });
+    // Permission is gone, so the one fresh start fails too.
+    jest.mocked(navigator.mediaDevices.getUserMedia).mockRejectedValueOnce(new Error('Permission denied'));
     await act(async () => {
       ended();
       await flushPromises();
@@ -1284,7 +1294,7 @@ describe('useRollingTranscriptionRecorder', () => {
     }
   });
 
-  it('shows a stop notice when the recorder stops by itself, keeps its audio, and resumes with one tap', async () => {
+  it('restarts once when the recorder stops by itself, then shows a stop notice, keeps its audio, and resumes with one tap', async () => {
     (transcribeAudio as jest.Mock).mockImplementation(async () => 'Speech before the stop.');
     const { result, unmount } = renderHook(() =>
       useRollingTranscriptionRecorder({ sessionSlug: 'self-stop', chunkMs: 15_000 }),
@@ -1292,23 +1302,32 @@ describe('useRollingTranscriptionRecorder', () => {
     await act(async () => {
       await result.current.startRecording();
     });
-    await act(async () => {
-      // The browser ends capture with no error event, as when the system takes the microphone.
-      instances[0].state = 'inactive';
-      instances[0].ondataavailable?.({ data: new Blob([new Uint8Array(256)], { type: 'audio/webm' }) });
-      instances[0].onstop?.();
-      await flushPromises();
-    });
+    // The browser ends capture with no error event, as when the system takes the microphone.
+    const stopsItself = async (recorder: MockMediaRecorder) =>
+      act(async () => {
+        recorder.state = 'inactive';
+        recorder.ondataavailable?.({ data: new Blob([new Uint8Array(256)], { type: 'audio/webm' }) });
+        recorder.onstop?.();
+        await flushPromises();
+      });
+    await stopsItself(instances[0]);
+    // The first time, a fresh microphone carries on.
+    expect(result.current.status).toBe('recording');
+    expect(instances).toHaveLength(2);
+    expect(navigator.mediaDevices.getUserMedia).toHaveBeenCalledTimes(2);
+    expect(soundRecordingAlarm).not.toHaveBeenCalled();
+    await stopsItself(instances[1]);
     expect(result.current.status).toBe('error');
     expect(result.current.errorMessage).toMatch(/^Recording stopped\. Press Record to continue\./);
-    expect(mockTrack.stop).toHaveBeenCalledTimes(1);
-    expect(result.current.transcript).toBe('Speech before the stop.');
+    expect(soundRecordingAlarm).toHaveBeenCalledTimes(1);
+    expect(mockTrack.stop).toHaveBeenCalledTimes(2);
+    expect(result.current.transcript).toBe('Speech before the stop. [No audio for 1 s.] Speech before the stop.');
     const elapsed = result.current.elapsedSeconds;
     await act(async () => {
       await jest.advanceTimersByTimeAsync(20_000);
     });
     expect(result.current.elapsedSeconds).toBe(elapsed);
-    expect(instances).toHaveLength(1);
+    expect(instances).toHaveLength(2);
     await act(async () => {
       await result.current.startRecording();
     });
@@ -1349,6 +1368,7 @@ describe('useRollingTranscriptionRecorder', () => {
         });
         const noticeText = notice === 'storage' ? "This recording can't be recovered after a reload" : 'Offline.';
         expect(result.current.errorMessage).toContain(noticeText);
+        jest.mocked(navigator.mediaDevices.getUserMedia).mockRejectedValueOnce(new Error('Permission denied'));
         await act(async () => {
           ended();
           await flushPromises();
@@ -1811,6 +1831,112 @@ describe('useRollingTranscriptionRecorder', () => {
       await flushPromises();
     });
     expect(result.current.transcript).toBe('Chunk 1. [No audio for 1 min 35 s.] Chunk 2.');
+    unmount();
+  });
+
+  it('restarts the microphone after 15 seconds without audio once it arrives every second', async () => {
+    let uploads = 0;
+    (transcribeAudio as jest.Mock).mockImplementation(async () => `Chunk ${++uploads}.`);
+    const { result, unmount } = renderHook(() =>
+      useRollingTranscriptionRecorder({ sessionSlug: 'flowing', chunkMs: 180_000 }),
+    );
+    await act(async () => {
+      await result.current.startRecording();
+      for (let second = 0; second < 5; second += 1) {
+        await jest.advanceTimersByTimeAsync(1000);
+        instances[0].requestData();
+      }
+    });
+    instances[0].silent = MockMediaRecorder.silent = true;
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(10_000);
+    });
+    expect(navigator.mediaDevices.getUserMedia).toHaveBeenCalledTimes(1);
+    MockMediaRecorder.silent = false;
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(10_000);
+      await flushPromises();
+    });
+    // Well before the three-and-a-half minutes a chunk-end-only browser gets.
+    expect(navigator.mediaDevices.getUserMedia).toHaveBeenCalledTimes(2);
+    expect(result.current.isRecording).toBe(true);
+    expect(result.current.captureNotice).toBe('No audio arrived for a while, so the microphone was restarted.');
+    unmount();
+  });
+
+  it('tries a fresh microphone once when the microphone ends, and sounds the alarm when it ends again', async () => {
+    const callbacks: Array<() => void> = [];
+    Object.assign(mockTrack, {
+      addEventListener: (name: string, callback: () => void) => {
+        if (name === 'ended') callbacks.push(callback);
+      },
+    });
+    const { result, unmount } = renderHook(() => useRollingTranscriptionRecorder({ sessionSlug: 'headset' }));
+    await act(async () => {
+      await result.current.startRecording();
+    });
+    expect(primeRecordingAlarm).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      callbacks[0]();
+      await flushPromises();
+    });
+    expect(navigator.mediaDevices.getUserMedia).toHaveBeenCalledTimes(2);
+    expect(result.current.status).toBe('recording');
+    expect(instances).toHaveLength(2);
+    expect(soundRecordingAlarm).not.toHaveBeenCalled();
+    await act(async () => {
+      callbacks[1]();
+      await flushPromises();
+    });
+    expect(result.current.status).toBe('error');
+    expect(result.current.errorMessage).toMatch(/^Microphone access ended/);
+    expect(soundRecordingAlarm).toHaveBeenCalledTimes(1);
+    // A new recording gets its own fresh start; a Stop the host pressed sounds nothing.
+    await act(async () => {
+      await result.current.startRecording();
+    });
+    await act(async () => {
+      callbacks[2]();
+      await flushPromises();
+    });
+    expect(result.current.status).toBe('recording');
+    await act(async () => {
+      await result.current.stopRecording();
+      await flushPromises();
+    });
+    expect(soundRecordingAlarm).toHaveBeenCalledTimes(1);
+    unmount();
+  });
+
+  it('keeps a paused recording paused when its microphone comes back, until Resume', async () => {
+    const callbacks: Array<() => void> = [];
+    Object.assign(mockTrack, {
+      addEventListener: (name: string, callback: () => void) => {
+        if (name === 'ended') callbacks.push(callback);
+      },
+    });
+    const { result, unmount } = renderHook(() =>
+      useRollingTranscriptionRecorder({ sessionSlug: 'paused-headset', chunkMs: 60_000 }),
+    );
+    await act(async () => {
+      await result.current.startRecording();
+    });
+    act(() => result.current.pauseRecording());
+    await act(async () => {
+      callbacks[0]();
+      await flushPromises();
+    });
+    expect(instances).toHaveLength(2);
+    expect(instances[1].state).toBe('paused');
+    expect(result.current.status).toBe('paused');
+    // No rotation runs while paused, so nothing new is recorded.
+    await act(async () => {
+      await jest.advanceTimersByTimeAsync(120_000);
+    });
+    expect(instances).toHaveLength(2);
+    act(() => result.current.resumeRecording());
+    expect(instances[1].state).toBe('recording');
+    expect(result.current.status).toBe('recording');
     unmount();
   });
 
