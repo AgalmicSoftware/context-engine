@@ -3,7 +3,10 @@ import { Input } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCaretDown, faCaretUp } from '@fortawesome/free-solid-svg-icons';
 
-import InterviewSettingsFields from '../InterviewSettingsFields';
+import InterviewSettingsFields, {
+  DRAFT_TEXT_NEEDS_NEWER_WORKER,
+  DRAFT_TEXT_NEEDS_WORKER,
+} from '../InterviewSettingsFields';
 import { SESSION_CONTEXT_LIMITS, isHttpsUrl, validateSessionContext } from '@ce-shared/sessionContext.mjs';
 import { E2E_TESTIDS } from '../../../utilities/e2eTestIds.js';
 import {
@@ -597,7 +600,9 @@ export const SetupParticipationSection = ({
         value={draft.interviewMode}
         onChange={(value) => onChange(['interviewMode'], value)}
         onTurnOnInterviews={() => onChange(['interviewModeEnabled'], true)}
-        draftTextSupported={workerHosted && draftTextSupported !== false}
+        draftTextUnavailable={
+          !workerHosted ? DRAFT_TEXT_NEEDS_WORKER : draftTextSupported === false ? DRAFT_TEXT_NEEDS_NEWER_WORKER : ''
+        }
       />
     ) : null}
     <SetupField id="ce-setup-group-creation" label="Who can create groups" help={GROUP_CREATION_HELP}>

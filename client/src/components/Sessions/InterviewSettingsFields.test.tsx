@@ -2,7 +2,7 @@ import React from 'react';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { createStore } from 'redux';
-import InterviewSettingsFields from './InterviewSettingsFields';
+import InterviewSettingsFields, { DRAFT_TEXT_NEEDS_NEWER_WORKER } from './InterviewSettingsFields';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 it('exposes conservative generation defaults and an editable owner opening', () => {
   const onChange = jest.fn();
@@ -429,14 +429,16 @@ describe('keeping AI draft text for admins', () => {
   });
 
   it('says an older Worker needs updating, and still lets it be turned off', () => {
-    const { rerender } = render(<InterviewSettingsFields value={{}} onChange={jest.fn()} draftTextSupported={false} />);
+    const { rerender } = render(
+      <InterviewSettingsFields value={{}} onChange={jest.fn()} draftTextUnavailable={DRAFT_TEXT_NEEDS_NEWER_WORKER} />,
+    );
     expect(screen.getByLabelText(label)).toBeDisabled();
     expect(screen.getByText('Needs a newer Session Worker (0.9.6 or later).')).toBeInTheDocument();
     rerender(
       <InterviewSettingsFields
         value={{ keepDraftTextForAdmins: true }}
         onChange={jest.fn()}
-        draftTextSupported={false}
+        draftTextUnavailable={DRAFT_TEXT_NEEDS_NEWER_WORKER}
       />,
     );
     expect(screen.getByLabelText(label)).toBeEnabled();

@@ -117,15 +117,17 @@ type Props = {
   disabled?: boolean;
   // Where voice interviews can be off while these settings show, as in /admin, this turns them on.
   onTurnOnInterviews?: () => void;
-  // False when the session's Worker predates keeping AI draft text for admins.
-  draftTextSupported?: boolean;
+  // Why AI draft text can't be kept for admins here (an older Worker, or no Session Worker); empty when it can.
+  draftTextUnavailable?: string;
 };
+export const DRAFT_TEXT_NEEDS_WORKER = 'Needs a session hosted on a Session Worker.';
+export const DRAFT_TEXT_NEEDS_NEWER_WORKER = 'Needs a newer Session Worker (0.9.6 or later).';
 export default function InterviewSettingsFields({
   value,
   onChange,
   disabled = false,
   onTurnOnInterviews,
-  draftTextSupported = true,
+  draftTextUnavailable = '',
 }: Props) {
   const id = useId();
   const tooltipsEnabled = useSessionWizardTooltipPreference(useContext(ReactReduxContext)?.store ?? null);
@@ -203,15 +205,15 @@ export default function InterviewSettingsFields({
             id={`${id}-draft-text`}
             type="select"
             value={String(settings.keepDraftTextForAdmins)}
-            // An older Worker can't store it; turning it off stays possible.
-            disabled={!draftTextSupported && !settings.keepDraftTextForAdmins}
+            // Where it can't be stored, turning it off stays possible.
+            disabled={!!draftTextUnavailable && !settings.keepDraftTextForAdmins}
             onChange={(e) => change('keepDraftTextForAdmins', e.target.value === 'true')}
             aria-describedby={setupHelpId(`${id}-draft-text`)}
           >
             <option value="false">Off</option>
             <option value="true">On</option>
           </Input>
-          {draftTextSupported ? null : <div>Needs a newer Session Worker (0.9.6 or later).</div>}
+          {draftTextUnavailable ? <div>{draftTextUnavailable}</div> : null}
         </HelpField>
       ) : null}
       <HelpField htmlFor={`${id}-hidden-drafts`} label="Hidden AI drafts" help={HIDDEN_DRAFTS_HELP}>

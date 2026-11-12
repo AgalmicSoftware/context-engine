@@ -59,6 +59,24 @@ describe('setup content sections', () => {
     expect(screen.queryByLabelText('Instructions file')).not.toBeInTheDocument();
   });
 
+  it('offers AI draft text for admins only on a Session Worker that keeps it, naming why not', () => {
+    const label = 'Keep AI draft text for admins';
+    const { unmount } = render(<Harness Section={WorkerParticipation} initial={{ interviewModeEnabled: true }} />);
+    expect(screen.getByLabelText(label)).toBeEnabled();
+    expect(screen.queryByText(/^Needs a /)).not.toBeInTheDocument();
+    unmount();
+    const OlderWorker = (props: SetupSectionProps) => (
+      <SetupParticipationSection {...props} workerHosted draftTextSupported={false} />
+    );
+    const older = render(<Harness Section={OlderWorker} initial={{ interviewModeEnabled: true }} />);
+    expect(screen.getByLabelText(label)).toBeDisabled();
+    expect(screen.getByText('Needs a newer Session Worker (0.9.6 or later).')).toBeInTheDocument();
+    older.unmount();
+    render(<Harness Section={ChainParticipation} initial={{ interviewModeEnabled: true }} />);
+    expect(screen.getByLabelText(label)).toBeDisabled();
+    expect(screen.getByText('Needs a session hosted on a Session Worker.')).toBeInTheDocument();
+  });
+
   it('loads instructions for AI agents from a .md or .txt file into the box, up to 8,000 characters', async () => {
     render(
       <Harness Section={WorkerParticipation} initial={{ interviewModeEnabled: false, agentInstructions: 'Earlier' }} />,
