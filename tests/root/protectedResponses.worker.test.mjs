@@ -44,7 +44,9 @@ const SESSION_ID = `0x${'7a'.repeat(16)}`;
 const memoryKv = (seed = {}) => {
   const store = new Map(Object.entries(seed));
   return {
-    get: async (key) => (store.has(key) ? store.get(key) : null),
+    // Cloudflare's bulk get: up to 100 keys as one operation, answered as a Map.
+    get: async (key) =>
+      Array.isArray(key) ? new Map(key.map((name) => [name, store.get(name) ?? null])) : (store.get(key) ?? null),
     put: async (key, value) => {
       store.set(key, value);
     },
@@ -109,8 +111,13 @@ test('protected hosted answers reach only their author and the admin on every re
   };
   const alice = await signIn('alice', ethers.Wallet.createRandom());
   const bob = await signIn('bob', ethers.Wallet.createRandom());
-  await signIn('admin', admin);
+  const host = await signIn('admin', admin);
   personas.anonymous = { name: 'anonymous', authorization: '' };
+  // A Worker-hosted session takes answers only to questions it has stored.
+  await host.client.upload({
+    resource: 'questions',
+    data: JSON.stringify({ id: 'q-protected', prompt: 'What stays private?', type: 'freeform', sessionSlug: SLUG, sessionId: SESSION_ID }),
+  });
 
   const answers = {};
   for (const persona of [alice, bob]) {
