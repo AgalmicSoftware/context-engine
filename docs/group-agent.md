@@ -84,16 +84,21 @@ page shows them. If members' answers can't be read
 for a question, the answer goes ahead without them and says so.
 
 One question reads at most 8,000 characters of context, 2,000 of results and
-16,000 of answers. For each question members answered, a Detailed answer is
+24,000 of answers. For each question members answered, a Detailed answer is
 given how many answered and, where the question has set options (agree or
-disagree, a rating, a choice), how many chose each. These counts cover every
-member's answer, however large the session, so the agent can say how widely a
-view is held. What members wrote, comments included, is a sample: each piece is
-cut to 300 characters, and they are taken a round at a time, first across the
-questions that share topic words with the one asked and then across the rest,
-each question starting at a different member. In a session of 50 people and 40
-questions that is every count, the written answers to the closest questions,
-and one or two from each of the others.
+disagree, a rating, a choice), how many chose each. These counts cover every member's answer, however large the
+session, so the agent can say how widely a view is held. What members wrote,
+comments included, is a sample: each piece is cut to 300 characters, in an
+order drawn afresh for every question asked, so a member's place among one
+question's answers says nothing about their place among another's.
+
+The room is shared out in this order: the counts of the questions that share
+topic words with the one asked; what members wrote on those questions, a round
+at a time, up to half the room; the other questions' counts; then what members
+wrote, the close questions before the rest. If some questions' answers still do
+not fit, the agent is told how many were left out. In a session of 50 people
+and about 50 questions that is every count, the written answers to the closest
+questions, and a few from each of the others.
 
 ## Instructions and rules
 

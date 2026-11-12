@@ -22,7 +22,7 @@ export const GROUP_AGENT_LIMITS = Object.freeze({
   // What one question may read, in characters of prompt.
   contextChars: 8000,
   resultsChars: 2000,
-  answersChars: 16000,
+  answersChars: 24000,
   answerItemChars: 300,
   // The options one question's counts may list, most chosen first.
   countedChoices: 12,
@@ -210,7 +210,8 @@ const byCloseness = (groups, question) => {
     .sort((a, b) => b.close - a.close || a.index - b.index);
 };
 
-// How many chose each option, most chosen first, from every answer given.
+// How many chose each option, from every answer given: the most chosen ones,
+// which JSON lists most chosen first, or in number order for a rating's numbers.
 const countChoices = (rows) => {
   const counts = new Map();
   rows.forEach((row) =>
@@ -222,55 +223,86 @@ const countChoices = (rows) => {
   return Object.fromEntries([...counts].sort((a, b) => b[1] - a[1]).slice(0, L.countedChoices));
 };
 
-// Each question's counts cover every answer, so they go in first, the
-// questions closest to the one asked leading. What members wrote is then
-// taken a round at a time, across the close questions before the rest, so a
-// large session's room goes to what was asked. Each question's rounds start
-// at a different member, so no one's words always come first.
-const fitAnswers = (groups, question, max) => {
-  const fitted = [];
+// In an order drawn afresh for each question asked, so a member's place among
+// one question's answers says nothing about their place among another's.
+const shuffled = (items, random) => {
+  const out = [...items];
+  for (let index = out.length - 1; index > 0; index -= 1) {
+    const other = Math.floor(random() * (index + 1));
+    [out[index], out[other]] = [out[other], out[index]];
+  }
+  return out;
+};
+
+// What fits of members' answers, and how many answered questions did not.
+// The questions closest to the one asked go first: their counts, which cover
+// every answer, then what members wrote, a round at a time, up to half the
+// room. The other questions' counts follow, and what is left goes to what
+// members wrote, the close questions before the rest.
+const fitAnswers = (groups, question, max, random) => {
+  const items = byCloseness(groups.filter(isRecord), question)
+    .map(({ group, close }) => {
+      const rows = (Array.isArray(group.answers) ? group.answers : []).filter(isRecord);
+      const counts = countChoices(rows);
+      return {
+        close,
+        answered: rows.length,
+        entry: {
+          question: clip(text(group.question), L.answerItemChars),
+          answered: rows.length,
+          ...(Object.keys(counts).length ? { counts } : {}),
+        },
+        queue: shuffled(rows.map((row) => clip(text(row.text), L.answerItemChars)).filter(Boolean), random),
+        written: [],
+        kept: false,
+      };
+    })
+    .filter((item) => item.answered);
   let used = 2;
-  byCloseness(groups.filter(isRecord), question).forEach(({ group, close }, position) => {
-    const rows = (Array.isArray(group.answers) ? group.answers : []).filter(isRecord);
-    const counts = countChoices(rows);
-    const entry = {
-      question: clip(text(group.question), L.answerItemChars),
-      answered: rows.length,
-      ...(Object.keys(counts).length ? { counts } : {}),
-    };
-    const cost = encode({ ...entry, written: [] }).length + 1;
-    if (!rows.length || used + cost > max) return;
-    used += cost;
-    const written = rows.map((row) => clip(text(row.text), L.answerItemChars)).filter(Boolean);
-    const start = written.length ? position % written.length : 0;
-    fitted.push({ entry, close, queue: [...written.slice(start), ...written.slice(0, start)], written: [] });
-  });
-  const takeRounds = (items) => {
-    for (let round = 0, added = true; added; round += 1) {
+  const admit = (list) =>
+    list.forEach((item) => {
+      const cost = encode({ ...item.entry, written: [] }).length + 1;
+      if (used + cost > max) return;
+      used += cost;
+      item.kept = true;
+    });
+  const takeRounds = (list, limit) => {
+    for (let added = true; added; ) {
       added = false;
-      items.forEach((item) => {
-        if (round >= item.queue.length) return;
-        const cost = encode(item.queue[round]).length + 1;
-        if (used + cost > max) return;
-        item.written.push(item.queue[round]);
+      list.forEach((item) => {
+        const next = item.queue[item.written.length];
+        if (!item.kept || next === undefined) return;
+        const cost = encode(next).length + 1;
+        if (used + cost > limit) return;
+        item.written.push(next);
         used += cost;
         added = true;
       });
     }
   };
-  takeRounds(fitted.filter((item) => item.close > 0));
-  takeRounds(fitted.filter((item) => item.close === 0));
-  return fitted.map(({ entry, written }) => (written.length ? { ...entry, written } : entry));
+  const close = items.filter((item) => item.close > 0);
+  const rest = items.filter((item) => item.close === 0);
+  admit(close);
+  takeRounds(close, max / 2);
+  admit(rest);
+  takeRounds(close, max);
+  takeRounds(rest, max);
+  const kept = items.filter((item) => item.kept);
+  return {
+    answers: kept.map(({ entry, written }) => (written.length ? { ...entry, written } : entry)),
+    leftOut: items.length - kept.length,
+  };
 };
 
 /**
  * The messages for one question. `material` must already be only what this
  * person's style may read: { sessionContext, sources, results, answers }, with
- * answers as [{ question, answers: [{ choices, text }] }], one entry for each
- * member's answer and no names. Instructions change only how the agent writes;
- * the rules after them always apply.
+ * answers as [{ question, answers: [{ choices, text }] }], one entry
+ * for each member's answer and no names. Instructions change only how the
+ * agent writes; the rules after them always apply. `random` orders what
+ * members wrote.
  */
-export const buildGroupAgentMessages = ({ setting, style, question, material = {} }) => {
+export const buildGroupAgentMessages = ({ setting, style, question, material = {}, random = Math.random }) => {
   const system = [
     `You are this session’s Group Agent, giving ${STYLE_NAMES[style]} answers.`,
     groupAgentInstructions(setting, style),
@@ -282,8 +314,10 @@ export const buildGroupAgentMessages = ({ setting, style, question, material = {
     totalChars: L.contextChars,
   });
   const results = clip(text(material.results), L.resultsChars);
-  const answers =
-    style === 'detailed' && Array.isArray(material.answers) ? fitAnswers(material.answers, question, L.answersChars) : [];
+  const { answers, leftOut } =
+    style === 'detailed' && Array.isArray(material.answers)
+      ? fitAnswers(material.answers, question, L.answersChars, random)
+      : { answers: [], leftOut: 0 };
   const parts = [
     context.text,
     results && block('Published results: the session’s results analysis, as JSON between the tags below.', 'session_results', results),
@@ -291,7 +325,8 @@ export const buildGroupAgentMessages = ({ setting, style, question, material = {
       block(
         'Members’ answers by question, from members who let the Group Agent use them, without names, as JSON between the tags below. ' +
           'For each question, "answered" is how many members answered and "counts" how many chose each option; both cover every answer. ' +
-          '"written" is only a sample of what they wrote.',
+          '"written" is only a sample of what they wrote, in no order.' +
+          (leftOut ? ` ${leftOut} more ${leftOut === 1 ? 'question has' : 'questions have'} answers that did not fit here.` : ''),
         'member_answers',
         answers,
       ),

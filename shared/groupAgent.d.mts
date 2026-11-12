@@ -72,6 +72,8 @@ export function buildGroupAgentMessages(input: {
   style: GroupAgentStyle;
   question: string;
   material?: GroupAgentMaterial;
+  /** Orders what members wrote; Math.random unless given. */
+  random?: () => number;
 }): {
   messages: Array<{ role: 'system' | 'user'; content: string }>;
   read: { context: number; results: boolean; answers: number };

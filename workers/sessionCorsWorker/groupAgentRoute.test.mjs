@@ -324,12 +324,13 @@ test('a Detailed answer counts every member’s choice, leaving out anyone who t
   const answersIn = ({ prompt }) =>
     JSON.parse(prompt.slice(prompt.indexOf('<member_answers>') + '<member_answers>'.length, prompt.indexOf('</member_answers>')));
   const all = await ask(h, { address: ADMIN, deps });
-  assert.deepEqual(answersIn(all), [
-    { question: 'Meet less?', answered: 6, counts: { Agree: 4, Disagree: 2 }, written: ['COMMENT too many'] },
-    { question: 'Which days?', answered: 6, counts: { Monday: 6, Friday: 3 } },
-    // The third question's rounds start at its third member.
-    { question: 'What should change?', answered: 6, written: [2, 3, 4, 5, 0, 1].map((index) => `WRITTEN ${index}`) },
-  ]);
+  const [meet, days, change] = answersIn(all);
+  assert.deepEqual(meet, { question: 'Meet less?', answered: 6, counts: { Agree: 4, Disagree: 2 }, written: ['COMMENT too many'] });
+  assert.deepEqual(days, { question: 'Which days?', answered: 6, counts: { Monday: 6, Friday: 3 } });
+  // What members wrote comes in an order drawn for each question asked.
+  assert.deepEqual({ ...change, written: [...change.written].sort() }, {
+    question: 'What should change?', answered: 6, written: [0, 1, 2, 3, 4, 5].map((index) => `WRITTEN ${index}`),
+  });
   assert.equal(all.body.read.answers, 18);
   assert.doesNotMatch(all.prompt, /ORPHAN|participant_/);
 

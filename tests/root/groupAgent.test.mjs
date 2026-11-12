@@ -215,13 +215,47 @@ test('what members wrote comes first from the questions closest to the one asked
   assert.ok(Math.max(...spread) - Math.min(...spread) <= 1, String(spread));
 });
 
-test('each question’s rounds start at a different member', () => {
-  const answers = ['One?', 'Two?', 'Three?'].map((question) => ({
-    question, answers: ['a', 'b', 'c'].map((text) => ({ text: `${text} wrote` })),
+test('what members wrote comes in an order drawn afresh, so no member’s place carries across questions', () => {
+  const answers = Array.from({ length: 30 }, (_, q) => ({
+    question: `Question ${q}?`, answers: ['a', 'b', 'c'].map((text) => ({ text: `${text} wrote` })),
   }));
-  const { messages } = buildGroupAgentMessages({ style: 'detailed', question: 'Q', material: { answers } });
-  const firsts = tagged(messages[1].content, 'member_answers').map((group) => group.written[0]);
-  assert.deepEqual(firsts, ['a wrote', 'b wrote', 'c wrote']);
+  const writtenWith = (random) =>
+    tagged(buildGroupAgentMessages({ style: 'detailed', question: 'Q', material: { answers }, ...(random ? { random } : {}) }).messages[1].content, 'member_answers')
+      .map((group) => group.written);
+  // The order comes from `random`: one that never swaps keeps the stored order, another gives its own.
+  assert.deepEqual(writtenWith(() => 0.999)[0], ['a wrote', 'b wrote', 'c wrote']);
+  assert.deepEqual(writtenWith(() => 0)[0], ['b wrote', 'c wrote', 'a wrote']);
+  // Left to itself, the same member does not lead every question.
+  const drawn = writtenWith();
+  assert.ok(new Set(drawn.map((written) => written[0])).size > 1);
+  drawn.forEach((written) => assert.deepEqual([...written].sort(), ['a wrote', 'b wrote', 'c wrote']));
+});
+
+test('the closest question’s written answers get room before other questions’ counts, and what didn’t fit is said', () => {
+  // 45 multi-select questions with long prompts and options: their counts alone overflow the room.
+  const options = Array.from({ length: 6 }, (_, i) => `Option ${i} ${'described at some length '.repeat(2)}`);
+  const answers = Array.from({ length: 45 }, (_, q) => ({
+    question: q === 30 ? `Which safeguards should apply to frontier training runs? ${'x'.repeat(90)}` : `Topic ${q}: ${'y'.repeat(140)}`,
+    answers: Array.from({ length: 50 }, (_, member) => ({
+      choices: [options[member % 6], options[(member + 1) % 6]],
+      text: `Member ${member} explains their choice on topic ${q} in a sentence of ordinary length.`,
+    })),
+  }));
+  const { messages, read } = buildGroupAgentMessages({
+    style: 'detailed', question: 'What safeguards do people want for frontier training?', material: { answers },
+  });
+  const user = messages[1].content;
+  const fitted = tagged(user, 'member_answers');
+  assert.match(fitted[0].question, /^Which safeguards/);
+  assert.equal(fitted[0].written.length, 50);
+  assert.ok(fitted.length < 45);
+  const leftOut = 45 - fitted.length;
+  assert.match(user, new RegExp(` ${leftOut} more questions have answers that did not fit here\\.`));
+  assert.ok(JSON.stringify(fitted).length <= GROUP_AGENT_LIMITS.answersChars);
+  assert.equal(read.answers, fitted.length * 50);
+  // Nothing is said when every question fits.
+  const all = buildGroupAgentMessages({ style: 'detailed', question: 'Q', material: { answers: answers.slice(0, 5) } });
+  assert.doesNotMatch(all.messages[1].content, /did not fit/);
 });
 
 test('counts list the most chosen options first, each choice of a multi-select counted', () => {
