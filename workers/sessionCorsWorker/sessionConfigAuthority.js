@@ -23,7 +23,43 @@ export const assertExpectedSessionAuthority = (authority, expected, slug, { requ
   }
 };
 
+// Concurrent config reads in one isolate share the call already in flight, so a
+// burst sends the session's coordinator one read instead of one per request.
+// A finished read is never reused: a reader sees the config as of a call that
+// was still unanswered when it arrived. A read that never settles (its
+// request was cancelled) is replaced after a wait, not joined forever.
+const configReadsInFlight = new WeakMap();
+const SHARED_READ_JOIN_MS = 10_000;
+const STALLED = Symbol('stalled');
+
+const shareConfigRead = (binding, slug, read) => {
+  let reads = configReadsInFlight.get(binding);
+  if (!reads) configReadsInFlight.set(binding, reads = new Map());
+  const joined = reads.get(slug);
+  if (!joined) {
+    const pending = read().finally(() => { if (reads.get(slug) === pending) reads.delete(slug); });
+    reads.set(slug, pending);
+    return pending.then((result) => structuredClone(result));
+  }
+  let timer;
+  const stalled = new Promise((resolve) => { timer = setTimeout(resolve, SHARED_READ_JOIN_MS, STALLED); });
+  return Promise.race([joined, stalled]).finally(() => clearTimeout(timer)).then((result) => {
+    if (result !== STALLED) return structuredClone(result);
+    if (reads.get(slug) === joined) reads.delete(slug);
+    return shareConfigRead(binding, slug, read);
+  });
+};
+
 export const callSessionConfigCoordinator = async ({ env, slug, path, ...payload }) => {
+  const binding = env?.CE_SESSION_COORDINATOR;
+  const normalizedSlug = resolveCoordinatorSessionSlugStorageKey(slug);
+  if (path === 'current' && normalizedSlug && binding && !Object.keys(payload).length) {
+    return shareConfigRead(binding, normalizedSlug, () => callCoordinator({ env, slug, path }));
+  }
+  return callCoordinator({ env, slug, path, ...payload });
+};
+
+const callCoordinator = async ({ env, slug, path, ...payload }) => {
   const normalizedSlug = resolveCoordinatorSessionSlugStorageKey(slug);
   const binding = env?.CE_SESSION_COORDINATOR;
   try {
