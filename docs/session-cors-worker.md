@@ -669,6 +669,16 @@ Admin test panel:
   check happens before scanning storage, so another submission does not repeat
   a failing history scan. Each retry reloads the session's authoritative config,
   so a disabled AI scope or changed policy stops it.
+- AI Views keeps its views and every answer they cover (written answers up to
+  4,000 characters and comments up to 2,000) in the session's coordinator
+  object, up to about 4.6 million characters. At 53 questions each that is
+  about 480 people giving short answers (a short comment on one in ten), about
+  260 with a few written answers, or about 120 with ten long written answers
+  (1,500 characters) and long comments on half the answers; if every answer
+  and comment were as long as allowed, about 700 answers. A larger build fails with `413` and says how
+  large it was; the last AI Views stays. Hidden questions are left out of AI
+  Views, so hiding long written-answer questions it does not need brings a
+  build under the limit.
 - Generated-results AI calls inherit the session's existing AI provider/model
   routing, especially the analysis/thinking assignment. They do not hardcode a
   separate provider or model. Inputs are submitted responses only; Circles is

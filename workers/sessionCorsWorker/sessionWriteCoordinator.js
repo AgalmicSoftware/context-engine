@@ -114,8 +114,22 @@ export const MAX_ANSWER_VERSIONS = 20;
 const MAX_UPLOAD_QUESTION_IDS = 1000;
 const MAX_PRIOR_UPLOAD_TARGETS = 8;
 const MAX_RESULTS_ANALYSIS_REQUESTS = 24;
+// An AI Views draft (the views plus every answer they cover) is kept in at
+// most 192 chunks of 24,000 characters, about 4.6 million characters. Each
+// chunk is its own get or put, well inside the session object's limits of
+// 128 keys per call and 8 MB per value.
 const RESULTS_ANALYSIS_VALUE_CHUNK_CHARS = 24_000;
-const RESULTS_ANALYSIS_MAX_DRAFT_CHUNKS = 64;
+const RESULTS_ANALYSIS_MAX_DRAFT_CHUNKS = 192;
+export const RESULTS_ANALYSIS_MAX_DRAFT_CHARS = RESULTS_ANALYSIS_VALUE_CHUNK_CHARS * RESULTS_ANALYSIS_MAX_DRAFT_CHUNKS;
+// The size is rounded up and the limit down, so the one never looks within the other.
+const millionChars = (chars, round = Math.ceil) => (round(chars / 100_000) / 10).toFixed(1);
+const draftTooLargeError = (chars) => Object.assign(new Error(
+  `AI Views could not be saved: its answers and views come to ${millionChars(chars)} million characters, ` +
+  `over its limit of ${millionChars(RESULTS_ANALYSIS_MAX_DRAFT_CHARS, Math.floor)} million (about 120 people answering 53 questions ` +
+  'with long written answers and comments). Hidden questions are left out of AI Views, so hiding long ' +
+  'written-answer questions it does not need, then building again, brings it under the limit. ' +
+  'The last AI Views is unchanged.',
+), { status: 413 });
 const RESULTS_ANALYSIS_AUTO_JOB_MAX_BYTES = 48_000;
 const RESULTS_ANALYSIS_RUNNING_LEASE_MS = 14 * 60 * 1000;
 const RESULTS_ANALYSIS_MAX_THRESHOLD_RECHECKS = 2;
@@ -780,11 +794,7 @@ export class SessionWriteCoordinator {
     for (let index = 0; index < serialized.length; index += RESULTS_ANALYSIS_VALUE_CHUNK_CHARS) {
       chunks.push(serialized.slice(index, index + RESULTS_ANALYSIS_VALUE_CHUNK_CHARS));
     }
-    if (chunks.length > RESULTS_ANALYSIS_MAX_DRAFT_CHUNKS) {
-      const error = new Error('Results analysis draft exceeds durable storage limits.');
-      error.status = 413;
-      throw error;
-    }
+    if (chunks.length > RESULTS_ANALYSIS_MAX_DRAFT_CHUNKS) throw draftTooLargeError(serialized.length);
     if (chunks.some((chunk) => byteLength(chunk) >= 120_000)) {
       const error = new Error('Results analysis draft chunk exceeds durable storage limits.');
       error.status = 413;
