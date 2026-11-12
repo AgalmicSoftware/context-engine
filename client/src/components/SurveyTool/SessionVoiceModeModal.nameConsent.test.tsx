@@ -285,6 +285,19 @@ it('keeps a declined AI draft text choice through login', async () => {
   expect(props.onRecordProvenance.mock.calls[0][7]).toEqual({ includeDraftText: false });
 });
 
+it('keeps no AI draft text when the setting turns on after the person read that none is kept', async () => {
+  const props = researchReviewProps();
+  const off = { interviewMode: { shareDraftChangesByDefault: true } };
+  const { rerender } = render(<SessionVoiceModeModal {...props} sessionConfig={off} />);
+  await screen.findByTestId(E2E_TESTIDS.SESSION_INTERVIEW_REVIEW);
+  const on = { interviewMode: { shareDraftChangesByDefault: true, keepDraftTextForAdmins: true } };
+  rerender(<SessionVoiceModeModal {...props} sessionConfig={on} />);
+  expect(screen.queryByTestId(E2E_TESTIDS.SESSION_INTERVIEW_INCLUDE_DRAFT_TEXT)).not.toBeInTheDocument();
+  fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_INTERVIEW_APPLY));
+  await waitFor(() => expect(props.onRecordProvenance).toHaveBeenCalledTimes(1));
+  expect(props.onRecordProvenance.mock.calls[0][7]).toEqual({ includeDraftText: false });
+});
+
 it('keeps provenance and the name inside AI submission info, before its metadata, and sharing on its bar', async () => {
   render(
     <SessionVoiceModeModal

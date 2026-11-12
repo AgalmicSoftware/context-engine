@@ -236,12 +236,10 @@ export default function SessionInterviewPanel({
   const [consentOverrides, setConsentOverrides] = useState<InterviewConsentOverrides>({});
   const [submissionInfoOpen, setSubmissionInfoOpen] = useState(false);
   const sessionResearchDetail = normalizeInterviewSettings(sessionConfig?.interviewMode).researchDetail;
-  // What the consent text described. It only ever narrows, so settings that load late can't widen
-  // what someone already agreed to share.
+  // What the consent text described: the research detail, and below whether draft text is kept. Each only
+  // narrows, so settings that load late can't widen what someone already agreed to share.
   const [shownResearchDetail, setShownResearchDetail] = useState(sessionResearchDetail);
-  useEffect(() => {
-    if (sessionResearchDetail === 'minimal') setShownResearchDetail('minimal');
-  }, [sessionResearchDetail]);
+  if (sessionResearchDetail === 'minimal' && shownResearchDetail !== 'minimal') setShownResearchDetail('minimal');
   const [showTranscript, setShowTranscript] = useState(false);
   // The questions an imported AI prefill drafted; its status line counts those still in review.
   const [prefillDraftIds, setPrefillDraftIds] = useState<string[]>([]);
@@ -258,6 +256,8 @@ export default function SessionInterviewPanel({
   const { showFidelityScore, joinMatchingGroups, keepDraftTextForAdmins } = normalizeInterviewSettings(
     sessionConfig?.interviewMode,
   );
+  const [draftTextShown, setDraftTextShown] = useState(keepDraftTextForAdmins);
+  if (draftTextShown && !keepDraftTextForAdmins) setDraftTextShown(false);
   const [showViewResults, setShowViewResults] = useState(false);
   const [hasRefreshableGroups, setHasRefreshableGroups] = useState(false);
   const [groupJoinRequest, setGroupJoinRequest] = useState(0);
@@ -458,7 +458,7 @@ export default function SessionInterviewPanel({
   const visibleDrafts = drafts.filter((draft) => !removedDraftIds[draft.questionId]);
   const consentDrafts = selectedDrafts.length ? selectedDrafts : drafts;
   const draftTextOverride = draftTextKept?.contextToken === baseSubmitContextToken ? draftTextKept.included : undefined;
-  const draftTextForwarded = keepDraftTextForAdmins ? draftTextOverride : undefined;
+  const draftTextForwarded = keepDraftTextForAdmins ? (draftTextShown ? draftTextOverride : false) : undefined;
   const { aiChoice, comparisonChoice, nameChoice, draftTextChoice, hasSavedName, hasSavedAi } =
     summarizeInterviewConsent({
       drafts: consentDrafts,
@@ -1467,7 +1467,7 @@ export default function SessionInterviewPanel({
                           unselectedCount={drafts.filter((draft) => !submittableSelection[draft.questionId]).length}
                           disabled={applying}
                           researchDetail={shownResearchDetail}
-                          draftText={keepDraftTextForAdmins ? draftTextChoice : null}
+                          draftText={draftTextShown ? draftTextChoice : null}
                           onDraftTextChange={(included) =>
                             setDraftTextKept({ contextToken: baseSubmitContextToken, included })
                           }
@@ -1485,7 +1485,7 @@ export default function SessionInterviewPanel({
                       mixed={comparisonChoice.mixed}
                       disabled={applying}
                       researchDetail={shownResearchDetail}
-                      draftTextOffered={keepDraftTextForAdmins}
+                      draftTextOffered={draftTextShown}
                       onChange={(included) => {
                         setResearchSharingChoice({ contextToken: baseSubmitContextToken, included });
                         setConsentOverrides((prev) => ({ ...prev, includePredictionComparison: included }));
