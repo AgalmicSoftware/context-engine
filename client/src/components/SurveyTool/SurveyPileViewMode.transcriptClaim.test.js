@@ -1,8 +1,11 @@
 import {
+  buildPileRuntimeInitialState,
   consumeTranscriptClaimHashIfPresent,
+  noteInterviewProgress,
   receiveTranscriptClaim,
   toggleSessionVoiceModeModal,
 } from './SurveyPileViewMode';
+import { readHeldClaim, releaseHeldClaim } from './sessionTranscriptClaim';
 
 const makeEngine = (sessionConfig = {}) => ({ props: { sessionConfig }, state: {}, setState: jest.fn() });
 
@@ -77,5 +80,75 @@ describe('a claimed part', () => {
     window.history.replaceState({}, '', '/session/salon');
     receiveTranscriptClaim(makeEngine(), claim);
     expect(window.location.search).toBe('');
+  });
+});
+
+describe('a claimed part across a reload', () => {
+  const claim = { sessionSlug: 'salon', person: 'Person 2', transcript: 'Responder: Yes.', joinGroup: 'salon-group' };
+  const reload = () =>
+    buildPileRuntimeInitialState({ props: { sessionSlug: 'salon' }, buildWarmPileSeedState: () => null });
+  beforeEach(() => {
+    releaseHeldClaim();
+    window.history.replaceState({}, '', '/session/salon');
+  });
+
+  it('reopens its review after a reload, such as a passkey sign-in', () => {
+    receiveTranscriptClaim(makeEngine(), claim);
+    window.history.replaceState({}, '', '/session/salon');
+    expect(reload()).toMatchObject({ showVoiceModeModal: true, sessionVoiceMode: 'interview', interviewClaim: claim });
+    // Only on its own session's page.
+    window.history.replaceState({}, '', '/session/other');
+    expect(
+      buildPileRuntimeInitialState({ props: { sessionSlug: 'other' }, buildWarmPileSeedState: () => null }),
+    ).toMatchObject({ interviewClaim: null });
+    expect(readHeldClaim('salon')).toEqual(claim);
+  });
+
+  it('gives way to a new code being scanned', () => {
+    receiveTranscriptClaim(makeEngine(), claim);
+    window.history.replaceState({}, '', '/session/salon#claim=ab12.0.3.data');
+    expect(reload()).toMatchObject({ interviewClaim: null, interviewClaimFrame: { id: 'ab12' } });
+  });
+
+  it('goes once its review is submitted or discarded, but not when a sign-in starts the dialog afresh', () => {
+    receiveTranscriptClaim(makeEngine(), claim);
+    expect(readHeldClaim('salon')).toEqual(claim);
+    // Opening the dialog afresh with no review in progress drops it, as the page's own copy is dropped.
+    toggleSessionVoiceModeModal({
+      ...makeEngine(),
+      state: { interviewProgressContext: '', interviewClaim: claim },
+      buildSessionInterviewSubmitContextToken: () => 'context',
+    });
+    expect(readHeldClaim('salon')).toBeNull();
+  });
+
+  it('stays through a sign-in mid-review, and goes when that review ends', () => {
+    receiveTranscriptClaim(makeEngine(), claim);
+    const engine = makeEngine();
+    engine.state = { interviewProgressContext: 'signed-out' };
+    // The sign-in gives the dialog a new context, whose fresh review isn't in progress yet.
+    noteInterviewProgress(engine, false, 'signed-in');
+    expect(readHeldClaim('salon')).toEqual(claim);
+    engine.state = { interviewProgressContext: 'signed-in' };
+    noteInterviewProgress(engine, true, 'signed-in');
+    expect(readHeldClaim('salon')).toEqual(claim);
+    // Submitted or discarded.
+    noteInterviewProgress(engine, false, 'signed-in');
+    expect(readHeldClaim('salon')).toBeNull();
+    expect(engine.setState).toHaveBeenLastCalledWith({ interviewProgressContext: '' });
+  });
+
+  it('forgets a damaged or day-old part', () => {
+    sessionStorage.setItem(
+      'ce:transcript-claim:v1',
+      JSON.stringify({ claim: { ...claim, transcript: 7 }, heldAt: Date.now() }),
+    );
+    expect(readHeldClaim('salon')).toBeNull();
+    expect(sessionStorage.getItem('ce:transcript-claim:v1')).toBeNull();
+    sessionStorage.setItem(
+      'ce:transcript-claim:v1',
+      JSON.stringify({ claim, heldAt: Date.now() - 25 * 60 * 60 * 1000 }),
+    );
+    expect(readHeldClaim('salon')).toBeNull();
   });
 });

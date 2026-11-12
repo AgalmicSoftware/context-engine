@@ -137,7 +137,10 @@ import {
 import {
   clearClaimHash,
   hasClaimHash,
+  holdClaim,
   readClaimFrame,
+  readHeldClaim,
+  releaseHeldClaim,
   type ClaimFrame,
   type TranscriptClaim,
 } from './sessionTranscriptClaim';
@@ -260,6 +263,11 @@ export const buildPileRuntimeInitialState = (engine: SurveyQuestionsRuntimeEngin
     interviewEnabled && typeof window !== 'undefined' && opensSessionVoiceChooser(window.location.search || '');
   const initialClaimFrame =
     interviewEnabled && typeof window !== 'undefined' ? readClaimFrame(window.location.hash || '') : null;
+  // A part claimed before a reload reopens its review; a new code being scanned replaces it.
+  const heldClaim =
+    interviewEnabled && typeof window !== 'undefined' && !initialClaimFrame
+      ? readHeldClaim(resolveEffectiveSlug(props))
+      : null;
   let initialPrefillPacket: InterviewPrefillPacket | null = null;
   let initialInterviewPrefillError = '';
   let initialInterviewPrefillNotice = '';
@@ -319,11 +327,13 @@ export const buildPileRuntimeInitialState = (engine: SurveyQuestionsRuntimeEngin
       initialPrefillPacket ||
       initialInterviewPrefillError ||
       initialClaimFrame ||
+      heldClaim ||
       opensVoiceChooser
     ),
     interviewClaimFrame: initialClaimFrame,
-    interviewClaim: null,
-    sessionVoiceMode: initialPrefillPacket || initialInterviewPrefillError ? 'interview' : initialVoiceMode,
+    interviewClaim: heldClaim,
+    sessionVoiceMode:
+      initialPrefillPacket || initialInterviewPrefillError || heldClaim ? 'interview' : initialVoiceMode,
     interviewPrefillPacket: initialPrefillPacket,
     interviewPrefillError: initialInterviewPrefillError,
     interviewPrefillNotice: initialInterviewPrefillNotice,
@@ -1116,6 +1126,7 @@ export const consumeTranscriptClaimHashIfPresent = (engine: PileViewModeEngine) 
 
 // Their part of the conversation goes to the interview, and they join the group the recorder's link was for.
 export const receiveTranscriptClaim = (engine: PileViewModeEngine, claim: TranscriptClaim) => {
+  holdClaim(claim);
   engine.setState({
     showVoiceModeModal: true,
     sessionVoiceMode: 'interview',
@@ -1127,6 +1138,14 @@ export const receiveTranscriptClaim = (engine: PileViewModeEngine, claim: Transc
   url.searchParams.set('joinGroup', claim.joinGroup);
   window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
   window.dispatchEvent(new PopStateEvent('popstate'));
+};
+
+export const noteInterviewProgress = (engine: PileViewModeEngine, inProgress: boolean, submitContextToken: string) => {
+  const interviewProgressContext = inProgress ? submitContextToken : '';
+  // A review that ends here was submitted or discarded, so its claimed part goes. One that ended with a sign-in
+  // (a new context) carries on in the next dialog and keeps it.
+  if (!inProgress && engine.state.interviewProgressContext === submitContextToken) releaseHeldClaim();
+  if (engine.state.interviewProgressContext !== interviewProgressContext) engine.setState({ interviewProgressContext });
 };
 
 const consumeInterviewPrefillHashIfPresent = (engine: PileViewModeEngine) => {
@@ -1594,6 +1613,7 @@ export const toggleSessionVoiceModeModal = (engine: PileViewModeEngine) => {
   }
   const resumeInterview =
     engine.state.interviewProgressContext === engine.buildSessionInterviewSubmitContextToken(engine.props);
+  if (!resumeInterview) releaseHeldClaim();
   engine.setState({
     showVoiceModeModal: true,
     sessionVoiceMode: resumeInterview ? 'interview' : null,
@@ -3540,12 +3560,9 @@ const renderPileViewMode = (engine: PileViewModeEngine) => {
             return (
               <LazySessionVoiceModeModal
                 key={submitContextToken}
-                onInterviewProgressChange={(inProgress: boolean) => {
-                  const interviewProgressContext = inProgress ? submitContextToken : '';
-                  if (engine.state.interviewProgressContext !== interviewProgressContext) {
-                    engine.setState({ interviewProgressContext });
-                  }
-                }}
+                onInterviewProgressChange={(inProgress: boolean) =>
+                  noteInterviewProgress(engine, inProgress, submitContextToken)
+                }
                 questionCreatorProps={{ ...engine.props, ...engine.getAudioInputWorkerProps() }}
                 {...engine.props}
                 {...engine.getAudioInputWorkerProps()}
