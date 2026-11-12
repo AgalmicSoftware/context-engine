@@ -70369,9 +70369,9 @@ var init_aiModelFamily = __esm({
     takesLongReply = (model) => {
       const leaf = toModelLeaf(model);
       if (/-chat(?:$|-)/.test(leaf)) return false;
-      return isGpt5Or6(leaf) || isOSeries(leaf) || /^gpt-4\.1(?:$|-)/.test(leaf) || /^claude-(?:opus|sonnet|haiku|fable|mythos)-(?:[5-9]|4-[5-9])(?:$|-)/.test(leaf);
+      return isGpt5Or6(leaf) || isOSeries(leaf) || /^gpt-4\.1(?:$|-)/.test(leaf) || /^claude-(?:opus|sonnet|haiku|fable|mythos)-(?:[5-9]|4[.-][5-9])(?:$|[.-])/.test(leaf);
     };
-    interviewMapOutputTokens = (model) => takesLongReply(model) ? 32e3 : 8e3;
+    interviewMapOutputTokens = (model, provider = "") => String(provider || "").trim().toLowerCase() !== "custom" && takesLongReply(model) ? 32e3 : 8e3;
     LADDER = ["none", "minimal", "low", "medium", "high", "xhigh", "max"];
     GPT_FULL = Object.freeze(["none", "low", "medium", "high", "xhigh", "max"]);
     GPT_FROM_LOW = Object.freeze(["low", "medium", "high", "xhigh", "max"]);
@@ -70519,7 +70519,7 @@ var init_aiRequestPolicy = __esm({
       if (!model || !allowed.some((entry2) => entry2.model === model)) return { ok: false, ...AI_MODEL_NOT_ALLOWED };
       const reasoning = isChatReasoningModel({ model }) || models2.thinking.provider === provider && models2.thinking.model === model;
       const responses = usesOpenAiResponsesApi({ provider, model, endpoint: payload.endpoint });
-      const ceiling = task === "interview-map" ? interviewMapOutputTokens(model) : operationCeilings[task] || (reasoning || responses ? 16e3 : 2048);
+      const ceiling = task === "interview-map" ? interviewMapOutputTokens(model, provider) : operationCeilings[task] || (reasoning || responses ? 16e3 : 2048);
       const requested = tokenFields.filter((key) => Object.hasOwn(payload, key)).map((key) => {
         const value = payload[key];
         return typeof value === "number" && Number.isFinite(value) && value >= 1 ? Math.floor(value) : ceiling;
