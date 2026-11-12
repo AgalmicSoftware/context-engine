@@ -43,6 +43,8 @@ export type SessionWizardShellProps = {
   renderField: SessionWizardRenderField;
   slugPreview: React.ReactNode;
   questionsPublisher?: React.ReactNode;
+  /** "Suggest questions", under the Questions section's list. */
+  questionsSuggest?: React.ReactNode;
   /** The Context section's files (before Create) and what adds them after it. */
   contextSources?: React.ReactNode;
   contextPublisher?: React.ReactNode;
@@ -84,6 +86,7 @@ const SessionWizardShell = ({
   renderField,
   slugPreview,
   questionsPublisher = null,
+  questionsSuggest = null,
   contextSources = null,
   contextPublisher = null,
   encryptionPanelProps,
@@ -125,7 +128,7 @@ const SessionWizardShell = ({
           headerImage={renderField('sessionHeader', draft.sessionHeader, [])}
         />
         <SetupContextSection {...section('context')} sources={contextSources} publisher={contextPublisher} />
-        <SetupQuestionsSection {...section('questions')} publisher={questionsPublisher} />
+        <SetupQuestionsSection {...section('questions')} publisher={questionsPublisher} suggest={questionsSuggest} />
         <SetupParticipationSection {...section('participation')} workerHosted={isWorkerCanonical} />
         <SetupResultsSection {...section('results')} {...policy} />
         <SetupAccessSection

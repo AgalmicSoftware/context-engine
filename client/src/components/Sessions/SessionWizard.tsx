@@ -100,6 +100,7 @@ import {
   SessionTemplateLinkNotice,
   SetupQuestionsPublisher,
 } from './setup/SessionTemplateTools';
+import { SetupSuggestQuestions } from './setup/SetupSuggestQuestions';
 import {
   diffSessionTemplates,
   sessionTemplateFromDraft,
@@ -2760,6 +2761,23 @@ const SessionWizard = ({
             groups={contextFileGroups}
           />
         ) : null
+      }
+      questionsSuggest={
+        <SetupSuggestQuestions
+          draft={draft}
+          pending={pendingContextFiles}
+          apiKey={toStr(workerSecrets.openaiKey)}
+          onAdd={(suggested) =>
+            setDraft((prev) => {
+              const next = {
+                ...prev,
+                questions: [...(Array.isArray(prev.questions) ? prev.questions : []), ...suggested],
+              };
+              draftRef.current = next;
+              return next;
+            })
+          }
+        />
       }
       questionsPublisher={
         sessionModeRequirements.isWorkerCanonical ? (

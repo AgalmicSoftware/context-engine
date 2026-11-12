@@ -532,6 +532,18 @@ The core session metadata:
   for any of the groups set up under Access and identity, chosen in its
   **Visible to** dropdown; they are added after **Create**, when PDFs can be read by the session's AI and
   the links' pages read for it. See [Session context](session-context-sources.md).
+- **Suggest questions**, under the Questions list, drafts five questions from
+  the name, description, context text, link titles and addresses (it doesn't
+  open the pages), and the files added to Context, admins-only ones too. It
+  follows **Question prompt** and **Tag suggestions** under AI, skips questions
+  already in the list, and uses the session's question types. It needs the
+  OpenAI key typed under AI: the browser sends the request straight to OpenAI's
+  Responses API, unstored, and the key goes nowhere else. Text files go in as
+  text, and PDFs with **Analyze with the session’s AI** on go in as files, up to
+  32 MB together; the page names any it leaves out. The context is marked as
+  untrusted material, as the session page's question generator marks it.
+  Drafts join the list, where you can edit or remove them; nothing reaches the
+  session before **Create**.
 - **Colors** in Basics: `Context Engine`, `Ocean`, or `Amber`. This controls
   only documented session accents/chrome and does not change the app theme.
 - slug: the page makes it from the name and shows the resulting link.

@@ -352,11 +352,20 @@ const splitOptions = (value: string): string[] =>
 type QuestionsProps = SetupSectionProps & {
   /** After creation: what adds the questions to the session. */
   publisher?: React.ReactNode;
+  /** /new: drafts questions from the page's context. */
+  suggest?: React.ReactNode;
 };
 
 // Questions travel with a template. They're added to the session once it
 // exists, as the question editor adds them, so a draft only lists them.
-export const SetupQuestionsSection = ({ draft, onChange, open, onToggle, publisher = null }: QuestionsProps) => {
+export const SetupQuestionsSection = ({
+  draft,
+  onChange,
+  open,
+  onToggle,
+  publisher = null,
+  suggest = null,
+}: QuestionsProps) => {
   const questions = readSetupQuestions(draft);
   const [newType, setNewType] = useState('binary');
   const [newPrompt, setNewPrompt] = useState('');
@@ -466,6 +475,7 @@ export const SetupQuestionsSection = ({ draft, onChange, open, onToggle, publish
           Add question
         </button>
       </div>
+      {suggest}
     </SetupSection>
   );
 };
