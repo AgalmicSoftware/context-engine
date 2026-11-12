@@ -100,6 +100,10 @@ export const validateStorageUploadPayload = ({ resource, bytes, payloadEncrypted
       if (!Array.isArray(payload.responses) || !payload.responses.length) {
         return invalid(resource, 'responses must be a non-empty array');
       }
+      // A bundle's answers are its responses alone; one beside them would go unchecked.
+      if (['questionID', 'questionId', 'answer'].some((field) => payload[field] !== undefined)) {
+        return invalid(resource, 'a bundle carries its answers in responses only');
+      }
       for (const [index, item] of payload.responses.entries()) {
         const failure = validateResponseItem(item, `responses[${index}]`);
         if (failure) return failure;

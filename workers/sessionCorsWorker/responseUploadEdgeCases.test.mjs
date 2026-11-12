@@ -70,3 +70,14 @@ test("agents' proposed questions raise the row limit until archived", async () =
   const next = await person();
   assert.equal(await fill(() => uploadJson({ env, token: next, resource: 'responses', data: answer('q-a') })), 5);
 });
+
+test('a bundle carries its answers in responses alone', async () => {
+  const { env, person } = await setup({ questions: ['q-a', 'q-b'] });
+  const token = await person();
+  for (const extra of [{ questionID: 'q-made-up' }, { answer: { value: 'not checked' } }]) {
+    const mixed = await uploadJson({ env, token, resource: 'responses', data: { surveyID: 's-1', ...session, responses: [answer('q-a')], ...extra } });
+    assert.equal(mixed.status, 400, JSON.stringify(mixed.body));
+  }
+  const bundle = await uploadJson({ env, token, resource: 'responses', data: { surveyID: 's-1', ...session, responses: [answer('q-a'), answer('q-b')] } });
+  assert.equal(bundle.status, 200, JSON.stringify(bundle.body));
+});
