@@ -44,7 +44,10 @@ describe('SetupGroupAgent', () => {
     expect(last()).toEqual({ audiences: [everyone] });
     expect(screen.getByTestId('ce-setup-group-agent-0-answers')).toHaveValue('general');
     // Each style's instructions start as its default.
-    expect(screen.getByTestId('ce-setup-group-agent-detailed')).toHaveValue(GROUP_AGENT_DEFAULT_INSTRUCTIONS.detailed);
+    const detailed = screen.getByTestId('ce-setup-group-agent-detailed');
+    expect(detailed).toHaveValue(GROUP_AGENT_DEFAULT_INSTRUCTIONS.detailed);
+    // The session's settings are public, and the "?" says so for what an admin writes here.
+    expect(detailed).toHaveAccessibleDescription(expect.stringContaining('these instructions can be read by anyone'));
     fireEvent.click(screen.getByTestId('ce-setup-group-agent'));
     expect(last()).toBeNull();
   });

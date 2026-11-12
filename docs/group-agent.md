@@ -62,7 +62,9 @@ as it does a file's **Visible to**. `match` is `any` or `all` of its rules:
 wrong shape, an unknown field or anything over a limit with `400`, and stores
 the normal form: group IDs and contracts in lower case, repeated groups once,
 and blank or default instructions left out. Instructions that look like a key,
-token or password are refused. Saving the setting signs no one out.
+token or password are refused. Saving the setting signs no one out. The setting
+is part of the session's public config, so anyone can read who may ask and the
+instructions; Settings says so beside the instructions.
 
 ## What each style reads
 

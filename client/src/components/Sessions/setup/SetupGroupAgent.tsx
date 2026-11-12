@@ -36,7 +36,8 @@ const ANSWERS_HELP =
 const MATCH_HELP = 'Any: people who meet at least one rule. All: only people who meet every rule.';
 const instructionsHelp = (style: string) =>
   `How ${STYLE_LABELS[style]} answers are written. Leave it blank for the default. Always added: answer only ` +
-  `from the session’s material, never name anyone, and use at most ${L.answerWords} words.`;
+  `from the session’s material, never name anyone, and use at most ${L.answerWords} words. Like the rest of the ` +
+  'session’s settings, these instructions can be read by anyone.';
 
 /** The first reason the setting can't be saved, or '' when it can. */
 export const describeGroupAgentProblem = (value: unknown): string => {
