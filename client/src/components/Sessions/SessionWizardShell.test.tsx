@@ -215,7 +215,7 @@ describe('SessionWizardShell', () => {
     expect(within(runsOn).getByRole('radio', { name: 'Centralized' })).toBeChecked();
 
     fireEvent.click(within(runsOn).getByRole('radio', { name: 'Decentralized' }));
-    const [edit] = (props.editProfile as jest.Mock).mock.calls.at(-1);
+    const [edit] = jest.mocked(props.editProfile).mock.calls[0];
     const { profile } = editSessionSetupProfile(defaultSessionSetupProfile(), edit);
     expect(profile.authority.mode).toBe('evm_registry_canonical');
 
