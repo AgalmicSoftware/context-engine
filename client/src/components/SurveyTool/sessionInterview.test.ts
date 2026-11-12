@@ -701,6 +701,10 @@ it('maps a numeric reply using the session thinking model and keeps the rating v
   const options = jest.mocked(callAI).mock.calls[0][1] as Record<string, unknown>;
   expect(options).not.toHaveProperty('provider');
   expect(options).not.toHaveProperty('model');
+  // The reply room is chosen where the model is known, not fixed here.
+  expect(options).toMatchObject({ taskType: 'interview-map' });
+  expect(options).not.toHaveProperty('maxTokens');
+  expect(options).not.toHaveProperty('max_tokens');
   expect(result).toEqual([{ questionId: 'trust', answer: 4, confidence: 1 }]);
 });
 

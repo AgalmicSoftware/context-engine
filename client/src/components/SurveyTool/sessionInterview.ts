@@ -731,7 +731,6 @@ export const mapInterviewEvidenceToResponses = async ({
       reasoningEffort: 'medium',
       service_tier: 'default',
       response_format: { type: 'json_object' },
-      maxTokens: 8000,
     },
   );
   const responses = parseInterviewDraftResponses(raw, questions);

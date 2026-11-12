@@ -146,6 +146,28 @@ it('sends the higher interview mapping effort even when the session default is l
   });
 });
 
+it('asks for a long interview mapping reply only from a model documented to take one', () => {
+  const budget = (provider: string, model: string, opts = {}) => {
+    const plan = buildAiWorkerRequestPlan({ ai: { provider, model }, taskType: 'interview-map', opts });
+    return plan.requestBody[plan.tokenBudgetKey];
+  };
+  expect(budget('openai', 'gpt-6.1-terra')).toBe(32000);
+  expect(budget('openai', 'gpt-6.1-sol')).toBe(32000);
+  expect(budget('anthropic', 'claude-opus-5-5')).toBe(32000);
+  expect(budget('anthropic', 'claude-sonnet-5-5')).toBe(32000);
+  expect(budget('openrouter', 'openai/gpt-6-astra')).toBe(32000);
+  // A model with no documented room keeps the reply size every model takes.
+  expect(budget('openai', 'gpt-4o')).toBe(8000);
+  expect(budget('openai', 'gpt-5-chat-latest')).toBe(8000);
+  expect(budget('openrouter', 'meta-llama/llama-3.3-70b-instruct')).toBe(8000);
+  expect(budget('custom', 'configured-model')).toBe(8000);
+  // A caller's own number still wins, and other tasks keep their defaults.
+  expect(budget('openai', 'gpt-6.1-terra', { maxTokens: 500 })).toBe(500);
+  expect(
+    buildAiWorkerRequestPlan({ ai: { provider: 'openai', model: 'gpt-6.1-terra' }, taskType: 'generate' }).maxTokens,
+  ).toBe(16384);
+});
+
 it('sends the new GPT-6 models to Responses with an effort each accepts', () => {
   for (const [model, effort, sent] of [
     ['gpt-6.1-terra', 'low', 'low'],
