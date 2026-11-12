@@ -217,11 +217,11 @@ export const renderFidelityMarkdown = (report) => {
       `(${coverage.byCondition.shown} shown, ${coverage.byCondition.blind} hidden, ${coverage.byCondition.separate} separate). ` +
       `${coverage.freeformPredictions + (coverage.skippedRecords?.freeformWithoutText ?? 0)} freeform predictions are not scored. ` +
       `Intervals are 95% bootstrap intervals over people (${report.options.bootstrapSamples} samples, seed ${report.options.seed}); ` +
-      `results from ${fewer} are withheld.`,
+      (minimum > 1 ? `results from ${fewer} are withheld.` : 'the minimum is 1, so nothing is withheld for size.'),
     '',
     '## Headline: AI prefill',
     '',
-    'The headline scores predictions made before the person spoke: drafts from their own ChatGPT or Claude (AI prefill), ' +
+    'The headline scores predictions made before the person spoke: drafts from each person\'s own AI assistant (AI prefill), ' +
       'and Session Wrapped predictions when given. Interview, typed-note and group-recording drafts restate what the person ' +
       'said, so they are scored on their own rows in "Where drafts came from" and never pooled with these.',
     '',
@@ -248,8 +248,11 @@ export const renderFidelityMarkdown = (report) => {
     '',
     '## Breakdowns',
     '',
-    `Rows from ${fewer} are withheld. Rows that divide people (where the draft came from, platform and group) are also withheld ` +
-      'when subtracting them from the total, or from each other, would leave fewer.',
+    minimum > 1
+      ? `Rows from ${fewer} are withheld. Rows that divide people (where the draft came from, platform, model, context ` +
+        'used and group) are also withheld when subtracting them from the total, or from each other or another such ' +
+        'table, would leave fewer.'
+      : 'With a minimum of 1 every row is shown, including single people.',
     '',
     breakdownTable('By question type', mirrorScore.byType),
     '',
@@ -358,8 +361,8 @@ export const runFidelityReport = (args) => {
     ...(args.seed !== undefined ? { seed: args.seed } : {}),
     ...(args['min-participants'] !== undefined ? { minParticipants: args['min-participants'] } : {}),
   };
-  const kept = (pair) =>
-    !excludeParticipants.some((id) => id.toLowerCase() === pair.participantId) && (args.includeAgents || !pair.isAgent);
+  const excluded = new Set(excludeParticipants.map((id) => id.toLowerCase()));
+  const kept = (pair) => !excluded.has(pair.participantId.toLowerCase()) && (args.includeAgents || !pair.isAgent);
   const pseudonyms = pseudonymsFor(pairs.filter(kept).map((pair) => pair.participantId));
   const report = scoreAgentFidelity({
     questions,
@@ -370,6 +373,18 @@ export const runFidelityReport = (args) => {
     options,
   });
   report.origins = scoreDraftOrigins({ questions, pairs, drafts, options });
+  // The headline pools prefill and Session Wrapped, so subtracting one's row from it would reveal the other:
+  // their rows here follow the headline's own withholding.
+  for (const origin of PREDICTION_ORIGINS) {
+    const row = report.origins[origin];
+    if (!row || !report.mirrorScore.byOrigin[origin]?.suppressed) continue;
+    report.origins[origin] = Object.fromEntries(
+      Object.entries(row).map(([key, value]) => [
+        key,
+        value && typeof value === 'object' ? { value: null, interval: null, participants: value.participants, suppressed: true } : value,
+      ]),
+    );
+  }
   report.coverage.skippedRecords = skipped;
   const out = args.out || '.';
   mkdirSync(out, { recursive: true });

@@ -981,3 +981,40 @@ test('a minimum of 1 withholds nothing that has people behind it', () => {
   assert.equal(report.mirrorScore.byCondition.blind.participants, 1);
   assert.equal(report.participants.length, 10);
 });
+
+test('a model or context row is withheld when another table would let it be subtracted out', () => {
+  // Claude: seven on one model, three on another; ChatGPT: six and six. Each model row alone is big enough or not,
+  // but Claude's platform row minus its larger model's row would be the three people's score.
+  const crowd = Array.from({ length: 22 }, (_, index) => ({
+    id: `0x${String(index + 100).padStart(40, '0')}`,
+    platform: index < 10 ? 'claude' : 'chatgpt',
+    modelId: index < 7 ? 'sonnet' : index < 10 ? 'opus' : index < 16 ? 'gpt-a' : 'gpt-b',
+  }));
+  const pairs = crowd.flatMap((person) =>
+    statements.map((questionId) => ({
+      participantId: person.id,
+      questionId,
+      condition: 'shown',
+      origin: 'external_prefill',
+      platform: person.platform,
+      modelId: person.modelId,
+      prediction: person.modelId === 'opus' ? 'Disagree' : 'Agree',
+      actual: 'Agree',
+      confidence: 0.9,
+    })),
+  );
+  const { mirrorScore } = scoreAgentFidelity({ questions, pairs, options: { bootstrapSamples: 50, minParticipants: 5 } });
+  assert.equal(mirrorScore.byModel.opus.suppressed, true);
+  assert.ok(
+    mirrorScore.byPlatform.claude.suppressed || mirrorScore.byModel.sonnet.suppressed,
+    'Claude minus Sonnet would be the three Opus users',
+  );
+  // Keys everyone shares only repeat the total, so they are shown and don't hide the rest.
+  assert.equal(mirrorScore.byContext['not reported'].participants, 22);
+  assert.equal(mirrorScore.byContext['not reported'].suppressed, undefined);
+  // Nor can the total minus every shown row leave a few people.
+  const shownKey = (person) => !mirrorScore.byPlatform[person.platform].suppressed || !mirrorScore.byModel[person.modelId].suppressed;
+  const uncovered = crowd.filter((person) => !shownKey(person)).length;
+  assert.ok(uncovered === 0 || uncovered >= 5, `${uncovered} people left over`);
+  assert.equal(mirrorScore.byPlatform.chatgpt.value, 1);
+});

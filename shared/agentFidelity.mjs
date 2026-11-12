@@ -538,12 +538,15 @@ const estimate = (values, options) => {
  * `keysByPerson` lists each person's keys.
  */
 export const reportableKeys = (keysByPerson, min) => {
+  if (keysByPerson.length < min) return [];
   const kept = new Set(keysByPerson.flat());
   const sizeOf = (key) => keysByPerson.filter((keys) => keys.includes(key)).length;
+  // A key everyone has describes the same people as the total, so it divides no one.
+  const everyone = new Set([...kept].filter((key) => sizeOf(key) === keysByPerson.length));
   for (;;) {
     const sets = new Map();
     for (const keys of keysByPerson) {
-      const signature = JSON.stringify([...new Set(keys.filter((key) => kept.has(key)))].sort());
+      const signature = JSON.stringify([...new Set(keys.filter((key) => kept.has(key) && !everyone.has(key)))].sort());
       sets.set(signature, (sets.get(signature) ?? 0) + 1);
     }
     const small = [...sets].find(([, size]) => size < min);
@@ -806,13 +809,32 @@ const breakdown = (people, keyOf, valueOf, options) => {
 // Platforms and draft origins mostly divide people rather than their drafts,
 // so like groups, a key is also withheld when subtracting it from the total,
 // or from the other keys, would leave fewer than the minimum.
-const peopleBreakdown = (people, keyOf, valueOf, options) => {
-  const reportable = new Set(reportableKeys(people.map((person) => person.pairs.map(keyOf)), options.minParticipants));
+// `reportable` lists the keys that may be shown, when several breakdowns are withheld together.
+const peopleBreakdown = (people, keyOf, valueOf, options, reportable = null) => {
+  const shown = reportable ?? new Set(reportableKeys(people.map((person) => person.pairs.map(keyOf)), options.minParticipants));
   return Object.fromEntries(
     Object.entries(breakdown(people, keyOf, valueOf, options)).map(([key, result]) => [
       key,
-      reportable.has(key) ? result : withheld(result.participants),
+      shown.has(key) ? result : withheld(result.participants),
     ]),
+  );
+};
+// Origin, platform, model and context each divide the same people, and a model sits inside its platform, so
+// subtracting one table's row from another's could reveal a few people's score. Their rows are withheld together.
+const DIVIDING = {
+  byOrigin: (pair) => pair.origin,
+  byPlatform: (pair) => pair.platform,
+  byModel: (pair) => pair.modelId ?? 'unknown',
+  byContext: (pair) => pair.context ?? 'not reported',
+};
+const dividingBreakdowns = (people, settings) => {
+  const keysOf = (pair) => Object.entries(DIVIDING).map(([name, keyOf]) => JSON.stringify([name, keyOf(pair)]));
+  const kept = reportableKeys(people.map((person) => person.pairs.flatMap(keysOf)), settings.minParticipants).map((key) => JSON.parse(key));
+  return Object.fromEntries(
+    Object.entries(DIVIDING).map(([name, keyOf]) => {
+      const reportable = new Set(kept.filter(([of]) => of === name).map(([, key]) => key));
+      return [name, peopleBreakdown(people, keyOf, meanSimilarity, settings, reportable)];
+    }),
   );
 };
 const meanSimilarity = (pairs) => mean(pairs.map((pair) => pair.similarity));
@@ -915,10 +937,7 @@ const coreScores = (people, settings) => ({
     overall: estimate(people.map((person) => meanSimilarity(person.pairs)), settings),
     byCondition: breakdown(people, (pair) => pair.condition, meanSimilarity, settings),
     byType: breakdown(people, (pair) => pair.question.type, meanSimilarity, settings),
-    byOrigin: peopleBreakdown(people, (pair) => pair.origin, meanSimilarity, settings),
-    byPlatform: peopleBreakdown(people, (pair) => pair.platform, meanSimilarity, settings),
-    byModel: peopleBreakdown(people, (pair) => pair.modelId ?? 'unknown', meanSimilarity, settings),
-    byContext: peopleBreakdown(people, (pair) => pair.context ?? 'not reported', meanSimilarity, settings),
+    ...dividingBreakdowns(people, settings),
   },
   correctionRate: estimate(
     people.map((person) => {

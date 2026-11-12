@@ -146,8 +146,14 @@ Similarity between a prediction and an answer runs from 0 to 1:
   draft came from, and group) also withhold a row when subtracting it from the total, or
   from the other rows, would reveal a result for fewer people than the
   minimum: with six people, five on Claude and one on ChatGPT, a minimum of 5
-  shows neither platform. The smallest row goes first. The benchmark's
-  `compare-answers` applies the same rule to its groups.
+  shows neither platform. The smallest row goes first. A row everyone shares
+  only repeats the total, so it never counts as dividing anyone. Origin,
+  platform, model and context rows are checked together, since a model sits
+  inside its platform: Claude minus its larger model would otherwise give the
+  smaller one. In the command-line report the AI prefill and Session Wrapped
+  rows of "Where drafts came from" follow the headline's own withholding, as
+  the headline pools the two. The benchmark's `compare-answers` applies the
+  same rule to its groups.
   - Withheld groups are not named at all, since a group can be a single
     invite link.
 - The overall calibration figure counts every confidence band, including bands

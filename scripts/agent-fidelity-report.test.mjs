@@ -244,6 +244,65 @@ test('interview drafts get their own row, not the headline, and predictions expo
   }
 });
 
+test('prefill and Session Wrapped rows follow the headline, and exclusions ignore case', () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'agent-fidelity-'));
+  try {
+    // Six prefill people and two Session Wrapped people; six voice and four typed-note people would otherwise
+    // make the prefill origin row showable, and the headline minus it would be the two Wrapped people.
+    const survey = exportFixture();
+    for (let index = 6; index < 16; index += 1) {
+      survey.filteredResponses.push({
+        responder: `0x${String(index + 1).padStart(40, '0')}`,
+        response: JSON.stringify({
+          responses: ['q1', 'q2'].map((questionID) => ({
+            questionID,
+            answer: { value: 'Agree', encrypted: false },
+            interviewProvenance: {
+              version: 2,
+              draftOrigin: index < 12 ? 'voice_interview' : 'typed_context',
+              originalPrediction: { answer: 'Agree', confidence: 0.9 },
+            },
+          })),
+        }),
+      });
+    }
+    const input = path.join(dir, 'results.json');
+    writeFileSync(input, JSON.stringify(survey));
+    const wrappedId = '0xAbCdEf0000000000000000000000000000000001';
+    const wrapped = ['0xAbCdEf0000000000000000000000000000000001', '0xAbCdEf0000000000000000000000000000000002'].flatMap(
+      (principal) =>
+        ['q1', 'q2'].map((statementId) => ({
+          principal_id: principal,
+          statement_id: statementId,
+          agent_prediction: 'Disagree',
+          human_current_answer: 'Agree',
+          agent_confidence: 60,
+          model: 'wrapped-model',
+        })),
+    );
+    const wrappedFile = path.join(dir, 'wrapped.jsonl');
+    writeFileSync(wrappedFile, wrapped.map((row) => JSON.stringify(row)).join('\n'));
+    const csv = path.join(dir, 'predictions.csv');
+    let run = runReport(dir, ['--export', input, '--wrapped', wrappedFile, '--predictions', csv]);
+    assert.equal(run.status, 0, run.stderr);
+    const report = JSON.parse(readFileSync(path.join(dir, 'agent-fidelity-report.json'), 'utf8'));
+    assert.equal(report.mirrorScore.overall.participants, 8);
+    assert.equal(report.mirrorScore.byOrigin.wrapped_agent.suppressed, true);
+    assert.equal(report.origins.external_prefill.mirrorScore.suppressed, true, 'the headline minus prefill would be Wrapped');
+    assert.equal(report.origins.voice_interview.mirrorScore.value, 1);
+
+    // An exclusion written in any case leaves the person out of the CSV too.
+    const exclude = path.join(dir, 'exclude.txt');
+    writeFileSync(exclude, `wrapped:${wrappedId}\n`);
+    run = runReport(dir, ['--export', input, '--wrapped', wrappedFile, '--predictions', csv, '--exclude', exclude]);
+    assert.equal(run.status, 0, run.stderr);
+    const lines = readFileSync(csv, 'utf8').trim().split('\n').slice(1);
+    assert.equal(lines.filter((line) => line.includes('"wrapped_agent"')).length, 2, 'one Wrapped person is left');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('the command exits non-zero with usage on bad input', () => {
   const run = spawnSync(process.execPath, [script], { encoding: 'utf8' });
   assert.equal(run.status, 1);
