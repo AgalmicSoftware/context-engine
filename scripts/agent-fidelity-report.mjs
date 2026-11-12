@@ -115,7 +115,8 @@ export const renderFidelityMarkdown = (report) => {
   const uncalibrated = Object.values(otherMeanings).reduce((sum, count) => sum + count, 0);
   const minimum = report.options.minParticipants;
   const fewer = `fewer than ${minimum} people`;
-  const cell = (result, format = decimal) => (result?.suppressed ? fewer : format(result?.value));
+  const cell = (result, format = decimal) =>
+    result?.suppressed ? (result.participants === 0 ? 'no data' : fewer) : format(result?.value);
   const breakdownTable = (label, results = {}, nameOf = (key) => key) =>
     Object.keys(results).length
       ? `### ${label}\n\n${table(

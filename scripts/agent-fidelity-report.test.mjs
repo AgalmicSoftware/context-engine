@@ -137,7 +137,7 @@ test('the command writes JSON and Markdown reports from a Results export', () =>
     assert.match(markdown, /Correction rate \(choice drafts shown and changed\): 33%/);
     // Always "Agree" is right exactly as often as chance; there are no ratings.
     assert.match(markdown, /\| Cohen's kappa, choice predictions \| 0\.00 \|/);
-    assert.match(markdown, /\| Rating error, as a share of the scale \| fewer than 3 people \|/);
+    assert.match(markdown, /\| Rating error, as a share of the scale \| no data \|/);
     // These records don't say which prompt version made them, so their confidences aren't calibrated.
     assert.deepEqual(report.coverage.byConfidenceMeaning, { unknown: 12 });
     assert.match(markdown, /12 choice predictions are left out of calibration/);
@@ -304,6 +304,41 @@ test('prefill and Session Wrapped rows follow the headline, and exclusions ignor
     assert.equal(run.status, 0, run.stderr);
     const lines = readFileSync(csv, 'utf8').trim().split('\n').slice(1);
     assert.equal(lines.filter((line) => line.includes('"wrapped_agent"')).length, 2, 'one Wrapped person is left');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('excluded people and agents leave no freeform rows in the predictions file', () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'agent-fidelity-'));
+  try {
+    const survey = exportFixture();
+    survey.filteredQuestions.push({ id: 'qf', type: 'freeform', prompt: 'Why?' });
+    const freeformFrom = (index, extra = {}) => ({
+      responder: `0x${String(index).padStart(40, '0')}`,
+      response: JSON.stringify({
+        ...extra,
+        responses: [
+          {
+            questionID: 'qf',
+            answer: { value: 'Text', encrypted: false },
+            interviewProvenance: { version: 2, draftOrigin: 'voice_interview', originalPrediction: { answer: null, confidence: 0.5 }, changedFields: ['answer'] },
+          },
+        ],
+      }),
+    });
+    // The first fixture person (excluded below, by an upper-case address), an agent and one other person.
+    survey.filteredResponses.push(freeformFrom(1), freeformFrom(20, { participant: { kind: 'agent' } }), freeformFrom(21));
+    const input = path.join(dir, 'results.json');
+    const exclude = path.join(dir, 'exclude.txt');
+    const csv = path.join(dir, 'predictions.csv');
+    writeFileSync(input, JSON.stringify(survey));
+    writeFileSync(exclude, `0x${'1'.padStart(40, '0').toUpperCase()}\n`);
+    const run = runReport(dir, ['--export', input, '--exclude', exclude, '--predictions', csv]);
+    assert.equal(run.status, 0, run.stderr);
+    const lines = readFileSync(csv, 'utf8').trim().split('\n').slice(1);
+    assert.equal(lines.filter((line) => line.includes('"freeform"')).length, 1, "only the other person's draft");
+    assert.equal(lines.length, 11, "five people's two predictions and one freeform draft");
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
