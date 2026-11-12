@@ -399,6 +399,7 @@ export const STORAGE_READ_BATCH_MAX_IDS = 100;
  * Reads up to 100 stored JSON payloads in one request (Workers that advertise
  * `storage_read_batch_v1`). Returns each payload in the order asked, or null
  * when it isn't JSON; an item the Worker refuses fails the call, as a single read would.
+ * An item the batch won't return as text is read on its own.
  */
 export const readSessionStorageBatch = async ({
   ids,
@@ -435,17 +436,35 @@ export const readSessionStorageBatch = async ({
       .filter((item): item is UnknownRecord => !!item && typeof item === 'object')
       .map((item) => [toStr(item.id), item]),
   );
-  return ids.map((id) => {
-    const item = items.get(id);
-    if (!item || item.status !== 200) {
-      throw new Error(toStr(item?.error) || `Storage read failed (${toStr(item?.status) || 'missing'}).`);
-    }
+  const parse = (text: string) => {
     try {
-      return JSON.parse(toStr(item.text));
+      return JSON.parse(text);
     } catch {
       return null;
     }
-  });
+  };
+  return Promise.all(
+    ids.map(async (id) => {
+      const item = items.get(id);
+      // An item stored without a text type is read on its own, as before batches.
+      if (item?.status === 415) {
+        const single = await readSessionStorageBlob({
+          storageRef: { id, backend: STORAGE_BACKENDS.CLOUDFLARE },
+          sessionSlug,
+          sessionConfig,
+          context,
+          workerUrl: baseUrl,
+          signal,
+          preferAnonymous,
+        });
+        return parse(await single.text());
+      }
+      if (!item || item.status !== 200) {
+        throw new Error(toStr(item?.error) || `Storage read failed (${toStr(item?.status) || 'missing'}).`);
+      }
+      return parse(toStr(item.text));
+    }),
+  );
 };
 
 export const listSessionStorageRefsPage = async ({
