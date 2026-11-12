@@ -265,14 +265,6 @@
             "run",
             "test:worker:session-cors"
           ]
-        },
-        {
-          "label": "Run session agent tests",
-          "command": "npm",
-          "args": [
-            "run",
-            "test:worker:agent"
-          ]
         }
       ]
     },

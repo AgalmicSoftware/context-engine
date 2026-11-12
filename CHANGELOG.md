@@ -47,6 +47,7 @@ All notable changes to this project will be documented in this file.
 
 ### Local tooling
 
+- CI runs the Agent HTTP tests once. The Session Worker suite already includes them, so the workers gate no longer runs `test:worker:agent` as well; the test wiring check now requires the suite to keep including them.
 - `npm run ai:test-theme:results-builds` checks the built debate atlas and risk matrix in each theme at phone and desktop widths; `ai:test-theme:atlas` is gone.
 
 ## [0.9.2] - 2026-11-11

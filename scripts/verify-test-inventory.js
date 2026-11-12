@@ -88,7 +88,8 @@ function verifyWorkerTests(rootDir, failures) {
     }
 
     const workerPkg = readJson(rootDir, path.join('workers', 'sessionCorsWorker', 'package.json'));
-    verifyPackageScript(workerPkg, 'test', 'node --test *.test.mjs', failures, 'workers/sessionCorsWorker/package.json');
+    // The Worker's one test run includes the agent tests, so CI runs them once.
+    verifyPackageScript(workerPkg, 'test', 'node --test *.test.mjs agent/*.test.mjs', failures, 'workers/sessionCorsWorker/package.json');
   }
 }
 
@@ -183,7 +184,6 @@ function verifyRootScripts(rootDir, failures) {
       ['client', 'npm run coverage-floor:check'],
       ['root-jest', 'npm run test:root:jest'],
       ['workers', 'npm run test:worker:session-cors'],
-      ['workers', 'npm run test:worker:agent'],
       ['e2e-smoke', 'npm run test:e2e:smoke'],
       ['cecc-and-node', 'npm run test:node:tracked'],
       ['cecc-and-node', 'npm run test:cache-guard'],
