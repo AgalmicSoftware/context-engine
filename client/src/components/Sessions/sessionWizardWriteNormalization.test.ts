@@ -771,14 +771,14 @@ describe('sessionWizardWriteNormalization', () => {
     expect(build(' Join the open group.\n')).toHaveProperty('agentInstructions', 'Join the open group.');
   });
 
-  test('buildSessionWizardWorkerConfigPayload sends the Group Agent as the Worker stores it, and leaves it out when off', () => {
+  test('buildSessionWizardWorkerConfigPayload sends the Session Agent as the Worker stores it, and leaves it out when off', () => {
     const build = (
-      groupAgent: unknown,
+      sessionAgent: unknown,
       preset: Parameters<typeof cloneSessionModePreset>[0] = SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE,
     ) =>
       buildSessionWizardWorkerConfigPayload({
-        slug: 'group-agent',
-        draft: { sessionModeProfile: cloneSessionModePreset(preset), groupAgent },
+        slug: 'session-agent',
+        draft: { sessionModeProfile: cloneSessionModePreset(preset), sessionAgent },
         workerUrl: 'https://worker.example',
       });
     const everyone = {
@@ -790,18 +790,18 @@ describe('sessionWizardWriteNormalization', () => {
       answers: 'detailed',
     });
 
-    expect(build({ audiences: [salon(' Salon '), everyone], instructions: { general: ' ' } }).groupAgent).toEqual({
+    expect(build({ audiences: [salon(' Salon '), everyone], instructions: { general: ' ' } }).sessionAgent).toEqual({
       audiences: [salon('salon'), everyone],
     });
-    // Older Workers refuse the field; the config writers clear a stored Group Agent.
-    expect(build(undefined)).not.toHaveProperty('groupAgent');
-    expect(build(null)).not.toHaveProperty('groupAgent');
+    // Older Workers refuse the field; the config writers clear a stored Session Agent.
+    expect(build(undefined)).not.toHaveProperty('sessionAgent');
+    expect(build(null)).not.toHaveProperty('sessionAgent');
     expect(() => build({ audiences: [{ ...everyone, answers: 'everything' }] })).toThrow(
-      'Fix the Group Agent: Audience 1 must get General or Detailed answers.',
+      'Fix the Session Agent: Audience 1 must get General or Detailed answers.',
     );
-    // Only a session on a Session Worker has a Group Agent.
+    // Only a session on a Session Worker has a Session Agent.
     expect(build({ audiences: [everyone] }, SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED)).not.toHaveProperty(
-      'groupAgent',
+      'sessionAgent',
     );
   });
 

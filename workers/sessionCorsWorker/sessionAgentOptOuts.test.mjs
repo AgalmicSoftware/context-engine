@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { dispatchGroupAgentOptOutStore } from './groupAgentOptOuts.js';
+import { dispatchSessionAgentOptOutStore } from './sessionAgentOptOuts.js';
 
 // Durable Object storage as the coordinator sees it: list pages by key order.
 const createCoordinator = () => {
@@ -20,7 +20,7 @@ const createCoordinator = () => {
 };
 
 const call = async (coordinator, operation, payload) => {
-  const response = await dispatchGroupAgentOptOutStore(coordinator, operation, payload);
+  const response = await dispatchSessionAgentOptOutStore(coordinator, operation, payload);
   return { status: response.status, body: await response.json() };
 };
 

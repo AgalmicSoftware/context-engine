@@ -787,13 +787,13 @@ describe('bundled app-theme contrast', () => {
     );
   });
 
-  // The Group Agent's launcher paints the session chrome pair itself, so it reads on any section background, and its
+  // The Session Agent's launcher paints the session chrome pair itself, so it reads on any section background, and its
   // dialog paints the setup page's surface, which everything inside reads on.
-  test.each(registry.themes.map(({ id }) => id))('%s keeps the Group Agent readable', (themeId) => {
+  test.each(registry.themes.map(({ id }) => id))('%s keeps the Session Agent readable', (themeId) => {
     const values = themeValues(css, themeId);
     const paint = painter(values);
     const onePageCss = compileModule('components/OnePageSession/OnePageSession.module.scss');
-    const agentCss = compileModule('components/OnePageSession/GroupAgentModal.module.scss');
+    const agentCss = compileModule('components/OnePageSession/SessionAgentModal.module.scss');
     const canvas = parseColor(values.canvas);
     const ratio = (rule: Record<string, string>, under = canvas) => {
       const fill = composite(paint(rule.background ?? 'transparent'), under);
@@ -805,7 +805,8 @@ describe('bundled app-theme contrast', () => {
       [selector, ratio({ ...moduleRule(agentCss, base), ...moduleRule(agentCss, selector) }, dialog)] as const;
     const ratios = [
       ...['', ':hover', ':focus-visible', ':active'].map(
-        (state) => [`.groupAgentButton${state}`, ratio(moduleRule(onePageCss, `.groupAgentButton${state}`))] as const,
+        (state) =>
+          [`.sessionAgentButton${state}`, ratio(moduleRule(onePageCss, `.sessionAgentButton${state}`))] as const,
       ),
       ['.content', ratio(moduleRule(agentCss, '.content'))] as const,
       inDialog('.hint'),

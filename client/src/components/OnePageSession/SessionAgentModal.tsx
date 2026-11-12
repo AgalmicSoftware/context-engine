@@ -1,23 +1,23 @@
-/** @file GroupAgentModal.tsx: asks the session's Group Agent, and sets whether it may use your answers and files. */
+/** @file SessionAgentModal.tsx: asks the Session Agent, and sets whether it may use your answers and files. */
 import React, { useEffect, useId, useRef, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faQuestionCircle } from '@fortawesome/free-solid-svg-icons';
 import { Modal, ModalBody, ModalHeader } from 'reactstrap';
 
-import { GROUP_AGENT_LIMITS } from '@ce-shared/groupAgent.mjs';
+import { SESSION_AGENT_LIMITS } from '@ce-shared/sessionAgent.mjs';
 import CETooltip from '../Shared/CETooltip';
-import GroupAgentNotice from './GroupAgentNotice';
+import SessionAgentNotice from './SessionAgentNotice';
 import {
-  askGroupAgent,
-  readGroupAgentStatus,
-  setGroupAgentOptOut,
-  type GroupAgentReply,
-  type GroupAgentRequestOptions,
-  type GroupAgentStatus,
-} from './groupAgentRequests';
-import styles from './GroupAgentModal.module.scss';
+  askSessionAgent,
+  readSessionAgentStatus,
+  setSessionAgentOptOut,
+  type SessionAgentReply,
+  type SessionAgentRequestOptions,
+  type SessionAgentStatus,
+} from './sessionAgentRequests';
+import styles from './SessionAgentModal.module.scss';
 
-type Props = GroupAgentRequestOptions & { onClose: () => void };
+type Props = SessionAgentRequestOptions & { onClose: () => void };
 
 const STYLE_HELP = {
   general:
@@ -34,7 +34,7 @@ const count = (value: number, one: string, many: string) =>
   `${value.toLocaleString('en-US')} ${value === 1 ? one : many}`;
 
 // What the Worker read for the answer, so a reader can tell General from Detailed.
-const drewOn = ({ context, results, answers }: GroupAgentReply['read']) => {
+const drewOn = ({ context, results, answers }: SessionAgentReply['read']) => {
   const parts = [
     context ? count(context, 'item of context', 'items of context') : '',
     results ? 'the results' : '',
@@ -45,15 +45,15 @@ const drewOn = ({ context, results, answers }: GroupAgentReply['read']) => {
 };
 
 // The session keeps no questions or answers, so the dialog shows only the latest.
-export default function GroupAgentModal({ sessionSlug, sessionConfig, account, onClose }: Props) {
-  const baseId = `ce-group-agent-${useId().replace(/:/g, '')}`;
+export default function SessionAgentModal({ sessionSlug, sessionConfig, account, onClose }: Props) {
+  const baseId = `ce-session-agent-${useId().replace(/:/g, '')}`;
   const options = { sessionSlug, sessionConfig, account };
   const [attempt, setAttempt] = useState(0);
-  const [status, setStatus] = useState<GroupAgentStatus | null>(null);
+  const [status, setStatus] = useState<SessionAgentStatus | null>(null);
   const [statusError, setStatusError] = useState('');
   const [question, setQuestion] = useState('');
   const [asking, setAsking] = useState(false);
-  const [reply, setReply] = useState<GroupAgentReply | null>(null);
+  const [reply, setReply] = useState<SessionAgentReply | null>(null);
   const [askError, setAskError] = useState('');
   const [savingOptOut, setSavingOptOut] = useState(false);
   const [optOutError, setOptOutError] = useState('');
@@ -65,7 +65,7 @@ export default function GroupAgentModal({ sessionSlug, sessionConfig, account, o
     let active = true;
     const savesBefore = switchSaves.current;
     setStatusError('');
-    readGroupAgentStatus({ sessionSlug, sessionConfig, account })
+    readSessionAgentStatus({ sessionSlug, sessionConfig, account })
       .then((next) => {
         if (!active) return;
         setStatus((current) =>
@@ -84,7 +84,7 @@ export default function GroupAgentModal({ sessionSlug, sessionConfig, account, o
     setAsking(true);
     setAskError('');
     try {
-      setReply(await askGroupAgent(question.trim(), options));
+      setReply(await askSessionAgent(question.trim(), options));
     } catch (error) {
       setReply(null);
       setAskError(errorText(error));
@@ -97,7 +97,7 @@ export default function GroupAgentModal({ sessionSlug, sessionConfig, account, o
     setSavingOptOut(true);
     setOptOutError('');
     try {
-      const optedOut = await setGroupAgentOptOut(!use, options);
+      const optedOut = await setSessionAgentOptOut(!use, options);
       switchSaves.current += 1;
       setStatus((current) => (current ? { ...current, optedOut } : current));
     } catch (error) {
@@ -116,12 +116,12 @@ export default function GroupAgentModal({ sessionSlug, sessionConfig, account, o
           role="switch"
           checked={!status.optedOut}
           disabled={savingOptOut}
-          data-testid="ce-group-agent-use-mine"
+          data-testid="ce-session-agent-use-mine"
           onChange={(event) => setUse(event.target.checked)}
         />
         Use my answers and files
       </label>
-      <GroupAgentNotice id={`${baseId}-notice`} where="switch" className={styles.helpLink} />
+      <SessionAgentNotice id={`${baseId}-notice`} where="switch" className={styles.helpLink} />
       {optOutError ? (
         <p className={styles.error} role="alert">
           {optOutError}
@@ -148,11 +148,11 @@ export default function GroupAgentModal({ sessionSlug, sessionConfig, account, o
   } else if (!status) {
     body = <p className={styles.hint}>Checking…</p>;
   } else if (!status.on) {
-    body = <p>An admin has turned the Group Agent off.</p>;
+    body = <p>An admin has turned the Session Agent off.</p>;
   } else if (!style) {
     body = (
       <>
-        <p>The Group Agent isn’t open to you in this session.</p>
+        <p>The Session Agent isn’t open to you in this session.</p>
         {optOutSwitch}
       </>
     );
@@ -185,21 +185,21 @@ export default function GroupAgentModal({ sessionSlug, sessionConfig, account, o
             id={`${baseId}-question`}
             className={`form-control ${styles.question}`}
             value={question}
-            maxLength={GROUP_AGENT_LIMITS.questionChars}
+            maxLength={SESSION_AGENT_LIMITS.questionChars}
             rows={3}
             aria-describedby={`${baseId}-limits`}
-            data-testid="ce-group-agent-question"
+            data-testid="ce-session-agent-question"
             onChange={(event) => setQuestion(event.target.value)}
           />
           <div className={styles.row}>
             <p id={`${baseId}-limits`} className={styles.hint}>
-              Answers are at most {GROUP_AGENT_LIMITS.answerWords} words. Questions and answers aren’t kept.
+              Answers are at most {SESSION_AGENT_LIMITS.answerWords} words. Questions and answers aren’t kept.
             </p>
             <button
               type="submit"
               className={styles.ask}
               disabled={asking || !question.trim()}
-              data-testid="ce-group-agent-ask"
+              data-testid="ce-session-agent-ask"
             >
               {asking ? 'Asking…' : 'Ask'}
             </button>
@@ -212,7 +212,7 @@ export default function GroupAgentModal({ sessionSlug, sessionConfig, account, o
         ) : null}
         <div aria-live="polite">
           {reply ? (
-            <div className={styles.answer} data-testid="ce-group-agent-answer">
+            <div className={styles.answer} data-testid="ce-session-agent-answer">
               <p className={styles.answerText}>{reply.answer}</p>
               <p className={styles.hint}>{drewOn(reply.read)}</p>
               {reply.note ? <p className={styles.hint}>{reply.note}</p> : null}
@@ -227,10 +227,10 @@ export default function GroupAgentModal({ sessionSlug, sessionConfig, account, o
   return (
     <Modal isOpen toggle={onClose} centered contentClassName={styles.content} labelledBy={`${baseId}-title`}>
       <ModalHeader toggle={onClose} className={styles.header}>
-        <span id={`${baseId}-title`}>Group Agent</span>
+        <span id={`${baseId}-title`}>Session Agent</span>
         <span className={styles.badge}>Preview</span>
       </ModalHeader>
-      <ModalBody className={styles.body} data-testid="ce-group-agent">
+      <ModalBody className={styles.body} data-testid="ce-session-agent">
         {body}
       </ModalBody>
     </Modal>

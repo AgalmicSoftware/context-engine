@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 
-import { GROUP_AGENT_DEFAULT_INSTRUCTIONS } from '@ce-shared/groupAgent.mjs';
-import SetupGroupAgent from './SetupGroupAgent';
+import { SESSION_AGENT_DEFAULT_INSTRUCTIONS } from '@ce-shared/sessionAgent.mjs';
+import SetupSessionAgent from './SetupSessionAgent';
 
 const GROUPS = [
   { groupId: 'salon', label: 'Salon' },
@@ -20,7 +20,7 @@ const renderAgent = ({ value = null, sbtChainId = 0 }: { value?: unknown; sbtCha
   const Page = () => {
     const [setting, setSetting] = useState<unknown>(value);
     return (
-      <SetupGroupAgent
+      <SetupSessionAgent
         value={setting}
         groups={GROUPS}
         sbtChainId={sbtChainId}
@@ -35,31 +35,31 @@ const renderAgent = ({ value = null, sbtChainId = 0 }: { value?: unknown; sbtCha
   return () => changes.at(-1);
 };
 
-describe('SetupGroupAgent', () => {
+describe('SetupSessionAgent', () => {
   it('is off until turned on, then lets everyone signed in ask for General answers', () => {
     const last = renderAgent();
-    expect(screen.getByTestId('ce-setup-group-agent')).not.toBeChecked();
-    expect(screen.queryByTestId('ce-setup-group-agent-audience-0')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByTestId('ce-setup-group-agent'));
+    expect(screen.getByTestId('ce-setup-session-agent')).not.toBeChecked();
+    expect(screen.queryByTestId('ce-setup-session-agent-audience-0')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('ce-setup-session-agent'));
     expect(last()).toEqual({ audiences: [everyone] });
-    expect(screen.getByTestId('ce-setup-group-agent-0-answers')).toHaveValue('general');
+    expect(screen.getByTestId('ce-setup-session-agent-0-answers')).toHaveValue('general');
     // Each style's instructions start as its default.
-    const detailed = screen.getByTestId('ce-setup-group-agent-detailed');
-    expect(detailed).toHaveValue(GROUP_AGENT_DEFAULT_INSTRUCTIONS.detailed);
+    const detailed = screen.getByTestId('ce-setup-session-agent-detailed');
+    expect(detailed).toHaveValue(SESSION_AGENT_DEFAULT_INSTRUCTIONS.detailed);
     // The session's settings are public, and the "?" says so for what an admin writes here.
     expect(detailed).toHaveAccessibleDescription(expect.stringContaining('these instructions can be read by anyone'));
-    fireEvent.click(screen.getByTestId('ce-setup-group-agent'));
+    fireEvent.click(screen.getByTestId('ce-setup-session-agent'));
     expect(last()).toBeNull();
   });
 
   it('puts a new audience first, for the groups an admin ticks, with Detailed answers', () => {
     const last = renderAgent({ value: { audiences: [everyone] } });
-    fireEvent.click(screen.getByTestId('ce-setup-group-agent-add'));
+    fireEvent.click(screen.getByTestId('ce-setup-session-agent-add'));
     // A rule naming no group can't be saved yet, and says so.
-    expect(screen.getByTestId('ce-setup-group-agent-error')).toHaveTextContent(
+    expect(screen.getByTestId('ce-setup-session-agent-error')).toHaveTextContent(
       'Audience 1, rule 1, needs at least one group.',
     );
-    const first = within(screen.getByTestId('ce-setup-group-agent-audience-0'));
+    const first = within(screen.getByTestId('ce-setup-session-agent-audience-0'));
     fireEvent.click(within(first.getByRole('group', { name: 'Audience 1, rule 1: groups' })).getByLabelText('Salon'));
     expect(last()).toEqual({
       audiences: [
@@ -67,7 +67,7 @@ describe('SetupGroupAgent', () => {
         everyone,
       ],
     });
-    expect(screen.queryByTestId('ce-setup-group-agent-error')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('ce-setup-session-agent-error')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Move audience 2 up' }));
     expect((last() as { audiences: unknown[] }).audiences[0]).toEqual(everyone);
   });
@@ -76,7 +76,7 @@ describe('SetupGroupAgent', () => {
     const last = renderAgent({ value: { audiences: [everyone] }, sbtChainId: 84532 });
     expect(screen.queryByLabelText('Who')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Add a rule to audience 1' }));
-    fireEvent.change(screen.getByTestId('ce-setup-group-agent-rule-0-1'), { target: { value: 'sbt_onchain' } });
+    fireEvent.change(screen.getByTestId('ce-setup-session-agent-rule-0-1'), { target: { value: 'sbt_onchain' } });
     fireEvent.change(screen.getByLabelText('Audience 1, rule 2: SBT contract'), { target: { value: CONTRACT } });
     fireEvent.change(screen.getByLabelText('Who'), { target: { value: 'all' } });
     expect(last()).toEqual({
@@ -97,7 +97,7 @@ describe('SetupGroupAgent', () => {
 
   it('offers SBT holders only on a session that checks SBTs', () => {
     renderAgent({ value: { audiences: [everyone] } });
-    const kinds = within(screen.getByTestId('ce-setup-group-agent-rule-0-0')).getAllByRole('option');
+    const kinds = within(screen.getByTestId('ce-setup-session-agent-rule-0-0')).getAllByRole('option');
     expect(kinds.map((option) => option.textContent)).toEqual(['Everyone signed in', 'Members of groups']);
   });
 
@@ -110,7 +110,7 @@ describe('SetupGroupAgent', () => {
 
   it('keeps an edited instruction with the setting', () => {
     const last = renderAgent({ value: { audiences: [everyone] } });
-    fireEvent.change(screen.getByTestId('ce-setup-group-agent-general'), { target: { value: 'Be brief.' } });
+    fireEvent.change(screen.getByTestId('ce-setup-session-agent-general'), { target: { value: 'Be brief.' } });
     expect(last()).toEqual({ audiences: [everyone], instructions: { general: 'Be brief.' } });
   });
 });

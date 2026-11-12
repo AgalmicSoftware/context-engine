@@ -35,9 +35,9 @@ import type {
 import styles from './OnePageSession.module.scss';
 import OnePageSessionAutoMintAlerts, { type OnePageSessionAutoMintAlertsProps } from './OnePageSessionAutoMintAlerts';
 import SessionContextSources from './SessionContextSources';
-import GroupAgentNotice from './GroupAgentNotice';
+import SessionAgentNotice from './SessionAgentNotice';
 import { useSessionContextSources } from '../../utilities/docLibrary/useSessionContextSources';
-import { groupAgentSettingOf } from '@ce-shared/groupAgent.mjs';
+import { sessionAgentSettingOf } from '@ce-shared/sessionAgent.mjs';
 
 const SurveyPage = React.lazy(() => import('../SurveyTool/SurveyPage'));
 const MemoSurveyPage = React.memo((props: Record<string, unknown>) => <SurveyPage {...props} />);
@@ -52,7 +52,7 @@ const SessionGeneratedResultsViews = React.lazy(() => import('../SessionResults/
 const SessionContextHtml = React.lazy(() => import('./SessionContextHtml'));
 const SessionDebateAtlasView = React.lazy(() => import('../DebateAtlas/SessionDebateAtlasView'));
 const SessionRiskMatrixView = React.lazy(() => import('../ResultsBuilds/SessionRiskMatrixView'));
-const GroupAgentModal = React.lazy(() => import('./GroupAgentModal'));
+const SessionAgentModal = React.lazy(() => import('./SessionAgentModal'));
 
 const DebateMapAny = DebateMap as React.ComponentType<Record<string, unknown>>;
 const DEMO_CORPUS_GITHUB_URL = PUBLIC_AI_DISCOURSE_CORPUS_URL;
@@ -475,23 +475,23 @@ export default function OnePageSessionStandardShell({
     account: typeof account === 'string' ? account : '',
   });
   const canEditContext = (contextSources.isAdmin && contextSources.supported) || contextSources.participantsCanAdd;
-  // Everyone signed in sees the Group Agent once an admin turns it on: the
+  // Everyone signed in sees the Session Agent once an admin turns it on: the
   // dialog says whether it answers them, and lets them keep their answers and
   // files out of it. The robot by the title tells everyone else it is on.
-  const groupAgentOn =
-    !isDemoSlug && !!groupAgentSettingOf((resolvedSessionConfig as UnknownRecord | null)?.groupAgent);
+  const sessionAgentOn =
+    !isDemoSlug && !!sessionAgentSettingOf((resolvedSessionConfig as UnknownRecord | null)?.sessionAgent);
   const viewerAccount = loginComplete && typeof account === 'string' ? account : '';
-  const showGroupAgent = groupAgentOn && !!viewerAccount;
-  const [groupAgentOpen, setGroupAgentOpen] = React.useState(false);
+  const showSessionAgent = sessionAgentOn && !!viewerAccount;
+  const [sessionAgentOpen, setSessionAgentOpen] = React.useState(false);
   // Signing out or switching account closes the dialog, so it never shows one
   // person's answer to another, or opens again by itself at the next sign-in.
   React.useEffect(() => {
-    setGroupAgentOpen(false);
-  }, [showGroupAgent, viewerAccount]);
+    setSessionAgentOpen(false);
+  }, [showSessionAgent, viewerAccount]);
   // Where the Context section's Add and View go, in its header beside the title.
   const [contextActions, setContextActions] = React.useState<HTMLDivElement | null>(null);
   const showContextSection =
-    isDemoSlug || !!sessionContext || contextSources.sources.length > 0 || canEditContext || showGroupAgent;
+    isDemoSlug || !!sessionContext || contextSources.sources.length > 0 || canEditContext || showSessionAgent;
   const sectionsGridClassName = [styles.sectionsGrid, !showContextSection ? styles.sectionsGridTwoUp : '']
     .filter(Boolean)
     .join(' ');
@@ -556,8 +556,12 @@ export default function OnePageSessionStandardShell({
           <CETooltip target={sessionInfoTooltipId} placement="bottom" trigger="hover focus" autohide={false}>
             {sessionInfoTooltip || 'Share input; your responses help generate a collective intelligence map.'}
           </CETooltip>
-          {groupAgentOn ? (
-            <GroupAgentNotice id={`${sessionInfoTooltipId}-agent`} where="page" className={styles.sessionInfoButton} />
+          {sessionAgentOn ? (
+            <SessionAgentNotice
+              id={`${sessionInfoTooltipId}-agent`}
+              where="page"
+              className={styles.sessionInfoButton}
+            />
           ) : null}
         </div>
 
@@ -781,24 +785,24 @@ export default function OnePageSessionStandardShell({
             </div>
             {showDocuments && (
               <div className={`${styles.miniSectionContent} ${styles.documentsSectionContent}`.trim()}>
-                {showGroupAgent ? (
-                  <div className={styles.groupAgentBar}>
+                {showSessionAgent ? (
+                  <div className={styles.sessionAgentBar}>
                     <button
                       type="button"
-                      className={styles.groupAgentButton}
-                      onClick={() => setGroupAgentOpen(true)}
-                      data-testid="ce-group-agent-open"
+                      className={styles.sessionAgentButton}
+                      onClick={() => setSessionAgentOpen(true)}
+                      data-testid="ce-session-agent-open"
                     >
                       <FontAwesomeIcon icon={faRobot} aria-hidden="true" />
-                      Group Agent
+                      Session Agent
                     </button>
-                    {groupAgentOpen ? (
+                    {sessionAgentOpen ? (
                       <Suspense fallback={null}>
-                        <GroupAgentModal
+                        <SessionAgentModal
                           sessionSlug={effectiveSlug}
                           sessionConfig={resolvedSessionConfig}
                           account={viewerAccount}
-                          onClose={() => setGroupAgentOpen(false)}
+                          onClose={() => setSessionAgentOpen(false)}
                         />
                       </Suspense>
                     ) : null}

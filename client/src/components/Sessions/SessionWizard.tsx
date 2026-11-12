@@ -114,7 +114,7 @@ import { defaultSessionSetupProfile, editSessionSetupProfile } from './setup/ses
 import SetupSlugPreview from './setup/SetupSlugPreview';
 import SetupWorkerQuick from './setup/SetupWorkerQuick';
 import { SetupWithAi } from './setup/SetupWithAi';
-import SetupGroupAgent, { describeGroupAgentProblem } from './setup/SetupGroupAgent';
+import SetupSessionAgent, { describeSessionAgentProblem } from './setup/SetupSessionAgent';
 import SessionHostedFaucetControl from './SessionHostedFaucetControl';
 import WorkerDeployHelperToggle from './WorkerDeployHelperToggle';
 import {
@@ -2665,14 +2665,14 @@ const SessionWizard = ({
     sessionModeRequirements.usesWorkerRuntime && !deployVerifiedInUi && !canUseSponsoredAutoDeployNow;
   const missingSecrets = needsWorkerDeploy && workerSecretsEnabled ? getMissingWorkerSecretsForDeploy() : [];
   const contextProblem = describeContextProblem(draft);
-  // Only a session on a Session Worker has a Group Agent.
-  const groupAgentProblem = sessionModeRequirements.isWorkerCanonical
-    ? describeGroupAgentProblem(draft.groupAgent)
+  // Only a session on a Session Worker has a Session Agent.
+  const sessionAgentProblem = sessionModeRequirements.isWorkerCanonical
+    ? describeSessionAgentProblem(draft.sessionAgent)
     : '';
   const missingInputs = [
     toStr(draft.sessionName).trim() ? '' : 'Enter a session name.',
     contextProblem ? `Fix the context: ${contextProblem}` : '',
-    groupAgentProblem ? `Fix the Group Agent: ${groupAgentProblem}` : '',
+    sessionAgentProblem ? `Fix the Session Agent: ${sessionAgentProblem}` : '',
     needsWorkerDeploy && !toStr(deployForm.apiToken).trim()
       ? 'Enter your Cloudflare API token, or verify a Worker you deployed from the Cloudflare dashboard.'
       : '',
@@ -2968,11 +2968,11 @@ const SessionWizard = ({
           </>
         ) : null
       }
-      groupAgent={
+      sessionAgent={
         sessionModeRequirements.isWorkerCanonical ? (
-          <SetupGroupAgent
-            value={draft.groupAgent}
-            onChange={(next) => updateDraftValue(['groupAgent'], next)}
+          <SetupSessionAgent
+            value={draft.sessionAgent}
+            onChange={(next) => updateDraftValue(['sessionAgent'], next)}
             groups={contextFileGroups.flatMap(({ groupId, label }) =>
               label.trim() ? [{ groupId, label: label.trim() }] : [],
             )}

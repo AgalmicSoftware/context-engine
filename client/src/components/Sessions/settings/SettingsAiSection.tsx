@@ -24,7 +24,7 @@ const AI_TASKS = Object.freeze([
   { key: 'interview-map', label: 'Interview mapping' },
   { key: 'interview-opening', label: 'Interview opening' },
   { key: 'context-read', label: 'Reading context files' },
-  { key: 'group-agent', label: 'Group Agent' },
+  { key: 'session-agent', label: 'Session Agent' },
 ]);
 const EFFORTS = ['low', 'medium', 'high'];
 const taskLabel = (key: string) => AI_TASKS.find((task) => task.key === key)?.label || key;
@@ -60,8 +60,8 @@ type Props = Omit<SetupSectionProps, 'mode' | 'conflicts'> & {
   lockedReason: string;
   /** Where the provider keys are changed. */
   keys?: React.ReactNode;
-  /** Who may ask the Group Agent, for a session on a Session Worker. */
-  groupAgent?: React.ReactNode;
+  /** Who may ask the Session Agent, for a session on a Session Worker. */
+  sessionAgent?: React.ReactNode;
 };
 
 // The settings page's AI section: the same fields setup writes, plus the
@@ -74,7 +74,7 @@ export const SettingsAiSection = ({
   onToggle,
   lockedReason,
   keys = null,
-  groupAgent = null,
+  sessionAgent = null,
 }: Props) => {
   const { models, provider, fast, thinking, transcription, effort, taskEffort } = readAi(draft);
   const [newTask, setNewTask] = useState('');
@@ -139,7 +139,7 @@ export const SettingsAiSection = ({
       summary={[
         describeModels(draft),
         effort ? `${effort} effort` : '',
-        groupAgent && draft.groupAgent ? 'Group Agent on' : '',
+        sessionAgent && draft.sessionAgent ? 'Session Agent on' : '',
       ]
         .filter(Boolean)
         .join(' · ')}
@@ -277,7 +277,7 @@ export const SettingsAiSection = ({
           onChange={(event) => onChange(['defaultTags'], event.target.value)}
         />
       </SetupField>
-      {groupAgent}
+      {sessionAgent}
     </SetupSection>
   );
 };

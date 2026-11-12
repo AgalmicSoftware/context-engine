@@ -42,7 +42,7 @@ export const WORKER_CANONICAL_SET_CONFIG_KEYS = Object.freeze([
   'authorization',
   'groupCreationPolicy',
   'contextAdditionPolicy',
-  'groupAgent',
+  'sessionAgent',
   'storageProfile',
   'storageEnvelope',
   'ai',
@@ -94,8 +94,8 @@ const CONTENT_FIELDS = new Set([
   // Read on each interview request and never held in a sign-in, so changing
   // any interview setting, even turning interviews off, signs no one out.
   'interviewModeEnabled', 'interviewMode',
-  // Checked on each question to the Group Agent, the same way.
-  'groupAgent',
+  // Checked on each question to the Session Agent, the same way.
+  'sessionAgent',
   ...CURATED_ID_LIST_KEYS,
 ]);
 const record = value => !!value && typeof value === 'object' && !Array.isArray(value);

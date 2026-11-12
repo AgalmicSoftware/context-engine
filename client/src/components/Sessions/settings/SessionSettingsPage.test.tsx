@@ -389,23 +389,23 @@ describe('SessionSettingsPage', () => {
     expect(screen.queryByTestId('ce-setting-results-admins')).not.toBeInTheDocument();
   });
 
-  it('offers the Group Agent only on a Worker that answers it, and says why otherwise', async () => {
+  it('offers the Session Agent only on a Worker that answers it, and says why otherwise', async () => {
     renderPage();
     await waitFor(() => expect(mockUpsertBootstrap).toHaveBeenCalled());
     fireEvent.click(screen.getByTestId('ce-setup-more-ai'));
-    expect(screen.queryByTestId('ce-setup-group-agent')).not.toBeInTheDocument();
-    expect(screen.getByTestId('ce-settings-group-agent-locked')).toHaveTextContent(
+    expect(screen.queryByTestId('ce-setup-session-agent')).not.toBeInTheDocument();
+    expect(screen.getByTestId('ce-settings-session-agent-locked')).toHaveTextContent(
       'this Session Worker is older and refuses it. Update the Worker to use it.',
     );
     cleanup();
 
     mockUpsertBootstrap.mockClear();
-    mockFetchBootstrap.mockResolvedValue(bootstrapOf(workerConfig({ groupAgentReady: true })));
+    mockFetchBootstrap.mockResolvedValue(bootstrapOf(workerConfig({ sessionAgentReady: true })));
     renderPage();
     await waitFor(() => expect(mockUpsertBootstrap).toHaveBeenCalled());
     fireEvent.click(screen.getByTestId('ce-setup-more-ai'));
-    expect(screen.getByTestId('ce-setup-group-agent')).not.toBeChecked();
-    expect(screen.queryByTestId('ce-settings-group-agent-locked')).not.toBeInTheDocument();
+    expect(screen.getByTestId('ce-setup-session-agent')).not.toBeChecked();
+    expect(screen.queryByTestId('ce-settings-session-agent-locked')).not.toBeInTheDocument();
   });
 
   it('offers members-only results only on a Worker that shows them', async () => {

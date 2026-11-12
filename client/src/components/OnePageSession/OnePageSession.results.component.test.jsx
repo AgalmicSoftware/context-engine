@@ -103,12 +103,12 @@ jest.mock('../../utilities/docLibrary/useSessionContextSources', () => ({
   useSessionContextSources: () => mockContextSources.current || emptyContextSources(),
 }));
 jest.mock('../Sessions/setup/ContextSourcesPanel', () => () => <div data-testid="mock-context-sources-panel" />);
-// The Group Agent's dialog asks the Worker how it would answer; tests answer for it.
-const mockGroupAgentStatus = jest.fn();
-jest.mock('./groupAgentRequests', () => ({
-  readGroupAgentStatus: (...args) => mockGroupAgentStatus(...args),
-  askGroupAgent: jest.fn(),
-  setGroupAgentOptOut: jest.fn(),
+// The Session Agent's dialog asks the Worker how it would answer; tests answer for it.
+const mockSessionAgentStatus = jest.fn();
+jest.mock('./sessionAgentRequests', () => ({
+  readSessionAgentStatus: (...args) => mockSessionAgentStatus(...args),
+  askSessionAgent: jest.fn(),
+  setSessionAgentOptOut: jest.fn(),
 }));
 
 jest.mock('../SurveyTool/SurveyPage', () => (props) => {
@@ -1686,36 +1686,36 @@ describe('OnePageSession results routing', () => {
       expect(screen.queryByTestId('ce-session-context-sources')).not.toBeInTheDocument();
     });
 
-    const groupAgent = {
+    const sessionAgent = {
       audiences: [
         { who: { match: 'any', conditions: [{ kind: 'agent_grant_scope', scope: 'ai' }] }, answers: 'general' },
       ],
     };
-    const withGroupAgent = (overrides = {}) => ({
-      sessionConfig: { ...buildProps().sessionConfig, groupAgent },
+    const withSessionAgent = (overrides = {}) => ({
+      sessionConfig: { ...buildProps().sessionConfig, sessionAgent },
       ...overrides,
     });
 
-    it('lets anyone signed in ask the Group Agent once an admin turns it on', async () => {
-      mockGroupAgentStatus.mockResolvedValue({ on: true, answers: 'general', audience: 0, optedOut: false });
-      // A participant with nothing to read still gets the Context section, for the Group Agent.
-      await renderSession([], false, withGroupAgent({ account: '0xabc', loginComplete: true }));
+    it('lets anyone signed in ask the Session Agent once an admin turns it on', async () => {
+      mockSessionAgentStatus.mockResolvedValue({ on: true, answers: 'general', audience: 0, optedOut: false });
+      // A participant with nothing to read still gets the Context section, for the Session Agent.
+      await renderSession([], false, withSessionAgent({ account: '0xabc', loginComplete: true }));
       fireEvent.click(screen.getByTestId('ce-demo-documents-toggle'));
-      fireEvent.click(screen.getByTestId('ce-group-agent-open'));
-      const dialog = await screen.findByRole('dialog', { name: 'Group Agent' });
+      fireEvent.click(screen.getByTestId('ce-session-agent-open'));
+      const dialog = await screen.findByRole('dialog', { name: 'Session Agent' });
       expect(await within(dialog).findByText('You get General answers.')).toBeInTheDocument();
-      expect(mockGroupAgentStatus).toHaveBeenCalledWith({
+      expect(mockSessionAgentStatus).toHaveBeenCalledWith({
         sessionSlug: 'edge',
-        sessionConfig: expect.objectContaining({ groupAgent }),
+        sessionConfig: expect.objectContaining({ sessionAgent }),
         account: '0xabc',
       });
       fireEvent.click(within(dialog).getByRole('button', { name: 'Close' }));
       await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     });
 
-    it('closes the Group Agent when its person switches account or signs out', async () => {
-      mockGroupAgentStatus.mockResolvedValue({ on: true, answers: 'general', audience: 0, optedOut: false });
-      const signedIn = withGroupAgent({ account: '0xabc', loginComplete: true });
+    it('closes the Session Agent when its person switches account or signs out', async () => {
+      mockSessionAgentStatus.mockResolvedValue({ on: true, answers: 'general', audience: 0, optedOut: false });
+      const signedIn = withSessionAgent({ account: '0xabc', loginComplete: true });
       const view = await renderSession([], false, signedIn);
       const show = (overrides) =>
         view.rerender(
@@ -1724,8 +1724,8 @@ describe('OnePageSession results routing', () => {
           </MemoryRouter>,
         );
       const open = async () => {
-        fireEvent.click(screen.getByTestId('ce-group-agent-open'));
-        await screen.findByRole('dialog', { name: 'Group Agent' });
+        fireEvent.click(screen.getByTestId('ce-session-agent-open'));
+        await screen.findByRole('dialog', { name: 'Session Agent' });
       };
       fireEvent.click(screen.getByTestId('ce-demo-documents-toggle'));
       await open();
@@ -1736,31 +1736,31 @@ describe('OnePageSession results routing', () => {
       // Signing out closes it, and signing back in doesn't open it again.
       show({ ...signedIn, loginComplete: false });
       await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
-      const checks = mockGroupAgentStatus.mock.calls.length;
+      const checks = mockSessionAgentStatus.mock.calls.length;
       show(signedIn);
-      expect(await screen.findByTestId('ce-group-agent-open')).toBeInTheDocument();
+      expect(await screen.findByTestId('ce-session-agent-open')).toBeInTheDocument();
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-      expect(mockGroupAgentStatus).toHaveBeenCalledTimes(checks);
+      expect(mockSessionAgentStatus).toHaveBeenCalledTimes(checks);
     });
 
-    it('says by the title that the Group Agent is on, even to someone signed out', async () => {
-      await renderSession([file, link], false, withGroupAgent());
-      expect(screen.getByTestId('ce-group-agent-notice-page')).toHaveAttribute(
+    it('says by the title that the Session Agent is on, even to someone signed out', async () => {
+      await renderSession([file, link], false, withSessionAgent());
+      expect(screen.getByTestId('ce-session-agent-notice-page')).toHaveAttribute(
         'href',
-        expect.stringMatching(/README\.md#group-agent$/),
+        expect.stringMatching(/README\.md#session-agent$/),
       );
       fireEvent.click(screen.getByTestId('ce-demo-documents-toggle'));
       expect(screen.getByTestId('ce-session-context-sources')).toBeInTheDocument();
-      expect(screen.queryByTestId('ce-group-agent-open')).not.toBeInTheDocument();
-      expect(mockGroupAgentStatus).not.toHaveBeenCalled();
+      expect(screen.queryByTestId('ce-session-agent-open')).not.toBeInTheDocument();
+      expect(mockSessionAgentStatus).not.toHaveBeenCalled();
     });
 
-    it('shows no Group Agent while it is off, even to admins', async () => {
+    it('shows no Session Agent while it is off, even to admins', async () => {
       await renderSession([], true, { account: '0xabc', loginComplete: true });
       fireEvent.click(screen.getByTestId('ce-demo-documents-toggle'));
       expect(screen.getByTestId('ce-session-context-manage')).toBeInTheDocument();
-      expect(screen.queryByTestId('ce-group-agent-open')).not.toBeInTheDocument();
-      expect(screen.queryByTestId('ce-group-agent-notice-page')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('ce-session-agent-open')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('ce-session-agent-notice-page')).not.toBeInTheDocument();
     });
   });
 

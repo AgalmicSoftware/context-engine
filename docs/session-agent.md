@@ -1,17 +1,17 @@
-# Group Agent
+# Session Agent
 
-A session's Group Agent answers questions about the session from its own
+The Session Agent answers questions about the session from its own
 material, through the session's own AI. An admin chooses who may ask and how
 each of them is answered; the Session Worker checks who is asking on every
 question and reads only what that person's answer style allows. The page sends
 only the question.
 
 Only sessions on a Session Worker have one. A session on the on-chain registry
-has no Group Agent setting.
+has no Session Agent setting.
 
 ## The setting
 
-The session config's `groupAgent` field, set under AI on `/new` and in the
+The session config's `sessionAgent` field, set under AI on `/new` and in the
 session's Settings:
 
 ```json
@@ -39,12 +39,12 @@ session's Settings:
 - **AI access.** Everyone who asks, admins included, also needs the session's
   AI access (the `ai` scope), as on the `/ai` route.
 - **No audiences** means only admins may ask.
-- **Off** is no setting. The page then shows no Group Agent. Saving it off sends
-  `groupAgent: null`, which the Worker stores as no setting. `/new` leaves an
-  off Group Agent out altogether, and clears a stored one only where the Worker
+- **Off** is no setting. The page then shows no Session Agent. Saving it off sends
+  `sessionAgent: null`, which the Worker stores as no setting. `/new` leaves an
+  off Session Agent out altogether, and clears a stored one only where the Worker
   already has it, since Workers from earlier releases refuse the field.
-- **Older Workers.** A Worker that answers the Group Agent sets
-  `groupAgentReady: true` in its public config. Settings offers the Group Agent
+- **Older Workers.** A Worker that answers the Session Agent sets
+  `sessionAgentReady: true` in its public config. Settings offers the Session Agent
   only on such a Worker, and on an older one says to update it first.
 
 Each audience's `who` is an access-condition document, which the Worker judges
@@ -57,8 +57,8 @@ as it does a file's **Visible to**. `match` is `any` or `all` of its rules:
 | `{ "kind": "sbt_onchain", "chainId", "contract", "anyOrAll" }` | Holders of the contract's SBTs; offered on sessions that check SBTs |
 | `{ "kind": "worker_role", "role": "admin" }` | Admins |
 
-`POST /admin/set-config` checks a sent setting with `validateGroupAgent` in
-`shared/groupAgent.mjs`, the module the Worker and the page share. It refuses a
+`POST /admin/set-config` checks a sent setting with `validateSessionAgent` in
+`shared/sessionAgent.mjs`, the module the Worker and the page share. It refuses a
 wrong shape, an unknown field or anything over a limit with `400`, and stores
 the normal form: group IDs and contracts in lower case, repeated groups once,
 and blank or default instructions left out. Instructions that look like a key,
@@ -139,15 +139,15 @@ Agent's dialog, turning off **Use my answers and files** keeps them out of every
 answer from the next question on. The files stay in the session's file list, and
 answers already given can't be taken back. The published results still count
 everyone's answers, as on the Results page. Anyone signed in with an address can
-turn it off, even someone the Group Agent doesn't answer, and turn it back on at
+turn it off, even someone the Session Agent doesn't answer, and turn it back on at
 any time.
 
 The Worker keeps one entry per address that turned it off, in the session's
 coordinator, and reads the list on every question; if it can't, the question
 fails rather than going ahead without it. The choices stay when an admin turns
-the Group Agent off. Session backups don't include them.
+the Session Agent off. Session backups don't include them.
 
-A "?" by the switch, and a robot by the session's title while the Group Agent
+A "?" by the switch, and a robot by the session's title while the Session Agent
 is on, say what it may read and link here through the README.
 
 ## Routes
@@ -155,7 +155,7 @@ is on, say what it may read and link here through the README.
 Each is a `POST` with JSON and the person's session sign-in, like the Worker's
 other signed-in routes.
 
-- `POST /group-agent/status` with `{}` returns
+- `POST /session-agent/status` with `{}` returns
   `{ on, answers, audience, optedOut }`. `on` is false when the session has no
   setting. `answers` is `general`, `detailed`, or `null` when the person lacks AI
   access or no audience admits them; `audience` is the admitting audience's
@@ -163,26 +163,26 @@ other signed-in routes.
   address, who has no switch. It checks the sign-in's scopes, and each question
   checks them afresh. Like `ask`, it refuses with `410` once the session has
   ended and with `403` (`ai_disabled`) while AI is off for it.
-- `POST /group-agent/ask` with `{ question }` (at most 500 characters) returns
+- `POST /session-agent/ask` with `{ question }` (at most 500 characters) returns
   `{ answer, answers, audience, read, note? }`. `read` says how much the answer
   drew on: `{ context, results, answers }`, as a count of context items, whether
   it read the results, and a count of members' answers. The answer is at most
   1,500 characters.
-- `POST /group-agent/opt-out` with `{ optedOut: true | false }` returns
+- `POST /session-agent/opt-out` with `{ optedOut: true | false }` returns
   `{ optedOut }`.
 
 A question goes through the session's AI provider and models as the
-`group-agent` task, which Settings can give its own reasoning effort, with at
+`session-agent` task, which Settings can give its own reasoning effort, with at
 most 3,000 output tokens, thinking included. It runs the `/ai` route's sign-in
 checks and rate limit first. Before the AI is called, `ask` refuses:
 
 | Status | When |
 |---|---|
 | `410` | The session has ended (`code: session_ended`) |
-| `403` | The session has no Group Agent (`reason: group_agent_off`), AI is off for it (`ai_disabled`), or the person lacks AI access or no audience admits them (`group_agent_not_admitted`) |
+| `403` | The session has no Session Agent (`reason: session_agent_off`), AI is off for it (`ai_disabled`), or the person lacks AI access or no audience admits them (`session_agent_not_admitted`) |
 | `400` | The question is blank or too long |
 | `429` | The `/ai` rate limit, or the provider is busy |
-| `402` | A payment step, which passes every question today (`group_agent_payment_required`) |
+| `402` | A payment step, which passes every question today (`session_agent_payment_required`) |
 | `503` | Who may ask can't be checked just now, such as a group or SBT check, the opt-outs can't be read, or the session's AI isn't set up |
 
 A provider error comes back as `502`, never as the provider's own reply, and
@@ -190,7 +190,7 @@ never as a `401`, which the page would take for its own sign-in failing.
 
 ## On the session page
 
-While the setting is on, the session's Context has a **Group Agent** button for
+While the setting is on, the session's Context has a **Session Agent** button for
 anyone signed in. The dialog says it's a preview and how the person will be
 answered, asks one question at a time, and shows only the latest answer, with
 what it drew on. It keeps no history, and errors say what went wrong.

@@ -40,7 +40,7 @@ export const PUBLIC_WORKER_CONFIG_FIELDS = Object.freeze([
   'workerAuthority',
   'groupCreationPolicy',
   'contextAdditionPolicy',
-  'groupAgent',
+  'sessionAgent',
   'linkedWorkerGroups',
   'storageProfile',
   'ai',
@@ -74,6 +74,6 @@ export const RISK_MATRIX_FIELD = 'riskMatrix';
 // the session_member_full results visibility, which older Workers refuse.
 export const MEMBER_RESULTS_FIELD = 'memberResults';
 
-// Set the same way: this Worker answers the Group Agent and accepts its
-// `groupAgent` setting, which older Workers refuse.
-export const GROUP_AGENT_READY_FIELD = 'groupAgentReady';
+// Set the same way: this Worker answers the Session Agent and accepts its
+// `sessionAgent` setting, which older Workers refuse.
+export const SESSION_AGENT_READY_FIELD = 'sessionAgentReady';

@@ -1,4 +1,4 @@
-import { GROUP_AGENT_LIMITS, buildGroupAgentMessages, groupAgentSettingOf } from '../../shared/groupAgent.mjs';
+import { SESSION_AGENT_LIMITS, buildSessionAgentMessages, sessionAgentSettingOf } from '../../shared/sessionAgent.mjs';
 import { buildSessionEndedResponse } from '../shared/sessionLifecycle.mjs';
 import { AI_MODEL_NOT_ALLOWED } from './aiRequestPolicy.js';
 import { isModelAllowed, normalizeAiRequestPayload } from './aiRequestNormalization.js';
@@ -8,7 +8,7 @@ import {
   loadWorkerCanonicalResultsAnalysisSource,
   readPublishedResultsAnalysisArtifact,
 } from './resultsAnalysisGeneration.js';
-import { canOptOut } from './groupAgentOptOuts.js';
+import { canOptOut } from './sessionAgentOptOuts.js';
 import { isListedResultsBuilder } from './resultsBuild.js';
 import { callSessionConfigCoordinator } from './sessionConfigAuthority.js';
 import {
@@ -17,23 +17,23 @@ import {
   resolveSessionAdminAddresses,
 } from './storageRouteExecution.js';
 
-// POST /group-agent/status says how this person would be answered,
-// POST /group-agent/ask answers one question, and POST /group-agent/opt-out
+// POST /session-agent/status says how this person would be answered,
+// POST /session-agent/ask answers one question, and POST /session-agent/opt-out
 // turns the agent's use of their answers and files off or on. Each question
 // judges who may ask afresh and gathers what the person's answer style may
 // read; the page sends only the question.
-export const GROUP_AGENT_PATHS = Object.freeze(['/group-agent/status', '/group-agent/ask', '/group-agent/opt-out']);
-const OPT_OUTS_UNAVAILABLE = 'Who turned the Group Agent off couldn’t be read just now. Try again shortly.';
+export const SESSION_AGENT_PATHS = Object.freeze(['/session-agent/status', '/session-agent/ask', '/session-agent/opt-out']);
+const OPT_OUTS_UNAVAILABLE = 'Who turned the Session Agent off couldn’t be read just now. Try again shortly.';
 
 const callOptOutStore = (env, slug, operation, payload = {}) =>
-  callSessionConfigCoordinator({ env, slug, path: `group-agent/${operation}`, ...payload });
+  callSessionConfigCoordinator({ env, slug, path: `session-agent/${operation}`, ...payload });
 
 const trim = (value) => (typeof value === 'string' ? value.trim() : '');
 const lower = (value) => trim(value).toLowerCase();
 const clip = (value, max) => (value.length <= max ? value : `${value.slice(0, Math.max(0, max - 1)).trimEnd()}…`);
 
 const NOT_ADMITTED = {
-  ok: false, status: 403, error: 'The Group Agent isn’t open to you in this session.', reason: 'group_agent_not_admitted',
+  ok: false, status: 403, error: 'The Session Agent isn’t open to you in this session.', reason: 'session_agent_not_admitted',
 };
 
 // Everyone who asks needs the session's AI access, as on the /ai route.
@@ -109,7 +109,7 @@ const scaleText = ({ scale } = {}) => {
 // Someone who is not an admin gets nothing from a question fewer than this
 // many members answered: a count of one, or the one answer left when the
 // asker keeps their own out, would be a single person's answer.
-export const GROUP_AGENT_MIN_ANSWERS = 3;
+export const SESSION_AGENT_MIN_ANSWERS = 3;
 const readMemberAnswers = async ({ env, slug, config, optedOut, minAnswers = 1, deps }) => {
   const source = await (deps.loadWorkerCanonicalResultsAnalysisSource || loadWorkerCanonicalResultsAnalysisSource)({ env, slug, config });
   if (!source?.ok) return null;
@@ -147,7 +147,7 @@ const gatherMaterial = async ({ env, slug, config, address, scopes, asker, acces
     }),
     readVisibleResults({ env, slug, config, address, scopes, deps }),
     detailed ? readMemberAnswers({
-      env, slug, config, optedOut, deps, minAnswers: asker.audience === 'admin' ? 1 : GROUP_AGENT_MIN_ANSWERS,
+      env, slug, config, optedOut, deps, minAnswers: asker.audience === 'admin' ? 1 : SESSION_AGENT_MIN_ANSWERS,
     }) : [],
   ]);
   return { material: { sessionContext: config?.sessionContext, sources, results, answers: answers || [] }, answersUnavailable: answers === null };
@@ -155,19 +155,19 @@ const gatherMaterial = async ({ env, slug, config, address, scopes, asker, acces
 
 // A price for an audience will be checked here, refusing with 402 until it
 // is paid. It runs after the material is fixed, so paying never widens it.
-const checkGroupAgentPayment = async () => ({ ok: true });
+const checkSessionAgentPayment = async () => ({ ok: true });
 
 const PROXIES = { anthropic: 'proxyAnthropic', openai: 'proxyOpenAI', openrouter: 'proxyOpenRouter', custom: 'proxyCustomRPC' };
 
 const askAi = async ({ messages, config, secrets, address, scopes, headers, deps }) => {
   const request = (deps.normalizeAiRequestPayload || normalizeAiRequestPayload)({
-    payload: { taskType: 'group-agent', messages, max_tokens: 3000, max_output_tokens: 3000 },
+    payload: { taskType: 'session-agent', messages, max_tokens: 3000, max_output_tokens: 3000 },
     config,
   });
   const { provider, payload } = request;
   if (!isModelAllowed(payload.model, provider)) return { ok: false, status: 403, body: AI_MODEL_NOT_ALLOWED };
   const proxy = deps[PROXIES[provider]];
-  if (!proxy) return { ok: false, status: 503, body: { error: 'The session’s AI provider can’t answer the Group Agent.' } };
+  if (!proxy) return { ok: false, status: 503, body: { error: 'The session’s AI provider can’t answer the Session Agent.' } };
   const response = await proxy({
     payload, config, secrets, baseHeaders: headers, ...(provider === 'custom' ? { auth: { address, scopes } } : {}),
   });
@@ -179,26 +179,26 @@ const askAi = async ({ messages, config, secrets, address, scopes, headers, deps
       ? { ok: false, status: 429, body: { error: 'The session’s AI is busy. Try again shortly.' } }
       : { ok: false, status: 502, body: { error: 'The session’s AI couldn’t answer. Try again.' } };
   }
-  const answer = clip(trim(data?.completion), GROUP_AGENT_LIMITS.answerChars);
-  return answer ? { ok: true, answer } : { ok: false, status: 502, body: { error: 'The Group Agent gave no answer. Try again.' } };
+  const answer = clip(trim(data?.completion), SESSION_AGENT_LIMITS.answerChars);
+  return answer ? { ok: true, answer } : { ok: false, status: 502, body: { error: 'The Session Agent gave no answer. Try again.' } };
 };
 
 const accessFor = ({ env, config, slug, address, scopes, deps }) =>
   createRequesterAccessChecks({ env, config, slug, requesterAddress: address, authScopes: scopes, deps });
 
-export const dispatchGroupAgentRoute = async ({ path, body, config, slug, address, env, limit, headers, scopes, deps } = {}) => {
+export const dispatchSessionAgentRoute = async ({ path, body, config, slug, address, env, limit, headers, scopes, deps } = {}) => {
   const json = (payload, status = 200) => deps.json(payload, status, headers);
-  const setting = groupAgentSettingOf(config?.groupAgent);
-  const store = deps.callGroupAgentOptOutStore || callOptOutStore;
-  if (path === '/group-agent/opt-out') {
+  const setting = sessionAgentSettingOf(config?.sessionAgent);
+  const store = deps.callSessionAgentOptOutStore || callOptOutStore;
+  if (path === '/session-agent/opt-out') {
     const saved = await store(env, slug, 'set', { address, optedOut: body?.optedOut });
     if (!saved.ok) return json({ error: saved.status === 400 ? saved.body?.error : OPT_OUTS_UNAVAILABLE }, saved.status === 400 ? 400 : 503);
     return json({ optedOut: saved.body.optedOut });
   }
   if (!setting) {
-    return path === '/group-agent/status'
+    return path === '/session-agent/status'
       ? json({ on: false, answers: null, audience: null })
-      : json({ error: 'This session has no Group Agent.', reason: 'group_agent_off' }, 403);
+      : json({ error: 'This session has no Session Agent.', reason: 'session_agent_off' }, 403);
   }
   // An ended session, or one with AI off, answers no one, so status says so too.
   const ended = buildSessionEndedResponse({ config, headers, json: deps.json, now: deps.now });
@@ -206,7 +206,7 @@ export const dispatchGroupAgentRoute = async ({ path, body, config, slug, addres
   if (config?.scopes?.ai === false) return json({ error: 'AI is turned off for this session.', reason: 'ai_disabled' }, 403);
   // Status only decides what the page shows, so it reads the sign-in's
   // scopes; each question checks them afresh before anything is read.
-  if (path === '/group-agent/status') {
+  if (path === '/session-agent/status') {
     const [asker, own] = await Promise.all([
       resolveAsker({
         setting, config, address, aiScope: scopes?.ai === true, access: accessFor({ env, config, slug, address, scopes, deps }),
@@ -222,8 +222,8 @@ export const dispatchGroupAgentRoute = async ({ path, body, config, slug, addres
 
   const question = trim(body?.question);
   if (!question) return json({ error: 'Ask a question.' }, 400);
-  if (question.length > GROUP_AGENT_LIMITS.questionChars) {
-    return json({ error: `A question can be at most ${GROUP_AGENT_LIMITS.questionChars} characters.` }, 400);
+  if (question.length > SESSION_AGENT_LIMITS.questionChars) {
+    return json({ error: `A question can be at most ${SESSION_AGENT_LIMITS.questionChars} characters.` }, 400);
   }
   // The /ai route's checks: the current AI scope, which every asker needs,
   // then its rate limit.
@@ -249,9 +249,9 @@ export const dispatchGroupAgentRoute = async ({ path, body, config, slug, addres
   const { material, answersUnavailable } = await gatherMaterial({
     env, slug, config, address, scopes: currentScopes, asker, access, optedOut, deps,
   });
-  const payment = await (deps.checkGroupAgentPayment || checkGroupAgentPayment)({ audience: asker.audience, answers: asker.answers });
-  if (!payment?.ok) return json({ error: payment?.error || 'This answer needs payment first.', reason: 'group_agent_payment_required' }, 402);
-  const { messages, read } = buildGroupAgentMessages({ setting, style: asker.answers, question, material });
+  const payment = await (deps.checkSessionAgentPayment || checkSessionAgentPayment)({ audience: asker.audience, answers: asker.answers });
+  if (!payment?.ok) return json({ error: payment?.error || 'This answer needs payment first.', reason: 'session_agent_payment_required' }, 402);
+  const { messages, read } = buildSessionAgentMessages({ setting, style: asker.answers, question, material });
   const reply = await askAi({ messages, config, secrets: secretContext.secrets, address, scopes: currentScopes, headers, deps });
   if (!reply.ok) return json(reply.body, reply.status);
   return json({

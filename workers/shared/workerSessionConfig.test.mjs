@@ -104,9 +104,9 @@ test('public config projection includes structured session context', () => {
   assert.equal(Object.hasOwn(projected, 'sessionSecrets'), false);
 });
 
-test('public config shows the Group Agent setting, so everyone can see who may ask and how they are answered', () => {
-  const groupAgent = { audiences: [{ who: { match: 'any', conditions: [{ kind: 'agent_grant_scope', scope: 'ai' }] }, answers: 'general' }] };
-  assert.deepEqual(projectPublicWorkerSessionConfig({ slug: 'session-a', groupAgent }).groupAgent, groupAgent);
+test('public config shows the Session Agent setting, so everyone can see who may ask and how they are answered', () => {
+  const sessionAgent = { audiences: [{ who: { match: 'any', conditions: [{ kind: 'agent_grant_scope', scope: 'ai' }] }, answers: 'general' }] };
+  assert.deepEqual(projectPublicWorkerSessionConfig({ slug: 'session-a', sessionAgent }).sessionAgent, sessionAgent);
 });
 
 test('deployment retains optional response encryption and exact linked group references', () => {
@@ -129,7 +129,7 @@ test('public config shows the AI models and effort, hides the rest of ai, and sa
     debateAtlas: false,
     riskMatrix: false,
     memberResults: false,
-    groupAgentReady: false,
+    sessionAgentReady: false,
   });
 
   assert.deepEqual(projected, {
@@ -144,7 +144,7 @@ test('public config shows the AI models and effort, hides the rest of ai, and sa
     debateAtlas: true,
     riskMatrix: true,
     memberResults: true,
-    groupAgentReady: true,
+    sessionAgentReady: true,
   });
 });
 

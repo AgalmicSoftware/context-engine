@@ -9,7 +9,7 @@ import { editSessionSetupProfile, setEncryptionMode, setResultsVisibility } from
 import { normalizeInterviewSettings } from '@ce-shared/interviewSettings.mjs';
 import { normalizeResultsAnalysisSettings } from '@ce-shared/resultsAnalysisSettings.mjs';
 import { SESSION_TEMPLATE_FORMAT, sessionTemplateFromDraft } from '@ce-shared/sessionTemplate.mjs';
-import { GROUP_AGENT_DEFAULT_INSTRUCTIONS } from '@ce-shared/groupAgent.mjs';
+import { SESSION_AGENT_DEFAULT_INSTRUCTIONS } from '@ce-shared/sessionAgent.mjs';
 import {
   applyTemplateToSessionSettingsDraft,
   buildSessionSettingsDraft,
@@ -523,10 +523,10 @@ describe('saving the edit page through the Session Worker', () => {
     expect(off.result.config.interviewMode).not.toHaveProperty('groupSuggestionData');
   });
 
-  it('saves the Group Agent as the Worker stores it, without signing anyone out, and turns it off with null', () => {
+  it('saves the Session Agent as the Worker stores it, without signing anyone out, and turns it off with null', () => {
     const stored = publishedSession();
-    expect(stored).not.toHaveProperty('groupAgent');
-    expect(buildSessionSettingsDraft(projectPublicWorkerSessionConfig(stored)).groupAgent).toBeNull();
+    expect(stored).not.toHaveProperty('sessionAgent');
+    expect(buildSessionSettingsDraft(projectPublicWorkerSessionConfig(stored)).sessionAgent).toBeNull();
     const everyone = {
       who: { match: 'any', conditions: [{ kind: 'agent_grant_scope', scope: 'ai' }] },
       answers: 'general',
@@ -536,35 +536,35 @@ describe('saving the edit page through the Session Worker', () => {
       answers: 'detailed',
     });
     const { save, result } = editAndSave(stored, (draft) => {
-      draft.groupAgent = {
+      draft.sessionAgent = {
         audiences: [salon(' Salon '), everyone],
-        instructions: { general: GROUP_AGENT_DEFAULT_INSTRUCTIONS.general, detailed: ' Cite the files. ' },
+        instructions: { general: SESSION_AGENT_DEFAULT_INSTRUCTIONS.general, detailed: ' Cite the files. ' },
       };
     });
-    const groupAgent = { audiences: [salon('salon'), everyone], instructions: { detailed: 'Cite the files.' } };
-    expect(save.patch).toEqual({ groupAgent });
+    const sessionAgent = { audiences: [salon('salon'), everyone], instructions: { detailed: 'Cite the files.' } };
+    expect(save.patch).toEqual({ sessionAgent });
     expect(save.classification.signsParticipantsOut).toBe(false);
     expect(result).toMatchObject({ ok: true });
-    expect(result.config.groupAgent).toEqual(groupAgent);
+    expect(result.config.sessionAgent).toEqual(sessionAgent);
     // The page sent the stored form, so reading it back shows no change.
     const reread = projectPublicWorkerSessionConfig(result.config);
     expect(buildSessionSettingsSave(reread, buildSessionSettingsDraft(reread)).patch).toEqual({});
 
     const off = editAndSave(result.config, (draft) => {
-      draft.groupAgent = null;
+      draft.sessionAgent = null;
     });
-    expect(off.save.patch).toEqual({ groupAgent: null });
-    expect(off.result.config).not.toHaveProperty('groupAgent');
+    expect(off.save.patch).toEqual({ sessionAgent: null });
+    expect(off.result.config).not.toHaveProperty('sessionAgent');
   });
 
-  it('says what to fix in a Group Agent setting before saving', () => {
+  it('says what to fix in a Session Agent setting before saving', () => {
     const before = projectPublicWorkerSessionConfig(publishedSession());
     const draft = buildSessionSettingsDraft(before);
-    draft.groupAgent = {
+    draft.sessionAgent = {
       audiences: [{ who: { match: 'any', conditions: [{ kind: 'worker_group', groupIds: [] }] }, answers: 'detailed' }],
     };
     expect(() => buildSessionSettingsSave(before, draft)).toThrow(
-      'Group Agent: Audience 1, rule 1, needs at least one group.',
+      'Session Agent: Audience 1, rule 1, needs at least one group.',
     );
   });
 

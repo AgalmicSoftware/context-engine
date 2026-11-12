@@ -480,7 +480,7 @@
   display: none;
 }
 
-.groupAgentBar {
+.sessionAgentBar {
   display: flex;
   justify-content: flex-end;
   width: min(100%, 980px);
@@ -489,7 +489,7 @@
 
 // The launcher paints the session chrome and its text colour, a pair every
 // theme keeps readable, so it reads on any section background in every state.
-.groupAgentButton {
+.sessionAgentButton {
   display: inline-flex;
   align-items: center;
   gap: 0.45rem;

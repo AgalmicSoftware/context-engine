@@ -9,5 +9,5 @@ export const DEBATE_ATLAS_FIELD: 'debateAtlas';
 export const RISK_MATRIX_FIELD: 'riskMatrix';
 /** The public config field a Worker sets when it shows every answer to signed-in members. */
 export const MEMBER_RESULTS_FIELD: 'memberResults';
-/** The public config field a Worker sets when it answers the Group Agent and accepts its setting. */
-export const GROUP_AGENT_READY_FIELD: 'groupAgentReady';
+/** The public config field a Worker sets when it answers the Session Agent and accepts its setting. */
+export const SESSION_AGENT_READY_FIELD: 'sessionAgentReady';

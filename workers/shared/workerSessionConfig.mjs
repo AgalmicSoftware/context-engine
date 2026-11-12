@@ -1,7 +1,7 @@
 import { projectPublicAgentConfig } from '../../shared/sessionAgentConfig.mjs';
 import {
   DEBATE_ATLAS_FIELD,
-  GROUP_AGENT_READY_FIELD,
+  SESSION_AGENT_READY_FIELD,
   MEMBER_RESULTS_FIELD,
   PUBLIC_WORKER_AI_FIELDS,
   PUBLIC_WORKER_CONFIG_FIELDS,
@@ -319,7 +319,7 @@ export const projectPublicWorkerSessionConfig = (config) => {
   projected[DEBATE_ATLAS_FIELD] = true;
   projected[RISK_MATRIX_FIELD] = true;
   projected[MEMBER_RESULTS_FIELD] = true;
-  projected[GROUP_AGENT_READY_FIELD] = true;
+  projected[SESSION_AGENT_READY_FIELD] = true;
   return projected;
 };
 

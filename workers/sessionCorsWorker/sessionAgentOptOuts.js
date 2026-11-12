@@ -1,7 +1,7 @@
-// Who has turned off the Group Agent's use of their answers and files: one key
+// Who has turned off the Session Agent's use of their answers and files: one key
 // per person in the session's coordinator, read on every question, so a change
 // applies from the next one. Everyone else is in, as the switch starts.
-const PREFIX = 'group-agent-opt-out-v1:';
+const PREFIX = 'session-agent-opt-out-v1:';
 const PAGE = 1000;
 const ADDRESS = /^0x[0-9a-f]{40}$/;
 
@@ -21,7 +21,7 @@ const listAddresses = async (storage) => {
   }
 };
 
-export const dispatchGroupAgentOptOutStore = async (coordinator, operation, payload = {}) => {
+export const dispatchSessionAgentOptOutStore = async (coordinator, operation, payload = {}) => {
   const storage = coordinator.state.storage;
   if (operation === 'list') return json({ ok: true, addresses: await listAddresses(storage) });
   const address = addressOf(payload.address);
@@ -29,7 +29,7 @@ export const dispatchGroupAgentOptOutStore = async (coordinator, operation, payl
   if (operation === 'read') return json({ ok: true, optedOut: (await storage.get(PREFIX + address)) === true });
   if (operation === 'set') {
     if (typeof payload.optedOut !== 'boolean') {
-      return json({ ok: false, error: 'Say whether the Group Agent may use your answers and files.' }, 400);
+      return json({ ok: false, error: 'Say whether the Session Agent may use your answers and files.' }, 400);
     }
     if (payload.optedOut) await storage.put(PREFIX + address, true);
     else await storage.delete(PREFIX + address);

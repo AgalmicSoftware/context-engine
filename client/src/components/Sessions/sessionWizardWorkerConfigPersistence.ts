@@ -1,6 +1,6 @@
 import {
   DEBATE_ATLAS_FIELD,
-  GROUP_AGENT_READY_FIELD,
+  SESSION_AGENT_READY_FIELD,
   MEMBER_RESULTS_FIELD,
   PUBLIC_WORKER_AI_FIELDS,
   PUBLIC_WORKER_CONFIG_FIELDS,
@@ -69,7 +69,7 @@ const isRetryableConfigReadStatus = (status: number): boolean =>
 const WORKER_CANONICAL_PUBLICATION_REVISION_KEY = 'workerCanonicalPublicationRevision';
 // The Worker sets these public fields itself: the authorization epoch and the
 // publication marker on writes, and response field encryption and the
-// merges-ai, debate-atlas, risk-matrix, member-results and Group Agent fields on every
+// merges-ai, debate-atlas, risk-matrix, member-results and Session Agent fields on every
 // read. They are not config the wizard writes, so the readback check skips them.
 const WORKER_MANAGED_PUBLIC_CONFIG_FIELDS = Object.freeze([
   'authzEpoch',
@@ -79,7 +79,7 @@ const WORKER_MANAGED_PUBLIC_CONFIG_FIELDS = Object.freeze([
   DEBATE_ATLAS_FIELD,
   RISK_MATRIX_FIELD,
   MEMBER_RESULTS_FIELD,
-  GROUP_AGENT_READY_FIELD,
+  SESSION_AGENT_READY_FIELD,
 ]);
 // Only a finalizing write claims a revision. Before that, a stored revision
 // (such as one the deploy helper staged) is not part of the checked config.
@@ -201,8 +201,8 @@ const pickFields = (source: UnknownRecord, fields: readonly string[]): UnknownRe
 const buildExpectedPublicConfig = (config: UnknownRecord, ignoredFields: readonly string[]): UnknownRecord =>
   PUBLIC_WORKER_CONFIG_FIELDS.reduce<UnknownRecord>((expected, key) => {
     if (ignoredFields.includes(key) || !Object.prototype.hasOwnProperty.call(config, key)) return expected;
-    // A Group Agent of null is off, as no setting is (see the readback below).
-    if (key === 'groupAgent' && config.groupAgent === null) return expected;
+    // A Session Agent of null is off, as no setting is (see the readback below).
+    if (key === 'sessionAgent' && config.sessionAgent === null) return expected;
     if (key === 'ai') {
       const ai =
         config.ai && typeof config.ai === 'object' && !Array.isArray(config.ai) ? (config.ai as UnknownRecord) : {};
@@ -276,8 +276,8 @@ const buildComparableActualPublicConfig = ({
   ignoredFields.forEach((key) => {
     delete comparableConfig[key];
   });
-  // The Worker stores an off Group Agent as no setting; null means the same.
-  if (comparableConfig.groupAgent === null) delete comparableConfig.groupAgent;
+  // The Worker stores an off Session Agent as no setting; null means the same.
+  if (comparableConfig.sessionAgent === null) delete comparableConfig.sessionAgent;
   // The critical-field check has already matched this URL's origin; a
   // trailing slash or letter case does not change the Worker it names.
   comparableConfig.corsWorkerUrl = workerOrigin;
@@ -328,12 +328,12 @@ const getPublicConfigFromResponse = (body: UnknownRecord): UnknownRecord => {
 };
 
 // set-config merges fields, so a config that leaves out its instructions for AI
-// agents or its Group Agent must clear stored ones, with '' and null. Older
+// agents or its Session Agent must clear stored ones, with '' and null. Older
 // Workers refuse either field, so each clear is sent only when the Worker's
 // config already has the field. A Worker with no config answers 404. Any other
 // failed read stops before signing: leaving a field out could keep what is
 // stored, and would change the revision a retry signs.
-const CLEARED_WHEN_LEFT_OUT = { agentInstructions: '', groupAgent: null } as const;
+const CLEARED_WHEN_LEFT_OUT = { agentInstructions: '', sessionAgent: null } as const;
 export const withLeftOutFieldsCleared = async <T extends UnknownRecord>({
   config,
   workerOrigin,

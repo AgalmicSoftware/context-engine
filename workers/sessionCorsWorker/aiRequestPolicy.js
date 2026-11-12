@@ -4,7 +4,7 @@ import { isChatReasoningModel, usesOpenAiResponsesApi } from './aiModelParams.js
 
 const trim = (value) => typeof value === 'string' ? value.trim() : '';
 const record = (value) => value && typeof value === 'object' && !Array.isArray(value) ? value : {};
-const tasks = new Set(['generate', 'rewrite', 'summarize', 'rank', 'analysis', 'compare', 'categorize', 'interview-map', 'interview-opening', 'context-read', 'group-agent']);
+const tasks = new Set(['generate', 'rewrite', 'summarize', 'rank', 'analysis', 'compare', 'categorize', 'interview-map', 'interview-opening', 'context-read', 'session-agent']);
 const taskName = (payload) => tasks.has(payload?.taskType) ? payload.taskType : '';
 const modelEntry = (entry, provider, fallback = DEFAULT_AI_MODEL) => {
   const obj = record(entry);
@@ -58,8 +58,8 @@ const operationCeilings = Object.freeze({
   'interview-opening': 2000,
   // A context PDF's text, read once by an admin's request.
   'context-read': 8000,
-  // One Group Agent answer of at most 150 words, thinking included.
-  'group-agent': 3000,
+  // One Session Agent answer of at most 150 words, thinking included.
+  'session-agent': 3000,
 });
 const tokenFields = ['max_tokens', 'max_completion_tokens', 'max_output_tokens', 'max_tokens_to_sample', 'maxTokens'];
 const effortOrder = ['none', 'minimal', 'low', 'medium', 'high'];

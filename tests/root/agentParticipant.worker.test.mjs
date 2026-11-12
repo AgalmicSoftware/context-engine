@@ -1376,10 +1376,10 @@ test('context the Worker refuses is reported in terms of what the agent can do',
   }
 });
 
-test('the Group Agent answers a member from stored answers through the real Worker, naming no one', async (t) => {
+test('the Session Agent answers a member from stored answers through the real Worker, naming no one', async (t) => {
   const config = sessionConfig();
   config.ai = { mode: 'anthropic', models: { fast: { provider: 'anthropic', model: 'claude-sonnet-5-5' } } };
-  config.groupAgent = { audiences: [{ who: { match: 'any', conditions: [{ kind: 'agent_grant_scope', scope: 'ai' }] }, answers: 'detailed' }] };
+  config.sessionAgent = { audiences: [{ who: { match: 'any', conditions: [{ kind: 'agent_grant_scope', scope: 'ai' }] }, answers: 'detailed' }] };
   const env = createEnv([config]);
   await env.GROUP_KV.put(`session:${SLUG}:secrets`, JSON.stringify({ anthropicKey: ['synthetic', 'anthropic', 'key'].join('-') }));
   const alice = await createAgent(env, 'alice.delve.town', []);
@@ -1409,10 +1409,10 @@ test('the Group Agent answers a member from stored answers through the real Work
   const client = createWorkerClient({
     workerOrigin: WORKER_ORIGIN, slug: SLUG, trustedOrigins: ['https://contextengine.sh'], wallet: alice.wallet, fetchImpl: workerFetch(env),
   });
-  assert.deepEqual(await client.request('/group-agent/status', { method: 'POST', auth: true, body: {} }), {
+  assert.deepEqual(await client.request('/session-agent/status', { method: 'POST', auth: true, body: {} }), {
     on: true, answers: 'detailed', audience: 0, optedOut: false,
   });
-  const reply = await client.request('/group-agent/ask', { method: 'POST', auth: true, body: { question: 'Do people want labels?' } });
+  const reply = await client.request('/session-agent/ask', { method: 'POST', auth: true, body: { question: 'Do people want labels?' } });
   assert.deepEqual({ answer: reply.answer, answers: reply.answers, read: reply.read.answers }, {
     answer: 'Most agree that labels help.', answers: 'detailed', read: 4,
   });
@@ -1430,8 +1430,8 @@ test('the Group Agent answers a member from stored answers through the real Work
   const bobClient = createWorkerClient({
     workerOrigin: WORKER_ORIGIN, slug: SLUG, trustedOrigins: ['https://contextengine.sh'], wallet: bob.wallet, fetchImpl: workerFetch(env),
   });
-  assert.deepEqual(await bobClient.request('/group-agent/opt-out', { method: 'POST', auth: true, body: { optedOut: true } }), { optedOut: true });
-  const without = await client.request('/group-agent/ask', { method: 'POST', auth: true, body: { question: 'Do people want labels?' } });
+  assert.deepEqual(await bobClient.request('/session-agent/opt-out', { method: 'POST', auth: true, body: { optedOut: true } }), { optedOut: true });
+  const without = await client.request('/session-agent/ask', { method: 'POST', auth: true, body: { question: 'Do people want labels?' } });
   assert.equal(without.read.answers, 3);
   assert.match(sent[1], /\\"Agree\\":2,\\"Disagree\\":1/);
   assert.doesNotMatch(sent[1], /Labels help readers/);

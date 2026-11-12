@@ -51,7 +51,7 @@ Session, gates, and the Worker:
 - `docs/standard-sponsored-links-fixture.md`: Temporary tracked fixture for publishing a small set of public sponsored setup links with minimal onboarding friction.
 - `docs/session-registry.md`: SessionRegistry and on-chain gate authority model.
 - `docs/session-cors-worker.md`: Cloudflare `sessionCorsWorker` behavior, endpoints, KV layouts, and wizard flow.
-- `docs/group-agent.md`: the Group Agent: who may ask, what General and Detailed answers read, opting out, limits, and its Worker routes.
+- `docs/session-agent.md`: the Session Agent: who may ask, what General and Detailed answers read, opting out, limits, and its Worker routes.
 - `docs/publication-upgrade.md`: Session Worker upgrades: capabilities, supported client and Worker versions, config preflight, and republishing admin corrections.
 - `../workers/sessionCorsWorker/agent/README.md`: optional Session Worker Agent HTTP API,
   credentials, Session Wrapped, canonical authority, and fresh deployment.

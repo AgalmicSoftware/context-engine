@@ -1,13 +1,13 @@
-/** @file SetupGroupAgent.tsx: who may ask the Group Agent, and how each audience is answered. */
+/** @file SetupSessionAgent.tsx: who may ask the Session Agent, and how each audience is answered. */
 import React from 'react';
 import { Input } from 'reactstrap';
 
 import {
-  GROUP_AGENT_DEFAULT_INSTRUCTIONS,
-  GROUP_AGENT_LIMITS,
-  GROUP_AGENT_STYLES,
-  validateGroupAgent,
-} from '@ce-shared/groupAgent.mjs';
+  SESSION_AGENT_DEFAULT_INSTRUCTIONS,
+  SESSION_AGENT_LIMITS,
+  SESSION_AGENT_STYLES,
+  validateSessionAgent,
+} from '@ce-shared/sessionAgent.mjs';
 import { SetupCheck, SetupField, setupHelpId } from './SetupPrimitives';
 import { asList, asRecord, text } from './setupSectionTypes';
 import styles from './SessionSetup.module.scss';
@@ -15,7 +15,7 @@ import styles from './SessionSetup.module.scss';
 type Rule = Record<string, unknown>;
 type Audience = { who: { match: string; conditions: Rule[] }; answers: string };
 
-const L = GROUP_AGENT_LIMITS;
+const L = SESSION_AGENT_LIMITS;
 const everyone = (): Rule => ({ kind: 'agent_grant_scope', scope: 'ai' });
 const STYLE_LABELS: Record<string, string> = { general: 'General', detailed: 'Detailed' };
 // Admins always get Detailed answers, so a rule naming them is only shown when a setting has one.
@@ -40,8 +40,8 @@ const instructionsHelp = (style: string) =>
   'session’s settings, these instructions can be read by anyone.';
 
 /** The first reason the setting can't be saved, or '' when it can. */
-export const describeGroupAgentProblem = (value: unknown): string => {
-  const checked = validateGroupAgent(value ?? null);
+export const describeSessionAgentProblem = (value: unknown): string => {
+  const checked = validateSessionAgent(value ?? null);
   return checked.ok ? '' : checked.errors[0].message;
 };
 
@@ -68,11 +68,11 @@ type Props = {
 // Off is no setting. Turning it on lets everyone signed in ask, with General
 // answers; an admin adds audiences, in order, and may rewrite each style's
 // instructions. The Worker checks who may ask and gathers what each style reads.
-const SetupGroupAgent = ({ value, onChange, groups, sbtChainId = 0 }: Props): React.ReactElement => {
+const SetupSessionAgent = ({ value, onChange, groups, sbtChainId = 0 }: Props): React.ReactElement => {
   const on = !!value && typeof value === 'object';
   const audiences = readAudiences(value);
   const instructions = asRecord(asRecord(value).instructions);
-  const problem = on ? describeGroupAgentProblem(value) : '';
+  const problem = on ? describeSessionAgentProblem(value) : '';
   const save = (next: Audience[], nextInstructions: Record<string, unknown> = instructions) =>
     onChange({ audiences: next, ...(Object.keys(nextInstructions).length ? { instructions: nextInstructions } : {}) });
   const update = (index: number, change: (audience: Audience) => Audience) =>
@@ -140,7 +140,7 @@ const SetupGroupAgent = ({ value, onChange, groups, sbtChainId = 0 }: Props): Re
           type="select"
           aria-label={name}
           value={kind}
-          data-testid={`ce-setup-group-agent-rule-${index}-${at}`}
+          data-testid={`ce-setup-session-agent-rule-${index}-${at}`}
           onChange={(event) => change(ruleOf(event.target.value))}
         >
           {kinds.map((option) => (
@@ -178,10 +178,10 @@ const SetupGroupAgent = ({ value, onChange, groups, sbtChainId = 0 }: Props): Re
   };
 
   const renderAudience = (audience: Audience, index: number) => {
-    const id = `ce-setup-group-agent-${index}`;
+    const id = `ce-setup-session-agent-${index}`;
     const { conditions } = audience.who;
     return (
-      <div key={index} className={styles.listRow} data-testid={`ce-setup-group-agent-audience-${index}`}>
+      <div key={index} className={styles.listRow} data-testid={`ce-setup-session-agent-audience-${index}`}>
         <div className={styles.listRowBody}>
           <span className={styles.questionType}>Audience {index + 1}</span>
           {conditions.length > 1 ? (
@@ -210,7 +210,7 @@ const SetupGroupAgent = ({ value, onChange, groups, sbtChainId = 0 }: Props): Re
               data-testid={`${id}-answers`}
               onChange={(event) => update(index, (current) => ({ ...current, answers: event.target.value }))}
             >
-              {GROUP_AGENT_STYLES.map((style) => (
+              {SESSION_AGENT_STYLES.map((style) => (
                 <option key={style} value={style}>
                   {STYLE_LABELS[style]}
                 </option>
@@ -265,11 +265,11 @@ const SetupGroupAgent = ({ value, onChange, groups, sbtChainId = 0 }: Props): Re
   return (
     <>
       <SetupCheck
-        id="ce-setup-group-agent"
-        label="Group Agent"
+        id="ce-setup-session-agent"
+        label="Session Agent"
         checked={on}
         help={AGENT_HELP}
-        testId="ce-setup-group-agent"
+        testId="ce-setup-session-agent"
         onChange={(checked) =>
           onChange(
             checked ? { audiences: [{ who: { match: 'any', conditions: [everyone()] }, answers: 'general' }] } : null,
@@ -285,7 +285,7 @@ const SetupGroupAgent = ({ value, onChange, groups, sbtChainId = 0 }: Props): Re
               <button
                 type="button"
                 className={styles.button}
-                data-testid="ce-setup-group-agent-add"
+                data-testid="ce-setup-session-agent-add"
                 // A new audience goes first: a narrower one, such as a group, comes before everyone else.
                 onClick={() =>
                   save([
@@ -298,8 +298,8 @@ const SetupGroupAgent = ({ value, onChange, groups, sbtChainId = 0 }: Props): Re
               </button>
             </div>
           ) : null}
-          {GROUP_AGENT_STYLES.map((style) => {
-            const fieldId = `ce-setup-group-agent-${style}`;
+          {SESSION_AGENT_STYLES.map((style) => {
+            const fieldId = `ce-setup-session-agent-${style}`;
             const written = instructions[style];
             return (
               <SetupField
@@ -313,7 +313,7 @@ const SetupGroupAgent = ({ value, onChange, groups, sbtChainId = 0 }: Props): Re
                   type="textarea"
                   className={styles.textarea}
                   maxLength={L.instructionsChars}
-                  value={typeof written === 'string' ? written : GROUP_AGENT_DEFAULT_INSTRUCTIONS[style]}
+                  value={typeof written === 'string' ? written : SESSION_AGENT_DEFAULT_INSTRUCTIONS[style]}
                   aria-describedby={setupHelpId(fieldId)}
                   data-testid={fieldId}
                   onChange={(event) => save(audiences, { ...instructions, [style]: event.target.value })}
@@ -322,7 +322,7 @@ const SetupGroupAgent = ({ value, onChange, groups, sbtChainId = 0 }: Props): Re
             );
           })}
           {problem ? (
-            <p className={styles.errorText} data-testid="ce-setup-group-agent-error">
+            <p className={styles.errorText} data-testid="ce-setup-session-agent-error">
               {problem}
             </p>
           ) : null}
@@ -332,4 +332,4 @@ const SetupGroupAgent = ({ value, onChange, groups, sbtChainId = 0 }: Props): Re
   );
 };
 
-export default SetupGroupAgent;
+export default SetupSessionAgent;

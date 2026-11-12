@@ -38,13 +38,13 @@ const summarizeAi = (draft: SetupSectionProps['draft']): string =>
 type AiProps = SetupSectionProps & {
   /** /new: the provider key inputs, which stay visible (keys are never saved). */
   keys?: React.ReactNode;
-  /** Who may ask the Group Agent, for a session on a Session Worker. */
-  groupAgent?: React.ReactNode;
+  /** Who may ask the Session Agent, for a session on a Session Worker. */
+  sessionAgent?: React.ReactNode;
 };
 
 const REASONING_EFFORTS = ['low', 'medium', 'high'];
 
-export const SetupAiSection = ({ draft, onChange, open, onToggle, keys = null, groupAgent = null }: AiProps) => {
+export const SetupAiSection = ({ draft, onChange, open, onToggle, keys = null, sessionAgent = null }: AiProps) => {
   const { provider, fast, thinking } = readModels(draft);
   const ai = asRecord(draft.ai);
   const setProvider = (next: string) => {
@@ -82,7 +82,9 @@ export const SetupAiSection = ({ draft, onChange, open, onToggle, keys = null, g
     <SetupSection
       sectionKey="ai"
       title="AI"
-      summary={[summarizeAi(draft), groupAgent && draft.groupAgent ? 'Group Agent on' : ''].filter(Boolean).join(' · ')}
+      summary={[summarizeAi(draft), sessionAgent && draft.sessionAgent ? 'Session Agent on' : '']
+        .filter(Boolean)
+        .join(' · ')}
       open={open}
       onToggle={onToggle}
       quick={keys}
@@ -154,7 +156,7 @@ export const SetupAiSection = ({ draft, onChange, open, onToggle, keys = null, g
           onChange={(event) => onChange(['defaultTags'], event.target.value)}
         />
       </SetupField>
-      {groupAgent}
+      {sessionAgent}
     </SetupSection>
   );
 };

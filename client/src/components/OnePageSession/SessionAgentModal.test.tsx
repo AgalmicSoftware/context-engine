@@ -1,39 +1,39 @@
 import React from 'react';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 
-import GroupAgentModal from './GroupAgentModal';
+import SessionAgentModal from './SessionAgentModal';
 import {
-  askGroupAgent,
-  readGroupAgentStatus,
-  setGroupAgentOptOut,
-  type GroupAgentReply,
-  type GroupAgentStatus,
-} from './groupAgentRequests';
+  askSessionAgent,
+  readSessionAgentStatus,
+  setSessionAgentOptOut,
+  type SessionAgentReply,
+  type SessionAgentStatus,
+} from './sessionAgentRequests';
 
-jest.mock('./groupAgentRequests', () => ({
-  readGroupAgentStatus: jest.fn(),
-  askGroupAgent: jest.fn(),
-  setGroupAgentOptOut: jest.fn(),
+jest.mock('./sessionAgentRequests', () => ({
+  readSessionAgentStatus: jest.fn(),
+  askSessionAgent: jest.fn(),
+  setSessionAgentOptOut: jest.fn(),
 }));
 
-const readStatus = jest.mocked(readGroupAgentStatus);
-const ask = jest.mocked(askGroupAgent);
-const setOptOut = jest.mocked(setGroupAgentOptOut);
+const readStatus = jest.mocked(readSessionAgentStatus);
+const ask = jest.mocked(askSessionAgent);
+const setOptOut = jest.mocked(setSessionAgentOptOut);
 
 const OPTIONS = { sessionSlug: 'salon', sessionConfig: { slug: 'salon' }, account: '0xabc' };
-const member: GroupAgentStatus = { on: true, answers: 'general', audience: 1, optedOut: false };
-const reply = (answer: string, read = { context: 0, results: false, answers: 0 }, note = ''): GroupAgentReply => ({
+const member: SessionAgentStatus = { on: true, answers: 'general', audience: 1, optedOut: false };
+const reply = (answer: string, read = { context: 0, results: false, answers: 0 }, note = ''): SessionAgentReply => ({
   answer,
   answers: 'general',
   read,
   note,
 });
 
-const renderModal = async (status: GroupAgentStatus) => {
+const renderModal = async (status: SessionAgentStatus) => {
   readStatus.mockResolvedValue(status);
   const onClose = jest.fn();
-  render(<GroupAgentModal {...OPTIONS} onClose={onClose} />);
-  const dialog = await screen.findByRole('dialog', { name: 'Group Agent' });
+  render(<SessionAgentModal {...OPTIONS} onClose={onClose} />);
+  const dialog = await screen.findByRole('dialog', { name: 'Session Agent' });
   await waitFor(() => expect(within(dialog).queryByText('Checking…')).not.toBeInTheDocument());
   return { dialog: within(dialog), onClose };
 };
@@ -43,7 +43,7 @@ const askQuestion = (dialog: ReturnType<typeof within>, text: string) => {
   fireEvent.click(dialog.getByRole('button', { name: 'Ask' }));
 };
 
-describe('GroupAgentModal', () => {
+describe('SessionAgentModal', () => {
   afterEach(() => {
     jest.resetAllMocks();
   });
@@ -82,7 +82,7 @@ describe('GroupAgentModal', () => {
     askQuestion(dialog, 'Who agreed?');
     await dialog.findByText('An answer.');
     let fail: (error: Error) => void = () => {};
-    ask.mockReturnValueOnce(new Promise<GroupAgentReply>((_, reject) => (fail = reject)));
+    ask.mockReturnValueOnce(new Promise<SessionAgentReply>((_, reject) => (fail = reject)));
     fireEvent.click(dialog.getByRole('button', { name: 'Ask' }));
     expect(await dialog.findByRole('button', { name: 'Asking…' })).toBeDisabled();
     fail(new Error('The session’s AI is busy. Try again shortly.'));
@@ -99,13 +99,13 @@ describe('GroupAgentModal', () => {
 
   it('tells someone it doesn’t answer them, and still lets them keep their answers and files out', async () => {
     const { dialog } = await renderModal({ on: true, answers: null, audience: null, optedOut: false });
-    expect(dialog.getByText('The Group Agent isn’t open to you in this session.')).toBeInTheDocument();
+    expect(dialog.getByText('The Session Agent isn’t open to you in this session.')).toBeInTheDocument();
     expect(dialog.queryByLabelText('Your question')).not.toBeInTheDocument();
     const use = dialog.getByRole('switch', { name: 'Use my answers and files' });
     expect(use).toBeChecked();
-    expect(dialog.getByTestId('ce-group-agent-notice-switch')).toHaveAttribute(
+    expect(dialog.getByTestId('ce-session-agent-notice-switch')).toHaveAttribute(
       'href',
-      expect.stringMatching(/README\.md#group-agent$/),
+      expect.stringMatching(/README\.md#session-agent$/),
     );
 
     setOptOut.mockResolvedValueOnce(true);
@@ -113,7 +113,7 @@ describe('GroupAgentModal', () => {
     await waitFor(() => expect(use).not.toBeChecked());
     expect(setOptOut).toHaveBeenCalledWith(true, OPTIONS);
 
-    setOptOut.mockRejectedValueOnce(new Error('Who turned the Group Agent off couldn’t be read just now.'));
+    setOptOut.mockRejectedValueOnce(new Error('Who turned the Session Agent off couldn’t be read just now.'));
     fireEvent.click(use);
     expect(await dialog.findByRole('alert')).toHaveTextContent('couldn’t be read just now');
     expect(setOptOut).toHaveBeenLastCalledWith(false, OPTIONS);
@@ -122,13 +122,13 @@ describe('GroupAgentModal', () => {
 
   it('keeps a switch change saved while a status check was on its way', async () => {
     readStatus.mockResolvedValueOnce(member);
-    const view = render(<GroupAgentModal {...OPTIONS} onClose={() => {}} />);
-    const dialog = within(await screen.findByRole('dialog', { name: 'Group Agent' }));
+    const view = render(<SessionAgentModal {...OPTIONS} onClose={() => {}} />);
+    const dialog = within(await screen.findByRole('dialog', { name: 'Session Agent' }));
     const use = await dialog.findByRole('switch', { name: 'Use my answers and files' });
-    let answer: (status: GroupAgentStatus) => void = () => {};
-    readStatus.mockReturnValueOnce(new Promise<GroupAgentStatus>((resolve) => (answer = resolve)));
+    let answer: (status: SessionAgentStatus) => void = () => {};
+    readStatus.mockReturnValueOnce(new Promise<SessionAgentStatus>((resolve) => (answer = resolve)));
     // A new config object checks the status again.
-    view.rerender(<GroupAgentModal {...OPTIONS} sessionConfig={{ slug: 'salon' }} onClose={() => {}} />);
+    view.rerender(<SessionAgentModal {...OPTIONS} sessionConfig={{ slug: 'salon' }} onClose={() => {}} />);
     expect(readStatus).toHaveBeenCalledTimes(2);
     setOptOut.mockResolvedValueOnce(true);
     fireEvent.click(use);
@@ -145,8 +145,8 @@ describe('GroupAgentModal', () => {
 
   it('offers to try again when it can’t say how it would answer', async () => {
     readStatus.mockRejectedValueOnce(new Error('Who may ask could not be checked just now. Try again shortly.'));
-    render(<GroupAgentModal {...OPTIONS} onClose={() => {}} />);
-    const dialog = within(await screen.findByRole('dialog', { name: 'Group Agent' }));
+    render(<SessionAgentModal {...OPTIONS} onClose={() => {}} />);
+    const dialog = within(await screen.findByRole('dialog', { name: 'Session Agent' }));
     expect(await dialog.findByRole('alert')).toHaveTextContent('Who may ask could not be checked just now.');
     readStatus.mockResolvedValueOnce(member);
     fireEvent.click(dialog.getByRole('button', { name: 'Try again' }));
@@ -156,7 +156,7 @@ describe('GroupAgentModal', () => {
 
   it('says when an admin has turned it off since the page loaded', async () => {
     const { dialog } = await renderModal({ on: false, answers: null, audience: null, optedOut: false });
-    expect(dialog.getByText('An admin has turned the Group Agent off.')).toBeInTheDocument();
+    expect(dialog.getByText('An admin has turned the Session Agent off.')).toBeInTheDocument();
     expect(dialog.queryByRole('switch')).not.toBeInTheDocument();
   });
 

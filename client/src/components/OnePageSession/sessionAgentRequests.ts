@@ -1,38 +1,38 @@
-/** @file groupAgentRequests.ts: the session page's calls to its Session Worker's Group Agent. */
+/** @file sessionAgentRequests.ts: the session page's calls to its Session Worker's Session Agent. */
 import { getCorsProxyUrlOrThrow } from '../../utilities/worker/corsProxy';
 import { fetchWorkerWithAuth } from '../../utilities/worker/workerAuth';
 import { defaultStrictAllowDemoFallback } from '../../utilities/worker/workerSessionResolution.js';
 import { toStr } from '../../utilities/shared/primitives.js';
 
-export type GroupAgentStyle = 'general' | 'detailed';
+export type SessionAgentStyle = 'general' | 'detailed';
 
 /** How the Worker would answer this person: no style when it doesn't admit them. */
-export type GroupAgentStatus = {
+export type SessionAgentStatus = {
   /** False once an admin has turned it off. */
   on: boolean;
-  answers: GroupAgentStyle | null;
+  answers: SessionAgentStyle | null;
   /** The audience that admits them, by position, or 'admin'. */
   audience: number | 'admin' | null;
   optedOut: boolean;
 };
 
-export type GroupAgentReply = {
+export type SessionAgentReply = {
   answer: string;
-  answers: GroupAgentStyle;
+  answers: SessionAgentStyle;
   /** How much the answer drew on: items of context, the results, members' answers. */
   read: { context: number; results: boolean; answers: number };
   note: string;
 };
 
-export type GroupAgentRequestOptions = { sessionSlug: string; sessionConfig: unknown; account: string };
+export type SessionAgentRequestOptions = { sessionSlug: string; sessionConfig: unknown; account: string };
 
 const asRecord = (value: unknown): Record<string, unknown> =>
   value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
-const styleOf = (value: unknown): GroupAgentStyle | null =>
+const styleOf = (value: unknown): SessionAgentStyle | null =>
   value === 'general' || value === 'detailed' ? value : null;
 
 // Every route takes a signed-in person's JSON POST; the Worker's errors are plain sentences.
-const post = async (path: string, body: Record<string, unknown>, options: GroupAgentRequestOptions) => {
+const post = async (path: string, body: Record<string, unknown>, options: SessionAgentRequestOptions) => {
   const session = {
     sessionSlug: options.sessionSlug,
     sessionConfig: options.sessionConfig,
@@ -54,14 +54,17 @@ const post = async (path: string, body: Record<string, unknown>, options: GroupA
   return result;
 };
 
-export const readGroupAgentStatus = async (options: GroupAgentRequestOptions): Promise<GroupAgentStatus> => {
-  const result = await post('/group-agent/status', {}, options);
+export const readSessionAgentStatus = async (options: SessionAgentRequestOptions): Promise<SessionAgentStatus> => {
+  const result = await post('/session-agent/status', {}, options);
   const audience = result.audience === 'admin' || typeof result.audience === 'number' ? result.audience : null;
   return { on: result.on === true, answers: styleOf(result.answers), audience, optedOut: result.optedOut === true };
 };
 
-export const askGroupAgent = async (question: string, options: GroupAgentRequestOptions): Promise<GroupAgentReply> => {
-  const result = await post('/group-agent/ask', { question }, options);
+export const askSessionAgent = async (
+  question: string,
+  options: SessionAgentRequestOptions,
+): Promise<SessionAgentReply> => {
+  const result = await post('/session-agent/ask', { question }, options);
   const read = asRecord(result.read);
   return {
     answer: toStr(result.answer),
@@ -72,5 +75,5 @@ export const askGroupAgent = async (question: string, options: GroupAgentRequest
 };
 
 /** Turns the agent's use of this person's answers and files off (true) or back on. */
-export const setGroupAgentOptOut = async (optedOut: boolean, options: GroupAgentRequestOptions): Promise<boolean> =>
-  (await post('/group-agent/opt-out', { optedOut }, options)).optedOut === true;
+export const setSessionAgentOptOut = async (optedOut: boolean, options: SessionAgentRequestOptions): Promise<boolean> =>
+  (await post('/session-agent/opt-out', { optedOut }, options)).optedOut === true;

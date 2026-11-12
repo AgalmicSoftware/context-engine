@@ -1,9 +1,9 @@
 import type { SessionContextPromptSource } from './sessionContextText.mjs';
 
-export type GroupAgentStyle = 'general' | 'detailed';
+export type SessionAgentStyle = 'general' | 'detailed';
 
 /** Who an audience is: rules the Session Worker judges as it does a file's. */
-export type GroupAgentCondition =
+export type SessionAgentCondition =
   | { kind: 'worker_role'; role: 'admin' }
   /** Anyone signed in to the session. */
   | { kind: 'agent_grant_scope'; scope: 'ai' }
@@ -11,33 +11,33 @@ export type GroupAgentCondition =
   | { kind: 'worker_group'; groupIds: string[] }
   | { kind: 'sbt_onchain'; chainId: number; contract: string; anyOrAll: 'any' | 'all' };
 
-export type GroupAgentAudience = {
-  who: { match: 'any' | 'all'; conditions: GroupAgentCondition[] };
-  answers: GroupAgentStyle;
+export type SessionAgentAudience = {
+  who: { match: 'any' | 'all'; conditions: SessionAgentCondition[] };
+  answers: SessionAgentStyle;
 };
 
 /** In order: the first audience a person matches sets how they are answered. */
-export type GroupAgentSetting = {
-  audiences: GroupAgentAudience[];
-  instructions?: Partial<Record<GroupAgentStyle, string>>;
+export type SessionAgentSetting = {
+  audiences: SessionAgentAudience[];
+  instructions?: Partial<Record<SessionAgentStyle, string>>;
 };
 
-export type GroupAgentError = { path: string; message: string };
+export type SessionAgentError = { path: string; message: string };
 
 /** One member's answer to a question: the options they chose, and what they wrote. */
-export type GroupAgentMemberAnswer = { choices?: string[]; text?: string };
+export type SessionAgentMemberAnswer = { choices?: string[]; text?: string };
 
 /** Only what this person's style may read; answers carry no names. */
-export type GroupAgentMaterial = {
+export type SessionAgentMaterial = {
   sessionContext?: unknown;
   sources?: SessionContextPromptSource[];
   results?: string;
   /** `scale` says what a rating question's numbers mean. */
-  answers?: Array<{ question: string; scale?: string; answers: GroupAgentMemberAnswer[] }>;
+  answers?: Array<{ question: string; scale?: string; answers: SessionAgentMemberAnswer[] }>;
 };
 
-export const GROUP_AGENT_STYLES: readonly GroupAgentStyle[];
-export const GROUP_AGENT_LIMITS: Readonly<{
+export const SESSION_AGENT_STYLES: readonly SessionAgentStyle[];
+export const SESSION_AGENT_LIMITS: Readonly<{
   audiences: number;
   conditions: number;
   groupIds: number;
@@ -53,27 +53,27 @@ export const GROUP_AGENT_LIMITS: Readonly<{
   choiceChars: number;
   scaleChars: number;
 }>;
-export const GROUP_AGENT_DEFAULT_INSTRUCTIONS: Readonly<Record<GroupAgentStyle, string>>;
+export const SESSION_AGENT_DEFAULT_INSTRUCTIONS: Readonly<Record<SessionAgentStyle, string>>;
 /** Sent after the instructions on every question; no setting removes them. */
-export const GROUP_AGENT_RULES: readonly string[];
+export const SESSION_AGENT_RULES: readonly string[];
 
 /** For writers: refuses anything but the stored form's fields and values; null is off. */
-export function validateGroupAgent(
+export function validateSessionAgent(
   value: unknown,
-): { ok: true; value: GroupAgentSetting | null; errors: [] } | { ok: false; errors: GroupAgentError[] };
+): { ok: true; value: SessionAgentSetting | null; errors: [] } | { ok: false; errors: SessionAgentError[] };
 
 /** For readers: the stored setting, or null when it is off or not valid. */
-export function groupAgentSettingOf(value: unknown): GroupAgentSetting | null;
+export function sessionAgentSettingOf(value: unknown): SessionAgentSetting | null;
 
 /** The instructions a style is sent: the admin's, or the default. */
-export function groupAgentInstructions(setting: GroupAgentSetting | null | undefined, style: GroupAgentStyle): string;
+export function sessionAgentInstructions(setting: SessionAgentSetting | null | undefined, style: SessionAgentStyle): string;
 
 /** The system and user messages for one question, and how much material they carry. */
-export function buildGroupAgentMessages(input: {
-  setting?: GroupAgentSetting | null;
-  style: GroupAgentStyle;
+export function buildSessionAgentMessages(input: {
+  setting?: SessionAgentSetting | null;
+  style: SessionAgentStyle;
   question: string;
-  material?: GroupAgentMaterial;
+  material?: SessionAgentMaterial;
   /** Orders what members wrote; Math.random unless given. */
   random?: () => number;
 }): {

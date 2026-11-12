@@ -25,9 +25,9 @@ const baseConfig = () => ({
   sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
   storageProfile: { backend: 'cloudflare' },
   ai: { models: { fast: { provider: 'openai', model: 'gpt-test' } } },
-  // A config with instructions for AI agents and a Group Agent is written without first reading the stored one.
+  // A config with instructions for AI agents and a Session Agent is written without first reading the stored one.
   agentInstructions: 'Join the open group.',
-  groupAgent: { audiences: [] },
+  sessionAgent: { audiences: [] },
 });
 
 const withoutInstructions = (config: Record<string, unknown>) => {
@@ -54,7 +54,7 @@ const verifiedConfig = (revision: string, overrides: Record<string, unknown> = {
 });
 
 describe('persistAndVerifySessionWizardWorkerConfig', () => {
-  it('reads a Group Agent sent as null as off, which the Worker stores as no setting', async () => {
+  it('reads a Session Agent sent as null as off, which the Worker stores as no setting', async () => {
     const publish = (readback: (signed: Record<string, unknown>) => Record<string, unknown>) => {
       let signed: Record<string, unknown> = {};
       return persistAndVerifySessionWizardWorkerConfig({
@@ -62,7 +62,7 @@ describe('persistAndVerifySessionWizardWorkerConfig', () => {
         slug: 'worker-session',
         sessionId: SESSION_ID,
         adminAddress: ADMIN_ADDRESS,
-        config: { ...baseConfig(), groupAgent: null },
+        config: { ...baseConfig(), sessionAgent: null },
         signAdminAction: async (input: SessionWizardWorkerConfigSignInput) => {
           signed = input.body.config;
           return { address: ADMIN_ADDRESS, message: 'signed set-config message', signature: '0xsigned' };
@@ -73,13 +73,13 @@ describe('persistAndVerifySessionWizardWorkerConfig', () => {
         retryDelaysMs: [],
       });
     };
-    await expect(publish(({ groupAgent: _off, ...stored }) => stored)).resolves.toMatchObject({
+    await expect(publish(({ sessionAgent: _off, ...stored }) => stored)).resolves.toMatchObject({
       workerOrigin: WORKER_ORIGIN,
     });
     await expect(publish((signed) => signed)).resolves.toMatchObject({ workerOrigin: WORKER_ORIGIN });
     // A setting an earlier write left behind is still caught.
-    await expect(publish((signed) => ({ ...signed, groupAgent: { audiences: [] } }))).rejects.toThrow(
-      'unexpected groupAgent',
+    await expect(publish((signed) => ({ ...signed, sessionAgent: { audiences: [] } }))).rejects.toThrow(
+      'unexpected sessionAgent',
     );
   });
 
@@ -349,30 +349,30 @@ describe('persistAndVerifySessionWizardWorkerConfig', () => {
     },
   );
 
-  it('clears a stored Group Agent that the config leaves out, and only on a Worker that has one', async () => {
-    const withoutGroupAgent = ({ groupAgent: _off, ...rest }: Record<string, unknown>) => rest;
+  it('clears a stored Session Agent that the config leaves out, and only on a Worker that has one', async () => {
+    const withoutSessionAgent = ({ sessionAgent: _off, ...rest }: Record<string, unknown>) => rest;
     const persist = (fetchImpl: SessionWizardWorkerConfigFetchPort) =>
       persistAndVerifySessionWizardWorkerConfig({
         workerUrl: WORKER_ORIGIN,
         slug: 'worker-session',
         sessionId: SESSION_ID,
         adminAddress: ADMIN_ADDRESS,
-        config: withoutGroupAgent(baseConfig()),
+        config: withoutSessionAgent(baseConfig()),
         signAdminAction: async () => ({ signature: '0xsigned' }),
         fetchImpl,
         retryDelaysMs: [],
       });
     const has = createWorkerFetch(async () =>
-      jsonResponse(200, { config: verifiedConfig('earlier', { groupAgent: { audiences: [] } }) }),
+      jsonResponse(200, { config: verifiedConfig('earlier', { sessionAgent: { audiences: [] } }) }),
     );
     await persist(has.fetchImpl);
-    expect(has.written()).toHaveProperty('groupAgent', null);
+    expect(has.written()).toHaveProperty('sessionAgent', null);
     // Older Workers refuse the field, and none of them has stored it.
     const lacks = createWorkerFetch(async () =>
-      jsonResponse(200, { config: withoutGroupAgent(verifiedConfig('earlier')) }),
+      jsonResponse(200, { config: withoutSessionAgent(verifiedConfig('earlier')) }),
     );
     await persist(lacks.fetchImpl);
-    expect(lacks.written()).not.toHaveProperty('groupAgent');
+    expect(lacks.written()).not.toHaveProperty('sessionAgent');
     expect(lacks.written()).toHaveProperty('agentInstructions', 'Join the open group.');
   });
 
