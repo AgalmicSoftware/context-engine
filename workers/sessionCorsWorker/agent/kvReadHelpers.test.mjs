@@ -1,17 +1,20 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { listKvRecordsByPrefix } from './kvReadHelpers.mjs';
+import { agentStoragePrefix, createAgentStorage } from './storage.mjs';
 
 class MemoryKv {
   constructor(entries = [], {
     pageSize = Infinity,
     rejectList = false,
     rejectGetKeys = [],
+    maxReplyBytes = 25 * 1000 * 1000,
   } = {}) {
     this.store = new Map(entries);
     this.pageSize = pageSize;
     this.rejectList = rejectList;
     this.rejectGetKeys = new Set(rejectGetKeys);
+    this.maxReplyBytes = maxReplyBytes;
     this.listCalls = [];
     this.getCalls = [];
   }
@@ -32,12 +35,24 @@ class MemoryKv {
     };
   }
 
-  // Like the KV binding, an array of up to 100 keys is one bulk read.
+  // Like the KV binding, an array of up to 100 keys is one bulk read, and a
+  // reply over 25 MB fails.
   async get(keys) {
     this.getCalls.push(keys);
     if (!Array.isArray(keys) || keys.length > 100) throw new Error('expected a bulk read');
     if (keys.some((key) => this.rejectGetKeys.has(key))) throw new Error('get failed');
-    return new Map(keys.map((key) => [key, this.store.get(key) ?? null]));
+    const values = new Map(keys.map((key) => [key, this.store.get(key) ?? null]));
+    const replyBytes = [...values.values()].reduce((sum, value) => sum + (value?.length || 0), 0);
+    if (replyBytes > this.maxReplyBytes) throw new Error('KV GET_BULK failed: 413 Payload Too Large');
+    return values;
+  }
+
+  async put(key, value) {
+    this.store.set(key, value);
+  }
+
+  async delete(key) {
+    this.store.delete(key);
   }
 }
 
@@ -72,13 +87,31 @@ test('listKvRecordsByPrefix skips malformed values but rejects unavailable KV re
   ], { rejectGetKeys: ['record:missing'] });
 
   await assert.rejects(listKvRecordsByPrefix({ AGENT_ACTION_KV: kv }, 'record:', { limit: Infinity }), /get failed/);
-  assert.deepEqual(kv.getCalls, [[
-    'record:valid',
-    'record:broken',
-    'record:array',
-    'record:string',
-    'record:missing',
-  ]]);
+  // The failed batch is read again in halves until the failing key fails alone.
+  assert.deepEqual(kv.getCalls, [
+    ['record:valid', 'record:broken', 'record:array', 'record:string', 'record:missing'],
+    ['record:valid', 'record:broken', 'record:array'],
+    ['record:string', 'record:missing'],
+    ['record:string'],
+    ['record:missing'],
+  ]);
+});
+
+test('listKvRecordsByPrefix reads a bulk reply over 25 MB in smaller parts', async () => {
+  // About the largest answer record one 512 KiB request can store. Agent
+  // storage reports the refusal only as agent_storage_unavailable.
+  const comments = 'x'.repeat(512 * 1024);
+  const sessionId = `0x${'1'.repeat(32)}`;
+  const kv = new MemoryKv(Array.from({ length: 60 }, (_, index) => [
+    `${agentStoragePrefix(sessionId)}record:${String(index).padStart(2, '0')}`, JSON.stringify({ index, comments }),
+  ]));
+
+  const records = await listKvRecordsByPrefix({ AGENT_ACTION_KV: createAgentStorage({ kv, sessionId }) }, 'record:', {
+    select: (record) => ({ index: record.index }),
+  });
+
+  assert.deepEqual(records.map((record) => record.index), Array.from({ length: 60 }, (_, index) => index));
+  assert.deepEqual(kv.getCalls.map((keys) => keys.length), [60, 30, 30]);
 });
 
 test('listKvRecordsByPrefix reads each listed page 100 keys at a time and keeps selected rows', async () => {

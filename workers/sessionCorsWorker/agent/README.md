@@ -80,7 +80,8 @@ groups, Polis and topic maps use this same selection; submission records retain 
 Results read only the permanent answer index, which every save writes before the
 30-day submission index, 100 records per KV read. Cloudflare counts each read as
 one of an invocation's 1,000 KV operations, so a salon of 80 people answering 30
-questions stays well under it.
+questions stays well under it. A stored answer can be half a megabyte, so a read
+that Cloudflare refuses for passing its 25 MB reply limit is read again in halves.
 
 `/preferences` saves drafts unless an explicitly authorized submit is requested.
 The coordinator retains an answer head per session, principal and question.

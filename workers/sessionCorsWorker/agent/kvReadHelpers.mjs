@@ -4,6 +4,21 @@ import { safeString, safeJsonParse } from './runtimePrimitives.mjs';
 // 100 keys counts as one, so each listed page of 1,000 keys costs 11.
 const BULK_GET_KEYS = 100;
 
+// Cloudflare also refuses a bulk reply over 25 MB, and one stored answer can
+// be half a megabyte, so a batch that fails is read again in halves. Agent
+// storage hides why a read failed, so any failure splits; a key that fails
+// alone fails as a single get would.
+async function getBatch(kv, keys) {
+  try {
+    return await kv.get(keys);
+  } catch (error) {
+    if (keys.length < 2) throw error;
+    const half = Math.ceil(keys.length / 2);
+    const first = await getBatch(kv, keys.slice(0, half));
+    return new Map([...first, ...await getBatch(kv, keys.slice(half))]);
+  }
+}
+
 export async function listKvRecordsByPrefix(env = {}, prefix = '', {
   limit = Infinity,
   parseJson = safeJsonParse,
@@ -28,7 +43,7 @@ export async function listKvRecordsByPrefix(env = {}, prefix = '', {
       .filter(Boolean);
     for (let offset = 0; offset < keys.length; offset += BULK_GET_KEYS) {
       const batch = keys.slice(offset, offset + BULK_GET_KEYS);
-      const values = await kv.get(batch);
+      const values = await getBatch(kv, batch);
       for (const key of batch) {
         const record = parseJson(values.get(key), null);
         if (!record || typeof record !== 'object' || Array.isArray(record)) continue;

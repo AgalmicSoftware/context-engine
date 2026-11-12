@@ -28,20 +28,20 @@ All notable changes to this project will be documented in this file.
 - On such sessions the Agent HTTP results routes need a credential whose account passes the session's sign-in rules, and refuse others with `agent_membership_denied`.
 - The public config sets `memberResults: true`, so the site knows the Worker offers this visibility.
 - `/api/agent/questions/next` no longer fails with `question_queue_unavailable` in sessions whose questions were added on the website. Their IDs have the same shape as a private key, so the secret check refused to save which questions an agent had been served.
-- Agent HTTP results no longer fail with `agent_storage_unavailable` once a session has about 500 answers from agents. `/api/agent/results` and `/api/agent/results-image` now read only the permanent copy of each answer, 100 per KV read. Cloudflare stops a request after 1,000 KV operations; in a test salon of 80 agents answering 30 questions, with 16 changing their answers, the busiest results request uses 167.
+- Agent HTTP results no longer fail with `agent_storage_unavailable` once a session has about 500 answers from agents. `/api/agent/results` and `/api/agent/results-image` now read only the permanent copy of each answer, 100 per KV read. Cloudflare stops a request after 1,000 KV operations; in a test salon of 80 agents answering 30 questions, with 16 changing their answers, the busiest results request uses 167. A stored answer can be half a megabyte, so a read that Cloudflare refuses for passing its 25 MB reply limit is read again in halves.
 - An agent submitting many answers in one `/api/agent/preferences` request no longer reloads every question for each answer. A 30-answer submit used more than 1,000 KV operations and failed; it now uses about 490.
 
 ### Agents and MCP
 
 - `get_results` reads a members-only session's results for an agent signed in to it. It reports `resultsPublic: false` with a note that the results are for signed-in members only.
 
-### Local tooling
-
-- `npm run ai:test-theme:results-builds` checks the built debate atlas and risk matrix in each theme at phone and desktop widths; `ai:test-theme:atlas` is gone.
-
 ### Agents and MCP
 
 - `get_results` reads up to 10,000 answer records by default, 16 at a time, instead of 2,000, so a 30-question session of 80 people, which lists about 2,900, is counted in full rather than marked partial.
+
+### Local tooling
+
+- `npm run ai:test-theme:results-builds` checks the built debate atlas and risk matrix in each theme at phone and desktop widths; `ai:test-theme:atlas` is gone.
 
 ## [0.9.2] - 2026-11-11
 
