@@ -50,7 +50,7 @@ import {
   readStoragePayloadResourceId,
   validateStorageUploadPayload,
 } from './storageUploadValidation.js';
-import { checkUploadedAnswers } from './responseAnswerValidation.js';
+import { checkUploadedAnswers, listUploadedAnswers } from './responseAnswerValidation.js';
 import { isWorkerCanonicalSessionConfig } from './workerCanonicalAuthority.js';
 import {
   isAdminStorageVersion,
@@ -1406,6 +1406,8 @@ export const publishCloudflareOwnedStorageMetadata = async ({ env, config, slug,
   await index.put(buildIndexKey({ slug, resource, id: metadata.id }), JSON.stringify(metadata), storageIndexPutOptions(metadata));
 };
 
+const RESPONSE_ROWS_PER_QUESTION = 5;
+
 const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, authScopes, expectedAuthority, payload, parsedPayload = null, answersChecked = false, resourceId = '', baseHeaders, deps }) => {
   const r2 = getStorageR2Binding(env);
   const index = getStorageIndexBinding(env);
@@ -1658,12 +1660,19 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
   if (prepared.response) return prepared.response;
 
   // Validation, encryption and serialized KV limits must pass before a retry lease starts.
-  const requestId = trim(payload.requestId);
+  // Every answer takes a receipt, which also counts it against the person's limits;
+  // without a usable request id it gets one of its own and is never replayed.
+  const callerRequestId = trim(payload.requestId);
+  const requestId = callerRequestId && callerRequestId.length <= 200 ? callerRequestId : `server:${id}`;
   let uploadReceipt = null;
-  if (resource === 'responses' && uploader && requestId && requestId.length <= 200) {
+  if (resource === 'responses' && uploader) {
     const digest = await (deps?.crypto || globalThis.crypto).subtle.digest('SHA-256', payload.bytes || new Uint8Array());
     const payloadDigest = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
-    uploadReceipt = await coordinateResponseUploadReceipt({ env, slug, responder: uploader, operation: 'reserve', payload: { requestId, payloadDigest, storageId: id, createdAt } });
+    const questionIds = parsedPayload ? [...new Set(listUploadedAnswers(parsedPayload).map((answer) => answer.questionId).filter(Boolean))] : [];
+    // A person may store at most five rows per question the session shows.
+    const maxRows = answerCheck?.ok ? RESPONSE_ROWS_PER_QUESTION * Math.max(answerCheck.questionCount, 1) : 0;
+    uploadReceipt = await coordinateResponseUploadReceipt({ env, slug, responder: uploader, operation: 'reserve',
+      payload: { requestId, payloadDigest, storageId: id, createdAt, questionIds, maxRows } });
     if (uploadReceipt?.kind === 'replay') {
       await enqueueResponseAnalysis(uploadReceipt.storageRef.id);
       return responseJson(deps, { id: uploadReceipt.storageRef.id, storageRef: uploadReceipt.storageRef, replayed: true }, 200, baseHeaders);

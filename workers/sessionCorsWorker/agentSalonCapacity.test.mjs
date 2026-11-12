@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { fixture, wallet, sessionId } from './agentTestFixture.mjs';
+import { issueAgentCredential } from './agent/agentCredentials.mjs';
 import { signToken } from './tokenSigning.js';
 import { persistAuthTokenRecord } from './authTokenClaims.js';
 
@@ -87,7 +88,11 @@ test('a salon of 80 agents answering 30 questions stays within each invocation\'
   const { f, limited, ok } = await hostedSession(QUESTIONS);
   const agents = [];
   for (let person = 0; person < PEOPLE; person += 1) {
-    agents.push(await f.credential({ scopes: ['read_questions', 'draft_answers'], principal: `salon-agent-${person}` }));
+    // Each person's agent answers from that person's own account.
+    const issued = await issueAgentCredential({ env: f.agentEnv, principal: { principalId: `salon-agent-${person}`, kind: 'user', adapter: 'http' },
+      sessionSlug: 'fixture', accountAddress: `0x${(person + 1).toString(16).padStart(40, '0')}`, scopes: ['read_questions', 'draft_answers'], credentialKind: 'user' });
+    assert.equal(issued.ok, true, JSON.stringify(issued));
+    agents.push(issued);
   }
   const { questions, hasMore } = await ok('/api/agent/questions', { token: agents[0].token });
   assert.equal(questions.length, QUESTIONS);

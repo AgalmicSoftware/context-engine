@@ -620,7 +620,7 @@ test('private response reads separate participant submission scope from non-owne
 			};
 			assert.equal(validateWorkerConfigModeValues(config).ok, true);
 			const kv = createMockKv();
-			const env = { GROUP_KV: kv, CE_STORAGE_INDEX_KV: kv, CE_STORAGE_ENVELOPE_KEK: 'synthetic-private-response-test-key' };
+			const env = { GROUP_KV: kv, CE_STORAGE_INDEX_KV: kv, CE_STORAGE_ENVELOPE_KEK: 'synthetic-private-response-test-key', TOKEN_HMAC_SECRET: 'synthetic-receipt-secret' };
 			if (storage === 'r2') env.CE_STORAGE_R2 = createMockR2();
 			attachSessionCoordinator(env, (next) => { config = next; });
 			await seedStoredQuestion(kv, 'session-a', '0xq1');
@@ -748,7 +748,7 @@ test('members-only results show every answer to signed-in session members, never
 			};
 			assert.equal(validateWorkerConfigModeValues(config).ok, true);
 			const kv = createMockKv();
-			const env = { GROUP_KV: kv, CE_STORAGE_INDEX_KV: kv, CE_STORAGE_ENVELOPE_KEK: 'synthetic-member-results-test-key' };
+			const env = { GROUP_KV: kv, CE_STORAGE_INDEX_KV: kv, CE_STORAGE_ENVELOPE_KEK: 'synthetic-member-results-test-key', TOKEN_HMAC_SECRET: 'synthetic-receipt-secret' };
 			if (storage === 'r2') env.CE_STORAGE_R2 = createMockR2();
 			attachSessionCoordinator(env, (next) => { config = next; });
 			await seedStoredQuestion(kv, 'session-a', '0xq1');
@@ -4332,6 +4332,7 @@ test('exportCloudflareEncryptedPayloadEnvelopes emits ciphertext and envelope me
 	const env = {
 		CE_STORAGE_INDEX_KV: kv,
 		CE_STORAGE_ENVELOPE_KEK: 'test deployment envelope kek',
+		TOKEN_HMAC_SECRET: 'synthetic-receipt-secret',
 	};
 	let config = createEnvelopeConfig({
 		payloadAccessControl: {
