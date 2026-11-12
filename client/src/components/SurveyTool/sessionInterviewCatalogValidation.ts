@@ -32,7 +32,7 @@ const readRefusalReason = async (response: Response): Promise<string> => {
 
 // Reads the catalog as the ticket's person when there is one. A held ticket the Worker no longer takes, as
 // after signing out and back in, is swapped for a fresh one once.
-const fetchInterviewCatalog = async (
+export const fetchInterviewCatalog = async (
   url: URL,
   {
     fetchImpl,

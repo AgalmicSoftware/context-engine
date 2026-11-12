@@ -115,26 +115,32 @@ it('shows each voice as Person turns, and chunks without turns as plain text', (
   );
 });
 
-it('drops speech both chunks heard and joins a voice that carries on across chunks', () => {
+it('drops speech both chunks heard from one voice, and joins a voice that carries on across chunks', () => {
   const segments = [
     chunk(0, 'We talked about budget timing and risk thresholds', [
       turn('Person 1', 'We talked about budget timing and risk thresholds'),
     ]),
-    chunk(1, 'risk thresholds that the group should review. I agree.', [
+    chunk(1, 'risk thresholds that the group should review. I agree with that.', [
       turn('Person 1', 'risk thresholds that the group should review.'),
-      turn('Person 2', 'I agree.'),
+      turn('Person 2', 'I agree with that.'),
     ]),
-    chunk(2, 'should review. I agree. Next item.', [
-      turn('Person 3', 'should review. I agree.'),
-      turn('Person 1', 'Next item.'),
-    ]),
+    chunk(2, 'agree with that. Next item.', [turn('Person 2', 'agree with that. Next item.')]),
   ];
   expect(stitchRollingTranscriptSegments(segments)).toBe(
     [
       'Person 1: We talked about budget timing and risk thresholds that the group should review.',
-      'Person 2: I agree.',
-      'Person 1: Next item.',
+      'Person 2: I agree with that. Next item.',
     ].join('\n'),
+  );
+});
+
+it('keeps a second voice echoing the end of the first across a chunk boundary', () => {
+  const segments = [
+    chunk(0, 'So we should fund the garden.', [turn('Person 1', 'So we should fund the garden.')]),
+    chunk(1, 'We should fund the garden. Yes.', [turn('Person 2', 'We should fund the garden. Yes.')]),
+  ];
+  expect(stitchRollingTranscriptSegments(segments)).toBe(
+    ['Person 1: So we should fund the garden.', 'Person 2: We should fund the garden. Yes.'].join('\n'),
   );
 });
 

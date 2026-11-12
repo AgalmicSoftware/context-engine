@@ -79,13 +79,6 @@ export const sanitizeRpcUrlMap = (value: unknown): RpcUrlMap => {
   return out;
 };
 
-export const pickFirstNonEmptyRpcUrlMap = (...candidates: unknown[]): RpcUrlMap =>
-  candidates.reduce<RpcUrlMap>((found, candidate) => {
-    if (found && Object.keys(found).length > 0) return found;
-    const sanitized = sanitizeRpcUrlMap(candidate);
-    return Object.keys(sanitized).length > 0 ? sanitized : found;
-  }, {});
-
 export const buildWorkerUrlResolutionDisplay = ({
   resolved,
   normalizeWorkerUrl,

@@ -319,19 +319,18 @@ test('admin typed-data constants preserve the expected domain and struct names',
   });
 });
 
-test('resolveTrustedAdminOrigins keeps the default hosted and local admin origins aligned', () => {
-  assert.deepEqual(resolveTrustedAdminOrigins({}), [
-    'https://contextengine.sh',
-    'https://www.contextengine.sh',
-    'https://contextengine.xyz',
-    'https://www.contextengine.xyz',
-    'http://localhost:3000',
-    'http://127.0.0.1:3000',
-    'http://localhost:3001',
-    'http://127.0.0.1:3001',
-    'http://localhost:7391',
-    'http://127.0.0.1:7391',
-  ]);
+const LOCAL = ['http://localhost:3000', 'http://127.0.0.1:3000', 'http://localhost:3001', 'http://127.0.0.1:3001',
+  'http://localhost:7391', 'http://127.0.0.1:7391'];
+
+test('resolveTrustedAdminOrigins trusts the site by default and local dev servers only on request', () => {
+  const site = ['https://contextengine.sh', 'https://www.contextengine.sh'];
+  assert.deepEqual(resolveTrustedAdminOrigins({}), site);
+  assert.deepEqual(resolveTrustedAdminOrigins({ CE_ALLOW_LOCAL_ORIGINS: 'false' }), site);
+  assert.deepEqual(resolveTrustedAdminOrigins({ CE_ALLOW_LOCAL_ORIGINS: 'true' }), [...site, ...LOCAL]);
+  assert.deepEqual(resolveTrustedAdminOrigins({ ADMIN_TRUSTED_ORIGINS: 'https://app.example http://localhost:3000' }),
+    ['https://app.example', 'http://localhost:3000']);
+  assert.deepEqual(resolveTrustedAdminOrigins({ ADMIN_TRUSTED_ORIGINS: 'https://app.example', CE_ALLOW_LOCAL_ORIGINS: 'true' }),
+    ['https://app.example', ...LOCAL]);
 });
 
 test('validateAdminActionAudience trusts the canonical .sh hosted origin', () => {
@@ -351,61 +350,18 @@ test('validateAdminActionAudience trusts the canonical .sh hosted origin', () =>
 });
 
 test('validateAdminActionAudience trusts approved origins, configured allowOrigins, and falls back to worker origin for non-browser callers', () => {
-  assert.deepEqual(
-    validateAdminActionAudience({
-      audience: 'https://contextengine.xyz',
-      request: {
-        url: 'https://worker.example/admin/set-config',
-        headers: new Headers({ Origin: 'https://contextengine.xyz' }),
-      },
-    }),
-    {
-      ok: true,
-      audience: 'https://contextengine.xyz',
-    },
-  );
-
-  assert.deepEqual(
-    validateAdminActionAudience({
-      audience: 'https://www.contextengine.xyz',
-      request: {
-        url: 'https://worker.example/admin/set-config',
-        headers: new Headers({ Origin: 'https://www.contextengine.xyz' }),
-      },
-    }),
-    {
-      ok: true,
-      audience: 'https://www.contextengine.xyz',
-    },
-  );
-
-  assert.deepEqual(
-    validateAdminActionAudience({
-      audience: 'http://localhost:3001',
-      request: {
-        url: 'https://worker.example/admin/set-config',
-        headers: new Headers({ Origin: 'http://localhost:3001' }),
-      },
-    }),
-    {
-      ok: true,
-      audience: 'http://localhost:3001',
-    },
-  );
-
-  assert.deepEqual(
-    validateAdminActionAudience({
-      audience: 'http://127.0.0.1:7391',
-      request: {
-        url: 'https://worker.example/admin/set-config',
-        headers: new Headers({ Origin: 'http://127.0.0.1:7391' }),
-      },
-    }),
-    {
-      ok: true,
-      audience: 'http://127.0.0.1:7391',
-    },
-  );
+  const audienceFrom = (origin, env) => validateAdminActionAudience({
+    audience: origin,
+    request: { url: 'https://worker.example/admin/set-config', headers: new Headers({ Origin: origin }) },
+    env,
+  });
+  // The retired .xyz site and local dev servers are not trusted by default.
+  for (const origin of ['https://contextengine.xyz', 'https://www.contextengine.xyz', 'http://localhost:3001', 'http://127.0.0.1:7391']) {
+    assert.deepEqual(audienceFrom(origin), { ok: false, error: 'Untrusted admin audience.' }, origin);
+  }
+  for (const origin of ['http://localhost:3001', 'http://127.0.0.1:7391']) {
+    assert.deepEqual(audienceFrom(origin, { CE_ALLOW_LOCAL_ORIGINS: 'true' }), { ok: true, audience: origin });
+  }
 
   assert.deepEqual(
     validateAdminActionAudience({

@@ -58,7 +58,7 @@ Context Engine is a web application, a set of smart contracts (EVM), and support
 - **AI** is already used for question generation, transcription, cluster summaries, result analysis, and comparison of user positions across wallets.
 - **Demonstration datasets** are shipped in the repo as well, including one built around simulated historical figures. The current public demo can be seen at [/demo-sh](https://contextengine.sh/session/demo-sh)
 
-The static web client can be self-hosted, and creators can deploy their own per-session Cloudflare Worker today. The Company-Operated edition, with adapters for internal identity, key management, storage, AI, networking, and observability, is planned and not yet generally available; it can be entirely off-chain. Hosting the existing client and deploying a Worker does not provide that planned local-only stack. See the [deployment-mode table](../README.md#deployment-modes) and [architecture](../ARCHITECTURE.md), including its [source-versus-deployed contract caveat](../ARCHITECTURE.md#contract-addresses).
+The static web client can be self-hosted, and creators can deploy their own per-session Cloudflare Worker today. The Company-Operated edition, with adapters for internal identity, key management, storage, AI, networking, and observability, is planned and not yet generally available; it can be entirely off-chain. Hosting the existing client and deploying a Worker does not provide that planned local-only stack. See the [deployment profiles](../docs/run-modes.md#session-infrastructure-profiles) and [architecture](../ARCHITECTURE.md), including its [source-versus-deployed contract caveat](../ARCHITECTURE.md#contract-addresses).
 
 ### Session Capacity and Scaling
 

@@ -331,6 +331,7 @@ export default function SessionInterviewPanel({
     sessionSlug,
     active: isRecording,
     append: recorder.appendInstructions,
+    ticket: silentCatalogTicketSource({ account, context, sessionSlug, sessionConfig, resolveWorkerUrl }),
   });
   const questions = updates.questions;
   const authenticatedForSubmit = Boolean(loginComplete && String(account || '').trim());

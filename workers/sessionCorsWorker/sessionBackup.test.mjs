@@ -35,7 +35,12 @@ const memoryKv = () => {
       operations = 0;
       try { return await callback(); } finally { requests.push(operations); operations = null; }
     },
-    get: async (key) => { operation(); gets.set(key, (gets.get(key) || 0) + 1); return values.get(key) ?? null; },
+    get: async (key) => {
+      operation();
+      // Cloudflare's bulk get: up to 100 keys as one operation, answered as a Map.
+      const one = (name) => { gets.set(name, (gets.get(name) || 0) + 1); return values.get(name) ?? null; };
+      return Array.isArray(key) ? new Map(key.map((name) => [name, one(name)])) : one(key);
+    },
     put: async (key, value, options) => {
       operation();
       if (options?.metadata) listMetadata.set(key, options.metadata);

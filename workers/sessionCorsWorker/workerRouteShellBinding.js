@@ -1,3 +1,4 @@
+import { revokeAuthTokenRecord } from './authTokenClaims.js';
 import { dispatchSessionAgentQueue } from './agent/queueBoundary.mjs';
 import { isAgentPath } from './agent/routes.mjs';
 import { dispatchSessionAgentRequest } from './agent/requestBoundary.mjs';
@@ -307,6 +308,14 @@ export const createWorkerRouteShellWithWorkerDeps = ({
             NONCE_RATE_LIMIT_TTL_SECONDS: constants?.nonceRateLimitTtlSeconds,
           },
         });
+      }
+
+      if (routeSelection.kind === 'auth-logout') {
+        // Signing out ends the token here too, so a copy of it stops working at once.
+        const auth = await deps?.requireAuth?.({ request, env, baseHeaders: routeBaseHeaders, slugHint: envSlug });
+        if (!auth?.ok) return auth?.response;
+        await revokeAuthTokenRecord({ env, slug: auth.slug, sub: auth.payload?.sub, jti: auth.payload?.jti });
+        return deps?.json?.({ ok: true }, 200, routeBaseHeaders);
       }
 
       if (routeSelection.kind === 'auth-login') {

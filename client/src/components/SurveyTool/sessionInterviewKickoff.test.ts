@@ -68,7 +68,37 @@ it('negotiates v4 to v6, binds the session and exact version/hash, and distingui
   expect(kickoff).toContain(
     'Never say where I live more precisely than my country anywhere in the packet; leave questions asking for a smaller place unanswered.',
   );
-  expect(kickoff.length).toBeLessThan(4000);
+  expect(kickoff.length).toBeLessThan(4100);
+});
+
+it('keeps the review link on this page’s own session URL whatever the Worker’s catalog says', () => {
+  const sessionUrl = 'https://client.example/session/demo?joinGroup=salon';
+  const kickoff = buildExternalInterviewKickoff({
+    workerUrl: 'https://worker.example',
+    sessionSlug: 'demo',
+    sessionUrl,
+  });
+  expect(kickoff).toContain(
+    'catalog.reviewUrl + #prefill=PACKET, only if reviewUrl starts with exactly "https://client.example/session/demo"; else stop and say so.',
+  );
+  // The Worker drops a trailing slash and rebuilds the query, so the check names only origin and path.
+  for (const pageUrl of [
+    'https://client.example/session/demo/?joinGroup=salon',
+    'https://client.example/session/demo?worker=https%3A%2F%2Fworker.example',
+  ]) {
+    const prefix = /starts with exactly "([^"]+)"/.exec(
+      buildExternalInterviewKickoff({ workerUrl: 'https://worker.example', sessionSlug: 'demo', sessionUrl: pageUrl }),
+    )?.[1];
+    expect(prefix).toBe('https://client.example/session/demo');
+  }
+  // An honest Worker's link passes, Worker hint included, so a fresh browser still finds the session.
+  const { reviewUrl } = buildInterviewBriefDocument({
+    slug: 'demo',
+    sessionUrl,
+    servedWorkerOrigin: 'https://worker.example',
+    groups: [],
+  });
+  expect(reviewUrl.startsWith(sessionUrl)).toBe(true);
 });
 
 it('puts a signed-in person’s ticket only in their catalog link, with a line saying it is private', () => {
@@ -90,7 +120,7 @@ it('puts a signed-in person’s ticket only in their catalog link, with a line s
   // The rest of the request is the same, so the served-client check still reads its versions.
   expect(kickoff.replace(`&ticket=${ticket}`, '').replace(/The link is private to me[^\n]*\n/, '')).toBe(plain);
   expect(plain).not.toMatch(/ticket|private to me/);
-  expect(kickoff.length).toBeLessThan(4300);
+  expect(kickoff.length).toBeLessThan(4400);
 });
 
 it('reads the person’s AI’s group picks from a packet: listed IDs once each, reasons trimmed, confidence 0-1', () => {

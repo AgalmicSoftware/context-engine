@@ -3,6 +3,7 @@ import { audioFileExtension } from '../audio/audioFileExtension';
 import { normalizeSpeakerTurns, type KnownSpeaker, type SpeakerTranscriptTurn } from '../audio/speakerTranscript';
 import { createNamedAudioFile } from './aiClientAudioTranscription';
 import { fetchWorkerWithAuth } from '../worker/workerAuth.js';
+import { shouldFallbackToAuthenticatedFlow } from '../worker/workerAuthFallbackPolicy.js';
 import { defaultStrictAllowDemoFallback } from '../worker/workerSessionResolution.js';
 
 type UnknownRecord = Record<string, unknown>;
@@ -29,6 +30,8 @@ export type TranscriptionUploadOptions = {
   signal?: AbortSignal;
   // Group labels only: voices from earlier chunks, so the model gives them the same names.
   knownSpeakers?: KnownSpeaker[];
+  // false for uploads nobody asked for just now: a refusal fails the upload instead of asking to sign in.
+  prompt?: boolean;
 };
 
 const asRecord = (value: unknown): UnknownRecord =>
@@ -95,6 +98,8 @@ const keepConnectionInUse = (baseUrl: string, signal?: AbortSignal): (() => void
   return stop;
 };
 
+export const SIGN_IN_TO_SEND = 'Sign in to send this part: press Retry.';
+
 /** `chunkOnly` refusals (this audio's size or content) leave labels on for the rest of the recording. */
 export class SpeakerLabelsUnavailableError extends Error {
   name = 'SpeakerLabelsUnavailableError';
@@ -109,7 +114,7 @@ export class SpeakerLabelsUnavailableError extends Error {
 const requestAudioTranscription = async (
   audioFileOrBlob: unknown,
   transport: TranscriptionWorkerTransport,
-  { fileName = '', signal, onJsonParseError, knownSpeakers = [] }: TranscriptionUploadOptions = {},
+  { fileName = '', signal, onJsonParseError, knownSpeakers = [], prompt }: TranscriptionUploadOptions = {},
   groupSpeakerLabels = false,
 ): Promise<UnknownRecord & { text: string }> => {
   const maybeBlob = typeof Blob !== 'undefined' && audioFileOrBlob instanceof Blob ? audioFileOrBlob : null;
@@ -145,8 +150,14 @@ const requestAudioTranscription = async (
       preferAnonymous: true,
       fallbackOnGateUnavailable: true,
       allowDemoFallback: defaultStrictAllowDemoFallback(),
+      prompt,
     },
   ).finally(stopKeepingConnection);
+  // A refusal that signing in would lift says nothing about labels.
+  const signInNeeded =
+    prompt === false &&
+    (resp.status === 401 ||
+      (resp.status === 403 && (await shouldFallbackToAuthenticatedFlow(resp, { fallbackOnGateUnavailable: true }))));
   let data: unknown = {};
   try {
     data = await resp.json();
@@ -157,6 +168,7 @@ const requestAudioTranscription = async (
 
   if (!resp.ok) {
     const transient = resp.status === 408 || resp.status === 429 || resp.status >= 500;
+    if (signInNeeded) throw Object.assign(new Error(SIGN_IN_TO_SEND), { status: resp.status });
     if (groupSpeakerLabels && !transient && resp.status >= 400 && resp.status < 500) {
       // Only a rejection of this chunk's audio (too large, or a provider error naming the file, which older
       // Workers relay under `details.error`) leaves labels on for later chunks. Anything else, such as a

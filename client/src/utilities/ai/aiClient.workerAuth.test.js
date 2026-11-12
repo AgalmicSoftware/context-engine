@@ -986,14 +986,16 @@ describe('group transcription fallback', () => {
     expect(fetchWorkerWithAuth).toHaveBeenCalledTimes(1);
   });
 
-  it('turns labels off for the recording after an older Worker refuses them, uploading later chunks once', async () => {
-    fetchWorkerWithAuth
-      .mockResolvedValueOnce({
-        ok: false,
-        status: 400,
-        json: async () => ({ error: 'Invalid request.', details: { error: { type: 'invalid_request_error' } } }),
-      })
-      .mockResolvedValue({ ok: true, json: async () => ({ text: 'Plain transcript.' }) });
+  it('turns labels off for the recording after an older Worker refuses them twice, uploading later chunks once', async () => {
+    fetchWorkerWithAuth.mockImplementation(async (_url, request) =>
+      request.body.get('labelSpeakers')
+        ? {
+            ok: false,
+            status: 400,
+            json: async () => ({ error: 'Invalid request.', details: { error: { type: 'invalid_request_error' } } }),
+          }
+        : { ok: true, json: async () => ({ text: 'Plain transcript.' }) },
+    );
     const { result, unmount } = renderHook(() =>
       useRecordingChunkQueue({ sessionSlug: 'older-worker', sessionConfig: null, labelSpeakers: true }),
     );
@@ -1005,9 +1007,13 @@ describe('group transcription fallback', () => {
           await result.current.finishTranscription();
         });
       await record('first chunk');
-      expect(result.current.labelsUnavailableReason).toBeTruthy();
+      expect(result.current.labelsUnavailableReason).toBe('');
       await record('second chunk');
+      expect(result.current.labelsUnavailableReason).toBeTruthy();
+      await record('third chunk');
       expect(fetchWorkerWithAuth.mock.calls.map(([, request]) => request.body.get('labelSpeakers'))).toEqual([
+        'true',
+        null,
         'true',
         null,
         null,

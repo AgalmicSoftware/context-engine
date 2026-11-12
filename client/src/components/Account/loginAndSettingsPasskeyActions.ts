@@ -1,3 +1,8 @@
+import { PasskeysUnavailableError } from '../../wallet/passkey/unavailable';
+
+/** Shown where this browser has no passkeys (many apps' built-in browsers); the login offers to copy the link. */
+export const PASSKEYS_UNAVAILABLE_MESSAGE = 'Open this link in Safari or Chrome to sign in.';
+
 export type LoginPasskeyNetwork = Record<string, unknown> & {
   chainId?: unknown;
   id?: unknown;
@@ -146,9 +151,11 @@ export const createLoginPasskeyActions = (deps: LoginPasskeyActionsDeps): LoginP
       const isMissingWallet = mode === 'sign-in' && deps.passkeyWallet.isMissingPasskeyWalletRecordError?.(error);
       const message = isMissingWallet
         ? 'No passkey wallet is saved in this browser for this app. Use Create to make one under this RP ID.'
-        : mode === 'create'
-          ? `Create failed: ${deps.getErrorMessage(error).trim() || 'Could not create passkey wallet.'}`
-          : `Login failed: ${deps.getErrorMessage(error).trim() || 'Could not unlock passkey wallet.'}`;
+        : error instanceof PasskeysUnavailableError
+          ? PASSKEYS_UNAVAILABLE_MESSAGE
+          : mode === 'create'
+            ? `Create failed: ${deps.getErrorMessage(error).trim() || 'Could not create passkey wallet.'}`
+            : `Login failed: ${deps.getErrorMessage(error).trim() || 'Could not unlock passkey wallet.'}`;
       deps.setStatus({
         passkeyWalletStatusMessage: message,
         passkeyWalletStatusTone: 'error',

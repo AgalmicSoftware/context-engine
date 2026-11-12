@@ -37,6 +37,8 @@ const words = (text: string) => text.replace(/\s+/g, ' ').trim();
 const overlaps = (a: SpeakerTranscriptTurn, b: SpeakerTranscriptTurn) =>
   Math.max(a.start, b.start) < Math.min(a.end, b.end) || (a.start === b.start && a.end === b.end);
 const knownName = (known: string[], label: string) => known.find((name) => name.toLowerCase() === label.toLowerCase());
+/** N in "Person N", or 0 for any other name. */
+export const personNumber = (name: string): number => Number(/^Person (\d+)$/.exec(name)?.[1] || 0);
 
 export type SpeakerPlan = {
   turns: SpeakerTranscriptTurn[];
@@ -64,19 +66,22 @@ export const planSpeakerTurns = (turns: SpeakerTranscriptTurn[], known: string[]
 
 /**
  * Names each turn's voice. A known voice keeps its name, and each `sampled` voice joins the known people as
- * the next Person. Other voices are numbered after them for this chunk only, and an isolated chunk numbers
- * all its voices afresh. A turn with an odd label, such as "@", joins the voice before it (or after it).
+ * the next Person. Other voices, and every voice of an isolated chunk, belong to this chunk only (`oneOff`).
+ * A number is never given twice: new voices start at `firstFree` (after every Person already in the
+ * transcript) or after the known people, whichever is later. A turn with an odd label, such as "@", joins the
+ * voice before it (or after it).
  */
-export const nameSpeakerTurns = (plan: SpeakerPlan, known: string[], sampled: string[]) => {
+export const nameSpeakerTurns = (plan: SpeakerPlan, known: string[], sampled: string[], firstFree = 1) => {
   const names = new Map<string, string>();
-  let next = plan.isolated ? 1 : known.length + 1;
+  let next = Math.max(firstFree, known.length + 1, ...known.map((name) => personNumber(name) + 1));
   const nextName = (label: string) => {
     const name = `Person ${next++}`;
     names.set(label, name);
     return name;
   };
   const added = plan.isolated ? [] : sampled.map(nextName);
-  for (const { label } of plan.voices) if (!names.has(label)) nextName(label);
+  const oneOff: string[] = [];
+  for (const { label } of plan.voices) if (!names.has(label)) oneOff.push(nextName(label));
   const named = plan.turns.map((turn) => ({
     ...turn,
     speaker: knownName(known, turn.speaker) ?? names.get(turn.speaker) ?? '',
@@ -93,5 +98,6 @@ export const nameSpeakerTurns = (plan: SpeakerPlan, known: string[], sampled: st
       .map((turn, index) => (turn.speaker ? turn : { ...turn, speaker: beside(index) }))
       .filter((turn) => turn.speaker),
     added,
+    oneOff,
   };
 };

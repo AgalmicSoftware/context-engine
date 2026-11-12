@@ -19,6 +19,8 @@ import { persistRecoveryMessage, retainOutcomeForRecovery } from './agentSubmitQ
 const activeAi = new Map();
 export const createAgentServices = ({ env, agentEnv, deps }) => {
   const ctx = agentEnv.AGENT_CONTEXT;
+  // One request may store many answers; the Worker counts the session's questions once.
+  const checkedAnswers = {};
   // The sign-in a key was made from is read once per request, not for every
   // answer it writes. The key, which ends no later than that sign-in, and the
   // session's revision and epoch are still checked on every write.
@@ -123,7 +125,9 @@ export const createAgentServices = ({ env, agentEnv, deps }) => {
       }
       const request = new Request(url, { method, headers: { 'Content-Type': 'application/json', ...Object.fromEntries(new Headers(headers)) }, ...(body ? { body: JSON.stringify(body) } : {}) });
       return deps.storageRoute({ path: url.pathname, method, request, env, config: ctx.config, slug: ctx.slug,
-        uploaderAddress: ctx.address, authScopes: ctx.scopes, expectedAuthority: expectedAuthority(), baseHeaders: {} });
+        uploaderAddress: ctx.address, authScopes: ctx.scopes, expectedAuthority: expectedAuthority(), baseHeaders: {},
+        // Agent answers are checked against the question read for them (onChainResponses.mjs).
+        answersChecked: url.pathname === '/storage/upload' && checkedAnswers });
     },
     async faucet() {
       const { config } = await current();

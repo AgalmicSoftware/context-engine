@@ -36,22 +36,27 @@ it('keeps known names and gives other voices the next free numbers', () => {
   expect(speakers(named.turns)).toEqual(['Person 2', 'Person 3', 'Person 1']);
 });
 
-it('numbers a fifth voice without a sample, within its chunk only', () => {
+it('numbers a voice without a sample after everyone already in the transcript, as heard in one part', () => {
   const known = ['Person 1', 'Person 2', 'Person 3', 'Person 4'];
   const plan = planSpeakerTurns([turn('Person 3', 0, 2), turn('B', 2, 6), turn('A', 6, 9)], known);
-  const named = nameSpeakerTurns(plan, known, []);
+  // An earlier chunk already gave Person 5 and 6 to voices without samples.
+  const named = nameSpeakerTurns(plan, known, [], 7);
   expect(named.added).toEqual([]);
-  expect(speakers(named.turns)).toEqual(['Person 3', 'Person 5', 'Person 6']);
+  expect(named.oneOff).toEqual(['Person 7', 'Person 8']);
+  expect(speakers(named.turns)).toEqual(['Person 3', 'Person 7', 'Person 8']);
+  // New known people too start after them, so Record more never hands out an old number.
+  expect(nameSpeakerTurns(planSpeakerTurns([turn('A', 0, 4)], []), [], ['A'], 9).added).toEqual(['Person 9']);
 });
 
-it('numbers a chunk on its own when samples were sent but no voice matched them', () => {
+it('gives a chunk new numbers when samples were sent but no voice matched them', () => {
   // An older Worker drops the samples, and the model labels every voice A, B, C again.
   const known = ['Person 1', 'Person 2'];
   const plan = planSpeakerTurns([turn('A', 0, 4), turn('B', 4, 9), turn('C', 9, 12)], known);
   expect(plan.isolated).toBe(true);
-  const named = nameSpeakerTurns(plan, known, ['A']);
+  const named = nameSpeakerTurns(plan, known, ['A'], 3);
   expect(named.added).toEqual([]);
-  expect(speakers(named.turns)).toEqual(['Person 1', 'Person 2', 'Person 3']);
+  expect(named.oneOff).toEqual(['Person 3', 'Person 4', 'Person 5']);
+  expect(speakers(named.turns)).toEqual(['Person 3', 'Person 4', 'Person 5']);
 });
 
 it('tolerates odd labels and repeated lines from the model', () => {

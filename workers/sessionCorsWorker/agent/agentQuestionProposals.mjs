@@ -661,6 +661,34 @@ export async function listAgentProposedQuestionsForSessionWithSummary(env = {}, 
   return { questions: records, skippedMalformed, complete: true };
 }
 
+// One active proposed question by id, as the listing would return it, or null.
+export async function readAgentProposedQuestion(env = {}, sessionSlug = '', questionId = '') {
+  const key = proposedQuestionKey(sessionSlug, questionId);
+  if (!key || typeof env?.AGENT_ACTION_KV?.get !== 'function') return null;
+  const parsed = safeJsonParse(await env.AGENT_ACTION_KV.get(key), null);
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+  if (parsed.status && lower(parsed.status) !== 'active') return null;
+  return proposedRecordMalformedReason(parsed) ? null : proposedRecordToQuestion(parsed) || null;
+}
+
+// How many proposed questions a session holds, from key metadata alone: a
+// list call per 1,000 keys and no reads. Archived ones are left out.
+export async function countAgentProposedQuestions(env = {}, sessionSlug = '') {
+  const prefix = proposedQuestionPrefix(sessionSlug);
+  if (!prefix || typeof env?.AGENT_ACTION_KV?.list !== 'function') return 0;
+  let count = 0;
+  let cursor = '';
+  for (let page = 0; page < 5; page += 1) {
+    const listed = await env.AGENT_ACTION_KV.list({ prefix, cursor, limit: 1000 });
+    for (const item of Array.isArray(listed?.keys) ? listed.keys : []) {
+      if (lower(item?.metadata?.s) !== 'archived') count += 1;
+    }
+    if (listed?.list_complete !== false || !listed?.cursor) break;
+    cursor = listed.cursor;
+  }
+  return count;
+}
+
 export async function listAgentProposedQuestionsForSession(env = {}, sessionSlug = '') {
   const summary = await listAgentProposedQuestionsForSessionWithSummary(env, sessionSlug);
   if (summary.complete === false) throw Object.assign(new Error('agent_question_read_incomplete'), { reason: 'agent_question_read_incomplete', status: 503 });

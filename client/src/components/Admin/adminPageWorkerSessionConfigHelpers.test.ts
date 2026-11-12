@@ -6,7 +6,6 @@ import {
   buildWorkerSessionConfigPayload,
   getSessionReadRpcConfig,
   normalizeRpcUrlList,
-  pickFirstNonEmptyRpcUrlMap,
   sanitizeRpcUrlMap,
 } from './adminPageWorkerSessionConfigHelpers';
 
@@ -30,17 +29,6 @@ describe('adminPageWorkerSessionConfigHelpers', () => {
     ).toEqual({
       8453: ['https://base.example'],
       84532: ['https://base-sepolia.example'],
-    });
-
-    expect(
-      pickFirstNonEmptyRpcUrlMap(
-        null,
-        { 8453: ['  '] },
-        { 8453: ['https://first.example'] },
-        { 8453: ['https://ignored.example'] },
-      ),
-    ).toEqual({
-      8453: ['https://first.example'],
     });
   });
 

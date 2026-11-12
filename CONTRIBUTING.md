@@ -75,6 +75,67 @@ Contributions to project-authored code use `MPL-2.0`. Preserve the existing righ
 - Small UI polish tasks that stay within the current design language
 - Isolated bug fixes that do not change contract interfaces or add dependencies
 
+## How To Add Common Things
+
+Each recipe lists the files to touch, in order. Run tests with
+`node --test <explicit paths>` for root and Worker files, and
+`cd client && npx jest --findRelatedTests <files>` for client files.
+
+### A Session Worker route
+
+1. Route it. `workers/sessionCorsWorker/topLevelRouteSelection.js` sorts every
+   request into a kind.
+   - Admin actions are `POST /admin/<action>`. Add an `if (action === '…')`
+     branch in `adminRequestDispatch.js`. The signed admin check runs first.
+   - Signed-in participant routes fall through to `kind: 'authenticated'`.
+     Path routes such as storage and groups are matched in
+     `authenticatedSecretPathRouteDispatch.js`, which also checks scopes and
+     refuses writes once a session has ended.
+   - A new top-level kind needs its own branch in `workerRouteShellBinding.js`.
+2. Test it in the module's `.test.mjs`. If the route changes who may do what,
+   also add a case to `sessionWorkerHardening.test.mjs`, which runs the real
+   Worker entry.
+3. Run `npm run worker:cloudflare-template` to regenerate
+   `deploy/cloudflare/session-worker/`. CI fails if the template is stale.
+4. Document it in `docs/session-cors-worker.md` and the endpoint list in
+   `spec.md`. If clients need to detect it, add a feature to `FEATURES` in
+   `workerCapabilities.js`.
+
+### A session config field
+
+1. Add the key to `WORKER_CANONICAL_SET_CONFIG_KEYS` in
+   `shared/sessionConfigEdits.mjs`, which is what `POST /admin/set-config`
+   accepts. Add it to `CONTENT_FIELDS` there only if changing it should sign no
+   one out.
+2. Validate it in `workers/sessionCorsWorker/sessionConfigMutation.js` and,
+   for the first deploy, `workers/shared/deployHelperCore.mjs`. Share one
+   validator from `shared/` between them.
+3. Add it to `DEPLOY_CANONICAL_CONFIG_KEYS` in
+   `workers/shared/workerSessionConfig.mjs`. Add it to
+   `PUBLIC_WORKER_CONFIG_FIELDS` in `shared/workerSessionPublicConfig.mjs` only
+   if signed-out visitors may read it.
+4. In `client/src/components/Sessions/`, add the input under `setup/`, send it
+   from `sessionWizardWriteNormalization.ts`, show or hide it per profile in
+   `sessionWizardModeFieldPolicy.ts`, and let admins edit it later in
+   `settings/sessionSettingsEdits.ts`.
+5. Regenerate the Worker template and document the field in
+   `docs/session-cors-worker.md`, `spec.md`, and
+   `docs/session-creation-guide.md`.
+
+### A question type
+
+There is no single registry yet; each layer lists the types it handles.
+
+1. Add the type to `QUESTION_TYPES` in `shared/questions/answerValue.mjs`, and
+   teach `normalizeAnswerValue` its answer shape.
+2. ``git grep -lE "[\"'\`]quadratic[\"'\`]"`` lists every file that names an
+   existing type, across the client, Worker agent modules, MCP server, AI
+   setup prompts, and encryption envelope. Add the new type wherever a sibling
+   type has its own branch.
+3. Add tests next to each changed module.
+4. Add it to the question types under Features in `README.md`. If authors need
+   guidance, give it a page like `docs/quadratic-allocation.md`.
+
 ## Architecture Notes
 
 - Runtime and deployment overview: [docs/architecture-overview.md](docs/architecture-overview.md)

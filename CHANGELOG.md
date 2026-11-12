@@ -2,6 +2,52 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.9.4] - 2026-11-12
+
+### Client — available when the site deploys
+
+- Group recordings: the **Give each person their part** codes open only once every part is transcribed, and say when a part failed.
+- A claimed part of a group conversation survives a reload or a passkey sign-in in the same tab, until its review is submitted or discarded.
+- A recorder who reloads still hands out codes that join the table's group.
+- Recording restarts the microphone once by itself when a headset or Bluetooth microphone drops or the recorder stops, restarts after 15 seconds of silence from the recorder, and plays an alarm (and buzzes where possible) if recording still stops. A paused recording stays paused until **Resume**.
+- Speaker labels stay on after a single refusal; they turn off only after two in a row, and the host can turn them back on.
+- A chunk whose labelled upload keeps being cut off, as by a network that drops quiet connections after 60 seconds, is sent again without labels, so later chunks keep moving; the claim screen says which parts have no labels.
+- A speaker number is never given to two different voices, including after **Record more**; voices heard in one part only are named on the claim screen so the host can join them.
+- At a chunk boundary, a second person echoing the first keeps their words.
+- Pausing no longer makes a recording chunk longer than three minutes of recorded time.
+- Someone whose browser has no passkeys, such as an app's built-in browser after scanning a QR code, is told to open the link in Safari or Chrome, with a **Copy link** button.
+- A recording's uploads never ask for a passkey or wallet signature mid-conversation; a part that needs a sign-in waits with **Retry**, and pressing Retry may ask.
+- On a private session, a voice interview that follows new questions now sees them, including questions only the signed-in person's groups may see.
+- A group's auto-join link can be shown as a QR code beside **Copy auto-join link**; both session QR codes now use error-correction level M.
+- The prompt for a person's own AI accepts a review link only on this site's own session page, so a Worker reached through someone else's link cannot send their drafted views elsewhere.
+- The AI that turns an interview into draft answers reads its instructions before the transcript, and the session's groups after it.
+- The interview settings say each AI is instructed never to go on health, religion and similar personal data, rather than promising it.
+- Fonts are served from the site itself instead of Google Fonts; the site also sends HSTS, a site-wide nosniff header and a Permissions-Policy that allows only its own microphone and camera.
+- A listed session's name opened through a different Worker shows **Not the listed session** with a link to the listed one.
+- Signing out also ends your sign-in at each Session Worker, so a copied sign-in token stops working.
+- Results load much faster on large sessions whose Worker runs this release: answers are read 100 at a time, so 500 answers take 10 requests instead of 505.
+
+### Workers — requires redeployment
+
+- A Worker-hosted session refuses an answer to a question it doesn't have, or a value the question can't take (a 9000 on a 1–5 rating, two picks on a pick-one question), with a message saying why. An answer sent as a whole encrypted payload is refused unless the session uses Lit encryption. An answer that names two different questions is refused.
+- One person can keep at most 20 versions of an answer, and five saved answers per question the session has (hidden questions included), agents' answers included; past that the upload is refused with a message. A survey's bundle is counted apart from its answers, under the same allowance. Answers stored before this release don't count.
+- Sign-in trusts only `contextengine.sh` and `www.contextengine.sh` by default. The retired `.xyz` addresses and local development servers are no longer trusted unless a Worker is set up for them (`ADMIN_TRUSTED_ORIGINS`, or `CE_ALLOW_LOCAL_ORIGINS=true` for local servers). The deploy helper's default allowed origins are the `.sh` site only.
+- `POST /auth/logout` ends a sign-in at the Worker.
+- Admin actions must be signed within ten minutes of use.
+- `POST /storage/read-batch` reads up to 100 stored items in one request, each under the access check a single read gets, and stops at 8 MiB of text; an item it refuses carries the reason, and one it leaves out answers 413. The Worker reports it as the `storage_read_batch_v1` feature.
+
+### Agents and MCP
+
+- MCP 0.3.2. The server signs in only as `contextengine.sh` (with or without `www`) or `CE_MCP_APP_ORIGIN`; the retired `contextengine.xyz` site is no longer trusted.
+
+### Documentation
+
+- `LICENSING.md` names the LGPL and other third-party items. The docs say real sessions need Cloudflare's Workers Paid plan, give the deployment profiles one home, and correct statements that contradicted the code. `CONTRIBUTING.md` has how-to recipes for adding a route, a config field and a question type.
+
+### Local tooling
+
+- The navigation smoke no longer stubs Google Fonts: the site doesn't request them, and such a request now fails the smoke like any other outside call.
+
 ## [0.9.3] - 2026-11-12
 
 ### Client — available when the site deploys

@@ -124,7 +124,7 @@ export default function SessionJoinPanel({
           </UncontrolledTooltip>
           {voiceUrl ? (
             <>
-              <QRCodeSVG value={voiceUrl} size={168} marginSize={4} title="Join the voice interview" />
+              <QRCodeSVG value={voiceUrl} level="M" size={168} marginSize={4} title="Join the voice interview" />
               <div>
                 <a href={voiceUrl}>Open voice interview</a>{' '}
                 <button

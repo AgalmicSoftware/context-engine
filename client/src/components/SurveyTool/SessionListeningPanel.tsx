@@ -268,6 +268,14 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
     () => recorder.segments.filter((segment) => segment.status === 'failed').length,
     [recorder.segments],
   );
+  const onePartSpeakers = useMemo(
+    () => [...new Set(recorder.segments.flatMap((segment) => segment.oneOffSpeakers || []))],
+    [recorder.segments],
+  );
+  const unlabelledParts = useMemo(
+    () => recorder.segments.filter((segment) => segment.speakersDropped).length,
+    [recorder.segments],
+  );
   const trimmedTranscript = recorder.transcript.trim();
   const hasTranscript = trimmedTranscript.length > 0;
   // As the host reads it and hands it out: each speaker they merged under the label that speaker joined.
@@ -788,6 +796,10 @@ export default function SessionListeningPanel(props: SessionListeningPanelProps)
           onPersonChange={setClaimPerson}
           speakerMerges={recorder.speakerMerges}
           onSpeakerMergesChange={recorder.saveSpeakerMerges}
+          waiting={isRecorderSessionActive || hasPendingTranscription}
+          failedParts={failedCount}
+          onePartSpeakers={onePartSpeakers}
+          unlabelledParts={unlabelledParts}
         />
       ) : null}
 

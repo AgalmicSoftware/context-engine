@@ -16,7 +16,7 @@ Use it for new files, refactors, and cleanup PRs.
   canonical source. It is separate from `workers/` source, untracked `dist/`
   build output, and immutable CI release assets; see
   [`deploy/README.md`](../deploy/README.md).
-- `contracts/` holds Solidity contracts, interfaces, and contract-focused tests.
+- `contracts/` holds the Solidity contracts; their tests are in `foundry/test/`.
 - `scripts/` holds build, verification, migration, and supported automation entrypoints.
 - `foundry/` holds Foundry-specific Solidity entry points; `foundry/script/` and `foundry/test/` intentionally keep Foundry's singular directory names one level below repo root.
 - `docs/` holds canonical implementation and operations documentation.

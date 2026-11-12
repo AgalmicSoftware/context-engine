@@ -32,6 +32,8 @@ import styles from './SurveyTool.module.scss';
 
 const ABOUT =
   'Each person scans their own code with their phone. It opens this session with their answers drafted from what they said, for them to check. Their part goes straight from this screen to their phone, where the session’s AI drafts their answers from it. Nothing is saved until they submit. On a video call, share your screen. If one person has two labels, drag one onto the other (on a touch screen, hold it still first), or choose Same person as in their code; × splits them again.';
+const ABOUT_ONE_PART =
+  'These voices had no sample to recognise them by, so each has a number of its own. One may be someone listed under another number: if so, drag one onto the other before showing codes.';
 const ABOUT_CODE =
   'The code changes as it goes. Keep the camera on it until the phone has every piece; any it misses come round again.';
 // A press that moves further than this is a drag, not a tap.
@@ -232,6 +234,14 @@ type Props = {
   // place to keep them, people can't be merged.
   speakerMerges?: SpeakerMerges;
   onSpeakerMergesChange?: (merges: SpeakerMerges) => void;
+  // Some audio is still being recorded or transcribed: a code now would miss its words, so none opens yet.
+  waiting?: boolean;
+  // Parts of the recording that failed to transcribe, whose words no code holds.
+  failedParts?: number;
+  // Labels heard in one part of the recording only, which may be someone with another number.
+  onePartSpeakers?: string[];
+  // Parts transcribed without speaker labels, whose words no code holds.
+  unlabelledParts?: number;
 };
 
 /**
@@ -246,8 +256,13 @@ export default function SessionTranscriptClaimShare({
   onPersonChange,
   speakerMerges = NO_MERGES,
   onSpeakerMergesChange,
+  waiting = false,
+  failedParts = 0,
+  onePartSpeakers = [],
+  unlabelledParts = 0,
 }: Props) {
   const helpId = `ce-claim-help-${useId().replace(/:/g, '')}`;
+  const onePartHelpId = `ce-claim-one-part-${useId().replace(/:/g, '')}`;
   const people = useMemo(() => claimablePeople(transcript), [transcript]);
   const [row, setRow] = useState<HTMLSpanElement | null>(null);
   const [drag, setDrag] = useState<{ person: string; over: string; x: number; y: number } | null>(null);
@@ -280,8 +295,16 @@ export default function SessionTranscriptClaimShare({
     return () => row.removeEventListener('touchmove', hold);
   }, [row]);
   useEffect(() => () => clearTimeout(pressRef.current?.timer), []);
+  // A speaker chosen from the transcript meanwhile doesn't open a code later, unasked.
+  useEffect(() => {
+    if (waiting && person) onPersonChange('');
+  }, [waiting, person, onPersonChange]);
   if (!people.length) return null;
   const labelFor = (name: string) => mergedSpeakerLabel(speakerMerges, name);
+  // Still a lone button: a voice merged either way has been joined up.
+  const onePart = people.filter(
+    (name) => onePartSpeakers.includes(name) && speakersShownAs(speakerMerges, name).length === 1,
+  );
   const merge = onSpeakerMergesChange
     ? (from: string, into: string) => {
         const next = mergeSpeakers(speakerMerges, from, into);
@@ -335,6 +358,8 @@ export default function SessionTranscriptClaimShare({
               <button
                 type="button"
                 data-claim-person={name}
+                // Still a drag source while waiting, so only opening its code is held back.
+                aria-disabled={waiting || undefined}
                 className={[
                   styles.sessionClaimPersonButton,
                   merge ? styles.sessionClaimPersonDraggable : '',
@@ -411,7 +436,7 @@ export default function SessionTranscriptClaimShare({
                     draggedRef.current = '';
                     return;
                   }
-                  onPersonChange(name);
+                  if (!waiting) onPersonChange(name);
                 }}
               >
                 {label}
@@ -435,8 +460,44 @@ export default function SessionTranscriptClaimShare({
       <span className={styles.sessionListeningSrOnly} role="status">
         {announcement}
       </span>
+      {waiting ? (
+        <p className={styles.sessionRecordingWakeNotice} role="status">
+          Codes open once every part is transcribed.
+        </p>
+      ) : failedParts ? (
+        <p className={styles.sessionRecordingWakeNotice} role="status">
+          {failedParts === 1 ? '1 part' : `${failedParts} parts`} failed to transcribe, so codes miss those words. Retry
+          above first.
+        </p>
+      ) : null}
+      {unlabelledParts ? (
+        <p className={styles.sessionRecordingWakeNotice} role="status">
+          {unlabelledParts === 1 ? '1 part has' : `${unlabelledParts} parts have`} no speaker labels, so no code holds
+          those words.
+        </p>
+      ) : null}
+      {onePart.length ? (
+        <p className={styles.sessionRecordingWakeNotice} role="status">
+          Heard in one part only: {onePart.map(labelFor).join(', ')}{' '}
+          <button
+            type="button"
+            id={onePartHelpId}
+            className={styles.sessionInterviewHeaderButton}
+            aria-label="About voices heard in one part only"
+            aria-describedby={`${onePartHelpId}-about`}
+          >
+            <FontAwesomeIcon icon={faQuestionCircle} />
+          </button>
+          <span id={`${onePartHelpId}-about`} hidden>
+            {ABOUT_ONE_PART}
+          </span>
+          <UncontrolledTooltip target={onePartHelpId} trigger="hover focus" autohide={false}>
+            {ABOUT_ONE_PART}
+          </UncontrolledTooltip>
+        </p>
+      ) : null}
       {/* Only a speaker with a button: a blank label has no part. A new person gets codes of their own. */}
-      {people.includes(person) ? (
+      {people.includes(person) && !waiting ? (
         <ClaimCodeDialog
           key={person}
           transcript={transcript}

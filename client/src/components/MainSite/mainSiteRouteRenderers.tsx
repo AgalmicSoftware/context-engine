@@ -66,6 +66,7 @@ import {
 import { MainSiteRouteStatusView } from './mainSiteRouteStatusView';
 import {
   renderWorkerCanonicalRouteBootstrap,
+  renderListedWorkerNotice,
   renderWorkerCanonicalRouteError,
   renderMissingMainSiteSessionConfig,
   renderUnresolvedMainSiteSessionId,
@@ -1286,6 +1287,7 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
     return (
       <InitialRouteBoundary fallback={<LazyFallback label="Loading Session..." />} resetKey={host.props.path}>
         <div data-testid={E2E_TESTIDS.PAGE_SESSION_ROOT}>
+          {renderListedWorkerNotice(workerRoute)}
           <OnePageSession
             slug={effectiveSessionConfig.slug || slug}
             sessionName={resolvedSessionName}

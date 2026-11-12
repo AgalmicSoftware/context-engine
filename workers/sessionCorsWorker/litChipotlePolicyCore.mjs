@@ -120,30 +120,6 @@ export const buildLitChipotleWrappedPlaintext = ({ cekHex, policy } = {}) => {
   };
 };
 
-export const parseLitChipotleWrappedPlaintext = (value) => {
-  let parsed;
-  try {
-    parsed = typeof value === 'string' ? JSON.parse(value) : value;
-  } catch {
-    throw new Error('Lit Chipotle wrapped key is not valid v2 JSON.');
-  }
-  if (!parsed || typeof parsed !== 'object' || parsed.v !== CHIPOTLE_WRAPPED_KEY_VERSION) {
-    throw new Error('Lit Chipotle legacy wrapped keys are not supported.');
-  }
-  const policy = buildLitChipotlePolicy(parsed.policy || {});
-  const expectedFingerprint = fingerprintLitChipotlePolicy(policy);
-  const actualFingerprint = toStr(parsed.policyFingerprint).trim().toLowerCase();
-  if (!actualFingerprint || actualFingerprint !== expectedFingerprint.toLowerCase()) {
-    throw new Error('Lit Chipotle wrapped key policy fingerprint mismatch.');
-  }
-  return {
-    v: CHIPOTLE_WRAPPED_KEY_VERSION,
-    cekHex: normalizeChipotleCekHex(parsed.cekHex),
-    policyFingerprint: expectedFingerprint,
-    policy,
-  };
-};
-
 export const normalizeLitChipotleMetadataVersion = (chipotle = {}) => {
   const raw = chipotle && typeof chipotle === 'object' ? (chipotle.version ?? chipotle.v) : null;
   const parsed = Number(raw || 0);

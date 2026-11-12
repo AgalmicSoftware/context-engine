@@ -13,7 +13,9 @@ jest.mock('../SurveyTool/sessionInterviewCatalogValidation', () => ({
 }));
 jest.mock('../../utilities/worker/corsProxy.js', () => ({ getCorsProxyUrlOrThrow: jest.fn() }));
 jest.mock('qrcode.react', () => ({
-  QRCodeSVG: ({ value }: { value: string }) => <svg data-testid="qr" data-value={value} />,
+  QRCodeSVG: ({ value, level }: { value: string; level?: string }) => (
+    <svg data-testid="qr" data-value={value} data-level={level} />
+  ),
 }));
 const verify = jest.mocked(verifyInterviewKickoffCatalog);
 const sessionUrl =
@@ -32,6 +34,8 @@ it('shares the voice link and the existing AI prompt without private query or fr
   fireEvent.click(screen.getByRole('button', { name: 'Interview & share' }));
   await waitFor(() => expect(screen.getByRole('button', { name: 'Copy AI prompt' })).toBeEnabled());
   expect(screen.getByTestId('qr')).toHaveAttribute('data-value', `${cleanUrl}&mode=voice`);
+  // Level M survives a projected screen's glare better than the default L.
+  expect(screen.getByTestId('qr')).toHaveAttribute('data-level', 'M');
   fireEvent.click(screen.getByRole('button', { name: 'Copy voice link' }));
   await waitFor(() => expect(writeText).toHaveBeenCalledWith(`${cleanUrl}&mode=voice`));
   fireEvent.click(screen.getByRole('button', { name: 'Copy AI prompt' }));

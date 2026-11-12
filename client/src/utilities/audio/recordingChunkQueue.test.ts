@@ -27,6 +27,7 @@ type Transcribe = (
   labels: boolean,
   signal: AbortSignal,
   knownSpeakers: KnownSpeaker[],
+  prompt: boolean,
 ) => Promise<{ text: string; speakerTurns?: SpeakerTranscriptTurn[]; speakerSamplesRefused?: boolean }>;
 // Exact backoff timings below assume no jitter; the jitter test sets its own value.
 let random = 0;
@@ -198,6 +199,51 @@ it('waits two minutes for a hung upload after quick failures, and longer only af
   expect(signals[3].aborted).toBe(true);
 });
 
+it('sends a chunk without labels after two cut-off attempts, so later chunks still move', async () => {
+  // A network that closes any connection quiet for 60 seconds: every labelled request is cut there, while a plain
+  // one answers in time.
+  const transcribe = jest.fn<Transcribe>(
+    (_blob, labels) =>
+      new Promise((resolve, reject) => {
+        if (labels) setTimeout(() => reject(new TypeError('Failed to fetch')), 60_000);
+        else setTimeout(() => resolve({ text: 'Plain.' }), 20_000);
+      }),
+  );
+  const queue = create(transcribe, 'cut-at-60');
+  await queue.ready;
+  queue.capture(queue.begin(true), audio, true);
+  const later = new Blob(['later']);
+  queue.capture(queue.begin(true), later, true);
+  await tick();
+  await jest.advanceTimersByTimeAsync(60_000 + 1000 + 60_000 + 2000 + 20_000);
+  expect(transcribe.mock.calls.map(([blob, labels]) => [blob === audio ? 'first' : 'later', labels])).toEqual([
+    ['first', true],
+    ['first', true],
+    ['first', false],
+    ['later', true],
+  ]);
+  expect(queue.segments[0]).toMatchObject({ status: 'complete', text: 'Plain.', speakersDropped: true });
+  // Labels stay on for later chunks: each gets its own two tries.
+  expect(queue.labelsUnavailableReason).toBe('');
+  await jest.advanceTimersByTimeAsync(60_000 + 1000 + 60_000 + 2000 + 20_000);
+  expect(queue.segments[1]).toMatchObject({ status: 'complete', text: 'Plain.', speakersDropped: true });
+});
+
+it('keeps asking for labels after quick failures, which are not stalls', async () => {
+  let calls = 0;
+  const transcribe = jest.fn<Transcribe>(async () => {
+    if (++calls <= 3) throw Object.assign(new Error('Unavailable'), { status: 503 });
+    return { text: 'Labelled.', speakerTurns: [{ speaker: 'A', start: 0, end: 1, text: 'Labelled.' }] };
+  });
+  const queue = create(transcribe, 'quick-failures');
+  await queue.ready;
+  queue.capture(queue.begin(true), audio, true);
+  await tick();
+  await jest.advanceTimersByTimeAsync(10_000);
+  expect(transcribe.mock.calls.map(([, labels]) => labels)).toEqual([true, true, true, true]);
+  expect(queue.segments[0]).not.toHaveProperty('speakersDropped');
+});
+
 it('restarts the uploading chunk at once when asked to retry it', async () => {
   const signals: AbortSignal[] = [];
   const queue = create((_blob: Blob, _labels: boolean, signal: AbortSignal) => {
@@ -274,6 +320,25 @@ it('skips permanent failures while retaining their exact audio for retry and dow
   queue.retry(failed);
   await queue.finish();
   expect(queue.segments.every((segment) => segment.status === 'complete')).toBe(true);
+});
+
+it('asks the person to sign in only for a chunk they retried', async () => {
+  const transcribe = jest.fn(async (...[, , , , prompt]: Parameters<Transcribe>) => {
+    if (!prompt) throw Object.assign(new Error('Sign in to send this part: press Retry.'), { status: 401 });
+    return { text: 'Signed in.' };
+  });
+  const queue = create(transcribe);
+  await queue.ready;
+  const first = queue.begin(false);
+  queue.capture(first, audio, true);
+  queue.capture(queue.begin(false), new Blob(['second']), true);
+  await queue.finish();
+  expect(queue.segments.map((segment) => segment.status)).toEqual(['failed', 'failed']);
+  expect(transcribe.mock.calls.map((call) => call[4])).toEqual([false, false]);
+  queue.retry(first);
+  await queue.finish();
+  expect(queue.segments.map((segment) => segment.status)).toEqual(['complete', 'failed']);
+  expect(transcribe.mock.calls.map((call) => call[4])).toEqual([false, false, true]);
 });
 
 it('keeps the stored audio until its transcript is saved, while the page keeps only the transcript', async () => {
@@ -451,12 +516,69 @@ it('resets speaker fallback when a completed recording is cleared', async () => 
   const queue = create(transcribe);
   await queue.ready;
   queue.capture(queue.begin(true), audio, true);
+  queue.capture(queue.begin(true), audio, true);
   await queue.finish();
   expect(queue.labelsUnavailableReason).toBe('Labels unavailable');
   await queue.clear(true);
   queue.capture(queue.begin(true), audio, true);
   await queue.finish();
-  expect(transcribe).toHaveBeenLastCalledWith(audio, true, expect.any(AbortSignal), []);
+  expect(transcribe).toHaveBeenLastCalledWith(audio, true, expect.any(AbortSignal), [], false);
+});
+
+it('keeps labels on after one refusal, turns them off after two in a row, and turns them back on', async () => {
+  const refusals = [true, false, true, true, false];
+  const transcribe = jest.fn<Transcribe>(async () =>
+    refusals.shift()
+      ? { text: 'Plain.', labelsUnavailableReason: 'Speaker labels are unavailable.' }
+      : { text: 'Labelled.' },
+  );
+  const queue = create(transcribe, 'refusals');
+  await queue.ready;
+  const chunk = async () => {
+    queue.capture(queue.begin(true), audio, true);
+    await queue.finish();
+  };
+  await chunk();
+  // One refusal may be this chunk's audio: the next chunk asks for labels again, and a labelled one resets it.
+  expect(queue.labelsUnavailableReason).toBe('');
+  // Its words have no speaker, so the claim screen counts the part as unlabelled.
+  expect(queue.segments[0]).toMatchObject({ text: 'Plain.', speakersDropped: true });
+  await chunk();
+  await chunk();
+  expect(queue.labelsUnavailableReason).toBe('');
+  await chunk();
+  expect(queue.labelsUnavailableReason).toBe('Speaker labels are unavailable.');
+  expect(transcribe.mock.calls.map(([, labels]) => labels)).toEqual([true, true, true, true]);
+  await chunk();
+  expect(transcribe).toHaveBeenLastCalledWith(audio, false, expect.any(AbortSignal), [], false);
+  // The host turns them back on, which a reload keeps.
+  queue.restoreSpeakerLabels();
+  expect(queue.labelsUnavailableReason).toBe('');
+  await queue.settled();
+  queue.dispose();
+  const reopened = create(transcribe, 'refusals');
+  await reopened.ready;
+  expect(reopened.labelsUnavailableReason).toBe('');
+  reopened.capture(reopened.begin(true), audio, true);
+  await reopened.finish();
+  expect(transcribe).toHaveBeenLastCalledWith(audio, true, expect.any(AbortSignal), [], false);
+});
+
+it('keeps labels off through a reload when they went off', async () => {
+  const transcribe = jest.fn<Transcribe>(async () => ({
+    text: 'Plain.',
+    labelsUnavailableReason: 'Speaker labels are unavailable.',
+  }));
+  const queue = create(transcribe, 'labels-off');
+  await queue.ready;
+  for (let index = 0; index < 2; index += 1) {
+    queue.capture(queue.begin(true), audio, true);
+    await queue.finish();
+  }
+  queue.dispose();
+  const reopened = create(transcribe, 'labels-off');
+  await reopened.ready;
+  expect(reopened.labelsUnavailableReason).toBe('Speaker labels are unavailable.');
 });
 
 it('keeps only the transcript in memory once a chunk is transcribed without IndexedDB', async () => {
@@ -611,7 +733,7 @@ it('reopens kept pending audio even when IndexedDB is unavailable', async () => 
   const transcribe = jest.fn<Transcribe>(async () => ({ text: 'Recovered from memory.' }));
   const reopened = create(transcribe, 'volatile-room');
   await reopened.finish();
-  expect(transcribe).toHaveBeenCalledWith(audio, false, expect.any(AbortSignal), []);
+  expect(transcribe).toHaveBeenCalledWith(audio, false, expect.any(AbortSignal), [], false);
   expect(reopened.segments[0].text).toBe('Recovered from memory.');
   expect(reopened.records.get(id)?.audio).toBeUndefined();
   expect(reopened.storageError).toContain("can't be recovered after a reload");
@@ -1002,20 +1124,50 @@ describe('speaker labels across chunks', () => {
     expect(saved.get('known-speakers')?.knownSpeakers?.map((speaker) => speaker.name)).toEqual(['Person 1']);
   });
 
-  it('keeps at most four voices, numbering a fifth within its chunk', async () => {
+  it('keeps at most four voices, and never gives a fifth voice’s number to anyone else', async () => {
     const transcribe = replies(
       [turn('A', 0, 3), turn('B', 3, 6), turn('C', 6, 9)],
       [turn('Person 1', 0, 3), turn('A', 3, 6), turn('B', 6, 9)],
+      // Two more voices without samples, in later chunks: each is a new number, not chunk 2's Person 5 again.
       [turn('Person 4', 0, 3), turn('A', 3, 6)],
+      [turn('Person 2', 0, 3), turn('A', 3, 6)],
     );
     const queue = create(transcribe, 'voices-2');
     await queue.ready;
-    for (let index = 0; index < 3; index += 1) await record(queue);
-    expect(sentNames(transcribe).map((names) => names.length)).toEqual([0, 3, 4]);
+    for (let index = 0; index < 4; index += 1) await record(queue);
+    expect(sentNames(transcribe).map((names) => names.length)).toEqual([0, 3, 4, 4]);
     expect(voices(queue)).toEqual([
       ['Person 1', 'Person 2', 'Person 3'],
       ['Person 1', 'Person 4', 'Person 5'],
-      ['Person 4', 'Person 5'],
+      ['Person 4', 'Person 6'],
+      ['Person 2', 'Person 7'],
+    ]);
+    expect(queue.segments.map((segment) => segment.oneOffSpeakers)).toEqual([
+      undefined,
+      ['Person 5'],
+      ['Person 6'],
+      ['Person 7'],
+    ]);
+  });
+
+  it('numbers new voices after everyone already heard when Record more starts without samples', async () => {
+    const transcribe = replies(
+      [turn('A', 0, 4), turn('B', 4, 8)],
+      // After a close and reopen the samples are gone, so the model labels the voices A and B again.
+      [turn('A', 0, 4), turn('B', 4, 8)],
+    );
+    const first = create(transcribe, 'voices-record-more');
+    await first.ready;
+    await record(first);
+    first.dispose();
+    await first.settled();
+    const second = create(transcribe, 'voices-record-more');
+    await second.ready;
+    await record(second);
+    expect(sentNames(transcribe)).toEqual([[], []]);
+    expect(voices(second)).toEqual([
+      ['Person 1', 'Person 2'],
+      ['Person 3', 'Person 4'],
     ]);
   });
 
@@ -1029,8 +1181,9 @@ describe('speaker labels across chunks', () => {
     const queue = create(transcribe, 'voices-3');
     await queue.ready;
     for (let index = 0; index < 3; index += 1) await record(queue);
-    expect(voices(queue)).toEqual([['Person 1', 'Person 2'], ['Person 1', 'Person 2', 'Person 3'], ['Person 2']]);
+    expect(voices(queue)).toEqual([['Person 1', 'Person 2'], ['Person 3', 'Person 4', 'Person 5'], ['Person 2']]);
     expect(queue.segments.map((segment) => Boolean(segment.speakersRenumbered))).toEqual([false, true, false]);
+    expect(queue.segments[1].oneOffSpeakers).toEqual(['Person 3', 'Person 4', 'Person 5']);
     // Its voices did not join the known people.
     expect(sentNames(transcribe)[2]).toEqual(['Person 1', 'Person 2']);
     expect(sampleVoices).toHaveBeenCalledTimes(1);
@@ -1042,7 +1195,8 @@ describe('speaker labels across chunks', () => {
     await queue.ready;
     for (let index = 0; index < 3; index += 1) await record(queue);
     expect(sentNames(transcribe)).toEqual([[], ['Person 1'], []]);
-    expect(voices(queue)).toEqual([['Person 1'], ['Person 1'], ['Person 1']]);
+    // Without samples the model can't say who is who, so each chunk's voice is new.
+    expect(voices(queue)).toEqual([['Person 1'], ['Person 2'], ['Person 3']]);
     expect(saved.get('known-speakers')?.speakerSamplesRefused).toBe(true);
   });
 
@@ -1058,9 +1212,11 @@ describe('speaker labels across chunks', () => {
     await jest.advanceTimersByTimeAsync(10_000);
     await queue.finish();
     expect(transcribe).toHaveBeenCalledTimes(2);
-    // Without a sample, the voice is numbered within each chunk.
+    // Without a sample, the first chunk's voice is marked as heard there only; the second chunk's voice, sampled
+    // in time, gets a new number rather than that one.
     expect(sentNames(transcribe)).toEqual([[], []]);
-    expect(voices(queue)).toEqual([['Person 1'], ['Person 1']]);
+    expect(voices(queue)).toEqual([['Person 1'], ['Person 2']]);
+    expect(queue.segments.map((segment) => segment.oneOffSpeakers)).toEqual([['Person 1'], undefined]);
   });
 });
 

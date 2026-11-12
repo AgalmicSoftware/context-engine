@@ -43,18 +43,32 @@ test('session creation docs align mode-specific deployment inputs', () => {
 });
 
 test('canonical docs name both Hosted deployment paths', () => {
-  const readme = read('README.md');
+  const runModes = read('docs/run-modes.md');
   const architecture = read('ARCHITECTURE.md');
   const overview = read('docs/architecture-overview.md');
   const spec = read('spec.md');
 
-  assert.match(readme, /Cloudflare account, an AI-provider key \(OpenAI by default\), and either a Cloudflare API token or the token-free dashboard setup/);
-  assert.doesNotMatch(readme, /default Cloudflare profile needs only a Cloudflare deploy token/i);
+  assert.doesNotMatch(read('README.md'), /needs only a Cloudflare deploy token/i);
+  assert.match(runModes, /Cloudflare account, an AI-provider key \(OpenAI by default\), and\s+either a Cloudflare API token[\s\S]{0,80}or the token-free dashboard handoff/);
   assert.match(architecture, /Deploy helper[\s\S]{0,80}request-only Cloudflare API token/);
   assert.match(architecture, /Native Deploy to Cloudflare[\s\S]{0,80}token-free dashboard handoff/);
   assert.match(overview, /deploy helper with a request-only API token/);
   assert.match(overview, /native Deploy to Cloudflare template[\s\S]{0,100}token-free dashboard handoff/);
   assert.match(spec, /Session\s+Wizard's API-token[\s\S]{0,120}token-free path\s+uses the native Cloudflare dashboard handoff/);
+});
+
+test('profile docs link to the one profile description', () => {
+  const home = 'run-modes.md#session-infrastructure-profiles';
+  assert.match(read('docs/run-modes.md'), /^## Session Infrastructure Profiles$/m);
+  for (const [relativePath, link] of [
+    ['README.md', `docs/${home}`],
+    ['ARCHITECTURE.md', `docs/${home}`],
+    ['spec.md', `docs/${home}`],
+    ['docs/scaling.md', home],
+    ['docs/architecture-overview.md', home],
+  ]) {
+    assert.ok(read(relativePath).includes(`](${link})`), relativePath);
+  }
 });
 
 test('profile docs use the current wizard labels', () => {

@@ -50,6 +50,8 @@ import {
   readStoragePayloadResourceId,
   validateStorageUploadPayload,
 } from './storageUploadValidation.js';
+import { checkUploadedAnswers, countSessionQuestions, listUploadedAnswers } from './responseAnswerValidation.js';
+import { isWorkerCanonicalSessionConfig } from './workerCanonicalAuthority.js';
 import {
   isAdminStorageVersion,
   isOwnedStorageResource,
@@ -1404,7 +1406,16 @@ export const publishCloudflareOwnedStorageMetadata = async ({ env, config, slug,
   await index.put(buildIndexKey({ slug, resource, id: metadata.id }), JSON.stringify(metadata), storageIndexPutOptions(metadata));
 };
 
-const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, authScopes, expectedAuthority, payload, resourceId = '', baseHeaders, deps }) => {
+const RESPONSE_ROWS_PER_QUESTION = 5;
+
+// Agents pass one object per request as answersChecked, which keeps the count.
+const countQuestionsOnce = async (memo, count) => {
+  if (!isObj(memo)) return count();
+  memo.questionCount ??= await count();
+  return memo.questionCount;
+};
+
+const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, authScopes, expectedAuthority, payload, parsedPayload = null, answersChecked = false, resourceId = '', baseHeaders, deps }) => {
   const r2 = getStorageR2Binding(env);
   const index = getStorageIndexBinding(env);
   const canWriteR2 = !!r2 && typeof r2.put === 'function';
@@ -1450,6 +1461,23 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
   }
   const resource = trim(payload.resource) || 'docsContext';
   const uploader = normalizeAddress(uploaderAddress);
+  // Readable answers must name a question the session has, with a value it accepts.
+  // Only a Worker-canonical session keeps its question list here; others read it from chain or Arweave.
+  // Agents check each answer against the question they read before uploading it.
+  // Only a Lit session's answers may be unreadable here; they still count toward the row limit.
+  const canonicalAnswers = resource === 'responses' && isWorkerCanonicalSessionConfig(config);
+  if (canonicalAnswers && !parsedPayload && payloadAccess.encryption !== PAYLOAD_ENCRYPTION_MODES.LIT) {
+    return responseJson(deps, {
+      error: 'This session needs answers its Worker can read. Reload the session and try again.',
+      reason: 'response_unreadable',
+    }, 422, baseHeaders);
+  }
+  const answerCheck = !canonicalAnswers ? null
+    : parsedPayload && !answersChecked ? await checkUploadedAnswers({ env, config, index, slug, payload: parsedPayload, deps })
+      : { ok: true, questionCount: await countQuestionsOnce(answersChecked, () => countSessionQuestions({ env, config, index, slug })) };
+  if (answerCheck && !answerCheck.ok) {
+    return responseJson(deps, { error: answerCheck.error, reason: answerCheck.reason }, answerCheck.status, baseHeaders);
+  }
   const owned = isOwnedStorageResource(resource);
   const uploaderIsAdmin = owned && resolveSessionAdminAddresses(config).has(uploader);
   const contextUploaderIsAdmin = resolveSessionAdminAddresses(config).has(uploader);
@@ -1647,12 +1675,27 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
   if (prepared.response) return prepared.response;
 
   // Validation, encryption and serialized KV limits must pass before a retry lease starts.
-  const requestId = trim(payload.requestId);
+  // Every answer takes a receipt, which also counts it against the person's limits;
+  // without a usable request id it gets one of its own and is never replayed.
+  const callerRequestId = trim(payload.requestId);
+  const requestId = callerRequestId && callerRequestId.length <= 200 ? callerRequestId : `server:${id}`;
   let uploadReceipt = null;
-  if (resource === 'responses' && uploader && requestId && requestId.length <= 200) {
+  if (resource === 'responses' && uploader) {
     const digest = await (deps?.crypto || globalThis.crypto).subtle.digest('SHA-256', payload.bytes || new Uint8Array());
     const payloadDigest = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
-    uploadReceipt = await coordinateResponseUploadReceipt({ env, slug, responder: uploader, operation: 'reserve', payload: { requestId, payloadDigest, storageId: id, createdAt } });
+    // A survey submit stores its bundle and then each answer on its own. The
+    // bundle is checked against the limits but counted apart, so its answers
+    // are not counted twice.
+    const bundle = Array.isArray(parsedPayload?.responses) && !!trim(parsedPayload.surveyID || parsedPayload.surveyId);
+    // Only answers checked against the session's questions count per question,
+    // so made-up ids cannot grow the coordinator's counters.
+    const questionIds = answerCheck?.ok && parsedPayload
+      ? [...new Set(listUploadedAnswers(parsedPayload).map((answer) => answer.questionId).filter(Boolean))]
+      : [];
+    // A person may store at most five rows per question the session shows.
+    const maxRows = answerCheck?.ok ? RESPONSE_ROWS_PER_QUESTION * Math.max(answerCheck.questionCount, 1) : 0;
+    uploadReceipt = await coordinateResponseUploadReceipt({ env, slug, responder: uploader, operation: 'reserve',
+      payload: { requestId, payloadDigest, storageId: id, createdAt, questionIds, maxRows, bundle } });
     if (uploadReceipt?.kind === 'replay') {
       await enqueueResponseAnalysis(uploadReceipt.storageRef.id);
       return responseJson(deps, { id: uploadReceipt.storageRef.id, storageRef: uploadReceipt.storageRef, replayed: true }, 200, baseHeaders);
@@ -1938,6 +1981,60 @@ const handleCloudflareRead = async ({ request, env, config, slug, uploaderAddres
     status: 200,
     headers: responseHeaders,
   });
+};
+
+export const MAX_READ_BATCH_IDS = 100;
+// A batch is read a few items at a time and stops once it holds this much
+// text, so a page of the largest items cannot exhaust the Worker's memory.
+// The rest answer 413, and the client reads each of those on its own.
+export const MAX_READ_BATCH_BYTES = 8 * 1024 * 1024;
+const READ_BATCH_CONCURRENCY = 5;
+
+// Up to one list page of payloads in one request. Each id is read exactly as
+// /storage/read reads it, with its own access check, so a batch never shows
+// more than single reads would; an item that fails carries its own status.
+const handleCloudflareReadBatch = async ({ request, baseHeaders, deps, ...read }) => {
+  let ids = null;
+  try {
+    ids = (await request.clone().json())?.ids;
+  } catch { /* refused below */ }
+  if (!Array.isArray(ids) || !ids.length || ids.length > MAX_READ_BATCH_IDS || new Set(ids).size !== ids.length ||
+      !ids.every(isSafeCloudflareStorageRefId)) {
+    return responseJson(deps, { error: `Send 1 to ${MAX_READ_BATCH_IDS} distinct storage ids.` }, 400, baseHeaders);
+  }
+  const origin = new URL(request.url).origin;
+  let privateItem = false;
+  const readItem = async (id) => {
+    const response = await handleCloudflareRead({
+      ...read, baseHeaders: {}, deps, request: new Request(`${origin}/storage/read?id=${encodeURIComponent(id)}`),
+    });
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      // The reason lets a signed-out reader tell a refusal that signing in lifts, as a single read's does.
+      return { id, status: response.status, error: trim(body?.error) || 'Storage read failed.', ...(trim(body?.reason) ? { reason: trim(body.reason) } : {}) };
+    }
+    if ((response.headers.get('Cache-Control') || '').includes('private')) privateItem = true;
+    const contentType = response.headers.get('Content-Type') || '';
+    if (!/json|^text\//i.test(contentType)) {
+      return { id, status: 415, error: 'This item is not text; read it on its own.' };
+    }
+    return { id, status: 200, contentType, text: await response.text() };
+  };
+  const items = [];
+  let textBytes = 0;
+  for (let offset = 0; offset < ids.length; offset += READ_BATCH_CONCURRENCY) {
+    const chunk = ids.slice(offset, offset + READ_BATCH_CONCURRENCY);
+    const read = textBytes < MAX_READ_BATCH_BYTES
+      ? await Promise.all(chunk.map(readItem))
+      : chunk.map((id) => ({ id, status: 413, error: 'This batch is full; read this item on its own.' }));
+    for (const item of read) textBytes += item.text?.length || 0;
+    items.push(...read);
+  }
+  const headers = new Headers(baseHeaders || {});
+  headers.set('Content-Type', 'application/json');
+  headers.set('X-Content-Type-Options', 'nosniff');
+  if (privateItem) headers.set('Cache-Control', 'private, no-store');
+  return new Response(JSON.stringify({ items }), { status: 200, headers });
 };
 
 const handleCloudflareList = async ({ request, env, config, slug, uploaderAddress, authScopes, baseHeaders, deps }) => {
@@ -2694,6 +2791,7 @@ export const removeCloudflareStorageRecords = async ({ env, slug, rows = [], mar
 
 export const storageRoute = async ({
   path, method, request, env, config, slug, uploaderAddress, authScopes, expectedAuthority, baseHeaders, checkFetchAccess, deps,
+  answersChecked = false,
 } = {}) => {
   if (method === 'POST' && ['/storage/response-field-key/wrap', '/storage/response-field-key/unwrap'].includes(path)) {
     // Field keys use the same lazy private-RPC setup and chain attestation as
@@ -2733,7 +2831,8 @@ export const storageRoute = async ({
     }
     const routeDeps = createStorageRouteGateDeps({ config, env, slug, deps });
     return handleCloudflareUpload({
-      env, config, slug, uploaderAddress, authScopes, expectedAuthority, payload, resourceId: checked.resourceId, baseHeaders, deps: routeDeps,
+      env, config, slug, uploaderAddress, authScopes, expectedAuthority, payload, parsedPayload: checked.payload || null, answersChecked,
+      resourceId: checked.resourceId, baseHeaders, deps: routeDeps,
     });
   }
 
@@ -2759,6 +2858,10 @@ export const storageRoute = async ({
   if (path === '/storage/read' && (method === 'GET' || method === 'POST')) {
     const routeDeps = createStorageRouteGateDeps({ config, env, slug, deps });
     return handleCloudflareRead({ request, env, config, slug, uploaderAddress, authScopes, baseHeaders, deps: routeDeps });
+  }
+  if (path === '/storage/read-batch' && method === 'POST') {
+    const routeDeps = createStorageRouteGateDeps({ config, env, slug, deps });
+    return handleCloudflareReadBatch({ request, env, config, slug, uploaderAddress, authScopes, baseHeaders, deps: routeDeps });
   }
   if (path === '/storage/list' && (method === 'GET' || method === 'POST')) {
     const routeDeps = createStorageRouteGateDeps({ config, env, slug, deps });

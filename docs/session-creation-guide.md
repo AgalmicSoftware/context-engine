@@ -38,7 +38,8 @@ handling](session-cors-worker.md#api-token-setup-and-handling).
 
 The token-free path is a guided Cloudflare dashboard handoff under Hosting and
 storage → More. Once its Worker is verified, Create needs no token. Lit profiles
-cannot use it. Both paths need a Cloudflare account.
+cannot use it. Both paths need a Cloudflare account, and a real session needs
+its Workers Paid plan ([why](#1-cloudflare-account)).
 
 The app's passkey-derived EOA supplies the admin identity and signs the worker
 config, but it does not submit a transaction and needs no gas. For the
@@ -122,7 +123,22 @@ A pure Worker session does not display or persist block numbers, registry
 contracts, Surveys contracts, faucet settings, or an Ethereum network.
 
 Most sessions can leave Participation at its defaults. **Who can create groups**
-is a dropdown: **Anyone in the session** or **Admins only**. **Voice interviews
+is a dropdown: **Anyone in the session** or **Admins only**.
+
+Each Worker group also has **Who can remove members**, chosen when the group is
+created and changeable later from the Admin page's groups panel:
+
+- **Admins and the member** (`both`, the default): members can leave, and
+  admins can remove them.
+- **Admins only** (`admin_only`): admins can remove members; members can't
+  leave.
+- **The member only** (`member_only`): members can leave; admins can't remove
+  them.
+- **No one** (`neither`): memberships last until the group is deleted.
+
+A Session Worker before 0.9.1 ignores the setting and keeps the old rule, which
+is `both`. The Worker's side is in [Worker-Native
+Groups](session-cors-worker.md#worker-native-groups). **Voice interviews
 and AI prefill** defaults on. **Interview settings** show only while it is on;
 turning it off hides them and keeps their values.
 
@@ -148,9 +164,9 @@ Interview settings for the call:
   `interviewMode.suggestGroups` is no longer read. While it is on, **The AI may
   use** (`interviewMode.groupSuggestionData`) sets what an AI may base a
   suggestion on: Country, Work, and Interests and causes by default; Town or
-  city only when ticked. No AI ever goes on health, disability, religion,
-  ethnicity, sexuality, gender identity, age, family life, or party or union
-  membership.
+  city only when ticked. Every AI is instructed never to go on health,
+  disability, religion, ethnicity, sexuality, gender identity, age, family life,
+  or party or union membership.
 
 Interview settings for research:
 
@@ -188,8 +204,8 @@ Interview settings for research:
 
 Older Session Workers reject settings they don't know, so each is saved only
 when changed from its default. The sharing default needs a 0.7.0 or later
-Session Worker; `full` detail, hidden drafts, the score, group suggestions, the
-Results section and its smallest group need one newer than 0.8.0, and
+Session Worker; `full` detail, hidden drafts, the score, the Results section and
+its smallest group need one newer than 0.8.0, and
 suggesting groups to join needs 0.9.1 or later. See
 [session-interview-research.md](session-interview-research.md),
 [session-listening-mode.md](session-listening-mode.md) and [Interview settings
@@ -308,7 +324,12 @@ for the manifest contract and steps.
 ### 1. Cloudflare account
 
 The session worker is the canonical config, auth, AI, and payload-storage host
-for the default profile. A free Cloudflare account is enough for small sessions.
+for the default profile. A real session needs the account on Cloudflare's
+**Workers Paid** plan. On the free plan Workers KV takes 1,000 writes a day, and
+each answer uses two and each sign-in one, so after roughly 450 answers in a day
+uploads fail until 00:00 UTC. Reads run out too: one Results view loads every
+answer, so a few dozen viewers of a large session use up the free day. The free
+plan is enough to try the app with a few people.
 
 Create or sign in to a Cloudflare account at <https://dash.cloudflare.com/>, then
 choose how to deploy:

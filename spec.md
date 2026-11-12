@@ -1,7 +1,7 @@
 # Context Engine Specification
 
 Status: Living specification (update alongside feature work)
-Last reviewed: 2026-11-06
+Last reviewed: 2026-11-12
 Canonical deep-dive docs: `docs/` (see `docs/README.md`)
 
 ## Purpose
@@ -41,7 +41,7 @@ deliberation and coordination, centered on:
 - Optional Agent HTTP inside that Worker, which exposes scoped `/api/agent/*`
   requests and Session Wrapped without replacing session authority.
 
-Primary storage and authority split:
+Primary storage and authority split ([profiles](docs/run-modes.md#session-infrastructure-profiles)):
 - Hosted & Fast: the creator-owned Session Worker is canonical for config,
   authentication, Worker-native groups/gates, and Cloudflare payload/index
   storage; it does not require EVM or Arweave.
@@ -482,6 +482,9 @@ Worker API (selected endpoints):
 - `GET /capabilities`: Public Worker feature list; `?slug=<slug>` adds that
   session's Agent HTTP readiness.
 - `GET /session-config`: Public session config projection, without secrets.
+- `GET /llms.txt`: The session's `agentInstructions`, as Markdown text for AI
+  agents, or 404 when it has none. The site's own `/llms.txt` describes the
+  app; this one describes a session.
 - `GET /resource-presence`: Reports which sponsored resources are configured,
   without returning their values.
 - `POST /auth/nonce`: Start SIWE-style login (returns nonce).
@@ -509,14 +512,17 @@ Worker API (selected endpoints):
   ciphertext and envelope metadata; session KEK material is never returned.
 - `POST /groups/create`: Authenticated participant Worker-group creation,
   enabled only by `groupCreationPolicy: "participants"` and forced to an open,
-  session-visible record. Tags, public reference URLs, member limit, and join
-  deadline are retained; the group-admin address is derived from the signed
-  principal.
+  session-visible record. Tags, public reference URLs, member limit, join
+  deadline and `removalAuth` are retained; the group-admin address is derived
+  from the signed principal.
 - `GET /groups/list`: Redacted session-visible Worker-group discovery is
-  anonymous only for a validated Worker-canonical mode with public stored
-  results and unencrypted, ungated Cloudflare storage. Memberships, member
-  identities/counts, and join/create remain authenticated; creation permission
-  is controlled separately by `groupCreationPolicy`.
+  anonymous for a validated Worker-canonical mode with public stored results
+  and unencrypted, ungated Cloudflare storage. On any other session it is
+  anonymous only with one `joinGroup=<groupId>` naming an open,
+  session-visible group still taking joins, as a join link does, and then
+  returns the session-visible group list without group-admin addresses. Memberships, member identities/counts, and
+  join/create remain authenticated; creation permission is controlled
+  separately by `groupCreationPolicy`.
 - `GET|POST /groups/my-memberships`: Authenticated self-membership projection.
 - `GET|POST /groups/members`: Authenticated, paginated member identities and
   authoritative count. `session` permits any authenticated session principal,
@@ -524,11 +530,17 @@ Worker API (selected endpoints):
   Admin route.
 - `POST /groups/join`: Authenticated self-join for an open Worker group before
   its configured deadline and within its member limits.
-- `POST /groups/leave`: Authenticated self-removal. The principal is derived
-  from the bearer credential rather than request JSON.
-- `POST /admin/groups/create`: Signed-admin Worker-group creation under either
-  creation policy, including Worker-native metadata, membership limits, join
-  deadlines, and a group-admin address.
+- `POST /groups/leave`: Authenticated self-removal, when the group's
+  `removalAuth` lets members leave. The principal is derived from the bearer
+  credential rather than request JSON.
+- `POST /admin/groups/create` and `POST /admin/groups/update`: Signed-admin
+  Worker-group creation (under either creation policy) and editing, including
+  Worker-native metadata, membership limits, join deadlines, a group-admin
+  address, and `removalAuth`.
+- `POST /admin/groups/remove-member`: Signed-admin removal, when the group's
+  `removalAuth` lets admins remove members. `removalAuth` is `both` (default),
+  `admin_only`, `member_only` or `neither`; every group the Worker returns
+  reports it.
 - `POST /admin/groups/reconcile-empty`: Signed-admin recovery for a locked Group
   coordinator; succeeds only with a valid server-managed bootstrap proof and no
   current or deleted Group rows.
@@ -586,7 +598,9 @@ Client-side:
 Worker-side:
 - Worker KV session config and secrets, including the top-level
   `groupCreationPolicy` enum (`admin_only` or `participants`; `admin_only` when
-  omitted), optional `sessionEndsAt`, and generic `defaultGroupTags`. Pure Worker profiles reject block/faucet/registry
+  omitted), optional `sessionEndsAt`, generic `defaultGroupTags`, and
+  `agentInstructions` (Markdown for AI agents, at most 8,000 characters, served
+  at the Worker's `/llms.txt`; editing it signs no one out). Pure Worker profiles reject block/faucet/registry
   configuration; explicit Worker + on-chain SBT profiles accept only the
   required network and Group Factory subset. See `docs/session-cors-worker.md`
   for shapes and bindings.

@@ -15,6 +15,8 @@ const createMemoryKv = (seed = {}) => {
 	const values = new Map(Object.entries(seed));
 	return {
 		async get(key, typeOrOptions) {
+			// Cloudflare's bulk get: up to 100 keys as one operation, answered as a Map.
+			if (Array.isArray(key)) return new Map(key.map((name) => [name, values.get(name) ?? null]));
 			const value = values.has(key) ? values.get(key) : null;
 			const type = typeof typeOrOptions === 'string' ? typeOrOptions : typeOrOptions?.type;
 			if (value == null || !type || type === 'text') return value;
@@ -57,9 +59,17 @@ const createDurableStorage = () => {
 		get: async (key) => cloneValue(target.get(key)),
 		put: async (key, value) => target.set(key, cloneValue(value)),
 		delete: async (key) => target.delete(key),
+		// Durable Object storage lists keys in order; this covers the options the coordinator uses.
+		list: async ({ prefix = '', startAfter = '', limit = Infinity } = {}) => new Map(
+			[...target.keys()].sort()
+				.filter((key) => key.startsWith(prefix) && key > startAfter)
+				.slice(0, limit)
+				.map((key) => [key, cloneValue(target.get(key))]),
+		),
 	});
 	return {
 		get: (key) => enqueue(() => view(values).get(key)),
+		list: (options) => enqueue(() => view(values).list(options)),
 		put: (key, value) => enqueue(() => view(values).put(key, value)),
 		delete: (key) => enqueue(() => view(values).delete(key)),
 		transaction: (callback) =>
@@ -236,6 +246,16 @@ const buildCentralizedConfig = (adminAddress) => ({
 	},
 });
 
+// A Worker-hosted session takes answers only to questions it has stored.
+const storeQuestion = async ({ env, token, id }) => {
+	const data = { id, prompt: 'What should the bundle keep?', type: 'freeform', sessionId: SESSION_ID, sessionSlug: SESSION_SLUG };
+	const stored = await fetchWorker(
+		makeRequest('/storage/upload', { method: 'POST', token, body: { data, contentType: 'application/json', resource: 'questions' } }),
+		env,
+	);
+	assert.equal(stored.status, 200, await stored.clone().text());
+};
+
 test('generated Worker bundle runs the centralized preset auth and encrypted storage path', async () => {
 	const admin = Wallet.createRandom();
 	const participant = Wallet.createRandom();
@@ -284,6 +304,7 @@ test('generated Worker bundle runs the centralized preset auth and encrypted sto
 	}), env);
 	assert.equal(duplicatePolicy.status, 400, await duplicatePolicy.clone().text());
 	assert.equal(storageKv.dump().size, 0);
+	await storeQuestion({ env, token: adminToken, id: 'bundle-runtime-question' });
 	const marker = 'credential-free bundle runtime plaintext marker';
 	// Responses must be answer-shaped JSON, as the client uploads them.
 	const answer = { questionID: 'bundle-runtime-question', answer: marker };
@@ -363,6 +384,7 @@ test('the deploy package stores encrypted answers with only the bindings it decl
 	assert.equal(capabilities.session.readiness.storage, 'ok');
 	assert.deepEqual(capabilities.session.unavailable, []);
 
+	await storeQuestion({ env, token: await login({ env, wallet: admin }), id: 'template-binding-question' });
 	const token = await login({ env, wallet: participant });
 	const answer = { questionID: 'template-binding-question', answer: 'template binding marker' };
 	const uploadResponse = await fetchWorker(

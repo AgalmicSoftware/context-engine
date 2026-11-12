@@ -49,7 +49,7 @@ test('parseArgs accepts required deploy-helper flags and boolean switches', asyn
   });
 });
 
-test('resolveDeployHelperDeployConfig falls back to the stable hosted/local bootstrap origins', async () => {
+test('resolveDeployHelperDeployConfig falls back to the site origins', async () => {
   const {
     DEFAULT_DEPLOY_HELPER_ALLOWED_ORIGINS,
     resolveDeployHelperDeployConfig,
@@ -63,18 +63,8 @@ test('resolveDeployHelperDeployConfig falls back to the stable hosted/local boot
   });
 
   assert.deepEqual(config.allowedOrigins, DEFAULT_DEPLOY_HELPER_ALLOWED_ORIGINS);
-  assert.deepEqual(config.allowedOrigins, [
-    'https://contextengine.sh', // canonical production hosted app origin
-    'https://www.contextengine.sh', // canonical production hosted app origin
-    'https://contextengine.xyz', // redirect compatibility origin
-    'https://www.contextengine.xyz', // redirect compatibility origin
-    'http://localhost:3000',
-    'http://127.0.0.1:3000',
-    'http://localhost:3001',
-    'http://127.0.0.1:3001',
-    'http://localhost:7391',
-    'http://127.0.0.1:7391',
-  ]);
+  // The site's own origins; local dev servers come from --allowed-origins or ALLOWED_ORIGINS.
+  assert.deepEqual(config.allowedOrigins, ['https://contextengine.sh', 'https://www.contextengine.sh']);
 });
 
 test('resolveDeployHelperDeployConfig bootstrap defaults do not infer arbitrary self-hosted app origins', async () => {

@@ -14,6 +14,7 @@ import { cutSpeakerSamples } from './speakerSamples';
 import {
   MAX_KNOWN_SPEAKERS,
   nameSpeakerTurns,
+  personNumber,
   planSpeakerTurns,
   type KnownSpeaker,
   type SpeakerTranscriptTurn,
@@ -91,6 +92,8 @@ type Options = {
     labels: boolean,
     signal: AbortSignal,
     knownSpeakers: KnownSpeaker[],
+    // Only a Retry the person pressed may ask them to sign in; uploads they didn't start never do.
+    prompt: boolean,
   ) => Promise<Transcription>;
   onChange: () => void;
   // Retry jitter source; tests pass a fixed one instead of patching Math.random.
@@ -105,6 +108,11 @@ const storageText = (error: unknown) =>
 // minutes longer, so a slow upload still finishes; quick failures such as a 503 don't lengthen the wait.
 const UPLOAD_DEADLINE_MS = 120_000;
 const stalledText = 'The upload stopped responding. Retrying.';
+// A request that failed after this long was cut on the way, as by a network that closes connections quiet for
+// 60 seconds, and counts as a stall too. A labelled chunk can take over a minute to answer, so after two stalls
+// it goes again without labels, which answers sooner, and later chunks stop waiting behind it.
+const LONG_ATTEMPT_MS = 30_000;
+const STALLS_BEFORE_PLAIN = 2;
 
 /**
  * Each chunk is one IndexedDB record: its audio until it is transcribed, then its transcript, which replaces the
@@ -114,6 +122,8 @@ export class RecordingChunkQueue {
   records = new Map<string, RecordingChunk>();
   storageError = '';
   labelsUnavailableReason = '';
+  // Label refusals in a row: one may be this chunk's audio, so labels go off only at the second.
+  private labelRefusals = 0;
   hiddenPeriods: HiddenPeriod[] = [];
   speakers: Speakers = { knownSpeakers: [], speakerSamplesRefused: false };
   // As restored when the recording opened; saving later drafts leaves it.
@@ -130,6 +140,7 @@ export class RecordingChunkQueue {
   private retryTimer: ReturnType<typeof setTimeout> | null = null;
   private attempts = new Map<string, number>();
   private stalls = new Map<string, number>();
+  private retriedByHand = new Set<string>();
   private lastSnapshotAt = new Map<string, number>();
   private failedWrites = new Set<string>();
   private resaving = new Set<string>();
@@ -183,8 +194,10 @@ export class RecordingChunkQueue {
           entry.segment = { ...entry.segment, status: 'queued', error: undefined };
         else if (!entry.audio && entry.segment.status !== 'complete') continue;
         this.records.set(entry.segment.id, entry);
-        if (entry.labelsUnavailableReason) this.labelsUnavailableReason = entry.labelsUnavailableReason;
       }
+      // The latest transcribed chunk says whether labels were off then; turning them back on clears it there.
+      const latest = this.segments.filter((segment) => segment.status === 'complete').pop();
+      this.labelsUnavailableReason = (latest && this.records.get(latest.id)?.labelsUnavailableReason) || '';
       holdInMemory(this.options.scope, null);
       this.resaveKept([...stripped, ...kept]);
       this.restoreHiddenPeriods(storedPeriods);
@@ -451,31 +464,52 @@ export class RecordingChunkQueue {
     this.changed();
     const controller = new AbortController();
     this.uploading = { id, controller };
+    const stalledLabels = (this.stalls.get(id) || 0) >= STALLS_BEFORE_PLAIN;
+    const labels = record.labelSpeakers && !this.labelsUnavailableReason && !stalledLabels;
+    const startedAt = Date.now();
+    const prompt = this.retriedByHand.delete(id);
+    let deadlinePassed = false;
     try {
       if (this.disposed) return;
       const result = await new Promise<Transcription>((resolve, reject) => {
         const stalls = this.stalls.get(id) || 0;
         const deadline = setTimeout(
           () => {
+            deadlinePassed = true;
             this.stalls.set(id, stalls + 1);
             controller.abort();
           },
           UPLOAD_DEADLINE_MS * (stalls + 1),
         );
         controller.signal.addEventListener('abort', () => reject(new Error(stalledText)), { once: true });
-        const labels = record.labelSpeakers && !this.labelsUnavailableReason;
         const { knownSpeakers, speakerSamplesRefused } = this.speakers;
         this.options
-          .transcribe(record.audio!, labels, controller.signal, labels && !speakerSamplesRefused ? knownSpeakers : [])
+          .transcribe(
+            record.audio!,
+            labels,
+            controller.signal,
+            labels && !speakerSamplesRefused ? knownSpeakers : [],
+            prompt,
+          )
           .then(resolve, reject)
           .finally(() => clearTimeout(deadline));
       }).finally(() => {
         this.uploading = null;
       });
       if (this.disposed) return;
-      if (result.labelsUnavailableReason) this.labelsUnavailableReason = result.labelsUnavailableReason;
+      // One refusal may be this chunk's own audio, which is then transcribed without labels; two in a row turn
+      // labels off for the recording, until the host turns them back on.
+      if (labels) this.labelRefusals = result.labelsUnavailableReason ? this.labelRefusals + 1 : 0;
+      if (result.labelsUnavailableReason && this.labelRefusals >= 2)
+        this.labelsUnavailableReason = result.labelsUnavailableReason;
       const named = result.speakerTurns?.length ? await this.nameSpeakers(record.audio!, result) : null;
       if (this.disposed) return;
+      // Words without a speaker are in no one's code. Labels off for the whole recording say so on their own.
+      const speakersDropped =
+        record.labelSpeakers &&
+        !this.labelsUnavailableReason &&
+        Boolean(String(result.text || '').trim()) &&
+        !result.speakerTurns?.length;
       const complete: RecordingChunk = {
         scope: record.scope,
         labelSpeakers: record.labelSpeakers,
@@ -486,6 +520,8 @@ export class RecordingChunkQueue {
           text: String(result.text || '').trim(),
           speakerTurns: named?.turns ?? result.speakerTurns,
           ...(named?.renumbered ? { speakersRenumbered: true } : {}),
+          ...(named?.oneOff.length ? { oneOffSpeakers: named.oneOff } : {}),
+          ...(speakersDropped ? { speakersDropped: true } : {}),
           error: undefined,
           completedAt: Date.now(),
         },
@@ -502,6 +538,8 @@ export class RecordingChunkQueue {
       if (this.disposed) return;
       const status = error && typeof error === 'object' && 'status' in error ? Number(error.status) : 0;
       const retry = !(status >= 400 && status < 500 && status !== 408 && status !== 429);
+      if (retry && !deadlinePassed && Date.now() - startedAt >= LONG_ATTEMPT_MS)
+        this.stalls.set(id, (this.stalls.get(id) || 0) + 1);
       record.segment = { ...record.segment, status: retry ? 'retrying' : 'failed', error: failureText(error) };
       this.records.set(id, record);
       if (!retry) await this.save(record);
@@ -519,7 +557,9 @@ export class RecordingChunkQueue {
   }
   /**
    * Names a chunk's voices Person 1, Person 2… Up to four voices first heard here join the known speakers with
-   * a sample of their longest turn, which later chunks send so the model gives them the same names.
+   * a sample of their longest turn, which later chunks send so the model gives them the same names. A number is
+   * never reused, even after the samples are forgotten: new voices are numbered after every Person in the
+   * transcript, so one label never holds two people's words.
    */
   private async nameSpeakers(audio: Blob, { speakerTurns = [], speakerSamplesRefused }: Transcription) {
     if (speakerSamplesRefused) this.saveSpeakers({ ...this.speakers, speakerSamplesRefused: true });
@@ -534,10 +574,15 @@ export class RecordingChunkQueue {
         return sample ? [{ label, sample }] : [];
       })
       .slice(0, room);
-    const { turns, added } = nameSpeakerTurns(
+    const highest = Math.max(
+      0,
+      ...this.segments.flatMap((segment) => (segment.speakerTurns || []).map((turn) => personNumber(turn.speaker))),
+    );
+    const { turns, added, oneOff } = nameSpeakerTurns(
       plan,
       known,
       sampled.map(({ label }) => label),
+      highest + 1,
     );
     // A closed recorder leaves this chunk to upload again when it reopens, sampling its voices then.
     if (added.length && !this.disposed)
@@ -545,7 +590,12 @@ export class RecordingChunkQueue {
         ...this.speakers,
         knownSpeakers: [...knownSpeakers, ...added.map((name, index) => ({ name, sample: sampled[index].sample }))],
       });
-    return { turns, renumbered: plan.isolated };
+    // Only the names that still label a line after odd labels joined their neighbours.
+    return {
+      turns,
+      renumbered: plan.isolated,
+      oneOff: oneOff.filter((name) => turns.some((turn) => turn.speaker === name)),
+    };
   }
   private sampleVoices(audio: Blob, voices: Array<{ start: number; end: number }>) {
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -556,6 +606,21 @@ export class RecordingChunkQueue {
         timer = setTimeout(() => resolve([]), SAMPLE_WAIT_MS);
       }),
     ]).finally(() => clearTimeout(timer));
+  }
+  /** The host turns labels back on after they went off: later chunks ask for them again. */
+  restoreSpeakerLabels() {
+    if (!this.labelsUnavailableReason) return;
+    this.labelsUnavailableReason = '';
+    this.labelRefusals = 0;
+    // Kept with the latest chunk, which is what a reload reads.
+    const latest = this.segments.filter((segment) => segment.status === 'complete').pop();
+    const record = latest && this.records.get(latest.id);
+    if (record?.labelsUnavailableReason) {
+      const cleared = { ...record, labelsUnavailableReason: '' };
+      this.records.set(record.segment.id, cleared);
+      void this.save(cleared);
+    }
+    this.changed();
   }
   /** Back online: a request sent before the outage may never answer, so start it again now. */
   async reconnect() {
@@ -584,6 +649,7 @@ export class RecordingChunkQueue {
         record.audio &&
         (record.segment.status === 'retrying' || (Boolean(id) && record.segment.status === 'failed'))
       ) {
+        if (id) this.retriedByHand.add(id);
         this.attempts.delete(record.segment.id);
         record.segment = { ...record.segment, status: 'queued', error: undefined };
       }
@@ -650,6 +716,7 @@ export class RecordingChunkQueue {
     this.hiddenPeriods = [];
     this.speakers = { knownSpeakers: [], speakerSamplesRefused: false };
     this.labelsUnavailableReason = '';
+    this.labelRefusals = 0;
     this.storageError = '';
     this.changed();
   }

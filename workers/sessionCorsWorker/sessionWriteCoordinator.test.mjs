@@ -2881,6 +2881,9 @@ for (const target of [{}, { storageId: receiptRef.id }, { createdAt: new Date(10
   });
 }
 
+// Receipts only; a person's stored-answer counts live beside them and never expire.
+const receiptEntries = (store) => [...store].filter(([key]) => key.startsWith('upload-receipt-v1:'));
+
 test('response upload receipts reserve atomically, replay settled writes and reject digest conflicts', async () => {
   const { state, store } = createTransactionalState();
   const coordinator = new SessionWriteCoordinator(state, { TOKEN_HMAC_SECRET: 'synthetic-receipt-secret' }, { now: () => 1_000 });
@@ -2897,9 +2900,9 @@ test('response upload receipts reserve atomically, replay settled writes and rej
   const conflict = await coordinator.fetch(receiptRequest('reserve', { ...payload, payloadDigest: 'b'.repeat(64) }));
   assert.equal(conflict.status, 409);
   assert.equal((await conflict.json()).reason, 'upload_request_conflict');
-  assert.equal(store.size, 1);
-  assert.notEqual([...store.values()][0].payloadDigest, payload.payloadDigest);
-  assert.match([...store.keys()][0], /^upload-receipt-v1:[a-f0-9]{64}$/);
+  assert.equal(receiptEntries(store).length, 1);
+  assert.notEqual(receiptEntries(store)[0][1].payloadDigest, payload.payloadDigest);
+  assert.match(receiptEntries(store)[0][0], /^upload-receipt-v1:[a-f0-9]{64}$/);
   assert.equal(JSON.stringify([...store]).includes(payload.requestId), false);
   assert.equal(JSON.stringify([...store]).includes(payload.payloadDigest), false);
 });
@@ -2929,13 +2932,13 @@ test('upload receipt writes prune the oldest settlements and expire them after s
   const payload = { requestId: 'new', payloadDigest: 'b'.repeat(64), storageId: receiptRef.id, createdAt: new Date(1000).toISOString() };
   const reservation = await (await coordinator.fetch(receiptRequest('reserve', payload))).json();
   await coordinator.fetch(receiptRequest('settle', { requestId: 'new', attemptId: reservation.attemptId, storageRef: receiptRef }));
-  assert.equal(store.size, 2000);
+  assert.equal(receiptEntries(store).length, 2000);
   assert.equal(store.has('upload-receipt-v1:old-0'), false);
   assert.equal(store.has('upload-receipt-v1:old-1'), true);
   now += 7 * 24 * 60 * 60 * 1000 + 1;
   const expired = await (await coordinator.fetch(receiptRequest('reserve', payload))).json();
   assert.equal(expired.kind, 'execute');
-  assert.equal(store.size, 1);
+  assert.equal(receiptEntries(store).length, 1);
 });
 
 
@@ -2980,7 +2983,9 @@ test('receipt alarms remove expired pending and settled entries without another 
   assert.equal(alarmAt, now + 7 * 24 * 60 * 60 * 1000);
   now = alarmAt;
   await new SessionWriteCoordinator(state, env, { now: () => now }).alarm();
-  assert.equal(store.size, 0);
+  assert.equal(receiptEntries(store).length, 0);
+  // The stored answer still counts toward the person's limit after its receipt expires.
+  assert.deepEqual([...store].filter(([key]) => /^upload-count-v1:[a-f0-9]{64}:total$/.test(key)).map(([, count]) => count), [1]);
 });
 
 test('receipt identifiers depend on the deployment secret and fail closed without it', async () => {

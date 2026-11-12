@@ -45,9 +45,3 @@ export const QUESTION_TYPES = Object.freeze({
   MULTICHOICE: 'multichoice',
   QUADRATIC: 'quadratic',
 });
-
-export const DEFAULT_RATING_SCALE = Object.freeze({
-  min: 0,
-  max: 10,
-  step: 1,
-});

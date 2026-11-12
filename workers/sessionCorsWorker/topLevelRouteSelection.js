@@ -22,6 +22,8 @@ export const resolveTopLevelRouteSelection = ({
     return { kind: 'auth-login' };
   }
 
+  if (path === '/auth/logout' && method === 'POST') return { kind: 'auth-logout' };
+
   if (path === '/arweave/upload' && method === 'POST') {
     return {
       kind: 'arweave-upload',
@@ -100,7 +102,8 @@ export const resolveTopLevelRouteSelection = ({
     !hasTrimmedAuthorization &&
     (
       (path === '/storage/read' && (method === 'GET' || method === 'POST')) ||
-      (path === '/storage/list' && (method === 'GET' || method === 'POST'))
+      (path === '/storage/list' && (method === 'GET' || method === 'POST')) ||
+      (path === '/storage/read-batch' && method === 'POST')
     )
   ) {
     return {

@@ -58,9 +58,6 @@ describe('Chipotle policy parity across client, Worker and Lit action', () => {
       const wrapped = clientPolicy.buildLitChipotleWrappedPlaintext({ cekHex: CEK_HEX, policy });
       expect(workerPolicy.buildLitChipotleWrappedPlaintext({ cekHex: CEK_HEX, policy })).toEqual(wrapped);
       const message = JSON.stringify(wrapped);
-      expect(workerPolicy.parseLitChipotleWrappedPlaintext(message)).toEqual(
-        clientPolicy.parseLitChipotleWrappedPlaintext(message),
-      );
       expect(actionPolicy.parseWrappedPlaintext(message)).toEqual({
         cekHex: wrapped.cekHex,
         policyFingerprint: fingerprint,

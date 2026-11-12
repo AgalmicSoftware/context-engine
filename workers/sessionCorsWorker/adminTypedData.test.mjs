@@ -142,7 +142,7 @@ test('an ethers-v5 client signature verifies in the ethers-v6 Worker and rejects
     ...params,
     signature,
     expectedAddress: wallet.address,
-    deps: { now: () => 1_900_000_000 },
+    deps: { now: () => 1_999_999_700 },
   });
   assert.equal(verified.valid, true);
   assert.equal(verified.address.toLowerCase(), wallet.address.toLowerCase());
@@ -158,7 +158,7 @@ test('an ethers-v5 client signature verifies in the ethers-v6 Worker and rejects
     ...invalidParams,
     signature: invalidSignature,
     expectedAddress: wallet.address,
-    deps: { now: () => 1_900_000_000 },
+    deps: { now: () => 1_999_999_700 },
   }), {
     valid: false,
     error: 'Invalid admin action expiration.',

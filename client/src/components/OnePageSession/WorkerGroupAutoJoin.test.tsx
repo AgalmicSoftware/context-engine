@@ -112,7 +112,10 @@ describe('WorkerGroupAutoJoin', () => {
     expect(new Headers(init?.headers).get('Authorization')).toBe('Bearer test-token');
     expect(window.location.search).toBe('?view=questions');
     expect(window.location.hash).toBe('#questions');
-    expect(window.history.state).toEqual({ keep: true });
+    expect(window.history.state).toEqual({
+      keep: true,
+      ceLinkedWorkerGroup: { sessionSlug: 'alpha', groupId: group.groupId },
+    });
     rerender(<WorkerGroupAutoJoin {...props} sessionConfig={{ ...config }} />);
     await tick(10000);
     expect(joins()).toHaveLength(1);
@@ -194,7 +197,10 @@ describe('WorkerGroupAutoJoin', () => {
       '?mode=interview&src=partner&groups=EDDY-2026&worker=https%3A%2F%2Fworker.example',
     );
     expect(window.location.hash).toBe('#prefill=abc');
-    expect(window.history.state).toEqual({ keep: true });
+    expect(window.history.state).toEqual({
+      keep: true,
+      ceLinkedWorkerGroup: { sessionSlug: 'alpha', groupId: group.groupId },
+    });
   });
 
   it.each(['unreachable', 'identity-mismatch'])(

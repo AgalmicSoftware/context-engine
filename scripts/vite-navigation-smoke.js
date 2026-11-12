@@ -59,11 +59,6 @@ const DEMO_READY_WORKER_SOURCE_SLUG = 'demo-sh';
 const DEMO_READY_WORKER_CONFIG = demoSessions[DEMO_READY_WORKER_SOURCE_SLUG] || {};
 const DEMO_READY_WORKER_ORIGIN = normalizeBaseUrl(DEMO_READY_WORKER_CONFIG.corsWorkerUrl || '');
 const DEMO_STORAGE_LIST_FIXTURE_RESOURCES = new Set(['questions', 'responses', 'surveys']);
-const LOCAL_SMOKE_FONT_URLS = new Set([
-  'https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300..800;1,300..800&family=Poppins:wght@400;600;700;800&display=swap',
-  'https://fonts.googleapis.com/css?family=Poppins:200,300,400,600,700,800',
-  'https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300;0,500;1,500;1,600&display=swap',
-]);
 const LOCAL_SMOKE_IMAGE_URLS = new Set([
   'https://www.cosmos-institute.org/media/logo.svg',
   'https://cosmosaccessmemory.b-cdn.net/1777891088662-oaript.png',
@@ -146,9 +141,6 @@ async function installLocalSmokeFixtureRoutes(page, baseUrl, route = '') {
     }
     if (request.method() === 'GET' && request.url() === 'https://demo-worker-030226.agalmic.workers.dev/capabilities?slug=') {
       return requestRoute.fulfill({ json: { type: 'ce_worker_capabilities', version: 1, apiVersion: 1, bundle: null, features: [] } });
-    }
-    if (request.method() === 'GET' && LOCAL_SMOKE_FONT_URLS.has(request.url())) {
-      return requestRoute.fulfill({ contentType: 'text/css', body: '/* Use installed fallback fonts in local smoke. */' });
     }
     if (request.method() === 'GET' && LOCAL_SMOKE_IMAGE_URLS.has(request.url())) {
       return requestRoute.fulfill({ contentType: 'image/png', path: path.join(__dirname, '../client/public/favicon-32x32.png') });

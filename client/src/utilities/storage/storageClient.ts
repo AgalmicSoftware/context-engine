@@ -3,6 +3,7 @@
 import { arweaveClient } from '../arweave/arweaveClient.js';
 import { getCorsProxyUrlOrThrow } from '../worker/corsProxy.js';
 import { fetchWorkerWithAuth } from '../worker/workerAuth.js';
+import { shouldFallbackToAuthenticatedFlow } from '../worker/workerAuthFallbackPolicy.js';
 import { defaultStrictAllowDemoFallback } from '../worker/workerSessionResolution.js';
 import { describeWorkerUnavailable, readWorkerCapabilities } from '../worker/workerCapabilities';
 import { toStr } from '../shared/primitives.js';
@@ -391,6 +392,95 @@ export const readSessionStorageBlob = async ({
     throw new Error(body?.error || `Storage read failed (${response.status}).`);
   }
   return response;
+};
+
+export const STORAGE_READ_BATCH_MAX_IDS = 100;
+
+// A batch answers 200 and refuses each item on its own. When the signed-out
+// try has an item refused for want of a sign-in, the batch is asked again
+// signed in, under the rule a refused single read follows.
+const batchNeedsSignIn = async (reply: Response): Promise<boolean> => {
+  const body = (await reply.json().catch(() => null)) as UnknownRecord | null;
+  for (const item of Array.isArray(body?.items) ? body.items : []) {
+    const { status, error, reason } = (item || {}) as UnknownRecord;
+    if (status !== 401 && status !== 403) continue;
+    if (await shouldFallbackToAuthenticatedFlow(new Response(JSON.stringify({ error, reason }), { status })))
+      return true;
+  }
+  return false;
+};
+
+/**
+ * Reads up to 100 stored JSON payloads in one request (Workers that advertise
+ * `storage_read_batch_v1`). Returns each payload in the order asked, or null
+ * when it isn't JSON; an item the Worker refuses fails the call, as a single read would.
+ * An item the batch won't return as text is read on its own.
+ */
+export const readSessionStorageBatch = async ({
+  ids,
+  sessionSlug = '',
+  sessionConfig = null,
+  context = null,
+  workerUrl = '',
+  signal,
+  preferAnonymous = true,
+}: Omit<ReadSessionStorageBlobOptions, 'storageRef' | 'prompt'> & { ids: string[] }): Promise<unknown[]> => {
+  if (!ids.length || ids.length > STORAGE_READ_BATCH_MAX_IDS) throw new Error('A batch read takes 1 to 100 ids.');
+  const baseUrl = await resolveStorageWorkerUrl({ sessionSlug, sessionConfig, context, workerUrl });
+  const response = await fetchWorkerWithAuth(
+    `${baseUrl}/storage/read-batch`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids }),
+      ...(signal ? { signal } : {}),
+    },
+    {
+      sessionSlug,
+      sessionConfig,
+      context,
+      workerUrl: baseUrl,
+      allowDemoFallback: defaultStrictAllowDemoFallback(),
+      preferAnonymous,
+      anonymousRefused: batchNeedsSignIn,
+    },
+  );
+  const body = (await response.json().catch(() => ({}))) as UnknownRecord;
+  if (!response.ok) throw new Error((body?.error as string) || `Storage read failed (${response.status}).`);
+  const items = new Map(
+    (Array.isArray(body.items) ? body.items : [])
+      .filter((item): item is UnknownRecord => !!item && typeof item === 'object')
+      .map((item) => [toStr(item.id), item]),
+  );
+  const parse = (text: string) => {
+    try {
+      return JSON.parse(text);
+    } catch {
+      return null;
+    }
+  };
+  return Promise.all(
+    ids.map(async (id) => {
+      const item = items.get(id);
+      // An item stored without a text type, or left out of a full batch, is read on its own.
+      if (item?.status === 415 || item?.status === 413) {
+        const single = await readSessionStorageBlob({
+          storageRef: { id, backend: STORAGE_BACKENDS.CLOUDFLARE },
+          sessionSlug,
+          sessionConfig,
+          context,
+          workerUrl: baseUrl,
+          signal,
+          preferAnonymous,
+        });
+        return parse(await single.text());
+      }
+      if (!item || item.status !== 200) {
+        throw new Error(toStr(item?.error) || `Storage read failed (${toStr(item?.status) || 'missing'}).`);
+      }
+      return parse(toStr(item.text));
+    }),
+  );
 };
 
 export const listSessionStorageRefsPage = async ({

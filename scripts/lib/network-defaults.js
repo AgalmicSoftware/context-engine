@@ -2,12 +2,10 @@
 
 const fs = require('fs');
 const path = require('path');
-const vm = require('vm');
 
 const { ROOT, toInt, toStr } = require('./common');
 
 const APP_CONFIG_PATH = path.join(ROOT, 'client', 'src', 'variables', 'appConfig.js');
-const CHAINS_PATH = path.join(ROOT, 'client', 'src', 'variables', 'chains.js');
 const CONTRACTS_CONFIG_PATH = path.join(ROOT, 'client', 'src', 'variables', 'contracts.json');
 const LOCAL_CONTRACTS_PATH = path.join(ROOT, 'client', 'src', 'variables', 'local-contracts.json');
 const RPC_DEFAULTS_PATH = path.join(ROOT, 'client', 'src', 'variables', 'rpcDefaults.js');
@@ -204,78 +202,11 @@ const parseExportedString = (source, name) => {
   return envFallbackMatch ? toStr(envFallbackMatch[1]).trim() : '';
 };
 
-const parseExportedObject = (source, name) => {
-  const src = toStr(source);
-  if (!src) return null;
-
-  const exportRe = new RegExp(`export\\s+const\\s+${name}\\s*=\\s*`, 'm');
-  const exportMatch = exportRe.exec(src);
-  if (!exportMatch) return null;
-
-  const startIdx = src.indexOf('{', exportMatch.index + exportMatch[0].length);
-  if (startIdx < 0) return null;
-
-  let depth = 0;
-  let inSingle = false;
-  let inDouble = false;
-  let inTemplate = false;
-  let escaped = false;
-  let endIdx = -1;
-
-  for (let i = startIdx; i < src.length; i += 1) {
-    const ch = src[i];
-
-    if (escaped) {
-      escaped = false;
-      continue;
-    }
-    if (ch === '\\') {
-      escaped = true;
-      continue;
-    }
-
-    if (!inDouble && !inTemplate && ch === '\'') {
-      inSingle = !inSingle;
-      continue;
-    }
-    if (!inSingle && !inTemplate && ch === '"') {
-      inDouble = !inDouble;
-      continue;
-    }
-    if (!inSingle && !inDouble && ch === '`') {
-      inTemplate = !inTemplate;
-      continue;
-    }
-    if (inSingle || inDouble || inTemplate) continue;
-
-    if (ch === '{') depth += 1;
-    else if (ch === '}') {
-      depth -= 1;
-      if (depth === 0) {
-        endIdx = i;
-        break;
-      }
-    }
-  }
-
-  if (endIdx < 0) return null;
-  const objectLiteral = src.slice(startIdx, endIdx + 1).trim();
-  if (!objectLiteral) return null;
-
-  try {
-    return vm.runInNewContext(`(${objectLiteral})`, Object.create(null), { timeout: 200 });
-  } catch (_) {
-    return null;
-  }
-};
-
 const loadClientDefaults = () => {
   if (cache) return cache;
 
   let appConfigText = APP_CONFIG_SOURCE;
-  let chainsText = '';
   const contractsConfig = readJsonFile(CONTRACTS_CONFIG_PATH, {});
-  chainsText = readTextFileFollowingTsShim(CHAINS_PATH);
 
   if (!appConfigText) {
     appConfigText = readTextFileFollowingTsShim(APP_CONFIG_PATH);
@@ -283,20 +214,14 @@ const loadClientDefaults = () => {
 
   const defaultChainId = parseDefaultChainIdFromAppConfig(appConfigText) || FALLBACKS.defaultChainId;
   const defaultWorkerUrl = parseExportedString(appConfigText, 'CLOUDFLARE_CORS_WORKER_URL');
-  const parsedRegistryByChain = parseExportedObject(chainsText, 'SESSION_REGISTRY_ADDRESSES');
   const localContracts = readJsonFile(LOCAL_CONTRACTS_PATH, {});
   const localChainId = toInt(localContracts.chainId, 0);
   const localRegistryAddress = toStr(localContracts.SessionRegistry).trim();
-  const registryByChain = (
-    parsedRegistryByChain && Object.keys(parsedRegistryByChain).length > 0
-      ? parsedRegistryByChain
-      : {
-          ...FALLBACKS.registryByChain,
-          ...normalizeNumericKeyedObject(contractsConfig.sessionRegistryAddresses),
-          ...(localChainId && localRegistryAddress ? { [localChainId]: localRegistryAddress } : {}),
-        }
-  );
-  const parsedContractsByChain = parseExportedObject(chainsText, 'SESSION_CONTRACTS_BY_CHAIN');
+  const registryByChain = {
+    ...FALLBACKS.registryByChain,
+    ...normalizeNumericKeyedObject(contractsConfig.sessionRegistryAddresses),
+    ...(localChainId && localRegistryAddress ? { [localChainId]: localRegistryAddress } : {}),
+  };
   const localContractsByChain = (
     localChainId
       ? {
@@ -311,14 +236,10 @@ const loadClientDefaults = () => {
         }
       : {}
   );
-  const contractsByChain = (
-    parsedContractsByChain && Object.keys(parsedContractsByChain).length > 0
-      ? parsedContractsByChain
-      : {
-          ...normalizeNumericKeyedObject(contractsConfig.sessionContractsByChain),
-          ...localContractsByChain,
-        }
-  );
+  const contractsByChain = {
+    ...normalizeNumericKeyedObject(contractsConfig.sessionContractsByChain),
+    ...localContractsByChain,
+  };
 
   const sbtFactoryByChain = { ...FALLBACKS.sbtFactoryByChain };
   Object.keys(contractsByChain || {}).forEach((key) => {
@@ -412,7 +333,6 @@ const resolveChainDefaults = ({ args = {}, env = process.env } = {}) => {
 };
 
 module.exports = {
-  CHAINS_PATH,
   FALLBACKS,
   APP_CONFIG_PATH,
   canUseLocalDevFunder,

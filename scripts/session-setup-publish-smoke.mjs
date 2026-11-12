@@ -27,13 +27,26 @@ const adminFixture = passkeyFixture('admin');
 const admin = adminFixture.wallet;
 const kv = () => {
   const values = new Map();
+  const metadata = new Map();
   return {
     values,
-    get: async (key) => values.get(key) ?? null,
-    put: async (key, value) => values.set(key, value),
-    delete: async (key) => values.delete(key),
+    // Cloudflare's bulk get: up to 100 keys as one operation, answered as a Map.
+    get: async (key) =>
+      Array.isArray(key) ? new Map(key.map((name) => [name, values.get(name) ?? null])) : (values.get(key) ?? null),
+    put: async (key, value, options) => {
+      values.set(key, value);
+      if (options?.metadata) metadata.set(key, options.metadata);
+      else metadata.delete(key);
+    },
+    delete: async (key) => {
+      metadata.delete(key);
+      return values.delete(key);
+    },
+    // Like Cloudflare, a listed key carries the metadata it was stored with.
     list: async ({ prefix = '' } = {}) => ({
-      keys: [...values.keys()].filter((key) => key.startsWith(prefix)).map((name) => ({ name })),
+      keys: [...values.keys()]
+        .filter((key) => key.startsWith(prefix))
+        .map((name) => ({ name, ...(metadata.has(name) ? { metadata: metadata.get(name) } : {}) })),
       list_complete: true,
     }),
   };

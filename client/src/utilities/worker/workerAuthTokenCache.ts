@@ -250,6 +250,24 @@ export const clearAllTokenCaches = (): void => {
   forEachTabTokenKey((key) => tabStorage()?.removeItem(key));
 };
 
+/** This page's unexpired sign-ins, so a sign-out can end each one at its Worker. */
+export const listHeldTokens = (
+  nowSeconds = Math.floor(Date.now() / 1000),
+): Array<{ sessionSlug: string; token: string; workerUrl: string }> => {
+  const keys = new Set(tokenMemoryCache.keys());
+  forEachTabTokenKey((key) => keys.add(key));
+  const held: Array<{ sessionSlug: string; token: string; workerUrl: string }> = [];
+  keys.forEach((key) => {
+    const record = readTokenCache(key) as TokenCacheEntry | null;
+    const token = toStr(record?.token).trim();
+    const workerUrl = normalizeWorkerUrl(record?.workerUrl);
+    if (token && workerUrl && Number(record?.expiresAt || 0) > nowSeconds) {
+      held.push({ workerUrl, sessionSlug: normalizeSessionSlug(record?.sessionSlug), token });
+    }
+  });
+  return held;
+};
+
 /** The page has learned who is signed in, as after a reload: this tab's saved sign-ins for them still count. */
 export const adoptTokenCaches = (address: unknown): void => {
   if (typeof window === 'undefined') return;

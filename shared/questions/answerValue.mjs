@@ -24,7 +24,7 @@ const matchOption = (options, value) => {
 };
 
 /** Checks an answer against its question and returns the value to store, or why it can't be. */
-export const normalizeAnswerValue = (question = {}, value) => {
+export const normalizeAnswerValue = (question = {}, value, { maxFreeformLength = MAX_FREEFORM_LENGTH } = {}) => {
   switch (question.type) {
     case 'binary': {
       const match = BINARY_ANSWERS.find((answer) => answer.toLowerCase() === trim(value).toLowerCase());
@@ -64,7 +64,7 @@ export const normalizeAnswerValue = (question = {}, value) => {
     case 'freeform': {
       const text = trim(value);
       if (!text) return fail('Freeform answers must be non-empty text.');
-      if (text.length > MAX_FREEFORM_LENGTH) return fail(`Freeform answers must be ${MAX_FREEFORM_LENGTH} characters or fewer.`);
+      if (text.length > maxFreeformLength) return fail(`Freeform answers must be ${maxFreeformLength} characters or fewer.`);
       return { ok: true, value: text };
     }
     default:

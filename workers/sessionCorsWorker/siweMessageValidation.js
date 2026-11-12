@@ -4,24 +4,14 @@ import {
   ADMIN_ACTION_TYPES,
 } from './adminTypedData.mjs';
 import { toStr } from './stringCoercion.js';
+import { LOCAL_DEV_ORIGINS, SITE_ORIGINS } from '../../shared/workerTrustedOrigins.mjs';
 
 export {
   ADMIN_ACTION_DOMAIN,
   ADMIN_ACTION_TYPES,
 };
 
-export const TRUSTED_ORIGINS = Object.freeze([
-  'https://contextengine.sh',
-  'https://www.contextengine.sh',
-  'https://contextengine.xyz',
-  'https://www.contextengine.xyz',
-  'http://localhost:3000',
-  'http://127.0.0.1:3000',
-  'http://localhost:3001',
-  'http://127.0.0.1:3001',
-  'http://localhost:7391',
-  'http://127.0.0.1:7391',
-]);
+export const TRUSTED_ORIGINS = SITE_ORIGINS;
 
 
 const normalizeOrigin = (value) => {
@@ -66,16 +56,14 @@ const resolveConfiguredAdminOrigins = (...configs) => {
   return out;
 };
 
+// The site's origins, or the deployment's own list; local dev servers only when the Worker opts in.
 export const resolveTrustedAdminOrigins = (env) => {
-  const raw = toStr(env?.ADMIN_TRUSTED_ORIGINS).trim();
-  if (!raw) return [...TRUSTED_ORIGINS];
-
-  const parsed = raw
+  const parsed = toStr(env?.ADMIN_TRUSTED_ORIGINS)
     .split(/[\s,]+/)
     .map((entry) => normalizeOrigin(entry))
     .filter(Boolean);
-
-  return parsed.length ? parsed : [...TRUSTED_ORIGINS];
+  const local = toStr(env?.CE_ALLOW_LOCAL_ORIGINS).trim().toLowerCase() === 'true' ? LOCAL_DEV_ORIGINS : [];
+  return [...new Set([...(parsed.length ? parsed : TRUSTED_ORIGINS), ...local])];
 };
 
 export const resolveTrustedLoginOrigins = ({

@@ -1,4 +1,6 @@
+import { render, screen } from '@testing-library/react';
 import {
+  renderListedWorkerNotice,
   renderWorkerCanonicalRouteBootstrap,
   resolveMainSiteAdminWorkerRoute,
   resolveMainSiteGroupWorkerRoute,
@@ -207,10 +209,40 @@ describe('workerCanonicalRouteResolution', () => {
       workerOrigin: FIXTURE_WORKER,
       expectedSessionId: FIXTURE_SESSION_ID,
     });
-    // A link naming another Worker chose it; the list says nothing about that Worker.
-    expect(
-      resolveMainSiteGroupWorkerRoute({ ...groupRoute, searchStr: '?worker=https%3A%2F%2Fother.example' }),
-    ).not.toHaveProperty('expectedSessionId');
+    // A link naming another Worker chose it; the list says nothing about that Worker, so it opens marked.
+    const otherWorker = resolveMainSiteGroupWorkerRoute({
+      ...groupRoute,
+      searchStr: '?worker=https%3A%2F%2Fother.example',
+    });
+    expect(otherWorker).not.toHaveProperty('expectedSessionId');
+    expect(otherWorker).toMatchObject({ kind: 'bootstrap', listedWorkerOrigin: FIXTURE_WORKER });
+    expect(resolveMainSiteGroupWorkerRoute(groupRoute)).not.toHaveProperty('listedWorkerOrigin');
+  });
+
+  it('opens a listed session’s name from another Worker with a notice linking to the listed one', () => {
+    const route = resolveMainSiteSessionRouteForRender({
+      sessionTokenRaw: FIXTURE_SLUG,
+      searchStr: '?worker=https%3A%2F%2Fother.example',
+      controller,
+      resolveSessionSlugFromPathToken: (token) => token,
+    });
+    expect(route).toMatchObject({ kind: 'bootstrap', workerOrigin: 'https://other.example' });
+    render(renderListedWorkerNotice(route)!);
+    expect(screen.getByRole('status')).toHaveTextContent(
+      `This link opens “${FIXTURE_SLUG}” from other.example, not the Worker this site lists for it.`,
+    );
+    expect(screen.getByRole('link', { name: 'Open the listed session' })).toHaveAttribute(
+      'href',
+      expect.stringMatching(new RegExp(`/session/${FIXTURE_SLUG}$`)),
+    );
+    // Its own link shows no notice.
+    const listed = resolveMainSiteSessionRouteForRender({
+      sessionTokenRaw: FIXTURE_SLUG,
+      searchStr: `?worker=${encodeURIComponent(FIXTURE_WORKER)}`,
+      controller,
+      resolveSessionSlugFromPathToken: (token) => token,
+    });
+    expect(renderListedWorkerNotice(listed)).toBeNull();
   });
 
   it('opens the group-recording QR link on a device that has never seen the session', () => {

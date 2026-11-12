@@ -44,13 +44,14 @@ it('leads the voice brief and personal AI prompt with newest unanswered question
   const kickoff = buildExternalInterviewKickoff({
     workerUrl: 'https://worker.example',
     sessionSlug: 'workshop',
+    sessionUrl: 'https://app.example/session/workshop',
     questionPriority: priority,
   });
   expect(kickoff).toContain('Unanswered question IDs, newest first: ["room-newest","room-first"]');
   expect(kickoff).toContain('Already answered IDs, only for changes I request: ["opening"]');
   expect(kickoff).not.toContain('Private prior answer');
   expect(kickoff.split('Fetch this URL:\n')[1].split('\n')[0]).toBe(
-    'https://worker.example/agent/interview-catalog?slug=workshop',
+    'https://worker.example/agent/interview-catalog?slug=workshop&sessionUrl=https%3A%2F%2Fapp.example%2Fsession%2Fworkshop',
   );
   expect(await hashInterviewQuestions(sorted)).toBe(await hashInterviewQuestions(normalizeInterviewQuestions(pool)));
   expect(INTERVIEW_PROMPT_VERSION).toBe('ce-interview-brief-v6');

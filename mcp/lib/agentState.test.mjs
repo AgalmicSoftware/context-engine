@@ -228,7 +228,8 @@ test('reads settings, rejecting unknown CE_MCP_* names and relative state paths'
   assert.throws(() => readConfig({ CE_MCP_DISPLAY_NAME: 'x'.repeat(81) }), /80 characters/);
   assert.throws(() => readConfig({ CE_MCP_RPC_URL: 'http://rpc.example' }), /https/);
   assert.equal(readConfig({ CE_MCP_RPC_URL: 'http://127.0.0.1:8545', CE_MCP_ALLOW_LOCAL_WORKERS: '1' }).rpcUrl, 'http://127.0.0.1:8545/');
-  assert.deepEqual(readConfig({}).trustedAppOrigins.slice(0, 2), ['https://contextengine.sh', 'https://www.contextengine.sh']);
+  // Only the site's own origins: the retired .xyz site and local servers are not trusted by default.
+  assert.deepEqual(readConfig({}).trustedAppOrigins, ['https://contextengine.sh', 'https://www.contextengine.sh']);
 });
 
 test('a damaged key file is reported without echoing any key material', { skip: process.platform === 'win32' }, async () => {

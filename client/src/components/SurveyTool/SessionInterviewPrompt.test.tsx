@@ -5,7 +5,11 @@ import { buildExternalInterviewKickoff } from './sessionInterview';
 
 describe('SessionInterviewPrompt', () => {
   it('bolds the confidence instruction in the real kickoff prompt', () => {
-    const prompt = buildExternalInterviewKickoff({ workerUrl: 'https://worker.example', sessionSlug: 'demo' });
+    const prompt = buildExternalInterviewKickoff({
+      workerUrl: 'https://worker.example',
+      sessionSlug: 'demo',
+      sessionUrl: 'https://site.example/session/demo',
+    });
     const { container } = render(<SessionInterviewPrompt prompt={prompt} />);
     const bold = [...container.querySelectorAll('strong')].map((node) => node.textContent);
     expect(bold).toContain('Every response needs confidence (0-1) and evidence.');

@@ -474,9 +474,13 @@ it.each<WorkerGeneration>(['current', 'refuses labels', 'text only'])(
     // From the second chunk on, before and after the reload, every labelled upload carried the first chunk's
     // voice and the model named it, so no chunk numbered its voices on its own.
     const labelled = mockWorker.uploads.filter((upload) => upload.labels);
-    expect(labelled.filter((upload) => upload.chunk > 1).map((upload) => upload.knownSpeakers.join())).toEqual(
-      labelled.filter((upload) => upload.chunk > 1).map(() => 'Person 1'),
-    );
+    if (generation === 'current')
+      expect(labelled.filter((upload) => upload.chunk > 1).map((upload) => upload.knownSpeakers.join())).toEqual(
+        labelled.filter((upload) => upload.chunk > 1).map(() => 'Person 1'),
+      );
+    // A Worker that refuses labels gets asked twice, in case the first refusal was that chunk's audio, and never
+    // again, even after the reload.
+    else expect([...new Set(labelled.map((upload) => upload.chunk))]).toEqual([1, 2]);
     expect(recorder.segments.some((segment) => segment.speakersRenumbered)).toBe(false);
     // Two presses of Record, one before and one after the reload; nothing else opened the microphone.
     expect(getUserMedia).toHaveBeenCalledTimes(2);
@@ -581,9 +585,22 @@ it('imports a ten-minute file as three-minute parts that each upload alone, thro
   expect(mockWorker.uploads[1].settledAt! - mockWorker.uploads[1].sentAt).toBeLessThanOrEqual(120_000);
   // Decoded once, when added: nothing decoded or sent the whole file again.
   expect(FakeOfflineAudioContext.decoded).toBe(1);
+  // These parts give no voice sample, so nothing ties one part's voice to the next: each part's voice gets a new
+  // number, never one already used, for the host to join up.
   expect(view.result.current.transcript).toBe(
-    ['Person 1: Chunk 101 speech.', 'Chunk 102 speech.', 'Chunk 103 speech.', 'Chunk 104 speech.'].join(' '),
+    [
+      'Person 1: Chunk 101 speech.',
+      'Person 2: Chunk 102 speech.',
+      'Person 3: Chunk 103 speech.',
+      'Person 4: Chunk 104 speech.',
+    ].join('\n'),
   );
+  expect(view.result.current.segments.map((segment) => segment.oneOffSpeakers)).toEqual([
+    ['Person 1'],
+    ['Person 2'],
+    ['Person 3'],
+    ['Person 4'],
+  ]);
   // Each part's transcript replaced its audio, on the device and on the page.
   const stored = [...mockStore.records.values()].filter((record) => record.segment.index >= 0);
   expect(stored.map((record) => [record.segment.status, record.audio])).toEqual(Array(4).fill(['complete', undefined]));

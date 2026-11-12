@@ -15,6 +15,7 @@ const cloneValue = (value) => (value === undefined ? undefined : structuredClone
 
 export const createMemoryKv = (seed = {}) => {
   const values = new Map(Object.entries(seed));
+  const metadata = new Map();
   return {
     values,
     async get(key, typeOrOptions) {
@@ -26,10 +27,13 @@ export const createMemoryKv = (seed = {}) => {
       if (type === 'json') return JSON.parse(value);
       return value;
     },
-    async put(key, value) {
+    async put(key, value, options) {
       values.set(key, value);
+      if (options?.metadata) metadata.set(key, structuredClone(options.metadata));
+      else metadata.delete(key);
     },
     async delete(key) {
+      metadata.delete(key);
       return values.delete(key);
     },
     async list({ prefix = '', limit = 1000, cursor = '' } = {}) {
@@ -38,7 +42,7 @@ export const createMemoryKv = (seed = {}) => {
       const selected = names.slice(offset, offset + limit);
       const nextOffset = offset + selected.length;
       return {
-        keys: selected.map((name) => ({ name })),
+        keys: selected.map((name) => (metadata.has(name) ? { name, metadata: structuredClone(metadata.get(name)) } : { name })),
         list_complete: nextOffset >= names.length,
         cursor: nextOffset >= names.length ? '' : String(nextOffset),
       };

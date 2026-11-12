@@ -19,8 +19,12 @@ export type RollingTranscriptSegment = {
   startedAt: number;
   completedAt?: number;
   speakerTurns?: SpeakerTranscriptTurn[];
-  // No voice matched the samples sent, so this chunk numbers its voices on its own.
+  // No voice matched the samples sent, so this chunk's voices have new numbers.
   speakersRenumbered?: boolean;
+  // Voices heard in this chunk only, with no sample to find them again: one may be someone with another number.
+  oneOffSpeakers?: string[];
+  // Its labelled uploads kept stalling, so it was transcribed without labels: its speech is in nobody's part.
+  speakersDropped?: boolean;
   gapBefore?: CaptureGap;
 };
 
@@ -55,27 +59,23 @@ const chunkLines = (segment: RollingTranscriptSegment): TranscriptLine[] => {
 };
 
 /**
- * Chunks in order, each voice's turns as "Person N: …" lines. Speech that the text so far already ends with
- * is dropped from a chunk's start, and a voice that carries on, like plain text and gap markers, stays on
- * the same line.
+ * Chunks in order, each voice's turns as "Person N: …" lines. Speech that the last line already ends with is
+ * dropped from a chunk's first line when both are the same voice (or either is unlabelled): a second person
+ * echoing "I agree" keeps their words. A voice that carries on, like plain text and gap markers, stays on the
+ * same line.
  */
 export const stitchRollingTranscriptSegments = (segments: RollingTranscriptSegment[] = []): string => {
   const lines: TranscriptLine[] = [];
   for (const segment of [...segments].sort((a, b) => a.index - b.index)) {
     if (segment.status !== 'complete' && segment.status !== 'failed') continue;
-    let next = chunkLines(segment);
-    const tail = transcriptOverlapTail(
-      lines.map((line) => line.text).join(' '),
-      next.map((line) => line.text).join(' '),
-      OVERLAP_WORDS,
-    );
-    // Drop the repeated characters, line by line (lines are joined by one space).
-    let repeated = tail == null ? 0 : next.map((line) => line.text).join(' ').length - tail.length;
-    next = next.flatMap((line) => {
-      const text = line.text.slice(repeated).trimStart();
-      repeated = Math.max(0, repeated - line.text.length - 1);
-      return text ? [{ ...line, text }] : [];
-    });
+    const next = chunkLines(segment);
+    const last = lines[lines.length - 1];
+    const first = next[0];
+    if (last && first && (last.speaker === first.speaker || !last.speaker || !first.speaker)) {
+      const tail = transcriptOverlapTail(last.text, first.text, OVERLAP_WORDS);
+      if (tail === '') next.shift();
+      else if (tail != null) next[0] = { ...first, text: tail };
+    }
     for (const line of next) {
       const last = lines[lines.length - 1];
       if (last?.speaker === line.speaker) last.text = joinTranscriptText(last.text, line.text);

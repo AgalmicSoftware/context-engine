@@ -70,8 +70,11 @@ profile. That choice happens separately in `/new`.
 
 ## Session Infrastructure Profiles
 
-`/new` is one page and starts on **Hosted & Fast**. The `Runs on` toggle at the
-top switches to **Trustless & Slower**. **Company-Operated** is planned.
+This section is the one description of the profiles; other documents link
+here. Each session picks its own profile, which decides who controls access and
+where its data lives. `/new` is one page and starts on **Hosted & Fast**. The
+`Runs on` toggle at the top switches to **Trustless & Slower**.
+**Company-Operated** is planned.
 
 ### Hosted & Fast — implemented default
 
@@ -85,9 +88,16 @@ top switches to **Trustless & Slower**. **Company-Operated** is planned.
   own.
 - Setup needs a Cloudflare account, an AI-provider key (OpenAI by default), and
   either a Cloudflare API token, sent once through the deploy helper and never
-  saved, or the token-free dashboard handoff.
-- The passkey-derived EOA supplies signing and admin identity, but publishing
-  this profile does not submit an EVM transaction or require gas.
+  saved, or the token-free dashboard handoff. The helper's operator can see that
+  token, the session secrets sent with it, and the Worker secrets it generates.
+- A real session needs the account on Cloudflare's Workers Paid plan; the free
+  plan's daily KV writes run out after a few hundred answers
+  ([details](session-creation-guide.md#1-cloudflare-account)).
+- The creator's passkey-derived EOA is the admin key: the Worker verifies its
+  signatures and enforces the session's roles and groups. Publishing does not
+  submit an EVM transaction or require gas.
+- The Cloudflare account's operator, and Cloudflare itself, can read the data.
+  Worker encryption (`worker_envelope`) protects it in storage only.
 - EVM contracts, registry/RPC access, Arweave, and Lit are not dependencies of
   the default profile.
 - The current OSS path is bring-your-own-worker; a generally available shared
@@ -97,10 +107,12 @@ top switches to **Trustless & Slower**. **Company-Operated** is planned.
 
 `Runs on` shows this as `Decentralized`.
 
-- Public EVM registry/contracts provide session and gate authority.
+- Public EVM registry/contracts provide session and gate authority, and the
+  registering wallet is the session's admin.
 - Arweave stores metadata and payloads, which are public and permanent. Anyone
-  can read them unless they are locked with Lit encryption, which covers only
-  the fields you lock.
+  can read them, including which wallet answered what, unless they are locked
+  with Lit encryption, which covers only the fields you lock. The Worker
+  operator and Lit administrators stay trusted.
 - Creation requires a compatible Session Worker, an Arweave wallet/JWK, RPC
   access, and a wallet that sends the registry transactions and pays gas and the
   0.0001 ETH creation fee.

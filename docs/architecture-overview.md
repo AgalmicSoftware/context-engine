@@ -61,12 +61,9 @@ to the Surveys contract; the EVM contracts remain canonical for that chain-backe
 write.
 
 Static app hosting, public/private session access, and the session
-infrastructure profile are independent choices. `/new` is one page that starts
-on Hosted & Fast, shown as `Centralized` under `Runs on`; `Decentralized`
-selects the opt-in Trustless & Slower path. The
-Company-Operated branch is a planned adapter architecture, not a shipped
-corporate package. It can target entirely off-chain infrastructure; a private
-EVM would be only a possible future adapter, never a requirement.
+infrastructure profile are independent choices. [Session Infrastructure
+Profiles](run-modes.md#session-infrastructure-profiles) describes each profile;
+the Company-Operated branch above is planned, not shipped.
 
 Primary source entry points are `client/src/components/MainSite/AppShell.tsx`,
 `client/src/components/SurveyTool/SurveyTool.tsx`,

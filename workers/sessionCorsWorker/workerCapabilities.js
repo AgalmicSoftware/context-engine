@@ -15,6 +15,7 @@ export const FEATURES = Object.freeze([
   'response_upload_receipts',
   'results_analysis_retry_v1',
   'session_backup_v1',
+  'storage_read_batch_v1',
   'upload_authority_stamps',
   'worker_groups',
 ]);

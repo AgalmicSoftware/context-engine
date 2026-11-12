@@ -24,8 +24,7 @@ npm test
 This runs the canonical root gate (`npm run test:ci`): wiring and ratchets,
 AI Discourse Bench tests, release-surface checks and builds, contract/ABI
 parity, client coverage, public-safe root Jest, both public Worker suites,
-Context Engine CC, MCP tests, the tracked root Node universe, and the
-managed-cache guard. The coverage-enabled full client universe and tracked Node
+Context Engine CC, MCP tests, the tracked root Node universe, and the managed-cache guard. The coverage-enabled full client universe and tracked Node
 universe each run exactly once. The wiring lane also verifies that every
 tracked typed client test/support source is in the monotonic test-typecheck
 universe. Build-owning gates immediately run the manifest-backed bundle budget
@@ -103,8 +102,8 @@ named-export usage while keeping production reachability production-only,
 understands explicit non-import entrypoints, and fails on any conservative
 unresolved production-file or named-export candidate instead of comparing
 against a debt-count baseline. The boundary checker runs in
-fail-on-new-violation mode against `scripts/client-boundaries-baseline.json`, so
-existing legacy imports stay visible while new direct violations fail the gate.
+fail-on-new-violation mode against `scripts/client-boundaries-baseline.json`.
+The baseline is empty, so any direct violation fails the gate.
 The inventory check keeps root tests classified as one of:
 
 - public-safe Node tests run by `npm run test:node`

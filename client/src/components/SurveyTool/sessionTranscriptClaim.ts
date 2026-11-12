@@ -104,6 +104,60 @@ export const unpackClaim = async (
     : { ok: false, error: UNREADABLE };
 };
 
+// A claimed part waits in this tab until its review is submitted or discarded, so a reload or a passkey sign-in
+// that reloads the page doesn't lose it. Only this tab sees it, and it goes after a day either way.
+const HELD_CLAIM_KEY = 'ce:transcript-claim:v1';
+const HELD_CLAIM_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+
+export const holdClaim = (claim: TranscriptClaim) => {
+  try {
+    sessionStorage.setItem(HELD_CLAIM_KEY, JSON.stringify({ claim, heldAt: Date.now() }));
+  } catch {
+    /* Without storage the part lives only on this page, as before. */
+  }
+};
+
+export const releaseHeldClaim = () => {
+  try {
+    sessionStorage.removeItem(HELD_CLAIM_KEY);
+  } catch {
+    /* Storage can be disabled. */
+  }
+};
+
+/** The part held for this session, if any. */
+export const readHeldClaim = (sessionSlug: string): TranscriptClaim | null => {
+  try {
+    const held = JSON.parse(sessionStorage.getItem(HELD_CLAIM_KEY) || 'null') as {
+      claim?: Partial<TranscriptClaim>;
+      heldAt?: unknown;
+    } | null;
+    const claim = held?.claim;
+    const age = Date.now() - Number(held?.heldAt);
+    if (
+      !claim ||
+      !(age >= 0 && age < HELD_CLAIM_MAX_AGE_MS) ||
+      typeof claim.person !== 'string' ||
+      typeof claim.transcript !== 'string' ||
+      !claim.transcript.trim() ||
+      (claim.joinGroup !== undefined && typeof claim.joinGroup !== 'string')
+    ) {
+      if (held) releaseHeldClaim();
+      return null;
+    }
+    // Another session's part stays for that session's page.
+    if (!sessionSlug || claim.sessionSlug !== sessionSlug) return null;
+    return {
+      sessionSlug,
+      person: claim.person,
+      transcript: claim.transcript,
+      ...(claim.joinGroup ? { joinGroup: claim.joinGroup } : {}),
+    };
+  } catch {
+    return null;
+  }
+};
+
 const frameUrl = (baseUrl: string, { id, index, total, data }: ClaimFrame) =>
   `${baseUrl}#${CLAIM_FRAGMENT_KEY}=${id}.${index.toString(36)}.${total.toString(36)}.${data}`;
 

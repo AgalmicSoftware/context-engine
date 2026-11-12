@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { hasInterviewQuestionGrowth, normalizeInterviewSettings } from '../../../../shared/interviewSettings.mjs';
 import { normalizeInterviewQuestions, type InterviewQuestion } from './sessionInterview';
+import { fetchInterviewCatalog, type InterviewCatalogTicketSource } from './sessionInterviewCatalogValidation';
 
 export function useInterviewQuestionUpdates({
   initialQuestions,
@@ -9,6 +10,7 @@ export function useInterviewQuestionUpdates({
   sessionSlug,
   active,
   append,
+  ticket,
 }: {
   initialQuestions: InterviewQuestion[];
   config: unknown;
@@ -16,12 +18,16 @@ export function useInterviewQuestionUpdates({
   sessionSlug?: string;
   active: boolean;
   append: (content: string) => boolean;
+  /** A private session lists its questions only to a ticket. */
+  ticket?: InterviewCatalogTicketSource;
 }) {
   const [added, setAdded] = useState<InterviewQuestion[]>([]);
   const [notice, setNotice] = useState('');
   const settings = normalizeInterviewSettings((config as { interviewMode?: unknown })?.interviewMode);
   const appendRef = useRef(append);
   appendRef.current = append;
+  const ticketRef = useRef(ticket);
+  ticketRef.current = ticket;
   const questions = useMemo(
     () => [...new Map([...initialQuestions, ...added].map((q) => [q.id, q])).values()],
     [initialQuestions, added],
@@ -40,11 +46,14 @@ export function useInterviewQuestionUpdates({
       controller = new AbortController();
       const timeout = setTimeout(() => controller?.abort(), 10000);
       try {
-        const sessionUrl = `${window.location.origin}${window.location.pathname}`;
-        const response = await fetch(
-          `${workerUrl.replace(/\/+$/, '')}/agent/interview-catalog?slug=${encodeURIComponent(sessionSlug || '')}&sessionUrl=${encodeURIComponent(sessionUrl)}`,
-          { signal: controller.signal },
-        );
+        const url = new URL(`${workerUrl.replace(/\/+$/, '')}/agent/interview-catalog`);
+        url.searchParams.set('slug', sessionSlug || '');
+        url.searchParams.set('sessionUrl', `${window.location.origin}${window.location.pathname}`);
+        const { response } = await fetchInterviewCatalog(url, {
+          fetchImpl: fetch,
+          signal: controller.signal,
+          ticket: ticketRef.current,
+        });
         if (!response.ok) throw new Error();
         const result = await response.json();
         if (disposed) return;

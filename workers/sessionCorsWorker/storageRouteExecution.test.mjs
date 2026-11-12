@@ -145,6 +145,8 @@ const createMockKv = ({ requestClock } = {}) => {
 			store.set(key, value);
 		},
 		async get(key) {
+			// Cloudflare's bulk get: up to 100 keys in one call, answered as a Map.
+			if (Array.isArray(key)) return new Map(key.map((name) => [name, store.get(name) || null]));
 			return store.get(key) || null;
 		},
 		async delete(key) {
@@ -214,6 +216,11 @@ const readCoordinatorValue = (env, key) => {
 };
 
 const readStorageIndexMetadata = async (kv, slug, resource, id) => JSON.parse(await kv.get(`ce-storage:${slug}:${resource}:${id}`));
+
+// A Worker-canonical session accepts answers only to questions it has stored.
+const seedStoredQuestion = (kv, slug, questionId) => kv.put(`ce-storage:${slug}:questions:seeded-${questionId}`, JSON.stringify({
+	id: `seeded-${questionId}`, resource: 'questions', resourceId: questionId, createdAt: '2026-01-01T00:00:00.000Z',
+}));
 
 const writeStorageIndexMetadata = async (kv, slug, resource, metadata) => {
 	await kv.put(`ce-storage:${slug}:${resource}:${metadata.id}`, JSON.stringify(metadata));
@@ -613,9 +620,10 @@ test('private response reads separate participant submission scope from non-owne
 			};
 			assert.equal(validateWorkerConfigModeValues(config).ok, true);
 			const kv = createMockKv();
-			const env = { GROUP_KV: kv, CE_STORAGE_INDEX_KV: kv, CE_STORAGE_ENVELOPE_KEK: 'synthetic-private-response-test-key' };
+			const env = { GROUP_KV: kv, CE_STORAGE_INDEX_KV: kv, CE_STORAGE_ENVELOPE_KEK: 'synthetic-private-response-test-key', TOKEN_HMAC_SECRET: 'synthetic-receipt-secret' };
 			if (storage === 'r2') env.CE_STORAGE_R2 = createMockR2();
 			attachSessionCoordinator(env, (next) => { config = next; });
+			await seedStoredQuestion(kv, 'session-a', '0xq1');
 			const scopesFor = (address) => resolveWorkerCanonicalLoginScopes({ address, config, env, slug: config.slug });
 			const firstScopes = await scopesFor(first);
 			const secondScopes = await scopesFor(second);
@@ -740,9 +748,10 @@ test('members-only results show every answer to signed-in session members, never
 			};
 			assert.equal(validateWorkerConfigModeValues(config).ok, true);
 			const kv = createMockKv();
-			const env = { GROUP_KV: kv, CE_STORAGE_INDEX_KV: kv, CE_STORAGE_ENVELOPE_KEK: 'synthetic-member-results-test-key' };
+			const env = { GROUP_KV: kv, CE_STORAGE_INDEX_KV: kv, CE_STORAGE_ENVELOPE_KEK: 'synthetic-member-results-test-key', TOKEN_HMAC_SECRET: 'synthetic-receipt-secret' };
 			if (storage === 'r2') env.CE_STORAGE_R2 = createMockR2();
 			attachSessionCoordinator(env, (next) => { config = next; });
+			await seedStoredQuestion(kv, 'session-a', '0xq1');
 			const scopesFor = (address) => resolveWorkerCanonicalLoginScopes({ address, config, env, slug: config.slug });
 			const firstScopes = await scopesFor(first);
 			const secondScopes = await scopesFor(second);
@@ -4323,6 +4332,7 @@ test('exportCloudflareEncryptedPayloadEnvelopes emits ciphertext and envelope me
 	const env = {
 		CE_STORAGE_INDEX_KV: kv,
 		CE_STORAGE_ENVELOPE_KEK: 'test deployment envelope kek',
+		TOKEN_HMAC_SECRET: 'synthetic-receipt-secret',
 	};
 	let config = createEnvelopeConfig({
 		payloadAccessControl: {
@@ -4621,6 +4631,7 @@ test('storageRoute lists Cloudflare refs from the metadata index without raw obj
 
 test('storageRoute enqueues automatic results analysis after response upload without waitUntil generation', async () => {
 	const kv = createMockKv();
+	await seedStoredQuestion(kv, 'session-a', 'q1');
 	let enqueueArgs = null;
 	const config = {
 		storageProfile: {

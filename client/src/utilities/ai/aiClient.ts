@@ -433,6 +433,7 @@ export async function transcribeAudio(audioBlobOrFile: AudioUploadBlob, opts: un
   const { maxUploadBytes, signal } = resolveTranscriptionUploadOptions(opts, {
     defaultMaxUploadBytes: TRANSCRIBE_MAX_UPLOAD_BYTES,
   });
+  const { prompt } = (opts || {}) as { prompt?: boolean };
 
   // Helper: coerce to a File when available to preserve filename
   const toFileLike = (blob: Blob & { name?: string }, nameFallback?: string): File | (Blob & { name?: string }) => {
@@ -497,6 +498,7 @@ export async function transcribeAudio(audioBlobOrFile: AudioUploadBlob, opts: un
       const chunkText = await uploadAudioForTranscription(chunk, transport, {
         onJsonParseError: (error) => aiLog.warn('Transcription response JSON parse failed:', error),
         signal,
+        prompt,
       });
       merged = mergeTranscriptText(merged, chunkText);
     }
@@ -511,6 +513,7 @@ export async function transcribeAudio(audioBlobOrFile: AudioUploadBlob, opts: un
       fileName: fname,
       onJsonParseError: (error) => aiLog.warn('Transcription response JSON parse failed:', error),
       signal,
+      prompt,
     },
   );
 }
@@ -519,13 +522,14 @@ export async function transcribeAudio(audioBlobOrFile: AudioUploadBlob, opts: un
 export async function transcribeGroupAudio(audio: AudioUploadBlob, opts: unknown = {}): Promise<DiarizedTranscription> {
   if (!audio) throw new Error('No audio provided');
   const { signal } = resolveTranscriptionUploadOptions(opts, { defaultMaxUploadBytes: TRANSCRIBE_MAX_UPLOAD_BYTES });
-  const { knownSpeakers } = (opts || {}) as { knownSpeakers?: KnownSpeaker[] };
+  const { knownSpeakers, prompt } = (opts || {}) as { knownSpeakers?: KnownSpeaker[]; prompt?: boolean };
   try {
     if (audio.size > TRANSCRIBE_MAX_UPLOAD_BYTES)
       throw new SpeakerLabelsUnavailableError('Speaker labels are unavailable for this audio size.', true);
     return await uploadAudioForDiarizedTranscription(audio, await resolveTranscriptionTransport(opts), {
       signal,
       knownSpeakers,
+      prompt,
     });
   } catch (error) {
     if (!(error instanceof SpeakerLabelsUnavailableError)) throw error;
