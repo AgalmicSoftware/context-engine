@@ -33439,6 +33439,8 @@ function isSafeHashValue(value, path = []) {
   const key = lower2(path[path.length - 1]);
   const parentKey = lower2(path[path.length - 2]);
   if (SAFE_HASH_VALUE_KEYS.has(key) || SAFE_HASH_VALUE_CONTAINER_KEYS.has(parentKey)) return true;
+  if (key === "storageid" || parentKey === "storageref" && key === "id") return STORAGE_ID_RE.test(value);
+  if (parentKey === "storageref" && key === "uri") return STORAGE_URI_RE.test(value);
   return (key.endsWith("questionid") || parentKey.endsWith("questionids")) && QUESTION_ID_RE.test(value);
 }
 function hasSecretShape(value, path = []) {
@@ -33478,7 +33480,7 @@ function assertNoSecretShape(value, message = "Agent records must not serialize 
   }
   return value;
 }
-var SECRET_FIELD_RE, SECRET_VALUE_RE, SAFE_HASH_VALUE_KEYS, SAFE_HASH_VALUE_CONTAINER_KEYS, SAFE_AUTHORITY_METADATA_KEYS, QUESTION_ID_RE;
+var SECRET_FIELD_RE, SECRET_VALUE_RE, SAFE_HASH_VALUE_KEYS, SAFE_HASH_VALUE_CONTAINER_KEYS, SAFE_AUTHORITY_METADATA_KEYS, QUESTION_ID_RE, STORAGE_ID_RE, STORAGE_URI_RE;
 var init_redaction = __esm({
   "workers/sessionCorsWorker/agent/redaction.mjs"() {
     init_runtimePrimitives();
@@ -33506,6 +33508,8 @@ var init_redaction = __esm({
       "signingauthority"
     ]);
     QUESTION_ID_RE = /^0x[0-9a-f]{64}$/i;
+    STORAGE_ID_RE = /^[A-Za-z0-9_-]{43}$/;
+    STORAGE_URI_RE = /^\/storage\/read\?id=[A-Za-z0-9_-]{43}$/;
   }
 });
 
