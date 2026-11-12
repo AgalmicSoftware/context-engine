@@ -303,6 +303,7 @@ export function useRecordingChunkQueue(options: Options) {
   const dismissHiddenPeriods = useCallback(() => queueRef.current?.dismissHiddenPeriods(), []);
   const saveQuestionDrafts = useCallback((drafts: QuestionDrafts) => queueRef.current?.saveQuestionDrafts(drafts), []);
   const saveSpeakerMerges = useCallback((merges: SpeakerMerges) => queueRef.current?.saveSpeakerMerges(merges), []);
+  const restoreSpeakerLabels = useCallback(() => queueRef.current?.restoreSpeakerLabels(), []);
   const downloadChunk = useCallback((id: string) => {
     const record = queueRef.current?.records.get(id);
     if (!record?.audio) return;
@@ -357,6 +358,7 @@ export function useRecordingChunkQueue(options: Options) {
     // Speakers the host merged in this recording.
     speakerMerges,
     saveSpeakerMerges,
+    restoreSpeakerLabels,
     downloadChunk,
     downloadRecording,
     clearDraft,

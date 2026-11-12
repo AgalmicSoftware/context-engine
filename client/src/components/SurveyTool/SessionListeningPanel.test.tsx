@@ -1441,6 +1441,16 @@ it('shows when recording continues without speaker labels', async () => {
   expect(await screen.findByRole('status')).toHaveTextContent('Continuing with plain transcription');
 });
 
+it('lets the host turn speaker labels back on after they went off', async () => {
+  const restoreSpeakerLabels = jest.fn();
+  (useRollingTranscriptionRecorder as jest.Mock).mockReturnValue(
+    buildRecorder({ labelsUnavailableReason: 'Speaker labels are unavailable.', restoreSpeakerLabels }),
+  );
+  render(<SessionListeningPanel sessionSlug="workshop" panelMode="recordGroup" />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Turn labels back on' }));
+  expect(restoreSpeakerLabels).toHaveBeenCalledTimes(1);
+});
+
 it('waits for the transcription provider before starting Group Conversation with labels', async () => {
   type Config = Awaited<ReturnType<typeof getEffectiveTranscriptionConfig>>;
   let resolve!: (config: Config) => void;

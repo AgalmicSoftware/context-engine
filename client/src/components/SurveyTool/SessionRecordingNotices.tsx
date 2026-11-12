@@ -13,6 +13,7 @@ type SessionRecordingNoticesProps = {
     ReturnType<typeof useRollingTranscriptionRecorder>,
     | 'segments'
     | 'labelsUnavailableReason'
+    | 'restoreSpeakerLabels'
     | 'hiddenPeriods'
     | 'dismissHiddenPeriods'
     | 'captureNotice'
@@ -38,7 +39,14 @@ export function SessionRecordingNotices({ recorder, capturing, labelCheckTimedOu
         <div role="status">Speaker label check timed out. Recording is available with plain transcription.</div>
       ) : null}
       {recorder.labelsUnavailableReason ? (
-        <div role="status">{recorder.labelsUnavailableReason} Continuing with plain transcription.</div>
+        <div role="status">
+          {recorder.labelsUnavailableReason} Continuing with plain transcription.{' '}
+          {recorder.restoreSpeakerLabels ? (
+            <Button size="sm" className={styles.sessionRecordingButton} onClick={recorder.restoreSpeakerLabels}>
+              Turn labels back on
+            </Button>
+          ) : null}
+        </div>
       ) : null}
       {renumberedChunks.length ? (
         <span className={styles.sessionRecordingOption}>

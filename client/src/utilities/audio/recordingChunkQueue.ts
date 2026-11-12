@@ -114,6 +114,8 @@ export class RecordingChunkQueue {
   records = new Map<string, RecordingChunk>();
   storageError = '';
   labelsUnavailableReason = '';
+  // Label refusals in a row: one may be this chunk's audio, so labels go off only at the second.
+  private labelRefusals = 0;
   hiddenPeriods: HiddenPeriod[] = [];
   speakers: Speakers = { knownSpeakers: [], speakerSamplesRefused: false };
   // As restored when the recording opened; saving later drafts leaves it.
@@ -183,8 +185,10 @@ export class RecordingChunkQueue {
           entry.segment = { ...entry.segment, status: 'queued', error: undefined };
         else if (!entry.audio && entry.segment.status !== 'complete') continue;
         this.records.set(entry.segment.id, entry);
-        if (entry.labelsUnavailableReason) this.labelsUnavailableReason = entry.labelsUnavailableReason;
       }
+      // The latest transcribed chunk says whether labels were off then; turning them back on clears it there.
+      const latest = this.segments.filter((segment) => segment.status === 'complete').pop();
+      this.labelsUnavailableReason = (latest && this.records.get(latest.id)?.labelsUnavailableReason) || '';
       holdInMemory(this.options.scope, null);
       this.resaveKept([...stripped, ...kept]);
       this.restoreHiddenPeriods(storedPeriods);
@@ -451,6 +455,7 @@ export class RecordingChunkQueue {
     this.changed();
     const controller = new AbortController();
     this.uploading = { id, controller };
+    const labels = record.labelSpeakers && !this.labelsUnavailableReason;
     try {
       if (this.disposed) return;
       const result = await new Promise<Transcription>((resolve, reject) => {
@@ -463,7 +468,6 @@ export class RecordingChunkQueue {
           UPLOAD_DEADLINE_MS * (stalls + 1),
         );
         controller.signal.addEventListener('abort', () => reject(new Error(stalledText)), { once: true });
-        const labels = record.labelSpeakers && !this.labelsUnavailableReason;
         const { knownSpeakers, speakerSamplesRefused } = this.speakers;
         this.options
           .transcribe(record.audio!, labels, controller.signal, labels && !speakerSamplesRefused ? knownSpeakers : [])
@@ -473,7 +477,11 @@ export class RecordingChunkQueue {
         this.uploading = null;
       });
       if (this.disposed) return;
-      if (result.labelsUnavailableReason) this.labelsUnavailableReason = result.labelsUnavailableReason;
+      // One refusal may be this chunk's own audio, which is then transcribed without labels; two in a row turn
+      // labels off for the recording, until the host turns them back on.
+      if (labels) this.labelRefusals = result.labelsUnavailableReason ? this.labelRefusals + 1 : 0;
+      if (result.labelsUnavailableReason && this.labelRefusals >= 2)
+        this.labelsUnavailableReason = result.labelsUnavailableReason;
       const named = result.speakerTurns?.length ? await this.nameSpeakers(record.audio!, result) : null;
       if (this.disposed) return;
       const complete: RecordingChunk = {
@@ -556,6 +564,21 @@ export class RecordingChunkQueue {
         timer = setTimeout(() => resolve([]), SAMPLE_WAIT_MS);
       }),
     ]).finally(() => clearTimeout(timer));
+  }
+  /** The host turns labels back on after they went off: later chunks ask for them again. */
+  restoreSpeakerLabels() {
+    if (!this.labelsUnavailableReason) return;
+    this.labelsUnavailableReason = '';
+    this.labelRefusals = 0;
+    // Kept with the latest chunk, which is what a reload reads.
+    const latest = this.segments.filter((segment) => segment.status === 'complete').pop();
+    const record = latest && this.records.get(latest.id);
+    if (record?.labelsUnavailableReason) {
+      const cleared = { ...record, labelsUnavailableReason: '' };
+      this.records.set(record.segment.id, cleared);
+      void this.save(cleared);
+    }
+    this.changed();
   }
   /** Back online: a request sent before the outage may never answer, so start it again now. */
   async reconnect() {
@@ -650,6 +673,7 @@ export class RecordingChunkQueue {
     this.hiddenPeriods = [];
     this.speakers = { knownSpeakers: [], speakerSamplesRefused: false };
     this.labelsUnavailableReason = '';
+    this.labelRefusals = 0;
     this.storageError = '';
     this.changed();
   }

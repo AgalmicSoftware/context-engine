@@ -1689,31 +1689,39 @@ describe('useRollingTranscriptionRecorder', () => {
     expect(result.current.elapsedSeconds).toBe(45 * 60);
     unmount();
   });
-  it('keeps a fallback transcript and stops requesting labels for the rest of the recording', async () => {
+  it('keeps fallback transcripts and, after two refusals in a row, stops requesting labels until turned back on', async () => {
+    let refused = 0;
     (transcribeGroupAudio as jest.Mock).mockImplementation(async () => ({
-      text: 'First chunk.',
+      text: `Refused ${++refused}.`,
       segments: [],
       labelsUnavailableReason: 'Labels unavailable.',
     }));
-    (transcribeAudio as jest.Mock).mockImplementation(async () => 'Second chunk.');
+    (transcribeAudio as jest.Mock).mockImplementation(async () => 'Plain chunk.');
     const { result, unmount } = renderHook(() =>
       useRollingTranscriptionRecorder({ sessionSlug: 'fallback', labelSpeakers: true }),
     );
     await act(async () => {
       await result.current.startRecording();
     });
-    for (let index = 0; index < 2; index++)
-      await act(async () => {
+    const nextChunk = () =>
+      act(async () => {
         jest.advanceTimersByTime(180000);
         await flushPromises();
       });
-    expect(result.current.transcript).toContain('First chunk.');
-    expect(result.current.transcript).toContain('Second chunk.');
+    await nextChunk();
+    expect(result.current.labelsUnavailableReason).toBe('');
+    await nextChunk();
+    await nextChunk();
+    expect(result.current.transcript).toBe('Refused 1. Refused 2. Plain chunk.');
     expect(result.current.labelsUnavailableReason).toBe('Labels unavailable.');
-    expect(result.current.segments.filter((segment) => segment.status === 'complete')).toHaveLength(2);
-    expect(result.current.segments.filter((segment) => segment.status === 'recording')).toHaveLength(1);
-    expect(transcribeGroupAudio).toHaveBeenCalledTimes(1);
+    expect(transcribeGroupAudio).toHaveBeenCalledTimes(2);
     expect(transcribeAudio).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      result.current.restoreSpeakerLabels();
+    });
+    expect(result.current.labelsUnavailableReason).toBe('');
+    await nextChunk();
+    expect(transcribeGroupAudio).toHaveBeenCalledTimes(3);
     unmount();
   });
 

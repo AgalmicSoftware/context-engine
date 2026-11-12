@@ -451,12 +451,67 @@ it('resets speaker fallback when a completed recording is cleared', async () => 
   const queue = create(transcribe);
   await queue.ready;
   queue.capture(queue.begin(true), audio, true);
+  queue.capture(queue.begin(true), audio, true);
   await queue.finish();
   expect(queue.labelsUnavailableReason).toBe('Labels unavailable');
   await queue.clear(true);
   queue.capture(queue.begin(true), audio, true);
   await queue.finish();
   expect(transcribe).toHaveBeenLastCalledWith(audio, true, expect.any(AbortSignal), []);
+});
+
+it('keeps labels on after one refusal, turns them off after two in a row, and turns them back on', async () => {
+  const refusals = [true, false, true, true, false];
+  const transcribe = jest.fn<Transcribe>(async () =>
+    refusals.shift()
+      ? { text: 'Plain.', labelsUnavailableReason: 'Speaker labels are unavailable.' }
+      : { text: 'Labelled.' },
+  );
+  const queue = create(transcribe, 'refusals');
+  await queue.ready;
+  const chunk = async () => {
+    queue.capture(queue.begin(true), audio, true);
+    await queue.finish();
+  };
+  await chunk();
+  // One refusal may be this chunk's audio: the next chunk asks for labels again, and a labelled one resets it.
+  expect(queue.labelsUnavailableReason).toBe('');
+  await chunk();
+  await chunk();
+  expect(queue.labelsUnavailableReason).toBe('');
+  await chunk();
+  expect(queue.labelsUnavailableReason).toBe('Speaker labels are unavailable.');
+  expect(transcribe.mock.calls.map(([, labels]) => labels)).toEqual([true, true, true, true]);
+  await chunk();
+  expect(transcribe).toHaveBeenLastCalledWith(audio, false, expect.any(AbortSignal), []);
+  // The host turns them back on, which a reload keeps.
+  queue.restoreSpeakerLabels();
+  expect(queue.labelsUnavailableReason).toBe('');
+  await queue.settled();
+  queue.dispose();
+  const reopened = create(transcribe, 'refusals');
+  await reopened.ready;
+  expect(reopened.labelsUnavailableReason).toBe('');
+  reopened.capture(reopened.begin(true), audio, true);
+  await reopened.finish();
+  expect(transcribe).toHaveBeenLastCalledWith(audio, true, expect.any(AbortSignal), []);
+});
+
+it('keeps labels off through a reload when they went off', async () => {
+  const transcribe = jest.fn<Transcribe>(async () => ({
+    text: 'Plain.',
+    labelsUnavailableReason: 'Speaker labels are unavailable.',
+  }));
+  const queue = create(transcribe, 'labels-off');
+  await queue.ready;
+  for (let index = 0; index < 2; index += 1) {
+    queue.capture(queue.begin(true), audio, true);
+    await queue.finish();
+  }
+  queue.dispose();
+  const reopened = create(transcribe, 'labels-off');
+  await reopened.ready;
+  expect(reopened.labelsUnavailableReason).toBe('Speaker labels are unavailable.');
 });
 
 it('keeps only the transcript in memory once a chunk is transcribed without IndexedDB', async () => {

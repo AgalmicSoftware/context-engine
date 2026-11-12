@@ -745,6 +745,7 @@ export const useRollingTranscriptionRecorder = ({
       .filter(Boolean)
       .join(' '),
     labelsUnavailableReason,
+    restoreSpeakerLabels: chunks.restoreSpeakerLabels,
     retryChunk,
     downloadChunk: chunks.downloadChunk,
     downloadRecording: chunks.downloadRecording,

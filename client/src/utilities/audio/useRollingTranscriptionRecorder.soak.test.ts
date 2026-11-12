@@ -474,9 +474,13 @@ it.each<WorkerGeneration>(['current', 'refuses labels', 'text only'])(
     // From the second chunk on, before and after the reload, every labelled upload carried the first chunk's
     // voice and the model named it, so no chunk numbered its voices on its own.
     const labelled = mockWorker.uploads.filter((upload) => upload.labels);
-    expect(labelled.filter((upload) => upload.chunk > 1).map((upload) => upload.knownSpeakers.join())).toEqual(
-      labelled.filter((upload) => upload.chunk > 1).map(() => 'Person 1'),
-    );
+    if (generation === 'current')
+      expect(labelled.filter((upload) => upload.chunk > 1).map((upload) => upload.knownSpeakers.join())).toEqual(
+        labelled.filter((upload) => upload.chunk > 1).map(() => 'Person 1'),
+      );
+    // A Worker that refuses labels gets asked twice, in case the first refusal was that chunk's audio, and never
+    // again, even after the reload.
+    else expect([...new Set(labelled.map((upload) => upload.chunk))]).toEqual([1, 2]);
     expect(recorder.segments.some((segment) => segment.speakersRenumbered)).toBe(false);
     // Two presses of Record, one before and one after the reload; nothing else opened the microphone.
     expect(getUserMedia).toHaveBeenCalledTimes(2);
