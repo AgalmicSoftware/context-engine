@@ -94,6 +94,8 @@ import {
   type GlobalSessionSelection,
 } from '../../utilities/session/globalSessionState.js';
 import { isHostedAgentSessionConfig } from '../../utilities/session/sessionBackendKind';
+import { isSessionModeProfileAgentHttpEnabled } from '../../utilities/session/sessionModeProfile';
+import { requestAgentDelegateKey } from '../../utilities/session/agentHandoff';
 import { resolveSessionCapabilityProjection } from '../../utilities/session/sessionCapabilityProjection';
 import {
   exchangeAgentClientLogin,
@@ -125,6 +127,8 @@ import {
   formatLoginSettingsAiProviderLabel,
 } from './loginSettingsAiDisplayHelpers';
 import LoginAgentTokenPanel from './LoginAgentTokenPanel';
+import LoginAgentHandoffPanel from './LoginAgentHandoffPanel';
+import { buildSessionWizardSessionUrl } from '../Sessions/sessionWizardUrlSupport';
 import {
   createLoginAgentActions,
   resolveValidatedWorkerCanonicalLoginConfig,
@@ -1016,19 +1020,20 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     await this.requestTestFunds({ source: 'auto' });
   };
 
+  getWorkerTokenContext = () => ({
+    account: this.props.account,
+    providerLike: this.props.provider || 'wagmi',
+    chainId: (this.props.network as any)?.id || (this.props.network as any)?.chainId || null,
+  });
+
   ensureWorkerSessionToken = async () => {
     if (!this.props.loginComplete || !this.props.account) return;
     try {
-      const chainId = (this.props.network as any)?.id || (this.props.network as any)?.chainId || null;
       const sessionSlug = this.getWorkerAuthSessionSlug();
       await getWorkerSessionToken({
         sessionSlug,
         sessionConfig: this.getDisplaySessionConfig(sessionSlug),
-        context: {
-          account: this.props.account,
-          providerLike: this.props.provider || 'wagmi',
-          chainId,
-        },
+        context: this.getWorkerTokenContext(),
       });
     } catch {
       accountLog.warn('[WorkerAuth] Session token request failed.');
@@ -1523,6 +1528,35 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
         onInputChange={this.handleAgentTokenInputChange}
         onSubmit={this.handleAgentTokenLoginSubmit}
         onToggle={this.toggleAgentTokenLogin}
+      />
+    );
+  };
+
+  requestAgentKey = async () => {
+    const { agentWorkerUrl, sessionConfig, sessionSlug } = this.getAgentTokenLoginSessionContext();
+    const workerToken = await getWorkerSessionToken({
+      sessionSlug,
+      sessionConfig,
+      context: this.getWorkerTokenContext(),
+    });
+    return requestAgentDelegateKey({ agentWorkerUrl, sessionSlug, workerToken });
+  };
+
+  // Hidden while an agent is the one signed in here: a key comes from a person's own sign-in.
+  renderAgentHandoffPanel = () => {
+    const { agentWorkerUrl, sessionConfig, sessionId, sessionSlug, workerCanonical, workerUrl } =
+      this.getAgentTokenLoginSessionContext();
+    if (!sessionSlug || readAgentClientLoginEnvelope({ sessionSlug, sessionId, workerUrl, agentWorkerUrl }))
+      return null;
+    return (
+      <LoginAgentHandoffPanel
+        key={sessionSlug}
+        agentHttpEnabled={!!agentWorkerUrl && isSessionModeProfileAgentHttpEnabled(sessionConfig)}
+        sessionUrl={buildSessionWizardSessionUrl({
+          slug: sessionSlug,
+          workerOrigin: workerCanonical ? agentWorkerUrl : '',
+        })}
+        requestKey={this.requestAgentKey}
       />
     );
   };
@@ -2581,6 +2615,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       passkeyWalletStatusHelp: this.state.passkeyWalletStatusHelp,
       passkeyMode: this.state.passkeyMode,
       provider: this.props.provider,
+      renderAgentHandoffPanel: this.renderAgentHandoffPanel,
       renderAgentTokenLoginPanel: this.renderAgentTokenLoginPanel,
       sessionIdentityUnavailable,
       showAdvancedWalletAccess,

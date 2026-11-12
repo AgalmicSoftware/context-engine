@@ -1,6 +1,10 @@
 import { render, screen, within } from '@testing-library/react';
 jest.mock('wagmi/actions', () => ({ disconnect: jest.fn(async () => {}) }));
-import { readAgentClientLoginEnvelope, writeAgentClientLoginEnvelope } from '../../utilities/session/agentClientLogin';
+import {
+  clearAgentClientLoginEnvelope,
+  readAgentClientLoginEnvelope,
+  writeAgentClientLoginEnvelope,
+} from '../../utilities/session/agentClientLogin';
 import { cacheAgentClientLoginEnvelope } from '../OnePageSession/onePageSessionAgentController';
 import { ethers } from 'ethers';
 import { LoginAndSettingsModal } from './LoginAndSettingsModal';
@@ -85,6 +89,12 @@ jest.mock('../../utilities/web3/sponsoredAccess.js', () => ({
 
 jest.mock('../../utilities/web3/sessionRegistry.js', () => ({
   refreshSessionRegistryFieldsCache: jest.fn(async () => null),
+  sessionRegistryUtils: {
+    normalizeSlug: (slug: unknown) =>
+      String(slug ?? '')
+        .trim()
+        .toLowerCase(),
+  },
 }));
 
 jest.mock('../../utilities/worker/workerResourcePresence', () => ({
@@ -2010,4 +2020,39 @@ test('settings logout clears every session agent credential before a later visit
   expect((globalThis as { __CE_AGENT_CLIENT_LOGIN_ENVELOPES__?: unknown }).__CE_AGENT_CLIENT_LOGIN_ENVELOPES__).toEqual(
     {},
   );
+});
+
+test("offers Your AI agent to a signed-in person, not to an agent's own sign-in", () => {
+  const sessionConfig = buildPureWorkerConfig('agent-handoff');
+  mockedGetSessionConfigBySlugOrDefault.mockReturnValue(sessionConfig);
+  const subject = mountClassSubject(
+    new LoginAndSettingsModalSubject(buildProps({ activeSessionSlug: 'agent-handoff' })),
+  );
+  const panelWithAgentHttp = (agentHttp: boolean) => {
+    const profile = sessionConfig.sessionModeProfile as any;
+    profile.surfaces = { ...profile.surfaces, agentHttp };
+    return subject.renderAgentHandoffPanel();
+  };
+  expect(panelWithAgentHttp(true).props.agentHttpEnabled).toBe(true);
+  expect(panelWithAgentHttp(false).props.agentHttpEnabled).toBe(false);
+
+  const target = subject.getAgentTokenLoginSessionContext();
+  const expiresAt = '2035-01-01T00:00:00.000Z';
+  writeAgentClientLoginEnvelope({
+    v: 3,
+    sessionSlug: target.sessionSlug,
+    ...(target.sessionId ? { sessionId: target.sessionId } : {}),
+    address: PASSKEY_ADDRESS,
+    expiresAt,
+    capabilities: { readQuestions: true },
+    workerUrl: target.workerUrl,
+    agentWorkerUrl: target.agentWorkerUrl,
+    agentCredential: { kind: 'session_agent_browser_token', token: 'agent-handoff-agent', expiresAt },
+    workerCredential: { kind: 'session_worker_jwt', token: 'agent-handoff-worker', expiresAt },
+  });
+  try {
+    expect(subject.renderAgentHandoffPanel()).toBeNull();
+  } finally {
+    clearAgentClientLoginEnvelope(target);
+  }
 });

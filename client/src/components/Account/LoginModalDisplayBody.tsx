@@ -41,6 +41,7 @@ type LoginModalDisplayBodyProps = {
   passkeyWalletStatusHelp: string;
   passkeyMode: PasskeyWalletActionMode;
   provider: string;
+  renderAgentHandoffPanel: () => React.ReactNode;
   renderAgentTokenLoginPanel: () => React.ReactNode;
   sessionIdentityUnavailable: boolean;
   showAdvancedWalletAccess: boolean;
@@ -70,6 +71,7 @@ const LoginModalDisplayBody = ({
   passkeyWalletStatusHelp,
   passkeyMode,
   provider,
+  renderAgentHandoffPanel,
   renderAgentTokenLoginPanel,
   sessionIdentityUnavailable,
   showAdvancedWalletAccess,
@@ -226,6 +228,7 @@ const LoginModalDisplayBody = ({
                 <FontAwesomeIcon icon={faSignOutAlt} /> Disconnect
               </Button>
             </div>
+            {renderAgentHandoffPanel()}
           </div>
         </div>
       </CardBody>

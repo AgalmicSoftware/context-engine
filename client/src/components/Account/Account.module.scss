@@ -2131,7 +2131,8 @@ button.passkeyButtonOutline:is(:hover, :focus, :active):not(:disabled) {
   color: var(--ce-status-danger-text);
 }
 
-.passkeyWalletStatusHelp {
+.passkeyWalletStatusHelp,
+.agentHandoffHelp {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -2236,6 +2237,131 @@ button.passkeyButtonOutline:is(:hover, :focus, :active):not(:disabled) {
   background: color-mix(in srgb, var(--ce-overlay-surface) 55%, transparent);
   color: var(--ce-status-danger-text);
   font-size: 0.88rem;
+}
+
+/* --- LoginAgentHandoffPanel.tsx --- */
+
+// The account panel's colours suit its profile card, not text laid on it, so this
+// panel paints the settings pair each theme defines for the account dialog. The
+// theme's field rule reads --ce-input-bg and --ce-text, so they follow the pair.
+.agentHandoffPanel {
+  --ce-input-bg: var(--ce-settings-field-bg);
+  --ce-text: var(--ce-settings-text);
+  width: min(560px, 100%);
+  padding: 14px;
+  border: 1px solid var(--ce-settings-border);
+  border-radius: var(--ce-radius-8);
+  background: var(--ce-settings-panel-bg);
+  color: var(--ce-settings-text);
+  text-align: left;
+}
+
+.agentHandoffHeader,
+.agentHandoffActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.agentHandoffTitle {
+  margin: 0;
+  color: inherit;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.agentHandoffChoices {
+  display: flex;
+  gap: 8px;
+  margin: 10px 0;
+}
+
+.agentHandoffChoice,
+.agentHandoffButton {
+  min-height: 44px;
+  padding: 6px 14px;
+  background: var(--ce-settings-control-bg);
+  color: var(--ce-settings-control-text);
+  font-weight: 650;
+  cursor: pointer;
+
+  &:hover {
+    background: color-mix(in srgb, currentColor 12%, var(--ce-settings-control-bg));
+  }
+
+  &:active,
+  &[aria-pressed='true'] {
+    background: color-mix(in srgb, currentColor 22%, var(--ce-settings-control-bg));
+  }
+
+  &:disabled {
+    cursor: progress;
+  }
+}
+
+.agentHandoffChoice {
+  flex: 1 1 0;
+
+  &[aria-pressed='true'] {
+    font-weight: 800;
+  }
+}
+
+.agentHandoffLabel,
+.agentHandoffStepLabel {
+  font-size: 0.9rem;
+  font-weight: 650;
+}
+
+.agentHandoffLabel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+}
+
+.agentHandoffInput {
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 10px;
+}
+
+.agentHandoffStep {
+  margin-top: 12px;
+}
+
+.agentHandoffStepLabel {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+// Bootstrap colours code pink; commands here read as the panel's text.
+.agentHandoffCommand {
+  display: block;
+  margin: 6px 0 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--ce-settings-border);
+  border-radius: var(--ce-radius-6);
+  background: var(--ce-settings-field-bg);
+  color: inherit;
+  font-size: 0.85rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.agentHandoffHint,
+.agentHandoffError {
+  margin: 10px 0 0;
+  font-size: 0.88rem;
+  line-height: 1.4;
+}
+
+.agentHandoffError {
+  padding-left: 8px;
+  border-left: 3px solid var(--ce-status-danger-text);
+  font-weight: 650;
 }
 
 .cryptoLoginLink {
