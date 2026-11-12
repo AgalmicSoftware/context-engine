@@ -228,12 +228,18 @@ test('interview drafts get their own row, not the headline, and predictions expo
 
     const [header, ...lines] = readFileSync(csv, 'utf8').trim().split('\n');
     assert.match(header, /^"person","origin","platform","model","context_used","group","condition","question_id"/);
-    assert.equal(lines.length, 20, 'freeform drafts are left out');
+    // Twenty scored predictions and four freeform drafts, whose text is left out but whose change is kept.
+    assert.equal(lines.length, 24);
+    assert.match(header, /"answer_changed","comment_changed"$/);
+    const freeform = lines.filter((line) => line.includes('"freeform"'));
+    assert.equal(freeform.length, 4);
+    for (const line of freeform) assert.match(line, /,"","","","","","","1","0"$/);
+    assert.ok(lines.filter((line) => line.includes('"voice_interview"') && !line.includes('"freeform"')).every((line) => line.endsWith('"0","0"')));
     const text = lines.join('\n');
     assert.doesNotMatch(text, /0x0{30}|reasons/i, 'no addresses or free text');
     // The report and the file name each person the same way.
     const perPerson = new Map();
-    for (const line of lines) {
+    for (const line of lines.filter((row) => !row.includes('"freeform"'))) {
       const person = line.split(',')[0].replaceAll('"', '');
       perPerson.set(person, (perPerson.get(person) ?? 0) + 1);
     }

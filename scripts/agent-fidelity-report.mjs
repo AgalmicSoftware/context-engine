@@ -33,7 +33,7 @@ Options:
   --seed <n>                Random seed (default 1)
   --min-participants <n>    Smallest group of people to report on (default 5)
   --include-agents          Keep self-declared agent participants
-  --predictions <file.csv>  Also write one de-identified row per scored prediction`;
+  --predictions <file.csv>  Also write one de-identified row per draft (scored, or freeform without its text)`;
 
 const VALUE_FLAGS = new Set(['export', 'questions', 'responses', 'wrapped', 'groups', 'exclude', 'out', 'bootstrap', 'seed', 'min-participants', 'predictions']);
 const INTEGER_FLAGS = { bootstrap: 0, seed: -Infinity, 'min-participants': 1 };
@@ -314,16 +314,23 @@ const pseudonymsFor = (participantIds) => {
   return new Map(ids.map((id, index) => [id, `p${String(index + 1).padStart(3, '0')}`]));
 };
 
-const PREDICTION_COLUMNS = ['person', 'origin', 'platform', 'model', 'context_used', 'group', 'condition', 'question_id', 'question_type', 'prediction', 'answer', 'similarity', 'exact_match', 'confidence', 'confidence_meaning'];
+const PREDICTION_COLUMNS = ['person', 'origin', 'platform', 'model', 'context_used', 'group', 'condition', 'question_id', 'question_type', 'prediction', 'answer', 'similarity', 'exact_match', 'confidence', 'confidence_meaning', 'answer_changed', 'comment_changed'];
 const cellValue = (value) => (value === null || value === undefined ? '' : typeof value === 'string' || typeof value === 'number' ? value : JSON.stringify(value));
+const flag = (value) => (value === true ? 1 : value === false ? 0 : null);
 
 /**
- * One row per scored prediction, for analysis outside the app: people by pseudonym, no addresses, names or free
- * text (freeform questions are left out), and only groups the report itself names.
+ * One row per scored prediction, plus one per freeform draft with its text left out, for analysis outside the app:
+ * people by pseudonym, no addresses, names or free text, and only groups the report itself names. The changed
+ * columns say whether the submitted answer and comment differ from the draft, when the record says.
  */
-export const predictionRows = ({ questions, pairs, pseudonyms, groupOf = () => '' }) => {
+export const predictionRows = ({ questions, pairs, drafts = [], pseudonyms, groupOf = () => '' }) => {
   const byId = new Map(questions.map(normalizeFidelityQuestion).filter(Boolean).map((question) => [question.id, question]));
-  const rows = pairs
+  const draftOf = new Map(drafts.map((draft) => [`${draft.participantId}|${draft.questionId}`, draft]));
+  const changes = (participantId, questionId) => {
+    const draft = draftOf.get(`${participantId}|${questionId}`);
+    return [flag(draft?.answerChanged), flag(draft?.commentChanged)];
+  };
+  const scored = pairs
     .filter((pair) => byId.get(pair.questionId) && byId.get(pair.questionId).type !== 'freeform' && pseudonyms.has(pair.participantId))
     .map((pair) => {
       const question = byId.get(pair.questionId);
@@ -332,10 +339,16 @@ export const predictionRows = ({ questions, pairs, pseudonyms, groupOf = () => '
         pseudonyms.get(pair.participantId), pair.origin, pair.platform, pair.modelId, pair.context ?? 'not reported',
         groupOf(pair.participantId), pair.condition, pair.questionId, question.type, pair.prediction, pair.actual,
         similarity === null ? null : Number(similarity.toFixed(4)), JSON.stringify(pair.prediction) === JSON.stringify(pair.actual) ? 1 : 0,
-        pair.confidence, pair.confidenceMeaning,
+        pair.confidence, pair.confidenceMeaning, ...changes(pair.participantId, pair.questionId),
       ];
-    })
-    .sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : a[7] < b[7] ? -1 : 1));
+    });
+  const freeform = drafts
+    .filter((draft) => byId.get(draft.questionId)?.type === 'freeform' && pseudonyms.has(draft.participantId))
+    .map((draft) => [
+      pseudonyms.get(draft.participantId), draft.origin, null, null, null, groupOf(draft.participantId), draft.condition,
+      draft.questionId, 'freeform', null, null, null, null, null, null, ...changes(draft.participantId, draft.questionId),
+    ]);
+  const rows = [...scored, ...freeform].sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : a[7] < b[7] ? -1 : 1));
   return `${[PREDICTION_COLUMNS, ...rows].map((cells) => cells.map((value) => quoteCsvCell(cellValue(value))).join(',')).join('\n')}\n`;
 };
 
@@ -363,7 +376,7 @@ export const runFidelityReport = (args) => {
   };
   const excluded = new Set(excludeParticipants.map((id) => id.toLowerCase()));
   const kept = (pair) => !excluded.has(pair.participantId.toLowerCase()) && (args.includeAgents || !pair.isAgent);
-  const pseudonyms = pseudonymsFor(pairs.filter(kept).map((pair) => pair.participantId));
+  const pseudonyms = pseudonymsFor([...pairs, ...drafts].filter(kept).map((record) => record.participantId));
   const report = scoreAgentFidelity({
     questions,
     pairs: pairs.filter((pair) => PREDICTION_ORIGINS.includes(pair.origin)),
@@ -398,7 +411,7 @@ export const runFidelityReport = (args) => {
       return own.find((group) => reportedGroups.has(group)) ?? '';
     };
     mkdirSync(path.dirname(path.resolve(args.predictions)), { recursive: true });
-    writeFileSync(args.predictions, predictionRows({ questions, pairs: pairs.filter(kept), pseudonyms, groupOf }));
+    writeFileSync(args.predictions, predictionRows({ questions, pairs: pairs.filter(kept), drafts: drafts.filter(kept), pseudonyms, groupOf }));
   }
   return report;
 };

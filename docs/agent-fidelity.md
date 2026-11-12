@@ -215,8 +215,11 @@ then names the person, and for each question the later one in the file counts.
 the person's pseudonym (the same one as in the report's per-person rows, in an
 order drawn afresh each run), origin, platform, model, context used, group
 (only groups the report names), condition, question, prediction, answer,
-similarity, exact match and confidence. It has no addresses, names or free
-text: freeform questions are left out, and choice answers keep only the
+similarity, exact match, confidence, and whether the submitted answer and
+comment differ from the draft (`answer_changed`, `comment_changed`; blank when
+the record doesn't say). Freeform drafts get a row too, with the text, scores
+and AI details blank, so how often people rewrote them can still be counted.
+It has no addresses, names or free text: choice answers keep only the
 question's own options. Excluded people and agents are left out, but no
 minimum applies, so it is de-identified rather than anonymous: keep it with
 the raw export.
