@@ -1,10 +1,13 @@
 import React, { useState } from 'react';
 import { Input } from 'reactstrap';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faCaretDown, faCaretUp } from '@fortawesome/free-solid-svg-icons';
 
 import InterviewSettingsFields from '../InterviewSettingsFields';
 import { SESSION_CONTEXT_LIMITS, isHttpsUrl, validateSessionContext } from '@ce-shared/sessionContext.mjs';
 import { E2E_TESTIDS } from '../../../utilities/e2eTestIds.js';
 import {
+  DEFAULT_SESSION_COLOR_SCHEME_ID,
   SESSION_COLOR_SCHEME_REGISTRY,
   normalizeSessionColorSchemeId,
 } from '../../../utilities/ui/sessionColorSchemes';
@@ -36,67 +39,93 @@ type BasicsProps = Pick<SetupSectionProps, 'draft' | 'onChange'> & {
   headerImage?: React.ReactNode;
 };
 
+const COLORS_HELP =
+  'Accent colours on this session’s pages, the same for everyone who opens it. Each person’s site theme stays as they set it.';
+
 export const SetupBasicsSection = ({
   draft,
   onChange,
   runsOn = null,
   link = null,
   headerImage = null,
-}: BasicsProps) => (
-  <SetupSection sectionKey="basics" title="Basics" alwaysOpen>
-    {runsOn}
-    <SetupField id="ce-setup-name" label="Name">
-      <Input
-        id="ce-setup-name"
-        value={text(draft.sessionName)}
-        required
-        aria-required="true"
-        autoComplete="off"
-        data-testid={E2E_TESTIDS.WIZARD_SESSION_NAME}
-        onChange={(event) => onChange(['sessionName'], event.target.value)}
-      />
-    </SetupField>
-    {link}
-    <SetupField id="ce-setup-description" label="Description" help="Shown on the session page and in link previews.">
-      <Input
-        id="ce-setup-description"
-        type="textarea"
-        className={styles.textarea}
-        value={text(draft.sessionInfo)}
-        aria-describedby={setupHelpId('ce-setup-description')}
-        data-testid={E2E_TESTIDS.WIZARD_SESSION_INFO}
-        onChange={(event) => onChange(['sessionInfo'], event.target.value)}
-      />
-    </SetupField>
-    {headerImage || (
-      <SetupField id="ce-setup-header-image" label="Header image" help="An https:// image link.">
+}: BasicsProps) => {
+  const colorSchemeId = normalizeSessionColorSchemeId(asRecord(draft.appearance).colorSchemeId);
+  // Starts open when the session already has colours of its own.
+  const [appearanceOpen, setAppearanceOpen] = useState(colorSchemeId !== DEFAULT_SESSION_COLOR_SCHEME_ID);
+  return (
+    <SetupSection sectionKey="basics" title="Basics" alwaysOpen>
+      {runsOn}
+      <SetupField id="ce-setup-name" label="Name">
         <Input
-          id="ce-setup-header-image"
-          type="url"
-          value={text(draft.sessionHeader)}
-          aria-describedby={setupHelpId('ce-setup-header-image')}
-          data-testid={E2E_TESTIDS.WIZARD_SESSION_HEADER_URL}
-          onChange={(event) => onChange(['sessionHeader'], event.target.value)}
+          id="ce-setup-name"
+          value={text(draft.sessionName)}
+          required
+          aria-required="true"
+          autoComplete="off"
+          data-testid={E2E_TESTIDS.WIZARD_SESSION_NAME}
+          onChange={(event) => onChange(['sessionName'], event.target.value)}
         />
       </SetupField>
-    )}
-    <SetupField id="ce-setup-colors" label="Colors">
-      <Input
-        id="ce-setup-colors"
-        type="select"
-        value={normalizeSessionColorSchemeId(asRecord(draft.appearance).colorSchemeId)}
-        data-testid={E2E_TESTIDS.WIZARD_SESSION_COLOR_SCHEME}
-        onChange={(event) => onChange(['appearance'], { colorSchemeId: event.target.value })}
-      >
-        {SESSION_COLOR_SCHEME_REGISTRY.map(({ id, label }) => (
-          <option key={id} value={id}>
-            {label}
-          </option>
-        ))}
-      </Input>
-    </SetupField>
-  </SetupSection>
-);
+      {link}
+      <SetupField id="ce-setup-description" label="Description" help="Shown on the session page and in link previews.">
+        <Input
+          id="ce-setup-description"
+          type="textarea"
+          className={styles.textarea}
+          value={text(draft.sessionInfo)}
+          aria-describedby={setupHelpId('ce-setup-description')}
+          data-testid={E2E_TESTIDS.WIZARD_SESSION_INFO}
+          onChange={(event) => onChange(['sessionInfo'], event.target.value)}
+        />
+      </SetupField>
+      {headerImage || (
+        <SetupField id="ce-setup-header-image" label="Header image" help="An https:// image link.">
+          <Input
+            id="ce-setup-header-image"
+            type="url"
+            value={text(draft.sessionHeader)}
+            aria-describedby={setupHelpId('ce-setup-header-image')}
+            data-testid={E2E_TESTIDS.WIZARD_SESSION_HEADER_URL}
+            onChange={(event) => onChange(['sessionHeader'], event.target.value)}
+          />
+        </SetupField>
+      )}
+      <div>
+        <button
+          type="button"
+          className={styles.moreButton}
+          aria-expanded={appearanceOpen}
+          aria-controls="ce-setup-appearance"
+          data-testid="ce-setup-appearance-toggle"
+          onClick={() => setAppearanceOpen((open) => !open)}
+        >
+          <FontAwesomeIcon icon={appearanceOpen ? faCaretUp : faCaretDown} aria-hidden="true" />
+          Appearance
+        </button>
+        {appearanceOpen ? (
+          <div id="ce-setup-appearance" className={styles.disclosureBody}>
+            <SetupField id="ce-setup-colors" label="Colors" help={COLORS_HELP}>
+              <Input
+                id="ce-setup-colors"
+                type="select"
+                value={colorSchemeId}
+                aria-describedby={setupHelpId('ce-setup-colors')}
+                data-testid={E2E_TESTIDS.WIZARD_SESSION_COLOR_SCHEME}
+                onChange={(event) => onChange(['appearance'], { colorSchemeId: event.target.value })}
+              >
+                {SESSION_COLOR_SCHEME_REGISTRY.map(({ id, label }) => (
+                  <option key={id} value={id}>
+                    {label}
+                  </option>
+                ))}
+              </Input>
+            </SetupField>
+          </div>
+        ) : null}
+      </div>
+    </SetupSection>
+  );
+};
 
 type ContextLink = { label: string; url: string };
 

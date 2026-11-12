@@ -199,6 +199,15 @@
   }
 }
 
+// A disclosure inside a section, such as Basics' Appearance.
+.disclosureBody {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 10px;
+  min-width: 0;
+}
+
 .inlineRow {
   display: flex;
   flex-wrap: wrap;

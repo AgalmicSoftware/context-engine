@@ -544,8 +544,9 @@ The core session metadata:
   untrusted material, as the session page's question generator marks it.
   Drafts join the list, where you can edit or remove them; nothing reaches the
   session before **Create**.
-- **Colors** in Basics: `Context Engine`, `Ocean`, or `Amber`. This controls
-  only documented session accents/chrome and does not change the app theme.
+- **Colors**, under **Appearance** in Basics: `Context Engine`, `Ocean`, or
+  `Amber`. This controls only documented session accents/chrome and does not
+  change the app theme.
 - slug: the page makes it from the name and shows the resulting link.
   It starts with a lowercase letter or number, then uses only lowercase letters, numbers, `_`, or `-`, up to 128 characters. Participant links open only slugs in this form. Slugs whose link opens a different session are reserved: `general` (the default session), `debate` (the session Worker opens `rxc` instead), `constructor` and `prototype`.
 - session ID, which the page generates

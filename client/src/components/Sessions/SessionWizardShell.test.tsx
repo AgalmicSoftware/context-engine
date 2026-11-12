@@ -172,7 +172,15 @@ describe('SessionWizardShell', () => {
     fireEvent.change(within(basics).getByTestId(E2E_TESTIDS.WIZARD_SESSION_INFO), {
       target: { value: 'What this session is for.' },
     });
+    // Colors sit under Appearance, closed while the session keeps the default colours.
+    expect(within(basics).queryByTestId(E2E_TESTIDS.WIZARD_SESSION_COLOR_SCHEME)).not.toBeInTheDocument();
+    const appearance = within(basics).getByRole('button', { name: 'Appearance' });
+    expect(appearance).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(appearance);
+    expect(appearance).toHaveAttribute('aria-expanded', 'true');
     const colors = within(basics).getByTestId(E2E_TESTIDS.WIZARD_SESSION_COLOR_SCHEME) as HTMLSelectElement;
+    expect(colors).toHaveAccessibleDescription(/^Accent colours on this session’s pages/);
+    expect(within(basics).getByRole('button', { name: 'About Colors' })).toBeInTheDocument();
     const otherScheme = Array.from(colors.options).find((option) => option.value !== colors.value)?.value;
     expect(otherScheme).toBeTruthy();
     fireEvent.change(colors, { target: { value: otherScheme } });
@@ -183,6 +191,16 @@ describe('SessionWizardShell', () => {
     expect(props.renderField).toHaveBeenCalledWith('sessionHeader', 'https://example.test/header.png', []);
     expect(basics).toContainElement(screen.getByTestId('shell-field-sessionHeader'));
     expect(basics).toContainElement(screen.getByTestId('shell-slug-preview'));
+  });
+
+  it('opens Appearance when the session has colours of its own', () => {
+    render(
+      <SessionWizardShell
+        {...baseProps({ draft: { ...baseProps().draft, appearance: { colorSchemeId: 'ocean' } } })}
+      />,
+    );
+    expect(screen.getByRole('button', { name: 'Appearance' })).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SESSION_COLOR_SCHEME)).toHaveValue('ocean');
   });
 
   it('asks first where the session runs, Centralized or Decentralized, and leaves Hosting without it', () => {
