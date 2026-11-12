@@ -1,5 +1,7 @@
 import { responseValuesEqual as valuesEqual } from './responseValueEquality';
 import { interviewDraftFieldValue } from './sessionInterviewReviewState';
+import { hasDraftValue } from './sessionInterviewModalState';
+import type { InterviewDraftResponse } from './sessionInterview';
 type RecordValue = Record<string, unknown>;
 const record = (value: unknown): RecordValue =>
   value && typeof value === 'object' && !Array.isArray(value) ? (value as RecordValue) : {};
@@ -58,6 +60,61 @@ export const resolveFieldProtection = (
     comments.encrypted === true ||
     (comments.audienceMode !== 'explicit' && encryptedAnswer);
   return { encryptedAnswer, encryptedComments };
+};
+
+/**
+ * Response fields as interview review reads them. What someone encrypted doesn't go to the session's AI, even once
+ * unlocked on this page, so their encrypted answers and comments count as locked ("*"): review never shows, quotes,
+ * joins or sends their text, an encrypted answer stands as a locked one does, and submitting leaves an encrypted
+ * comment as it was unless they choose the AI's.
+ */
+export const lockEncryptedFields = (fields: RecordValue | null | undefined): RecordValue | null | undefined => {
+  const source = record(fields);
+  const lockIn = (field: 'answers' | 'additionalComments', protectedField: 'encryptedAnswer' | 'encryptedComments') => {
+    const entries = record(source[field]);
+    const locked = Object.keys(entries).filter((questionId) => {
+      const { value } = record(entries[questionId]);
+      return hasDraftValue(value) && value !== '*' && resolveFieldProtection(questionId, source)[protectedField];
+    });
+    const masked = locked.map((questionId) => [questionId, { ...record(entries[questionId]), value: '*' }]);
+    return locked.length ? { [field]: { ...entries, ...Object.fromEntries(masked) } } : null;
+  };
+  const answers = lockIn('answers', 'encryptedAnswer');
+  const comments = lockIn('additionalComments', 'encryptedComments');
+  return answers || comments ? { ...source, ...answers, ...comments } : fields;
+};
+
+/**
+ * Reviewed values an AI may hear: an answer or comment someone encrypted stays out, even once unlocked on this page,
+ * and so do the ratings beside it, as research sharing redacts them.
+ */
+export const withoutEncryptedFields = (
+  questionId: string,
+  fields: RecordValue | null | undefined,
+  values: InterviewDraftResponse | undefined,
+): InterviewDraftResponse | undefined => {
+  if (!values) return values;
+  const { encryptedAnswer, encryptedComments } = resolveFieldProtection(questionId, record(fields));
+  if (!encryptedAnswer && !encryptedComments) return values;
+  const kept = (field: string) =>
+    !(field === 'answer' && encryptedAnswer) &&
+    !(field === 'additionalComments' && encryptedComments) &&
+    field !== 'importance' &&
+    field !== 'conviction';
+  const {
+    answer,
+    additionalComments,
+    importance: _importance,
+    conviction: _conviction,
+    userEditedFields,
+    ...rest
+  } = values;
+  return {
+    ...rest,
+    answer: kept('answer') ? answer : undefined,
+    ...(kept('additionalComments') ? { additionalComments } : {}),
+    ...(userEditedFields ? { userEditedFields: userEditedFields.filter(kept) } : {}),
+  };
 };
 
 const protectSnapshot = (values: unknown, encryptedAnswer: boolean, encryptedComments: boolean): RecordValue => {

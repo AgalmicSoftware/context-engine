@@ -5,11 +5,14 @@ import {
   CONTEXT_SOURCE_LIMITS as LIMITS,
   CONTEXT_TAGS as TAGS,
   CONTEXT_TEXT_ROLE,
+  contextAdderProblem,
   contextRoleOf,
   contextTagValue,
   isAdminsOnlyAccess,
+  participantsMayAddContext,
 } from '../../shared/sessionContextSources.mjs';
 import { looksSecret } from '../../shared/secretText.mjs';
+import { resolveSessionLifecycle } from '../shared/sessionLifecycle.mjs';
 import { readPdfWithSessionAi } from './contextDocumentRead.js';
 import { fetchContextSnapshotText } from './fetchExecution.js';
 import {
@@ -63,9 +66,16 @@ const storeRecord = async (store, payload) => {
   return trim(body?.id) ? { id: trim(body.id) } : { response };
 };
 
+// An agent's self-declared mark and name for a link it adds, as the tags a file carries.
+const adderTagsOf = (body) => [
+  { name: TAGS.adderKind, value: trim(body.adder) },
+  { name: TAGS.adderName, value: trim(body.adderName) },
+].filter((tag) => tag.value);
+
 // A link: the Worker fetches the page under the strict link policy and stores
-// its text with the link. With `replaces`, a refresh of that link: the new
-// snapshot keeps its privacy and title, then the old record goes.
+// its text with the link. With `replaces`, a refresh of that link: the same
+// page read again, whose snapshot keeps the link's title, privacy and adder,
+// then the old record goes.
 const addLink = async ({ body, env, slug, deps, store, json, now }) => {
   const url = trim(body.url);
   let parsed = null;
@@ -80,6 +90,15 @@ const addLink = async ({ body, env, slug, deps, store, json, now }) => {
   if (trim(body.replaces) && (!replaces || contextTagValue(replaces.tags, TAGS.kind) !== 'link')) {
     return json({ error: 'That link is no longer in the session.' }, 404);
   }
+  if (replaces && contextTagValue(replaces.tags, TAGS.url) !== parsed.toString()) {
+    return json({ error: 'A refresh reads the same link again; add another link as a new item.' }, 400);
+  }
+  // A refresh keeps the link's agent mark, as the store keeps its adder.
+  const adderTags = adderTagsOf(replaces
+    ? { adder: contextTagValue(replaces.tags, TAGS.adderKind), adderName: contextTagValue(replaces.tags, TAGS.adderName) }
+    : body);
+  const adderProblem = contextAdderProblem(adderTags);
+  if (adderProblem) return json({ error: adderProblem, reason: 'context_adder_invalid' }, 400);
   const fetched = await fetchContextSnapshotText({
     url: parsed.toString(),
     deps: { safeFetch: deps?.safeFetch, isBlockedOutboundUrl: deps?.isBlockedOutboundUrl, fetchTimeoutMs: deps?.fetchTimeoutMs },
@@ -91,7 +110,8 @@ const addLink = async ({ body, env, slug, deps, store, json, now }) => {
   }
   const text = fetched.text.slice(0, LIMITS.snapshotChars);
   if (!text.trim()) return json({ error: 'The page has no text to read.', reason: 'context_link_empty' }, 422);
-  const title = clip(trim(body.title) || contextTagValue(replaces?.tags, TAGS.name) || fetched.title || parsed.hostname, LIMITS.titleChars);
+  const title = clip((replaces ? contextTagValue(replaces.tags, TAGS.name) : trim(body.title)) || fetched.title || parsed.hostname,
+    LIMITS.titleChars);
   const adminsOnly = replaces ? isAdminsOnlyAccess(replaces.accessConditions) : body.adminsOnly === true;
   const fetchedAt = now();
   const record = {
@@ -106,6 +126,8 @@ const addLink = async ({ body, env, slug, deps, store, json, now }) => {
     bytes: encoder.encode(JSON.stringify(record)),
     contentType: 'application/json',
     accessConditions: adminsOnly ? ADMINS_ONLY_ACCESS : null,
+    // A refreshed link stays its first adder's, who may still remove it.
+    ...(replaces ? { contextUploader: replaces.uploader } : {}),
     tags: [
       ...commonTags('link'),
       { name: TAGS.role, value: CONTEXT_ROLE },
@@ -113,6 +135,7 @@ const addLink = async ({ body, env, slug, deps, store, json, now }) => {
       { name: TAGS.mime, value: 'application/json' },
       { name: TAGS.url, value: record.url },
       { name: TAGS.fetchedAt, value: fetchedAt },
+      ...adderTags,
     ],
   });
   if (stored.response) return stored.response;
@@ -232,11 +255,14 @@ const remove = async ({ body, env, slug, deps, json }) => {
 
 const ACTIONS = Object.freeze({ 'add-link': addLink, 'read-pdf': readPdf, remove });
 
-// POST /storage/context { action, ... }: admins change context sources, and
-// whoever added a file may remove it. Files are added through /storage/upload
-// with a context role.
+// POST /storage/context { action, ... }: admins change context sources. Anyone
+// else may remove what they added, and add a link while the session takes
+// additions and hasn't ended, when they may have the Worker fetch pages;
+// refreshing a link and having a PDF read stay with admins, as each makes the
+// Worker work again for an item already there. Files are added through
+// /storage/upload with a context role.
 export const contextSourceRoute = async ({
-  request, env, config, slug, uploaderAddress, baseHeaders, deps, store,
+  request, env, config, slug, uploaderAddress, authScopes, baseHeaders, deps, store, authorizeAdd, checkFetchAccess,
 } = {}) => {
   const json = (body, status = 200) => (deps?.json
     ? deps.json(body, status, baseHeaders)
@@ -247,11 +273,36 @@ export const contextSourceRoute = async ({
   const isAdmin = resolveSessionAdminAddresses(config).has(admin);
   let body = null;
   try { body = await request.json(); } catch { body = null; }
-  if (!isAdmin && (!isObj(body) || trim(body.action) !== 'remove')) return refused();
+  const name = isObj(body) ? trim(body.action) : '';
+  const participantMay = name === 'remove' || (name === 'add-link' && !trim(body.replaces));
+  if (!isAdmin && !participantMay) return refused();
   if (!isObj(body)) return json({ error: 'Invalid JSON.' }, 400);
-  const name = trim(body.action);
   if (!Object.hasOwn(ACTIONS, name)) return json({ error: 'Unknown context action.' }, 400);
-  if (!isAdmin) {
+  // Checked before the Worker fetches anything; the upload path checks again as it stores.
+  if (name === 'add-link') {
+    if (!isAdmin && !participantsMayAddContext(config)) {
+      return json({ error: 'Only session admins can add context.', reason: 'context_admin_required' }, 403);
+    }
+    if (!isAdmin && resolveSessionLifecycle(config, { now: deps?.now }).ended) {
+      return json({ error: 'This session has ended.', code: 'session_ended' }, 410);
+    }
+    const access = await authorizeAdd();
+    if (!access.ok) return access.response;
+    if (!isAdmin) {
+      // A participant's link has the Worker fetch a page for them, so it takes the
+      // fetch scope of their sign-in and counts against their daily limit, as /fetch does.
+      if (authScopes?.fetch !== true) {
+        return json({
+          error: 'This session doesn’t let you have its Worker fetch pages, so you can’t add links.',
+          reason: 'context_link_fetch_denied',
+        }, 403);
+      }
+      // Any other refusal, such as a failed authorization check or the daily limit, is /fetch's own.
+      const fetchAccess = await checkFetchAccess?.();
+      if (!fetchAccess?.ok) return fetchAccess?.response || json({ error: 'Fetch access could not be checked.' }, 403);
+    }
+  }
+  if (!isAdmin && name === 'remove') {
     // A row that can't be read proves nothing, so it removes nothing.
     const row = await readContextSourceRow({ env, slug, id: body.id });
     if (!row) return json({ error: 'That item is no longer in the session.' }, 404);

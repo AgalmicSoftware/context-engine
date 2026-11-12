@@ -16,6 +16,8 @@ import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import type { InterviewDraftResponse, InterviewQuestion } from './sessionInterview';
 import { describeInterviewAnswer } from './sessionInterviewHiddenDrafts';
 import { changesEarlierAnswer, interviewDraftFieldValue } from './sessionInterviewReviewState';
+import { interviewCommentChoices, startingInterviewComment } from './sessionInterviewComments';
+import SessionInterviewCommentChoices from './SessionInterviewCommentChoices';
 import styles from './SessionInterviewDraftCard.module.scss';
 
 export type InterviewQuestionControls = {
@@ -40,8 +42,8 @@ type Props = InterviewQuestionControls & {
   existing: boolean;
   // The responder's current answer to this question, saved or typed on the page, if any.
   earlierAnswer?: unknown;
-  // The responder's saved comment, which review shows when the AI proposed none.
-  savedComment?: string;
+  // Their comment the same way, '*' when locked. Review starts from it, with the AI's proposal after it.
+  earlierComment?: unknown;
   // A hidden draft's status line. The card then holds only the responder's own answer.
   blindNote?: string;
   concealed?: boolean;
@@ -215,14 +217,36 @@ const DraftEditableText = ({
   );
 };
 
-// Earlier answers short enough to quote back; others, and locked ones, are only mentioned.
-const QUOTED_ANSWER_TYPES = new Set(['binary', 'multichoice', 'rating']);
-const describeChangedAnswer = (answer: unknown, earlier: unknown, question?: InterviewQuestion) => {
-  if (!changesEarlierAnswer(answer, earlier, question?.type)) return '';
-  return earlier !== '*' && QUOTED_ANSWER_TYPES.has(String(question?.type))
-    ? `Changes your earlier answer: ${describeInterviewAnswer(earlier, question)}`
-    : 'Changes your earlier answer';
+// Earlier answers and comments longer than this are cut short, with a way to read all of it.
+const EARLIER_PREVIEW = 120;
+const shortenEarlier = (text: string) => {
+  const flat = text.replace(/\s+/g, ' ').trim();
+  if (flat.length <= EARLIER_PREVIEW) return '';
+  const space = flat.lastIndexOf(' ', EARLIER_PREVIEW);
+  return `${flat.slice(0, space > EARLIER_PREVIEW / 2 ? space : EARLIER_PREVIEW).trimEnd()}…`;
 };
+
+/** The person's earlier answer or comment after a label, or the label alone when it's locked and can't be read. */
+function EarlierNote({ label, text, className = '' }: { label: string; text: string; className?: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const preview = shortenEarlier(text);
+  return (
+    <p className={`${styles.blindNote} ${className} ${expanded ? styles.earlierAnswerFull : ''}`}>
+      {text ? `${label}: ${preview && !expanded ? preview : text}` : label}
+      {preview ? (
+        <button
+          type="button"
+          className={styles.earlierAnswerToggle}
+          data-ce-control-appearance="frameless"
+          aria-expanded={expanded}
+          onClick={() => setExpanded((value) => !value)}
+        >
+          {expanded ? 'Show less' : 'Show all'}
+        </button>
+      ) : null}
+    </p>
+  );
+}
 
 const isNativeAnswerType = (question?: InterviewQuestion): boolean => {
   const type = String(question?.type || '').toLowerCase();
@@ -242,7 +266,7 @@ function SessionInterviewDraftCardContent({
   selected,
   existing,
   earlierAnswer,
-  savedComment = '',
+  earlierComment,
   blindNote,
   concealed = false,
   disabled,
@@ -252,7 +276,14 @@ function SessionInterviewDraftCardContent({
   renderAdditionalInput,
   renderFieldLock,
 }: Props) {
-  const [showComments, setShowComments] = useState(Boolean(edited.additionalComments));
+  // A hidden draft holds only the person's own values, so it has nothing to choose between.
+  const commentChoices = blindNote ? [] : interviewCommentChoices(draft.additionalComments, earlierComment);
+  const hasCommentChoices = commentChoices.length > 0;
+  const [showComments, setShowComments] = useState(Boolean(edited.additionalComments) || hasCommentChoices);
+  // Their comment and the AI's are both shown once there is a choice between them.
+  useEffect(() => {
+    if (hasCommentChoices) setShowComments(true);
+  }, [hasCommentChoices]);
   const [showEvidence, setShowEvidence] = useState(false);
   const [sliderMode, setSliderMode] = useState<'conviction' | 'importance'>('conviction');
   const [sliderOpen, setSliderOpen] = useState(false);
@@ -267,11 +298,11 @@ function SessionInterviewDraftCardContent({
   const rawComments = String(edited.additionalComments || '');
   const answerValue = edited.answer;
   // Chosen or not, a draft that would replace a different earlier answer says so.
-  const changeNote = describeChangedAnswer(answerValue, earlierAnswer, question);
+  const changesAnswer = changesEarlierAnswer(answerValue, earlierAnswer, question?.type);
   const useNativeAnswer = isNativeAnswerType(question);
-  // Review shows the saved comment when the AI proposed none, so edits start from it.
+  // An untouched comment is the person's own followed by the AI's, so edits start from that.
   const startingValue = (field: EditableField) =>
-    field === 'additionalComments' ? draft.additionalComments || savedComment : draft[field];
+    field === 'additionalComments' ? startingInterviewComment(draft.additionalComments, earlierComment) : draft[field];
   const valuesEqual = (left: unknown, right: unknown, field: EditableField = 'answer') =>
     responseValuesEqual(
       left,
@@ -323,7 +354,13 @@ function SessionInterviewDraftCardContent({
           {blindNote}
         </p>
       ) : null}
-      {changeNote ? <p className={styles.blindNote}>{changeNote}</p> : null}
+      {/* Under a draft that would replace a different earlier answer: that answer, so the two can be compared. */}
+      {changesAnswer ? (
+        <EarlierNote
+          label="Changes your earlier answer"
+          text={earlierAnswer === '*' ? '' : describeInterviewAnswer(earlierAnswer, question)}
+        />
+      ) : null}
       <div className={styles.editorStack}>
         {blindNote ? <strong>Your answer</strong> : null}
         {useNativeAnswer && renderAnswerInput ? (
@@ -410,13 +447,30 @@ function SessionInterviewDraftCardContent({
           {showComments ? (
             <div className={styles.commentsRow}>
               <div className={styles.additionalEditor}>
+                {hasCommentChoices ? (
+                  <>
+                    {/* Their earlier comment stays in view whichever choice or edit the box holds. */}
+                    <EarlierNote
+                      className={styles.earlierComment}
+                      label={earlierComment === '*' ? 'Your earlier comment is locked' : 'Your earlier comment'}
+                      text={earlierComment === '*' ? '' : String(earlierComment ?? '')}
+                    />
+                    <SessionInterviewCommentChoices
+                      choices={commentChoices}
+                      value={rawComments}
+                      locked={earlierComment === '*'}
+                      disabled={disabled}
+                      onChoose={onCommentsChange}
+                    />
+                  </>
+                ) : null}
                 <AdditionalCommentsInlineRow
                   lockControl={renderFieldLock?.(draft.questionId, 'additional')}
                   input={
                     <DraftEditableText
                       label={`Additional comments for ${prompt}`}
                       value={rawComments}
-                      placeholder="No additional comment."
+                      placeholder={earlierComment === '*' ? 'Your locked comment stays.' : 'No additional comment.'}
                       disabled={disabled}
                       onChange={onCommentsChange}
                       renderEditor={

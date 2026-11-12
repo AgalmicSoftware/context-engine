@@ -2,8 +2,10 @@
 import {
   ADMINS_ONLY_ACCESS,
   groupLockedAccess,
+  CONTEXT_AGENT_ADDER,
   CONTEXT_FILE_TYPES,
   CONTEXT_ROLE,
+  CONTEXT_SOURCE_LIMITS,
   CONTEXT_TAGS,
   CONTEXT_TEXT_ROLE,
   contextFileByteLimit,
@@ -40,6 +42,10 @@ export type ContextSource = {
   lockedGroupIds: string[];
   /** The address that added it. */
   addedBy: string;
+  /** True when an agent marked it as one it added. Self-declared, so only a label. */
+  addedByAgent: boolean;
+  /** The name that agent goes by; '' when it gave none or isn't an agent. */
+  adderName: string;
   /** When the Worker last read a link's page. */
   fetchedAt: string;
   /** A PDF's text as the session's AI read it. */
@@ -89,6 +95,10 @@ export const workerSupportsContextSources = (options: ContextSourceOptions): Pro
 export const workerAcceptsParticipantContext = (options: ContextSourceOptions): Promise<boolean> =>
   workerHasFeature(options, 'participant_context_v1');
 
+/** True when this session's Worker lets participants add links too (Session Workers from 0.9.2). */
+export const workerAcceptsParticipantLinks = (options: ContextSourceOptions): Promise<boolean> =>
+  workerHasFeature(options, 'participant_context_links_v1');
+
 const toSource = (item: unknown): (ContextSource & { role: string; derivedFrom: string }) | null => {
   const record = asRecord(item);
   const metadata = asRecord(record.metadata);
@@ -98,6 +108,7 @@ const toSource = (item: unknown): (ContextSource & { role: string; derivedFrom: 
   const tags = metadata.tags;
   const role = contextRoleOf(tags);
   if (!role) return null;
+  const addedByAgent = contextTagValue(tags, CONTEXT_TAGS.adderKind) === CONTEXT_AGENT_ADDER;
   return {
     id,
     role,
@@ -113,6 +124,10 @@ const toSource = (item: unknown): (ContextSource & { role: string; derivedFrom: 
       .map((groupId: unknown) => toStr(groupId).trim().toLowerCase())
       .filter(Boolean),
     addedBy: toStr(metadata.addedBy).toLowerCase(),
+    addedByAgent,
+    adderName: addedByAgent
+      ? contextTagValue(tags, CONTEXT_TAGS.adderName).slice(0, CONTEXT_SOURCE_LIMITS.adderNameChars)
+      : '',
     fetchedAt: contextTagValue(tags, CONTEXT_TAGS.fetchedAt),
     reading:
       role === CONTEXT_TEXT_ROLE
@@ -212,17 +227,24 @@ export const loadContextSourcesForAi = async (
   return loaded.filter((source): source is NonNullable<typeof source> => !!source);
 };
 
-/** Who added a source, for its list: "you", "an admin" or a short address. '' when unrecorded. */
+/**
+ * Who added a source, for its list: "you", an agent's name with "(agent)", "an
+ * admin" or a short address. '' when unrecorded.
+ */
 export const contextAdderLabel = (
-  { addedBy }: Pick<ContextSource, 'addedBy'>,
+  {
+    addedBy,
+    addedByAgent = false,
+    adderName = '',
+  }: Pick<ContextSource, 'addedBy'> & Partial<Pick<ContextSource, 'addedByAgent' | 'adderName'>>,
   sessionConfig: unknown,
   account: unknown,
 ): string => {
   if (!addedBy) return '';
   if (addedBy === toStr(account).trim().toLowerCase()) return 'you';
-  return isConfiguredAdmin(sessionConfig, { account: addedBy })
-    ? 'an admin'
-    : `${addedBy.slice(0, 6)}…${addedBy.slice(-4)}`;
+  const short = `${addedBy.slice(0, 6)}…${addedBy.slice(-4)}`;
+  if (addedByAgent) return `${adderName || short} (agent)`;
+  return isConfiguredAdmin(sessionConfig, { account: addedBy }) ? 'an admin' : short;
 };
 
 /** A session's files as a template lists them. Groups don't travel between sessions, so a locked file stays narrow. */

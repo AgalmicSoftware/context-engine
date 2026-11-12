@@ -3,6 +3,12 @@ import { readFileSync } from 'node:fs';
 import { ethers } from 'ethers';
 
 const sessions = JSON.parse(readFileSync(new URL('../client/src/variables/demo/demo_sessions.json', import.meta.url)));
+// A listed session opens on its listed Worker, so demo-sh is left out of the list
+// the client sees: it stays on the fixture Worker below.
+const knownSessions = JSON.parse(readFileSync(new URL('../known-sessions.json', import.meta.url)));
+delete knownSessions['demo-sh'];
+// Vite asks for a JSON module as `?import`, after a `t=` timestamp once it has changed.
+const jsonModule = (path) => (url) => url.pathname.endsWith(path) && url.searchParams.has('import');
 const registry = new ethers.utils.Interface(
   JSON.parse(readFileSync(new URL('../client/src/contractsABI/SESSION_REGISTRY_ABI.json', import.meta.url))),
 );
@@ -139,11 +145,14 @@ export async function installCivicThemeFixtures(context, baseUrl, { privateGroup
   });
   // Retain the checked-in demo-2 question/report preview; isolate the session
   // catalog from live discovery while testing the real selector and cache paths.
-  await context.route('**/src/variables/demo/demo_sessions.json?import*', (route) =>
+  await context.route(jsonModule('/src/variables/demo/demo_sessions.json'), (route) =>
     route.fulfill({
       contentType: 'application/javascript',
       body: `export default ${JSON.stringify({ general: sessions.general, 'demo-sh': config, 'demo-2': sessions['demo-2'] })};`,
     }),
+  );
+  await context.route(jsonModule('/known-sessions.json'), (route) =>
+    route.fulfill({ contentType: 'application/javascript', body: `export default ${JSON.stringify(knownSessions)};` }),
   );
   await context.addInitScript(() => {
     if (!localStorage.getItem('ce:primarySessionSlug')) {

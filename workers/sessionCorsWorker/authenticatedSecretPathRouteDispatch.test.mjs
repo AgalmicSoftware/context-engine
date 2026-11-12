@@ -132,14 +132,35 @@ test('dispatchAuthenticatedSecretPathRoute blocks participant writes after the s
   }
   assert.equal(groupRouteCalls, 0);
 
-  // Context changes are admin-only, so an admin can still remove a private item.
+  // The context route checks the end itself: an admin can still remove a
+  // private item, while a participant's new link is refused there.
+  const preflights = [];
+  let checkFetchAccess = null;
   const contextChange = await dispatchAuthenticatedSecretPathRoute({
     ...base,
     path: '/storage/context',
     method: 'POST',
-    deps: { ...deps, storageRoute: async () => new Response('context') },
+    address: '0xabc',
+    limit: 7,
+    scopes: { storage: true, fetch: true },
+    deps: {
+      ...deps,
+      storageRoute: async (value) => {
+        checkFetchAccess = value.checkFetchAccess;
+        return new Response('context');
+      },
+      evaluateAuthenticatedRoutePreflight: async ({ scope, route, address, limit }) => {
+        preflights.push({ scope, route, address, limit });
+        return { ok: true };
+      },
+    },
   });
   assert.equal(await contextChange.response.text(), 'context');
+  // Each context change counts against the storage route's per-address rate limit,
+  // and a participant's link, which the route checks, against the fetch route's too.
+  assert.deepEqual(preflights, [{ scope: 'storage', route: 'storage', address: '0xabc', limit: 7 }]);
+  assert.deepEqual(await checkFetchAccess(), { ok: true });
+  assert.deepEqual(preflights[1], { scope: 'fetch', route: 'fetch', address: '0xabc', limit: 7 });
 
   for (const path of ['/groups/list', '/groups/members']) {
     const readable = await dispatchAuthenticatedSecretPathRoute({

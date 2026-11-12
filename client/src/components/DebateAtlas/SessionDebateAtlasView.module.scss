@@ -82,3 +82,12 @@
     }
   }
 }
+
+// Classic's corners are square, as Windows 95's are, and the atlas sits on
+// its gray face, where the map's white bevel edges show.
+@container ce-theme style(--ce-layout-profile: desktop-window) {
+  .atlas {
+    border-radius: 0;
+    background: var(--ce-surface);
+  }
+}

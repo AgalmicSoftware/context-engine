@@ -72,7 +72,6 @@ import {
   displayResponderContext,
   omitConcealedInterviewFacts,
   hasDraftValue,
-  responseCommentValue,
   responseFieldValue,
   type SessionInterviewModalRecord,
 } from './sessionInterviewModalState';
@@ -80,9 +79,13 @@ import {
 import type { SessionInterviewPanelBaseProps } from './sessionVoiceModeTypes';
 import {
   addsToSavedAnswer,
+  describeLeftOutDrafts,
   loadOwnContextForMapping,
+  readAnswersThatStillFit,
   readAnswersToReconsider,
 } from './sessionInterviewReconsideration';
+import { draftsWithUnseenComments, useStartingInterviewComments } from './sessionInterviewComments';
+import { lockEncryptedFields } from './sessionInterviewResearch';
 import type { TranscriptClaim } from './sessionTranscriptClaim';
 
 type UnknownRecord = SessionInterviewModalRecord;
@@ -184,8 +187,10 @@ export default function SessionInterviewPanel({
   };
   const [mapping, setMapping] = useState(false);
   const [mappingNotice, setMappingNotice] = useState('');
-  // Drafts left out of review because the person already answered their questions.
+  // Drafts left out of review because the person already answered their questions, and of those,
+  // the answers a claim's AI reconsidered and repeated.
   const [leftOutIds, setLeftOutIds] = useState<string[]>([]);
+  const [stillFitIds, setStillFitIds] = useState<string[]>([]);
   const [applying, setApplying] = useState(false);
   const [pendingSubmitAfterLogin, setPendingSubmitAfterLogin] = useState(false);
   const pendingSubmitBaseContextRef = useRef('');
@@ -371,12 +376,14 @@ export default function SessionInterviewPanel({
   // Saved answers can load after drafts entered review. An answered question gets no suggestion,
   // so untouched drafts go. The person's own drafts, and their own words in this interview giving
   // a different answer, stay as they are; their cards say which answer they change. A queued
-  // submit waits for the person to check them.
+  // submit waits for the person to check them, and any card a loaded comment doesn't match.
   const reviewSavedConflicts = useCallback(
     (slice: SessionInterviewModalRecord | null | undefined) => {
-      const saved = (draft: InterviewDraftResponse) => responseFieldValue(slice, 'answers', draft.questionId);
+      const loaded = lockEncryptedFields(slice);
+      const saved = (draft: InterviewDraftResponse) => responseFieldValue(loaded, 'answers', draft.questionId);
       const conflicts = drafts.filter((draft) => hasDraftValue(saved(draft)));
-      if (!conflicts.length) return false;
+      const unseen = draftsWithUnseenComments(drafts, selected, editedDrafts, loaded).length;
+      if (!conflicts.length && !unseen) return false;
       const kept = conflicts.filter(
         (draft) =>
           participantOwned(draft.questionId) ||
@@ -393,21 +400,22 @@ export default function SessionInterviewPanel({
       pendingSubmitActiveContextRef.current = '';
       setPendingSubmitAfterLogin(false);
       setStatus(
-        kept.some((draft) =>
-          changesEarlierAnswer(
-            editedDrafts[draft.questionId]?.answer ?? draft.answer,
-            saved(draft),
-            questions.find((question) => question.id === draft.questionId)?.type,
-          ),
-        )
-          ? 'Saved answers loaded. Check drafts that change an earlier answer, then submit.'
+        unseen ||
+          kept.some((draft) =>
+            changesEarlierAnswer(
+              editedDrafts[draft.questionId]?.answer ?? draft.answer,
+              saved(draft),
+              questions.find((question) => question.id === draft.questionId)?.type,
+            ),
+          )
+          ? 'Saved answers loaded. Check drafts that change an earlier answer or comment, then submit.'
           : drafts.length > dropped.length || suggestedQuestions.length
             ? 'Review drafts'
             : 'Ready',
       );
       return true;
     },
-    [drafts, dropDrafts, editedDrafts, participantOwned, questions, suggestedQuestions.length],
+    [drafts, dropDrafts, editedDrafts, participantOwned, questions, selected, suggestedQuestions.length],
   );
   const ownAnswers = useInterviewSavedAnswers({
     load: onLoadSavedResponses,
@@ -417,7 +425,9 @@ export default function SessionInterviewPanel({
     onLoaded: reviewSavedConflicts,
   });
   // Review starts from the form, unsaved edits included; the own-answer read merges saved answers into it.
-  const existingResponseSlice = formResponseSlice || ownAnswers.slice;
+  // An encrypted answer or comment counts as locked there, even once unlocked on the page.
+  const existingResponseSlice = lockEncryptedFields(formResponseSlice || ownAnswers.slice);
+  useStartingInterviewComments(drafts, existingResponseSlice, setEditedDrafts);
   const hiddenDrafts = useInterviewHiddenDrafts({
     questions,
     editedDrafts,
@@ -621,6 +631,7 @@ export default function SessionInterviewPanel({
         let mapped = importedDrafts;
         let proposedQuestions: GeneratedSurveyStatement[] = [];
         let draftingPicks: InterviewPrefillGroupPick[] = [];
+        let reconsidered: ReturnType<typeof readAnswersToReconsider> = [];
         if (mapped === null) {
           const url = await resolveWorkerUrl();
           if (disposedRef.current) return;
@@ -635,6 +646,7 @@ export default function SessionInterviewPanel({
           // The mapper hears no AI prediction for an answered question, so it can't hand one back
           // as new evidence. Drafts under review keep theirs.
           const inReview = new Set(latestReviewRef.current.drafts.map((draft) => draft.questionId));
+          if (usedClaimRef.current) reconsidered = readAnswersToReconsider(questions, existingResponsesRef.current);
           mapped = await mapInterviewEvidenceToResponses({
             questions:
               !nextTranscript.trim() && prefillPacket ? validatedPrefillQuestionsRef.current || questions : questions,
@@ -677,7 +689,7 @@ export default function SessionInterviewPanel({
             },
             reconsideration: usedClaimRef.current
               ? {
-                  savedAnswers: readAnswersToReconsider(questions, existingResponsesRef.current),
+                  earlierAnswers: reconsidered,
                   ownContext: await loadOwnContextForMapping(sessionContextPrompt.sources, {
                     sessionSlug,
                     sessionConfig,
@@ -733,7 +745,7 @@ export default function SessionInterviewPanel({
               ? undefined
               : responseFieldValue(existingResponsesRef.current, 'answers', id),
           importedDrafts ? prefillPacket?.source.modelId : mappingModelId,
-          (id) => responseCommentValue(existingResponsesRef.current, id),
+          (id) => responseFieldValue(existingResponsesRef.current, 'additionalComments', id),
           ownEvidence,
           (id) => questions.find((question) => question.id === id)?.type,
         );
@@ -742,18 +754,11 @@ export default function SessionInterviewPanel({
           if (ownEvidence(draft)) ownEvidenceIdsRef.current.add(draft.questionId);
           else ownEvidenceIdsRef.current.delete(draft.questionId);
         }
-        for (const draft of review.drafts) {
-          if (!latest.editedDrafts[draft.questionId] && !review.edited[draft.questionId]?.additionalComments) {
-            review.edited[draft.questionId] = {
-              ...review.edited[draft.questionId],
-              additionalComments: responseCommentValue(existingResponsesRef.current, draft.questionId),
-            };
-          }
-        }
         setDrafts(review.drafts);
         setEditedDrafts(review.edited);
         setSelected(review.selected);
         setLeftOutIds((current) => [...new Set([...current, ...review.leftOut])]);
+        setStillFitIds(readAnswersThatStillFit(review.leftOut, mapped, reconsidered, questions));
         if (importedDrafts) setPrefillDraftIds(importedDrafts.map((draft) => draft.questionId));
         let newlyHidden: string[] = [];
         if (review.drafts.length) {
@@ -878,11 +883,12 @@ export default function SessionInterviewPanel({
   }, [mapping, prefillPacket, questions, runMapping]);
 
   // Someone's part of a group conversation joins whatever they've said here, and what they already had is
-  // reconsidered against it, so a signed-in person's saved answers load first.
+  // reconsidered against it, so a signed-in person's saved answers load first. A failed load holds drafting
+  // until its retry succeeds: drafts must not replace answers nobody compared.
   useEffect(() => {
     if (!claim || usedClaimRef.current === claim || !questions.length || mapping || sessionContextPrompt.loading)
       return;
-    if (authenticatedForSubmit && !responseStateReadyForSubmit && !ownAnswers.error) return;
+    if (authenticatedForSubmit && !responseStateReadyForSubmit) return;
     usedClaimRef.current = claim;
     const combined = appendInterviewTranscript(transcriptRef.current, claim.transcript);
     transcriptRef.current = combined;
@@ -892,7 +898,6 @@ export default function SessionInterviewPanel({
     authenticatedForSubmit,
     claim,
     mapping,
-    ownAnswers.error,
     questions.length,
     responseStateReadyForSubmit,
     runMapping,
@@ -1006,6 +1011,7 @@ export default function SessionInterviewPanel({
       baseSubmitContextToken,
       drafts,
       editedDrafts: review.editedDrafts,
+      earlierResponses: () => existingResponsesRef.current,
       hasAiPrefill,
       includePredictionComparison,
       includeProvenance,
@@ -1193,17 +1199,7 @@ export default function SessionInterviewPanel({
           ? 'Talk through your drafts'
           : 'Start voice interview';
   const leftOutCount = leftOutIds.length;
-  const leftOutNotice = !leftOutCount
-    ? ''
-    : claim
-      ? leftOutCount === 1
-        ? 'One of your answers still fits, so it stays as it is.'
-        : `${leftOutCount} of your answers still fit, so they stay as they are.`
-      : drafts.length
-        ? `Left out ${leftOutCount} ${leftOutCount === 1 ? 'draft for a question' : 'drafts for questions'} you’ve already answered.`
-        : leftOutCount === 1
-          ? 'You’ve already answered the question this draft covers.'
-          : 'You’ve already answered every question these drafts cover.';
+  const leftOutNotice = describeLeftOutDrafts(leftOutIds, stillFitIds, drafts.length > 0);
   // Drafts that were left out came from the evidence already mapped, so mapping it again won't help.
   const canGenerateDrafts = Boolean(
     !isInterviewBusy &&
@@ -1250,7 +1246,10 @@ export default function SessionInterviewPanel({
 
           {claim ? (
             <p role="status" data-testid="ce-session-interview-claim">
-              Drafting from {claim.person}’s part of the conversation. Open the transcript to check it’s yours.
+              {usedClaimRef.current !== claim && authenticatedForSubmit && !responseStateReadyForSubmit
+                ? 'Waiting for your saved answers before drafting from '
+                : 'Drafting from '}
+              {claim.person}’s part of the conversation. Open the transcript to check it’s yours.
             </p>
           ) : null}
           {updates.notice ? <p role="status">{updates.notice}</p> : null}
@@ -1367,7 +1366,7 @@ export default function SessionInterviewPanel({
                     selected={Boolean(selected[draft.questionId])}
                     existing={hasDraftValue(responseFieldValue(existingResponseSlice, 'answers', draft.questionId))}
                     earlierAnswer={responseFieldValue(existingResponseSlice, 'answers', draft.questionId)}
-                    savedComment={responseCommentValue(existingResponseSlice, draft.questionId)}
+                    earlierComment={responseFieldValue(existingResponseSlice, 'additionalComments', draft.questionId)}
                     disabled={applying}
                     onSelect={(value) => {
                       // Dismissing a draft that isn't chosen changes nothing to submit.

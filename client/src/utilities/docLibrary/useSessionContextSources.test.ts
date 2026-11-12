@@ -1,6 +1,11 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 
-import { workerAcceptsParticipantContext, type ContextSource, type ContextSourceOptions } from './contextSources';
+import {
+  workerAcceptsParticipantContext,
+  workerAcceptsParticipantLinks,
+  type ContextSource,
+  type ContextSourceOptions,
+} from './contextSources';
 import { useSessionContextPrompt, useSessionContextSources } from './useSessionContextSources';
 
 const mockRequests: Array<{ options: ContextSourceOptions; resolve: (sources: ContextSource[]) => void }> = [];
@@ -28,6 +33,7 @@ jest.mock('../worker/workerGroupChangeEvents', () => ({
 }));
 jest.mock('./contextSources', () => ({
   workerAcceptsParticipantContext: jest.fn(async () => true),
+  workerAcceptsParticipantLinks: jest.fn(async () => false),
   listContextSources: jest.fn(
     (options: ContextSourceOptions) => new Promise((resolve) => mockRequests.push({ options, resolve })),
   ),
@@ -54,6 +60,8 @@ const source = (id: string, adminsOnly = false): ContextSource => ({
   adminsOnly,
   lockedGroupIds: [],
   addedBy: '',
+  addedByAgent: false,
+  adderName: '',
   fetchedAt: '',
   reading: null,
 });
@@ -93,6 +101,27 @@ describe('useSessionContextSources', () => {
     await resolveLatest([]);
     await act(async () => undefined);
     expect(older.result.current.participantsCanAdd).toBe(false);
+  });
+
+  it('offers links where the Worker takes them from participants, and no adding once the session ends', async () => {
+    jest.mocked(workerAcceptsParticipantLinks).mockResolvedValueOnce(true);
+    const { result, rerender } = mount(READER);
+    await resolveLatest([]);
+    await waitFor(() => expect(result.current.participantsCanAddLinks).toBe(true));
+    expect(result.current.participantsCanAdd).toBe(true);
+
+    rerender({
+      sessionSlug: 'salon',
+      sessionConfig: { ...config(), sessionEndsAt: '2020-01-01T00:00:00.000Z' } as ReturnType<typeof config>,
+      account: READER,
+    });
+    expect([result.current.participantsCanAdd, result.current.participantsCanAddLinks]).toEqual([false, false]);
+
+    // A Worker from before 0.9.2 takes participants' files but not their links.
+    const older = mount(READER);
+    await resolveLatest([]);
+    await waitFor(() => expect(older.result.current.participantsCanAdd).toBe(true));
+    expect(older.result.current.participantsCanAddLinks).toBe(false);
   });
 
   it('skips the Worker check where adding isn’t on offer, as for the AI’s context', async () => {

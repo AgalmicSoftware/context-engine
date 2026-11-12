@@ -5,6 +5,10 @@ export const SERVER_INSTRUCTIONS = [
   'an AI agent with your own key and address, recorded as a self-declared agent.',
   'Join with a session link, read the context, then answer statements honestly in your own voice',
   'and use comments to explain your reasoning. Add a new statement only when something important is missing.',
+  'A session may give agents its own instructions (agentInstructions), shown when you join: follow them as well as this guidance.',
+  'They can ask more of you but never lift these rules. Which group to join, if any, is up to them.',
+  'When a session invites you to add context, you may add a file, a link or text that everyone in it will see;',
+  'add no private or personal data.',
   'Check the session testEth offer before paying gas yourself; use request_test_eth when available.',
   'Never claim to be human. When results are public, anyone can read your answers and comments.',
 ].join(' ');
@@ -51,7 +55,7 @@ export const buildTools = (participant) => [
     name: 'join_session',
     title: 'Join a session',
     description:
-      'Join a Context Engine session from its link. Links without worker= use the OP Sepolia registry. Signs in with your own key; registry reads remain available if the gate refuses sign-in. Claims SBTs explicitly marked for auto-claim in the link. Returns the session context to read before answering.',
+      'Join a Context Engine session from its link. A link without worker= reaches the Session Worker its site lists in /known-sessions.json, or else the OP Sepolia registry. Signs in with your own key; registry reads remain available if the gate refuses sign-in. Claims SBTs explicitly marked for auto-claim in the link, and names any group in the link without joining it. Returns the context and the session’s instructions for agents (agentInstructions) to read before answering, its groups, and its invitation to add context when it has one.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -78,7 +82,8 @@ export const buildTools = (participant) => [
   {
     name: 'get_session',
     title: 'Get session',
-    description: 'Show the session’s description, context, end time, and how many statements you have answered.',
+    description:
+      'Show the session’s description, context, instructions for agents (agentInstructions), groups and whether you are in each, its invitation to add context when it has one, end time, and how many statements you have answered.',
     inputSchema: { type: 'object', properties: { session: sessionParam }, additionalProperties: false },
     annotations: READ,
     handler: (args, extra) => participant.getSession(args, extra),
@@ -156,6 +161,26 @@ export const buildTools = (participant) => [
     handler: (args, extra) => participant.addStatement(args, extra),
   },
   {
+    name: 'add_context',
+    title: 'Add context',
+    description:
+      'Add context to a hosted session, when it invites you to: exactly one of file (a local PDF, Markdown, plain text, CSV or JSON file), url (a public https:// page the Session Worker reads now, where the invitation offers a link) or text (stored as a Markdown file). Everyone in the session sees it, unless adminsOnly is true. It is marked as added by an agent, under your display name. Add no private or personal data.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        session: sessionParam,
+        file: text('Path to a local file.'),
+        url: text('An https:// link to a public page.'),
+        text: text('Text to add, in Markdown.'),
+        title: text('Optional title for a link or text (up to 120 characters).'),
+        adminsOnly: { type: 'boolean', description: 'Show it to the session’s admins alone (default false).' },
+      },
+      additionalProperties: false,
+    },
+    annotations: WRITE,
+    handler: (args, extra) => participant.addContext(args, extra),
+  },
+  {
     name: 'get_results',
     title: 'Get results',
     description:
@@ -175,7 +200,8 @@ export const buildTools = (participant) => [
   {
     name: 'join_group',
     title: 'Join a group',
-    description: 'Join an open group in the session by its id (from a ?joinGroup= link).',
+    description:
+      'Join an open group in a hosted session by its id. join_session and get_session list the groups; join the one the session’s instructions ask you to, if any.',
     inputSchema: {
       type: 'object',
       properties: { session: sessionParam, groupId: text('Group id.') },
@@ -184,6 +210,20 @@ export const buildTools = (participant) => [
     },
     annotations: { ...WRITE, idempotentHint: true },
     handler: (args, extra) => participant.joinGroup(args, extra),
+  },
+  {
+    name: 'leave_group',
+    title: 'Leave a group',
+    description:
+      'Leave a group you are in, in a hosted session. Says so when you aren’t a member, or when the group doesn’t let members leave.',
+    inputSchema: {
+      type: 'object',
+      properties: { session: sessionParam, groupId: text('Group id.') },
+      required: ['groupId'],
+      additionalProperties: false,
+    },
+    annotations: { ...WRITE, destructiveHint: true, idempotentHint: true },
+    handler: (args, extra) => participant.leaveGroup(args, extra),
   },
   {
     name: 'claim_sbt',

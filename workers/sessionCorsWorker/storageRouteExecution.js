@@ -1373,11 +1373,14 @@ const handleArweaveStorageUpload = async ({ request, env, config, slug, uploader
 export const publishCloudflareOwnedStorageMetadata = async ({ env, config, slug, actor, metadata, createOwner }) => {
   const uploader = normalizeAddress(actor);
   const resource = metadata?.resource;
-  const isAdmin = resolveSessionAdminAddresses(config).has(uploader);
+  const admins = resolveSessionAdminAddresses(config);
+  const isAdmin = admins.has(uploader);
   const context = metadata?.contextSource === true && resource === 'docsContext';
+  // An admin's refresh of a link keeps the adder the context route recorded.
+  const adder = context && isAdmin && metadata.contextOrigin === 'worker' ? normalizeAddress(metadata.uploader) : uploader;
   if (!(context ? isAdmin || participantsMayAddContext(config) : isOwnedStorageResource(resource) && isStorageResourceId(metadata?.resourceId)) ||
-    !isSafeCloudflareStorageRefId(metadata?.id) || !uploader || metadata.uploader !== uploader ||
-    metadata.uploadAuthority !== (isAdmin ? 'admin' : 'author')) {
+    !isSafeCloudflareStorageRefId(metadata?.id) || !uploader || !adder || metadata.uploader !== adder ||
+    metadata.uploadAuthority !== (admins.has(adder) ? 'admin' : 'author')) {
     throw Object.assign(new Error(SUPERSEDED_AUTHORITY_ERROR), { status: 409 });
   }
   const index = getStorageIndexBinding(env);
@@ -1456,6 +1459,8 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
   if (!contextCheck.ok) {
     return responseJson(deps, { error: contextCheck.error, reason: contextCheck.reason }, contextCheck.status, baseHeaders);
   }
+  // Only the context route names an item's adder: a refreshed link stays its first adder's.
+  const contextAdder = (payload.contextOrigin === 'worker' && normalizeAddress(payload.contextUploader)) || uploader;
   let owner = null;
   let hidden = false;
   if (owned) {
@@ -1588,8 +1593,8 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
       // Server-authored: only an upload the policy passed with a context role is context.
       ...(contextCheck.role ? {
         contextSource: true,
-        uploadAuthority: contextUploaderIsAdmin ? 'admin' : 'author',
-        uploader,
+        uploadAuthority: resolveSessionAdminAddresses(config).has(contextAdder) ? 'admin' : 'author',
+        uploader: contextAdder,
         ...(payload.contextOrigin === 'worker' ? { contextOrigin: 'worker' } : {}),
       } : {}),
       payloadAccessMode: payloadAccess.mode,
@@ -2621,7 +2626,9 @@ export const removeCloudflareStorageRecords = async ({ env, slug, rows = [], mar
   await markWrite();
 };
 
-export const storageRoute = async ({ path, method, request, env, config, slug, uploaderAddress, authScopes, expectedAuthority, baseHeaders, deps } = {}) => {
+export const storageRoute = async ({
+  path, method, request, env, config, slug, uploaderAddress, authScopes, expectedAuthority, baseHeaders, checkFetchAccess, deps,
+} = {}) => {
   if (method === 'POST' && ['/storage/response-field-key/wrap', '/storage/response-field-key/unwrap'].includes(path)) {
     // Field keys use the same lazy private-RPC setup and chain attestation as
     // payload reads; bypassing it denies members of secret-only SBT gates.
@@ -2671,7 +2678,12 @@ export const storageRoute = async ({ path, method, request, env, config, slug, u
   if (path === '/storage/context' && method === 'POST') {
     const routeDeps = createStorageRouteGateDeps({ config, env, slug, deps });
     return contextSourceRoute({
-      request, env, config, slug, uploaderAddress, authScopes, baseHeaders, deps: routeDeps,
+      request, env, config, slug, uploaderAddress, authScopes, baseHeaders, deps: routeDeps, checkFetchAccess,
+      // The upload's own access check, run before the Worker fetches a link's page.
+      authorizeAdd: () => authorizeCloudflareStorageAccess({
+        env, config, slug, resource: 'docsContext', operation: 'upload', requesterAddress: uploaderAddress, authScopes,
+        metadata: null, baseHeaders, deps: routeDeps,
+      }),
       store: (payload) => handleCloudflareUpload({
         env, config, slug, uploaderAddress, authScopes, expectedAuthority, baseHeaders, deps: routeDeps,
         payload: { resource: 'docsContext', groupIds: [], uploadPolicy: null, payloadEncrypted: false, ...payload, contextOrigin: 'worker' },

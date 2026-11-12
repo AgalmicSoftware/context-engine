@@ -761,9 +761,19 @@ Matrix scroll/detail behavior, and Circles hover/drill interactions.
 
 Authenticated clients can use the worker as the session storage boundary:
 
-- `POST /storage/context`: session admins, except that whoever added a file may `remove` it. `{ action: "add-link", url, title?, adminsOnly?, replaces? }`
+- `POST /storage/context`: session admins. Anyone else signed in may `remove` what they added and, while
+  `contextAdditionPolicy` isn't `admin_only` and the session hasn't ended, `add-link` without `replaces`
+  (`403 context_admin_required` or `410 session_ended` otherwise, before any fetch; Workers that allow it advertise
+  `participant_context_links_v1`). Their link also needs the token's `fetch` scope, as `fetch_url` does, and counts
+  against `limits.perWalletPerDay` as a fetch as well as a storage request (`403 context_link_fetch_denied` when the
+  token lacks the scope; any other refusal, such as a failed authorization check or `429` over the limit, is
+  `fetch_url`'s own). Every `add-link` passes the upload's access check before the Worker fetches the page.
+  `{ action: "add-link", url, title?, adminsOnly?, replaces?, adder?, adderName? }`
   fetches the page under the public-artifact link policy and stores it as a context link record with its text
-  snapshot and fetch date (`replaces` refreshes an existing one, keeping its title and privacy);
+  snapshot and fetch date (`replaces` refreshes an existing one: the same `url`, else `400`, keeping its title,
+  privacy and adder, and an agent's mark; `adder: "agent"` and an optional `adderName` store an agent's
+  self-declared mark, as the `CE-AdderKind` and `CE-AdderName` tags a context file may carry,
+  `400 context_adder_invalid` for any other value);
   `{ action: "read-pdf", id }` sends a context PDF to the session's own Claude or OpenAI model and stores the
   returned text beside it with the same privacy; `{ action: "remove", id }` deletes a context source and that
   text. A PDF has one reading at a time: `read-pdf` returns `409` while another reading of it runs, and the

@@ -69,10 +69,10 @@ export const dispatchAuthenticatedSecretPathRoute = async ({
     ? 'transcribe'
     : ((isStorageRoute || isAgentQuestionsRoute) ? 'storage' : (isWorkerGroupsRoute ? 'groups' : 'arweave'));
   const scope = route === 'storage' && scopes?.storage !== true ? 'arweave' : route;
-  const preflight = await deps?.evaluateAuthenticatedRoutePreflight?.({
+  const preflightFor = (preflightScope, preflightRoute) => deps?.evaluateAuthenticatedRoutePreflight?.({
     scopes,
-    scope,
-    route,
+    scope: preflightScope,
+    route: preflightRoute,
     config,
     env,
     slug,
@@ -85,6 +85,7 @@ export const dispatchAuthenticatedSecretPathRoute = async ({
       json: deps?.json,
     },
   });
+  const preflight = await preflightFor(scope, route);
   if (!preflight?.ok) {
     return {
       handled: true,
@@ -141,6 +142,8 @@ export const dispatchAuthenticatedSecretPathRoute = async ({
         expectedAuthority,
         authScopes: scopes,
         baseHeaders: headers,
+        // A participant's context link has the Worker fetch a page, as /fetch does.
+        checkFetchAccess: () => preflightFor('fetch', 'fetch'),
       }),
     };
   }

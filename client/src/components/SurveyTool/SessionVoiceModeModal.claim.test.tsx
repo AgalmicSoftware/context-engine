@@ -1,5 +1,5 @@
 import React from 'react';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import SessionVoiceModeModal from './SessionVoiceModeModal';
 import { mapInterviewEvidenceToResponses } from './sessionInterview';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
@@ -193,7 +193,7 @@ describe('drafting from a claimed part', () => {
     await waitFor(() => expect(mapped).toHaveBeenCalledTimes(1));
     expect(mapped.mock.calls[0][0]).toMatchObject({
       transcript: claim.transcript,
-      reconsideration: { savedAnswers: [], ownContext: '' },
+      reconsideration: { earlierAnswers: [], ownContext: '' },
     });
     expect(screen.getByTestId('ce-session-interview-claim')).toHaveTextContent('Person 2');
   });
@@ -204,20 +204,39 @@ describe('drafting from a claimed part', () => {
     const { rerender } = render(interview({ onLoadSavedResponses }));
     await waitFor(() => expect(onLoadSavedResponses).toHaveBeenCalled());
     expect(mapped).not.toHaveBeenCalled();
+    expect(screen.getByTestId('ce-session-interview-claim')).toHaveTextContent(
+      /^Waiting for your saved answers before drafting from Person 2’s part of the conversation\./,
+    );
 
     const slice = saved({ q1: 'Yes, fund it' });
     rerender(interview({ onLoadSavedResponses, existingResponseSlice: slice }));
     await act(async () => finishLoad(slice));
     await waitFor(() => expect(mapped).toHaveBeenCalledTimes(1));
+    expect(screen.getByTestId('ce-session-interview-claim')).toHaveTextContent(
+      /^Drafting from Person 2’s part of the conversation\./,
+    );
     expect(mapped.mock.calls[0][0].reconsideration).toEqual({
-      savedAnswers: [{ questionId: 'q1', answer: 'Yes, fund it' }],
+      earlierAnswers: [{ questionId: 'q1', answer: 'Yes, fund it' }],
       ownContext: '',
     });
   });
 
-  it('drafts anyway if saved answers can’t be loaded, rather than leaving them waiting', async () => {
-    render(interview({ onLoadSavedResponses: jest.fn(async () => Promise.reject(new Error('offline'))) }));
+  it('holds drafting while saved answers can’t be read, until a retry reads them', async () => {
+    const slice = saved({ q1: 'Yes, fund it' });
+    const onLoadSavedResponses = jest.fn().mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce(slice);
+    render(interview({ onLoadSavedResponses, existingResponseSlice: slice }));
+    const retry = await screen.findByRole('button', { name: 'Retry saved answers' });
+    expect(screen.getByText(/Could not load your saved answers: offline/)).toBeInTheDocument();
+    expect(screen.getByTestId('ce-session-interview-claim')).toHaveTextContent(/^Waiting for your saved answers/);
+    await act(async () => undefined);
+    expect(mapped).not.toHaveBeenCalled();
+
+    fireEvent.click(retry);
     await waitFor(() => expect(mapped).toHaveBeenCalledTimes(1));
+    expect(onLoadSavedResponses).toHaveBeenCalledTimes(2);
+    expect(mapped.mock.calls[0][0].reconsideration?.earlierAnswers).toEqual([
+      { questionId: 'q1', answer: 'Yes, fund it' },
+    ]);
   });
 
   it('shows a change to a saved answer for review, and says when others still fit', async () => {
@@ -233,6 +252,41 @@ describe('drafting from a claimed part', () => {
     expect(screen.queryByText('Who runs it?')).toBeNull();
   });
 
+  it('says only answers the AI compared still fit, never a locked one', async () => {
+    mapped.mockResolvedValue(
+      ['q1', 'q2', 'q3'].map((questionId) => ({ questionId, answer: 'Yes', evidence: 'as before', confidence: 0.8 })),
+    );
+    const slice = {
+      // q2 was unlocked on the page and q3 is still locked: neither goes to the AI.
+      answers: { q1: { value: 'Yes' }, q2: { value: 'Yes', encrypted: true }, q3: { value: '*', encrypted: true } },
+      additionalComments: {},
+      importance: {},
+      conviction: {},
+    };
+    render(
+      interview({
+        questionPool: [...(baseProps.questionPool as object[]), { id: 'q3', prompt: 'When?', type: 'freeform' }],
+        onLoadSavedResponses: jest.fn(async () => slice),
+        existingResponseSlice: slice,
+      }),
+    );
+    expect(
+      await screen.findByText(
+        'One of your answers still fits, so it stays as it is. Left out 2 drafts for questions you’ve already answered.',
+      ),
+    ).toBeInTheDocument();
+    expect(mapped.mock.calls[0][0].reconsideration?.earlierAnswers).toEqual([{ questionId: 'q1', answer: 'Yes' }]);
+  });
+
+  it('lets an encrypted answer stand, unquoted, even once unlocked on the page', async () => {
+    mapped.mockResolvedValue([{ questionId: 'q1', answer: 'No, not this year', evidence: 'said so', confidence: 0.8 }]);
+    const slice = { ...saved({}), answers: { q1: { value: 'My private yes', encrypted: true } } };
+    render(interview({ onLoadSavedResponses: jest.fn(async () => slice), existingResponseSlice: slice }));
+    expect(await screen.findByText('You’ve already answered the question this draft covers.')).toBeInTheDocument();
+    expect(screen.queryByText('Fund the garden?')).toBeNull();
+    expect(document.body).not.toHaveTextContent('My private yes');
+  });
+
   it('keeps a kept answer’s new comment for review', async () => {
     mapped.mockResolvedValue([
       { questionId: 'q2', answer: 'The neighbours', additionalComments: 'With a small rota', confidence: 0.8 },
@@ -240,6 +294,24 @@ describe('drafting from a claimed part', () => {
     const slice = saved({ q2: 'The neighbours' });
     render(interview({ onLoadSavedResponses: jest.fn(async () => slice), existingResponseSlice: slice }));
     expect(await screen.findByText('Who runs it?')).toBeInTheDocument();
+  });
+
+  it.each([
+    ['a locked comment', '*'],
+    ['an encrypted comment unlocked on the page', 'Secret reason'],
+  ])('offers a new comment beside %s, keeping theirs unless they choose the AI’s', async (_label, value) => {
+    mapped.mockResolvedValue([
+      { questionId: 'q2', answer: 'The neighbours', additionalComments: 'With a small rota', confidence: 0.8 },
+    ]);
+    const slice = { ...saved({ q2: 'The neighbours' }), additionalComments: { q2: { value, encrypted: true } } };
+    render(interview({ onLoadSavedResponses: jest.fn(async () => slice), existingResponseSlice: slice }));
+    expect(await screen.findByText('Who runs it?')).toBeInTheDocument();
+    const choices = screen.getByRole('group', { name: 'Comment to submit' });
+    expect(within(choices).getByRole('button', { name: 'Mine' })).toHaveAttribute('aria-pressed', 'true');
+    expect(within(choices).getByRole('button', { name: 'AI’s' })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.queryByText(/still fit/)).toBeNull();
+    expect(document.body).not.toHaveTextContent('Secret reason');
+    expect(JSON.stringify(mapped.mock.calls)).not.toContain('Secret reason');
   });
 
   it('adds to what they said here, keeps drafts in review, and takes a part in only once', async () => {

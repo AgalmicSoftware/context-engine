@@ -21,6 +21,16 @@ const published = { ...registry, 'dist-tags': { latest: '0.1.2' }, versions: {
   '0.1.2': { dist: { integrity: receipt.integrity, attestations: { url: 'https://registry.npmjs.org/attestations/fixture' } } },
 } };
 
+// A clock that moves only when the publisher waits, and fails a poll that never stops.
+const fakeClock = () => {
+  let time = 0;
+  const clock = { waits: 0, now: () => time, wait: async (ms) => {
+    assert.ok(++clock.waits <= 100, 'the registry poll must be bounded');
+    time += ms;
+  } };
+  return clock;
+};
+
 function archive(extra = [], patch = {}) {
   const entries = [
     ['package/LICENSE', 'Fixture license'], ['package/README.md', 'Fixture readme'],
@@ -146,11 +156,60 @@ test('ambiguous publish response is reconciled without retrying the upload', asy
     publish: () => { publishes++; throw new Error('connection closed'); } }), 'published:verified-after-error');
   assert.equal(publishes, 1);
   await assert.rejects(publishVerified({ receipt, getRegistry: async () => registry, checkSource: () => {},
-    publish: () => { throw new Error('offline'); } }), /not confirmed/);
+    publish: () => { throw new Error('offline'); }, ...fakeClock() }), /not confirmed/);
   const noProvenance = structuredClone(published); delete noProvenance.versions['0.1.2'].dist.attestations;
   reads = 0;
   await assert.rejects(publishVerified({ receipt, getRegistry: async () => reads++ < 2 ? registry : noProvenance,
-    checkSource: () => {}, publish: () => {} }), /provenance/);
+    checkSource: () => {}, publish: () => {}, ...fakeClock() }), /provenance/);
+});
+
+test('after publishing, the registry is read for up to three minutes until it lists the version', async () => {
+  // npm lists the version a few reads later, one read failing and one still showing the old latest.
+  const oldLatest = { ...published, 'dist-tags': { latest: '0.1.0' } };
+  const answers = [registry, registry, registry, new Error('registry unavailable (503)'), oldLatest, published];
+  let reads = 0, publishes = 0;
+  const listed = fakeClock();
+  assert.equal(await publishVerified({ receipt, checkSource: () => {}, ...listed,
+    getRegistry: async () => {
+      const answer = answers[Math.min(reads++, answers.length - 1)];
+      if (answer instanceof Error) throw answer;
+      return answer;
+    },
+    publish: () => { publishes++; } }), 'published');
+  assert.deepEqual({ publishes, waits: listed.waits }, { publishes: 1, waits: 3 });
+
+  // A version npm never lists is unconfirmed after three minutes, and the upload isn't repeated.
+  const never = fakeClock();
+  publishes = 0;
+  await assert.rejects(publishVerified({ receipt, checkSource: () => {}, ...never,
+    getRegistry: async () => registry, publish: () => { publishes++; } }), /not confirmed/);
+  assert.deepEqual({ publishes, waits: never.waits, elapsed: never.now() }, { publishes: 1, waits: 18, elapsed: 180_000 });
+
+  // A registry down for the whole window says so.
+  reads = 0;
+  await assert.rejects(publishVerified({ receipt, checkSource: () => {}, ...fakeClock(), publish: () => {},
+    getRegistry: async () => { if (reads++ < 2) return registry; throw new Error('registry unavailable (503)'); } }),
+  (error) => /not confirmed/.test(error.message) && /503/.test(error.cause?.message));
+
+  // So does one that went down after listing the version without its provenance yet.
+  const noProvenance = structuredClone(published); delete noProvenance.versions['0.1.2'].dist.attestations;
+  reads = 0;
+  await assert.rejects(publishVerified({ receipt, checkSource: () => {}, ...fakeClock(), publish: () => {},
+    getRegistry: async () => {
+      reads++;
+      if (reads <= 2) return registry;
+      if (reads === 3) return noProvenance;
+      throw new Error('registry unavailable (503)');
+    } }),
+  (error) => /not confirmed/.test(error.message) && /503/.test(error.cause?.message));
+
+  // Other contents under this version fail at once, without waiting for latest to move.
+  const other = structuredClone(oldLatest); other.versions['0.1.2'].dist.integrity = 'sha512-other';
+  const mismatch = fakeClock();
+  reads = 0;
+  await assert.rejects(publishVerified({ receipt, checkSource: () => {}, ...mismatch, publish: () => {},
+    getRegistry: async () => reads++ < 2 ? registry : other }), /integrity mismatch/);
+  assert.equal(mismatch.waits, 0);
 });
 
 test('workflow publishes only the CI artifact, defaults to dry-run and serializes publication', () => {

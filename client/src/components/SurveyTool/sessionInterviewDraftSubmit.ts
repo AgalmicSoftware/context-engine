@@ -1,6 +1,13 @@
 import type { InterviewConsentOverrides } from './sessionInterviewConsent';
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
 import type { InterviewDraftResponse, InterviewPrefillPacket } from './sessionInterview';
+import { startingInterviewComment } from './sessionInterviewComments';
+import {
+  isResponseFieldUnsubmitted,
+  responseFieldValue,
+  withoutWholePhrase,
+  type SessionInterviewModalRecord,
+} from './sessionInterviewModalState';
 
 export type InterviewSubmitResult =
   | { status: 'submitted' | 'already-saved' }
@@ -15,6 +22,8 @@ type RunInterviewDraftSubmitInput = {
   baseSubmitContextToken: string;
   drafts: InterviewDraftResponse[];
   editedDrafts: Record<string, InterviewDraftResponse>;
+  // The person's answers and comments as review reads them now, a locked comment as "*".
+  earlierResponses: () => SessionInterviewModalRecord | null | undefined;
   hasAiPrefill: boolean;
   includePredictionComparison: boolean;
   includeProvenance: boolean;
@@ -57,6 +66,25 @@ type RunInterviewDraftSubmitInput = {
   setStatus: SubmitStatusSetter;
 };
 
+// What research records of a comment on a card left out, where nothing is submitted: what the person did with the
+// AI's. An untouched one is the AI's own (none for a hidden draft); one they touched is as they left it, less their
+// own comment from the page if they haven't submitted it.
+const leftOutComment = (
+  original: InterviewDraftResponse,
+  draft: InterviewDraftResponse,
+  responses: SessionInterviewModalRecord | null | undefined,
+): string => {
+  if (!draft.userEditedFields?.includes('additionalComments')) {
+    return draft.predictionCondition === 'blind' ? '' : String(original.additionalComments || '');
+  }
+  const comment = String(draft.additionalComments || '');
+  if (!isResponseFieldUnsubmitted(responses, 'additionalComments', draft.questionId)) return comment;
+  return withoutWholePhrase(
+    comment,
+    String(responseFieldValue(responses, 'additionalComments', draft.questionId) ?? ''),
+  );
+};
+
 const clearPendingSubmit = ({
   pendingSubmitActiveContextRef,
   pendingSubmitBaseContextRef,
@@ -76,6 +104,7 @@ export const runInterviewDraftSubmit = async ({
   baseSubmitContextToken,
   drafts,
   editedDrafts,
+  earlierResponses,
   hasAiPrefill,
   includePredictionComparison,
   includeProvenance,
@@ -162,11 +191,15 @@ export const runInterviewDraftSubmit = async ({
       const draft = editedDrafts[original.questionId] || original;
       await onApplyAnswer(draft.questionId, draft.answer);
       if (!isSubmitContextCurrent(attemptToken)) return;
-      // Review shows the form's comment when the AI proposed none; only a proposal or an edit replaces it.
-      // A hidden draft's proposal was never shown, so only an edit counts there.
-      const proposedComment = draft.predictionCondition !== 'blind' && String(original.additionalComments || '').trim();
-      if (proposedComment || draft.userEditedFields?.includes('additionalComments')) {
-        await onApplyAdditional(draft.questionId, String(draft.additionalComments || ''));
+      // The comment the card ends with goes in unless the form already holds it. One the person touched is as they
+      // left it. An untouched one is worked out now, since a comment that loads late reaches the card only after
+      // a render: theirs joined with the AI's, a hidden draft's theirs alone, and a locked one kept as it is.
+      const earlier = responseFieldValue(earlierResponses(), 'additionalComments', draft.questionId);
+      const comment = draft.userEditedFields?.includes('additionalComments')
+        ? String(draft.additionalComments || '')
+        : startingInterviewComment(draft.predictionCondition === 'blind' ? '' : original.additionalComments, earlier);
+      if (comment !== startingInterviewComment('', earlier)) {
+        await onApplyAdditional(draft.questionId, comment);
         if (!isSubmitContextCurrent(attemptToken)) return;
       }
       if (draft.importance !== undefined) await onApplyImportance(draft.questionId, draft.importance);
@@ -189,12 +222,15 @@ export const runInterviewDraftSubmit = async ({
       includeResponderName ? String(prefillPacket?.responderContext?.name || '').trim() : '',
       drafts.map((draft) => {
         const reviewed = editedDrafts[draft.questionId] || draft;
+        const chosen = Boolean(selected[draft.questionId]);
         return {
           ...reviewed,
           answer: reviewed.answer,
-          additionalComments: String(reviewed.additionalComments || ''),
+          additionalComments: chosen
+            ? String(reviewed.additionalComments || '')
+            : leftOutComment(draft, reviewed, earlierResponses()),
           original: draft,
-          selected: Boolean(selected[draft.questionId]),
+          selected: chosen,
         };
       }),
       consentOverrides,

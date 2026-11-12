@@ -13,12 +13,19 @@ import {
   listContextSources,
   loadContextSourcesForAi,
   workerAcceptsParticipantContext,
+  workerAcceptsParticipantLinks,
   type ContextSource,
 } from './contextSources';
 
 /** Context sources need Worker storage the Worker can read: not Arweave, not Lit-encrypted. */
 export const supportsContextSources = (sessionConfig: unknown): boolean =>
   usesCloudflareSessionStorage(sessionConfig) && !requiresLitForSessionStorage(sessionConfig);
+
+/** True once the session's end time has passed, when the Worker stops taking participants' additions. */
+const sessionHasEnded = (sessionConfig: unknown): boolean => {
+  const endsAt = Date.parse(String((sessionConfig as { sessionEndsAt?: unknown } | null)?.sessionEndsAt ?? ''));
+  return Number.isFinite(endsAt) && endsAt <= Date.now();
+};
 
 type Input = { sessionSlug: string; sessionConfig: unknown; account?: unknown; enabled?: boolean };
 type ListInput = Input & { offersAdding?: boolean };
@@ -124,13 +131,15 @@ export function useSessionContextSources({
     };
   }, [active, isAdmin, account, sessionSlug, revision]);
   // Only someone signed in can add, so only they make this check, and only where adding is on offer.
-  const [workerAccepts, setWorkerAccepts] = useState(false);
-  const mayAdd = active && offersAdding && !!account && participantsMayAddContext(sessionConfig);
+  const [workerAccepts, setWorkerAccepts] = useState({ files: false, links: false });
+  const mayAdd =
+    active && offersAdding && !!account && participantsMayAddContext(sessionConfig) && !sessionHasEnded(sessionConfig);
   useEffect(() => {
     if (!mayAdd) return undefined;
     let current = true;
-    void workerAcceptsParticipantContext({ sessionSlug, sessionConfig: configRef.current, context: { account } }).then(
-      (accepts) => current && setWorkerAccepts(accepts),
+    const options = { sessionSlug, sessionConfig: configRef.current, context: { account } };
+    void Promise.all([workerAcceptsParticipantContext(options), workerAcceptsParticipantLinks(options)]).then(
+      ([files, links]) => current && setWorkerAccepts({ files, links }),
     );
     return () => {
       current = false;
@@ -146,7 +155,9 @@ export function useSessionContextSources({
     error: fresh ? loaded.error : '',
     supported,
     isAdmin,
-    participantsCanAdd: mayAdd && workerAccepts,
+    participantsCanAdd: mayAdd && workerAccepts.files,
+    // Links need a Worker that takes them from participants too.
+    participantsCanAddLinks: mayAdd && workerAccepts.files && workerAccepts.links,
     // Not offered while the list, and any sign-in it asked for, is still under way.
     groupFilesHidden: groupFilesHidden && !loading,
     reload,

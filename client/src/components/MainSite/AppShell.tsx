@@ -173,7 +173,6 @@ import { createMainSiteRouteRenderers } from './mainSiteRouteRenderers.js';
 import { createMainSiteSessionScanPolicy } from './mainSiteSessionScanPolicyBinding.js';
 import {
   initializeMainSiteWorkerCanonicalCachesForGroup,
-  preloadMainSiteAboutDemoSessionData,
   resolveMainSiteDisplaySessionChainId,
   resolveMainSiteDisplaySessionConfig,
   resolveMainSiteDisplaySessionNetwork,
@@ -824,8 +823,6 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
   _sessionRegistryCacheUpdateUnsubscribe: (() => void) | null = null;
   _userPriorityPromise: Promise<MainSiteProfileScanReport | null> | null = null;
   _userPriorityTarget: string | null = null;
-  _aboutDemoSessionPreloadSlug = '';
-  _aboutDemoSessionPreloadPromise: Promise<void> | null = null;
   _sessionFallbackRedirectPath = '';
   _lastProcessedQuestionIdFromPath = '';
   _lastProcessedQuestionSlugFromPath: string | null = null;
@@ -1176,18 +1173,6 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
   ): Promise<boolean> =>
     initializeMainSiteWorkerCanonicalCachesForGroup(this, slugIn, options, (message, error) =>
       mainSiteLog.error(message, readMainSiteErrorMessage(error)),
-    );
-
-  isAboutRoutePath = (pathIn: unknown = ''): boolean => {
-    const path = this.getEffectiveRoutePath(
-      String(pathIn || '') || (typeof window !== 'undefined' ? window.location.pathname : '') || this.props.path || '',
-    );
-    return path === '/about' || path === '/about/';
-  };
-
-  preloadAboutDemoSessionData = (pathIn: unknown = ''): Promise<void> | null =>
-    preloadMainSiteAboutDemoSessionData(this, pathIn, (message, details) =>
-      mainSiteLog.warn(message, { ...details, error: readMainSiteErrorMessage(details.error) }),
     );
 
   handleSessionRegistryCacheUpdated = () => {
@@ -2335,7 +2320,6 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
     }
 
     const pathname = this.getEffectiveRoutePath(this.getCurrentPathname());
-    this.preloadAboutDemoSessionData(pathname);
     const isDemoPath = pathname.startsWith('/session/');
     const sbtAddressFromPath = this.getSbtAddressFromPath(pathname);
     const isSbtDetailRoute = !!sbtAddressFromPath;
@@ -2966,7 +2950,6 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
 
     // Check for deep link scan if path changed
     if (currPath !== prevPath) {
-      this.preloadAboutDemoSessionData(currPath);
       this.handleDeepLinkScan();
     }
   }

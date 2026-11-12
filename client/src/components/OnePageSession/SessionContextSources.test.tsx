@@ -1,7 +1,12 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 
 import SessionContextSources from './SessionContextSources';
-import { removeContextSource, uploadContextFile, type ContextSource } from '../../utilities/docLibrary/contextSources';
+import {
+  addContextLink,
+  removeContextSource,
+  uploadContextFile,
+  type ContextSource,
+} from '../../utilities/docLibrary/contextSources';
 import type { SessionContextSourcesState } from '../../utilities/docLibrary/useSessionContextSources';
 import { getWorkerSessionToken } from '../../utilities/worker/workerAuth.js';
 
@@ -16,6 +21,7 @@ jest.mock('../../utilities/docLibrary/contextSources', () => ({
   ...jest.requireActual<typeof import('../../utilities/docLibrary/contextSources')>(
     '../../utilities/docLibrary/contextSources',
   ),
+  addContextLink: jest.fn(async () => ({ id: 'link' })),
   removeContextSource: jest.fn(async () => undefined),
   uploadContextFile: jest.fn(async () => 'stored'),
 }));
@@ -33,6 +39,8 @@ const file = (overrides: Partial<ContextSource>): ContextSource => ({
   adminsOnly: false,
   lockedGroupIds: [],
   addedBy: '',
+  addedByAgent: false,
+  adderName: '',
   fetchedAt: '',
   reading: null,
   ...overrides,
@@ -44,6 +52,7 @@ const state = (overrides: Partial<SessionContextSourcesState> = {}): SessionCont
   supported: true,
   isAdmin: false,
   participantsCanAdd: true,
+  participantsCanAddLinks: false,
   groupFilesHidden: false,
   reload: jest.fn(),
   ...overrides,
@@ -88,6 +97,44 @@ describe('the Context section for participants', () => {
       expect.objectContaining({ sessionSlug: 'salon', context: { account: ME } }),
     );
     expect(list.reload).toHaveBeenCalled();
+  });
+
+  it('names what an agent added by the name it goes by, marked as an agent’s', () => {
+    renderList(
+      state({
+        sources: [
+          file({ id: 'kami', title: 'kami.md', addedBy: THEM, addedByAgent: true, adderName: 'Test Kami' }),
+          file({ id: 'agent', title: 'agent.md', addedBy: THEM, addedByAgent: true }),
+        ],
+      }),
+    );
+    const kami = screen.getByRole('link', { name: /kami\.md/ }).parentElement as HTMLElement;
+    expect(within(kami).getByText('Added by Test Kami (agent)')).toBeInTheDocument();
+    const agent = screen.getByRole('link', { name: /agent\.md/ }).parentElement as HTMLElement;
+    expect(within(agent).getByText('Added by 0xbbbb…0002 (agent)')).toBeInTheDocument();
+  });
+
+  it('adds a link beside the file form where the Worker takes participants’ links', async () => {
+    const list = state({ participantsCanAddLinks: true });
+    renderList(list);
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+    fireEvent.change(screen.getByLabelText('Link'), { target: { value: ' https://example.org/essay ' } });
+    fireEvent.change(screen.getByLabelText('Link title'), { target: { value: 'Essay' } });
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Add link' })));
+    expect(addContextLink).toHaveBeenCalledWith(
+      { url: 'https://example.org/essay', title: 'Essay' },
+      expect.objectContaining({ sessionSlug: 'salon', context: { account: ME } }),
+    );
+    expect(list.reload).toHaveBeenCalled();
+    expect(within(screen.getByTestId('ce-session-context-add-link')).getByRole('status')).toHaveTextContent(
+      'Link added.',
+    );
+  });
+
+  it('offers files alone where the Worker takes no links from participants', () => {
+    renderList(state());
+    expect(screen.getByTestId('ce-session-context-add-file')).toBeInTheDocument();
+    expect(screen.queryByTestId('ce-session-context-add-link')).toBeNull();
   });
 
   it('adds a file, locked to the groups chosen, from a form that Add opens and closes', async () => {

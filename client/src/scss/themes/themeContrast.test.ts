@@ -359,6 +359,29 @@ describe('bundled app-theme contrast', () => {
     expect(ratios.filter(([, value]) => value < 4.5)).toEqual([]);
   });
 
+  // The Session Doc Library's fields sit in an upload box on a panel, both translucent layers on the page canvas.
+  // Its link fields took the document text the recipe gives every field (1.93:1 in Context Engine), and Classic 95's
+  // placeholders were 1.82:1.
+  const docLibraryCss = compileModule('components/DocumentLibrary/DocumentLibraryPanel.module.scss');
+  test.each(registry.themes.map(({ id }) => id))('%s keeps the Session Doc Library fields readable', (themeId) => {
+    const values = themeValues(css, themeId);
+    const paint = painter(values);
+    const rule = (selector: string) => moduleRule(docLibraryCss, selector);
+    const layer = (selector: string, under: Rgba) => composite(paint(rule(selector).background), under);
+    const field = composite(
+      parseColor(values['input-bg']),
+      layer('.uploadBox', layer('.panel', parseColor(values.canvas))),
+    );
+    const ratio = (color?: string) =>
+      color ? Number(contrastRatio(composite(paint(color), field), field).toFixed(2)) : 0;
+    const ratios = [
+      ['text', ratio(rule('.uploadBox .uploadRow input.urlField').color)],
+      ['placeholder', ratio(rule('.uploadBox .uploadRow input.urlField::placeholder').color)],
+      ['file name', ratio(moduleRule(css, ':root[data-ce-theme] input[type=file]').color)],
+    ] as const;
+    expect(ratios.filter(([, value]) => value < 4.5)).toEqual([]);
+  });
+
   // Every pairing below paints over the global `.btn` rules, so each fill has to be !important in every state.
   const stateSelectors = (button: string) =>
     ['', ':hover', ':focus', ':active', ':active:hover'].map((state) => `${button}${state}`);

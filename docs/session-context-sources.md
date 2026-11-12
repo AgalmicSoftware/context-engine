@@ -16,7 +16,8 @@ Sources need a session whose storage is on its Session Worker (Cloudflare), not
 Arweave and not Lit-encrypted, because the Worker must be able to read them.
 Session Workers advertise them as the `context_sources_v1` capability; the page
 asks admins to update an older Worker. Workers that also let participants add
-files advertise `participant_context_v1`.
+files advertise `participant_context_v1`, and those that let them add links too
+advertise `participant_context_links_v1`.
 
 ## Limits
 
@@ -56,13 +57,20 @@ Sources (`shared/sessionContextSources.mjs`):
 
 ## Adding and removing
 
-Anyone signed in to the session may add a file, unless an admin sets **Who can
-add files** to **Admins only** in Settings (`contextAdditionPolicy`, which is
-`participants` when unset). The Worker checks that again when each file
-publishes. Each source shows who added it. Whoever added a file may remove it,
-and admins may remove any source. Only admins add or refresh links and have the
-AI read a PDF, because those make the Worker fetch a page or spend the session's
-AI key; the Worker refuses anyone else.
+Anyone signed in to the session may add a file or a link, unless an admin sets
+**Who can add files** to **Admins only** in Settings (`contextAdditionPolicy`,
+which is `participants` when unset). The Worker checks that again when each
+item publishes. Once the session has ended it takes no more from participants.
+Everyone's links follow the same link rules (below). A participant's link also
+needs their `fetch` scope, as `fetch_url` does, and counts against the
+session's per-address daily limit (`limits.perWalletPerDay`), when it sets one,
+for fetches as well as for storage. The Worker checks all this, and that
+whoever adds a link may add files to the session, before it fetches the page.
+Each source shows who added it, and a refreshed link keeps its adder. Whoever
+added a file or link may remove it, and admins may remove any source. Only admins refresh links
+and have the AI read a PDF, because those make the Worker fetch a page again or
+spend the session's AI key on an item already there; the Worker refuses anyone
+else.
 
 - **Setup (`/new`):** the Context section takes paragraphs, links and files.
   Files stay in the browser until **Create**; then **Add context to
@@ -71,8 +79,9 @@ AI key; the Worker refuses anyone else.
   page for the AI. After a reload only the file names remain, to attach again.
 - **The session page's Context section**, when open, has **Add** and **View** in
   its header, as the Tool Explorer does. **Add** opens a form to add a file, with
-  who can read it, for someone signed in, or **Manage files and links** for an
-  admin; **Remove** sits beside their own files. Its first list asks someone
+  who can read it, and a link where the Worker takes participants' links, for
+  someone signed in, or **Manage files and links** for an admin; **Remove** sits
+  beside their own items. Its first list asks someone
   signed in to sign in to the session if their browser holds no Worker token
   yet, as in a new tab. Declined, it shows what a signed-out visitor sees.
   Where visitors can see the session's groups, **View** then signs them in to
@@ -90,6 +99,17 @@ Files go through `POST /storage/upload` with the tags `CE-DocRole: context`
 and `CE-DocKind: file`. Links and PDF readings go through `POST /storage/context`
 (see [the Worker's storage routes](session-cors-worker.md#session-storage-routes)),
 so every link snapshot is one the Worker fetched.
+
+**Who added it.** The Worker records each item's uploader as `addedBy`. An AI
+agent may mark an item as its own: the tags `CE-AdderKind: agent` and
+`CE-AdderName: <its display name>` on a file, or `adder: "agent"` and
+`adderName` with a link. The list then shows "<name> (agent)", or the agent's
+short address with "(agent)" when it gave no name. The mark is self-declared,
+so it is only a label and nothing reads it for access. The Worker accepts the
+value `agent` alone, at most once, and only beside it a name of up to 80
+characters of plain text, without control characters or the marks that reorder
+text. A refreshed link keeps its mark. The Context Engine MCP marks everything
+an agent adds.
 
 ## Privacy
 
@@ -113,8 +133,8 @@ The Worker fetches the page itself: `https://` only, no user names or
 passwords in the link, no IP addresses, localhost or private names (such as
 `.local` or `.internal`), and every redirect is checked the same way, up to
 five. It reads HTML (as text), JSON, plain text and Markdown, stops after
-10 seconds or 2 MB, and records the fetch date. **Refresh** reads the page again
-and replaces the snapshot, keeping its title and privacy. The same checks
+10 seconds or 2 MB, and records the fetch date. **Refresh** reads the same page
+again and replaces the snapshot, keeping its title, privacy and who added it. The same checks
 apply to `fetch_url` and `fetch_image`, which question generation and image
 links use, so an `http://`, IP-address or local link is refused there too.
 
@@ -139,9 +159,10 @@ no text; **Read with AI** reads it later.
 
 One helper (`shared/sessionContextText.mjs`) turns the notes, links and source
 texts into a single block between `<session_context>` tags, as JSON with `<` and
-`>` escaped, introduced as untrusted reference data whose instructions are
-never followed. It caps each item (6,000 characters) and the whole block per
-call, and reports what it left out.
+`>` escaped, introduced as untrusted reference data from the session's hosts
+and participants, AI agents among them, whose instructions are never followed.
+It caps each item (6,000 characters) and the whole block per call, and reports
+what it left out.
 
 | Feature | Reads | Block cap |
 |---|---|---|

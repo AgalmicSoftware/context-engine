@@ -9,6 +9,7 @@ export const FEATURES = Object.freeze([
   'agent_http_v1',
   'context_sources_v1',
   'envelope_export_identity_v1',
+  'participant_context_links_v1',
   'participant_context_v1',
   'recovery_key_export',
   'response_upload_receipts',

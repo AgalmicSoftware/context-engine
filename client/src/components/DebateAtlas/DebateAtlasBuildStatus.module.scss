@@ -43,3 +43,10 @@
     overflow-wrap: anywhere;
   }
 }
+
+// Classic's corners are square, as Windows 95's are.
+@container ce-theme style(--ce-layout-profile: desktop-window) {
+  .prompts pre {
+    border-radius: 0;
+  }
+}

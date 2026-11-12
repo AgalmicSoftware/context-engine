@@ -193,7 +193,21 @@ readable answer and comment text is shown by default; tapping or pressing Enter
 opens editing. Prose draft editors keep microphone dictation and autosize to the
 full text, but hide the AI rewrite/cleanup action inside interview draft review.
 Icon tooltips explain the remaining actions on hover and keyboard focus.
-Relevant interview explanations appear as editable additional comments. A single glowing robot icon
+Relevant interview explanations appear as editable additional comments. When the responder
+already has a comment, saved or typed on the page, the card holds theirs followed by what the
+AI adds; **Both**, **Mine** and **AI’s** switch between them, with their earlier comment quoted
+above, so it stays in view whatever the box holds. The text stays editable, and submitting sends
+exactly the comment the card ends with. A locked comment can't be shown, so the quote says **Your
+earlier comment is locked** and the comment stays unless they choose the AI's or write in the box.
+An encrypted answer or comment counts as locked even once it's unlocked on the page: an encrypted
+answer stands as a locked one does and is never quoted, and for an encrypted comment review shows
+**Your locked comment stays.**, never joins its text, and submitting leaves it as it was unless
+they choose the AI's or write in the box. No answer or comment someone
+encrypted, nor anything they type into an encrypted field, goes to the voice interviewer or the
+next round of drafting. A comment that loads after the drafts joins them the same way, and a
+submit pressed before it loaded waits, with **Saved answers loaded. Check drafts that change an
+earlier answer or comment, then submit.**, while any chosen card doesn't match it, so no earlier
+comment is replaced unseen. A single glowing robot icon
 beside the footer/comment controls marks an untouched AI-proposed response; it
 stays through focus-only review and disappears after any real answer, comment,
 importance, or conviction edit. The responder selects which drafts to submit and
@@ -201,7 +215,10 @@ must explicitly opt into replacing an existing local answer. Selected drafts hav
 an **X** that removes the whole card from review and excludes its answer from
 submission. Removed cards stay hidden during continued interviews. Drafts that
 conflict with an existing local answer remain visible with **Replace with draft**
-until the responder explicitly selects them. **Submit responses** saves reviewed values and enters the
+until the responder explicitly selects them. A card whose draft would replace a different
+earlier answer quotes that answer under the question, free text and quadratic votes included;
+one longer than 120 characters is cut at a word with **Show all**, and a locked or encrypted one
+is only mentioned. **Submit responses** saves reviewed values and enters the
 normal submission flow, opening sign-in when necessary. Drafts survive sign-in,
 and the modal resumes the normal response upload after the authenticated
 response state has rehydrated. Canceling sign-in leaves the review open without
@@ -532,14 +549,22 @@ the recorder's link was for. Their lines join whatever they've said in this revi
 mapping treats `Responder:` lines as their words and `Other person:` lines as context only.
 
 What they already had is reconsidered against it. A signed-in person's saved answers load
-first (or drafting goes ahead without them if they can't be read). The mapper gets those
+first, and the review says **Waiting for your saved answers before drafting from** their part
+until they do; if they can't be read, drafting waits until **Retry saved answers** reads them,
+so no draft replaces an answer nobody compared. The mapper gets those
 answers and their comments, the drafts already in review and any responder context as
-usual, and the files they added to the session themselves. A draft that gives a different
-answer shows for review, saying which answer it changes. One that repeats the saved answer
-adds nothing and is counted in a note, unless it adds a new comment. A locked answer stands
-and goes to no AI, even after it's been unlocked on the page.
-Someone signed out gets drafts from their part alone; if they sign in to submit, the usual
-check of drafts against saved answers applies.
+usual, and the files they added to the session themselves. An answer or comment changed or
+cleared on the page but not yet submitted, including an unsent draft restored on load, stands in
+for the submitted one, so the mapper is told which fields are unsubmitted. A draft that gives a different
+answer shows for review, saying which answer it changes. One that repeats an answer the AI
+was given adds nothing and is counted in a note as still fitting, unless it adds to the
+comment. A locked comment, or an encrypted one, can't be compared, so any comment the AI proposes
+beside it is offered with **Mine** chosen, keeping theirs unless they choose **AI’s**. A locked
+answer stands and goes to no AI, even after it's been unlocked on the page, so a draft left out
+beside one is counted only as left out, never as still fitting.
+Someone signed out gets drafts from their part alone; if they sign in to submit, their saved
+answers load first, and the submit waits while a card would change an earlier answer or
+doesn't match a comment that loaded.
 
 ## Access and failure behavior
 

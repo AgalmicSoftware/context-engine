@@ -36,6 +36,8 @@ const source = (overrides: Partial<ContextSource>): ContextSource => ({
   adminsOnly: false,
   lockedGroupIds: [],
   addedBy: '',
+  addedByAgent: false,
+  adderName: '',
   fetchedAt: '',
   reading: null,
   ...overrides,
@@ -64,6 +66,7 @@ const list = (overrides: Partial<SessionContextSourcesState> = {}): SessionConte
   supported: true,
   isAdmin: true,
   participantsCanAdd: false,
+  participantsCanAddLinks: false,
   groupFilesHidden: false,
   reload: jest.fn(),
   ...overrides,
@@ -97,6 +100,19 @@ describe('context sources panel', () => {
     expect(within(rows[0]).getByRole('button', { name: 'Refresh Essay' })).toBeInTheDocument();
     expect(within(rows[1]).getByRole('button', { name: /Read again with the session’s AI/ })).toBeInTheDocument();
     expect(within(rows[2]).getByRole('button', { name: /^Read with the session’s AI/ })).toBeInTheDocument();
+  });
+
+  it('names what an agent added by the name it goes by, marked as an agent’s', async () => {
+    const agentLink = source({
+      ...essay,
+      id: 'link-2',
+      addedBy: `0x${'2'.repeat(40)}`,
+      addedByAgent: true,
+      adderName: 'Test Kami',
+    });
+    renderPanel(list({ sources: [agentLink] }));
+    const [row] = await screen.findAllByTestId('ce-context-source');
+    expect(row).toHaveTextContent('Everyone in the session · Added by Test Kami (agent) · Read');
   });
 
   it('adds a link with its privacy, refreshes one, reads a PDF and removes after asking', async () => {

@@ -7,7 +7,7 @@ import { normalizeRecruitmentSource } from './records.mjs';
 
 const SLUG_RE = /^[a-z0-9_-]{1,128}$/;
 const ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
-const GROUP_ID_RE = /^[A-Za-z0-9._:-]{1,128}$/;
+export const GROUP_ID_RE = /^[A-Za-z0-9._:-]{1,128}$/;
 
 const trim = (value) => String(value ?? '').trim();
 
@@ -62,7 +62,8 @@ const readClaimPairs = (params) => {
 
 /**
  * Parses a session link into the Worker, slug, and any invite parameters.
- * A link without worker= resolves through the OP Sepolia registry.
+ * A link without worker= is a registry link here; the participant looks it up
+ * in its site's known sessions before treating it as an on-chain session.
  */
 export const parseSessionLink = (link, { allowLocalWorkers = false } = {}) => {
   let url;

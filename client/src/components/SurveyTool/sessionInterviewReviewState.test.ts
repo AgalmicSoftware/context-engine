@@ -187,6 +187,56 @@ it('treats an untouched empty comment as the AI draft without one', () => {
   expect(result.edited.q1.userEditedFields).toBeUndefined();
 });
 
+it('starts a comment from the person’s own with the AI’s after it, and keeps their choice across predictions', () => {
+  const earlier = (id: string) => ({ q1: 'Saved note', q2: 'Saved too', locked: '*' })[id];
+  const first = mergeInterviewReview(
+    [],
+    {},
+    {},
+    [
+      { questionId: 'q1', answer: 'Agree', additionalComments: 'With a rota' },
+      { questionId: 'q2', answer: 'Agree' },
+      { questionId: 'locked', answer: 'Agree', additionalComments: 'New note' },
+    ],
+    noAnswers,
+    undefined,
+    earlier,
+  );
+  expect(first.edited.q1.additionalComments).toBe('Saved note\n\nWith a rota');
+  expect(first.edited.q2.additionalComments).toBe('Saved too');
+  expect(first.edited.locked.additionalComments).toBe('');
+  // The AI's draft itself stays as proposed.
+  expect(first.drafts[0].additionalComments).toBe('With a rota');
+
+  // An untouched comment follows the AI's next proposal, still after theirs.
+  const refreshed = mergeInterviewReview(
+    first.drafts,
+    first.edited,
+    first.selected,
+    [{ questionId: 'q1', answer: 'Agree', additionalComments: 'With a weekly rota' }],
+    noAnswers,
+    undefined,
+    earlier,
+  );
+  expect(refreshed.edited.q1.additionalComments).toBe('Saved note\n\nWith a weekly rota');
+  expect(refreshed.edited.q1.userEditedFields).toBeUndefined();
+
+  // Once they pick a comment, later predictions leave it.
+  const kept = mergeInterviewReview(
+    refreshed.drafts,
+    {
+      ...refreshed.edited,
+      q1: { ...refreshed.edited.q1, additionalComments: 'Saved note', userEditedFields: ['additionalComments'] },
+    },
+    refreshed.selected,
+    [{ questionId: 'q1', answer: 'Agree', additionalComments: 'Something else' }],
+    noAnswers,
+    undefined,
+    earlier,
+  );
+  expect(kept.edited.q1.additionalComments).toBe('Saved note');
+});
+
 test.each([
   ['0', '00'],
   ['01', '1'],

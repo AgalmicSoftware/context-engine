@@ -6,7 +6,11 @@ import {
   responseFieldValue,
   type SessionInterviewModalRecord,
 } from './sessionInterviewModalState';
-import { isTextInterviewQuestion, resolveInterviewDraftOrigin } from './sessionInterviewResearch';
+import {
+  isTextInterviewQuestion,
+  resolveInterviewDraftOrigin,
+  withoutEncryptedFields,
+} from './sessionInterviewResearch';
 import type { InterviewDraftResponse, InterviewPrefillPacket, InterviewQuestion } from './sessionInterview';
 
 // Hidden drafts (interviewMode.hiddenDraftShare) measure anchoring. A stable random share
@@ -180,12 +184,19 @@ export function useInterviewHiddenDrafts({ questions, editedDrafts, savedRespons
     return !!state && state.revealedAt === undefined;
   }, []);
 
-  /** What the person has reviewed for a draft: for a hidden one, only the values they set. */
+  /**
+   * What an AI may hear the person reviewed for a draft, for the next mapping and the voice interviewer: for a
+   * hidden one only the values they set, and never an answer or comment they encrypted.
+   */
   const reviewedValues = useCallback(
     (questionId: string): InterviewDraftResponse | undefined =>
-      latest.current.hidden[questionId]
-        ? ownDraftIn(latest.current, questionId)
-        : latest.current.editedDrafts[questionId],
+      withoutEncryptedFields(
+        questionId,
+        latest.current.savedResponses,
+        latest.current.hidden[questionId]
+          ? ownDraftIn(latest.current, questionId)
+          : latest.current.editedDrafts[questionId],
+      ),
     [],
   );
 

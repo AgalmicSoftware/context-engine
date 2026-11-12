@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import fs from 'fs';
 import path from 'path';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import SessionInterviewDraftCard from './SessionInterviewDraftCard';
 import QuadraticAllocationInput from './QuadraticAllocationInput';
+import { startingInterviewComment } from './sessionInterviewComments';
 import type { InterviewDraftResponse } from './sessionInterview';
 
 const readDraftCardScss = () => fs.readFileSync(path.join(__dirname, 'SessionInterviewDraftCard.module.scss'), 'utf8');
@@ -322,7 +323,7 @@ describe('SessionInterviewDraftCard readable draft editors', () => {
           edited={edited}
           selected
           existing
-          savedComment="Saved note"
+          earlierComment="Saved note"
           disabled={false}
           onSelect={jest.fn()}
           onEdit={(patch) => {
@@ -427,6 +428,128 @@ describe('SessionInterviewDraftCard readable draft editors', () => {
   });
 });
 
+describe('SessionInterviewDraftCard comments beside the person’s own', () => {
+  const draft = { questionId: 'q1', answer: 'Agree', additionalComments: 'With a small rota' };
+  const Review = ({
+    earlierComment,
+    blindNote,
+    onEdit = jest.fn(),
+  }: {
+    earlierComment: string;
+    blindNote?: string;
+    onEdit?: jest.Mock;
+  }) => {
+    const [edited, setEdited] = useState<InterviewDraftResponse>({
+      ...draft,
+      additionalComments: startingInterviewComment(draft.additionalComments, earlierComment),
+    });
+    return (
+      <SessionInterviewDraftCard
+        draft={draft}
+        edited={edited}
+        selected
+        existing
+        earlierComment={earlierComment}
+        blindNote={blindNote}
+        disabled={false}
+        onSelect={jest.fn()}
+        onEdit={(patch) => {
+          onEdit(patch);
+          setEdited((current) => ({ ...current, ...patch }));
+        }}
+      />
+    );
+  };
+  const comment = () => screen.getByRole('button', { name: /Additional comments for q1/ });
+  const choice = (name: string) =>
+    within(screen.getByRole('group', { name: 'Comment to submit' })).getByRole('button', { name });
+
+  it('shows their comment with the AI’s after it, and keeps either, both, or an edit', () => {
+    const onEdit = jest.fn();
+    render(<Review earlierComment="Saved note" onEdit={onEdit} />);
+    expect(comment()).toHaveTextContent('Saved note With a small rota');
+    expect(choice('Both')).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByLabelText('AI-proposed response')).toBeInTheDocument();
+
+    fireEvent.click(choice('Mine'));
+    expect(onEdit).toHaveBeenLastCalledWith({
+      additionalComments: 'Saved note',
+      userEditedFields: ['additionalComments'],
+    });
+    expect(comment()).toHaveTextContent(/^Saved note$/);
+    expect(choice('Mine')).toHaveAttribute('aria-pressed', 'true');
+
+    fireEvent.click(choice('AI’s'));
+    expect(onEdit).toHaveBeenLastCalledWith({
+      additionalComments: 'With a small rota',
+      userEditedFields: ['additionalComments'],
+    });
+    expect(choice('Both')).toHaveAttribute('aria-pressed', 'false');
+
+    // Both is where the card started, so it is no longer an edit.
+    fireEvent.click(choice('Both'));
+    expect(onEdit).toHaveBeenLastCalledWith({
+      additionalComments: 'Saved note\n\nWith a small rota',
+      userEditedFields: [],
+    });
+    expect(screen.getByLabelText('AI-proposed response')).toBeInTheDocument();
+
+    fireEvent.click(comment());
+    fireEvent.change(screen.getByRole('textbox', { name: /Additional comments for q1/ }), {
+      target: { value: 'Saved note, and a rota' },
+    });
+    expect(['Both', 'Mine', 'AI’s'].map((name) => choice(name).getAttribute('aria-pressed'))).toEqual([
+      'false',
+      'false',
+      'false',
+    ]);
+  });
+
+  it('keeps their earlier comment in view above the choices, whatever the box holds', () => {
+    render(<Review earlierComment="Saved note" />);
+    const quoted = () => screen.getByText('Your earlier comment: Saved note', { exact: true });
+    expect(quoted().compareDocumentPosition(screen.getByRole('group', { name: 'Comment to submit' }))).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+    fireEvent.click(choice('AI’s'));
+    expect(comment()).toHaveTextContent(/^With a small rota$/);
+    expect(quoted()).toBeInTheDocument();
+    fireEvent.click(comment());
+    fireEvent.change(screen.getByRole('textbox', { name: /Additional comments for q1/ }), {
+      target: { value: 'A rota, in my words' },
+    });
+    expect(quoted()).toBeInTheDocument();
+  });
+
+  it('keeps a locked comment until they choose the AI’s, and explains why', () => {
+    const onEdit = jest.fn();
+    render(<Review earlierComment="*" onEdit={onEdit} />);
+    expect(screen.getByText('Your earlier comment is locked', { exact: true })).toBeInTheDocument();
+    expect(choice('Mine')).toHaveAttribute('aria-pressed', 'true');
+    expect(within(screen.getByRole('group', { name: 'Comment to submit' })).queryByText('Both')).toBeNull();
+    expect(comment()).toHaveTextContent('Your locked comment stays.');
+    expect(screen.getByRole('button', { name: 'About these comment choices' })).toHaveAccessibleDescription(
+      /locked, so it stays unless you choose the AI’s/,
+    );
+    fireEvent.click(choice('AI’s'));
+    expect(onEdit).toHaveBeenLastCalledWith({
+      additionalComments: 'With a small rota',
+      userEditedFields: ['additionalComments'],
+    });
+  });
+
+  it('offers no choice on a hidden draft, or when the AI adds nothing', () => {
+    const { unmount } = render(<Review earlierComment="Saved note" blindNote="Hidden" />);
+    expect(screen.queryByRole('group', { name: 'Comment to submit' })).toBeNull();
+    unmount();
+    render(<Review earlierComment="Saved note, with a small rota" />);
+    expect(screen.queryByRole('group', { name: 'Comment to submit' })).toBeNull();
+    expect(comment()).toHaveTextContent('Saved note, with a small rota');
+    // The box holds their comment alone, so it isn't quoted again.
+    expect(screen.queryByText(/Your earlier comment/)).toBeNull();
+  });
+});
+
 describe('SessionInterviewDraftCard styles', () => {
   it('keeps long freeform editors scrollable and the AI marker borderless', () => {
     const scss = readDraftCardScss();
@@ -520,13 +643,32 @@ describe('SessionInterviewDraftCard earlier answers', () => {
     ['multichoice', 'Transit', 'Parks', { singleSelect: true }, 'Changes your earlier answer: Parks'],
     ['multichoice', ['Housing'], ['Parks', 'Transit'], {}, 'Changes your earlier answer: Parks, Transit'],
     ['rating', 3, 7, { scale: { min: 0, max: 10 } }, 'Changes your earlier answer: 7 of 10'],
-    ['quadratic', [1, 0, -1], [0, 1, 0], {}, 'Changes your earlier answer'],
-    ['freeform', 'New view', 'Old view', {}, 'Changes your earlier answer'],
+    ['quadratic', [1, 0, -1], [0, 1, -2], {}, 'Changes your earlier answer: Housing -2, Transit +1'],
+    ['freeform', 'New view', 'Old view', {}, 'Changes your earlier answer: Old view'],
     // A locked earlier answer can't be read, so it is only mentioned.
     ['binary', 'Disagree', '*', {}, 'Changes your earlier answer'],
+    ['freeform', 'New view', '*', {}, 'Changes your earlier answer'],
   ])('says a %s draft changes the earlier answer', (type, answer, earlier, extra, note) => {
     renderCard(type, answer, earlier, extra);
     expect(screen.getByText(note, { exact: true })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Show all' })).toBeNull();
+  });
+
+  it('shortens a long earlier answer, with a way to read all of it', () => {
+    const earlier = `First line of what I said before.\nThen ${'a much longer explanation of my view '.repeat(4)}ending here.`;
+    renderCard('freeform', 'New view', earlier);
+    const note = screen.getByText(/^Changes your earlier answer: /);
+    // Cut at a word, on one line.
+    expect(note.firstChild?.textContent).toBe(
+      'Changes your earlier answer: First line of what I said before. Then a much longer explanation of my view a much longer explanation of my view a much…',
+    );
+    const toggle = within(note).getByRole('button', { name: 'Show all' });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(toggle);
+    expect(note.firstChild?.textContent).toBe(`Changes your earlier answer: ${earlier}`);
+    expect(within(note).getByRole('button', { name: 'Show less' })).toHaveAttribute('aria-expanded', 'true');
+    fireEvent.click(within(note).getByRole('button', { name: 'Show less' }));
+    expect(note.firstChild?.textContent).toMatch(/…$/);
   });
 
   it('says nothing when there is no earlier answer or the draft repeats it, and still says it when not chosen', () => {

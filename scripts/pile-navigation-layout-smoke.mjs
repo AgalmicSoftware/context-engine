@@ -42,6 +42,10 @@ try {
         localStorage.setItem('ce:theme-default-version', '2026-10-13-civic-v1');
         localStorage.setItem('ce_onboarding_complete', 'true');
       }, theme);
+      // Only GETs may leave the dev server (fonts, the Worker's unrouted reads); any
+      // other request off it, such as the interview's starter POST, is aborted.
+      await page.route(url => url.origin !== new URL(base).origin, route =>
+        route.request().method() === 'GET' ? route.fallback() : route.abort());
       await page.route(`${new URL(config.corsWorkerUrl).origin}/storage/list?*`, route => route.fulfill({ json: {
         items: new URL(route.request().url()).searchParams.get('resource') === 'questions'
           ? questions.map(question => ({ storageRef: { backend: 'cloudflare', id: question.id, resource: 'questions' } })) : [],

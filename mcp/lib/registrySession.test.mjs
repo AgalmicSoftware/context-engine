@@ -88,6 +88,8 @@ const fixture = (overrides = {}) => {
     return surveys;
   };
   const fetchImpl = async (url) => {
+    // The link's site lists no hosted sessions, so its links stay on-chain.
+    if (new URL(url).pathname === '/known-sessions.json') return new Response('', { status: 404 });
     const id = new URL(url).pathname.split('/').pop();
     return unavailable.has(id) ? new Response('', { status: 404 }) : Response.json(records.get(id));
   };
@@ -546,8 +548,38 @@ test('participant joins registry links read-only when gates refuse login and per
   assert.equal((await participant.listQuestions()).questions[0].id, qid);
   assert.equal((await participant.getResults()).resultsPublic, true);
   await assert.rejects(participant.joinGroup({ groupId: 'group' }), /not available in on-chain/);
+  await assert.rejects(participant.leaveGroup({ groupId: 'group' }), /not available in on-chain/);
+  await assert.rejects(participant.addContext({ text: 'A note.' }), /^Error: Adding context isn’t available in on-chain sessions yet\.$/);
+  assert.equal(joined.addingContext, undefined);
+  assert.equal(joined.groups, undefined);
   const state = JSON.parse(await fs.readFile(path.join(stateDir, 'state.json'), 'utf8'));
   assert.match(state.current, /^registry /);
+  assert.equal(state.sessions[state.current].kind, 'registry');
+});
+
+test('a slug its site’s list of known sessions doesn’t name still opens on-chain', async (t) => {
+  const stateDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ce-registry-unlisted-'));
+  t.after(() => fs.rm(stateDir, { recursive: true, force: true }));
+  const f = fixture();
+  const lists = [];
+  const participant = createParticipant({ config: readConfig({ CE_MCP_STATE_DIR: stateDir }), wallet, registry: f.options,
+    fetchImpl: async (url, init) => {
+      const { hostname, pathname } = new URL(url);
+      if (pathname === '/known-sessions.json') {
+        lists.push(String(url));
+        return Response.json({ 'town-hall': { worker: 'https://ce-town-hall.example.workers.dev', sessionId: `0x${'1'.repeat(32)}` } });
+      }
+      if (hostname !== 'w.example.dev') return f.fetchImpl(url, init);
+      if (pathname === '/resource-presence') return Response.json({ resources: { txGas: false } });
+      if (pathname === '/auth/nonce') return Response.json({ nonce: 'nonce123456' });
+      if (pathname === '/auth/login') return Response.json({ error: 'default gate requires membership' }, { status: 403 });
+      throw new Error(`Unexpected Worker read ${pathname}`);
+    },
+  });
+  const joined = await participant.joinSession({ link: 'https://contextengine.sh/session/town' });
+  assert.equal(joined.session, 'town');
+  assert.deepEqual(lists, ['https://contextengine.sh/known-sessions.json']);
+  const state = JSON.parse(await fs.readFile(path.join(stateDir, 'state.json'), 'utf8'));
   assert.equal(state.sessions[state.current].kind, 'registry');
 });
 

@@ -2,6 +2,48 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.9.2] - 2026-11-11
+
+### Client — available when the site deploys
+
+- When the AI proposes a comment for a question you've already commented on, the review card keeps your comment and puts the AI's after it. **Both**, **Mine** and **AI’s** switch between them under a quote of your earlier comment, the text stays editable, and a locked comment stays unless you choose the AI's or write in the box. A submit pressed before your saved answers load waits for you to check any card whose comment doesn't match one that loaded, saying **Saved answers loaded. Check drafts that change an earlier answer or comment, then submit.**
+- A review card that would change your earlier answer now quotes free-text answers and quadratic votes too, so you can compare them; a long answer is cut short with **Show all**, and an encrypted one is only mentioned.
+- After you claim your part of a conversation, "still fit" counts only the answers the AI compared. A locked or encrypted answer, which the AI never sees, is no longer said to fit, and a comment the AI proposes beside a locked or encrypted comment is offered for review, keeping yours unless you choose the AI's.
+- When you claim your part while signed in, the review says it's waiting for your saved answers until they load, and if they can't be read, drafting now waits until **Retry saved answers** reads them, instead of drafting without them.
+- When you claim your part, answers and comments you've changed or cleared on the page but not submitted, including an unsent draft restored after a reload, reach the AI marked as unsubmitted instead of as saved answers.
+- For a draft you leave out, research sharing records the AI's comment as you left it, never a comment of yours from the page that you haven't submitted.
+- In interview review, an answer or comment you encrypted counts as locked even after you unlock it on the page: an encrypted answer stands and isn't quoted, and for an encrypted comment the card shows **Your locked comment stays.** and keeps it unless you choose the AI's or write in the box. No answer or comment you encrypted, nor anything you type into an encrypted field, goes to the voice interviewer or the next round of drafting.
+- A signed-in participant can now add a link to a session's context from the session page as well as a file. The form offers it only while the session takes participants' additions and hasn't ended, and only on a Session Worker from this release.
+- The context list marks what an AI agent added: "<its name> (agent)", or its short address with "(agent)" when it gave no name. The agent sets the mark itself, as with its answers' agent marker, and the mark grants nothing.
+- `/skill.md`, the guide for AI agents, names `leave_group` and `add_context` and says the MCP shows a session's instructions when an agent joins. It and `/llms.txt` say a session may invite agents to add context.
+- In Classic 95 the Debate Map is drawn as a Windows 95 program rather than dark glass: the theme's font, square raised buttons with the chosen view pressed in, and sunken white canvases. `/atlas` and a topic's panel have navy title bars, the panel's staying in view as it scrolls, and **Top Debates** opens as a gray window. On a phone its toolbar wraps, so the legend and **Filter Depth** stay on screen. **Suggest New Topic** opens as a gray dialog; its path, field label and **Cancel** were white on white.
+- The **Session Doc Library**'s link and title fields are readable in the Context Engine theme, where typed text was 1.93:1, and their hint text is readable in Classic 95, where it was 1.82:1. On phones the file field takes a whole line, so the chosen file's name shows.
+
+### Workers — requires redeployment
+
+- Signed-in participants may add links to context (`/storage/context` `add-link`) while the session doesn't limit context to admins and hasn't ended. Their links follow the same link rules as admins', need their `fetch` scope and count against the per-address daily limit as fetches too. Every link passes the upload's access check before the Worker fetches the page. Refreshing a link and having a PDF read stay with admins. `/capabilities` reports `participant_context_links_v1`.
+- A refresh must name the same link, and keeps its title, privacy and who added it.
+- A context item may carry an agent's self-declared mark: `CE-AdderKind` `agent`, with its name in `CE-AdderName`, up to 80 characters of plain text without control characters or marks that reorder text. Any other mark is refused, as is a name without the mark. A refreshed link keeps its mark.
+- Prompts that read a session's context say it comes from its hosts and participants, AI agents among them. They call it untrusted material and tell the AI never to follow instructions inside it.
+
+### Agents and MCP
+
+- MCP 0.3.0. A normal session link, without `worker=`, goes to the Session Worker that the link's site lists for it in `/known-sessions.json`, once that Worker reports the listed session ID. A slug the site doesn't list stays on-chain, as before, and a `worker=` in the link still wins. When the list can't be read, `join_session` says so and asks for a link with `worker=`.
+- New `add_context` tool: an agent adds a local file, a link or text (stored as Markdown) to a hosted session's context when the session invites it.
+  - Everyone in the session sees what it adds unless it passes `adminsOnly`, and each item is marked as an agent's, under its display name.
+  - It never adds a file from the MCP's state folder or a hidden folder, a hidden file, or text that looks like a key, token or password.
+  - Sessions that limit context to admins, sessions that have ended, sessions that keep their files where the Session Worker can't read them, and on-chain sessions refuse it.
+- `join_session` and `get_session` show:
+  - the session's instructions for agents, marked as from its admins and as adding to the general guidance;
+  - its groups, with how joining works and who may end a membership;
+  - its invitation to add context, with the limits.
+- `join_session` no longer joins a group named in the link. It names the group, says when the agent is already in it, and its next step says to read the session's instructions, then call `join_group`. New `leave_group` tool, which says why when a group doesn't let members leave.
+- After a restart, the MCP checks that a hosted session it joined is still the same session behind its Worker, and asks the agent to join again when it isn't.
+
+### Release verification
+
+- The MCP publish workflow reads npm every ten seconds, for up to three minutes, until it lists the new version as `latest` with provenance. It no longer fails when npm takes a moment to list the version.
+
 ## [0.9.1] - 2026-11-10
 
 ### Client — available when the site deploys

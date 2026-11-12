@@ -63,6 +63,39 @@
   line-height: 1.45;
 }
 
+// A long earlier answer read in full keeps its line breaks.
+.earlierAnswerFull {
+  white-space: pre-line;
+}
+
+// Their earlier comment, quoted above the comment choices rather than tucked under the question.
+.earlierComment {
+  margin: 0;
+}
+
+.draftCard .earlierAnswerToggle {
+  appearance: none;
+  margin-left: 6px;
+  padding: 0 3px;
+  border: 0;
+  background: transparent;
+  color: var(--ce-panel-text);
+  font: inherit;
+  font-weight: 850;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+
+  &:hover {
+    background: color-mix(in srgb, var(--ce-action-accent) 12%, var(--ce-card-bg));
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--ce-focus-ring);
+    outline-offset: 2px;
+  }
+}
+
 .editorStack {
   display: grid;
   gap: 10px;
@@ -182,6 +215,65 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
+}
+
+// Quick choices between the person's earlier comment and the AI's, above the comment box.
+.commentChoices {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+// Borders beat the interview panel's button reset, as the comment box's do.
+.draftCard .commentChoice,
+.draftCard .commentChoicesHelp {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 34px;
+  border: 1px solid color-mix(in srgb, var(--ce-panel-text) 45%, transparent) !important;
+  background: var(--ce-card-bg);
+  color: var(--ce-panel-text);
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 750;
+  line-height: 1.2;
+
+  &:hover:not(:disabled) {
+    border-color: var(--ce-action-accent) !important;
+    background: color-mix(in srgb, var(--ce-action-accent) 12%, var(--ce-card-bg));
+    color: var(--ce-panel-text);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--ce-focus-ring);
+    outline-offset: 2px;
+  }
+}
+
+.draftCard .commentChoice {
+  padding: 4px 12px;
+  cursor: pointer;
+
+  &[aria-pressed='true'] {
+    border-color: var(--ce-action-accent) !important;
+    background: color-mix(in srgb, var(--ce-action-accent) 20%, var(--ce-card-bg));
+    font-weight: 850;
+  }
+
+  &:disabled {
+    cursor: default;
+    opacity: 0.72;
+  }
+}
+
+.draftCard .commentChoicesHelp {
+  width: 34px;
+  padding: 0;
+  cursor: help;
 }
 
 .agentCommentMarker {
