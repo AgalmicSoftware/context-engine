@@ -123,7 +123,9 @@ export const createAgentServices = ({ env, agentEnv, deps }) => {
       }
       const request = new Request(url, { method, headers: { 'Content-Type': 'application/json', ...Object.fromEntries(new Headers(headers)) }, ...(body ? { body: JSON.stringify(body) } : {}) });
       return deps.storageRoute({ path: url.pathname, method, request, env, config: ctx.config, slug: ctx.slug,
-        uploaderAddress: ctx.address, authScopes: ctx.scopes, expectedAuthority: expectedAuthority(), baseHeaders: {} });
+        uploaderAddress: ctx.address, authScopes: ctx.scopes, expectedAuthority: expectedAuthority(), baseHeaders: {},
+        // Agent answers are checked against the question read for them (onChainResponses.mjs).
+        answersChecked: url.pathname === '/storage/upload' });
     },
     async faucet() {
       const { config } = await current();

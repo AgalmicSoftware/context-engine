@@ -4,5 +4,5 @@ export const BINARY_ANSWERS: readonly string[];
 export function ratingScaleFor(question?: object): RatingScale & { step: number };
 export function optionsOf(question: { options?: unknown }): string[];
 export function isSingleSelect(question: object): boolean;
-export function normalizeAnswerValue(question: object, value: unknown):
+export function normalizeAnswerValue(question: object, value: unknown, options?: { maxFreeformLength?: number }):
   { ok: true; value: string | number | string[] | number[] } | { ok: false; error: string };

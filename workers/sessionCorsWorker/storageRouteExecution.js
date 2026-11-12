@@ -50,6 +50,8 @@ import {
   readStoragePayloadResourceId,
   validateStorageUploadPayload,
 } from './storageUploadValidation.js';
+import { checkUploadedAnswers } from './responseAnswerValidation.js';
+import { isWorkerCanonicalSessionConfig } from './workerCanonicalAuthority.js';
 import {
   isAdminStorageVersion,
   isOwnedStorageResource,
@@ -1404,7 +1406,7 @@ export const publishCloudflareOwnedStorageMetadata = async ({ env, config, slug,
   await index.put(buildIndexKey({ slug, resource, id: metadata.id }), JSON.stringify(metadata), storageIndexPutOptions(metadata));
 };
 
-const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, authScopes, expectedAuthority, payload, resourceId = '', baseHeaders, deps }) => {
+const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, authScopes, expectedAuthority, payload, parsedPayload = null, answersChecked = false, resourceId = '', baseHeaders, deps }) => {
   const r2 = getStorageR2Binding(env);
   const index = getStorageIndexBinding(env);
   const canWriteR2 = !!r2 && typeof r2.put === 'function';
@@ -1450,6 +1452,15 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
   }
   const resource = trim(payload.resource) || 'docsContext';
   const uploader = normalizeAddress(uploaderAddress);
+  // Readable answers must name a question the session has, with a value it accepts.
+  // Only a Worker-canonical session keeps its question list here; others read it from chain or Arweave.
+  // Agents check each answer against the question they read before uploading it.
+  const answerCheck = resource === 'responses' && parsedPayload && !answersChecked && isWorkerCanonicalSessionConfig(config)
+    ? await checkUploadedAnswers({ env, config, index, slug, payload: parsedPayload })
+    : null;
+  if (answerCheck && !answerCheck.ok) {
+    return responseJson(deps, { error: answerCheck.error, reason: answerCheck.reason }, answerCheck.status, baseHeaders);
+  }
   const owned = isOwnedStorageResource(resource);
   const uploaderIsAdmin = owned && resolveSessionAdminAddresses(config).has(uploader);
   const contextUploaderIsAdmin = resolveSessionAdminAddresses(config).has(uploader);
@@ -2694,6 +2705,7 @@ export const removeCloudflareStorageRecords = async ({ env, slug, rows = [], mar
 
 export const storageRoute = async ({
   path, method, request, env, config, slug, uploaderAddress, authScopes, expectedAuthority, baseHeaders, checkFetchAccess, deps,
+  answersChecked = false,
 } = {}) => {
   if (method === 'POST' && ['/storage/response-field-key/wrap', '/storage/response-field-key/unwrap'].includes(path)) {
     // Field keys use the same lazy private-RPC setup and chain attestation as
@@ -2733,7 +2745,8 @@ export const storageRoute = async ({
     }
     const routeDeps = createStorageRouteGateDeps({ config, env, slug, deps });
     return handleCloudflareUpload({
-      env, config, slug, uploaderAddress, authScopes, expectedAuthority, payload, resourceId: checked.resourceId, baseHeaders, deps: routeDeps,
+      env, config, slug, uploaderAddress, authScopes, expectedAuthority, payload, parsedPayload: checked.payload || null, answersChecked,
+      resourceId: checked.resourceId, baseHeaders, deps: routeDeps,
     });
   }
 

@@ -661,6 +661,16 @@ export async function listAgentProposedQuestionsForSessionWithSummary(env = {}, 
   return { questions: records, skippedMalformed, complete: true };
 }
 
+// One active proposed question by id, as the listing would return it, or null.
+export async function readAgentProposedQuestion(env = {}, sessionSlug = '', questionId = '') {
+  const key = proposedQuestionKey(sessionSlug, questionId);
+  if (!key || typeof env?.AGENT_ACTION_KV?.get !== 'function') return null;
+  const parsed = safeJsonParse(await env.AGENT_ACTION_KV.get(key), null);
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+  if (parsed.status && lower(parsed.status) !== 'active') return null;
+  return proposedRecordMalformedReason(parsed) ? null : proposedRecordToQuestion(parsed) || null;
+}
+
 export async function listAgentProposedQuestionsForSession(env = {}, sessionSlug = '') {
   const summary = await listAgentProposedQuestionsForSessionWithSummary(env, sessionSlug);
   if (summary.complete === false) throw Object.assign(new Error('agent_question_read_incomplete'), { reason: 'agent_question_read_incomplete', status: 503 });
