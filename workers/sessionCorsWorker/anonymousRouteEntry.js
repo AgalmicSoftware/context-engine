@@ -24,7 +24,8 @@ export const dispatchAnonymousRouteEntry = async ({
   const slug = slugResolution?.slug;
   let config;
   try {
-    ({ config } = await (deps?.readCurrentSessionConfig || readCurrentSessionConfig)({ env, slug }));
+    // Signed-out routes never act as an admin, so a config up to a second old serves them.
+    ({ config } = await (deps?.readCurrentSessionConfig || readCurrentSessionConfig)({ env, slug, cache: true }));
   } catch (error) {
     return deps?.json?.({ error: error.message }, 503, baseHeaders);
   }

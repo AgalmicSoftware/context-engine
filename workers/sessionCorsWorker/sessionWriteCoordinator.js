@@ -8,7 +8,7 @@ import { registerUploadReceiptStore, readUploadReceiptRegistrationRetryAt, dispa
 import { bumpStorageBackupRevision, WORKER_GROUP_BACKUP_PENDING_PREFIX } from './storageBackupRevision.js';
 import { exportCoordinatorRecoveryKey } from './recoveryKeyExport.js';
 import { withFreshRecoveryKey } from '../shared/recoveryKey.mjs';
-import { SESSION_CONFIG_COORDINATION_ERROR, assertExpectedSessionAuthority, logCoordinatorFailure } from './sessionConfigAuthority.js';
+import { SESSION_CONFIG_COORDINATION_ERROR, assertExpectedSessionAuthority, forgetSessionConfig, logCoordinatorFailure } from './sessionConfigAuthority.js';
 import { exportCoordinatorBackup, exportWorkerGroupBackup, importWorkerGroupBackup, controlWorkerGroupBackupImport, BACKUP_GROUP_IMPORT_ACTIVE_KEY } from './sessionBackupCoordinator.js';
 import { importCoordinatorBackupPage } from './sessionBackupImport.js';
 import { normalizeStorageRef, isSafeCloudflareStorageRefId } from './storageRefNormalization.js';
@@ -3588,6 +3588,8 @@ export const getOrCreateCoordinatedStorageEnvelopeSessionKey = async ({
       ? 'Session config projection is pending; retry.'
       : 'Session config coordination failed.');
   }
+  // A new key is written into the config; later reads here must see it.
+  if (result.created) forgetSessionConfig(env, slug);
   return result;
 };
 
@@ -3627,6 +3629,9 @@ export const executeCoordinatedSessionConfigMutation = async ({
       status: 503,
       body: { error: 'Session config coordination failed; retry.' },
     };
+  } finally {
+    // The admin who made a change must see it at once, not a cached copy.
+    forgetSessionConfig(env, slug);
   }
   const result = await response.json().catch(() => ({}));
   return response.ok && result?.ok === true

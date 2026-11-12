@@ -26,38 +26,83 @@ export const assertExpectedSessionAuthority = (authority, expected, slug, { requ
 
 // Concurrent config reads in one isolate share the call already in flight, so a
 // burst sends the session's coordinator one read instead of one per request.
-// A finished read is never reused: a reader sees the config as of a call that
-// was still unanswered when it arrived. A read that never settles (its
-// request was cancelled) is replaced after a wait, not joined forever.
-const configReadsInFlight = new WeakMap();
+// A read that never settles (its request was cancelled) is replaced after a
+// wait, not joined forever.
+//
+// Ordinary requests (signed-out reads, and answers and reads by people the
+// config does not name) may also reuse a successful read for up to one second
+// from when it finished, so a sign-out everywhere or a session made private
+// reaches every request within a second. Admin routes and config changes read
+// fresh, and any change made through this isolate drops its copy at once.
+export const SESSION_CONFIG_CACHE_MS = 1_000;
 const SHARED_READ_JOIN_MS = 10_000;
 const STALLED = Symbol('stalled');
+const configReads = new WeakMap();
 
-const shareConfigRead = (binding, slug, read) => {
-  let reads = configReadsInFlight.get(binding);
-  if (!reads) configReadsInFlight.set(binding, reads = new Map());
-  const joined = reads.get(slug);
+const readState = (binding, slug) => {
+  let slugs = configReads.get(binding);
+  if (!slugs) configReads.set(binding, slugs = new Map());
+  let state = slugs.get(slug);
+  if (!state) slugs.set(slug, state = { generation: 0, cached: null, inFlight: null });
+  return state;
+};
+
+const shareConfigRead = (state, read) => {
+  const joined = state.inFlight;
   if (!joined) {
-    const pending = read().finally(() => { if (reads.get(slug) === pending) reads.delete(slug); });
-    reads.set(slug, pending);
+    const generation = state.generation;
+    const pending = read().then((result) => {
+      // A read that overlapped a change made here may predate it; never keep it.
+      if (result.ok && state.generation === generation) {
+        state.cached = { result, expiresAt: Date.now() + SESSION_CONFIG_CACHE_MS };
+      }
+      return result;
+    }).finally(() => { if (state.inFlight === pending) state.inFlight = null; });
+    state.inFlight = pending;
     return pending.then((result) => structuredClone(result));
   }
   let timer;
   const stalled = new Promise((resolve) => { timer = setTimeout(resolve, SHARED_READ_JOIN_MS, STALLED); });
   return Promise.race([joined, stalled]).finally(() => clearTimeout(timer)).then((result) => {
     if (result !== STALLED) return structuredClone(result);
-    if (reads.get(slug) === joined) reads.delete(slug);
-    return shareConfigRead(binding, slug, read);
+    // The stalled read may still finish; it must not replace a newer copy.
+    if (state.inFlight === joined) { state.inFlight = null; state.generation += 1; }
+    return shareConfigRead(state, read);
   });
 };
 
-export const callSessionConfigCoordinator = async ({ env, slug, path, ...payload }) => {
+// Drops this isolate's copy of a session's config after a change, so the next
+// read, and any read already in flight, is not reused.
+export const forgetSessionConfig = (env, slug) => {
+  const binding = env?.CE_SESSION_COORDINATOR;
+  const normalizedSlug = resolveCoordinatorSessionSlugStorageKey(slug);
+  const state = binding && normalizedSlug ? configReads.get(binding)?.get(normalizedSlug) : null;
+  if (!state) return;
+  state.generation += 1;
+  state.cached = null;
+  state.inFlight = null;
+};
+
+// Calls that leave the config as it was: reads, backup marks and exports, and
+// the per-answer and per-view journals. Every other call drops this copy.
+// (backup/status can finish a restore, so it drops it.)
+const KEEPS_CONFIG = new Set(['current', 'backup/write-revision', 'backup/export', 'diagnostics', 'storage/publish']);
+const KEEPS_CONFIG_PREFIXES = ['agent-submit/', 'debate-atlas/', 'risk-matrix/'];
+const keepsConfig = (path) => KEEPS_CONFIG.has(path) || KEEPS_CONFIG_PREFIXES.some((prefix) => String(path).startsWith(prefix));
+
+export const callSessionConfigCoordinator = async ({ env, slug, path, cache = false, ...payload }) => {
   const binding = env?.CE_SESSION_COORDINATOR;
   const normalizedSlug = resolveCoordinatorSessionSlugStorageKey(slug);
   if (path === 'current' && normalizedSlug && binding && !Object.keys(payload).length) {
-    return shareConfigRead(binding, normalizedSlug, () => callCoordinator({ env, slug, path }));
+    const state = readState(binding, normalizedSlug);
+    if (cache && state.cached && Date.now() < state.cached.expiresAt) return structuredClone(state.cached.result);
+    return shareConfigRead(state, () => callCoordinator({ env, slug, path }));
   }
-  return callCoordinator({ env, slug, path, ...payload });
+  try {
+    return await callCoordinator({ env, slug, path, ...payload });
+  } finally {
+    if (!keepsConfig(path)) forgetSessionConfig(env, slug);
+  }
 };
 
 // Logs why the coordinator could not answer: Cloudflare's own error text and
@@ -102,8 +147,8 @@ const callCoordinator = async ({ env, slug, path, ...payload }) => {
   }
 };
 
-export const readCurrentSessionConfig = async ({ env, slug }) => {
-  const result = await callSessionConfigCoordinator({ env, slug, path: 'current' });
+export const readCurrentSessionConfig = async ({ env, slug, cache = false }) => {
+  const result = await callSessionConfigCoordinator({ env, slug, path: 'current', cache });
   if (!result.ok && result.status === 503 && result.body?.reason === SESSION_CONFIG_MIGRATION_REQUIRED_REASON) {
     throw legacySessionConfigMigrationError();
   }
