@@ -160,7 +160,8 @@ export const shouldOfferGeneratedResultsAuthorization = ({
   const config = toRecord(sessionConfig);
   if (!Object.values(normalizeResultsAnalysisSettings(config.resultsAnalysis).views).some(Boolean)) return false;
   // Elsewhere the browser supplies the answers, which only the admin may do.
-  if (resolveSessionCapabilityProjection(config).isWorkerCanonical === true) return mayStartResultsBuilds(config, account);
+  if (resolveSessionCapabilityProjection(config).isWorkerCanonical === true)
+    return mayStartResultsBuilds(config, account);
   const accountLower = toText(account).toLowerCase();
   const adminAddress = toText(config.adminAddress || toRecord(config.__registry).adminAddress).toLowerCase();
   const hasHatAuthority = !!toText(config.adminHatId) && !!toText(config.hatsAddress);

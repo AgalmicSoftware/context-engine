@@ -25,7 +25,10 @@ describe('who is offered the Results builds', () => {
   });
 
   it('offers AI Views only to the admin where the browser supplies the answers', () => {
-    const onChain = { ...config, sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED) };
+    const onChain = {
+      ...config,
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED),
+    };
     expect(shouldOfferGeneratedResultsAuthorization({ account: ADMIN, sessionConfig: onChain })).toBe(true);
     expect(shouldOfferGeneratedResultsAuthorization({ account: RESULTS_ADMIN, sessionConfig: onChain })).toBe(false);
     expect(mayStartResultsBuilds(onChain, RESULTS_ADMIN)).toBe(true);

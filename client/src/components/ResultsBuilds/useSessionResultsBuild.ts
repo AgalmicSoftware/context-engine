@@ -65,7 +65,6 @@ const toRecord = (value: unknown): UnknownRecord =>
   value && typeof value === 'object' && !Array.isArray(value) ? (value as UnknownRecord) : {};
 const lower = (value: unknown): string => (typeof value === 'string' ? value.trim().toLowerCase() : '');
 
-
 // A session's builds of one kind, as the open Results show them: the newest or
 // a picked one, the list of those kept, and a build this reader starts.
 export const useSessionResultsBuild = <TBuild extends ResultsBuildSummary>({

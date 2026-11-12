@@ -15,7 +15,9 @@ const ADMIN = '0x00000000000000000000000000000000000000aa';
 const renderWith = (workerOrigin: string, capabilities: Record<string, unknown>) => {
   const fetchImpl = jest.fn(async (url: unknown) =>
     String(url).startsWith(`${workerOrigin}/capabilities`)
-      ? new Response(JSON.stringify({ type: 'ce_worker_capabilities', version: 1, apiVersion: 1, features: [], ...capabilities }))
+      ? new Response(
+          JSON.stringify({ type: 'ce_worker_capabilities', version: 1, apiVersion: 1, features: [], ...capabilities }),
+        )
       : new Response('{}', { status: 404 }),
   ) as unknown as typeof fetch;
   render(
