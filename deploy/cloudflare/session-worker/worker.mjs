@@ -33439,7 +33439,7 @@ function isSafeHashValue(value, path = []) {
   const key = lower2(path[path.length - 1]);
   const parentKey = lower2(path[path.length - 2]);
   if (SAFE_HASH_VALUE_KEYS.has(key) || SAFE_HASH_VALUE_CONTAINER_KEYS.has(parentKey)) return true;
-  if (key === "storageid" || parentKey === "storageref" && key === "id") return STORAGE_ID_RE.test(value);
+  if (key === "storageid" || key === "arweavetxid" || parentKey === "storageref" && key === "id") return STORAGE_ID_RE.test(value);
   if (parentKey === "storageref" && key === "uri") return STORAGE_URI_RE.test(value);
   return (key.endsWith("questionid") || parentKey.endsWith("questionids")) && QUESTION_ID_RE.test(value);
 }
@@ -33509,7 +33509,7 @@ var init_redaction = __esm({
     ]);
     QUESTION_ID_RE = /^0x[0-9a-f]{64}$/i;
     STORAGE_ID_RE = /^[A-Za-z0-9_-]{43}$/;
-    STORAGE_URI_RE = /^\/storage\/read\?id=[A-Za-z0-9_-]{43}$/;
+    STORAGE_URI_RE = /^(?:\/storage\/read\?id=|ar:\/\/|lit-arweave:\/\/)[A-Za-z0-9_-]{43}$/;
   }
 });
 
@@ -101525,7 +101525,8 @@ async function handlePreferencesRequest({ env = {}, context = {}, input = {}, wa
   const agentMetadata = normalizeAgentMetadata2(input);
   const hasAgentMetadata = agentMetadata && typeof agentMetadata === "object" && Object.values(agentMetadata).some((value) => value !== null && value !== void 0 && value !== "");
   const clientSource = safeString(firstValue2(input.source, input.client, input.integration)).slice(0, 120);
-  const rootSubmitRequested = directSubmitRequested(input);
+  const draftsOnly = !!context.delegation?.sourceParticipant && context.session.sessionModeProfile?.authority?.mode !== "worker_canonical";
+  const rootSubmitRequested = !draftsOnly && directSubmitRequested(input);
   const drafts = [];
   const submitted = [];
   const skipped = [];
@@ -101544,7 +101545,7 @@ async function handlePreferencesRequest({ env = {}, context = {}, input = {}, wa
   }
   for (const entry2 of entries) {
     const questionId4 = safeString(entry2.questionId);
-    const shouldSubmit = rootSubmitRequested || directSubmitRequested(entry2.answer);
+    const shouldSubmit = !draftsOnly && (rootSubmitRequested || directSubmitRequested(entry2.answer));
     if (shouldSubmit) submitRequestedCount += 1;
     const question = byId.get(questionId4);
     if (!question) {
@@ -102877,12 +102878,14 @@ var FEATURES = Object.freeze([
   "upload_authority_stamps",
   "worker_groups"
 ]);
+var workerRelease = () => "0.9.3" ? "0.9.3" : null;
 var dispatchWorkerCapabilities = async ({ request, env = {}, headers: headers2 = {} }) => {
   const body = {
     type: "ce_worker_capabilities",
     version: 1,
     apiVersion: 1,
     bundle: env.CE_BUNDLE_SHA256 || null,
+    release: workerRelease(),
     features: FEATURES.filter((feature) => feature !== "recovery_key_export")
   };
   const responseHeaders = new Headers(headers2);
@@ -104143,6 +104146,11 @@ var dispatchRiskMatrixReadRequest = (args = {}) => dispatchResultsBuildRead({
 });
 
 // workers/sessionCorsWorker/adminRequestDispatch.js
+var RESULTS_BUILDER_ACTIONS = /* @__PURE__ */ new Set([
+  DEBATE_ATLAS_BUILD_ACTION,
+  RISK_MATRIX_BUILD_ACTION,
+  "results-analysis/generate"
+]);
 var toTrimmedString16 = (value) => typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
 var recordAuthFailure2 = async ({ env, deps } = {}) => {
   try {
@@ -104241,8 +104249,9 @@ var dispatchAdminRequest = async ({
       validateSiweAddressMatchesRequest: deps?.validateSiweAddressMatchesRequest,
       consumeNonce: deps?.consumeNonce,
       validateBootstrapAdmin: deps?.validateBootstrapAdmin,
-      // Co-admins and results admins may build atlases and risk matrices and do nothing else here.
-      validateAdmin: action === DEBATE_ATLAS_BUILD_ACTION || action === RISK_MATRIX_BUILD_ACTION ? (args) => canBuildResults({ ...args, validateAdmin: deps?.validateAdmin }) : deps?.validateAdmin,
+      // Co-admins and results admins may build atlases, risk matrices and AI
+      // Views, and do nothing else here.
+      validateAdmin: RESULTS_BUILDER_ACTIONS.has(action) ? (args) => canBuildResults({ ...args, validateAdmin: deps?.validateAdmin }) : deps?.validateAdmin,
       MISSING_SLUG_ERROR: deps?.MISSING_SLUG_ERROR
     }
   });
@@ -104281,6 +104290,17 @@ var dispatchAdminRequest = async ({
   }
   if (action === "results-analysis/generate") {
     const privateHeaders = withPrivateNoStoreHeaders2(headers2);
+    const suppliesRows = (body?.source?.kind || body?.sourceKind || "worker-canonical") !== "worker-canonical" || body?.committedResponses !== void 0;
+    if (suppliesRows && await deps?.validateAdmin?.({
+      env,
+      slug: targetSlug,
+      address: toTrimmedString16(authorityResult.address).toLowerCase(),
+      config: existingConfig,
+      body: {}
+    }) !== true) {
+      await recordAuthFailure2({ env, deps });
+      return deps?.json?.({ error: "Only the session admin can build AI Views from supplied answers." }, 403, privateHeaders);
+    }
     try {
       const result = await (deps?.generateResultsAnalysisDraft || generateResultsAnalysisDraft)({
         env,
@@ -104852,13 +104872,7 @@ var dispatchAdminResultsAnalysisStatusRequest = async ({
   const config = context.config;
   const headers2 = withPrivateNoStoreHeaders3(context.headers);
   const address2 = toTrimmedString18(auth.payload?.sub, deps).toLowerCase();
-  const isAdmin = await deps?.validateAdmin?.({
-    env,
-    slug: targetSlug,
-    address: address2,
-    config,
-    body: {}
-  });
+  const isAdmin = diagnostics ? await deps?.validateAdmin?.({ env, slug: targetSlug, address: address2, config, body: {} }) : await canBuildResults({ env, slug: targetSlug, config, address: address2, validateAdmin: deps?.validateAdmin });
   if (!isAdmin) {
     await recordAuthFailure4({ env, deps });
     return deps?.json?.({ error: "Admin authorization failed." }, 403, headers2);

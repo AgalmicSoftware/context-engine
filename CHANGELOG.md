@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.9.3]
+## [0.9.3] - 2026-11-12
 
 ### Client — available when the site deploys
 
@@ -21,18 +21,22 @@ All notable changes to this project will be documented in this file.
 - Older text on `/new` is now readable in every theme: the Worker name under Hosting and storage, **ANY** and **ALL** on an access rule when hovered, **Create Group** while pressed, and **Add Address** once an address is typed. In Classic, access rules and group pickers, with their **+ By Address**, address chips and group menus, read dark on light wherever they appear, where they were light on light, and in Context Engine the group picker's placeholder is brighter.
 - The account menu has **Your AI agent**, with two ways to bring an agent to the session. **As itself** copies a Claude Code command that adds the Context Engine MCP with the agent named "<your name>'s Kami", and a prompt that joins the session. **On my behalf**, when the session has Agents (HTTP API) on, makes a key that lets your agent read the questions, save drafts and submit the answers you approve, as you. The key comes inside a terminal command that sets `CE_AGENT_TOKEN`, so it stays out of the chat: the prompt you paste there names the variable, not the key. The key is kept only while the dialog is open, and works until your sign-in ends.
 - `/skill.md` and `/llms.txt` tell an agent to ask the person it works for which way to take part, and say what each way needs.
+- **Settings** shows which Context Engine release the session's Worker runs; a Worker from before 0.9.3 shows "before 0.9.3".
+- Results admins can start **AI Views** on Worker-hosted sessions and see their progress, as they already build atlases and risk matrices. Only the admin can publish AI Views from answers the browser supplies, as on-chain sessions do.
 - The About page's **Representative Models** card now says training representative AI models is planned, where it read as available today. The group recording guide (`docs/session-listening-mode.md`) no longer says handing each speaker their part by code is unavailable.
 
 ### Workers — requires redeployment
 
 - Admins, co-admins and results admins can build a session's risk matrix with AI, as they build its debate atlas (`POST /admin/risk-matrix/build`, read at `GET /risk-matrix`). One call names the areas the responses discuss, each with a few subareas, and writes notes on where two areas meet, each an opportunity or a risk with an intensity from 1 to 10. A note is kept only when it cites someone who answered a question it cites. The session's context reaches the AI as untrusted material. Builds are kept and read like atlas builds: the newest 8, each stamped with its time and response count, under the same viewer rule. The public config reports `riskMatrix: true`.
 - AI Views and the debate atlas read a session's answers 100 at a time, so about 80 people answering 30 questions now fit the Worker's read limit. Before, a session was refused from about 400 answers. An answer that can't be read now stops the build with a message to retry, instead of being left out.
-- New results visibility `session_member_full`. `/storage/list` and `/storage/read` give a signed-in participant who holds the `storage` (or `arweave`) scope every answer, and the AI Views and Debate Atlas reads follow; a signed-out visitor, or a sign-in without that scope, reads none. Per-answer access rules still apply. Only Worker-hosted sessions with Cloudflare storage can choose it.
+- New results visibility `session_member_full`. `/storage/list` and `/storage/read` give a signed-in participant who holds the `storage` (or `arweave`) scope every answer, and the AI Views, Debate Atlas and Risk Matrix reads follow; a signed-out visitor, or a sign-in without that scope, reads none. Per-answer access rules still apply. Only Worker-hosted sessions with Cloudflare storage can choose it.
 - On such sessions the Agent HTTP results routes need a credential whose account passes the session's sign-in rules, and refuse others with `agent_membership_denied`.
 - The public config sets `memberResults: true`, so the site knows the Worker offers this visibility.
 - `/api/agent/questions/next` no longer fails with `question_queue_unavailable` in sessions whose questions were added on the website. Their IDs have the same shape as a private key, so the secret check refused to save which questions an agent had been served. Fields named for question IDs may now hold exactly that shape, and nothing else that looks like a secret.
 - Agent HTTP results no longer fail with `agent_storage_unavailable` once a session has about 500 answers from agents. `/api/agent/results` and `/api/agent/results-image` now read only the permanent copy of each answer, 100 per KV read. Cloudflare stops a request after 1,000 KV operations; in a test salon of 80 agents answering 30 questions, with 16 changing their answers, the busiest results request uses 167. A stored answer can be half a megabyte, so a read that Cloudflare refuses for passing its 25 MB reply limit is read again in halves.
 - An agent submitting many answers in one `/api/agent/preferences` request no longer reloads every question for each answer. A 30-answer submit used more than 1,000 KV operations and failed; it now uses about 490.
+- `/capabilities` reports the Worker's Context Engine release as `release`, so a public GET tells which release a Worker runs.
+- Results admins may call `POST /admin/results-analysis/generate` and read its status on Worker-stored answers; a request that supplies its own answers is still the admin's alone.
 - An agent's submitted answer no longer fails with a 500 about once in 50,000 submissions, when the random ID its stored copy was given happened to look like an API key.
 - `POST /api/agent/credentials/delegate` gives a signed-in person a key for their own agent, with `read_questions` and `draft_answers` for their address, so what it submits counts as their answer. It never carries their admin powers, and in an on-chain session it only drafts, since its answers would not be signed as them. It ends with the sign-in it came from and when they make a new one, can't be exchanged for a website sign-in, and isn't given to a sign-in an agent made. The Agent HTTP skill, now v46, says how an agent uses it.
 
