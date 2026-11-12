@@ -195,7 +195,7 @@ const ASKING_WORDS = new Set(
     'with would you your').split(' '),
 );
 const topicWords = (value) =>
-  new Set((text(value).toLowerCase().match(/[\p{L}\p{N}]{3,}/gu) || []).filter((word) => !ASKING_WORDS.has(word)));
+  new Set((text(value).toLowerCase().match(/[\p{L}\p{N}\p{M}]{3,}/gu) || []).filter((word) => !ASKING_WORDS.has(word)));
 
 // The session's questions, those closest to the one asked first: by the topic
 // words they share, a word counting for less the more questions use it.

@@ -270,6 +270,14 @@ test('a rating’s counts carry what its numbers mean', () => {
   assert.match(messages[1].content, /"scale" says what a rating’s numbers mean/);
 });
 
+test('closeness reads words in scripts that use combining marks', () => {
+  const answers = ['मौसम कैसा है', 'शिक्षा नीति क्या हो', 'यातायात'].map((question, index) => ({
+    question, answers: [{ text: `उत्तर ${index}` }],
+  }));
+  const { messages } = buildGroupAgentMessages({ style: 'detailed', question: 'शिक्षा नीति पर लोग क्या सोचते हैं', material: { answers } });
+  assert.equal(tagged(messages[1].content, 'member_answers')[0].question, 'शिक्षा नीति क्या हो');
+});
+
 test('counts list the most chosen options first, each choice of a multi-select counted', () => {
   const options = Array.from({ length: 15 }, (_, i) => `Option ${String(i).padStart(2, '0')}`);
   const answers = [{
