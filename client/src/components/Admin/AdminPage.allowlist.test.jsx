@@ -477,10 +477,11 @@ describe('AdminPage allowlist controls', () => {
         'https://existing.example.test',
         'http://localhost:7391',
         'https://contextengine.sh', // canonical production recommended origin
-        'https://contextengine.xyz', // redirect compatibility origin
+        'https://www.contextengine.sh',
         window.location.origin,
       ]),
     );
+    expect(values).not.toContain('https://contextengine.xyz');
     expect(values.filter((entry) => entry === 'http://localhost:7391')).toHaveLength(1);
     expect(global.fetch.mock.calls.find(([url]) => String(url).endsWith('/admin/set-config'))).toBeUndefined();
   });

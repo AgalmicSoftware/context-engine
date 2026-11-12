@@ -8,3 +8,7 @@ CE_STORAGE_ENVELOPE_KEK=""
 # Temporary break-glass decrypt fallback after a mistaken deployment-secret replacement.
 # Restore the original CE_STORAGE_ENVELOPE_KEK, verify reads, then remove this value.
 # CE_STORAGE_ENVELOPE_PREVIOUS_KEK=""
+
+# Local development only: trust sign-ins from localhost and 127.0.0.1 dev servers
+# (ports 3000, 3001 and 7391). Deployed Workers trust the site's own origins.
+CE_ALLOW_LOCAL_ORIGINS="true"
