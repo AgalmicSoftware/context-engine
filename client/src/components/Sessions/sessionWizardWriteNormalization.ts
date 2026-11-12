@@ -494,11 +494,12 @@ export const buildSessionWizardWorkerConfigPayload = ({
     // field; the config writers send '' when the Worker's config already has it.
     const agentInstructions = trimString(resolvedDraft.agentInstructions);
     if (agentInstructions) next.agentInstructions = agentInstructions;
-    // In the form the Worker stores, so the readback matches. Off is sent as
-    // null for the same reason as the end time: it clears an earlier one.
+    // In the form the Worker stores, so the readback matches. Off is left out,
+    // as older Workers refuse the field; the config writers send null when the
+    // Worker's config already has one.
     const groupAgent = validateGroupAgent(resolvedDraft.groupAgent ?? null);
     if (!groupAgent.ok) throw new Error(`Fix the Group Agent: ${groupAgent.errors[0].message}`);
-    next.groupAgent = groupAgent.value;
+    if (groupAgent.value) next.groupAgent = groupAgent.value;
     if (usesOnChainSbt) {
       next.defaultSbtTags = trimString(resolvedDraft.defaultSbtTags);
       next.defaultFeaturedSBTs = normalizeSessionWizardDefaultFeaturedSbtMetadata(resolvedDraft.defaultFeaturedSBTs);

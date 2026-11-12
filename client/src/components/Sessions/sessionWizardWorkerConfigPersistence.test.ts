@@ -25,8 +25,9 @@ const baseConfig = () => ({
   sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
   storageProfile: { backend: 'cloudflare' },
   ai: { models: { fast: { provider: 'openai', model: 'gpt-test' } } },
-  // A config with instructions for AI agents is written without first reading the stored one.
+  // A config with instructions for AI agents and a Group Agent is written without first reading the stored one.
   agentInstructions: 'Join the open group.',
+  groupAgent: { audiences: [] },
 });
 
 const withoutInstructions = (config: Record<string, unknown>) => {
@@ -347,6 +348,33 @@ describe('persistAndVerifySessionWizardWorkerConfig', () => {
       expect(worker.written()).toHaveProperty('agentInstructions', '');
     },
   );
+
+  it('clears a stored Group Agent that the config leaves out, and only on a Worker that has one', async () => {
+    const withoutGroupAgent = ({ groupAgent: _off, ...rest }: Record<string, unknown>) => rest;
+    const persist = (fetchImpl: SessionWizardWorkerConfigFetchPort) =>
+      persistAndVerifySessionWizardWorkerConfig({
+        workerUrl: WORKER_ORIGIN,
+        slug: 'worker-session',
+        sessionId: SESSION_ID,
+        adminAddress: ADMIN_ADDRESS,
+        config: withoutGroupAgent(baseConfig()),
+        signAdminAction: async () => ({ signature: '0xsigned' }),
+        fetchImpl,
+        retryDelaysMs: [],
+      });
+    const has = createWorkerFetch(async () =>
+      jsonResponse(200, { config: verifiedConfig('earlier', { groupAgent: { audiences: [] } }) }),
+    );
+    await persist(has.fetchImpl);
+    expect(has.written()).toHaveProperty('groupAgent', null);
+    // Older Workers refuse the field, and none of them has stored it.
+    const lacks = createWorkerFetch(async () =>
+      jsonResponse(200, { config: withoutGroupAgent(verifiedConfig('earlier')) }),
+    );
+    await persist(lacks.fetchImpl);
+    expect(lacks.written()).not.toHaveProperty('groupAgent');
+    expect(lacks.written()).toHaveProperty('agentInstructions', 'Join the open group.');
+  });
 
   // Older Workers refuse the field, and none of them has stored it.
   it.each([

@@ -771,7 +771,7 @@ describe('sessionWizardWriteNormalization', () => {
     expect(build(' Join the open group.\n')).toHaveProperty('agentInstructions', 'Join the open group.');
   });
 
-  test('buildSessionWizardWorkerConfigPayload sends the Group Agent as the Worker stores it, and off as a clear', () => {
+  test('buildSessionWizardWorkerConfigPayload sends the Group Agent as the Worker stores it, and leaves it out when off', () => {
     const build = (
       groupAgent: unknown,
       preset: Parameters<typeof cloneSessionModePreset>[0] = SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE,
@@ -793,8 +793,9 @@ describe('sessionWizardWriteNormalization', () => {
     expect(build({ audiences: [salon(' Salon '), everyone], instructions: { general: ' ' } }).groupAgent).toEqual({
       audiences: [salon('salon'), everyone],
     });
-    // set-config merges fields, so off clears a setting an earlier verification stored.
-    expect(build(undefined)).toHaveProperty('groupAgent', null);
+    // Older Workers refuse the field; the config writers clear a stored Group Agent.
+    expect(build(undefined)).not.toHaveProperty('groupAgent');
+    expect(build(null)).not.toHaveProperty('groupAgent');
     expect(() => build({ audiences: [{ ...everyone, answers: 'everything' }] })).toThrow(
       'Fix the Group Agent: Audience 1 must get General or Detailed answers.',
     );
