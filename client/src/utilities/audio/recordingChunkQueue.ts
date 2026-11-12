@@ -92,6 +92,8 @@ type Options = {
     labels: boolean,
     signal: AbortSignal,
     knownSpeakers: KnownSpeaker[],
+    // Only a Retry the person pressed may ask them to sign in; uploads they didn't start never do.
+    prompt: boolean,
   ) => Promise<Transcription>;
   onChange: () => void;
   // Retry jitter source; tests pass a fixed one instead of patching Math.random.
@@ -138,6 +140,7 @@ export class RecordingChunkQueue {
   private retryTimer: ReturnType<typeof setTimeout> | null = null;
   private attempts = new Map<string, number>();
   private stalls = new Map<string, number>();
+  private retriedByHand = new Set<string>();
   private lastSnapshotAt = new Map<string, number>();
   private failedWrites = new Set<string>();
   private resaving = new Set<string>();
@@ -464,6 +467,7 @@ export class RecordingChunkQueue {
     const stalledLabels = (this.stalls.get(id) || 0) >= STALLS_BEFORE_PLAIN;
     const labels = record.labelSpeakers && !this.labelsUnavailableReason && !stalledLabels;
     const startedAt = Date.now();
+    const prompt = this.retriedByHand.delete(id);
     let deadlinePassed = false;
     try {
       if (this.disposed) return;
@@ -480,7 +484,13 @@ export class RecordingChunkQueue {
         controller.signal.addEventListener('abort', () => reject(new Error(stalledText)), { once: true });
         const { knownSpeakers, speakerSamplesRefused } = this.speakers;
         this.options
-          .transcribe(record.audio!, labels, controller.signal, labels && !speakerSamplesRefused ? knownSpeakers : [])
+          .transcribe(
+            record.audio!,
+            labels,
+            controller.signal,
+            labels && !speakerSamplesRefused ? knownSpeakers : [],
+            prompt,
+          )
           .then(resolve, reject)
           .finally(() => clearTimeout(deadline));
       }).finally(() => {
@@ -639,6 +649,7 @@ export class RecordingChunkQueue {
         record.audio &&
         (record.segment.status === 'retrying' || (Boolean(id) && record.segment.status === 'failed'))
       ) {
+        if (id) this.retriedByHand.add(id);
         this.attempts.delete(record.segment.id);
         record.segment = { ...record.segment, status: 'queued', error: undefined };
       }

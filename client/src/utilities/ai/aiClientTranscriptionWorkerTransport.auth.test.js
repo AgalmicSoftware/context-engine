@@ -1,4 +1,8 @@
-import { uploadAudioForTranscription } from './aiClientTranscriptionWorkerTransport';
+import {
+  SIGN_IN_TO_SEND,
+  uploadAudioForDiarizedTranscription,
+  uploadAudioForTranscription,
+} from './aiClientTranscriptionWorkerTransport';
 import { clearAllWorkerSessionTokens } from '../worker/workerAuth.js';
 import store from '../../store.js';
 
@@ -43,13 +47,14 @@ const jsonResponse = (status, body) => ({
   clone: () => jsonResponse(status, body),
 });
 
-const upload = () =>
-  uploadAudioForTranscription(new Blob(['fixture audio'], { type: 'audio/wav' }), {
-    endpoint: `${WORKER_URL}/transcribe`,
-    baseUrl: WORKER_URL,
-    sessionSlug: 'audio-session',
-    transcriptionCfg: { provider: 'openai', model: 'whisper-1' },
-  });
+const transport = {
+  endpoint: `${WORKER_URL}/transcribe`,
+  baseUrl: WORKER_URL,
+  sessionSlug: 'audio-session',
+  transcriptionCfg: { provider: 'openai', model: 'whisper-1' },
+};
+const audio = () => new Blob(['fixture audio'], { type: 'audio/wav' });
+const upload = (options) => uploadAudioForTranscription(audio(), transport, options);
 
 describe('transcription through worker authentication', () => {
   const originalFetch = global.fetch;
@@ -178,5 +183,22 @@ describe('transcription through worker authentication', () => {
     await expect(upload()).rejects.toThrow('Token missing transcribe scope');
     expect(global.fetch.mock.calls.filter(([url]) => url.endsWith('/auth/login'))).toHaveLength(1);
     expect(mockSignMessage).toHaveBeenCalledTimes(1);
+  });
+
+  // Recording uploads run while the person talks: a passkey or wallet prompt then would interrupt the room.
+  it.each([
+    ['plain', () => upload({ prompt: false })],
+    ['labelled', () => uploadAudioForDiarizedTranscription(audio(), transport, { prompt: false })],
+  ])('fails a background %s upload that needs a signature, without asking for one', async (_kind, send) => {
+    global.fetch = jest.fn(async (url) => {
+      if (url.endsWith('/auth/nonce')) return jsonResponse(200, { nonce: 'fixture-nonce' });
+      return jsonResponse(403, { error: ANONYMOUS_DENIAL });
+    });
+
+    const failure = await send().catch((error) => error);
+    expect(failure.message).toBe(SIGN_IN_TO_SEND);
+    expect(failure.status).toBe(403);
+    expect(mockSignMessage).not.toHaveBeenCalled();
+    expect(global.fetch.mock.calls.filter(([url]) => url.endsWith('/transcribe'))).toHaveLength(1);
   });
 });

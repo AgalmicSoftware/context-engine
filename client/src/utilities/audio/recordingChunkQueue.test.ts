@@ -27,6 +27,7 @@ type Transcribe = (
   labels: boolean,
   signal: AbortSignal,
   knownSpeakers: KnownSpeaker[],
+  prompt: boolean,
 ) => Promise<{ text: string; speakerTurns?: SpeakerTranscriptTurn[]; speakerSamplesRefused?: boolean }>;
 // Exact backoff timings below assume no jitter; the jitter test sets its own value.
 let random = 0;
@@ -321,6 +322,25 @@ it('skips permanent failures while retaining their exact audio for retry and dow
   expect(queue.segments.every((segment) => segment.status === 'complete')).toBe(true);
 });
 
+it('asks the person to sign in only for a chunk they retried', async () => {
+  const transcribe = jest.fn(async (...[, , , , prompt]: Parameters<Transcribe>) => {
+    if (!prompt) throw Object.assign(new Error('Sign in to send this part: press Retry.'), { status: 401 });
+    return { text: 'Signed in.' };
+  });
+  const queue = create(transcribe);
+  await queue.ready;
+  const first = queue.begin(false);
+  queue.capture(first, audio, true);
+  queue.capture(queue.begin(false), new Blob(['second']), true);
+  await queue.finish();
+  expect(queue.segments.map((segment) => segment.status)).toEqual(['failed', 'failed']);
+  expect(transcribe.mock.calls.map((call) => call[4])).toEqual([false, false]);
+  queue.retry(first);
+  await queue.finish();
+  expect(queue.segments.map((segment) => segment.status)).toEqual(['complete', 'failed']);
+  expect(transcribe.mock.calls.map((call) => call[4])).toEqual([false, false, true]);
+});
+
 it('keeps the stored audio until its transcript is saved, while the page keeps only the transcript', async () => {
   const queue = create();
   await queue.ready;
@@ -502,7 +522,7 @@ it('resets speaker fallback when a completed recording is cleared', async () => 
   await queue.clear(true);
   queue.capture(queue.begin(true), audio, true);
   await queue.finish();
-  expect(transcribe).toHaveBeenLastCalledWith(audio, true, expect.any(AbortSignal), []);
+  expect(transcribe).toHaveBeenLastCalledWith(audio, true, expect.any(AbortSignal), [], false);
 });
 
 it('keeps labels on after one refusal, turns them off after two in a row, and turns them back on', async () => {
@@ -530,7 +550,7 @@ it('keeps labels on after one refusal, turns them off after two in a row, and tu
   expect(queue.labelsUnavailableReason).toBe('Speaker labels are unavailable.');
   expect(transcribe.mock.calls.map(([, labels]) => labels)).toEqual([true, true, true, true]);
   await chunk();
-  expect(transcribe).toHaveBeenLastCalledWith(audio, false, expect.any(AbortSignal), []);
+  expect(transcribe).toHaveBeenLastCalledWith(audio, false, expect.any(AbortSignal), [], false);
   // The host turns them back on, which a reload keeps.
   queue.restoreSpeakerLabels();
   expect(queue.labelsUnavailableReason).toBe('');
@@ -541,7 +561,7 @@ it('keeps labels on after one refusal, turns them off after two in a row, and tu
   expect(reopened.labelsUnavailableReason).toBe('');
   reopened.capture(reopened.begin(true), audio, true);
   await reopened.finish();
-  expect(transcribe).toHaveBeenLastCalledWith(audio, true, expect.any(AbortSignal), []);
+  expect(transcribe).toHaveBeenLastCalledWith(audio, true, expect.any(AbortSignal), [], false);
 });
 
 it('keeps labels off through a reload when they went off', async () => {
@@ -713,7 +733,7 @@ it('reopens kept pending audio even when IndexedDB is unavailable', async () => 
   const transcribe = jest.fn<Transcribe>(async () => ({ text: 'Recovered from memory.' }));
   const reopened = create(transcribe, 'volatile-room');
   await reopened.finish();
-  expect(transcribe).toHaveBeenCalledWith(audio, false, expect.any(AbortSignal), []);
+  expect(transcribe).toHaveBeenCalledWith(audio, false, expect.any(AbortSignal), [], false);
   expect(reopened.segments[0].text).toBe('Recovered from memory.');
   expect(reopened.records.get(id)?.audio).toBeUndefined();
   expect(reopened.storageError).toContain("can't be recovered after a reload");
