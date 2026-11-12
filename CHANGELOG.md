@@ -39,6 +39,10 @@ All notable changes to this project will be documented in this file.
 
 - `npm run ai:test-theme:results-builds` checks the built debate atlas and risk matrix in each theme at phone and desktop widths; `ai:test-theme:atlas` is gone.
 
+### Agents and MCP
+
+- `get_results` reads up to 10,000 answer records by default, 16 at a time, instead of 2,000, so a 30-question session of 80 people, which lists about 2,900, is counted in full rather than marked partial.
+
 ## [0.9.2] - 2026-11-11
 
 ### Client — available when the site deploys

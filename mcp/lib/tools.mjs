@@ -190,7 +190,7 @@ export const buildTools = (participant) => [
       properties: {
         session: sessionParam,
         questionIds: { type: 'array', items: { type: 'string' }, description: 'Limit to these questions.' },
-        maxRecords: { type: 'integer', minimum: 1, maximum: 10000, description: 'Most answer records to read (default 2000).' },
+        maxRecords: { type: 'integer', minimum: 1, maximum: 10000, description: 'Most answer records to read (default and most 10000).' },
       },
       additionalProperties: false,
     },

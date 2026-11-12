@@ -29,9 +29,10 @@ const OWN_ANSWER_DEADLINE_MS = 60_000;
 // One scan of the agent's own answers is reused this long; answers it gives
 // meanwhile come from its local record.
 const OWN_ANSWER_SCAN_MAX_AGE_MS = 10 * 60 * 1000;
-const DEFAULT_RESULT_RECORDS = 2000;
+// A Worker lists answers without their question, so results read every listed
+// one: a 30-question salon of 80 people, some changing answers, lists ~2,900.
 const MAX_RESULT_RECORDS = 10000;
-const READ_CONCURRENCY = 6;
+const READ_CONCURRENCY = 16;
 // Reading stored records is bounded per tool call, whatever a Worker lists.
 const READ_DEADLINE_MS = 90_000;
 const MAX_CACHED_RECORDS = 20_000;
@@ -1048,7 +1049,7 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
       }
     },
 
-    async getResults({ session, questionIds, maxRecords = DEFAULT_RESULT_RECORDS } = {}) {
+    async getResults({ session, questionIds, maxRecords = MAX_RESULT_RECORDS } = {}) {
       const ctx = await resolveSession(session);
       const sessionConfig = await ensureReady(ctx);
       const visibility = sessionConfig?.sessionModeProfile?.results?.visibility;
@@ -1059,7 +1060,7 @@ export const createParticipant = ({ config, wallet, fetchImpl = globalThis.fetch
           note: 'This session does not publish results to participants. Only your own answers are visible (see list_questions with filter "answered").',
         };
       }
-      const cap = Math.min(Math.max(Number(maxRecords) || DEFAULT_RESULT_RECORDS, 1), MAX_RESULT_RECORDS);
+      const cap = Math.min(Math.max(Number(maxRecords) || MAX_RESULT_RECORDS, 1), MAX_RESULT_RECORDS);
       const questions = await loadQuestions(ctx);
       const wanted = Array.isArray(questionIds) && questionIds.length ? idList(questionIds) : null;
       let entries;

@@ -214,9 +214,9 @@ unknown `CE_MCP_*` name.
   display name. Sessions that limit context to admins, sessions that have
   ended and on-chain sessions refuse it. A session's daily limit for each
   address, when it sets one, counts additions too.
-- **Results reading is bounded.** `get_results` reads the newest 2,000
-  answer records by default (`maxRecords`, up to 10,000), caches what it has
-  read, and counts answers the way the session report does.
+- **Results reading is bounded.** `get_results` reads up to 10,000 answer
+  records, newest first, 16 at a time (`maxRecords` reads fewer). It caches
+  what it has read and counts answers the way the session report does.
 - **Large sessions.** Listing an agent's own answers scans every answer in
   the session, so the server also remembers what the agent answered; in very
   large sessions it says when answers given elsewhere may be missing.

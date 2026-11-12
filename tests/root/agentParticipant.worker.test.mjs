@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { AsyncLocalStorage } from 'node:async_hooks';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -836,6 +837,58 @@ for (const value of ['Disagree', '']) test(`an unread newer ${value || 'cleared'
   assert.notEqual(own.myAnswersComplete, false);
   assert.equal(own.answeredByMe, value ? 1 : 0);
   if (value) assert.equal(own.questions[0].myAnswer.value, value);
+});
+
+// Counts each Worker request's KV operations; Cloudflare stops a request after 1,000.
+const countKvOperations = (env, fetchImpl) => {
+  const request = new AsyncLocalStorage();
+  const counts = [];
+  for (const kv of [env.GROUP_KV, env.CE_STORAGE_INDEX_KV]) {
+    for (const name of ['get', 'put', 'delete', 'list']) {
+      const operation = kv[name];
+      kv[name] = (...args) => {
+        const count = request.getStore();
+        if (count) count.ops += 1;
+        return operation(...args);
+      };
+    }
+  }
+  const counted = async (url, init) => {
+    const count = { ops: 0 };
+    try { return await request.run(count, () => fetchImpl(url, init)); } finally { counts.push(count.ops); }
+  };
+  return { counts, fetch: counted };
+};
+
+test('MCP results count every answer of an 80-person, 30-statement salon', async (t) => {
+  const env = createEnv([sessionConfig()]);
+  const kvOperations = countKvOperations(env, workerFetch(env));
+  const host = await createAgent(env, 'salon-host', [], kvOperations.fetch);
+  const reader = await createAgent(env, 'salon-reader', [], kvOperations.fetch);
+  t.after(() => Promise.all([host, reader].map(({ stateDir }) => fs.rm(stateDir, { recursive: true, force: true }))));
+  await host.participant.joinSession({ link: LINK });
+  const ids = [];
+  for (let index = 1; index <= 30; index += 1) ids.push((await host.participant.addStatement({ prompt: `Salon statement ${index}.` })).questionId);
+  for (const batch of [ids.slice(0, 25), ids.slice(25)]) {
+    assert.equal((await host.participant.answer({ answers: batch.map((questionId) => ({ questionId, value: 'Agree' })) })).submitted, batch.length);
+  }
+  // 79 more people answer every statement; the first 16 then change each answer.
+  const votes = ['Agree', 'Disagree', 'Unsure'];
+  const plantAnswer = (person, index, shift, createdAt) => plantRecord(env, 'responses', {
+    questionID: ids[index], sessionSlug: SLUG, sessionId: SESSION_ID, type: 'binary', answer: { value: votes[(person + index + shift) % 3] }, additional: { value: '' },
+  }, { responder: `0x${String(person).padStart(40, '0')}`, createdAt });
+  for (let person = 1; person < 80; person += 1) ids.forEach((_, index) => plantAnswer(person, index, 0, new Date(Date.now() + 1000).toISOString()));
+  for (let person = 1; person <= 16; person += 1) ids.forEach((_, index) => plantAnswer(person, index, 1, new Date(Date.now() + 2000).toISOString()));
+  assert.equal(storedRecords(env, 'responses').filter((row) => row.resource === 'responses').length, 30 * 80 + 30 * 16);
+
+  await reader.participant.joinSession({ link: LINK });
+  const results = await reader.participant.getResults();
+  assert.equal(results.partial, false);
+  assert.equal(results.unreadAnswers, 0);
+  assert.equal(results.participants, 80);
+  assert.equal(results.questions.length, 30);
+  assert.deepEqual(results.questions.find((question) => question.questionId === ids[0]).counts, { Agree: 27, Unsure: 27, Disagree: 26 });
+  assert.ok(Math.max(...kvOperations.counts) <= 1000, `most KV operations in one request: ${Math.max(...kvOperations.counts)}`);
 });
 
 test('a listed unread question is incomplete until its payload can be read', async (t) => {

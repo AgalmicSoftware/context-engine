@@ -42,7 +42,9 @@ content after partial publication, coordinator restart, one-write-per-second
 KV enforcement, and concurrent batches preserving both answer summaries.
 `agentSalonCapacity.test.mjs` runs 80 agents each submitting 30 answers in one
 request, with 16 changing them, then every question and results route, against a
-KV that fails any invocation past Cloudflare's 1,000 operations.
+KV that fails any invocation past Cloudflare's 1,000 operations. In
+`tests/root/agentParticipant.worker.test.mjs`, MCP `get_results` reads the same
+salon completely.
 `agentQueue.test.mjs` checks that unexpected processing failures remain queued.
 The Wrapped coordinator journal also participates in the empty-restore-target check.
 The revocation tests first assert a successful real statement read, then exact 401
