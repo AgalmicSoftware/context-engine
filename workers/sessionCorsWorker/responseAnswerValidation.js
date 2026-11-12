@@ -6,7 +6,7 @@ import {
 } from './storageRouteExecution.js';
 import { listHiddenStorageResourceIds, selectCanonicalStorageVersions } from './storageResourceOwnership.js';
 import { createResultsAnalysisScanBudget } from './storageScanBudget.js';
-import { readAgentProposedQuestion } from './agent/agentQuestionProposals.mjs';
+import { countAgentProposedQuestions, readAgentProposedQuestion } from './agent/agentQuestionProposals.mjs';
 import { createAgentStorage } from './agent/storage.mjs';
 
 const decoder = new TextDecoder();
@@ -82,24 +82,36 @@ const readQuestionPayloads = async ({ env, index, slug, budget, metadataList }) 
   return payloads;
 };
 
+// Agents' proposed questions sit under the session's own agent prefix.
+const agentKv = ({ env, config }) => {
+  try {
+    return createAgentStorage({ kv: env.GROUP_KV, sessionId: trim(config?.sessionId) });
+  } catch {
+    return null;
+  }
+};
+
+const readProposedQuestion = async ({ env, config, slug, questionId }) => {
+  const kv = agentKv({ env, config });
+  return kv ? readAgentProposedQuestion({ AGENT_ACTION_KV: kv }, slug, questionId) : null;
+};
+
+const countProposedQuestions = async ({ env, config, slug }) => {
+  const kv = agentKv({ env, config });
+  return kv ? countAgentProposedQuestions({ AGENT_ACTION_KV: kv }, slug) : 0;
+};
+
+// The questions the session shows, its own and agents' proposed ones. Bounds
+// how many rows one person may store.
+export const countSessionQuestions = async ({ env, config, index, slug }) =>
+  (await readQuestionVersions({ env, index, slug })).visibleCount + await countProposedQuestions({ env, config, slug });
+
 /**
  * Checks each answer an upload carries against its stored question. Refuses
  * an unknown question id and a readable value its question does not accept;
  * encrypted values, blank answers (a comment alone) and locked or encrypted
- * questions are not checked. Returns the session's visible question count,
- * which bounds how many rows one person may store.
+ * questions are not checked. Returns the session's question count.
  */
-// Agents' proposed questions sit under the session's own agent prefix.
-const readProposedQuestion = async ({ env, config, slug, questionId }) => {
-  let kv = null;
-  try {
-    kv = createAgentStorage({ kv: env.GROUP_KV, sessionId: trim(config?.sessionId) });
-  } catch {
-    return null;
-  }
-  return kv ? readAgentProposedQuestion({ AGENT_ACTION_KV: kv }, slug, questionId) : null;
-};
-
 export const checkUploadedAnswers = async ({ env, config, index, slug, payload }) => {
   const answers = listUploadedAnswers(payload);
   const { budget, current, untrusted, visibleCount } = await readQuestionVersions({ env, index, slug });
@@ -134,5 +146,5 @@ export const checkUploadedAnswers = async ({ env, config, index, slug, payload }
     const checked = normalizeAnswerValue({ ...question, type }, answer.value, { maxFreeformLength: Infinity });
     if (!checked.ok) return refusal(422, `This answer can't be saved: ${checked.error}`, 'response_answer_invalid');
   }
-  return { ok: true, questionCount: visibleCount };
+  return { ok: true, questionCount: visibleCount + await countProposedQuestions({ env, config, slug }) };
 };

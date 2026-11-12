@@ -50,7 +50,7 @@ import {
   readStoragePayloadResourceId,
   validateStorageUploadPayload,
 } from './storageUploadValidation.js';
-import { checkUploadedAnswers, listUploadedAnswers } from './responseAnswerValidation.js';
+import { checkUploadedAnswers, countSessionQuestions, listUploadedAnswers } from './responseAnswerValidation.js';
 import { isWorkerCanonicalSessionConfig } from './workerCanonicalAuthority.js';
 import {
   isAdminStorageVersion,
@@ -1408,6 +1408,13 @@ export const publishCloudflareOwnedStorageMetadata = async ({ env, config, slug,
 
 const RESPONSE_ROWS_PER_QUESTION = 5;
 
+// Agents pass one object per request as answersChecked, which keeps the count.
+const countQuestionsOnce = async (memo, count) => {
+  if (!isObj(memo)) return count();
+  memo.questionCount ??= await count();
+  return memo.questionCount;
+};
+
 const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, authScopes, expectedAuthority, payload, parsedPayload = null, answersChecked = false, resourceId = '', baseHeaders, deps }) => {
   const r2 = getStorageR2Binding(env);
   const index = getStorageIndexBinding(env);
@@ -1457,9 +1464,17 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
   // Readable answers must name a question the session has, with a value it accepts.
   // Only a Worker-canonical session keeps its question list here; others read it from chain or Arweave.
   // Agents check each answer against the question they read before uploading it.
-  const answerCheck = resource === 'responses' && parsedPayload && !answersChecked && isWorkerCanonicalSessionConfig(config)
-    ? await checkUploadedAnswers({ env, config, index, slug, payload: parsedPayload })
-    : null;
+  // Only a Lit session's answers may be unreadable here; they still count toward the row limit.
+  const canonicalAnswers = resource === 'responses' && isWorkerCanonicalSessionConfig(config);
+  if (canonicalAnswers && !parsedPayload && payloadAccess.encryption !== PAYLOAD_ENCRYPTION_MODES.LIT) {
+    return responseJson(deps, {
+      error: 'This session needs answers its Worker can read. Reload the session and try again.',
+      reason: 'response_unreadable',
+    }, 422, baseHeaders);
+  }
+  const answerCheck = !canonicalAnswers ? null
+    : parsedPayload && !answersChecked ? await checkUploadedAnswers({ env, config, index, slug, payload: parsedPayload })
+      : { ok: true, questionCount: await countQuestionsOnce(answersChecked, () => countSessionQuestions({ env, config, index, slug })) };
   if (answerCheck && !answerCheck.ok) {
     return responseJson(deps, { error: answerCheck.error, reason: answerCheck.reason }, answerCheck.status, baseHeaders);
   }
@@ -1668,7 +1683,11 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
   if (resource === 'responses' && uploader) {
     const digest = await (deps?.crypto || globalThis.crypto).subtle.digest('SHA-256', payload.bytes || new Uint8Array());
     const payloadDigest = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
-    const questionIds = parsedPayload ? [...new Set(listUploadedAnswers(parsedPayload).map((answer) => answer.questionId).filter(Boolean))] : [];
+    // Only answers checked against the session's questions count per question,
+    // so made-up ids cannot grow the coordinator's counters.
+    const questionIds = answerCheck?.ok && parsedPayload
+      ? [...new Set(listUploadedAnswers(parsedPayload).map((answer) => answer.questionId).filter(Boolean))]
+      : [];
     // A person may store at most five rows per question the session shows.
     const maxRows = answerCheck?.ok ? RESPONSE_ROWS_PER_QUESTION * Math.max(answerCheck.questionCount, 1) : 0;
     uploadReceipt = await coordinateResponseUploadReceipt({ env, slug, responder: uploader, operation: 'reserve',
