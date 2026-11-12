@@ -66,11 +66,19 @@ const createDurableStorage = () => {
 		get: async (key) => cloneValue(target.get(key)),
 		put: async (key, value) => target.set(key, cloneValue(value)),
 		delete: async (key) => target.delete(key),
+		// Durable Object storage lists keys in order; this covers the options the coordinator uses.
+		list: async ({ prefix = '', startAfter = '', limit = Infinity } = {}) => new Map(
+			[...target.keys()].sort()
+				.filter((key) => key.startsWith(prefix) && key > startAfter)
+				.slice(0, limit)
+				.map((key) => [key, cloneValue(target.get(key))]),
+		),
 	});
 	return {
 		get: (key) => enqueue(() => view(values).get(key)),
 		put: (key, value) => enqueue(() => view(values).put(key, value)),
 		delete: (key) => enqueue(() => view(values).delete(key)),
+		list: (options) => enqueue(() => view(values).list(options)),
 		setAlarm: async () => {},
 		transaction: (callback) =>
 			enqueue(async () => {
@@ -227,11 +235,19 @@ const uploadJson = async ({ env, token, resource, data }) =>
 		body: { data, contentType: 'application/json', resource },
 	}), env));
 
+// A Worker-hosted session takes answers only to questions it has stored.
+const storeOfficialQuestion = async ({ env, admin }) => {
+	const data = { id: 'q-official-1', prompt: 'Should the pilot continue?', type: 'binary', sessionId: SESSION_ID, sessionSlug: SLUG };
+	const stored = await uploadJson({ env, token: await login({ env, wallet: admin }), resource: 'questions', data });
+	assert.equal(stored.status, 200, JSON.stringify(stored.body));
+};
+
 const listResource = async ({ env, resource }) =>
 	readJson(await fetchWorker(new Request(`${WORKER_ORIGIN}/storage/list?resource=${resource}`), env));
 
 test('a participant cannot store a 15 MiB answer that every results viewer would download', async () => {
-	const { env } = createSessionEnv();
+	const { admin, env } = createSessionEnv();
+	await storeOfficialQuestion({ env, admin });
 	const token = await login({ env, wallet: Wallet.createRandom() });
 
 	const upload = await uploadJson({
@@ -458,6 +474,7 @@ test('signed admin actions are refused when any signed field is forged, stale or
 
 test('a bearer token with a rewritten payload or a foreign signing key is refused', async () => {
 	const { admin, env } = createSessionEnv();
+	await storeOfficialQuestion({ env, admin });
 	const token = await login({ env, wallet: Wallet.createRandom() });
 	const [payloadPart, signaturePart] = token.split('.');
 	const payload = JSON.parse(Buffer.from(payloadPart, 'base64url').toString());
