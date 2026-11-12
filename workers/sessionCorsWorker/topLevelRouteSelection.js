@@ -22,6 +22,8 @@ export const resolveTopLevelRouteSelection = ({
     return { kind: 'auth-login' };
   }
 
+  if (path === '/auth/logout' && method === 'POST') return { kind: 'auth-logout' };
+
   if (path === '/arweave/upload' && method === 'POST') {
     return {
       kind: 'arweave-upload',
