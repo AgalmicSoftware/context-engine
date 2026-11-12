@@ -254,7 +254,7 @@ $muted-text: var(--ce-panel-text-muted);
   border: 0;
   padding: 0;
   font-size: 12px;
-  color: $clickable-color;
+  color: var(--ce-link);
   text-decoration: none;
   margin-left: 6px;
   cursor: pointer;
@@ -1045,7 +1045,7 @@ $muted-text: var(--ce-panel-text-muted);
   background: color-mix(in srgb, var(--ce-text-inverse) 3%, transparent);
   font-size: 12px;
   letter-spacing: 0.04em;
-  color: color-mix(in srgb, var(--ce-control-text) 55%, transparent);
+  color: var(--ce-panel-text-muted);
 }
 
 .workerDeployGrid {
@@ -1454,12 +1454,12 @@ $muted-text: var(--ce-panel-text-muted);
     background 0.15s ease;
 
   &:hover {
-    color: color-mix(in srgb, var(--ce-text-inverse) 85%, transparent);
+    color: var(--ce-panel-text);
   }
 }
 
 .gateModeActive {
-  color: $clickable-color;
+  color: var(--ce-link);
   background: color-mix(in srgb, var(--ce-action-accent) 12%, transparent);
 }
 
@@ -1996,23 +1996,30 @@ $muted-text: var(--ce-panel-text-muted);
     color: var(--ce-document-text-muted);
   }
 
-  .createSbtButton,
-  .createSbtButton:hover,
-  .createSbtButton:focus,
-  .createSbtButton:active {
-    background: var(--ce-selection-bg);
-    color: var(--ce-selection-text);
-  }
-
   .interviewModePanel,
   .interviewModePanelBody,
   .promptPreview,
-  .encryptionGateCard,
   .contractViewerModalContent {
     background: var(--ce-document-surface);
   }
 
   .interviewModePanelBody p {
     color: var(--ce-document-text-muted);
+  }
+}
+
+// The access rule card and its Create Group button, on Classic's light faces too.
+@container ce-theme style(--ce-layout-profile: minimal-app) or style(--ce-layout-profile: desktop-window) {
+  .encryptionGateCard {
+    background: var(--ce-document-surface);
+  }
+
+  .createSbtButton,
+  .createSbtButton:hover,
+  .createSbtButton:focus,
+  .createSbtButton:active,
+  .createSbtButton:active:focus {
+    background: var(--ce-selection-bg);
+    color: var(--ce-selection-text);
   }
 }

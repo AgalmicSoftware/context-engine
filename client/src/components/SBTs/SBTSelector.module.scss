@@ -444,12 +444,6 @@
     color: var(--ce-panel-text);
   }
 
-  .adminVariant,
-  .adminVariant .groupPicker,
-  .createVariant .groupPicker {
-    background: var(--ce-document-surface);
-  }
-
   .adminVariant .groupSelect,
   .adminVariant .sbtAddressInput,
   .createVariant .groupSelect,
@@ -458,13 +452,8 @@
     color: var(--ce-control-text);
   }
 
-  .adminVariant .addressTag,
-  .createVariant .addressTag,
-  .createVariant .sbtAddButton,
   .quickChip,
-  .quickChip:hover,
-  .menuButton,
-  .menuButton:hover {
+  .quickChip:hover {
     background: var(--ce-control-face);
     color: var(--ce-control-text);
     opacity: 1;
@@ -475,5 +464,30 @@
     background: var(--ce-control-disabled-bg);
     color: var(--ce-control-disabled-text);
     opacity: 1;
+  }
+}
+
+// The group picker and its address controls, on Classic's light faces too.
+@container ce-theme style(--ce-layout-profile: minimal-app) or style(--ce-layout-profile: desktop-window) {
+  .adminVariant,
+  .adminVariant .groupPicker,
+  .createVariant .groupPicker {
+    background: var(--ce-document-surface);
+  }
+
+  .adminVariant .addressTag,
+  .createVariant .addressTag,
+  .createVariant .sbtAddButton,
+  .menuButton,
+  .menuButton:hover {
+    background: var(--ce-control-face);
+    color: var(--ce-control-text);
+    opacity: 1;
+  }
+
+  // Bootstrap's secondary buttons are transparent here, so the text and edge carry it.
+  .adminVariant .sbtAddButton {
+    border-color: var(--ce-input-border-strong);
+    color: var(--ce-control-text);
   }
 }

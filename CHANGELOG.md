@@ -18,6 +18,7 @@ All notable changes to this project will be documented in this file.
 - The faucet card under Hosting and storage is titled **Test gas faucet**, where it showed the code **TXGAS**.
 - **Sign-in** and **Permissions**, on `/new` and in Settings, and **Storage** on `/new` now show as text with a "?", since **Runs on** allows only one of each; their dropdowns and checkboxes could only cause conflicts. **SBTs grant permissions** stays a choice on Centralized sessions. When a template brings values Runs on doesn't allow, **Match Runs on** puts back what it needs, and **Session Worker** encryption can't be chosen on a Decentralized session.
 - **Session members see their own answers**, which looked like **Each person sees their own answers** on the web, is now **Own answers; agents need a group**, and **Anyone can see the results** is **Anyone can see all answers**. The "?" beside **Who sees results** says what each choice shows.
+- Older text on `/new` is now readable in every theme: the Worker name under Hosting and storage, **ANY** and **ALL** on an access rule when hovered, **Create Group** while pressed, and **Add Address** once an address is typed. In Classic, access rules and group pickers, with their **+ By Address**, address chips and group menus, read dark on light wherever they appear, where they were light on light, and in Context Engine the group picker's placeholder is brighter.
 
 ### Workers — requires redeployment
 

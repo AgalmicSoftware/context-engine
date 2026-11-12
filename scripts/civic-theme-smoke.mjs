@@ -522,6 +522,8 @@ export async function runSmoke() {
         await dialog.getByRole('heading', { name: 'Featured Groups', exact: true }).waitFor({ state: 'visible' });
         await assertReadable(dialog);
         await dialog.getByRole('button', { name: 'Close', exact: true }).click();
+        await page.goto(`${baseUrl}/session/new`, { waitUntil: 'domcontentloaded' });
+        await inspectCivicWizard(page);
       }
       // Classic paints the post on its gray window face, as Civic does on white.
       await page.goto(`${baseUrl}/posts/agent-village-wrapped-2026`, { waitUntil: 'domcontentloaded' });
@@ -530,7 +532,7 @@ export async function runSmoke() {
       console.log(`Civic smoke passed: ${viewport.width}×${viewport.height}`);
     }
     console.log(
-      'Civic theme smoke passed at desktop and mobile sizes; Groups dialog passed in all three themes; the post passed in Classic.',
+      'Civic theme smoke passed at desktop and mobile sizes; Groups dialog and /new passed in all three themes; the post passed in Classic.',
     );
   } finally {
     await browser.close();
