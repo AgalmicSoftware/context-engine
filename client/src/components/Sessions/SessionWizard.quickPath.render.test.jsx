@@ -127,16 +127,16 @@ describe('SessionWizard quick path', () => {
     const createButton = screen.getByTestId(E2E_TESTIDS.WIZARD_PUBLISH);
     expect(createButton).toBeEnabled();
 
-    openSetupSection('hosting');
-    fireEvent.change(screen.getByTestId('ce-setup-storage'), { target: { value: 'arweave' } });
-    const hosting = screen.getByTestId('ce-setup-section-hosting');
-    expect(within(hosting).getByTestId('ce-setup-conflict-worker_authority_requires_cloudflare')).toHaveTextContent(
-      'Worker-hosted sessions store data on Cloudflare.',
+    openSetupSection('access');
+    fireEvent.click(screen.getByLabelText('SBTs grant permissions'));
+    const access = screen.getByTestId('ce-setup-section-access');
+    expect(within(access).getByTestId('ce-setup-conflict-sbt_authorization_requires_condition')).toHaveTextContent(
+      'SBT permissions need at least one SBT rule.',
     );
     expect(createButton).toBeDisabled();
 
-    fireEvent.change(screen.getByTestId('ce-setup-storage'), { target: { value: 'cloudflare' } });
-    expect(screen.queryByTestId('ce-setup-conflict-worker_authority_requires_cloudflare')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText('SBTs grant permissions'));
+    expect(screen.queryByTestId('ce-setup-conflict-sbt_authorization_requires_condition')).not.toBeInTheDocument();
     expect(createButton).toBeEnabled();
   });
 });

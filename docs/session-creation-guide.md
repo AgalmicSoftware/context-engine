@@ -484,8 +484,11 @@ Switching **Runs on** also replaces storage, identity and authorization:
 Centralized uses Cloudflare with passkey plus Worker roles, while Decentralized
 uses Arweave with wallet plus on-chain SBT authorization. A stale wallet, Worker
 role, or legacy top-level chain ID cannot survive that switch as a hidden
-capability. The **Storage** selector changes only storage, including its payload
-access gate; identity and authorization stay as set.
+capability. Since each choice allows only one of each, **Sign-in** and
+**Permissions** in Access and identity and **Storage** in Hosting and storage
+show as text with a "?". **SBTs grant permissions** stays a choice on
+Centralized sessions. If a template brings values Runs on doesn't allow, **Match
+Runs on** beside the conflict puts back what it needs.
 
 The wizard validates the profile at the publish boundary and rechecks the live
 draft after asynchronous identity and duplicate-session preflight, so a profile
@@ -585,9 +588,9 @@ What gets stored where:
   chain/RPC before the Worker serves bytes. That is a separately labelled
   Advanced on-chain gate; it does not replace the session's Worker-native
   Groups and is not end-to-end encryption.
-- **Storage** in Hosting and storage offers Arweave, which is permanent and can
-  receive payloads encrypted before upload, and Cloudflare, which is mutable and
-  not permanent.
+- **Storage** in Hosting and storage follows Runs on: Arweave for Decentralized,
+  which is permanent and can receive payloads encrypted before upload, and
+  Cloudflare for Centralized, which is mutable and not permanent.
 - **Encryption** in Access and identity offers
   `none` (payload bytes are stored as provided), `lit` (locked fields are encrypted
   before upload and a Lit Action releases their key after an on-chain SBT check;

@@ -215,6 +215,12 @@
   gap: 8px;
 }
 
+// SetupFact: a setting another choice decides.
+.fact {
+  margin: 0;
+  color: var(--ce-panel-text);
+}
+
 .readOnlyValue {
   font-family: var(--ce-font-mono);
   font-size: 0.85rem;

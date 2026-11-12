@@ -18,6 +18,7 @@ import {
   waitFor,
   within,
 } from './SessionWizard.workerPanel.testUtils';
+import { SESSION_TEMPLATE_FORMAT } from '@ce-shared/sessionTemplate.mjs';
 import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';
 import { getSessionWizardWorkerSettlementStorageKey } from './sessionWizardWorkerSettlement';
 import { readSessionWizardPendingSbtDraftsCache } from './hooks/usePendingSbtDrafts';
@@ -146,9 +147,21 @@ describe('SessionWizard publish boundary rendering', () => {
     fireEvent.click(publishButton);
     await waitFor(() => expect(mockSessionExists).toHaveBeenCalled());
 
-    // Dropping the registry's only permission mechanism makes the live profile invalid mid-publish.
-    openSetupSection('access');
-    fireEvent.click(screen.getByLabelText('SBTs grant permissions'));
+    // A template imported mid-publish brings passkey-only sign-in, which the registry doesn't allow.
+    const conflicting = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED);
+    conflicting.identity = { default: 'passkey', enabled: ['passkey'] };
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SETUP_TEMPLATE_IMPORT));
+    fireEvent.change(screen.getByTestId(E2E_TESTIDS.SETUP_TEMPLATE_PASTE), {
+      target: {
+        value: JSON.stringify({
+          format: SESSION_TEMPLATE_FORMAT,
+          sessionName: 'Live profile revalidation session',
+          sessionModeProfile: conflicting,
+        }),
+      },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Check' }));
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SETUP_TEMPLATE_IMPORT_APPLY));
     await act(async () => {
       resolveDuplicateCheck(false);
       await duplicateCheck;
