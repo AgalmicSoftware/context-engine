@@ -35,6 +35,12 @@ export const computeFidelityOverview = ({
   });
   const prefill = pairs.filter((pair) => pair.origin === 'external_prefill');
   return prefill.length
-    ? scoreFidelityOverview({ questions: questionList, pairs: prefill, options: { minParticipants } })
+    ? // Results shows the condition and platform rows, so only those are withheld together.
+      scoreFidelityOverview({
+        questions: questionList,
+        pairs: prefill,
+        options: { minParticipants },
+        tables: ['byCondition', 'byPlatform'],
+      })
     : null;
 };

@@ -150,9 +150,12 @@ Similarity between a prediction and an answer runs from 0 to 1:
   minimum: with six people, five on Claude and one on ChatGPT, a minimum of 5
   shows neither platform. The smallest row goes first. A row everyone shares
   only repeats the total, so it never counts as dividing anyone. Origin,
-  platform, model and context rows are checked together, since a model sits
-  inside its platform: Claude minus its larger model would otherwise give the
-  smaller one. In the command-line report the AI prefill and Session Wrapped
+  platform, model, context, condition (shown, hidden, made separately) and
+  group rows are checked together, since a model sits inside its platform and
+  Session Wrapped people are the only ones with separate predictions: Claude
+  minus its larger model would otherwise give the smaller one. Per-person rows
+  name only the origin a person counts under, and only when that row is shown.
+  In the command-line report the AI prefill and Session Wrapped
   rows of "Where drafts came from" follow the headline's own withholding, as
   the headline pools the two. The benchmark's `compare-answers` applies the
   same rule to its groups.
@@ -264,7 +267,11 @@ the share kept, and the Mirror Score by platform. It scores in a background
 thread, so large sessions don't freeze the page, and gives the same numbers as
 this report's, except that only AI-prefill drafts count (voice and
 typed-context drafts restate what the person said). Every cell follows the
-withholding rules above with the session's minimum, and until the report's
+withholding rules above with the session's minimum, checked over the condition
+and platform rows it shows rather than every table, so its platform rows can
+appear where the report withholds them (don't publish this report's model or
+context rows beside Results, or the two together could reveal a small model's
+score), and until the report's
 responses include AI-prefill drafts from that many people it shows a one-line
 note instead. To set a session up for this, see
 [session-creation-guide.md](session-creation-guide.md#measure-how-well-ai-represents-participants).

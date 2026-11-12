@@ -831,7 +831,8 @@ const peopleBreakdown = (people, keyOf, valueOf, options, reportable = null) => 
 };
 // Origin, platform, model and context each divide the same people, and a model sits inside its platform, so
 // subtracting one table's row from another's could reveal a few people's score. Each person counts whole, under the
-// key that made most of their drafts, so the rows split people (not drafts) and are withheld together.
+// key that made most of their drafts, so the rows split people (not drafts) and are withheld together, with the
+// condition rows (Session Wrapped people have only 'separate') and groups, which divide people too.
 const DIVIDING = {
   byOrigin: (pair) => pair.origin,
   byPlatform: (pair) => pair.platform,
@@ -843,26 +844,35 @@ const mainKey = (pairs, keyOf) => {
   for (const pair of pairs) counts.set(keyOf(pair), (counts.get(keyOf(pair)) ?? 0) + 1);
   return [...counts].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1))[0][0];
 };
-const dividingBreakdowns = (people, settings) => {
-  const keyOfPerson = Object.fromEntries(
-    Object.entries(DIVIDING).map(([name, keyOf]) => {
-      const main = new Map(people.map((person) => [person.participantId, mainKey(person.pairs, keyOf)]));
-      return [name, (pair) => main.get(pair.participantId)];
-    }),
-  );
-  const keysByPerson = people.map((person) =>
-    Object.entries(keyOfPerson).map(([name, keyOf]) => JSON.stringify([name, keyOf(person.pairs[0])])),
-  );
+export const DIVIDING_TABLES = Object.freeze(['byCondition', ...Object.keys(DIVIDING)]);
+// The keys each table may show, worked out together over `tables` (and groups, when `groupsOf` is given).
+// Only tables that are shown need to be in it: one that is never shown cannot be subtracted.
+const jointlyReportable = (people, settings, tables, groupsOf = null) => {
+  const keysOf = {
+    byCondition: (person) => [...new Set(person.pairs.map((pair) => pair.condition))],
+    ...Object.fromEntries(Object.entries(DIVIDING).map(([name, keyOf]) => [name, (person) => [mainKey(person.pairs, keyOf)]])),
+    byGroup: (person) => groupsOf(person.participantId),
+  };
+  const families = [...tables, ...(groupsOf ? ['byGroup'] : [])];
+  const keysByPerson = people.map((person) => families.flatMap((name) => keysOf[name](person).map((key) => JSON.stringify([name, key]))));
   // A row everyone is in is the total itself, so it divides no one.
   const total = [...new Set(keysByPerson.flat())].filter((key) => keysByPerson.every((keys) => keys.includes(key)));
   const kept = reportableKeys(keysByPerson, settings.minParticipants, total).map((key) => JSON.parse(key));
-  return Object.fromEntries(
-    Object.entries(keyOfPerson).map(([name, keyOf]) => {
-      const reportable = new Set(kept.filter(([of]) => of === name).map(([, key]) => key));
-      return [name, peopleBreakdown(people, keyOf, meanSimilarity, settings, reportable)];
-    }),
-  );
+  return Object.fromEntries(families.map((name) => [name, new Set(kept.filter(([of]) => of === name).map(([, key]) => key))]));
 };
+const dividingBreakdowns = (people, settings, reportable) =>
+  Object.fromEntries(
+    Object.keys(reportable)
+      .filter((name) => name !== 'byGroup')
+      .map((name) => {
+        if (name === 'byCondition') {
+          const rows = breakdown(people, (pair) => pair.condition, meanSimilarity, settings);
+          return [name, Object.fromEntries(Object.entries(rows).map(([key, row]) => [key, reportable[name].has(key) ? row : withheld(row.participants)]))];
+        }
+        const main = new Map(people.map((person) => [person.participantId, mainKey(person.pairs, DIVIDING[name])]));
+        return [name, peopleBreakdown(people, (pair) => main.get(pair.participantId), meanSimilarity, settings, reportable[name])];
+      }),
+  );
 const meanSimilarity = (pairs) => mean(pairs.map((pair) => pair.similarity));
 const matchRate = (pairs) => mean(pairs.map((pair) => (pair.match ? 1 : 0)));
 
@@ -958,12 +968,11 @@ const coverageOf = ({ pairs, scored, measured, people, settings }) => ({
   excludedAgentPredictions: settings.includeAgents ? 0 : pairs.filter((pair) => pair.isAgent).length,
 });
 // Mirror Scores, the correction rate and calibration: each person counts once.
-const coreScores = (people, settings) => ({
+const coreScores = (people, settings, reportable) => ({
   mirrorScore: {
     overall: estimate(people.map((person) => meanSimilarity(person.pairs)), settings),
-    byCondition: breakdown(people, (pair) => pair.condition, meanSimilarity, settings),
     byType: breakdown(people, (pair) => pair.question.type, meanSimilarity, settings),
-    ...dividingBreakdowns(people, settings),
+    ...dividingBreakdowns(people, settings, reportable),
   },
   correctionRate: estimate(
     people.map((person) => {
@@ -1020,13 +1029,14 @@ export const scoreAgentFidelity = ({ questions = [], pairs = [], answers = [], g
     };
   });
   const people = peopleOf(withBaselines);
-  const core = coreScores(people, settings);
+  const reportable = jointlyReportable(people, settings, DIVIDING_TABLES, groupsOf);
+  const core = coreScores(people, settings, reportable);
   const perPerson = (valueOf) => estimate(people.map((person) => valueOf(person.pairs)), settings);
   const groupSizes = new Map();
   for (const person of people) {
     for (const group of groupsOf(person.participantId)) groupSizes.set(group, (groupSizes.get(group) ?? 0) + 1);
   }
-  const reportedGroups = reportableKeys(people.map((person) => groupsOf(person.participantId)), settings.minParticipants);
+  const reportedGroups = [...reportable.byGroup].sort();
 
   // Unusual views: how similar each person's own answers are to everyone
   // else's, across every question they answered.
@@ -1170,7 +1180,9 @@ export const scoreAgentFidelity = ({ questions = [], pairs = [], answers = [], g
           exactMatchRate: matchRate(person.pairs),
           typicality: typicality.get(person.participantId) ?? null,
           groups: groupsOf(person.participantId).filter((group) => reportedGroups.includes(group)),
-          origins: [...new Set(person.pairs.map((pair) => pair.origin))].sort(),
+          // Only the origin the person counts under in the origin table, and only when that row is shown,
+          // so a withheld row cannot be rebuilt from these.
+          origins: [mainKey(person.pairs, DIVIDING.byOrigin)].filter((origin) => reportable.byOrigin.has(origin)),
         }))
       : [],
   };
@@ -1182,7 +1194,7 @@ export const scoreAgentFidelity = ({ questions = [], pairs = [], answers = [], g
  * of people and are too slow to rerun in the browser; what it returns matches
  * the same parts of scoreAgentFidelity.
  */
-export const scoreFidelityOverview = ({ questions = [], pairs = [], options = {} } = {}) => {
+export const scoreFidelityOverview = ({ questions = [], pairs = [], options = {}, tables = DIVIDING_TABLES } = {}) => {
   const settings = settingsFrom(options);
   const scored = scorePairs(pairs.filter(allowedBy(settings)), mapQuestions(questions));
   const measured = scored.filter((pair) => pair.similarity !== null);
@@ -1191,7 +1203,8 @@ export const scoreFidelityOverview = ({ questions = [], pairs = [], options = {}
     method: FIDELITY_METHOD_VERSION,
     options: { ...settings, excludeParticipants: settings.excludeParticipants.length },
     coverage: coverageOf({ pairs, scored, measured, people, settings }),
-    ...coreScores(people, settings),
+    // `tables` lists the dividing tables the caller shows; only those are withheld together, and only they are returned.
+    ...coreScores(people, settings, jointlyReportable(people, settings, tables.filter((name) => DIVIDING_TABLES.includes(name)))),
   };
 };
 

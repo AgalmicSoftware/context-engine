@@ -108,10 +108,11 @@ export type FidelityOverview = {
     overall: FidelityEstimate;
     byCondition: Partial<Record<FidelityCondition, FidelityEstimate>>;
     byType: Record<string, FidelityEstimate>;
-    byOrigin: Record<string, FidelityEstimate>;
-    byPlatform: Record<string, FidelityEstimate>;
-    byModel: Record<string, FidelityEstimate>;
-    byContext: Record<string, FidelityEstimate>;
+    // Only the dividing tables the caller asked for.
+    byOrigin?: Record<string, FidelityEstimate>;
+    byPlatform?: Record<string, FidelityEstimate>;
+    byModel?: Record<string, FidelityEstimate>;
+    byContext?: Record<string, FidelityEstimate>;
   };
   correctionRate: FidelityEstimate;
   calibration: Partial<Record<FidelityCondition, FidelityCalibration>>;
@@ -143,10 +144,13 @@ export function scoreDraftOrigins(input: {
   drafts?: FidelityDraft[];
   options?: { bootstrapSamples?: number; seed?: number; minParticipants?: number };
 }): Record<string, DraftOriginScore>;
+export type FidelityDividingTable = 'byCondition' | 'byOrigin' | 'byPlatform' | 'byModel' | 'byContext';
+export const DIVIDING_TABLES: readonly FidelityDividingTable[];
 export function scoreFidelityOverview(input: {
   questions?: unknown[];
   pairs?: SessionFidelityPair[];
   options?: { bootstrapSamples?: number; seed?: number; minParticipants?: number };
+  tables?: readonly FidelityDividingTable[];
 }): FidelityOverview;
 export function fidelityPairsFromReview(input: { questions?: unknown[]; reviewed?: FidelityReviewEntry[] }): FidelityPair[];
 export function summarizeParticipantFidelity(input: {
