@@ -73052,7 +73052,7 @@ var init_storageRouteExecution = __esm({
         });
         if (!response2.ok) {
           const body = await response2.json().catch(() => ({}));
-          return { id: id2, status: response2.status, error: trim14(body?.error) || "Storage read failed." };
+          return { id: id2, status: response2.status, error: trim14(body?.error) || "Storage read failed.", ...trim14(body?.reason) ? { reason: trim14(body.reason) } : {} };
         }
         if ((response2.headers.get("Cache-Control") || "").includes("private")) privateItem = true;
         const contentType = response2.headers.get("Content-Type") || "";
