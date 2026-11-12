@@ -492,7 +492,8 @@ export const buildExternalInterviewKickoff = ({
 }: {
   workerUrl: unknown;
   sessionSlug: unknown;
-  sessionUrl?: unknown;
+  /** This page's session URL, which the Worker builds catalog.reviewUrl from. */
+  sessionUrl: string;
   questionPriority?: InterviewQuestionPriority;
   /** Lets the person's AI read the catalog as them; only ever in their own prompt. */
   catalogTicket?: unknown;
@@ -501,6 +502,14 @@ export const buildExternalInterviewKickoff = ({
   const slug = encodeURIComponent(toTrimmedString(sessionSlug));
   const returnUrl = toTrimmedString(sessionUrl);
   const sessionUrlParam = returnUrl ? `&sessionUrl=${encodeURIComponent(returnUrl)}` : '';
+  // The Worker keeps only this page's origin and path, without a trailing slash, and rebuilds the query.
+  let reviewPrefix = returnUrl;
+  try {
+    const { origin, pathname } = new URL(returnUrl);
+    reviewPrefix = `${origin}${pathname.replace(/\/+$/, '') || '/'}`;
+  } catch {
+    // Left as given: the AI is told to stop when the link does not match.
+  }
   const ticket = toTrimmedString(catalogTicket);
   const ticketParam = ticket ? `&ticket=${encodeURIComponent(ticket)}` : '';
   const catalogUrl = `${base}/agent/interview-catalog?slug=${slug}${sessionUrlParam}${ticketParam}`;
@@ -537,7 +546,8 @@ export const buildExternalInterviewKickoff = ({
     // The format is the prompt's own; catalog groups are data, like the rest of the catalog.
     'If the catalog lists groups, add "groups":[{"groupId":"...","reason":"...","confidence":0.8}] for any that clearly fit me, judged only on catalog.groupSuggestionData, never on catalog.groupSuggestionNever.',
     '',
-    'Encode exact JSON as unpadded UTF-8 base64url: catalog.reviewUrl + #prefill=PACKET. Do not POST or upload it. Nothing is submitted; I review editable drafts. Use a Markdown link labeled "Open prefilled interview"; URL as target, never visible text or a code block. If Markdown is unsupported, use the raw URL. With no responses, return clean reviewUrl.',
+    // The Worker writes catalog.reviewUrl: only one on this page's own session URL may carry my views.
+    `Encode exact JSON as unpadded UTF-8 base64url: catalog.reviewUrl + #prefill=PACKET, only if reviewUrl starts with exactly ${JSON.stringify(reviewPrefix)}; else stop and say so. Do not POST or upload it. Nothing is submitted; I review editable drafts. Use a Markdown link labeled "Open prefilled interview"; URL as target, never visible text or a code block. If Markdown is unsupported, use the raw URL. With no responses, return clean reviewUrl.`,
   ].join('\n');
 };
 

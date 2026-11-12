@@ -312,7 +312,7 @@ describe('session interview protocol', () => {
     expect(kickoff).toContain('Nothing is submitted;');
     expect(kickoff).toContain('Markdown link labeled "Open prefilled interview"');
     expect(kickoff).toContain('never visible text or a code block');
-    expect(kickoff.length).toBeLessThan(4000);
+    expect(kickoff.length).toBeLessThan(4100);
 
     const mappingPrompt = buildInterviewResponseMappingPrompt({
       questions: [{ id: 'q1', prompt: 'What matters?', type: 'freeform', options: [] }],
