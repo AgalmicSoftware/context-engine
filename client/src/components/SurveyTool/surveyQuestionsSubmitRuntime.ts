@@ -1,4 +1,5 @@
 import { buildSavedInterviewConsent } from './sessionInterviewConsent';
+import { planDraftTextSync, syncDraftText } from './sessionInterviewDraftText';
 import { getSubmittedWorkerResponseRecency } from '../../utilities/survey/workerResponseRecency';
 import {
   nameQuestionForNotice,
@@ -626,6 +627,27 @@ export const createSurveyQuestionsSubmitRuntime = (
           )
           .filter(Boolean),
       );
+      // AI draft text for admins follows the consent each uploaded response was saved with.
+      const draftTextConfig = resolveEffectiveResponseGateConfig(submitContext.effectiveDraftSlug, submitContext.props);
+      const draftTextPlan = planDraftTextSync({
+        sessionConfig: draftTextConfig,
+        uploaded: Array.isArray(receipt?.__ceQuestionResponses) ? receipt.__ceQuestionResponses : [],
+        drafts: activeSlice?.interviewProvenance || {},
+        earlier: stateRef.current.editBaseline?.interviewProvenance || {},
+      });
+      try {
+        await syncDraftText(draftTextPlan, {
+          sessionConfig: draftTextConfig,
+          sessionSlug: submitContext.effectiveDraftSlug,
+        });
+      } catch (error) {
+        surveyLog.warn('[SurveyQuestions] AI draft text update failed:', error);
+        setState(
+          buildSubmissionErrorState(
+            'Your answers were saved, but the AI draft text kept for admins could not be updated.',
+          ),
+        );
+      }
 
       // 1. STOP any pending draft saves immediately
       if (inst._persistTimer) {

@@ -54,6 +54,8 @@ const RESEARCH_SHARING_HELP =
   'Whether the box that shares someone’s AI draft changes for research starts ticked on new answers. Each person can change it before submitting, and choices already saved stay as they are.';
 const RESEARCH_DETAIL_HELP =
   'What a shared draft comparison saves. Minimal keeps none of the AI’s notes or drafted text, which suits public sessions; Full also keeps them and drafts for skipped questions.';
+const DRAFT_TEXT_HELP =
+  'People who share for research can also let this session’s config admins read the AI’s drafted answers and comments; nobody else can, and no AI feature or Results uses it. Each person can turn it off. Turning this off stops collecting; text already kept stays until each person withdraws it. Session backups leave it out, so download it from Admin before deleting the session or restoring it from a backup.';
 const HIDDEN_DRAFTS_HELP =
   'Hides this share of each participant’s AI prefill drafts until they answer, to measure how much seeing a draft sways answers. Only for participants sharing draft changes for research.';
 const VOICE_MODEL_HELP = `The OpenAI live model that holds voice interviews. Keep ${DEFAULT_REALTIME_INTERVIEW_MODEL} unless you need another; the session’s OpenAI key must have access to it.`;
@@ -115,8 +117,16 @@ type Props = {
   disabled?: boolean;
   // Where voice interviews can be off while these settings show, as in /admin, this turns them on.
   onTurnOnInterviews?: () => void;
+  // False when the session's Worker predates keeping AI draft text for admins.
+  draftTextSupported?: boolean;
 };
-export default function InterviewSettingsFields({ value, onChange, disabled = false, onTurnOnInterviews }: Props) {
+export default function InterviewSettingsFields({
+  value,
+  onChange,
+  disabled = false,
+  onTurnOnInterviews,
+  draftTextSupported = true,
+}: Props) {
   const id = useId();
   const tooltipsEnabled = useSessionWizardTooltipPreference(useContext(ReactReduxContext)?.store ?? null);
   const raw = value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
@@ -187,6 +197,23 @@ export default function InterviewSettingsFields({ value, onChange, disabled = fa
           <option value="full">Full: also the AI&apos;s notes, drafted text and drafts for skipped questions</option>
         </Input>
       </HelpField>
+      {settings.researchDetail === 'minimal' ? (
+        <HelpField htmlFor={`${id}-draft-text`} label="Keep AI draft text for admins" help={DRAFT_TEXT_HELP}>
+          <Input
+            id={`${id}-draft-text`}
+            type="select"
+            value={String(settings.keepDraftTextForAdmins)}
+            // An older Worker can't store it; turning it off stays possible.
+            disabled={!draftTextSupported && !settings.keepDraftTextForAdmins}
+            onChange={(e) => change('keepDraftTextForAdmins', e.target.value === 'true')}
+            aria-describedby={setupHelpId(`${id}-draft-text`)}
+          >
+            <option value="false">Off</option>
+            <option value="true">On</option>
+          </Input>
+          {draftTextSupported ? null : <div>Needs a newer Session Worker (0.9.6 or later).</div>}
+        </HelpField>
+      ) : null}
       <HelpField htmlFor={`${id}-hidden-drafts`} label="Hidden AI drafts" help={HIDDEN_DRAFTS_HELP}>
         <Input
           id={`${id}-hidden-drafts`}

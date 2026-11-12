@@ -565,9 +565,18 @@ export const summarizeParticipation = (draft: SetupSectionProps['draft']): strin
 type ParticipationProps = SetupSectionProps & {
   /** End times and instructions for AI agents apply only to Worker-hosted sessions. */
   workerHosted: boolean;
+  /** False when the session's Worker predates keeping AI draft text for admins. */
+  draftTextSupported?: boolean;
 };
 
-export const SetupParticipationSection = ({ draft, onChange, open, onToggle, workerHosted }: ParticipationProps) => (
+export const SetupParticipationSection = ({
+  draft,
+  onChange,
+  open,
+  onToggle,
+  workerHosted,
+  draftTextSupported,
+}: ParticipationProps) => (
   <SetupSection
     sectionKey="participation"
     title="Participation"
@@ -588,6 +597,7 @@ export const SetupParticipationSection = ({ draft, onChange, open, onToggle, wor
         value={draft.interviewMode}
         onChange={(value) => onChange(['interviewMode'], value)}
         onTurnOnInterviews={() => onChange(['interviewModeEnabled'], true)}
+        draftTextSupported={workerHosted && draftTextSupported !== false}
       />
     ) : null}
     <SetupField id="ce-setup-group-creation" label="Who can create groups" help={GROUP_CREATION_HELP}>

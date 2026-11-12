@@ -393,6 +393,7 @@ it('explains each setting behind its own "?", not in text under it', () => {
   const explained = {
     'Share AI draft changes for research by default': /choices already saved stay as they are/,
     'AI draft research detail': /Minimal keeps none of the AI’s notes/,
+    'Keep AI draft text for admins': /stays until each person withdraws it\. Session backups leave it out/,
     'Hidden AI drafts': /how much seeing a draft sways answers/,
     'Interview voice model': /OpenAI live model/,
     'Opening question': /Owner-written: every interview opens with your question/,
@@ -412,4 +413,32 @@ it('explains each setting behind its own "?", not in text under it', () => {
   }
   expect(screen.queryByText(/^Sets the initial research-sharing checkbox/)).not.toBeInTheDocument();
   expect(screen.queryByText(/^Additions accumulate since/)).not.toBeInTheDocument();
+});
+
+describe('keeping AI draft text for admins', () => {
+  const label = 'Keep AI draft text for admins';
+
+  it('is off by default, offered only at minimal detail, and saved when turned on', () => {
+    const onChange = jest.fn();
+    const { rerender } = render(<InterviewSettingsFields value={{}} onChange={onChange} />);
+    expect(screen.getByLabelText(label)).toHaveValue('false');
+    fireEvent.change(screen.getByLabelText(label), { target: { value: 'true' } });
+    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ keepDraftTextForAdmins: true }));
+    rerender(<InterviewSettingsFields value={{ researchDetail: 'full' }} onChange={onChange} />);
+    expect(screen.queryByLabelText(label)).not.toBeInTheDocument();
+  });
+
+  it('says an older Worker needs updating, and still lets it be turned off', () => {
+    const { rerender } = render(<InterviewSettingsFields value={{}} onChange={jest.fn()} draftTextSupported={false} />);
+    expect(screen.getByLabelText(label)).toBeDisabled();
+    expect(screen.getByText('Needs a newer Session Worker (0.9.6 or later).')).toBeInTheDocument();
+    rerender(
+      <InterviewSettingsFields
+        value={{ keepDraftTextForAdmins: true }}
+        onChange={jest.fn()}
+        draftTextSupported={false}
+      />,
+    );
+    expect(screen.getByLabelText(label)).toBeEnabled();
+  });
 });

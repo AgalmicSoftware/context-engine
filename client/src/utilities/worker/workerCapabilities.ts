@@ -14,6 +14,7 @@ export type WorkerCapabilities = {
 
 export const KNOWN_WORKER_FEATURES = [
   'context_sources_v1',
+  'draft_text_v1',
   'envelope_export_identity_v1',
   'participant_context_links_v1',
   'participant_context_v1',

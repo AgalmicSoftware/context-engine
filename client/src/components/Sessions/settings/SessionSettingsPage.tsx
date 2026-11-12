@@ -40,7 +40,7 @@ import {
 } from '../../../utilities/session/sessionWorkerDiscovery';
 import { upsertWorkerCanonicalSessionBootstrap } from '../../../utilities/session/sessionWorkerConfigCache';
 import { describeWorkerModeError, listSessionModeConflicts } from '../../../utilities/session/sessionModeRuleMessages';
-import { readWorkerReleaseLabel } from '../../../domains/worker/workerRelease';
+import { readWorkerKeepsDraftText, readWorkerReleaseLabel } from '../../../domains/worker/workerRelease';
 import {
   applyTemplateToSessionSettingsDraft,
   buildSessionSettingsDraft,
@@ -214,11 +214,17 @@ const SessionSettingsPage = ({
 
   // Which release the Session Worker runs; Workers before 0.9.3 don't say.
   const [workerRelease, setWorkerRelease] = useState('');
+  // Whether it keeps AI draft text for admins; null while unknown, which leaves the setting as it is.
+  const [workerKeepsDraftText, setWorkerKeepsDraftText] = useState<boolean | null>(null);
   useEffect(() => {
     let stale = false;
     setWorkerRelease('');
+    setWorkerKeepsDraftText(null);
     void readWorkerReleaseLabel(workerOrigin, sessionSlug, fetchImpl).then((release) => {
       if (!stale) setWorkerRelease(release);
+    });
+    void readWorkerKeepsDraftText(workerOrigin, sessionSlug, fetchImpl).then((keeps) => {
+      if (!stale) setWorkerKeepsDraftText(keeps);
     });
     return () => {
       stale = true;
@@ -551,7 +557,11 @@ const SessionSettingsPage = ({
             </>
           }
         />
-        <SetupParticipationSection {...section('participation')} workerHosted={!onChain} />
+        <SetupParticipationSection
+          {...section('participation')}
+          workerHosted={!onChain}
+          draftTextSupported={workerKeepsDraftText !== false}
+        />
         <SetupResultsSection
           {...section('results')}
           editProfile={editProfile}

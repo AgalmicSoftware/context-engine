@@ -56,6 +56,50 @@ Owners also choose the **AI draft research detail**, `interviewMode.researchDeta
 Settings save `researchDetail` only when it is `full`, for the same reason as
 the sharing default: choosing `full` needs a Session Worker newer than 0.8.0.
 
+### AI draft text for admins
+
+At minimal detail an owner can also turn on **Keep AI draft text for admins**
+(`interviewMode.keepDraftTextForAdmins`, off by default; Session Workers from
+0.9.6, which advertise `draft_text_v1`). Settings show "Needs a newer Session
+Worker" on an older one, and save the key only while it is on.
+
+- **Consent.** Inside the expanded **AI submission info**, under the research
+  details, people see **Let admins read the AI's draft text**, ticked for new
+  drafts, with a sentence saying the session's admins can read the text of the
+  AI's drafts and what they changed, and nobody else can, and that it can be
+  turned off on its own. Unticking it keeps the minimal record and keeps no
+  text; unticking **Share for research** keeps neither. The choice is held with
+  the other consent choices, so it survives signing in to submit. The public
+  record carries only `draftTextConsent: true`, never the text.
+- **What is kept.** Per person and question: the AI's drafted freeform answer
+  (free-text questions only), its drafted comment, and the draft's origin and
+  shown-or-hidden condition. Not its notes, revisions, skipped-question drafts,
+  the transcript or times. Nothing is kept for a question whose answer or
+  comment is encrypted. The person's final text is not copied: it is their
+  saved response, which the report script joins.
+- **Where.** In the Session Worker under its own prefix (`ce-draft-text:`), one
+  row per person and question, overwritten by a later draft. Only the signed-in
+  person can write their row, only while the setting is on, only for a
+  question the session has, and each field is capped at 8,000 characters. No
+  response reader, AI feature, Session Agent, MCP tool, Results view or export
+  reads that prefix.
+- **Who can read it.** Only config admins (the session's admin address or its
+  admin hat), through **Download AI draft text** on the Admin page. Co-admins
+  without config rights, results admins, members and signed-out readers are
+  refused.
+- **Withdrawal.** At each submit, after the answers are saved, the browser
+  deletes the stored text for every uploaded question without draft-text
+  consent (unticked, research unticked, or now encrypted), then stores the
+  text for the rest. A consent change on saved answers is uploaded as a
+  resubmission, so it deletes at that submit. Deleting works even after the
+  setting is turned off or the session has ended.
+- **Turning it off** stops collecting; stored text stays until each person
+  withdraws it. Session backups leave the prefix out, so an admin must download
+  it before deleting the session or restoring it from a backup.
+
+The report script turns the download into pseudonymous clustering input; see
+[agent-fidelity.md](agent-fidelity.md#running-it).
+
 Either way the record carries `version: 2`, `researchTier` and `draftOrigin`.
 Records submitted before research detail existed keep `version: 1` and their
 original shape. When a minimal record is resubmitted later, its drafted text is
@@ -191,7 +235,7 @@ does not make draft revisions a complete record of what the voice model saw.
 
 When answer text is encrypted, the research snapshot writes `{ "redacted": true, "reason": "encrypted_field" }` instead of plaintext answer text. When additional comments are encrypted, or when comments follow an encrypted answer rather than an explicit plaintext audience, the comment text is redacted too. Importance and conviction are redacted in original, revision, reviewed, and submitted snapshots whenever either response field is protected or the submitted rating remains encrypted in a rating envelope. Evidence/basis strings are removed whenever answer or comment text is redacted, because evidence can repeat or reveal the protected text.
 
-Redaction does not remove the whole record. Field names, changed/touched indicators, confidence, unencrypted importance and conviction, revision numbers, model IDs, and timestamps can remain. The ordinary submitted response still carries its normal question and responder identifiers, including the responder wallet field written by the response payload. Interview research follows the response's normal session storage and visibility path; it is not automatically anonymous and does not create a separate private research backend.
+Redaction does not remove the whole record. Field names, changed/touched indicators, confidence, unencrypted importance and conviction, revision numbers, model IDs, and timestamps can remain. The ordinary submitted response still carries its normal question and responder identifiers, including the responder wallet field written by the response payload. Interview research follows the response's normal session storage and visibility path; it is not automatically anonymous. Only the optional [AI draft text for admins](#ai-draft-text-for-admins) is kept apart from it.
 
 The full interview transcript, imported conversation history, keystrokes, cursor history, edit timing, time-to-review, and semantic agreement score are not attached to this record. Unencrypted draft answers, comments, and evidence can still quote or summarize transcript-derived or import-derived content because those fields are the AI-generated draft and reviewed response content. Confidence, evidence, platform/model identity, and provenance details are reported by the workflow/model path; they are not independently validated research truth.
 

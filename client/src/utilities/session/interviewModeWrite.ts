@@ -4,6 +4,7 @@
 const NEWER_INTERVIEW_DEFAULTS: Record<string, unknown> = {
   shareDraftChangesByDefault: true,
   researchDetail: 'minimal',
+  keepDraftTextForAdmins: false,
   hiddenDraftShare: 0,
   showFidelityScore: false,
   suggestGroups: false,

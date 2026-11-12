@@ -4,6 +4,8 @@ export type InterviewConsentOverrides = {
   includeAiProvenance?: boolean;
   includePredictionComparison?: boolean;
   includeResponderName?: boolean;
+  // Also keep the AI's drafted text where only the session's config admins can read it.
+  includeDraftText?: boolean;
   // The research detail shown when the participant chose; a later config can't widen it.
   researchDetail?: 'minimal' | 'full';
 };
@@ -38,14 +40,61 @@ export const resolveConsentFlags = (value: unknown) => {
     includePredictionComparison:
       record.includePredictionComparison === true ||
       (record.includePredictionComparison !== false && !!record.predictionComparison),
+    // A saved response says so with draftTextConsent; without it, the text was never kept.
+    includeDraftText:
+      record.includeDraftText === true || (record.includeDraftText !== false && record.draftTextConsent === true),
+  };
+};
+
+type ConsentDraft = { questionId: string };
+
+/** The consent boxes' states over these drafts: saved choices where saved, else these defaults. */
+export const summarizeInterviewConsent = ({
+  drafts,
+  saved,
+  overrides,
+  defaults,
+}: {
+  drafts: ConsentDraft[];
+  saved: Record<string, Record<string, unknown>>;
+  overrides: InterviewConsentOverrides;
+  defaults: { ai: boolean; comparison: boolean; name: boolean; draftText: boolean };
+}) => {
+  const choice = (read: (record: Record<string, unknown>) => boolean, fallback: boolean, override?: boolean) =>
+    summarizeConsentChoice(
+      drafts.map((draft) => (saved[draft.questionId] ? read(saved[draft.questionId]) : fallback)),
+      override,
+    );
+  return {
+    aiChoice: choice(
+      (record) => resolveConsentFlags(record).includeAiProvenance,
+      defaults.ai,
+      overrides.includeAiProvenance,
+    ),
+    comparisonChoice: choice(
+      (record) => resolveConsentFlags(record).includePredictionComparison,
+      defaults.comparison,
+      overrides.includePredictionComparison,
+    ),
+    nameChoice: choice((record) => !!record.responderName, defaults.name, overrides.includeResponderName),
+    draftTextChoice: choice(
+      (record) => resolveConsentFlags(record).includeDraftText,
+      defaults.draftText,
+      overrides.includeDraftText,
+    ),
+    hasSavedName: drafts.some((draft) => !!saved[draft.questionId]?.responderName),
+    hasSavedAi: drafts.some((draft) => resolveConsentFlags(saved[draft.questionId]).includeAiProvenance),
   };
 };
 
 export const consentSignature = (value: unknown, responderName?: unknown): string => {
   const record = asRecord(value);
   const source = asRecord(record.source);
-  const { includeAiProvenance: includeAi, includePredictionComparison: includeComparison } =
-    resolveConsentFlags(record);
+  const {
+    includeAiProvenance: includeAi,
+    includePredictionComparison: includeComparison,
+    includeDraftText,
+  } = resolveConsentFlags(record);
   return JSON.stringify([
     String(responderName ?? record.responderName ?? '')
       .trim()
@@ -53,6 +102,7 @@ export const consentSignature = (value: unknown, responderName?: unknown): strin
       .slice(0, 160),
     includeAi,
     includeComparison,
+    includeComparison && includeDraftText,
     ...(includeAi
       ? [
           String(source.platform || 'other'),
@@ -108,7 +158,10 @@ const PREDICTION_RESEARCH_KEYS = [
   'blindAnswer',
   'revealedAt',
   'confidenceMeaning',
+  'includeDraftText',
+  'draftTextConsent',
 ];
+const DRAFT_TEXT_KEYS = ['includeDraftText', 'draftTextConsent'];
 
 // Undoing or restoring edits never makes a response more disclosing: a name, AI attribution
 // or research consent that was withdrawn stays withdrawn from the consent it had before.
@@ -121,7 +174,8 @@ export const keepConsentWithdrawals = (before: unknown, attempted: unknown): Rec
   const withdrawName = !!prior.responderName && !tried.responderName;
   const withdrawAi = priorFlags.includeAiProvenance && !triedFlags.includeAiProvenance;
   const withdrawResearch = priorFlags.includePredictionComparison && !triedFlags.includePredictionComparison;
-  if (!withdrawName && !withdrawAi && !withdrawResearch) return null;
+  const withdrawDraftText = priorFlags.includeDraftText && !triedFlags.includeDraftText;
+  if (!withdrawName && !withdrawAi && !withdrawResearch && !withdrawDraftText) return null;
   const kept: Record<string, unknown> = {
     ...prior,
     version: 1,
@@ -133,6 +187,7 @@ export const keepConsentWithdrawals = (before: unknown, attempted: unknown): Rec
     ...(withdrawName ? ['responderName'] : []),
     ...(withdrawAi ? AI_ATTRIBUTION_KEYS : []),
     ...(withdrawResearch ? PREDICTION_RESEARCH_KEYS : []),
+    ...(withdrawDraftText ? DRAFT_TEXT_KEYS : []),
   ].forEach((key) => delete kept[key]);
   return kept;
 };
