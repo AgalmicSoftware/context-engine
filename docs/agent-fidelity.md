@@ -202,6 +202,7 @@ This writes `agent-fidelity-report.json` and `agent-fidelity-report.md`.
 | `--bootstrap`, `--seed`, `--min-participants` | Interval samples, random seed, smallest reported cell. |
 | `--include-agents` | Keep self-declared agent participants. |
 | `--predictions <file.csv>` | Also write one row per scored prediction, for analysis elsewhere (below). |
+| `--draft-text <file> --clio <file.jsonl>` | Turn an admin's AI draft text download into pseudonymous input for clustering tools (below). |
 
 `--responses` takes a JSON array of rows as the Worker stores them:
 `{ "responder": "0x…", "createdAt": "2026-10-02T09:00:00Z", "response": … }`,
@@ -223,6 +224,24 @@ It has no addresses, names or free text: choice answers keep only the
 question's own options. Excluded people and agents are left out, but no
 minimum applies, so it is de-identified rather than anonymous: keep it with
 the raw export.
+
+`--draft-text` takes the file a config admin downloads with **Download AI draft
+text** on the Admin page, on sessions that keep the AI's drafted text for
+admins (see
+[session-interview-research.md](session-interview-research.md#ai-draft-text-for-admins)).
+`--clio` then writes one JSON line per person, question and field (`answer` or
+`comment`): the AI's draft as an `assistant` message and, when the person's
+latest saved text differs, that text as a `user` message, with `participant`
+(the same pseudonym as `--predictions` in the same run), `question_id`,
+`field`, `origin`, `condition` and `changed` in `metadata`. Every time is the
+download's date at midnight UTC, and no address appears. A field whose latest
+answer or comment is encrypted gets no line. The shape suits
+conversation-clustering tools: OpenClio reads it with
+`getConversationFunc=lambda r: r["messages"]`, and Kura reads each line as a
+`Conversation`. They are examples, not dependencies. Neither enforces a
+minimum group size: keep only clusters drawn from at least the report's
+minimum number of people before sharing anything. The output holds
+participants' own words, so keep it as privately as the download.
 
 ## What participants see
 

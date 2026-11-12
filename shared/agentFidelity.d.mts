@@ -118,6 +118,16 @@ export type FidelityOverview = {
 };
 
 export function resultsResponseRows(source: unknown): unknown[];
+export function latestResponseEntries(input: { questions?: unknown[]; payloads?: unknown[] }): {
+  entries: Array<{
+    participantId: string;
+    questionId: string;
+    question: { id: string; type: string };
+    entry: Record<string, unknown>;
+    payload: Record<string, unknown>;
+  }>;
+  skipped: { unknownQuestion: number; noParticipant: number };
+};
 export function collectSessionFidelityData(input: { questions?: unknown[]; payloads?: unknown[] }): {
   answers: unknown[];
   pairs: SessionFidelityPair[];

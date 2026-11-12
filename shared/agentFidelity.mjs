@@ -351,16 +351,14 @@ export const resultsResponseRows = (source) => {
 };
 
 /**
- * Reads stored session responses into final answers (everyone) and
- * prediction pairs (responses that kept their AI draft comparison). Only each
- * person's latest record for a question counts, so withdrawing research
- * consent or encrypting an answer later replaces what was shared before.
- * Latest is the order the Worker or the chain recorded rows in, or else the
- * input order; payload timestamps are never compared.
+ * Each person's latest stored response entry per question, as
+ * { participantId, questionId, question, entry, payload }. Latest is the order
+ * the Worker or the chain recorded rows in, or else the input order; payload
+ * timestamps are never compared.
  */
-export const collectSessionFidelityData = ({ questions = [], payloads = [] } = {}) => {
+export const latestResponseEntries = ({ questions = [], payloads = [] } = {}) => {
   const questionMap = mapQuestions(questions);
-  const skipped = { unknownQuestion: 0, noParticipant: 0, unreadableAnswer: 0, unreadablePrediction: 0, freeformWithoutText: 0 };
+  const skipped = { unknownQuestion: 0, noParticipant: 0 };
   const records = [];
   for (const item of payloads) {
     for (const { entry, payload, row } of entriesOf(item)) {
@@ -379,10 +377,22 @@ export const collectSessionFidelityData = ({ questions = [], payloads = [] } = {
       records.push({ participantId, questionId: question.id, question, entry, payload, recordedAt: recordedAt(row) });
     }
   }
+  return { entries: latestByKey(records).map(({ recordedAt: _recordedAt, ...record }) => record), skipped };
+};
+
+/**
+ * Reads stored session responses into final answers (everyone) and
+ * prediction pairs (responses that kept their AI draft comparison). Only each
+ * person's latest record for a question counts, so withdrawing research
+ * consent or encrypting an answer later replaces what was shared before.
+ */
+export const collectSessionFidelityData = ({ questions = [], payloads = [] } = {}) => {
+  const latest = latestResponseEntries({ questions, payloads });
+  const skipped = { ...latest.skipped, unreadableAnswer: 0, unreadablePrediction: 0, freeformWithoutText: 0 };
   const answers = [];
   const pairs = [];
   const drafts = [];
-  for (const { participantId, questionId, question, entry, payload } of latestByKey(records)) {
+  for (const { participantId, questionId, question, entry, payload } of latest.entries) {
     const final = normalizeFidelityAnswer(question, entry.answer);
     if (final === null) {
       skipped.unreadableAnswer += 1;

@@ -11,6 +11,8 @@ import {
   collectSessionFidelityData,
   collectWrappedFidelityPairs,
   CONTEXT_BUCKETS,
+  DRAFT_ORIGINS,
+  latestResponseEntries,
   normalizeFidelityQuestion,
   resultsResponseRows,
   scoreAgentFidelity,
@@ -33,9 +35,13 @@ Options:
   --seed <n>                Random seed (default 1)
   --min-participants <n>    Smallest group of people to report on (default 5)
   --include-agents          Keep self-declared agent participants
-  --predictions <file.csv>  Also write one de-identified row per draft (scored, or freeform without its text)`;
+  --predictions <file.csv>  Also write one de-identified row per draft (scored, or freeform without its text)
+  --draft-text <file>       The admin's AI draft text download (JSON); needs --clio
+  --clio <file.jsonl>       Write each AI draft and the person's final text as a conversation for OpenClio or Kura; needs --draft-text
 
-const VALUE_FLAGS = new Set(['export', 'questions', 'responses', 'wrapped', 'groups', 'exclude', 'out', 'bootstrap', 'seed', 'min-participants', 'predictions']);
+Neither clustering tool enforces a minimum group size: keep only clusters drawn from at least the report's minimum number of people before sharing anything.`;
+
+const VALUE_FLAGS = new Set(['export', 'questions', 'responses', 'wrapped', 'groups', 'exclude', 'out', 'bootstrap', 'seed', 'min-participants', 'predictions', 'draft-text', 'clio']);
 const INTEGER_FLAGS = { bootstrap: 0, seed: -Infinity, 'min-participants': 1 };
 
 export const parseArgs = (argv) => {
@@ -62,6 +68,9 @@ export const parseArgs = (argv) => {
   }
   if (!args.help && !args.export && !(args.questions && args.responses)) {
     throw new Error('Pass --export, or both --questions and --responses.');
+  }
+  if (!args.help && Boolean(args['draft-text']) !== Boolean(args.clio)) {
+    throw new Error('--draft-text and --clio go together: pass both, or neither.');
   }
   return args;
 };
@@ -353,7 +362,106 @@ export const predictionRows = ({ questions, pairs, drafts = [], pseudonyms, grou
   return `${[PREDICTION_COLUMNS, ...rows].map((cells) => cells.map((value) => quoteCsvCell(cellValue(value))).join(',')).join('\n')}\n`;
 };
 
+const isRecord = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
+const DRAFT_TEXT_TYPE = 'ce_draft_text_export';
+
+/**
+ * Reads the admin's AI draft text download: one row per person and question, the latest saved if repeated.
+ * Only the export's UTC date is kept, since per-row times can single people out.
+ */
+export const readDraftTextExport = (source) => {
+  if (source?.type !== DRAFT_TEXT_TYPE || source.version !== 1) {
+    throw new Error(`--draft-text must be the AI draft text download (type "${DRAFT_TEXT_TYPE}", version 1).`);
+  }
+  if (!Array.isArray(source.rows)) throw new Error('--draft-text has no list of rows.');
+  const exportedAt = typeof source.exportedAt === 'string' ? new Date(source.exportedAt) : null;
+  if (!exportedAt || Number.isNaN(exportedAt.getTime())) throw new Error('--draft-text has no readable exportedAt time.');
+  const latest = new Map();
+  for (const row of source.rows.filter(isRecord)) {
+    const participantId = typeof row.responder === 'string' ? row.responder.trim().toLowerCase() : '';
+    const questionId = typeof row.questionId === 'string' ? row.questionId.trim().toLowerCase() : '';
+    if (!participantId || !questionId) continue;
+    const key = `${participantId}|${questionId}`;
+    const savedAt = Date.parse(row.savedAt);
+    if (latest.has(key) && savedAt < latest.get(key).savedAt) continue;
+    latest.set(key, {
+      participantId,
+      questionId,
+      savedAt,
+      aiAnswer: typeof row.aiAnswer === 'string' ? row.aiAnswer : '',
+      aiComment: typeof row.aiComment === 'string' ? row.aiComment : '',
+      origin: DRAFT_ORIGINS.includes(row.origin) ? row.origin : null,
+      condition: ['shown', 'blind'].includes(row.condition) ? row.condition : null,
+    });
+  }
+  return { day: exportedAt.toISOString().slice(0, 10), rows: [...latest.values()] };
+};
+
+// A stored field's readable value, or undefined when it is encrypted or redacted.
+const readStoredField = (field) => {
+  if (!isRecord(field)) return field ?? '';
+  if (field.encrypted === true || field.redacted === true || field.encryptedPortion) return undefined;
+  const key = ['value', 'values', 'text'].find((candidate) => Object.hasOwn(field, candidate));
+  return key ? readStoredField(field[key]) : '';
+};
+const commentField = (entry) => entry.additional ?? entry.additionalComment ?? entry.additionalComments ?? entry.comment;
+
+/**
+ * Pairs each AI draft with the person's latest saved text for that question and field. Fields whose final
+ * text is encrypted, and drafts with no saved response, are left out.
+ */
+export const draftTextRecords = ({ drafts, entries }) => {
+  const entryOf = new Map(entries.map((record) => [`${record.participantId}|${record.questionId}`, record]));
+  return drafts.flatMap((draft) => {
+    const record = entryOf.get(`${draft.participantId}|${draft.questionId}`);
+    if (!record) return [];
+    const isAgent = record.entry.participant?.kind === 'agent' || record.payload.participant?.kind === 'agent';
+    return [
+      ['answer', draft.aiAnswer, record.entry.answer],
+      ['comment', draft.aiComment, commentField(record.entry)],
+    ].flatMap(([field, aiText, stored]) => {
+      const final = readStoredField(stored);
+      if (!aiText.trim() || final === undefined) return [];
+      const finalText = typeof final === 'string' ? final : JSON.stringify(final);
+      return [{ ...draft, field, aiText, finalText, isAgent }];
+    });
+  });
+};
+
+/**
+ * One conversation per line in the shape OpenClio and Kura read: the AI's draft, then the person's final text
+ * when it differs. People by pseudonym, every time the session's day.
+ */
+export const clioLines = ({ records, pseudonyms, day }) => {
+  const createdAt = `${day}T00:00:00Z`;
+  const lines = records
+    .filter((record) => pseudonyms.has(record.participantId))
+    .map((record) => {
+      const participant = pseudonyms.get(record.participantId);
+      const changed = record.finalText.trim() !== record.aiText.trim();
+      return {
+        chat_id: `${participant}:${record.questionId}:${record.field}`,
+        created_at: createdAt,
+        messages: [
+          { role: 'assistant', content: record.aiText, created_at: createdAt },
+          ...(changed ? [{ role: 'user', content: record.finalText, created_at: createdAt }] : []),
+        ],
+        metadata: {
+          participant,
+          question_id: record.questionId,
+          field: record.field,
+          ...(record.origin ? { origin: record.origin } : {}),
+          ...(record.condition ? { condition: record.condition } : {}),
+          changed,
+        },
+      };
+    })
+    .sort((a, b) => (a.chat_id < b.chat_id ? -1 : a.chat_id > b.chat_id ? 1 : 0));
+  return lines.map((line) => `${JSON.stringify(line)}\n`).join('');
+};
+
 export const runFidelityReport = (args) => {
+  const draftText = args['draft-text'] ? readDraftTextExport(readJson(args['draft-text'])) : null;
   const exported = args.export ? readJson(args.export) : null;
   const questions = listOf(exported ?? readJson(args.questions), 'filteredQuestions', 'questions') ?? [];
   const payloads = resultsResponseRows(exported ?? readJson(args.responses));
@@ -377,7 +485,11 @@ export const runFidelityReport = (args) => {
   };
   const excluded = new Set(excludeParticipants.map((id) => id.toLowerCase()));
   const kept = (pair) => !excluded.has(pair.participantId.toLowerCase()) && (args.includeAgents || !pair.isAgent);
-  const pseudonyms = pseudonymsFor([...pairs, ...drafts].filter(kept).map((record) => record.participantId));
+  const clioRecords = draftText
+    ? draftTextRecords({ drafts: draftText.rows, entries: latestResponseEntries({ questions, payloads }).entries }).filter(kept)
+    : [];
+  // One map per run, so the predictions file and the conversations name each person the same way.
+  const pseudonyms = pseudonymsFor([...pairs, ...drafts, ...clioRecords].filter(kept).map((record) => record.participantId));
   const report = scoreAgentFidelity({
     questions,
     pairs: pairs.filter((pair) => PREDICTION_ORIGINS.includes(pair.origin)),
@@ -413,6 +525,10 @@ export const runFidelityReport = (args) => {
     };
     mkdirSync(path.dirname(path.resolve(args.predictions)), { recursive: true });
     writeFileSync(args.predictions, predictionRows({ questions, pairs: pairs.filter(kept), drafts: drafts.filter(kept), pseudonyms, groupOf }));
+  }
+  if (draftText) {
+    mkdirSync(path.dirname(path.resolve(args.clio)), { recursive: true });
+    writeFileSync(args.clio, clioLines({ records: clioRecords, pseudonyms, day: draftText.day }));
   }
   return report;
 };

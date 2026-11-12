@@ -49,6 +49,9 @@ test('arguments need an export or both questions and responses, and whole number
   assert.throws(() => parseArgs(['--export', 'r.json', '--min-participants', 'five']), /--min-participants must be a whole number of at least 1/);
   assert.throws(() => parseArgs(['--export', 'r.json', '--min-participants', '0']), /at least 1/);
   assert.throws(() => parseArgs(['--export', 'r.json', '--bootstrap', 'lots']), /--bootstrap must be a whole number/);
+  assert.equal(parseArgs(['--export', 'r.json', '--draft-text', 'd.json', '--clio', 'c.jsonl']).clio, 'c.jsonl');
+  assert.throws(() => parseArgs(['--export', 'r.json', '--draft-text', 'd.json']), /--draft-text and --clio go together/);
+  assert.throws(() => parseArgs(['--export', 'r.json', '--clio', 'c.jsonl']), /--draft-text and --clio go together/);
 });
 
 const runReport = (dir, args) =>
@@ -348,4 +351,171 @@ test('the command exits non-zero with usage on bad input', () => {
   const run = spawnSync(process.execPath, [script], { encoding: 'utf8' });
   assert.equal(run.status, 1);
   assert.match(run.stderr, /Usage:/);
+});
+
+const addressOf = (index) => `0x${String(index + 1).padStart(40, '0')}`;
+// The admin's AI draft text download, made the day after the Results export, with rows saved the day before.
+const draftTextFixture = (rows) => ({
+  type: 'ce_draft_text_export',
+  version: 1,
+  sessionSlug: 'fixture',
+  exportedAt: '2026-10-25T23:59:00.000Z',
+  rows: rows.map((row) => ({ savedAt: '2026-10-23T15:42:11.000Z', ...row })),
+});
+const readJsonl = (file) => readFileSync(file, 'utf8').trim().split('\n').filter(Boolean).map((line) => JSON.parse(line));
+
+test('conversations name people as the predictions file does, on the export day, without addresses', () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'agent-fidelity-'));
+  try {
+    // Each person's AI has its own model, so a CSV row says whose it is; each draft's text says the same.
+    const survey = exportFixture();
+    survey.filteredResponses.forEach((row, index) => {
+      const payload = JSON.parse(row.response);
+      payload.responses.forEach((entry) => {
+        entry.interviewProvenance.source.modelId = `model-${index}`;
+      });
+      row.response = JSON.stringify(payload);
+    });
+    const input = path.join(dir, 'results.json');
+    const draftFile = path.join(dir, 'draft-text.json');
+    const exclude = path.join(dir, 'exclude.txt');
+    const csv = path.join(dir, 'predictions.csv');
+    const clio = path.join(dir, 'out', 'conversations.jsonl');
+    writeFileSync(input, JSON.stringify(survey));
+    writeFileSync(
+      draftFile,
+      JSON.stringify(
+        draftTextFixture(
+          Array.from({ length: 6 }, (_, index) => ({
+            responder: addressOf(index).toUpperCase().replace('0X', '0x'),
+            questionId: 'q1',
+            aiAnswer: `Draft ${index}`,
+            aiComment: '',
+            origin: 'external_prefill',
+            condition: 'shown',
+          })),
+        ),
+      ),
+    );
+    // The last person is left out, by an address in another case.
+    writeFileSync(exclude, `${addressOf(5).toUpperCase()}\n`);
+    const run = runReport(dir, ['--export', input, '--exclude', exclude, '--predictions', csv, '--draft-text', draftFile, '--clio', clio]);
+    assert.equal(run.status, 0, run.stderr);
+
+    const conversations = readJsonl(clio);
+    assert.equal(conversations.length, 5, "the excluded person's draft is left out");
+    assert.ok(!conversations.some((line) => line.messages[0].content === 'Draft 5'));
+    const csvPerson = new Map(
+      readFileSync(csv, 'utf8').trim().split('\n').slice(1).map((line) => {
+        const cells = line.split(',').map((cell) => cell.replaceAll('"', ''));
+        return [cells[3], cells[0]];
+      }),
+    );
+    assert.equal(csvPerson.size, 5);
+    for (const line of conversations) {
+      const index = line.messages[0].content.replace('Draft ', '');
+      assert.equal(line.metadata.participant, csvPerson.get(`model-${index}`), `person ${index}`);
+      assert.equal(line.chat_id, `${line.metadata.participant}:q1:answer`);
+      assert.equal(line.created_at, '2026-10-25T00:00:00Z');
+      for (const message of line.messages) assert.equal(message.created_at, '2026-10-25T00:00:00Z');
+      assert.deepEqual(
+        line.messages.map((message) => [message.role, message.content]),
+        [['assistant', `Draft ${index}`], ['user', Number(index) < 4 ? 'Agree' : 'Disagree']],
+      );
+      assert.deepEqual(line.metadata, { participant: line.metadata.participant, question_id: 'q1', field: 'answer', origin: 'external_prefill', condition: 'shown', changed: true });
+    }
+    assert.deepEqual(conversations.map((line) => line.chat_id), conversations.map((line) => line.chat_id).sort());
+    const markdown = readFileSync(path.join(dir, 'agent-fidelity-report.md'), 'utf8');
+    for (const [name, body] of [['conversations', readFileSync(clio, 'utf8')], ['markdown', markdown], ['stdout', run.stdout]]) {
+      assert.doesNotMatch(body, /0x[0-9a-f]{8}/i, `no address in the ${name}`);
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('conversations add the final text only when it changed, and skip encrypted or missing finals', () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'agent-fidelity-'));
+  try {
+    const survey = exportFixture();
+    survey.filteredQuestions.push({ id: 'qf', type: 'freeform', prompt: 'Why?' });
+    const freeform = (index, answer, additional) => ({
+      responder: addressOf(index),
+      response: JSON.stringify({ responses: [{ questionID: 'qf', answer, additional }] }),
+    });
+    survey.filteredResponses.push(
+      freeform(0, { value: 'Keep it simple', encrypted: false }, { value: 'My own note', encrypted: false }),
+      // The second person first saved a plain answer, then encrypted it.
+      freeform(1, { value: 'Old plain answer', encrypted: false }, { value: 'Old note', encrypted: false }),
+      freeform(1, { value: '*', encrypted: true, encryptedPortion: '{"ciphertext":"x"}' }, { value: 'Plain note', encrypted: false }),
+    );
+    const input = path.join(dir, 'results.json');
+    const draftFile = path.join(dir, 'draft-text.json');
+    const clio = path.join(dir, 'conversations.jsonl');
+    writeFileSync(input, JSON.stringify(survey));
+    writeFileSync(
+      draftFile,
+      JSON.stringify(
+        draftTextFixture([
+          { responder: addressOf(0), questionId: 'qf', aiAnswer: 'Keep it simple ', aiComment: 'AI note', origin: 'voice_interview', condition: 'blind' },
+          { responder: addressOf(1), questionId: 'qf', aiAnswer: 'AI guess', aiComment: 'Plain note' },
+          // No response to these questions, and no drafted text.
+          { responder: addressOf(2), questionId: 'qf', aiAnswer: 'Unanswered', aiComment: '' },
+          { responder: addressOf(2), questionId: 'q9', aiAnswer: 'Unknown question', aiComment: '' },
+          { responder: addressOf(3), questionId: 'q1', aiAnswer: '', aiComment: '  ' },
+        ]),
+      ),
+    );
+    const run = runReport(dir, ['--export', input, '--draft-text', draftFile, '--clio', clio]);
+    assert.equal(run.status, 0, run.stderr);
+    const conversations = readJsonl(clio);
+    const byField = (field, origin) => conversations.find((line) => line.metadata.field === field && line.metadata.origin === origin);
+    assert.equal(conversations.length, 3, 'two from the first person, the comment from the second');
+
+    const unchanged = byField('answer', 'voice_interview');
+    const first = unchanged.metadata.participant;
+    assert.deepEqual(unchanged, {
+      chat_id: `${first}:qf:answer`,
+      created_at: '2026-10-25T00:00:00Z',
+      messages: [{ role: 'assistant', content: 'Keep it simple ', created_at: '2026-10-25T00:00:00Z' }],
+      metadata: { participant: first, question_id: 'qf', field: 'answer', origin: 'voice_interview', condition: 'blind', changed: false },
+    });
+    const changed = byField('comment', 'voice_interview');
+    assert.deepEqual(changed.messages.map((message) => [message.role, message.content]), [['assistant', 'AI note'], ['user', 'My own note']]);
+    assert.equal(changed.metadata.changed, true);
+
+    // The second person's answer is encrypted now, so only their comment is written; origin and condition weren't given.
+    const second = conversations.filter((line) => line.metadata.participant !== first);
+    assert.deepEqual(second.map((line) => line.metadata.field), ['comment']);
+    assert.deepEqual(Object.keys(second[0].metadata), ['participant', 'question_id', 'field', 'changed']);
+    assert.equal(second[0].messages.length, 1);
+    assert.doesNotMatch(readFileSync(clio, 'utf8'), /AI guess|Old plain|Unanswered|Unknown question/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('a draft text file of the wrong kind is an error', () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'agent-fidelity-'));
+  try {
+    const input = path.join(dir, 'results.json');
+    const draftFile = path.join(dir, 'draft-text.json');
+    const clio = path.join(dir, 'conversations.jsonl');
+    writeFileSync(input, JSON.stringify(exportFixture()));
+    for (const [body, message] of [
+      [{ ...draftTextFixture([]), type: 'ce_results_export' }, /must be the AI draft text download/],
+      [{ ...draftTextFixture([]), version: 2 }, /must be the AI draft text download/],
+      [{ ...draftTextFixture([]), rows: {} }, /has no list of rows/],
+    ]) {
+      writeFileSync(draftFile, JSON.stringify(body));
+      const run = runReport(dir, ['--export', input, '--draft-text', draftFile, '--clio', clio]);
+      assert.equal(run.status, 1);
+      assert.match(run.stderr, message);
+    }
+    const run = spawnSync(process.execPath, [script, '--export', input, '--clio', clio], { encoding: 'utf8' });
+    assert.equal(run.status, 1);
+    assert.match(run.stderr, /--draft-text and --clio go together/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
