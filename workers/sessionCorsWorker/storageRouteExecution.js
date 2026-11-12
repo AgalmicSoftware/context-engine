@@ -67,6 +67,7 @@ import { executeCoordinatedStoragePublication, SUPERSEDED_AUTHORITY_ERROR } from
 import { sessionSlugStorageKey } from './sessionSlugResolution.js';
 import { getStorageIndexBinding } from './storageKvBindings.js';
 import { responseFieldKeyRoute } from './responseFieldKeyRoute.js';
+import { DRAFT_TEXT_PATHS, draftTextRoute } from './draftTextRoute.js';
 import { checkContextSourceUpload, contextSourceListFields } from './contextSourcePolicy.js';
 import { contextSourceRoute } from './contextSourceRoute.js';
 import { toStr } from './stringCoercion.js';
@@ -2843,6 +2844,17 @@ export const storageRoute = async ({
       authorizeSession: () => authorizeCloudflareStorageGate({
         env, config, slug, resource: 'responses', requesterAddress: uploaderAddress, authScopes, baseHeaders, deps: routeDeps,
       }),
+    });
+  }
+  if (method === 'POST' && DRAFT_TEXT_PATHS.includes(path)) {
+    const routeDeps = createStorageRouteGateDeps({ config, env, slug, deps });
+    return draftTextRoute({
+      path, request, env, config, slug, uploaderAddress, authScopes, baseHeaders, deps: routeDeps,
+      authorizeSession: () => authorizeCloudflareStorageGate({
+        env, config, slug, resource: 'responses', requesterAddress: uploaderAddress, authScopes, baseHeaders, deps: routeDeps,
+      }),
+      // The check a config change passes: the creator or an admin-hat wearer.
+      isConfigAdmin: (principal) => deps?.validateAdmin?.({ env, slug, address: principal, config, body: {} }),
     });
   }
   if (path === '/storage/upload' && method === 'POST') {

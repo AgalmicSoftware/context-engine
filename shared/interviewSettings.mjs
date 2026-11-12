@@ -21,6 +21,7 @@ export const DEFAULT_INTERVIEW_SETTINGS = Object.freeze({
   allowManualRefresh: true,
   shareDraftChangesByDefault: true,
   researchDetail: 'minimal',
+  keepDraftTextForAdmins: false,
   hiddenDraftShare: 0,
   showFidelityScore: false,
   suggestGroups: false,
@@ -56,6 +57,8 @@ export const normalizeInterviewSettings = (value = {}) => {
         : DEFAULT_INTERVIEW_SETTINGS.shareDraftChangesByDefault,
     // How much an AI draft comparison saves: 'minimal' keeps no AI notes or drafted text.
     researchDetail: source.researchDetail === 'full' ? 'full' : 'minimal',
+    // At minimal detail, also keep the AI's drafted text where only config admins can read it.
+    keepDraftTextForAdmins: source.keepDraftTextForAdmins === true,
     // Share of a person's AI prefill drafts hidden until they answer, which measures anchoring.
     hiddenDraftShare: Number.isFinite(source.hiddenDraftShare)
       ? Math.max(0, Math.min(MAX_HIDDEN_DRAFT_SHARE, source.hiddenDraftShare))
@@ -131,6 +134,7 @@ export const validInterviewSettings = (value = {}) => {
     'suggestQuestions',
     'allowManualRefresh',
     'shareDraftChangesByDefault',
+    'keepDraftTextForAdmins',
     'showFidelityScore',
     'suggestGroups',
     'joinMatchingGroups',

@@ -3,6 +3,7 @@ import { resolveMaxUploadBytes } from './uploadSizeLimits.js';
 import { workerGroupsRoute as workerGroupsRouteBoundary } from './workerGroups.js';
 import { loadPublicInterviewQuestions as loadPublicInterviewQuestionsBoundary } from './interviewQuestionCatalog.js';
 import { buildSessionEndedResponse } from '../shared/sessionLifecycle.mjs';
+import { DRAFT_TEXT_PATHS } from './draftTextRoute.js';
 
 export const dispatchAuthenticatedSecretPathRoute = async ({
   path,
@@ -23,6 +24,7 @@ export const dispatchAuthenticatedSecretPathRoute = async ({
   const isAgentQuestionsRoute = path === '/api/agent/questions' && method === 'GET';
   const isStorageRoute = (
     (['/storage/response-field-key/wrap', '/storage/response-field-key/unwrap'].includes(path) && method === 'POST') ||
+    (DRAFT_TEXT_PATHS.includes(path) && method === 'POST') ||
     (path === '/storage/upload' && method === 'POST') ||
     (path === '/storage/context' && method === 'POST') ||
     (path === '/storage/read' && (method === 'GET' || method === 'POST')) ||
@@ -49,6 +51,7 @@ export const dispatchAuthenticatedSecretPathRoute = async ({
   }
   const isParticipantWrite = (
     (path === '/storage/response-field-key/wrap' && method === 'POST') ||
+    (path === '/storage/draft-text/put' && method === 'POST') ||
     isTranscribeRoute ||
     isArweaveUploadRoute ||
     (path === '/storage/upload' && method === 'POST') ||

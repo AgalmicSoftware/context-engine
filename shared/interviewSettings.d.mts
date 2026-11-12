@@ -12,6 +12,7 @@ export type InterviewSettings = {
   allowManualRefresh: boolean;
   shareDraftChangesByDefault: boolean;
   researchDetail: 'minimal' | 'full';
+  keepDraftTextForAdmins: boolean;
   hiddenDraftShare: number;
   showFidelityScore: boolean;
   suggestGroups: boolean;
