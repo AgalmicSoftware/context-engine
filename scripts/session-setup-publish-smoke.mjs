@@ -404,17 +404,18 @@ try {
     responseRecord,
     'The session admin may read the submitted response',
   );
-  const stranger = makeClient(ethers.Wallet.createRandom());
-  assert.equal(
-    (await stranger.listAll('responses')).items.length,
-    0,
-    'Another participant cannot discover this private response',
+  // A new session shows every answer to its signed-in members, and none to visitors.
+  const member = makeClient(ethers.Wallet.createRandom());
+  assert.deepEqual(
+    (await member.listAll('responses')).items.map((item) => item.storageRef.id),
+    [responseId],
+    'Another signed-in member sees the response listed',
   );
-  await assert.rejects(stranger.read(responseId), (error) => error.status === 403);
-  const anonymous = await workerFetch(`${workerOrigin}/storage/read?id=${encodeURIComponent(responseId)}`, {
-    headers: { 'X-Group-Slug': slug },
-  });
-  assert.equal(anonymous.status, 403, 'Anonymous access to the private response is denied');
+  assert.deepEqual(await member.read(responseId), responseRecord, 'Another signed-in member may read the response');
+  for (const path of [`/storage/read?id=${encodeURIComponent(responseId)}`, '/storage/list?resource=responses']) {
+    const anonymous = await workerFetch(`${workerOrigin}${path}`, { headers: { 'X-Group-Slug': slug } });
+    assert.equal(anonymous.status, 403, `A signed-out visitor is refused ${path}`);
+  }
   assert.equal(
     [...env.GROUP_KV.values].some(([key, value]) => key.startsWith('ce-storage') && String(value).includes(question.record.prompt)),
     false,
