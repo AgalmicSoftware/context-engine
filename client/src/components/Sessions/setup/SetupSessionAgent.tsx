@@ -33,8 +33,8 @@ const ANSWERS_HELP =
   'General answers read the context, files open to everyone and results the asker may see. ' +
   'Detailed answers also read the files they may open and members’ answers, from people who allow it. ' +
   'No answer names anyone.';
-const MIN_ANSWERS_HELP =
-  `On: a Detailed answer to someone who isn’t an admin leaves out any question fewer than ${L.minAnswers} members ` +
+const minAnswersHelp = (min: number) =>
+  `On: a Detailed answer to someone who isn’t an admin leaves out any question fewer than ${min} members ` +
   'answered. Off: a question only one member answered is used too, so that one person’s answer can come back as ' +
   '“the members’” view. Admins always get every question.';
 const MATCH_HELP = 'Any: people who meet at least one rule. All: only people who meet every rule.';
@@ -77,6 +77,8 @@ const SetupSessionAgent = ({ value, onChange, groups, sbtChainId = 0 }: Props): 
   const audiences = readAudiences(value);
   const instructions = asRecord(asRecord(value).instructions);
   const { minAnswers } = asRecord(value);
+  // The number the rule holds while on: a stored one below the default, or the default.
+  const skipUnder = typeof minAnswers === 'number' && minAnswers > 1 ? minAnswers : L.minAnswers;
   const problem = on ? describeSessionAgentProblem(value) : '';
   const save = (
     next: Audience[],
@@ -314,10 +316,10 @@ const SetupSessionAgent = ({ value, onChange, groups, sbtChainId = 0 }: Props): 
           ) : null}
           <SetupCheck
             id="ce-setup-session-agent-min-answers"
-            label={`Skip questions with under ${L.minAnswers} answers`}
-            // Any number above 1 keeps the rule on; turning it back on returns to the default.
+            label={`Skip questions with under ${skipUnder} answers`}
+            // Turning it back on returns to the default.
             checked={minAnswers !== 1}
-            help={MIN_ANSWERS_HELP}
+            help={minAnswersHelp(skipUnder)}
             testId="ce-setup-session-agent-min-answers"
             onChange={(checked) => save(audiences, instructions, checked ? L.minAnswers : 1)}
           />

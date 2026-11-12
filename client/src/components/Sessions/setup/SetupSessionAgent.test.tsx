@@ -128,4 +128,14 @@ describe('SetupSessionAgent', () => {
     fireEvent.click(skip);
     expect(last()).toEqual({ audiences: [everyone], instructions: { general: 'Be brief.' } });
   });
+
+  it('names the number a stored rule holds, and returns to 3 when turned off and on again', () => {
+    const last = renderAgent({ value: { audiences: [everyone], minAnswers: 2 } });
+    const skip = screen.getByRole('checkbox', { name: 'Skip questions with under 2 answers' });
+    expect(skip).toBeChecked();
+    expect(skip).toHaveAccessibleDescription(expect.stringContaining('fewer than 2 members'));
+    fireEvent.click(skip);
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Skip questions with under 3 answers' }));
+    expect(last()).toEqual({ audiences: [everyone] });
+  });
 });
