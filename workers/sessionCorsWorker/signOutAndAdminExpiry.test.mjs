@@ -22,3 +22,13 @@ test('signing out revokes the token at the Worker', async () => {
   assert.equal((await uploadJson({ env, token: other, resource: 'questions', data: question('q-3') })).status, 200);
   assert.equal((await logout(env, '')).status, 401);
 });
+
+test('an admin action signed to expire more than ten minutes ahead is refused', async () => {
+  const { admin, env } = createSessionEnv();
+  const now = Math.floor(Date.now() / 1000);
+  const farAhead = await signedAdminRequest({ env, wallet: admin, action: 'secret-presence', expiration: now + 3600 });
+  assert.notEqual(farAhead.status, 200);
+  assert.match(farAhead.body.error, /expires too far ahead/);
+  const usual = await signedAdminRequest({ env, wallet: admin, action: 'secret-presence', expiration: now + 300 });
+  assert.equal(usual.status, 200, JSON.stringify(usual.body));
+});

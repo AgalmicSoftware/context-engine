@@ -90,6 +90,9 @@ const verifyTypedDataCompat = (...args) => {
 
 const normalizeAddressLower = (value) => toTrimmedString(value).toLowerCase();
 
+// The web client signs for five minutes; ten leave room for clock drift.
+const MAX_ADMIN_ACTION_LEAD_SECONDS = 10 * 60;
+
 const normalizeUnixSeconds = (value, deps) => {
   const raw = Number(
     value != null
@@ -165,8 +168,13 @@ export const verifyAdminActionSignature = ({
     return { valid: false, error: 'Invalid admin action expiration.' };
   }
 
-  if (expirationSeconds <= normalizeUnixSeconds(null, deps)) {
+  const nowSeconds = normalizeUnixSeconds(null, deps);
+  if (expirationSeconds <= nowSeconds) {
     return { valid: false, error: 'Admin action expired.' };
+  }
+  // A signed action is a one-shot approval: it may not outlive a short window.
+  if (expirationSeconds > nowSeconds + MAX_ADMIN_ACTION_LEAD_SECONDS) {
+    return { valid: false, error: 'Admin action expires too far ahead; sign it again.' };
   }
 
   return { valid: true, address: recovered };
