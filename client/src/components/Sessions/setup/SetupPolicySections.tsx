@@ -14,17 +14,27 @@ import type {
   SessionModeProfile,
   SessionModeResultsVisibility,
 } from '../../../utilities/session/sessionModeProfile';
-import { SetupCheck, SetupConflicts, SetupField, SetupSection, setupHelpId } from './SetupPrimitives';
+import {
+  SetupCheck,
+  SetupConflicts,
+  SetupFact,
+  SetupField,
+  SetupHelp,
+  SetupSection,
+  SetupToggle,
+  setupHelpId,
+} from './SetupPrimitives';
 import {
   DEFAULT_REGISTRY_CHAIN_ID,
+  MEMBER_RESULTS,
   PUBLIC_RESULTS,
-  defaultCloudflarePayloadAccess,
   effectiveEnvelopeConditions,
   isSessionModeProfile,
   setEncryptionMode,
   setEnvelopeConditions,
   setHosting,
   setResultsVisibility,
+  supportsMemberResults,
   supportsPublicResults,
   usesDefaultEnvelopeRules,
 } from './sessionSetupProfile';
@@ -40,10 +50,23 @@ const profileOf = (draft: SetupSectionProps['draft']): SessionModeProfile | null
   isSessionModeProfile(draft.sessionModeProfile) ? draft.sessionModeProfile : null;
 
 const VISIBILITY_LABELS: Partial<Record<SessionModeResultsVisibility, string>> = {
+  [MEMBER_RESULTS]: 'Session members see all answers',
   participant_aggregate: 'Each person sees their own answers',
-  session_member_aggregate: 'Session members see their own answers',
-  [PUBLIC_RESULTS]: 'Anyone can see the results',
+  session_member_aggregate: 'Own answers; agents need a group',
+  [PUBLIC_RESULTS]: 'Anyone can see all answers',
 };
+
+const VISIBILITY_HELP = [
+  'Session members: everyone signed in to the session sees every answer and the AI Views; signed-out visitors see none. Needs the Session Worker; an older one must be redeployed first.',
+  'Each person: people see only their own answers.',
+  'Own answers; agents need a group: as Each person, and agents get summaries only for accounts in a group at least the smallest group size.',
+  'Anyone: everyone sees every answer, signed in or not. Needs answers stored unencrypted.',
+  'Admins always see every answer.',
+].join(' ');
+
+const visibilityUnavailable = (profile: SessionModeProfile, value: string, memberResultsSupported: boolean): boolean =>
+  (value === PUBLIC_RESULTS && !supportsPublicResults(profile)) ||
+  (value === MEMBER_RESULTS && !(memberResultsSupported && supportsMemberResults(profile)));
 
 const EXPORT_LABELS: Partial<Record<SessionModeExportScope, string>> = {
   admin_raw: 'Raw results',
@@ -84,13 +107,18 @@ const MinGroupSizeInput = ({
   const [value, setValue] = useState(String(committed));
   useEffect(() => setValue(String(committed)), [committed]);
   return (
-    <SetupField id="ce-setup-min-group" label="Smallest group shown">
+    <SetupField
+      id="ce-setup-min-group"
+      label="Smallest group shown"
+      help="Group summaries leave out any group with fewer people than this, so no one can be picked out. At least 2."
+    >
       <Input
         id="ce-setup-min-group"
         type="number"
         min={2}
         inputMode="numeric"
         value={value}
+        aria-describedby={setupHelpId('ce-setup-min-group')}
         onChange={(event) => {
           setValue(event.target.value);
           const next = Number(event.target.value);
@@ -117,7 +145,12 @@ export const SetupResultsSection = ({
   conflicts,
   editProfile,
   admins = null,
-}: PolicyProps & { admins?: React.ReactNode }) => {
+  memberResultsSupported = true,
+}: PolicyProps & {
+  admins?: React.ReactNode;
+  /** False when the session's Worker predates members-only results. */
+  memberResultsSupported?: boolean;
+}) => {
   const profile = profileOf(draft);
   const sectionConflicts = conflicts.filter((conflict) => conflict.section === 'results');
   const visibilityConflicts = conflictsAt(sectionConflicts, ['results.visibility']);
@@ -132,11 +165,7 @@ export const SetupResultsSection = ({
     >
       {profile ? (
         <>
-          <SetupField
-            id="ce-setup-results-visibility"
-            label="Who sees results"
-            help="Public results need answers stored unencrypted."
-          >
+          <SetupField id="ce-setup-results-visibility" label="Who sees results" help={VISIBILITY_HELP}>
             <Input
               id="ce-setup-results-visibility"
               type="select"
@@ -151,7 +180,7 @@ export const SetupResultsSection = ({
                 <option
                   key={value}
                   value={value}
-                  disabled={value === PUBLIC_RESULTS && !supportsPublicResults(profile)}
+                  disabled={visibilityUnavailable(profile, value, memberResultsSupported)}
                 >
                   {label}
                 </option>
@@ -194,23 +223,57 @@ export const SetupResultsSection = ({
   );
 };
 
+// "Passkey", or "Wallet or passkey": the default method first.
+const signInMethods = (profile: SessionModeProfile): string =>
+  [profile.identity.default, ...profile.identity.enabled.filter((method) => method !== profile.identity.default)]
+    .map((method, index) => (index ? method : `${method.charAt(0).toUpperCase()}${method.slice(1)}`))
+    .join(' or ');
+
 export const summarizeAccess = (draft: SetupSectionProps['draft']): string => {
   const profile = profileOf(draft);
   if (!profile) return '';
-  const signIn =
-    profile.identity.enabled.length > 1
-      ? `${profile.identity.default === 'wallet' ? 'Wallet' : 'Passkey'} or ${profile.identity.default === 'wallet' ? 'passkey' : 'wallet'} sign-in`
-      : `${profile.identity.default === 'wallet' ? 'Wallet' : 'Passkey'} sign-in`;
   const encryption =
     profile.encryption.mode === 'none' ? 'not encrypted' : `encrypted by ${ENCRYPTION_LABELS[profile.encryption.mode]}`;
-  return `${signIn} · ${encryption}`;
+  return `${signInMethods(profile)} sign-in · ${encryption}`;
 };
+
+const PERMISSION_LABELS: Record<string, string> = { worker_roles: 'Session roles', sbt_onchain: 'SBT holders' };
+
+const SIGN_IN_HELP =
+  'Set by Runs on. Centralized sessions sign people in with a passkey, which the Session Worker checks. Decentralized sessions use a wallet, and passkeys work too.';
+const PERMISSIONS_HELP =
+  'Who may do more than answer, such as add questions or manage the session. Set by Runs on: Centralized sessions use roles the Session Worker keeps, such as admin; Decentralized sessions use the session’s SBTs.';
+const SBT_PERMISSIONS_HELP =
+  'Holders of the SBTs in this session’s access rules get permissions too. It needs an SBT holders rule, which Session Worker encryption’s access rules can add.';
+
+// A template can bring sign-in, permissions or storage that Runs on doesn't
+// allow; this puts back what it needs.
+const MatchRunsOn = ({
+  editProfile,
+  registryChainId,
+}: {
+  editProfile: SetupProfileEditor;
+  registryChainId: number | null;
+}) => (
+  <div className={styles.buttonRow}>
+    <button
+      type="button"
+      className={styles.button}
+      onClick={() => editProfile((next) => setHosting(next, next.authority.mode, registryChainId))}
+    >
+      Match Runs on
+    </button>
+  </div>
+);
 
 const RULE_LABELS: Record<SessionModeAccessConditionDocument['conditions'][number]['kind'], string> = {
   worker_role: 'Session role',
   sbt_onchain: 'SBT holders',
   agent_grant_scope: 'Authorized accounts',
 };
+
+const RULES_HELP =
+  'Who can read encrypted answers. Session role: accounts with that role, such as admin. Authorized accounts: accounts granted that permission scope, such as storage, which participants and agents get. SBT holders: accounts holding SBTs from that contract on the registry network.';
 
 const EnvelopeRules = ({
   profile,
@@ -252,87 +315,105 @@ const EnvelopeRules = ({
   };
   return (
     <>
-      <SetupField id="ce-setup-rule-match" label="Give access when">
+      <SetupField
+        id="ce-setup-rule-match"
+        label="Give access when"
+        help="Any rule matches: meeting one rule below is enough. All rules match: a reader must meet every rule."
+      >
         <Input
           id="ce-setup-rule-match"
           type="select"
           value={conditions.match}
+          aria-describedby={setupHelpId('ce-setup-rule-match')}
           onChange={(event) => commit({ ...conditions, match: event.target.value === 'all' ? 'all' : 'any' })}
         >
           <option value="any">Any rule matches</option>
           <option value="all">All rules match</option>
         </Input>
       </SetupField>
-      {conditions.conditions.map((rule, index) => (
-        <div key={`${rule.kind}-${index}`} className={styles.listRow}>
-          <div className={styles.listRowBody}>
-            <span className={styles.questionType}>{RULE_LABELS[rule.kind]}</span>
-            {rule.kind === 'worker_role' ? (
-              <Input
-                aria-label="Session role"
-                value={rule.role}
-                onChange={(event) => updateRule(index, () => ({ kind: 'worker_role', role: event.target.value }))}
-              />
-            ) : null}
-            {rule.kind === 'agent_grant_scope' ? (
-              <Input
-                aria-label="Permission scope"
-                value={rule.scope}
-                onChange={(event) =>
-                  updateRule(index, () => ({ kind: 'agent_grant_scope', scope: event.target.value }))
-                }
-              />
-            ) : null}
-            {rule.kind === 'sbt_onchain' ? (
-              <>
+      <div
+        role="group"
+        aria-labelledby="ce-setup-rules-label"
+        aria-describedby={setupHelpId('ce-setup-rules')}
+        className={styles.field}
+      >
+        <div className={styles.fieldLabelRow}>
+          <span id="ce-setup-rules-label" className={styles.fieldLabel}>
+            Access rules
+          </span>
+          <SetupHelp id="ce-setup-rules" label="Access rules" help={RULES_HELP} />
+        </div>
+        {conditions.conditions.map((rule, index) => (
+          <div key={`${rule.kind}-${index}`} className={styles.listRow}>
+            <div className={styles.listRowBody}>
+              <span className={styles.questionType}>{RULE_LABELS[rule.kind]}</span>
+              {rule.kind === 'worker_role' ? (
                 <Input
-                  aria-label="SBT contract address"
-                  placeholder="0x…"
-                  value={rule.contract}
+                  aria-label="Session role"
+                  value={rule.role}
+                  onChange={(event) => updateRule(index, () => ({ kind: 'worker_role', role: event.target.value }))}
+                />
+              ) : null}
+              {rule.kind === 'agent_grant_scope' ? (
+                <Input
+                  aria-label="Permission scope"
+                  value={rule.scope}
                   onChange={(event) =>
-                    updateRule(index, (current) => ({ ...current, contract: event.target.value }) as typeof current)
+                    updateRule(index, () => ({ kind: 'agent_grant_scope', scope: event.target.value }))
                   }
                 />
-                <Input
-                  type="select"
-                  aria-label="SBT requirement"
-                  value={rule.anyOrAll}
-                  onChange={(event) =>
-                    updateRule(
-                      index,
-                      (current) =>
-                        ({ ...current, anyOrAll: event.target.value === 'all' ? 'all' : 'any' }) as typeof current,
-                    )
-                  }
-                >
-                  <option value="any">Any SBT from this contract</option>
-                  <option value="all">All SBTs from this contract</option>
-                </Input>
-              </>
-            ) : null}
+              ) : null}
+              {rule.kind === 'sbt_onchain' ? (
+                <>
+                  <Input
+                    aria-label="SBT contract address"
+                    placeholder="0x…"
+                    value={rule.contract}
+                    onChange={(event) =>
+                      updateRule(index, (current) => ({ ...current, contract: event.target.value }) as typeof current)
+                    }
+                  />
+                  <Input
+                    type="select"
+                    aria-label="SBT requirement"
+                    value={rule.anyOrAll}
+                    onChange={(event) =>
+                      updateRule(
+                        index,
+                        (current) =>
+                          ({ ...current, anyOrAll: event.target.value === 'all' ? 'all' : 'any' }) as typeof current,
+                      )
+                    }
+                  >
+                    <option value="any">Any SBT from this contract</option>
+                    <option value="all">All SBTs from this contract</option>
+                  </Input>
+                </>
+              ) : null}
+            </div>
+            <button
+              type="button"
+              className={styles.button}
+              aria-label={`Remove ${RULE_LABELS[rule.kind]} rule`}
+              onClick={() =>
+                commit({ ...conditions, conditions: conditions.conditions.filter((_rule, at) => at !== index) })
+              }
+            >
+              Remove
+            </button>
           </div>
-          <button
-            type="button"
-            className={styles.button}
-            aria-label={`Remove ${RULE_LABELS[rule.kind]} rule`}
-            onClick={() =>
-              commit({ ...conditions, conditions: conditions.conditions.filter((_rule, at) => at !== index) })
-            }
-          >
-            Remove
+        ))}
+        <div className={styles.buttonRow}>
+          <button type="button" className={styles.button} onClick={() => add('worker_role')}>
+            Add session role
+          </button>
+          <button type="button" className={styles.button} onClick={() => add('agent_grant_scope')}>
+            Add authorized accounts
+          </button>
+          <button type="button" className={styles.button} onClick={() => add('sbt_onchain')}>
+            Add SBT holders
           </button>
         </div>
-      ))}
-      <div className={styles.buttonRow}>
-        <button type="button" className={styles.button} onClick={() => add('worker_role')}>
-          Add session role
-        </button>
-        <button type="button" className={styles.button} onClick={() => add('agent_grant_scope')}>
-          Add authorized accounts
-        </button>
-        <button type="button" className={styles.button} onClick={() => add('sbt_onchain')}>
-          Add SBT holders
-        </button>
       </div>
     </>
   );
@@ -345,6 +426,7 @@ type AccessProps = PolicyProps & {
 
 export const SetupAccessSection = ({
   draft,
+  mode,
   open,
   onToggle,
   conflicts,
@@ -355,8 +437,13 @@ export const SetupAccessSection = ({
   const profile = profileOf(draft);
   const sectionConflicts = conflicts.filter((conflict) => conflict.section === 'access');
   if (!profile) return null;
-  const otherMethod = profile.identity.default === 'wallet' ? 'passkey' : 'wallet';
+  const workerHosted = profile.authority.mode === 'worker_canonical';
   const hasRegistryChain = !!(profile.evm.registryChainId || registryChainId);
+  // On a Worker-hosted session SBT holders are the one choice here, below.
+  const permissions = profile.authorization.mechanisms
+    .filter((mechanism) => !(workerHosted && mechanism === 'sbt_onchain'))
+    .map((mechanism) => PERMISSION_LABELS[mechanism] || mechanism);
+  const identityConflicts = conflictsAt(sectionConflicts, ['identity', 'authorization']);
   return (
     <SetupSection
       sectionKey="access"
@@ -366,67 +453,31 @@ export const SetupAccessSection = ({
       onToggle={onToggle}
       conflictCount={sectionConflicts.length}
     >
-      <SetupField
-        id="ce-setup-sign-in"
-        label="Sign-in"
-        help="Worker-hosted sessions use passkeys; on-chain sessions use a wallet."
-      >
-        <Input
-          id="ce-setup-sign-in"
-          type="select"
-          value={profile.identity.default}
-          aria-describedby={setupHelpId('ce-setup-sign-in')}
-          onChange={(event) =>
+      <SetupFact id="ce-setup-sign-in" label="Sign-in" help={SIGN_IN_HELP} testId="ce-setup-sign-in">
+        {signInMethods(profile)}
+      </SetupFact>
+      <SetupFact id="ce-setup-permissions" label="Permissions" help={PERMISSIONS_HELP} testId="ce-setup-permissions">
+        {permissions.join(' and ') || 'None'}
+      </SetupFact>
+      {workerHosted ? (
+        <SetupCheck
+          id="ce-setup-permission-sbt"
+          label="SBTs grant permissions"
+          help={SBT_PERMISSIONS_HELP}
+          checked={profile.authorization.mechanisms.includes('sbt_onchain')}
+          onChange={(checked) =>
             editProfile((next) => {
-              const method = event.target.value as SessionModeProfile['identity']['default'];
-              next.identity = {
-                default: method,
-                enabled: next.identity.enabled.includes(method)
-                  ? next.identity.enabled
-                  : [method, ...next.identity.enabled],
-              };
+              const others = next.authorization.mechanisms.filter((mechanism) => mechanism !== 'sbt_onchain');
+              next.authorization = { mechanisms: checked ? [...others, 'sbt_onchain'] : others };
             })
           }
-        >
-          <option value="passkey">Passkey</option>
-          <option value="wallet">Wallet</option>
-        </Input>
-      </SetupField>
-      <SetupCheck
-        id="ce-setup-sign-in-other"
-        label={`Also allow ${otherMethod}`}
-        checked={profile.identity.enabled.includes(otherMethod)}
-        onChange={(checked) =>
-          editProfile((next) => {
-            const others = next.identity.enabled.filter((method) => method !== otherMethod);
-            next.identity = { ...next.identity, enabled: checked ? [...others, otherMethod] : others };
-          })
-        }
-      />
-      <SetupConflicts conflicts={conflictsAt(sectionConflicts, ['identity'])} />
-      <SetupCheck
-        id="ce-setup-permission-roles"
-        label="Session roles grant permissions"
-        checked={profile.authorization.mechanisms.includes('worker_roles')}
-        onChange={(checked) =>
-          editProfile((next) => {
-            const others = next.authorization.mechanisms.filter((mechanism) => mechanism !== 'worker_roles');
-            next.authorization = { mechanisms: checked ? ['worker_roles', ...others] : others };
-          })
-        }
-      />
-      <SetupCheck
-        id="ce-setup-permission-sbt"
-        label="SBTs grant permissions"
-        checked={profile.authorization.mechanisms.includes('sbt_onchain')}
-        onChange={(checked) =>
-          editProfile((next) => {
-            const others = next.authorization.mechanisms.filter((mechanism) => mechanism !== 'sbt_onchain');
-            next.authorization = { mechanisms: checked ? [...others, 'sbt_onchain'] : others };
-          })
-        }
-      />
-      <SetupConflicts conflicts={conflictsAt(sectionConflicts, ['authorization'])} />
+        />
+      ) : null}
+      <SetupConflicts conflicts={identityConflicts} />
+      {mode === 'create' &&
+      identityConflicts.some((conflict) => conflict.code !== 'sbt_authorization_requires_condition') ? (
+        <MatchRunsOn editProfile={editProfile} registryChainId={registryChainId} />
+      ) : null}
       <SetupField
         id="ce-setup-encryption"
         label="Encryption"
@@ -440,7 +491,12 @@ export const SetupAccessSection = ({
           data-testid={E2E_TESTIDS.SETUP_ENCRYPTION}
           onChange={(event) => editProfile((next) => setEncryptionMode(next, event.target.value, registryChainId))}
         >
-          <option value="worker_envelope">{ENCRYPTION_LABELS.worker_envelope}</option>
+          <option
+            value="worker_envelope"
+            disabled={profile.storage.backend !== 'cloudflare' && profile.encryption.mode !== 'worker_envelope'}
+          >
+            {ENCRYPTION_LABELS.worker_envelope}
+          </option>
           <option value="lit" disabled={!hasRegistryChain && profile.encryption.mode !== 'lit'}>
             {ENCRYPTION_LABELS.lit}
           </option>
@@ -481,6 +537,37 @@ export const SetupAccessSection = ({
     </SetupSection>
   );
 };
+
+const RUNS_ON_HELP =
+  'Centralized: a Session Worker in your own Cloudflare account runs the session and keeps its data in Cloudflare storage. Decentralized: the session is registered on a public chain by wallet transactions, and its data is stored permanently on Arweave, where anyone can read it unless it is encrypted with Lit; it needs a wallet with gas, an Arweave key and an RPC URL. Hosting and storage lists what each needs.';
+
+/** /new: where the session runs, the choice the rest of the page follows. */
+export const SetupRunsOn = ({
+  draft,
+  editProfile,
+  registryChainId,
+}: Pick<PolicyProps, 'draft' | 'editProfile' | 'registryChainId'>) => {
+  const profile = profileOf(draft);
+  if (!profile) return null;
+  return (
+    <SetupToggle
+      id="ce-setup-authority"
+      label="Runs on"
+      help={RUNS_ON_HELP}
+      value={profile.authority.mode}
+      options={[
+        { value: 'worker_canonical', label: 'Centralized' },
+        { value: 'evm_registry_canonical', label: 'Decentralized' },
+      ]}
+      testId={E2E_TESTIDS.SETUP_AUTHORITY}
+      onChange={(mode) => editProfile((next) => setHosting(next, mode, registryChainId))}
+    />
+  );
+};
+
+const STORAGE_LABELS: Record<string, string> = { cloudflare: 'Cloudflare', arweave: 'Arweave' };
+const STORAGE_HELP =
+  'Set by Runs on. Centralized sessions keep their data in Cloudflare storage in your account. Decentralized sessions store it permanently on Arweave, where anyone can read it unless it is encrypted with Lit.';
 
 export const summarizeHosting = (draft: SetupSectionProps['draft'], status = ''): string => {
   const profile = profileOf(draft);
@@ -526,6 +613,7 @@ export const SetupHostingSection = ({
     [profile.encryption.accessConditions, profile.storage.payloadAccessControl?.accessConditions].some((document) =>
       document?.conditions?.some((rule) => rule.kind === 'sbt_onchain'),
     );
+  const storageConflicts = conflictsAt(sectionConflicts, ['authority', 'storage']);
   const placedPaths = ['authority', 'storage', 'evm', 'surfaces', 'export'];
   const unplaced = sectionConflicts.filter((conflict) => !conflictsAt([conflict], placedPaths).length);
   return (
@@ -540,53 +628,25 @@ export const SetupHostingSection = ({
     >
       {locked}
       {mode === 'create' ? (
-        <>
-          <SetupField
-            id="ce-setup-authority"
-            label="Runs on"
-            help="Session Worker: your own Cloudflare Worker holds the session. On-chain registry: the session is registered on a chain and stored on Arweave."
-          >
-            <Input
-              id="ce-setup-authority"
-              type="select"
-              value={profile.authority.mode}
-              aria-describedby={setupHelpId('ce-setup-authority')}
-              data-testid={E2E_TESTIDS.SETUP_AUTHORITY}
-              onChange={(event) => editProfile((next) => setHosting(next, event.target.value, registryChainId))}
-            >
-              <option value="worker_canonical">Session Worker</option>
-              <option value="evm_registry_canonical">On-chain registry</option>
-            </Input>
-          </SetupField>
-          <SetupField id="ce-setup-storage" label="Storage">
-            <Input
-              id="ce-setup-storage"
-              type="select"
-              value={profile.storage.backend}
-              data-testid={E2E_TESTIDS.SETUP_STORAGE}
-              onChange={(event) =>
-                editProfile((next) => {
-                  if (event.target.value === next.storage.backend) return;
-                  next.storage =
-                    event.target.value === 'cloudflare'
-                      ? { backend: 'cloudflare', payloadAccessControl: defaultCloudflarePayloadAccess(next) }
-                      : { backend: 'arweave' };
-                })
-              }
-            >
-              <option value="cloudflare">Cloudflare</option>
-              <option value="arweave">Arweave</option>
-            </Input>
-          </SetupField>
-        </>
+        <SetupFact id="ce-setup-storage" label="Storage" help={STORAGE_HELP} testId={E2E_TESTIDS.SETUP_STORAGE}>
+          {STORAGE_LABELS[profile.storage.backend] || profile.storage.backend}
+        </SetupFact>
       ) : null}
-      <SetupConflicts conflicts={conflictsAt(sectionConflicts, ['authority', 'storage'])} />
+      <SetupConflicts conflicts={storageConflicts} />
+      {mode === 'create' && storageConflicts.length ? (
+        <MatchRunsOn editProfile={editProfile} registryChainId={registryChainId} />
+      ) : null}
       {chainRelevant && mode === 'create' ? (
-        <SetupField id="ce-setup-chain" label="Registry network">
+        <SetupField
+          id="ce-setup-chain"
+          label="Registry network"
+          help="The test network whose contracts this session uses: its registry entry when Decentralized, and its SBTs and Lit rules. Transactions on it are paid in its test gas."
+        >
           <Input
             id="ce-setup-chain"
             type="select"
             value={String(profile.evm.registryChainId || registryChainId || DEFAULT_REGISTRY_CHAIN_ID)}
+            aria-describedby={setupHelpId('ce-setup-chain')}
             onChange={(event) => {
               const chainId = Number(event.target.value);
               onRegistryChainChange?.(chainId);

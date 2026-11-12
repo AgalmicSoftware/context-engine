@@ -117,7 +117,7 @@ The route-shell bundle is intentionally still a large boundary object because it
 ## Dashboard wizard flow: no API token
 
 This token-free path is under Hosting and storage → More in `/new`. Lit profiles
-cannot use it. For the default **Hosted & Fast** profile (`Session Worker` under
+cannot use it. For the default **Hosted & Fast** profile (`Centralized` under
 `Runs on`):
 
 1. Context Engine shows the exact session slug, public passkey-derived admin
@@ -563,7 +563,7 @@ Admin test panel:
 - Admin-generated Results views split viewer reads from admin controls.
   `GET /results-analysis/artifact?sessionSlug=<slug>&includeSnapshot=true`
   returns the latest successful generated artifact plus a safe frozen submitted
-  snapshot only when the session profile has `results.visibility: "public_full_if_storage_public"`, `aggregateResultsEnabled: true`, and the
+  snapshot only when the session profile has `results.visibility` of `"public_full_if_storage_public"` or `"session_member_full"`, `aggregateResultsEnabled: true`, and the
   caller passes the existing Cloudflare read gates for all three resources:
   `generatedArtifacts`, `questions`, and `responses`. This prevents a broader
   generated-artifact gate from exposing raw snapshot source rows. The viewer
@@ -610,6 +610,23 @@ Admin test panel:
   templates, with the session's data as placeholders, which the site shows
   while a build runs. The public config sets `debateAtlas: true` so the site
   knows the Worker builds atlases.
+- Risk matrices are built the same way, apart from the generated Results views'
+  Risk Matrix. `POST /admin/risk-matrix/build` (signed admin action
+  `risk-matrix/build`) accepts the same builders and reads the same stored
+  responses. One call names up to 8 areas the responses discuss, each with up to
+  4 subareas, and writes up to 20 notes on where two areas meet: what a subarea
+  of one means for a subarea of another, as an opportunity or a risk with an
+  intensity from 1 to 10. The Worker keeps a note only when it joins two areas
+  the reply named and cites a participant who answered a question it cites. Each
+  note stores its cell (`Area.Subarea.Area.Subarea`, so names lose dots and
+  underscores), how many cited participants hold it and the questions it rests
+  on, by their stored ids (the prompt calls them `q1`, `q2`…), and the matrix
+  keeps only areas a note joins. The session context reaches
+  the prompt as untrusted data, as in every AI prompt. The coordinator keeps a
+  risk matrix's lease and its newest 8 builds apart from atlases. `GET
+  /risk-matrix?sessionSlug=<slug>&id=` reads them under the atlas rule, with
+  `canBuild` and, for builders, `nextBuild`, and the public config sets
+  `riskMatrix: true`.
 - Manual generation uses signed admin action
   `POST /admin/results-analysis/generate` with action
   `results-analysis/generate`. Worker-canonical Cloudflare sessions can request
@@ -692,18 +709,23 @@ Admin test panel:
   between the generated wording and its evidence. Invalid sections are withheld;
   an artifact with no valid requested section fails generation.
 - Worker-canonical analysis scans share a synchronous safety budget: 800 storage
-  operations, 1,000 metadata/hidden-marker/committed-response rows, 2 MiB of
-  metadata, and 8 MiB of readable payload data. R2 reads, KV fallback reads, and
-  supplied committed responses count against the same budget. Exceeding a budget
-  returns `503` before AI generation or publication and preserves the last good
-  artifact; the Worker never publishes an apparently complete truncated snapshot.
-  Missing, invalid, or unreadable listed metadata also returns `503`, rather
-  than silently selecting an older answer. Automatic threshold evaluation and
-  provider generation reuse the same complete snapshot and its single scan budget.
-  These application limits leave room for authentication and JSON processing;
-  they are not a claim about a universal platform request ceiling. Large histories
-  require a future bounded background snapshot/current-version index. This guard
-  covers Worker storage history, not the separate existing admin-snapshot contract.
+  operations, 10,000 metadata/hidden-marker/committed-response rows, 8 MiB of
+  metadata, and 8 MiB of readable payload data. KV metadata and payloads are
+  read in bulk gets of up to 100 keys, each one operation, so about 80 people
+  answering 30 questions, with some answers changed, read whole in under 100
+  operations. R2 has no bulk read, so with R2 bound each payload is one
+  operation. R2 reads, KV reads, and supplied committed responses count against
+  the same budget. Exceeding a budget returns `503` before AI generation or
+  publication and preserves the last good artifact; the Worker never publishes
+  an apparently complete truncated snapshot. Missing, invalid, or unreadable
+  listed metadata also returns `503`, rather than silently selecting an older
+  answer, and so does a failed payload read. Automatic threshold evaluation and
+  provider generation reuse the same complete snapshot and its single scan
+  budget. These application limits leave room for authentication and JSON
+  processing; they are not a claim about a universal platform request ceiling.
+  Larger histories require a future bounded background snapshot/current-version
+  index. This guard covers Worker storage history, not the separate existing
+  admin-snapshot contract.
 - Only each participant's latest readable row per question is analysed,
   ordered by Worker time and then storage id, as the client orders them. A
   newer answer that is locked field by field, cleared, or invalid therefore
@@ -796,7 +818,11 @@ Authenticated clients can use the worker as the session storage boundary:
     `public_full_if_storage_public`, individual response reads also require
     that recorded author or a current session admin. A participant's ordinary
     `storage` route scope permits submission and own-response reload, not other
-    participants' raw answers. Lists apply the same restriction to each row, and
+    participants' raw answers. Under `session_member_full` it permits reading
+    every answer: any signed-in member holding the `storage` (or `arweave`)
+    scope reads them all, and a signed-out visitor reads none. The payload gate
+    and any per-answer access rules still apply on top. The public config sets
+    `memberResults: true` so the site knows the Worker offers this visibility. Lists apply the same restriction to each row, and
     older rows lacking trusted author metadata remain unavailable to ordinary
     participants.
     Existing per-item access conditions still apply to every permitted reader.
@@ -984,10 +1010,11 @@ readers, but cannot replace or broaden that gate. Resource names are restricted
 to `docsContext`, `questions`, `surveys`, `responses`, `generatedArtifacts`,
 `media`, and `images`; list rows must match the exact resource namespace.
 
-- A new session from `/new` starts with public results: `gate: "none"` and
-  `encryption: "none"`. The `fast_cheap_cloudflare` preset, and a session that
-  chooses other results visibility, use `gate: "role_gate"`, with
-  `encryption: "worker_envelope"` or `encryption: "none"`. Pure Worker profiles
+- A new session from `/new` starts with `session_member_full` results:
+  `gate: "role_gate"` and `encryption: "none"`. Public results use
+  `gate: "none"` and `encryption: "none"`. The `fast_cheap_cloudflare` preset,
+  and a session that chooses other results visibility, use `gate: "role_gate"`,
+  with `encryption: "worker_envelope"` or `encryption: "none"`. Pure Worker profiles
   remain passkey/Worker-owned and require `evm.registryChainId: null`.
 - A current Worker/SBT hybrid expresses SBT authorization as an explicit
   `sbt_onchain` access condition and labels it **Advanced on-chain access**.

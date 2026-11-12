@@ -340,7 +340,7 @@ const selectNormalModeCard = (label) => {
 // default (trustless) preset took.
 const selectRegistryHosting = () => {
   openSetupSection('hosting');
-  fireEvent.change(screen.getByTestId('ce-setup-authority'), { target: { value: 'evm_registry_canonical' } });
+  fireEvent.click(screen.getByRole('radio', { name: 'Decentralized' }));
 };
 const setCloudflareApiToken = (value) => {
   fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN), { target: { value } });
@@ -605,7 +605,7 @@ describe('SessionWizard rendered validation', () => {
     expect(badges).toEqual([]);
   });
 
-  it('keeps group creation policy and interview settings under Participation and colors in Basics', async () => {
+  it('keeps group creation policy and interview settings under Participation and colors under Basics’ Appearance', async () => {
     renderSessionWizard();
 
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
@@ -614,6 +614,8 @@ describe('SessionWizard rendered validation', () => {
     expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_GROUP_CREATION_POLICY)).not.toBeInTheDocument();
     expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_INTERVIEW_REALTIME_MODEL)).not.toBeInTheDocument();
     const basics = screen.getByTestId('ce-setup-section-basics');
+    expect(within(basics).queryByTestId(E2E_TESTIDS.WIZARD_SESSION_COLOR_SCHEME)).not.toBeInTheDocument();
+    fireEvent.click(within(basics).getByRole('button', { name: 'Appearance' }));
     expect(within(basics).getByTestId(E2E_TESTIDS.WIZARD_SESSION_COLOR_SCHEME)).toHaveValue('context-engine');
 
     fireEvent.click(participationMore);

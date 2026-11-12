@@ -5,7 +5,6 @@ import { parseSessionWorkerDiscoveryOrigin } from '../../utilities/session/sessi
 import type { DebateNode, HistoricalCompassPoint } from '../DebateMap/debateMapTypes';
 import type {
   DebateAtlasBuild,
-  DebateAtlasBuildSummary,
   DebateAtlasMapping,
   DebateAtlasPlacedParticipant,
 } from '../../domains/debateAtlas/debateAtlasTypes';
@@ -17,25 +16,6 @@ const POINT_COLOR = 'var(--ce-document-text)';
 export const shortenAddress = (address: string): string => `${address.slice(0, 6)}…${address.slice(-4)}`;
 
 const plural = (count: number, word: string): string => `${count} ${word}${count === 1 ? '' : 's'}`;
-
-const formatBuiltAt = (value: string): string => {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime())
-    ? ''
-    : date.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
-};
-
-// "8 Nov 2026, 14:05 · 512 responses · 47 participants"
-export const describeDebateAtlasBuild = (build: DebateAtlasBuildSummary): string => {
-  const counts = build.counts || {};
-  return [
-    formatBuiltAt(build.builtAt),
-    Number.isFinite(counts.responses) ? plural(Number(counts.responses), 'response') : '',
-    Number.isFinite(counts.participants) ? plural(Number(counts.participants), 'participant') : '',
-  ]
-    .filter(Boolean)
-    .join(' · ');
-};
 
 const uniqueName = (taken: Set<string>, name: string): string => {
   let candidate = name;

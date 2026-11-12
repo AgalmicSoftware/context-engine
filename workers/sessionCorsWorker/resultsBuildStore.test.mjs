@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { DEBATE_ATLAS_LEASE_MS, MAX_DEBATE_ATLAS_BUILDS, dispatchDebateAtlasStore } from './debateAtlasStore.js';
+import { MAX_RESULTS_BUILDS, RESULTS_BUILD_LEASE_MS, dispatchResultsBuildStore } from './resultsBuildStore.js';
 
 const createCoordinator = () => {
   const values = new Map();
@@ -17,8 +17,8 @@ const createCoordinator = () => {
   return coordinator;
 };
 
-const call = async (coordinator, operation, payload) => {
-  const response = await dispatchDebateAtlasStore(coordinator, operation, payload);
+const call = async (coordinator, operation, payload, kind = 'debate-atlas') => {
+  const response = await dispatchResultsBuildStore(coordinator, kind, operation, payload);
   return { status: response.status, body: await response.json() };
 };
 
@@ -53,7 +53,7 @@ test('one build runs at a time until it finishes or its lease runs out', async (
   assert.equal(second.body.reason, 'debate_atlas_build_running');
   assert.deepEqual(second.body.active, { startedAtMs: 1_000_000 });
 
-  coordinator.nowMs += DEBATE_ATLAS_LEASE_MS;
+  coordinator.nowMs += RESULTS_BUILD_LEASE_MS;
   const afterLease = await call(coordinator, 'reserve', { builder: '0xDEF' });
   assert.equal(afterLease.status, 200);
   // The expired attempt can no longer write over the new one.
@@ -89,16 +89,16 @@ test('a large build is kept in chunks and read back whole, newest first', async 
   assert.deepEqual((await call(coordinator, 'read', { id: older.id })).body.build, older);
 });
 
-test(`keeps the newest ${MAX_DEBATE_ATLAS_BUILDS} builds and deletes the chunks of older ones`, async () => {
+test(`keeps the newest ${MAX_RESULTS_BUILDS} builds and deletes the chunks of older ones`, async () => {
   const coordinator = createCoordinator();
   const builds = [];
-  for (let index = 0; index <= MAX_DEBATE_ATLAS_BUILDS; index += 1) {
+  for (let index = 0; index <= MAX_RESULTS_BUILDS; index += 1) {
     const build = buildRecord();
     builds.push(build);
     await finishBuild(coordinator, build);
   }
   const read = await call(coordinator, 'read', {});
-  assert.equal(read.body.builds.length, MAX_DEBATE_ATLAS_BUILDS);
+  assert.equal(read.body.builds.length, MAX_RESULTS_BUILDS);
   assert.equal(read.body.builds.some((entry) => entry.id === builds[0].id), false);
   assert.equal([...coordinator.state.storage.values.keys()].some((key) => key.includes(`${builds[0].id}:`)), false);
   assert.equal((await call(coordinator, 'read', { id: builds[0].id })).status, 404);
@@ -117,4 +117,34 @@ test('refuses a malformed or oversized build, keeps nothing, and frees the next 
   }
   assert.equal((await call(coordinator, 'reserve', {})).status, 200);
   assert.deepEqual((await call(coordinator, 'read', {})).body.builds, []);
+});
+
+test('a risk matrix keeps its own builds and lease beside the atlas', async () => {
+  const coordinator = createCoordinator();
+  assert.equal((await call(coordinator, 'reserve', {})).status, 200);
+  const reserved = await call(coordinator, 'reserve', {}, 'risk-matrix');
+  assert.equal(reserved.status, 200);
+  const running = await call(coordinator, 'reserve', {}, 'risk-matrix');
+  assert.equal(running.status, 409);
+  assert.equal(running.body.reason, 'risk_matrix_build_running');
+  assert.equal(running.body.error, 'A risk matrix is already being built for this session. Try again when it finishes.');
+
+  const matrix = {
+    id: 'risk_k1_00000001',
+    builtAt: '2026-11-08T12:00:00.000Z',
+    title: 'Risks',
+    areas: [{ name: 'Trust', subareas: ['Media'] }],
+    notes: [{ cell: 'Trust.Media.Labor.Jobs', valence: 'risk', intensity: 4, comment: 'A risk.' }],
+  };
+  // An atlas id is not a risk matrix's, and the refusal still frees the next press.
+  assert.equal((await call(coordinator, 'finalize', { attemptId: reserved.body.attemptId, build: buildRecord() }, 'risk-matrix')).status, 400);
+  const again = await call(coordinator, 'reserve', {}, 'risk-matrix');
+  assert.equal((await call(coordinator, 'finalize', { attemptId: again.body.attemptId, build: matrix }, 'risk-matrix')).status, 200);
+
+  const read = await call(coordinator, 'read', {}, 'risk-matrix');
+  assert.deepEqual(read.body.build, matrix);
+  assert.deepEqual(read.body.builds, [{ id: matrix.id, builtAt: matrix.builtAt, title: 'Risks' }]);
+  assert.equal((await call(coordinator, 'read', {})).body.build, null);
+  assert.equal((await call(coordinator, 'read', { id: 'atlas_k1_00000001' }, 'risk-matrix')).status, 400);
+  assert.equal((await call(coordinator, 'read', {}, 'config')).status, 404);
 });

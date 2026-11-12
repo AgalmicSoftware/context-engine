@@ -389,6 +389,29 @@ describe('SessionSettingsPage', () => {
     expect(screen.queryByTestId('ce-setting-results-admins')).not.toBeInTheDocument();
   });
 
+  it('offers members-only results only on a Worker that shows them', async () => {
+    const membersOption = () =>
+      within(screen.getByTestId(E2E_TESTIDS.SETUP_RESULTS_VISIBILITY)).getByRole('option', {
+        name: 'Session members see all answers',
+      });
+    renderPage();
+    await waitFor(() => expect(mockUpsertBootstrap).toHaveBeenCalled());
+    fireEvent.click(screen.getByTestId('ce-setup-more-results'));
+    expect(membersOption()).toBeDisabled();
+    cleanup();
+
+    mockUpsertBootstrap.mockClear();
+    mockFetchBootstrap.mockResolvedValue(bootstrapOf(workerConfig({ memberResults: true })));
+    renderPage();
+    await waitFor(() => expect(mockUpsertBootstrap).toHaveBeenCalled());
+    fireEvent.click(screen.getByTestId('ce-setup-more-results'));
+    expect(membersOption()).toBeEnabled();
+    fireEvent.change(screen.getByTestId(E2E_TESTIDS.SETUP_RESULTS_VISIBILITY), {
+      target: { value: 'session_member_full' },
+    });
+    expect(screen.getByTestId(E2E_TESTIDS.SETUP_RESULTS_VISIBILITY)).toHaveValue('session_member_full');
+  });
+
   it('adds and removes results admins and saves them without a sign-out', async () => {
     const existing = `0x${'cd'.repeat(20)}`;
     const added = `0x${'AB'.repeat(20)}`;

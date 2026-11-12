@@ -151,11 +151,74 @@
   }
 }
 
+// SetupToggle: joined choices. The radio stays in the label, out of sight,
+// so arrow keys and screen readers work as for any radio group.
+.toggle {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-self: flex-start;
+  max-width: 100%;
+  border: 1px solid var(--ce-input-border-strong);
+  border-radius: var(--ce-radius-8, 8px);
+  overflow: hidden;
+}
+
+.toggleOption {
+  position: relative;
+  margin: 0;
+  padding: 6px 16px;
+  background: var(--ce-control-face);
+  color: var(--ce-panel-text);
+  font-size: 0.9rem;
+  cursor: pointer;
+
+  & + & {
+    border-left: 1px solid var(--ce-input-border-strong);
+  }
+
+  input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  &:has(input:checked) {
+    background: var(--ce-action-accent);
+    color: var(--ce-action-accent-text);
+    font-weight: 600;
+  }
+
+  // Inside the segment, in a colour that shows on either fill.
+  &:has(input:focus-visible) {
+    outline: 2px solid var(--ce-action-accent);
+    outline-offset: -4px;
+  }
+
+  &:has(input:checked:focus-visible) {
+    outline-color: var(--ce-action-accent-text);
+  }
+}
+
+// A disclosure inside a section, such as Basics' Appearance.
+.disclosureBody {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 10px;
+  min-width: 0;
+}
+
 .inlineRow {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
+}
+
+// SetupFact: a setting another choice decides.
+.fact {
+  margin: 0;
+  color: var(--ce-panel-text);
 }
 
 .readOnlyValue {

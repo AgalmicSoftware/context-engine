@@ -5,7 +5,7 @@ description: Read Context Engine questions, save drafts and submit explicitly au
 
 # Context Engine Agent Runtime
 
-Skill version: 2026-10-27 (v45).
+Skill version: 2026-11-11 (v46).
 
 Use the Session Worker origin supplied by the user. Check
 `GET /capabilities?slug=<sessionSlug>` for `agent_http_v1` and `agentHttp.ready`.
@@ -18,6 +18,13 @@ URLs, chat, logs, receipts or browser storage. Include the issued `sessionSlug`;
 do not supply a transport user ID. Credentials cannot switch sessions or users.
 Operator actions use the Session Worker's signed admin authority, not a root
 agent token. Do not ask for operator authority to perform participant work.
+
+A person may make a key for their own agent in the session's account menu and
+give it to you in the `CE_AGENT_TOKEN` environment variable. Send it as
+`Authorization: Bearer $CE_AGENT_TOKEN`, so it never appears in your output.
+It answers as that person, without their admin powers: submit only the answers
+they approved. It ends with their sign-in, within hours, and cannot make a
+browser login.
 
 Read `/api/agent/questions` and follow every `nextCursor` while `hasMore` is
 true. Keep the reported total and reject incomplete or stale pagination. Read

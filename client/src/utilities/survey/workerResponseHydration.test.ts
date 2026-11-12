@@ -222,6 +222,35 @@ describe('workerCanonicalResponseHydration', () => {
     ]);
   });
 
+  it('does not count an answer whose payload names another session ID', async () => {
+    const payloads: Record<string, Record<string, unknown>> = {
+      'this-session': { questionID: 'question-a', sessionId: SESSION_ID, sessionSlug: 'demo-sh', answer: 'Agree' },
+      'other-session': {
+        questionID: 'question-a',
+        sessionId: `0x${'9'.repeat(32)}`,
+        sessionSlug: 'demo-sh',
+        answer: 'Agree',
+      },
+    };
+    const listSessionStorageRefsPage = jest.fn().mockResolvedValue({
+      items: Object.keys(payloads).map((id) => ({
+        storageRef: { backend: 'cloudflare', id },
+        metadata: { responder: `0xresponder-${id}`, createdAt: '2026-07-22T12:00:01.000Z' },
+      })),
+      listComplete: true,
+      cursor: null,
+    });
+    const readSessionStorageBlob = jest.fn(
+      async ({ storageRef }: any) => new Response(JSON.stringify(payloads[storageRef.id])),
+    );
+
+    const rows = await loadWorkerResponses(
+      { sessionSlug: 'demo-sh', sessionConfig: workerConfig },
+      { listSessionStorageRefsPage, readSessionStorageBlob },
+    );
+    expect(rows.map((row) => row.storageRefId)).toEqual(['this-session']);
+  });
+
   it('reuses cached immutable refs while reading newly submitted edits', async () => {
     const listSessionStorageRefsPage = jest.fn().mockResolvedValue({
       items: ['cached', 'edited'].map((id) => ({

@@ -39,8 +39,33 @@ describe('sessionWizardResourceConfig', () => {
   it('returns non-ai secret fields without mutation', () => {
     const first = resolveSessionWizardResourceSecretFields('rpc', null);
     const second = resolveSessionWizardResourceSecretFields('rpc', null);
-    expect(first).toEqual([{ key: 'customRpcUrl', label: 'Custom RPC URL', type: 'text', placeholder: 'https://...' }]);
+    expect(first).toEqual([
+      expect.objectContaining({
+        key: 'customRpcUrl',
+        label: 'Custom RPC URL',
+        type: 'text',
+        placeholder: 'https://...',
+      }),
+    ]);
     expect(first).not.toBe(second);
+  });
+
+  it('gives every secret field its own help', () => {
+    const ai = { models: { fast: { provider: 'anthropic' }, thinking: { provider: 'openrouter' } } };
+    const fields = ['ai', 'rpc', 'arweave', 'txGas', 'lit'].flatMap((key) =>
+      resolveSessionWizardResourceSecretFields(key, ai),
+    );
+    expect(fields.map((field) => field.key)).toEqual([
+      'anthropicKey',
+      'openrouterKey',
+      'openaiKey',
+      'customRpcUrl',
+      'arweaveJwk',
+      'faucetPrivateKey',
+      'litAccountApiKey',
+    ]);
+    for (const field of fields) expect(field.help).toMatch(/\w.*\./);
+    expect(fields.find((field) => field.key === 'openaiKey')?.help).toMatch(/straight to OpenAI/);
   });
 
   it('keeps the /new Lit secret surface to one account authority field', () => {
@@ -51,6 +76,8 @@ describe('sessionWizardResourceConfig', () => {
 
   it('exposes resource labels and tooltips', () => {
     expect(RESOURCE_LABELS.ai).toBe('AI');
+    // Card titles are words, not resource codes.
+    expect(RESOURCE_LABELS.txGas).toBe('Test gas faucet');
     expect(RESOURCE_SECTION_TOOLTIPS.ai).toMatch(/provider key/i);
     expect(RESOURCE_SECTION_TOOLTIPS.rpc).toMatch(/Authenticated RPC endpoint/i);
     expect(RESOURCE_SECTION_TOOLTIPS.lit).toMatch(/Paste one Lit API key/i);

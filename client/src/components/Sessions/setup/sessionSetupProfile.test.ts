@@ -24,23 +24,32 @@ describe('session setup profile edits', () => {
     expect(Object.entries(profile.surfaces).filter(([, on]) => on)).toEqual([['web', true]]);
   });
 
-  it('starts with public results, which needs unencrypted answers on public-read storage', () => {
+  it('starts with every answer shown to signed-in members, unencrypted behind the session gate', () => {
     const profile = defaultSessionSetupProfile();
-    expect(profile.results.visibility).toBe('public_full_if_storage_public');
+    expect(profile.results.visibility).toBe('session_member_full');
     expect(profile.encryption).toEqual({ mode: 'none' });
-    expect(profile.storage.payloadAccessControl).toEqual({ gate: 'none', encryption: 'none' });
+    expect(profile.storage.payloadAccessControl).toEqual({
+      ...defaultCloudflarePayloadAccess(),
+      encryption: 'none',
+    });
     expect(issueCodes(profile)).toEqual([]);
-    expect(sessionModeAllowsAnonymousWorkerGroupDiscovery(profile)).toBe(true);
-    expect(sessionAnswersRequireLogin(profile)).toBe(false);
+    expect(sessionModeAllowsAnonymousWorkerGroupDiscovery(profile)).toBe(false);
+    expect(sessionAnswersRequireLogin(profile)).toBe(true);
   });
 
-  it('asks visitors to log in only once the creator chooses non-public results', () => {
-    const { profile } = editSessionSetupProfile(defaultSessionSetupProfile(), (draft) =>
-      setResultsVisibility(draft, 'participant_aggregate'),
-    );
-    expect(sessionAnswersRequireLogin(profile)).toBe(true);
-    expect(profile.storage.payloadAccessControl?.gate).toBe('role_gate');
-    expect(issueCodes(profile)).toEqual([]);
+  it('lets signed-out visitors read only once the creator chooses public results', () => {
+    const open = editSessionSetupProfile(defaultSessionSetupProfile(), (draft) =>
+      setResultsVisibility(draft, 'public_full_if_storage_public'),
+    ).profile;
+    expect(sessionAnswersRequireLogin(open)).toBe(false);
+    expect(open.storage.payloadAccessControl).toEqual({ gate: 'none', encryption: 'none' });
+    expect(issueCodes(open)).toEqual([]);
+    const members = editSessionSetupProfile(open, (draft) =>
+      setResultsVisibility(draft, 'session_member_full'),
+    ).profile;
+    expect(sessionAnswersRequireLogin(members)).toBe(true);
+    expect(members.storage.payloadAccessControl?.gate).toBe('role_gate');
+    expect(issueCodes(members)).toEqual([]);
   });
 
   it('keeps the private access policy for sessions that leave public results', () => {
@@ -83,6 +92,8 @@ describe('session setup profile edits', () => {
       encryption: { mode: 'none' },
     });
     expect(issueCodes(onChain)).toEqual([]);
+    // Unencrypted answers on Arweave are public anyway, so members-only results become public.
+    expect(onChain.results.visibility).toBe('public_full_if_storage_public');
     const back = editSessionSetupProfile(onChain, (draft) => setHosting(draft, 'worker_canonical', null)).profile;
     expect(back.evm.registryChainId).toBeNull();
     expect(back.storage.backend).toBe('cloudflare');
@@ -101,9 +112,18 @@ describe('session setup profile edits', () => {
     const encrypted = editSessionSetupProfile(open, (draft) =>
       setEncryptionMode(draft, 'worker_envelope', null),
     ).profile;
-    expect(encrypted.results.visibility).toBe('participant_aggregate');
+    expect(encrypted.results.visibility).toBe('session_member_full');
     expect(encrypted.storage.payloadAccessControl?.gate).toBe('role_gate');
     expect(usesDefaultEnvelopeRules(encrypted)).toBe(true);
     expect(issueCodes(encrypted)).toEqual([]);
+  });
+
+  it('keeps encrypted on-chain answers to their owners, since only the Worker serves members', () => {
+    const onChain = editSessionSetupProfile(defaultSessionSetupProfile(), (draft) => {
+      setHosting(draft, 'evm_registry_canonical', 84532);
+      setEncryptionMode(draft, 'lit', 84532);
+    }).profile;
+    expect(onChain.results.visibility).toBe('participant_aggregate');
+    expect(issueCodes(onChain)).toEqual([]);
   });
 });

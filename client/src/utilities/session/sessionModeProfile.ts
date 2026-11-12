@@ -97,6 +97,7 @@ const SESSION_MODE_RESULTS_VISIBILITIES = new Set<string>([
   'private_admin',
   'participant_aggregate',
   'session_member_aggregate',
+  'session_member_full',
   'public_redacted_snapshot',
   'public_full_if_storage_public',
 ]);
@@ -542,6 +543,18 @@ export const validateSessionModeProfile = (
       'results.visibility',
       'public_results_require_public_storage',
       'Public stored-results visibility requires unencrypted public-read storage without access conditions.',
+    );
+  }
+  // Only the Session Worker serves Cloudflare answers, so only it can hold them to members.
+  if (
+    visibilityValid &&
+    String(results?.visibility) === 'session_member_full' &&
+    (authorityMode !== 'worker_canonical' || storageBackend !== 'cloudflare')
+  ) {
+    addIssue(
+      'results.visibility',
+      'member_results_require_session_worker',
+      'Members-only results need a Session Worker with Cloudflare storage.',
     );
   }
   const exposure = requireRecord('results.exposure', results?.exposure, [

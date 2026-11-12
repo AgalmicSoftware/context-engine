@@ -331,7 +331,7 @@ const openSetupSection = (key) => {
 // New drafts start Worker-hosted; SBT gates need the on-chain registry path.
 const selectRegistryHosting = () => {
   openSetupSection('hosting');
-  fireEvent.change(screen.getByTestId('ce-setup-authority'), { target: { value: 'evm_registry_canonical' } });
+  fireEvent.click(screen.getByRole('radio', { name: 'Decentralized' }));
 };
 const getGateCreateSbtButton = () =>
   within(document.getElementById('session-wizard-section-encryption')).getByTestId(E2E_TESTIDS.WIZARD_CREATE_SBT);

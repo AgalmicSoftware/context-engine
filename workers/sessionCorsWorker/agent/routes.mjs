@@ -4,6 +4,7 @@ export const AGENT_ROUTES = Object.freeze({
   '/api/agent/invite/onboard': entry('POST', 'public', { cors: true }),
   '/api/agent/client-login/exchange': entry('POST', 'exchange', { cors: true }),
   '/api/agent/wrapped/member-exchange': entry('POST', 'participant', { cors: true }),
+  '/api/agent/credentials/delegate': entry('POST', 'participant', { cors: true }),
   '/api/agent/session-meta': entry('GET', 'public', { cors: true, descriptor: true }),
   '/api/agent/skill': entry('GET', 'public', { descriptor: true }),
   '/api/agent/skill-version': entry('GET', 'public', { descriptor: true }),

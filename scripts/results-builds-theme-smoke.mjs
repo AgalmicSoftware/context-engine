@@ -1,8 +1,9 @@
 // Local fixtures only: the Session Worker's replies come from here, so nothing
-// reaches a real Worker and no atlas is built. Checks a built atlas, its Build
-// button, a running build's status and prompts, a category's and a topic's
-// compass, summary and question cards, and the List and Tree views, in each
-// theme and width.
+// reaches a real Worker and nothing is built. Checks a built atlas and risk
+// matrix, their Build buttons, a running build's status and prompts, a
+// category's and a topic's compass, summary and question cards, the List and
+// Tree views, and the matrix's cells, detail grid and notes, in each theme and
+// width.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -15,6 +16,7 @@ const config = {
   corsWorkerUrl: 'https://civic-worker.example.test',
   sessionName: 'Civic smoke session',
   debateAtlas: true,
+  riskMatrix: true,
 };
 const address = (seed) => `0x${seed.repeat(40 / seed.length)}`;
 const topic = (id, label, offset) => ({
@@ -58,14 +60,71 @@ const build = {
     { ...topic('b2t3', 'Repairs', 0.02), id: 'b2', label: 'Housing', summary: 'Rents and repairs.', topics: [topic('b2t3', 'Repairs', 0.02)] },
   ],
 };
-const nextBuild = {
-  model: 'fixture-model',
-  prompts: { plan: 'You are planning a debate atlas.\nQuestions:\n<Questions>', map: 'You are mapping one topic.\n<Responses>' },
-};
-// Set to show someone else's build running, without pressing Build.
-const fixtureState = { active: null };
 const older = { ...build, id: 'atlas_mh0_0a1b2c3e', builtAt: '2026-11-08T13:00:00.000Z', counts: { responses: 30, participants: 8 } };
-const summary = ({ branches, ...rest }) => rest;
+const note = (cell, valence, intensity, comment, participantCount) => ({
+  cell,
+  valence,
+  intensity,
+  comment,
+  participantCount,
+  questionIds: ['q-b1t1'],
+});
+// A strong and a faint cell of each kind, one with both kinds of note, and pairs with none.
+const riskMatrix = {
+  id: 'risk_mh1_0a1b2c3d',
+  builtAt: '2026-11-08T14:20:00.000Z',
+  builtBy: address('a1'),
+  model: 'fixture',
+  title: 'Civic services risks',
+  counts: { responses: 64, participants: 12, questions: 9, aiResponses: 48, aiQuestions: 9 },
+  areas: [
+    { name: 'Transport', subareas: ['Bus lanes', 'Bike parking'] },
+    { name: 'Housing', subareas: ['Rents', 'Repairs'] },
+    { name: 'Safety', subareas: ['Street lighting'] },
+  ],
+  notes: [
+    note('Transport.Bus lanes.Housing.Rents', 'opportunity', 8, 'Faster buses open cheaper neighbourhoods to commuters.', 6),
+    note('Housing.Repairs.Safety.Street lighting', 'risk', 9, 'Slow repairs leave stairwells dark at night.', 4),
+    note('Safety.Street lighting.Transport.Bus lanes', 'opportunity', 4, 'Lit bus stops make late routes feel safer.', 3),
+    note('Safety.Street lighting.Transport.Bike parking', 'risk', 2, 'Dark bike racks invite theft.', 1),
+    note('Housing.Rents.Transport.Bus lanes', 'risk', 2, 'Rising rents push riders away from the lanes.', 2),
+  ],
+};
+const olderRiskMatrix = {
+  ...riskMatrix,
+  id: 'risk_mh0_0a1b2c3e',
+  builtAt: '2026-11-08T13:20:00.000Z',
+  counts: { responses: 30, participants: 8 },
+};
+// The builds the open Results menu offers, with the Worker's reply for each.
+const BUILDS = [
+  {
+    kind: 'debate-atlas',
+    label: 'Build atlas',
+    tooltip: 'Builds a debate atlas',
+    name: 'atlas',
+    prompt: 'Planning prompt',
+    build,
+    older,
+    nextBuild: {
+      model: 'fixture-model',
+      prompts: { plan: 'You are planning a debate atlas.\nQuestions:\n<Questions>', map: 'You are mapping one topic.\n<Responses>' },
+    },
+  },
+  {
+    kind: 'risk-matrix',
+    label: 'Build risk matrix',
+    tooltip: 'Builds a risk matrix',
+    name: 'risk matrix',
+    prompt: 'Building prompt',
+    build: riskMatrix,
+    older: olderRiskMatrix,
+    nextBuild: { model: 'fixture-model', prompts: { build: 'You are building a risk matrix.\nResponses:\n<Responses>' } },
+  },
+];
+// Set to show someone else's builds running, without pressing Build.
+const fixtureState = { active: null };
+const summary = ({ branches, areas, notes, ...rest }) => rest;
 // The light themes' tree connectors are graphics on the chart, so they need 3:1 against it.
 const LIGHT_THEMES = new Set(['civic', 'classic-95']);
 const connectorContrast = (chart) => {
@@ -118,9 +177,9 @@ const step = async (name, run) => {
   }
 };
 
-async function installAtlasFixtures(context, base) {
+async function installBuildFixtures(context, base) {
   await installCivicThemeFixtures(context, base);
-  // demo-sh takes its config from the bundled list, so the Worker's atlas flag goes there too.
+  // demo-sh takes its config from the bundled list, so the Worker's build flags go there too.
   await context.route('**/src/variables/demo/demo_sessions.json?import*', (route) =>
     route.fulfill({
       contentType: 'application/javascript',
@@ -130,29 +189,31 @@ async function installAtlasFixtures(context, base) {
   await context.route(`${config.corsWorkerUrl}/session-config*`, (route) =>
     route.fulfill({ json: { ok: true, sessionSlug: config.slug, sessionId: config.sessionId, config } }),
   );
-  // canBuild shows the Build button without a sign-in; the button is never pressed.
-  await context.route(`${config.corsWorkerUrl}/debate-atlas*`, (route) => {
-    const id = new URL(route.request().url()).searchParams.get('id');
-    return route.fulfill({
-      json: {
-        ok: true,
-        active: fixtureState.active,
-        canBuild: true,
-        nextBuild,
-        builds: [summary(build), summary(older)],
-        build: id === older.id ? older : build,
-      },
+  // canBuild shows the Build buttons without a sign-in; they are never pressed.
+  for (const { kind, build: newest, older: earlier, nextBuild } of BUILDS) {
+    await context.route(`${config.corsWorkerUrl}/${kind}*`, (route) => {
+      const id = new URL(route.request().url()).searchParams.get('id');
+      return route.fulfill({
+        json: {
+          ok: true,
+          active: fixtureState.active,
+          canBuild: true,
+          nextBuild,
+          builds: [summary(newest), summary(earlier)],
+          build: id === earlier.id ? earlier : newest,
+        },
+      });
     });
-  });
+  }
 }
 
-async function inspectBuildButton(page) {
-  const buildButton = page.getByTestId('ce-session-debate-atlas-build');
+async function inspectBuildButton(page, { kind, label, tooltip: tooltipText }) {
+  const buildButton = page.getByTestId(`ce-session-${kind}-build`);
   await buildButton.waitFor({ timeout: 60000 });
-  await step('Build atlas', () => assertReadable(buildButton));
+  await step(label, () => assertReadable(buildButton));
   // Focus opens the tooltip too; it is read after its fade-in, before any hover can queue a hide.
-  const tooltip = page.getByRole('tooltip').filter({ hasText: 'Builds a debate atlas' });
-  await step('Build atlas tooltip', async () => {
+  const tooltip = page.getByRole('tooltip').filter({ hasText: tooltipText });
+  await step(`${label} tooltip`, async () => {
     let result = null;
     await buildButton.focus();
     for (const deadline = Date.now() + 20000; Date.now() < deadline; ) {
@@ -165,34 +226,61 @@ async function inspectBuildButton(page) {
     assert.equal(result.failures.length, 0, `Tooltip contrast: ${JSON.stringify(result.failures)}`);
   });
   await buildButton.blur();
-  await buildButton.hover();
-  await step('Build atlas hovered', () => assertReadable(buildButton));
+  await inspectStates(page, buildButton, label, buildButton);
+}
+
+// A select's shown text has no box of its own, so the audit reads a copy of it
+// on the select's background, among the same ancestors.
+async function assertSelectReadable(select) {
+  await select.evaluate((node) => {
+    const style = getComputedStyle(node);
+    const copy = document.createElement('span');
+    copy.dataset.ceSelectCopy = '';
+    copy.textContent = node.selectedOptions[0]?.textContent || '';
+    Object.assign(copy.style, { background: style.backgroundColor, color: style.color, font: style.font });
+    node.after(copy);
+  });
+  const copy = select.locator('xpath=..').locator('[data-ce-select-copy]');
+  try {
+    await assertReadable(copy);
+  } finally {
+    await copy.evaluate((node) => node.remove());
+  }
+}
+
+// Hovered, focused and pressed, with `target` read in each. A press is released
+// elsewhere, so nothing it would start or open does.
+async function inspectStates(page, control, name, target) {
+  await control.hover();
+  await step(`${name} hovered`, () => assertReadable(target));
   await page.mouse.move(0, 0);
-  await buildButton.focus();
-  await step('Build atlas focused', () => assertReadable(buildButton));
-  // Pressed: hold the mouse down on it, then release elsewhere so no build starts.
-  const box = await buildButton.boundingBox();
+  await control.focus();
+  await step(`${name} focused`, () => assertReadable(target));
+  const box = await control.boundingBox();
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await page.mouse.down();
-  await step('Build atlas pressed', () => assertReadable(buildButton));
+  await step(`${name} pressed`, () => assertReadable(target));
   await page.mouse.move(1, 1);
   await page.mouse.up();
+  await control.blur();
 }
 
 export async function inspectDebateAtlas(page, { screenshotDir = '', tag = '', theme = '' } = {}) {
-  await page.getByTestId('ce-session-results-toggle').click();
   const nav = page.getByTestId('ce-session-results-view-nav');
-  await inspectBuildButton(page);
   await nav.getByRole('button', { name: 'Debate Map', exact: true }).click();
   const atlas = page.getByTestId('ce-session-debate-atlas');
   await atlas.waitFor();
   await page.getByTestId('ce-atlas-node').first().waitFor();
   await step('atlas', () => assertReadable(atlas));
   const picker = atlas.getByRole('combobox', { name: 'Version' });
+  await step('build picker text', () => assertSelectReadable(picker));
   await picker.hover();
   await step('build picker hovered', () => assertReadable(picker.locator('xpath=..')));
   await picker.focus();
-  await step('build picker focused', () => assertReadable(picker.locator('xpath=..')));
+  await step('build picker focused', async () => {
+    await assertReadable(picker.locator('xpath=..'));
+    await assertSelectReadable(picker);
+  });
   const help = atlas.getByRole('button', { name: 'About this atlas' });
   await help.focus();
   const helpTip = page.getByRole('tooltip').filter({ hasText: 'built this' });
@@ -266,18 +354,7 @@ export async function inspectDebateAtlas(page, { screenshotDir = '', tag = '', t
   });
   for (const [index, card] of [cards.first(), cards.last()].entries()) {
     await step(`question card ${index + 1}`, () => assertReadable(card));
-    await card.hover();
-    await step(`question card ${index + 1} hovered`, () => assertReadable(card));
-    await page.mouse.move(0, 0);
-    await card.focus();
-    await step(`question card ${index + 1} focused`, () => assertReadable(card));
-    const cardBox = await card.boundingBox();
-    await page.mouse.move(cardBox.x + cardBox.width / 2, cardBox.y + cardBox.height / 2);
-    await page.mouse.down();
-    await step(`question card ${index + 1} pressed`, () => assertReadable(card));
-    await page.mouse.move(1, 1);
-    await page.mouse.up();
-    await card.blur();
+    await inspectStates(page, card, `question card ${index + 1}`, card);
   }
   if (screenshotDir) await cards.last().screenshot({ path: `${screenshotDir}/debate-atlas-question-${tag}.png` });
 
@@ -339,48 +416,115 @@ export async function inspectDebateAtlas(page, { screenshotDir = '', tag = '', t
   if (screenshotDir) await atlas.screenshot({ path: `${screenshotDir}/debate-atlas-tree-${tag}.png` });
 }
 
+// A built risk matrix: its stamp, picker and "?", its cells in each state, a
+// cell's notes, and the detail grid of the two areas it joins.
+export async function inspectRiskMatrix(page, { screenshotDir = '', tag = '' } = {}) {
+  const nav = page.getByTestId('ce-session-results-view-nav');
+  await nav.getByRole('button', { name: 'Risk Matrix', exact: true }).click();
+  const view = page.getByTestId('ce-session-risk-matrix');
+  await view.waitFor();
+  await step('risk matrix', () => assertReadable(view));
+  if (screenshotDir) await view.screenshot({ path: `${screenshotDir}/risk-matrix-${tag}.png` });
+  const picker = view.getByRole('combobox', { name: 'Version' });
+  await step('risk matrix picker text', () => assertSelectReadable(picker));
+  await picker.hover();
+  await step('risk matrix picker hovered', () => assertReadable(picker.locator('xpath=..')));
+  await picker.focus();
+  await step('risk matrix picker focused', async () => {
+    await assertReadable(picker.locator('xpath=..'));
+    await assertSelectReadable(picker);
+  });
+  const help = view.getByRole('button', { name: 'About this risk matrix' });
+  await help.focus();
+  await step('risk matrix tooltip', async () => {
+    const helpTip = page.getByRole('tooltip').filter({ hasText: 'Each note is an opportunity or a risk' });
+    await helpTip.waitFor();
+    await assertReadable(helpTip);
+  });
+  await help.blur();
+  const overflow = await page.evaluate(() => document.scrollingElement.scrollWidth - window.innerWidth);
+  assert(overflow <= 1, `The page scrolls sideways by ${overflow}px`);
+
+  // The strongest opportunity and risk, and a faint cell holding both kinds.
+  for (const pair of ['transport-vs-housing', 'housing-vs-safety', 'safety-vs-transport']) {
+    await inspectStates(page, view.getByTestId(`ce-risk-matrix-cell-${pair}`), `cell ${pair}`, view);
+  }
+  await view.getByTestId('ce-risk-matrix-cell-safety-vs-transport').click();
+  await page.mouse.move(0, 0);
+  const modal = page.getByTestId('ce-risk-matrix-modal');
+  await step('cell notes', async () => {
+    await modal.getByText('From 3 participants').waitFor();
+    await modal.getByText('From 1 participant', { exact: true }).waitFor();
+    await assertReadable(modal);
+  });
+  for (const group of ['Opportunities', 'Risks']) {
+    await inspectStates(page, modal.getByRole('button', { name: new RegExp(`^${group}`) }), `${group} toggle`, modal);
+  }
+  const close = modal.getByRole('button', { name: 'Close', exact: true }).last();
+  await inspectStates(page, close, 'notes Close', modal);
+  if (screenshotDir) await modal.screenshot({ path: `${screenshotDir}/risk-matrix-notes-${tag}.png` });
+  await close.click();
+
+  // The cell opened the detail grid of its two areas.
+  const subgrid = view.getByTestId('ce-risk-matrix-subgrid');
+  await step('detail grid', () => assertReadable(subgrid));
+  const subcell = subgrid.getByTestId('ce-risk-matrix-subcell-safety-street-lighting-vs-transport-bus-lanes');
+  await inspectStates(page, subcell, 'detail cell', subgrid);
+  await inspectStates(page, view.getByTestId('ce-risk-matrix-selector-x-street-lighting'), 'subarea selector', view);
+  await subcell.click();
+  await step('detail cell notes', async () => {
+    await modal.getByText('Lit bus stops make late routes feel safer.').waitFor();
+    await assertReadable(modal);
+  });
+  await modal.getByRole('button', { name: 'Close', exact: true }).last().click();
+  const detailOverflow = await page.evaluate(() => document.scrollingElement.scrollWidth - window.innerWidth);
+  assert(detailOverflow <= 1, `The page scrolls sideways by ${detailOverflow}px with the detail grid open`);
+  if (screenshotDir) await subgrid.screenshot({ path: `${screenshotDir}/risk-matrix-detail-${tag}.png` });
+}
+
 // A running build shows its time, model and, on request, its prompts.
-export async function inspectBuildStatus(page, { screenshotDir = '', tag = '' } = {}) {
-  await page.getByTestId('ce-session-results-toggle').click();
-  const status = page.getByTestId('ce-session-debate-atlas-status');
-  await step('build status', async () => {
-    await status.getByText(/Building the atlas · \d+s/).waitFor({ timeout: 60000 });
+export async function inspectBuildStatus(page, { kind, name, prompt }, { screenshotDir = '', tag = '' } = {}) {
+  const status = page.getByTestId(`ce-session-${kind}-status`);
+  await step(`${name} build status`, async () => {
+    await status.getByText(new RegExp(`Building the ${name} · \\d+s`)).waitFor({ timeout: 60000 });
     await status.getByText('AI model: fixture-model').waitFor();
     await assertReadable(status);
   });
+  await step(`${name} busy button`, () => assertReadable(page.getByTestId(`ce-session-${kind}-build`)));
   const toggle = status.getByRole('button', { name: /Show AI prompt/ });
   await toggle.hover();
-  await step('prompt toggle hovered', () => assertReadable(status));
+  await step(`${name} prompt toggle hovered`, () => assertReadable(status));
   await page.mouse.move(0, 0);
   await toggle.focus();
-  await step('prompt toggle focused', () => assertReadable(status));
+  await step(`${name} prompt toggle focused`, () => assertReadable(status));
   const box = await toggle.boundingBox();
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await page.mouse.down();
-  await step('prompt toggle pressed', () => assertReadable(status));
+  await step(`${name} prompt toggle pressed`, () => assertReadable(status));
   await page.mouse.up();
-  await step('prompts shown', async () => {
-    await status.getByRole('region', { name: 'Planning prompt' }).waitFor();
+  await step(`${name} prompts shown`, async () => {
+    await status.getByRole('region', { name: prompt }).waitFor();
     await assertReadable(status);
   });
   const overflow = await page.evaluate(() => document.scrollingElement.scrollWidth - window.innerWidth);
   assert(overflow <= 1, `The page scrolls sideways by ${overflow}px with the prompts open`);
-  if (screenshotDir) await status.screenshot({ path: `${screenshotDir}/debate-atlas-status-${tag}.png` });
+  if (screenshotDir) await status.screenshot({ path: `${screenshotDir}/${kind}-status-${tag}.png` });
 }
 
-export async function runDebateAtlasThemeSmoke() {
+export async function runResultsBuildsThemeSmoke() {
   const { chromium } = await import('playwright');
   const base = (process.env.BASE_URL || 'http://127.0.0.1:3000').replace(/\/$/, '');
   assert(['localhost', '127.0.0.1'].includes(new URL(base).hostname), 'Use a local Vite server');
   const themes = process.env.THEMES?.split(',') || ['civic', 'context-engine', 'classic-95'];
   const widths = process.env.WIDTHS?.split(',').map(Number) || [375, 1280];
-  const screenshotDir = process.env.ATLAS_SCREENSHOT_DIR || '';
+  const screenshotDir = process.env.SCREENSHOT_DIR || '';
   const browser = await chromium.launch({ headless: true });
   try {
     for (const theme of themes) {
       for (const width of widths) {
+        const tag = `${theme}-${width}`;
         const context = await browser.newContext({ viewport: { width, height: 900 } });
-        await installAtlasFixtures(context, base);
+        await installBuildFixtures(context, base);
         await context.addInitScript((value) => {
           localStorage.setItem('ce:theme-default-version', '2026-10-13-civic-v1');
           localStorage.setItem('ce:theme', value);
@@ -392,13 +536,17 @@ export async function runDebateAtlasThemeSmoke() {
           await page.goto(`${base}/session/demo-sh`, { waitUntil: 'domcontentloaded' });
           await page.waitForFunction((value) => document.documentElement.dataset.ceTheme === value, theme);
           fixtureState.active = null;
-          await inspectDebateAtlas(page, { screenshotDir, tag: `${theme}-${width}`, theme });
+          await page.getByTestId('ce-session-results-toggle').click();
+          for (const entry of BUILDS) await inspectBuildButton(page, entry);
+          await inspectDebateAtlas(page, { screenshotDir, tag, theme });
+          await inspectRiskMatrix(page, { screenshotDir, tag });
           fixtureState.active = { startedAtMs: Date.now() - 42_000 };
           await page.reload({ waitUntil: 'domcontentloaded' });
-          await inspectBuildStatus(page, { screenshotDir, tag: `${theme}-${width}` });
-          console.log(`PASS debate atlas contrast ${theme} ${width}px`);
+          await page.getByTestId('ce-session-results-toggle').click();
+          for (const entry of BUILDS) await inspectBuildStatus(page, entry, { screenshotDir, tag });
+          console.log(`PASS Results builds contrast ${tag}px`);
         } catch (error) {
-          if (screenshotDir) await page.screenshot({ path: `${screenshotDir}/failed-${theme}-${width}.png` }).catch(() => {});
+          if (screenshotDir) await page.screenshot({ path: `${screenshotDir}/failed-${tag}.png` }).catch(() => {});
           throw new Error(`${theme} ${width}px: ${error.message}`);
         } finally {
           await context.close();
@@ -411,7 +559,7 @@ export async function runDebateAtlasThemeSmoke() {
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  runDebateAtlasThemeSmoke().catch((error) => {
+  runResultsBuildsThemeSmoke().catch((error) => {
     console.error(error);
     process.exitCode = 1;
   });

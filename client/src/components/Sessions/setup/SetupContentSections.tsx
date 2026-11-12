@@ -1,10 +1,13 @@
 import React, { useState } from 'react';
 import { Input } from 'reactstrap';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faCaretDown, faCaretUp } from '@fortawesome/free-solid-svg-icons';
 
 import InterviewSettingsFields from '../InterviewSettingsFields';
 import { SESSION_CONTEXT_LIMITS, isHttpsUrl, validateSessionContext } from '@ce-shared/sessionContext.mjs';
 import { E2E_TESTIDS } from '../../../utilities/e2eTestIds.js';
 import {
+  DEFAULT_SESSION_COLOR_SCHEME_ID,
   SESSION_COLOR_SCHEME_REGISTRY,
   normalizeSessionColorSchemeId,
 } from '../../../utilities/ui/sessionColorSchemes';
@@ -28,66 +31,104 @@ import {
 import styles from './SessionSetup.module.scss';
 
 type BasicsProps = Pick<SetupSectionProps, 'draft' | 'onChange'> & {
+  /** /new: the Centralized or Decentralized toggle, first on the page. */
+  runsOn?: React.ReactNode;
   /** The session link: a preview while creating, fixed once published. */
   link?: React.ReactNode;
   /** /new passes its header image control (paste, upload); otherwise a URL. */
   headerImage?: React.ReactNode;
 };
 
-export const SetupBasicsSection = ({ draft, onChange, link = null, headerImage = null }: BasicsProps) => (
-  <SetupSection sectionKey="basics" title="Basics" alwaysOpen>
-    <SetupField id="ce-setup-name" label="Name">
-      <Input
-        id="ce-setup-name"
-        value={text(draft.sessionName)}
-        required
-        aria-required="true"
-        autoComplete="off"
-        data-testid={E2E_TESTIDS.WIZARD_SESSION_NAME}
-        onChange={(event) => onChange(['sessionName'], event.target.value)}
-      />
-    </SetupField>
-    {link}
-    <SetupField id="ce-setup-description" label="Description" help="Shown on the session page and in link previews.">
-      <Input
-        id="ce-setup-description"
-        type="textarea"
-        className={styles.textarea}
-        value={text(draft.sessionInfo)}
-        aria-describedby={setupHelpId('ce-setup-description')}
-        data-testid={E2E_TESTIDS.WIZARD_SESSION_INFO}
-        onChange={(event) => onChange(['sessionInfo'], event.target.value)}
-      />
-    </SetupField>
-    {headerImage || (
-      <SetupField id="ce-setup-header-image" label="Header image" help="An https:// image link.">
+const NAME_HELP =
+  'The session’s title on its page and in lists of sessions. Until the session is created, its link is made from the name.';
+const COLORS_HELP =
+  'Accent colours on this session’s pages, the same for everyone who opens it. Each person’s site theme stays as they set it.';
+
+export const SetupBasicsSection = ({
+  draft,
+  onChange,
+  runsOn = null,
+  link = null,
+  headerImage = null,
+}: BasicsProps) => {
+  const colorSchemeId = normalizeSessionColorSchemeId(asRecord(draft.appearance).colorSchemeId);
+  // Starts open when the session already has colours of its own.
+  const [appearanceOpen, setAppearanceOpen] = useState(colorSchemeId !== DEFAULT_SESSION_COLOR_SCHEME_ID);
+  return (
+    <SetupSection sectionKey="basics" title="Basics" alwaysOpen>
+      {runsOn}
+      <SetupField id="ce-setup-name" label="Name" help={NAME_HELP}>
         <Input
-          id="ce-setup-header-image"
-          type="url"
-          value={text(draft.sessionHeader)}
-          aria-describedby={setupHelpId('ce-setup-header-image')}
-          data-testid={E2E_TESTIDS.WIZARD_SESSION_HEADER_URL}
-          onChange={(event) => onChange(['sessionHeader'], event.target.value)}
+          id="ce-setup-name"
+          value={text(draft.sessionName)}
+          required
+          aria-required="true"
+          autoComplete="off"
+          aria-describedby={setupHelpId('ce-setup-name')}
+          data-testid={E2E_TESTIDS.WIZARD_SESSION_NAME}
+          onChange={(event) => onChange(['sessionName'], event.target.value)}
         />
       </SetupField>
-    )}
-    <SetupField id="ce-setup-colors" label="Colors">
-      <Input
-        id="ce-setup-colors"
-        type="select"
-        value={normalizeSessionColorSchemeId(asRecord(draft.appearance).colorSchemeId)}
-        data-testid={E2E_TESTIDS.WIZARD_SESSION_COLOR_SCHEME}
-        onChange={(event) => onChange(['appearance'], { colorSchemeId: event.target.value })}
-      >
-        {SESSION_COLOR_SCHEME_REGISTRY.map(({ id, label }) => (
-          <option key={id} value={id}>
-            {label}
-          </option>
-        ))}
-      </Input>
-    </SetupField>
-  </SetupSection>
-);
+      {link}
+      <SetupField id="ce-setup-description" label="Description" help="Shown on the session page and in link previews.">
+        <Input
+          id="ce-setup-description"
+          type="textarea"
+          className={styles.textarea}
+          value={text(draft.sessionInfo)}
+          aria-describedby={setupHelpId('ce-setup-description')}
+          data-testid={E2E_TESTIDS.WIZARD_SESSION_INFO}
+          onChange={(event) => onChange(['sessionInfo'], event.target.value)}
+        />
+      </SetupField>
+      {headerImage || (
+        <SetupField id="ce-setup-header-image" label="Header image" help="An https:// image link.">
+          <Input
+            id="ce-setup-header-image"
+            type="url"
+            value={text(draft.sessionHeader)}
+            aria-describedby={setupHelpId('ce-setup-header-image')}
+            data-testid={E2E_TESTIDS.WIZARD_SESSION_HEADER_URL}
+            onChange={(event) => onChange(['sessionHeader'], event.target.value)}
+          />
+        </SetupField>
+      )}
+      <div>
+        <button
+          type="button"
+          className={styles.moreButton}
+          aria-expanded={appearanceOpen}
+          aria-controls="ce-setup-appearance"
+          data-testid="ce-setup-appearance-toggle"
+          onClick={() => setAppearanceOpen((open) => !open)}
+        >
+          <FontAwesomeIcon icon={appearanceOpen ? faCaretUp : faCaretDown} aria-hidden="true" />
+          Appearance
+        </button>
+        {appearanceOpen ? (
+          <div id="ce-setup-appearance" className={styles.disclosureBody}>
+            <SetupField id="ce-setup-colors" label="Colors" help={COLORS_HELP}>
+              <Input
+                id="ce-setup-colors"
+                type="select"
+                value={colorSchemeId}
+                aria-describedby={setupHelpId('ce-setup-colors')}
+                data-testid={E2E_TESTIDS.WIZARD_SESSION_COLOR_SCHEME}
+                onChange={(event) => onChange(['appearance'], { colorSchemeId: event.target.value })}
+              >
+                {SESSION_COLOR_SCHEME_REGISTRY.map(({ id, label }) => (
+                  <option key={id} value={id}>
+                    {label}
+                  </option>
+                ))}
+              </Input>
+            </SetupField>
+          </div>
+        ) : null}
+      </div>
+    </SetupSection>
+  );
+};
 
 type ContextLink = { label: string; url: string };
 
@@ -135,6 +176,10 @@ const CONTEXT_HELP =
   'Paragraphs and links show on the session page to everyone who can open it, and the session’s AI reads them. Files and admins-only links go below.';
 const FORMAT_HELP =
   'Text shows the paragraphs and links below. An HTML file replaces them, under the same title. Switching discards the other one, after asking.';
+const PARAGRAPH_HELP = `Plain text, up to ${SESSION_CONTEXT_LIMITS.paragraphChars.toLocaleString('en-US')} characters, shown on the session page in this order. The session’s AI reads it too.`;
+const LINK_LABEL_HELP = `The words the session page shows for this link, up to ${SESSION_CONTEXT_LIMITS.labelChars} characters.`;
+const LINK_URL_HELP =
+  'An https:// address, for everyone who can open the session. Its page is read for the AI only if you choose that after Create.';
 const LEAVE_TEXT = 'Use an HTML file instead? The paragraphs and links will be removed.';
 const LEAVE_HTML = 'Use typed text instead? The HTML file will be removed.';
 
@@ -218,12 +263,14 @@ export const SetupContextSection = ({
             key={`paragraph-${index}`}
             id={`ce-setup-context-paragraph-${index}`}
             label={`Paragraph ${index + 1}`}
+            help={PARAGRAPH_HELP}
           >
             <Input
               id={`ce-setup-context-paragraph-${index}`}
               type="textarea"
               className={styles.textarea}
               value={paragraph}
+              aria-describedby={setupHelpId(`ce-setup-context-paragraph-${index}`)}
               maxLength={SESSION_CONTEXT_LIMITS.paragraphChars}
               onChange={(event) =>
                 save({ paragraphs: context.paragraphs.map((entry, at) => (at === index ? event.target.value : entry)) })
@@ -244,19 +291,21 @@ export const SetupContextSection = ({
         context.links.map((link, index) => (
           <div key={`link-${index}`} className={styles.listRow}>
             <div className={styles.listRowBody}>
-              <SetupField id={`ce-setup-context-link-label-${index}`} label="Link label">
+              <SetupField id={`ce-setup-context-link-label-${index}`} label="Link label" help={LINK_LABEL_HELP}>
                 <Input
                   id={`ce-setup-context-link-label-${index}`}
                   value={link.label}
+                  aria-describedby={setupHelpId(`ce-setup-context-link-label-${index}`)}
                   maxLength={SESSION_CONTEXT_LIMITS.labelChars}
                   onChange={(event) => setLink(index, { label: event.target.value })}
                 />
               </SetupField>
-              <SetupField id={`ce-setup-context-link-url-${index}`} label="Link">
+              <SetupField id={`ce-setup-context-link-url-${index}`} label="Link" help={LINK_URL_HELP}>
                 <Input
                   id={`ce-setup-context-link-url-${index}`}
                   type="url"
                   value={link.url}
+                  aria-describedby={setupHelpId(`ce-setup-context-link-url-${index}`)}
                   maxLength={SESSION_CONTEXT_LIMITS.urlChars}
                   invalid={!!link.url && !isHttpsUrl(link.url.trim())}
                   onChange={(event) => setLink(index, { url: event.target.value })}
@@ -352,11 +401,26 @@ const splitOptions = (value: string): string[] =>
 type QuestionsProps = SetupSectionProps & {
   /** After creation: what adds the questions to the session. */
   publisher?: React.ReactNode;
+  /** /new: drafts questions from the page's context. */
+  suggest?: React.ReactNode;
 };
+
+const QUESTION_TYPE_HELP =
+  'How people answer: Agree or disagree, an open answer in their own words, a rating, one of several options, or a quadratic vote, where they spread a budget of votes across options.';
+const QUESTION_PROMPT_HELP =
+  'One statement or question, in plain words. Add question puts it in the list above, where you can still edit it; it reaches the session after Create.';
+const QUESTION_OPTIONS_HELP = 'The choices people pick from, at least two, one per line.';
 
 // Questions travel with a template. They're added to the session once it
 // exists, as the question editor adds them, so a draft only lists them.
-export const SetupQuestionsSection = ({ draft, onChange, open, onToggle, publisher = null }: QuestionsProps) => {
+export const SetupQuestionsSection = ({
+  draft,
+  onChange,
+  open,
+  onToggle,
+  publisher = null,
+  suggest = null,
+}: QuestionsProps) => {
   const questions = readSetupQuestions(draft);
   const [newType, setNewType] = useState('binary');
   const [newPrompt, setNewPrompt] = useState('');
@@ -422,11 +486,12 @@ export const SetupQuestionsSection = ({ draft, onChange, open, onToggle, publish
           </button>
         </div>
       ))}
-      <SetupField id="ce-setup-question-type" label="New question type">
+      <SetupField id="ce-setup-question-type" label="New question type" help={QUESTION_TYPE_HELP}>
         <Input
           id="ce-setup-question-type"
           type="select"
           value={newType}
+          aria-describedby={setupHelpId('ce-setup-question-type')}
           onChange={(event) => setNewType(event.target.value)}
         >
           {SETUP_QUESTION_TYPES.map((entry) => (
@@ -436,21 +501,23 @@ export const SetupQuestionsSection = ({ draft, onChange, open, onToggle, publish
           ))}
         </Input>
       </SetupField>
-      <SetupField id="ce-setup-question-prompt" label="New question">
+      <SetupField id="ce-setup-question-prompt" label="New question" help={QUESTION_PROMPT_HELP}>
         <Input
           id="ce-setup-question-prompt"
           type="textarea"
           value={newPrompt}
+          aria-describedby={setupHelpId('ce-setup-question-prompt')}
           data-testid="ce-setup-question-prompt"
           onChange={(event) => setNewPrompt(event.target.value)}
         />
       </SetupField>
       {setupQuestionUsesOptions(newType) ? (
-        <SetupField id="ce-setup-question-options" label="Options, one per line">
+        <SetupField id="ce-setup-question-options" label="Options, one per line" help={QUESTION_OPTIONS_HELP}>
           <Input
             id="ce-setup-question-options"
             type="textarea"
             value={newOptions}
+            aria-describedby={setupHelpId('ce-setup-question-options')}
             onChange={(event) => setNewOptions(event.target.value)}
           />
         </SetupField>
@@ -466,6 +533,7 @@ export const SetupQuestionsSection = ({ draft, onChange, open, onToggle, publish
           Add question
         </button>
       </div>
+      {suggest}
     </SetupSection>
   );
 };
@@ -477,6 +545,9 @@ const toLocalDateTime = (value: unknown): string => {
     ? new Date(parsed.getTime() - parsed.getTimezoneOffset() * 60_000).toISOString().slice(0, 16)
     : raw;
 };
+
+const GROUP_CREATION_HELP =
+  'Anyone in the session: every signed-in participant can start a group for others to join. Admins only: only admins start groups, and participants join them.';
 
 export const summarizeParticipation = (draft: SetupSectionProps['draft']): string => {
   const interview = draft.interviewModeEnabled !== false;
@@ -519,11 +590,12 @@ export const SetupParticipationSection = ({ draft, onChange, open, onToggle, wor
         onTurnOnInterviews={() => onChange(['interviewModeEnabled'], true)}
       />
     ) : null}
-    <SetupField id="ce-setup-group-creation" label="Who can create groups">
+    <SetupField id="ce-setup-group-creation" label="Who can create groups" help={GROUP_CREATION_HELP}>
       <Input
         id="ce-setup-group-creation"
         type="select"
         value={normalizeGroupCreationPolicy(draft.groupCreationPolicy, DEFAULT_NEW_SESSION_GROUP_CREATION_POLICY)}
+        aria-describedby={setupHelpId('ce-setup-group-creation')}
         data-testid={E2E_TESTIDS.WIZARD_GROUP_CREATION_POLICY}
         onChange={(event) => onChange(['groupCreationPolicy'], event.target.value)}
       >

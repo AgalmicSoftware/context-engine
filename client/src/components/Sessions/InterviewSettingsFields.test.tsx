@@ -296,7 +296,8 @@ describe('the Results section on how well AIs predicted people', () => {
     );
     rerender(<InterviewSettingsFields value={onChange.mock.calls[0][0]} onChange={onChange} />);
     expect(screen.getByLabelText(results)).toBeChecked();
-    expect(screen.getByLabelText(results).closest('label')?.nextElementSibling).toContainElement(
+    // The switch's row, with its "?", then the smallest group directly under it.
+    expect(screen.getByLabelText(results).closest('label')?.parentElement?.nextElementSibling).toContainElement(
       screen.getByText(label),
     );
   });
@@ -380,4 +381,35 @@ describe('the Results section on how well AIs predicted people', () => {
     expect(screen.queryByRole('button', { name: help })).not.toBeInTheDocument();
     expect(screen.getByLabelText(label)).toHaveAccessibleDescription(/Turn it off only where everyone knows/);
   });
+});
+
+it('explains each setting behind its own "?", not in text under it', () => {
+  render(
+    <InterviewSettingsFields
+      value={{ openingMode: 'owner', openingPrompt: 'What should change?', followNewQuestions: true }}
+      onChange={jest.fn()}
+    />,
+  );
+  const explained = {
+    'Share AI draft changes for research by default': /choices already saved stay as they are/,
+    'AI draft research detail': /Minimal keeps none of the AI’s notes/,
+    'Hidden AI drafts': /how much seeing a draft sways answers/,
+    'Interview voice model': /OpenAI live model/,
+    'Opening question': /Owner-written: every interview opens with your question/,
+    'Owner opening question': /up to 1,200 characters/,
+    'Interview steering prompt': /public settings, so anyone can read them/,
+    'Regenerate opening when the question bank grows': /Off while the opening is owner-written/,
+    'Check for new session questions during interviews': /every 30 seconds/,
+    'Suggest new question drafts from interview evidence': /up to three new questions/,
+    'Allow admins to regenerate the opening': /Regenerate interview opening/,
+    'Show participants how well their AI predicted them': /see privately/,
+    'Show “How well AIs predicted people” in Results': /at least the smallest group/,
+    'Question growth threshold (%)': /at 20%, 42 questions need nine more/,
+  };
+  for (const [label, help] of Object.entries(explained)) {
+    expect(screen.getByLabelText(label)).toHaveAccessibleDescription(help);
+    expect(screen.getByRole('button', { name: `About ${label}` })).toBeInTheDocument();
+  }
+  expect(screen.queryByText(/^Sets the initial research-sharing checkbox/)).not.toBeInTheDocument();
+  expect(screen.queryByText(/^Additions accumulate since/)).not.toBeInTheDocument();
 });

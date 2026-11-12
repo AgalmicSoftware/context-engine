@@ -11,7 +11,7 @@ import {
   normalizeDebateAtlasTopic,
   runWithConcurrency,
 } from './debateAtlasBuild.js';
-import { dispatchDebateAtlasStore } from './debateAtlasStore.js';
+import { dispatchResultsBuildStore } from './resultsBuildStore.js';
 import { dispatchAdminRequest } from './adminRequestDispatch.js';
 
 // Addresses are built at run time so no fixture holds a key-shaped string.
@@ -32,13 +32,13 @@ const createStore = () => {
   };
   const coordinator = { state: { storage }, now: () => 1_000 };
   const calls = [];
-  const callAtlasStore = async (_env, _slug, operation, payload = {}) => {
+  const callBuildStore = async (_env, _slug, operation, payload = {}) => {
     calls.push(operation);
-    const response = await dispatchDebateAtlasStore(coordinator, operation, payload);
+    const response = await dispatchResultsBuildStore(coordinator, 'debate-atlas', operation, payload);
     const body = await response.json();
     return { ok: response.ok && body.ok === true, status: response.status, body };
   };
-  return { callAtlasStore, calls };
+  return { callBuildStore, calls };
 };
 
 const createSource = ({ questionCount = 4 } = {}) => {
@@ -102,7 +102,7 @@ const runBuild = async ({ source = createSource(), provider, store = createStore
     body,
     builderAddress: RESULTS_ADMIN.toUpperCase().replace('0X', '0x'),
     deps: {
-      callAtlasStore: store.callAtlasStore,
+      callBuildStore: store.callBuildStore,
       loadSource: async () => source,
       getSessionSecrets: async () => ({}),
       loadParticipantContextSources: async () => [],
@@ -162,7 +162,7 @@ test('builds an atlas from a planning call, a call per topic and one per branch,
   // Positions are counted against everyone whose answers the AI read, not only those it placed.
   assert.equal(topic.answered, 3);
   assert.equal(branch.answered, 3);
-  const stored = await store.callAtlasStore({}, 'atlas-session', 'read', {});
+  const stored = await store.callBuildStore({}, 'atlas-session', 'read', {});
   assert.deepEqual(stored.body.build, build);
 });
 
@@ -261,7 +261,7 @@ test('a failed build keeps nothing and frees the next press', async () => {
     const store = createStore();
     const { result } = await runBuild({ provider, store });
     assert.equal(result.ok, false);
-    const read = await store.callAtlasStore({}, 'atlas-session', 'read', {});
+    const read = await store.callBuildStore({}, 'atlas-session', 'read', {});
     assert.deepEqual(read.body.builds, []);
     assert.equal(read.body.active, null);
   }
@@ -269,7 +269,7 @@ test('a failed build keeps nothing and frees the next press', async () => {
 
 test('refuses before any AI call when a build runs, AI is off, the input is thin, or the source is not stored', async () => {
   const busy = createStore();
-  await busy.callAtlasStore({}, 'atlas-session', 'reserve', {});
+  await busy.callBuildStore({}, 'atlas-session', 'reserve', {});
   const provider = async () => assert.fail('no AI call expected');
   const refused = (await runBuild({ provider, store: busy })).result;
   assert.equal(refused.status, 409);
@@ -283,7 +283,7 @@ test('refuses before any AI call when a build runs, AI is off, the input is thin
   thin.counts.aiInputParticipantCount = 1;
   const store = createStore();
   assert.equal((await runBuild({ provider, source: thin, store })).result.status, 422);
-  assert.equal((await store.callAtlasStore({}, 'atlas-session', 'read', {})).body.active, null);
+  assert.equal((await store.callBuildStore({}, 'atlas-session', 'read', {})).body.active, null);
 });
 
 test('a plan assigns each answered question to one topic and a rejected topic claims none', () => {
@@ -367,7 +367,7 @@ const readAtlas = async ({ config, address: requester = '', validateAdmin = asyn
         return validateAdmin(args);
       },
       authorizeCloudflareStorageResourceRead: async () => ({ ok: true }),
-      callAtlasStore: async (_env, _slug, operation, payload) => {
+      callBuildStore: async (_env, _slug, operation, payload) => {
         storeCalls.push([operation, payload]);
         return { ok: true, status: 200, body: { ok: true, builds: [], build: null, active: null } };
       },
@@ -463,5 +463,5 @@ test('results admins and co-admins may build atlases and nothing else; strangers
   }
   assert.deepEqual(await dispatchAs({ action: DEBATE_ATLAS_BUILD_ACTION, signer: address(6), config }), { status: 403, built: false });
   assert.equal((await dispatchAs({ action: 'set-config', signer: RESULTS_ADMIN, config })).status, 403);
-  assert.equal((await dispatchAs({ action: 'results-analysis/generate', signer: RESULTS_ADMIN, config })).status, 403);
+  assert.equal((await dispatchAs({ action: 'set-secrets', signer: RESULTS_ADMIN, config })).status, 403);
 });

@@ -19,6 +19,7 @@ import {
   getStorageIndexBinding,
   listCloudflareMetadataRows,
   readStoredCloudflarePayloadBytes,
+  readStoredCloudflarePayloadsBulk,
 } from './storageRouteExecution.js';
 import { listHiddenStorageResourceIds, selectCanonicalStorageVersions } from './storageResourceOwnership.js';
 import { blockedQuestionIds } from './blockedQuestionIds.js';
@@ -537,8 +538,20 @@ const readWorkerCanonicalResultsAnalysisSource = async ({ env, slug, config, com
   if (!index || typeof index.list !== 'function' || typeof index.get !== 'function') {
     return { ok: false, status: 501, error: 'Cloudflare storage index binding not configured.' };
   }
+  const isEncrypted = (metadata) => metadata.encrypted === true || metadata.payloadEncrypted === true;
+  // KV payloads come in bulk reads; any the bulk read did not cover (R2's) are
+  // read one by one, strictly, so a KV fallback that fails stops the snapshot too.
+  const readPayloads = async (metadataList) => {
+    const payloads = await readStoredCloudflarePayloadsBulk({ env, index, slug, metadataList, budget });
+    return (metadata) => (payloads.has(trim(metadata.id))
+      ? payloads.get(trim(metadata.id))
+      : readStoredCloudflarePayloadBytes({ env, index, slug, metadata, strict: true, budget }));
+  };
   const questionRows = await listCloudflareMetadataRows({ index, slug, resource: 'questions', budget, strict: true });
   const hiddenQuestionIds = await listHiddenStorageResourceIds({ index, slug, resource: 'questions', budget });
+  const readableQuestion = (metadata) => isObj(metadata) && metadata.hidden !== true && !isEncrypted(metadata) &&
+    metadataAccessMatchesPublishedAudience(metadata, config);
+  const readQuestionPayload = await readPayloads(questionRows.map((row) => row?.metadata).filter(readableQuestion));
   const candidates = [];
   for (const row of questionRows) {
     const metadata = row?.metadata;
@@ -552,11 +565,11 @@ const readWorkerCanonicalResultsAnalysisSource = async ({ env, slug, config, com
     const trustedId = lower(metadata.resourceId);
     // A version this audience cannot read can still be the current one, so it
     // competes too, and an older public version is not promoted in its place.
-    if (metadata.encrypted === true || metadata.payloadEncrypted === true || !metadataAccessMatchesPublishedAudience(metadata, config)) {
+    if (!readableQuestion(metadata)) {
       if (trustedId) candidates.push({ ...version, resourceId: trustedId, withheld: true });
       continue;
     }
-    const payload = parseJsonBytes(await readStoredCloudflarePayloadBytes({ env, index, slug, metadata, budget }));
+    const payload = parseJsonBytes(await readQuestionPayload(metadata));
     if (!isObj(payload)) continue;
     if (!compareIdentity({ slug, config, suppliedSlug: payload.sessionSlug, suppliedSessionId: payload.sessionId || payload.sessionIdHex })) continue;
     // Key on the id the upload route checked for ownership (stored lower case).
@@ -576,6 +589,8 @@ const readWorkerCanonicalResultsAnalysisSource = async ({ env, slug, config, com
     .map((candidate) => candidate.question);
 
   const rows = await listCloudflareMetadataRows({ index, slug, resource: 'responses', budget, strict: true });
+  const readResponsePayload = await readPayloads(rows.map((row) => row?.metadata)
+    .filter((metadata) => isObj(metadata) && trim(metadata.responder) && !isEncrypted(metadata)));
   const responseRows = [];
   let excludedCount = 0;
   let lockedCount = 0;
@@ -587,13 +602,12 @@ const readWorkerCanonicalResultsAnalysisSource = async ({ env, slug, config, com
     }
     // Encrypted bytes do not say which question they answer, so these rows
     // cannot be matched to an older answer.
-    if (metadata.encrypted === true || metadata.payloadEncrypted === true) {
+    if (isEncrypted(metadata)) {
       excludedCount += 1;
       if (metadataAccessMatchesPublishedAudience(metadata, config)) lockedCount += 1;
       continue;
     }
-    const bytes = await readStoredCloudflarePayloadBytes({ env, index, slug, metadata, budget });
-    const payload = parseJsonBytes(bytes);
+    const payload = parseJsonBytes(await readResponsePayload(metadata));
     if (!isObj(payload)) {
       excludedCount += 1;
       continue;
@@ -1097,12 +1111,14 @@ export const evaluateResultsAnalysisViewerEligibility = ({ config } = {}) => {
     return { ok: false, status: 403, reason: 'aggregate_results_disabled', error: 'Aggregate results are not enabled for this session.' };
   }
   const visibility = resolveResultsVisibility(config);
-  if (visibility !== 'public_full_if_storage_public') {
+  // Members-only results stay readable here: the storage reads that follow
+  // hold the viewer to a signed-in session member.
+  if (visibility !== 'public_full_if_storage_public' && visibility !== 'session_member_full') {
     return {
       ok: false,
       status: 403,
       reason: visibility === 'private_admin' ? 'private_admin_requires_admin_status' : 'results_visibility_unsupported',
-      error: 'Generated results analysis viewer access is only supported for public full results backed by storage gates.',
+      error: 'Generated results analysis viewer access is only supported for full results backed by storage gates.',
     };
   }
   return { ok: true, visibility };

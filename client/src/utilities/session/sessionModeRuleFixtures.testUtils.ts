@@ -52,6 +52,9 @@ export const RULE_FIXTURES: Record<string, SessionModeProfile> = {
   public_results_require_public_storage: worker((profile) => {
     profile.results.visibility = 'public_full_if_storage_public';
   }),
+  member_results_require_session_worker: registry((profile) => {
+    profile.results.visibility = 'session_member_full';
+  }),
   payload_access_mode_mismatch: worker((profile) => {
     profile.storage.payloadAccessControl.mode = 'public_read';
   }),

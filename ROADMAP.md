@@ -5,7 +5,7 @@ Context Engine has its core deliberation, SBT, worker, encryption, and deploymen
 ## Recently Completed Foundations
 
 - **Public release hygiene**: the public release flow now includes strip/surface checks, PII scanning, branch push allowlisting, and split CI jobs for wiring, workers, contracts, client coverage, and root/node tests.
-- **Session setup**: `/new` is one page. A new draft starts on a Session Worker on Cloudflare with public results and unencrypted answers, and each option is checked against the session mode rules as you choose it.
+- **Session setup**: `/new` is one page. A new draft starts on a Session Worker on Cloudflare, with unencrypted answers that the session's signed-in members see, and each option is checked against the session mode rules as you choose it.
 - **Chipotle runtime**: supported sessions use worker-mediated Chipotle execution for Lit key release.
 - **Client modernization baseline**: the client is on React 18 and TypeScript 5.8, with production component surfaces moved to TSX and a growing set of helper-level tests.
 - **Protected SBT mint modes**: SBT contracts now expose explicit mint modes so protected password, group-signature, and invite-signature flows do not fall through to public `claim()` minting.

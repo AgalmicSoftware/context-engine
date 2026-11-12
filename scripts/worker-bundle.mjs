@@ -57,6 +57,8 @@ export const buildWorkerBundles = async ({
   writeFileSyncImpl = writeFileSync,
 } = {}) => {
   const targets = resolveWorkerBundleTargets({ rootDir, targetKeys });
+  // Every bundle reports the release it was built from (/capabilities `release`).
+  const { version } = JSON.parse(readFileSyncImpl(resolve(rootDir, 'package.json'), 'utf8'));
   if (targets.some((target) => target.enforceWorkerDependencyGuard)) {
     assertWorkerDeps({ rootDir });
   }
@@ -73,6 +75,7 @@ export const buildWorkerBundles = async ({
       format: 'esm',
       preserveSymlinks: true,
       metafile: true,
+      define: { __CE_RELEASE_VERSION__: JSON.stringify(String(version || '')) },
       target: [target.target || 'es2020'],
       ...(target.legalComments ? { legalComments: target.legalComments } : {}),
       ...(target.mainFields ? { mainFields: target.mainFields } : {}),

@@ -64,13 +64,13 @@ test('profile docs use the current wizard labels', () => {
   const e2eCadence = readIfPresent('docs/e2e-cadence.md');
 
   assert.match(wizardPolicy, /label="Runs on"/);
-  assert.match(wizardPolicy, /<option value="worker_canonical">Session Worker<\/option>/);
-  assert.match(wizardPolicy, /<option value="evm_registry_canonical">On-chain registry<\/option>/);
-  assert.match(runModes, /Hosted & Fast[\s\S]*`Session Worker`/);
-  assert.match(runModes, /Trustless & Slower[\s\S]*`On-chain registry`/);
-  assert.match(workerDoc, /Hosted & Fast[\s\S]{0,100}`Session Worker`/);
+  assert.match(wizardPolicy, /\{ value: 'worker_canonical', label: 'Centralized' \}/);
+  assert.match(wizardPolicy, /\{ value: 'evm_registry_canonical', label: 'Decentralized' \}/);
+  assert.match(runModes, /Hosted & Fast[^#]{0,80}`Runs on` shows this as `Centralized`/);
+  assert.match(runModes, /Trustless & Slower[^#]{0,80}`Runs on` shows this as `Decentralized`/);
+  assert.match(workerDoc, /Hosted & Fast\*\* profile \(`Centralized` under\s+`Runs on`/);
   if (e2eCadence) {
-    assert.match(e2eCadence, /Hosted & Fast profile \(`Session Worker`/);
+    assert.match(e2eCadence, /Hosted & Fast profile \(`Centralized` under\s+\*\*Runs on\*\*/);
   }
 
   for (const [relativePath, source] of [

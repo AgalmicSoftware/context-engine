@@ -152,7 +152,11 @@ export async function handlePreferencesRequest({ env = {}, context = {}, input =
     typeof agentMetadata === 'object' &&
     Object.values(agentMetadata).some((value) => value !== null && value !== undefined && value !== '');
   const clientSource = safeString(firstValue(input.source, input.client, input.integration)).slice(0, 120);
-  const rootSubmitRequested = directSubmitRequested(input);
+  // A person's key answers as them only where the Worker stores the answers.
+  // On chain a managed account would sign instead, so its submit stays a draft.
+  const draftsOnly = !!context.delegation?.sourceParticipant &&
+    context.session.sessionModeProfile?.authority?.mode !== 'worker_canonical';
+  const rootSubmitRequested = !draftsOnly && directSubmitRequested(input);
   const drafts = [];
   const submitted = [];
   const skipped = [];
@@ -171,7 +175,7 @@ export async function handlePreferencesRequest({ env = {}, context = {}, input =
   }
   for (const entry of entries) {
     const questionId = safeString(entry.questionId);
-    const shouldSubmit = rootSubmitRequested || directSubmitRequested(entry.answer);
+    const shouldSubmit = !draftsOnly && (rootSubmitRequested || directSubmitRequested(entry.answer));
     if (shouldSubmit) submitRequestedCount += 1;
     const question = byId.get(questionId);
     if (!question) {
@@ -268,6 +272,7 @@ export async function handlePreferencesRequest({ env = {}, context = {}, input =
         draft: draftRecord,
         sessionSlug: context.session.sessionSlug,
         selectedQuestionId: questionId,
+        question,
         createdAt: null,
       });
       if (!submit.ok) {

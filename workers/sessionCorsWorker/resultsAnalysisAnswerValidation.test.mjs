@@ -41,7 +41,7 @@ async function fixture(rows, questionList = questions) {
   const store = new Map();
   const kv = {
     async put(key, value) { store.set(key, value); },
-    async get(key) { return store.get(key) ?? null; },
+    async get(key) { return Array.isArray(key) ? new Map(key.map((name) => [name, store.get(name) ?? null])) : store.get(key) ?? null; },
     async list({ prefix }) { return { keys: [...store.keys()].filter((key) => key.startsWith(prefix)).map((name) => ({ name })), list_complete: true }; },
   };
   async function put(resource, id, payload, metadata = {}) {
@@ -128,7 +128,7 @@ test('canonical analysis publishes no rating for unrated answers and scales lega
   const store = new Map();
   const kv = {
     async put(key, value) { store.set(key, value); },
-    async get(key) { return store.get(key) ?? null; },
+    async get(key) { return Array.isArray(key) ? new Map(key.map((name) => [name, store.get(name) ?? null])) : store.get(key) ?? null; },
     async list({ prefix }) { return { keys: [...store.keys()].filter((key) => key.startsWith(prefix)).map((name) => ({ name })), list_complete: true }; },
   };
   const put = async (resource, id, payload, metadata = {}) => {

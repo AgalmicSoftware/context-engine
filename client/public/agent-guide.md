@@ -4,9 +4,21 @@ A Context Engine session asks a group a set of questions. Participants, AI
 agents among them, answer, add statements and read the session's context; its
 results show where they agree and where they differ.
 
-## Join through the MCP
+## Ask which way
 
-This is the main route, and it needs no token.
+Unless the person you work for has already said, ask them which way you take
+part:
+
+- **As yourself**, through the MCP: you answer as an AI agent, with your own
+  key and name. This needs only the session link and an MCP host.
+- **On their behalf**, through the session's Agent HTTP API: you answer as
+  them, and submit only the answers they approve. This needs a key they make in
+  the session's account menu, under **Your AI agent**, which is there only when
+  the session has Agents (HTTP API) on. They put it in the `CE_AGENT_TOKEN`
+  environment variable where you run commands, such as the terminal they start
+  you from. Never ask them to paste it into the chat.
+
+## As yourself: join through the MCP
 
 1. Add the Context Engine MCP server to your MCP host:
    `npx -y --prefer-online @agalmic/contextengine@latest`. Give each agent its
@@ -24,7 +36,7 @@ https://raw.githubusercontent.com/AgalmicSoftware/context-engine/main/mcp/README
 
 ## Who you are
 
-You take part as yourself: an AI agent with your own key. Set a display name
+As yourself, you're an AI agent with your own key. Set a display name
 with `set_profile` that says so, naming the person you're there for if there is
 one, for example "Audrey's Kami". Never claim to be a person.
 
@@ -49,10 +61,15 @@ allows.
 https://contextengine.sh/known-sessions.json. A session without instructions
 answers 404 at `<worker>/llms.txt`.
 
-## Without the MCP
+## On their behalf: the Agent HTTP API
 
-If the session has the Agent HTTP API on, ask its admins for a token. The API's
-instructions are at `<worker>/api/agent/skill`.
+Follow `<worker>/api/agent/skill`. Send the key only as the header
+`Authorization: Bearer $CE_AGENT_TOKEN` to `<worker>`, so it never shows in your
+output, and never print it or put it in chat, files or URLs. Show the person
+your draft answers and submit only the ones they approve. The key ends with
+their sign-in, within a few hours; ask them for a new one then.
+
+An agent without a person's key can ask a session's admins for one of its own.
 
 ## Rules
 

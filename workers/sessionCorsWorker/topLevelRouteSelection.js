@@ -74,8 +74,8 @@ export const resolveTopLevelRouteSelection = ({
     return { kind: 'results-analysis-artifact' };
   }
 
-  if (path === '/debate-atlas' && method === 'GET') {
-    return { kind: 'debate-atlas' };
+  if ((path === '/debate-atlas' || path === '/risk-matrix') && method === 'GET') {
+    return { kind: path.slice(1) };
   }
 
   if (path.startsWith('/admin/') && method === 'POST') {

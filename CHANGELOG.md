@@ -2,6 +2,55 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.9.3] - 2026-11-12
+
+### Client — available when the site deploys
+
+- Admins, co-admins and results admins get **Build risk matrix** beside **Build atlas** in the open Results menu, with a "?" saying what it builds. While it runs, the status line counts the time, names the AI model and shows the prompt under **Show AI prompt**. The newest build opens as **Risk Matrix**, with a **Version** picker for earlier builds, in place of the demo's or AI Views' risk matrix; each note says how many participants hold it.
+- The Risk Matrix shows AI Views' notes as written: it no longer adds the demo's historical figures, sources and atlas scenarios when their areas share the demo's names. A cell between two areas now lists only their notes, where a note could also show up when one of its subareas had an area's name.
+- The Risk Matrix reads clearly in Context Engine and Classic 95. A cell's figure sits on a chip of its own, where the strongest cells were as low as 2.1:1, and the diagonal's dots are no longer faint. In Classic 95 a cell's notes sit on white cards rather than black ones, where their text was 1:1, and a note group's title stays readable when hovered. In every theme **Clear X** and **Clear Y** stay readable while there is nothing to clear; in Civic they were 2.4:1.
+- The **Version** picker of a debate atlas or risk matrix shows its text in the panel's colour in Context Engine, where it was 2.1:1.
+- **Session members see all answers** is a new **Who sees results** choice, and new sessions on `/new` start with it: everyone signed in to the session sees every answer and the AI Views, and a signed-out visitor is asked to sign in. It needs the Session Worker, so choosing on-chain hosting moves it to public results, or to own answers when answers are encrypted. Sessions created earlier keep their setting; Settings offers the new choice once the session's Worker runs this release.
+- **Suggest questions**, under the question list on `/new`, drafts five questions from the page's context with the OpenAI key typed under AI, following **Question prompt** and **Tag suggestions**. It reads the name, description, context text and links, and the files added to Context. Drafts join the list, where you can edit or remove them before **Create**. The key goes only to OpenAI, from your browser.
+- **Runs on** is now a toggle at the top of `/new`, **Centralized** (a Session Worker on Cloudflare) or **Decentralized** (an on-chain registry with Arweave), where it was a dropdown under Hosting and storage. Its "?" says what each needs.
+- **Colors** on `/new` and in Settings now sit under **Appearance** in Basics, which opens by itself when a session has colours of its own.
+- **Every option on `/new`** now has its own "?" saying what it does and what it needs, including the interview settings, the results analysis, the access rules and each key field. Help that showed as text under an option has moved into its "?", and screen readers still read it with the option. The interview and results analysis settings show the same "?" in Settings and on `/admin`, and the key fields now have labels.
+- The faucet card under Hosting and storage is titled **Test gas faucet**, where it showed the code **TXGAS**.
+- **Sign-in** and **Permissions**, on `/new` and in Settings, and **Storage** on `/new` now show as text with a "?", since **Runs on** allows only one of each; their dropdowns and checkboxes could only cause conflicts. **SBTs grant permissions** stays a choice on Centralized sessions. When a template brings values Runs on doesn't allow, **Match Runs on** puts back what it needs, and **Session Worker** encryption can't be chosen on a Decentralized session.
+- **Session members see their own answers**, which looked like **Each person sees their own answers** on the web, is now **Own answers; agents need a group**, and **Anyone can see the results** is **Anyone can see all answers**. The "?" beside **Who sees results** says what each choice shows.
+- Older text on `/new` is now readable in every theme: the Worker name under Hosting and storage, **ANY** and **ALL** on an access rule when hovered, **Create Group** while pressed, and **Add Address** once an address is typed. In Classic, access rules and group pickers, with their **+ By Address**, address chips and group menus, read dark on light wherever they appear, where they were light on light, and in Context Engine the group picker's placeholder is brighter.
+- The account menu has **Your AI agent**, with two ways to bring an agent to the session. **As itself** copies a Claude Code command that adds the Context Engine MCP with the agent named "<your name>'s Kami", and a prompt that joins the session. **On my behalf**, when the session has Agents (HTTP API) on, makes a key that lets your agent read the questions, save drafts and submit the answers you approve, as you. The key comes inside a terminal command that sets `CE_AGENT_TOKEN`, so it stays out of the chat: the prompt you paste there names the variable, not the key. The key is kept only while the dialog is open, and works until your sign-in ends.
+- `/skill.md` and `/llms.txt` tell an agent to ask the person it works for which way to take part, and say what each way needs.
+- **Settings** shows which Context Engine release the session's Worker runs; a Worker from before 0.9.3 shows "before 0.9.3".
+- Results admins can start **AI Views** on Worker-hosted sessions and see their progress, as they already build atlases and risk matrices. Only the admin can publish AI Views from answers the browser supplies, as on-chain sessions do.
+- The About page's **Representative Models** card now says training representative AI models is planned, where it read as available today. The group recording guide (`docs/session-listening-mode.md`) no longer says handing each speaker their part by code is unavailable.
+
+### Workers — requires redeployment
+
+- Admins, co-admins and results admins can build a session's risk matrix with AI, as they build its debate atlas (`POST /admin/risk-matrix/build`, read at `GET /risk-matrix`). One call names the areas the responses discuss, each with a few subareas, and writes notes on where two areas meet, each an opportunity or a risk with an intensity from 1 to 10. A note is kept only when it cites someone who answered a question it cites. The session's context reaches the AI as untrusted material. Builds are kept and read like atlas builds: the newest 8, each stamped with its time and response count, under the same viewer rule. The public config reports `riskMatrix: true`.
+- AI Views and the debate atlas read a session's answers 100 at a time, so about 80 people answering 30 questions now fit the Worker's read limit. Before, a session was refused from about 400 answers. An answer that can't be read now stops the build with a message to retry, instead of being left out.
+- New results visibility `session_member_full`. `/storage/list` and `/storage/read` give a signed-in participant who holds the `storage` (or `arweave`) scope every answer, and the AI Views, Debate Atlas and Risk Matrix reads follow; a signed-out visitor, or a sign-in without that scope, reads none. Per-answer access rules still apply. Only Worker-hosted sessions with Cloudflare storage can choose it.
+- On such sessions the Agent HTTP results routes need a credential whose account passes the session's sign-in rules, and refuse others with `agent_membership_denied`.
+- The public config sets `memberResults: true`, so the site knows the Worker offers this visibility.
+- `/api/agent/questions/next` no longer fails with `question_queue_unavailable` in sessions whose questions were added on the website. Their IDs have the same shape as a private key, so the secret check refused to save which questions an agent had been served. Fields named for question IDs may now hold exactly that shape, and nothing else that looks like a secret.
+- Agent HTTP results no longer fail with `agent_storage_unavailable` once a session has about 500 answers from agents. `/api/agent/results` and `/api/agent/results-image` now read only the permanent copy of each answer, 100 per KV read. Cloudflare stops a request after 1,000 KV operations; in a test salon of 80 agents answering 30 questions, with 16 changing their answers, the busiest results request uses 167. A stored answer can be half a megabyte, so a read that Cloudflare refuses for passing its 25 MB reply limit is read again in halves.
+- An agent submitting many answers in one `/api/agent/preferences` request no longer reloads every question for each answer. A 30-answer submit used more than 1,000 KV operations and failed; it now uses about 490.
+- `/capabilities` reports the Worker's Context Engine release as `release`, so a public GET tells which release a Worker runs.
+- Results admins may call `POST /admin/results-analysis/generate` and read its status on Worker-stored answers; a request that supplies its own answers is still the admin's alone.
+- An agent's submitted answer no longer fails with a 500 about once in 50,000 submissions, when the random ID its stored copy was given happened to look like an API key.
+- `POST /api/agent/credentials/delegate` gives a signed-in person a key for their own agent, with `read_questions` and `draft_answers` for their address, so what it submits counts as their answer. It never carries their admin powers, and in an on-chain session it only drafts, since its answers would not be signed as them. It ends with the sign-in it came from and when they make a new one, can't be exchanged for a website sign-in, and isn't given to a sign-in an agent made. The Agent HTTP skill, now v46, says how an agent uses it.
+
+### Agents and MCP
+
+- MCP 0.3.1. `get_results` reads a members-only session's results for an agent signed in to it. It reports `resultsPublic: false` with a note that the results are for signed-in members only.
+- `get_results` reads up to 10,000 answer records by default, 16 at a time, instead of 2,000, so a 30-question session of 80 people, which lists about 2,900, is counted in full rather than marked partial.
+- The MCP server's instructions tell an agent to ask the person it works for whether to take part as itself, with these tools, or on their behalf, with a key from the account menu.
+
+### Local tooling
+
+- CI runs the Agent HTTP tests once. The Session Worker suite already includes them, so the workers gate no longer runs `test:worker:agent` as well; the test wiring check now requires the suite to keep including them.
+- `npm run ai:test-theme:results-builds` checks the built debate atlas and risk matrix in each theme at phone and desktop widths; `ai:test-theme:atlas` is gone.
+
 ## [0.9.2] - 2026-11-11
 
 ### Client — available when the site deploys
@@ -110,7 +159,7 @@ All notable changes to this project will be documented in this file.
 - The Debate Map's tree view asks for a category to draw the **Tree Chart**, as its button is named.
 - Question Results shows a spinner in place of its question and response counts, and each question's count, until they load, instead of 0.
 - The status line under Results, shown while AI Views or an atlas builds, is readable in Civic, where it measured 3.35:1.
-- The Results menu buttons, the Debate Map view switch and legend, a topic's panel and its compass are readable in Civic, Context Engine and Classic 95: some labels were as low as 1:1. `npm run ai:test-theme:atlas` checks them in each theme at phone and desktop widths.
+- The Results menu buttons, the Debate Map view switch and legend, a topic's panel and its compass are readable in Civic, Context Engine and Classic 95: some labels were as low as 1:1. `npm run ai:test-theme:results-builds` (named `ai:test-theme:atlas` until 0.9.3) checks them in each theme at phone and desktop widths.
 - The Agent Village post is readable in Classic 95, where its tags, chart labels and tooltips, List view and evaluation protocol measured as low as 1.1:1. A pinned tooltip's close button also stays visible on hover and focus there and in Civic. `npm run ai:test-theme:civic` now checks the post in Classic 95 too.
 - The About page says Soulbound Token groups instead of SBT groups, and names the Cloudflare Worker alternatives: Worker Groups for access control, and Worker encryption beside Lit for on-chain sessions.
 - The RxC sessions no longer show twelve pre-filled topic circles: Debate Map appears once an atlas is built, on rxc-ra-test too. On a demo session, a built atlas replaces the demo atlas.

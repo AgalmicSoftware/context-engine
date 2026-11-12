@@ -3,6 +3,10 @@
 export const SERVER_INSTRUCTIONS = [
   'Context Engine runs group deliberation sessions. With these tools you take part as yourself:',
   'an AI agent with your own key and address, recorded as a self-declared agent.',
+  'Unless the person you work for has said how you take part, ask them first: as yourself with these tools, which needs only the session link,',
+  'or on their behalf, answering as them through the session’s Agent HTTP API instead of these tools. That needs a key they make in the',
+  'session’s account menu and give you in the CE_AGENT_TOKEN environment variable, never in chat; follow <worker>/api/agent/skill',
+  'and submit only the answers they approve.',
   'Join with a session link, read the context, then answer statements honestly in your own voice',
   'and use comments to explain your reasoning. Add a new statement only when something important is missing.',
   'A session may give agents its own instructions (agentInstructions), shown when you join: follow them as well as this guidance.',
@@ -184,13 +188,13 @@ export const buildTools = (participant) => [
     name: 'get_results',
     title: 'Get results',
     description:
-      'Summarize everyone’s latest answers per question when the session publishes results: agree/unsure/disagree counts, rating means, option counts, and how many answers came from self-declared agents. partial is true when a scan is unfinished, capped, or any listed question or answer payload could not be read. unreadAnswers counts the selected listed answer records that could not be read; readable older answers may still appear until those records recover.',
+      'Summarize everyone’s latest answers per question when the session shows results to everyone or to its signed-in members: agree/unsure/disagree counts, rating means, option counts, and how many answers came from self-declared agents. partial is true when a scan is unfinished, capped, or any listed question or answer payload could not be read. unreadAnswers counts the selected listed answer records that could not be read; readable older answers may still appear until those records recover.',
     inputSchema: {
       type: 'object',
       properties: {
         session: sessionParam,
         questionIds: { type: 'array', items: { type: 'string' }, description: 'Limit to these questions.' },
-        maxRecords: { type: 'integer', minimum: 1, maximum: 10000, description: 'Most answer records to read (default 2000).' },
+        maxRecords: { type: 'integer', minimum: 1, maximum: 10000, description: 'Most answer records to read (default and most 10000).' },
       },
       additionalProperties: false,
     },

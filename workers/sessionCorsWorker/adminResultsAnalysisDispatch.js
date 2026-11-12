@@ -7,6 +7,7 @@ import {
 import {
   readResultsAnalysisAdminStatus,
 } from './resultsAnalysisGeneration.js';
+import { canBuildResults } from './resultsBuild.js';
 
 const toTrimmedString = (value, deps) => {
   if (typeof deps?.toStr === 'function') return deps.toStr(value).trim();
@@ -94,13 +95,10 @@ export const dispatchAdminResultsAnalysisStatusRequest = async ({
   const headers = withPrivateNoStoreHeaders(context.headers);
 
   const address = toTrimmedString(auth.payload?.sub, deps).toLowerCase();
-  const isAdmin = await deps?.validateAdmin?.({
-    env,
-    slug: targetSlug,
-    address,
-    config,
-    body: {},
-  });
+  // Results admins also read AI Views status; diagnostics stay with admins.
+  const isAdmin = diagnostics
+    ? await deps?.validateAdmin?.({ env, slug: targetSlug, address, config, body: {} })
+    : await canBuildResults({ env, slug: targetSlug, config, address, validateAdmin: deps?.validateAdmin });
   if (!isAdmin) {
     await recordAuthFailure({ env, deps });
     return deps?.json?.({ error: 'Admin authorization failed.' }, 403, headers);

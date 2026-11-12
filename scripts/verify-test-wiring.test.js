@@ -294,6 +294,7 @@ test('public-release style copies without .git still pass wiring checks', () => 
           'test:e2e': 'npm run -s test:e2e:smoke',
           'test:e2e:quick': 'npm run -s test:e2e:smoke',
           'test:e2e:smoke': 'npm run -s ai:test-nav:smoke',
+          'test:e2e:recording-durability': 'node scripts/breakout-recording-durability-smoke.mjs',
           'ai:test-nav:smoke': 'node scripts/vite-navigation-smoke.js',
           'type-debt:check': 'node scripts/check-type-debt-ratchet.mjs',
           'coverage-floor:check': 'node scripts/check-client-coverage-floors.mjs',

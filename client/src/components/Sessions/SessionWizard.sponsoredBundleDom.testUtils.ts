@@ -19,7 +19,7 @@ const openSetupSection = (key: string) => {
 // helper, which can't be imported here without also installing its jest mocks.
 const selectRegistryHosting = () => {
   openSetupSection('hosting');
-  fireEvent.change(screen.getByTestId('ce-setup-authority'), { target: { value: 'evm_registry_canonical' } });
+  fireEvent.click(screen.getByRole('radio', { name: 'Decentralized' }));
 };
 
 // Lit encryption adds the Lit resource card under Hosting.

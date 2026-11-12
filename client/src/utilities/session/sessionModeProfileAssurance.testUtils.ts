@@ -80,6 +80,7 @@ export const SESSION_MODE_DECLARED_SUPPORT = {
     private_admin: 'unavailable',
     participant_aggregate: 'reachable',
     session_member_aggregate: 'reachable',
+    session_member_full: 'reachable',
     public_redacted_snapshot: 'unavailable',
     public_full_if_storage_public: 'reachable',
   } satisfies Record<SessionModeResultsVisibility, SessionModeProfileSupportStatus>,
@@ -128,6 +129,13 @@ const roleGatedPlaintextCloudflareProfile = (): SessionModeProfile => {
     encryption: 'none',
   };
   profile.encryption = { mode: 'none' };
+  return profile;
+};
+
+// The /new default: every answer visible to signed-in session members.
+const membersResultsCloudflareProfile = (): SessionModeProfile => {
+  const profile = roleGatedPlaintextCloudflareProfile();
+  profile.results.visibility = 'session_member_full';
   return profile;
 };
 
@@ -202,6 +210,7 @@ export const createReachableSessionModeFixtures = (): SessionModeAssuranceFixtur
   },
   { id: 'cloudflare-public', profile: publicCloudflareProfile() },
   { id: 'cloudflare-role-gated-plaintext', profile: roleGatedPlaintextCloudflareProfile() },
+  { id: 'cloudflare-members-results', profile: membersResultsCloudflareProfile() },
   { id: 'cloudflare-lit', profile: litCloudflareProfile() },
   { id: 'cloudflare-worker-envelope-sbt', profile: sbtEnvelopeProfile() },
   { id: 'arweave-lit', profile: litArweaveProfile() },

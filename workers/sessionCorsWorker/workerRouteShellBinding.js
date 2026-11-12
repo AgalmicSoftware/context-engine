@@ -34,6 +34,7 @@ import {
   dispatchResultsAnalysisArtifactRequest as dispatchResultsAnalysisArtifactRequestBoundary,
 } from './resultsAnalysisArtifactDispatch.js';
 import { dispatchDebateAtlasReadRequest as dispatchDebateAtlasReadRequestBoundary } from './debateAtlasBuild.js';
+import { dispatchRiskMatrixReadRequest as dispatchRiskMatrixReadRequestBoundary } from './riskMatrixBuild.js';
 import {
   dispatchAuthNonceRequest as dispatchAuthNonceRequestBoundary,
 } from './authNonceRequestDispatch.js';
@@ -115,6 +116,7 @@ export const createWorkerRouteShellWithWorkerDeps = ({
     deps?.dispatchResultsAnalysisArtifactRequest || dispatchResultsAnalysisArtifactRequestBoundary
   );
   const dispatchDebateAtlasReadRequest = deps?.dispatchDebateAtlasReadRequest || dispatchDebateAtlasReadRequestBoundary;
+  const dispatchRiskMatrixReadRequest = deps?.dispatchRiskMatrixReadRequest || dispatchRiskMatrixReadRequestBoundary;
   const dispatchAnonymousRouteEntry = (
     deps?.dispatchAnonymousRouteEntry || dispatchAnonymousRouteEntryBoundary
   );
@@ -530,8 +532,8 @@ export const createWorkerRouteShellWithWorkerDeps = ({
       }
 
 
-      // Atlases share this route's slug, CORS and optional sign-in handling.
-      if (routeSelection.kind === 'results-analysis-artifact' || routeSelection.kind === 'debate-atlas') {
+      // Atlases and risk matrices share this route's slug, CORS and optional sign-in handling.
+      if (['results-analysis-artifact', 'debate-atlas', 'risk-matrix'].includes(routeSelection.kind)) {
         const withQuerySlugHeader = (() => {
           try {
             const params = new URL(request.url).searchParams;
@@ -587,8 +589,9 @@ export const createWorkerRouteShellWithWorkerDeps = ({
           address = context.address;
           scopes = context.scopes;
         }
-        if (routeSelection.kind === 'debate-atlas') {
-          return await dispatchDebateAtlasReadRequest({
+        if (routeSelection.kind === 'debate-atlas' || routeSelection.kind === 'risk-matrix') {
+          const dispatchBuildRead = routeSelection.kind === 'debate-atlas' ? dispatchDebateAtlasReadRequest : dispatchRiskMatrixReadRequest;
+          return await dispatchBuildRead({
             request: withQuerySlugHeader,
             env,
             config,

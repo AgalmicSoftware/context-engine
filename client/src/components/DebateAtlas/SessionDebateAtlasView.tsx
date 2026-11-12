@@ -1,22 +1,20 @@
-import React, { useCallback, useEffect, useId, useMemo, useRef } from 'react';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faQuestionCircle } from '@fortawesome/free-solid-svg-icons';
+import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 
 import DebateMap from '../DebateMap/DebateMap';
-import CETooltip from '../Shared/CETooltip';
+import ResultsBuildPanel from '../ResultsBuilds/ResultsBuildPanel';
 import {
   buildDebateAtlasTree,
   buildSessionAtlasLink,
   buildSessionQuestionLink,
   debateAtlasBuildIdOf,
-  describeDebateAtlasBuild,
 } from './debateAtlasTree';
-import type { DebateAtlasBuild, DebateAtlasBuildSummary } from '../../domains/debateAtlas/debateAtlasTypes';
+import type { DebateAtlasBuild } from '../../domains/debateAtlas/debateAtlasTypes';
+import type { ResultsBuildSummary } from '../../domains/resultsBuilds/resultsBuildWorkerClient';
 import styles from './SessionDebateAtlasView.module.scss';
 
 type Props = {
   build: DebateAtlasBuild;
-  builds: DebateAtlasBuildSummary[];
+  builds: ResultsBuildSummary[];
   onSelectBuild: (id: string) => void;
   sessionSlug: string;
   workerUrl?: string;
@@ -39,10 +37,8 @@ export default function SessionDebateAtlasView({
   requestedNodeId = null,
   onRequestedNodeClose = null,
 }: Props) {
-  const helpId = `debate-atlas-help-${useId().replace(/:/g, '')}`;
   const treeData = useMemo(() => buildDebateAtlasTree(build, { sessionSlug }), [build, sessionSlug]);
   const title = build.title || 'Debate atlas';
-  const sampled = Number(build.counts?.aiResponses) < Number(build.counts?.responses);
   const missing = build.missingTopics || [];
   const requestedBuildId = requestedNodeId ? debateAtlasBuildIdOf(requestedNodeId) : '';
   const requestedBuildKept = builds.some((entry) => entry.id === requestedBuildId);
@@ -65,48 +61,19 @@ export default function SessionDebateAtlasView({
   );
 
   return (
-    <section className={styles.atlas} aria-label="Debate atlas" data-testid="ce-session-debate-atlas">
-      <header className={styles.header}>
-        <div>
-          <div className={styles.titleRow}>
-            <h3>{title}</h3>
-            <button
-              type="button"
-              id={helpId}
-              className={styles.help}
-              data-ce-control-appearance="frameless"
-              aria-label="About this atlas"
-            >
-              <FontAwesomeIcon icon={faQuestionCircle} />
-            </button>
-            <CETooltip target={helpId} placement="bottom" trigger="hover focus" autohide={false}>
-              The session&apos;s AI built this from the responses at that moment. Open a category or topic to see its
-              compass: the positions found and where each participant sits.
-              {sampled ? ` The AI read ${build.counts?.aiResponses} of the ${build.counts?.responses} responses.` : ''}
-            </CETooltip>
-          </div>
-          <p className={styles.meta}>Built {describeDebateAtlasBuild(build)}</p>
-        </div>
-        {builds.length > 1 && (
-          <label className={styles.picker}>
-            <span>Version</span>
-            <select
-              value={build.id}
-              onChange={(event) => {
-                // Another version was picked, so a node a link asked for stays shut.
-                onRequestedNodeClose?.();
-                onSelectBuild(event.target.value);
-              }}
-            >
-              {builds.map((entry) => (
-                <option key={entry.id} value={entry.id}>
-                  {describeDebateAtlasBuild(entry)}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
-      </header>
+    <ResultsBuildPanel
+      kind="debate-atlas"
+      label="Debate atlas"
+      className={styles.atlas}
+      build={build}
+      builds={builds}
+      onSelectBuild={(id) => {
+        // Another version was picked, so a node a link asked for stays shut.
+        onRequestedNodeClose?.();
+        onSelectBuild(id);
+      }}
+      help="The session's AI built this from the responses at that moment. Open a category or topic to see its compass: the positions found and where each participant sits."
+    >
       {missing.length > 0 && (
         <p className={styles.notice} role="status">
           Not mapped this time: {missing.join(', ')}.
@@ -129,6 +96,6 @@ export default function SessionDebateAtlasView({
           levelLabels={LEVEL_LABELS}
         />
       </div>
-    </section>
+    </ResultsBuildPanel>
   );
 }

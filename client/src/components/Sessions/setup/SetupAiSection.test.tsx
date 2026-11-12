@@ -32,8 +32,12 @@ describe('SetupAiSection', () => {
     expect(screen.getByTestId('ce-setup-summary-ai')).toHaveTextContent('OpenAI gpt-5.6-terra · medium effort');
   });
 
-  it('names the transcription model new sessions use', () => {
+  it('names the transcription model new sessions use behind the Provider’s "?"', () => {
     renderAi('create');
-    expect(screen.getByText('Transcription uses OpenAI gpt-transcribe.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'About Provider' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Provider')).toHaveAccessibleDescription(
+      /Transcription always uses OpenAI gpt-transcribe, so voice interviews and group recordings need an OpenAI key too\./,
+    );
+    expect(screen.queryByText(/^Transcription uses OpenAI/)).not.toBeInTheDocument();
   });
 });

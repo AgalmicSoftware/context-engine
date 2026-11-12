@@ -30,7 +30,10 @@ export const WORKER_MODE_PATH_RULE_CODES = Object.freeze({
     'sbt_authorization_requires_condition',
     'registry_authorization_mismatch',
   ]),
-  'sessionModeProfile.results.visibility': Object.freeze(['public_results_require_public_storage']),
+  'sessionModeProfile.results.visibility': Object.freeze([
+    'public_results_require_public_storage',
+    'member_results_require_session_worker',
+  ]),
   'sessionModeProfile.export.scope': Object.freeze(['encrypted_export_requires_encryption']),
   'sessionModeProfile.export.surfaceFilter': Object.freeze(['surface_filter_requires_selected_export']),
   'sessionModeProfile.surfaces.miniApp': Object.freeze(['mini_app_requires_telegram']),

@@ -938,7 +938,7 @@ test('artifact requests reject stale token epochs and require current storage sc
   assert.equal(artifactReads, 2);
 });
 
-test('atlas reads pass the artifact checks and reach the atlas reader with the signed-in address', async () => {
+test('atlas and risk matrix reads pass the artifact checks and reach their readers with the signed-in address', async () => {
   const sessionId = '0x' + '1'.repeat(32);
   const reader = '0x' + '2'.repeat(40);
   const reads = [];
@@ -954,18 +954,28 @@ test('atlas reads pass the artifact checks and reach the atlas reader with the s
       getCorsContext: async () => ({ ok: true, headers: {} }),
       requireAuth: async () => ({ ok: true, slug: 'session-a', payload: { sub: reader, sessionId, authzEpoch: 2, scopes: { storage: true } } }),
       computeScopesForLogin: async () => ({ storage: true }), checkRateLimit: async () => true,
-      dispatchResultsAnalysisArtifactRequest: async () => assert.fail('atlas reads must not reach the artifact reader'),
+      dispatchResultsAnalysisArtifactRequest: async () => assert.fail('build reads must not reach the artifact reader'),
       dispatchDebateAtlasReadRequest: async ({ slug, address, request }) => {
-        reads.push({ slug, address, id: new URL(request.url).searchParams.get('id') });
+        reads.push({ kind: 'atlas', slug, address, id: new URL(request.url).searchParams.get('id') });
+        return new Response('{}');
+      },
+      dispatchRiskMatrixReadRequest: async ({ slug, address, request }) => {
+        reads.push({ kind: 'risk', slug, address, id: new URL(request.url).searchParams.get('id') });
         return new Response('{}');
       },
     },
   });
-  const request = (headers = {}) => new Request('https://worker.example/debate-atlas?sessionSlug=session-a&id=atlas_k1_00000001', { headers });
-  assert.equal((await shell.fetch(request({ authorization: 'Bearer synthetic' }), {})).status, 200);
-  assert.equal((await shell.fetch(request(), {})).status, 200);
+  const request = (path, headers = {}) => new Request(`https://worker.example${path}`, { headers });
+  const atlas = '/debate-atlas?sessionSlug=session-a&id=atlas_k1_00000001';
+  const matrix = '/risk-matrix?sessionSlug=session-a&id=risk_k1_00000001';
+  assert.equal((await shell.fetch(request(atlas, { authorization: 'Bearer synthetic' }), {})).status, 200);
+  assert.equal((await shell.fetch(request(atlas), {})).status, 200);
+  assert.equal((await shell.fetch(request(matrix, { authorization: 'Bearer synthetic' }), {})).status, 200);
+  assert.equal((await shell.fetch(request(matrix), {})).status, 200);
   assert.deepEqual(reads, [
-    { slug: 'session-a', address: reader, id: 'atlas_k1_00000001' },
-    { slug: 'session-a', address: '', id: 'atlas_k1_00000001' },
+    { kind: 'atlas', slug: 'session-a', address: reader, id: 'atlas_k1_00000001' },
+    { kind: 'atlas', slug: 'session-a', address: '', id: 'atlas_k1_00000001' },
+    { kind: 'risk', slug: 'session-a', address: reader, id: 'risk_k1_00000001' },
+    { kind: 'risk', slug: 'session-a', address: '', id: 'risk_k1_00000001' },
   ]);
 });

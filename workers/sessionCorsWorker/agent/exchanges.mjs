@@ -1,4 +1,4 @@
-import { AGENT_BROWSER_CREDENTIAL_TTL_SECONDS, AGENT_CREDENTIAL_AUDIENCES, AGENT_CREDENTIAL_KINDS, AGENT_MEMBER_CREDENTIAL_MAX_TTL_SECONDS, issueAgentCredential, revokeAgentCredentialHash } from './agentCredentials.mjs';
+import { AGENT_BROWSER_CREDENTIAL_TTL_SECONDS, AGENT_CREDENTIAL_AUDIENCES, AGENT_CREDENTIAL_KINDS, AGENT_CREDENTIAL_SCOPES, AGENT_MEMBER_CREDENTIAL_MAX_TTL_SECONDS, issueAgentCredential, revokeAgentCredentialHash } from './agentCredentials.mjs';
 import { loadAgentLightweightGroups } from './agentGroups.mjs';
 import { loadSessionPolicy } from './sessionPolicyLoader.mjs';
 import { sha256Hex } from './runtimePrimitives.mjs';
@@ -7,8 +7,9 @@ import { json } from './httpInput.mjs';
 export async function handleClientLoginExchangeRequest({ env }) {
   const ctx = env.AGENT_CONTEXT;
   const source = ctx.auth.delegation;
+  // A key made from a person's sign-in cannot sign in again as them.
   if (!['user', 'service'].includes(source?.credentialKind) || source.audience !== AGENT_CREDENTIAL_AUDIENCES.SESSION_AGENT ||
-      source.scopes.includes('agent_autofill')) return json({ ok: false, reason: 'agent_credential_exchange_denied' }, { status: 403 });
+      source.scopes.includes('agent_autofill') || source.sourceParticipant) return json({ ok: false, reason: 'agent_credential_exchange_denied' }, { status: 403 });
   if (source.credentialKind === 'service' && !source.scopes.includes('session_login')) {
     return json({ ok: false, reason: 'agent_credential_session_login_denied' }, { status: 403 });
   }
@@ -63,4 +64,28 @@ export async function handleWrappedMemberExchangeRequest({ env }) {
     sessionWorkerOrigin: ctx.origin, principal, accountAddress: payload.sub, scopes: issued.record.scopes,
     audience: issued.record.audience, expiresAt: issued.record.expiresAt,
     workerCredentialExpiresAt: new Date(payload.exp * 1000).toISOString(), revocationBoundSeconds: ttlSeconds });
+}
+
+// A signed-in person's key for their own agent, which reads questions, saves
+// drafts and submits the answers the person approves, as that person. It ends
+// with the sign-in it came from, as the Wrapped member key does.
+export async function handleDelegateCredentialRequest({ env }) {
+  const ctx = env.AGENT_CONTEXT;
+  const payload = ctx.auth.payload;
+  // A sign-in an agent credential made is not a person's.
+  if (payload.agentSource) return json({ ok: false, reason: 'agent_delegate_person_required' }, { status: 403 });
+  const ttlSeconds = payload.exp - Math.floor(ctx.now() / 1000);
+  if (ttlSeconds <= 0) return json({ ok: false, reason: 'session_worker_credential_expired' }, { status: 401 });
+  const principal = { principalId: `session-member:${payload.sub.toLowerCase()}`, kind: 'user', adapter: 'session_worker', label: 'Session member' };
+  const issued = await issueAgentCredential({ env, principal, sessionSlug: ctx.slug, accountAddress: payload.sub,
+    scopes: [AGENT_CREDENTIAL_SCOPES.READ_QUESTIONS, AGENT_CREDENTIAL_SCOPES.DRAFT_ANSWERS],
+    sourceParticipant: payload, ttlSeconds, createdAt: new Date(ctx.now()).toISOString() });
+  if (!issued.ok) return json({ ok: false, reason: issued.reason }, { status: 503 });
+  const { linkedSessions: [session] } = await loadSessionPolicy(env);
+  // On chain, an agent's answer is signed by an account made for its key, not
+  // by the person, so only a session the Worker hosts takes this key's submits.
+  const hosted = ctx.config.sessionModeProfile?.authority?.mode === 'worker_canonical';
+  return json({ ok: true, token: issued.token, sessionSlug: ctx.slug, sessionId: ctx.sessionId, workerUrl: ctx.origin,
+    accountAddress: payload.sub, scopes: issued.record.scopes, expiresAt: issued.record.expiresAt,
+    submitAnswers: hosted && session.managedAccountSubmitAllowed && !!(ctx.scopes.storage || ctx.scopes.arweave) });
 }

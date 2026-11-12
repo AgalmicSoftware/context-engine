@@ -1,7 +1,11 @@
 import { useCallback, useState } from 'react';
 import { Input } from 'reactstrap';
 
-import { CONTEXT_FILE_TYPES, resolveContextFileType } from '@ce-shared/sessionContextSources.mjs';
+import {
+  CONTEXT_FILE_TYPES,
+  CONTEXT_SOURCE_LIMITS,
+  resolveContextFileType,
+} from '@ce-shared/sessionContextSources.mjs';
 import {
   addContextLink,
   checkContextFile,
@@ -11,7 +15,7 @@ import {
 } from '../../../utilities/docLibrary/contextSources';
 import ContextAccessPicker from './ContextAccessPicker';
 import { CONTEXT_ANALYZE_HELP, FILE_ACCESS_HELP } from './ContextSourcesPanel';
-import { SetupCheck, SetupField } from './SetupPrimitives';
+import { SetupCheck, SetupField, setupHelpId } from './SetupPrimitives';
 import { asList, asRecord, text, type SetupDraft } from './setupSectionTypes';
 import styles from './SessionSetup.module.scss';
 
@@ -58,6 +62,11 @@ export const readContextFiles = (draft: SetupDraft): ContextFileEntry[] =>
 export type SetupGroupOption = { groupId: string; label: string };
 
 const FILE_VISIBILITY_HELP = `${FILE_ACCESS_HELP} Groups set up under Access and identity are made at Create, before these files are added.`;
+
+const MB = 1024 * 1024;
+const ADD_FILE_HELP = `A PDF up to ${CONTEXT_SOURCE_LIMITS.pdfBytes / MB} MB, or Markdown, text, CSV or JSON up to ${CONTEXT_SOURCE_LIMITS.textFileBytes / MB} MB. It is added to the session after Create, for the people you choose in its Visible to.`;
+const ATTACH_AGAIN_HELP =
+  'The page holds chosen files only until it reloads. Choose this file again so Create can add it.';
 
 // What a file's Visible to shows. One locked to groups no longer set up stays with admins, never wider.
 const accessOf = (entry: ContextFileEntry, groups: SetupGroupOption[]): ContextFileAccess => {
@@ -115,10 +124,11 @@ export const SetupContextFiles = ({ draft, onChange, pending, groups = [] }: Fil
               {chosen ? (
                 <span className={styles.hint}>Added to the session after Create.</span>
               ) : (
-                <SetupField id={`ce-setup-context-file-again-${index}`} label="Attach again">
+                <SetupField id={`ce-setup-context-file-again-${index}`} label="Attach again" help={ATTACH_AGAIN_HELP}>
                   <Input
                     id={`ce-setup-context-file-again-${index}`}
                     type="file"
+                    aria-describedby={setupHelpId(`ce-setup-context-file-again-${index}`)}
                     onChange={(event) => attach((event.target as HTMLInputElement).files?.[0], entry.name)}
                   />
                 </SetupField>
@@ -159,10 +169,11 @@ export const SetupContextFiles = ({ draft, onChange, pending, groups = [] }: Fil
           </div>
         );
       })}
-      <SetupField id="ce-setup-context-file" label="Add a file">
+      <SetupField id="ce-setup-context-file" label="Add a file" help={ADD_FILE_HELP}>
         <Input
           id="ce-setup-context-file"
           type="file"
+          aria-describedby={setupHelpId('ce-setup-context-file')}
           accept=".pdf,.md,.markdown,.txt,.csv,.json,application/pdf,text/markdown,text/plain,text/csv,application/json"
           data-testid="ce-setup-context-file-input"
           onChange={(event) => {

@@ -38,6 +38,7 @@ import {
 } from '../../../utilities/session/sessionWorkerDiscovery';
 import { upsertWorkerCanonicalSessionBootstrap } from '../../../utilities/session/sessionWorkerConfigCache';
 import { describeWorkerModeError, listSessionModeConflicts } from '../../../utilities/session/sessionModeRuleMessages';
+import { readWorkerReleaseLabel } from '../../../domains/worker/workerRelease';
 import {
   applyTemplateToSessionSettingsDraft,
   buildSessionSettingsDraft,
@@ -46,6 +47,7 @@ import {
   rebaseSessionSettingsDraft,
   usesSbtDefaults,
   workerMergesAi,
+  workerShowsMemberResults,
   workerTakesResultsAdmins,
   type SessionSettingsSave,
 } from './sessionSettingsEdits';
@@ -202,6 +204,19 @@ const SessionSettingsPage = ({
       stale = true;
     };
   }, [refresh]);
+
+  // Which release the Session Worker runs; Workers before 0.9.3 don't say.
+  const [workerRelease, setWorkerRelease] = useState('');
+  useEffect(() => {
+    let stale = false;
+    setWorkerRelease('');
+    void readWorkerReleaseLabel(workerOrigin, sessionSlug, fetchImpl).then((release) => {
+      if (!stale) setWorkerRelease(release);
+    });
+    return () => {
+      stale = true;
+    };
+  }, [fetchImpl, sessionSlug, workerOrigin]);
 
   // An on-chain session's config arrives through the registry cache.
   useEffect(() => {
@@ -449,6 +464,15 @@ const SessionSettingsPage = ({
           link={
             <p className={styles.hint}>
               Link: <span className={styles.readOnlyValue}>{sessionUrl}</span>
+              {workerRelease ? (
+                <>
+                  <br />
+                  Session Worker release:{' '}
+                  <span className={styles.readOnlyValue} data-testid="ce-settings-worker-release">
+                    {workerRelease}
+                  </span>
+                </>
+              ) : null}
             </p>
           }
         />
@@ -525,6 +549,7 @@ const SessionSettingsPage = ({
           {...section('results')}
           editProfile={editProfile}
           registryChainId={facts.registryChainId || null}
+          memberResultsSupported={workerShowsMemberResults(saved)}
           admins={
             !onChain && workerTakesResultsAdmins(saved) ? (
               <SettingsResultsAdminsField

@@ -1,6 +1,6 @@
 import { safeString, lower, safeEnvJsonParse as safeJsonParse, sanitizeSessionSlug, stableJson } from './runtimePrimitives.mjs';
 import { listKvRecordsByPrefix } from './kvReadHelpers.mjs';
-import { canonicalAnswerSessionKvPrefix, submitRequestSessionKvPrefix } from './agentSubmitQueue.mjs';
+import { canonicalAnswerSessionKvPrefix } from './agentSubmitQueue.mjs';
 import { safeAnswerString, firstAnswerValue, questionText, questionId, shortQuestionId } from './runtimeCore.mjs';
 
 export function normalizeResultAnswerLabel(value = '') {
@@ -35,80 +35,62 @@ export function selectCurrentSubmittedAnswers(records = []) {
   return [...byParticipantQuestion.values(), ...anonymous].sort(compareAnswerChronology);
 }
 
-export function dedupeSubmitRecords(records = []) {
-  const byId = new Map();
-  (Array.isArray(records) ? records : []).forEach((record) => {
-    const requestId = safeString(record.requestId || record.idempotencyKey || record.key);
-    if (!requestId) return;
-    const existing = byId.get(requestId);
-    // Canonical copies follow index copies and must win equal-time ties before
-    // status filtering can discard a stale index entry.
-    if (!existing || safeString(existing.createdAt).localeCompare(safeString(record.createdAt)) <= 0) {
-      byId.set(requestId, record);
-    }
-  });
-  return Array.from(byId.values());
-}
-
 export async function loadSubmittedResultRecords(env = {}, sessionSlug = '', { includeRawAnswer = false } = {}) {
   const slug = sanitizeSessionSlug(sessionSlug);
-  const indexedPrefix = submitRequestSessionKvPrefix(slug);
-  const indexedRecords = indexedPrefix
-    ? await listKvRecordsByPrefix(env, indexedPrefix, { limit: Infinity, parseJson: safeJsonParse })
-    : [];
-  const canonicalPrefix = canonicalAnswerSessionKvPrefix(slug);
-  const canonicalRecords = canonicalPrefix
-    ? await listKvRecordsByPrefix(env, canonicalPrefix, { limit: Infinity, parseJson: safeJsonParse })
-    : [];
-  const records = dedupeSubmitRecords([...indexedRecords, ...canonicalRecords]);
-  const submittedStatuses = new Set(['direct_submitted']);
-  return records
-    .filter((record) => (
-      submittedStatuses.has(safeString(record?.status)) &&
+  const prefix = canonicalAnswerSessionKvPrefix(slug);
+  if (!prefix) return [];
+  // Every save writes this permanent index before the 30-day submission index,
+  // which holds copies of the same records, so results read this one alone.
+  const rows = await listKvRecordsByPrefix(env, prefix, {
+    parseJson: safeJsonParse,
+    select: (record) => (
+      safeString(record.status) === 'direct_submitted' &&
       sanitizeSessionSlug(record.sessionSlug) === slug &&
       safeString(record.questionId)
-    ))
-    .map((record) => {
-      const answer = structuredResultAnswer(record);
-      return {
-        key: safeString(record.key),
-        requestId: safeString(record.requestId),
-        createdAt: safeString(record.createdAt),
-        sessionSlug: slug,
-        answerRevision: answerRevision(record),
-        telegramUserId: safeString(record.telegramUserId),
-        questionId: safeString(record.questionId),
-        label: normalizeResultAnswerLabel(firstAnswerValue(
-          answer.label,
-          answer.value,
-          answer.text,
-          record.answerLabel,
-          record.answerValue,
-        )),
-        value: safeAnswerString(firstAnswerValue(
-          answer.value,
-          answer.text,
-          answer.label,
-          record.answerValue,
-          record.answerLabel,
-        )),
-        questionType: safeString(answer.questionType || record.questionType || record.controlType),
-        ...(includeRawAnswer ? { answer: record.answer || null }
-          : answer.questionType === 'quadratic' ? { answer: { value: answer.value, encrypted: answer.encrypted === true } } : {}),
-        text: safeAnswerString(firstAnswerValue(
-          answer.text,
-          record.answerText,
-        )),
-        comments: safeAnswerString(firstAnswerValue(
-          answer.comments,
-          answer.additionalComments,
-          record.comments,
-          record.answerComments,
-        )),
-        txHash: safeString(record.onChain?.txHash),
-      };
-    })
-    .sort((left, right) => safeString(left.createdAt).localeCompare(safeString(right.createdAt)));
+    ) ? resultRecord(record, slug, includeRawAnswer) : null,
+  });
+  return rows.sort((left, right) => safeString(left.createdAt).localeCompare(safeString(right.createdAt)));
+}
+
+function resultRecord(record, slug, includeRawAnswer) {
+  const answer = structuredResultAnswer(record);
+  return {
+    key: safeString(record.key),
+    requestId: safeString(record.requestId),
+    createdAt: safeString(record.createdAt),
+    sessionSlug: slug,
+    answerRevision: answerRevision(record),
+    telegramUserId: safeString(record.telegramUserId),
+    questionId: safeString(record.questionId),
+    label: normalizeResultAnswerLabel(firstAnswerValue(
+      answer.label,
+      answer.value,
+      answer.text,
+      record.answerLabel,
+      record.answerValue,
+    )),
+    value: safeAnswerString(firstAnswerValue(
+      answer.value,
+      answer.text,
+      answer.label,
+      record.answerValue,
+      record.answerLabel,
+    )),
+    questionType: safeString(answer.questionType || record.questionType || record.controlType),
+    ...(includeRawAnswer ? { answer: record.answer || null }
+      : answer.questionType === 'quadratic' ? { answer: { value: answer.value, encrypted: answer.encrypted === true } } : {}),
+    text: safeAnswerString(firstAnswerValue(
+      answer.text,
+      record.answerText,
+    )),
+    comments: safeAnswerString(firstAnswerValue(
+      answer.comments,
+      answer.additionalComments,
+      record.comments,
+      record.answerComments,
+    )),
+    txHash: safeString(record.onChain?.txHash),
+  };
 }
 
 export function structuredResultAnswer(record = {}) {

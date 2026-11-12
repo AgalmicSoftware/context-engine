@@ -33,6 +33,16 @@ An operator uses the existing signed Session Worker admin request to
 `agentHttp.invites`. Redemption is journaled atomically by the existing
 `SessionWriteCoordinator`, separately for each session and invite.
 
+A signed-in participant makes a key for their own agent at
+`POST /api/agent/credentials/delegate` (the account menu's **Your AI agent**,
+**On my behalf**). It is a user credential for their address with
+`read_questions` and `draft_answers`, so what it submits is their answer. Like
+a member credential it is bound to the participant JWT it came from and ends
+with it; a new key stops the last. It never carries the person's admin powers.
+On chain it only drafts, since the Worker would sign its answers with an account
+it derives for the agent, not the person's. A JWT that an agent credential made
+gets 403 `agent_delegate_person_required`.
+
 User, service, member and browser credentials remain separate purposes. Each
 credential binds the canonical session, exact origin, principal, authorization
 epoch, scopes, expiry and active rotation slot. Operator writes retain signed
@@ -41,7 +51,8 @@ and must match the request method. Auxiliary scoped-admin actions also require
 current canonical admin authority. Caller-supplied principal fields never select
 another identity.
 
-Browser exchange requires a user credential or a service with `session_login`.
+Browser exchange requires a user credential or a service with `session_login`,
+and refuses a person's key.
 It returns distinct agent and participant credentials at the same origin; the
 participant JWT cannot outlive its source and becomes unusable on source
 revocation, rotation, session disablement or stale authority. Both exchanged
@@ -77,8 +88,11 @@ zero), then `createdAt`, then `requestId`, with deterministic content tie-breaki
 Selected answers are ordered chronologically by `createdAt`, then `requestId`;
 revisions do not order different participants or questions. Consensus, difference,
 groups, Polis and topic maps use this same selection; submission records retain history.
-Duplicate copies of one request prefer the later `createdAt`; on a timestamp tie,
-the canonical copy loaded after the submission index wins before status filtering.
+Results read only the permanent answer index, which every save writes before the
+30-day submission index, 100 records per KV read. Cloudflare counts each read as
+one of an invocation's 1,000 KV operations, so a salon of 80 people answering 30
+questions stays well under it. A stored answer can be half a megabyte, so a read
+that Cloudflare refuses for passing its 25 MB reply limit is read again in halves.
 
 `/preferences` saves drafts unless an explicitly authorized submit is requested.
 The coordinator retains an answer head per session, principal and question.

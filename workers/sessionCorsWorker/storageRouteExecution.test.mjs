@@ -706,6 +706,112 @@ test('private response reads separate participant submission scope from non-owne
 	}
 });
 
+test('members-only results show every answer to signed-in session members, never to visitors', async (t) => {
+	for (const storage of ['kv', 'r2']) {
+		await t.test(storage, async () => {
+			const admin = '0x1111111111111111111111111111111111111111';
+			const first = '0x2222222222222222222222222222222222222222';
+			const second = '0x3333333333333333333333333333333333333333';
+			const outsider = '0x4444444444444444444444444444444444444444';
+			// The /new default: unencrypted answers behind the Session Worker's default rules.
+			const payloadAccessControl = {
+				gate: 'role_gate', encryption: 'none',
+				accessConditions: { match: 'any', conditions: [
+					{ kind: 'worker_role', role: 'admin' },
+					{ kind: 'agent_grant_scope', scope: 'storage' },
+				] },
+			};
+			const profile = {
+				profileVersion: 1, preset: 'custom', authority: { mode: 'worker_canonical' },
+				evm: { registryChainId: null }, storage: { backend: 'cloudflare', payloadAccessControl },
+				identity: { default: 'passkey', enabled: ['passkey'] }, authorization: { mechanisms: ['worker_roles'] },
+				encryption: { mode: 'none' },
+				surfaces: { web: true, telegram: false, miniApp: false, agentHttp: false, mcp: false, ceCc: false },
+				results: { visibility: 'session_member_full', exposure: { aggregateResultsEnabled: true, anonymizedGroupsEnabled: false, minGroupSize: 2 } },
+				export: { scope: 'admin_raw' },
+			};
+			let config = {
+				slug: 'session-a', sessionId: WORKER_GROUP_SESSION_ID, adminAddress: admin,
+				storageProfile: { backend: 'cloudflare', payloadAccessControl },
+				// Only the two participants pass the sign-in rules.
+				workerRoles: { member: [first, second] },
+				workerAuthority: { version: 1, loginGate: { conditions: [{ kind: 'worker_role', role: 'member' }] }, participantScopes: ['storage'], anonymousScopes: [] },
+				sessionModeProfile: profile,
+			};
+			assert.equal(validateWorkerConfigModeValues(config).ok, true);
+			const kv = createMockKv();
+			const env = { GROUP_KV: kv, CE_STORAGE_INDEX_KV: kv, CE_STORAGE_ENVELOPE_KEK: 'synthetic-member-results-test-key' };
+			if (storage === 'r2') env.CE_STORAGE_R2 = createMockR2();
+			attachSessionCoordinator(env, (next) => { config = next; });
+			const scopesFor = (address) => resolveWorkerCanonicalLoginScopes({ address, config, env, slug: config.slug });
+			const firstScopes = await scopesFor(first);
+			const secondScopes = await scopesFor(second);
+			await assert.rejects(scopesFor(outsider), /login gate failed/);
+			const deps = { json, randomBytes: createSequenceRandomBytes() };
+			const route = (path, request, uploaderAddress, authScopes) => storageRoute({
+				path, method: request.method, request, env, config, slug: config.slug, uploaderAddress, authScopes, baseHeaders: {}, deps,
+			});
+			const upload = async (address, authScopes, extra = {}) => {
+				const response = await route('/storage/upload', new Request('https://worker.example/storage/upload', {
+					method: 'POST', headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ data: { questionID: '0xq1', answer: { value: `answer from ${address}` } }, resource: 'responses', ...extra }),
+				}), address, authScopes);
+				assert.equal(response.status, 200, JSON.stringify(await response.clone().json()));
+				return (await response.json()).storageRef.id;
+			};
+			const firstId = await upload(first, firstScopes);
+			const secondId = await upload(second, secondScopes);
+			const read = (id, address, scopes) => route('/storage/read', new Request(`https://worker.example/storage/read?id=${id}`), address, scopes);
+			const list = (address, scopes) => route('/storage/list', new Request('https://worker.example/storage/list?resource=responses'), address, scopes);
+			for (const [address, scopes] of [[first, firstScopes], [second, secondScopes]]) {
+				const listed = await list(address, scopes);
+				assert.equal(listed.status, 200);
+				assert.deepEqual((await listed.json()).items.map((item) => item.storageRef.id).sort(), [firstId, secondId].sort());
+				for (const id of [firstId, secondId]) {
+					const answer = await read(id, address, scopes);
+					assert.equal(answer.status, 200);
+					assert.equal(answer.headers.get('Cache-Control'), 'private, no-store');
+				}
+			}
+			// Signed-out visitors and sign-ins without the participant scope read nothing.
+			const denied = await read(firstId, '', {});
+			assert.equal(denied.status, 403);
+			assert.deepEqual(await denied.json(), {
+				error: 'Access denied: answers are visible to signed-in session members.',
+				reason: 'private_response_owner_required',
+			});
+			assert.equal((await list('', {})).status, 403);
+			assert.equal((await read(firstId, first, {})).status, 403);
+			// Per-answer rules still apply after the visibility rule.
+			const adminOnlyId = await upload(second, secondScopes, { accessConditions: { match: 'all', conditions: [{ kind: 'worker_role', role: 'admin' }] } });
+			assert.equal((await read(adminOnlyId, first, firstScopes)).status, 403);
+			assert.equal((await read(adminOnlyId, admin, await scopesFor(admin))).status, 200);
+			// Each person's own answers only, once the session is switched back.
+			config = { ...config, sessionModeProfile: { ...profile, results: { ...profile.results, visibility: 'participant_aggregate' } } };
+			assert.equal((await read(secondId, first, firstScopes)).status, 403);
+			assert.deepEqual((await (await list(first, firstScopes)).json()).items.map((item) => item.storageRef.id), [firstId]);
+		});
+	}
+});
+
+test('members-only results need the Session Worker and its Cloudflare storage', () => {
+	const results = { visibility: 'session_member_full', exposure: { aggregateResultsEnabled: true, anonymizedGroupsEnabled: false, minGroupSize: 2 } };
+	const onChain = {
+		profileVersion: 1, preset: 'custom', authority: { mode: 'evm_registry_canonical' }, evm: { registryChainId: 11155420 },
+		storage: { backend: 'arweave' }, identity: { default: 'wallet', enabled: ['wallet', 'passkey'] },
+		authorization: { mechanisms: ['sbt_onchain'] }, encryption: { mode: 'none' },
+		surfaces: { web: true, telegram: false, miniApp: false, agentHttp: false, mcp: false, ceCc: false },
+		results, export: { scope: 'all_session' },
+	};
+	const storageProfile = { backend: 'arweave' };
+	assert.deepEqual(validateWorkerConfigModeValues({ storageProfile, sessionModeProfile: onChain }), {
+		ok: false, path: 'sessionModeProfile.results.visibility',
+	});
+	assert.equal(validateWorkerConfigModeValues({
+		storageProfile, sessionModeProfile: { ...onChain, results: { ...results, visibility: 'public_full_if_storage_public' } },
+	}).ok, true);
+});
+
 test('storageRoute delegates Arweave uploads and returns storageRef compatibility fields', async () => {
 	const env = { marker: 'worker-env' };
 	const request = new Request('https://worker.example/storage/upload', {

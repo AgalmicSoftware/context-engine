@@ -247,7 +247,7 @@ const prefix = 'ce-agent:0x11111111111111111111111111111111:';
 for (let i = 0; i < 6; i++) {
   const record = { requestId: `r${i}`, status: 'direct_submitted', sessionSlug: 'fixture', questionId: qid,
     telegramUserId: `p${i}`, answer: { value: i % 2 ? 'Disagree' : 'Agree' }, createdAt: `2026-10-2${i}T00:00:00Z` };
-  await f.env.GROUP_KV.put(`${prefix}telegram:submit-request-by-session:v1:fixture:r${i}`, JSON.stringify(record));
+  await f.env.GROUP_KV.put(`${prefix}telegram:canonical-answer-by-session:v1:fixture:r${i}`, JSON.stringify(record));
 }
 const consensus = async () => {
   const r = await f.request('/api/agent/results?view=consensus', { token: a.token });
@@ -255,11 +255,11 @@ const consensus = async () => {
 };
 assert.match(await consensus(), /^200 responseCount=6/);
 const get = f.env.GROUP_KV.get.bind(f.env.GROUP_KV);
-f.env.GROUP_KV.get = async key => { if (/submit-request-by-session:v1:fixture:r[0-3]$/.test(key)) throw new Error('KV get failed / op limit'); return get(key); };
+f.env.GROUP_KV.get = async keys => { if ([keys].flat().some(key => /canonical-answer-by-session:v1:fixture:r[0-3]$/.test(key))) throw new Error('KV get failed / op limit'); return get(keys); };
 assert.match(await consensus(), /^503 /);
 f.env.GROUP_KV.get = get;
 const list = f.env.GROUP_KV.list.bind(f.env.GROUP_KV);
-f.env.GROUP_KV.list = async opts => { if (String(opts.prefix).includes('submit-request-by-session')) throw new Error('KV list failed'); return list(opts); };
+f.env.GROUP_KV.list = async opts => { if (String(opts.prefix).includes('canonical-answer-by-session')) throw new Error('KV list failed'); return list(opts); };
 assert.match(await consensus(), /^503 /);
 f.env.GROUP_KV.list = list;
 

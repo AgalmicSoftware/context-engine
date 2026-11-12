@@ -25,6 +25,7 @@ const SURFACES = ['web', 'telegram', 'miniApp', 'agentHttp', 'mcp', 'ceCc'];
 const RESULTS_VISIBILITIES = new Set([
   'participant_aggregate',
   'session_member_aggregate',
+  'session_member_full',
   'public_full_if_storage_public',
 ]);
 const EXPORT_SCOPES = new Set(['admin_raw', 'all_session', 'encrypted_envelopes_only']);
@@ -471,6 +472,14 @@ const validateVersionedSessionModeProfile = (profile, path) => {
         )
       )
     )
+  ) {
+    return invalid(`${path}.results.visibility`);
+  }
+  // Mirrors the client member_results_require_session_worker rule: only the
+  // Session Worker serves Cloudflare answers, so only it can hold them to members.
+  if (
+    results.value.visibility === 'session_member_full' &&
+    (authorityMode !== 'worker_canonical' || storage.value.backend !== 'cloudflare')
   ) {
     return invalid(`${path}.results.visibility`);
   }

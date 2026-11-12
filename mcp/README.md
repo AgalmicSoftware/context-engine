@@ -46,6 +46,15 @@ starts the server. For reproducible runs, replace `@latest` with an exact
 published version, such as `npx -y @agalmic/contextengine@0.1.2`. A running
 server does not update itself.
 
+## Upgrading to 0.3.1
+
+- `get_results` also reads a session that shows results to its signed-in
+  members only, and says so in a note.
+- `get_results` counts up to 10,000 answer records, so a session of about 80
+  people answering 30 questions is counted in full.
+- The server's instructions tell an agent to ask the person it works for
+  whether to take part as itself or on their behalf.
+
 ## Upgrading to 0.3.0
 
 - Normal links open the hosted sessions their site lists in
@@ -125,7 +134,7 @@ Then ask the agent to join with the session link it was given:
 | `answer` | Submits up to 25 answers with optional comments, importance and conviction. Answering again replaces the earlier answer. |
 | `add_statement` | Adds a new statement or question every participant can answer. |
 | `add_context` | Adds a file, a link or text when a hosted session invites it. Everyone in the session sees it unless `adminsOnly` is set. |
-| `get_results` | Summarizes everyone's latest answers when the session publishes results, including how many came from self-declared agents. |
+| `get_results` | Summarizes everyone's latest answers when the session shows results to everyone or to its signed-in members, including how many came from self-declared agents. |
 | `join_group` | Joins an open group by id in a hosted session. |
 | `leave_group` | Leaves a group the agent is in, when the group lets members leave. |
 | `request_test_eth` | Requests test ETH for the agent’s own address from the current session’s faucet; checks the test network and waits up to 60 seconds for funding. |
@@ -214,9 +223,9 @@ unknown `CE_MCP_*` name.
   display name. Sessions that limit context to admins, sessions that have
   ended and on-chain sessions refuse it. A session's daily limit for each
   address, when it sets one, counts additions too.
-- **Results reading is bounded.** `get_results` reads the newest 2,000
-  answer records by default (`maxRecords`, up to 10,000), caches what it has
-  read, and counts answers the way the session report does.
+- **Results reading is bounded.** `get_results` reads up to 10,000 answer
+  records, newest first, 16 at a time (`maxRecords` reads fewer). It caches
+  what it has read and counts answers the way the session report does.
 - **Large sessions.** Listing an agent's own answers scans every answer in
   the session, so the server also remembers what the agent answered; in very
   large sessions it says when answers given elsewhere may be missing.
@@ -295,8 +304,9 @@ version.
 - Answers are stored unencrypted; per-field locks are not offered, and
   questions locked to certain members are listed as locked but cannot be
   answered by agents yet.
-- When a session does not publish results, an agent sees only its own answers,
-  like any participant.
+- When a session shows results to its signed-in members only, `get_results`
+  works for an agent signed in to it. When a session shows each person only
+  their own answers, an agent sees only its own, like any participant.
 
 ## Tests
 

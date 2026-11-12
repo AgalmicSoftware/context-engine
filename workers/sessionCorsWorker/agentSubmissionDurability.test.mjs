@@ -202,8 +202,6 @@ test('independent isolates share submission bytes and a late failed outcome cann
         return result;
       },
       storage: async (path, { body } = {}) => {
-        if (path.startsWith('/storage/list')) return Response.json({ items: [{ storageRef: { backend: 'cloudflare', id: 'qref', resource: 'questions' }, metadata: {} }], listComplete: true });
-        if (path.startsWith('/storage/read')) return Response.json({ questionId: 'ceq_fixture', sessionSlug: 'fixture', prompt: 'Fixture question', questionType: 'binary' });
         payloads.push(body.data);
         const index = payloads.length;
         if (index === 2) releaseUploads();
@@ -218,6 +216,7 @@ test('independent isolates share submission bytes and a late failed outcome cann
     return env;
   };
   const args = savedAt => ({ normalized: { user: { telegramUserId: 'fixture-principal' }, chat: {} }, sessionSlug: 'fixture', selectedQuestionId: 'ceq_fixture',
+    question: { questionId: 'ceq_fixture', sessionSlug: 'fixture', prompt: 'Fixture question', questionType: 'binary' },
     draft: { status: 'draft_saved', sessionSlug: 'fixture', questionId: 'ceq_fixture', answerLabel: 'Agree', answerValue: '"Agree"', controlType: 'agree_unsure_disagree', origin: { savedAt }, selectedAt: savedAt } });
   const results = await Promise.all([
     submitA({ env: environment(), ...args('2026-01-01T00:00:00.001Z'), createdAt: '2026-10-27T12:00:00.001Z' }),

@@ -65,3 +65,10 @@ export const SET_CONFIG_MERGES_AI_FIELD = 'setConfigMergesAi';
 // Set the same way: this Worker builds debate atlases and accepts
 // resultsAdminAddresses, which older Workers refuse.
 export const DEBATE_ATLAS_FIELD = 'debateAtlas';
+
+// Set the same way: this Worker builds risk matrices.
+export const RISK_MATRIX_FIELD = 'riskMatrix';
+
+// Set the same way: this Worker shows every answer to signed-in members under
+// the session_member_full results visibility, which older Workers refuse.
+export const MEMBER_RESULTS_FIELD = 'memberResults';

@@ -30,7 +30,7 @@ export function fixture(overrides = {}) {
   const writes = [];
   const metadata = new Map();
   let reads = 0;
-  const kv = { async get(key) { return records.get(key) ?? null; }, async put(key, value, options) { writes.push(key); records.set(key, value); metadata.set(key, options?.metadata); },
+  const kv = { async get(key) { return Array.isArray(key) ? new Map(key.map(name => [name, records.get(name) ?? null])) : records.get(key) ?? null; }, async put(key, value, options) { writes.push(key); records.set(key, value); metadata.set(key, options?.metadata); },
     async delete(key) { writes.push(key); records.delete(key); }, async list({ prefix = '' } = {}) { return { keys: [...records.keys()].filter(key => key.startsWith(prefix)).map(name => ({ name, metadata: metadata.get(name) })), list_complete: true }; } };
   const config = { sessionId, authzEpoch: 1, adminAddress: wallet.address, corsWorkerUrl: origin, allowOrigins: ['https://client.example'],
     sessionModeProfile: { authority: { mode: 'worker_canonical' }, surfaces: { agentHttp: true, browser: true } },

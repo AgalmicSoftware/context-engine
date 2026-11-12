@@ -1,8 +1,8 @@
 import React, { Suspense } from 'react';
 import CETooltip from '../Shared/CETooltip';
 import SessionTestEthBadge from '../Shared/SessionTestEthBadge';
-import { useSessionDebateAtlas } from '../DebateAtlas/useSessionDebateAtlas';
-import DebateAtlasBuildStatus from '../DebateAtlas/DebateAtlasBuildStatus';
+import { useSessionResultsBuild } from '../ResultsBuilds/useSessionResultsBuild';
+import ResultsBuildStatus from '../ResultsBuilds/ResultsBuildStatus';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faArrowLeft,
@@ -24,6 +24,8 @@ import { PUBLIC_AI_DISCOURSE_CORPUS_URL } from '../../variables/publicRepoMetada
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { hasDemoAnalysisFixture } from '../../utilities/demo/demoFixtureSessionSlugs';
 import type { RiskMatrixRestoreState } from '../MainContent/RiskMatrix';
+import type { DebateAtlasBuild } from '../../domains/debateAtlas/debateAtlasTypes';
+import type { RiskMatrixBuild } from '../../domains/riskMatrix/riskMatrixTypes';
 import type { SessionGeneratedResultsViewKey } from '../../domains/sessionResults/sessionResultsGeneratedViewTypes';
 import type { SessionResultsGeneratedAnalysisArtifact } from '../../utilities/sessionResultsExport/sessionResultsAnalysisArtifacts';
 import type {
@@ -47,6 +49,7 @@ const SessionGeneratedResultsViews = React.lazy(() => import('../SessionResults/
 // Loaded only for a session whose context is an uploaded HTML page, with its sanitizer.
 const SessionContextHtml = React.lazy(() => import('./SessionContextHtml'));
 const SessionDebateAtlasView = React.lazy(() => import('../DebateAtlas/SessionDebateAtlasView'));
+const SessionRiskMatrixView = React.lazy(() => import('../ResultsBuilds/SessionRiskMatrixView'));
 const GroupAgentModal = React.lazy(() => import('./GroupAgentModal'));
 
 const DebateMapAny = DebateMap as React.ComponentType<Record<string, unknown>>;
@@ -187,25 +190,28 @@ const renderSectionHeading = (title: React.ReactNode, subtitle?: React.ReactNode
 );
 
 const DEBATE_ATLAS_VIEW_OPTION: ResultsViewOption = { key: 'debateAtlas', label: 'Debate Map', icon: '🗺️' };
+const RISK_MATRIX_VIEW_OPTION: ResultsViewOption = { key: 'riskMatrix', label: 'Risk Matrix', icon: '⚠️' };
 
 const buildResultsViewOptions = (
   isDemoSlug: boolean,
   showDemoAnalysisView: boolean,
   generatedOptions: ResultsViewOption[] = [],
-  showBuiltAtlas = false,
+  builtOptions: ResultsViewOption[] = [],
 ): ResultsViewOption[] => {
   const demoOptions =
     isDemoSlug && generatedOptions.length === 0
       ? [
           DEBATE_ATLAS_VIEW_OPTION,
           ...(showDemoAnalysisView ? [{ key: 'analysis', label: 'Breakdown', icon: '📊' }] : []),
-          { key: 'riskMatrix', label: 'Risk Matrix', icon: '⚠️' },
+          RISK_MATRIX_VIEW_OPTION,
         ]
       : [];
+  // A built view takes the place of the AI Views one of its name.
+  const builtKeys = new Set(builtOptions.map(({ key }) => key));
   return [
     { key: 'polis', label: 'Report', icon: '🧾' },
-    ...(showBuiltAtlas && demoOptions.length === 0 ? [DEBATE_ATLAS_VIEW_OPTION] : []),
-    ...(generatedOptions.length > 0 ? generatedOptions : demoOptions),
+    ...(demoOptions.length === 0 ? builtOptions : []),
+    ...(generatedOptions.length > 0 ? generatedOptions.filter(({ key }) => !builtKeys.has(key)) : demoOptions),
   ];
 };
 
@@ -349,10 +355,20 @@ export default function OnePageSessionStandardShell({
   onViewAllQuestionsClick,
 }: OnePageSessionStandardShellProps) {
   const basePath = readPublicUrlBasePath();
-  const atlas = useSessionDebateAtlas({
+  const atlas = useSessionResultsBuild<DebateAtlasBuild>({
     account,
     chainId: networkChainId,
     enabled: showResults,
+    kind: 'debate-atlas',
+    provider,
+    sessionConfig: resolvedSessionConfig,
+    sessionSlug: effectiveSlug,
+  });
+  const riskMatrix = useSessionResultsBuild<RiskMatrixBuild>({
+    account,
+    chainId: networkChainId,
+    enabled: showResults,
+    kind: 'risk-matrix',
     provider,
     sessionConfig: resolvedSessionConfig,
     sessionSlug: effectiveSlug,
@@ -360,8 +376,34 @@ export default function OnePageSessionStandardShell({
   const showBuiltAtlas = !!atlas.build;
   // Risk Matrix and Context links open nodes of the demo atlas, so it stays the one shown for them.
   const showDemoAtlas = isDemoSlug && (!showBuiltAtlas || !!embeddedAtlasNodeId);
-  const atlasBusy = atlas.building || atlas.activeSinceMs !== null;
+  const builtViewOptions = [
+    ...(showBuiltAtlas ? [DEBATE_ATLAS_VIEW_OPTION] : []),
+    ...(riskMatrix.build ? [RISK_MATRIX_VIEW_OPTION] : []),
+  ];
+  const builtViewKeys = new Set(builtViewOptions.map(({ key }) => key));
   const buildAtlasHelpId = `build-atlas-help-${React.useId().replace(/:/g, '')}`;
+  const buildRiskMatrixHelpId = `build-risk-matrix-help-${React.useId().replace(/:/g, '')}`;
+  // The views admins build, each pressed from the open Results menu.
+  const resultsBuilds = [
+    {
+      kind: 'debate-atlas' as const,
+      mode: 'debateAtlas',
+      results: atlas,
+      helpId: buildAtlasHelpId,
+      label: 'Build atlas',
+      busyLabel: 'Building atlas…',
+      help: 'Builds a debate atlas from the responses right now, with a political compass for each category and topic. Takes a few minutes. Everyone who sees Results sees it, and earlier builds stay to compare.',
+    },
+    {
+      kind: 'risk-matrix' as const,
+      mode: 'riskMatrix',
+      results: riskMatrix,
+      helpId: buildRiskMatrixHelpId,
+      label: 'Build risk matrix',
+      busyLabel: 'Building risk matrix…',
+      help: 'Builds a risk matrix from the responses right now: the areas they discuss, and the opportunities and risks where two of them meet. Takes a minute or two. Everyone who sees Results sees it, and earlier builds stay to compare.',
+    },
+  ].map((entry) => ({ ...entry, busy: entry.results.building || entry.results.activeSinceMs !== null }));
   const showDemoAnalysisView = isDemoSlug && hasDemoAnalysisFixture(displaySessionSlug);
   const generatedState = (
     generatedResultsAnalysis && typeof generatedResultsAnalysis === 'object' ? generatedResultsAnalysis : {}
@@ -381,7 +423,9 @@ export default function OnePageSessionStandardShell({
           })
           .filter((option) => option.key)
       : [];
-  const generatedViewKeys = new Set(generatedViewOptions.map((option) => option.key));
+  const generatedViewKeys = new Set(
+    generatedViewOptions.map((option) => option.key).filter((key) => !builtViewKeys.has(key)),
+  );
   const requestedResultsViewMode = resultsViewMode;
   const effectiveResultsViewMode = generatedViewKeys.has(requestedResultsViewMode)
     ? requestedResultsViewMode
@@ -389,14 +433,14 @@ export default function OnePageSessionStandardShell({
       ? requestedResultsViewMode === 'analysis' && !showDemoAnalysisView
         ? 'polis'
         : requestedResultsViewMode
-      : requestedResultsViewMode === 'polis' || (showBuiltAtlas && requestedResultsViewMode === 'debateAtlas')
+      : requestedResultsViewMode === 'polis' || builtViewKeys.has(requestedResultsViewMode)
         ? requestedResultsViewMode
         : 'polis';
   const resultsViewOptions = buildResultsViewOptions(
     isDemoSlug,
     showDemoAnalysisView,
     generatedViewOptions,
-    showBuiltAtlas,
+    builtViewOptions,
   );
   const generatedStatus = String(generatedState.status || 'idle');
   const generatedIsRunning = generatedState.isRunning === true || generatedStatus === 'running';
@@ -832,30 +876,30 @@ export default function OnePageSessionStandardShell({
                     <FontAwesomeIcon icon={faExpand} />
                     Raw Results
                   </button>
-                  {atlas.canBuild && (
-                    <>
-                      {/* The "?" sits in the pill so it shares the menu's colours in every state. */}
-                      <button
-                        type="button"
-                        id={buildAtlasHelpId}
-                        onClick={async (event: React.MouseEvent<HTMLElement>) => {
-                          event.preventDefault();
-                          event.stopPropagation();
-                          if (await atlas.buildAtlas()) onResultsModeChange('debateAtlas');
-                        }}
-                        className={styles.sectionHeaderViewModeButton}
-                        disabled={atlasBusy}
-                        data-testid="ce-session-debate-atlas-build"
-                      >
-                        {atlasBusy ? 'Building atlas…' : 'Build atlas'}
-                        <FontAwesomeIcon icon={faQuestionCircle} aria-hidden="true" />
-                      </button>
-                      <CETooltip target={buildAtlasHelpId} placement="bottom" trigger="hover focus" autohide={false}>
-                        Builds a debate atlas from the responses right now, with a political compass for each category
-                        and topic. Takes a few minutes. Everyone who sees Results sees it, and earlier builds stay to
-                        compare.
-                      </CETooltip>
-                    </>
+                  {resultsBuilds.map(({ kind, mode, results, busy, helpId, label, busyLabel, help }) =>
+                    results.canBuild ? (
+                      <React.Fragment key={kind}>
+                        {/* The "?" sits in the pill so it shares the menu's colours in every state. */}
+                        <button
+                          type="button"
+                          id={helpId}
+                          onClick={async (event: React.MouseEvent<HTMLElement>) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            if (await results.startBuild()) onResultsModeChange(mode);
+                          }}
+                          className={styles.sectionHeaderViewModeButton}
+                          disabled={busy}
+                          data-testid={`ce-session-${kind}-build`}
+                        >
+                          {busy ? busyLabel : label}
+                          <FontAwesomeIcon icon={faQuestionCircle} aria-hidden="true" />
+                        </button>
+                        <CETooltip target={helpId} placement="bottom" trigger="hover focus" autohide={false}>
+                          {help}
+                        </CETooltip>
+                      </React.Fragment>
+                    ) : null,
                   )}
                   {showGeneratedCheckAction && (
                     <button
@@ -902,15 +946,19 @@ export default function OnePageSessionStandardShell({
                   {String(generatedState.lastFailure)}
                 </div>
               ) : null}
-              {atlas.canBuild && (atlasBusy || atlas.error) ? (
-                <DebateAtlasBuildStatus
-                  className={styles.generatedResultsStatus}
-                  busy={atlasBusy}
-                  error={atlas.error}
-                  nextBuild={atlas.nextBuild}
-                  startedAtMs={atlas.buildStartedAtMs}
-                />
-              ) : null}
+              {resultsBuilds.map(({ kind, results, busy }) =>
+                results.canBuild && (busy || results.error) ? (
+                  <ResultsBuildStatus
+                    key={kind}
+                    kind={kind}
+                    className={styles.generatedResultsStatus}
+                    busy={busy}
+                    error={results.error}
+                    nextBuild={results.nextBuild}
+                    startedAtMs={results.buildStartedAtMs}
+                  />
+                ) : null,
+              )}
               <div>
                 {!showDemoAtlas && effectiveResultsViewMode === 'debateAtlas' && atlas.build && (
                   <Suspense fallback={<LazyFallback label="Loading Debate Atlas..." minHeight="30vh" />}>
@@ -984,7 +1032,17 @@ export default function OnePageSessionStandardShell({
                     </div>
                   </Suspense>
                 )}
+                {effectiveResultsViewMode === 'riskMatrix' && riskMatrix.build && (
+                  <Suspense fallback={<LazyFallback label="Loading Risk Matrix..." minHeight="30vh" />}>
+                    <SessionRiskMatrixView
+                      build={riskMatrix.build}
+                      builds={riskMatrix.builds}
+                      onSelectBuild={riskMatrix.selectBuild}
+                    />
+                  </Suspense>
+                )}
                 {isDemoSlug &&
+                  !riskMatrix.build &&
                   effectiveResultsViewMode === 'riskMatrix' &&
                   !generatedViewKeys.has(effectiveResultsViewMode) && (
                     <Suspense fallback={<LazyFallback label="Loading Risk Matrix..." minHeight="30vh" />}>

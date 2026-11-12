@@ -5,3 +5,7 @@ export const PUBLIC_WORKER_AI_FIELDS: readonly string[];
 export const SET_CONFIG_MERGES_AI_FIELD: 'setConfigMergesAi';
 /** The public config field a Worker sets when it builds debate atlases and accepts results admins. */
 export const DEBATE_ATLAS_FIELD: 'debateAtlas';
+/** The public config field a Worker sets when it builds risk matrices. */
+export const RISK_MATRIX_FIELD: 'riskMatrix';
+/** The public config field a Worker sets when it shows every answer to signed-in members. */
+export const MEMBER_RESULTS_FIELD: 'memberResults';

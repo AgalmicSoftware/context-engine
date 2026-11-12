@@ -44,3 +44,24 @@ it('preserves invalid threshold draft state until write validation rejects it', 
     }),
   );
 });
+
+it('explains the mode, the views and the threshold behind their own "?"', () => {
+  render(
+    <ResultsAnalysisSettingsFields
+      value={{ generationMode: 'automatic' }}
+      onChange={jest.fn()}
+      backgroundAutoSupported
+    />,
+  );
+  expect(screen.getByLabelText('Generation mode')).toHaveAccessibleDescription(/Manual: an admin presses Generate/);
+  expect(screen.getByRole('group', { name: 'AI Views' })).toHaveAccessibleDescription(
+    /Circles: a map of the arguments.*Breakdown.*Risk Matrix/,
+  );
+  expect(screen.getByLabelText('Distinct participant threshold')).toHaveAccessibleDescription(
+    /Someone answering again doesn’t count/,
+  );
+  for (const label of ['Generation mode', 'AI Views', 'Distinct participant threshold']) {
+    expect(screen.getByRole('button', { name: `About ${label}` })).toBeInTheDocument();
+  }
+  expect(screen.queryByText(/^Runs after this many newly seen/)).not.toBeInTheDocument();
+});

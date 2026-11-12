@@ -53,7 +53,15 @@ import {
 } from '../shared/workerSessionConfig.mjs';
 import { executeCoordinatedSessionConfigMutation } from './sessionWriteCoordinator.js';
 import { generateResultsAnalysisDraft } from './resultsAnalysisGeneration.js';
-import { buildDebateAtlas, canBuildDebateAtlas, DEBATE_ATLAS_BUILD_ACTION } from './debateAtlasBuild.js';
+import { buildDebateAtlas, DEBATE_ATLAS_BUILD_ACTION } from './debateAtlasBuild.js';
+import { buildRiskMatrix, RISK_MATRIX_BUILD_ACTION } from './riskMatrixBuild.js';
+import { canBuildResults } from './resultsBuild.js';
+
+const RESULTS_BUILDER_ACTIONS = new Set([
+  DEBATE_ATLAS_BUILD_ACTION,
+  RISK_MATRIX_BUILD_ACTION,
+  'results-analysis/generate',
+]);
 
 const toTrimmedString = (value) => (
   typeof value === 'string'
@@ -175,9 +183,10 @@ export const dispatchAdminRequest = async ({
       validateSiweAddressMatchesRequest: deps?.validateSiweAddressMatchesRequest,
       consumeNonce: deps?.consumeNonce,
       validateBootstrapAdmin: deps?.validateBootstrapAdmin,
-      // Co-admins and results admins may build atlases and do nothing else here.
-      validateAdmin: action === DEBATE_ATLAS_BUILD_ACTION
-        ? (args) => canBuildDebateAtlas({ ...args, validateAdmin: deps?.validateAdmin })
+      // Co-admins and results admins may build atlases, risk matrices and AI
+      // Views, and do nothing else here.
+      validateAdmin: RESULTS_BUILDER_ACTIONS.has(action)
+        ? (args) => canBuildResults({ ...args, validateAdmin: deps?.validateAdmin })
         : deps?.validateAdmin,
       MISSING_SLUG_ERROR: deps?.MISSING_SLUG_ERROR,
     },
@@ -220,6 +229,15 @@ export const dispatchAdminRequest = async ({
 
   if (action === 'results-analysis/generate') {
     const privateHeaders = withPrivateNoStoreHeaders(headers);
+    // Only the admin may supply the rows: a results admin's AI Views read the Worker's own.
+    const suppliesRows = (body?.source?.kind || body?.sourceKind || 'worker-canonical') !== 'worker-canonical' ||
+      body?.committedResponses !== undefined;
+    if (suppliesRows && await deps?.validateAdmin?.({
+      env, slug: targetSlug, address: toTrimmedString(authorityResult.address).toLowerCase(), config: existingConfig, body: {},
+    }) !== true) {
+      await recordAuthFailure({ env, deps });
+      return deps?.json?.({ error: 'Only the session admin can build AI Views from supplied answers.' }, 403, privateHeaders);
+    }
     try {
       const result = await (deps?.generateResultsAnalysisDraft || generateResultsAnalysisDraft)({
         env,
@@ -240,9 +258,12 @@ export const dispatchAdminRequest = async ({
     }
   }
 
-  if (action === DEBATE_ATLAS_BUILD_ACTION) {
+  if (action === DEBATE_ATLAS_BUILD_ACTION || action === RISK_MATRIX_BUILD_ACTION) {
     const privateHeaders = withPrivateNoStoreHeaders(headers);
-    const result = await (deps?.buildDebateAtlas || buildDebateAtlas)({
+    const build = action === DEBATE_ATLAS_BUILD_ACTION
+      ? deps?.buildDebateAtlas || buildDebateAtlas
+      : deps?.buildRiskMatrix || buildRiskMatrix;
+    const result = await build({
       env,
       slug: targetSlug,
       config: existingConfig,

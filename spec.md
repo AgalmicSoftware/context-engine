@@ -166,9 +166,10 @@ What users can do:
   stylesheets, or CSS.
 
 What the system does:
-- Starts a new draft on Hosted & Fast with public results and unencrypted
-  answers. Choosing encryption or another results visibility keeps them private;
-  `Runs on` under Hosting and storage switches to Trustless & Slower.
+- Starts a new draft on Hosted & Fast with unencrypted answers that the
+  session's signed-in members see. Choosing encryption or another results
+  visibility changes who sees them; the `Runs on` toggle at the top switches to
+  Trustless & Slower.
 - In Hosted & Fast, stores canonical signed session config, secrets,
   Worker-native group/gate state, and Cloudflare payload indexes in the
   per-session Worker; publication does not perform an EVM transaction or
@@ -336,6 +337,8 @@ What integrations can do:
   `authority.mode=worker_canonical` and `surfaces.agentHttp=true`.
 - Exchange an authorized Session Worker identity for a scoped member credential
   at `/api/agent/wrapped/member-exchange`.
+- Give a signed-in person's own agent a key that answers as them, at
+  `/api/agent/credentials/delegate` (the account menu's **Your AI agent**).
 
 What the system does:
 - Runs `workers/sessionCorsWorker/agent/` inside the Session Worker.
@@ -548,6 +551,8 @@ Worker API (selected endpoints):
 - `POST /admin/debate-atlas/build` and `GET /debate-atlas`: Build a debate atlas
   from the stored responses (admins, co-admins and `resultsAdminAddresses`), and
   read the newest build or one by `id` under the same viewer rule.
+- `POST /admin/risk-matrix/build` and `GET /risk-matrix`: The same for a risk
+  matrix of areas and the opportunities and risks where two of them meet.
 - `POST /`: Authenticated action-style requests using an `action` field: `request_test_eth` (testnet faucet), `fetch_url`, `fetch_image`.
 
 Agent HTTP API families (selected):

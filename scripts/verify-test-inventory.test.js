@@ -51,7 +51,7 @@ function writeInventoryFixture(rootDir, overrides = {}) {
   writeFile(rootDir, path.join('workers', 'sessionCorsWorker', 'routeBaseHeaders.test.mjs'));
   writeJson(rootDir, path.join('workers', 'sessionCorsWorker', 'package.json'), {
     scripts: {
-      test: 'node --test *.test.mjs',
+      test: 'node --test *.test.mjs agent/*.test.mjs',
     },
   });
 
@@ -111,7 +111,6 @@ function writeInventoryFixture(rootDir, overrides = {}) {
       workers: {
         commands: [
           { label: 'worker', command: 'npm', args: ['run', 'test:worker:session-cors'] },
-          { label: 'agent', command: 'npm', args: ['run', 'test:worker:agent'] },
         ],
       },
       'wiring-and-release': {
@@ -199,18 +198,20 @@ test('verifyTestInventory owns canonical test runner and CI-gate reachability', 
 
     const manifest = JSON.parse(fs.readFileSync(path.join(rootDir, 'scripts/ci-gates.json'), 'utf8'));
     manifest.profiles.ci = manifest.profiles.ci.filter((gateName) => gateName !== 'client');
-    manifest.gates.workers.commands = manifest.gates.workers.commands
-      .filter((entry) => entry.args.join(' ') !== 'run test:worker:agent');
     writeJson(rootDir, 'scripts/ci-gates.json', manifest);
+    // The workers gate runs the Worker's own test script once, which must include the agent tests.
+    writeJson(rootDir, path.join('workers', 'sessionCorsWorker', 'package.json'), {
+      scripts: { test: 'node --test *.test.mjs' },
+    });
     writeFile(rootDir, '.github/workflows/ci.yml', fs.readFileSync(
       path.join(rootDir, '.github/workflows/ci.yml'),
       'utf8',
     ).replace('run: npm run ci:gates:check-hosted', 'run: true'));
 
     assert.deepEqual(verifyTestInventory(rootDir), [
+      'workers/sessionCorsWorker/package.json scripts.test must include "node --test *.test.mjs agent/*.test.mjs"',
       'package.json missing scripts.test:worker:agent',
       'scripts/ci-gates.json profile "ci" must include "client"',
-      'scripts/ci-gates.json gate "workers" must run test:worker:agent',
       '.github/workflows/ci.yml must include the manifest-backed aggregate checker',
     ]);
   });

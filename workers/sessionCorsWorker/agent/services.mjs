@@ -19,6 +19,10 @@ import { persistRecoveryMessage, retainOutcomeForRecovery } from './agentSubmitQ
 const activeAi = new Map();
 export const createAgentServices = ({ env, agentEnv, deps }) => {
   const ctx = agentEnv.AGENT_CONTEXT;
+  // The sign-in a key was made from is read once per request, not for every
+  // answer it writes. The key, which ends no later than that sign-in, and the
+  // session's revision and epoch are still checked on every write.
+  const checkedSources = new Set();
   const expectedAuthority = () => ({ actor: ctx.address.toLowerCase(), revision: ctx.revision, authzEpoch: ctx.authzEpoch });
   const current = async () => {
     const next = await (deps.readCurrentSessionConfig || readCurrentSessionConfig)({ env, slug: ctx.slug });
@@ -27,8 +31,11 @@ export const createAgentServices = ({ env, agentEnv, deps }) => {
     if (ctx.auth?.delegation) {
       const loaded = await loadAgentCredentialHash({ env: agentEnv, tokenHash: ctx.auth.delegation.tokenHash, now: new Date(ctx.now()).toISOString() });
       if (!loaded.ok) throw authorityError('agent_credential_source_inactive', 401);
-      await validateCredentialAuthority({ env: agentEnv, record: loaded.record,
-        validateSourceJwt: payload => validateMemberSource({ env, context: ctx, payload, deps }) });
+      await validateCredentialAuthority({ env: agentEnv, record: loaded.record, validateSourceJwt: async (payload) => {
+        if (checkedSources.has(payload.jti)) return;
+        await validateMemberSource({ env, context: ctx, payload, deps });
+        checkedSources.add(payload.jti);
+      } });
     }
     if (ctx.address) {
       try { ctx.scopes = await deps.computeScopesForLogin({ env, slug: ctx.slug, config: next.config, address: ctx.address }); }
@@ -38,7 +45,9 @@ export const createAgentServices = ({ env, agentEnv, deps }) => {
   };
   const admin = async () => {
     await current();
-    const ok = !!ctx.address && await deps.validateAdmin({ env, slug: ctx.slug, address: ctx.address, config: ctx.config });
+    // A key made from a person's sign-in answers as them, never as their admin role.
+    const ok = !!ctx.address && !ctx.auth?.delegation?.sourceParticipant &&
+      await deps.validateAdmin({ env, slug: ctx.slug, address: ctx.address, config: ctx.config });
     return { ok: !!ok, accountAddress: ctx.address };
   };
   const submitJournal = async (operation, record) => {

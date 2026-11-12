@@ -52,7 +52,8 @@ const createKv = () => {
   return {
     store,
     async put(key, value) { store.set(key, value); },
-    async get(key) { return store.get(key) || null; },
+    // A key list is Cloudflare's bulk get.
+    async get(key) { return Array.isArray(key) ? new Map(key.map((name) => [name, store.get(name) || null])) : store.get(key) || null; },
     async list({ prefix = '' } = {}) {
       return {
         keys: [...store.keys()].filter((name) => name.startsWith(prefix)).map((name) => ({ name })),
@@ -166,6 +167,43 @@ test('generated and stored artifacts enforce current group thresholds and disabl
   stricter.resultsAnalysis.views = { circles: false, breakdown: false, riskMatrix: false };
   const hidden = await read(stricter);
   assert.equal(Object.values(hidden.artifact.sections).every((section) => section.available === false), true);
+});
+
+test('members-only AI Views are read by signed-in members, never by visitors', async () => {
+  const access = { gate: 'role_gate', encryption: 'none', accessConditions: { match: 'any', conditions: [
+    { kind: 'worker_role', role: 'admin' }, { kind: 'agent_grant_scope', scope: 'storage' },
+  ] } };
+  const settings = { ...config, storageProfile: { backend: 'cloudflare', payloadAccessControl: access },
+    sessionModeProfile: {
+      profileVersion: 1, preset: 'custom', authority: { mode: 'worker_canonical' }, evm: { registryChainId: null },
+      storage: { backend: 'cloudflare', payloadAccessControl: access }, identity: { default: 'passkey', enabled: ['passkey'] },
+      authorization: { mechanisms: ['worker_roles'] }, encryption: { mode: 'none' },
+      surfaces: { web: true, telegram: false, miniApp: false, agentHttp: false, mcp: false, ceCc: false },
+      results: { visibility: 'session_member_full', exposure: { aggregateResultsEnabled: true, anonymizedGroupsEnabled: false, minGroupSize: 2 } },
+      export: { scope: 'admin_raw' },
+    } };
+  assert.equal(validateWorkerConfigModeValues(settings).ok, true);
+  const values = new Map();
+  const storage = { get: async (key) => structuredClone(values.get(key)), put: async (key, value) => values.set(key, structuredClone(value)),
+    delete: async (key) => values.delete(key), transaction: async (callback) => callback(storage) };
+  const env = {};
+  const coordinator = new SessionWriteCoordinator({ storage }, env);
+  env.CE_SESSION_COORDINATOR = { idFromName: (name) => name, get: () => ({ fetch: (url, init) => coordinator.fetch(new Request(url, init)) }) };
+  const body = { requestId: 'members-check', source: { kind: 'admin-snapshot', snapshot: { sessionSlug: 'session-a', sessionId,
+    questions: [{ id: 'q1', prompt: 'Question?', type: 'text' }],
+    responses: [1, 2, 3].map((i) => ({ questionId: 'q1', participantId: 'synthetic-' + i, answer: 'View ' + i })) } } };
+  const generated = await generateResultsAnalysisDraft({ env, config: settings, slug: 'session-a', body,
+    deps: { generateAnalysisArtifact: async () => ({ ok: true, value: { breakdown: { summary: { overview: 'Synthesis' }, groups: [] } } }) } });
+  assert.equal(generated.ok, true, JSON.stringify(generated));
+  const read = (address, scopes) => dispatchResultsAnalysisArtifactRequest({ request: new Request('https://worker.invalid/results-analysis/artifact'),
+    env, slug: 'session-a', config: settings, address, scopes, headers: {},
+    deps: { json: (value, status, headers) => new Response(JSON.stringify(value), { status, headers }) } });
+  const member = '0x' + '2'.repeat(40);
+  assert.equal((await read('', {})).status, 403);
+  assert.equal((await read(member, {})).status, 403);
+  const served = await read(member, { storage: true });
+  assert.equal(served.status, 200);
+  assert.equal((await served.json()).artifact.sections.breakdown.summary.overview, 'Synthesis');
 });
 
 test('maps each synthetic participant to the address that answered, and keeps addresses out of the AI input', async () => {
@@ -1033,7 +1071,7 @@ test('Results generation passes saved model authority to the real provider and r
   assert.deepEqual(result.value, { summary: 'Synthetic report' });
 });
 
-test('viewer eligibility only supports public full results with aggregate exposure', () => {
+test('viewer eligibility only supports full results with aggregate exposure', () => {
   const publicFull = {
     ...config,
     sessionModeProfile: {
@@ -1042,6 +1080,14 @@ test('viewer eligibility only supports public full results with aggregate exposu
     },
   };
   assert.deepEqual(evaluateResultsAnalysisViewerEligibility({ config: publicFull }), { ok: true, visibility: 'public_full_if_storage_public' });
+  const withVisibility = (visibility) => ({
+    ...publicFull,
+    sessionModeProfile: { ...publicFull.sessionModeProfile, results: { visibility, exposure: { aggregateResultsEnabled: true } } },
+  });
+  assert.deepEqual(evaluateResultsAnalysisViewerEligibility({ config: withVisibility('session_member_full') }), { ok: true, visibility: 'session_member_full' });
+  for (const own of ['participant_aggregate', 'session_member_aggregate']) {
+    assert.equal(evaluateResultsAnalysisViewerEligibility({ config: withVisibility(own) }).reason, 'results_visibility_unsupported');
+  }
   const privateAdmin = {
     ...config,
     sessionModeProfile: {

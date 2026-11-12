@@ -4,6 +4,8 @@ export type WorkerCapabilities = {
   features: string[];
   apiVersion?: number;
   bundle?: string | null;
+  /** The release the Worker bundle was built from; null when it doesn't say (before 0.9.3). */
+  release?: string | null;
   session?: {
     readiness: Record<string, string>;
     unavailable: Array<{ operation: string; reason: string }>;
@@ -89,6 +91,7 @@ export const readWorkerCapabilities = async (
         legacy: false,
         apiVersion: body.apiVersion,
         bundle: typeof body.bundle === 'string' ? body.bundle : null,
+        release: typeof body.release === 'string' && body.release ? body.release : null,
         features: body.features.filter((item: unknown): item is string => typeof item === 'string'),
         ...(body.session && Array.isArray(body.session.unavailable)
           ? {

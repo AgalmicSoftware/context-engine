@@ -3,6 +3,7 @@ import { recoveryKeyFingerprint } from '../../../../shared/crypto/recoveryKeyFin
 import React from 'react';
 import { Button, FormGroup, Input, Label } from 'reactstrap';
 import styles from './SessionWizard.module.scss';
+import { SetupHelp, setupHelpId } from './setup/SetupPrimitives';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { CLOUDFLARE_NATIVE_DEPLOY_URL } from '../../variables/publicDeploymentConfig.js';
 import { createCloudflareNativeSetupSecrets } from '../../utilities/worker/cloudflareNativeDeploy.js';
@@ -337,13 +338,17 @@ const WorkerDeploySection = ({
         }}
       >
         <summary>Advanced: use my own recovery key</summary>
-        <p className={styles.helperText}>
-          Optional. Enter 64 hex characters or generate a key in this tab. Keep a private copy before deploying. This
-          value is never saved in a wizard draft.
-        </p>
-        <Label for="ce-wizard-recovery-key-input">Your recovery key</Label>
+        <div className={styles.fieldLabelRow}>
+          <Label for="ce-wizard-recovery-key-input">Your recovery key</Label>
+          <SetupHelp
+            id="ce-wizard-recovery-key-input"
+            label="Your recovery key"
+            help="Optional. Enter 64 hex characters or generate a key in this tab. Keep a private copy before deploying. This value is never saved in a wizard draft."
+          />
+        </div>
         <Input
           id="ce-wizard-recovery-key-input"
+          aria-describedby={setupHelpId('ce-wizard-recovery-key-input')}
           data-testid="ce-wizard-recovery-key-input"
           type={revealOperatorKey ? 'text' : 'password'}
           autoComplete="off"

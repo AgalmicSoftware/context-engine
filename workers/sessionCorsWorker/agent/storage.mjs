@@ -41,7 +41,14 @@ export const createAgentStorage = ({ kv, sessionId, cursorSecret, beforeWrite } 
     }
   };
   return Object.freeze({
-    get: (name, options) => providerRead(() => kv.get(key(name), options)),
+    get: (name, options) => providerRead(async () => {
+      if (!Array.isArray(name)) return kv.get(key(name), options);
+      // Like the binding, an array reads up to 100 keys in one call, which
+      // Cloudflare counts as one of an invocation's 1,000 KV operations.
+      if (name.length > 100) throw new Error('agent_storage_bulk_get_invalid');
+      const values = await kv.get(name.map(key), options);
+      return new Map(name.map((suffix) => [suffix, values.get(key(suffix)) ?? null]));
+    }),
     put: async (name, value, options) => { await beforeWrite?.(); return kv.put(key(name), value, options); },
     delete: async (name) => { await beforeWrite?.(); return kv.delete(key(name)); },
     async list(options = {}) {

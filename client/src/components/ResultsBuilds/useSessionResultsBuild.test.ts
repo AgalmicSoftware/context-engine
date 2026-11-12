@@ -1,16 +1,22 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 
-import { DEBATE_ATLAS_ACTIVE_POLL_MS, DEBATE_ATLAS_KEPT_BUILDS, useSessionDebateAtlas } from './useSessionDebateAtlas';
 import {
-  readDebateAtlas,
-  requestDebateAtlasBuild,
-  type DebateAtlasBuildResult,
-} from '../../domains/debateAtlas/debateAtlasWorkerClient';
+  RESULTS_BUILD_ACTIVE_POLL_MS,
+  RESULTS_BUILD_KEPT_BUILDS,
+  useSessionResultsBuild,
+} from './useSessionResultsBuild';
+import {
+  readResultsBuild,
+  requestResultsBuild,
+  type ResultsBuildResult,
+  type ResultsBuildSummary,
+} from '../../domains/resultsBuilds/resultsBuildWorkerClient';
 import { adminWorkerPorts } from '../../domains/worker/adminWorkerPorts';
 
-jest.mock('../../domains/debateAtlas/debateAtlasWorkerClient', () => ({
-  readDebateAtlas: jest.fn(),
-  requestDebateAtlasBuild: jest.fn(),
+jest.mock('../../domains/resultsBuilds/resultsBuildWorkerClient', () => ({
+  ...jest.requireActual<object>('../../domains/resultsBuilds/resultsBuildWorkerClient'),
+  readResultsBuild: jest.fn(),
+  requestResultsBuild: jest.fn(),
 }));
 jest.mock('../../domains/worker/adminWorkerPorts', () => ({
   adminWorkerPorts: { adminAuth: { buildSignedAdminActionAuth: jest.fn(async () => ({ signed: true })) } },
@@ -19,8 +25,12 @@ jest.mock('../../utilities/session/sessionWorkerAvailability', () => ({
   getUsableSessionWorkerUrl: () => 'https://worker.example',
 }));
 
-const read = jest.mocked(readDebateAtlas);
-const requestBuild = jest.mocked(requestDebateAtlasBuild);
+// Builds of any kind, as the tests hand them back.
+type RequestBuild = (
+  ...args: Parameters<typeof requestResultsBuild>
+) => Promise<ResultsBuildResult<ResultsBuildSummary>>;
+const read = jest.mocked(readResultsBuild);
+const requestBuild = jest.mocked(requestResultsBuild as RequestBuild);
 const address = (digit: number) => `0x${String(digit).repeat(40)}`;
 const summary = (id: string) => ({ id, builtAt: '2026-11-08T14:05:00.000Z', counts: { responses: 12 } });
 const build = (id: string) => ({ ...summary(id), branches: [] });
@@ -39,7 +49,15 @@ type Props = { account: string; enabled: boolean; sessionConfig: Record<string, 
 const renderAtlas = (props: Partial<Props> = {}) =>
   renderHook(
     ({ account, enabled, sessionConfig, sessionSlug }: Props) =>
-      useSessionDebateAtlas({ account, chainId: 1, enabled, provider: 'wallet', sessionConfig, sessionSlug }),
+      useSessionResultsBuild({
+        account,
+        chainId: 1,
+        enabled,
+        kind: 'debate-atlas',
+        provider: 'wallet',
+        sessionConfig,
+        sessionSlug,
+      }),
     { initialProps: { account: '', enabled: true, sessionConfig: baseConfig, sessionSlug: 'salon', ...props } },
   );
 
@@ -140,7 +158,7 @@ it('opens the newest build when the one asked for is no longer kept', async () =
 });
 
 it('signs the build as the account and lists the new atlas first, keeping as many as the Worker', async () => {
-  const kept = Array.from({ length: DEBATE_ATLAS_KEPT_BUILDS }, (_, index) =>
+  const kept = Array.from({ length: RESULTS_BUILD_KEPT_BUILDS }, (_, index) =>
     summary(`atlas_k${index}_0000000${index}`),
   );
   read.mockResolvedValue({ ok: true, status: 200, builds: kept, build: build(kept[0].id) });
@@ -154,10 +172,10 @@ it('signs the build as the account and lists the new atlas first, keeping as man
     return { ok: true, status: 200, build: build('atlas_kz_0000000f') };
   });
   const { result } = renderAtlas({ account: address(2) });
-  await waitFor(() => expect(result.current.builds).toHaveLength(DEBATE_ATLAS_KEPT_BUILDS));
+  await waitFor(() => expect(result.current.builds).toHaveLength(RESULTS_BUILD_KEPT_BUILDS));
   let built = false;
   await act(async () => {
-    built = await result.current.buildAtlas();
+    built = await result.current.startBuild();
   });
   expect(built).toBe(true);
   expect(requestBuild).toHaveBeenCalledWith(
@@ -173,20 +191,20 @@ it('signs the build as the account and lists the new atlas first, keeping as man
     }),
   );
   expect(result.current.build?.id).toBe('atlas_kz_0000000f');
-  expect(result.current.builds).toHaveLength(DEBATE_ATLAS_KEPT_BUILDS);
+  expect(result.current.builds).toHaveLength(RESULTS_BUILD_KEPT_BUILDS);
   expect(result.current.builds[0].id).toBe('atlas_kz_0000000f');
   expect(result.current.builds.some((entry) => entry.id === kept.at(-1)?.id)).toBe(false);
   expect('branches' in result.current.builds[0]).toBe(false);
 });
 
 it('drops a build that finishes after the reader changed', async () => {
-  let finish: (value: DebateAtlasBuildResult) => void = () => {};
+  let finish: (value: ResultsBuildResult<ResultsBuildSummary>) => void = () => {};
   requestBuild.mockReturnValue(new Promise((resolve) => (finish = resolve)));
   const { result, rerender } = renderAtlas({ account: address(1) });
   await waitFor(() => expect(result.current.build?.id).toBe('atlas_k2_00000002'));
   let pending: Promise<boolean> = Promise.resolve(true);
   act(() => {
-    pending = result.current.buildAtlas();
+    pending = result.current.startBuild();
   });
   expect(result.current.building).toBe(true);
   read.mockResolvedValue({ ok: false, status: 403, error: 'Not visible.' });
@@ -206,7 +224,7 @@ it('keeps the shown atlas and reports why a build failed', async () => {
   await waitFor(() => expect(result.current.build?.id).toBe('atlas_k2_00000002'));
   let built = true;
   await act(async () => {
-    built = await result.current.buildAtlas();
+    built = await result.current.startBuild();
   });
   expect(built).toBe(false);
   expect(result.current.error).toBe('Needs at least 2 participants.');
@@ -228,13 +246,13 @@ it("shows someone else's running build when a press is refused for it, and check
   });
   read.mockClear();
   await act(async () => {
-    await result.current.buildAtlas();
+    await result.current.startBuild();
   });
   expect(result.current.activeSinceMs).toBe(7);
   expect(result.current.error).toBe('An atlas is already being built.');
   expect(read).not.toHaveBeenCalled();
   await act(async () => {
-    jest.advanceTimersByTime(DEBATE_ATLAS_ACTIVE_POLL_MS);
+    jest.advanceTimersByTime(RESULTS_BUILD_ACTIVE_POLL_MS);
     await Promise.resolve();
   });
   expect(read).toHaveBeenCalledTimes(1);
@@ -255,7 +273,7 @@ it('checks back on the build the reader picked, not the newest', async () => {
   expect(read).toHaveBeenLastCalledWith(expect.objectContaining({ id: 'atlas_k1_00000001' }));
   read.mockClear();
   await act(async () => {
-    jest.advanceTimersByTime(DEBATE_ATLAS_ACTIVE_POLL_MS);
+    jest.advanceTimersByTime(RESULTS_BUILD_ACTIVE_POLL_MS);
     await Promise.resolve();
   });
   expect(read).toHaveBeenCalledTimes(1);
@@ -273,21 +291,21 @@ it("keeps checking back while someone else's build is still running", async () =
   expect(result.current.activeSinceMs).toBe(5);
   for (const expectedReads of [2, 3]) {
     await act(async () => {
-      jest.advanceTimersByTime(DEBATE_ATLAS_ACTIVE_POLL_MS);
+      jest.advanceTimersByTime(RESULTS_BUILD_ACTIVE_POLL_MS);
       await Promise.resolve();
     });
     expect(read).toHaveBeenCalledTimes(expectedReads);
     expect(result.current.activeSinceMs).toBe(5);
   }
   await act(async () => {
-    jest.advanceTimersByTime(DEBATE_ATLAS_ACTIVE_POLL_MS);
+    jest.advanceTimersByTime(RESULTS_BUILD_ACTIVE_POLL_MS);
     await Promise.resolve();
   });
   expect(read).toHaveBeenCalledTimes(4);
   expect(result.current.activeSinceMs).toBeNull();
   expect(result.current.build?.id).toBe('atlas_k2_00000002');
   await act(async () => {
-    jest.advanceTimersByTime(DEBATE_ATLAS_ACTIVE_POLL_MS * 2);
+    jest.advanceTimersByTime(RESULTS_BUILD_ACTIVE_POLL_MS * 2);
     await Promise.resolve();
   });
   expect(read).toHaveBeenCalledTimes(4);
@@ -304,7 +322,7 @@ it('names the Worker that keeps its atlases, and none where it builds none', asy
 it('times a press from when it started and gives the model and prompts the Worker sent builders', async () => {
   const nextBuild = { model: 'deep-model', prompts: { plan: 'Plan <Questions>', map: 'Map <Responses>' } };
   read.mockResolvedValue({ ...shown('atlas_k2_00000002'), canBuild: true, nextBuild });
-  let finish: (value: DebateAtlasBuildResult) => void = () => {};
+  let finish: (value: ResultsBuildResult<ResultsBuildSummary>) => void = () => {};
   requestBuild.mockReturnValue(new Promise((resolve) => (finish = resolve)));
   const { result } = renderAtlas({ account: address(1) });
   await waitFor(() => expect(result.current.nextBuild).toEqual(nextBuild));
@@ -313,7 +331,7 @@ it('times a press from when it started and gives the model and prompts the Worke
   const before = Date.now();
   let pending: Promise<boolean> = Promise.resolve(true);
   act(() => {
-    pending = result.current.buildAtlas();
+    pending = result.current.startBuild();
   });
   expect(result.current.buildStartedAtMs).toBeGreaterThanOrEqual(before);
   await act(async () => {
@@ -328,4 +346,58 @@ it("times someone else's running build from its start", async () => {
   const { result } = renderAtlas({ account: address(1) });
   await waitFor(() => expect(result.current.activeSinceMs).toBe(1234));
   expect(result.current.buildStartedAtMs).toBe(1234);
+});
+
+describe('a risk matrix', () => {
+  const renderRiskMatrix = (sessionConfig: Record<string, unknown>) =>
+    renderHook(() =>
+      useSessionResultsBuild({
+        account: address(1),
+        chainId: 1,
+        enabled: true,
+        kind: 'risk-matrix',
+        provider: 'wallet',
+        sessionConfig,
+        sessionSlug: 'salon',
+      }),
+    );
+  const riskBuild = (id: string) => ({ ...summary(id), areas: [{ name: 'Trust', subareas: ['Identity'] }], notes: [] });
+
+  it('is read where the Worker builds risk matrices, whatever it says of atlases', async () => {
+    read.mockResolvedValue({
+      ok: true,
+      status: 200,
+      builds: [summary('risk_k2_00000002')],
+      build: riskBuild('risk_k2_00000002'),
+    });
+    const { result } = renderRiskMatrix({ ...baseConfig, debateAtlas: undefined, riskMatrix: true });
+    await waitFor(() => expect(result.current.build?.id).toBe('risk_k2_00000002'));
+    expect(read).toHaveBeenCalledWith(expect.objectContaining({ kind: 'risk-matrix', sessionSlug: 'salon' }));
+    expect(result.current.canBuild).toBe(true);
+
+    read.mockClear();
+    const atlasOnly = renderRiskMatrix(baseConfig);
+    expect(atlasOnly.result.current.supported).toBe(false);
+    expect(atlasOnly.result.current.canBuild).toBe(false);
+    expect(read).not.toHaveBeenCalled();
+  });
+
+  it('lists a new build without its areas and notes, and says why one failed in its own words', async () => {
+    read.mockResolvedValue({ ok: true, status: 200, builds: [], build: null });
+    requestBuild.mockResolvedValueOnce({ ok: true, status: 200, build: riskBuild('risk_kz_0000000f') });
+    const { result } = renderRiskMatrix({ ...baseConfig, riskMatrix: true });
+    await waitFor(() => expect(read).toHaveBeenCalled());
+    await act(async () => {
+      expect(await result.current.startBuild()).toBe(true);
+    });
+    expect(requestBuild).toHaveBeenCalledWith(expect.objectContaining({ kind: 'risk-matrix' }));
+    expect(result.current.build?.id).toBe('risk_kz_0000000f');
+    expect(result.current.builds).toEqual([summary('risk_kz_0000000f')]);
+
+    requestBuild.mockResolvedValueOnce({ ok: false, status: 0 });
+    await act(async () => {
+      expect(await result.current.startBuild()).toBe(false);
+    });
+    expect(result.current.error).toBe('The risk matrix build failed.');
+  });
 });

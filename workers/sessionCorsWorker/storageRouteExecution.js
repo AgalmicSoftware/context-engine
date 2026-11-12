@@ -957,6 +957,8 @@ const hasPrivateResponsePolicy = ({ config, resource }) => {
     !!profile?.results?.visibility && profile.results.visibility !== 'public_full_if_storage_public';
 };
 
+const membersSeeAllResponses = (config) => config?.sessionModeProfile?.results?.visibility === 'session_member_full';
+
 const canReadPrivateResponse = ({ config, resource, metadata, requesterAddress, authScopes, operation }) => {
   if (operation === 'upload' || !hasPrivateResponsePolicy({ config, resource })) return true;
 
@@ -965,9 +967,11 @@ const canReadPrivateResponse = ({ config, resource, metadata, requesterAddress, 
   if (address && resolveRoleAddressSet({ config, role: 'admin' }).has(address)) return true;
 
   // A participant's route scope permits submission, not reading everyone else's
-  // answers. List preflight permits scanning; each row still requires its owner.
+  // answers, unless the session shows every answer to its members. List
+  // preflight permits scanning; each row still requires its owner or a member.
+  // Either way the session gate is checked after this.
   if (!address || (scopes.storage !== true && scopes.arweave !== true)) return false;
-  if (operation === 'list') return true;
+  if (operation === 'list' || membersSeeAllResponses(config)) return true;
   return !!trim(metadata?.responder) && normalizeAddress(metadata.responder) === address;
 };
 
@@ -990,7 +994,9 @@ const authorizeCloudflareStorageAccess = async ({
     return {
       ok: false,
       response: responseJson(deps, {
-        error: 'Access denied: individual response access requires its author or a session admin.',
+        error: membersSeeAllResponses(config)
+          ? 'Access denied: answers are visible to signed-in session members.'
+          : 'Access denied: individual response access requires its author or a session admin.',
         reason: 'private_response_owner_required',
       }, 403, baseHeaders),
     };
@@ -2088,7 +2094,13 @@ const handleCloudflareList = async ({ request, env, config, slug, uploaderAddres
     : baseHeaders);
 };
 
+// Cloudflare reads up to 100 KV keys in one bulk get, counted as one
+// operation, and refuses a bulk reply over 25 MB.
+const KV_BULK_GET_KEYS = 100;
+const KV_BULK_REPLY_BYTES = 16 * 1024 * 1024;
+
 // `skipKey` passes over a listed key, from its list metadata, without reading it.
+// A budgeted scan reads each listed page in one bulk get.
 export const listCloudflareMetadataRows = async ({ index, slug, resource = '', budget, strict = false, skipKey }) => {
   const rows = [];
   const prefix = trim(resource)
@@ -2101,16 +2113,21 @@ export const listCloudflareMetadataRows = async ({ index, slug, resource = '', b
     const listed = await index.list({
       prefix,
       ...(cursor ? { cursor } : {}),
-      ...(budget ? { limit: 100 } : {}),
+      ...(budget ? { limit: KV_BULK_GET_KEYS } : {}),
     });
-    const keys = Array.isArray(listed?.keys) ? listed.keys : [];
-    for (const keyEntry of keys) {
-      const key = trim(keyEntry?.name || keyEntry);
-      if (!key || typeof index.get !== 'function' || skipKey?.(keyEntry)) continue;
-      budget?.rows();
-      budget?.operation();
+    const keys = (Array.isArray(listed?.keys) ? listed.keys : [])
+      .filter((keyEntry) => trim(keyEntry?.name || keyEntry) && typeof index.get === 'function' && !skipKey?.(keyEntry))
+      .map((keyEntry) => trim(keyEntry?.name || keyEntry));
+    let bulk = null;
+    if (budget && keys.length) {
+      budget.rows(keys.length);
+      budget.operation();
+      // Awaited once per key below, so a failed bulk get fails each key as a single get would.
+      bulk = index.get(keys);
+    }
+    for (const key of keys) {
       try {
-        const raw = await index.get(key);
+        const raw = bulk ? (await bulk).get(key) : await index.get(key);
         if (raw != null) budget?.metadata(raw);
         const metadata = typeof raw === 'string' ? JSON.parse(raw) : raw;
         if (isObj(metadata) && trim(metadata.id)) rows.push({ key, metadata });
@@ -2125,6 +2142,55 @@ export const listCloudflareMetadataRows = async ({ index, slug, resource = '', b
     if (cursor) seenCursors.add(cursor);
   } while (cursor);
   return rows;
+};
+
+const decodeBulkPayloadEnvelope = (raw, budget) => {
+  let envelope = null;
+  try {
+    envelope = JSON.parse(raw || 'null');
+  } catch {
+    return null;
+  }
+  if (!isObj(envelope?.metadata) || typeof envelope.payloadBase64url !== 'string') return null;
+  const limit = budget?.remainingPayloadBytes ?? Infinity;
+  if (Math.floor(envelope.payloadBase64url.length * 3 / 4) > limit) throw new StorageReadLimitError('payloadBytes');
+  const bytes = base64urlToBytes(envelope.payloadBase64url);
+  if (bytes.length > limit) throw new StorageReadLimitError('payloadBytes');
+  budget?.payload(bytes.length);
+  return bytes;
+};
+
+// The KV payloads of a budgeted scan, read in bulk gets of at most 100 keys
+// whose stored sizes keep each reply well under the bulk limit. Returns id ->
+// bytes, or null for a payload that is missing or unreadable. R2 has no bulk
+// read, so with R2 bound this reads nothing and callers read each payload.
+export const readStoredCloudflarePayloadsBulk = async ({ env, index, slug, metadataList = [], budget }) => {
+  const payloads = new Map();
+  if (getStorageR2Binding(env) || typeof index?.get !== 'function') return payloads;
+  let chunk = [];
+  let chunkBytes = 0;
+  const flush = async () => {
+    const ids = chunk;
+    chunk = [];
+    chunkBytes = 0;
+    if (!ids.length) return;
+    budget?.operation();
+    const envelopes = await index.get(ids.map((id) => buildPayloadKey({ slug, id })));
+    for (const id of ids) payloads.set(id, decodeBulkPayloadEnvelope(envelopes.get(buildPayloadKey({ slug, id })), budget));
+  };
+  for (const metadata of metadataList) {
+    const id = trim(metadata?.id);
+    if (!id || payloads.has(id) || chunk.includes(id)) continue;
+    const size = Number(metadata.size) || 0;
+    if (size > (budget?.remainingPayloadBytes ?? Infinity)) throw new StorageReadLimitError('payloadBytes');
+    // An envelope holds the payload in base64url beside a copy of its metadata.
+    const replyBytes = Math.ceil(size * 4 / 3) + jsonByteLength(metadata);
+    if (chunk.length === KV_BULK_GET_KEYS || (chunk.length && chunkBytes + replyBytes > KV_BULK_REPLY_BYTES)) await flush();
+    chunk.push(id);
+    chunkBytes += replyBytes;
+  }
+  await flush();
+  return payloads;
 };
 
 export const readStoredCloudflarePayloadBytes = async ({ env, index, slug, metadata, strict = false, budget, maxBytes = Infinity }) => {

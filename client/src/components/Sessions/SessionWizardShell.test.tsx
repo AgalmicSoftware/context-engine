@@ -6,6 +6,7 @@ import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities
 import { listSessionModeConflicts, type SessionSetupConflict } from '../../utilities/session/sessionModeRuleMessages';
 import { RULE_FIXTURES } from '../../utilities/session/sessionModeRuleFixtures.testUtils';
 import SessionWizardShell, { type SessionWizardShellProps } from './SessionWizardShell';
+import { defaultSessionSetupProfile, editSessionSetupProfile, setHosting } from './setup/sessionSetupProfile';
 
 jest.mock('./SessionWizardSponsoredStatus', () => (props: any) => (
   <div data-testid="shell-sponsored-status" data-tone={props.status?.tone || ''}>
@@ -171,7 +172,15 @@ describe('SessionWizardShell', () => {
     fireEvent.change(within(basics).getByTestId(E2E_TESTIDS.WIZARD_SESSION_INFO), {
       target: { value: 'What this session is for.' },
     });
+    // Colors sit under Appearance, closed while the session keeps the default colours.
+    expect(within(basics).queryByTestId(E2E_TESTIDS.WIZARD_SESSION_COLOR_SCHEME)).not.toBeInTheDocument();
+    const appearance = within(basics).getByRole('button', { name: 'Appearance' });
+    expect(appearance).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(appearance);
+    expect(appearance).toHaveAttribute('aria-expanded', 'true');
     const colors = within(basics).getByTestId(E2E_TESTIDS.WIZARD_SESSION_COLOR_SCHEME) as HTMLSelectElement;
+    expect(colors).toHaveAccessibleDescription(/^Accent colours on this session’s pages/);
+    expect(within(basics).getByRole('button', { name: 'About Colors' })).toBeInTheDocument();
     const otherScheme = Array.from(colors.options).find((option) => option.value !== colors.value)?.value;
     expect(otherScheme).toBeTruthy();
     fireEvent.change(colors, { target: { value: otherScheme } });
@@ -182,6 +191,36 @@ describe('SessionWizardShell', () => {
     expect(props.renderField).toHaveBeenCalledWith('sessionHeader', 'https://example.test/header.png', []);
     expect(basics).toContainElement(screen.getByTestId('shell-field-sessionHeader'));
     expect(basics).toContainElement(screen.getByTestId('shell-slug-preview'));
+  });
+
+  it('opens Appearance when the session has colours of its own', () => {
+    render(
+      <SessionWizardShell
+        {...baseProps({ draft: { ...baseProps().draft, appearance: { colorSchemeId: 'ocean' } } })}
+      />,
+    );
+    expect(screen.getByRole('button', { name: 'Appearance' })).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SESSION_COLOR_SCHEME)).toHaveValue('ocean');
+  });
+
+  it('asks first where the session runs, Centralized or Decentralized, and leaves Hosting without it', () => {
+    const props = baseProps();
+    render(<SessionWizardShell {...props} />);
+    const basics = screen.getByTestId('ce-setup-section-basics');
+    const runsOn = within(basics).getByRole('radiogroup', { name: 'Runs on' });
+    expect(runsOn).toHaveAttribute('data-testid', E2E_TESTIDS.SETUP_AUTHORITY);
+    expect(runsOn).toHaveAccessibleDescription(/^Centralized: a Session Worker in your own Cloudflare account/);
+    expect(within(basics).getByRole('button', { name: 'About Runs on' })).toBeInTheDocument();
+    expect(isAfter(runsOn, within(basics).getByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME))).toBe(true);
+    expect(within(runsOn).getByRole('radio', { name: 'Centralized' })).toBeChecked();
+
+    fireEvent.click(within(runsOn).getByRole('radio', { name: 'Decentralized' }));
+    const [edit] = jest.mocked(props.editProfile).mock.calls[0];
+    const { profile } = editSessionSetupProfile(defaultSessionSetupProfile(), edit);
+    expect(profile.authority.mode).toBe('evm_registry_canonical');
+
+    fireEvent.click(screen.getByTestId('ce-setup-more-hosting'));
+    expect(within(screen.getByTestId('ce-setup-section-hosting')).queryByText('Runs on')).not.toBeInTheDocument();
   });
 
   it('embeds the gates panel and SBT defaults under Access and the Worker panel under Hosting', () => {
@@ -244,6 +283,27 @@ describe('SessionWizardShell', () => {
     expect(screen.getByTestId('ce-setup-conflicts')).toHaveTextContent(conflict.message);
     fireEvent.click(createButton);
     expect(props.createPanelProps.onCreate).not.toHaveBeenCalled();
+  });
+
+  it('starts with every answer shown to members, a choice only the Session Worker offers', () => {
+    const draftWith = (sessionModeProfile: unknown) =>
+      baseProps({ draft: { ...baseProps().draft, sessionModeProfile } });
+    const { rerender } = render(<SessionWizardShell {...draftWith(defaultSessionSetupProfile())} />);
+    fireEvent.click(screen.getByTestId(`${E2E_TESTIDS.SETUP_MORE_PREFIX}results`));
+    const select = () => screen.getByTestId(E2E_TESTIDS.SETUP_RESULTS_VISIBILITY);
+    const members = () => within(select()).getByRole('option', { name: 'Session members see all answers' });
+    expect(select()).toHaveValue('session_member_full');
+    expect(members()).toBeEnabled();
+    expect(
+      screen.getByText(/Session members: everyone signed in to the session sees every answer/),
+    ).toBeInTheDocument();
+
+    const onChain = editSessionSetupProfile(defaultSessionSetupProfile(), (draft) =>
+      setHosting(draft, 'evm_registry_canonical', 84532),
+    ).profile;
+    rerender(<SessionWizardShell {...draftWith(onChain)} />);
+    expect(select()).toHaveValue('public_full_if_storage_public');
+    expect(members()).toBeDisabled();
   });
 
   it('routes registry network changes to the page and the profile', () => {

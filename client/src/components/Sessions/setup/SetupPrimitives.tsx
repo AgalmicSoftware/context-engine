@@ -98,35 +98,71 @@ type SetupFieldProps = {
   children: React.ReactNode;
 };
 
-// Label first, then the input; explanations stay behind the "?" so labels
-// stay short. The input names setupHelpId(id) in aria-describedby.
-export const SetupField = ({ id, label, help = '', children }: SetupFieldProps): React.ReactElement => {
+type SetupHelpProps = {
+  /** The control's id; the screen-reader copy is setupHelpId(id). */
+  id: string;
+  /** The control's label, for the "?" button's name. */
+  label: string;
+  help: string;
+};
+
+// The "?" beside a label, and the copy screen readers get with the control,
+// which names setupHelpId(id) in aria-describedby. Tooltip ids are CSS
+// selectors, so React's colons are dropped from them.
+export const SetupHelp = ({ id, label, help }: SetupHelpProps): React.ReactElement => {
   const tooltipsEnabled = useSessionWizardTooltipPreference(useContext(ReactReduxContext)?.store ?? null);
   return (
-    <div className={styles.field}>
-      <div className={styles.fieldLabelRow}>
-        <label htmlFor={id} className={styles.fieldLabel}>
-          {label}
-        </label>
-        {help ? (
-          <SessionWizardInfoTooltip
-            enabled={tooltipsEnabled}
-            id={`${id}-tip`}
-            content={help}
-            placement="top"
-            ariaLabel={typeof label === 'string' ? `About ${label}` : 'About this setting'}
-          />
-        ) : null}
-      </div>
-      {children}
-      {help ? (
-        <span id={setupHelpId(id)} className={styles.srOnly}>
-          {help}
-        </span>
-      ) : null}
-    </div>
+    <>
+      <SessionWizardInfoTooltip
+        enabled={tooltipsEnabled}
+        id={`${id.replace(/:/g, '')}-tip`}
+        content={help}
+        placement="top"
+        ariaLabel={`About ${label}`}
+      />
+      <span id={setupHelpId(id)} className={styles.srOnly}>
+        {help}
+      </span>
+    </>
   );
 };
+
+const helpLabel = (label: React.ReactNode) => (typeof label === 'string' ? label : 'this setting');
+
+// Label first, then the input; explanations stay behind the "?" so labels
+// stay short. The input names setupHelpId(id) in aria-describedby.
+export const SetupField = ({ id, label, help = '', children }: SetupFieldProps): React.ReactElement => (
+  <div className={styles.field}>
+    <div className={styles.fieldLabelRow}>
+      <label htmlFor={id} className={styles.fieldLabel}>
+        {label}
+      </label>
+      {help ? <SetupHelp id={id} label={helpLabel(label)} help={help} /> : null}
+    </div>
+    {children}
+  </div>
+);
+
+type SetupFactProps = {
+  id: string;
+  label: string;
+  help: string;
+  children: React.ReactNode;
+  testId?: string;
+};
+
+// A setting another choice decides, shown as text with the same "?" help.
+export const SetupFact = ({ id, label, help, children, testId }: SetupFactProps): React.ReactElement => (
+  <div className={styles.field}>
+    <div className={styles.fieldLabelRow}>
+      <span className={styles.fieldLabel}>{label}</span>
+      <SetupHelp id={id} label={label} help={help} />
+    </div>
+    <p className={styles.fact} data-testid={testId}>
+      {children}
+    </p>
+  </div>
+);
 
 type SetupCheckProps = {
   id: string;
@@ -147,39 +183,73 @@ export const SetupCheck = ({
   help = '',
   disabled = false,
   testId,
-}: SetupCheckProps): React.ReactElement => {
-  const tooltipsEnabled = useSessionWizardTooltipPreference(useContext(ReactReduxContext)?.store ?? null);
-  return (
-    <div className={styles.checkRow}>
-      <label htmlFor={id}>
-        <input
-          id={id}
-          type="checkbox"
-          checked={checked}
-          disabled={disabled}
-          aria-describedby={help ? setupHelpId(id) : undefined}
-          data-testid={testId}
-          onChange={(event) => onChange(event.target.checked)}
-        />
-        {label}
-      </label>
-      {help ? (
-        <>
-          <SessionWizardInfoTooltip
-            enabled={tooltipsEnabled}
-            id={`${id}-tip`}
-            content={help}
-            placement="top"
-            ariaLabel={typeof label === 'string' ? `About ${label}` : 'About this setting'}
-          />
-          <span id={setupHelpId(id)} className={styles.srOnly}>
-            {help}
-          </span>
-        </>
-      ) : null}
-    </div>
-  );
+}: SetupCheckProps): React.ReactElement => (
+  <div className={styles.checkRow}>
+    <label htmlFor={id}>
+      <input
+        id={id}
+        type="checkbox"
+        checked={checked}
+        disabled={disabled}
+        aria-describedby={help ? setupHelpId(id) : undefined}
+        data-testid={testId}
+        onChange={(event) => onChange(event.target.checked)}
+      />
+      {label}
+    </label>
+    {help ? <SetupHelp id={id} label={helpLabel(label)} help={help} /> : null}
+  </div>
+);
+
+type SetupToggleProps = {
+  id: string;
+  label: string;
+  help?: string;
+  value: string;
+  options: Array<{ value: string; label: string }>;
+  onChange: (value: string) => void;
+  testId?: string;
 };
+
+// A few choices side by side: one radio group, with the same "?" help as fields.
+export const SetupToggle = ({
+  id,
+  label,
+  help = '',
+  value,
+  options,
+  onChange,
+  testId,
+}: SetupToggleProps): React.ReactElement => (
+  <div className={styles.field}>
+    <div className={styles.fieldLabelRow}>
+      <span id={`${id}-label`} className={styles.fieldLabel}>
+        {label}
+      </span>
+      {help ? <SetupHelp id={id} label={label} help={help} /> : null}
+    </div>
+    <div
+      role="radiogroup"
+      aria-labelledby={`${id}-label`}
+      aria-describedby={help ? setupHelpId(id) : undefined}
+      className={styles.toggle}
+      data-testid={testId}
+    >
+      {options.map((option) => (
+        <label key={option.value} className={styles.toggleOption}>
+          <input
+            type="radio"
+            name={id}
+            value={option.value}
+            checked={option.value === value}
+            onChange={() => onChange(option.value)}
+          />
+          {option.label}
+        </label>
+      ))}
+    </div>
+  </div>
+);
 
 // The rules table's plain messages for the conflicts at one option.
 export const SetupConflicts = ({ conflicts }: { conflicts: SessionSetupConflict[] }): React.ReactElement | null =>

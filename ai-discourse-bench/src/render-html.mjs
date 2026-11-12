@@ -4541,10 +4541,10 @@ export const renderHtmlReport = (inputReport) => {
     .riskMatrixGridCellLinked.gridCellLinked { border-color: rgba(0, 197, 255, 0.18); box-shadow: inset 0 0 0 1px rgba(0, 197, 255, 0.08), 0 12px 24px rgba(0, 0, 0, 0.14); }
     .riskMatrixEmptyCell,
     .riskMatrixEmptyCell.emptyCell { background: rgba(255, 255, 255, 0.04); color: rgba(244, 247, 255, 0.35); }
-    .riskMatrixDiagonalCell, .diagonalCell { cursor: default; background: rgba(255, 255, 255, 0.03); color: rgba(244, 247, 255, 0.35); font-size: 1.35rem; }
+    .riskMatrixDiagonalCell, .diagonalCell { cursor: default; background: rgba(255, 255, 255, 0.03); color: rgba(190, 199, 230, 0.82); font-size: 1.35rem; }
     .highlighted { border-color: rgba(255, 255, 255, 0.18); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08); }
     .popOutEffect { transform: translateY(-2px) scale(1.02); box-shadow: 0 14px 30px rgba(0, 0, 0, 0.28); }
-    .riskMatrixCellValue { color: rgba(244, 247, 255, 0.96); font-size: 1.2rem; font-weight: 700; letter-spacing: 0.02em; }
+    .riskMatrixCellValue { padding: 2px 8px; border-radius: var(--ce-radius-pill); background: #1f234f; color: rgba(244, 247, 255, 0.96); font-size: 1.2rem; font-weight: 700; letter-spacing: 0.02em; }
     .riskMatrixCellMeta { color: rgba(190, 199, 230, 0.72); font-size: 0.68rem; font-weight: 700; text-transform: uppercase; }
     .selectorGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-bottom: 16px; }
     .selectorPanel { padding: 12px; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: var(--ce-radius-10); background: rgba(255, 255, 255, 0.04); }
@@ -4552,7 +4552,7 @@ export const renderHtmlReport = (inputReport) => {
     .selectorButtonRow { display: flex; flex-wrap: wrap; gap: 8px; }
     .selectorButton { appearance: none; display: inline-flex; align-items: center; justify-content: center; min-height: 40px; padding: 10px 14px; border: 1px solid rgba(255, 255, 255, 0.14); border-radius: var(--ce-radius-10); background: rgba(255, 255, 255, 0.06); color: rgba(244, 247, 255, 0.96); font: inherit; cursor: pointer; transition: transform 0.08s ease, background-color 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease; }
     .selectorButton:hover, .selectorButton:focus-visible { border-color: rgba(77, 255, 164, 0.38); background: rgba(77, 255, 164, 0.12); transform: translateY(-1px); outline: none; box-shadow: 0 0 0 3px rgba(77, 255, 164, 0.18); }
-    .selectorButton:disabled { cursor: not-allowed; opacity: 0.55; transform: none; }
+    .selectorButton:disabled { cursor: not-allowed; border-style: dashed; color: rgba(190, 199, 230, 0.82); transform: none; }
     .selectorButtonActive { border-color: rgba(77, 255, 164, 0.38); background: rgba(77, 255, 164, 0.18); }
     .selectorButtonClear { color: rgba(190, 199, 230, 0.82); }
     .subgridHeader { margin-bottom: 14px; }

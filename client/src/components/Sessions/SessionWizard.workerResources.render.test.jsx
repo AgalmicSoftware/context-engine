@@ -36,7 +36,7 @@ describe('SessionWizard worker resource rendering', () => {
   };
   const selectWorkerHosting = () => {
     openSetupSection('hosting');
-    fireEvent.change(screen.getByTestId('ce-setup-authority'), { target: { value: 'worker_canonical' } });
+    fireEvent.click(screen.getByRole('radio', { name: 'Centralized' }));
   };
 
   it('shows only the AI resource for the default Cloudflare two-key profile', async () => {
@@ -71,7 +71,7 @@ describe('SessionWizard worker resource rendering', () => {
     expect(getWizardResourceCard('lit')).toBeUndefined();
   });
 
-  it('uses the Hosting storage control instead of a second Session Storage editor', async () => {
+  it('shows the storage Runs on sets in Hosting, with no second Session Storage editor', async () => {
     renderLoggedInSessionWizard();
 
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
@@ -79,15 +79,15 @@ describe('SessionWizard worker resource rendering', () => {
     expect(screen.queryByText('Session Storage')).not.toBeInTheDocument();
 
     enableAdvancedMode();
-    const storageSelect = screen.getByTestId('ce-setup-storage');
     expect(screen.getAllByTestId('ce-setup-storage')).toHaveLength(1);
-    expect(storageSelect).toHaveValue('arweave');
+    expect(screen.getByTestId('ce-setup-storage')).toHaveTextContent('Arweave');
+    expect(screen.queryByRole('combobox', { name: 'Storage' })).not.toBeInTheDocument();
     expect(screen.queryByText('Session Storage')).not.toBeInTheDocument();
 
-    fireEvent.change(storageSelect, { target: { value: 'cloudflare' } });
+    fireEvent.click(screen.getByRole('radio', { name: 'Centralized' }));
 
     await waitFor(() => {
-      expect(screen.getByTestId('ce-setup-storage')).toHaveValue('cloudflare');
+      expect(screen.getByTestId('ce-setup-storage')).toHaveTextContent('Cloudflare');
     });
     expect(screen.queryByRole('radio', { name: 'Public read' })).not.toBeInTheDocument();
     expect(screen.queryByRole('radio', { name: 'Worker SBT gate' })).not.toBeInTheDocument();

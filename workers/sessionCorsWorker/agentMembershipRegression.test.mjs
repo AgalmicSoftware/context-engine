@@ -53,3 +53,17 @@ test('membership response without canonical fields fails closed', async () => {
     assert.notEqual((await w.request('/api/agent/results?sessionSlug=alpha&view=consensus', { token: agent.token })).status, 200);
   }
 });
+
+test('members-only results need a credential whose account passes the session sign-in rules', async () => {
+  const cfg = baseConfig('alpha', A, { workerRoles: { member: [member.address] } });
+  cfg.workerAuthority.loginGate = { conditions: [{ kind: 'worker_role', role: 'member' }] };
+  cfg.sessionModeProfile.results = { visibility: 'session_member_full', exposure: { aggregateResultsEnabled: true, anonymizedGroupsEnabled: false, minGroupSize: 2 } };
+  const w = world({ sessions: { alpha: cfg } });
+  const path = '/api/agent/results?sessionSlug=alpha&view=consensus';
+  const reasonOf = async (response) => [response.status, (await response.json()).reason];
+  assert.notEqual((await w.request(path, { token: (await w.credential('alpha')).token })).status, 403);
+  const stranger = await w.credential('alpha', { principal: 'stranger', accountAddress: outsider.address });
+  assert.deepEqual(await reasonOf(await w.request(path, { token: stranger.token })), [403, 'agent_membership_denied']);
+  const accountless = await w.credential('alpha', { principal: 'accountless', accountAddress: '' });
+  assert.deepEqual(await reasonOf(await w.request(path, { token: accountless.token })), [403, 'agent_membership_denied']);
+});

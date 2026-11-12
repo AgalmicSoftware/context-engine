@@ -5,7 +5,13 @@ import { Wallet } from 'ethers';
 import sessionWorker, { SessionWriteCoordinator } from './worker.js';
 import { ADMIN_ACTION_TYPES, buildAdminActionBodyHash, buildAdminActionTypedData } from './adminTypedData.mjs';
 import { loadWorkerCanonicalResultsAnalysisSource } from './resultsAnalysisGeneration.js';
+import {
+	decryptPayloadWithStorageEnvelope,
+	encryptPayloadWithStorageEnvelope,
+	ensureStorageEnvelopeSessionKey,
+} from './storageEnvelopeEncryption.js';
 import { buildIndexKey, buildPayloadKey } from './storageRouteExecution.js';
+import { signToken } from './tokenSigning.js';
 
 // End-to-end checks against the real Worker entry with in-memory KV and the
 // real session coordinator, shaped like a public evaluator session.
@@ -21,6 +27,7 @@ const createMemoryKv = (seed = {}) => {
 	return {
 		values,
 		async get(key, typeOrOptions) {
+			if (Array.isArray(key)) return new Map(await Promise.all(key.map(async (name) => [name, await this.get(name, typeOrOptions)])));
 			const value = values.has(key) ? values.get(key) : null;
 			const type = typeof typeOrOptions === 'string' ? typeOrOptions : typeOrOptions?.type;
 			if (value == null || !type || type === 'text') return value;
@@ -388,4 +395,113 @@ test('login requires the signed Worker and session binding and keeps the nonce o
 	}
 	const login = await loginWithMessage({ env, wallet, message: bound });
 	assert.equal(login.status, 200, JSON.stringify(login.body));
+});
+
+// Builds a signed admin action where each signed field can be overridden, so
+// every refusal below goes through the real Worker entry, not a mocked check.
+const buildAdminAction = async ({ env, signer, claimed = signer.address, action, body = {}, signed = {} }) => {
+	const nonce = await readJson(await fetchWorker(makeRequest('/auth/nonce', {
+		method: 'POST',
+		body: { address: claimed, sessionSlug: SLUG, sessionId: SESSION_ID, adminAction: true },
+	}), env));
+	assert.equal(nonce.status, 200, JSON.stringify(nonce.body));
+	const unsigned = { address: claimed, sessionSlug: SLUG, sessionId: SESSION_ID, ...body };
+	const typedData = buildAdminActionTypedData({
+		action,
+		slug: SLUG,
+		bodyHash: buildAdminActionBodyHash(unsigned),
+		nonce: nonce.body.nonce,
+		audience: APP_ORIGIN,
+		expiration: Math.floor(Date.now() / 1000) + 300,
+		...signed,
+	});
+	const signature = await signer.signTypedData(typedData.domain, ADMIN_ACTION_TYPES, typedData.message);
+	return { ...unsigned, ...typedData.message, signature };
+};
+
+const postAdmin = async ({ env, path, body }) =>
+	readJson(await fetchWorker(makeRequest(`/admin/${path}`, { method: 'POST', body }), env));
+
+test('signed admin actions are refused when any signed field is forged, stale or replayed', async () => {
+	const action = 'storage/set-hidden';
+	const body = { resource: 'questions', id: 'q-official-1', hidden: true };
+	const tenMinutesAgo = Math.floor(Date.now() / 1000) - 600;
+	const refusals = [
+		['forged signer', (admin) => ({ signer: Wallet.createRandom(), claimed: admin.address }), 'Signature does not match address.'],
+		['expired action', (admin) => ({ signer: admin, signed: { expiration: tenMinutesAgo } }), 'Admin action expired.'],
+		['wrong action', (admin) => ({ signer: admin, signed: { action: 'set-config' } }), 'Admin action mismatch.'],
+		['wrong slug', (admin) => ({ signer: admin, signed: { slug: 'other-session' } }), 'Admin slug mismatch.'],
+		['wrong audience', (admin) => ({ signer: admin, signed: { audience: 'https://attacker.example' } }), /audience/i],
+	];
+	// A fresh session per case keeps the nonce rate limit out of the way.
+	for (const [label, options, error] of refusals) {
+		const { admin, env } = createSessionEnv();
+		const refused = await postAdmin({ env, path: action, body: await buildAdminAction({ env, action, body, ...options(admin) }) });
+		assert.equal(refused.status, 400, `${label}: ${JSON.stringify(refused.body)}`);
+		if (error instanceof RegExp) assert.match(refused.body.error, error, label);
+		else assert.equal(refused.body.error, error, label);
+	}
+
+	const { admin, env } = createSessionEnv();
+	const altered = await buildAdminAction({ env, signer: admin, action, body });
+	const tampered = await postAdmin({ env, path: action, body: { ...altered, id: 'q-other' } });
+	assert.equal(tampered.status, 400, JSON.stringify(tampered.body));
+	assert.equal(tampered.body.error, 'Admin request body mismatch.');
+
+	const genuine = await buildAdminAction({ env, signer: admin, action, body });
+	const accepted = await postAdmin({ env, path: action, body: genuine });
+	assert.equal(accepted.status, 200, JSON.stringify(accepted.body));
+	const replayed = await postAdmin({ env, path: action, body: genuine });
+	assert.equal(replayed.status, 400, JSON.stringify(replayed.body));
+	assert.match(replayed.body.error, /nonce/i);
+});
+
+test('a bearer token with a rewritten payload or a foreign signing key is refused', async () => {
+	const { admin, env } = createSessionEnv();
+	const token = await login({ env, wallet: Wallet.createRandom() });
+	const [payloadPart, signaturePart] = token.split('.');
+	const payload = JSON.parse(Buffer.from(payloadPart, 'base64url').toString());
+	const claimsAdmin = { ...payload, address: admin.address.toLowerCase() };
+	const forgedTokens = [
+		`${Buffer.from(JSON.stringify(claimsAdmin)).toString('base64url')}.${signaturePart}`,
+		await signToken(claimsAdmin, 'not-the-worker-secret'),
+	];
+	const answer = { questionID: 'q-official-1', answer: 'Agree' };
+	for (const forged of forgedTokens) {
+		const upload = await uploadJson({ env, token: forged, resource: 'responses', data: answer });
+		assert.equal(upload.status, 401, JSON.stringify(upload.body));
+	}
+	assert.deepEqual((await listResource({ env, resource: 'responses' })).body.items, []);
+	assert.equal((await uploadJson({ env, token, resource: 'responses', data: answer })).status, 200);
+});
+
+test('envelope encryption draws a fresh key and IV every time', async () => {
+	const env = { CE_STORAGE_ENVELOPE_KEK: 'hardening-envelope-kek' };
+	const deps = {
+		getOrCreateCoordinatedStorageEnvelopeSessionKey: async ({ baseConfig, candidateRecord }) => ({
+			config: { ...baseConfig, storageEnvelope: { sessionKey: candidateRecord } },
+			created: true,
+		}),
+	};
+	const sessionKey = await ensureStorageEnvelopeSessionKey({ env, config: {}, slug: SLUG, deps });
+	assert.equal(sessionKey.keyBytes.length, 32);
+	assert.ok(sessionKey.keyBytes.some((byte) => byte !== 0), 'session key is all zeros');
+
+	const plaintext = 'the same answer, stored twice';
+	const encrypt = () => encryptPayloadWithStorageEnvelope({
+		env, config: sessionKey.config, slug: SLUG, payloadId: 'answer-1',
+		plaintextBytes: new TextEncoder().encode(plaintext), contentType: 'text/plain', deps,
+	});
+	const first = await encrypt();
+	const second = await encrypt();
+	assert.notEqual(first.envelope.payloadIv, second.envelope.payloadIv);
+	assert.notEqual(first.envelope.dek.iv, second.envelope.dek.iv);
+	assert.notDeepEqual(first.ciphertextBytes, second.ciphertextBytes);
+	for (const encrypted of [first, second]) {
+		const decrypted = await decryptPayloadWithStorageEnvelope({
+			env, config: sessionKey.config, slug: SLUG, payloadId: 'answer-1',
+			ciphertextBytes: encrypted.ciphertextBytes, envelope: encrypted.envelope, deps,
+		});
+		assert.equal(new TextDecoder().decode(decrypted), plaintext);
+	}
 });
