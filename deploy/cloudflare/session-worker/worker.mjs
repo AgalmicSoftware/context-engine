@@ -70539,7 +70539,8 @@ var init_draftTextRoute = __esm({
     };
     draftTextRoute = async ({ path, request, env, config, slug, uploaderAddress, authScopes, baseHeaders, deps, authorizeSession, isConfigAdmin }) => {
       const principal = address2(uploaderAddress);
-      if (!principal || authScopes?.storage !== true && authScopes?.arweave !== true) return response2({ error: "Authentication required." }, 401, baseHeaders);
+      const scoped = authScopes?.storage === true || authScopes?.arweave === true;
+      if (!principal || !scoped && path !== "/storage/draft-text/delete") return response2({ error: "Authentication required." }, 401, baseHeaders);
       const index = getStorageIndexBinding(env);
       if (!index?.get || !index?.put || !index?.delete || !index?.list) return response2({ error: "Draft text storage is unavailable." }, 503, baseHeaders);
       const args = { request, env, config, slug, principal, index, deps, headers: baseHeaders };
@@ -108750,10 +108751,12 @@ var dispatchAuthenticatedSecretPathRoute = async ({
   }
   const route = isTranscribeRoute ? "transcribe" : isStorageRoute || isAgentQuestionsRoute ? "storage" : isWorkerGroupsRoute ? "groups" : "arweave";
   const scope = route === "storage" && scopes?.storage !== true ? "arweave" : route;
+  const allowWithoutScope = path === "/storage/draft-text/delete";
   const preflightFor = (preflightScope, preflightRoute) => deps?.evaluateAuthenticatedRoutePreflight?.({
     scopes,
     scope: preflightScope,
     route: preflightRoute,
+    allowWithoutScope,
     config,
     env,
     slug,
