@@ -188,8 +188,8 @@ Interview settings for research:
 
 Older Session Workers reject settings they don't know, so each is saved only
 when changed from its default. The sharing default needs a 0.7.0 or later
-Session Worker; `full` detail, hidden drafts, the score, group suggestions, the
-Results section and its smallest group need one newer than 0.8.0, and
+Session Worker; `full` detail, hidden drafts, the score, the Results section and
+its smallest group need one newer than 0.8.0, and
 suggesting groups to join needs 0.9.1 or later. See
 [session-interview-research.md](session-interview-research.md),
 [session-listening-mode.md](session-listening-mode.md) and [Interview settings

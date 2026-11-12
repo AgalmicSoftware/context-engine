@@ -336,8 +336,11 @@ base64url payload plus HMAC, expire after four hours, and have a same-TTL
 `authToken:{slug}:{sub}:{jti}` KV marker. Before protected route side effects,
 the Worker also requires the token's server-managed authorization epoch to
 match current config and re-evaluates the current default plus route-specific
-gate. Registry gate changes therefore take effect on the next request; config
-changes invalidate previously issued tokens. The mandatory Session coordinator
+gate. Registry gate changes therefore take effect on the next request;
+authority-sensitive config changes invalidate previously issued tokens, while
+content edits such as the session's name, context, agent instructions or
+interview settings sign no one out (`shared/sessionConfigEdits.mjs`). The
+mandatory Session coordinator
 Durable Object serializes nonce issue/consume and per-route counters across
 isolates; nonce state is stored only in the coordinator, without redundant KV mirrors.
 

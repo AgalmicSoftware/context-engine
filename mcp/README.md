@@ -43,7 +43,7 @@ and `npm --prefix mcp start` from the repository root.
 
 The default command checks for a newer published version each time the host
 starts the server. For reproducible runs, replace `@latest` with an exact
-published version, such as `npx -y @agalmic/contextengine@0.1.2`. A running
+published version, such as `npx -y @agalmic/contextengine@0.2.0`. A running
 server does not update itself.
 
 ## Upgrading to 0.3.1
