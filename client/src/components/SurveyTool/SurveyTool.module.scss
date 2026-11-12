@@ -3835,6 +3835,15 @@ button.sessionListeningGenerate:is(:hover, :focus, :active):not(:disabled) {
   padding-top: 0;
 }
 
+// The Session Agent's line, at the foot of the interview dialog in the dialog's own colours, under the body
+// that scrolls.
+.sessionVoiceModeModal > .sessionInterviewAgentUse {
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  padding: 6px var(--ce-voice-body-pad);
+  border-top: 1px solid var(--ce-card-border);
+}
+
 .sessionInterviewHeader {
   display: inline-flex;
   align-items: center;

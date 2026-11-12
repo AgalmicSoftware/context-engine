@@ -160,6 +160,12 @@ the Session Agent off. Session backups don't include them.
 A "?" by the switch, and a robot by the session's title while the Session Agent
 is on, say what it may read and link here through the README.
 
+While it is on, the interview dialog, where AI-drafted answers are reviewed and
+submitted, carries the same switch at its foot, **Session Agent may use my
+answers and files**, with the same "?". A change made there is saved at once
+when signed in; made before signing in, it is saved once the person has, ahead
+of their answers, and if it can't be saved nothing is submitted.
+
 ## Routes
 
 Each is a `POST` with JSON and the person's session sign-in, like the Worker's
