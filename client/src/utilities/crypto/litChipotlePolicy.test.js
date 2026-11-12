@@ -9,9 +9,16 @@ const {
   normalizeChipotleGateMode,
   normalizeChipotleSbtAddresses,
   normalizeLitChipotleMetadataVersion,
-  parseLitChipotleWrappedPlaintext,
   stableChipotleStringify,
 } = require('./litChipotlePolicy.js');
+const { ethers } = require('ethers');
+const { DEFAULT_CHIPOTLE_ACTION_CODE } = require('./litChipotleCatalog');
+
+// Wrapped keys are parsed only inside the Lit action, so test its parser.
+const parseWrappedPlaintext = new Function('ethers', `${DEFAULT_CHIPOTLE_ACTION_CODE}\nreturn parseWrappedPlaintext;`)(
+  ethers,
+);
+const parseWrapped = (value) => parseWrappedPlaintext(JSON.stringify(value));
 
 const SBT_A = '0x00000000000000000000000000000000000000aa';
 const SBT_B = '0x00000000000000000000000000000000000000bb';
@@ -82,22 +89,17 @@ describe('litChipotlePolicy helpers', () => {
     ).toBe('{"a":{"c":3,"d":4},"b":2}');
   });
 
-  it('parses v2 wrapped plaintext JSON without mutating metadata', () => {
+  it('parses a v2 wrapped key in the Lit action', () => {
     const wrapped = buildLitChipotleWrappedPlaintext({
       cekHex: CEK_HEX,
       policy: makePolicyInput(),
     });
-    const input = JSON.parse(JSON.stringify(wrapped));
-    const original = JSON.parse(JSON.stringify(input));
 
-    const parsedFromObject = parseLitChipotleWrappedPlaintext(input);
-    const parsedFromJson = parseLitChipotleWrappedPlaintext(JSON.stringify(input));
-
-    expect(input).toEqual(original);
-    expect(parsedFromObject).toEqual(wrapped);
-    expect(parsedFromObject).not.toBe(input);
-    expect(parsedFromObject.policy).not.toBe(input.policy);
-    expect(parsedFromJson).toEqual(wrapped);
+    expect(parseWrapped(wrapped)).toEqual({
+      cekHex: wrapped.cekHex,
+      policyFingerprint: wrapped.policyFingerprint,
+      policy: wrapped.policy,
+    });
     expect(normalizeLitChipotleMetadataVersion({ version: 2 })).toBe(2);
     expect(normalizeLitChipotleMetadataVersion({ v: '2' })).toBe(2);
     expect(normalizeLitChipotleMetadataVersion(null)).toBe(0);
@@ -109,14 +111,11 @@ describe('litChipotlePolicy helpers', () => {
       policy: makePolicyInput(),
     });
 
-    expect(() => parseLitChipotleWrappedPlaintext({ ...wrapped, v: 1 })).toThrow(
-      'Lit Chipotle legacy wrapped keys are not supported.',
-    );
-    expect(() => parseLitChipotleWrappedPlaintext({ cekHex: CEK_HEX })).toThrow(
-      'Lit Chipotle legacy wrapped keys are not supported.',
-    );
-    expect(() => parseLitChipotleWrappedPlaintext(null)).toThrow('Lit Chipotle legacy wrapped keys are not supported.');
-    expect(() => parseLitChipotleWrappedPlaintext(CEK_HEX)).toThrow('Lit Chipotle wrapped key is not valid v2 JSON.');
+    expect(() => parseWrapped({ ...wrapped, v: 1 })).toThrow('Lit Chipotle legacy wrapped keys are not supported.');
+    expect(() => parseWrapped({ cekHex: CEK_HEX })).toThrow('Lit Chipotle legacy wrapped keys are not supported.');
+    expect(() => parseWrapped(null)).toThrow('Lit Chipotle legacy wrapped keys are not supported.');
+    expect(() => parseWrappedPlaintext(CEK_HEX)).toThrow('Lit Chipotle legacy wrapped keys are not supported.');
+    expect(() => parseWrapped({ ...wrapped, cekHex: '0x1234' })).toThrow('Lit Chipotle wrapped key CEK is invalid.');
   });
 
   it('rejects malformed policies, CEKs, and fingerprint mismatches', () => {
@@ -141,12 +140,9 @@ describe('litChipotlePolicy helpers', () => {
       'Lit Chipotle policy requires a Lit PKP ID.',
     );
     expect(() => normalizeChipotleCekHex('0x1234')).toThrow('Lit Chipotle CEK must be a 32-byte hex string.');
-    expect(() =>
-      parseLitChipotleWrappedPlaintext({
-        ...wrapped,
-        policyFingerprint: `0x${'00'.repeat(32)}`,
-      }),
-    ).toThrow('Lit Chipotle wrapped key policy fingerprint mismatch.');
-    expect(() => parseLitChipotleWrappedPlaintext('')).toThrow('Lit Chipotle wrapped key is not valid v2 JSON.');
+    expect(() => parseWrapped({ ...wrapped, policyFingerprint: `0x${'00'.repeat(32)}` })).toThrow(
+      'Lit Chipotle wrapped key policy fingerprint mismatch.',
+    );
+    expect(() => parseWrappedPlaintext('')).toThrow('Lit Chipotle legacy wrapped keys are not supported.');
   });
 });

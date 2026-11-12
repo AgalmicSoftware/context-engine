@@ -43,5 +43,4 @@ export function normalizeChipotleCekHex(value: unknown): string;
 export function buildLitChipotleWrappedPlaintext(
   options?: BuildLitChipotleWrappedPlaintextOptions,
 ): LitChipotleWrappedPlaintext;
-export function parseLitChipotleWrappedPlaintext(value: unknown): LitChipotleWrappedPlaintext;
 export function normalizeLitChipotleMetadataVersion(chipotle?: unknown): number;
