@@ -38,10 +38,7 @@ All notable changes to this project will be documented in this file.
 
 ### Agents and MCP
 
-- `get_results` reads a members-only session's results for an agent signed in to it. It reports `resultsPublic: false` with a note that the results are for signed-in members only.
-
-### Agents and MCP
-
+- MCP 0.3.1. `get_results` reads a members-only session's results for an agent signed in to it. It reports `resultsPublic: false` with a note that the results are for signed-in members only.
 - `get_results` reads up to 10,000 answer records by default, 16 at a time, instead of 2,000, so a 30-question session of 80 people, which lists about 2,900, is counted in full rather than marked partial.
 - The MCP server's instructions tell an agent to ask the person it works for whether to take part as itself, with these tools, or on their behalf, with a key from the account menu.
 

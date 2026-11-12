@@ -46,6 +46,15 @@ starts the server. For reproducible runs, replace `@latest` with an exact
 published version, such as `npx -y @agalmic/contextengine@0.1.2`. A running
 server does not update itself.
 
+## Upgrading to 0.3.1
+
+- `get_results` also reads a session that shows results to its signed-in
+  members only, and says so in a note.
+- `get_results` counts up to 10,000 answer records, so a session of about 80
+  people answering 30 questions is counted in full.
+- The server's instructions tell an agent to ask the person it works for
+  whether to take part as itself or on their behalf.
+
 ## Upgrading to 0.3.0
 
 - Normal links open the hosted sessions their site lists in
