@@ -15,13 +15,14 @@ import { handleAgentOnlyAnswersBulkRequest, handleAgentOnlyStartRequest, handleA
 import { handleActionsRequest, handleQuestionVoteApplyRequest, handleQuestionVoteRecommendationsRequest } from './questionVotes.mjs';
 import { handlePreferencesRequest } from './participation.mjs';
 import { handleInviteOnboardRequest } from './invites.mjs';
-import { handleClientLoginExchangeRequest, handleWrappedMemberExchangeRequest } from './exchanges.mjs';
+import { handleClientLoginExchangeRequest, handleDelegateCredentialRequest, handleWrappedMemberExchangeRequest } from './exchanges.mjs';
 
 const handlers = {
   '/api/agent/credentials/service': handleServiceCredentialBootstrapRequest,
   '/api/agent/invite/onboard': handleInviteOnboardRequest,
   '/api/agent/client-login/exchange': handleClientLoginExchangeRequest,
   '/api/agent/wrapped/member-exchange': handleWrappedMemberExchangeRequest,
+  '/api/agent/credentials/delegate': handleDelegateCredentialRequest,
   '/api/agent/session-meta': handleSessionMetaHttpRequest,
   '/api/agent/agent-only/start': handleAgentOnlyStartRequest,
   '/api/agent/questions': handleQuestionsRequest,

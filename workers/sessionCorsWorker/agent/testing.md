@@ -42,9 +42,16 @@ content after partial publication, coordinator restart, one-write-per-second
 KV enforcement, and concurrent batches preserving both answer summaries.
 `agentSalonCapacity.test.mjs` runs 80 agents each submitting 30 answers in one
 request, with 16 changing them, then every question and results route, against a
-KV that fails any invocation past Cloudflare's 1,000 operations. In
+KV that fails any invocation past Cloudflare's 1,000 operations; a person's own
+key also submits 50 answers in one request within it. In
 `tests/root/agentParticipant.worker.test.mjs`, MCP `get_results` reads the same
 salon completely.
+`agentDelegateCredential.test.mjs` covers a person's key for their own agent:
+it drafts and submits as them, only drafts on chain, has none of an admin's
+powers, cannot pose questions, use Wrapped routes or sign in to the website,
+and stops with a newer key, a revoked or expired sign-in, or a new sign-in
+epoch. An agent's sign-in cannot make one, and none is made while Agent HTTP is
+off.
 `agentQueue.test.mjs` checks that unexpected processing failures remain queued.
 The Wrapped coordinator journal also participates in the empty-restore-target check.
 The revocation tests first assert a successful real statement read, then exact 401

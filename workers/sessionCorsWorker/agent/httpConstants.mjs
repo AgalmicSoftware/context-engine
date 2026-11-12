@@ -4,7 +4,7 @@
 export const DEFAULT_AGENT_RAW_SKILL_URL =
   'https://raw.githubusercontent.com/AgalmicSoftware/context-engine/main/workers/sessionCorsWorker/agent/skills/ce-agent-access/SKILL.md';
 
-export const CE_AGENT_ACCESS_SKILL_VERSION = '2026-10-27 (v45)';
+export const CE_AGENT_ACCESS_SKILL_VERSION = '2026-11-11 (v46)';
 
 export const DEFAULT_SESSION_WRAPPED_RAW_SKILL_URL =
   'https://raw.githubusercontent.com/AgalmicSoftware/context-engine/main/workers/sessionCorsWorker/agent/skills/ce-session-wrapped/SKILL.md';

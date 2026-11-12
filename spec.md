@@ -337,6 +337,8 @@ What integrations can do:
   `authority.mode=worker_canonical` and `surfaces.agentHttp=true`.
 - Exchange an authorized Session Worker identity for a scoped member credential
   at `/api/agent/wrapped/member-exchange`.
+- Give a signed-in person's own agent a key that answers as them, at
+  `/api/agent/credentials/delegate` (the account menu's **Your AI agent**).
 
 What the system does:
 - Runs `workers/sessionCorsWorker/agent/` inside the Session Worker.
