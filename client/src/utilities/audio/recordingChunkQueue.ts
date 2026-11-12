@@ -105,6 +105,11 @@ const storageText = (error: unknown) =>
 // minutes longer, so a slow upload still finishes; quick failures such as a 503 don't lengthen the wait.
 const UPLOAD_DEADLINE_MS = 120_000;
 const stalledText = 'The upload stopped responding. Retrying.';
+// A request that failed after this long was cut on the way, as by a network that closes connections quiet for
+// 60 seconds, and counts as a stall too. A labelled chunk can take over a minute to answer, so after two stalls
+// it goes again without labels, which answers sooner, and later chunks stop waiting behind it.
+const LONG_ATTEMPT_MS = 30_000;
+const STALLS_BEFORE_PLAIN = 2;
 
 /**
  * Each chunk is one IndexedDB record: its audio until it is transcribed, then its transcript, which replaces the
@@ -455,13 +460,17 @@ export class RecordingChunkQueue {
     this.changed();
     const controller = new AbortController();
     this.uploading = { id, controller };
-    const labels = record.labelSpeakers && !this.labelsUnavailableReason;
+    const stalledLabels = (this.stalls.get(id) || 0) >= STALLS_BEFORE_PLAIN;
+    const labels = record.labelSpeakers && !this.labelsUnavailableReason && !stalledLabels;
+    const startedAt = Date.now();
+    let deadlinePassed = false;
     try {
       if (this.disposed) return;
       const result = await new Promise<Transcription>((resolve, reject) => {
         const stalls = this.stalls.get(id) || 0;
         const deadline = setTimeout(
           () => {
+            deadlinePassed = true;
             this.stalls.set(id, stalls + 1);
             controller.abort();
           },
@@ -484,6 +493,12 @@ export class RecordingChunkQueue {
         this.labelsUnavailableReason = result.labelsUnavailableReason;
       const named = result.speakerTurns?.length ? await this.nameSpeakers(record.audio!, result) : null;
       if (this.disposed) return;
+      // Words without a speaker are in no one's code. Labels off for the whole recording say so on their own.
+      const speakersDropped =
+        record.labelSpeakers &&
+        !this.labelsUnavailableReason &&
+        Boolean(String(result.text || '').trim()) &&
+        !result.speakerTurns?.length;
       const complete: RecordingChunk = {
         scope: record.scope,
         labelSpeakers: record.labelSpeakers,
@@ -494,6 +509,7 @@ export class RecordingChunkQueue {
           text: String(result.text || '').trim(),
           speakerTurns: named?.turns ?? result.speakerTurns,
           ...(named?.renumbered ? { speakersRenumbered: true } : {}),
+          ...(speakersDropped ? { speakersDropped: true } : {}),
           error: undefined,
           completedAt: Date.now(),
         },
@@ -510,6 +526,8 @@ export class RecordingChunkQueue {
       if (this.disposed) return;
       const status = error && typeof error === 'object' && 'status' in error ? Number(error.status) : 0;
       const retry = !(status >= 400 && status < 500 && status !== 408 && status !== 429);
+      if (retry && !deadlinePassed && Date.now() - startedAt >= LONG_ATTEMPT_MS)
+        this.stalls.set(id, (this.stalls.get(id) || 0) + 1);
       record.segment = { ...record.segment, status: retry ? 'retrying' : 'failed', error: failureText(error) };
       this.records.set(id, record);
       if (!retry) await this.save(record);

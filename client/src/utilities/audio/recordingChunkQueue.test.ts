@@ -198,6 +198,51 @@ it('waits two minutes for a hung upload after quick failures, and longer only af
   expect(signals[3].aborted).toBe(true);
 });
 
+it('sends a chunk without labels after two cut-off attempts, so later chunks still move', async () => {
+  // A network that closes any connection quiet for 60 seconds: every labelled request is cut there, while a plain
+  // one answers in time.
+  const transcribe = jest.fn<Transcribe>(
+    (_blob, labels) =>
+      new Promise((resolve, reject) => {
+        if (labels) setTimeout(() => reject(new TypeError('Failed to fetch')), 60_000);
+        else setTimeout(() => resolve({ text: 'Plain.' }), 20_000);
+      }),
+  );
+  const queue = create(transcribe, 'cut-at-60');
+  await queue.ready;
+  queue.capture(queue.begin(true), audio, true);
+  const later = new Blob(['later']);
+  queue.capture(queue.begin(true), later, true);
+  await tick();
+  await jest.advanceTimersByTimeAsync(60_000 + 1000 + 60_000 + 2000 + 20_000);
+  expect(transcribe.mock.calls.map(([blob, labels]) => [blob === audio ? 'first' : 'later', labels])).toEqual([
+    ['first', true],
+    ['first', true],
+    ['first', false],
+    ['later', true],
+  ]);
+  expect(queue.segments[0]).toMatchObject({ status: 'complete', text: 'Plain.', speakersDropped: true });
+  // Labels stay on for later chunks: each gets its own two tries.
+  expect(queue.labelsUnavailableReason).toBe('');
+  await jest.advanceTimersByTimeAsync(60_000 + 1000 + 60_000 + 2000 + 20_000);
+  expect(queue.segments[1]).toMatchObject({ status: 'complete', text: 'Plain.', speakersDropped: true });
+});
+
+it('keeps asking for labels after quick failures, which are not stalls', async () => {
+  let calls = 0;
+  const transcribe = jest.fn<Transcribe>(async () => {
+    if (++calls <= 3) throw Object.assign(new Error('Unavailable'), { status: 503 });
+    return { text: 'Labelled.', speakerTurns: [{ speaker: 'A', start: 0, end: 1, text: 'Labelled.' }] };
+  });
+  const queue = create(transcribe, 'quick-failures');
+  await queue.ready;
+  queue.capture(queue.begin(true), audio, true);
+  await tick();
+  await jest.advanceTimersByTimeAsync(10_000);
+  expect(transcribe.mock.calls.map(([, labels]) => labels)).toEqual([true, true, true, true]);
+  expect(queue.segments[0]).not.toHaveProperty('speakersDropped');
+});
+
 it('restarts the uploading chunk at once when asked to retry it', async () => {
   const signals: AbortSignal[] = [];
   const queue = create((_blob: Blob, _labels: boolean, signal: AbortSignal) => {
@@ -476,6 +521,8 @@ it('keeps labels on after one refusal, turns them off after two in a row, and tu
   await chunk();
   // One refusal may be this chunk's audio: the next chunk asks for labels again, and a labelled one resets it.
   expect(queue.labelsUnavailableReason).toBe('');
+  // Its words have no speaker, so the claim screen counts the part as unlabelled.
+  expect(queue.segments[0]).toMatchObject({ text: 'Plain.', speakersDropped: true });
   await chunk();
   await chunk();
   expect(queue.labelsUnavailableReason).toBe('');
