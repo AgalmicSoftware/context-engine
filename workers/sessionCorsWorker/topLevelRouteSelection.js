@@ -102,7 +102,8 @@ export const resolveTopLevelRouteSelection = ({
     !hasTrimmedAuthorization &&
     (
       (path === '/storage/read' && (method === 'GET' || method === 'POST')) ||
-      (path === '/storage/list' && (method === 'GET' || method === 'POST'))
+      (path === '/storage/list' && (method === 'GET' || method === 'POST')) ||
+      (path === '/storage/read-batch' && method === 'POST')
     )
   ) {
     return {

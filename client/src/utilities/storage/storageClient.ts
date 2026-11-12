@@ -393,6 +393,61 @@ export const readSessionStorageBlob = async ({
   return response;
 };
 
+export const STORAGE_READ_BATCH_MAX_IDS = 100;
+
+/**
+ * Reads up to 100 stored JSON payloads in one request (Workers that advertise
+ * `storage_read_batch_v1`). Returns each payload in the order asked, or null
+ * when it isn't JSON; an item the Worker refuses fails the call, as a single read would.
+ */
+export const readSessionStorageBatch = async ({
+  ids,
+  sessionSlug = '',
+  sessionConfig = null,
+  context = null,
+  workerUrl = '',
+  signal,
+  preferAnonymous = true,
+}: Omit<ReadSessionStorageBlobOptions, 'storageRef' | 'prompt'> & { ids: string[] }): Promise<unknown[]> => {
+  if (!ids.length || ids.length > STORAGE_READ_BATCH_MAX_IDS) throw new Error('A batch read takes 1 to 100 ids.');
+  const baseUrl = await resolveStorageWorkerUrl({ sessionSlug, sessionConfig, context, workerUrl });
+  const response = await fetchWorkerWithAuth(
+    `${baseUrl}/storage/read-batch`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids }),
+      ...(signal ? { signal } : {}),
+    },
+    {
+      sessionSlug,
+      sessionConfig,
+      context,
+      workerUrl: baseUrl,
+      allowDemoFallback: defaultStrictAllowDemoFallback(),
+      preferAnonymous,
+    },
+  );
+  const body = (await response.json().catch(() => ({}))) as UnknownRecord;
+  if (!response.ok) throw new Error((body?.error as string) || `Storage read failed (${response.status}).`);
+  const items = new Map(
+    (Array.isArray(body.items) ? body.items : [])
+      .filter((item): item is UnknownRecord => !!item && typeof item === 'object')
+      .map((item) => [toStr(item.id), item]),
+  );
+  return ids.map((id) => {
+    const item = items.get(id);
+    if (!item || item.status !== 200) {
+      throw new Error(toStr(item?.error) || `Storage read failed (${toStr(item?.status) || 'missing'}).`);
+    }
+    try {
+      return JSON.parse(toStr(item.text));
+    } catch {
+      return null;
+    }
+  });
+};
+
 export const listSessionStorageRefsPage = async ({
   sessionSlug = '',
   sessionConfig = null,

@@ -58,7 +58,7 @@ export const dispatchAnonymousRoute = async ({
   }
 
   if (
-    (path === '/storage/read' || path === '/storage/list') &&
+    ['/storage/read', '/storage/list', '/storage/read-batch'].includes(path) &&
     typeof deps?.storageRoute === 'function'
   ) {
     return deps.storageRoute({

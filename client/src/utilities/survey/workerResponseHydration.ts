@@ -1,5 +1,11 @@
 import { isWorkerResponseNewer } from './workerResponseRecency';
-import { listSessionStorageRefsPage, readSessionStorageBlob } from '../storage/storageClient.js';
+import {
+  STORAGE_READ_BATCH_MAX_IDS,
+  listSessionStorageRefsPage,
+  readSessionStorageBatch,
+  readSessionStorageBlob,
+} from '../storage/storageClient.js';
+import { type WorkerCapabilities, readWorkerCapabilities } from '../worker/workerCapabilities';
 import { resolveSessionCapabilityProjection } from '../session/sessionCapabilityProjection';
 import { canonicalizeSessionSlug } from '../session/canonicalSessionContext';
 import { normalizeWorkerCanonicalSessionIdHex } from '../session/sessionWorkerDiscovery';
@@ -22,6 +28,8 @@ type WorkerStoragePage = {
 type WorkerCanonicalResponseHydrationDeps = {
   listSessionStorageRefsPage?: (options: UnknownRecord) => Promise<WorkerStoragePage>;
   readSessionStorageBlob?: (options: UnknownRecord) => Promise<Response>;
+  readSessionStorageBatch?: (options: UnknownRecord & { ids: string[] }) => Promise<unknown[]>;
+  readWorkerCapabilities?: (workerUrl: string, slug: string) => Promise<WorkerCapabilities>;
 };
 
 export type WorkerCanonicalResponseRow = {
@@ -130,69 +138,87 @@ export const loadWorkerResponses = async (
     }
   }
 
+  type WantedRead = { metadata: UnknownRecord; storageRef: UnknownRecord; storageRefId: string };
+  const wanted: WantedRead[] = [];
+  for (const item of items) {
+    const storageRef = isRecord(item.storageRef) ? item.storageRef : {};
+    const metadata = isRecord(item.metadata) ? item.metadata : {};
+    const storageRefId = readString(storageRef.id);
+    if (
+      ownResponses &&
+      (!storageRefId || readString(metadata.responder).toLowerCase() !== readString(account).toLowerCase())
+    )
+      throw new Error('The Worker returned an invalid own-response reference.');
+    // Response payloads are immutable; an edit receives a new storage reference.
+    if (storageRefId && !cachedStorageRefIds?.has(storageRefId)) wanted.push({ metadata, storageRef, storageRefId });
+  }
+
+  const toRow = ({ metadata, storageRefId }: WantedRead, payload: unknown): WorkerCanonicalResponseRow | null => {
+    if (!isRecord(payload)) {
+      if (ownResponses) throw new Error('A saved answer could not be read.');
+      return null;
+    }
+    const payloadSlug = readString(payload.sessionSlug);
+    const payloadSessionId = normalizeWorkerCanonicalSessionIdHex(payload.sessionId);
+    if (
+      payloadSlug !== target.sessionSlug ||
+      canonicalizeSessionSlug(payloadSlug) !== target.sessionSlug ||
+      payloadSessionId !== target.sessionId
+    ) {
+      if (ownResponses) throw new Error('A saved answer belongs to a different session.');
+      return null;
+    }
+    const questionId = readString(payload.questionID || payload.questionId).toLowerCase();
+    if (!questionId) {
+      if (ownResponses && !isSurveyResponseContainer(payload)) throw new Error('A saved answer has no question identity.');
+      return null;
+    }
+    // The Worker derives this value from the authenticated uploader. Payload claims
+    // are intentionally ignored so one participant cannot impersonate another.
+    const responder = readString(metadata.responder).toLowerCase();
+    if (!responder) return null;
+    const createdAtMs = Date.parse(readString(metadata.createdAt));
+    if (ownResponses && !(Number.isFinite(createdAtMs) && createdAtMs > 0))
+      throw new Error('A saved answer has no valid timestamp.');
+    return {
+      questionId,
+      responder,
+      response: payload,
+      storageRefId,
+      timestamp: Number.isFinite(createdAtMs) && createdAtMs > 0 ? createdAtMs / 1000 : 1,
+    };
+  };
+
+  // A Worker that reads a whole list page in one request costs two requests per
+  // hundred answers; older Workers are read one answer at a time, a few at once.
+  const readTarget = {
+    sessionSlug: target.sessionSlug,
+    sessionConfig: target.sessionConfig,
+    context,
+    workerUrl: target.workerUrl,
+    ...(signal ? { signal } : {}),
+  };
+  const batched =
+    !!wanted.length &&
+    (await (deps.readWorkerCapabilities || readWorkerCapabilities)(readString(target.workerUrl), target.sessionSlug))
+      .features.includes('storage_read_batch_v1');
+  const readBatch = deps.readSessionStorageBatch || readSessionStorageBatch;
+  const step = batched ? STORAGE_READ_BATCH_MAX_IDS : RESPONSE_READ_CONCURRENCY;
   const rows: WorkerCanonicalResponseRow[] = [];
-  for (let offset = 0; offset < items.length; offset += RESPONSE_READ_CONCURRENCY) {
+  for (let offset = 0; offset < wanted.length; offset += step) {
     signal?.throwIfAborted();
-    const batch = items.slice(offset, offset + RESPONSE_READ_CONCURRENCY);
-    const batchRows = await Promise.all(
-      batch.map(async (item): Promise<WorkerCanonicalResponseRow | null> => {
-        const storageRef = isRecord(item.storageRef) ? item.storageRef : {};
-        const metadata = isRecord(item.metadata) ? item.metadata : {};
-        const storageRefId = readString(storageRef.id);
-        if (
-          ownResponses &&
-          (!storageRefId || readString(metadata.responder).toLowerCase() !== readString(account).toLowerCase())
-        )
-          throw new Error('The Worker returned an invalid own-response reference.');
-        if (!storageRefId) return null;
-        // Response payloads are immutable; an edit receives a new storage reference.
-        if (cachedStorageRefIds?.has(storageRefId)) return null;
-        const response = await readBlob({
-          storageRef,
-          sessionSlug: target.sessionSlug,
-          sessionConfig: target.sessionConfig,
-          context,
-          workerUrl: target.workerUrl,
-          ...(signal ? { signal } : {}),
-        });
-        const payload = await response.json().catch(() => null);
-        if (!isRecord(payload)) {
-          if (ownResponses) throw new Error('A saved answer could not be read.');
-          return null;
-        }
-        const payloadSlug = readString(payload.sessionSlug);
-        const payloadSessionId = normalizeWorkerCanonicalSessionIdHex(payload.sessionId);
-        if (
-          payloadSlug !== target.sessionSlug ||
-          canonicalizeSessionSlug(payloadSlug) !== target.sessionSlug ||
-          payloadSessionId !== target.sessionId
-        ) {
-          if (ownResponses) throw new Error('A saved answer belongs to a different session.');
-          return null;
-        }
-        const questionId = readString(payload.questionID || payload.questionId).toLowerCase();
-        if (!questionId) {
-          if (ownResponses && !isSurveyResponseContainer(payload))
-            throw new Error('A saved answer has no question identity.');
-          return null;
-        }
-        // The Worker derives this value from the authenticated uploader. Payload claims
-        // are intentionally ignored so one participant cannot impersonate another.
-        const responder = readString(metadata.responder).toLowerCase();
-        if (!responder) return null;
-        const createdAtMs = Date.parse(readString(metadata.createdAt));
-        if (ownResponses && !(Number.isFinite(createdAtMs) && createdAtMs > 0))
-          throw new Error('A saved answer has no valid timestamp.');
-        return {
-          questionId,
-          responder,
-          response: payload,
-          storageRefId,
-          timestamp: Number.isFinite(createdAtMs) && createdAtMs > 0 ? createdAtMs / 1000 : 1,
-        };
-      }),
-    );
-    rows.push(...batchRows.filter((row): row is WorkerCanonicalResponseRow => !!row));
+    const chunk = wanted.slice(offset, offset + step);
+    const payloads = batched
+      ? await readBatch({ ...readTarget, ids: chunk.map((read) => read.storageRefId) })
+      : await Promise.all(
+          chunk.map(async ({ storageRef }) =>
+            (await readBlob({ ...readTarget, storageRef })).json().catch(() => null),
+          ),
+        );
+    chunk.forEach((read, index) => {
+      const row = toRow(read, payloads[index]);
+      if (row) rows.push(row);
+    });
   }
 
   return rows;

@@ -1960,6 +1960,44 @@ const handleCloudflareRead = async ({ request, env, config, slug, uploaderAddres
   });
 };
 
+export const MAX_READ_BATCH_IDS = 100;
+
+// Up to one list page of payloads in one request. Each id is read exactly as
+// /storage/read reads it, with its own access check, so a batch never shows
+// more than single reads would; an item that fails carries its own status.
+const handleCloudflareReadBatch = async ({ request, baseHeaders, deps, ...read }) => {
+  let ids = null;
+  try {
+    ids = (await request.clone().json())?.ids;
+  } catch { /* refused below */ }
+  if (!Array.isArray(ids) || !ids.length || ids.length > MAX_READ_BATCH_IDS || new Set(ids).size !== ids.length ||
+      !ids.every(isSafeCloudflareStorageRefId)) {
+    return responseJson(deps, { error: `Send 1 to ${MAX_READ_BATCH_IDS} distinct storage ids.` }, 400, baseHeaders);
+  }
+  const origin = new URL(request.url).origin;
+  let privateItem = false;
+  const items = await Promise.all(ids.map(async (id) => {
+    const response = await handleCloudflareRead({
+      ...read, baseHeaders: {}, deps, request: new Request(`${origin}/storage/read?id=${encodeURIComponent(id)}`),
+    });
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      return { id, status: response.status, error: trim(body?.error) || 'Storage read failed.' };
+    }
+    if ((response.headers.get('Cache-Control') || '').includes('private')) privateItem = true;
+    const contentType = response.headers.get('Content-Type') || '';
+    if (!/json|^text\//i.test(contentType)) {
+      return { id, status: 415, error: 'This item is not text; read it on its own.' };
+    }
+    return { id, status: 200, contentType, text: await response.text() };
+  }));
+  const headers = new Headers(baseHeaders || {});
+  headers.set('Content-Type', 'application/json');
+  headers.set('X-Content-Type-Options', 'nosniff');
+  if (privateItem) headers.set('Cache-Control', 'private, no-store');
+  return new Response(JSON.stringify({ items }), { status: 200, headers });
+};
+
 const handleCloudflareList = async ({ request, env, config, slug, uploaderAddress, authScopes, baseHeaders, deps }) => {
   const url = new URL(request.url);
   const listOptions = await readStorageListOptions({ request, url });
@@ -2781,6 +2819,10 @@ export const storageRoute = async ({
   if (path === '/storage/read' && (method === 'GET' || method === 'POST')) {
     const routeDeps = createStorageRouteGateDeps({ config, env, slug, deps });
     return handleCloudflareRead({ request, env, config, slug, uploaderAddress, authScopes, baseHeaders, deps: routeDeps });
+  }
+  if (path === '/storage/read-batch' && method === 'POST') {
+    const routeDeps = createStorageRouteGateDeps({ config, env, slug, deps });
+    return handleCloudflareReadBatch({ request, env, config, slug, uploaderAddress, authScopes, baseHeaders, deps: routeDeps });
   }
   if (path === '/storage/list' && (method === 'GET' || method === 'POST')) {
     const routeDeps = createStorageRouteGateDeps({ config, env, slug, deps });

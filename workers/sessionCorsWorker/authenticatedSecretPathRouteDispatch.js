@@ -27,6 +27,7 @@ export const dispatchAuthenticatedSecretPathRoute = async ({
     (path === '/storage/context' && method === 'POST') ||
     (path === '/storage/read' && (method === 'GET' || method === 'POST')) ||
     (path === '/storage/list' && (method === 'GET' || method === 'POST')) ||
+    (path === '/storage/read-batch' && method === 'POST') ||
     (path === '/storage/export-envelopes' && (method === 'GET' || method === 'POST'))
   );
   const isWorkerGroupsRoute = (
