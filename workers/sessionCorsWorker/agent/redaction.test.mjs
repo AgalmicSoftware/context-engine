@@ -23,3 +23,24 @@ test('question id fields hold only question ids, never another secret', () => {
     assert.notDeepEqual(redactSecrets(record), record);
   }
 });
+
+test('a stored answer reference may hold a storage id shaped like an API key', () => {
+  // 43 base64url characters, as 32 random bytes encode; these begin like a key.
+  const id = `sk-${'A'.repeat(40)}`;
+  const record = { storageId: id, storageRef: { backend: 'cloudflare', id, uri: `/storage/read?id=${id}` } };
+  assert.equal(hasSecretShape(record), false);
+  assert.deepEqual(redactSecrets(record), record);
+  assert.equal(hasSecretShape({ note: id }), true);
+  assert.equal(hasSecretShape({ storageRef: { note: id } }), true);
+  const key = `sk-${'A'.repeat(48)}`;
+  for (const leak of [
+    { storageId: key },
+    { storageRef: { id: key } },
+    { storageRef: { uri: `/storage/read?id=${key}` } },
+    { storageRef: { uri: `https://example.test/?id=${id}` } },
+    { storageId: 'Bearer abcdef123456' },
+  ]) {
+    assert.equal(hasSecretShape(leak), true, JSON.stringify(leak));
+    assert.notDeepEqual(redactSecrets(leak), leak);
+  }
+});
