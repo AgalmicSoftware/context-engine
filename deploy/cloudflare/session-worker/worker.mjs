@@ -70344,7 +70344,7 @@ var init_aiDefaults = __esm({
 });
 
 // shared/aiModelFamily.mjs
-var toModelLeaf, inferAiProviderFromModel, isGpt5Or6, isOSeries, isOpenAiReasoningModel, usesOpenAiResponsesApi, LADDER, GPT_FULL, GPT_FROM_LOW, GPT_5, GPT_5_POINT, LOW_TO_HIGH, CLAUDE, reasoningEffortsOf, takesReasoningEffort, fitReasoningEffort;
+var toModelLeaf, inferAiProviderFromModel, isGpt5Or6, isOSeries, isOpenAiReasoningModel, usesOpenAiResponsesApi, takesLongReply, interviewMapOutputTokens, LADDER, GPT_FULL, GPT_FROM_LOW, GPT_5, GPT_5_POINT, LOW_TO_HIGH, CLAUDE, reasoningEffortsOf, takesReasoningEffort, fitReasoningEffort;
 var init_aiModelFamily = __esm({
   "shared/aiModelFamily.mjs"() {
     toModelLeaf = (model) => String(model ?? "").trim().toLowerCase().split("/").pop() || "";
@@ -70366,6 +70366,12 @@ var init_aiModelFamily = __esm({
       const route = String(endpoint || "").trim().toLowerCase();
       return route === "responses" || route.includes("/responses") || isGpt5Or6(toModelLeaf(model));
     };
+    takesLongReply = (model) => {
+      const leaf = toModelLeaf(model);
+      if (/-chat(?:$|-)/.test(leaf)) return false;
+      return isGpt5Or6(leaf) || isOSeries(leaf) || /^gpt-4\.1(?:$|-)/.test(leaf) || /^claude-(?:opus|sonnet|haiku|fable|mythos)-(?:[5-9]|4-[5-9])(?:$|-)/.test(leaf);
+    };
+    interviewMapOutputTokens = (model) => takesLongReply(model) ? 32e3 : 8e3;
     LADDER = ["none", "minimal", "low", "medium", "high", "xhigh", "max"];
     GPT_FULL = Object.freeze(["none", "low", "medium", "high", "xhigh", "max"]);
     GPT_FROM_LOW = Object.freeze(["low", "medium", "high", "xhigh", "max"]);
@@ -70439,6 +70445,7 @@ var trim11, record3, tasks, taskName, modelEntry, configuredModels, resolveSessi
 var init_aiRequestPolicy = __esm({
   "workers/sessionCorsWorker/aiRequestPolicy.js"() {
     init_aiDefaults();
+    init_aiModelFamily();
     init_aiModelParams();
     trim11 = (value) => typeof value === "string" ? value.trim() : "";
     record3 = (value) => value && typeof value === "object" && !Array.isArray(value) ? value : {};
@@ -70484,7 +70491,6 @@ var init_aiRequestPolicy = __esm({
       compare: 16e3,
       categorize: 16e3,
       analysis: 7e3,
-      "interview-map": 8e3,
       // One short question, but models that think spend part of the cap on thinking.
       "interview-opening": 2e3,
       // A context PDF's text, read once by an admin's request.
@@ -70513,7 +70519,7 @@ var init_aiRequestPolicy = __esm({
       if (!model || !allowed.some((entry2) => entry2.model === model)) return { ok: false, ...AI_MODEL_NOT_ALLOWED };
       const reasoning = isChatReasoningModel({ model }) || models2.thinking.provider === provider && models2.thinking.model === model;
       const responses = usesOpenAiResponsesApi({ provider, model, endpoint: payload.endpoint });
-      const ceiling = operationCeilings[task] || (reasoning || responses ? 16e3 : 2048);
+      const ceiling = task === "interview-map" ? interviewMapOutputTokens(model) : operationCeilings[task] || (reasoning || responses ? 16e3 : 2048);
       const requested = tokenFields.filter((key) => Object.hasOwn(payload, key)).map((key) => {
         const value = payload[key];
         return typeof value === "number" && Number.isFinite(value) && value >= 1 ? Math.floor(value) : ceiling;
