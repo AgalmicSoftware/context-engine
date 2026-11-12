@@ -336,14 +336,8 @@ test('local navigation uses explicit asset fixtures and ABI-valid registry reads
     });
     return result;
   };
-  for (const fontUrl of [
-    'https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300..800;1,300..800&family=Poppins:wght@400;600;700;800&display=swap',
-    'https://fonts.googleapis.com/css?family=Poppins:200,300,400,600,700,800',
-    'https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300;0,500;1,500;1,600&display=swap',
-  ]) {
-    const font = await request(fontUrl);
-    assert.equal(font.contentType, 'text/css', fontUrl);
-  }
+  // The site serves its own fonts, so a request to Google Fonts is blocked like any other outside call.
+  assert.deepEqual(await request('https://fonts.googleapis.com/css?family=Poppins:200,300,400,600,700,800'), { aborted: 'blockedbyclient' });
   const logo = await request('https://ethereum.org/images/assets/eth-diamond-glyph.png');
   assert.equal(logo.contentType, 'image/png');
   assert.match(logo.path, /client\/public\/favicon-32x32\.png$/);
