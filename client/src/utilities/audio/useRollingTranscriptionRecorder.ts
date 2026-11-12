@@ -95,7 +95,11 @@ export const useRollingTranscriptionRecorder = ({
   const mountedRef = useRef(false);
   const requestGenerationRef = useRef(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const rotationTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const rotationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Audio recorded into the current chunk before its latest pause, and when recording last resumed, so a chunk
+  // ends after its length of recorded time however often it is paused.
+  const chunkRecordedMsRef = useRef(0);
+  const chunkResumedAtRef = useRef(0);
   const recordingActiveRef = useRef(false);
   const endingRecordersRef = useRef<Set<MediaRecorder>>(new Set());
   const stopWaitersRef = useRef<Set<() => void>>(new Set());
@@ -156,7 +160,7 @@ export const useRollingTranscriptionRecorder = ({
 
   const clearRotationTimer = useCallback(() => {
     if (rotationTimerRef.current) {
-      clearInterval(rotationTimerRef.current);
+      clearTimeout(rotationTimerRef.current);
       rotationTimerRef.current = null;
     }
   }, []);
@@ -330,12 +334,23 @@ export const useRollingTranscriptionRecorder = ({
     [createRecorder, stopRecorder],
   );
 
-  const startRotationTimer = useCallback(() => {
-    clearRotationTimer();
-    rotationTimerRef.current = setInterval(() => {
-      rotateRecorder();
-    }, chunkDurationMs);
-  }, [chunkDurationMs, clearRotationTimer, rotateRecorder]);
+  // `continueChunk`: recording resumes into the chunk it paused, which ends once its recorded time is up.
+  const startRotationTimer = useCallback(
+    (continueChunk = false) => {
+      clearRotationTimer();
+      if (!continueChunk) chunkRecordedMsRef.current = 0;
+      const schedule = (delay: number) => {
+        chunkResumedAtRef.current = Date.now();
+        rotationTimerRef.current = setTimeout(() => {
+          chunkRecordedMsRef.current = 0;
+          rotateRecorder();
+          schedule(chunkDurationMs);
+        }, delay);
+      };
+      schedule(Math.max(0, chunkDurationMs - chunkRecordedMsRef.current));
+    },
+    [chunkDurationMs, clearRotationTimer, rotateRecorder],
+  );
 
   const watchMicrophone = useCallback(
     (stream: MediaStream) => {
@@ -552,6 +567,7 @@ export const useRollingTranscriptionRecorder = ({
     if (!recorder || recorder.state !== 'recording') return;
     try {
       recorder.pause();
+      chunkRecordedMsRef.current += Date.now() - chunkResumedAtRef.current;
       clearRotationTimer();
       stopTimer();
       setStatus('paused');
@@ -568,7 +584,7 @@ export const useRollingTranscriptionRecorder = ({
     try {
       recorder.resume();
       startElapsedTimer();
-      startRotationTimer();
+      startRotationTimer(true);
       setStatus('recording');
     } catch (error) {
       setErrorMessage(describeError(error));

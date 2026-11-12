@@ -1603,7 +1603,7 @@ describe('useRollingTranscriptionRecorder', () => {
     unmount();
   });
 
-  it('pauses and resumes without rotating or advancing the visible timer while paused', async () => {
+  it('pauses and resumes without rotating or advancing the visible timer while paused, ending chunks on recorded time', async () => {
     const { result, unmount } = renderHook(() =>
       useRollingTranscriptionRecorder({
         sessionSlug: 'demo',
@@ -1649,12 +1649,28 @@ describe('useRollingTranscriptionRecorder', () => {
     });
     expect(result.current.elapsedSeconds).toBe(3);
 
+    // The chunk ends after 15 seconds of recording, counting the two before the pause.
     await act(async () => {
-      jest.advanceTimersByTime(15_000);
+      jest.advanceTimersByTime(11_999);
       await flushPromises();
     });
-
+    expect(instances).toHaveLength(1);
+    await act(async () => {
+      jest.advanceTimersByTime(1);
+      await flushPromises();
+    });
     expect(instances).toHaveLength(2);
+    // The next chunk gets its full length.
+    await act(async () => {
+      jest.advanceTimersByTime(14_999);
+      await flushPromises();
+    });
+    expect(instances).toHaveLength(2);
+    await act(async () => {
+      jest.advanceTimersByTime(1);
+      await flushPromises();
+    });
+    expect(instances).toHaveLength(3);
 
     unmount();
   });
