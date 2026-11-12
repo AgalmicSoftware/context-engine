@@ -164,9 +164,9 @@ Interview settings for the call:
   `interviewMode.suggestGroups` is no longer read. While it is on, **The AI may
   use** (`interviewMode.groupSuggestionData`) sets what an AI may base a
   suggestion on: Country, Work, and Interests and causes by default; Town or
-  city only when ticked. No AI ever goes on health, disability, religion,
-  ethnicity, sexuality, gender identity, age, family life, or party or union
-  membership.
+  city only when ticked. Every AI is instructed never to go on health,
+  disability, religion, ethnicity, sexuality, gender identity, age, family life,
+  or party or union membership.
 
 Interview settings for research:
 
