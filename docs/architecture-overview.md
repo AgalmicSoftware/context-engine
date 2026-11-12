@@ -62,7 +62,7 @@ write.
 
 Static app hosting, public/private session access, and the session
 infrastructure profile are independent choices. `/new` is one page that starts
-on Hosted & Fast, shown as `Session Worker` under `Runs on`; `On-chain registry`
+on Hosted & Fast, shown as `Centralized` under `Runs on`; `Decentralized`
 selects the opt-in Trustless & Slower path. The
 Company-Operated branch is a planned adapter architecture, not a shipped
 corporate package. It can target entirely off-chain infrastructure; a private

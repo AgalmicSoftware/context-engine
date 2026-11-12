@@ -15,7 +15,7 @@ import {
   SetupParticipationSection,
   SetupQuestionsSection,
 } from './setup/SetupContentSections';
-import { SetupAccessSection, SetupHostingSection, SetupResultsSection } from './setup/SetupPolicySections';
+import { SetupAccessSection, SetupHostingSection, SetupResultsSection, SetupRunsOn } from './setup/SetupPolicySections';
 import type { SetupSectionKey } from './setup/SetupPrimitives';
 import type { SetupProfileEditor } from './setup/setupSectionTypes';
 import type { SessionWizardRenderField } from './sessionWizardFieldDescriptors';
@@ -124,6 +124,7 @@ const SessionWizardShell = ({
         <SetupBasicsSection
           draft={draft}
           onChange={updateDraftValue}
+          runsOn={<SetupRunsOn draft={draft} {...policy} />}
           link={slugPreview}
           headerImage={renderField('sessionHeader', draft.sessionHeader, [])}
         />

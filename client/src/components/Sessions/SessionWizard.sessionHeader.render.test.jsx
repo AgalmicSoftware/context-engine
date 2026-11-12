@@ -85,7 +85,7 @@ describe('SessionWizard session header image controls', () => {
       );
 
       openSetupSection('hosting');
-      fireEvent.change(screen.getByTestId('ce-setup-authority'), { target: { value: 'worker_canonical' } });
+      fireEvent.click(screen.getByRole('radio', { name: 'Centralized' }));
 
       await waitFor(
         () => {

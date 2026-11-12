@@ -9,7 +9,7 @@
 App hosting, public/private session access, and session infrastructure are
 separate choices. A publicly hosted web app can open either a private
 worker-canonical session or a public decentralized session. `/new` is one page
-that starts on Hosted & Fast; `Runs on` under Hosting and storage switches to
+that starts on Hosted & Fast; the `Runs on` toggle at the top switches to
 Trustless & Slower.
 
 ### Implemented Profiles

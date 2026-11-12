@@ -185,6 +185,26 @@ describe('SessionWizardShell', () => {
     expect(basics).toContainElement(screen.getByTestId('shell-slug-preview'));
   });
 
+  it('asks first where the session runs, Centralized or Decentralized, and leaves Hosting without it', () => {
+    const props = baseProps();
+    render(<SessionWizardShell {...props} />);
+    const basics = screen.getByTestId('ce-setup-section-basics');
+    const runsOn = within(basics).getByRole('radiogroup', { name: 'Runs on' });
+    expect(runsOn).toHaveAttribute('data-testid', E2E_TESTIDS.SETUP_AUTHORITY);
+    expect(runsOn).toHaveAccessibleDescription(/^Centralized: a Session Worker in your own Cloudflare account/);
+    expect(within(basics).getByRole('button', { name: 'About Runs on' })).toBeInTheDocument();
+    expect(isAfter(runsOn, within(basics).getByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME))).toBe(true);
+    expect(within(runsOn).getByRole('radio', { name: 'Centralized' })).toBeChecked();
+
+    fireEvent.click(within(runsOn).getByRole('radio', { name: 'Decentralized' }));
+    const [edit] = (props.editProfile as jest.Mock).mock.calls.at(-1);
+    const { profile } = editSessionSetupProfile(defaultSessionSetupProfile(), edit);
+    expect(profile.authority.mode).toBe('evm_registry_canonical');
+
+    fireEvent.click(screen.getByTestId('ce-setup-more-hosting'));
+    expect(within(screen.getByTestId('ce-setup-section-hosting')).queryByText('Runs on')).not.toBeInTheDocument();
+  });
+
   it('embeds the gates panel and SBT defaults under Access and the Worker panel under Hosting', () => {
     const props = baseProps();
     render(<SessionWizardShell {...props} />);

@@ -70,12 +70,12 @@ profile. That choice happens separately in `/new`.
 
 ## Session Infrastructure Profiles
 
-`/new` is one page and starts on **Hosted & Fast**. `Runs on` under Hosting and
-storage switches to **Trustless & Slower**. **Company-Operated** is planned.
+`/new` is one page and starts on **Hosted & Fast**. The `Runs on` toggle at the
+top switches to **Trustless & Slower**. **Company-Operated** is planned.
 
 ### Hosted & Fast — implemented default
 
-`Runs on` shows this as `Session Worker`.
+`Runs on` shows this as `Centralized`.
 
 - A creator deploys a per-session Cloudflare Worker with Cloudflare-backed
   canonical config and payload storage, under `worker_canonical` authority.
@@ -95,7 +95,7 @@ storage switches to **Trustless & Slower**. **Company-Operated** is planned.
 
 ### Trustless & Slower — implemented opt-in
 
-`Runs on` shows this as `On-chain registry`.
+`Runs on` shows this as `Decentralized`.
 
 - Public EVM registry/contracts provide session and gate authority.
 - Arweave stores metadata and payloads, which are public and permanent. Anyone

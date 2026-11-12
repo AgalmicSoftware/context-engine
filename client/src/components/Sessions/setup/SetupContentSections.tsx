@@ -28,14 +28,23 @@ import {
 import styles from './SessionSetup.module.scss';
 
 type BasicsProps = Pick<SetupSectionProps, 'draft' | 'onChange'> & {
+  /** /new: the Centralized or Decentralized toggle, first on the page. */
+  runsOn?: React.ReactNode;
   /** The session link: a preview while creating, fixed once published. */
   link?: React.ReactNode;
   /** /new passes its header image control (paste, upload); otherwise a URL. */
   headerImage?: React.ReactNode;
 };
 
-export const SetupBasicsSection = ({ draft, onChange, link = null, headerImage = null }: BasicsProps) => (
+export const SetupBasicsSection = ({
+  draft,
+  onChange,
+  runsOn = null,
+  link = null,
+  headerImage = null,
+}: BasicsProps) => (
   <SetupSection sectionKey="basics" title="Basics" alwaysOpen>
+    {runsOn}
     <SetupField id="ce-setup-name" label="Name">
       <Input
         id="ce-setup-name"

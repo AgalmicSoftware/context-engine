@@ -20,11 +20,11 @@ Two decisions shape a deployment, and they are independent: where the web interf
 
 **Web interface.** Use the front-end at [contextengine.sh](https://contextengine.sh), or host the static client on your own domain. Passkeys are tied to the domain they are created on, so choose the domain first.
 
-**Session profile.** Each session decides who controls access and where its data lives. New sessions start on Hosted & Fast; the `Runs on` dropdown on `/new` switches to the on-chain profile.
+**Session profile.** Each session decides who controls access and where its data lives. New sessions start on Hosted & Fast; the `Runs on` toggle at the top of `/new` switches to the on-chain profile.
 
-**Hosted & Fast** (the `Session Worker` option). The session runs on a Cloudflare Worker in the creator's own Cloudflare account. The creator's passkey is the admin key: the Worker verifies its signatures and enforces the session's roles and groups. No blockchain or gas is involved unless you add on-chain Soulbound Token (SBT) rules or Lit encryption. The account's operator, and Cloudflare itself, can read the data; Worker encryption protects it in storage only.
+**Hosted & Fast** (`Runs on`: `Centralized`). The session runs on a Cloudflare Worker in the creator's own Cloudflare account. The creator's passkey is the admin key: the Worker verifies its signatures and enforces the session's roles and groups. No blockchain or gas is involved unless you add on-chain Soulbound Token (SBT) rules or Lit encryption. The account's operator, and Cloudflare itself, can read the data; Worker encryption protects it in storage only.
 
-**Trustless & Slower** (the `On-chain registry` option). The session is registered on a public EVM chain by wallet transactions, and the registering wallet is its admin. Its data, including which wallet answered what, is stored permanently and publicly on Arweave. Lit encryption can lock fields to SBT holders, though the Worker operator and Lit administrators stay trusted. A Session Worker is still needed for AI, sign-in and uploads.
+**Trustless & Slower** (`Runs on`: `Decentralized`). The session is registered on a public EVM chain by wallet transactions, and the registering wallet is its admin. Its data, including which wallet answered what, is stored permanently and publicly on Arweave. Lit encryption can lock fields to SBT holders, though the Worker operator and Lit administrators stay trusted. A Session Worker is still needed for AI, sign-in and uploads.
 
 **Company-Operated** (planned). An organization's own identity, key management and storage, with no public chain required.
 

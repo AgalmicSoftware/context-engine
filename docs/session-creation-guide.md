@@ -413,17 +413,17 @@ Registration cost notes:
 
 Open `/new`. The app canonicalizes that route to `/session/new`, but `/new` is the intended entry point.
 
-The page opens on the default profile; Hosting and storage → **Runs on**
-switches between the two hosting models, and every other option adjusts that
-profile in place:
+The page opens on the default profile; **Runs on**, at the top of Basics,
+switches between the two hosting models, **Centralized** and **Decentralized**,
+and every other option adjusts that profile in place:
 
-- **Session Worker** (Hosted & Fast) compiles to a Cloudflare-backed,
+- **Centralized** (a Session Worker; Hosted & Fast) compiles to a Cloudflare-backed,
   worker-canonical session shape whose signed-in members see every answer, with
   no encryption by default; Cloudflare-internal worker encryption
   (`worker_envelope`) is an option in setup. Create asks for a name, a Cloudflare API token
   (or a verified dashboard-deployed Worker) and the OpenAI key. It does not ask for
   Arweave, Lit, RPC, funding, faucet, or gas inputs.
-- **On-chain registry** (Trustless & Slower; this guide also says decentralized)
+- **Decentralized** (an on-chain registry; Trustless & Slower)
   compiles to the Arweave + Ethereum smart-contract session shape. It needs a
   compatible Session Worker for AI, auth and Arweave uploads, the Arweave
   wallet/JWK, an Ethereum RPC URL, Ethereum gas for transaction fees, the OpenAI
@@ -480,8 +480,8 @@ agree with the validated profile. Deploy, signed config mutation, and public
 Worker readback all fail closed on missing, ambiguous, or divergent
 profile/storage policy.
 
-Switching **Runs on** also replaces storage, identity and authorization: Session
-Worker uses Cloudflare with passkey plus Worker roles, while On-chain registry
+Switching **Runs on** also replaces storage, identity and authorization:
+Centralized uses Cloudflare with passkey plus Worker roles, while Decentralized
 uses Arweave with wallet plus on-chain SBT authorization. A stale wallet, Worker
 role, or legacy top-level chain ID cannot survive that switch as a hidden
 capability. The **Storage** selector changes only storage, including its payload

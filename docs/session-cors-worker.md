@@ -117,7 +117,7 @@ The route-shell bundle is intentionally still a large boundary object because it
 ## Dashboard wizard flow: no API token
 
 This token-free path is under Hosting and storage → More in `/new`. Lit profiles
-cannot use it. For the default **Hosted & Fast** profile (`Session Worker` under
+cannot use it. For the default **Hosted & Fast** profile (`Centralized` under
 `Runs on`):
 
 1. Context Engine shows the exact session slug, public passkey-derived admin

@@ -181,6 +181,72 @@ export const SetupCheck = ({
   );
 };
 
+type SetupToggleProps = {
+  id: string;
+  label: string;
+  help?: string;
+  value: string;
+  options: Array<{ value: string; label: string }>;
+  onChange: (value: string) => void;
+  testId?: string;
+};
+
+// A few choices side by side: one radio group, with the same "?" help as fields.
+export const SetupToggle = ({
+  id,
+  label,
+  help = '',
+  value,
+  options,
+  onChange,
+  testId,
+}: SetupToggleProps): React.ReactElement => {
+  const tooltipsEnabled = useSessionWizardTooltipPreference(useContext(ReactReduxContext)?.store ?? null);
+  return (
+    <div className={styles.field}>
+      <div className={styles.fieldLabelRow}>
+        <span id={`${id}-label`} className={styles.fieldLabel}>
+          {label}
+        </span>
+        {help ? (
+          <SessionWizardInfoTooltip
+            enabled={tooltipsEnabled}
+            id={`${id}-tip`}
+            content={help}
+            placement="top"
+            ariaLabel={`About ${label}`}
+          />
+        ) : null}
+      </div>
+      <div
+        role="radiogroup"
+        aria-labelledby={`${id}-label`}
+        aria-describedby={help ? setupHelpId(id) : undefined}
+        className={styles.toggle}
+        data-testid={testId}
+      >
+        {options.map((option) => (
+          <label key={option.value} className={styles.toggleOption}>
+            <input
+              type="radio"
+              name={id}
+              value={option.value}
+              checked={option.value === value}
+              onChange={() => onChange(option.value)}
+            />
+            {option.label}
+          </label>
+        ))}
+      </div>
+      {help ? (
+        <span id={setupHelpId(id)} className={styles.srOnly}>
+          {help}
+        </span>
+      ) : null}
+    </div>
+  );
+};
+
 // The rules table's plain messages for the conflicts at one option.
 export const SetupConflicts = ({ conflicts }: { conflicts: SessionSetupConflict[] }): React.ReactElement | null =>
   conflicts.length ? (

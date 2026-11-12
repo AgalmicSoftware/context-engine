@@ -370,7 +370,7 @@ const PUBLIC_RESULTS_VISIBILITY = 'public_full_if_storage_public';
 // public results and whole-session export.
 const selectRegistryHosting = ({ publicResults = false } = {}) => {
   openSetupSection('hosting');
-  fireEvent.change(screen.getByTestId('ce-setup-authority'), { target: { value: 'evm_registry_canonical' } });
+  fireEvent.click(screen.getByRole('radio', { name: 'Decentralized' }));
   if (!publicResults) return;
   openSetupSection('results');
   fireEvent.change(screen.getByTestId('ce-setup-results-visibility'), {

@@ -14,7 +14,7 @@ import type {
   SessionModeProfile,
   SessionModeResultsVisibility,
 } from '../../../utilities/session/sessionModeProfile';
-import { SetupCheck, SetupConflicts, SetupField, SetupSection, setupHelpId } from './SetupPrimitives';
+import { SetupCheck, SetupConflicts, SetupField, SetupSection, SetupToggle, setupHelpId } from './SetupPrimitives';
 import {
   DEFAULT_REGISTRY_CHAIN_ID,
   MEMBER_RESULTS,
@@ -498,6 +498,33 @@ export const SetupAccessSection = ({
   );
 };
 
+const RUNS_ON_HELP =
+  'Centralized: a Session Worker in your own Cloudflare account runs the session and keeps its data in Cloudflare storage. Decentralized: the session is registered on a public chain by wallet transactions, and its data is stored permanently and publicly on Arweave unless encrypted with Lit; it needs a wallet with gas, an Arweave key and an RPC URL. Hosting and storage lists what each needs.';
+
+/** /new: where the session runs, the choice the rest of the page follows. */
+export const SetupRunsOn = ({
+  draft,
+  editProfile,
+  registryChainId,
+}: Pick<PolicyProps, 'draft' | 'editProfile' | 'registryChainId'>) => {
+  const profile = profileOf(draft);
+  if (!profile) return null;
+  return (
+    <SetupToggle
+      id="ce-setup-authority"
+      label="Runs on"
+      help={RUNS_ON_HELP}
+      value={profile.authority.mode}
+      options={[
+        { value: 'worker_canonical', label: 'Centralized' },
+        { value: 'evm_registry_canonical', label: 'Decentralized' },
+      ]}
+      testId={E2E_TESTIDS.SETUP_AUTHORITY}
+      onChange={(mode) => editProfile((next) => setHosting(next, mode, registryChainId))}
+    />
+  );
+};
+
 export const summarizeHosting = (draft: SetupSectionProps['draft'], status = ''): string => {
   const profile = profileOf(draft);
   if (!profile) return status;
@@ -557,23 +584,6 @@ export const SetupHostingSection = ({
       {locked}
       {mode === 'create' ? (
         <>
-          <SetupField
-            id="ce-setup-authority"
-            label="Runs on"
-            help="Session Worker: your own Cloudflare Worker holds the session. On-chain registry: the session is registered on a chain and stored on Arweave."
-          >
-            <Input
-              id="ce-setup-authority"
-              type="select"
-              value={profile.authority.mode}
-              aria-describedby={setupHelpId('ce-setup-authority')}
-              data-testid={E2E_TESTIDS.SETUP_AUTHORITY}
-              onChange={(event) => editProfile((next) => setHosting(next, event.target.value, registryChainId))}
-            >
-              <option value="worker_canonical">Session Worker</option>
-              <option value="evm_registry_canonical">On-chain registry</option>
-            </Input>
-          </SetupField>
           <SetupField id="ce-setup-storage" label="Storage">
             <Input
               id="ce-setup-storage"

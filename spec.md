@@ -168,8 +168,8 @@ What users can do:
 What the system does:
 - Starts a new draft on Hosted & Fast with unencrypted answers that the
   session's signed-in members see. Choosing encryption or another results
-  visibility changes who sees them; `Runs on` under Hosting and storage switches
-  to Trustless & Slower.
+  visibility changes who sees them; the `Runs on` toggle at the top switches to
+  Trustless & Slower.
 - In Hosted & Fast, stores canonical signed session config, secrets,
   Worker-native group/gate state, and Cloudflare payload indexes in the
   per-session Worker; publication does not perform an EVM transaction or

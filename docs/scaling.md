@@ -7,8 +7,8 @@ session's authority, storage, access policy, or settlement path.
 
 ## Current Implemented Profiles
 
-`/new` starts on **Hosted & Fast**, shown as `Session Worker` under `Runs on`.
-**Trustless & Slower**, shown as `On-chain registry`, is an implemented opt-in
+`/new` starts on **Hosted & Fast**, shown as `Centralized` under `Runs on`.
+**Trustless & Slower**, shown as `Decentralized`, is an implemented opt-in
 path.
 
 | Profile | Availability | Canonical authority and storage | Creator setup | Chain requirement |

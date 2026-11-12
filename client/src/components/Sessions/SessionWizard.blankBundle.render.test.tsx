@@ -65,7 +65,7 @@ const openSetupSection = (key: string) => {
 // worker-panel testUtils helper, which would also install that module's jest mocks.
 const selectRegistryHosting = () => {
   openSetupSection('hosting');
-  fireEvent.change(screen.getByTestId('ce-setup-authority'), { target: { value: 'evm_registry_canonical' } });
+  fireEvent.click(screen.getByRole('radio', { name: 'Decentralized' }));
 };
 
 jest.mock('../SBTs/SBTSelector', () => () => <div data-testid="mock-wizard-sbt-selector" />);

@@ -340,7 +340,7 @@ const selectNormalModeCard = (label) => {
 // default (trustless) preset took.
 const selectRegistryHosting = () => {
   openSetupSection('hosting');
-  fireEvent.change(screen.getByTestId('ce-setup-authority'), { target: { value: 'evm_registry_canonical' } });
+  fireEvent.click(screen.getByRole('radio', { name: 'Decentralized' }));
 };
 const setCloudflareApiToken = (value) => {
   fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN), { target: { value } });

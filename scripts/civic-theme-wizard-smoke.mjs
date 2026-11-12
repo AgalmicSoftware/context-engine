@@ -14,10 +14,13 @@ export async function openSetupSections(page) {
 export async function inspectCivicWizard(page) {
   await page.getByRole('heading', { name: 'New session', exact: true }).waitFor({ state: 'visible' });
   const setup = page.getByTestId('ce-setup-section-basics').locator('..');
+  // Runs on: a radio group whose labels are Centralized and Decentralized.
   const authority = page.getByTestId('ce-setup-authority');
+  const runsOn = { worker_canonical: 'Centralized', evm_registry_canonical: 'Decentralized' };
   for (const mode of ['worker_canonical', 'evm_registry_canonical']) {
     await openSetupSections(page);
-    await authority.selectOption(mode);
+    await authority.getByText(runsOn[mode], { exact: true }).click();
+    await assertReadable(authority.getByText(runsOn[mode], { exact: true }));
     await openSetupSections(page);
     await assertReadable(setup);
     if (mode === 'worker_canonical') {
@@ -29,12 +32,16 @@ export async function inspectCivicWizard(page) {
     }
     const help = page.getByRole('button', { name: 'About Runs on', exact: true });
     await help.click();
-    const tooltip = page.getByRole('tooltip').filter({ hasText: /On-chain registry/ });
+    const tooltip = page.getByRole('tooltip').filter({ hasText: /Decentralized:/ });
     await assertReadable(tooltip);
     await help.press('Escape');
     await tooltip.waitFor({ state: 'hidden' });
     await assertReadable(page.getByTestId('ce-setup-create'));
   }
-  await authority.selectOption('worker_canonical');
-  assert.equal(await authority.inputValue(), 'worker_canonical', 'The review leaves the default hosting selected');
+  await authority.getByText(runsOn.worker_canonical, { exact: true }).click();
+  assert.equal(
+    await authority.locator('input:checked').getAttribute('value'),
+    'worker_canonical',
+    'The review leaves the default hosting selected',
+  );
 }

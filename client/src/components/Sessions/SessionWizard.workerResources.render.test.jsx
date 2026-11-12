@@ -36,7 +36,7 @@ describe('SessionWizard worker resource rendering', () => {
   };
   const selectWorkerHosting = () => {
     openSetupSection('hosting');
-    fireEvent.change(screen.getByTestId('ce-setup-authority'), { target: { value: 'worker_canonical' } });
+    fireEvent.click(screen.getByRole('radio', { name: 'Centralized' }));
   };
 
   it('shows only the AI resource for the default Cloudflare two-key profile', async () => {
