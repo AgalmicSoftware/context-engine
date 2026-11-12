@@ -198,6 +198,11 @@ test('Detailed answers add what the asker may read and members’ answers, and n
   const few = await ask(h, { address: MEMBER });
   assert.doesNotMatch(few.prompt, /ANSWER/);
   assert.equal(few.body.read.answers, 0);
+  // An admin may lower how many answers a question needs; at 1, one member's answer is used.
+  const lowered = await seeded({ ...twoAudiences, minAnswers: 1 });
+  const one = await ask(lowered, { address: MEMBER });
+  assert.match(one.prompt, /ANSWER/);
+  assert.equal(one.body.read.answers, 1);
   const admin = await ask(h, { address: ADMIN });
   for (const piece of ['ADMINS plan', 'GROUP notes', 'ANSWER meet less']) assert.match(admin.prompt, new RegExp(piece));
   // Answers that can't be read leave them out, and the reply says so.

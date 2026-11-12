@@ -33,6 +33,10 @@ const ANSWERS_HELP =
   'General answers read the context, files open to everyone and results the asker may see. ' +
   'Detailed answers also read the files they may open and members’ answers, from people who allow it. ' +
   'No answer names anyone.';
+const MIN_ANSWERS_HELP =
+  `On: a Detailed answer to someone who isn’t an admin leaves out any question fewer than ${L.minAnswers} members ` +
+  'answered. Off: a question only one member answered is used too, so that one person’s answer can come back as ' +
+  '“the members’” view. Admins always get every question.';
 const MATCH_HELP = 'Any: people who meet at least one rule. All: only people who meet every rule.';
 const instructionsHelp = (style: string) =>
   `How ${STYLE_LABELS[style]} answers are written. Leave it blank for the default. Always added: answer only ` +
@@ -72,9 +76,19 @@ const SetupSessionAgent = ({ value, onChange, groups, sbtChainId = 0 }: Props): 
   const on = !!value && typeof value === 'object';
   const audiences = readAudiences(value);
   const instructions = asRecord(asRecord(value).instructions);
+  const { minAnswers } = asRecord(value);
   const problem = on ? describeSessionAgentProblem(value) : '';
-  const save = (next: Audience[], nextInstructions: Record<string, unknown> = instructions) =>
-    onChange({ audiences: next, ...(Object.keys(nextInstructions).length ? { instructions: nextInstructions } : {}) });
+  const save = (
+    next: Audience[],
+    nextInstructions: Record<string, unknown> = instructions,
+    nextMinAnswers: unknown = minAnswers,
+  ) =>
+    onChange({
+      audiences: next,
+      ...(Object.keys(nextInstructions).length ? { instructions: nextInstructions } : {}),
+      // The default is stored as nothing.
+      ...(nextMinAnswers === undefined || nextMinAnswers === L.minAnswers ? {} : { minAnswers: nextMinAnswers }),
+    });
   const update = (index: number, change: (audience: Audience) => Audience) =>
     save(audiences.map((audience, at) => (at === index ? change(audience) : audience)));
   const setRules = (index: number, conditions: Rule[]) =>
@@ -298,6 +312,15 @@ const SetupSessionAgent = ({ value, onChange, groups, sbtChainId = 0 }: Props): 
               </button>
             </div>
           ) : null}
+          <SetupCheck
+            id="ce-setup-session-agent-min-answers"
+            label={`Skip questions with under ${L.minAnswers} answers`}
+            // Any number above 1 keeps the rule on; turning it back on returns to the default.
+            checked={minAnswers !== 1}
+            help={MIN_ANSWERS_HELP}
+            testId="ce-setup-session-agent-min-answers"
+            onChange={(checked) => save(audiences, instructions, checked ? L.minAnswers : 1)}
+          />
           {SESSION_AGENT_STYLES.map((style) => {
             const fieldId = `ce-setup-session-agent-${style}`;
             const written = instructions[style];

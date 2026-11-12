@@ -20,6 +20,8 @@ export type SessionAgentAudience = {
 export type SessionAgentSetting = {
   audiences: SessionAgentAudience[];
   instructions?: Partial<Record<SessionAgentStyle, string>>;
+  /** Fewest members who must have answered a question for a non-admin to hear from it; 3 unless set, 1 is off. */
+  minAnswers?: number;
 };
 
 export type SessionAgentError = { path: string; message: string };
@@ -42,6 +44,7 @@ export const SESSION_AGENT_LIMITS: Readonly<{
   conditions: number;
   groupIds: number;
   instructionsChars: number;
+  minAnswers: number;
   questionChars: number;
   answerWords: number;
   answerChars: number;
@@ -64,6 +67,9 @@ export function validateSessionAgent(
 
 /** For readers: the stored setting, or null when it is off or not valid. */
 export function sessionAgentSettingOf(value: unknown): SessionAgentSetting | null;
+
+/** How many members must have answered a question before someone who is not an admin hears from it. */
+export function sessionAgentMinAnswers(setting: SessionAgentSetting | null | undefined): number;
 
 /** The instructions a style is sent: the admin's, or the default. */
 export function sessionAgentInstructions(setting: SessionAgentSetting | null | undefined, style: SessionAgentStyle): string;

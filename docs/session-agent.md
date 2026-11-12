@@ -26,7 +26,8 @@ session's Settings:
       "answers": "general"
     }
   ],
-  "instructions": { "general": "…", "detailed": "…" }
+  "instructions": { "general": "…", "detailed": "…" },
+  "minAnswers": 1
 }
 ```
 
@@ -88,7 +89,11 @@ for a question, the answer goes ahead without them and says so.
 Someone who is not an admin gets nothing from a question that fewer than three
 members answered, counting only members who have not kept their answers out:
 a count of one, or the one answer left when the asker keeps their own out,
-would be a single person's answer. Admins get every question's answers.
+would be a single person's answer. Admins get every question's answers. An
+admin can lower the three with the setting's `minAnswers` (a whole number from
+1 to 3; 3 is stored as nothing), which **Skip questions with under 3 answers**
+sets to 1 when turned off. At 1 the rule is off: a question only one member
+answered is used, so that person's answer can come back as the members' view.
 
 One question reads at most 8,000 characters of context, 2,000 of results and
 24,000 of answers. For each question members answered, a Detailed answer is

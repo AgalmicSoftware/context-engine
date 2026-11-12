@@ -113,4 +113,19 @@ describe('SetupSessionAgent', () => {
     fireEvent.change(screen.getByTestId('ce-setup-session-agent-general'), { target: { value: 'Be brief.' } });
     expect(last()).toEqual({ audiences: [everyone], instructions: { general: 'Be brief.' } });
   });
+
+  it('skips thinly answered questions unless an admin turns that off, and says what off allows', () => {
+    const last = renderAgent({ value: { audiences: [everyone] } });
+    const skip = screen.getByRole('checkbox', { name: 'Skip questions with under 3 answers' });
+    expect(skip).toBeChecked();
+    expect(skip).toHaveAccessibleDescription(expect.stringContaining('one person’s answer can come back'));
+    fireEvent.click(skip);
+    expect(last()).toEqual({ audiences: [everyone], minAnswers: 1 });
+    expect(skip).not.toBeChecked();
+    // Off stays off through other edits.
+    fireEvent.change(screen.getByTestId('ce-setup-session-agent-general'), { target: { value: 'Be brief.' } });
+    expect(last()).toEqual({ audiences: [everyone], instructions: { general: 'Be brief.' }, minAnswers: 1 });
+    fireEvent.click(skip);
+    expect(last()).toEqual({ audiences: [everyone], instructions: { general: 'Be brief.' } });
+  });
 });

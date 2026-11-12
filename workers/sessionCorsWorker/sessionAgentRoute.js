@@ -1,4 +1,6 @@
-import { SESSION_AGENT_LIMITS, buildSessionAgentMessages, sessionAgentSettingOf } from '../../shared/sessionAgent.mjs';
+import {
+  SESSION_AGENT_LIMITS, buildSessionAgentMessages, sessionAgentMinAnswers, sessionAgentSettingOf,
+} from '../../shared/sessionAgent.mjs';
 import { buildSessionEndedResponse } from '../shared/sessionLifecycle.mjs';
 import { AI_MODEL_NOT_ALLOWED } from './aiRequestPolicy.js';
 import { isModelAllowed, normalizeAiRequestPayload } from './aiRequestNormalization.js';
@@ -106,10 +108,9 @@ const scaleText = ({ scale } = {}) => {
   const end = (value, label) => (trim(label) && trim(label) !== String(value) ? `${value} (${trim(label)})` : `${value}`);
   return `${end(scale.min, scale.minLabel)} to ${end(scale.max, scale.maxLabel)}`;
 };
-// Someone who is not an admin gets nothing from a question fewer than this
-// many members answered: a count of one, or the one answer left when the
-// asker keeps their own out, would be a single person's answer.
-export const SESSION_AGENT_MIN_ANSWERS = 3;
+// Someone who is not an admin gets nothing from a question fewer than
+// `minAnswers` members answered: a count of one, or the one answer left when
+// the asker keeps their own out, would be a single person's answer.
 const readMemberAnswers = async ({ env, slug, config, optedOut, minAnswers = 1, deps }) => {
   const source = await (deps.loadWorkerCanonicalResultsAnalysisSource || loadWorkerCanonicalResultsAnalysisSource)({ env, slug, config });
   if (!source?.ok) return null;
@@ -136,7 +137,7 @@ const readMemberAnswers = async ({ env, slug, config, optedOut, minAnswers = 1, 
 // see. Detailed: every file they may read, and members' answers as well.
 // Neither reads the answers or files of anyone who opted out; the published
 // results, built from everyone's answers, are read as the Results page shows them.
-const gatherMaterial = async ({ env, slug, config, address, scopes, asker, access, optedOut, deps }) => {
+const gatherMaterial = async ({ env, slug, config, setting, address, scopes, asker, access, optedOut, deps }) => {
   const detailed = asker.answers === 'detailed';
   const [sources, results, answers] = await Promise.all([
     loadParticipantContextSources({
@@ -147,7 +148,7 @@ const gatherMaterial = async ({ env, slug, config, address, scopes, asker, acces
     }),
     readVisibleResults({ env, slug, config, address, scopes, deps }),
     detailed ? readMemberAnswers({
-      env, slug, config, optedOut, deps, minAnswers: asker.audience === 'admin' ? 1 : SESSION_AGENT_MIN_ANSWERS,
+      env, slug, config, optedOut, deps, minAnswers: asker.audience === 'admin' ? 1 : sessionAgentMinAnswers(setting),
     }) : [],
   ]);
   return { material: { sessionContext: config?.sessionContext, sources, results, answers: answers || [] }, answersUnavailable: answers === null };
@@ -247,7 +248,7 @@ export const dispatchSessionAgentRoute = async ({ path, body, config, slug, addr
   if (!optOuts.ok) return json({ error: OPT_OUTS_UNAVAILABLE }, 503);
   const optedOut = new Set(optOuts.body.addresses);
   const { material, answersUnavailable } = await gatherMaterial({
-    env, slug, config, address, scopes: currentScopes, asker, access, optedOut, deps,
+    env, slug, config, setting, address, scopes: currentScopes, asker, access, optedOut, deps,
   });
   const payment = await (deps.checkSessionAgentPayment || checkSessionAgentPayment)({ audience: asker.audience, answers: asker.answers });
   if (!payment?.ok) return json({ error: payment?.error || 'This answer needs payment first.', reason: 'session_agent_payment_required' }, 402);

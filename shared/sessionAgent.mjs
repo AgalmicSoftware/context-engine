@@ -5,8 +5,9 @@ import { buildSessionContextPrompt } from './sessionContextText.mjs';
 // an admin lets ask. The setting is { audiences: [{ who, answers }],
 // instructions? }, in order: `who` is an access-condition document the Session
 // Worker judges as it does a file's, and the first audience a person matches
-// sets how they are answered. Admins always get Detailed answers. Off is no
-// setting. The answer style decides what the Worker reads; instructions only
+// sets how they are answered. Admins always get Detailed answers. `minAnswers`
+// is how many members must have answered a question before someone who is not
+// an admin hears anything from it. Off is no setting. The answer style decides what the Worker reads; instructions only
 // change how the agent writes.
 
 export const SESSION_AGENT_STYLES = Object.freeze(['general', 'detailed']);
@@ -16,6 +17,9 @@ export const SESSION_AGENT_LIMITS = Object.freeze({
   conditions: 8,
   groupIds: 20,
   instructionsChars: 1500,
+  // How many members must have answered a question before its answers reach
+  // someone who is not an admin: this unless an admin lowers it. 1 is off.
+  minAnswers: 3,
   questionChars: 500,
   answerWords: 150,
   answerChars: 1500,
@@ -150,6 +154,15 @@ const readInstructions = (value, errors) => {
   return Object.keys(stored).length ? stored : undefined;
 };
 
+const readMinAnswers = (value, errors) => {
+  if (value === undefined) return undefined;
+  if (!Number.isInteger(value) || value < 1 || value > L.minAnswers) {
+    return fail(errors, 'sessionAgent.minAnswers', `The fewest answers a question needs must be a whole number from 1 to ${L.minAnswers}.`);
+  }
+  // The default is stored as nothing, as the instructions are.
+  return value === L.minAnswers ? undefined : value;
+};
+
 /** For writers: refuses anything but the stored form's fields and values; null is off. */
 export const validateSessionAgent = (value) => {
   if (value == null) return { ok: true, value: null, errors: [] };
@@ -158,7 +171,7 @@ export const validateSessionAgent = (value) => {
     fail(errors, 'sessionAgent', 'The Session Agent setting must list who may ask.');
     return { ok: false, errors };
   }
-  refuseUnknown(value, ['audiences', 'instructions'], errors, 'sessionAgent', 'The Session Agent setting');
+  refuseUnknown(value, ['audiences', 'instructions', 'minAnswers'], errors, 'sessionAgent', 'The Session Agent setting');
   const audiences = [];
   if (!Array.isArray(value.audiences)) fail(errors, 'sessionAgent.audiences', 'Who may ask must be a list.');
   else if (value.audiences.length > L.audiences) {
@@ -169,8 +182,9 @@ export const validateSessionAgent = (value) => {
     });
   }
   const instructions = readInstructions(value.instructions, errors);
+  const minAnswers = readMinAnswers(value.minAnswers, errors);
   if (errors.length) return { ok: false, errors };
-  return { ok: true, value: instructions ? { audiences, instructions } : { audiences }, errors };
+  return { ok: true, value: { audiences, ...(instructions ? { instructions } : {}), ...(minAnswers ? { minAnswers } : {}) }, errors };
 };
 
 /** For readers: the stored setting, or null when it is off or not valid. */
@@ -178,6 +192,9 @@ export const sessionAgentSettingOf = (value) => {
   const checked = validateSessionAgent(value);
   return checked.ok ? checked.value : null;
 };
+
+/** How many members must have answered a question before someone who is not an admin hears from it. */
+export const sessionAgentMinAnswers = (setting) => setting?.minAnswers || L.minAnswers;
 
 /** The instructions a style is sent: the admin's, or the default. */
 export const sessionAgentInstructions = (setting, style) =>

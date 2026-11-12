@@ -6,6 +6,7 @@ import {
   SESSION_AGENT_RULES,
   buildSessionAgentMessages,
   sessionAgentInstructions,
+  sessionAgentMinAnswers,
   sessionAgentSettingOf,
   validateSessionAgent,
 } from '../../shared/sessionAgent.mjs';
@@ -107,6 +108,19 @@ test('instructions are bounded text that never looks like a secret', () => {
   assert.match(at('x'.repeat(SESSION_AGENT_LIMITS.instructionsChars + 1)), /longer than 1,500 characters/);
   assert.equal(at('x'.repeat(SESSION_AGENT_LIMITS.instructionsChars)), undefined);
   assert.match(at(`Use ${['sk', 'proj', 'a'.repeat(24)].join('-')} for this.`), /look like a key, token or password/);
+});
+
+test('the fewest answers a question needs is 3 unless an admin lowers it, and is a whole number from 1 to 3', () => {
+  const setting = (minAnswers) => ({ audiences: [audience(everyone)], minAnswers });
+  assert.equal(sessionAgentMinAnswers(sessionAgentSettingOf({ audiences: [] })), 3);
+  // The default is stored as nothing; a lower number is kept.
+  assert.deepEqual(validateSessionAgent(setting(3)).value, { audiences: [audience(everyone)] });
+  assert.deepEqual(validateSessionAgent(setting(1)).value, setting(1));
+  assert.equal(sessionAgentMinAnswers(sessionAgentSettingOf(setting(1))), 1);
+  assert.equal(sessionAgentMinAnswers(sessionAgentSettingOf(setting(2))), 2);
+  for (const bad of [0, 4, 1.5, '1', null, true]) {
+    assert.equal(messageOf(setting(bad)), 'The fewest answers a question needs must be a whole number from 1 to 3.');
+  }
 });
 
 test('readers treat a setting that is not valid as off', () => {
