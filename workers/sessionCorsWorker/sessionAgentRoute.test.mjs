@@ -167,12 +167,34 @@ test('General answers read the context, open files and visible results, never an
   assert.equal(member.body.answers, 'general');
   assert.match(member.prompt, /OPEN agenda/);
   for (const piece of ['GROUP notes', 'ANSWER']) assert.doesNotMatch(member.prompt, new RegExp(piece));
-  // "Open to everyone" means everyone the session's own file gate admits:
-  // someone it does not admit gets the session's context and no files.
-  const outsider = await ask(await seeded(), { scopes: { ai: true } });
-  assert.equal(outsider.status, 200);
-  assert.match(outsider.prompt, /CONTEXT/);
-  assert.doesNotMatch(outsider.prompt, /OPEN agenda/);
+});
+
+test('the session’s own gate comes first: someone it keeps out may not ask, whatever the audiences say', async () => {
+  // Everyone signed in gets Detailed answers, on a session only the salon group may view.
+  const h = await seeded({ audiences: [{ who: everyone, answers: 'detailed' }], minAnswers: 1 });
+  // As Settings writes a session locked to a group.
+  h.state.config.storageProfile.payloadAccessControl = {
+    gate: 'role_gate', encryption: 'none', accessConditions: { match: 'any', conditions: [{ kind: 'worker_role', role: 'admin' }, salonMembers.conditions[0]] },
+  };
+  // Signed in, with the session's AI access, but outside the group.
+  const outsider = await ask(h);
+  assert.equal(outsider.status, 403);
+  assert.equal(outsider.body.reason, 'session_agent_not_admitted');
+  assert.deepEqual(outsider.calls.ai, []);
+  assert.deepEqual((await ask(h, { path: '/session-agent/status', body: {} })).body, {
+    on: true, answers: null, audience: null, optedOut: false,
+  });
+  const member = await ask(h, { address: MEMBER });
+  assert.equal(member.status, 200);
+  assert.match(member.prompt, /ANSWER meet less/);
+  assert.equal((await ask(h, { address: ADMIN })).body.audience, 'admin');
+  // A gate that can't be checked just now refuses without saying they're kept out.
+  const outage = await ask(h, { address: MEMBER, deps: { isWorkerGroupMember: async () => { throw new Error('store down'); } } });
+  assert.equal(outage.status, 503);
+  assert.deepEqual(outage.calls.ai, []);
+  // On a session open to everyone signed in, the same outsider is answered.
+  const open = await ask(await seeded({ audiences: [{ who: everyone, answers: 'detailed' }] }));
+  assert.equal(open.status, 200);
 });
 
 test('Detailed answers add what the asker may read and members’ answers, and never a participant’s label or address', async () => {

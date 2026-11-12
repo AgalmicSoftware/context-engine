@@ -38,20 +38,24 @@ const NOT_ADMITTED = {
   ok: false, status: 403, error: 'The Session Agent isn’t open to you in this session.', reason: 'session_agent_not_admitted',
 };
 
+const UNCHECKED = { ok: false, status: 503, error: 'Who may ask could not be checked just now. Try again shortly.' };
+
 // Everyone who asks needs the session's AI access, as on the /ai route.
-// Admins, as the config names them now, then get Detailed answers; anyone
-// else, the first audience that admits them. An outage before a match leaves
-// the answer unknown, so it refuses.
+// Admins, as the config names them now, then get Detailed answers. Anyone
+// else must pass the session's own gate, so the agent is never open to
+// someone the session keeps out, whatever the audiences say; then the first
+// audience that admits them sets their answers. An outage before a match
+// leaves the answer unknown, so it refuses.
 const resolveAsker = async ({ setting, config, address, aiScope, access }) => {
   if (!aiScope) return NOT_ADMITTED;
   if (resolveSessionAdminAddresses(config).has(lower(address))) {
     return { ok: true, answers: 'detailed', audience: 'admin' };
   }
+  const gate = await access.sessionGate();
+  if (!gate.ok) return gate.unavailable ? UNCHECKED : NOT_ADMITTED;
   for (const [index, audience] of setting.audiences.entries()) {
     const result = await access.admits(audience.who);
-    if (result.outcome === 'unavailable') {
-      return { ok: false, status: 503, error: 'Who may ask could not be checked just now. Try again shortly.' };
-    }
+    if (result.outcome === 'unavailable') return UNCHECKED;
     if (result.ok) return { ok: true, answers: audience.answers, audience: index };
   }
   return NOT_ADMITTED;
@@ -142,8 +146,8 @@ const gatherMaterial = async ({ env, slug, config, setting, address, scopes, ask
   const [sources, results, answers] = await Promise.all([
     loadParticipantContextSources({
       env, slug, config, deps, principal: lower(address), leaveOutUploaders: optedOut,
-      // A General asker reads the files open to everyone the session admits,
-      // and must be someone it admits: the session's own gate is checked too.
+      // A General asker reads the files open to everyone the session admits;
+      // each read checks the session's own gate again, as a file read does.
       readable: detailed ? access.canRead : async (row) => forEveryone(row, config) && access.canRead(row),
     }),
     readVisibleResults({ env, slug, config, address, scopes, deps }),

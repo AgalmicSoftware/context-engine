@@ -1223,11 +1223,19 @@ export const authorizeCloudflareStorageResourceRead = async ({
 });
 
 // One person's checks within one request, sharing their group and chain
-// lookups: whether an access-condition document admits them, and whether
-// they may read a stored row, as a list or read of it would decide.
+// lookups: whether an access-condition document admits them, whether they
+// may read a stored row, as a list or read of it would decide, and whether
+// the session's own gate admits them, as a read of its questions would.
 export const createRequesterAccessChecks = ({ env, config, slug, requesterAddress = '', authScopes, deps } = {}) => {
   const gateDeps = createStorageRouteGateDeps({ config, env, slug, deps });
   return {
+    sessionGate: async () => {
+      const result = await authorizeCloudflareStorageAccess({
+        env, config, slug, resource: 'questions', requesterAddress, authScopes, metadata: { resource: 'questions' }, deps: gateDeps,
+      });
+      // A gate that couldn't be checked just now is told apart from one that refused.
+      return { ok: result.ok === true, unavailable: result.ok !== true && (result.chainUnavailable === true || result.response?.status >= 500) };
+    },
     admits: (document) => evaluateAccessConditionDocument({
       document, source: 'request', env, slug, config, requesterAddress, authScopes, deps: gateDeps,
     }),

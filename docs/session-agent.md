@@ -39,6 +39,11 @@ session's Settings:
 - **Admins** always get Detailed answers, whatever the audiences say.
 - **AI access.** Everyone who asks, admins included, also needs the session's
   AI access (the `ai` scope), as on the `/ai` route.
+- **The session's own lock comes first.** Where the session needs a group or
+  an SBT to view it, the same is needed to ask: someone the session keeps from
+  its questions is refused whatever the audiences say, and each file an answer
+  reads is checked against the lock as a file read is. If the lock can't be
+  checked just now, the question is refused and says so.
 - **No audiences** means only admins may ask.
 - **Off** is no setting. The page then shows no Session Agent. Saving it off sends
   `sessionAgent: null`, which the Worker stores as no setting. `/new` leaves an
